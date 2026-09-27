@@ -56,6 +56,10 @@ var Roles = []Role{
 	{Name: "mechanization_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
 	{Name: "mrv_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
 	{Name: "sync_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
+	// Đợt hoàn thiện G1.
+	{Name: "accounts_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
+	{Name: "notify_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
+	{Name: "reports_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
 	{Name: "fieldops_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
 	{Name: "vault_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.Vault}},
 }

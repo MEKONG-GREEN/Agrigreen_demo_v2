@@ -32,6 +32,13 @@ Không đổi số đã cấp. Mỗi module chỉ tạo tệp migration mang s�
 | pf | 000008 | mrv | `pf_mrv` | `mrv_app` |
 | pf | 000009 | sync: thiết bị, con trỏ, xung đột | `pf_sync` | `sync_app` |
 | pf | 000010 | tệp minh chứng (đối tượng mã hóa) | `pf_files` | `sync_app` |
+| pf | 000011 | accounts: tài khoản (cầu nối Keycloak) | `pf_accounts` | `accounts_app` |
+| pf | 000012 | notify: thông báo trong app, token đẩy, email | `pf_notify` | `notify_app` |
+| pf | 000013 | reports: mẫu biểu, việc xuất, lịch gửi | `pf_reports` | `reports_app` |
+| pf | 000014 | content: danh mục cá nhân (LIB-05) | `pf_content` | `content_app` |
+| pf | 000015 | mechanization: dự báo nhu cầu (FN-09) | `pf_mechanization` | `mechanization_app` |
+| pf | 000016 | extension: bổ sung báo cáo (FR-03) | `pf_extension` | `extension_app` |
+| pf | 000017 | party: bổ sung mô hình đọc (G-03/G-04) | `pf_party` | `party_app` |
 | vault | 000002 | vault/identity | `vault` | `vault_app` |
 
 - Các vai đã khai trong `internal/shared/dbadmin/dbadmin.go`. **Không sửa tệp đó.** Cần vai mới thì ghi vào báo cáo.
@@ -101,7 +108,7 @@ Không đổi số đã cấp. Mỗi module chỉ tạo tệp migration mang s�
 
 Các tệp sau do người tích hợp giữ:
 - `internal/shared/dbadmin/dbadmin.go`
-- `cmd/api-platform/modules.go`, `cmd/api-platform/router.go`, `cmd/api-platform/main.go`
+- `cmd/api-platform/main.go` — gốc lắp ráp DUY NHẤT là `cmd/api-platform/assembly/modules.go`; agent được thêm phần nối module của mình vào đó, giữ thay đổi gọn
 - `.github/workflows/ci.yml`
 - `deploy/**`
 - migration của module khác
