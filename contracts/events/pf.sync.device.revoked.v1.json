@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.sync.device.revoked/v1",
+  "title": "pf.sync.device.revoked — payload",
+  "description": "Một thiết bị hiện trường đã bị thu hồi. Mọi lời gọi đồng bộ từ thiết bị này trả 403 sync.device_revoked; app xóa dữ liệu cục bộ (mục 15). Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.sync.device.revoked",
+  "x-schema-version": 1,
+  "x-producer": "pf/sync",
+  "type": "object",
+  "required": ["device_id", "actor_ref", "revoked_by", "reason", "event_time"],
+  "properties": {
+    "device_id":  { "type": "string", "format": "uuid" },
+    "actor_ref":  { "type": "string", "format": "uuid", "description": "Người đã đăng ký thiết bị" },
+    "revoked_by": { "type": "string", "format": "uuid" },
+    "reason":     { "type": "string", "minLength": 10, "maxLength": 500 },
+    "event_time": { "type": "string", "format": "date-time" }
+  }
+}

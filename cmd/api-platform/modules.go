@@ -2,13 +2,16 @@ package main
 
 import (
 	"context"
+	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
+	syncmod "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
@@ -44,5 +47,31 @@ func buildModules(ctx context.Context, open PoolOpener, clk clock.Clock, ext Ext
 	}
 	pty := party.New(partyPool, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault})
 
-	return []httpx.Module{md, pty}, pools, nil
+	syncPool, err := pool(syncmod.DBRole)
+	if err != nil {
+		return nil, pools, err
+	}
+	files, err := fileStoreFromEnv(ctx)
+	if err != nil {
+		return nil, pools, err
+	}
+	snc := syncmod.New(syncPool, clk, syncmod.Deps{
+		Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Params: md.Params(), Vault: ext.Vault,
+		Store: files, CursorKey: []byte(os.Getenv("AG_SYNC_CURSOR_KEY")),
+		// Source/Sink của geo (plot, plot_boundary), content (document), extension (task,
+		// directive, task_update, field_report), mrv (evidence) nối ở đây khi các module có.
+		Sources: nil,
+		Sinks:   nil,
+	})
+
+	return []httpx.Module{md, pty, snc}, pools, nil
+}
+
+// fileStoreFromEnv mở kho đối tượng cho tệp minh chứng nếu đã cấu hình
+// (AG_S3_ENDPOINT hoặc AG_OBJSTORE_DIR); chưa cấu hình → nil, /v1/files trả 503.
+func fileStoreFromEnv(ctx context.Context) (objstore.Store, error) {
+	if os.Getenv("AG_S3_ENDPOINT") == "" && os.Getenv("AG_OBJSTORE_DIR") == "" {
+		return nil, nil
+	}
+	return objstore.FromEnv(ctx)
 }

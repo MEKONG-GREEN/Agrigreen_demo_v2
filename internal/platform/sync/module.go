@@ -1,0 +1,111 @@
+// Package sync là module đồng bộ ngoại tuyến phía máy chủ (mục 15, ADR-0006,
+// docs/dev/sync-contract.md): đăng ký/thu hồi thiết bị, pull theo phạm vi, push
+// chỉ ghi thêm, tệp minh chứng đã mã hóa, sổ đăng ký xung đột có SLA.
+//
+// pf/sync không đọc bảng của module khác: dữ liệu đi xuống qua port.Source, đi lên
+// qua port.Sink, do gốc lắp ráp truyền vào (R-02, R-05, R-06).
+package sync
+
+import (
+	"context"
+	"crypto/rand"
+	"log/slog"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+
+	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/app"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/handler"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
+)
+
+// DBRole là vai DB riêng của module (R-05) cho cả pf_sync và pf_files.
+const DBRole = "sync_app"
+
+// MetricConflictOverdue là chỉ số nghiệp vụ bắt buộc có cảnh báo (mục 19): số
+// xung đột đồng bộ đang mở đã quá SLA, theo tenant.
+const MetricConflictOverdue = "ag.sync.conflict.overdue"
+
+// Deps là phụ thuộc của module. Sources/Sinks là port của các module có dữ liệu
+// hiện trường (geo, content, extension, mrv…), gốc lắp ráp gom lại.
+type Deps struct {
+	Scope     partyport.ScopeResolver  // phạm vi TW → Tỉnh → Xã (ADR-0009); nil → phạm vi rỗng
+	Consent   partyport.ConsentChecker // tùy chọn: kiểm đồng ý trước khi cấp tệp minh chứng
+	Params    mdport.Params            // tùy chọn: sync.conflict_sla_hours (mặc định 72 giờ)
+	Vault     client.Client            // khóa công khai (pubkey), mở DEK xem tệp
+	Store     objstore.Store           // kho đối tượng chỉ chứa bản mã (R-40); nil → /v1/files trả 503
+	CursorKey []byte                   // AG_SYNC_CURSOR_KEY, ít nhất 32 byte
+	Log       *slog.Logger
+	Sources   []port.Source
+	Sinks     []port.Sink
+}
+
+// Module là pf/sync đã nối.
+type Module struct{ svc *app.Service }
+
+// New tạo module với pool của vai sync_app. Thiếu CursorKey (AG_SYNC_CURSOR_KEY)
+// → sinh khóa ngẫu nhiên cho tiến trình: con trỏ cũ hết hiệu lực sau khi khởi
+// động lại hoặc khi đi qua phiên bản khác — CHỈ chấp nhận ở Local/Dev.
+// Hai Source/Sink cùng entity là lỗi lắp ráp → panic lúc khởi động.
+func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
+	if len(d.CursorKey) == 0 {
+		d.CursorKey = make([]byte, 32)
+		if _, err := rand.Read(d.CursorKey); err != nil {
+			panic("sync: không sinh được khóa con trỏ: " + err.Error())
+		}
+	}
+	svc, err := app.NewService(db, clk, app.Deps{Scope: d.Scope, Consent: d.Consent, Params: d.Params, Vault: d.Vault,
+		Store: d.Store, CursorKey: d.CursorKey, Log: d.Log}, d.Sources, d.Sinks)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Module{svc: svc}
+}
+
+// RegisterApp gắn route Application API.
+func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterApp(rg) }
+
+// RegisterAdmin gắn route Admin API.
+func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }
+
+// PullEntities liệt kê entity chiều xuống đã nối (kể cả pubkey).
+func (m *Module) PullEntities() []string { return m.svc.PullEntities() }
+
+// ConflictSLA cho worker đo xung đột quá hạn của một tenant (mục 19).
+func (m *Module) ConflictSLA(ctx context.Context, tenantID uuid.UUID) (port.ConflictSLA, error) {
+	return m.svc.ConflictSLA(ctx, tenantID)
+}
+
+// RegisterSLAMetrics đăng ký gauge ag.sync.conflict.overdue (theo tenant_id) trên
+// meter OpenTelemetry chung; tenants trả danh sách tenant cần đo.
+func (m *Module) RegisterSLAMetrics(tenants func(context.Context) ([]uuid.UUID, error)) (metric.Registration, error) {
+	mt := telemetry.Meter()
+	g, err := mt.Int64ObservableGauge(MetricConflictOverdue,
+		metric.WithDescription("Số xung đột đồng bộ đang mở đã quá SLA (C-8)"))
+	if err != nil {
+		return nil, err
+	}
+	return mt.RegisterCallback(func(ctx context.Context, o metric.Observer) error {
+		ts, err := tenants(ctx)
+		if err != nil {
+			return err
+		}
+		for _, t := range ts {
+			s, err := m.svc.ConflictSLA(ctx, t)
+			if err != nil {
+				return err
+			}
+			o.ObserveInt64(g, s.Overdue, metric.WithAttributes(attribute.String("tenant_id", t.String())))
+		}
+		return nil
+	}, g)
+}
