@@ -1,0 +1,91 @@
+{
+  "description": "Vector cố định cho phong bì mã hóa v1 (docs/dev/envelope-format.md). Sinh bằng: go test ./internal/shared/envelope -run TestVectors -update. Mọi trường *_hex là hex chữ thường; ciphertext = bản mã ‖ tag GCM 16 byte; wrapped_dek = crypto_box_seal(dek, recipient_public_key) 80 byte. wrapped_dek có khóa tạm ngẫu nhiên nên phía khác không tái tạo được — chỉ kiểm bằng cách mở.",
+  "version": 1,
+  "alg": "A256GCM+X25519-SEALEDBOX",
+  "vectors": [
+    {
+      "name": "empty",
+      "recipient_secret_key_hex": "c604af41111e334278fe39469e657ae57c34674d565b8bad4b6c1d24ee5131c9",
+      "recipient_public_key_hex": "33fec0b811b42ae6bfa732078d1856be69fac03f7b0287b157cf6a596968066e",
+      "plaintext_hex": "",
+      "dek_hex": "1b3a70d5e29cd4ae3170049b200db77ddf6d55d22d72032180a345f2b496418a",
+      "nonce_hex": "2a418d0be03d953dd76e40d9",
+      "ciphertext_hex": "8c8fd418860a4a8eb9f7055555df1d5a",
+      "wrapped_dek_hex": "56b31132c49c8331cba7a22703befd48fc920e2e186d52414e050533fad35d2a53a89a777db83f44bf7ef9ced8f5b59c5e69a7ffc8e0a578698ab1058cb0132c32db93a56c37971dae0d200ef05a300a",
+      "sha256_ciphertext_hex": "aec196256f6e7ff2892019e5bfde4e165be1e1641423c0d95ab1429383ee695f",
+      "metadata": {
+        "v": 1,
+        "alg": "A256GCM+X25519-SEALEDBOX",
+        "subject_ref": "0191f3a0-7c2e-7b3d-9a41-6f1e2d3c4b5a",
+        "nonce": "KkGNC+A9lT3XbkDZ",
+        "wrapped_dek": "VrMRMsScgzHLp6InA779SPySDi4YbVJBTgUFM/rTXSpTqJp3fbg/RL9++c7Y9bWcXmmn/8jgpXhpirEFjLATLDLbk6VsN5cdrg0gDvBaMAo=",
+        "sha256_ciphertext": "aec196256f6e7ff2892019e5bfde4e165be1e1641423c0d95ab1429383ee695f",
+        "content_type": "application/octet-stream",
+        "captured_at": "2026-12-03T07:14:22+07:00"
+      }
+    },
+    {
+      "name": "ascii",
+      "recipient_secret_key_hex": "eea37ee89ee659398ddb88e1c3bcde8af7859f2478588f0e1eb3915d506fd7b4",
+      "recipient_public_key_hex": "87336fe61900928e3a6c9a35cda549f91a6e366ef9de125b947e18ff258f3a10",
+      "plaintext_hex": "41677269477265656e20656e76656c6f7065207631",
+      "dek_hex": "627f5b48b93d34f10bccb57fb3a7aaa953599cb88eeaf857a89329549bc93bde",
+      "nonce_hex": "e4cbb9acfc8c447b14733ff3",
+      "ciphertext_hex": "d85e0002d69acb85b33c10252349313285f40dbbaf9bd86ef60565b78c6728984fa41029fd",
+      "wrapped_dek_hex": "ea1ba4b56940251b209e9dedffb60408bb6b7fa5cfe1cab9d7618e71b9918d3c149c9a83f94a5517f0807e67397456f532a6dcde0520983645c30b1658fe0cf877561fcad3816f68959e8ff943e9eb89",
+      "sha256_ciphertext_hex": "9e9bcffc4094e09942cecd4f134ffbc69d4c60c31e47bfe5d2325c9276a54e34",
+      "metadata": {
+        "v": 1,
+        "alg": "A256GCM+X25519-SEALEDBOX",
+        "subject_ref": "0191f3a0-7c2e-7b3d-9a41-6f1e2d3c4b5a",
+        "nonce": "5Mu5rPyMRHsUcz/z",
+        "wrapped_dek": "6huktWlAJRsgnp3t/7YECLtrf6XP4cq512GOcbmRjTwUnJqD+UpVF/CAfmc5dFb1Mqbc3gUgmDZFwwsWWP4M+HdWH8rTgW9olZ6P+UPp64k=",
+        "sha256_ciphertext": "9e9bcffc4094e09942cecd4f134ffbc69d4c60c31e47bfe5d2325c9276a54e34",
+        "content_type": "application/octet-stream",
+        "captured_at": "2026-12-03T07:14:22+07:00"
+      }
+    },
+    {
+      "name": "utf8-vietnamese",
+      "recipient_secret_key_hex": "d0aea63c3db70e3a258649070498fdf0c47912e7f85d7d6a603505d962802fd1",
+      "recipient_public_key_hex": "f3f870dc63656708c022f0f81e25cd54bb38a32052c243df5fbef53895f1cc33",
+      "plaintext_hex": "e1baa26e68206869e1bb876e207472c6b0e1bb9d6e672063e1bba7612068e1bb9920e1bb9f2078c3a32054c3a26e205068c3ba20c490c3b46e6720e28094206dc3a32068c3b361206e676179206b6869206368e1bba5702e",
+      "dek_hex": "b4f97815968daa57820d71b81ac5e2e850a720425c90f5795584b2813a1b7b45",
+      "nonce_hex": "6357c57f92918819293072d8",
+      "ciphertext_hex": "cc7e20a2fef493807f834d86616755a463bfac0ac21f23c634c9b79151f5d96c565385ecf2b7868c7245d6c32e7f75ed31e45954ef78928a535ea67d2816eb9417bebd88d8cdde381afbbb305092b26f3ce5772f6286e9e1aac34fc7b822fc28375b1fc0a88e5734",
+      "wrapped_dek_hex": "581d96445c53689adf6b18ce4584cfd3b592f27771ea299a47d522521625712ba996e5d2613da2a8fa57bed6e816f4fbc04d3d0cae85f3a69f27ae286306d7ab313c8ff9d00d7fab5cb3b47132b85084",
+      "sha256_ciphertext_hex": "e0819e660e77f1e34929fe8b5ffbe3e5ff5a0fdef7fb36f7805c9c2078e2e715",
+      "metadata": {
+        "v": 1,
+        "alg": "A256GCM+X25519-SEALEDBOX",
+        "subject_ref": "0191f3a0-7c2e-7b3d-9a41-6f1e2d3c4b5a",
+        "nonce": "Y1fFf5KRiBkpMHLY",
+        "wrapped_dek": "WB2WRFxTaJrfaxjORYTP07WS8ndx6imaR9UiUhYlcSupluXSYT2iqPpXvtboFvT7wE09DK6F86afJ64oYwbXqzE8j/nQDX+rXLO0cTK4UIQ=",
+        "sha256_ciphertext": "e0819e660e77f1e34929fe8b5ffbe3e5ff5a0fdef7fb36f7805c9c2078e2e715",
+        "content_type": "application/octet-stream",
+        "captured_at": "2026-12-03T07:14:22+07:00"
+      }
+    },
+    {
+      "name": "binary-1000",
+      "recipient_secret_key_hex": "d43fb16b9a88ad13d06a91f1121833cd4471fac42634410db23e36045d0ec788",
+      "recipient_public_key_hex": "802c3af713f267ab1841b25850df8368019367b4d23aee71472163b60c3fb72f",
+      "plaintext_hex": "00070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7dee5ecf3fa01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7dee5ecf3fa01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7dee5ecf3fa01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f464d545b626970777e858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8dfe6edf4fb020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7dee5ecf3fa01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3dae1e8eff6fd040b121920272e353c434a51",
+      "dek_hex": "297e89108341a7a7e7715b951f77ebea0f17ca91210b59091817669569c8d6d8",
+      "nonce_hex": "e74d755f3f295e5a46662a9f",
+      "ciphertext_hex": "360a206deb0b48d4a4be659ce6cbc9108058707853b9cb15d79ef66cfebb0fa34c8f51e91cf86c96dd782072fccf19593fb6cb3751e0f4782a48f2a29a6891ab6fb2a99c2615195fe324246ddcf5ed5553f18f0264343d58eb7b5eaa40029725a421ebcb110a4a6794cc4a4bc026e3ce9ab0e01021b25e5b223c3cce6541b9e4017e7e257734644b975ada53418f82f56a0325546ad671def4845af3663dd8f4b1f8b40cb3c9373ac50d848f58b7cf836485dd1ff48b395442831fdd9629d923fcdf65062bc153e0da83fc399237f4c6b4fdc40c073bc29615d9d1765a152bbd9765538693cf50ace3c45a739d8058f735db59c302cc8c8cdd81247571c9e4505d38520931f129696b72ffcb3e8e9cf9764de6a77b7b84772d3c6a3aee8eb0ca9b6f36db6638666d7987cf795d48761fc178809c644d09fa928db1d1865bc842876238a8c5b88e0e96915708e154f72fd60889c321ea471ac86599007f72d5ef05f0c9af3f5dc33265dd63fd07505ccb2a9748e4bbf553ce3701fe824ef66958f148dfd00f0fe0c981e15998bb3e8cce425f44e867382f00ad3278eb475a955e8e5d8fa2c93ede8e2ddccc45e48ed52a300de5710861cfb2594f654099bc21fd00fb639d0d4b94e36780c2e9756537c68a0c6a9c362a9e4c1ca192c58d00554c5be656a2f2d1182d9f7867881ef651a1da2519cd4f50ce9d5637b75d5a3780bc0a4b8d5b3c94c4d6c558026a4cd66d097384e5b437cd92656156c288002e69c40624328800c74f9bca1c3578b04365e794e22546f69d1ddc1e0aabadf6dcff229de4ebb439624e7eb9917a077ad1fa4d7c91c54250df2ebaf6cf524202dc320b3918f3eafeadf6b4c8286a4eed7b7c87ea50dac5d11b12618264f1848566f0d20adc09262570bae0a2d46938b97c04790d3420c4a11602d6d49f3e4f5bb61196b3efdd0796a68d91a6c00dbb8d95943814ca53b7a5167f8669125bbbfec572356659b23cb7e37c2fcb373bd0d1a7865eba5b942f438ba2bf863f525fabbbd38b2d1ecac15977cfdc8ffef1a9b8e3f35355b9c6f42c3f255db7ae303a51f825877e238e5d129e97c572a8f47f41256489aa8dc023ca47ac32a3a5d8a596ad747746e78a4f2cbdb04cd5cebf1811d058389955c2c10ad41d9aa3fd4f80b7a919511def69df940754f3d99b9ba94c3c7d56a6ce0d2a8088ffe1ed589876c0b39e3a3a14f29a3180ea983579d9dd6b121a5d9e8a82e8e946edbf29f50aca205f55c39be88f7e3301d28a5916b17f4f18139a3d71883dc3276e6a002fbe9abcb5b61e484cb179f99d56e272b659e609182363c376de5b2218e5f2512d624b35871cb57a87690dda3f4e5a12af3d1ad8874d45c32c90c331be7cb8fb419c45435d8464406f85feda646ef900198a7090fa50c3a6edebd5d1703a0c",
+      "wrapped_dek_hex": "a23082249be908035af257252d22cf5c87e81de453e462e96b23e126e82e197a2b7087439978878f3ae1239cc0f684e3ac1cc4971902066310a4e11c6b2d1bd4093193742b67bc5dfa41deba6f041ef1",
+      "sha256_ciphertext_hex": "f1b40e8489461ff2a9f23d27f2f46b257e3588042182bef67bfc057b42db7aaa",
+      "metadata": {
+        "v": 1,
+        "alg": "A256GCM+X25519-SEALEDBOX",
+        "subject_ref": "0191f3a0-7c2e-7b3d-9a41-6f1e2d3c4b5a",
+        "nonce": "5011Xz8pXlpGZiqf",
+        "wrapped_dek": "ojCCJJvpCANa8lclLSLPXIfoHeRT5GLpayPhJuguGXorcIdDmXiHjzrhI5zA9oTjrBzElxkCBmMQpOEcay0b1Akxk3QrZ7xd+kHeum8EHvE=",
+        "sha256_ciphertext": "f1b40e8489461ff2a9f23d27f2f46b257e3588042182bef67bfc057b42db7aaa",
+        "content_type": "application/octet-stream",
+        "captured_at": "2026-12-03T07:14:22+07:00"
+      }
+    }
+  ]
+}

@@ -1,0 +1,277 @@
+openapi: 3.1.0
+info:
+  title: AgriGreen Identity Vault API
+  version: "1"
+  description: |
+    Kho định danh (mục 10, ADR-0004) — bề mặt Internal, chỉ trong cụm, mTLS (mục 11, 17).
+    Module gọi CHUYỂN TIẾP nguyên access token của người dùng cuối; kho tự xác minh
+    issuer/audience/chữ ký (R-54), tenant và người yêu cầu lấy từ token (R-16).
+    Mọi thao tác đọc bắt buộc mục đích (R-42): header X-Purpose hoặc trường "purpose"
+    trong thân (GET: header hoặc ?purpose=). Thiếu → 400 vault.purpose_required.
+    Idempotency-Key (R-51) bắt buộc cho POST /v1/subjects và POST …/erasure; các POST
+    resolve/lookup/unwrap là thao tác đọc, không lưu phản hồi (phản hồi chứa định danh/DEK).
+    Giá trị định danh chỉ đi trong thân, không bao giờ trong URL. Lỗi theo RFC 9457 (docs/errors.md).
+    Vai: vault_registrar, vault_display, vault_evidence_viewer, vault_eraser (+ MFA), vault_pubkey_sync.
+servers:
+  - url: https://identity-vault.vault.svc:8090
+security:
+  - oidc: []
+paths:
+  /v1/subjects:
+    post:
+      summary: Tạo chủ thể (hộ hoặc người), sinh cặp khóa X25519 — vai vault_registrar
+      operationId: createSubject
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/Purpose"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateSubject" }
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Created" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "409":
+          description: vault.duplicate — trùng SĐT/CCCD trong tenant; problem có thêm ref và public_key của chủ thể cũ
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /v1/subjects/{ref}/display:
+    get:
+      summary: Nhãn hiển thị tối thiểu (mục 10.4) — vai vault_registrar, vault_display, vault_evidence_viewer
+      operationId: displaySubject
+      parameters:
+        - $ref: "#/components/parameters/Ref"
+        - $ref: "#/components/parameters/Purpose"
+      responses:
+        "200":
+          description: Nhãn
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ref, label, masked_phone]
+                properties:
+                  ref: { type: string, format: uuid }
+                  label: { type: string, examples: ["Nguyễn V. A."] }
+                  masked_phone: { type: string, examples: ["09xx xxx 123"] }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "410": { $ref: "#/components/responses/Problem" }
+  /v1/subjects/{ref}/resolve:
+    post:
+      summary: Định danh đầy đủ, ghi sổ truy cập — vai vault_registrar
+      operationId: resolveSubject
+      parameters:
+        - $ref: "#/components/parameters/Ref"
+        - $ref: "#/components/parameters/Purpose"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                purpose: { type: string }
+      responses:
+        "200":
+          description: Định danh (Cache-Control no-store)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Identity" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "410": { $ref: "#/components/responses/Problem" }
+  /v1/subjects/lookup:
+    post:
+      summary: Tìm chủ thể theo SĐT hoặc CCCD qua chỉ mục mù — vai vault_registrar
+      operationId: lookupSubject
+      parameters:
+        - $ref: "#/components/parameters/Purpose"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                purpose: { type: string }
+                value: { type: string, description: SĐT Việt Nam hoặc CCCD/CMND }
+      responses:
+        "200":
+          description: Tìm thấy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ref]
+                properties:
+                  ref: { type: string, format: uuid }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /v1/subjects/{ref}/unwrap:
+    post:
+      summary: Mở DEK đã seal bằng khóa công khai của chủ thể — vai vault_evidence_viewer
+      operationId: unwrapDEK
+      parameters:
+        - $ref: "#/components/parameters/Ref"
+        - $ref: "#/components/parameters/Purpose"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [wrapped_dek]
+              properties:
+                purpose: { type: string }
+                wrapped_dek: { type: string, contentEncoding: base64, description: crypto_box_seal 80 byte }
+      responses:
+        "200":
+          description: DEK (Cache-Control no-store)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [dek]
+                properties:
+                  dek: { type: string, contentEncoding: base64 }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "410": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /v1/subjects/{ref}/erasure:
+    post:
+      summary: Xóa định danh (RB-3) — hủy khóa bí mật, xóa định danh và chỉ mục mù, giữ dấu mộ — vai vault_eraser + MFA
+      operationId: eraseSubject
+      parameters:
+        - $ref: "#/components/parameters/Ref"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 10, maxLength: 500 }
+      responses:
+        "200":
+          description: Đã xóa (gọi lại khi đã xóa cũng trả 200)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ref, erased]
+                properties:
+                  ref: { type: string, format: uuid }
+                  erased: { type: boolean }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /v1/pubkeys:
+    get:
+      summary: Khóa công khai của chủ thể chưa xóa theo địa bàn, cho đồng bộ xuống thiết bị (cursor, R-53)
+      operationId: listPubKeys
+      parameters:
+        - { name: area, in: query, required: true, style: form, explode: true, schema: { type: array, items: { type: string } } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 1000 } }
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [ref, area_code, public_key]
+                      properties:
+                        ref: { type: string, format: uuid }
+                        area_code: { type: string }
+                        public_key: { type: string, contentEncoding: base64 }
+                  next_cursor: { type: [string, "null"] }
+        "403": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+components:
+  securitySchemes:
+    oidc:
+      type: openIdConnect
+      openIdConnectUrl: https://auth.agrigreen.vn/realms/agrigreen/.well-known/openid-configuration
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, pattern: "^[A-Za-z0-9._:-]{8,200}$" }
+    Purpose:
+      name: X-Purpose
+      in: header
+      schema: { type: string, pattern: "^[a-z][a-z0-9_.]{2,63}$" }
+    Ref:
+      name: ref
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    Problem:
+      description: RFC 9457
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+  schemas:
+    CreateSubject:
+      type: object
+      required: [kind, full_name, area_code]
+      properties:
+        purpose: { type: string }
+        kind: { type: string, enum: [household, person] }
+        full_name: { type: string, maxLength: 200 }
+        phone: { type: string, description: "Chuẩn hóa về 84xxxxxxxxx" }
+        national_id: { type: string, description: "CCCD 12 số hoặc CMND 9 số" }
+        address: { type: string, maxLength: 500 }
+        area_code: { type: string, pattern: "^[0-9A-Za-z._-]{1,32}$" }
+    Created:
+      type: object
+      required: [ref, public_key]
+      properties:
+        ref: { type: string, format: uuid }
+        public_key: { type: string, contentEncoding: base64, description: X25519 32 byte }
+    Identity:
+      type: object
+      required: [ref, kind, full_name, phone, national_id, address, area_code]
+      properties:
+        ref: { type: string, format: uuid }
+        kind: { type: string, enum: [household, person] }
+        full_name: { type: string }
+        phone: { type: string }
+        national_id: { type: string }
+        address: { type: string }
+        area_code: { type: string }
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        code: { type: string }
+        detail: { type: string }
+        trace_id: { type: string }
+        ref: { type: string, format: uuid }
+        public_key: { type: string, contentEncoding: base64 }

@@ -1,0 +1,50 @@
+package client
+
+import (
+	"net/http"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+)
+
+// Vai của kho định danh (realm role trong token của NGƯỜI DÙNG CUỐI). Kho tự
+// kiểm vai trên token được chuyển tiếp — module gọi không thể nâng quyền.
+//
+//	Thao tác             Vai được phép
+//	Create, Lookup       RoleRegistrar
+//	Resolve              RoleRegistrar
+//	Display              RoleRegistrar, RoleDisplay, RoleEvidenceViewer
+//	Unwrap               RoleEvidenceViewer
+//	Erase                RoleEraser + MFA
+//	PubKeys              RoleRegistrar, RoleDisplay, RoleEvidenceViewer, RolePubKeySync
+const (
+	RoleRegistrar      = "vault_registrar"       // cán bộ quản lý hồ sơ hộ/người: tạo, tra, xem đầy đủ
+	RoleDisplay        = "vault_display"         // chỉ nhãn hiển thị tối thiểu
+	RoleEvidenceViewer = "vault_evidence_viewer" // mở DEK để xem ảnh minh chứng
+	RoleEraser         = "vault_eraser"          // xóa định danh theo yêu cầu (RB-3), bắt buộc MFA
+	RolePubKeySync     = "vault_pubkey_sync"     // thiết bị hiện trường tải khóa công khai theo địa bàn
+)
+
+// PurposeErasure là mục đích ghi vào sổ truy cập cho thao tác xóa định danh.
+const PurposeErasure Purpose = "registry.erasure"
+
+// HeaderPurpose là header mang mục đích (R-42). Thân request có thể mang trường "purpose" thay thế.
+const HeaderPurpose = "X-Purpose"
+
+// Mã lỗi ổn định của kho định danh (docs/errors.md).
+const (
+	CodePurposeRequired = "vault.purpose_required"
+	CodeNotFound        = "vault.not_found"
+	CodeErased          = "vault.erased"
+	CodeDuplicate       = "vault.duplicate"
+	CodeUnwrapFailed    = "vault.unwrap_failed"
+	CodeUnavailable     = "vault.unavailable"
+)
+
+// Problem tương ứng các lỗi của kho. errors.Is(p, ErrX) đúng nhờ WithCause.
+var (
+	ProblemPurposeRequired = problem.New(http.StatusBadRequest, CodePurposeRequired, "Thiếu mục đích xử lý dữ liệu cá nhân").WithCause(ErrNoPurpose)
+	ProblemNotFound        = problem.New(http.StatusNotFound, CodeNotFound, "Không có chủ thể").WithCause(ErrNotFound)
+	ProblemErased          = problem.New(http.StatusGone, CodeErased, "Chủ thể đã bị xóa định danh").WithCause(ErrErased)
+	ProblemDuplicate       = problem.New(http.StatusConflict, CodeDuplicate, "Đã có chủ thể cùng số điện thoại hoặc CCCD").WithCause(ErrDuplicate)
+	ProblemUnwrapFailed    = problem.New(http.StatusUnprocessableEntity, CodeUnwrapFailed, "Không mở được khóa tệp bằng khóa của chủ thể")
+)

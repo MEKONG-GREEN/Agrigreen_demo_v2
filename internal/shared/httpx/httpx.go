@@ -116,6 +116,7 @@ func Authenticate(v *authz.Verifier) gin.HandlerFunc {
 			return
 		}
 		ctx := authz.WithPrincipal(c.Request.Context(), p)
+		ctx = authz.WithRawToken(ctx, raw) // để chuyển tiếp sang kho định danh (R-54)
 		ctx = tenant.WithID(ctx, p.TenantID)
 		c.Request = c.Request.WithContext(ctx)
 		c.Next()
