@@ -9,13 +9,13 @@
 #   Admin API (MFA)     http://localhost:8082
 #   identity-vault      http://localhost:8090   (bề mặt Internal — production chỉ mTLS trong cụm)
 #   Keycloak            http://localhost:8180   (realm agrigreen; issuer = http://localhost:8180/realms/agrigreen)
-#   MinIO               http://localhost:9001   (console)
+#   S3 (SeaweedFS)      http://localhost:9000
 #   RabbitMQ            http://localhost:15672
 #
 # Bí mật chỉ nằm trong deploy/compose/.env (không commit). Mỗi dịch vụ chỉ nhận
 # đúng biến nó cần (không dùng env_file chung): api-platform KHÔNG có mật khẩu
 # vai vault_app, KEK hay khóa ký neo.
-# Kho S3: MinIO thay cho kho tương thích S3 TRONG LÃNH THỔ (RB-7) ở môi trường thật.
+# Kho S3: SeaweedFS thay cho kho tương thích S3 TRONG LÃNH THỔ (RB-7) ở môi trường thật.
 name: agrigreen
 
 # Cứng hóa chung cho container ứng dụng (mục 18): hệ tệp gốc chỉ đọc, bỏ mọi
@@ -43,7 +43,7 @@ x-oidc-env: &oidc-env
   AG_OIDC_JWKS_URL: http://keycloak:8080/realms/agrigreen/protocol/openid-connect/certs
 
 x-s3-env: &s3-env
-  AG_S3_ENDPOINT: minio:9000
+  AG_S3_ENDPOINT: seaweedfs:9000
   AG_S3_BUCKET: ${AG_S3_BUCKET:-agrigreen}
   AG_S3_ACCESS_KEY: agrigreen-app
   AG_S3_SECRET_KEY: ${S3_APP_SECRET_KEY:?chạy scripts/gen-dev-secrets để sinh deploy/compose/.env}
@@ -149,49 +149,61 @@ services:
       retries: 30
     restart: unless-stopped
 
-  minio:
-    image: quay.io/minio/minio:latest
-    command: ["server", "/data", "--console-address", ":9001"]
+  # Kho S3 cho Local/Dev: SeaweedFS (Apache-2.0). MinIO đã ngừng phát hành image
+  # công khai (2026). Production dùng kho tương thích S3 TRONG LÃNH THỔ có khóa đối
+  # tượng và thông tin xác thực không có quyền xóa (RB-7, ADR-0007, mục 22).
+  # Hai danh tính: "agrigreen" (quản trị, chỉ s3-init dùng) và "agrigreen-app"
+  # (ứng dụng, chỉ Read/Write/List trên bucket). Lưu ý: hành động Write của
+  # SeaweedFS gồm cả xóa — giới hạn "không xóa" chỉ kiểm chứng được trên kho thật.
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.47
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        mkdir -p /tmp/cfg
+        cat > /tmp/cfg/s3.json <<EOF
+        {"identities":[
+          {"name":"admin","credentials":[{"accessKey":"agrigreen","secretKey":"$$S3_ROOT_SECRET"}],"actions":["Admin","Read","Write","List","Tagging"]},
+          {"name":"agrigreen-app","credentials":[{"accessKey":"agrigreen-app","secretKey":"$$S3_APP_SECRET_KEY"}],"actions":["Read:$$BUCKET","Write:$$BUCKET","List:$$BUCKET"]}
+        ]}
+        EOF
+        exec weed server -dir=/data -ip.bind=0.0.0.0 -s3 -s3.port=9000 -s3.config=/tmp/cfg/s3.json -master.volumeSizeLimitMB=256
     environment:
-      MINIO_ROOT_USER: agrigreen
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?chạy scripts/gen-dev-secrets}
+      S3_ROOT_SECRET: ${MINIO_ROOT_PASSWORD:?chạy scripts/gen-dev-secrets}
+      S3_APP_SECRET_KEY: ${S3_APP_SECRET_KEY:?chạy scripts/gen-dev-secrets}
+      BUCKET: ${AG_S3_BUCKET:-agrigreen}
+    tmpfs: ["/tmp"]
     volumes: ["objects:/data"]
-    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+    ports: ["127.0.0.1:9000:9000"]
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status && wget -q -O /dev/null http://127.0.0.1:9000/ || wget -q -S -O /dev/null http://127.0.0.1:9000/ 2>&1 | grep -q 'HTTP/'"]
       interval: 5s
-      retries: 20
+      timeout: 5s
+      start_period: 20s
+      retries: 30
     restart: unless-stopped
 
-  # Một lần: tạo bucket, bật versioning, tạo tài khoản ứng dụng chỉ có Get/Put
-  # (không có DeleteObject — mục 22).
-  minio-init:
+  # Một lần: tạo bucket và thử bật versioning bằng AWS CLI (Apache-2.0).
+  s3-init:
     <<: *hardened
-    image: quay.io/minio/mc:latest
+    image: amazon/aws-cli:2.37.4
     depends_on:
-      minio: { condition: service_healthy }
+      seaweedfs: { condition: service_healthy }
     environment:
-      MC_CONFIG_DIR: /tmp/.mc
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      S3_APP_SECRET_KEY: ${S3_APP_SECRET_KEY}
+      HOME: /tmp
+      AWS_ACCESS_KEY_ID: agrigreen
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_DEFAULT_REGION: us-east-1
       BUCKET: ${AG_S3_BUCKET:-agrigreen}
     tmpfs: ["/tmp"]
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
-        mc alias set local http://minio:9000 agrigreen "$$MINIO_ROOT_PASSWORD" >/dev/null
-        mc mb --ignore-existing "local/$$BUCKET"
-        mc version enable "local/$$BUCKET"
-        mc anonymous set none "local/$$BUCKET"
-        cat > /tmp/agrigreen-app.json <<EOF
-        {"Version":"2012-10-17","Statement":[
-          {"Effect":"Allow","Action":["s3:GetBucketLocation","s3:ListBucket"],"Resource":["arn:aws:s3:::$$BUCKET"]},
-          {"Effect":"Allow","Action":["s3:GetObject","s3:PutObject"],"Resource":["arn:aws:s3:::$$BUCKET/*"]}]}
-        EOF
-        mc admin policy create local agrigreen-app /tmp/agrigreen-app.json
-        mc admin user add local agrigreen-app "$$S3_APP_SECRET_KEY"
-        mc admin policy attach local agrigreen-app --user agrigreen-app || true
-        echo "minio-init: xong bucket $$BUCKET"
+        E="--endpoint-url http://seaweedfs:9000"
+        aws $$E s3api head-bucket --bucket "$$BUCKET" 2>/dev/null || aws $$E s3api create-bucket --bucket "$$BUCKET"
+        aws $$E s3api put-bucket-versioning --bucket "$$BUCKET" --versioning-configuration Status=Enabled \
+          || echo "s3-init: kho dev chưa hỗ trợ versioning — bỏ qua (chỉ Local/Dev)"
+        echo "s3-init: xong bucket $$BUCKET"
     restart: "no"
 
   otel-collector:
@@ -228,7 +240,7 @@ services:
     build: { context: ../.., dockerfile: Dockerfile, args: { CMD: api-platform } }
     depends_on:
       migrate-up: { condition: service_completed_successfully }
-      minio-init: { condition: service_completed_successfully }
+      s3-init: { condition: service_completed_successfully }
       pgbouncer: { condition: service_healthy }
       keycloak: { condition: service_healthy }
       identity-vault: { condition: service_started }
@@ -263,7 +275,7 @@ services:
     build: { context: ../.., dockerfile: Dockerfile, args: { CMD: worker } }
     depends_on:
       migrate-up: { condition: service_completed_successfully }
-      minio-init: { condition: service_completed_successfully }
+      s3-init: { condition: service_completed_successfully }
       rabbitmq: { condition: service_healthy }
       pgbouncer: { condition: service_healthy }
     environment:

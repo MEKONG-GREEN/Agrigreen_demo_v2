@@ -24,7 +24,7 @@
 | `rabbitmq` | outbox → consumer | 5672, console 15672 |
 | `valkey` | cache (không phải nguồn sự thật) | 6379 |
 | `keycloak` | realm `agrigreen` (nhập từ `deploy/compose/keycloak/agrigreen-realm.json`) | 8180 |
-| `minio`, `minio-init` | kho S3; `minio-init` tạo bucket, bật versioning, tạo tài khoản `agrigreen-app` chỉ Get/Put | 9000, console 9001 |
+| `seaweedfs`, `s3-init` | kho S3 (SeaweedFS — MinIO đã ngừng phát hành image công khai); `s3-init` tạo bucket, thử bật versioning; tài khoản ứng dụng `agrigreen-app` chỉ Read/Write/List trên bucket | 9000 |
 | `otel-collector` | nhận OTLP, in ra log (exporter `debug`) | 4317, 4318 |
 | `identity-vault` | kho định danh (bề mặt Internal) | 8090 |
 | `api-platform` | Application API + Admin API (MFA) | 8080, 8082 |
