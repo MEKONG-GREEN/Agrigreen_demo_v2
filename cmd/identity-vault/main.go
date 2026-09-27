@@ -9,6 +9,7 @@
 //	AG_DB_VIA_PGBOUNCER  =1 khi đi qua PgBouncer transaction mode
 //	AG_OIDC_ISSUER       issuer của realm Keycloak — kho tự xác minh token người dùng cuối (R-54)
 //	AG_OIDC_AUDIENCE     audience bắt buộc trong token
+//	AG_OIDC_JWKS_URL     (tùy chọn) lấy khóa ký từ URL này thay vì discovery (xem cmd/api-platform/oidc.go)
 //	AG_VAULT_KEK         KEK dev: base64 chuẩn của 32 byte (KMS phần mềm; production thay bằng KMS trong lãnh thổ)
 //	AG_VAULT_KEK_ID      định danh KEK, mặc định local-1
 //	AG_VAULT_BLIND_KEY   khóa HMAC của chỉ mục mù: base64 chuẩn, ≥ 32 byte, KHÁC KEK
@@ -26,7 +27,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
@@ -82,7 +82,7 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	verifier, err := authz.NewVerifier(ctx, issuer, audience)
+	verifier, err := verifierFromEnv(ctx, issuer, audience)
 	if err != nil {
 		return err
 	}

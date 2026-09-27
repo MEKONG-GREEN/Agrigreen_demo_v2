@@ -1,20 +1,46 @@
 # Cài môi trường phát triển
 
-## Cách 1: Docker Compose (Linux, macOS, Windows có Docker Desktop)
+## Cách 1: Docker Compose — toàn bộ nền tảng (Linux, macOS, Windows có Docker Desktop)
 
-```bash
-cp deploy/compose/.env.example deploy/compose/.env
-```
+1. **Sinh bí mật** vào `deploy/compose/.env` (đã có trong `.gitignore`, không bao giờ commit; script không in giá trị ra màn hình):
+   ```powershell
+   .\scripts\gen-dev-secrets.ps1          # Windows
+   ```
+   ```bash
+   sh scripts/gen-dev-secrets.sh          # Linux, macOS, CI
+   ```
+   Chạy lại khi đã có `.env` thì script giữ nguyên tệp. `-Force` / `--force` sinh lại — khi đó chạy `docker compose ... down -v` trước, vì mật khẩu DB đã lưu trong volume.
+2. **Dựng và chờ mọi dịch vụ sẵn sàng:**
+   ```bash
+   docker compose -f deploy/compose/docker-compose.yml up -d --build --wait
+   ```
+3. **Kiểm:** `curl http://127.0.0.1:8080/readyz`, `curl http://127.0.0.1:8090/readyz`, mở http://localhost:3000.
 
-Điền mật khẩu vào `deploy/compose/.env`, rồi chạy:
+| Dịch vụ | Vai trò | Địa chỉ trên máy (chỉ 127.0.0.1) |
+|---|---|---|
+| `postgres` | PostgreSQL 17 + PostGIS | 5432 |
+| `pgbouncer` | transaction mode (R-30); ứng dụng đi qua đây | 6432 |
+| `migrate-bootstrap`, `migrate-up` | chạy một lần: tạo vai/database, áp migration | — |
+| `rabbitmq` | outbox → consumer | 5672, console 15672 |
+| `valkey` | cache (không phải nguồn sự thật) | 6379 |
+| `keycloak` | realm `agrigreen` (nhập từ `deploy/compose/keycloak/agrigreen-realm.json`) | 8180 |
+| `minio`, `minio-init` | kho S3; `minio-init` tạo bucket, bật versioning, tạo tài khoản `agrigreen-app` chỉ Get/Put | 9000, console 9001 |
+| `otel-collector` | nhận OTLP, in ra log (exporter `debug`) | 4317, 4318 |
+| `identity-vault` | kho định danh (bề mặt Internal) | 8090 |
+| `api-platform` | Application API + Admin API (MFA) | 8080, 8082 |
+| `outbox-publisher`, `worker` | phát outbox, consumer + job vận hành (neo chuỗi, dọn idempotency, leo thang SLA) | — |
+| `web-ops` | web vận hành Next.js | 3000 |
 
-```bash
-docker compose -f deploy/compose/docker-compose.yml up -d --build
-```
+Ghi chú:
+- **Mỗi dịch vụ chỉ nhận biến nó cần** (không có `env_file` chung). `api-platform` không có mật khẩu vai `vault_app`, KEK hay khóa ký neo.
+- **Container ứng dụng** chạy `read_only`, `cap_drop: [ALL]`, `no-new-privileges`.
+- **Issuer OIDC** là `http://localhost:8180/realms/agrigreen`, tức địa chỉ trình duyệt thấy. Container không gọi được `localhost:8180`, nên `api-platform` và `identity-vault` lấy khóa ký qua `AG_OIDC_JWKS_URL=http://keycloak:8080/...`, vẫn so issuer và audience (R-54).
+- **Realm chưa có người dùng.** Tạo trong console Keycloak (http://localhost:8180, tài khoản `admin`, mật khẩu `KEYCLOAK_ADMIN_PASSWORD` trong `.env`). Đặt thuộc tính `tenant_id` (UUID), `org_ref` (UUID tổ chức trong pf/party) và gán vai. Vai ghi `[MFA]` trong mô tả chỉ dùng được trên Admin API sau khi cấu hình TOTP.
+- **CORS:** `AG_CORS_ORIGINS` mặc định `http://localhost:3000,http://127.0.0.1:3000`. So khớp chính xác; không chấp nhận `*`.
+- Xem trace và metric: `docker compose -f deploy/compose/docker-compose.yml logs -f otel-collector`.
+- Dọn toàn bộ, kể cả dữ liệu: `docker compose -f deploy/compose/docker-compose.yml down -v`.
 
-Compose dựng PostgreSQL 17 + PostGIS, PgBouncer (transaction mode), RabbitMQ, Valkey, Keycloak (realm `agrigreen`), MinIO. Nó chạy `migrate bootstrap` và `migrate up` trước, rồi khởi động `api-platform`, `outbox-publisher` và `worker`.
-
-> Compose và realm Keycloak **chưa được chạy thử trên máy dựng G0**, vì máy đó không có Docker. CI (`.github/workflows/ci.yml`) là nơi kiểm chứng chính.
+> **Stack Compose chưa được chạy trên máy dựng** (Windows, không có Docker). Tệp đã được kiểm cú pháp và soát kỹ. Job CI `compose-smoke` (`.github/workflows/ci.yml`) là nơi kiểm chứng: dựng toàn bộ bằng `up --wait`, gọi `/healthz`, `/readyz` của `api-platform`, `identity-vault` và trang web, rồi `down -v`.
 
 ## Cách 2: Windows không Docker (cách đã dùng để dựng G0)
 
@@ -42,6 +68,9 @@ Compose dựng PostgreSQL 17 + PostGIS, PgBouncer (transaction mode), RabbitMQ, 
 | `AG_PG_ADMIN_URL`, `AG_DB_URL`, `AG_PF_DB_URL` | Lệnh `migrate` và `api-platform` |
 | `AG_OIDC_ISSUER`, `AG_OIDC_AUDIENCE` | Xác minh token |
 | `AG_AMQP_URL` | `outbox-publisher`, `worker` |
+| `AG_OIDC_JWKS_URL` | (tùy chọn) `api-platform`, `identity-vault`: lấy khóa ký từ URL này thay vì discovery khi issuer công khai khác địa chỉ nội bộ |
+| `AG_CORS_ORIGINS` | `api-platform`: origin web được gọi chéo, phân tách bằng dấu phẩy, khớp chính xác |
+| `AG_VAULT_URL`, `AG_SYNC_CURSOR_KEY`, `AG_S3_*` | `api-platform` (kho định danh, cursor đồng bộ, kho đối tượng) |
 
 ## Vai DB
 

@@ -12,6 +12,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
@@ -53,6 +54,7 @@ func New(db tenant.Beginner, clk clock.Clock, deps ...Deps) *Module {
 func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.Handler{Svc: m.svc}.Register(rg)
 	handler.Registry{Reg: m.reg}.RegisterApp(rg)
+	handler.Me{Reg: m.reg}.Register(rg)
 }
 
 // RegisterAdmin gắn route Admin API.
@@ -66,3 +68,6 @@ func (m *Module) Orgs() port.Orgs { return m.reg }
 
 // ScopeResolver cho module khác tính phạm vi theo cây phân cấp (qua port, ADR-0009).
 func (m *Module) ScopeResolver() port.ScopeResolver { return m.reg }
+
+// SyncSink nhận bản ghi đồng ý thu ngoại tuyến qua pf/sync (entity consent).
+func (m *Module) SyncSink() syncport.Sink { return app.ConsentSink{Svc: m.svc} }

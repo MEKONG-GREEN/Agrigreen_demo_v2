@@ -15,15 +15,48 @@
   "otpPolicyAlgorithm": "HmacSHA1",
   "otpPolicyDigits": 6,
   "otpPolicyPeriod": 30,
+  "attributes": {
+    "note": "Vai đánh dấu [MFA] chỉ dùng trên Admin API — backend chặn token không có yếu tố thứ hai (httpx.RequireMFA, mục 11). Người giữ vai này phải cấu hình TOTP (required action CONFIGURE_TOTP) khi tạo tài khoản."
+  },
   "roles": {
     "realm": [
-      { "name": "platform_admin", "description": "Quản trị nền tảng — BẮT BUỘC MFA (mục 11)" },
-      { "name": "param_setter", "description": "Đặt tham số có phê duyệt (R-56)" },
-      { "name": "param_approver", "description": "Phê duyệt tham số — không tự phê duyệt thay đổi của mình (R-56)" },
-      { "name": "consent_writer", "description": "Ghi đồng ý theo mục đích" },
-      { "name": "consent_reader", "description": "Đọc đồng ý theo mục đích" }
+      { "name": "platform_admin", "description": "[MFA] Quản trị nền tảng — phạm vi toàn quốc (mục 11)" },
+      { "name": "param_setter", "description": "[MFA] Đặt tham số/danh mục có phê duyệt (R-56)" },
+      { "name": "param_approver", "description": "[MFA] Phê duyệt tham số — không tự phê duyệt thay đổi của mình (R-56)" },
+      { "name": "masterdata_admin", "description": "[MFA] Quản trị danh mục và đơn vị hành chính (Admin API, pf/masterdata)" },
+      { "name": "registry_admin", "description": "[MFA] Quản trị sổ tổ chức, HTX, nông hộ; nhập hàng loạt (pf/party)" },
+      { "name": "consent_writer", "description": "Ghi đồng ý theo mục đích (pf/party, cả qua đồng bộ ngoại tuyến)" },
+      { "name": "consent_reader", "description": "Đọc đồng ý theo mục đích (pf/party)" },
+      { "name": "kn_national_admin", "description": "Cán bộ TTKN Quốc gia — xem toàn quốc, chỉ đạo toàn quốc (KN US-HTX-01)" },
+      { "name": "kn_province_admin", "description": "Cán bộ TTKN tỉnh — đọc/ghi, phân công, chỉ đạo trong tỉnh" },
+      { "name": "kn_officer", "description": "Cán bộ khuyến nông xã / Tổ KNCĐ — đọc/ghi trong xã phụ trách" },
+      { "name": "coop_manager", "description": "Quản lý HTX/THT — nông hộ, thửa của chính HTX mình" },
+      { "name": "cgh_viewer", "description": "Cục KTHT — xem bản đồ cơ giới hóa, chỉ đọc hồ sơ HTX" },
+      { "name": "cgh_admin", "description": "[MFA] Quản trị dữ liệu bản đồ cơ giới hóa (pf/mechanization, Admin API)" },
+      { "name": "plot_editor", "description": "Vẽ/sửa/gán/ngừng dùng thửa trong phạm vi (pf/geo)" },
+      { "name": "plot_viewer", "description": "Chỉ xem thửa trong phạm vi (pf/geo)" },
+      { "name": "geo_admin", "description": "[MFA] Nhập tệp ranh giới thửa, ranh giới hành chính (pf/geo, Admin API)" },
+      { "name": "content_editor_national", "description": "Soạn quy trình kỹ thuật chuẩn quốc gia (pf/content, KN BR-06)" },
+      { "name": "content_editor_province", "description": "Bổ sung hướng dẫn đặc thù địa phương (pf/content, KN FR-13)" },
+      { "name": "content_reviewer", "description": "Duyệt và xuất bản tài liệu — không xuất bản bản do chính mình soạn (R-56)" },
+      { "name": "mrv_collector", "description": "Thu minh chứng MRV trong địa bàn (KN US-MRV-01, 03)" },
+      { "name": "mrv_reviewer", "description": "Duyệt minh chứng MRV — không duyệt minh chứng do chính mình thu (KN US-MRV-05)" },
+      { "name": "mrv_viewer", "description": "Chỉ xem minh chứng MRV (chuyên gia thẩm định)" },
+      { "name": "mrv_exporter", "description": "Yêu cầu xuất và tải gói bằng chứng MRV" },
+      { "name": "device_admin", "description": "[MFA] Thu hồi thiết bị hiện trường (pf/sync, Admin API)" },
+      { "name": "sync_conflict_resolver", "description": "[MFA] Xem và đóng xung đột đồng bộ (pf/sync, Admin API, C-8)" },
+      { "name": "vault_registrar", "description": "Kho định danh: tạo, tra, xem đầy đủ hồ sơ hộ/người (có mục đích, R-42)" },
+      { "name": "vault_display", "description": "Kho định danh: chỉ nhãn hiển thị tối thiểu đã che" },
+      { "name": "vault_evidence_viewer", "description": "Kho định danh: mở DEK để xem ảnh minh chứng (có mục đích và đồng ý)" },
+      { "name": "vault_eraser", "description": "[MFA] Kho định danh: xóa định danh theo yêu cầu (RB-3)" },
+      { "name": "vault_pubkey_sync", "description": "Thiết bị hiện trường tải khóa công khai của hộ theo địa bàn" },
+      { "name": "offline_access", "description": "Refresh token ngoại tuyến (app hiện trường, tối đa 72 giờ không trực tuyến — mục 15)" },
+      { "name": "default-roles-agrigreen", "description": "Vai mặc định của realm — KHÔNG gồm vai nghiệp vụ nào", "composite": true, "composites": { "realm": ["offline_access"] } }
     ]
   },
+  "defaultRole": { "name": "default-roles-agrigreen", "composite": true },
+  "defaultDefaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"],
+  "defaultOptionalClientScopes": ["offline_access"],
   "groups": [
     {
       "name": "admins",
@@ -31,7 +64,57 @@
       "attributes": { "note": ["Thành viên nhóm này phải cấu hình TOTP — required action CONFIGURE_TOTP khi tạo tài khoản"] }
     }
   ],
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"displayName\":\"${email}\",\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"tenant_id\",\"displayName\":\"Tenant (UUID)\",\"validations\":{\"pattern\":{\"pattern\":\"^[0-9a-fA-F-]{36}$\",\"error-message\":\"tenant_id phải là UUID\"}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false},{\"name\":\"org_ref\",\"displayName\":\"Đơn vị công tác (org_ref, UUID)\",\"validations\":{\"pattern\":{\"pattern\":\"^[0-9a-fA-F-]{36}$\",\"error-message\":\"org_ref phải là UUID\"}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes, which refer to user metadata\"}]}"
+          ]
+        }
+      }
+    ]
+  },
   "clientScopes": [
+    {
+      "name": "basic",
+      "description": "sub và auth_time (Keycloak 25+ tách khỏi scope openid)",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "false", "display.on.consent.screen": "false" },
+      "protocolMappers": [
+        { "name": "sub", "protocol": "openid-connect", "protocolMapper": "oidc-sub-mapper", "config": { "access.token.claim": "true", "introspection.token.claim": "true" } },
+        { "name": "auth_time", "protocol": "openid-connect", "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "config": { "user.session.note": "AUTH_TIME", "claim.name": "auth_time", "jsonType.label": "long", "id.token.claim": "true", "access.token.claim": "true", "introspection.token.claim": "true" } }
+      ]
+    },
+    {
+      "name": "roles",
+      "description": "Vai realm vào realm_access.roles — backend đọc claim này (authz.Verify)",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "false", "display.on.consent.screen": "false" },
+      "protocolMappers": [
+        { "name": "realm roles", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": { "claim.name": "realm_access.roles", "jsonType.label": "String", "multivalued": "true", "access.token.claim": "true", "id.token.claim": "false", "userinfo.token.claim": "false", "introspection.token.claim": "true" } },
+        { "name": "audience resolve", "protocol": "openid-connect", "protocolMapper": "oidc-audience-resolve-mapper", "config": { "access.token.claim": "true", "introspection.token.claim": "true" } }
+      ]
+    },
+    {
+      "name": "web-origins",
+      "description": "allowed-origins trong token",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "false", "display.on.consent.screen": "false" },
+      "protocolMappers": [
+        { "name": "allowed web origins", "protocol": "openid-connect", "protocolMapper": "oidc-allowed-origins-mapper", "config": { "access.token.claim": "true", "introspection.token.claim": "true" } }
+      ]
+    },
+    {
+      "name": "offline_access",
+      "description": "OpenID Connect built-in scope: offline_access",
+      "protocol": "openid-connect",
+      "attributes": { "consent.screen.text": "${offlineAccessScopeConsentText}", "display.on.consent.screen": "true" }
+    },
     {
       "name": "agrigreen-claims",
       "protocol": "openid-connect",
@@ -42,6 +125,12 @@
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-attribute-mapper",
           "config": { "user.attribute": "tenant_id", "claim.name": "tenant_id", "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "false", "userinfo.token.claim": "false" }
+        },
+        {
+          "name": "org_ref",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "org_ref", "claim.name": "org_ref", "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "false", "userinfo.token.claim": "false" }
         },
         {
           "name": "audience agrigreen-api",
@@ -61,7 +150,7 @@
   "clients": [
     {
       "clientId": "agrigreen-api",
-      "name": "AgriGreen Application API (audience)",
+      "name": "AgriGreen Application API + Admin API (audience)",
       "enabled": true,
       "bearerOnly": true,
       "publicClient": false,
@@ -74,10 +163,10 @@
       "publicClient": true,
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
-      "redirectUris": ["http://localhost:3000/*"],
-      "webOrigins": ["http://localhost:3000"],
-      "attributes": { "pkce.code.challenge.method": "S256" },
-      "defaultClientScopes": ["openid", "profile", "roles", "agrigreen-claims"]
+      "redirectUris": ["http://localhost:3000/*", "http://127.0.0.1:3000/*"],
+      "webOrigins": ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8082"],
+      "attributes": { "pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "http://localhost:3000/*##http://127.0.0.1:3000/*" },
+      "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"]
     },
     {
       "clientId": "agrigreen-field-app",
@@ -88,7 +177,8 @@
       "directAccessGrantsEnabled": false,
       "redirectUris": ["vn.agrigreen.field:/oauth2redirect"],
       "attributes": { "pkce.code.challenge.method": "S256" },
-      "defaultClientScopes": ["openid", "profile", "roles", "agrigreen-claims", "offline_access"]
+      "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"],
+      "optionalClientScopes": ["offline_access"]
     }
   ]
 }

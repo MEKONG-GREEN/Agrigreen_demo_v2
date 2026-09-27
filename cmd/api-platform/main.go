@@ -9,6 +9,9 @@
 //	AG_DB_VIA_PGBOUNCER  =1 khi đi qua PgBouncer transaction mode
 //	AG_OIDC_ISSUER       issuer của realm Keycloak
 //	AG_OIDC_AUDIENCE     audience bắt buộc trong token
+//	AG_OIDC_JWKS_URL     (tùy chọn) lấy khóa ký từ URL này thay vì discovery — khi issuer công khai khác địa chỉ nội bộ
+//	AG_CORS_ORIGINS      origin web được gọi chéo, phân tách bằng dấu phẩy, khớp chính xác (không có "*")
+//	AG_SYNC_CURSOR_KEY   khóa HMAC của cursor đồng bộ
 //	AG_VAULT_URL         địa chỉ identity-vault (vd https://identity-vault:8090)
 //	AG_VAULT_CLIENT_CERT, AG_VAULT_CLIENT_KEY, AG_VAULT_CA  mTLS tới kho định danh (tùy chọn ở Local/Dev)
 //	AG_OTLP_ENDPOINT     bật OpenTelemetry (ADR-0013)
@@ -26,10 +29,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
@@ -93,11 +96,15 @@ func run(log *slog.Logger) error {
 		return err
 	}
 
-	verifier, err := authz.NewVerifier(ctx, issuer, audience)
+	verifier, err := verifierFromEnv(ctx, issuer, audience)
 	if err != nil {
 		return err
 	}
-	d := Deps{Log: log, Verifier: verifier, Ops: ops, Modules: mods, Pools: pools}
+	origins, err := httpx.CORSOriginsFromEnv()
+	if err != nil {
+		return err
+	}
+	d := Deps{Log: log, Verifier: verifier, Ops: ops, Modules: mods, Pools: pools, CORSOrigins: origins}
 	servers := []*http.Server{
 		{Addr: env("AG_HTTP_ADDR", ":8080"), Handler: NewRouter(d)},
 		{Addr: env("AG_ADMIN_HTTP_ADDR", ":8082"), Handler: NewAdminRouter(d)},

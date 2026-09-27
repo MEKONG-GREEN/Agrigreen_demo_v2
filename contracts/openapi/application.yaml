@@ -196,6 +196,23 @@ paths:
               schema: {$ref: "#/components/schemas/ParamValue"}
         "404": {description: masterdata.param_not_found, $ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /v1/me:
+    get:
+      summary: Người gọi hiện tại, đơn vị công tác và phạm vi dữ liệu đã giải (pf/party, ADR-0009)
+      description: |
+        Mọi người gọi đã xác thực đều gọi được, không cần vai nghiệp vụ. Không chứa dữ liệu cá nhân
+        (R-04, R-14): chỉ mã tham chiếu, vai, tên tổ chức và tên đơn vị hành chính.
+        Chỉ để giao diện hiển thị; quyền thật do từng module kiểm ở backend (R-55).
+        Phản hồi có Cache-Control private, no-store.
+      operationId: getMe
+      responses:
+        "200":
+          description: Người gọi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Me"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "503": {description: party.dependency_unavailable — chưa nối danh mục đơn vị hành chính, $ref: "#/components/responses/Problem"}
   /v1/orgs:
     get:
       summary: Tổ chức trong phạm vi của người gọi (phân trang cursor)
@@ -1910,6 +1927,37 @@ components:
         parent_ref: {type: [string, "null"], format: uuid}
         representative_ref: {type: [string, "null"], format: uuid, description: "Mã tham chiếu người đại diện trong kho định danh"}
         active: {type: boolean}
+    Me:
+      type: object
+      required: [actor_ref, tenant_id, roles, mfa, org, scope]
+      additionalProperties: false
+      properties:
+        actor_ref: {type: string, format: uuid, description: "= sub của token; mã tham chiếu, không phải định danh"}
+        tenant_id: {type: string, format: uuid}
+        roles: {type: array, items: {type: string}}
+        mfa: {type: boolean, description: "Token có yếu tố thứ hai (amr) — Admin API bắt buộc"}
+        org:
+          description: Đơn vị công tác (claim org_ref). null khi không có org_ref hoặc tổ chức không tồn tại trong tenant.
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [ref, kind, name, admin_unit_code, active]
+              additionalProperties: false
+              properties:
+                ref: {type: string, format: uuid}
+                kind: {$ref: "#/components/schemas/OrgKind"}
+                name: {type: string}
+                admin_unit_code: {type: [string, "null"]}
+                active: {type: boolean, description: "false = tổ chức đã bị vô hiệu hóa → phạm vi rỗng"}
+        scope:
+          type: object
+          required: [all, level, units, unit_names]
+          additionalProperties: false
+          properties:
+            all: {type: boolean, description: "true = toàn quốc (TTKN QG, Cục KTHT, Mekong Green, platform_admin)"}
+            level: {type: string, enum: [national, province, commune, cooperative, none]}
+            units: {type: array, items: {type: string}, description: "Mã đơn vị hành chính hiện hành được thấy; rỗng khi all = true hoặc level = none"}
+            unit_names: {type: object, additionalProperties: {type: string}, description: "Mã đơn vị → tên (masterdata tại thời điểm hiện tại), gồm cả đơn vị của tổ chức"}
     Decimal:
       type: string
       pattern: "^-?[0-9]+(\\.[0-9]+)?$"
@@ -2023,6 +2071,19 @@ components:
         supersedes_id: {type: [string, "null"], format: uuid, description: "Bắt buộc khi op = correct"}
         correction_reason: {type: [string, "null"], minLength: 10, maxLength: 500, description: "Bắt buộc khi op = correct"}
         payload: {type: object, description: "Tối đa 256 KiB; máy chủ pf/sync chỉ lưu SHA-256"}
+    SyncConsentPayload:
+      type: object
+      description: |
+        payload của bản ghi push entity = consent (Sink của pf/party). Chỉ op = create; rút lại đồng ý là
+        bản ghi mới status = withdrawn. id, event_time, device_id lấy từ phong bì; idem_key của máy là khóa
+        chống trùng của sổ đồng ý (gửi lại → duplicate). Cần vai consent_writer.
+      required: [subject_ref, purpose, text_version, status]
+      properties:
+        subject_ref: {type: string, format: uuid}
+        purpose: {type: string, pattern: "^[a-z][a-z0-9_.]{2,63}$", examples: ["mrv.evidence"]}
+        text_version: {type: string, maxLength: 40}
+        status: {type: string, enum: [granted, withdrawn]}
+        channel: {type: string, enum: [field_app, web, zalo, paper], default: field_app}
     SyncPushBatch:
       type: object
       required: [device_id, records]

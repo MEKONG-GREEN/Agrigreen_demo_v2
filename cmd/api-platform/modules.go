@@ -105,7 +105,7 @@ func buildModules(ctx context.Context, open PoolOpener, clk clock.Clock, ext Ext
 		Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Params: md.Params(), Vault: ext.Vault,
 		Store: store, CursorKey: []byte(os.Getenv("AG_SYNC_CURSOR_KEY")),
 		Sources: []syncport.Source{g.SyncSource(), cnt.SyncSource(), kn.SyncSource()},
-		Sinks:   []syncport.Sink{g.SyncSink(), kn.SyncSink(), mrvMod.SyncSink()},
+		Sinks:   []syncport.Sink{g.SyncSink(), kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink()},
 	})
 
 	return []httpx.Module{md, pty, g, cnt, kn, mech, mrvMod, snc}, pools, nil
