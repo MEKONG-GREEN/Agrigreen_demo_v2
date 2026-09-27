@@ -11,6 +11,9 @@
     {"key": "cgh.norm_ha_per_machine:MPT:cham_soc", "value": "260", "unit": "ha/máy/vụ", "effective_from": "2026-01-01", "source_doc": "QĐ số 128/QĐ-KTHT ngày 15/01/2026 (minh hoạ)"},
     {"key": "cgh.norm_ha_per_machine:MGD:thu_hoach", "value": "90", "unit": "ha/máy/vụ", "effective_from": "2026-01-01", "source_doc": "QĐ số 128/QĐ-KTHT ngày 15/01/2026 (minh hoạ)"},
     {"key": "cgh.norm_ha_per_machine:MCR:sau_thu_hoach", "value": "140", "unit": "ha/máy/vụ", "effective_from": "2026-01-01", "source_doc": "QĐ số 128/QĐ-KTHT ngày 15/01/2026 (minh hoạ)"},
-    {"key": "cgh.norm_ha_per_machine:MSL:sau_thu_hoach", "value": "400", "unit": "ha/máy/vụ", "effective_from": "2026-01-01", "source_doc": "QĐ số 128/QĐ-KTHT ngày 15/01/2026 (minh hoạ)"}
+    {"key": "cgh.norm_ha_per_machine:MSL:sau_thu_hoach", "value": "400", "unit": "ha/máy/vụ", "effective_from": "2026-01-01", "source_doc": "QĐ số 128/QĐ-KTHT ngày 15/01/2026 (minh hoạ)"},
+
+    {"key": "geo.overlap_tolerance_pct", "value": "1", "unit": "%", "effective_from": "2026-01-01", "source_doc": "App HTX Backlog v4.0 US-PLOT-04 AC-1 (ngưỡng chồng lấn ranh giới, đề xuất 1% — chờ MKG xác nhận)"},
+    {"key": "geo.area_deviation_max_pct", "value": "5", "unit": "%", "effective_from": "2026-01-01", "source_doc": "App HTX Backlog v4.0 US-PLOT-02 AC-3, US-PLOT-03 AC-2 (sai lệch diện tích ước tính dưới 5%)"}
   ]
 }

@@ -287,46 +287,51 @@ func TestBoundaryValidationRules(t *testing.T) {
 	expect(t, r, http.StatusUnprocessableEntity, "mã xã không tồn tại")
 }
 
-// HTX US-PLOT-04 / KN US-PLOT-03: chồng lấn trong cùng HTX vượt ngưỡng → chặn (geo.overlap kèm
-// danh sách thửa); chồng lấn với HTX khác → nhận nhưng mở xung đột chờ xem xét. Thửa liền kề
-// chung cạnh và phần chồng dưới ngưỡng 1 % không bị coi là chồng lấn.
-func TestOverlapSameCoopRejectedCrossCoopFlagged(t *testing.T) {
+// KN US-PLOT-03, HTX US-PLOT-04 AC-1/AC-2, nguyên mẫu mdm/lifecycle.ts: chồng lấn thửa của HTX KHÁC
+// vượt ngưỡng → chặn (geo.overlap_cross_coop, không bỏ qua được); chồng lấn cùng HTX hoặc với thửa
+// nháp → 409 geo.overlap_needs_confirm, chỉ lưu khi confirm_overlap = true (mở xung đột xem xét).
+// Thửa liền kề chung cạnh và phần chồng dưới ngưỡng 1 % không bị coi là chồng lấn.
+func TestOverlapRules(t *testing.T) {
 	f := newFixture(t)
 	c := f.national()
 	p1, _ := c.createPlot("31117", f.coopA, rect(0, 0, 100, 100))
-
-	r := c.appDo(http.MethodPost, "/v1/plots", map[string]any{"commune_code": "31117", "cooperative_ref": f.coopA.String(), "geometry": rect(50, 0, 100, 100)})
-	if r.status != http.StatusConflict || code(r) != "geo.overlap" {
-		t.Fatalf("cùng HTX: %d %s", r.status, r.raw)
-	}
-	ov := list(r.body, "overlaps")
-	if len(ov) != 1 || str(ov[0], "plot_ref") != p1.String() || str(ov[0], "overlap_pct") != "50.0000" {
-		t.Fatalf("danh sách chồng lấn = %v", ov)
+	body := func(coop uuid.UUID, geom map[string]any, confirm bool) map[string]any {
+		b := map[string]any{"commune_code": "31117", "geometry": geom, "confirm_overlap": confirm}
+		if coop != uuid.Nil {
+			b["cooperative_ref"] = coop.String()
+		}
+		return b
 	}
 
-	// Liền kề chung cạnh: nhận, không cờ.
-	_, r = c.createPlot("31117", f.coopA, rect(100, 0, 100, 100))
-	if len(list(r.body, "flagged_overlaps")) != 0 || get(r.body, "plot", "properties", "needs_review") != false {
-		t.Fatalf("thửa liền kề bị cờ: %s", r.raw)
-	}
-	// Chồng 0,5 % (dưới ngưỡng 1 %): nhận.
-	_, r = c.createPlot("31117", f.coopA, rect(0, 99.5, 100, 100))
-	if len(list(r.body, "flagged_overlaps")) != 0 {
-		t.Fatalf("chồng dưới ngưỡng bị cờ: %s", r.raw)
+	// HTX khác: chặn, kể cả khi xác nhận.
+	for _, confirm := range []bool{false, true} {
+		r := c.appDo(http.MethodPost, "/v1/plots", body(f.coopB, rect(50, 0, 100, 100), confirm))
+		if r.status != http.StatusConflict || code(r) != "geo.overlap_cross_coop" {
+			t.Fatalf("khác HTX (confirm=%v): %d %s", confirm, r.status, r.raw)
+		}
+		if ov := list(r.body, "overlaps"); len(ov) != 1 || str(ov[0], "plot_ref") != p1.String() || str(ov[0], "overlap_pct") != "50.0000" {
+			t.Fatalf("danh sách chồng lấn = %v", ov)
+		}
 	}
 
-	// Khác HTX: nhận, cờ, mở xung đột.
-	p3, r := c.createPlot("31117", f.coopB, rect(0, 30, 60, 50))
-	fl := list(r.body, "flagged_overlaps")
-	if len(fl) != 1 || str(fl[0], "plot_ref") != p1.String() {
-		t.Fatalf("khác HTX phải được cờ với %s: %s", p1, r.raw)
+	// Cùng HTX: cần xác nhận.
+	r := c.appDo(http.MethodPost, "/v1/plots", body(f.coopA, rect(50, 0, 100, 100), false))
+	if r.status != http.StatusConflict || code(r) != "geo.overlap_needs_confirm" || get(r.body, "needs_confirm") != true {
+		t.Fatalf("cùng HTX chưa xác nhận: %d %s", r.status, r.raw)
 	}
+	// Thửa nháp (chưa gán HTX) đè thửa HTX A: cũng chỉ cần xác nhận.
+	r = c.appDo(http.MethodPost, "/v1/plots", body(uuid.Nil, rect(50, 0, 100, 100), false))
+	if r.status != http.StatusConflict || code(r) != "geo.overlap_needs_confirm" {
+		t.Fatalf("thửa nháp chưa xác nhận: %d %s", r.status, r.raw)
+	}
+	// Xác nhận → lưu, mở xung đột same_coop_overlap, chờ xem xét.
+	r = c.appDo(http.MethodPost, "/v1/plots", body(f.coopA, rect(50, 0, 100, 100), true))
+	expect(t, r, http.StatusCreated, "cùng HTX đã xác nhận")
+	p2 := uuid.MustParse(str(r.body, "plot", "id"))
 	cs := list(r.body, "conflicts")
-	if len(cs) != 1 || str(cs[0], "kind") != "cross_coop_overlap" || str(cs[0], "status") != "open" {
-		t.Fatalf("xung đột = %v", cs)
-	}
-	if get(r.body, "plot", "properties", "needs_review") != true {
-		t.Fatal("thửa chồng lấn khác HTX phải chờ xem xét")
+	if len(cs) != 1 || str(cs[0], "kind") != "same_coop_overlap" || str(cs[0], "owner_ref") != f.coopA.String() ||
+		get(r.body, "plot", "properties", "needs_review") != true || len(list(r.body, "flagged_overlaps")) != 1 {
+		t.Fatalf("xung đột sau xác nhận: %s", r.raw)
 	}
 	due, _ := time.Parse(time.RFC3339Nano, str(cs[0], "due_at"))
 	det, _ := time.Parse(time.RFC3339Nano, str(cs[0], "detected_at"))
@@ -334,31 +339,74 @@ func TestOverlapSameCoopRejectedCrossCoopFlagged(t *testing.T) {
 		t.Fatalf("SLA = %v, muốn 72 giờ", due.Sub(det))
 	}
 
-	// Kiểm trước khi lưu: cùng HTX → blocking.
-	r = c.appDo(http.MethodPost, "/v1/plots/overlap-check", map[string]any{"commune_code": "31117", "cooperative_ref": f.coopA.String(), "geometry": rect(20, 20, 30, 30)})
-	expect(t, r, http.StatusOK, "overlap-check")
-	if get(r.body, "can_save") != false || len(list(r.body, "blocking")) != 1 {
-		t.Fatalf("overlap-check: %s", r.raw)
+	// Liền kề chung cạnh: nhận, không cờ. Chồng 0,5 % (dưới ngưỡng 1 %): nhận.
+	_, r = c.createPlot("31117", f.coopB, rect(0, 100, 100, 100))
+	if len(list(r.body, "flagged_overlaps")) != 0 || get(r.body, "plot", "properties", "needs_review") != false {
+		t.Fatalf("thửa liền kề bị cờ: %s", r.raw)
+	}
+	_, r = c.createPlot("31117", f.coopA, rect(0, -99.5, 100, 100))
+	if len(list(r.body, "flagged_overlaps")) != 0 {
+		t.Fatalf("chồng dưới ngưỡng bị cờ: %s", r.raw)
 	}
 
-	// Xử lý xung đột → gỡ cờ.
-	r = c.appDo(http.MethodGet, "/v1/geo/conflicts?status=open", nil)
-	expect(t, r, http.StatusOK, "liệt kê xung đột")
-	if len(list(r.body, "items")) != 1 {
-		t.Fatalf("xung đột mở = %s", r.raw)
+	// HTX US-PLOT-02 AC-3: lệch > 5 % so với diện tích khai báo → cần xác nhận.
+	r = c.appDo(http.MethodPost, "/v1/plots", map[string]any{"commune_code": "31117", "geometry": rect(1000, 0, 100, 100), "declared_area_ha": "1.2"})
+	if r.status != http.StatusConflict || code(r) != "geo.area_deviation_needs_confirm" || str(r.body, "deviation_pct") < "16" {
+		t.Fatalf("lệch diện tích: %d %s", r.status, r.raw)
 	}
-	cid := str(list(r.body, "items")[0], "id")
+	c.createPlot("31117", uuid.Nil, rect(1000, 0, 100, 100)) // không khai báo: không kiểm
+	r = c.appDo(http.MethodPost, "/v1/plots", map[string]any{"commune_code": "31117", "geometry": rect(1300, 0, 100, 100), "declared_area_ha": "1.03"})
+	expect(t, r, http.StatusCreated, "lệch 3 % (dưới ngưỡng)")
+	r = c.appDo(http.MethodPost, "/v1/plots", map[string]any{"commune_code": "31117", "geometry": rect(1600, 0, 100, 100), "declared_area_ha": "1.2", "confirm_overlap": true})
+	expect(t, r, http.StatusCreated, "lệch diện tích đã xác nhận")
+
+	// Kiểm trước khi lưu: HTX khác → blocking; cùng HTX → needs_confirm.
+	r = c.appDo(http.MethodPost, "/v1/plots/overlap-check", map[string]any{"commune_code": "31117", "cooperative_ref": f.coopB.String(), "geometry": rect(20, 20, 30, 30)})
+	expect(t, r, http.StatusOK, "overlap-check HTX B")
+	if get(r.body, "can_save") != false || len(list(r.body, "blocking")) != 1 {
+		t.Fatalf("overlap-check HTX B: %s", r.raw)
+	}
+	r = c.appDo(http.MethodPost, "/v1/plots/overlap-check", map[string]any{"commune_code": "31117", "cooperative_ref": f.coopA.String(), "geometry": rect(20, 20, 30, 30)})
+	if get(r.body, "can_save") != true || get(r.body, "requires_confirm") != true || len(list(r.body, "needs_confirm")) != 1 {
+		t.Fatalf("overlap-check HTX A: %s", r.raw)
+	}
+
+	// Gán lại HTX kiểm lại chồng lấn: thửa nháp D đè p1 (HTX A).
+	r = c.appDo(http.MethodPost, "/v1/plots", body(uuid.Nil, rect(0, 60, 40, 30), true))
+	expect(t, r, http.StatusCreated, "thửa nháp D đã xác nhận")
+	d := str(r.body, "plot", "id")
+	r = c.appDo(http.MethodPost, "/v1/plots/"+d+"/assign", map[string]any{"cooperative_ref": f.coopB.String()})
+	if r.status != http.StatusConflict || code(r) != "geo.overlap_cross_coop" {
+		t.Fatalf("gán D cho HTX B: %d %s", r.status, r.raw)
+	}
+	r = c.appDo(http.MethodPost, "/v1/plots/"+d+"/assign", map[string]any{"cooperative_ref": f.coopA.String()})
+	if r.status != http.StatusConflict || code(r) != "geo.overlap_needs_confirm" {
+		t.Fatalf("gán D cho HTX A chưa xác nhận: %d %s", r.status, r.raw)
+	}
+	r = c.appDo(http.MethodPost, "/v1/plots/"+d+"/assign", map[string]any{"cooperative_ref": f.coopA.String(), "confirm_overlap": true})
+	expect(t, r, http.StatusOK, "gán D cho HTX A đã xác nhận")
+	if len(list(r.body, "conflicts")) != 1 || get(r.body, "plot", "properties", "needs_review") != true {
+		t.Fatalf("gán có xác nhận: %s", r.raw)
+	}
+
+	// Xử lý xung đột của p2 → gỡ cờ.
+	r = c.appDo(http.MethodGet, "/v1/plots/"+p2.String(), nil)
+	cid := str(list(r.body, "conflicts")[0], "id")
 	r = c.appDo(http.MethodPost, "/v1/geo/conflicts/"+cid+"/resolve", map[string]any{"note": "ngắn"})
 	expect(t, r, http.StatusUnprocessableEntity, "ghi chú quá ngắn")
-	r = c.appDo(http.MethodPost, "/v1/geo/conflicts/"+cid+"/resolve", map[string]any{"note": "Đã đối chiếu thực địa, hai HTX thống nhất ranh giới"})
+	r = c.appDo(http.MethodPost, "/v1/geo/conflicts/"+cid+"/resolve", map[string]any{"note": "Đã đối chiếu thực địa, HTX thống nhất ranh giới"})
 	expect(t, r, http.StatusOK, "xử lý xung đột")
-	r = c.appDo(http.MethodGet, "/v1/plots/"+p3.String(), nil)
+	r = c.appDo(http.MethodGet, "/v1/plots/"+p2.String(), nil)
 	if get(r.body, "plot", "properties", "needs_review") != false {
 		t.Fatalf("cờ chờ xem xét phải được gỡ: %s", r.raw)
 	}
 	r = c.appDo(http.MethodPost, "/v1/geo/conflicts/"+cid+"/resolve", map[string]any{"note": "Xử lý lần hai không được phép"})
 	if r.status != http.StatusConflict || code(r) != "geo.conflict_state" {
 		t.Fatalf("xử lý lại: %d %s", r.status, r.raw)
+	}
+	r = c.appDo(http.MethodGet, "/v1/geo/conflicts?status=open", nil)
+	if len(list(r.body, "items")) != 2 {
+		t.Fatalf("còn đúng 2 xung đột mở (thửa D: lúc tạo và lúc gán): %s", r.raw)
 	}
 }
 
@@ -690,6 +738,30 @@ func TestSyncSinkIdempotentAndConflict(t *testing.T) {
 		t.Fatalf("sửa đồng thời phải giữ cả hai, bản muộn không thành hiện hành: %s", r.raw)
 	}
 
+	// Máy đã xác nhận giữ nguyên chồng lấn cùng HTX (confirm_overlap) → accepted, xung đột vẫn mở.
+	cp, cpl, _, _ := boundaryRecord("create", ids.New(), "31117", f.coopA, rect(40, 50, 100, 100), nil)
+	var m map[string]any
+	_ = json.Unmarshal(cpl, &m)
+	m["confirm_overlap"] = true
+	cpl, _ = json.Marshal(m)
+	if res := snk.Accept(ctx, scA, syncRecord(cp, "dev:"+dev2.String()+":3", "create", cpl, nil, nil, dev2)); res.Status != "accepted" {
+		t.Fatalf("cùng HTX đã xác nhận: %+v", res)
+	}
+	// HTX khác vẽ đè ngoại tuyến: không chặn được máy → giữ cả hai, conflict cross_coop_overlap.
+	xp, xpl, _, _ := boundaryRecord("create", ids.New(), "31117", f.coopB, rect(0, 0, 50, 50), nil)
+	res := snk.Accept(ctx, scA, syncRecord(xp, "dev:"+dev2.String()+":4", "create", xpl, nil, nil, dev2))
+	if res.Status != "conflict" || res.ConflictID == nil {
+		t.Fatalf("khác HTX ngoại tuyến: %+v", res)
+	}
+	r = f.national().appDo(http.MethodGet, "/v1/geo/conflicts?status=open&limit=200", nil)
+	kinds := map[string]int{}
+	for _, it := range list(r.body, "items") {
+		kinds[str(it, "kind")]++
+	}
+	if kinds["cross_coop_overlap"] != 1 {
+		t.Fatalf("xung đột khác HTX: %v", kinds)
+	}
+
 	// Dữ liệu sai → rejected kèm mã.
 	bad := mk("create", ids.New(), map[string]any{"type": "Polygon", "coordinates": [][][]float64{{{105.6, 10.05}, {105.601, 10.05}, {105.6, 10.051}}}}, nil)
 	if st, _, c := send(bad, dev1, "dev:"+dev1.String()+":3", ""); st != "rejected" || c != "geo.too_few_points" {
@@ -697,7 +769,7 @@ func TestSyncSinkIdempotentAndConflict(t *testing.T) {
 	}
 	// Ngoài phạm vi → rejected.
 	out, p, _, _ := boundaryRecord("create", ids.New(), "31120", uuid.Nil, rect(0, 900, 50, 50), nil)
-	res := snk.Accept(ctx, scA, syncRecord(out, "dev:"+dev1.String()+":4", "create", p, nil, nil, dev1))
+	res = snk.Accept(ctx, scA, syncRecord(out, "dev:"+dev1.String()+":4", "create", p, nil, nil, dev1))
 	if res.Status != "rejected" || res.Code != "geo.out_of_scope" {
 		t.Fatalf("ngoài phạm vi: %+v", res)
 	}
@@ -723,7 +795,7 @@ func TestImportGeoJSONAndKML(t *testing.T) {
 	if get(r.body, "accepted") != 1.0 || get(r.body, "rejected") != 3.0 || len(fs) != 4 {
 		t.Fatalf("kết quả nhập: %s", r.raw)
 	}
-	for i, want := range []string{"", "geo.too_few_points", "geo.overlap", "geo.invalid_geometry"} {
+	for i, want := range []string{"", "geo.too_few_points", "geo.overlap_needs_confirm", "geo.invalid_geometry"} {
 		if got := str(fs[i], "code"); got != want {
 			t.Fatalf("đối tượng %d: mã %q, muốn %q (%s)", i+1, got, want, r.raw)
 		}

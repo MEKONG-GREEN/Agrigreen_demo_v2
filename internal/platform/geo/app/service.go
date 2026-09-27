@@ -29,7 +29,9 @@ var (
 	ErrPlotNotFound          = problem.New(http.StatusNotFound, "geo.plot_not_found", "Không tìm thấy thửa")
 	ErrConflictNotFound      = problem.New(http.StatusNotFound, "geo.conflict_not_found", "Không tìm thấy xung đột ranh giới")
 	ErrAdminBoundaryNotFound = problem.New(http.StatusNotFound, "geo.admin_boundary_not_found", "Chưa có ranh giới hành chính cho đơn vị này")
-	ErrOverlap               = problem.New(http.StatusConflict, "geo.overlap", "Ranh giới bị chồng lấn với lô đã đăng ký, vui lòng kiểm tra lại.")
+	ErrOverlapCrossCoop      = problem.New(http.StatusConflict, "geo.overlap_cross_coop", "Ranh giới bị chồng lấn với lô đã đăng ký của HTX/nông hộ khác, vui lòng kiểm tra lại.")
+	ErrOverlapNeedsConfirm   = problem.New(http.StatusConflict, "geo.overlap_needs_confirm", "Ranh giới bị chồng lấn với lô đã đăng ký, vui lòng kiểm tra lại hoặc xác nhận giữ nguyên.")
+	ErrAreaDeviation         = problem.New(http.StatusConflict, "geo.area_deviation_needs_confirm", "Diện tích đo lệch quá ngưỡng so với diện tích khai báo")
 	ErrVersionConflict       = problem.New(http.StatusConflict, "geo.version_conflict", "Ranh giới đã được sửa bởi người khác — hãy tải phiên bản hiện hành rồi sửa lại")
 	ErrPlotState             = problem.New(http.StatusConflict, "geo.plot_state_conflict", "Trạng thái thửa không cho phép thao tác này")
 	ErrConflictState         = problem.New(http.StatusConflict, "geo.conflict_state", "Xung đột đã được xử lý")
@@ -159,6 +161,26 @@ func (s *Service) tolerance(ctx context.Context, at time.Time) (decimal.Decimal,
 		return domain.DefaultOverlapTolerancePct, nil
 	}
 	return v.Value, nil
+}
+
+// thresholds đọc ngưỡng chồng lấn và ngưỡng lệch diện tích tại thời điểm sự việc.
+func (s *Service) thresholds(ctx context.Context, at time.Time) (tol, maxDev decimal.Decimal, err error) {
+	if tol, err = s.tolerance(ctx, at); err != nil {
+		return
+	}
+	maxDev = domain.DefaultAreaDeviationMaxPct
+	if s.Params == nil {
+		return
+	}
+	v, perr := s.Params.At(ctx, port.ParamAreaDeviationMaxPct, at)
+	switch {
+	case errors.Is(perr, mdport.ErrParamNotFound):
+	case perr != nil:
+		err = ErrDependency.WithDetail("không đọc được tham số ngưỡng lệch diện tích").WithCause(perr)
+	case v.Value.IsPositive():
+		maxDev = v.Value
+	}
+	return
 }
 
 // checkCommune kiểm mã xã còn hiệu lực và đúng cấp xã.

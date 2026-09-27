@@ -35,6 +35,9 @@ const (
 	// ParamOverlapTolerancePct: ngưỡng chồng lấn (%) theo diện tích thửa nhỏ hơn;
 	// mặc định 1 khi chưa có phiên bản được duyệt.
 	ParamOverlapTolerancePct = "geo.overlap_tolerance_pct"
+	// ParamAreaDeviationMaxPct: sai lệch tối đa (%) giữa diện tích đo và diện tích khai
+	// báo trước khi cần xác nhận (HTX US-PLOT-02 AC-3); mặc định 5.
+	ParamAreaDeviationMaxPct = "geo.area_deviation_max_pct"
 )
 
 // Trạng thái thửa.
@@ -109,4 +112,6 @@ type PlotBoundaryRecordedV1 struct {
 	CorrectionReason *string    `json:"correction_reason"`
 	ActorRef         uuid.UUID  `json:"actor_ref"`
 	EventTime        string     `json:"event_time"`
+	DeclaredAreaHa   *string    `json:"declared_area_ha,omitempty"`   // diện tích khai báo (nếu có)
+	AreaDeviationPct *string    `json:"area_deviation_pct,omitempty"` // lệch so với khai báo (%)
 }

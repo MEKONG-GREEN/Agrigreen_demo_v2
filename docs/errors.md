@@ -157,7 +157,9 @@ Phản hồi phát lại theo Idempotency-Key có header `Idempotent-Replayed: t
 | 404 | `geo.plot_not_found` | pf/geo: không có thửa, hoặc nằm ngoài phạm vi đọc (xã/HTX) — không lộ sự tồn tại |
 | 404 | `geo.conflict_not_found` | pf/geo: không có xung đột ranh giới trong phạm vi |
 | 404 | `geo.admin_boundary_not_found` | pf/geo: chưa nhập ranh giới hành chính cho mã đơn vị |
-| 409 | `geo.overlap` | pf/geo: ranh giới chồng lấn thửa **cùng HTX** (hoặc cùng là thửa nháp) vượt ngưỡng `geo.overlap_tolerance_pct` (mặc định 1 %, tính theo thửa nhỏ hơn); `overlaps` liệt kê `plot_ref`, `code`, `overlap_pct`. Chồng lấn khác HTX không lỗi — thửa được nhận, mở xung đột chờ xem xét |
+| 409 | `geo.overlap_cross_coop` | pf/geo: ranh giới chồng lấn thửa của **HTX khác** vượt ngưỡng `geo.overlap_tolerance_pct` (mặc định 1 %, tính theo thửa nhỏ hơn) — chặn lưu, không bỏ qua được (KN US-PLOT-03); `overlaps` liệt kê `plot_ref`, `code`, `overlap_pct`. Cũng trả khi `/assign` sang HTX làm phát sinh chồng lấn khác HTX |
+| 409 | `geo.overlap_needs_confirm` | pf/geo: chồng lấn thửa **cùng HTX** hoặc với thửa nháp chưa gán HTX; `needs_confirm = true`, `overlaps`. Gửi lại với `confirm_overlap: true` để lưu — xung đột `same_coop_overlap` được mở để xem xét (HTX US-PLOT-04 AC-2) |
+| 409 | `geo.area_deviation_needs_confirm` | pf/geo: diện tích đo lệch so với `declared_area_ha` quá `geo.area_deviation_max_pct` (mặc định 5 %, HTX US-PLOT-02 AC-3); có `deviation_pct`, `needs_confirm`. Gửi lại với `confirm_overlap: true` |
 | 409 | `geo.version_conflict` | pf/geo: `supersedes_id` không phải phiên bản ranh giới hiện hành; problem có `current_boundary_id`, `current_version` |
 | 409 | `geo.plot_state_conflict` | pf/geo: thửa đã ngừng dùng, hoặc gán trùng trạng thái hiện tại |
 | 409 | `geo.plot_exists` | pf/geo: `plot_ref` do máy sinh đã được dùng |
@@ -173,4 +175,4 @@ Phản hồi phát lại theo Idempotency-Key có header `Idempotent-Replayed: t
 | 422 | `geo.format_unsupported` | pf/geo: định dạng chưa hỗ trợ (Shapefile) — chuyển sang GeoJSON hoặc KML |
 | 503 | `geo.dependency_unavailable` | pf/geo: chưa nối hoặc không gọi được pf/party (phạm vi), pf/masterdata (đơn vị hành chính, tham số) |
 
-Đồng bộ ngoại tuyến `plot_boundary` (docs/dev/sync-contract.md): chồng lấn cùng HTX hoặc sửa trên phiên bản cũ **không** bị từ chối — bản ghi được giữ, trả `status = conflict` kèm `conflict_id`. Bản ghi sai trả `rejected` với các mã ở trên.
+Đồng bộ ngoại tuyến `plot_boundary` (docs/dev/sync-contract.md): không chặn được máy — chồng lấn HTX khác, sửa trên phiên bản cũ, hoặc chồng lấn cùng HTX chưa xác nhận **không** bị từ chối; bản ghi được giữ, trả `status = conflict` kèm `conflict_id`. Chồng lấn cùng HTX có `confirm_overlap: true` → `accepted` (xung đột vẫn mở để xem xét). Lệch diện tích khai báo không chặn. Bản ghi sai trả `rejected` với các mã ở trên.

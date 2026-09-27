@@ -739,7 +739,7 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
     post:
-      summary: Tạo thửa với ranh giới đầu tiên (KN US-PLOT-01, HTX US-PLOT-02/03). Chồng lấn cùng HTX vượt ngưỡng → 409 geo.overlap; khác HTX → nhận, mở xung đột chờ xem xét
+      summary: Tạo thửa với ranh giới đầu tiên (KN US-PLOT-01, HTX US-PLOT-02/03). Chồng lấn HTX khác vượt ngưỡng → 409 geo.overlap_cross_coop (không bỏ qua được); cùng HTX/thửa nháp hoặc lệch diện tích khai báo > 5 % → 409 geo.overlap_needs_confirm / geo.area_deviation_needs_confirm, trừ khi confirm_overlap = true (khi đó mở xung đột xem xét)
       operationId: createPlot
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -778,6 +778,7 @@ paths:
                 commune_code: {type: string}
                 cooperative_ref: {type: [string, "null"], format: uuid}
                 exclude_plot_ref: {type: [string, "null"], format: uuid, description: "Thửa đang sửa (không tự so với chính nó)"}
+                declared_area_ha: {$ref: "#/components/schemas/Decimal"}
       responses:
         "200":
           description: Kết quả kiểm
@@ -785,14 +786,17 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [area_ha, point_count, tolerance_pct, blocking, flagged, can_save]
+                required: [area_ha, point_count, tolerance_pct, blocking, needs_confirm, deviation_pct, deviation_needs_confirm, can_save, requires_confirm]
                 properties:
                   area_ha: {$ref: "#/components/schemas/Decimal"}
                   point_count: {type: integer}
                   tolerance_pct: {$ref: "#/components/schemas/Decimal"}
-                  blocking: {type: array, items: {$ref: "#/components/schemas/PlotOverlap"}, description: "Cùng HTX — sẽ bị chặn khi lưu"}
-                  flagged: {type: array, items: {$ref: "#/components/schemas/PlotOverlap"}, description: "Khác HTX — lưu được nhưng chờ xem xét"}
-                  can_save: {type: boolean}
+                  blocking: {type: array, items: {$ref: "#/components/schemas/PlotOverlap"}, description: "HTX khác — bị chặn khi lưu (geo.overlap_cross_coop)"}
+                  needs_confirm: {type: array, items: {$ref: "#/components/schemas/PlotOverlap"}, description: "Cùng HTX / thửa nháp — lưu được khi confirm_overlap = true"}
+                  deviation_pct: {oneOf: [{$ref: "#/components/schemas/Decimal"}, {type: "null"}], description: "Lệch so với declared_area_ha (%)"}
+                  deviation_needs_confirm: {type: boolean}
+                  can_save: {type: boolean, description: "Không có chồng lấn HTX khác"}
+                  requires_confirm: {type: boolean, description: "Lưu được nhưng phải gửi confirm_overlap = true"}
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
   /v1/plots/{ref}:
@@ -834,7 +838,7 @@ paths:
               schema: {$ref: "#/components/schemas/PlotWriteResult"}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
-        "409": {description: "geo.overlap, geo.version_conflict (supersedes_id không phải phiên bản hiện hành; kèm current_boundary_id), geo.plot_state_conflict", content: {application/problem+json: {schema: {$ref: "#/components/schemas/Problem"}}}}
+        "409": {description: "geo.overlap_cross_coop, geo.overlap_needs_confirm, geo.area_deviation_needs_confirm, geo.version_conflict (supersedes_id không phải phiên bản hiện hành; kèm current_boundary_id), geo.plot_state_conflict", content: {application/problem+json: {schema: {$ref: "#/components/schemas/Problem"}}}}
         "422": {$ref: "#/components/responses/Problem"}
   /v1/plots/{ref}/assign:
     post:
@@ -853,6 +857,7 @@ paths:
                 cooperative_ref: {type: [string, "null"], format: uuid}
                 household_ref: {type: [string, "null"], format: uuid}
                 reason: {type: string}
+                confirm_overlap: {type: boolean, default: false, description: "Gán HTX mới làm đổi phân loại chồng lấn: HTX khác → 409 geo.overlap_cross_coop; cùng HTX/thửa nháp → cần xác nhận"}
       responses:
         "200":
           description: Đã gán
@@ -2346,6 +2351,8 @@ components:
         source: {type: string, enum: [kn_web, kn_field_app, htx_app, import_file, cadastral], default: kn_web}
         event_time: {type: string, format: date-time, description: "Lúc vẽ tại hiện trường (R-13); mặc định hiện tại"}
         device_id: {type: string}
+        declared_area_ha: {$ref: "#/components/schemas/Decimal", description: "Diện tích khai báo để đối chiếu (HTX US-PLOT-02 AC-3)"}
+        confirm_overlap: {type: boolean, default: false, description: "Xác nhận giữ nguyên dù chồng lấn cùng HTX/thửa nháp hoặc lệch diện tích > 5 % (HTX US-PLOT-04 AC-2). Không bỏ qua được chồng lấn HTX khác."}
     PlotCreateInput:
       allOf:
         - $ref: "#/components/schemas/PlotBoundaryInput"
@@ -2420,12 +2427,13 @@ components:
         plot: {$ref: "#/components/schemas/PlotFeature"}
         boundary: {$ref: "#/components/schemas/PlotBoundaryVersion"}
         conflicts: {type: array, items: {$ref: "#/components/schemas/BoundaryConflict"}}
-        flagged_overlaps: {type: array, items: {$ref: "#/components/schemas/PlotOverlap"}, description: "Chồng lấn khác HTX đã nhận nhưng chờ xem xét"}
+        flagged_overlaps: {type: array, items: {$ref: "#/components/schemas/PlotOverlap"}, description: "Chồng lấn cùng HTX/thửa nháp đã xác nhận, chờ xem xét"}
     PlotAttrResult:
       type: object
-      required: [plot, event]
+      required: [plot, conflicts, event]
       properties:
         plot: {$ref: "#/components/schemas/PlotFeature"}
+        conflicts: {type: array, items: {$ref: "#/components/schemas/BoundaryConflict"}}
         event:
           type: object
           required: [id, action, seq, event_time, reason, actor_ref]

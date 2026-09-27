@@ -1031,6 +1031,7 @@ paths:
         - {name: commune_code, in: query, schema: {type: string}, description: "Mặc định khi đối tượng không có commune_code"}
         - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}, description: "Mặc định khi đối tượng không có cooperative_ref"}
         - {name: source, in: query, schema: {type: string, enum: [import_file, cadastral], default: import_file}}
+        - {name: confirm_overlap, in: query, schema: {type: boolean, default: false}, description: "Nhận cả đối tượng chồng lấn cùng HTX/thửa nháp (mở xung đột xem xét); chồng lấn HTX khác luôn bị loại"}
       requestBody:
         required: true
         content:
@@ -1048,7 +1049,7 @@ paths:
                 properties:
                   format: {type: string, enum: [geojson, kml]}
                   accepted: {type: integer}
-                  flagged: {type: integer, description: "Đã tạo nhưng chồng lấn HTX khác — chờ xem xét"}
+                  flagged: {type: integer, description: "Đã tạo, chồng lấn cùng HTX/thửa nháp đã xác nhận — chờ xem xét"}
                   duplicate: {type: integer}
                   rejected: {type: integer}
                   features:
@@ -1060,7 +1061,7 @@ paths:
                         index: {type: integer}
                         name: {type: [string, "null"]}
                         status: {type: string, enum: [accepted, flagged, duplicate, rejected]}
-                        code: {type: [string, "null"], description: "Mã lỗi khi rejected, vd geo.too_few_points, geo.overlap"}
+                        code: {type: [string, "null"], description: "Mã lỗi khi rejected, vd geo.too_few_points, geo.overlap_cross_coop, geo.overlap_needs_confirm"}
                         reason: {type: [string, "null"]}
                         plot_ref: {type: [string, "null"], format: uuid}
                         plot_code: {type: [string, "null"]}

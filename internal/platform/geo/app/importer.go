@@ -20,7 +20,7 @@ import (
 // Trạng thái kết quả từng đối tượng nhập.
 const (
 	FeatureAccepted  = "accepted"  // đã tạo thửa
-	FeatureFlagged   = "flagged"   // đã tạo nhưng chồng lấn với HTX khác — chờ xem xét
+	FeatureFlagged   = "flagged"   // đã tạo, chồng lấn cùng HTX/thửa nháp đã xác nhận — chờ xem xét
 	FeatureDuplicate = "duplicate" // lần nhập lặp cùng Idempotency-Key
 	FeatureRejected  = "rejected"
 )
@@ -53,6 +53,8 @@ type ImportInput struct {
 	CommuneCode    string    // mặc định khi đối tượng không có thuộc tính commune_code
 	CooperativeRef uuid.UUID // mặc định khi đối tượng không có cooperative_ref
 	Source         string    // import_file (mặc định) | cadastral
+	// ConfirmOverlap: nhận cả đối tượng chồng lấn cùng HTX/thửa nháp (mở xung đột xem xét).
+	ConfirmOverlap bool
 	IdemKey        string
 }
 
@@ -124,7 +126,7 @@ func (s *Service) ImportPlots(ctx context.Context, in ImportInput) (ImportResult
 			Name:           f.Name,
 			CommuneCode:    firstOf(f.Props, "commune_code", "ma_xa"),
 			CooperativeRef: in.CooperativeRef,
-			Boundary:       BoundaryInput{Parsed: f.Geom, Points: f.Points, Source: in.Source},
+			Boundary:       BoundaryInput{Parsed: f.Geom, Points: f.Points, Source: in.Source, Confirm: in.ConfirmOverlap},
 			IdemKey:        in.IdemKey + ":" + strconv.Itoa(f.Index),
 		}
 		if cin.CommuneCode == "" {
