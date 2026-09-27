@@ -38,6 +38,210 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/masterdata/admin-units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Đơn vị con trực tiếp có hiệu lực tại thời điểm at (parent bỏ trống → các tỉnh) */
+        get: operations["listAdminUnits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/masterdata/admin-units/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Đơn vị có hiệu lực tại at (cùng một mã có thể là đơn vị khác nhau ở hai thời điểm) */
+        get: operations["getAdminUnit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/masterdata/admin-units/{code}/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cây đơn vị (chính nó và mọi đơn vị con cháu) có hiệu lực tại at */
+        get: operations["getAdminUnitTree"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/masterdata/admin-units/{code}/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mã hiện hành (tại at) của một mã có thể đã cũ — đi theo chuỗi sáp nhập/chia tách */
+        get: operations["currentAdminUnitCodes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/masterdata/catalogs/{catalog}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách mục của một danh mục (mặc định chỉ mục đang dùng) */
+        get: operations["listCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/masterdata/catalogs/{catalog}/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một mục danh mục (kể cả đã ngừng dùng) */
+        get: operations["getCatalogItem"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/masterdata/params/value": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Giá trị tham số ĐÃ PHÊ DUYỆT có hiệu lực tại thời điểm của sự việc (CGH QT-01, AC-02) */
+        get: operations["getParamValue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orgs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tổ chức trong phạm vi của người gọi (phân trang cursor) */
+        get: operations["listOrgs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cooperatives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** HTX/THT trong phạm vi, tìm theo tên, Mã HTX hoặc mã số thuế */
+        get: operations["listCooperatives"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cooperatives/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hồ sơ HTX (ngoài phạm vi → 404) */
+        get: operations["getCooperative"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cooperatives/{ref}/households": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nông hộ thành viên của HTX, kèm nhãn hiển thị đã che (không bao giờ có định danh đầy đủ) */
+        get: operations["listCooperativeHouseholds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/households": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tạo nông hộ — định danh chủ hộ đi thẳng vào kho định danh; trùng SĐT/CCCD → dùng lại mã cũ, báo "trùng" */
+        post: operations["createHousehold"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -87,6 +291,140 @@ export interface components {
             /** @description Thứ tự trong chuỗi băm của chủ thể */
             seq: number;
         };
+        AdminUnit: {
+            code: string;
+            name: string;
+            /**
+             * @description district chỉ có trong dữ liệu trước 01/07/2025
+             * @enum {string}
+             */
+            level: "province" | "commune" | "district";
+            parent_code: string | null;
+            /** Format: date */
+            valid_from: string;
+            /**
+             * Format: date
+             * @description Không bao gồm; null = còn hiệu lực
+             */
+            valid_to: string | null;
+            successor_codes: string[];
+        };
+        AdminUnitNode: components["schemas"]["AdminUnit"] & {
+            children: components["schemas"]["AdminUnitNode"][];
+        };
+        CatalogItem: {
+            catalog: string;
+            code: string;
+            name: string;
+            /** @description Số (vd expected_yield_t_per_ha) là chuỗi decimal */
+            attrs: {
+                [key: string]: string;
+            };
+            active: boolean;
+            deactivation_reason: string | null;
+            revision: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ParamValue: {
+            key: string;
+            /** @description Số thập phân dạng chuỗi (R-10) */
+            value: string | null;
+            text: string | null;
+            unit: string;
+            version: number;
+            /** Format: date-time */
+            effective_from: string;
+            source_doc: string;
+            /** Format: date-time */
+            approved_at: string;
+            /** Format: uuid */
+            param_version_id: string;
+            /** Format: uuid */
+            supersedes_id: string | null;
+            seq: number;
+        };
+        /** @enum {string} */
+        OrgKind: "ttkn_national" | "ttkn_province" | "extension_team" | "dcrd" | "cooperative" | "mkg" | "partner";
+        Org: {
+            /** Format: uuid */
+            ref: string;
+            kind: components["schemas"]["OrgKind"];
+            /** @description Mã đơn vị; với HTX là Mã HTX do hệ thống tự sinh (CGH BR-01) */
+            code: string;
+            name: string;
+            /** @description Mã tỉnh/xã hiện hành; null với cấp quốc gia */
+            admin_unit_code: string | null;
+            /** Format: uuid */
+            parent_ref: string | null;
+            /**
+             * Format: uuid
+             * @description Mã tham chiếu người đại diện trong kho định danh
+             */
+            representative_ref: string | null;
+            active: boolean;
+        };
+        /** @description Số thập phân dạng chuỗi (không float) */
+        Decimal: string;
+        Point: {
+            lat: components["schemas"]["Decimal"];
+            lon: components["schemas"]["Decimal"];
+        };
+        Cooperative: components["schemas"]["Org"] & {
+            /** @description Lý do vô hiệu hóa hiện tại */
+            status_reason: string | null;
+            tax_code: string | null;
+            /** @description Diện tích đăng ký hành chính (ha) */
+            area_ha: components["schemas"]["Decimal"] | null;
+            /** Format: date */
+            established_on: string | null;
+            location: components["schemas"]["Point"] | null;
+            /** @description true = chưa có toạ độ; bản đồ hiển thị tâm xã, nhãn "vị trí tạm" */
+            location_provisional: boolean;
+        };
+        Household: {
+            /**
+             * Format: uuid
+             * @description Mã tham chiếu trong kho định danh (R-41)
+             */
+            household_ref: string;
+            /** Format: uuid */
+            cooperative_ref: string | null;
+            commune_code: string;
+            cultivated_area_ha: components["schemas"]["Decimal"] | null;
+            /** Format: date */
+            member_since: string | null;
+            active: boolean;
+        };
+        HouseholdListItem: components["schemas"]["Household"] & {
+            /** @description Nhãn đã che, vd "Nguyễn V. A." */
+            label: string;
+            /** @description SĐT đã che */
+            masked_phone: string;
+            label_unavailable: boolean;
+        };
+        HouseholdInput: {
+            /** Format: uuid */
+            cooperative_ref: string;
+            /** @description Bỏ trống = xã của HTX */
+            commune_code?: string;
+            cultivated_area_ha?: components["schemas"]["Decimal"];
+            /** Format: date */
+            member_since?: string;
+            /** @description Chỉ chuyển vào kho định danh (mục đích registry.admin), không lưu ở pf_party */
+            identity: {
+                full_name: string;
+                phone: string;
+                national_id?: string;
+                address?: string;
+            };
+        };
+        HouseholdCreated: {
+            household: components["schemas"]["Household"];
+            duplicate: boolean;
+            /** @enum {string} */
+            duplicate_label?: "trùng";
+        };
     };
     responses: {
         /** @description RFC 9457 */
@@ -101,6 +439,10 @@ export interface components {
     };
     parameters: {
         IdempotencyKey: string;
+        /** @description Thời điểm tra (RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam). Mặc định là hiện tại. */
+        At: string;
+        UnitCode: string;
+        Catalog: "rice_variety" | "farm_stage" | "machine_type" | "season" | "pest";
     };
     requestBodies: never;
     headers: never;
@@ -190,6 +532,355 @@ export interface operations {
                 };
             };
             404: components["responses"]["Problem"];
+        };
+    };
+    listAdminUnits: {
+        parameters: {
+            query?: {
+                parent?: string;
+                /** @description Thời điểm tra (RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam). Mặc định là hiện tại. */
+                at?: components["parameters"]["At"];
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang, theo mã */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AdminUnit"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            /** @description masterdata.admin_unit_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    getAdminUnit: {
+        parameters: {
+            query?: {
+                /** @description Thời điểm tra (RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam). Mặc định là hiện tại. */
+                at?: components["parameters"]["At"];
+            };
+            header?: never;
+            path: {
+                code: components["parameters"]["UnitCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đơn vị */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUnit"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    getAdminUnitTree: {
+        parameters: {
+            query?: {
+                /** @description Thời điểm tra (RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam). Mặc định là hiện tại. */
+                at?: components["parameters"]["At"];
+            };
+            header?: never;
+            path: {
+                code: components["parameters"]["UnitCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cây */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUnitNode"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    currentAdminUnitCodes: {
+        parameters: {
+            query?: {
+                /** @description Thời điểm tra (RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam). Mặc định là hiện tại. */
+                at?: components["parameters"]["At"];
+            };
+            header?: never;
+            path: {
+                code: components["parameters"]["UnitCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mã hiện hành */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        code: string;
+                        /** Format: date-time */
+                        at: string;
+                        current_codes: string[];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    listCatalog: {
+        parameters: {
+            query?: {
+                include_inactive?: boolean;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                catalog: components["parameters"]["Catalog"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang, theo mã */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CatalogItem"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            /** @description masterdata.catalog_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    getCatalogItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalog: components["parameters"]["Catalog"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mục */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogItem"];
+                };
+            };
+            /** @description masterdata.catalog_item_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    getParamValue: {
+        parameters: {
+            query: {
+                key: string;
+                /** @description Thời điểm tra (RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam). Mặc định là hiện tại. */
+                at?: components["parameters"]["At"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Giá trị */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParamValue"];
+                };
+            };
+            /** @description masterdata.param_not_found */
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listOrgs: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["OrgKind"];
+                include_inactive?: boolean;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Org"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    listCooperatives: {
+        parameters: {
+            query?: {
+                q?: string;
+                include_inactive?: boolean;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Cooperative"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    getCooperative: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hồ sơ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cooperative"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    listCooperativeHouseholds: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HouseholdListItem"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    createHousehold: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HouseholdInput"];
+            };
+        };
+        responses: {
+            /** @description Trùng chủ hộ đã có (duplicate = true, duplicate_label = "trùng") */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdCreated"];
+                };
+            };
+            /** @description Đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdCreated"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
         };
     };
 }
