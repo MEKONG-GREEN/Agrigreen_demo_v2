@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.directive.issued/v1",
+  "title": "pf.extension.directive.issued — payload",
+  "description": "Chỉ đạo/cảnh báo khẩn đã ban hành tới đúng vùng đã chọn (KN US-TASK-03, BRD FR-19). Consumer gửi thông báo đẩy tới từng cán bộ trong target_refs; tiêu đề và nội dung đọc qua API. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.extension.directive.issued",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": ["directive_id", "severity", "audience_units", "province_codes", "target_refs", "issuer_ref", "issued_at", "expires_at"],
+  "properties": {
+    "directive_id":   { "type": "string", "format": "uuid" },
+    "severity":       { "type": "string", "enum": ["urgent", "normal"] },
+    "audience_units": { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "Mã tỉnh/xã nhận" },
+    "province_codes": { "type": "array", "items": { "type": "string" } },
+    "target_refs":    { "type": "array", "items": { "type": "string", "format": "uuid" }, "description": "actor_ref của cán bộ nhận (chụp từ danh bạ lúc ban hành)" },
+    "issuer_ref":     { "type": "string", "format": "uuid" },
+    "issued_at":      { "type": "string", "format": "date-time" },
+    "expires_at":     { "type": ["string", "null"], "format": "date-time" }
+  }
+}

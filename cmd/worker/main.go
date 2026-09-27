@@ -10,6 +10,7 @@
 //
 //	anchor       00:30 hằng ngày: neo chuỗi mọi cụm + manifest ký số (mục 8.2)
 //	idempotency  mỗi giờ: xóa Idempotency-Key hết hạn ở mọi cụm (R-51)
+//	extension_escalation  mỗi 15 phút: leo thang nhiệm vụ khuyến nông quá SLA lên TTKN tỉnh (KN US-TASK-02)
 //
 // Biến môi trường:
 //
@@ -17,7 +18,8 @@
 //	AG_DB_DIRECT_URL                   (tùy chọn) URL nối THẲNG PostgreSQL cho job + khóa leader;
 //	                                   mặc định AG_DB_URL. Không trỏ vào PgBouncer.
 //	AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER vai của job vận hành (migration shared/000002)
-//	AG_WORKER_JOBS                     mặc định cho -jobs: all | none | anchor,idempotency
+//	AG_WORKER_JOBS                     mặc định cho -jobs: all | none | anchor,idempotency,extension_escalation
+//	AG_DB_PASSWORD_EXTENSION_APP       (hoặc AG_DB_APP_PASSWORD) vai extension_app — khi có job extension_escalation
 //	AG_ANCHOR_SIGNING_KEY              Ed25519 (base64 seed 32 byte) — bắt buộc khi có job anchor
 //	AG_ANCHOR_KEY_ID                   (tùy chọn) mã khóa ghi vào manifest
 //	AG_S3_* hoặc AG_OBJSTORE_DIR       kho manifest (shared/objstore)
@@ -40,6 +42,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	amqp "github.com/rabbitmq/amqp091-go"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
@@ -269,9 +272,27 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			},
 		})
 	}
+	if selected(jobs, extension.JobEscalation) {
+		// Leo thang SLA nhiệm vụ khuyến nông: tìm tenant bằng pool ag_outbox_publisher
+		// (chỉ đọc 4 cột), ghi bằng vai extension_app của module (R-05).
+		dsn, err := dbadmin.RoleURL(direct, migrations.PF, "", extension.DBRole)
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		extPool, err := db.Open(ctx, dsn, db.Options{AppName: "worker-extension", MaxConns: 2})
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		prevClose := closeFn
+		closeFn = func() { extPool.Close(); prevClose() }
+		kn := extension.New(extPool, clk, extension.Deps{})
+		js = append(js, kn.Jobs(extension.OverdueTenants(out.pools[migrations.PF]), log)...)
+	}
 	if len(js) == 0 {
 		closeFn()
-		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency)")
+		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + extension.JobEscalation + ")")
 	}
 	out.s = &schedule.Scheduler{Clock: clk, Log: log, Jobs: js}
 	return out, closeFn, nil
