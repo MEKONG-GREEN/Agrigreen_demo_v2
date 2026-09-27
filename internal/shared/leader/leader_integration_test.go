@@ -48,7 +48,7 @@ func TestLeaderExclusive(t *testing.T) {
 func TestLeaderLostWhenSessionKilled(t *testing.T) {
 	ctx := context.Background()
 	env := pgtest.Get(t)
-	pool := env.Pool(t, migrations.PF, dbadmin.OutboxPublisher)
+	pool := env.DirectPool(t, migrations.PF, dbadmin.OutboxPublisher)
 	a, err := leader.TryAcquire(ctx, pool, lockID+1, leader.Options{Heartbeat: 50 * time.Millisecond})
 	if err != nil || a == nil {
 		t.Fatal(err)

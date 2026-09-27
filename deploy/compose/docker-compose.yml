@@ -150,7 +150,7 @@ services:
     restart: unless-stopped
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: agrigreen
@@ -167,7 +167,7 @@ services:
   # (không có DeleteObject — mục 22).
   minio-init:
     <<: *hardened
-    image: minio/mc:latest
+    image: quay.io/minio/mc:latest
     depends_on:
       minio: { condition: service_healthy }
     environment:

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -253,7 +254,11 @@ func TestGeodesicAreaNearCanTho(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Join(types, ",") != port.EventPlotCreated+","+port.EventPlotBoundaryRecorded {
+	// Hai sự kiện cùng một giao dịch: thứ tự id UUIDv7 trong cùng mili giây không bảo đảm.
+	sort.Strings(types)
+	want := []string{port.EventPlotBoundaryRecorded, port.EventPlotCreated}
+	sort.Strings(want)
+	if strings.Join(types, ",") != strings.Join(want, ",") {
 		t.Fatalf("sự kiện = %v", types)
 	}
 }
