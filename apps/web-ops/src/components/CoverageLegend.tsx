@@ -1,5 +1,4 @@
-import type { CoverageThresholds, DataSource } from "@/api/pending/cgh";
-import { COVERAGE_STYLES, legendEntries, type CoverageStatus } from "@/cgh/coverage";
+import { COVERAGE_STYLES, legendEntries, type CoverageStatus, type CoverageThresholds } from "@/cgh/coverage";
 
 export function CoverageLegend({ thresholds }: { thresholds: CoverageThresholds | null }) {
   return (
@@ -35,8 +34,8 @@ export function CoverageChip({ status }: { status: CoverageStatus }) {
   );
 }
 
-const SOURCE: Record<DataSource, string> = { app_htx: "[App HTX]", manual: "[Nhập tay]", none: "[Chưa có dữ liệu]" };
-
-export function SourceLabel({ source }: { source: DataSource }) {
-  return <span className="mute small">{SOURCE[source]}</span>;
+/** Nhãn nguồn dữ liệu theo QT-03: ưu tiên App HTX, dự phòng nhập tay. */
+export function SourceLabel({ source }: { source: string | null | undefined }) {
+  const text = source === "app_htx" ? "[App HTX]" : source === "manual" ? "[Nhập tay]" : "[Chưa có dữ liệu]";
+  return <span className="mute small">{text}</span>;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { compareDecimal, toScaled } from "@/lib/decimal";
-import { coverageStatus, DEFAULT_THRESHOLDS } from "./coverage";
+import { coverageStatus, DEFAULT_THRESHOLDS, fromMechStatus, thresholdsFromRun } from "./coverage";
 
 describe("coverageStatus — ngưỡng BRD CGH (Đủ ≥85, Chú ý 60–<85, Thiếu <60, Thừa ≥120)", () => {
   it.each([
@@ -62,5 +62,27 @@ describe("compareDecimal — không qua float", () => {
     expect(toScaled("abc")).toBeNull();
     expect(toScaled(".")).toBeNull();
     expect(() => compareDecimal("x", "1")).toThrow();
+  });
+});
+
+describe("pf/mechanization — trạng thái và ngưỡng đã lưu theo vụ", () => {
+  it("ánh xạ MechCoverageStatus", () => {
+    expect(fromMechStatus("shortage")).toBe("thieu");
+    expect(fromMechStatus("attention")).toBe("chu_y");
+    expect(fromMechStatus("sufficient")).toBe("du");
+    expect(fromMechStatus("surplus")).toBe("thua");
+    expect(fromMechStatus("no_data")).toBe("khong_du_lieu");
+    expect(fromMechStatus("no_norm")).toBe("chua_dinh_muc");
+    expect(fromMechStatus("unclassified")).toBe("chua_cau_hinh");
+  });
+  it("ngưỡng của lần cân đối; thiếu một ngưỡng → null", () => {
+    const p = (value: string) => ({ key: "k", value, version: 1, source_doc: "x" });
+    expect(thresholdsFromRun({ thresholds: { sufficient: p("85"), attention: p("60"), surplus: p("120.5") } })).toEqual({
+      sufficient_pct: "85",
+      attention_pct: "60",
+      surplus_pct: "120.5",
+    });
+    expect(thresholdsFromRun({ thresholds: { sufficient: p("85"), attention: null, surplus: p("120") } })).toBeNull();
+    expect(thresholdsFromRun(null)).toBeNull();
   });
 });

@@ -1,54 +1,83 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { loadBoundaries } from "@/api/adapters/boundaries";
+import { listChildUnits, unitLabel } from "@/api/adapters/units";
 import { unwrap } from "@/api/client";
-import { usePagedList } from "@/api/pagination";
+import type { MechCoverageItem, MechGroup } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
-import { COVERAGE_STYLES, coverageStatus } from "@/cgh/coverage";
+import { fromMechStatus, thresholdsFromRun } from "@/cgh/coverage";
 import { CoverageChip, CoverageLegend, SourceLabel } from "@/components/CoverageLegend";
 import { MapView, type AreaCollection } from "@/components/MapView";
 import { ProblemAlert } from "@/components/ProblemAlert";
-import { KpiTile, LoadMore, Loading, PageHead } from "@/components/ui";
+import { KpiTile, Loading, PageHead } from "@/components/ui";
 import { formatDecimal, formatInt } from "@/lib/decimal";
-import { formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { useAsync } from "@/lib/useAsync";
+import { useUnits } from "@/lib/useUnits";
 
-/** Cổng Cục KTHT — CHỈ XEM (BRD CGH FN-11 BR-02). Không có nút tạo/sửa/xoá. */
+const SEASON_NAME: Record<string, string> = { DX: "Đông Xuân", HT: "Hè Thu", TD: "Thu Đông" };
+
+/** Nhóm của khâu đang lọc (nếu có), không thì mức chung (= khâu thấp nhất). */
+function groupFor(item: MechCoverageItem, stage: string): MechGroup {
+  return (stage ? item.stages[stage] : undefined) ?? item.overall;
+}
+
+function GroupLine({ g, source }: { g: MechGroup; source?: string | null }) {
+  if (g.coverage_pct === null) return <div className="mute small">{g.status_label}</div>;
+  return (
+    <div className="small">
+      Đáp ứng <b style={{ display: "inline" }}>{formatDecimal(g.coverage_pct, 1)}%</b> · Cần {formatInt(g.required_whole)} · Hoạt động{" "}
+      {formatInt(g.capacity)} {source !== undefined ? <SourceLabel source={source} /> : null}
+    </div>
+  );
+}
+
+/**
+ * Cổng Cục KTHT — CHỈ XEM (BRD CGH FN-11 BR-02). Đọc KẾT QUẢ CÂN ĐỐI ĐÃ LƯU theo vụ (pf/mechanization),
+ * không tính lại ở client: mức đáp ứng, màu và nhãn do máy chủ trả.
+ */
 export default function CghPortalPage() {
   const { api } = useAuth();
-  const [season, setSeason] = useState("HT2026");
-  const [stage, setStage] = useState("thu_hoach");
+  const [runId, setRunId] = useState("");
+  const [stage, setStage] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
 
-  const seasons = useAsync(() => unwrap(api.GET("/v1/catalogs/{catalog}", { params: { path: { catalog: "season" } } })), [api]);
-  const stages = useAsync(() => unwrap(api.GET("/v1/catalogs/{catalog}", { params: { path: { catalog: "farm_stage" } } })), [api]);
-  const dash = useAsync(() => unwrap(api.GET("/v1/cgh/dashboard", { params: { query: { season } } })), [api, season]);
+  const runs = useAsync(() => unwrap(api.GET("/v1/mechanization/balance-runs")), [api]);
+  const stages = useAsync(() => unwrap(api.GET("/v1/masterdata/catalogs/{catalog}", { params: { path: { catalog: "farm_stage" } } })), [api]);
+  const dash = useAsync(() => unwrap(api.GET("/v1/mechanization/dashboard", { params: { query: { run_id: runId || undefined } } })), [api, runId]);
   const coverage = useAsync(
-    () => unwrap(api.GET("/v1/cgh/coverage", { params: { query: { season, stage, level: "province" } } })),
-    [api, season, stage],
+    () =>
+      unwrap(
+        api.GET("/v1/mechanization/coverage", {
+          params: { query: { level: "province", run_id: runId || undefined, farm_stage: stage || undefined } },
+        }),
+      ),
+    [api, runId, stage],
   );
-  const areas = useAsync(() => unwrap(api.GET("/v1/admin-units/boundaries", { params: { query: { level: "province" } } })), [api]);
-  const priority = usePagedList(
-    (cursor) => unwrap(api.GET("/v1/cgh/priority-cooperatives", { params: { query: { season, stage, cursor, limit: 10 } } })),
-    [api, season, stage],
-  );
+  const areas = useAsync(async () => loadBoundaries(api, (await listChildUnits(api, null)).map((u) => u.code)), [api]);
 
-  const thresholds = coverage.data ? coverage.data.thresholds : null;
-  const byUnit = useMemo(() => new Map((coverage.data?.items ?? []).map((i) => [i.admin_unit_code, i])), [coverage.data]);
+  const run = coverage.data?.run ?? dash.data?.run ?? null;
+  const thresholds = thresholdsFromRun(run);
+  const byUnit = useMemo(() => new Map((coverage.data?.items ?? []).map((i) => [i.unit_code ?? "", i])), [coverage.data]);
+  const priority = dash.data?.priority ?? [];
+  const units = useUnits(api, priority.map((p) => p.commune_code));
 
   const areaFc = useMemo<AreaCollection | null>(() => {
     if (!areas.data) return null;
     return {
       type: "FeatureCollection",
-      features: areas.data.features.map((f) => {
+      features: areas.data.collection.features.map((f) => {
         const item = byUnit.get(f.properties.code);
-        const status = coverageStatus(item?.coverage_pct ?? null, coverage.data ? thresholds : undefined);
-        return { ...f, properties: { ...f.properties, fill: COVERAGE_STYLES[status].fill } };
+        // Màu tô do backend trả (FN-08 BR-01); chưa có kết quả → xám "Chưa có dữ liệu".
+        return { ...f, properties: { ...f.properties, fill: item ? groupFor(item, stage).color : "#B8C2BD" } };
       }),
     };
-  }, [areas.data, byUnit, thresholds, coverage.data]);
+  }, [areas.data, byUnit, stage]);
 
   const sel = selected ? byUnit.get(selected) : undefined;
+  const kpis = dash.data?.kpis;
+  const noRun = coverage.error?.code === "mechanization.run_not_found";
 
   return (
     <>
@@ -57,27 +86,34 @@ export default function CghPortalPage() {
         subtitle={
           <>
             Cân đối cung – cầu máy theo định mức và diện tích · Chỉ xem
-            {coverage.data ? <> · Cập nhật {formatDateTime(coverage.data.as_of)}</> : null}
+            {run ? (
+              <>
+                {" "}
+                · Vụ {SEASON_NAME[run.season_code] ?? run.season_code} {run.season_year} · Mốc {formatDate(run.reference_date)} · Cân đối lúc{" "}
+                {formatDateTime(run.computed_at)}
+              </>
+            ) : null}
           </>
         }
       />
 
       <section className="grid4" aria-label="Chỉ số tổng quan" style={{ marginBottom: 16 }}>
-        <KpiTile color="green" icon="tractor" label="Tổng số máy" value={dash.data ? (dash.data.total_machines === null ? null : formatInt(dash.data.total_machines)) : "…"} />
-        <KpiTile color="blue" icon="coop" label="Tổng số HTX" value={dash.data ? (dash.data.total_cooperatives === null ? null : formatInt(dash.data.total_cooperatives)) : "…"} />
-        <KpiTile color="violet" icon="task" label="HTX đủ máy" value={dash.data ? (dash.data.cooperatives_sufficient === null ? null : formatInt(dash.data.cooperatives_sufficient)) : "…"} />
-        <KpiTile color="red" icon="alert" label="HTX thiếu máy" value={dash.data ? (dash.data.cooperatives_short === null ? null : formatInt(dash.data.cooperatives_short)) : "…"} />
+        <KpiTile color="green" icon="tractor" label="Tổng số máy" value={kpis ? formatInt(kpis.total_machines) : dash.loading ? "…" : null} />
+        <KpiTile color="blue" icon="coop" label="Tổng số HTX" value={kpis ? formatInt(kpis.total_cooperatives) : dash.loading ? "…" : null} />
+        <KpiTile color="violet" icon="task" label="HTX đủ máy" value={kpis ? formatInt(kpis.cooperatives_sufficient) : dash.loading ? "…" : null} />
+        <KpiTile color="red" icon="alert" label="HTX thiếu máy" value={kpis ? formatInt(kpis.cooperatives_shortage) : dash.loading ? "…" : null} />
       </section>
       {dash.error ? <ProblemAlert problem={dash.error} onRetry={dash.reload} /> : null}
 
       <div className="cgh-grid" style={{ marginBottom: 16 }}>
         <aside className="card sec stack" aria-label="Bộ lọc và chú giải">
           <div className="field">
-            <label htmlFor="cgh-season">Mùa vụ</label>
-            <select id="cgh-season" className="select" value={season} onChange={(e) => setSeason(e.target.value)}>
-              {(seasons.data?.items ?? [{ code: "HT2026", name: "Hè Thu 2026" }]).map((s) => (
-                <option key={s.code} value={s.code}>
-                  {s.name}
+            <label htmlFor="cgh-run">Mùa vụ (lần cân đối đã lưu)</label>
+            <select id="cgh-run" className="select" value={runId} onChange={(e) => setRunId(e.target.value)}>
+              <option value="">Mới nhất</option>
+              {(runs.data?.items ?? []).map((r) => (
+                <option key={r.id} value={r.id}>
+                  {SEASON_NAME[r.season_code] ?? r.season_code} {r.season_year} — {formatDate(r.computed_at)}
                 </option>
               ))}
             </select>
@@ -85,25 +121,37 @@ export default function CghPortalPage() {
           <div className="field">
             <label htmlFor="cgh-stage">Khâu sản xuất</label>
             <select id="cgh-stage" className="select" value={stage} onChange={(e) => setStage(e.target.value)}>
-              {(stages.data?.items ?? [{ code: "thu_hoach", name: "Thu hoạch" }]).map((s) => (
+              <option value="">Tất cả khâu (mức của khâu thấp nhất)</option>
+              {(stages.data?.items ?? []).map((s) => (
                 <option key={s.code} value={s.code}>
                   {s.name}
                 </option>
               ))}
             </select>
           </div>
-          <CoverageLegend thresholds={coverage.data ? thresholds : null} />
+          <CoverageLegend thresholds={thresholds} />
+          {run && run.missing_norms.length > 0 ? (
+            <p className="small" style={{ color: "var(--amber)" }}>
+              Chưa cấu hình định mức: {run.missing_norms.join(", ")}
+            </p>
+          ) : null}
         </aside>
 
         <div className="card" style={{ minHeight: 480, position: "relative" }}>
-          {coverage.error ? <ProblemAlert problem={coverage.error} onRetry={coverage.reload} /> : null}
+          {noRun ? (
+            <div className="alert alert-info" role="status">
+              Chưa có kết quả cân đối đã lưu cho vụ này. Bản đồ chỉ hiển thị kết quả đã lưu, không tính lại.
+            </div>
+          ) : coverage.error ? (
+            <ProblemAlert problem={coverage.error} onRetry={coverage.reload} />
+          ) : null}
           {areas.error ? <ProblemAlert problem={areas.error} onRetry={areas.reload} /> : null}
           <MapView label="Bản đồ mức đáp ứng máy theo tỉnh" areas={areaFc} onAreaClick={(c) => setSelected((s) => (s === c ? null : c))} height={480} />
         </div>
 
         <aside className="card sec cgh-right" aria-label="Chi tiết theo tỉnh">
           <div className="sec-h">
-            <h2>{sel ? sel.admin_unit_name : "Theo tỉnh"}</h2>
+            <h2>{sel ? sel.name : "Theo tỉnh"}</h2>
             {sel ? (
               <button type="button" className="btn btn-o btn-sm" onClick={() => setSelected(null)}>
                 Tất cả
@@ -112,23 +160,17 @@ export default function CghPortalPage() {
           </div>
           {coverage.loading && !coverage.data ? <Loading /> : null}
           <ul style={{ listStyle: "none" }}>
-            {(sel ? [sel] : coverage.data?.items ?? []).map((i) => {
-              const status = coverageStatus(i.coverage_pct, thresholds);
+            {(sel ? [sel] : (coverage.data?.items ?? [])).map((i) => {
+              const g = groupFor(i, stage);
               return (
-                <li key={i.admin_unit_code} style={{ padding: "10px 0", borderBottom: "1px solid #edf3ef" }}>
-                  <button type="button" onClick={() => setSelected(i.admin_unit_code)} style={{ textAlign: "left", width: "100%" }} aria-label={`Xem ${i.admin_unit_name}`}>
+                <li key={i.unit_code ?? i.name} style={{ padding: "10px 0", borderBottom: "1px solid #edf3ef" }}>
+                  <button type="button" onClick={() => setSelected(i.unit_code)} style={{ textAlign: "left", width: "100%" }} aria-label={`Xem ${i.name}`}>
                     <div className="row" style={{ justifyContent: "space-between" }}>
-                      <b>{i.admin_unit_name}</b>
-                      <CoverageChip status={status} />
+                      <b>{i.name}</b>
+                      <CoverageChip status={fromMechStatus(g.status)} />
                     </div>
-                    {i.coverage_pct === null ? (
-                      <div className="mute small">Chưa đủ dữ liệu để cân đối</div>
-                    ) : (
-                      <div className="small">
-                        Đáp ứng <b style={{ display: "inline" }}>{formatDecimal(i.coverage_pct, 1)}%</b> · Cần {formatInt(i.demand_machines)} · Hoạt động{" "}
-                        {formatInt(i.capacity_machines)} <SourceLabel source={i.source} />
-                      </div>
-                    )}
+                    <GroupLine g={g} />
+                    <div className="mute small">{formatInt(i.cooperatives)} HTX</div>
                   </button>
                 </li>
               );
@@ -140,9 +182,8 @@ export default function CghPortalPage() {
       <section className="card sec" aria-labelledby="pri-title">
         <div className="sec-h">
           <h2 id="pri-title">HTX cần ưu tiên</h2>
-          <span className="mute small">Sắp theo mức thiếu máy</span>
+          <span className="mute small">Mức đáp ứng thấp nhất trước</span>
         </div>
-        {priority.error ? <ProblemAlert problem={priority.error} onRetry={priority.reload} /> : null}
         <div className="tbl-wrap">
           <table className="tbl">
             <caption className="sr-only">HTX cần ưu tiên hỗ trợ cơ giới hoá</caption>
@@ -150,7 +191,7 @@ export default function CghPortalPage() {
               <tr>
                 <th scope="col">HTX</th>
                 <th scope="col">Địa bàn</th>
-                <th scope="col" className="num">Nhu cầu</th>
+                <th scope="col" className="num">Nhu cầu (máy)</th>
                 <th scope="col" className="num">Năng lực</th>
                 <th scope="col" className="num">Chênh lệch</th>
                 <th scope="col" className="num">Mức đáp ứng</th>
@@ -159,35 +200,34 @@ export default function CghPortalPage() {
               </tr>
             </thead>
             <tbody>
-              {priority.items.map((p) => (
-                <tr key={p.cooperative_id}>
-                  <td>
-                    <b>{p.name}</b>
-                    <div className="mute small">{p.code}</div>
-                  </td>
-                  <td>
-                    {p.commune_name}
-                    <div className="mute small">{p.province_name}</div>
-                  </td>
-                  <td className="num">{formatInt(p.demand_machines)}</td>
-                  <td className="num">{formatInt(p.capacity_machines)}</td>
-                  <td className="num" style={{ color: p.gap < 0 ? "var(--red)" : undefined, fontWeight: 700 }}>
-                    {p.gap < 0 ? `Thiếu ${-p.gap}` : p.gap === 0 ? "Đủ" : `Dư ${p.gap}`}
-                  </td>
-                  <td className="num">{p.coverage_pct === null ? "—" : `${formatDecimal(p.coverage_pct, 1)}%`}</td>
-                  <td>
-                    <CoverageChip status={coverageStatus(p.coverage_pct, thresholds)} />
-                  </td>
-                  <td>
-                    <SourceLabel source={p.source} />
-                  </td>
-                </tr>
-              ))}
+              {priority.map((p) => {
+                const gap = p.overall.capacity - p.overall.required_whole;
+                return (
+                  <tr key={p.cooperative_ref ?? p.name}>
+                    <td>
+                      <b>{p.name}</b>
+                    </td>
+                    <td>{unitLabel(units, p.commune_code)}</td>
+                    <td className="num">{formatInt(p.overall.required_whole)}</td>
+                    <td className="num">{formatInt(p.overall.capacity)}</td>
+                    <td className="num" style={{ color: gap < 0 ? "var(--red)" : undefined, fontWeight: 700 }}>
+                      {gap < 0 ? `Thiếu ${-gap}` : gap === 0 ? "Đủ" : `Dư ${gap}`}
+                    </td>
+                    <td className="num">{p.overall.coverage_pct === null ? "—" : `${formatDecimal(p.overall.coverage_pct, 1)}%`}</td>
+                    <td>
+                      <CoverageChip status={fromMechStatus(p.overall.status)} />
+                    </td>
+                    <td>
+                      <SourceLabel source={p.area_source} />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-        {priority.loading ? <Loading /> : null}
-        <LoadMore hasMore={priority.hasMore} loading={priority.loading} onClick={priority.loadMore} />
+        {dash.loading && !dash.data ? <Loading /> : null}
+        {dash.data && priority.length === 0 ? <p className="mute small">Chưa có HTX nào trong kết quả cân đối.</p> : null}
       </section>
     </>
   );

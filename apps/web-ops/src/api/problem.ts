@@ -23,7 +23,8 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   idempotency_key_required: "Thiếu khóa chống gửi trùng (Idempotency-Key). Vui lòng tải lại trang và thử lại.",
   unauthenticated: "Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.",
   forbidden: "Bạn không có quyền thực hiện thao tác này.",
-  mfa_required: "Chức năng quản trị yêu cầu xác thực hai yếu tố. Vui lòng đăng nhập lại bằng mã OTP.",
+  mfa_required:
+    "Chức năng quản trị (Admin API) bắt buộc xác thực hai yếu tố. Phiên hiện tại mới đăng nhập bằng mật khẩu — vui lòng đăng xuất rồi đăng nhập lại kèm mã OTP.",
   self_approval_forbidden: "Không được tự phê duyệt thay đổi do chính mình đề xuất. Cần một người phê duyệt khác.",
   not_found: "Không tìm thấy dữ liệu yêu cầu.",
   method_not_allowed: "Thao tác không được hỗ trợ.",
@@ -35,9 +36,50 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   internal_error: "Hệ thống gặp lỗi. Vui lòng thử lại sau hoặc gửi mã tra cứu cho bộ phận hỗ trợ.",
   "party.consent_not_found": "Không tìm thấy bản ghi đồng ý.",
   "party.consent_id_reused": "Mã bản ghi đồng ý đã được dùng cho bản ghi khác.",
+  // pf/masterdata
+  "masterdata.admin_unit_not_found": "Không tìm thấy đơn vị hành chính có hiệu lực với mã này.",
+  "masterdata.catalog_not_found": "Danh mục không tồn tại.",
+  "masterdata.param_version_not_found": "Không tìm thấy phiên bản tham số.",
+  "masterdata.param_invalid_transition": "Trạng thái phiên bản không cho phép thao tác này (có thể đã được người khác xử lý). Vui lòng tải lại.",
+  "masterdata.param_not_setter": "Chỉ người đặt tham số mới được gửi duyệt phiên bản này.",
+  "masterdata.param_correction_required":
+    "Đã có phiên bản được duyệt cùng ngày hiệu lực. Nhập “Lý do sửa” (ít nhất 10 ký tự) để ghi bản ghi bù.",
+  // pf/party
+  "party.org_not_found": "Không tìm thấy tổ chức/HTX, hoặc nằm ngoài phạm vi được phân quyền.",
+  "party.org_state_conflict": "Trạng thái tổ chức không cho phép thao tác này (hoặc không có gì thay đổi).",
+  "party.out_of_scope": "Thao tác nằm ngoài phạm vi TW → Tỉnh → Xã được phân quyền.",
+  "party.import_invalid": "Tệp nhập sai mẫu (thiếu cột bắt buộc full_name, phone, cooperative_code; sai CSV hoặc quá 200 dòng). Cả tệp bị từ chối.",
+  "party.dependency_unavailable": "Dịch vụ danh bạ tổ chức/kho định danh tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+  // pf/geo
+  "geo.admin_boundary_not_found": "Chưa nhập ranh giới hành chính cho đơn vị này.",
+  "geo.plot_not_found": "Không tìm thấy thửa, hoặc thửa nằm ngoài phạm vi.",
+  "geo.out_of_scope": "Thửa/HTX nằm ngoài phạm vi xã được phân quyền.",
+  "geo.plot_state_conflict": "Thửa đã ngừng dùng hoặc đã ở đúng trạng thái yêu cầu.",
+  "geo.overlap_cross_coop":
+    "Ranh giới chồng lấn thửa của HTX khác vượt ngưỡng cho phép — không thể lưu. Cần hiệu chỉnh ranh giới hoặc xử lý với HTX liên quan.",
+  "geo.overlap_needs_confirm":
+    "Ranh giới chồng lấn thửa cùng HTX hoặc thửa nháp chưa gán. Bạn có thể xác nhận vẫn lưu — hệ thống sẽ mở xung đột để xem xét.",
+  "geo.area_deviation_needs_confirm":
+    "Diện tích đo lệch quá 5% so với diện tích khai báo. Kiểm tra lại, hoặc xác nhận vẫn lưu nếu số đo là đúng.",
+  "geo.version_conflict": "Ranh giới đã được người khác cập nhật. Vui lòng tải lại để sửa trên phiên bản mới nhất.",
+  "geo.dependency_unavailable": "Dịch vụ bản đồ tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+  // pf/extension, pf/content, pf/mechanization
+  "extension.out_of_scope": "Dữ liệu nằm ngoài phạm vi TW → Tỉnh → Xã được phân quyền.",
+  "extension.dependency_unavailable": "Dịch vụ khuyến nông tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+  "content.document_not_found": "Tài liệu không tồn tại, đã gỡ hoặc nằm ngoài phạm vi.",
+  "content.dependency_unavailable": "Thư viện số tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+  "mechanization.run_not_found": "Chưa có kết quả cân đối đã lưu cho vụ này.",
+  "mechanization.dependency_unavailable": "Dịch vụ Bản đồ CGH tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
   network_error: "Không kết nối được máy chủ. Vui lòng kiểm tra mạng và thử lại.",
   invalid_response: "Máy chủ trả về dữ liệu không đúng định dạng.",
 };
+
+/** Mã 409 của pf/geo mà người dùng được phép "Xác nhận vẫn lưu" (gửi lại với confirm_overlap: true). */
+export const CONFIRMABLE_CODES: ReadonlySet<string> = new Set(["geo.overlap_needs_confirm", "geo.area_deviation_needs_confirm"]);
+
+export function isConfirmable(p: { code: string } | null | undefined): boolean {
+  return !!p && CONFIRMABLE_CODES.has(p.code);
+}
 
 const STATUS_FALLBACK: Readonly<Record<number, string>> = {
   400: "bad_request",

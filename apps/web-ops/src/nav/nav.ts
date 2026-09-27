@@ -1,4 +1,4 @@
-import type { ScopeLevel } from "@/api/pending/common";
+import type { ScopeLevel } from "@/auth/principal";
 import { hasRole, ROLES, type Principal } from "@/auth/principal";
 
 export type NavIcon =
@@ -59,20 +59,22 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         label: "Bản đồ CGH",
         icon: "tractor",
         levels: ["cuc"],
+        // cgh_viewer (Cục) và platform_admin; vai được kiểm lại ở backend.
       },
     ],
   },
   {
     label: "5. Quản trị",
     items: [
-      { href: "/quan-tri/danh-muc", label: "Danh mục dùng chung", icon: "catalog", roles: [ROLES.platformAdmin] },
+      { href: "/quan-tri/danh-muc", label: "Danh mục dùng chung", icon: "catalog", roles: [ROLES.platformAdmin, ROLES.masterdataAdmin] },
       {
         href: "/quan-tri/tham-so",
         label: "Tham số & phê duyệt",
         icon: "param",
         roles: [ROLES.platformAdmin, ROLES.paramSetter, ROLES.paramApprover],
       },
-      { href: "/quan-tri/to-chuc", label: "Cơ cấu tổ chức", icon: "org", roles: [ROLES.platformAdmin] },
+      { href: "/quan-tri/to-chuc", label: "Cơ cấu tổ chức", icon: "org", roles: [ROLES.platformAdmin, ROLES.registryAdmin] },
+      { href: "/quan-tri/nhap-nong-ho", label: "Nhập nông hộ từ tệp", icon: "coop", roles: [ROLES.platformAdmin, ROLES.registryAdmin] },
     ],
   },
 ];

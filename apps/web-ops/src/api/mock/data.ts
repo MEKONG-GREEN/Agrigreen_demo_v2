@@ -1,16 +1,27 @@
 // ============================================================================
 // DỮ LIỆU GIẢ LẬP (SYNTHETIC) — chỉ dùng khi NEXT_PUBLIC_API_MOCK=1.
-// - Tên tỉnh theo đơn vị hành chính sau sắp xếp 2025 vùng ĐBSCL; mã xã, tên xã,
-//   HTX, mã HTX, ranh giới đều là DỮ LIỆU MINH HOẠ, không khớp thực tế.
+// Hình dạng bản ghi = kiểu SINH từ contracts/openapi (src/api/types.ts), để giao diện chạy
+// giả lập giống hệt khi nối backend thật. Bản đồ CGH ở mock/mechanization.ts.
+// - Tên tỉnh theo đơn vị hành chính sau sắp xếp 2025 vùng ĐBSCL; mã xã, tên xã, HTX, mã HTX,
+//   ranh giới đều là DỮ LIỆU MINH HOẠ, không khớp thực tế.
 // - Ranh giới là lục giác quanh tâm gần đúng — KHÔNG phải ranh giới hành chính.
 // - Không có dữ liệu cá nhân thật: nhãn nông hộ là chuỗi ngẫu nhiên đã che.
 // ============================================================================
-import type { CghDashboard, CoverageItem, PriorityCooperative } from "../pending/cgh";
-import type { LibraryDocument } from "../pending/content";
-import type { SupportTask, TaskKind, TaskPriority, TaskStatus } from "../pending/extension";
-import type { AdminBoundaryCollection, Plot, Position } from "../pending/geo";
-import type { CatalogItem, CatalogSummary, Param, ParamProposal } from "../pending/masterdata";
-import type { AdminUnit, Cooperative, HouseholdSummary, Org } from "../pending/party";
+import type {
+  AdminBoundaryFeature,
+  AdminUnit,
+  CatalogItem,
+  CatalogName,
+  ContentDocument,
+  ContentKind,
+  Cooperative,
+  ExtTask,
+  HouseholdListItem,
+  Org,
+  ParamVersion,
+  PartyOrgEvent,
+  PlotFeature,
+} from "../types";
 
 /** PRNG có hạt giống để dữ liệu ổn định giữa các lần tải. */
 export function mulberry32(seed: number): () => number {
@@ -25,14 +36,26 @@ export function mulberry32(seed: number): () => number {
 }
 
 type LngLat = [number, number];
+type Position = number[];
 
 const rnd = mulberry32(20261001);
 const pick = <T,>(arr: readonly T[], r: () => number = rnd): T => arr[Math.floor(r() * arr.length)] as T;
 const int = (min: number, max: number, r: () => number = rnd) => Math.floor(min + r() * (max - min + 1));
+const iso = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString();
 
 function hexId(n: number, prefix: string): string {
   const h = n.toString(16).padStart(12, "0");
   return `01927b3e-${prefix}-7000-8000-${h}`;
+}
+
+/** Cộng hai chuỗi thập phân 4 chữ số lẻ bằng số nguyên (không float, R-10). */
+export function addDecimal4(a: string, b: string): string {
+  const scaled = (s: string) => {
+    const [i = "0", f = ""] = s.split(".");
+    return BigInt(i) * 10000n + BigInt((f + "0000").slice(0, 4));
+  };
+  const v = scaled(a) + scaled(b);
+  return `${v / 10000n}.${String(v % 10000n).padStart(4, "0")}`;
 }
 
 export interface MockProvince {
@@ -86,51 +109,59 @@ export function hexagon(center: LngLat, r: number): Position[][] {
   return [ring];
 }
 
+// --------------------------------------------------------------------------
+// pf/masterdata — đơn vị hành chính (GET /v1/masterdata/admin-units)
+// --------------------------------------------------------------------------
 export const ADMIN_UNITS: AdminUnit[] = [
-  ...PROVINCES.map((p) => ({
+  ...PROVINCES.map((p): AdminUnit => ({
     code: p.code,
     name: p.name,
-    level: "province" as const,
+    level: "province",
     parent_code: null,
     valid_from: "2025-07-01",
     valid_to: null,
+    successor_codes: [],
   })),
-  ...COMMUNES.map((c) => ({
+  ...COMMUNES.map((c): AdminUnit => ({
     code: c.code,
     name: c.name,
-    level: "commune" as const,
+    level: "commune",
     parent_code: c.province_code,
     valid_from: "2025-07-01",
     valid_to: null,
+    successor_codes: [],
   })),
 ];
 
-export function boundaries(level: "province" | "commune"): AdminBoundaryCollection {
-  if (level === "province") {
-    return {
-      type: "FeatureCollection",
-      features: PROVINCES.map((p) => ({
-        type: "Feature",
-        id: p.code,
-        geometry: { type: "Polygon", coordinates: hexagon(p.center, 0.26) },
-        properties: { code: p.code, name: p.name, level: "province", parent_code: null },
-      })),
-    };
-  }
+/** GET /v1/geo/admin-boundaries/{code} — null khi "chưa nhập ranh giới" (geo.admin_boundary_not_found). */
+export function boundaryOf(code: string): AdminBoundaryFeature | null {
+  const p = PROVINCES.find((x) => x.code === code);
+  const c = p ? undefined : COMMUNES.find((x) => x.code === code);
+  if (!p && !c) return null;
+  const level = p ? "province" : "commune";
+  const center = (p ?? c)!.center;
   return {
-    type: "FeatureCollection",
-    features: COMMUNES.map((c) => ({
-      type: "Feature",
-      id: c.code,
-      geometry: { type: "Polygon", coordinates: hexagon(c.center, 0.065) },
-      properties: { code: c.code, name: c.name, level: "commune", parent_code: c.province_code },
-    })),
+    type: "Feature",
+    id: code,
+    geometry: { type: "Polygon", coordinates: hexagon(center, p ? 0.26 : 0.065) },
+    properties: {
+      code,
+      level,
+      name: (p ?? c)!.name,
+      source: "Ranh giới minh hoạ (giả lập)",
+      area_ha: p ? "312480.5000" : "4120.2500",
+      imported_at: iso(30),
+    },
   };
 }
 
 // --------------------------------------------------------------------------
-// HTX
+// pf/party — tổ chức, HTX, nông hộ
 // --------------------------------------------------------------------------
+const NATIONAL_REF = hexId(1, "0e90");
+const provinceOrgRef = (pi: number) => hexId(100 + pi, "0e90");
+const communeOrgRef = (pi: number, ci: number) => hexId(1000 + pi * 10 + ci, "0e90");
+
 const COOP_PATTERNS = [
   "HTX Nông nghiệp {x}",
   "HTX Lúa chất lượng cao {x}",
@@ -138,408 +169,376 @@ const COOP_PATTERNS = [
   "HTX Sản xuất lúa giống {x}",
   "Tổ hợp tác lúa {x}",
 ];
-const OFFICERS = ["KNV Tổ 1 (giả lập)", "KNV Tổ 2 (giả lập)", "KNV Tổ 3 (giả lập)", null];
 
-export interface MockCooperative extends Cooperative {
-  location: LngLat;
+/** Thông tin phụ chỉ mock cần (không có trong hợp đồng). */
+export interface MockCooperative {
+  api: Cooperative;
+  province_code: string;
+  commune_name: string;
+  province_name: string;
+  member_households: number;
+  plots: number;
+  lnglat: LngLat;
 }
 
 export const COOPERATIVES: MockCooperative[] = COMMUNES.flatMap((c, ci) => {
   const count = 1 + (ci % 3);
-  const province = PROVINCES.find((p) => p.code === c.province_code);
-  return Array.from({ length: count }, (_, k) => {
+  const pi = PROVINCES.findIndex((p) => p.code === c.province_code);
+  const province = PROVINCES[pi];
+  return Array.from({ length: count }, (_, k): MockCooperative => {
     const n = ci * 3 + k + 1;
     const pattern = COOP_PATTERNS[(ci + k) % COOP_PATTERNS.length] ?? "HTX {x}";
     const place = c.name.replace(/^Xã /, "");
-    const area = (int(80, 950) + rnd()).toFixed(4);
-    const plots = int(20, 260);
+    const lnglat: LngLat = [c.center[0] + (rnd() - 0.5) * 0.08, c.center[1] + (rnd() - 0.5) * 0.08];
+    const active = n % 11 !== 0;
+    const provisional = n % 9 === 0;
     return {
-      id: hexId(n, "c00b"),
-      code: `MG-HTX-${c.province_code}-${String(n).padStart(3, "0")}`,
-      name: pattern.replace("{x}", k === 0 ? place : `${place} ${k + 1}`),
-      kind: pattern.startsWith("Tổ hợp tác") ? "tht" : "htx",
       province_code: c.province_code,
-      province_name: province?.name ?? "",
-      commune_code: c.code,
       commune_name: c.name,
+      province_name: province?.name ?? "",
       member_households: int(25, 340),
-      area_ha: area,
-      digitized_plots: plots,
-      status: n % 11 === 0 ? "inactive" : "active",
-      founded_on: `20${int(10, 23)}-0${int(1, 9)}-1${int(0, 9)}`,
-      extension_officer: pick(OFFICERS),
-      updated_at: new Date(Date.now() - int(1, 30) * 86_400_000).toISOString(),
-      location: [c.center[0] + (rnd() - 0.5) * 0.08, c.center[1] + (rnd() - 0.5) * 0.08] as LngLat,
-    } satisfies MockCooperative;
+      plots: int(8, 60),
+      lnglat,
+      api: {
+        ref: hexId(n, "c00b"),
+        kind: "cooperative",
+        code: `HTX${c.province_code}${String(n).padStart(5, "0")}`,
+        name: pattern.replace("{x}", k === 0 ? place : `${place} ${k + 1}`),
+        admin_unit_code: c.code,
+        parent_ref: communeOrgRef(pi, ci % 4),
+        representative_ref: null,
+        active,
+        status_reason: active ? null : "Tạm ngừng hoạt động theo đề nghị của HTX (giả lập)",
+        tax_code: `${1800000000 + n * 7919}`.slice(0, 10),
+        area_ha: `${int(80, 950)}.${String(int(0, 9999)).padStart(4, "0")}`,
+        established_on: `20${int(10, 23)}-0${int(1, 9)}-1${int(0, 9)}`,
+        location: provisional ? null : { lat: lnglat[1].toFixed(6), lon: lnglat[0].toFixed(6) },
+        location_provisional: provisional,
+      },
+    };
   });
 });
 
+export function findCoop(ref: string | undefined): MockCooperative | undefined {
+  return COOPERATIVES.find((c) => c.api.ref === ref);
+}
+
+const SURNAMES = ["Nguyễn", "Trần", "Lê", "Phạm", "Huỳnh", "Võ", "Đặng", "Bùi"];
 const INITIALS = "ABCDĐGHKLMNPQSTVX";
 
-/** Nhãn nông hộ ĐÃ CHE — sinh ngẫu nhiên, không tương ứng người thật. */
-function maskedLabel(r: () => number): string {
-  const tag = Math.floor(r() * 0xffff).toString(16).toUpperCase().padStart(4, "0");
-  const parts = Array.from({ length: 3 }, (_, i) => {
-    const ch = INITIALS[Math.floor(r() * INITIALS.length)] ?? "N";
-    return i === 2 ? ch : `${ch}${"*".repeat(2 + Math.floor(r() * 2))}`;
-  });
-  return `Hộ #${tag} · ${parts.join(" ")}`;
-}
-
-export function householdsOf(coop: Cooperative): HouseholdSummary[] {
-  const r = mulberry32(parseInt(coop.id.slice(-6), 16));
+/** GET /v1/cooperatives/{ref}/households — nhãn ĐÃ CHE sinh ngẫu nhiên, không tương ứng người thật. */
+export function householdsOf(coop: MockCooperative): HouseholdListItem[] {
+  const r = mulberry32(parseInt(coop.api.ref.slice(-6), 16));
   const n = Math.min(coop.member_households, 57);
-  return Array.from({ length: n }, (_, i) => ({
-    ref: hexId(parseInt(coop.id.slice(-4), 16) * 1000 + i, "a0e0"),
-    masked_label: maskedLabel(r),
-    commune_name: coop.commune_name,
-    plots: 1 + Math.floor(r() * 4),
-    area_ha: (0.3 + r() * 4.5).toFixed(4),
-    consent: r() < 0.82 ? "granted" : r() < 0.5 ? "withdrawn" : "none",
-    joined_on: `202${Math.floor(r() * 6)}-0${1 + Math.floor(r() * 9)}-15`,
-  }));
-}
-
-export function plotsOf(coop: Cooperative): Plot[] {
-  const r = mulberry32(parseInt(coop.id.slice(-5), 16) + 7);
-  const n = Math.min(coop.digitized_plots + 8, 64);
-  return Array.from({ length: n }, (_, i) => ({
-    id: hexId(parseInt(coop.id.slice(-4), 16) * 1000 + i, "b10f"),
-    label: `SPOT-${coop.province_code}-${String(parseInt(coop.id.slice(-3), 16) * 100 + i).padStart(6, "0")}`,
-    cooperative_id: coop.id,
-    commune_code: coop.commune_code,
-    area_ha: (0.4 + r() * 5).toFixed(4),
-    digitized: i < coop.digitized_plots,
-    crop: pick(["Lúa OM5451", "Lúa OM18", "Lúa Đài Thơm 8", "Lúa ST25"], r),
-    updated_at: new Date(Date.now() - Math.floor(r() * 40) * 86_400_000).toISOString(),
-  }));
-}
-
-// --------------------------------------------------------------------------
-// Tổ chức (cây TW → Tỉnh → Xã)
-// --------------------------------------------------------------------------
-const NATIONAL_REF = hexId(1, "0e90");
-export const ORGS: Org[] = [
-  { ref: NATIONAL_REF, kind: "ttkn_national", code: "TTKNQG", name: "Trung tâm Khuyến nông Quốc gia", admin_unit_code: null, parent_ref: null, active: true },
-  { ref: hexId(2, "0e90"), kind: "dcrd", code: "CUC-KTHT", name: "Cục Kinh tế hợp tác và PTNT", admin_unit_code: null, parent_ref: null, active: true },
-  { ref: hexId(3, "0e90"), kind: "mkg", code: "MKG", name: "Mekong Green", admin_unit_code: null, parent_ref: null, active: true },
-  ...PROVINCES.flatMap((p, pi): Org[] => {
-    const provRef = hexId(100 + pi, "0e90");
-    return [
-      { ref: provRef, kind: "ttkn_province", code: `TTKN-${p.code}`, name: `TTKN tỉnh ${p.name}`, admin_unit_code: p.code, parent_ref: NATIONAL_REF, active: true },
-      ...COMMUNES.filter((c) => c.province_code === p.code).map((c, ci): Org => ({
-        ref: hexId(1000 + pi * 10 + ci, "0e90"),
-        kind: "extension_team",
-        code: `TKN-${c.code}`,
-        name: `Tổ khuyến nông cộng đồng ${c.name}`,
-        admin_unit_code: c.code,
-        parent_ref: provRef,
-        active: !(pi === 5 && ci === 3),
-      })),
-    ];
-  }),
-];
-
-// --------------------------------------------------------------------------
-// Nhiệm vụ hỗ trợ
-// --------------------------------------------------------------------------
-const TASK_TITLES: { kind: TaskKind; title: string }[] = [
-  { kind: "hoi_dap", title: "Hỏi về liều lượng phân đạm giai đoạn đẻ nhánh" },
-  { kind: "phan_anh_khan", title: "Phản ánh rầy nâu mật độ cao trên ruộng lúa 35 ngày" },
-  { kind: "ho_tro_ky_thuat", title: "Hỗ trợ vẽ lại ranh giới thửa sau sáp nhập ấp" },
-  { kind: "hoi_dap", title: "Hỏi lịch xuống giống vụ Thu Đông theo khuyến cáo" },
-  { kind: "hau_kiem", title: "Hậu kiểm nhật ký canh tác tưới ướt khô xen kẽ" },
-  { kind: "phan_anh_khan", title: "Phản ánh xâm nhập mặn tại cống đầu kênh" },
-  { kind: "ho_tro_ky_thuat", title: "Hướng dẫn cài app hiện trường cho tổ hợp tác" },
-  { kind: "hoi_dap", title: "Hỏi cách xử lý rơm rạ không đốt đồng" },
-  { kind: "hau_kiem", title: "Đối chiếu diện tích sạ báo cáo với ranh giới thửa" },
-  { kind: "hoi_dap", title: "Hỏi dấu hiệu bệnh đạo ôn cổ bông" },
-];
-const TASK_SLA_HOURS: Record<TaskKind, number> = { phan_anh_khan: 24, hoi_dap: 48, ho_tro_ky_thuat: 72, hau_kiem: 120 };
-
-export const TASKS: SupportTask[] = Array.from({ length: 36 }, (_, i) => {
-  const t = TASK_TITLES[i % TASK_TITLES.length] ?? TASK_TITLES[0]!;
-  const coop = COOPERATIVES[(i * 7) % COOPERATIVES.length]!;
-  const ageH = int(1, 150);
-  const created = Date.now() - ageH * 3_600_000;
-  const due = created + TASK_SLA_HOURS[t.kind] * 3_600_000;
-  const status: TaskStatus = i % 6 === 5 ? "resolved" : i % 4 === 1 ? "in_progress" : "open";
-  const priority: TaskPriority = t.kind === "phan_anh_khan" ? "urgent" : pick(["low", "normal", "normal", "high"]);
-  return {
-    id: hexId(5000 + i, "7a5c"),
-    code: `NV-${coop.province_code}-${String(2600 + i)}`,
-    title: t.title,
-    kind: t.kind,
-    status,
-    priority,
-    province_name: coop.province_name,
-    commune_code: coop.commune_code,
-    commune_name: coop.commune_name,
-    cooperative_id: coop.id,
-    cooperative_name: coop.name,
-    assignee: status === "open" && i % 3 === 0 ? null : pick(OFFICERS.filter(Boolean) as string[]),
-    created_at: new Date(created).toISOString(),
-    due_at: new Date(due).toISOString(),
-    resolved_at: status === "resolved" ? new Date(created + int(2, TASK_SLA_HOURS[t.kind] + 12) * 3_600_000).toISOString() : null,
-  };
-});
-
-// --------------------------------------------------------------------------
-// Thư viện số
-// --------------------------------------------------------------------------
-const DOCS: Omit<LibraryDocument, "id" | "published_at" | "read_count">[] = [
-  { title: "Quy trình canh tác lúa chất lượng cao, phát thải thấp vùng ĐBSCL", kind: "quy_trinh", topic: "Canh tác", summary: "Các bước làm đất, gieo sạ, bón phân, tưới và thu hoạch theo hướng giảm phát thải.", version: 3, issued_by_level: "tw", issuer_name: "TTKN Quốc gia", has_local_supplement: true },
-  { title: "Sổ tay kỹ thuật tưới ướt khô xen kẽ (AWD)", kind: "so_tay", topic: "Tưới tiêu", summary: "Cách đặt ống quan trắc mực nước, thời điểm rút nước và cho nước vào lại.", version: 2, issued_by_level: "tw", issuer_name: "TTKN Quốc gia", has_local_supplement: false },
-  { title: "Hướng dẫn quản lý rơm rạ sau thu hoạch", kind: "so_tay", topic: "Sau thu hoạch", summary: "Thu gom, cuộn rơm, ủ phân hữu cơ; không đốt đồng.", version: 1, issued_by_level: "tw", issuer_name: "TTKN Quốc gia", has_local_supplement: true },
-  { title: "Video: Kỹ thuật sạ cụm kết hợp vùi phân", kind: "video", topic: "Gieo sạ", summary: "Minh hoạ vận hành máy sạ cụm và điều chỉnh lượng giống.", version: 1, issued_by_level: "tw", issuer_name: "TTKN Quốc gia", has_local_supplement: false },
-  { title: "Quy trình “1 Phải 5 Giảm” trong sản xuất lúa", kind: "quy_trinh", topic: "Canh tác", summary: "Phải dùng giống xác nhận; giảm giống, phân đạm, thuốc BVTV, nước tưới, thất thoát sau thu hoạch.", version: 4, issued_by_level: "tw", issuer_name: "TTKN Quốc gia", has_local_supplement: true },
-  { title: "Hướng dẫn nhận biết và phòng trừ rầy nâu", kind: "infographic", topic: "Bảo vệ thực vật", summary: "Ngưỡng mật độ, thời điểm phun, luân phiên hoạt chất.", version: 2, issued_by_level: "tw", issuer_name: "TTKN Quốc gia", has_local_supplement: false },
-  { title: "Hướng dẫn phòng bệnh đạo ôn lá và cổ bông", kind: "so_tay", topic: "Bảo vệ thực vật", summary: "Điều kiện phát sinh, triệu chứng, biện pháp canh tác và hoá học.", version: 1, issued_by_level: "tw", issuer_name: "TTKN Quốc gia", has_local_supplement: false },
-  { title: "Bổ sung đặc thù: lịch xuống giống vùng ngập sâu Đồng Tháp", kind: "van_ban", topic: "Lịch thời vụ", summary: "Khung lịch né lũ cho các xã vùng trũng.", version: 1, issued_by_level: "tinh", issuer_name: "TTKN tỉnh Đồng Tháp", has_local_supplement: false },
-  { title: "Bổ sung đặc thù: ứng phó xâm nhập mặn vụ Đông Xuân tại Cà Mau", kind: "van_ban", topic: "Tưới tiêu", summary: "Theo dõi độ mặn, lịch đóng mở cống, giống chịu mặn.", version: 2, issued_by_level: "tinh", issuer_name: "TTKN tỉnh Cà Mau", has_local_supplement: false },
-  { title: "Video: Vận hành thiết bị bay phun thuốc an toàn", kind: "video", topic: "Cơ giới hoá", summary: "Kiểm tra trước bay, pha thuốc, vùng đệm an toàn.", version: 1, issued_by_level: "tw", issuer_name: "TTKN Quốc gia", has_local_supplement: false },
-  { title: "Sổ tay ghi nhật ký canh tác điện tử cho HTX", kind: "so_tay", topic: "Chuyển đổi số", summary: "Ghi nhật ký trên app hiện trường, chụp ảnh minh chứng, đồng bộ khi có mạng.", version: 2, issued_by_level: "tw", issuer_name: "TTKN Quốc gia", has_local_supplement: false },
-  { title: "Quy trình sản xuất lúa giống cấp xác nhận", kind: "quy_trinh", topic: "Giống", summary: "Chọn ruộng, khử lẫn, thu hoạch và bảo quản giống.", version: 1, issued_by_level: "tw", issuer_name: "TTKN Quốc gia", has_local_supplement: false },
-];
-
-export const DOCUMENTS: LibraryDocument[] = DOCS.map((d, i) => ({
-  ...d,
-  id: hexId(7000 + i, "d0c0"),
-  published_at: new Date(Date.now() - (i * 9 + 3) * 86_400_000).toISOString(),
-  read_count: int(40, 4800),
-}));
-
-// --------------------------------------------------------------------------
-// Danh mục & tham số
-// --------------------------------------------------------------------------
-export const CATALOGS: Record<string, { name: string; items: CatalogItem[] }> = {
-  rice_variety: {
-    name: "Giống lúa",
-    items: [
-      ["OM5451", "OM5451", { nhom: "Thơm nhẹ", tgst: "95–100 ngày" }, true],
-      ["OM18", "OM18", { nhom: "Chất lượng cao", tgst: "95–100 ngày" }, true],
-      ["DT8", "Đài Thơm 8", { nhom: "Thơm", tgst: "95–100 ngày" }, true],
-      ["ST25", "ST25", { nhom: "Đặc sản", tgst: "100–105 ngày" }, true],
-      ["OM4900", "OM4900", { nhom: "Chất lượng cao", tgst: "95–100 ngày" }, true],
-      ["IR50404", "IR50404", { nhom: "Thường", tgst: "90–95 ngày", ghi_chu: "Ngừng khuyến cáo" }, false],
-    ].map(([code, name, attrs, active]) => ({ catalog: "rice_variety", code: code as string, name: name as string, attrs: attrs as Record<string, string>, active: active as boolean })),
-  },
-  farm_stage: {
-    name: "Khâu sản xuất",
-    items: [
-      ["lam_dat", "Làm đất"],
-      ["gieo_sa", "Gieo sạ / cấy"],
-      ["cham_soc", "Chăm sóc, phun thuốc"],
-      ["thu_hoach", "Thu hoạch"],
-      ["sau_thu_hoach", "Sấy, xử lý rơm rạ"],
-    ].map(([code, name]) => ({ catalog: "farm_stage", code: code!, name: name!, attrs: {}, active: true })),
-  },
-  machine_type: {
-    name: "Chủng loại máy",
-    items: [
-      ["may_cay", "Máy cày / xới", "lam_dat"],
-      ["may_sa", "Máy sạ cụm / máy cấy", "gieo_sa"],
-      ["drone", "Thiết bị bay phun thuốc", "cham_soc"],
-      ["may_gat", "Máy gặt đập liên hợp", "thu_hoach"],
-      ["may_say", "Máy sấy", "sau_thu_hoach"],
-      ["may_cuon_rom", "Máy cuộn rơm", "sau_thu_hoach"],
-    ].map(([code, name, stage]) => ({ catalog: "machine_type", code: code!, name: name!, attrs: { khau: stage! }, active: true })),
-  },
-  season: {
-    name: "Mùa vụ",
-    items: [
-      ["DX2026", "Đông Xuân 2025–2026", false],
-      ["HT2026", "Hè Thu 2026", true],
-      ["TD2026", "Thu Đông 2026", true],
-    ].map(([code, name, active]) => ({ catalog: "season", code: code as string, name: name as string, attrs: {}, active: active as boolean })),
-  },
-  pest: {
-    name: "Sâu bệnh hại",
-    items: [
-      ["ray_nau", "Rầy nâu"],
-      ["dao_on", "Bệnh đạo ôn"],
-      ["sau_cuon_la", "Sâu cuốn lá"],
-      ["oc_buou_vang", "Ốc bươu vàng"],
-      ["chay_bia_la", "Bệnh cháy bìa lá"],
-    ].map(([code, name]) => ({ catalog: "pest", code: code!, name: name!, attrs: {}, active: true })),
-  },
-};
-
-export function catalogSummaries(): CatalogSummary[] {
-  return Object.entries(CATALOGS).map(([catalog, c]) => ({ catalog, name: c.name, item_count: c.items.length }));
-}
-
-const iso = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString();
-
-export const PARAMS: Param[] = [
-  {
-    key: "cgh.coverage.sufficient_pct",
-    name: "Ngưỡng Đủ máy (mức đáp ứng)",
-    unit: "%",
-    kind: "decimal",
-    current: { version: 1, value: "85", text: null, unit: "%", effective_from: "2026-01-01", source_doc: "Văn bản DCRD (giả lập) số 01/2026", approved_by: "Quản trị viên B (giả lập)", approved_at: iso(260) },
-    pending: [],
-  },
-  {
-    key: "cgh.coverage.attention_pct",
-    name: "Ngưỡng Cần chú ý",
-    unit: "%",
-    kind: "decimal",
-    current: { version: 1, value: "60", text: null, unit: "%", effective_from: "2026-01-01", source_doc: "Văn bản DCRD (giả lập) số 01/2026", approved_by: "Quản trị viên B (giả lập)", approved_at: iso(260) },
-    pending: [],
-  },
-  {
-    key: "cgh.coverage.surplus_pct",
-    name: "Ngưỡng Thừa máy",
-    unit: "%",
-    kind: "decimal",
-    current: { version: 1, value: "120", text: null, unit: "%", effective_from: "2026-01-01", source_doc: "Văn bản DCRD (giả lập) số 01/2026", approved_by: "Quản trị viên B (giả lập)", approved_at: iso(260) },
-    pending: [],
-  },
-  {
-    key: "cgh.norm_ha_per_machine:may_gat:thu_hoach",
-    name: "Định mức máy gặt đập liên hợp — khâu thu hoạch",
-    unit: "ha/máy/vụ",
-    kind: "decimal",
-    current: { version: 2, value: "50", text: null, unit: "ha/máy/vụ", effective_from: "2026-04-01", source_doc: "Văn bản DCRD (giả lập) số 07/2026", approved_by: "Quản trị viên B (giả lập)", approved_at: iso(180) },
-    pending: [],
-  },
-  {
-    key: "cgh.norm_ha_per_machine:drone:cham_soc",
-    name: "Định mức thiết bị bay — khâu chăm sóc",
-    unit: "ha/máy/vụ",
-    kind: "decimal",
-    current: { version: 1, value: "300", text: null, unit: "ha/máy/vụ", effective_from: "2026-01-01", source_doc: "Văn bản DCRD (giả lập) số 01/2026", approved_by: "Quản trị viên B (giả lập)", approved_at: iso(260) },
-    pending: [],
-  },
-  {
-    key: "kn.task_sla_hours:phan_anh_khan",
-    name: "SLA xử lý phản ánh khẩn",
-    unit: "giờ",
-    kind: "decimal",
-    current: { version: 1, value: "24", text: null, unit: "giờ", effective_from: "2026-07-01", source_doc: "Quyết định TTKNQG (giả lập) 12/QĐ", approved_by: "Quản trị viên B (giả lập)", approved_at: iso(90) },
-    pending: [],
-  },
-  {
-    key: "kn.task_sla_hours:hoi_dap",
-    name: "SLA trả lời hỏi đáp kỹ thuật",
-    unit: "giờ",
-    kind: "decimal",
-    current: { version: 1, value: "48", text: null, unit: "giờ", effective_from: "2026-07-01", source_doc: "Quyết định TTKNQG (giả lập) 12/QĐ", approved_by: "Quản trị viên B (giả lập)", approved_at: iso(90) },
-    pending: [],
-  },
-];
-
-function proposal(p: Partial<ParamProposal> & Pick<ParamProposal, "key" | "value" | "proposed_by" | "proposed_by_name" | "reason">): ParamProposal {
-  return {
-    id: hexId(9000 + Math.floor(rnd() * 900), "9a7a"),
-    text: null,
-    unit: PARAMS.find((x) => x.key === p.key)?.unit ?? "",
-    effective_from: "2026-11-01",
-    source_doc: "Văn bản (giả lập) số 21/2026",
-    status: "pending",
-    proposed_at: iso(1),
-    decided_by: null,
-    decided_by_name: null,
-    decided_at: null,
-    decision_note: null,
-    ...p,
-  };
-}
-
-// Một đề xuất do "người đặt" (persona setter) tạo — người này KHÔNG được tự duyệt.
-PARAMS[3]!.pending.push(
-  proposal({ key: PARAMS[3]!.key, value: "45", proposed_by: "mock-admin-setter", proposed_by_name: "Quản trị viên A (giả lập)", reason: "Cập nhật theo năng suất máy thực tế vụ Hè Thu" }),
-);
-// Một đề xuất do người khác tạo — persona setter/approver có thể thử duyệt.
-PARAMS[6]!.pending.push(
-  proposal({ key: PARAMS[6]!.key, value: "36", proposed_by: "mock-admin-other", proposed_by_name: "Quản trị viên C (giả lập)", reason: "Rút ngắn thời gian phản hồi hỏi đáp theo chỉ đạo" }),
-);
-
-// --------------------------------------------------------------------------
-// Bản đồ CGH (Cục KTHT)
-// --------------------------------------------------------------------------
-const COVERAGE_BY_PROVINCE: Record<string, { demand: number; capacity: number } | null> = {
-  "82": { demand: 412, capacity: 358 }, // ~86.9% Đủ
-  "91": { demand: 530, capacity: 318 }, // 60% đúng ngưỡng → Cần chú ý
-  "92": { demand: 296, capacity: 154 }, // ~52% Thiếu
-  "86": { demand: 188, capacity: 236 }, // ~125.5% Thừa
-  "96": { demand: 244, capacity: 190 }, // ~77.9% Cần chú ý
-  "80": null, // Chưa có dữ liệu
-};
-
-function pct(capacity: number, demand: number): string {
-  // Tính bằng số nguyên để giữ 2 chữ số thập phân chính xác (không float cho hiển thị ngưỡng).
-  const scaled = Math.round((capacity * 10000) / demand);
-  return `${Math.floor(scaled / 100)}.${String(scaled % 100).padStart(2, "0")}`;
-}
-
-export function coverageItems(stageFactor = 1): CoverageItem[] {
-  return PROVINCES.map((p) => {
-    const c = COVERAGE_BY_PROVINCE[p.code];
-    if (!c) {
-      return { admin_unit_code: p.code, admin_unit_name: p.name, demand_machines: null, capacity_machines: null, coverage_pct: null, source: "none", updated_at: null };
-    }
-    const demand = Math.max(1, Math.round(c.demand * stageFactor));
-    const capacity = Math.round(c.capacity * stageFactor);
+  return Array.from({ length: n }, (_, i): HouseholdListItem => {
+    const unavailable = r() < 0.04;
+    const a = INITIALS[Math.floor(r() * INITIALS.length)] ?? "V";
+    const b = INITIALS[Math.floor(r() * INITIALS.length)] ?? "A";
     return {
-      admin_unit_code: p.code,
-      admin_unit_name: p.name,
-      demand_machines: demand,
-      capacity_machines: capacity,
-      coverage_pct: pct(capacity, demand),
-      source: p.code === "96" ? "manual" : "app_htx",
-      updated_at: iso(p.code === "96" ? 6 : 1),
+      household_ref: hexId(parseInt(coop.api.ref.slice(-4), 16) * 1000 + i, "a0e0"),
+      cooperative_ref: coop.api.ref,
+      commune_code: coop.api.admin_unit_code ?? "",
+      cultivated_area_ha: r() < 0.05 ? null : `${(0.3 + r() * 4.5).toFixed(4)}`,
+      member_since: `202${Math.floor(r() * 6)}-0${1 + Math.floor(r() * 9)}-15`,
+      active: r() > 0.06,
+      label: unavailable ? "" : `${pick(SURNAMES, r)} ${a}. ${b}.`,
+      masked_phone: `09******${String(Math.floor(r() * 100)).padStart(2, "0")}`,
+      label_unavailable: unavailable,
     };
   });
 }
 
-export function priorityCooperatives(stage: string): PriorityCooperative[] {
-  const r = mulberry32(stage.length * 97 + 11);
-  return COOPERATIVES.filter((c) => c.province_code !== "80" && c.status === "active")
-    .map((c) => {
-      const demand = 2 + Math.floor(r() * 9);
-      const capacity = Math.max(0, demand + Math.floor(r() * 7) - 4);
-      return {
-        cooperative_id: c.id,
-        code: c.code,
-        name: c.name,
-        province_name: c.province_name,
-        commune_name: c.commune_name,
-        stage,
-        machine_type: stage === "cham_soc" ? "drone" : stage === "lam_dat" ? "may_cay" : "may_gat",
-        demand_machines: demand,
-        capacity_machines: capacity,
-        coverage_pct: pct(capacity, demand),
-        gap: capacity - demand,
-        source: r() < 0.8 ? "app_htx" : "manual",
-      } satisfies PriorityCooperative;
-    })
-    .sort((a, b) => a.gap - b.gap || a.capacity_machines - b.capacity_machines);
+/** GET /v1/cooperatives/{ref}/plots — PlotFeature quanh vị trí HTX. */
+export function plotsOf(coop: MockCooperative): PlotFeature[] {
+  const r = mulberry32(parseInt(coop.api.ref.slice(-5), 16) + 7);
+  return Array.from({ length: coop.plots }, (_, i): PlotFeature => {
+    const ref = hexId(parseInt(coop.api.ref.slice(-4), 16) * 1000 + i, "b10f");
+    const status = i % 13 === 12 ? "retired" : i % 7 === 6 ? "draft" : "active";
+    const center: LngLat = [coop.lnglat[0] + (r() - 0.5) * 0.02, coop.lnglat[1] + (r() - 0.5) * 0.02];
+    return {
+      type: "Feature",
+      id: ref,
+      geometry: { type: "Polygon", coordinates: hexagon(center, 0.0012) },
+      properties: {
+        ref,
+        code: `TH${String(parseInt(coop.api.ref.slice(-3), 16) * 100 + i).padStart(7, "0")}`,
+        name: i % 3 === 0 ? `Thửa ${i + 1} ấp ${1 + (i % 5)}` : null,
+        commune_code: coop.api.admin_unit_code ?? "",
+        cooperative_ref: status === "draft" ? null : coop.api.ref,
+        household_ref: null,
+        status,
+        status_reason: status === "retired" ? "Chuyển mục đích sử dụng đất (giả lập)" : null,
+        version: 1 + (i % 3),
+        boundary_id: hexId(parseInt(coop.api.ref.slice(-4), 16) * 1000 + i, "b0dd"),
+        area_ha: (0.4 + r() * 5).toFixed(4),
+        source: pick(["kn_web", "kn_field_app", "htx_app", "import_file"] as const, r),
+        needs_review: i % 17 === 5,
+        revision: 1 + (i % 4),
+        created_at: iso(60 + i),
+        updated_at: iso(Math.floor(r() * 40)),
+      },
+    };
+  });
 }
 
-export function cghDashboard(season: string): CghDashboard {
-  const pri = priorityCooperatives("thu_hoach");
+/** GET /v1/orgs — danh sách phẳng, client dựng cây theo parent_ref. */
+export const ORGS: Org[] = [
+  { ref: NATIONAL_REF, kind: "ttkn_national", code: "TTKNQG", name: "Trung tâm Khuyến nông Quốc gia", admin_unit_code: null, parent_ref: null, representative_ref: null, active: true },
+  { ref: hexId(2, "0e90"), kind: "dcrd", code: "CUC-KTHT", name: "Cục Kinh tế hợp tác và PTNT", admin_unit_code: null, parent_ref: null, representative_ref: null, active: true },
+  { ref: hexId(3, "0e90"), kind: "mkg", code: "MKG", name: "Mekong Green", admin_unit_code: null, parent_ref: null, representative_ref: null, active: true },
+  ...PROVINCES.flatMap((p, pi): Org[] => [
+    { ref: provinceOrgRef(pi), kind: "ttkn_province", code: `TTKN-${p.code}`, name: `TTKN tỉnh ${p.name}`, admin_unit_code: p.code, parent_ref: NATIONAL_REF, representative_ref: null, active: true },
+    ...COMMUNES.filter((c) => c.province_code === p.code).map((c, ci): Org => ({
+      ref: communeOrgRef(pi, ci),
+      kind: "extension_team",
+      code: `TKN-${c.code}`,
+      name: `Tổ khuyến nông cộng đồng ${c.name}`,
+      admin_unit_code: c.code,
+      parent_ref: provinceOrgRef(pi),
+      representative_ref: null,
+      active: !(pi === 5 && ci === 3),
+    })),
+  ]),
+  ...COOPERATIVES.map((c): Org => {
+    const { ref, kind, code, name, admin_unit_code, parent_ref, representative_ref, active } = c.api;
+    return { ref, kind, code, name, admin_unit_code, parent_ref, representative_ref, active };
+  }),
+];
+
+const ADMIN_ACTOR = "01927b3e-ad00-7000-8000-000000000001";
+
+/** Admin GET /v1/orgs/{ref}/events — sổ biến động (mock ghi thêm khi đổi tên). */
+export const ORG_EVENTS = new Map<string, PartyOrgEvent[]>();
+
+export function orgEvents(org: Org): PartyOrgEvent[] {
+  let list = ORG_EVENTS.get(org.ref);
+  if (!list) {
+    list = [
+      {
+        seq: 1,
+        action: "created",
+        event_time: iso(400),
+        recorded_at: iso(400),
+        actor_ref: ADMIN_ACTOR,
+        reason: null,
+        name: org.name,
+        admin_unit_code: org.admin_unit_code,
+        parent_ref: org.parent_ref,
+        prev_parent_ref: null,
+        prev_admin_unit_code: null,
+        active: true,
+      },
+    ];
+    if (!org.active) {
+      list.push({ ...list[0]!, seq: 2, action: "deactivated", event_time: iso(20), recorded_at: iso(20), reason: "Ngừng hoạt động (giả lập)", active: false });
+    }
+    ORG_EVENTS.set(org.ref, list);
+  }
+  return list;
+}
+
+// --------------------------------------------------------------------------
+// pf/extension — nhiệm vụ hỗ trợ
+// --------------------------------------------------------------------------
+const TASK_TEXT: { category: ExtTask["category"]; text: string }[] = [
+  { category: "ky_thuat", text: "Hỏi về liều lượng phân đạm giai đoạn đẻ nhánh cho giống OM18" },
+  { category: "sau_benh", text: "Phản ánh rầy nâu mật độ cao trên ruộng lúa 35 ngày tuổi" },
+  { category: "ky_thuat", text: "Hỗ trợ vẽ lại ranh giới thửa sau sáp nhập ấp" },
+  { category: "khac", text: "Hỏi lịch xuống giống vụ Thu Đông theo khuyến cáo của tỉnh" },
+  { category: "co_gioi", text: "Cần hỗ trợ điều phối máy gặt đập liên hợp cho 40 ha" },
+  { category: "sau_benh", text: "Phản ánh ốc bươu vàng gây hại sau sạ tại cánh đồng lớn" },
+  { category: "ky_thuat", text: "Hướng dẫn cài app hiện trường cho tổ hợp tác mới" },
+  { category: "khac", text: "Hỏi cách xử lý rơm rạ không đốt đồng sau thu hoạch" },
+  { category: "co_gioi", text: "Đề nghị kiểm tra thiết bị bay phun thuốc trước vụ" },
+  { category: "sau_benh", text: "Hỏi dấu hiệu bệnh đạo ôn cổ bông và thời điểm phun" },
+];
+const SLA_HOURS = "24";
+
+export const OFFICER_REFS = ["01927b3e-0ff1-7000-8000-000000000001", "01927b3e-0ff1-7000-8000-000000000002", "01927b3e-0ff1-7000-8000-000000000003"];
+
+export const TASKS: ExtTask[] = Array.from({ length: 36 }, (_, i): ExtTask => {
+  const t = TASK_TEXT[i % TASK_TEXT.length] ?? TASK_TEXT[0]!;
+  const coop = COOPERATIVES[(i * 7) % COOPERATIVES.length]!;
+  const ageH = int(1, 60);
+  const created = Date.now() - ageH * 3_600_000;
+  const due = created + Number(SLA_HOURS) * 3_600_000;
+  const status: ExtTask["status"] = i % 6 === 5 ? "resolved" : i % 5 === 1 ? "in_progress" : i % 4 === 2 ? "accepted" : i % 3 === 0 ? "new" : "assigned";
+  const priority = t.category === "sau_benh" ? "urgent" : pick(["low", "normal", "normal", "high"]);
+  const resolvedAt = status === "resolved" ? created + int(2, 30) * 3_600_000 : null;
+  const overdue = resolvedAt ? resolvedAt > due : Date.now() > due;
   return {
-    season,
-    as_of: iso(0.1),
-    total_machines: 1256,
-    total_cooperatives: COOPERATIVES.filter((c) => c.province_code !== "80").length,
-    cooperatives_sufficient: pri.filter((p) => p.gap >= 0).length,
-    cooperatives_short: pri.filter((p) => p.gap < 0).length,
-    machines_by_type: [
-      { machine_type: "may_gat", name: "Máy gặt đập liên hợp", count: 468 },
-      { machine_type: "may_cay", name: "Máy cày / xới", count: 352 },
-      { machine_type: "drone", name: "Thiết bị bay phun thuốc", count: 214 },
-      { machine_type: "may_sa", name: "Máy sạ cụm / máy cấy", count: 131 },
-      { machine_type: "may_say", name: "Máy sấy", count: 91 },
-    ],
+    task_id: hexId(5000 + i, "7a5c"),
+    commune_code: coop.api.admin_unit_code ?? "",
+    province_code: coop.province_code,
+    cooperative_ref: coop.api.ref,
+    household_ref: null,
+    plot_ref: null,
+    category: t.category,
+    description: t.text,
+    priority,
+    source: pick(["officer", "coop_manager", "htx_app"] as const),
+    status,
+    assignee_ref: status === "new" ? null : pick(OFFICER_REFS),
+    created_by: ADMIN_ACTOR,
+    created_at: new Date(created).toISOString(),
+    sla_hours: SLA_HOURS,
+    due_at: new Date(due).toISOString(),
+    overdue,
+    escalated_at: null,
+    escalated_unit: null,
+    escalation_org_ref: null,
+    resolved_at: resolvedAt ? new Date(resolvedAt).toISOString() : null,
+    last_note: null,
+    version: 1 + (i % 4),
+  };
+});
+
+// --------------------------------------------------------------------------
+// pf/content — thư viện số (chỉ tài liệu đã xuất bản)
+// --------------------------------------------------------------------------
+const DOCS: { title: string; kind: ContentKind; category: string | null; summary: string; tags: string[]; province?: string }[] = [
+  { title: "Quy trình canh tác lúa chất lượng cao, phát thải thấp vùng ĐBSCL", kind: "procedure", category: "technique", summary: "Các bước làm đất, gieo sạ, bón phân, tưới và thu hoạch theo hướng giảm phát thải.", tags: ["farm_stage:gieo_sa"] },
+  { title: "Hướng dẫn kỹ thuật tưới ướt khô xen kẽ (AWD)", kind: "guide", category: "technique", summary: "Cách đặt ống quan trắc mực nước, thời điểm rút nước và cho nước vào lại.", tags: ["farm_stage:cham_soc"] },
+  { title: "Hướng dẫn quản lý rơm rạ sau thu hoạch", kind: "guide", category: "technique", summary: "Thu gom, cuộn rơm, ủ phân hữu cơ; không đốt đồng.", tags: ["farm_stage:sau_thu_hoach"] },
+  { title: "Cảnh báo rầy nâu di trú cuối vụ Hè Thu", kind: "alert", category: "pest_warning", summary: "Mật độ rầy tăng tại các xã ven sông; kiểm tra đồng ruộng 3 ngày/lần.", tags: ["pest:ray_nau"] },
+  { title: "Quy trình “1 Phải 5 Giảm” trong sản xuất lúa", kind: "procedure", category: "technique", summary: "Phải dùng giống xác nhận; giảm giống, phân đạm, thuốc BVTV, nước tưới, thất thoát sau thu hoạch.", tags: [] },
+  { title: "Hướng dẫn nhận biết và phòng trừ bệnh đạo ôn", kind: "guide", category: "pest_warning", summary: "Điều kiện phát sinh, triệu chứng, biện pháp canh tác và hoá học.", tags: ["pest:dao_on"] },
+  { title: "Bổ sung đặc thù: lịch xuống giống vùng ngập sâu Đồng Tháp", kind: "supplement", category: "technique", summary: "Khung lịch né lũ cho các xã vùng trũng.", tags: ["season:TD"], province: "82" },
+  { title: "Bổ sung đặc thù: ứng phó xâm nhập mặn vụ Đông Xuân tại Cà Mau", kind: "supplement", category: "technique", summary: "Theo dõi độ mặn, lịch đóng mở cống, giống chịu mặn.", tags: ["season:DX"], province: "96" },
+  { title: "Chính sách hỗ trợ cơ giới hoá khâu thu hoạch năm 2026", kind: "news", category: "policy", summary: "Tóm tắt điều kiện, mức hỗ trợ và hồ sơ đề nghị.", tags: [] },
+  { title: "Giá lúa tươi tại ruộng tuần 38", kind: "news", category: "market", summary: "Bảng giá tham khảo theo giống tại một số tỉnh.", tags: ["rice_variety:OM18"] },
+  { title: "Hướng dẫn ghi nhật ký canh tác điện tử cho HTX", kind: "guide", category: "technique", summary: "Ghi nhật ký trên app hiện trường, chụp ảnh minh chứng, đồng bộ khi có mạng.", tags: [] },
+  { title: "Quy trình sản xuất lúa giống cấp xác nhận", kind: "procedure", category: "technique", summary: "Chọn ruộng, khử lẫn, thu hoạch và bảo quản giống.", tags: [] },
+];
+
+export const DOCUMENTS: ContentDocument[] = DOCS.map((d, i): ContentDocument => ({
+  ref: hexId(7000 + i, "d0c0"),
+  kind: d.kind,
+  audience: d.province ? { level: "province", units: [d.province], province_code: d.province } : { level: "national", units: [], province_code: null },
+  parent_ref: d.kind === "supplement" ? hexId(7000, "d0c0") : null,
+  status: "published",
+  title: d.title,
+  summary: d.summary,
+  category: d.category,
+  tags: d.tags,
+  published_version_no: 1 + (i % 4),
+  published_at: iso(i * 9 + 3),
+  publisher_ref: ADMIN_ACTOR,
+  retired_at: null,
+  retire_reason: null,
+}));
+
+// --------------------------------------------------------------------------
+// pf/masterdata — danh mục & tham số (theo seeddata của backend)
+// --------------------------------------------------------------------------
+const cat = (catalog: CatalogName, rows: [string, string, Record<string, string>, boolean?][]): CatalogItem[] =>
+  rows.map(([code, name, attrs, inactive]) => ({
+    catalog,
+    code,
+    name,
+    attrs,
+    active: !inactive,
+    deactivation_reason: inactive ? "Ngừng khuyến cáo theo văn bản của Cục Trồng trọt (giả lập)" : null,
+    revision: inactive ? 2 : 1,
+    updated_at: iso(inactive ? 30 : 200),
+  }));
+
+export const CATALOGS: Record<CatalogName, CatalogItem[]> = {
+  rice_variety: cat("rice_variety", [
+    ["OM5451", "OM5451", { growth_days: "95", expected_yield_t_per_ha: "6.75" }],
+    ["OM18", "OM18", { growth_days: "97", expected_yield_t_per_ha: "6.75" }],
+    ["DT8", "Đài Thơm 8", { growth_days: "100", expected_yield_t_per_ha: "6.5" }],
+    ["ST25", "ST25 (lúa đặc sản)", { growth_days: "105", expected_yield_t_per_ha: "5.5" }],
+    ["IR50404", "IR50404", { growth_days: "90", expected_yield_t_per_ha: "7.25" }, true],
+  ]),
+  farm_stage: cat("farm_stage", [
+    ["lam_dat", "Làm đất", { pilot: "true" }],
+    ["gieo_sa", "Gieo sạ / Cấy", { pilot: "true" }],
+    ["cham_soc", "Chăm sóc", { pilot: "true" }],
+    ["thu_hoach", "Thu hoạch", { pilot: "true" }],
+    ["sau_thu_hoach", "Sau thu hoạch", { pilot: "false" }],
+  ]),
+  machine_type: cat("machine_type", [
+    ["MLD", "Máy làm đất (máy cày/xới)", { farm_stage: "lam_dat" }],
+    ["MGS", "Máy gieo sạ / cấy", { farm_stage: "gieo_sa" }],
+    ["MPT", "Máy phun thuốc / drone", { farm_stage: "cham_soc" }],
+    ["MGD", "Máy gặt đập liên hợp", { farm_stage: "thu_hoach" }],
+    ["MCR", "Máy cuộn rơm", { farm_stage: "sau_thu_hoach" }],
+    ["MSL", "Máy sấy lúa", { farm_stage: "sau_thu_hoach" }],
+  ]),
+  season: cat("season", [
+    ["DX", "Đông Xuân", { start_month: "11", end_month: "3" }],
+    ["HT", "Hè Thu", { start_month: "4", end_month: "8" }],
+    ["TD", "Thu Đông", { start_month: "8", end_month: "12" }],
+  ]),
+  pest: cat("pest", [
+    ["ray_nau", "Rầy nâu", { kind: "sau_hai" }],
+    ["sau_cuon_la", "Sâu cuốn lá nhỏ", { kind: "sau_hai" }],
+    ["dao_on", "Bệnh đạo ôn", { kind: "benh_hai" }],
+    ["oc_buou_vang", "Ốc bươu vàng", { kind: "dong_vat_hai" }],
+  ]),
+};
+
+function version(p: Partial<ParamVersion> & Pick<ParamVersion, "key" | "value" | "unit" | "version">): ParamVersion {
+  return {
+    id: hexId(9000 + Math.floor(rnd() * 9000), "9a7a"),
+    text: null,
+    effective_from: "2026-01-01T00:00:00+07:00",
+    source_doc: "QĐ số 128/QĐ-KTHT ngày 15/01/2026 (minh hoạ)",
+    correction_reason: null,
+    status: "approved",
+    setter_ref: "mock-admin-other",
+    submitted_at: iso(262),
+    approver_ref: "mock-admin-approver",
+    decided_at: iso(260),
+    decision_note: null,
+    created_at: iso(263),
+    ...p,
   };
 }
 
+/** Admin GET /v1/masterdata/params/versions — mọi phiên bản, mọi trạng thái. */
+export const PARAM_VERSIONS: ParamVersion[] = [
+  version({ key: "cgh.coverage.sufficient_min_pct", value: "85", unit: "%", version: 1 }),
+  version({ key: "cgh.coverage.attention_min_pct", value: "60", unit: "%", version: 1 }),
+  version({ key: "cgh.coverage.surplus_min_pct", value: "120", unit: "%", version: 1 }),
+  version({ key: "cgh.norm_ha_per_machine:MGD:thu_hoach", value: "90", unit: "ha/máy/vụ", version: 1 }),
+  version({ key: "cgh.norm_ha_per_machine:MPT:cham_soc", value: "260", unit: "ha/máy/vụ", version: 1 }),
+  version({ key: "extension.task_sla_hours", value: "24", unit: "giờ", version: 1, effective_from: "2026-07-01T00:00:00+07:00", source_doc: "Quyết định TTKNQG (giả lập) 12/QĐ" }),
+  // Chờ duyệt do "người đặt" (persona setter) gửi — người này KHÔNG được tự duyệt (R-56).
+  version({
+    key: "cgh.norm_ha_per_machine:MGD:thu_hoach",
+    value: "85",
+    unit: "ha/máy/vụ",
+    version: 2,
+    effective_from: "2026-11-01T00:00:00+07:00",
+    source_doc: "Văn bản (giả lập) số 21/2026",
+    status: "submitted",
+    setter_ref: "mock-admin-setter",
+    submitted_at: iso(1),
+    approver_ref: null,
+    decided_at: null,
+    created_at: iso(1),
+  }),
+  // Chờ duyệt do người khác gửi — persona setter/approver thử duyệt được.
+  version({
+    key: "extension.task_sla_hours",
+    value: "36",
+    unit: "giờ",
+    version: 2,
+    effective_from: "2026-11-01T00:00:00+07:00",
+    source_doc: "Công văn TTKNQG (giả lập) 45/CV",
+    status: "submitted",
+    setter_ref: "mock-admin-other",
+    submitted_at: iso(2),
+    approver_ref: null,
+    decided_at: null,
+    created_at: iso(2),
+  }),
+];
+
 // --------------------------------------------------------------------------
-// Tổng quan
+// Tổng quan (GET /v1/extension/dashboard)
 // --------------------------------------------------------------------------
-/** Đơn vị chưa gửi số liệu kỳ này → dashboard phải hiện "Số liệu tạm tính". */
-export const UNREPORTED_UNITS = new Set<string>(["80", `82${"104"}`]);
-export const TARGET_AREA_BY_PROVINCE: Record<string, number> = { "82": 62000, "91": 88000, "92": 54000, "86": 41000, "96": 36000, "80": 28000 };
+/** Xã chưa gửi báo cáo kỳ này → KPI "Số liệu tạm tính" (provisional). */
+export const UNREPORTED_COMMUNES = new Set<string>(["82104", "80101", "80102", "80103", "80104"]);

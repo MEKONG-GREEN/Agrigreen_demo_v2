@@ -2,54 +2,61 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { unitLabel } from "@/api/adapters/units";
 import { unwrap } from "@/api/client";
 import { usePagedList } from "@/api/pagination";
-import type { TaskKind, TaskPriority, TaskStatus } from "@/api/pending/extension";
+import type { ExtTaskPriority, ExtTaskStatus } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { SlaCountdown, useNow } from "@/components/SlaCountdown";
 import { Empty, LoadMore, Loading, PageHead } from "@/components/ui";
+import { formatDecimal } from "@/lib/decimal";
 import { formatDateTime } from "@/lib/format";
+import { useUnits } from "@/lib/useUnits";
 
-const KIND: Record<TaskKind, string> = {
-  hoi_dap: "Hỏi đáp kỹ thuật",
-  ho_tro_ky_thuat: "Hỗ trợ kỹ thuật",
-  phan_anh_khan: "Phản ánh khẩn",
-  hau_kiem: "Hậu kiểm nhật ký",
+const CATEGORY: Record<string, string> = {
+  sau_benh: "Sâu bệnh",
+  ky_thuat: "Kỹ thuật canh tác",
+  co_gioi: "Cơ giới hoá",
+  khac: "Khác",
 };
-const STATUS: Record<TaskStatus, { text: string; cls: string }> = {
-  open: { text: "Mới", cls: "c-info" },
+const STATUS: Record<ExtTaskStatus, { text: string; cls: string }> = {
+  new: { text: "Mới", cls: "c-info" },
+  assigned: { text: "Đã phân công", cls: "c-warn" },
+  accepted: { text: "Đã tiếp nhận", cls: "c-violet" },
   in_progress: { text: "Đang xử lý", cls: "c-violet" },
-  resolved: { text: "Đã xử lý", cls: "c-ok" },
-  closed: { text: "Đã đóng", cls: "c-mute" },
+  resolved: { text: "Đã hoàn thành", cls: "c-ok" },
 };
-const PRIORITY: Record<TaskPriority, string> = { low: "Thấp", normal: "Bình thường", high: "Cao", urgent: "Khẩn" };
+const PRIORITY: Record<ExtTaskPriority, string> = { low: "Thấp", normal: "Bình thường", high: "Cao", urgent: "Khẩn" };
+const SOURCE: Record<string, string> = { officer: "Cán bộ KN", coop_manager: "Quản lý HTX", htx_app: "App HTX" };
 
+/** GET /v1/extension/tasks — nhiệm vụ hỗ trợ trong phạm vi, sắp theo hạn SLA. */
 export default function TasksPage() {
   const { api } = useAuth();
   const now = useNow();
-  const [status, setStatus] = useState<"" | TaskStatus>("");
-  const [kind, setKind] = useState<"" | TaskKind>("");
+  const [status, setStatus] = useState<"" | ExtTaskStatus>("");
+  const [priority, setPriority] = useState<"" | ExtTaskPriority>("");
   const [overdue, setOverdue] = useState(false);
 
   const list = usePagedList(
     (cursor) =>
       unwrap(
-        api.GET("/v1/tasks", {
-          params: { query: { status: status || undefined, kind: kind || undefined, overdue: overdue || undefined, cursor, limit: 20 } },
+        api.GET("/v1/extension/tasks", {
+          params: { query: { status: status || undefined, priority: priority || undefined, overdue: overdue || undefined, cursor, limit: 20 } },
         }),
       ),
-    [api, status, kind, overdue],
+    [api, status, priority, overdue],
   );
+  const units = useUnits(api, list.items.map((t) => t.commune_code));
 
   return (
     <>
-      <PageHead title="Nhiệm vụ hỗ trợ" subtitle="Hỏi đáp từ HTX, phản ánh khẩn, hậu kiểm — sắp theo hạn SLA gần nhất" />
+      <PageHead title="Nhiệm vụ hỗ trợ" subtitle="Yêu cầu hỗ trợ từ HTX, phản ánh sâu bệnh, cơ giới hoá — hạn SLA tính từ lúc tạo" />
       <div className="card sec">
         <div className="row" style={{ marginBottom: 14 }}>
           <div className="field">
             <label htmlFor="t-status">Trạng thái</label>
-            <select id="t-status" className="select" value={status} onChange={(e) => setStatus(e.target.value as "" | TaskStatus)}>
+            <select id="t-status" className="select" value={status} onChange={(e) => setStatus(e.target.value as "" | ExtTaskStatus)}>
               <option value="">Tất cả</option>
               {Object.entries(STATUS).map(([k, v]) => (
                 <option key={k} value={k}>
@@ -59,10 +66,10 @@ export default function TasksPage() {
             </select>
           </div>
           <div className="field">
-            <label htmlFor="t-kind">Loại nhiệm vụ</label>
-            <select id="t-kind" className="select" value={kind} onChange={(e) => setKind(e.target.value as "" | TaskKind)}>
+            <label htmlFor="t-priority">Mức ưu tiên</label>
+            <select id="t-priority" className="select" value={priority} onChange={(e) => setPriority(e.target.value as "" | ExtTaskPriority)}>
               <option value="">Tất cả</option>
-              {Object.entries(KIND).map(([k, v]) => (
+              {Object.entries(PRIORITY).map(([k, v]) => (
                 <option key={k} value={k}>
                   {v}
                 </option>
@@ -80,36 +87,42 @@ export default function TasksPage() {
             <caption className="sr-only">Danh sách nhiệm vụ hỗ trợ</caption>
             <thead>
               <tr>
-                <th scope="col">Nhiệm vụ</th>
-                <th scope="col">Loại</th>
-                <th scope="col">HTX / địa bàn</th>
-                <th scope="col">Người xử lý</th>
+                <th scope="col">Nội dung</th>
+                <th scope="col">Nhóm</th>
+                <th scope="col">Địa bàn</th>
+                <th scope="col">Phân công</th>
                 <th scope="col">Trạng thái</th>
                 <th scope="col">SLA</th>
               </tr>
             </thead>
             <tbody>
               {list.items.map((t) => (
-                <tr key={t.id}>
-                  <td>
-                    <div style={{ fontWeight: 600 }}>{t.title}</div>
+                <tr key={t.task_id}>
+                  <td style={{ maxWidth: 360 }}>
+                    <div style={{ fontWeight: 600 }}>{t.description}</div>
                     <div className="mute small">
-                      {t.code} · Ưu tiên {PRIORITY[t.priority]} · Tạo {formatDateTime(t.created_at)}
+                      Ưu tiên {PRIORITY[t.priority as ExtTaskPriority] ?? t.priority} · {SOURCE[t.source] ?? t.source} · Tạo {formatDateTime(t.created_at)}
                     </div>
                   </td>
-                  <td>{t.kind === "phan_anh_khan" ? <span className="chip c-bad">{KIND[t.kind]}</span> : KIND[t.kind]}</td>
+                  <td>{t.category === "sau_benh" ? <span className="chip c-bad">{CATEGORY[t.category]}</span> : (CATEGORY[t.category] ?? t.category)}</td>
                   <td>
-                    {t.cooperative_id ? <Link href={`/htx/${t.cooperative_id}`}>{t.cooperative_name}</Link> : "—"}
-                    <div className="mute small">
-                      {t.commune_name}, {t.province_name}
-                    </div>
+                    {unitLabel(units, t.commune_code)}
+                    {t.cooperative_ref ? (
+                      <div className="small">
+                        <Link href={`/htx/${t.cooperative_ref}`}>Xem HTX</Link>
+                      </div>
+                    ) : null}
                   </td>
-                  <td>{t.assignee ?? <span className="chip c-warn">Chưa phân công</span>}</td>
+                  <td>
+                    {t.assignee_ref ? <span className="chip c-ok">Đã phân công</span> : <span className="chip c-warn">Chưa phân công</span>}
+                    {t.escalated_at ? <div className="mute small">Đã chuyển lên tỉnh</div> : null}
+                  </td>
                   <td>
                     <span className={`chip ${STATUS[t.status].cls}`}>{STATUS[t.status].text}</span>
                   </td>
                   <td>
                     <SlaCountdown dueAt={t.due_at} resolvedAt={t.resolved_at} now={now} />
+                    <div className="mute small">SLA {formatDecimal(t.sla_hours, 1)} giờ</div>
                   </td>
                 </tr>
               ))}

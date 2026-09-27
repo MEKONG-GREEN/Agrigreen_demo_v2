@@ -2,7 +2,7 @@
 
 import type { GeoJSONSource, Map as MlMap, StyleSpecification } from "maplibre-gl";
 import { useEffect, useRef, useState } from "react";
-import type { FeatureCollection, MultiPolygonGeometry, PointGeometry, PolygonGeometry, Position } from "@/api/pending/geo";
+import type { FeatureCollection, MultiPolygonGeometry, PointGeometry, PolygonGeometry, Position } from "@/lib/geojson";
 import { config } from "@/config";
 
 type GeoJsonData = Parameters<GeoJSONSource["setData"]>[0];

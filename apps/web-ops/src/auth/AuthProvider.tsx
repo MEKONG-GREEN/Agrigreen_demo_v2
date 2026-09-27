@@ -2,10 +2,11 @@
 
 import type { User } from "oidc-client-ts";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { createApiClient, unwrap, type ApiClient } from "@/api/client";
-import { mockFetch } from "@/api/mock/handler";
-import { findPersona, mockToken } from "@/api/mock/personas";
-import type { Me } from "@/api/pending/party";
+import { createAdminApiClient, createApiClient, unwrap, type AdminApiClient, type ApiClient } from "@/api/client";
+import { mockAdminFetch, mockFetch } from "@/api/mock/handler";
+import { findPersona, mockToken, type MockPersona } from "@/api/mock/personas";
+import { ApiProblem } from "@/api/problem";
+import type { Me } from "@/api/types";
 import { config } from "@/config";
 import { buildPrincipal, decodeAccessToken, type Principal } from "./principal";
 import { getUserManager, safeReturnTo } from "./oidc";
@@ -18,8 +19,10 @@ export interface AuthContextValue {
   principal: Principal | null;
   /** /v1/me chưa có hoặc lỗi → phạm vi chưa xác định (chỉ hiện menu theo vai). */
   scopeWarning: string | null;
+  /** Application API (api.<domain>). */
   api: ApiClient;
-  adminApi: ApiClient;
+  /** Admin API (host riêng, MFA bắt buộc): danh mục, tham số, cây tổ chức, nhập nông hộ. */
+  adminApi: AdminApiClient;
   login: (returnTo?: string) => Promise<void>;
   /** Chỉ chế độ giả lập: đăng nhập bằng persona. */
   loginAsPersona: (personaId: string) => Promise<void>;
@@ -51,24 +54,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clients = useMemo(() => {
     const getAccessToken = tokenStore.get;
-    const fetchImpl = config.mock ? mockFetch : undefined;
     return {
-      api: createApiClient({ baseUrl: config.apiBaseUrl, getAccessToken, onUnauthenticated, fetch: fetchImpl }),
-      adminApi: createApiClient({ baseUrl: config.adminApiBaseUrl, getAccessToken, onUnauthenticated, fetch: fetchImpl }),
+      api: createApiClient({ baseUrl: config.apiBaseUrl, getAccessToken, onUnauthenticated, fetch: config.mock ? mockFetch : undefined }),
+      adminApi: createAdminApiClient({
+        baseUrl: config.adminApiBaseUrl,
+        getAccessToken,
+        onUnauthenticated,
+        fetch: config.mock ? mockAdminFetch : undefined,
+      }),
     };
   }, [onUnauthenticated]);
 
   const establish = useCallback(
-    async (accessToken: string, mockAmr?: string[]) => {
+    async (accessToken: string, mock?: MockPersona) => {
       tokenStore.set(accessToken);
       let me: Me | null = null;
       try {
         me = await unwrap(clients.api.GET("/v1/me"));
         setScopeWarning(null);
-      } catch {
-        setScopeWarning("Chưa lấy được phạm vi dữ liệu (/v1/me). Menu chỉ hiển thị theo vai.");
+      } catch (e) {
+        const p = e instanceof ApiProblem ? e : null;
+        setScopeWarning(
+          `Chưa lấy được phạm vi dữ liệu (GET /v1/me${p ? `: ${p.message}${p.traceId ? ` — mã tra cứu ${p.traceId}` : ""}` : ""}). Menu chỉ hiển thị theo vai; dữ liệu vẫn được máy chủ lọc theo phạm vi.`,
+        );
       }
-      const claims = config.mock ? { sub: me?.subject, amr: mockAmr, realm_access: { roles: me?.roles ?? [] } } : decodeAccessToken(accessToken);
+      const claims = mock
+        ? { sub: mock.me.actor_ref, name: mock.displayName, amr: mock.amr, realm_access: { roles: mock.me.roles } }
+        : decodeAccessToken(accessToken);
       setPrincipal(buildPrincipal(claims, me));
       setStatus("authenticated");
     },
@@ -80,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (config.mock) {
       void (async () => {
         const persona = findPersona(readMockPersona());
-        if (persona) await establish(mockToken(persona.id), persona.amr);
+        if (persona) await establish(mockToken(persona.id), persona);
         else if (!cancelled) setStatus("anonymous");
       })();
       return () => {
@@ -136,7 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // bỏ qua: chỉ mất khả năng nhớ persona khi tải lại
       }
       setStatus("loading");
-      await establish(mockToken(persona.id), persona.amr);
+      await establish(mockToken(persona.id), persona);
     },
     [establish],
   );

@@ -1,4 +1,4 @@
-import type { Org } from "@/api/pending/party";
+import type { Org } from "@/api/types";
 
 export interface OrgNode {
   org: Org;

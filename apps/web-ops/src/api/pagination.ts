@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toApiProblem, useRequestKey } from "@/lib/useAsync";
-import type { Page } from "./pending/common";
+import type { Page } from "./types";
 import type { ApiProblem } from "./problem";
 
 export type PageFetcher<T> = (cursor: string | undefined) => Promise<Page<T>>;
