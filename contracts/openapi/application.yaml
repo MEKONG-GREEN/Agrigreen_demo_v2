@@ -300,6 +300,473 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  # --- pf/extension ---
+  # Nghiệp vụ khuyến nông (ADR-0011): nhiệm vụ hỗ trợ + SLA, chỉ đạo khẩn, báo cáo hiện trường,
+  # dashboard 4 KPI, danh bạ trực. Vai: kn_officer, kn_province_admin, kn_national_admin,
+  # coop_manager (tạo yêu cầu cho HTX mình, xem danh bạ). Phạm vi TW → Tỉnh → Xã (ADR-0009):
+  # ngoài phạm vi đọc → 404, ghi → 403 extension.out_of_scope.
+  /v1/extension/tasks:
+    post:
+      summary: Tạo nhiệm vụ hỗ trợ — due_at = lúc tạo + SLA (tham số extension.task_sla_hours tại thời điểm tạo, mặc định 24 giờ)
+      operationId: extCreateTask
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ExtTaskInput"}
+      responses:
+        "201":
+          description: Đã tạo
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtTask"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Nhiệm vụ trong phạm vi (US-TASK-03) — lọc trạng thái, ưu tiên, cán bộ, quá hạn
+      operationId: extListTasks
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [new, assigned, accepted, in_progress, resolved]}}
+        - {name: priority, in: query, schema: {type: string, enum: [low, normal, high, urgent]}}
+        - {name: assignee_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: mine, in: query, schema: {type: boolean}, description: "Chỉ nhiệm vụ giao cho mình"}
+        - {name: overdue, in: query, schema: {type: boolean}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ExtTask"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/extension/tasks/bulk-assign:
+    post:
+      summary: Phân công hàng loạt trong một lần xác nhận (US-TASK-04) — chia vòng tròn; một nhiệm vụ lỗi thì cả lô không đổi
+      operationId: extBulkAssign
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_ids, assignee_refs]
+              properties:
+                task_ids: {type: array, minItems: 1, maxItems: 200, items: {type: string, format: uuid}}
+                assignee_refs: {type: array, minItems: 1, maxItems: 50, items: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Đã phân công
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ExtTask"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/tasks/{id}:
+    get:
+      operationId: extGetTask
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Nhiệm vụ kèm lịch sử sự việc (sổ chỉ ghi thêm)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [task, events]
+                properties:
+                  task: {$ref: "#/components/schemas/ExtTask"}
+                  events: {type: array, items: {$ref: "#/components/schemas/ExtTaskEvent"}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/extension/tasks/{id}/assign:
+    post:
+      summary: Phân công (hoặc phân công lại) cho cán bộ phụ trách xã/tỉnh của nhiệm vụ
+      operationId: extAssignTask
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assignee_ref]
+              properties:
+                assignee_ref: {type: string, format: uuid}
+                note: {type: string, maxLength: 2000}
+      responses:
+        "200": {$ref: "#/components/responses/ExtTaskWritten"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/tasks/{id}/status:
+    post:
+      summary: Ghi sự việc — tiếp nhận, tiến độ, hoàn thành (bắt buộc kết quả ≥ 10 ký tự), chuyển tiếp lên tỉnh, mở lại
+      operationId: extUpdateTaskStatus
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: {type: string, enum: [accepted, progress, resolved, escalated, reopened]}
+                note: {type: string, maxLength: 2000, description: "Không ghi SĐT/CCCD (R-04)"}
+                event_time: {type: string, format: date-time}
+      responses:
+        "200": {$ref: "#/components/responses/ExtTaskWritten"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/directives:
+    post:
+      summary: Ban hành chỉ đạo khẩn tới đúng vùng đã chọn (US-TASK-03) — phát pf.extension.directive.issued
+      operationId: extIssueDirective
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, body, audience_units]
+              properties:
+                title: {type: string, minLength: 5, maxLength: 200}
+                body: {type: string, minLength: 10, maxLength: 5000}
+                severity: {type: string, enum: [urgent, normal], default: urgent}
+                audience_units: {type: array, minItems: 1, maxItems: 500, items: {type: string}, description: "Mã tỉnh/xã nhận, trong phạm vi người ban hành"}
+                expires_at: {type: string, format: date-time}
+      responses:
+        "201":
+          description: Đã ban hành
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtDirective"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Chỉ đạo mình nhận; cấp giám sát thấy thêm chỉ đạo có vùng nhận trong phạm vi (mới nhất trước)
+      operationId: extListDirectives
+      parameters:
+        - {name: mine, in: query, schema: {type: boolean}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ExtDirective"}}
+                  next_cursor: {type: [string, "null"]}
+  /v1/extension/directives/{id}:
+    get:
+      operationId: extGetDirective
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Chỉ đạo; pending_targets chỉ có với cấp giám sát
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [directive, pending_targets]
+                properties:
+                  directive: {$ref: "#/components/schemas/ExtDirective"}
+                  pending_targets:
+                    type: [array, "null"]
+                    items:
+                      type: object
+                      properties:
+                        actor_ref: {type: string, format: uuid}
+                        unit_code: {type: string}
+                        province_code: {type: string}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/extension/directives/{id}/ack:
+    post:
+      summary: Xác nhận đã đọc (chỉ người nhận; gọi lặp giữ lần đầu)
+      operationId: extAckDirective
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Đã xác nhận
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtDirective"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/extension/field-reports:
+    post:
+      summary: Gửi báo cáo hiện trường (FR-01 gieo sạ, FR-02 sinh trưởng/sâu bệnh). Kỳ mở — gửi lại cùng khóa là phiên bản mới; kỳ đã chốt → 409
+      operationId: extCreateFieldReport
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ExtFieldReportInput"
+                - type: object
+                  properties:
+                    id: {type: string, format: uuid, description: "UUIDv7 do máy sinh"}
+                    event_time: {type: string, format: date-time}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtFieldReport"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Phiên bản hiện hành trong phạm vi
+      operationId: extListFieldReports
+      parameters:
+        - {name: period, in: query, schema: {type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"}}
+        - {name: kind, in: query, schema: {type: string, enum: [sowing_progress, growth_pest]}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ExtFieldReport"}}
+                  next_cursor: {type: [string, "null"]}
+  /v1/extension/field-reports/{id}:
+    get:
+      operationId: extGetFieldReport
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Phiên bản kèm mọi phiên bản cùng khóa
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [report, versions]
+                properties:
+                  report: {$ref: "#/components/schemas/ExtFieldReport"}
+                  versions: {type: array, items: {$ref: "#/components/schemas/ExtFieldReport"}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/extension/field-reports/{id}/corrections:
+    post:
+      summary: Bản ghi bù cho phiên bản hiện hành — bắt buộc correction_reason ≥ 10 ký tự (US-DASH-02 AC-2)
+      operationId: extCorrectFieldReport
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [correction_reason]
+              properties:
+                correction_reason: {type: string, minLength: 10}
+                sown_area_ha: {$ref: "#/components/schemas/Decimal"}
+                sown_on: {type: string, format: date}
+                growth_stage: {type: string}
+                pest_code: {type: string}
+                severity: {type: string, enum: [nhe, trung_binh, nang]}
+                affected_area_ha: {$ref: "#/components/schemas/Decimal"}
+                urgent: {type: boolean}
+                note: {type: string}
+                event_time: {type: string, format: date-time}
+      responses:
+        "201":
+          description: Đã ghi phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtFieldReport"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-periods/close:
+    post:
+      summary: Chốt kỳ báo cáo của một tỉnh (FR-05) — TTKN tỉnh/QG; chốt lặp trả 200
+      operationId: extClosePeriod
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [period, province_code]
+              properties:
+                period: {type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"}
+                province_code: {type: string}
+                note: {type: string}
+      responses:
+        "201": {description: Đã chốt}
+        "200": {description: Đã chốt trước đó}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/dashboard:
+    get:
+      summary: 4 KPI theo phạm vi (US-DASH-01) — tổng luôn bằng tổng các đơn vị con; thiếu báo cáo xã → provisional "Số liệu tạm tính"
+      operationId: extDashboard
+      parameters:
+        - {name: unit, in: query, schema: {type: string}, description: "Mã tỉnh/xã; bỏ trống = toàn quốc (nếu được) hoặc đơn vị phụ trách"}
+        - {name: period, in: query, schema: {type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"}, description: "Mặc định tháng hiện tại (giờ Việt Nam)"}
+      responses:
+        "200":
+          description: Dashboard
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [unit, level, period, as_of, total, period_closed, closed_provinces, children]
+                properties:
+                  unit: {type: [string, "null"]}
+                  level: {type: string, enum: [national, province, commune]}
+                  period: {type: string}
+                  as_of: {type: string, format: date-time}
+                  total: {$ref: "#/components/schemas/ExtKPI"}
+                  period_closed: {type: boolean}
+                  closed_provinces: {type: array, items: {type: string}}
+                  children:
+                    type: array
+                    items:
+                      type: object
+                      required: [unit, kpi]
+                      properties:
+                        unit: {type: string, description: "Tỉnh (với toàn quốc) hoặc xã"}
+                        kpi: {$ref: "#/components/schemas/ExtKPI"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/extension/staff:
+    post:
+      summary: Ghi cán bộ vào danh bạ trực — TTKN tỉnh/QG cho cán bộ trong phạm vi; cán bộ xã tự khai cho mình
+      operationId: extUpsertStaff
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [actor_ref, unit_code, role_title, display_name]
+              properties:
+                actor_ref: {type: string, format: uuid, description: "sub của tài khoản cán bộ"}
+                unit_code: {type: string}
+                role_title: {type: string}
+                display_name: {type: string, description: "Tên cán bộ (danh bạ công vụ, không ghi log)"}
+                active: {type: boolean, default: true}
+      responses:
+        "200":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtStaff"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/roster:
+    get:
+      summary: Danh bạ trực theo địa bàn (US-DIR-02) — không ai đang trực → fallback là cán bộ TTKN tỉnh
+      operationId: extRoster
+      parameters:
+        - {name: unit, in: query, schema: {type: string}}
+      responses:
+        "200":
+          description: Danh bạ
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [unit, on_duty, items, fallback]
+                properties:
+                  unit: {type: [string, "null"]}
+                  on_duty: {type: integer}
+                  items: {type: array, items: {$ref: "#/components/schemas/ExtRosterEntry"}}
+                  fallback: {type: array, items: {$ref: "#/components/schemas/ExtRosterEntry"}}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/extension/roster/status:
+    post:
+      summary: Tự cập nhật trạng thái trực (US-DIR-01); hết hạn sau extension.duty_status_ttl_hours → unknown
+      operationId: extSetDutyStatus
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: {type: string, enum: [on_duty, off_duty]}
+      responses:
+        "201": {description: Đã ghi}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/roster/shifts:
+    post:
+      summary: Khai báo ca trực cho cán bộ trong tỉnh (US-DIR-03)
+      operationId: extAddShift
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [actor_ref, starts_at, ends_at]
+              properties:
+                actor_ref: {type: string, format: uuid}
+                starts_at: {type: string, format: date-time}
+                ends_at: {type: string, format: date-time}
+      responses:
+        "201": {description: Đã ghi}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -332,6 +799,16 @@ components:
       content:
         application/problem+json:
           schema: {$ref: "#/components/schemas/Problem"}
+    ExtTaskWritten:
+      description: Sự việc đã ghi (pf/extension)
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [task, event]
+            properties:
+              task: {$ref: "#/components/schemas/ExtTask"}
+              event: {$ref: "#/components/schemas/ExtTaskEvent"}
   schemas:
     Problem:
       type: object
@@ -496,3 +973,146 @@ components:
         household: {$ref: "#/components/schemas/Household"}
         duplicate: {type: boolean}
         duplicate_label: {type: string, enum: ["trùng"]}
+    # --- pf/extension ---
+    ExtTaskInput:
+      type: object
+      required: [commune_code, category, description]
+      properties:
+        id: {type: string, format: uuid, description: "UUIDv7 do máy sinh (R-11)"}
+        commune_code: {type: string}
+        cooperative_ref: {type: string, format: uuid, description: "Quản lý HTX: bỏ trống = HTX của mình"}
+        household_ref: {type: string, format: uuid, description: "Chỉ mã tham chiếu (R-41)"}
+        plot_ref: {type: string, format: uuid}
+        category: {type: string, enum: [sau_benh, ky_thuat, co_gioi, khac]}
+        description: {type: string, minLength: 10, maxLength: 2000, description: "Không ghi SĐT/CCCD — bị từ chối (R-04)"}
+        priority: {type: string, enum: [low, normal, high, urgent], default: normal}
+        assignee_ref: {type: string, format: uuid}
+    ExtTask:
+      type: object
+      required: [task_id, commune_code, province_code, category, description, priority, source, status, created_by, created_at, sla_hours, due_at, overdue, version]
+      properties:
+        task_id: {type: string, format: uuid}
+        commune_code: {type: string}
+        province_code: {type: string}
+        cooperative_ref: {type: [string, "null"], format: uuid}
+        household_ref: {type: [string, "null"], format: uuid}
+        plot_ref: {type: [string, "null"], format: uuid}
+        category: {type: string}
+        description: {type: string}
+        priority: {type: string}
+        source: {type: string, enum: [officer, coop_manager, htx_app]}
+        status: {type: string, enum: [new, assigned, accepted, in_progress, resolved]}
+        assignee_ref: {type: [string, "null"], format: uuid}
+        created_by: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+        sla_hours: {$ref: "#/components/schemas/Decimal"}
+        due_at: {type: string, format: date-time}
+        overdue: {type: boolean}
+        escalated_at: {type: [string, "null"], format: date-time}
+        escalated_unit: {type: [string, "null"]}
+        escalation_org_ref: {type: [string, "null"], format: uuid, description: "TTKN tỉnh nhận leo thang"}
+        resolved_at: {type: [string, "null"], format: date-time}
+        last_note: {type: [string, "null"]}
+        version: {type: integer, description: "seq cuối trong sổ của nhiệm vụ"}
+    ExtTaskEvent:
+      type: object
+      required: [event_id, action, status_after, due_at, actor_ref, event_time, recorded_at, seq]
+      properties:
+        event_id: {type: string, format: uuid}
+        action: {type: string, enum: [created, assigned, accepted, progress, resolved, escalated, reopened]}
+        status_after: {type: string}
+        assignee_ref: {type: [string, "null"], format: uuid}
+        due_at: {type: string, format: date-time}
+        note: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        seq: {type: integer}
+    ExtDirective:
+      type: object
+      required: [directive_id, title, body, severity, audience_units, province_codes, issuer_ref, issued_at, target_count, ack_count, ack_rate, is_target]
+      properties:
+        directive_id: {type: string, format: uuid}
+        title: {type: string}
+        body: {type: string}
+        severity: {type: string, enum: [urgent, normal]}
+        audience_units: {type: array, items: {type: string}}
+        province_codes: {type: array, items: {type: string}}
+        issuer_ref: {type: string, format: uuid}
+        issued_at: {type: string, format: date-time}
+        expires_at: {type: [string, "null"], format: date-time}
+        target_count: {type: integer}
+        ack_count: {type: integer}
+        ack_rate: {oneOf: [{$ref: "#/components/schemas/Decimal"}, {type: "null"}], description: "ack_count / target_count"}
+        is_target: {type: boolean}
+        acked_at: {type: [string, "null"], format: date-time}
+    ExtFieldReportInput:
+      type: object
+      required: [kind, commune_code, period]
+      properties:
+        kind: {type: string, enum: [sowing_progress, growth_pest]}
+        commune_code: {type: string}
+        cooperative_ref: {type: string, format: uuid, description: "Bắt buộc với sowing_progress"}
+        period: {type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"}
+        season_code: {type: string, description: "Danh mục season"}
+        variety_code: {type: string, description: "Danh mục rice_variety (BR-01)"}
+        sown_area_ha: {$ref: "#/components/schemas/Decimal"}
+        sown_on: {type: string, format: date}
+        growth_stage: {type: string}
+        pest_code: {type: string, description: "Danh mục pest"}
+        severity: {type: string, enum: [nhe, trung_binh, nang]}
+        affected_area_ha: {$ref: "#/components/schemas/Decimal"}
+        urgent: {type: boolean, description: "Phản ánh khẩn (FR-02)"}
+        note: {type: string, maxLength: 2000}
+    ExtFieldReport:
+      allOf:
+        - $ref: "#/components/schemas/ExtFieldReportInput"
+        - type: object
+          required: [id, province_code, version, actor_ref, event_time, recorded_at, seq]
+          properties:
+            id: {type: string, format: uuid}
+            province_code: {type: string}
+            version: {type: integer}
+            previous_id: {type: [string, "null"], format: uuid}
+            supersedes_id: {type: [string, "null"], format: uuid}
+            correction_reason: {type: [string, "null"]}
+            actor_ref: {type: string, format: uuid}
+            event_time: {type: string, format: date-time}
+            recorded_at: {type: string, format: date-time}
+            seq: {type: integer}
+    ExtKPI:
+      type: object
+      required: [sown_area_ha, cooperatives_reporting, open_tasks, overdue_tasks, directive_targets, directive_acks, directive_ack_rate, expected_communes, reported_communes, missing_communes, provisional, provisional_label]
+      properties:
+        sown_area_ha: {$ref: "#/components/schemas/Decimal"}
+        cooperatives_reporting: {type: integer}
+        open_tasks: {type: integer}
+        overdue_tasks: {type: integer}
+        directive_targets: {type: integer}
+        directive_acks: {type: integer}
+        directive_ack_rate: {oneOf: [{$ref: "#/components/schemas/Decimal"}, {type: "null"}]}
+        expected_communes: {type: integer, description: "Xã có cán bộ phụ trách trong danh bạ"}
+        reported_communes: {type: integer}
+        missing_communes: {type: array, items: {type: string}}
+        provisional: {type: boolean}
+        provisional_label: {type: [string, "null"], enum: ["Số liệu tạm tính", null]}
+    ExtStaff:
+      type: object
+      required: [actor_ref, unit_code, province_code, role_title, display_name, active, updated_at]
+      properties:
+        actor_ref: {type: string, format: uuid}
+        unit_code: {type: string}
+        province_code: {type: string}
+        role_title: {type: string}
+        display_name: {type: string}
+        active: {type: boolean}
+        updated_at: {type: string, format: date-time}
+    ExtRosterEntry:
+      allOf:
+        - $ref: "#/components/schemas/ExtStaff"
+        - type: object
+          required: [duty_status, status_source, until]
+          properties:
+            duty_status: {type: string, enum: [on_duty, off_duty, unknown]}
+            status_source: {type: string, enum: [manual, shift, none]}
+            until: {type: [string, "null"], format: date-time}

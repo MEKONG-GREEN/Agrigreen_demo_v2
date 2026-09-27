@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.task.escalated/v1",
+  "title": "pf.extension.task.escalated — payload",
+  "description": "Nhiệm vụ hỗ trợ đã leo thang lên TTKN tỉnh: quá SLA mà chưa hoàn thành (job leo thang, reason = sla_overdue) hoặc cán bộ chuyển tiếp kèm ghi chú (reason = manual) — KN US-TASK-02 AC-2. Ghi trong sổ pf_extension.task_event. Consumer thông báo cho cán bộ TTKN tỉnh. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.extension.task.escalated",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": ["task_id", "commune_code", "province_code", "escalation_org_ref", "reason", "status", "priority", "category", "assignee_ref", "due_at", "event_time", "seq"],
+  "properties": {
+    "task_id":            { "type": "string", "format": "uuid" },
+    "commune_code":       { "type": "string", "description": "Mã xã hiện hành của nhiệm vụ" },
+    "province_code":      { "type": "string", "description": "Mã tỉnh nhận leo thang" },
+    "escalation_org_ref": { "type": ["string", "null"], "format": "uuid", "description": "TTKN tỉnh (pf_party) tìm theo cây tổ chức của người tạo; null nếu chưa xác định" },
+    "reason":             { "type": "string", "enum": ["sla_overdue", "manual"] },
+    "status":             { "type": "string", "enum": ["new", "assigned", "accepted", "in_progress"] },
+    "priority":           { "type": "string", "enum": ["low", "normal", "high", "urgent"] },
+    "category":           { "type": "string", "enum": ["sau_benh", "ky_thuat", "co_gioi", "khac"] },
+    "assignee_ref":       { "type": ["string", "null"], "format": "uuid" },
+    "due_at":             { "type": "string", "format": "date-time", "description": "Hạn SLA đã quá" },
+    "event_time":         { "type": "string", "format": "date-time" },
+    "seq":                { "type": "integer", "minimum": 1, "description": "Thứ tự trong chuỗi băm của nhiệm vụ" }
+  }
+}

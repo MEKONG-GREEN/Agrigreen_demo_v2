@@ -5,6 +5,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -44,5 +45,13 @@ func buildModules(ctx context.Context, open PoolOpener, clk clock.Clock, ext Ext
 	}
 	pty := party.New(partyPool, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault})
 
-	return []httpx.Module{md, pty}, pools, nil
+	extPool, err := pool(extension.DBRole)
+	if err != nil {
+		return nil, pools, err
+	}
+	kn := extension.New(extPool, clk, extension.Deps{
+		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(),
+	})
+
+	return []httpx.Module{md, pty, kn}, pools, nil
 }
