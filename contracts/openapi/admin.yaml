@@ -331,6 +331,7 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
   # --- pf/party: tổ chức, HTX, nông hộ ---
+
   /v1/orgs:
     post:
       summary: Tạo tổ chức trong cây TW → Tỉnh → Xã; kind = cooperative kèm hồ sơ HTX, Mã HTX tự sinh
@@ -503,6 +504,7 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
   # --- hết pf/party ---
+
   # --- pf/sync --- (docs/dev/sync-contract.md)
   /v1/devices:
     get:
@@ -614,6 +616,155 @@ paths:
         "409": {description: "sync.conflict_state — đã đóng", $ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
   # --- hết pf/sync ---
+
+  # --- pf/mrv ---
+
+  # Danh mục trường bằng chứng MRV có phiên bản + phê duyệt (R-56 dùng lại param_setter/param_approver).
+
+  # Danh mục thương mại chưa chốt (C-1): thêm/đổi trường = phiên bản mới, không cần migration.
+  /v1/mrv/catalog/seed:
+    post:
+      summary: Nạp danh mục mẫu G1 (awd_log, field_checklist) dạng NHÁP, provisional — loại đã có phiên bản thì bỏ qua
+      operationId: seedMrvCatalog
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Kết quả theo loại minh chứng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [evidence_type, created, version]
+                      properties:
+                        evidence_type: {type: string}
+                        created: {type: boolean}
+                        version: {oneOf: [{$ref: "#/components/schemas/MrvCatalogVersion"}, {type: "null"}]}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/catalog/versions:
+    post:
+      summary: Đề xuất phiên bản danh mục trường (vai param_setter) — số phiên bản tăng theo loại minh chứng
+      operationId: proposeMrvCatalogVersion
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/MrvCatalogInput"}
+      responses:
+        "201":
+          description: Nháp đã tạo
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvCatalogVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Lịch sử phiên bản danh mục (mọi trạng thái)
+      operationId: listMrvCatalogVersions
+      parameters:
+        - {name: evidence_type, in: query, schema: {type: string}}
+        - {name: status, in: query, schema: {type: string, enum: [draft, submitted, approved, rejected]}}
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MrvCatalogVersion"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/catalog/versions/{id}:
+    get:
+      operationId: getMrvCatalogVersion
+      parameters:
+        - $ref: "#/components/parameters/VersionID"
+      responses:
+        "200":
+          description: Phiên bản
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvCatalogVersion"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/catalog/versions/{id}/submit:
+    post:
+      summary: Gửi duyệt — chỉ người đặt
+      operationId: submitMrvCatalogVersion
+      parameters:
+        - $ref: "#/components/parameters/VersionID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Đã gửi duyệt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvCatalogVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/catalog/versions/{id}/approve:
+    post:
+      summary: Phê duyệt (vai param_approver; không được là người đặt — self_approval_forbidden)
+      operationId: approveMrvCatalogVersion
+      parameters:
+        - $ref: "#/components/parameters/VersionID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: {type: string, maxLength: 500}
+      responses:
+        "200":
+          description: Đã duyệt — dùng được để thu minh chứng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvCatalogVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/catalog/versions/{id}/reject:
+    post:
+      summary: Từ chối (vai param_approver; bắt buộc lý do)
+      operationId: rejectMrvCatalogVersion
+      parameters:
+        - $ref: "#/components/parameters/VersionID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties:
+                note: {type: string, minLength: 5, maxLength: 500}
+      responses:
+        "200":
+          description: Đã từ chối
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvCatalogVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -857,6 +1008,7 @@ components:
         active: {type: boolean}
         details: {type: object, description: "Hồ sơ HTX lúc tạo (không PII)"}
     # --- pf/sync ---
+
     SyncDeviceAdmin:
       type: object
       required: [device_id, registered_at, platform, app_version, revoked, actor_ref]
@@ -873,8 +1025,7 @@ components:
         revoke_reason: {type: string}
     SyncConflict:
       type: object
-      required: [conflict_id, entity, first_record_id, device_id, reported_by, owner_org_ref, opened_at, due_at, status, overdue,
-                 resolved_at, resolved_by, resolution_note, resolved_record_id]
+      required: [conflict_id, entity, first_record_id, device_id, reported_by, owner_org_ref, opened_at, due_at, status, overdue, resolved_at, resolved_by, resolution_note, resolved_record_id]
       properties:
         conflict_id: {type: string, format: uuid}
         entity: {type: string}
@@ -890,3 +1041,58 @@ components:
         resolved_by: {type: [string, "null"], format: uuid}
         resolution_note: {type: [string, "null"]}
         resolved_record_id: {type: [string, "null"], format: uuid}
+    MrvFieldInput:
+      type: object
+      required: [key, label_vi, data_type]
+      properties:
+        key: {type: string, pattern: "^[a-z][a-z0-9_]{1,62}$", description: "Khóa dành riêng plot_ref/season (text), gps (geo_point), photo (photo) lấy giá trị từ cột riêng"}
+        label_vi: {type: string, maxLength: 200}
+        data_type: {type: string, enum: [decimal, integer, boolean, enum, date, photo, geo_point, text]}
+        unit: {type: string, maxLength: 20, description: "Chỉ decimal/integer"}
+        required: {type: boolean, default: false}
+        min: {type: string, description: "Số thập phân dạng chuỗi; photo = số ảnh, text = độ dài"}
+        max: {type: string}
+        max_scale: {type: integer, minimum: 0, maximum: 8}
+        enum_values: {type: array, items: {type: string, pattern: "^[a-z0-9][a-z0-9_.-]{0,62}$"}}
+        help_vi: {type: string, maxLength: 500}
+    MrvCatalogInput:
+      type: object
+      required: [evidence_type, source_note, fields]
+      properties:
+        evidence_type: {type: string, pattern: "^[a-z][a-z0-9_]{2,39}$"}
+        provisional: {type: boolean, default: false, description: "Danh mục tạm, chờ chốt C-1"}
+        source_note: {type: string, maxLength: 500}
+        fields: {type: array, minItems: 1, maxItems: 100, items: {$ref: "#/components/schemas/MrvFieldInput"}}
+    MrvField:
+      type: object
+      required: [key, label_vi, data_type, unit, required, min, max, max_scale, enum_values, help_vi, position, reserved]
+      properties:
+        key: {type: string}
+        label_vi: {type: string}
+        data_type: {type: string}
+        unit: {type: [string, "null"]}
+        required: {type: boolean}
+        min: {type: [string, "null"]}
+        max: {type: [string, "null"]}
+        max_scale: {type: [integer, "null"]}
+        enum_values: {type: array, items: {type: string}}
+        help_vi: {type: [string, "null"]}
+        position: {type: integer}
+        reserved: {type: boolean}
+    MrvCatalogVersion:
+      type: object
+      required: [id, evidence_type, version, status, provisional, source_note, fields, setter_ref, approver_ref, submitted_at, decided_at, decision_note, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        evidence_type: {type: string}
+        version: {type: integer}
+        status: {type: string, enum: [draft, submitted, approved, rejected]}
+        provisional: {type: boolean}
+        source_note: {type: string}
+        fields: {type: array, items: {$ref: "#/components/schemas/MrvField"}}
+        setter_ref: {type: string, format: uuid}
+        approver_ref: {type: [string, "null"], format: uuid}
+        submitted_at: {type: [string, "null"], format: date-time}
+        decided_at: {type: [string, "null"], format: date-time}
+        decision_note: {type: [string, "null"]}
+        created_at: {type: string, format: date-time}

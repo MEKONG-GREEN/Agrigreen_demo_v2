@@ -301,6 +301,7 @@ paths:
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
   # --- pf/sync --- (docs/dev/sync-contract.md)
+
   /v1/devices:
     post:
       summary: Đăng ký thiết bị hiện trường cho người gọi (actor_ref, org_ref lấy từ token)
@@ -445,6 +446,198 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
         "410": {description: "vault.erased — hộ đã xóa định danh, tệp không còn mở được", $ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  # Nền MRV G1 (mục 16). Danh mục trường bằng chứng chưa chốt (C-1): danh mục là dữ liệu có
+
+  # phiên bản + phê duyệt (Admin API); mỗi minh chứng ghim phiên bản danh mục đã duyệt lúc thu.
+  /v1/mrv/catalog:
+    get:
+      summary: Phiên bản danh mục trường ĐÃ DUYỆT của một loại minh chứng (app hiện trường dựng biểu mẫu)
+      operationId: getMrvApprovedCatalog
+      parameters:
+        - {name: evidence_type, in: query, required: true, schema: {type: string, pattern: "^[a-z][a-z0-9_]{2,39}$", examples: [awd_log, field_checklist]}}
+        - {name: version, in: query, description: "Bỏ trống = bản đã duyệt mới nhất", schema: {type: integer, minimum: 1}}
+      responses:
+        "200":
+          description: Phiên bản danh mục
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvCatalogVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/evidence:
+    post:
+      summary: Ghi một minh chứng (hoặc bản ghi bù khi có supersedes_id) — kiểm theo phiên bản danh mục đã ghim
+      description: |
+        Vai mrv_collector, trong phạm vi xã (ADR-0009). Có household_ref → bắt buộc đồng ý mục đích
+        mrv.evidence (mrv.consent_missing). Ảnh chỉ tham chiếu file_ref + sha256 ciphertext (ADR-0004).
+        Toạ độ là dữ liệu cá nhân khi gắn với hộ — không ghi log.
+      operationId: captureMrvEvidence
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/MrvEvidenceInput"}
+      responses:
+        "201":
+          description: Đã ghi
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvEvidence"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Bản hiện hành của các chuỗi minh chứng trong phạm vi (hàng chờ duyệt = review_status=pending)
+      operationId: listMrvEvidence
+      parameters:
+        - {name: evidence_type, in: query, schema: {type: string}}
+        - {name: admin_unit_code, in: query, schema: {type: string}}
+        - {name: review_status, in: query, schema: {type: string, enum: [pending, accepted, rejected]}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MrvEvidence"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/evidence/{id}:
+    get:
+      summary: Một phiên bản minh chứng kèm chuỗi sửa sai và các quyết định duyệt
+      operationId: getMrvEvidence
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Minh chứng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvEvidenceView"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/evidence/{id}/reviews:
+    post:
+      summary: Quyết định duyệt của TTKN tỉnh cho bản hiện hành (KN US-MRV-05) — người duyệt ≠ người thu
+      operationId: reviewMrvEvidence
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision, reason]
+              properties:
+                decision: {type: string, enum: [accepted, rejected], description: "accepted = Đạt chuẩn; rejected = Yêu cầu kiểm tra lại"}
+                reason: {type: string, minLength: 5, maxLength: 1000}
+      responses:
+        "201":
+          description: Đã ghi quyết định
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvReview"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/exports:
+    post:
+      summary: Yêu cầu xuất gói bằng chứng (mục 12) — 202 + job; worker dựng gói, lưu kèm băm ảnh chụp dữ liệu
+      operationId: requestMrvExport
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                filters: {$ref: "#/components/schemas/MrvExportFilters"}
+      responses:
+        "202":
+          description: Đã nhận; theo dõi tại Location
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvExport"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/exports/{id}:
+    get:
+      summary: Trạng thái job xuất
+      operationId: getMrvExport
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Job
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvExport"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/exports/{id}/package:
+    get:
+      summary: URL tải gói có hạn (≤ 15 phút; không ghi log)
+      operationId: getMrvExportPackage
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: URL có chữ ký
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [export_id, url, expires_at, package_sha256, snapshot_sha256]
+                properties:
+                  export_id: {type: string, format: uuid}
+                  url: {type: string}
+                  expires_at: {type: string, format: date-time}
+                  package_sha256: {type: string}
+                  snapshot_sha256: {type: string}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/exports/{id}/verify:
+    get:
+      summary: Dựng lại ảnh chụp dữ liệu tại as_of từ sổ và so với snapshot_sha256 đã lưu
+      operationId: verifyMrvExport
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả so băm
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [export_id, as_of, snapshot_sha256, rebuilt_sha256, match]
+                properties:
+                  export_id: {type: string, format: uuid}
+                  as_of: {type: string, format: date-time}
+                  snapshot_sha256: {type: string}
+                  rebuilt_sha256: {type: string}
+                  match: {type: boolean}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -654,6 +847,7 @@ components:
         duplicate: {type: boolean}
         duplicate_label: {type: string, enum: ["trùng"]}
     # --- pf/sync ---
+
     SyncDeviceInput:
       type: object
       required: [device_id, platform, app_version]
@@ -771,3 +965,143 @@ components:
                 lon: {type: number}
                 accuracy_m: {type: number}
         created_at: {type: string, format: date-time}
+    MrvField:
+      type: object
+      required: [key, label_vi, data_type, unit, required, min, max, max_scale, enum_values, help_vi, position, reserved]
+      properties:
+        key: {type: string}
+        label_vi: {type: string}
+        data_type: {type: string, enum: [decimal, integer, boolean, enum, date, photo, geo_point, text]}
+        unit: {type: [string, "null"]}
+        required: {type: boolean}
+        min: {type: [string, "null"], description: "decimal/integer: giá trị; photo: số ảnh; text: độ dài"}
+        max: {type: [string, "null"]}
+        max_scale: {type: [integer, "null"]}
+        enum_values: {type: array, items: {type: string}}
+        help_vi: {type: [string, "null"]}
+        position: {type: integer}
+        reserved: {type: boolean, description: "plot_ref, season, gps, photo: giá trị lấy từ plot_ref, season_code, gps, file_refs của bản ghi"}
+    MrvCatalogVersion:
+      type: object
+      required: [id, evidence_type, version, status, provisional, source_note, fields, setter_ref, approver_ref, submitted_at, decided_at, decision_note, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        evidence_type: {type: string}
+        version: {type: integer}
+        status: {type: string, enum: [draft, submitted, approved, rejected]}
+        provisional: {type: boolean, description: "Danh mục tạm, chờ chốt C-1"}
+        source_note: {type: string}
+        fields: {type: array, items: {$ref: "#/components/schemas/MrvField"}}
+        setter_ref: {type: string, format: uuid}
+        approver_ref: {type: [string, "null"], format: uuid}
+        submitted_at: {type: [string, "null"], format: date-time}
+        decided_at: {type: [string, "null"], format: date-time}
+        decision_note: {type: [string, "null"]}
+        created_at: {type: string, format: date-time}
+    MrvFileRef:
+      type: object
+      required: [file_ref, sha256]
+      properties:
+        file_ref: {type: string, format: uuid, description: "Tệp đã mã hóa phong bì (POST /v1/files)"}
+        sha256: {type: string, pattern: "^[0-9a-f]{64}$", description: "Băm ciphertext"}
+    MrvGPS:
+      type: object
+      description: Dữ liệu cá nhân khi gắn với hộ — không ghi log
+      required: [lat, lon]
+      properties:
+        lat: {$ref: "#/components/schemas/Decimal"}
+        lon: {$ref: "#/components/schemas/Decimal"}
+        accuracy_m: {oneOf: [{$ref: "#/components/schemas/Decimal"}, {type: "null"}]}
+    MrvEvidenceInput:
+      type: object
+      required: [evidence_type, admin_unit_code, values, event_time]
+      properties:
+        id: {type: string, format: uuid, description: "UUIDv7 sinh trên máy (R-11)"}
+        evidence_type: {type: string, examples: [awd_log, field_checklist]}
+        catalog_version: {type: integer, minimum: 1, description: "Phiên bản danh mục máy đang dùng; bỏ trống = bản đã duyệt mới nhất (được ghim)"}
+        admin_unit_code: {type: string, description: "Xã nơi thu"}
+        plot_ref: {type: string, format: uuid}
+        household_ref: {type: string, format: uuid, description: "Có → bắt buộc đồng ý mục đích mrv.evidence"}
+        season_code: {type: string}
+        values:
+          type: object
+          description: Giá trị theo khóa trường của danh mục; decimal là CHUỖI (R-10); photo là mảng file_ref
+          additionalProperties: true
+        file_refs: {type: array, maxItems: 20, items: {$ref: "#/components/schemas/MrvFileRef"}}
+        gps: {$ref: "#/components/schemas/MrvGPS"}
+        event_time: {type: string, format: date-time}
+        supersedes_id: {type: string, format: uuid, description: "Bản ghi bù: id bản HIỆN HÀNH bị thay"}
+        correction_reason: {type: string, minLength: 10, maxLength: 1000}
+        device_id: {type: string}
+    MrvEvidence:
+      type: object
+      required: [id, root_id, chain_version, evidence_type, catalog_version, admin_unit_code, plot_ref, household_ref, season_code, values, file_refs, gps, event_time, recorded_at, captured_by, device_id, supersedes_id, correction_reason, seq]
+      properties:
+        id: {type: string, format: uuid}
+        root_id: {type: string, format: uuid}
+        chain_version: {type: integer}
+        evidence_type: {type: string}
+        catalog_version: {type: integer}
+        admin_unit_code: {type: string}
+        plot_ref: {type: [string, "null"], format: uuid}
+        household_ref: {type: [string, "null"], format: uuid}
+        season_code: {type: [string, "null"]}
+        values: {type: object, additionalProperties: true}
+        file_refs: {type: array, items: {$ref: "#/components/schemas/MrvFileRef"}}
+        gps: {oneOf: [{$ref: "#/components/schemas/MrvGPS"}, {type: "null"}]}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        captured_by: {type: string, format: uuid}
+        device_id: {type: [string, "null"]}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        seq: {type: integer}
+        review_status: {type: string, enum: [pending, accepted, rejected], description: "Chỉ có trong danh sách"}
+    MrvReview:
+      type: object
+      required: [id, evidence_id, root_id, decision, reason, reviewer_ref, event_time, recorded_at, seq]
+      properties:
+        id: {type: string, format: uuid}
+        evidence_id: {type: string, format: uuid}
+        root_id: {type: string, format: uuid}
+        decision: {type: string, enum: [accepted, rejected]}
+        reason: {type: string}
+        reviewer_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        seq: {type: integer}
+    MrvEvidenceView:
+      type: object
+      required: [evidence, head_id, is_current, review_status, chain, reviews]
+      properties:
+        evidence: {$ref: "#/components/schemas/MrvEvidence"}
+        head_id: {type: string, format: uuid}
+        is_current: {type: boolean}
+        review_status: {type: string, enum: [pending, accepted, rejected]}
+        chain: {type: array, items: {$ref: "#/components/schemas/MrvEvidence"}}
+        reviews: {type: array, items: {$ref: "#/components/schemas/MrvReview"}}
+    MrvExportFilters:
+      type: object
+      properties:
+        evidence_type: {type: string}
+        admin_unit_codes: {type: array, items: {type: string}, description: "Bỏ trống = toàn bộ phạm vi người gọi (giải ra danh sách xã lúc yêu cầu)"}
+        all_units: {type: boolean, readOnly: true, description: "Do máy chủ đặt khi phạm vi toàn quốc"}
+        season_code: {type: string}
+        event_from: {type: string, format: date-time}
+        event_to: {type: string, format: date-time}
+        review_status: {type: string, enum: [pending, accepted, rejected]}
+    MrvExport:
+      type: object
+      required: [id, status, filters, requested_by, requested_at, object_key, package_sha256, snapshot_sha256, evidence_count, error_code, completed_at]
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string, enum: [queued, completed, failed]}
+        filters: {$ref: "#/components/schemas/MrvExportFilters"}
+        requested_by: {type: string, format: uuid}
+        requested_at: {type: string, format: date-time, description: "Mốc ảnh chụp dữ liệu (as_of)"}
+        object_key: {type: [string, "null"]}
+        package_sha256: {type: [string, "null"]}
+        snapshot_sha256: {type: [string, "null"], description: "SHA-256 của JSON chuẩn hóa (khóa sắp xếp) của trường snapshot trong gói"}
+        evidence_count: {type: [integer, "null"]}
+        error_code: {type: [string, "null"]}
+        completed_at: {type: [string, "null"], format: date-time}

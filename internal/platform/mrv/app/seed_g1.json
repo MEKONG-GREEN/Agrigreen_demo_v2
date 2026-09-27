@@ -1,0 +1,44 @@
+[
+  {
+    "evidence_type": "awd_log",
+    "provisional": true,
+    "source_note": "Danh mục mẫu G1 — TẠM, chờ chốt danh mục trường bằng chứng thương mại (C-1). Theo KN US-MRV-01: nhật ký AWD tại SPOT, ≥ 1 ảnh + toạ độ + thời gian tự động.",
+    "fields": [
+      {"key": "plot_ref", "label_vi": "Thửa ruộng / SPOT", "data_type": "text", "required": true},
+      {"key": "season", "label_vi": "Vụ", "data_type": "text", "required": true},
+      {"key": "stage", "label_vi": "Giai đoạn sinh trưởng", "data_type": "enum", "required": true,
+       "enum_values": ["ma", "de_nhanh", "lam_dong", "tro_bong", "chin"]},
+      {"key": "awd_water_level_cm", "label_vi": "Mực nước so với mặt ruộng", "data_type": "decimal", "unit": "cm",
+       "required": true, "min": "-30", "max": "30", "max_scale": 1,
+       "help_vi": "Đo tại ống quan trắc; âm = dưới mặt ruộng"},
+      {"key": "awd_dry_days", "label_vi": "Số ngày khô liên tục", "data_type": "integer", "unit": "ngày",
+       "required": true, "min": "0", "max": "60"},
+      {"key": "field_surface", "label_vi": "Tình trạng mặt ruộng", "data_type": "enum", "required": false,
+       "enum_values": ["ngap", "am", "nut_ne", "kho"]},
+      {"key": "photo", "label_vi": "Ảnh hiện trường", "data_type": "photo", "required": true, "min": "1", "max": "10"},
+      {"key": "gps", "label_vi": "Toạ độ lúc chụp", "data_type": "geo_point", "required": true},
+      {"key": "note", "label_vi": "Ghi chú", "data_type": "text", "required": false, "max": "1000"}
+    ]
+  },
+  {
+    "evidence_type": "field_checklist",
+    "provisional": true,
+    "source_note": "Danh mục mẫu G1 — TẠM, chờ chốt C-1. Theo KN US-MRV-03: kiểm tra thực địa theo danh mục chuẩn (ranh giới, phỏng vấn, chế độ nước, ước tính số liệu).",
+    "fields": [
+      {"key": "plot_ref", "label_vi": "Thửa ruộng / SPOT", "data_type": "text", "required": true},
+      {"key": "season", "label_vi": "Vụ", "data_type": "text", "required": true},
+      {"key": "stage", "label_vi": "Giai đoạn sinh trưởng", "data_type": "enum", "required": false,
+       "enum_values": ["ma", "de_nhanh", "lam_dong", "tro_bong", "chin"]},
+      {"key": "check_boundary_ok", "label_vi": "Ranh giới thửa khớp bản đồ", "data_type": "boolean", "required": true},
+      {"key": "check_interview_done", "label_vi": "Đã phỏng vấn nông hộ", "data_type": "boolean", "required": true},
+      {"key": "check_water_regime", "label_vi": "Chế độ nước quan sát được", "data_type": "enum", "required": true,
+       "enum_values": ["awd", "ngap_lien_tuc", "khac"]},
+      {"key": "check_estimated_yield_t_ha", "label_vi": "Ước tính năng suất", "data_type": "decimal", "unit": "t/ha",
+       "required": false, "min": "0", "max": "20", "max_scale": 2},
+      {"key": "check_visit_date", "label_vi": "Ngày kiểm tra", "data_type": "date", "required": true},
+      {"key": "photo", "label_vi": "Ảnh hiện trường", "data_type": "photo", "required": true, "min": "1", "max": "10"},
+      {"key": "gps", "label_vi": "Toạ độ lúc kiểm tra", "data_type": "geo_point", "required": true},
+      {"key": "note", "label_vi": "Ghi chú", "data_type": "text", "required": false, "max": "1000"}
+    ]
+  }
+]

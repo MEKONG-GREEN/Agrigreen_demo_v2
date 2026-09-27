@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.mrv.export.requested/v1",
+  "title": "pf.mrv.export.requested — payload",
+  "description": "Yêu cầu xuất gói bằng chứng MRV đã ghi vào pf_mrv.export_job (mục 12). Worker nạp bộ lọc đã giải phạm vi từ bảng job, dựng ảnh chụp dữ liệu tại requested_at. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.mrv.export.requested",
+  "x-schema-version": 1,
+  "x-producer": "pf/mrv",
+  "type": "object",
+  "required": ["export_id", "requested_by", "requested_at"],
+  "properties": {
+    "export_id":    { "type": "string", "format": "uuid" },
+    "requested_by": { "type": "string", "format": "uuid", "description": "actor_ref người yêu cầu" },
+    "requested_at": { "type": "string", "format": "date-time", "description": "Mốc ảnh chụp dữ liệu (as_of)" }
+  }
+}

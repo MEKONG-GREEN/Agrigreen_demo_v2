@@ -1,0 +1,57 @@
+// Package mrv là module nền MRV của G1 (mục 16): danh mục trường bằng chứng có
+// phiên bản và phê duyệt [CHỜ-1], sổ minh chứng ghim phiên bản danh mục, duyệt
+// tối thiểu của TTKN tỉnh, xuất gói bằng chứng bất đồng bộ (mục 12) có băm ảnh
+// chụp dữ liệu, và Sink đồng bộ ngoại tuyến cho entity "evidence".
+//
+// Module khác chỉ được import mrv/port (R-02). Tệp này nối các lớp cho
+// cmd/api-platform và cmd/worker.
+package mrv
+
+import (
+	"github.com/gin-gonic/gin"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/app"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/handler"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+)
+
+// DBRole là vai DB riêng của module (R-05).
+const DBRole = "mrv_app"
+
+// Deps là phụ thuộc của module.
+type Deps struct {
+	// Scope: phạm vi TW → Tỉnh → Xã của người gọi (pf/party, ADR-0009).
+	Scope partyport.ScopeResolver
+	// Consent: đồng ý theo mục đích mrv.evidence của nông hộ (pf/party, mục 10.5).
+	Consent partyport.ConsentChecker
+	// Store: kho đối tượng cho gói xuất (packages/<tenant>/<export_id>.json).
+	Store objstore.Store
+}
+
+// Module là pf/mrv đã nối.
+type Module struct{ svc *app.Service }
+
+// New tạo module với pool của vai mrv_app. Ở worker, db có thể nil — handler
+// xuất gói chỉ dùng giao dịch do inbox.Process mở. Thiếu phụ thuộc → 503
+// mrv.dependency_unavailable ở thao tác cần nó.
+func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
+	return &Module{svc: &app.Service{DB: db, Clock: clk, Scope: deps.Scope, Consent: deps.Consent, Store: deps.Store}}
+}
+
+// RegisterApp gắn route Application API.
+func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterApp(rg) }
+
+// RegisterAdmin gắn route Admin API (danh mục trường, phê duyệt).
+func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }
+
+// SyncSink cho pf/sync nhận entity "evidence" chiều lên.
+func (m *Module) SyncSink() syncport.Sink { return app.Sink{Svc: m.svc} }
+
+// ExportHandler là inbox.Handler của worker cho pf.mrv.export.requested
+// (consumer port.ExportConsumer, pool vai mrv_app).
+func (m *Module) ExportHandler() inbox.Handler { return m.svc.HandleExportRequested }

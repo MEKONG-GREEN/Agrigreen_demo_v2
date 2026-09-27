@@ -7,8 +7,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	syncmod "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync"
+	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
@@ -47,11 +49,19 @@ func buildModules(ctx context.Context, open PoolOpener, clk clock.Clock, ext Ext
 	}
 	pty := party.New(partyPool, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault})
 
-	syncPool, err := pool(syncmod.DBRole)
+	files, err := fileStoreFromEnv(ctx)
 	if err != nil {
 		return nil, pools, err
 	}
-	files, err := fileStoreFromEnv(ctx)
+
+	mrvPool, err := pool(mrv.DBRole)
+	if err != nil {
+		return nil, pools, err
+	}
+	// Kho đối tượng cho gói xuất MRV: thiếu cấu hình → tải gói trả 503 mrv.dependency_unavailable.
+	mrvMod := mrv.New(mrvPool, clk, mrv.Deps{Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Store: files})
+
+	syncPool, err := pool(syncmod.DBRole)
 	if err != nil {
 		return nil, pools, err
 	}
@@ -61,10 +71,10 @@ func buildModules(ctx context.Context, open PoolOpener, clk clock.Clock, ext Ext
 		// Source/Sink của geo (plot, plot_boundary), content (document), extension (task,
 		// directive, task_update, field_report), mrv (evidence) nối ở đây khi các module có.
 		Sources: nil,
-		Sinks:   nil,
+		Sinks:   []syncport.Sink{mrvMod.SyncSink()},
 	})
 
-	return []httpx.Module{md, pty, snc}, pools, nil
+	return []httpx.Module{md, pty, mrvMod, snc}, pools, nil
 }
 
 // fileStoreFromEnv mở kho đối tượng cho tệp minh chứng nếu đã cấu hình

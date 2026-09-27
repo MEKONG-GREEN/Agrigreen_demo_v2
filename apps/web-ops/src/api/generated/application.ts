@@ -242,6 +242,250 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đăng ký thiết bị hiện trường cho người gọi (actor_ref, org_ref lấy từ token) */
+        post: operations["registerDevice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sync/pull": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thay đổi chiều xuống theo phạm vi phân công (cursor mờ có chữ ký, round-robin giữa các entity) */
+        get: operations["syncPull"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sync/push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gửi một lô bản ghi chỉ ghi thêm; kết quả theo từng bản ghi */
+        post: operations["syncPush"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tải tệp minh chứng đã mã hóa phong bì (chỉ bản mã, ≤ 15 MB) */
+        post: operations["uploadFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/files/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Siêu dữ liệu tệp + URL tải BẢN MÃ có hạn 5 phút (vai vault_evidence_viewer, có mục đích) */
+        get: operations["getFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/files/{ref}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nội dung đã giải mã để hiển thị — kho định danh mở DEK theo mục đích; bản rõ chỉ trong bộ nhớ request */
+        get: operations["getFileContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mrv/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiên bản danh mục trường ĐÃ DUYỆT của một loại minh chứng (app hiện trường dựng biểu mẫu) */
+        get: operations["getMrvApprovedCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mrv/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bản hiện hành của các chuỗi minh chứng trong phạm vi (hàng chờ duyệt = review_status=pending) */
+        get: operations["listMrvEvidence"];
+        put?: never;
+        /**
+         * Ghi một minh chứng (hoặc bản ghi bù khi có supersedes_id) — kiểm theo phiên bản danh mục đã ghim
+         * @description Vai mrv_collector, trong phạm vi xã (ADR-0009). Có household_ref → bắt buộc đồng ý mục đích
+         *     mrv.evidence (mrv.consent_missing). Ảnh chỉ tham chiếu file_ref + sha256 ciphertext (ADR-0004).
+         *     Toạ độ là dữ liệu cá nhân khi gắn với hộ — không ghi log.
+         */
+        post: operations["captureMrvEvidence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mrv/evidence/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một phiên bản minh chứng kèm chuỗi sửa sai và các quyết định duyệt */
+        get: operations["getMrvEvidence"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mrv/evidence/{id}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Quyết định duyệt của TTKN tỉnh cho bản hiện hành (KN US-MRV-05) — người duyệt ≠ người thu */
+        post: operations["reviewMrvEvidence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mrv/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Yêu cầu xuất gói bằng chứng (mục 12) — 202 + job; worker dựng gói, lưu kèm băm ảnh chụp dữ liệu */
+        post: operations["requestMrvExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mrv/exports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái job xuất */
+        get: operations["getMrvExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mrv/exports/{id}/package": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** URL tải gói có hạn (≤ 15 phút; không ghi log) */
+        get: operations["getMrvExportPackage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mrv/exports/{id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dựng lại ảnh chụp dữ liệu tại as_of từ sổ và so với snapshot_sha256 đã lưu */
+        get: operations["verifyMrvExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -425,6 +669,355 @@ export interface components {
             /** @enum {string} */
             duplicate_label?: "trùng";
         };
+        SyncDeviceInput: {
+            /**
+             * Format: uuid
+             * @description UUIDv7 sinh trên máy
+             */
+            device_id: string;
+            /** @enum {string} */
+            platform: "android" | "ios";
+            app_version: string;
+        };
+        SyncDevice: {
+            /** Format: uuid */
+            device_id: string;
+            /** Format: date-time */
+            registered_at: string;
+            platform: string;
+            app_version: string;
+            revoked: boolean;
+        };
+        SyncChange: {
+            /**
+             * @example plot
+             * @example task
+             * @example directive
+             * @example document
+             * @example pubkey
+             */
+            entity: string;
+            /**
+             * Format: uuid
+             * @description pubkey + id 00000000-0000-0000-0000-000000000000 + tombstone = kết thúc lượt khóa: xóa mọi pubkey có version nhỏ hơn
+             */
+            id: string;
+            version: number;
+            /** @enum {string} */
+            op: "upsert" | "tombstone";
+            /** @description Không có khi tombstone. pubkey: {ref, area_code, public_key (base64 32 byte)} */
+            data?: Record<string, never>;
+        };
+        SyncPullPage: {
+            changes: components["schemas"]["SyncChange"][];
+            /** @description Mờ, có chữ ký HMAC, gắn với tenant + thiết bị + phạm vi */
+            next_cursor: string;
+            has_more: boolean;
+            /** Format: date-time */
+            server_time: string;
+            /** @description true = phạm vi đã đổi; pull bắt đầu lại từ đầu, máy thay toàn bộ dữ liệu tham chiếu */
+            reset: boolean;
+        };
+        SyncPushRecord: {
+            /**
+             * Format: uuid
+             * @description UUIDv7 sinh trên máy
+             */
+            id: string;
+            /** @description dev:<device_id của chính máy gửi>:<seq> */
+            idem_key: string;
+            /**
+             * @example plot_boundary
+             * @example field_report
+             * @example task_update
+             * @example consent
+             * @example evidence
+             */
+            entity: string;
+            /** @enum {string} */
+            op: "create" | "correct";
+            /**
+             * Format: date-time
+             * @description Có múi giờ; không vượt quá giờ máy chủ + 5 phút
+             */
+            event_time: string;
+            /**
+             * Format: uuid
+             * @description Bắt buộc khi op = correct
+             */
+            supersedes_id?: string | null;
+            /** @description Bắt buộc khi op = correct */
+            correction_reason?: string | null;
+            /** @description Tối đa 256 KiB; máy chủ pf/sync chỉ lưu SHA-256 */
+            payload: Record<string, never>;
+        };
+        SyncPushBatch: {
+            /**
+             * Format: uuid
+             * @description Phải trùng header X-Device-Id
+             */
+            device_id: string;
+            records: components["schemas"]["SyncPushRecord"][];
+        };
+        SyncPushResult: {
+            /** @description id máy gửi, nguyên văn (kể cả khi sai dạng) */
+            id: string;
+            /** @enum {string} */
+            status: "accepted" | "duplicate" | "conflict" | "rejected";
+            /** Format: uuid */
+            conflict_id?: string;
+            /** @description Khi rejected: validation_failed | sync.unknown_entity | sync.sink_failed (máy tự gửi lại, không bắt người dùng sửa) | mã của module nhận */
+            code?: string;
+            errors?: {
+                field?: string;
+                reason?: string;
+            }[];
+        };
+        /** @description docs/dev/envelope-format.md, phiên bản 1 */
+        SyncEnvelopeMeta: {
+            /** @enum {integer} */
+            v: 1;
+            /** @enum {string} */
+            alg: "A256GCM+X25519-SEALEDBOX";
+            /** Format: uuid */
+            subject_ref: string;
+            /** @description 12 byte */
+            nonce: string;
+            /** @description 80 byte (crypto_box_seal) */
+            wrapped_dek: string;
+            sha256_ciphertext: string;
+            /** @enum {string} */
+            content_type: "image/jpeg" | "image/png" | "image/webp" | "image/heic" | "application/pdf" | "video/mp4";
+            /** Format: date-time */
+            captured_at?: string;
+            gps?: {
+                lat: number;
+                lon: number;
+                accuracy_m?: number;
+            };
+        };
+        SyncFileCreated: {
+            /** Format: uuid */
+            file_ref: string;
+            sha256_ciphertext: string;
+            size: number;
+        };
+        SyncFile: {
+            /** Format: uuid */
+            file_ref: string;
+            /** Format: uuid */
+            subject_ref: string;
+            v: number;
+            alg: string;
+            nonce: string;
+            wrapped_dek: string;
+            sha256_ciphertext: string;
+            size: number;
+            content_type: string;
+            /** Format: date-time */
+            captured_at: string | null;
+            gps: null | {
+                lat?: number;
+                lon?: number;
+                accuracy_m?: number;
+            };
+            /** Format: date-time */
+            created_at: string;
+        };
+        MrvField: {
+            key: string;
+            label_vi: string;
+            /** @enum {string} */
+            data_type: "decimal" | "integer" | "boolean" | "enum" | "date" | "photo" | "geo_point" | "text";
+            unit: string | null;
+            required: boolean;
+            /** @description decimal/integer: giá trị; photo: số ảnh; text: độ dài */
+            min: string | null;
+            max: string | null;
+            max_scale: number | null;
+            enum_values: string[];
+            help_vi: string | null;
+            position: number;
+            /** @description plot_ref, season, gps, photo: giá trị lấy từ plot_ref, season_code, gps, file_refs của bản ghi */
+            reserved: boolean;
+        };
+        MrvCatalogVersion: {
+            /** Format: uuid */
+            id: string;
+            evidence_type: string;
+            version: number;
+            /** @enum {string} */
+            status: "draft" | "submitted" | "approved" | "rejected";
+            /** @description Danh mục tạm, chờ chốt C-1 */
+            provisional: boolean;
+            source_note: string;
+            fields: components["schemas"]["MrvField"][];
+            /** Format: uuid */
+            setter_ref: string;
+            /** Format: uuid */
+            approver_ref: string | null;
+            /** Format: date-time */
+            submitted_at: string | null;
+            /** Format: date-time */
+            decided_at: string | null;
+            decision_note: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        MrvFileRef: {
+            /**
+             * Format: uuid
+             * @description Tệp đã mã hóa phong bì (POST /v1/files)
+             */
+            file_ref: string;
+            /** @description Băm ciphertext */
+            sha256: string;
+        };
+        /** @description Dữ liệu cá nhân khi gắn với hộ — không ghi log */
+        MrvGPS: {
+            lat: components["schemas"]["Decimal"];
+            lon: components["schemas"]["Decimal"];
+            accuracy_m?: components["schemas"]["Decimal"] | null;
+        };
+        MrvEvidenceInput: {
+            /**
+             * Format: uuid
+             * @description UUIDv7 sinh trên máy (R-11)
+             */
+            id?: string;
+            /**
+             * @example awd_log
+             * @example field_checklist
+             */
+            evidence_type: string;
+            /** @description Phiên bản danh mục máy đang dùng; bỏ trống = bản đã duyệt mới nhất (được ghim) */
+            catalog_version?: number;
+            /** @description Xã nơi thu */
+            admin_unit_code: string;
+            /** Format: uuid */
+            plot_ref?: string;
+            /**
+             * Format: uuid
+             * @description Có → bắt buộc đồng ý mục đích mrv.evidence
+             */
+            household_ref?: string;
+            season_code?: string;
+            /** @description Giá trị theo khóa trường của danh mục; decimal là CHUỖI (R-10); photo là mảng file_ref */
+            values: {
+                [key: string]: unknown;
+            };
+            file_refs?: components["schemas"]["MrvFileRef"][];
+            gps?: components["schemas"]["MrvGPS"];
+            /** Format: date-time */
+            event_time: string;
+            /**
+             * Format: uuid
+             * @description Bản ghi bù: id bản HIỆN HÀNH bị thay
+             */
+            supersedes_id?: string;
+            correction_reason?: string;
+            device_id?: string;
+        };
+        MrvEvidence: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            root_id: string;
+            chain_version: number;
+            evidence_type: string;
+            catalog_version: number;
+            admin_unit_code: string;
+            /** Format: uuid */
+            plot_ref: string | null;
+            /** Format: uuid */
+            household_ref: string | null;
+            season_code: string | null;
+            values: {
+                [key: string]: unknown;
+            };
+            file_refs: components["schemas"]["MrvFileRef"][];
+            gps: components["schemas"]["MrvGPS"] | null;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            captured_by: string;
+            device_id: string | null;
+            /** Format: uuid */
+            supersedes_id: string | null;
+            correction_reason: string | null;
+            seq: number;
+            /**
+             * @description Chỉ có trong danh sách
+             * @enum {string}
+             */
+            review_status?: "pending" | "accepted" | "rejected";
+        };
+        MrvReview: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            evidence_id: string;
+            /** Format: uuid */
+            root_id: string;
+            /** @enum {string} */
+            decision: "accepted" | "rejected";
+            reason: string;
+            /** Format: uuid */
+            reviewer_ref: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            seq: number;
+        };
+        MrvEvidenceView: {
+            evidence: components["schemas"]["MrvEvidence"];
+            /** Format: uuid */
+            head_id: string;
+            is_current: boolean;
+            /** @enum {string} */
+            review_status: "pending" | "accepted" | "rejected";
+            chain: components["schemas"]["MrvEvidence"][];
+            reviews: components["schemas"]["MrvReview"][];
+        };
+        MrvExportFilters: {
+            evidence_type?: string;
+            /** @description Bỏ trống = toàn bộ phạm vi người gọi (giải ra danh sách xã lúc yêu cầu) */
+            admin_unit_codes?: string[];
+            /** @description Do máy chủ đặt khi phạm vi toàn quốc */
+            readonly all_units?: boolean;
+            season_code?: string;
+            /** Format: date-time */
+            event_from?: string;
+            /** Format: date-time */
+            event_to?: string;
+            /** @enum {string} */
+            review_status?: "pending" | "accepted" | "rejected";
+        };
+        MrvExport: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            status: "queued" | "completed" | "failed";
+            filters: components["schemas"]["MrvExportFilters"];
+            /** Format: uuid */
+            requested_by: string;
+            /**
+             * Format: date-time
+             * @description Mốc ảnh chụp dữ liệu (as_of)
+             */
+            requested_at: string;
+            object_key: string | null;
+            package_sha256: string | null;
+            /** @description SHA-256 của JSON chuẩn hóa (khóa sắp xếp) của trường snapshot trong gói */
+            snapshot_sha256: string | null;
+            evidence_count: number | null;
+            error_code: string | null;
+            /** Format: date-time */
+            completed_at: string | null;
+        };
     };
     responses: {
         /** @description RFC 9457 */
@@ -443,6 +1036,10 @@ export interface components {
         At: string;
         UnitCode: string;
         Catalog: "rice_variety" | "farm_stage" | "machine_type" | "season" | "pest";
+        /** @description Mã thiết bị đã đăng ký bởi chính người gọi (pf/sync) */
+        DeviceID: string;
+        /** @description Mục đích xử lý dữ liệu cá nhân (R-42) */
+        Purpose: "mrv.evidence" | "extension.field_support";
     };
     requestBodies: never;
     headers: never;
@@ -881,6 +1478,511 @@ export interface operations {
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
+        };
+    };
+    registerDevice: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncDeviceInput"];
+            };
+        };
+        responses: {
+            /** @description Cùng người đăng ký lại cùng mã (cài lại, nâng cấp app) — cập nhật app_version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncDevice"];
+                };
+            };
+            /** @description Đã đăng ký */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncDevice"];
+                };
+            };
+            /** @description sync.device_revoked — mã đã bị thu hồi; máy xóa dữ liệu và sinh mã mới */
+            403: components["responses"]["Problem"];
+            /** @description sync.device_taken */
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    syncPull: {
+        parameters: {
+            query?: {
+                /** @description next_cursor của trang trước; bỏ trống = từ đầu */
+                cursor?: string;
+                limit?: number;
+            };
+            header: {
+                /** @description Mã thiết bị đã đăng ký bởi chính người gọi (pf/sync) */
+                "X-Device-Id": components["parameters"]["DeviceID"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncPullPage"];
+                };
+            };
+            /** @description sync.cursor_invalid — con trỏ bị sửa hoặc của thiết bị khác; pull lại từ đầu */
+            400: components["responses"]["Problem"];
+            /** @description sync.device_unregistered | sync.device_revoked */
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    syncPush: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Mã thiết bị đã đăng ký bởi chính người gọi (pf/sync) */
+                "X-Device-Id": components["parameters"]["DeviceID"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncPushBatch"];
+            };
+        };
+        responses: {
+            /** @description Kết quả theo thứ tự bản ghi gửi lên. Gọi lặp cùng Idempotency-Key trả đúng phản hồi này. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        results: components["schemas"]["SyncPushResult"][];
+                    };
+                };
+            };
+            /** @description sync.device_unregistered | sync.device_revoked */
+            403: components["responses"]["Problem"];
+            /** @description device_id khác header, quá 500 bản ghi */
+            422: components["responses"]["Problem"];
+        };
+    };
+    uploadFile: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Mã thiết bị đã đăng ký bởi chính người gọi (pf/sync) */
+                "X-Device-Id": components["parameters"]["DeviceID"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    meta: components["schemas"]["SyncEnvelopeMeta"];
+                    /**
+                     * Format: binary
+                     * @description Bản mã AES-256-GCM ‖ tag; SHA-256 phải bằng meta.sha256_ciphertext
+                     */
+                    blob: string;
+                    /**
+                     * Format: uuid
+                     * @description Tùy chọn: UUIDv7 máy sinh để bản ghi evidence ngoại tuyến tham chiếu trước khi tải
+                     */
+                    file_ref?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Cùng file_ref, cùng bản mã đã có */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncFileCreated"];
+                };
+            };
+            /** @description Đã lưu */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncFileCreated"];
+                };
+            };
+            /** @description sync.device_unregistered | sync.device_revoked */
+            403: components["responses"]["Problem"];
+            /** @description sync.file_ref_taken */
+            409: components["responses"]["Problem"];
+            413: components["responses"]["Problem"];
+            /** @description validation_failed | sync.file_checksum_mismatch */
+            422: components["responses"]["Problem"];
+            /** @description sync.dependency_unavailable — chưa cấu hình kho đối tượng */
+            503: components["responses"]["Problem"];
+        };
+    };
+    getFile: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Mục đích xử lý dữ liệu cá nhân (R-42) */
+                "X-Purpose": components["parameters"]["Purpose"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Siêu dữ liệu (gps, captured_at là dữ liệu cá nhân — không lưu đệm) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        file: components["schemas"]["SyncFile"];
+                        /** Format: uri */
+                        download_url: string;
+                        /** Format: date-time */
+                        expires_at: string;
+                    };
+                };
+            };
+            /** @description sync.purpose_required */
+            400: components["responses"]["Problem"];
+            /** @description forbidden | sync.purpose_not_allowed | sync.consent_missing */
+            403: components["responses"]["Problem"];
+            /** @description sync.file_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    getFileContent: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Mục đích xử lý dữ liệu cá nhân (R-42) */
+                "X-Purpose": components["parameters"]["Purpose"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bản rõ, Content-Type = content_type của tệp, Cache-Control no-store */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            /** @description vault.erased — hộ đã xóa định danh, tệp không còn mở được */
+            410: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    getMrvApprovedCatalog: {
+        parameters: {
+            query: {
+                evidence_type: string;
+                /** @description Bỏ trống = bản đã duyệt mới nhất */
+                version?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản danh mục */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MrvCatalogVersion"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listMrvEvidence: {
+        parameters: {
+            query?: {
+                evidence_type?: string;
+                admin_unit_code?: string;
+                review_status?: "pending" | "accepted" | "rejected";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MrvEvidence"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    captureMrvEvidence: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MrvEvidenceInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MrvEvidence"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    getMrvEvidence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Minh chứng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MrvEvidenceView"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    reviewMrvEvidence: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * @description accepted = Đạt chuẩn; rejected = Yêu cầu kiểm tra lại
+                     * @enum {string}
+                     */
+                    decision: "accepted" | "rejected";
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi quyết định */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MrvReview"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    requestMrvExport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    filters?: components["schemas"]["MrvExportFilters"];
+                };
+            };
+        };
+        responses: {
+            /** @description Đã nhận; theo dõi tại Location */
+            202: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MrvExport"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getMrvExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Job */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MrvExport"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    getMrvExportPackage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description URL có chữ ký */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        export_id: string;
+                        url: string;
+                        /** Format: date-time */
+                        expires_at: string;
+                        package_sha256: string;
+                        snapshot_sha256: string;
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    verifyMrvExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả so băm */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        export_id: string;
+                        /** Format: date-time */
+                        as_of: string;
+                        snapshot_sha256: string;
+                        rebuilt_sha256: string;
+                        match: boolean;
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
         };
     };
 }
