@@ -31,15 +31,15 @@ func DialRabbit(url string) (*Rabbit, error) {
 	}
 	ch, err := conn.Channel()
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, err
 	}
 	if err := DeclareTopology(ch); err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, err
 	}
 	if err := ch.Confirm(false); err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, fmt.Errorf("outbox: bật publisher confirm: %w", err)
 	}
 	return &Rabbit{conn: conn, ch: ch}, nil

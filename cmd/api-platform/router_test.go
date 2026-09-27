@@ -76,7 +76,7 @@ func (c caller) do(method, path, idem string, body any) (*http.Response, map[str
 	if err != nil {
 		c.f.t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	raw, _ := io.ReadAll(resp.Body)
 	var m map[string]any
 	_ = json.Unmarshal(raw, &m)

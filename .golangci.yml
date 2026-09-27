@@ -41,8 +41,8 @@ linters:
       - tools/archlint/testdata
     rules:
       - path: _test\.go
-        linters: [gosec, forbidigo]
+        linters: [gosec, forbidigo, bodyclose]
       - path: tools/
-        linters: [forbidigo]
+        linters: [forbidigo, gosec]
       - path: cmd/(migrate|ingest|edge-agent)/
         linters: [forbidigo]

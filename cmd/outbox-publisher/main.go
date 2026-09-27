@@ -41,7 +41,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	defer broker.Close()
+	defer func() { _ = broker.Close() }()
 
 	var wg sync.WaitGroup
 	for _, c := range migrations.Clusters {

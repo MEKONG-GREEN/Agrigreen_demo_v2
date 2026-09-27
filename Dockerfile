@@ -1,6 +1,6 @@
 # Một Dockerfile cho mọi lệnh trong cmd/: docker build --build-arg CMD=api-platform .
 # Image tối giản, non-root, hệ tệp gốc chỉ đọc khi chạy (mục 18).
-ARG GO_VERSION=1.25
+ARG GO_VERSION=1.26
 
 FROM golang:${GO_VERSION}-bookworm AS build
 WORKDIR /src

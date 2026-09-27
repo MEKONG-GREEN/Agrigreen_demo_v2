@@ -135,7 +135,7 @@ func TestContextDoesNotOutliveTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 	if err := tenant.WithTenantTx(ctx, conn, ids.New(), func(tx pgx.Tx) error { return nil }); err != nil {
 		t.Fatal(err)
 	}

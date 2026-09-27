@@ -83,7 +83,7 @@ func Bootstrap(ctx context.Context, adminURL, dbSuffix string) error {
 	if err != nil {
 		return fmt.Errorf("dbadmin: kết nối quản trị: %w", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	// Khóa tư vấn mức phiên: tuần tự hóa bootstrap giữa các gói kiểm thử chạy song song.
 	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock(727001)"); err != nil {
@@ -207,7 +207,7 @@ func runDir(dsn, dir, table string) error {
 	if err != nil {
 		return err
 	}
-	defer m.Close()
+	defer func() { _, _ = m.Close() }()
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return err
 	}
@@ -223,7 +223,7 @@ func DropDatabases(ctx context.Context, adminURL, dbSuffix string) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 	for _, c := range migrations.Clusters {
 		if _, err := conn.Exec(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", ident(DatabaseName(c, dbSuffix)))); err != nil {
 			return err

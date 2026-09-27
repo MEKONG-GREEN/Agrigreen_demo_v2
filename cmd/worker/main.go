@@ -69,7 +69,7 @@ func run(log *slog.Logger, mods string) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	errc := make(chan error, 8)
 	started := 0

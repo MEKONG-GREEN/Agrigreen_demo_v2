@@ -14,9 +14,6 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  GO_VERSION: "1.25"
-
 jobs:
   lint:
     name: Cổng tĩnh (ranh giới, float, PII, migration, hợp đồng)
@@ -25,14 +22,14 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - uses: actions/setup-go@v5
-        with: { go-version: "${{ env.GO_VERSION }}" }
+        with: { go-version-file: go.mod }
       - name: gofmt
         run: test -z "$(gofmt -l $(git ls-files '*.go' | grep -v /testdata/))"
       - name: go vet
         run: go vet ./...
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
-        with: { version: v2.4 }
+        uses: golangci/golangci-lint-action@v9
+        with: { version: v2.14.0 }
       - name: archlint — R-02/R-03/R-04, R-10, R-12, R-14
         run: go run ./tools/archlint ./...
       - name: migratecheck — R-23/R-25
@@ -62,7 +59,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: { go-version: "${{ env.GO_VERSION }}" }
+        with: { go-version-file: go.mod }
       - name: PgBouncer transaction mode (R-32)
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq pgbouncer
@@ -86,8 +83,11 @@ jobs:
           server_reset_query =
           ignore_startup_parameters = extra_float_digits,application_name,timezone
           max_prepared_statements = 0
+          pidfile = /tmp/pgbouncer-ci.pid
+          logfile = /tmp/pgbouncer-ci.log
           INI
           sudo -u postgres pgbouncer -d /etc/pgbouncer-ci/pgbouncer.ini
+          sleep 1 && pg_isready -h 127.0.0.1 -p 6432
       - name: go test -race
         run: go test -race -count=1 ./...
 
@@ -98,7 +98,7 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - uses: actions/setup-go@v5
-        with: { go-version: "${{ env.GO_VERSION }}" }
+        with: { go-version-file: go.mod }
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
       - name: Giấy phép dependency (RB-4)
@@ -109,7 +109,7 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
       - name: Trivy — quét repo
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@0.36.0
         with: { scan-type: fs, severity: "CRITICAL,HIGH", exit-code: "1", ignore-unfixed: true }
 
   images:
@@ -135,7 +135,7 @@ jobs:
           format: spdx-json
           output-file: sbom-${{ matrix.cmd }}.spdx.json
       - name: Trivy — quét image
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@0.36.0
         with:
           image-ref: ghcr.io/${{ github.repository_owner }}/agrigreen-${{ matrix.cmd }}:${{ github.sha }}
           severity: "CRITICAL,HIGH"
@@ -149,5 +149,5 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           docker push "$IMAGE"
           DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE")
-          curl -sSfL https://github.com/sigstore/cosign/releases/download/v2.5.3/cosign-linux-amd64 -o cosign && chmod +x cosign
+          curl -sSfL https://github.com/sigstore/cosign/releases/download/v3.1.3/cosign-linux-amd64 -o cosign && chmod +x cosign
           ./cosign sign --yes "$DIGEST"

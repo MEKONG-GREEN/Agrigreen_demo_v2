@@ -82,7 +82,7 @@ func violation(from, to loc, imp string) string {
 		return ""
 	}
 	// R-04: vault chỉ qua client.
-	if to.zone == "vault" && !(from.internal && from.zone == "vault") {
+	if to.zone == "vault" && (!from.internal || from.zone != "vault") {
 		if !strings.HasPrefix(imp, modulePath+"/"+vaultClient) {
 			return "R-04: chỉ được gọi kho định danh qua " + vaultClient + ", không import " + imp
 		}
