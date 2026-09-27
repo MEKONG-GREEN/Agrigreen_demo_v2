@@ -22,7 +22,7 @@ const lockID = 727199
 // Chỉ một worker giữ quyền chạy lịch.
 func TestLeaderExclusive(t *testing.T) {
 	ctx := context.Background()
-	pool := pgtest.Get(t).Pool(t, migrations.PF, dbadmin.OutboxPublisher)
+	pool := pgtest.Get(t).DirectPool(t, migrations.PF, dbadmin.OutboxPublisher)
 	a, err := leader.TryAcquire(ctx, pool, lockID, leader.Options{})
 	if err != nil || a == nil {
 		t.Fatalf("lần đầu phải lấy được khóa: %v", err)
@@ -71,7 +71,7 @@ func TestLeaderLostWhenSessionKilled(t *testing.T) {
 
 // Hai vòng Run song song: tại mỗi thời điểm chỉ một vòng chạy fn.
 func TestRunSingleLeader(t *testing.T) {
-	pool := pgtest.Get(t).Pool(t, migrations.PF, dbadmin.OutboxPublisher)
+	pool := pgtest.Get(t).DirectPool(t, migrations.PF, dbadmin.OutboxPublisher)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Millisecond)
 	defer cancel()

@@ -126,6 +126,29 @@ func (e *Env) Pool(t testing.TB, c migrations.Cluster, role string) *pgxpool.Poo
 	return p
 }
 
+// DirectPool mở pool của một vai nối THẲNG PostgreSQL, không qua PgBouncer —
+// cho mã cần tính năng mức phiên (khóa tư vấn của leader, LISTEN), vốn không
+// dùng được qua PgBouncer transaction mode.
+func (e *Env) DirectPool(t testing.TB, c migrations.Cluster, role string) *pgxpool.Pool {
+	t.Helper()
+	key := string(c) + "/" + role + "/@direct"
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if p, ok := e.pools[key]; ok {
+		return p
+	}
+	dsn, err := dbadmin.RoleURL(e.DirectURL, c, e.Suffix, role)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := db.Open(context.Background(), dsn, db.Options{MaxConns: 8, AppName: "pgtest-direct"})
+	if err != nil {
+		t.Fatalf("pgtest: mở pool %s: %v", key, err)
+	}
+	e.pools[key] = p
+	return p
+}
+
 // AdminPool mở pool bằng tài khoản quản trị cụm tới database kiểm thử — chỉ để
 // giả lập kẻ tấn công có quyền cao (vd sửa dữ liệu vượt trigger) trong kiểm thử.
 func (e *Env) AdminPool(t testing.TB, c migrations.Cluster) *pgxpool.Pool {

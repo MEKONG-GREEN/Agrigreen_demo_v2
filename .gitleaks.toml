@@ -1,0 +1,12 @@
+# Cấu hình gitleaks: dùng bộ quy tắc mặc định, chỉ bỏ qua các tệp vector kiểm thử
+# chứa khóa X25519 CÔNG BỐ CÓ CHỦ Ý (docs/dev/envelope-format.md). Không thêm
+# đường dẫn khác vào đây nếu không có review bảo mật.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Vector kiểm thử phong bì mã hóa — khóa công bố, không dùng cho dữ liệu thật"
+paths = [
+  '''^internal/shared/envelope/testdata/vectors\.json$''',
+  '''^apps/field-app/test/fixtures/go_nacl_vectors\.json$''',
+]
