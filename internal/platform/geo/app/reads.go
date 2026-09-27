@@ -165,15 +165,19 @@ type OverlapCheckInput struct {
 	CommuneCode    string
 	CooperativeRef uuid.UUID
 	ExcludePlotRef uuid.UUID
+	DeclaredAreaHa *decimal.Decimal
 }
 
 // OverlapCheck là kết quả kiểm trước — không ghi gì.
 type OverlapCheck struct {
-	AreaHa     decimal.Decimal
-	PointCount int
-	Blocking   []domain.Overlap // cùng HTX → sẽ bị chặn khi lưu
-	Flagged    []domain.Overlap // khác HTX → được lưu nhưng chờ xem xét
-	Tolerance  decimal.Decimal
+	AreaHa       decimal.Decimal
+	PointCount   int
+	Blocking     []domain.Overlap // HTX khác → bị chặn khi lưu (geo.overlap_cross_coop)
+	NeedsConfirm []domain.Overlap // cùng HTX / thửa nháp → lưu được khi confirm_overlap = true
+	Tolerance    decimal.Decimal
+	// DeviationPct: lệch so với diện tích khai báo; DeviationNeedsConfirm khi vượt ngưỡng.
+	DeviationPct          *decimal.Decimal
+	DeviationNeedsConfirm bool
 }
 
 // CheckOverlap chạy đủ các kiểm tra như khi lưu nhưng không ghi (giao dịch luôn rollback).
@@ -196,7 +200,7 @@ func (s *Service) CheckOverlap(ctx context.Context, in OverlapCheckInput) (Overl
 	if !a.sc.Allows(in.CommuneCode) {
 		return OverlapCheck{}, ErrOutOfScope
 	}
-	tol, err := s.tolerance(ctx, s.now())
+	tol, maxDev, err := s.thresholds(ctx, s.now())
 	if err != nil {
 		return OverlapCheck{}, err
 	}
@@ -206,7 +210,9 @@ func (s *Service) CheckOverlap(ctx context.Context, in OverlapCheckInput) (Overl
 		if e != nil {
 			return e
 		}
-		out.AreaHa, out.Blocking, out.Flagged = c.areaHa, c.same, c.cross
+		c.deviation(in.DeclaredAreaHa)
+		out.AreaHa, out.Blocking, out.NeedsConfirm, out.DeviationPct = c.areaHa, c.cross, c.same, c.devPct
+		out.DeviationNeedsConfirm = c.devPct != nil && c.devPct.GreaterThan(maxDev)
 		return errRollback
 	})
 	if err != nil && !errors.Is(err, errRollback) {

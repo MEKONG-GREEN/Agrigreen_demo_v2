@@ -21,6 +21,8 @@
     "supersedes_id":     { "type": ["string", "null"], "format": "uuid", "description": "Phiên bản bị thay; null ở phiên bản đầu" },
     "correction_reason": { "type": ["string", "null"], "minLength": 10 },
     "actor_ref":         { "type": "string", "format": "uuid", "description": "Người vẽ (drawn_by)" },
-    "event_time":        { "type": "string", "format": "date-time" }
+    "event_time":        { "type": "string", "format": "date-time" },
+    "declared_area_ha":  { "type": "string", "pattern": "^[0-9]+\\.[0-9]{4}$", "description": "Tùy chọn: diện tích khai báo để đối chiếu (HTX US-PLOT-02 AC-3)" },
+    "area_deviation_pct": { "type": "string", "pattern": "^[0-9]+\\.[0-9]{4}$", "description": "Tùy chọn: lệch so với diện tích khai báo (%); vượt geo.area_deviation_max_pct thì bản ghi trực tuyến đã được xác nhận (confirm_overlap)" }
   }
 }

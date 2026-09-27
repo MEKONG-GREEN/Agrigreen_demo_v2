@@ -137,7 +137,10 @@ type BoundaryPayload struct {
 	HouseholdRef   string          `json:"household_ref"`
 	Geometry       json.RawMessage `json:"geometry"`
 	GPSAccuracyM   *string         `json:"gps_accuracy_m"`
+	DeclaredAreaHa *string         `json:"declared_area_ha"`
 	Source         string          `json:"source"`
+	// ConfirmOverlap: người vẽ đã xác nhận giữ nguyên chồng lấn cùng HTX/thửa nháp trên máy.
+	ConfirmOverlap bool `json:"confirm_overlap"`
 }
 
 func rejected(id uuid.UUID, err error) syncport.Result {
@@ -171,9 +174,11 @@ func optRef(field, s string) (uuid.UUID, error) {
 	return u, nil
 }
 
-// Accept thực hiện syncport.Sink: idempotent theo IdemKey; chồng lấn hoặc sửa
-// đồng thời → giữ cả hai, mở xung đột (StatusConflict) thay vì từ chối, vì người
-// vẽ ngoại tuyến không thấy nhau (mục 15).
+// Accept thực hiện syncport.Sink: idempotent theo IdemKey. Không chặn được máy
+// ngoại tuyến (mục 15): chồng lấn HTX khác, sửa đồng thời, hoặc chồng lấn cùng
+// HTX chưa xác nhận → giữ cả hai, mở xung đột (StatusConflict); chồng lấn cùng
+// HTX đã xác nhận (confirm_overlap) → accepted, xung đột vẫn mở để xem xét.
+// Lệch diện tích khai báo không chặn — ghi vào sự kiện pf.geo.plot_boundary.recorded.
 func (snk SyncSink) Accept(ctx context.Context, scope authz.Scope, rec syncport.Record) syncport.Result {
 	s := snk.Svc
 	p, err := authz.Require(ctx, writeRoles...)
@@ -211,7 +216,14 @@ func (snk SyncSink) Accept(ctx context.Context, scope authz.Scope, rec syncport.
 	if err := json.Unmarshal(rec.Payload, &pl); err != nil {
 		return rejected(rec.ID, problem.Validation.WithField("payload", "phải là JSON hợp lệ"))
 	}
-	b := BoundaryInput{ID: rec.ID, Geometry: pl.Geometry, Source: strings.TrimSpace(pl.Source), EventTime: rec.EventTime}
+	b := BoundaryInput{ID: rec.ID, Geometry: pl.Geometry, Source: strings.TrimSpace(pl.Source), EventTime: rec.EventTime, Confirm: pl.ConfirmOverlap}
+	if pl.DeclaredAreaHa != nil {
+		d, err := decimal.NewFromString(*pl.DeclaredAreaHa)
+		if err != nil {
+			return rejected(rec.ID, problem.Validation.WithField("payload.declared_area_ha", "phải là số thập phân dạng chuỗi"))
+		}
+		b.DeclaredAreaHa = &d
+	}
 	if rec.DeviceID != uuid.Nil {
 		d := rec.DeviceID.String()
 		b.DeviceID = &d
@@ -276,9 +288,13 @@ func (snk SyncSink) Accept(ctx context.Context, scope authz.Scope, rec syncport.
 	if res.Replayed {
 		return syncport.Result{ID: rec.ID, Status: syncport.StatusDuplicate}
 	}
-	if len(res.Conflicts) > 0 {
-		id := res.Conflicts[0].ID
-		return syncport.Result{ID: rec.ID, Status: syncport.StatusConflict, ConflictID: &id}
+	// Chồng lấn cùng HTX/thửa nháp đã được xác nhận trên máy → accepted (xung đột vẫn mở để
+	// xem xét); còn lại (HTX khác, sửa đồng thời, chưa xác nhận) → conflict.
+	for _, cf := range res.Conflicts {
+		if cf.Kind != domain.ConflictSameCoop || !pl.ConfirmOverlap {
+			id := cf.ID
+			return syncport.Result{ID: rec.ID, Status: syncport.StatusConflict, ConflictID: &id}
+		}
 	}
 	return syncport.Result{ID: rec.ID, Status: syncport.StatusAccepted}
 }

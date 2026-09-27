@@ -547,7 +547,7 @@ export interface paths {
         /** Thửa trong khung nhìn (GIS FN-07 BR-24/25) — GeoJSON FeatureCollection, tối đa 1.000 polygon, lọc theo phạm vi xã/HTX */
         get: operations["listPlotsInBBox"];
         put?: never;
-        /** Tạo thửa với ranh giới đầu tiên (KN US-PLOT-01, HTX US-PLOT-02/03). Chồng lấn cùng HTX vượt ngưỡng → 409 geo.overlap; khác HTX → nhận, mở xung đột chờ xem xét */
+        /** Tạo thửa với ranh giới đầu tiên (KN US-PLOT-01, HTX US-PLOT-02/03). Chồng lấn HTX khác vượt ngưỡng → 409 geo.overlap_cross_coop (không bỏ qua được); cùng HTX/thửa nháp hoặc lệch diện tích khai báo > 5 % → 409 geo.overlap_needs_confirm / geo.area_deviation_needs_confirm, trừ khi confirm_overlap = true (khi đó mở xung đột xem xét) */
         post: operations["createPlot"];
         delete?: never;
         options?: never;
@@ -1682,6 +1682,13 @@ export interface components {
              */
             event_time?: string;
             device_id?: string;
+            /** @description Diện tích khai báo để đối chiếu (HTX US-PLOT-02 AC-3) */
+            declared_area_ha?: components["schemas"]["Decimal"];
+            /**
+             * @description Xác nhận giữ nguyên dù chồng lấn cùng HTX/thửa nháp hoặc lệch diện tích > 5 % (HTX US-PLOT-04 AC-2). Không bỏ qua được chồng lấn HTX khác.
+             * @default false
+             */
+            confirm_overlap: boolean;
         };
         PlotCreateInput: components["schemas"]["PlotBoundaryInput"] & {
             /**
@@ -1780,11 +1787,12 @@ export interface components {
             plot: components["schemas"]["PlotFeature"];
             boundary: components["schemas"]["PlotBoundaryVersion"];
             conflicts: components["schemas"]["BoundaryConflict"][];
-            /** @description Chồng lấn khác HTX đã nhận nhưng chờ xem xét */
+            /** @description Chồng lấn cùng HTX/thửa nháp đã xác nhận, chờ xem xét */
             flagged_overlaps: components["schemas"]["PlotOverlap"][];
         };
         PlotAttrResult: {
             plot: components["schemas"]["PlotFeature"];
+            conflicts: components["schemas"]["BoundaryConflict"][];
             event: {
                 /** Format: uuid */
                 id: string;
@@ -3156,6 +3164,7 @@ export interface operations {
                      * @description Thửa đang sửa (không tự so với chính nó)
                      */
                     exclude_plot_ref?: string | null;
+                    declared_area_ha?: components["schemas"]["Decimal"];
                 };
             };
         };
@@ -3170,11 +3179,17 @@ export interface operations {
                         area_ha: components["schemas"]["Decimal"];
                         point_count: number;
                         tolerance_pct: components["schemas"]["Decimal"];
-                        /** @description Cùng HTX — sẽ bị chặn khi lưu */
+                        /** @description HTX khác — bị chặn khi lưu (geo.overlap_cross_coop) */
                         blocking: components["schemas"]["PlotOverlap"][];
-                        /** @description Khác HTX — lưu được nhưng chờ xem xét */
-                        flagged: components["schemas"]["PlotOverlap"][];
+                        /** @description Cùng HTX / thửa nháp — lưu được khi confirm_overlap = true */
+                        needs_confirm: components["schemas"]["PlotOverlap"][];
+                        /** @description Lệch so với declared_area_ha (%) */
+                        deviation_pct: components["schemas"]["Decimal"] | null;
+                        deviation_needs_confirm: boolean;
+                        /** @description Không có chồng lấn HTX khác */
                         can_save: boolean;
+                        /** @description Lưu được nhưng phải gửi confirm_overlap = true */
+                        requires_confirm: boolean;
                     };
                 };
             };
@@ -3237,7 +3252,7 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
-            /** @description geo.overlap, geo.version_conflict (supersedes_id không phải phiên bản hiện hành; kèm current_boundary_id), geo.plot_state_conflict */
+            /** @description geo.overlap_cross_coop, geo.overlap_needs_confirm, geo.area_deviation_needs_confirm, geo.version_conflict (supersedes_id không phải phiên bản hiện hành; kèm current_boundary_id), geo.plot_state_conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3268,6 +3283,11 @@ export interface operations {
                     /** Format: uuid */
                     household_ref?: string | null;
                     reason?: string;
+                    /**
+                     * @description Gán HTX mới làm đổi phân loại chồng lấn: HTX khác → 409 geo.overlap_cross_coop; cùng HTX/thửa nháp → cần xác nhận
+                     * @default false
+                     */
+                    confirm_overlap?: boolean;
                 };
             };
         };

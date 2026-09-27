@@ -25,11 +25,13 @@ import (
 type mode int
 
 const (
-	// modeOnline: người vẽ thấy bản đồ hiện hành — chồng lấn cùng HTX bị chặn (409),
-	// sửa trên phiên bản cũ bị chặn (409).
+	// modeOnline: người vẽ thấy bản đồ hiện hành (KN US-PLOT-03, HTX US-PLOT-04):
+	// chồng lấn HTX khác → chặn 409 geo.overlap_cross_coop; chồng lấn cùng HTX/thửa
+	// nháp hoặc lệch diện tích khai báo > 5 % → 409 cần xác nhận, trừ khi Confirm;
+	// sửa trên phiên bản cũ → 409 geo.version_conflict.
 	modeOnline mode = iota
-	// modeOffline: bản ghi từ thiết bị ngoại tuyến — người vẽ không thấy nhau, nên
-	// giữ cả hai và mở xung đột chờ xử lý (mục 15) thay vì từ chối.
+	// modeOffline: bản ghi từ thiết bị ngoại tuyến — không chặn được máy, nên giữ
+	// cả hai và mở xung đột chờ xử lý (mục 15) thay vì từ chối.
 	modeOffline
 )
 
@@ -43,6 +45,11 @@ type BoundaryInput struct {
 	Source       string
 	EventTime    time.Time
 	DeviceID     *string
+	// DeclaredAreaHa: diện tích khai báo (tùy chọn) — lệch > geo.area_deviation_max_pct cần xác nhận (HTX US-PLOT-02 AC-3).
+	DeclaredAreaHa *decimal.Decimal
+	// Confirm (confirm_overlap): người vẽ xác nhận giữ nguyên dù chồng lấn cùng HTX/thửa nháp
+	// hoặc lệch diện tích khai báo (HTX US-PLOT-04 AC-2). Không bỏ qua được chồng lấn HTX khác.
+	Confirm bool
 }
 
 // CreateInput tạo thửa kèm phiên bản ranh giới đầu tiên.
@@ -70,7 +77,7 @@ type WriteResult struct {
 	Plot      store.Plot
 	Boundary  store.Boundary
 	Conflicts []store.Conflict
-	// Flagged: chồng lấn vượt ngưỡng đã nhận nhưng chờ xem xét (khác HTX; hoặc cùng HTX khi ngoại tuyến).
+	// Flagged: chồng lấn vượt ngưỡng đã nhận nhưng chờ xem xét (cùng HTX đã xác nhận; khác HTX khi ngoại tuyến).
 	Flagged  []domain.Overlap
 	Replayed bool
 }
@@ -89,6 +96,9 @@ func (s *Service) prepare(b *BoundaryInput, defaultSource string) error {
 	}
 	if !domain.KnownSource(b.Source) {
 		return problem.Validation.WithField("source", "phải là kn_web, kn_field_app, htx_app, import_file hoặc cadastral")
+	}
+	if b.DeclaredAreaHa != nil && !b.DeclaredAreaHa.IsPositive() {
+		return problem.Validation.WithField("declared_area_ha", "phải dương")
 	}
 	if b.GPSAccuracyM != nil && b.GPSAccuracyM.IsNegative() {
 		return problem.Validation.WithField("gps_accuracy_m", "không được âm")
@@ -110,8 +120,9 @@ func (s *Service) prepare(b *BoundaryInput, defaultSource string) error {
 type checked struct {
 	geojson string
 	areaHa  decimal.Decimal
-	same    []domain.Overlap
-	cross   []domain.Overlap
+	same    []domain.Overlap // cùng HTX / thửa nháp — cần xác nhận
+	cross   []domain.Overlap // HTX khác — bị chặn khi trực tuyến
+	devPct  *decimal.Decimal // lệch so với diện tích khai báo (nếu có)
 }
 
 // checkShape kiểm hợp lệ, diện tích, nằm trong xã, chồng lấn (trong giao dịch đang mở).
@@ -137,18 +148,52 @@ func checkShape(ctx context.Context, tx pgx.Tx, mp domain.MultiPolygon, commune 
 		return c, ErrOutsideCommune.WithDetail(out.StringFixed(2)+"% diện tích nằm ngoài địa giới xã "+commune).
 			With("outside_pct", out.StringFixed(4))
 	}
-	hits, err := store.FindOverlaps(ctx, tx, c.geojson, exclude)
+	c.same, c.cross, err = classifiedOverlaps(ctx, tx, c.geojson, an.AreaHa, coop, exclude, tol)
+	return c, err
+}
+
+// classifiedOverlaps tìm và phân loại chồng lấn của hình geojson (diện tích areaHa) nếu thuộc HTX coop.
+func classifiedOverlaps(ctx context.Context, tx pgx.Tx, geojson string, areaHa decimal.Decimal, coop, exclude uuid.UUID, tol decimal.Decimal) (same, cross []domain.Overlap, err error) {
+	hits, err := store.FindOverlaps(ctx, tx, geojson, exclude)
 	if err != nil {
-		return c, err
+		return nil, nil, err
 	}
 	overlaps := make([]domain.Overlap, 0, len(hits))
 	for _, h := range hits {
 		o := h.Overlap
-		o.Pct = domain.OverlapPct(h.IntersectHa, h.AreaHa, an.AreaHa)
+		o.Pct = domain.OverlapPct(h.IntersectHa, h.AreaHa, areaHa)
 		overlaps = append(overlaps, o)
 	}
-	c.same, c.cross = domain.ClassifyOverlaps(coop, overlaps, tol)
-	return c, nil
+	same, cross = domain.ClassifyOverlaps(coop, overlaps, tol)
+	return same, cross, nil
+}
+
+// deviation tính lệch diện tích so với khai báo.
+func (c *checked) deviation(declared *decimal.Decimal) {
+	if declared != nil {
+		d := domain.AreaDeviationPct(c.areaHa, *declared)
+		c.devPct = &d
+	}
+}
+
+// onlineGate áp quy tắc chặn/cần xác nhận khi ghi trực tuyến.
+func onlineGate(same, cross []domain.Overlap, devPct *decimal.Decimal, maxDev decimal.Decimal, confirm bool) error {
+	if len(cross) > 0 {
+		return overlapProblem(ErrOverlapCrossCoop, cross, "của HTX/nông hộ khác, vui lòng kiểm tra lại.")
+	}
+	if confirm {
+		return nil
+	}
+	if len(same) > 0 {
+		return overlapProblem(ErrOverlapNeedsConfirm, same, "— vui lòng kiểm tra lại hoặc xác nhận giữ nguyên (confirm_overlap).").
+			With("needs_confirm", true)
+	}
+	if devPct != nil && devPct.GreaterThan(maxDev) {
+		return ErrAreaDeviation.WithDetail("Diện tích đo lệch "+devPct.StringFixed(2)+"% so với diện tích khai báo (ngưỡng "+
+			maxDev.String()+"%) — kiểm tra lại hoặc xác nhận giữ nguyên (confirm_overlap).").
+			With("deviation_pct", devPct.StringFixed(4)).With("needs_confirm", true)
+	}
+	return nil
 }
 
 func overlapList(os []domain.Overlap) []map[string]any {
@@ -172,13 +217,25 @@ func refsOf(os []domain.Overlap) []uuid.UUID {
 	return out
 }
 
-func overlapProblem(same []domain.Overlap) error {
-	codes := make([]string, 0, len(same))
-	for _, o := range same {
+func overlapProblem(base *problem.Problem, os []domain.Overlap, tail string) *problem.Problem {
+	codes := make([]string, 0, len(os))
+	for _, o := range os {
 		codes = append(codes, o.Code)
 	}
-	return ErrOverlap.WithDetail("Ranh giới bị chồng lấn với lô đã đăng ký ("+strings.Join(codes, ", ")+"), vui lòng kiểm tra lại.").
-		With("overlaps", overlapList(same))
+	return base.WithDetail("Ranh giới bị chồng lấn với lô đã đăng ký ("+strings.Join(codes, ", ")+") "+tail).
+		With("overlaps", overlapList(os))
+}
+
+// conflictsFor dựng xung đột cho chồng lấn đã được nhận (xác nhận hoặc ngoại tuyến).
+func conflictsFor(plot store.Plot, boundaryID uuid.UUID, same, cross []domain.Overlap, now time.Time) []store.Conflict {
+	var out []store.Conflict
+	if len(same) > 0 {
+		out = append(out, newConflict(domain.ConflictSameCoop, plot, boundaryID, same, now))
+	}
+	if len(cross) > 0 {
+		out = append(out, newConflict(domain.ConflictCrossCoop, plot, boundaryID, cross, now))
+	}
+	return out
 }
 
 // newConflict dựng xung đột với người phụ trách và SLA (C-8, tạm 72 giờ).
@@ -287,7 +344,7 @@ func (s *Service) create(ctx context.Context, a access, in CreateInput, m mode, 
 	if err := s.checkCooperative(ctx, a, in.CooperativeRef); err != nil {
 		return WriteResult{}, err
 	}
-	tol, err := s.tolerance(ctx, in.Boundary.EventTime)
+	tol, maxDev, err := s.thresholds(ctx, in.Boundary.EventTime)
 	if err != nil {
 		return WriteResult{}, err
 	}
@@ -305,8 +362,11 @@ func (s *Service) create(ctx context.Context, a access, in CreateInput, m mode, 
 		if err != nil {
 			return WriteResult{}, err
 		}
-		if len(c.same) > 0 && m == modeOnline {
-			return WriteResult{}, overlapProblem(c.same)
+		c.deviation(in.Boundary.DeclaredAreaHa)
+		if m == modeOnline {
+			if err := onlineGate(c.same, c.cross, c.devPct, maxDev, in.Boundary.Confirm); err != nil {
+				return WriteResult{}, err
+			}
 		}
 		code, err := store.NextPlotCode(ctx, tx)
 		if err != nil {
@@ -338,25 +398,16 @@ func (s *Service) create(ctx context.Context, a access, in CreateInput, m mode, 
 		if err := store.InsertPlot(ctx, tx, a.p.TenantID, plot, c.geojson); err != nil {
 			return WriteResult{}, err
 		}
-		res := WriteResult{Boundary: b, Flagged: flagged}
-		if len(c.same) > 0 {
-			cf := newConflict(domain.ConflictSameCoop, plot, b.ID, c.same, now)
+		res := WriteResult{Boundary: b, Flagged: flagged, Conflicts: conflictsFor(plot, b.ID, c.same, c.cross, now)}
+		for _, cf := range res.Conflicts {
 			if err := store.InsertConflict(ctx, tx, a.p.TenantID, cf); err != nil {
 				return WriteResult{}, err
 			}
-			res.Conflicts = append(res.Conflicts, cf)
-		}
-		if len(c.cross) > 0 {
-			cf := newConflict(domain.ConflictCrossCoop, plot, b.ID, c.cross, now)
-			if err := store.InsertConflict(ctx, tx, a.p.TenantID, cf); err != nil {
-				return WriteResult{}, err
-			}
-			res.Conflicts = append(res.Conflicts, cf)
 		}
 		if err := enqueueCreated(ctx, tx, plot, b, a.p.ActorRef); err != nil {
 			return WriteResult{}, err
 		}
-		if err := enqueueBoundary(ctx, tx, b); err != nil {
+		if err := enqueueBoundary(ctx, tx, b, in.Boundary.DeclaredAreaHa, c.devPct); err != nil {
 			return WriteResult{}, err
 		}
 		cur, err := store.PlotByRef(ctx, tx, ref, false)
@@ -392,7 +443,7 @@ func (s *Service) correct(ctx context.Context, a access, in CorrectInput, m mode
 	if err := s.prepare(&in.Boundary, defaultSource); err != nil {
 		return WriteResult{}, err
 	}
-	tol, err := s.tolerance(ctx, in.Boundary.EventTime)
+	tol, maxDev, err := s.thresholds(ctx, in.Boundary.EventTime)
 	if err != nil {
 		return WriteResult{}, err
 	}
@@ -429,8 +480,11 @@ func (s *Service) correct(ctx context.Context, a access, in CorrectInput, m mode
 		if err != nil {
 			return WriteResult{}, err
 		}
-		if len(c.same) > 0 && m == modeOnline {
-			return WriteResult{}, overlapProblem(c.same)
+		c.deviation(in.Boundary.DeclaredAreaHa)
+		if m == modeOnline {
+			if err := onlineGate(c.same, c.cross, c.devPct, maxDev, in.Boundary.Confirm); err != nil {
+				return WriteResult{}, err
+			}
 		}
 		sup, reason := in.SupersedesID, in.Reason
 		b := store.Boundary{
@@ -448,12 +502,7 @@ func (s *Service) correct(ctx context.Context, a access, in CorrectInput, m mode
 			conflicts = append(conflicts, newConflict(domain.ConflictConcurrent, *plot, b.ID, nil, now))
 		} else {
 			res.Flagged = append(append(res.Flagged, c.same...), c.cross...)
-			if len(c.same) > 0 {
-				conflicts = append(conflicts, newConflict(domain.ConflictSameCoop, *plot, b.ID, c.same, now))
-			}
-			if len(c.cross) > 0 {
-				conflicts = append(conflicts, newConflict(domain.ConflictCrossCoop, *plot, b.ID, c.cross, now))
-			}
+			conflicts = conflictsFor(*plot, b.ID, c.same, c.cross, now)
 			if err := store.SetCurrentBoundary(ctx, tx, plot.Ref, b, c.geojson, len(conflicts) > 0); err != nil {
 				return WriteResult{}, err
 			}
@@ -469,7 +518,7 @@ func (s *Service) correct(ctx context.Context, a access, in CorrectInput, m mode
 			}
 		}
 		res.Conflicts = conflicts
-		if err := enqueueBoundary(ctx, tx, b); err != nil {
+		if err := enqueueBoundary(ctx, tx, b, in.Boundary.DeclaredAreaHa, c.devPct); err != nil {
 			return WriteResult{}, err
 		}
 		cur, err := store.PlotByRef(ctx, tx, plot.Ref, false)
@@ -487,14 +536,17 @@ type AssignInput struct {
 	CooperativeRef uuid.UUID // Nil = bỏ gán (thửa về nháp)
 	HouseholdRef   uuid.UUID
 	Reason         string
+	// ConfirmOverlap: xác nhận giữ nguyên khi thửa chồng lấn thửa cùng HTX mới/thửa nháp.
+	ConfirmOverlap bool
 	IdemKey        string
 }
 
 // AttrResult là kết quả gán/ngừng dùng.
 type AttrResult struct {
-	Plot     store.Plot
-	Event    store.PlotEvent
-	Replayed bool
+	Plot      store.Plot
+	Event     store.PlotEvent
+	Conflicts []store.Conflict // chồng lấn đã xác nhận khi gán HTX mới
+	Replayed  bool
 }
 
 func (s *Service) writeAttrs(ctx context.Context, tid uuid.UUID, key string, fn func(pgx.Tx) (AttrResult, error)) (AttrResult, error) {
@@ -554,6 +606,10 @@ func (s *Service) Assign(ctx context.Context, in AssignInput) (AttrResult, error
 		return AttrResult{}, err
 	}
 	now := s.now()
+	tol, err := s.tolerance(ctx, now)
+	if err != nil {
+		return AttrResult{}, err
+	}
 	return s.writeAttrs(ctx, a.p.TenantID, in.IdemKey, func(tx pgx.Tx) (AttrResult, error) {
 		plot, err := store.PlotByRef(ctx, tx, in.PlotRef, true)
 		if err != nil {
@@ -573,6 +629,19 @@ func (s *Service) Assign(ctx context.Context, in AssignInput) (AttrResult, error
 		}
 		p := *plot
 		p.CooperativeRef, p.HouseholdRef, p.Status = in.CooperativeRef, in.HouseholdRef, domain.StatusFor(in.CooperativeRef)
+		// Đổi HTX làm đổi phân loại chồng lấn: kiểm lại với HTX mới (khác HTX → chặn,
+		// cùng HTX/thửa nháp → cần xác nhận). Bỏ gán về nháp không cần kiểm lại.
+		var conflicts []store.Conflict
+		if in.CooperativeRef != uuid.Nil && in.CooperativeRef != plot.CooperativeRef {
+			same, cross, err := classifiedOverlaps(ctx, tx, plot.GeoJSON, plot.AreaHa, in.CooperativeRef, plot.Ref, tol)
+			if err != nil {
+				return AttrResult{}, err
+			}
+			if err := onlineGate(same, cross, nil, decimal.Zero, in.ConfirmOverlap); err != nil {
+				return AttrResult{}, err
+			}
+			conflicts = conflictsFor(p, plot.CurrentBoundaryID, same, nil, now)
+		}
 		ev := store.PlotEvent{
 			ID: ids.New(), TenantID: a.p.TenantID, PlotRef: p.Ref, Action: domain.ActionAssigned, Code: p.Code, Name: p.Name,
 			CommuneCode: p.CommuneCode, CooperativeRef: p.CooperativeRef, HouseholdRef: p.HouseholdRef, Status: p.Status,
@@ -584,11 +653,21 @@ func (s *Service) Assign(ctx context.Context, in AssignInput) (AttrResult, error
 		if err := store.SetAttrs(ctx, tx, p); err != nil {
 			return AttrResult{}, err
 		}
+		for _, cf := range conflicts {
+			if err := store.InsertConflict(ctx, tx, a.p.TenantID, cf); err != nil {
+				return AttrResult{}, err
+			}
+		}
+		if len(conflicts) > 0 {
+			if err := store.SetNeedsReview(ctx, tx, p.Ref, true); err != nil {
+				return AttrResult{}, err
+			}
+		}
 		cur, err := store.PlotByRef(ctx, tx, p.Ref, false)
 		if err != nil {
 			return AttrResult{}, err
 		}
-		return AttrResult{Plot: *cur, Event: ev}, nil
+		return AttrResult{Plot: *cur, Event: ev, Conflicts: conflicts}, nil
 	})
 }
 
@@ -673,11 +752,20 @@ func enqueueCreated(ctx context.Context, tx pgx.Tx, p store.Plot, b store.Bounda
 	})
 }
 
-func enqueueBoundary(ctx context.Context, tx pgx.Tx, b store.Boundary) error {
+func decStr(d *decimal.Decimal) *string {
+	if d == nil {
+		return nil
+	}
+	s := d.StringFixed(4)
+	return &s
+}
+
+func enqueueBoundary(ctx context.Context, tx pgx.Tx, b store.Boundary, declared, devPct *decimal.Decimal) error {
 	return enqueue(ctx, tx, b.TenantID, port.EventPlotBoundaryRecorded, b.EventTime, port.PlotBoundaryRecordedV1{
 		PlotRef: b.PlotRef, BoundaryID: b.ID, Version: b.Version, BecameCurrent: b.BecameCurrent, AreaHa: b.AreaHa.StringFixed(4),
 		PointCount: b.PointCount, Source: b.Source, CommuneCode: b.CommuneCode, CooperativeRef: uuidPtr(b.CooperativeRef),
 		SupersedesID: b.SupersedesID, CorrectionReason: b.CorrectionReason, ActorRef: b.ActorRef,
+		DeclaredAreaHa: decStr(declared), AreaDeviationPct: decStr(devPct),
 		EventTime: b.EventTime.Format(time.RFC3339),
 	})
 }

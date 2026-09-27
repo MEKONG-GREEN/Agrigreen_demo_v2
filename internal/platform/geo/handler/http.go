@@ -110,12 +110,17 @@ type boundaryReq struct {
 	Source       string           `json:"source"`
 	EventTime    *string          `json:"event_time"`
 	DeviceID     *string          `json:"device_id"`
+	// DeclaredAreaHa: diện tích khai báo để đối chiếu (HTX US-PLOT-02 AC-3).
+	DeclaredAreaHa *decimal.Decimal `json:"declared_area_ha"`
+	// ConfirmOverlap: xác nhận giữ nguyên chồng lấn cùng HTX/thửa nháp hoặc lệch diện tích (HTX US-PLOT-04 AC-2).
+	ConfirmOverlap bool `json:"confirm_overlap"`
 }
 
 func (r boundaryReq) input(f *fieldCollector) app.BoundaryInput {
 	return app.BoundaryInput{
 		ID: f.v7("boundary_id", r.BoundaryID), Geometry: r.Geometry, GPSAccuracyM: r.GPSAccuracyM,
 		Source: strings.TrimSpace(r.Source), EventTime: f.at("event_time", r.EventTime), DeviceID: r.DeviceID,
+		DeclaredAreaHa: r.DeclaredAreaHa, Confirm: r.ConfirmOverlap,
 	}
 }
 
@@ -199,10 +204,11 @@ type assignReq struct {
 	CooperativeRef *string `json:"cooperative_ref"`
 	HouseholdRef   *string `json:"household_ref"`
 	Reason         string  `json:"reason"`
+	ConfirmOverlap bool    `json:"confirm_overlap"`
 }
 
 func attrResult(c *gin.Context, res app.AttrResult) {
-	c.JSON(http.StatusOK, gin.H{"plot": plotFeature(res.Plot), "event": gin.H{
+	c.JSON(http.StatusOK, gin.H{"plot": plotFeature(res.Plot), "conflicts": conflictList(res.Conflicts), "event": gin.H{
 		"id": res.Event.ID.String(), "action": res.Event.Action, "seq": res.Event.Seq, "event_time": ts(res.Event.EventTime),
 		"reason": strOrNil(res.Event.Reason), "actor_ref": res.Event.ActorRef.String(),
 	}})
@@ -220,7 +226,7 @@ func (h Handler) assign(c *gin.Context) {
 	f := newCollector()
 	in := app.AssignInput{
 		PlotRef: ref, CooperativeRef: f.ref("cooperative_ref", req.CooperativeRef),
-		HouseholdRef: f.ref("household_ref", req.HouseholdRef), Reason: req.Reason,
+		HouseholdRef: f.ref("household_ref", req.HouseholdRef), Reason: req.Reason, ConfirmOverlap: req.ConfirmOverlap,
 		IdemKey: idempotency.KeyFromContext(c.Request.Context()),
 	}
 	if f.bad {
@@ -256,10 +262,11 @@ func (h Handler) retire(c *gin.Context) {
 
 func (h Handler) overlapCheck(c *gin.Context) {
 	var req struct {
-		Geometry       json.RawMessage `json:"geometry"`
-		CommuneCode    string          `json:"commune_code"`
-		CooperativeRef *string         `json:"cooperative_ref"`
-		ExcludePlotRef *string         `json:"exclude_plot_ref"`
+		Geometry       json.RawMessage  `json:"geometry"`
+		CommuneCode    string           `json:"commune_code"`
+		CooperativeRef *string          `json:"cooperative_ref"`
+		ExcludePlotRef *string          `json:"exclude_plot_ref"`
+		DeclaredAreaHa *decimal.Decimal `json:"declared_area_ha"`
 	}
 	if !bindJSON(c, &req) {
 		return
@@ -267,7 +274,7 @@ func (h Handler) overlapCheck(c *gin.Context) {
 	f := newCollector()
 	in := app.OverlapCheckInput{
 		Geometry: req.Geometry, CommuneCode: req.CommuneCode, CooperativeRef: f.ref("cooperative_ref", req.CooperativeRef),
-		ExcludePlotRef: f.ref("exclude_plot_ref", req.ExcludePlotRef),
+		ExcludePlotRef: f.ref("exclude_plot_ref", req.ExcludePlotRef), DeclaredAreaHa: req.DeclaredAreaHa,
 	}
 	if f.bad {
 		httpx.Fail(c, f.p)
@@ -280,7 +287,10 @@ func (h Handler) overlapCheck(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"area_ha": out.AreaHa.StringFixed(4), "point_count": out.PointCount, "tolerance_pct": out.Tolerance.String(),
-		"blocking": overlapDTOs(out.Blocking), "flagged": overlapDTOs(out.Flagged), "can_save": len(out.Blocking) == 0,
+		"blocking": overlapDTOs(out.Blocking), "needs_confirm": overlapDTOs(out.NeedsConfirm),
+		"deviation_pct": decOrNil(out.DeviationPct), "deviation_needs_confirm": out.DeviationNeedsConfirm,
+		"can_save":         len(out.Blocking) == 0,
+		"requires_confirm": len(out.Blocking) == 0 && (len(out.NeedsConfirm) > 0 || out.DeviationNeedsConfirm),
 	})
 }
 
@@ -441,7 +451,7 @@ func (h Handler) importPlots(c *gin.Context) {
 	coopQ := c.Query("cooperative_ref")
 	in := app.ImportInput{
 		Format: c.Query("format"), FileName: c.Query("file_name"), Data: raw, CommuneCode: c.Query("commune_code"),
-		CooperativeRef: f.ref("cooperative_ref", &coopQ), Source: c.Query("source"),
+		CooperativeRef: f.ref("cooperative_ref", &coopQ), Source: c.Query("source"), ConfirmOverlap: c.Query("confirm_overlap") == "true",
 		IdemKey: idempotency.KeyFromContext(c.Request.Context()),
 	}
 	if f.bad {

@@ -101,6 +101,51 @@ Phản hồi `200` trả kết quả **theo từng bản ghi**. Một bản ghi 
 - `rejected`: dữ liệu sai. Máy giữ bản ghi, hiển thị lỗi để người dùng tạo bản ghi bù.
 - Máy xóa bản ghi cục bộ sau khi máy chủ xác nhận **+ 48 giờ**.
 
+### Payload `plot_boundary` (pf/geo, `app.BoundaryPayload`)
+
+`id` của bản ghi là `boundary_id` (UUIDv7 máy sinh) của phiên bản ranh giới.
+
+```json
+{
+  "plot_ref": "0191…",
+  "name": "Thửa bờ kênh",
+  "commune_code": "31117",
+  "cooperative_ref": "0191…",
+  "household_ref": null,
+  "geometry": { "type": "Polygon", "coordinates": [[[105.60, 10.05], [105.601, 10.05], [105.601, 10.051], [105.60, 10.051]]] },
+  "gps_accuracy_m": "3.5",
+  "declared_area_ha": "1.20",
+  "source": "kn_field_app",
+  "confirm_overlap": false
+}
+```
+
+| Trường | Bắt buộc | Ghi chú |
+|---|---|---|
+| `plot_ref` | `create` | UUIDv7 máy sinh cho thửa mới. Với `correct` bỏ qua — thửa suy ra từ `supersedes_id` |
+| `commune_code` | `create` | Mã xã hiện hành, phải trong phạm vi người gửi |
+| `name`, `cooperative_ref`, `household_ref` | không | Quản lý HTX bỏ trống `cooperative_ref` → HTX của mình. `household_ref` cần `cooperative_ref` |
+| `geometry` | có | GeoJSON Polygon/MultiPolygon WGS84 (EPSG:4326); ≥ 4 đỉnh phân biệt không thẳng hàng; vòng chưa khép được tự khép |
+| `gps_accuracy_m`, `declared_area_ha` | không | Số thập phân **dạng chuỗi** |
+| `source` | không | `kn_field_app` (mặc định) hoặc `htx_app` |
+| `confirm_overlap` | không | Người vẽ đã xác nhận giữ nguyên chồng lấn cùng HTX / thửa nháp trên máy (HTX US-PLOT-04 AC-2) |
+
+`op: correct`: `supersedes_id` = `boundary_id` của phiên bản đang sửa, `correction_reason` ≥ 10 ký tự.
+
+Kết quả (máy ngoại tuyến không thấy nhau nên máy chủ **không chặn** vì chồng lấn — mục 15):
+
+| Tình huống | `status` |
+|---|---|
+| Hợp lệ, không chồng lấn vượt ngưỡng `geo.overlap_tolerance_pct` | `accepted` |
+| Chồng lấn thửa cùng HTX / thửa nháp, `confirm_overlap: true` | `accepted` (xung đột `same_coop_overlap` vẫn mở để xem xét) |
+| Chồng lấn thửa cùng HTX / thửa nháp, chưa xác nhận | `conflict` (`same_coop_overlap`, phụ trách = HTX) |
+| Chồng lấn thửa HTX khác | `conflict` (`cross_coop_overlap`, phụ trách = cán bộ KN của xã) — trực tuyến thì bị chặn `geo.overlap_cross_coop` |
+| `correct` dựa trên phiên bản không còn hiện hành | `conflict` (`concurrent_edit`); bản ghi được giữ nhưng không thành hiện hành |
+| Lệch diện tích so với `declared_area_ha` > 5 % | không chặn; ghi `area_deviation_pct` vào `pf.geo.plot_boundary.recorded` |
+| Hình sai, ngoài phạm vi, ngoài địa giới xã | `rejected` với mã `geo.*` (docs/errors.md) |
+
+Chiều xuống entity `plot`: `data = {ref, code, name, commune_code, cooperative_ref, household_ref, status, version, boundary_id, area_ha, source, needs_review, geometry, updated_at}`; `version` của thay đổi là `revision` của thửa. Tombstone khi thửa ngừng dùng, hoặc (quản lý HTX) thửa chuyển sang HTX khác.
+
 ## Tệp minh chứng
 
 `POST /v1/files` (multipart, Idempotency-Key):
