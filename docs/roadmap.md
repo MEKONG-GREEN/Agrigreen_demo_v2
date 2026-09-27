@@ -13,7 +13,7 @@ Lộ trình theo Phụ lục A của tài liệu kiến trúc v3.0. Kế hoạch
 - [x] CI: lint → test (PostgreSQL + PgBouncer) → govulncheck, go-licenses, gitleaks, trivy → build, SBOM, quét image, ký cosign
 - [x] Docker Compose ĐTK 1, realm Keycloak, cấu hình PgBouncer
 - [x] ADR 0001–0013
-- [ ] **Chạy CI xanh lần đầu trên GitHub** (cần xác nhận workflow chạy được)
+- [x] CI xanh toàn bộ trên GitHub, kể cả R-32 qua PgBouncer và build/ký 6 image (27/09/2026)
 - [ ] Chạy thử Compose trên máy có Docker
 - [ ] MKG ký các ADR đề xuất: 0006, 0007, 0009, 0010, 0011
 
