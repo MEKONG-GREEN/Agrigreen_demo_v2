@@ -9,9 +9,7 @@
 //   - issuer OIDC giả (authztest), kho đối tượng thư mục cục bộ;
 //   - bộ gom log của cả ba server để kiểm không lộ dữ liệu cá nhân (R-14).
 //
-// cmd/api-platform là package main nên không import được: Build lặp lại
-// buildModules. TestAssemblyMatchesAPIPlatform (tests/e2e) đọc modules.go và
-// báo lệch khi gốc lắp ráp thật đổi Sources/Sinks hay danh sách module.
+// Gốc lắp ráp và router lấy từ cmd/api-platform/assembly — cùng mã với tiến trình thật.
 package harness
 
 import (
@@ -29,21 +27,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/identity-vault/vaulttest"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
-	syncmod "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync"
-	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
@@ -51,49 +40,22 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
-// maxBody khớp cmd/api-platform/router.go.
-const maxBody = 1 << 20
-
 // CursorKey là khóa HMAC con trỏ đồng bộ cố định của kiểm thử (≥ 32 byte).
 var CursorKey = bytes.Repeat([]byte{0x5a}, 32)
 
-// Modules là các module đã nối — kiểm thử dùng để dựng bản của worker (job leo
-// thang với đồng hồ giả, handler xuất gói MRV) trên cùng port.
-type Modules struct {
-	MasterData    *masterdata.Module
-	Party         *party.Module
-	Geo           *geo.Module
-	Content       *content.Module
-	Extension     *extension.Module
-	Mechanization *mechanization.Module
-	MRV           *mrv.Module
-	Sync          *syncmod.Module
-}
+// Modules là các module đã nối (assembly.Modules) — kiểm thử dùng để dựng bản
+// của worker (job leo thang với đồng hồ giả, handler xuất gói MRV) trên cùng port.
+type Modules = assembly.Modules
 
-// List trả module theo đúng thứ tự của cmd/api-platform.
-func (m Modules) List() []httpx.Module {
-	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync}
-}
-
-// Build lặp lại buildModules của cmd/api-platform (modules.go): cùng thứ tự,
-// cùng port, cùng Sources/Sinks.
+// Build nối module bằng CHÍNH gốc lắp ráp của cmd/api-platform (assembly.Build).
 func Build(open func(role string) *pgxpool.Pool, clk clock.Clock, vault client.Client, store objstore.Store) Modules {
-	md := masterdata.New(open(masterdata.DBRole), clk)
-	pty := party.New(open(party.DBRole), clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: vault})
-	g := geo.New(open(geo.DBRole), clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits(), Orgs: pty.Orgs()})
-	cnt := content.New(open(content.DBRole), clk, content.Deps{Scope: pty.ScopeResolver(), Catalogs: md.Catalogs(), AdminUnits: md.AdminUnits(), Store: store})
-	kn := extension.New(open(extension.DBRole), clk, extension.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs()})
-	mech := mechanization.New(open(mechanization.DBRole), clk, mechanization.Deps{
-		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Params: md.Params(), Catalogs: md.Catalogs(), AdminUnits: md.AdminUnits(), Vault: vault,
-	})
-	mrvMod := mrv.New(open(mrv.DBRole), clk, mrv.Deps{Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Store: store})
-	snc := syncmod.New(open(syncmod.DBRole), clk, syncmod.Deps{
-		Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Params: md.Params(), Vault: vault,
-		Store: store, CursorKey: CursorKey,
-		Sources: []syncport.Source{g.SyncSource(), cnt.SyncSource(), kn.SyncSource()},
-		Sinks:   []syncport.Sink{g.SyncSink(), kn.SyncSink(), mrvMod.SyncSink()},
-	})
-	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc}
+	mods, _, err := assembly.Build(context.Background(), func(_ context.Context, role string) (*pgxpool.Pool, error) {
+		return open(role), nil
+	}, clk, assembly.External{Vault: vault, Store: store, CursorKey: CursorKey})
+	if err != nil {
+		panic(err)
+	}
+	return mods
 }
 
 // Stack là nền tảng đang chạy trong tiến trình.
@@ -134,24 +96,13 @@ func New(t testing.TB) *Stack {
 	return &Stack{T: t, Env: env, Issuer: iss, App: app, Admin: admin, Vault: vsrv, Mods: mods, VaultClient: vc, Store: store, StoreDir: dir, Logs: logs}
 }
 
-// newRouter lặp lại NewRouter/NewAdminRouter của cmd/api-platform/router.go.
+// newRouter dùng router của cmd/api-platform (assembly).
 func newRouter(log *slog.Logger, v *authz.Verifier, ops *pgxpool.Pool, mods []httpx.Module, admin bool) *gin.Engine {
-	r := httpx.NewEngine(log, maxBody)
-	r.GET("/healthz", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
-	mw := []gin.HandlerFunc{httpx.Authenticate(v)}
+	d := assembly.Deps{Log: log, Verifier: v, Ops: ops, Modules: mods}
 	if admin {
-		mw = append(mw, httpx.RequireMFA())
+		return assembly.NewAdminRouter(d)
 	}
-	mw = append(mw, idempotency.Middleware(ops))
-	v1 := r.Group("/v1", mw...)
-	for _, m := range mods {
-		if admin {
-			m.RegisterAdmin(v1)
-		} else {
-			m.RegisterApp(v1)
-		}
-	}
-	return r
+	return assembly.NewRouter(d)
 }
 
 // PF trả pool của một vai trên cụm pf (vd dbadmin.OutboxPublisher để đọc outbox).
