@@ -27,7 +27,7 @@ func TestDayOfUsesVietnamTime(t *testing.T) {
 }
 
 func TestUnitValidate(t *testing.T) {
-	ok := Unit{Code: "91-X-RACH-GIA", Name: "Rạch Giá", Level: port.LevelCommune, ParentCode: "91", ValidFrom: ReorgDate}
+	ok := Unit{Code: "30742", Name: "Phường Rạch Giá", Level: port.LevelCommune, ParentCode: "91", ValidFrom: ReorgDate}
 	if err := ok.Validate(); err != nil {
 		t.Fatalf("hợp lệ mà báo lỗi: %v", err)
 	}
@@ -44,9 +44,9 @@ func TestUnitValidate(t *testing.T) {
 		"to trước from": {Unit{Code: "91", Name: "x", Level: port.LevelProvince, ValidFrom: ReorgDate, ValidTo: dp(Day(2025, 1, 1))},
 			"valid_to", ErrUnitValidity},
 		// Sau sắp xếp 2025 chỉ còn hai cấp: huyện phải chấm dứt trước 01/07/2025.
-		"huyện còn mở": {Unit{Code: "89-H-A", Name: "x", Level: port.LevelDistrict, ParentCode: "89", ValidFrom: Day(2004, 1, 1)},
+		"huyện còn mở": {Unit{Code: "883", Name: "x", Level: port.LevelDistrict, ParentCode: "89", ValidFrom: Day(2004, 1, 1)},
 			"valid_to", ErrUnitDistrict},
-		"huyện sau 2025": {Unit{Code: "89-H-A", Name: "x", Level: port.LevelDistrict, ParentCode: "89", ValidFrom: Day(2004, 1, 1),
+		"huyện sau 2025": {Unit{Code: "883", Name: "x", Level: port.LevelDistrict, ParentCode: "89", ValidFrom: Day(2004, 1, 1),
 			ValidTo: dp(Day(2026, 1, 1))}, "valid_to", ErrUnitDistrict},
 		"kế thừa khi còn mở": {Unit{Code: "91", Name: "x", Level: port.LevelProvince, ValidFrom: ReorgDate, Successors: []string{"92"}},
 			"successors", ErrUnitSuccessors},
