@@ -27,6 +27,32 @@ describe("<ProblemAlert>", () => {
   });
 });
 
+describe("<ProblemAlert> — mã đặc thù", () => {
+  const problem = (code: string, status: number) =>
+    new ApiProblem({ type: `https://errors.agrigreen.vn/${code}`, title: "", status, code, trace_id: "trace-9" });
+
+  it("geo.overlap_needs_confirm: có nút Xác nhận vẫn lưu", async () => {
+    let confirmed = 0;
+    render(<ProblemAlert problem={problem("geo.overlap_needs_confirm", 409)} onConfirm={() => confirmed++} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("chồng lấn thửa cùng HTX");
+    screen.getByRole("button", { name: "Xác nhận vẫn lưu" }).click();
+    expect(confirmed).toBe(1);
+  });
+
+  it("geo.overlap_cross_coop: không có nút xác nhận (không bỏ qua được)", () => {
+    render(<ProblemAlert problem={problem("geo.overlap_cross_coop", 409)} onConfirm={() => undefined} />);
+    expect(screen.queryByRole("button", { name: "Xác nhận vẫn lưu" })).toBeNull();
+    expect(screen.getByRole("alert")).toHaveTextContent("HTX khác");
+  });
+
+  it("mfa_required: hướng dẫn đăng nhập lại có OTP, kèm trace_id", () => {
+    render(<ProblemAlert problem={problem("mfa_required", 403)} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("xác thực hai yếu tố");
+    expect(screen.getByRole("alert")).toHaveTextContent("OTP");
+    expect(screen.getByTestId("trace-id")).toHaveTextContent("trace-9");
+  });
+});
+
 describe("<KpiTile> / <ProvisionalBadge>", () => {
   it("thiếu dữ liệu → hiện — kèm chú thích cho trình đọc màn hình", () => {
     render(<KpiTile color="green" icon="area" label="Diện tích đã triển khai" value={null} unit="ha" />);

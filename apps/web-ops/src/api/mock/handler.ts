@@ -1,39 +1,37 @@
 // ============================================================================
 // BACKEND GIẢ LẬP (NEXT_PUBLIC_API_MOCK=1). Thay `fetch` của openapi-fetch nên toàn bộ
 // middleware thật (Bearer, Idempotency-Key, parse problem+json) vẫn chạy.
-// Mô phỏng các quy tắc backend để UI thể hiện đúng: lọc theo phạm vi (ADR-0009),
-// POST thiếu Idempotency-Key → 400, phát lại cùng khóa → Idempotent-Replayed,
-// tự phê duyệt → 403 self_approval_forbidden (R-56), Admin API cần MFA.
+// Đường dẫn và hình dạng phản hồi theo ĐÚNG contracts/openapi/application.yaml và admin.yaml.
+// Mô phỏng quy tắc backend để UI thể hiện đúng: lọc theo phạm vi (ADR-0009), POST thiếu
+// Idempotency-Key → 400, phát lại cùng khóa → Idempotent-Replayed, tự phê duyệt → 403
+// self_approval_forbidden (R-56), mọi route Admin API cần MFA → 403 mfa_required.
 // ============================================================================
-import type { Page } from "../pending/common";
-import type { DashboardKpis } from "../pending/extension";
-import type { Cooperative } from "../pending/party";
-import type { ParamDecisionInput, ParamProposal, ParamProposalInput } from "../pending/masterdata";
+import type { AppGet, ExtKPI, Page, ParamVersion, PlotFeature } from "../types";
 import { uuidv7 } from "../idempotency";
 import {
+  addDecimal4,
   ADMIN_UNITS,
-  boundaries,
-  catalogSummaries,
+  boundaryOf,
   CATALOGS,
-  cghDashboard,
   COMMUNES,
   COOPERATIVES,
-  coverageItems,
   DOCUMENTS,
+  findCoop,
   householdsOf,
+  orgEvents,
+  ORG_EVENTS,
   ORGS,
-  PARAMS,
+  PARAM_VERSIONS,
   plotsOf,
-  priorityCooperatives,
   PROVINCES,
-  TARGET_AREA_BY_PROVINCE,
   TASKS,
-  UNREPORTED_UNITS,
-  type MockCooperative,
+  UNREPORTED_COMMUNES,
 } from "./data";
+import { coverage as mechCoverage, dashboard as mechDashboard, findRun, RUNS } from "./mechanization";
 import { personaFromAuthHeader, type MockPersona } from "./personas";
 
-const CURRENT_SEASON = "HT2026";
+/** Mã xã minh hoạ "chưa nhập ranh giới" → 404 geo.admin_boundary_not_found. */
+const MISSING_BOUNDARY = "96104";
 
 function traceId(): string {
   return uuidv7().replace(/-/g, "");
@@ -54,12 +52,17 @@ function problem(status: number, code: string, title: string, extra: Record<stri
   );
 }
 
-function paginate<T>(items: T[], url: URL, defaultLimit = 20): Page<T> {
-  const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? defaultLimit) || defaultLimit, 1), 200);
+function pageSlice<T>(items: T[], url: URL, defaultLimit = 50, maxLimit = 200): { slice: T[]; next: string | null } {
+  const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? defaultLimit) || defaultLimit, 1), maxLimit);
   const cursor = url.searchParams.get("cursor");
   const offset = cursor ? Number.parseInt(atob(cursor), 10) || 0 : 0;
   const slice = items.slice(offset, offset + limit);
   const next = offset + limit < items.length ? btoa(String(offset + limit)) : null;
+  return { slice, next };
+}
+
+function paginate<T>(items: T[], url: URL, defaultLimit = 50, maxLimit = 200): Page<T> {
+  const { slice, next } = pageSlice(items, url, defaultLimit, maxLimit);
   return { items: slice, next_cursor: next };
 }
 
@@ -68,364 +71,664 @@ function scopeUnits(p: MockPersona): Set<string> | null {
   return p.me.scope.all ? null : new Set(p.me.scope.units);
 }
 
-function inScope(p: MockPersona, provinceCode: string, communeCode?: string): boolean {
+function inScope(p: MockPersona, provinceCode: string, communeCode?: string | null): boolean {
   const s = scopeUnits(p);
   if (!s) return true;
-  if (communeCode) return s.has(communeCode);
-  return s.has(provinceCode);
+  if (p.me.scope.level === "commune") return !!communeCode && s.has(communeCode);
+  return s.has(provinceCode) || (!!communeCode && s.has(communeCode));
 }
 
 function norm(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
 }
 
-function stripLocation(c: MockCooperative): Cooperative {
-  const out: Partial<MockCooperative> = { ...c };
-  delete out.location;
-  return out as Cooperative;
+function hasRole(p: MockPersona, ...roles: string[]): boolean {
+  return roles.some((r) => p.me.roles.includes(r));
 }
-
-const replay = new Map<string, { status: number; body: string; fingerprint: string }>();
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function dashboard(p: MockPersona): DashboardKpis {
-  const coops = COOPERATIVES.filter((c) => inScope(p, c.province_code, p.me.scope.level === "xa" ? c.commune_code : undefined));
-  const level = p.me.scope.level;
-  const provinceScope = level === "tinh" ? p.me.org?.admin_unit_code ?? null : null;
-  const units =
-    level === "tw" || level === "cuc" || p.me.scope.all
-      ? PROVINCES.map((x) => ({ code: x.code, name: x.name, target: TARGET_AREA_BY_PROVINCE[x.code] ?? 30000 }))
-      : COMMUNES.filter((c) => (provinceScope ? c.province_code === provinceScope : p.me.scope.units.includes(c.code))).map((c) => ({
-          code: c.code,
-          name: c.name,
-          target: 4000,
-        }));
-  const breakdown = units.map((u) => {
-    const unitCoops = coops.filter((c) => c.province_code === u.code || c.commune_code === u.code);
-    const area = unitCoops.reduce((s, c) => s + Number(c.area_ha), 0) * (u.code.length === 2 ? 21 : 3.5);
-    const reported = !UNREPORTED_UNITS.has(u.code);
-    return {
-      unit_code: u.code,
-      unit_name: u.name,
-      deployed_area_ha: reported ? area.toFixed(4) : "0",
-      target_area_ha: String(u.target),
-      reported,
-    };
-  });
-  const missing = breakdown.filter((b) => !b.reported).length;
-  const deployed = breakdown.reduce((s, b) => s + Number(b.deployed_area_ha), 0);
-  const scopedTasks = TASKS.filter((t) => {
-    const coop = COOPERATIVES.find((c) => c.id === t.cooperative_id);
-    return coop ? inScope(p, coop.province_code, level === "xa" ? coop.commune_code : undefined) : false;
-  });
-  const now = Date.now();
+// --------------------------------------------------------------------------
+// GET /v1/extension/dashboard
+// --------------------------------------------------------------------------
+type Dashboard = AppGet<"/v1/extension/dashboard">;
+
+function ratio4(num: number, den: number): string | null {
+  if (den === 0) return null;
+  const scaled = Math.round((num * 10000) / den);
+  return `${Math.floor(scaled / 10000)}.${String(scaled % 10000).padStart(4, "0")}`;
+}
+
+function communeKpi(code: string): ExtKPI {
+  const reported = !UNREPORTED_COMMUNES.has(code);
+  const coops = COOPERATIVES.filter((c) => c.api.admin_unit_code === code && c.api.active);
+  const tasks = TASKS.filter((t) => t.commune_code === code && t.status !== "resolved");
+  const area = reported ? coops.reduce((s, c) => addDecimal4(s, c.api.area_ha ?? "0"), "0.0000") : "0.0000";
+  const targets = 2;
+  const acks = reported ? 2 : 1;
   return {
-    scope: { level, unit_name: p.me.scope.unit_name },
-    season: CURRENT_SEASON,
-    as_of: new Date(now - 40 * 60_000).toISOString(),
-    complete: missing === 0,
-    missing_units: missing,
-    total_units: breakdown.length,
-    kpis: {
-      deployed_area_ha: deployed.toFixed(4),
-      cooperatives: coops.length,
-      digitized_plots: coops.reduce((s, c) => s + c.digitized_plots, 0),
-      overdue_tasks: scopedTasks.filter((t) => !t.resolved_at && Date.parse(t.due_at) < now).length,
-    },
-    breakdown,
+    sown_area_ha: area,
+    cooperatives_reporting: reported ? coops.length : 0,
+    open_tasks: tasks.length,
+    overdue_tasks: tasks.filter((t) => t.overdue).length,
+    directive_targets: targets,
+    directive_acks: acks,
+    directive_ack_rate: ratio4(acks, targets),
+    expected_communes: 1,
+    reported_communes: reported ? 1 : 0,
+    missing_communes: reported ? [] : [code],
+    provisional: !reported,
+    provisional_label: reported ? null : "Số liệu tạm tính",
   };
 }
 
-type Handler = (ctx: { url: URL; persona: MockPersona; params: string[]; body: unknown; request: Request }) => Response;
-
-function adminOnly(persona: MockPersona): Response | null {
-  if (!persona.amr.includes("otp")) return problem(403, "mfa_required", "MFA required");
-  return null;
+function sumKpi(list: ExtKPI[]): ExtKPI {
+  const out = list.reduce<ExtKPI>(
+    (s, k) => ({
+      sown_area_ha: addDecimal4(s.sown_area_ha, k.sown_area_ha),
+      cooperatives_reporting: s.cooperatives_reporting + k.cooperatives_reporting,
+      open_tasks: s.open_tasks + k.open_tasks,
+      overdue_tasks: s.overdue_tasks + k.overdue_tasks,
+      directive_targets: s.directive_targets + k.directive_targets,
+      directive_acks: s.directive_acks + k.directive_acks,
+      directive_ack_rate: null,
+      expected_communes: s.expected_communes + k.expected_communes,
+      reported_communes: s.reported_communes + k.reported_communes,
+      missing_communes: [...s.missing_communes, ...k.missing_communes],
+      provisional: s.provisional || k.provisional,
+      provisional_label: null,
+    }),
+    {
+      sown_area_ha: "0.0000", cooperatives_reporting: 0, open_tasks: 0, overdue_tasks: 0, directive_targets: 0, directive_acks: 0,
+      directive_ack_rate: null, expected_communes: 0, reported_communes: 0, missing_communes: [], provisional: false, provisional_label: null,
+    },
+  );
+  out.directive_ack_rate = ratio4(out.directive_acks, out.directive_targets);
+  out.provisional_label = out.provisional ? "Số liệu tạm tính" : null;
+  return out;
 }
 
-const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
+function dashboard(p: MockPersona, url: URL): Dashboard | Response {
+  const period = url.searchParams.get("period") ?? new Date().toISOString().slice(0, 7);
+  const asOf = new Date(Date.now() - 40 * 60_000).toISOString();
+  let unit = url.searchParams.get("unit");
+  if (!unit && !p.me.scope.all) unit = p.me.org?.admin_unit_code ?? null;
+  if (unit && !inScope(p, unit.slice(0, 2), unit)) return problem(403, "extension.out_of_scope", "Out of scope");
+  const province = unit ? PROVINCES.find((x) => x.code === unit) : undefined;
+  const commune = unit && !province ? COMMUNES.find((x) => x.code === unit) : undefined;
+  if (unit && !province && !commune) return problem(403, "extension.out_of_scope", "Unknown unit");
+
+  if (commune) {
+    const k = communeKpi(commune.code);
+    return { unit: commune.code, level: "commune", period, as_of: asOf, total: k, period_closed: false, closed_provinces: [], children: [] };
+  }
+  const provinces = province ? [province] : PROVINCES;
+  const children = province
+    ? COMMUNES.filter((c) => c.province_code === province.code).map((c) => ({ unit: c.code, kpi: communeKpi(c.code) }))
+    : provinces.map((pr) => ({ unit: pr.code, kpi: sumKpi(COMMUNES.filter((c) => c.province_code === pr.code).map((c) => communeKpi(c.code))) }));
+  return {
+    unit: province?.code ?? null,
+    level: province ? "province" : "national",
+    period,
+    as_of: asOf,
+    total: sumKpi(children.map((c) => c.kpi)),
+    period_closed: false,
+    closed_provinces: ["92"],
+    children,
+  };
+}
+
+// --------------------------------------------------------------------------
+// Trạng thái thửa sau khi gán (mock giữ trong bộ nhớ tab)
+// --------------------------------------------------------------------------
+const PLOT_STATE = new Map<string, Pick<PlotFeature["properties"], "cooperative_ref" | "status" | "needs_review">>();
+
+function plotsWithState(coop: (typeof COOPERATIVES)[number]): PlotFeature[] {
+  return plotsOf(coop).map((p) => {
+    const s = PLOT_STATE.get(p.properties.ref);
+    return s ? { ...p, properties: { ...p.properties, ...s, revision: p.properties.revision + 1 } } : p;
+  });
+}
+
+function findPlot(ref: string | undefined): { plot: PlotFeature; index: number; coop: (typeof COOPERATIVES)[number] } | undefined {
+  for (const coop of COOPERATIVES) {
+    const list = plotsWithState(coop);
+    const index = list.findIndex((p) => p.properties.ref === ref);
+    if (index >= 0) return { plot: list[index]!, index, coop };
+  }
+  return undefined;
+}
+
+// --------------------------------------------------------------------------
+// Bảng định tuyến
+// --------------------------------------------------------------------------
+interface Ctx {
+  url: URL;
+  persona: MockPersona;
+  params: string[];
+  body: unknown;
+  request: Request;
+}
+type Handler = (ctx: Ctx) => Response;
+type Route = { method: string; pattern: RegExp; handler: Handler };
+
+const cghAllowed = (p: MockPersona) => p.me.org?.kind === "dcrd" || hasRole(p, "platform_admin", "cgh_viewer");
+
+const appRoutes: Route[] = [
+  // --- pf/party: người gọi + phạm vi ---
   { method: "GET", pattern: /^\/v1\/me$/, handler: ({ persona }) => json(persona.me) },
-  { method: "GET", pattern: /^\/v1\/dashboard\/kpis$/, handler: ({ persona }) => json(dashboard(persona)) },
+
+  // --- pf/extension ---
   {
     method: "GET",
-    pattern: /^\/v1\/cooperatives$/,
+    pattern: /^\/v1\/extension\/dashboard$/,
+    handler: ({ persona, url }) => {
+      const d = dashboard(persona, url);
+      return d instanceof Response ? d : json(d);
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/extension\/tasks$/,
     handler: ({ url, persona }) => {
-      const q = norm(url.searchParams.get("q") ?? "");
-      const unit = url.searchParams.get("admin_unit");
       const status = url.searchParams.get("status");
-      const list = COOPERATIVES.filter(
-        (c) =>
-          inScope(persona, c.province_code, persona.me.scope.level === "xa" ? c.commune_code : undefined) &&
-          (!q || norm(`${c.name} ${c.code} ${c.commune_name}`).includes(q)) &&
-          (!unit || c.province_code === unit || c.commune_code === unit) &&
-          (!status || c.status === status),
-      ).map(stripLocation);
+      const priority = url.searchParams.get("priority");
+      const overdue = url.searchParams.get("overdue") === "true";
+      const list = TASKS.filter(
+        (t) =>
+          inScope(persona, t.province_code, t.commune_code) &&
+          (!status || t.status === status) &&
+          (!priority || t.priority === priority) &&
+          (!overdue || (t.overdue && t.status !== "resolved")),
+      ).sort((a, b) => Date.parse(a.due_at) - Date.parse(b.due_at));
+      return json(paginate(list, url));
+    },
+  },
+
+  // --- pf/masterdata ---
+  {
+    method: "GET",
+    pattern: /^\/v1\/masterdata\/admin-units$/,
+    handler: ({ url }) => {
+      const parent = url.searchParams.get("parent");
+      if (parent && !ADMIN_UNITS.some((u) => u.code === parent)) return problem(404, "masterdata.admin_unit_not_found", "Not found");
+      return json(paginate(ADMIN_UNITS.filter((u) => (parent ? u.parent_code === parent : u.parent_code === null)), url));
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/masterdata\/admin-units\/([0-9A-Z.-]+)$/,
+    handler: ({ params }) => {
+      const u = ADMIN_UNITS.find((x) => x.code === params[0]);
+      return u ? json(u) : problem(404, "masterdata.admin_unit_not_found", "Not found");
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/masterdata\/catalogs\/([a-z_]+)$/,
+    handler: ({ params, url }) => {
+      const items = CATALOGS[params[0] as keyof typeof CATALOGS];
+      if (!items) return problem(404, "masterdata.catalog_not_found", "Not found");
+      const all = url.searchParams.get("include_inactive") === "true";
+      return json(paginate(items.filter((i) => all || i.active), url));
+    },
+  },
+
+  // --- pf/party ---
+  {
+    method: "GET",
+    pattern: /^\/v1\/orgs$/,
+    handler: ({ url, persona }) => {
+      const kind = url.searchParams.get("kind");
+      const inactive = url.searchParams.get("include_inactive") === "true";
+      const s = scopeUnits(persona);
+      const list = ORGS.filter(
+        (o) => (!s || (o.admin_unit_code !== null && s.has(o.admin_unit_code))) && (!kind || o.kind === kind) && (inactive || o.active),
+      );
       return json(paginate(list, url));
     },
   },
   {
     method: "GET",
-    pattern: /^\/v1\/cooperatives\/locations$/,
-    handler: ({ persona }) =>
-      json({
-        type: "FeatureCollection",
-        features: COOPERATIVES.filter((c) => inScope(persona, c.province_code, persona.me.scope.level === "xa" ? c.commune_code : undefined)).map((c) => ({
-          type: "Feature",
-          id: c.id,
-          geometry: { type: "Point", coordinates: c.location },
-          properties: { id: c.id, code: c.code, name: c.name, province_code: c.province_code, commune_code: c.commune_code, area_ha: c.area_ha },
-        })),
-      }),
+    pattern: /^\/v1\/cooperatives$/,
+    handler: ({ url, persona }) => {
+      const q = norm(url.searchParams.get("q") ?? "");
+      const inactive = url.searchParams.get("include_inactive") === "true";
+      const list = COOPERATIVES.filter(
+        (c) =>
+          inScope(persona, c.province_code, c.api.admin_unit_code) &&
+          (inactive || c.api.active) &&
+          (!q || norm(`${c.api.name} ${c.api.code} ${c.api.tax_code ?? ""}`).includes(q)),
+      ).map((c) => c.api);
+      return json(paginate(list, url));
+    },
   },
   {
     method: "GET",
     pattern: /^\/v1\/cooperatives\/([\w-]+)$/,
     handler: ({ params, persona }) => {
-      const c = COOPERATIVES.find((x) => x.id === params[0]);
-      // Ngoài phạm vi trả 404 như backend (không tiết lộ sự tồn tại).
-      if (!c || !inScope(persona, c.province_code, persona.me.scope.level === "xa" ? c.commune_code : undefined)) {
-        return problem(404, "not_found", "Not found");
-      }
-      return json(stripLocation(c));
+      const c = findCoop(params[0]);
+      // Ngoài phạm vi trả 404 như backend (không lộ sự tồn tại).
+      if (!c || !inScope(persona, c.province_code, c.api.admin_unit_code)) return problem(404, "party.org_not_found", "Not found");
+      return json(c.api);
     },
   },
   {
     method: "GET",
     pattern: /^\/v1\/cooperatives\/([\w-]+)\/households$/,
     handler: ({ params, url, persona }) => {
-      const c = COOPERATIVES.find((x) => x.id === params[0]);
-      if (!c || !inScope(persona, c.province_code, persona.me.scope.level === "xa" ? c.commune_code : undefined)) {
-        return problem(404, "not_found", "Not found");
-      }
-      return json(paginate(householdsOf(c), url, 15));
+      const c = findCoop(params[0]);
+      if (!c || !inScope(persona, c.province_code, c.api.admin_unit_code)) return problem(404, "party.org_not_found", "Not found");
+      return json(paginate(householdsOf(c), url));
+    },
+  },
+
+  // --- pf/geo ---
+  {
+    method: "GET",
+    pattern: /^\/v1\/cooperatives\/([\w-]+)\/plots$/,
+    handler: ({ params, url, persona }) => {
+      const c = findCoop(params[0]);
+      if (!c || !inScope(persona, c.province_code, c.api.admin_unit_code)) return problem(403, "geo.out_of_scope", "Out of scope");
+      const own = plotsWithState(c).filter((p) => p.properties.cooperative_ref === c.api.ref);
+      const { slice, next } = pageSlice(own, url, 200, 1000);
+      return json({ type: "FeatureCollection", features: slice, next_cursor: next });
     },
   },
   {
     method: "GET",
     pattern: /^\/v1\/plots$/,
     handler: ({ url, persona }) => {
-      const cid = url.searchParams.get("cooperative_id");
-      const c = COOPERATIVES.find((x) => x.id === cid);
-      if (!c || !inScope(persona, c.province_code)) return json({ items: [], next_cursor: null });
-      return json(paginate(plotsOf(c), url, 15));
+      const parts = (url.searchParams.get("bbox") ?? "").split(",").map(Number);
+      if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) {
+        return problem(422, "validation_failed", "Validation failed", { errors: [{ field: "bbox", reason: "Cần minLon,minLat,maxLon,maxLat (WGS84)" }] });
+      }
+      const [minLon, minLat, maxLon, maxLat] = parts as [number, number, number, number];
+      const limit = Math.min(Number(url.searchParams.get("limit") ?? 1000) || 1000, 1000);
+      const inside = COOPERATIVES.filter((c) => inScope(persona, c.province_code, c.api.admin_unit_code))
+        .flatMap((c) => plotsWithState(c))
+        .filter((p) => {
+          if (p.properties.status === "retired") return false;
+          const pt = (p.geometry.coordinates[0] as number[][] | undefined)?.[0];
+          return !!pt && pt[0]! >= minLon && pt[0]! <= maxLon && pt[1]! >= minLat && pt[1]! <= maxLat;
+        });
+      return json({ type: "FeatureCollection", features: inside.slice(0, limit), truncated: inside.length > limit, limit });
     },
-  },
-  {
+  },  {
     method: "GET",
-    pattern: /^\/v1\/tasks$/,
-    handler: ({ url, persona }) => {
-      const status = url.searchParams.get("status");
-      const kind = url.searchParams.get("kind");
-      const overdue = url.searchParams.get("overdue") === "true";
-      const now = Date.now();
-      const list = TASKS.filter((t) => {
-        const coop = COOPERATIVES.find((c) => c.id === t.cooperative_id);
-        if (!coop || !inScope(persona, coop.province_code, persona.me.scope.level === "xa" ? coop.commune_code : undefined)) return false;
-        if (status && t.status !== status) return false;
-        if (kind && t.kind !== kind) return false;
-        if (overdue && (t.resolved_at || Date.parse(t.due_at) >= now)) return false;
-        return true;
-      }).sort((a, b) => Date.parse(a.due_at) - Date.parse(b.due_at));
-      return json(paginate(list, url));
+    pattern: /^\/v1\/geo\/admin-boundaries\/([0-9A-Z.-]+)$/,
+    handler: ({ params }) => {
+      const f = params[0] === MISSING_BOUNDARY ? null : boundaryOf(params[0] ?? "");
+      return f ? json(f) : problem(404, "geo.admin_boundary_not_found", "Boundary not imported");
     },
   },
+
+  // --- pf/content ---
   {
     method: "GET",
     pattern: /^\/v1\/documents$/,
-    handler: ({ url }) => {
+    handler: ({ url, persona }) => {
       const q = norm(url.searchParams.get("q") ?? "");
       const kind = url.searchParams.get("kind");
-      const topic = url.searchParams.get("topic");
-      const list = DOCUMENTS.filter(
-        (d) => (!q || norm(`${d.title} ${d.summary}`).includes(q)) && (!kind || d.kind === kind) && (!topic || d.topic === topic),
-      );
-      return json(paginate(list, url, 12));
-    },
-  },
-  {
-    method: "GET",
-    pattern: /^\/v1\/admin-units$/,
-    handler: ({ url }) => {
-      const level = url.searchParams.get("level");
-      const parent = url.searchParams.get("parent");
-      return json({ items: ADMIN_UNITS.filter((u) => (!level || u.level === level) && (!parent || u.parent_code === parent)) });
-    },
-  },
-  {
-    method: "GET",
-    pattern: /^\/v1\/admin-units\/boundaries$/,
-    handler: ({ url, persona }) => {
-      const level = url.searchParams.get("level") === "commune" ? "commune" : "province";
-      const fc = boundaries(level);
+      const category = url.searchParams.get("category");
+      const tag = url.searchParams.get("tag");
       const s = scopeUnits(persona);
-      if (s) fc.features = fc.features.filter((f) => s.has(f.properties.code) || (f.properties.parent_code !== null && s.has(f.properties.parent_code)));
-      return new Response(JSON.stringify(fc), { status: 200, headers: { "Content-Type": "application/geo+json" } });
+      const list = DOCUMENTS.filter(
+        (d) =>
+          (!s || d.audience.level === "national" || d.audience.units.some((u) => s.has(u))) &&
+          (!q || norm(`${d.title ?? ""} ${d.summary ?? ""}`).includes(q)) &&
+          (!kind || d.kind === kind) &&
+          (!category || d.category === category) &&
+          (!tag || d.tags.includes(tag)),
+      );
+      return json(paginate(list, url));
     },
   },
-  {
-    method: "GET",
-    pattern: /^\/v1\/orgs$/,
-    handler: ({ url, persona }) => {
-      if (!persona.me.roles.includes("platform_admin")) return problem(403, "forbidden", "Forbidden");
-      return json(paginate(ORGS, url, 200));
-    },
-  },
-  { method: "GET", pattern: /^\/v1\/catalogs$/, handler: () => json({ items: catalogSummaries() }) },
-  {
-    method: "GET",
-    pattern: /^\/v1\/catalogs\/([\w-]+)$/,
-    handler: ({ params, url }) => {
-      const cat = CATALOGS[params[0] ?? ""];
-      if (!cat) return problem(404, "not_found", "Not found");
-      const all = url.searchParams.get("include_inactive") === "true";
-      return json({ items: cat.items.filter((i) => all || i.active) });
-    },
-  },
-  { method: "GET", pattern: /^\/v1\/params$/, handler: () => json({ items: PARAMS }) },
+
+  // --- pf/geo: gán thửa (quy tắc chồng lấn: HTX khác chặn, cùng HTX/thửa nháp cần xác nhận) ---
   {
     method: "POST",
-    pattern: /^\/v1\/params\/([^/]+)\/proposals$/,
-    handler: ({ params, persona, body }) => {
-      const denied = adminOnly(persona);
-      if (denied) return denied;
-      if (!persona.me.roles.includes("param_setter")) return problem(403, "forbidden", "Forbidden");
-      const param = PARAMS.find((p) => p.key === decodeURIComponent(params[0] ?? ""));
-      if (!param) return problem(404, "not_found", "Not found");
-      const input = body as Partial<ParamProposalInput>;
-      const errors: { field: string; reason: string }[] = [];
-      if (param.kind === "decimal" && !/^\d+(\.\d{1,4})?$/.test(input.value ?? "")) errors.push({ field: "value", reason: "Giá trị phải là số thập phân không âm, tối đa 4 chữ số lẻ" });
-      if (!input.effective_from || !/^\d{4}-\d{2}-\d{2}$/.test(input.effective_from)) errors.push({ field: "effective_from", reason: "Ngày hiệu lực không hợp lệ" });
-      if (!input.source_doc?.trim()) errors.push({ field: "source_doc", reason: "Cần số văn bản làm căn cứ" });
-      if (!input.reason?.trim()) errors.push({ field: "reason", reason: "Cần ghi lý do thay đổi" });
-      if (errors.length) return problem(422, "validation_failed", "Validation failed", { errors });
-      const p: ParamProposal = {
-        id: uuidv7(),
-        key: param.key,
-        value: input.value ?? null,
-        text: input.text ?? null,
-        unit: param.unit,
-        effective_from: input.effective_from!,
-        source_doc: input.source_doc!,
-        reason: input.reason!,
-        status: "pending",
-        proposed_by: persona.me.subject,
-        proposed_by_name: persona.me.display_name,
-        proposed_at: new Date().toISOString(),
-        decided_by: null,
-        decided_by_name: null,
-        decided_at: null,
-        decision_note: null,
-      };
-      param.pending.push(p);
-      return json(p, 201);
-    },
-  },
-  {
-    method: "POST",
-    pattern: /^\/v1\/params\/proposals\/([\w-]+)\/(approve|reject)$/,
-    handler: ({ params, persona, body }) => {
-      const denied = adminOnly(persona);
-      if (denied) return denied;
-      if (!persona.me.roles.includes("param_approver")) return problem(403, "forbidden", "Forbidden");
-      const param = PARAMS.find((p) => p.pending.some((x) => x.id === params[0]));
-      const prop = param?.pending.find((x) => x.id === params[0]);
-      if (!param || !prop) return problem(404, "not_found", "Not found");
-      if (prop.proposed_by === persona.me.subject) return problem(403, "self_approval_forbidden", "Self approval forbidden");
-      if (prop.status !== "pending") return problem(409, "conflict", "Already decided");
-      const note = (body as ParamDecisionInput | undefined)?.note ?? null;
-      const decided: ParamProposal = {
-        ...prop,
-        status: params[1] === "approve" ? "approved" : "rejected",
-        decided_by: persona.me.subject,
-        decided_by_name: persona.me.display_name,
-        decided_at: new Date().toISOString(),
-        decision_note: note,
-      };
-      param.pending = param.pending.filter((x) => x.id !== prop.id);
-      if (decided.status === "approved") {
-        param.current = {
-          version: (param.current?.version ?? 0) + 1,
-          value: decided.value,
-          text: decided.text,
-          unit: decided.unit,
-          effective_from: decided.effective_from,
-          source_doc: decided.source_doc,
-          approved_by: persona.me.display_name,
-          approved_at: decided.decided_at!,
-        };
-      }
-      return json(decided);
-    },
-  },
-  {
-    method: "GET",
-    pattern: /^\/v1\/cgh\/coverage$/,
-    handler: ({ url, persona }) => {
-      if (!(persona.me.scope.level === "cuc" || persona.me.roles.includes("platform_admin"))) return problem(403, "forbidden", "Forbidden");
-      const stage = url.searchParams.get("stage") ?? "thu_hoach";
-      const factor = stage === "thu_hoach" ? 1 : stage === "cham_soc" ? 0.8 : stage === "lam_dat" ? 1.12 : 0.95;
+    pattern: /^\/v1\/plots\/([\w-]+)\/assign$/,
+    handler: ({ params, body, persona }) => {
+      const found = findPlot(params[0]);
+      if (!found || !inScope(persona, found.coop.province_code, found.coop.api.admin_unit_code)) return problem(404, "geo.plot_not_found", "Not found");
+      const { plot, index } = found;
+      if (plot.properties.status === "retired") return problem(409, "geo.plot_state_conflict", "Retired");
+      const input = (body ?? {}) as { cooperative_ref?: string | null; reason?: string; confirm_overlap?: boolean };
+      const target = input.cooperative_ref ?? null;
+      if (target === plot.properties.cooperative_ref) return problem(409, "geo.plot_state_conflict", "No change");
+      const overlaps = [{ plot_ref: plot.properties.ref, code: `${plot.properties.code.slice(0, -1)}9`, cooperative_ref: target, intersect_ha: "0.0420", overlap_pct: "3.10" }];
+      // Minh hoạ: 1/3 thửa nháp chồng lấn HTX khác (không bỏ qua được), còn lại cần xác nhận.
+      if (target && index % 3 === 0) return problem(409, "geo.overlap_cross_coop", "Cross-coop overlap", { overlaps });
+      if (target && !input.confirm_overlap) return problem(409, "geo.overlap_needs_confirm", "Needs confirm", { needs_confirm: true, overlaps });
+      const now = new Date().toISOString();
+      PLOT_STATE.set(plot.properties.ref, { cooperative_ref: target, status: target ? "active" : "draft", needs_review: !!input.confirm_overlap });
+      const updated = findPlot(params[0])!.plot;
       return json({
-        season: url.searchParams.get("season") ?? CURRENT_SEASON,
-        stage,
-        machine_type: url.searchParams.get("machine_type"),
-        thresholds: { sufficient_pct: "85", attention_pct: "60", surplus_pct: "120" },
-        as_of: new Date(Date.now() - 25 * 60_000).toISOString(),
-        items: coverageItems(factor),
+        plot: updated,
+        conflicts: input.confirm_overlap
+          ? [{
+              id: uuidv7(), kind: "same_coop_overlap", plot_ref: updated.properties.ref, boundary_id: updated.properties.boundary_id, other_plot_refs: [],
+              max_overlap_pct: "3.10", commune_code: updated.properties.commune_code, owner_ref: target, due_at: new Date(Date.now() + 72 * 3_600_000).toISOString(),
+              status: "open", detected_at: now, resolved_by: null, resolved_at: null, resolution_note: null,
+            }]
+          : [],
+        event: { id: uuidv7(), action: "assigned", seq: updated.properties.revision, event_time: now, reason: input.reason ?? null, actor_ref: persona.me.actor_ref },
       });
     },
   },
+
+  // --- pf/mechanization (Bản đồ CGH — chỉ xem) ---
   {
     method: "GET",
-    pattern: /^\/v1\/cgh\/dashboard$/,
+    pattern: /^\/v1\/mechanization\/balance-runs$/,
     handler: ({ url, persona }) => {
-      if (!(persona.me.scope.level === "cuc" || persona.me.roles.includes("platform_admin"))) return problem(403, "forbidden", "Forbidden");
-      return json(cghDashboard(url.searchParams.get("season") ?? CURRENT_SEASON));
+      if (!cghAllowed(persona)) return problem(403, "forbidden", "Forbidden");
+      const code = url.searchParams.get("season_code");
+      const year = Number(url.searchParams.get("season_year")) || null;
+      return json({ items: RUNS.map((r) => r.run).filter((r) => (!code || r.season_code === code) && (!year || r.season_year === year)) });
     },
   },
   {
     method: "GET",
-    pattern: /^\/v1\/cgh\/priority-cooperatives$/,
+    pattern: /^\/v1\/mechanization\/coverage$/,
     handler: ({ url, persona }) => {
-      if (!(persona.me.scope.level === "cuc" || persona.me.roles.includes("platform_admin"))) return problem(403, "forbidden", "Forbidden");
-      return json(paginate(priorityCooperatives(url.searchParams.get("stage") ?? "thu_hoach"), url, 10));
+      if (!cghAllowed(persona)) return problem(403, "forbidden", "Forbidden");
+      const q = (k: string) => url.searchParams.get(k);
+      const stored = findRun({ run_id: q("run_id"), season_code: q("season_code"), season_year: Number(q("season_year")) || null });
+      if (!stored) return problem(404, "mechanization.run_not_found", "Run not found");
+      return json(mechCoverage(stored, { level: q("level") ?? "province", province_code: q("province_code"), commune_code: q("commune_code"), farm_stage: q("farm_stage") }));
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/mechanization\/dashboard$/,
+    handler: ({ url, persona }) => {
+      if (!cghAllowed(persona)) return problem(403, "forbidden", "Forbidden");
+      const q = (k: string) => url.searchParams.get(k);
+      const stored = findRun({ run_id: q("run_id"), season_code: q("season_code"), season_year: Number(q("season_year")) || null });
+      if (!stored) return json({ kpis: { total_machines: 0, total_cooperatives: 0, cooperatives_sufficient: 0, cooperatives_shortage: 0 }, cooperatives_by_status: {}, priority: [], run: null });
+      return json(mechDashboard(stored));
+    },
+  },];
+
+// --------------------------------------------------------------------------
+// Admin API (host riêng) — mọi route cần MFA
+// --------------------------------------------------------------------------
+const DECIMAL = /^-?\d+(\.\d+)?$/;
+const PARAM_KEY = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+(:[A-Za-z0-9_.-]+)*$/;
+
+function normEffectiveFrom(v: string): string | null {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return `${v}T00:00:00+07:00`;
+  return Number.isFinite(Date.parse(v)) ? v : null;
+}
+
+function findVersion(id: string | undefined): ParamVersion | undefined {
+  return PARAM_VERSIONS.find((v) => v.id === id);
+}
+
+/** Tách CSV đơn giản (có ngoặc kép). Đủ cho tệp mẫu; backend dùng bộ đọc CSV đầy đủ. */
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  for (const line of text.replace(/^﻿/, "").split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const cells: string[] = [];
+    let cur = "";
+    let quoted = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (quoted) {
+        if (ch === '"' && line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else if (ch === '"') quoted = false;
+        else cur += ch;
+      } else if (ch === '"') quoted = true;
+      else if (ch === ",") {
+        cells.push(cur.trim());
+        cur = "";
+      } else cur += ch;
+    }
+    cells.push(cur.trim());
+    rows.push(cells);
+  }
+  return rows;
+}
+
+const importedPhones = new Set<string>();
+
+const adminRoutes: Route[] = [
+  {
+    method: "GET",
+    pattern: /^\/v1\/masterdata\/catalogs\/([a-z_]+)\/items$/,
+    handler: ({ params, url, persona }) => {
+      if (!hasRole(persona, "masterdata_admin", "platform_admin")) return problem(403, "forbidden", "Forbidden");
+      const items = CATALOGS[params[0] as keyof typeof CATALOGS];
+      if (!items) return problem(404, "masterdata.catalog_not_found", "Not found");
+      const all = url.searchParams.get("include_inactive") !== "false";
+      return json(paginate(items.filter((i) => all || i.active), url));
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/masterdata\/params\/versions$/,
+    handler: ({ url, persona }) => {
+      if (!hasRole(persona, "param_setter", "param_approver", "platform_admin")) return problem(403, "forbidden", "Forbidden");
+      const key = url.searchParams.get("key");
+      const status = url.searchParams.get("status");
+      return json(paginate(PARAM_VERSIONS.filter((v) => (!key || v.key === key) && (!status || v.status === status)), url));
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/v1\/masterdata\/params\/versions$/,
+    handler: ({ body, persona }) => {
+      if (!hasRole(persona, "param_setter")) return problem(403, "forbidden", "Forbidden");
+      const input = (body ?? {}) as Record<string, unknown>;
+      const errors: { field: string; reason: string }[] = [];
+      const key = typeof input.key === "string" ? input.key : "";
+      const value = typeof input.value === "string" ? input.value.trim() : "";
+      const eff = typeof input.effective_from === "string" ? normEffectiveFrom(input.effective_from) : null;
+      const sourceDoc = typeof input.source_doc === "string" ? input.source_doc.trim() : "";
+      const correction = typeof input.correction_reason === "string" ? input.correction_reason.trim() : "";
+      if (!PARAM_KEY.test(key)) errors.push({ field: "key", reason: "Khóa tham số không đúng mẫu" });
+      if (!DECIMAL.test(value)) errors.push({ field: "value", reason: "Giá trị phải là số thập phân (dạng chuỗi)" });
+      if (!eff) errors.push({ field: "effective_from", reason: "Ngày hiệu lực không hợp lệ" });
+      if (!sourceDoc) errors.push({ field: "source_doc", reason: "Cần số/ngày văn bản ban hành" });
+      if (correction && correction.length < 10) errors.push({ field: "correction_reason", reason: "Lý do sửa tối thiểu 10 ký tự" });
+      if (errors.length) return problem(422, "validation_failed", "Validation failed", { errors });
+      const sameKey = PARAM_VERSIONS.filter((v) => v.key === key);
+      if (!correction && sameKey.some((v) => v.status === "approved" && Date.parse(v.effective_from) === Date.parse(eff!))) {
+        return problem(422, "masterdata.param_correction_required", "Correction reason required");
+      }
+      const last = sameKey.reduce((m, v) => Math.max(m, v.version), 0);
+      const v: ParamVersion = {
+        id: uuidv7(),
+        key,
+        version: last + 1,
+        value,
+        text: null,
+        unit: typeof input.unit === "string" && input.unit ? input.unit : (sameKey[0]?.unit ?? ""),
+        effective_from: eff!,
+        source_doc: sourceDoc,
+        correction_reason: correction || null,
+        status: "draft",
+        setter_ref: persona.me.actor_ref,
+        submitted_at: null,
+        approver_ref: null,
+        decided_at: null,
+        decision_note: null,
+        created_at: new Date().toISOString(),
+      };
+      PARAM_VERSIONS.push(v);
+      return json(v, 201, { Location: `/v1/masterdata/params/versions/${v.id}` });
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/v1\/masterdata\/params\/versions\/([\w-]+)\/submit$/,
+    handler: ({ params, persona }) => {
+      const v = findVersion(params[0]);
+      if (!v) return problem(404, "masterdata.param_version_not_found", "Not found");
+      if (v.setter_ref !== persona.me.actor_ref) return problem(403, "masterdata.param_not_setter", "Not setter");
+      if (v.status !== "draft") return problem(409, "masterdata.param_invalid_transition", "Invalid transition");
+      v.status = "submitted";
+      v.submitted_at = new Date().toISOString();
+      return json(v);
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/v1\/masterdata\/params\/versions\/([\w-]+)\/(approve|reject)$/,
+    handler: ({ params, persona, body }) => {
+      if (!hasRole(persona, "param_approver")) return problem(403, "forbidden", "Forbidden");
+      const v = findVersion(params[0]);
+      if (!v) return problem(404, "masterdata.param_version_not_found", "Not found");
+      if (v.setter_ref === persona.me.actor_ref) return problem(403, "self_approval_forbidden", "Self approval forbidden");
+      if (v.status !== "submitted") return problem(409, "masterdata.param_invalid_transition", "Invalid transition");
+      const note = typeof (body as { note?: unknown } | undefined)?.note === "string" ? (body as { note: string }).note.trim() : "";
+      if (params[1] === "reject" && note.length < 10) {
+        return problem(422, "validation_failed", "Validation failed", { errors: [{ field: "note", reason: "Lý do từ chối tối thiểu 10 ký tự" }] });
+      }
+      v.status = params[1] === "approve" ? "approved" : "rejected";
+      v.approver_ref = persona.me.actor_ref;
+      v.decided_at = new Date().toISOString();
+      v.decision_note = note || null;
+      if (v.status === "rejected") return json(v);
+      const approved: AppGet<"/v1/masterdata/params/value"> = {
+        key: v.key,
+        value: v.value,
+        text: v.text,
+        unit: v.unit,
+        version: v.version,
+        effective_from: v.effective_from,
+        source_doc: v.source_doc,
+        approved_at: v.decided_at,
+        param_version_id: v.id,
+        supersedes_id: null,
+        seq: PARAM_VERSIONS.filter((x) => x.status === "approved").length,
+      };
+      return json({ version: v, approved });
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/orgs\/([\w-]+)\/events$/,
+    handler: ({ params }) => {
+      const org = ORGS.find((o) => o.ref === params[0]);
+      return org ? json({ items: orgEvents(org) }) : problem(404, "party.org_not_found", "Not found");
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/v1\/orgs\/([\w-]+)\/rename$/,
+    handler: ({ params, body, persona }) => {
+      if (!hasRole(persona, "registry_admin", "platform_admin")) return problem(403, "forbidden", "Forbidden");
+      const org = ORGS.find((o) => o.ref === params[0]);
+      if (!org) return problem(404, "party.org_not_found", "Not found");
+      const input = (body ?? {}) as { name?: unknown; reason?: unknown };
+      const name = typeof input.name === "string" ? input.name.trim() : "";
+      if (!name || name.length > 200) return problem(422, "validation_failed", "Validation failed", { errors: [{ field: "name", reason: "Tên từ 1 đến 200 ký tự" }] });
+      if (name === org.name) return problem(409, "party.org_state_conflict", "No change");
+      const events = orgEvents(org);
+      org.name = name;
+      const now = new Date().toISOString();
+      const event = {
+        ...events[events.length - 1]!,
+        seq: events.length + 1,
+        action: "renamed" as const,
+        event_time: now,
+        recorded_at: now,
+        actor_ref: persona.me.actor_ref,
+        reason: typeof input.reason === "string" && input.reason ? input.reason : null,
+        name,
+      };
+      events.push(event);
+      ORG_EVENTS.set(org.ref, events);
+      return json({ org, event, active_households: 0 });
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/v1\/households\/import$/,
+    handler: ({ body, persona, request }) => {
+      if (!hasRole(persona, "registry_admin", "platform_admin")) return problem(403, "forbidden", "Forbidden");
+      if (!(request.headers.get("Content-Type") ?? "").startsWith("text/csv")) return problem(422, "party.import_invalid", "Expected text/csv");
+      const rows = parseCsv(typeof body === "string" ? body : "");
+      const header = (rows[0] ?? []).map((h) => h.toLowerCase());
+      const col = (...names: string[]) => header.findIndex((h) => names.includes(h));
+      const iName = col("full_name", "ho_ten");
+      const iPhone = col("phone", "so_dien_thoai");
+      const iCoop = col("cooperative_code", "ma_htx");
+      if (iName < 0 || iPhone < 0 || iCoop < 0) return problem(422, "party.import_invalid", "Missing required columns");
+      const data = rows.slice(1);
+      if (data.length === 0 || data.length > 200) return problem(422, "party.import_invalid", "Row count out of range");
+      const out = data.map((r, i) => {
+        const row = i + 2;
+        const phone = (r[iPhone] ?? "").replace(/\s+/g, "");
+        if (!(r[iName] ?? "").trim()) return { row, status: "rejected" as const, reason: "Thiếu họ tên chủ hộ", household_ref: null };
+        if (!/^0\d{9}$/.test(phone)) return { row, status: "rejected" as const, reason: "Số điện thoại không đúng định dạng", household_ref: null };
+        if (!COOPERATIVES.some((c) => c.api.code === (r[iCoop] ?? "").trim())) return { row, status: "rejected" as const, reason: "Không tìm thấy HTX theo mã đã nhập", household_ref: null };
+        if (importedPhones.has(phone)) return { row, status: "duplicate" as const, reason: "Trùng chủ hộ đã có — dùng lại mã cũ", household_ref: uuidv7() };
+        importedPhones.add(phone);
+        return { row, status: "accepted" as const, reason: null, household_ref: uuidv7() };
+      });
+      return json({
+        accepted: out.filter((r) => r.status === "accepted").length,
+        duplicate: out.filter((r) => r.status === "duplicate").length,
+        rejected: out.filter((r) => r.status === "rejected").length,
+        rows: out,
+      });
     },
   },
 ];
 
-/** fetch giả lập cho openapi-fetch. */
-export async function mockFetch(request: Request): Promise<Response> {
-  await sleep(120 + Math.random() * 220);
-  const url = new URL(request.url);
-  const persona = personaFromAuthHeader(request.headers.get("Authorization"));
-  if (!persona) return problem(401, "unauthenticated", "Unauthenticated");
+// --------------------------------------------------------------------------
+// fetch giả lập
+// --------------------------------------------------------------------------
+const replay = new Map<string, { status: number; body: string; fingerprint: string }>();
 
-  let body: unknown = undefined;
-  if (request.method === "POST") {
-    const key = request.headers.get("Idempotency-Key");
-    if (!key) return problem(400, "idempotency_key_required", "Idempotency-Key required");
-    const text = await request.text();
-    const fingerprint = `${persona.id}|${url.pathname}|${text}`;
-    const prev = replay.get(key);
-    if (prev) {
-      if (prev.fingerprint !== fingerprint) return problem(422, "idempotency_key_reused", "Idempotency key reused");
-      return new Response(prev.body, { status: prev.status, headers: { "Content-Type": "application/json", "Idempotent-Replayed": "true" } });
+function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; latency?: boolean }) {
+  return async function mockFetch(request: Request): Promise<Response> {
+    if (opts.latency !== false) await sleep(120 + Math.random() * 220);
+    const url = new URL(request.url);
+    const persona = personaFromAuthHeader(request.headers.get("Authorization"));
+    if (!persona) return problem(401, "unauthenticated", "Unauthenticated");
+    // Bề mặt Admin: mọi route bắt buộc token đã qua yếu tố thứ hai (mục 11).
+    if (opts.surface === "admin" && !persona.amr.includes("otp")) return problem(403, "mfa_required", "MFA required");
+
+    let body: unknown = undefined;
+    if (request.method === "POST") {
+      const key = request.headers.get("Idempotency-Key");
+      if (!key) return problem(400, "idempotency_key_required", "Idempotency-Key required");
+      const text = await request.text();
+      const fingerprint = `${opts.surface}|${persona.id}|${url.pathname}|${text}`;
+      const prev = replay.get(key);
+      if (prev) {
+        if (prev.fingerprint !== fingerprint) return problem(422, "idempotency_key_reused", "Idempotency key reused");
+        return new Response(prev.body, { status: prev.status, headers: { "Content-Type": "application/json", "Idempotent-Replayed": "true" } });
+      }
+      const isJson = (request.headers.get("Content-Type") ?? "application/json").includes("json");
+      if (isJson) {
+        try {
+          body = text ? JSON.parse(text) : undefined;
+        } catch {
+          return problem(400, "bad_request", "Invalid JSON");
+        }
+      } else {
+        body = text;
+      }
+      const res = dispatch(routes, request, url, persona, body);
+      if (res.ok) replay.set(key, { status: res.status, body: await res.clone().text(), fingerprint });
+      return res;
     }
-    try {
-      body = text ? JSON.parse(text) : undefined;
-    } catch {
-      return problem(400, "bad_request", "Invalid JSON");
-    }
-    const res = dispatch(request, url, persona, body);
-    if (res.ok) replay.set(key, { status: res.status, body: await res.clone().text(), fingerprint });
-    return res;
-  }
-  return dispatch(request, url, persona, body);
+    return dispatch(routes, request, url, persona, body);
+  };
 }
 
-function dispatch(request: Request, url: URL, persona: MockPersona, body: unknown): Response {
+function dispatch(routes: Route[], request: Request, url: URL, persona: MockPersona, body: unknown): Response {
   for (const r of routes) {
     if (r.method !== request.method) continue;
     const m = r.pattern.exec(url.pathname);
@@ -433,3 +736,12 @@ function dispatch(request: Request, url: URL, persona: MockPersona, body: unknow
   }
   return problem(404, "not_found", "Not found");
 }
+
+/** fetch giả lập cho client Application API. */
+export const mockFetch = createMockFetch(appRoutes, { surface: "app" });
+/** fetch giả lập cho client Admin API (MFA bắt buộc). */
+export const mockAdminFetch = createMockFetch(adminRoutes, { surface: "admin" });
+
+/** Cho kiểm thử: không chờ độ trễ giả lập. */
+export const mockFetchNoDelay = createMockFetch(appRoutes, { surface: "app", latency: false });
+export const mockAdminFetchNoDelay = createMockFetch(adminRoutes, { surface: "admin", latency: false });

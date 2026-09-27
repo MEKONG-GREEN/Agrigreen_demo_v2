@@ -1,11 +1,16 @@
-import type { Me } from "@/api/pending/party";
-import type { ScopeLevel } from "@/api/pending/common";
+import type { Me } from "@/api/types";
+
+/** Cấp phạm vi hiển thị trên web: TW → Tỉnh → Xã (ADR-0009) + Cục KTHT (xem toàn vùng). */
+export type ScopeLevel = "tw" | "tinh" | "xa" | "cuc";
 
 /** Vai realm Keycloak (deploy/compose/keycloak/agrigreen-realm.json). */
 export const ROLES = {
   platformAdmin: "platform_admin",
   paramSetter: "param_setter",
   paramApprover: "param_approver",
+  masterdataAdmin: "masterdata_admin",
+  registryAdmin: "registry_admin",
+  cghViewer: "cgh_viewer",
   consentWriter: "consent_writer",
   consentReader: "consent_reader",
 } as const;
@@ -60,19 +65,46 @@ export function decodeAccessToken(token: string): AccessTokenClaims {
 
 const OTP_AMR = new Set(["otp", "mfa", "totp", "hwk"]);
 
-/** Dựng Principal từ claim token + /v1/me (nếu backend đã có). */
+/**
+ * Cấp phạm vi của GET /v1/me → cấp hiển thị. Cục KTHT (tổ chức dcrd) có phạm vi toàn quốc
+ * nhưng dùng cổng riêng (BRD CGH FN-11), nên tách thành "cuc". Quản lý HTX (cooperative) và
+ * "none" không có màn hình khuyến nông → null (menu chỉ theo vai).
+ */
+export function scopeLevelOf(me: Pick<Me, "org" | "scope">): ScopeLevel | null {
+  if (me.org?.kind === "dcrd") return "cuc";
+  switch (me.scope.level) {
+    case "national":
+      return "tw";
+    case "province":
+      return "tinh";
+    case "commune":
+      return "xa";
+    default:
+      return null;
+  }
+}
+
+function unitNameOf(me: Pick<Me, "org" | "scope">, level: ScopeLevel | null): string | null {
+  if (level === "cuc") return "Toàn vùng";
+  if (me.scope.all) return "Toàn quốc";
+  const code = me.org?.admin_unit_code ?? me.scope.units[0];
+  return code ? (me.scope.unit_names[code] ?? code) : null;
+}
+
+/** Dựng Principal từ claim token + GET /v1/me. Me không chứa tên người (R-04) → tên lấy từ claim. */
 export function buildPrincipal(claims: AccessTokenClaims, me: Me | null): Principal {
   const tokenRoles = claims.realm_access?.roles ?? [];
   const roles = Array.from(new Set([...tokenRoles, ...(me?.roles ?? [])]));
+  const level = me ? scopeLevelOf(me) : null;
   return {
-    subject: me?.subject ?? claims.sub ?? "",
-    displayName: me?.display_name ?? claims.name ?? claims.preferred_username ?? "Người dùng",
+    subject: me?.actor_ref ?? claims.sub ?? "",
+    displayName: claims.name ?? claims.preferred_username ?? "Người dùng",
     tenantId: me?.tenant_id ?? claims.tenant_id ?? null,
     orgRef: me?.org?.ref ?? claims.org_ref ?? null,
     roles,
-    mfa: (claims.amr ?? []).some((a) => OTP_AMR.has(a)),
-    level: me?.scope.level ?? null,
-    unitName: me?.scope.unit_name ?? null,
+    mfa: (me?.mfa ?? false) || (claims.amr ?? []).some((a) => OTP_AMR.has(a)),
+    level,
+    unitName: me ? unitNameOf(me, level) : null,
     orgName: me?.org?.name ?? null,
     scopeUnits: me?.scope.units ?? [],
     scopeAll: me?.scope.all ?? false,

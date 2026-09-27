@@ -2,41 +2,70 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { unwrap } from "@/api/client";
+import { loadBoundaries } from "@/api/adapters/boundaries";
+import { cooperativePoints, listAllCooperatives } from "@/api/adapters/cooperatives";
+import { listChildUnits, unitResolver } from "@/api/adapters/units";
+import type { ApiClient } from "@/api/client";
 import { useAuth } from "@/auth/AuthProvider";
+import type { Principal } from "@/auth/principal";
 import { MapView, type AreaCollection, type PointCollection } from "@/components/MapView";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { Loading, PageHead } from "@/components/ui";
 import { formatDecimal } from "@/lib/decimal";
 import { useAsync } from "@/lib/useAsync";
+import { useUnits } from "@/lib/useUnits";
+
+/** Mã đơn vị cần vẽ ranh giới: toàn quốc → các tỉnh; tỉnh/xã → các xã trong phạm vi. */
+async function areaCodes(api: ApiClient, p: Principal | null): Promise<{ level: "province" | "commune"; codes: string[] }> {
+  if (!p || p.scopeAll || p.level === "tw" || p.level === "cuc" || p.scopeUnits.length === 0) {
+    return { level: "province", codes: (await listChildUnits(api, null)).map((u) => u.code) };
+  }
+  const units = await unitResolver(api).many(p.scopeUnits, false);
+  const communes = new Set<string>();
+  for (const u of units.values()) {
+    if (u.level === "commune") communes.add(u.code);
+    else if (u.level === "province" && !p.scopeUnits.some((c) => units.get(c)?.parent_code === u.code)) {
+      for (const c of await listChildUnits(api, u.code)) communes.add(c.code);
+    }
+  }
+  return { level: "commune", codes: Array.from(communes) };
+}
 
 export default function MapPage() {
   const { api, principal } = useAuth();
-  const level = principal?.level === "tw" || principal?.scopeAll ? "province" : "commune";
   const [showAreas, setShowAreas] = useState(true);
   const [showCoops, setShowCoops] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
 
-  const areas = useAsync(() => unwrap(api.GET("/v1/admin-units/boundaries", { params: { query: { level } } })), [api, level]);
-  const coops = useAsync(() => unwrap(api.GET("/v1/cooperatives/locations")), [api]);
+  const areas = useAsync(async () => {
+    const { level, codes } = await areaCodes(api, principal);
+    return { level, ...(await loadBoundaries(api, codes)) };
+  }, [api, principal]);
+  const coops = useAsync(() => listAllCooperatives(api), [api]);
+  const units = useUnits(api, (coops.data ?? []).map((c) => c.admin_unit_code));
+  const level = areas.data?.level ?? "province";
 
   const areaFc = useMemo<AreaCollection | null>(() => {
     if (!areas.data || !showAreas) return null;
     return {
       type: "FeatureCollection",
-      features: areas.data.features.map((f) => ({
+      features: areas.data.collection.features.map((f) => ({
         ...f,
         properties: { ...f.properties, fill: f.properties.code === selected ? "#f0b429" : "#9fd8b4" },
       })),
     };
   }, [areas.data, showAreas, selected]);
 
-  const pointFc = useMemo<PointCollection | null>(() => (coops.data && showCoops ? coops.data : null), [coops.data, showCoops]);
+  const points = useMemo(() => cooperativePoints(coops.data ?? []), [coops.data]);
+  const pointFc = useMemo<PointCollection | null>(() => (showCoops ? points : null), [points, showCoops]);
 
   const listed = useMemo(() => {
-    const all = coops.data?.features ?? [];
-    return selected ? all.filter((f) => f.properties.province_code === selected || f.properties.commune_code === selected) : all;
-  }, [coops.data, selected]);
+    const all = coops.data ?? [];
+    if (!selected) return all;
+    return all.filter((c) => c.admin_unit_code === selected || (c.admin_unit_code && units.get(c.admin_unit_code)?.parent_code === selected));
+  }, [coops.data, selected, units]);
+
+  const withoutLocation = (coops.data ?? []).length - points.features.length;
 
   return (
     <>
@@ -59,9 +88,14 @@ export default function MapPage() {
               </label>
               <label className="row mute">
                 <input type="checkbox" disabled />
-                Thửa ruộng (lớp tạm — chờ module geo)
+                Thửa ruộng — xem trong hồ sơ HTX
               </label>
             </fieldset>
+            {areas.data && areas.data.missing.length > 0 ? (
+              <p className="mute small" style={{ marginTop: 6 }}>
+                {areas.data.missing.length} đơn vị chưa nhập ranh giới.
+              </p>
+            ) : null}
           </div>
           {areas.loading && !areas.data ? <Loading label="Đang tải ranh giới…" /> : null}
           <MapView label="Bản đồ ranh giới hành chính và HTX" areas={areaFc} points={pointFc} onAreaClick={(c) => setSelected((s) => (s === c ? null : c))} />
@@ -80,7 +114,7 @@ export default function MapPage() {
               <label htmlFor="area-pick">Chọn vùng (thay cho bấm trên bản đồ)</label>
               <select id="area-pick" className="select" value={selected ?? ""} onChange={(e) => setSelected(e.target.value || null)}>
                 <option value="">Tất cả</option>
-                {areas.data.features.map((f) => (
+                {areas.data.collection.features.map((f) => (
                   <option key={f.properties.code} value={f.properties.code}>
                     {f.properties.name}
                   </option>
@@ -88,14 +122,17 @@ export default function MapPage() {
               </select>
             </div>
           ) : null}
+          {withoutLocation > 0 ? <p className="mute small">{withoutLocation} HTX chưa có toạ độ trụ sở (vị trí tạm) — không vẽ trên bản đồ.</p> : null}
+          {coops.loading && !coops.data ? <Loading /> : null}
           <ul style={{ listStyle: "none" }}>
-            {listed.map((f) => (
-              <li key={f.properties.id} style={{ padding: "8px 0", borderBottom: "1px solid #edf3ef" }}>
-                <Link href={`/htx/${f.properties.id}`} style={{ fontWeight: 600 }}>
-                  {f.properties.name}
+            {listed.map((c) => (
+              <li key={c.ref} style={{ padding: "8px 0", borderBottom: "1px solid #edf3ef" }}>
+                <Link href={`/htx/${c.ref}`} style={{ fontWeight: 600 }}>
+                  {c.name}
                 </Link>
                 <div className="mute small">
-                  {f.properties.code} · {formatDecimal(f.properties.area_ha, 1)} ha
+                  {c.code} · {c.area_ha ? `${formatDecimal(c.area_ha, 1)} ha` : "chưa khai diện tích"}
+                  {c.location_provisional ? " · vị trí tạm" : ""}
                 </div>
               </li>
             ))}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createApiClient, unwrap } from "./client";
+import { createAdminApiClient, createApiClient, unwrap } from "./client";
 import { IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY_PATTERN, uuidv7 } from "./idempotency";
 
 function recordingFetch(status = 201, body: unknown = { ok: true }) {
@@ -35,11 +35,12 @@ describe("uuidv7", () => {
 describe("Idempotency-Key trên POST (R-51)", () => {
   it("tự thêm khóa cho POST", async () => {
     const { seen, fetch } = recordingFetch();
-    const api = createApiClient({ baseUrl: "https://api.test", getAccessToken: () => "tok", fetch });
+    const api = createAdminApiClient({ baseUrl: "https://admin.test", getAccessToken: () => "tok", fetch });
+    // Kiểu sinh bắt buộc header; middleware vẫn đảm bảo có khóa nếu nơi gọi quên (ép kiểu để thử).
     await unwrap(
-      api.POST("/v1/params/{key}/proposals", {
-        params: { path: { key: "kn.sla" } },
-        body: { value: "36", effective_from: "2026-11-01", source_doc: "VB 1", reason: "Thử" },
+      api.POST("/v1/masterdata/params/versions", {
+        params: { header: {} as { "Idempotency-Key": string } },
+        body: { key: "extension.task_sla_hours", value: "36", effective_from: "2026-11-01", source_doc: "VB 1" },
       }),
     );
     const key = seen[0]?.headers.get(IDEMPOTENCY_HEADER);
@@ -50,8 +51,9 @@ describe("Idempotency-Key trên POST (R-51)", () => {
 
   it("mỗi thao tác một khóa mới", async () => {
     const { seen, fetch } = recordingFetch();
-    const api = createApiClient({ baseUrl: "https://api.test", getAccessToken: () => "tok", fetch });
-    const call = () => unwrap(api.POST("/v1/params/proposals/{id}/approve", { params: { path: { id: "x" } }, body: {} }));
+    const api = createAdminApiClient({ baseUrl: "https://admin.test", getAccessToken: () => "tok", fetch });
+    const call = () =>
+      unwrap(api.POST("/v1/masterdata/params/versions/{id}/approve", { params: { path: { id: "x" }, header: {} as { "Idempotency-Key": string } }, body: {} }));
     await call();
     await call();
     expect(seen[0]?.headers.get(IDEMPOTENCY_HEADER)).not.toBe(seen[1]?.headers.get(IDEMPOTENCY_HEADER));
@@ -59,11 +61,11 @@ describe("Idempotency-Key trên POST (R-51)", () => {
 
   it("giữ nguyên khóa do nơi gọi đặt (thử lại cùng thao tác)", async () => {
     const { seen, fetch } = recordingFetch();
-    const api = createApiClient({ baseUrl: "https://api.test", getAccessToken: () => "tok", fetch });
+    const api = createAdminApiClient({ baseUrl: "https://admin.test", getAccessToken: () => "tok", fetch });
     await unwrap(
-      api.POST("/v1/params/proposals/{id}/reject", {
+      api.POST("/v1/masterdata/params/versions/{id}/reject", {
         params: { path: { id: "x" }, header: { "Idempotency-Key": "retry-key-0001" } },
-        body: {},
+        body: { note: "Thiếu căn cứ văn bản" },
       }),
     );
     expect(seen[0]?.headers.get(IDEMPOTENCY_HEADER)).toBe("retry-key-0001");
@@ -72,7 +74,7 @@ describe("Idempotency-Key trên POST (R-51)", () => {
   it("không thêm khóa cho GET", async () => {
     const { seen, fetch } = recordingFetch(200, { items: [], next_cursor: null });
     const api = createApiClient({ baseUrl: "https://api.test", getAccessToken: () => null, fetch });
-    await unwrap(api.GET("/v1/tasks"));
+    await unwrap(api.GET("/v1/extension/tasks"));
     expect(seen[0]?.headers.get(IDEMPOTENCY_HEADER)).toBeNull();
     expect(seen[0]?.headers.get("Authorization")).toBeNull();
   });

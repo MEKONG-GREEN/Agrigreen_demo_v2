@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { unitLabel } from "@/api/adapters/units";
 import { unwrap } from "@/api/client";
 import { usePagedList } from "@/api/pagination";
-import type { CooperativeStatus } from "@/api/pending/party";
 import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { Empty, LoadMore, Loading, PageHead } from "@/components/ui";
-import { formatDecimal, formatInt } from "@/lib/decimal";
-import { useAsync } from "@/lib/useAsync";
+import { formatDecimal } from "@/lib/decimal";
+import { useUnits } from "@/lib/useUnits";
 
 function useDebounced<T>(value: T, ms = 300): T {
   const [v, setV] = useState(value);
@@ -21,25 +21,19 @@ function useDebounced<T>(value: T, ms = 300): T {
   return v;
 }
 
+/** GET /v1/cooperatives — HTX/THT trong phạm vi, tìm theo tên, Mã HTX hoặc mã số thuế. */
 export default function CooperativesPage() {
-  const { api, principal } = useAuth();
+  const { api } = useAuth();
   const [q, setQ] = useState("");
-  const [unit, setUnit] = useState("");
-  const [status, setStatus] = useState<"" | CooperativeStatus>("");
+  const [includeInactive, setIncludeInactive] = useState(false);
   const dq = useDebounced(q);
 
-  const provinces = useAsync(() => unwrap(api.GET("/v1/admin-units", { params: { query: { level: "province" } } })), [api]);
   const list = usePagedList(
     (cursor) =>
-      unwrap(
-        api.GET("/v1/cooperatives", {
-          params: { query: { q: dq || undefined, admin_unit: unit || undefined, status: status || undefined, cursor, limit: 20 } },
-        }),
-      ),
-    [api, dq, unit, status],
+      unwrap(api.GET("/v1/cooperatives", { params: { query: { q: dq || undefined, include_inactive: includeInactive || undefined, cursor, limit: 20 } } })),
+    [api, dq, includeInactive],
   );
-
-  const showProvinceFilter = principal?.level === "tw" || principal?.scopeAll;
+  const units = useUnits(api, list.items.map((c) => c.admin_unit_code));
 
   return (
     <>
@@ -52,32 +46,15 @@ export default function CooperativesPage() {
               id="htx-q"
               className="input"
               type="search"
-              placeholder="Tên, mã HTX hoặc xã…"
+              placeholder="Tên, Mã HTX hoặc mã số thuế…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
-          {showProvinceFilter ? (
-            <div className="field">
-              <label htmlFor="htx-unit">Tỉnh/thành</label>
-              <select id="htx-unit" className="select" value={unit} onChange={(e) => setUnit(e.target.value)}>
-                <option value="">Tất cả</option>
-                {provinces.data?.items.map((p) => (
-                  <option key={p.code} value={p.code}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
-          <div className="field">
-            <label htmlFor="htx-status">Trạng thái</label>
-            <select id="htx-status" className="select" value={status} onChange={(e) => setStatus(e.target.value as "" | CooperativeStatus)}>
-              <option value="">Tất cả</option>
-              <option value="active">Đang hoạt động</option>
-              <option value="inactive">Ngừng hoạt động</option>
-            </select>
-          </div>
+          <label className="row" style={{ alignSelf: "flex-end", paddingBottom: 8 }}>
+            <input type="checkbox" checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} />
+            Gồm cả HTX đã vô hiệu hoá
+          </label>
         </form>
 
         {list.error ? <ProblemAlert problem={list.error} onRetry={list.reload} /> : null}
@@ -88,30 +65,31 @@ export default function CooperativesPage() {
               <tr>
                 <th scope="col">HTX / THT</th>
                 <th scope="col">Địa bàn</th>
-                <th scope="col" className="num">Hộ thành viên</th>
-                <th scope="col" className="num">Diện tích (ha)</th>
-                <th scope="col" className="num">Thửa số hoá</th>
+                <th scope="col">Mã số thuế</th>
+                <th scope="col" className="num">Diện tích đăng ký (ha)</th>
                 <th scope="col">Trạng thái</th>
               </tr>
             </thead>
             <tbody>
               {list.items.map((c) => (
-                <tr key={c.id}>
+                <tr key={c.ref}>
                   <td>
-                    <Link href={`/htx/${c.id}`} style={{ fontWeight: 600 }}>
+                    <Link href={`/htx/${c.ref}`} style={{ fontWeight: 600 }}>
                       {c.name}
                     </Link>
                     <div className="mute small">{c.code}</div>
                   </td>
-                  <td>
-                    {c.commune_name}
-                    <div className="mute small">{c.province_name}</div>
-                  </td>
-                  <td className="num">{formatInt(c.member_households)}</td>
+                  <td>{unitLabel(units, c.admin_unit_code)}</td>
+                  <td>{c.tax_code ?? "—"}</td>
                   <td className="num">{formatDecimal(c.area_ha, 1)}</td>
-                  <td className="num">{formatInt(c.digitized_plots)}</td>
                   <td>
-                    {c.status === "active" ? <span className="chip c-ok">Đang hoạt động</span> : <span className="chip c-mute">Ngừng hoạt động</span>}
+                    {c.active ? (
+                      <span className="chip c-ok">Đang hoạt động</span>
+                    ) : (
+                      <span className="chip c-mute" title={c.status_reason ?? undefined}>
+                        Đã vô hiệu hoá
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}

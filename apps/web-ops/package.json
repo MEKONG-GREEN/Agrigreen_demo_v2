@@ -2,7 +2,7 @@
   "name": "@agrigreen/web-ops",
   "version": "0.1.0",
   "private": true,
-  "description": "Web vận hành AgriGreen: khuyến nông TW/Tỉnh/Xã, cổng Bản đồ CGH cho Cục, quản trị",
+  "description": "Web váº­n hÃ nh AgriGreen: khuyáº¿n nÃ´ng TW/Tá»‰nh/XÃ£, cá»•ng Báº£n Ä‘á»“ CGH cho Cá»¥c, quáº£n trá»‹",
   "license": "UNLICENSED",
   "engines": {
     "node": ">=24"
@@ -18,8 +18,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "gen:api": "openapi-typescript ../../contracts/openapi/application.yaml -o src/api/generated/application.ts",
-    "check:api": "openapi-typescript ../../contracts/openapi/application.yaml -o src/api/generated/application.ts --check"
+    "gen:api": "openapi-typescript ../../contracts/openapi/application.yaml -o src/api/generated/application.ts && openapi-typescript ../../contracts/openapi/admin.yaml -o src/api/generated/admin.ts",
+    "check:api": "openapi-typescript ../../contracts/openapi/application.yaml -o src/api/generated/application.ts --check && openapi-typescript ../../contracts/openapi/admin.yaml -o src/api/generated/admin.ts --check"
   },
   "dependencies": {
     "maplibre-gl": "6.11.2",

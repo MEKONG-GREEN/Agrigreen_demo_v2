@@ -10,7 +10,7 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/", useRouter: () => ({ 
 function persona(id: string): Principal {
   const p = MOCK_PERSONAS.find((x) => x.id === id);
   if (!p) throw new Error(id);
-  return buildPrincipal({ sub: p.me.subject, amr: p.amr, realm_access: { roles: p.me.roles } }, p.me);
+  return buildPrincipal({ sub: p.me.actor_ref, name: p.displayName, amr: p.amr, realm_access: { roles: p.me.roles } }, p.me);
 }
 
 const hrefs = (p: Principal | null) => visibleNav(p).flatMap((g) => g.items.map((i) => i.href));

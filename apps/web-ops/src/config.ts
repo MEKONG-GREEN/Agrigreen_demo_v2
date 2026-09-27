@@ -7,9 +7,11 @@ export const config = {
   mock: process.env.NEXT_PUBLIC_API_MOCK === "1",
   /** Gốc Application API, vd https://api.agrigreen.vn */
   apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080",
-  /** Gốc Admin API (bắt buộc MFA). Mặc định trùng Application API. */
-  adminApiBaseUrl:
-    process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080",
+  /**
+   * Gốc Admin API — host RIÊNG (admin.<domain>), MFA bắt buộc cho mọi route.
+   * api-platform mở Admin API ở AG_ADMIN_HTTP_ADDR, mặc định :8082.
+   */
+  adminApiBaseUrl: process.env.NEXT_PUBLIC_ADMIN_API_BASE || "http://localhost:8082",
   oidc: {
     issuer: process.env.NEXT_PUBLIC_OIDC_ISSUER || "http://localhost:8081/realms/agrigreen",
     clientId: process.env.NEXT_PUBLIC_OIDC_CLIENT_ID || "agrigreen-web-ops",

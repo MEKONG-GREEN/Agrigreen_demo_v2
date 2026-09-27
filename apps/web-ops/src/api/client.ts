@@ -1,12 +1,16 @@
 import createClient, { type Client, type Middleware } from "openapi-fetch";
+import type { paths as AdminGeneratedPaths } from "./generated/admin";
 import type { paths as GeneratedPaths } from "./generated/application";
 import { idempotencyMiddleware } from "./idempotency";
-import type { PendingPaths } from "./pending/paths";
 import { ApiProblem, networkProblem, toProblem } from "./problem";
 
-/** Route đã có trong contracts/openapi + route đang chờ hợp đồng (src/api/pending). */
-export type ApiPaths = GeneratedPaths & PendingPaths;
+/** Application API: route của contracts/openapi/application.yaml — không còn route viết tay. */
+export type ApiPaths = GeneratedPaths;
 export type ApiClient = Client<ApiPaths>;
+
+/** Admin API (host riêng, MFA bắt buộc): chỉ route của contracts/openapi/admin.yaml. */
+export type AdminPaths = AdminGeneratedPaths;
+export type AdminApiClient = Client<AdminPaths>;
 
 export interface ApiClientOptions {
   baseUrl: string;
@@ -36,14 +40,23 @@ export function authMiddleware(
   };
 }
 
-export function createApiClient(opts: ApiClientOptions): ApiClient {
-  const client = createClient<ApiPaths>({
+function build<P extends object>(opts: ApiClientOptions): Client<P> {
+  const client = createClient<P>({
     baseUrl: opts.baseUrl.replace(/\/+$/, ""),
     ...(opts.fetch ? { fetch: opts.fetch } : {}),
   });
   client.use(authMiddleware(opts.getAccessToken, opts.onUnauthenticated));
   client.use(idempotencyMiddleware());
   return client;
+}
+
+export function createApiClient(opts: ApiClientOptions): ApiClient {
+  return build<ApiPaths>(opts);
+}
+
+/** Client Admin API — cùng middleware (Bearer, Idempotency-Key cho mọi POST, problem+json). */
+export function createAdminApiClient(opts: ApiClientOptions): AdminApiClient {
+  return build<AdminPaths>(opts);
 }
 
 interface FetchResultLike<D> {
