@@ -1,0 +1,269 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
+
+import '../../core/backoff.dart';
+import '../../core/clock.dart';
+import '../auth/wipe_service.dart';
+import '../db/local_db.dart';
+import '../files/evidence_repository.dart';
+import '../outbox/outbox_repository.dart';
+import '../reference/reference_repository.dart';
+import 'sync_api.dart';
+
+enum SyncState { idle, running, offline, needsLogin, revoked, error }
+
+class SyncStatus {
+  const SyncStatus({
+    this.state = SyncState.idle,
+    this.lastSuccessAt,
+    this.lastError,
+    this.failures = 0,
+    this.nextAttemptAt,
+  });
+  final SyncState state;
+  final DateTime? lastSuccessAt;
+  final String? lastError;
+  final int failures;
+  final DateTime? nextAttemptAt;
+
+  String get label => switch (state) {
+    SyncState.idle => 'Đã sẵn sàng',
+    SyncState.running => 'Đang đồng bộ…',
+    SyncState.offline => 'Mất kết nối — sẽ thử lại',
+    SyncState.needsLogin => 'Cần đăng nhập lại khi có mạng',
+    SyncState.revoked => 'Thiết bị đã bị thu hồi',
+    SyncState.error => 'Lỗi đồng bộ — sẽ thử lại',
+  };
+
+  Map<String, Object?> toJson() => {
+    'state': state.name,
+    'last_success_at': lastSuccessAt?.millisecondsSinceEpoch,
+    'last_error': lastError,
+    'failures': failures,
+    'next_attempt_at': nextAttemptAt?.millisecondsSinceEpoch,
+  };
+
+  factory SyncStatus.fromJson(Map<String, Object?> j) {
+    DateTime? t(Object? v) =>
+        v is int ? DateTime.fromMillisecondsSinceEpoch(v) : null;
+    return SyncStatus(
+      state: SyncState.values.firstWhere(
+        (s) => s.name == j['state'],
+        orElse: () => SyncState.idle,
+      ),
+      lastSuccessAt: t(j['last_success_at']),
+      lastError: j['last_error'] as String?,
+      failures: (j['failures'] as int?) ?? 0,
+      nextAttemptAt: t(j['next_attempt_at']),
+    );
+  }
+}
+
+class SyncReport {
+  int pushed = 0;
+  int pulled = 0;
+  int uploaded = 0;
+  int purged = 0;
+}
+
+/// Điều phối đồng bộ: tải tệp → push lô → pull theo cursor → purge.
+/// Trạng thái lùi thử lại lưu bền trong bảng meta (sống qua khởi động lại).
+class SyncService {
+  SyncService({
+    required LocalDb db,
+    required SyncApi api,
+    required OutboxRepository outbox,
+    required ReferenceRepository refs,
+    required EvidenceRepository evidence,
+    required WipeService wipe,
+    required Clock clock,
+    required String deviceId,
+    this.backoff = const Backoff(),
+    this.batchSize = 100,
+    this.pullLimit = 500,
+    this.retention = const Duration(hours: 48),
+    Random? random,
+    this.beforeSync,
+  }) : _db = db,
+       _api = api,
+       _outbox = outbox,
+       _refs = refs,
+       _evidence = evidence,
+       _wipe = wipe,
+       _clock = clock,
+       _deviceId = deviceId,
+       _random = random ?? Random();
+
+  final LocalDb _db;
+  final SyncApi _api;
+  final OutboxRepository _outbox;
+  final ReferenceRepository _refs;
+  final EvidenceRepository _evidence;
+  final WipeService _wipe;
+  final Clock _clock;
+  final String _deviceId;
+  final Backoff backoff;
+  final int batchSize;
+  final int pullLimit;
+  final Duration retention;
+  final Random _random;
+
+  /// Chạy trước mỗi lượt (ví dụ đăng ký thiết bị).
+  final Future<void> Function()? beforeSync;
+
+  static const _statusKey = 'sync.status';
+
+  final _statusCtl = StreamController<SyncStatus>.broadcast();
+  Stream<SyncStatus> get statusStream => _statusCtl.stream;
+
+  Future<SyncReport?>? _running;
+
+  Future<SyncStatus> status() async {
+    if (_wipe.wiped) return const SyncStatus(state: SyncState.revoked);
+    final j = await _db.getMetaJson(_statusKey);
+    return j == null ? const SyncStatus() : SyncStatus.fromJson(j);
+  }
+
+  Future<void> _save(SyncStatus s) async {
+    if (!_wipe.wiped) {
+      await _db.setMeta(_statusKey, jsonEncode(s.toJson()));
+    }
+    if (!_statusCtl.isClosed) _statusCtl.add(s);
+  }
+
+  /// Chạy một lượt đồng bộ. [force] bỏ qua thời điểm lùi (nút "Đồng bộ ngay").
+  /// Gọi chồng nhau thì dùng chung lượt đang chạy.
+  Future<SyncReport?> syncOnce({bool force = false}) {
+    if (_wipe.wiped) return Future.value(null);
+    final running = _running;
+    if (running != null) return running.then((_) => null);
+    final f = _run(force);
+    _running = f;
+    return f.whenComplete(() => _running = null);
+  }
+
+  Future<SyncReport?> _run(bool force) async {
+    final prev = await status();
+    if (!force &&
+        prev.nextAttemptAt != null &&
+        _clock.now().isBefore(prev.nextAttemptAt!)) {
+      return null;
+    }
+    final report = SyncReport();
+    try {
+      await _save(
+        SyncStatus(
+          state: SyncState.running,
+          lastSuccessAt: prev.lastSuccessAt,
+          failures: prev.failures,
+        ),
+      );
+      await beforeSync?.call();
+      await _uploadFiles(report);
+      await _pushAll(report);
+      await _pullAll(report);
+      report.purged = await _outbox.purgeAcked(retention);
+      await _evidence.purgeUploaded(retention);
+      await _save(
+        SyncStatus(state: SyncState.idle, lastSuccessAt: _clock.now()),
+      );
+      return report;
+    } on DeviceRevokedException {
+      await _save(const SyncStatus(state: SyncState.revoked));
+      await _wipe.wipe();
+      return null;
+    } on UnauthenticatedException catch (e) {
+      await _save(
+        SyncStatus(
+          state: SyncState.needsLogin,
+          lastSuccessAt: prev.lastSuccessAt,
+          lastError: e.code,
+        ),
+      );
+      return null;
+    } on NetworkException {
+      await _fail(prev, SyncState.offline, 'network');
+      return null;
+    } on ApiException catch (e) {
+      await _fail(prev, SyncState.error, e.code);
+      return null;
+    }
+  }
+
+  Future<void> _fail(SyncStatus prev, SyncState state, String error) async {
+    final failures = prev.failures + 1;
+    await _save(
+      SyncStatus(
+        state: state,
+        lastSuccessAt: prev.lastSuccessAt,
+        lastError: error,
+        failures: failures,
+        nextAttemptAt: _clock.now().add(
+          backoff.delayFor(failures, random: _random),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _uploadFiles(SyncReport report) async {
+    for (final f in await _evidence.pending()) {
+      try {
+        final blob = await _evidence.blobs.read(f.blobPath);
+        final ref = await _api.uploadFile(
+          idempotencyKey: 'file:${f.id}',
+          meta: f.meta,
+          ciphertext: blob,
+        );
+        await _evidence.markUploaded(f, ref, _outbox);
+        report.uploaded++;
+      } on ApiException catch (e) {
+        if (e is DeviceRevokedException || e is UnauthenticatedException) {
+          rethrow;
+        }
+        if (e.retriable) rethrow;
+        // Lỗi dữ liệu (413, 422…): đánh dấu hỏng, hiển thị, không chặn hàng đợi.
+        await _evidence.recordFailure(f.id, e.code, fatal: true);
+      }
+    }
+  }
+
+  Future<void> _pushAll(SyncReport report) async {
+    // Giới hạn vòng lặp để không quay vô hạn nếu máy chủ không trả kết quả.
+    for (var guard = 0; guard < 1000; guard++) {
+      final batch = await _outbox.claimBatch(batchSize);
+      if (batch == null || batch.records.isEmpty) return;
+      List<PushResult> results;
+      try {
+        results = await _api.push(
+          batchKey: batch.batchKey,
+          deviceId: _deviceId,
+          records: batch.records,
+        );
+      } on ApiException catch (e) {
+        if (e.status == 422 && e.code == 'idempotency_key_reused') {
+          await _outbox.releaseBatch(batch.batchKey);
+          continue;
+        }
+        rethrow; // lô giữ batch_key → lần sau gửi lại y nguyên
+      }
+      await _outbox.applyResults(batch.batchKey, results);
+      report.pushed += results.length;
+      if (results.isEmpty) return;
+    }
+  }
+
+  Future<void> _pullAll(SyncReport report) async {
+    for (var guard = 0; guard < 10000; guard++) {
+      final page = await _api.pull(
+        cursor: await _refs.cursor(),
+        limit: pullLimit,
+      );
+      await _refs.applyPage(page);
+      report.pulled += page.changes.length;
+      if (!page.hasMore || page.nextCursor == null) return;
+    }
+  }
+
+  Future<void> dispose() => _statusCtl.close();
+}
