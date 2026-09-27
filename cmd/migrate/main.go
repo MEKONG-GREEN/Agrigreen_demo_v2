@@ -4,6 +4,8 @@
 //	migrate bootstrap   tạo/cập nhật vai và database — cần AG_PG_ADMIN_URL (quản trị cụm)
 //	migrate up          áp migration cho mọi cụm bằng vai ag_migrator — cần AG_DB_URL
 //	migrate verify      kiểm các view cổng (v_missing_immutability, v_missing_rls) phải rỗng
+//	migrate maintain    tạo trước phân vùng tháng cho mọi bảng sổ ở mọi cụm (AG_PARTITION_MONTHS_AHEAD, mặc định 24)
+//	migrate verify-chains  chạy shared.verify_chain cho mọi chuỗi trong chain_head; có chỗ đứt → mã thoát 1
 //
 // Mật khẩu vai: AG_DB_PASSWORD_<VAI> hoặc AG_DB_APP_PASSWORD.
 package main
@@ -20,7 +22,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "dùng: migrate bootstrap|up|verify")
+		fmt.Fprintln(os.Stderr, "dùng: migrate bootstrap|up|verify|maintain|verify-chains")
 		os.Exit(2)
 	}
 	if err := run(os.Args[1]); err != nil {
@@ -98,6 +100,10 @@ func run(cmd string) error {
 		}
 		fmt.Println("cổng catalog: sạch")
 		return nil
+	case "maintain":
+		return maintain(ctx)
+	case "verify-chains":
+		return verifyChains(ctx)
 	}
 	return fmt.Errorf("lệnh không hỗ trợ: %s", cmd)
 }

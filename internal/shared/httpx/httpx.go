@@ -9,6 +9,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -33,8 +37,16 @@ func NewEngine(log *slog.Logger, maxBody int64) *gin.Engine {
 }
 
 // Trace đọc traceparent hoặc sinh trace_id mới.
+//
+// Khi OpenTelemetry bật (telemetry.Enabled), mở span máy chủ là con của
+// traceparent gửi tới (W3C), và trace_id lấy từ span đó — cùng giá trị ở
+// header X-Trace-Id, trong problem+json và trong log. Khi tắt: như G0.
 func Trace() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if telemetry.Enabled() {
+			traceOTel(c)
+			return
+		}
 		id := telemetry.TraceIDFromHeader(c.GetHeader("traceparent"))
 		if id == "" {
 			id = telemetry.NewTraceID()
@@ -42,6 +54,30 @@ func Trace() gin.HandlerFunc {
 		c.Request = c.Request.WithContext(telemetry.WithTraceID(c.Request.Context(), id))
 		c.Header(TraceHeader, id)
 		c.Next()
+	}
+}
+
+func traceOTel(c *gin.Context) {
+	ctx := telemetry.Extract(c.Request.Context(), propagation.HeaderCarrier(c.Request.Header))
+	route := c.FullPath()
+	name := c.Request.Method + " " + route
+	if route == "" {
+		name = c.Request.Method
+	}
+	ctx, span := telemetry.Tracer().Start(ctx, name, trace.WithSpanKind(trace.SpanKindServer),
+		trace.WithAttributes(attribute.String("http.request.method", c.Request.Method), attribute.String("http.route", route)))
+	defer span.End()
+	id := span.SpanContext().TraceID().String()
+	if !span.SpanContext().IsValid() {
+		id = telemetry.NewTraceID()
+	}
+	c.Request = c.Request.WithContext(telemetry.WithTraceID(ctx, id))
+	c.Header(TraceHeader, id)
+	c.Next()
+	status := c.Writer.Status()
+	span.SetAttributes(attribute.Int("http.response.status_code", status))
+	if status >= 500 {
+		span.SetStatus(codes.Error, http.StatusText(status))
 	}
 }
 
@@ -57,6 +93,7 @@ func AccessLog(log *slog.Logger) gin.HandlerFunc {
 			"method", c.Request.Method, "route", c.FullPath(), "status", c.Writer.Status(),
 			"duration_ms", time.Since(start).Milliseconds(), "outcome", outcome(c.Writer.Status()),
 		}
+		telemetry.RecordHTTP(ctx, c.Request.Method, c.FullPath(), c.Writer.Status(), time.Since(start))
 		if p, ok := authz.FromContext(ctx); ok {
 			attrs = append(attrs, "tenant_id", p.TenantID, "actor_ref", p.ActorRef)
 		}
