@@ -6,6 +6,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
@@ -20,13 +23,17 @@ import (
 // PoolOpener mở pool cho một vai DB của cụm pf.
 type PoolOpener func(ctx context.Context, role string) (*pgxpool.Pool, error)
 
-// External là phụ thuộc ngoài cụm pf: kho định danh (R-04, qua client).
+// External là phụ thuộc ngoài cụm pf.
 type External struct {
+	// Vault: kho định danh (R-04, qua client).
 	Vault client.Client
+	// Store: kho đối tượng (tệp minh chứng, tệp đính kèm, gói MRV). Nil → đọc từ
+	// môi trường (AG_S3_* hoặc AG_OBJSTORE_DIR); không cấu hình → các đường tải tệp trả 503.
+	Store objstore.Store
 }
 
-// buildModules là gốc lắp ráp: mở pool theo vai của từng module và nối các port
-// giữa module (R-02: module chỉ thấy port của nhau). Thêm module mới ở đây.
+// buildModules là gốc lắp ráp: mở pool theo vai của từng module (R-05) và nối
+// port giữa các module (R-02: module chỉ thấy port của nhau). Thêm module ở đây.
 func buildModules(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) ([]httpx.Module, []*pgxpool.Pool, error) {
 	var pools []*pgxpool.Pool
 	pool := func(role string) (*pgxpool.Pool, error) {
@@ -35,6 +42,14 @@ func buildModules(ctx context.Context, open PoolOpener, clk clock.Clock, ext Ext
 			pools = append(pools, p)
 		}
 		return p, err
+	}
+	store := ext.Store
+	if store == nil {
+		s, err := fileStoreFromEnv(ctx)
+		if err != nil {
+			return nil, pools, err
+		}
+		store = s
 	}
 
 	mdPool, err := pool(masterdata.DBRole)
@@ -49,17 +64,29 @@ func buildModules(ctx context.Context, open PoolOpener, clk clock.Clock, ext Ext
 	}
 	pty := party.New(partyPool, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault})
 
-	files, err := fileStoreFromEnv(ctx)
+	geoPool, err := pool(geo.DBRole)
 	if err != nil {
 		return nil, pools, err
 	}
+	g := geo.New(geoPool, clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits(), Orgs: pty.Orgs()})
+
+	contentPool, err := pool(content.DBRole)
+	if err != nil {
+		return nil, pools, err
+	}
+	cnt := content.New(contentPool, clk, content.Deps{Scope: pty.ScopeResolver(), Catalogs: md.Catalogs(), AdminUnits: md.AdminUnits(), Store: store})
+
+	extPool, err := pool(extension.DBRole)
+	if err != nil {
+		return nil, pools, err
+	}
+	kn := extension.New(extPool, clk, extension.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs()})
 
 	mrvPool, err := pool(mrv.DBRole)
 	if err != nil {
 		return nil, pools, err
 	}
-	// Kho đối tượng cho gói xuất MRV: thiếu cấu hình → tải gói trả 503 mrv.dependency_unavailable.
-	mrvMod := mrv.New(mrvPool, clk, mrv.Deps{Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Store: files})
+	mrvMod := mrv.New(mrvPool, clk, mrv.Deps{Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Store: store})
 
 	syncPool, err := pool(syncmod.DBRole)
 	if err != nil {
@@ -67,18 +94,16 @@ func buildModules(ctx context.Context, open PoolOpener, clk clock.Clock, ext Ext
 	}
 	snc := syncmod.New(syncPool, clk, syncmod.Deps{
 		Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Params: md.Params(), Vault: ext.Vault,
-		Store: files, CursorKey: []byte(os.Getenv("AG_SYNC_CURSOR_KEY")),
-		// Source/Sink của geo (plot, plot_boundary), content (document), extension (task,
-		// directive, task_update, field_report), mrv (evidence) nối ở đây khi các module có.
-		Sources: nil,
-		Sinks:   []syncport.Sink{mrvMod.SyncSink()},
+		Store: store, CursorKey: []byte(os.Getenv("AG_SYNC_CURSOR_KEY")),
+		Sources: []syncport.Source{g.SyncSource(), cnt.SyncSource(), kn.SyncSource()},
+		Sinks:   []syncport.Sink{g.SyncSink(), kn.SyncSink(), mrvMod.SyncSink()},
 	})
 
-	return []httpx.Module{md, pty, mrvMod, snc}, pools, nil
+	return []httpx.Module{md, pty, g, cnt, kn, mrvMod, snc}, pools, nil
 }
 
-// fileStoreFromEnv mở kho đối tượng cho tệp minh chứng nếu đã cấu hình
-// (AG_S3_ENDPOINT hoặc AG_OBJSTORE_DIR); chưa cấu hình → nil, /v1/files trả 503.
+// fileStoreFromEnv mở kho đối tượng nếu đã cấu hình (AG_S3_ENDPOINT hoặc
+// AG_OBJSTORE_DIR); chưa cấu hình → nil.
 func fileStoreFromEnv(ctx context.Context) (objstore.Store, error) {
 	if os.Getenv("AG_S3_ENDPOINT") == "" && os.Getenv("AG_OBJSTORE_DIR") == "" {
 		return nil, nil

@@ -43,6 +43,8 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
@@ -275,19 +277,41 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 	if selected(jobs, extension.JobEscalation) {
 		// Leo thang SLA nhiệm vụ khuyến nông: tìm tenant bằng pool ag_outbox_publisher
 		// (chỉ đọc 4 cột), ghi bằng vai extension_app của module (R-05).
-		dsn, err := dbadmin.RoleURL(direct, migrations.PF, "", extension.DBRole)
+		openRole := func(role string) (*pgxpool.Pool, error) {
+			d, err := dbadmin.RoleURL(direct, migrations.PF, "", role)
+			if err != nil {
+				return nil, err
+			}
+			p, err := db.Open(ctx, d, db.Options{AppName: "worker-extension", MaxConns: 2})
+			if err != nil {
+				return nil, err
+			}
+			prevClose := closeFn
+			closeFn = func() { p.Close(); prevClose() }
+			return p, nil
+		}
+		extPool, err := openRole(extension.DBRole)
 		if err != nil {
 			closeFn()
 			return nil, func() {}, err
 		}
-		extPool, err := db.Open(ctx, dsn, db.Options{AppName: "worker-extension", MaxConns: 2})
+		// Leo thang cần cây tổ chức (tìm TTKN tỉnh) và đơn vị hành chính (tỉnh của xã):
+		// dựng port của party/masterdata bằng vai riêng của từng module (R-05).
+		mdPool, err := openRole(masterdata.DBRole)
 		if err != nil {
 			closeFn()
 			return nil, func() {}, err
 		}
-		prevClose := closeFn
-		closeFn = func() { extPool.Close(); prevClose() }
-		kn := extension.New(extPool, clk, extension.Deps{})
+		partyPool, err := openRole(party.DBRole)
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		md := masterdata.New(mdPool, clk)
+		pty := party.New(partyPool, clk, party.Deps{AdminUnits: md.AdminUnits()})
+		kn := extension.New(extPool, clk, extension.Deps{
+			Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(),
+		})
 		js = append(js, kn.Jobs(extension.OverdueTenants(out.pools[migrations.PF]), log)...)
 	}
 	if len(js) == 0 {

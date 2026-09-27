@@ -486,6 +486,517 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tra cứu tài liệu đã xuất bản (KN US-LIB-04, HTX US-NEWS-01) — tìm không dấu, lọc loại/nhãn/chuyên mục */
+        get: operations["listDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/documents/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bản xuất bản hiện hành, tệp đính kèm (URL có hạn ≤ 15 phút) và hướng dẫn đặc thù địa phương trong phạm vi (KN FR-13) */
+        get: operations["getDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/documents/{ref}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Các phiên bản đã từng xuất bản (hiện hành + bị thay) — xuất bản bản mới không xóa bản cũ */
+        get: operations["listDocumentVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thửa trong khung nhìn (GIS FN-07 BR-24/25) — GeoJSON FeatureCollection, tối đa 1.000 polygon, lọc theo phạm vi xã/HTX */
+        get: operations["listPlotsInBBox"];
+        put?: never;
+        /** Tạo thửa với ranh giới đầu tiên (KN US-PLOT-01, HTX US-PLOT-02/03). Chồng lấn cùng HTX vượt ngưỡng → 409 geo.overlap; khác HTX → nhận, mở xung đột chờ xem xét */
+        post: operations["createPlot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plots/overlap-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Kiểm trước một ranh giới (KN US-PLOT-03 — cảnh báo ngay khi vẽ); chạy đủ kiểm tra như khi lưu nhưng không ghi */
+        post: operations["checkPlotOverlap"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plots/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thửa kèm toàn bộ phiên bản ranh giới (lịch sử chỉ đọc) và xung đột; ngoài phạm vi → 404 */
+        get: operations["getPlot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plots/{ref}/boundaries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa ranh giới = phiên bản mới (bản ghi bù) trỏ supersedes_id về phiên bản hiện hành; phiên bản cũ giữ nguyên */
+        post: operations["correctPlotBoundary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plots/{ref}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gán thửa cho HTX / nông hộ (HTX US-PLOT-01 AC-3 — mỗi thửa đúng một HTX); cooperative_ref = null → về nháp. Quản lý HTX chỉ nhận thửa về HTX mình */
+        post: operations["assignPlot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/plots/{ref}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ngừng dùng thửa (xóa mềm, GIS BR-17) — ẩn khỏi bản đồ, giữ toàn bộ lịch sử; lý do ≥ 10 ký tự */
+        post: operations["retirePlot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cooperatives/{ref}/plots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thửa của một HTX (HTX US-PLOT-01), phân trang cursor */
+        get: operations["listCooperativePlots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/conflicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xung đột ranh giới chờ xử lý trong phạm vi (mục 15 — người phụ trách + SLA tạm 72 giờ) */
+        get: operations["listBoundaryConflicts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/conflicts/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đóng xung đột kèm ghi chú (≥ 10 ký tự); sửa hình nếu cần là một phiên bản ranh giới mới */
+        post: operations["resolveBoundaryConflict"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/admin-boundaries/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ranh giới hành chính dùng chung hiện hành của tỉnh/xã (GIS FN-07 BR-21), GeoJSON Feature */
+        get: operations["getAdminBoundary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhiệm vụ trong phạm vi (US-TASK-03) — lọc trạng thái, ưu tiên, cán bộ, quá hạn */
+        get: operations["extListTasks"];
+        put?: never;
+        /** Tạo nhiệm vụ hỗ trợ — due_at = lúc tạo + SLA (tham số extension.task_sla_hours tại thời điểm tạo, mặc định 24 giờ) */
+        post: operations["extCreateTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/tasks/bulk-assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Phân công hàng loạt trong một lần xác nhận (US-TASK-04) — chia vòng tròn; một nhiệm vụ lỗi thì cả lô không đổi */
+        post: operations["extBulkAssign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/tasks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["extGetTask"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/tasks/{id}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Phân công (hoặc phân công lại) cho cán bộ phụ trách xã/tỉnh của nhiệm vụ */
+        post: operations["extAssignTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/tasks/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi sự việc — tiếp nhận, tiến độ, hoàn thành (bắt buộc kết quả ≥ 10 ký tự), chuyển tiếp lên tỉnh, mở lại */
+        post: operations["extUpdateTaskStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/directives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chỉ đạo mình nhận; cấp giám sát thấy thêm chỉ đạo có vùng nhận trong phạm vi (mới nhất trước) */
+        get: operations["extListDirectives"];
+        put?: never;
+        /** Ban hành chỉ đạo khẩn tới đúng vùng đã chọn (US-TASK-03) — phát pf.extension.directive.issued */
+        post: operations["extIssueDirective"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/directives/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["extGetDirective"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/directives/{id}/ack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xác nhận đã đọc (chỉ người nhận; gọi lặp giữ lần đầu) */
+        post: operations["extAckDirective"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/field-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiên bản hiện hành trong phạm vi */
+        get: operations["extListFieldReports"];
+        put?: never;
+        /** Gửi báo cáo hiện trường (FR-01 gieo sạ, FR-02 sinh trưởng/sâu bệnh). Kỳ mở — gửi lại cùng khóa là phiên bản mới; kỳ đã chốt → 409 */
+        post: operations["extCreateFieldReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/field-reports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["extGetFieldReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/field-reports/{id}/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bản ghi bù cho phiên bản hiện hành — bắt buộc correction_reason ≥ 10 ký tự (US-DASH-02 AC-2) */
+        post: operations["extCorrectFieldReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-periods/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chốt kỳ báo cáo của một tỉnh (FR-05) — TTKN tỉnh/QG; chốt lặp trả 200 */
+        post: operations["extClosePeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 4 KPI theo phạm vi (US-DASH-01) — tổng luôn bằng tổng các đơn vị con; thiếu báo cáo xã → provisional "Số liệu tạm tính" */
+        get: operations["extDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi cán bộ vào danh bạ trực — TTKN tỉnh/QG cho cán bộ trong phạm vi; cán bộ xã tự khai cho mình */
+        post: operations["extUpsertStaff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/roster": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh bạ trực theo địa bàn (US-DIR-02) — không ai đang trực → fallback là cán bộ TTKN tỉnh */
+        get: operations["extRoster"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/roster/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tự cập nhật trạng thái trực (US-DIR-01); hết hạn sau extension.duty_status_ttl_hours → unknown */
+        post: operations["extSetDutyStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/roster/shifts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Khai báo ca trực cho cán bộ trong tỉnh (US-DIR-03) */
+        post: operations["extAddShift"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1018,6 +1529,470 @@ export interface components {
             /** Format: date-time */
             completed_at: string | null;
         };
+        /**
+         * @description procedure = quy trình kỹ thuật chuẩn quốc gia; supplement = hướng dẫn đặc thù địa phương gắn quy trình gốc; alert = cảnh báo khẩn (phát thông báo đẩy theo vùng)
+         * @enum {string}
+         */
+        ContentKind: "procedure" | "guide" | "news" | "alert" | "supplement";
+        ContentAudience: {
+            /** @enum {string} */
+            level: "national" | "province" | "commune";
+            /** @description Rỗng với national; [mã tỉnh] với province; mã các xã (cùng tỉnh) với commune */
+            units: string[];
+            /** @description Tỉnh sở hữu (chỉ đọc) */
+            province_code?: string | null;
+        };
+        ContentDocument: {
+            /** Format: uuid */
+            ref: string;
+            kind: components["schemas"]["ContentKind"];
+            audience: components["schemas"]["ContentAudience"];
+            /** Format: uuid */
+            parent_ref?: string | null;
+            /** @enum {string} */
+            status: "draft" | "review" | "published" | "retired";
+            /** @description Tiêu đề của bản xuất bản hiện hành */
+            title?: string | null;
+            summary?: string | null;
+            category?: string | null;
+            tags: string[];
+            published_version_no?: number | null;
+            /** Format: date-time */
+            published_at?: string | null;
+            /** Format: uuid */
+            publisher_ref?: string | null;
+            /** Format: date-time */
+            retired_at?: string | null;
+            retire_reason?: string | null;
+        };
+        ContentAttachment: {
+            /** Format: uuid */
+            id: string;
+            file_name: string;
+            /** @enum {string} */
+            content_type: "application/pdf" | "application/vnd.openxmlformats-officedocument.wordprocessingml.document" | "image/jpeg" | "image/png" | "image/webp" | "video/mp4";
+            size: number;
+            sha256: string;
+            /** @enum {string} */
+            role: "attachment" | "cover";
+            /** @description URL tải có hạn; không ghi log (R-92) */
+            url?: string | null;
+            /** Format: date-time */
+            url_expires_at?: string | null;
+        };
+        ContentVersion: {
+            /** Format: uuid */
+            id: string;
+            version_no: number;
+            /** @enum {string} */
+            status: "draft" | "review" | "published" | "superseded" | "discarded" | "returned";
+            title: string;
+            summary?: string;
+            /** @description Đã qua bộ lọc allow-list (không script, không on*, liên kết chỉ http/https/mailto/att:<id>). Client hiển thị Markdown ở chế độ tắt HTML thô. */
+            body: string;
+            /** @enum {string} */
+            body_format: "markdown" | "html";
+            category?: string | null;
+            tags: string[];
+            /** Format: uuid */
+            author_ref?: string;
+            /** Format: date-time */
+            recorded_at?: string;
+            attachments: components["schemas"]["ContentAttachment"][];
+        };
+        ContentVersionInfo: {
+            version_no: number;
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            status: "draft" | "review" | "published" | "superseded" | "discarded" | "returned";
+            title: string;
+            /** Format: uuid */
+            author_ref: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: date-time */
+            published_at?: string | null;
+            /** Format: uuid */
+            publisher_ref?: string | null;
+            return_reason?: string | null;
+        };
+        /** @description GeoJSON (RFC 7946) Polygon hoặc MultiPolygon, WGS84 kinh/vĩ độ (EPSG:4326). Vòng chưa khép được tự khép. Tối thiểu 4 đỉnh phân biệt không thẳng hàng mỗi mảnh. */
+        PolygonGeometry: {
+            /** @enum {string} */
+            type: "Polygon" | "MultiPolygon";
+            coordinates: unknown[];
+        };
+        PlotProperties: {
+            /** Format: uuid */
+            ref: string;
+            /** @description Mã thửa hiển thị, vd TH0000001 */
+            code: string;
+            name: string | null;
+            commune_code: string;
+            /**
+             * Format: uuid
+             * @description null = KN vẽ trước, chưa gán HTX ("Nháp - KN vẽ trước")
+             */
+            cooperative_ref: string | null;
+            /** Format: uuid */
+            household_ref: string | null;
+            /** @enum {string} */
+            status: "draft" | "active" | "retired";
+            status_reason: string | null;
+            /** @description Phiên bản ranh giới hiện hành */
+            version: number;
+            /** Format: uuid */
+            boundary_id: string;
+            area_ha: components["schemas"]["Decimal"];
+            /** @enum {string} */
+            source: "kn_web" | "kn_field_app" | "htx_app" | "import_file" | "cadastral";
+            /** @description Có xung đột chồng lấn chờ xử lý */
+            needs_review: boolean;
+            revision: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        PlotFeature: {
+            /** @enum {string} */
+            type: "Feature";
+            /** Format: uuid */
+            id: string;
+            geometry: components["schemas"]["PolygonGeometry"];
+            properties: components["schemas"]["PlotProperties"];
+        };
+        PlotBoundaryInput: {
+            /**
+             * Format: uuid
+             * @description UUIDv7 sinh trên máy (R-11); bỏ trống → server sinh
+             */
+            boundary_id?: string;
+            geometry: components["schemas"]["PolygonGeometry"];
+            gps_accuracy_m?: components["schemas"]["Decimal"];
+            /**
+             * @default kn_web
+             * @enum {string}
+             */
+            source: "kn_web" | "kn_field_app" | "htx_app" | "import_file" | "cadastral";
+            /**
+             * Format: date-time
+             * @description Lúc vẽ tại hiện trường (R-13); mặc định hiện tại
+             */
+            event_time?: string;
+            device_id?: string;
+        };
+        PlotCreateInput: components["schemas"]["PlotBoundaryInput"] & {
+            /**
+             * Format: uuid
+             * @description UUIDv7 sinh trên máy; bỏ trống → server sinh
+             */
+            plot_ref?: string;
+            name?: string;
+            commune_code: string;
+            /**
+             * Format: uuid
+             * @description Quản lý HTX bỏ trống → HTX của chính mình
+             */
+            cooperative_ref?: string | null;
+            /** Format: uuid */
+            household_ref?: string | null;
+        };
+        PlotCorrectInput: components["schemas"]["PlotBoundaryInput"] & {
+            /**
+             * Format: uuid
+             * @description boundary_id của phiên bản hiện hành đang được thay
+             */
+            supersedes_id: string;
+            correction_reason: string;
+        };
+        PlotBoundaryVersion: {
+            /** Format: uuid */
+            boundary_id: string;
+            /** Format: uuid */
+            plot_ref: string;
+            version: number;
+            area_ha: components["schemas"]["Decimal"];
+            point_count: number;
+            gps_accuracy_m: components["schemas"]["Decimal"] | null;
+            source: string;
+            commune_code: string;
+            /** Format: uuid */
+            cooperative_ref: string | null;
+            /** @description false: bản sửa ngoại tuyến dựa trên phiên bản cũ — được giữ, chờ xử lý */
+            became_current: boolean;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            supersedes_id: string | null;
+            correction_reason: string | null;
+            /** Format: uuid */
+            drawn_by: string;
+            device_id: string | null;
+            geometry?: components["schemas"]["PolygonGeometry"];
+        };
+        PlotOverlap: {
+            /** Format: uuid */
+            plot_ref: string;
+            code: string;
+            /** Format: uuid */
+            cooperative_ref: string | null;
+            intersect_ha: components["schemas"]["Decimal"];
+            /** @description Phần trăm so với thửa nhỏ hơn */
+            overlap_pct: components["schemas"]["Decimal"];
+        };
+        BoundaryConflict: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "same_coop_overlap" | "cross_coop_overlap" | "concurrent_edit";
+            /** Format: uuid */
+            plot_ref: string;
+            /** Format: uuid */
+            boundary_id: string;
+            other_plot_refs: string[];
+            max_overlap_pct: components["schemas"]["Decimal"] | null;
+            commune_code: string;
+            /**
+             * Format: uuid
+             * @description HTX phụ trách; null = cán bộ KN của xã
+             */
+            owner_ref: string | null;
+            /**
+             * Format: date-time
+             * @description SLA tạm 72 giờ (C-8)
+             */
+            due_at: string;
+            /** @enum {string} */
+            status: "open" | "resolved";
+            /** Format: date-time */
+            detected_at: string;
+            /** Format: uuid */
+            resolved_by: string | null;
+            /** Format: date-time */
+            resolved_at: string | null;
+            resolution_note: string | null;
+        };
+        PlotWriteResult: {
+            plot: components["schemas"]["PlotFeature"];
+            boundary: components["schemas"]["PlotBoundaryVersion"];
+            conflicts: components["schemas"]["BoundaryConflict"][];
+            /** @description Chồng lấn khác HTX đã nhận nhưng chờ xem xét */
+            flagged_overlaps: components["schemas"]["PlotOverlap"][];
+        };
+        PlotAttrResult: {
+            plot: components["schemas"]["PlotFeature"];
+            event: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                action: "assigned" | "retired";
+                seq: number;
+                /** Format: date-time */
+                event_time: string;
+                reason: string | null;
+                /** Format: uuid */
+                actor_ref: string;
+            };
+        };
+        ExtTaskInput: {
+            /**
+             * Format: uuid
+             * @description UUIDv7 do máy sinh (R-11)
+             */
+            id?: string;
+            commune_code: string;
+            /**
+             * Format: uuid
+             * @description Quản lý HTX: bỏ trống = HTX của mình
+             */
+            cooperative_ref?: string;
+            /**
+             * Format: uuid
+             * @description Chỉ mã tham chiếu (R-41)
+             */
+            household_ref?: string;
+            /** Format: uuid */
+            plot_ref?: string;
+            /** @enum {string} */
+            category: "sau_benh" | "ky_thuat" | "co_gioi" | "khac";
+            /** @description Không ghi SĐT/CCCD — bị từ chối (R-04) */
+            description: string;
+            /**
+             * @default normal
+             * @enum {string}
+             */
+            priority: "low" | "normal" | "high" | "urgent";
+            /** Format: uuid */
+            assignee_ref?: string;
+        };
+        ExtTask: {
+            /** Format: uuid */
+            task_id: string;
+            commune_code: string;
+            province_code: string;
+            /** Format: uuid */
+            cooperative_ref?: string | null;
+            /** Format: uuid */
+            household_ref?: string | null;
+            /** Format: uuid */
+            plot_ref?: string | null;
+            category: string;
+            description: string;
+            priority: string;
+            /** @enum {string} */
+            source: "officer" | "coop_manager" | "htx_app";
+            /** @enum {string} */
+            status: "new" | "assigned" | "accepted" | "in_progress" | "resolved";
+            /** Format: uuid */
+            assignee_ref?: string | null;
+            /** Format: uuid */
+            created_by: string;
+            /** Format: date-time */
+            created_at: string;
+            sla_hours: components["schemas"]["Decimal"];
+            /** Format: date-time */
+            due_at: string;
+            overdue: boolean;
+            /** Format: date-time */
+            escalated_at?: string | null;
+            escalated_unit?: string | null;
+            /**
+             * Format: uuid
+             * @description TTKN tỉnh nhận leo thang
+             */
+            escalation_org_ref?: string | null;
+            /** Format: date-time */
+            resolved_at?: string | null;
+            last_note?: string | null;
+            /** @description seq cuối trong sổ của nhiệm vụ */
+            version: number;
+        };
+        ExtTaskEvent: {
+            /** Format: uuid */
+            event_id: string;
+            /** @enum {string} */
+            action: "created" | "assigned" | "accepted" | "progress" | "resolved" | "escalated" | "reopened";
+            status_after: string;
+            /** Format: uuid */
+            assignee_ref?: string | null;
+            /** Format: date-time */
+            due_at: string;
+            note?: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            seq: number;
+        };
+        ExtDirective: {
+            /** Format: uuid */
+            directive_id: string;
+            title: string;
+            body: string;
+            /** @enum {string} */
+            severity: "urgent" | "normal";
+            audience_units: string[];
+            province_codes: string[];
+            /** Format: uuid */
+            issuer_ref: string;
+            /** Format: date-time */
+            issued_at: string;
+            /** Format: date-time */
+            expires_at?: string | null;
+            target_count: number;
+            ack_count: number;
+            /** @description ack_count / target_count */
+            ack_rate: components["schemas"]["Decimal"] | null;
+            is_target: boolean;
+            /** Format: date-time */
+            acked_at?: string | null;
+        };
+        ExtFieldReportInput: {
+            /** @enum {string} */
+            kind: "sowing_progress" | "growth_pest";
+            commune_code: string;
+            /**
+             * Format: uuid
+             * @description Bắt buộc với sowing_progress
+             */
+            cooperative_ref?: string;
+            period: string;
+            /** @description Danh mục season */
+            season_code?: string;
+            /** @description Danh mục rice_variety (BR-01) */
+            variety_code?: string;
+            sown_area_ha?: components["schemas"]["Decimal"];
+            /** Format: date */
+            sown_on?: string;
+            growth_stage?: string;
+            /** @description Danh mục pest */
+            pest_code?: string;
+            /** @enum {string} */
+            severity?: "nhe" | "trung_binh" | "nang";
+            affected_area_ha?: components["schemas"]["Decimal"];
+            /** @description Phản ánh khẩn (FR-02) */
+            urgent?: boolean;
+            note?: string;
+        };
+        ExtFieldReport: components["schemas"]["ExtFieldReportInput"] & {
+            /** Format: uuid */
+            id: string;
+            province_code: string;
+            version: number;
+            /** Format: uuid */
+            previous_id?: string | null;
+            /** Format: uuid */
+            supersedes_id?: string | null;
+            correction_reason?: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            seq: number;
+        };
+        ExtKPI: {
+            sown_area_ha: components["schemas"]["Decimal"];
+            cooperatives_reporting: number;
+            open_tasks: number;
+            overdue_tasks: number;
+            directive_targets: number;
+            directive_acks: number;
+            directive_ack_rate: components["schemas"]["Decimal"] | null;
+            /** @description Xã có cán bộ phụ trách trong danh bạ */
+            expected_communes: number;
+            reported_communes: number;
+            missing_communes: string[];
+            provisional: boolean;
+            /** @enum {string|null} */
+            provisional_label: "Số liệu tạm tính" | null;
+        };
+        ExtStaff: {
+            /** Format: uuid */
+            actor_ref: string;
+            unit_code: string;
+            province_code: string;
+            role_title: string;
+            display_name: string;
+            active: boolean;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ExtRosterEntry: components["schemas"]["ExtStaff"] & {
+            /** @enum {string} */
+            duty_status: "on_duty" | "off_duty" | "unknown";
+            /** @enum {string} */
+            status_source: "manual" | "shift" | "none";
+            /** Format: date-time */
+            until: string | null;
+        };
     };
     responses: {
         /** @description RFC 9457 */
@@ -1027,6 +2002,18 @@ export interface components {
             };
             content: {
                 "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Sự việc đã ghi (pf/extension) */
+        ExtTaskWritten: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    task: components["schemas"]["ExtTask"];
+                    event: components["schemas"]["ExtTaskEvent"];
+                };
             };
         };
     };
@@ -1983,6 +2970,1139 @@ export interface operations {
             };
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+        };
+    };
+    listDocuments: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["ContentKind"];
+                /** @description Nhãn '<danh mục>:<mã>', vd farm_stage:sowing */
+                tag?: string;
+                category?: string;
+                /** @description Từ khóa; không phân biệt dấu ("lua" khớp "lúa"), khớp tiền tố từng từ */
+                q?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang, mới xuất bản trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ContentDocument"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            401: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            /** @description content.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    getDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tài liệu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        document: components["schemas"]["ContentDocument"];
+                        version: components["schemas"]["ContentVersion"];
+                        supplements: {
+                            /** Format: uuid */
+                            ref?: string;
+                            title?: string;
+                            province_code?: string | null;
+                            /** Format: date-time */
+                            published_at?: string | null;
+                        }[];
+                    };
+                };
+            };
+            /** @description content.document_not_found — không có, chưa xuất bản, đã gỡ hoặc ngoài phạm vi */
+            404: components["responses"]["Problem"];
+        };
+    };
+    listDocumentVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        document_ref: string;
+                        items: components["schemas"]["ContentVersionInfo"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    listPlotsInBBox: {
+        parameters: {
+            query: {
+                /** @description minLon,minLat,maxLon,maxLat (WGS84) */
+                bbox: string;
+                /** @description Mức zoom web-mercator; < 17 thì hình được đơn giản hóa (nửa điểm ảnh) */
+                zoom?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thửa chưa ngừng dùng giao khung nhìn. truncated = true khi còn thửa vượt limit (hãy zoom sâu hơn). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        type: "FeatureCollection";
+                        features: components["schemas"]["PlotFeature"][];
+                        truncated: boolean;
+                        limit: number;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    createPlot: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlotCreateInput"];
+            };
+        };
+        responses: {
+            /** @description Đã tạo */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlotWriteResult"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    checkPlotOverlap: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    geometry: components["schemas"]["PolygonGeometry"];
+                    commune_code: string;
+                    /** Format: uuid */
+                    cooperative_ref?: string | null;
+                    /**
+                     * Format: uuid
+                     * @description Thửa đang sửa (không tự so với chính nó)
+                     */
+                    exclude_plot_ref?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Kết quả kiểm */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        area_ha: components["schemas"]["Decimal"];
+                        point_count: number;
+                        tolerance_pct: components["schemas"]["Decimal"];
+                        /** @description Cùng HTX — sẽ bị chặn khi lưu */
+                        blocking: components["schemas"]["PlotOverlap"][];
+                        /** @description Khác HTX — lưu được nhưng chờ xem xét */
+                        flagged: components["schemas"]["PlotOverlap"][];
+                        can_save: boolean;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getPlot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thửa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        plot: components["schemas"]["PlotFeature"];
+                        versions: components["schemas"]["PlotBoundaryVersion"][];
+                        conflicts: components["schemas"]["BoundaryConflict"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    correctPlotBoundary: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlotCorrectInput"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlotWriteResult"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            /** @description geo.overlap, geo.version_conflict (supersedes_id không phải phiên bản hiện hành; kèm current_boundary_id), geo.plot_state_conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
+    assignPlot: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    cooperative_ref?: string | null;
+                    /** Format: uuid */
+                    household_ref?: string | null;
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã gán */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlotAttrResult"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    retirePlot: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ngừng dùng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlotAttrResult"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listCooperativePlots: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        type: "FeatureCollection";
+                        features: components["schemas"]["PlotFeature"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    listBoundaryConflicts: {
+        parameters: {
+            query?: {
+                status?: "open" | "resolved";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["BoundaryConflict"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    resolveBoundaryConflict: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    note: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã đóng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoundaryConflict"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getAdminBoundary: {
+        parameters: {
+            query?: {
+                zoom?: number;
+            };
+            header?: never;
+            path: {
+                code: components["parameters"]["UnitCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ranh giới */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        type: "Feature";
+                        id: string;
+                        geometry: components["schemas"]["PolygonGeometry"];
+                        properties: {
+                            code: string;
+                            /** @enum {string} */
+                            level: "province" | "commune";
+                            name: string;
+                            source: string;
+                            area_ha: components["schemas"]["Decimal"];
+                            /** Format: date-time */
+                            imported_at: string;
+                        };
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    extListTasks: {
+        parameters: {
+            query?: {
+                status?: "new" | "assigned" | "accepted" | "in_progress" | "resolved";
+                priority?: "low" | "normal" | "high" | "urgent";
+                assignee_ref?: string;
+                /** @description Chỉ nhiệm vụ giao cho mình */
+                mine?: boolean;
+                overdue?: boolean;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ExtTask"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    extCreateTask: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtTaskInput"];
+            };
+        };
+        responses: {
+            /** @description Đã tạo */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtTask"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extBulkAssign: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    task_ids: string[];
+                    assignee_refs: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Đã phân công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ExtTask"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extGetTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nhiệm vụ kèm lịch sử sự việc (sổ chỉ ghi thêm) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        task: components["schemas"]["ExtTask"];
+                        events: components["schemas"]["ExtTaskEvent"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    extAssignTask: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    assignee_ref: string;
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["ExtTaskWritten"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extUpdateTaskStatus: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    action: "accepted" | "progress" | "resolved" | "escalated" | "reopened";
+                    /** @description Không ghi SĐT/CCCD (R-04) */
+                    note?: string;
+                    /** Format: date-time */
+                    event_time?: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["ExtTaskWritten"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extListDirectives: {
+        parameters: {
+            query?: {
+                mine?: boolean;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ExtDirective"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+        };
+    };
+    extIssueDirective: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    title: string;
+                    body: string;
+                    /**
+                     * @default urgent
+                     * @enum {string}
+                     */
+                    severity?: "urgent" | "normal";
+                    /** @description Mã tỉnh/xã nhận, trong phạm vi người ban hành */
+                    audience_units: string[];
+                    /** Format: date-time */
+                    expires_at?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ban hành */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtDirective"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extGetDirective: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chỉ đạo; pending_targets chỉ có với cấp giám sát */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        directive: components["schemas"]["ExtDirective"];
+                        pending_targets: {
+                            /** Format: uuid */
+                            actor_ref?: string;
+                            unit_code?: string;
+                            province_code?: string;
+                        }[] | null;
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    extAckDirective: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã xác nhận */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtDirective"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    extListFieldReports: {
+        parameters: {
+            query?: {
+                period?: string;
+                kind?: "sowing_progress" | "growth_pest";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ExtFieldReport"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+        };
+    };
+    extCreateFieldReport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtFieldReportInput"] & {
+                    /**
+                     * Format: uuid
+                     * @description UUIDv7 do máy sinh
+                     */
+                    id?: string;
+                    /** Format: date-time */
+                    event_time?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtFieldReport"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extGetFieldReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản kèm mọi phiên bản cùng khóa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        report: components["schemas"]["ExtFieldReport"];
+                        versions: components["schemas"]["ExtFieldReport"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    extCorrectFieldReport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    correction_reason: string;
+                    sown_area_ha?: components["schemas"]["Decimal"];
+                    /** Format: date */
+                    sown_on?: string;
+                    growth_stage?: string;
+                    pest_code?: string;
+                    /** @enum {string} */
+                    severity?: "nhe" | "trung_binh" | "nang";
+                    affected_area_ha?: components["schemas"]["Decimal"];
+                    urgent?: boolean;
+                    note?: string;
+                    /** Format: date-time */
+                    event_time?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtFieldReport"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extClosePeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    period: string;
+                    province_code: string;
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã chốt trước đó */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Đã chốt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extDashboard: {
+        parameters: {
+            query?: {
+                /** @description Mã tỉnh/xã; bỏ trống = toàn quốc (nếu được) hoặc đơn vị phụ trách */
+                unit?: string;
+                /** @description Mặc định tháng hiện tại (giờ Việt Nam) */
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dashboard */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        unit: string | null;
+                        /** @enum {string} */
+                        level: "national" | "province" | "commune";
+                        period: string;
+                        /** Format: date-time */
+                        as_of: string;
+                        total: components["schemas"]["ExtKPI"];
+                        period_closed: boolean;
+                        closed_provinces: string[];
+                        children: {
+                            /** @description Tỉnh (với toàn quốc) hoặc xã */
+                            unit: string;
+                            kpi: components["schemas"]["ExtKPI"];
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    extUpsertStaff: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: uuid
+                     * @description sub của tài khoản cán bộ
+                     */
+                    actor_ref: string;
+                    unit_code: string;
+                    role_title: string;
+                    /** @description Tên cán bộ (danh bạ công vụ, không ghi log) */
+                    display_name: string;
+                    /** @default true */
+                    active?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtStaff"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extRoster: {
+        parameters: {
+            query?: {
+                unit?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh bạ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        unit: string | null;
+                        on_duty: number;
+                        items: components["schemas"]["ExtRosterEntry"][];
+                        fallback: components["schemas"]["ExtRosterEntry"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    extSetDutyStatus: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    status: "on_duty" | "off_duty";
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extAddShift: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    actor_ref: string;
+                    /** Format: date-time */
+                    starts_at: string;
+                    /** Format: date-time */
+                    ends_at: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
 }
