@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.mechanization.balance.computed/v1",
+  "title": "pf.mechanization.balance.computed — payload",
+  "description": "Một lần cân đối cung–cầu máy (CGH FN-09, QT-01/QT-02) cho một vụ đã được lưu bất biến trong sổ pf_mechanization.balance_run/balance_result. Báo cáo, dashboard và xu hướng (FN-10/FN-11) đọc kết quả đã lưu theo run_id, không tính lại. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.mechanization.balance.computed",
+  "x-schema-version": 1,
+  "x-producer": "pf/mechanization",
+  "type": "object",
+  "required": ["run_id", "season_code", "season_year", "reference_date", "rule_version", "result_count", "status_counts", "missing_norms", "computed_at", "seq"],
+  "properties": {
+    "run_id":         { "type": "string", "format": "uuid" },
+    "season_code":    { "type": "string", "description": "Mã vụ trong danh mục season (vd DX, HT, TD)" },
+    "season_year":    { "type": "integer", "minimum": 2000, "maximum": 2100, "description": "Năm bắt đầu vụ" },
+    "reference_date": { "type": "string", "format": "date", "description": "Thời điểm T: định mức, ngưỡng và số máy lấy tại T (ngày bắt đầu vụ)" },
+    "rule_version":   { "type": "string", "description": "Phiên bản quy tắc tính, vd cgh.balance/v1" },
+    "result_count":   { "type": "integer", "minimum": 0, "description": "Số dòng HTX × khâu × chủng loại đã lưu" },
+    "status_counts":  { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 }, "description": "Số dòng theo trạng thái: sufficient, attention, shortage, surplus, no_data, no_norm, unclassified" },
+    "missing_norms":  { "type": "array", "items": { "type": "string" }, "description": "Khóa định mức chưa cấu hình (cgh.norm_ha_per_machine:<loại máy>:<khâu>)" },
+    "computed_at":    { "type": "string", "format": "date-time" },
+    "seq":            { "type": "integer", "minimum": 1, "description": "Thứ tự lần tính trong chuỗi băm của vụ" }
+  }
+}

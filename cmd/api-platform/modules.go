@@ -10,6 +10,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	syncmod "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync"
@@ -82,6 +83,14 @@ func buildModules(ctx context.Context, open PoolOpener, clk clock.Clock, ext Ext
 	}
 	kn := extension.New(extPool, clk, extension.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs()})
 
+	mechPool, err := pool(mechanization.DBRole)
+	if err != nil {
+		return nil, pools, err
+	}
+	mech := mechanization.New(mechPool, clk, mechanization.Deps{
+		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Params: md.Params(), Catalogs: md.Catalogs(), AdminUnits: md.AdminUnits(), Vault: ext.Vault,
+	})
+
 	mrvPool, err := pool(mrv.DBRole)
 	if err != nil {
 		return nil, pools, err
@@ -99,7 +108,7 @@ func buildModules(ctx context.Context, open PoolOpener, clk clock.Clock, ext Ext
 		Sinks:   []syncport.Sink{g.SyncSink(), kn.SyncSink(), mrvMod.SyncSink()},
 	})
 
-	return []httpx.Module{md, pty, g, cnt, kn, mrvMod, snc}, pools, nil
+	return []httpx.Module{md, pty, g, cnt, kn, mech, mrvMod, snc}, pools, nil
 }
 
 // fileStoreFromEnv mở kho đối tượng nếu đã cấu hình (AG_S3_ENDPOINT hoặc

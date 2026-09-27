@@ -1114,6 +1114,377 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
   # --- hết pf/geo ---
+
+  # --- pf/mechanization: Bản đồ CGH — ghi dữ liệu chủ, vụ mùa, chạy cân đối (chỉ cgh_admin; Cục KTHT → 403) ---
+
+  # Không xóa cứng: vô hiệu hóa là sự kiện trong sổ kèm ngày và lý do. Mã CSH-/MAY- do hệ thống tự sinh.
+  /v1/mechanization/owners:
+    post:
+      summary: Tạo chủ sở hữu máy (FN-04) — Mã CSH-<tỉnh HTX>-00001 tự sinh; họ tên/SĐT cá nhân chỉ vào kho định danh
+      description: Thành viên HTX / HTX phải liên kết đúng một HTX. Chống trùng theo SĐT qua chỉ mục mù của kho định danh.
+      operationId: mechCreateOwner
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [owner_type]
+              properties:
+                owner_type: {type: string, description: "Mã hoặc nhãn: thanh_vien_htx | htx | doanh_nghiep | khac"}
+                cooperative_ref: {type: string, format: uuid}
+                name: {type: string, description: "Bắt buộc trừ loại HTX; cá nhân → kho định danh"}
+                phone: {type: string, description: "Bắt buộc trừ loại HTX; chỉ vào kho định danh"}
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [owner, seq]
+                properties:
+                  owner: {$ref: "#/components/schemas/MechOwner"}
+                  seq: {type: integer}
+        "403": {description: forbidden | mechanization.out_of_scope, $ref: "#/components/responses/Problem"}
+        "409": {description: mechanization.owner_duplicate, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | mechanization.cooperative_invalid, $ref: "#/components/responses/Problem"}
+        "503": {description: mechanization.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/mechanization/owners/{id}/deactivate:
+    post:
+      summary: Vô hiệu hóa chủ sở hữu (FN-04 BR-05) — còn máy thì 409, trừ khi with_machines = true (máy chuyển Inactive)
+      operationId: mechDeactivateOwner
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 10}
+                with_machines: {type: boolean, default: false}
+                deactivated_on: {type: string, format: date, description: "Ngày vô hiệu hóa của máy kèm theo; mặc định hôm nay"}
+      responses:
+        "200": {$ref: "#/components/responses/MechOwnerChanged"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: mechanization.owner_has_machines (active_machines) | mechanization.state_conflict, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/mechanization/owners/{id}/reactivate:
+    post:
+      summary: Kích hoạt lại chủ sở hữu
+      operationId: mechReactivateOwner
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {$ref: "#/components/responses/MechOwnerChanged"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/mechanization/owners/{id}/events:
+    get:
+      summary: Lịch sử biến động của chủ sở hữu (FN-04 B7)
+      operationId: mechOwnerEvents
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Theo seq
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MechOwnerEvent"}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/mechanization/machines:
+    post:
+      summary: Thêm máy (FN-05) — Mã MAY-<tỉnh HTX>-00001 tự sinh; khâu tự gán theo chủng loại; Số máy/SN, Số khung duy nhất
+      operationId: mechCreateMachine
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/MechMachineInput"
+                - type: object
+                  required: [cooperative_ref, machine_type, owner_id, owned_since]
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [machine, seq]
+                properties:
+                  machine: {$ref: "#/components/schemas/MechMachine"}
+                  seq: {type: integer}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {description: mechanization.serial_taken | mechanization.chassis_taken (existing_code), $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/mechanization/machines/import:
+    post:
+      summary: Nhập danh sách máy của MỘT HTX từ CSV (FN-05 BR-07/BR-10, US-MAC-02)
+      description: |
+        Đối chiếu từng dòng theo Số máy/SN (thiếu thì Số khung): đã có → cập nhật, chưa có → tạo mới.
+        mode=replace ("Thay thế toàn bộ"): máy đang Active của HTX vắng mặt trong tệp chuyển Inactive bằng sự kiện kèm Ngày vô hiệu hóa — không xóa.
+        mode=update ("Cập nhật"): máy vắng mặt giữ nguyên. Tệp có cột "Mã máy" hoặc "Khâu", hoặc thiếu cột bắt buộc → từ chối cả tệp.
+        Cột (tiêu đề có/không dấu): Chủng loại, Hãng, Model, Năm SX, Nhiên liệu, Công suất, Năng suất, Mã CSH, Số máy, Số khung, Ngày sở hữu (dd/mm/yyyy), Tình trạng.
+      operationId: mechImportMachines
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: cooperative_ref, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: mode, in: query, required: true, schema: {type: string, enum: [update, replace]}}
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: {type: string}
+      responses:
+        "200":
+          description: Kết quả theo dòng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mode, created, updated, reactivated, unchanged, rejected, rows, deactivated]
+                properties:
+                  mode: {type: string}
+                  created: {type: integer}
+                  updated: {type: integer}
+                  reactivated: {type: integer}
+                  unchanged: {type: integer}
+                  rejected: {type: integer}
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      required: [row, status, reason, machine_ref, code]
+                      properties:
+                        row: {type: integer}
+                        status: {type: string, enum: [created, updated, reactivated, unchanged, rejected]}
+                        reason: {type: [string, "null"], description: "vd \"Dòng 5: Số máy/SN trùng với dòng 9 trong cùng file\""}
+                        machine_ref: {type: [string, "null"], format: uuid}
+                        code: {type: [string, "null"]}
+                  deactivated: {type: array, items: {$ref: "#/components/schemas/MechMachine"}}
+        "422": {description: mechanization.import_invalid, $ref: "#/components/responses/Problem"}
+  /v1/mechanization/machines/{ref}/update:
+    post:
+      summary: Sửa hồ sơ máy (chuyển HTX, đổi chủng loại → khâu đổi theo); Mã máy không đổi
+      operationId: mechUpdateMachine
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/MechMachineInput"}
+      responses:
+        "200": {$ref: "#/components/responses/MechMachineChanged"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/mechanization/machines/{ref}/status:
+    post:
+      summary: Đổi tình trạng máy (nhập tay, QT-03) — dòng sổ status_changed có event_time = thời điểm hiệu lực
+      operationId: mechChangeMachineStatus
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: {type: string, description: "Mã hoặc nhãn: Hoạt động / Bảo trì / Hỏng / Ngừng hoạt động"}
+                effective_at: {type: string, format: date-time, description: "Không ở tương lai, không trước lần cập nhật gần nhất"}
+      responses:
+        "200": {$ref: "#/components/responses/MechMachineChanged"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/mechanization/machines/{ref}/deactivate:
+    post:
+      summary: Vô hiệu hóa máy (FN-05 BR-06) — kèm Ngày vô hiệu hóa (≥ Ngày HTX sở hữu, không ở tương lai) và lý do
+      operationId: mechDeactivateMachine
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 10}
+                deactivated_on: {type: string, format: date}
+      responses:
+        "200": {$ref: "#/components/responses/MechMachineChanged"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/mechanization/machines/{ref}/reactivate:
+    post:
+      summary: Kích hoạt lại máy
+      operationId: mechReactivateMachine
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {$ref: "#/components/responses/MechMachineChanged"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/mechanization/machines/{ref}/events:
+    get:
+      summary: Lịch sử biến động của máy (FN-05 B8, AC-04)
+      operationId: mechMachineEvents
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Theo seq
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MechMachineEvent"}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/mechanization/season-areas:
+    post:
+      summary: Nhập tay diện tích canh tác & lịch mùa vụ theo HTX × vụ (FN-06, US-SEA-01) — nhãn [Nhập tay], tùy chọn khóa
+      operationId: mechRecordSeasonArea
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cooperative_ref, season_code, season_year, area_ha]
+              properties:
+                cooperative_ref: {type: string, format: uuid}
+                season_code: {type: string}
+                season_year: {type: integer}
+                area_ha: {$ref: "#/components/schemas/MechDecimal"}
+                lock: {type: boolean, default: false}
+                source: {type: string, enum: [manual]}
+                calendar:
+                  type: array
+                  items:
+                    type: object
+                    required: [stage, start, end]
+                    properties:
+                      stage: {type: string}
+                      start: {type: string, format: date}
+                      end: {type: string, format: date, description: "Sau ngày bắt đầu; cùng khâu không chồng lấn"}
+      responses:
+        "201": {$ref: "#/components/responses/MechAreaChanged"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/mechanization/season-areas/{id}/lock:
+    post:
+      summary: Khóa bản ghi nhập tay — đồng bộ App HTX không ghi đè (FN-06 B5, QT-03)
+      operationId: mechLockSeasonArea
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {$ref: "#/components/responses/MechAreaChanged"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/mechanization/season-areas/{id}/unlock:
+    post:
+      summary: Mở khóa — App HTX được ưu tiên trở lại ở lần đồng bộ kế tiếp
+      operationId: mechUnlockSeasonArea
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {$ref: "#/components/responses/MechAreaChanged"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/mechanization/season-areas/{id}/events:
+    get:
+      summary: Lịch sử thay đổi của bản ghi diện tích vụ (FN-06 B7)
+      operationId: mechSeasonAreaEvents
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Theo seq
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [seq, action, event_time, recorded_at, actor_ref, reason, area]
+                      properties:
+                        seq: {type: integer}
+                        action: {type: string, enum: [recorded, synced, locked, unlocked]}
+                        event_time: {type: string, format: date-time}
+                        recorded_at: {type: string, format: date-time}
+                        actor_ref: {type: string, format: uuid}
+                        reason: {type: [string, "null"]}
+                        area: {$ref: "#/components/schemas/MechSeasonArea"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/mechanization/balance-runs:
+    post:
+      summary: Tính và LƯU cân đối cung–cầu của một vụ (FN-09, QT-01/QT-02) — phát pf.mechanization.balance.computed
+      description: |
+        Số máy cần = diện tích canh tác ÷ định mức hiệu lực TẠI VỤ (T = ngày bắt đầu vụ); năng lực = máy "Hoạt động" tại T;
+        chỉ khâu bật cờ thí điểm. Kết quả bất biến, kèm rule_version và phiên bản tham số đã dùng.
+        Chạy đồng bộ (dự kiến < 2 giây ở ĐTK 1); khi vượt ngưỡng sẽ chuyển sang 202 + job (R-52) mà không đổi hợp đồng kết quả.
+      operationId: mechComputeBalance
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [season_code, season_year]
+              properties:
+                season_code: {type: string}
+                season_year: {type: integer, description: "Năm bắt đầu vụ"}
+      responses:
+        "201":
+          description: Đã lưu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [run]
+                properties:
+                  run: {$ref: "#/components/schemas/MechRun"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/mechanization ---
 components:
   securitySchemes:
     oidc:
@@ -1184,6 +1555,37 @@ components:
             required: [document]
             properties:
               document: {$ref: "#/components/schemas/ContentAdminDocument"}
+    MechOwnerChanged:
+      description: Chủ sở hữu sau biến động, dòng sổ vừa ghi và máy bị vô hiệu hóa kèm (nếu có)
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [owner, event, deactivated_machines]
+            properties:
+              owner: {$ref: "#/components/schemas/MechOwner"}
+              event: {$ref: "#/components/schemas/MechOwnerEvent"}
+              deactivated_machines: {type: array, items: {$ref: "#/components/schemas/MechMachine"}}
+    MechMachineChanged:
+      description: Máy sau biến động và dòng sổ vừa ghi
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [machine, event]
+            properties:
+              machine: {$ref: "#/components/schemas/MechMachine"}
+              event: {$ref: "#/components/schemas/MechMachineEvent"}
+    MechAreaChanged:
+      description: Diện tích vụ sau biến động và dòng sổ vừa ghi
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [area, event]
+            properties:
+              area: {$ref: "#/components/schemas/MechSeasonArea"}
+              event: {type: object}
   schemas:
     Problem:
       type: object
@@ -1566,6 +1968,213 @@ components:
               id: {type: string, format: uuid, description: Tệp đã tải lên cho tài liệu hoặc có trong phiên bản gần nhất}
               role: {type: string, enum: [attachment, cover], default: attachment}
     # --- hết pf/content ---
+
+    MechOwnerType:
+      type: string
+      enum: [thanh_vien_htx, htx, doanh_nghiep, khac]
+      description: Thành viên HTX / HTX / Doanh nghiệp / Đơn vị khác (FN-04)
+    MechMachineStatus:
+      type: string
+      enum: [hoat_dong, bao_tri, hong, ngung_hoat_dong]
+    MechCoverageStatus:
+      type: string
+      enum: [sufficient, attention, shortage, surplus, no_data, no_norm, unclassified]
+      description: Đủ / Cần chú ý / Thiếu / Thừa / Chưa có dữ liệu / Chưa cấu hình định mức / Chưa cấu hình ngưỡng (QT-02)
+    MechOwner:
+      type: object
+      required: [id, code, owner_type, owner_type_label, cooperative_ref, person_ref, active, status_reason, label, masked_phone, label_unavailable, machines]
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string, pattern: "^CSH-[A-Z]{2,6}-[0-9]{5,}$", description: "Mã CSH tự sinh (FN-04 BR-02)"}
+        owner_type: {$ref: "#/components/schemas/MechOwnerType"}
+        owner_type_label: {type: string}
+        cooperative_ref: {type: [string, "null"], format: uuid}
+        person_ref: {type: [string, "null"], format: uuid, description: "Mã tham chiếu kho định danh (R-04)"}
+        active: {type: boolean}
+        status_reason: {type: [string, "null"]}
+        label: {type: string, description: "Tên tổ chức, hoặc nhãn cá nhân đã che"}
+        masked_phone: {type: string}
+        label_unavailable: {type: boolean}
+        machines: {type: integer, description: "Số máy đang hoạt động"}
+    MechMachine:
+      type: object
+      required: [ref, code, machine_type, farm_stage, cooperative_ref, owner_id, brand, model, serial_no, chassis_no, year_made, fuel, power_hp, capacity_ha, owned_since, status, status_label, status_source, source_label, status_at, active, deactivated_on, status_reason]
+      properties:
+        ref: {type: string, format: uuid}
+        code: {type: string, pattern: "^MAY-[A-Z]{2,6}-[0-9]{5,}$", description: "Mã máy tự sinh — nhãn hiển thị, không đổi khi máy/HTX đổi tỉnh (ADR-0009)"}
+        machine_type: {type: string}
+        farm_stage: {type: string, description: "Khâu suy ra từ chủng loại (FN-05 AC-03)"}
+        cooperative_ref: {type: string, format: uuid}
+        owner_id: {type: string, format: uuid}
+        brand: {type: [string, "null"]}
+        model: {type: [string, "null"]}
+        serial_no: {type: [string, "null"]}
+        chassis_no: {type: [string, "null"]}
+        year_made: {type: [integer, "null"]}
+        fuel: {type: [string, "null"]}
+        power_hp: {oneOf: [{$ref: "#/components/schemas/MechDecimal"}, {type: "null"}]}
+        capacity_ha: {oneOf: [{$ref: "#/components/schemas/MechDecimal"}, {type: "null"}]}
+        owned_since: {type: string, format: date}
+        status: {$ref: "#/components/schemas/MechMachineStatus"}
+        status_label: {type: string}
+        status_source: {type: string, enum: [manual, import, app_htx]}
+        source_label: {type: string, enum: ["Nhập tay", "App HTX"]}
+        status_at: {type: string, format: date-time}
+        active: {type: boolean}
+        deactivated_on: {type: [string, "null"], format: date}
+        status_reason: {type: [string, "null"]}
+    MechSeasonArea:
+      type: object
+      required: [id, cooperative_ref, season_code, season_year, commune_code, area_ha, source, source_label, source_at, locked, calendar]
+      properties:
+        id: {type: string, format: uuid}
+        cooperative_ref: {type: string, format: uuid}
+        season_code: {type: string}
+        season_year: {type: integer, description: "Năm bắt đầu vụ"}
+        commune_code: {type: [string, "null"]}
+        area_ha: {$ref: "#/components/schemas/MechDecimal"}
+        source: {type: string, enum: [app_htx, manual]}
+        source_label: {type: string, enum: ["App HTX", "Nhập tay"]}
+        source_at: {type: string, format: date-time}
+        locked: {type: boolean, description: "Khóa: đồng bộ App HTX không ghi đè (QT-03)"}
+        calendar:
+          type: array
+          items:
+            type: object
+            required: [stage, start, end]
+            properties:
+              stage: {type: string}
+              start: {type: string, format: date}
+              end: {type: string, format: date}
+    MechParam:
+      type: object
+      required: [key, value, version, source_doc]
+      properties:
+        key: {type: string}
+        value: {$ref: "#/components/schemas/MechDecimal"}
+        version: {type: integer}
+        source_doc: {type: string}
+    MechRun:
+      type: object
+      required: [id, season_code, season_year, season_key, reference_date, rule_version, pilot_stages, thresholds, result_count, status_counts, missing_norms, computed_at, seq]
+      properties:
+        id: {type: string, format: uuid}
+        season_code: {type: string}
+        season_year: {type: integer}
+        season_key: {type: string, description: "vd DX-2025"}
+        reference_date: {type: string, format: date, description: "T: ngày bắt đầu vụ — định mức, ngưỡng, số máy lấy tại T"}
+        rule_version: {type: string}
+        pilot_stages: {type: array, items: {type: string}}
+        thresholds:
+          type: object
+          required: [sufficient, attention, surplus]
+          properties:
+            sufficient: {oneOf: [{$ref: "#/components/schemas/MechParam"}, {type: "null"}]}
+            attention: {oneOf: [{$ref: "#/components/schemas/MechParam"}, {type: "null"}]}
+            surplus: {oneOf: [{$ref: "#/components/schemas/MechParam"}, {type: "null"}]}
+        result_count: {type: integer}
+        status_counts: {type: object, additionalProperties: {type: integer}}
+        missing_norms: {type: array, items: {type: string}}
+        computed_at: {type: string, format: date-time}
+        seq: {type: integer}
+    MechResult:
+      type: object
+      required: [cooperative_ref, commune_code, province_code, farm_stage, machine_type, area_ha, area_source, area_source_label, area_locked, norm_key, norm, required, required_whole, machines_total, capacity, coverage_pct, gap, status, status_label, color, seq]
+      properties:
+        cooperative_ref: {type: string, format: uuid}
+        commune_code: {type: [string, "null"]}
+        province_code: {type: [string, "null"]}
+        farm_stage: {type: string}
+        machine_type: {type: string}
+        area_ha: {oneOf: [{$ref: "#/components/schemas/MechDecimal"}, {type: "null"}]}
+        area_source: {type: [string, "null"], enum: [app_htx, manual, null]}
+        area_source_label: {type: string}
+        area_locked: {type: boolean}
+        norm_key: {type: string}
+        norm: {oneOf: [{$ref: "#/components/schemas/MechParam"}, {type: "null"}], description: "Định mức hiệu lực tại vụ đã dùng (QT-01)"}
+        required: {oneOf: [{$ref: "#/components/schemas/MechDecimal"}, {type: "null"}], description: "Diện tích ÷ định mức"}
+        required_whole: {type: [integer, "null"]}
+        machines_total: {type: integer}
+        capacity: {type: integer, description: "Máy \"Hoạt động\" tại T"}
+        coverage_pct: {oneOf: [{$ref: "#/components/schemas/MechDecimal"}, {type: "null"}]}
+        gap: {type: [integer, "null"], description: "Năng lực − nhu cầu làm tròn lên (âm = thiếu)"}
+        status: {$ref: "#/components/schemas/MechCoverageStatus"}
+        status_label: {type: string}
+        color: {type: string}
+        seq: {type: integer}
+    MechGroup:
+      type: object
+      required: [required, required_whole, capacity, machines_total, coverage_pct, status, status_label, color]
+      properties:
+        required: {$ref: "#/components/schemas/MechDecimal"}
+        required_whole: {type: integer}
+        capacity: {type: integer}
+        machines_total: {type: integer}
+        coverage_pct: {oneOf: [{$ref: "#/components/schemas/MechDecimal"}, {type: "null"}]}
+        status: {$ref: "#/components/schemas/MechCoverageStatus"}
+        status_label: {type: string}
+        color: {type: string}
+    MechCoverageItem:
+      type: object
+      required: [unit_code, cooperative_ref, name, province_code, commune_code, cooperatives, area_source, area_locked, overall, stages]
+      properties:
+        unit_code: {type: [string, "null"]}
+        cooperative_ref: {type: [string, "null"], format: uuid}
+        name: {type: string}
+        province_code: {type: [string, "null"]}
+        commune_code: {type: [string, "null"]}
+        cooperatives: {type: integer}
+        area_source: {type: [string, "null"]}
+        area_locked: {type: boolean}
+        overall: {$ref: "#/components/schemas/MechGroup"}
+        stages: {type: object, additionalProperties: {$ref: "#/components/schemas/MechGroup"}}
+    MechDecimal:
+      type: string
+      pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+      description: Số thập phân dạng chuỗi (không float)
+    MechMachineInput:
+      type: object
+      description: Không có Mã máy (tự sinh) và không có farm_stage (khâu tự gán theo chủng loại — gửi farm_stage → 422)
+      properties:
+        cooperative_ref: {type: string, format: uuid}
+        machine_type: {type: string, description: "Mã trong danh mục machine_type"}
+        owner_id: {type: string, format: uuid}
+        brand: {type: string}
+        model: {type: string}
+        serial_no: {type: string, description: "Số máy/SN — cần SN hoặc Số khung; duy nhất trong tenant"}
+        chassis_no: {type: string}
+        year_made: {type: integer}
+        fuel: {type: string}
+        power_hp: {$ref: "#/components/schemas/MechDecimal"}
+        capacity_ha: {$ref: "#/components/schemas/MechDecimal"}
+        owned_since: {type: string, format: date, description: "Ngày HTX sở hữu/tiếp nhận — không ở tương lai"}
+        status: {type: string, description: "Chỉ khi tạo; mặc định Hoạt động"}
+    MechOwnerEvent:
+      type: object
+      required: [seq, action, event_time, recorded_at, actor_ref, reason, active, cooperative_ref, machines_affected]
+      properties:
+        seq: {type: integer}
+        action: {type: string, enum: [created, deactivated, reactivated]}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        reason: {type: [string, "null"]}
+        active: {type: boolean}
+        cooperative_ref: {type: [string, "null"], format: uuid}
+        machines_affected: {type: integer}
+    MechMachineEvent:
+      type: object
+      required: [seq, action, source, event_time, recorded_at, actor_ref, reason, machine]
+      properties:
+        seq: {type: integer}
+        action: {type: string, enum: [created, updated, status_changed, deactivated, reactivated]}
+        source: {type: string, enum: [manual, import, app_htx]}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        reason: {type: [string, "null"]}
+        machine: {$ref: "#/components/schemas/MechMachine"}
+    # --- hết pf/mechanization ---
   requestBodies:
     ContentTransition:
       required: true
