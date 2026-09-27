@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.geo.plot_boundary.recorded/v1",
+  "title": "pf.geo.plot_boundary.recorded — payload",
+  "description": "Một phiên bản ranh giới thửa đã được ghi vào sổ chỉ ghi thêm pf_geo.plot_boundary (tạo mới hoặc sửa = bản ghi bù trỏ supersedes_id). became_current = false khi bản sửa ngoại tuyến dựa trên phiên bản cũ: bản ghi được giữ và mở xung đột chờ xử lý (mục 15). Không mang hình; không có dữ liệu cá nhân.",
+  "x-event-type": "pf.geo.plot_boundary.recorded",
+  "x-schema-version": 1,
+  "x-producer": "pf/geo",
+  "type": "object",
+  "required": ["plot_ref", "boundary_id", "version", "became_current", "area_ha", "point_count", "source", "commune_code", "cooperative_ref", "supersedes_id", "correction_reason", "actor_ref", "event_time"],
+  "properties": {
+    "plot_ref":          { "type": "string", "format": "uuid" },
+    "boundary_id":       { "type": "string", "format": "uuid" },
+    "version":           { "type": "integer", "minimum": 1, "description": "Số phiên bản = seq trong chuỗi băm của thửa" },
+    "became_current":    { "type": "boolean" },
+    "area_ha":           { "type": "string", "pattern": "^[0-9]+\\.[0-9]{4}$", "description": "Diện tích trắc địa (ha), decimal dạng chuỗi" },
+    "point_count":       { "type": "integer", "minimum": 4 },
+    "source":            { "type": "string", "enum": ["kn_web", "kn_field_app", "htx_app", "import_file", "cadastral"] },
+    "commune_code":      { "type": "string" },
+    "cooperative_ref":   { "type": ["string", "null"], "format": "uuid" },
+    "supersedes_id":     { "type": ["string", "null"], "format": "uuid", "description": "Phiên bản bị thay; null ở phiên bản đầu" },
+    "correction_reason": { "type": ["string", "null"], "minLength": 10 },
+    "actor_ref":         { "type": "string", "format": "uuid", "description": "Người vẽ (drawn_by)" },
+    "event_time":        { "type": "string", "format": "date-time" }
+  }
+}

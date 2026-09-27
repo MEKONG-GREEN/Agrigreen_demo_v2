@@ -639,6 +639,7 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
   # Chỉ tài liệu ĐÃ XUẤT BẢN trong phạm vi người gọi: toàn quốc + tỉnh + xã của mình (ADR-0009).
+
   /v1/documents:
     get:
       summary: Tra cứu tài liệu đã xuất bản (KN US-LIB-04, HTX US-NEWS-01) — tìm không dấu, lọc loại/nhãn/chuyên mục
@@ -713,6 +714,276 @@ paths:
                   items: {type: array, items: {$ref: "#/components/schemas/ContentVersionInfo"}}
         "404": {$ref: "#/components/responses/Problem"}
   # --- hết pf/content ---
+
+  /v1/plots:
+    get:
+      summary: Thửa trong khung nhìn (GIS FN-07 BR-24/25) — GeoJSON FeatureCollection, tối đa 1.000 polygon, lọc theo phạm vi xã/HTX
+      operationId: listPlotsInBBox
+      parameters:
+        - {name: bbox, in: query, required: true, description: "minLon,minLat,maxLon,maxLat (WGS84)", schema: {type: string, examples: ["105.55,10.00,105.70,10.15"]}}
+        - {name: zoom, in: query, description: "Mức zoom web-mercator; < 17 thì hình được đơn giản hóa (nửa điểm ảnh)", schema: {type: integer, minimum: 0, maximum: 22, default: 17}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 1000, default: 1000}}
+      responses:
+        "200":
+          description: Thửa chưa ngừng dùng giao khung nhìn. truncated = true khi còn thửa vượt limit (hãy zoom sâu hơn).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [type, features, truncated, limit]
+                properties:
+                  type: {type: string, enum: [FeatureCollection]}
+                  features: {type: array, items: {$ref: "#/components/schemas/PlotFeature"}}
+                  truncated: {type: boolean}
+                  limit: {type: integer}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Tạo thửa với ranh giới đầu tiên (KN US-PLOT-01, HTX US-PLOT-02/03). Chồng lấn cùng HTX vượt ngưỡng → 409 geo.overlap; khác HTX → nhận, mở xung đột chờ xem xét
+      operationId: createPlot
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PlotCreateInput"}
+      responses:
+        "201":
+          description: Đã tạo
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PlotWriteResult"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/plots/overlap-check:
+    post:
+      summary: Kiểm trước một ranh giới (KN US-PLOT-03 — cảnh báo ngay khi vẽ); chạy đủ kiểm tra như khi lưu nhưng không ghi
+      operationId: checkPlotOverlap
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [geometry, commune_code]
+              properties:
+                geometry: {$ref: "#/components/schemas/PolygonGeometry"}
+                commune_code: {type: string}
+                cooperative_ref: {type: [string, "null"], format: uuid}
+                exclude_plot_ref: {type: [string, "null"], format: uuid, description: "Thửa đang sửa (không tự so với chính nó)"}
+      responses:
+        "200":
+          description: Kết quả kiểm
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [area_ha, point_count, tolerance_pct, blocking, flagged, can_save]
+                properties:
+                  area_ha: {$ref: "#/components/schemas/Decimal"}
+                  point_count: {type: integer}
+                  tolerance_pct: {$ref: "#/components/schemas/Decimal"}
+                  blocking: {type: array, items: {$ref: "#/components/schemas/PlotOverlap"}, description: "Cùng HTX — sẽ bị chặn khi lưu"}
+                  flagged: {type: array, items: {$ref: "#/components/schemas/PlotOverlap"}, description: "Khác HTX — lưu được nhưng chờ xem xét"}
+                  can_save: {type: boolean}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/plots/{ref}:
+    get:
+      summary: Thửa kèm toàn bộ phiên bản ranh giới (lịch sử chỉ đọc) và xung đột; ngoài phạm vi → 404
+      operationId: getPlot
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thửa
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [plot, versions, conflicts]
+                properties:
+                  plot: {$ref: "#/components/schemas/PlotFeature"}
+                  versions: {type: array, items: {$ref: "#/components/schemas/PlotBoundaryVersion"}}
+                  conflicts: {type: array, items: {$ref: "#/components/schemas/BoundaryConflict"}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/plots/{ref}/boundaries:
+    post:
+      summary: Sửa ranh giới = phiên bản mới (bản ghi bù) trỏ supersedes_id về phiên bản hiện hành; phiên bản cũ giữ nguyên
+      operationId: correctPlotBoundary
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PlotCorrectInput"}
+      responses:
+        "201":
+          description: Đã ghi phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PlotWriteResult"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "geo.overlap, geo.version_conflict (supersedes_id không phải phiên bản hiện hành; kèm current_boundary_id), geo.plot_state_conflict", content: {application/problem+json: {schema: {$ref: "#/components/schemas/Problem"}}}}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/plots/{ref}/assign:
+    post:
+      summary: Gán thửa cho HTX / nông hộ (HTX US-PLOT-01 AC-3 — mỗi thửa đúng một HTX); cooperative_ref = null → về nháp. Quản lý HTX chỉ nhận thửa về HTX mình
+      operationId: assignPlot
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cooperative_ref: {type: [string, "null"], format: uuid}
+                household_ref: {type: [string, "null"], format: uuid}
+                reason: {type: string}
+      responses:
+        "200":
+          description: Đã gán
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PlotAttrResult"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/plots/{ref}/retire:
+    post:
+      summary: Ngừng dùng thửa (xóa mềm, GIS BR-17) — ẩn khỏi bản đồ, giữ toàn bộ lịch sử; lý do ≥ 10 ký tự
+      operationId: retirePlot
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 10}
+      responses:
+        "200":
+          description: Đã ngừng dùng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PlotAttrResult"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/cooperatives/{ref}/plots:
+    get:
+      summary: Thửa của một HTX (HTX US-PLOT-01), phân trang cursor
+      operationId: listCooperativePlots
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 1000, default: 200}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [type, features, next_cursor]
+                properties:
+                  type: {type: string, enum: [FeatureCollection]}
+                  features: {type: array, items: {$ref: "#/components/schemas/PlotFeature"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/geo/conflicts:
+    get:
+      summary: Xung đột ranh giới chờ xử lý trong phạm vi (mục 15 — người phụ trách + SLA tạm 72 giờ)
+      operationId: listBoundaryConflicts
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [open, resolved]}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/BoundaryConflict"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/geo/conflicts/{id}/resolve:
+    post:
+      summary: Đóng xung đột kèm ghi chú (≥ 10 ký tự); sửa hình nếu cần là một phiên bản ranh giới mới
+      operationId: resolveBoundaryConflict
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties:
+                note: {type: string, minLength: 10}
+      responses:
+        "200":
+          description: Đã đóng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/BoundaryConflict"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/admin-boundaries/{code}:
+    get:
+      summary: Ranh giới hành chính dùng chung hiện hành của tỉnh/xã (GIS FN-07 BR-21), GeoJSON Feature
+      operationId: getAdminBoundary
+      parameters:
+        - $ref: "#/components/parameters/UnitCode"
+        - {name: zoom, in: query, schema: {type: integer, minimum: 0, maximum: 22, default: 12}}
+      responses:
+        "200":
+          description: Ranh giới
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [type, id, geometry, properties]
+                properties:
+                  type: {type: string, enum: [Feature]}
+                  id: {type: string}
+                  geometry: {$ref: "#/components/schemas/PolygonGeometry"}
+                  properties:
+                    type: object
+                    required: [code, level, name, source, area_ha, imported_at]
+                    properties:
+                      code: {type: string}
+                      level: {type: string, enum: [province, commune]}
+                      name: {type: string}
+                      source: {type: string}
+                      area_ha: {$ref: "#/components/schemas/Decimal"}
+                      imported_at: {type: string, format: date-time}
+        "404": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -1251,3 +1522,139 @@ components:
         publisher_ref: {type: [string, "null"], format: uuid}
         return_reason: {type: [string, "null"]}
     # --- hết pf/content ---
+
+    PolygonGeometry:
+      type: object
+      description: GeoJSON (RFC 7946) Polygon hoặc MultiPolygon, WGS84 kinh/vĩ độ (EPSG:4326). Vòng chưa khép được tự khép. Tối thiểu 4 đỉnh phân biệt không thẳng hàng mỗi mảnh.
+      required: [type, coordinates]
+      properties:
+        type: {type: string, enum: [Polygon, MultiPolygon]}
+        coordinates: {type: array}
+    PlotProperties:
+      type: object
+      required: [ref, code, name, commune_code, cooperative_ref, household_ref, status, status_reason, version, boundary_id, area_ha, source, needs_review, revision, created_at, updated_at]
+      properties:
+        ref: {type: string, format: uuid}
+        code: {type: string, description: "Mã thửa hiển thị, vd TH0000001"}
+        name: {type: [string, "null"]}
+        commune_code: {type: string}
+        cooperative_ref: {type: [string, "null"], format: uuid, description: "null = KN vẽ trước, chưa gán HTX (\"Nháp - KN vẽ trước\")"}
+        household_ref: {type: [string, "null"], format: uuid}
+        status: {type: string, enum: [draft, active, retired]}
+        status_reason: {type: [string, "null"]}
+        version: {type: integer, description: "Phiên bản ranh giới hiện hành"}
+        boundary_id: {type: string, format: uuid}
+        area_ha: {$ref: "#/components/schemas/Decimal"}
+        source: {type: string, enum: [kn_web, kn_field_app, htx_app, import_file, cadastral]}
+        needs_review: {type: boolean, description: "Có xung đột chồng lấn chờ xử lý"}
+        revision: {type: integer}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    PlotFeature:
+      type: object
+      required: [type, id, geometry, properties]
+      properties:
+        type: {type: string, enum: [Feature]}
+        id: {type: string, format: uuid}
+        geometry: {$ref: "#/components/schemas/PolygonGeometry"}
+        properties: {$ref: "#/components/schemas/PlotProperties"}
+    PlotBoundaryInput:
+      type: object
+      required: [geometry]
+      properties:
+        boundary_id: {type: string, format: uuid, description: "UUIDv7 sinh trên máy (R-11); bỏ trống → server sinh"}
+        geometry: {$ref: "#/components/schemas/PolygonGeometry"}
+        gps_accuracy_m: {$ref: "#/components/schemas/Decimal"}
+        source: {type: string, enum: [kn_web, kn_field_app, htx_app, import_file, cadastral], default: kn_web}
+        event_time: {type: string, format: date-time, description: "Lúc vẽ tại hiện trường (R-13); mặc định hiện tại"}
+        device_id: {type: string}
+    PlotCreateInput:
+      allOf:
+        - $ref: "#/components/schemas/PlotBoundaryInput"
+        - type: object
+          required: [commune_code]
+          properties:
+            plot_ref: {type: string, format: uuid, description: "UUIDv7 sinh trên máy; bỏ trống → server sinh"}
+            name: {type: string, maxLength: 200}
+            commune_code: {type: string}
+            cooperative_ref: {type: [string, "null"], format: uuid, description: "Quản lý HTX bỏ trống → HTX của chính mình"}
+            household_ref: {type: [string, "null"], format: uuid}
+    PlotCorrectInput:
+      allOf:
+        - $ref: "#/components/schemas/PlotBoundaryInput"
+        - type: object
+          required: [supersedes_id, correction_reason]
+          properties:
+            supersedes_id: {type: string, format: uuid, description: "boundary_id của phiên bản hiện hành đang được thay"}
+            correction_reason: {type: string, minLength: 10}
+    PlotBoundaryVersion:
+      type: object
+      required: [boundary_id, plot_ref, version, area_ha, point_count, gps_accuracy_m, source, commune_code, cooperative_ref, became_current, event_time, recorded_at, supersedes_id, correction_reason, drawn_by, device_id]
+      properties:
+        boundary_id: {type: string, format: uuid}
+        plot_ref: {type: string, format: uuid}
+        version: {type: integer}
+        area_ha: {$ref: "#/components/schemas/Decimal"}
+        point_count: {type: integer}
+        gps_accuracy_m: {oneOf: [{$ref: "#/components/schemas/Decimal"}, {type: "null"}]}
+        source: {type: string}
+        commune_code: {type: string}
+        cooperative_ref: {type: [string, "null"], format: uuid}
+        became_current: {type: boolean, description: "false: bản sửa ngoại tuyến dựa trên phiên bản cũ — được giữ, chờ xử lý"}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        drawn_by: {type: string, format: uuid}
+        device_id: {type: [string, "null"]}
+        geometry: {$ref: "#/components/schemas/PolygonGeometry"}
+    PlotOverlap:
+      type: object
+      required: [plot_ref, code, cooperative_ref, intersect_ha, overlap_pct]
+      properties:
+        plot_ref: {type: string, format: uuid}
+        code: {type: string}
+        cooperative_ref: {type: [string, "null"], format: uuid}
+        intersect_ha: {$ref: "#/components/schemas/Decimal"}
+        overlap_pct: {$ref: "#/components/schemas/Decimal", description: "Phần trăm so với thửa nhỏ hơn"}
+    BoundaryConflict:
+      type: object
+      required: [id, kind, plot_ref, boundary_id, other_plot_refs, max_overlap_pct, commune_code, owner_ref, due_at, status, detected_at, resolved_by, resolved_at, resolution_note]
+      properties:
+        id: {type: string, format: uuid}
+        kind: {type: string, enum: [same_coop_overlap, cross_coop_overlap, concurrent_edit]}
+        plot_ref: {type: string, format: uuid}
+        boundary_id: {type: string, format: uuid}
+        other_plot_refs: {type: array, items: {type: string, format: uuid}}
+        max_overlap_pct: {oneOf: [{$ref: "#/components/schemas/Decimal"}, {type: "null"}]}
+        commune_code: {type: string}
+        owner_ref: {type: [string, "null"], format: uuid, description: "HTX phụ trách; null = cán bộ KN của xã"}
+        due_at: {type: string, format: date-time, description: "SLA tạm 72 giờ (C-8)"}
+        status: {type: string, enum: [open, resolved]}
+        detected_at: {type: string, format: date-time}
+        resolved_by: {type: [string, "null"], format: uuid}
+        resolved_at: {type: [string, "null"], format: date-time}
+        resolution_note: {type: [string, "null"]}
+    PlotWriteResult:
+      type: object
+      required: [plot, boundary, conflicts, flagged_overlaps]
+      properties:
+        plot: {$ref: "#/components/schemas/PlotFeature"}
+        boundary: {$ref: "#/components/schemas/PlotBoundaryVersion"}
+        conflicts: {type: array, items: {$ref: "#/components/schemas/BoundaryConflict"}}
+        flagged_overlaps: {type: array, items: {$ref: "#/components/schemas/PlotOverlap"}, description: "Chồng lấn khác HTX đã nhận nhưng chờ xem xét"}
+    PlotAttrResult:
+      type: object
+      required: [plot, event]
+      properties:
+        plot: {$ref: "#/components/schemas/PlotFeature"}
+        event:
+          type: object
+          required: [id, action, seq, event_time, reason, actor_ref]
+          properties:
+            id: {type: string, format: uuid}
+            action: {type: string, enum: [assigned, retired]}
+            seq: {type: integer}
+            event_time: {type: string, format: date-time}
+            reason: {type: [string, "null"]}
+            actor_ref: {type: string, format: uuid}
