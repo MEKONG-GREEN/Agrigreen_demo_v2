@@ -1,0 +1,38 @@
+{
+  "format": "agrigreen.catalogs/v1",
+  "source": "BRD Bản đồ CGH v1.3 (FN-02, BR-06), Backlog App HTX v4.0 (US-CAT-01), nguyên mẫu mekong-green (src/seed.ts, src/mdm/varieties.ts)",
+  "items": [
+    {"catalog": "farm_stage", "code": "lam_dat", "name": "Làm đất", "attrs": {"pilot": "true", "description": "Cày, xới, trục, san phẳng mặt ruộng"}},
+    {"catalog": "farm_stage", "code": "gieo_sa", "name": "Gieo sạ / Cấy", "attrs": {"pilot": "true", "description": "Gieo sạ hàng, sạ cụm, cấy máy"}},
+    {"catalog": "farm_stage", "code": "cham_soc", "name": "Chăm sóc", "attrs": {"pilot": "true", "description": "Bón phân, phun thuốc bảo vệ thực vật"}},
+    {"catalog": "farm_stage", "code": "thu_hoach", "name": "Thu hoạch", "attrs": {"pilot": "true", "description": "Gặt đập liên hợp"}},
+    {"catalog": "farm_stage", "code": "sau_thu_hoach", "name": "Sau thu hoạch", "attrs": {"pilot": "false", "description": "Sấy lúa, thu gom và cuộn rơm"}},
+
+    {"catalog": "machine_type", "code": "MLD", "name": "Máy làm đất (máy cày/xới)", "attrs": {"farm_stage": "lam_dat"}},
+    {"catalog": "machine_type", "code": "MGS", "name": "Máy gieo sạ / cấy", "attrs": {"farm_stage": "gieo_sa"}},
+    {"catalog": "machine_type", "code": "MPT", "name": "Máy phun thuốc / drone", "attrs": {"farm_stage": "cham_soc"}},
+    {"catalog": "machine_type", "code": "MGD", "name": "Máy gặt đập liên hợp", "attrs": {"farm_stage": "thu_hoach"}},
+    {"catalog": "machine_type", "code": "MCR", "name": "Máy cuộn rơm", "attrs": {"farm_stage": "sau_thu_hoach"}},
+    {"catalog": "machine_type", "code": "MSL", "name": "Máy sấy lúa", "attrs": {"farm_stage": "sau_thu_hoach"}},
+
+    {"catalog": "season", "code": "DX", "name": "Đông Xuân", "attrs": {"start_month": "11", "end_month": "3"}},
+    {"catalog": "season", "code": "HT", "name": "Hè Thu", "attrs": {"start_month": "4", "end_month": "8"}},
+    {"catalog": "season", "code": "TD", "name": "Thu Đông", "attrs": {"start_month": "8", "end_month": "12"}},
+
+    {"catalog": "rice_variety", "code": "OM5451", "name": "OM5451", "attrs": {"growth_days": "95", "expected_yield_t_per_ha": "6.75"}},
+    {"catalog": "rice_variety", "code": "OM18", "name": "OM18", "attrs": {"growth_days": "97", "expected_yield_t_per_ha": "6.75"}},
+    {"catalog": "rice_variety", "code": "DT8", "name": "Đài Thơm 8", "attrs": {"growth_days": "100", "expected_yield_t_per_ha": "6.5"}},
+    {"catalog": "rice_variety", "code": "ST25", "name": "ST25 (lúa đặc sản)", "attrs": {"growth_days": "105", "expected_yield_t_per_ha": "5.5"}},
+    {"catalog": "rice_variety", "code": "IR50404", "name": "IR50404", "attrs": {"growth_days": "90", "expected_yield_t_per_ha": "7.25"}},
+    {"catalog": "rice_variety", "code": "JASMINE85", "name": "Jasmine 85", "attrs": {"growth_days": "100", "expected_yield_t_per_ha": "6"}},
+
+    {"catalog": "pest", "code": "ray_nau", "name": "Rầy nâu", "attrs": {"kind": "sau_hai"}},
+    {"catalog": "pest", "code": "sau_cuon_la", "name": "Sâu cuốn lá nhỏ", "attrs": {"kind": "sau_hai"}},
+    {"catalog": "pest", "code": "dao_on", "name": "Bệnh đạo ôn", "attrs": {"kind": "benh_hai"}},
+    {"catalog": "pest", "code": "bac_la", "name": "Bệnh bạc lá", "attrs": {"kind": "benh_hai"}},
+    {"catalog": "pest", "code": "lem_lep_hat", "name": "Bệnh lem lép hạt", "attrs": {"kind": "benh_hai"}},
+    {"catalog": "pest", "code": "vang_lun", "name": "Bệnh vàng lùn – lùn xoắn lá", "attrs": {"kind": "benh_hai"}},
+    {"catalog": "pest", "code": "oc_buou_vang", "name": "Ốc bươu vàng", "attrs": {"kind": "dong_vat_hai"}},
+    {"catalog": "pest", "code": "chuot", "name": "Chuột", "attrs": {"kind": "dong_vat_hai"}}
+  ]
+}

@@ -1,0 +1,499 @@
+openapi: 3.1.0
+info:
+  title: AgriGreen Admin API
+  version: "1"
+  description: |
+    Bề mặt Admin (admin.<domain>) — OIDC + JWT + **MFA bắt buộc** cho mọi route (mục 11).
+    Dữ liệu chủ, tham số, phê duyệt, nhật ký. Mọi POST bắt buộc Idempotency-Key (R-51).
+    Lỗi theo RFC 9457 (docs/errors.md). Tenant lấy từ token, không bao giờ từ path/query/body (R-16).
+    Thay đổi có phê duyệt dùng hai vai param_setter và param_approver; người duyệt không được là người đặt (R-56).
+servers:
+  - url: https://admin.agrigreen.vn
+security:
+  - oidc: []
+paths:
+  /v1/masterdata/seed:
+    post:
+      summary: Nạp dữ liệu nền nhúng cho tenant của người gọi (chạy lặp an toàn)
+      description: Vai masterdata_admin hoặc platform_admin. Đơn vị hành chính ĐBSCL, danh mục mặc định, tham số CGH đã duyệt.
+      operationId: seedMasterdata
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Tổng kết
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  admin_units: { $ref: "#/components/schemas/ImportResult" }
+                  catalog_items_created: { type: integer }
+                  params_created: { type: integer }
+                  params_skipped: { type: integer }
+        "401": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+  /v1/masterdata/admin-units/import:
+    post:
+      summary: Nhập danh mục đơn vị hành chính có hiệu lực theo thời gian
+      description: |
+        Vai masterdata_admin. Một giao dịch: thêm phiên bản mới, đóng hiệu lực phiên bản đang mở (valid_to + successors),
+        bỏ qua dòng không đổi. Nhập lặp cùng tệp không đổi gì. Không bao giờ xóa hay sửa nội dung phiên bản đã có.
+        Phát pf.masterdata.admin_unit.changed cho mỗi phiên bản thêm/đóng.
+      operationId: importAdminUnits
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GazetteerFile" }
+      responses:
+        "200":
+          description: Tổng kết
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportResult" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "409": { description: "masterdata.admin_unit_conflict | masterdata.admin_unit_overlap", $ref: "#/components/responses/Problem" }
+        "422": { description: "validation_failed | masterdata.admin_unit_invalid_reference", $ref: "#/components/responses/Problem" }
+  /v1/masterdata/catalogs/{catalog}/items:
+    parameters:
+      - $ref: "#/components/parameters/Catalog"
+    get:
+      summary: Liệt kê mục danh mục (mặc định gồm cả mục đã ngừng dùng)
+      operationId: adminListCatalogItems
+      tags: [masterdata]
+      parameters:
+        - { name: include_inactive, in: query, schema: { type: boolean, default: true } }
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/CatalogItem" } }
+                  next_cursor: { type: [string, "null"] }
+        "404": { $ref: "#/components/responses/Problem" }
+    post:
+      summary: Thêm mục danh mục (vai masterdata_admin)
+      operationId: createCatalogItem
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CatalogItemInput" }
+      responses:
+        "201":
+          description: Đã thêm. Gọi lặp cùng khóa trả lại đúng phản hồi này, kèm Idempotent-Replayed.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatalogItem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { description: masterdata.catalog_not_found, $ref: "#/components/responses/Problem" }
+        "409": { description: masterdata.catalog_item_exists, $ref: "#/components/responses/Problem" }
+        "422": { description: "validation_failed | masterdata.farm_stage_invalid", $ref: "#/components/responses/Problem" }
+  /v1/masterdata/catalogs/{catalog}/items/{code}:
+    parameters:
+      - $ref: "#/components/parameters/Catalog"
+      - $ref: "#/components/parameters/ItemCode"
+    put:
+      summary: Sửa tên/thuộc tính (ghi lịch sử trước → sau; không đổi gì thì không ghi)
+      operationId: updateCatalogItem
+      tags: [masterdata]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CatalogItemInput" }
+      responses:
+        "200":
+          description: Mục sau khi sửa
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatalogItem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /v1/masterdata/catalogs/{catalog}/items/{code}/deactivate:
+    parameters:
+      - $ref: "#/components/parameters/Catalog"
+      - $ref: "#/components/parameters/ItemCode"
+    post:
+      summary: Ngừng dùng một mục (không xóa; lý do bắt buộc ≥ 10 ký tự)
+      operationId: deactivateCatalogItem
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReasonInput" }
+      responses:
+        "200":
+          description: Mục đã ngừng dùng
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatalogItem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { description: masterdata.catalog_item_state, $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /v1/masterdata/catalogs/{catalog}/items/{code}/reactivate:
+    parameters:
+      - $ref: "#/components/parameters/Catalog"
+      - $ref: "#/components/parameters/ItemCode"
+    post:
+      summary: Dùng lại một mục đã ngừng
+      operationId: reactivateCatalogItem
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReasonInput" }
+      responses:
+        "200":
+          description: Mục đang dùng
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatalogItem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /v1/masterdata/catalogs/{catalog}/items/{code}/history:
+    parameters:
+      - $ref: "#/components/parameters/Catalog"
+      - $ref: "#/components/parameters/ItemCode"
+    get:
+      summary: Lịch sử thay đổi của một mục (sổ chỉ ghi thêm, có chuỗi băm)
+      operationId: catalogItemHistory
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang, theo thứ tự ghi
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/CatalogChange" } }
+                  next_cursor: { type: [string, "null"] }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+  /v1/masterdata/params/versions:
+    post:
+      summary: Đề xuất phiên bản tham số (nháp, vai param_setter)
+      description: |
+        Số phiên bản tăng dần theo khóa. Nếu đã có phiên bản được duyệt cùng effective_from, phải nêu
+        correction_reason — bản duyệt mới là bản ghi bù (supersedes_id), bản cũ vẫn trong sổ.
+      operationId: proposeParam
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ParamProposal" }
+      responses:
+        "201":
+          description: Đã tạo nháp
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ParamVersion" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "422": { description: "validation_failed | masterdata.param_correction_required", $ref: "#/components/responses/Problem" }
+    get:
+      summary: Lịch sử phiên bản tham số (mọi trạng thái)
+      operationId: listParamVersions
+      tags: [masterdata]
+      parameters:
+        - { name: key, in: query, schema: { type: string }, examples: { norm: { value: "cgh.norm_ha_per_machine:MGD:thu_hoach" } } }
+        - { name: status, in: query, schema: { type: string, enum: [draft, submitted, approved, rejected] } }
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang, theo thứ tự tạo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/ParamVersion" } }
+                  next_cursor: { type: [string, "null"] }
+        "403": { $ref: "#/components/responses/Problem" }
+  /v1/masterdata/params/versions/{id}:
+    get:
+      operationId: getParamVersion
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/VersionID"
+      responses:
+        "200":
+          description: Phiên bản
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ParamVersion" }
+        "404": { description: masterdata.param_version_not_found, $ref: "#/components/responses/Problem" }
+  /v1/masterdata/params/versions/{id}/submit:
+    post:
+      summary: Gửi duyệt (chỉ người đặt)
+      operationId: submitParamVersion
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/VersionID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Đã gửi duyệt
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ParamVersion" }
+        "403": { description: "forbidden | masterdata.param_not_setter", $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { description: masterdata.param_invalid_transition, $ref: "#/components/responses/Problem" }
+  /v1/masterdata/params/versions/{id}/approve:
+    post:
+      summary: Phê duyệt (vai param_approver, không phải người đặt — R-56)
+      description: Ghi sổ param_approved và phát pf.masterdata.param.approved trong cùng giao dịch. Phiên bản đã duyệt bất biến.
+      operationId: approveParamVersion
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/VersionID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DecisionInput" }
+      responses:
+        "200":
+          description: Đã duyệt
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, approved]
+                properties:
+                  version: { $ref: "#/components/schemas/ParamVersion" }
+                  approved: { $ref: "application.yaml#/components/schemas/ParamValue" }
+        "403": { description: "forbidden | self_approval_forbidden", $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { description: masterdata.param_invalid_transition, $ref: "#/components/responses/Problem" }
+        "422": { description: masterdata.param_correction_required, $ref: "#/components/responses/Problem" }
+  /v1/masterdata/params/versions/{id}/reject:
+    post:
+      summary: Từ chối (vai param_approver, không phải người đặt; lý do bắt buộc)
+      operationId: rejectParamVersion
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/VersionID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DecisionInput" }
+      responses:
+        "200":
+          description: Đã từ chối
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ParamVersion" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+components:
+  securitySchemes:
+    oidc:
+      type: openIdConnect
+      openIdConnectUrl: https://auth.agrigreen.vn/realms/agrigreen/.well-known/openid-configuration
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, pattern: "^[A-Za-z0-9._:-]{8,200}$" }
+    Catalog:
+      name: catalog
+      in: path
+      required: true
+      schema: { type: string, enum: [rice_variety, farm_stage, machine_type, season, pest] }
+    ItemCode:
+      name: code
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$" }
+    VersionID:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+  responses:
+    Problem:
+      description: RFC 9457
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        code: { type: string }
+        detail: { type: string }
+        instance: { type: string }
+        trace_id: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              reason: { type: string }
+    GazetteerFile:
+      type: object
+      required: [format, source, units]
+      additionalProperties: false
+      properties:
+        format: { type: string, const: agrigreen.admin_units/v1 }
+        source: { type: string, maxLength: 300, description: "Nguồn dữ liệu (văn bản, tệp gốc)" }
+        note: { type: string }
+        units:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items:
+            type: object
+            required: [code, name, level, valid_from]
+            additionalProperties: false
+            properties:
+              code: { type: string, pattern: "^[0-9A-Z][0-9A-Z.-]{0,39}$" }
+              name: { type: string, maxLength: 200 }
+              level: { type: string, enum: [province, commune, district], description: "district chỉ cho dữ liệu lịch sử, valid_to ≤ 2025-07-01" }
+              parent_code: { type: string }
+              valid_from: { type: string, format: date }
+              valid_to: { type: string, format: date, description: "Không bao gồm; bỏ trống = còn hiệu lực" }
+              successors: { type: array, items: { type: string }, description: "Đơn vị kế thừa, phải có hiệu lực tại valid_to" }
+    ImportResult:
+      type: object
+      required: [created, closed, unchanged]
+      properties:
+        created: { type: integer }
+        closed: { type: integer }
+        unchanged: { type: integer }
+    CatalogItemInput:
+      type: object
+      required: [name]
+      properties:
+        code: { type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$", description: "Bắt buộc khi thêm; khi sửa bỏ trống hoặc trùng mã trên đường dẫn" }
+        name: { type: string, maxLength: 200 }
+        attrs:
+          type: object
+          additionalProperties: { type: string }
+          description: |
+            Theo danh mục — rice_variety: growth_days, expected_yield_t_per_ha (decimal); farm_stage: pilot (true|false, cờ thí điểm CGH), description;
+            machine_type: farm_stage (mã khâu đang dùng); season: start_month, end_month; pest: kind (sau_hai|benh_hai|dong_vat_hai|co_dai).
+    CatalogItem:
+      type: object
+      required: [catalog, code, name, attrs, active, deactivation_reason, revision, updated_at]
+      properties:
+        catalog: { type: string }
+        code: { type: string }
+        name: { type: string }
+        attrs: { type: object, additionalProperties: { type: string } }
+        active: { type: boolean }
+        deactivation_reason: { type: [string, "null"] }
+        revision: { type: integer }
+        updated_at: { type: string, format: date-time }
+    ReasonInput:
+      type: object
+      properties:
+        reason: { type: string, minLength: 10, maxLength: 500 }
+    CatalogSnapshot:
+      type: object
+      properties:
+        name: { type: string }
+        attrs: { type: object, additionalProperties: { type: string } }
+        active: { type: boolean }
+        deactivation_reason: { type: string }
+    CatalogChange:
+      type: object
+      required: [id, action, before, after, reason, event_time, actor_ref, seq, recorded_at]
+      properties:
+        id: { type: string, format: uuid }
+        action: { type: string, enum: [created, updated, deactivated, reactivated] }
+        before: { oneOf: [{ $ref: "#/components/schemas/CatalogSnapshot" }, { type: "null" }] }
+        after: { $ref: "#/components/schemas/CatalogSnapshot" }
+        reason: { type: [string, "null"] }
+        event_time: { type: string, format: date-time }
+        actor_ref: { type: string, format: uuid }
+        seq: { type: integer }
+        recorded_at: { type: string, format: date-time }
+    ParamProposal:
+      type: object
+      required: [key, effective_from, source_doc]
+      properties:
+        key: { type: string, maxLength: 200, pattern: "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+(:[A-Za-z0-9_.-]+)*$", examples: ["cgh.norm_ha_per_machine:MGD:thu_hoach"] }
+        value: { type: [string, number], description: "Số thập phân (chuỗi khuyến nghị); đọc thẳng thành decimal, không qua float. Loại trừ với text." }
+        text: { type: string, maxLength: 1000 }
+        unit: { type: string, maxLength: 30 }
+        effective_from: { type: string, description: "RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam" }
+        source_doc: { type: string, maxLength: 300, description: "Số/ngày văn bản ban hành (bắt buộc — CGH FN-02 B3)" }
+        correction_reason: { type: string, minLength: 10 }
+    ParamVersion:
+      type: object
+      required: [id, key, version, value, text, unit, effective_from, source_doc, status, setter_ref, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string }
+        version: { type: integer, minimum: 1 }
+        value: { type: [string, "null"] }
+        text: { type: [string, "null"] }
+        unit: { type: string }
+        effective_from: { type: string, format: date-time }
+        source_doc: { type: string }
+        correction_reason: { type: [string, "null"] }
+        status: { type: string, enum: [draft, submitted, approved, rejected] }
+        setter_ref: { type: string, format: uuid }
+        submitted_at: { type: [string, "null"], format: date-time }
+        approver_ref: { type: [string, "null"], format: uuid }
+        decided_at: { type: [string, "null"], format: date-time }
+        decision_note: { type: [string, "null"] }
+        created_at: { type: string, format: date-time }
+    DecisionInput:
+      type: object
+      properties:
+        note: { type: string, maxLength: 500, description: "Bắt buộc (≥ 10 ký tự) khi từ chối" }

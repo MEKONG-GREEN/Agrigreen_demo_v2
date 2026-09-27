@@ -1,0 +1,16 @@
+{
+  "format": "agrigreen.params/v1",
+  "source": "BRD Bản đồ CGH v1.3 (QT-01, QT-02, mục IV.1.c); nguyên mẫu mekong-green src/seed.ts (định mức minh hoạ)",
+  "params": [
+    {"key": "cgh.coverage.sufficient_min_pct", "value": "85", "unit": "%", "effective_from": "2026-01-01", "source_doc": "BRD Bản đồ CGH v1.3 — QT-02: Đủ ≥85% (đề xuất, chờ văn bản DCRD)"},
+    {"key": "cgh.coverage.attention_min_pct", "value": "60", "unit": "%", "effective_from": "2026-01-01", "source_doc": "BRD Bản đồ CGH v1.3 — QT-02: Cần chú ý 60–<85%, Thiếu <60% (đề xuất, chờ văn bản DCRD)"},
+    {"key": "cgh.coverage.surplus_min_pct", "value": "120", "unit": "%", "effective_from": "2026-01-01", "source_doc": "BRD Bản đồ CGH v1.3 — QT-02: Thừa ≥120% (đề xuất, chờ văn bản DCRD)"},
+
+    {"key": "cgh.norm_ha_per_machine:MLD:lam_dat", "value": "120", "unit": "ha/máy/vụ", "effective_from": "2026-01-01", "source_doc": "QĐ số 128/QĐ-KTHT ngày 15/01/2026 (minh hoạ)"},
+    {"key": "cgh.norm_ha_per_machine:MGS:gieo_sa", "value": "100", "unit": "ha/máy/vụ", "effective_from": "2026-01-01", "source_doc": "QĐ số 128/QĐ-KTHT ngày 15/01/2026 (minh hoạ)"},
+    {"key": "cgh.norm_ha_per_machine:MPT:cham_soc", "value": "260", "unit": "ha/máy/vụ", "effective_from": "2026-01-01", "source_doc": "QĐ số 128/QĐ-KTHT ngày 15/01/2026 (minh hoạ)"},
+    {"key": "cgh.norm_ha_per_machine:MGD:thu_hoach", "value": "90", "unit": "ha/máy/vụ", "effective_from": "2026-01-01", "source_doc": "QĐ số 128/QĐ-KTHT ngày 15/01/2026 (minh hoạ)"},
+    {"key": "cgh.norm_ha_per_machine:MCR:sau_thu_hoach", "value": "140", "unit": "ha/máy/vụ", "effective_from": "2026-01-01", "source_doc": "QĐ số 128/QĐ-KTHT ngày 15/01/2026 (minh hoạ)"},
+    {"key": "cgh.norm_ha_per_machine:MSL:sau_thu_hoach", "value": "400", "unit": "ha/máy/vụ", "effective_from": "2026-01-01", "source_doc": "QĐ số 128/QĐ-KTHT ngày 15/01/2026 (minh hoạ)"}
+  ]
+}

@@ -67,6 +67,134 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Consent" }
         "404": { $ref: "#/components/responses/Problem" }
+  # --- pf/masterdata (chỉ đọc; ghi qua Admin API — contracts/openapi/admin.yaml) ---
+  # Dữ liệu chủ là dữ liệu tham chiếu của tenant: mọi người gọi đã xác thực đều đọc được.
+  /v1/masterdata/admin-units:
+    get:
+      summary: Đơn vị con trực tiếp có hiệu lực tại thời điểm at (parent bỏ trống → các tỉnh)
+      operationId: listAdminUnits
+      tags: [masterdata]
+      parameters:
+        - { name: parent, in: query, schema: { type: string } }
+        - $ref: "#/components/parameters/At"
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: Một trang, theo mã
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/AdminUnit" } }
+                  next_cursor: { type: [string, "null"] }
+        "404": { description: masterdata.admin_unit_not_found, $ref: "#/components/responses/Problem" }
+  /v1/masterdata/admin-units/{code}:
+    get:
+      summary: Đơn vị có hiệu lực tại at (cùng một mã có thể là đơn vị khác nhau ở hai thời điểm)
+      operationId: getAdminUnit
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/UnitCode"
+        - $ref: "#/components/parameters/At"
+      responses:
+        "200":
+          description: Đơn vị
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminUnit" }
+        "404": { $ref: "#/components/responses/Problem" }
+  /v1/masterdata/admin-units/{code}/tree:
+    get:
+      summary: Cây đơn vị (chính nó và mọi đơn vị con cháu) có hiệu lực tại at
+      operationId: getAdminUnitTree
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/UnitCode"
+        - $ref: "#/components/parameters/At"
+      responses:
+        "200":
+          description: Cây
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminUnitNode" }
+        "404": { $ref: "#/components/responses/Problem" }
+  /v1/masterdata/admin-units/{code}/current:
+    get:
+      summary: Mã hiện hành (tại at) của một mã có thể đã cũ — đi theo chuỗi sáp nhập/chia tách
+      operationId: currentAdminUnitCodes
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/UnitCode"
+        - $ref: "#/components/parameters/At"
+      responses:
+        "200":
+          description: Mã hiện hành
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, at, current_codes]
+                properties:
+                  code: { type: string }
+                  at: { type: string, format: date-time }
+                  current_codes: { type: array, items: { type: string } }
+        "404": { $ref: "#/components/responses/Problem" }
+  /v1/masterdata/catalogs/{catalog}:
+    get:
+      summary: Danh sách mục của một danh mục (mặc định chỉ mục đang dùng)
+      operationId: listCatalog
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/Catalog"
+        - { name: include_inactive, in: query, schema: { type: boolean, default: false } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: Một trang, theo mã
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/CatalogItem" } }
+                  next_cursor: { type: [string, "null"] }
+        "404": { description: masterdata.catalog_not_found, $ref: "#/components/responses/Problem" }
+  /v1/masterdata/catalogs/{catalog}/{code}:
+    get:
+      summary: Một mục danh mục (kể cả đã ngừng dùng)
+      operationId: getCatalogItem
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/Catalog"
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Mục
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatalogItem" }
+        "404": { description: masterdata.catalog_item_not_found, $ref: "#/components/responses/Problem" }
+  /v1/masterdata/params/value:
+    get:
+      summary: Giá trị tham số ĐÃ PHÊ DUYỆT có hiệu lực tại thời điểm của sự việc (CGH QT-01, AC-02)
+      operationId: getParamValue
+      tags: [masterdata]
+      parameters:
+        - { name: key, in: query, required: true, schema: { type: string }, examples: { norm: { value: "cgh.norm_ha_per_machine:MGD:thu_hoach" } } }
+        - $ref: "#/components/parameters/At"
+      responses:
+        "200":
+          description: Giá trị
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ParamValue" }
+        "404": { description: masterdata.param_not_found, $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
 components:
   securitySchemes:
     oidc:
@@ -78,6 +206,21 @@ components:
       in: header
       required: true
       schema: { type: string, pattern: "^[A-Za-z0-9._:-]{8,200}$" }
+    At:
+      name: at
+      in: query
+      description: Thời điểm tra (RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam). Mặc định là hiện tại.
+      schema: { type: string }
+    UnitCode:
+      name: code
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[0-9A-Z][0-9A-Z.-]{0,39}$" }
+    Catalog:
+      name: catalog
+      in: path
+      required: true
+      schema: { type: string, enum: [rice_variety, farm_stage, machine_type, season, pest] }
   responses:
     Problem:
       description: RFC 9457
@@ -123,3 +266,48 @@ components:
           properties:
             recorded_at: { type: string, format: date-time }
             seq: { type: integer, description: "Thứ tự trong chuỗi băm của chủ thể" }
+    AdminUnit:
+      type: object
+      required: [code, name, level, parent_code, valid_from, valid_to, successor_codes]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        level: { type: string, enum: [province, commune, district], description: "district chỉ có trong dữ liệu trước 01/07/2025" }
+        parent_code: { type: [string, "null"] }
+        valid_from: { type: string, format: date }
+        valid_to: { type: [string, "null"], format: date, description: "Không bao gồm; null = còn hiệu lực" }
+        successor_codes: { type: array, items: { type: string } }
+    AdminUnitNode:
+      allOf:
+        - $ref: "#/components/schemas/AdminUnit"
+        - type: object
+          required: [children]
+          properties:
+            children: { type: array, items: { $ref: "#/components/schemas/AdminUnitNode" } }
+    CatalogItem:
+      type: object
+      required: [catalog, code, name, attrs, active, deactivation_reason, revision, updated_at]
+      properties:
+        catalog: { type: string }
+        code: { type: string }
+        name: { type: string }
+        attrs: { type: object, additionalProperties: { type: string }, description: "Số (vd expected_yield_t_per_ha) là chuỗi decimal" }
+        active: { type: boolean }
+        deactivation_reason: { type: [string, "null"] }
+        revision: { type: integer }
+        updated_at: { type: string, format: date-time }
+    ParamValue:
+      type: object
+      required: [key, value, text, unit, version, effective_from, source_doc, approved_at, param_version_id, supersedes_id, seq]
+      properties:
+        key: { type: string }
+        value: { type: [string, "null"], description: "Số thập phân dạng chuỗi (R-10)" }
+        text: { type: [string, "null"] }
+        unit: { type: string }
+        version: { type: integer }
+        effective_from: { type: string, format: date-time }
+        source_doc: { type: string }
+        approved_at: { type: string, format: date-time }
+        param_version_id: { type: string, format: uuid }
+        supersedes_id: { type: [string, "null"], format: uuid }
+        seq: { type: integer }

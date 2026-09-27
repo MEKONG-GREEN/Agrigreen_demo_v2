@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.masterdata.param.approved/v1",
+  "title": "pf.masterdata.param.approved — payload",
+  "description": "Một phiên bản tham số đã được phê duyệt (người duyệt khác người đặt, R-56) và vào sổ pf_masterdata.param_approved. Consumer tra giá trị theo thời điểm của sự việc: phiên bản có effective_from lớn nhất ≤ thời điểm đó; cùng effective_from thì seq lớn hơn thắng (bản ghi bù có supersedes_id).",
+  "x-event-type": "pf.masterdata.param.approved",
+  "x-schema-version": 1,
+  "x-producer": "pf/masterdata",
+  "type": "object",
+  "required": ["param_key", "version", "param_version_id", "value", "text", "unit", "effective_from", "source_doc", "setter_ref", "approver_ref", "seq"],
+  "properties": {
+    "param_key":        { "type": "string", "maxLength": 200, "examples": ["cgh.norm_ha_per_machine:MGD:thu_hoach"] },
+    "version":          { "type": "integer", "minimum": 1 },
+    "param_version_id": { "type": "string", "format": "uuid" },
+    "value":            { "type": ["string", "null"], "pattern": "^-?[0-9]+(\\.[0-9]+)?$", "description": "Số thập phân dạng chuỗi (R-10); null với tham số chuỗi" },
+    "text":             { "type": ["string", "null"] },
+    "unit":             { "type": "string" },
+    "effective_from":   { "type": "string", "format": "date-time" },
+    "source_doc":       { "type": "string", "description": "Số/ngày văn bản ban hành" },
+    "setter_ref":       { "type": "string", "format": "uuid" },
+    "approver_ref":     { "type": "string", "format": "uuid" },
+    "supersedes_id":    { "type": ["string", "null"], "format": "uuid", "description": "Bản duyệt trước cùng effective_from bị bản này thay (bản ghi bù)" },
+    "seq":              { "type": "integer", "minimum": 1, "description": "Thứ tự trong chuỗi băm của khóa tham số" }
+  }
+}
