@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.content.alert.published/v1",
+  "title": "pf.content.alert.published — payload",
+  "description": "Một cảnh báo khẩn cấp vừa được xuất bản (HTX US-NEWS-03). Worker thông báo đẩy gửi ngay tới mọi nông dân, Quản lý HTX và cán bộ có lô ruộng/HTX/địa bàn trong vùng ảnh hưởng; thất bại từng thiết bị thì thử lại, không chặn thiết bị khác. Phát kèm pf.content.document.published trong cùng giao dịch. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.content.alert.published",
+  "x-schema-version": 1,
+  "x-producer": "pf/content",
+  "type": "object",
+  "required": ["document_ref", "version_no", "title", "summary", "audience_level", "audience_units", "publisher_ref", "published_at"],
+  "properties": {
+    "document_ref":   { "type": "string", "format": "uuid" },
+    "version_no":     { "type": "integer", "minimum": 1 },
+    "title":          { "type": "string", "maxLength": 300 },
+    "summary":        { "type": "string", "maxLength": 2000 },
+    "audience_level": { "type": "string", "enum": ["national", "province", "commune"] },
+    "audience_units": { "type": "array", "items": { "type": "string" }, "description": "Vùng ảnh hưởng: rỗng + national = toàn quốc" },
+    "province_code":  { "type": ["string", "null"] },
+    "publisher_ref":  { "type": "string", "format": "uuid" },
+    "published_at":   { "type": "string", "format": "date-time" }
+  }
+}

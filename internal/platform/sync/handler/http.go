@@ -32,7 +32,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.POST("/devices", h.register)
 	rg.GET("/sync/pull", h.pull)
 	rg.POST("/sync/push", h.push)
-	httpx.AllowBody(http.MethodPost, rg.BasePath()+"/files", domain.MaxUploadBody)
+	httpx.AllowBody(rg, http.MethodPost, "/files", domain.MaxUploadBody)
 	rg.POST("/files", h.upload)
 	rg.GET("/files/:ref", h.getFile)
 	rg.GET("/files/:ref/content", h.content)

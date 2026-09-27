@@ -97,5 +97,22 @@ Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính m�
 | 503 | `mrv.dependency_unavailable` | pf/mrv: chưa nối phạm vi, kiểm đồng ý hoặc kho đối tượng |
 
 Tự phê duyệt phiên bản danh mục trường MRV của chính mình trả mã chung `self_approval_forbidden` (R-56).
+| 404 | `content.document_not_found` | pf/content: không có tài liệu, chưa xuất bản/đã gỡ (bề mặt người đọc), hoặc ngoài phạm vi (không lộ sự tồn tại) |
+| 404 | `content.version_not_found` | pf/content: không có phiên bản với số đó |
+| 403 | `content.out_of_scope` | pf/content: soạn/duyệt ngoài phạm vi TW → Tỉnh → Xã (cán bộ tỉnh soạn phạm vi toàn quốc hoặc tỉnh khác; người duyệt tỉnh xuất bản tài liệu toàn quốc) |
+| 403 | `content.kind_not_allowed` | pf/content: TTKN tỉnh soạn quy trình kỹ thuật chuẩn (KN BR-06 — tỉnh dùng loại `supplement`) |
+| 409 | `content.invalid_transition` | pf/content: trạng thái không cho phép (gửi duyệt khi không phải bản nháp mới nhất, xuất bản khi chưa gửi duyệt, soạn tiếp khi đang chờ duyệt, gỡ lần hai) |
+| 422 | `content.parent_invalid` | pf/content: bản bổ sung địa phương không gắn quy trình chuẩn quốc gia đã xuất bản |
+| 422 | `content.tag_invalid` | pf/content: nhãn phân loại không có hoặc đã ngừng dùng trong danh mục pf/masterdata |
+| 422 | `content.audience_invalid` | pf/content: mã đơn vị của phạm vi áp dụng không có, sai cấp, hoặc các xã khác tỉnh |
+| 422 | `content.attachment_not_found` | pf/content: phiên bản chọn tệp không thuộc tài liệu |
+| 413 | `content.file_too_large` | pf/content: tệp vượt 15 MB |
+| 415 | `content.file_type_not_allowed` | pf/content: loại tệp không nhận (đính kèm: PDF, .docx, JPEG/PNG/WebP, MP4; trích: Word/PDF) — theo chữ ký nội dung, không theo tên |
+| 422 | `content.checksum_mismatch` | pf/content: SHA-256 khai báo không khớp nội dung tệp |
+| 422 | `content.extract_unsupported` | pf/content: chưa trích được định dạng này (PDF, .doc cũ) — soạn thủ công |
+| 422 | `content.extract_failed` | pf/content: tệp Word lỗi hoặc không có chữ (ảnh scan) — soạn thủ công (HTX US-CMS-02 AC-2) |
+| 503 | `content.dependency_unavailable` | pf/content: chưa nối ScopeResolver (pf/party), danh mục (pf/masterdata) hoặc kho đối tượng |
+
+Người duyệt xuất bản phiên bản do chính mình soạn trả mã chung `self_approval_forbidden` (R-56).
 
 Phản hồi phát lại theo Idempotency-Key có header `Idempotent-Replayed: true`.
