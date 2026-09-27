@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.content.document.published/v1",
+  "title": "pf.content.document.published — payload",
+  "description": "Một phiên bản tài liệu (quy trình kỹ thuật, hướng dẫn, tin tức, cảnh báo, hướng dẫn đặc thù địa phương) vừa được xuất bản trong sổ pf_content.document_event. Phiên bản trước (nếu có) vẫn còn nguyên trong sổ. Consumer thông báo gửi thông báo theo phạm vi áp dụng (KN FR-16, US-LIB-06) — không gửi tràn toàn hệ thống. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.content.document.published",
+  "x-schema-version": 1,
+  "x-producer": "pf/content",
+  "type": "object",
+  "required": ["document_ref", "kind", "version_no", "version_id", "title", "tags", "audience_level", "audience_units", "author_ref", "publisher_ref", "published_at", "first_version", "seq"],
+  "properties": {
+    "document_ref":   { "type": "string", "format": "uuid" },
+    "kind":           { "type": "string", "enum": ["procedure", "guide", "news", "alert", "supplement"] },
+    "version_no":     { "type": "integer", "minimum": 1 },
+    "version_id":     { "type": "string", "format": "uuid", "description": "id dòng sổ pf_content.document_version" },
+    "title":          { "type": "string", "maxLength": 300 },
+    "category":       { "type": ["string", "null"], "description": "Chuyên mục tin tức (technique, pest_warning, policy, market, event)" },
+    "tags":           { "type": "array", "items": { "type": "string" }, "description": "Nhãn '<danh mục>:<mã>' của pf/masterdata" },
+    "audience_level": { "type": "string", "enum": ["national", "province", "commune"] },
+    "audience_units": { "type": "array", "items": { "type": "string" }, "description": "Rỗng với national; [mã tỉnh] với province; mã các xã với commune" },
+    "province_code":  { "type": ["string", "null"], "description": "Tỉnh sở hữu tài liệu cấp tỉnh/xã" },
+    "parent_ref":     { "type": ["string", "null"], "format": "uuid", "description": "Quy trình gốc TW của bản bổ sung địa phương" },
+    "author_ref":     { "type": "string", "format": "uuid" },
+    "publisher_ref":  { "type": "string", "format": "uuid", "description": "Người duyệt xuất bản; luôn khác author_ref (R-56)" },
+    "published_at":   { "type": "string", "format": "date-time" },
+    "first_version":  { "type": "boolean", "description": "true = lần xuất bản đầu (nội dung mới); false = cập nhật" },
+    "seq":            { "type": "integer", "minimum": 1, "description": "Thứ tự trong chuỗi băm document_event của tài liệu" }
+  }
+}

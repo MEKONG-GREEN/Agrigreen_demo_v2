@@ -300,6 +300,82 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  # --- pf/content: thư viện quy trình kỹ thuật, tài liệu, tin tức, cảnh báo (chỉ đọc; soạn/duyệt qua Admin API) ---
+  # Chỉ tài liệu ĐÃ XUẤT BẢN trong phạm vi người gọi: toàn quốc + tỉnh + xã của mình (ADR-0009).
+  /v1/documents:
+    get:
+      summary: Tra cứu tài liệu đã xuất bản (KN US-LIB-04, HTX US-NEWS-01) — tìm không dấu, lọc loại/nhãn/chuyên mục
+      operationId: listDocuments
+      tags: [content]
+      parameters:
+        - {name: kind, in: query, schema: {$ref: "#/components/schemas/ContentKind"}}
+        - {name: tag, in: query, description: "Nhãn '<danh mục>:<mã>', vd farm_stage:sowing", schema: {type: string}}
+        - {name: category, in: query, schema: {type: string}}
+        - {name: q, in: query, description: "Từ khóa; không phân biệt dấu (\"lua\" khớp \"lúa\"), khớp tiền tố từng từ", schema: {type: string}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang, mới xuất bản trước
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ContentDocument"}}
+                  next_cursor: {type: [string, "null"]}
+        "401": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {description: content.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/documents/{ref}:
+    get:
+      summary: Bản xuất bản hiện hành, tệp đính kèm (URL có hạn ≤ 15 phút) và hướng dẫn đặc thù địa phương trong phạm vi (KN FR-13)
+      operationId: getDocument
+      tags: [content]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Tài liệu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [document, version, supplements]
+                properties:
+                  document: {$ref: "#/components/schemas/ContentDocument"}
+                  version: {$ref: "#/components/schemas/ContentVersion"}
+                  supplements:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ref: {type: string, format: uuid}
+                        title: {type: string}
+                        province_code: {type: [string, "null"]}
+                        published_at: {type: [string, "null"], format: date-time}
+        "404": {description: "content.document_not_found — không có, chưa xuất bản, đã gỡ hoặc ngoài phạm vi", $ref: "#/components/responses/Problem"}
+  /v1/documents/{ref}/versions:
+    get:
+      summary: Các phiên bản đã từng xuất bản (hiện hành + bị thay) — xuất bản bản mới không xóa bản cũ
+      operationId: listDocumentVersions
+      tags: [content]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Lịch sử
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [document_ref, items]
+                properties:
+                  document_ref: {type: string, format: uuid}
+                  items: {type: array, items: {$ref: "#/components/schemas/ContentVersionInfo"}}
+        "404": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/content ---
 components:
   securitySchemes:
     oidc:
@@ -496,3 +572,75 @@ components:
         household: {$ref: "#/components/schemas/Household"}
         duplicate: {type: boolean}
         duplicate_label: {type: string, enum: ["trùng"]}
+    # --- pf/content ---
+    ContentKind:
+      type: string
+      enum: [procedure, guide, news, alert, supplement]
+      description: procedure = quy trình kỹ thuật chuẩn quốc gia; supplement = hướng dẫn đặc thù địa phương gắn quy trình gốc; alert = cảnh báo khẩn (phát thông báo đẩy theo vùng)
+    ContentAudience:
+      type: object
+      required: [level, units]
+      properties:
+        level: {type: string, enum: [national, province, commune]}
+        units: {type: array, items: {type: string}, description: "Rỗng với national; [mã tỉnh] với province; mã các xã (cùng tỉnh) với commune"}
+        province_code: {type: [string, "null"], description: Tỉnh sở hữu (chỉ đọc)}
+    ContentDocument:
+      type: object
+      required: [ref, kind, audience, status, tags]
+      properties:
+        ref: {type: string, format: uuid}
+        kind: {$ref: "#/components/schemas/ContentKind"}
+        audience: {$ref: "#/components/schemas/ContentAudience"}
+        parent_ref: {type: [string, "null"], format: uuid}
+        status: {type: string, enum: [draft, review, published, retired]}
+        title: {type: [string, "null"], description: Tiêu đề của bản xuất bản hiện hành}
+        summary: {type: [string, "null"]}
+        category: {type: [string, "null"]}
+        tags: {type: array, items: {type: string}}
+        published_version_no: {type: [integer, "null"]}
+        published_at: {type: [string, "null"], format: date-time}
+        publisher_ref: {type: [string, "null"], format: uuid}
+        retired_at: {type: [string, "null"], format: date-time}
+        retire_reason: {type: [string, "null"]}
+    ContentAttachment:
+      type: object
+      required: [id, file_name, content_type, size, sha256, role]
+      properties:
+        id: {type: string, format: uuid}
+        file_name: {type: string}
+        content_type: {type: string, enum: [application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, image/jpeg, image/png, image/webp, video/mp4]}
+        size: {type: integer, maximum: 15728640}
+        sha256: {type: string, pattern: "^[0-9a-f]{64}$"}
+        role: {type: string, enum: [attachment, cover]}
+        url: {type: [string, "null"], description: "URL tải có hạn; không ghi log (R-92)"}
+        url_expires_at: {type: [string, "null"], format: date-time}
+    ContentVersion:
+      type: object
+      required: [id, version_no, status, title, body, body_format, tags, attachments]
+      properties:
+        id: {type: string, format: uuid}
+        version_no: {type: integer, minimum: 1}
+        status: {type: string, enum: [draft, review, published, superseded, discarded, returned]}
+        title: {type: string}
+        summary: {type: string}
+        body: {type: string, description: "Đã qua bộ lọc allow-list (không script, không on*, liên kết chỉ http/https/mailto/att:<id>). Client hiển thị Markdown ở chế độ tắt HTML thô."}
+        body_format: {type: string, enum: [markdown, html]}
+        category: {type: [string, "null"]}
+        tags: {type: array, items: {type: string}}
+        author_ref: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+        attachments: {type: array, items: {$ref: "#/components/schemas/ContentAttachment"}}
+    ContentVersionInfo:
+      type: object
+      required: [version_no, id, status, title, author_ref, recorded_at]
+      properties:
+        version_no: {type: integer}
+        id: {type: string, format: uuid}
+        status: {type: string, enum: [draft, review, published, superseded, discarded, returned]}
+        title: {type: string}
+        author_ref: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+        published_at: {type: [string, "null"], format: date-time}
+        publisher_ref: {type: [string, "null"], format: uuid}
+        return_reason: {type: [string, "null"]}
+    # --- hết pf/content ---

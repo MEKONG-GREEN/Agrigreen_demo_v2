@@ -125,16 +125,6 @@ func Recover(log *slog.Logger) gin.HandlerFunc {
 	}
 }
 
-// BodyLimit giới hạn kích thước thân request.
-func BodyLimit(n int64) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if n > 0 && c.Request.Body != nil {
-			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, n)
-		}
-		c.Next()
-	}
-}
-
 // Authenticate xác minh Bearer token, gắn Principal và tenant vào context.
 // Tenant CHỈ lấy từ token (R-16).
 func Authenticate(v *authz.Verifier) gin.HandlerFunc {
