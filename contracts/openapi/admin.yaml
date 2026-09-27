@@ -7,6 +7,12 @@ info:
     Dữ liệu chủ, tham số, phê duyệt, nhật ký. Mọi POST bắt buộc Idempotency-Key (R-51).
     Lỗi theo RFC 9457 (docs/errors.md). Tenant lấy từ token, không bao giờ từ path/query/body (R-16).
     Thay đổi có phê duyệt dùng hai vai param_setter và param_approver; người duyệt không được là người đặt (R-56).
+
+    Bề mặt Admin (admin.<domain>) — OIDC + MFA bắt buộc cho mọi route (mục 11).
+    Dữ liệu chủ, tham số, phê duyệt, nhật ký. Mọi POST bắt buộc Idempotency-Key (R-51).
+    Lỗi theo RFC 9457 (docs/errors.md). Tenant lấy từ token (R-16).
+
+    Mỗi module giữ một phần riêng có đánh dấu "# --- <module> ---" để gộp dễ.
 servers:
   - url: https://admin.agrigreen.vn
 security:
@@ -28,12 +34,12 @@ paths:
               schema:
                 type: object
                 properties:
-                  admin_units: { $ref: "#/components/schemas/ImportResult" }
-                  catalog_items_created: { type: integer }
-                  params_created: { type: integer }
-                  params_skipped: { type: integer }
-        "401": { $ref: "#/components/responses/Problem" }
-        "403": { $ref: "#/components/responses/Problem" }
+                  admin_units: {$ref: "#/components/schemas/ImportResult"}
+                  catalog_items_created: {type: integer}
+                  params_created: {type: integer}
+                  params_skipped: {type: integer}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
   /v1/masterdata/admin-units/import:
     post:
       summary: Nhập danh mục đơn vị hành chính có hiệu lực theo thời gian
@@ -49,17 +55,17 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/GazetteerFile" }
+            schema: {$ref: "#/components/schemas/GazetteerFile"}
       responses:
         "200":
           description: Tổng kết
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ImportResult" }
-        "400": { $ref: "#/components/responses/Problem" }
-        "403": { $ref: "#/components/responses/Problem" }
-        "409": { description: "masterdata.admin_unit_conflict | masterdata.admin_unit_overlap", $ref: "#/components/responses/Problem" }
-        "422": { description: "validation_failed | masterdata.admin_unit_invalid_reference", $ref: "#/components/responses/Problem" }
+              schema: {$ref: "#/components/schemas/ImportResult"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {description: "masterdata.admin_unit_conflict | masterdata.admin_unit_overlap", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | masterdata.admin_unit_invalid_reference", $ref: "#/components/responses/Problem"}
   /v1/masterdata/catalogs/{catalog}/items:
     parameters:
       - $ref: "#/components/parameters/Catalog"
@@ -68,7 +74,7 @@ paths:
       operationId: adminListCatalogItems
       tags: [masterdata]
       parameters:
-        - { name: include_inactive, in: query, schema: { type: boolean, default: true } }
+        - {name: include_inactive, in: query, schema: {type: boolean, default: true}}
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
@@ -80,9 +86,9 @@ paths:
                 type: object
                 required: [items, next_cursor]
                 properties:
-                  items: { type: array, items: { $ref: "#/components/schemas/CatalogItem" } }
-                  next_cursor: { type: [string, "null"] }
-        "404": { $ref: "#/components/responses/Problem" }
+                  items: {type: array, items: {$ref: "#/components/schemas/CatalogItem"}}
+                  next_cursor: {type: [string, "null"]}
+        "404": {$ref: "#/components/responses/Problem"}
     post:
       summary: Thêm mục danh mục (vai masterdata_admin)
       operationId: createCatalogItem
@@ -93,19 +99,19 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/CatalogItemInput" }
+            schema: {$ref: "#/components/schemas/CatalogItemInput"}
       responses:
         "201":
           description: Đã thêm. Gọi lặp cùng khóa trả lại đúng phản hồi này, kèm Idempotent-Replayed.
           headers:
-            Location: { schema: { type: string } }
+            Location: {schema: {type: string}}
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/CatalogItem" }
-        "403": { $ref: "#/components/responses/Problem" }
-        "404": { description: masterdata.catalog_not_found, $ref: "#/components/responses/Problem" }
-        "409": { description: masterdata.catalog_item_exists, $ref: "#/components/responses/Problem" }
-        "422": { description: "validation_failed | masterdata.farm_stage_invalid", $ref: "#/components/responses/Problem" }
+              schema: {$ref: "#/components/schemas/CatalogItem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: masterdata.catalog_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: masterdata.catalog_item_exists, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | masterdata.farm_stage_invalid", $ref: "#/components/responses/Problem"}
   /v1/masterdata/catalogs/{catalog}/items/{code}:
     parameters:
       - $ref: "#/components/parameters/Catalog"
@@ -118,16 +124,16 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/CatalogItemInput" }
+            schema: {$ref: "#/components/schemas/CatalogItemInput"}
       responses:
         "200":
           description: Mục sau khi sửa
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/CatalogItem" }
-        "403": { $ref: "#/components/responses/Problem" }
-        "404": { $ref: "#/components/responses/Problem" }
-        "422": { $ref: "#/components/responses/Problem" }
+              schema: {$ref: "#/components/schemas/CatalogItem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/masterdata/catalogs/{catalog}/items/{code}/deactivate:
     parameters:
       - $ref: "#/components/parameters/Catalog"
@@ -142,16 +148,16 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/ReasonInput" }
+            schema: {$ref: "#/components/schemas/ReasonInput"}
       responses:
         "200":
           description: Mục đã ngừng dùng
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/CatalogItem" }
-        "404": { $ref: "#/components/responses/Problem" }
-        "409": { description: masterdata.catalog_item_state, $ref: "#/components/responses/Problem" }
-        "422": { $ref: "#/components/responses/Problem" }
+              schema: {$ref: "#/components/schemas/CatalogItem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: masterdata.catalog_item_state, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/masterdata/catalogs/{catalog}/items/{code}/reactivate:
     parameters:
       - $ref: "#/components/parameters/Catalog"
@@ -165,15 +171,15 @@ paths:
       requestBody:
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/ReasonInput" }
+            schema: {$ref: "#/components/schemas/ReasonInput"}
       responses:
         "200":
           description: Mục đang dùng
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/CatalogItem" }
-        "404": { $ref: "#/components/responses/Problem" }
-        "409": { $ref: "#/components/responses/Problem" }
+              schema: {$ref: "#/components/schemas/CatalogItem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
   /v1/masterdata/catalogs/{catalog}/items/{code}/history:
     parameters:
       - $ref: "#/components/parameters/Catalog"
@@ -194,10 +200,10 @@ paths:
                 type: object
                 required: [items, next_cursor]
                 properties:
-                  items: { type: array, items: { $ref: "#/components/schemas/CatalogChange" } }
-                  next_cursor: { type: [string, "null"] }
-        "403": { $ref: "#/components/responses/Problem" }
-        "404": { $ref: "#/components/responses/Problem" }
+                  items: {type: array, items: {$ref: "#/components/schemas/CatalogChange"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
   /v1/masterdata/params/versions:
     post:
       summary: Đề xuất phiên bản tham số (nháp, vai param_setter)
@@ -212,24 +218,24 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/ParamProposal" }
+            schema: {$ref: "#/components/schemas/ParamProposal"}
       responses:
         "201":
           description: Đã tạo nháp
           headers:
-            Location: { schema: { type: string } }
+            Location: {schema: {type: string}}
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ParamVersion" }
-        "403": { $ref: "#/components/responses/Problem" }
-        "422": { description: "validation_failed | masterdata.param_correction_required", $ref: "#/components/responses/Problem" }
+              schema: {$ref: "#/components/schemas/ParamVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | masterdata.param_correction_required", $ref: "#/components/responses/Problem"}
     get:
       summary: Lịch sử phiên bản tham số (mọi trạng thái)
       operationId: listParamVersions
       tags: [masterdata]
       parameters:
-        - { name: key, in: query, schema: { type: string }, examples: { norm: { value: "cgh.norm_ha_per_machine:MGD:thu_hoach" } } }
-        - { name: status, in: query, schema: { type: string, enum: [draft, submitted, approved, rejected] } }
+        - {name: key, in: query, schema: {type: string}, examples: {norm: {value: "cgh.norm_ha_per_machine:MGD:thu_hoach"}}}
+        - {name: status, in: query, schema: {type: string, enum: [draft, submitted, approved, rejected]}}
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
@@ -241,9 +247,9 @@ paths:
                 type: object
                 required: [items, next_cursor]
                 properties:
-                  items: { type: array, items: { $ref: "#/components/schemas/ParamVersion" } }
-                  next_cursor: { type: [string, "null"] }
-        "403": { $ref: "#/components/responses/Problem" }
+                  items: {type: array, items: {$ref: "#/components/schemas/ParamVersion"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
   /v1/masterdata/params/versions/{id}:
     get:
       operationId: getParamVersion
@@ -255,8 +261,8 @@ paths:
           description: Phiên bản
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ParamVersion" }
-        "404": { description: masterdata.param_version_not_found, $ref: "#/components/responses/Problem" }
+              schema: {$ref: "#/components/schemas/ParamVersion"}
+        "404": {description: masterdata.param_version_not_found, $ref: "#/components/responses/Problem"}
   /v1/masterdata/params/versions/{id}/submit:
     post:
       summary: Gửi duyệt (chỉ người đặt)
@@ -270,10 +276,10 @@ paths:
           description: Đã gửi duyệt
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ParamVersion" }
-        "403": { description: "forbidden | masterdata.param_not_setter", $ref: "#/components/responses/Problem" }
-        "404": { $ref: "#/components/responses/Problem" }
-        "409": { description: masterdata.param_invalid_transition, $ref: "#/components/responses/Problem" }
+              schema: {$ref: "#/components/schemas/ParamVersion"}
+        "403": {description: "forbidden | masterdata.param_not_setter", $ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: masterdata.param_invalid_transition, $ref: "#/components/responses/Problem"}
   /v1/masterdata/params/versions/{id}/approve:
     post:
       summary: Phê duyệt (vai param_approver, không phải người đặt — R-56)
@@ -286,7 +292,7 @@ paths:
       requestBody:
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/DecisionInput" }
+            schema: {$ref: "#/components/schemas/DecisionInput"}
       responses:
         "200":
           description: Đã duyệt
@@ -296,12 +302,12 @@ paths:
                 type: object
                 required: [version, approved]
                 properties:
-                  version: { $ref: "#/components/schemas/ParamVersion" }
-                  approved: { $ref: "application.yaml#/components/schemas/ParamValue" }
-        "403": { description: "forbidden | self_approval_forbidden", $ref: "#/components/responses/Problem" }
-        "404": { $ref: "#/components/responses/Problem" }
-        "409": { description: masterdata.param_invalid_transition, $ref: "#/components/responses/Problem" }
-        "422": { description: masterdata.param_correction_required, $ref: "#/components/responses/Problem" }
+                  version: {$ref: "#/components/schemas/ParamVersion"}
+                  approved: {$ref: "application.yaml#/components/schemas/ParamValue"}
+        "403": {description: "forbidden | self_approval_forbidden", $ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: masterdata.param_invalid_transition, $ref: "#/components/responses/Problem"}
+        "422": {description: masterdata.param_correction_required, $ref: "#/components/responses/Problem"}
   /v1/masterdata/params/versions/{id}/reject:
     post:
       summary: Từ chối (vai param_approver, không phải người đặt; lý do bắt buộc)
@@ -314,16 +320,189 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/DecisionInput" }
+            schema: {$ref: "#/components/schemas/DecisionInput"}
       responses:
         "200":
           description: Đã từ chối
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ParamVersion" }
-        "403": { $ref: "#/components/responses/Problem" }
-        "409": { $ref: "#/components/responses/Problem" }
-        "422": { $ref: "#/components/responses/Problem" }
+              schema: {$ref: "#/components/schemas/ParamVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  # --- pf/party: tổ chức, HTX, nông hộ ---
+  /v1/orgs:
+    post:
+      summary: Tạo tổ chức trong cây TW → Tỉnh → Xã; kind = cooperative kèm hồ sơ HTX, Mã HTX tự sinh
+      operationId: partyCreateOrg
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PartyOrgInput"}
+      responses:
+        "201":
+          description: Đã tạo; ghi sổ pf_party.org_event (action = created)
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [org, seq, representative_duplicate]
+                properties:
+                  org: {$ref: "#/components/schemas/PartyOrg"}
+                  seq: {type: integer}
+                  representative_duplicate: {type: boolean, description: "Người đại diện đã có trong kho định danh, dùng lại mã cũ"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/orgs/{ref}/move:
+    post:
+      summary: Di chuyển một nút kèm cả nhánh con sang cha mới (sáp nhập đơn vị hành chính), giữ lịch sử
+      operationId: partyMoveOrg
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                new_parent_ref: {type: [string, "null"], format: uuid, description: "null = đưa lên gốc"}
+                new_admin_unit_code: {type: string, description: "Mã đơn vị mới sau sáp nhập; bỏ trống = giữ"}
+                reason: {type: string, minLength: 10}
+      responses:
+        "200": {$ref: "#/components/responses/PartyOrgChanged"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/orgs/{ref}/rename:
+    post:
+      summary: Đổi tên tổ chức (ghi sổ, action = renamed)
+      operationId: partyRenameOrg
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string, maxLength: 200}
+                reason: {type: string}
+      responses:
+        "200": {$ref: "#/components/responses/PartyOrgChanged"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/orgs/{ref}/events:
+    get:
+      summary: Nhật ký biến động chỉ đọc, lưu vĩnh viễn (HTX US-HTXSTATUS-03)
+      operationId: partyOrgEvents
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Theo seq tăng dần
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/PartyOrgEvent"}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/cooperatives/{ref}/deactivate:
+    post:
+      summary: Vô hiệu hóa HTX (soft-delete) — lý do ≥ 20 ký tự; phát pf.party.org.deactivated để khóa tài khoản
+      operationId: partyDeactivateCooperative
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 20}
+      responses:
+        "200": {$ref: "#/components/responses/PartyOrgChanged"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/cooperatives/{ref}/reactivate:
+    post:
+      summary: Kích hoạt lại HTX; phát pf.party.org.reactivated
+      operationId: partyReactivateCooperative
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: {type: string}
+      responses:
+        "200": {$ref: "#/components/responses/PartyOrgChanged"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/households/import:
+    post:
+      summary: Nhập nông hộ từ CSV (UTF-8, dòng đầu là tiêu đề), tối đa 200 dòng; kết quả theo từng dòng
+      description: |
+        Cột: full_name|ho_ten, phone|so_dien_thoai, national_id|cccd, address|dia_chi,
+        cooperative_code|ma_htx, commune_code|ma_xa, cultivated_area_ha|dien_tich_ha,
+        member_since|ngay_vao_htx. Bắt buộc: full_name, phone, cooperative_code.
+        Thiếu cột bắt buộc → từ chối cả tệp (party.import_invalid).
+      operationId: partyImportHouseholds
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: {type: string}
+      responses:
+        "200":
+          description: Kết quả theo dòng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accepted, duplicate, rejected, rows]
+                properties:
+                  accepted: {type: integer}
+                  duplicate: {type: integer}
+                  rejected: {type: integer}
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      required: [row, status, reason, household_ref]
+                      properties:
+                        row: {type: integer, description: "Số dòng trong tệp (dòng 1 là tiêu đề)"}
+                        status: {type: string, enum: [accepted, duplicate, rejected]}
+                        reason: {type: [string, "null"], description: "Không chứa dữ liệu cá nhân"}
+                        household_ref: {type: [string, "null"], format: uuid}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/party ---
 components:
   securitySchemes:
     oidc:
@@ -334,63 +513,74 @@ components:
       name: Idempotency-Key
       in: header
       required: true
-      schema: { type: string, pattern: "^[A-Za-z0-9._:-]{8,200}$" }
+      schema: {type: string, pattern: "^[A-Za-z0-9._:-]{8,200}$"}
     Catalog:
       name: catalog
       in: path
       required: true
-      schema: { type: string, enum: [rice_variety, farm_stage, machine_type, season, pest] }
+      schema: {type: string, enum: [rice_variety, farm_stage, machine_type, season, pest]}
     ItemCode:
       name: code
       in: path
       required: true
-      schema: { type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$" }
+      schema: {type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$"}
     VersionID:
       name: id
       in: path
       required: true
-      schema: { type: string, format: uuid }
+      schema: {type: string, format: uuid}
     Cursor:
       name: cursor
       in: query
-      schema: { type: string }
+      schema: {type: string}
     Limit:
       name: limit
       in: query
-      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      schema: {type: integer, minimum: 1, maximum: 200, default: 50}
   responses:
     Problem:
       description: RFC 9457
       content:
         application/problem+json:
-          schema: { $ref: "#/components/schemas/Problem" }
+          schema: {$ref: "#/components/schemas/Problem"}
+    PartyOrgChanged:
+      description: Trạng thái sau biến động và dòng sổ vừa ghi
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [org, event, active_households]
+            properties:
+              org: {$ref: "#/components/schemas/PartyOrg"}
+              event: {$ref: "#/components/schemas/PartyOrgEvent"}
+              active_households: {type: integer, description: "Số nông hộ đang là thành viên (cảnh báo phạm vi ảnh hưởng khi vô hiệu hóa)"}
   schemas:
     Problem:
       type: object
       required: [type, title, status, code]
       properties:
-        type: { type: string, format: uri }
-        title: { type: string }
-        status: { type: integer }
-        code: { type: string }
-        detail: { type: string }
-        instance: { type: string }
-        trace_id: { type: string }
+        type: {type: string, format: uri}
+        title: {type: string}
+        status: {type: integer}
+        code: {type: string}
+        detail: {type: string}
+        instance: {type: string}
+        trace_id: {type: string}
         errors:
           type: array
           items:
             type: object
             properties:
-              field: { type: string }
-              reason: { type: string }
+              field: {type: string}
+              reason: {type: string}
     GazetteerFile:
       type: object
       required: [format, source, units]
       additionalProperties: false
       properties:
-        format: { type: string, const: agrigreen.admin_units/v1 }
-        source: { type: string, maxLength: 300, description: "Nguồn dữ liệu (văn bản, tệp gốc)" }
-        note: { type: string }
+        format: {type: string, const: agrigreen.admin_units/v1}
+        source: {type: string, maxLength: 300, description: "Nguồn dữ liệu (văn bản, tệp gốc)"}
+        note: {type: string}
         units:
           type: array
           minItems: 1
@@ -400,29 +590,29 @@ components:
             required: [code, name, level, valid_from]
             additionalProperties: false
             properties:
-              code: { type: string, pattern: "^[0-9A-Z][0-9A-Z.-]{0,39}$" }
-              name: { type: string, maxLength: 200 }
-              level: { type: string, enum: [province, commune, district], description: "district chỉ cho dữ liệu lịch sử, valid_to ≤ 2025-07-01" }
-              parent_code: { type: string }
-              valid_from: { type: string, format: date }
-              valid_to: { type: string, format: date, description: "Không bao gồm; bỏ trống = còn hiệu lực" }
-              successors: { type: array, items: { type: string }, description: "Đơn vị kế thừa, phải có hiệu lực tại valid_to" }
+              code: {type: string, pattern: "^[0-9A-Z][0-9A-Z.-]{0,39}$"}
+              name: {type: string, maxLength: 200}
+              level: {type: string, enum: [province, commune, district], description: "district chỉ cho dữ liệu lịch sử, valid_to ≤ 2025-07-01"}
+              parent_code: {type: string}
+              valid_from: {type: string, format: date}
+              valid_to: {type: string, format: date, description: "Không bao gồm; bỏ trống = còn hiệu lực"}
+              successors: {type: array, items: {type: string}, description: "Đơn vị kế thừa, phải có hiệu lực tại valid_to"}
     ImportResult:
       type: object
       required: [created, closed, unchanged]
       properties:
-        created: { type: integer }
-        closed: { type: integer }
-        unchanged: { type: integer }
+        created: {type: integer}
+        closed: {type: integer}
+        unchanged: {type: integer}
     CatalogItemInput:
       type: object
       required: [name]
       properties:
-        code: { type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$", description: "Bắt buộc khi thêm; khi sửa bỏ trống hoặc trùng mã trên đường dẫn" }
-        name: { type: string, maxLength: 200 }
+        code: {type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$", description: "Bắt buộc khi thêm; khi sửa bỏ trống hoặc trùng mã trên đường dẫn"}
+        name: {type: string, maxLength: 200}
         attrs:
           type: object
-          additionalProperties: { type: string }
+          additionalProperties: {type: string}
           description: |
             Theo danh mục — rice_variety: growth_days, expected_yield_t_per_ha (decimal); farm_stage: pilot (true|false, cờ thí điểm CGH), description;
             machine_type: farm_stage (mã khâu đang dùng); season: start_month, end_month; pest: kind (sau_hai|benh_hai|dong_vat_hai|co_dai).
@@ -430,70 +620,128 @@ components:
       type: object
       required: [catalog, code, name, attrs, active, deactivation_reason, revision, updated_at]
       properties:
-        catalog: { type: string }
-        code: { type: string }
-        name: { type: string }
-        attrs: { type: object, additionalProperties: { type: string } }
-        active: { type: boolean }
-        deactivation_reason: { type: [string, "null"] }
-        revision: { type: integer }
-        updated_at: { type: string, format: date-time }
+        catalog: {type: string}
+        code: {type: string}
+        name: {type: string}
+        attrs: {type: object, additionalProperties: {type: string}}
+        active: {type: boolean}
+        deactivation_reason: {type: [string, "null"]}
+        revision: {type: integer}
+        updated_at: {type: string, format: date-time}
     ReasonInput:
       type: object
       properties:
-        reason: { type: string, minLength: 10, maxLength: 500 }
+        reason: {type: string, minLength: 10, maxLength: 500}
     CatalogSnapshot:
       type: object
       properties:
-        name: { type: string }
-        attrs: { type: object, additionalProperties: { type: string } }
-        active: { type: boolean }
-        deactivation_reason: { type: string }
+        name: {type: string}
+        attrs: {type: object, additionalProperties: {type: string}}
+        active: {type: boolean}
+        deactivation_reason: {type: string}
     CatalogChange:
       type: object
       required: [id, action, before, after, reason, event_time, actor_ref, seq, recorded_at]
       properties:
-        id: { type: string, format: uuid }
-        action: { type: string, enum: [created, updated, deactivated, reactivated] }
-        before: { oneOf: [{ $ref: "#/components/schemas/CatalogSnapshot" }, { type: "null" }] }
-        after: { $ref: "#/components/schemas/CatalogSnapshot" }
-        reason: { type: [string, "null"] }
-        event_time: { type: string, format: date-time }
-        actor_ref: { type: string, format: uuid }
-        seq: { type: integer }
-        recorded_at: { type: string, format: date-time }
+        id: {type: string, format: uuid}
+        action: {type: string, enum: [created, updated, deactivated, reactivated]}
+        before: {oneOf: [{$ref: "#/components/schemas/CatalogSnapshot"}, {type: "null"}]}
+        after: {$ref: "#/components/schemas/CatalogSnapshot"}
+        reason: {type: [string, "null"]}
+        event_time: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        seq: {type: integer}
+        recorded_at: {type: string, format: date-time}
     ParamProposal:
       type: object
       required: [key, effective_from, source_doc]
       properties:
-        key: { type: string, maxLength: 200, pattern: "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+(:[A-Za-z0-9_.-]+)*$", examples: ["cgh.norm_ha_per_machine:MGD:thu_hoach"] }
-        value: { type: [string, number], description: "Số thập phân (chuỗi khuyến nghị); đọc thẳng thành decimal, không qua float. Loại trừ với text." }
-        text: { type: string, maxLength: 1000 }
-        unit: { type: string, maxLength: 30 }
-        effective_from: { type: string, description: "RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam" }
-        source_doc: { type: string, maxLength: 300, description: "Số/ngày văn bản ban hành (bắt buộc — CGH FN-02 B3)" }
-        correction_reason: { type: string, minLength: 10 }
+        key: {type: string, maxLength: 200, pattern: "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+(:[A-Za-z0-9_.-]+)*$", examples: ["cgh.norm_ha_per_machine:MGD:thu_hoach"]}
+        value: {type: [string, number], description: "Số thập phân (chuỗi khuyến nghị); đọc thẳng thành decimal, không qua float. Loại trừ với text."}
+        text: {type: string, maxLength: 1000}
+        unit: {type: string, maxLength: 30}
+        effective_from: {type: string, description: "RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam"}
+        source_doc: {type: string, maxLength: 300, description: "Số/ngày văn bản ban hành (bắt buộc — CGH FN-02 B3)"}
+        correction_reason: {type: string, minLength: 10}
     ParamVersion:
       type: object
       required: [id, key, version, value, text, unit, effective_from, source_doc, status, setter_ref, created_at]
       properties:
-        id: { type: string, format: uuid }
-        key: { type: string }
-        version: { type: integer, minimum: 1 }
-        value: { type: [string, "null"] }
-        text: { type: [string, "null"] }
-        unit: { type: string }
-        effective_from: { type: string, format: date-time }
-        source_doc: { type: string }
-        correction_reason: { type: [string, "null"] }
-        status: { type: string, enum: [draft, submitted, approved, rejected] }
-        setter_ref: { type: string, format: uuid }
-        submitted_at: { type: [string, "null"], format: date-time }
-        approver_ref: { type: [string, "null"], format: uuid }
-        decided_at: { type: [string, "null"], format: date-time }
-        decision_note: { type: [string, "null"] }
-        created_at: { type: string, format: date-time }
+        id: {type: string, format: uuid}
+        key: {type: string}
+        version: {type: integer, minimum: 1}
+        value: {type: [string, "null"]}
+        text: {type: [string, "null"]}
+        unit: {type: string}
+        effective_from: {type: string, format: date-time}
+        source_doc: {type: string}
+        correction_reason: {type: [string, "null"]}
+        status: {type: string, enum: [draft, submitted, approved, rejected]}
+        setter_ref: {type: string, format: uuid}
+        submitted_at: {type: [string, "null"], format: date-time}
+        approver_ref: {type: [string, "null"], format: uuid}
+        decided_at: {type: [string, "null"], format: date-time}
+        decision_note: {type: [string, "null"]}
+        created_at: {type: string, format: date-time}
     DecisionInput:
       type: object
       properties:
-        note: { type: string, maxLength: 500, description: "Bắt buộc (≥ 10 ký tự) khi từ chối" }
+        note: {type: string, maxLength: 500, description: "Bắt buộc (≥ 10 ký tự) khi từ chối"}
+    PartyOrg:
+      type: object
+      required: [ref, kind, code, name, admin_unit_code, parent_ref, representative_ref, active]
+      properties:
+        ref: {type: string, format: uuid}
+        kind: {type: string, enum: [ttkn_national, ttkn_province, extension_team, dcrd, cooperative, mkg, partner]}
+        code: {type: string}
+        name: {type: string}
+        admin_unit_code: {type: [string, "null"]}
+        parent_ref: {type: [string, "null"], format: uuid}
+        representative_ref: {type: [string, "null"], format: uuid}
+        active: {type: boolean}
+    PartyOrgInput:
+      type: object
+      required: [kind, name]
+      properties:
+        kind: {type: string, enum: [ttkn_national, ttkn_province, extension_team, dcrd, cooperative, mkg, partner]}
+        code: {type: string, maxLength: 40, description: "Bắt buộc trừ HTX; HTX không được gửi (Mã HTX tự sinh)"}
+        name: {type: string, maxLength: 200}
+        admin_unit_code: {type: string, description: "Tỉnh với ttkn_province; xã với extension_team và cooperative"}
+        parent_ref: {type: string, format: uuid}
+        representative_ref: {type: string, format: uuid, description: "Mã tham chiếu đã có trong kho định danh"}
+        representative:
+          type: object
+          description: Hoặc gửi định danh người đại diện — chuyển thẳng vào kho định danh, không lưu ở pf_party
+          required: [full_name, phone]
+          properties:
+            full_name: {type: string}
+            phone: {type: string}
+        cooperative:
+          type: object
+          properties:
+            tax_code: {type: string, description: "10 hoặc 13 chữ số; duy nhất trong tenant"}
+            area_ha: {type: string, description: "Decimal dạng chuỗi"}
+            established_on: {type: string, format: date}
+            location:
+              type: object
+              required: [lat, lon]
+              properties:
+                lat: {type: string}
+                lon: {type: string}
+    PartyOrgEvent:
+      type: object
+      required: [seq, action, event_time, recorded_at, actor_ref, reason, name, admin_unit_code, parent_ref, prev_parent_ref, prev_admin_unit_code, active]
+      properties:
+        seq: {type: integer}
+        action: {type: string, enum: [created, moved, renamed, deactivated, reactivated]}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        reason: {type: [string, "null"]}
+        name: {type: string}
+        admin_unit_code: {type: [string, "null"]}
+        parent_ref: {type: [string, "null"], format: uuid}
+        prev_parent_ref: {type: [string, "null"], format: uuid}
+        prev_admin_unit_code: {type: [string, "null"]}
+        active: {type: boolean}
+        details: {type: object, description: "Hồ sơ HTX lúc tạo (không PII)"}

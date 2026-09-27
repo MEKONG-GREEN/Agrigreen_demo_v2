@@ -127,6 +127,40 @@ func Bootstrap(ctx context.Context, adminURL, dbSuffix string) error {
 				}
 			}
 		}
+		if err := ensureExtensions(ctx, adminURL, c, name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Extensions là extension cần quyền quản trị cụm (không phải trusted extension),
+// tạo ở Bootstrap vì ag_migrator không phải superuser. Migration chỉ giả định
+// chúng đã có (CREATE EXTENSION IF NOT EXISTS trong migration là no-op).
+var Extensions = map[migrations.Cluster][]string{
+	migrations.PF:  {"postgis"},
+	migrations.MKG: {"postgis"},
+}
+
+func ensureExtensions(ctx context.Context, adminURL string, c migrations.Cluster, dbName string) error {
+	exts := Extensions[c]
+	if len(exts) == 0 {
+		return nil
+	}
+	u, err := url.Parse(adminURL)
+	if err != nil {
+		return err
+	}
+	u.Path = "/" + dbName
+	conn, err := pgx.Connect(ctx, u.String())
+	if err != nil {
+		return fmt.Errorf("dbadmin: kết nối %s: %w", dbName, err)
+	}
+	defer func() { _ = conn.Close(ctx) }()
+	for _, e := range exts {
+		if _, err := conn.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS "+ident(e)); err != nil {
+			return fmt.Errorf("dbadmin: tạo extension %s trong %s: %w", e, dbName, err)
+		}
 	}
 	return nil
 }

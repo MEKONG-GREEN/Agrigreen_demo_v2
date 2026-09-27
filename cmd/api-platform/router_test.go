@@ -22,6 +22,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client/clienttest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
@@ -39,7 +40,7 @@ func newFixture(t *testing.T) *fixture {
 	iss := authztest.New(t)
 	mods, pools, err := buildModules(context.Background(), func(_ context.Context, role string) (*pgxpool.Pool, error) {
 		return env.Pool(t, migrations.PF, role), nil
-	}, clock.System{})
+	}, clock.System{}, External{Vault: clienttest.New()})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -21,27 +21,27 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/ConsentInput" }
+            schema: {$ref: "#/components/schemas/ConsentInput"}
       responses:
         "201":
           description: Đã ghi. Gọi lặp cùng khóa trả lại đúng phản hồi này, kèm header Idempotent-Replayed.
           headers:
-            Location: { schema: { type: string } }
+            Location: {schema: {type: string}}
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Consent" }
-        "400": { $ref: "#/components/responses/Problem" }
-        "401": { $ref: "#/components/responses/Problem" }
-        "403": { $ref: "#/components/responses/Problem" }
-        "409": { $ref: "#/components/responses/Problem" }
-        "422": { $ref: "#/components/responses/Problem" }
+              schema: {$ref: "#/components/schemas/Consent"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
     get:
       summary: Lịch sử đồng ý của một chủ thể (phân trang cursor, R-53)
       operationId: listConsents
       parameters:
-        - { name: subject_ref, in: query, required: true, schema: { type: string, format: uuid } }
-        - { name: cursor, in: query, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - {name: subject_ref, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
       responses:
         "200":
           description: Một trang
@@ -51,23 +51,24 @@ paths:
                 type: object
                 required: [items, next_cursor]
                 properties:
-                  items: { type: array, items: { $ref: "#/components/schemas/Consent" } }
-                  next_cursor: { type: [string, "null"] }
-        "401": { $ref: "#/components/responses/Problem" }
-        "403": { $ref: "#/components/responses/Problem" }
+                  items: {type: array, items: {$ref: "#/components/schemas/Consent"}}
+                  next_cursor: {type: [string, "null"]}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
   /v1/consents/{id}:
     get:
       operationId: getConsent
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
       responses:
         "200":
           description: Bản ghi
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Consent" }
-        "404": { $ref: "#/components/responses/Problem" }
+              schema: {$ref: "#/components/schemas/Consent"}
+        "404": {$ref: "#/components/responses/Problem"}
   # --- pf/masterdata (chỉ đọc; ghi qua Admin API — contracts/openapi/admin.yaml) ---
+
   # Dữ liệu chủ là dữ liệu tham chiếu của tenant: mọi người gọi đã xác thực đều đọc được.
   /v1/masterdata/admin-units:
     get:
@@ -75,10 +76,10 @@ paths:
       operationId: listAdminUnits
       tags: [masterdata]
       parameters:
-        - { name: parent, in: query, schema: { type: string } }
+        - {name: parent, in: query, schema: {type: string}}
         - $ref: "#/components/parameters/At"
-        - { name: cursor, in: query, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
       responses:
         "200":
           description: Một trang, theo mã
@@ -88,9 +89,9 @@ paths:
                 type: object
                 required: [items, next_cursor]
                 properties:
-                  items: { type: array, items: { $ref: "#/components/schemas/AdminUnit" } }
-                  next_cursor: { type: [string, "null"] }
-        "404": { description: masterdata.admin_unit_not_found, $ref: "#/components/responses/Problem" }
+                  items: {type: array, items: {$ref: "#/components/schemas/AdminUnit"}}
+                  next_cursor: {type: [string, "null"]}
+        "404": {description: masterdata.admin_unit_not_found, $ref: "#/components/responses/Problem"}
   /v1/masterdata/admin-units/{code}:
     get:
       summary: Đơn vị có hiệu lực tại at (cùng một mã có thể là đơn vị khác nhau ở hai thời điểm)
@@ -104,8 +105,8 @@ paths:
           description: Đơn vị
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/AdminUnit" }
-        "404": { $ref: "#/components/responses/Problem" }
+              schema: {$ref: "#/components/schemas/AdminUnit"}
+        "404": {$ref: "#/components/responses/Problem"}
   /v1/masterdata/admin-units/{code}/tree:
     get:
       summary: Cây đơn vị (chính nó và mọi đơn vị con cháu) có hiệu lực tại at
@@ -119,8 +120,8 @@ paths:
           description: Cây
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/AdminUnitNode" }
-        "404": { $ref: "#/components/responses/Problem" }
+              schema: {$ref: "#/components/schemas/AdminUnitNode"}
+        "404": {$ref: "#/components/responses/Problem"}
   /v1/masterdata/admin-units/{code}/current:
     get:
       summary: Mã hiện hành (tại at) của một mã có thể đã cũ — đi theo chuỗi sáp nhập/chia tách
@@ -138,10 +139,10 @@ paths:
                 type: object
                 required: [code, at, current_codes]
                 properties:
-                  code: { type: string }
-                  at: { type: string, format: date-time }
-                  current_codes: { type: array, items: { type: string } }
-        "404": { $ref: "#/components/responses/Problem" }
+                  code: {type: string}
+                  at: {type: string, format: date-time}
+                  current_codes: {type: array, items: {type: string}}
+        "404": {$ref: "#/components/responses/Problem"}
   /v1/masterdata/catalogs/{catalog}:
     get:
       summary: Danh sách mục của một danh mục (mặc định chỉ mục đang dùng)
@@ -149,9 +150,9 @@ paths:
       tags: [masterdata]
       parameters:
         - $ref: "#/components/parameters/Catalog"
-        - { name: include_inactive, in: query, schema: { type: boolean, default: false } }
-        - { name: cursor, in: query, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
       responses:
         "200":
           description: Một trang, theo mã
@@ -161,9 +162,9 @@ paths:
                 type: object
                 required: [items, next_cursor]
                 properties:
-                  items: { type: array, items: { $ref: "#/components/schemas/CatalogItem" } }
-                  next_cursor: { type: [string, "null"] }
-        "404": { description: masterdata.catalog_not_found, $ref: "#/components/responses/Problem" }
+                  items: {type: array, items: {$ref: "#/components/schemas/CatalogItem"}}
+                  next_cursor: {type: [string, "null"]}
+        "404": {description: masterdata.catalog_not_found, $ref: "#/components/responses/Problem"}
   /v1/masterdata/catalogs/{catalog}/{code}:
     get:
       summary: Một mục danh mục (kể cả đã ngừng dùng)
@@ -171,30 +172,134 @@ paths:
       tags: [masterdata]
       parameters:
         - $ref: "#/components/parameters/Catalog"
-        - { name: code, in: path, required: true, schema: { type: string } }
+        - {name: code, in: path, required: true, schema: {type: string}}
       responses:
         "200":
           description: Mục
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/CatalogItem" }
-        "404": { description: masterdata.catalog_item_not_found, $ref: "#/components/responses/Problem" }
+              schema: {$ref: "#/components/schemas/CatalogItem"}
+        "404": {description: masterdata.catalog_item_not_found, $ref: "#/components/responses/Problem"}
   /v1/masterdata/params/value:
     get:
       summary: Giá trị tham số ĐÃ PHÊ DUYỆT có hiệu lực tại thời điểm của sự việc (CGH QT-01, AC-02)
       operationId: getParamValue
       tags: [masterdata]
       parameters:
-        - { name: key, in: query, required: true, schema: { type: string }, examples: { norm: { value: "cgh.norm_ha_per_machine:MGD:thu_hoach" } } }
+        - {name: key, in: query, required: true, schema: {type: string}, examples: {norm: {value: "cgh.norm_ha_per_machine:MGD:thu_hoach"}}}
         - $ref: "#/components/parameters/At"
       responses:
         "200":
           description: Giá trị
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ParamValue" }
-        "404": { description: masterdata.param_not_found, $ref: "#/components/responses/Problem" }
-        "422": { $ref: "#/components/responses/Problem" }
+              schema: {$ref: "#/components/schemas/ParamValue"}
+        "404": {description: masterdata.param_not_found, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/orgs:
+    get:
+      summary: Tổ chức trong phạm vi của người gọi (phân trang cursor)
+      operationId: listOrgs
+      parameters:
+        - {name: kind, in: query, schema: {$ref: "#/components/schemas/OrgKind"}}
+        - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/Org"}}
+                  next_cursor: {type: [string, "null"]}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/cooperatives:
+    get:
+      summary: HTX/THT trong phạm vi, tìm theo tên, Mã HTX hoặc mã số thuế
+      operationId: listCooperatives
+      parameters:
+        - {name: q, in: query, schema: {type: string}}
+        - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/Cooperative"}}
+                  next_cursor: {type: [string, "null"]}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/cooperatives/{ref}:
+    get:
+      summary: Hồ sơ HTX (ngoài phạm vi → 404)
+      operationId: getCooperative
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Hồ sơ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Cooperative"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/cooperatives/{ref}/households:
+    get:
+      summary: Nông hộ thành viên của HTX, kèm nhãn hiển thị đã che (không bao giờ có định danh đầy đủ)
+      operationId: listCooperativeHouseholds
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/HouseholdListItem"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/households:
+    post:
+      summary: Tạo nông hộ — định danh chủ hộ đi thẳng vào kho định danh; trùng SĐT/CCCD → dùng lại mã cũ, báo "trùng"
+      operationId: createHousehold
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HouseholdInput"}
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HouseholdCreated"}
+        "200":
+          description: Trùng chủ hộ đã có (duplicate = true, duplicate_label = "trùng")
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HouseholdCreated"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -205,109 +310,189 @@ components:
       name: Idempotency-Key
       in: header
       required: true
-      schema: { type: string, pattern: "^[A-Za-z0-9._:-]{8,200}$" }
+      schema: {type: string, pattern: "^[A-Za-z0-9._:-]{8,200}$"}
     At:
       name: at
       in: query
       description: Thời điểm tra (RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam). Mặc định là hiện tại.
-      schema: { type: string }
+      schema: {type: string}
     UnitCode:
       name: code
       in: path
       required: true
-      schema: { type: string, pattern: "^[0-9A-Z][0-9A-Z.-]{0,39}$" }
+      schema: {type: string, pattern: "^[0-9A-Z][0-9A-Z.-]{0,39}$"}
     Catalog:
       name: catalog
       in: path
       required: true
-      schema: { type: string, enum: [rice_variety, farm_stage, machine_type, season, pest] }
+      schema: {type: string, enum: [rice_variety, farm_stage, machine_type, season, pest]}
   responses:
     Problem:
       description: RFC 9457
       content:
         application/problem+json:
-          schema: { $ref: "#/components/schemas/Problem" }
+          schema: {$ref: "#/components/schemas/Problem"}
   schemas:
     Problem:
       type: object
       required: [type, title, status, code]
       properties:
-        type: { type: string, format: uri }
-        title: { type: string }
-        status: { type: integer }
-        code: { type: string }
-        detail: { type: string }
-        instance: { type: string }
-        trace_id: { type: string }
+        type: {type: string, format: uri}
+        title: {type: string}
+        status: {type: integer}
+        code: {type: string}
+        detail: {type: string}
+        instance: {type: string}
+        trace_id: {type: string}
         errors:
           type: array
           items:
             type: object
             properties:
-              field: { type: string }
-              reason: { type: string }
+              field: {type: string}
+              reason: {type: string}
     ConsentInput:
       type: object
       required: [subject_ref, purpose, text_version, status, channel, event_time]
       properties:
-        id: { type: string, format: uuid, description: "UUIDv7 sinh trên thiết bị khi ngoại tuyến (R-11). Bỏ trống → server sinh." }
-        subject_ref: { type: string, format: uuid, description: "Mã tham chiếu chủ thể — không phải định danh (R-41)" }
-        purpose: { type: string, pattern: "^[a-z][a-z0-9_.]{2,63}$", examples: ["mrv.evidence"] }
-        text_version: { type: string, maxLength: 40 }
-        status: { type: string, enum: [granted, withdrawn] }
-        channel: { type: string, enum: [field_app, web, zalo, paper] }
-        event_time: { type: string, format: date-time, description: "Lúc xảy ra tại hiện trường (R-13)" }
-        device_id: { type: string }
+        id: {type: string, format: uuid, description: "UUIDv7 sinh trên thiết bị khi ngoại tuyến (R-11). Bỏ trống → server sinh."}
+        subject_ref: {type: string, format: uuid, description: "Mã tham chiếu chủ thể — không phải định danh (R-41)"}
+        purpose: {type: string, pattern: "^[a-z][a-z0-9_.]{2,63}$", examples: ["mrv.evidence"]}
+        text_version: {type: string, maxLength: 40}
+        status: {type: string, enum: [granted, withdrawn]}
+        channel: {type: string, enum: [field_app, web, zalo, paper]}
+        event_time: {type: string, format: date-time, description: "Lúc xảy ra tại hiện trường (R-13)"}
+        device_id: {type: string}
     Consent:
       allOf:
         - $ref: "#/components/schemas/ConsentInput"
         - type: object
           required: [id, recorded_at, seq]
           properties:
-            recorded_at: { type: string, format: date-time }
-            seq: { type: integer, description: "Thứ tự trong chuỗi băm của chủ thể" }
+            recorded_at: {type: string, format: date-time}
+            seq: {type: integer, description: "Thứ tự trong chuỗi băm của chủ thể"}
     AdminUnit:
       type: object
       required: [code, name, level, parent_code, valid_from, valid_to, successor_codes]
       properties:
-        code: { type: string }
-        name: { type: string }
-        level: { type: string, enum: [province, commune, district], description: "district chỉ có trong dữ liệu trước 01/07/2025" }
-        parent_code: { type: [string, "null"] }
-        valid_from: { type: string, format: date }
-        valid_to: { type: [string, "null"], format: date, description: "Không bao gồm; null = còn hiệu lực" }
-        successor_codes: { type: array, items: { type: string } }
+        code: {type: string}
+        name: {type: string}
+        level: {type: string, enum: [province, commune, district], description: "district chỉ có trong dữ liệu trước 01/07/2025"}
+        parent_code: {type: [string, "null"]}
+        valid_from: {type: string, format: date}
+        valid_to: {type: [string, "null"], format: date, description: "Không bao gồm; null = còn hiệu lực"}
+        successor_codes: {type: array, items: {type: string}}
     AdminUnitNode:
       allOf:
         - $ref: "#/components/schemas/AdminUnit"
         - type: object
           required: [children]
           properties:
-            children: { type: array, items: { $ref: "#/components/schemas/AdminUnitNode" } }
+            children: {type: array, items: {$ref: "#/components/schemas/AdminUnitNode"}}
     CatalogItem:
       type: object
       required: [catalog, code, name, attrs, active, deactivation_reason, revision, updated_at]
       properties:
-        catalog: { type: string }
-        code: { type: string }
-        name: { type: string }
-        attrs: { type: object, additionalProperties: { type: string }, description: "Số (vd expected_yield_t_per_ha) là chuỗi decimal" }
-        active: { type: boolean }
-        deactivation_reason: { type: [string, "null"] }
-        revision: { type: integer }
-        updated_at: { type: string, format: date-time }
+        catalog: {type: string}
+        code: {type: string}
+        name: {type: string}
+        attrs: {type: object, additionalProperties: {type: string}, description: "Số (vd expected_yield_t_per_ha) là chuỗi decimal"}
+        active: {type: boolean}
+        deactivation_reason: {type: [string, "null"]}
+        revision: {type: integer}
+        updated_at: {type: string, format: date-time}
     ParamValue:
       type: object
       required: [key, value, text, unit, version, effective_from, source_doc, approved_at, param_version_id, supersedes_id, seq]
       properties:
-        key: { type: string }
-        value: { type: [string, "null"], description: "Số thập phân dạng chuỗi (R-10)" }
-        text: { type: [string, "null"] }
-        unit: { type: string }
-        version: { type: integer }
-        effective_from: { type: string, format: date-time }
-        source_doc: { type: string }
-        approved_at: { type: string, format: date-time }
-        param_version_id: { type: string, format: uuid }
-        supersedes_id: { type: [string, "null"], format: uuid }
-        seq: { type: integer }
+        key: {type: string}
+        value: {type: [string, "null"], description: "Số thập phân dạng chuỗi (R-10)"}
+        text: {type: [string, "null"]}
+        unit: {type: string}
+        version: {type: integer}
+        effective_from: {type: string, format: date-time}
+        source_doc: {type: string}
+        approved_at: {type: string, format: date-time}
+        param_version_id: {type: string, format: uuid}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        seq: {type: integer}
+    OrgKind:
+      type: string
+      enum: [ttkn_national, ttkn_province, extension_team, dcrd, cooperative, mkg, partner]
+    Org:
+      type: object
+      required: [ref, kind, code, name, admin_unit_code, parent_ref, representative_ref, active]
+      properties:
+        ref: {type: string, format: uuid}
+        kind: {$ref: "#/components/schemas/OrgKind"}
+        code: {type: string, description: "Mã đơn vị; với HTX là Mã HTX do hệ thống tự sinh (CGH BR-01)"}
+        name: {type: string}
+        admin_unit_code: {type: [string, "null"], description: "Mã tỉnh/xã hiện hành; null với cấp quốc gia"}
+        parent_ref: {type: [string, "null"], format: uuid}
+        representative_ref: {type: [string, "null"], format: uuid, description: "Mã tham chiếu người đại diện trong kho định danh"}
+        active: {type: boolean}
+    Decimal:
+      type: string
+      pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+      description: Số thập phân dạng chuỗi (không float)
+    Point:
+      type: object
+      required: [lat, lon]
+      properties:
+        lat: {$ref: "#/components/schemas/Decimal"}
+        lon: {$ref: "#/components/schemas/Decimal"}
+    Cooperative:
+      allOf:
+        - $ref: "#/components/schemas/Org"
+        - type: object
+          required: [status_reason, tax_code, area_ha, established_on, location, location_provisional]
+          properties:
+            status_reason: {type: [string, "null"], description: "Lý do vô hiệu hóa hiện tại"}
+            tax_code: {type: [string, "null"], pattern: "^[0-9]{10}(-[0-9]{3})?$"}
+            area_ha: {oneOf: [{$ref: "#/components/schemas/Decimal"}, {type: "null"}], description: "Diện tích đăng ký hành chính (ha)"}
+            established_on: {type: [string, "null"], format: date}
+            location: {oneOf: [{$ref: "#/components/schemas/Point"}, {type: "null"}]}
+            location_provisional: {type: boolean, description: "true = chưa có toạ độ; bản đồ hiển thị tâm xã, nhãn \"vị trí tạm\""}
+    Household:
+      type: object
+      required: [household_ref, cooperative_ref, commune_code, cultivated_area_ha, member_since, active]
+      properties:
+        household_ref: {type: string, format: uuid, description: "Mã tham chiếu trong kho định danh (R-41)"}
+        cooperative_ref: {type: [string, "null"], format: uuid}
+        commune_code: {type: string}
+        cultivated_area_ha: {oneOf: [{$ref: "#/components/schemas/Decimal"}, {type: "null"}]}
+        member_since: {type: [string, "null"], format: date}
+        active: {type: boolean}
+    HouseholdListItem:
+      allOf:
+        - $ref: "#/components/schemas/Household"
+        - type: object
+          required: [label, masked_phone, label_unavailable]
+          properties:
+            label: {type: string, description: "Nhãn đã che, vd \"Nguyễn V. A.\""}
+            masked_phone: {type: string, description: "SĐT đã che"}
+            label_unavailable: {type: boolean}
+    HouseholdInput:
+      type: object
+      required: [cooperative_ref, identity]
+      properties:
+        cooperative_ref: {type: string, format: uuid}
+        commune_code: {type: string, description: "Bỏ trống = xã của HTX"}
+        cultivated_area_ha: {$ref: "#/components/schemas/Decimal"}
+        member_since: {type: string, format: date}
+        identity:
+          type: object
+          description: Chỉ chuyển vào kho định danh (mục đích registry.admin), không lưu ở pf_party
+          required: [full_name, phone]
+          properties:
+            full_name: {type: string}
+            phone: {type: string}
+            national_id: {type: string}
+            address: {type: string}
+    HouseholdCreated:
+      type: object
+      required: [household, duplicate]
+      properties:
+        household: {$ref: "#/components/schemas/Household"}
+        duplicate: {type: boolean}
+        duplicate_label: {type: string, enum: ["trùng"]}

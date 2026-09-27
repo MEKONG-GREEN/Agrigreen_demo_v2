@@ -52,6 +52,11 @@ func run(log *slog.Logger) error {
 	if base == "" || issuer == "" || audience == "" {
 		return errors.New("thiếu AG_VAULT_DB_URL, AG_OIDC_ISSUER hoặc AG_OIDC_AUDIENCE")
 	}
+	shutdownOTel, err := telemetry.Setup(ctx, "identity-vault")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = shutdownOTel(context.Background()) }()
 	keys, err := identity.LocalKMSFromEnv()
 	if err != nil {
 		return err

@@ -9,6 +9,9 @@
 //	AG_DB_VIA_PGBOUNCER  =1 khi đi qua PgBouncer transaction mode
 //	AG_OIDC_ISSUER       issuer của realm Keycloak
 //	AG_OIDC_AUDIENCE     audience bắt buộc trong token
+//	AG_VAULT_URL         địa chỉ identity-vault (vd https://identity-vault:8090)
+//	AG_VAULT_CLIENT_CERT, AG_VAULT_CLIENT_KEY, AG_VAULT_CA  mTLS tới kho định danh (tùy chọn ở Local/Dev)
+//	AG_OTLP_ENDPOINT     bật OpenTelemetry (ADR-0013)
 package main
 
 import (
@@ -28,6 +31,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
@@ -55,6 +59,11 @@ func run(log *slog.Logger) error {
 	if base == "" || issuer == "" || audience == "" {
 		return errors.New("thiếu AG_PF_DB_URL, AG_OIDC_ISSUER hoặc AG_OIDC_AUDIENCE")
 	}
+	shutdownOTel, err := telemetry.Setup(ctx, "api-platform")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = shutdownOTel(context.Background()) }()
 	opts := db.OptionsFromEnv("api-platform")
 	open := func(ctx context.Context, role string) (*pgxpool.Pool, error) {
 		dsn, err := dbadmin.RoleURL(base, migrations.PF, "", role)
@@ -68,7 +77,15 @@ func run(log *slog.Logger) error {
 		return err
 	}
 	defer ops.Close()
-	mods, pools, err := buildModules(ctx, open, clock.System{})
+	vaultURL := os.Getenv("AG_VAULT_URL")
+	if vaultURL == "" {
+		return errors.New("thiếu AG_VAULT_URL (identity-vault, mTLS nội bộ)")
+	}
+	vaultHTTP, err := vaultHTTPClientFromEnv()
+	if err != nil {
+		return err
+	}
+	mods, pools, err := buildModules(ctx, open, clock.System{}, External{Vault: client.NewHTTP(vaultURL, vaultHTTP)})
 	for _, p := range pools {
 		defer p.Close()
 	}

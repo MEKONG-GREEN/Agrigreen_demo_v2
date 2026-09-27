@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.party.org.deactivated/v1",
+  "title": "pf.party.org.deactivated — payload",
+  "description": "Một tổ chức (thường là HTX/THT) đã bị vô hiệu hóa, ghi trong sổ pf_party.org_event. Consumer quản trị tài khoản khóa mọi tài khoản thuộc tổ chức (HTX US-HTXSTATUS-01 AC-2) và đánh dấu lý do khóa là do tổ chức bị vô hiệu hóa. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.party.org.deactivated",
+  "x-schema-version": 1,
+  "x-producer": "pf/party",
+  "type": "object",
+  "required": ["org_ref", "kind", "code", "admin_unit_code", "reason", "actor_ref", "event_time", "seq", "active_households"],
+  "properties": {
+    "org_ref":           { "type": "string", "format": "uuid" },
+    "kind":              { "type": "string", "enum": ["ttkn_national", "ttkn_province", "extension_team", "dcrd", "cooperative", "mkg", "partner"] },
+    "code":              { "type": "string", "maxLength": 40 },
+    "admin_unit_code":   { "type": "string", "description": "Mã đơn vị hành chính của tổ chức; rỗng với cấp quốc gia" },
+    "reason":            { "type": "string", "minLength": 20, "description": "Lý do vô hiệu hóa, ít nhất 20 ký tự (US-HTXSTATUS-01 AC-3). Không chứa dữ liệu cá nhân." },
+    "actor_ref":         { "type": "string", "format": "uuid" },
+    "event_time":        { "type": "string", "format": "date-time" },
+    "seq":               { "type": "integer", "minimum": 1, "description": "Thứ tự trong chuỗi băm của tổ chức" },
+    "active_households": { "type": "integer", "minimum": 0, "description": "Số nông hộ đang là thành viên tại thời điểm vô hiệu hóa" }
+  }
+}
