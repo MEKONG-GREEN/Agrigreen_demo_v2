@@ -195,7 +195,7 @@ func ValidKind(k port.Kind) bool {
 
 var (
 	// unitRe khớp mã đơn vị của pf/masterdata (unitCodeRe: tới 40 ký tự, có "-" và
-	// "."), vd xã minh hoạ "92-X-NINH-KIEU" của bộ seed ĐBSCL.
+	// "."), vd mã xã TCTK "31135" (Phường Ninh Kiều) hoặc mã nhập qua Admin API.
 	unitRe     = regexp.MustCompile(`^[0-9A-Za-z][0-9A-Za-z.-]{1,39}$`)
 	tagCodeRe  = regexp.MustCompile(`^[a-z_]+:[A-Za-z0-9_.-]{1,40}$`)
 	categoryRe = regexp.MustCompile(`^[a-z][a-z0-9_]{1,39}$`)

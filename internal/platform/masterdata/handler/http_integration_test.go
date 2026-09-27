@@ -174,11 +174,15 @@ func TestSuccessorResolutionAfterMerger(t *testing.T) {
 		code, at string
 		want     []string
 	}{
-		{"89", "2026-03-01", []string{"91"}},                           // An Giang cũ → An Giang mới
-		{"95", "2026-03-01", []string{"96"}},                           // Bạc Liêu → Cà Mau
-		{"89-H-LONG-XUYEN", "2026-03-01", []string{"91-X-LONG-XUYEN"}}, // huyện cũ → đơn vị cấp xã
-		{"91", "2024-05-01", []string{"91"}},                           // Kiên Giang lúc còn hiệu lực
-		{"91-X-RACH-GIA", "2026-03-01", []string{"91-X-RACH-GIA"}},
+		{"89", "2026-03-01", []string{"91"}}, // An Giang cũ → An Giang mới
+		{"95", "2026-03-01", []string{"96"}}, // Bạc Liêu → Cà Mau
+		// TP Long Xuyên (huyện cũ 883) → 4 đơn vị cấp xã mới.
+		{"883", "2026-03-01", []string{"30292", "30301", "30307", "30313"}},
+		{"30280", "2026-03-01", []string{"30307"}},          // P. Mỹ Bình → P. Long Xuyên
+		{"31178", "2026-03-01", []string{"31120", "31168"}}, // P. Bùi Hữu Nghĩa nhập một phần vào hai phường
+		{"91", "2024-05-01", []string{"91"}},                // Kiên Giang lúc còn hiệu lực
+		{"30742", "2026-03-01", []string{"30742"}},          // P. Rạch Giá (mã dùng lại)
+		{"31135", "2024-05-01", []string{"31135"}},          // P. Tân An cũ lúc còn hiệu lực
 	} {
 		got, err := units.Current(u.ctx(), c.code, day(c.at))
 		if err != nil || !slices.Equal(got, c.want) {
@@ -203,22 +207,23 @@ func TestSuccessorResolutionAfterMerger(t *testing.T) {
 		t.Fatalf("HTTP current: %d %v", code, body)
 	}
 
-	// Chia tách qua Admin API: 92-X-CAI-RANG → hai đơn vị mới từ 2027.
+	// Chia tách giả định qua Admin API: P. Cái Răng (31186) → hai đơn vị từ 2027.
+	// Mã KT-* là mã kiểm thử, không phải mã TCTK.
 	admin := f.caller(tid, port.RoleMasterdataAdmin)
 	split := map[string]any{
 		"format": "agrigreen.admin_units/v1", "source": "Kiểm thử chia tách",
 		"units": []map[string]any{
-			{"code": "92-X-CAI-RANG", "name": "Cái Răng", "level": "commune", "parent_code": "92", "valid_from": "2025-07-01",
-				"valid_to": "2027-01-01", "successors": []string{"92-X-CAI-RANG-A", "92-X-CAI-RANG-B"}},
-			{"code": "92-X-CAI-RANG-A", "name": "Cái Răng A", "level": "commune", "parent_code": "92", "valid_from": "2027-01-01"},
-			{"code": "92-X-CAI-RANG-B", "name": "Cái Răng B", "level": "commune", "parent_code": "92", "valid_from": "2027-01-01"},
+			{"code": "31186", "name": "Phường Cái Răng", "level": "commune", "parent_code": "92", "valid_from": "2025-07-01",
+				"valid_to": "2027-01-01", "successors": []string{"KT-31186-A", "KT-31186-B"}},
+			{"code": "KT-31186-A", "name": "Cái Răng A", "level": "commune", "parent_code": "92", "valid_from": "2027-01-01"},
+			{"code": "KT-31186-B", "name": "Cái Răng B", "level": "commune", "parent_code": "92", "valid_from": "2027-01-01"},
 		},
 	}
 	if code, body := admin.adm("POST", "/v1/masterdata/admin-units/import", split); code != 200 || body["created"] != 2.0 || body["closed"] != 1.0 {
 		t.Fatalf("nhập chia tách: %d %v", code, body)
 	}
-	got, err := units.Current(u.ctx(), "92-X-CAI-RANG", day("2027-06-01"))
-	if err != nil || !slices.Equal(got, []string{"92-X-CAI-RANG-A", "92-X-CAI-RANG-B"}) {
+	got, err := units.Current(u.ctx(), "31186", day("2027-06-01"))
+	if err != nil || !slices.Equal(got, []string{"KT-31186-A", "KT-31186-B"}) {
 		t.Fatalf("sau chia tách: %v %v", got, err)
 	}
 	// Nhập lặp cùng tệp: không đổi gì (idempotent theo nội dung).
@@ -232,15 +237,15 @@ func TestSuccessorResolutionAfterMerger(t *testing.T) {
 	}
 	// Kế thừa trỏ tới mã không tồn tại → 422.
 	badRef := map[string]any{"format": "agrigreen.admin_units/v1", "source": "x", "units": []map[string]any{
-		{"code": "92-X-O-MON", "name": "Ô Môn", "level": "commune", "parent_code": "92", "valid_from": "2025-07-01",
-			"valid_to": "2027-01-01", "successors": []string{"92-X-KHONG-CO"}},
+		{"code": "31153", "name": "Phường Ô Môn", "level": "commune", "parent_code": "92", "valid_from": "2025-07-01",
+			"valid_to": "2027-01-01", "successors": []string{"KT-KHONG-CO"}},
 	}}
 	if code, body := admin.adm("POST", "/v1/masterdata/admin-units/import", badRef); code != 422 || body["code"] != "masterdata.admin_unit_invalid_reference" {
 		t.Fatalf("kế thừa không tồn tại: %d %v", code, body)
 	}
 	// Chồng lấp hiệu lực cùng mã → 409.
 	overlap := map[string]any{"format": "agrigreen.admin_units/v1", "source": "x", "units": []map[string]any{
-		{"code": "92-X-O-MON", "name": "Ô Môn 2", "level": "commune", "parent_code": "92", "valid_from": "2026-01-01"},
+		{"code": "31153", "name": "Phường Ô Môn 2", "level": "commune", "parent_code": "92", "valid_from": "2026-01-01"},
 	}}
 	if code, body := admin.adm("POST", "/v1/masterdata/admin-units/import", overlap); code != 409 || body["code"] != "masterdata.admin_unit_overlap" {
 		t.Fatalf("chồng lấp: %d %v", code, body)
@@ -260,14 +265,15 @@ func TestDescendantsAtTime(t *testing.T) {
 	units := f.mod.AdminUnits()
 
 	now, err := units.Descendants(u.ctx(), "91", day("2026-01-01"))
-	if err != nil || now[0] != "91" || !slices.Contains(now, "91-X-RACH-GIA") || !slices.Contains(now, "91-X-LONG-XUYEN") {
+	if err != nil || now[0] != "91" || !slices.Contains(now, "30742") || !slices.Contains(now, "30307") {
 		t.Fatalf("An Giang mới: %v %v", now, err)
 	}
-	if slices.Contains(now, "89-H-LONG-XUYEN") || slices.Contains(now, "92-X-NINH-KIEU") {
+	if slices.Contains(now, "883") || slices.Contains(now, "31135") {
 		t.Fatalf("lẫn đơn vị ngoài tỉnh/ngoài thời điểm: %v", now)
 	}
+	// 30742 năm 2024 là phường của Kiên Giang (91 cũ), không thuộc An Giang cũ (89).
 	old, err := units.Descendants(u.ctx(), "89", day("2024-01-01"))
-	if err != nil || !slices.Contains(old, "89-H-LONG-XUYEN") || slices.Contains(old, "91-X-LONG-XUYEN") {
+	if err != nil || !slices.Contains(old, "883") || !slices.Contains(old, "30280") || slices.Contains(old, "30742") {
 		t.Fatalf("An Giang cũ 2024: %v %v", old, err)
 	}
 	if _, err := units.Descendants(u.ctx(), "89", day("2026-01-01")); !errors.Is(err, port.ErrUnitNotFound) {
@@ -291,6 +297,43 @@ func TestDescendantsAtTime(t *testing.T) {
 	_, old14 := u.get("/v1/masterdata/admin-units?at=2024-01-01&limit=50")
 	if len(old14["items"].([]any)) != 14 {
 		t.Fatalf("trước sắp xếp phải có 14 tỉnh: %v", old14)
+	}
+}
+
+// Descendants(tỉnh) trả đủ mọi đơn vị con của tỉnh theo danh mục chính thức (số liệu
+// khớp docs/requirements/danh-muc-hanh-chinh.md): sau 01/07/2025 là tỉnh + các xã;
+// ngày 30/06/2025 là tỉnh cũ + huyện + xã/phường/thị trấn.
+func TestDescendantsCoverWholeProvince(t *testing.T) {
+	f := newFixture(t)
+	tid := f.seeded()
+	u := f.caller(tid)
+	units := f.mod.AdminUnits()
+
+	check := func(code, at string, want int) {
+		t.Helper()
+		got, err := units.Descendants(u.ctx(), code, day(at))
+		if err != nil || len(got) != want || got[0] != code {
+			t.Errorf("Descendants(%s, %s): %d đơn vị, %v; muốn %d", code, at, len(got), err, want)
+			return
+		}
+		seen := map[string]bool{}
+		for _, c := range got {
+			if seen[c] {
+				t.Errorf("Descendants(%s, %s): trùng %s", code, at, c)
+			}
+			seen[c] = true
+		}
+	}
+	// Tỉnh mới: 1 + số xã/phường/đặc khu.
+	for code, n := range map[string]int{"91": 102, "92": 103, "82": 102, "86": 124, "96": 64, "80": 96} {
+		check(code, "2026-01-01", 1+n)
+	}
+	// Tỉnh cũ ngày 30/06/2025: 1 + số huyện + số xã.
+	for code, n := range map[string][2]int{
+		"89": {11, 155}, "91": {15, 143}, "87": {12, 141}, "82": {11, 164}, "86": {8, 102}, "83": {9, 148}, "84": {9, 104},
+		"92": {9, 80}, "94": {11, 108}, "93": {8, 75}, "96": {9, 100}, "95": {7, 64}, "72": {9, 94}, "80": {15, 186},
+	} {
+		check(code, "2025-06-30", 1+n[0]+n[1])
 	}
 }
 

@@ -25,12 +25,12 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/e2e/harness"
 )
 
-// Địa bàn của kịch bản (mã theo bộ seed ĐBSCL sau sắp xếp 2025 của pf/masterdata).
+// Địa bàn của kịch bản (mã chính thức QĐ 19/2025/QĐ-TTg trong bộ seed ĐBSCL của pf/masterdata).
 const (
-	provCT     = "92"             // TP Cần Thơ
-	communeNK  = "92-X-NINH-KIEU" // xã minh hoạ Ninh Kiều
-	provAG     = "91"             // An Giang — "tỉnh khác"
-	communeLX  = "91-X-LONG-XUYEN"
+	provCT     = "92"    // TP Cần Thơ
+	communeNK  = "31135" // Phường Ninh Kiều
+	provAG     = "91"    // An Giang — "tỉnh khác"
+	communeLX  = "30307" // Phường Long Xuyên
 	nkLat      = 10.03
 	nkLon      = 105.77
 	seasonYear = 2026 // vụ Đông Xuân 2026–2027: ngày tham chiếu 01/11/2026, sau hiệu lực tham số CGH (01/01/2026)
