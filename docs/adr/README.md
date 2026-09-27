@@ -14,6 +14,6 @@
 | 0010 | [Kênh nông hộ: Flutter cho hiện trường, Zalo Mini App chỉ online](0010-kenh-nong-ho.md) | Đề xuất — cần MKG ký |
 | 0011 | [Bổ sung module nghiệp vụ cho các app](0011-module-nghiep-vu-cac-app.md) | Đề xuất |
 | 0012 | [Tính duy nhất trên bảng sổ phân vùng](0012-duy-nhat-tren-bang-so-phan-vung.md) | Chấp nhận |
-| 0013 | [Quan sát: trace_id từ G0, OTLP từ G1](0013-quan-sat-otlp.md) | Chấp nhận |
+| 0013 | [Quan sát: trace_id từ G0, OTLP từ G1](0013-quan-sat-otlp.md) | Chấp nhận — đã hiện thực OTLP ở G1 |
 
 ADR 0001–0008 là danh sách bắt buộc ở Phụ lục B của tài liệu kiến trúc. ADR 0009–0013 phát sinh khi tổng hợp BRD và khi dựng G0.

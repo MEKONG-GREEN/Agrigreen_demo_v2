@@ -16,6 +16,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 )
 
 // Envelope là phong bì sự kiện trên dây (mục 12).
@@ -29,6 +34,10 @@ type Envelope struct {
 	TraceID       string          `json:"trace_id,omitempty"`
 	Producer      string          `json:"producer"`
 	Payload       json.RawMessage `json:"payload"`
+
+	// TraceParent là header W3C traceparent lúc ghi (cột trace_parent). Không
+	// thuộc phong bì trên dây: publisher đưa nó vào header thông điệp (R-63, R-90).
+	TraceParent string `json:"-"`
 }
 
 // R-64: <vùng>.<module>.<thực thể>.<động từ quá khứ>
@@ -54,7 +63,9 @@ type Event struct {
 	Payload       any
 }
 
-// Enqueue ghi sự kiện trong giao dịch nghiệp vụ đang mở.
+// Enqueue ghi sự kiện trong giao dịch nghiệp vụ đang mở. Ngữ cảnh trace của
+// ctx (span OTel đang hoạt động) được lưu kèm để nối trace qua hàng đợi;
+// TraceID rỗng thì lấy từ ctx.
 func Enqueue(ctx context.Context, tx pgx.Tx, e Event) error {
 	if err := ValidateType(e.Type); err != nil {
 		return err
@@ -66,15 +77,21 @@ func Enqueue(ctx context.Context, tx pgx.Tx, e Event) error {
 	if err != nil {
 		return fmt.Errorf("outbox: payload: %w", err)
 	}
-	var trace *string
+	if e.TraceID == "" {
+		e.TraceID = telemetry.TraceID(ctx)
+	}
+	var traceID, parent *string
 	if e.TraceID != "" {
-		trace = &e.TraceID
+		traceID = &e.TraceID
+	}
+	if tp := telemetry.Traceparent(ctx); tp != "" {
+		parent = &tp
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO shared.outbox
-	  (id, tenant_id, event_type, schema_version, occurred_at, trace_id, producer, payload)
-	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+	  (id, tenant_id, event_type, schema_version, occurred_at, trace_id, producer, payload, trace_parent)
+	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)`,
 		// payload gửi dạng chuỗi: ở QueryExecModeExec (PgBouncer) []byte bị mã hóa thành bytea.
-		e.ID, e.TenantID, e.Type, e.SchemaVersion, e.OccurredAt.UTC(), trace, e.Producer, string(payload))
+		e.ID, e.TenantID, e.Type, e.SchemaVersion, e.OccurredAt.UTC(), traceID, e.Producer, string(payload), parent)
 	return err
 }
 
@@ -104,7 +121,7 @@ func (p *Publisher) PublishBatch(ctx context.Context) (int, error) {
 	defer tx.Rollback(ctx) //nolint:errcheck
 
 	rows, err := tx.Query(ctx, `SELECT id, tenant_id, event_type, schema_version, occurred_at, recorded_at,
-	    coalesce(trace_id, ''), producer, payload
+	    coalesce(trace_id, ''), producer, payload, coalesce(trace_parent, '')
 	  FROM shared.outbox WHERE published_at IS NULL
 	  ORDER BY id FOR UPDATE SKIP LOCKED LIMIT $1`, batch)
 	if err != nil {
@@ -114,7 +131,7 @@ func (p *Publisher) PublishBatch(ctx context.Context) (int, error) {
 	for rows.Next() {
 		var e Envelope
 		if err := rows.Scan(&e.EventID, &e.TenantID, &e.EventType, &e.SchemaVersion, &e.OccurredAt, &e.RecordedAt,
-			&e.TraceID, &e.Producer, &e.Payload); err != nil {
+			&e.TraceID, &e.Producer, &e.Payload, &e.TraceParent); err != nil {
 			rows.Close()
 			return 0, err
 		}
@@ -128,7 +145,7 @@ func (p *Publisher) PublishBatch(ctx context.Context) (int, error) {
 	sent := 0
 	var pubErr error
 	for _, e := range envs {
-		if err := p.Broker.Publish(ctx, e); err != nil {
+		if err := p.publishOne(ctx, e); err != nil {
 			pubErr = err
 			msg := err.Error()
 			if len(msg) > 500 {
@@ -149,6 +166,27 @@ func (p *Publisher) PublishBatch(ctx context.Context) (int, error) {
 		return sent, err
 	}
 	return sent, pubErr
+}
+
+// publishOne phát trong span producer là con của trace lúc ghi outbox. OTel
+// tắt → gọi thẳng broker như G0.
+func (p *Publisher) publishOne(ctx context.Context, e Envelope) error {
+	if !telemetry.Enabled() {
+		return p.Broker.Publish(ctx, e)
+	}
+	pctx := telemetry.ContextWithParent(ctx, e.TraceParent, e.TraceID)
+	pctx, span := telemetry.Tracer().Start(pctx, "publish "+e.EventType, trace.WithSpanKind(trace.SpanKindProducer),
+		trace.WithAttributes(
+			attribute.String("messaging.system", "rabbitmq"),
+			attribute.String("messaging.destination.name", Exchange),
+			attribute.String("messaging.message.id", e.EventID.String()),
+		))
+	defer span.End()
+	err := p.Broker.Publish(pctx, e)
+	if err != nil {
+		span.SetStatus(codes.Error, "publish failed")
+	}
+	return err
 }
 
 // Run lặp PublishBatch cho tới khi ctx hủy.

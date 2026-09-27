@@ -8,6 +8,8 @@ import (
 	"sync"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 )
 
 // Exchange là topic exchange của sự kiện nghiệp vụ; routing key = event_type.
@@ -67,7 +69,7 @@ func (r *Rabbit) Publish(ctx context.Context, env Envelope) error {
 		MessageId:    env.EventID.String(),
 		Timestamp:    env.RecordedAt,
 		Type:         env.EventType,
-		Headers:      amqp.Table{"trace_id": env.TraceID, "schema_version": int32(env.SchemaVersion)}, // R-63
+		Headers:      MessageHeaders(ctx, env), // R-63
 		Body:         body,
 	})
 	if err != nil {
@@ -81,6 +83,35 @@ func (r *Rabbit) Publish(ctx context.Context, env Envelope) error {
 		return errors.New("outbox: broker từ chối (nack)")
 	}
 	return nil
+}
+
+// MessageHeaders dựng header thông điệp: trace_id và schema_version (R-63),
+// cộng traceparent W3C của ctx khi OpenTelemetry bật (R-90).
+func MessageHeaders(ctx context.Context, env Envelope) amqp.Table {
+	h := amqp.Table{"trace_id": env.TraceID, "schema_version": int32(env.SchemaVersion)}
+	telemetry.Inject(ctx, HeaderCarrier(h))
+	return h
+}
+
+// HeaderCarrier cho propagator OTel đọc/ghi header AMQP.
+type HeaderCarrier amqp.Table
+
+// Get trả giá trị chuỗi của khóa.
+func (c HeaderCarrier) Get(key string) string {
+	v, _ := c[key].(string)
+	return v
+}
+
+// Set ghi khóa.
+func (c HeaderCarrier) Set(key, value string) { c[key] = value }
+
+// Keys liệt kê khóa.
+func (c HeaderCarrier) Keys() []string {
+	out := make([]string, 0, len(c))
+	for k := range c {
+		out = append(out, k)
+	}
+	return out
 }
 
 // Close đóng kết nối.

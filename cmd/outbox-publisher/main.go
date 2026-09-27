@@ -3,6 +3,8 @@
 //
 //	AG_DB_URL      URL gốc tới PostgreSQL (host, cổng, sslmode)
 //	AG_AMQP_URL    URL RabbitMQ
+//	AG_OTLP_ENDPOINT, ...  OpenTelemetry: span publish nối trace của request gốc; metric
+//	               ag.outbox.backlog, ag.outbox.oldest_age theo cụm (mục 19)
 package main
 
 import (
@@ -13,6 +15,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
@@ -33,6 +37,15 @@ func run() error {
 	log := telemetry.NewLogger("outbox-publisher", os.Stdout)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	shutdown, err := telemetry.Setup(ctx, "outbox-publisher")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		sctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		_ = shutdown(sctx)
+	}()
 	base, amqpURL := os.Getenv("AG_DB_URL"), os.Getenv("AG_AMQP_URL")
 	if base == "" || amqpURL == "" {
 		return errors.New("thiếu AG_DB_URL hoặc AG_AMQP_URL")
@@ -44,6 +57,7 @@ func run() error {
 	defer func() { _ = broker.Close() }()
 
 	var wg sync.WaitGroup
+	pools := map[string]*pgxpool.Pool{}
 	for _, c := range migrations.Clusters {
 		dsn, err := dbadmin.RoleURL(base, c, "", dbadmin.OutboxPublisher)
 		if err != nil {
@@ -54,6 +68,7 @@ func run() error {
 			return err
 		}
 		defer pool.Close()
+		pools[string(c)] = pool
 		p := &outbox.Publisher{Pool: pool, Broker: broker, Batch: 100}
 		cluster := string(c)
 		wg.Add(1)
@@ -63,6 +78,9 @@ func run() error {
 				log.Warn("phát outbox lỗi", "event", "outbox.publish", "cluster", cluster, "outcome", "retry", "error", err.Error())
 			})
 		}()
+	}
+	if _, err := outbox.RegisterBacklogMetrics(pools); err != nil {
+		log.Warn("không đăng ký được metric outbox", "event", "startup", "outcome", "error", "error", err.Error())
 	}
 	log.Info("đang chạy", "event", "startup", "outcome", "ok")
 	wg.Wait()

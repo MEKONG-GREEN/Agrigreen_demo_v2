@@ -9,6 +9,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 )
 
 // Options điều chỉnh pool.
@@ -43,6 +45,10 @@ func Open(ctx context.Context, dsn string, o Options) (*pgxpool.Pool, error) {
 	}
 	// UTC ở mức kết nối: timestamptz đọc ra luôn là UTC (R-12).
 	cfg.ConnConfig.RuntimeParams["timezone"] = "UTC"
+	// Span SQL (không ghi tham số — R-14) khi OpenTelemetry bật; gọi telemetry.Setup trước db.Open.
+	if telemetry.Enabled() {
+		cfg.ConnConfig.Tracer = telemetry.PgxTracer()
+	}
 	cfg.MaxConnIdleTime = 5 * time.Minute
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {

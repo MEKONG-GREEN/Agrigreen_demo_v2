@@ -4,8 +4,8 @@
 // event, outcome. KHÔNG có trường chứa dữ liệu cá nhân (R-14) — chỉ mã tham
 // chiếu. Không log bí mật, token, URL có chữ ký, nội dung ảnh (R-92).
 //
-// G0: trace_id theo W3C traceparent, log JSON qua slog. Xuất OTLP tới
-// Tempo/Prometheus/Loki (R-90) bổ sung ở G1 — xem docs/adr/0013.
+// trace_id theo W3C traceparent, log JSON qua slog. Từ G1: OpenTelemetry xuất
+// OTLP (trace + metric) khi đặt AG_OTLP_ENDPOINT — xem otel.go và docs/adr/0013.
 package telemetry
 
 import (
@@ -61,8 +61,10 @@ func WithTraceID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, traceKey{}, id)
 }
 
-// TraceID lấy trace_id từ context.
+// TraceID lấy trace_id từ context; chưa gắn thì lấy của span OTel đang hoạt động (nếu có).
 func TraceID(ctx context.Context) string {
-	s, _ := ctx.Value(traceKey{}).(string)
-	return s
+	if s, _ := ctx.Value(traceKey{}).(string); s != "" {
+		return s
+	}
+	return spanTraceID(ctx)
 }
