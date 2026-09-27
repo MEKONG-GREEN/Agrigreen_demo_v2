@@ -1,0 +1,11 @@
+node_modules
+.next
+out
+coverage
+public/maplibre
+*.tsbuildinfo
+.env*
+Dockerfile
+.dockerignore
+**/*.test.ts
+**/*.test.tsx

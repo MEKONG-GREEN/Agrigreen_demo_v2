@@ -1,0 +1,9 @@
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+# chép từ node_modules/maplibre-gl lúc dev/build
+public/maplibre/
+.env*.local
+coverage/
