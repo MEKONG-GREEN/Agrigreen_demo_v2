@@ -9,6 +9,9 @@ param(
 )
 $goBin = "$env:LOCALAPPDATA\Programs\go\bin"
 if (Test-Path $goBin) { $env:Path = "$goBin;$env:Path" }
+$flutterBin = "$env:LOCALAPPDATA\Programs\flutter\bin"
+if (Test-Path $flutterBin) { $env:Path = "$flutterBin;$env:Path" }
+$env:Path = "$env:USERPROFILE\go\bin;$env:Path"
 $pwFile = Join-Path $PgRoot "superuser.pw"
 if (-not (Test-Path $pwFile)) { throw "Không thấy $pwFile — xem docs/dev-setup.md" }
 $pw = [IO.File]::ReadAllText($pwFile).Trim()
