@@ -53,14 +53,22 @@ Future<void> _check(Map<String, Object?> v) async {
     return b;
   }
 
+  // Tên chuẩn theo bộ vector Go: recipient_secret_key_hex, recipient_public_key_hex.
   final sk = need([
+    'recipient_secret_key',
     'recipient_sk',
     'secret_key',
     'sk',
     'private_key',
     'x25519_sk',
   ]);
-  final pk = _field(v, ['recipient_pk', 'public_key', 'pk', 'x25519_pk']);
+  final pk = _field(v, [
+    'recipient_public_key',
+    'recipient_pk',
+    'public_key',
+    'pk',
+    'x25519_pk',
+  ]);
   final plaintext = need(['plaintext', 'pt']);
   final dek = need(['dek']);
   final nonce = need(['nonce']);
@@ -86,7 +94,7 @@ Future<void> _check(Map<String, Object?> v) async {
     reason: '$name: ciphertext‖tag',
   );
   expect(await EnvelopeCipher.aesGcmDecrypt(dek, nonce, ct), plaintext);
-  final sha = v['sha256_ciphertext'];
+  final sha = v['sha256_ciphertext_hex'] ?? v['sha256_ciphertext'];
   if (sha is String) expect(EnvelopeCipher.sha256Hex(ct), sha.toLowerCase());
   // 3. Chiều ngược: DEK do Dart seal → mở lại được bằng khóa bí mật.
   final resealed = EnvelopeCipher.sealDek(

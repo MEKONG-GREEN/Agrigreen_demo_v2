@@ -91,6 +91,26 @@ jobs:
       - name: go test -race
         run: go test -race -count=1 ./...
 
+  field-app:
+    name: App hiện trường (Flutter)
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: apps/field-app }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { flutter-version: "3.47.5", channel: stable, cache: true }
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq libsqlite3-dev
+      - run: flutter pub get --enforce-lockfile
+      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: flutter analyze --fatal-infos
+      - name: flutter test (gồm bộ vector phong bì chung với Go)
+        run: flutter test
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - name: flutter build apk --debug
+        run: flutter build apk --debug
+
   security:
     name: Bảo mật và giấy phép
     runs-on: ubuntu-latest

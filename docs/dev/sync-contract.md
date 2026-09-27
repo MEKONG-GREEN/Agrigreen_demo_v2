@@ -89,3 +89,16 @@ Phản hồi `200` trả kết quả **theo từng bản ghi**. Một bản ghi 
 - phần `blob`: ciphertext.
 
 Trả về `201 {file_ref}`. Giới hạn 15 MB mỗi tệp. Máy chủ kiểm `sha256_ciphertext`. Máy chủ không bao giờ thấy bản rõ, trừ khi vault mở DEK để hiển thị có mục đích.
+
+## Làm rõ (27/09/2026, sau khi ráp app Flutter với vault)
+
+1. **Khóa công khai** (`entity: pubkey`): `data = {"ref": "<uuid>", "area_code": "<mã xã>", "public_key": "<base64 chuẩn, 32 byte>"}`. Đây là mã hóa `[]byte` mặc định của JSON trong Go.
+2. **`POST /v1/files`**: phần `meta` là **trường văn bản** multipart, chứa JSON; phần `blob` là tệp nhị phân.
+3. **Idempotency-Key** do app đặt:
+   - `devreg:<device_id>` cho đăng ký thiết bị;
+   - `file:<file_ref>` cho tải tệp;
+   - `batch:<uuid>` cho một lô push.
+   - Máy chủ giữ khóa 48 giờ. Lô gửi lại sau 48 giờ vẫn an toàn vì từng bản ghi được chống trùng theo `idem_key`.
+4. **Bản ghi bị `rejected`** không được lưu ở máy chủ. Muốn sửa, người dùng tạo bản ghi **mới** (`op: create`), không dùng `correct`. `correct` chỉ trỏ tới bản ghi máy chủ đã nhận (`accepted` hoặc `conflict`).
+5. **Schema payload** theo từng entity nằm trong `contracts/openapi/application.yaml`, mục `pf/sync`. Mỗi module công bố schema của entity nó nhận.
+6. **Bộ vector** `internal/shared/envelope/testdata/vectors.json` dùng tên trường `recipient_secret_key_hex`, `recipient_public_key_hex`, `plaintext_hex`, `dek_hex`, `nonce_hex`, `ciphertext_hex` (ciphertext ‖ tag), `wrapped_dek_hex`, `sha256_ciphertext_hex`.
