@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.sync.conflict.opened/v1",
+  "title": "pf.sync.conflict.opened — payload",
+  "description": "Bản ghi chiều lên xung đột với bản ghi khác của cùng thực thể (vd hai ranh giới cho một thửa). Máy chủ giữ cả hai; đơn vị phụ trách phải xử lý trước due_at (C-8). Không chứa payload bản ghi.",
+  "x-event-type": "pf.sync.conflict.opened",
+  "x-schema-version": 1,
+  "x-producer": "pf/sync",
+  "type": "object",
+  "required": ["conflict_id", "entity", "record_id", "device_id", "owner_org_ref", "opened_at", "due_at"],
+  "properties": {
+    "conflict_id":   { "type": "string", "format": "uuid" },
+    "entity":        { "type": "string" },
+    "record_id":     { "type": "string", "format": "uuid" },
+    "device_id":     { "type": "string", "format": "uuid" },
+    "owner_org_ref": { "type": ["string", "null"], "format": "uuid" },
+    "opened_at":     { "type": "string", "format": "date-time" },
+    "due_at":        { "type": "string", "format": "date-time" }
+  }
+}

@@ -300,6 +300,151 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  # --- pf/sync --- (docs/dev/sync-contract.md)
+  /v1/devices:
+    post:
+      summary: Đăng ký thiết bị hiện trường cho người gọi (actor_ref, org_ref lấy từ token)
+      operationId: registerDevice
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/SyncDeviceInput"}
+      responses:
+        "201":
+          description: Đã đăng ký
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SyncDevice"}
+        "200":
+          description: Cùng người đăng ký lại cùng mã (cài lại, nâng cấp app) — cập nhật app_version
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SyncDevice"}
+        "403": {description: "sync.device_revoked — mã đã bị thu hồi; máy xóa dữ liệu và sinh mã mới", $ref: "#/components/responses/Problem"}
+        "409": {description: "sync.device_taken", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/sync/pull:
+    get:
+      summary: Thay đổi chiều xuống theo phạm vi phân công (cursor mờ có chữ ký, round-robin giữa các entity)
+      operationId: syncPull
+      parameters:
+        - $ref: "#/components/parameters/DeviceID"
+        - {name: cursor, in: query, description: "next_cursor của trang trước; bỏ trống = từ đầu", schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 1000, default: 500}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SyncPullPage"}
+        "400": {description: "sync.cursor_invalid — con trỏ bị sửa hoặc của thiết bị khác; pull lại từ đầu", $ref: "#/components/responses/Problem"}
+        "403": {description: "sync.device_unregistered | sync.device_revoked", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/sync/push:
+    post:
+      summary: Gửi một lô bản ghi chỉ ghi thêm; kết quả theo từng bản ghi
+      operationId: syncPush
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey", description: "Mã lô do máy sinh"}
+        - $ref: "#/components/parameters/DeviceID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/SyncPushBatch"}
+      responses:
+        "200":
+          description: Kết quả theo thứ tự bản ghi gửi lên. Gọi lặp cùng Idempotency-Key trả đúng phản hồi này.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results: {type: array, items: {$ref: "#/components/schemas/SyncPushResult"}}
+        "403": {description: "sync.device_unregistered | sync.device_revoked", $ref: "#/components/responses/Problem"}
+        "422": {description: "device_id khác header, quá 500 bản ghi", $ref: "#/components/responses/Problem"}
+  /v1/files:
+    post:
+      summary: Tải tệp minh chứng đã mã hóa phong bì (chỉ bản mã, ≤ 15 MB)
+      operationId: uploadFile
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/DeviceID"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [meta, blob]
+              properties:
+                meta: {$ref: "#/components/schemas/SyncEnvelopeMeta"}
+                blob: {type: string, format: binary, description: "Bản mã AES-256-GCM ‖ tag; SHA-256 phải bằng meta.sha256_ciphertext"}
+                file_ref: {type: string, format: uuid, description: "Tùy chọn: UUIDv7 máy sinh để bản ghi evidence ngoại tuyến tham chiếu trước khi tải"}
+            encoding:
+              meta: {contentType: application/json}
+      responses:
+        "201":
+          description: Đã lưu
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SyncFileCreated"}
+        "200":
+          description: Cùng file_ref, cùng bản mã đã có
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SyncFileCreated"}
+        "403": {description: "sync.device_unregistered | sync.device_revoked", $ref: "#/components/responses/Problem"}
+        "409": {description: "sync.file_ref_taken", $ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | sync.file_checksum_mismatch", $ref: "#/components/responses/Problem"}
+        "503": {description: "sync.dependency_unavailable — chưa cấu hình kho đối tượng", $ref: "#/components/responses/Problem"}
+  /v1/files/{ref}:
+    get:
+      summary: Siêu dữ liệu tệp + URL tải BẢN MÃ có hạn 5 phút (vai vault_evidence_viewer, có mục đích)
+      operationId: getFile
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/Purpose"
+      responses:
+        "200":
+          description: Siêu dữ liệu (gps, captured_at là dữ liệu cá nhân — không lưu đệm)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [file, download_url, expires_at]
+                properties:
+                  file: {$ref: "#/components/schemas/SyncFile"}
+                  download_url: {type: string, format: uri}
+                  expires_at: {type: string, format: date-time}
+        "400": {description: "sync.purpose_required", $ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | sync.purpose_not_allowed | sync.consent_missing", $ref: "#/components/responses/Problem"}
+        "404": {description: "sync.file_not_found", $ref: "#/components/responses/Problem"}
+  /v1/files/{ref}/content:
+    get:
+      summary: Nội dung đã giải mã để hiển thị — kho định danh mở DEK theo mục đích; bản rõ chỉ trong bộ nhớ request
+      operationId: getFileContent
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/Purpose"
+      responses:
+        "200":
+          description: Bản rõ, Content-Type = content_type của tệp, Cache-Control no-store
+          content:
+            "*/*":
+              schema: {type: string, format: binary}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "410": {description: "vault.erased — hộ đã xóa định danh, tệp không còn mở được", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -326,6 +471,18 @@ components:
       in: path
       required: true
       schema: {type: string, enum: [rice_variety, farm_stage, machine_type, season, pest]}
+    DeviceID:
+      name: X-Device-Id
+      in: header
+      required: true
+      description: Mã thiết bị đã đăng ký bởi chính người gọi (pf/sync)
+      schema: {type: string, format: uuid}
+    Purpose:
+      name: X-Purpose
+      in: header
+      required: true
+      description: Mục đích xử lý dữ liệu cá nhân (R-42)
+      schema: {type: string, enum: [mrv.evidence, extension.field_support]}
   responses:
     Problem:
       description: RFC 9457
@@ -496,3 +653,121 @@ components:
         household: {$ref: "#/components/schemas/Household"}
         duplicate: {type: boolean}
         duplicate_label: {type: string, enum: ["trùng"]}
+    # --- pf/sync ---
+    SyncDeviceInput:
+      type: object
+      required: [device_id, platform, app_version]
+      properties:
+        device_id: {type: string, format: uuid, description: "UUIDv7 sinh trên máy"}
+        platform: {type: string, enum: [android, ios]}
+        app_version: {type: string, pattern: "^[0-9A-Za-z.+_-]{1,40}$"}
+    SyncDevice:
+      type: object
+      required: [device_id, registered_at, platform, app_version, revoked]
+      properties:
+        device_id: {type: string, format: uuid}
+        registered_at: {type: string, format: date-time}
+        platform: {type: string}
+        app_version: {type: string}
+        revoked: {type: boolean}
+    SyncChange:
+      type: object
+      required: [entity, id, version, op]
+      properties:
+        entity: {type: string, examples: [plot, task, directive, document, pubkey]}
+        id: {type: string, format: uuid, description: "pubkey + id 00000000-0000-0000-0000-000000000000 + tombstone = kết thúc lượt khóa: xóa mọi pubkey có version nhỏ hơn"}
+        version: {type: integer}
+        op: {type: string, enum: [upsert, tombstone]}
+        data: {type: object, description: "Không có khi tombstone. pubkey: {ref, area_code, public_key (base64 32 byte)}"}
+    SyncPullPage:
+      type: object
+      required: [changes, next_cursor, has_more, server_time, reset]
+      properties:
+        changes: {type: array, items: {$ref: "#/components/schemas/SyncChange"}}
+        next_cursor: {type: string, description: "Mờ, có chữ ký HMAC, gắn với tenant + thiết bị + phạm vi"}
+        has_more: {type: boolean}
+        server_time: {type: string, format: date-time}
+        reset: {type: boolean, description: "true = phạm vi đã đổi; pull bắt đầu lại từ đầu, máy thay toàn bộ dữ liệu tham chiếu"}
+    SyncPushRecord:
+      type: object
+      required: [id, idem_key, entity, op, event_time, payload]
+      properties:
+        id: {type: string, format: uuid, description: "UUIDv7 sinh trên máy"}
+        idem_key: {type: string, pattern: "^dev:[0-9a-fA-F-]{36}:[1-9][0-9]{0,18}$", description: "dev:<device_id của chính máy gửi>:<seq>"}
+        entity: {type: string, examples: [plot_boundary, field_report, task_update, consent, evidence]}
+        op: {type: string, enum: [create, correct]}
+        event_time: {type: string, format: date-time, description: "Có múi giờ; không vượt quá giờ máy chủ + 5 phút"}
+        supersedes_id: {type: [string, "null"], format: uuid, description: "Bắt buộc khi op = correct"}
+        correction_reason: {type: [string, "null"], minLength: 10, maxLength: 500, description: "Bắt buộc khi op = correct"}
+        payload: {type: object, description: "Tối đa 256 KiB; máy chủ pf/sync chỉ lưu SHA-256"}
+    SyncPushBatch:
+      type: object
+      required: [device_id, records]
+      properties:
+        device_id: {type: string, format: uuid, description: "Phải trùng header X-Device-Id"}
+        records: {type: array, maxItems: 500, items: {$ref: "#/components/schemas/SyncPushRecord"}}
+    SyncPushResult:
+      type: object
+      required: [id, status]
+      properties:
+        id: {type: string, description: "id máy gửi, nguyên văn (kể cả khi sai dạng)"}
+        status: {type: string, enum: [accepted, duplicate, conflict, rejected]}
+        conflict_id: {type: string, format: uuid}
+        code: {type: string, description: "Khi rejected: validation_failed | sync.unknown_entity | sync.sink_failed (máy tự gửi lại, không bắt người dùng sửa) | mã của module nhận"}
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: {type: string}
+              reason: {type: string}
+    SyncEnvelopeMeta:
+      type: object
+      description: docs/dev/envelope-format.md, phiên bản 1
+      required: [v, alg, subject_ref, nonce, wrapped_dek, sha256_ciphertext, content_type]
+      properties:
+        v: {type: integer, enum: [1]}
+        alg: {type: string, enum: ["A256GCM+X25519-SEALEDBOX"]}
+        subject_ref: {type: string, format: uuid}
+        nonce: {type: string, contentEncoding: base64, description: "12 byte"}
+        wrapped_dek: {type: string, contentEncoding: base64, description: "80 byte (crypto_box_seal)"}
+        sha256_ciphertext: {type: string, pattern: "^[0-9a-f]{64}$"}
+        content_type: {type: string, enum: [image/jpeg, image/png, image/webp, image/heic, application/pdf, video/mp4]}
+        captured_at: {type: string, format: date-time}
+        gps:
+          type: object
+          required: [lat, lon]
+          properties:
+            lat: {type: number, minimum: -90, maximum: 90}
+            lon: {type: number, minimum: -180, maximum: 180}
+            accuracy_m: {type: number, minimum: 0}
+    SyncFileCreated:
+      type: object
+      required: [file_ref, sha256_ciphertext, size]
+      properties:
+        file_ref: {type: string, format: uuid}
+        sha256_ciphertext: {type: string}
+        size: {type: integer}
+    SyncFile:
+      type: object
+      required: [file_ref, subject_ref, v, alg, nonce, wrapped_dek, sha256_ciphertext, size, content_type, captured_at, gps, created_at]
+      properties:
+        file_ref: {type: string, format: uuid}
+        subject_ref: {type: string, format: uuid}
+        v: {type: integer}
+        alg: {type: string}
+        nonce: {type: string, contentEncoding: base64}
+        wrapped_dek: {type: string, contentEncoding: base64}
+        sha256_ciphertext: {type: string}
+        size: {type: integer}
+        content_type: {type: string}
+        captured_at: {type: [string, "null"], format: date-time}
+        gps:
+          oneOf:
+            - type: "null"
+            - type: object
+              properties:
+                lat: {type: number}
+                lon: {type: number}
+                accuracy_m: {type: number}
+        created_at: {type: string, format: date-time}

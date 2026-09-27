@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -125,11 +126,25 @@ func Recover(log *slog.Logger) gin.HandlerFunc {
 	}
 }
 
-// BodyLimit giới hạn kích thước thân request.
+// bodyOverrides: "METHOD route" → giới hạn thân riêng (vd tải tệp minh chứng 15 MB).
+var bodyOverrides sync.Map
+
+// AllowBody cho một route (mẫu đầy đủ, vd "/v1/files") giới hạn thân riêng thay cho
+// giới hạn chung của engine. Module gọi khi đăng ký route; BodyLimit đọc theo
+// c.FullPath() nên chỉ đúng route đó được nới.
+func AllowBody(method, route string, n int64) {
+	bodyOverrides.Store(method+" "+route, n)
+}
+
+// BodyLimit giới hạn kích thước thân request (route đã khai AllowBody dùng giới hạn riêng).
 func BodyLimit(n int64) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if n > 0 && c.Request.Body != nil {
-			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, n)
+		limit := n
+		if v, ok := bodyOverrides.Load(c.Request.Method + " " + c.FullPath()); ok {
+			limit = v.(int64)
+		}
+		if limit > 0 && c.Request.Body != nil {
+			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit)
 		}
 		c.Next()
 	}

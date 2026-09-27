@@ -503,6 +503,117 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
   # --- hết pf/party ---
+  # --- pf/sync --- (docs/dev/sync-contract.md)
+  /v1/devices:
+    get:
+      summary: Liệt kê thiết bị của tenant (vai device_admin)
+      operationId: syncListDevices
+      parameters:
+        - {name: actor_ref, in: query, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/SyncDeviceAdmin"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/devices/{id}/revoke:
+    post:
+      summary: Thu hồi thiết bị — mọi lời gọi đồng bộ sau đó trả 403 sync.device_revoked, app xóa dữ liệu cục bộ; phát pf.sync.device.revoked
+      operationId: syncRevokeDevice
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "200":
+          description: Đã thu hồi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SyncDeviceAdmin"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "sync.device_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "sync.device_already_revoked", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/sync/conflicts:
+    get:
+      summary: Sổ đăng ký xung đột đồng bộ (vai sync_conflict_resolver), SLA C-8
+      operationId: syncListConflicts
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [open, resolved]}}
+        - {name: overdue, in: query, description: "true = chỉ mục đang mở đã quá due_at", schema: {type: boolean}}
+        - {name: owner_org_ref, in: query, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/SyncConflict"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/sync/conflicts/{id}:
+    get:
+      operationId: syncGetConflict
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Xung đột
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SyncConflict"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "sync.conflict_not_found", $ref: "#/components/responses/Problem"}
+  /v1/sync/conflicts/{id}/resolve:
+    post:
+      summary: Đóng xung đột; phát pf.sync.conflict.resolved để module sở hữu entity áp quyết định bằng bản ghi bù
+      operationId: syncResolveConflict
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties:
+                note: {type: string, minLength: 10, maxLength: 500}
+                resolved_record_id: {type: string, format: uuid, description: "Bản ghi được giữ (tùy chọn)"}
+      responses:
+        "200":
+          description: Đã đóng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SyncConflict"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "sync.conflict_state — đã đóng", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/sync ---
 components:
   securitySchemes:
     oidc:
@@ -745,3 +856,37 @@ components:
         prev_admin_unit_code: {type: [string, "null"]}
         active: {type: boolean}
         details: {type: object, description: "Hồ sơ HTX lúc tạo (không PII)"}
+    # --- pf/sync ---
+    SyncDeviceAdmin:
+      type: object
+      required: [device_id, registered_at, platform, app_version, revoked, actor_ref]
+      properties:
+        device_id: {type: string, format: uuid}
+        registered_at: {type: string, format: date-time}
+        platform: {type: string, enum: [android, ios]}
+        app_version: {type: string}
+        revoked: {type: boolean}
+        actor_ref: {type: string, format: uuid}
+        org_ref: {type: string, format: uuid}
+        last_seen_at: {type: string, format: date-time}
+        revoked_at: {type: string, format: date-time}
+        revoke_reason: {type: string}
+    SyncConflict:
+      type: object
+      required: [conflict_id, entity, first_record_id, device_id, reported_by, owner_org_ref, opened_at, due_at, status, overdue,
+                 resolved_at, resolved_by, resolution_note, resolved_record_id]
+      properties:
+        conflict_id: {type: string, format: uuid}
+        entity: {type: string}
+        first_record_id: {type: string, format: uuid}
+        device_id: {type: string, format: uuid}
+        reported_by: {type: string, format: uuid}
+        owner_org_ref: {type: [string, "null"], format: uuid, description: "Đơn vị phụ trách xử lý (đơn vị của người gửi)"}
+        opened_at: {type: string, format: date-time}
+        due_at: {type: string, format: date-time, description: "opened_at + sync.conflict_sla_hours (mặc định 72, C-8)"}
+        status: {type: string, enum: [open, resolved]}
+        overdue: {type: boolean}
+        resolved_at: {type: [string, "null"], format: date-time}
+        resolved_by: {type: [string, "null"], format: uuid}
+        resolution_note: {type: [string, "null"]}
+        resolved_record_id: {type: [string, "null"], format: uuid}

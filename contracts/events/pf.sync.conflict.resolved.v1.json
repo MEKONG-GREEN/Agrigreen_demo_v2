@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.sync.conflict.resolved/v1",
+  "title": "pf.sync.conflict.resolved — payload",
+  "description": "Xung đột đồng bộ đã được đóng. resolved_record_id là bản ghi được chọn (nếu có); module sở hữu entity áp quyết định bằng bản ghi bù. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.sync.conflict.resolved",
+  "x-schema-version": 1,
+  "x-producer": "pf/sync",
+  "type": "object",
+  "required": ["conflict_id", "entity", "resolved_by", "resolved_at", "resolved_record_id", "overdue"],
+  "properties": {
+    "conflict_id":        { "type": "string", "format": "uuid" },
+    "entity":             { "type": "string" },
+    "resolved_by":        { "type": "string", "format": "uuid" },
+    "resolved_at":        { "type": "string", "format": "date-time" },
+    "resolved_record_id": { "type": ["string", "null"], "format": "uuid" },
+    "overdue":            { "type": "boolean", "description": "true = đóng sau due_at (vi phạm SLA)" }
+  }
+}
