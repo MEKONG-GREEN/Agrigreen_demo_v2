@@ -157,6 +157,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Người gọi hiện tại, đơn vị công tác và phạm vi dữ liệu đã giải (pf/party, ADR-0009)
+         * @description Mọi người gọi đã xác thực đều gọi được, không cần vai nghiệp vụ. Không chứa dữ liệu cá nhân
+         *     (R-04, R-14): chỉ mã tham chiếu, vai, tên tổ chức và tên đơn vị hành chính.
+         *     Chỉ để giao diện hiển thị; quyền thật do từng module kiểm ở backend (R-55).
+         *     Phản hồi có Cache-Control private, no-store.
+         */
+        get: operations["getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/orgs": {
         parameters: {
             query?: never;
@@ -997,6 +1020,217 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/mechanization/owners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chủ sở hữu máy (FN-04) — nhãn đã che từ kho định danh, số máy đang hoạt động */
+        get: operations["mechListOwners"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mechanization/owners/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một chủ sở hữu */
+        get: operations["mechGetOwner"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mechanization/machines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Máy móc – thiết bị (FN-05 B1) kèm tình trạng và nhãn nguồn */
+        get: operations["mechListMachines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mechanization/machines/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một máy */
+        get: operations["mechGetMachine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mechanization/cooperatives/{ref}/machine-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Số máy của HTX tại một ngày trong quá khứ (FN-05 BR-09, US-MAC-03)
+         * @description Đếm máy có Ngày HTX sở hữu ≤ T và (chưa vô hiệu hóa hoặc Ngày vô hiệu hóa > T); tình trạng tại T đọc từ sổ biến động.
+         */
+        get: operations["mechMachineCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mechanization/cooperatives/{ref}/panel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Panel chi tiết HTX trên bản đồ (FN-08 B5) — máy theo khâu, chủ sở hữu (nhãn đã che), mức đáp ứng đã lưu */
+        get: operations["mechCooperativePanel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mechanization/season-areas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Diện tích canh tác & lịch mùa vụ theo HTX × vụ, kèm nhãn nguồn [App HTX]/[Nhập tay] và cờ khóa (FN-06) */
+        get: operations["mechListSeasonAreas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mechanization/balance-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Các lần cân đối đã lưu (mới nhất trước) */
+        get: operations["mechListBalanceRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mechanization/balance-runs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một lần cân đối và các dòng HTX × khâu × chủng loại đã lưu (bất biến) */
+        get: operations["mechGetBalanceRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mechanization/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mức đáp ứng theo tỉnh → xã → HTX, kèm màu và chú giải (FN-08, FN-10 tab Tổng hợp/Thiếu hụt)
+         * @description Đọc lần cân đối run_id, hoặc lần mới nhất của (season_code, season_year), hoặc mới nhất mọi vụ.
+         *     Mức của một đơn vị là mức của khâu thấp nhất; nhu cầu/năng lực là tổng. Mức đáp ứng không cắt ở 100% (Thừa ≥ ngưỡng).
+         */
+        get: operations["mechCoverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mechanization/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dashboard (FN-11) — 4 thẻ chỉ số và bảng "HTX cần ưu tiên" (mức đáp ứng thấp nhất trước) */
+        get: operations["mechDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mechanization/trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xu hướng nhiều năm theo vụ đã lưu (FN-11 B3) — lần cân đối mới nhất của mỗi vụ */
+        get: operations["mechTrend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1118,6 +1352,40 @@ export interface components {
              */
             representative_ref: string | null;
             active: boolean;
+        };
+        Me: {
+            /**
+             * Format: uuid
+             * @description = sub của token; mã tham chiếu, không phải định danh
+             */
+            actor_ref: string;
+            /** Format: uuid */
+            tenant_id: string;
+            roles: string[];
+            /** @description Token có yếu tố thứ hai (amr) — Admin API bắt buộc */
+            mfa: boolean;
+            /** @description Đơn vị công tác (claim org_ref). null khi không có org_ref hoặc tổ chức không tồn tại trong tenant. */
+            org: null | {
+                /** Format: uuid */
+                ref: string;
+                kind: components["schemas"]["OrgKind"];
+                name: string;
+                admin_unit_code: string | null;
+                /** @description false = tổ chức đã bị vô hiệu hóa → phạm vi rỗng */
+                active: boolean;
+            };
+            scope: {
+                /** @description true = toàn quốc (TTKN QG, Cục KTHT, Mekong Green, platform_admin) */
+                all: boolean;
+                /** @enum {string} */
+                level: "national" | "province" | "commune" | "cooperative" | "none";
+                /** @description Mã đơn vị hành chính hiện hành được thấy; rỗng khi all = true hoặc level = none */
+                units: string[];
+                /** @description Mã đơn vị → tên (masterdata tại thời điểm hiện tại), gồm cả đơn vị của tổ chức */
+                unit_names: {
+                    [key: string]: string;
+                };
+            };
         };
         /** @description Số thập phân dạng chuỗi (không float) */
         Decimal: string;
@@ -1261,6 +1529,25 @@ export interface components {
             correction_reason?: string | null;
             /** @description Tối đa 256 KiB; máy chủ pf/sync chỉ lưu SHA-256 */
             payload: Record<string, never>;
+        };
+        /**
+         * @description payload của bản ghi push entity = consent (Sink của pf/party). Chỉ op = create; rút lại đồng ý là
+         *     bản ghi mới status = withdrawn. id, event_time, device_id lấy từ phong bì; idem_key của máy là khóa
+         *     chống trùng của sổ đồng ý (gửi lại → duplicate). Cần vai consent_writer.
+         */
+        SyncConsentPayload: {
+            /** Format: uuid */
+            subject_ref: string;
+            /** @example mrv.evidence */
+            purpose: string;
+            text_version: string;
+            /** @enum {string} */
+            status: "granted" | "withdrawn";
+            /**
+             * @default field_app
+             * @enum {string}
+             */
+            channel: "field_app" | "web" | "zalo" | "paper";
         };
         SyncPushBatch: {
             /**
@@ -2001,6 +2288,190 @@ export interface components {
             /** Format: date-time */
             until: string | null;
         };
+        /**
+         * @description Thành viên HTX / HTX / Doanh nghiệp / Đơn vị khác (FN-04)
+         * @enum {string}
+         */
+        MechOwnerType: "thanh_vien_htx" | "htx" | "doanh_nghiep" | "khac";
+        /** @enum {string} */
+        MechMachineStatus: "hoat_dong" | "bao_tri" | "hong" | "ngung_hoat_dong";
+        /**
+         * @description Đủ / Cần chú ý / Thiếu / Thừa / Chưa có dữ liệu / Chưa cấu hình định mức / Chưa cấu hình ngưỡng (QT-02)
+         * @enum {string}
+         */
+        MechCoverageStatus: "sufficient" | "attention" | "shortage" | "surplus" | "no_data" | "no_norm" | "unclassified";
+        MechOwner: {
+            /** Format: uuid */
+            id: string;
+            /** @description Mã CSH tự sinh (FN-04 BR-02) */
+            code: string;
+            owner_type: components["schemas"]["MechOwnerType"];
+            owner_type_label: string;
+            /** Format: uuid */
+            cooperative_ref: string | null;
+            /**
+             * Format: uuid
+             * @description Mã tham chiếu kho định danh (R-04)
+             */
+            person_ref: string | null;
+            active: boolean;
+            status_reason: string | null;
+            /** @description Tên tổ chức, hoặc nhãn cá nhân đã che */
+            label: string;
+            masked_phone: string;
+            label_unavailable: boolean;
+            /** @description Số máy đang hoạt động */
+            machines: number;
+        };
+        MechMachine: {
+            /** Format: uuid */
+            ref: string;
+            /** @description Mã máy tự sinh — nhãn hiển thị, không đổi khi máy/HTX đổi tỉnh (ADR-0009) */
+            code: string;
+            machine_type: string;
+            /** @description Khâu suy ra từ chủng loại (FN-05 AC-03) */
+            farm_stage: string;
+            /** Format: uuid */
+            cooperative_ref: string;
+            /** Format: uuid */
+            owner_id: string;
+            brand: string | null;
+            model: string | null;
+            serial_no: string | null;
+            chassis_no: string | null;
+            year_made: number | null;
+            fuel: string | null;
+            power_hp: components["schemas"]["Decimal"] | null;
+            capacity_ha: components["schemas"]["Decimal"] | null;
+            /** Format: date */
+            owned_since: string;
+            status: components["schemas"]["MechMachineStatus"];
+            status_label: string;
+            /** @enum {string} */
+            status_source: "manual" | "import" | "app_htx";
+            /** @enum {string} */
+            source_label: "Nhập tay" | "App HTX";
+            /** Format: date-time */
+            status_at: string;
+            active: boolean;
+            /** Format: date */
+            deactivated_on: string | null;
+            status_reason: string | null;
+        };
+        MechSeasonArea: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            cooperative_ref: string;
+            season_code: string;
+            /** @description Năm bắt đầu vụ */
+            season_year: number;
+            commune_code: string | null;
+            area_ha: components["schemas"]["Decimal"];
+            /** @enum {string} */
+            source: "app_htx" | "manual";
+            /** @enum {string} */
+            source_label: "App HTX" | "Nhập tay";
+            /** Format: date-time */
+            source_at: string;
+            /** @description Khóa: đồng bộ App HTX không ghi đè (QT-03) */
+            locked: boolean;
+            calendar: {
+                stage: string;
+                /** Format: date */
+                start: string;
+                /** Format: date */
+                end: string;
+            }[];
+        };
+        MechParam: {
+            key: string;
+            value: components["schemas"]["Decimal"];
+            version: number;
+            source_doc: string;
+        };
+        MechRun: {
+            /** Format: uuid */
+            id: string;
+            season_code: string;
+            season_year: number;
+            /** @description vd DX-2025 */
+            season_key: string;
+            /**
+             * Format: date
+             * @description T: ngày bắt đầu vụ — định mức, ngưỡng, số máy lấy tại T
+             */
+            reference_date: string;
+            rule_version: string;
+            pilot_stages: string[];
+            thresholds: {
+                sufficient: components["schemas"]["MechParam"] | null;
+                attention: components["schemas"]["MechParam"] | null;
+                surplus: components["schemas"]["MechParam"] | null;
+            };
+            result_count: number;
+            status_counts: {
+                [key: string]: number;
+            };
+            missing_norms: string[];
+            /** Format: date-time */
+            computed_at: string;
+            seq: number;
+        };
+        MechResult: {
+            /** Format: uuid */
+            cooperative_ref: string;
+            commune_code: string | null;
+            province_code: string | null;
+            farm_stage: string;
+            machine_type: string;
+            area_ha: components["schemas"]["Decimal"] | null;
+            /** @enum {string|null} */
+            area_source: "app_htx" | "manual" | null;
+            area_source_label: string;
+            area_locked: boolean;
+            norm_key: string;
+            /** @description Định mức hiệu lực tại vụ đã dùng (QT-01) */
+            norm: components["schemas"]["MechParam"] | null;
+            /** @description Diện tích ÷ định mức */
+            required: components["schemas"]["Decimal"] | null;
+            required_whole: number | null;
+            machines_total: number;
+            /** @description Máy "Hoạt động" tại T */
+            capacity: number;
+            coverage_pct: components["schemas"]["Decimal"] | null;
+            /** @description Năng lực − nhu cầu làm tròn lên (âm = thiếu) */
+            gap: number | null;
+            status: components["schemas"]["MechCoverageStatus"];
+            status_label: string;
+            color: string;
+            seq: number;
+        };
+        MechGroup: {
+            required: components["schemas"]["Decimal"];
+            required_whole: number;
+            capacity: number;
+            machines_total: number;
+            coverage_pct: components["schemas"]["Decimal"] | null;
+            status: components["schemas"]["MechCoverageStatus"];
+            status_label: string;
+            color: string;
+        };
+        MechCoverageItem: {
+            unit_code: string | null;
+            /** Format: uuid */
+            cooperative_ref: string | null;
+            name: string;
+            province_code: string | null;
+            commune_code: string | null;
+            cooperatives: number;
+            area_source: string | null;
+            area_locked: boolean;
+            overall: components["schemas"]["MechGroup"];
+            stages: {
+                [key: string]: components["schemas"]["MechGroup"];
+            };
+        };
     };
     responses: {
         /** @description RFC 9457 */
@@ -2321,6 +2792,29 @@ export interface operations {
             /** @description masterdata.param_not_found */
             404: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+        };
+    };
+    getMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Người gọi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            /** @description party.dependency_unavailable — chưa nối danh mục đơn vị hành chính */
+            503: components["responses"]["Problem"];
         };
     };
     listOrgs: {
@@ -4123,6 +4617,402 @@ export interface operations {
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+        };
+    };
+    mechListOwners: {
+        parameters: {
+            query?: {
+                cooperative_ref?: string;
+                owner_type?: components["schemas"]["MechOwnerType"];
+                include_inactive?: boolean;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MechOwner"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    mechGetOwner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chủ sở hữu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MechOwner"];
+                };
+            };
+            /** @description mechanization.owner_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    mechListMachines: {
+        parameters: {
+            query?: {
+                cooperative_ref?: string;
+                owner_id?: string;
+                farm_stage?: string;
+                machine_type?: string;
+                status?: components["schemas"]["MechMachineStatus"];
+                include_inactive?: boolean;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MechMachine"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    mechGetMachine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Máy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MechMachine"];
+                };
+            };
+            /** @description mechanization.machine_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    mechMachineCount: {
+        parameters: {
+            query: {
+                at: string;
+            };
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số máy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        cooperative_ref: string;
+                        /** Format: date */
+                        at: string;
+                        total: number;
+                        /** @description Máy "Hoạt động" — tính vào năng lực (FN-05 BR-04) */
+                        active: number;
+                        by_stage: {
+                            farm_stage: string;
+                            machine_type: string;
+                            total: number;
+                            by_status: {
+                                [key: string]: number;
+                            };
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    mechCooperativePanel: {
+        parameters: {
+            query?: {
+                season_code?: string;
+                season_year?: number;
+                run_id?: string;
+            };
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Panel */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        cooperative_ref: string;
+                        name: string;
+                        commune_code: string | null;
+                        province_code: string | null;
+                        /** @enum {string} */
+                        note?: "Chưa có máy";
+                        machines: (components["schemas"]["MechMachine"] & {
+                            owner_code: string;
+                            /** @description Nhãn đã che (mục 10.4) */
+                            owner_label: string;
+                            owner_masked_phone: string;
+                        })[];
+                        coverage: components["schemas"]["MechCoverageItem"] | null;
+                        run: components["schemas"]["MechRun"] | null;
+                    };
+                };
+            };
+            /** @description mechanization.cooperative_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    mechListSeasonAreas: {
+        parameters: {
+            query: {
+                season_code: string;
+                season_year: number;
+                cooperative_ref?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MechSeasonArea"][];
+                    };
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
+    mechListBalanceRuns: {
+        parameters: {
+            query?: {
+                season_code?: string;
+                season_year?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MechRun"][];
+                    };
+                };
+            };
+        };
+    };
+    mechGetBalanceRun: {
+        parameters: {
+            query?: {
+                province_code?: string;
+                commune_code?: string;
+                cooperative_ref?: string;
+                farm_stage?: string;
+                machine_type?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        run: components["schemas"]["MechRun"];
+                        results: components["schemas"]["MechResult"][];
+                    };
+                };
+            };
+            /** @description mechanization.run_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    mechCoverage: {
+        parameters: {
+            query?: {
+                level?: "province" | "commune" | "cooperative";
+                season_code?: string;
+                season_year?: number;
+                run_id?: string;
+                province_code?: string;
+                commune_code?: string;
+                farm_stage?: string;
+                machine_type?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tổng hợp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        run: components["schemas"]["MechRun"];
+                        level: string;
+                        summary: components["schemas"]["MechGroup"];
+                        stages: {
+                            [key: string]: components["schemas"]["MechGroup"];
+                        };
+                        items: components["schemas"]["MechCoverageItem"][];
+                        legend: {
+                            status: components["schemas"]["MechCoverageStatus"];
+                            label: string;
+                            color: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description mechanization.run_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    mechDashboard: {
+        parameters: {
+            query?: {
+                season_code?: string;
+                season_year?: number;
+                run_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dashboard */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        kpis: {
+                            total_machines: number;
+                            total_cooperatives: number;
+                            /** @description Đủ hoặc Thừa */
+                            cooperatives_sufficient: number;
+                            cooperatives_shortage: number;
+                        };
+                        cooperatives_by_status: {
+                            [key: string]: number;
+                        };
+                        priority: components["schemas"]["MechCoverageItem"][];
+                        run: components["schemas"]["MechRun"] | null;
+                    };
+                };
+            };
+        };
+    };
+    mechTrend: {
+        parameters: {
+            query?: {
+                season_code?: string;
+                farm_stage?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chuỗi theo vụ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            run: components["schemas"]["MechRun"];
+                            summary: components["schemas"]["MechGroup"];
+                            stages: {
+                                [key: string]: components["schemas"]["MechGroup"];
+                            };
+                            cooperatives_by_status: {
+                                [key: string]: number;
+                            };
+                        }[];
+                    };
+                };
+            };
         };
     };
 }

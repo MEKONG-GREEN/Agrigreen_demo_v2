@@ -32,6 +32,7 @@
       { "name": "kn_officer", "description": "Cán bộ khuyến nông xã / Tổ KNCĐ — đọc/ghi trong xã phụ trách" },
       { "name": "coop_manager", "description": "Quản lý HTX/THT — nông hộ, thửa của chính HTX mình" },
       { "name": "cgh_viewer", "description": "Cục KTHT — xem bản đồ cơ giới hóa, chỉ đọc hồ sơ HTX" },
+      { "name": "cgh_sync", "description": "Tài khoản dịch vụ nạp dữ liệu diện tích/lịch mùa vụ từ App HTX (FN-07, G2)" },
       { "name": "cgh_admin", "description": "[MFA] Quản trị dữ liệu bản đồ cơ giới hóa (pf/mechanization, Admin API)" },
       { "name": "plot_editor", "description": "Vẽ/sửa/gán/ngừng dùng thửa trong phạm vi (pf/geo)" },
       { "name": "plot_viewer", "description": "Chỉ xem thửa trong phạm vi (pf/geo)" },
