@@ -91,6 +91,24 @@ jobs:
       - name: go test -race
         run: go test -race -count=1 ./...
 
+  web-ops:
+    name: Web vận hành (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: apps/web-ops }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", cache: npm, cache-dependency-path: apps/web-ops/package-lock.json }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check:api
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Giấy phép npm (RB-4)
+        run: npx --yes license-checker-rseidelsohn --production --excludePrivatePackages --excludePackages "sharp;@img/sharp-libvips-linux-x64;@img/sharp-libvips-linuxmusl-x64" --onlyAllow "MIT;BSD-2-Clause;BSD-3-Clause;Apache-2.0;ISC;MPL-2.0;0BSD;BlueOak-1.0.0;CC0-1.0;Python-2.0;CC-BY-4.0"
+
   field-app:
     name: App hiện trường (Flutter)
     runs-on: ubuntu-latest

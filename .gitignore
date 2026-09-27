@@ -12,7 +12,8 @@ deploy/compose/.env
 *.exe
 *.test
 *.out
-coverage.*
+/coverage.out
+/coverage.html
 
 # Công cụ
 .idea/
