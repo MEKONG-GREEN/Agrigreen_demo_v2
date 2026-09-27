@@ -109,7 +109,7 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
       - name: Trivy — quét repo
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with: { scan-type: fs, severity: "CRITICAL,HIGH", exit-code: "1", ignore-unfixed: true }
 
   images:
@@ -135,7 +135,7 @@ jobs:
           format: spdx-json
           output-file: sbom-${{ matrix.cmd }}.spdx.json
       - name: Trivy — quét image
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/${{ github.repository_owner }}/agrigreen-${{ matrix.cmd }}:${{ github.sha }}
           severity: "CRITICAL,HIGH"

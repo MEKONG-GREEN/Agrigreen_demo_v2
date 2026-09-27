@@ -108,7 +108,9 @@ func (e *Env) Pool(t testing.TB, c migrations.Cluster, role string) *pgxpool.Poo
 	if p, ok := e.pools[key]; ok {
 		return p
 	}
-	base, bouncer := e.PoolURL, e.ViaBouncer
+	// Vai ứng dụng luôn dùng chế độ thực thi của PgBouncer (QueryExecModeExec), kể cả khi nối thẳng,
+	// để lỗi mã hóa tham số chỉ lộ ra qua PgBouncer cũng bị bắt trên máy dev.
+	base, bouncer := e.PoolURL, true
 	if role == dbadmin.Migrator {
 		base, bouncer = e.DirectURL, false
 	}

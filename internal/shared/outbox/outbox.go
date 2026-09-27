@@ -72,8 +72,9 @@ func Enqueue(ctx context.Context, tx pgx.Tx, e Event) error {
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO shared.outbox
 	  (id, tenant_id, event_type, schema_version, occurred_at, trace_id, producer, payload)
-	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		e.ID, e.TenantID, e.Type, e.SchemaVersion, e.OccurredAt.UTC(), trace, e.Producer, payload)
+	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+		// payload gửi dạng chuỗi: ở QueryExecModeExec (PgBouncer) []byte bị mã hóa thành bytea.
+		e.ID, e.TenantID, e.Type, e.SchemaVersion, e.OccurredAt.UTC(), trace, e.Producer, string(payload))
 	return err
 }
 
