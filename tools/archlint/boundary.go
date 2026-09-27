@@ -13,6 +13,11 @@ var modulePath = "github.com/MEKONG-GREEN/Agrigreen_demo_v2"
 // vaultClient là package DUY NHẤT của vault được phép import từ ngoài (R-04).
 const vaultClient = "internal/vault/identity/client"
 
+// vaultRoot là gốc lắp ráp của vùng vault: dịch vụ identity-vault chạy riêng ở
+// vùng định danh (mục 17). Chỉ nó được import gốc module vault (module.go) và
+// port/ — vẫn theo quy tắc gốc lắp ráp R-02.
+const vaultRoot = "cmd/identity-vault"
+
 // Boundary cưỡng chế R-02, R-03, R-04 và "shared không chứa logic nghiệp vụ".
 var Boundary = &analysis.Analyzer{
 	Name: "agboundary",
@@ -26,6 +31,7 @@ func init() {
 
 // loc mô tả vị trí một package trong internal/: vùng, module, phần còn lại.
 type loc struct {
+	path     string // đường dẫn package đầy đủ
 	internal bool
 	zone     string // platform | mkg | vault | shared
 	module   string
@@ -35,13 +41,13 @@ type loc struct {
 func locate(pkg string) loc {
 	rel, ok := strings.CutPrefix(pkg, modulePath+"/")
 	if !ok {
-		return loc{}
+		return loc{path: pkg}
 	}
 	parts := strings.Split(rel, "/")
 	if len(parts) < 2 || parts[0] != "internal" {
-		return loc{}
+		return loc{path: pkg}
 	}
-	l := loc{internal: true, zone: parts[1]}
+	l := loc{path: pkg, internal: true, zone: parts[1]}
 	if len(parts) >= 3 {
 		l.module = parts[2]
 	}
@@ -81,12 +87,15 @@ func violation(from, to loc, imp string) string {
 	if to.zone == "shared" {
 		return ""
 	}
-	// R-04: vault chỉ qua client.
+	// R-04: vault chỉ qua client — trừ gốc lắp ráp của vault (theo quy tắc gốc lắp ráp bên dưới).
+	isVaultRoot := from.path == modulePath+"/"+vaultRoot || strings.HasPrefix(from.path, modulePath+"/"+vaultRoot+"/")
 	if to.zone == "vault" && (!from.internal || from.zone != "vault") {
-		if !strings.HasPrefix(imp, modulePath+"/"+vaultClient) {
+		if strings.HasPrefix(imp, modulePath+"/"+vaultClient) {
+			return ""
+		}
+		if !isVaultRoot {
 			return "R-04: chỉ được gọi kho định danh qua " + vaultClient + ", không import " + imp
 		}
-		return ""
 	}
 	if !from.internal {
 		// cmd/, tools/: gốc lắp ráp — được import gốc module (module.go) và port/.

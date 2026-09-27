@@ -14,6 +14,7 @@ func TestBoundary(t *testing.T) {
 		"example.com/ag/internal/platform/alpha/app",
 		"example.com/ag/internal/shared/x",
 		"example.com/ag/cmd/app",
+		"example.com/ag/cmd/identity-vault",
 	)
 }
 
