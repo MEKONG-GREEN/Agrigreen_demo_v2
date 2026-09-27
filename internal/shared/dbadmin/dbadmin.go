@@ -48,6 +48,14 @@ var Roles = []Role{
 	{Name: "platform_api", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
 	{Name: "worker_platform", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
 	{Name: "party_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
+	// Module G1 của cụm pf (docs/dev/g1-conventions.md).
+	{Name: "masterdata_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
+	{Name: "geo_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
+	{Name: "extension_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
+	{Name: "content_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
+	{Name: "mechanization_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
+	{Name: "mrv_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
+	{Name: "sync_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
 	{Name: "fieldops_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
 	{Name: "vault_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.Vault}},
 }

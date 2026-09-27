@@ -1,6 +1,7 @@
 // Lệnh migratecheck là cổng CI cho migration (R-23, R-25):
 //
-//   - tên tệp NNNNNN_ten.up.sql, số tăng liên tục trong mỗi thư mục cụm
+//   - tên tệp NNNNNN_ten.up.sql, số không trùng trong mỗi thư mục cụm (số được cấp
+//     trước cho từng module — docs/dev/g1-conventions.md — nên có thể có khoảng trống)
 //   - không có câu lệnh UPDATE, DELETE, TRUNCATE ở mức migration (được phép
 //     bên trong thân hàm $$...$$)
 //   - không tắt cơ chế bảo vệ: DISABLE TRIGGER, DROP TRIGGER trg_immutable/trg_chain,
@@ -55,7 +56,7 @@ func checkTree(root string) ([]string, error) {
 			return nil, err
 		}
 		sort.Strings(files)
-		want := 1
+		seen := map[int]string{}
 		for _, f := range files {
 			base := filepath.Base(f)
 			m := nameRe.FindStringSubmatch(base)
@@ -63,10 +64,11 @@ func checkTree(root string) ([]string, error) {
 				problems = append(problems, fmt.Sprintf("%s: tên tệp phải là NNNNNN_ten.up.sql (chỉ tiến, R-24)", f))
 				continue
 			}
-			if n, _ := strconv.Atoi(m[1]); n != want {
-				problems = append(problems, fmt.Sprintf("%s: số thứ tự %d, mong %d", f, n, want))
+			n, _ := strconv.Atoi(m[1])
+			if prev, dup := seen[n]; dup {
+				problems = append(problems, fmt.Sprintf("%s: trùng số %06d với %s", f, n, prev))
 			}
-			want++
+			seen[n] = base
 			src, err := os.ReadFile(f)
 			if err != nil {
 				return nil, err

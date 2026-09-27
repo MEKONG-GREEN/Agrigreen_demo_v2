@@ -66,7 +66,7 @@ jobs:
           sudo systemctl stop pgbouncer || true
           sudo mkdir -p /etc/pgbouncer-ci
           : | sudo tee /etc/pgbouncer-ci/userlist.txt > /dev/null
-          for r in platform_api worker_platform party_app fieldops_app vault_app ag_outbox_publisher ag_migrator; do
+          for r in platform_api worker_platform party_app masterdata_app geo_app extension_app content_app mechanization_app mrv_app sync_app fieldops_app vault_app ag_outbox_publisher ag_migrator; do
             printf '"%s" "%s"\n' "$r" "$AG_DB_APP_PASSWORD" | sudo tee -a /etc/pgbouncer-ci/userlist.txt > /dev/null
           done
           sudo tee /etc/pgbouncer-ci/pgbouncer.ini > /dev/null <<'INI'

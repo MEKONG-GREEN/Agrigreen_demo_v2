@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
@@ -36,9 +37,15 @@ type fixture struct {
 func newFixture(t *testing.T) *fixture {
 	env := pgtest.Get(t)
 	iss := authztest.New(t)
+	mods, pools, err := buildModules(context.Background(), func(_ context.Context, role string) (*pgxpool.Pool, error) {
+		return env.Pool(t, migrations.PF, role), nil
+	}, clock.System{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	r := NewRouter(Deps{
-		Log: telemetry.NewLogger("test", io.Discard), Verifier: iss.Verifier(), Clock: clock.System{},
-		Ops: env.Pool(t, migrations.PF, "platform_api"), Party: env.Pool(t, migrations.PF, "party_app"),
+		Log: telemetry.NewLogger("test", io.Discard), Verifier: iss.Verifier(),
+		Ops: env.Pool(t, migrations.PF, "platform_api"), Modules: mods, Pools: pools,
 	})
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)

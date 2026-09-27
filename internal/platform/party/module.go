@@ -27,8 +27,11 @@ func New(db tenant.Beginner, clk clock.Clock) *Module {
 	return &Module{svc: &app.Service{DB: db, Clock: clk}}
 }
 
-// Register gắn route Application API.
-func (m *Module) Register(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.Register(rg) }
+// RegisterApp gắn route Application API.
+func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.Register(rg) }
+
+// RegisterAdmin gắn route Admin API.
+func (m *Module) RegisterAdmin(rg *gin.RouterGroup) {}
 
 // ConsentChecker cho module khác (qua port).
 func (m *Module) ConsentChecker() port.ConsentChecker { return m.svc }

@@ -26,6 +26,10 @@ const (
 type Principal struct {
 	ActorRef uuid.UUID // = sub của token; mã tham chiếu, không phải định danh
 	TenantID uuid.UUID // từ claim tenant_id của token (R-16)
+	// OrgRef là đơn vị công tác của người gọi (claim org_ref): TTKN TW, TTKN tỉnh,
+	// tổ khuyến nông xã, HTX, Cục KTHT… Phạm vi dữ liệu theo cây phân cấp tính từ
+	// đây ở tầng ứng dụng (ADR-0009, R-33). uuid.Nil nếu token không có.
+	OrgRef   uuid.UUID
 	Roles    []string
 	MFA      bool      // token có amr chứa yếu tố thứ hai
 	AuthTime time.Time // thời điểm đăng nhập

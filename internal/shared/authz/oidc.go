@@ -37,6 +37,7 @@ type claims struct {
 	Roles       []string `json:"roles"`
 	AMR         []string `json:"amr"`
 	AuthTime    int64    `json:"auth_time"`
+	OrgRef      string   `json:"org_ref"`
 	RealmAccess struct {
 		Roles []string `json:"roles"`
 	} `json:"realm_access"`
@@ -71,6 +72,13 @@ func (v *Verifier) Verify(ctx context.Context, raw string) (Principal, error) {
 		}
 	}
 	p := Principal{ActorRef: actor, TenantID: tid, Roles: roles, MFA: mfa}
+	if c.OrgRef != "" {
+		org, err := uuid.Parse(c.OrgRef)
+		if err != nil {
+			return Principal{}, errors.New("authz: org_ref phải là UUID")
+		}
+		p.OrgRef = org
+	}
 	if c.AuthTime > 0 {
 		p.AuthTime = time.Unix(c.AuthTime, 0).UTC()
 	}

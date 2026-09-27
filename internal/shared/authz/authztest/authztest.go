@@ -53,6 +53,7 @@ type Token struct {
 	TenantID uuid.UUID
 	Roles    []string
 	MFA      bool
+	OrgRef   uuid.UUID
 	Issuer   string // rỗng = Issuer
 	Audience string // rỗng = Audience
 	TTL      time.Duration
@@ -81,6 +82,9 @@ func (f *FakeIssuer) Sign(t testing.TB, tk Token) string {
 		amr = append(amr, "otp")
 	}
 	extra := map[string]any{"tenant_id": tk.TenantID.String(), "realm_access": map[string]any{"roles": tk.Roles}, "amr": amr, "auth_time": now.Unix()}
+	if tk.OrgRef != uuid.Nil {
+		extra["org_ref"] = tk.OrgRef.String()
+	}
 	raw, err := jwt.Signed(f.signer).Claims(std).Claims(extra).Serialize()
 	if err != nil {
 		t.Fatal(err)
