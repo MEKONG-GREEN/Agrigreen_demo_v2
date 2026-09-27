@@ -70,7 +70,7 @@ func consumers(log *slog.Logger) []consumer {
 			log.Info("đồng ý đã ghi", "event", env.EventType, "event_id", env.EventID, "tenant_id", env.TenantID, "trace_id", env.TraceID, "outcome", "ok")
 			return nil
 		},
-	}}
+	}, mrvExportConsumer(log)}
 }
 
 func main() {

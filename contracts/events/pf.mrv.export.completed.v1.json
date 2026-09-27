@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.mrv.export.completed/v1",
+  "title": "pf.mrv.export.completed — payload",
+  "description": "Gói bằng chứng MRV đã lưu vào kho đối tượng và ghi sổ pf_mrv.export_package (bất biến). snapshot_sha256 là băm của ảnh chụp dữ liệu chuẩn hóa — dựng lại từ sổ tại as_of phải ra cùng giá trị.",
+  "x-event-type": "pf.mrv.export.completed",
+  "x-schema-version": 1,
+  "x-producer": "pf/mrv",
+  "type": "object",
+  "required": ["export_id", "object_key", "package_sha256", "snapshot_sha256", "evidence_count", "as_of", "completed_at"],
+  "properties": {
+    "export_id":       { "type": "string", "format": "uuid" },
+    "object_key":      { "type": "string", "description": "packages/<tenant>/<export_id>.json" },
+    "package_sha256":  { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "snapshot_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "evidence_count":  { "type": "integer", "minimum": 0 },
+    "as_of":           { "type": "string", "format": "date-time" },
+    "completed_at":    { "type": "string", "format": "date-time" }
+  }
+}

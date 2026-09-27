@@ -6,9 +6,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
@@ -44,5 +46,16 @@ func buildModules(ctx context.Context, open PoolOpener, clk clock.Clock, ext Ext
 	}
 	pty := party.New(partyPool, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault})
 
-	return []httpx.Module{md, pty}, pools, nil
+	mrvPool, err := pool(mrv.DBRole)
+	if err != nil {
+		return nil, pools, err
+	}
+	// Kho đối tượng cho gói xuất MRV: thiếu cấu hình → tải gói trả 503 mrv.dependency_unavailable.
+	var store objstore.Store
+	if s, serr := objstore.FromEnv(ctx); serr == nil {
+		store = s
+	}
+	mrvMod := mrv.New(mrvPool, clk, mrv.Deps{Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Store: store})
+
+	return []httpx.Module{md, pty, mrvMod}, pools, nil
 }
