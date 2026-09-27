@@ -106,8 +106,10 @@ jobs:
           go install github.com/google/go-licenses/v2@latest
           go-licenses check ./... --allowed_licenses=$(tr '\n' ',' < deploy/policies/allowed-licenses.txt | sed 's/,$//') --ignore github.com/MEKONG-GREEN/Agrigreen_demo_v2
       - name: gitleaks — quét bí mật
-        uses: gitleaks/gitleaks-action@v2
-        env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+        # Chạy CLI (MIT). gitleaks-action đòi license cho repo thuộc organization.
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz | tar -xz gitleaks
+          ./gitleaks git --redact --exit-code 1 .
       - name: Trivy — quét repo
         uses: aquasecurity/trivy-action@v0.36.0
         with: { scan-type: fs, severity: "CRITICAL,HIGH", exit-code: "1", ignore-unfixed: true }
