@@ -25,6 +25,8 @@ Mọi lỗi trả về `application/problem+json` theo RFC 9457. Mỗi lỗi có
 | 422 | `idempotency_key_reused` | Cùng khóa, khác nội dung, khác người gọi hoặc khác route |
 | 500 | `internal_error` | Lỗi hệ thống. Chi tiết chỉ nằm trong log, tra theo `trace_id` |
 
+**CORS (httpx.CORS, `AG_CORS_ORIGINS`):** preflight (`OPTIONS` + `Access-Control-Request-Method`) từ origin không nằm trong danh sách trả `403` **không có thân và không có mã** (trình duyệt không đọc được thân của preflight). Preflight hợp lệ trả `204`. Request thường từ origin lạ vẫn được xử lý và trả mã như trên nhưng không có header CORS.
+
 ## Mã của module
 
 Mã lỗi của module có dạng `<module>.<lỗi>`.
@@ -32,7 +34,7 @@ Mã lỗi của module có dạng `<module>.<lỗi>`.
 | HTTP | code | Module |
 |---|---|---|
 | 404 | `party.consent_not_found` | pf/party |
-| 409 | `party.consent_id_reused` | pf/party: `id` do client sinh đã dùng cho bản ghi khác |
+| 409 | `party.consent_id_reused` | pf/party: `id` do client sinh đã dùng cho bản ghi khác. Qua pf/sync (entity `consent`) là mã trong kết quả `rejected`; các lỗi kiểm dữ liệu của Sink đồng ý trả `validation_failed` với `errors[]` (`op`, `payload`, `payload.subject_ref`, `purpose`…), thiếu vai `consent_writer` trả `forbidden` |
 | 400 | `vault.purpose_required` | vault/identity: thao tác thiếu mục đích (header `X-Purpose` hoặc trường `purpose`), R-42 |
 | 404 | `vault.not_found` | vault/identity: không có chủ thể trong tenant của token, hoặc tra cứu không thấy |
 | 409 | `vault.duplicate` | vault/identity: trùng SĐT hoặc CCCD trong tenant; problem có thêm `ref` và `public_key` của chủ thể cũ |
@@ -62,7 +64,7 @@ Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính m�
 | 409 | `party.org_state_conflict` | pf/party: trạng thái không cho phép (đã vô hiệu hóa, đang hoạt động, HTX đã ngừng, không có thay đổi) |
 | 409 | `party.org_has_active_children` | pf/party: vô hiệu hóa tổ chức còn tổ chức con đang hoạt động; `active_children` là số con |
 | 403 | `party.out_of_scope` | pf/party: ghi ngoài phạm vi TW → Tỉnh → Xã của người gọi (ADR-0009) |
-| 503 | `party.dependency_unavailable` | pf/party: chưa nối hoặc không gọi được masterdata / kho định danh |
+| 503 | `party.dependency_unavailable` | pf/party: chưa nối hoặc không gọi được masterdata / kho định danh (kể cả `GET /v1/me` của cán bộ TTKN tỉnh khi chưa nối danh mục đơn vị hành chính) |
 | 422 | `party.import_invalid` | pf/party: tệp nhập sai mẫu (thiếu cột bắt buộc, sai định dạng, quá số dòng) — từ chối cả tệp |
 | 403 | `sync.device_unregistered` | pf/sync: thiếu/sai header `X-Device-Id`, thiết bị chưa đăng ký trong tenant, hoặc đăng ký bởi tài khoản khác |
 | 403 | `sync.device_revoked` | pf/sync: thiết bị đã bị thu hồi — app **xóa dữ liệu cục bộ** và khóa token; đăng ký lại cùng mã cũng trả mã này |

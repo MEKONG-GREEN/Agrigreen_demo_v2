@@ -24,6 +24,9 @@ type Deps struct {
 	Modules []httpx.Module
 	// Pools liệt kê mọi pool để /readyz kiểm.
 	Pools []*pgxpool.Pool
+	// CORSOrigins là origin trình duyệt được gọi chéo (AG_CORS_ORIGINS, khớp chính xác).
+	// Rỗng → không origin nào; app di động và server-to-server không bị ảnh hưởng.
+	CORSOrigins []string
 }
 
 // maxBody giới hạn thân request (tải tệp đi qua đường riêng có giới hạn riêng).
@@ -49,6 +52,7 @@ func health(d Deps) func(r *gin.Engine) {
 // NewRouter dựng Application API (api.<domain>). Public API tắt ở ĐTK 1 (mục 11).
 func NewRouter(d Deps) *gin.Engine {
 	r := httpx.NewEngine(d.Log, maxBody)
+	r.Use(httpx.CORS(d.CORSOrigins)) // trước mọi route: preflight đi qua cả nhánh 404/405
 	health(d)(r)
 	v1 := r.Group("/v1", httpx.Authenticate(d.Verifier), idempotency.Middleware(d.Ops))
 	for _, m := range d.Modules {
@@ -60,6 +64,7 @@ func NewRouter(d Deps) *gin.Engine {
 // NewAdminRouter dựng Admin API (admin.<domain>): MFA bắt buộc cho mọi route (mục 11).
 func NewAdminRouter(d Deps) *gin.Engine {
 	r := httpx.NewEngine(d.Log, maxBody)
+	r.Use(httpx.CORS(d.CORSOrigins)) // trước mọi route: preflight đi qua cả nhánh 404/405
 	health(d)(r)
 	v1 := r.Group("/v1", httpx.Authenticate(d.Verifier), httpx.RequireMFA(), idempotency.Middleware(d.Ops))
 	for _, m := range d.Modules {

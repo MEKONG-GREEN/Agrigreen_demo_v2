@@ -72,7 +72,7 @@ Thân: `{ "device_id": "<UUIDv7 sinh trên máy>", "platform": "android" | "ios"
   - `plot_boundary`: ranh giới thửa vẽ ngoại tuyến;
   - `field_report`: báo cáo hiện trường;
   - `task_update`: cập nhật nhiệm vụ hỗ trợ;
-  - `consent`: đồng ý theo mục đích (Sink do pf/party cung cấp — chưa nối, hiện trả `sync.unknown_entity`);
+  - `consent`: đồng ý theo mục đích (Sink của pf/party, dùng lại use case ghi đồng ý của `POST /v1/consents`; payload `SyncConsentPayload` = `{subject_ref, purpose, text_version, status, channel?}`, `channel` mặc định `field_app`). Chỉ `op: create` — rút lại đồng ý là bản ghi **mới** `status: withdrawn`. `idem_key` của máy là khóa chống trùng của sổ đồng ý: gửi lại → `duplicate`. Cần vai `consent_writer`;
   - `evidence`: minh chứng, tham chiếu `file_ref`.
 - `op`:
   - `create`: bản ghi mới;

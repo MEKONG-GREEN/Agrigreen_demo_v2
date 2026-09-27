@@ -1,0 +1,41 @@
+# OpenTelemetry Collector cho Local/Dev (ADR-0013): nhận OTLP từ các dịch vụ Go và
+# in ra log của container (exporter debug). Môi trường thật thay exporter debug
+# bằng backend quan sát trong lãnh thổ.
+#   docker compose -f deploy/compose/docker-compose.yml logs -f otel-collector
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+  batch: {}
+
+exporters:
+  debug:
+    verbosity: basic
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]
