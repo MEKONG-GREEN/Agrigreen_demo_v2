@@ -1,0 +1,39 @@
+name: agrigreen_field
+description: "AgriGreen — app hiện trường ngoại tuyến (cán bộ khuyến nông, HTX, nông dân)."
+publish_to: 'none'
+
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.4
+
+# Mọi dependency phải có giấy phép MIT/BSD/Apache-2.0/ISC/MPL-2.0 — xem README.md.
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^3.4.3
+  sqflite_sqlcipher: ^3.4.1
+  sqflite_common: ^2.5.13
+  flutter_secure_storage: ^11.2.0
+  uuid: ^4.6.0
+  cryptography: ^2.9.0
+  pinenacl: ^0.6.0
+  http: ^1.6.0
+  flutter_appauth: ^12.1.0
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
+  geolocator: ^14.1.1
+  image_picker: ^1.2.3
+  connectivity_plus: ^7.3.1
+  path_provider: ^2.1.6
+  path: ^1.9.1
+  crypto: ^3.0.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  sqflite_common_ffi: ^2.4.3
+
+flutter:
+  uses-material-design: true
