@@ -104,7 +104,7 @@ jobs:
       - name: Giấy phép dependency (RB-4)
         run: |
           go install github.com/google/go-licenses/v2@latest
-          go-licenses check ./... --allowed_licenses=$(tr '\n' ',' < deploy/policies/allowed-licenses.txt | sed 's/,$//')
+          go-licenses check ./... --allowed_licenses=$(tr '\n' ',' < deploy/policies/allowed-licenses.txt | sed 's/,$//') --ignore github.com/MEKONG-GREEN/Agrigreen_demo_v2
       - name: gitleaks — quét bí mật
         uses: gitleaks/gitleaks-action@v2
         env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
