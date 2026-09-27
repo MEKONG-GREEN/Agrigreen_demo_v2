@@ -1,0 +1,48 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard
+  enable:
+    - gosec
+    - errorlint
+    - bodyclose
+    - depguard
+    - forbidigo
+  settings:
+    depguard:
+      # Lớp dự phòng cho R-03; quy tắc đầy đủ R-02/R-03/R-04 ở tools/archlint.
+      rules:
+        platform-not-mkg:
+          files: ["**/internal/platform/**"]
+          deny:
+            - pkg: "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg"
+              desc: "R-03: platform/ không được import mkg/"
+        mkg-not-platform:
+          files: ["**/internal/mkg/**"]
+          deny:
+            - pkg: "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform"
+              desc: "R-03: mkg/ không được import platform/"
+        no-lib-pq:
+          deny:
+            - pkg: "github.com/lib/pq"
+              desc: "dùng pgx/v5"
+    forbidigo:
+      forbid:
+        - pattern: '^(fmt\.Print(ln|f)?|print|println)$'
+          msg: "dùng logger slog có cấu trúc (R-91)"
+    gosec:
+      excludes:
+        - G115 # chuyển đổi số nguyên có kiểm soát ở tầng DB
+  exclusions:
+    paths:
+      - tools/archlint/testdata
+    rules:
+      - path: _test\.go
+        linters: [gosec, forbidigo]
+      - path: tools/
+        linters: [forbidigo]
+      - path: cmd/(migrate|ingest|edge-agent)/
+        linters: [forbidigo]

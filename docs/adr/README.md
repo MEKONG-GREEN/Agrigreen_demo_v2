@@ -1,0 +1,19 @@
+# Architecture Decision Records
+
+| # | Quyết định | Trạng thái |
+|---|---|---|
+| 0001 | [Go là ngôn ngữ dịch vụ](0001-go-ngon-ngu-dich-vu.md) | Chấp nhận |
+| 0002 | [RabbitMQ thay vì hàng đợi trong PostgreSQL](0002-rabbitmq.md) | Chấp nhận |
+| 0003 | [Event sourcing mức B](0003-event-sourcing-muc-b.md) | Chấp nhận |
+| 0004 | [Mã hóa phong bì X25519 theo hộ](0004-ma-hoa-phong-bi-theo-ho.md) | Chấp nhận — hiện thực ở G1 |
+| 0005 | [Row-level security, một policy mỗi bảng](0005-rls-mot-policy-moi-bang.md) | Chấp nhận |
+| 0006 | [Engine đồng bộ ngoại tuyến và phương án xử lý slot](0006-engine-dong-bo-ngoai-tuyen.md) | Đề xuất — chờ câu hỏi 23.1 |
+| 0007 | [Danh mục nhà cung cấp trong lãnh thổ](0007-nha-cung-cap-trong-lanh-tho.md) | Đề xuất |
+| 0008 | [Phân vùng mạng và bảng luồng](0008-phan-vung-mang.md) | Chấp nhận — hiện thực từ G4 |
+| 0009 | [Mô hình tenant theo tổ chức sở hữu dữ liệu](0009-mo-hinh-tenant.md) | Đề xuất — cần MKG ký |
+| 0010 | [Kênh nông hộ: Flutter cho hiện trường, Zalo Mini App chỉ online](0010-kenh-nong-ho.md) | Đề xuất — cần MKG ký |
+| 0011 | [Bổ sung module nghiệp vụ cho các app](0011-module-nghiep-vu-cac-app.md) | Đề xuất |
+| 0012 | [Tính duy nhất trên bảng sổ phân vùng](0012-duy-nhat-tren-bang-so-phan-vung.md) | Chấp nhận |
+| 0013 | [Quan sát: trace_id từ G0, OTLP từ G1](0013-quan-sat-otlp.md) | Chấp nhận |
+
+ADR 0001–0008 là danh sách bắt buộc ở Phụ lục B của tài liệu kiến trúc. ADR 0009–0013 phát sinh khi tổng hợp BRD và khi dựng G0.

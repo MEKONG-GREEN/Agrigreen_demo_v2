@@ -1,0 +1,115 @@
+# ĐTK 1 — Docker Compose (mục 4). Chỉ cho Local/Dev với dữ liệu tổng hợp (mục 21).
+#   cp deploy/compose/.env.example deploy/compose/.env   # rồi điền mật khẩu
+#   docker compose -f deploy/compose/docker-compose.yml up -d --build
+#
+# Kho S3: MinIO thay cho kho tương thích S3 TRONG LÃNH THỔ (RB-7) ở môi trường thật.
+name: agrigreen
+
+x-app: &app
+  build:
+    context: ../..
+    dockerfile: Dockerfile
+  env_file: .env
+  read_only: true
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_PASSWORD: ${PG_SUPERUSER_PASSWORD:?đặt PG_SUPERUSER_PASSWORD trong .env}
+    command: ["postgres", "-c", "max_connections=300", "-c", "wal_level=logical", "-c", "shared_preload_libraries=pg_stat_statements"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    ports: ["127.0.0.1:5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 20
+
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.24.1-p1
+    depends_on:
+      postgres: { condition: service_healthy }
+    env_file: .env
+    entrypoint: ["/bin/sh", "/etc/pgbouncer-src/entrypoint.sh"]
+    volumes: ["./pgbouncer:/etc/pgbouncer-src:ro"]
+    ports: ["127.0.0.1:6432:6432"]
+
+  migrate-bootstrap:
+    <<: *app
+    build: { context: ../.., dockerfile: Dockerfile, args: { CMD: migrate } }
+    depends_on:
+      postgres: { condition: service_healthy }
+    command: ["bootstrap"]
+    restart: "no"
+
+  migrate-up:
+    <<: *app
+    build: { context: ../.., dockerfile: Dockerfile, args: { CMD: migrate } }
+    depends_on:
+      migrate-bootstrap: { condition: service_completed_successfully }
+    command: ["up"]
+    restart: "no"
+
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    environment:
+      RABBITMQ_DEFAULT_USER: agrigreen
+      RABBITMQ_DEFAULT_PASS: ${AMQP_PASSWORD:?đặt AMQP_PASSWORD trong .env}
+    ports: ["127.0.0.1:5672:5672", "127.0.0.1:15672:15672"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      retries: 12
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    command: ["valkey-server", "--save", "", "--appendonly", "no"]   # cache, KHÔNG phải nguồn sự thật
+    ports: ["127.0.0.1:6379:6379"]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?đặt KEYCLOAK_ADMIN_PASSWORD trong .env}
+    volumes: ["./keycloak:/opt/keycloak/data/import:ro"]
+    ports: ["127.0.0.1:8180:8080"]
+
+  minio:
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: agrigreen
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:?đặt MINIO_PASSWORD trong .env}
+    volumes: ["objects:/data"]
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+
+  api-platform:
+    <<: *app
+    build: { context: ../.., dockerfile: Dockerfile, args: { CMD: api-platform } }
+    depends_on:
+      migrate-up: { condition: service_completed_successfully }
+      pgbouncer: { condition: service_started }
+      keycloak: { condition: service_started }
+    ports: ["127.0.0.1:8080:8080"]
+
+  outbox-publisher:
+    <<: *app
+    build: { context: ../.., dockerfile: Dockerfile, args: { CMD: outbox-publisher } }
+    depends_on:
+      migrate-up: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+
+  worker:
+    <<: *app
+    build: { context: ../.., dockerfile: Dockerfile, args: { CMD: worker } }
+    depends_on:
+      migrate-up: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+
+volumes:
+  pgdata: {}
+  objects: {}

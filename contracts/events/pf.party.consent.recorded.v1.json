@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.party.consent.recorded/v1",
+  "title": "pf.party.consent.recorded — payload",
+  "description": "Một bản ghi đồng ý theo mục đích đã vào sổ pf_party.consent. Không chứa dữ liệu cá nhân: subject_ref là mã tham chiếu.",
+  "x-event-type": "pf.party.consent.recorded",
+  "x-schema-version": 1,
+  "x-producer": "pf/party",
+  "type": "object",
+  "required": ["consent_id", "subject_ref", "purpose", "status", "text_version", "event_time", "seq"],
+  "properties": {
+    "consent_id":   { "type": "string", "format": "uuid" },
+    "subject_ref":  { "type": "string", "format": "uuid" },
+    "purpose":      { "type": "string", "pattern": "^[a-z][a-z0-9_.]{2,63}$" },
+    "status":       { "type": "string", "enum": ["granted", "withdrawn"] },
+    "text_version": { "type": "string", "maxLength": 40 },
+    "event_time":   { "type": "string", "format": "date-time" },
+    "seq":          { "type": "integer", "minimum": 1 }
+  }
+}

@@ -1,0 +1,153 @@
+# Pipeline mục 20: lint → kiểm thử → build → SBOM → quét lỗ hổng → ký image → push.
+# Mọi cổng hỏng build — không có ngoại lệ.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.25"
+
+jobs:
+  lint:
+    name: Cổng tĩnh (ranh giới, float, PII, migration, hợp đồng)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-go@v5
+        with: { go-version: "${{ env.GO_VERSION }}" }
+      - name: gofmt
+        run: test -z "$(gofmt -l $(git ls-files '*.go' | grep -v /testdata/))"
+      - name: go vet
+        run: go vet ./...
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with: { version: v2.4 }
+      - name: archlint — R-02/R-03/R-04, R-10, R-12, R-14
+        run: go run ./tools/archlint ./...
+      - name: migratecheck — R-23/R-25
+        run: go run ./tools/migratecheck migrations
+      - name: contractcheck — R-64, van công bố
+        run: |
+          BASE=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then BASE="origin/${{ github.base_ref }}"; fi
+          go run ./tools/contractcheck -base "$BASE"
+
+  test:
+    name: Kiểm thử (sổ, RLS qua PgBouncer, idempotency)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_PASSWORD: ci-superuser
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 20
+    env:
+      CI: "true"
+      AG_TEST_PG_ADMIN_URL: postgres://postgres:ci-superuser@localhost:5432/postgres?sslmode=disable
+      AG_TEST_PGBOUNCER_URL: postgres://localhost:6432/?sslmode=disable
+      AG_DB_APP_PASSWORD: ci-app-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: "${{ env.GO_VERSION }}" }
+      - name: PgBouncer transaction mode (R-32)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq pgbouncer
+          sudo systemctl stop pgbouncer || true
+          sudo mkdir -p /etc/pgbouncer-ci
+          : | sudo tee /etc/pgbouncer-ci/userlist.txt > /dev/null
+          for r in platform_api worker_platform party_app fieldops_app vault_app ag_outbox_publisher ag_migrator; do
+            printf '"%s" "%s"\n' "$r" "$AG_DB_APP_PASSWORD" | sudo tee -a /etc/pgbouncer-ci/userlist.txt > /dev/null
+          done
+          sudo tee /etc/pgbouncer-ci/pgbouncer.ini > /dev/null <<'INI'
+          [databases]
+          * = host=127.0.0.1 port=5432
+          [pgbouncer]
+          listen_addr = 127.0.0.1
+          listen_port = 6432
+          auth_type = scram-sha-256
+          auth_file = /etc/pgbouncer-ci/userlist.txt
+          pool_mode = transaction
+          max_client_conn = 500
+          default_pool_size = 10
+          server_reset_query =
+          ignore_startup_parameters = extra_float_digits,application_name,timezone
+          max_prepared_statements = 0
+          INI
+          sudo -u postgres pgbouncer -d /etc/pgbouncer-ci/pgbouncer.ini
+      - name: go test -race
+        run: go test -race -count=1 ./...
+
+  security:
+    name: Bảo mật và giấy phép
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-go@v5
+        with: { go-version: "${{ env.GO_VERSION }}" }
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - name: Giấy phép dependency (RB-4)
+        run: |
+          go install github.com/google/go-licenses/v2@latest
+          go-licenses check ./... --allowed_licenses=$(tr '\n' ',' < deploy/policies/allowed-licenses.txt | sed 's/,$//')
+      - name: gitleaks — quét bí mật
+        uses: gitleaks/gitleaks-action@v2
+        env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: Trivy — quét repo
+        uses: aquasecurity/trivy-action@0.33.1
+        with: { scan-type: fs, severity: "CRITICAL,HIGH", exit-code: "1", ignore-unfixed: true }
+
+  images:
+    name: Build, SBOM, quét, ký image
+    needs: [lint, test, security]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write   # ký keyless bằng cosign
+    strategy:
+      matrix:
+        cmd: [api-platform, api-internal, identity-vault, worker, outbox-publisher, migrate]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build
+        run: docker build --build-arg CMD=${{ matrix.cmd }} -t ghcr.io/${{ github.repository_owner }}/agrigreen-${{ matrix.cmd }}:${{ github.sha }} .
+      - name: SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ghcr.io/${{ github.repository_owner }}/agrigreen-${{ matrix.cmd }}:${{ github.sha }}
+          format: spdx-json
+          output-file: sbom-${{ matrix.cmd }}.spdx.json
+      - name: Trivy — quét image
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/agrigreen-${{ matrix.cmd }}:${{ github.sha }}
+          severity: "CRITICAL,HIGH"
+          exit-code: "1"
+          ignore-unfixed: true
+      - name: Push và ký (chỉ main)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/agrigreen-${{ matrix.cmd }}:${{ github.sha }}
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push "$IMAGE"
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE")
+          curl -sSfL https://github.com/sigstore/cosign/releases/download/v2.5.3/cosign-linux-amd64 -o cosign && chmod +x cosign
+          ./cosign sign --yes "$DIGEST"

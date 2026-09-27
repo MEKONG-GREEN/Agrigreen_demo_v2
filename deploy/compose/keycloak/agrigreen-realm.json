@@ -1,0 +1,94 @@
+{
+  "realm": "agrigreen",
+  "enabled": true,
+  "displayName": "AgriGreen (Local/Dev)",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "loginWithEmailAllowed": true,
+  "bruteForceProtected": true,
+  "failureFactor": 5,
+  "maxFailureWaitSeconds": 900,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 3600,
+  "passwordPolicy": "length(12) and notUsername and passwordHistory(5)",
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "roles": {
+    "realm": [
+      { "name": "platform_admin", "description": "Quản trị nền tảng — BẮT BUỘC MFA (mục 11)" },
+      { "name": "param_setter", "description": "Đặt tham số có phê duyệt (R-56)" },
+      { "name": "param_approver", "description": "Phê duyệt tham số — không tự phê duyệt thay đổi của mình (R-56)" },
+      { "name": "consent_writer", "description": "Ghi đồng ý theo mục đích" },
+      { "name": "consent_reader", "description": "Đọc đồng ý theo mục đích" }
+    ]
+  },
+  "groups": [
+    {
+      "name": "admins",
+      "realmRoles": ["platform_admin"],
+      "attributes": { "note": ["Thành viên nhóm này phải cấu hình TOTP — required action CONFIGURE_TOTP khi tạo tài khoản"] }
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "agrigreen-claims",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "false" },
+      "protocolMappers": [
+        {
+          "name": "tenant_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "tenant_id", "claim.name": "tenant_id", "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "false", "userinfo.token.claim": "false" }
+        },
+        {
+          "name": "audience agrigreen-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": { "included.client.audience": "agrigreen-api", "access.token.claim": "true", "id.token.claim": "false" }
+        },
+        {
+          "name": "amr",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-amr-mapper",
+          "config": { "access.token.claim": "true", "id.token.claim": "true" }
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "agrigreen-api",
+      "name": "AgriGreen Application API (audience)",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "standardFlowEnabled": false
+    },
+    {
+      "clientId": "agrigreen-web-ops",
+      "name": "Web vận hành (Next.js)",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3000"],
+      "attributes": { "pkce.code.challenge.method": "S256" },
+      "defaultClientScopes": ["openid", "profile", "roles", "agrigreen-claims"]
+    },
+    {
+      "clientId": "agrigreen-field-app",
+      "name": "App hiện trường (Flutter)",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["vn.agrigreen.field:/oauth2redirect"],
+      "attributes": { "pkce.code.challenge.method": "S256" },
+      "defaultClientScopes": ["openid", "profile", "roles", "agrigreen-claims", "offline_access"]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/envelope/v1",
+  "title": "Phong bì sự kiện (mục 12)",
+  "type": "object",
+  "required": ["event_id", "event_type", "schema_version", "tenant_id", "occurred_at", "recorded_at", "producer", "payload"],
+  "properties": {
+    "event_id":       { "type": "string", "format": "uuid", "description": "UUIDv7" },
+    "event_type":     { "type": "string", "pattern": "^(pf|mkg|vault|edge)\\.[a-z_]+\\.[a-z_]+\\.[a-z_]+$" },
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "tenant_id":      { "type": "string", "format": "uuid" },
+    "occurred_at":    { "type": "string", "format": "date-time", "description": "event_time tại hiện trường (R-13)" },
+    "recorded_at":    { "type": "string", "format": "date-time", "description": "lúc hệ ghi nhận (R-13)" },
+    "trace_id":       { "type": "string" },
+    "producer":       { "type": "string" },
+    "payload":        { "type": "object" }
+  }
+}

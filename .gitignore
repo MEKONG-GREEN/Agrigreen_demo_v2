@@ -1,0 +1,24 @@
+# Bí mật và dữ liệu cục bộ — không bao giờ commit
+.env
+*.env.local
+deploy/compose/.env
+*.pw
+*.pem
+*.key
+
+# Build
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+coverage.*
+
+# Công cụ
+.idea/
+.vscode/
+.DS_Store
+node_modules/
+.next/
+__pycache__/
+.venv/
