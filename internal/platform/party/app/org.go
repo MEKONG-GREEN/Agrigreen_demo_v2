@@ -330,7 +330,7 @@ func (r *Registry) createRepresentative(ctx context.Context, rep Representative,
 	case errors.Is(err, client.ErrDuplicate) && created.Ref != uuid.Nil:
 		return created.Ref, true, nil
 	case err != nil:
-		return uuid.Nil, false, ErrDependency.WithDetail("kho định danh từ chối hoặc không phản hồi").WithCause(err)
+		return uuid.Nil, false, vaultError(err)
 	}
 	return created.Ref, false, nil
 }
