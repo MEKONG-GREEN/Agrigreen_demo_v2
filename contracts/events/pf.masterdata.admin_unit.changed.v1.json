@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.masterdata.admin_unit.changed/v1",
+  "title": "pf.masterdata.admin_unit.changed — payload",
+  "description": "Danh mục đơn vị hành chính thay đổi: thêm một phiên bản hiệu lực (created) hoặc đóng hiệu lực một phiên bản kèm đơn vị kế thừa (closed). Không bao giờ xóa. Khoảng hiệu lực [valid_from, valid_to) theo ngày giờ Việt Nam.",
+  "x-event-type": "pf.masterdata.admin_unit.changed",
+  "x-schema-version": 1,
+  "x-producer": "pf/masterdata",
+  "type": "object",
+  "required": ["code", "name", "level", "parent_code", "valid_from", "valid_to", "successor_codes", "change"],
+  "properties": {
+    "code":            { "type": "string", "pattern": "^[0-9A-Z][0-9A-Z.-]{0,39}$" },
+    "name":            { "type": "string" },
+    "level":           { "type": "string", "enum": ["province", "commune", "district"] },
+    "parent_code":     { "type": ["string", "null"] },
+    "valid_from":      { "type": "string", "format": "date" },
+    "valid_to":        { "type": ["string", "null"], "format": "date" },
+    "successor_codes": { "type": "array", "items": { "type": "string" } },
+    "change":          { "type": "string", "enum": ["created", "closed"] }
+  }
+}
