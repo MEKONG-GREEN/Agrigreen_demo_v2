@@ -503,6 +503,107 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
   # --- hết pf/party ---
+  # --- pf/geo ---
+  /v1/geo/plots/import:
+    post:
+      summary: Nhập tệp ranh giới thửa GeoJSON/KML (KN US-PLOT-02, GIS FN-05) — mỗi vùng thành một thửa, cùng quy tắc như vẽ tay; kết quả theo từng đối tượng
+      description: |
+        Thân request là nội dung tệp (≤ 200 đối tượng, xử lý đồng bộ). Chỉ nhận WGS84 (EPSG:4326):
+        thành phần crs khác hoặc toạ độ ngoài miền kinh/vĩ độ (VN-2000/UTM) → 422 geo.crs_unsupported.
+        Shapefile chưa hỗ trợ → 422 geo.format_unsupported. Thuộc tính đối tượng được đọc:
+        name, commune_code (hoặc ma_xa), cooperative_ref, household_ref. Idem_key từng đối tượng =
+        Idempotency-Key + ":" + thứ tự, nên nhập lại cùng khóa trả duplicate, không tạo trùng.
+      operationId: importPlotBoundaries
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: format, in: query, schema: {type: string, enum: [geojson, kml, shapefile]}, description: "Bỏ trống → nhận từ file_name hoặc nội dung"}
+        - {name: file_name, in: query, schema: {type: string}}
+        - {name: commune_code, in: query, schema: {type: string}, description: "Mặc định khi đối tượng không có commune_code"}
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}, description: "Mặc định khi đối tượng không có cooperative_ref"}
+        - {name: source, in: query, schema: {type: string, enum: [import_file, cadastral], default: import_file}}
+      requestBody:
+        required: true
+        content:
+          application/geo+json: {schema: {type: object}}
+          application/json: {schema: {type: object}}
+          application/vnd.google-earth.kml+xml: {schema: {type: string}}
+      responses:
+        "200":
+          description: Kết quả theo đối tượng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [format, accepted, flagged, duplicate, rejected, features]
+                properties:
+                  format: {type: string, enum: [geojson, kml]}
+                  accepted: {type: integer}
+                  flagged: {type: integer, description: "Đã tạo nhưng chồng lấn HTX khác — chờ xem xét"}
+                  duplicate: {type: integer}
+                  rejected: {type: integer}
+                  features:
+                    type: array
+                    items:
+                      type: object
+                      required: [index, name, status, code, reason, plot_ref, plot_code, area_ha, flagged_overlaps]
+                      properties:
+                        index: {type: integer}
+                        name: {type: [string, "null"]}
+                        status: {type: string, enum: [accepted, flagged, duplicate, rejected]}
+                        code: {type: [string, "null"], description: "Mã lỗi khi rejected, vd geo.too_few_points, geo.overlap"}
+                        reason: {type: [string, "null"]}
+                        plot_ref: {type: [string, "null"], format: uuid}
+                        plot_code: {type: [string, "null"]}
+                        area_ha: {type: [string, "null"]}
+                        flagged_overlaps: {type: array, items: {type: object}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/admin-boundaries/import:
+    post:
+      summary: Nhập ranh giới hành chính tỉnh/xã từ GeoJSON (GIS FN-07 BR-26/27); dry_run=true để kiểm và xem trước, chưa áp dụng
+      description: |
+        Mỗi Feature phải có properties.code là mã đơn vị còn hiệu lực trong pf/masterdata (cấp tỉnh hoặc xã).
+        Nhập lại một mã: hình cũ được đóng (không xóa), hình mới là hiện hành. Hình xã dùng để kiểm thửa nằm trong địa giới xã.
+      operationId: importAdminBoundaries
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: source, in: query, required: true, schema: {type: string, maxLength: 300}, description: "Nguồn dữ liệu, vd CloudMap 2026-09"}
+        - {name: dry_run, in: query, schema: {type: boolean, default: false}}
+      requestBody:
+        required: true
+        content:
+          application/geo+json: {schema: {type: object}}
+          application/json: {schema: {type: object}}
+      responses:
+        "200":
+          description: Kết quả theo đơn vị
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [dry_run, accepted, rejected, features]
+                properties:
+                  dry_run: {type: boolean}
+                  accepted: {type: integer}
+                  rejected: {type: integer}
+                  features:
+                    type: array
+                    items:
+                      type: object
+                      required: [index, code, name, level, status, replaced, error_code, reason, area_ha]
+                      properties:
+                        index: {type: integer}
+                        code: {type: [string, "null"]}
+                        name: {type: [string, "null"]}
+                        level: {type: [string, "null"], enum: [province, commune, null]}
+                        status: {type: string, enum: [accepted, rejected]}
+                        replaced: {type: boolean}
+                        error_code: {type: [string, "null"]}
+                        reason: {type: [string, "null"]}
+                        area_ha: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/geo ---
 components:
   securitySchemes:
     oidc:

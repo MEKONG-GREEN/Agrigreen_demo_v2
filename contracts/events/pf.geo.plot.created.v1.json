@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.geo.plot.created/v1",
+  "title": "pf.geo.plot.created — payload",
+  "description": "Một thửa ruộng mới đã được tạo cùng phiên bản ranh giới đầu tiên (sổ pf_geo.plot_event + pf_geo.plot_boundary). Thửa do cán bộ KN vẽ trước khi gán HTX có status = draft và cooperative_ref = null (ADR-0009). Không chứa dữ liệu cá nhân; không mang hình — consumer đọc hình qua GET /v1/plots/{ref}.",
+  "x-event-type": "pf.geo.plot.created",
+  "x-schema-version": 1,
+  "x-producer": "pf/geo",
+  "type": "object",
+  "required": ["plot_ref", "code", "commune_code", "cooperative_ref", "household_ref", "status", "boundary_id", "area_ha", "source", "actor_ref", "event_time"],
+  "properties": {
+    "plot_ref":        { "type": "string", "format": "uuid" },
+    "code":            { "type": "string", "maxLength": 40, "description": "Mã thửa hiển thị, vd TH0000001" },
+    "commune_code":    { "type": "string", "description": "Mã xã hiện hành (pf/masterdata)" },
+    "cooperative_ref": { "type": ["string", "null"], "format": "uuid" },
+    "household_ref":   { "type": ["string", "null"], "format": "uuid", "description": "Mã tham chiếu nông hộ trong kho định danh (R-41)" },
+    "status":          { "type": "string", "enum": ["draft", "active"] },
+    "boundary_id":     { "type": "string", "format": "uuid", "description": "Phiên bản ranh giới đầu tiên" },
+    "area_ha":         { "type": "string", "pattern": "^[0-9]+\\.[0-9]{4}$", "description": "Diện tích trắc địa (ha), decimal dạng chuỗi" },
+    "source":          { "type": "string", "enum": ["kn_web", "kn_field_app", "htx_app", "import_file", "cadastral"] },
+    "actor_ref":       { "type": "string", "format": "uuid" },
+    "event_time":      { "type": "string", "format": "date-time", "description": "Lúc vẽ tại hiện trường (R-13)" }
+  }
+}

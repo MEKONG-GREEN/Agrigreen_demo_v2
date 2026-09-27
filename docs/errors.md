@@ -66,3 +66,28 @@ Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính m�
 | 422 | `party.import_invalid` | pf/party: tệp nhập sai mẫu (thiếu cột bắt buộc, sai định dạng, quá số dòng) — từ chối cả tệp |
 
 Phản hồi phát lại theo Idempotency-Key có header `Idempotent-Replayed: true`.
+
+### pf/geo
+
+| HTTP | code | Ý nghĩa |
+|---|---|---|
+| 404 | `geo.plot_not_found` | pf/geo: không có thửa, hoặc nằm ngoài phạm vi đọc (xã/HTX) — không lộ sự tồn tại |
+| 404 | `geo.conflict_not_found` | pf/geo: không có xung đột ranh giới trong phạm vi |
+| 404 | `geo.admin_boundary_not_found` | pf/geo: chưa nhập ranh giới hành chính cho mã đơn vị |
+| 409 | `geo.overlap` | pf/geo: ranh giới chồng lấn thửa **cùng HTX** (hoặc cùng là thửa nháp) vượt ngưỡng `geo.overlap_tolerance_pct` (mặc định 1 %, tính theo thửa nhỏ hơn); `overlaps` liệt kê `plot_ref`, `code`, `overlap_pct`. Chồng lấn khác HTX không lỗi — thửa được nhận, mở xung đột chờ xem xét |
+| 409 | `geo.version_conflict` | pf/geo: `supersedes_id` không phải phiên bản ranh giới hiện hành; problem có `current_boundary_id`, `current_version` |
+| 409 | `geo.plot_state_conflict` | pf/geo: thửa đã ngừng dùng, hoặc gán trùng trạng thái hiện tại |
+| 409 | `geo.plot_exists` | pf/geo: `plot_ref` do máy sinh đã được dùng |
+| 409 | `geo.conflict_state` | pf/geo: xung đột đã được xử lý |
+| 403 | `geo.out_of_scope` | pf/geo: ghi ngoài phạm vi xã của người gọi, hoặc quản lý HTX thao tác trên thửa/HTX khác (HTX US-PLOT-01 AC-4) |
+| 422 | `geo.too_few_points` | pf/geo: dưới 4 điểm phân biệt, hoặc các điểm thẳng hàng (KN US-PLOT-01 AC-1, HTX US-PLOT-02 AC-2) |
+| 422 | `geo.invalid_geometry` | pf/geo: hình không hợp lệ theo PostGIS (tự cắt — hình nơ bướm, vòng sai), không phải vùng khép kín, quá 5.000 đỉnh |
+| 422 | `geo.crs_unsupported` | pf/geo: hệ toạ độ khác WGS84 (EPSG:4326) — thành phần `crs` khác, hoặc toạ độ ngoài miền kinh/vĩ độ (VN-2000/UTM) |
+| 422 | `geo.area_out_of_range` | pf/geo: diện tích trắc địa ngoài 0,001–1.000 ha |
+| 422 | `geo.outside_commune` | pf/geo: phần thửa nằm ngoài ranh giới xã (đã nhập) vượt ngưỡng; có `outside_pct` |
+| 422 | `geo.cooperative_invalid` | pf/geo: HTX không tồn tại, đã ngừng hoạt động hoặc ngoài phạm vi (khi đã nối pf/party) |
+| 422 | `geo.format_invalid` | pf/geo: tệp nhập không đọc được, không có đối tượng, hoặc quá 200 đối tượng |
+| 422 | `geo.format_unsupported` | pf/geo: định dạng chưa hỗ trợ (Shapefile) — chuyển sang GeoJSON hoặc KML |
+| 503 | `geo.dependency_unavailable` | pf/geo: chưa nối hoặc không gọi được pf/party (phạm vi), pf/masterdata (đơn vị hành chính, tham số) |
+
+Đồng bộ ngoại tuyến `plot_boundary` (docs/dev/sync-contract.md): chồng lấn cùng HTX hoặc sửa trên phiên bản cũ **không** bị từ chối — bản ghi được giữ, trả `status = conflict` kèm `conflict_id`. Bản ghi sai trả `rejected` với các mã ở trên.

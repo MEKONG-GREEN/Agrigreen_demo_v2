@@ -5,6 +5,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -44,5 +45,12 @@ func buildModules(ctx context.Context, open PoolOpener, clk clock.Clock, ext Ext
 	}
 	pty := party.New(partyPool, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault})
 
-	return []httpx.Module{md, pty}, pools, nil
+	// pf/geo: thửa + ranh giới. SyncSource()/SyncSink() chờ nối vào pf/sync.
+	geoPool, err := pool(geo.DBRole)
+	if err != nil {
+		return nil, pools, err
+	}
+	g := geo.New(geoPool, clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits(), Orgs: pty.Orgs()})
+
+	return []httpx.Module{md, pty, g}, pools, nil
 }
