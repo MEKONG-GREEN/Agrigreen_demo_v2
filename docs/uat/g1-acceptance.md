@@ -19,7 +19,7 @@ Kiểm thử cần PostgreSQL 17 + PostGIS như mọi kiểm thử tích hợp. 
 ### Kịch bản đầu–cuối `TestG1DongXuanCanTho`
 
 Kịch bản "G1 — một vụ Đông Xuân ở Cần Thơ" nằm ở [tests/e2e/g1_scenario_test.go](../../tests/e2e/g1_scenario_test.go). Nó dựng toàn bộ nền tảng trong tiến trình bằng [tests/e2e/harness](../../tests/e2e/harness):
-- **Application API và Admin API** dựng như `cmd/api-platform` (lặp lại `buildModules`). Mỗi module có vai DB riêng.
+- **Application API và Admin API** dựng bằng chính gốc lắp ráp `cmd/api-platform/assembly` (cùng mã với tiến trình thật). Mỗi module có vai DB riêng.
 - **Kho định danh là bản thật.** Nó chạy trên database vault riêng, sau `httptest.Server` ([cmd/identity-vault/vaulttest](../../cmd/identity-vault/vaulttest)). Module gọi kho qua `client.NewHTTP` và chuyển tiếp token người dùng.
 - **Issuer OIDC là bản giả.** Kho đối tượng là một thư mục cục bộ.
 

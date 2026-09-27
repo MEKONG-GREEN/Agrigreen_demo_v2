@@ -29,6 +29,26 @@ Người dùng là cán bộ khuyến nông, TTKNQG và Cục Kinh tế hợp t�
 | S4 | 23/11–6/12 | `platform/extension` (nhiệm vụ SLA 24 giờ), thư viện quy trình, dashboard 4 KPI. `platform/mechanization` (CGH: cân đối QT-01/02). Danh mục trường MRV (C-1). OTLP (ADR-0013) |
 | S5 | 7–15/12 | Cứng hóa, bộ sinh dữ liệu tổng hợp (R-95), UAT theo ca kiểm thử trích từ prototype `mekong-green`, diễn tập sao lưu và phục hồi |
 
+### Trạng thái G1 (28/09/2026)
+
+Mã đã có đủ các phần của kế hoạch S1–S5. Đối chiếu yêu cầu → kiểm thử nằm ở [docs/uat/g1-acceptance.md](uat/g1-acceptance.md), trong đó 35 ô ghi "chưa có" hoặc "một phần".
+
+**Đã có:**
+- Backend 8 module: masterdata, party, geo, content, extension, mechanization (CGH), mrv, sync.
+- Kho định danh `identity-vault`.
+- Web `apps/web-ops` nối API thật.
+- App Flutter `apps/field-app`: ngoại tuyến, SQLCipher, mã hóa ảnh, tương thích vector với Go.
+- Bộ sinh dữ liệu tổng hợp `cmd/seed-synthetic`.
+- Kịch bản E2E 14 bước; Compose đầy đủ; CI 8 job.
+
+**Còn thiếu trước khi nghiệm thu G1:**
+- Xuất báo cáo theo mẫu Bộ và email định kỳ (US-DASH-02/03, CGH FN-10).
+- Nhập/xuất Excel (hiện chỉ có CSV).
+- Kênh đẩy thông báo (push/Zalo) cho chỉ đạo khẩn và tin mới.
+- Kiểm thử giao diện đầu–cuối trên trình duyệt; chạy app Flutter trên thiết bị Android thật.
+- Diễn tập sao lưu và phục hồi.
+- **Dữ liệu thật:** mã và danh mục xã ĐBSCL chính thức sau sáp nhập (seed hiện tại là dữ liệu minh họa); danh mục trường MRV (C-1).
+- **Khoảng trống API** cho web: [docs/dev/web-backend-gaps.md](dev/web-backend-gaps.md), G-02..G-10.
 ## G2: 31/03/2027
 - App HTX:
   - `platform/cropcycle`: nhật ký canh tác dạng sổ, sản lượng decimal.
