@@ -67,6 +67,111 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Consent" }
         "404": { $ref: "#/components/responses/Problem" }
+  # --- pf/party: tổ chức, HTX, nông hộ (phạm vi theo cây TW → Tỉnh → Xã, ADR-0009) ---
+  /v1/orgs:
+    get:
+      summary: Tổ chức trong phạm vi của người gọi (phân trang cursor)
+      operationId: listOrgs
+      parameters:
+        - { name: kind, in: query, schema: { $ref: "#/components/schemas/OrgKind" } }
+        - { name: include_inactive, in: query, schema: { type: boolean, default: false } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Org" } }
+                  next_cursor: { type: [string, "null"] }
+        "401": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+  /v1/cooperatives:
+    get:
+      summary: HTX/THT trong phạm vi, tìm theo tên, Mã HTX hoặc mã số thuế
+      operationId: listCooperatives
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: include_inactive, in: query, schema: { type: boolean, default: false } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Cooperative" } }
+                  next_cursor: { type: [string, "null"] }
+        "401": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+  /v1/cooperatives/{ref}:
+    get:
+      summary: Hồ sơ HTX (ngoài phạm vi → 404)
+      operationId: getCooperative
+      parameters:
+        - { name: ref, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Hồ sơ
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Cooperative" }
+        "404": { $ref: "#/components/responses/Problem" }
+  /v1/cooperatives/{ref}/households:
+    get:
+      summary: Nông hộ thành viên của HTX, kèm nhãn hiển thị đã che (không bao giờ có định danh đầy đủ)
+      operationId: listCooperativeHouseholds
+      parameters:
+        - { name: ref, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/HouseholdListItem" } }
+                  next_cursor: { type: [string, "null"] }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+  /v1/households:
+    post:
+      summary: Tạo nông hộ — định danh chủ hộ đi thẳng vào kho định danh; trùng SĐT/CCCD → dùng lại mã cũ, báo "trùng"
+      operationId: createHousehold
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HouseholdInput" }
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HouseholdCreated" }
+        "200":
+          description: Trùng chủ hộ đã có (duplicate = true, duplicate_label = "trùng")
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HouseholdCreated" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
 components:
   securitySchemes:
     oidc:
@@ -123,3 +228,84 @@ components:
           properties:
             recorded_at: { type: string, format: date-time }
             seq: { type: integer, description: "Thứ tự trong chuỗi băm của chủ thể" }
+    # --- pf/party: tổ chức, HTX, nông hộ ---
+    OrgKind:
+      type: string
+      enum: [ttkn_national, ttkn_province, extension_team, dcrd, cooperative, mkg, partner]
+    Org:
+      type: object
+      required: [ref, kind, code, name, admin_unit_code, parent_ref, representative_ref, active]
+      properties:
+        ref: { type: string, format: uuid }
+        kind: { $ref: "#/components/schemas/OrgKind" }
+        code: { type: string, description: "Mã đơn vị; với HTX là Mã HTX do hệ thống tự sinh (CGH BR-01)" }
+        name: { type: string }
+        admin_unit_code: { type: [string, "null"], description: "Mã tỉnh/xã hiện hành; null với cấp quốc gia" }
+        parent_ref: { type: [string, "null"], format: uuid }
+        representative_ref: { type: [string, "null"], format: uuid, description: "Mã tham chiếu người đại diện trong kho định danh" }
+        active: { type: boolean }
+    Decimal:
+      type: string
+      pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+      description: Số thập phân dạng chuỗi (không float)
+    Point:
+      type: object
+      required: [lat, lon]
+      properties:
+        lat: { $ref: "#/components/schemas/Decimal" }
+        lon: { $ref: "#/components/schemas/Decimal" }
+    Cooperative:
+      allOf:
+        - $ref: "#/components/schemas/Org"
+        - type: object
+          required: [status_reason, tax_code, area_ha, established_on, location, location_provisional]
+          properties:
+            status_reason: { type: [string, "null"], description: "Lý do vô hiệu hóa hiện tại" }
+            tax_code: { type: [string, "null"], pattern: "^[0-9]{10}(-[0-9]{3})?$" }
+            area_ha: { oneOf: [{ $ref: "#/components/schemas/Decimal" }, { type: "null" }], description: "Diện tích đăng ký hành chính (ha)" }
+            established_on: { type: [string, "null"], format: date }
+            location: { oneOf: [{ $ref: "#/components/schemas/Point" }, { type: "null" }] }
+            location_provisional: { type: boolean, description: "true = chưa có toạ độ; bản đồ hiển thị tâm xã, nhãn \"vị trí tạm\"" }
+    Household:
+      type: object
+      required: [household_ref, cooperative_ref, commune_code, cultivated_area_ha, member_since, active]
+      properties:
+        household_ref: { type: string, format: uuid, description: "Mã tham chiếu trong kho định danh (R-41)" }
+        cooperative_ref: { type: [string, "null"], format: uuid }
+        commune_code: { type: string }
+        cultivated_area_ha: { oneOf: [{ $ref: "#/components/schemas/Decimal" }, { type: "null" }] }
+        member_since: { type: [string, "null"], format: date }
+        active: { type: boolean }
+    HouseholdListItem:
+      allOf:
+        - $ref: "#/components/schemas/Household"
+        - type: object
+          required: [label, masked_phone, label_unavailable]
+          properties:
+            label: { type: string, description: "Nhãn đã che, vd \"Nguyễn V. A.\"" }
+            masked_phone: { type: string, description: "SĐT đã che" }
+            label_unavailable: { type: boolean }
+    HouseholdInput:
+      type: object
+      required: [cooperative_ref, identity]
+      properties:
+        cooperative_ref: { type: string, format: uuid }
+        commune_code: { type: string, description: "Bỏ trống = xã của HTX" }
+        cultivated_area_ha: { $ref: "#/components/schemas/Decimal" }
+        member_since: { type: string, format: date }
+        identity:
+          type: object
+          description: Chỉ chuyển vào kho định danh (mục đích registry.admin), không lưu ở pf_party
+          required: [full_name, phone]
+          properties:
+            full_name: { type: string }
+            phone: { type: string }
+            national_id: { type: string }
+            address: { type: string }
+    HouseholdCreated:
+      type: object
+      required: [household, duplicate]
+      properties:
+        household: { $ref: "#/components/schemas/Household" }
+        duplicate: { type: boolean }
+        duplicate_label: { type: string, enum: ["trùng"] }

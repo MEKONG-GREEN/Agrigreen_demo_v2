@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.party.org.reactivated/v1",
+  "title": "pf.party.org.reactivated — payload",
+  "description": "Một tổ chức đã được kích hoạt lại. Consumer quản trị tài khoản chỉ mở khóa các tài khoản đã bị khóa do pf.party.org.deactivated, không mở tài khoản bị khóa vì lý do khác (HTX US-HTXSTATUS-02 AC-2). Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.party.org.reactivated",
+  "x-schema-version": 1,
+  "x-producer": "pf/party",
+  "type": "object",
+  "required": ["org_ref", "kind", "code", "admin_unit_code", "actor_ref", "event_time", "seq"],
+  "properties": {
+    "org_ref":         { "type": "string", "format": "uuid" },
+    "kind":            { "type": "string", "enum": ["ttkn_national", "ttkn_province", "extension_team", "dcrd", "cooperative", "mkg", "partner"] },
+    "code":            { "type": "string", "maxLength": 40 },
+    "admin_unit_code": { "type": "string" },
+    "reason":          { "type": "string" },
+    "actor_ref":       { "type": "string", "format": "uuid" },
+    "event_time":      { "type": "string", "format": "date-time" },
+    "seq":             { "type": "integer", "minimum": 1 }
+  }
+}
