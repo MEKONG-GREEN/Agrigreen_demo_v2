@@ -8,6 +8,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
@@ -61,7 +62,9 @@ func (b ReportPayload) ToReport() (domain.Report, error) {
 	r.SownAreaHa = dec("sown_area_ha", b.SownAreaHa)
 	r.AffectedAreaHa = dec("affected_area_ha", b.AffectedAreaHa)
 	if b.SownOn != nil && *b.SownOn != "" {
-		t, err := time.Parse(time.DateOnly, *b.SownOn)
+		// Ngày gieo là ngày nghiệp vụ Việt Nam (R-12): 00:00 giờ VN, không phải 00:00 UTC —
+		// nếu không, báo cáo ngày hôm nay gửi trước 07:00 bị coi là "ở tương lai".
+		t, err := time.ParseInLocation(time.DateOnly, *b.SownOn, clock.Zone())
 		if err != nil {
 			v, bad = v.WithField("sown_on", "định dạng YYYY-MM-DD"), true
 		} else {

@@ -48,6 +48,18 @@ type HouseholdResult struct {
 // DuplicateLabel là nhãn báo trùng hiển thị cho người dùng.
 const DuplicateLabel = "trùng"
 
+// vaultError phân loại lỗi của kho định danh: kho từ chối dữ liệu hoặc quyền (4xx,
+// vd SĐT/CCCD sai dạng, thiếu vai vault_registrar) là lỗi của người gọi — trả
+// nguyên problem của kho để client sửa, không thử lại; lỗi hệ thống hoặc không
+// phản hồi → 503 party.dependency_unavailable.
+func vaultError(err error) error {
+	var p *problem.Problem
+	if errors.As(err, &p) && p.Status >= 400 && p.Status < 500 {
+		return p
+	}
+	return ErrDependency.WithDetail("kho định danh từ chối hoặc không phản hồi").WithCause(err)
+}
+
 // CreateHousehold tạo chủ hộ trong kho định danh (mục đích registry.admin) rồi
 // ghi nông hộ chỉ chứa mã tham chiếu. Trùng chỉ mục mù → dùng lại mã cũ.
 func (r *Registry) CreateHousehold(ctx context.Context, in CreateHouseholdInput) (HouseholdResult, error) {
@@ -116,7 +128,7 @@ func (r *Registry) createHousehold(ctx context.Context, p authz.Principal, sc au
 	case errors.Is(err, client.ErrDuplicate) && created.Ref != uuid.Nil:
 		dup = true
 	case err != nil:
-		return HouseholdResult{}, ErrDependency.WithDetail("kho định danh từ chối hoặc không phản hồi").WithCause(err)
+		return HouseholdResult{}, vaultError(err)
 	}
 
 	h := domain.Household{
