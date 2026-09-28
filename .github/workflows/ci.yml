@@ -160,7 +160,7 @@ jobs:
   # Keystore, giao diện thật; máy chủ API giả chạy trong tiến trình kiểm thử.
   # Chậm (~15–25 phút) nên chỉ chạy khi push lên main hoặc chạy tay.
   field-app-emulator:
-    name: App hiện trường — tích hợp trên emulator (API 30)
+    name: App hiện trường — tích hợp trên emulator (API 29)
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs: field-app
     runs-on: ubuntu-latest
@@ -183,11 +183,14 @@ jobs:
       - name: flutter test integration_test
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: 29
           arch: x86_64
-          target: google_apis
+          target: default
+          cores: 4
+          ram-size: 4096M
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -no-snapshot -no-metrics -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           working-directory: apps/field-app
           script: flutter test integration_test -d emulator-5554 --reporter expanded
 
