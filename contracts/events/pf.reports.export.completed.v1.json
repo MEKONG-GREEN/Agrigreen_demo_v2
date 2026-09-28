@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.reports.export.completed/v1",
+  "title": "pf.reports.export.completed — payload",
+  "description": "Tệp báo cáo đã dựng và lưu ở kho đối tượng (reports/<tenant>/<job>.<định dạng>). Consumer pf.reports.delivery gửi email liên kết tải ngắn hạn khi việc xuất thuộc lịch gửi. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.reports.export.completed",
+  "x-schema-version": 1,
+  "x-producer": "pf/reports",
+  "type": "object",
+  "required": ["job_id", "template_key", "format", "object_key", "sha256", "size_bytes", "row_count", "provisional", "completed_at"],
+  "properties": {
+    "job_id":       { "type": "string", "format": "uuid" },
+    "template_key": { "type": "string" },
+    "format":       { "type": "string", "enum": ["xlsx", "pdf"] },
+    "object_key":   { "type": "string" },
+    "sha256":       { "type": "string" },
+    "size_bytes":   { "type": "integer", "minimum": 0 },
+    "row_count":    { "type": "integer", "minimum": 0 },
+    "provisional":  { "type": "boolean", "description": "Số liệu tạm tính (US-DASH-02 AC-1)" },
+    "schedule_id":  { "type": ["string", "null"], "format": "uuid", "description": "Lịch gửi sinh ra việc xuất; null = xuất theo yêu cầu" },
+    "completed_at": { "type": "string", "format": "date-time" }
+  }
+}

@@ -32,7 +32,7 @@ import "slices"
 // dùng (offline_access, vai mặc định, vai do quản trị realm cấp) không bị đụng tới.
 var ManagedRoles = []string{
 	RoleAccountAdmin, RoleAccountAdminProvince,
-	"param_setter", "param_approver", "masterdata_admin", "registry_admin",
+	"param_setter", "param_approver", "masterdata_admin", "registry_admin", "reports_admin",
 	"consent_writer", "consent_reader",
 	"kn_national_admin", "kn_province_admin", "kn_officer", "coop_manager",
 	"cgh_viewer", "cgh_admin",
@@ -46,7 +46,7 @@ var ManagedRoles = []string{
 // MFARoles là vai đánh dấu [MFA] trong realm: người giữ vai phải cấu hình TOTP
 // (required action CONFIGURE_TOTP khi tạo hoặc khi được cấp thêm vai).
 var MFARoles = []string{
-	"platform_admin", "param_setter", "param_approver", "masterdata_admin", "registry_admin",
+	"platform_admin", "param_setter", "param_approver", "masterdata_admin", "registry_admin", "reports_admin",
 	"cgh_admin", "geo_admin", "device_admin", "sync_conflict_resolver", "vault_eraser",
 	RoleAccountAdmin, RoleAccountAdminProvince,
 }

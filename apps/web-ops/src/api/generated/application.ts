@@ -935,6 +935,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/program-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** FR-03 báo cáo tiến độ Đề án 1 triệu ha của một HTX × vụ (gửi lại = phiên bản mới, phải duyệt lại) */
+        post: operations["submitProgramReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/program-reports/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Admin tỉnh duyệt phiên bản hiện hành (không duyệt báo cáo do chính mình gửi — R-56) */
+        post: operations["approveProgramReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/program-progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tiến độ Đề án theo HTX × vụ trong phạm vi, kèm mục tiêu tỉnh (tham số extension.program_target_ha:<tỉnh>) */
+        get: operations["getProgramProgress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/dashboard": {
         parameters: {
             query?: never;
@@ -1468,6 +1519,74 @@ export interface paths {
         put?: never;
         /** US-LIB-05: bỏ lưu (không xóa cứng; máy nhận tombstone library_item) */
         post: operations["unsaveDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mẫu báo cáo đang dùng mà vai của người gọi được xuất (mẫu hệ thống = phiên bản 0) */
+        get: operations["listReportTemplates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Yêu cầu xuất báo cáo (Excel/PDF) — 202 + việc xuất; worker dựng tệp. Phạm vi giải lúc yêu cầu (ADR-0009) */
+        post: operations["requestReportExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/exports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái việc xuất (người yêu cầu, hoặc người có phạm vi bao trọn) */
+        get: operations["getReportExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/exports/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** URL tải tệp có hạn (10 phút; không ghi log) — qua điểm kiểm soát xuất dữ liệu */
+        get: operations["downloadReportExport"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2875,6 +2994,87 @@ export interface components {
             summary: string | null;
             /** Format: date-time */
             published_at: string | null;
+        };
+        ReportColumn: {
+            /** @description Khóa cột của nguồn dữ liệu */
+            key: string;
+            title: string;
+        };
+        ReportDefinition: {
+            title: string;
+            /** @enum {string} */
+            source: "extension.sowing" | "extension.growth_pest" | "extension.program_progress" | "extension.tasks_sla" | "extension.period_summary" | "mechanization.summary" | "mechanization.shortage_by_coop" | "mechanization.season_compare";
+            /** @enum {string} */
+            grouping: "national" | "province" | "commune" | "cooperative";
+            columns: components["schemas"]["ReportColumn"][];
+            formats: ("xlsx" | "pdf")[];
+            /** @description Bố cục tạm — BRD chưa có mẫu biểu chính thức của Bộ NN&MT/NN&PTNT */
+            provisional_layout?: boolean;
+            form_note?: string;
+        };
+        ReportTemplate: {
+            key: string;
+            version: number;
+            builtin: boolean;
+            /** @enum {string} */
+            status: "active" | "retired";
+            definition: components["schemas"]["ReportDefinition"];
+            reason?: string | null;
+            /** Format: uuid */
+            created_by?: string | null;
+            /** Format: date-time */
+            created_at?: string | null;
+        };
+        ReportParams: {
+            /**
+             * @description Mặc định: cấp của mẫu
+             * @enum {string}
+             */
+            level?: "national" | "province" | "commune" | "cooperative";
+            /** @description Tỉnh/xã trong phạm vi; rỗng = toàn phạm vi */
+            unit_code?: string;
+            /** @description KN: YYYY-MM | YYYY-Qn | YYYY (FR-05); mặc định tháng hiện tại */
+            period?: string;
+            /** @description FR-03, CGH; với đối chiếu là Vụ A */
+            season_code?: string;
+            season_year?: number;
+            /** @description CGH tab đối chiếu: Vụ B (khác Vụ A) */
+            season_code_b?: string;
+            season_year_b?: number;
+            /**
+             * Format: uuid
+             * @description CGH: lần cân đối đã lưu; rỗng = mới nhất của vụ
+             */
+            run_id?: string;
+            machine_type?: string;
+        };
+        ReportExport: {
+            /** Format: uuid */
+            id: string;
+            template_key: string;
+            template_version: number;
+            title: string;
+            /** @enum {string} */
+            format: "xlsx" | "pdf";
+            params: components["schemas"]["ReportParams"];
+            /** @enum {string} */
+            status: "queued" | "completed" | "failed";
+            /** @enum {string} */
+            trigger: "api" | "schedule";
+            /** Format: uuid */
+            schedule_id?: string | null;
+            /** Format: uuid */
+            requested_by: string;
+            /** Format: date-time */
+            requested_at: string;
+            row_count?: number | null;
+            /** @description Số liệu tạm tính */
+            provisional?: boolean | null;
+            size_bytes?: number | null;
+            sha256?: string | null;
+            error_code?: string | null;
+            /** Format: date-time */
+            completed_at?: string | null;
         };
     };
     responses: {
@@ -4851,6 +5051,118 @@ export interface operations {
             422: components["responses"]["Problem"];
         };
     };
+    submitProgramReport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    id?: string;
+                    commune_code: string;
+                    /** Format: uuid */
+                    cooperative_ref: string;
+                    season_code: string;
+                    season_year: number;
+                    /** @description decimal (ha) */
+                    registered_area_ha: string;
+                    /** @description decimal; đang triển khai + hoàn thành ≤ đăng ký */
+                    deploying_area_ha: string;
+                    completed_area_ha: string;
+                    note?: string;
+                    /** Format: date-time */
+                    event_time?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Đã ghi phiên bản */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    approveProgramReport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã duyệt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    getProgramProgress: {
+        parameters: {
+            query?: {
+                unit?: string;
+                season_code?: string;
+                season_year?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tiến độ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: Record<string, never>[];
+                        targets: {
+                            [key: string]: string | null;
+                        };
+                        unapproved: number;
+                        provisional: boolean;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
     extDashboard: {
         parameters: {
             query?: {
@@ -5864,6 +6176,129 @@ export interface operations {
             };
             /** @description content.library_item_not_found */
             404: components["responses"]["Problem"];
+        };
+    };
+    listReportTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách mẫu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ReportTemplate"][];
+                    };
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    requestReportExport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * @example kn.sowing_progress
+                     * @example cgh.shortage_by_coop
+                     */
+                    template_key: string;
+                    /** @enum {string} */
+                    format: "xlsx" | "pdf";
+                    params?: components["schemas"]["ReportParams"];
+                };
+            };
+        };
+        responses: {
+            /** @description Đã nhận; theo dõi tại Location */
+            202: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportExport"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    getReportExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Việc xuất */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportExport"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    downloadReportExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description URL có chữ ký */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        export_id: string;
+                        url: string;
+                        /** Format: date-time */
+                        expires_at: string;
+                        file_name: string;
+                        content_type: string;
+                        sha256: string;
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
         };
     };
 }

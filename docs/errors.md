@@ -136,6 +136,8 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 404 | `extension.staff_not_found` | pf/extension: cán bộ chưa có (hoặc đã ngừng) trong danh bạ trực |
 | 409 | `extension.id_reused` | pf/extension: `id` do máy sinh đã dùng cho bản ghi khác |
 | 503 | `extension.dependency_unavailable` | pf/extension: chưa nối pf/party (phạm vi) hoặc pf/masterdata (đơn vị, danh mục) |
+| 404 | `extension.program_report_not_found` | pf/extension: không có báo cáo tiến độ Đề án (FR-03), hoặc ngoài phạm vi đọc |
+| 409 | `extension.program_report_approved` | pf/extension: phiên bản tiến độ Đề án đã được duyệt |
 
 Đồng bộ ngoại tuyến (`task_update`, `field_report`): lỗi nghiệp vụ trả trong `results[].code` với `status = rejected` theo cùng các mã trên; bản ghi gửi lặp (`idem_key` đã ghi) trả `duplicate`.
 
@@ -155,8 +157,24 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 422 | `mechanization.import_invalid` | pf/mechanization: tệp nhập máy sai mẫu (thiếu cột bắt buộc, có cột "Mã máy"/"Khâu", sai CSV/.xlsx, ô công thức, quá 500 dòng) — từ chối cả tệp |
 Phản hồi phát lại theo Idempotency-Key có header `Idempotent-Replayed: true`.
 
-### pf/geo
+### pf/reports
 
+| HTTP | code | Ý nghĩa |
+|---|---|---|
+| 404 | `reports.template_not_found` | pf/reports: không có mẫu báo cáo với mã này (cả mẫu hệ thống lẫn phiên bản của tenant) |
+| 409 | `reports.template_retired` | pf/reports: mẫu đã ngừng dùng — không xuất, không lập lịch, không ngừng lại lần nữa |
+| 422 | `reports.format_unsupported` | pf/reports: mẫu không hỗ trợ định dạng đã chọn (`xlsx`/`pdf`) |
+| 404 | `reports.export_not_found` | pf/reports: không có việc xuất, hoặc người gọi không phải người yêu cầu và phạm vi không bao trọn |
+| 409 | `reports.export_not_ready` | pf/reports: việc xuất chưa xong hoặc đã hỏng — chưa có tệp để tải |
+| 429 | `reports.export_quota_exceeded` | pf/reports: vượt hạn mức xuất trong ngày (giờ Việt Nam) của người gọi — tham số `reports.daily_export_quota`, mặc định 50 (mục 18 DLP) |
+| 403 | `reports.out_of_scope` | pf/reports: đơn vị ngoài phạm vi TW → Tỉnh → Xã của người gọi, hoặc tài khoản chưa gắn đơn vị (ADR-0009) |
+| 404 | `reports.schedule_not_found` | pf/reports: không có lịch gửi, hoặc ngoài phạm vi xem |
+| 422 | `reports.unit_invalid` | pf/reports: mã đơn vị hành chính không còn hiệu lực hoặc không phải tỉnh/xã |
+| 503 | `reports.dependency_unavailable` | pf/reports: chưa nối pf/party, pf/masterdata, kho đối tượng hoặc cổng dữ liệu của module nguồn |
+
+Việc xuất hỏng vĩnh viễn ghi `error_code` trên việc xuất (vd `mechanization.run_not_found` khi vụ chưa có kết quả cân đối đã lưu, `reports.object_conflict` khi đã có tệp khác nội dung dưới cùng khóa).
+
+### pf/geo
 | HTTP | code | Ý nghĩa |
 |---|---|---|
 | 404 | `geo.plot_not_found` | pf/geo: không có thửa, hoặc nằm ngoài phạm vi đọc (xã/HTX) — không lộ sự tồn tại |

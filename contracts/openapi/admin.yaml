@@ -2043,6 +2043,175 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
   # --- hết pf/accounts ---
+  # --- pf/reports: mẫu biểu (reports_admin, masterdata_admin hoặc platform_admin — CGH FN-10 BR-03) và lịch gửi định kỳ (US-DASH-03) ---
+  /v1/reports/templates:
+    get:
+      summary: Mọi mẫu (mẫu hệ thống + phiên bản mới nhất của tenant, kể cả đã ngừng dùng)
+      operationId: adminListReportTemplates
+      tags: [reports]
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/ReportTemplate"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Tạo phiên bản mới của mẫu (việc xuất cũ giữ ảnh chụp phiên bản cũ)
+      operationId: saveReportTemplate
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, definition]
+              properties:
+                key: {type: string, pattern: "^[a-z][a-z0-9_.]{2,63}$"}
+                definition: {$ref: "#/components/schemas/ReportDefinition"}
+      responses:
+        "201":
+          description: Phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportTemplate"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/reports/templates/{key}/versions:
+    get:
+      summary: Lịch sử phiên bản của mẫu (mới nhất trước; mẫu hệ thống là phiên bản 0)
+      operationId: listReportTemplateVersions
+      tags: [reports]
+      parameters:
+        - {name: key, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Phiên bản
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/ReportTemplate"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/reports/templates/{key}/retire:
+    post:
+      summary: Ngừng dùng mẫu kèm lý do (phiên bản mới trạng thái retired; không xóa)
+      operationId: retireReportTemplate
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: key, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [reason], properties: {reason: {type: string, minLength: 10, maxLength: 500}}}
+      responses:
+        "201":
+          description: Đã ngừng dùng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportTemplate"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/reports/schedules:
+    get:
+      summary: Lịch gửi người gọi được xem (người lập hoặc phạm vi bao trọn)
+      operationId: listReportSchedules
+      tags: [reports]
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/ReportSchedule"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Lập lịch gửi báo cáo (tuần/tháng, giờ Việt Nam). Người nhận là actor_ref — email tra lúc gửi, không lưu
+      operationId: createReportSchedule
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [template_key, format, frequency, hour, recipients]
+              properties:
+                template_key: {type: string}
+                format: {type: string, enum: [xlsx, pdf]}
+                unit_code: {type: string}
+                params: {type: object, description: "Như ReportParams của Application API; kỳ tính theo mốc (tháng: tháng trước; tuần: tháng đang chạy)"}
+                frequency: {type: string, enum: [weekly, monthly]}
+                weekday: {type: integer, minimum: 1, maximum: 7, description: "weekly: 1 = thứ Hai"}
+                day_of_month: {type: integer, minimum: 1, maximum: 28, description: "monthly"}
+                hour: {type: integer, minimum: 0, maximum: 23}
+                recipients: {type: array, minItems: 1, maxItems: 50, items: {type: string, format: uuid}}
+      responses:
+        "201":
+          description: Đã lập lịch
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportSchedule"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/reports/schedules/{id}/deactivate:
+    post:
+      summary: Ngừng lịch kèm lý do (không xóa; lịch sử chạy giữ nguyên)
+      operationId: deactivateReportSchedule
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [reason], properties: {reason: {type: string, minLength: 10, maxLength: 500}}}
+      responses:
+        "200":
+          description: Lịch
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportSchedule"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/reports/schedules/{id}/runs:
+    get:
+      summary: Các lần chạy của lịch — mỗi mốc (tuần ISO / tháng) đúng một lần, kèm kết quả gửi email
+      operationId: listReportScheduleRuns
+      tags: [reports]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Lần chạy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [slot_key, slot_at, status, fired_at]
+                      properties:
+                        slot_key: {type: string, examples: [2026-W40, 2026-10]}
+                        slot_at: {type: string, format: date-time}
+                        status: {type: string, enum: [queued, skipped]}
+                        skip_reason: {type: [string, "null"]}
+                        job_id: {type: [string, "null"], format: uuid}
+                        fired_at: {type: string, format: date-time}
+                        delivery_status: {type: [string, "null"], enum: [sent, skipped, failed, null]}
+                        delivery_note: {type: [string, "null"]}
+                        sent_count: {type: [integer, "null"]}
+                        delivered_at: {type: [string, "null"], format: date-time}
+        "404": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/reports ---
 components:
   securitySchemes:
     oidc:
@@ -2156,6 +2325,57 @@ components:
               seq: {type: integer}
               replayed: {type: boolean}
   schemas:
+    # --- pf/reports ---
+    ReportDefinition:
+      type: object
+      required: [title, source, grouping, columns, formats]
+      properties:
+        title: {type: string, minLength: 5, maxLength: 200}
+        source:
+          type: string
+          enum: [extension.sowing, extension.growth_pest, extension.program_progress, extension.tasks_sla, extension.period_summary,
+                 mechanization.summary, mechanization.shortage_by_coop, mechanization.season_compare]
+        grouping: {type: string, enum: [national, province, commune, cooperative]}
+        columns:
+          type: array
+          minItems: 1
+          maxItems: 40
+          items: {type: object, required: [key], properties: {key: {type: string}, title: {type: string}}}
+        formats: {type: array, items: {type: string, enum: [xlsx, pdf]}}
+        provisional_layout: {type: boolean}
+        form_note: {type: string, maxLength: 500}
+    ReportTemplate:
+      type: object
+      required: [key, version, builtin, status, definition]
+      properties:
+        key: {type: string}
+        version: {type: integer, minimum: 0}
+        builtin: {type: boolean}
+        status: {type: string, enum: [active, retired]}
+        definition: {$ref: "#/components/schemas/ReportDefinition"}
+        reason: {type: [string, "null"]}
+        created_by: {type: [string, "null"], format: uuid}
+        created_at: {type: [string, "null"], format: date-time}
+    ReportSchedule:
+      type: object
+      required: [id, template_key, format, params, frequency, hour, recipients, owner_ref, active, created_at, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        template_key: {type: string}
+        format: {type: string, enum: [xlsx, pdf]}
+        unit_code: {type: [string, "null"]}
+        params: {type: object}
+        frequency: {type: string, enum: [weekly, monthly]}
+        weekday: {type: [integer, "null"]}
+        day_of_month: {type: [integer, "null"]}
+        hour: {type: integer}
+        recipients: {type: array, items: {type: string, format: uuid}}
+        owner_ref: {type: string, format: uuid}
+        active: {type: boolean}
+        deactivated_reason: {type: [string, "null"]}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    # --- hết pf/reports ---
     Problem:
       type: object
       required: [type, title, status, code]

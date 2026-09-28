@@ -77,6 +77,9 @@ func (m *Module) Staff() port.StaffDirectory { return app.StaffDirectory{Svc: m.
 // SyncSink cho pf/sync: chiều lên "task_update", "field_report".
 func (m *Module) SyncSink() syncport.Sink { return app.SyncSink{Svc: m.svc} }
 
+// ReportData cho pf/reports: đọc dữ liệu báo cáo FR-01..FR-05 theo phạm vi đã giải.
+func (m *Module) ReportData() port.ReportData { return app.ReportData{Svc: m.svc} }
+
 // OverdueTenants dựng bộ tìm tenant có nhiệm vụ quá hạn từ pool vai
 // ag_outbox_publisher (worker, nối thẳng).
 func OverdueTenants(pool *pgxpool.Pool) app.TenantLister { return app.OverdueTenants(pool) }

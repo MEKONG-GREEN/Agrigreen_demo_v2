@@ -24,6 +24,7 @@
       { "name": "param_setter", "description": "[MFA] Đặt tham số/danh mục có phê duyệt (R-56)" },
       { "name": "param_approver", "description": "[MFA] Phê duyệt tham số — không tự phê duyệt thay đổi của mình (R-56)" },
       { "name": "masterdata_admin", "description": "[MFA] Quản trị danh mục và đơn vị hành chính (Admin API, pf/masterdata)" },
+      { "name": "reports_admin", "description": "[MFA] Quản lý mẫu báo cáo có phiên bản (Admin API, pf/reports — CGH FN-10 BR-03)" },
       { "name": "registry_admin", "description": "[MFA] Quản trị sổ tổ chức, HTX, nông hộ; nhập hàng loạt (pf/party)" },
       { "name": "consent_writer", "description": "Ghi đồng ý theo mục đích (pf/party, cả qua đồng bộ ngoại tuyến)" },
       { "name": "consent_reader", "description": "Đọc đồng ý theo mục đích (pf/party)" },

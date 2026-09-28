@@ -43,6 +43,9 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.GET("/field-reports/:id", h.getReport)
 	g.POST("/field-reports/:id/corrections", h.correctReport)
 	g.POST("/report-periods/close", h.closePeriod)
+	g.POST("/program-reports", h.submitProgram)
+	g.POST("/program-reports/:id/approve", h.approveProgram)
+	g.GET("/program-progress", h.programProgress)
 
 	g.GET("/dashboard", h.dashboard)
 

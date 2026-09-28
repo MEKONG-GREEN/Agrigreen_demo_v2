@@ -11,11 +11,15 @@
 //	anchor       00:30 hằng ngày: neo chuỗi mọi cụm + manifest ký số (mục 8.2)
 //	idempotency  mỗi giờ: xóa Idempotency-Key hết hạn ở mọi cụm (R-51)
 //	extension_escalation  mỗi 15 phút: leo thang nhiệm vụ khuyến nông quá SLA lên TTKN tỉnh (KN US-TASK-02)
+//	reports_schedules     mỗi 15 phút: lịch gửi báo cáo định kỳ — mỗi mốc tạo đúng một việc xuất (KN US-DASH-03)
 //	notify_email_digest   mỗi giờ: email tóm tắt chỉ đạo khẩn tới hộp thư công vụ (pf/notify, ADR-0015)
 //
 // Consumer pf/notify (vai notify_app): pf.notify.directive, pf.notify.content,
 // pf.notify.task, pf.notify.sync, pf.notify.party (dựng thông báo) và pf.notify.push
 // (gửi thông điệp dữ liệu tới thiết bị).
+//
+// Consumer pf/reports (vai reports_app): pf.reports.export (dựng tệp Excel/PDF) và
+// pf.reports.delivery (email lịch gửi báo cáo).
 //
 // Biến môi trường:
 //
@@ -30,7 +34,9 @@
 //	AG_SMTP_HOST, AG_SMTP_PORT, AG_SMTP_USERNAME, AG_SMTP_PASSWORD, AG_SMTP_FROM, AG_SMTP_DIGEST_TO  email tóm tắt (SMTP trong lãnh thổ)
 //	AG_ANCHOR_SIGNING_KEY              Ed25519 (base64 seed 32 byte) — bắt buộc khi có job anchor
 //	AG_ANCHOR_KEY_ID                   (tùy chọn) mã khóa ghi vào manifest
-//	AG_S3_* hoặc AG_OBJSTORE_DIR       kho manifest (shared/objstore)
+//	AG_S3_* hoặc AG_OBJSTORE_DIR       kho manifest, tệp báo cáo (shared/objstore)
+//	AG_SMTP_HOST/PORT/USERNAME/PASSWORD/FROM/TLS  (tùy chọn) email lịch gửi báo cáo; thiếu → bỏ gửi kèm cảnh báo
+//	AG_WEB_OPS_URL                     (tùy chọn) URL web-ops cho liên kết tải lại trong email
 //	AG_RABBITMQ_MGMT_URL               (tùy chọn) management API cho metric độ sâu DLQ
 //	AG_KC_ADMIN_URL, AG_KC_REALM,      Keycloak Admin REST (tài khoản dịch vụ agrigreen-accounts) cho consumer
 //	AG_KC_CLIENT_ID, AG_KC_CLIENT_SECRET  pf.accounts.org_status (khóa/mở tài khoản theo trạng thái tổ chức)
@@ -59,6 +65,7 @@ import (
 	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
@@ -82,14 +89,14 @@ type consumer struct {
 }
 
 func consumers(log *slog.Logger) []consumer {
-	return []consumer{{
+	return append([]consumer{{
 		name: "pf.audit.consent", cluster: migrations.PF, role: "worker_platform",
 		events: []string{port.EventConsentRecorded},
 		handler: func(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
 			log.Info("đồng ý đã ghi", "event", env.EventType, "event_id", env.EventID, "tenant_id", env.TenantID, "trace_id", env.TraceID, "outcome", "ok")
 			return nil
 		},
-	}, mrvExportConsumer(log), accountsOrgStatusConsumer(log)}
+	}, mrvExportConsumer(log), accountsOrgStatusConsumer(log)}, reportsConsumers(log)...)
 }
 
 func allConsumers(log *slog.Logger) []consumer {
@@ -353,10 +360,43 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		}
 		js = append(js, nt.Jobs(notify.DigestTenants(out.pools[migrations.PF]), log)...)
 	}
+	if selected(jobs, reports.JobSchedules) {
+		// Lịch gửi báo cáo: tìm tenant bằng pool ag_outbox_publisher (hai cột), chạy bằng vai reports_app;
+		// tham số hạn mức DLP đọc qua pf/masterdata bằng vai của nó (R-05).
+		repPool, err := openPF(ctx, direct, reports.DBRole, &closeFn)
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		mdPool, err := openPF(ctx, direct, masterdata.DBRole, &closeFn)
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		md := masterdata.New(mdPool, clk)
+		rep := reports.New(repPool, clk, reports.Deps{Params: md.Params(), Log: log})
+		js = append(js, rep.Jobs(reports.ScheduleTenants(out.pools[migrations.PF]), log)...)
+	}
 	if len(js) == 0 {
 		closeFn()
-		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + extension.JobEscalation + ", " + notifyport.JobEmailDigest + ")")
+		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + extension.JobEscalation + ", " +
+			notifyport.JobEmailDigest + ", " + reports.JobSchedules + ")")
 	}
 	out.s = &schedule.Scheduler{Clock: clk, Log: log, Jobs: js}
 	return out, closeFn, nil
+}
+
+// openPF mở pool nối thẳng cụm pf cho một vai của job và đăng ký đóng pool.
+func openPF(ctx context.Context, direct, role string, closeFn *func()) (*pgxpool.Pool, error) {
+	d, err := dbadmin.RoleURL(direct, migrations.PF, "", role)
+	if err != nil {
+		return nil, err
+	}
+	p, err := db.Open(ctx, d, db.Options{AppName: "worker-" + role, MaxConns: 2})
+	if err != nil {
+		return nil, err
+	}
+	prev := *closeFn
+	*closeFn = func() { p.Close(); prev() }
+	return p, nil
 }

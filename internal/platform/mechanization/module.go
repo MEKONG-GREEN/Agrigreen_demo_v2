@@ -42,5 +42,8 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.
 // RegisterAdmin gắn route Admin API (ghi dữ liệu chủ, vụ mùa, chạy cân đối; MFA bắt buộc ở router).
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }
 
+// ReportData cho pf/reports: 3 tab FN-10 đọc từ kết quả cân đối đã lưu.
+func (m *Module) ReportData() port.ReportData { return app.ReportData{Svc: m.svc} }
+
 // AreaFeed cho bộ đồng bộ App HTX (FN-07, G2) áp diện tích vụ theo QT-03.
 func (m *Module) AreaFeed() port.AreaFeed { return m.svc }

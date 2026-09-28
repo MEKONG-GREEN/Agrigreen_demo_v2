@@ -17,6 +17,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/keycloak"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	reportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
@@ -56,6 +57,15 @@ func (m *Module) OrgStatusHandler() inbox.Handler {
 		_, err := m.svc.HandleOrgStatus(ctx, tx, env)
 		return err
 	}
+}
+
+// MailDirectory cho pf/reports: email đã xác minh của tài khoản lúc gửi lịch báo
+// cáo. Chưa cấu hình Keycloak → nil (pf/reports bỏ gửi kèm cảnh báo).
+func (m *Module) MailDirectory() reportsport.MailDirectory {
+	if m.svc.Dir == nil {
+		return nil
+	}
+	return app.MailDirectory{Dir: m.svc.Dir}
 }
 
 // OrgStatusEvents là các sự kiện consumer đăng ký.

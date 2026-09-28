@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.reports.export.anomaly/v1",
+  "title": "pf.reports.export.anomaly — payload",
+  "description": "Điểm kiểm soát xuất dữ liệu (mục 18 DLP): một người xuất báo cáo vượt ngưỡng bất thường reports.export_anomaly_threshold trong ngày (giờ Việt Nam). Phát một lần mỗi người mỗi ngày, ở lần đầu vượt ngưỡng. Consumer cảnh báo bộ phận an ninh. Chỉ mã tham chiếu, không PII.",
+  "x-event-type": "pf.reports.export.anomaly",
+  "x-schema-version": 1,
+  "x-producer": "pf/reports",
+  "type": "object",
+  "required": ["actor_ref", "business_date", "daily_count", "threshold", "quota", "last_job_id", "template_key", "kind", "detected_at"],
+  "properties": {
+    "actor_ref":     { "type": "string", "format": "uuid" },
+    "business_date": { "type": "string", "format": "date" },
+    "daily_count":   { "type": "integer", "minimum": 1 },
+    "threshold":     { "type": "integer" },
+    "quota":         { "type": "integer" },
+    "last_job_id":   { "type": "string", "format": "uuid" },
+    "template_key":  { "type": "string" },
+    "kind":          { "type": "string", "enum": ["export", "scheduled"] },
+    "detected_at":   { "type": "string", "format": "date-time" }
+  }
+}
