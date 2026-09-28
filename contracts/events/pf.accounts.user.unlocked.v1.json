@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.accounts.user.unlocked/v1",
+  "title": "pf.accounts.user.unlocked — payload",
+  "description": "Một tài khoản đã được mở khóa: thủ công hoặc do tổ chức được kích hoạt lại (chỉ tài khoản bị khóa vì org_deactivated, HTX US-HTXSTATUS-02 AC-2). Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.accounts.user.unlocked",
+  "x-schema-version": 1,
+  "x-producer": "pf/accounts",
+  "type": "object",
+  "required": [
+    "user_ref",
+    "org_ref",
+    "prev_cause",
+    "actor_ref",
+    "event_time",
+    "seq"
+  ],
+  "properties": {
+    "user_ref": {
+      "type": "string",
+      "format": "uuid",
+      "description": "id người dùng trong Keycloak (không phải định danh cá nhân)"
+    },
+    "org_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "prev_cause": {
+      "type": "string",
+      "enum": [
+        "",
+        "manual",
+        "org_deactivated"
+      ]
+    },
+    "actor_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

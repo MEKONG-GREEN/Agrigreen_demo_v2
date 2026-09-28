@@ -30,6 +30,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
@@ -46,6 +47,10 @@ func main() {
 func run(log *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// RB-7: production chỉ được nối tới đích trong lãnh thổ (internal/shared/residency).
+	if err := residency.CheckEnv(); err != nil {
+		return err
+	}
 
 	base := os.Getenv("AG_VAULT_DB_URL")
 	issuer, audience := os.Getenv("AG_OIDC_ISSUER"), os.Getenv("AG_OIDC_AUDIENCE")

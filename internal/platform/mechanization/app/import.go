@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"encoding/csv"
 	"errors"
 	"fmt"
 	"io"
@@ -19,10 +18,14 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tabular"
 )
 
 // MaxImportRows giới hạn số dòng xử lý đồng bộ trong một request (R-52: dưới 2 giây).
 const MaxImportRows = 500
+
+// MaxImportBytes giới hạn dung lượng tệp nhập (CSV UTF-8 hoặc Excel .xlsx).
+const MaxImportBytes = 2 << 20
 
 // Chế độ nhập máy (US-MAC-02).
 const (
@@ -59,7 +62,8 @@ type ImportResult struct {
 	Deactivated                                        []domain.Machine
 }
 
-// ImportInput là tệp CSV (UTF-8, dòng đầu là tiêu đề) danh sách máy của MỘT HTX.
+// ImportInput là tệp CSV (UTF-8) hoặc Excel .xlsx (trang tính đầu; ô công thức
+// bị từ chối) danh sách máy của MỘT HTX; dòng đầu là tiêu đề.
 type ImportInput struct {
 	CooperativeRef uuid.UUID
 	Mode           string
@@ -86,11 +90,9 @@ var importAliases = map[string]string{
 var importRequired = []string{"machine_type", "brand", "model", "owner_code", "owned_since", "status"}
 
 // forbiddenColumns: tệp có các cột này bị từ chối toàn bộ (mã do hệ thống sinh; khâu tự gán).
-var forbiddenColumns = map[string]string{"ma_may": "Mã máy", "machine_code": "Mã máy", "khau": "Khâu sản xuất", "farm_stage": "Khâu sản xuất"}
-
-func headerKey(h string) string {
-	h = strings.TrimPrefix(h, string(rune(0xFEFF))) // BOM của Excel
-	return strings.ReplaceAll(strings.ReplaceAll(domain.Fold(h), " ", "_"), "/", "_")
+// Khóa là tiêu đề đã chuẩn hóa (tabular.NormalizeHeader).
+var forbiddenColumns = map[string]string{
+	"ma_may": "Mã máy", "machine_code": "Mã máy", "khau": "Khâu sản xuất", "khau_san_xuat": "Khâu sản xuất", "farm_stage": "Khâu sản xuất",
 }
 
 // ImportMachines nhập danh sách máy của một HTX (FN-05 BR-07/BR-10, US-MAC-02):
@@ -117,29 +119,27 @@ func (s *Service) ImportMachines(ctx context.Context, in ImportInput) (ImportRes
 	if err != nil {
 		return ImportResult{}, ErrDependency.WithCause(err)
 	}
-	rd := csv.NewReader(in.Body)
-	rd.FieldsPerRecord = -1
-	rd.TrimLeadingSpace = true
-	header, err := rd.Read()
+	lim := tabular.Limits{MaxBytes: MaxImportBytes, MaxRows: MaxImportRows}
+	tb, err := tabular.Read(in.Body, lim)
 	if err != nil {
-		return ImportResult{}, ErrImportInvalid
+		var fe *tabular.FormulaError
+		switch {
+		case errors.As(err, &fe), errors.Is(err, tabular.ErrTooManyRows), errors.Is(err, tabular.ErrTooLarge),
+			errors.Is(err, tabular.ErrTooManyColumns), errors.Is(err, tabular.ErrEncoding), errors.Is(err, tabular.ErrLegacyExcel),
+			errors.Is(err, tabular.ErrFormat):
+			return ImportResult{}, ErrImportInvalid.WithDetail(tabular.Message(err, lim))
+		case errors.Is(err, tabular.ErrEmpty):
+			return ImportResult{}, ErrImportInvalid
+		}
+		return ImportResult{}, err
 	}
-	col := map[string]int{}
-	for i, h := range header {
-		k := headerKey(h)
+	for _, k := range tb.Keys {
 		if label, bad := forbiddenColumns[k]; bad {
 			return ImportResult{}, ErrImportInvalid.WithDetail("Tệp không đúng mẫu quy định: không được có cột \"" + label + "\" (hệ thống tự sinh/tự gán)")
 		}
-		if canon, ok := importAliases[k]; ok {
-			col[canon] = i
-		}
 	}
-	var missing []string
-	for _, c := range importRequired {
-		if _, ok := col[c]; !ok {
-			missing = append(missing, c)
-		}
-	}
+	col := tb.Columns(importAliases)
+	missing := tabular.Missing(col, importRequired...)
 	_, hasSerial := col["serial_no"]
 	_, hasChassis := col["chassis_no"]
 	if !hasSerial && !hasChassis {
@@ -148,26 +148,14 @@ func (s *Service) ImportMachines(ctx context.Context, in ImportInput) (ImportRes
 	if len(missing) > 0 {
 		return ImportResult{}, ErrImportInvalid.WithDetail("Thiếu cột bắt buộc: " + strings.Join(missing, ", "))
 	}
-	records, err := rd.ReadAll()
-	if err != nil {
-		return ImportResult{}, ErrImportInvalid.WithDetail("Sai định dạng tệp CSV")
-	}
-	if len(records) > MaxImportRows {
-		return ImportResult{}, ErrImportInvalid.WithDetail(fmt.Sprintf("Tối đa %d dòng mỗi lần nhập", MaxImportRows))
-	}
 
 	res := ImportResult{Mode: in.Mode, Rows: []ImportRow{}, Deactivated: []domain.Machine{}}
 	present := map[string]bool{} // khóa định danh xuất hiện trong tệp (kể cả dòng lỗi) — không bị vô hiệu hóa
 	seen := map[string]int{}
 	stages := map[string]string{}
-	for i, rec := range records {
-		rowNo := i + 2 // dòng 1 là tiêu đề
-		get := func(k string) string {
-			if j, ok := col[k]; ok && j < len(rec) {
-				return strings.TrimSpace(rec[j])
-			}
-			return ""
-		}
+	for _, rec := range tb.Rows {
+		rowNo := rec.Line // số dòng trong tệp (dòng 1 là tiêu đề)
+		get := func(k string) string { return rec.Get(col, k) }
 		serial, chassis := domain.NormalizeIdent(get("serial_no")), domain.NormalizeIdent(get("chassis_no"))
 		for _, k := range []string{"sn:" + serial, "ck:" + chassis} {
 			if len(k) > 3 {

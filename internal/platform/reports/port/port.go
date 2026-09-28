@@ -14,9 +14,11 @@ import (
 // Vai của module (tên vai trong Keycloak). Vai xuất theo nguồn dữ liệu dùng lại
 // vai của module nguồn (extension/port, mechanization/port).
 const (
-	// RoleReportsAdmin quản lý mẫu biểu (CGH FN-10 BR-03: chỉ Admin quản lý mẫu báo cáo). Dùng lại vai Admin
-	// danh mục & cấu hình của pf/masterdata (mẫu biểu là cấu hình hệ thống; realm Keycloak đã có vai này).
-	RoleReportsAdmin = mdport.RoleMasterdataAdmin
+	// RoleReportsAdmin quản lý mẫu biểu (CGH FN-10 BR-03: chỉ Admin quản lý mẫu báo cáo). Admin danh mục
+	// (masterdata_admin) và platform_admin cũng được quản lý mẫu.
+	RoleReportsAdmin = "reports_admin"
+	// RoleMasterdataAdmin: vai Admin danh mục & cấu hình của pf/masterdata.
+	RoleMasterdataAdmin = mdport.RoleMasterdataAdmin
 )
 
 // Khóa tham số pf/masterdata (tra theo thời điểm, mục 16).

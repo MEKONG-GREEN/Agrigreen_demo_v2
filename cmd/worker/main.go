@@ -12,6 +12,14 @@
 //	idempotency  mỗi giờ: xóa Idempotency-Key hết hạn ở mọi cụm (R-51)
 //	extension_escalation  mỗi 15 phút: leo thang nhiệm vụ khuyến nông quá SLA lên TTKN tỉnh (KN US-TASK-02)
 //	reports_schedules     mỗi 15 phút: lịch gửi báo cáo định kỳ — mỗi mốc tạo đúng một việc xuất (KN US-DASH-03)
+//	notify_email_digest   mỗi giờ: email tóm tắt chỉ đạo khẩn tới hộp thư công vụ (pf/notify, ADR-0015)
+//
+// Consumer pf/notify (vai notify_app): pf.notify.directive, pf.notify.content,
+// pf.notify.task, pf.notify.sync, pf.notify.party (dựng thông báo) và pf.notify.push
+// (gửi thông điệp dữ liệu tới thiết bị).
+//
+// Consumer pf/reports (vai reports_app): pf.reports.export (dựng tệp Excel/PDF) và
+// pf.reports.delivery (email lịch gửi báo cáo).
 //
 // Biến môi trường:
 //
@@ -19,14 +27,20 @@
 //	AG_DB_DIRECT_URL                   (tùy chọn) URL nối THẲNG PostgreSQL cho job + khóa leader;
 //	                                   mặc định AG_DB_URL. Không trỏ vào PgBouncer.
 //	AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER vai của job vận hành (migration shared/000002)
-//	AG_WORKER_JOBS                     mặc định cho -jobs: all | none | anchor,idempotency,extension_escalation
+//	AG_WORKER_JOBS                     mặc định cho -jobs: all | none | anchor,idempotency,extension_escalation,notify_email_digest
 //	AG_DB_PASSWORD_EXTENSION_APP       (hoặc AG_DB_APP_PASSWORD) vai extension_app — khi có job extension_escalation
+//	AG_DB_PASSWORD_NOTIFY_APP          vai notify_app (cùng extension_app, masterdata_app) — consumer/job pf/notify
+//	AG_FCM_PROJECT_ID, AG_FCM_CREDENTIALS_FILE  FCM HTTP v1 (không đặt → kênh đẩy chỉ ghi log); AG_FCM_ENDPOINT, AG_FCM_TOKEN_URL tùy chọn
+//	AG_SMTP_HOST, AG_SMTP_PORT, AG_SMTP_USERNAME, AG_SMTP_PASSWORD, AG_SMTP_FROM, AG_SMTP_DIGEST_TO  email tóm tắt (SMTP trong lãnh thổ)
 //	AG_ANCHOR_SIGNING_KEY              Ed25519 (base64 seed 32 byte) — bắt buộc khi có job anchor
 //	AG_ANCHOR_KEY_ID                   (tùy chọn) mã khóa ghi vào manifest
 //	AG_S3_* hoặc AG_OBJSTORE_DIR       kho manifest, tệp báo cáo (shared/objstore)
 //	AG_SMTP_HOST/PORT/USERNAME/PASSWORD/FROM/TLS  (tùy chọn) email lịch gửi báo cáo; thiếu → bỏ gửi kèm cảnh báo
 //	AG_WEB_OPS_URL                     (tùy chọn) URL web-ops cho liên kết tải lại trong email
 //	AG_RABBITMQ_MGMT_URL               (tùy chọn) management API cho metric độ sâu DLQ
+//	AG_KC_ADMIN_URL, AG_KC_REALM,      Keycloak Admin REST (tài khoản dịch vụ agrigreen-accounts) cho consumer
+//	AG_KC_CLIENT_ID, AG_KC_CLIENT_SECRET  pf.accounts.org_status (khóa/mở tài khoản theo trạng thái tổ chức)
+//	AG_DB_PASSWORD_ACCOUNTS_APP        (hoặc AG_DB_APP_PASSWORD) vai accounts_app của consumer đó
 //	AG_OTLP_ENDPOINT, ...              OpenTelemetry (shared/telemetry)
 package main
 
@@ -47,6 +61,8 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
+	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
@@ -58,6 +74,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/opsjobs"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
@@ -79,7 +96,11 @@ func consumers(log *slog.Logger) []consumer {
 			log.Info("đồng ý đã ghi", "event", env.EventType, "event_id", env.EventID, "tenant_id", env.TenantID, "trace_id", env.TraceID, "outcome", "ok")
 			return nil
 		},
-	}, mrvExportConsumer(log)}, reportsConsumers(log)...)
+	}, mrvExportConsumer(log), accountsOrgStatusConsumer(log)}, reportsConsumers(log)...)
+}
+
+func allConsumers(log *slog.Logger) []consumer {
+	return append(consumers(log), notifyConsumers(log)...)
 }
 
 func main() {
@@ -104,6 +125,10 @@ func selected(list, name string) bool {
 func run(log *slog.Logger, mods, jobs string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// RB-7: production chỉ được nối tới đích trong lãnh thổ (internal/shared/residency).
+	if err := residency.CheckEnv(); err != nil {
+		return err
+	}
 	shutdown, err := telemetry.Setup(ctx, "worker")
 	if err != nil {
 		return err
@@ -167,7 +192,7 @@ func startConsumers(ctx context.Context, log *slog.Logger, base, mods string, er
 		_ = conn.Close()
 	}
 	started := 0
-	for _, c := range consumers(log) {
+	for _, c := range allConsumers(log) {
 		if !selected(mods, c.name) {
 			continue
 		}
@@ -318,6 +343,23 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		})
 		js = append(js, kn.Jobs(extension.OverdueTenants(out.pools[migrations.PF]), log)...)
 	}
+	if selected(jobs, notifyport.JobEmailDigest) && os.Getenv("AG_SMTP_HOST") != "" {
+		// Email tóm tắt chỉ chạy khi đã cấu hình SMTP; tìm tenant bằng ag_outbox_publisher (2 cột).
+		var kept []*pgxpool.Pool
+		nt, err := buildNotify(ctx, log, direct, func(p *pgxpool.Pool) { kept = append(kept, p) })
+		prevClose := closeFn
+		closeFn = func() {
+			for _, p := range kept {
+				p.Close()
+			}
+			prevClose()
+		}
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		js = append(js, nt.Jobs(notify.DigestTenants(out.pools[migrations.PF]), log)...)
+	}
 	if selected(jobs, reports.JobSchedules) {
 		// Lịch gửi báo cáo: tìm tenant bằng pool ag_outbox_publisher (hai cột), chạy bằng vai reports_app;
 		// tham số hạn mức DLP đọc qua pf/masterdata bằng vai của nó (R-05).
@@ -337,7 +379,8 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 	}
 	if len(js) == 0 {
 		closeFn()
-		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + extension.JobEscalation + ", " + reports.JobSchedules + ")")
+		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + extension.JobEscalation + ", " +
+			notifyport.JobEmailDigest + ", " + reports.JobSchedules + ")")
 	}
 	out.s = &schedule.Scheduler{Clock: clk, Log: log, Jobs: js}
 	return out, closeFn, nil

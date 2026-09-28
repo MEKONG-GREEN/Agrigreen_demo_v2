@@ -23,6 +23,12 @@
 //	-app-url   AG_SEED_APP_URL    Application API, mặc định http://localhost:8080
 //	-admin-url AG_SEED_ADMIN_URL  Admin API, mặc định http://localhost:8082
 //	-token     AG_SEED_TOKEN      bearer token (hoặc -token-file / AG_SEED_TOKEN_FILE)
+//	-kc-token-url AG_SEED_KC_TOKEN_URL  (thay -token) endpoint token Keycloak Local/Dev, vd
+//	                                   http://localhost:8180/realms/agrigreen/protocol/openid-connect/token
+//	-kc-client AG_SEED_KC_CLIENT  client CHỈ-DEV agrigreen-seed (direct access grants), mặc định agrigreen-seed
+//	-kc-user   AG_SEED_KC_USER    người dùng quản trị dev (scripts/dev-users.*, đã cấu hình TOTP)
+//	           AG_SEED_KC_PASSWORD mật khẩu (chỉ qua biến môi trường, không qua cờ)
+//	-kc-otp    AG_SEED_KC_OTP     mã TOTP 6 số hiện tại
 //	-seed      AG_SEED_SEED       hạt giống, mặc định 1
 //	-scale     AG_SEED_SCALE      small | medium, mặc định small
 //	AG_ENV=production → từ chối chạy.
@@ -51,6 +57,7 @@ import (
 type Config struct {
 	AppURL, AdminURL string
 	Token            string `json:"-"`
+	KC               KCLogin
 	Seed             uint64
 	Scale            string
 	Env              string // AG_ENV
@@ -92,6 +99,11 @@ func parseFlags(args []string, log *slog.Logger) (Config, error) {
 	tokenFile := fs.String("token-file", os.Getenv("AG_SEED_TOKEN_FILE"), "tệp chứa bearer token")
 	seed := fs.String("seed", envOr("AG_SEED_SEED", "1"), "hạt giống (số nguyên không âm)")
 	fs.StringVar(&cfg.Scale, "scale", envOr("AG_SEED_SCALE", "small"), "small | medium")
+	fs.StringVar(&cfg.KC.TokenURL, "kc-token-url", os.Getenv("AG_SEED_KC_TOKEN_URL"), "endpoint token Keycloak Local/Dev (thay cho -token)")
+	fs.StringVar(&cfg.KC.ClientID, "kc-client", envOr("AG_SEED_KC_CLIENT", "agrigreen-seed"), "client chỉ-dev có direct access grants")
+	fs.StringVar(&cfg.KC.Username, "kc-user", os.Getenv("AG_SEED_KC_USER"), "người dùng quản trị dev")
+	fs.StringVar(&cfg.KC.OTP, "kc-otp", os.Getenv("AG_SEED_KC_OTP"), "mã TOTP hiện tại")
+	cfg.KC.Password = os.Getenv("AG_SEED_KC_PASSWORD")
 	if err := fs.Parse(args); err != nil {
 		return cfg, err
 	}
@@ -120,15 +132,22 @@ func Run(ctx context.Context, cfg Config) (*Stats, error) {
 	if !ok {
 		return nil, fmt.Errorf("-scale phải là small hoặc medium, nhận %q", cfg.Scale)
 	}
-	if cfg.Token == "" {
-		return nil, errors.New("thiếu bearer token (-token, -token-file, AG_SEED_TOKEN)")
-	}
 	if cfg.Log == nil {
 		cfg.Log = telemetry.NewLogger("seed-synthetic", io.Discard)
 	}
 	hc := cfg.HTTP
 	if hc == nil {
 		hc = &http.Client{Timeout: 60 * time.Second}
+	}
+	if cfg.Token == "" && cfg.KC.TokenURL != "" {
+		tok, err := fetchToken(ctx, hc, cfg.KC)
+		if err != nil {
+			return nil, err
+		}
+		cfg.Token = tok
+	}
+	if cfg.Token == "" {
+		return nil, errors.New("thiếu bearer token (-token, -token-file, AG_SEED_TOKEN hoặc -kc-token-url + -kc-user)")
 	}
 	today := cfg.Today
 	if today.IsZero() {

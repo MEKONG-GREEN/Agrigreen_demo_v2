@@ -70,8 +70,8 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | S4 | Danh mục trường MRV (C-1) | `TestCatalogSoDAndVersionPinning`, E2E-10 | có. Danh mục vẫn là **tạm**, chờ khách chốt C-1 |
 | S4 | OTLP (ADR-0013) | `TestTraceWithOTel`, `TestTracePropagatesOutboxToInbox` | có |
 | S5 | Bộ sinh dữ liệu tổng hợp (R-95) | `TestRefusesProduction`, `TestPlanDeterministicAndPlausible`, `TestSeedAgainstInProcessStack` ([cmd/seed-synthetic](../../cmd/seed-synthetic)) | có |
-| S5 | UAT theo ca kiểm thử trích từ prototype `mekong-green` | — | **chưa có**. Ca kiểm thử của prototype chưa được trích thành kiểm thử Go. Kịch bản E2E dựa trên BRD/Backlog |
-| S5 | Diễn tập sao lưu và phục hồi | — | **chưa có**. Là việc vận hành (mục 22) |
+| S5 | UAT theo ca kiểm thử trích từ prototype `mekong-green` | 39 kiểm thử ở [tests/acceptance](../../tests/acceptance) (HTX, thửa/chồng lấn, định mức/ngưỡng/cân đối CGH, nhiệm vụ KN + SLA, báo cáo hiện trường, danh mục, idempotency); mỗi ca ghi `// Nguồn:` tệp/ca prototype; bảng đối chiếu trong `doc.go` | **có**. 5 ca giữ nguyên quy tắc, 34 ca viết theo quy tắc MỚI có ghi `// Khác prototype:` (PII chỉ ở vault, chỉ ghi thêm thay vì xóa, chồng lấn theo BRD, Idempotency-Key bắt buộc). Phát hiện chưa sửa: gán thửa cho nông hộ HTX khác được chấp nhận; ngưỡng CGH không kiểm thứ tự; không khôi phục được thửa đã retire; mặt nạ SĐT khác DEF-CGH-08; mã vụ không chuẩn hóa chữ hoa |
+| S5 | Diễn tập sao lưu và phục hồi (mục 22) | `TestDrillEndToEndAndDetectsCorruption` ([cmd/drill](../../cmd/drill): số dòng, băm bộ tham số, `verify_chain`, tính lại cân đối CGH, checksum kho đối tượng, neo ký Ed25519 — và phát hiện từng kiểu hỏng), `TestBackupRestoreVerify` ([internal/shared/objsync](../../internal/shared/objsync)); workflow `restore-drill` (hằng tuần + chạy tay: pgBackRest full → `down -v` → restore → `drill check -strict`) | **có** (kiểm thử Go). Phần Docker (pgBackRest, kho S3 thứ hai, kcadm) chỉ chạy trong CI — chưa chạy trên máy dựng. Xem [restore-drill.md](../runbooks/restore-drill.md) |
 
 ## 3. App Khuyến nông (Backlog v1.0)
 
@@ -79,11 +79,12 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 
 | Story | Kiểm thử | Trạng thái |
 |---|---|---|
-| US-ADM-01/02/03 tài khoản, nhập hàng loạt, thao tác loạt | — | **chưa có**. Tài khoản quản lý ở Keycloak (ADR-0010), không có mã trong repo |
+| US-ADM-01/02/03 tài khoản, nhập hàng loạt, thao tác loạt | `TestCreateUserUSADM01`, `TestProvinceAdminGrantMatrix`, `TestLockUnlockNeedsReason`, `TestImportXLSXMixedRows`, `TestBulkActions`, `TestAssignmentChange`, `TestIdempotentCreate`, `TestTenantIsolation`, `TestContractHTTPAgainstEmulator` ([internal/platform/accounts](../../internal/platform/accounts)) | **một phần**. pf/accounts gọi Keycloak Admin REST (bản HTTP kiểm bằng emulator, không có Keycloak thật trong kiểm thử). Kích hoạt bằng liên kết một lần thay cho mật khẩu tạm (ADR-0010) |
+| HTX epic J (US-HTXSTATUS-01 AC-2, 02 AC-2, 03): vô hiệu hóa/kích hoạt lại HTX khóa/mở tài khoản | `TestOrgDeactivationLocksOnlyThatOrgAndReactivationRestoresOnlyThose` (consumer `pf.accounts.org_status` qua `inbox.Process`), `TestLockUnlockNeedsReason` (sổ chỉ ghi thêm, chuỗi băm) | có ở mức module. E2E chưa chạy qua RabbitMQ |
 | US-ADM-04 đăng nhập, điều hướng theo vai trò và phạm vi | `TestVerifyRejects`, `TestVerifyBuildsPrincipal`, `TestNoOrgSeesNothing`, E2E-05 | **một phần**. Có xác minh token và phạm vi theo `org_ref`; phần điều hướng giao diện chưa có |
 | US-ADM-05/06 PIN 6 số, offline 72 giờ | `apps/field-app/test/auth_test.dart` | **một phần**. Chỉ có kiểm thử Dart, không có trong E2E |
 | US-ADM-07 cây phân cấp 3 cấp | E2E-02, `TestAllowedParent`, `TestScopeProvinceSeesOnlyItsCommunes` | có |
-| US-ADM-08 di chuyển nhánh; nhập/xuất Excel | `TestOrgMoveHistoryAndChain` | **một phần**. Chưa có nhập/xuất cây bằng Excel |
+| US-ADM-08 di chuyển nhánh; nhập/xuất Excel | `TestOrgMoveHistoryAndChain`, `TestOrgTreeExportImportRoundTrip`, `TestOrgTreeExportScoped` | có. `GET /v1/orgs/export.xlsx` → sửa → `POST /v1/orgs/import`; nhập đi qua CreateOrg/MoveOrg/RenameOrg (sổ ghi lý do). Không vô hiệu hóa tổ chức vắng mặt trong tệp |
 
 ### B. Quản lý HTX và nông hộ
 
@@ -91,7 +92,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 |---|---|---|
 | US-HTX-01 danh sách HTX theo phạm vi | E2E-02, E2E-03, `TestScopeProvinceSeesOnlyItsCommunes`, `TestDeactivateReactivateCooperative` | có |
 | US-HTX-02 hồ sơ nông hộ, chống trùng | E2E-03, `TestHouseholdDedupeViaVault` | có |
-| US-HTX-03 nhập hàng loạt | `TestImportHouseholdsCSV` | **một phần**. Hỗ trợ CSV, chưa hỗ trợ tệp Excel |
+| US-HTX-03 nhập hàng loạt | `TestImportHouseholdsCSV`, `TestImportHouseholdsXLSX`, `TestImportHouseholdsXLSXFormulaRejected` | có. CSV UTF-8 và Excel .xlsx (tiêu đề có dấu); ô công thức bị từ chối cả tệp |
 | US-HTX-04 khai báo máy cơ giới hóa | E2E-09, `TestSerialUniqueAndStageDerived`, `TestImportUpdateAndReplace` | có (qua pf/mechanization) |
 | US-HTX-05 đồng bộ nông hộ từ App HTX | — | **chưa có**. App HTX thuộc G2 |
 
@@ -100,7 +101,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | Story | Kiểm thử | Trạng thái |
 |---|---|---|
 | US-PLOT-01 vẽ ranh giới | E2E-05, `TestBoundaryValidationRules`, `TestCorrectionCreatesNewVersion` | có |
-| US-PLOT-02 tải tệp ranh giới | `TestImportGeoJSONAndKML` | **một phần**. Hỗ trợ GeoJSON và KML; Shapefile trả `geo.format_unsupported` |
+| US-PLOT-02 tải tệp ranh giới | `TestImportGeoJSONAndKML`, `TestImportShapefileZip`, `TestParseShapefileZip`, `TestParseShapefileRejects` | có. GeoJSON, KML, Shapefile (.zip: .shp/.dbf/.prj). Chỉ WGS84; VN-2000/hệ phẳng trả `geo.crs_unsupported` — chưa tự chuyển VN-2000 (người dùng chuyển sang EPSG:4326 trước) |
 | US-PLOT-03 cảnh báo chồng lấn | `TestOverlapSameCoopRejectedCrossCoopFlagged`, `TestClassifyOverlaps` | có ở mức module. E2E không kiểm vì quy tắc đang được sửa song song |
 | US-PLOT-04 vẽ offline, tự đồng bộ | E2E-11 (`plot_boundary` accepted; tam giác → rejected), `TestSyncSinkIdempotentAndConflict` | có (phía máy chủ) |
 
@@ -109,7 +110,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | Story | Kiểm thử | Trạng thái |
 |---|---|---|
 | US-SYNC-01 hai chiều với App HTX | — | **chưa có**, thuộc G2. G1 chỉ có đồng bộ app hiện trường ↔ máy chủ: E2E-11, `TestPushMixedBatchAndReplay`, `TestPullPaginationRoundRobin`, `TestPullScopeChangeResets` |
-| US-SYNC-02 đồng bộ ngay theo yêu cầu | — | **chưa có** |
+| US-SYNC-02 đồng bộ ngay theo yêu cầu | `TestNudgeScopeAndRateLimit` (`POST /v1/sync/nudge`, thông điệp dữ liệu `sync_now`, giới hạn 5 phút/đích, 30 lần/giờ) | **một phần**. Có ở máy chủ; app phải xử lý `sync_now` (chưa ráp Flutter) |
 | US-SYNC-03 đối soát xung đột | `TestConflictSLA`, `TestSyncSinkIdempotentAndConflict` | **một phần**. Có sổ xung đột và SLA 72 giờ (C-8 tạm), có API resolve; chưa có màn hình, E2E không tạo xung đột |
 
 ### G. Thư viện kỹ thuật và tin tức
@@ -118,10 +119,10 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 |---|---|---|
 | US-LIB-01 soạn và xuất bản theo vùng | E2E-06, `TestPublishNewVersionKeepsOld`, `TestProvinceEditorScope`, `TestAuthorCannotSelfApprove` | có |
 | US-LIB-02 hướng dẫn đặc thù địa phương | E2E-06, `TestLocalSupplementScope` | có |
-| US-LIB-03 trích nội dung từ tệp | `TestExtract` | **một phần**. Trích được DOCX; PDF trả `content.extract_unsupported` |
+| US-LIB-03 trích nội dung từ tệp | `TestExtract`, `TestExtractPDFVietnamese`, `TestExtractPDFRejects`, `TestParseToUnicode` | có. DOCX và PDF có lớp chữ (tiếng Việt có dấu). PDF ảnh scan/mã hóa trả `content.extract_unsupported` kèm lý do (không OCR) |
 | US-LIB-04 tra cứu | `TestSearchAccentInsensitive`, E2E-06 | có |
 | US-LIB-05 lưu và tải offline | E2E-11 (pull `document`), `TestSyncRetireTombstone` | **một phần**. Có đồng bộ xuống máy; chưa có danh mục cá nhân |
-| US-LIB-06 thông báo nội dung mới | E2E-06 (`pf.content.document.published` trong outbox), `TestAlertPublishedEvent` | **một phần**. Có sự kiện; chưa có kênh đẩy thông báo tới máy |
+| US-LIB-06 thông báo nội dung mới | E2E-06, `TestAlertPublishedEvent`, `TestAlertFanOutRespectsScope`, `TestDuplicateEventDeliveryNoDuplicates`, `TestFCMPayloadIsDataOnly` | **một phần**. pf/notify: hộp thư trong app theo phạm vi, đẩy FCM chỉ dữ liệu (ADR-0015); chưa ráp app web/Flutter |
 
 ### I. Dashboard và báo cáo
 
@@ -152,11 +153,11 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 
 | FN | Nội dung | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| FN-01 | Tài khoản và phân quyền | `TestViewerReadsAllButCannotWrite` | **một phần**. Có kiểm vai; tài khoản quản lý ở Keycloak |
+| FN-01 | Tài khoản và phân quyền | `TestViewerReadsAllButCannotWrite`, `TestCreateUserUSADM01`, `TestLockUnlockNeedsReason`, `TestGrantMatrix` | **một phần**. Quản trị tài khoản qua pf/accounts (Keycloak Admin REST); "mật khẩu tạm" của BRD thay bằng liên kết UPDATE_PASSWORD một lần (ADR-0010) |
 | FN-02 | Danh mục và cấu hình | E2E-01, E2E-09 (ngưỡng 85/60 đọc từ tham số đã duyệt), `TestSelfApprovalBlocked` | có |
 | FN-03 | Hồ sơ HTX | E2E-02, `TestTaxCodeUniquePerTenant` | có |
 | FN-04 | Chủ sở hữu máy | E2E-09 (vault, trùng SĐT → 409), `TestCodesAssignedOnceAndStableOnProvinceMove` | có |
-| FN-05 | Hồ sơ máy | E2E-09, `TestSerialUniqueAndStageDerived`, `TestMachineCountAtT`, `TestImportUpdateAndReplace` | có |
+| FN-05 | Hồ sơ máy | E2E-09, `TestSerialUniqueAndStageDerived`, `TestMachineCountAtT`, `TestImportUpdateAndReplace`, `TestImportMachinesXLSXReplace` | có. Nhập CSV hoặc Excel .xlsx |
 | FN-06 | Lịch mùa vụ và diện tích theo vụ | E2E-09 (nhập tay), `TestLockedManualAreaNotOverwritten`, `TestValidateCalendar` | có |
 | FN-07 | Tích hợp App HTX | `TestResolveAreaQT03` (chỉ port `AreaFeed`) | **chưa có** luồng thật, thuộc G2 |
 | FN-08 | Bản đồ và trực quan hóa | `TestSummarizeBottleneck` (API coverage theo cấp) | **một phần**. Có API đọc; chưa có kiểm thử giao diện bản đồ |
@@ -169,7 +170,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | FN | Nội dung | Kiểm thử | Trạng thái |
 |---|---|---|---|
 | FN-04 | Ranh giới HTX/Hub | `TestAdminBoundaryAndCommuneContainment` | **một phần**. Có ranh giới hành chính và toạ độ điểm của HTX; chưa có polygon HTX và Hub (thuộc mkg/hub, G2+) |
-| FN-05 | Thửa ruộng: vẽ, sửa, nhập | E2E-05, `TestImportGeoJSONAndKML`, `TestCorrectionCreatesNewVersion`, `TestBBoxLimitAndScope` | có. "Xóa" là `retire`, không xóa cứng (X1) |
+| FN-05 | Thửa ruộng: vẽ, sửa, nhập | E2E-05, `TestImportGeoJSONAndKML`, `TestImportShapefileZip`, `TestCorrectionCreatesNewVersion`, `TestBBoxLimitAndScope` | có. "Xóa" là `retire`, không xóa cứng (X1) |
 | FN-06 | Kho/Hub | — | **chưa có**, thuộc G2+ |
 | FN-07 | Dữ liệu nền: ranh giới hành chính theo zoom | `TestAdminBoundaryAndCommuneContainment` | **một phần**. Chưa có giao thông, tự nhiên, tile |
 
@@ -179,11 +180,11 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 |---|---|---|---|
 | RB-1 | Chỉ ghi thêm, sửa bằng bản ghi bù | `TestAppendOnlySixWays`, `TestCatalogGates`, `TestChainSequenceAndTamperDetection`, `TestCorrectionCreatesNewVersion`, `TestCorrectionChain` | có |
 | RB-2 | Cách ly tenant | `TestTenantLeakParallel` (R-32, qua PgBouncer trong CI), `TestTenantIsolation` của từng module | có. E2E dùng một tenant |
-| RB-3 | PII xóa được | `TestErasure` (vault) | **một phần**. E2E không xóa định danh rồi kiểm ảnh không mở được |
+| RB-3 | PII xóa được | `TestErasure` (vault) | **một phần**. E2E không xóa định danh rồi kiểm ảnh không mở được. Bản sao lưu (pgBackRest, `objsync`) chỉ chứa bản mã; xóa trong bản sao dựa vào hủy khóa hộ (mục 22) — diễn tập chưa kiểm "phục hồi rồi ảnh đã xóa vẫn không mở được" |
 | RB-4 | Giấy phép | CI `go-licenses` + `deploy/policies/allowed-licenses.txt` | có (cổng CI, không phải kiểm thử Go) |
 | RB-5 | Ranh giới module | `go run ./tools/archlint ./...`, `TestAssemblyMatchesAPIPlatform` | có |
 | RB-6 | Đối soát chéo số đo ở biên | — | **chưa có**. Module đối soát (mục 13) chưa thuộc G1 |
-| RB-7 | Dữ liệu trong lãnh thổ | — | **chưa có** kiểm thử tự động. Là chính sách nhà cung cấp và cấu hình triển khai |
+| RB-7 | Dữ liệu trong lãnh thổ | `TestEachEndpointOutsideTerritoryFails`, `TestProductionRequiresAllowlist`, `TestNonPIIAllowlistOnlyForPushChannels`, `TestServiceMainsCallGuard` ([internal/shared/residency](../../internal/shared/residency)) | **có** cho cấu hình: `AG_ENV=production` → mọi đích DB/S3/OTLP/SMTP/FCM/Keycloak/vault/AMQP phải thuộc `AG_RESIDENCY_ALLOWLIST` (ngoại lệ không định danh qua `AG_NONPII_ALLOWLIST` chỉ cho kênh đẩy), sai thì dừng khởi động. Pháp nhân/hạ tầng của nhà cung cấp vẫn là rà soát hồ sơ. Xem [residency.md](../runbooks/residency.md) |
 | R-04 | PII chỉ ở vault | E2E-14, `TestNoPIIColumns`, archlint `agboundary` | có |
 | R-10 | Decimal cho số đo | archlint `agnofloat`, E2E-08 (tổng decimal), E2E-09 | có |
 | R-11 | UUIDv7 | `TestParseRequiresV7`, E2E-11 (id do máy sinh) | có |

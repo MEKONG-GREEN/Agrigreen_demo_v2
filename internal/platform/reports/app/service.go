@@ -54,8 +54,8 @@ const DownloadTTL = 10 * time.Minute
 var (
 	knRoles       = []string{extport.RoleKNOfficer, extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin, authz.RolePlatformAdmin}
 	cghRoles      = []string{mechport.RoleCGHViewer, mechport.RoleCGHAdmin, authz.RolePlatformAdmin}
-	allReaders    = []string{extport.RoleKNOfficer, extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin, mechport.RoleCGHViewer, mechport.RoleCGHAdmin, port.RoleReportsAdmin, authz.RolePlatformAdmin}
-	templateAdmin = []string{port.RoleReportsAdmin, authz.RolePlatformAdmin}
+	allReaders    = []string{extport.RoleKNOfficer, extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin, mechport.RoleCGHViewer, mechport.RoleCGHAdmin, port.RoleReportsAdmin, port.RoleMasterdataAdmin, authz.RolePlatformAdmin}
+	templateAdmin = []string{port.RoleReportsAdmin, port.RoleMasterdataAdmin, authz.RolePlatformAdmin}
 	// Lập lịch: cán bộ quản lý (TTKN QG/tỉnh — US-DASH-03) và Admin CGH.
 	schedulers = []string{extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin, mechport.RoleCGHAdmin, authz.RolePlatformAdmin}
 )

@@ -65,7 +65,7 @@ Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính m�
 | 409 | `party.org_has_active_children` | pf/party: vô hiệu hóa tổ chức còn tổ chức con đang hoạt động; `active_children` là số con |
 | 403 | `party.out_of_scope` | pf/party: ghi ngoài phạm vi TW → Tỉnh → Xã của người gọi (ADR-0009) |
 | 503 | `party.dependency_unavailable` | pf/party: chưa nối hoặc không gọi được masterdata / kho định danh (kể cả `GET /v1/me` của cán bộ TTKN tỉnh khi chưa nối danh mục đơn vị hành chính) |
-| 422 | `party.import_invalid` | pf/party: tệp nhập sai mẫu (thiếu cột bắt buộc, sai định dạng, quá số dòng) — từ chối cả tệp |
+| 422 | `party.import_invalid` | pf/party: tệp nhập (nông hộ, cây tổ chức; CSV UTF-8 hoặc .xlsx) sai mẫu — thiếu cột bắt buộc, sai định dạng, không phải UTF-8, tệp .xls cũ, ô công thức (không tính công thức; `detail` nêu ô), quá số dòng/dung lượng — từ chối cả tệp |
 | 403 | `sync.device_unregistered` | pf/sync: thiếu/sai header `X-Device-Id`, thiết bị chưa đăng ký trong tenant, hoặc đăng ký bởi tài khoản khác |
 | 403 | `sync.device_revoked` | pf/sync: thiết bị đã bị thu hồi — app **xóa dữ liệu cục bộ** và khóa token; đăng ký lại cùng mã cũng trả mã này |
 | 409 | `sync.device_taken` | pf/sync: `device_id` đã được tài khoản khác đăng ký |
@@ -111,8 +111,8 @@ Tự phê duyệt phiên bản danh mục trường MRV của chính mình trả
 | 413 | `content.file_too_large` | pf/content: tệp vượt 15 MB |
 | 415 | `content.file_type_not_allowed` | pf/content: loại tệp không nhận (đính kèm: PDF, .docx, JPEG/PNG/WebP, MP4; trích: Word/PDF) — theo chữ ký nội dung, không theo tên |
 | 422 | `content.checksum_mismatch` | pf/content: SHA-256 khai báo không khớp nội dung tệp |
-| 422 | `content.extract_unsupported` | pf/content: chưa trích được định dạng này (PDF, .doc cũ) — soạn thủ công |
-| 422 | `content.extract_failed` | pf/content: tệp Word lỗi hoặc không có chữ (ảnh scan) — soạn thủ công (HTX US-CMS-02 AC-2) |
+| 422 | `content.extract_unsupported` | pf/content: không trích được chữ — PDF ảnh scan (không có lớp chữ, không OCR), PDF mã hóa, phông PDF không giải mã được, tệp .doc cũ; lý do ở `detail` — soạn thủ công |
+| 422 | `content.extract_failed` | pf/content: tệp Word/PDF hỏng, không đọc được, hoặc Word không có chữ — soạn thủ công (HTX US-CMS-02 AC-2) |
 | 503 | `content.dependency_unavailable` | pf/content: chưa nối ScopeResolver (pf/party), danh mục (pf/masterdata) hoặc kho đối tượng |
 
 Người duyệt xuất bản phiên bản do chính mình soạn trả mã chung `self_approval_forbidden` (R-56).
@@ -151,7 +151,7 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 422 | `mechanization.cooperative_invalid` | pf/mechanization: HTX không tồn tại, không phải HTX, hoặc đã ngừng hoạt động |
 | 403 | `mechanization.out_of_scope` | pf/mechanization: ghi dữ liệu của HTX ngoài phạm vi TW → Tỉnh → Xã của người gọi (ADR-0009) |
 | 503 | `mechanization.dependency_unavailable` | pf/mechanization: chưa nối hoặc không gọi được pf/party, pf/masterdata hoặc kho định danh |
-| 422 | `mechanization.import_invalid` | pf/mechanization: tệp nhập máy sai mẫu (thiếu cột bắt buộc, có cột "Mã máy"/"Khâu", sai CSV, quá 500 dòng) — từ chối cả tệp |
+| 422 | `mechanization.import_invalid` | pf/mechanization: tệp nhập máy sai mẫu (thiếu cột bắt buộc, có cột "Mã máy"/"Khâu", sai CSV/.xlsx, ô công thức, quá 500 dòng) — từ chối cả tệp |
 Phản hồi phát lại theo Idempotency-Key có header `Idempotent-Replayed: true`.
 
 ### pf/reports
@@ -187,12 +187,45 @@ Việc xuất hỏng vĩnh viễn ghi `error_code` trên việc xuất (vd `mech
 | 403 | `geo.out_of_scope` | pf/geo: ghi ngoài phạm vi xã của người gọi, hoặc quản lý HTX thao tác trên thửa/HTX khác (HTX US-PLOT-01 AC-4) |
 | 422 | `geo.too_few_points` | pf/geo: dưới 4 điểm phân biệt, hoặc các điểm thẳng hàng (KN US-PLOT-01 AC-1, HTX US-PLOT-02 AC-2) |
 | 422 | `geo.invalid_geometry` | pf/geo: hình không hợp lệ theo PostGIS (tự cắt — hình nơ bướm, vòng sai), không phải vùng khép kín, quá 5.000 đỉnh |
-| 422 | `geo.crs_unsupported` | pf/geo: hệ toạ độ khác WGS84 (EPSG:4326) — thành phần `crs` khác, hoặc toạ độ ngoài miền kinh/vĩ độ (VN-2000/UTM) |
+| 422 | `geo.crs_unsupported` | pf/geo: hệ toạ độ khác WGS84 (EPSG:4326) — thành phần `crs` khác; `.prj` của Shapefile là VN-2000, hệ chiếu phẳng, hệ khác hoặc thiếu `.prj`; hoặc toạ độ ngoài miền kinh/vĩ độ. Hệ thống không tự chuyển VN-2000 — chuyển sang EPSG:4326 trước khi tải lên |
 | 422 | `geo.area_out_of_range` | pf/geo: diện tích trắc địa ngoài 0,001–1.000 ha |
 | 422 | `geo.outside_commune` | pf/geo: phần thửa nằm ngoài ranh giới xã (đã nhập) vượt ngưỡng; có `outside_pct` |
 | 422 | `geo.cooperative_invalid` | pf/geo: HTX không tồn tại, đã ngừng hoạt động hoặc ngoài phạm vi (khi đã nối pf/party) |
-| 422 | `geo.format_invalid` | pf/geo: tệp nhập không đọc được, không có đối tượng, hoặc quá 200 đối tượng |
-| 422 | `geo.format_unsupported` | pf/geo: định dạng chưa hỗ trợ (Shapefile) — chuyển sang GeoJSON hoặc KML |
+| 422 | `geo.format_invalid` | pf/geo: tệp nhập không đọc được, không có đối tượng, hoặc quá 200 đối tượng; Shapefile: không phải gói .zip, thiếu .shp/.dbf, nhiều lớp, số bản ghi .dbf khác .shp |
+| 422 | `geo.format_unsupported` | pf/geo: không nhận ra định dạng tệp — hỗ trợ GeoJSON, KML, Shapefile (.zip) |
 | 503 | `geo.dependency_unavailable` | pf/geo: chưa nối hoặc không gọi được pf/party (phạm vi), pf/masterdata (đơn vị hành chính, tham số) |
 
 Đồng bộ ngoại tuyến `plot_boundary` (docs/dev/sync-contract.md): không chặn được máy — chồng lấn HTX khác, sửa trên phiên bản cũ, hoặc chồng lấn cùng HTX chưa xác nhận **không** bị từ chối; bản ghi được giữ, trả `status = conflict` kèm `conflict_id`. Chồng lấn cùng HTX có `confirm_overlap: true` → `accepted` (xung đột vẫn mở để xem xét). Lệch diện tích khai báo không chặn. Bản ghi sai trả `rejected` với các mã ở trên.
+
+### pf/notify
+
+| HTTP | code | Ý nghĩa |
+|---|---|---|
+| 404 | `notify.notification_not_found` | pf/notify: không có thông báo, của người khác, ngoài phạm vi hoặc thông báo chủ đề cũ hơn 90 ngày — không lộ sự tồn tại |
+| 403 | `notify.device_unregistered` | pf/notify: `POST /v1/devices/{id}/push-token` với thiết bị chưa đăng ký ở pf/sync (`POST /v1/devices`) hoặc đăng ký bởi tài khoản khác |
+| 403 | `notify.device_revoked` | pf/notify: gắn token cho thiết bị đã bị thu hồi — app xóa dữ liệu cục bộ, sinh mã thiết bị mới |
+| 403 | `notify.out_of_scope` | pf/notify: `POST /v1/sync/nudge` với `unit` ngoài phạm vi người gọi |
+| 404 | `notify.nudge_target_not_found` | pf/notify: `device_id` không có token đẩy đang dùng hoặc ngoài phạm vi (trừ vai `device_admin`, `platform_admin`) |
+| 429 | `notify.nudge_rate_limited` | pf/notify: đích đã được yêu cầu đồng bộ trong 5 phút qua, hoặc người gọi vượt 30 lần/giờ; có `retry_after_s` và header `Retry-After` |
+| 503 | `notify.dependency_unavailable` | pf/notify: chưa nối sổ thiết bị của pf/sync |
+### pf/accounts
+
+Tài khoản cán bộ quản lý trong Keycloak qua Admin REST (KN US-ADM-01..03, HTX US-ACC-01/02, US-HTXSTATUS-01..03, CGH FN-01). Lỗi không bao giờ chứa họ tên, email, SĐT hay thân phản hồi của Keycloak (R-14).
+
+| HTTP | code | Ý nghĩa |
+|---|---|---|
+| 403 | `accounts.out_of_scope` | pf/accounts: tổ chức (`org_ref`) hoặc tài khoản đích ngoài phạm vi TW → Tỉnh → Xã của người gọi; tổ chức cấp quốc gia chỉ người có phạm vi toàn quốc thao tác |
+| 403 | `accounts.role_not_grantable` | pf/accounts: vai cần cấp, hoặc một vai tài khoản đích đang có, nằm ngoài ma trận cấp vai của người gọi (quản trị tỉnh chỉ `kn_officer`, `coop_manager`); tài khoản `platform_admin` chỉ `platform_admin` thao tác; vai không có trong realm |
+| 403 | `accounts.self_action` | pf/accounts: tự khóa, mở khóa hoặc đổi đơn vị/vai của chính mình |
+| 404 | `accounts.user_not_found` | pf/accounts: không có người dùng Keycloak, hoặc người dùng thuộc tenant khác (không lộ sự tồn tại) |
+| 409 | `accounts.user_exists` | pf/accounts: tên đăng nhập hoặc email đã có trong realm |
+| 409 | `accounts.phone_taken` | pf/accounts: "Số điện thoại này đã được đăng ký cho một tài khoản khác." (trong tenant) |
+| 409 | `accounts.state_conflict` | pf/accounts: khóa tài khoản đã khóa, mở tài khoản đang hoạt động, gửi liên kết cho tài khoản đang khóa |
+| 409 | `accounts.org_inactive` | pf/accounts: gán tài khoản vào tổ chức đã vô hiệu hóa, hoặc mở khóa khi tổ chức của tài khoản đang vô hiệu hóa (kích hoạt lại tổ chức sẽ tự mở) |
+| 422 | `accounts.org_invalid` | pf/accounts: không có tổ chức với `org_ref` trong tenant |
+| 422 | `accounts.import_invalid` | pf/accounts: tệp nhập không phải CSV/XLSX đọc được, thiếu cột bắt buộc (`email`, `org_ref`, `roles`, `full_name` hoặc `first_name`/`last_name`), không có dòng dữ liệu hoặc quá 200 dòng — từ chối cả tệp |
+| 422 | `validation_failed` | pf/accounts: lý do khóa/mở khóa dưới 20 ký tự; email/SĐT/tên đăng nhập sai dạng; thiếu vai; vai sai loại tổ chức (`coop_manager` → "Vui lòng chọn HTX liên kết.") |
+| 502 | `accounts.email_failed` | pf/accounts: Keycloak không gửi được email liên kết (SMTP lỗi) khi gửi lại; khi tạo tài khoản thì trả 201 với `activation_email_sent = false` |
+| 503 | `accounts.dependency_unavailable` | pf/accounts: chưa cấu hình `AG_KC_*`, Keycloak không phản hồi hoặc từ chối tài khoản dịch vụ, chưa nối pf/party |
+
+Nhập hàng loạt: lý do theo dòng dùng nhãn "Thiếu Email", "Sai định dạng Email", "Sai định dạng vai trò", "SĐT đã tồn tại", "Tên đăng nhập hoặc Email đã tồn tại", "Trùng với dòng N trong tệp", "Tổ chức ngoài phạm vi phụ trách", "Vai trò vượt quyền cấp của bạn". Thao tác loạt trả `code` của từng tài khoản trong `items[]`.

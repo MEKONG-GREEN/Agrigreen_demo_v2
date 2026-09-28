@@ -121,8 +121,11 @@ func TestExtractDOCX(t *testing.T) {
 }
 
 func TestExtractRejects(t *testing.T) {
-	if _, err := Extract([]byte("%PDF-1.7 ...")); !errors.Is(err, ErrExtractUnsupported) {
-		t.Fatalf("PDF: %v", err)
+	if _, err := Extract([]byte("%PDF-1.7 ...")); !errors.Is(err, ErrExtractFailed) {
+		t.Fatalf("PDF hỏng: %v", err)
+	}
+	if _, err := Extract([]byte{0xD0, 0xCF, 0x11, 0xE0, 0, 0}); !errors.Is(err, ErrExtractUnsupported) {
+		t.Fatalf(".doc cũ: %v", err)
 	}
 	if _, err := Extract([]byte("PK\x03\x04hỏng")); !errors.Is(err, ErrExtractFailed) {
 		t.Fatalf("zip hỏng: %v", err)

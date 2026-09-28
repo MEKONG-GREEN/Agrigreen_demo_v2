@@ -20,10 +20,6 @@ const (
 // CodeFormatUnsupported: định dạng tệp chưa hỗ trợ.
 const CodeFormatUnsupported = "geo.format_unsupported"
 
-// ErrShapefileUnsupported: chưa có bộ đọc Shapefile thuần Go với giấy phép phù hợp.
-var ErrShapefileUnsupported = violation(CodeFormatUnsupported,
-	"Chưa hỗ trợ Shapefile — hãy xuất sang GeoJSON hoặc KML (hệ toạ độ WGS84, EPSG:4326) rồi tải lên lại")
-
 // MaxFeatures mỗi lần nhập — xử lý đồng bộ dưới 2 giây (R-52).
 const MaxFeatures = 200
 
@@ -79,9 +75,9 @@ func ParseFeatures(format string, data []byte) ([]Feature, error) {
 	case FormatKML:
 		feats, err = parseKML(data)
 	case FormatShapefile:
-		return nil, ErrShapefileUnsupported
+		feats, err = parseShapefileZip(data)
 	default:
-		return nil, violation(CodeFormatUnsupported, "Không nhận ra định dạng tệp — hỗ trợ GeoJSON (.geojson/.json) và KML (.kml)")
+		return nil, violation(CodeFormatUnsupported, "Không nhận ra định dạng tệp — hỗ trợ GeoJSON (.geojson/.json), KML (.kml) và Shapefile (gói .zip)")
 	}
 	if err != nil {
 		return nil, err

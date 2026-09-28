@@ -6,6 +6,7 @@
 //	migrate verify      kiểm các view cổng (v_missing_immutability, v_missing_rls) phải rỗng
 //	migrate maintain    tạo trước phân vùng tháng cho mọi bảng sổ ở mọi cụm (AG_PARTITION_MONTHS_AHEAD, mặc định 24)
 //	migrate verify-chains  chạy shared.verify_chain cho mọi chuỗi trong chain_head; có chỗ đứt → mã thoát 1
+//	migrate anchor      neo mọi cụm một lần + manifest ký số (AG_ANCHOR_DATE, mặc định ngày vừa kết thúc)
 //
 // Mật khẩu vai: AG_DB_PASSWORD_<VAI> hoặc AG_DB_APP_PASSWORD.
 package main
@@ -22,7 +23,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "dùng: migrate bootstrap|up|verify|maintain|verify-chains")
+		fmt.Fprintln(os.Stderr, "dùng: migrate bootstrap|up|verify|maintain|verify-chains|anchor")
 		os.Exit(2)
 	}
 	if err := run(os.Args[1]); err != nil {
@@ -104,6 +105,8 @@ func run(cmd string) error {
 		return maintain(ctx)
 	case "verify-chains":
 		return verifyChains(ctx)
+	case "anchor":
+		return anchorNow(ctx)
 	}
 	return fmt.Errorf("lệnh không hỗ trợ: %s", cmd)
 }

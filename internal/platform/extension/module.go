@@ -63,6 +63,9 @@ func (m *Module) RegisterAdmin(*gin.RouterGroup) {}
 // SyncSource cho pf/sync: chiều xuống "task", "directive".
 func (m *Module) SyncSource() syncport.Source { return app.SyncSource{Svc: m.svc} }
 
+// Staff là cổng đọc danh bạ cán bộ (chỉ mã tham chiếu + đơn vị) cho pf/notify.
+func (m *Module) Staff() port.StaffDirectory { return app.StaffDirectory{Svc: m.svc} }
+
 // SyncSink cho pf/sync: chiều lên "task_update", "field_report".
 func (m *Module) SyncSink() syncport.Sink { return app.SyncSink{Svc: m.svc} }
 

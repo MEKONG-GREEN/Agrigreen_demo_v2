@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
@@ -78,6 +79,15 @@ func buildReportsWorker(ctx context.Context, log *slog.Logger) (*reports.Module,
 	mech := mechanization.New(pools[mechanization.DBRole], clk, mechanization.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Params: md.Params(), Catalogs: md.Catalogs(), AdminUnits: md.AdminUnits(),
 	})
+	// Email người nhận tra qua pf/accounts (Keycloak Admin REST, AG_KC_*); chưa cấu hình → bỏ gửi kèm cảnh báo.
+	kc, err := accounts.DirectoryFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	dir := accounts.New(nil, clk, accounts.Deps{Directory: kc}).MailDirectory()
+	if dir == nil {
+		log.Warn("chưa cấu hình AG_KC_* — lịch gửi báo cáo không tra được email người nhận", "event", "startup", "outcome", "skipped")
+	}
 	mailer, err := reports.SMTPFromEnv(clk)
 	if err != nil {
 		return nil, err
@@ -87,8 +97,7 @@ func buildReportsWorker(ctx context.Context, log *slog.Logger) (*reports.Module,
 	}
 	return reports.New(nil, clk, reports.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(), Store: store,
-		Extension: kn.ReportData(), Mechanization: mech.ReportData(), Mailer: mailer, LinkBase: os.Getenv("AG_WEB_OPS_URL"), Log: log,
-		// Directory: pf/accounts nối khi có; thiếu → bỏ gửi email kèm cảnh báo.
+		Extension: kn.ReportData(), Mechanization: mech.ReportData(), Directory: dir, Mailer: mailer, LinkBase: os.Getenv("AG_WEB_OPS_URL"), Log: log,
 	}), nil
 }
 

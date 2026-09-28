@@ -15,8 +15,8 @@ import (
 
 // Lỗi trích xuất.
 var (
-	// ErrExtractUnsupported: định dạng chưa hỗ trợ trích (PDF: chưa có thư viện
-	// thuần Go giấy phép phù hợp đọc đúng phông tiếng Việt — soạn thủ công).
+	// ErrExtractUnsupported: định dạng/tệp không trích được chữ (.doc cũ, PDF ảnh
+	// scan, PDF mã hóa, phông không giải mã được — soạn thủ công). Lý do cụ thể ở ExtractError.
 	ErrExtractUnsupported = errors.New("content: định dạng chưa hỗ trợ trích nội dung")
 	// ErrExtractFailed: tệp hỏng, không đọc được hoặc không có chữ (ảnh scan).
 	ErrExtractFailed = errors.New("content: không trích được nội dung")
@@ -50,8 +50,10 @@ func Extract(b []byte) (Extracted, error) {
 	switch FileKind(b) {
 	case "zip":
 		return ExtractDOCX(b)
-	case "pdf", "ole":
-		return Extracted{}, ErrExtractUnsupported
+	case "pdf":
+		return ExtractPDF(b)
+	case "ole":
+		return Extracted{}, &ExtractError{ErrExtractUnsupported, "Không hỗ trợ tệp Word 97-2003 (.doc) — hãy lưu thành .docx hoặc PDF"}
 	}
 	return Extracted{}, ErrExtractUnsupported
 }

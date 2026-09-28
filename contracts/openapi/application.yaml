@@ -1847,6 +1847,111 @@ paths:
                         stages: {type: object, additionalProperties: {$ref: "#/components/schemas/MechGroup"}}
                         cooperatives_by_status: {type: object, additionalProperties: {type: integer}}
   # --- hết pf/mechanization ---
+  # --- pf/notify --- (ADR-0015: hộp thư trong app; đẩy CHỈ dữ liệu; đồng bộ ngay)
+
+  /v1/notifications:
+    get:
+      summary: Hộp thư của người gọi (cá nhân + chủ đề theo phạm vi/vai/tổ chức), mới nhất trước
+      operationId: listNotifications
+      parameters:
+        - {name: cursor, in: query, description: "next_cursor của trang trước", schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+        - {name: unread, in: query, description: "true = chỉ chưa đọc", schema: {type: boolean}}
+      responses:
+        "200":
+          description: Một trang. Thông báo chủ đề cũ hơn 90 ngày không hiện.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/Notification"}}
+                  next_cursor: {type: [string, "null"]}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/notifications/unread-count:
+    get:
+      summary: Số thông báo chưa đọc (huy hiệu)
+      operationId: notificationUnreadCount
+      responses:
+        "200":
+          description: Đếm
+          content:
+            application/json:
+              schema: {type: object, required: [unread], properties: {unread: {type: integer, minimum: 0}}}
+  /v1/notifications/read-all:
+    post:
+      summary: Đánh dấu đã đọc mọi thông báo người gọi thấy được
+      operationId: readAllNotifications
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Số đã đánh dấu
+          content:
+            application/json:
+              schema: {type: object, required: [marked], properties: {marked: {type: integer, minimum: 0}}}
+  /v1/notifications/{id}/read:
+    post:
+      summary: Đánh dấu đã đọc một thông báo (đọc lại giữ read_at lần đầu)
+      operationId: readNotification
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thông báo sau khi đọc
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Notification"}
+        "404": {description: "notify.notification_not_found — không có, của người khác, ngoài phạm vi", $ref: "#/components/responses/Problem"}
+  /v1/devices/{id}/push-token:
+    post:
+      summary: Gắn/cập nhật token đẩy FCM cho thiết bị pf/sync của CHÍNH người gọi (gọi mỗi lần khởi động và khi FCM đổi token)
+      operationId: registerPushToken
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, description: "device_id đã đăng ký ở POST /v1/devices", schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PushTokenInput"}
+      responses:
+        "200":
+          description: Đã gắn. Không trả lại token.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PushToken"}
+        "403": {description: "notify.device_unregistered | notify.device_revoked", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {description: "notify.dependency_unavailable", $ref: "#/components/responses/Problem"}
+  /v1/sync/nudge:
+    post:
+      summary: Yêu cầu thiết bị đồng bộ ngay (US-SYNC-02) — gửi thông điệp dữ liệu {kind sync_now}
+      description: |
+        Vai kn_province_admin, kn_national_admin, device_admin, platform_admin. Đúng một trong device_id hoặc unit.
+        unit phải trong phạm vi; device_id phải có token đang dùng và thuộc phạm vi (device_admin/platform_admin: cả tenant).
+        Giới hạn: một đích mỗi 5 phút, mỗi người 30 lần/giờ → 429 + Retry-After.
+      operationId: syncNudge
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/NudgeInput"}
+      responses:
+        "202":
+          description: Đã xếp lần gửi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/NudgeResult"}
+        "403": {description: "forbidden | notify.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "notify.nudge_target_not_found", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "429": {description: "notify.nudge_rate_limited (retry_after_s, header Retry-After)", $ref: "#/components/responses/Problem"}
+  # --- hết pf/notify ---
   # --- pf/reports: mẫu biểu, xuất Excel/PDF bất đồng bộ (mục 12, R-52), điểm kiểm soát xuất dữ liệu (mục 18) ---
   # Mẫu và lịch gửi quản trị qua Admin API (admin.yaml). Mọi yêu cầu xuất và cấp URL tải đi qua MỘT điểm kiểm soát:
   # nhật ký (không PII), hạn mức ngày reports.daily_export_quota (mặc định 50) → 429, vượt reports.export_anomaly_threshold
@@ -2973,6 +3078,52 @@ components:
         overall: {$ref: "#/components/schemas/MechGroup"}
         stages: {type: object, additionalProperties: {$ref: "#/components/schemas/MechGroup"}}
     # --- hết pf/mechanization ---
+    # --- pf/notify ---
+    Notification:
+      type: object
+      required: [id, kind, severity, title, body, deep_link, subject_ref, created_at, read_at, topic]
+      description: Không chứa dữ liệu cá nhân. Cũng là data của entity đồng bộ "notification" (không có topic).
+      properties:
+        id: {type: string, format: uuid}
+        kind: {type: string, enum: [directive, alert, document, task_escalated, sync_conflict, org_deactivated]}
+        severity: {type: string, enum: [urgent, normal]}
+        title: {type: string, maxLength: 300}
+        body: {type: string, maxLength: 2000}
+        deep_link: {type: string, description: "Đường dẫn trong app: /extension/directives/{id}, /documents/{ref}, /extension/tasks/{id}, /sync/conflicts/{id}, /orgs/{ref}"}
+        subject_ref: {type: [string, "null"], format: uuid}
+        created_at: {type: string, format: date-time}
+        read_at: {type: [string, "null"], format: date-time}
+        topic: {type: boolean, description: "true = thông báo chủ đề (theo đơn vị/tổ chức/vai), false = gửi riêng người gọi"}
+    PushTokenInput:
+      type: object
+      required: [token]
+      properties:
+        provider: {type: string, enum: [fcm], default: fcm}
+        token: {type: string, minLength: 20, maxLength: 4096, pattern: "^[A-Za-z0-9_:.-]+$"}
+    PushToken:
+      type: object
+      required: [device_id, provider, platform, active, registered_at, updated_at]
+      properties:
+        device_id: {type: string, format: uuid}
+        provider: {type: string}
+        platform: {type: string, enum: [android, ios]}
+        active: {type: boolean}
+        registered_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    NudgeInput:
+      type: object
+      properties:
+        device_id: {type: string, format: uuid}
+        unit: {type: string, description: "Mã tỉnh/xã hiện hành"}
+    NudgeResult:
+      type: object
+      required: [nudge_id, target_kind, target, devices]
+      properties:
+        nudge_id: {type: string, format: uuid}
+        target_kind: {type: string, enum: [device, unit]}
+        target: {type: string}
+        devices: {type: integer, minimum: 0}
+    # --- hết pf/notify ---
     # --- pf/reports ---
     ReportColumn:
       type: object

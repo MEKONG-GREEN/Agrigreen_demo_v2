@@ -1,10 +1,31 @@
 package port
 
 import (
+	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// DeviceInfo là thông tin tối thiểu của một thiết bị đã đăng ký, cho module khác
+// kiểm thiết bị (vd pf/notify gắn token đẩy). Không có dữ liệu cá nhân.
+type DeviceInfo struct {
+	ID       uuid.UUID
+	ActorRef uuid.UUID  // người đăng ký
+	OrgRef   *uuid.UUID // đơn vị công tác lúc đăng ký
+	Platform string     // android | ios
+	Revoked  bool
+}
+
+// ErrDeviceNotFound: không có thiết bị với mã đó trong tenant.
+var ErrDeviceNotFound = errors.New("sync: không có thiết bị")
+
+// Devices là cổng đọc sổ thiết bị của pf/sync. Tenant truyền tường minh; module gọi
+// lấy nó từ Principal đã xác thực (R-16).
+type Devices interface {
+	Device(ctx context.Context, tenantID, deviceID uuid.UUID) (DeviceInfo, error)
+}
 
 // EntityPubKey là entity chiều xuống do chính pf/sync cung cấp: khóa công khai
 // X25519 của hộ thuộc địa bàn (đọc từ kho định danh qua client.PubKeys). Không

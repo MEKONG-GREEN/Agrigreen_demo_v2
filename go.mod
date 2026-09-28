@@ -12,6 +12,7 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.20.1
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.11.0
+	github.com/ledongthuc/pdf v0.0.0-20260907135840-6c8c28e0e8a0
 	github.com/minio/minio-go/v7 v7.3.0
 	github.com/rabbitmq/amqp091-go v1.15.0
 	github.com/shopspring/decimal v1.4.0
@@ -26,6 +27,7 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.46.0
 	go.opentelemetry.io/otel/trace v1.46.0
 	golang.org/x/crypto v0.57.0
+	golang.org/x/image v0.46.0
 	golang.org/x/net v0.59.0
 	golang.org/x/text v0.42.0
 	golang.org/x/tools v0.50.0

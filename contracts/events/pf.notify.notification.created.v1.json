@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.notify.notification.created/v1",
+  "title": "pf.notify.notification.created — payload",
+  "description": "Một thông báo đã vào hộp thư trong app (pf_notify.notification). Không có tiêu đề/nội dung (đọc qua GET /v1/notifications) và không có dữ liệu cá nhân. Thông báo chủ đề (người nhận theo đơn vị/tổ chức/vai) có topic = true và recipient_ref = null.",
+  "x-event-type": "pf.notify.notification.created",
+  "x-schema-version": 1,
+  "x-producer": "pf/notify",
+  "type": "object",
+  "required": ["notification_id", "kind", "severity", "recipient_ref", "topic", "subject_ref", "source_event_id", "created_at"],
+  "properties": {
+    "notification_id": { "type": "string", "format": "uuid" },
+    "kind":            { "type": "string", "enum": ["directive", "alert", "document", "task_escalated", "sync_conflict", "org_deactivated"] },
+    "severity":        { "type": "string", "enum": ["urgent", "normal"] },
+    "recipient_ref":   { "type": ["string", "null"], "format": "uuid", "description": "actor_ref người nhận; null với thông báo chủ đề" },
+    "topic":           { "type": "boolean" },
+    "subject_ref":     { "type": ["string", "null"], "format": "uuid", "description": "Chỉ đạo, tài liệu, nhiệm vụ, xung đột hoặc tổ chức được nhắc tới" },
+    "source_event_id": { "type": "string", "format": "uuid", "description": "event_id của sự kiện nguồn" },
+    "created_at":      { "type": "string", "format": "date-time" }
+  }
+}

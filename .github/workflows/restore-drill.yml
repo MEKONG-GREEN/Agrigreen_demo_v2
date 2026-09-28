@@ -1,0 +1,139 @@
+# Diễn tập sao lưu → phục hồi trên môi trường SẠCH (mục 22 tài liệu kiến trúc).
+# KHÔNG chạy trên mỗi PR: hằng tuần + chạy tay. Runbook: docs/runbooks/restore-drill.md.
+#
+#   dựng stack + profile backup → sinh dữ liệu tổng hợp (small) → dừng tiến trình ghi
+#   → neo chuỗi → chụp manifest DB → pgBackRest full → objsync sang kho sao lưu
+#   → down -v (giữ 2 volume sao lưu external) → pgBackRest restore vào pgdata rỗng
+#   → dựng hạ tầng sạch → objsync restore → drill check -strict → tải báo cáo.
+name: restore-drill
+
+on:
+  schedule:
+    - cron: "0 19 * * 0"   # 02:00 thứ Hai giờ Việt Nam
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restore-drill
+  cancel-in-progress: false
+
+jobs:
+  restore-drill:
+    name: Diễn tập phục hồi (pgBackRest + kho đối tượng + drill)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      COMPOSE: docker compose -f deploy/compose/docker-compose.yml -f deploy/compose/docker-compose.backup.yml
+      DRILL_TENANT: 0192f000-0000-7000-8000-00000000d211
+      OUT: drill-out
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+
+      - name: Bí mật dev và volume sao lưu (external — down -v không xóa)
+        run: |
+          sh scripts/gen-dev-secrets.sh --force
+          docker volume create agrigreen-backup-pgbackrest
+          docker volume create agrigreen-backup-objects
+          mkdir -p "$OUT"
+
+      - name: docker compose config (base + backup, mọi profile)
+        run: $COMPOSE --profile backup --profile restore config --quiet
+
+      - name: Dựng stack + kho sao lưu
+        run: $COMPOSE --profile backup up -d --build --wait --wait-timeout 900
+
+      - name: pgBackRest stanza-create + check (WAL đẩy được vào kho)
+        run: |
+          $COMPOSE exec -T -u postgres postgres pgbackrest --stanza=agrigreen stanza-create
+          $COMPOSE exec -T -u postgres postgres pgbackrest --stanza=agrigreen check
+
+      - name: Sinh dữ liệu tổng hợp (seed-synthetic small)
+        run: |
+          set -eu; set -a; . deploy/compose/.env; set +a
+          TOKEN=$(TENANT="$DRILL_TENANT" COMPOSE="$COMPOSE" sh scripts/drill/seed-token.sh)
+          test -n "$TOKEN"
+          AG_SEED_TOKEN="$TOKEN" go run ./cmd/seed-synthetic -scale small -seed 1
+
+      - name: Dừng tiến trình ghi (ảnh chụp ổn định)
+        run: $COMPOSE stop web-ops api-platform worker outbox-publisher identity-vault
+
+      - name: Neo chuỗi ngày hôm nay + manifest ký số
+        run: |
+          set -eu; set -a; . deploy/compose/.env; set +a
+          AG_DB_URL="postgres://127.0.0.1:5432/?sslmode=disable" \
+          AG_S3_ENDPOINT=127.0.0.1:9000 AG_S3_BUCKET=agrigreen AG_S3_ACCESS_KEY=agrigreen-app AG_S3_SECRET_KEY="$S3_APP_SECRET_KEY" AG_S3_USE_TLS=false \
+          AG_ANCHOR_DATE=$(TZ=Asia/Ho_Chi_Minh date +%F) \
+            go run ./cmd/migrate anchor
+
+      - name: Chụp manifest DB (số dòng, băm bộ tham số, neo mới nhất)
+        run: |
+          set -eu; set -a; . deploy/compose/.env; set +a
+          AG_PG_ADMIN_URL="postgres://postgres:$PG_SUPERUSER_PASSWORD@127.0.0.1:5432/postgres?sslmode=disable" \
+            go run ./cmd/drill capture -out "$OUT/db-manifest.json"
+
+      - name: pgBackRest full backup
+        run: |
+          $COMPOSE exec -T -u postgres postgres pgbackrest --stanza=agrigreen --type=full backup
+          $COMPOSE exec -T -u postgres postgres pgbackrest --stanza=agrigreen info | tee "$OUT/pgbackrest-info.txt"
+
+      - name: Sao lưu kho đối tượng (backup-writer)
+        run: |
+          set -eu; set -a; . deploy/compose/.env; set +a
+          AG_S3_ENDPOINT=127.0.0.1:9000 AG_S3_BUCKET=agrigreen AG_S3_ACCESS_KEY=agrigreen-app AG_S3_SECRET_KEY="$S3_APP_SECRET_KEY" AG_S3_USE_TLS=false \
+          AG_BACKUP_S3_ENDPOINT=127.0.0.1:9100 AG_BACKUP_S3_BUCKET=agrigreen-backup AG_BACKUP_S3_ACCESS_KEY=backup-writer AG_BACKUP_S3_SECRET_KEY="$S3_BACKUP_WRITER_SECRET" AG_BACKUP_S3_USE_TLS=false \
+            go run ./cmd/objsync backup -label ci -out "$OUT/objects-manifest.json" | tee "$OUT/objsync-backup.json"
+
+      - name: Hủy môi trường (down -v, chỉ còn 2 volume sao lưu)
+        run: |
+          $COMPOSE --profile backup --profile restore down -v --remove-orphans
+          docker volume inspect agrigreen-backup-pgbackrest agrigreen-backup-objects > /dev/null
+          ! docker volume inspect agrigreen_pgdata > /dev/null 2>&1
+
+      - name: pgBackRest restore vào pgdata rỗng (kho gắn chỉ đọc)
+        run: $COMPOSE --profile restore run --rm pgbackrest-restore
+
+      - name: Dựng hạ tầng sạch (không chạy ứng dụng)
+        run: $COMPOSE --profile restore up -d --wait --wait-timeout 600 postgres seaweedfs s3-init backup-s3 backup-s3-init
+
+      - name: Phục hồi kho đối tượng (restore-reader)
+        run: |
+          set -eu; set -a; . deploy/compose/.env; set +a
+          AG_S3_ENDPOINT=127.0.0.1:9000 AG_S3_BUCKET=agrigreen AG_S3_ACCESS_KEY=agrigreen-app AG_S3_SECRET_KEY="$S3_APP_SECRET_KEY" AG_S3_USE_TLS=false \
+          AG_BACKUP_S3_ENDPOINT=127.0.0.1:9100 AG_BACKUP_S3_BUCKET=agrigreen-backup AG_BACKUP_S3_ACCESS_KEY=restore-reader AG_BACKUP_S3_SECRET_KEY="$S3_RESTORE_READER_SECRET" AG_BACKUP_S3_USE_TLS=false \
+            go run ./cmd/objsync restore -manifest latest | tee "$OUT/objsync-restore.json"
+
+      - name: drill check -strict (số dòng, băm tham số, verify_chain, tính lại cân đối, checksum, neo ký số)
+        run: |
+          set -eu; set -a; . deploy/compose/.env; set +a
+          # CI: khóa công khai suy từ khóa ký dev. Production lấy khóa công khai qua kênh riêng.
+          AG_ANCHOR_PUBLIC_KEY=$(go run ./cmd/drill pubkey)
+          export AG_ANCHOR_PUBLIC_KEY
+          AG_PG_ADMIN_URL="postgres://postgres:$PG_SUPERUSER_PASSWORD@127.0.0.1:5432/postgres?sslmode=disable" \
+          AG_S3_ENDPOINT=127.0.0.1:9000 AG_S3_BUCKET=agrigreen AG_S3_ACCESS_KEY=agrigreen-app AG_S3_SECRET_KEY="$S3_APP_SECRET_KEY" AG_S3_USE_TLS=false \
+          AG_BACKUP_S3_ENDPOINT=127.0.0.1:9100 AG_BACKUP_S3_BUCKET=agrigreen-backup AG_BACKUP_S3_ACCESS_KEY=restore-reader AG_BACKUP_S3_SECRET_KEY="$S3_RESTORE_READER_SECRET" AG_BACKUP_S3_USE_TLS=false \
+            go run ./cmd/drill check -manifest "$OUT/db-manifest.json" -objects-manifest latest -report "$OUT/drill-report.json" -strict
+
+      - name: Tải báo cáo diễn tập (không có bí mật — chỉ số dòng, băm, khóa đối tượng)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: restore-drill-${{ github.run_id }}
+          path: ${{ env.OUT }}
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Trạng thái và log khi hỏng
+        if: failure()
+        run: |
+          $COMPOSE --profile backup --profile restore ps -a
+          $COMPOSE --profile backup --profile restore logs --no-color --timestamps postgres backup-s3 seaweedfs api-platform || true
+
+      - name: Dọn
+        if: always()
+        run: |
+          $COMPOSE --profile backup --profile restore down -v --remove-orphans || true
+          docker volume rm agrigreen-backup-pgbackrest agrigreen-backup-objects || true

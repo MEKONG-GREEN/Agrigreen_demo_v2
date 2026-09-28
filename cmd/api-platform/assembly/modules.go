@@ -6,12 +6,15 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
+	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
 	syncmod "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync"
@@ -34,6 +37,9 @@ type External struct {
 	Store objstore.Store
 	// CursorKey: khóa HMAC con trỏ đồng bộ (AG_SYNC_CURSOR_KEY, ≥ 32 byte). Nil → đọc biến môi trường.
 	CursorKey []byte
+	// Accounts: Keycloak Admin REST cho pf/accounts. Nil → đọc AG_KC_*; chưa cấu
+	// hình → các route /v1/accounts/* trả 503 accounts.dependency_unavailable.
+	Accounts accport.Directory
 }
 
 // Modules là các module đã nối — worker và kiểm thử dùng lại port của chúng.
@@ -46,12 +52,14 @@ type Modules struct {
 	Mechanization *mechanization.Module
 	MRV           *mrv.Module
 	Sync          *syncmod.Module
+	Notify        *notify.Module
+	Accounts      *accounts.Module
 	Reports       *reports.Module
 }
 
 // List trả module theo thứ tự gắn route.
 func (m Modules) List() []httpx.Module {
-	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Reports}
+	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports}
 }
 
 // Build là gốc lắp ráp DUY NHẤT: mở pool theo vai của từng module (R-05) và nối
@@ -122,24 +130,47 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
+	// pf/notify cần sổ thiết bị của pf/sync (gắn token đẩy) và là Source của pf/sync:
+	// dùng cổng thiết bị độc lập (syncmod.NewDevices) để không vòng phụ thuộc. API chỉ
+	// xếp lần gửi đẩy; gửi thật ở consumer pf.notify.push của worker.
+	notifyPool, err := pool(notify.DBRole)
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	nt := notify.New(notifyPool, clk, notify.Deps{
+		Scope: pty.ScopeResolver(), Devices: syncmod.NewDevices(syncPool), Staff: kn.Staff(), Units: md.AdminUnits(),
+	})
+
 	snc := syncmod.New(syncPool, clk, syncmod.Deps{
 		Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Params: md.Params(), Vault: ext.Vault,
 		Store: store, CursorKey: cursorKey(ext),
-		Sources: []syncport.Source{g.SyncSource(), cnt.SyncSource(), kn.SyncSource()},
+		Sources: []syncport.Source{g.SyncSource(), cnt.SyncSource(), kn.SyncSource(), nt.SyncSource()},
 		Sinks:   []syncport.Sink{g.SyncSink(), kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink()},
 	})
 
-	// pf/reports: API tạo việc xuất và cấp URL tải; worker dựng tệp (cmd/worker). MailDirectory do pf/accounts nối sau.
+	accPool, err := pool(accounts.DBRole)
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	dir := ext.Accounts
+	if dir == nil {
+		if dir, err = accounts.DirectoryFromEnv(); err != nil {
+			return Modules{}, pools, err
+		}
+	}
+	acc := accounts.New(accPool, clk, accounts.Deps{Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs()})
+
+	// pf/reports: API tạo việc xuất và cấp URL tải; worker dựng tệp (cmd/worker). Địa chỉ email tra qua pf/accounts (MailDirectory).
 	repPool, err := pool(reports.DBRole)
 	if err != nil {
 		return Modules{}, pools, err
 	}
 	rep := reports.New(repPool, clk, reports.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(), Store: store,
-		Extension: kn.ReportData(), Mechanization: mech.ReportData(),
+		Extension: kn.ReportData(), Mechanization: mech.ReportData(), Directory: acc.MailDirectory(),
 	})
 
-	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Reports: rep}, pools, nil
+	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc, Reports: rep}, pools, nil
 }
 
 func cursorKey(ext External) []byte {
