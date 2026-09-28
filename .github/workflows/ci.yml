@@ -169,6 +169,11 @@ jobs:
       run: { working-directory: apps/field-app }
     steps:
       - uses: actions/checkout@v4
+      - name: Giải phóng dung lượng runner (emulator cần > 7 GB)
+        working-directory: .
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL "$AGENT_TOOLSDIRECTORY"/PyPy
+          df -h /
       - name: Bật KVM cho emulator x86_64
         working-directory: .
         run: |
@@ -188,6 +193,7 @@ jobs:
           target: default
           cores: 4
           ram-size: 4096M
+          disk-size: 3000M
           disable-animations: true
           emulator-boot-timeout: 900
           emulator-options: -no-window -no-snapshot -no-metrics -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
