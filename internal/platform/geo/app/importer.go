@@ -13,6 +13,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
@@ -90,7 +91,7 @@ func rejectReason(err error) (string, string) {
 	return pr.Code, pr.Title
 }
 
-// ImportPlots nhập tệp GeoJSON/KML: mỗi đối tượng vùng thành một thửa, cùng quy
+// ImportPlots nhập tệp GeoJSON/KML/Shapefile (.zip): mỗi đối tượng vùng thành một thửa, cùng quy
 // tắc như vẽ tay (≥ 4 điểm, hợp lệ, trong xã, chồng lấn). Đối tượng lỗi bị loại
 // kèm lý do; đối tượng hợp lệ vẫn được nạp. Lỗi hệ thống dừng cả lượt (client
 // thử lại được nhờ idem_key theo từng đối tượng).
@@ -114,6 +115,7 @@ func (s *Service) ImportPlots(ctx context.Context, in ImportInput) (ImportResult
 		return ImportResult{}, violationProblem(err)
 	}
 	res := ImportResult{Format: format}
+	coops := map[string]uuid.UUID{} // Mã HTX → ref (tra một lần mỗi mã)
 	for _, f := range feats {
 		r := FeatureResult{Index: f.Index, Name: f.Name}
 		if f.Err != nil {
@@ -137,6 +139,16 @@ func (s *Service) ImportPlots(ctx context.Context, in ImportInput) (ImportResult
 			bad = problem.Validation.WithField("cooperative_ref", "phải là UUID")
 		} else if ok {
 			cin.CooperativeRef = u
+		} else if code := firstOf(f.Props, "cooperative_code", "ma_htx"); code != "" {
+			ref, err := s.coopByCode(ctx, code, coops)
+			if err != nil {
+				var pr *problem.Problem
+				if !errors.As(err, &pr) {
+					return ImportResult{}, err
+				}
+				bad = err
+			}
+			cin.CooperativeRef = ref
 		}
 		if u, ok, err := propUUID(f.Props, "household_ref"); err != nil {
 			bad = problem.Validation.WithField("household_ref", "phải là UUID")
@@ -171,6 +183,31 @@ func (s *Service) ImportPlots(ctx context.Context, in ImportInput) (ImportResult
 		res.add(r)
 	}
 	return res, nil
+}
+
+// coopByCode tra HTX theo Mã HTX (thuộc tính cooperative_code/ma_htx của đối
+// tượng, vd trường MA_HTX của .dbf) qua party (port.OrgCodes).
+func (s *Service) coopByCode(ctx context.Context, code string, cache map[string]uuid.UUID) (uuid.UUID, error) {
+	if ref, ok := cache[code]; ok {
+		if ref == uuid.Nil {
+			return uuid.Nil, ErrCooperativeInvalid.WithDetail("Không có HTX mã " + code)
+		}
+		return ref, nil
+	}
+	oc, ok := s.Orgs.(partyport.OrgCodes)
+	if s.Orgs == nil || !ok {
+		return uuid.Nil, ErrDependency.WithDetail("chưa nối tra cứu Mã HTX (pf/party)")
+	}
+	o, err := oc.ByCode(ctx, code)
+	switch {
+	case errors.Is(err, partyport.ErrOrgNotFound) || (err == nil && o.Kind != partyport.OrgCooperative):
+		cache[code] = uuid.Nil
+		return uuid.Nil, ErrCooperativeInvalid.WithDetail("Không có HTX mã " + code)
+	case err != nil:
+		return uuid.Nil, ErrDependency.WithDetail("không tra được Mã HTX").WithCause(err)
+	}
+	cache[code] = o.Ref
+	return o.Ref, nil
 }
 
 func (r *ImportResult) add(f FeatureResult) {

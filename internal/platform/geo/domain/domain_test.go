@@ -90,8 +90,11 @@ func TestParseKML(t *testing.T) {
 }
 
 func TestParseFeaturesFormats(t *testing.T) {
-	if _, err := ParseFeatures(FormatShapefile, []byte("PK\x03\x04")); code(err) != CodeFormatUnsupported {
-		t.Fatalf("Shapefile phải trả geo.format_unsupported, được %v", err)
+	if _, err := ParseFeatures(FormatShapefile, []byte("PK\x03\x04")); code(err) != CodeFormat {
+		t.Fatalf("gói .zip hỏng phải trả geo.format_invalid, được %v", err)
+	}
+	if _, err := ParseFeatures("docx", []byte("x")); code(err) != CodeFormatUnsupported {
+		t.Fatalf("định dạng lạ phải trả geo.format_unsupported, được %v", err)
 	}
 	if got := DetectFormat("", "ranh_gioi.shp", nil); got != FormatShapefile {
 		t.Fatalf("nhận dạng .shp = %q", got)

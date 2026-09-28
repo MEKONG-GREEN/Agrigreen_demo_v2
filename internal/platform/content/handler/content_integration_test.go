@@ -21,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/pdftest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -561,7 +562,31 @@ func TestExtract(t *testing.T) {
 	if r.body["title"] != "Quy trình 1 phải 5 giảm" || r.body["body"] != "# Quy trình 1 phải 5 giảm\n\nGiảm lượng giống gieo sạ." || r.body["status"] != "draft_only" {
 		t.Fatalf("trích: %v", r.body)
 	}
-	expect(t, a.natEditor.upload("/v1/documents/extract", "a.pdf", []byte("%PDF-1.7\n..."), ""), http.StatusUnprocessableEntity, "content.extract_unsupported")
+	// PDF có lớp chữ tiếng Việt (tệp mẫu sinh bằng fpdf, phông Unicode nhúng).
+	vi, err := os.ReadFile("../domain/testdata/quy-trinh-vi.pdf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r = a.natEditor.upload("/v1/documents/extract", "quy-trinh.pdf", vi, "")
+	expect(t, r, http.StatusOK, "")
+	if r.body["title"] != "Quy trình canh tác lúa giảm phát thải" || !strings.Contains(r.body["body"].(string), "Không đốt rơm rạ; thu gom để ủ phân hữu cơ") || r.body["status"] != "draft_only" {
+		t.Fatalf("trích PDF: %v", r.body)
+	}
+	enc, err := pdftest.Generate([]pdftest.Block{{Text: "Tai lieu mat"}}, pdftest.Options{Password: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r = a.natEditor.upload("/v1/documents/extract", "mat.pdf", enc, "")
+	expect(t, r, http.StatusUnprocessableEntity, "content.extract_unsupported")
+	if d, _ := r.body["detail"].(string); !strings.Contains(d, "mã hóa") {
+		t.Fatalf("PDF mã hóa phải nêu lý do: %v", r.body)
+	}
+	scan, err := pdftest.Generate(nil, pdftest.Options{ImageOnly: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expect(t, a.natEditor.upload("/v1/documents/extract", "scan.pdf", scan, ""), http.StatusUnprocessableEntity, "content.extract_unsupported")
+	expect(t, a.natEditor.upload("/v1/documents/extract", "a.pdf", []byte("%PDF-1.7\n..."), ""), http.StatusUnprocessableEntity, "content.extract_failed")
 	expect(t, a.natEditor.upload("/v1/documents/extract", "hong.docx", []byte("PK\x03\x04hong"), ""), http.StatusUnprocessableEntity, "content.extract_failed")
 	expect(t, a.natEditor.upload("/v1/documents/extract", "a.txt", []byte("văn bản"), ""), http.StatusUnsupportedMediaType, "content.file_type_not_allowed")
 	expect(t, a.reader89.upload("/v1/documents/extract", "quy-trinh.docx", docxBytes(t), ""), http.StatusForbidden, "forbidden")

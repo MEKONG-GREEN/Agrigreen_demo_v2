@@ -44,6 +44,12 @@ type Orgs interface {
 	Get(ctx context.Context, ref uuid.UUID) (Org, error)
 }
 
+// OrgCodes tra tổ chức theo mã nghiệp vụ (vd Mã HTX trong tệp nhập). Tách khỏi
+// Orgs để không buộc mọi bản cài Orgs phải có; module khác kiểm bằng type assertion.
+type OrgCodes interface {
+	ByCode(ctx context.Context, code string) (Org, error) // không có → ErrOrgNotFound
+}
+
 // ScopeResolver tính phạm vi dữ liệu của người gọi từ Principal.OrgRef (ADR-0009):
 //   - ttkn_national, dcrd, mkg, vai platform_admin → All
 //   - ttkn_province → tỉnh và mọi xã của tỉnh (theo masterdata tại thời điểm hiện tại)

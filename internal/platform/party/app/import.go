@@ -2,9 +2,7 @@ package app
 
 import (
 	"context"
-	"encoding/csv"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -17,11 +15,15 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tabular"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 // MaxImportRows giới hạn số dòng xử lý đồng bộ trong một request (R-52: dưới 2 giây).
 const MaxImportRows = 200
+
+// MaxImportBytes giới hạn dung lượng tệp nhập (CSV hoặc .xlsx).
+const MaxImportBytes = 2 << 20
 
 // Trạng thái từng dòng nhập (KN US-HTX-03, HTX US-HH-02 AC-3).
 const (
@@ -44,9 +46,10 @@ type ImportResult struct {
 	Rows                          []ImportRow
 }
 
-// Cột của tệp mẫu; chấp nhận tên tiếng Việt không dấu làm bí danh.
+// Cột của tệp mẫu. Khóa là tiêu đề đã chuẩn hóa (tabular.NormalizeHeader), nên
+// tiêu đề có dấu như "Họ tên", "Mã HTX", "Ngày vào HTX" cũng khớp.
 var importAliases = map[string]string{
-	"full_name": "full_name", "ho_ten": "full_name",
+	"full_name": "full_name", "ho_ten": "full_name", "ho_va_ten": "full_name",
 	"phone": "phone", "so_dien_thoai": "phone", "sdt": "phone",
 	"national_id": "national_id", "cccd": "national_id",
 	"address": "address", "dia_chi": "address",
@@ -58,8 +61,25 @@ var importAliases = map[string]string{
 
 var importRequired = []string{"full_name", "phone", "cooperative_code"}
 
-// ImportHouseholds nhập nông hộ từ CSV (UTF-8, dòng đầu là tiêu đề). Tệp sai mẫu
-// bị từ chối toàn bộ; dòng lỗi bị loại kèm lý do, chỉ nạp dòng hợp lệ.
+// readImportTable đọc tệp CSV/.xlsx và quy lỗi đọc về party.import_invalid kèm lý do.
+func readImportTable(src io.Reader, lim tabular.Limits) (*tabular.Table, error) {
+	tb, err := tabular.Read(src, lim)
+	if err == nil {
+		return tb, nil
+	}
+	var fe *tabular.FormulaError
+	switch {
+	case errors.As(err, &fe), errors.Is(err, tabular.ErrTooManyRows), errors.Is(err, tabular.ErrTooLarge),
+		errors.Is(err, tabular.ErrTooManyColumns), errors.Is(err, tabular.ErrEncoding), errors.Is(err, tabular.ErrLegacyExcel),
+		errors.Is(err, tabular.ErrEmpty), errors.Is(err, tabular.ErrFormat):
+		return nil, ErrImportInvalid.WithDetail(tabular.Message(err, lim))
+	}
+	return nil, err
+}
+
+// ImportHouseholds nhập nông hộ từ CSV (UTF-8) hoặc Excel .xlsx (trang tính đầu,
+// nhận theo chữ ký tệp); dòng đầu là tiêu đề, ô công thức bị từ chối. Tệp sai
+// mẫu bị từ chối toàn bộ; dòng lỗi bị loại kèm lý do, chỉ nạp dòng hợp lệ.
 func (r *Registry) ImportHouseholds(ctx context.Context, src io.Reader) (ImportResult, error) {
 	p, err := authz.Require(ctx, port.RoleRegistryAdmin, port.RoleKNProvinceAdmin)
 	if err != nil {
@@ -69,41 +89,19 @@ func (r *Registry) ImportHouseholds(ctx context.Context, src io.Reader) (ImportR
 	if err != nil {
 		return ImportResult{}, err
 	}
-	rd := csv.NewReader(src)
-	rd.FieldsPerRecord = -1
-	rd.TrimLeadingSpace = true
-	header, err := rd.Read()
+	tb, err := readImportTable(src, tabular.Limits{MaxBytes: MaxImportBytes, MaxRows: MaxImportRows})
 	if err != nil {
-		return ImportResult{}, ErrImportInvalid.WithDetail("Tệp không đúng mẫu quy định, vui lòng tải mẫu chuẩn và thử lại")
+		return ImportResult{}, err
 	}
-	col := map[string]int{}
-	for i, h := range header {
-		h = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(h, string(rune(0xFEFF))))) // bỏ BOM của Excel
-		if canon, ok := importAliases[h]; ok {
-			col[canon] = i
-		}
-	}
-	var missing []string
-	for _, c := range importRequired {
-		if _, ok := col[c]; !ok {
-			missing = append(missing, c)
-		}
-	}
-	if len(missing) > 0 {
+	col := tb.Columns(importAliases)
+	if missing := tabular.Missing(col, importRequired...); len(missing) > 0 {
 		return ImportResult{}, ErrImportInvalid.WithDetail("Thiếu cột bắt buộc: " + strings.Join(missing, ", "))
-	}
-	records, err := rd.ReadAll()
-	if err != nil {
-		return ImportResult{}, ErrImportInvalid.WithDetail("Sai định dạng file")
-	}
-	if len(records) > MaxImportRows {
-		return ImportResult{}, ErrImportInvalid.WithDetail(fmt.Sprintf("Tối đa %d dòng mỗi lần nhập", MaxImportRows))
 	}
 
 	coops := map[string]uuid.UUID{}
 	var res ImportResult
-	for i, rec := range records {
-		row := ImportRow{Row: i + 2} // dòng 1 là tiêu đề
+	for _, rec := range tb.Rows {
+		row := ImportRow{Row: rec.Line} // số dòng trong tệp (dòng 1 là tiêu đề)
 		in, reason := r.parseImportRow(ctx, p.TenantID, rec, col, coops)
 		if reason == "" {
 			out, err := r.createHousehold(ctx, p, sc, in)
@@ -146,38 +144,31 @@ func rowReason(pr *problem.Problem) string {
 	return pr.Title
 }
 
-func cell(rec []string, col map[string]int, name string) string {
-	i, ok := col[name]
-	if !ok || i >= len(rec) {
-		return ""
-	}
-	return strings.TrimSpace(rec[i])
-}
-
 // parseImportRow đọc một dòng; trả lý do loại (rỗng = hợp lệ).
-func (r *Registry) parseImportRow(ctx context.Context, tid uuid.UUID, rec []string, col map[string]int, coops map[string]uuid.UUID) (CreateHouseholdInput, string) {
+func (r *Registry) parseImportRow(ctx context.Context, tid uuid.UUID, rec tabular.Row, col map[string]int, coops map[string]uuid.UUID) (CreateHouseholdInput, string) {
+	cell := func(name string) string { return rec.Get(col, name) }
 	in := CreateHouseholdInput{Identity: FarmerIdentity{
-		FullName: cell(rec, col, "full_name"), Phone: cell(rec, col, "phone"),
-		NationalID: cell(rec, col, "national_id"), Address: cell(rec, col, "address"),
-	}, CommuneCode: cell(rec, col, "commune_code")}
+		FullName: cell("full_name"), Phone: cell("phone"),
+		NationalID: cell("national_id"), Address: cell("address"),
+	}, CommuneCode: cell("commune_code")}
 	if in.Identity.FullName == "" {
 		return in, "Thiếu trường bắt buộc: full_name"
 	}
 	if in.Identity.Phone == "" {
 		return in, "Thiếu trường bắt buộc: phone"
 	}
-	code := cell(rec, col, "cooperative_code")
+	code := cell("cooperative_code")
 	if code == "" {
 		return in, "Thiếu trường bắt buộc: cooperative_code"
 	}
-	if s := cell(rec, col, "cultivated_area_ha"); s != "" {
+	if s := cell("cultivated_area_ha"); s != "" {
 		d, err := decimal.NewFromString(strings.ReplaceAll(s, ",", "."))
 		if err != nil {
 			return in, "cultivated_area_ha không phải số"
 		}
 		in.CultivatedAreaHa = &d
 	}
-	if s := cell(rec, col, "member_since"); s != "" {
+	if s := cell("member_since"); s != "" {
 		t, err := time.Parse(time.DateOnly, s)
 		if err != nil {
 			return in, "member_since phải có dạng YYYY-MM-DD"

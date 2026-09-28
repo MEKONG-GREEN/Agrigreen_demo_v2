@@ -19,6 +19,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tabular"
 )
 
 // Registry gói app.Registry cho HTTP: sổ tổ chức, HTX, nông hộ.
@@ -36,11 +37,15 @@ func (h Registry) RegisterApp(rg *gin.RouterGroup) {
 // RegisterAdmin gắn route Admin API (MFA bắt buộc ở router).
 func (h Registry) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.POST("/orgs", h.createOrg)
+	rg.GET("/orgs/export.xlsx", h.exportOrgTree)
+	httpx.AllowBody(rg, http.MethodPost, "/orgs/import", app.MaxOrgTreeBytes)
+	rg.POST("/orgs/import", h.importOrgTree)
 	rg.POST("/orgs/:ref/move", h.moveOrg)
 	rg.POST("/orgs/:ref/rename", h.renameOrg)
 	rg.GET("/orgs/:ref/events", h.orgEvents)
 	rg.POST("/cooperatives/:ref/deactivate", h.deactivate)
 	rg.POST("/cooperatives/:ref/reactivate", h.reactivate)
+	httpx.AllowBody(rg, http.MethodPost, "/households/import", app.MaxImportBytes)
 	rg.POST("/households/import", h.importHouseholds)
 }
 
@@ -548,4 +553,42 @@ func (h Registry) importHouseholds(c *gin.Context) {
 		rows = append(rows, importRowDTO{Row: r.Row, Status: r.Status, Reason: strPtr(r.Reason), HouseholdRef: refPtr(r.HouseholdRef)})
 	}
 	c.JSON(http.StatusOK, gin.H{"accepted": out.Accepted, "duplicate": out.Duplicate, "rejected": out.Rejected, "rows": rows})
+}
+
+func (h Registry) exportOrgTree(c *gin.Context) {
+	data, err := h.Reg.ExportOrgTree(c.Request.Context())
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.Header("Content-Disposition", `attachment; filename="cay-to-chuc.xlsx"`)
+	c.Header("Cache-Control", "no-store")
+	c.Data(http.StatusOK, tabular.ContentTypeXLSX, data)
+}
+
+type orgImportRowDTO struct {
+	Row     int      `json:"row"`
+	Status  string   `json:"status"`
+	Code    *string  `json:"code"`
+	OrgRef  *string  `json:"org_ref"`
+	Changes []string `json:"changes"`
+	Reason  *string  `json:"reason"`
+}
+
+func (h Registry) importOrgTree(c *gin.Context) {
+	ctx := c.Request.Context()
+	out, err := h.Reg.ImportOrgTree(ctx, app.OrgImportInput{Body: c.Request.Body, Reason: c.Query("reason"), IdemKey: idempotency.KeyFromContext(ctx)})
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	rows := make([]orgImportRowDTO, 0, len(out.Rows))
+	for _, r := range out.Rows {
+		changes := r.Changes
+		if changes == nil {
+			changes = []string{}
+		}
+		rows = append(rows, orgImportRowDTO{Row: r.Row, Status: r.Status, Code: strPtr(r.Code), OrgRef: refPtr(r.OrgRef), Changes: changes, Reason: strPtr(r.Reason)})
+	}
+	c.JSON(http.StatusOK, gin.H{"created": out.Created, "updated": out.Updated, "unchanged": out.Unchanged, "rejected": out.Rejected, "rows": rows})
 }

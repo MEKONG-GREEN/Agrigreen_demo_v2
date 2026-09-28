@@ -83,7 +83,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | US-ADM-04 đăng nhập, điều hướng theo vai trò và phạm vi | `TestVerifyRejects`, `TestVerifyBuildsPrincipal`, `TestNoOrgSeesNothing`, E2E-05 | **một phần**. Có xác minh token và phạm vi theo `org_ref`; phần điều hướng giao diện chưa có |
 | US-ADM-05/06 PIN 6 số, offline 72 giờ | `apps/field-app/test/auth_test.dart` | **một phần**. Chỉ có kiểm thử Dart, không có trong E2E |
 | US-ADM-07 cây phân cấp 3 cấp | E2E-02, `TestAllowedParent`, `TestScopeProvinceSeesOnlyItsCommunes` | có |
-| US-ADM-08 di chuyển nhánh; nhập/xuất Excel | `TestOrgMoveHistoryAndChain` | **một phần**. Chưa có nhập/xuất cây bằng Excel |
+| US-ADM-08 di chuyển nhánh; nhập/xuất Excel | `TestOrgMoveHistoryAndChain`, `TestOrgTreeExportImportRoundTrip`, `TestOrgTreeExportScoped` | có. `GET /v1/orgs/export.xlsx` → sửa → `POST /v1/orgs/import`; nhập đi qua CreateOrg/MoveOrg/RenameOrg (sổ ghi lý do). Không vô hiệu hóa tổ chức vắng mặt trong tệp |
 
 ### B. Quản lý HTX và nông hộ
 
@@ -91,7 +91,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 |---|---|---|
 | US-HTX-01 danh sách HTX theo phạm vi | E2E-02, E2E-03, `TestScopeProvinceSeesOnlyItsCommunes`, `TestDeactivateReactivateCooperative` | có |
 | US-HTX-02 hồ sơ nông hộ, chống trùng | E2E-03, `TestHouseholdDedupeViaVault` | có |
-| US-HTX-03 nhập hàng loạt | `TestImportHouseholdsCSV` | **một phần**. Hỗ trợ CSV, chưa hỗ trợ tệp Excel |
+| US-HTX-03 nhập hàng loạt | `TestImportHouseholdsCSV`, `TestImportHouseholdsXLSX`, `TestImportHouseholdsXLSXFormulaRejected` | có. CSV UTF-8 và Excel .xlsx (tiêu đề có dấu); ô công thức bị từ chối cả tệp |
 | US-HTX-04 khai báo máy cơ giới hóa | E2E-09, `TestSerialUniqueAndStageDerived`, `TestImportUpdateAndReplace` | có (qua pf/mechanization) |
 | US-HTX-05 đồng bộ nông hộ từ App HTX | — | **chưa có**. App HTX thuộc G2 |
 
@@ -100,7 +100,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | Story | Kiểm thử | Trạng thái |
 |---|---|---|
 | US-PLOT-01 vẽ ranh giới | E2E-05, `TestBoundaryValidationRules`, `TestCorrectionCreatesNewVersion` | có |
-| US-PLOT-02 tải tệp ranh giới | `TestImportGeoJSONAndKML` | **một phần**. Hỗ trợ GeoJSON và KML; Shapefile trả `geo.format_unsupported` |
+| US-PLOT-02 tải tệp ranh giới | `TestImportGeoJSONAndKML`, `TestImportShapefileZip`, `TestParseShapefileZip`, `TestParseShapefileRejects` | có. GeoJSON, KML, Shapefile (.zip: .shp/.dbf/.prj). Chỉ WGS84; VN-2000/hệ phẳng trả `geo.crs_unsupported` — chưa tự chuyển VN-2000 (người dùng chuyển sang EPSG:4326 trước) |
 | US-PLOT-03 cảnh báo chồng lấn | `TestOverlapSameCoopRejectedCrossCoopFlagged`, `TestClassifyOverlaps` | có ở mức module. E2E không kiểm vì quy tắc đang được sửa song song |
 | US-PLOT-04 vẽ offline, tự đồng bộ | E2E-11 (`plot_boundary` accepted; tam giác → rejected), `TestSyncSinkIdempotentAndConflict` | có (phía máy chủ) |
 
@@ -118,7 +118,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 |---|---|---|
 | US-LIB-01 soạn và xuất bản theo vùng | E2E-06, `TestPublishNewVersionKeepsOld`, `TestProvinceEditorScope`, `TestAuthorCannotSelfApprove` | có |
 | US-LIB-02 hướng dẫn đặc thù địa phương | E2E-06, `TestLocalSupplementScope` | có |
-| US-LIB-03 trích nội dung từ tệp | `TestExtract` | **một phần**. Trích được DOCX; PDF trả `content.extract_unsupported` |
+| US-LIB-03 trích nội dung từ tệp | `TestExtract`, `TestExtractPDFVietnamese`, `TestExtractPDFRejects`, `TestParseToUnicode` | có. DOCX và PDF có lớp chữ (tiếng Việt có dấu). PDF ảnh scan/mã hóa trả `content.extract_unsupported` kèm lý do (không OCR) |
 | US-LIB-04 tra cứu | `TestSearchAccentInsensitive`, E2E-06 | có |
 | US-LIB-05 lưu và tải offline | E2E-11 (pull `document`), `TestSyncRetireTombstone` | **một phần**. Có đồng bộ xuống máy; chưa có danh mục cá nhân |
 | US-LIB-06 thông báo nội dung mới | E2E-06 (`pf.content.document.published` trong outbox), `TestAlertPublishedEvent` | **một phần**. Có sự kiện; chưa có kênh đẩy thông báo tới máy |
@@ -156,7 +156,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | FN-02 | Danh mục và cấu hình | E2E-01, E2E-09 (ngưỡng 85/60 đọc từ tham số đã duyệt), `TestSelfApprovalBlocked` | có |
 | FN-03 | Hồ sơ HTX | E2E-02, `TestTaxCodeUniquePerTenant` | có |
 | FN-04 | Chủ sở hữu máy | E2E-09 (vault, trùng SĐT → 409), `TestCodesAssignedOnceAndStableOnProvinceMove` | có |
-| FN-05 | Hồ sơ máy | E2E-09, `TestSerialUniqueAndStageDerived`, `TestMachineCountAtT`, `TestImportUpdateAndReplace` | có |
+| FN-05 | Hồ sơ máy | E2E-09, `TestSerialUniqueAndStageDerived`, `TestMachineCountAtT`, `TestImportUpdateAndReplace`, `TestImportMachinesXLSXReplace` | có. Nhập CSV hoặc Excel .xlsx |
 | FN-06 | Lịch mùa vụ và diện tích theo vụ | E2E-09 (nhập tay), `TestLockedManualAreaNotOverwritten`, `TestValidateCalendar` | có |
 | FN-07 | Tích hợp App HTX | `TestResolveAreaQT03` (chỉ port `AreaFeed`) | **chưa có** luồng thật, thuộc G2 |
 | FN-08 | Bản đồ và trực quan hóa | `TestSummarizeBottleneck` (API coverage theo cấp) | **một phần**. Có API đọc; chưa có kiểm thử giao diện bản đồ |
@@ -169,7 +169,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | FN | Nội dung | Kiểm thử | Trạng thái |
 |---|---|---|---|
 | FN-04 | Ranh giới HTX/Hub | `TestAdminBoundaryAndCommuneContainment` | **một phần**. Có ranh giới hành chính và toạ độ điểm của HTX; chưa có polygon HTX và Hub (thuộc mkg/hub, G2+) |
-| FN-05 | Thửa ruộng: vẽ, sửa, nhập | E2E-05, `TestImportGeoJSONAndKML`, `TestCorrectionCreatesNewVersion`, `TestBBoxLimitAndScope` | có. "Xóa" là `retire`, không xóa cứng (X1) |
+| FN-05 | Thửa ruộng: vẽ, sửa, nhập | E2E-05, `TestImportGeoJSONAndKML`, `TestImportShapefileZip`, `TestCorrectionCreatesNewVersion`, `TestBBoxLimitAndScope` | có. "Xóa" là `retire`, không xóa cứng (X1) |
 | FN-06 | Kho/Hub | — | **chưa có**, thuộc G2+ |
 | FN-07 | Dữ liệu nền: ranh giới hành chính theo zoom | `TestAdminBoundaryAndCommuneContainment` | **một phần**. Chưa có giao thông, tự nhiên, tile |
 
