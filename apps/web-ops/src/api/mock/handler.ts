@@ -29,7 +29,7 @@ import {
 } from "./data";
 import { adminOpsRoutes, headerKey, parseCsv } from "./admin-ops";
 import { hasRole, inScope, isZip, json, norm, omit, pageSlice, paginate, problem, scopeUnits, type Route } from "./http";
-import { coverage as mechCoverage, dashboard as mechDashboard, findRun, RUNS } from "./mechanization";
+import { coverage as mechCoverage, dashboard as mechDashboard, findRun, panel as mechPanel, RUNS } from "./mechanization";
 import { communeKpi, MISSING_BOUNDARY, opsRoutes, resolveUnit, sumKpi } from "./ops";
 import { rosterRoutes } from "./roster";
 import { personaFromAuthHeader, type MockPersona } from "./personas";
@@ -322,6 +322,17 @@ const appRoutes: Route[] = [
       const stored = findRun({ run_id: q("run_id"), season_code: q("season_code"), season_year: Number(q("season_year")) || null });
       if (!stored) return problem(404, "mechanization.run_not_found", "Run not found");
       return json(mechCoverage(stored, { level: q("level") ?? "province", province_code: q("province_code"), commune_code: q("commune_code"), farm_stage: q("farm_stage") }));
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/mechanization\/cooperatives\/([\w-]+)\/panel$/,
+    handler: ({ url, persona, params }) => {
+      if (!cghAllowed(persona)) return problem(403, "forbidden", "Forbidden");
+      const q = (k: string) => url.searchParams.get(k);
+      const stored = findRun({ run_id: q("run_id"), season_code: q("season_code"), season_year: Number(q("season_year")) || null }) ?? RUNS[0]!;
+      const p = mechPanel(stored, params[0] ?? "");
+      return p ? json(p) : problem(422, "mechanization.cooperative_invalid", "Cooperative invalid");
     },
   },
   {

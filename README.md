@@ -2,7 +2,7 @@
 
 Nền tảng AgriGreen được viết lại từ đầu theo **Thiết kế kiến trúc hệ thống v3.0** (15/09/2026). Hệ thống là một Go modular monolith, chạy trên PostgreSQL 17 + PostGIS.
 
-**Trạng thái (29/09/2026):** đã chốt mã cổng **G1** (ĐTK 1: cán bộ khuyến nông, TTKNQG, Cục Kinh tế hợp tác; một tenant). Đối chiếu yêu cầu → kiểm thử: [docs/uat/g1-acceptance.md](docs/uat/g1-acceptance.md) — 94 yêu cầu, 79 đạt, 6 một phần (chủ yếu chờ khách chốt), 9 thuộc G2/G3. Kế hoạch G1–G6: [docs/roadmap.md](docs/roadmap.md).
+**Trạng thái (29/09/2026):** đã chốt mã cổng **G1** (ĐTK 1: cán bộ khuyến nông, TTKNQG, Cục Kinh tế hợp tác; một tenant). Đối chiếu yêu cầu → kiểm thử: [docs/uat/g1-acceptance.md](docs/uat/g1-acceptance.md) — 94 yêu cầu, 80 đạt, 5 một phần (chủ yếu chờ khách chốt), 9 thuộc G2/G3. Kế hoạch G1–G6: [docs/roadmap.md](docs/roadmap.md).
 
 ## Đã có trong G1
 
@@ -20,7 +20,7 @@ Nền tảng AgriGreen được viết lại từ đầu theo **Thiết kế ki�
 | `pf/accounts` | Tài khoản cán bộ qua Keycloak Admin REST, ma trận cấp vai, khóa/mở, thao tác loạt, nhập tệp | kiểm thử + emulator Keycloak |
 | `pf/reports` | Xuất Excel/PDF bất đồng bộ từ mẫu có phiên bản, lịch gửi email (SMTP TLS) | kiểm thử + SMTP giả |
 | `vault/identity` | Kho định danh tách database: X25519 theo hộ, blind index, mở DEK có mục đích, xóa được (RB-3) | E2E-14, `TestErasure` |
-| `apps/web-ops` | Next.js: vận hành KN (TW/tỉnh/xã), cổng CGH cho Cục, 8 màn quản trị | Vitest 115, Playwright 25 |
+| `apps/web-ops` | Next.js: vận hành KN (TW/tỉnh/xã), cổng CGH cho Cục (ghim HTX gom cụm, panel máy, tra cứu), 8 màn quản trị | Vitest 119, Playwright 27 |
 | `apps/field-app` | Flutter Android: ngoại tuyến 72 giờ + PIN, SQLCipher, hàng đợi đúng một lần, vẽ ranh giới, ảnh mã hóa, hộp thư/đẩy, danh bạ trực | 143 kiểm thử + emulator |
 | Công cụ | `cmd/seed-synthetic` (R-95), `cmd/drill` + `cmd/objsync` (diễn tập phục hồi), `cmd/worker` (job, consumer, lịch báo cáo) | kiểm thử của từng lệnh |
 

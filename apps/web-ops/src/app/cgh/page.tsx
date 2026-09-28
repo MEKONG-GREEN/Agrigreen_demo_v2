@@ -1,10 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { loadBoundaries } from "@/api/adapters/boundaries";
+import { loadBoundaries, mergeBoundaries } from "@/api/adapters/boundaries";
 import { unitLabel } from "@/api/adapters/units";
 import { ForecastSection } from "@/cgh/ForecastSection";
 import { unwrap } from "@/api/client";
+import { collectPages } from "@/api/pagination";
+import { CoopPanel } from "@/cgh/CoopPanel";
+import { buildPins, communeCentroids, pinsToGeoJSON, searchPins } from "@/cgh/pins";
 import type { MechCoverageItem, MechGroup } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { COVERAGE_STYLES, fromMechStatus, thresholdsFromRun } from "@/cgh/coverage";
@@ -43,6 +46,9 @@ export default function CghPortalPage() {
   const [runId, setRunId] = useState("");
   const [stage, setStage] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
+  const [coopSel, setCoopSel] = useState<string | null>(null);
+  const [focus, setFocus] = useState<{ lng: number; lat: number; zoom?: number; key: string } | null>(null);
+  const [query, setQuery] = useState("");
 
   const runs = useAsync(() => unwrap(api.GET("/v1/mechanization/balance-runs")), [api]);
   const stages = useAsync(() => unwrap(api.GET("/v1/masterdata/catalogs/{catalog}", { params: { path: { catalog: "farm_stage" } } })), [api]);
@@ -57,11 +63,49 @@ export default function CghPortalPage() {
     [api, runId, stage],
   );
   const areas = useAsync(() => loadBoundaries(api, { level: "province" }), [api]);
-  // Tên và Mã HTX (G-10) từ kết quả cân đối cấp HTX — dùng cho bảng dự báo.
+  // Kết quả cân đối cấp HTX (G-10: tên, Mã HTX) — ghim bản đồ (FN-08 B2) và bảng dự báo.
   const coopLevel = useAsync(
-    () => unwrap(api.GET("/v1/mechanization/coverage", { params: { query: { level: "cooperative", run_id: runId || undefined } } })),
-    [api, runId],
+    () =>
+      unwrap(
+        api.GET("/v1/mechanization/coverage", { params: { query: { level: "cooperative", run_id: runId || undefined, farm_stage: stage || undefined } } }),
+      ),
+    [api, runId, stage],
   );
+  // Vị trí HTX từ hồ sơ pf/party (Cục đọc được hồ sơ HTX, chỉ xem).
+  const coopLocs = useAsync(
+    () => collectPages((cursor) => unwrap(api.GET("/v1/cooperatives", { params: { query: { cursor, limit: 200 } } })), 5000),
+    [api],
+  );
+  const locMap = useMemo(() => new Map((coopLocs.data ?? []).map((c) => [c.ref, c])), [coopLocs.data]);
+  // HTX chưa có toạ độ → tâm xã: chỉ tải ranh giới xã của các tỉnh cần đặt "vị trí tạm".
+  const needProvinces = useMemo(() => {
+    if (!coopLocs.data) return "";
+    const set = new Set<string>();
+    for (const i of coopLevel.data?.items ?? []) {
+      const l = i.cooperative_ref ? locMap.get(i.cooperative_ref) : undefined;
+      if ((!l?.location || l.location_provisional) && i.province_code) set.add(i.province_code);
+    }
+    return Array.from(set).sort().join(",");
+  }, [coopLevel.data, locMap, coopLocs.data]);
+  const communeAreas = useAsync(
+    async () =>
+      needProvinces
+        ? mergeBoundaries(await Promise.all(needProvinces.split(",").map((p) => loadBoundaries(api, { level: "commune", parent: p }, 9))))
+        : null,
+    [api, needProvinces],
+  );
+  const centroids = useMemo(() => communeCentroids(communeAreas.data?.collection), [communeAreas.data]);
+  const { pins, unplaced } = useMemo(() => buildPins(coopLevel.data?.items ?? [], locMap, centroids, stage), [coopLevel.data, locMap, centroids, stage]);
+  const pinsFc = useMemo(() => pinsToGeoJSON(pins), [pins]);
+  const pinByRef = useMemo(() => new Map(pins.map((p) => [p.ref, p])), [pins]);
+  const hits = useMemo(() => searchPins(pins, query), [pins, query]);
+  const stageNames = useMemo(() => new Map((stages.data?.items ?? []).map((s) => [s.code, s.name])), [stages.data]);
+  const provisionalCount = useMemo(() => pins.filter((p) => p.provisional).length, [pins]);
+  const openCoop = (ref: string, fly: boolean) => {
+    setCoopSel(ref);
+    const p = pinByRef.get(ref);
+    if (fly && p) setFocus((f) => ({ lng: p.lng, lat: p.lat, zoom: 13, key: `${ref}#${Number(f?.key.split("#")[1] ?? 0) + 1}` }));
+  };
   const coopNames = useMemo(
     () => new Map((coopLevel.data?.items ?? []).filter((i) => i.cooperative_ref).map((i) => [i.cooperative_ref!, { name: i.name, code: i.cooperative_code ?? null }])),
     [coopLevel.data],
@@ -141,6 +185,33 @@ export default function CghPortalPage() {
             </select>
           </div>
           <CoverageLegend thresholds={thresholds} legend={coverage.data?.legend} />
+          <p className="small mute">
+            Ghim HTX: vòng rỗng = <b style={{ display: "inline" }}>vị trí tạm</b> (chưa có toạ độ, đặt ở tâm xã). Phóng to để tách cụm.
+          </p>
+          <div className="field">
+            <label htmlFor="cgh-search">Tra cứu nhanh HTX (tên, Mã HTX, xã)</label>
+            <input id="cgh-search" className="input" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="VD: HTX8200001, Mỹ An" />
+          </div>
+          {query.trim() ? (
+            hits.length === 0 ? (
+              <p className="small" role="status" style={{ color: "var(--amber)" }}>
+                Không có kết quả phù hợp
+              </p>
+            ) : (
+              <ul className="list-plain" aria-label="Kết quả tra cứu HTX">
+                {hits.map((h) => (
+                  <li key={h.ref}>
+                    <button type="button" style={{ textAlign: "left", width: "100%" }} onClick={() => openCoop(h.ref, true)}>
+                      <b style={{ display: "inline" }}>{h.name}</b> <span className="mute small">{h.code ?? ""} · {h.communeName ?? h.communeCode ?? ""}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : null}
+          <p className="small mute" data-testid="pin-count">
+            {formatInt(pins.length)} HTX trên bản đồ · {formatInt(provisionalCount)} vị trí tạm{unplaced > 0 ? ` · ${formatInt(unplaced)} chưa định vị được` : ""}
+          </p>
           {run && run.missing_norms.length > 0 ? (
             <p className="small" style={{ color: "var(--amber)" }}>
               Chưa cấu hình định mức: {run.missing_norms.join(", ")}
@@ -160,13 +231,24 @@ export default function CghPortalPage() {
           <MapView
             label="Bản đồ mức đáp ứng máy theo tỉnh"
             areas={areaFc}
+            points={pinsFc}
+            clusterPoints
+            onPointClick={(ref) => openCoop(ref, false)}
+            focus={focus}
             describeAreas
-            onAreaClick={(c) => setSelected((s) => (s === c ? null : c))}
+            onAreaClick={(c) => {
+              setCoopSel(null);
+              setSelected((s) => (s === c ? null : c));
+            }}
             height={480}
           />
         </div>
 
         <aside className="card sec cgh-right" aria-label="Chi tiết theo tỉnh">
+          {coopSel && pinByRef.get(coopSel) ? (
+            <CoopPanel pin={pinByRef.get(coopSel)!} runId={runId} stageNames={stageNames} onClose={() => setCoopSel(null)} />
+          ) : (
+          <>
           <div className="sec-h">
             <h2>{sel ? sel.name : "Theo tỉnh"}</h2>
             {sel ? (
@@ -193,6 +275,8 @@ export default function CghPortalPage() {
               );
             })}
           </ul>
+          </>
+          )}
         </aside>
       </div>
 
