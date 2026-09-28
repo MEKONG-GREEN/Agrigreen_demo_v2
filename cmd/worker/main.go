@@ -54,6 +54,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/opsjobs"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
@@ -100,6 +101,10 @@ func selected(list, name string) bool {
 func run(log *slog.Logger, mods, jobs string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// RB-7: production chỉ được nối tới đích trong lãnh thổ (internal/shared/residency).
+	if err := residency.CheckEnv(); err != nil {
+		return err
+	}
 	shutdown, err := telemetry.Setup(ctx, "worker")
 	if err != nil {
 		return err

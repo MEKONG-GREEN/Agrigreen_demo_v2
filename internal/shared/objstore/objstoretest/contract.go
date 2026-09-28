@@ -125,6 +125,26 @@ func Contract(t *testing.T, s objstore.Store, prefix string) {
 		}
 	})
 
+	// Lister (công cụ vận hành, mục 22): liệt kê đúng tiền tố, thứ tự khóa, có băm.
+	t.Run("list_prefix", func(t *testing.T) {
+		l, ok := s.(objstore.Lister)
+		if !ok {
+			t.Skip("hiện thực không có Lister")
+		}
+		var keys []string
+		err := l.List(ctx, prefix+"/evidence/", func(i objstore.Info) error {
+			if i.SHA256 == "" || i.Size <= 0 {
+				t.Errorf("thiếu băm/kích thước: %+v", i)
+			}
+			keys = append(keys, i.Key)
+			return nil
+		})
+		want := []string{prefix + "/evidence/a.bin", prefix + "/evidence/race.bin"}
+		if err != nil || strings.Join(keys, ",") != strings.Join(want, ",") {
+			t.Fatalf("liệt kê: %v %v, muốn %v", keys, err, want)
+		}
+	})
+
 	// Không có Delete trong interface: kiểm ở mức kiểu.
 	t.Run("no_delete_method", func(t *testing.T) {
 		if _, ok := s.(interface {
