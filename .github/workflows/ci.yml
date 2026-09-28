@@ -181,10 +181,14 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: "17" }
+        with: { distribution: temurin, java-version: "17", cache: gradle, cache-dependency-path: "apps/field-app/android/**/*.gradle*" }
       - uses: subosito/flutter-action@v2
         with: { flutter-version: "3.47.5", channel: stable, cache: true }
       - run: flutter pub get --enforce-lockfile
+      # Build APK (Gradle + CMake cho SQLCipher, ~10 phút) TRƯỚC khi bật emulator: chạy đồng thời thì
+      # QEMU bị treo ("hanging thread") và emulator chết giữa chừng. Lần build trong script chỉ còn tăng dần.
+      - name: Build APK kiểm thử trước khi bật emulator
+        run: flutter build apk --debug -t integration_test/app_flow_test.dart
       - name: flutter test integration_test
         uses: reactivecircus/android-emulator-runner@v2
         with:
