@@ -38,10 +38,11 @@ func fixtureUnits() ([]Unit, map[string][]Unit) {
 	communes := map[string][]Unit{}
 	for _, p := range provs {
 		for i := 1; i <= 6; i++ {
-			communes[p.Code] = append(communes[p.Code], Unit{Code: fmt.Sprintf("%s-X-XA-%d", p.Code, i), Name: fmt.Sprintf("Xã %d", i), Parent: p.Code})
+			// Mã giả lập chỉ dùng trong kiểm thử (không phải mã TCTK).
+			communes[p.Code] = append(communes[p.Code], Unit{Code: fmt.Sprintf("FX-%s-%d", p.Code, i), Name: fmt.Sprintf("Xã %d", i), Parent: p.Code})
 		}
 	}
-	communes["92"][0].Code = "92-X-NINH-KIEU" // xã có toạ độ trong bảng
+	communes["92"][0].Code, communes["92"][0].Name = "31135", "Phường Ninh Kiều" // xã có toạ độ trong bảng (mã QĐ 19/2025)
 	return provs, communes
 }
 
