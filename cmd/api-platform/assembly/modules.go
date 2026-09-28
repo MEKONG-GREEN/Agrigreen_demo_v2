@@ -6,6 +6,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
+	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
@@ -33,6 +35,9 @@ type External struct {
 	Store objstore.Store
 	// CursorKey: khóa HMAC con trỏ đồng bộ (AG_SYNC_CURSOR_KEY, ≥ 32 byte). Nil → đọc biến môi trường.
 	CursorKey []byte
+	// Accounts: Keycloak Admin REST cho pf/accounts. Nil → đọc AG_KC_*; chưa cấu
+	// hình → các route /v1/accounts/* trả 503 accounts.dependency_unavailable.
+	Accounts accport.Directory
 }
 
 // Modules là các module đã nối — worker và kiểm thử dùng lại port của chúng.
@@ -45,11 +50,12 @@ type Modules struct {
 	Mechanization *mechanization.Module
 	MRV           *mrv.Module
 	Sync          *syncmod.Module
+	Accounts      *accounts.Module
 }
 
 // List trả module theo thứ tự gắn route.
 func (m Modules) List() []httpx.Module {
-	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync}
+	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Accounts}
 }
 
 // Build là gốc lắp ráp DUY NHẤT: mở pool theo vai của từng module (R-05) và nối
@@ -127,7 +133,19 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		Sinks:   []syncport.Sink{g.SyncSink(), kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink()},
 	})
 
-	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc}, pools, nil
+	accPool, err := pool(accounts.DBRole)
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	dir := ext.Accounts
+	if dir == nil {
+		if dir, err = accounts.DirectoryFromEnv(); err != nil {
+			return Modules{}, pools, err
+		}
+	}
+	acc := accounts.New(accPool, clk, accounts.Deps{Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs()})
+
+	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Accounts: acc}, pools, nil
 }
 
 func cursorKey(ext External) []byte {

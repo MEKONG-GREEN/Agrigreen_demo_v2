@@ -42,6 +42,15 @@ x-oidc-env: &oidc-env
   AG_OIDC_AUDIENCE: agrigreen-api
   AG_OIDC_JWKS_URL: http://keycloak:8080/realms/agrigreen/protocol/openid-connect/certs
 
+# Keycloak Admin REST cho pf/accounts (tài khoản dịch vụ agrigreen-accounts, realm dev).
+x-kc-admin-env: &kc-admin-env
+  AG_KC_ADMIN_URL: http://keycloak:8080
+  AG_KC_REALM: agrigreen
+  AG_KC_CLIENT_ID: agrigreen-accounts
+  AG_KC_CLIENT_SECRET: ${AG_KC_CLIENT_SECRET:?chạy scripts/gen-dev-secrets để bổ sung AG_KC_CLIENT_SECRET vào deploy/compose/.env}
+  AG_KC_ACTIONS_CLIENT_ID: agrigreen-web-ops
+  AG_KC_ACTIONS_REDIRECT_URI: http://localhost:3000/
+
 x-s3-env: &s3-env
   AG_S3_ENDPOINT: seaweedfs:9000
   AG_S3_BUCKET: ${AG_S3_BUCKET:-agrigreen}
@@ -134,6 +143,8 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?chạy scripts/gen-dev-secrets}
+      # Thay placeholder ${AG_KC_CLIENT_SECRET} của client agrigreen-accounts khi nhập realm.
+      AG_KC_CLIENT_SECRET: ${AG_KC_CLIENT_SECRET:?chạy scripts/gen-dev-secrets}
       # Issuer cố định theo địa chỉ trình duyệt; container khác gọi keycloak:8080 (backchannel).
       KC_HOSTNAME: http://localhost:8180
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
@@ -245,7 +256,7 @@ services:
       keycloak: { condition: service_healthy }
       identity-vault: { condition: service_started }
     environment:
-      <<: [*otel-env, *oidc-env, *s3-env]
+      <<: [*otel-env, *oidc-env, *s3-env, *kc-admin-env]
       AG_HTTP_ADDR: ":8080"
       AG_ADMIN_HTTP_ADDR: ":8082"
       AG_PF_DB_URL: postgres://pgbouncer:6432/?sslmode=disable
@@ -278,8 +289,9 @@ services:
       s3-init: { condition: service_completed_successfully }
       rabbitmq: { condition: service_healthy }
       pgbouncer: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
     environment:
-      <<: [*otel-env, *s3-env]
+      <<: [*otel-env, *s3-env, *kc-admin-env]
       # Consumer đi qua PgBouncer; job vận hành + khóa leader nối THẲNG PostgreSQL (khóa mức phiên).
       AG_DB_URL: postgres://pgbouncer:6432/?sslmode=disable
       AG_DB_VIA_PGBOUNCER: "1"

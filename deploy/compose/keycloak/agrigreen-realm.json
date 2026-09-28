@@ -51,10 +51,20 @@
       { "name": "vault_evidence_viewer", "description": "Kho định danh: mở DEK để xem ảnh minh chứng (có mục đích và đồng ý)" },
       { "name": "vault_eraser", "description": "[MFA] Kho định danh: xóa định danh theo yêu cầu (RB-3)" },
       { "name": "vault_pubkey_sync", "description": "Thiết bị hiện trường tải khóa công khai của hộ theo địa bàn" },
+      { "name": "account_admin", "description": "[MFA] Quản trị tài khoản toàn quốc: tạo, khóa/mở khóa, phân quyền theo ma trận cấp vai (pf/accounts, KN US-ADM-01..03)" },
+      { "name": "account_admin_province", "description": "[MFA] Quản trị tài khoản của một tỉnh: chỉ cấp kn_officer/coop_manager cho tổ chức trong tỉnh (pf/accounts)" },
       { "name": "offline_access", "description": "Refresh token ngoại tuyến (app hiện trường, tối đa 72 giờ không trực tuyến — mục 15)" },
       { "name": "default-roles-agrigreen", "description": "Vai mặc định của realm — KHÔNG gồm vai nghiệp vụ nào", "composite": true, "composites": { "realm": ["offline_access"] } }
     ]
   },
+  "users": [
+    {
+      "username": "service-account-agrigreen-accounts",
+      "enabled": true,
+      "serviceAccountClientId": "agrigreen-accounts",
+      "clientRoles": { "realm-management": ["manage-users", "view-users", "query-users"] }
+    }
+  ],
   "defaultRole": { "name": "default-roles-agrigreen", "composite": true },
   "defaultDefaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"],
   "defaultOptionalClientScopes": ["offline_access"],
@@ -72,7 +82,7 @@
         "subComponents": {},
         "config": {
           "kc.user.profile.config": [
-            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"displayName\":\"${email}\",\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"tenant_id\",\"displayName\":\"Tenant (UUID)\",\"validations\":{\"pattern\":{\"pattern\":\"^[0-9a-fA-F-]{36}$\",\"error-message\":\"tenant_id phải là UUID\"}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false},{\"name\":\"org_ref\",\"displayName\":\"Đơn vị công tác (org_ref, UUID)\",\"validations\":{\"pattern\":{\"pattern\":\"^[0-9a-fA-F-]{36}$\",\"error-message\":\"org_ref phải là UUID\"}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes, which refer to user metadata\"}]}"
+            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"displayName\":\"${email}\",\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"tenant_id\",\"displayName\":\"Tenant (UUID)\",\"validations\":{\"pattern\":{\"pattern\":\"^[0-9a-fA-F-]{36}$\",\"error-message\":\"tenant_id phải là UUID\"}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false},{\"name\":\"phone_number\",\"displayName\":\"Số điện thoại\",\"validations\":{\"pattern\":{\"pattern\":\"^0[0-9]{9}$\",\"error-message\":\"phone_number phải gồm 10 chữ số, bắt đầu bằng 0\"}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false},{\"name\":\"org_ref\",\"displayName\":\"Đơn vị công tác (org_ref, UUID)\",\"validations\":{\"pattern\":{\"pattern\":\"^[0-9a-fA-F-]{36}$\",\"error-message\":\"org_ref phải là UUID\"}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes, which refer to user metadata\"}]}"
           ]
         }
       }
@@ -149,6 +159,31 @@
     }
   ],
   "clients": [
+    {
+      "clientId": "agrigreen-accounts",
+      "name": "Tài khoản dịch vụ pf/accounts — Keycloak Admin REST (manage-users, view-users, query-users)",
+      "description": "Bí mật lấy từ biến môi trường AG_KC_CLIENT_SECRET lúc nhập realm (scripts/gen-dev-secrets). Không đăng nhập người dùng.",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${AG_KC_CLIENT_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": ["basic", "roles"]
+    },
+    {
+      "clientId": "agrigreen-seed",
+      "name": "CHỈ Local/Dev — cmd/seed-synthetic lấy token (mật khẩu + OTP) cho người dùng quản trị dev",
+      "description": "KHÔNG BAO GIỜ tạo client này ở staging/production: bật direct access grants (ROPC). Chỉ có trong realm dev deploy/compose/keycloak.",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"]
+    },
     {
       "clientId": "agrigreen-api",
       "name": "AgriGreen Application API + Admin API (audience)",

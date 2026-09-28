@@ -24,6 +24,9 @@
 //	AG_ANCHOR_KEY_ID                   (tùy chọn) mã khóa ghi vào manifest
 //	AG_S3_* hoặc AG_OBJSTORE_DIR       kho manifest (shared/objstore)
 //	AG_RABBITMQ_MGMT_URL               (tùy chọn) management API cho metric độ sâu DLQ
+//	AG_KC_ADMIN_URL, AG_KC_REALM,      Keycloak Admin REST (tài khoản dịch vụ agrigreen-accounts) cho consumer
+//	AG_KC_CLIENT_ID, AG_KC_CLIENT_SECRET  pf.accounts.org_status (khóa/mở tài khoản theo trạng thái tổ chức)
+//	AG_DB_PASSWORD_ACCOUNTS_APP        (hoặc AG_DB_APP_PASSWORD) vai accounts_app của consumer đó
 //	AG_OTLP_ENDPOINT, ...              OpenTelemetry (shared/telemetry)
 package main
 
@@ -75,7 +78,7 @@ func consumers(log *slog.Logger) []consumer {
 			log.Info("đồng ý đã ghi", "event", env.EventType, "event_id", env.EventID, "tenant_id", env.TenantID, "trace_id", env.TraceID, "outcome", "ok")
 			return nil
 		},
-	}, mrvExportConsumer(log)}
+	}, mrvExportConsumer(log), accountsOrgStatusConsumer(log)}
 }
 
 func main() {

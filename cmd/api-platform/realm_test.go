@@ -118,7 +118,7 @@ func TestKeycloakRealmCoversRolesAndClaims(t *testing.T) {
 			t.Errorf("realm thiếu vai %q (%s)", v, where)
 		}
 	}
-	for _, admin := range []string{"platform_admin", "masterdata_admin", "registry_admin", "geo_admin", "device_admin", "vault_eraser"} {
+	for _, admin := range []string{"platform_admin", "masterdata_admin", "registry_admin", "geo_admin", "device_admin", "vault_eraser", "account_admin", "account_admin_province"} {
 		if !strings.Contains(have[admin], "MFA") {
 			t.Errorf("vai quản trị %s phải ghi chú bắt buộc MFA", admin)
 		}
