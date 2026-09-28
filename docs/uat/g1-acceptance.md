@@ -16,19 +16,18 @@ Ba trạng thái:
 
 | Mục | Số yêu cầu | đạt | một phần | ngoài G1 → G2/G3 |
 |---|---|---|---|---|
-| 2. Lộ trình G1 | 20 | 18 | 2 | 0 |
+| 2. Lộ trình G1 | 20 | 19 | 1 | 0 |
 | 3. App Khuyến nông | 34 | 29 | 2 | 3 |
 | 4. Bản đồ CGH | 11 | 9 | 1 | 1 |
 | 5. GIS nền | 4 | 1 | 0 | 3 |
 | 6. Cổng kiến trúc | 25 | 23 | 0 | 2 |
-| **Tổng** | **94** | **80** | **5** | **9** |
+| **Tổng** | **94** | **81** | **4** | **9** |
 
-**Năm dòng "một phần"** — phần còn thiếu:
+**Bốn dòng "một phần"** — phần còn thiếu:
 
 | Yêu cầu | Còn thiếu | Loại |
 |---|---|---|
 | S4 Danh mục trường MRV (C-1) | Danh mục trường **chính thức** do khách chốt (C-1). Cơ chế (danh mục có phiên bản, người duyệt ≠ người soạn, ghim phiên bản) đã đạt; nội dung hiện là danh mục tạm | chờ khách |
-| S5 Diễn tập sao lưu và phục hồi | Workflow `restore-drill` (pgBackRest → `down -v` → restore → `drill check -strict`) **chưa có lần chạy xanh trên GitHub**: hai lần chạy tay ngày 28/09 hỏng, lần thứ ba đang chạy khi lập bảng. Logic kiểm (`cmd/drill`, `objsync`) đã đạt bằng kiểm thử Go | hạ tầng CI |
 | KN US-SYNC-02 Đồng bộ ngay | AC "chọn **nhóm/loại dữ liệu**": lệnh `sync_now` chọn đích theo đơn vị hoặc thiết bị, thiết bị kéo mọi entity. Chọn theo nhóm dữ liệu gắn với liên thông App HTX (FN-07 KN) → G2 | một phần thuộc G2 |
 | KN US-DASH-02 Xuất theo mẫu Bộ | **Mẫu biểu chính thức của Bộ NN&PTNT**: BRD không kèm mẫu; bố cục FR-01/02/03/05 hiện là tạm (mẫu có phiên bản, thay được không sửa mã) | chờ khách |
 | CGH FN-09 Cân đối và dự báo | **DCRD xác nhận phương pháp dự báo** `cgh.forecast/v1` ([cgh-forecast.md](../dev/cgh-forecast.md)). Cân đối QT-01/02 và lưu kết quả theo vụ đã đạt | chờ khách |
@@ -120,7 +119,7 @@ Kịch bản chỉ gọi qua HTTP, trừ hai việc mà ở production do worker
 | S4 | OTLP (ADR-0013) | `TestTraceWithOTel`, `TestTracePropagatesOutboxToInbox` | **đạt** |
 | S5 | Bộ sinh dữ liệu tổng hợp (R-95) | `TestRefusesProduction`, `TestPlanDeterministicAndPlausible`, `TestSeedAgainstInProcessStack` ([cmd/seed-synthetic](../../cmd/seed-synthetic)) | **đạt** cho dữ liệu G1. Số đo G3 xem R-95 ở mục 6 |
 | S5 | UAT theo ca kiểm thử trích từ prototype `mekong-green` | 39 kiểm thử ở [tests/acceptance](../../tests/acceptance); mỗi ca ghi `// Nguồn:` tệp/ca prototype, bảng đối chiếu trong `doc.go` | **đạt**. 5 ca giữ nguyên quy tắc, 34 ca theo quy tắc mới có ghi `// Khác prototype:` (PII chỉ ở vault, chỉ ghi thêm, chồng lấn theo BRD, Idempotency-Key bắt buộc). Năm phát hiện đã sửa: gán thửa cho nông hộ HTX khác → 422 `geo.household_invalid`; mốc ngưỡng CGH phải tăng dần → 422 `masterdata.param_threshold_order`; khôi phục thửa `POST /v1/plots/{ref}/restore`; mặt nạ SĐT `0912•••678`; mã mùa vụ chuẩn hóa chữ HOA |
-| S5 | Diễn tập sao lưu và phục hồi (mục 22) | `TestDrillEndToEndAndDetectsCorruption` ([cmd/drill](../../cmd/drill)), `TestBackupRestoreVerify` ([internal/shared/objsync](../../internal/shared/objsync)); workflow `restore-drill` | **một phần** — logic kiểm đạt; **workflow `restore-drill` chưa có lần chạy xanh** (28/09: hai lần hỏng, một lần đang chạy). Xem [restore-drill.md](../runbooks/restore-drill.md) |
+| S5 | Diễn tập sao lưu và phục hồi (mục 22) | `TestDrillEndToEndAndDetectsCorruption` ([cmd/drill](../../cmd/drill)), `TestBackupRestoreVerify` ([internal/shared/objsync](../../internal/shared/objsync)); workflow `restore-drill` (run 36471567344, 29/09/2026: pgBackRest full → `down -v` → khôi phục vào môi trường sạch → `drill check -strict` đạt đủ 6 phép kiểm §22) | **đạt**. Xem [restore-drill.md](../runbooks/restore-drill.md) |
 
 ## 3. App Khuyến nông (Backlog v1.0)
 
