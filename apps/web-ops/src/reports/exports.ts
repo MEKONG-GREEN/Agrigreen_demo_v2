@@ -2,17 +2,15 @@
 
 // pf/reports — xuất báo cáo bất đồng bộ (R-52): POST /v1/reports/exports → 202 + việc xuất → hỏi trạng thái
 // GET /v1/reports/exports/{id} → khi `completed` lấy URL tải có hạn GET /v1/reports/exports/{id}/download.
-// Hợp đồng không có route liệt kê việc xuất của người dùng, nên "lịch sử" là các việc xuất trong phiên
-// làm việc này: chỉ giữ MÃ việc xuất trong sessionStorage (không PII), trạng thái luôn đọc lại từ máy chủ.
+// Lịch sử: GET /v1/reports/exports — việc xuất của CHÍNH người dùng, mới nhất trước (cursor, R-53).
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ApiClient } from "@/api/client";
 import { unwrap } from "@/api/client";
-import type { ReportDownload, ReportExport, ReportParams } from "@/api/types";
+import type { Page, ReportDownload, ReportExport, ReportExportListItem, ReportParams } from "@/api/types";
 import { triggerDownload } from "@/lib/files";
 import { useInterval } from "@/lib/useInterval";
 
 export const EXPORT_POLL_MS = 1500;
-const HISTORY_KEY = "ag.reports.history";
 const HISTORY_MAX = 30;
 
 export function requestExport(
@@ -21,6 +19,11 @@ export function requestExport(
   idemKey: string,
 ): Promise<ReportExport> {
   return unwrap(api.POST("/v1/reports/exports", { params: { header: { "Idempotency-Key": idemKey } }, body: input }));
+}
+
+/** Một trang lịch sử xuất của người dùng (mới nhất trước). */
+export function listMyExports(api: ApiClient, cursor?: string, limit = HISTORY_MAX): Promise<Page<ReportExportListItem>> {
+  return unwrap(api.GET("/v1/reports/exports", { params: { query: { cursor, limit } } }));
 }
 
 export function getExport(api: ApiClient, id: string): Promise<ReportExport> {
@@ -48,31 +51,13 @@ export async function waitExport(api: ApiClient, id: string, opts: { intervalMs?
   }
 }
 
-function readHistory(): string[] {
-  try {
-    const raw = window.sessionStorage.getItem(HISTORY_KEY);
-    const v: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, HISTORY_MAX) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeHistory(ids: string[]): void {
-  try {
-    window.sessionStorage.setItem(HISTORY_KEY, JSON.stringify(ids.slice(0, HISTORY_MAX)));
-  } catch {
-    // bỏ qua: chỉ mất lịch sử khi tải lại trang
-  }
-}
-
 export interface ExportJobs {
   jobs: ReportExport[];
   add: (e: ReportExport) => void;
   refresh: () => void;
 }
 
-/** Danh sách việc xuất của phiên + tự hỏi lại việc đang `queued` mỗi 1,5 giây. */
+/** Lịch sử xuất của người dùng (trang đầu từ máy chủ) + tự hỏi lại việc đang `queued` mỗi 1,5 giây. */
 export function useExportJobs(api: ApiClient): ExportJobs {
   const [jobs, setJobs] = useState<ReportExport[]>([]);
   const loaded = useRef(false);
@@ -96,13 +81,11 @@ export function useExportJobs(api: ApiClient): ExportJobs {
   useEffect(() => {
     if (loaded.current) return;
     loaded.current = true;
-    const ids = readHistory();
-    if (ids.length === 0) return;
-    // Nạp lại trạng thái các việc xuất của phiên (setState chỉ trong callback của promise).
-    Promise.allSettled(ids.map((id) => getExport(api, id))).then((settled) => {
-      const list = settled.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
-      setJobs((cur) => (cur.length ? cur : list.sort((a, b) => Date.parse(b.requested_at) - Date.parse(a.requested_at))));
-    });
+    // Nạp lịch sử từ máy chủ (setState chỉ trong callback của promise); lỗi → danh sách rỗng.
+    listMyExports(api).then(
+      (page) => setJobs((cur) => (cur.length ? cur : page.items)),
+      () => undefined,
+    );
   }, [api]);
 
   const pending = jobs.filter((j) => j.status === "queued").map((j) => j.id);
@@ -115,7 +98,6 @@ export function useExportJobs(api: ApiClient): ExportJobs {
 
   const add = useCallback((e: ReportExport) => {
     setJobs((cur) => [e, ...cur.filter((j) => j.id !== e.id)]);
-    writeHistory([e.id, ...readHistory().filter((id) => id !== e.id)]);
   }, []);
 
   return { jobs, add, refresh: () => void refreshIds(jobs.map((j) => j.id)) };

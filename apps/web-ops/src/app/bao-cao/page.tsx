@@ -275,12 +275,12 @@ export default function ReportsPage() {
 
       <section className="card sec" style={{ marginTop: 16 }} aria-labelledby="rp-history">
         <div className="sec-h">
-          <h2 id="rp-history">Lịch sử xuất trong phiên</h2>
+          <h2 id="rp-history">Lịch sử xuất của tôi</h2>
           <button type="button" className="btn btn-o btn-sm" onClick={jobs.refresh} disabled={jobs.jobs.length === 0}>
             Làm mới
           </button>
         </div>
-        {jobs.jobs.length === 0 ? <p className="mute small">Chưa có yêu cầu xuất nào trong phiên làm việc này.</p> : null}
+        {jobs.jobs.length === 0 ? <p className="mute small">Chưa có yêu cầu xuất nào.</p> : null}
         {jobs.jobs.length > 0 ? (
           <div className="tbl-wrap">
             <table className="tbl">

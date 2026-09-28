@@ -12,11 +12,12 @@ import type {
   AdminUnit,
   CatalogItem,
   CatalogName,
+  ConsentState,
   ContentDocument,
   ContentKind,
-  CooperativeItem,
+  Cooperative,
   ExtTask,
-  HouseholdItem,
+  HouseholdListItem,
   Org,
   ParamVersion,
   PartyOrgEvent,
@@ -178,7 +179,7 @@ const COOP_PATTERNS = [
 
 /** Thông tin phụ chỉ mock cần. `api` gồm cả trường đọc bổ sung G-03 backend trả. */
 export interface MockCooperative {
-  api: CooperativeItem;
+  api: Cooperative;
   province_code: string;
   commune_name: string;
   province_name: string;
@@ -240,15 +241,15 @@ const SURNAMES = ["Nguyễn", "Trần", "Lê", "Phạm", "Huỳnh", "Võ", "Đ�
 const INITIALS = "ABCDĐGHKLMNPQSTVX";
 
 /** GET /v1/cooperatives/{ref}/households — nhãn ĐÃ CHE sinh ngẫu nhiên, không tương ứng người thật. */
-export function householdsOf(coop: MockCooperative): HouseholdItem[] {
+export function householdsOf(coop: MockCooperative): HouseholdListItem[] {
   const r = mulberry32(parseInt(coop.api.ref.slice(-6), 16));
   const n = Math.min(coop.member_households, 57);
-  return Array.from({ length: n }, (_, i): HouseholdItem => {
+  return Array.from({ length: n }, (_, i): HouseholdListItem => {
     const unavailable = r() < 0.04;
     const a = INITIALS[Math.floor(r() * INITIALS.length)] ?? "V";
     const b = INITIALS[Math.floor(r() * INITIALS.length)] ?? "A";
     // G-04: trạng thái đồng ý theo mục đích — 1/3 đồng ý MRV, một ít đã rút, còn lại chưa có bản ghi.
-    const consents =
+    const consents: ConsentState[] =
       i % 3 === 0
         ? [{ purpose: "mrv.evidence", status: "granted", event_time: iso(40 - (i % 20)) }]
         : i % 7 === 1

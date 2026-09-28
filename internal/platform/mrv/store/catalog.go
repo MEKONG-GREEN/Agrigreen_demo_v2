@@ -218,3 +218,84 @@ func MarkDecided(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.Cat
 	  WHERE id = $1`, id, string(status), approver, at.UTC(), note)
 	return err
 }
+
+// ApprovedSummary là bản đã duyệt mới nhất của một loại minh chứng, không kèm
+// định nghĩa trường (chỉ số trường).
+type ApprovedSummary struct {
+	Version    domain.CatalogVersion
+	FieldCount int
+}
+
+// ApprovedLatest trả bản đã duyệt mới nhất (số phiên bản lớn nhất) của mỗi loại
+// minh chứng, theo loại.
+func ApprovedLatest(ctx context.Context, tx pgx.Tx) ([]ApprovedSummary, error) {
+	rows, err := tx.Query(ctx, "SELECT DISTINCT ON (evidence_type) "+versionCols+`, field_count FROM pf_mrv.catalog_version
+	    WHERE status = 'approved' ORDER BY evidence_type, version DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ApprovedSummary
+	for rows.Next() {
+		var r ApprovedSummary
+		v := &r.Version
+		var status string
+		if err := rows.Scan(&v.ID, &v.TenantID, &v.EvidenceType, &v.Version, &status, &v.Provisional, &v.SourceNote, &v.SetterRef,
+			&v.ApproverRef, &v.SubmittedAt, &v.DecidedAt, &v.DecisionNote, &v.IdemKey, &v.CreatedAt, &r.FieldCount); err != nil {
+			return nil, err
+		}
+		v.Status = domain.CatalogStatus(status)
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// ApprovedSyncRow là bản đã duyệt mới nhất của một loại minh chứng kèm con trỏ
+// đồng bộ: thời điểm duyệt tính bằng micro giây Unix (bất biến sau khi duyệt).
+type ApprovedSyncRow struct {
+	Version domain.CatalogVersion
+	Cursor  int64
+}
+
+// ApprovedSince trả bản đã duyệt mới nhất của mỗi loại minh chứng có thời điểm
+// duyệt (micro giây Unix) > after, theo thời điểm duyệt rồi theo loại, kèm định
+// nghĩa trường. Số dòng tối đa bằng số loại minh chứng (nhỏ) nên không phân trang ở SQL.
+func ApprovedSince(ctx context.Context, tx pgx.Tx, after int64) ([]ApprovedSyncRow, error) {
+	rows, err := tx.Query(ctx, `SELECT id, cur FROM (
+	    SELECT DISTINCT ON (evidence_type) id, evidence_type,
+	           (extract(epoch FROM decided_at) * 1000000)::bigint AS cur
+	      FROM pf_mrv.catalog_version WHERE status = 'approved'
+	     ORDER BY evidence_type, version DESC) t
+	  WHERE cur > $1 ORDER BY cur, evidence_type`, after)
+	if err != nil {
+		return nil, err
+	}
+	type ref struct {
+		id  uuid.UUID
+		cur int64
+	}
+	var refs []ref
+	for rows.Next() {
+		var r ref
+		if err := rows.Scan(&r.id, &r.cur); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		refs = append(refs, r)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	out := make([]ApprovedSyncRow, 0, len(refs))
+	for _, r := range refs {
+		v, err := VersionByID(ctx, tx, r.id, false)
+		if err != nil {
+			return nil, err
+		}
+		if v != nil {
+			out = append(out, ApprovedSyncRow{Version: *v, Cursor: r.cur})
+		}
+	}
+	return out, nil
+}

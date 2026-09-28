@@ -241,6 +241,7 @@ paths:
       operationId: listCooperatives
       parameters:
         - {name: q, in: query, schema: {type: string}}
+        - {name: admin_unit, in: query, description: "G-03: mã tỉnh hoặc xã hiện hành — chỉ HTX thuộc đơn vị này (và con cháu) giao với phạm vi người gọi; mã không có hiệu lực → 422 validation_failed (trường admin_unit)", schema: {type: string}}
         - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
         - {name: cursor, in: query, schema: {type: string}}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
@@ -257,6 +258,7 @@ paths:
                   next_cursor: {type: [string, "null"]}
         "401": {$ref: "#/components/responses/Problem"}
         "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/cooperatives/{ref}:
     get:
       summary: Hồ sơ HTX (ngoài phạm vi → 404)
@@ -482,6 +484,25 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/evidence-types:
+    get:
+      summary: Loại minh chứng đang dùng được (có danh mục ĐÃ DUYỆT) kèm phiên bản đã duyệt mới nhất
+      description: |
+        Cùng vai với GET /v1/mrv/catalog (mrv_collector, mrv_reviewer, mrv_viewer, mrv_exporter, param_setter,
+        param_approver). App dùng để biết loại nào có biểu mẫu; nội dung danh mục tải qua GET /v1/mrv/catalog
+        hoặc entity pull mrv_catalog. Sắp theo evidence_type.
+      operationId: listMrvEvidenceTypes
+      responses:
+        "200":
+          description: Danh sách loại minh chứng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MrvEvidenceType"}}
+        "403": {$ref: "#/components/responses/Problem"}
   /v1/mrv/evidence:
     post:
       summary: Ghi một minh chứng (hoặc bản ghi bù khi có supersedes_id) — kiểm theo phiên bản danh mục đã ghim
@@ -2214,6 +2235,35 @@ paths:
         "401": {$ref: "#/components/responses/Problem"}
         "403": {$ref: "#/components/responses/Problem"}
   /v1/reports/exports:
+    get:
+      summary: Lịch sử xuất của CHÍNH người gọi (kể cả việc của lịch gửi họ sở hữu), mới nhất trước
+      description: Phân trang cursor (R-53). downloadable = true khi việc đã xong và có tệp — tải qua GET /v1/reports/exports/{id}/download.
+      operationId: listMyReportExports
+      tags: [reports]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: "#/components/schemas/ReportExport"
+                        - type: object
+                          required: [downloadable]
+                          properties:
+                            downloadable: {type: boolean}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
     post:
       summary: Yêu cầu xuất báo cáo (Excel/PDF) — 202 + việc xuất; worker dựng tệp. Phạm vi giải lúc yêu cầu (ADR-0009)
       operationId: requestReportExport
@@ -2491,6 +2541,15 @@ components:
             established_on: {type: [string, "null"], format: date}
             location: {oneOf: [{$ref: "#/components/schemas/Point"}, {type: "null"}]}
             location_provisional: {type: boolean, description: "true = chưa có toạ độ; bản đồ hiển thị tâm xã, nhãn \"vị trí tạm\""}
+        - type: object
+          description: Dữ liệu đọc bổ sung của danh sách/hồ sơ HTX (G-03)
+          required: [province_code, commune_name, province_name, member_households, digitized_plots]
+          properties:
+            province_code: {type: [string, "null"], description: "Mã tỉnh hiện hành của xã nơi HTX đặt trụ sở"}
+            commune_name: {type: [string, "null"]}
+            province_name: {type: [string, "null"]}
+            member_households: {type: integer, minimum: 0, description: "Số nông hộ thành viên đang hoạt động"}
+            digitized_plots: {type: [integer, "null"], minimum: 0, description: "Số thửa đã số hoá (pf/geo); null khi chưa nối pf/geo hoặc tra lỗi"}
     Household:
       type: object
       required: [household_ref, cooperative_ref, commune_code, cultivated_area_ha, member_since, active]
@@ -2505,11 +2564,21 @@ components:
       allOf:
         - $ref: "#/components/schemas/Household"
         - type: object
-          required: [label, masked_phone, label_unavailable]
+          required: [label, masked_phone, label_unavailable, consents]
           properties:
             label: {type: string, description: "Nhãn đã che, vd \"Nguyễn V. A.\""}
             masked_phone: {type: string, description: "SĐT đã che"}
             label_unavailable: {type: boolean}
+            consents:
+              type: array
+              description: "G-04: trạng thái đồng ý hiện tại theo từng mục đích (R-41/R-42); rỗng khi chưa ghi nhận"
+              items:
+                type: object
+                required: [purpose, status, event_time]
+                properties:
+                  purpose: {type: string, examples: ["mrv.evidence"]}
+                  status: {type: string, enum: [granted, withdrawn]}
+                  event_time: {type: string, format: date-time}
     HouseholdInput:
       type: object
       required: [cooperative_ref, identity]
@@ -2556,11 +2625,45 @@ components:
       type: object
       required: [entity, id, version, op]
       properties:
-        entity: {type: string, examples: [plot, task, directive, document, pubkey]}
+        entity: {type: string, examples: [catalog_item, admin_unit, mrv_catalog, plot, task, directive, document, pubkey]}
         id: {type: string, format: uuid, description: "pubkey + id 00000000-0000-0000-0000-000000000000 + tombstone = kết thúc lượt khóa: xóa mọi pubkey có version nhỏ hơn"}
         version: {type: integer}
         op: {type: string, enum: [upsert, tombstone]}
-        data: {type: object, description: "Không có khi tombstone. pubkey: {ref, area_code, public_key (base64 32 byte)}"}
+        data:
+          type: object
+          description: |
+            Không có khi tombstone. pubkey: {ref, area_code, public_key (base64 32 byte)}.
+            catalog_item: SyncCatalogItemData; admin_unit: SyncAdminUnitData; mrv_catalog: MrvCatalogVersion (bản đã duyệt).
+    SyncCatalogItemData:
+      type: object
+      description: |
+        data của entity pull catalog_item (pf/masterdata): mục đang dùng của rice_variety, farm_stage, machine_type,
+        season, pest — không lọc theo địa bàn. id = UUIDv5 cố định theo (catalog, code); version = sync_seq
+        (luôn tăng). Ngừng dùng → tombstone cùng id; dùng lại → upsert version mới.
+      required: [catalog, code, name, attrs, revision, updated_at]
+      properties:
+        catalog: {type: string, enum: [rice_variety, farm_stage, machine_type, season, pest]}
+        code: {type: string}
+        name: {type: string}
+        attrs: {type: object, additionalProperties: {type: string}}
+        revision: {type: integer, minimum: 1}
+        updated_at: {type: string, format: date-time}
+    SyncAdminUnitData:
+      type: object
+      description: |
+        data của entity pull admin_unit (pf/masterdata): một PHIÊN BẢN hiệu lực của đơn vị có mã thuộc phạm vi
+        người gọi (toàn quốc: mọi đơn vị). id = UUIDv5 cố định theo (code, valid_from) — mã có thể dùng lại sau
+        sắp xếp; version = sync_seq. Phiên bản đã hết hiệu lực (valid_to ≤ hôm nay) → tombstone, kể cả đơn vị
+        cũ có đơn vị kế thừa trong phạm vi.
+      required: [code, name, level, parent_code, valid_from, valid_to, successor_codes]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        level: {type: string, enum: [province, commune, district]}
+        parent_code: {type: [string, "null"]}
+        valid_from: {type: string, format: date}
+        valid_to: {type: [string, "null"], format: date, description: "Khác null: đã định ngày hết hiệu lực trong tương lai; máy coi hết hiệu lực từ ngày này"}
+        successor_codes: {type: array, items: {type: string}}
     SyncPullPage:
       type: object
       required: [changes, next_cursor, has_more, server_time, reset]
@@ -2699,6 +2802,17 @@ components:
         decided_at: {type: [string, "null"], format: date-time}
         decision_note: {type: [string, "null"]}
         created_at: {type: string, format: date-time}
+    MrvEvidenceType:
+      type: object
+      required: [evidence_type, catalog_id, version, provisional, source_note, field_count, approved_at]
+      properties:
+        evidence_type: {type: string, examples: [awd_log, field_checklist]}
+        catalog_id: {type: string, format: uuid, description: "id của phiên bản danh mục đã duyệt mới nhất"}
+        version: {type: integer, minimum: 1, description: "Số phiên bản đã duyệt mới nhất — giá trị app gửi trong catalog_version"}
+        provisional: {type: boolean, description: "Danh mục tạm, chờ chốt C-1"}
+        source_note: {type: string}
+        field_count: {type: integer}
+        approved_at: {type: [string, "null"], format: date-time}
     MrvFileRef:
       type: object
       required: [file_ref, sha256]

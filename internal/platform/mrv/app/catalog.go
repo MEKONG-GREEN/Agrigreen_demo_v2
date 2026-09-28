@@ -270,7 +270,7 @@ func (s *Service) Versions(ctx context.Context, evidenceType, status string, aft
 // ApprovedCatalog trả phiên bản đã duyệt (version = 0: mới nhất) cho app hiện
 // trường dựng biểu mẫu (Application API).
 func (s *Service) ApprovedCatalog(ctx context.Context, evidenceType string, version int) (domain.CatalogVersion, error) {
-	p, err := authz.Require(ctx, append(slicesClone(evidenceReaders), catalogAdminRoles...)...)
+	p, err := authz.Require(ctx, catalogReaders()...)
 	if err != nil {
 		return domain.CatalogVersion{}, err
 	}
@@ -291,8 +291,6 @@ func (s *Service) ApprovedCatalog(ctx context.Context, evidenceType string, vers
 	}
 	return *v, nil
 }
-
-func slicesClone(xs []string) []string { return append([]string(nil), xs...) }
 
 //go:embed seed_g1.json
 var seedG1 []byte

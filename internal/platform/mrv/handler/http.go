@@ -23,6 +23,7 @@ type Handler struct{ Svc *app.Service }
 // RegisterApp gắn route Application API vào nhóm /v1 (đã có xác thực + idempotency).
 func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/mrv/catalog", h.approvedCatalog)
+	rg.GET("/mrv/evidence-types", h.evidenceTypes)
 	rg.POST("/mrv/evidence", h.capture)
 	rg.GET("/mrv/evidence", h.list)
 	rg.GET("/mrv/evidence/:id", h.get)
@@ -115,6 +116,32 @@ func (h Handler) approvedCatalog(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, toCatalogDTO(v))
+}
+
+type evidenceTypeDTO struct {
+	EvidenceType string  `json:"evidence_type"`
+	CatalogID    string  `json:"catalog_id"`
+	Version      int     `json:"version"`
+	Provisional  bool    `json:"provisional"`
+	SourceNote   string  `json:"source_note"`
+	FieldCount   int     `json:"field_count"`
+	ApprovedAt   *string `json:"approved_at"`
+}
+
+func (h Handler) evidenceTypes(c *gin.Context) {
+	ts, err := h.Svc.EvidenceTypes(c.Request.Context())
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	items := make([]evidenceTypeDTO, 0, len(ts))
+	for _, t := range ts {
+		items = append(items, evidenceTypeDTO{
+			EvidenceType: t.EvidenceType, CatalogID: t.CatalogID.String(), Version: t.Version, Provisional: t.Provisional,
+			SourceNote: t.SourceNote, FieldCount: t.FieldCount, ApprovedAt: tsPtr(t.DecidedAt),
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 
 // ---------------------------------------------------------------------------

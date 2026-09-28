@@ -40,6 +40,7 @@ Không đổi số đã cấp. Mỗi module chỉ tạo tệp migration mang s�
 | pf | 000016 | extension: bổ sung báo cáo (FR-03) | `pf_extension` | `extension_app` |
 | pf | 000017 | party: bổ sung mô hình đọc (G-03/G-04) | `pf_party` | `party_app` |
 | pf | 000018 | geo: khôi phục thửa đã ngừng dùng (sự kiện `restored`) | `pf_geo` | `geo_app` |
+| pf | 000019 | masterdata: `sync_seq` cho entity pull `catalog_item`, `admin_unit` | `pf_masterdata` | `masterdata_app` |
 | vault | 000002 | vault/identity | `vault` | `vault_app` |
 
 - Các vai đã khai trong `internal/shared/dbadmin/dbadmin.go`. **Không sửa tệp đó.** Cần vai mới thì ghi vào báo cáo.

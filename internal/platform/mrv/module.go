@@ -52,6 +52,9 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc
 // SyncSink cho pf/sync nhận entity "evidence" chiều lên.
 func (m *Module) SyncSink() syncport.Sink { return app.Sink{Svc: m.svc} }
 
+// SyncSource cho pf/sync: entity "mrv_catalog" chiều xuống (danh mục đã duyệt).
+func (m *Module) SyncSource() syncport.Source { return app.CatalogSource{Svc: m.svc} }
+
 // ExportHandler là inbox.Handler của worker cho pf.mrv.export.requested
 // (consumer port.ExportConsumer, pool vai mrv_app).
 func (m *Module) ExportHandler() inbox.Handler { return m.svc.HandleExportRequested }

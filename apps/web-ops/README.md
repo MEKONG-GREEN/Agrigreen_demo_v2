@@ -56,7 +56,7 @@ Mọi biến `NEXT_PUBLIC_*` được **nhúng lúc build**. Đổi môi trườ
 
 - OIDC Authorization Code + PKCE (S256) qua `oidc-client-ts` (Apache-2.0).
 - Access/ID/refresh token chỉ nằm trong **bộ nhớ** của tab. Không dùng localStorage hay cookie đọc được bằng JS.
-- `sessionStorage` chỉ giữ `state` và `code_verifier` tạm thời của một lượt chuyển hướng (và, ở chế độ giả lập, mã vai thử; ở trang Báo cáo, **mã** các việc xuất của phiên — không PII).
+- `sessionStorage` chỉ giữ `state` và `code_verifier` tạm thời của một lượt chuyển hướng (và, ở chế độ giả lập, mã vai thử). Lịch sử xuất ở trang Báo cáo đọc từ `GET /v1/reports/exports`.
 - Tải lại trang thì đăng nhập im lặng (`prompt=none`, trang `/login/silent`) qua phiên SSO của Keycloak. Token được gia hạn tự động.
 - `redirect_uri` = `<origin>/login/callback`, `post_logout_redirect_uri` = `<origin>/login`.
 - Vai lấy từ `realm_access.roles`, `tenant_id` và `org_ref` từ claim của access token. Cấp phạm vi (TW / Tỉnh / Xã / Cục) và danh sách đơn vị lấy từ `GET /v1/me`. Tên hiển thị lấy từ claim `name` (Me không chứa tên người). Tổ chức `dcrd` là Cục KTHT, dùng cổng CGH. Nếu `/v1/me` lỗi, web hiện cảnh báo kèm mã tra cứu và menu chỉ lọc theo vai.
@@ -81,9 +81,8 @@ Mọi biến `NEXT_PUBLIC_*` được **nhúng lúc build**. Đổi môi trườ
 - Phân trang cursor theo `next_cursor`: `usePagedList` (nút "Tải thêm") và `collectPages`.
 - Tệp tải lên (`src/lib/files.ts`) được nhận dạng theo chữ ký nội dung (.xlsx/.zip, chặn .xls cũ) và gửi **nguyên văn** (CSV/KML/GeoJSON là chuỗi, .xlsx/.zip là byte) với đúng `Content-Type`. Tải xuống: báo cáo qua URL có hạn của `/download`; cây tổ chức qua `GET /v1/orgs/export.xlsx` (`parseAs: "blob"`).
 - Web không khai route viết tay. Mọi khoảng trống G-02…G-10 trong `docs/dev/web-backend-gaps.md` đã chuyển sang route/trường thật, phần ghép tạm đã xoá (tra tên đơn vị từng mã, gọi ranh giới từng đơn vị, bảng tên tham số/danh mục viết cứng, cây tổ chức qua Application API).
-- **Còn lệch hợp đồng (báo nhóm backend):** trường G-03 của `Cooperative` (`province_code`, `commune_name`, `province_name`, `member_households`, `digitized_plots`), bộ lọc `admin_unit` của `GET /v1/cooperatives` và `consents[]` (G-04) của `HouseholdListItem` đã có ở backend (`internal/platform/party/handler/readmodel.go`, `registry.go`) nhưng **chưa khai trong `contracts/openapi/application.yaml`**. Web đọc chúng qua kiểu mở rộng `CooperativeItem`, `HouseholdItem`, `CoopQuery` (`src/api/types.ts`, `src/api/adapters/cooperatives.ts`); khi hợp đồng bổ sung, chạy `gen:api` và bỏ phần mở rộng.
 - Thông báo: chuông ở thanh trên hỏi `GET /v1/notifications/unread-count` mỗi 60 giây (không websocket, tab ẩn thì bỏ lượt). `deep_link` được ánh xạ cố định (`src/lib/deepLink.ts`): `/extension/directives/{id}` → `/chi-dao?id=`, `/documents/{ref}` → `/thu-vien?doc=`, `/extension/tasks/{id}` → `/nhiem-vu?task=`, `/sync/conflicts/{id}` → `/quan-tri/xung-dot?id=`, `/orgs/{ref}` → `/quan-tri/to-chuc?org=`; đường dẫn lạ không điều hướng.
-- Báo cáo: `POST /v1/reports/exports` → 202 → hỏi `GET /v1/reports/exports/{id}` mỗi 1,5 giây tới `completed`/`failed` → `GET …/download`. Hợp đồng không có route liệt kê việc xuất, nên "lịch sử" là các việc xuất của phiên (chỉ giữ mã, trạng thái luôn đọc lại từ máy chủ).
+- Báo cáo: `POST /v1/reports/exports` → 202 → hỏi `GET /v1/reports/exports/{id}` mỗi 1,5 giây tới `completed`/`failed` → `GET …/download`. Lịch sử: `GET /v1/reports/exports` — việc xuất của chính người dùng, mới nhất trước, kèm cờ `downloadable`.
 
 ## Màn hình
 

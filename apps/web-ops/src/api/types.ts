@@ -55,27 +55,8 @@ export type PartyOrgEvent = AS["PartyOrgEvent"];
 export type HouseholdImportResult = AdminPaths["/v1/households/import"]["post"]["responses"][200]["content"]["application/json"];
 export type OrgImportResult = AdminPaths["/v1/orgs/import"]["post"]["responses"][200]["content"]["application/json"];
 
-/**
- * G-03 — trường đọc bổ sung backend trả cùng `Cooperative` (internal/platform/party/handler/readmodel.go, coopItemDTO).
- * contracts/openapi/application.yaml CHƯA khai các trường này trong schema Cooperative → web đọc như tùy chọn,
- * không bịa route. Khi hợp đồng bổ sung, `gen:api` sẽ sinh đúng kiểu và có thể bỏ phần mở rộng này.
- */
-export interface CooperativeExtras {
-  province_code?: string | null;
-  commune_name?: string | null;
-  province_name?: string | null;
-  member_households?: number;
-  digitized_plots?: number | null;
-}
-export type CooperativeItem = Cooperative & CooperativeExtras;
-
-/** G-04 — trạng thái đồng ý theo mục đích (handler/readmodel.go consentStateDTO), chưa khai trong hợp đồng. */
-export interface ConsentState {
-  purpose: string;
-  status: "granted" | "withdrawn" | string;
-  event_time: string;
-}
-export type HouseholdItem = HouseholdListItem & { consents?: ConsentState[] };
+/** G-04 — trạng thái đồng ý hiện tại theo mục đích của một nông hộ. */
+export type ConsentState = HouseholdListItem["consents"][number];
 
 // pf/geo
 export type PlotFeature = S["PlotFeature"];
@@ -138,6 +119,7 @@ export type AccountsImportResult = AdminPost<"/v1/accounts/users/import">;
 export type ReportTemplate = S["ReportTemplate"];
 export type ReportParams = S["ReportParams"];
 export type ReportExport = S["ReportExport"];
+export type ReportExportListItem = AppGet<"/v1/reports/exports">["items"][number];
 export type ReportDownload = AppGet<"/v1/reports/exports/{id}/download">;
 /** Mẫu báo cáo như Admin API trả (schema riêng của admin.yaml). */
 export type AdminReportTemplate = AdminGet<"/v1/reports/templates">["items"][number];
