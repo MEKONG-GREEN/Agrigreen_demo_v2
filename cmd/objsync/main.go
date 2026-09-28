@@ -58,7 +58,7 @@ func main() {
 		rep.Error = err.Error()
 	}
 	b, _ := json.MarshalIndent(rep, "", "  ")
-	fmt.Fprintln(os.Stdout, string(b))
+	_, _ = fmt.Fprintln(os.Stdout, string(b))
 	if errors.Is(err, errUsage) {
 		os.Exit(2)
 	}
@@ -149,7 +149,7 @@ func run(ctx context.Context, cmd string, args []string) (report, error) {
 		if err != nil {
 			return rep, err
 		}
-		if err := os.WriteFile(*out, b, 0o600); err != nil {
+		if err := os.WriteFile(*out, b, 0o600); err != nil { //nolint:gosec // đường dẫn do người vận hành truyền vào
 			return rep, err
 		}
 	}

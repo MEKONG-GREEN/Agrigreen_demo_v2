@@ -45,7 +45,7 @@ func TestPrototypeVoHieuHoaHTXCanLyDo(t *testing.T) {
 	nguon(t, "brd-2026.test.ts", "Vô hiệu hoá HTX cần lý do ≥ 20 ký tự, khoá tài khoản liên quan và khôi phục được")
 	w := newWorld(t)
 	w.household(w.officerBT, w.coopBT, "Nguyễn Văn Tổng Hợp", "0999000111")
-	manager := w.user(w.coopBT, false, "coop_manager") // HTX duy nhất của xã Bình Thủy
+	manager := w.user(w.coopBT, false, "coop_manager") // HTX duy nhất của xã Cái Răng
 	if n := len(w.want(manager.Do(harness.App, http.MethodGet, "/v1/cooperatives", "", nil), 200, "quản lý HTX xem HTX").Items()); n != 1 {
 		t.Fatalf("quản lý HTX phải thấy HTX mình, thấy %d", n)
 	}

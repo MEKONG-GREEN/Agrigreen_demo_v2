@@ -18,11 +18,11 @@ func TestMain(m *testing.M) { os.Exit(pgtest.Run(m)) }
 
 // Địa bàn dùng chung (mã theo bộ seed ĐBSCL sau sắp xếp 2025 của pf/masterdata).
 const (
-	provCT    = "92"             // TP Cần Thơ
-	communeNK = "92-X-NINH-KIEU" // xã minh hoạ Ninh Kiều
-	communeBT = "92-X-BINH-THUY" // xã minh hoạ Bình Thủy (cùng tỉnh, khác xã)
-	provAG    = "91"             // An Giang — "tỉnh khác"
-	communeLX = "91-X-LONG-XUYEN"
+	provCT    = "92"    // TP Cần Thơ
+	communeNK = "31135" // Phường Ninh Kiều
+	communeBT = "31186" // Phường Cái Răng (cùng tỉnh, khác xã)
+	provAG    = "91"    // An Giang — "tỉnh khác"
+	communeLX = "30307" // Phường Long Xuyên
 	nkLat     = 10.03
 	nkLon     = 105.77
 )
@@ -34,8 +34,8 @@ func nguon(t *testing.T, file, name string) {
 }
 
 // world là một tenant riêng đã nạp dữ liệu chủ và dựng cây tổ chức:
-// TTKN QG → TTKN Cần Thơ → tổ KN Ninh Kiều / Bình Thủy, TTKN An Giang → tổ KN Long Xuyên;
-// HTX NK1, NK2 (xã Ninh Kiều), HTX BT (xã Bình Thủy), HTX LX (An Giang).
+// TTKN QG → TTKN Cần Thơ → tổ KN Ninh Kiều / Cái Răng, TTKN An Giang → tổ KN Long Xuyên;
+// HTX NK1, NK2 (xã Ninh Kiều), HTX BT (xã Cái Răng), HTX LX (An Giang).
 type world struct {
 	t   *testing.T
 	s   *harness.Stack
@@ -61,12 +61,12 @@ func newWorld(t *testing.T) *world {
 	w.orgNational = w.createOrg(map[string]any{"kind": "ttkn_national", "code": "TTKNQG", "name": "Trung tâm Khuyến nông Quốc gia"})
 	w.orgP92 = w.createOrg(map[string]any{"kind": "ttkn_province", "code": "TTKN92", "name": "TTKN TP Cần Thơ", "admin_unit_code": provCT, "parent_ref": w.orgNational})
 	w.teamNK = w.createOrg(map[string]any{"kind": "extension_team", "code": "TKN-NK", "name": "Tổ KNCĐ Ninh Kiều", "admin_unit_code": communeNK, "parent_ref": w.orgP92})
-	w.teamBT = w.createOrg(map[string]any{"kind": "extension_team", "code": "TKN-BT", "name": "Tổ KNCĐ Bình Thủy", "admin_unit_code": communeBT, "parent_ref": w.orgP92})
+	w.teamBT = w.createOrg(map[string]any{"kind": "extension_team", "code": "TKN-BT", "name": "Tổ KNCĐ Cái Răng", "admin_unit_code": communeBT, "parent_ref": w.orgP92})
 	w.orgP91 = w.createOrg(map[string]any{"kind": "ttkn_province", "code": "TTKN91", "name": "TTKN An Giang", "admin_unit_code": provAG, "parent_ref": w.orgNational})
 	w.teamLX = w.createOrg(map[string]any{"kind": "extension_team", "code": "TKN-LX", "name": "Tổ KNCĐ Long Xuyên", "admin_unit_code": communeLX, "parent_ref": w.orgP91})
 	w.coopNK = w.createCoop("HTX Tổng Hợp Ninh Kiều 1", communeNK, w.teamNK)
 	w.coopNK2 = w.createCoop("HTX Tổng Hợp Ninh Kiều 2", communeNK, w.teamNK)
-	w.coopBT = w.createCoop("HTX Tổng Hợp Bình Thủy", communeBT, w.teamBT)
+	w.coopBT = w.createCoop("HTX Tổng Hợp Cái Răng", communeBT, w.teamBT)
 	w.coopLX = w.createCoop("HTX Tổng Hợp Long Xuyên", communeLX, w.teamLX)
 
 	officerRoles := []string{"kn_officer", "plot_editor", "plot_viewer", "vault_registrar"}

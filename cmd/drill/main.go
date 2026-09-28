@@ -85,7 +85,7 @@ func run(ctx context.Context, cmd string, args []string) (int, error) {
 		if err != nil {
 			return 2, fmt.Errorf("%w: %w", errConfig, err)
 		}
-		fmt.Fprintln(os.Stdout, base64.StdEncoding.EncodeToString(s.Public()))
+		_, _ = fmt.Fprintln(os.Stdout, base64.StdEncoding.EncodeToString(s.Public()))
 		return 0, nil
 	}
 	cfg := Config{AdminURL: os.Getenv("AG_PG_ADMIN_URL"), Suffix: *suffix, SampleRuns: *sample, IgnoreTables: map[string]bool{}}
@@ -107,11 +107,11 @@ func run(ctx context.Context, cmd string, args []string) (int, error) {
 			return 1, err
 		}
 		b, _ := json.MarshalIndent(m, "", "  ")
-		if err := os.WriteFile(*out, b, 0o600); err != nil {
+		if err := os.WriteFile(*out, b, 0o600); err != nil { //nolint:gosec // đường dẫn do người vận hành truyền vào
 			return 1, err
 		}
 		for c, cm := range m.Clusters {
-			fmt.Fprintf(os.Stdout, "%s: %d bảng, %d chuỗi, neo mới nhất %q, băm tham số %q\n", c, len(cm.Tables), cm.Chains, cm.LatestAnchorDate, cm.ParamSetHash)
+			_, _ = fmt.Fprintf(os.Stdout, "%s: %d bảng, %d chuỗi, neo mới nhất %q, băm tham số %q\n", c, len(cm.Tables), cm.Chains, cm.LatestAnchorDate, cm.ParamSetHash)
 		}
 		return 0, nil
 	case "check":
@@ -147,7 +147,7 @@ func check(ctx context.Context, cfg Config, manifestPath, objectsRef, reportPath
 	switch {
 	case objectsRef == "none":
 	case strings.HasPrefix(objectsRef, "file:"):
-		ob, err := os.ReadFile(strings.TrimPrefix(objectsRef, "file:"))
+		ob, err := os.ReadFile(strings.TrimPrefix(objectsRef, "file:")) //nolint:gosec // đường dẫn do người vận hành truyền vào
 		if err != nil {
 			return 2, fmt.Errorf("%w: %w", errConfig, err)
 		}
@@ -172,9 +172,9 @@ func check(ctx context.Context, cfg Config, manifestPath, objectsRef, reportPath
 		return 1, err
 	}
 	out, _ := json.MarshalIndent(rep, "", "  ")
-	fmt.Fprintln(os.Stdout, string(out))
+	_, _ = fmt.Fprintln(os.Stdout, string(out))
 	if reportPath != "" {
-		if err := os.WriteFile(reportPath, out, 0o600); err != nil {
+		if err := os.WriteFile(reportPath, out, 0o600); err != nil { //nolint:gosec // đường dẫn do người vận hành truyền vào
 			return 1, err
 		}
 	}

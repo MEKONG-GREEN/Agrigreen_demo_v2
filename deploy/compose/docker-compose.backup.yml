@@ -1,0 +1,129 @@
+# Sao lưu và diễn tập phục hồi cho Local/Dev/CI (mục 22). Tệp CHỒNG lên
+# docker-compose.yml, không sửa định nghĩa gốc:
+#
+#   docker volume create agrigreen-backup-pgbackrest
+#   docker volume create agrigreen-backup-objects
+#   docker compose -f deploy/compose/docker-compose.yml -f deploy/compose/docker-compose.backup.yml \
+#     --profile backup up -d --build --wait
+#
+# Runbook: docs/runbooks/backup.md, docs/runbooks/restore-drill.md.
+#
+# - postgres: thêm pgBackRest (image deploy/compose/backup), archive_mode=on,
+#   archive_command đẩy WAL liên tục vào kho pgBackRest (volume riêng, mã hóa AES-256).
+# - backup-s3 (+ backup-s3-init): kho S3 THỨ HAI cho bản sao kho đối tượng, danh
+#   tính riêng: backup-writer (chỉ cmd/objsync backup dùng) và restore-reader
+#   (chỉ đọc — objsync restore, drill check). Credential ghi sao lưu tách khỏi
+#   credential phục hồi (mục 22).
+# - pgbackrest-restore (profile restore): chạy một lần trên pgdata RỖNG, kho
+#   pgBackRest gắn CHỈ ĐỌC — phục hồi không có quyền ghi vào bản sao lưu.
+#
+# Hai volume sao lưu là external: `docker compose down -v` KHÔNG xóa chúng — đúng
+# yêu cầu diễn tập "dựng môi trường sạch rồi phục hồi từ bản sao lưu".
+name: agrigreen
+
+services:
+  postgres:
+    image: agrigreen/postgres-pgbackrest:dev
+    build: { context: ./backup, dockerfile: Dockerfile }
+    command:
+      - postgres
+      - -c
+      - max_connections=300
+      - -c
+      - wal_level=logical
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=pgbackrest --stanza=agrigreen archive-push %p
+      - -c
+      - archive_timeout=60
+    environment:
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_CIPHER_PASS:?chạy scripts/gen-dev-secrets --force (thiếu PGBACKREST_CIPHER_PASS)}
+    volumes: ["pgbackrest-repo:/var/lib/pgbackrest"]
+
+  # Kho S3 thứ hai (vùng sao lưu). Production: kho sao lưu trong lãnh thổ, vùng
+  # khác kho chính, bật object lock; backup-writer không có s3:DeleteObject.
+  # Lưu ý SeaweedFS: hành động Write gồm cả xóa — giới hạn "không xóa" chỉ kiểm được trên kho thật.
+  backup-s3:
+    image: chrislusf/seaweedfs:4.47
+    profiles: ["backup", "restore"]
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        mkdir -p /tmp/cfg
+        cat > /tmp/cfg/s3.json <<EOF
+        {"identities":[
+          {"name":"backup-admin","credentials":[{"accessKey":"backup-admin","secretKey":"$$ROOT"}],"actions":["Admin","Read","Write","List","Tagging"]},
+          {"name":"backup-writer","credentials":[{"accessKey":"backup-writer","secretKey":"$$WRITER"}],"actions":["Read:$$BUCKET","Write:$$BUCKET","List:$$BUCKET"]},
+          {"name":"restore-reader","credentials":[{"accessKey":"restore-reader","secretKey":"$$READER"}],"actions":["Read:$$BUCKET","List:$$BUCKET"]}
+        ]}
+        EOF
+        exec weed server -dir=/data -ip.bind=0.0.0.0 -s3 -s3.port=9000 -s3.config=/tmp/cfg/s3.json -master.volumeSizeLimitMB=256
+    environment:
+      ROOT: ${BACKUP_S3_ROOT_SECRET:?chạy scripts/gen-dev-secrets --force}
+      WRITER: ${S3_BACKUP_WRITER_SECRET:?chạy scripts/gen-dev-secrets --force}
+      READER: ${S3_RESTORE_READER_SECRET:?chạy scripts/gen-dev-secrets --force}
+      BUCKET: agrigreen-backup
+    tmpfs: ["/tmp"]
+    volumes: ["backup-objects:/data"]
+    ports: ["127.0.0.1:9100:9000"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status && (wget -q -O /dev/null http://127.0.0.1:9000/ || wget -q -S -O /dev/null http://127.0.0.1:9000/ 2>&1 | grep -q 'HTTP/')"]
+      interval: 5s
+      timeout: 5s
+      start_period: 20s
+      retries: 30
+    restart: unless-stopped
+
+  backup-s3-init:
+    image: amazon/aws-cli:2.37.4
+    profiles: ["backup", "restore"]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    depends_on:
+      backup-s3: { condition: service_healthy }
+    environment:
+      HOME: /tmp
+      AWS_ACCESS_KEY_ID: backup-admin
+      AWS_SECRET_ACCESS_KEY: ${BACKUP_S3_ROOT_SECRET}
+      AWS_DEFAULT_REGION: us-east-1
+      BUCKET: agrigreen-backup
+    tmpfs: ["/tmp"]
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        E="--endpoint-url http://backup-s3:9000"
+        aws $$E s3api head-bucket --bucket "$$BUCKET" 2>/dev/null || aws $$E s3api create-bucket --bucket "$$BUCKET"
+        aws $$E s3api put-bucket-versioning --bucket "$$BUCKET" --versioning-configuration Status=Enabled \
+          || echo "backup-s3-init: kho dev chưa hỗ trợ versioning — bỏ qua (chỉ Local/Dev)"
+        echo "backup-s3-init: xong bucket $$BUCKET"
+    restart: "no"
+
+  # Một lần, trên môi trường SẠCH (pgdata rỗng, postgres CHƯA chạy):
+  #   docker compose ... --profile restore run --rm pgbackrest-restore
+  pgbackrest-restore:
+    image: agrigreen/postgres-pgbackrest:dev
+    build: { context: ./backup, dockerfile: Dockerfile }
+    profiles: ["restore"]
+    user: postgres
+    entrypoint: ["pgbackrest"]
+    command: ["--stanza=agrigreen", "--type=default", "restore"]
+    environment:
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_CIPHER_PASS:?chạy scripts/gen-dev-secrets --force}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - pgbackrest-repo:/var/lib/pgbackrest:ro
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    restart: "no"
+
+volumes:
+  pgbackrest-repo:
+    external: true
+    name: agrigreen-backup-pgbackrest
+  backup-objects:
+    external: true
+    name: agrigreen-backup-objects

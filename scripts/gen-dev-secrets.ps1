@@ -30,6 +30,11 @@ $lines = @(
     "AG_VAULT_KEK='$(New-B64 32)'"
     "AG_VAULT_BLIND_KEY='$(New-B64 32)'"
     "AG_ANCHOR_SIGNING_KEY='$(New-B64 32)'"
+    '# Sao lưu (docker-compose.backup.yml): mã hóa kho pgBackRest, kho S3 thứ hai với danh tính ghi/đọc tách biệt.'
+    "PGBACKREST_CIPHER_PASS=$(New-Hex 32)"
+    "BACKUP_S3_ROOT_SECRET=$(New-Hex 24)"
+    "S3_BACKUP_WRITER_SECRET=$(New-Hex 24)"
+    "S3_RESTORE_READER_SECRET=$(New-Hex 24)"
 )
 $rng.Dispose()
 # LF, UTF-8 không BOM — Docker Compose đọc được trên mọi nền tảng.

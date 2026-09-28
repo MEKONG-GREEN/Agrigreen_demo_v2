@@ -278,7 +278,7 @@ func paramSetHash(ctx context.Context, tx pgx.Tx) (string, int64, error) {
 				vnum = d.String()
 			}
 		}
-		fmt.Fprintf(h, "%s\x1f%s\x1f%d\x1f%s\x1f%s\x1f%s\x1f%s\x1f%s\x1f%s\x1f%x\n",
+		_, _ = fmt.Fprintf(h, "%s\x1f%s\x1f%d\x1f%s\x1f%s\x1f%s\x1f%s\x1f%s\x1f%s\x1f%x\n",
 			tid, key, ver, vnum, vtext, unit, eff.UTC().Format(time.RFC3339Nano), src, sup, rh)
 		n++
 	}
