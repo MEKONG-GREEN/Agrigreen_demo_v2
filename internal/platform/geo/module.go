@@ -32,6 +32,8 @@ type Deps struct {
 	AdminUnits mdport.AdminUnits
 	// Orgs (tùy chọn): kiểm HTX tồn tại, đang hoạt động khi tạo/gán thửa.
 	Orgs partyport.Orgs
+	// Households (tùy chọn): kiểm nông hộ là thành viên đang hoạt động của HTX sở hữu thửa khi gán.
+	Households partyport.Households
 }
 
 // Module là pf/geo đã nối.
@@ -39,7 +41,7 @@ type Module struct{ svc *app.Service }
 
 // New tạo module với pool của vai geo_app.
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
-	return &Module{svc: &app.Service{DB: db, Clock: clk, Scope: deps.Scope, Params: deps.Params, Units: deps.AdminUnits, Orgs: deps.Orgs}}
+	return &Module{svc: &app.Service{DB: db, Clock: clk, Scope: deps.Scope, Params: deps.Params, Units: deps.AdminUnits, Orgs: deps.Orgs, Households: deps.Households}}
 }
 
 // RegisterApp gắn route Application API.

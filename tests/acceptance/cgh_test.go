@@ -209,8 +209,8 @@ func TestPrototypeDinhMucPhaiCoVanBan(t *testing.T) {
 }
 
 // Nguồn: mekong-green/tests/brd-2026.test.ts — "Ngưỡng cảnh báo theo phiên bản: mốc phải tăng dần, áp đúng phiên bản theo ngày của vụ".
-// Chỉ kiểm phần "áp đúng phiên bản theo ngày của vụ" (ngày tham chiếu = ngày bắt đầu vụ, 01/11).
-// Phần "mốc phải tăng dần" KHÔNG được nền tảng kiểm (xem báo cáo) nên không đưa vào.
+// Giống prototype: mốc phải tăng dần (Cần chú ý < Đủ < Thừa, so với hai mốc đã duyệt tại ngày hiệu lực —
+// kiểm khi đề xuất và khi duyệt) và áp đúng phiên bản theo ngày của vụ (ngày tham chiếu = ngày bắt đầu vụ, 01/11).
 func TestPrototypeNguongTheoPhienBan(t *testing.T) {
 	nguon(t, "brd-2026.test.ts", "Ngưỡng cảnh báo theo phiên bản: mốc phải tăng dần, áp đúng phiên bản theo ngày của vụ")
 	c := newCGH(t)
@@ -221,6 +221,16 @@ func TestPrototypeNguongTheoPhienBan(t *testing.T) {
 	c.area(c.coopNK, 2026, "550") // 4 × 120 ÷ 550 ≈ 87,3 %
 	c.area(c.coopNK, 2027, "550")
 	c.approveParam("cgh.coverage.sufficient_min_pct", "90", "2027-01-01")
+	setter := c.user("", true, "param_setter")
+	for _, bad := range []struct{ key, value, from, why string }{
+		{"cgh.coverage.sufficient_min_pct", "50", "2027-06-01", "Đủ 50 % dưới Cần chú ý 60 %"},
+		{"cgh.coverage.surplus_min_pct", "90", "2027-06-01", "Thừa 90 % không lớn hơn Đủ 90 %"},
+		{"cgh.coverage.attention_min_pct", "86", "2026-06-01", "Cần chú ý 86 % trên Đủ 85 % (bản trước 01/01/2027)"},
+	} {
+		wantProblem(t, setter.Do(harness.Admin, http.MethodPost, "/v1/masterdata/params/versions", "", map[string]any{
+			"key": bad.key, "value": bad.value, "unit": "%", "effective_from": bad.from, "source_doc": "QĐ thử nghiệm UAT số 02/2027",
+		}), 422, "masterdata.param_threshold_order", bad.why)
+	}
 	for _, tc := range []struct {
 		year       int
 		sufficient string

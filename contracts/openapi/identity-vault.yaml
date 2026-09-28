@@ -62,7 +62,7 @@ paths:
                 properties:
                   ref: { type: string, format: uuid }
                   label: { type: string, examples: ["Nguyễn V. A."] }
-                  masked_phone: { type: string, examples: ["09xx xxx 123"] }
+                  masked_phone: { type: string, examples: ["0912•••123"] }
         "400": { $ref: "#/components/responses/Problem" }
         "404": { $ref: "#/components/responses/Problem" }
         "410": { $ref: "#/components/responses/Problem" }

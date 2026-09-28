@@ -663,6 +663,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/plots/{ref}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Khôi phục thửa đã ngừng dùng (GIS BR-17) — sự kiện mới 'restored' kèm lý do ≥ 10 ký tự; kiểm lại chồng lấn như khi gán */
+        post: operations["restorePlot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cooperatives/{ref}/plots": {
         parameters: {
             query?: never;
@@ -2446,7 +2463,7 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 /** @enum {string} */
-                action: "assigned" | "retired";
+                action: "assigned" | "retired" | "restored";
                 seq: number;
                 /** Format: date-time */
                 event_time: string;
@@ -4425,6 +4442,44 @@ export interface operations {
         };
         responses: {
             /** @description Đã ngừng dùng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlotAttrResult"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    restorePlot: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                    /**
+                     * @description Xác nhận giữ nguyên khi chồng lấn thửa cùng HTX/thửa nháp
+                     * @default false
+                     */
+                    confirm_overlap?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã khôi phục */
             200: {
                 headers: {
                     [name: string]: unknown;

@@ -54,7 +54,7 @@ type Created struct {
 type Display struct {
 	Ref         uuid.UUID
 	Label       string `pii:"true"` // vd "Nguyễn V. A." — che bớt
-	MaskedPhone string `pii:"true"` // vd "09xx xxx 123"
+	MaskedPhone string `pii:"true"` // vd "0912•••123" (4 số đầu · 3 số cuối, UAT DEF-CGH-08)
 }
 
 // PubKey là khóa công khai của một chủ thể để đồng bộ xuống thiết bị.

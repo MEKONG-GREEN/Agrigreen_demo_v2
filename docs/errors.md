@@ -54,6 +54,7 @@ Mã lỗi của module có dạng `<module>.<lỗi>`.
 | 404 | `masterdata.param_version_not_found` | pf/masterdata: không có phiên bản tham số |
 | 409 | `masterdata.param_invalid_transition` | pf/masterdata: trạng thái không cho phép (gửi duyệt khi không phải nháp; duyệt/từ chối khi chưa gửi hoặc đã quyết định) |
 | 403 | `masterdata.param_not_setter` | pf/masterdata: gửi duyệt phiên bản do người khác đặt |
+| 422 | `masterdata.param_threshold_order` | pf/masterdata: mốc ngưỡng CGH (QT-02) lệch thứ tự so với hai mốc đã duyệt tại ngày hiệu lực — phải Cần chú ý < Đủ < Thừa (kiểm khi đề xuất và khi duyệt) |
 | 422 | `masterdata.param_correction_required` | pf/masterdata: đã có bản duyệt cùng `effective_from` — phải nêu `correction_reason` (bản ghi bù) |
 
 Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính mình trả mã chung `self_approval_forbidden` (R-56).
@@ -193,6 +194,7 @@ Việc xuất hỏng vĩnh viễn ghi `error_code` trên việc xuất (vd `mech
 | 422 | `geo.crs_unsupported` | pf/geo: hệ toạ độ khác WGS84 (EPSG:4326) — thành phần `crs` khác; `.prj` của Shapefile là VN-2000, hệ chiếu phẳng, hệ khác hoặc thiếu `.prj`; hoặc toạ độ ngoài miền kinh/vĩ độ. Hệ thống không tự chuyển VN-2000 — chuyển sang EPSG:4326 trước khi tải lên |
 | 422 | `geo.area_out_of_range` | pf/geo: diện tích trắc địa ngoài 0,001–1.000 ha |
 | 422 | `geo.outside_commune` | pf/geo: phần thửa nằm ngoài ranh giới xã (đã nhập) vượt ngưỡng; có `outside_pct` |
+| 422 | `geo.household_invalid` | pf/geo: nông hộ gán cho thửa không tồn tại, đã ngừng hoạt động hoặc không là thành viên của HTX được gán (khi đã nối pf/party) |
 | 422 | `geo.cooperative_invalid` | pf/geo: HTX không tồn tại, đã ngừng hoạt động hoặc ngoài phạm vi (khi đã nối pf/party) |
 | 422 | `geo.format_invalid` | pf/geo: tệp nhập không đọc được, không có đối tượng, hoặc quá 200 đối tượng; Shapefile: không phải gói .zip, thiếu .shp/.dbf, nhiều lớp, số bản ghi .dbf khác .shp |
 | 422 | `geo.format_unsupported` | pf/geo: không nhận ra định dạng tệp — hỗ trợ GeoJSON, KML, Shapefile (.zip) |

@@ -910,6 +910,32 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /v1/plots/{ref}/restore:
+    post:
+      summary: Khôi phục thửa đã ngừng dùng (GIS BR-17) — sự kiện mới 'restored' kèm lý do ≥ 10 ký tự; kiểm lại chồng lấn như khi gán
+      operationId: restorePlot
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 10}
+                confirm_overlap: {type: boolean, default: false, description: "Xác nhận giữ nguyên khi chồng lấn thửa cùng HTX/thửa nháp"}
+      responses:
+        "200":
+          description: Đã khôi phục
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PlotAttrResult"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/cooperatives/{ref}/plots:
     get:
       summary: Thửa của một HTX (HTX US-PLOT-01), phân trang cursor
@@ -2985,7 +3011,7 @@ components:
           required: [id, action, seq, event_time, reason, actor_ref]
           properties:
             id: {type: string, format: uuid}
-            action: {type: string, enum: [assigned, retired]}
+            action: {type: string, enum: [assigned, retired, restored]}
             seq: {type: integer}
             event_time: {type: string, format: date-time}
             reason: {type: [string, "null"]}

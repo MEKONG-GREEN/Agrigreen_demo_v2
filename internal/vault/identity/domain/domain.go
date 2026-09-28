@@ -157,13 +157,14 @@ func initial(w string) string {
 	return string(unicode.ToUpper(r)) + "."
 }
 
-// MaskPhone che SĐT đã chuẩn hóa 84xxxxxxxxx thành "09xx xxx 123".
+// MaskPhone che SĐT đã chuẩn hóa 84xxxxxxxxx theo mẫu 4 số đầu · 3 số cuối
+// (UAT DEF-CGH-08): 84912345678 → "0912•••678".
 func MaskPhone(normalized string) string {
 	if len(normalized) != 11 || !strings.HasPrefix(normalized, "84") {
 		return ""
 	}
 	local := "0" + normalized[2:]
-	return local[:2] + "xx xxx " + local[len(local)-3:]
+	return local[:4] + "•••" + local[len(local)-3:]
 }
 
 var areaRe = regexp.MustCompile(`^[0-9A-Za-z._-]{1,32}$`)

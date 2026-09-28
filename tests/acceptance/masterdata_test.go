@@ -67,7 +67,8 @@ func TestPrototypeQuyDoiDiaGioi2025(t *testing.T) {
 }
 
 // Nguồn: mekong-green/tests/brd-2026.test.ts — "UAT DEF-HTX-13: tạo mùa vụ có kiểm tra và không trùng mã".
-// Khác prototype: mã được lưu đúng như nhập (không tự viết hoa); tháng bắt đầu/kết thúc đi cùng nhau.
+// Giống prototype: mã mùa vụ được chuẩn hóa chữ HOA nên "dx-…" và "DX-…" là cùng một vụ (trùng → 409).
+// Khác prototype: tháng bắt đầu/kết thúc đi cùng nhau.
 func TestPrototypeMuaVuKhongTrungMa(t *testing.T) {
 	nguon(t, "brd-2026.test.ts", "UAT DEF-HTX-13: tạo mùa vụ có kiểm tra và không trùng mã")
 	w := newWorld(t)
@@ -75,7 +76,7 @@ func TestPrototypeMuaVuKhongTrungMa(t *testing.T) {
 		return w.root.Do(harness.Admin, http.MethodPost, "/v1/masterdata/catalogs/season/items", "", body)
 	}
 	attrs := map[string]string{"start_month": "11", "end_month": "3"}
-	r := w.want(post(map[string]any{"code": "DX-2027-2028", "name": "Đông Xuân 2027-2028", "attrs": attrs}), 201, "tạo mùa vụ")
+	r := w.want(post(map[string]any{"code": "dx-2027-2028", "name": "Đông Xuân 2027-2028", "attrs": attrs}), 201, "tạo mùa vụ (mã chữ thường)")
 	if str(r.Body, "code") != "DX-2027-2028" {
 		t.Fatalf("mã mùa vụ: %s", trim(r.Raw))
 	}

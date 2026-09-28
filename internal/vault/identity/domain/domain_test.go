@@ -67,7 +67,7 @@ func TestLabelAndMask(t *testing.T) {
 	if got := Label("Út"); got != "Ú." {
 		t.Fatalf("Label một từ = %q", got)
 	}
-	if got := MaskPhone("84912345123"); got != "09xx xxx 123" {
+	if got := MaskPhone("84912345123"); got != "0912•••123" {
 		t.Fatalf("MaskPhone = %q", got)
 	}
 }

@@ -37,9 +37,11 @@ var (
 
 	ErrParamNotFound = problem.New(http.StatusNotFound, "masterdata.param_not_found", "Không có tham số đã phê duyệt có hiệu lực tại thời điểm tra").
 				WithCause(port.ErrParamNotFound)
-	ErrVersionNotFound    = problem.New(http.StatusNotFound, "masterdata.param_version_not_found", "Không có phiên bản tham số")
-	ErrTransition         = problem.New(http.StatusConflict, "masterdata.param_invalid_transition", "Trạng thái phiên bản không cho phép thao tác này")
-	ErrNotSetter          = problem.New(http.StatusForbidden, "masterdata.param_not_setter", "Chỉ người đặt được gửi duyệt phiên bản của mình")
+	ErrVersionNotFound = problem.New(http.StatusNotFound, "masterdata.param_version_not_found", "Không có phiên bản tham số")
+	ErrTransition      = problem.New(http.StatusConflict, "masterdata.param_invalid_transition", "Trạng thái phiên bản không cho phép thao tác này")
+	ErrNotSetter       = problem.New(http.StatusForbidden, "masterdata.param_not_setter", "Chỉ người đặt được gửi duyệt phiên bản của mình")
+	ErrThresholdOrder  = problem.New(http.StatusUnprocessableEntity, "masterdata.param_threshold_order",
+		"Ngưỡng mức đáp ứng CGH phải tăng dần: Cần chú ý < Đủ < Thừa")
 	ErrCorrectionRequired = problem.New(http.StatusUnprocessableEntity, "masterdata.param_correction_required",
 		"Đã có phiên bản được duyệt cùng ngày hiệu lực: phải nêu correction_reason")
 )

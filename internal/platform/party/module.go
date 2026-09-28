@@ -67,6 +67,9 @@ func (m *Module) ConsentChecker() port.ConsentChecker { return m.svc }
 // Orgs cho module khác tra cứu tổ chức (qua port).
 func (m *Module) Orgs() port.Orgs { return m.reg }
 
+// Households cho module khác tra HTX hiện tại của nông hộ (geo: gán thửa).
+func (m *Module) Households() port.Households { return m.reg }
+
 // ScopeResolver cho module khác tính phạm vi theo cây phân cấp (qua port, ADR-0009).
 func (m *Module) ScopeResolver() port.ScopeResolver { return m.reg }
 

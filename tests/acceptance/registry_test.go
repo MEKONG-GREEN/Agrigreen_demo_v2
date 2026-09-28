@@ -138,8 +138,9 @@ func TestPrototypeNongHoTrungSoDienThoai(t *testing.T) {
 		t.Fatalf("HTX phải có đúng 1 hộ (không sinh bản trùng), có %d", len(items))
 	}
 	masked := str(items[0], "masked_phone")
-	if masked == "" || strings.Contains(strings.ReplaceAll(masked, " ", ""), "0999000101") || !strings.HasSuffix(masked, "101") {
-		t.Fatalf("SĐT phải được che, chỉ lộ 3 số cuối: %q", masked)
+	// UAT DEF-CGH-08: che theo mẫu 4 số đầu · 3 số cuối.
+	if masked != "0999•••101" {
+		t.Fatalf("SĐT phải được che theo mẫu 4 đầu · 3 cuối: %q", masked)
 	}
 	if containsAny(str(items[0], "label"), "Trần Thị Mô Phỏng") {
 		t.Fatalf("nhãn hiển thị phải che bớt họ tên: %q", str(items[0], "label"))

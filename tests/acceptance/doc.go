@@ -25,7 +25,7 @@
 //	brd-2026.test.ts        DEF-KN-PLOT-01 nơ bướm                                  → TestPrototypeThuaTuCatBiTuChoi        G
 //	brd-2026.test.ts        "Chồng lấn cùng HTX → cần xác nhận…; HTX khác → chặn"   → TestPrototypeChongLanCungHTXVaKhacHTX K (mở xung đột chờ xem xét)
 //	brd-2026.test.ts        DEF-KN-PLOT-02 giao cạnh                                → TestPrototypeChongLanQuaGiaoCanh      K (ngưỡng 1 %, liền kề không cờ)
-//	brd-2026.test.ts        "Xoá mềm ẩn thửa… khôi phục được"                       → TestPrototypeNgungDungThuaCoLyDo      K (retire là sự kiện; chưa có khôi phục)
+//	brd-2026.test.ts        "Xoá mềm ẩn thửa… khôi phục được"                       → TestPrototypeNgungDungThuaCoLyDo      K (retire/restore là sự kiện, lý do bắt buộc)
 //	htx-operations.test.ts  "Vẽ lại đường bao thì diện tích tính lại…"              → TestPrototypeVeLaiRanhGioiTinhLaiDienTich K (phiên bản mới + lý do)
 //	htx-operations.test.ts  "Khuyến nông vẽ thửa rồi gán cho HTX và thành viên"     → TestPrototypeGanThuaChoHTXVaNongHo    K (sự kiện assigned)
 //	brd-2026.test.ts        DEF-HTX-01/02 nạp tệp; "Đọc GeoJSON và KML…"            → TestPrototypeNapThuaTuTep             K (Admin API, kết quả từng đối tượng)
@@ -34,7 +34,7 @@
 //	brd-2026.test.ts        "BR-09: số máy của HTX tại ngày T…"                     → TestPrototypeSoMayTaiNgayT            K (vô hiệu hóa là sự kiện)
 //	brd-2026.test.ts        "Nhập máy hàng loạt: Cập nhật / Thay thế"               → TestPrototypeNhapMayCapNhatVaThayThe  K (vô hiệu hóa, không xóa)
 //	brd-2026.test.ts        "Định mức: phải có văn bản, không chồng…"               → TestPrototypeDinhMucPhaiCoVanBan      K (effective_from, bản ghi bù, R-56)
-//	brd-2026.test.ts        "Ngưỡng cảnh báo theo phiên bản…"                       → TestPrototypeNguongTheoPhienBan       G (chỉ phần áp theo ngày vụ)
+//	brd-2026.test.ts        "Ngưỡng cảnh báo theo phiên bản…"                       → TestPrototypeNguongTheoPhienBan       G (mốc tăng dần + áp theo ngày vụ)
 //	brd-2026.test.ts        classifyCoverage; DEF-CGH-01 dashboard                  → TestPrototypePhanLoaiMucDapUng        K (không cắt 100 %, Thừa ≥ 120 %)
 //	brd-2026.test.ts        "Chủng loại máy còn máy tham chiếu… chỉ ngừng"          → TestPrototypeChungLoaiMayChiNgungDung K (không có xóa)
 //	brd-2026.test.ts        DEF-HTX-12/10 yêu cầu hỗ trợ thiếu mô tả                → TestPrototypeYeuCauHoTroThieuMoTa     K (cấm SĐT/CCCD trong mô tả)
@@ -45,7 +45,7 @@
 //	brd-2026.test.ts        "Báo cáo tổng hợp KN gắn cờ tạm tính…"                  → TestPrototypeDashboardTamTinh         K (tạm tính = còn xã chưa báo cáo)
 //	htx-operations.test.ts  "Dropdown hành chính lọc dần…"; "Cây hành chính…"       → TestPrototypeDonViHanhChinhLocDan     K (2 cấp, không có ấp)
 //	import.test.ts          "Quy đổi địa giới 2025 — 12 tỉnh cũ gộp về 6"           → TestPrototypeQuyDoiDiaGioi2025        K (14 tỉnh cũ, lịch sử hiệu lực)
-//	brd-2026.test.ts        DEF-HTX-13 mùa vụ không trùng mã                        → TestPrototypeMuaVuKhongTrungMa        K (không tự viết hoa mã)
+//	brd-2026.test.ts        DEF-HTX-13 mùa vụ không trùng mã                        → TestPrototypeMuaVuKhongTrungMa        G (mã vụ chuẩn hóa chữ HOA)
 //	brd-2026.test.ts        DEF-CGH-05/06/10 sửa chủng loại máy                     → TestPrototypeSuaChungLoaiMay          K (mã bất biến, định mức là tham số)
 //	brd-2026.test.ts        "Giống đang được vụ tham chiếu thì chỉ ẩn…"             → TestPrototypeGiongNgungDungChiAn      K (không xóa hẳn)
 //	idempotency.test.ts     "Cùng khoá, gửi hai lần…"                               → TestPrototypeCungKhoaGuiHaiLan        G
@@ -54,8 +54,8 @@
 //	idempotency.test.ts     "Cùng khoá nhưng đường dẫn khác…"                       → TestPrototypeCungKhoaKhacDuongDan     G
 //	idempotency.test.ts     "Khoá thuộc về người dùng…"                             → TestPrototypeKhoaTheoTenant           K (khóa theo tenant)
 //
-// Ca prototype KHÔNG port vì nền tảng chưa có/không đúng BRD (xem báo cáo UAT S5):
-// "Không gán được thửa cho thành viên của HTX khác" (geo chưa kiểm nông hộ thuộc HTX),
-// "mốc ngưỡng phải tăng dần" (chưa kiểm liên khóa), khôi phục thửa đã ngừng dùng,
-// "không vô hiệu hoá được HTX còn vụ đang canh tác" (G1 chưa có vụ/nhật ký).
+// Năm phát hiện của đợt port đầu (gán thửa cho nông hộ HTX khác, mốc ngưỡng CGH không kiểm thứ tự,
+// không khôi phục được thửa, mặt nạ SĐT khác DEF-CGH-08, mã vụ không viết hoa) đã được sửa ở module
+// sở hữu; các ca tương ứng nay kiểm quy tắc đúng. Ca prototype chưa port: "không vô hiệu hoá được HTX
+// còn vụ đang canh tác" (G1 chưa có vụ/nhật ký canh tác).
 package acceptance
