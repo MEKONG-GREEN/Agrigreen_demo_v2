@@ -116,13 +116,13 @@ type CoverageItem struct {
 	// CooperativeCode: Mã HTX (CGH BR-01, FN-11) — chỉ ở cấp HTX (G-10).
 	CooperativeCode string
 	Name            string
-	ProvinceCode   string
-	CommuneCode    string
-	Cooperatives   int
-	AreaSource     string // chỉ ở cấp HTX: [App HTX]/[Nhập tay]
-	AreaLocked     bool
-	Overall        domain.Group
-	Stages         map[string]domain.Group
+	ProvinceCode    string
+	CommuneCode     string
+	Cooperatives    int
+	AreaSource      string // chỉ ở cấp HTX: [App HTX]/[Nhập tay]
+	AreaLocked      bool
+	Overall         domain.Group
+	Stages          map[string]domain.Group
 }
 
 // CoverageView là kết quả tổng hợp theo cấp.

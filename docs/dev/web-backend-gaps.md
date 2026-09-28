@@ -16,17 +16,25 @@ Quy ước chung của mọi đề xuất (docs/dev/g1-conventions.md §3–4):
 
 ## Tóm tắt
 
-| Mã | Route đề xuất | Bề mặt | Trang cần | Web đang làm tạm |
+**Trạng thái 28/09/2026: G-02 … G-10 ĐÃ XONG ở backend** (OpenAPI đã cập nhật, kiểu web đã sinh lại bằng `npm run gen:api`). Web còn phải chuyển nơi gọi sang route/trường mới và xoá phần ghép tạm (bước 2–3 ở trên) — việc của nhóm web. Mọi trường mới là **thêm vào**, không đổi hình dạng cũ.
+
+| Mã | Trạng thái | Route / trường cuối cùng | Bề mặt | Trang cần |
 |---|---|---|---|---|
-| G-02 | Mở rộng `GET /v1/extension/dashboard` (hoặc `GET /v1/dashboard/summary`) | Application | `/` | chỉ hiện 4 KPI của pf/extension |
-| G-03 | Thêm trường và bộ lọc cho `GET /v1/cooperatives` | Application | `/htx`, `/htx/[id]`, `/ban-do` | tra tên xã/tỉnh từng mã qua masterdata |
-| G-04 | Trạng thái đồng ý trong `GET /v1/cooperatives/{ref}/households` | Application | `/htx/[id]` tab Nông hộ | không hiện cột đồng ý |
-| G-05 | `GET /v1/geo/admin-boundaries?level=&parent=` | Application | `/ban-do`, `/cgh` | gọi `GET /v1/geo/admin-boundaries/{code}` cho từng đơn vị |
-| G-06 | `GET /v1/masterdata/catalogs` | Admin | `/quan-tri/danh-muc` | danh sách danh mục cứng theo enum, không có số mục |
-| G-07 | `GET /v1/masterdata/params` (sổ đăng ký tham số) | Admin | `/quan-tri/tham-so` | tên tham số viết cứng ở `src/admin/params.ts`; người đặt/duyệt hiện mã |
-| G-08 | `GET /v1/orgs` trên Admin API | Admin | `/quan-tri/to-chuc` | đọc cây qua Application API |
-| G-09 | Tên hiển thị trong `GET /v1/extension/tasks` | Application | `/nhiem-vu` | chỉ hiện "Đã/Chưa phân công", link HTX không có tên |
-| G-10 | Mã HTX và nguồn diện tích trong `MechCoverageItem` | Application | `/cgh` bảng "HTX cần ưu tiên" | chỉ hiện tên HTX |
+| G-02 | **DONE** | `GET /v1/dashboard?unit=&period=` (phương án b, bỏ `/summary`) | Application | `/` |
+| G-03 | **DONE** | `GET /v1/cooperatives?admin_unit=` + `province_code, commune_name, province_name, member_households, digitized_plots` (cả `GET /v1/cooperatives/{ref}`) | Application | `/htx`, `/htx/[id]`, `/ban-do` |
+| G-04 | **DONE** | `consents[] {purpose, status, event_time}` trong `HouseholdListItem` | Application | `/htx/[id]` |
+| G-05 | **DONE** | `GET /v1/geo/admin-boundaries?level=province\|commune&parent=&zoom=` → FeatureCollection + `missing[]` | Application | `/ban-do`, `/cgh` |
+| G-06 | **DONE** | `GET /v1/masterdata/catalogs` | Admin | `/quan-tri/danh-muc` |
+| G-07 | **DONE** | `GET /v1/masterdata/params?prefix=` + `setter_name`, `approver_name` trong `ParamVersion` | Admin | `/quan-tri/tham-so` |
+| G-08 | **DONE** | `GET /v1/orgs?kind=&parent_ref=&include_inactive=` | Admin | `/quan-tri/to-chuc` |
+| G-09 | **DONE** | `assignee_name, cooperative_name, commune_name` trong `ExtTask` (danh sách và chi tiết) | Application | `/nhiem-vu` |
+| G-10 | **DONE** | `cooperative_code, area_source_label` trong `MechCoverageItem` | Application | `/cgh` |
+
+Ghi chú hiện thực (R-02, R-06 — không SQL xuyên schema):
+- G-02: pf/extension ghép KPI của mình với cổng đọc `geo/port.PlotStats` (thửa chưa ngừng dùng theo xã) và `party/port.CooperativeStats` (HTX đang hoạt động, hộ thành viên theo xã). Tổng = tổng các đơn vị con (toàn quốc = tổng các tỉnh); `provisional` giữ nguyên nghĩa "Số liệu tạm tính" của pf/extension. Mục tiêu diện tích là tham số có phê duyệt `extension.target_sown_area_ha:<mã đơn vị>` (tra tại đầu kỳ); toàn quốc = tổng mục tiêu các tỉnh, tỉnh/xã dùng tham số của chính đơn vị nếu có. `sources[]` cho biết module nào đã nối.
+- G-03: `digitized_plots` qua `geo/port.PlotStats` (null khi chưa nối pf/geo). Phạm vi người gọi vẫn áp: `admin_unit` ngoài phạm vi → danh sách rỗng.
+- G-07: tên người đặt/duyệt lấy từ danh bạ cán bộ pf/extension (`extension/port.StaffDirectory`); cán bộ chưa có trong danh bạ → `null` (web hiện mã). Khóa chưa có phiên bản vẫn có trong sổ; khóa có chiều (định mức) chỉ hiện khi đã có phiên bản.
+- G-09: tên cán bộ từ danh bạ trực (`display_name`), tên HTX qua `party/port.Orgs`, tên xã qua masterdata.
 
 Đã chuyển sang route thật:
 - `GET /v1/me`: phạm vi, menu, tên đơn vị. `Me` không có tên người (R-04), nên tên hiển thị lấy từ claim `name` của token.
@@ -34,7 +42,7 @@ Quy ước chung của mọi đề xuất (docs/dev/g1-conventions.md §3–4):
 
 ---
 
-## G-02 — Bảng điều hành gộp nhiều module
+## [DONE] G-02 — Bảng điều hành gộp nhiều module
 
 **Cần cho:** trang `/` (US-DASH-01 và prototype KN: 4 thẻ "diện tích triển khai – HTX – thửa đã số hoá – nhiệm vụ quá hạn", biểu đồ tiến độ so với mục tiêu).
 
@@ -60,7 +68,7 @@ Phương án (b) là route gộp mới `GET /v1/dashboard/summary?unit=82&period
 }
 ```
 
-## G-03 — Danh sách HTX: tên địa bàn, số hộ, bộ lọc đơn vị
+## [DONE] G-03 — Danh sách HTX: tên địa bàn, số hộ, bộ lọc đơn vị
 
 **Cần cho:** `/htx` (cột Địa bàn, Hộ thành viên, Thửa số hoá; bộ lọc tỉnh cho cán bộ TW), `/htx/[id]`, `/ban-do` (lọc HTX theo tỉnh đã chọn).
 
@@ -82,7 +90,7 @@ Phương án (b) là route gộp mới `GET /v1/dashboard/summary?unit=82&period
 }
 ```
 
-## G-04 — Trạng thái đồng ý của nông hộ trong danh sách
+## [DONE] G-04 — Trạng thái đồng ý của nông hộ trong danh sách
 
 **Cần cho:** `/htx/[id]`, tab Nông hộ, cột "Đồng ý chia sẻ dữ liệu" (R-41/R-42).
 
@@ -92,7 +100,7 @@ Phương án (b) là route gộp mới `GET /v1/dashboard/summary?unit=82&period
 { "household_ref": "…", "label": "Nguyễn V. A.", "consents": [ { "purpose": "mrv.evidence", "status": "granted", "event_time": "2026-05-02T08:00:00+07:00" } ] }
 ```
 
-## G-05 — Ranh giới hành chính theo cấp hoặc đơn vị cha
+## [DONE] G-05 — Ranh giới hành chính theo cấp hoặc đơn vị cha
 
 **Cần cho:** `/ban-do` (ranh giới tỉnh với TW, ranh giới xã với tỉnh/xã) và `/cgh` (tô màu mức đáp ứng theo tỉnh).
 
@@ -112,7 +120,7 @@ Backend chỉ có `GET /v1/geo/admin-boundaries/{code}`. Web phải liệt kê �
 }
 ```
 
-## G-06 — Danh sách danh mục (Admin)
+## [DONE] G-06 — Danh sách danh mục (Admin)
 
 **Cần cho:** cột trái của `/quan-tri/danh-muc`, gồm tên tiếng Việt, số mục và số mục ngừng dùng.
 
@@ -125,7 +133,7 @@ Tên danh mục hiện là enum cố định (`components.parameters.Catalog`), 
 { "items": [ { "catalog": "rice_variety", "name": "Giống lúa", "item_count": 6, "inactive_count": 1, "attrs_schema": ["growth_days", "expected_yield_t_per_ha"] } ] }
 ```
 
-## G-07 — Sổ đăng ký tham số và tên người đặt/duyệt
+## [DONE] G-07 — Sổ đăng ký tham số và tên người đặt/duyệt
 
 **Cần cho:** `/quan-tri/tham-so`.
 
@@ -146,7 +154,7 @@ Tên danh mục hiện là enum cố định (`components.parameters.Catalog`), 
 
 Kèm theo: thêm `setter_name` và `approver_name` (tên cán bộ, không phải nông hộ) vào `ParamVersion`.
 
-## G-08 — Liệt kê tổ chức trên Admin API
+## [DONE] G-08 — Liệt kê tổ chức trên Admin API
 
 **Cần cho:** `/quan-tri/to-chuc`.
 
@@ -159,7 +167,7 @@ Admin API có tạo, di chuyển, đổi tên và nhật ký tổ chức, nhưng
 { "ref": "…", "kind": "extension_team", "code": "TKN-82101", "name": "Tổ khuyến nông cộng đồng Xã Mỹ An", "admin_unit_code": "82101", "parent_ref": "…", "representative_ref": null, "active": true }
 ```
 
-## G-09 — Tên hiển thị trong danh sách nhiệm vụ
+## [DONE] G-09 — Tên hiển thị trong danh sách nhiệm vụ
 
 **Cần cho:** `/nhiem-vu`, gồm cột "Phân công" (tên cán bộ) và "HTX / địa bàn" (tên HTX).
 
@@ -169,7 +177,7 @@ Admin API có tạo, di chuyển, đổi tên và nhật ký tổ chức, nhưng
 { "task_id": "…", "assignee_ref": "…", "assignee_name": "Trần Thị C", "cooperative_ref": "…", "cooperative_name": "HTX Nông nghiệp Mỹ An", "commune_name": "Xã Mỹ An" }
 ```
 
-## G-10 — Mã HTX trong kết quả cân đối CGH
+## [DONE] G-10 — Mã HTX trong kết quả cân đối CGH
 
 **Cần cho:** `/cgh`, bảng "HTX cần ưu tiên" (BRD CGH FN-11 hiện Mã HTX).
 
@@ -178,3 +186,9 @@ Admin API có tạo, di chuyển, đổi tên và nhật ký tổ chức, nhưng
 ```json
 { "cooperative_ref": "…", "cooperative_code": "HTX8200001", "name": "HTX Nông nghiệp Mỹ An", "province_code": "82", "commune_code": "82101" }
 ```
+
+## Route mới khác cho web (28/09/2026)
+
+- **US-LIB-05** danh mục cá nhân: `GET /v1/library`, `POST /v1/documents/{ref}/save {note?}`, `POST /v1/documents/{ref}/unsave` (Application). Đồng bộ xuống máy qua entity `library_item` của nguồn tài liệu (chỉ giao cho chính người lưu; bỏ lưu → tombstone).
+- **US-SYNC-03** đối soát xung đột (Admin, vai `sync_conflict_resolver`): `GET /v1/sync/conflicts?entity=&sla=on_track|due_soon|overdue` (mỗi mục có `sla_status`), `GET /v1/sync/conflicts/{id}` (thêm `records[]` — bản ghi máy gửi, không payload; `versions[]` — hai phiên bản do module sở hữu cung cấp, không PII; `resolution`), `POST /v1/sync/conflicts/{id}/resolve {note, resolution: keep_version|correction, resolved_record_id}`. Xung đột ranh giới: `GET /v1/geo/conflicts/{id}` (Application) trả `versions[]` gồm bản gây xung đột, bản hiện hành, thửa bị chồng lấn kèm hình.
+- **CGH FN-09** dự báo nhu cầu (phương pháp tạm, cần DCRD xác nhận — `docs/dev/cgh-forecast.md`): `POST /v1/mechanization/forecasts` (Admin), `GET /v1/mechanization/forecasts`, `GET /v1/mechanization/forecasts/{id}` (Application).

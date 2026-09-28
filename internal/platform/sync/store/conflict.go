@@ -54,6 +54,12 @@ type ConflictFilter struct {
 	Status      string     // rỗng = mọi trạng thái
 	OverdueAt   *time.Time // khác nil: chỉ mục đang mở có due_at < OverdueAt
 	OwnerOrgRef *uuid.UUID
+	Entity      string // rỗng = mọi entity
+	// DueWindow khác nil: chỉ mục đang mở CHƯA quá hạn tại Now và hết hạn trước Now + DueWindow
+	// ("sắp quá hạn", US-SYNC-03). OnTrackAt khác nil: mục đang mở còn hạn sau thời điểm này.
+	Now       time.Time
+	DueWindow *time.Duration
+	OnTrackAt *time.Time
 }
 
 // ListConflicts phân trang theo id (UUIDv7).
@@ -67,11 +73,23 @@ func ListConflicts(ctx context.Context, tx pgx.Tx, f ConflictFilter, after uuid.
 		t := f.OverdueAt.UTC()
 		overdue = &t
 	}
+	var soonFrom, soonTo, onTrack *time.Time
+	if f.DueWindow != nil {
+		a, b := f.Now.UTC(), f.Now.Add(*f.DueWindow).UTC()
+		soonFrom, soonTo = &a, &b
+	}
+	if f.OnTrackAt != nil {
+		t := f.OnTrackAt.UTC()
+		onTrack = &t
+	}
 	rows, err := tx.Query(ctx, "SELECT "+conflictCols+` FROM pf_sync.conflict
 	  WHERE id > $1 AND ($2::text IS NULL OR status = $2)
 	    AND ($3::timestamptz IS NULL OR (status = 'open' AND due_at < $3))
 	    AND ($4::uuid IS NULL OR owner_org_ref = $4)
-	  ORDER BY id LIMIT $5`, after, status, overdue, f.OwnerOrgRef, limit)
+	    AND ($6::text = '' OR entity = $6)
+	    AND ($7::timestamptz IS NULL OR (status = 'open' AND due_at >= $7 AND due_at < $8::timestamptz))
+	    AND ($9::timestamptz IS NULL OR (status = 'open' AND due_at >= $9))
+	  ORDER BY id LIMIT $5`, after, status, overdue, f.OwnerOrgRef, limit, f.Entity, soonFrom, soonTo, onTrack)
 	if err != nil {
 		return nil, err
 	}

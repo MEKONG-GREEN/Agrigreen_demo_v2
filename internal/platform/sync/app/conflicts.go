@@ -26,6 +26,9 @@ type ConflictQuery struct {
 	OwnerOrgRef *uuid.UUID
 	After       uuid.UUID
 	Limit       int
+	// Entity lọc theo entity; SLA lọc theo trạng thái SLA: on_track | due_soon | overdue (US-SYNC-03).
+	Entity string
+	SLA    string
 }
 
 // ConflictPage là một trang xung đột.
@@ -48,9 +51,12 @@ func (s *Service) ListConflicts(ctx context.Context, q ConflictQuery) (ConflictP
 		q.Limit = 50
 	}
 	now := s.Clock.Now()
-	f := store.ConflictFilter{Status: q.Status, OwnerOrgRef: q.OwnerOrgRef}
+	f := store.ConflictFilter{Status: q.Status, OwnerOrgRef: q.OwnerOrgRef, Entity: q.Entity, Now: now}
 	if q.OverdueOnly {
 		f.OverdueAt = &now
+	}
+	if err := applySLAFilter(&f, q.SLA, now); err != nil {
+		return ConflictPage{}, err
 	}
 	var items []domain.Conflict
 	err = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
@@ -95,6 +101,10 @@ func (s *Service) GetConflict(ctx context.Context, id uuid.UUID) (domain.Conflic
 // ResolveConflict đóng xung đột. Quyết định nghiệp vụ (giữ bản ghi nào) do module
 // sở hữu entity áp bằng bản ghi bù khi nhận pf.sync.conflict.resolved.
 func (s *Service) ResolveConflict(ctx context.Context, id uuid.UUID, note string, record *uuid.UUID) (domain.Conflict, error) {
+	return s.resolve(ctx, id, note, record, "")
+}
+
+func (s *Service) resolve(ctx context.Context, id uuid.UUID, note string, record *uuid.UUID, resolution string) (domain.Conflict, error) {
 	p, err := authz.Require(ctx, port.RoleConflictResolver)
 	if err != nil {
 		return domain.Conflict{}, err
@@ -125,7 +135,7 @@ func (s *Service) ResolveConflict(ctx context.Context, id uuid.UUID, note string
 			ID: ids.New(), TenantID: p.TenantID, Type: port.EventConflictResolved, SchemaVersion: 1,
 			OccurredAt: now, TraceID: telemetry.TraceID(ctx), Producer: "pf/sync",
 			Payload: port.ConflictResolvedV1{ConflictID: id, Entity: c.Entity, ResolvedBy: by, ResolvedAt: now.Format(time.RFC3339),
-				ResolvedRecordID: record, Overdue: c.Overdue(now)},
+				ResolvedRecordID: record, Overdue: c.Overdue(now), Resolution: resolution},
 		})
 	})
 	return c, err

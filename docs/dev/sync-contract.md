@@ -43,7 +43,8 @@ Thân: `{ "device_id": "<UUIDv7 sinh trên máy>", "platform": "android" | "ios"
   - HTX, nông hộ (chỉ nhãn hiển thị tối thiểu, **không** họ tên đầy đủ, SĐT, CCCD);
   - thửa, nhiệm vụ được giao, quy trình kỹ thuật;
   - khóa công khai của hộ thuộc địa bàn.
-- `entity` G1: `catalog_item`, `admin_unit`, `cooperative`, `household`, `plot`, `task`, `directive`, `document`, `pubkey`.
+- `entity` G1: `catalog_item`, `admin_unit`, `cooperative`, `household`, `plot`, `task`, `directive`, `document`, `library_item`, `pubkey`.
+- `library_item` (pf/content, KN US-LIB-05): danh mục cá nhân của CHÍNH người gọi; `id` = `document_ref`, `data = {document_ref, saved_at, note, title, available}`; bỏ lưu → tombstone. Tài liệu đã lưu luôn nằm trong entity `document` của người đó (chỉ lưu được tài liệu đang hiển thị với họ); `available = false` khi tài liệu đã gỡ — máy giữ bản đã tải, nhãn "đã gỡ".
 - `op: tombstone` nghĩa là ngừng hiển thị trên máy (hết phạm vi, ngừng dùng). Không có xóa cứng ở máy chủ.
 
 ## Chiều lên: push

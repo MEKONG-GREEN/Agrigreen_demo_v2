@@ -28,7 +28,7 @@ type Sync struct{ Svc *Service }
 var _ syncport.Source = Sync{}
 
 // Entities thực hiện syncport.Source.
-func (Sync) Entities() []string { return []string{port.SyncEntityDocument} }
+func (Sync) Entities() []string { return []string{port.SyncEntityDocument, port.SyncEntityLibrary} }
 
 // SyncAttachment là siêu dữ liệu tệp trong payload đồng bộ; máy tải tệp qua
 // GET /v1/documents/{ref} (URL có hạn), không kèm URL ở đây.
@@ -63,6 +63,12 @@ type SyncDocument struct {
 
 // Changes thực hiện syncport.Source.
 func (s Sync) Changes(ctx context.Context, scope authz.Scope, entity string, after int64, limit int) ([]syncport.Change, int64, error) {
+	if limit <= 0 || limit > 1000 {
+		limit = 500
+	}
+	if entity == port.SyncEntityLibrary {
+		return s.libraryChanges(ctx, scope, after, limit)
+	}
 	if entity != port.SyncEntityDocument {
 		return nil, after, fmt.Errorf("content: entity %q không thuộc module", entity)
 	}
