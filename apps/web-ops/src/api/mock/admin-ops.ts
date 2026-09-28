@@ -6,7 +6,7 @@ import { uuidv7 } from "../idempotency";
 import type { AccountsEvent, AccountsUser, CatalogName, Org, ReportSchedule, ReportTemplate } from "../types";
 import { CATALOG_META, CATALOGS, COMMUNES, COOPERATIVES, ORGS, PARAM_REGISTRY, PARAM_VERSIONS } from "./data";
 import { SYNC_CONFLICTS_STORE, slaStatusOf } from "./conflicts";
-import { hasRole, isZip, iso, json, nowIso, omit, opaque, paginate, problem, reasonOf, scopeUnits, validation, type Route } from "./http";
+import { hasRole, isZip, iso, json, nowIso, omit, opaque, paginate, problem, problemOf, reasonOf, scopeUnits, validation, type Route } from "./http";
 import { computeForecast, FORECASTS, latestTemplate, MOCK_DEVICES, nudge, REPORT_TEMPLATES, templateKeys } from "./ops";
 import type { MockPersona } from "./personas";
 
@@ -282,6 +282,16 @@ function lockUnlock(p: MockPersona, id: string | undefined, body: unknown, lock:
   return json({ account: accountSnapshot(found.user), seq, replayed: false });
 }
 
+function resendActions(p: MockPersona, id: string | undefined, body: unknown): Response {
+  const a = findAccount(p, id);
+  if (a instanceof Response) return a;
+  if (!a.user.enabled) return problem(409, "accounts.state_conflict", "Locked");
+  const req = (body as { actions?: unknown } | undefined)?.actions;
+  const actions = Array.isArray(req) && req.length ? req : a.user.required_actions.length ? a.user.required_actions : ["UPDATE_PASSWORD"];
+  pushEvent(a, "actions_sent", p.me.actor_ref, null, { actions });
+  return json({ account: accountSnapshot(a.user), activation_email_sent: true, replayed: false });
+}
+
 // --------------------------------------------------------------------------
 // pf/reports — lịch gửi
 // --------------------------------------------------------------------------
@@ -539,17 +549,23 @@ export const adminOpsRoutes: Route[] = [
   },
   { method: "POST", pattern: /^\/v1\/accounts\/users\/([\w-]+)\/lock$/, handler: ({ persona, params, body }) => lockUnlock(persona, params[0], body, true) },
   { method: "POST", pattern: /^\/v1\/accounts\/users\/([\w-]+)\/unlock$/, handler: ({ persona, params, body }) => lockUnlock(persona, params[0], body, false) },
+  { method: "POST", pattern: /^\/v1\/accounts\/users\/([\w-]+)\/resend-actions$/, handler: ({ persona, params, body }) => resendActions(persona, params[0], body) },
   {
+    // Thao tác loạt (US-ADM-03): tối đa 100 tài khoản, kết quả theo từng tài khoản.
     method: "POST",
-    pattern: /^\/v1\/accounts\/users\/([\w-]+)\/resend-actions$/,
-    handler: ({ persona, params, body }) => {
-      const a = findAccount(persona, params[0]);
-      if (a instanceof Response) return a;
-      if (!a.user.enabled) return problem(409, "accounts.state_conflict", "Locked");
-      const req = (body as { actions?: unknown } | undefined)?.actions;
-      const actions = Array.isArray(req) && req.length ? req : a.user.required_actions.length ? a.user.required_actions : ["UPDATE_PASSWORD"];
-      pushEvent(a, "actions_sent", persona.me.actor_ref, null, { actions });
-      return json({ account: accountSnapshot(a.user), activation_email_sent: true, replayed: false });
+    pattern: /^\/v1\/accounts\/users\/bulk$/,
+    handler: ({ persona, body }) => {
+      const b = (body ?? {}) as { action?: unknown; user_ids?: unknown; reason?: unknown };
+      const ids = Array.isArray(b.user_ids) ? b.user_ids.filter((x): x is string => typeof x === "string") : [];
+      if (b.action !== "lock" && b.action !== "unlock" && b.action !== "resend") return validation([{ field: "action", reason: "lock, unlock hoặc resend" }]);
+      if (ids.length === 0 || ids.length > 100) return validation([{ field: "user_ids", reason: "1–100 tài khoản" }]);
+      if (b.action !== "resend" && reasonOf(b).length < 20) return validation([{ field: "reason", reason: "Lý do tối thiểu 20 ký tự" }]);
+      const out = ids.map((id) => {
+        const r = b.action === "resend" ? resendActions(persona, id, {}) : lockUnlock(persona, id, { reason: b.reason }, b.action === "lock");
+        const p = r.ok ? null : problemOf(r);
+        return { user_id: id, ok: r.ok, replayed: false, code: p?.code ?? null, detail: p?.title ?? null };
+      });
+      return json({ succeeded: out.filter((o) => o.ok).length, failed: out.filter((o) => !o.ok).length, items: out });
     },
   },
   {

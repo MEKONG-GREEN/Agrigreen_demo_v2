@@ -16,6 +16,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/keycloak"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	reportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -66,6 +67,15 @@ func (m *Module) MailDirectory() reportsport.MailDirectory {
 		return nil
 	}
 	return app.MailDirectory{Dir: m.svc.Dir}
+}
+
+// StaffContacts cho pf/extension: số điện thoại của cán bộ lúc bấm "gọi/nhắn" trong
+// danh bạ trực (KN US-DIR-02). Chưa cấu hình Keycloak → nil (route liên hệ trả 503).
+func (m *Module) StaffContacts() extport.StaffContacts {
+	if m.svc.Dir == nil {
+		return nil
+	}
+	return app.StaffContacts{Dir: m.svc.Dir}
 }
 
 // OrgStatusEvents là các sự kiện consumer đăng ký.

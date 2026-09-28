@@ -65,14 +65,18 @@ export interface CoverageStyle {
   bg: string;
 }
 
+/**
+ * `fill` trùng màu tô bản đồ của backend (pf/mechanization domain.CoverageColors, FN-08 BR-01) để chú giải,
+ * chấm màu trên nhãn và vùng tô trên bản đồ là MỘT màu. Chú giải ưu tiên `legend[].color` do máy chủ trả.
+ */
 export const COVERAGE_STYLES: Record<CoverageStatus, CoverageStyle> = {
-  du: { label: "Đủ", fill: "#22A45D", ink: "#11663A", bg: "#DFF7E8" },
-  chu_y: { label: "Cần chú ý", fill: "#F0A020", ink: "#8A5300", bg: "#FFF3D6" },
-  thieu: { label: "Thiếu", fill: "#E5484D", ink: "#A11C22", bg: "#FDE8E8" },
-  thua: { label: "Thừa", fill: "#2F80ED", ink: "#1454A8", bg: "#E3EFFD" },
-  khong_du_lieu: { label: "Chưa có dữ liệu", fill: "#B8C2BD", ink: "#4B5563", bg: "#EEF1EF" },
-  chua_cau_hinh: { label: "Chưa cấu hình ngưỡng", fill: "#D5DBD7", ink: "#4B5563", bg: "#F3F4F6" },
-  chua_dinh_muc: { label: "Chưa cấu hình định mức", fill: "#D5DBD7", ink: "#4B5563", bg: "#F3F4F6" },
+  du: { label: "Đủ", fill: "#1F7A38", ink: "#11663A", bg: "#DFF7E8" },
+  chu_y: { label: "Cần chú ý", fill: "#9C6414", ink: "#8A5300", bg: "#FFF3D6" },
+  thieu: { label: "Thiếu", fill: "#A3372A", ink: "#A11C22", bg: "#FDE8E8" },
+  thua: { label: "Thừa", fill: "#2A78D6", ink: "#1454A8", bg: "#E3EFFD" },
+  khong_du_lieu: { label: "Chưa có dữ liệu", fill: "#9AA5A0", ink: "#4B5563", bg: "#EEF1EF" },
+  chua_cau_hinh: { label: "Chưa cấu hình ngưỡng", fill: "#9AA5A0", ink: "#4B5563", bg: "#F3F4F6" },
+  chua_dinh_muc: { label: "Chưa cấu hình định mức", fill: "#9AA5A0", ink: "#4B5563", bg: "#F3F4F6" },
 };
 
 /** Chú giải theo thứ tự hiển thị, kèm mô tả ngưỡng. */

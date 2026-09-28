@@ -1076,6 +1076,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/roster/{id}/contact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Số điện thoại của cán bộ để gọi/nhắn 1 chạm (US-DIR-02) — đọc từ tài khoản (pf/accounts) lúc bấm, không lưu ở pf, phản hồi Cache-Control no-store. Chỉ cán bộ người gọi thấy trong danh bạ (kể cả cán bộ tỉnh dự phòng) */
+        get: operations["extRosterContact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/roster/status": {
         parameters: {
             query?: never;
@@ -5461,6 +5478,37 @@ export interface operations {
             403: components["responses"]["Problem"];
         };
     };
+    extRosterContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description actor_ref của cán bộ */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số liên hệ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        actor_ref: string;
+                        /** @description Số điện thoại công vụ (PII — không lưu ở máy khách) */
+                        phone: string;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     extSetDutyStatus: {
         parameters: {
             query?: never;
@@ -5484,7 +5532,16 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        status: "on_duty" | "off_duty";
+                        /** Format: date-time */
+                        set_at: string;
+                        /** Format: date-time */
+                        valid_until: string;
+                    };
+                };
             };
             404: components["responses"]["Problem"];
             422: components["responses"]["Problem"];

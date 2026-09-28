@@ -162,6 +162,9 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		}
 	}
 	acc := accounts.New(accPool, clk, accounts.Deps{Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs()})
+	if c := acc.StaffContacts(); c != nil {
+		kn.UseContacts(c) // US-DIR-02: số điện thoại cán bộ đọc từ Keycloak lúc bấm liên hệ
+	}
 
 	// pf/reports: API tạo việc xuất và cấp URL tải; worker dựng tệp (cmd/worker). Địa chỉ email tra qua pf/accounts (MailDirectory).
 	repPool, err := pool(reports.DBRole)

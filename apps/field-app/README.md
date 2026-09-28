@@ -46,7 +46,8 @@ Màn hình:
 - chỉ đạo: đọc, xác nhận đã đọc (ngoại tuyến được);
 - thư viện kỹ thuật: "Tài liệu" và "Đã lưu" (lưu/bỏ lưu ngoại tuyến được; tài liệu đã gỡ giữ bản đã tải, nhãn "đã gỡ");
 - ghi nhận đồng ý của nông hộ (`mrv.evidence`) — bắt buộc trước khi chụp ảnh minh chứng;
-- bản đồ ngoại tuyến: tải vùng đang xem, danh sách gói, xóa gói.
+- bản đồ ngoại tuyến: tải vùng đang xem, danh sách gói, xóa gói;
+- danh bạ trực (cần mạng): ai đang trực trong phạm vi, cán bộ tỉnh dự phòng; nút "Gọi"/"Nhắn tin" đọc số lúc bấm (`GET /v1/extension/roster/{id}/contact`, không lưu trên máy) rồi mở `tel:`/`sms:`; tự khai "Đang trực"/"Tạm nghỉ" (KN US-DIR-01/02).
 
 ### Thông báo và kênh đẩy (pf/notify, ADR-0015)
 
@@ -212,6 +213,7 @@ Lưu ý RB-4: thư viện native `com.google.firebase:firebase-messaging` là Ap
 | flutter_local_notifications 22.3 (+ timezone 0.11) | BSD-3-Clause (timezone: BSD-2-Clause) | thông báo cục bộ |
 | image 4.10 | MIT | đóng dấu GPS/thời gian lên ảnh trong bộ nhớ |
 | integration_test (dev, SDK) | BSD-3-Clause | kiểm thử trên emulator (kéo theo flutter_driver, webdriver Apache-2.0) |
+| url_launcher 6.3 (+ url_launcher_android/ios/…, url_launcher_platform_interface) | BSD-3-Clause | danh bạ trực: mở trình quay số `tel:` / nhắn tin `sms:` (KN US-DIR-02, 29/09/2026) — không cần quyền CALL_PHONE |
 | path_provider 2.1, path 1.9 | BSD-3-Clause | thư mục dữ liệu |
 | flutter_lints 6 (dev) | BSD-3-Clause | lint |
 

@@ -11,6 +11,7 @@ import '../data/auth/wipe_service.dart';
 import '../data/catalog/catalog_cache.dart';
 import '../data/crypto/envelope.dart';
 import '../data/db/local_db.dart';
+import '../data/dial/dialer.dart';
 import '../data/files/blob_store.dart';
 import '../data/files/evidence_repository.dart';
 import '../data/map/tile_store.dart';
@@ -31,6 +32,7 @@ import 'field_report_service.dart';
 import 'inbox_service.dart';
 import 'library_service.dart';
 import 'push_coordinator.dart';
+import 'roster_service.dart';
 import 'task_service.dart';
 import 'tile_pack_service.dart';
 
@@ -50,6 +52,7 @@ class AppPlatform {
     this.push = const NoopPushMessaging(),
     this.notifier = const NoopLocalNotifier(),
     this.watermarker = const ImageWatermarker(),
+    this.dialer = const UrlLauncherDialer(),
   });
 
   final AppConfig config;
@@ -69,6 +72,9 @@ class AppPlatform {
   final PushMessaging push;
   final LocalNotifier notifier;
   final Watermarker watermarker;
+
+  /// Mở ứng dụng gọi/nhắn tin (tel:/sms:) cho danh bạ trực.
+  final Dialer dialer;
 }
 
 /// Toàn bộ dịch vụ sau khi mở khóa (CSDL đã mở).
@@ -95,6 +101,7 @@ class AppServices {
     required this.pushTokens,
     required this.catalogs,
     required this.mrv,
+    required this.roster,
   });
 
   final AppPlatform platform;
@@ -118,6 +125,9 @@ class AppServices {
   final PushTokenRegistrar pushTokens;
   final CatalogCache catalogs;
   final EvidenceService mrv;
+
+  /// Danh bạ trực (trực tuyến; số điện thoại đọc lúc bấm, không lưu máy).
+  final RosterService roster;
 
   late final PushHost pushHost = _ServicesPushHost(this);
 
@@ -225,6 +235,7 @@ class AppServices {
         clock: pf.clock,
         ids: pf.ids,
       ),
+      roster: RosterService(api: api, dialer: pf.dialer, ids: pf.ids),
     );
   }
 

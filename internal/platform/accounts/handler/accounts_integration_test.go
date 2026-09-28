@@ -412,6 +412,37 @@ func TestLockUnlockNeedsReason(t *testing.T) {
 	}
 }
 
+// CGH FN-01 luồng ngoại lệ "không khóa được Admin cuối cùng đang hoạt động": tài khoản
+// quản trị nền tảng chỉ quản trị nền tảng thao tác được, và không ai tự khóa mình — nên
+// luôn còn ít nhất một quản trị nền tảng đang hoạt động (người đang gọi).
+func TestPlatformAdminCannotBeLockedByLowerAdminOrSelf(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	root := f.dir.Seed(port.NewUser{Username: "qtnt-1", Email: "qtnt-1@vi-du.vn", TenantID: f.tenant, OrgRef: f.national}, true)
+	if err := f.dir.AddRealmRoles(ctx, root, []string{"platform_admin"}); err != nil {
+		t.Fatal(err)
+	}
+	path := "/v1/accounts/users/" + root.String() + "/lock"
+	for name, c := range map[string]caller{"quản trị tài khoản QG": f.nationalAdmin(), "quản trị tài khoản tỉnh": f.provinceAdmin()} {
+		if r := c.do(http.MethodPost, path, map[string]any{"reason": goodReason}); r.status != http.StatusForbidden {
+			t.Fatalf("%s khóa quản trị nền tảng: %d %v", name, r.status, r.body)
+		}
+	}
+	// Chính quản trị nền tảng đó (token có sub = id Keycloak) không tự khóa được.
+	self := caller{f: f, actor: root, token: f.iss.Sign(t, authztest.Token{Subject: root, TenantID: f.tenant, Roles: []string{"platform_admin"}, OrgRef: f.national, MFA: true})}
+	if r := self.do(http.MethodPost, path, map[string]any{"reason": goodReason}); r.status != http.StatusForbidden || r.body["code"] != "accounts.self_action" {
+		t.Fatalf("tự khóa: %d %v", r.status, r.body)
+	}
+	if u, _ := f.dir.GetUser(ctx, root); !u.Enabled {
+		t.Fatal("quản trị nền tảng phải còn hoạt động")
+	}
+	// Có quản trị nền tảng thứ hai thì người này khóa được người kia (không phải người cuối cùng).
+	second := f.as(f.tenant, f.national, "platform_admin")
+	if r := second.do(http.MethodPost, path, map[string]any{"reason": goodReason}); r.status != http.StatusOK {
+		t.Fatalf("quản trị nền tảng khác khóa: %d %v", r.status, r.body)
+	}
+}
+
 func orgEvent(f *fixture, typ string, org uuid.UUID) outbox.Envelope {
 	var payload any = partyport.OrgDeactivatedV1{OrgRef: org, Kind: "cooperative", Code: "HTX000001", AdminUnitCode: "30292", Reason: "HTX giải thể theo nghị quyết đại hội", ActorRef: ids.New(), EventTime: time.Now().UTC().Format(time.RFC3339), Seq: 2}
 	if typ == partyport.EventOrgReactivated {

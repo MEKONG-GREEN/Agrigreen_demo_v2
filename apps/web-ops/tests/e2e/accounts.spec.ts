@@ -37,6 +37,32 @@ test("quản trị tài khoản tỉnh: vai theo ma trận cấp vai, lỗi máy
   await expect(alert).toContainText("accounts.user_exists");
 });
 
+test("thao tác loạt (US-ADM-03): chọn nhiều tài khoản → khóa theo đợt có lý do; gửi lại liên kết cho tài khoản đã khóa báo lỗi từng tài khoản", async ({ page }) => {
+  await loginAs(page, "setter", "/quan-tri/tai-khoan");
+  const rows = page.getByRole("table", { name: "Tài khoản trong phạm vi" }).locator("tbody tr");
+  await expect(rows.first()).toBeVisible();
+  await expect(page.getByTestId("bulk-bar")).toHaveCount(0);
+  const boxes = rows.getByRole("checkbox");
+  await boxes.nth(0).check();
+  await boxes.nth(1).check();
+  const bar = page.getByTestId("bulk-bar");
+  await expect(bar).toContainText("Đã chọn 2 tài khoản");
+  const run = bar.getByRole("button", { name: "Khóa 2 tài khoản" });
+  await bar.getByLabel("Lý do (tối thiểu 20 ký tự)").fill("Nghỉ phép");
+  await expect(run).toBeDisabled();
+  await bar.getByLabel("Lý do (tối thiểu 20 ký tự)").fill("Sáp nhập đơn vị, tạm khóa theo đợt từ 01/10");
+  await run.click();
+  await expect(page.getByTestId("bulk-result")).toContainText("Thành công 2 · Lỗi 0");
+  await expect(rows.nth(0).locator(".chip")).toHaveText("Đã khóa");
+  await expect(rows.nth(1).locator(".chip")).toHaveText("Đã khóa");
+
+  await bar.getByLabel("Thao tác").selectOption("resend");
+  await bar.getByRole("button", { name: "Gửi lại liên kết kích hoạt 2 tài khoản" }).click();
+  const result = page.getByTestId("bulk-result");
+  await expect(result).toContainText("Thành công 0 · Lỗi 2");
+  await expect(result.getByText("accounts.state_conflict")).toHaveCount(2);
+});
+
 test("quản trị chưa MFA: màn hình tài khoản báo mfa_required", async ({ page }) => {
   await loginAs(page, "admin-no-mfa", "/quan-tri/tai-khoan");
   await expect(page.getByTestId("mfa-notice")).toBeVisible();

@@ -1554,6 +1554,28 @@ paths:
                   items: {type: array, items: {$ref: "#/components/schemas/ExtRosterEntry"}}
                   fallback: {type: array, items: {$ref: "#/components/schemas/ExtRosterEntry"}}
         "403": {$ref: "#/components/responses/Problem"}
+  /v1/extension/roster/{id}/contact:
+    get:
+      summary: >-
+        Số điện thoại của cán bộ để gọi/nhắn 1 chạm (US-DIR-02) — đọc từ tài khoản (pf/accounts) lúc bấm,
+        không lưu ở pf, phản hồi Cache-Control no-store. Chỉ cán bộ người gọi thấy trong danh bạ (kể cả cán bộ tỉnh dự phòng)
+      operationId: extRosterContact
+      parameters:
+        - {name: id, in: path, required: true, description: actor_ref của cán bộ, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Số liên hệ
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [actor_ref, phone]
+                properties:
+                  actor_ref: {type: string, format: uuid}
+                  phone: {type: string, description: "Số điện thoại công vụ (PII — không lưu ở máy khách)"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/roster/status:
     post:
       summary: Tự cập nhật trạng thái trực (US-DIR-01); hết hạn sau extension.duty_status_ttl_hours → unknown
@@ -1570,7 +1592,17 @@ paths:
               properties:
                 status: {type: string, enum: [on_duty, off_duty]}
       responses:
-        "201": {description: Đã ghi}
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, set_at, valid_until]
+                properties:
+                  status: {type: string, enum: [on_duty, off_duty]}
+                  set_at: {type: string, format: date-time}
+                  valid_until: {type: string, format: date-time}
         "404": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
   /v1/extension/roster/shifts:
