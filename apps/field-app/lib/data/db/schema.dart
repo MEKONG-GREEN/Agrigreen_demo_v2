@@ -8,8 +8,12 @@ import 'package:sqflite_common/sqlite_api.dart';
 /// - `household_pubkey`: khóa công khai X25519 của hộ thuộc địa bàn.
 /// - `evidence_file`: ciphertext ảnh đã mã hóa phong bì, chờ tải lên.
 /// - `meta`: bộ đếm seq, cursor pull, trạng thái lùi thử lại.
+/// - `api_action` (v2): lệnh API idempotent xếp hàng khi ngoại tuyến (đánh dấu
+///   đã đọc, xác nhận chỉ đạo, lưu/bỏ lưu tài liệu), phát lại khi có mạng.
+/// - `consent_local` (v2): sổ đồng ý ghi trên máy (chỉ mã tham chiếu hộ).
+/// - `tile_pack`, `map_tile` (v2): gói bản đồ ngoại tuyến (nằm trong SQLCipher).
 abstract final class Schema {
-  static const version = 1;
+  static const version = 2;
 
   static Future<void> create(Database db) async {
     final b = db.batch();
@@ -38,6 +42,7 @@ CREATE TABLE outbox (
   conflict_id       TEXT,
   error_code        TEXT,
   errors            TEXT,
+  replaced_by       TEXT,
   CHECK (op = 'create' OR (supersedes_id IS NOT NULL AND correction_reason IS NOT NULL))
 )''');
     b.execute('CREATE INDEX outbox_status_seq ON outbox(status, seq)');
@@ -87,10 +92,75 @@ CREATE TABLE evidence_file (
   last_error      TEXT,
   created_at      INTEGER NOT NULL
 )''');
+    _createV2Tables(b);
     await b.commit(noResult: true);
   }
 
+  static void _createV2Tables(Batch b) {
+    b.execute('''
+CREATE TABLE api_action (
+  id          TEXT PRIMARY KEY,
+  seq         INTEGER NOT NULL UNIQUE,
+  kind        TEXT NOT NULL,
+  target      TEXT,
+  body        TEXT,
+  status      TEXT NOT NULL DEFAULT 'pending'
+              CHECK (status IN ('pending','done','failed')),
+  attempts    INTEGER NOT NULL DEFAULT 0,
+  last_error  TEXT,
+  created_at  INTEGER NOT NULL,
+  done_at     INTEGER
+)''');
+    b.execute('CREATE INDEX api_action_status ON api_action(status, seq)');
+    b.execute('CREATE INDEX api_action_target ON api_action(kind, target)');
+    b.execute('''
+CREATE TABLE consent_local (
+  record_id    TEXT PRIMARY KEY,
+  subject_ref  TEXT NOT NULL,
+  purpose      TEXT NOT NULL,
+  text_version TEXT NOT NULL,
+  status       TEXT NOT NULL CHECK (status IN ('granted','withdrawn')),
+  event_time   TEXT NOT NULL,
+  recorded_at  INTEGER NOT NULL
+)''');
+    b.execute(
+      'CREATE INDEX consent_local_subject ON consent_local(subject_ref, purpose, recorded_at)',
+    );
+    b.execute('''
+CREATE TABLE tile_pack (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  min_lat     REAL NOT NULL,
+  min_lon     REAL NOT NULL,
+  max_lat     REAL NOT NULL,
+  max_lon     REAL NOT NULL,
+  min_zoom    INTEGER NOT NULL,
+  max_zoom    INTEGER NOT NULL,
+  tile_count  INTEGER NOT NULL DEFAULT 0,
+  bytes       INTEGER NOT NULL DEFAULT 0,
+  status      TEXT NOT NULL DEFAULT 'downloading'
+              CHECK (status IN ('downloading','ready','failed')),
+  created_at  INTEGER NOT NULL
+)''');
+    b.execute('''
+CREATE TABLE map_tile (
+  pack_id TEXT NOT NULL,
+  z       INTEGER NOT NULL,
+  x       INTEGER NOT NULL,
+  y       INTEGER NOT NULL,
+  data    BLOB NOT NULL,
+  PRIMARY KEY (pack_id, z, x, y)
+)''');
+    b.execute('CREATE INDEX map_tile_zxy ON map_tile(z, x, y)');
+  }
+
   static Future<void> upgrade(Database db, int from, int to) async {
-    // Chưa có phiên bản nào sau v1. Migration cục bộ chỉ tiến.
+    // Migration cục bộ chỉ tiến.
+    if (from < 2) {
+      final b = db.batch();
+      b.execute('ALTER TABLE outbox ADD COLUMN replaced_by TEXT');
+      _createV2Tables(b);
+      await b.commit(noResult: true);
+    }
   }
 }

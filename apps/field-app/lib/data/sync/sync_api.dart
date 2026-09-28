@@ -76,11 +76,15 @@ class PullPage {
     required this.nextCursor,
     required this.hasMore,
     this.serverTime,
+    this.reset = false,
   });
   final List<PullChange> changes;
   final String? nextCursor;
   final bool hasMore;
   final String? serverTime;
+
+  /// Phạm vi đã đổi: máy thay toàn bộ dữ liệu tham chiếu (sync-contract).
+  final bool reset;
 
   factory PullPage.fromJson(Map<String, Object?> j) => PullPage(
     changes: ((j['changes'] as List?) ?? const [])
@@ -89,6 +93,7 @@ class PullPage {
     nextCursor: j['next_cursor'] as String?,
     hasMore: j['has_more'] == true,
     serverTime: j['server_time'] as String?,
+    reset: j['reset'] == true,
   );
 }
 
@@ -108,11 +113,28 @@ abstract class SyncApi {
 
   Future<PullPage> pull({String? cursor, required int limit});
 
-  /// `POST /v1/files` multipart: phần `meta` (JSON phong bì) + `blob` (ciphertext).
+  /// `POST /v1/files` multipart: phần `meta` (JSON phong bì) + `blob`
+  /// (ciphertext) + `file_ref` (UUIDv7 máy sinh, tùy chọn).
   Future<String> uploadFile({
     required String idempotencyKey,
     required Map<String, Object?> meta,
     required Uint8List ciphertext,
+    String? fileRef,
+  });
+
+  /// `POST /v1/devices/{device_id}/push-token {provider: fcm, token}`.
+  Future<void> registerPushToken({
+    required String deviceId,
+    required String token,
+    required String idempotencyKey,
+  });
+
+  /// Lệnh API idempotent (POST + Idempotency-Key) xếp hàng khi ngoại tuyến:
+  /// đánh dấu đã đọc, xác nhận chỉ đạo, lưu/bỏ lưu tài liệu.
+  Future<Map<String, Object?>> postAction({
+    required String path,
+    required String idempotencyKey,
+    Map<String, Object?>? body,
   });
 }
 
@@ -122,12 +144,16 @@ class HttpSyncApi implements SyncApi {
   HttpSyncApi({
     required this.baseUrl,
     required this.accessToken,
+    this.deviceId,
     http.Client? client,
     this.timeout = const Duration(seconds: 30),
   }) : _client = client ?? http.Client();
 
   final String baseUrl;
   final AccessTokenProvider accessToken;
+
+  /// Gửi trong header `X-Device-Id` của mọi lời gọi (sync-contract).
+  final String? deviceId;
   final http.Client _client;
   final Duration timeout;
 
@@ -141,6 +167,7 @@ class HttpSyncApi implements SyncApi {
     return {
       if (token != null) 'Authorization': 'Bearer $token',
       'Idempotency-Key': ?idem,
+      'X-Device-Id': ?deviceId,
       if (json) 'Content-Type': 'application/json',
       'Accept': 'application/json, application/problem+json',
     };
@@ -251,6 +278,7 @@ class HttpSyncApi implements SyncApi {
     required String idempotencyKey,
     required Map<String, Object?> meta,
     required Uint8List ciphertext,
+    String? fileRef,
   }) async {
     final h = await _headers(idem: idempotencyKey, json: false);
     final res = await _send(() async {
@@ -258,6 +286,7 @@ class HttpSyncApi implements SyncApi {
         ..headers.addAll(h)
         // `meta` là trường văn bản (không filename), `blob` là phần tệp.
         ..fields['meta'] = jsonEncode(meta)
+        ..fields.addAll({'file_ref': ?fileRef})
         ..files.add(
           http.MultipartFile.fromBytes(
             'blob',
@@ -273,5 +302,43 @@ class HttpSyncApi implements SyncApi {
       throw ApiException(res.statusCode, 'files.missing_file_ref');
     }
     return ref;
+  }
+
+  @override
+  Future<void> registerPushToken({
+    required String deviceId,
+    required String token,
+    required String idempotencyKey,
+  }) async {
+    final h = await _headers(idem: idempotencyKey);
+    await _send(
+      () => _client.post(
+        _u('/v1/devices/$deviceId/push-token'),
+        headers: h,
+        body: jsonEncode({'provider': 'fcm', 'token': token}),
+      ),
+    );
+  }
+
+  @override
+  Future<Map<String, Object?>> postAction({
+    required String path,
+    required String idempotencyKey,
+    Map<String, Object?>? body,
+  }) async {
+    final h = await _headers(idem: idempotencyKey);
+    final res = await _send(
+      () => _client.post(
+        _u(path),
+        headers: h,
+        body: body == null ? null : jsonEncode(body),
+      ),
+    );
+    if (res.bodyBytes.isEmpty) return const {};
+    try {
+      return _json(res);
+    } catch (_) {
+      return const {};
+    }
   }
 }

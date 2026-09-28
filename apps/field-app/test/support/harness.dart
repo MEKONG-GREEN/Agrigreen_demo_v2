@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:agrigreen_field/core/backoff.dart';
 import 'package:agrigreen_field/core/clock.dart';
 import 'package:agrigreen_field/core/ids.dart';
+import 'package:agrigreen_field/data/actions/action_queue.dart';
 import 'package:agrigreen_field/data/auth/wipe_service.dart';
 import 'package:agrigreen_field/data/db/local_db.dart';
 import 'package:agrigreen_field/data/files/blob_store.dart';
@@ -40,6 +41,7 @@ class Harness {
   late BlobStore blobs;
   late WipeService wipe;
   late SyncService sync;
+  late ActionQueue actions;
   int wipedCallbacks = 0;
 
   String get dbPath => p.join(dir.path, 'field.db');
@@ -80,7 +82,9 @@ class Harness {
       store: store,
       onWiped: () => wipedCallbacks++,
     );
+    actions = ActionQueue(db: db, clock: clock, ids: ids);
     sync = SyncService(
+      actions: actions,
       db: db,
       api: server,
       outbox: outbox,

@@ -4,4 +4,8 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- CHỈ bản debug: cho HTTP rõ tới 127.0.0.1/localhost để kiểm thử tích hợp
+         gọi máy chủ API giả trong tiến trình. Bản release không có cấu hình này
+         (usesCleartextTraffic=false ở main). -->
+    <application android:networkSecurityConfig="@xml/network_security_config_debug"/>
 </manifest>

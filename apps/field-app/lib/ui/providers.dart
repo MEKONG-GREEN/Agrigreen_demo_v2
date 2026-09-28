@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/app_services.dart';
 import '../application/auth_flow.dart';
+import '../application/push_coordinator.dart';
 import '../data/auth/oidc_client.dart';
 import '../data/auth/pin_service.dart';
 import '../data/auth/session_service.dart';
@@ -41,6 +43,35 @@ final pinServiceProvider = Provider<PinService>((ref) {
   );
 });
 
+/// Kênh đẩy sống suốt tiến trình app (kể cả khi đang khóa).
+final pushCoordinatorProvider = Provider<PushCoordinator>((ref) {
+  final pf = ref.watch(platformProvider);
+  final c = PushCoordinator(
+    messaging: pf.push,
+    notifier: pf.notifier,
+    isForeground: () =>
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed,
+  );
+  ref.onDispose(c.dispose);
+  return c;
+});
+
+/// Đường dẫn trong app chờ mở (từ thông báo được chạm). HomeScreen tiêu thụ.
+class PendingDeepLink extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void set(String? link) => state = link;
+  String? take() {
+    final v = state;
+    state = null;
+    return v;
+  }
+}
+
+final pendingDeepLinkProvider = NotifierProvider<PendingDeepLink, String?>(
+  PendingDeepLink.new,
+);
+
 final authFlowProvider = Provider<AuthFlow>(
   (ref) => AuthFlow(
     session: ref.watch(sessionServiceProvider),
@@ -64,18 +95,38 @@ class AppState {
 
 class AppController extends Notifier<AppState> {
   StreamSubscription<List<ConnectivityResult>>? _conn;
+  StreamSubscription<String?>? _taps;
   Timer? _timer;
 
   @override
   AppState build() {
     ref.onDispose(_stopAutoSync);
+    ref.onDispose(() => unawaited(_taps?.cancel()));
     Future.microtask(_init);
     return const AppState(AuthView(AuthStage.loading));
   }
 
   AuthFlow get _flow => ref.read(authFlowProvider);
+  PushCoordinator get _push => ref.read(pushCoordinatorProvider);
 
-  Future<void> _init() async => _apply(await _flow.start());
+  Future<void> _init() async {
+    final push = _push;
+    _taps = push.taps.listen(
+      (link) => ref
+          .read(pendingDeepLinkProvider.notifier)
+          .set(link ?? '/notifications'),
+    );
+    try {
+      await push.start();
+      final launched = await push.launchPayload();
+      if (launched != null) {
+        ref.read(pendingDeepLinkProvider.notifier).set(launched);
+      }
+    } catch (_) {
+      // Kênh đẩy lỗi không chặn app (hộp thư vẫn đồng bộ qua pull).
+    }
+    await _apply(await _flow.start());
+  }
 
   Future<void> _apply(AuthView v) async {
     if (v.stage == AuthStage.unlocked) {
@@ -89,10 +140,12 @@ class AppController extends Notifier<AppState> {
           );
       state = AppState(v, services: services);
       _startAutoSync(services);
+      await _push.attach(services.pushHost);
       unawaited(services.sync.syncOnce(force: true));
     } else {
       // Ngoài trạng thái mở khóa không giữ CSDL mở.
       _stopAutoSync();
+      _push.detach();
       final old = state.services;
       state = AppState(v);
       await old?.close();
@@ -116,12 +169,14 @@ class AppController extends Notifier<AppState> {
   /// Khóa màn hình: đóng CSDL, về màn PIN.
   Future<void> lock() async {
     _stopAutoSync();
+    _push.detach();
     await state.services?.close();
     state = const AppState(AuthView(AuthStage.locked));
   }
 
   void _onWiped() {
     _stopAutoSync();
+    _push.detach();
     state = const AppState(
       AuthView(
         AuthStage.needsOnlineLogin,
@@ -157,6 +212,15 @@ final appControllerProvider = NotifierProvider<AppController, AppState>(
   AppController.new,
 );
 
+/// Dịch vụ đã mở khóa, dùng trong callback của widget.
+extension WidgetServices on WidgetRef {
+  AppServices get services {
+    final s = read(appControllerProvider).services;
+    if (s == null) throw StateError('Chưa mở khóa');
+    return s;
+  }
+}
+
 AppServices servicesOf(Ref ref) {
   final s = ref.watch(appControllerProvider).services;
   if (s == null) throw StateError('Chưa mở khóa');
@@ -170,12 +234,22 @@ class HomeSummary {
     required this.openTasks,
     required this.plots,
     required this.pendingFiles,
+    this.unreadNotifications = 0,
+    this.unackedDirectives = 0,
+    this.pendingActions = 0,
+    this.boundaryAttention = 0,
   });
   final OutboxCounts counts;
   final SyncStatus status;
   final int openTasks;
   final int plots;
   final int pendingFiles;
+  final int unreadNotifications;
+  final int unackedDirectives;
+  final int pendingActions;
+
+  /// Ranh giới xung đột/bị từ chối chưa xử lý.
+  final int boundaryAttention;
 }
 
 /// Làm mới khi trạng thái đồng bộ đổi.
@@ -193,5 +267,9 @@ final homeSummaryProvider = FutureProvider<HomeSummary>((ref) async {
     openTasks: await s.tasks.openCount(),
     plots: await s.refs.count(RefEntity.plot),
     pendingFiles: (await s.evidence.pending()).length,
+    unreadNotifications: await s.inbox.unreadCount(),
+    unackedDirectives: await s.directives.unackedCount(),
+    pendingActions: await s.actions.pendingCount(),
+    boundaryAttention: (await s.boundaries.needingAttention()).length,
   );
 });

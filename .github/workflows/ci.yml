@@ -6,6 +6,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Chạy tay (ví dụ kiểm thử tích hợp app hiện trường trên emulator).
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -120,7 +122,7 @@ jobs:
         with: { flutter-version: "3.47.5", channel: stable, cache: true }
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq libsqlite3-dev
       - run: flutter pub get --enforce-lockfile
-      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: dart format --output=none --set-exit-if-changed lib test integration_test
       - run: flutter analyze --fatal-infos
       - name: flutter test (gồm bộ vector phong bì chung với Go)
         run: flutter test
@@ -128,6 +130,41 @@ jobs:
         with: { distribution: temurin, java-version: "17" }
       - name: flutter build apk --debug
         run: flutter build apk --debug
+
+  # Kiểm thử tích hợp trên emulator Android (integration_test): SQLCipher,
+  # Keystore, giao diện thật; máy chủ API giả chạy trong tiến trình kiểm thử.
+  # Chậm (~15–25 phút) nên chỉ chạy khi push lên main hoặc chạy tay.
+  field-app-emulator:
+    name: App hiện trường — tích hợp trên emulator (API 30)
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: field-app
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run: { working-directory: apps/field-app }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bật KVM cho emulator x86_64
+        working-directory: .
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: subosito/flutter-action@v2
+        with: { flutter-version: "3.47.5", channel: stable, cache: true }
+      - run: flutter pub get --enforce-lockfile
+      - name: flutter test integration_test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          working-directory: apps/field-app
+          script: flutter test integration_test -d emulator-5554 --reporter expanded
 
   security:
     name: Bảo mật và giấy phép

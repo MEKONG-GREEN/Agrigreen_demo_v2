@@ -9,13 +9,17 @@ import '../../application/boundary_service.dart';
 import '../../data/photo/location_source.dart';
 import '../../data/reference/reference_repository.dart';
 import '../../domain/geo/boundary.dart';
+import '../../domain/geo/tiles.dart';
+import '../map/offline_tile_provider.dart';
 import '../providers.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'map_packs_screen.dart';
 import 'plots_screen.dart';
 
 /// Vẽ ranh giới thửa: chạm bản đồ để chấm điểm hoặc lấy điểm GPS tại chỗ.
 /// Lưu được khi ngoại tuyến — bản ghi vào hàng đợi, tự đồng bộ khi có mạng.
+/// Bản đồ đọc gói tile ngoại tuyến trước (US-MAP-03).
 class BoundaryScreen extends ConsumerStatefulWidget {
   const BoundaryScreen({super.key, this.plot});
   final RefRow? plot;
@@ -26,13 +30,23 @@ class BoundaryScreen extends ConsumerStatefulWidget {
 
 class _BoundaryScreenState extends ConsumerState<BoundaryScreen> {
   final _points = <GeoPoint>[];
+  final _map = MapController();
+  final _declared = TextEditingController();
   double? _worstAccuracy;
   BoundaryCheck? _check;
   bool _busy = false;
   List<List<GeoPoint>> _others = const [];
+  List<RefRow> _communes = const [];
+  String? _commune;
+  OfflineFirstTileProvider? _tiles;
 
   // Trung tâm mặc định: Cần Thơ.
   static const _defaultCenter = LatLng(10.0341, 105.7880);
+
+  String? get _coop =>
+      (widget.plot?.data['cooperative_ref'] ??
+              widget.plot?.data['cooperative_id'])
+          as String?;
 
   @override
   void initState() {
@@ -41,11 +55,23 @@ class _BoundaryScreenState extends ConsumerState<BoundaryScreen> {
       widget.plot?.data['boundary'] ?? widget.plot?.data['geometry'],
     );
     if (ring != null) _points.addAll(ring);
-    _loadOthers();
+    final s = ref.read(appControllerProvider).services;
+    _tiles = OfflineFirstTileProvider(
+      store: s?.tiles.store,
+      urlTemplate: ref.read(platformProvider).config.tileUrlTemplate,
+    );
+    _load();
     _recheck();
   }
 
-  Future<void> _loadOthers() async {
+  @override
+  void dispose() {
+    _declared.dispose();
+    _map.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
     final s = ref.read(appControllerProvider).services;
     if (s == null) return;
     final all = await s.refs.list(RefEntity.plot);
@@ -55,8 +81,25 @@ class _BoundaryScreenState extends ConsumerState<BoundaryScreen> {
       final r = ringFromGeoJson(p.data['boundary'] ?? p.data['geometry']);
       if (r != null && r.length >= 3) rings.add(r);
     }
-    if (mounted) setState(() => _others = rings);
+    final units = (await s.refs.list(RefEntity.adminUnit))
+        .where(
+          (u) =>
+              u.data['level'] == null ||
+              u.data['level'] == 'commune' ||
+              u.data['level'] == 'xa',
+        )
+        .toList();
+    if (!mounted) return;
+    setState(() {
+      _others = rings;
+      _communes = units;
+      if (widget.plot == null && units.length == 1) {
+        _commune = _codeOf(units[0]);
+      }
+    });
   }
+
+  static String _codeOf(RefRow u) => (u.data['code'] ?? u.id).toString();
 
   Future<void> _recheck() async {
     final s = ref.read(appControllerProvider).services;
@@ -64,7 +107,7 @@ class _BoundaryScreenState extends ConsumerState<BoundaryScreen> {
     final c = await s.boundaries.check(
       _points,
       plotId: widget.plot?.id,
-      cooperativeId: widget.plot?.data['cooperative_id'] as String?,
+      cooperativeId: _coop,
     );
     if (mounted) setState(() => _check = c);
   }
@@ -77,7 +120,7 @@ class _BoundaryScreenState extends ConsumerState<BoundaryScreen> {
   Future<void> _addGps() async {
     setState(() => _busy = true);
     try {
-      final loc = await const GeolocatorLocationSource().current();
+      final loc = await ref.read(platformProvider).location.current();
       if (!mounted) return;
       if (loc.fix == null) {
         showMessage(
@@ -100,35 +143,93 @@ class _BoundaryScreenState extends ConsumerState<BoundaryScreen> {
     }
   }
 
+  Future<bool> _confirm(String title, String body) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(title),
+          content: Text(body),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Chỉnh lại'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Vẫn lưu'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+
+  Future<String?> _askReason() async {
+    final ctl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Lý do sửa ranh giới'),
+        content: TextField(
+          controller: ctl,
+          maxLines: 2,
+          decoration: const InputDecoration(
+            labelText: 'Bắt buộc, ít nhất 10 ký tự',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Lưu'),
+          ),
+        ],
+      ),
+    );
+    final r = ctl.text;
+    ctl.dispose();
+    return ok == true ? r : null;
+  }
+
   Future<void> _save() async {
     final s = ref.read(appControllerProvider).services;
     final c = _check;
     if (s == null || c == null) return;
+    double? declared;
+    try {
+      declared = parseDeclaredHa(_declared.text);
+    } on BoundaryException catch (e) {
+      showMessage(context, e.message, error: true);
+      return;
+    }
     var ack = false;
     if (c.needsAck) {
-      ack =
-          await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Cảnh báo chồng lấn'),
-              content: Text(
-                'Ranh giới bị chồng lấn với lô đã đăng ký: ${c.overlaps.map((o) => o.label).join(', ')}. '
-                'Bạn đã kiểm tra thực địa và vẫn muốn lưu?',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('Chỉnh lại'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('Vẫn lưu'),
-                ),
-              ],
-            ),
-          ) ??
-          false;
+      ack = await _confirm(
+        'Cảnh báo chồng lấn',
+        'Ranh giới bị chồng lấn với lô đã đăng ký: ${c.overlaps.map((o) => o.label).join(', ')}. '
+            'Bạn đã kiểm tra thực địa và vẫn muốn lưu?',
+      );
       if (!ack) return;
+    }
+    if (declared != null && c.validation.ok) {
+      final dev = areaDeviationPct(c.validation.areaHa, declared);
+      if (dev > areaDeviationConfirmPct) {
+        final ok = await _confirm(
+          'Lệch diện tích khai báo',
+          'Diện tích vẽ ${formatHa(c.validation.areaHa)} ha lệch '
+              '${dev.toStringAsFixed(1)} % so với khai báo '
+              '${declared.toStringAsFixed(2)} ha. Vẫn lưu?',
+        );
+        if (!ok) return;
+        ack = true;
+      }
+    }
+    String? reason;
+    if (widget.plot?.data['boundary_id'] != null) {
+      reason = await _askReason();
+      if (reason == null) return;
     }
     try {
       await s.boundaries.save(
@@ -137,7 +238,10 @@ class _BoundaryScreenState extends ConsumerState<BoundaryScreen> {
             ? BoundaryMethod.map
             : BoundaryMethod.gps,
         plotId: widget.plot?.id,
-        cooperativeId: widget.plot?.data['cooperative_id'] as String?,
+        cooperativeId: _coop,
+        communeCode: _commune,
+        declaredAreaHa: declared,
+        correctionReason: reason,
         acknowledgeOverlap: ack,
         worstAccuracyM: _worstAccuracy,
       );
@@ -149,12 +253,32 @@ class _BoundaryScreenState extends ConsumerState<BoundaryScreen> {
     }
   }
 
+  Future<void> _downloadView() async {
+    final cam = _map.camera;
+    final b = cam.visibleBounds;
+    final z = cam.zoom.round();
+    final bbox = GeoBBox(
+      minLat: b.south,
+      minLon: b.west,
+      maxLat: b.north,
+      maxLon: b.east,
+    );
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => MapPacksScreen(
+          proposal: bbox,
+          minZoom: max(z - 2, 10),
+          maxZoom: min(z + 2, 18),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = _check;
     final pts = [for (final p in _points) LatLng(p.lat, p.lon)];
     final center = pts.isNotEmpty ? pts.first : _defaultCenter;
-    final cfg = ref.read(platformProvider).config;
     final valid = c?.validation.ok ?? false;
     return Scaffold(
       appBar: AppBar(
@@ -163,22 +287,33 @@ class _BoundaryScreenState extends ConsumerState<BoundaryScreen> {
               ? 'Vẽ thửa mới'
               : 'Ranh giới: ${plotLabel(widget.plot!)}',
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Tải bản đồ ngoại tuyến vùng này',
+            iconSize: 28,
+            icon: const Icon(Icons.download_for_offline),
+            onPressed: _downloadView,
+          ),
+        ],
       ),
       body: Column(
         children: [
           Expanded(
             child: FlutterMap(
+              mapController: _map,
               options: MapOptions(
                 initialCenter: center,
                 initialZoom: pts.isNotEmpty ? 17 : 13,
                 onTap: (_, ll) => _add(GeoPoint(ll.latitude, ll.longitude)),
               ),
               children: [
-                // TODO(offline-map): gói tile ngoại tuyến theo địa bàn (US-MAP-03);
-                // tile OSM trực tuyến chỉ là placeholder cho dev.
                 TileLayer(
-                  urlTemplate: cfg.tileUrlTemplate,
+                  urlTemplate: ref
+                      .read(platformProvider)
+                      .config
+                      .tileUrlTemplate,
                   userAgentPackageName: 'vn.agrigreen.field',
+                  tileProvider: _tiles,
                 ),
                 PolygonLayer(
                   polygons: [
@@ -254,6 +389,44 @@ class _BoundaryScreenState extends ConsumerState<BoundaryScreen> {
                         : 'Chồng lấn với: ${c.overlaps.map((o) => o.label).join(', ')}',
                     style: const TextStyle(color: AgColors.amber, fontSize: 15),
                   ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    if (widget.plot == null)
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: _commune,
+                          isExpanded: true,
+                          decoration: const InputDecoration(labelText: 'Xã'),
+                          items: [
+                            for (final u in _communes)
+                              DropdownMenuItem(
+                                value: _codeOf(u),
+                                child: Text(
+                                  (u.data['name'] ??
+                                          u.data['label'] ??
+                                          _codeOf(u))
+                                      .toString(),
+                                ),
+                              ),
+                          ],
+                          onChanged: (v) => setState(() => _commune = v),
+                        ),
+                      ),
+                    if (widget.plot == null) const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _declared,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Diện tích khai báo (ha)',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 8),
                 Row(
                   children: [

@@ -62,7 +62,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | S2 | HTX và nông hộ, định danh ở vault | `TestHouseholdDedupeViaVault`, `TestNoPIIColumns`, E2E-03, E2E-14 | có |
 | S2 | `apps/web-ops` | — | **chưa có** trong bộ này. Giao diện chưa có kiểm thử đầu–cuối qua trình duyệt |
 | S2 | Chốt engine đồng bộ (23.1) | ADR-0006: đồng bộ qua Application API; E2E-11 | có (quyết định) |
-| S3 | `apps/field-app`: offline 72 giờ, SQLCipher, hàng đợi, vẽ offline, mã hóa ảnh | `apps/field-app/test/*.dart` (auth, outbox, boundary, photo_pipeline, envelope_vectors, wipe) | **một phần**. Kiểm thử Dart chạy riêng, dùng máy chủ giả. E2E-11 chỉ mô phỏng phía thiết bị bằng Go |
+| S3 | `apps/field-app`: offline 72 giờ, SQLCipher, hàng đợi, vẽ offline, mã hóa ảnh, hộp thư/đẩy, thư viện "Đã lưu", đồng ý, watermark, bản đồ ngoại tuyến | `apps/field-app/test/*.dart` (auth, outbox, boundary, photo_pipeline, envelope_vectors, wipe, inbox_library_directive, push, consent_watermark, tiles_pull, http_contract_g1), `offline_flow_http_test.dart` (HTTP thật tới máy chủ giả `dart:io`), `integration_test/app_flow_test.dart` (emulator API 30, CI `field-app-emulator`) | **có** (28/09). Emulator chạy SQLCipher + Keystore + giao diện thật với máy chủ API giả trong tiến trình; chưa chạy với máy chủ Go thật (E2E-11 vẫn mô phỏng phía thiết bị bằng Go). Job emulator chỉ chạy khi push `main`/chạy tay — chưa chạy trên máy dựng (không có Android SDK) |
 | S4 | `platform/extension`: nhiệm vụ SLA 24 giờ, leo thang | `TestTaskSLAFromParamAtCreation`, `TestEscalationJobOnlyOverdueAndIdempotent`, E2E-07 | có |
 | S4 | Thư viện quy trình | `TestLocalSupplementScope`, `TestAuthorCannotSelfApprove`, E2E-06 | có |
 | S4 | Dashboard 4 KPI | `TestNationalKPIEqualsSumOfProvinces`, E2E-08 | có |
@@ -82,7 +82,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | US-ADM-01/02/03 tài khoản, nhập hàng loạt, thao tác loạt | `TestCreateUserUSADM01`, `TestProvinceAdminGrantMatrix`, `TestLockUnlockNeedsReason`, `TestImportXLSXMixedRows`, `TestBulkActions`, `TestAssignmentChange`, `TestIdempotentCreate`, `TestTenantIsolation`, `TestContractHTTPAgainstEmulator` ([internal/platform/accounts](../../internal/platform/accounts)) | **một phần**. pf/accounts gọi Keycloak Admin REST (bản HTTP kiểm bằng emulator, không có Keycloak thật trong kiểm thử). Kích hoạt bằng liên kết một lần thay cho mật khẩu tạm (ADR-0010) |
 | HTX epic J (US-HTXSTATUS-01 AC-2, 02 AC-2, 03): vô hiệu hóa/kích hoạt lại HTX khóa/mở tài khoản | `TestOrgDeactivationLocksOnlyThatOrgAndReactivationRestoresOnlyThose` (consumer `pf.accounts.org_status` qua `inbox.Process`), `TestLockUnlockNeedsReason` (sổ chỉ ghi thêm, chuỗi băm) | có ở mức module. E2E chưa chạy qua RabbitMQ |
 | US-ADM-04 đăng nhập, điều hướng theo vai trò và phạm vi | `TestVerifyRejects`, `TestVerifyBuildsPrincipal`, `TestNoOrgSeesNothing`, E2E-05 | **một phần**. Có xác minh token và phạm vi theo `org_ref`; phần điều hướng giao diện chưa có |
-| US-ADM-05/06 PIN 6 số, offline 72 giờ | `apps/field-app/test/auth_test.dart` | **một phần**. Chỉ có kiểm thử Dart, không có trong E2E |
+| US-ADM-05/06 PIN 6 số, offline 72 giờ | `apps/field-app/test/auth_test.dart`, `integration_test/app_flow_test.dart` (đăng nhập chế độ kiểm thử → tạo PIN → mở khóa CSDL SQLCipher bằng khóa Keystore) | **một phần**. Có Dart + emulator; OIDC ở chế độ kiểm thử (chưa có Keycloak thật trên emulator) |
 | US-ADM-07 cây phân cấp 3 cấp | E2E-02, `TestAllowedParent`, `TestScopeProvinceSeesOnlyItsCommunes` | có |
 | US-ADM-08 di chuyển nhánh; nhập/xuất Excel | `TestOrgMoveHistoryAndChain`, `TestOrgTreeExportImportRoundTrip`, `TestOrgTreeExportScoped` | có. `GET /v1/orgs/export.xlsx` → sửa → `POST /v1/orgs/import`; nhập đi qua CreateOrg/MoveOrg/RenameOrg (sổ ghi lý do). Không vô hiệu hóa tổ chức vắng mặt trong tệp |
 
@@ -102,17 +102,17 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 |---|---|---|
 | US-PLOT-01 vẽ ranh giới | E2E-05, `TestBoundaryValidationRules`, `TestCorrectionCreatesNewVersion` | có |
 | US-PLOT-02 tải tệp ranh giới | `TestImportGeoJSONAndKML`, `TestImportShapefileZip`, `TestParseShapefileZip`, `TestParseShapefileRejects` | có. GeoJSON, KML, Shapefile (.zip: .shp/.dbf/.prj). Chỉ WGS84; VN-2000/hệ phẳng trả `geo.crs_unsupported` — chưa tự chuyển VN-2000 (người dùng chuyển sang EPSG:4326 trước) |
-| US-PLOT-03 cảnh báo chồng lấn | `TestOverlapSameCoopRejectedCrossCoopFlagged`, `TestClassifyOverlaps` | có ở mức module. E2E không kiểm vì quy tắc đang được sửa song song |
-| US-PLOT-04 vẽ offline, tự đồng bộ | E2E-11 (`plot_boundary` accepted; tam giác → rejected), `TestSyncSinkIdempotentAndConflict` | có (phía máy chủ) |
+| US-PLOT-03 cảnh báo chồng lấn | `TestOverlapSameCoopRejectedCrossCoopFlagged`, `TestClassifyOverlaps`; app: `boundary_test.dart` (chặn HTX khác, xác nhận cùng HTX, lệch diện tích khai báo > 5 %) | có ở mức module + app. E2E không kiểm vì quy tắc đang được sửa song song |
+| US-PLOT-04 vẽ offline, tự đồng bộ | E2E-11 (`plot_boundary` accepted; tam giác → rejected), `TestSyncSinkIdempotentAndConflict`; app: `boundary_test.dart` (payload `BoundaryPayload`, `declared_area_ha` chuỗi, `correct` theo `boundary_id`, `confirm_overlap` sau `conflict`/`rejected geo.*_needs_confirm`), `offline_flow_http_test.dart`, `integration_test/app_flow_test.dart` (vẽ khi mất mạng → có mạng + `sync_now` → accepted) | có (máy chủ + app). Trạng thái xung đột hiện ở danh sách thửa và hàng đợi |
 
 ### E. Liên thông dữ liệu (một phần)
 
 | Story | Kiểm thử | Trạng thái |
 |---|---|---|
 | US-SYNC-01 hai chiều với App HTX | — | **chưa có**, thuộc G2. G1 chỉ có đồng bộ app hiện trường ↔ máy chủ: E2E-11, `TestPushMixedBatchAndReplay`, `TestPullPaginationRoundRobin`, `TestPullScopeChangeResets` |
-| US-SYNC-02 đồng bộ ngay theo yêu cầu | `TestNudgeScopeAndRateLimit` (`POST /v1/sync/nudge`, thông điệp dữ liệu `sync_now`, giới hạn 5 phút/đích, 30 lần/giờ) | **một phần**. Có ở máy chủ; app phải xử lý `sync_now` (chưa ráp Flutter) |
+| US-SYNC-02 đồng bộ ngay theo yêu cầu | `TestNudgeScopeAndRateLimit` (`POST /v1/sync/nudge`, thông điệp dữ liệu `sync_now`, giới hạn 5 phút/đích, 30 lần/giờ); app: `push_test.dart` (`sync_now` → đồng bộ ngay; token `POST /v1/devices/{id}/push-token` sau đăng ký, mỗi lần khởi động, khi đổi), `integration_test/app_flow_test.dart` | **có** (28/09). FCM thật cần cấu hình `AG_FCM_*`; kiểm thử dùng kênh đẩy giả sau lớp trừu tượng. App tắt/đang khóa: `sync_now` chờ tới khi mở khóa (chưa có WorkManager) |
 | US-SYNC-03 đối soát xung đột | `TestConflictSLA`, `TestSyncSinkIdempotentAndConflict` | **một phần**. Có sổ xung đột và SLA 72 giờ (C-8 tạm), có API resolve; chưa có màn hình, E2E không tạo xung đột |
-| US-SYNC-02 đồng bộ ngay theo yêu cầu | — | **chưa có** |
+| US-SYNC-02 đồng bộ ngay theo yêu cầu | xem dòng trên | **có** (28/09) |
 | US-SYNC-03 đối soát xung đột | `TestConflictSLA`, `TestSyncSinkIdempotentAndConflict`, `TestConflictResolutionUI`, `TestConflictDetailBothVersions` | **đạt API** (28/09). Lọc theo entity/SLA (`sla_status`), chi tiết giữ cả hai phiên bản không PII, xử lý chọn phiên bản hoặc bản ghi bù; chưa có màn hình web |
 
 ### G. Thư viện kỹ thuật và tin tức
@@ -123,10 +123,10 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | US-LIB-02 hướng dẫn đặc thù địa phương | E2E-06, `TestLocalSupplementScope` | có |
 | US-LIB-03 trích nội dung từ tệp | `TestExtract`, `TestExtractPDFVietnamese`, `TestExtractPDFRejects`, `TestParseToUnicode` | có. DOCX và PDF có lớp chữ (tiếng Việt có dấu). PDF ảnh scan/mã hóa trả `content.extract_unsupported` kèm lý do (không OCR) |
 | US-LIB-04 tra cứu | `TestSearchAccentInsensitive`, E2E-06 | có |
-| US-LIB-05 lưu và tải offline | E2E-11 (pull `document`), `TestSyncRetireTombstone` | **một phần**. Có đồng bộ xuống máy; chưa có danh mục cá nhân |
-| US-LIB-06 thông báo nội dung mới | E2E-06, `TestAlertPublishedEvent`, `TestAlertFanOutRespectsScope`, `TestDuplicateEventDeliveryNoDuplicates`, `TestFCMPayloadIsDataOnly` | **một phần**. pf/notify: hộp thư trong app theo phạm vi, đẩy FCM chỉ dữ liệu (ADR-0015); chưa ráp app web/Flutter |
-| US-LIB-05 lưu và tải offline | E2E-11 (pull `document`), `TestSyncRetireTombstone`, `TestPersonalLibraryUSLIB05` | **đạt API** (28/09). Danh mục cá nhân (migration 000014) + entity đồng bộ `library_item` của chính người lưu |
-| US-LIB-06 thông báo nội dung mới | E2E-06 (`pf.content.document.published` trong outbox), `TestAlertPublishedEvent` | **một phần**. Có sự kiện; chưa có kênh đẩy thông báo tới máy |
+| US-LIB-05 lưu và tải offline | E2E-11 (pull `document`), `TestSyncRetireTombstone`, `TestPersonalLibraryUSLIB05`; app: `inbox_library_directive_test.dart` | **có** (28/09) — xem dòng dưới |
+| US-LIB-06 thông báo nội dung mới | E2E-06, `TestAlertPublishedEvent`, `TestAlertFanOutRespectsScope`, `TestDuplicateEventDeliveryNoDuplicates`, `TestFCMPayloadIsDataOnly`; app: `inbox_library_directive_test.dart`, `push_test.dart`, `integration_test/app_flow_test.dart` | **một phần**. Flutter: hộp thư từ entity `notification` (30 ngày), chuông + số chưa đọc, đọc/đọc hết xếp hàng khi ngoại tuyến, `{kind, notification_id}` → pull → thông báo cục bộ (màn hình khóa chỉ "Có thông báo mới"), mở đúng màn hình theo `deep_link`. Chưa ráp app web |
+| US-LIB-05 lưu và tải offline | E2E-11 (pull `document`), `TestSyncRetireTombstone`, `TestPersonalLibraryUSLIB05`; app: `inbox_library_directive_test.dart` (lưu/bỏ lưu ngoại tuyến → phát lại theo thứ tự, tài liệu đã gỡ giữ nhãn "đã gỡ", tombstone) | **có** (28/09). Danh mục cá nhân (migration 000014) + entity `library_item`; app có màn "Thư viện · Đã lưu" |
+| US-LIB-06 thông báo nội dung mới | xem dòng US-LIB-06 ở trên | **một phần** (28/09): có kênh đẩy tới app Flutter; chưa có app web |
 
 ### I. Dashboard và báo cáo
 
@@ -141,8 +141,8 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | Story | Kiểm thử | Trạng thái |
 |---|---|---|
 | US-TASK-01 tự sinh nhiệm vụ từ yêu cầu App HTX | `TestCoopManagerCreatesForOwnCooperative` | **một phần**. Quản lý HTX tạo được nhiệm vụ qua API; luồng tự động từ App HTX thuộc G2 |
-| US-TASK-02 tiếp nhận, xử lý, chuyển tiếp, leo thang SLA | E2E-07 (SLA 24 giờ, leo thang lên tỉnh), E2E-11 (`task_update` accepted), `TestEscalationJobOnlyOverdueAndIdempotent` | có |
-| US-TASK-03 giám sát và gửi chỉ đạo | `TestDirectiveAckRate`, `TestOfficerOutsideCommuneCannotSeeOrAssign` | có ở mức module. E2E không gửi chỉ đạo |
+| US-TASK-02 tiếp nhận, xử lý, chuyển tiếp, leo thang SLA | E2E-07 (SLA 24 giờ, leo thang lên tỉnh), E2E-11 (`task_update` accepted), `TestEscalationJobOnlyOverdueAndIdempotent`; app: `consent_watermark_test.dart` (đếm ngược SLA: còn / sắp hết < 4 giờ / quá hạn; `action` theo pf/extension), `photo_pipeline_test.dart` | có. App hiển thị đếm ngược SLA theo `due_at`, mở đúng nhiệm vụ từ thông báo leo thang |
+| US-TASK-03 giám sát và gửi chỉ đạo | `TestDirectiveAckRate`, `TestOfficerOutsideCommuneCannotSeeOrAssign`; app: `inbox_library_directive_test.dart` (xác nhận đã đọc ngoại tuyến → `POST /v1/extension/directives/{id}/ack`, chỉ người nhận) | có ở mức module + app. E2E không gửi chỉ đạo |
 | US-TASK-04 phân công hàng loạt | `TestBulkAssign` | có |
 
 ### K. Danh bạ trực
