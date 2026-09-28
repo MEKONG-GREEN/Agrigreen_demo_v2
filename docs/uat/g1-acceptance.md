@@ -208,6 +208,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 1. **pf/content: không dùng được mã xã của bộ seed cho phạm vi cấp xã.**
    - Regex `^[0-9A-Za-z]{2,10}$` loại mã `92-X-NINH-KIEU`, nên tài liệu cấp xã không tạo được với dữ liệu chủ thật.
    - Đã đổi regex cho khớp quy tắc mã của pf/masterdata. E2E-06 tạo cảnh báo cấp xã.
+   - Cập nhật: bộ seed nay dùng mã xã chính thức 5 chữ số (QĐ 19/2025/QĐ-TTg), E2E dùng `31135` (Phường Ninh Kiều) và `30307` (Phường Long Xuyên) — xem [danh-muc-hanh-chinh.md](../requirements/danh-muc-hanh-chinh.md).
 2. **pf/extension: `sown_on` bị coi là "ở tương lai" trước 07:00 giờ Việt Nam.**
    - Ngày được parse theo UTC.
    - Đã parse theo `clock.Zone()` (R-12).
