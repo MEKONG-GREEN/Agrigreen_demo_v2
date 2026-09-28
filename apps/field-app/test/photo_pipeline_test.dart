@@ -122,7 +122,7 @@ void main() {
     },
   );
 
-  test('đồng bộ: tải tệp (multipart, Idempotency-Key file:<id>) rồi mới tạo bản ghi evidence có file_ref', () async {
+  test('đồng bộ: tải tệp (multipart, Idempotency-Key file:<id>, file_ref = id) idempotent qua crash; ảnh lẻ không tạo evidence (chỉ biểu mẫu MRV tạo)', () async {
     final out = await pipeline(
       const LocationResult(GpsStatus.denied),
     ).capture(subjectRef: 'hh1', parentEntity: 'field_report', parentId: 'r1');
@@ -135,23 +135,18 @@ void main() {
     expect(await h.outbox.list(), isEmpty);
     await h.reopen();
 
-    // Lần 2: tải lại cùng khóa → cùng file_ref; bản ghi evidence tạo đúng một lần.
+    // Lần 2: tải lại cùng khóa → cùng file_ref (= id máy sinh).
     await h.sync.syncOnce(force: true);
     expect(h.fake.uploadKeys, ['file:${f.id}', 'file:${f.id}']);
-    final ev = await h.outbox.list(entity: PushEntity.evidence);
-    expect(ev, hasLength(1));
-    expect(ev.single.payload['file_ref'], h.fake.files['file:${f.id}']!['ref']);
-    expect(ev.single.payload['parent_id'], 'r1');
-    expect(ev.single.payload['gps_status'], 'missing');
-    expect(ev.single.eventTime, f.meta['captured_at']);
-    expect(ev.single.status, OutboxStatus.sent);
-    expect(h.fake.ledger[ev.single.idemKey], isNotNull);
+    expect(h.fake.uploadFileRefs, [f.id, f.id]);
+    expect(h.fake.files['file:${f.id}']!['ref'], f.id);
     // Ciphertext cục bộ đã được bỏ sau khi tải lên.
     expect(File(f.blobPath).existsSync(), isFalse);
-    expect((await h.evidence.byId(f.id))!.status, 'uploaded');
-
-    await h.sync.syncOnce(force: true);
-    expect(await h.outbox.list(entity: PushEntity.evidence), hasLength(1));
+    final up = (await h.evidence.byId(f.id))!;
+    expect(up.status, 'uploaded');
+    expect(up.fileRef, f.id);
+    // Bản ghi evidence chỉ do biểu mẫu MRV tạo (payload_contract_test).
+    expect(await h.outbox.list(entity: PushEntity.evidence), isEmpty);
   });
 
   group('nhiệm vụ hỗ trợ (US-TASK-02)', () {

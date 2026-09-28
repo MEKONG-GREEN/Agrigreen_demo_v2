@@ -2,27 +2,65 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/field_report_service.dart';
-import '../../data/photo/location_source.dart';
+import '../../data/catalog/catalog_cache.dart';
 import '../../data/reference/reference_repository.dart';
 import '../../domain/outbox_record.dart';
 import '../providers.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
-import 'photo_capture_screen.dart';
-import 'plots_screen.dart';
 
-const _activityIcons = {
-  FarmActivity.lamDat: Icons.agriculture,
-  FarmActivity.gieoSa: Icons.grass,
-  FarmActivity.tuoiNuoc: Icons.water_drop,
-  FarmActivity.bonPhan: Icons.scatter_plot,
-  FarmActivity.phunThuoc: Icons.sanitizer,
-  FarmActivity.kiemTra: Icons.fact_check,
-  FarmActivity.thuHoach: Icons.inventory_2,
-};
+/// Lựa chọn cho biểu mẫu: xã/HTX trong phạm vi (từ dữ liệu đã đồng bộ) và
+/// danh mục giống/vụ/sâu bệnh (đệm từ API masterdata).
+class ReportOptions {
+  const ReportOptions({
+    required this.communes,
+    required this.cooperatives,
+    required this.varieties,
+    required this.seasons,
+    required this.pests,
+  });
+  final Map<String, String> communes;
+  final Map<String, String> cooperatives;
+  final List<CatalogEntry> varieties;
+  final List<CatalogEntry> seasons;
+  final List<CatalogEntry> pests;
+}
 
-/// Báo cáo hiện trường / nhật ký canh tác. GPS + thời gian gắn tự động khi lưu
-/// và không sửa được về sau (HTX US-LOG-01).
+final reportOptionsProvider = FutureProvider.autoDispose<ReportOptions>((
+  ref,
+) async {
+  final s = servicesOf(ref);
+  final communes = <String, String>{};
+  final coops = <String, String>{};
+  for (final u in await s.refs.list(RefEntity.adminUnit)) {
+    final code = '${u.data['code'] ?? u.id}';
+    communes[code] = '${u.data['name'] ?? code}';
+  }
+  for (final e in [
+    ...await s.refs.list(RefEntity.plot),
+    ...await s.refs.list(RefEntity.task),
+  ]) {
+    final c = e.data['commune_code'];
+    if (c is String && c.isNotEmpty) communes.putIfAbsent(c, () => c);
+    final coop = e.data['cooperative_ref'];
+    if (coop is String && coop.isNotEmpty) {
+      coops.putIfAbsent(coop, () => 'HTX ${coop.substring(0, 8)}');
+    }
+  }
+  for (final c in await s.refs.list(RefEntity.cooperative)) {
+    coops[c.id] = '${c.data['name'] ?? c.data['label'] ?? c.id}';
+  }
+  return ReportOptions(
+    communes: communes,
+    cooperatives: coops,
+    varieties: await s.catalogs.entries('rice_variety'),
+    seasons: await s.catalogs.entries('season'),
+    pests: await s.catalogs.entries('pest'),
+  );
+});
+
+/// Báo cáo hiện trường KN: tiến độ gieo sạ (FR-01) hoặc sinh trưởng – sâu bệnh
+/// (FR-02). Payload đúng `ReportPayload` của pf/extension; lưu được ngoại tuyến.
 class FieldReportScreen extends ConsumerStatefulWidget {
   const FieldReportScreen({super.key});
 
@@ -31,134 +69,219 @@ class FieldReportScreen extends ConsumerStatefulWidget {
 }
 
 class _FieldReportScreenState extends ConsumerState<FieldReportScreen> {
-  RefRow? _plot;
-  FarmActivity? _activity;
+  FieldReportKind _kind = FieldReportKind.sowing;
+  String? _commune;
+  String? _coop;
+  String? _season;
+  String? _variety;
+  String? _pest;
+  PestSeverity? _severity;
+  bool _urgent = false;
+  final _communeText = TextEditingController();
+  final _area = TextEditingController();
+  final _sownOn = TextEditingController();
+  final _stage = TextEditingController();
   final _note = TextEditingController();
   bool _busy = false;
 
   @override
   void dispose() {
-    _note.dispose();
+    for (final c in [_communeText, _area, _sownOn, _stage, _note]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   Future<void> _save() async {
     final s = ref.read(appControllerProvider).services;
-    if (s == null || _plot == null || _activity == null) return;
+    if (s == null) return;
+    final sowing = _kind == FieldReportKind.sowing;
+    final draft = FieldReportDraft(
+      kind: _kind,
+      communeCode: (_commune ?? _communeText.text).trim(),
+      cooperativeRef: _coop,
+      period: periodOf(s.platform.clock.now()),
+      seasonCode: _season ?? '',
+      varietyCode: _variety ?? '',
+      sownAreaHa: sowing ? normalizeDecimal(_area.text) : null,
+      sownOn: _sownOn.text.trim().isEmpty ? null : _sownOn.text.trim(),
+      growthStage: _stage.text.trim(),
+      pestCode: _pest ?? '',
+      severity: _severity,
+      affectedAreaHa: sowing ? null : normalizeDecimal(_area.text),
+      urgent: _urgent,
+      note: _note.text,
+    );
     setState(() => _busy = true);
     try {
-      final loc = await s.platform.location.current();
-      final rec = await s.reports.create(
-        plotId: _plot!.id,
-        householdRef: _plot!.data['household_ref'] as String?,
-        activity: _activity!,
-        note: _note.text,
-        location: loc,
-      );
+      await s.reports.create(draft);
       if (!mounted) return;
-      showMessage(
-        context,
-        loc.fix == null
-            ? 'Đã lưu (${loc.status.label}). Chờ đồng bộ.'
-            : 'Đã lưu kèm GPS và thời gian. Chờ đồng bộ.',
-      );
-      final household = _plot!.data['household_ref'] as String?;
-      if (household != null) {
-        await Navigator.of(context).pushReplacement(
-          MaterialPageRoute<void>(
-            builder: (_) => PhotoCaptureScreen(
-              subjectRef: household,
-              parentEntity: PushEntity.fieldReport,
-              parentId: rec.id,
-            ),
-          ),
-        );
-      } else {
-        Navigator.of(context).pop();
-      }
+      showMessage(context, 'Đã lưu báo cáo. Chờ đồng bộ.');
+      Navigator.of(context).pop();
+    } on FieldReportError catch (e) {
+      if (mounted) showMessage(context, e.reason, error: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
+  Widget _pick(
+    String label,
+    String? value,
+    Map<String, String> items,
+    void Function(String?) onChanged,
+  ) => DropdownButtonFormField<String>(
+    initialValue: value,
+    isExpanded: true,
+    decoration: InputDecoration(labelText: label),
+    items: [
+      for (final e in items.entries)
+        DropdownMenuItem(value: e.key, child: Text(e.value)),
+    ],
+    onChanged: onChanged,
+  );
+
+  Map<String, String> _catalog(List<CatalogEntry> l) => {
+    for (final e in l) e.code: '${e.name} (${e.code})',
+  };
+
   @override
   Widget build(BuildContext context) {
-    final plots = ref.watch(plotsProvider);
+    final opts = ref.watch(reportOptionsProvider);
+    final sowing = _kind == FieldReportKind.sowing;
     return Scaffold(
       appBar: AppBar(title: const Text('Báo cáo hiện trường')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text(
-            'Thửa ruộng',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          plots.when(
-            loading: () => const LinearProgressIndicator(),
-            error: (e, _) => Text('Lỗi: $e'),
-            data: (list) => DropdownButtonFormField<String>(
-              initialValue: _plot?.id,
-              isExpanded: true,
-              itemHeight: 56,
-              hint: const Text('Chọn thửa'),
-              items: [
-                for (final p in list)
-                  DropdownMenuItem(value: p.id, child: Text(plotLabel(p))),
+      body: opts.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Lỗi: $e')),
+        data: (o) => ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            SegmentedButton<FieldReportKind>(
+              segments: [
+                for (final k in FieldReportKind.values)
+                  ButtonSegment(value: k, label: Text(k.label)),
               ],
-              onChanged: (id) =>
-                  setState(() => _plot = list.firstWhere((p) => p.id == id)),
+              selected: {_kind},
+              onSelectionChanged: (v) => setState(() => _kind = v.first),
             ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Hoạt động',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              for (final a in FarmActivity.values)
-                ChoiceChip(
-                  avatar: Icon(_activityIcons[a], size: 24),
-                  label: Text(a.label, style: const TextStyle(fontSize: 17)),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 10,
-                  ),
-                  selected: _activity == a,
-                  selectedColor: AgColors.g100,
-                  onSelected: (_) => setState(() => _activity = a),
+            const SizedBox(height: 12),
+            if (o.communes.isNotEmpty)
+              _pick('Xã', _commune, o.communes, (v) {
+                setState(() => _commune = v);
+              })
+            else
+              TextField(
+                controller: _communeText,
+                decoration: const InputDecoration(labelText: 'Mã xã'),
+              ),
+            const SizedBox(height: 8),
+            _pick(
+              sowing ? 'Hợp tác xã (bắt buộc)' : 'Hợp tác xã (không bắt buộc)',
+              _coop,
+              o.cooperatives,
+              (v) => setState(() => _coop = v),
+            ),
+            const SizedBox(height: 8),
+            if (sowing) ...[
+              _pick(
+                'Vụ',
+                _season,
+                _catalog(o.seasons),
+                (v) => setState(() => _season = v),
+              ),
+              const SizedBox(height: 8),
+              _pick(
+                'Giống lúa',
+                _variety,
+                _catalog(o.varieties),
+                (v) => setState(() => _variety = v),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _area,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
                 ),
+                decoration: const InputDecoration(
+                  labelText: 'Diện tích đã sạ (ha)',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _sownOn,
+                decoration: const InputDecoration(
+                  labelText: 'Ngày sạ (YYYY-MM-DD, không bắt buộc)',
+                ),
+              ),
+            ] else ...[
+              TextField(
+                controller: _stage,
+                decoration: const InputDecoration(
+                  labelText: 'Giai đoạn sinh trưởng (mã, vd de_nhanh)',
+                ),
+              ),
+              const SizedBox(height: 8),
+              _pick(
+                'Sâu bệnh',
+                _pest,
+                _catalog(o.pests),
+                (v) => setState(() => _pest = v),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final sv in PestSeverity.values)
+                    ChoiceChip(
+                      label: Text(sv.label),
+                      selected: _severity == sv,
+                      onSelected: (_) => setState(() => _severity = sv),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _area,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Diện tích nhiễm (ha, không bắt buộc)',
+                ),
+              ),
+              SwitchListTile(
+                value: _urgent,
+                onChanged: (v) => setState(() => _urgent = v),
+                title: const Text('Khẩn cấp'),
+              ),
             ],
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _note,
-            maxLines: 3,
-            style: const TextStyle(fontSize: 17),
-            decoration: const InputDecoration(
-              labelText: 'Ghi chú (không bắt buộc)',
+            if (o.varieties.isEmpty && o.pests.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text(
+                  'Chưa có danh mục giống/vụ/sâu bệnh trên máy. Hãy đồng bộ khi có mạng.',
+                  style: TextStyle(color: AgColors.amber),
+                ),
+              ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _note,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Ghi chú (không ghi SĐT, CCCD)',
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Tọa độ GPS và thời gian được gắn tự động khi lưu và không thể chỉnh sửa sau đó.',
-            style: TextStyle(color: AgColors.mute, fontSize: 15),
-          ),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: _busy || _plot == null || _activity == null
-                ? null
-                : _save,
-            icon: const Icon(Icons.save),
-            label: Text(_busy ? 'Đang lấy GPS…' : 'Lưu báo cáo'),
-          ),
-          const SizedBox(height: 28),
-          const _RecentReports(),
-        ],
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _busy ? null : _save,
+              icon: const Icon(Icons.save),
+              label: const Text('Lưu báo cáo'),
+            ),
+            const SizedBox(height: 24),
+            const _RecentReports(),
+          ],
+        ),
       ),
     );
   }
@@ -167,6 +290,17 @@ class _FieldReportScreenState extends ConsumerState<FieldReportScreen> {
 final recentReportsProvider = FutureProvider.autoDispose<List<OutboxRecord>>(
   (ref) => servicesOf(ref).reports.recent(),
 );
+
+String reportSummary(Map<String, Object?> p) {
+  final k = FieldReportKind.parse(p['kind'] as String?);
+  return switch (k) {
+    FieldReportKind.sowing =>
+      'Gieo sạ · ${p['variety_code']} · ${p['sown_area_ha']} ha',
+    FieldReportKind.growthPest =>
+      'Sâu bệnh · ${p['pest_code']} · ${p['severity']}',
+    null => 'Báo cáo',
+  };
+}
 
 class _RecentReports extends ConsumerWidget {
   const _RecentReports();
@@ -188,16 +322,11 @@ class _RecentReports extends ConsumerWidget {
           for (final r in items)
             Card(
               child: ListTile(
-                title: Text(
-                  FarmActivity.byCode(r.payload['activity'] as String?)
-                          ?.label ??
-                      'Báo cáo',
-                ),
+                title: Text(reportSummary(r.payload)),
                 subtitle: Text(
-                  '${r.eventTime}\n${GpsStatus.values.where((g) => g.name == r.payload['gps_status']).map((g) => g.label).firstOrNull ?? ''}'
+                  'Kỳ ${r.payload['period']} · ${r.eventTime}'
                   '${r.op == RecordOp.correct ? ' · Bản ghi bù' : ''}',
                 ),
-                isThreeLine: true,
                 trailing: StatusChip(r.status),
               ),
             ),

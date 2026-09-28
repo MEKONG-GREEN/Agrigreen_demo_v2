@@ -1,0 +1,19 @@
+{
+  "_source": "internal/platform/extension/app/payload.go ReportPayload + domain/report.go Validate (kind sowing_progress, FR-01)",
+  "payload": {
+    "kind": "sowing_progress",
+    "commune_code": "31117",
+    "cooperative_ref": "01920000-0000-7000-8000-0000000000c1",
+    "period": "2026-12",
+    "season_code": "DX",
+    "variety_code": "OM5451",
+    "sown_area_ha": "12.5",
+    "sown_on": "2026-11-20",
+    "growth_stage": "",
+    "pest_code": "",
+    "severity": "",
+    "affected_area_ha": null,
+    "urgent": false,
+    "note": "Sạ lan, đủ nước"
+  }
+}

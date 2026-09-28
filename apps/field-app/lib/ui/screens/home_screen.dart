@@ -7,6 +7,7 @@ import '../providers.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'directives_screen.dart';
+import 'evidence_form_screen.dart';
 import 'field_report_screen.dart';
 import 'library_screen.dart';
 import 'notifications_screen.dart';
@@ -109,6 +110,11 @@ class HomeScreen extends ConsumerWidget {
                   icon: Icons.edit_note,
                   label: 'Báo cáo hiện trường',
                   onTap: () => open(const FieldReportScreen()),
+                ),
+                BigTile(
+                  icon: Icons.fact_check_outlined,
+                  label: 'Minh chứng MRV',
+                  onTap: () => open(const EvidenceFormScreen()),
                 ),
                 BigTile(
                   icon: Icons.campaign_outlined,

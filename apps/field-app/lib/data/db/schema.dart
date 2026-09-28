@@ -13,7 +13,7 @@ import 'package:sqflite_common/sqlite_api.dart';
 /// - `consent_local` (v2): sổ đồng ý ghi trên máy (chỉ mã tham chiếu hộ).
 /// - `tile_pack`, `map_tile` (v2): gói bản đồ ngoại tuyến (nằm trong SQLCipher).
 abstract final class Schema {
-  static const version = 2;
+  static const version = 3;
 
   static Future<void> create(Database db) async {
     final b = db.batch();
@@ -93,7 +93,33 @@ CREATE TABLE evidence_file (
   created_at      INTEGER NOT NULL
 )''');
     _createV2Tables(b);
+    _createV3Tables(b);
     await b.commit(noResult: true);
+  }
+
+  /// v3: biểu mẫu minh chứng MRV chờ ảnh tải xong (`evidence_form`) và bộ đệm
+  /// danh mục tải qua API (`catalog_cache`: danh mục trường MRV, danh mục
+  /// masterdata giống/vụ/sâu bệnh).
+  static void _createV3Tables(Batch b) {
+    b.execute('''
+CREATE TABLE evidence_form (
+  id          TEXT PRIMARY KEY,
+  payload     TEXT NOT NULL,
+  event_time  TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'waiting'
+              CHECK (status IN ('waiting','queued','blocked')),
+  record_id   TEXT,
+  last_error  TEXT,
+  created_at  INTEGER NOT NULL
+)''');
+    b.execute('''
+CREATE TABLE catalog_cache (
+  kind        TEXT NOT NULL,
+  key         TEXT NOT NULL,
+  json        TEXT NOT NULL,
+  fetched_at  INTEGER NOT NULL,
+  PRIMARY KEY (kind, key)
+)''');
   }
 
   static void _createV2Tables(Batch b) {
@@ -160,6 +186,11 @@ CREATE TABLE map_tile (
       final b = db.batch();
       b.execute('ALTER TABLE outbox ADD COLUMN replaced_by TEXT');
       _createV2Tables(b);
+      await b.commit(noResult: true);
+    }
+    if (from < 3) {
+      final b = db.batch();
+      _createV3Tables(b);
       await b.commit(noResult: true);
     }
   }

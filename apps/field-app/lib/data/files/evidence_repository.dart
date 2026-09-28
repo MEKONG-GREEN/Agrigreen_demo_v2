@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../../core/clock.dart';
+import '../../domain/mrv.dart';
 import '../../domain/outbox_record.dart';
 import '../crypto/envelope.dart';
 import '../db/local_db.dart';
@@ -127,58 +128,118 @@ class EvidenceRepository {
         [error, fatal ? 'failed' : 'pending', id],
       );
 
-  /// Sau khi máy chủ trả `file_ref`: đánh dấu đã tải **và** tạo bản ghi
-  /// `evidence` trong hàng đợi trong cùng một giao dịch — không mất, không trùng.
-  Future<OutboxRecord> markUploaded(
-    EvidenceFile f,
-    String fileRef,
-    OutboxRepository outbox,
-  ) async {
-    final rec = await _db.db.transaction((tx) async {
-      final cur = await tx.query(
-        'evidence_file',
-        columns: ['status', 'evidence_record'],
-        where: 'id = ?',
-        whereArgs: [f.id],
-      );
-      if (cur.isNotEmpty && cur.first['status'] == 'uploaded') {
-        final existingId = cur.first['evidence_record'] as String?;
-        final existing = existingId == null
-            ? null
-            : await outbox.byId(existingId, tx: tx);
-        if (existing != null) return existing;
-      }
-      final r = await outbox.enqueue(
-        entity: PushEntity.evidence,
-        eventTimeRfc3339: f.meta['captured_at'] as String?,
-        payload: {
-          'file_ref': fileRef,
-          'subject_ref': f.subjectRef,
-          'parent_entity': f.parentEntity,
-          'parent_id': f.parentId,
-          'content_type': f.meta['content_type'],
-          'captured_at': f.meta['captured_at'],
-          'sha256_ciphertext': f.meta['sha256_ciphertext'],
-          'gps_status': f.meta['gps'] == null ? 'missing' : 'ok',
-        },
-        tx: tx,
-      );
-      await tx.update(
-        'evidence_file',
-        {
-          'status': 'uploaded',
-          'file_ref': fileRef,
-          'evidence_record': r.id,
-          'last_error': null,
-        },
-        where: 'id = ?',
-        whereArgs: [f.id],
-      );
-      return r;
-    });
+  /// Sau khi máy chủ trả `file_ref`: đánh dấu đã tải rồi bỏ ciphertext cục bộ.
+  /// Bản ghi `evidence` tạo ở [flushForms] khi **mọi** ảnh của biểu mẫu đã tải.
+  Future<void> markUploaded(EvidenceFile f, String fileRef) async {
+    await _db.db.update(
+      'evidence_file',
+      {'status': 'uploaded', 'file_ref': fileRef, 'last_error': null},
+      where: 'id = ?',
+      whereArgs: [f.id],
+    );
     // Ciphertext đã nằm ở kho đối tượng; bỏ bản cục bộ để tiết kiệm bộ nhớ.
     await _blobs.delete(f.blobPath);
-    return rec;
+  }
+
+  /// Lưu biểu mẫu minh chứng MRV (payload `CapturePayload` chưa có
+  /// `file_refs`). Ảnh của biểu mẫu là `evidence_file` có
+  /// `parent_entity = evidence_form`, `parent_id = id`.
+  Future<void> addForm({
+    required String id,
+    required MrvEvidenceDraft draft,
+    required String eventTime,
+  }) => _db.db.insert('evidence_form', {
+    'id': id,
+    'payload': jsonEncode(draft.toPayload()),
+    'event_time': eventTime,
+    'status': 'waiting',
+    'created_at': _clock.now().millisecondsSinceEpoch,
+  });
+
+  Future<List<EvidenceForm>> forms({String? status}) async {
+    final rows = await _db.db.query(
+      'evidence_form',
+      where: status == null ? null : 'status = ?',
+      whereArgs: status == null ? null : [status],
+      orderBy: 'created_at DESC',
+    );
+    return rows.map(EvidenceForm.fromRow).toList();
+  }
+
+  /// Biểu mẫu có mọi ảnh đã tải → tạo bản ghi `evidence` (file_refs = file_ref
+  /// + sha256 ciphertext do máy chủ xác nhận) **trong cùng giao dịch** với việc
+  /// đánh dấu biểu mẫu đã xếp hàng — không mất, không trùng. Ảnh hỏng vĩnh viễn
+  /// → biểu mẫu `blocked` (hiển thị, không gửi thiếu ảnh).
+  Future<List<OutboxRecord>> flushForms(OutboxRepository outbox) async {
+    final out = <OutboxRecord>[];
+    for (final form in await forms(status: 'waiting')) {
+      final files = await forParent(form.id);
+      if (files.any((f) => f.status == 'failed')) {
+        await _db.db.update(
+          'evidence_form',
+          {
+            'status': 'blocked',
+            'last_error': files
+                .where((f) => f.status == 'failed')
+                .map((f) => f.lastError)
+                .join(', '),
+          },
+          where: 'id = ?',
+          whereArgs: [form.id],
+        );
+        continue;
+      }
+      if (files.any((f) => f.status != 'uploaded')) continue;
+      final byLocal = {for (final f in files) f.id: f.fileRef ?? f.id};
+      final draft = form.draft;
+      final values = <String, Object>{
+        for (final e in draft.values.entries)
+          e.key: e.value is List
+              ? [for (final r in e.value as List) byLocal['$r'] ?? '$r']
+              : e.value,
+      };
+      final payload = MrvEvidenceDraft(
+        evidenceType: draft.evidenceType,
+        catalogVersion: draft.catalogVersion,
+        adminUnitCode: draft.adminUnitCode,
+        plotRef: draft.plotRef,
+        householdRef: draft.householdRef,
+        seasonCode: draft.seasonCode,
+        values: values,
+        gps: draft.gps,
+        fileRefs: [
+          for (final f in files)
+            MrvFileRef(
+              f.fileRef ?? f.id,
+              '${f.meta['sha256_ciphertext']}'.toLowerCase(),
+            ),
+        ],
+      ).toPayload();
+      final rec = await _db.db.transaction((tx) async {
+        final cur = await tx.query(
+          'evidence_form',
+          columns: ['status', 'record_id'],
+          where: 'id = ?',
+          whereArgs: [form.id],
+        );
+        if (cur.isEmpty || cur.first['status'] != 'waiting') return null;
+        final r = await outbox.enqueue(
+          entity: PushEntity.evidence,
+          eventTimeRfc3339: form.eventTime,
+          payload: payload,
+          tx: tx,
+        );
+        await tx.update(
+          'evidence_form',
+          {'status': 'queued', 'record_id': r.id, 'last_error': null},
+          where: 'id = ?',
+          whereArgs: [form.id],
+        );
+        return r;
+      });
+      if (rec != null) out.add(rec);
+    }
+    return out;
   }
 
   Future<int> purgeUploaded(Duration retention) {
@@ -189,4 +250,36 @@ class EvidenceRepository {
       whereArgs: [cutoff],
     );
   }
+}
+
+/// Biểu mẫu minh chứng MRV chờ ảnh tải lên.
+class EvidenceForm {
+  const EvidenceForm({
+    required this.id,
+    required this.draft,
+    required this.eventTime,
+    required this.status,
+    this.recordId,
+    this.lastError,
+  });
+
+  final String id;
+  final MrvEvidenceDraft draft;
+  final String eventTime;
+
+  /// waiting | queued | blocked
+  final String status;
+  final String? recordId;
+  final String? lastError;
+
+  factory EvidenceForm.fromRow(Map<String, Object?> r) => EvidenceForm(
+    id: r['id']! as String,
+    draft: MrvEvidenceDraft.fromPayload(
+      (jsonDecode(r['payload']! as String) as Map).cast<String, Object?>(),
+    ),
+    eventTime: r['event_time']! as String,
+    status: r['status']! as String,
+    recordId: r['record_id'] as String?,
+    lastError: r['last_error'] as String?,
+  );
 }

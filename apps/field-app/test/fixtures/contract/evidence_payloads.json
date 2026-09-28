@@ -1,0 +1,42 @@
+{
+  "_source": "internal/platform/mrv/app/evidence.go CapturePayload/Parse + domain/evidence.go ValidateEnvelope + domain/catalog.go ValidateRecord; id, event_time, device_id, supersedes_id, correction_reason lấy từ phong bì bản ghi đồng bộ (app/sync.go)",
+  "awd_log": {
+    "evidence_type": "awd_log",
+    "catalog_version": 1,
+    "admin_unit_code": "31117",
+    "plot_ref": "01920000-0000-7000-8000-0000000000b1",
+    "household_ref": "01920000-0000-7000-8000-0000000000a1",
+    "season_code": "DX",
+    "values": {
+      "awd_dry_days": 5,
+      "awd_water_level_cm": "-12.5",
+      "field_surface": "am",
+      "note": "Ống quan trắc số 2",
+      "stage": "de_nhanh"
+    },
+    "file_refs": [
+      {"file_ref": "01920000-0000-7000-8000-0000000000f1", "sha256": "3f0a9a1c5a4b8e2d7c6f1e0d9b8a7c6e5f4d3c2b1a0918273645546372819a0b"}
+    ],
+    "gps": {"lat": "10.0452", "lon": "105.7701", "accuracy_m": "4.5"}
+  },
+  "field_checklist": {
+    "evidence_type": "field_checklist",
+    "catalog_version": 1,
+    "admin_unit_code": "31117",
+    "plot_ref": "01920000-0000-7000-8000-0000000000b1",
+    "household_ref": "01920000-0000-7000-8000-0000000000a1",
+    "season_code": "DX",
+    "values": {
+      "check_boundary_ok": true,
+      "check_estimated_yield_t_ha": "6.75",
+      "check_interview_done": false,
+      "check_visit_date": "2026-12-01",
+      "check_water_regime": "awd"
+    },
+    "file_refs": [
+      {"file_ref": "01920000-0000-7000-8000-0000000000f1", "sha256": "3f0a9a1c5a4b8e2d7c6f1e0d9b8a7c6e5f4d3c2b1a0918273645546372819a0b"},
+      {"file_ref": "01920000-0000-7000-8000-0000000000f2", "sha256": "0000000000000000000000000000000000000000000000000000000000000abc"}
+    ],
+    "gps": {"lat": "10.0452", "lon": "105.7701"}
+  }
+}

@@ -8,6 +8,7 @@ import '../core/ids.dart';
 import '../data/actions/action_queue.dart';
 import '../data/auth/device_service.dart';
 import '../data/auth/wipe_service.dart';
+import '../data/catalog/catalog_cache.dart';
 import '../data/crypto/envelope.dart';
 import '../data/db/local_db.dart';
 import '../data/files/blob_store.dart';
@@ -25,6 +26,7 @@ import '../data/sync/sync_service.dart';
 import 'boundary_service.dart';
 import 'consent_service.dart';
 import 'directive_service.dart';
+import 'evidence_service.dart';
 import 'field_report_service.dart';
 import 'inbox_service.dart';
 import 'library_service.dart';
@@ -91,6 +93,8 @@ class AppServices {
     required this.consents,
     required this.tiles,
     required this.pushTokens,
+    required this.catalogs,
+    required this.mrv,
   });
 
   final AppPlatform platform;
@@ -112,6 +116,8 @@ class AppServices {
   final ConsentService consents;
   final TilePackService tiles;
   final PushTokenRegistrar pushTokens;
+  final CatalogCache catalogs;
+  final EvidenceService mrv;
 
   late final PushHost pushHost = _ServicesPushHost(this);
 
@@ -138,6 +144,7 @@ class AppServices {
     final actions = ActionQueue(db: db, clock: pf.clock, ids: pf.ids);
     final pushTokens = PushTokenRegistrar(db, startedAt: pf.clock.now());
     final consents = ConsentService(db: db, outbox: outbox, clock: pf.clock);
+    final catalogs = CatalogCache(db, pf.clock);
     final evidence = EvidenceRepository(db: db, blobs: blobs, clock: pf.clock);
     final wipe = WipeService(
       db: db,
@@ -164,6 +171,20 @@ class AppServices {
         // Sau đăng ký thiết bị: gắn token đẩy (mỗi lần khởi động, khi đổi).
         await pushTokens.flush(api, deviceId);
       },
+      // Danh mục không có entity đồng bộ: tải qua API sau mỗi lượt pull.
+      afterPull: () => catalogs.refresh(api),
+    );
+    final photos = PhotoPipeline(
+      camera: pf.camera,
+      location: pf.location,
+      clock: pf.clock,
+      ids: pf.ids,
+      cipher: EnvelopeCipher(),
+      refs: refs,
+      evidence: evidence,
+      maxBytes: pf.config.maxFileBytes,
+      watermarker: pf.watermarker,
+      consent: consents,
     );
     return AppServices._(
       platform: pf,
@@ -174,23 +195,8 @@ class AppServices {
       evidence: evidence,
       wipe: wipe,
       sync: sync,
-      photos: PhotoPipeline(
-        camera: pf.camera,
-        location: pf.location,
-        clock: pf.clock,
-        ids: pf.ids,
-        cipher: EnvelopeCipher(),
-        refs: refs,
-        evidence: evidence,
-        maxBytes: pf.config.maxFileBytes,
-        watermarker: pf.watermarker,
-        consent: consents,
-      ),
-      reports: FieldReportService(
-        outbox: outbox,
-        location: pf.location,
-        clock: pf.clock,
-      ),
+      photos: photos,
+      reports: FieldReportService(outbox: outbox, clock: pf.clock),
       boundaries: BoundaryService(outbox: outbox, refs: refs, ids: pf.ids),
       tasks: TaskService(outbox: outbox, refs: refs),
       actions: actions,
@@ -209,6 +215,16 @@ class AppServices {
         ids: pf.ids,
       ),
       pushTokens: pushTokens,
+      catalogs: catalogs,
+      mrv: EvidenceService(
+        catalogs: catalogs,
+        evidence: evidence,
+        photos: photos,
+        location: pf.location,
+        consent: consents,
+        clock: pf.clock,
+        ids: pf.ids,
+      ),
     );
   }
 

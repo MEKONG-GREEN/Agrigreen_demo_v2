@@ -148,7 +148,8 @@ class FakeServer implements SyncApi {
       failNextUploads--;
       throw NetworkException('upload failed');
     }
-    final ref = 'fref-${idempotencyKey.hashCode.toUnsigned(32)}';
+    // Máy chủ dùng file_ref máy gửi (sync-contract); thiếu thì tự sinh.
+    final ref = fileRef ?? 'fref-${idempotencyKey.hashCode.toUnsigned(32)}';
     files[idempotencyKey] = {
       'meta': meta,
       'size': ciphertext.length,
@@ -159,6 +160,25 @@ class FakeServer implements SyncApi {
       throw NetworkException('upload response lost');
     }
     return ref;
+  }
+
+  /// path → JSON trả cho GET (danh mục).
+  final Map<String, Map<String, Object?>> getResponses = {};
+  final List<String> gets = [];
+
+  @override
+  Future<Map<String, Object?>> getJson(
+    String path, {
+    Map<String, String>? query,
+  }) async {
+    _guard();
+    final key = query == null || query['evidence_type'] == null
+        ? path
+        : '$path?evidence_type=${query['evidence_type']}';
+    gets.add(key);
+    final r = getResponses[key];
+    if (r == null) throw ApiException(404, 'not_found');
+    return r;
   }
 
   @override

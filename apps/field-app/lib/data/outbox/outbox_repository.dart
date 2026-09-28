@@ -473,6 +473,8 @@ class OutboxRepository {
 /// Người dùng cố đổi trường bị khóa sau khi lưu.
 class LockedFieldException extends OutboxException {
   LockedFieldException(this.field)
-    : super('Tọa độ GPS và thời gian không thể chỉnh sửa sau khi lưu.');
+    : super(
+        'Trường $field giữ nguyên như bản gốc, không sửa được bằng bản ghi bù.',
+      );
   final String field;
 }
