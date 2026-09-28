@@ -65,18 +65,34 @@ func fakeAddress(r *rand.Rand, communeName string) string {
 // LatLon là toạ độ WGS84.
 type LatLon struct{ Lat, Lon float64 }
 
-// Tâm gần đúng của các xã (đơn vị minh hoạ theo huyện cũ) của TP Cần Thơ sau sắp
-// xếp 2025 — toạ độ công khai của trung tâm huyện/thị, làm tròn 2 chữ số.
+// Tâm gần đúng của một số xã/phường của TP Cần Thơ sau sắp xếp 2025 (mã chính
+// thức QĐ 19/2025/QĐ-TTg) — toạ độ công khai của trung tâm huyện/thị cũ cùng tên,
+// làm tròn 2 chữ số; chỉ dùng để đặt thửa tổng hợp, không phải địa giới.
 var communeCenters = map[string]LatLon{
-	"92-X-NINH-KIEU": {10.03, 105.77}, "92-X-BINH-THUY": {10.07, 105.73}, "92-X-CAI-RANG": {9.99, 105.78},
-	"92-X-O-MON": {10.11, 105.62}, "92-X-THOT-NOT": {10.27, 105.53}, "92-X-CO-DO": {10.10, 105.43},
-	"92-X-PHONG-DIEN": {9.99, 105.66}, "92-X-THOI-LAI": {10.06, 105.56}, "92-X-VINH-THANH": {10.20, 105.40},
-	"92-X-SOC-TRANG": {9.60, 105.97}, "92-X-CHAU-THANH-SOC-TRANG": {9.70, 105.90}, "92-X-KE-SACH": {9.77, 105.98},
-	"92-X-LONG-PHU": {9.61, 106.12}, "92-X-MY-TU": {9.64, 105.81}, "92-X-MY-XUYEN": {9.55, 105.98},
-	"92-X-NGA-NAM": {9.56, 105.60}, "92-X-THANH-TRI": {9.45, 105.72}, "92-X-TRAN-DE": {9.52, 106.20},
-	"92-X-CU-LAO-DUNG": {9.62, 106.20}, "92-X-VINH-CHAU": {9.33, 105.98}, "92-X-VI-THANH": {9.78, 105.47},
-	"92-X-VI-THUY": {9.80, 105.56}, "92-X-LONG-MY": {9.68, 105.57}, "92-X-PHUNG-HIEP": {9.80, 105.73},
-	"92-X-CHAU-THANH-HAU-GIANG": {9.92, 105.80}, "92-X-CHAU-THANH-A": {9.93, 105.65}, "92-X-NGA-BAY": {9.82, 105.82},
+	"31135": {10.03, 105.77}, // Phường Ninh Kiều
+	"31168": {10.07, 105.73}, // Phường Bình Thủy
+	"31186": {9.99, 105.78},  // Phường Cái Răng
+	"31153": {10.11, 105.62}, // Phường Ô Môn
+	"31207": {10.27, 105.53}, // Phường Thốt Nốt
+	"31261": {10.10, 105.43}, // Xã Cờ Đỏ
+	"31299": {9.99, 105.66},  // Xã Phong Điền
+	"31258": {10.06, 105.56}, // Xã Thới Lai
+	"31232": {10.20, 105.40}, // Xã Vĩnh Thạnh
+	"31507": {9.60, 105.97},  // Phường Sóc Trăng
+	"31528": {9.77, 105.98},  // Xã Kế Sách
+	"31639": {9.61, 106.12},  // Xã Long Phú
+	"31567": {9.64, 105.81},  // Xã Mỹ Tú
+	"31684": {9.55, 105.98},  // Phường Mỹ Xuyên
+	"31732": {9.56, 105.60},  // Phường Ngã Năm
+	"31673": {9.52, 106.20},  // Xã Trần Đề
+	"31633": {9.62, 106.20},  // Xã Cù Lao Dung
+	"31783": {9.33, 105.98},  // Phường Vĩnh Châu
+	"31321": {9.78, 105.47},  // Phường Vị Thanh
+	"31441": {9.80, 105.56},  // Xã Vị Thủy
+	"31471": {9.68, 105.57},  // Phường Long Mỹ
+	"31420": {9.80, 105.73},  // Xã Phụng Hiệp
+	"31366": {9.92, 105.80},  // Xã Châu Thành (Hậu Giang cũ)
+	"31340": {9.82, 105.82},  // Phường Ngã Bảy
 }
 
 // Tâm vùng trồng lúa gần đúng của các tỉnh sau sắp xếp 2025 (mã TCTK).
