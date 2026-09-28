@@ -44,6 +44,7 @@ export function MapView({
   label,
   onAreaClick,
   showAreaLabels = true,
+  describeAreas = false,
   height,
 }: {
   areas?: AreaCollection | null;
@@ -51,6 +52,8 @@ export function MapView({
   label: string;
   onAreaClick?: (code: string) => void;
   showAreaLabels?: boolean;
+  /** Kèm danh sách vùng cho trình đọc màn hình: tên, `status_label` và màu tô (data-fill). */
+  describeAreas?: boolean;
   height?: number | string;
 }) {
   const el = useRef<HTMLDivElement>(null);
@@ -156,6 +159,16 @@ export function MapView({
         <div className="empty" role="status">
           Không khởi tạo được bản đồ (trình duyệt cần hỗ trợ WebGL). Dữ liệu vẫn có trong bảng bên cạnh.
         </div>
+      ) : null}
+      {describeAreas && areas && areas.features.length > 0 ? (
+        <ul className="sr-only" aria-label={`${label}: danh sách vùng`} data-testid="map-areas">
+          {areas.features.map((f) => (
+            <li key={f.properties.code} data-code={f.properties.code} data-fill={f.properties.fill ?? ""}>
+              {f.properties.name}
+              {typeof f.properties.status_label === "string" ? `: ${f.properties.status_label}` : ""}
+            </li>
+          ))}
+        </ul>
       ) : null}
     </div>
   );

@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -81,6 +82,9 @@ func ConfigFromEnv() (Config, error) {
 type SMTP struct {
 	Cfg   Config
 	Clock clock.Clock
+	// RootCAs: CA tin cậy để xác minh chứng chỉ máy chủ SMTP. Nil = kho CA của hệ điều hành
+	// (production). Kiểm thử đặt CA của máy chủ SMTP giả.
+	RootCAs *x509.CertPool
 }
 
 var _ port.Mailer = (*SMTP)(nil)
@@ -95,7 +99,7 @@ func (s *SMTP) Send(ctx context.Context, m port.Message) error {
 		return err
 	}
 	addr := net.JoinHostPort(s.Cfg.Host, strconv.Itoa(s.Cfg.Port))
-	tcfg := &tls.Config{ServerName: s.Cfg.Host, MinVersion: tls.VersionTLS12}
+	tcfg := &tls.Config{ServerName: s.Cfg.Host, MinVersion: tls.VersionTLS12, RootCAs: s.RootCAs}
 	d := &net.Dialer{Timeout: 20 * time.Second}
 	var conn net.Conn
 	if s.Cfg.TLS == TLSImplicit {

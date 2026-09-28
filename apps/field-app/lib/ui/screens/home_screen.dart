@@ -12,6 +12,7 @@ import 'field_report_screen.dart';
 import 'library_screen.dart';
 import 'notifications_screen.dart';
 import 'plots_screen.dart';
+import 'roster_screen.dart';
 import 'sync_queue_screen.dart';
 import 'tasks_screen.dart';
 
@@ -128,6 +129,11 @@ class HomeScreen extends ConsumerWidget {
                   icon: Icons.menu_book_outlined,
                   label: 'Thư viện · Đã lưu',
                   onTap: () => open(const LibraryScreen()),
+                ),
+                BigTile(
+                  icon: Icons.contact_phone_outlined,
+                  label: 'Danh bạ trực',
+                  onTap: () => open(const RosterScreen()),
                 ),
                 BigTile(
                   icon: Icons.cloud_sync_outlined,

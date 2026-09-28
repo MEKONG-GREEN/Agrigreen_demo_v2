@@ -14,7 +14,7 @@ Lộ trình theo Phụ lục A của tài liệu kiến trúc v3.0. Kế hoạch
 - [x] Docker Compose ĐTK 1, realm Keycloak, cấu hình PgBouncer
 - [x] ADR 0001–0013
 - [x] CI xanh toàn bộ trên GitHub, kể cả R-32 qua PgBouncer và build/ký 6 image (27/09/2026)
-- [ ] Chạy thử Compose trên máy có Docker
+- [x] Chạy thử Compose trên máy có Docker (job CI `compose-smoke`: dựng toàn bộ stack, kiểm healthz/readyz)
 - [ ] MKG ký các ADR đề xuất: 0006, 0007, 0009, 0010, 0011
 
 ## G1: ĐTK 1, ngày 15/12/2026
@@ -29,26 +29,22 @@ Người dùng là cán bộ khuyến nông, TTKNQG và Cục Kinh tế hợp t�
 | S4 | 23/11–6/12 | `platform/extension` (nhiệm vụ SLA 24 giờ), thư viện quy trình, dashboard 4 KPI. `platform/mechanization` (CGH: cân đối QT-01/02). Danh mục trường MRV (C-1). OTLP (ADR-0013) |
 | S5 | 7–15/12 | Cứng hóa, bộ sinh dữ liệu tổng hợp (R-95), UAT theo ca kiểm thử trích từ prototype `mekong-green`, diễn tập sao lưu và phục hồi |
 
-### Trạng thái G1 (28/09/2026)
+### Trạng thái G1 (29/09/2026 — chốt mã)
 
-Mã đã có đủ các phần của kế hoạch S1–S5. Đối chiếu yêu cầu → kiểm thử nằm ở [docs/uat/g1-acceptance.md](uat/g1-acceptance.md), trong đó 35 ô ghi "chưa có" hoặc "một phần".
+Mã đã có đủ các phần của kế hoạch S1–S5, sớm hơn mốc 15/12/2026. Đối chiếu yêu cầu → kiểm thử: [docs/uat/g1-acceptance.md](uat/g1-acceptance.md) — **94 yêu cầu: 79 đạt, 6 một phần, 9 ngoài G1** (G2/G3). CI trên GitHub xanh toàn bộ (14 job).
 
 **Đã có:**
-- Backend 8 module: masterdata, party, geo, content, extension, mechanization (CGH), mrv, sync.
-- Kho định danh `identity-vault`.
-- Web `apps/web-ops` nối API thật.
-- App Flutter `apps/field-app`: ngoại tuyến, SQLCipher, mã hóa ảnh, tương thích vector với Go.
-- Bộ sinh dữ liệu tổng hợp `cmd/seed-synthetic`.
-- Kịch bản E2E 14 bước; Compose đầy đủ; CI 8 job.
+- Backend 11 module pf: masterdata, party, geo, content, extension, mechanization (CGH), mrv, sync, notify (hộp thư + đẩy FCM chỉ dữ liệu), accounts (Keycloak Admin REST), reports (xuất Excel/PDF bất đồng bộ, lịch gửi email). Kho định danh `identity-vault` tách database.
+- Web `apps/web-ops` (Next.js): điều hành, bản đồ khuyến nông, nhiệm vụ, chỉ đạo khẩn, danh bạ trực, báo cáo, HTX & nông hộ, thư viện, cổng CGH cho Cục, 8 màn quản trị. Vitest 115 ca, Playwright 25 ca.
+- App `apps/field-app` (Flutter): ngoại tuyến 72 giờ + PIN, SQLCipher, hàng đợi đúng một lần, vẽ ranh giới ngoại tuyến, ảnh mã hóa ngay khi chụp, hộp thư/đẩy, thư viện "Đã lưu", chỉ đạo, đồng ý + watermark, bản đồ ngoại tuyến, danh bạ trực gọi/nhắn một chạm. 143 ca + kiểm thử tích hợp trên emulator.
+- Danh mục hành chính **chính thức** sau sáp nhập 2025 (6 tỉnh/thành ĐBSCL và Tây Ninh, 591 xã mới); nhập/xuất Excel (.xlsx) cho nông hộ, tài khoản, cây tổ chức, máy; `cmd/seed-synthetic`; `cmd/drill` + `objsync` (diễn tập phục hồi).
+- Kịch bản E2E 14 bước, 39 ca UAT từ prototype; Compose Local/Dev (SeaweedFS thay MinIO) có job `compose-smoke`.
 
-**Còn thiếu trước khi nghiệm thu G1:**
-- Xuất báo cáo theo mẫu Bộ và email định kỳ (US-DASH-02/03, CGH FN-10).
-- Nhập/xuất Excel (hiện chỉ có CSV).
-- Kênh đẩy thông báo (push/Zalo) cho chỉ đạo khẩn và tin mới.
-- Kiểm thử giao diện đầu–cuối trên trình duyệt; chạy app Flutter trên thiết bị Android thật.
-- Diễn tập sao lưu và phục hồi.
-- **Dữ liệu thật:** mã và danh mục xã ĐBSCL chính thức sau sáp nhập (seed hiện tại là dữ liệu minh họa); danh mục trường MRV (C-1).
-- **Khoảng trống API** cho web: [docs/dev/web-backend-gaps.md](dev/web-backend-gaps.md), G-02..G-10.
+**Còn lại của G1** (không chặn mã; chi tiết ở mục Tóm tắt của g1-acceptance):
+- **Chờ khách:** danh mục trường MRV chính thức (C-1); mẫu biểu báo cáo chính thức của Bộ (US-DASH-02); DCRD xác nhận phương pháp dự báo CGH (FN-09); chuyển VN-2000 khi nhập (X9).
+- **Mã:** bản đồ CGH cấp HTX — ghim HTX, panel máy theo loại/tình trạng/nhãn nguồn, gom cụm, ô tra cứu (FN-08); chọn nhóm dữ liệu khi đồng bộ ngay (US-SYNC-02, cùng liên thông App HTX ở G2).
+- **Hạ tầng:** workflow `restore-drill` chưa có lần chạy xanh; chạy thử trên Keycloak/SMTP/FCM thật trong lãnh thổ; MKG ký các ADR đề xuất.
+- Chuyển sang G2 theo lộ trình: App HTX (US-HTX-05, US-SYNC-01, US-TASK-01 tự động, CGH FN-07), Hub/kho và lớp GIS nền (GIS FN-04/06/07). Sang G3: đối soát đo lường RB-6, số đo của R-95.
 ## G2: 31/03/2027
 - App HTX:
   - `platform/cropcycle`: nhật ký canh tác dạng sổ, sản lượng decimal.

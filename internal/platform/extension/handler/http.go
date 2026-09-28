@@ -51,6 +51,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 
 	g.POST("/staff", h.upsertStaff)
 	g.GET("/roster", h.roster)
+	g.GET("/roster/:id/contact", h.rosterContact)
 	g.POST("/roster/status", h.setDuty)
 	g.POST("/roster/shifts", h.addShift)
 	h.registerUnified(rg)
@@ -640,6 +641,21 @@ func (h Handler) roster(c *gin.Context) {
 		unit = r.Unit
 	}
 	c.JSON(http.StatusOK, gin.H{"unit": unit, "on_duty": r.OnDuty, "items": toRoster(r.Items), "fallback": toRoster(r.Fallback)})
+}
+
+// rosterContact: số điện thoại của cán bộ để gọi/nhắn 1 chạm (US-DIR-02). Không lưu đệm.
+func (h Handler) rosterContact(c *gin.Context) {
+	id, ok := pathID(c, app.ErrStaffNotFound)
+	if !ok {
+		return
+	}
+	phone, err := h.Svc.StaffPhone(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{"actor_ref": id.String(), "phone": phone})
 }
 
 type dutyReq struct {

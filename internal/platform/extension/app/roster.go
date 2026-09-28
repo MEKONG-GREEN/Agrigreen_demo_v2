@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -235,4 +236,59 @@ func dutyEntries(ctx context.Context, tx pgx.Tx, staff []domain.Staff, now time.
 		out = append(out, RosterEntry{Staff: st, Status: status, Source: source, Until: until})
 	}
 	return out, nil
+}
+
+// StaffPhone trả số điện thoại của một cán bộ trong danh bạ trực để "gọi/nhắn 1 chạm"
+// (US-DIR-02). Người đọc phải thấy được cán bộ đó: cùng địa bàn trong phạm vi, hoặc
+// cán bộ cấp tỉnh là nơi dự phòng (fallback) của một xã trong phạm vi. Số đọc từ
+// pf/accounts lúc gọi, không lưu, không ghi log (R-14).
+func (s *Service) StaffPhone(ctx context.Context, actor uuid.UUID) (string, error) {
+	p, err := authz.Require(ctx, rosterReader...)
+	if err != nil {
+		return "", err
+	}
+	sc, err := s.scope(ctx, p)
+	if err != nil {
+		return "", err
+	}
+	var st *domain.Staff
+	err = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
+		var e error
+		st, e = store.StaffByActor(ctx, tx, actor)
+		return e
+	})
+	if err != nil {
+		return "", err
+	}
+	if st == nil || !st.Active || !s.contactVisible(ctx, sc, *st) {
+		return "", ErrStaffNotFound // không lộ sự tồn tại của cán bộ ngoài phạm vi
+	}
+	if s.Contacts == nil {
+		return "", ErrDependency.WithDetail("chưa nối pf/accounts (Keycloak Admin REST)")
+	}
+	phone, err := s.Contacts.PhoneOf(ctx, p.TenantID, actor)
+	if errors.Is(err, port.ErrNoPhone) {
+		return "", ErrNoContact
+	}
+	if err != nil {
+		return "", ErrDependency.WithDetail("không tra được số liên hệ")
+	}
+	return phone, nil
+}
+
+// contactVisible: cán bộ thuộc phạm vi, hoặc là cán bộ cấp tỉnh (dự phòng khi xã
+// không ai trực) của tỉnh chứa một đơn vị trong phạm vi.
+func (s *Service) contactVisible(ctx context.Context, sc authz.Scope, st domain.Staff) bool {
+	if visible(sc, st.UnitCode, st.ProvinceCode) {
+		return true
+	}
+	if st.UnitCode != st.ProvinceCode {
+		return false
+	}
+	for _, u := range sc.Units {
+		if prov, _, err := s.provinceOf(ctx, u, "unit"); err == nil && prov == st.ProvinceCode {
+			return true
+		}
+	}
+	return false
 }

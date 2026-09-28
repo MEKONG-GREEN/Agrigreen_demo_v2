@@ -7,6 +7,7 @@
   "loginWithEmailAllowed": true,
   "bruteForceProtected": true,
   "failureFactor": 5,
+  "maxDeltaTimeSeconds": 900,
   "maxFailureWaitSeconds": 900,
   "accessTokenLifespan": 300,
   "ssoSessionIdleTimeout": 3600,

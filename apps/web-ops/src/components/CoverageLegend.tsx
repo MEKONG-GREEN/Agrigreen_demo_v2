@@ -1,6 +1,19 @@
-import { COVERAGE_STYLES, legendEntries, type CoverageStatus, type CoverageThresholds } from "@/cgh/coverage";
+import type { MechCoverageStatus } from "@/api/types";
+import { COVERAGE_STYLES, fromMechStatus, legendEntries, type CoverageStatus, type CoverageThresholds } from "@/cgh/coverage";
 
-export function CoverageLegend({ thresholds }: { thresholds: CoverageThresholds | null }) {
+/**
+ * Chú giải mức đáp ứng. `legend` là chú giải máy chủ trả kèm kết quả cân đối (GET /v1/mechanization/coverage):
+ * có thì dùng đúng màu đó (cùng màu tô bản đồ, FN-08 AC-01); không có thì dùng màu mặc định.
+ */
+export function CoverageLegend({
+  thresholds,
+  legend,
+}: {
+  thresholds: CoverageThresholds | null;
+  legend?: readonly { status: MechCoverageStatus; color: string }[] | null;
+}) {
+  const colors = new Map<CoverageStatus, string>();
+  for (const l of legend ?? []) if (!colors.has(fromMechStatus(l.status))) colors.set(fromMechStatus(l.status), l.color);
   return (
     <div>
       <h3 style={{ fontSize: 13.5, marginBottom: 8 }} id="legend-title">
@@ -8,8 +21,8 @@ export function CoverageLegend({ thresholds }: { thresholds: CoverageThresholds 
       </h3>
       <ul className="legend" aria-labelledby="legend-title">
         {legendEntries(thresholds).map((e) => (
-          <li key={e.status}>
-            <span className="sw" style={{ background: COVERAGE_STYLES[e.status].fill }} aria-hidden="true" />
+          <li key={e.status} data-status={e.status}>
+            <span className="sw" style={{ background: colors.get(e.status) ?? COVERAGE_STYLES[e.status].fill }} aria-hidden="true" data-color={colors.get(e.status) ?? COVERAGE_STYLES[e.status].fill} />
             <b style={{ minWidth: 104 }}>{COVERAGE_STYLES[e.status].label}</b>
             <span className="mute small">{e.text}</span>
           </li>

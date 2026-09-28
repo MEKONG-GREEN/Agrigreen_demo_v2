@@ -53,6 +53,7 @@ test.describe("đăng nhập giả lập và điều hướng theo vai/phạm vi
       ["Cơ cấu tổ chức", "Cơ cấu tổ chức", "Trung tâm Khuyến nông Quốc gia"],
       ["Danh mục dùng chung", "Danh mục dùng chung", "Giống lúa"],
       ["Chỉ đạo khẩn", "Chỉ đạo khẩn", "Danh sách chỉ đạo"],
+      ["Danh bạ trực", "Danh bạ trực", "Theo địa bàn"],
       ["Thư viện số", "Thư viện số", "Đã lưu"],
       ["Bản đồ CGH", "Bản đồ cơ giới hoá — Cổng Cục KTHT", "Dự báo nhu cầu máy (FN-09)"],
     ];

@@ -7,7 +7,7 @@ import { ForecastSection } from "@/cgh/ForecastSection";
 import { unwrap } from "@/api/client";
 import type { MechCoverageItem, MechGroup } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
-import { fromMechStatus, thresholdsFromRun } from "@/cgh/coverage";
+import { COVERAGE_STYLES, fromMechStatus, thresholdsFromRun } from "@/cgh/coverage";
 import { CoverageChip, CoverageLegend, SourceLabel } from "@/components/CoverageLegend";
 import { MapView, type AreaCollection } from "@/components/MapView";
 import { ProblemAlert } from "@/components/ProblemAlert";
@@ -80,7 +80,8 @@ export default function CghPortalPage() {
       features: areas.data.collection.features.map((f) => {
         const item = byUnit.get(f.properties.code);
         // Màu tô do backend trả (FN-08 BR-01); chưa có kết quả → xám "Chưa có dữ liệu".
-        return { ...f, properties: { ...f.properties, fill: item ? groupFor(item, stage).color : "#B8C2BD" } };
+        const g = item ? groupFor(item, stage) : null;
+        return { ...f, properties: { ...f.properties, fill: g ? g.color : COVERAGE_STYLES.khong_du_lieu.fill, status_label: g?.status_label ?? "Chưa có dữ liệu" } };
       }),
     };
   }, [areas.data, byUnit, stage]);
@@ -139,7 +140,7 @@ export default function CghPortalPage() {
               ))}
             </select>
           </div>
-          <CoverageLegend thresholds={thresholds} />
+          <CoverageLegend thresholds={thresholds} legend={coverage.data?.legend} />
           {run && run.missing_norms.length > 0 ? (
             <p className="small" style={{ color: "var(--amber)" }}>
               Chưa cấu hình định mức: {run.missing_norms.join(", ")}
@@ -156,7 +157,13 @@ export default function CghPortalPage() {
             <ProblemAlert problem={coverage.error} onRetry={coverage.reload} />
           ) : null}
           {areas.error ? <ProblemAlert problem={areas.error} onRetry={areas.reload} /> : null}
-          <MapView label="Bản đồ mức đáp ứng máy theo tỉnh" areas={areaFc} onAreaClick={(c) => setSelected((s) => (s === c ? null : c))} height={480} />
+          <MapView
+            label="Bản đồ mức đáp ứng máy theo tỉnh"
+            areas={areaFc}
+            describeAreas
+            onAreaClick={(c) => setSelected((s) => (s === c ? null : c))}
+            height={480}
+          />
         </div>
 
         <aside className="card sec cgh-right" aria-label="Chi tiết theo tỉnh">

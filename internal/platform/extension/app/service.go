@@ -44,6 +44,7 @@ var (
 	ErrStaffNotFound      = problem.New(http.StatusNotFound, "extension.staff_not_found", "Cán bộ chưa có trong danh bạ")
 	ErrDependency         = problem.New(http.StatusServiceUnavailable, "extension.dependency_unavailable", "Dịch vụ phụ thuộc chưa sẵn sàng")
 	ErrIDReuse            = problem.New(http.StatusConflict, "extension.id_reused", "id đã dùng cho bản ghi khác")
+	ErrNoContact          = problem.New(http.StatusNotFound, "extension.contact_unavailable", "Cán bộ chưa khai số điện thoại liên hệ")
 )
 
 // Nhóm vai.
@@ -71,6 +72,8 @@ type Service struct {
 	// Plots, Coops (tùy chọn): thống kê của pf/geo và pf/party cho bảng điều hành gộp (G-02).
 	Plots geoport.PlotStats
 	Coops partyport.CooperativeStats
+	// Contacts (tùy chọn): số điện thoại cán bộ ở pf/accounts cho "gọi/nhắn 1 chạm" (US-DIR-02).
+	Contacts port.StaffContacts
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

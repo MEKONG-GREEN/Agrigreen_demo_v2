@@ -69,7 +69,12 @@ func roleConstants(t *testing.T) map[string]string {
 }
 
 type realmFile struct {
-	Roles struct {
+	RegistrationAllowed bool   `json:"registrationAllowed"`
+	BruteForceProtected bool   `json:"bruteForceProtected"`
+	FailureFactor       int    `json:"failureFactor"`
+	MaxDeltaTimeSeconds int    `json:"maxDeltaTimeSeconds"`
+	PasswordPolicy      string `json:"passwordPolicy"`
+	Roles               struct {
 		Realm []struct {
 			Name        string `json:"name"`
 			Description string `json:"description"`
@@ -101,6 +106,13 @@ func TestKeycloakRealmCoversRolesAndClaims(t *testing.T) {
 	dec := json.NewDecoder(strings.NewReader(string(raw)))
 	if err := dec.Decode(&realm); err != nil {
 		t.Fatalf("realm JSON: %v", err)
+	}
+	// CGH FN-01 BR-01/luồng ngoại lệ: không đăng ký công khai; sai 5 lần trong 15 phút → khóa tạm thời;
+	// mật khẩu có tiêu chí độ mạnh (BR-02).
+	if realm.RegistrationAllowed || !realm.BruteForceProtected || realm.FailureFactor != 5 || realm.MaxDeltaTimeSeconds != 900 ||
+		!strings.Contains(realm.PasswordPolicy, "length(") {
+		t.Errorf("chính sách đăng nhập: đăng ký=%v chống dò=%v sai tối đa=%d cửa sổ=%ds mật khẩu=%q",
+			realm.RegistrationAllowed, realm.BruteForceProtected, realm.FailureFactor, realm.MaxDeltaTimeSeconds, realm.PasswordPolicy)
 	}
 	have := map[string]string{}
 	for _, r := range realm.Roles.Realm {

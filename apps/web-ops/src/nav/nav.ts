@@ -17,7 +17,8 @@ export type NavIcon =
   | "sync"
   | "user"
   | "conflict"
-  | "upload";
+  | "upload"
+  | "phone";
 
 export interface NavItem {
   href: string;
@@ -51,6 +52,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { href: "/ban-do", label: "Bản đồ khuyến nông", icon: "map", levels: KN },
       { href: "/nhiem-vu", label: "Nhiệm vụ hỗ trợ", icon: "task", levels: KN },
       { href: "/chi-dao", label: "Chỉ đạo khẩn", icon: "megaphone", levels: KN },
+      { href: "/danh-ba", label: "Danh bạ trực", icon: "phone", levels: KN },
       { href: "/bao-cao", label: "Báo cáo & xuất dữ liệu", icon: "report", levels: [...KN, "cuc"] },
       {
         href: "/dong-bo",

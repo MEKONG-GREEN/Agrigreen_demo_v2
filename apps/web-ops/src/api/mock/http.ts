@@ -15,12 +15,21 @@ export function json(body: unknown, status = 200, headers: Record<string, string
   });
 }
 
+const PROBLEMS = new WeakMap<Response, { code: string; title: string }>();
+
 export function problem(status: number, code: string, title: string, extra: Record<string, unknown> = {}, headers: Record<string, string> = {}): Response {
   const tid = traceId();
-  return new Response(
+  const res = new Response(
     JSON.stringify({ type: `https://errors.agrigreen.vn/${code}`, title, status, code, trace_id: tid, ...extra }),
     { status, headers: { "Content-Type": "application/problem+json", "X-Trace-Id": tid, ...headers } },
   );
+  PROBLEMS.set(res, { code, title });
+  return res;
+}
+
+/** Mã + tiêu đề của một phản hồi problem do mock dựng (đọc đồng bộ, không tiêu thụ thân) — dùng cho thao tác loạt. */
+export function problemOf(res: Response): { code: string; title: string } | null {
+  return PROBLEMS.get(res) ?? null;
 }
 
 export function validation(errors: { field: string; reason: string }[]): Response {

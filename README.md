@@ -2,9 +2,31 @@
 
 Nền tảng AgriGreen được viết lại từ đầu theo **Thiết kế kiến trúc hệ thống v3.0** (15/09/2026). Hệ thống là một Go modular monolith, chạy trên PostgreSQL 17 + PostGIS.
 
-**Trạng thái:** đang ở cổng **G0**: khung repo, `shared/*`, mẫu bảng sổ, `WithTenantTx`, kiểm thử rò rỉ tenant và CI với các cổng ở mục 20. Kế hoạch G1–G6 nằm ở [docs/roadmap.md](docs/roadmap.md).
+**Trạng thái (29/09/2026):** đã chốt mã cổng **G1** (ĐTK 1: cán bộ khuyến nông, TTKNQG, Cục Kinh tế hợp tác; một tenant). Đối chiếu yêu cầu → kiểm thử: [docs/uat/g1-acceptance.md](docs/uat/g1-acceptance.md) — 94 yêu cầu, 79 đạt, 6 một phần (chủ yếu chờ khách chốt), 9 thuộc G2/G3. Kế hoạch G1–G6: [docs/roadmap.md](docs/roadmap.md).
 
-## Đã có trong G0
+## Đã có trong G1
+
+| Thành phần | Nội dung | Kiểm chứng |
+|---|---|---|
+| `pf/masterdata` | Đơn vị hành chính có hiệu lực theo sáp nhập 2025 (danh mục chính thức QĐ 19/2025), giống lúa, danh mục, tham số có phiên bản (người đặt ≠ người duyệt) | kiểm thử module, E2E-01 |
+| `pf/party` | Cây TW → Tỉnh → Xã, HTX, nông hộ (định danh ở vault), đồng ý theo mục đích | E2E-02..04 |
+| `pf/geo` | Thửa PostGIS, diện tích geodesic, chồng lấn theo BRD, nhập GeoJSON/KML/Shapefile, ranh giới hành chính theo zoom | E2E-05, `TestOverlapRules` |
+| `pf/content` | Thư viện quy trình theo vùng, duyệt, trích DOCX/PDF, tra cứu không dấu, "Đã lưu" | E2E-06 |
+| `pf/extension` | Nhiệm vụ SLA 24 giờ + leo thang, chỉ đạo khẩn, báo cáo hiện trường, dashboard 4 KPI, danh bạ trực (gọi/nhắn 1 chạm) | E2E-07/08 |
+| `pf/mechanization` | CGH: chủ máy, máy, lịch mùa vụ, cân đối QT-01/02 lưu theo vụ, dự báo (phương pháp tạm) | E2E-09 |
+| `pf/mrv` | Danh mục trường MRV (C-1 tạm), minh chứng, gói xuất có băm | E2E-10, E2E-13 |
+| `pf/sync` | Đồng bộ app hiện trường qua Application API (ADR-0006), xung đột + đối soát | E2E-11/12 |
+| `pf/notify` | Hộp thư theo phạm vi, đẩy FCM chỉ dữ liệu (ADR-0015), đồng bộ ngay | kiểm thử module |
+| `pf/accounts` | Tài khoản cán bộ qua Keycloak Admin REST, ma trận cấp vai, khóa/mở, thao tác loạt, nhập tệp | kiểm thử + emulator Keycloak |
+| `pf/reports` | Xuất Excel/PDF bất đồng bộ từ mẫu có phiên bản, lịch gửi email (SMTP TLS) | kiểm thử + SMTP giả |
+| `vault/identity` | Kho định danh tách database: X25519 theo hộ, blind index, mở DEK có mục đích, xóa được (RB-3) | E2E-14, `TestErasure` |
+| `apps/web-ops` | Next.js: vận hành KN (TW/tỉnh/xã), cổng CGH cho Cục, 8 màn quản trị | Vitest 115, Playwright 25 |
+| `apps/field-app` | Flutter Android: ngoại tuyến 72 giờ + PIN, SQLCipher, hàng đợi đúng một lần, vẽ ranh giới, ảnh mã hóa, hộp thư/đẩy, danh bạ trực | 143 kiểm thử + emulator |
+| Công cụ | `cmd/seed-synthetic` (R-95), `cmd/drill` + `cmd/objsync` (diễn tập phục hồi), `cmd/worker` (job, consumer, lịch báo cáo) | kiểm thử của từng lệnh |
+
+CI GitHub (`.github/workflows/ci.yml`, 14 job): cổng tĩnh (gofmt, vet, golangci-lint, archlint, migratecheck, contractcheck) → kiểm thử Go trên PostgreSQL + PgBouncer → web (check:api, lint, typecheck, Vitest, build, giấy phép npm) → Playwright → Flutter (format, analyze, test, build apk) → tích hợp trên emulator Android → bảo mật (govulncheck, go-licenses, gitleaks, trivy) → build/SBOM/quét/ký 6 image → `compose-smoke`. Workflow `restore-drill` chạy hằng tuần.
+
+## Nền móng G0
 
 | Hạng mục kiến trúc | Ở đâu | Kiểm chứng bằng |
 |---|---|---|
@@ -34,35 +56,49 @@ Có hai chỗ khi dựng G0 phát hiện mẫu trong tài liệu v3.0 chạy kh�
 ## Cấu trúc
 
 ```
-cmd/            api-platform, api-internal, identity-vault, worker, outbox-publisher, migrate, ingest*, edge-agent*
+cmd/            api-platform (+ assembly: gốc lắp ráp duy nhất), api-internal, identity-vault, worker, outbox-publisher,
+                migrate, seed-synthetic, drill, objsync, ingest*, edge-agent*
 internal/
-  platform/     party (G0) · masterdata, geo, waterway, simulation, mrv, metering, metrics (G1+)
-  mkg/          fieldops, measurement, hub, logistics, orders, costing, acctbridge (G2+)
-  vault/        identity (G1)
-  shared/       ledger, outbox, inbox, idempotency, tenant, money, mass, clock, authz, problem, telemetry, httpx, db, dbadmin, ids, pgtest
-contracts/      openapi/, events/, publication/
+  platform/     masterdata, party, geo, content, extension, mechanization, mrv, sync, notify, accounts, reports (G1)
+                waterway, simulation, cropcycle (G2) · metering, metrics (G3+)
+  mkg/          fieldops, measurement, hub, logistics, orders, costing, acctbridge (G2+, chưa có mã)
+  vault/        identity
+  shared/       ledger, outbox, inbox, idempotency, tenant, money, mass, clock, authz, problem, telemetry, httpx, db,
+                dbadmin, ids, pgtest, envelope, objstore, objsync, residency, schedule, tabular, leader, opsjobs
+contracts/      openapi/ (application.yaml, admin.yaml), events/, publication/
 migrations/     shared/ (áp cho mọi database), pf/, mkg/, vault/
+tests/          e2e/ (kịch bản G1 14 bước), acceptance/ (39 ca từ prototype)
 tools/          archlint, migratecheck, contractcheck
-deploy/         compose/ (ĐTK 1), policies/
-docs/           adr/, requirements/, roadmap.md, dev-setup.md, errors.md
-apps/           web-ops, web-sim, field-app (G1)
+deploy/         compose/ (ĐTK 1: PostgreSQL, PgBouncer, RabbitMQ, Keycloak, SeaweedFS, OTel), policies/
+docs/           adr/, requirements/, uat/, runbooks/, dev/, roadmap.md, dev-setup.md, errors.md
+apps/           web-ops (Next.js), field-app (Flutter)
 optimizer/      Python (G2)
 ```
 `*` là khung giữ chỗ cho G3.
 
 ## Chạy
 
-Cài môi trường xem [docs/dev-setup.md](docs/dev-setup.md). Cần Go 1.25+ và PostgreSQL 17.
+Cài môi trường xem [docs/dev-setup.md](docs/dev-setup.md): Go 1.26, PostgreSQL 17 + PostGIS, Node 24, Flutter (Android SDK cho emulator). Trên Windows, chạy `. .\scripts\dev-env.ps1` trước.
 
 ```bash
-go test ./...
-```
-
-```bash
+go test -count=1 ./...
 go run ./tools/archlint ./... && go run ./tools/migratecheck migrations && go run ./tools/contractcheck
 ```
 
 Kiểm thử tích hợp cần `AG_TEST_PG_ADMIN_URL` và `AG_DB_APP_PASSWORD`. Nếu thiếu, trên máy dev các kiểm thử này được bỏ qua; khi `CI=true` thì build hỏng.
+
+```bash
+cd apps/web-ops && npm ci && npm run check:api && npm run lint && npm run typecheck && npm test && npm run build
+CI=1 npm run e2e                  # Playwright trên bản build giả lập (npm run e2e:install một lần)
+npm run dev:mock                  # giao diện với dữ liệu giả lập, không cần backend
+```
+
+```bash
+cd apps/field-app && flutter pub get && flutter analyze --fatal-infos && flutter test
+flutter test integration_test -d emulator-5554
+```
+
+Toàn bộ stack Local/Dev: `scripts/gen-dev-secrets` rồi `docker compose -f deploy/compose/docker-compose.yml up -d --build --wait` (xem [docs/dev-setup.md](docs/dev-setup.md)).
 
 ## Tài liệu nguồn
 

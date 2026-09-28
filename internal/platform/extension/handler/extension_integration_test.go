@@ -784,3 +784,56 @@ func TestRosterDutyStatus(t *testing.T) {
 		t.Fatalf("cán bộ xã khai hộ người khác: %d", r.status)
 	}
 }
+
+// fakeContacts là số điện thoại theo actor_ref (bản thật: pf/accounts đọc Keycloak).
+type fakeContacts map[uuid.UUID]string
+
+func (f fakeContacts) PhoneOf(_ context.Context, _, actor uuid.UUID) (string, error) {
+	if p, ok := f[actor]; ok {
+		return p, nil
+	}
+	return "", port.ErrNoPhone
+}
+
+// US-DIR-02 "gọi/nhắn 1 chạm": số điện thoại đọc lúc bấm, chỉ cho cán bộ người gọi thấy được
+// trong danh bạ (kể cả cán bộ tỉnh dự phòng); không lưu đệm.
+func TestRosterContactOneTap(t *testing.T) {
+	f := newFixture(t)
+	p := f.seedPeople()
+	path := func(c caller) string { return "/v1/extension/roster/" + c.actor.String() + "/contact" }
+	if r := p.off30001a.get(path(p.off30001b)); r.status != http.StatusServiceUnavailable || code(r) != "extension.dependency_unavailable" {
+		t.Fatalf("chưa nối pf/accounts: %d %v", r.status, r.body)
+	}
+	f.mod.UseContacts(fakeContacts{p.off30001b.actor: "0912345678", p.admin89.actor: "0292 3812 345", p.off31001.actor: "0987654321"})
+	r := p.off30001a.must(p.off30001a.get(path(p.off30001b)), http.StatusOK, "cùng xã")
+	if str(r.body, "phone") != "0912345678" || str(r.body, "actor_ref") != p.off30001b.actor.String() || r.hdr.Get("Cache-Control") != "no-store" {
+		t.Fatalf("liên hệ cùng xã: %v %v", r.body, r.hdr)
+	}
+	// Cán bộ TTKN tỉnh là nơi dự phòng khi xã không ai trực → cán bộ xã trong tỉnh gọi được.
+	if r := p.off30001a.must(p.off30001a.get(path(p.admin89)), http.StatusOK, "tỉnh dự phòng"); str(r.body, "phone") != "0292 3812 345" {
+		t.Fatalf("liên hệ cán bộ tỉnh: %v", r.body)
+	}
+	// TTKN tỉnh gọi cán bộ xã trong tỉnh; TTKN QG gọi mọi nơi.
+	p.admin89.must(p.admin89.get(path(p.off30001b)), http.StatusOK, "tỉnh → xã")
+	p.national.must(p.national.get(path(p.off31001)), http.StatusOK, "QG → xã tỉnh khác")
+	// Ngoài phạm vi: 404 như không có (không lộ sự tồn tại).
+	for _, c := range []struct {
+		who, target caller
+		what        string
+	}{
+		{p.off30001a, p.off31001, "xã tỉnh khác"}, {p.off30002, p.off30001b, "xã khác cùng tỉnh"}, {p.admin92, p.admin89, "tỉnh khác"},
+	} {
+		if r := c.who.get(path(c.target)); r.status != http.StatusNotFound || code(r) != "extension.staff_not_found" {
+			t.Fatalf("%s: %d %v", c.what, r.status, r.body)
+		}
+	}
+	if r := p.off30001b.get(path(p.off30001a)); r.status != http.StatusNotFound || code(r) != "extension.contact_unavailable" {
+		t.Fatalf("chưa khai số: %d %v", r.status, r.body)
+	}
+	if r := p.off30001a.get("/v1/extension/roster/" + ids.New().String() + "/contact"); r.status != http.StatusNotFound || code(r) != "extension.staff_not_found" {
+		t.Fatalf("không có trong danh bạ: %d %v", r.status, r.body)
+	}
+	if r := f.as(f.org.t30001, "mrv_viewer").get(path(p.off30001b)); r.status != http.StatusForbidden {
+		t.Fatalf("vai không đọc danh bạ: %d", r.status)
+	}
+}

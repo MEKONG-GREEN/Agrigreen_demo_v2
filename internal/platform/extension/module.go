@@ -59,6 +59,9 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	}}
 }
 
+// UseContacts nối cổng số điện thoại cán bộ (pf/accounts) sau khi module đó được dựng.
+func (m *Module) UseContacts(c port.StaffContacts) { m.svc.Contacts = c }
+
 // StaffNames cho module khác tra tên cán bộ trong danh bạ (qua port, G-07/G-09).
 func (m *Module) StaffNames() port.StaffNames { return m.svc }
 

@@ -31,6 +31,7 @@ import { adminOpsRoutes, headerKey, parseCsv } from "./admin-ops";
 import { hasRole, inScope, isZip, json, norm, omit, pageSlice, paginate, problem, scopeUnits, type Route } from "./http";
 import { coverage as mechCoverage, dashboard as mechDashboard, findRun, RUNS } from "./mechanization";
 import { communeKpi, MISSING_BOUNDARY, opsRoutes, resolveUnit, sumKpi } from "./ops";
+import { rosterRoutes } from "./roster";
 import { personaFromAuthHeader, type MockPersona } from "./personas";
 
 function sleep(ms: number) {
@@ -335,6 +336,7 @@ const appRoutes: Route[] = [
     },
   },
   ...opsRoutes,
+  ...rosterRoutes,
 ];
 
 // --------------------------------------------------------------------------

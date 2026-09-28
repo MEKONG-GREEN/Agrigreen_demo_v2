@@ -419,6 +419,89 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
   );
 }
 
+type BulkAction = "lock" | "unlock" | "resend";
+const BULK_LABEL: Record<BulkAction, string> = { lock: "Khóa", unlock: "Mở khóa", resend: "Gửi lại liên kết kích hoạt" };
+
+/**
+ * Thao tác loạt (KN US-ADM-03) — POST /v1/accounts/users/bulk: khóa, mở khóa (lý do ≥ 20 ký tự) hoặc gửi lại
+ * liên kết cho tối đa 100 tài khoản đã chọn; kết quả theo từng tài khoản (tài khoản ngoài quyền báo lỗi riêng).
+ */
+function BulkBar({ ids, names, onDone }: { ids: string[]; names: ReadonlyMap<string, string>; onDone: () => void }) {
+  const { adminApi } = useAuth();
+  const [action, setAction] = useState<BulkAction>("lock");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<ApiProblem | null>(null);
+  const [result, setResult] = useState<{ succeeded: number; failed: number; items: { user_id: string; ok: boolean; code: string | null }[] } | null>(null);
+  const needReason = action !== "resend";
+  const reasonErr = needReason ? lockReasonError(reason) : null;
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (reasonErr) return;
+    setBusy(true);
+    setProblem(null);
+    setResult(null);
+    try {
+      const r = await unwrap(
+        adminApi.POST("/v1/accounts/users/bulk", {
+          params: { header: { "Idempotency-Key": newIdempotencyKey() } },
+          body: { action, user_ids: ids, reason: needReason ? reason.trim() : undefined },
+        }),
+      );
+      setResult(r);
+      onDone();
+    } catch (x) {
+      setProblem(toApiProblem(x));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <form className="panel stack" style={{ gap: 8, marginBottom: 12 }} onSubmit={(e) => void submit(e)} noValidate aria-label="Thao tác loạt" data-testid="bulk-bar">
+      <div className="row" style={{ alignItems: "flex-end" }}>
+        <b>Đã chọn {ids.length} tài khoản</b>
+        <div className="field">
+          <label htmlFor="ac-bulk-action">Thao tác</label>
+          <select id="ac-bulk-action" className="select" value={action} onChange={(e) => setAction(e.target.value as BulkAction)}>
+            {(Object.keys(BULK_LABEL) as BulkAction[]).map((a) => (
+              <option key={a} value={a}>
+                {BULK_LABEL[a]}
+              </option>
+            ))}
+          </select>
+        </div>
+        {needReason ? (
+          <div className="field" style={{ flex: "1 1 280px" }}>
+            <label htmlFor="ac-bulk-reason">Lý do (tối thiểu 20 ký tự)</label>
+            <input id="ac-bulk-reason" className="input" value={reason} onChange={(e) => setReason(e.target.value)} />
+          </div>
+        ) : null}
+        <button type="submit" className="btn btn-p btn-sm" disabled={busy || ids.length === 0 || !!reasonErr || ids.length > 100}>
+          {busy ? "Đang thực hiện…" : `${BULK_LABEL[action]} ${ids.length} tài khoản`}
+        </button>
+      </div>
+      {ids.length > 100 ? <p className="small" style={{ color: "var(--red)" }}>Mỗi lần tối đa 100 tài khoản.</p> : null}
+      {problem ? <ProblemAlert problem={problem} /> : null}
+      {result ? (
+        <div role="status" className="small" data-testid="bulk-result">
+          Thành công {result.succeeded} · Lỗi {result.failed}
+          {result.items.filter((i) => !i.ok).length > 0 ? (
+            <ul className="list-plain">
+              {result.items
+                .filter((i) => !i.ok)
+                .map((i) => (
+                  <li key={i.user_id}>
+                    {names.get(i.user_id) ?? i.user_id}: <code>{i.code}</code>
+                  </li>
+                ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+    </form>
+  );
+}
+
 /** Tài khoản cán bộ (pf/accounts, Admin API, MFA) — KN US-ADM-01..03, HTX US-ACC-01/02, CGH FN-01. */
 export default function AccountsPage() {
   const { adminApi } = useAuth();
@@ -427,6 +510,7 @@ export default function AccountsPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const [created, setCreated] = useState<{ user: AccountsUser; sent: boolean } | null>(null);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
   const grants = useAsync(() => unwrap(adminApi.GET("/v1/accounts/grants")), [adminApi]);
   const orgs = useAsync(
     () => collectPages((cursor) => unwrap(adminApi.GET("/v1/orgs", { params: { query: { include_inactive: true, cursor, limit: 200 } } })), 5000),
@@ -465,7 +549,15 @@ export default function AccountsPage() {
               <div>
                 <div className="field" style={{ marginBottom: 12, maxWidth: 420 }}>
                   <label htmlFor="ac-filter">Lọc theo đơn vị</label>
-                  <OrgSelect id="ac-filter" orgs={orgList} value={orgFilter} onChange={setOrgFilter} />
+                  <OrgSelect
+                    id="ac-filter"
+                    orgs={orgList}
+                    value={orgFilter}
+                    onChange={(v) => {
+                      setOrgFilter(v);
+                      setChecked(new Set());
+                    }}
+                  />
                 </div>
                 {created ? (
                   <div className="alert alert-info" role="status" style={{ marginBottom: 12 }}>
@@ -477,11 +569,26 @@ export default function AccountsPage() {
                   </div>
                 ) : null}
                 {list.error ? <ProblemAlert problem={list.error} onRetry={list.reload} /> : null}
+                {checked.size > 0 ? (
+                  <BulkBar
+                    ids={Array.from(checked)}
+                    names={new Map(list.items.map((u) => [u.id, fullName(u) || u.username]))}
+                    onDone={() => setVersion((v) => v + 1)}
+                  />
+                ) : null}
                 <div className="tbl-wrap">
                   <table className="tbl">
                     <caption className="sr-only">Tài khoản trong phạm vi</caption>
                     <thead>
                       <tr>
+                        <th scope="col">
+                          <input
+                            type="checkbox"
+                            aria-label="Chọn tất cả tài khoản đang hiện"
+                            checked={list.items.length > 0 && list.items.every((u) => checked.has(u.id))}
+                            onChange={(e) => setChecked(e.target.checked ? new Set(list.items.map((u) => u.id)) : new Set())}
+                          />
+                        </th>
                         <th scope="col">Cán bộ</th>
                         <th scope="col">Đơn vị</th>
                         <th scope="col">Vai</th>
@@ -491,6 +598,19 @@ export default function AccountsPage() {
                     <tbody>
                       {list.items.map((u) => (
                         <tr key={u.id} aria-selected={selected === u.id}>
+                          <td>
+                            <input
+                              type="checkbox"
+                              aria-label={`Chọn ${fullName(u) || u.username}`}
+                              checked={checked.has(u.id)}
+                              onChange={() => {
+                                const n = new Set(checked);
+                                if (n.has(u.id)) n.delete(u.id);
+                                else n.add(u.id);
+                                setChecked(n);
+                              }}
+                            />
+                          </td>
                           <td>
                             <button type="button" onClick={() => setSelected(u.id)} style={{ fontWeight: 700, textAlign: "left", color: "var(--g800)" }} aria-label={`Chi tiết ${fullName(u) || u.username}`}>
                               {fullName(u) || u.username}
