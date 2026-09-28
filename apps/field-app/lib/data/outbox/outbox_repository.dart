@@ -87,6 +87,10 @@ class OutboxRepository {
 
   static const _seqKey = 'outbox.seq';
 
+  /// `rejected` mà máy tự gửi lại (sync-contract: `sync.sink_failed`; pf/geo trả
+  /// `internal_error` khi lỗi hệ thống).
+  static const retriableRejectCodes = {'sync.sink_failed', 'internal_error'};
+
   Database get _sql => _db.db;
 
   Future<int> _nextSeq(DatabaseExecutor tx) async {
@@ -150,6 +154,71 @@ class OutboxRepository {
       );
     });
   }
+
+  /// Bản ghi bù cho bản ghi **máy chủ đã nhận** mà máy không còn giữ (đã purge
+  /// sau 48 giờ, hoặc lấy từ dữ liệu chiều xuống, ví dụ `boundary_id` của thửa).
+  Future<OutboxRecord> correctRemote({
+    required String entity,
+    required String supersedesId,
+    required String reason,
+    required Map<String, Object?> payload,
+    DateTime? eventTime,
+  }) {
+    if (reason.trim().length < 10) {
+      throw OutboxException('Lý do sửa cần ít nhất 10 ký tự.');
+    }
+    return _insert(
+      entity: entity,
+      op: RecordOp.correct,
+      payload: payload,
+      eventTime: formatRfc3339(eventTime ?? _clock.now()),
+      supersedesId: supersedesId,
+      correctionReason: reason.trim(),
+    );
+  }
+
+  /// Thay bản ghi bị `rejected` bằng một bản ghi **mới** (`op: create`) — máy
+  /// chủ không lưu bản bị từ chối (sync-contract "Làm rõ" mục 4). Bản gốc
+  /// chuyển `superseded` khi bản mới được nhận.
+  Future<OutboxRecord> replaceRejected({
+    required String originalId,
+    required Map<String, Object?> payload,
+  }) {
+    return _sql.transaction((tx) async {
+      final orig = await byId(originalId, tx: tx);
+      if (orig == null || orig.status != OutboxStatus.rejected) {
+        throw OutboxException('Chỉ thay được bản ghi đang bị từ chối.');
+      }
+      if (orig.replacedBy != null) {
+        final prev = await byId(orig.replacedBy!, tx: tx);
+        if (prev != null) return prev;
+      }
+      final rec = await _insert(
+        entity: orig.entity,
+        op: RecordOp.create,
+        payload: payload,
+        eventTime: orig.eventTime,
+        tx: tx,
+      );
+      await tx.update(
+        'outbox',
+        {'replaced_by': rec.id},
+        where: 'id = ?',
+        whereArgs: [orig.id],
+      );
+      return rec;
+    });
+  }
+
+  /// Ghi nhận [originalId] đã được xử lý bằng bản ghi [replacementId] (chỉ
+  /// đổi cột trạng thái `replaced_by`, không đổi nội dung).
+  Future<void> linkReplacement(String originalId, String replacementId) =>
+      _sql.update(
+        'outbox',
+        {'replaced_by': replacementId},
+        where: 'id = ?',
+        whereArgs: [originalId],
+      );
 
   Future<OutboxRecord> _insert({
     required String entity,
@@ -320,6 +389,13 @@ class OutboxRepository {
               where: 'id = ?',
               whereArgs: [r.id],
             );
+            // Bản bị từ chối đã được thay bằng bản mới này → superseded.
+            await tx.update(
+              'outbox',
+              {'status': OutboxStatus.superseded.name, 'acked_at': now},
+              where: 'replaced_by = ? AND status = ?',
+              whereArgs: [r.id, OutboxStatus.rejected.name],
+            );
             final sup = rows.first['supersedes_id'] as String?;
             if (sup != null) {
               // Bản gốc bị từ chối đã được thay thế → cho phép purge sau 48 giờ.
@@ -338,6 +414,15 @@ class OutboxRepository {
                 'acked_at': now,
                 'conflict_id': r.conflictId,
               },
+              where: 'id = ?',
+              whereArgs: [r.id],
+            );
+          case 'rejected' when retriableRejectCodes.contains(r.code):
+            // Lỗi hệ thống của module nhận: giữ pending, tự gửi lại (không bắt
+            // người dùng tạo bản ghi bù).
+            await tx.update(
+              'outbox',
+              {'error_code': r.code},
               where: 'id = ?',
               whereArgs: [r.id],
             );

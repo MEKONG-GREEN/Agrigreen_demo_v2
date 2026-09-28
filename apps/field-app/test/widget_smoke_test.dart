@@ -35,7 +35,7 @@ void main() {
       ids: UuidV7Generator(),
       opener: FfiOpener(),
       dataDir: Directory.systemTemp,
-      apiFactory: (_) => FakeServer(),
+      apiFactory: (_, _) => FakeServer(),
       camera: _NoCamera(),
       location: const FixedLocationSource(LocationResult(GpsStatus.denied)),
     );

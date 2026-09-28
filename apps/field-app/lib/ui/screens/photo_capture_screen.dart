@@ -3,9 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/files/evidence_repository.dart';
 import '../../data/photo/photo_pipeline.dart';
+import '../../domain/consent.dart';
 import '../providers.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'consent_screen.dart';
+
+final _blockReasonProvider = FutureProvider.autoDispose.family<String?, String>(
+  (ref, subjectRef) => servicesOf(ref).photos.blockReason(subjectRef),
+);
 
 final _evidenceProvider = FutureProvider.autoDispose
     .family<List<EvidenceFile>, String>(
@@ -50,6 +56,9 @@ class _PhotoCaptureScreenState extends ConsumerState<PhotoCaptureScreen> {
       ref.invalidate(_evidenceProvider(widget.parentId));
     } on PhotoPipelineException catch (e) {
       if (mounted) showMessage(context, e.message, error: true);
+    } on ConsentRequiredException catch (e) {
+      if (mounted) showMessage(context, e.message, error: true);
+      ref.invalidate(_blockReasonProvider(widget.subjectRef));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -58,19 +67,69 @@ class _PhotoCaptureScreenState extends ConsumerState<PhotoCaptureScreen> {
   @override
   Widget build(BuildContext context) {
     final files = ref.watch(_evidenceProvider(widget.parentId));
+    final block = ref.watch(_blockReasonProvider(widget.subjectRef));
+    final reason = block.value;
+    final needsConsent =
+        reason != null &&
+        reason == ConsentRequiredException(widget.subjectRef).message;
     return Scaffold(
       appBar: AppBar(title: const Text('Ảnh minh chứng')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (reason != null)
+            Card(
+              color: AgColors.amberBg,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.block, color: AgColors.amber),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            reason,
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (needsConsent) ...[
+                      const SizedBox(height: 8),
+                      FilledButton.icon(
+                        icon: const Icon(Icons.how_to_reg),
+                        label: const Text('Ghi nhận đồng ý của nông hộ'),
+                        onPressed: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute<bool>(
+                              builder: (_) =>
+                                  ConsentScreen(subjectRef: widget.subjectRef),
+                            ),
+                          );
+                          ref.invalidate(
+                            _blockReasonProvider(widget.subjectRef),
+                          );
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 8),
           FilledButton.icon(
-            onPressed: _busy ? null : _capture,
+            onPressed: _busy || reason != null || block.isLoading
+                ? null
+                : _capture,
             icon: const Icon(Icons.photo_camera, size: 28),
             label: const Text('Chụp ảnh'),
           ),
           const SizedBox(height: 8),
           const Text(
-            'Ảnh gắn mốc thời gian và tọa độ GPS, được mã hóa ngay trên máy. '
+            'Ảnh được đóng dấu thời gian và tọa độ GPS rồi mã hóa ngay trong bộ nhớ. '
             'Chỉ người có thẩm quyền mới mở được ảnh trên hệ thống.',
             style: TextStyle(color: AgColors.mute, fontSize: 15),
           ),

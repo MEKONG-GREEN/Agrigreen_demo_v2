@@ -117,7 +117,7 @@ String entityLabel(String entity) => switch (entity) {
   PushEntity.plotBoundary => 'Ranh giới thửa',
   PushEntity.fieldReport => 'Báo cáo hiện trường',
   PushEntity.taskUpdate => 'Cập nhật nhiệm vụ',
-  PushEntity.consent => 'Đồng ý',
+  PushEntity.consent => 'Đồng ý của nông hộ',
   PushEntity.evidence => 'Ảnh minh chứng',
   _ => entity,
 };

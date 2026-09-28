@@ -1,3 +1,32 @@
+/// Cấu hình Firebase Cloud Messaging (chỉ thông điệp dữ liệu — ADR-0015).
+/// Không có → không đăng ký kênh đẩy; hộp thư vẫn đồng bộ qua pull.
+class FcmConfig {
+  const FcmConfig({
+    required this.projectId,
+    required this.appId,
+    required this.apiKey,
+    required this.senderId,
+  });
+  final String projectId;
+  final String appId;
+  final String apiKey;
+  final String senderId;
+
+  static FcmConfig? fromEnvironment() {
+    const projectId = String.fromEnvironment('AG_FCM_PROJECT_ID');
+    const appId = String.fromEnvironment('AG_FCM_APP_ID');
+    const apiKey = String.fromEnvironment('AG_FCM_API_KEY');
+    const senderId = String.fromEnvironment('AG_FCM_SENDER_ID');
+    if (projectId.isEmpty || appId.isEmpty || apiKey.isEmpty) return null;
+    return const FcmConfig(
+      projectId: projectId,
+      appId: appId,
+      apiKey: apiKey,
+      senderId: senderId,
+    );
+  }
+}
+
 /// Cấu hình môi trường. Giá trị truyền qua `--dart-define` khi build (CI),
 /// mặc định trỏ môi trường dev.
 class AppConfig {
@@ -16,21 +45,23 @@ class AppConfig {
     this.pullLimit = 500,
     this.maxFileBytes = 15 * 1024 * 1024,
     this.tileUrlTemplate = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    this.fcm,
   });
 
-  factory AppConfig.fromEnvironment() => const AppConfig(
-    apiBaseUrl: String.fromEnvironment(
+  factory AppConfig.fromEnvironment() => AppConfig(
+    apiBaseUrl: const String.fromEnvironment(
       'AG_API_BASE',
       defaultValue: 'https://api.dev.agrigreen.vn',
     ),
-    oidcIssuer: String.fromEnvironment(
+    oidcIssuer: const String.fromEnvironment(
       'AG_OIDC_ISSUER',
       defaultValue: 'https://id.dev.agrigreen.vn/realms/agrigreen',
     ),
-    tileUrlTemplate: String.fromEnvironment(
+    tileUrlTemplate: const String.fromEnvironment(
       'AG_TILE_URL',
       defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     ),
+    fcm: FcmConfig.fromEnvironment(),
   );
 
   final String apiBaseUrl;
@@ -55,7 +86,10 @@ class AppConfig {
   final int pullLimit;
   final int maxFileBytes;
 
-  /// TODO(offline-map): thay bằng gói tile ngoại tuyến theo địa bàn (US-MAP-03).
-  /// OSM tile.openstreetmap.org chỉ dùng cho dev — xem chính sách sử dụng tile OSM.
+  /// Máy chủ tile (`AG_TILE_URL`), dùng cả khi tải gói ngoại tuyến (US-MAP-03).
+  /// OSM tile.openstreetmap.org **chỉ dùng cho dev** (chính sách OSM cấm tải
+  /// hàng loạt); production: máy chủ tile trong lãnh thổ (ADR-0007).
   final String tileUrlTemplate;
+
+  final FcmConfig? fcm;
 }

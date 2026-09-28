@@ -7,6 +7,7 @@ import '../../domain/outbox_record.dart';
 import '../providers.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'plots_screen.dart' show confirmBoundary;
 
 final queueProvider = FutureProvider.autoDispose<List<OutboxRecord>>(
   (ref) => servicesOf(ref).outbox.list(limit: 300),
@@ -91,7 +92,14 @@ class _RecordCard extends ConsumerWidget {
     );
     if (ok != true) return;
     try {
-      if (record.entity == PushEntity.fieldReport) {
+      if (record.status == OutboxStatus.rejected) {
+        // Máy chủ không lưu bản bị từ chối → bản ghi MỚI (op create) thay thế;
+        // GPS/thời gian giữ nguyên theo bản gốc.
+        await s.outbox.replaceRejected(
+          originalId: record.id,
+          payload: {...record.payload, 'note': note.text},
+        );
+      } else if (record.entity == PushEntity.fieldReport) {
         await s.reports.correct(
           original: record,
           reason: reason.text,
@@ -114,10 +122,19 @@ class _RecordCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final r = record;
+    final s = ref.read(appControllerProvider).services;
+    final boundary = r.entity == PushEntity.plotBoundary && s != null
+        ? s.boundaries.statusOfRecord(r)
+        : null;
+    final needsConfirm =
+        (boundary?.canConfirm ?? false) && r.replacedBy == null;
     final canCorrect =
-        r.status == OutboxStatus.rejected ||
-        r.status == OutboxStatus.sent ||
-        r.status == OutboxStatus.conflict;
+        r.replacedBy == null &&
+        r.entity != PushEntity.consent &&
+        r.entity != PushEntity.plotBoundary &&
+        (r.status == OutboxStatus.rejected ||
+            r.status == OutboxStatus.sent ||
+            r.status == OutboxStatus.conflict);
     final activity = FarmActivity.byCode(r.payload['activity'] as String?)
         ?.label;
     return Card(
@@ -167,6 +184,26 @@ class _RecordCard extends ConsumerWidget {
                   'Bị từ chối: ${r.errorCode ?? ''}'
                   '${(r.errors ?? const []).isNotEmpty ? ' — ${r.errors!.map(_fmtErr).join('; ')}' : ''}',
                   style: const TextStyle(color: AgColors.red, fontSize: 15),
+                ),
+              ),
+            if (r.replacedBy != null)
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Text(
+                  'Đã tạo bản ghi thay thế.',
+                  style: TextStyle(color: AgColors.g700, fontSize: 15),
+                ),
+              ),
+            if (needsConfirm)
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  onPressed: () async {
+                    await confirmBoundary(context, ref, boundary!);
+                    ref.invalidate(queueProvider);
+                  },
+                  icon: const Icon(Icons.fact_check),
+                  label: const Text('Xác nhận giữ nguyên'),
                 ),
               ),
             if (canCorrect)

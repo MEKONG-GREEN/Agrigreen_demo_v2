@@ -19,6 +19,20 @@ class FakeServer implements SyncApi {
   final List<String> uploadKeys = [];
   final List<String> registeredDevices = [];
 
+  /// device_id → token đẩy đã gắn; khóa idempotency đã dùng.
+  final Map<String, String> pushTokens = {};
+  final List<String> pushTokenKeys = [];
+  int failPushToken = 0;
+
+  /// Lệnh API đã nhận (path, khóa) — gọi lặp cùng khóa trả phản hồi cũ.
+  final List<(String, String)> actionCalls = [];
+  final Map<String, Map<String, Object?>> _actionResponses = {};
+  int failNextActions = 0;
+
+  /// path → mã lỗi 4xx trả về (ví dụ 404 notify.notification_not_found).
+  final Map<String, (int, String)> actionErrors = {};
+  final List<String?> uploadFileRefs = [];
+
   int failNextPushes = 0;
   int dropNextResponses = 0;
   int failNextUploads = 0;
@@ -125,9 +139,11 @@ class FakeServer implements SyncApi {
     required String idempotencyKey,
     required Map<String, Object?> meta,
     required Uint8List ciphertext,
+    String? fileRef,
   }) async {
     _guard();
     uploadKeys.add(idempotencyKey);
+    uploadFileRefs.add(fileRef);
     if (failNextUploads > 0) {
       failNextUploads--;
       throw NetworkException('upload failed');
@@ -143,5 +159,50 @@ class FakeServer implements SyncApi {
       throw NetworkException('upload response lost');
     }
     return ref;
+  }
+
+  @override
+  Future<void> registerPushToken({
+    required String deviceId,
+    required String token,
+    required String idempotencyKey,
+  }) async {
+    _guard();
+    pushTokenKeys.add(idempotencyKey);
+    if (failPushToken > 0) {
+      failPushToken--;
+      throw ApiException(503, 'notify.dependency_unavailable');
+    }
+    pushTokens[deviceId] = token;
+  }
+
+  @override
+  Future<Map<String, Object?>> postAction({
+    required String path,
+    required String idempotencyKey,
+    Map<String, Object?>? body,
+  }) async {
+    _guard();
+    actionCalls.add((path, idempotencyKey));
+    if (failNextActions > 0) {
+      failNextActions--;
+      throw NetworkException('action failed');
+    }
+    final err = actionErrors[path];
+    if (err != null) throw ApiException(err.$1, err.$2);
+    return _actionResponses.putIfAbsent(
+      idempotencyKey,
+      () => {'path': path, 'body': body},
+    );
+  }
+
+  /// Số lần máy chủ thực hiện mỗi path (khóa trùng chỉ tính một).
+  Map<String, int> get actionEffects {
+    final m = <String, int>{};
+    final seen = <String>{};
+    for (final (path, key) in actionCalls) {
+      if (seen.add(key)) m[path] = (m[path] ?? 0) + 1;
+    }
+    return m;
   }
 }

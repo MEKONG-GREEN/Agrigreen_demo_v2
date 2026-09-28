@@ -10,13 +10,59 @@ final tasksProvider = FutureProvider.autoDispose<List<FieldTask>>(
   (ref) => servicesOf(ref).tasks.list(),
 );
 
-/// Nhiệm vụ hỗ trợ được giao (KN epic J).
-class TasksScreen extends ConsumerWidget {
-  const TasksScreen({super.key});
+/// Nhịp mỗi phút để đếm ngược SLA.
+final minuteTickProvider = StreamProvider.autoDispose<DateTime>((ref) async* {
+  final clock = ref.watch(platformProvider).clock;
+  yield clock.now();
+  yield* Stream.periodic(const Duration(minutes: 1), (_) => clock.now());
+});
+
+Color slaColor(SlaLevel l) => switch (l) {
+  SlaLevel.overdue => AgColors.red,
+  SlaLevel.soon => AgColors.amber,
+  SlaLevel.ok => AgColors.g700,
+  SlaLevel.none => AgColors.mute,
+};
+
+/// Nhiệm vụ hỗ trợ được giao (KN epic J) — đếm ngược SLA theo hạn xử lý.
+class TasksScreen extends ConsumerStatefulWidget {
+  const TasksScreen({super.key, this.highlightTaskId});
+
+  /// Mở ngay nhiệm vụ này (từ thông báo "nhiệm vụ leo thang").
+  final String? highlightTaskId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TasksScreen> createState() => _TasksScreenState();
+}
+
+class _TasksScreenState extends ConsumerState<TasksScreen> {
+  bool _opened = false;
+
+  Future<void> _open(FieldTask t) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _TaskUpdateSheet(task: t),
+    );
+    ref.invalidate(tasksProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final tasks = ref.watch(tasksProvider);
+    final now =
+        ref.watch(minuteTickProvider).value ??
+        ref.read(platformProvider).clock.now();
+    final hl = widget.highlightTaskId;
+    if (!_opened && hl != null && tasks.hasValue) {
+      _opened = true;
+      final t = tasks.value!.where((t) => t.id == hl).firstOrNull;
+      if (t != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _open(t);
+        });
+      }
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('Nhiệm vụ hỗ trợ')),
       body: tasks.when(
@@ -34,15 +80,42 @@ class TasksScreen extends ConsumerWidget {
                 separatorBuilder: (_, _) => const Divider(height: 1),
                 itemBuilder: (_, i) {
                   final t = list[i];
+                  final sla = t.sla(now);
                   return ListTile(
-                    tileColor: Colors.white,
+                    tileColor: t.id == hl ? AgColors.g100 : Colors.white,
                     title: Text(t.title),
-                    subtitle: Text(
-                      [
-                        t.status.label,
-                        if (t.dueAt != null) 'Hạn: ${t.dueAt}',
-                        if (t.pendingLocal) 'Chờ đồng bộ',
-                      ].join(' · '),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          [
+                            t.status.label,
+                            if (t.dueAt != null)
+                              'Hạn: ${formatLocal(DateTime.tryParse(t.dueAt!))}',
+                            if (t.pendingLocal) 'Chờ đồng bộ',
+                          ].join(' · '),
+                        ),
+                        if (sla.level != SlaLevel.none)
+                          Row(
+                            children: [
+                              Icon(
+                                sla.level == SlaLevel.overdue
+                                    ? Icons.alarm_off
+                                    : Icons.timer_outlined,
+                                size: 18,
+                                color: slaColor(sla.level),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                sla.label,
+                                style: TextStyle(
+                                  color: slaColor(sla.level),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
                     ),
                     trailing: Icon(
                       t.status == TaskStatus.done
@@ -53,14 +126,7 @@ class TasksScreen extends ConsumerWidget {
                           : AgColors.mute,
                       size: 30,
                     ),
-                    onTap: () async {
-                      await showModalBottomSheet<void>(
-                        context: context,
-                        isScrollControlled: true,
-                        builder: (_) => _TaskUpdateSheet(task: t),
-                      );
-                      ref.invalidate(tasksProvider);
-                    },
+                    onTap: () => _open(t),
                   );
                 },
               ),

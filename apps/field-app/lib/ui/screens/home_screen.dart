@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/sync/sync_service.dart';
+import '../navigation.dart';
 import '../providers.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'directives_screen.dart';
 import 'field_report_screen.dart';
+import 'library_screen.dart';
+import 'notifications_screen.dart';
 import 'plots_screen.dart';
 import 'sync_queue_screen.dart';
 import 'tasks_screen.dart';
@@ -20,10 +24,30 @@ class HomeScreen extends ConsumerWidget {
         Navigator.of(context)
             .push(MaterialPageRoute<void>(builder: (_) => w))
             .then((_) => ref.invalidate(homeSummaryProvider));
+    // Thông báo được chạm (kể cả trước khi mở khóa) → mở đúng màn hình.
+    void consumeLink(String? link) {
+      if (link == null) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final l = ref.read(pendingDeepLinkProvider.notifier).take();
+        if (l != null && context.mounted) {
+          openDeepLink(
+            context,
+            l,
+          ).then((_) => ref.invalidate(homeSummaryProvider));
+        }
+      });
+    }
+
+    ref.listen(pendingDeepLinkProvider, (_, next) => consumeLink(next));
+    consumeLink(ref.read(pendingDeepLinkProvider));
     return Scaffold(
       appBar: AppBar(
         title: const Text('AgriGreen Hiện trường'),
         actions: [
+          InboxBell(
+            unread: summary.value?.unreadNotifications ?? 0,
+            onTap: () => open(const NotificationsScreen()),
+          ),
           IconButton(
             tooltip: 'Khóa',
             iconSize: 28,
@@ -66,7 +90,9 @@ class HomeScreen extends ConsumerWidget {
                 BigTile(
                   icon: Icons.map_outlined,
                   label: 'Thửa ruộng',
-                  badge: summary.value == null
+                  badge: (summary.value?.boundaryAttention ?? 0) > 0
+                      ? '!${summary.value!.boundaryAttention}'
+                      : summary.value == null
                       ? null
                       : '${summary.value!.plots}',
                   onTap: () => open(const PlotsScreen()),
@@ -83,6 +109,19 @@ class HomeScreen extends ConsumerWidget {
                   icon: Icons.edit_note,
                   label: 'Báo cáo hiện trường',
                   onTap: () => open(const FieldReportScreen()),
+                ),
+                BigTile(
+                  icon: Icons.campaign_outlined,
+                  label: 'Chỉ đạo',
+                  badge: (summary.value?.unackedDirectives ?? 0) > 0
+                      ? '${summary.value!.unackedDirectives}'
+                      : null,
+                  onTap: () => open(const DirectivesScreen()),
+                ),
+                BigTile(
+                  icon: Icons.menu_book_outlined,
+                  label: 'Thư viện · Đã lưu',
+                  onTap: () => open(const LibraryScreen()),
                 ),
                 BigTile(
                   icon: Icons.cloud_sync_outlined,
@@ -153,7 +192,7 @@ class _SyncCard extends ConsumerWidget {
               children: [
                 _Count(
                   'Chờ đồng bộ',
-                  c.pending + summary.pendingFiles,
+                  c.pending + summary.pendingFiles + summary.pendingActions,
                   AgColors.amber,
                 ),
                 _Count('Bị từ chối', c.rejected, AgColors.red),

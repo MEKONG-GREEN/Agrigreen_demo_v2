@@ -66,6 +66,7 @@ class OutboxRecord {
     this.conflictId,
     this.errorCode,
     this.errors,
+    this.replacedBy,
   });
 
   final String id;
@@ -89,6 +90,23 @@ class OutboxRecord {
   final String? conflictId;
   final String? errorCode;
   final List<Object?>? errors;
+
+  /// Bản ghi bị từ chối đã được thay bằng bản ghi **mới** (op create) có id này
+  /// (hợp đồng: bản bị từ chối không có ở máy chủ nên không dùng `correct`).
+  final String? replacedBy;
+
+  /// Mã lỗi `geo.*` và lỗi theo trường (để hiển thị).
+  String get errorSummary {
+    final parts = <String>[?errorCode];
+    for (final e in errors ?? const <Object?>[]) {
+      if (e is Map) {
+        final f = e['field'];
+        final r = e['reason'];
+        parts.add([?f, ?r].join(': '));
+      }
+    }
+    return parts.join(' · ');
+  }
 
   /// Thân bản ghi gửi lên `POST /v1/sync/push`.
   Map<String, Object?> toWire() => {
@@ -125,5 +143,6 @@ class OutboxRecord {
     errors: r['errors'] == null
         ? null
         : (jsonDecode(r['errors']! as String) as List),
+    replacedBy: r['replaced_by'] as String?,
   );
 }

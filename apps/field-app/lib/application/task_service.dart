@@ -13,8 +13,63 @@ enum TaskStatus {
   final String code;
   final String label;
 
-  static TaskStatus parse(String? c) =>
-      values.firstWhere((s) => s.code == c, orElse: () => TaskStatus.assigned);
+  /// `action` của `TaskUpdatePayload` phía máy chủ (pf/extension):
+  /// assigned, accepted, progress, resolved, escalated, reopened.
+  String get action => switch (this) {
+    TaskStatus.assigned => 'assigned',
+    TaskStatus.accepted => 'accepted',
+    TaskStatus.inProgress => 'progress',
+    TaskStatus.done => 'resolved',
+    TaskStatus.escalated => 'escalated',
+  };
+
+  static TaskStatus parse(String? c) => values.firstWhere(
+    (s) => s.code == c || s.action == c,
+    orElse: () => TaskStatus.assigned,
+  );
+
+  bool get closed => this == TaskStatus.done;
+}
+
+enum SlaLevel { ok, soon, overdue, none }
+
+/// Thời hạn xử lý còn lại của nhiệm vụ (SLA 24 giờ — KN US-TASK-02).
+class SlaInfo {
+  const SlaInfo(this.level, this.label, [this.remaining]);
+  final SlaLevel level;
+  final String label;
+  final Duration? remaining;
+}
+
+/// Đếm ngược SLA theo `due_at`. Còn dưới [soon] → cảnh báo; quá hạn → đỏ.
+SlaInfo slaFor(
+  String? dueAt,
+  DateTime now, {
+  bool closed = false,
+  Duration soon = const Duration(hours: 4),
+}) {
+  final due = dueAt == null ? null : DateTime.tryParse(dueAt);
+  if (closed) return const SlaInfo(SlaLevel.none, 'Đã hoàn thành');
+  if (due == null) return const SlaInfo(SlaLevel.none, 'Không có hạn xử lý');
+  final left = due.difference(now);
+  String span(Duration d) {
+    final m = d.inMinutes.abs();
+    final days = m ~/ (24 * 60);
+    final h = (m % (24 * 60)) ~/ 60;
+    final mm = m % 60;
+    if (days > 0) return '$days ngày $h giờ';
+    if (h > 0) return '$h giờ $mm phút';
+    return '$mm phút';
+  }
+
+  if (left.isNegative) {
+    return SlaInfo(SlaLevel.overdue, 'Quá hạn ${span(left)}', left);
+  }
+  return SlaInfo(
+    left <= soon ? SlaLevel.soon : SlaLevel.ok,
+    'Còn ${span(left)}',
+    left,
+  );
 }
 
 class FieldTask {
@@ -26,6 +81,8 @@ class FieldTask {
     this.dueAt,
     this.priority,
     this.description,
+    this.category,
+    this.lastNote,
     this.pendingLocal = false,
   });
   final String id;
@@ -35,6 +92,10 @@ class FieldTask {
   final String? dueAt;
   final String? priority;
   final String? description;
+  final String? category;
+  final String? lastNote;
+
+  SlaInfo sla(DateTime now) => slaFor(dueAt, now, closed: status.closed);
 
   /// Có cập nhật trên máy chưa đồng bộ.
   final bool pendingLocal;
@@ -75,7 +136,12 @@ class TaskService {
           final local = latest[r.id];
           return FieldTask(
             id: r.id,
-            title: (r.data['title'] ?? 'Nhiệm vụ').toString(),
+            title:
+                (r.data['title'] ??
+                        r.data['description'] ??
+                        r.data['category'] ??
+                        'Nhiệm vụ')
+                    .toString(),
             status: TaskStatus.parse(
               (local?.payload['status'] ?? r.data['status']) as String?,
             ),
@@ -83,6 +149,8 @@ class TaskService {
             dueAt: r.data['due_at'] as String?,
             priority: r.data['priority'] as String?,
             description: r.data['description'] as String?,
+            category: r.data['category'] as String?,
+            lastNote: r.data['last_note'] as String?,
             pendingLocal: local?.status == OutboxStatus.pending,
           );
         }(),
@@ -114,6 +182,7 @@ class TaskService {
       entity: PushEntity.taskUpdate,
       payload: {
         'task_id': taskId,
+        'action': status.action,
         'status': status.code,
         'note': note.trim(),
         'result': result.trim(),

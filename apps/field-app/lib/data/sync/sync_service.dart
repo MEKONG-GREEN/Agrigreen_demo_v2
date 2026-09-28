@@ -4,6 +4,7 @@ import 'dart:math';
 
 import '../../core/backoff.dart';
 import '../../core/clock.dart';
+import '../actions/action_queue.dart';
 import '../auth/wipe_service.dart';
 import '../db/local_db.dart';
 import '../files/evidence_repository.dart';
@@ -65,6 +66,7 @@ class SyncReport {
   int pulled = 0;
   int uploaded = 0;
   int purged = 0;
+  int actions = 0;
 }
 
 /// Điều phối đồng bộ: tải tệp → push lô → pull theo cursor → purge.
@@ -85,7 +87,9 @@ class SyncService {
     this.retention = const Duration(hours: 48),
     Random? random,
     this.beforeSync,
-  }) : _db = db,
+    ActionQueue? actions,
+  }) : _actions = actions,
+       _db = db,
        _api = api,
        _outbox = outbox,
        _refs = refs,
@@ -108,6 +112,7 @@ class SyncService {
   final int pullLimit;
   final Duration retention;
   final Random _random;
+  final ActionQueue? _actions;
 
   /// Chạy trước mỗi lượt (ví dụ đăng ký thiết bị).
   final Future<void> Function()? beforeSync;
@@ -162,9 +167,12 @@ class SyncService {
       await beforeSync?.call();
       await _uploadFiles(report);
       await _pushAll(report);
+      await _replayActions(report);
       await _pullAll(report);
       report.purged = await _outbox.purgeAcked(retention);
       await _evidence.purgeUploaded(retention);
+      await _refs.purgeOldNotifications();
+      await _actions?.purgeDone();
       await _save(
         SyncStatus(state: SyncState.idle, lastSuccessAt: _clock.now()),
       );
@@ -214,6 +222,7 @@ class SyncService {
           idempotencyKey: 'file:${f.id}',
           meta: f.meta,
           ciphertext: blob,
+          fileRef: f.id,
         );
         await _evidence.markUploaded(f, ref, _outbox);
         report.uploaded++;
@@ -250,15 +259,61 @@ class SyncService {
       await _outbox.applyResults(batch.batchKey, results);
       report.pushed += results.length;
       if (results.isEmpty) return;
+      // Module nhận lỗi hệ thống (sync.sink_failed): bản ghi vẫn chờ; dừng lượt
+      // này và lùi thử lại thay vì gửi dồn liên tục.
+      if (results.every(
+        (r) =>
+            r.status == 'rejected' &&
+            OutboxRepository.retriableRejectCodes.contains(r.code),
+      )) {
+        throw ApiException(503, results.first.code ?? 'sync.sink_failed');
+      }
+    }
+  }
+
+  /// Phát lại lệnh API xếp hàng (đánh dấu đã đọc, xác nhận chỉ đạo, lưu tài
+  /// liệu) theo thứ tự. Mỗi lệnh có Idempotency-Key cố định → gọi lặp an toàn.
+  Future<void> _replayActions(SyncReport report) async {
+    final q = _actions;
+    if (q == null) return;
+    for (final a in await q.pending()) {
+      try {
+        await _api.postAction(
+          path: a.path,
+          idempotencyKey: a.idempotencyKey,
+          body: a.body,
+        );
+        await q.markDone(a.id);
+        report.actions++;
+      } on ApiException catch (e) {
+        if (e is DeviceRevokedException || e is UnauthenticatedException) {
+          rethrow;
+        }
+        if (e.retriable) {
+          await q.recordAttempt(a.id, e.code);
+          rethrow;
+        }
+        // 404 (không còn/ngoài phạm vi), 403, 422: bỏ lệnh, không chặn hàng đợi.
+        await q.markFailed(a.id, e.code);
+      }
     }
   }
 
   Future<void> _pullAll(SyncReport report) async {
+    var restarted = false;
     for (var guard = 0; guard < 10000; guard++) {
-      final page = await _api.pull(
-        cursor: await _refs.cursor(),
-        limit: pullLimit,
-      );
+      PullPage page;
+      try {
+        page = await _api.pull(cursor: await _refs.cursor(), limit: pullLimit);
+      } on ApiException catch (e) {
+        // Con trỏ bị sửa / của thiết bị khác → pull lại từ đầu (một lần).
+        if (e.status == 400 && e.code == 'sync.cursor_invalid' && !restarted) {
+          restarted = true;
+          await _db.setMeta(ReferenceRepository.cursorKey, null);
+          continue;
+        }
+        rethrow;
+      }
       await _refs.applyPage(page);
       report.pulled += page.changes.length;
       if (!page.hasMore || page.nextCursor == null) return;

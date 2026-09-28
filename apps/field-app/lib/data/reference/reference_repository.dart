@@ -18,7 +18,16 @@ abstract final class RefEntity {
   static const directive = 'directive';
   static const document = 'document';
   static const pubkey = 'pubkey';
+  static const notification = 'notification';
+  static const libraryItem = 'library_item';
 }
+
+/// Bản ghi đánh dấu kết thúc một "lượt" khóa công khai (sync-contract, pubkey):
+/// máy xóa mọi khóa có version nhỏ hơn version của bản ghi này.
+const pubkeyRoundMarkerId = '00000000-0000-0000-0000-000000000000';
+
+/// Máy tự bỏ thông báo cũ hơn 30 ngày (sync-contract, notification).
+const notificationRetention = Duration(days: 30);
 
 /// Trường nông hộ được phép lưu trên máy (mục 10.4: chỉ nhãn hiển thị tối
 /// thiểu — không họ tên đầy đủ, SĐT, CCCD, địa chỉ).
@@ -74,6 +83,12 @@ class ReferenceRepository {
   /// version).
   Future<void> applyPage(PullPage page) {
     return _db.db.transaction((tx) async {
+      if (page.reset) {
+        // Phạm vi đã đổi (điều chuyển, sáp nhập xã): thay toàn bộ dữ liệu tham
+        // chiếu bằng kết quả lượt mới.
+        await tx.delete('ref_entity');
+        await tx.delete('household_pubkey');
+      }
       for (final c in page.changes) {
         await _apply(tx, c);
       }
@@ -133,7 +148,19 @@ class ReferenceRepository {
   }
 
   Future<void> _applyPubkey(Transaction tx, PullChange c) async {
-    final subject = (c.data?['subject_ref'] as String?) ?? c.id;
+    if (c.id == pubkeyRoundMarkerId && c.op == 'tombstone') {
+      // Kết thúc lượt: khóa không có trong lượt (version cũ hơn) bị bỏ.
+      await tx.delete(
+        'household_pubkey',
+        where: 'version < ?',
+        whereArgs: [c.version],
+      );
+      return;
+    }
+    final subject =
+        (c.data?['ref'] as String?) ??
+        (c.data?['subject_ref'] as String?) ??
+        c.id;
     final existing = await tx.query(
       'household_pubkey',
       columns: ['version'],
@@ -218,6 +245,23 @@ class ReferenceRepository {
     );
     if (rows.isEmpty) return null;
     return rows.first['public_key']! as Uint8List;
+  }
+
+  /// Bỏ thông báo cũ hơn [notificationRetention] khỏi máy.
+  Future<int> purgeOldNotifications() async {
+    final cutoff = _clock.now().toUtc().subtract(notificationRetention);
+    var n = 0;
+    for (final r in await list(RefEntity.notification)) {
+      final t = DateTime.tryParse('${r.data['created_at']}');
+      if (t != null && t.isBefore(cutoff)) {
+        n += await _db.db.delete(
+          'ref_entity',
+          where: 'entity = ? AND id = ?',
+          whereArgs: [RefEntity.notification, r.id],
+        );
+      }
+    }
+    return n;
   }
 
   Future<DateTime?> lastPullAt() async {

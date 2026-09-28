@@ -1,11 +1,14 @@
 import 'dart:math';
 
 import 'package:agrigreen_field/application/boundary_service.dart';
+import 'package:agrigreen_field/core/ids.dart';
+import 'package:agrigreen_field/data/outbox/outbox_repository.dart';
 import 'package:agrigreen_field/data/sync/sync_api.dart';
 import 'package:agrigreen_field/domain/geo/boundary.dart';
 import 'package:agrigreen_field/domain/outbox_record.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/fake_server.dart';
 import 'support/harness.dart';
 
 /// Hình vuông cạnh [sideM] mét, góc tây nam tại (lat, lon).
@@ -207,16 +210,41 @@ void main() {
           ),
           throwsA(isA<BoundaryException>()),
         );
+        await expectLater(
+          svc().save(
+            points: pts,
+            method: BoundaryMethod.gps,
+            cooperativeId: 'coopA',
+            acknowledgeOverlap: true,
+          ),
+          throwsA(
+            isA<BoundaryException>().having(
+              (e) => e.message,
+              'message',
+              contains('xã'),
+            ),
+          ),
+        );
         final rec = await svc().save(
           points: pts,
           method: BoundaryMethod.gps,
           cooperativeId: 'coopA',
+          communeCode: '31117',
           acknowledgeOverlap: true,
+          worstAccuracyM: 3.46,
         );
         expect(rec.entity, PushEntity.plotBoundary);
+        expect(rec.op, RecordOp.create);
+        // Payload theo BoundaryPayload của pf/geo (sync-contract).
+        expect(isUuidV7(rec.payload['plot_ref']! as String), isTrue);
+        expect(rec.payload['commune_code'], '31117');
+        expect(rec.payload['cooperative_ref'], 'coopA');
+        expect(rec.payload['confirm_overlap'], isTrue);
+        expect(rec.payload['source'], 'kn_field_app');
+        expect(rec.payload['gps_accuracy_m'], '3.5');
+        expect(rec.payload.containsKey('declared_area_ha'), isFalse);
+        expect((rec.payload['geometry']! as Map)['type'], 'Polygon');
         expect(rec.payload['overlap_plot_ids'], ['own']);
-        expect(rec.payload['overlap_acknowledged'], isTrue);
-        expect(rec.payload['is_new_plot'], isTrue);
         expect(rec.payload['area_ha_client'], matches(RegExp(r'^\d+\.\d{4}$')));
       },
     );
@@ -245,7 +273,8 @@ void main() {
         plotId: 'own',
         cooperativeId: 'coopA',
       );
-      expect(rec.payload['plot_id'], 'own');
+      expect(rec.payload['plot_ref'], 'own');
+      expect(rec.payload['confirm_overlap'], isFalse);
       expect(rec.status, OutboxStatus.pending);
       expect(h.fake.pushCalls, 0);
     });
@@ -261,4 +290,197 @@ void main() {
       expect(await h.outbox.list(), isEmpty);
     });
   });
+
+  group('BoundaryService — hợp đồng pf/geo: sửa, diện tích khai báo, xác nhận sau phản hồi', () {
+    late Harness h;
+    setUp(() async {
+      h = await Harness.create();
+      await h.refs.applyPage(
+        PullPage(
+          changes: [
+            PullChange(
+              entity: 'plot',
+              id: 'p1',
+              version: 2,
+              op: 'upsert',
+              data: {
+                'name': 'Thửa bờ kênh',
+                'commune_code': '31117',
+                'cooperative_ref': 'coopA',
+                'boundary_id': 'b-cur',
+                'geometry': toGeoJsonPolygon(square(10.05, 105.60, 100)),
+              },
+            ),
+          ],
+          nextCursor: 'c',
+          hasMore: false,
+        ),
+      );
+    });
+    tearDown(() => h.dispose());
+
+    BoundaryService svc() =>
+        BoundaryService(outbox: h.outbox, refs: h.refs, ids: h.ids);
+
+    test('sửa thửa đã có boundary_id → op correct supersedes_id = boundary_id, bắt buộc lý do ≥ 10 ký tự', () async {
+      final pts = square(10.05, 105.60, 110);
+      await expectLater(
+        svc().save(
+          points: pts,
+          method: BoundaryMethod.map,
+          plotId: 'p1',
+          cooperativeId: 'coopA',
+          correctionReason: 'ngắn',
+        ),
+        throwsA(isA<BoundaryException>()),
+      );
+      final rec = await svc().save(
+        points: pts,
+        method: BoundaryMethod.map,
+        plotId: 'p1',
+        cooperativeId: 'coopA',
+        correctionReason: 'Đo lại bờ phía kênh sau mùa lũ',
+      );
+      expect(rec.op, RecordOp.correct);
+      expect(rec.supersedesId, 'b-cur');
+      expect(rec.correctionReason, 'Đo lại bờ phía kênh sau mùa lũ');
+      expect(rec.payload['commune_code'], '31117');
+      expect(rec.toWire()['supersedes_id'], 'b-cur');
+    });
+
+    test('declared_area_ha dạng chuỗi; lệch > 5 % phải xác nhận', () async {
+      // Hình vuông cạnh 100 m ≈ 1 ha.
+      final pts = square(10.07, 105.62, 100);
+      await expectLater(
+        svc().save(
+          points: pts,
+          method: BoundaryMethod.map,
+          communeCode: '31117',
+          declaredAreaHa: 1.5,
+        ),
+        throwsA(isA<BoundaryException>()),
+      );
+      final ok = await svc().save(
+        points: pts,
+        method: BoundaryMethod.map,
+        communeCode: '31117',
+        declaredAreaHa: 1.0,
+      );
+      expect(ok.payload['declared_area_ha'], '1.0000');
+      expect(ok.payload['confirm_overlap'], isFalse);
+      final confirmed = await svc().save(
+        points: pts,
+        method: BoundaryMethod.map,
+        communeCode: '31117',
+        declaredAreaHa: 1.5,
+        acknowledgeOverlap: true,
+      );
+      expect(confirmed.payload['confirm_overlap'], isTrue);
+      expect(parseDeclaredHa('1,25'), 1.25);
+      expect(parseDeclaredHa(' '), isNull);
+      expect(() => parseDeclaredHa('abc'), throwsA(isA<BoundaryException>()));
+    });
+
+    test('rejected geo.overlap_needs_confirm → cần xác nhận → bản ghi MỚI confirm_overlap; bản gốc superseded khi được nhận', () async {
+      final rec = await svc().save(
+        points: square(10.08, 105.63, 100),
+        method: BoundaryMethod.map,
+        communeCode: '31117',
+      );
+      h.fake.rejectIf = (w) => (w['payload'] as Map)['confirm_overlap'] != true;
+      await h.sync.syncOnce();
+      // FakeServer trả validation_failed — mô phỏng mã geo bằng cách đổi kết quả.
+      var st = await svc().statusOf(rec.payload['plot_ref']! as String);
+      expect(st.state, PlotSyncState.rejected);
+      expect(st.canConfirm, isFalse);
+
+      // Máy chủ thật trả geo.overlap_needs_confirm.
+      await h.db.db.update(
+        'outbox',
+        {'error_code': 'geo.overlap_needs_confirm'},
+        where: 'id = ?',
+        whereArgs: [rec.id],
+      );
+      st = await svc().statusOf(rec.payload['plot_ref']! as String);
+      expect(st.state, PlotSyncState.needsConfirm);
+      expect(await svc().needingAttention(), hasLength(1));
+
+      final again = await svc().confirmAfterServer(st.record!);
+      expect(again.op, RecordOp.create);
+      expect(again.id, isNot(rec.id));
+      expect(again.payload['plot_ref'], rec.payload['plot_ref']);
+      expect(again.payload['confirm_overlap'], isTrue);
+      expect(await svc().needingAttention(), isEmpty);
+      // Gọi lại không tạo bản thứ hai.
+      expect((await svc().confirmAfterServer(st.record!)).id, again.id);
+
+      await h.sync.syncOnce(force: true);
+      expect((await h.outbox.byId(rec.id))!.status, OutboxStatus.superseded);
+      expect((await h.outbox.byId(again.id))!.status, OutboxStatus.sent);
+      final latest = await svc().statusOf(rec.payload['plot_ref']! as String);
+      expect(latest.state, PlotSyncState.accepted);
+    });
+
+    test('conflict chưa xác nhận → bản ghi bù correct trỏ tới bản ghi xung đột, confirm_overlap = true', () async {
+      final rec = await svc().save(
+        points: square(10.09, 105.64, 100),
+        method: BoundaryMethod.map,
+        communeCode: '31117',
+      );
+      h.fake.conflictIf = (w) =>
+          (w['payload'] as Map)['confirm_overlap'] != true;
+      await h.sync.syncOnce();
+      final st = await svc().statusOf(rec.payload['plot_ref']! as String);
+      expect(st.state, PlotSyncState.needsConfirm);
+      expect(st.detail, contains('c-${rec.id}'));
+      final fix = await svc().confirmAfterServer(st.record!);
+      expect(fix.op, RecordOp.correct);
+      expect(fix.supersedesId, rec.id);
+      expect(fix.correctionReason!.length, greaterThanOrEqualTo(10));
+      expect(fix.payload['confirm_overlap'], isTrue);
+      expect(await svc().needingAttention(), isEmpty);
+      await h.sync.syncOnce(force: true);
+      expect((await h.outbox.byId(fix.id))!.status, OutboxStatus.sent);
+    });
+
+    test('rejected sync.sink_failed → giữ pending, tự gửi lại (không bắt tạo bản bù)', () async {
+      await h.outbox.enqueue(
+        entity: PushEntity.fieldReport,
+        payload: {'note': 'x'},
+      );
+      final fake = _SinkFailingOnce(h.fake);
+      h.server = fake;
+      await h.reopen();
+      await h.sync.syncOnce();
+      final r = (await h.outbox.list()).single;
+      expect(r.status, OutboxStatus.pending);
+      expect(r.errorCode, 'sync.sink_failed');
+      await h.sync.syncOnce(force: true);
+      expect((await h.outbox.list()).single.status, OutboxStatus.sent);
+    });
+  });
+}
+
+/// Máy chủ giả trả `rejected sync.sink_failed` cho lô đầu tiên.
+class _SinkFailingOnce extends FakeServer {
+  _SinkFailingOnce(FakeServer base) {
+    ledger.addAll(base.ledger);
+  }
+  bool _failed = false;
+
+  @override
+  Future<List<PushResult>> push({
+    required String batchKey,
+    required String deviceId,
+    required List<OutboxRecord> records,
+  }) async {
+    if (!_failed) {
+      _failed = true;
+      return [
+        for (final r in records)
+          PushResult(id: r.id, status: 'rejected', code: 'sync.sink_failed'),
+      ];
+    }
+    return super.push(batchKey: batchKey, deviceId: deviceId, records: records);
+  }
 }
