@@ -1486,6 +1486,28 @@ paths:
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
   # --- hết pf/mechanization ---
+  # --- pf/notify ---
+  /v1/sync/nudge:
+    post:
+      summary: Yêu cầu thiết bị đồng bộ ngay (US-SYNC-02) — như Application API
+      operationId: adminSyncNudge
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/NudgeInput"}
+      responses:
+        "202":
+          description: Đã xếp lần gửi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/NudgeResult"}
+        "403": {description: "forbidden | mfa_required | notify.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "notify.nudge_target_not_found", $ref: "#/components/responses/Problem"}
+        "429": {description: "notify.nudge_rate_limited", $ref: "#/components/responses/Problem"}
+  # --- hết pf/notify ---
 components:
   securitySchemes:
     oidc:
@@ -2176,6 +2198,21 @@ components:
         reason: {type: [string, "null"]}
         machine: {$ref: "#/components/schemas/MechMachine"}
     # --- hết pf/mechanization ---
+    # --- pf/notify ---
+    NudgeInput:
+      type: object
+      properties:
+        device_id: {type: string, format: uuid}
+        unit: {type: string, description: "Mã tỉnh/xã hiện hành"}
+    NudgeResult:
+      type: object
+      required: [nudge_id, target_kind, target, devices]
+      properties:
+        nudge_id: {type: string, format: uuid}
+        target_kind: {type: string, enum: [device, unit]}
+        target: {type: string}
+        devices: {type: integer, minimum: 0}
+    # --- hết pf/notify ---
   requestBodies:
     ContentTransition:
       required: true

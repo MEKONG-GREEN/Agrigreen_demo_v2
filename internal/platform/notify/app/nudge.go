@@ -71,7 +71,7 @@ func (s *Service) Nudge(ctx context.Context, in NudgeInput) (NudgeResult, *RateL
 			if err != nil {
 				return err
 			}
-			if t == nil || t.DisabledAt != nil || !(tenantWide || tokenInScope(*t, sc)) {
+			if t == nil || t.DisabledAt != nil || (!tenantWide && !tokenInScope(*t, sc)) {
 				return ErrNudgeTargetNotFound
 			}
 			tokens = []domain.PushToken{*t}

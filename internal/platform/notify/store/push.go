@@ -96,7 +96,7 @@ func ActiveTokensForActors(ctx context.Context, tx pgx.Tx, actors []uuid.UUID) (
 		return nil, nil
 	}
 	return collectTokens(tx.Query(ctx, "SELECT "+tokenCols+` FROM pf_notify.push_token
-	  WHERE disabled_at IS NULL AND actor_ref = ANY($1::uuid[]) ORDER BY device_id`, actors))
+	  WHERE disabled_at IS NULL AND actor_ref = ANY($1::uuid[]) ORDER BY device_id`, uuidStrings(actors)))
 }
 
 // ActiveTokensForAudience trả token đang dùng có ảnh chụp phạm vi/vai khớp chủ đề
@@ -254,7 +254,7 @@ func PendingDigest(ctx context.Context, tx pgx.Tx, limit int) ([]domain.DigestIt
 // MarkDigestSent đánh dấu các mục đã vào email digestID.
 func MarkDigestSent(ctx context.Context, tx pgx.Tx, ids []uuid.UUID, digestID uuid.UUID, now time.Time) error {
 	_, err := tx.Exec(ctx, `UPDATE pf_notify.email_digest_item SET digest_id = $2, sent_at = $3
-	  WHERE directive_id = ANY($1::uuid[]) AND sent_at IS NULL`, ids, digestID, now.UTC())
+	  WHERE directive_id = ANY($1::uuid[]) AND sent_at IS NULL`, uuidStrings(ids), digestID, now.UTC())
 	return err
 }
 
@@ -275,4 +275,13 @@ func PendingDigestTenants(ctx context.Context, pool *pgxpool.Pool) ([]uuid.UUID,
 		out = append(out, t)
 	}
 	return out, rows.Err()
+}
+
+// uuidStrings: mảng uuid gửi dạng text[] (pgx không có kế hoạch mã hóa []uuid.UUID ở chế độ PgBouncer).
+func uuidStrings(in []uuid.UUID) []string {
+	out := make([]string, len(in))
+	for i, u := range in {
+		out[i] = u.String()
+	}
+	return out
 }

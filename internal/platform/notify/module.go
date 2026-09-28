@@ -56,6 +56,31 @@ type Deps struct {
 	NudgeHourly   int
 }
 
+// Channels là kênh gửi ra ngoài đọc từ môi trường (cho cmd/worker).
+type Channels struct {
+	Pusher   channel.Pusher
+	Mailer   channel.Mailer // nil khi chưa đặt AG_SMTP_HOST
+	DigestTo []string
+}
+
+// ChannelsFromEnv: AG_FCM_* → FCM HTTP v1 (không đặt → chỉ ghi log);
+// AG_SMTP_* → email tóm tắt qua SMTP trong lãnh thổ (ADR-0015).
+func ChannelsFromEnv(log *slog.Logger) (Channels, error) {
+	p, err := channel.PusherFromEnv(log)
+	if err != nil {
+		return Channels{}, err
+	}
+	out := Channels{Pusher: p, DigestTo: channel.DigestRecipientsFromEnv()}
+	m, err := channel.SMTPFromEnv()
+	if err != nil {
+		return Channels{}, err
+	}
+	if m != nil {
+		out.Mailer = m
+	}
+	return out, nil
+}
+
 // Module là pf/notify đã nối.
 type Module struct{ svc *app.Service }
 

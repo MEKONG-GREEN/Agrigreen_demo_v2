@@ -109,7 +109,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | Story | Kiểm thử | Trạng thái |
 |---|---|---|
 | US-SYNC-01 hai chiều với App HTX | — | **chưa có**, thuộc G2. G1 chỉ có đồng bộ app hiện trường ↔ máy chủ: E2E-11, `TestPushMixedBatchAndReplay`, `TestPullPaginationRoundRobin`, `TestPullScopeChangeResets` |
-| US-SYNC-02 đồng bộ ngay theo yêu cầu | — | **chưa có** |
+| US-SYNC-02 đồng bộ ngay theo yêu cầu | `TestNudgeScopeAndRateLimit` (`POST /v1/sync/nudge`, thông điệp dữ liệu `sync_now`, giới hạn 5 phút/đích, 30 lần/giờ) | **một phần**. Có ở máy chủ; app phải xử lý `sync_now` (chưa ráp Flutter) |
 | US-SYNC-03 đối soát xung đột | `TestConflictSLA`, `TestSyncSinkIdempotentAndConflict` | **một phần**. Có sổ xung đột và SLA 72 giờ (C-8 tạm), có API resolve; chưa có màn hình, E2E không tạo xung đột |
 
 ### G. Thư viện kỹ thuật và tin tức
@@ -121,7 +121,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | US-LIB-03 trích nội dung từ tệp | `TestExtract` | **một phần**. Trích được DOCX; PDF trả `content.extract_unsupported` |
 | US-LIB-04 tra cứu | `TestSearchAccentInsensitive`, E2E-06 | có |
 | US-LIB-05 lưu và tải offline | E2E-11 (pull `document`), `TestSyncRetireTombstone` | **một phần**. Có đồng bộ xuống máy; chưa có danh mục cá nhân |
-| US-LIB-06 thông báo nội dung mới | E2E-06 (`pf.content.document.published` trong outbox), `TestAlertPublishedEvent` | **một phần**. Có sự kiện; chưa có kênh đẩy thông báo tới máy |
+| US-LIB-06 thông báo nội dung mới | E2E-06, `TestAlertPublishedEvent`, `TestAlertFanOutRespectsScope`, `TestDuplicateEventDeliveryNoDuplicates`, `TestFCMPayloadIsDataOnly` | **một phần**. pf/notify: hộp thư trong app theo phạm vi, đẩy FCM chỉ dữ liệu (ADR-0015); chưa ráp app web/Flutter |
 
 ### I. Dashboard và báo cáo
 

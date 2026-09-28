@@ -26,7 +26,7 @@ import (
 // Mặc định của FCM HTTP v1.
 const (
 	DefaultFCMEndpoint = "https://fcm.googleapis.com"
-	DefaultFCMTokenURL = "https://oauth2.googleapis.com/token"
+	DefaultFCMTokenURL = "https://oauth2.googleapis.com/token" //nolint:gosec // URL máy chủ token OAuth2, không phải bí mật
 	fcmScope           = "https://www.googleapis.com/auth/firebase.messaging"
 )
 

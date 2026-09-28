@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.notify.push.requested/v1",
+  "title": "pf.notify.push.requested — payload",
+  "description": "Một lô lần gửi đẩy đã xếp trong pf_notify.push_delivery (thông báo mới hoặc yêu cầu đồng bộ ngay). Consumer pf.notify.push gửi từng thiết bị một thông điệp DỮ LIỆU chỉ gồm kind + notification_id (RB-7, ADR-0015). Không có token, không có dữ liệu cá nhân.",
+  "x-event-type": "pf.notify.push.requested",
+  "x-schema-version": 1,
+  "x-producer": "pf/notify",
+  "type": "object",
+  "required": ["batch_id", "kind", "deliveries"],
+  "properties": {
+    "batch_id":   { "type": "string", "format": "uuid", "description": "Với sync_now = nudge_id" },
+    "kind":       { "type": "string", "enum": ["directive", "alert", "document", "task_escalated", "sync_conflict", "org_deactivated", "sync_now"] },
+    "deliveries": { "type": "integer", "minimum": 1 }
+  }
+}

@@ -31,9 +31,10 @@ func (m PushMessage) Data() map[string]string {
 // Nhà cung cấp token đẩy.
 const ProviderFCM = "fcm"
 
-var tokenRe = regexp.MustCompile(`^[A-Za-z0-9_:.\-]{20,4096}$`)
+var tokenRe = regexp.MustCompile(`^[A-Za-z0-9_:.\-]+$`)
 
-// ValidToken kiểm dạng token đẩy (FCM: chữ, số, _ : . -).
+// ValidToken kiểm dạng token đẩy (FCM: 20–4096 ký tự chữ, số, _ : . -).
 func ValidToken(provider, token string) bool {
-	return provider == ProviderFCM && tokenRe.MatchString(strings.TrimSpace(token))
+	token = strings.TrimSpace(token)
+	return provider == ProviderFCM && len(token) >= 20 && len(token) <= 4096 && tokenRe.MatchString(token)
 }

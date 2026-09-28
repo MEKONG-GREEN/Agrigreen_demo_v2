@@ -43,7 +43,9 @@ Thân: `{ "device_id": "<UUIDv7 sinh trên máy>", "platform": "android" | "ios"
   - HTX, nông hộ (chỉ nhãn hiển thị tối thiểu, **không** họ tên đầy đủ, SĐT, CCCD);
   - thửa, nhiệm vụ được giao, quy trình kỹ thuật;
   - khóa công khai của hộ thuộc địa bàn.
-- `entity` G1: `catalog_item`, `admin_unit`, `cooperative`, `household`, `plot`, `task`, `directive`, `document`, `pubkey`.
+- `entity` G1: `catalog_item`, `admin_unit`, `cooperative`, `household`, `plot`, `task`, `directive`, `document`, `pubkey`, `notification`.
+- `notification` (pf/notify, ADR-0015): hộp thư của người gọi trong 30 ngày gần nhất, `data = {id, kind, severity, title, body, deep_link, subject_ref, created_at, read_at}`; luôn `upsert`; đánh dấu đã đọc ở nơi khác → đi xuống lại với `read_at` và `version` mới. Máy tự bỏ bản cũ hơn 30 ngày.
+- **Thông điệp đẩy** (FCM, chỉ dữ liệu): `{kind, notification_id}` → app gọi `GET /v1/notifications` (hoặc pull) để lấy nội dung rồi hiện thông báo cục bộ; `{kind: "sync_now"}` → app chạy pull/push ngay. Token gắn bằng `POST /v1/devices/{device_id}/push-token {provider: "fcm", token}` sau khi đăng ký thiết bị, mỗi lần khởi động và khi FCM đổi token.
 - `op: tombstone` nghĩa là ngừng hiển thị trên máy (hết phạm vi, ngừng dùng). Không có xóa cứng ở máy chủ.
 
 ## Chiều lên: push
