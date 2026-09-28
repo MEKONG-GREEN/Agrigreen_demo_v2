@@ -45,7 +45,8 @@ services:
     # Container chạy một lần backup-s3-init phải có service chờ nó xong, nếu không
     # `compose up --wait` coi việc nó thoát (mã 0) là lỗi.
     depends_on:
-      backup-s3-init: { condition: service_completed_successfully }
+      # required: false — lệnh không bật profile backup (exec, run) vẫn hợp lệ.
+      backup-s3-init: { condition: service_completed_successfully, required: false }
 
   # Kho S3 thứ hai (vùng sao lưu). Production: kho sao lưu trong lãnh thổ, vùng
   # khác kho chính, bật object lock; backup-writer không có s3:DeleteObject.
