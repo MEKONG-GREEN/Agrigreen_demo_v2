@@ -45,6 +45,9 @@ export function MapView({
   onAreaClick,
   showAreaLabels = true,
   describeAreas = false,
+  clusterPoints = false,
+  onPointClick,
+  focus,
   height,
 }: {
   areas?: AreaCollection | null;
@@ -54,6 +57,15 @@ export function MapView({
   showAreaLabels?: boolean;
   /** Kèm danh sách vùng cho trình đọc màn hình: tên, `status_label` và màu tô (data-fill). */
   describeAreas?: boolean;
+  /**
+   * Gom/tách cụm điểm theo zoom (MapLibre cluster, FN-08 B4). Điểm tô theo thuộc tính `color`;
+   * `provisional = true` vẽ vòng rỗng ("vị trí tạm"). Chỉ đọc lúc khởi tạo.
+   */
+  clusterPoints?: boolean;
+  /** Bấm một điểm (không phải cụm) → id điểm; không đặt thì hiện popup tên. */
+  onPointClick?: (id: string) => void;
+  /** Bay tới toạ độ khi `key` đổi (tra cứu nhanh). */
+  focus?: { lng: number; lat: number; zoom?: number; key: string } | null;
   height?: number | string;
 }) {
   const el = useRef<HTMLDivElement>(null);
@@ -61,8 +73,12 @@ export function MapView({
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const clickRef = useRef(onAreaClick);
+  const pointClickRef = useRef(onPointClick);
+  const clusterRef = useRef(clusterPoints);
+  const labelRef = useRef(label);
   useEffect(() => {
     clickRef.current = onAreaClick;
+    pointClickRef.current = onPointClick;
   });
 
   // Khởi tạo bản đồ một lần (maplibre chỉ chạy trên trình duyệt có WebGL).
@@ -88,15 +104,59 @@ export function MapView({
         map.on("load", () => {
           if (!map) return;
           map.addSource("areas", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-          map.addSource("points", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+          const cluster = clusterRef.current;
+          map.addSource("points", {
+            type: "geojson",
+            data: { type: "FeatureCollection", features: [] },
+            ...(cluster ? { cluster: true, clusterMaxZoom: 11, clusterRadius: 44 } : {}),
+          });
           map.addLayer({ id: "areas-fill", type: "fill", source: "areas", paint: { "fill-color": ["coalesce", ["get", "fill"], "#9fd8b4"], "fill-opacity": 0.72 } });
           map.addLayer({ id: "areas-line", type: "line", source: "areas", paint: { "line-color": "#0b4a2f", "line-width": 1.4 } });
-          map.addLayer({
-            id: "points",
-            type: "circle",
-            source: "points",
-            paint: { "circle-radius": 5.5, "circle-color": "#f0871a", "circle-stroke-color": "#fff", "circle-stroke-width": 1.6 },
-          });
+          if (cluster) {
+            map.addLayer({
+              id: "clusters",
+              type: "circle",
+              source: "points",
+              filter: ["has", "point_count"],
+              paint: {
+                "circle-color": "#0b4a2f",
+                "circle-opacity": 0.78,
+                "circle-radius": ["step", ["get", "point_count"], 12, 10, 16, 50, 21, 200, 27],
+                "circle-stroke-color": "#fff",
+                "circle-stroke-width": 2,
+              },
+            });
+            map.addLayer({
+              id: "points",
+              type: "circle",
+              source: "points",
+              filter: ["!", ["has", "point_count"]],
+              paint: {
+                "circle-radius": 7,
+                // Vị trí tạm (chưa có toạ độ, đặt ở tâm xã): vòng rỗng cùng màu mức đáp ứng.
+                "circle-color": ["case", ["==", ["get", "provisional"], true], "#ffffff", ["coalesce", ["get", "color"], "#f0871a"]],
+                "circle-stroke-color": ["case", ["==", ["get", "provisional"], true], ["coalesce", ["get", "color"], "#f0871a"], "#ffffff"],
+                "circle-stroke-width": ["case", ["==", ["get", "provisional"], true], 3, 1.6],
+              },
+            });
+            map.on("click", "clusters", (e) => {
+              const f = e.features?.[0];
+              const id = f?.properties?.cluster_id;
+              const src = map?.getSource("points") as GeoJSONSource | undefined;
+              if (!map || !src || typeof id !== "number" || f?.geometry.type !== "Point") return;
+              const center = f.geometry.coordinates as [number, number];
+              void src.getClusterExpansionZoom(id).then((z) => map?.easeTo({ center, zoom: z }));
+            });
+            map.on("mouseenter", "clusters", () => map && (map.getCanvas().style.cursor = "pointer"));
+            map.on("mouseleave", "clusters", () => map && (map.getCanvas().style.cursor = ""));
+          } else {
+            map.addLayer({
+              id: "points",
+              type: "circle",
+              source: "points",
+              paint: { "circle-radius": 5.5, "circle-color": "#f0871a", "circle-stroke-color": "#fff", "circle-stroke-width": 1.6 },
+            });
+          }
           map.on("click", "areas-fill", (e) => {
             const code = e.features?.[0]?.properties?.code;
             if (typeof code === "string") clickRef.current?.(code);
@@ -104,6 +164,11 @@ export function MapView({
           map.on("click", "points", (e) => {
             const f = e.features?.[0];
             if (!f || !map) return;
+            const pid = f.properties?.id;
+            if (pointClickRef.current && typeof pid === "string") {
+              pointClickRef.current(pid);
+              return;
+            }
             const name = String(f.properties?.name ?? "");
             const node = document.createElement("div");
             node.textContent = name; // textContent: không chèn HTML từ dữ liệu
@@ -114,6 +179,8 @@ export function MapView({
             map.on("mouseleave", id, () => map && (map.getCanvas().style.cursor = ""));
           }
           mapRef.current = map;
+          // Chế độ giả lập: lộ đối tượng bản đồ cho kiểm thử E2E (đọc cụm/điểm đã dựng, không có trong bản thật).
+          if (config.mock) ((window as unknown as { __agMaps?: Record<string, MlMap> }).__agMaps ??= {})[labelRef.current] = map;
           setReady(true);
         });
       } catch {
@@ -133,7 +200,6 @@ export function MapView({
     const map = mapRef.current;
     if (!ready || !map) return;
     (map.getSource("areas") as GeoJSONSource | undefined)?.setData((areas ?? { type: "FeatureCollection", features: [] }) as unknown as GeoJsonData);
-    (map.getSource("points") as GeoJSONSource | undefined)?.setData((points ?? { type: "FeatureCollection", features: [] }) as unknown as GeoJsonData);
     const b = bbox(areas);
     if (b) map.fitBounds(b, { padding: 32, duration: 0 });
 
@@ -150,7 +216,21 @@ export function MapView({
         }
       });
     }
-  }, [ready, areas, points, showAreaLabels]);
+  }, [ready, areas, showAreaLabels]);
+
+  // Điểm cập nhật riêng — không làm bản đồ nhảy về khung ranh giới khi lọc.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    (map.getSource("points") as GeoJSONSource | undefined)?.setData((points ?? { type: "FeatureCollection", features: [] }) as unknown as GeoJsonData);
+  }, [ready, points]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || !focus) return;
+    map.flyTo({ center: [focus.lng, focus.lat], zoom: focus.zoom ?? 13, duration: 600 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ bay khi key đổi
+  }, [ready, focus?.key]);
 
   return (
     <div className="map" style={height ? { height } : { height: "100%" }} role="region" aria-label={label}>

@@ -18,12 +18,12 @@ Ba trạng thái:
 |---|---|---|---|---|
 | 2. Lộ trình G1 | 20 | 18 | 2 | 0 |
 | 3. App Khuyến nông | 34 | 29 | 2 | 3 |
-| 4. Bản đồ CGH | 11 | 8 | 2 | 1 |
+| 4. Bản đồ CGH | 11 | 9 | 1 | 1 |
 | 5. GIS nền | 4 | 1 | 0 | 3 |
 | 6. Cổng kiến trúc | 25 | 23 | 0 | 2 |
-| **Tổng** | **94** | **79** | **6** | **9** |
+| **Tổng** | **94** | **80** | **5** | **9** |
 
-**Sáu dòng "một phần"** — phần còn thiếu:
+**Năm dòng "một phần"** — phần còn thiếu:
 
 | Yêu cầu | Còn thiếu | Loại |
 |---|---|---|
@@ -31,12 +31,11 @@ Ba trạng thái:
 | S5 Diễn tập sao lưu và phục hồi | Workflow `restore-drill` (pgBackRest → `down -v` → restore → `drill check -strict`) **chưa có lần chạy xanh trên GitHub**: hai lần chạy tay ngày 28/09 hỏng, lần thứ ba đang chạy khi lập bảng. Logic kiểm (`cmd/drill`, `objsync`) đã đạt bằng kiểm thử Go | hạ tầng CI |
 | KN US-SYNC-02 Đồng bộ ngay | AC "chọn **nhóm/loại dữ liệu**": lệnh `sync_now` chọn đích theo đơn vị hoặc thiết bị, thiết bị kéo mọi entity. Chọn theo nhóm dữ liệu gắn với liên thông App HTX (FN-07 KN) → G2 | một phần thuộc G2 |
 | KN US-DASH-02 Xuất theo mẫu Bộ | **Mẫu biểu chính thức của Bộ NN&PTNT**: BRD không kèm mẫu; bố cục FR-01/02/03/05 hiện là tạm (mẫu có phiên bản, thay được không sửa mã) | chờ khách |
-| CGH FN-08 Bản đồ | Ghim HTX và **panel chi tiết HTX kèm danh sách máy, tình trạng, nhãn nguồn** (AC-02, B5); gom/tách cụm theo zoom (B4); ô tra cứu nhanh (luồng phụ). Đã đạt: tô màu theo ngưỡng (AC-01), lọc (AC-03), vùng chưa có dữ liệu tô xám (AC-04), chi tiết theo tỉnh | mã |
 | CGH FN-09 Cân đối và dự báo | **DCRD xác nhận phương pháp dự báo** `cgh.forecast/v1` ([cgh-forecast.md](../dev/cgh-forecast.md)). Cân đối QT-01/02 và lưu kết quả theo vụ đã đạt | chờ khách |
 
 **Chín dòng "ngoài G1"**: KN US-HTX-05, US-SYNC-01, US-TASK-01 (luồng tự động) và CGH FN-07 — tích hợp App HTX (G2); GIS FN-04 (polygon HTX/Hub), FN-06 (kho/Hub), FN-07 (lớp giao thông, thủy hệ, tự nhiên, tile — G2 cùng `pf/waterway`); RB-6 đối soát đo lường ở biên và phần số đo của R-95 (G3).
 
-Thay đổi so với bản 28/09: gộp các dòng trùng (US-ADM-04, US-ADM-05/06, US-PLOT-03/04, US-SYNC-02, US-LIB-05/06, US-TASK-02/03 xuất hiện 2–4 lần với trạng thái khác nhau); bỏ ghi chú cũ ("quy tắc chồng lấn đang được sửa", "chưa ráp Flutter/web", "harness lặp lại router"). Đóng khoảng trống trong G1 ngày 29/09: danh bạ trực trên web và app kèm gọi/nhắn một chạm (US-DIR-01/02/03), thao tác loạt tài khoản trên web (US-ADM-03), gửi email lịch báo cáo qua SMTP được kiểm với máy chủ SMTP giả + E2E web lập lịch (US-DASH-03), chú giải bản đồ CGH cùng màu với vùng tô + E2E (FN-08 AC-01/03/04), chính sách đăng nhập realm và không khóa được quản trị nền tảng cuối cùng (CGH FN-01).
+Thay đổi so với bản 28/09: gộp các dòng trùng (US-ADM-04, US-ADM-05/06, US-PLOT-03/04, US-SYNC-02, US-LIB-05/06, US-TASK-02/03 xuất hiện 2–4 lần với trạng thái khác nhau); bỏ ghi chú cũ ("quy tắc chồng lấn đang được sửa", "chưa ráp Flutter/web", "harness lặp lại router"). Đóng khoảng trống trong G1 ngày 29/09: danh bạ trực trên web và app kèm gọi/nhắn một chạm (US-DIR-01/02/03), thao tác loạt tài khoản trên web (US-ADM-03), gửi email lịch báo cáo qua SMTP được kiểm với máy chủ SMTP giả + E2E web lập lịch (US-DASH-03), bản đồ CGH đủ FN-08 (chú giải cùng màu vùng tô; ghim HTX theo vị trí hồ sơ, "vị trí tạm" ở tâm xã; gom cụm theo zoom; panel HTX máy theo khâu; tra cứu nhanh bay tới ghim), chính sách đăng nhập realm và không khóa được quản trị nền tảng cuối cùng (CGH FN-01).
 
 ## 1. Cách chạy
 
@@ -54,9 +53,9 @@ Web vận hành (`apps/web-ops`), không cần backend:
 cd apps/web-ops
 npm ci
 npm run check:api; npm run lint; npm run typecheck
-npm test                 # Vitest: 115 ca (src/**/*.test.ts(x))
+npm test                 # Vitest: 119 ca (src/**/*.test.ts(x))
 npm run e2e:install      # một lần: Chromium
-$env:CI='1'; npm run e2e # Playwright: next build (NEXT_PUBLIC_API_MOCK=1) + next start, 25 ca trong tests/e2e/
+$env:CI='1'; npm run e2e # Playwright: next build (NEXT_PUBLIC_API_MOCK=1) + next start, 27 ca trong tests/e2e/
 ```
 
 App hiện trường (`apps/field-app`):
@@ -110,7 +109,7 @@ Kịch bản chỉ gọi qua HTTP, trừ hai việc mà ở production do worker
 | S2 | Thửa PostGIS, chồng lấn, diện tích geodesic | `TestGeodesicAreaNearCanTho`, `TestOverlapRules`, `TestClassifyOverlaps`, E2E-05 | **đạt**. Quy tắc chồng lấn đã chốt theo BRD (xem US-PLOT-03). E2E-05 dùng thửa không chồng lấn; chồng lấn do kiểm thử module chứng minh |
 | S2 | Cây phân cấp KN | `TestScopeProvinceSeesOnlyItsCommunes`, `TestOrgMoveHistoryAndChain`, E2E-02, E2E-05 | **đạt** |
 | S2 | HTX và nông hộ, định danh ở vault | `TestHouseholdDedupeViaVault`, `TestNoPIIColumns`, E2E-03, E2E-14 | **đạt** |
-| S2 | `apps/web-ops` | Vitest 115 ca; WEB-E2E 25 ca: `navigation`, `accounts`, `params`, `htx`, `dashboard`, `reports`, `notifications`, `conflicts`, `roster`, `cgh` `.spec.ts` | **đạt**. Chạy trên bản build production ở chế độ giả lập (job `web-e2e`) |
+| S2 | `apps/web-ops` | Vitest 119 ca; WEB-E2E 27 ca: `navigation`, `accounts`, `params`, `htx`, `dashboard`, `reports`, `notifications`, `conflicts`, `roster`, `cgh`, `cgh-pins` `.spec.ts` | **đạt**. Chạy trên bản build production ở chế độ giả lập (job `web-e2e`) |
 | S2 | Chốt engine đồng bộ (23.1) | ADR-0006 (đồng bộ qua Application API); E2E-11 | **đạt** (quyết định + kiểm thử) |
 | S3 | `apps/field-app`: offline 72 giờ, SQLCipher, hàng đợi UUIDv7 + idem_key, vẽ offline, mã hóa ảnh ngay khi chụp | `test/*.dart` (143 ca: auth, outbox, sync_push, sync_pull, boundary, photo_pipeline, envelope_vectors, wipe, inbox_library_directive, push, consent_watermark, tiles_pull, http_contract_g1, roster, …), `offline_flow_http_test.dart` (HTTP thật tới máy chủ giả `dart:io`), `integration_test/app_flow_test.dart` (emulator API 29: SQLCipher + Keystore + giao diện thật; job `field-app-emulator`) | **đạt**. Emulator dùng máy chủ API giả trong tiến trình; phía máy chủ của cùng luồng do E2E-11 chứng minh |
 | S4 | `platform/extension`: nhiệm vụ SLA 24 giờ, leo thang | `TestTaskSLAFromParamAtCreation`, `TestEscalationJobOnlyOverdueAndIdempotent`, E2E-07 | **đạt** |
@@ -210,7 +209,7 @@ Kịch bản chỉ gọi qua HTTP, trừ hai việc mà ở production do worker
 | FN-05 | Hồ sơ máy | E2E-09, `TestSerialUniqueAndStageDerived`, `TestMachineCountAtT`, `TestImportUpdateAndReplace`, `TestImportMachinesXLSXReplace` | **đạt**. CSV hoặc .xlsx |
 | FN-06 | Lịch mùa vụ và diện tích theo vụ | E2E-09 (nhập tay), `TestLockedManualAreaNotOverwritten`, `TestValidateCalendar` | **đạt** |
 | FN-07 | Tích hợp App HTX | `TestResolveAreaQT03` (chỉ port `AreaFeed`, fallback nhập tay) | **ngoài G1 → G2** |
-| FN-08 | Bản đồ và trực quan hóa | `TestSummarizeBottleneck` (coverage theo cấp); **WEB-E2E `cgh.spec.ts`** (chú giải ngưỡng; mọi tỉnh tô đúng màu chú giải của mức máy chủ trả; Tây Ninh chưa có dữ liệu → xám "Chưa có dữ liệu"; lọc khâu áp dụng ngay; bấm tỉnh → chi tiết); `navigation.spec.ts` (Cục vào `/cgh`) | **một phần** — đạt AC-01/03/04; **thiếu ghim HTX + panel máy theo loại, tình trạng, nhãn nguồn (AC-02), gom cụm theo zoom, ô tra cứu nhanh**. 29/09 sửa lỗi chú giải khác màu vùng tô (mục 7) |
+| FN-08 | Bản đồ và trực quan hóa | `TestSummarizeBottleneck` (coverage theo cấp); `TestBalanceUsesNormAtSeasonAndPilotStages` (panel HTX `GET /v1/mechanization/cooperatives/{ref}/panel` (máy, nhãn chủ sở hữu đã che, mức đáp ứng đã lưu); Vitest `src/cgh/pins.test.ts` (vị trí hồ sơ HTX / tâm xã "vị trí tạm", màu theo khâu lọc, tra cứu không dấu theo tên/Mã HTX/xã, **1.200 HTX dựng ghim + lọc < 1 giây**); **WEB-E2E `cgh.spec.ts`** (chú giải ngưỡng; tỉnh tô đúng màu chú giải; Tây Ninh chưa có dữ liệu → xám; lọc khâu áp dụng ngay; bấm tỉnh → chi tiết), **`cgh-pins.spec.ts`** (MapLibre gom cụm ở zoom toàn vùng, tách ghim khi phóng to, ghim tô màu mức đáp ứng; tra cứu nhanh → bay tới ghim → panel HTX: mức theo 4 khâu, máy theo khâu kèm tình trạng + [Nhập tay]/[App HTX], chủ sở hữu chỉ nhãn + SĐT che; HTX chưa có toạ độ → "vị trí tạm"; không có kết quả → "Không có kết quả phù hợp"); `navigation.spec.ts` (Cục vào `/cgh`) | **đạt** (29/09). Ghim từ kết quả cân đối **đã lưu** cấp HTX (`GET /v1/mechanization/coverage?level=cooperative`) + vị trí hồ sơ HTX (`GET /v1/cooperatives`); không thêm API. Vòng rỗng = vị trí tạm. Chỉ xem (BR-04) |
 | FN-09 | Cân đối và dự báo | E2E-09, `TestBalanceUsesNormAtSeasonAndPilotStages`, `TestSavedResultsImmutableAndChainVerifies`, `TestForecastFN09AndCoopCodeG10`, `TestProjectAreaFN09`, Vitest `features.test.ts`, WEB-E2E `navigation.spec.ts` (nhãn "Phương pháp dự báo tạm thời") | **một phần** — cân đối và dự báo chạy, kết quả lưu bất biến; **thiếu xác nhận phương pháp dự báo của DCRD** (`cgh.forecast/v1` là tạm) |
 | FN-10 | Báo cáo và xuất dữ liệu | `TestReportDataEqualsSavedResults`, `TestCGHExportEqualsSavedResults`, `TestTemplateVersionsAdmin`, WEB-E2E `reports.spec.ts` (mẫu CGH cho Cục) | **đạt**. Xuất từ kết quả cân đối **đã lưu**, nhãn nguồn, Admin quản lý mẫu |
 | FN-11 | Dashboard tổng quan | E2E-09 (`total_machines`), WEB-E2E `navigation.spec.ts` (cổng Cục) | **đạt** |

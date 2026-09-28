@@ -244,3 +244,69 @@ export function dashboard(stored: StoredRun): Dashboard {
     run: stored.run,
   };
 }
+
+type Panel = AppGet<"/v1/mechanization/cooperatives/{ref}/panel">;
+const MACHINE_STATUS = [
+  { status: "hoat_dong", label: "Hoạt động" },
+  { status: "hoat_dong", label: "Hoạt động" },
+  { status: "bao_tri", label: "Bảo trì" },
+  { status: "hong", label: "Hỏng" },
+] as const;
+const OWNER_LABELS = ["Nguyễn V. A.", "Trần T. B.", "Lê V. C.", "Phạm T. D.", "HTX (chủ sở hữu tập thể)"];
+
+/** Panel HTX (FN-08 B5): máy theo khâu từ ô cân đối đã lưu, chủ sở hữu CHỈ nhãn đã che (mục 10.4). null → HTX không có. */
+export function panel(stored: StoredRun, ref: string): Panel | null {
+  const res = stored.results.find((r) => r.coop.api.ref === ref);
+  const coop = res?.coop ?? COOPERATIVES.find((c) => c.api.ref === ref);
+  if (!coop) return null;
+  const prov = coop.province_code.toUpperCase();
+  let seq = 0;
+  const machines: Panel["machines"] = res
+    ? STAGES.flatMap((s) =>
+        Array.from({ length: res.cells[s.stage]?.machines ?? 0 }, (): Panel["machines"][number] => {
+          seq++;
+          const st = MACHINE_STATUS[seq % MACHINE_STATUS.length]!;
+          const app = coop.api.ref.endsWith("3") ? false : seq % 2 === 0;
+          return {
+            ref: `${coop.api.ref.slice(0, 24)}${String(seq).padStart(12, "0")}`,
+            code: `MAY-${s.machine}-${String(Number(coop.api.code.slice(-5)) * 100 + seq).padStart(5, "0")}`,
+            machine_type: s.machine,
+            farm_stage: s.stage,
+            cooperative_ref: coop.api.ref,
+            owner_id: `01927b3e-0a0e-7000-8000-${String(seq).padStart(12, "0")}`,
+            brand: seq % 3 === 0 ? "Kubota" : "Yanmar",
+            model: null,
+            serial_no: null,
+            chassis_no: null,
+            year_made: 2015 + (seq % 10),
+            fuel: "dầu",
+            power_hp: null,
+            capacity_ha: null,
+            owned_since: "2020-01-01",
+            status: st.status,
+            status_label: st.label,
+            status_source: app ? "app_htx" : "manual",
+            source_label: app ? "App HTX" : "Nhập tay",
+            status_at: stored.run.computed_at,
+            active: true,
+            deactivated_on: null,
+            status_reason: null,
+            owner_code: `CSH-${prov === "82" ? "DT" : "VN"}-${String(seq).padStart(5, "0")}`,
+            owner_label: OWNER_LABELS[seq % OWNER_LABELS.length]!,
+            owner_masked_phone: `09${String(10 + (seq % 80))}•••${String(100 + ((seq * 37) % 900))}`,
+          };
+        }),
+      )
+    : [];
+  const base = { unit_code: null, cooperative_ref: coop.api.ref, name: coop.api.name, province_code: coop.province_code, commune_code: coop.api.admin_unit_code };
+  return {
+    cooperative_ref: coop.api.ref,
+    name: coop.api.name,
+    commune_code: coop.api.admin_unit_code,
+    province_code: coop.province_code,
+    ...(machines.length === 0 ? { note: "Chưa có máy" as const } : {}),
+    machines,
+    coverage: res ? item(base, [res], null) : null,
+    run: stored.run,
+  };
+}
