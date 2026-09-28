@@ -32,7 +32,7 @@ if [ -z "$CID" ]; then
     -s 'config."claim.name"=tenant_id' -s "config.\"claim.value\"=$TENANT" \
     -s 'config."jsonType.label"=String' -s 'config."access.token.claim"=true'
   mapper -s name=amr-drill -s protocolMapper=oidc-hardcoded-claim-mapper \
-    -s 'config."claim.name"=amr' -s 'config."claim.value"=["pwd","otp"]' \
+    -s 'config."claim.name"=amr' -s 'config."claim.value"="[\"pwd\",\"otp\"]"' \
     -s 'config."jsonType.label"=JSON' -s 'config."access.token.claim"=true'
   kc add-roles -r agrigreen --uusername "service-account-$CLIENT" \
     --rolename platform_admin --rolename masterdata_admin --rolename registry_admin \
