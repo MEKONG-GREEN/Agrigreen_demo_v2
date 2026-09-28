@@ -53,7 +53,24 @@ test("danh bạ trực (US-DIR-01/03): cán bộ xã tự khai Tạm nghỉ; TTK
   const row = page.getByRole("table", { name: "Cán bộ trong địa bàn" }).locator('tr[data-actor="mock-knv-82103-2"]');
   await expect(row).toContainText("Không xác định");
   await page.getByLabel("Cán bộ", { exact: true }).selectOption("mock-knv-82103-2");
-  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  // Trình duyệt chạy giờ Việt Nam (playwright.config timezoneId); định dạng theo đúng múi đó,
+  // không theo múi của tiến trình Node (CI là UTC) — nếu không, ca trực lệch 7 giờ.
+  const fmt = (d: Date) => {
+    const p = Object.fromEntries(
+      new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Ho_Chi_Minh",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      })
+        .formatToParts(d)
+        .map((x) => [x.type, x.value]),
+    );
+    return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+  };
   const now = Date.now();
   await page.getByLabel("Bắt đầu").fill(fmt(new Date(now - 3_600_000)));
   await page.getByLabel("Kết thúc").fill(fmt(new Date(now + 4 * 3_600_000)));
