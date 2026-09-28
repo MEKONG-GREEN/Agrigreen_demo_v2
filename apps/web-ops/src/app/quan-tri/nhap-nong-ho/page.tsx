@@ -7,9 +7,11 @@ import { ApiProblem } from "@/api/problem";
 import type { HouseholdImportResult } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
+import { MfaNotice } from "@/components/MfaNotice";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { PageHead } from "@/components/ui";
 import { formatInt } from "@/lib/decimal";
+import { readUpload, type UploadFile } from "@/lib/files";
 
 const STATUS = {
   accepted: { text: "Đã nhận", cls: "c-ok" },
@@ -17,11 +19,10 @@ const STATUS = {
   rejected: { text: "Bị từ chối", cls: "c-bad" },
 } as const;
 
-/** Nhập nông hộ từ CSV — Admin API POST /v1/households/import (MFA bắt buộc). */
+/** Nhập nông hộ từ CSV UTF-8 hoặc Excel .xlsx — Admin API POST /v1/households/import (MFA bắt buộc). */
 export default function HouseholdImportPage() {
-  const { adminApi, principal } = useAuth();
-  const [csv, setCsv] = useState<string | null>(null);
-  const [fileName, setFileName] = useState("");
+  const { adminApi } = useAuth();
+  const [file, setFile] = useState<UploadFile | null>(null);
   const [check, setCheck] = useState<CsvPrecheck | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<ApiProblem | null>(null);
@@ -34,24 +35,24 @@ export default function HouseholdImportPage() {
     setResult(null);
     setProblem(null);
     if (!f) {
-      setCsv(null);
+      setFile(null);
       setCheck(null);
       return;
     }
-    const text = await f.text();
-    setFileName(f.name);
-    setCsv(text);
-    setCheck(precheckCsv(text));
+    const up = await readUpload(f);
+    setFile(up);
+    // Kiểm sơ bộ dòng tiêu đề chỉ với CSV; .xlsx do máy chủ đọc trang tính đầu.
+    setCheck(up.kind === "csv" && typeof up.body === "string" ? precheckCsv(up.body) : null);
     setIdemKey(newIdempotencyKey());
   };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!csv) return;
+    if (!file) return;
     setBusy(true);
     setProblem(null);
     try {
-      setResult(await importHouseholds(adminApi, csv, idemKey));
+      setResult(await importHouseholds(adminApi, file, idemKey));
     } catch (err) {
       setProblem(err instanceof ApiProblem ? err : null);
     } finally {
@@ -59,11 +60,12 @@ export default function HouseholdImportPage() {
     }
   };
 
-  const blocked = !csv || !check || check.missingColumns.length > 0 || check.tooMany || check.rows === 0;
+  const unsupported = !!file && file.kind !== "csv" && file.kind !== "xlsx";
+  const blocked = !file || unsupported || (file.kind === "csv" && (!check || check.missingColumns.length > 0 || check.tooMany || check.rows === 0));
 
   return (
     <>
-      <PageHead title="Nhập nông hộ từ tệp" subtitle="Tệp CSV UTF-8, dòng đầu là tiêu đề, tối đa 200 dòng — kết quả theo từng dòng" />
+      <PageHead title="Nhập nông hộ từ tệp" subtitle="CSV UTF-8 hoặc Excel .xlsx (trang tính đầu), dòng đầu là tiêu đề, tối đa 200 dòng — kết quả theo từng dòng" />
       <div className="alert alert-info" style={{ marginBottom: 16 }}>
         <Icon name="info" />
         <span>
@@ -73,20 +75,26 @@ export default function HouseholdImportPage() {
           này không lưu và không hiển thị lại nội dung tệp.
         </span>
       </div>
-      {principal && !principal.mfa ? (
-        <div className="alert alert-warn" style={{ marginBottom: 16 }} role="status">
-          <Icon name="alert" />
-          <span>Phiên hiện tại chưa qua xác thực hai yếu tố — Admin API sẽ từ chối (mfa_required).</span>
-        </div>
-      ) : null}
+      <MfaNotice />
       <form className="card sec stack" onSubmit={(e) => void submit(e)}>
         <div className="field">
-          <label htmlFor="hh-file">Chọn tệp CSV</label>
-          <input id="hh-file" type="file" accept=".csv,text/csv" onChange={(e) => void onFile(e)} />
+          <label htmlFor="hh-file">Chọn tệp CSV hoặc .xlsx</label>
+          <input
+            id="hh-file"
+            type="file"
+            accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            onChange={(e) => void onFile(e)}
+          />
         </div>
+        {file && file.kind === "xlsx" ? <div className="small">{file.name}: Excel .xlsx — máy chủ đọc trang tính đầu, kiểm tiêu đề và từng dòng.</div> : null}
+        {unsupported ? (
+          <p className="err small" role="alert">
+            {file?.kind === "xls" ? "Tệp .xls cũ không được nhận — mở bằng Excel và lưu lại dạng .xlsx." : "Chỉ nhận CSV UTF-8 hoặc Excel .xlsx."}
+          </p>
+        ) : null}
         {check ? (
           <div className="small">
-            {fileName}: {formatInt(check.rows)} dòng dữ liệu.
+            {file?.name}: {formatInt(check.rows)} dòng dữ liệu.
             {check.missingColumns.length > 0 ? (
               <p className="err" role="alert">
                 Thiếu cột bắt buộc: {check.missingColumns.join("; ")}.

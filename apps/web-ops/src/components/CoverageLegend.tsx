@@ -34,8 +34,8 @@ export function CoverageChip({ status }: { status: CoverageStatus }) {
   );
 }
 
-/** Nhãn nguồn dữ liệu theo QT-03: ưu tiên App HTX, dự phòng nhập tay. */
-export function SourceLabel({ source }: { source: string | null | undefined }) {
-  const text = source === "app_htx" ? "[App HTX]" : source === "manual" ? "[Nhập tay]" : "[Chưa có dữ liệu]";
+/** Nhãn nguồn dữ liệu theo QT-03: ưu tiên nhãn backend trả (G-10 `area_source_label`), không có thì suy từ mã nguồn. */
+export function SourceLabel({ source, label }: { source: string | null | undefined; label?: string | null }) {
+  const text = label ?? (source === "app_htx" ? "[App HTX]" : source === "manual" ? "[Nhập tay]" : "[Chưa có dữ liệu]");
   return <span className="mute small">{text}</span>;
 }

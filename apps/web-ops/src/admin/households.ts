@@ -1,9 +1,10 @@
-// Nhập nông hộ từ CSV — Admin API POST /v1/households/import (pf/party), thân text/csv.
+// Nhập nông hộ từ CSV UTF-8 hoặc Excel .xlsx — Admin API POST /v1/households/import (pf/party).
 // Tệp chứa định danh chủ hộ (họ tên, SĐT, CCCD): web chỉ đọc tệp để gửi thẳng lên máy chủ,
 // không lưu, không ghi log, không hiển thị lại nội dung (R-04). Kết quả theo dòng không có PII.
 import type { AdminApiClient } from "@/api/client";
 import { unwrap } from "@/api/client";
 import type { HouseholdImportResult } from "@/api/types";
+import type { UploadFile } from "@/lib/files";
 
 export const IMPORT_MAX_ROWS = 200;
 export const REQUIRED_COLUMNS: readonly (readonly string[])[] = [
@@ -27,13 +28,16 @@ export function precheckCsv(text: string): CsvPrecheck {
   return { rows, missingColumns, tooMany: rows > IMPORT_MAX_ROWS };
 }
 
-export function importHouseholds(admin: AdminApiClient, csv: string, idemKey: string): Promise<HouseholdImportResult> {
+/** Gửi tệp CSV (chuỗi) hoặc Excel .xlsx (byte) nguyên văn — máy chủ nhận dạng theo chữ ký tệp. */
+export function importHouseholds(admin: AdminApiClient, file: string | UploadFile, idemKey: string): Promise<HouseholdImportResult> {
+  const body = typeof file === "string" ? file : file.body;
+  const contentType = typeof file === "string" ? "text/csv; charset=utf-8" : file.contentType;
   return unwrap(
     admin.POST("/v1/households/import", {
       params: { header: { "Idempotency-Key": idemKey } },
-      body: csv,
-      bodySerializer: (b: string) => b,
-      headers: { "Content-Type": "text/csv; charset=utf-8" },
+      body: body as unknown as string,
+      bodySerializer: (b: unknown) => b as BodyInit,
+      headers: { "Content-Type": contentType },
     }),
   );
 }

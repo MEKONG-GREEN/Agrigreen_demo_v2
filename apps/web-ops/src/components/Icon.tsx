@@ -1,6 +1,22 @@
 import type { NavIcon } from "@/nav/nav";
 
-export type IconName = NavIcon | "logout" | "menu" | "leaf" | "alert" | "info" | "search" | "clock" | "area" | "plot";
+export type IconName =
+  | NavIcon
+  | "logout"
+  | "menu"
+  | "leaf"
+  | "alert"
+  | "info"
+  | "search"
+  | "clock"
+  | "area"
+  | "plot"
+  | "download"
+  | "bookmark"
+  | "check"
+  | "lock"
+  | "unlock"
+  | "mail";
 
 const PATHS: Record<IconName, string> = {
   dashboard: "M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z",
@@ -21,6 +37,19 @@ const PATHS: Record<IconName, string> = {
   clock: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2",
   area: "M3 3h18v18H3zM3 9h18M9 3v18",
   plot: "M4 4l7 3 9-3v16l-9 3-7-3zM11 7v16",
+  megaphone: "M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13",
+  report: "M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 17v-3M12 17v-6M16 17v-4",
+  bell: "M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0",
+  sync: "M21 12a9 9 0 0 1-15.5 6.2L3 16M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5M3 21v-5h5",
+  user: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+  conflict: "M7 4v16M17 4v16M7 8h4l2 3-2 3H7M17 10h-4",
+  upload: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12",
+  download: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3",
+  bookmark: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z",
+  check: "M20 6L9 17l-5-5",
+  lock: "M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4",
+  unlock: "M5 11h14v10H5zM8 11V7a4 4 0 0 1 7.5-2",
+  mail: "M4 4h16v16H4zM4 6l8 7 8-7",
 };
 
 export function Icon({ name, size = 18, label }: { name: IconName; size?: number; label?: string }) {

@@ -14,7 +14,7 @@ import { ApiProblem } from "../problem";
 import type { Cooperative } from "../types";
 import { loadBoundaries } from "./boundaries";
 import { assignPlot, bboxOf, cooperativePlotsPage, cooperativePoints, draftPlotsInCommune } from "./cooperatives";
-import { loadDashboard } from "./dashboard";
+import { loadDashboard, progressPct } from "./dashboard";
 import { unitLabel, unitResolver } from "./units";
 
 /** fetch ghi lại request rồi chuyển cho backend giả lập (hình dạng theo hợp đồng thật). */
@@ -47,8 +47,25 @@ async function problemOf(p: Promise<unknown>): Promise<ApiProblem> {
 describe("hợp đồng: không còn route viết tay", () => {
   it("mọi route web gọi đều có trong kiểu sinh (không còn thư mục pending)", () => {
     const generated = readFileSync(resolve(process.cwd(), "src/api/generated/application.ts"), "utf8");
-    for (const p of ["/v1/me", "/v1/mechanization/coverage", "/v1/mechanization/dashboard", "/v1/extension/dashboard", "/v1/geo/admin-boundaries/{code}"]) {
+    for (const p of [
+      "/v1/me",
+      "/v1/mechanization/coverage",
+      "/v1/mechanization/dashboard",
+      "/v1/dashboard",
+      "/v1/geo/admin-boundaries",
+      "/v1/geo/admin-boundaries/{code}",
+      "/v1/notifications",
+      "/v1/notifications/unread-count",
+      "/v1/sync/nudge",
+      "/v1/library",
+      "/v1/reports/exports/{id}/download",
+      "/v1/mechanization/forecasts/{id}",
+    ]) {
       expect(generated.includes(`"${p}": {`)).toBe(true);
+    }
+    const admin = readFileSync(resolve(process.cwd(), "src/api/generated/admin.ts"), "utf8");
+    for (const p of ["/v1/accounts/users", "/v1/accounts/grants", "/v1/reports/schedules", "/v1/sync/conflicts/{id}", "/v1/orgs/export.xlsx", "/v1/masterdata/params"]) {
+      expect(admin.includes(`"${p}": {`)).toBe(true);
     }
   });
 });
@@ -80,12 +97,17 @@ describe("masterdata — tra tên đơn vị", () => {
   });
 });
 
-describe("geo — ranh giới hành chính theo mã", () => {
-  it("gộp FeatureCollection, đơn vị chưa nhập ranh giới vào missing, diện tích giữ chuỗi", async () => {
-    const res = await loadBoundaries(app("tw"), ["82", "91", "96104"]);
-    expect(res.collection.features.map((f) => f.properties.code).sort()).toEqual(["82", "91"]);
+describe("geo — ranh giới hành chính theo cấp (G-05)", () => {
+  it("MỘT lời gọi cho cả tỉnh; đơn vị chưa nhập ranh giới vào missing; diện tích giữ chuỗi", async () => {
+    const { seen, fetch } = recording(mockFetchNoDelay);
+    const res = await loadBoundaries(app("tw", fetch), { level: "commune", parent: "96" });
+    expect(seen).toHaveLength(1);
+    expect(new URL(seen[0]!.url).search).toBe("?level=commune&parent=96");
+    expect(res.collection.features.every((f) => f.properties.parent_code === "96")).toBe(true);
     expect(res.missing).toEqual(["96104"]);
     expect(typeof res.collection.features[0]?.properties.area_ha).toBe("string");
+    const provinces = await loadBoundaries(app("tw"), { level: "province" });
+    expect(provinces.collection.features.length).toBeGreaterThanOrEqual(6);
   });
 
   it("khung bao của hình", () => {
@@ -94,16 +116,31 @@ describe("geo — ranh giới hành chính theo mã", () => {
   });
 });
 
-describe("extension — dashboard", () => {
-  it("tên đơn vị con lấy từ masterdata; decimal là chuỗi; thiếu báo cáo → tạm tính", async () => {
+describe("bảng điều hành gộp — GET /v1/dashboard (G-02)", () => {
+  it("tên đơn vị con do backend trả; tổng = tổng các con; decimal là chuỗi; thiếu báo cáo → tạm tính", async () => {
     const d = await loadDashboard(app("tinh"));
-    expect(d.raw.level).toBe("province");
-    expect(d.unitName).toBe("Đồng Tháp");
+    expect(d.level).toBe("province");
+    expect(d.unit).toBe("82");
     expect(d.children.length).toBeGreaterThan(0);
-    expect(d.children.every((c) => c.name.startsWith("Xã "))).toBe(true);
-    expect(d.raw.total.sown_area_ha).toMatch(/^\d+\.\d{4}$/);
-    expect(d.raw.total.provisional).toBe(true);
-    expect(d.raw.total.provisional_label).toBe("Số liệu tạm tính");
+    expect(d.children.every((c) => (c.name ?? "").startsWith("Xã "))).toBe(true);
+    expect(d.total.sown_area_ha).toMatch(/^\d+\.\d{4}$/);
+    expect(d.total.digitized_plots).toBe(d.children.reduce((s, c) => s + c.digitized_plots, 0));
+    expect(d.total.cooperatives).toBe(d.children.reduce((s, c) => s + c.cooperatives, 0));
+    expect(d.total.provisional).toBe(true);
+    expect(d.total.provisional_label).toBe("Số liệu tạm tính");
+    expect(d.sources).toContain("geo");
+  });
+
+  it("tiến độ so với mục tiêu tính trên số nguyên đã nhân tỉ lệ (không float trên chuỗi)", () => {
+    expect(progressPct({ sown_area_ha: "750.0000", target_area_ha: "1500.0000" })).toBe(50);
+    expect(progressPct({ sown_area_ha: "1.0000", target_area_ha: "3.0000" })).toBe(33.33);
+    expect(progressPct({ sown_area_ha: "10", target_area_ha: null })).toBeNull();
+    expect(progressPct({ sown_area_ha: "10", target_area_ha: "0" })).toBeNull();
+  });
+
+  it("đơn vị ngoài phạm vi → 403 extension.out_of_scope", async () => {
+    const p = await problemOf(loadDashboard(app("tinh"), { unit: "91" }));
+    expect(p.code).toBe("extension.out_of_scope");
   });
 });
 

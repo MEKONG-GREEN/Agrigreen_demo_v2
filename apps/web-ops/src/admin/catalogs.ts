@@ -1,14 +1,5 @@
-// Danh mục dùng chung (pf/masterdata). Tên danh mục là enum cố định trong hợp đồng
-// (components.parameters.Catalog); backend chưa có route liệt kê danh mục kèm số mục (G-06).
-import type { CatalogName } from "@/api/types";
-
-export const CATALOGS: readonly { catalog: CatalogName; name: string; hint: string }[] = [
-  { catalog: "rice_variety", name: "Giống lúa", hint: "growth_days, expected_yield_t_per_ha" },
-  { catalog: "farm_stage", name: "Khâu sản xuất", hint: "pilot (thí điểm CGH), description" },
-  { catalog: "machine_type", name: "Chủng loại máy", hint: "farm_stage (khâu đang dùng)" },
-  { catalog: "season", name: "Mùa vụ", hint: "start_month, end_month" },
-  { catalog: "pest", name: "Sâu bệnh hại", hint: "kind" },
-];
+// Danh mục dùng chung (pf/masterdata). Danh sách danh mục, tên tiếng Việt và thuộc tính lấy từ
+// Admin GET /v1/masterdata/catalogs (G-06); ở đây chỉ còn nhãn hiển thị cho khóa thuộc tính hay gặp.
 
 /** Nhãn tiếng Việt cho khóa thuộc tính hay gặp. */
 export const ATTR_LABEL: Record<string, string> = {

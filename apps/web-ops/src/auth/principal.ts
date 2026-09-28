@@ -11,9 +11,49 @@ export const ROLES = {
   masterdataAdmin: "masterdata_admin",
   registryAdmin: "registry_admin",
   cghViewer: "cgh_viewer",
+  cghAdmin: "cgh_admin",
   consentWriter: "consent_writer",
   consentReader: "consent_reader",
+  knOfficer: "kn_officer",
+  knProvinceAdmin: "kn_province_admin",
+  knNationalAdmin: "kn_national_admin",
+  accountAdmin: "account_admin",
+  accountAdminProvince: "account_admin_province",
+  reportsAdmin: "reports_admin",
+  conflictResolver: "sync_conflict_resolver",
+  deviceAdmin: "device_admin",
+  geoAdmin: "geo_admin",
+  plotEditor: "plot_editor",
 } as const;
+
+/** Nhãn tiếng Việt của vai realm (hiển thị; mã vai vẫn gửi nguyên văn). */
+export const ROLE_LABEL: Readonly<Record<string, string>> = {
+  platform_admin: "Quản trị nền tảng",
+  param_setter: "Người đặt tham số",
+  param_approver: "Người phê duyệt tham số",
+  masterdata_admin: "Quản trị danh mục",
+  registry_admin: "Quản trị cơ cấu tổ chức",
+  cgh_viewer: "Xem Bản đồ CGH (Cục)",
+  cgh_admin: "Quản trị Bản đồ CGH",
+  kn_officer: "Khuyến nông viên xã",
+  kn_province_admin: "Quản lý TTKN tỉnh",
+  kn_national_admin: "Quản lý TTKN Quốc gia",
+  coop_manager: "Quản lý HTX",
+  account_admin: "Quản trị tài khoản",
+  account_admin_province: "Quản trị tài khoản tỉnh",
+  reports_admin: "Quản trị mẫu báo cáo",
+  sync_conflict_resolver: "Xử lý xung đột đồng bộ",
+  device_admin: "Quản trị thiết bị",
+  geo_admin: "Quản trị dữ liệu bản đồ",
+  plot_editor: "Vẽ ranh giới thửa",
+  vault_eraser: "Xoá định danh (RB-3)",
+  consent_writer: "Ghi đồng ý",
+  consent_reader: "Xem đồng ý",
+};
+
+export function roleLabel(role: string): string {
+  return ROLE_LABEL[role] ?? role;
+}
 
 /**
  * Người dùng hiện tại như client thấy. CHỈ dùng để ẩn/hiện giao diện —

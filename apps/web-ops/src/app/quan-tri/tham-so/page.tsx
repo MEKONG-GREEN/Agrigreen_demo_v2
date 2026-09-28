@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import { approvalBlockReason, proposeBlockReason, submitBlockReason } from "@/admin/approval";
-import { groupParamVersions, proposeParam, submitParam, type ParamView } from "@/admin/params";
+import { actorLabel, groupParamVersions, proposeParam, submitParam, type ParamView } from "@/admin/params";
 import { unwrap } from "@/api/client";
 import { newIdempotencyKey } from "@/api/idempotency";
 import { collectPages } from "@/api/pagination";
@@ -10,6 +10,7 @@ import { ApiProblem, fieldErrorMap } from "@/api/problem";
 import type { ParamVersion } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
+import { MfaNotice } from "@/components/MfaNotice";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { Loading, PageHead } from "@/components/ui";
 import { formatDecimal } from "@/lib/decimal";
@@ -168,7 +169,8 @@ function VersionRow({ v, onChanged }: { v: ParamVersion; onChanged: () => void }
           </b>{" "}
           <span className="mute small">hiệu lực từ {formatDate(v.effective_from)}</span>
           <div className="small">
-            Người đặt: <code>{v.setter_ref}</code> · {formatDateTime(v.submitted_at ?? v.created_at)}
+            Người đặt: {v.setter_name ? <b style={{ display: "inline" }}>{v.setter_name}</b> : <code>{v.setter_ref}</code>} ·{" "}
+            {formatDateTime(v.submitted_at ?? v.created_at)}
           </div>
           <div className="small mute">
             Căn cứ: {v.source_doc}
@@ -218,14 +220,20 @@ function VersionRow({ v, onChanged }: { v: ParamVersion; onChanged: () => void }
   );
 }
 
-/** Tham số & phê duyệt — Admin API /v1/masterdata/params/versions (MFA bắt buộc, R-56). */
+/** Tham số & phê duyệt — Admin API /v1/masterdata/params (sổ đăng ký, G-07) + /params/versions (MFA bắt buộc, R-56). */
 export default function ParamsPage() {
   const { adminApi, principal } = useAuth();
   const versions = useAsync(
-    () => collectPages((cursor) => unwrap(adminApi.GET("/v1/masterdata/params/versions", { params: { query: { cursor, limit: 200 } } })), 5000),
+    async () => {
+      const [registry, list] = await Promise.all([
+        collectPages((cursor) => unwrap(adminApi.GET("/v1/masterdata/params", { params: { query: { cursor, limit: 200 } } })), 5000),
+        collectPages((cursor) => unwrap(adminApi.GET("/v1/masterdata/params/versions", { params: { query: { cursor, limit: 200 } } })), 5000),
+      ]);
+      return { registry, list };
+    },
     [adminApi],
   );
-  const params = versions.data ? groupParamVersions(versions.data) : [];
+  const params = versions.data ? groupParamVersions(versions.data.list, versions.data.registry) : [];
   const [editing, setEditing] = useState<string | null>(null);
   const [warning, setWarning] = useState<ApiProblem | null>(null);
   const proposeBlock = proposeBlockReason(principal);
@@ -244,12 +252,7 @@ export default function ParamsPage() {
           sửa sai là phiên bản mới có lý do.
         </span>
       </div>
-      {principal && !principal.mfa ? (
-        <div className="alert alert-warn" style={{ marginBottom: 16 }} role="status">
-          <Icon name="alert" />
-          <span>Phiên hiện tại chưa qua xác thực hai yếu tố — Admin API sẽ từ chối mọi thao tác (mfa_required).</span>
-        </div>
-      ) : null}
+      <MfaNotice />
       {warning ? (
         <div style={{ marginBottom: 16 }}>
           <p className="small" style={{ marginBottom: 6 }}>
@@ -283,13 +286,26 @@ export default function ParamsPage() {
               <p>
                 Đang hiệu lực: <b style={{ fontSize: 18 }}>{show(p.current)}</b> {p.current.unit}{" "}
                 <span className="mute small">
-                  (phiên bản {p.current.version}, từ {formatDate(p.current.effective_from)} · {p.current.source_doc} · duyệt{" "}
+                  (phiên bản {p.current.version}, từ {formatDate(p.current.effective_from)} · {p.current.source_doc} · người đặt{" "}
+                  {actorLabel(p.current.setter_name, p.current.setter_ref)} · duyệt bởi {actorLabel(p.current.approver_name, p.current.approver_ref)}{" "}
                   {formatDateTime(p.current.decided_at)})
+                </span>
+              </p>
+            ) : p.registryCurrent ? (
+              <p>
+                Đang hiệu lực: <b style={{ fontSize: 18 }}>{show(p.registryCurrent)}</b> {p.unit}{" "}
+                <span className="mute small">
+                  (phiên bản {p.registryCurrent.version}, từ {formatDate(p.registryCurrent.effective_from)})
                 </span>
               </p>
             ) : (
               <p className="mute">Chưa có phiên bản được phê duyệt có hiệu lực.</p>
             )}
+            {p.min !== null || p.max !== null ? (
+              <p className="mute small">
+                Khoảng hợp lệ: {p.min ?? "—"} – {p.max ?? "—"} {p.unit}
+              </p>
+            ) : null}
             {p.upcoming.map((u) => (
               <p key={u.id} className="small">
                 Sắp hiệu lực từ {formatDate(u.effective_from)}: <b style={{ display: "inline" }}>{show(u)}</b> {u.unit} (phiên bản {u.version})

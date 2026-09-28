@@ -196,6 +196,32 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .persona:hover { border-color: var(--g600); background: var(--g50); }
 .persona b { color: var(--g900); }
 
+/* ---------- Thông báo (chuông) ---------- */
+.bell-wrap { position: relative; }
+.bell { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; color: var(--ink2); border: 1px solid var(--line); background: #fff; position: relative; }
+.bell:hover { background: var(--g50); }
+.bell-count { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--red); color: #fff; font-size: 11px; font-weight: 800; display: grid; place-items: center; }
+.bell-panel { position: absolute; right: 0; top: 48px; width: min(400px, calc(100vw - 32px)); max-height: 70vh; overflow: auto; padding: 14px; z-index: 50; }
+.bell-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.bell-list button, .inbox button.item { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; width: 100%; padding: 10px; border-radius: 10px; }
+.bell-list button:hover, .inbox button.item:hover { background: var(--g50); }
+.bell-list button.unread, .inbox button.item.unread { background: #f4fbff; border-left: 3px solid var(--blue); }
+
+/* ---------- Tiện ích chung ---------- */
+.kv { display: grid; grid-template-columns: minmax(140px, 220px) 1fr; gap: 8px 16px; }
+.kv dt { color: var(--mute); }
+.kv dd { font-weight: 600; }
+.textarea { min-height: 88px; resize: vertical; font: inherit; }
+.panel { padding: 14px; background: var(--g50); border-radius: 12px; border: 1px solid var(--line); }
+.hl { outline: 3px solid #f0b429; outline-offset: 2px; }
+.list-plain { list-style: none; }
+.list-plain > li { padding: 10px 0; border-bottom: 1px solid #edf3ef; }
+.bar { height: 10px; background: #edf3ef; border-radius: 8px; overflow: hidden; min-width: 80px; }
+.bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--g500), var(--g700)); }
+fieldset.plain { border: none; }
+fieldset.plain legend { font-size: 12.5px; font-weight: 600; color: var(--ink2); margin-bottom: 6px; }
+.check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 12px; }
+
 /* ---------- Responsive: tablet ---------- */
 @media (max-width: 1280px) {
   .cgh-grid { grid-template-columns: 240px minmax(0, 1fr); }

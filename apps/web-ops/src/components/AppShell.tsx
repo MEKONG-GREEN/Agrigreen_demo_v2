@@ -8,6 +8,7 @@ import { LEVEL_LABEL, type Principal } from "@/auth/principal";
 import { config } from "@/config";
 import { canSee, findNavItem, homeFor, visibleNav, type NavGroup } from "@/nav/nav";
 import { Icon } from "./Icon";
+import { NotificationBell } from "./NotificationBell";
 import { Loading } from "./ui";
 
 function initials(name: string): string {
@@ -130,6 +131,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <div className="spacer" />
           {config.mock ? <span className="mock-badge">Dữ liệu giả lập</span> : null}
+          <NotificationBell />
         </header>
         <main className="body" id="main" tabIndex={-1}>
           {scopeWarning ? (

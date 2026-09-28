@@ -10,7 +10,14 @@ export type NavIcon =
   | "catalog"
   | "param"
   | "org"
-  | "tractor";
+  | "tractor"
+  | "megaphone"
+  | "report"
+  | "bell"
+  | "sync"
+  | "user"
+  | "conflict"
+  | "upload";
 
 export interface NavItem {
   href: string;
@@ -20,6 +27,8 @@ export interface NavItem {
   levels?: readonly ScopeLevel[];
   /** Cần ít nhất một vai. Bỏ trống = không lọc theo vai. */
   roles?: readonly string[];
+  /** Không vẽ trong menu (vd hộp thư mở từ chuông) nhưng vẫn dùng để kiểm quyền và hiện tiêu đề. */
+  hidden?: boolean;
 }
 
 export interface NavGroup {
@@ -32,7 +41,7 @@ const KN: readonly ScopeLevel[] = ["tw", "tinh", "xa"];
 
 /**
  * Menu theo vai và phạm vi. Đây CHỈ là ẩn/hiện — backend vẫn kiểm quyền từng lời gọi (R-55).
- * Cục KTHT chỉ thấy cổng CGH (BRD CGH FN-11 BR-01: không có đường tới khối vận hành).
+ * Cục KTHT chỉ thấy cổng CGH và xuất báo cáo CGH (BRD CGH FN-10, FN-11 BR-01: không có đường tới khối vận hành).
  */
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
@@ -41,6 +50,15 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { href: "/", label: "Tổng quan", icon: "dashboard", levels: KN },
       { href: "/ban-do", label: "Bản đồ khuyến nông", icon: "map", levels: KN },
       { href: "/nhiem-vu", label: "Nhiệm vụ hỗ trợ", icon: "task", levels: KN },
+      { href: "/chi-dao", label: "Chỉ đạo khẩn", icon: "megaphone", levels: KN },
+      { href: "/bao-cao", label: "Báo cáo & xuất dữ liệu", icon: "report", levels: [...KN, "cuc"] },
+      {
+        href: "/dong-bo",
+        label: "Đồng bộ thiết bị",
+        icon: "sync",
+        roles: [ROLES.knProvinceAdmin, ROLES.knNationalAdmin, ROLES.deviceAdmin, ROLES.platformAdmin],
+      },
+      { href: "/thong-bao", label: "Thông báo", icon: "bell", hidden: true },
     ],
   },
   {
@@ -66,6 +84,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: "5. Quản trị",
     items: [
+      { href: "/quan-tri/tai-khoan", label: "Tài khoản cán bộ", icon: "user", roles: [ROLES.platformAdmin, ROLES.accountAdmin, ROLES.accountAdminProvince] },
       { href: "/quan-tri/danh-muc", label: "Danh mục dùng chung", icon: "catalog", roles: [ROLES.platformAdmin, ROLES.masterdataAdmin] },
       {
         href: "/quan-tri/tham-so",
@@ -75,6 +94,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       },
       { href: "/quan-tri/to-chuc", label: "Cơ cấu tổ chức", icon: "org", roles: [ROLES.platformAdmin, ROLES.registryAdmin] },
       { href: "/quan-tri/nhap-nong-ho", label: "Nhập nông hộ từ tệp", icon: "coop", roles: [ROLES.platformAdmin, ROLES.registryAdmin] },
+      { href: "/quan-tri/nhap-thua", label: "Nhập ranh giới thửa", icon: "upload", roles: [ROLES.platformAdmin, ROLES.geoAdmin] },
+      { href: "/quan-tri/xung-dot", label: "Xung đột đồng bộ", icon: "conflict", roles: [ROLES.platformAdmin, ROLES.conflictResolver] },
+      { href: "/quan-tri/mau-bao-cao", label: "Mẫu & lịch báo cáo", icon: "report", roles: [ROLES.platformAdmin, ROLES.reportsAdmin, ROLES.masterdataAdmin] },
     ],
   },
 ];
@@ -92,13 +114,12 @@ export function canSee(item: NavItem, p: Principal | null): boolean {
 }
 
 export function visibleNav(p: Principal | null): NavGroup[] {
-  return NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => canSee(i, p)) })).filter(
-    (g) => g.items.length > 0,
-  );
+  return NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !i.hidden && canSee(i, p)) })).filter((g) => g.items.length > 0);
 }
 
 /** Trang đích sau đăng nhập: mục đầu tiên được thấy (Cục → /cgh). */
 export function homeFor(p: Principal | null): string {
+  if (p?.level === "cuc" && !hasRole(p, ROLES.platformAdmin)) return "/cgh";
   const first = visibleNav(p)[0]?.items[0];
   return first?.href ?? "/khong-co-quyen";
 }

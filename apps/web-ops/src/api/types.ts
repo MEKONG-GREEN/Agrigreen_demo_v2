@@ -20,6 +20,17 @@ export type AdminGet<P extends keyof AdminPaths> = AdminPaths[P] extends {
   ? R
   : never;
 
+/** Body JSON thành công (200/201/202) của một POST. */
+type PostOk<R> = R extends { 200: { content: { "application/json": infer X } } }
+  ? X
+  : R extends { 201: { content: { "application/json": infer X } } }
+    ? X
+    : R extends { 202: { content: { "application/json": infer X } } }
+      ? X
+      : never;
+export type AppPost<P extends keyof AppPaths> = AppPaths[P] extends { post: { responses: infer R } } ? PostOk<R> : never;
+export type AdminPost<P extends keyof AdminPaths> = AdminPaths[P] extends { post: { responses: infer R } } ? PostOk<R> : never;
+
 /** Số thập phân dạng chuỗi (R-10). Chỉ đổi sang số khi hiển thị/vẽ. */
 export type Decimal = S["Decimal"];
 
@@ -27,33 +38,72 @@ export type Decimal = S["Decimal"];
 export type AdminUnit = S["AdminUnit"];
 export type CatalogItem = S["CatalogItem"];
 export type CatalogName = AppPaths["/v1/masterdata/catalogs/{catalog}"]["get"]["parameters"]["path"]["catalog"];
+export type CatalogSummary = AdminGet<"/v1/masterdata/catalogs">["items"][number];
 export type ParamVersion = AS["ParamVersion"];
 export type ParamProposalInput = AS["ParamProposal"];
 export type ParamStatus = ParamVersion["status"];
+/** G-07: một khóa trong sổ đăng ký tham số (Admin GET /v1/masterdata/params). */
+export type ParamRegistryItem = AdminGet<"/v1/masterdata/params">["items"][number];
 
 // pf/party
 export type OrgKind = S["OrgKind"];
 export type Org = S["Org"];
 export type Cooperative = S["Cooperative"];
 export type HouseholdListItem = S["HouseholdListItem"];
+export type PartyOrg = AS["PartyOrg"];
 export type PartyOrgEvent = AS["PartyOrgEvent"];
 export type HouseholdImportResult = AdminPaths["/v1/households/import"]["post"]["responses"][200]["content"]["application/json"];
+export type OrgImportResult = AdminPaths["/v1/orgs/import"]["post"]["responses"][200]["content"]["application/json"];
+
+/**
+ * G-03 — trường đọc bổ sung backend trả cùng `Cooperative` (internal/platform/party/handler/readmodel.go, coopItemDTO).
+ * contracts/openapi/application.yaml CHƯA khai các trường này trong schema Cooperative → web đọc như tùy chọn,
+ * không bịa route. Khi hợp đồng bổ sung, `gen:api` sẽ sinh đúng kiểu và có thể bỏ phần mở rộng này.
+ */
+export interface CooperativeExtras {
+  province_code?: string | null;
+  commune_name?: string | null;
+  province_name?: string | null;
+  member_households?: number;
+  digitized_plots?: number | null;
+}
+export type CooperativeItem = Cooperative & CooperativeExtras;
+
+/** G-04 — trạng thái đồng ý theo mục đích (handler/readmodel.go consentStateDTO), chưa khai trong hợp đồng. */
+export interface ConsentState {
+  purpose: string;
+  status: "granted" | "withdrawn" | string;
+  event_time: string;
+}
+export type HouseholdItem = HouseholdListItem & { consents?: ConsentState[] };
 
 // pf/geo
 export type PlotFeature = S["PlotFeature"];
 export type PlotStatus = S["PlotProperties"]["status"];
 export type AdminBoundaryFeature = AppGet<"/v1/geo/admin-boundaries/{code}">;
+export type BoundaryConflict = S["BoundaryConflict"];
+export type BoundaryConflictDetail = AppGet<"/v1/geo/conflicts/{id}">;
+export type PlotImportResult = AdminPaths["/v1/geo/plots/import"]["post"]["responses"][200]["content"]["application/json"];
 
 // pf/content
 export type ContentKind = S["ContentKind"];
 export type ContentDocument = S["ContentDocument"];
+export type LibraryItem = S["LibraryItem"];
+export type DocumentDetail = AppGet<"/v1/documents/{ref}">;
 
 // pf/extension
 export type ExtTask = S["ExtTask"];
 export type ExtTaskStatus = ExtTask["status"];
 export type ExtTaskPriority = NonNullable<AppPaths["/v1/extension/tasks"]["get"]["parameters"]["query"]>["priority"] & string;
+export type ExtTaskDetail = AppGet<"/v1/extension/tasks/{id}">;
 export type ExtKPI = S["ExtKPI"];
 export type ExtDashboard = AppGet<"/v1/extension/dashboard">;
+export type ExtDirective = S["ExtDirective"];
+export type ExtDirectiveDetail = AppGet<"/v1/extension/directives/{id}">;
+
+// Bảng điều hành gộp (G-02, GET /v1/dashboard)
+export type UnifiedFigures = S["UnifiedFigures"];
+export type UnifiedDashboard = AppGet<"/v1/dashboard">;
 
 // pf/mechanization (Bản đồ CGH — cổng Cục KTHT, chỉ xem)
 export type MechCoverageStatus = S["MechCoverageStatus"];
@@ -62,7 +112,37 @@ export type MechGroup = S["MechGroup"];
 export type MechCoverageItem = S["MechCoverageItem"];
 export type MechCoverage = AppGet<"/v1/mechanization/coverage">;
 export type MechDashboard = AppGet<"/v1/mechanization/dashboard">;
+export type MechForecastRun = S["MechForecastRun"];
+export type MechForecastResult = S["MechForecastResult"];
+export type MechForecast = AppGet<"/v1/mechanization/forecasts/{id}">;
 export type PlotAssignResult = S["PlotAttrResult"];
+
+// pf/notify
+export type Notification = S["Notification"];
+export type NudgeInput = S["NudgeInput"];
+export type NudgeResult = S["NudgeResult"];
+export type SyncDevice = AS["SyncDeviceAdmin"];
+
+// pf/sync — xung đột (Admin)
+export type SyncConflict = AS["SyncConflict"];
+export type SyncConflictDetail = AdminGet<"/v1/sync/conflicts/{id}">;
+export type SlaStatus = NonNullable<SyncConflict["sla_status"]>;
+
+// pf/accounts (Admin)
+export type AccountsUser = AS["AccountsUser"];
+export type AccountsEvent = AS["AccountsEvent"];
+export type AccountsGrants = AdminGet<"/v1/accounts/grants">;
+export type AccountsImportResult = AdminPost<"/v1/accounts/users/import">;
+
+// pf/reports
+export type ReportTemplate = S["ReportTemplate"];
+export type ReportParams = S["ReportParams"];
+export type ReportExport = S["ReportExport"];
+export type ReportDownload = AppGet<"/v1/reports/exports/{id}/download">;
+/** Mẫu báo cáo như Admin API trả (schema riêng của admin.yaml). */
+export type AdminReportTemplate = AdminGet<"/v1/reports/templates">["items"][number];
+export type ReportSchedule = AS["ReportSchedule"];
+export type ReportScheduleRun = AdminGet<"/v1/reports/schedules/{id}/runs">["items"][number];
 
 // pf/party — GET /v1/me (người gọi + phạm vi đã giải)
 export type Me = S["Me"];

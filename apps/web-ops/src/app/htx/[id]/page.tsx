@@ -3,22 +3,19 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { assignPlot, cooperativePlotsPage, draftPlotsInCommune } from "@/api/adapters/cooperatives";
-import { unitLabel } from "@/api/adapters/units";
-import { unwrap } from "@/api/client";
+import { assignPlot, cooperativePlotsPage, coopPlace, draftPlotsInCommune, getCooperative, householdsPage } from "@/api/adapters/cooperatives";
 import { newIdempotencyKey } from "@/api/idempotency";
 import { usePagedList } from "@/api/pagination";
 import { ApiProblem } from "@/api/problem";
-import type { Cooperative, PlotFeature, PlotStatus } from "@/api/types";
+import type { ConsentState, Cooperative, CooperativeItem, PlotFeature, PlotStatus } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { Tabs } from "@/components/Tabs";
 import { Empty, LoadMore, Loading, PageHead } from "@/components/ui";
-import { formatDecimal } from "@/lib/decimal";
+import { formatDecimal, formatInt } from "@/lib/decimal";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { useAsync } from "@/lib/useAsync";
-import { useUnits } from "@/lib/useUnits";
 
 const PLOT_STATUS: Record<PlotStatus, { cls: string; text: string }> = {
   active: { cls: "c-ok", text: "Đang dùng" },
@@ -26,13 +23,37 @@ const PLOT_STATUS: Record<PlotStatus, { cls: string; text: string }> = {
   retired: { cls: "c-mute", text: "Ngừng dùng" },
 };
 
-function Overview({ c }: { c: Cooperative }) {
-  const { api } = useAuth();
-  const units = useUnits(api, [c.admin_unit_code]);
+/** Mục đích xử lý dữ liệu (R-42) → nhãn ngắn. */
+const PURPOSE: Record<string, string> = {
+  "mrv.evidence": "MRV",
+  "extension.field_support": "Hỗ trợ hiện trường",
+};
+
+/** Huy hiệu đồng ý chia sẻ dữ liệu theo mục đích (G-04). Chưa có bản ghi → "Chưa đồng ý". */
+function ConsentBadges({ consents }: { consents: ConsentState[] | undefined }) {
+  if (!consents || consents.length === 0) return <span className="chip c-mute">Chưa đồng ý</span>;
+  return (
+    <span className="row" style={{ gap: 4 }}>
+      {consents.map((c) => (
+        <span
+          key={c.purpose}
+          className={`chip ${c.status === "granted" ? "c-ok" : "c-warn"}`}
+          title={`${c.status === "granted" ? "Đồng ý" : "Đã rút đồng ý"} lúc ${formatDateTime(c.event_time)}`}
+        >
+          {c.status === "granted" ? "Đồng ý" : "Đã rút"} · {PURPOSE[c.purpose] ?? c.purpose}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function Overview({ c }: { c: CooperativeItem }) {
   const rows: [string, string][] = [
     ["Mã HTX", c.code],
     ["Mã số thuế", c.tax_code ?? "—"],
-    ["Địa bàn", unitLabel(units, c.admin_unit_code)],
+    ["Địa bàn", coopPlace(c)],
+    ["Hộ thành viên", c.member_households === undefined ? "—" : formatInt(c.member_households)],
+    ["Thửa đã số hoá", c.digitized_plots === null || c.digitized_plots === undefined ? "—" : formatInt(c.digitized_plots)],
     ["Ngày thành lập", formatDate(c.established_on)],
     ["Diện tích đăng ký", c.area_ha ? `${formatDecimal(c.area_ha, 2)} ha` : "—"],
     [
@@ -53,13 +74,11 @@ function Overview({ c }: { c: Cooperative }) {
   );
 }
 
-function Households({ id }: { id: string }) {
+function Households({ coop }: { coop: CooperativeItem }) {
   const { api } = useAuth();
-  const list = usePagedList(
-    (cursor) => unwrap(api.GET("/v1/cooperatives/{ref}/households", { params: { path: { ref: id }, query: { cursor, limit: 20 } } })),
-    [api, id],
-  );
-  const units = useUnits(api, list.items.map((h) => h.commune_code));
+  const id = coop.ref;
+  const list = usePagedList((cursor) => householdsPage(api, id, cursor, 20), [api, id]);
+  const communeName = (code: string) => (code === coop.admin_unit_code ? (coop.commune_name ?? code) : code);
   return (
     <>
       <div className="alert alert-info" style={{ marginBottom: 12 }}>
@@ -80,6 +99,7 @@ function Households({ id }: { id: string }) {
               <th scope="col">Xã</th>
               <th scope="col" className="num">Diện tích canh tác (ha)</th>
               <th scope="col">Vào HTX</th>
+              <th scope="col">Đồng ý chia sẻ dữ liệu</th>
               <th scope="col">Trạng thái</th>
             </tr>
           </thead>
@@ -88,9 +108,12 @@ function Households({ id }: { id: string }) {
               <tr key={h.household_ref}>
                 <td>{h.label_unavailable ? <span className="mute">Không hiển thị được nhãn</span> : h.label}</td>
                 <td style={{ fontFamily: "ui-monospace, Consolas, monospace" }}>{h.masked_phone || "—"}</td>
-                <td>{unitLabel(units, h.commune_code, false)}</td>
+                <td>{communeName(h.commune_code)}</td>
                 <td className="num">{formatDecimal(h.cultivated_area_ha, 2)}</td>
                 <td>{formatDate(h.member_since)}</td>
+                <td>
+                  <ConsentBadges consents={h.consents} />
+                </td>
                 <td>{h.active ? <span className="chip c-ok">Thành viên</span> : <span className="chip c-mute">Đã rời</span>}</td>
               </tr>
             ))}
@@ -260,8 +283,7 @@ export default function CooperativeDetailPage() {
   const id = params?.id ?? "";
   const { api } = useAuth();
   const [tab, setTab] = useState("overview");
-  const coop = useAsync(() => unwrap(api.GET("/v1/cooperatives/{ref}", { params: { path: { ref: id } } })), [api, id]);
-  const units = useUnits(api, [coop.data?.admin_unit_code]);
+  const coop = useAsync(() => getCooperative(api, id), [api, id]);
 
   return (
     <>
@@ -274,7 +296,7 @@ export default function CooperativeDetailPage() {
         <>
           <PageHead
             title={coop.data.name}
-            subtitle={`${coop.data.code} · ${unitLabel(units, coop.data.admin_unit_code)}`}
+            subtitle={`${coop.data.code} · ${coopPlace(coop.data)}`}
             actions={coop.data.active ? <span className="chip c-ok">Đang hoạt động</span> : <span className="chip c-mute">Đã vô hiệu hoá</span>}
           />
           <div className="card sec">
@@ -289,7 +311,7 @@ export default function CooperativeDetailPage() {
               ]}
             >
               {tab === "overview" ? <Overview c={coop.data} /> : null}
-              {tab === "households" ? <Households id={id} /> : null}
+              {tab === "households" ? <Households coop={coop.data} /> : null}
               {tab === "plots" ? <PlotsTab coop={coop.data} /> : null}
             </Tabs>
           </div>

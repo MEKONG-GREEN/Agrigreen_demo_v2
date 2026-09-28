@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { loadBoundaries } from "@/api/adapters/boundaries";
-import { listChildUnits, unitLabel } from "@/api/adapters/units";
+import { unitLabel } from "@/api/adapters/units";
+import { ForecastSection } from "@/cgh/ForecastSection";
 import { unwrap } from "@/api/client";
 import type { MechCoverageItem, MechGroup } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
@@ -55,7 +56,16 @@ export default function CghPortalPage() {
       ),
     [api, runId, stage],
   );
-  const areas = useAsync(async () => loadBoundaries(api, (await listChildUnits(api, null)).map((u) => u.code)), [api]);
+  const areas = useAsync(() => loadBoundaries(api, { level: "province" }), [api]);
+  // Tên và Mã HTX (G-10) từ kết quả cân đối cấp HTX — dùng cho bảng dự báo.
+  const coopLevel = useAsync(
+    () => unwrap(api.GET("/v1/mechanization/coverage", { params: { query: { level: "cooperative", run_id: runId || undefined } } })),
+    [api, runId],
+  );
+  const coopNames = useMemo(
+    () => new Map((coopLevel.data?.items ?? []).filter((i) => i.cooperative_ref).map((i) => [i.cooperative_ref!, { name: i.name, code: i.cooperative_code ?? null }])),
+    [coopLevel.data],
+  );
 
   const run = coverage.data?.run ?? dash.data?.run ?? null;
   const thresholds = thresholdsFromRun(run);
@@ -189,6 +199,7 @@ export default function CghPortalPage() {
             <caption className="sr-only">HTX cần ưu tiên hỗ trợ cơ giới hoá</caption>
             <thead>
               <tr>
+                <th scope="col">Mã HTX</th>
                 <th scope="col">HTX</th>
                 <th scope="col">Địa bàn</th>
                 <th scope="col" className="num">Nhu cầu (máy)</th>
@@ -205,6 +216,9 @@ export default function CghPortalPage() {
                 return (
                   <tr key={p.cooperative_ref ?? p.name}>
                     <td>
+                      <code>{p.cooperative_code ?? "—"}</code>
+                    </td>
+                    <td>
                       <b>{p.name}</b>
                     </td>
                     <td>{unitLabel(units, p.commune_code)}</td>
@@ -218,7 +232,7 @@ export default function CghPortalPage() {
                       <CoverageChip status={fromMechStatus(p.overall.status)} />
                     </td>
                     <td>
-                      <SourceLabel source={p.area_source} />
+                      <SourceLabel source={p.area_source} label={p.area_source_label} />
                     </td>
                   </tr>
                 );
@@ -229,6 +243,7 @@ export default function CghPortalPage() {
         {dash.loading && !dash.data ? <Loading /> : null}
         {dash.data && priority.length === 0 ? <p className="mute small">Chưa có HTX nào trong kết quả cân đối.</p> : null}
       </section>
+      <ForecastSection coopNames={coopNames} />
     </>
   );
 }

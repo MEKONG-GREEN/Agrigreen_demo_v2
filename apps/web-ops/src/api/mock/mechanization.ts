@@ -175,10 +175,14 @@ function item(
   stageKeys.forEach((k, i) => (stages[k] = group([perStage[i]!])));
   const overall = group(perStage);
   const one = results.length === 1 ? results[0] : undefined;
+  const source = one ? (one.coop.province_code === "80" ? null : one.coop.api.ref.endsWith("3") ? "manual" : "app_htx") : null;
   return {
     ...base,
     cooperatives: results.length,
-    area_source: one ? (one.coop.province_code === "80" ? null : one.coop.api.ref.endsWith("3") ? "manual" : "app_htx") : null,
+    // G-10: Mã HTX và nhãn nguồn diện tích — chỉ ở cấp HTX.
+    cooperative_code: base.cooperative_ref ? (one?.coop.api.code ?? null) : null,
+    area_source_label: source === "manual" ? "[Nhập tay]" : source === "app_htx" ? "[App HTX]" : null,
+    area_source: source,
     area_locked: false,
     overall,
     stages,

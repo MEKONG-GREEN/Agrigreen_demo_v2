@@ -7,3 +7,7 @@ next-env.d.ts
 public/maplibre/
 .env*.local
 coverage/
+# Playwright
+playwright-report/
+test-results/
+blob-report/

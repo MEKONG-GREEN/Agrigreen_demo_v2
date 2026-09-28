@@ -15,6 +15,8 @@ export interface ProblemDetails {
   instance?: string;
   trace_id?: string;
   errors?: ProblemFieldError[];
+  /** 429: số giây phải chờ (thân `retry_after_s` hoặc header Retry-After). */
+  retry_after_s?: number;
 }
 
 /** Thông báo tiếng Việt theo mã lỗi (docs/errors.md). */
@@ -48,7 +50,8 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "party.org_not_found": "Không tìm thấy tổ chức/HTX, hoặc nằm ngoài phạm vi được phân quyền.",
   "party.org_state_conflict": "Trạng thái tổ chức không cho phép thao tác này (hoặc không có gì thay đổi).",
   "party.out_of_scope": "Thao tác nằm ngoài phạm vi TW → Tỉnh → Xã được phân quyền.",
-  "party.import_invalid": "Tệp nhập sai mẫu (thiếu cột bắt buộc full_name, phone, cooperative_code; sai CSV hoặc quá 200 dòng). Cả tệp bị từ chối.",
+  "party.import_invalid":
+    "Tệp nhập sai mẫu (thiếu cột bắt buộc, không phải CSV UTF-8/.xlsx, tệp .xls cũ, có ô công thức hoặc quá số dòng). Cả tệp bị từ chối.",
   "party.dependency_unavailable": "Dịch vụ danh bạ tổ chức/kho định danh tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
   // pf/geo
   "geo.admin_boundary_not_found": "Chưa nhập ranh giới hành chính cho đơn vị này.",
@@ -70,6 +73,55 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "content.dependency_unavailable": "Thư viện số tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
   "mechanization.run_not_found": "Chưa có kết quả cân đối đã lưu cho vụ này.",
   "mechanization.dependency_unavailable": "Dịch vụ Bản đồ CGH tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+  "mechanization.forecast_not_found": "Chưa có lần dự báo đã lưu này. Quản trị CGH chạy dự báo trên Admin API.",
+  "extension.directive_not_found": "Không tìm thấy chỉ đạo, hoặc bạn không thuộc danh sách nhận/giám sát.",
+  "extension.not_directive_target": "Bạn không thuộc danh sách nhận chỉ đạo này nên không xác nhận được.",
+  "extension.no_directive_targets": "Vùng đã chọn chưa có cán bộ nào trong danh bạ — không ban hành chỉ đạo rỗng.",
+  "extension.task_not_found": "Không tìm thấy nhiệm vụ, hoặc nhiệm vụ nằm ngoài phạm vi.",
+  "content.library_item_not_found": "Tài liệu chưa có trong danh mục cá nhân.",
+  // pf/notify
+  "notify.notification_not_found": "Thông báo không còn (đã quá 90 ngày hoặc ngoài phạm vi).",
+  "notify.out_of_scope": "Đơn vị đã chọn nằm ngoài phạm vi phụ trách.",
+  "notify.nudge_target_not_found": "Không có thiết bị đang nhận thông báo đẩy với mã này (hoặc ngoài phạm vi).",
+  "notify.nudge_rate_limited": "Đích này vừa được yêu cầu đồng bộ (tối đa 1 lần/5 phút, 30 lần/giờ mỗi người). Vui lòng đợi rồi thử lại.",
+  "notify.dependency_unavailable": "Dịch vụ thông báo chưa nối sổ thiết bị. Vui lòng thử lại sau.",
+  // pf/sync (Admin)
+  "sync.conflict_not_found": "Không tìm thấy xung đột đồng bộ.",
+  "sync.conflict_state": "Xung đột đã được đóng trước đó. Vui lòng tải lại.",
+  "sync.conflict_resolution_invalid":
+    "Cách xử lý không hợp lệ: “Giữ phiên bản” phải chọn một bản ghi của xung đột; “Bản ghi bù” không được trỏ lại bản ghi của xung đột.",
+  "geo.conflict_not_found": "Không tìm thấy xung đột ranh giới trong phạm vi.",
+  "geo.conflict_state": "Xung đột ranh giới đã được xử lý.",
+  "geo.format_invalid": "Tệp ranh giới không đọc được (Shapefile phải là gói .zip gồm .shp, .dbf, .prj; tối đa 200 đối tượng).",
+  "geo.format_unsupported": "Không nhận ra định dạng tệp — hỗ trợ GeoJSON, KML, Shapefile (.zip).",
+  "geo.crs_unsupported": "Hệ toạ độ không phải WGS84 (EPSG:4326), ví dụ VN-2000. Chuyển sang EPSG:4326 (QGIS/ArcGIS) trước khi tải lên.",
+  // pf/accounts
+  "accounts.out_of_scope": "Tổ chức hoặc tài khoản nằm ngoài phạm vi TW → Tỉnh → Xã bạn phụ trách.",
+  "accounts.role_not_grantable": "Vai trò vượt quyền cấp của bạn (hoặc tài khoản đích đang có vai bạn không được cấp).",
+  "accounts.self_action": "Không được tự khóa, mở khóa hoặc đổi đơn vị/vai của chính mình.",
+  "accounts.user_not_found": "Không tìm thấy tài khoản.",
+  "accounts.user_exists": "Tên đăng nhập hoặc email đã có.",
+  "accounts.phone_taken": "Số điện thoại này đã được đăng ký cho một tài khoản khác.",
+  "accounts.state_conflict": "Trạng thái tài khoản không cho phép thao tác này (đã khóa, đang hoạt động, hoặc đang khóa khi gửi liên kết).",
+  "accounts.org_inactive": "Tổ chức đang bị vô hiệu hóa — không gán hoặc mở khóa được tài khoản.",
+  "accounts.org_invalid": "Không có tổ chức này trong tenant.",
+  "accounts.import_invalid":
+    "Tệp nhập sai mẫu (thiếu cột email, org_ref, roles, full_name; không phải CSV/XLSX; không có dòng hoặc quá 200 dòng). Cả tệp bị từ chối.",
+  "accounts.email_failed": "Máy chủ không gửi được email liên kết kích hoạt. Vui lòng thử lại sau.",
+  "accounts.dependency_unavailable": "Dịch vụ tài khoản (Keycloak) tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+  // pf/reports
+  "reports.template_not_found": "Không có mẫu báo cáo này.",
+  "reports.template_retired": "Mẫu đã ngừng dùng — không xuất và không lập lịch được.",
+  "reports.format_unsupported": "Mẫu không hỗ trợ định dạng đã chọn.",
+  "reports.export_not_found": "Không tìm thấy việc xuất.",
+  "reports.export_not_ready": "Tệp chưa dựng xong hoặc việc xuất bị lỗi — chưa tải được.",
+  "reports.export_quota_exceeded":
+    "Bạn đã dùng hết hạn mức xuất báo cáo trong ngày (mặc định 50 lần, tính theo giờ Việt Nam). Vui lòng thử lại vào ngày mai hoặc liên hệ quản trị.",
+  "reports.out_of_scope": "Đơn vị đã chọn nằm ngoài phạm vi phụ trách, hoặc tài khoản chưa gắn đơn vị.",
+  "reports.schedule_not_found": "Không tìm thấy lịch gửi.",
+  "reports.unit_invalid": "Mã đơn vị hành chính không còn hiệu lực hoặc không phải tỉnh/xã.",
+  "reports.dependency_unavailable": "Dịch vụ báo cáo tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+  too_many_requests: "Quá nhiều yêu cầu. Vui lòng đợi rồi thử lại.",
   network_error: "Không kết nối được máy chủ. Vui lòng kiểm tra mạng và thử lại.",
   invalid_response: "Máy chủ trả về dữ liệu không đúng định dạng.",
 };
@@ -90,6 +142,7 @@ const STATUS_FALLBACK: Readonly<Record<number, string>> = {
   409: "conflict",
   413: "payload_too_large",
   422: "validation_failed",
+  429: "too_many_requests",
 };
 
 export class ApiProblem extends Error {
@@ -98,6 +151,8 @@ export class ApiProblem extends Error {
   readonly traceId: string | undefined;
   readonly fieldErrors: ProblemFieldError[];
   readonly problem: ProblemDetails;
+  /** Giây phải chờ trước khi thử lại (429), nếu máy chủ cho biết. */
+  readonly retryAfterS: number | undefined;
 
   constructor(problem: ProblemDetails) {
     super(problemMessage(problem));
@@ -107,7 +162,18 @@ export class ApiProblem extends Error {
     this.traceId = problem.trace_id;
     this.fieldErrors = problem.errors ?? [];
     this.problem = problem;
+    this.retryAfterS = problem.retry_after_s;
   }
+}
+
+/** Header Retry-After: số giây hoặc HTTP-date (RFC 9110 §10.2.3). Sai dạng → undefined. */
+export function parseRetryAfter(value: string | null | undefined, now: number = Date.now()): number | undefined {
+  if (!value) return undefined;
+  const v = value.trim();
+  if (/^\d+$/.test(v)) return Number(v);
+  const t = Date.parse(v);
+  if (!Number.isFinite(t)) return undefined;
+  return Math.max(0, Math.ceil((t - now) / 1000));
 }
 
 /** Thông báo cho người dùng: ưu tiên bảng mã; mã lạ thì dùng detail/title của server. */
@@ -142,6 +208,8 @@ function traceIdFromHeaders(headers: Headers | undefined): string | undefined {
 export function toProblem(body: unknown, response?: Pick<Response, "status" | "headers">): ProblemDetails {
   const status = response?.status ?? (isRecord(body) && typeof body.status === "number" ? body.status : 500);
   const headerTrace = traceIdFromHeaders(response?.headers);
+  const retryAfter =
+    isRecord(body) && typeof body.retry_after_s === "number" ? body.retry_after_s : parseRetryAfter(response?.headers?.get("Retry-After"));
   if (isRecord(body) && typeof body.code === "string") {
     const errors = Array.isArray(body.errors)
       ? body.errors.filter(isRecord).map((e) => ({
@@ -158,6 +226,7 @@ export function toProblem(body: unknown, response?: Pick<Response, "status" | "h
       instance: typeof body.instance === "string" ? body.instance : undefined,
       trace_id: typeof body.trace_id === "string" ? body.trace_id : headerTrace,
       errors,
+      retry_after_s: retryAfter,
     };
   }
   const code = STATUS_FALLBACK[status] ?? (status >= 500 ? "internal_error" : "bad_request");
@@ -167,6 +236,7 @@ export function toProblem(body: unknown, response?: Pick<Response, "status" | "h
     status,
     code,
     trace_id: headerTrace,
+    retry_after_s: retryAfter,
   };
 }
 
