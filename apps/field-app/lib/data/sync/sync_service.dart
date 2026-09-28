@@ -87,6 +87,7 @@ class SyncService {
     this.retention = const Duration(hours: 48),
     Random? random,
     this.beforeSync,
+    this.afterPull,
     ActionQueue? actions,
   }) : _actions = actions,
        _db = db,
@@ -116,6 +117,10 @@ class SyncService {
 
   /// Chạy trước mỗi lượt (ví dụ đăng ký thiết bị).
   final Future<void> Function()? beforeSync;
+
+  /// Chạy sau pull (ví dụ làm mới danh mục tải qua API). Lỗi ném ra được xử lý
+  /// như lỗi của lượt đồng bộ.
+  final Future<void> Function()? afterPull;
 
   static const _statusKey = 'sync.status';
 
@@ -166,9 +171,11 @@ class SyncService {
       );
       await beforeSync?.call();
       await _uploadFiles(report);
+      await _evidence.flushForms(_outbox);
       await _pushAll(report);
       await _replayActions(report);
       await _pullAll(report);
+      await afterPull?.call();
       report.purged = await _outbox.purgeAcked(retention);
       await _evidence.purgeUploaded(retention);
       await _refs.purgeOldNotifications();
@@ -224,7 +231,7 @@ class SyncService {
           ciphertext: blob,
           fileRef: f.id,
         );
-        await _evidence.markUploaded(f, ref, _outbox);
+        await _evidence.markUploaded(f, ref);
         report.uploaded++;
       } on ApiException catch (e) {
         if (e is DeviceRevokedException || e is UnauthenticatedException) {

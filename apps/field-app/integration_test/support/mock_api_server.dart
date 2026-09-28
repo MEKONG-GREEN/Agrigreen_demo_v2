@@ -49,6 +49,12 @@ class MockApiServer {
   final requests = <String>[];
   int pullCalls = 0;
 
+  /// Danh mục trường MRV đã duyệt (GET /v1/mrv/catalog?evidence_type=).
+  final mrvCatalogs = <String, Map<String, Object?>>{};
+
+  /// Danh mục masterdata (GET /v1/masterdata/catalogs/{catalog}).
+  final masterdata = <String, List<Map<String, Object?>>>{};
+
   /// Thay đổi chiều xuống chưa gửi (mỗi thay đổi một version tăng dần).
   final _changes = <Map<String, Object?>>[];
 
@@ -112,6 +118,20 @@ class MockApiServer {
           return await _problem(req, 403, 'sync.device_unregistered');
         }
       }
+      if (req.method == 'GET' && path == '/v1/mrv/catalog') {
+        final c = mrvCatalogs[req.uri.queryParameters['evidence_type']];
+        if (c == null) return await _problem(req, 404, 'mrv.catalog_not_found');
+        return await _json(req, 200, c);
+      }
+      final md = RegExp(r'^/v1/masterdata/catalogs/([a-z_]+)$')
+          .firstMatch(path);
+      if (req.method == 'GET' && md != null) {
+        final items = masterdata[md.group(1)];
+        if (items == null) {
+          return await _problem(req, 404, 'masterdata.catalog_not_found');
+        }
+        return await _json(req, 200, {'items': items, 'next_cursor': null});
+      }
       if (req.method == 'GET' && path == '/v1/sync/pull') {
         pullCalls++;
         final cur = int.tryParse(req.uri.queryParameters['cursor'] ?? '') ?? 0;
@@ -157,7 +177,14 @@ class MockApiServer {
           }
           if (r['entity'] == 'evidence') {
             final p = r['payload']! as Map;
-            if (!files.containsKey(p['file_ref'])) {
+            final refs = ((p['file_refs'] as List?) ?? const [])
+                .cast<Map<String, Object?>>();
+            if (refs.isEmpty ||
+                refs.any(
+                  (f) =>
+                      files[f['file_ref']]?.meta['sha256_ciphertext'] !=
+                      f['sha256'],
+                )) {
               results.add({
                 'id': r['id'],
                 'status': 'rejected',

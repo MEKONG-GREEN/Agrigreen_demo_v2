@@ -1,8 +1,5 @@
-import 'package:agrigreen_field/application/field_report_service.dart';
 import 'package:agrigreen_field/core/ids.dart';
-import 'package:agrigreen_field/data/crypto/envelope.dart';
 import 'package:agrigreen_field/data/outbox/outbox_repository.dart';
-import 'package:agrigreen_field/data/photo/location_source.dart';
 import 'package:agrigreen_field/data/secure/secure_store.dart';
 import 'package:agrigreen_field/domain/outbox_record.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -154,79 +151,5 @@ void main() {
         throwsA(isA<OutboxException>()),
       );
     });
-
-    test(
-      'nhật ký: GPS và thời gian bị khóa sau khi lưu (HTX US-LOG-01 AC-3)',
-      () async {
-        final svc = FieldReportService(
-          outbox: h.outbox,
-          location: const FixedLocationSource(
-            LocationResult(
-              GpsStatus.ok,
-              GpsFix(lat: 10.03, lon: 105.78, accuracyM: 5),
-            ),
-          ),
-          clock: h.clock,
-        );
-        final r = await svc.create(
-          plotId: 'p1',
-          activity: FarmActivity.bonPhan,
-        );
-        expect(r.payload['gps'], {
-          'lat': 10.03,
-          'lon': 105.78,
-          'accuracy_m': 5.0,
-        });
-        expect(r.payload['captured_at'], isNotNull);
-
-        // Sửa ghi chú: được, GPS/thời gian giữ nguyên.
-        final c = await svc.correct(
-          original: r,
-          reason: 'Bổ sung ghi chú',
-          note: 'bón NPK',
-        );
-        expect(c.payload['gps'], r.payload['gps']);
-        expect(c.payload['captured_at'], r.payload['captured_at']);
-        expect(c.eventTime, r.eventTime);
-
-        // Cố đổi GPS: bị chặn.
-        expect(
-          () => h.outbox.correct(
-            originalId: r.id,
-            reason: 'đổi vị trí',
-            payload: {
-              ...r.payload,
-              'gps': {'lat': 1.0, 'lon': 1.0},
-            },
-            lockedPayloadKeys: fieldReportLockedKeys,
-          ),
-          throwsA(
-            isA<LockedFieldException>().having(
-              (e) => e.message,
-              'message',
-              'Tọa độ GPS và thời gian không thể chỉnh sửa sau khi lưu.',
-            ),
-          ),
-        );
-      },
-    );
-
-    test(
-      'từ chối GPS không chặn lưu, gắn nhãn Thiếu GPS (US-GPS-01 AC-4)',
-      () async {
-        final svc = FieldReportService(
-          outbox: h.outbox,
-          location: const FixedLocationSource(LocationResult(GpsStatus.denied)),
-          clock: h.clock,
-        );
-        final r = await svc.create(
-          plotId: 'p1',
-          activity: FarmActivity.kiemTra,
-        );
-        expect(r.payload['gps'], isNull);
-        expect(r.payload['gps_status'], 'denied');
-        expect(GpsStatus.denied.label, 'Thiếu GPS');
-      },
-    );
   });
 }

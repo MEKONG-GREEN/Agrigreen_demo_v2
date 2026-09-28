@@ -98,13 +98,15 @@ Màn hình:
   - `reset: true` → thay toàn bộ dữ liệu tham chiếu. `400 sync.cursor_invalid` → pull lại từ đầu (một lần).
   - `pubkey` theo "lượt": `data = {ref, area_code, public_key}`; bản ghi đánh dấu `id = 00000000-…`, `tombstone`, version V → xóa khóa có version < V.
   - Nông hộ chỉ giữ các trường nhãn: `label`, `display_label`, `code`, `cooperative_id`, `admin_unit_code`, `status`. Họ tên, SĐT, CCCD, địa chỉ bị loại trước khi ghi (mục 10.4).
+- **Báo cáo hiện trường** (`field_report`) theo `ReportPayload`: `sowing_progress` / `growth_pest`, số là chuỗi decimal, kỳ `YYYY-MM` giờ Việt Nam, kiểm như máy chủ trước khi lưu. Bản ghi bù giữ loại/xã/HTX/kỳ (+ vụ/giống).
+- **Minh chứng MRV** (`evidence`) theo `CapturePayload`: biểu mẫu dựng từ danh mục đã duyệt (đệm từ `GET /v1/mrv/catalog`), ghim `catalog_version`, `values` đúng kiểu, `file_refs` = file_ref + sha256 ciphertext, `gps` chuỗi decimal, bắt buộc đồng ý khi có hộ.
 - **Ảnh minh chứng.** Luồng xử lý:
   1. Chụp ảnh.
   2. Gắn GPS và thời gian vào metadata.
   3. Mã hóa phong bì **ngay** bằng khóa công khai của hộ.
   4. Chỉ ghi ciphertext xuống đĩa (watermark GPS + thời gian được đóng lên ảnh **trong bộ nhớ, trước khi mã hóa**).
   5. `POST /v1/files` với `Idempotency-Key = file:<id>` và `file_ref = <id>`.
-  6. Trong **một giao dịch**: đánh dấu đã tải và tạo bản ghi `evidence` tham chiếu `file_ref` vào hàng đợi.
+  6. Khi **mọi** ảnh của biểu mẫu MRV đã tải, trong **một giao dịch**: tạo bản ghi `evidence` (`file_refs`) và đánh dấu biểu mẫu đã xếp hàng. Ảnh hỏng vĩnh viễn → biểu mẫu `blocked`.
   7. Xóa ciphertext cục bộ.
 
 ## Lệnh
@@ -145,6 +147,7 @@ Kiểm thử chính (`test/`):
 | `push_test.dart` | `sync_now`; thông báo cục bộ **không lộ nội dung** khi khóa/nền/chưa về; token khi mở khóa/đổi; không có Firebase; `PushTokenRegistrar` (sau đăng ký, mỗi lần khởi động, lỗi 503 không chặn) |
 | `consent_watermark_test.dart` | chặn chụp khi chưa đồng ý; payload `consent`; rút lại; sổ đồng ý sống qua purge; watermark có trong ảnh đã giải mã; không JPEG bản rõ trên đĩa; `shredFile`; SLA |
 | `tiles_pull_test.dart` | toán tile; giới hạn khung/zoom/diện tích/số tile/dung lượng; tải, đọc lại, tải tiếp, lỗi tile, dừng; pubkey theo lượt; `reset`; `cursor_invalid` |
+| `payload_contract_test.dart` | `field_report`/`evidence` so với fixture JSON rút từ quy tắc Go (`test/fixtures/contract/`); lỗi theo trường như máy chủ; khóa bản ghi bù; biểu mẫu MRV: tải danh mục, đồng ý, 2 ảnh, mất mạng giữa hai ảnh → evidence chỉ tạo khi đủ ảnh |
 | `offline_flow_http_test.dart` | kịch bản tích hợp qua **HTTP thật** tới máy chủ giả `dart:io` (cùng kịch bản với emulator) |
 | `integration_test/app_flow_test.dart` | **emulator** (CI `field-app-emulator`): đăng nhập chế độ kiểm thử → PIN → đăng ký thiết bị + token → pull → vẽ thửa khi mất mạng → có mạng + `sync_now` → push accepted → đồng ý + ảnh mã hóa tải lên (mở bằng khóa hộ, có watermark) → thông báo đẩy → đánh dấu đã đọc → chuông |
 
@@ -268,6 +271,6 @@ field-app:
    - `evidence`: `file_ref`, `parent_*`, `sha256_ciphertext`.
 6. **Định dạng `vectors.json`:** chưa quy định tên trường. Đề xuất theo `test/fixtures/go_nacl_vectors.json`: `{v, alg, vectors:[{name, recipient_sk_hex, recipient_pk_hex, plaintext_hex, dek_hex, nonce_hex, ciphertext_hex (ct‖tag), wrapped_dek_hex, sha256_ciphertext}]}`. Test đọc được nhiều biến thể tên.
 7. **`Idempotency-Key` của đăng ký thiết bị** (`devreg:<device_id>`) và tệp (`file:<id>`) do app tự đặt. Hai khóa này hợp regex `[A-Za-z0-9._:-]{8,200}` của máy chủ.
-8. **Payload `task_update`/`field_report`/`evidence`:** máy chủ (`TaskUpdatePayload.action`, `ReportPayload`, `mrv.CapturePayload`) khác payload app đang gửi. App đã thêm `action` cho `task_update`; `field_report` (nhật ký canh tác) và `evidence` (`file_refs[]`, `evidence_type`, `admin_unit_code`) cần chốt ánh xạ với pf/extension và pf/mrv.
+8. **Payload `field_report`/`evidence`:** đã theo máy chủ (`ReportPayload`, `mrv.CapturePayload`) — schema và khoảng trống danh mục (không có entity đồng bộ cho danh mục MRV, `catalog_item` chưa có nguồn pull) ghi ở `docs/dev/sync-contract.md`. Báo cáo hiện trường là báo cáo KN FR-01/FR-02, **không** còn "nhật ký canh tác" có GPS (máy chủ không có entity đó — HTX US-LOG-01 thuộc G2). Minh chứng là biểu mẫu theo danh mục đã duyệt, nhiều ảnh; bản ghi chỉ gửi khi mọi ảnh đã tải.
 9. **Mã `geo.*` cần xác nhận khi đồng bộ:** Sink pf/geo trả `conflict` cho chồng lấn chưa xác nhận; `geo.overlap_needs_confirm`/`geo.area_deviation_needs_confirm` hiện chỉ thấy ở API trực tuyến. App xử lý cả hai.
 10. **Thời hạn khóa idempotency:** máy chủ giữ khóa 48 giờ. Nếu lô gửi lại sau hơn 48 giờ, máy chủ coi là yêu cầu mới. Vẫn an toàn vì chống trùng theo `idem_key`.

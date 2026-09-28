@@ -1,91 +1,90 @@
 import '../core/clock.dart';
 import '../data/outbox/outbox_repository.dart';
-import '../data/photo/location_source.dart';
+import '../domain/field_report.dart';
 import '../domain/outbox_record.dart';
 
-/// Hoạt động canh tác chọn bằng biểu tượng (HTX US-LOG-01).
-enum FarmActivity {
-  lamDat('lam_dat', 'Làm đất'),
-  gieoSa('gieo_sa', 'Gieo sạ'),
-  tuoiNuoc('tuoi_nuoc', 'Tưới nước'),
-  bonPhan('bon_phan', 'Bón phân'),
-  phunThuoc('phun_thuoc', 'Phun thuốc'),
-  kiemTra('kiem_tra', 'Kiểm tra'),
-  thuHoach('thu_hoach', 'Thu hoạch');
+export '../domain/field_report.dart';
 
-  const FarmActivity(this.code, this.label);
-  final String code;
-  final String label;
-
-  static FarmActivity? byCode(String? c) {
-    for (final a in values) {
-      if (a.code == c) return a;
-    }
-    return null;
-  }
-}
-
-/// Khóa không được đổi khi sửa sai (US-LOG-01 AC-3).
-const fieldReportLockedKeys = {'gps', 'gps_status', 'captured_at'};
-
-/// Báo cáo hiện trường / nhật ký canh tác. Tọa độ GPS và thời gian gắn tự động
-/// lúc lưu và **bị khóa**: sửa sai tạo bản ghi bù giữ nguyên các trường đó.
+/// Báo cáo hiện trường KN (FR-01 tiến độ gieo sạ, FR-02 sinh trưởng – sâu
+/// bệnh) → bản ghi `field_report` theo `ReportPayload` của pf/extension.
+///
+/// Sửa sai = bản ghi bù `correct` (lý do ≥ 10 ký tự); loại, xã, HTX, kỳ (và
+/// vụ, giống của báo cáo gieo sạ) giữ nguyên như bản bị thay — máy chủ cũng lấy
+/// các trường này từ bản cũ.
 class FieldReportService {
-  FieldReportService({
-    required OutboxRepository outbox,
-    required LocationSource location,
-    required Clock clock,
-  }) : _outbox = outbox,
-       _location = location,
-       _clock = clock;
+  FieldReportService({required OutboxRepository outbox, required Clock clock})
+    : _outbox = outbox,
+      _clock = clock;
 
   final OutboxRepository _outbox;
-  final LocationSource _location;
   final Clock _clock;
 
-  Future<OutboxRecord> create({
-    required String plotId,
-    required FarmActivity activity,
-    String? householdRef,
-    String note = '',
-    List<String> machineryIds = const [],
-    LocationResult? location,
-  }) async {
-    final loc = location ?? await _location.current();
-    final now = _clock.now();
+  Future<OutboxRecord> create(FieldReportDraft draft) async {
+    draft.validate(_clock.now());
     return _outbox.enqueue(
       entity: PushEntity.fieldReport,
-      eventTime: now,
-      payload: {
-        'plot_id': plotId,
-        'household_ref': householdRef,
-        'activity': activity.code,
-        'note': note.trim(),
-        'machinery_ids': machineryIds,
-        'captured_at': formatRfc3339(now),
-        'gps': loc.fix?.toJson(),
-        'gps_status': loc.status.name,
-      },
+      eventTime: _clock.now(),
+      payload: draft.toPayload(),
     );
   }
 
-  /// Sửa sai: chỉ đổi hoạt động/ghi chú/máy móc; GPS và thời gian lấy từ bản gốc.
+  /// Bản ghi bù: đổi số liệu/ghi chú, giữ khóa phiên bản của bản gốc.
   Future<OutboxRecord> correct({
     required OutboxRecord original,
     required String reason,
-    FarmActivity? activity,
+    FieldReportDraft? changes,
     String? note,
-    List<String>? machineryIds,
-  }) {
+  }) async {
+    if (reason.trim().runes.length < 10) {
+      throw const FieldReportError('correction_reason', 'bắt buộc, ≥ 10 ký tự');
+    }
     final p = Map<String, Object?>.from(original.payload);
-    if (activity != null) p['activity'] = activity.code;
+    final kind = FieldReportKind.parse(p['kind'] as String?);
+    if (changes != null) {
+      // Chỉ số liệu của đúng loại báo cáo gốc được sửa.
+      final editable = kind == FieldReportKind.sowing
+          ? const {'sown_area_ha', 'sown_on', 'urgent', 'note'}
+          : const {
+              'growth_stage',
+              'pest_code',
+              'severity',
+              'affected_area_ha',
+              'urgent',
+              'note',
+            };
+      final c = FieldReportDraft(
+        kind: kind ?? changes.kind,
+        communeCode: changes.communeCode,
+        period: changes.period,
+        cooperativeRef: changes.cooperativeRef,
+        sownAreaHa: changes.sownAreaHa,
+        sownOn: changes.sownOn,
+        growthStage: changes.growthStage,
+        pestCode: changes.pestCode,
+        severity: changes.severity,
+        affectedAreaHa: changes.affectedAreaHa,
+        urgent: changes.urgent,
+        note: changes.note,
+      ).toPayload();
+      for (final k in editable) {
+        p[k] = c[k];
+      }
+    }
     if (note != null) p['note'] = note.trim();
-    if (machineryIds != null) p['machinery_ids'] = machineryIds;
+    if (containsPii('${p['note'] ?? ''}')) {
+      throw const FieldReportError(
+        'note',
+        'không ghi số điện thoại hoặc số CCCD vào ghi chú',
+      );
+    }
     return _outbox.correct(
       originalId: original.id,
       reason: reason,
       payload: p,
-      lockedPayloadKeys: fieldReportLockedKeys,
+      lockedPayloadKeys: {
+        ...fieldReportLockedKeys,
+        if (kind == FieldReportKind.sowing) ...sowingLockedKeys,
+      },
     );
   }
 

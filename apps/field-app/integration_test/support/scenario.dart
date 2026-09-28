@@ -7,6 +7,7 @@ import 'package:agrigreen_field/application/consent_service.dart';
 import 'package:agrigreen_field/data/auth/oidc_client.dart';
 import 'package:agrigreen_field/data/crypto/envelope.dart';
 import 'package:agrigreen_field/data/photo/photo_pipeline.dart';
+import 'package:agrigreen_field/domain/mrv.dart';
 import 'package:agrigreen_field/data/push/push_messaging.dart';
 import 'package:agrigreen_field/data/sync/sync_service.dart';
 import 'package:agrigreen_field/domain/geo/boundary.dart';
@@ -46,6 +47,10 @@ const plotRef = '01920000-0000-7000-8000-0000000000b1';
 /// Dữ liệu chiều xuống ban đầu: xã, thửa, khóa công khai hộ, thông báo.
 nacl.PrivateKey seedServer(MockApiServer s) {
   final sk = nacl.PrivateKey.generate();
+  s.mrvCatalogs['awd_log'] = awdLogCatalog;
+  s.masterdata['season'] = [
+    {'catalog': 'season', 'code': 'DX', 'name': 'Đông Xuân', 'attrs': {}},
+  ];
   s
     ..addChange('admin_unit', '31117', {
       'code': '31117',
@@ -79,6 +84,80 @@ nacl.PrivateKey seedServer(MockApiServer s) {
     });
   return sk;
 }
+
+/// Danh mục mẫu `awd_log` (mrv/app/seed_g1.json) đã duyệt, dạng API.
+const awdLogCatalog = <String, Object?>{
+  'id': '01920000-0000-7000-8000-00000000ca01',
+  'evidence_type': 'awd_log',
+  'version': 1,
+  'status': 'approved',
+  'provisional': true,
+  'source_note': 'Danh mục mẫu G1 — TẠM',
+  'fields': [
+    {
+      'key': 'plot_ref',
+      'label_vi': 'Thửa',
+      'data_type': 'text',
+      'required': true,
+      'position': 1,
+      'reserved': true,
+    },
+    {
+      'key': 'season',
+      'label_vi': 'Vụ',
+      'data_type': 'text',
+      'required': true,
+      'position': 2,
+      'reserved': true,
+    },
+    {
+      'key': 'stage',
+      'label_vi': 'Giai đoạn',
+      'data_type': 'enum',
+      'required': true,
+      'enum_values': ['ma', 'de_nhanh', 'lam_dong', 'tro_bong', 'chin'],
+      'position': 3,
+    },
+    {
+      'key': 'awd_water_level_cm',
+      'label_vi': 'Mực nước',
+      'data_type': 'decimal',
+      'unit': 'cm',
+      'required': true,
+      'min': '-30',
+      'max': '30',
+      'max_scale': 1,
+      'position': 4,
+    },
+    {
+      'key': 'awd_dry_days',
+      'label_vi': 'Số ngày khô',
+      'data_type': 'integer',
+      'required': true,
+      'min': '0',
+      'max': '60',
+      'position': 5,
+    },
+    {
+      'key': 'photo',
+      'label_vi': 'Ảnh',
+      'data_type': 'photo',
+      'required': true,
+      'min': '1',
+      'max': '10',
+      'position': 6,
+      'reserved': true,
+    },
+    {
+      'key': 'gps',
+      'label_vi': 'Toạ độ',
+      'data_type': 'geo_point',
+      'required': true,
+      'position': 7,
+      'reserved': true,
+    },
+  ],
+};
 
 /// Chờ tới khi [cond] đúng (tối đa [timeout]); [tick] cho khung hình chạy.
 Future<void> waitUntil(
@@ -166,12 +245,32 @@ Future<void> runOfflineFieldScenario({
     subjectRef: householdRef,
     status: ConsentStatus.granted,
   );
-  final shot = await s.photos.capture(
-    subjectRef: householdRef,
-    parentEntity: PushEntity.fieldReport,
-    parentId: rec.id,
+  // Danh mục trường MRV đã tải qua API sau lượt pull đầu.
+  final cat = await s.catalogs.mrvCatalog('awd_log');
+  expect(cat?.version, 1);
+  final form = s.mrv.newFormId();
+  final shot = await s.mrv.capturePhoto(
+    formId: form,
+    householdRef: householdRef,
   );
   expect(shot, isNotNull);
+  await s.mrv.submit(
+    formId: form,
+    draft: MrvEvidenceDraft(
+      evidenceType: 'awd_log',
+      catalogVersion: cat!.version,
+      adminUnitCode: '31117',
+      plotRef: plotRef,
+      householdRef: householdRef,
+      seasonCode: 'DX',
+      values: const {
+        'stage': 'de_nhanh',
+        'awd_water_level_cm': '-12.5',
+        'awd_dry_days': 4,
+      },
+      gps: await s.mrv.currentGps(),
+    ),
+  );
   await s.sync.syncOnce(force: true);
   await waitUntil(
     () async => server.recordsOf('evidence').isNotEmpty,
@@ -191,7 +290,16 @@ Future<void> runOfflineFieldScenario({
   final decoded = img.decodeJpg(plain)!;
   expect(decoded.getPixel(790, 598).g, lessThan(120)); // dải watermark
   final ev = server.recordsOf('evidence').single['payload']! as Map;
-  expect(ev['file_ref'], shot.file.id);
+  expect(ev['evidence_type'], 'awd_log');
+  expect(ev['catalog_version'], 1);
+  expect(ev['plot_ref'], plotRef);
+  expect(ev['household_ref'], householdRef);
+  expect(ev['season_code'], 'DX');
+  expect((ev['values']! as Map)['awd_water_level_cm'], '-12.5');
+  expect((ev['gps']! as Map)['lat'], isA<String>());
+  expect(ev['file_refs'], [
+    {'file_ref': shot.file.id, 'sha256': shot.file.meta['sha256_ciphertext']},
+  ]);
   expect(server.recordsOf('consent').single['payload'], {
     'subject_ref': householdRef,
     'purpose': 'mrv.evidence',

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/field_report_service.dart';
+import 'field_report_screen.dart' show reportSummary;
 import '../../data/outbox/outbox_repository.dart';
 import '../../domain/outbox_record.dart';
 import '../providers.dart';
@@ -116,6 +117,8 @@ class _RecordCard extends ConsumerWidget {
       ref.invalidate(queueProvider);
     } on OutboxException catch (e) {
       if (context.mounted) showMessage(context, e.message, error: true);
+    } on FieldReportError catch (e) {
+      if (context.mounted) showMessage(context, e.reason, error: true);
     }
   }
 
@@ -135,8 +138,9 @@ class _RecordCard extends ConsumerWidget {
         (r.status == OutboxStatus.rejected ||
             r.status == OutboxStatus.sent ||
             r.status == OutboxStatus.conflict);
-    final activity = FarmActivity.byCode(r.payload['activity'] as String?)
-        ?.label;
+    final activity = r.entity == PushEntity.fieldReport
+        ? reportSummary(r.payload)
+        : null;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),

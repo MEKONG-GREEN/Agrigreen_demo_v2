@@ -150,6 +150,82 @@ Kết quả (máy ngoại tuyến không thấy nhau nên máy chủ **không ch
 
 Chiều xuống entity `plot`: `data = {ref, code, name, commune_code, cooperative_ref, household_ref, status, version, boundary_id, area_ha, source, needs_review, geometry, updated_at}`; `version` của thay đổi là `revision` của thửa. Tombstone khi thửa ngừng dùng, hoặc (quản lý HTX) thửa chuyển sang HTX khác.
 
+### Payload `field_report` (pf/extension, `app.ReportPayload`)
+
+Nguồn: `internal/platform/extension/app/payload.go` (`ReportPayload.ToReport`), `domain/report.go` (`Report.Validate`), `app/reports.go` (`SubmitReport`). `id` của bản ghi là mã báo cáo; `event_time` lấy từ phong bì. Trường lạ bị bỏ qua (app **không** gửi GPS).
+
+```json
+{
+  "kind": "sowing_progress",
+  "commune_code": "31117",
+  "cooperative_ref": "0192…",
+  "period": "2026-12",
+  "season_code": "DX",
+  "variety_code": "OM5451",
+  "sown_area_ha": "12.5",
+  "sown_on": "2026-11-20",
+  "growth_stage": "",
+  "pest_code": "",
+  "severity": "",
+  "affected_area_ha": null,
+  "urgent": false,
+  "note": "Sạ lan, đủ nước"
+}
+```
+
+| Trường | Quy tắc |
+|---|---|
+| `kind` | `sowing_progress` (FR-01) hoặc `growth_pest` (FR-02) |
+| `commune_code` | bắt buộc; mã **xã** (cấp commune) trong phạm vi người gửi |
+| `period` | `YYYY-MM`, không ở tương lai theo giờ Việt Nam (R-12); kỳ đã chốt ở tỉnh → chỉ nhận bản ghi bù |
+| `cooperative_ref` | UUID; **bắt buộc** với `sowing_progress`, HTX phải thuộc xã |
+| `season_code`, `variety_code` | `sowing_progress`: bắt buộc; `season_code` `[A-Za-z0-9_]{1,40}`; tra danh mục masterdata `season`, `rice_variety` |
+| `sown_area_ha` | `sowing_progress`: bắt buộc, chuỗi decimal > 0, ≤ 100 000, ≤ 4 chữ số lẻ |
+| `sown_on` | tùy chọn, `YYYY-MM-DD` giờ Việt Nam, không ở tương lai |
+| `growth_stage` | `growth_pest`: bắt buộc, `[A-Za-z0-9_]{1,40}` |
+| `pest_code` | `growth_pest`: bắt buộc, tra danh mục `pest` |
+| `severity` | `growth_pest`: `nhe` \| `trung_binh` \| `nang` |
+| `affected_area_ha` | `growth_pest`: tùy chọn, chuỗi decimal ≥ 0, ≤ 100 000, ≤ 4 chữ số lẻ |
+| `urgent`, `note` | `note` ≤ 2000 ký tự, **không** chứa SĐT hay số CCCD 12 số (`ErrPIIInText`) |
+
+Trường của loại kia bị máy chủ xóa khi kiểm; app gửi chuỗi rỗng/null. `op: correct` cần lý do ≥ 10 ký tự và phải thay phiên bản **hiện hành**; loại, xã, HTX, kỳ (và vụ, giống với `sowing_progress`) lấy từ bản bị thay — app khóa các trường này khi tạo bản ghi bù. Fixture: `apps/field-app/test/fixtures/contract/field_report_*.json`.
+
+### Payload `evidence` (pf/mrv, `app.CapturePayload`)
+
+Nguồn: `internal/platform/mrv/app/evidence.go` (`CapturePayload.Parse`, `Capture`), `domain/evidence.go` (`ValidateEnvelope`), `domain/catalog.go` (`ValidateRecord`, `checkValue`). `id` (UUIDv7), `event_time`, `device_id`, `supersedes_id`, `correction_reason` lấy từ phong bì bản ghi đồng bộ, không từ payload.
+
+```json
+{
+  "evidence_type": "awd_log",
+  "catalog_version": 1,
+  "admin_unit_code": "31117",
+  "plot_ref": "0192…",
+  "household_ref": "0192…",
+  "season_code": "DX",
+  "values": {"stage": "de_nhanh", "awd_water_level_cm": "-12.5", "awd_dry_days": 5},
+  "file_refs": [{"file_ref": "0192…", "sha256": "<64 hex thường của ciphertext>"}],
+  "gps": {"lat": "10.0452", "lon": "105.7701", "accuracy_m": "4.5"}
+}
+```
+
+| Trường | Quy tắc |
+|---|---|
+| `evidence_type` | `^[a-z][a-z0-9_]{2,39}$`; G1: `awd_log`, `field_checklist` |
+| `catalog_version` | số nguyên dương — phiên bản danh mục **đã duyệt** app dùng để dựng biểu mẫu; máy chủ kiểm và **ghim** đúng phiên bản này (bỏ trống = bản mới nhất lúc ghi; app luôn gửi) |
+| `admin_unit_code` | `^[0-9A-Z][0-9A-Z.-]{0,39}$`, trong phạm vi người gửi |
+| `plot_ref`, `household_ref` | UUID; có `household_ref` → bắt buộc đồng ý `mrv.evidence` (`rejected mrv.consent_missing`) |
+| `season_code` | 1–40 ký tự |
+| `values` | chỉ khóa **không dành riêng** của danh mục; khóa lạ hoặc khóa dành riêng → lỗi `values.<khóa>`. Kiểu: `decimal` = **chuỗi** `^-?\d{1,16}(\.\d{1,8})?$`, ≤ `max_scale` chữ số lẻ, trong `[min, max]`; `integer` = số JSON hoặc chuỗi chữ số; `boolean`; `enum` ∈ `enum_values`; `date` `YYYY-MM-DD`; `text` ≤ 2000 và trong `[min, max]` ký tự; `photo` = danh sách `file_ref` có trong `file_refs`, không trùng |
+| `file_refs` | ≤ 20, `file_ref` UUID không trùng, `sha256` 64 hex **thường** (băm ciphertext). Khóa dành riêng `photo` kiểm số ảnh theo `min`/`max` |
+| `gps` | chuỗi decimal, lat ∈ [-90, 90], lon ∈ [-180, 180], `accuracy_m` ≥ 0; dữ liệu cá nhân khi gắn với hộ. Khóa dành riêng `gps` |
+
+Khóa dành riêng của danh mục lấy giá trị từ cột riêng: `plot_ref` → `plot_ref`, `season` → `season_code`, `gps` → `gps`, `photo` → `file_refs`. App chỉ tạo bản ghi `evidence` khi **mọi** ảnh của biểu mẫu đã `POST /v1/files` xong (bảng `evidence_form`), rồi điền `file_refs` bằng `file_ref` máy chủ trả và SHA-256 ciphertext. Fixture: `apps/field-app/test/fixtures/contract/evidence_payloads.json`, `mrv_catalogs_g1.json`.
+
+### Danh mục cần cho biểu mẫu — khoảng trống
+
+- **Danh mục trường MRV:** không có entity đồng bộ. Có `GET /v1/mrv/catalog?evidence_type=` (vai `mrv_collector`/`mrv_reviewer`/`mrv_viewer`/`mrv_exporter` hoặc quản trị danh mục) trả bản đã duyệt mới nhất, nhưng **không có API liệt kê loại minh chứng** — app giữ danh sách G1 cố định (`awd_log`, `field_checklist`, theo `mrv/port`). App tải sau mỗi lượt pull, đệm trong SQLCipher, dùng khi ngoại tuyến. Đề xuất: entity pull `mrv_catalog` (bản đã duyệt theo loại, `version` = phiên bản danh mục).
+- **Danh mục masterdata** (`rice_variety`, `season`, `pest` cho `field_report`; `season` cho `evidence`): hợp đồng liệt kê entity `catalog_item`, nhưng **chưa module nào cung cấp nguồn pull** cho `catalog_item` (và cả `admin_unit`, `cooperative`, `household`). App tải qua `GET /v1/masterdata/catalogs/{catalog}` khi có mạng và đệm lại. Mã xã và HTX lấy từ `plot`/`task` đã đồng bộ.
+
 ## Tệp minh chứng
 
 `POST /v1/files` (multipart, Idempotency-Key):

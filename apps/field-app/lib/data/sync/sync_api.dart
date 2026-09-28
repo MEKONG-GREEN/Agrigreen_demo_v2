@@ -129,6 +129,12 @@ abstract class SyncApi {
     required String idempotencyKey,
   });
 
+  /// GET JSON chỉ đọc (danh mục masterdata, danh mục trường MRV).
+  Future<Map<String, Object?>> getJson(
+    String path, {
+    Map<String, String>? query,
+  });
+
   /// Lệnh API idempotent (POST + Idempotency-Key) xếp hàng khi ngoại tuyến:
   /// đánh dấu đã đọc, xác nhận chỉ đạo, lưu/bỏ lưu tài liệu.
   Future<Map<String, Object?>> postAction({
@@ -302,6 +308,16 @@ class HttpSyncApi implements SyncApi {
       throw ApiException(res.statusCode, 'files.missing_file_ref');
     }
     return ref;
+  }
+
+  @override
+  Future<Map<String, Object?>> getJson(
+    String path, {
+    Map<String, String>? query,
+  }) async {
+    final h = await _headers(json: false);
+    final res = await _send(() => _client.get(_u(path, query), headers: h));
+    return _json(res);
   }
 
   @override

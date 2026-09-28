@@ -1,0 +1,19 @@
+{
+  "_source": "internal/platform/extension/app/payload.go ReportPayload + domain/report.go Validate (kind growth_pest, FR-02)",
+  "payload": {
+    "kind": "growth_pest",
+    "commune_code": "31117",
+    "cooperative_ref": null,
+    "period": "2026-12",
+    "season_code": "",
+    "variety_code": "",
+    "sown_area_ha": null,
+    "sown_on": null,
+    "growth_stage": "de_nhanh",
+    "pest_code": "RAY_NAU",
+    "severity": "trung_binh",
+    "affected_area_ha": "3.25",
+    "urgent": true,
+    "note": ""
+  }
+}

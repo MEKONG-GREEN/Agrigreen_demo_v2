@@ -1,0 +1,57 @@
+{
+  "_source": "GET /v1/mrv/catalog (handler/dto.go catalogDTO) cho danh mục mẫu internal/platform/mrv/app/seed_g1.json, đã duyệt phiên bản 1",
+  "catalogs": [
+    {
+      "id": "01920000-0000-7000-8000-00000000ca01",
+      "evidence_type": "awd_log",
+      "version": 1,
+      "status": "approved",
+      "provisional": true,
+      "source_note": "Danh mục mẫu G1 — TẠM, chờ chốt C-1",
+      "setter_ref": "01920000-0000-7000-8000-00000000aa01",
+      "approver_ref": "01920000-0000-7000-8000-00000000aa02",
+      "submitted_at": "2026-09-27T01:00:00Z",
+      "decided_at": "2026-09-27T02:00:00Z",
+      "decision_note": null,
+      "created_at": "2026-09-27T00:00:00Z",
+      "fields": [
+        {"key": "plot_ref", "label_vi": "Thửa ruộng / SPOT", "data_type": "text", "unit": null, "required": true, "min": null, "max": null, "max_scale": null, "enum_values": [], "help_vi": null, "position": 1, "reserved": true},
+        {"key": "season", "label_vi": "Vụ", "data_type": "text", "unit": null, "required": true, "min": null, "max": null, "max_scale": null, "enum_values": [], "help_vi": null, "position": 2, "reserved": true},
+        {"key": "stage", "label_vi": "Giai đoạn sinh trưởng", "data_type": "enum", "unit": null, "required": true, "min": null, "max": null, "max_scale": null, "enum_values": ["ma", "de_nhanh", "lam_dong", "tro_bong", "chin"], "help_vi": null, "position": 3, "reserved": false},
+        {"key": "awd_water_level_cm", "label_vi": "Mực nước so với mặt ruộng", "data_type": "decimal", "unit": "cm", "required": true, "min": "-30", "max": "30", "max_scale": 1, "enum_values": [], "help_vi": "Đo tại ống quan trắc; âm = dưới mặt ruộng", "position": 4, "reserved": false},
+        {"key": "awd_dry_days", "label_vi": "Số ngày khô liên tục", "data_type": "integer", "unit": "ngày", "required": true, "min": "0", "max": "60", "max_scale": null, "enum_values": [], "help_vi": null, "position": 5, "reserved": false},
+        {"key": "field_surface", "label_vi": "Tình trạng mặt ruộng", "data_type": "enum", "unit": null, "required": false, "min": null, "max": null, "max_scale": null, "enum_values": ["ngap", "am", "nut_ne", "kho"], "help_vi": null, "position": 6, "reserved": false},
+        {"key": "photo", "label_vi": "Ảnh hiện trường", "data_type": "photo", "unit": null, "required": true, "min": "1", "max": "10", "max_scale": null, "enum_values": [], "help_vi": null, "position": 7, "reserved": true},
+        {"key": "gps", "label_vi": "Toạ độ lúc chụp", "data_type": "geo_point", "unit": null, "required": true, "min": null, "max": null, "max_scale": null, "enum_values": [], "help_vi": null, "position": 8, "reserved": true},
+        {"key": "note", "label_vi": "Ghi chú", "data_type": "text", "unit": null, "required": false, "min": null, "max": "1000", "max_scale": null, "enum_values": [], "help_vi": null, "position": 9, "reserved": false}
+      ]
+    },
+    {
+      "id": "01920000-0000-7000-8000-00000000ca02",
+      "evidence_type": "field_checklist",
+      "version": 1,
+      "status": "approved",
+      "provisional": true,
+      "source_note": "Danh mục mẫu G1 — TẠM, chờ chốt C-1",
+      "setter_ref": "01920000-0000-7000-8000-00000000aa01",
+      "approver_ref": "01920000-0000-7000-8000-00000000aa02",
+      "submitted_at": "2026-09-27T01:00:00Z",
+      "decided_at": "2026-09-27T02:00:00Z",
+      "decision_note": null,
+      "created_at": "2026-09-27T00:00:00Z",
+      "fields": [
+        {"key": "plot_ref", "label_vi": "Thửa ruộng / SPOT", "data_type": "text", "unit": null, "required": true, "min": null, "max": null, "max_scale": null, "enum_values": [], "help_vi": null, "position": 1, "reserved": true},
+        {"key": "season", "label_vi": "Vụ", "data_type": "text", "unit": null, "required": true, "min": null, "max": null, "max_scale": null, "enum_values": [], "help_vi": null, "position": 2, "reserved": true},
+        {"key": "stage", "label_vi": "Giai đoạn sinh trưởng", "data_type": "enum", "unit": null, "required": false, "min": null, "max": null, "max_scale": null, "enum_values": ["ma", "de_nhanh", "lam_dong", "tro_bong", "chin"], "help_vi": null, "position": 3, "reserved": false},
+        {"key": "check_boundary_ok", "label_vi": "Ranh giới thửa khớp bản đồ", "data_type": "boolean", "unit": null, "required": true, "min": null, "max": null, "max_scale": null, "enum_values": [], "help_vi": null, "position": 4, "reserved": false},
+        {"key": "check_interview_done", "label_vi": "Đã phỏng vấn nông hộ", "data_type": "boolean", "unit": null, "required": true, "min": null, "max": null, "max_scale": null, "enum_values": [], "help_vi": null, "position": 5, "reserved": false},
+        {"key": "check_water_regime", "label_vi": "Chế độ nước quan sát được", "data_type": "enum", "unit": null, "required": true, "min": null, "max": null, "max_scale": null, "enum_values": ["awd", "ngap_lien_tuc", "khac"], "help_vi": null, "position": 6, "reserved": false},
+        {"key": "check_estimated_yield_t_ha", "label_vi": "Ước tính năng suất", "data_type": "decimal", "unit": "t/ha", "required": false, "min": "0", "max": "20", "max_scale": 2, "enum_values": [], "help_vi": null, "position": 7, "reserved": false},
+        {"key": "check_visit_date", "label_vi": "Ngày kiểm tra", "data_type": "date", "unit": null, "required": true, "min": null, "max": null, "max_scale": null, "enum_values": [], "help_vi": null, "position": 8, "reserved": false},
+        {"key": "photo", "label_vi": "Ảnh hiện trường", "data_type": "photo", "unit": null, "required": true, "min": "1", "max": "10", "max_scale": null, "enum_values": [], "help_vi": null, "position": 9, "reserved": true},
+        {"key": "gps", "label_vi": "Toạ độ lúc kiểm tra", "data_type": "geo_point", "unit": null, "required": true, "min": null, "max": null, "max_scale": null, "enum_values": [], "help_vi": null, "position": 10, "reserved": true},
+        {"key": "note", "label_vi": "Ghi chú", "data_type": "text", "unit": null, "required": false, "min": null, "max": "1000", "max_scale": null, "enum_values": [], "help_vi": null, "position": 11, "reserved": false}
+      ]
+    }
+  ]
+}
