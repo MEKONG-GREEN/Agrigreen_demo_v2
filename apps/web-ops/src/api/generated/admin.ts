@@ -1161,6 +1161,196 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/accounts/grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vai người gọi được cấp, vai [MFA], ràng buộc vai ↔ loại tổ chức */
+        get: operations["accountsGrants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tài khoản trong phạm vi — đọc Keycloak theo tenant_id của token, lọc org_ref thuộc phạm vi người gọi */
+        get: operations["accountsListUsers"];
+        put?: never;
+        /** Tạo tài khoản — tenant_id từ token, org_ref trong phạm vi, vai theo ma trận; required actions VERIFY_EMAIL, UPDATE_PASSWORD (+ CONFIGURE_TOTP với vai [MFA]) */
+        post: operations["accountsCreateUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/users/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nhập tài khoản hàng loạt từ CSV (UTF-8) hoặc Excel .xlsx (trang tính đầu), tối đa 200 dòng; kết quả theo dòng
+         * @description Cột (tiêu đề không phân biệt hoa thường, bỏ dấu): email; full_name|ho_ten (hoặc first_name|ten + last_name|ho);
+         *     org_ref|ma_to_chuc (UUID tổ chức pf/party); roles|vai_tro (phân tách , ; |); tùy chọn username|ten_dang_nhap, phone|so_dien_thoai|sdt.
+         *     Thiếu cột bắt buộc → từ chối cả tệp (accounts.import_invalid). Dòng lỗi bị loại kèm lý do ("Thiếu Email", "Sai định dạng Email",
+         *     "Sai định dạng vai trò", "SĐT đã tồn tại", "Trùng với dòng N trong tệp"…), dòng hợp lệ được tạo và nhận liên kết kích hoạt.
+         */
+        post: operations["accountsImportUsers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/users/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thao tác loạt (KN US-ADM-03) — khóa, mở khóa hoặc gửi lại liên kết cho tối đa 100 tài khoản; kết quả theo từng tài khoản */
+        post: operations["accountsBulk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description id người dùng Keycloak */
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Chi tiết tài khoản (vai đọc thẳng từ Keycloak) */
+        get: operations["accountsGetUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/users/{id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Nhật ký thao tác (sổ chỉ ghi thêm — ai, lúc nào, lý do; US-HTXSTATUS-03) */
+        get: operations["accountsUserEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/users/{id}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Khóa tài khoản (enabled=false) và thu hồi mọi phiên — lý do ≥ 20 ký tự; phát pf.accounts.user.locked */
+        post: operations["accountsLock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/users/{id}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mở khóa — lý do ≥ 20 ký tự; tổ chức đang vô hiệu hóa → 409 accounts.org_inactive; phát pf.accounts.user.unlocked */
+        post: operations["accountsUnlock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/users/{id}/resend-actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gửi lại liên kết một lần — mặc định các required action đang chờ; không còn → UPDATE_PASSWORD (đặt lại mật khẩu, không mật khẩu tạm) */
+        post: operations["accountsResendActions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/users/{id}/assignment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đổi đơn vị công tác và/hoặc vai (roles là tập đầy đủ vai do module quản lý); thêm vai [MFA] khi chưa có OTP → CONFIGURE_TOTP */
+        post: operations["accountsAssign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1871,6 +2061,54 @@ export interface components {
             target: string;
             devices: number;
         };
+        /** @description Tài khoản đọc từ Keycloak — dữ liệu cá nhân chỉ hiển thị cho quản trị viên, không lưu ở pf, không ghi log */
+        AccountsUser: {
+            /** Format: uuid */
+            id: string;
+            username: string;
+            email: string;
+            first_name: string;
+            last_name: string;
+            phone: string | null;
+            enabled: boolean;
+            email_verified: boolean;
+            /** Format: uuid */
+            org_ref: string | null;
+            /** @description Vai do pf/accounts quản lý; null ở danh sách nếu tài khoản tạo ngoài nền tảng */
+            roles: string[] | null;
+            /** @enum {string|null} */
+            lock_cause: "manual" | "org_deactivated" | null;
+            required_actions: string[];
+            /** Format: date-time */
+            created_at: string | null;
+            /** @description Có trong pf_accounts (tạo hoặc thao tác qua nền tảng) */
+            tracked: boolean;
+        };
+        AccountsAccount: {
+            /** Format: uuid */
+            user_ref: string;
+            /** Format: uuid */
+            org_ref: string;
+            roles: string[];
+            enabled: boolean;
+            /** @enum {string|null} */
+            lock_cause: "manual" | "org_deactivated" | null;
+        };
+        AccountsEvent: {
+            seq: number;
+            /** @enum {string} */
+            action: "created" | "locked" | "unlocked" | "assignment_changed" | "actions_sent";
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            actor_ref: string;
+            reason: string | null;
+            account: components["schemas"]["AccountsAccount"];
+            /** @description vd required actions, prev_org_ref, source_event_id — không PII */
+            details?: Record<string, never>;
+        };
         ParamValue: {
             key: string;
             /** @description Số thập phân dạng chuỗi (R-10) */
@@ -1974,6 +2212,19 @@ export interface components {
                 };
             };
         };
+        /** @description Trạng thái tài khoản sau thao tác và seq dòng sổ vừa ghi */
+        AccountsChanged: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    account: components["schemas"]["AccountsAccount"];
+                    seq: number;
+                    replayed: boolean;
+                };
+            };
+        };
     };
     parameters: {
         IdempotencyKey: string;
@@ -1991,6 +2242,14 @@ export interface components {
                     version_no?: number;
                     /** @description Bắt buộc với return/retire */
                     reason?: string;
+                };
+            };
+        };
+        AccountsReason: {
+            content: {
+                "application/json": {
+                    /** @description Lý do ≥ 20 ký tự (HTX US-HTXSTATUS-01 AC-3); không ghi dữ liệu cá nhân */
+                    reason: string;
                 };
             };
         };
@@ -4026,6 +4285,359 @@ export interface operations {
             404: components["responses"]["Problem"];
             /** @description notify.nudge_rate_limited */
             429: components["responses"]["Problem"];
+        };
+    };
+    accountsGrants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ma trận cấp vai áp cho người gọi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        grantable: string[];
+                        mfa_roles: string[];
+                        role_org_kinds: {
+                            [key: string]: string[];
+                        };
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    accountsListUsers: {
+        parameters: {
+            query?: {
+                org_ref?: string;
+                /** @description next_cursor của trang trước (R-53) */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AccountsUser"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    accountsCreateUser: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Bỏ trống → dùng email. 3–64 ký tự a-z 0-9 . _ - @ */
+                    username?: string;
+                    /** Format: email */
+                    email: string;
+                    /** @description Họ tên; tách thành last_name (họ, đệm) + first_name (tên) nếu không gửi hai trường kia */
+                    full_name?: string;
+                    first_name?: string;
+                    last_name?: string;
+                    /** @description 10 chữ số bắt đầu bằng 0 (+84 được đổi); duy nhất trong tenant */
+                    phone?: string;
+                    /** Format: uuid */
+                    org_ref: string;
+                    roles: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Đã tạo trong Keycloak và ghi sổ pf_accounts.account_event (created, actions_sent); phát pf.accounts.user.created */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        user: components["schemas"]["AccountsUser"];
+                        seq: number;
+                        /** @description false khi Keycloak không gửi được email — gửi lại bằng /resend-actions */
+                        activation_email_sent: boolean;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    accountsImportUsers: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+            };
+        };
+        responses: {
+            /** @description Kết quả theo dòng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        created: number;
+                        rejected: number;
+                        rows: {
+                            /** @description Số dòng trong tệp (dòng 1 là tiêu đề) */
+                            row: number;
+                            /** @enum {string} */
+                            status: "created" | "rejected";
+                            /** @description Không chứa dữ liệu cá nhân */
+                            reason: string | null;
+                            /** Format: uuid */
+                            user_id: string | null;
+                            activation_email_sent: boolean;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    accountsBulk: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    action: "lock" | "unlock" | "resend";
+                    user_ids: string[];
+                    /** @description Bắt buộc với lock/unlock */
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        succeeded: number;
+                        failed: number;
+                        items: {
+                            /** Format: uuid */
+                            user_id: string;
+                            ok: boolean;
+                            replayed: boolean;
+                            /** @description Mã lỗi docs/errors.md */
+                            code: string | null;
+                            detail: string | null;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    accountsGetUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description id người dùng Keycloak */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tài khoản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountsUser"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    accountsUserEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Theo seq tăng dần */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AccountsEvent"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    accountsLock: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["AccountsReason"];
+        responses: {
+            200: components["responses"]["AccountsChanged"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    accountsUnlock: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["AccountsReason"];
+        responses: {
+            200: components["responses"]["AccountsChanged"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    accountsResendActions: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    actions?: ("VERIFY_EMAIL" | "UPDATE_PASSWORD" | "CONFIGURE_TOTP")[];
+                };
+            };
+        };
+        responses: {
+            /** @description Đã gửi; ghi sổ actions_sent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        account: components["schemas"]["AccountsAccount"];
+                        activation_email_sent: boolean;
+                        replayed: boolean;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+        };
+    };
+    accountsAssign: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    org_ref?: string;
+                    roles?: string[];
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["AccountsChanged"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
 }
