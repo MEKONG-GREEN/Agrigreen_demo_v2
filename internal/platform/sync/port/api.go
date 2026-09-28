@@ -111,4 +111,7 @@ type ConflictResolvedV1 struct {
 	ResolvedAt       string     `json:"resolved_at"`
 	ResolvedRecordID *uuid.UUID `json:"resolved_record_id"`
 	Overdue          bool       `json:"overdue"`
+	// Resolution: keep_version (giữ bản ghi resolved_record_id) | correction (bản ghi bù
+	// resolved_record_id do module sở hữu tạo) | rỗng (chỉ đóng kèm ghi chú) — US-SYNC-03.
+	Resolution string `json:"resolution,omitempty"`
 }

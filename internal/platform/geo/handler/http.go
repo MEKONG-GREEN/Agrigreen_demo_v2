@@ -34,6 +34,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/geo/conflicts", h.conflicts)
 	rg.POST("/geo/conflicts/:id/resolve", h.resolve)
 	rg.GET("/geo/admin-boundaries/:code", h.adminBoundary)
+	h.registerG1(rg)
 }
 
 // MaxImportBody là giới hạn thân request của đường nhập thửa (gói Shapefile .zip lớn hơn GeoJSON).

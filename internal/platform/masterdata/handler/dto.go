@@ -126,6 +126,9 @@ type versionDTO struct {
 	DecidedAt        *string `json:"decided_at"`
 	DecisionNote     *string `json:"decision_note"`
 	CreatedAt        string  `json:"created_at"`
+	// SetterName/ApproverName: tên cán bộ từ danh bạ pf/extension (G-07); null khi chưa có trong danh bạ.
+	SetterName   *string `json:"setter_name"`
+	ApproverName *string `json:"approver_name"`
 }
 
 func ts(t *time.Time) *string {

@@ -51,6 +51,9 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc
 // Plots cho module khác tra cứu thửa (qua port), vd kiểm vị trí GPS ≤ 50 m (HTX US-GPS-01).
 func (m *Module) Plots() port.Plots { return m.svc }
 
+// PlotStats cho module khác đọc thống kê thửa đã số hoá (qua port, G-02/G-03).
+func (m *Module) PlotStats() port.PlotStats { return m.svc }
+
 // SyncSource là chiều xuống entity "plot" cho pf/sync.
 func (m *Module) SyncSource() syncport.Source { return app.SyncSource{Svc: m.svc} }
 

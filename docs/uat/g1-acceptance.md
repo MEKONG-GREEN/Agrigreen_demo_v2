@@ -112,6 +112,8 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | US-SYNC-01 hai chiều với App HTX | — | **chưa có**, thuộc G2. G1 chỉ có đồng bộ app hiện trường ↔ máy chủ: E2E-11, `TestPushMixedBatchAndReplay`, `TestPullPaginationRoundRobin`, `TestPullScopeChangeResets` |
 | US-SYNC-02 đồng bộ ngay theo yêu cầu | `TestNudgeScopeAndRateLimit` (`POST /v1/sync/nudge`, thông điệp dữ liệu `sync_now`, giới hạn 5 phút/đích, 30 lần/giờ) | **một phần**. Có ở máy chủ; app phải xử lý `sync_now` (chưa ráp Flutter) |
 | US-SYNC-03 đối soát xung đột | `TestConflictSLA`, `TestSyncSinkIdempotentAndConflict` | **một phần**. Có sổ xung đột và SLA 72 giờ (C-8 tạm), có API resolve; chưa có màn hình, E2E không tạo xung đột |
+| US-SYNC-02 đồng bộ ngay theo yêu cầu | — | **chưa có** |
+| US-SYNC-03 đối soát xung đột | `TestConflictSLA`, `TestSyncSinkIdempotentAndConflict`, `TestConflictResolutionUI`, `TestConflictDetailBothVersions` | **đạt API** (28/09). Lọc theo entity/SLA (`sla_status`), chi tiết giữ cả hai phiên bản không PII, xử lý chọn phiên bản hoặc bản ghi bù; chưa có màn hình web |
 
 ### G. Thư viện kỹ thuật và tin tức
 
@@ -123,6 +125,8 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | US-LIB-04 tra cứu | `TestSearchAccentInsensitive`, E2E-06 | có |
 | US-LIB-05 lưu và tải offline | E2E-11 (pull `document`), `TestSyncRetireTombstone` | **một phần**. Có đồng bộ xuống máy; chưa có danh mục cá nhân |
 | US-LIB-06 thông báo nội dung mới | E2E-06, `TestAlertPublishedEvent`, `TestAlertFanOutRespectsScope`, `TestDuplicateEventDeliveryNoDuplicates`, `TestFCMPayloadIsDataOnly` | **một phần**. pf/notify: hộp thư trong app theo phạm vi, đẩy FCM chỉ dữ liệu (ADR-0015); chưa ráp app web/Flutter |
+| US-LIB-05 lưu và tải offline | E2E-11 (pull `document`), `TestSyncRetireTombstone`, `TestPersonalLibraryUSLIB05` | **đạt API** (28/09). Danh mục cá nhân (migration 000014) + entity đồng bộ `library_item` của chính người lưu |
+| US-LIB-06 thông báo nội dung mới | E2E-06 (`pf.content.document.published` trong outbox), `TestAlertPublishedEvent` | **một phần**. Có sự kiện; chưa có kênh đẩy thông báo tới máy |
 
 ### I. Dashboard và báo cáo
 
@@ -161,7 +165,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | FN-06 | Lịch mùa vụ và diện tích theo vụ | E2E-09 (nhập tay), `TestLockedManualAreaNotOverwritten`, `TestValidateCalendar` | có |
 | FN-07 | Tích hợp App HTX | `TestResolveAreaQT03` (chỉ port `AreaFeed`) | **chưa có** luồng thật, thuộc G2 |
 | FN-08 | Bản đồ và trực quan hóa | `TestSummarizeBottleneck` (API coverage theo cấp) | **một phần**. Có API đọc; chưa có kiểm thử giao diện bản đồ |
-| FN-09 | Cân đối và dự báo | E2E-09, `TestBalanceUsesNormAtSeasonAndPilotStages`, `TestSavedResultsImmutableAndChainVerifies` | **một phần**. Có cân đối lưu theo vụ; chưa có dự báo |
+| FN-09 | Cân đối và dự báo | E2E-09, `TestBalanceUsesNormAtSeasonAndPilotStages`, `TestSavedResultsImmutableAndChainVerifies`, `TestForecastFN09AndCoopCodeG10`, `TestProjectAreaFN09` | **đạt, phương pháp dự báo tạm** (`cgh.forecast/v1`, docs/dev/cgh-forecast.md) — **cần DCRD xác nhận phương pháp** |
 | FN-10 | Báo cáo và xuất dữ liệu | — | **chưa có**. Có API đọc coverage/trend, chưa có xuất tệp |
 | FN-11 | Dashboard tổng quan | E2E-09 (`total_machines`) | có |
 
@@ -181,6 +185,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | RB-1 | Chỉ ghi thêm, sửa bằng bản ghi bù | `TestAppendOnlySixWays`, `TestCatalogGates`, `TestChainSequenceAndTamperDetection`, `TestCorrectionCreatesNewVersion`, `TestCorrectionChain` | có |
 | RB-2 | Cách ly tenant | `TestTenantLeakParallel` (R-32, qua PgBouncer trong CI), `TestTenantIsolation` của từng module | có. E2E dùng một tenant |
 | RB-3 | PII xóa được | `TestErasure` (vault) | **một phần**. E2E không xóa định danh rồi kiểm ảnh không mở được. Bản sao lưu (pgBackRest, `objsync`) chỉ chứa bản mã; xóa trong bản sao dựa vào hủy khóa hộ (mục 22) — diễn tập chưa kiểm "phục hồi rồi ảnh đã xóa vẫn không mở được" |
+| RB-3 | PII xóa được | `TestErasure` (vault), E2E `TestRB3ErasureEvidenceUnreadable` | **đạt**. Xóa định danh → `GET /v1/files/{ref}/content` trả 410 `vault.erased`; sổ pf (đồng ý, inbound, org_event) còn nguyên, chuỗi băm xác minh được |
 | RB-4 | Giấy phép | CI `go-licenses` + `deploy/policies/allowed-licenses.txt` | có (cổng CI, không phải kiểm thử Go) |
 | RB-5 | Ranh giới module | `go run ./tools/archlint ./...`, `TestAssemblyMatchesAPIPlatform` | có |
 | RB-6 | Đối soát chéo số đo ở biên | — | **chưa có**. Module đối soát (mục 13) chưa thuộc G1 |

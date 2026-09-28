@@ -8,6 +8,7 @@ package party
 import (
 	"github.com/gin-gonic/gin"
 
+	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/handler"
@@ -68,6 +69,13 @@ func (m *Module) Orgs() port.Orgs { return m.reg }
 
 // ScopeResolver cho module khác tính phạm vi theo cây phân cấp (qua port, ADR-0009).
 func (m *Module) ScopeResolver() port.ScopeResolver { return m.reg }
+
+// UsePlotStats nối thống kê thửa của pf/geo cho danh sách HTX (G-03). Gốc lắp ráp
+// gọi sau khi dựng pf/geo (pf/geo cần phạm vi của pf/party nên dựng sau).
+func (m *Module) UsePlotStats(ps geoport.PlotStats) { m.reg.Plots = ps }
+
+// CooperativeStats cho module khác đếm HTX, hộ thành viên theo đơn vị (qua port, G-02).
+func (m *Module) CooperativeStats() port.CooperativeStats { return m.reg }
 
 // SyncSink nhận bản ghi đồng ý thu ngoại tuyến qua pf/sync (entity consent).
 func (m *Module) SyncSink() syncport.Sink { return app.ConsentSink{Svc: m.svc} }

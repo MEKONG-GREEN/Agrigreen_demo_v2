@@ -113,14 +113,16 @@ type CoverageQuery struct {
 type CoverageItem struct {
 	UnitCode       string // mã tỉnh/xã; với HTX là mã xã
 	CooperativeRef uuid.UUID
-	Name           string
-	ProvinceCode   string
-	CommuneCode    string
-	Cooperatives   int
-	AreaSource     string // chỉ ở cấp HTX: [App HTX]/[Nhập tay]
-	AreaLocked     bool
-	Overall        domain.Group
-	Stages         map[string]domain.Group
+	// CooperativeCode: Mã HTX (CGH BR-01, FN-11) — chỉ ở cấp HTX (G-10).
+	CooperativeCode string
+	Name            string
+	ProvinceCode    string
+	CommuneCode     string
+	Cooperatives    int
+	AreaSource      string // chỉ ở cấp HTX: [App HTX]/[Nhập tay]
+	AreaLocked      bool
+	Overall         domain.Group
+	Stages          map[string]domain.Group
 }
 
 // CoverageView là kết quả tổng hợp theo cấp.
@@ -193,6 +195,9 @@ func (s *Service) coverageOf(ctx context.Context, rv RunView, level string) Cove
 		b.item.Overall, b.item.Stages = domain.Summarize(b.rows, th)
 		b.item.Cooperatives = len(b.coops)
 		b.item.Name = s.unitName(ctx, level, b.item, rv.Run.ReferenceDate, names)
+		if level == LevelCooperative {
+			b.item.CooperativeCode = s.coopCode(ctx, b.item.CooperativeRef, names)
+		}
 		out.Items = append(out.Items, b.item)
 	}
 	sort.SliceStable(out.Items, func(i, j int) bool {

@@ -70,7 +70,8 @@ func (h Handler) revoke(c *gin.Context) {
 }
 
 func (h Handler) listConflicts(c *gin.Context) {
-	q := app.ConflictQuery{Status: c.Query("status"), OverdueOnly: c.Query("overdue") == "true", Limit: limitParam(c)}
+	q := app.ConflictQuery{Status: c.Query("status"), OverdueOnly: c.Query("overdue") == "true", Limit: limitParam(c),
+		Entity: c.Query("entity"), SLA: c.Query("sla")}
 	if s := c.Query("owner_org_ref"); s != "" {
 		o, err := ids.ParseRef(s)
 		if err != nil {
@@ -102,17 +103,19 @@ func (h Handler) getConflict(c *gin.Context) {
 		httpx.Fail(c, app.ErrConflictNotFound)
 		return
 	}
-	cf, err := h.Svc.GetConflict(c.Request.Context(), id)
+	d, err := h.Svc.GetConflictDetail(c.Request.Context(), id)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, toConflictDTO(cf, h.Svc.Clock.Now()))
+	c.JSON(http.StatusOK, toConflictDetailDTO(d, h.Svc.Clock.Now()))
 }
 
 type resolveReq struct {
 	Note             string  `json:"note"`
 	ResolvedRecordID *string `json:"resolved_record_id"`
+	// Resolution (tùy chọn, US-SYNC-03): keep_version | correction.
+	Resolution string `json:"resolution"`
 }
 
 func (h Handler) resolve(c *gin.Context) {
@@ -134,7 +137,7 @@ func (h Handler) resolve(c *gin.Context) {
 		}
 		rec = &r
 	}
-	cf, err := h.Svc.ResolveConflict(c.Request.Context(), id, req.Note, rec)
+	cf, err := h.Svc.ResolveConflictAs(c.Request.Context(), id, req.Note, rec, req.Resolution)
 	if err != nil {
 		httpx.Fail(c, err)
 		return

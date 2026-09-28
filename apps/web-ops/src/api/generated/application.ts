@@ -1338,6 +1338,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/geo/conflicts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết xung đột ranh giới giữ cả hai phiên bản (US-SYNC-03): bản gây xung đột, bản hiện hành, thửa bị chồng lấn — không PII */
+        get: operations["getBoundaryConflict"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/admin-boundaries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** G-05: ranh giới hành chính hiện hành theo cấp và đơn vị cha (FeatureCollection); đơn vị chưa có hình ở missing */
+        get: operations["listAdminBoundaries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mechanization/forecasts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dự báo nhu cầu đã lưu (FN-09, cgh.forecast/v1 — phương pháp tạm, cần DCRD xác nhận); chạy qua Admin API */
+        get: operations["mechListForecasts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mechanization/forecasts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một lần dự báo đã lưu (không tính lại) và các dòng HTX × chủng loại trong phạm vi */
+        get: operations["mechGetForecast"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** G-02 (US-DASH-01): bảng điều hành gộp — KPI pf/extension + HTX/hộ pf/party + thửa số hoá pf/geo + mục tiêu diện tích; tổng = tổng các con (toàn quốc = tổng các tỉnh); thiếu báo cáo → "Số liệu tạm tính" */
+        get: operations["unifiedDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/library": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** US-LIB-05: danh mục cá nhân (tài liệu đã lưu để đọc ngoại tuyến) của người gọi, mới lưu trước */
+        get: operations["listLibrary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/documents/{ref}/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** US-LIB-05: lưu tài liệu đang hiển thị vào danh mục cá nhân (đồng bộ xuống máy qua entity library_item) */
+        post: operations["saveDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/documents/{ref}/unsave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** US-LIB-05: bỏ lưu (không xóa cứng; máy nhận tombstone library_item) */
+        post: operations["unsaveDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2272,6 +2408,12 @@ export interface components {
             last_note?: string | null;
             /** @description seq cuối trong sổ của nhiệm vụ */
             version: number;
+            /** @description G-09: tên cán bộ được giao (danh bạ trực) */
+            assignee_name?: string | null;
+            /** @description G-09: tên HTX (pf/party) */
+            cooperative_name?: string | null;
+            /** @description G-09: tên xã (pf/masterdata) */
+            commune_name?: string | null;
         };
         ExtTaskEvent: {
             /** Format: uuid */
@@ -2578,6 +2720,10 @@ export interface components {
             stages: {
                 [key: string]: components["schemas"]["MechGroup"];
             };
+            /** @description G-10: Mã HTX (CGH BR-01) — chỉ ở cấp HTX */
+            cooperative_code?: string | null;
+            /** @description G-10: nhãn nguồn diện tích [App HTX]/[Nhập tay] */
+            area_source_label?: string | null;
         };
         /** @description Không chứa dữ liệu cá nhân. Cũng là data của entity đồng bộ "notification" (không có topic). */
         Notification: {
@@ -2633,6 +2779,102 @@ export interface components {
             target_kind: "device" | "unit";
             target: string;
             devices: number;
+        };
+        /** @description Lần chạy dự báo nhu cầu (FN-09) — phương pháp TẠM cgh.forecast/v1, cần DCRD xác nhận (docs/dev/cgh-forecast.md) */
+        MechForecastRun: {
+            /** Format: uuid */
+            id: string;
+            season_code: string;
+            season_year: number;
+            season_key: string;
+            /**
+             * Format: date
+             * @description Ngày bắt đầu vụ dự báo — định mức tra tại đây
+             */
+            reference_date: string;
+            /** @enum {string} */
+            rule_version: "cgh.forecast/v1";
+            method_provisional: boolean;
+            method: {
+                formula: string;
+                max_history: number;
+                growth_cap: components["schemas"]["Decimal"];
+                note: string;
+            };
+            pilot_stages: string[];
+            result_count: number;
+            missing_norms: string[];
+            /** Format: date-time */
+            computed_at: string;
+            seq: number;
+        };
+        MechForecastResult: {
+            /** Format: uuid */
+            cooperative_ref: string;
+            commune_code: string | null;
+            province_code: string | null;
+            farm_stage: string;
+            machine_type: string;
+            /** @description Diện tích cùng vụ năm trước */
+            base_area_ha: components["schemas"]["Decimal"] | null;
+            /** @description Tăng trưởng đã áp (%) sau chặn ±20 % */
+            growth_pct: components["schemas"]["Decimal"] | null;
+            forecast_area_ha: components["schemas"]["Decimal"] | null;
+            norm_key: string;
+            norm: Record<string, never> | null;
+            required: components["schemas"]["Decimal"] | null;
+            required_whole: number | null;
+            /** @description Máy Hoạt động lúc chạy dự báo */
+            capacity_now: number;
+            gap: number | null;
+            /** @enum {string} */
+            status: "ok" | "no_data" | "no_norm";
+            inputs: {
+                history: {
+                    [key: string]: string;
+                };
+                rates: {
+                    [key: string]: string;
+                };
+                raw_growth: string | null;
+                capped: boolean;
+                /** Format: date */
+                norm_at: string;
+            };
+            seq: number;
+        };
+        /** @description G-02: số liệu gộp của một đơn vị (pf/extension + pf/party + pf/geo + tham số mục tiêu) */
+        UnifiedFigures: {
+            sown_area_ha: components["schemas"]["Decimal"];
+            /** @description Tham số extension.target_sown_area_ha:<đơn vị> */
+            target_area_ha: components["schemas"]["Decimal"] | null;
+            cooperatives: number;
+            households: number;
+            cooperatives_reporting: number;
+            digitized_plots: number;
+            digitized_area_ha: components["schemas"]["Decimal"];
+            open_tasks: number;
+            overdue_tasks: number;
+            expected_communes: number;
+            reported_communes: number;
+            missing_communes: string[];
+            provisional: boolean;
+            provisional_label: string | null;
+        };
+        /** @description US-LIB-05: tài liệu trong danh mục cá nhân */
+        LibraryItem: {
+            /** Format: uuid */
+            document_ref: string;
+            /** Format: date-time */
+            saved_at: string;
+            note: string | null;
+            /** @description false = tài liệu đã gỡ/ra khỏi phạm vi — máy giữ bản đã tải, nhãn "đã gỡ" */
+            available: boolean;
+            kind: string | null;
+            title: string | null;
+            summary: string | null;
+            /** Format: date-time */
+            published_at: string | null;
         };
     };
     responses: {
@@ -5344,6 +5586,284 @@ export interface operations {
             422: components["responses"]["Problem"];
             /** @description notify.nudge_rate_limited (retry_after_s, header Retry-After) */
             429: components["responses"]["Problem"];
+        };
+    };
+    getBoundaryConflict: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Xung đột kèm các phiên bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoundaryConflict"] & {
+                        versions: {
+                            /** @enum {string} */
+                            role: "record" | "current" | "overlapping";
+                            /** Format: uuid */
+                            boundary_id: string;
+                            /** Format: uuid */
+                            plot_ref: string;
+                            plot_code: string;
+                            version: number;
+                            area_ha: components["schemas"]["Decimal"];
+                            current: boolean;
+                            geometry?: components["schemas"]["PolygonGeometry"];
+                        }[];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    listAdminBoundaries: {
+        parameters: {
+            query: {
+                level: "province" | "commune";
+                /** @description Mã tỉnh; bắt buộc với level=commune */
+                parent?: string;
+                zoom?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ranh giới */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/geo+json": {
+                        /** @enum {string} */
+                        type: "FeatureCollection";
+                        features: {
+                            /** @enum {string} */
+                            type: "Feature";
+                            id: string;
+                            geometry: components["schemas"]["PolygonGeometry"];
+                            properties: {
+                                code: string;
+                                /** @enum {string} */
+                                level: "province" | "commune";
+                                name: string;
+                                parent_code: string | null;
+                                source: string;
+                                area_ha: components["schemas"]["Decimal"];
+                                /** Format: date-time */
+                                imported_at: string;
+                            };
+                        }[];
+                        /** @description Mã đơn vị chưa nhập ranh giới */
+                        missing: string[];
+                    };
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
+    mechListForecasts: {
+        parameters: {
+            query?: {
+                season_code?: string;
+                season_year?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Các lần chạy (mới nhất trước) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MechForecastRun"][];
+                    };
+                };
+            };
+        };
+    };
+    mechGetForecast: {
+        parameters: {
+            query?: {
+                province_code?: string;
+                commune_code?: string;
+                cooperative_ref?: string;
+                farm_stage?: string;
+                machine_type?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dự báo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        run: components["schemas"]["MechForecastRun"];
+                        results: components["schemas"]["MechForecastResult"][];
+                        summary: {
+                            forecast_area_ha: components["schemas"]["Decimal"];
+                            required_by_stage: {
+                                [key: string]: string;
+                            };
+                        };
+                    };
+                };
+            };
+            /** @description mechanization.forecast_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    unifiedDashboard: {
+        parameters: {
+            query?: {
+                /** @description Mã tỉnh/xã; bỏ trống = toàn quốc (nếu được) hoặc đơn vị phụ trách */
+                unit?: string;
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bảng điều hành */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        unit: string | null;
+                        /** @enum {string} */
+                        level: "national" | "province" | "commune";
+                        period: string;
+                        /** Format: date-time */
+                        as_of: string;
+                        total: components["schemas"]["UnifiedFigures"];
+                        children: (components["schemas"]["UnifiedFigures"] & {
+                            unit: string;
+                            name: string | null;
+                        })[];
+                        /** @description Module đã nối vào số liệu */
+                        sources: string[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listLibrary: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["LibraryItem"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+        };
+    };
+    saveDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    note?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã lưu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryItem"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    unsaveDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã bỏ lưu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        document_ref: string;
+                        saved: boolean;
+                        /** Format: date-time */
+                        removed_at: string;
+                    };
+                };
+            };
+            /** @description content.library_item_not_found */
+            404: components["responses"]["Problem"];
         };
     };
 }

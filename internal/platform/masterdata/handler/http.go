@@ -45,6 +45,7 @@ func (h Handler) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.POST("/masterdata/params/versions/:id/submit", h.submit)
 	rg.POST("/masterdata/params/versions/:id/approve", h.approve)
 	rg.POST("/masterdata/params/versions/:id/reject", h.reject)
+	h.registerRegistry(rg)
 }
 
 func bindJSON(c *gin.Context, v any) bool {
@@ -371,7 +372,9 @@ func (h Handler) version(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, toVersionDTO(v))
+	d := []versionDTO{toVersionDTO(v)}
+	h.withNames(c.Request.Context(), d)
+	c.JSON(http.StatusOK, d[0])
 }
 
 func (h Handler) versions(c *gin.Context) {
@@ -396,6 +399,7 @@ func (h Handler) versions(c *gin.Context) {
 	for _, v := range pg.Items {
 		items = append(items, toVersionDTO(v))
 	}
+	h.withNames(c.Request.Context(), items)
 	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": encodeCursor(pg.Next)})
 }
 

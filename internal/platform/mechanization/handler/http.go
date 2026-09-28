@@ -34,6 +34,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.GET("/coverage", h.coverage)
 	g.GET("/dashboard", h.dashboard)
 	g.GET("/trend", h.trend)
+	h.registerForecastApp(g)
 }
 
 // RegisterAdmin gắn route Admin API (MFA bắt buộc ở router) — chỉ cgh_admin ghi.
@@ -55,6 +56,7 @@ func (h Handler) RegisterAdmin(rg *gin.RouterGroup) {
 	g.POST("/season-areas/:id/unlock", h.unlockArea)
 	g.GET("/season-areas/:id/events", h.areaEvents)
 	g.POST("/balance-runs", h.computeBalance)
+	h.registerForecastAdmin(g)
 }
 
 func created(replayed bool) int {
