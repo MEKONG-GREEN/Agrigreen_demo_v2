@@ -41,7 +41,7 @@ func (g *fakeGoogle) server(t *testing.T) *httptest.Server {
 		g.mu.Lock()
 		g.tokens++
 		g.mu.Unlock()
-		_, _ = w.Write([]byte(`{"access_token":"ya29.thu-nghiem","expires_in":3600,"token_type":"Bearer"}`))
+		_, _ = w.Write([]byte(`{"access_token":"token-gia-cho-kiem-thu","expires_in":3600,"token_type":"Bearer"}`))
 	})
 	mux.HandleFunc("/v1/projects/agrigreen-test/messages:send", func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
@@ -102,7 +102,7 @@ func TestFCMPayloadIsDataOnly(t *testing.T) {
 		t.Fatalf("access token phải được dùng lại, lấy %d lần", g.tokens)
 	}
 	for i, b := range g.bodies {
-		if g.auth[i] != "Bearer ya29.thu-nghiem" {
+		if g.auth[i] != "Bearer token-gia-cho-kiem-thu" {
 			t.Fatalf("Authorization: %q", g.auth[i])
 		}
 		var req map[string]map[string]json.RawMessage

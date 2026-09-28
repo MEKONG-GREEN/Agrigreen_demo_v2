@@ -1,0 +1,2 @@
+# Phát hiện đã xem xét — token GIẢ trong kiểm thử FCM (fcm_test.go), đã thay bằng chuỗi không giống token thật ở commit sau.
+1a729bf279d2da663f90b2546ce63431e38c89a0:internal/platform/notify/channel/fcm_test.go:generic-api-key:44
