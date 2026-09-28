@@ -70,8 +70,8 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | S4 | Danh mục trường MRV (C-1) | `TestCatalogSoDAndVersionPinning`, E2E-10 | có. Danh mục vẫn là **tạm**, chờ khách chốt C-1 |
 | S4 | OTLP (ADR-0013) | `TestTraceWithOTel`, `TestTracePropagatesOutboxToInbox` | có |
 | S5 | Bộ sinh dữ liệu tổng hợp (R-95) | `TestRefusesProduction`, `TestPlanDeterministicAndPlausible`, `TestSeedAgainstInProcessStack` ([cmd/seed-synthetic](../../cmd/seed-synthetic)) | có |
-| S5 | UAT theo ca kiểm thử trích từ prototype `mekong-green` | — | **chưa có**. Ca kiểm thử của prototype chưa được trích thành kiểm thử Go. Kịch bản E2E dựa trên BRD/Backlog |
-| S5 | Diễn tập sao lưu và phục hồi | — | **chưa có**. Là việc vận hành (mục 22) |
+| S5 | UAT theo ca kiểm thử trích từ prototype `mekong-green` | 39 kiểm thử ở [tests/acceptance](../../tests/acceptance) (HTX, thửa/chồng lấn, định mức/ngưỡng/cân đối CGH, nhiệm vụ KN + SLA, báo cáo hiện trường, danh mục, idempotency); mỗi ca ghi `// Nguồn:` tệp/ca prototype; bảng đối chiếu trong `doc.go` | **có**. 5 ca giữ nguyên quy tắc, 34 ca viết theo quy tắc MỚI có ghi `// Khác prototype:` (PII chỉ ở vault, chỉ ghi thêm thay vì xóa, chồng lấn theo BRD, Idempotency-Key bắt buộc). Phát hiện chưa sửa: gán thửa cho nông hộ HTX khác được chấp nhận; ngưỡng CGH không kiểm thứ tự; không khôi phục được thửa đã retire; mặt nạ SĐT khác DEF-CGH-08; mã vụ không chuẩn hóa chữ hoa |
+| S5 | Diễn tập sao lưu và phục hồi (mục 22) | `TestDrillEndToEndAndDetectsCorruption` ([cmd/drill](../../cmd/drill): số dòng, băm bộ tham số, `verify_chain`, tính lại cân đối CGH, checksum kho đối tượng, neo ký Ed25519 — và phát hiện từng kiểu hỏng), `TestBackupRestoreVerify` ([internal/shared/objsync](../../internal/shared/objsync)); workflow `restore-drill` (hằng tuần + chạy tay: pgBackRest full → `down -v` → restore → `drill check -strict`) | **có** (kiểm thử Go). Phần Docker (pgBackRest, kho S3 thứ hai, kcadm) chỉ chạy trong CI — chưa chạy trên máy dựng. Xem [restore-drill.md](../runbooks/restore-drill.md) |
 
 ## 3. App Khuyến nông (Backlog v1.0)
 
@@ -180,11 +180,11 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 |---|---|---|---|
 | RB-1 | Chỉ ghi thêm, sửa bằng bản ghi bù | `TestAppendOnlySixWays`, `TestCatalogGates`, `TestChainSequenceAndTamperDetection`, `TestCorrectionCreatesNewVersion`, `TestCorrectionChain` | có |
 | RB-2 | Cách ly tenant | `TestTenantLeakParallel` (R-32, qua PgBouncer trong CI), `TestTenantIsolation` của từng module | có. E2E dùng một tenant |
-| RB-3 | PII xóa được | `TestErasure` (vault) | **một phần**. E2E không xóa định danh rồi kiểm ảnh không mở được |
+| RB-3 | PII xóa được | `TestErasure` (vault) | **một phần**. E2E không xóa định danh rồi kiểm ảnh không mở được. Bản sao lưu (pgBackRest, `objsync`) chỉ chứa bản mã; xóa trong bản sao dựa vào hủy khóa hộ (mục 22) — diễn tập chưa kiểm "phục hồi rồi ảnh đã xóa vẫn không mở được" |
 | RB-4 | Giấy phép | CI `go-licenses` + `deploy/policies/allowed-licenses.txt` | có (cổng CI, không phải kiểm thử Go) |
 | RB-5 | Ranh giới module | `go run ./tools/archlint ./...`, `TestAssemblyMatchesAPIPlatform` | có |
 | RB-6 | Đối soát chéo số đo ở biên | — | **chưa có**. Module đối soát (mục 13) chưa thuộc G1 |
-| RB-7 | Dữ liệu trong lãnh thổ | — | **chưa có** kiểm thử tự động. Là chính sách nhà cung cấp và cấu hình triển khai |
+| RB-7 | Dữ liệu trong lãnh thổ | `TestEachEndpointOutsideTerritoryFails`, `TestProductionRequiresAllowlist`, `TestNonPIIAllowlistOnlyForPushChannels`, `TestServiceMainsCallGuard` ([internal/shared/residency](../../internal/shared/residency)) | **có** cho cấu hình: `AG_ENV=production` → mọi đích DB/S3/OTLP/SMTP/FCM/Keycloak/vault/AMQP phải thuộc `AG_RESIDENCY_ALLOWLIST` (ngoại lệ không định danh qua `AG_NONPII_ALLOWLIST` chỉ cho kênh đẩy), sai thì dừng khởi động. Pháp nhân/hạ tầng của nhà cung cấp vẫn là rà soát hồ sơ. Xem [residency.md](../runbooks/residency.md) |
 | R-04 | PII chỉ ở vault | E2E-14, `TestNoPIIColumns`, archlint `agboundary` | có |
 | R-10 | Decimal cho số đo | archlint `agnofloat`, E2E-08 (tổng decimal), E2E-09 | có |
 | R-11 | UUIDv7 | `TestParseRequiresV7`, E2E-11 (id do máy sinh) | có |

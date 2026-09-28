@@ -21,6 +21,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
@@ -37,6 +38,10 @@ func run() error {
 	log := telemetry.NewLogger("outbox-publisher", os.Stdout)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// RB-7: production chỉ được nối tới đích trong lãnh thổ (internal/shared/residency).
+	if err := residency.CheckEnv(); err != nil {
+		return err
+	}
 	shutdown, err := telemetry.Setup(ctx, "outbox-publisher")
 	if err != nil {
 		return err

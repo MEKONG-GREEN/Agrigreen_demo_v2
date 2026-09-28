@@ -40,6 +40,7 @@ Ghi chú:
 - **CORS:** `AG_CORS_ORIGINS` mặc định `http://localhost:3000,http://127.0.0.1:3000`. So khớp chính xác; không chấp nhận `*`.
 - Xem trace và metric: `docker compose -f deploy/compose/docker-compose.yml logs -f otel-collector`.
 - Dọn toàn bộ, kể cả dữ liệu: `docker compose -f deploy/compose/docker-compose.yml down -v`.
+- **Sao lưu và diễn tập phục hồi:** tệp chồng `deploy/compose/docker-compose.backup.yml` (pgBackRest + WAL, kho S3 thứ hai với danh tính `backup-writer`/`restore-reader`, profile `backup`/`restore`). Xem [runbooks/backup.md](runbooks/backup.md) và [runbooks/restore-drill.md](runbooks/restore-drill.md).
 
 > **Stack Compose chưa được chạy trên máy dựng** (Windows, không có Docker). Tệp đã được kiểm cú pháp và soát kỹ. Job CI `compose-smoke` (`.github/workflows/ci.yml`) là nơi kiểm chứng: dựng toàn bộ bằng `up --wait`, gọi `/healthz`, `/readyz` của `api-platform`, `identity-vault` và trang web, rồi `down -v`.
 
