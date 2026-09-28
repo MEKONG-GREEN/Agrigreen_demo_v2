@@ -19,73 +19,11 @@ func tsPtr(t *time.Time) *string {
 	return &s
 }
 
-type fieldDTO struct {
-	Key        string   `json:"key"`
-	LabelVi    string   `json:"label_vi"`
-	DataType   string   `json:"data_type"`
-	Unit       *string  `json:"unit"`
-	Required   bool     `json:"required"`
-	Min        *string  `json:"min"`
-	Max        *string  `json:"max"`
-	MaxScale   *int     `json:"max_scale"`
-	EnumValues []string `json:"enum_values"`
-	HelpVi     *string  `json:"help_vi"`
-	Position   int      `json:"position"`
-	Reserved   bool     `json:"reserved"` // giá trị lấy từ cột riêng (plot_ref, season_code, gps, file_refs)
-}
+// catalogDTO là phiên bản danh mục trả qua API — cùng dạng với payload entity
+// đồng bộ mrv_catalog (app.CatalogDoc).
+type catalogDTO = app.CatalogDoc
 
-type catalogDTO struct {
-	ID           string     `json:"id"`
-	EvidenceType string     `json:"evidence_type"`
-	Version      int        `json:"version"`
-	Status       string     `json:"status"`
-	Provisional  bool       `json:"provisional"`
-	SourceNote   string     `json:"source_note"`
-	Fields       []fieldDTO `json:"fields"`
-	SetterRef    string     `json:"setter_ref"`
-	ApproverRef  *string    `json:"approver_ref"`
-	SubmittedAt  *string    `json:"submitted_at"`
-	DecidedAt    *string    `json:"decided_at"`
-	DecisionNote *string    `json:"decision_note"`
-	CreatedAt    string     `json:"created_at"`
-}
-
-func toCatalogDTO(v domain.CatalogVersion) catalogDTO {
-	d := catalogDTO{
-		ID: v.ID.String(), EvidenceType: v.EvidenceType, Version: v.Version, Status: string(v.Status), Provisional: v.Provisional,
-		SourceNote: v.SourceNote, Fields: make([]fieldDTO, 0, len(v.Fields)), SetterRef: v.SetterRef.String(),
-		SubmittedAt: tsPtr(v.SubmittedAt), DecidedAt: tsPtr(v.DecidedAt), DecisionNote: v.DecisionNote, CreatedAt: ts(v.CreatedAt),
-	}
-	if v.ApproverRef != nil {
-		s := v.ApproverRef.String()
-		d.ApproverRef = &s
-	}
-	for _, f := range v.Fields {
-		fd := fieldDTO{Key: f.Key, LabelVi: f.LabelVi, DataType: string(f.Type), Required: f.Required, MaxScale: f.MaxScale,
-			EnumValues: f.EnumValues, Position: f.Position, Reserved: domain.IsReserved(f.Key)}
-		if fd.EnumValues == nil {
-			fd.EnumValues = []string{}
-		}
-		if f.Unit != "" {
-			u := f.Unit
-			fd.Unit = &u
-		}
-		if f.HelpVi != "" {
-			h := f.HelpVi
-			fd.HelpVi = &h
-		}
-		if f.Min != nil {
-			s := f.Min.String()
-			fd.Min = &s
-		}
-		if f.Max != nil {
-			s := f.Max.String()
-			fd.Max = &s
-		}
-		d.Fields = append(d.Fields, fd)
-	}
-	return d
-}
+func toCatalogDTO(v domain.CatalogVersion) catalogDTO { return app.CatalogDocOf(v) }
 
 type gpsDTO struct {
 	Lat       string  `json:"lat" pii:"true"`

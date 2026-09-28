@@ -2,7 +2,7 @@
 import type { ApiClient, ApiPaths } from "../client";
 import { unwrap } from "../client";
 import { collectPages } from "../pagination";
-import type { Cooperative, CooperativeItem, HouseholdItem, Page, PlotAssignResult, PlotFeature } from "../types";
+import type { Cooperative, HouseholdListItem, Page, PlotAssignResult, PlotFeature } from "../types";
 import type { FeatureCollection, PointGeometry } from "@/lib/geojson";
 
 export interface CoopPointProps {
@@ -39,31 +39,25 @@ export function cooperativePoints(coops: readonly Cooperative[]): CoopPointColle
   };
 }
 
-type CoopQueryContract = NonNullable<ApiPaths["/v1/cooperatives"]["get"]["parameters"]["query"]>;
-
-/**
- * Bộ lọc của GET /v1/cooperatives. `admin_unit` (mã tỉnh hoặc xã, G-03) backend đã nhận
- * (internal/platform/party/handler/registry.go) nhưng application.yaml chưa khai → thêm ở kiểu mở rộng này.
- */
-export type CoopQuery = CoopQueryContract & { admin_unit?: string };
+/** Bộ lọc của GET /v1/cooperatives (`admin_unit`: mã tỉnh hoặc xã, G-03). */
+export type CoopQuery = NonNullable<ApiPaths["/v1/cooperatives"]["get"]["parameters"]["query"]>;
 
 /** Một trang HTX kèm trường đọc bổ sung G-03 (tên xã/tỉnh, số hộ, số thửa số hoá). */
-export function cooperativesPage(api: ApiClient, q: CoopQuery): Promise<Page<CooperativeItem>> {
-  const query: CoopQueryContract = { ...q };
-  return unwrap(api.GET("/v1/cooperatives", { params: { query } })) as Promise<Page<CooperativeItem>>;
+export function cooperativesPage(api: ApiClient, q: CoopQuery): Promise<Page<Cooperative>> {
+  return unwrap(api.GET("/v1/cooperatives", { params: { query: q } }));
 }
 
-export function getCooperative(api: ApiClient, ref: string): Promise<CooperativeItem> {
-  return unwrap(api.GET("/v1/cooperatives/{ref}", { params: { path: { ref } } })) as Promise<CooperativeItem>;
+export function getCooperative(api: ApiClient, ref: string): Promise<Cooperative> {
+  return unwrap(api.GET("/v1/cooperatives/{ref}", { params: { path: { ref } } }));
 }
 
 /** Nông hộ thành viên kèm trạng thái đồng ý theo mục đích (G-04). */
-export function householdsPage(api: ApiClient, ref: string, cursor: string | undefined, limit = 20): Promise<Page<HouseholdItem>> {
-  return unwrap(api.GET("/v1/cooperatives/{ref}/households", { params: { path: { ref }, query: { cursor, limit } } })) as Promise<Page<HouseholdItem>>;
+export function householdsPage(api: ApiClient, ref: string, cursor: string | undefined, limit = 20): Promise<Page<HouseholdListItem>> {
+  return unwrap(api.GET("/v1/cooperatives/{ref}/households", { params: { path: { ref }, query: { cursor, limit } } }));
 }
 
 /** Mọi HTX trong phạm vi (gom trang cursor, tối đa `max`). */
-export function listAllCooperatives(api: ApiClient, opts: { includeInactive?: boolean; adminUnit?: string; max?: number } = {}): Promise<CooperativeItem[]> {
+export function listAllCooperatives(api: ApiClient, opts: { includeInactive?: boolean; adminUnit?: string; max?: number } = {}): Promise<Cooperative[]> {
   return collectPages(
     (cursor) => cooperativesPage(api, { include_inactive: opts.includeInactive, admin_unit: opts.adminUnit, cursor, limit: 200 }),
     opts.max ?? 2000,
@@ -71,7 +65,7 @@ export function listAllCooperatives(api: ApiClient, opts: { includeInactive?: bo
 }
 
 /** "Xã A, Đồng Tháp" từ trường G-03; thiếu tên thì hiện mã. */
-export function coopPlace(c: Pick<CooperativeItem, "admin_unit_code" | "commune_name" | "province_name">): string {
+export function coopPlace(c: Pick<Cooperative, "admin_unit_code" | "commune_name" | "province_name">): string {
   const commune = c.commune_name ?? c.admin_unit_code ?? "—";
   return c.province_name ? `${commune}, ${c.province_name}` : commune;
 }

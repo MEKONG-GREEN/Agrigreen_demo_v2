@@ -3,6 +3,7 @@
 package handler
 
 import (
+	"encoding/base64"
 	"net/http"
 	"strconv"
 	"time"
@@ -27,6 +28,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g := rg.Group("/reports")
 	g.GET("/templates", h.templates)
 	g.POST("/exports", h.requestExport)
+	g.GET("/exports", h.myExports)
 	g.GET("/exports/:id", h.export)
 	g.GET("/exports/:id/download", h.download)
 }
@@ -233,6 +235,47 @@ func (h Handler) export(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, toExport(j))
+}
+
+// exportListItem là một dòng lịch sử xuất: việc xuất kèm cờ tải được.
+type exportListItem struct {
+	exportDTO
+	Downloadable bool `json:"downloadable"`
+}
+
+func (h Handler) myExports(c *gin.Context) {
+	var before uuid.UUID
+	if cur := c.Query("cursor"); cur != "" {
+		b, err := base64.RawURLEncoding.DecodeString(cur)
+		if err != nil || len(b) != 16 {
+			httpx.Fail(c, problem.Validation.WithField("cursor", "không hợp lệ"))
+			return
+		}
+		copy(before[:], b)
+	}
+	limit := 0
+	if s := c.Query("limit"); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil || n < 1 || n > 200 {
+			httpx.Fail(c, problem.Validation.WithField("limit", "1–200"))
+			return
+		}
+		limit = n
+	}
+	pg, err := h.Svc.MyExports(c.Request.Context(), before, limit)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	items := make([]exportListItem, 0, len(pg.Items))
+	for _, j := range pg.Items {
+		items = append(items, exportListItem{exportDTO: toExport(j), Downloadable: app.Downloadable(j)})
+	}
+	var next any
+	if pg.Next != nil {
+		next = base64.RawURLEncoding.EncodeToString(pg.Next[:])
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": next})
 }
 
 func (h Handler) download(c *gin.Context) {

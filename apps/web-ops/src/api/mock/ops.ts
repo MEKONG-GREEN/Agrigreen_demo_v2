@@ -964,6 +964,22 @@ export const opsRoutes: Route[] = [
   { method: "POST", pattern: /^\/v1\/reports\/exports$/, handler: ({ persona, body }) => requestExport(persona, body) },
   {
     method: "GET",
+    pattern: /^\/v1\/reports\/exports$/,
+    handler: ({ persona, url }) => {
+      // Lịch sử của CHÍNH người gọi, mới nhất trước; cursor = id việc cuối trang trước (UUIDv7 tăng theo thời gian).
+      const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 50) || 50, 1), 200);
+      const cursor = url.searchParams.get("cursor");
+      const mine = Array.from(EXPORTS.values())
+        .filter((s) => s.owner === persona.id)
+        .map(exportView)
+        .sort((a, b) => (a.id < b.id ? 1 : -1))
+        .filter((e) => !cursor || e.id < cursor);
+      const page = mine.slice(0, limit).map((e) => ({ ...e, downloadable: e.status === "completed" }));
+      return json({ items: page, next_cursor: mine.length > limit ? page[page.length - 1]!.id : null });
+    },
+  },
+  {
+    method: "GET",
     pattern: /^\/v1\/reports\/exports\/([\w-]+)$/,
     handler: ({ persona, params }) => {
       const s = EXPORTS.get(params[0] ?? "");

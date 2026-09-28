@@ -16,6 +16,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -47,6 +48,9 @@ func (m *Module) Params() port.Params { return app.ParamsPort{Svc: m.svc} }
 
 // Catalogs cho module khác: danh mục dùng chung.
 func (m *Module) Catalogs() port.Catalogs { return app.CatalogsPort{Svc: m.svc} }
+
+// SyncSource cho pf/sync: entity "catalog_item" và "admin_unit" chiều xuống.
+func (m *Module) SyncSource() syncport.Source { return app.Sync{Svc: m.svc} }
 
 // UseStaffDirectory nối danh bạ cán bộ của pf/extension (tên người đặt/duyệt
 // tham số, G-07). Gốc lắp ráp gọi sau khi dựng pf/extension; không nối → tên null.

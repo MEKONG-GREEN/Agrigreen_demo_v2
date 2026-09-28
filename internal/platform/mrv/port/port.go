@@ -8,6 +8,8 @@
 package port
 
 import (
+	"github.com/google/uuid"
+
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 )
 
@@ -45,6 +47,18 @@ const (
 
 // SyncEntity là entity chiều lên của sync (docs/dev/sync-contract.md).
 const SyncEntity = "evidence"
+
+// SyncEntityCatalog là entity chiều xuống: danh mục trường đã duyệt mới nhất của
+// mỗi loại minh chứng, để app kiểm biểu mẫu khi ngoại tuyến.
+const SyncEntityCatalog = "mrv_catalog"
+
+var catalogSyncNS = uuid.NewSHA1(uuid.NameSpaceURL, []byte("urn:agrigreen:pf/mrv:sync"))
+
+// CatalogSyncID là id cố định của entity mrv_catalog cho một loại minh chứng
+// (UUIDv5 của loại): phiên bản duyệt mới thay bản cũ trên máy theo cùng id.
+func CatalogSyncID(evidenceType string) uuid.UUID {
+	return uuid.NewSHA1(catalogSyncNS, []byte("mrv_catalog:"+evidenceType))
+}
 
 // Sự kiện module phát ra (schema trong contracts/events/).
 const (

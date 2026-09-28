@@ -7,7 +7,7 @@ import { assignPlot, cooperativePlotsPage, coopPlace, draftPlotsInCommune, getCo
 import { newIdempotencyKey } from "@/api/idempotency";
 import { usePagedList } from "@/api/pagination";
 import { ApiProblem } from "@/api/problem";
-import type { ConsentState, Cooperative, CooperativeItem, PlotFeature, PlotStatus } from "@/api/types";
+import type { ConsentState, Cooperative, PlotFeature, PlotStatus } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
 import { ProblemAlert } from "@/components/ProblemAlert";
@@ -47,7 +47,7 @@ function ConsentBadges({ consents }: { consents: ConsentState[] | undefined }) {
   );
 }
 
-function Overview({ c }: { c: CooperativeItem }) {
+function Overview({ c }: { c: Cooperative }) {
   const rows: [string, string][] = [
     ["Mã HTX", c.code],
     ["Mã số thuế", c.tax_code ?? "—"],
@@ -74,7 +74,7 @@ function Overview({ c }: { c: CooperativeItem }) {
   );
 }
 
-function Households({ coop }: { coop: CooperativeItem }) {
+function Households({ coop }: { coop: Cooperative }) {
   const { api } = useAuth();
   const id = coop.ref;
   const list = usePagedList((cursor) => householdsPage(api, id, cursor, 20), [api, id]);

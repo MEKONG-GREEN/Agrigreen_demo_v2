@@ -147,7 +147,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	snc := syncmod.New(syncPool, clk, syncmod.Deps{
 		Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Params: md.Params(), Vault: ext.Vault,
 		Store: store, CursorKey: cursorKey(ext),
-		Sources: []syncport.Source{g.SyncSource(), cnt.SyncSource(), kn.SyncSource(), nt.SyncSource()},
+		Sources: []syncport.Source{md.SyncSource(), g.SyncSource(), cnt.SyncSource(), kn.SyncSource(), nt.SyncSource(), mrvMod.SyncSource()},
 		Sinks:   []syncport.Sink{g.SyncSink(), kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink()},
 	})
 

@@ -622,3 +622,57 @@ func TestTemplateVersionsAdmin(t *testing.T) {
 		}
 	}
 }
+
+// Lịch sử xuất của CHÍNH người gọi: mới nhất trước, phân trang cursor, cờ tải được
+// sau khi worker xong; người khác (kể cả tỉnh cha thấy từng việc) không thấy trong danh sách.
+func TestMyExportsHistory(t *testing.T) {
+	f := newFixture(t, false)
+	off := f.as(f.org.tBinhDuc, extport.RoleKNOfficer)
+	var ids3 []string
+	for _, format := range []string{"xlsx", "pdf", "xlsx"} {
+		r := off.must(off.post("/v1/reports/exports", map[string]any{"template_key": "kn.sowing_progress", "format": format}),
+			http.StatusAccepted, "xuất "+format)
+		ids3 = append(ids3, str(r.body, "id"))
+	}
+	p1 := off.must(off.get("/v1/reports/exports?limit=2"), http.StatusOK, "trang 1")
+	it1 := items(p1)
+	if len(it1) != 2 || str(it1[0], "id") != ids3[2] || str(it1[1], "id") != ids3[1] || it1[0]["downloadable"] != false ||
+		str(it1[0], "status") != "queued" || str(it1[1], "format") != "pdf" || str(it1[0], "template_key") != "kn.sowing_progress" {
+		t.Fatalf("trang 1 (mới nhất trước): %v", p1.body)
+	}
+	cur, _ := p1.body["next_cursor"].(string)
+	if cur == "" {
+		t.Fatalf("thiếu next_cursor: %v", p1.body)
+	}
+	p2 := off.must(off.get("/v1/reports/exports?limit=2&cursor="+cur), http.StatusOK, "trang 2")
+	if it2 := items(p2); len(it2) != 1 || str(it2[0], "id") != ids3[0] || p2.body["next_cursor"] != nil {
+		t.Fatalf("trang 2: %v", p2.body)
+	}
+
+	f.runWorker()
+	all := items(off.must(off.get("/v1/reports/exports"), http.StatusOK, "sau khi dựng"))
+	if len(all) != 3 {
+		t.Fatalf("đủ 3 việc: %v", all)
+	}
+	for _, it := range all {
+		if it["downloadable"] != true || str(it, "status") != "completed" || str(it, "completed_at") == "" {
+			t.Fatalf("đã dựng xong phải tải được: %v", it)
+		}
+	}
+
+	// Tỉnh cha đọc được từng việc, nhưng danh sách chỉ gồm việc của chính mình.
+	ag := f.as(f.org.pAG, extport.RoleKNProvinceAdmin)
+	ag.must(ag.get("/v1/reports/exports/"+ids3[0]), http.StatusOK, "tỉnh cha đọc từng việc")
+	if r := ag.must(ag.get("/v1/reports/exports"), http.StatusOK, "danh sách tỉnh"); len(items(r)) != 0 {
+		t.Fatalf("không thấy việc của người khác: %v", r.body)
+	}
+	if r := off.get("/v1/reports/exports?cursor=khong-hop-le"); r.status != http.StatusUnprocessableEntity {
+		t.Fatalf("cursor sai: %d", r.status)
+	}
+	if r := off.get("/v1/reports/exports?limit=0"); r.status != http.StatusUnprocessableEntity {
+		t.Fatalf("limit sai: %d", r.status)
+	}
+	if r := f.as(f.org.tBinhDuc, "mrv_viewer").get("/v1/reports/exports"); r.status != http.StatusForbidden {
+		t.Fatalf("thiếu vai: %d", r.status)
+	}
+}

@@ -224,6 +224,43 @@ func (s *Service) GetExport(ctx context.Context, id uuid.UUID) (domain.Job, erro
 	return *j, nil
 }
 
+// ExportPage là một trang lịch sử xuất của người gọi.
+type ExportPage struct {
+	Items []domain.Job
+	Next  *uuid.UUID // id việc cuối trang; nil = hết
+}
+
+// MyExports liệt kê việc xuất do CHÍNH người gọi yêu cầu (kể cả việc của lịch gửi
+// họ sở hữu), mới nhất trước, phân trang cursor (R-53). limit 1–200, mặc định 50.
+func (s *Service) MyExports(ctx context.Context, before uuid.UUID, limit int) (ExportPage, error) {
+	p, err := authz.Require(ctx, allReaders...)
+	if err != nil {
+		return ExportPage{}, err
+	}
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	var jobs []domain.Job
+	if err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+		var e error
+		jobs, e = store.JobsOf(ctx, tx, p.ActorRef, before, limit+1)
+		return e
+	}); err != nil {
+		return ExportPage{}, err
+	}
+	var pg ExportPage
+	if len(jobs) > limit {
+		jobs = jobs[:limit]
+		last := jobs[limit-1].ID
+		pg.Next = &last
+	}
+	pg.Items = jobs
+	return pg, nil
+}
+
+// Downloadable cho biết việc xuất đã có tệp để tải (GET .../download).
+func Downloadable(j domain.Job) bool { return j.Status == domain.JobCompleted && j.ObjectKey != nil }
+
 // DownloadLink là URL tải tệp có hạn.
 type DownloadLink struct {
 	Job       domain.Job

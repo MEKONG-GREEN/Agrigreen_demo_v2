@@ -5,7 +5,7 @@ import { importHouseholds } from "@/admin/households";
 import { deepLinkHref } from "@/lib/deepLink";
 import { detectKind, filenameFromDisposition } from "@/lib/files";
 import { markAllRead, markRead, unreadCount } from "@/notify/notify";
-import { buildPeriod, getExport, requestExport, waitExport } from "@/reports/exports";
+import { buildPeriod, getExport, listMyExports, requestExport, waitExport } from "@/reports/exports";
 import { createAdminApiClient, createApiClient, unwrap } from "../client";
 import { newIdempotencyKey } from "../idempotency";
 import { ACCOUNTS } from "../mock/admin-ops";
@@ -125,6 +125,11 @@ describe("pf/reports — xuất bất đồng bộ", () => {
     expect(dl.file_name).toMatch(/kn\.sowing_progress/);
     // Người khác (không bao trọn phạm vi) không xem được việc xuất.
     expect((await problemOf(getExport(app("xa"), job.id))).code).toBe("reports.export_not_found");
+    // Lịch sử của chính người dùng: việc mới nhất đứng đầu, đã tải được; người khác không thấy trong danh sách.
+    const mine = await listMyExports(api);
+    expect(mine.items[0]?.id).toBe(job.id);
+    expect(mine.items[0]?.downloadable).toBe(true);
+    expect((await listMyExports(app("xa"))).items.some((e) => e.id === job.id)).toBe(false);
   });
 
   it("định dạng mẫu không hỗ trợ → 422; vượt hạn mức ngày → 429 reports.export_quota_exceeded", async () => {

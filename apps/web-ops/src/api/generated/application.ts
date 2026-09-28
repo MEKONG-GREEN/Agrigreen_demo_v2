@@ -384,6 +384,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/mrv/evidence-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Loại minh chứng đang dùng được (có danh mục ĐÃ DUYỆT) kèm phiên bản đã duyệt mới nhất
+         * @description Cùng vai với GET /v1/mrv/catalog (mrv_collector, mrv_reviewer, mrv_viewer, mrv_exporter, param_setter,
+         *     param_approver). App dùng để biết loại nào có biểu mẫu; nội dung danh mục tải qua GET /v1/mrv/catalog
+         *     hoặc entity pull mrv_catalog. Sắp theo evidence_type.
+         */
+        get: operations["listMrvEvidenceTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/mrv/evidence": {
         parameters: {
             query?: never;
@@ -1566,7 +1588,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Lịch sử xuất của CHÍNH người gọi (kể cả việc của lịch gửi họ sở hữu), mới nhất trước
+         * @description Phân trang cursor (R-53). downloadable = true khi việc đã xong và có tệp — tải qua GET /v1/reports/exports/{id}/download.
+         */
+        get: operations["listMyReportExports"];
         put?: never;
         /** Yêu cầu xuất báo cáo (Excel/PDF) — 202 + việc xuất; worker dựng tệp. Phạm vi giải lúc yêu cầu (ADR-0009) */
         post: operations["requestReportExport"];
@@ -1783,6 +1809,15 @@ export interface components {
             location: components["schemas"]["Point"] | null;
             /** @description true = chưa có toạ độ; bản đồ hiển thị tâm xã, nhãn "vị trí tạm" */
             location_provisional: boolean;
+        } & {
+            /** @description Mã tỉnh hiện hành của xã nơi HTX đặt trụ sở */
+            province_code: string | null;
+            commune_name: string | null;
+            province_name: string | null;
+            /** @description Số nông hộ thành viên đang hoạt động */
+            member_households: number;
+            /** @description Số thửa đã số hoá (pf/geo); null khi chưa nối pf/geo hoặc tra lỗi */
+            digitized_plots: number | null;
         };
         Household: {
             /**
@@ -1804,6 +1839,15 @@ export interface components {
             /** @description SĐT đã che */
             masked_phone: string;
             label_unavailable: boolean;
+            /** @description G-04: trạng thái đồng ý hiện tại theo từng mục đích (R-41/R-42); rỗng khi chưa ghi nhận */
+            consents: {
+                /** @example mrv.evidence */
+                purpose: string;
+                /** @enum {string} */
+                status: "granted" | "withdrawn";
+                /** Format: date-time */
+                event_time: string;
+            }[];
         };
         HouseholdInput: {
             /** Format: uuid */
@@ -1848,6 +1892,9 @@ export interface components {
         };
         SyncChange: {
             /**
+             * @example catalog_item
+             * @example admin_unit
+             * @example mrv_catalog
              * @example plot
              * @example task
              * @example directive
@@ -1863,8 +1910,49 @@ export interface components {
             version: number;
             /** @enum {string} */
             op: "upsert" | "tombstone";
-            /** @description Không có khi tombstone. pubkey: {ref, area_code, public_key (base64 32 byte)} */
+            /**
+             * @description Không có khi tombstone. pubkey: {ref, area_code, public_key (base64 32 byte)}.
+             *     catalog_item: SyncCatalogItemData; admin_unit: SyncAdminUnitData; mrv_catalog: MrvCatalogVersion (bản đã duyệt).
+             */
             data?: Record<string, never>;
+        };
+        /**
+         * @description data của entity pull catalog_item (pf/masterdata): mục đang dùng của rice_variety, farm_stage, machine_type,
+         *     season, pest — không lọc theo địa bàn. id = UUIDv5 cố định theo (catalog, code); version = sync_seq
+         *     (luôn tăng). Ngừng dùng → tombstone cùng id; dùng lại → upsert version mới.
+         */
+        SyncCatalogItemData: {
+            /** @enum {string} */
+            catalog: "rice_variety" | "farm_stage" | "machine_type" | "season" | "pest";
+            code: string;
+            name: string;
+            attrs: {
+                [key: string]: string;
+            };
+            revision: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /**
+         * @description data của entity pull admin_unit (pf/masterdata): một PHIÊN BẢN hiệu lực của đơn vị có mã thuộc phạm vi
+         *     người gọi (toàn quốc: mọi đơn vị). id = UUIDv5 cố định theo (code, valid_from) — mã có thể dùng lại sau
+         *     sắp xếp; version = sync_seq. Phiên bản đã hết hiệu lực (valid_to ≤ hôm nay) → tombstone, kể cả đơn vị
+         *     cũ có đơn vị kế thừa trong phạm vi.
+         */
+        SyncAdminUnitData: {
+            code: string;
+            name: string;
+            /** @enum {string} */
+            level: "province" | "commune" | "district";
+            parent_code: string | null;
+            /** Format: date */
+            valid_from: string;
+            /**
+             * Format: date
+             * @description Khác null: đã định ngày hết hiệu lực trong tương lai; máy coi hết hiệu lực từ ngày này
+             */
+            valid_to: string | null;
+            successor_codes: string[];
         };
         SyncPullPage: {
             changes: components["schemas"]["SyncChange"][];
@@ -2040,6 +2128,26 @@ export interface components {
             decision_note: string | null;
             /** Format: date-time */
             created_at: string;
+        };
+        MrvEvidenceType: {
+            /**
+             * @example awd_log
+             * @example field_checklist
+             */
+            evidence_type: string;
+            /**
+             * Format: uuid
+             * @description id của phiên bản danh mục đã duyệt mới nhất
+             */
+            catalog_id: string;
+            /** @description Số phiên bản đã duyệt mới nhất — giá trị app gửi trong catalog_version */
+            version: number;
+            /** @description Danh mục tạm, chờ chốt C-1 */
+            provisional: boolean;
+            source_note: string;
+            field_count: number;
+            /** Format: date-time */
+            approved_at: string | null;
         };
         MrvFileRef: {
             /**
@@ -3472,6 +3580,8 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string;
+                /** @description G-03: mã tỉnh hoặc xã hiện hành — chỉ HTX thuộc đơn vị này (và con cháu) giao với phạm vi người gọi; mã không có hiệu lực → 422 validation_failed (trường admin_unit) */
+                admin_unit?: string;
                 include_inactive?: boolean;
                 cursor?: string;
                 limit?: number;
@@ -3496,6 +3606,7 @@ export interface operations {
             };
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     getCooperative: {
@@ -3848,6 +3959,29 @@ export interface operations {
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+        };
+    };
+    listMrvEvidenceTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách loại minh chứng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MrvEvidenceType"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
         };
     };
     listMrvEvidence: {
@@ -6255,6 +6389,36 @@ export interface operations {
             };
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
+        };
+    };
+    listMyReportExports: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: (components["schemas"]["ReportExport"] & {
+                            downloadable: boolean;
+                        })[];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     requestReportExport: {

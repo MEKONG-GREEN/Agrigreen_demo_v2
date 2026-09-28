@@ -133,6 +133,29 @@ func JobByID(ctx context.Context, tx pgx.Tx, id uuid.UUID, forUpdate bool) (*dom
 	return oneJob(ctx, tx, q, id)
 }
 
+// JobsOf liệt kê việc xuất do actor yêu cầu, mới nhất trước (requested_at, id
+// giảm dần); before khác uuid.Nil → chỉ việc đứng sau việc đó (cursor).
+func JobsOf(ctx context.Context, tx pgx.Tx, actor, before uuid.UUID, limit int) ([]domain.Job, error) {
+	rows, err := tx.Query(ctx, "SELECT "+jobCols+` FROM pf_reports.export_job j
+	    WHERE j.requested_by = $1
+	      AND ($2::uuid = '00000000-0000-0000-0000-000000000000'::uuid
+	           OR (j.requested_at, j.id) < (SELECT c.requested_at, c.id FROM pf_reports.export_job c WHERE c.id = $2::uuid))
+	    ORDER BY j.requested_at DESC, j.id DESC LIMIT $3`, actor, before, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.Job
+	for rows.Next() {
+		j, err := scanJob(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, j)
+	}
+	return out, rows.Err()
+}
+
 // InsertJob ghi việc xuất; requested_at do DB đặt.
 func InsertJob(ctx context.Context, tx pgx.Tx, j *domain.Job) error {
 	def, err := json.Marshal(j.Def)
