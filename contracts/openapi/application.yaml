@@ -1355,6 +1355,79 @@ paths:
         "200": {description: Đã chốt trước đó}
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/program-reports:
+    post:
+      summary: FR-03 báo cáo tiến độ Đề án 1 triệu ha của một HTX × vụ (gửi lại = phiên bản mới, phải duyệt lại)
+      operationId: submitProgramReport
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [commune_code, cooperative_ref, season_code, season_year, registered_area_ha, deploying_area_ha, completed_area_ha]
+              properties:
+                id: {type: string, format: uuid}
+                commune_code: {type: string}
+                cooperative_ref: {type: string, format: uuid}
+                season_code: {type: string}
+                season_year: {type: integer}
+                registered_area_ha: {type: string, description: "decimal (ha)"}
+                deploying_area_ha: {type: string, description: "decimal; đang triển khai + hoàn thành ≤ đăng ký"}
+                completed_area_ha: {type: string}
+                note: {type: string, maxLength: 2000}
+                event_time: {type: string, format: date-time}
+      responses:
+        "201": {description: Đã ghi phiên bản}
+        "200": {description: Gọi lặp cùng Idempotency-Key}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/program-reports/{id}/approve:
+    post:
+      summary: Admin tỉnh duyệt phiên bản hiện hành (không duyệt báo cáo do chính mình gửi — R-56)
+      operationId: approveProgramReport
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: {type: string, maxLength: 500}
+      responses:
+        "200": {description: Đã duyệt}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/extension/program-progress:
+    get:
+      summary: Tiến độ Đề án theo HTX × vụ trong phạm vi, kèm mục tiêu tỉnh (tham số extension.program_target_ha:<tỉnh>)
+      operationId: getProgramProgress
+      tags: [extension]
+      parameters:
+        - {name: unit, in: query, schema: {type: string}}
+        - {name: season_code, in: query, schema: {type: string}}
+        - {name: season_year, in: query, schema: {type: integer}}
+      responses:
+        "200":
+          description: Tiến độ
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, targets, unapproved, provisional]
+                properties:
+                  items: {type: array, items: {type: object}}
+                  targets: {type: object, additionalProperties: {type: [string, "null"]}}
+                  unapproved: {type: integer}
+                  provisional: {type: boolean}
+        "403": {$ref: "#/components/responses/Problem"}
   /v1/extension/dashboard:
     get:
       summary: 4 KPI theo phạm vi (US-DASH-01) — tổng luôn bằng tổng các đơn vị con; thiếu báo cáo xã → provisional "Số liệu tạm tính"
@@ -1774,6 +1847,99 @@ paths:
                         stages: {type: object, additionalProperties: {$ref: "#/components/schemas/MechGroup"}}
                         cooperatives_by_status: {type: object, additionalProperties: {type: integer}}
   # --- hết pf/mechanization ---
+  # --- pf/reports: mẫu biểu, xuất Excel/PDF bất đồng bộ (mục 12, R-52), điểm kiểm soát xuất dữ liệu (mục 18) ---
+  # Mẫu và lịch gửi quản trị qua Admin API (admin.yaml). Mọi yêu cầu xuất và cấp URL tải đi qua MỘT điểm kiểm soát:
+  # nhật ký (không PII), hạn mức ngày reports.daily_export_quota (mặc định 50) → 429, vượt reports.export_anomaly_threshold
+  # → sự kiện pf.reports.export.anomaly. Số liệu CGH lấy từ kết quả cân đối ĐÃ LƯU (FN-10 BR-04), không tính lại.
+  /v1/reports/templates:
+    get:
+      summary: Mẫu báo cáo đang dùng mà vai của người gọi được xuất (mẫu hệ thống = phiên bản 0)
+      operationId: listReportTemplates
+      tags: [reports]
+      responses:
+        "200":
+          description: Danh sách mẫu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ReportTemplate"}}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/reports/exports:
+    post:
+      summary: Yêu cầu xuất báo cáo (Excel/PDF) — 202 + việc xuất; worker dựng tệp. Phạm vi giải lúc yêu cầu (ADR-0009)
+      operationId: requestReportExport
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [template_key, format]
+              properties:
+                template_key: {type: string, examples: [kn.sowing_progress, cgh.shortage_by_coop]}
+                format: {type: string, enum: [xlsx, pdf]}
+                params: {$ref: "#/components/schemas/ReportParams"}
+      responses:
+        "202":
+          description: Đã nhận; theo dõi tại Location
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportExport"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "429": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/reports/exports/{id}:
+    get:
+      summary: Trạng thái việc xuất (người yêu cầu, hoặc người có phạm vi bao trọn)
+      operationId: getReportExport
+      tags: [reports]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Việc xuất
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportExport"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/reports/exports/{id}/download:
+    get:
+      summary: URL tải tệp có hạn (10 phút; không ghi log) — qua điểm kiểm soát xuất dữ liệu
+      operationId: downloadReportExport
+      tags: [reports]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: URL có chữ ký
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [export_id, url, expires_at, file_name, content_type, sha256]
+                properties:
+                  export_id: {type: string, format: uuid}
+                  url: {type: string}
+                  expires_at: {type: string, format: date-time}
+                  file_name: {type: string}
+                  content_type: {type: string}
+                  sha256: {type: string}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/reports ---
 components:
   securitySchemes:
     oidc:
@@ -2807,3 +2973,70 @@ components:
         overall: {$ref: "#/components/schemas/MechGroup"}
         stages: {type: object, additionalProperties: {$ref: "#/components/schemas/MechGroup"}}
     # --- hết pf/mechanization ---
+    # --- pf/reports ---
+    ReportColumn:
+      type: object
+      required: [key, title]
+      properties:
+        key: {type: string, description: "Khóa cột của nguồn dữ liệu"}
+        title: {type: string}
+    ReportDefinition:
+      type: object
+      required: [title, source, grouping, columns, formats]
+      properties:
+        title: {type: string, minLength: 5, maxLength: 200}
+        source:
+          type: string
+          enum: [extension.sowing, extension.growth_pest, extension.program_progress, extension.tasks_sla, extension.period_summary,
+                 mechanization.summary, mechanization.shortage_by_coop, mechanization.season_compare]
+        grouping: {type: string, enum: [national, province, commune, cooperative]}
+        columns: {type: array, minItems: 1, maxItems: 40, items: {$ref: "#/components/schemas/ReportColumn"}}
+        formats: {type: array, items: {type: string, enum: [xlsx, pdf]}}
+        provisional_layout: {type: boolean, description: "Bố cục tạm — BRD chưa có mẫu biểu chính thức của Bộ NN&MT/NN&PTNT"}
+        form_note: {type: string, maxLength: 500}
+    ReportTemplate:
+      type: object
+      required: [key, version, builtin, status, definition]
+      properties:
+        key: {type: string}
+        version: {type: integer, minimum: 0}
+        builtin: {type: boolean}
+        status: {type: string, enum: [active, retired]}
+        definition: {$ref: "#/components/schemas/ReportDefinition"}
+        reason: {type: [string, "null"]}
+        created_by: {type: [string, "null"], format: uuid}
+        created_at: {type: [string, "null"], format: date-time}
+    ReportParams:
+      type: object
+      properties:
+        level: {type: string, enum: [national, province, commune, cooperative], description: "Mặc định: cấp của mẫu"}
+        unit_code: {type: string, description: "Tỉnh/xã trong phạm vi; rỗng = toàn phạm vi"}
+        period: {type: string, description: "KN: YYYY-MM | YYYY-Qn | YYYY (FR-05); mặc định tháng hiện tại"}
+        season_code: {type: string, description: "FR-03, CGH; với đối chiếu là Vụ A"}
+        season_year: {type: integer}
+        season_code_b: {type: string, description: "CGH tab đối chiếu: Vụ B (khác Vụ A)"}
+        season_year_b: {type: integer}
+        run_id: {type: string, format: uuid, description: "CGH: lần cân đối đã lưu; rỗng = mới nhất của vụ"}
+        machine_type: {type: string}
+    ReportExport:
+      type: object
+      required: [id, template_key, template_version, title, format, params, status, trigger, requested_by, requested_at]
+      properties:
+        id: {type: string, format: uuid}
+        template_key: {type: string}
+        template_version: {type: integer}
+        title: {type: string}
+        format: {type: string, enum: [xlsx, pdf]}
+        params: {$ref: "#/components/schemas/ReportParams"}
+        status: {type: string, enum: [queued, completed, failed]}
+        trigger: {type: string, enum: [api, schedule]}
+        schedule_id: {type: [string, "null"], format: uuid}
+        requested_by: {type: string, format: uuid}
+        requested_at: {type: string, format: date-time}
+        row_count: {type: [integer, "null"]}
+        provisional: {type: [boolean, "null"], description: "Số liệu tạm tính"}
+        size_bytes: {type: [integer, "null"]}
+        sha256: {type: [string, "null"]}
+        error_code: {type: [string, "null"]}
+        completed_at: {type: [string, "null"], format: date-time}
+    # --- hết pf/reports ---

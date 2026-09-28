@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.reports.export.requested/v1",
+  "title": "pf.reports.export.requested — payload",
+  "description": "Yêu cầu xuất báo cáo đã ghi vào pf_reports.export_job (mục 12, R-52) — từ API hoặc lịch gửi. Worker nạp mẫu, bộ lọc và phạm vi đã giải từ bảng job rồi dựng tệp Excel/PDF. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.reports.export.requested",
+  "x-schema-version": 1,
+  "x-producer": "pf/reports",
+  "type": "object",
+  "required": ["job_id", "template_key", "format", "requested_by", "requested_at"],
+  "properties": {
+    "job_id":       { "type": "string", "format": "uuid" },
+    "template_key": { "type": "string" },
+    "format":       { "type": "string", "enum": ["xlsx", "pdf"] },
+    "requested_by": { "type": "string", "format": "uuid", "description": "actor_ref người yêu cầu (hoặc người lập lịch)" },
+    "requested_at": { "type": "string", "format": "date-time", "description": "Ngày xuất in trên tệp" }
+  }
+}

@@ -16,6 +16,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/handler"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
@@ -64,6 +65,9 @@ func (m *Module) SyncSource() syncport.Source { return app.SyncSource{Svc: m.svc
 
 // SyncSink cho pf/sync: chiều lên "task_update", "field_report".
 func (m *Module) SyncSink() syncport.Sink { return app.SyncSink{Svc: m.svc} }
+
+// ReportData cho pf/reports: đọc dữ liệu báo cáo FR-01..FR-05 theo phạm vi đã giải.
+func (m *Module) ReportData() port.ReportData { return app.ReportData{Svc: m.svc} }
 
 // OverdueTenants dựng bộ tìm tenant có nhiệm vụ quá hạn từ pool vai
 // ag_outbox_publisher (worker, nối thẳng).

@@ -128,8 +128,8 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | Story | Kiểm thử | Trạng thái |
 |---|---|---|
 | US-DASH-01 4 KPI theo vai trò | E2E-08, `TestNationalKPIEqualsSumOfProvinces`, `TestClosedPeriodNeedsCorrectionReason` | có |
-| US-DASH-02 xuất theo mẫu Bộ NN&PTNT | — | **chưa có**. Chưa có mẫu biểu |
-| US-DASH-03 lịch gửi báo cáo email | — | **chưa có** |
+| US-DASH-02 xuất theo mẫu Bộ NN&PTNT | `TestExportXLSXAsyncViaInboxOnce`, `TestXLSXContent`, `TestPDFVietnamese`, `TestReportDataSowingAndSummary`, `TestProgramProgressFR03`, `TestQuotaAndAnomaly`, `TestExportScope` | **một phần**. Xuất Excel/PDF bất đồng bộ từ mẫu có phiên bản (FR-01/02/03/05, nhiệm vụ); nhãn "Số liệu tạm tính"; DLP hạn mức + cảnh báo. Bố cục **tạm**: BRD chưa có mẫu biểu chính thức của Bộ |
+| US-DASH-03 lịch gửi báo cáo email | `TestScheduleFiresOncePerPeriodAndDelivers`, `TestDeliverySkippedWithoutDirectory`, `TestScheduleSlot` | **một phần**. Lịch tuần/tháng, mỗi mốc đúng một lần, email liên kết 15 phút qua SMTP TLS; địa chỉ email tra qua cổng `MailDirectory` (pf/accounts nối sau — thiếu thì bỏ gửi kèm cảnh báo) |
 
 ### J. Nhiệm vụ hỗ trợ
 
@@ -161,7 +161,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 | FN-07 | Tích hợp App HTX | `TestResolveAreaQT03` (chỉ port `AreaFeed`) | **chưa có** luồng thật, thuộc G2 |
 | FN-08 | Bản đồ và trực quan hóa | `TestSummarizeBottleneck` (API coverage theo cấp) | **một phần**. Có API đọc; chưa có kiểm thử giao diện bản đồ |
 | FN-09 | Cân đối và dự báo | E2E-09, `TestBalanceUsesNormAtSeasonAndPilotStages`, `TestSavedResultsImmutableAndChainVerifies` | **một phần**. Có cân đối lưu theo vụ; chưa có dự báo |
-| FN-10 | Báo cáo và xuất dữ liệu | — | **chưa có**. Có API đọc coverage/trend, chưa có xuất tệp |
+| FN-10 | Báo cáo và xuất dữ liệu | `TestReportDataEqualsSavedResults`, `TestCGHExportEqualsSavedResults`, `TestTemplateVersionsAdmin` | có (API). 3 tab Tổng hợp / Thiếu hụt theo HTX / Đối chiếu vụ A–B, xuất Excel/PDF từ kết quả cân đối **đã lưu**, nhãn nguồn, Admin quản lý mẫu |
 | FN-11 | Dashboard tổng quan | E2E-09 (`total_machines`) | có |
 
 ## 5. GIS nền (Backlog v1.1)
