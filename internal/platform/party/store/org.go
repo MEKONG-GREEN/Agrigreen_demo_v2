@@ -87,6 +87,18 @@ func OrgByRef(ctx context.Context, tx pgx.Tx, ref uuid.UUID, forUpdate bool) (*O
 	return &s, nil
 }
 
+// OrgByCode đọc tổ chức theo mã nghiệp vụ (duy nhất trong tenant); nil nếu không có.
+func OrgByCode(ctx context.Context, tx pgx.Tx, code string) (*port.Org, error) {
+	o, err := scanOrg(tx.QueryRow(ctx, "SELECT "+orgCols+" FROM pf_party.org WHERE code = $1", code))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &o, nil
+}
+
 // OrgCodeTaken cho biết mã tổ chức đã dùng trong tenant.
 func OrgCodeTaken(ctx context.Context, tx pgx.Tx, code string) (bool, error) {
 	var ok bool

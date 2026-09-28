@@ -134,7 +134,7 @@ func (s *Service) Upload(ctx context.Context, ref uuid.UUID, in UploadInput) (st
 	return row, replayed, err
 }
 
-// Extract trích nội dung từ tệp Word để điền sẵn bản nháp (US-LIB-03, US-CMS-02).
+// Extract trích nội dung từ tệp Word (.docx) hoặc PDF có lớp chữ để điền sẵn bản nháp (US-LIB-03, US-CMS-02).
 // Không lưu gì: người soạn xem lại, sửa rồi tạo bản nháp — không bao giờ tự xuất bản.
 func (s *Service) Extract(ctx context.Context, data []byte) (domain.Extracted, error) {
 	if _, err := authz.Require(ctx, editorRoles...); err != nil {
@@ -152,7 +152,10 @@ func (s *Service) Extract(ctx context.Context, data []byte) (domain.Extracted, e
 		return domain.Extracted{}, ErrFileType.WithDetail("Chỉ hỗ trợ file Word hoặc PDF trong giới hạn dung lượng cho phép.")
 	}
 	x, err := domain.Extract(data)
+	var xe *domain.ExtractError
 	switch {
+	case errors.As(err, &xe) && errors.Is(err, domain.ErrExtractUnsupported):
+		return x, ErrExtractUnsupported.WithDetail(xe.Msg)
 	case errors.Is(err, domain.ErrExtractUnsupported):
 		return x, ErrExtractUnsupported
 	case errors.Is(err, domain.ErrExtractFailed):

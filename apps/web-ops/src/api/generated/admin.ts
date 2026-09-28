@@ -255,6 +255,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/orgs/export.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Xuất cây tổ chức trong phạm vi ra Excel .xlsx (KN US-ADM-08) — cha luôn đứng trước con; tệp nhập lại được ngay
+         * @description Cột: Mã tổ chức, Loại (mã kind), Tên, Mã đơn vị hành chính, Mã tổ chức cấp trên, Trạng thái (Hoạt động/Ngừng hoạt động).
+         *     Gồm cả tổ chức ngừng hoạt động. Cấp trên ngoài phạm vi (vd TTKN QG khi TTKN tỉnh xuất) vẫn có mã để nối cây.
+         */
+        get: operations["partyExportOrgTree"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orgs/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nhập cây tổ chức từ Excel .xlsx hoặc CSV UTF-8 (KN US-ADM-08), tối đa 500 dòng; kết quả theo từng dòng
+         * @description Cùng cột với tệp xuất (tiêu đề có/không dấu; bắt buộc Mã tổ chức, Loại, Tên). Mã chưa có → tạo (CreateOrg);
+         *     mã đã có → di chuyển nếu cấp trên/đơn vị khác (MoveOrg, ghi sổ với lý do `reason`), đổi tên nếu tên khác (RenameOrg).
+         *     Dòng được xử lý cha trước con bất kể thứ tự trong tệp. HTX mới: để trống Mã tổ chức (Mã HTX do hệ thống sinh, CGH BR-01).
+         *     Tệp không vô hiệu hóa tổ chức vắng mặt; cột Trạng thái chỉ để xem. Ô công thức, tệp .xls cũ, thiếu cột bắt buộc →
+         *     từ chối cả tệp (party.import_invalid). Idem_key từng thao tác = Idempotency-Key + ":org:" + số dòng.
+         */
+        post: operations["partyImportOrgTree"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/orgs/{ref}/move": {
         parameters: {
             query?: never;
@@ -350,11 +395,12 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Nhập nông hộ từ CSV (UTF-8, dòng đầu là tiêu đề), tối đa 200 dòng; kết quả theo từng dòng
-         * @description Cột: full_name|ho_ten, phone|so_dien_thoai, national_id|cccd, address|dia_chi,
+         * Nhập nông hộ từ CSV UTF-8 hoặc Excel .xlsx (dòng đầu là tiêu đề), tối đa 200 dòng, 2 MB; kết quả theo từng dòng
+         * @description Định dạng nhận theo chữ ký tệp; .xlsx đọc trang tính đầu. Cột (tiêu đề có/không dấu, vd "Họ tên" = ho_ten):
+         *     full_name|ho_ten, phone|so_dien_thoai, national_id|cccd, address|dia_chi,
          *     cooperative_code|ma_htx, commune_code|ma_xa, cultivated_area_ha|dien_tich_ha,
-         *     member_since|ngay_vao_htx. Bắt buộc: full_name, phone, cooperative_code.
-         *     Thiếu cột bắt buộc → từ chối cả tệp (party.import_invalid).
+         *     member_since|ngay_vao_htx (YYYY-MM-DD hoặc ô ngày Excel). Bắt buộc: full_name, phone, cooperative_code.
+         *     Thiếu cột bắt buộc, ô công thức (hệ thống không tính công thức), tệp .xls cũ → từ chối cả tệp (party.import_invalid).
          */
         post: operations["partyImportHouseholds"];
         delete?: never;
@@ -576,7 +622,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Trích nội dung từ Word (.docx) để điền sẵn bản nháp — không lưu, không xuất bản (KN US-LIB-03, HTX US-CMS-02) */
+        /**
+         * Trích nội dung từ Word (.docx) hoặc PDF có lớp chữ để điền sẵn bản nháp — không lưu, không xuất bản (KN US-LIB-03, HTX US-CMS-02)
+         * @description PDF: đọc chữ qua bảng ToUnicode của phông (tiếng Việt có dấu, chuẩn hóa NFC), ghép dòng thành đoạn, cỡ chữ lớn thành tiêu đề.
+         *     PDF ảnh scan (không có lớp chữ, không OCR), PDF mã hóa, phông không giải mã được, .doc cũ → 422 content.extract_unsupported
+         *     kèm lý do ở detail; tệp hỏng → 422 content.extract_failed.
+         */
         post: operations["extractDocument"];
         delete?: never;
         options?: never;
@@ -766,11 +817,16 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Nhập tệp ranh giới thửa GeoJSON/KML (KN US-PLOT-02, GIS FN-05) — mỗi vùng thành một thửa, cùng quy tắc như vẽ tay; kết quả theo từng đối tượng
-         * @description Thân request là nội dung tệp (≤ 200 đối tượng, xử lý đồng bộ). Chỉ nhận WGS84 (EPSG:4326):
+         * Nhập tệp ranh giới thửa GeoJSON/KML/Shapefile (.zip) (KN US-PLOT-02, GIS FN-05) — mỗi vùng thành một thửa, cùng quy tắc như vẽ tay; kết quả theo từng đối tượng
+         * @description Thân request là nội dung tệp (≤ 200 đối tượng, ≤ 10 MB, xử lý đồng bộ). Chỉ nhận WGS84 (EPSG:4326):
          *     thành phần crs khác hoặc toạ độ ngoài miền kinh/vĩ độ (VN-2000/UTM) → 422 geo.crs_unsupported.
-         *     Shapefile chưa hỗ trợ → 422 geo.format_unsupported. Thuộc tính đối tượng được đọc:
-         *     name, commune_code (hoặc ma_xa), cooperative_ref, household_ref. Idem_key từng đối tượng =
+         *     Shapefile: gói .zip gồm .shp (Polygon/PolygonZ/PolygonM), .dbf, .prj (.shx, .cpg tùy chọn). .prj phải là
+         *     GEOGCS WGS84; VN-2000 hoặc hệ chiếu phẳng → 422 geo.crs_unsupported (hệ thống không tự chuyển VN-2000 —
+         *     chuyển sang EPSG:4326 bằng QGIS/ArcGIS trước). Tải .shp rời → 422 geo.format_invalid. Thuộc tính .dbf
+         *     (tên trường không phân biệt hoa thường): TEN/TEN_THUA/MA_THUA (hoặc SO_TO + SO_THUA → "Tờ … thửa …") làm tên thửa
+         *     (mã thửa do hệ thống sinh), MA_XA → commune_code, MA_HTX → Mã HTX tra ra cooperative_ref.
+         *     Thuộc tính đối tượng được đọc (mọi định dạng): name, commune_code (hoặc ma_xa), cooperative_ref,
+         *     cooperative_code (hoặc ma_htx; không có HTX mã này → đối tượng bị loại geo.cooperative_invalid), household_ref. Idem_key từng đối tượng =
          *     Idempotency-Key + ":" + thứ tự, nên nhập lại cùng khóa trả duplicate, không tạo trùng.
          */
         post: operations["importPlotBoundaries"];
@@ -899,8 +955,9 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Nhập danh sách máy của MỘT HTX từ CSV (FN-05 BR-07/BR-10, US-MAC-02)
-         * @description Đối chiếu từng dòng theo Số máy/SN (thiếu thì Số khung): đã có → cập nhật, chưa có → tạo mới.
+         * Nhập danh sách máy của MỘT HTX từ CSV UTF-8 hoặc Excel .xlsx (FN-05 BR-07/BR-10, US-MAC-02)
+         * @description Định dạng nhận theo chữ ký tệp; .xlsx đọc trang tính đầu, ô ngày Excel đọc thành ngày, ô công thức → từ chối cả tệp.
+         *     Đối chiếu từng dòng theo Số máy/SN (thiếu thì Số khung): đã có → cập nhật, chưa có → tạo mới.
          *     mode=replace ("Thay thế toàn bộ"): máy đang Active của HTX vắng mặt trong tệp chuyển Inactive bằng sự kiện kèm Ngày vô hiệu hóa — không xóa.
          *     mode=update ("Cập nhật"): máy vắng mặt giữ nguyên. Tệp có cột "Mã máy" hoặc "Khâu", hoặc thiếu cột bắt buộc → từ chối cả tệp.
          *     Cột (tiêu đề có/không dấu): Chủng loại, Hãng, Model, Năm SX, Nhiên liệu, Công suất, Năng suất, Mã CSH, Số máy, Số khung, Ngày sở hữu (dd/mm/yyyy), Tình trạng.
@@ -2412,6 +2469,76 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
+    partyExportOrgTree: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx (Content-Disposition attachment) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    partyImportOrgTree: {
+        parameters: {
+            query?: {
+                /** @description Lý do ghi sổ khi di chuyển/đổi tên; bỏ trống = "Cập nhật cây tổ chức từ tệp nhập Excel" */
+                reason?: string;
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                "text/csv": string;
+            };
+        };
+        responses: {
+            /** @description Kết quả theo dòng (thứ tự của tệp) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        created: number;
+                        updated: number;
+                        unchanged: number;
+                        rejected: number;
+                        rows: {
+                            /** @description Số dòng trong tệp (dòng 1 là tiêu đề) */
+                            row: number;
+                            /** @enum {string} */
+                            status: "created" | "updated" | "unchanged" | "rejected";
+                            /** @description Mã tổ chức (HTX mới: mã vừa sinh) */
+                            code: string | null;
+                            /** Format: uuid */
+                            org_ref: string | null;
+                            changes: ("moved" | "renamed")[];
+                            reason: string | null;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
     partyMoveOrg: {
         parameters: {
             query?: never;
@@ -2557,6 +2684,7 @@ export interface operations {
         requestBody: {
             content: {
                 "text/csv": string;
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
             };
         };
         responses: {
@@ -3302,6 +3430,7 @@ export interface operations {
                 "application/geo+json": Record<string, never>;
                 "application/json": Record<string, never>;
                 "application/vnd.google-earth.kml+xml": string;
+                "application/zip": string;
             };
         };
         responses: {
@@ -3313,7 +3442,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        format: "geojson" | "kml";
+                        format: "geojson" | "kml" | "shapefile";
                         accepted: number;
                         /** @description Đã tạo, chồng lấn cùng HTX/thửa nháp đã xác nhận — chờ xem xét */
                         flagged: number;
@@ -3560,6 +3689,7 @@ export interface operations {
         requestBody: {
             content: {
                 "text/csv": string;
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
             };
         };
         responses: {

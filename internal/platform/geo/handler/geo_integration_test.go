@@ -780,7 +780,7 @@ func TestSyncSinkIdempotentAndConflict(t *testing.T) {
 	}
 }
 
-// KN US-PLOT-02, GIS FN-05: nhập GeoJSON/KML, kết quả theo từng đối tượng; chỉ WGS84; Shapefile chưa hỗ trợ.
+// KN US-PLOT-02, GIS FN-05: nhập GeoJSON/KML, kết quả theo từng đối tượng; chỉ WGS84; .shp rời bị từ chối.
 func TestImportGeoJSONAndKML(t *testing.T) {
 	f := newFixture(t)
 	adm := f.national()
@@ -825,8 +825,8 @@ func TestImportGeoJSONAndKML(t *testing.T) {
 	}
 
 	r = adm.adminPost("/v1/geo/plots/import?file_name=ranh_gioi.shp", "application/octet-stream", []byte{0x00, 0x00, 0x27, 0x0a, 0x00})
-	if r.status != http.StatusUnprocessableEntity || code(r) != "geo.format_unsupported" {
-		t.Fatalf("Shapefile: %d %s", r.status, r.raw)
+	if r.status != http.StatusUnprocessableEntity || code(r) != "geo.format_invalid" {
+		t.Fatalf("Shapefile .shp rời (không phải gói .zip): %d %s", r.status, r.raw)
 	}
 	utm, _ := json.Marshal(map[string]any{"type": "FeatureCollection", "crs": map[string]any{"type": "name", "properties": map[string]any{"name": "EPSG:32648"}}, "features": []any{}})
 	r = adm.adminPost("/v1/geo/plots/import", "application/geo+json", utm)

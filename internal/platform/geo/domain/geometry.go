@@ -1,5 +1,5 @@
 // Package domain: quy tắc nghiệp vụ của pf/geo — đọc và kiểm hình ranh giới thửa
-// (GeoJSON, KML), quy tắc tối thiểu 4 điểm, hệ toạ độ WGS84, nguồn và trạng thái
+// (GeoJSON, KML, Shapefile), quy tắc tối thiểu 4 điểm, hệ toạ độ WGS84, nguồn và trạng thái
 // thửa. Không phụ thuộc hạ tầng; kiểm hình học chính xác (ST_IsValid, diện tích
 // trắc địa, chồng lấn) chạy trong PostGIS ở tầng store.
 package domain

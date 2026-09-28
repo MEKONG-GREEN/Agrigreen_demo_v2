@@ -60,6 +60,7 @@ type Registry struct {
 
 var (
 	_ port.Orgs          = (*Registry)(nil)
+	_ port.OrgCodes      = (*Registry)(nil)
 	_ port.ScopeResolver = (*Registry)(nil)
 )
 
@@ -87,6 +88,23 @@ func (r *Registry) Get(ctx context.Context, ref uuid.UUID) (port.Org, error) {
 		return port.Org{}, port.ErrOrgNotFound
 	}
 	return s.Org, nil
+}
+
+// ByCode thực hiện port.OrgCodes cho module khác. Tenant lấy từ context.
+func (r *Registry) ByCode(ctx context.Context, code string) (port.Org, error) {
+	var o *port.Org
+	err := tenant.FromCtxTx(ctx, r.DB, func(tx pgx.Tx) error {
+		var e error
+		o, e = store.OrgByCode(ctx, tx, code)
+		return e
+	})
+	if err != nil {
+		return port.Org{}, err
+	}
+	if o == nil {
+		return port.Org{}, port.ErrOrgNotFound
+	}
+	return *o, nil
 }
 
 // Scope thực hiện port.ScopeResolver (ADR-0009).
