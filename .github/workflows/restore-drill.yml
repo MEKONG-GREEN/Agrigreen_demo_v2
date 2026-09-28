@@ -97,7 +97,10 @@ jobs:
         run: $COMPOSE --profile restore run --rm pgbackrest-restore
 
       - name: Dựng hạ tầng sạch (không chạy ứng dụng)
-        run: $COMPOSE --profile restore up -d --wait --wait-timeout 600 postgres seaweedfs s3-init backup-s3 backup-s3-init
+        run: |
+          $COMPOSE --profile restore up -d --wait --wait-timeout 600 postgres seaweedfs backup-s3
+          # Container chạy một lần: chạy tới khi xong thay vì --wait (thoát mã 0 bị --wait coi là lỗi).
+          $COMPOSE --profile restore run --rm s3-init
 
       - name: Phục hồi kho đối tượng (restore-reader)
         run: |
