@@ -16,6 +16,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/handler"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
@@ -61,6 +62,9 @@ func (m *Module) RegisterAdmin(*gin.RouterGroup) {}
 
 // SyncSource cho pf/sync: chiều xuống "task", "directive".
 func (m *Module) SyncSource() syncport.Source { return app.SyncSource{Svc: m.svc} }
+
+// Staff là cổng đọc danh bạ cán bộ (chỉ mã tham chiếu + đơn vị) cho pf/notify.
+func (m *Module) Staff() port.StaffDirectory { return app.StaffDirectory{Svc: m.svc} }
 
 // SyncSink cho pf/sync: chiều lên "task_update", "field_report".
 func (m *Module) SyncSink() syncport.Sink { return app.SyncSink{Svc: m.svc} }

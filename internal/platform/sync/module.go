@@ -71,6 +71,14 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	return &Module{svc: svc}
 }
 
+// NewDevices dựng cổng đọc sổ thiết bị (port.Devices) từ pool vai sync_app, độc
+// lập với module (không cần Source/Sink) — gốc lắp ráp dùng khi module khác vừa cần
+// kiểm thiết bị vừa là Source của pf/sync.
+func NewDevices(db tenant.Beginner) port.Devices { return app.DeviceLookup{DB: db} }
+
+// Devices là cổng đọc sổ thiết bị của module đã nối.
+func (m *Module) Devices() port.Devices { return app.DeviceLookup{DB: m.svc.DB} }
+
 // RegisterApp gắn route Application API.
 func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterApp(rg) }
 
