@@ -1847,8 +1847,8 @@ paths:
                         stages: {type: object, additionalProperties: {$ref: "#/components/schemas/MechGroup"}}
                         cooperatives_by_status: {type: object, additionalProperties: {type: integer}}
   # --- hết pf/mechanization ---
-  # --- pf/notify --- (ADR-0015: hộp thư trong app; đẩy CHỈ dữ liệu; đồng bộ ngay)
 
+  # --- pf/notify --- (ADR-0015: hộp thư trong app; đẩy CHỈ dữ liệu; đồng bộ ngay)
   /v1/notifications:
     get:
       summary: Hộp thư của người gọi (cá nhân + chủ đề theo phạm vi/vai/tổ chức), mới nhất trước
@@ -1952,6 +1952,220 @@ paths:
         "422": {$ref: "#/components/responses/Problem"}
         "429": {description: "notify.nudge_rate_limited (retry_after_s, header Retry-After)", $ref: "#/components/responses/Problem"}
   # --- hết pf/notify ---
+
+  /v1/geo/conflicts/{id}:
+    get:
+      summary: "Chi tiết xung đột ranh giới giữ cả hai phiên bản (US-SYNC-03): bản gây xung đột, bản hiện hành, thửa bị chồng lấn — không PII"
+      operationId: getBoundaryConflict
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Xung đột kèm các phiên bản
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/BoundaryConflict"
+                  - type: object
+                    required: [versions]
+                    properties:
+                      versions:
+                        type: array
+                        items:
+                          type: object
+                          required: [role, boundary_id, plot_ref, plot_code, version, area_ha, current]
+                          properties:
+                            role: {type: string, enum: [record, current, overlapping]}
+                            boundary_id: {type: string, format: uuid}
+                            plot_ref: {type: string, format: uuid}
+                            plot_code: {type: string}
+                            version: {type: integer}
+                            area_ha: {$ref: "#/components/schemas/Decimal"}
+                            current: {type: boolean}
+                            geometry: {$ref: "#/components/schemas/PolygonGeometry"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/geo/admin-boundaries:
+    get:
+      summary: "G-05: ranh giới hành chính hiện hành theo cấp và đơn vị cha (FeatureCollection); đơn vị chưa có hình ở missing"
+      operationId: listAdminBoundaries
+      parameters:
+        - {name: level, in: query, required: true, schema: {type: string, enum: [province, commune]}}
+        - {name: parent, in: query, schema: {type: string}, description: "Mã tỉnh; bắt buộc với level=commune"}
+        - {name: zoom, in: query, schema: {type: integer, minimum: 0, maximum: 22, default: 12}}
+      responses:
+        "200":
+          description: Ranh giới
+          content:
+            application/geo+json:
+              schema:
+                type: object
+                required: [type, features, missing]
+                properties:
+                  type: {type: string, enum: [FeatureCollection]}
+                  features:
+                    type: array
+                    items:
+                      type: object
+                      required: [type, id, geometry, properties]
+                      properties:
+                        type: {type: string, enum: [Feature]}
+                        id: {type: string}
+                        geometry: {$ref: "#/components/schemas/PolygonGeometry"}
+                        properties:
+                          type: object
+                          required: [code, level, name, parent_code, source, area_ha, imported_at]
+                          properties:
+                            code: {type: string}
+                            level: {type: string, enum: [province, commune]}
+                            name: {type: string}
+                            parent_code: {type: [string, "null"]}
+                            source: {type: string}
+                            area_ha: {$ref: "#/components/schemas/Decimal"}
+                            imported_at: {type: string, format: date-time}
+                  missing: {type: array, items: {type: string}, description: "Mã đơn vị chưa nhập ranh giới"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/mechanization/forecasts:
+    get:
+      summary: "Dự báo nhu cầu đã lưu (FN-09, cgh.forecast/v1 — phương pháp tạm, cần DCRD xác nhận); chạy qua Admin API"
+      operationId: mechListForecasts
+      parameters:
+        - {name: season_code, in: query, schema: {type: string}}
+        - {name: season_year, in: query, schema: {type: integer}}
+      responses:
+        "200":
+          description: Các lần chạy (mới nhất trước)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MechForecastRun"}}
+  /v1/mechanization/forecasts/{id}:
+    get:
+      summary: Một lần dự báo đã lưu (không tính lại) và các dòng HTX × chủng loại trong phạm vi
+      operationId: mechGetForecast
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: province_code, in: query, schema: {type: string}}
+        - {name: commune_code, in: query, schema: {type: string}}
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: farm_stage, in: query, schema: {type: string}}
+        - {name: machine_type, in: query, schema: {type: string}}
+      responses:
+        "200":
+          description: Dự báo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [run, results, summary]
+                properties:
+                  run: {$ref: "#/components/schemas/MechForecastRun"}
+                  results: {type: array, items: {$ref: "#/components/schemas/MechForecastResult"}}
+                  summary:
+                    type: object
+                    required: [forecast_area_ha, required_by_stage]
+                    properties:
+                      forecast_area_ha: {$ref: "#/components/schemas/Decimal"}
+                      required_by_stage: {type: object, additionalProperties: {type: string}}
+        "404": {description: mechanization.forecast_not_found, $ref: "#/components/responses/Problem"}
+  # --- hết pf/mechanization ---
+
+  /v1/dashboard:
+    get:
+      summary: "G-02 (US-DASH-01): bảng điều hành gộp — KPI pf/extension + HTX/hộ pf/party + thửa số hoá pf/geo + mục tiêu diện tích; tổng = tổng các con (toàn quốc = tổng các tỉnh); thiếu báo cáo → \"Số liệu tạm tính\""
+      operationId: unifiedDashboard
+      parameters:
+        - {name: unit, in: query, schema: {type: string}, description: "Mã tỉnh/xã; bỏ trống = toàn quốc (nếu được) hoặc đơn vị phụ trách"}
+        - {name: period, in: query, schema: {type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"}}
+      responses:
+        "200":
+          description: Bảng điều hành
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [unit, level, period, as_of, total, children, sources]
+                properties:
+                  unit: {type: [string, "null"]}
+                  level: {type: string, enum: [national, province, commune]}
+                  period: {type: string}
+                  as_of: {type: string, format: date-time}
+                  total: {$ref: "#/components/schemas/UnifiedFigures"}
+                  children:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: "#/components/schemas/UnifiedFigures"
+                        - type: object
+                          required: [unit, name]
+                          properties:
+                            unit: {type: string}
+                            name: {type: [string, "null"]}
+                  sources: {type: array, items: {type: string}, description: "Module đã nối vào số liệu"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/library:
+    get:
+      summary: "US-LIB-05: danh mục cá nhân (tài liệu đã lưu để đọc ngoại tuyến) của người gọi, mới lưu trước"
+      operationId: listLibrary
+      parameters:
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/LibraryItem"}}
+                  next_cursor: {type: [string, "null"]}
+  /v1/documents/{ref}/save:
+    post:
+      summary: "US-LIB-05: lưu tài liệu đang hiển thị vào danh mục cá nhân (đồng bộ xuống máy qua entity library_item)"
+      operationId: saveDocument
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: {type: [string, "null"], maxLength: 500}
+      responses:
+        "200":
+          description: Đã lưu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/LibraryItem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/documents/{ref}/unsave:
+    post:
+      summary: "US-LIB-05: bỏ lưu (không xóa cứng; máy nhận tombstone library_item)"
+      operationId: unsaveDocument
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Đã bỏ lưu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [document_ref, saved, removed_at]
+                properties:
+                  document_ref: {type: string, format: uuid}
+                  saved: {type: boolean}
+                  removed_at: {type: string, format: date-time}
+        "404": {description: content.library_item_not_found, $ref: "#/components/responses/Problem"}
   # --- pf/reports: mẫu biểu, xuất Excel/PDF bất đồng bộ (mục 12, R-52), điểm kiểm soát xuất dữ liệu (mục 18) ---
   # Mẫu và lịch gửi quản trị qua Admin API (admin.yaml). Mọi yêu cầu xuất và cấp URL tải đi qua MỘT điểm kiểm soát:
   # nhật ký (không PII), hạn mức ngày reports.daily_export_quota (mặc định 50) → 429, vượt reports.export_anomaly_threshold
@@ -2816,6 +3030,9 @@ components:
         resolved_at: {type: [string, "null"], format: date-time}
         last_note: {type: [string, "null"]}
         version: {type: integer, description: "seq cuối trong sổ của nhiệm vụ"}
+        assignee_name: {type: [string, "null"], description: "G-09: tên cán bộ được giao (danh bạ trực)"}
+        cooperative_name: {type: [string, "null"], description: "G-09: tên HTX (pf/party)"}
+        commune_name: {type: [string, "null"], description: "G-09: tên xã (pf/masterdata)"}
     ExtTaskEvent:
       type: object
       required: [event_id, action, status_after, due_at, actor_ref, event_time, recorded_at, seq]
@@ -3077,7 +3294,10 @@ components:
         area_locked: {type: boolean}
         overall: {$ref: "#/components/schemas/MechGroup"}
         stages: {type: object, additionalProperties: {$ref: "#/components/schemas/MechGroup"}}
+        cooperative_code: {type: [string, "null"], description: "G-10: Mã HTX (CGH BR-01) — chỉ ở cấp HTX"}
+        area_source_label: {type: [string, "null"], description: "G-10: nhãn nguồn diện tích [App HTX]/[Nhập tay]"}
     # --- hết pf/mechanization ---
+
     # --- pf/notify ---
     Notification:
       type: object
@@ -3124,6 +3344,94 @@ components:
         target: {type: string}
         devices: {type: integer, minimum: 0}
     # --- hết pf/notify ---
+
+    MechForecastRun:
+      type: object
+      description: "Lần chạy dự báo nhu cầu (FN-09) — phương pháp TẠM cgh.forecast/v1, cần DCRD xác nhận (docs/dev/cgh-forecast.md)"
+      required: [id, season_code, season_year, season_key, reference_date, rule_version, method_provisional, method, pilot_stages, result_count, missing_norms, computed_at, seq]
+      properties:
+        id: {type: string, format: uuid}
+        season_code: {type: string}
+        season_year: {type: integer}
+        season_key: {type: string}
+        reference_date: {type: string, format: date, description: "Ngày bắt đầu vụ dự báo — định mức tra tại đây"}
+        rule_version: {type: string, enum: [cgh.forecast/v1]}
+        method_provisional: {type: boolean}
+        method:
+          type: object
+          required: [formula, max_history, growth_cap, note]
+          properties:
+            formula: {type: string}
+            max_history: {type: integer}
+            growth_cap: {$ref: "#/components/schemas/Decimal"}
+            note: {type: string}
+        pilot_stages: {type: array, items: {type: string}}
+        result_count: {type: integer}
+        missing_norms: {type: array, items: {type: string}}
+        computed_at: {type: string, format: date-time}
+        seq: {type: integer}
+    MechForecastResult:
+      type: object
+      required: [cooperative_ref, commune_code, province_code, farm_stage, machine_type, base_area_ha, growth_pct, forecast_area_ha, norm_key, norm, required, required_whole, capacity_now, gap, status, inputs, seq]
+      properties:
+        cooperative_ref: {type: string, format: uuid}
+        commune_code: {type: [string, "null"]}
+        province_code: {type: [string, "null"]}
+        farm_stage: {type: string}
+        machine_type: {type: string}
+        base_area_ha: {oneOf: [{$ref: "#/components/schemas/Decimal"}, {type: "null"}], description: "Diện tích cùng vụ năm trước"}
+        growth_pct: {oneOf: [{$ref: "#/components/schemas/Decimal"}, {type: "null"}], description: "Tăng trưởng đã áp (%) sau chặn ±20 %"}
+        forecast_area_ha: {oneOf: [{$ref: "#/components/schemas/Decimal"}, {type: "null"}]}
+        norm_key: {type: string}
+        norm: {oneOf: [{type: object}, {type: "null"}]}
+        required: {oneOf: [{$ref: "#/components/schemas/Decimal"}, {type: "null"}]}
+        required_whole: {type: [integer, "null"]}
+        capacity_now: {type: integer, description: "Máy Hoạt động lúc chạy dự báo"}
+        gap: {type: [integer, "null"]}
+        status: {type: string, enum: [ok, no_data, no_norm]}
+        inputs:
+          type: object
+          required: [history, rates, raw_growth, capped, norm_at]
+          properties:
+            history: {type: object, additionalProperties: {type: string}}
+            rates: {type: object, additionalProperties: {type: string}}
+            raw_growth: {type: [string, "null"]}
+            capped: {type: boolean}
+            norm_at: {type: string, format: date}
+        seq: {type: integer}
+    UnifiedFigures:
+      type: object
+      description: "G-02: số liệu gộp của một đơn vị (pf/extension + pf/party + pf/geo + tham số mục tiêu)"
+      required: [sown_area_ha, target_area_ha, cooperatives, households, cooperatives_reporting, digitized_plots, digitized_area_ha, open_tasks, overdue_tasks, expected_communes, reported_communes, missing_communes, provisional, provisional_label]
+      properties:
+        sown_area_ha: {$ref: "#/components/schemas/Decimal"}
+        target_area_ha: {oneOf: [{$ref: "#/components/schemas/Decimal"}, {type: "null"}], description: "Tham số extension.target_sown_area_ha:<đơn vị>"}
+        cooperatives: {type: integer}
+        households: {type: integer}
+        cooperatives_reporting: {type: integer}
+        digitized_plots: {type: integer}
+        digitized_area_ha: {$ref: "#/components/schemas/Decimal"}
+        open_tasks: {type: integer}
+        overdue_tasks: {type: integer}
+        expected_communes: {type: integer}
+        reported_communes: {type: integer}
+        missing_communes: {type: array, items: {type: string}}
+        provisional: {type: boolean}
+        provisional_label: {type: [string, "null"]}
+    LibraryItem:
+      type: object
+      description: "US-LIB-05: tài liệu trong danh mục cá nhân"
+      required: [document_ref, saved_at, note, available, kind, title, summary, published_at]
+      properties:
+        document_ref: {type: string, format: uuid}
+        saved_at: {type: string, format: date-time}
+        note: {type: [string, "null"]}
+        available: {type: boolean, description: "false = tài liệu đã gỡ/ra khỏi phạm vi — máy giữ bản đã tải, nhãn \"đã gỡ\""}
+        kind: {type: [string, "null"]}
+        title: {type: [string, "null"]}
+        summary: {type: [string, "null"]}
+        published_at: {type: [string, "null"], format: date-time}
+    # --- hết pf/mechanization ---
     # --- pf/reports ---
     ReportColumn:
       type: object

@@ -99,6 +99,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		return Modules{}, pools, err
 	}
 	g := geo.New(geoPool, clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits(), Orgs: pty.Orgs()})
+	pty.UsePlotStats(g.PlotStats()) // G-03: số thửa đã số hoá trong danh sách HTX
 
 	contentPool, err := pool(content.DBRole)
 	if err != nil {
@@ -110,7 +111,9 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	kn := extension.New(extPool, clk, extension.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs()})
+	kn := extension.New(extPool, clk, extension.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(),
+		Plots: g.PlotStats(), Coops: pty.CooperativeStats()})
+	md.UseStaffDirectory(kn.StaffNames()) // G-07: tên người đặt/duyệt tham số
 
 	mechPool, err := pool(mechanization.DBRole)
 	if err != nil {

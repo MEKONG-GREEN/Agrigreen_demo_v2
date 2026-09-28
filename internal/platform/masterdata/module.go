@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
@@ -46,6 +47,10 @@ func (m *Module) Params() port.Params { return app.ParamsPort{Svc: m.svc} }
 
 // Catalogs cho module khác: danh mục dùng chung.
 func (m *Module) Catalogs() port.Catalogs { return app.CatalogsPort{Svc: m.svc} }
+
+// UseStaffDirectory nối danh bạ cán bộ của pf/extension (tên người đặt/duyệt
+// tham số, G-07). Gốc lắp ráp gọi sau khi dựng pf/extension; không nối → tên null.
+func (m *Module) UseStaffDirectory(d extport.StaffNames) { m.svc.Staff = d }
 
 // Seed nạp dữ liệu nền nhúng cho một tenant (chạy lặp an toàn) — gọi khi tạo tenant.
 func (m *Module) Seed(ctx context.Context, tenantID uuid.UUID) (app.SeedResult, error) {

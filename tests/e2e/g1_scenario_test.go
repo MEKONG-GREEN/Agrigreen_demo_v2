@@ -19,6 +19,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/envelope"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -907,4 +908,140 @@ func (g *g1) stepNoPII() {
 	if lk.Status != 200 || str(lk.Body, "ref") != g.households[1] {
 		g.t.Fatalf("vault phải tìm được hộ 2 theo SĐT: %d %s", lk.Status, trim(lk.Raw))
 	}
+}
+
+// TestRB3ErasureEvidenceUnreadable là kịch bản RB-3 (ADR-0004): xóa định danh một
+// hộ ở kho định danh → ảnh minh chứng của hộ không còn giải mã được qua
+// GET /v1/files/{ref}/content (410 vault.erased), trong khi sổ của cụm pf (đồng ý,
+// sổ nhận đồng bộ) vẫn nguyên vẹn và chuỗi băm xác minh được.
+func TestRB3ErasureEvidenceUnreadable(t *testing.T) {
+	s := harness.New(t)
+	g := &g1{t: t, s: s, tid: harness.NewTenant(), pubkeys: map[string][]byte{}}
+	g.root = s.User(harness.UserSpec{Tenant: g.tid, MFA: true,
+		Roles: []string{"platform_admin", "masterdata_admin", "registry_admin", "vault_registrar"}})
+	g.want(g.root.Do(harness.Admin, http.MethodPost, "/v1/masterdata/seed", "", map[string]any{}), 200, "seed")
+	g.orgNational = g.createOrg(map[string]any{"kind": "ttkn_national", "code": "TTKNQG", "name": "Trung tâm Khuyến nông Quốc gia"})
+	g.orgP92 = g.createOrg(map[string]any{"kind": "ttkn_province", "code": "TTKN92", "name": "TTKN TP Cần Thơ", "admin_unit_code": provCT, "parent_ref": g.orgNational})
+	g.orgTeamNK = g.createOrg(map[string]any{"kind": "extension_team", "code": "TKN-NINHKIEU", "name": "Tổ KNCĐ Ninh Kiều", "admin_unit_code": communeNK, "parent_ref": g.orgP92})
+	g.coopNK = g.createOrg(map[string]any{"kind": "cooperative", "name": "HTX Tổng Hợp Xóa Định Danh", "admin_unit_code": communeNK, "parent_ref": g.orgTeamNK})
+	g.officer = s.User(harness.UserSpec{Tenant: g.tid, Org: uuid.MustParse(g.orgTeamNK), Roles: []string{
+		"kn_officer", "vault_registrar", "vault_pubkey_sync", "consent_writer"}})
+
+	// Hộ có đồng ý mrv.evidence.
+	r := g.want(g.officer.Do(harness.App, http.MethodPost, "/v1/households", "", map[string]any{
+		"cooperative_ref": g.coopNK, "identity": map[string]any{"full_name": "Nguyễn Văn Tổng Hợp", "phone": "0999000031"},
+	}), 201, "tạo hộ")
+	hh := str(obj(r.Body, "household"), "household_ref")
+	g.want(g.officer.Do(harness.App, http.MethodPost, "/v1/consents", "", map[string]any{
+		"subject_ref": hh, "purpose": mrvport.ConsentPurpose, "text_version": "2026-11", "status": "granted",
+		"channel": "field_app", "event_time": time.Now().Add(-time.Hour).UTC().Format(time.RFC3339),
+	}), 201, "ghi đồng ý")
+
+	// Máy: đăng ký, kéo khóa công khai, mã hóa ảnh, tải bản mã, gửi thêm một bản ghi đồng ý qua đồng bộ.
+	g.deviceID = uuid.Must(uuid.NewV7()).String()
+	g.want(g.officer.Do(harness.App, http.MethodPost, "/v1/devices", "devreg:"+g.deviceID, map[string]any{
+		"device_id": g.deviceID, "platform": "android", "app_version": "1.0.0+1"}), 201, "đăng ký thiết bị")
+	g.officer.DeviceID = g.deviceID
+	var pub []byte
+	for _, c := range g.pullAll(g.officer)["pubkey"] {
+		var d struct {
+			Ref       string `json:"ref"`
+			PublicKey []byte `json:"public_key"`
+		}
+		if c.Op == "upsert" && json.Unmarshal(c.Data, &d) == nil && d.Ref == hh {
+			pub = d.PublicKey
+		}
+	}
+	key, err := envelope.Key32(pub)
+	if err != nil {
+		t.Fatalf("khóa công khai của hộ: %v", err)
+	}
+	plain := []byte("\xff\xd8\xff\xe0JFIF-anh-minh-chung-rb3")
+	sealed, err := envelope.Seal(plain, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta := envelope.NewMetadata(hh, sealed, "image/jpeg", time.Now().Add(-10*time.Minute).Format(time.RFC3339))
+	mb, _ := json.Marshal(meta)
+	fileRef := uuid.Must(uuid.NewV7()).String()
+	g.want(g.officer.Multipart(harness.App, "/v1/files", "file:"+fileRef, map[string]string{"meta": string(mb), "file_ref": fileRef}, "blob", sealed.Ciphertext), 201, "tải bản mã")
+	push := g.want(g.officer.Do(harness.App, http.MethodPost, "/v1/sync/push", "batch:"+uuid.Must(uuid.NewV7()).String(), map[string]any{
+		"device_id": g.deviceID, "records": []map[string]any{{"id": uuid.Must(uuid.NewV7()).String(), "idem_key": "dev:" + g.deviceID + ":1",
+			"entity": "consent", "op": "create", "event_time": time.Now().Add(-5 * time.Minute).Format(time.RFC3339),
+			"payload": map[string]any{"subject_ref": hh, "purpose": "extension.field_support", "text_version": "2026-11", "status": "granted"}}},
+	}), 200, "push đồng ý")
+	if st := str(push.Items("results")[0], "status"); st != "accepted" {
+		t.Fatalf("bản ghi đồng ý qua đồng bộ: %s", trim(push.Raw))
+	}
+
+	viewer := s.User(harness.UserSpec{Tenant: g.tid, Org: uuid.MustParse(g.orgP92), Roles: []string{"vault_evidence_viewer"}})
+	purpose := http.Header{"X-Purpose": {mrvport.ConsentPurpose}}
+	if c := viewer.DoRaw(harness.App, http.MethodGet, "/v1/files/"+fileRef+"/content", purpose, nil); c.Status != 200 || string(c.Raw) != string(plain) {
+		t.Fatalf("trước khi xóa phải đọc được bản rõ: %d", c.Status)
+	}
+
+	// Xóa định danh (RB-3): vai vault_eraser + MFA.
+	g.wantProblem(viewer.Do(harness.Vault, http.MethodPost, "/v1/subjects/"+hh+"/erasure", "", map[string]any{"reason": "Chủ hộ yêu cầu xóa dữ liệu"}),
+		403, "forbidden", "không có vai xóa định danh")
+	eraser := s.User(harness.UserSpec{Tenant: g.tid, MFA: true, Roles: []string{"vault_eraser"}})
+	er := g.want(eraser.Do(harness.Vault, http.MethodPost, "/v1/subjects/"+hh+"/erasure", "", map[string]any{"reason": "Chủ hộ yêu cầu xóa dữ liệu"}), 200, "xóa định danh")
+	if er.Body["erased"] != true {
+		t.Fatalf("xóa định danh: %s", trim(er.Raw))
+	}
+
+	// Ảnh không còn giải mã được: khóa bí mật đã hủy.
+	g.wantProblem(viewer.DoRaw(harness.App, http.MethodGet, "/v1/files/"+fileRef+"/content", purpose, nil), 410, "vault.erased", "đọc ảnh sau khi xóa định danh")
+	// Bản mã vẫn còn ở kho đối tượng (không xóa cứng sổ/bản mã), nhưng vô dụng khi thiếu khóa.
+	if rc, _, err := s.Store.Get(context.Background(), "files/"+g.tid.String()+"/"+fileRef); err != nil {
+		t.Fatalf("bản mã phải còn: %v", err)
+	} else {
+		_ = rc.Close()
+	}
+	// Nhãn hiển thị của hộ đã thành "đã xóa định danh".
+	for _, it := range g.want(g.officer.Do(harness.App, http.MethodGet, "/v1/cooperatives/"+g.coopNK+"/households", "", nil), 200, "hộ sau xóa").Items() {
+		if str(it, "household_ref") == hh && it["label_unavailable"] != true {
+			t.Fatalf("nhãn của hộ đã xóa phải không còn: %v", it)
+		}
+	}
+
+	// Sổ pf nguyên vẹn: dòng đồng ý và dòng sổ nhận đồng bộ vẫn còn, chuỗi băm hợp lệ.
+	ctx := context.Background()
+	verify := func(role, table, where string, arg any, minRows int) {
+		t.Helper()
+		pool := s.PF(role)
+		err := tenant.WithTenantTx(ctx, pool, g.tid, func(tx pgx.Tx) error {
+			rows, err := tx.Query(ctx, "SELECT DISTINCT stream_key FROM "+table+" WHERE "+where, arg)
+			if err != nil {
+				return err
+			}
+			streams, err := pgx.CollectRows(rows, pgx.RowTo[string])
+			if err != nil {
+				return err
+			}
+			if len(streams) == 0 {
+				t.Fatalf("%s: không còn dòng sổ", table)
+			}
+			var total int64
+			for _, st := range streams {
+				res, err := ledger.Verify(ctx, tx, table, g.tid, st)
+				if err != nil {
+					return err
+				}
+				if !res.OK {
+					t.Fatalf("%s %s: chuỗi băm hỏng %+v", table, st, res)
+				}
+				total += res.RowsChecked
+			}
+			if total < int64(minRows) {
+				t.Fatalf("%s: chỉ còn %d dòng", table, total)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	verify("party_app", "pf_party.consent", "subject_ref = $1::uuid", hh, 2)
+	verify("sync_app", "pf_sync.inbound", "device_id = $1", g.deviceID, 1)
+	verify("party_app", "pf_party.org_event", "org_ref = $1::uuid", g.coopNK, 1)
 }

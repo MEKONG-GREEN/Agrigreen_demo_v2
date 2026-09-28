@@ -104,6 +104,15 @@ func (m *Memory) Seed(nu port.NewUser, enabled bool, roles ...string) uuid.UUID 
 	return id
 }
 
+// SetEmailVerified đặt cờ email đã xác minh (Keycloak đặt khi người dùng hoàn tất VERIFY_EMAIL).
+func (m *Memory) SetEmailVerified(id uuid.UUID, v bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if u, ok := m.users[id]; ok {
+		u.u.EmailVerified = v
+	}
+}
+
 func fold(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
 
 // CreateUser thực hiện port.Directory.

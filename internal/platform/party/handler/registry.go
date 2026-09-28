@@ -36,6 +36,7 @@ func (h Registry) RegisterApp(rg *gin.RouterGroup) {
 
 // RegisterAdmin gắn route Admin API (MFA bắt buộc ở router).
 func (h Registry) RegisterAdmin(rg *gin.RouterGroup) {
+	rg.GET("/orgs", h.adminListOrgs)
 	rg.POST("/orgs", h.createOrg)
 	rg.GET("/orgs/export.xlsx", h.exportOrgTree)
 	httpx.AllowBody(rg, http.MethodPost, "/orgs/import", app.MaxOrgTreeBytes)
@@ -264,14 +265,16 @@ func (h Registry) listCooperatives(c *gin.Context) {
 	}
 	page, err := h.Reg.ListCooperatives(c.Request.Context(), app.ListQuery{
 		Q: c.Query("q"), IncludeInactive: c.Query("include_inactive") == "true", After: after, Limit: queryLimit(c),
+		AdminUnit: c.Query("admin_unit"),
 	})
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	items := make([]coopDTO, 0, len(page.Items))
-	for _, it := range page.Items {
-		items = append(items, toCoopDTO(it))
+	items, err := h.coopItems(c.Request.Context(), page.Items)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": encodeCursor(page.Next)})
 }
@@ -286,7 +289,12 @@ func (h Registry) getCooperative(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, toCoopDTO(out))
+	items, err := h.coopItems(c.Request.Context(), []store.Cooperative{out})
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, items[0])
 }
 
 type householdDTO struct {
@@ -315,6 +323,8 @@ type householdListItem struct {
 	Label            string `json:"label" pii:"true"`
 	MaskedPhone      string `json:"masked_phone" pii:"true"`
 	LabelUnavailable bool   `json:"label_unavailable"`
+	// Consents: trạng thái đồng ý hiện tại theo mục đích (G-04, R-41/R-42).
+	Consents []consentStateDTO `json:"consents"`
 }
 
 func (h Registry) listHouseholds(c *gin.Context) {
@@ -331,10 +341,20 @@ func (h Registry) listHouseholds(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
+	refs := make([]uuid.UUID, 0, len(page.Items))
+	for _, it := range page.Items {
+		refs = append(refs, it.Ref)
+	}
+	consents, err := h.consentsOf(c.Request.Context(), refs)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
 	items := make([]householdListItem, 0, len(page.Items))
 	for _, it := range page.Items {
 		items = append(items, householdListItem{
 			householdDTO: toHouseholdDTO(it.Household), Label: it.Label, MaskedPhone: it.MaskedPhone, LabelUnavailable: it.LabelUnavailable,
+			Consents: consents[it.Ref],
 		})
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": encodeCursor(page.Next)})

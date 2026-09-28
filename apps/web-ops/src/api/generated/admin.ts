@@ -46,6 +46,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/masterdata/catalogs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** G-06: danh sách danh mục kèm tên tiếng Việt, số mục, số mục ngừng dùng, thuộc tính (vai masterdata_admin) */
+        get: operations["mdListCatalogs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/masterdata/params": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** G-07: sổ đăng ký tham số — mọi khóa đã biết (kể cả chưa có phiên bản) và khóa đã có phiên bản, kèm tên, đơn vị, kiểu, khoảng hợp lệ, bản đang hiệu lực, số bản chờ duyệt */
+        get: operations["mdListParams"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/masterdata/catalogs/{catalog}/items": {
         parameters: {
             query?: never;
@@ -245,7 +279,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** G-08: liệt kê cây tổ chức cho quản trị (toàn quốc thấy mọi tổ chức; quản trị tỉnh thấy trong tỉnh) */
+        get: operations["partyAdminListOrgs"];
         put?: never;
         /** Tạo tổ chức trong cây TW → Tỉnh → Xã; kind = cooperative kèm hồ sơ HTX, Mã HTX tự sinh */
         post: operations["partyCreateOrg"];
@@ -467,6 +502,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** US-SYNC-03: chi tiết xung đột — các bản ghi máy gửi (không payload) và các phiên bản do module sở hữu cung cấp (không PII) */
         get: operations["syncGetConflict"];
         put?: never;
         post?: never;
@@ -1122,6 +1158,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/mechanization/forecasts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Chạy và LƯU dự báo nhu cầu máy cho một vụ (FN-09) — phương pháp TẠM cgh.forecast/v1, cần DCRD xác nhận
+         * @description Diện tích dự báo = diện tích cùng vụ năm trước × (1 + tăng trưởng trung bình của tối đa 3 vụ cùng loại gần nhất, chặn ±20 %);
+         *     số máy cần = diện tích dự báo ÷ định mức hiệu lực tại ngày bắt đầu vụ dự báo. Kết quả bất biến, lưu kèm đầu vào
+         *     (docs/dev/cgh-forecast.md). Đọc qua Application API GET /v1/mechanization/forecasts/{id}.
+         */
+        post: operations["mechRunForecast"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/mechanization/balance-runs": {
         parameters: {
             query?: never;
@@ -1351,10 +1409,164 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reports/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mọi mẫu (mẫu hệ thống + phiên bản mới nhất của tenant, kể cả đã ngừng dùng) */
+        get: operations["adminListReportTemplates"];
+        put?: never;
+        /** Tạo phiên bản mới của mẫu (việc xuất cũ giữ ảnh chụp phiên bản cũ) */
+        post: operations["saveReportTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/templates/{key}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử phiên bản của mẫu (mới nhất trước; mẫu hệ thống là phiên bản 0) */
+        get: operations["listReportTemplateVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/templates/{key}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ngừng dùng mẫu kèm lý do (phiên bản mới trạng thái retired; không xóa) */
+        post: operations["retireReportTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch gửi người gọi được xem (người lập hoặc phạm vi bao trọn) */
+        get: operations["listReportSchedules"];
+        put?: never;
+        /** Lập lịch gửi báo cáo (tuần/tháng, giờ Việt Nam). Người nhận là actor_ref — email tra lúc gửi, không lưu */
+        post: operations["createReportSchedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/schedules/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ngừng lịch kèm lý do (không xóa; lịch sử chạy giữ nguyên) */
+        post: operations["deactivateReportSchedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/schedules/{id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Các lần chạy của lịch — mỗi mốc (tuần ISO / tháng) đúng một lần, kèm kết quả gửi email */
+        get: operations["listReportScheduleRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ReportDefinition: {
+            title: string;
+            /** @enum {string} */
+            source: "extension.sowing" | "extension.growth_pest" | "extension.program_progress" | "extension.tasks_sla" | "extension.period_summary" | "mechanization.summary" | "mechanization.shortage_by_coop" | "mechanization.season_compare";
+            /** @enum {string} */
+            grouping: "national" | "province" | "commune" | "cooperative";
+            columns: {
+                key: string;
+                title?: string;
+            }[];
+            formats: ("xlsx" | "pdf")[];
+            provisional_layout?: boolean;
+            form_note?: string;
+        };
+        ReportTemplate: {
+            key: string;
+            version: number;
+            builtin: boolean;
+            /** @enum {string} */
+            status: "active" | "retired";
+            definition: components["schemas"]["ReportDefinition"];
+            reason?: string | null;
+            /** Format: uuid */
+            created_by?: string | null;
+            /** Format: date-time */
+            created_at?: string | null;
+        };
+        ReportSchedule: {
+            /** Format: uuid */
+            id: string;
+            template_key: string;
+            /** @enum {string} */
+            format: "xlsx" | "pdf";
+            unit_code?: string | null;
+            params: Record<string, never>;
+            /** @enum {string} */
+            frequency: "weekly" | "monthly";
+            weekday?: number | null;
+            day_of_month?: number | null;
+            hour: number;
+            recipients: string[];
+            /** Format: uuid */
+            owner_ref: string;
+            active: boolean;
+            deactivated_reason?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
         Problem: {
             /** Format: uri */
             type: string;
@@ -1490,6 +1702,10 @@ export interface components {
             decision_note?: string | null;
             /** Format: date-time */
             created_at: string;
+            /** @description G-07: tên cán bộ đặt (danh bạ pf/extension) */
+            setter_name?: string | null;
+            /** @description G-07: tên cán bộ duyệt */
+            approver_name?: string | null;
         };
         DecisionInput: {
             /** @description Bắt buộc (≥ 10 ký tự) khi từ chối */
@@ -1615,6 +1831,11 @@ export interface components {
             resolution_note: string | null;
             /** Format: uuid */
             resolved_record_id: string | null;
+            /**
+             * @description US-SYNC-03
+             * @enum {string}
+             */
+            sla_status?: "on_track" | "due_soon" | "overdue" | "resolved_on_time" | "resolved_late";
         };
         MrvFieldInput: {
             /** @description Khóa dành riêng plot_ref/season (text), gps (geo_point), photo (photo) lấy giá trị từ cột riêng */
@@ -2320,6 +2541,80 @@ export interface operations {
             422: components["responses"]["Problem"];
         };
     };
+    mdListCatalogs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh mục */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            catalog: string;
+                            name: string;
+                            item_count: number;
+                            inactive_count: number;
+                            attrs_schema: string[];
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    mdListParams: {
+        parameters: {
+            query?: {
+                /** @description Lọc theo tiền tố khóa, vd cgh. */
+                prefix?: string;
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang (sắp theo khóa) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            key: string;
+                            name: string;
+                            unit: string;
+                            /** @enum {string} */
+                            kind: "decimal" | "text";
+                            min: string | null;
+                            max: string | null;
+                            current: null | {
+                                version: number;
+                                value: string | null;
+                                text: string | null;
+                                /** Format: date-time */
+                                effective_from: string;
+                            };
+                            submitted_count: number;
+                        }[];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
     adminListCatalogItems: {
         parameters: {
             query?: {
@@ -2692,6 +2987,38 @@ export interface operations {
             422: components["responses"]["Problem"];
         };
     };
+    partyAdminListOrgs: {
+        parameters: {
+            query?: {
+                kind?: "ttkn_national" | "ttkn_province" | "extension_team" | "dcrd" | "cooperative" | "mkg" | "partner";
+                /** @description Chỉ con trực tiếp của tổ chức này */
+                parent_ref?: string;
+                include_inactive?: boolean;
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["PartyOrg"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
     partyCreateOrg: {
         parameters: {
             query?: never;
@@ -3045,6 +3372,10 @@ export interface operations {
                 /** @description true = chỉ mục đang mở đã quá due_at */
                 overdue?: boolean;
                 owner_org_ref?: string;
+                /** @description US-SYNC-03: lọc theo entity */
+                entity?: string;
+                /** @description US-SYNC-03: due_soon = còn hạn dưới 24 giờ */
+                sla?: "on_track" | "due_soon" | "overdue";
                 cursor?: components["parameters"]["Cursor"];
                 limit?: components["parameters"]["Limit"];
             };
@@ -3087,7 +3418,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SyncConflict"];
+                    "application/json": components["schemas"]["SyncConflict"] & {
+                        /** @enum {string|null} */
+                        resolution: "keep_version" | "correction" | null;
+                        versions_available: boolean;
+                        records: {
+                            /** Format: uuid */
+                            record_id: string | null;
+                            record_idem_key: string;
+                            entity: string;
+                            op: string;
+                            status: string;
+                            /** Format: uuid */
+                            device_id: string;
+                            /** Format: uuid */
+                            actor_ref: string;
+                            /** Format: date-time */
+                            event_time: string;
+                            /** Format: uuid */
+                            supersedes_id: string | null;
+                            payload_sha256: string | null;
+                        }[];
+                        versions: {
+                            /** Format: uuid */
+                            record_id: string;
+                            /** @enum {string} */
+                            role: "record" | "current" | "overlapping";
+                            label: string;
+                            current: boolean;
+                            /** Format: date-time */
+                            event_time: string;
+                            /** @description Dữ liệu phiên bản của module sở hữu (vd plot_boundary: plot_ref, plot_code, area_ha, geometry) */
+                            data: Record<string, never>;
+                        }[];
+                    };
                 };
             };
             403: components["responses"]["Problem"];
@@ -3112,9 +3476,14 @@ export interface operations {
                     note: string;
                     /**
                      * Format: uuid
-                     * @description Bản ghi được giữ (tùy chọn)
+                     * @description Bản ghi được giữ (keep_version) hoặc bản ghi bù đã tạo ở module sở hữu (correction)
                      */
                     resolved_record_id?: string;
+                    /**
+                     * @description US-SYNC-03 (tùy chọn): keep_version bắt buộc resolved_record_id thuộc xung đột; correction không được trỏ bản ghi của xung đột
+                     * @enum {string}
+                     */
+                    resolution?: "keep_version" | "correction";
                 };
             };
         };
@@ -4220,6 +4589,48 @@ export interface operations {
             404: components["responses"]["Problem"];
         };
     };
+    mechRunForecast: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    season_code: string;
+                    /** @description Năm bắt đầu vụ dự báo */
+                    season_year: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Đã lưu */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description MechForecastRun (application.yaml) */
+                        run: Record<string, never>;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
     mechComputeBalance: {
         parameters: {
             query?: never;
@@ -4638,6 +5049,260 @@ export interface operations {
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+        };
+    };
+    adminListReportTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ReportTemplate"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    saveReportTemplate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    key: string;
+                    definition: components["schemas"]["ReportDefinition"];
+                };
+            };
+        };
+        responses: {
+            /** @description Phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportTemplate"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listReportTemplateVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ReportTemplate"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    retireReportTemplate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ngừng dùng */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportTemplate"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    listReportSchedules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ReportSchedule"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    createReportSchedule: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    template_key: string;
+                    /** @enum {string} */
+                    format: "xlsx" | "pdf";
+                    unit_code?: string;
+                    /** @description Như ReportParams của Application API; kỳ tính theo mốc (tháng: tháng trước; tuần: tháng đang chạy) */
+                    params?: Record<string, never>;
+                    /** @enum {string} */
+                    frequency: "weekly" | "monthly";
+                    /** @description weekly: 1 = thứ Hai */
+                    weekday?: number;
+                    /** @description monthly */
+                    day_of_month?: number;
+                    hour: number;
+                    recipients: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Đã lập lịch */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSchedule"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    deactivateReportSchedule: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Lịch */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSchedule"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    listReportScheduleRuns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lần chạy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /**
+                             * @example 2026-W40
+                             * @example 2026-10
+                             */
+                            slot_key: string;
+                            /** Format: date-time */
+                            slot_at: string;
+                            /** @enum {string} */
+                            status: "queued" | "skipped";
+                            skip_reason?: string | null;
+                            /** Format: uuid */
+                            job_id?: string | null;
+                            /** Format: date-time */
+                            fired_at: string;
+                            /** @enum {string|null} */
+                            delivery_status?: "sent" | "skipped" | "failed" | null;
+                            delivery_note?: string | null;
+                            sent_count?: number | null;
+                            /** Format: date-time */
+                            delivered_at?: string | null;
+                        }[];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
         };
     };
 }

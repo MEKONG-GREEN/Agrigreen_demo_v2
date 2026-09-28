@@ -164,6 +164,8 @@ type conflictDTO struct {
 	ResolvedBy       *string `json:"resolved_by"`
 	ResolutionNote   *string `json:"resolution_note"`
 	ResolvedRecordID *string `json:"resolved_record_id"`
+	// SLAStatus: on_track | due_soon | overdue | resolved_on_time | resolved_late (US-SYNC-03).
+	SLAStatus string `json:"sla_status"`
 }
 
 func uuidStr[T interface{ String() string }](v *T) *string {
@@ -179,6 +181,54 @@ func toConflictDTO(c domain.Conflict, now time.Time) conflictDTO {
 		ConflictID: c.ID.String(), Entity: c.Entity, FirstRecordID: c.FirstRecordID.String(), DeviceID: c.DeviceID.String(),
 		ReportedBy: c.ReportedBy.String(), OwnerOrgRef: uuidStr(c.OwnerOrgRef), OpenedAt: ts(c.OpenedAt), DueAt: ts(c.DueAt),
 		Status: c.Status, Overdue: c.Overdue(now), ResolvedAt: tsPtr(c.ResolvedAt), ResolvedBy: uuidStr(c.ResolvedBy),
-		ResolutionNote: c.ResolutionNote, ResolvedRecordID: uuidStr(c.ResolvedRecordID),
+		ResolutionNote: c.ResolutionNote, ResolvedRecordID: uuidStr(c.ResolvedRecordID), SLAStatus: app.SLAStatus(c, now),
 	}
+}
+
+type conflictRecordDTO struct {
+	RecordID      *string `json:"record_id"`
+	RecordIdemKey string  `json:"record_idem_key"`
+	Entity        string  `json:"entity"`
+	Op            string  `json:"op"`
+	Status        string  `json:"status"`
+	DeviceID      string  `json:"device_id"`
+	ActorRef      string  `json:"actor_ref"`
+	EventTime     string  `json:"event_time"`
+	SupersedesID  *string `json:"supersedes_id"`
+	PayloadSHA256 *string `json:"payload_sha256"`
+}
+
+type conflictVersionDTO struct {
+	RecordID  string          `json:"record_id"`
+	Role      string          `json:"role"`
+	Label     string          `json:"label"`
+	Current   bool            `json:"current"`
+	EventTime string          `json:"event_time"`
+	Data      json.RawMessage `json:"data"`
+}
+
+type conflictDetailDTO struct {
+	conflictDTO
+	Resolution        *string              `json:"resolution"`
+	Records           []conflictRecordDTO  `json:"records"`
+	Versions          []conflictVersionDTO `json:"versions"`
+	VersionsAvailable bool                 `json:"versions_available"`
+}
+
+func toConflictDetailDTO(d app.ConflictDetail, now time.Time) conflictDetailDTO {
+	out := conflictDetailDTO{conflictDTO: toConflictDTO(d.Conflict, now), Records: []conflictRecordDTO{}, Versions: []conflictVersionDTO{},
+		VersionsAvailable: d.VersionsAvailable}
+	if r := app.ResolutionOf(d.Conflict, d.Records); r != "" {
+		out.Resolution = &r
+	}
+	for _, r := range d.Records {
+		out.Records = append(out.Records, conflictRecordDTO{RecordID: uuidStr(r.RecordID), RecordIdemKey: r.RecordIdemKey, Entity: r.Entity,
+			Op: r.Op, Status: r.Status, DeviceID: r.DeviceID.String(), ActorRef: r.ActorRef.String(), EventTime: ts(r.EventTime),
+			SupersedesID: uuidStr(r.RecordSupersedesID), PayloadSHA256: r.PayloadSHA256})
+	}
+	for _, v := range d.Versions {
+		out.Versions = append(out.Versions, conflictVersionDTO{RecordID: v.RecordID.String(), Role: v.Role, Label: v.Label, Current: v.Current,
+			EventTime: ts(v.EventTime), Data: v.Data})
+	}
+	return out
 }

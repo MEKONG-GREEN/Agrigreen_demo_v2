@@ -48,6 +48,8 @@ var (
 type Service struct {
 	DB    tenant.Beginner // pool vai masterdata_app
 	Clock clock.Clock
+	// Staff (tùy chọn): danh bạ cán bộ của pf/extension — tên người đặt/duyệt tham số (G-07).
+	Staff staffDirectory
 }
 
 // Page là một trang kết quả phân trang bằng cursor (R-53).

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -56,6 +57,8 @@ type Registry struct {
 	Clock clock.Clock
 	Units mdport.AdminUnits // có thể nil khi chưa nối — thao tác cần nó trả ErrDependency
 	Vault client.Client     // có thể nil khi chưa nối
+	// Plots (tùy chọn): thống kê thửa đã số hoá của pf/geo cho danh sách HTX (G-03).
+	Plots geoport.PlotStats
 }
 
 var (

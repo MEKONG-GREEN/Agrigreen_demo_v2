@@ -15,6 +15,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
+	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -67,6 +68,9 @@ type Service struct {
 	Units    mdport.AdminUnits
 	Params   mdport.Params
 	Catalogs mdport.Catalogs
+	// Plots, Coops (tùy chọn): thống kê của pf/geo và pf/party cho bảng điều hành gộp (G-02).
+	Plots geoport.PlotStats
+	Coops partyport.CooperativeStats
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

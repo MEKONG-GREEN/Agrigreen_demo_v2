@@ -345,14 +345,21 @@ type coverageItemDTO struct {
 	AreaLocked     bool                `json:"area_locked"`
 	Overall        groupDTO            `json:"overall"`
 	Stages         map[string]groupDTO `json:"stages"`
+	// G-10: Mã HTX và nhãn nguồn diện tích ([App HTX]/[Nhập tay]) — chỉ ở cấp HTX.
+	CooperativeCode *string `json:"cooperative_code"`
+	AreaSourceLabel *string `json:"area_source_label"`
 }
 
 func toCoverageItemDTO(it app.CoverageItem) coverageItemDTO {
-	return coverageItemDTO{
+	d := coverageItemDTO{
 		UnitCode: strPtr(it.UnitCode), CooperativeRef: refPtr(it.CooperativeRef), Name: it.Name, ProvinceCode: strPtr(it.ProvinceCode),
 		CommuneCode: strPtr(it.CommuneCode), Cooperatives: it.Cooperatives, AreaSource: strPtr(it.AreaSource), AreaLocked: it.AreaLocked,
-		Overall: toGroupDTO(it.Overall), Stages: toStagesDTO(it.Stages),
+		Overall: toGroupDTO(it.Overall), Stages: toStagesDTO(it.Stages), CooperativeCode: strPtr(it.CooperativeCode),
 	}
+	if it.AreaSource != "" {
+		d.AreaSourceLabel = strPtr(areaSourceLabels[it.AreaSource])
+	}
+	return d
 }
 
 // ---------------------------------------------------------------------------

@@ -66,6 +66,73 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "409": {description: "masterdata.admin_unit_conflict | masterdata.admin_unit_overlap", $ref: "#/components/responses/Problem"}
         "422": {description: "validation_failed | masterdata.admin_unit_invalid_reference", $ref: "#/components/responses/Problem"}
+  /v1/masterdata/catalogs:
+    get:
+      summary: "G-06: danh sách danh mục kèm tên tiếng Việt, số mục, số mục ngừng dùng, thuộc tính (vai masterdata_admin)"
+      operationId: mdListCatalogs
+      responses:
+        "200":
+          description: Danh mục
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [catalog, name, item_count, inactive_count, attrs_schema]
+                      properties:
+                        catalog: {type: string}
+                        name: {type: string}
+                        item_count: {type: integer}
+                        inactive_count: {type: integer}
+                        attrs_schema: {type: array, items: {type: string}}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/masterdata/params:
+    get:
+      summary: "G-07: sổ đăng ký tham số — mọi khóa đã biết (kể cả chưa có phiên bản) và khóa đã có phiên bản, kèm tên, đơn vị, kiểu, khoảng hợp lệ, bản đang hiệu lực, số bản chờ duyệt"
+      operationId: mdListParams
+      parameters:
+        - {name: prefix, in: query, schema: {type: string}, description: "Lọc theo tiền tố khóa, vd cgh."}
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang (sắp theo khóa)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [key, name, unit, kind, min, max, current, submitted_count]
+                      properties:
+                        key: {type: string}
+                        name: {type: string}
+                        unit: {type: string}
+                        kind: {type: string, enum: [decimal, text]}
+                        min: {type: [string, "null"]}
+                        max: {type: [string, "null"]}
+                        current:
+                          oneOf:
+                            - type: "null"
+                            - type: object
+                              required: [version, value, text, effective_from]
+                              properties:
+                                version: {type: integer}
+                                value: {type: [string, "null"]}
+                                text: {type: [string, "null"]}
+                                effective_from: {type: string, format: date-time}
+                        submitted_count: {type: integer}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
   /v1/masterdata/catalogs/{catalog}/items:
     parameters:
       - $ref: "#/components/parameters/Catalog"
@@ -333,6 +400,28 @@ paths:
   # --- pf/party: tổ chức, HTX, nông hộ ---
 
   /v1/orgs:
+    get:
+      summary: "G-08: liệt kê cây tổ chức cho quản trị (toàn quốc thấy mọi tổ chức; quản trị tỉnh thấy trong tỉnh)"
+      operationId: partyAdminListOrgs
+      parameters:
+        - {name: kind, in: query, schema: {type: string, enum: [ttkn_national, ttkn_province, extension_team, dcrd, cooperative, mkg, partner]}}
+        - {name: parent_ref, in: query, schema: {type: string, format: uuid}, description: "Chỉ con trực tiếp của tổ chức này"}
+        - {name: include_inactive, in: query, schema: {type: boolean, default: true}}
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/PartyOrg"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
     post:
       summary: Tạo tổ chức trong cây TW → Tỉnh → Xã; kind = cooperative kèm hồ sơ HTX, Mã HTX tự sinh
       operationId: partyCreateOrg
@@ -624,6 +713,8 @@ paths:
         - {name: status, in: query, schema: {type: string, enum: [open, resolved]}}
         - {name: overdue, in: query, description: "true = chỉ mục đang mở đã quá due_at", schema: {type: boolean}}
         - {name: owner_org_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: entity, in: query, schema: {type: string}, description: "US-SYNC-03: lọc theo entity"}
+        - {name: sla, in: query, schema: {type: string, enum: [on_track, due_soon, overdue]}, description: "US-SYNC-03: due_soon = còn hạn dưới 24 giờ"}
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
@@ -641,6 +732,7 @@ paths:
         "422": {$ref: "#/components/responses/Problem"}
   /v1/sync/conflicts/{id}:
     get:
+      summary: "US-SYNC-03: chi tiết xung đột — các bản ghi máy gửi (không payload) và các phiên bản do module sở hữu cung cấp (không PII)"
       operationId: syncGetConflict
       parameters:
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -649,7 +741,42 @@ paths:
           description: Xung đột
           content:
             application/json:
-              schema: {$ref: "#/components/schemas/SyncConflict"}
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SyncConflict"
+                  - type: object
+                    required: [resolution, records, versions, versions_available]
+                    properties:
+                      resolution: {type: [string, "null"], enum: [keep_version, correction, null]}
+                      versions_available: {type: boolean}
+                      records:
+                        type: array
+                        items:
+                          type: object
+                          required: [record_id, record_idem_key, entity, op, status, device_id, actor_ref, event_time, supersedes_id, payload_sha256]
+                          properties:
+                            record_id: {type: [string, "null"], format: uuid}
+                            record_idem_key: {type: string}
+                            entity: {type: string}
+                            op: {type: string}
+                            status: {type: string}
+                            device_id: {type: string, format: uuid}
+                            actor_ref: {type: string, format: uuid}
+                            event_time: {type: string, format: date-time}
+                            supersedes_id: {type: [string, "null"], format: uuid}
+                            payload_sha256: {type: [string, "null"]}
+                      versions:
+                        type: array
+                        items:
+                          type: object
+                          required: [record_id, role, label, current, event_time, data]
+                          properties:
+                            record_id: {type: string, format: uuid}
+                            role: {type: string, enum: [record, current, overlapping]}
+                            label: {type: string}
+                            current: {type: boolean}
+                            event_time: {type: string, format: date-time}
+                            data: {type: object, description: "Dữ liệu phiên bản của module sở hữu (vd plot_boundary: plot_ref, plot_code, area_ha, geometry)"}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {description: "sync.conflict_not_found", $ref: "#/components/responses/Problem"}
   /v1/sync/conflicts/{id}/resolve:
@@ -668,7 +795,8 @@ paths:
               required: [note]
               properties:
                 note: {type: string, minLength: 10, maxLength: 500}
-                resolved_record_id: {type: string, format: uuid, description: "Bản ghi được giữ (tùy chọn)"}
+                resolved_record_id: {type: string, format: uuid, description: "Bản ghi được giữ (keep_version) hoặc bản ghi bù đã tạo ở module sở hữu (correction)"}
+                resolution: {type: string, enum: [keep_version, correction], description: "US-SYNC-03 (tùy chọn): keep_version bắt buộc resolved_record_id thuộc xung đột; correction không được trỏ bản ghi của xung đột"}
       responses:
         "200":
           description: Đã đóng
@@ -1529,6 +1657,39 @@ paths:
                         reason: {type: [string, "null"]}
                         area: {$ref: "#/components/schemas/MechSeasonArea"}
         "404": {$ref: "#/components/responses/Problem"}
+  /v1/mechanization/forecasts:
+    post:
+      summary: "Chạy và LƯU dự báo nhu cầu máy cho một vụ (FN-09) — phương pháp TẠM cgh.forecast/v1, cần DCRD xác nhận"
+      description: |
+        Diện tích dự báo = diện tích cùng vụ năm trước × (1 + tăng trưởng trung bình của tối đa 3 vụ cùng loại gần nhất, chặn ±20 %);
+        số máy cần = diện tích dự báo ÷ định mức hiệu lực tại ngày bắt đầu vụ dự báo. Kết quả bất biến, lưu kèm đầu vào
+        (docs/dev/cgh-forecast.md). Đọc qua Application API GET /v1/mechanization/forecasts/{id}.
+      operationId: mechRunForecast
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [season_code, season_year]
+              properties:
+                season_code: {type: string}
+                season_year: {type: integer, description: "Năm bắt đầu vụ dự báo"}
+      responses:
+        "201":
+          description: Đã lưu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [run]
+                properties:
+                  run: {type: object, description: "MechForecastRun (application.yaml)"}
+        "200": {description: Gọi lặp cùng Idempotency-Key}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/mechanization/balance-runs:
     post:
       summary: Tính và LƯU cân đối cung–cầu của một vụ (FN-09, QT-01/QT-02) — phát pf.mechanization.balance.computed
@@ -2343,6 +2504,8 @@ components:
         decided_at: {type: [string, "null"], format: date-time}
         decision_note: {type: [string, "null"]}
         created_at: {type: string, format: date-time}
+        setter_name: {type: [string, "null"], description: "G-07: tên cán bộ đặt (danh bạ pf/extension)"}
+        approver_name: {type: [string, "null"], description: "G-07: tên cán bộ duyệt"}
     DecisionInput:
       type: object
       properties:
@@ -2439,6 +2602,7 @@ components:
         resolved_by: {type: [string, "null"], format: uuid}
         resolution_note: {type: [string, "null"]}
         resolved_record_id: {type: [string, "null"], format: uuid}
+        sla_status: {type: string, enum: [on_track, due_soon, overdue, resolved_on_time, resolved_late], description: "US-SYNC-03"}
     MrvFieldInput:
       type: object
       required: [key, label_vi, data_type]

@@ -53,6 +53,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.GET("/roster", h.roster)
 	g.POST("/roster/status", h.setDuty)
 	g.POST("/roster/shifts", h.addShift)
+	h.registerUnified(rg)
 }
 
 func bind(c *gin.Context, v any) bool {
@@ -191,9 +192,10 @@ func (h Handler) listTasks(c *gin.Context) {
 		return
 	}
 	now := h.Svc.Clock.Now()
+	names := h.Svc.NamesFor(c.Request.Context(), page.Items)
 	items := make([]taskDTO, 0, len(page.Items))
 	for _, t := range page.Items {
-		items = append(items, toTask(t, now))
+		items = append(items, withNames(toTask(t, now), t, names))
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": nextUUID(page.Next)})
 }
@@ -212,7 +214,8 @@ func (h Handler) getTask(c *gin.Context) {
 	for _, e := range d.Events {
 		evs = append(evs, toEvent(e))
 	}
-	c.JSON(http.StatusOK, gin.H{"task": toTask(d.Task, h.Svc.Clock.Now()), "events": evs})
+	names := h.Svc.NamesFor(c.Request.Context(), []domain.Task{d.Task})
+	c.JSON(http.StatusOK, gin.H{"task": withNames(toTask(d.Task, h.Svc.Clock.Now()), d.Task, names), "events": evs})
 }
 
 type assignReq struct {

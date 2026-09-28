@@ -76,6 +76,7 @@ Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính m�
 | — | `sync.sink_failed` | pf/sync push: mã trong kết quả `rejected` — module nhận lỗi hệ thống; máy **giữ và tự gửi lại**, không bắt người dùng tạo bản ghi bù |
 | 404 | `sync.conflict_not_found` | pf/sync (Admin): không có xung đột |
 | 409 | `sync.conflict_state` | pf/sync (Admin): xung đột đã được đóng |
+| 422 | `sync.conflict_resolution_invalid` | pf/sync (Admin, US-SYNC-03): `resolution = keep_version` mà `resolved_record_id` không phải bản ghi của xung đột, hoặc `correction` trỏ lại bản ghi của xung đột |
 | 422 | `sync.file_checksum_mismatch` | pf/sync: SHA-256 của `blob` khác `meta.sha256_ciphertext` |
 | 409 | `sync.file_ref_taken` | pf/sync: `file_ref` đã dùng cho tệp có bản mã khác |
 | 404 | `sync.file_not_found` | pf/sync: không có tệp minh chứng trong tenant |
@@ -100,6 +101,7 @@ Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính m�
 
 Tự phê duyệt phiên bản danh mục trường MRV của chính mình trả mã chung `self_approval_forbidden` (R-56).
 | 404 | `content.document_not_found` | pf/content: không có tài liệu, chưa xuất bản/đã gỡ (bề mặt người đọc), hoặc ngoài phạm vi (không lộ sự tồn tại) |
+| 404 | `content.library_item_not_found` | pf/content (US-LIB-05): bỏ lưu tài liệu chưa có trong danh mục cá nhân |
 | 404 | `content.version_not_found` | pf/content: không có phiên bản với số đó |
 | 403 | `content.out_of_scope` | pf/content: soạn/duyệt ngoài phạm vi TW → Tỉnh → Xã (cán bộ tỉnh soạn phạm vi toàn quốc hoặc tỉnh khác; người duyệt tỉnh xuất bản tài liệu toàn quốc) |
 | 403 | `content.kind_not_allowed` | pf/content: TTKN tỉnh soạn quy trình kỹ thuật chuẩn (KN BR-06 — tỉnh dùng loại `supplement`) |
@@ -143,6 +145,7 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 404 | `mechanization.machine_not_found` | pf/mechanization: không có máy, hoặc HTX của máy ngoài phạm vi đọc |
 | 404 | `mechanization.area_not_found` | pf/mechanization: không có bản ghi diện tích vụ |
 | 404 | `mechanization.run_not_found` | pf/mechanization: chưa có kết quả cân đối đã lưu cho vụ/`run_id` (báo cáo không tính lại — chạy `POST /balance-runs`) |
+| 404 | `mechanization.forecast_not_found` | pf/mechanization (FN-09): không có lần dự báo đã lưu với `id` này (chạy `POST /v1/mechanization/forecasts` trên Admin API) |
 | 409 | `mechanization.serial_taken` | pf/mechanization: Số máy/SN đã có trong tenant (kể cả máy đã vô hiệu hóa); `existing_code` là mã máy đang giữ, lý do nêu HTX (FN-05 BR-01) |
 | 409 | `mechanization.chassis_taken` | pf/mechanization: Số khung đã có trong tenant |
 | 409 | `mechanization.owner_duplicate` | pf/mechanization: chủ sở hữu trùng định danh (SĐT qua chỉ mục mù của kho định danh), hoặc HTX đã có hồ sơ chủ loại HTX; `existing_code` là Mã CSH đang giữ |

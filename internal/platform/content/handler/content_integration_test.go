@@ -473,7 +473,7 @@ func TestSyncRetireTombstone(t *testing.T) {
 	f := newFixture(t)
 	a := f.actors()
 	src := f.mod.SyncSource()
-	if !slices.Equal(src.Entities(), []string{"document"}) {
+	if !slices.Equal(src.Entities(), []string{"document", "library_item"}) { // library_item: danh mục cá nhân (US-LIB-05)
 		t.Fatalf("entities: %v", src.Entities())
 	}
 	d := createDoc(t, a.p89Editor, map[string]any{"kind": "guide", "audience": map[string]any{"level": "province", "units": []string{"89"}},

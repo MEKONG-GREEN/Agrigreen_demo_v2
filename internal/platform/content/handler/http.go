@@ -36,6 +36,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/documents", h.list)
 	rg.GET("/documents/:ref", h.get)
 	rg.GET("/documents/:ref/versions", h.publishedVersions)
+	h.registerLibrary(rg)
 }
 
 // RegisterAdmin gắn route Admin API (MFA bắt buộc ở router).
