@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.accounts.user.created/v1",
+  "title": "pf.accounts.user.created — payload",
+  "description": "Một tài khoản cán bộ đã được tạo trong Keycloak qua pf/accounts (KN US-ADM-01). Họ tên, email, SĐT chỉ nằm trong Keycloak — payload không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.accounts.user.created",
+  "x-schema-version": 1,
+  "x-producer": "pf/accounts",
+  "type": "object",
+  "required": [
+    "user_ref",
+    "org_ref",
+    "roles",
+    "actor_ref",
+    "event_time",
+    "seq"
+  ],
+  "properties": {
+    "user_ref": {
+      "type": "string",
+      "format": "uuid",
+      "description": "id người dùng trong Keycloak (không phải định danh cá nhân)"
+    },
+    "org_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "vai realm do pf/accounts quản lý"
+    },
+    "actor_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

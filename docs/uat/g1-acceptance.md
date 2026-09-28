@@ -79,7 +79,8 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 
 | Story | Kiểm thử | Trạng thái |
 |---|---|---|
-| US-ADM-01/02/03 tài khoản, nhập hàng loạt, thao tác loạt | — | **chưa có**. Tài khoản quản lý ở Keycloak (ADR-0010), không có mã trong repo |
+| US-ADM-01/02/03 tài khoản, nhập hàng loạt, thao tác loạt | `TestCreateUserUSADM01`, `TestProvinceAdminGrantMatrix`, `TestLockUnlockNeedsReason`, `TestImportXLSXMixedRows`, `TestBulkActions`, `TestAssignmentChange`, `TestIdempotentCreate`, `TestTenantIsolation`, `TestContractHTTPAgainstEmulator` ([internal/platform/accounts](../../internal/platform/accounts)) | **một phần**. pf/accounts gọi Keycloak Admin REST (bản HTTP kiểm bằng emulator, không có Keycloak thật trong kiểm thử). Kích hoạt bằng liên kết một lần thay cho mật khẩu tạm (ADR-0010) |
+| HTX epic J (US-HTXSTATUS-01 AC-2, 02 AC-2, 03): vô hiệu hóa/kích hoạt lại HTX khóa/mở tài khoản | `TestOrgDeactivationLocksOnlyThatOrgAndReactivationRestoresOnlyThose` (consumer `pf.accounts.org_status` qua `inbox.Process`), `TestLockUnlockNeedsReason` (sổ chỉ ghi thêm, chuỗi băm) | có ở mức module. E2E chưa chạy qua RabbitMQ |
 | US-ADM-04 đăng nhập, điều hướng theo vai trò và phạm vi | `TestVerifyRejects`, `TestVerifyBuildsPrincipal`, `TestNoOrgSeesNothing`, E2E-05 | **một phần**. Có xác minh token và phạm vi theo `org_ref`; phần điều hướng giao diện chưa có |
 | US-ADM-05/06 PIN 6 số, offline 72 giờ | `apps/field-app/test/auth_test.dart` | **một phần**. Chỉ có kiểm thử Dart, không có trong E2E |
 | US-ADM-07 cây phân cấp 3 cấp | E2E-02, `TestAllowedParent`, `TestScopeProvinceSeesOnlyItsCommunes` | có |
@@ -152,7 +153,7 @@ Kịch bản có 14 bước, được nhắc tới trong bảng ở dạng **E2E
 
 | FN | Nội dung | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| FN-01 | Tài khoản và phân quyền | `TestViewerReadsAllButCannotWrite` | **một phần**. Có kiểm vai; tài khoản quản lý ở Keycloak |
+| FN-01 | Tài khoản và phân quyền | `TestViewerReadsAllButCannotWrite`, `TestCreateUserUSADM01`, `TestLockUnlockNeedsReason`, `TestGrantMatrix` | **một phần**. Quản trị tài khoản qua pf/accounts (Keycloak Admin REST); "mật khẩu tạm" của BRD thay bằng liên kết UPDATE_PASSWORD một lần (ADR-0010) |
 | FN-02 | Danh mục và cấu hình | E2E-01, E2E-09 (ngưỡng 85/60 đọc từ tham số đã duyệt), `TestSelfApprovalBlocked` | có |
 | FN-03 | Hồ sơ HTX | E2E-02, `TestTaxCodeUniquePerTenant` | có |
 | FN-04 | Chủ sở hữu máy | E2E-09 (vault, trùng SĐT → 409), `TestCodesAssignedOnceAndStableOnProvinceMove` | có |

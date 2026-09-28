@@ -7,6 +7,13 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 target="$root/deploy/compose/.env"
 if [ -f "$target" ] && [ "${1:-}" != "--force" ]; then
+  # Bổ sung bí mật mới thêm sau (không đổi bí mật cũ, không cần down -v).
+  if ! grep -q '^AG_KC_CLIENT_SECRET=' "$target"; then
+    [ -z "$(tail -c1 "$target")" ] || echo >> "$target"
+    echo "AG_KC_CLIENT_SECRET=$(head -c 32 /dev/urandom | od -An -v -tx1 | tr -d ' 
+')" >> "$target"
+    echo "Đã bổ sung AG_KC_CLIENT_SECRET vào $target (giá trị không in ra). Tạo lại container keycloak để nhập lại realm."
+  fi
   echo "Đã có $target — giữ nguyên (dùng --force để sinh lại; khi đó chạy 'docker compose down -v' vì mật khẩu DB đã đổi)."
   exit 0
 fi
@@ -30,6 +37,7 @@ tmp="$target.tmp.$$"
   echo "AG_VAULT_KEK='$(b64 32)'"
   echo "AG_VAULT_BLIND_KEY='$(b64 32)'"
   echo "AG_ANCHOR_SIGNING_KEY='$(b64 32)'"
+  echo "AG_KC_CLIENT_SECRET=$(hex 32)"
 } > "$tmp"
 mv "$tmp" "$target"
 echo "Đã ghi $target (giá trị không in ra)."

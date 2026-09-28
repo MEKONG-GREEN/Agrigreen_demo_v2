@@ -1563,6 +1563,7 @@ paths:
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
   # --- hết pf/mechanization ---
+
   # --- pf/notify ---
   /v1/sync/nudge:
     post:
@@ -1585,6 +1586,302 @@ paths:
         "404": {description: "notify.nudge_target_not_found", $ref: "#/components/responses/Problem"}
         "429": {description: "notify.nudge_rate_limited", $ref: "#/components/responses/Problem"}
   # --- hết pf/notify ---
+
+  # --- pf/accounts --- tài khoản cán bộ qua Keycloak Admin REST (KN US-ADM-01..03, HTX US-ACC-01/02, CGH FN-01)
+
+  #
+
+  # Vai: platform_admin, account_admin, account_admin_province (đều [MFA]). Ma trận cấp vai (accounts/port/grants.go):
+
+  #   platform_admin → mọi vai do module quản lý; account_admin → trừ account_admin, param_approver, vault_eraser;
+
+  #   account_admin_province → chỉ kn_officer, coop_manager, chỉ tổ chức trong tỉnh (phạm vi theo org_ref, ADR-0009).
+
+  # Thao tác trên một tài khoản đòi mọi vai hiện có của tài khoản đó nằm trong tập người gọi được cấp.
+
+  # Họ tên, email, SĐT chỉ nằm trong Keycloak; pf_accounts chỉ giữ user_ref, org_ref, ảnh chụp vai (không PII).
+
+  # Kích hoạt bằng liên kết một lần của Keycloak (execute-actions-email, 72 giờ) — không gửi mật khẩu tạm (ADR-0010).
+  /v1/accounts/grants:
+    get:
+      summary: Vai người gọi được cấp, vai [MFA], ràng buộc vai ↔ loại tổ chức
+      operationId: accountsGrants
+      responses:
+        "200":
+          description: Ma trận cấp vai áp cho người gọi
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [grantable, mfa_roles, role_org_kinds]
+                properties:
+                  grantable: {type: array, items: {type: string}}
+                  mfa_roles: {type: array, items: {type: string}}
+                  role_org_kinds: {type: object, additionalProperties: {type: array, items: {type: string}}}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/users:
+    get:
+      summary: Tài khoản trong phạm vi — đọc Keycloak theo tenant_id của token, lọc org_ref thuộc phạm vi người gọi
+      operationId: accountsListUsers
+      parameters:
+        - {name: org_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}, description: "next_cursor của trang trước (R-53)"}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/AccountsUser"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Tạo tài khoản — tenant_id từ token, org_ref trong phạm vi, vai theo ma trận; required actions VERIFY_EMAIL, UPDATE_PASSWORD (+ CONFIGURE_TOTP với vai [MFA])
+      operationId: accountsCreateUser
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, org_ref, roles]
+              properties:
+                username: {type: string, description: "Bỏ trống → dùng email. 3–64 ký tự a-z 0-9 . _ - @"}
+                email: {type: string, format: email}
+                full_name: {type: string, description: "Họ tên; tách thành last_name (họ, đệm) + first_name (tên) nếu không gửi hai trường kia"}
+                first_name: {type: string}
+                last_name: {type: string}
+                phone: {type: string, description: "10 chữ số bắt đầu bằng 0 (+84 được đổi); duy nhất trong tenant"}
+                org_ref: {type: string, format: uuid}
+                roles: {type: array, minItems: 1, items: {type: string}}
+      responses:
+        "201":
+          description: Đã tạo trong Keycloak và ghi sổ pf_accounts.account_event (created, actions_sent); phát pf.accounts.user.created
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user, seq, activation_email_sent]
+                properties:
+                  user: {$ref: "#/components/schemas/AccountsUser"}
+                  seq: {type: integer}
+                  activation_email_sent: {type: boolean, description: "false khi Keycloak không gửi được email — gửi lại bằng /resend-actions"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/users/import:
+    post:
+      summary: Nhập tài khoản hàng loạt từ CSV (UTF-8) hoặc Excel .xlsx (trang tính đầu), tối đa 200 dòng; kết quả theo dòng
+      description: |
+        Cột (tiêu đề không phân biệt hoa thường, bỏ dấu): email; full_name|ho_ten (hoặc first_name|ten + last_name|ho);
+        org_ref|ma_to_chuc (UUID tổ chức pf/party); roles|vai_tro (phân tách , ; |); tùy chọn username|ten_dang_nhap, phone|so_dien_thoai|sdt.
+        Thiếu cột bắt buộc → từ chối cả tệp (accounts.import_invalid). Dòng lỗi bị loại kèm lý do ("Thiếu Email", "Sai định dạng Email",
+        "Sai định dạng vai trò", "SĐT đã tồn tại", "Trùng với dòng N trong tệp"…), dòng hợp lệ được tạo và nhận liên kết kích hoạt.
+      operationId: accountsImportUsers
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: {type: string}
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+            schema: {type: string, format: binary}
+      responses:
+        "200":
+          description: Kết quả theo dòng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created, rejected, rows]
+                properties:
+                  created: {type: integer}
+                  rejected: {type: integer}
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      required: [row, status, reason, user_id, activation_email_sent]
+                      properties:
+                        row: {type: integer, description: "Số dòng trong tệp (dòng 1 là tiêu đề)"}
+                        status: {type: string, enum: [created, rejected]}
+                        reason: {type: [string, "null"], description: "Không chứa dữ liệu cá nhân"}
+                        user_id: {type: [string, "null"], format: uuid}
+                        activation_email_sent: {type: boolean}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/users/bulk:
+    post:
+      summary: Thao tác loạt (KN US-ADM-03) — khóa, mở khóa hoặc gửi lại liên kết cho tối đa 100 tài khoản; kết quả theo từng tài khoản
+      operationId: accountsBulk
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, user_ids]
+              properties:
+                action: {type: string, enum: [lock, unlock, resend]}
+                user_ids: {type: array, minItems: 1, maxItems: 100, items: {type: string, format: uuid}}
+                reason: {type: string, minLength: 20, description: "Bắt buộc với lock/unlock"}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [succeeded, failed, items]
+                properties:
+                  succeeded: {type: integer}
+                  failed: {type: integer}
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [user_id, ok, replayed, code, detail]
+                      properties:
+                        user_id: {type: string, format: uuid}
+                        ok: {type: boolean}
+                        replayed: {type: boolean}
+                        code: {type: [string, "null"], description: "Mã lỗi docs/errors.md"}
+                        detail: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/users/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: "id người dùng Keycloak"}
+    get:
+      summary: Chi tiết tài khoản (vai đọc thẳng từ Keycloak)
+      operationId: accountsGetUser
+      responses:
+        "200":
+          description: Tài khoản
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AccountsUser"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/users/{id}/events:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: Nhật ký thao tác (sổ chỉ ghi thêm — ai, lúc nào, lý do; US-HTXSTATUS-03)
+      operationId: accountsUserEvents
+      responses:
+        "200":
+          description: Theo seq tăng dần
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/AccountsEvent"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/users/{id}/lock:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Khóa tài khoản (enabled=false) và thu hồi mọi phiên — lý do ≥ 20 ký tự; phát pf.accounts.user.locked
+      operationId: accountsLock
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        $ref: "#/components/requestBodies/AccountsReason"
+      responses:
+        "200": {$ref: "#/components/responses/AccountsChanged"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/users/{id}/unlock:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Mở khóa — lý do ≥ 20 ký tự; tổ chức đang vô hiệu hóa → 409 accounts.org_inactive; phát pf.accounts.user.unlocked
+      operationId: accountsUnlock
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        $ref: "#/components/requestBodies/AccountsReason"
+      responses:
+        "200": {$ref: "#/components/responses/AccountsChanged"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/users/{id}/resend-actions:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Gửi lại liên kết một lần — mặc định các required action đang chờ; không còn → UPDATE_PASSWORD (đặt lại mật khẩu, không mật khẩu tạm)
+      operationId: accountsResendActions
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                actions: {type: array, items: {type: string, enum: [VERIFY_EMAIL, UPDATE_PASSWORD, CONFIGURE_TOTP]}}
+      responses:
+        "200":
+          description: Đã gửi; ghi sổ actions_sent
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [account, activation_email_sent, replayed]
+                properties:
+                  account: {$ref: "#/components/schemas/AccountsAccount"}
+                  activation_email_sent: {type: boolean}
+                  replayed: {type: boolean}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "502": {$ref: "#/components/responses/Problem"}
+  /v1/accounts/users/{id}/assignment:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Đổi đơn vị công tác và/hoặc vai (roles là tập đầy đủ vai do module quản lý); thêm vai [MFA] khi chưa có OTP → CONFIGURE_TOTP
+      operationId: accountsAssign
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                org_ref: {type: string, format: uuid}
+                roles: {type: array, minItems: 1, items: {type: string}}
+      responses:
+        "200": {$ref: "#/components/responses/AccountsChanged"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/accounts ---
 components:
   securitySchemes:
     oidc:
@@ -1686,6 +1983,17 @@ components:
             properties:
               area: {$ref: "#/components/schemas/MechSeasonArea"}
               event: {type: object}
+    AccountsChanged:
+      description: Trạng thái tài khoản sau thao tác và seq dòng sổ vừa ghi
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [account, seq, replayed]
+            properties:
+              account: {$ref: "#/components/schemas/AccountsAccount"}
+              seq: {type: integer}
+              replayed: {type: boolean}
   schemas:
     Problem:
       type: object
@@ -2275,6 +2583,7 @@ components:
         reason: {type: [string, "null"]}
         machine: {$ref: "#/components/schemas/MechMachine"}
     # --- hết pf/mechanization ---
+
     # --- pf/notify ---
     NudgeInput:
       type: object
@@ -2290,6 +2599,49 @@ components:
         target: {type: string}
         devices: {type: integer, minimum: 0}
     # --- hết pf/notify ---
+
+    # --- pf/accounts ---
+    AccountsUser:
+      type: object
+      description: Tài khoản đọc từ Keycloak — dữ liệu cá nhân chỉ hiển thị cho quản trị viên, không lưu ở pf, không ghi log
+      required: [id, username, email, first_name, last_name, phone, enabled, email_verified, org_ref, roles, lock_cause, required_actions, created_at, tracked]
+      properties:
+        id: {type: string, format: uuid}
+        username: {type: string}
+        email: {type: string}
+        first_name: {type: string}
+        last_name: {type: string}
+        phone: {type: [string, "null"]}
+        enabled: {type: boolean}
+        email_verified: {type: boolean}
+        org_ref: {type: [string, "null"], format: uuid}
+        roles: {type: [array, "null"], items: {type: string}, description: "Vai do pf/accounts quản lý; null ở danh sách nếu tài khoản tạo ngoài nền tảng"}
+        lock_cause: {type: [string, "null"], enum: [manual, org_deactivated, null]}
+        required_actions: {type: array, items: {type: string}}
+        created_at: {type: [string, "null"], format: date-time}
+        tracked: {type: boolean, description: "Có trong pf_accounts (tạo hoặc thao tác qua nền tảng)"}
+    AccountsAccount:
+      type: object
+      required: [user_ref, org_ref, roles, enabled, lock_cause]
+      properties:
+        user_ref: {type: string, format: uuid}
+        org_ref: {type: string, format: uuid}
+        roles: {type: array, items: {type: string}}
+        enabled: {type: boolean}
+        lock_cause: {type: [string, "null"], enum: [manual, org_deactivated, null]}
+    AccountsEvent:
+      type: object
+      required: [seq, action, event_time, recorded_at, actor_ref, reason, account]
+      properties:
+        seq: {type: integer}
+        action: {type: string, enum: [created, locked, unlocked, assignment_changed, actions_sent]}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        reason: {type: [string, "null"]}
+        account: {$ref: "#/components/schemas/AccountsAccount"}
+        details: {type: object, description: "vd required actions, prev_org_ref, source_event_id — không PII"}
+    # --- hết pf/accounts ---
   requestBodies:
     ContentTransition:
       required: true
@@ -2300,3 +2652,12 @@ components:
             properties:
               version_no: {type: integer, minimum: 1, description: "Bắt buộc với submit/return/publish"}
               reason: {type: string, minLength: 10, description: "Bắt buộc với return/retire"}
+    AccountsReason:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [reason]
+            properties:
+              reason: {type: string, minLength: 20, description: "Lý do ≥ 20 ký tự (HTX US-HTXSTATUS-01 AC-3); không ghi dữ liệu cá nhân"}
