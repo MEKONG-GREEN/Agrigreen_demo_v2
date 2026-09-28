@@ -5,11 +5,11 @@
 // Mô phỏng quy tắc backend để UI thể hiện đúng: lọc theo phạm vi (ADR-0009), POST thiếu
 // Idempotency-Key → 400, phát lại cùng khóa → Idempotent-Replayed, tự phê duyệt → 403
 // self_approval_forbidden (R-56), mọi route Admin API cần MFA → 403 mfa_required.
+// Route mới của đợt hoàn thiện G1: ops.ts (Application) và admin-ops.ts (Admin).
 // ============================================================================
-import type { AppGet, ExtKPI, Page, ParamVersion, PlotFeature } from "../types";
+import type { AppGet, ParamVersion, PlotFeature } from "../types";
 import { uuidv7 } from "../idempotency";
 import {
-  addDecimal4,
   ADMIN_UNITS,
   boundaryOf,
   CATALOGS,
@@ -25,152 +25,37 @@ import {
   plotsOf,
   PROVINCES,
   TASKS,
-  UNREPORTED_COMMUNES,
+  ACTOR_NAMES,
 } from "./data";
+import { adminOpsRoutes, headerKey, parseCsv } from "./admin-ops";
+import { hasRole, inScope, isZip, json, norm, omit, pageSlice, paginate, problem, scopeUnits, type Route } from "./http";
 import { coverage as mechCoverage, dashboard as mechDashboard, findRun, RUNS } from "./mechanization";
+import { communeKpi, MISSING_BOUNDARY, opsRoutes, resolveUnit, sumKpi } from "./ops";
 import { personaFromAuthHeader, type MockPersona } from "./personas";
-
-/** Mã xã minh hoạ "chưa nhập ranh giới" → 404 geo.admin_boundary_not_found. */
-const MISSING_BOUNDARY = "96104";
-
-function traceId(): string {
-  return uuidv7().replace(/-/g, "");
-}
-
-function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json", "X-Trace-Id": traceId(), ...headers },
-  });
-}
-
-function problem(status: number, code: string, title: string, extra: Record<string, unknown> = {}): Response {
-  const tid = traceId();
-  return new Response(
-    JSON.stringify({ type: `https://errors.agrigreen.vn/${code}`, title, status, code, trace_id: tid, ...extra }),
-    { status, headers: { "Content-Type": "application/problem+json", "X-Trace-Id": tid } },
-  );
-}
-
-function pageSlice<T>(items: T[], url: URL, defaultLimit = 50, maxLimit = 200): { slice: T[]; next: string | null } {
-  const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? defaultLimit) || defaultLimit, 1), maxLimit);
-  const cursor = url.searchParams.get("cursor");
-  const offset = cursor ? Number.parseInt(atob(cursor), 10) || 0 : 0;
-  const slice = items.slice(offset, offset + limit);
-  const next = offset + limit < items.length ? btoa(String(offset + limit)) : null;
-  return { slice, next };
-}
-
-function paginate<T>(items: T[], url: URL, defaultLimit = 50, maxLimit = 200): Page<T> {
-  const { slice, next } = pageSlice(items, url, defaultLimit, maxLimit);
-  return { items: slice, next_cursor: next };
-}
-
-/** Phạm vi của persona: mã tỉnh/xã được thấy (All → null). */
-function scopeUnits(p: MockPersona): Set<string> | null {
-  return p.me.scope.all ? null : new Set(p.me.scope.units);
-}
-
-function inScope(p: MockPersona, provinceCode: string, communeCode?: string | null): boolean {
-  const s = scopeUnits(p);
-  if (!s) return true;
-  if (p.me.scope.level === "commune") return !!communeCode && s.has(communeCode);
-  return s.has(provinceCode) || (!!communeCode && s.has(communeCode));
-}
-
-function norm(s: string): string {
-  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
-}
-
-function hasRole(p: MockPersona, ...roles: string[]): boolean {
-  return roles.some((r) => p.me.roles.includes(r));
-}
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
 // --------------------------------------------------------------------------
-// GET /v1/extension/dashboard
+// GET /v1/extension/dashboard (route cũ của pf/extension, vẫn có trong hợp đồng)
 // --------------------------------------------------------------------------
-type Dashboard = AppGet<"/v1/extension/dashboard">;
+type ExtDashboardBody = AppGet<"/v1/extension/dashboard">;
 
-function ratio4(num: number, den: number): string | null {
-  if (den === 0) return null;
-  const scaled = Math.round((num * 10000) / den);
-  return `${Math.floor(scaled / 10000)}.${String(scaled % 10000).padStart(4, "0")}`;
-}
-
-function communeKpi(code: string): ExtKPI {
-  const reported = !UNREPORTED_COMMUNES.has(code);
-  const coops = COOPERATIVES.filter((c) => c.api.admin_unit_code === code && c.api.active);
-  const tasks = TASKS.filter((t) => t.commune_code === code && t.status !== "resolved");
-  const area = reported ? coops.reduce((s, c) => addDecimal4(s, c.api.area_ha ?? "0"), "0.0000") : "0.0000";
-  const targets = 2;
-  const acks = reported ? 2 : 1;
-  return {
-    sown_area_ha: area,
-    cooperatives_reporting: reported ? coops.length : 0,
-    open_tasks: tasks.length,
-    overdue_tasks: tasks.filter((t) => t.overdue).length,
-    directive_targets: targets,
-    directive_acks: acks,
-    directive_ack_rate: ratio4(acks, targets),
-    expected_communes: 1,
-    reported_communes: reported ? 1 : 0,
-    missing_communes: reported ? [] : [code],
-    provisional: !reported,
-    provisional_label: reported ? null : "Số liệu tạm tính",
-  };
-}
-
-function sumKpi(list: ExtKPI[]): ExtKPI {
-  const out = list.reduce<ExtKPI>(
-    (s, k) => ({
-      sown_area_ha: addDecimal4(s.sown_area_ha, k.sown_area_ha),
-      cooperatives_reporting: s.cooperatives_reporting + k.cooperatives_reporting,
-      open_tasks: s.open_tasks + k.open_tasks,
-      overdue_tasks: s.overdue_tasks + k.overdue_tasks,
-      directive_targets: s.directive_targets + k.directive_targets,
-      directive_acks: s.directive_acks + k.directive_acks,
-      directive_ack_rate: null,
-      expected_communes: s.expected_communes + k.expected_communes,
-      reported_communes: s.reported_communes + k.reported_communes,
-      missing_communes: [...s.missing_communes, ...k.missing_communes],
-      provisional: s.provisional || k.provisional,
-      provisional_label: null,
-    }),
-    {
-      sown_area_ha: "0.0000", cooperatives_reporting: 0, open_tasks: 0, overdue_tasks: 0, directive_targets: 0, directive_acks: 0,
-      directive_ack_rate: null, expected_communes: 0, reported_communes: 0, missing_communes: [], provisional: false, provisional_label: null,
-    },
-  );
-  out.directive_ack_rate = ratio4(out.directive_acks, out.directive_targets);
-  out.provisional_label = out.provisional ? "Số liệu tạm tính" : null;
-  return out;
-}
-
-function dashboard(p: MockPersona, url: URL): Dashboard | Response {
+function extensionDashboard(p: MockPersona, url: URL): ExtDashboardBody | Response {
   const period = url.searchParams.get("period") ?? new Date().toISOString().slice(0, 7);
   const asOf = new Date(Date.now() - 40 * 60_000).toISOString();
-  let unit = url.searchParams.get("unit");
-  if (!unit && !p.me.scope.all) unit = p.me.org?.admin_unit_code ?? null;
-  if (unit && !inScope(p, unit.slice(0, 2), unit)) return problem(403, "extension.out_of_scope", "Out of scope");
-  const province = unit ? PROVINCES.find((x) => x.code === unit) : undefined;
-  const commune = unit && !province ? COMMUNES.find((x) => x.code === unit) : undefined;
-  if (unit && !province && !commune) return problem(403, "extension.out_of_scope", "Unknown unit");
-
-  if (commune) {
-    const k = communeKpi(commune.code);
-    return { unit: commune.code, level: "commune", period, as_of: asOf, total: k, period_closed: false, closed_provinces: [], children: [] };
+  const r = resolveUnit(p, url.searchParams.get("unit"));
+  if (r instanceof Response) return r;
+  if (r.commune) {
+    return { unit: r.commune.code, level: "commune", period, as_of: asOf, total: communeKpi(r.commune.code), period_closed: false, closed_provinces: [], children: [] };
   }
-  const provinces = province ? [province] : PROVINCES;
-  const children = province
-    ? COMMUNES.filter((c) => c.province_code === province.code).map((c) => ({ unit: c.code, kpi: communeKpi(c.code) }))
-    : provinces.map((pr) => ({ unit: pr.code, kpi: sumKpi(COMMUNES.filter((c) => c.province_code === pr.code).map((c) => communeKpi(c.code))) }));
+  const children = r.province
+    ? COMMUNES.filter((c) => c.province_code === r.province!.code).map((c) => ({ unit: c.code, kpi: communeKpi(c.code) }))
+    : PROVINCES.map((pr) => ({ unit: pr.code, kpi: sumKpi(COMMUNES.filter((c) => c.province_code === pr.code).map((c) => communeKpi(c.code))) }));
   return {
-    unit: province?.code ?? null,
-    level: province ? "province" : "national",
+    unit: r.province?.code ?? null,
+    level: r.province ? "province" : "national",
     period,
     as_of: asOf,
     total: sumKpi(children.map((c) => c.kpi)),
@@ -202,19 +87,9 @@ function findPlot(ref: string | undefined): { plot: PlotFeature; index: number; 
 }
 
 // --------------------------------------------------------------------------
-// Bảng định tuyến
+// Bảng định tuyến Application API
 // --------------------------------------------------------------------------
-interface Ctx {
-  url: URL;
-  persona: MockPersona;
-  params: string[];
-  body: unknown;
-  request: Request;
-}
-type Handler = (ctx: Ctx) => Response;
-type Route = { method: string; pattern: RegExp; handler: Handler };
-
-const cghAllowed = (p: MockPersona) => p.me.org?.kind === "dcrd" || hasRole(p, "platform_admin", "cgh_viewer");
+const cghAllowed = (p: MockPersona) => p.me.org?.kind === "dcrd" || hasRole(p, "platform_admin", "cgh_viewer", "cgh_admin");
 
 const appRoutes: Route[] = [
   // --- pf/party: người gọi + phạm vi ---
@@ -225,7 +100,7 @@ const appRoutes: Route[] = [
     method: "GET",
     pattern: /^\/v1\/extension\/dashboard$/,
     handler: ({ persona, url }) => {
-      const d = dashboard(persona, url);
+      const d = extensionDashboard(persona, url);
       return d instanceof Response ? d : json(d);
     },
   },
@@ -296,9 +171,12 @@ const appRoutes: Route[] = [
     handler: ({ url, persona }) => {
       const q = norm(url.searchParams.get("q") ?? "");
       const inactive = url.searchParams.get("include_inactive") === "true";
+      // G-03: admin_unit = mã tỉnh hoặc xã; ngoài phạm vi → danh sách rỗng (không lỗi).
+      const unit = url.searchParams.get("admin_unit");
       const list = COOPERATIVES.filter(
         (c) =>
           inScope(persona, c.province_code, c.api.admin_unit_code) &&
+          (!unit || c.province_code === unit || c.api.admin_unit_code === unit) &&
           (inactive || c.api.active) &&
           (!q || norm(`${c.api.name} ${c.api.code} ${c.api.tax_code ?? ""}`).includes(q)),
       ).map((c) => c.api);
@@ -356,12 +234,15 @@ const appRoutes: Route[] = [
         });
       return json({ type: "FeatureCollection", features: inside.slice(0, limit), truncated: inside.length > limit, limit });
     },
-  },  {
+  },
+  {
     method: "GET",
     pattern: /^\/v1\/geo\/admin-boundaries\/([0-9A-Z.-]+)$/,
     handler: ({ params }) => {
       const f = params[0] === MISSING_BOUNDARY ? null : boundaryOf(params[0] ?? "");
-      return f ? json(f) : problem(404, "geo.admin_boundary_not_found", "Boundary not imported");
+      if (!f) return problem(404, "geo.admin_boundary_not_found", "Boundary not imported");
+      // Route theo mã không có parent_code trong hợp đồng.
+      return json({ ...f, properties: omit(f.properties, "parent_code") });
     },
   },
 
@@ -452,7 +333,9 @@ const appRoutes: Route[] = [
       if (!stored) return json({ kpis: { total_machines: 0, total_cooperatives: 0, cooperatives_sufficient: 0, cooperatives_shortage: 0 }, cooperatives_by_status: {}, priority: [], run: null });
       return json(mechDashboard(stored));
     },
-  },];
+  },
+  ...opsRoutes,
+];
 
 // --------------------------------------------------------------------------
 // Admin API (host riêng) — mọi route cần MFA
@@ -467,34 +350,6 @@ function normEffectiveFrom(v: string): string | null {
 
 function findVersion(id: string | undefined): ParamVersion | undefined {
   return PARAM_VERSIONS.find((v) => v.id === id);
-}
-
-/** Tách CSV đơn giản (có ngoặc kép). Đủ cho tệp mẫu; backend dùng bộ đọc CSV đầy đủ. */
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  for (const line of text.replace(/^﻿/, "").split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    const cells: string[] = [];
-    let cur = "";
-    let quoted = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (quoted) {
-        if (ch === '"' && line[i + 1] === '"') {
-          cur += '"';
-          i++;
-        } else if (ch === '"') quoted = false;
-        else cur += ch;
-      } else if (ch === '"') quoted = true;
-      else if (ch === ",") {
-        cells.push(cur.trim());
-        cur = "";
-      } else cur += ch;
-    }
-    cells.push(cur.trim());
-    rows.push(cells);
-  }
-  return rows;
 }
 
 const importedPhones = new Set<string>();
@@ -556,8 +411,10 @@ const adminRoutes: Route[] = [
         correction_reason: correction || null,
         status: "draft",
         setter_ref: persona.me.actor_ref,
+        setter_name: ACTOR_NAMES[persona.me.actor_ref] ?? null,
         submitted_at: null,
         approver_ref: null,
+        approver_name: null,
         decided_at: null,
         decision_note: null,
         created_at: new Date().toISOString(),
@@ -594,6 +451,7 @@ const adminRoutes: Route[] = [
       }
       v.status = params[1] === "approve" ? "approved" : "rejected";
       v.approver_ref = persona.me.actor_ref;
+      v.approver_name = ACTOR_NAMES[persona.me.actor_ref] ?? null;
       v.decided_at = new Date().toISOString();
       v.decision_note = note || null;
       if (v.status === "rejected") return json(v);
@@ -655,9 +513,22 @@ const adminRoutes: Route[] = [
     pattern: /^\/v1\/households\/import$/,
     handler: ({ body, persona, request }) => {
       if (!hasRole(persona, "registry_admin", "platform_admin")) return problem(403, "forbidden", "Forbidden");
-      if (!(request.headers.get("Content-Type") ?? "").startsWith("text/csv")) return problem(422, "party.import_invalid", "Expected text/csv");
+      if (isZip(body)) {
+        // .xlsx (chữ ký ZIP): giả lập không giải nén — trả kết quả minh hoạ cho trang tính đầu.
+        return json({
+          accepted: 2,
+          duplicate: 0,
+          rejected: 1,
+          rows: [
+            { row: 2, status: "accepted", reason: null, household_ref: uuidv7() },
+            { row: 3, status: "accepted", reason: null, household_ref: uuidv7() },
+            { row: 4, status: "rejected", reason: "Số điện thoại không đúng định dạng", household_ref: null },
+          ],
+        });
+      }
+      if (!(request.headers.get("Content-Type") ?? "").startsWith("text/csv")) return problem(422, "party.import_invalid", "Expected text/csv or .xlsx");
       const rows = parseCsv(typeof body === "string" ? body : "");
-      const header = (rows[0] ?? []).map((h) => h.toLowerCase());
+      const header = (rows[0] ?? []).map(headerKey);
       const col = (...names: string[]) => header.findIndex((h) => names.includes(h));
       const iName = col("full_name", "ho_ten");
       const iPhone = col("phone", "so_dien_thoai");
@@ -683,12 +554,20 @@ const adminRoutes: Route[] = [
       });
     },
   },
+  ...adminOpsRoutes,
 ];
 
 // --------------------------------------------------------------------------
 // fetch giả lập
 // --------------------------------------------------------------------------
-const replay = new Map<string, { status: number; body: string; fingerprint: string }>();
+const replay = new Map<string, { status: number; body: string; headers: Record<string, string>; fingerprint: string }>();
+
+/** Dấu vân tay thân nhị phân (độ dài + tổng kiểm đơn giản) — đủ để phát hiện dùng lại khóa cho tệp khác. */
+function binaryFingerprint(bytes: Uint8Array): string {
+  let h = 2166136261;
+  for (let i = 0; i < bytes.length; i++) h = Math.imul(h ^ (bytes[i] ?? 0), 16777619) >>> 0;
+  return `bin:${bytes.length}:${h.toString(16)}`;
+}
 
 function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; latency?: boolean }) {
   return async function mockFetch(request: Request): Promise<Response> {
@@ -703,25 +582,34 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
     if (request.method === "POST") {
       const key = request.headers.get("Idempotency-Key");
       if (!key) return problem(400, "idempotency_key_required", "Idempotency-Key required");
-      const text = await request.text();
-      const fingerprint = `${opts.surface}|${persona.id}|${url.pathname}|${text}`;
-      const prev = replay.get(key);
-      if (prev) {
-        if (prev.fingerprint !== fingerprint) return problem(422, "idempotency_key_reused", "Idempotency key reused");
-        return new Response(prev.body, { status: prev.status, headers: { "Content-Type": "application/json", "Idempotent-Replayed": "true" } });
-      }
-      const isJson = (request.headers.get("Content-Type") ?? "application/json").includes("json");
-      if (isJson) {
+      const type = request.headers.get("Content-Type") ?? "application/json";
+      let fingerprintBody: string;
+      if (type.includes("json")) {
+        const text = await request.text();
+        fingerprintBody = text;
         try {
           body = text ? JSON.parse(text) : undefined;
         } catch {
           return problem(400, "bad_request", "Invalid JSON");
         }
+      } else if (type.startsWith("text/") || /[+/]xml\b/.test(type)) {
+        body = await request.text();
+        fingerprintBody = body as string;
       } else {
-        body = text;
+        const bytes = new Uint8Array(await request.arrayBuffer());
+        body = bytes;
+        fingerprintBody = binaryFingerprint(bytes);
+      }
+      const fingerprint = `${opts.surface}|${persona.id}|${url.pathname}${url.search}|${fingerprintBody}`;
+      const prev = replay.get(key);
+      if (prev) {
+        if (prev.fingerprint !== fingerprint) return problem(422, "idempotency_key_reused", "Idempotency key reused");
+        return new Response(prev.body, { status: prev.status, headers: { ...prev.headers, "Idempotent-Replayed": "true" } });
       }
       const res = dispatch(routes, request, url, persona, body);
-      if (res.ok) replay.set(key, { status: res.status, body: await res.clone().text(), fingerprint });
+      if (res.ok) {
+        replay.set(key, { status: res.status, body: await res.clone().text(), headers: { "Content-Type": res.headers.get("Content-Type") ?? "application/json" }, fingerprint });
+      }
       return res;
     }
     return dispatch(routes, request, url, persona, body);
@@ -732,7 +620,13 @@ function dispatch(routes: Route[], request: Request, url: URL, persona: MockPers
   for (const r of routes) {
     if (r.method !== request.method) continue;
     const m = r.pattern.exec(url.pathname);
-    if (m) return r.handler({ url, persona, params: m.slice(1), body, request });
+    if (!m) continue;
+    try {
+      return r.handler({ url, persona, params: m.slice(1), body, request });
+    } catch (e) {
+      // Lỗi của chính backend giả lập → 500 internal_error (không thành "mất kết nối").
+      return problem(500, "internal_error", "Mock handler failed", { detail: e instanceof Error ? e.message : String(e) });
+    }
   }
   return problem(404, "not_found", "Not found");
 }

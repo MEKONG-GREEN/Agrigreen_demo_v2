@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { loadBoundaries } from "@/api/adapters/boundaries";
-import { cooperativePoints, listAllCooperatives } from "@/api/adapters/cooperatives";
-import { listChildUnits, unitResolver } from "@/api/adapters/units";
+import { loadBoundaries, mergeBoundaries, type BoundaryResult } from "@/api/adapters/boundaries";
+import { cooperativePoints, coopPlace, listAllCooperatives } from "@/api/adapters/cooperatives";
+import { unitResolver } from "@/api/adapters/units";
 import type { ApiClient } from "@/api/client";
 import { useAuth } from "@/auth/AuthProvider";
 import type { Principal } from "@/auth/principal";
@@ -13,22 +13,34 @@ import { ProblemAlert } from "@/components/ProblemAlert";
 import { Loading, PageHead } from "@/components/ui";
 import { formatDecimal } from "@/lib/decimal";
 import { useAsync } from "@/lib/useAsync";
-import { useUnits } from "@/lib/useUnits";
 
-/** Mã đơn vị cần vẽ ranh giới: toàn quốc → các tỉnh; tỉnh/xã → các xã trong phạm vi. */
-async function areaCodes(api: ApiClient, p: Principal | null): Promise<{ level: "province" | "commune"; codes: string[] }> {
+/**
+ * Ranh giới cần vẽ, mỗi tỉnh MỘT lời gọi GET /v1/geo/admin-boundaries (G-05): toàn quốc → các tỉnh;
+ * tỉnh → các xã của tỉnh; xã → xã của mình (lọc từ các xã cùng tỉnh).
+ */
+async function loadScopeAreas(api: ApiClient, p: Principal | null): Promise<{ level: "province" | "commune" } & BoundaryResult> {
   if (!p || p.scopeAll || p.level === "tw" || p.level === "cuc" || p.scopeUnits.length === 0) {
-    return { level: "province", codes: (await listChildUnits(api, null)).map((u) => u.code) };
+    return { level: "province", ...(await loadBoundaries(api, { level: "province" })) };
   }
   const units = await unitResolver(api).many(p.scopeUnits, false);
+  const provinces = new Set<string>();
   const communes = new Set<string>();
   for (const u of units.values()) {
-    if (u.level === "commune") communes.add(u.code);
-    else if (u.level === "province" && !p.scopeUnits.some((c) => units.get(c)?.parent_code === u.code)) {
-      for (const c of await listChildUnits(api, u.code)) communes.add(c.code);
+    if (u.level === "province") provinces.add(u.code);
+    else if (u.level === "commune") {
+      communes.add(u.code);
+      if (u.parent_code) provinces.add(u.parent_code);
     }
   }
-  return { level: "commune", codes: Array.from(communes) };
+  const merged = mergeBoundaries(await Promise.all(Array.from(provinces).map((parent) => loadBoundaries(api, { level: "commune", parent }))));
+  // Cán bộ tỉnh thấy mọi xã của tỉnh; cán bộ xã chỉ thấy xã được phân công.
+  const keepAll = Array.from(provinces).some((code) => p.scopeUnits.includes(code));
+  if (keepAll) return { level: "commune", ...merged };
+  return {
+    level: "commune",
+    collection: { type: "FeatureCollection", features: merged.collection.features.filter((f) => communes.has(f.properties.code)) },
+    missing: merged.missing.filter((c) => communes.has(c)),
+  };
 }
 
 export default function MapPage() {
@@ -37,12 +49,8 @@ export default function MapPage() {
   const [showCoops, setShowCoops] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
 
-  const areas = useAsync(async () => {
-    const { level, codes } = await areaCodes(api, principal);
-    return { level, ...(await loadBoundaries(api, codes)) };
-  }, [api, principal]);
+  const areas = useAsync(() => loadScopeAreas(api, principal), [api, principal]);
   const coops = useAsync(() => listAllCooperatives(api), [api]);
-  const units = useUnits(api, (coops.data ?? []).map((c) => c.admin_unit_code));
   const level = areas.data?.level ?? "province";
 
   const areaFc = useMemo<AreaCollection | null>(() => {
@@ -62,8 +70,8 @@ export default function MapPage() {
   const listed = useMemo(() => {
     const all = coops.data ?? [];
     if (!selected) return all;
-    return all.filter((c) => c.admin_unit_code === selected || (c.admin_unit_code && units.get(c.admin_unit_code)?.parent_code === selected));
-  }, [coops.data, selected, units]);
+    return all.filter((c) => c.admin_unit_code === selected || c.province_code === selected);
+  }, [coops.data, selected]);
 
   const withoutLocation = (coops.data ?? []).length - points.features.length;
 
@@ -131,7 +139,7 @@ export default function MapPage() {
                   {c.name}
                 </Link>
                 <div className="mute small">
-                  {c.code} · {c.area_ha ? `${formatDecimal(c.area_ha, 1)} ha` : "chưa khai diện tích"}
+                  {c.code} · {coopPlace(c)} · {c.area_ha ? `${formatDecimal(c.area_ha, 1)} ha` : "chưa khai diện tích"}
                   {c.location_provisional ? " · vị trí tạm" : ""}
                 </div>
               </li>

@@ -1,44 +1,22 @@
-// pf/extension — GET /v1/extension/dashboard (US-DASH-01). Route chỉ trả MÃ đơn vị con;
-// tên lấy từ pf/masterdata. Số thập phân giữ nguyên chuỗi (R-10) — chỉ định dạng khi hiển thị.
+// Bảng điều hành gộp — GET /v1/dashboard (G-02, US-DASH-01): KPI pf/extension + HTX/hộ pf/party + thửa số hoá pf/geo
+// + mục tiêu diện tích (tham số có phê duyệt). Tên đơn vị con do backend trả. Số thập phân giữ chuỗi (R-10).
 import type { ApiClient } from "../client";
 import { unwrap } from "../client";
-import type { AdminUnit, ExtDashboard, ExtKPI } from "../types";
-import { listChildUnits, unitResolver } from "./units";
+import type { UnifiedDashboard, UnifiedFigures } from "../types";
+import { toScaled } from "@/lib/decimal";
 
-export interface DashboardChild {
-  unit: string;
-  name: string;
-  kpi: ExtKPI;
+export function loadDashboard(api: ApiClient, query: { unit?: string; period?: string } = {}): Promise<UnifiedDashboard> {
+  return unwrap(api.GET("/v1/dashboard", { params: { query } }));
 }
 
-export interface DashboardView {
-  raw: ExtDashboard;
-  unitName: string | null;
-  children: DashboardChild[];
-}
-
-export async function loadDashboard(api: ApiClient, query: { unit?: string; period?: string } = {}): Promise<DashboardView> {
-  const raw = await unwrap(api.GET("/v1/extension/dashboard", { params: { query } }));
-  let units: AdminUnit[] = [];
-  if (raw.children.length > 0) {
-    try {
-      units = await listChildUnits(api, raw.level === "national" ? null : raw.unit);
-    } catch {
-      units = []; // thiếu tên thì hiện mã — không chặn cả dashboard
-    }
-  }
-  const names = new Map(units.map((u) => [u.code, u.name]));
-  let unitName: string | null = null;
-  if (raw.unit) {
-    try {
-      unitName = (await unitResolver(api).get(raw.unit))?.name ?? null;
-    } catch {
-      unitName = null;
-    }
-  }
-  return {
-    raw,
-    unitName,
-    children: raw.children.map((c) => ({ unit: c.unit, name: names.get(c.unit) ?? c.unit, kpi: c.kpi })),
-  };
+/**
+ * Tỷ lệ diện tích đã gieo sạ so với mục tiêu, dạng % (số) CHỈ để vẽ thanh tiến độ. Tính trên số nguyên
+ * đã nhân tỉ lệ (không cộng/chia float trên chuỗi thập phân). Chưa có mục tiêu hoặc mục tiêu 0 → null.
+ */
+export function progressPct(f: Pick<UnifiedFigures, "sown_area_ha" | "target_area_ha">): number | null {
+  if (f.target_area_ha === null) return null;
+  const sown = toScaled(f.sown_area_ha);
+  const target = toScaled(f.target_area_ha);
+  if (sown === null || target === null || target <= 0n) return null;
+  return Number((sown * 10000n) / target) / 100;
 }

@@ -1,18 +1,21 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { buildOrgTree, type OrgNode } from "@/admin/orgTree";
 import { unwrap } from "@/api/client";
 import { newIdempotencyKey } from "@/api/idempotency";
 import { collectPages } from "@/api/pagination";
-import { ApiProblem } from "@/api/problem";
-import type { Org, OrgKind, PartyOrgEvent } from "@/api/types";
+import { ApiProblem, parseProblemResponse } from "@/api/problem";
+import type { Org, OrgImportResult, OrgKind, PartyOrgEvent } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
+import { MfaNotice } from "@/components/MfaNotice";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { Loading, PageHead } from "@/components/ui";
+import { filenameFromDisposition, readUpload, saveBlob, type UploadFile } from "@/lib/files";
 import { formatDateTime } from "@/lib/format";
-import { useAsync } from "@/lib/useAsync";
+import { toApiProblem, useAsync } from "@/lib/useAsync";
 
 const KIND: Record<OrgKind, { text: string; cls: string }> = {
   ttkn_national: { text: "TTKN Quốc gia", cls: "c-ok" },
@@ -163,19 +166,127 @@ function OrgPanel({ org, onRenamed }: { org: Org; onRenamed: () => void }) {
   );
 }
 
-/**
- * Cơ cấu tổ chức. Cây đọc qua Application API GET /v1/orgs (Admin API không có route liệt kê — G-08);
- * nhật ký và đổi tên đi qua Admin API.
- */
-export default function OrgTreePage() {
-  const { api, principal } = useAuth();
+/** Xuất cây tổ chức Excel (Admin GET /v1/orgs/export.xlsx) — tải tệp nhị phân, nhập lại được ngay. */
+function ExportButton() {
+  const { adminApi } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<ApiProblem | null>(null);
+  const run = async () => {
+    setBusy(true);
+    setProblem(null);
+    try {
+      const res = await adminApi.GET("/v1/orgs/export.xlsx", { parseAs: "blob" });
+      if (!res.response.ok || !res.data) throw await parseProblemResponse(res.response);
+      saveBlob(res.data, filenameFromDisposition(res.response.headers.get("Content-Disposition"), "co-cau-to-chuc.xlsx"));
+    } catch (e) {
+      setProblem(toApiProblem(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <button type="button" className="btn btn-o btn-sm" onClick={() => void run()} disabled={busy}>
+        <Icon name="download" size={15} />
+        {busy ? "Đang xuất…" : "Xuất Excel"}
+      </button>
+      {problem ? <ProblemAlert problem={problem} /> : null}
+    </>
+  );
+}
+
+/** Nhập cây tổ chức từ .xlsx/CSV (Admin POST /v1/orgs/import) — kết quả theo dòng. */
+function ImportPanel({ onDone }: { onDone: () => void }) {
+  const { adminApi } = useAuth();
+  const [file, setFile] = useState<UploadFile | null>(null);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<ApiProblem | null>(null);
+  const [result, setResult] = useState<OrgImportResult | null>(null);
+  const [idemKey, setIdemKey] = useState(newIdempotencyKey);
+  const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    setResult(null);
+    setProblem(null);
+    setFile(f ? await readUpload(f) : null);
+    setIdemKey(newIdempotencyKey());
+  };
+  const ok = !!file && (file.kind === "xlsx" || file.kind === "csv");
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!file || !ok) return;
+    setBusy(true);
+    setProblem(null);
+    try {
+      const res = await unwrap(
+        adminApi.POST("/v1/orgs/import", {
+          params: { header: { "Idempotency-Key": idemKey }, query: { reason: reason.trim() || undefined } },
+          body: file.body as unknown as string,
+          bodySerializer: (b: unknown) => b as BodyInit,
+          headers: { "Content-Type": file.contentType },
+        }),
+      );
+      setResult(res);
+      onDone();
+    } catch (err) {
+      setProblem(err instanceof ApiProblem ? err : null);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const STATUS = { created: "Tạo mới", updated: "Cập nhật", unchanged: "Không đổi", rejected: "Bị loại" } as const;
+  return (
+    <form className="panel stack" style={{ gap: 8, marginBottom: 16 }} onSubmit={(e) => void submit(e)}>
+      <b>Nhập cây tổ chức (.xlsx hoặc CSV, tối đa 500 dòng)</b>
+      <span className="small mute">Cùng cột với tệp xuất. Mã đã có → di chuyển/đổi tên (ghi sổ kèm lý do); tệp không vô hiệu hoá tổ chức vắng mặt.</span>
+      <div className="row" style={{ alignItems: "flex-end" }}>
+        <input type="file" aria-label="Tệp cây tổ chức" accept=".xlsx,.csv" onChange={(e) => void onFile(e)} />
+        <div className="field" style={{ flex: "1 1 240px" }}>
+          <label htmlFor="imp-reason">Lý do ghi sổ (≥ 10 ký tự, tuỳ chọn)</label>
+          <input id="imp-reason" className="input" value={reason} onChange={(e) => setReason(e.target.value)} />
+        </div>
+        <button type="submit" className="btn btn-p btn-sm" disabled={!ok || busy}>
+          {busy ? "Đang nhập…" : "Nhập"}
+        </button>
+      </div>
+      {file && !ok ? <span className="err small">Chỉ nhận .xlsx hoặc CSV UTF-8 (không nhận .xls cũ).</span> : null}
+      {problem ? <ProblemAlert problem={problem} /> : null}
+      {result ? (
+        <div className="small">
+          <p>
+            {result.created} tạo mới · {result.updated} cập nhật · {result.unchanged} không đổi · {result.rejected} bị loại
+          </p>
+          <ul className="list-plain">
+            {result.rows
+              .filter((r) => r.status !== "unchanged")
+              .map((r) => (
+                <li key={r.row}>
+                  Dòng {r.row}: {STATUS[r.status]} {r.code ? <code>{r.code}</code> : null} {r.changes.length ? `(${r.changes.join(", ")})` : ""} {r.reason ?? ""}
+                </li>
+              ))}
+          </ul>
+        </div>
+      ) : null}
+    </form>
+  );
+}
+
+/** Cơ cấu tổ chức (Admin API, MFA): cây GET /v1/orgs (G-08), xuất/nhập Excel, nhật ký, đổi tên. */
+function OrgTreeInner() {
+  const { adminApi } = useAuth();
+  const params = useSearchParams();
+  const focusRef = params.get("org");
+  const [version, setVersion] = useState(0);
   const orgs = useAsync(
-    () => collectPages((cursor) => unwrap(api.GET("/v1/orgs", { params: { query: { include_inactive: true, cursor, limit: 200 } } })), 5000),
-    [api],
+    () => collectPages((cursor) => unwrap(adminApi.GET("/v1/orgs", { params: { query: { include_inactive: true, cursor, limit: 200 } } })), 5000),
+    [adminApi, version],
   );
   const tree = useMemo(() => buildOrgTree(orgs.data ?? []), [orgs.data]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [selected, setSelected] = useState<Org | null>(null);
+  const [picked, setPicked] = useState<Org | null>(null);
+  const [showImport, setShowImport] = useState(false);
+  const selected = picked ?? (focusRef ? ((orgs.data ?? []).find((o) => o.ref === focusRef) ?? null) : null);
+  const setSelected = setPicked;
   const effective = expanded.size === 0 && tree.length > 0 ? new Set(tree.map((t) => t.org.ref)) : expanded;
 
   const toggle = (ref: string) =>
@@ -199,15 +310,16 @@ export default function OrgTreePage() {
             <button type="button" className="btn btn-o btn-sm" onClick={() => setExpanded(new Set(["__none__"]))}>
               Thu gọn
             </button>
+            <ExportButton />
+            <button type="button" className="btn btn-o btn-sm" onClick={() => setShowImport((v) => !v)} aria-expanded={showImport}>
+              <Icon name="upload" size={15} />
+              Nhập từ tệp
+            </button>
           </>
         }
       />
-      {principal && !principal.mfa ? (
-        <div className="alert alert-warn" style={{ marginBottom: 16 }} role="status">
-          <Icon name="alert" />
-          <span>Phiên hiện tại chưa qua xác thực hai yếu tố — nhật ký và đổi tên (Admin API) sẽ bị từ chối (mfa_required).</span>
-        </div>
-      ) : null}
+      <MfaNotice />
+      {showImport ? <ImportPanel onDone={() => setVersion((v) => v + 1)} /> : null}
       {orgs.error ? <ProblemAlert problem={orgs.error} onRetry={orgs.reload} /> : null}
       {orgs.loading && !orgs.data ? <Loading /> : null}
       <div className="grid2" style={{ gridTemplateColumns: "minmax(0, 1.6fr) minmax(280px, 1fr)", alignItems: "start" }}>
@@ -227,5 +339,13 @@ export default function OrgTreePage() {
         </aside>
       </div>
     </>
+  );
+}
+
+export default function OrgTreePage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <OrgTreeInner />
+    </Suspense>
   );
 }

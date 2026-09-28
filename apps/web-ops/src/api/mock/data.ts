@@ -14,9 +14,9 @@ import type {
   CatalogName,
   ContentDocument,
   ContentKind,
-  Cooperative,
+  CooperativeItem,
   ExtTask,
-  HouseholdListItem,
+  HouseholdItem,
   Org,
   ParamVersion,
   PartyOrgEvent,
@@ -134,7 +134,10 @@ export const ADMIN_UNITS: AdminUnit[] = [
 ];
 
 /** GET /v1/geo/admin-boundaries/{code} — null khi "chưa nhập ranh giới" (geo.admin_boundary_not_found). */
-export function boundaryOf(code: string): AdminBoundaryFeature | null {
+/** Ranh giới kèm `parent_code` (dạng phần tử của GET /v1/geo/admin-boundaries?level=). */
+export type MockBoundary = Omit<AdminBoundaryFeature, "properties"> & { properties: AdminBoundaryFeature["properties"] & { parent_code: string | null } };
+
+export function boundaryOf(code: string): MockBoundary | null {
   const p = PROVINCES.find((x) => x.code === code);
   const c = p ? undefined : COMMUNES.find((x) => x.code === code);
   if (!p && !c) return null;
@@ -148,6 +151,7 @@ export function boundaryOf(code: string): AdminBoundaryFeature | null {
       code,
       level,
       name: (p ?? c)!.name,
+      parent_code: c?.province_code ?? null,
       source: "Ranh giới minh hoạ (giả lập)",
       area_ha: p ? "312480.5000" : "4120.2500",
       imported_at: iso(30),
@@ -158,9 +162,11 @@ export function boundaryOf(code: string): AdminBoundaryFeature | null {
 // --------------------------------------------------------------------------
 // pf/party — tổ chức, HTX, nông hộ
 // --------------------------------------------------------------------------
-const NATIONAL_REF = hexId(1, "0e90");
-const provinceOrgRef = (pi: number) => hexId(100 + pi, "0e90");
-const communeOrgRef = (pi: number, ci: number) => hexId(1000 + pi * 10 + ci, "0e90");
+export const NATIONAL_REF = hexId(1, "0e90");
+export const DCRD_REF = hexId(2, "0e90");
+export const MKG_REF = hexId(3, "0e90");
+export const provinceOrgRef = (pi: number) => hexId(100 + pi, "0e90");
+export const communeOrgRef = (pi: number, ci: number) => hexId(1000 + pi * 10 + ci, "0e90");
 
 const COOP_PATTERNS = [
   "HTX Nông nghiệp {x}",
@@ -170,9 +176,9 @@ const COOP_PATTERNS = [
   "Tổ hợp tác lúa {x}",
 ];
 
-/** Thông tin phụ chỉ mock cần (không có trong hợp đồng). */
+/** Thông tin phụ chỉ mock cần. `api` gồm cả trường đọc bổ sung G-03 backend trả. */
 export interface MockCooperative {
-  api: Cooperative;
+  api: CooperativeItem;
   province_code: string;
   commune_name: string;
   province_name: string;
@@ -192,14 +198,21 @@ export const COOPERATIVES: MockCooperative[] = COMMUNES.flatMap((c, ci) => {
     const lnglat: LngLat = [c.center[0] + (rnd() - 0.5) * 0.08, c.center[1] + (rnd() - 0.5) * 0.08];
     const active = n % 11 !== 0;
     const provisional = n % 9 === 0;
+    const members = int(25, 340);
+    const plots = int(8, 60);
     return {
       province_code: c.province_code,
       commune_name: c.name,
       province_name: province?.name ?? "",
-      member_households: int(25, 340),
-      plots: int(8, 60),
+      member_households: members,
+      plots,
       lnglat,
       api: {
+        province_code: c.province_code,
+        commune_name: c.name,
+        province_name: province?.name ?? null,
+        member_households: members,
+        digitized_plots: c.province_code === "80" ? null : plots - Math.floor(plots / 13) - Math.floor(plots / 7),
         ref: hexId(n, "c00b"),
         kind: "cooperative",
         code: `HTX${c.province_code}${String(n).padStart(5, "0")}`,
@@ -227,14 +240,23 @@ const SURNAMES = ["Nguyễn", "Trần", "Lê", "Phạm", "Huỳnh", "Võ", "Đ�
 const INITIALS = "ABCDĐGHKLMNPQSTVX";
 
 /** GET /v1/cooperatives/{ref}/households — nhãn ĐÃ CHE sinh ngẫu nhiên, không tương ứng người thật. */
-export function householdsOf(coop: MockCooperative): HouseholdListItem[] {
+export function householdsOf(coop: MockCooperative): HouseholdItem[] {
   const r = mulberry32(parseInt(coop.api.ref.slice(-6), 16));
   const n = Math.min(coop.member_households, 57);
-  return Array.from({ length: n }, (_, i): HouseholdListItem => {
+  return Array.from({ length: n }, (_, i): HouseholdItem => {
     const unavailable = r() < 0.04;
     const a = INITIALS[Math.floor(r() * INITIALS.length)] ?? "V";
     const b = INITIALS[Math.floor(r() * INITIALS.length)] ?? "A";
+    // G-04: trạng thái đồng ý theo mục đích — 1/3 đồng ý MRV, một ít đã rút, còn lại chưa có bản ghi.
+    const consents =
+      i % 3 === 0
+        ? [{ purpose: "mrv.evidence", status: "granted", event_time: iso(40 - (i % 20)) }]
+        : i % 7 === 1
+          ? [{ purpose: "mrv.evidence", status: "withdrawn", event_time: iso(5) }]
+          : [];
+    if (i % 4 === 0) consents.push({ purpose: "extension.field_support", status: "granted", event_time: iso(60) });
     return {
+      consents,
       household_ref: hexId(parseInt(coop.api.ref.slice(-4), 16) * 1000 + i, "a0e0"),
       cooperative_ref: coop.api.ref,
       commune_code: coop.api.admin_unit_code ?? "",
@@ -355,6 +377,12 @@ const TASK_TEXT: { category: ExtTask["category"]; text: string }[] = [
 const SLA_HOURS = "24";
 
 export const OFFICER_REFS = ["01927b3e-0ff1-7000-8000-000000000001", "01927b3e-0ff1-7000-8000-000000000002", "01927b3e-0ff1-7000-8000-000000000003"];
+/** Tên cán bộ trong danh bạ trực (giả lập, không phải người thật). */
+export const OFFICER_NAMES: Record<string, string> = {
+  [OFFICER_REFS[0]!]: "KNV Trần Thị C (giả lập)",
+  [OFFICER_REFS[1]!]: "KNV Lê Văn D (giả lập)",
+  [OFFICER_REFS[2]!]: "KNV Phạm Thị E (giả lập)",
+};
 
 export const TASKS: ExtTask[] = Array.from({ length: 36 }, (_, i): ExtTask => {
   const t = TASK_TEXT[i % TASK_TEXT.length] ?? TASK_TEXT[0]!;
@@ -366,7 +394,11 @@ export const TASKS: ExtTask[] = Array.from({ length: 36 }, (_, i): ExtTask => {
   const priority = t.category === "sau_benh" ? "urgent" : pick(["low", "normal", "normal", "high"]);
   const resolvedAt = status === "resolved" ? created + int(2, 30) * 3_600_000 : null;
   const overdue = resolvedAt ? resolvedAt > due : Date.now() > due;
+  const assignee = status === "new" ? null : pick(OFFICER_REFS);
   return {
+    assignee_name: assignee ? (OFFICER_NAMES[assignee] ?? null) : null,
+    cooperative_name: coop.api.name,
+    commune_name: coop.commune_name,
     task_id: hexId(5000 + i, "7a5c"),
     commune_code: coop.api.admin_unit_code ?? "",
     province_code: coop.province_code,
@@ -378,7 +410,7 @@ export const TASKS: ExtTask[] = Array.from({ length: 36 }, (_, i): ExtTask => {
     priority,
     source: pick(["officer", "coop_manager", "htx_app"] as const),
     status,
-    assignee_ref: status === "new" ? null : pick(OFFICER_REFS),
+    assignee_ref: assignee,
     created_by: ADMIN_ACTOR,
     created_at: new Date(created).toISOString(),
     sla_hours: SLA_HOURS,
@@ -479,8 +511,19 @@ export const CATALOGS: Record<CatalogName, CatalogItem[]> = {
   ]),
 };
 
+/** Tên cán bộ quản trị theo actor_ref (danh bạ pf/extension, G-07). Không có → null (web hiện mã). */
+export const ACTOR_NAMES: Record<string, string> = {
+  "mock-admin-setter": "Quản trị viên A (giả lập)",
+  "mock-admin-approver": "Quản trị viên B (giả lập)",
+  "mock-admin-other": "Chuyên viên TTKNQG (giả lập)",
+};
+
 function version(p: Partial<ParamVersion> & Pick<ParamVersion, "key" | "value" | "unit" | "version">): ParamVersion {
+  const setter = p.setter_ref ?? "mock-admin-other";
+  const approver = p.approver_ref === undefined ? "mock-admin-approver" : p.approver_ref;
   return {
+    setter_name: ACTOR_NAMES[setter] ?? null,
+    approver_name: approver ? (ACTOR_NAMES[approver] ?? null) : null,
     id: hexId(9000 + Math.floor(rnd() * 9000), "9a7a"),
     text: null,
     effective_from: "2026-01-01T00:00:00+07:00",
@@ -542,3 +585,35 @@ export const PARAM_VERSIONS: ParamVersion[] = [
 // --------------------------------------------------------------------------
 /** Xã chưa gửi báo cáo kỳ này → KPI "Số liệu tạm tính" (provisional). */
 export const UNREPORTED_COMMUNES = new Set<string>(["82104", "80101", "80102", "80103", "80104"]);
+
+// --------------------------------------------------------------------------
+// G-06 / G-07 — danh sách danh mục và sổ đăng ký tham số (Admin API)
+// --------------------------------------------------------------------------
+export const CATALOG_META: Record<CatalogName, { name: string; attrs_schema: string[] }> = {
+  rice_variety: { name: "Giống lúa", attrs_schema: ["growth_days", "expected_yield_t_per_ha"] },
+  farm_stage: { name: "Khâu sản xuất", attrs_schema: ["pilot", "description"] },
+  machine_type: { name: "Chủng loại máy", attrs_schema: ["farm_stage"] },
+  season: { name: "Mùa vụ", attrs_schema: ["start_month", "end_month"] },
+  pest: { name: "Sâu bệnh hại", attrs_schema: ["kind"] },
+};
+
+export interface MockParamDef {
+  key: string;
+  name: string;
+  unit: string;
+  kind: "decimal" | "text";
+  min: string | null;
+  max: string | null;
+}
+
+export const PARAM_REGISTRY: MockParamDef[] = [
+  { key: "cgh.coverage.attention_min_pct", name: "Ngưỡng Cần chú ý (mức đáp ứng)", unit: "%", kind: "decimal", min: "0", max: "500" },
+  { key: "cgh.coverage.sufficient_min_pct", name: "Ngưỡng Đủ máy (mức đáp ứng)", unit: "%", kind: "decimal", min: "0", max: "500" },
+  { key: "cgh.coverage.surplus_min_pct", name: "Ngưỡng Thừa máy", unit: "%", kind: "decimal", min: "0", max: "500" },
+  { key: "cgh.norm_ha_per_machine:MGD:thu_hoach", name: "Định mức máy gặt đập liên hợp — khâu thu hoạch", unit: "ha/máy/vụ", kind: "decimal", min: "1", max: "5000" },
+  { key: "cgh.norm_ha_per_machine:MPT:cham_soc", name: "Định mức máy phun thuốc/drone — khâu chăm sóc", unit: "ha/máy/vụ", kind: "decimal", min: "1", max: "5000" },
+  { key: "extension.task_sla_hours", name: "SLA xử lý nhiệm vụ hỗ trợ", unit: "giờ", kind: "decimal", min: "1", max: "720" },
+  { key: "geo.overlap_tolerance_pct", name: "Ngưỡng chồng lấn ranh giới thửa", unit: "%", kind: "decimal", min: "0", max: "100" },
+  { key: "reports.daily_export_quota", name: "Hạn mức xuất báo cáo mỗi ngày", unit: "lần/người/ngày", kind: "decimal", min: "1", max: "1000" },
+  { key: "sync.conflict_sla_hours", name: "SLA xử lý xung đột đồng bộ", unit: "giờ", kind: "decimal", min: "1", max: "720" },
+];

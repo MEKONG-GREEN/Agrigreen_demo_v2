@@ -5,7 +5,7 @@ import { buildPrincipal } from "@/auth/principal";
 import { approvalBlockReason, proposeBlockReason, submitBlockReason } from "./approval";
 import { precheckCsv } from "./households";
 import { buildOrgTree } from "./orgTree";
-import { groupParamVersions, paramLabel } from "./params";
+import { actorLabel, groupParamVersions } from "./params";
 
 const approver = (sub: string, mfa = true) =>
   buildPrincipal({ sub, amr: mfa ? ["pwd", "otp"] : ["pwd"], realm_access: { roles: ["param_approver", "param_setter"] } }, null);
@@ -57,6 +57,7 @@ describe("groupParamVersions — gom phiên bản theo khóa", () => {
         v({ id: "e", version: 5, status: "draft", effective_from: "2027-01-01T00:00:00+07:00" }),
         v({ id: "f", version: 6, status: "rejected", effective_from: "2026-05-01T00:00:00+07:00" }),
       ],
+      [{ key: "cgh.norm_ha_per_machine:MGD:thu_hoach", name: "Định mức máy gặt — thu hoạch", unit: "ha/máy/vụ", kind: "decimal", min: "1", max: "5000", current: null, submitted_count: 1 }],
       now,
     );
     expect(g?.current?.id).toBe("b");
@@ -65,7 +66,9 @@ describe("groupParamVersions — gom phiên bản theo khóa", () => {
     expect(g?.upcoming.map((x) => x.id)).toEqual(["c"]);
     expect(g?.submitted.map((x) => x.id)).toEqual(["d"]);
     expect(g?.drafts.map((x) => x.id)).toEqual(["e"]);
-    expect(g?.label).toBe("Định mức máy MGD — khâu thu hoạch");
+    // Tên và khoảng hợp lệ từ sổ đăng ký tham số (G-07), không viết cứng ở web.
+    expect(g?.label).toBe("Định mức máy gặt — thu hoạch");
+    expect(g?.max).toBe("5000");
   });
 
   it("cùng ngày hiệu lực → bản ghi bù (số phiên bản lớn hơn) thắng", () => {
@@ -74,14 +77,27 @@ describe("groupParamVersions — gom phiên bản theo khóa", () => {
         v({ id: "a", version: 1, status: "approved", effective_from: "2026-01-01T00:00:00+07:00" }),
         v({ id: "a2", version: 2, status: "approved", effective_from: "2026-01-01T00:00:00+07:00", correction_reason: "Sửa lỗi đánh máy" }),
       ],
+      [],
       now,
     );
     expect(g?.current?.id).toBe("a2");
   });
 
-  it("khóa lạ → hiện chính khóa", () => {
-    expect(paramLabel("foo.bar")).toBe("foo.bar");
-    expect(paramLabel("extension.task_sla_hours")).toMatch(/SLA/);
+  it("khóa không có trong sổ → hiện chính khóa; khóa trong sổ chưa có phiên bản vẫn hiện", () => {
+    const list = groupParamVersions(
+      [v({ id: "x", key: "foo.bar", version: 1, status: "draft", effective_from: "2027-01-01T00:00:00+07:00" })],
+      [{ key: "sync.conflict_sla_hours", name: "SLA xử lý xung đột", unit: "giờ", kind: "decimal", min: "1", max: "720", current: null, submitted_count: 0 }],
+      now,
+    );
+    expect(list.map((p) => [p.key, p.label])).toEqual([
+      ["foo.bar", "foo.bar"],
+      ["sync.conflict_sla_hours", "SLA xử lý xung đột"],
+    ]);
+  });
+
+  it("tên người đặt/duyệt (G-07) — thiếu tên thì hiện mã", () => {
+    expect(actorLabel("Quản trị viên A", "u1")).toBe("Quản trị viên A");
+    expect(actorLabel(null, "u1")).toBe("u1");
   });
 });
 

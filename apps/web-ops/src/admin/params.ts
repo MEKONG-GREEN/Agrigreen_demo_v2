@@ -1,17 +1,22 @@
-// Tham số có phê duyệt (Admin API pf/masterdata). Backend trả DANH SÁCH PHIÊN BẢN
-// (GET /v1/masterdata/params/versions); web gom theo khóa để hiện "đang hiệu lực" + "chờ duyệt".
-// Backend chưa có sổ đăng ký tên/đơn vị tham số (web-backend-gaps.md G-07) → tên hiển thị ở đây.
+// Tham số có phê duyệt (Admin API pf/masterdata). Tên, đơn vị, kiểu, khoảng hợp lệ lấy từ sổ đăng ký
+// GET /v1/masterdata/params (G-07); danh sách phiên bản GET /v1/masterdata/params/versions cho bản chờ duyệt,
+// nháp và bản sắp hiệu lực. Web gom theo khóa để hiện "đang hiệu lực" + "chờ duyệt".
 import type { AdminApiClient } from "@/api/client";
 import { unwrap } from "@/api/client";
 import { ApiProblem } from "@/api/problem";
-import type { ParamProposalInput, ParamVersion } from "@/api/types";
+import type { ParamProposalInput, ParamRegistryItem, ParamVersion } from "@/api/types";
 
 export interface ParamView {
   key: string;
   label: string;
   unit: string;
+  kind: ParamRegistryItem["kind"] | null;
+  min: string | null;
+  max: string | null;
   /** Bản đã duyệt có hiệu lực tại `now` (effective_from ≤ now, mới nhất; cùng ngày → số phiên bản lớn hơn). */
   current: ParamVersion | null;
+  /** Bản đang hiệu lực theo sổ đăng ký khi danh sách phiên bản không có (vd phân trang). */
+  registryCurrent: ParamRegistryItem["current"];
   /** Bản đã duyệt sẽ có hiệu lực sau `now`. */
   upcoming: ParamVersion[];
   /** Đã gửi duyệt, chờ người phê duyệt. */
@@ -20,56 +25,45 @@ export interface ParamView {
   drafts: ParamVersion[];
 }
 
-const STAGE: Record<string, string> = {
-  lam_dat: "làm đất",
-  gieo_sa: "gieo sạ/cấy",
-  cham_soc: "chăm sóc",
-  thu_hoach: "thu hoạch",
-  sau_thu_hoach: "sau thu hoạch",
-};
-
-const KNOWN: Record<string, string> = {
-  "cgh.coverage.sufficient_min_pct": "Ngưỡng Đủ máy (mức đáp ứng)",
-  "cgh.coverage.attention_min_pct": "Ngưỡng Cần chú ý",
-  "cgh.coverage.surplus_min_pct": "Ngưỡng Thừa máy",
-  "extension.task_sla_hours": "SLA xử lý nhiệm vụ hỗ trợ",
-  "extension.duty_status_ttl_hours": "Thời hạn trạng thái trực",
-  "geo.overlap_tolerance_pct": "Ngưỡng chồng lấn ranh giới thửa",
-  "geo.area_deviation_max_pct": "Ngưỡng lệch diện tích khai báo",
-  "sync.conflict_sla_hours": "SLA xử lý xung đột đồng bộ",
-};
-
-/** Tên tiếng Việt của khóa tham số; khóa lạ → chính khóa. */
-export function paramLabel(key: string): string {
-  const known = KNOWN[key];
-  if (known) return known;
-  const norm = /^cgh\.norm_ha_per_machine:([^:]+):([^:]+)$/.exec(key);
-  if (norm) return `Định mức máy ${norm[1]} — khâu ${STAGE[norm[2] ?? ""] ?? norm[2]}`;
-  return key;
-}
-
 function newer(a: ParamVersion, b: ParamVersion): number {
   return Date.parse(b.effective_from) - Date.parse(a.effective_from) || b.version - a.version;
 }
 
-export function groupParamVersions(versions: readonly ParamVersion[], now: number = Date.now()): ParamView[] {
+/** Gom phiên bản theo khóa; khóa trong sổ đăng ký chưa có phiên bản nào vẫn hiện (để đề xuất lần đầu). */
+export function groupParamVersions(
+  versions: readonly ParamVersion[],
+  registry: readonly ParamRegistryItem[] = [],
+  now: number = Date.now(),
+): ParamView[] {
   const byKey = new Map<string, ParamVersion[]>();
+  for (const r of registry) byKey.set(r.key, []);
   for (const v of versions) byKey.set(v.key, [...(byKey.get(v.key) ?? []), v]);
+  const reg = new Map(registry.map((r) => [r.key, r]));
   return Array.from(byKey.entries())
     .map(([key, list]): ParamView => {
       const approved = list.filter((v) => v.status === "approved").sort(newer);
       const current = approved.find((v) => Date.parse(v.effective_from) <= now) ?? null;
+      const r = reg.get(key);
       return {
         key,
-        label: paramLabel(key),
-        unit: current?.unit ?? list[0]?.unit ?? "",
+        label: r?.name ?? key,
+        unit: r?.unit ?? current?.unit ?? list[0]?.unit ?? "",
+        kind: r?.kind ?? null,
+        min: r?.min ?? null,
+        max: r?.max ?? null,
         current,
+        registryCurrent: r?.current ?? null,
         upcoming: approved.filter((v) => Date.parse(v.effective_from) > now).reverse(),
         submitted: list.filter((v) => v.status === "submitted").sort((a, b) => a.version - b.version),
         drafts: list.filter((v) => v.status === "draft").sort((a, b) => a.version - b.version),
       };
     })
     .sort((a, b) => a.key.localeCompare(b.key));
+}
+
+/** Tên người đặt/duyệt (G-07); cán bộ chưa có trong danh bạ → mã tham chiếu. */
+export function actorLabel(name: string | null | undefined, ref: string | null | undefined): string {
+  return name ?? ref ?? "—";
 }
 
 export interface ProposeResult {

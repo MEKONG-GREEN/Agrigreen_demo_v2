@@ -1,7 +1,8 @@
 // DỮ LIỆU GIẢ LẬP — người dùng thử cho chế độ NEXT_PUBLIC_API_MOCK=1. Không phải người thật.
 // `me` có ĐÚNG hình dạng GET /v1/me (components.schemas.Me) — mock trả nguyên văn.
+// Tổ chức của persona trùng tổ chức trong cây giả lập (ORGS) để màn hình tài khoản/tổ chức khớp nhau.
 import type { Me } from "../types";
-import { COMMUNES, PROVINCES } from "./data";
+import { COMMUNES, communeOrgRef, DCRD_REF, MKG_REF, NATIONAL_REF, PROVINCES, provinceOrgRef } from "./data";
 
 export interface MockPersona {
   id: string;
@@ -15,7 +16,7 @@ export interface MockPersona {
 }
 
 const TENANT = "01927b3e-0000-7000-8000-00000000a001";
-const MKG_ORG = { ref: "01927b3e-0000-7000-8000-0000000000d1", kind: "mkg", name: "Mekong Green", admin_unit_code: null, active: true } as const;
+const MKG_ORG = { ref: MKG_REF, kind: "mkg", name: "Mekong Green", admin_unit_code: null, active: true } as const;
 
 const dtCommunes = COMMUNES.filter((c) => c.province_code === "82");
 const myCommune = dtCommunes[0];
@@ -41,28 +42,31 @@ function persona(p: Omit<MockPersona, "me"> & { actor: string; roles: string[]; 
   };
 }
 
+const DT_ORG = { ref: provinceOrgRef(0), kind: "ttkn_province", name: "TTKN tỉnh Đồng Tháp", admin_unit_code: "82", active: true } as const;
+const DT_SCOPE = { all: false, level: "province", units: ["82", ...dtCommunes.map((c) => c.code)] } as const;
+
 export const MOCK_PERSONAS: readonly MockPersona[] = [
   persona({
     id: "tw",
     title: "Cán bộ TTKN Quốc gia",
-    description: "Phạm vi toàn quốc — xem tổng hợp, thư viện, nhiệm vụ",
+    description: "Phạm vi toàn quốc — tổng hợp, chỉ đạo khẩn, báo cáo, thư viện",
     displayName: "Cán bộ TW (giả lập)",
     amr: ["pwd"],
     actor: "mock-tw-0001",
     roles: ["kn_national_admin"],
-    org: { ref: "01927b3e-0000-7000-8000-0000000000a1", kind: "ttkn_national", name: "Trung tâm Khuyến nông Quốc gia", admin_unit_code: null, active: true },
+    org: { ref: NATIONAL_REF, kind: "ttkn_national", name: "Trung tâm Khuyến nông Quốc gia", admin_unit_code: null, active: true },
     scope: { all: true, level: "national", units: [] },
   }),
   persona({
     id: "tinh",
     title: "Cán bộ TTKN tỉnh Đồng Tháp",
-    description: "Phạm vi tỉnh Đồng Tháp và các xã trực thuộc",
+    description: "Phạm vi tỉnh Đồng Tháp và các xã trực thuộc — ban hành chỉ đạo, đồng bộ ngay",
     displayName: "Cán bộ tỉnh (giả lập)",
     amr: ["pwd"],
     actor: "mock-tinh-0082",
     roles: ["kn_province_admin"],
-    org: { ref: "01927b3e-0000-7000-8000-0000000082a1", kind: "ttkn_province", name: "TTKN tỉnh Đồng Tháp", admin_unit_code: "82", active: true },
-    scope: { all: false, level: "province", units: ["82", ...dtCommunes.map((c) => c.code)] },
+    org: DT_ORG,
+    scope: { ...DT_SCOPE, units: [...DT_SCOPE.units] },
   }),
   persona({
     id: "xa",
@@ -73,9 +77,9 @@ export const MOCK_PERSONAS: readonly MockPersona[] = [
     actor: "mock-xa-0001",
     roles: ["kn_officer"],
     org: {
-      ref: "01927b3e-0000-7000-8000-0000000082b1",
+      ref: communeOrgRef(0, 0),
       kind: "extension_team",
-      name: `Tổ khuyến nông ${myCommune?.name ?? ""}`,
+      name: `Tổ khuyến nông cộng đồng ${myCommune?.name ?? ""}`,
       admin_unit_code: myCommune?.code ?? null,
       active: true,
     },
@@ -84,22 +88,35 @@ export const MOCK_PERSONAS: readonly MockPersona[] = [
   persona({
     id: "cuc",
     title: "Cục Kinh tế hợp tác & PTNT",
-    description: "Cổng Bản đồ CGH — chỉ xem, toàn vùng",
+    description: "Cổng Bản đồ CGH — chỉ xem, toàn vùng; xuất báo cáo CGH",
     displayName: "Chuyên viên Cục (giả lập)",
     amr: ["pwd"],
     actor: "mock-cuc-0001",
     roles: ["cgh_viewer"],
-    org: { ref: "01927b3e-0000-7000-8000-0000000000c1", kind: "dcrd", name: "Cục Kinh tế hợp tác và PTNT", admin_unit_code: null, active: true },
+    org: { ref: DCRD_REF, kind: "dcrd", name: "Cục Kinh tế hợp tác và PTNT", admin_unit_code: null, active: true },
     scope: { all: true, level: "national", units: [] },
   }),
   persona({
     id: "setter",
-    title: "Quản trị — đặt & duyệt tham số",
-    description: "platform_admin, masterdata_admin, registry_admin, param_setter, param_approver — đã qua MFA (thử quy tắc không tự duyệt)",
+    title: "Quản trị nền tảng (đã qua MFA)",
+    description:
+      "platform_admin + đặt/duyệt tham số, tài khoản, mẫu báo cáo, xung đột đồng bộ, dự báo CGH — thử quy tắc không tự duyệt",
     displayName: "Quản trị viên A (giả lập)",
     amr: ["pwd", "otp"],
     actor: "mock-admin-setter",
-    roles: ["platform_admin", "masterdata_admin", "registry_admin", "param_setter", "param_approver"],
+    roles: [
+      "platform_admin",
+      "masterdata_admin",
+      "registry_admin",
+      "param_setter",
+      "param_approver",
+      "account_admin",
+      "reports_admin",
+      "sync_conflict_resolver",
+      "device_admin",
+      "cgh_admin",
+      "geo_admin",
+    ],
     org: MKG_ORG,
     scope: { all: true, level: "national", units: [] },
   }),
@@ -114,6 +131,17 @@ export const MOCK_PERSONAS: readonly MockPersona[] = [
     org: MKG_ORG,
     scope: { all: true, level: "national", units: [] },
   }),
+  persona({
+    id: "account-tinh",
+    title: "Quản trị tài khoản tỉnh Đồng Tháp",
+    description: "account_admin_province (đã qua MFA) — chỉ cấp vai kn_officer, coop_manager trong tỉnh",
+    displayName: "Quản trị tài khoản tỉnh (giả lập)",
+    amr: ["pwd", "otp"],
+    actor: "mock-acc-0082",
+    roles: ["account_admin_province"],
+    org: DT_ORG,
+    scope: { ...DT_SCOPE, units: [...DT_SCOPE.units] },
+  }),
   // Quản trị CHƯA qua MFA: mọi lời gọi Admin API trả 403 mfa_required (thử thông báo).
   persona({
     id: "admin-no-mfa",
@@ -122,7 +150,7 @@ export const MOCK_PERSONAS: readonly MockPersona[] = [
     displayName: "Quản trị viên D (giả lập)",
     amr: ["pwd"],
     actor: "mock-admin-nomfa",
-    roles: ["platform_admin", "param_setter"],
+    roles: ["platform_admin", "param_setter", "account_admin"],
     org: MKG_ORG,
     scope: { all: true, level: "national", units: [] },
   }),

@@ -25,10 +25,25 @@ describe("menu theo phạm vi và vai", () => {
     }
   });
 
-  it("Cục KTHT chỉ thấy cổng CGH và được đưa thẳng tới /cgh", () => {
+  it("Cục KTHT chỉ thấy cổng CGH + xuất báo cáo CGH, được đưa thẳng tới /cgh", () => {
     const cuc = persona("cuc");
-    expect(hrefs(cuc)).toEqual(["/cgh"]);
+    expect(hrefs(cuc).sort()).toEqual(["/bao-cao", "/cgh"]);
     expect(homeFor(cuc)).toBe("/cgh");
+  });
+
+  it("chỉ đạo, báo cáo cho KN; đồng bộ ngay chỉ cho quản lý tỉnh/TW; hộp thư không nằm trong menu", () => {
+    expect(hrefs(persona("xa"))).toEqual(expect.arrayContaining(["/chi-dao", "/bao-cao"]));
+    expect(hrefs(persona("xa"))).not.toContain("/dong-bo");
+    expect(hrefs(persona("tinh"))).toContain("/dong-bo");
+    expect(hrefs(persona("tw"))).toContain("/dong-bo");
+    expect(hrefs(persona("setter")).includes("/thong-bao")).toBe(false);
+    const inbox = findNavItem("/thong-bao");
+    expect(inbox && canSee(inbox, persona("cuc"))).toBe(true);
+  });
+
+  it("quản trị tài khoản tỉnh chỉ thấy màn hình tài khoản trong nhóm quản trị", () => {
+    const h = hrefs(persona("account-tinh")).filter((x) => x.startsWith("/quan-tri"));
+    expect(h).toEqual(["/quan-tri/tai-khoan"]);
   });
 
   it("platform_admin thấy mọi nhóm, kể cả quản trị", () => {
@@ -72,10 +87,11 @@ describe("<Sidebar>", () => {
     expect(screen.getByText(/Tỉnh · Đồng Tháp/)).toBeInTheDocument();
   });
 
-  it("Cục chỉ có một mục menu", () => {
+  it("Cục chỉ có cổng CGH và báo cáo", () => {
     const p = persona("cuc");
     render(<Sidebar groups={visibleNav(p)} pathname="/cgh" principal={p} onLogout={() => undefined} />);
-    expect(screen.getAllByRole("link")).toHaveLength(1);
-    expect(screen.getByRole("link", { name: /Bản đồ CGH/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("link")).toHaveLength(2);
+    expect(screen.getByRole("link", { name: /Bản đồ CGH/ })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: /Báo cáo/ })).toBeInTheDocument();
   });
 });

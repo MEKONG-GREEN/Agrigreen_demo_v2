@@ -1,20 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { ATTR_LABEL, CATALOGS } from "@/admin/catalogs";
+import { ATTR_LABEL } from "@/admin/catalogs";
 import { unwrap } from "@/api/client";
 import { usePagedList } from "@/api/pagination";
 import type { CatalogName } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
+import { MfaNotice } from "@/components/MfaNotice";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { Empty, LoadMore, Loading, PageHead } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
+import { useAsync } from "@/lib/useAsync";
 
-/** Danh mục dùng chung — Admin API GET /v1/masterdata/catalogs/{catalog}/items (MFA bắt buộc). */
+/** Danh mục dùng chung — Admin API GET /v1/masterdata/catalogs (G-06) + /{catalog}/items (MFA bắt buộc). */
 export default function CatalogsPage() {
-  const { adminApi, principal } = useAuth();
-  const [current, setCurrent] = useState<CatalogName>("rice_variety");
+  const { adminApi } = useAuth();
+  const catalogs = useAsync(() => unwrap(adminApi.GET("/v1/masterdata/catalogs")), [adminApi]);
+  const [picked, setPicked] = useState<CatalogName | null>(null);
+  const current = (picked ?? catalogs.data?.items[0]?.catalog ?? "rice_variety") as CatalogName;
+  const setCurrent = setPicked;
   const [includeInactive, setIncludeInactive] = useState(true);
 
   const items = usePagedList(
@@ -26,7 +31,7 @@ export default function CatalogsPage() {
       ),
     [adminApi, current, includeInactive],
   );
-  const meta = CATALOGS.find((c) => c.catalog === current);
+  const meta = catalogs.data?.items.find((c) => c.catalog === current);
 
   return (
     <>
@@ -38,27 +43,24 @@ export default function CatalogsPage() {
           (máy chủ quản trị riêng, bắt buộc xác thực hai yếu tố).
         </span>
       </div>
-      {principal && !principal.mfa ? (
-        <div className="alert alert-warn" style={{ marginBottom: 16 }} role="status">
-          <Icon name="alert" />
-          <span>Phiên hiện tại chưa qua xác thực hai yếu tố — Admin API sẽ từ chối (mfa_required).</span>
-        </div>
-      ) : null}
+      <MfaNotice />
+      {catalogs.error ? <ProblemAlert problem={catalogs.error} onRetry={catalogs.reload} /> : null}
       <div className="grid2" style={{ gridTemplateColumns: "minmax(220px, 280px) minmax(0, 1fr)", alignItems: "start" }}>
         <nav className="card sec" aria-label="Chọn danh mục">
+          {catalogs.loading && !catalogs.data ? <Loading /> : null}
           <ul style={{ listStyle: "none" }} className="stack" role="list">
-            {CATALOGS.map((c) => (
+            {(catalogs.data?.items ?? []).map((c) => (
               <li key={c.catalog} style={{ margin: 0 }}>
                 <button
                   type="button"
                   className="persona"
                   aria-current={c.catalog === current ? "true" : undefined}
                   style={c.catalog === current ? { borderColor: "var(--g600)", background: "var(--g50)" } : undefined}
-                  onClick={() => setCurrent(c.catalog)}
+                  onClick={() => setCurrent(c.catalog as CatalogName)}
                 >
                   <b>{c.name}</b>
                   <span className="mute small">
-                    <code>{c.catalog}</code>
+                    <code>{c.catalog}</code> · {c.item_count} mục{c.inactive_count ? ` (${c.inactive_count} ngừng dùng)` : ""}
                   </span>
                 </button>
               </li>
@@ -69,7 +71,9 @@ export default function CatalogsPage() {
           <div className="sec-h">
             <div>
               <h2 id="cat-title">{meta?.name ?? current}</h2>
-              {meta ? <span className="mute small">Thuộc tính: {meta.hint}</span> : null}
+              {meta && meta.attrs_schema.length > 0 ? (
+                <span className="mute small">Thuộc tính: {meta.attrs_schema.map((a) => ATTR_LABEL[a] ?? a).join(", ")}</span>
+              ) : null}
             </div>
             <label className="row small">
               <input type="checkbox" checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} />
