@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5" // driver pgx5://
@@ -91,7 +92,7 @@ func DatabaseName(c migrations.Cluster, suffix string) string {
 // Bootstrap tạo (hoặc cập nhật) mọi vai và database. adminURL là tài khoản
 // quản trị cụm. Chạy lặp an toàn; nhiều tiến trình kiểm thử chạy song song được.
 func Bootstrap(ctx context.Context, adminURL, dbSuffix string) error {
-	conn, err := pgx.Connect(ctx, adminURL)
+	conn, err := connectRetry(ctx, adminURL)
 	if err != nil {
 		return fmt.Errorf("dbadmin: kết nối quản trị: %w", err)
 	}
@@ -276,4 +277,23 @@ func DropDatabases(ctx context.Context, adminURL, dbSuffix string) error {
 		}
 	}
 	return nil
+}
+
+// connectRetry nối tới cụm, thử lại tối đa ~30 giây: lúc vừa khởi tạo, PostgreSQL
+// có thể đang khởi động lại (image chính thức chạy server tạm rồi mới chạy thật).
+func connectRetry(ctx context.Context, dsn string) (*pgx.Conn, error) {
+	var last error
+	for i := 0; i < 15; i++ {
+		conn, err := pgx.Connect(ctx, dsn)
+		if err == nil {
+			return conn, nil
+		}
+		last = err
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
+	return nil, last
 }
