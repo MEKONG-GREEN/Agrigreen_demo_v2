@@ -37,7 +37,7 @@ func TestFakeSemantics(t *testing.T) {
 		t.Fatalf("tenant khác phải không thấy: %v", err)
 	}
 	d, err := f.Display(ctxA, client.PurposeContact, c.Ref)
-	if err != nil || d.Label != "Trần T. B." || d.MaskedPhone != "09xx xxx 678" {
+	if err != nil || d.Label != "Trần T. B." || d.MaskedPhone != "0912•••678" {
 		t.Fatalf("display: %+v %v", d, err)
 	}
 	pub, _ := envelope.Key32(c.PublicKey)

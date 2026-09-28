@@ -72,6 +72,9 @@ func (s *Service) Propose(ctx context.Context, in ProposeInput) (domain.ParamVer
 		} else if same != nil && v.CorrectionReason == nil {
 			return ErrCorrectionRequired
 		}
+		if err := checkThresholdOrder(ctx, tx, v); err != nil {
+			return err
+		}
 		n, err := store.NextVersion(ctx, tx, v.Key)
 		if err != nil {
 			return err
@@ -165,6 +168,10 @@ func (s *Service) Approve(ctx context.Context, id uuid.UUID, note *string) (doma
 		if prev != nil && v.CorrectionReason == nil {
 			return ErrCorrectionRequired
 		}
+		// Kiểm lại lúc duyệt: mốc khác có thể đã được duyệt sau lúc đề xuất.
+		if e := checkThresholdOrder(ctx, tx, v); e != nil {
+			return e
+		}
 		if e := store.MarkDecided(ctx, tx, v.ID, domain.StatusApproved, p.ActorRef, now, note); e != nil {
 			return e
 		}
@@ -174,6 +181,49 @@ func (s *Service) Approve(ctx context.Context, id uuid.UUID, note *string) (doma
 		return e
 	})
 	return v, a, err
+}
+
+// thresholdOrder là ba mốc ngưỡng mức đáp ứng CGH (QT-02) theo thứ tự tăng dần:
+// Cần chú ý < Đủ < Thừa. Một bộ ngưỡng lệch thứ tự làm Classify phân loại sai.
+var thresholdOrder = []string{port.ParamCGHCoverageAttention, port.ParamCGHCoverageSufficient, port.ParamCGHCoverageSurplusFrom}
+
+// checkThresholdOrder kiểm giá trị đề xuất của một mốc ngưỡng CGH cùng hai mốc
+// còn lại ĐÃ DUYỆT có hiệu lực tại effective_from phải tăng dần nghiêm ngặt.
+// Mốc chưa cấu hình thì bỏ qua. Muốn dời cả bộ ngưỡng: duyệt theo thứ tự giữ
+// được tăng dần (vd nâng ngưỡng Thừa trước, hạ ngưỡng Cần chú ý trước).
+func checkThresholdOrder(ctx context.Context, tx pgx.Tx, v domain.ParamVersion) error {
+	idx := -1
+	for i, k := range thresholdOrder {
+		if k == v.Key {
+			idx = i
+		}
+	}
+	if idx < 0 || v.Value == nil {
+		return nil
+	}
+	vals := make([]*decimal.Decimal, len(thresholdOrder))
+	for i, k := range thresholdOrder {
+		if i == idx {
+			vals[i] = v.Value
+			continue
+		}
+		a, err := store.ApprovedAt(ctx, tx, k, v.EffectiveFrom)
+		if err != nil {
+			return err
+		}
+		if a != nil {
+			vals[i] = a.Value
+		}
+	}
+	for i := range vals {
+		for j := i + 1; j < len(vals); j++ {
+			if vals[i] != nil && vals[j] != nil && !vals[i].LessThan(*vals[j]) {
+				return ErrThresholdOrder.WithDetail(thresholdOrder[i] + " = " + vals[i].String() + " phải nhỏ hơn " +
+					thresholdOrder[j] + " = " + vals[j].String() + " (tại ngày hiệu lực của phiên bản)")
+			}
+		}
+	}
+	return nil
 }
 
 // recordApproved ghi sổ phiên bản đã duyệt và sự kiện pf.masterdata.param.approved.

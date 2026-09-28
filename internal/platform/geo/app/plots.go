@@ -344,6 +344,9 @@ func (s *Service) create(ctx context.Context, a access, in CreateInput, m mode, 
 	if err := s.checkCooperative(ctx, a, in.CooperativeRef); err != nil {
 		return WriteResult{}, err
 	}
+	if err := s.checkHousehold(ctx, in.HouseholdRef, in.CooperativeRef); err != nil {
+		return WriteResult{}, err
+	}
 	tol, maxDev, err := s.thresholds(ctx, in.Boundary.EventTime)
 	if err != nil {
 		return WriteResult{}, err
@@ -605,6 +608,9 @@ func (s *Service) Assign(ctx context.Context, in AssignInput) (AttrResult, error
 	if err := s.checkCooperative(ctx, a, in.CooperativeRef); err != nil {
 		return AttrResult{}, err
 	}
+	if err := s.checkHousehold(ctx, in.HouseholdRef, in.CooperativeRef); err != nil {
+		return AttrResult{}, err
+	}
 	now := s.now()
 	tol, err := s.tolerance(ctx, now)
 	if err != nil {
@@ -723,6 +729,87 @@ func (s *Service) Retire(ctx context.Context, in RetireInput) (AttrResult, error
 			return AttrResult{}, err
 		}
 		return AttrResult{Plot: *cur, Event: ev}, nil
+	})
+}
+
+// RestoreInput khôi phục thửa đã ngừng dùng (GIS BR-17: xóa mềm khôi phục được).
+type RestoreInput struct {
+	PlotRef uuid.UUID
+	Reason  string
+	// ConfirmOverlap: xác nhận giữ nguyên khi thửa chồng lấn thửa cùng HTX/thửa nháp vẽ sau lúc ngừng dùng.
+	ConfirmOverlap bool
+	IdemKey        string
+}
+
+// Restore đưa thửa đã ngừng dùng về trạng thái theo HTX (nháp/hoạt động) bằng
+// sự kiện 'restored' kèm lý do. Trong thời gian ngừng dùng có thể đã có thửa
+// khác vẽ đè: kiểm lại chồng lấn như khi gán (khác HTX → chặn, cùng HTX → cần xác nhận).
+func (s *Service) Restore(ctx context.Context, in RestoreInput) (AttrResult, error) {
+	a, err := s.access(ctx, writeRoles...)
+	if err != nil {
+		return AttrResult{}, err
+	}
+	if in.IdemKey == "" {
+		return AttrResult{}, problem.IdempotencyRequired
+	}
+	if !domain.ValidReason(in.Reason) {
+		return AttrResult{}, problem.Validation.WithField("reason", "bắt buộc, ít nhất 10 ký tự")
+	}
+	now := s.now()
+	tol, err := s.tolerance(ctx, now)
+	if err != nil {
+		return AttrResult{}, err
+	}
+	return s.writeAttrs(ctx, a.p.TenantID, in.IdemKey, func(tx pgx.Tx) (AttrResult, error) {
+		plot, err := store.PlotByRef(ctx, tx, in.PlotRef, true)
+		if err != nil {
+			return AttrResult{}, err
+		}
+		if plot == nil || !a.sees(plot.CommuneCode, plot.CooperativeRef) {
+			return AttrResult{}, ErrPlotNotFound
+		}
+		if err := a.canWrite(plot.CommuneCode, plot.CooperativeRef); err != nil {
+			return AttrResult{}, err
+		}
+		if plot.Status != port.StatusRetired {
+			return AttrResult{}, ErrPlotState.WithDetail("thửa chưa ngừng dùng")
+		}
+		same, cross, err := classifiedOverlaps(ctx, tx, plot.GeoJSON, plot.AreaHa, plot.CooperativeRef, plot.Ref, tol)
+		if err != nil {
+			return AttrResult{}, err
+		}
+		if err := onlineGate(same, cross, nil, decimal.Zero, in.ConfirmOverlap); err != nil {
+			return AttrResult{}, err
+		}
+		p := *plot
+		p.Status, p.StatusReason = domain.StatusFor(p.CooperativeRef), ""
+		conflicts := conflictsFor(p, plot.CurrentBoundaryID, same, nil, now)
+		ev := store.PlotEvent{
+			ID: ids.New(), TenantID: a.p.TenantID, PlotRef: p.Ref, Action: domain.ActionRestored, Code: p.Code, Name: p.Name,
+			CommuneCode: p.CommuneCode, CooperativeRef: p.CooperativeRef, HouseholdRef: p.HouseholdRef, Status: p.Status,
+			Reason: strings.TrimSpace(in.Reason), EventTime: now, ActorRef: a.p.ActorRef, IdemKey: in.IdemKey,
+		}
+		if err := store.InsertPlotEvent(ctx, tx, &ev); err != nil {
+			return AttrResult{}, err
+		}
+		if err := store.SetAttrs(ctx, tx, p); err != nil {
+			return AttrResult{}, err
+		}
+		for _, cf := range conflicts {
+			if err := store.InsertConflict(ctx, tx, a.p.TenantID, cf); err != nil {
+				return AttrResult{}, err
+			}
+		}
+		if len(conflicts) > 0 {
+			if err := store.SetNeedsReview(ctx, tx, p.Ref, true); err != nil {
+				return AttrResult{}, err
+			}
+		}
+		cur, err := store.PlotByRef(ctx, tx, p.Ref, false)
+		if err != nil {
+			return AttrResult{}, err
+		}
+		return AttrResult{Plot: *cur, Event: ev, Conflicts: conflicts}, nil
 	})
 }
 

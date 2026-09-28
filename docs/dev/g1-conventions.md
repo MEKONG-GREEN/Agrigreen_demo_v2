@@ -39,6 +39,7 @@ Không đổi số đã cấp. Mỗi module chỉ tạo tệp migration mang s�
 | pf | 000015 | mechanization: dự báo nhu cầu (FN-09) | `pf_mechanization` | `mechanization_app` |
 | pf | 000016 | extension: bổ sung báo cáo (FR-03) | `pf_extension` | `extension_app` |
 | pf | 000017 | party: bổ sung mô hình đọc (G-03/G-04) | `pf_party` | `party_app` |
+| pf | 000018 | geo: khôi phục thửa đã ngừng dùng (sự kiện `restored`) | `pf_geo` | `geo_app` |
 | vault | 000002 | vault/identity | `vault` | `vault_app` |
 
 - Các vai đã khai trong `internal/shared/dbadmin/dbadmin.go`. **Không sửa tệp đó.** Cần vai mới thì ghi vào báo cáo.

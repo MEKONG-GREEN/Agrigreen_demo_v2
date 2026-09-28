@@ -35,6 +35,7 @@ const (
 	ActionCreated  = "created"
 	ActionAssigned = "assigned"
 	ActionRetired  = "retired"
+	ActionRestored = "restored" // khôi phục thửa đã ngừng dùng (GIS BR-17)
 )
 
 // Loại xung đột ranh giới.

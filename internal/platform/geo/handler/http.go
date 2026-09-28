@@ -30,6 +30,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.POST("/plots/:ref/boundaries", h.correct)
 	rg.POST("/plots/:ref/assign", h.assign)
 	rg.POST("/plots/:ref/retire", h.retire)
+	rg.POST("/plots/:ref/restore", h.restore)
 	rg.GET("/cooperatives/:ref/plots", h.coopPlots)
 	rg.GET("/geo/conflicts", h.conflicts)
 	rg.POST("/geo/conflicts/:id/resolve", h.resolve)
@@ -258,6 +259,28 @@ func (h Handler) retire(c *gin.Context) {
 		return
 	}
 	res, err := h.Svc.Retire(c.Request.Context(), app.RetireInput{PlotRef: ref, Reason: req.Reason, IdemKey: idempotency.KeyFromContext(c.Request.Context())})
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	attrResult(c, res)
+}
+
+func (h Handler) restore(c *gin.Context) {
+	ref, ok := pathRef(c, "ref")
+	if !ok {
+		return
+	}
+	var req struct {
+		Reason         string `json:"reason"`
+		ConfirmOverlap bool   `json:"confirm_overlap"`
+	}
+	if !bindJSON(c, &req) {
+		return
+	}
+	res, err := h.Svc.Restore(c.Request.Context(), app.RestoreInput{
+		PlotRef: ref, Reason: req.Reason, ConfirmOverlap: req.ConfirmOverlap, IdemKey: idempotency.KeyFromContext(c.Request.Context()),
+	})
 	if err != nil {
 		httpx.Fail(c, err)
 		return

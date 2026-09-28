@@ -98,7 +98,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	g := geo.New(geoPool, clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits(), Orgs: pty.Orgs()})
+	g := geo.New(geoPool, clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits(), Orgs: pty.Orgs(), Households: pty.Households()})
 	pty.UsePlotStats(g.PlotStats()) // G-03: số thửa đã số hoá trong danh sách HTX
 
 	contentPool, err := pool(content.DBRole)

@@ -228,7 +228,7 @@ func TestHTTPClientEndToEnd(t *testing.T) {
 		t.Fatalf("client chặn thiếu mục đích: %v", err)
 	}
 	d, err := vc.Display(ctx, client.PurposeContact, c.Ref)
-	if err != nil || d.Label != "Phạm V. H." || d.MaskedPhone != "09xx xxx 001" {
+	if err != nil || d.Label != "Phạm V. H." || d.MaskedPhone != "0903•••001" {
 		t.Fatalf("display: %+v %v", d, err)
 	}
 	id, err := vc.Resolve(ctx, client.PurposeRegistryAdmin, c.Ref)

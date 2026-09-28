@@ -155,8 +155,8 @@ func TestPrototypeChongLanQuaGiaoCanh(t *testing.T) {
 
 // Nguồn: mekong-green/tests/brd-2026.test.ts — "Xoá mềm ẩn thửa khỏi danh sách vận hành nhưng khôi phục được, có lý do và lịch sử".
 // Khác prototype: G1 không xóa — "ngừng dùng" (retire) là sự kiện mới trong sổ kèm lý do ≥ 10 ký tự;
-// thửa ẩn khỏi bản đồ và không còn chặn chồng lấn, lịch sử giữ nguyên. G1 chưa có thao tác khôi phục
-// (xem báo cáo) nên phần "khôi phục" của prototype không được kiểm.
+// thửa ẩn khỏi bản đồ và không còn chặn chồng lấn, lịch sử giữ nguyên. Khôi phục cũng là sự kiện mới
+// ("restored", lý do ≥ 10 ký tự) và kiểm lại chồng lấn: thửa khác đã vẽ đè trong lúc ngừng dùng thì bị chặn.
 func TestPrototypeNgungDungThuaCoLyDo(t *testing.T) {
 	nguon(t, "brd-2026.test.ts", "Xoá mềm ẩn thửa khỏi danh sách vận hành nhưng khôi phục được, có lý do và lịch sử")
 	w := newWorld(t)
@@ -175,8 +175,24 @@ func TestPrototypeNgungDungThuaCoLyDo(t *testing.T) {
 		t.Fatalf("thửa đã ngừng vẫn tra cứu được kèm lý do và lịch sử: %s", trim(got.Raw))
 	}
 	wantProblem(t, w.officer.Do(harness.App, http.MethodPost, path, "", map[string]any{"reason": "Ngừng dùng lần thứ hai"}), 409, "geo.plot_state_conflict", "ngừng dùng lặp")
-	// Thửa đã ngừng không còn chặn chồng lấn với HTX khác.
+	// Khôi phục: bắt buộc lý do; thửa chưa ngừng dùng thì không khôi phục được.
+	restore := "/v1/plots/" + ref + "/restore"
+	wantFieldError(t, w.officer.Do(harness.App, http.MethodPost, restore, "", map[string]any{"reason": "nhầm"}), "reason", "lý do khôi phục quá ngắn")
+	back := w.want(w.officer.Do(harness.App, http.MethodPost, restore, "", map[string]any{"reason": "Ngừng dùng nhầm thửa, khôi phục"}), 200, "khôi phục thửa")
+	if str(props(back), "status") != "active" || str(obj(back.Body, "event"), "action") != "restored" {
+		t.Fatalf("khôi phục phải đưa thửa về hoạt động bằng sự kiện restored: %s", trim(back.Raw))
+	}
+	if !refsOf(w.want(w.provAdmin.Do(harness.App, http.MethodGet, bboxNK, "", nil), 200, "bản đồ").Items("features"), "id")[ref] {
+		t.Fatal("thửa đã khôi phục phải hiện lại trên bản đồ")
+	}
+	wantProblem(t, w.officer.Do(harness.App, http.MethodPost, restore, "", map[string]any{"reason": "Khôi phục lần thứ hai"}), 409, "geo.plot_state_conflict", "khôi phục thửa đang hoạt động")
+
+	// Ngừng dùng lại → thửa đã ngừng không còn chặn chồng lấn với HTX khác …
+	w.want(w.officer.Do(harness.App, http.MethodPost, path, "", map[string]any{"reason": "Ngừng dùng lần hai sau khôi phục"}), 200, "ngừng dùng lại")
 	w.want(w.plot(w.officer, w.coopNK2, 0, 0, 100, 100), 201, "vẽ lại đúng chỗ cho HTX khác")
+	// … và khi đã có thửa HTX khác đè lên thì không khôi phục được (chồng lấn khác HTX luôn chặn).
+	wantProblem(t, w.officer.Do(harness.App, http.MethodPost, restore, "", map[string]any{"reason": "Khôi phục khi đã bị vẽ đè", "confirm_overlap": true}),
+		409, "geo.overlap_cross_coop", "khôi phục thửa đã bị HTX khác vẽ đè")
 }
 
 // Nguồn: mekong-green/tests/htx-operations.test.ts — "Vẽ lại đường bao thì diện tích tính lại và báo mức chênh lệch".
@@ -210,6 +226,8 @@ func TestPrototypeVeLaiRanhGioiTinhLaiDienTich(t *testing.T) {
 
 // Nguồn: mekong-green/tests/htx-operations.test.ts — "Khuyến nông vẽ thửa rồi gán cho HTX và thành viên".
 // Khác prototype: gán là sự kiện "assigned" trong sổ thửa; gán nông hộ bắt buộc đã có HTX.
+// Giống prototype: nông hộ phải là thành viên của đúng HTX được gán ("Không gán được thửa cho thành viên
+// của HTX khác") → 422 geo.household_invalid.
 func TestPrototypeGanThuaChoHTXVaNongHo(t *testing.T) {
 	nguon(t, "htx-operations.test.ts", "Khuyến nông vẽ thửa rồi gán cho HTX và thành viên")
 	w := newWorld(t)
@@ -221,6 +239,8 @@ func TestPrototypeGanThuaChoHTXVaNongHo(t *testing.T) {
 	}
 	path := "/v1/plots/" + str(p, "ref") + "/assign"
 	wantFieldError(t, w.officer.Do(harness.App, http.MethodPost, path, "", map[string]any{"household_ref": hh}), "household_ref", "gán nông hộ khi chưa có HTX")
+	wantProblem(t, w.officer.Do(harness.App, http.MethodPost, path, "", map[string]any{"cooperative_ref": w.coopNK2, "household_ref": hh}),
+		422, "geo.household_invalid", "gán thửa cho HTX này với nông hộ của HTX khác")
 	a := w.want(w.officer.Do(harness.App, http.MethodPost, path, "", map[string]any{"cooperative_ref": w.coopNK, "household_ref": hh}), 200, "gán HTX và nông hộ")
 	if str(props(a), "cooperative_ref") != w.coopNK || str(props(a), "household_ref") != hh || str(obj(a.Body, "event"), "action") != "assigned" {
 		t.Fatalf("gán thửa: %s", trim(a.Raw))
@@ -233,6 +253,7 @@ func TestPrototypeGanThuaChoHTXVaNongHo(t *testing.T) {
 func TestPrototypeNapThuaTuTep(t *testing.T) {
 	nguon(t, "brd-2026.test.ts", "UAT DEF-HTX-01/02: nạp thửa từ tệp cũng phải ≥ 4 điểm và bị chặn/cần xác nhận khi chồng lấn")
 	nguon(t, "brd-2026.test.ts", "Đọc GeoJSON và KML thành danh sách đối tượng; Shapefile bị từ chối kèm hướng dẫn")
+	// Khác prototype: Shapefile (.zip, .prj WGS84) nay được nhận; chỉ hệ toạ độ khác EPSG:4326 bị từ chối kèm hướng dẫn.
 	w := newWorld(t)
 	adm := w.user(w.orgNational, true, "geo_admin", "plot_viewer")
 	feat := func(name string, geom map[string]any) map[string]any {
@@ -274,5 +295,22 @@ func TestPrototypeNapThuaTuTep(t *testing.T) {
 	if num(foreign.Body, "rejected") != 1 || str(list(foreign.Body, "features")[0], "code") != "geo.overlap_cross_coop" {
 		t.Fatalf("chồng lấn HTX khác luôn bị chặn: %s", trim(foreign.Raw))
 	}
-	wantProblem(t, upload("file_name=ranh_gioi.shp", "application/octet-stream", []byte{0x00, 0x00, 0x27, 0x0a, 0x00}), 422, "geo.format_unsupported", "Shapefile")
+	// Shapefile (.zip kèm .prj WGS84) được nhận như GeoJSON; hệ toạ độ khác (VN-2000 UTM) bị từ chối
+	// kèm hướng dẫn chuyển về EPSG:4326; .shp rời (không nén .zip) không đọc được.
+	ring := func(east, north, side float64) [][2]float64 {
+		var out [][2]float64
+		for _, p := range harness.Rect(nkLat, nkLon, east, north, side, side)["coordinates"].([][][]float64)[0] {
+			out = append(out, [2]float64{p[0], p[1]})
+		}
+		return out
+	}
+	fields := []string{"TEN_THUA", "MA_XA"}
+	shpFeats := []shpFeature{{Ring: ring(600, 600, 80), Attrs: map[string]string{"TEN_THUA": "Thua Shapefile", "MA_XA": communeNK}}}
+	shp := w.want(upload("file_name=thua_vu_dx.zip&cooperative_ref="+w.coopNK, "application/zip", shapefileZip(t, fields, shpFeats, prjWGS84)), 200, "nạp Shapefile WGS84")
+	if num(shp.Body, "accepted") != 1 || num(shp.Body, "rejected") != 0 {
+		t.Fatalf("Shapefile WGS84 phải được nhận: %s", trim(shp.Raw))
+	}
+	wantProblem(t, upload("file_name=thua_vn2000.zip&cooperative_ref="+w.coopNK, "application/zip", shapefileZip(t, fields, shpFeats, prjVN2000UTM48)),
+		422, "geo.crs_unsupported", "Shapefile VN-2000 UTM")
+	wantProblem(t, upload("file_name=ranh_gioi.shp", "application/octet-stream", []byte{0x00, 0x00, 0x27, 0x0a, 0x00}), 422, "geo.format_invalid", ".shp rời (phải nén .zip)")
 }

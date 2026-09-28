@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +20,21 @@ import (
 )
 
 func TestMain(m *testing.M) { os.Exit(pgtest.Run(m)) }
+
+// synthPhoneRe là SĐT tổng hợp nguyên vẹn 0999[01]xxxxx, không nằm giữa một dãy số dài hơn.
+var synthPhoneRe = regexp.MustCompile(`(^|[^0-9])0999[01][0-9]{5}([^0-9]|$)`)
+
+// Kiểm cho chính bộ so khớp log: không báo nhầm chuỗi số dài hơn, vẫn bắt SĐT thật.
+func TestSynthPhoneRe(t *testing.T) {
+	for s, want := range map[string]bool{
+		`"phone":"0999012345"`: true, `SĐT 0999112345.`: true, `0999012345`: true,
+		`trace_id=a1b209990123456789`: false, `id=10999012345`: false, `09990123456`: false, `duration_ms=99901`: false,
+	} {
+		if got := synthPhoneRe.MatchString(s); got != want {
+			t.Errorf("%q: %v, muốn %v", s, got, want)
+		}
+	}
+}
 
 // R-95: không bao giờ sinh dữ liệu tổng hợp trên production.
 func TestRefusesProduction(t *testing.T) {
@@ -200,7 +216,8 @@ func TestSeedAgainstInProcessStack(t *testing.T) {
 
 	// Log của bộ sinh và của nền tảng không chứa định danh tổng hợp (R-14).
 	for _, line := range []string{logs.String(), s.Logs.String()} {
-		if strings.Contains(line, "09990") || strings.Contains(line, "09991") || strings.Contains(line, "Ấp Tổng Hợp") {
+		// Khớp NGUYÊN số điện thoại (ranh giới không phải chữ số) — mã ngẫu nhiên/UUID/số đo chứa "09990" không phải SĐT.
+		if synthPhoneRe.MatchString(line) || strings.Contains(line, "Ấp Tổng Hợp") {
 			t.Fatal("log chứa SĐT/địa chỉ tổng hợp")
 		}
 	}

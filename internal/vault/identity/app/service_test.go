@@ -146,7 +146,7 @@ func TestCreateResolveDisplayUnwrap(t *testing.T) {
 		t.Fatalf("resolve lệch dữ liệu vào (đã chuẩn hóa)")
 	}
 	d, err := s.Display(ctx, client.PurposeFieldSupport, c.Ref)
-	if err != nil || d.Label != "Nguyễn V. T." || d.MaskedPhone != "09xx xxx 020" {
+	if err != nil || d.Label != "Nguyễn V. T." || d.MaskedPhone != "0901•••020" {
 		t.Fatalf("display: %v", err)
 	}
 	for _, v := range []string{"0901000020", "079123456789"} {

@@ -183,12 +183,24 @@ var attrSpecs = map[string]map[string]attrSpec{
 	},
 }
 
+// CanonicalCode là dạng chuẩn của mã mục: mã mùa vụ luôn viết HOA (UAT DEF-HTX-13 —
+// "dx-2027" và "DX-2027" là một vụ, không được thành hai mục). Danh mục khác giữ
+// nguyên mã (vd khâu "lam_dat"). Dùng cả khi ghi lẫn khi tra.
+func CanonicalCode(catalog, code string) string {
+	code = strings.TrimSpace(code)
+	if catalog == port.CatalogSeason {
+		return strings.ToUpper(code)
+	}
+	return code
+}
+
 // Normalize kiểm và chuẩn hóa mục trước khi ghi: mã, tên, thuộc tính theo từng
 // danh mục (thiếu thuộc tính bắt buộc hoặc có thuộc tính lạ đều bị từ chối).
 func (it Item) Normalize() (Item, error) {
 	if !KnownCatalog(it.Catalog) {
 		return it, FieldError{"catalog", ErrCatalogUnknown}
 	}
+	it.Code = CanonicalCode(it.Catalog, it.Code)
 	if !itemCodeRe.MatchString(it.Code) {
 		return it, FieldError{"code", ErrItemCode}
 	}

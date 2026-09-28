@@ -44,6 +44,7 @@ var (
 	ErrFormatUnsupported     = problem.New(http.StatusUnprocessableEntity, domain.CodeFormatUnsupported, "Định dạng tệp chưa được hỗ trợ")
 	ErrAreaOutOfRange        = problem.New(http.StatusUnprocessableEntity, "geo.area_out_of_range", "Diện tích thửa ngoài giới hạn hợp lý")
 	ErrOutsideCommune        = problem.New(http.StatusUnprocessableEntity, "geo.outside_commune", "Ranh giới nằm ngoài địa giới xã")
+	ErrHouseholdInvalid      = problem.New(http.StatusUnprocessableEntity, "geo.household_invalid", "Nông hộ không tồn tại, đã ngừng hoạt động hoặc không là thành viên của HTX được gán thửa")
 	ErrCooperativeInvalid    = problem.New(http.StatusUnprocessableEntity, "geo.cooperative_invalid", "HTX không tồn tại, đã ngừng hoạt động hoặc ngoài phạm vi")
 	ErrDependency            = problem.New(http.StatusServiceUnavailable, "geo.dependency_unavailable", "Dịch vụ phụ thuộc chưa sẵn sàng")
 )
@@ -65,6 +66,8 @@ type Service struct {
 	Params mdport.Params           // tùy chọn — thiếu thì dùng ngưỡng mặc định
 	Units  mdport.AdminUnits       // bắt buộc cho ghi
 	Orgs   partyport.Orgs          // tùy chọn — có thì kiểm HTX khi gán
+	// Households (tùy chọn): có thì kiểm nông hộ thuộc đúng HTX của thửa khi gán.
+	Households partyport.Households
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }
@@ -218,6 +221,25 @@ func (s *Service) checkCooperative(ctx context.Context, a access, coop uuid.UUID
 	}
 	if o.Kind != partyport.OrgCooperative || !o.Active || (!a.sc.All && !a.sc.Allows(o.AdminUnitCode)) {
 		return ErrCooperativeInvalid
+	}
+	return nil
+}
+
+// checkHousehold kiểm nông hộ là thành viên ĐANG HOẠT ĐỘNG của đúng HTX coop
+// (mỗi thửa đúng một HTX và nông hộ thuộc HTX đó — HTX US-PLOT-01, BRD).
+func (s *Service) checkHousehold(ctx context.Context, household, coop uuid.UUID) error {
+	if household == uuid.Nil || s.Households == nil {
+		return nil
+	}
+	m, err := s.Households.Membership(ctx, household)
+	if errors.Is(err, partyport.ErrHouseholdNotFound) {
+		return ErrHouseholdInvalid
+	}
+	if err != nil {
+		return ErrDependency.WithDetail("không tra được nông hộ").WithCause(err)
+	}
+	if !m.Active || m.CooperativeRef != coop {
+		return ErrHouseholdInvalid
 	}
 	return nil
 }
