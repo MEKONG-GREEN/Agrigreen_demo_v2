@@ -1087,6 +1087,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/sync/nudge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Yêu cầu thiết bị đồng bộ ngay (US-SYNC-02) — như Application API */
+        post: operations["adminSyncNudge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1782,6 +1799,20 @@ export interface components {
             actor_ref: string;
             reason: string | null;
             machine: components["schemas"]["MechMachine"];
+        };
+        NudgeInput: {
+            /** Format: uuid */
+            device_id?: string;
+            /** @description Mã tỉnh/xã hiện hành */
+            unit?: string;
+        };
+        NudgeResult: {
+            /** Format: uuid */
+            nudge_id: string;
+            /** @enum {string} */
+            target_kind: "device" | "unit";
+            target: string;
+            devices: number;
         };
         ParamValue: {
             key: string;
@@ -3833,6 +3864,38 @@ export interface operations {
             403: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
+        };
+    };
+    adminSyncNudge: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NudgeInput"];
+            };
+        };
+        responses: {
+            /** @description Đã xếp lần gửi */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NudgeResult"];
+                };
+            };
+            /** @description forbidden | mfa_required | notify.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description notify.nudge_target_not_found */
+            404: components["responses"]["Problem"];
+            /** @description notify.nudge_rate_limited */
+            429: components["responses"]["Problem"];
         };
     };
 }

@@ -1231,6 +1231,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hộp thư của người gọi (cá nhân + chủ đề theo phạm vi/vai/tổ chức), mới nhất trước */
+        get: operations["listNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Số thông báo chưa đọc (huy hiệu) */
+        get: operations["notificationUnreadCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đánh dấu đã đọc mọi thông báo người gọi thấy được */
+        post: operations["readAllNotifications"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đánh dấu đã đọc một thông báo (đọc lại giữ read_at lần đầu) */
+        post: operations["readNotification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/devices/{id}/push-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gắn/cập nhật token đẩy FCM cho thiết bị pf/sync của CHÍNH người gọi (gọi mỗi lần khởi động và khi FCM đổi token) */
+        post: operations["registerPushToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sync/nudge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Yêu cầu thiết bị đồng bộ ngay (US-SYNC-02) — gửi thông điệp dữ liệu {kind sync_now}
+         * @description Vai kn_province_admin, kn_national_admin, device_admin, platform_admin. Đúng một trong device_id hoặc unit.
+         *     unit phải trong phạm vi; device_id phải có token đang dùng và thuộc phạm vi (device_admin/platform_admin: cả tenant).
+         *     Giới hạn: một đích mỗi 5 phút, mỗi người 30 lần/giờ → 429 + Retry-After.
+         */
+        post: operations["syncNudge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2471,6 +2578,61 @@ export interface components {
             stages: {
                 [key: string]: components["schemas"]["MechGroup"];
             };
+        };
+        /** @description Không chứa dữ liệu cá nhân. Cũng là data của entity đồng bộ "notification" (không có topic). */
+        Notification: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "directive" | "alert" | "document" | "task_escalated" | "sync_conflict" | "org_deactivated";
+            /** @enum {string} */
+            severity: "urgent" | "normal";
+            title: string;
+            body: string;
+            /** @description Đường dẫn trong app: /extension/directives/{id}, /documents/{ref}, /extension/tasks/{id}, /sync/conflicts/{id}, /orgs/{ref} */
+            deep_link: string;
+            /** Format: uuid */
+            subject_ref: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            read_at: string | null;
+            /** @description true = thông báo chủ đề (theo đơn vị/tổ chức/vai), false = gửi riêng người gọi */
+            topic: boolean;
+        };
+        PushTokenInput: {
+            /**
+             * @default fcm
+             * @enum {string}
+             */
+            provider: "fcm";
+            token: string;
+        };
+        PushToken: {
+            /** Format: uuid */
+            device_id: string;
+            provider: string;
+            /** @enum {string} */
+            platform: "android" | "ios";
+            active: boolean;
+            /** Format: date-time */
+            registered_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        NudgeInput: {
+            /** Format: uuid */
+            device_id?: string;
+            /** @description Mã tỉnh/xã hiện hành */
+            unit?: string;
+        };
+        NudgeResult: {
+            /** Format: uuid */
+            nudge_id: string;
+            /** @enum {string} */
+            target_kind: "device" | "unit";
+            target: string;
+            devices: number;
         };
     };
     responses: {
@@ -5013,6 +5175,175 @@ export interface operations {
                     };
                 };
             };
+        };
+    };
+    listNotifications: {
+        parameters: {
+            query?: {
+                /** @description next_cursor của trang trước */
+                cursor?: string;
+                limit?: number;
+                /** @description true = chỉ chưa đọc */
+                unread?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang. Thông báo chủ đề cũ hơn 90 ngày không hiện. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Notification"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
+    notificationUnreadCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đếm */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        unread: number;
+                    };
+                };
+            };
+        };
+    };
+    readAllNotifications: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số đã đánh dấu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        marked: number;
+                    };
+                };
+            };
+        };
+    };
+    readNotification: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thông báo sau khi đọc */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Notification"];
+                };
+            };
+            /** @description notify.notification_not_found — không có, của người khác, ngoài phạm vi */
+            404: components["responses"]["Problem"];
+        };
+    };
+    registerPushToken: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description device_id đã đăng ký ở POST /v1/devices */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushTokenInput"];
+            };
+        };
+        responses: {
+            /** @description Đã gắn. Không trả lại token. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushToken"];
+                };
+            };
+            /** @description notify.device_unregistered | notify.device_revoked */
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            /** @description notify.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    syncNudge: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NudgeInput"];
+            };
+        };
+        responses: {
+            /** @description Đã xếp lần gửi */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NudgeResult"];
+                };
+            };
+            /** @description forbidden | notify.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description notify.nudge_target_not_found */
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            /** @description notify.nudge_rate_limited (retry_after_s, header Retry-After) */
+            429: components["responses"]["Problem"];
         };
     };
 }
