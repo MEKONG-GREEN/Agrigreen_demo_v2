@@ -16,6 +16,8 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/handler"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
+	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
@@ -39,6 +41,9 @@ type Deps struct {
 	Units    mdport.AdminUnits       // tỉnh của xã
 	Params   mdport.Params           // extension.task_sla_hours, extension.duty_status_ttl_hours
 	Catalogs mdport.Catalogs         // giống lúa, vụ, sâu bệnh (FR-01 BR-01)
+	// Plots, Coops (tùy chọn): thống kê thửa (pf/geo) và HTX (pf/party) cho GET /v1/dashboard (G-02).
+	Plots geoport.PlotStats
+	Coops partyport.CooperativeStats
 }
 
 // Module là pf/extension đã nối.
@@ -50,8 +55,12 @@ type Module struct {
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	return &Module{svc: &app.Service{
 		DB: db, Clock: clk, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
+		Plots: d.Plots, Coops: d.Coops,
 	}}
 }
+
+// StaffDirectory cho module khác tra tên cán bộ trong danh bạ (qua port, G-07).
+func (m *Module) StaffDirectory() port.StaffDirectory { return m.svc }
 
 // RegisterApp gắn route Application API.
 func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterApp(rg) }

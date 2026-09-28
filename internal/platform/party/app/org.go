@@ -600,6 +600,8 @@ type ListQuery struct {
 	IncludeInactive bool
 	After           uuid.UUID
 	Limit           int
+	// AdminUnit (tùy chọn): chỉ tổ chức thuộc tỉnh/xã này (G-03), giao với phạm vi người gọi.
+	AdminUnit string
 }
 
 func (q *ListQuery) normalize() {
@@ -666,6 +668,9 @@ func (r *Registry) ListCooperatives(ctx context.Context, q ListQuery) (CoopPage,
 	}
 	q.normalize()
 	sc, err := r.scopeFor(ctx, p)
+	if err == nil && !sc.Empty() {
+		sc, err = r.narrowScope(ctx, sc, q.AdminUnit)
+	}
 	if err != nil || sc.Empty() {
 		return CoopPage{Items: []store.Cooperative{}}, err
 	}

@@ -61,6 +61,19 @@ type taskDTO struct {
 	ResolvedAt       *string `json:"resolved_at"`
 	LastNote         *string `json:"last_note"`
 	Version          int64   `json:"version"`
+	// Tên hiển thị (G-09): cán bộ được giao (danh bạ trực), HTX (pf/party), xã (pf/masterdata).
+	// null khi chưa tra được — web hiện mã.
+	AssigneeName    *string `json:"assignee_name"`
+	CooperativeName *string `json:"cooperative_name"`
+	CommuneName     *string `json:"commune_name"`
+}
+
+// withNames điền tên hiển thị G-09 vào DTO nhiệm vụ.
+func withNames(d taskDTO, t domain.Task, n app.TaskNames) taskDTO {
+	d.AssigneeName = opt(n.Assignees[t.AssigneeRef])
+	d.CooperativeName = opt(n.Cooperatives[t.CooperativeRef])
+	d.CommuneName = opt(n.Communes[t.CommuneCode])
+	return d
 }
 
 func toTask(t domain.Task, now time.Time) taskDTO {
