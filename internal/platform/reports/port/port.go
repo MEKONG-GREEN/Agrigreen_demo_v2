@@ -39,6 +39,9 @@ const (
 	SourceCGHSummary      = "mechanization.summary"
 	SourceCGHShortage     = "mechanization.shortage_by_coop"
 	SourceCGHCompare      = "mechanization.season_compare"
+	// SourceHTXProduction: sản lượng dự kiến – thực tế, diện tích, số hộ, tiến độ SOP theo
+	// HTX × vụ × giống từ pf/cropcycle (HTX US-DASH-02, US-DASH-03).
+	SourceHTXProduction = "cropcycle.production"
 )
 
 // Sự kiện module phát ra (schema trong contracts/events/).

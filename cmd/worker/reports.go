@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
@@ -27,7 +28,8 @@ import (
 )
 
 // reportsWorker dựng pf/reports cho worker một lần (sự kiện đầu tiên): kho đối
-// tượng, cổng đọc của pf/extension và pf/mechanization — mỗi module bằng vai DB
+// tượng, cổng đọc của pf/extension, pf/mechanization và pf/cropcycle (sản lượng
+// HTX — HTX US-DASH-02/03) — mỗi module bằng vai DB
 // riêng (R-05) — cùng bộ gửi SMTP (AG_SMTP_*). Thiếu cấu hình → handler lỗi, sự
 // kiện được giao lại rồi vào DLQ (R-62) — không mất yêu cầu.
 type reportsWorker struct {
@@ -60,7 +62,7 @@ func buildReportsWorker(ctx context.Context, log *slog.Logger) (*reports.Module,
 		return db.Open(context.WithoutCancel(ctx), dsn, db.OptionsFromEnv("worker-reports"))
 	}
 	pools := map[string]*pgxpool.Pool{}
-	for _, role := range []string{masterdata.DBRole, party.DBRole, extension.DBRole, mechanization.DBRole} {
+	for _, role := range []string{masterdata.DBRole, party.DBRole, extension.DBRole, mechanization.DBRole, cropcycle.DBRole} {
 		p, err := open(role)
 		if err != nil {
 			for _, q := range pools {
@@ -79,6 +81,7 @@ func buildReportsWorker(ctx context.Context, log *slog.Logger) (*reports.Module,
 	mech := mechanization.New(pools[mechanization.DBRole], clk, mechanization.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Params: md.Params(), Catalogs: md.Catalogs(), AdminUnits: md.AdminUnits(),
 	})
+	cc := cropcycle.New(pools[cropcycle.DBRole], clk, cropcycle.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Params: md.Params(), Catalogs: md.Catalogs()})
 	// Email người nhận tra qua pf/accounts (Keycloak Admin REST, AG_KC_*); chưa cấu hình → bỏ gửi kèm cảnh báo.
 	kc, err := accounts.DirectoryFromEnv()
 	if err != nil {
@@ -97,7 +100,7 @@ func buildReportsWorker(ctx context.Context, log *slog.Logger) (*reports.Module,
 	}
 	return reports.New(nil, clk, reports.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(), Store: store,
-		Extension: kn.ReportData(), Mechanization: mech.ReportData(), Directory: dir, Mailer: mailer, LinkBase: os.Getenv("AG_WEB_OPS_URL"), Log: log,
+		Extension: kn.ReportData(), Mechanization: mech.ReportData(), CropCycle: cc.ReportData(), Directory: dir, Mailer: mailer, LinkBase: os.Getenv("AG_WEB_OPS_URL"), Log: log,
 	}), nil
 }
 

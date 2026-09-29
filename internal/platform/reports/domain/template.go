@@ -59,7 +59,7 @@ type ColumnSpec struct {
 // SourceSpec mô tả một nguồn dữ liệu của mẫu biểu.
 type SourceSpec struct {
 	Key          string
-	Module       string // extension | mechanization
+	Module       string // extension | mechanization | cropcycle
 	Levels       []string
 	DefaultLevel string
 	NeedsPeriod  bool // kỳ tháng/quý/năm (FR-05)
@@ -186,6 +186,32 @@ var Sources = map[string]SourceSpec{
 			{Key: "capacity_diff", Title: "Chênh lệch Năng lực (B−A)", Kind: KindInt},
 			{Key: "coverage_diff", Title: "Chênh lệch Mức đáp ứng (B−A, điểm %)", Kind: KindPercent, Scale: 2},
 		}},
+	// HTX US-DASH-02: sản lượng theo HTX × vụ × giống — cùng số liệu và công thức với bảng
+	// điều hành (US-DASH-01). Cột chiều (HTX, vụ, giống) có trong mẫu thì tách dòng theo
+	// chiều đó, không có thì gộp (HasColumn); số hộ đếm phân biệt trong từng dòng.
+	port.SourceHTXProduction: {Key: port.SourceHTXProduction, Module: "cropcycle", Levels: []string{LevelCooperative},
+		DefaultLevel: LevelCooperative, UsesSeason: true,
+		Columns: []ColumnSpec{
+			{Key: "cooperative_code", Title: "Mã HTX", Kind: KindText},
+			{Key: "cooperative_name", Title: "HTX", Kind: KindText},
+			{Key: "season", Title: "Vụ", Kind: KindText},
+			{Key: "variety_name", Title: "Giống lúa", Kind: KindText},
+			{Key: "seasons", Title: "Số lô (vụ)", Kind: KindInt},
+			{Key: "open_seasons", Title: "Đang canh tác", Kind: KindInt},
+			{Key: "completed_seasons", Title: "Đã thu hoạch", Kind: KindInt},
+			{Key: "households", Title: "Số nông hộ", Kind: KindInt},
+			{Key: "area_ha", Title: "Diện tích (ha)", Kind: KindDecimal, Scale: 2},
+			{Key: "harvested_area_ha", Title: "Diện tích đã khai sản lượng (ha)", Kind: KindDecimal, Scale: 2},
+			{Key: "expected_t", Title: "Sản lượng dự kiến (tấn)", Kind: KindDecimal, Scale: 3},
+			{Key: "actual_t", Title: "Sản lượng thực tế (tấn)", Kind: KindDecimal, Scale: 3},
+			{Key: "actual_yield_t_per_ha", Title: "Năng suất thực tế (tấn/ha)", Kind: KindDecimal, Scale: 2},
+			{Key: "sop_progress_pct", Title: "Tiến độ SOP (%)", Kind: KindPercent, Scale: 1},
+		}},
+}
+
+// HasColumn cho biết mẫu có cột key.
+func (d Definition) HasColumn(key string) bool {
+	return slices.ContainsFunc(d.Columns, func(c Column) bool { return c.Key == key })
 }
 
 // Column là một cột của mẫu (khóa cột nguồn + tiêu đề hiển thị).
@@ -306,6 +332,9 @@ func defCols(source string, keys ...string) []Column {
 
 func both() []string { return []string{FormatXLSX, FormatPDF} }
 
+// HTXProductionKey là mã mẫu hệ thống báo cáo sản lượng HTX (HTX US-DASH-02, US-DASH-03).
+const HTXProductionKey = "htx.production"
+
 // Builtins là mẫu hệ thống (phiên bản 0) — dùng khi tenant chưa có phiên bản riêng.
 func Builtins() []Template {
 	mk := func(key string, d Definition) Template {
@@ -337,6 +366,11 @@ func Builtins() []Template {
 		mk("cgh.shortage_by_coop", Definition{Title: "Thiếu hụt theo HTX", Source: port.SourceCGHShortage, Grouping: LevelCooperative,
 			Columns: defCols(port.SourceCGHShortage, "cooperative_code", "cooperative_name", "province_name", "commune_name", "farm_stage",
 				"machine_type", "capacity", "required_whole", "shortage", "coverage_pct", "area_source"),
+			Formats: both()}),
+		mk(HTXProductionKey, Definition{Title: "Báo cáo sản lượng HTX (dự kiến – thực tế)", Source: port.SourceHTXProduction,
+			Grouping: LevelCooperative,
+			Columns: defCols(port.SourceHTXProduction, "cooperative_name", "season", "variety_name", "seasons", "households", "area_ha",
+				"harvested_area_ha", "expected_t", "actual_t", "actual_yield_t_per_ha", "sop_progress_pct"),
 			Formats: both()}),
 		mk("cgh.season_compare", Definition{Title: "Đối chiếu giữa các vụ", Source: port.SourceCGHCompare, Grouping: LevelProvince,
 			Columns: defCols(port.SourceCGHCompare, "unit_name", "farm_stage", "machine_type", "required_a", "capacity_a", "coverage_a",

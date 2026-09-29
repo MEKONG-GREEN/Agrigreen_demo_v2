@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -23,6 +24,39 @@ import (
 )
 
 func ts(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
+
+// codeRe: mã danh mục (vụ, giống) trong bộ lọc.
+var codeRe = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,40}$`)
+
+// reach là phạm vi đơn vị của người gọi. Quản lý HTX thuần (coopOnly, không vai CGH)
+// không có phạm vi đơn vị — chỉ HTX của mình — nên không cần pf/party.
+func (s *Service) reach(ctx context.Context, p authz.Principal) (authz.Scope, error) {
+	if coopOnly(p) && !hasAny(p, cghRoles) {
+		return authz.Scope{}, nil
+	}
+	return s.scope(ctx, p)
+}
+
+// jobScope giải phạm vi của việc xuất theo nguồn của mẫu. Nguồn HTX với quản lý HTX
+// (coopOnly): phạm vi là HTX của người gọi, ghi vào bộ lọc cooperative_ref (lọc HTX
+// khác → 403), phạm vi đơn vị để trống (domain.Params.CoopScoped). Còn lại: phạm vi
+// đơn vị, rỗng → 403.
+func jobScope(p authz.Principal, sc authz.Scope, def domain.Definition, params *domain.Params) (authz.Scope, error) {
+	if domain.Sources[def.Source].Module == "cropcycle" && coopOnly(p) {
+		if p.OrgRef == uuid.Nil {
+			return sc, ErrOutOfScope.WithDetail("tài khoản chưa gắn HTX")
+		}
+		if c := strings.TrimSpace(params.CooperativeRef); c != "" && !strings.EqualFold(c, p.OrgRef.String()) {
+			return sc, ErrOutOfScope.WithDetail("quản lý HTX chỉ xuất số liệu HTX của mình")
+		}
+		params.CooperativeRef = p.OrgRef.String()
+		return authz.Scope{}, nil
+	}
+	if sc.Empty() {
+		return sc, ErrOutOfScope.WithDetail("tài khoản chưa gắn đơn vị công tác")
+	}
+	return sc, nil
+}
 
 // ExportInput là yêu cầu xuất một mẫu báo cáo.
 type ExportInput struct {
@@ -73,6 +107,23 @@ func (s *Service) normalizeParams(ctx context.Context, def domain.Definition, in
 			return p, problem.Validation.WithField("season_year", "năm vụ không hợp lệ")
 		}
 	}
+	if src.Module == "cropcycle" {
+		// HTX US-DASH-02 AC-1: cùng bộ lọc với bảng điều hành (vụ, năm, HTX, giống).
+		p.VarietyCode = strings.TrimSpace(in.VarietyCode)
+		if p.VarietyCode != "" && !codeRe.MatchString(p.VarietyCode) {
+			return p, problem.Validation.WithField("variety_code", "mã giống không hợp lệ")
+		}
+		if p.SeasonCode != "" && !codeRe.MatchString(p.SeasonCode) {
+			return p, problem.Validation.WithField("season_code", "mã vụ không hợp lệ")
+		}
+		if c := strings.TrimSpace(in.CooperativeRef); c != "" {
+			id, err := uuid.Parse(c)
+			if err != nil {
+				return p, problem.Validation.WithField("cooperative_ref", "phải là UUID")
+			}
+			p.CooperativeRef = id.String()
+		}
+	}
 	if src.Module == "mechanization" && !src.NeedsCompare && in.RunID != "" {
 		if _, err := uuid.Parse(in.RunID); err != nil {
 			return p, problem.Validation.WithField("run_id", "phải là UUID")
@@ -104,11 +155,11 @@ func (s *Service) RequestExport(ctx context.Context, in ExportInput) (domain.Job
 	if in.IdemKey == "" {
 		return domain.Job{}, false, problem.IdempotencyRequired
 	}
-	sc, err := s.scope(ctx, p)
+	sc, err := s.reach(ctx, p)
 	if err != nil {
 		return domain.Job{}, false, err
 	}
-	if sc.Empty() {
+	if sc.Empty() && !coopOnly(p) {
 		return domain.Job{}, false, ErrOutOfScope.WithDetail("tài khoản chưa gắn đơn vị công tác")
 	}
 	now := s.now()
@@ -134,13 +185,18 @@ func (s *Service) RequestExport(ctx context.Context, in ExportInput) (domain.Job
 		if !slices.Contains(t.Def.Formats, in.Format) {
 			return ErrFormat.WithField("format", "mẫu hỗ trợ "+strings.Join(t.Def.Formats, ", "))
 		}
-		params, err := s.normalizeParams(ctx, t.Def, in.Params, sc, now)
+		raw := in.Params
+		jsc, err := jobScope(p, sc, t.Def, &raw)
+		if err != nil {
+			return err
+		}
+		params, err := s.normalizeParams(ctx, t.Def, raw, jsc, now)
 		if err != nil {
 			return err
 		}
 		job = domain.Job{
 			ID: ids.New(), TenantID: p.TenantID, TemplateKey: t.Key, TemplateVersion: t.Version, Def: t.Def, Format: in.Format,
-			Params: params, ScopeAll: sc.All, ScopeUnits: sc.Units, RequestedBy: p.ActorRef, RequestedAt: now,
+			Params: params, ScopeAll: jsc.All, ScopeUnits: jsc.Units, RequestedBy: p.ActorRef, RequestedAt: now,
 			Trigger: domain.TriggerAPI, IdemKey: in.IdemKey, Status: domain.JobQueued,
 		}
 		if err := s.egress(ctx, tx, Egress{Kind: EgressExport, TenantID: p.TenantID, ActorRef: p.ActorRef, TemplateKey: t.Key,
@@ -186,6 +242,10 @@ func jobVisible(p authz.Principal, sc authz.Scope, j domain.Job) bool {
 	if !hasAny(p, rolesFor(j.Def.Source)) {
 		return false
 	}
+	if domain.Sources[j.Def.Source].Module == "cropcycle" && coopOnly(p) {
+		// HTX US-DASH-02: quản lý HTX chỉ thấy việc xuất trong phạm vi HTX của mình.
+		return p.OrgRef != uuid.Nil && j.Params.CoopScoped(j.ScopeAll, j.ScopeUnits) && j.Params.CooperativeRef == p.OrgRef.String()
+	}
 	if sc.All {
 		return true
 	}
@@ -206,7 +266,7 @@ func (s *Service) GetExport(ctx context.Context, id uuid.UUID) (domain.Job, erro
 	if err != nil {
 		return domain.Job{}, err
 	}
-	sc, err := s.scope(ctx, p)
+	sc, err := s.reach(ctx, p)
 	if err != nil {
 		return domain.Job{}, err
 	}

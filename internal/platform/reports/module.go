@@ -1,7 +1,7 @@
 // Package reports là module pf/reports: mẫu biểu có phiên bản (Admin quản lý),
 // xuất báo cáo Excel/PDF bất đồng bộ (mục 12, R-52) từ cổng đọc của pf/extension
-// (KN FR-01..FR-05, US-DASH-02) và pf/mechanization (CGH FN-10, từ kết quả cân đối
-// ĐÃ LƯU), điểm kiểm soát xuất dữ liệu duy nhất (mục 18 DLP) và lịch gửi báo cáo
+// (KN FR-01..FR-05, US-DASH-02), pf/mechanization (CGH FN-10, từ kết quả cân đối
+// ĐÃ LƯU) và pf/cropcycle (sản lượng HTX — HTX US-DASH-02/03), điểm kiểm soát xuất dữ liệu duy nhất (mục 18 DLP) và lịch gửi báo cáo
 // định kỳ qua email (US-DASH-03).
 //
 // Module khác chỉ được import reports/port (R-02). Tệp này nối các lớp cho
@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
@@ -49,6 +50,7 @@ type Deps struct {
 	Store         objstore.Store // reports/<tenant>/<job>.<định dạng>
 	Extension     extport.ReportData
 	Mechanization mechport.ReportData
+	CropCycle     ccport.ReportData  // pf/cropcycle: báo cáo sản lượng HTX (HTX US-DASH-02, US-DASH-03)
 	Directory     port.MailDirectory // pf/accounts hiện thực; nil → bỏ gửi email
 	Mailer        port.Mailer
 	LinkBase      string // AG_WEB_OPS_URL: liên kết trang việc xuất trong email
@@ -63,7 +65,7 @@ type Module struct{ svc *app.Service }
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	return &Module{svc: &app.Service{
 		DB: db, Clock: clk, Log: d.Log, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
-		Store: d.Store, Extension: d.Extension, Mechanization: d.Mechanization, Directory: d.Directory, Mailer: d.Mailer,
+		Store: d.Store, Extension: d.Extension, Mechanization: d.Mechanization, CropCycle: d.CropCycle, Directory: d.Directory, Mailer: d.Mailer,
 		LinkBase: d.LinkBase,
 	}}
 }

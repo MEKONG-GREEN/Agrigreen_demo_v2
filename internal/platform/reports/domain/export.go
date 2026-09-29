@@ -36,6 +36,16 @@ type Params struct {
 	SeasonYearB int    `json:"season_year_b,omitempty"`
 	RunID       string `json:"run_id,omitempty"`
 	MachineType string `json:"machine_type,omitempty"`
+	// HTX US-DASH-02: lọc theo HTX và giống như bảng điều hành. Với quản lý HTX,
+	// cooperative_ref luôn là HTX của người yêu cầu (phạm vi, không chỉ là bộ lọc).
+	CooperativeRef string `json:"cooperative_ref,omitempty"`
+	VarietyCode    string `json:"variety_code,omitempty"`
+}
+
+// CoopScoped cho biết phạm vi của việc xuất/lịch là MỘT HTX (quản lý HTX, HTX
+// US-DASH-02): không có phạm vi đơn vị, cooperative_ref là HTX của người yêu cầu.
+func (p Params) CoopScoped(scopeAll bool, scopeUnits []string) bool {
+	return !scopeAll && len(scopeUnits) == 0 && p.CooperativeRef != ""
 }
 
 // Job là một việc xuất.

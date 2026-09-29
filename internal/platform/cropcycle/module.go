@@ -64,6 +64,9 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc
 // Stats cho module khác: vụ mở / nhật ký chờ duyệt theo HTX, diện tích vụ (qua port).
 func (m *Module) Stats() port.Stats { return m.svc }
 
+// ReportData cho pf/reports (qua gốc lắp ráp): báo cáo sản lượng HTX (HTX US-DASH-02, US-DASH-03).
+func (m *Module) ReportData() port.ReportData { return app.ReportData{Svc: m.svc} }
+
 // UseGpsLog nối log GPS của pf/geo (consumer port.GpsLogConsumer).
 func (m *Module) UseGpsLog(g geoport.GpsLog) { m.svc.GpsLog = g }
 

@@ -526,6 +526,8 @@ export const REPORT_TEMPLATES: ReportTemplate[] = [
   { key: "cgh.summary", version: 0, builtin: true, status: "active", definition: { title: "Tổng hợp cân đối máy theo tỉnh (FN-10)", source: "mechanization.summary", grouping: "province", columns: [col("unit_name", "Tỉnh"), col("required", "Nhu cầu"), col("capacity", "Năng lực")], formats: ["xlsx", "pdf"] } },
   { key: "cgh.shortage_by_coop", version: 0, builtin: true, status: "active", definition: { title: "Thiếu hụt máy theo HTX (FN-10)", source: "mechanization.shortage_by_coop", grouping: "cooperative", columns: [col("coop_code", "Mã HTX"), col("coop_name", "HTX"), col("gap", "Chênh lệch")], formats: ["xlsx", "pdf"] } },
   { key: "cgh.season_compare", version: 0, builtin: true, status: "active", definition: { title: "Đối chiếu vụ A – vụ B (FN-10)", source: "mechanization.season_compare", grouping: "province", columns: [col("unit_name", "Tỉnh"), col("a", "Vụ A"), col("b", "Vụ B")], formats: ["xlsx"] } },
+  // HTX US-DASH-02: sản lượng HTX × vụ × giống (nguồn cropcycle.production).
+  { key: "htx.production", version: 0, builtin: true, status: "active", definition: { title: "Báo cáo sản lượng HTX (dự kiến – thực tế)", source: "cropcycle.production", grouping: "cooperative", columns: [col("cooperative_name", "HTX"), col("season", "Vụ"), col("variety_name", "Giống lúa"), col("households", "Số nông hộ"), col("area_ha", "Diện tích (ha)"), col("expected_t", "Sản lượng dự kiến (tấn)"), col("actual_t", "Sản lượng thực tế (tấn)"), col("sop_progress_pct", "Tiến độ SOP (%)")], formats: ["xlsx", "pdf"] } },
 ];
 
 /** Mẫu mới nhất theo khóa (mẫu hệ thống hoặc phiên bản của tenant). */
@@ -539,8 +541,13 @@ export function templateKeys(): string[] {
 
 const KN_ROLES = ["kn_officer", "kn_province_admin", "kn_national_admin", "platform_admin"];
 const CGH_ROLES = ["cgh_viewer", "cgh_admin", "platform_admin"];
-const canExport = (p: MockPersona, t: ReportTemplate) =>
-  t.key.startsWith("cgh.") ? hasRole(p, ...CGH_ROLES) || p.me.org?.kind === "dcrd" : hasRole(p, ...KN_ROLES);
+const canExport = (p: MockPersona, t: ReportTemplate) => {
+  if (t.key.startsWith("cgh.")) return hasRole(p, ...CGH_ROLES) || p.me.org?.kind === "dcrd";
+  if (t.key.startsWith("htx.")) return hasRole(p, "coop_manager", ...KN_ROLES);
+  return hasRole(p, ...KN_ROLES);
+};
+/** Quản lý HTX thuần: số liệu HTX chỉ của HTX mình (pf/reports coopOnly). */
+const coopOnly = (p: MockPersona) => hasRole(p, "coop_manager") && !hasRole(p, ...KN_ROLES);
 
 interface StoredExport {
   exp: ReportExport;
@@ -555,11 +562,13 @@ function exportView(s: StoredExport): ReportExport {
   if (s.exp.status === "queued" && Date.now() >= s.readyAt) {
     const unit = s.exp.params.unit_code ?? "";
     const communes = COMMUNES.filter((c) => !unit || c.code === unit || c.province_code === unit);
-    const provisional = s.exp.template_key.startsWith("kn.") ? communes.some((c) => UNREPORTED_COMMUNES.has(c.code)) : false;
+    const htx = s.exp.template_key.startsWith("htx.");
+    // Sản lượng HTX: còn lô đang canh tác → tạm tính; số dòng = HTX × vụ × giống giả lập.
+    const provisional = s.exp.template_key.startsWith("kn.") ? communes.some((c) => UNREPORTED_COMMUNES.has(c.code)) : htx;
     s.exp = {
       ...s.exp,
       status: "completed",
-      row_count: communes.length,
+      row_count: htx ? (s.exp.params.variety_code ? 1 : 3) : communes.length,
       provisional,
       size_bytes: 18_432 + communes.length * 211,
       sha256: "9f2c".padEnd(64, "0"),
@@ -610,7 +619,18 @@ function requestExport(p: MockPersona, body: unknown): Response {
   if (t.status === "retired") return problem(409, "reports.template_retired", "Template retired");
   if (!t.definition.formats.includes(format)) return problem(422, "reports.format_unsupported", "Format unsupported");
   const params: ReportParams = { ...(input.params ?? {}) };
-  if (params.unit_code) {
+  if (t.key.startsWith("htx.")) {
+    // Như pf/reports: năm vụ 2000–2100; quản lý HTX chỉ HTX của mình (gán cooperative_ref).
+    if (params.season_year !== undefined && (params.season_year < 2000 || params.season_year > 2100)) {
+      return validation([{ field: "season_year", reason: "năm vụ không hợp lệ" }]);
+    }
+    if (coopOnly(p)) {
+      const own = p.me.org?.ref;
+      if (!own) return problem(403, "reports.out_of_scope", "Out of scope");
+      if (params.cooperative_ref && params.cooperative_ref !== own) return problem(403, "reports.out_of_scope", "Out of scope");
+      params.cooperative_ref = own;
+    }
+  } else if (params.unit_code) {
     const province = PROVINCES.find((x) => x.code === params.unit_code);
     const commune = COMMUNES.find((x) => x.code === params.unit_code);
     if (!province && !commune) return problem(422, "reports.unit_invalid", "Unit invalid");

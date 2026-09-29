@@ -2,17 +2,20 @@
 
 import { useState } from "react";
 import { unwrap } from "@/api/client";
+import type { ApiProblem } from "@/api/problem";
 import type { CropDashGroup } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { KpiTile, Loading, PageHead } from "@/components/ui";
 import { useCatalog } from "@/htx/common";
+import { useProductionExport } from "@/htx/production";
 import { toCsv, todayVN } from "@/htx/rules";
 import { CoopPicker, useHtxScope } from "@/htx/scope";
 import { formatDecimal, formatInt } from "@/lib/decimal";
 import { saveBlob } from "@/lib/files";
-import { useAsync } from "@/lib/useAsync";
+import { toApiProblem, useAsync } from "@/lib/useAsync";
+import { downloadExport } from "@/reports/exports";
 
 const tonnes = (kg: string | null | undefined) => (kg ? Number(kg) / 1000 : 0);
 
@@ -108,7 +111,13 @@ function pct(v: string | null | undefined): string | null {
   return v === null || v === undefined ? null : formatDecimal(v, 1);
 }
 
-/** Bảng điều hành sản xuất HTX (HTX US-DASH-01): dự kiến – thực tế, diện tích, nông hộ, tiến độ SOP; xuất CSV (US-DASH-02). */
+const EXPORT_STATUS = { queued: "Đang dựng tệp ở máy chủ…", completed: "Tệp đã sẵn sàng", failed: "Dựng tệp thất bại" } as const;
+
+/**
+ * Bảng điều hành sản xuất HTX (HTX US-DASH-01): dự kiến – thực tế, diện tích, nông hộ, tiến độ SOP.
+ * Xuất báo cáo (US-DASH-02): việc xuất mẫu `htx.production` ở pf/reports (Excel/PDF, dựng nền, khớp bộ lọc);
+ * CSV dựng trên trình duyệt CHỈ là phương án dự phòng khi API báo cáo lỗi.
+ */
 export default function CropDashboardPage() {
   const { api } = useAuth();
   const scope = useHtxScope();
@@ -139,6 +148,27 @@ export default function CropDashboardPage() {
   const groups = d.data?.[by] ?? [];
   const chart = groups.map((g) => ({ key: g.key ?? "", name: nameOf(g), expected: tonnes(g.expected_kg), actual: tonnes(g.actual_kg) }));
 
+  const rep = useProductionExport(api);
+  const [format, setFormat] = useState<"xlsx" | "pdf">("xlsx");
+  const [dlBusy, setDlBusy] = useState(false);
+  const [dlProblem, setDlProblem] = useState<ApiProblem | null>(null);
+  const filter = { coopRef: scope.coopRef, seasonCode, year, variety };
+  const startExport = () => {
+    setDlProblem(null);
+    void rep.start(format, filter);
+  };
+  const download = async (id: string) => {
+    setDlBusy(true);
+    setDlProblem(null);
+    try {
+      await downloadExport(api, id);
+    } catch (e) {
+      setDlProblem(toApiProblem(e));
+    } finally {
+      setDlBusy(false);
+    }
+  };
+
   const exportCsv = () => {
     const header = ["Nhóm", "Số vụ", "Vụ đang mở", "Vụ hoàn thành", "Nông hộ", "Diện tích (ha)", "Dự kiến (kg)", "Thực tế (kg)", "Diện tích đã thu (ha)", "Năng suất thực tế (t/ha)", "Tiến độ SOP (%)", "Nhật ký đã duyệt", "Nhật ký chờ duyệt"];
     const row = (name: string, g: CropDashGroup) => [name, g.seasons, g.open_seasons, g.completed_seasons, g.households, g.area_ha, g.expected_kg, g.actual_kg, g.harvested_area_ha, g.actual_yield_t_per_ha ?? "", g.sop_progress_pct ?? "", g.approved_logs, g.pending_logs];
@@ -159,19 +189,57 @@ export default function CropDashboardPage() {
         title="Bảng điều hành sản xuất"
         subtitle="Sản lượng dự kiến – thực tế, diện tích, nông hộ và tiến độ SOP (chỉ tính nhật ký đã duyệt)"
         actions={
-          <button type="button" className="btn btn-o btn-sm" onClick={exportCsv} disabled={!d.data}>
-            <Icon name="download" size={15} />
-            Xuất Excel (CSV)
-          </button>
+          <div className="row" style={{ alignItems: "flex-end", gap: 8 }}>
+            <div className="field">
+              <label htmlFor="d-format">Định dạng</label>
+              <select id="d-format" className="select" value={format} onChange={(e) => setFormat(e.target.value as "xlsx" | "pdf")}>
+                <option value="xlsx">Excel (.xlsx)</option>
+                <option value="pdf">PDF</option>
+              </select>
+            </div>
+            <button type="button" className="btn btn-p btn-sm" onClick={startExport} disabled={rep.busy || rep.job?.status === "queued"}>
+              <Icon name="download" size={15} />
+              {rep.busy ? "Đang gửi yêu cầu…" : "Xuất báo cáo"}
+            </button>
+          </div>
         }
       />
-      <div className="alert alert-info small" style={{ marginBottom: 14 }} role="note">
-        <Icon name="info" />
-        <span>
-          Chưa có mẫu báo cáo sản lượng HTX trong bộ máy báo cáo (pf/reports), nên tệp được dựng ngay trên trình duyệt từ số liệu đang xem, khớp đúng bộ lọc hiện hành
-          (CSV mở bằng Excel). Xuất PDF, xuất nền và lập lịch gửi báo cáo qua email sẽ có khi bổ sung mẫu báo cáo HTX.
-        </span>
-      </div>
+      <section className="card sec small" style={{ marginBottom: 14 }} aria-label="Xuất báo cáo sản lượng">
+        {!rep.job && !rep.problem ? (
+          <p role="note" style={{ margin: 0 }}>
+            Báo cáo sản lượng theo HTX × vụ × giống (Excel hoặc PDF) được dựng nền ở máy chủ theo đúng bộ lọc đang chọn; khi tệp sẵn sàng, nút tải xuất hiện tại
+            đây (liên kết tải có hạn 10 phút).
+          </p>
+        ) : null}
+        {rep.job ? (
+          <div className="row" style={{ alignItems: "center", gap: 10 }}>
+            <span role="status">
+              {rep.job.title} ({rep.job.format === "pdf" ? "PDF" : "Excel"}): {EXPORT_STATUS[rep.job.status]}
+              {rep.job.status === "completed" && rep.job.row_count !== null && rep.job.row_count !== undefined ? ` — ${formatInt(rep.job.row_count)} dòng` : ""}
+              {rep.job.provisional ? " · Số liệu tạm tính (còn lô chưa khai sản lượng)" : ""}
+            </span>
+            {rep.job.status === "completed" ? (
+              <button type="button" className="btn btn-o btn-sm" onClick={() => void download(rep.job!.id)} disabled={dlBusy}>
+                <Icon name="download" size={15} />
+                {dlBusy ? "Đang lấy liên kết…" : "Tải xuống"}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        {dlProblem ? <ProblemAlert problem={dlProblem} /> : null}
+        {rep.problem ? (
+          <div className="stack" style={{ gap: 8 }}>
+            <ProblemAlert problem={rep.problem} onRetry={startExport} />
+            <div className="row" style={{ alignItems: "center", gap: 10 }}>
+              <span>Không tạo được việc xuất trên máy chủ — có thể tải bản CSV dựng ngay trên trình duyệt từ số liệu đang xem (dự phòng).</span>
+              <button type="button" className="btn btn-o btn-sm" onClick={exportCsv} disabled={!d.data}>
+                <Icon name="download" size={15} />
+                Tải CSV dự phòng
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </section>
       <div className="card sec" style={{ marginBottom: 16 }}>
         <form className="row" role="search" style={{ alignItems: "flex-end" }} onSubmit={(e) => e.preventDefault()}>
           <CoopPicker scope={scope} />

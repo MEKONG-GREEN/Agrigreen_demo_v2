@@ -2570,6 +2570,7 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
     post:
       summary: Lập lịch gửi báo cáo (tuần/tháng, giờ Việt Nam). Người nhận là actor_ref — email tra lúc gửi, không lưu
+      description: HTX US-DASH-03 — quản lý HTX (coop_manager) lập lịch mẫu htx.production, chỉ trong HTX của mình (params.cooperative_ref được gán; HTX khác → 403).
       operationId: createReportSchedule
       tags: [reports]
       parameters:
@@ -3308,7 +3309,7 @@ components:
         title: {type: string, minLength: 5, maxLength: 200}
         source:
           type: string
-          enum: [extension.sowing, extension.growth_pest, extension.program_progress, extension.tasks_sla, extension.period_summary, mechanization.summary, mechanization.shortage_by_coop, mechanization.season_compare]
+          enum: [extension.sowing, extension.growth_pest, extension.program_progress, extension.tasks_sla, extension.period_summary, mechanization.summary, mechanization.shortage_by_coop, mechanization.season_compare, cropcycle.production]
         grouping: {type: string, enum: [national, province, commune, cooperative]}
         columns:
           type: array

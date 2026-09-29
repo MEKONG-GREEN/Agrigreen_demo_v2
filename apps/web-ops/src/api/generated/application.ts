@@ -1882,7 +1882,10 @@ export interface paths {
          */
         get: operations["listMyReportExports"];
         put?: never;
-        /** Yêu cầu xuất báo cáo (Excel/PDF) — 202 + việc xuất; worker dựng tệp. Phạm vi giải lúc yêu cầu (ADR-0009) */
+        /**
+         * Yêu cầu xuất báo cáo (Excel/PDF) — 202 + việc xuất; worker dựng tệp. Phạm vi giải lúc yêu cầu (ADR-0009)
+         * @description Mẫu htx.production (nguồn cropcycle.production — HTX US-DASH-02): sản lượng dự kiến – thực tế, diện tích, số nông hộ, tiến độ SOP theo HTX × vụ × giống, cùng số liệu bảng điều hành GET /v1/cropcycle/dashboard. Quản lý HTX chỉ xuất HTX của mình (params.cooperative_ref được gán); cán bộ KN theo phạm vi xã/tỉnh; platform_admin toàn bộ.
+         */
         post: operations["requestReportExport"];
         delete?: never;
         options?: never;
@@ -4581,7 +4584,7 @@ export interface components {
         ReportDefinition: {
             title: string;
             /** @enum {string} */
-            source: "extension.sowing" | "extension.growth_pest" | "extension.program_progress" | "extension.tasks_sla" | "extension.period_summary" | "mechanization.summary" | "mechanization.shortage_by_coop" | "mechanization.season_compare";
+            source: "extension.sowing" | "extension.growth_pest" | "extension.program_progress" | "extension.tasks_sla" | "extension.period_summary" | "mechanization.summary" | "mechanization.shortage_by_coop" | "mechanization.season_compare" | "cropcycle.production";
             /** @enum {string} */
             grouping: "national" | "province" | "commune" | "cooperative";
             columns: components["schemas"]["ReportColumn"][];
@@ -4625,6 +4628,13 @@ export interface components {
              */
             run_id?: string;
             machine_type?: string;
+            /**
+             * Format: uuid
+             * @description HTX US-DASH-02 (cropcycle.production): lọc HTX. Quản lý HTX luôn là HTX của mình (HTX khác → 403 reports.out_of_scope)
+             */
+            cooperative_ref?: string;
+            /** @description HTX US-DASH-02 (cropcycle.production): lọc giống lúa */
+            variety_code?: string;
         };
         ReportExport: {
             /** Format: uuid */

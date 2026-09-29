@@ -54,6 +54,7 @@ type fixture struct {
 	org      *orgTree
 	ext      *fakeExt
 	mech     *fakeMech
+	cc       *fakeCC
 	store    *objstore.Local
 	storeDir string
 	mailer   *fakeMailer
@@ -66,6 +67,7 @@ func newFixture(t *testing.T, withDirectory bool) *fixture {
 	f := &fixture{t: t, env: env, iss: authztest.New(t), clk: clock.NewFixed(t0), params: &fakeParams{v: map[string]decimal.Decimal{}},
 		org: newOrgTree(), ext: &fakeExt{}, mailer: &fakeMailer{}, tenant: ids.New(), storeDir: t.TempDir()}
 	f.mech = newFakeMech(f.org.coop)
+	f.cc = newFakeCC(f.org.coop, f.org.coopCaiKhe)
 	f.pool = env.Pool(t, migrations.PF, reports.DBRole)
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	st, err := objstore.NewLocal(f.storeDir, objstore.LocalOptions{PresignSecret: []byte("reports-test-presign-secret-32-bytes!"), BaseURL: "http://files.test"})
@@ -75,7 +77,7 @@ func newFixture(t *testing.T, withDirectory bool) *fixture {
 	f.store = st
 	f.dir = fakeDirectory{emails: map[uuid.UUID]string{}}
 	deps := reports.Deps{Scope: f.org, Orgs: f.org, Units: newFakeUnits(), Params: f.params, Catalogs: fakeCatalogs{}, Store: st,
-		Extension: f.ext, Mechanization: f.mech, Mailer: f.mailer, LinkBase: "https://ops.test"}
+		Extension: f.ext, Mechanization: f.mech, CropCycle: f.cc, Mailer: f.mailer, LinkBase: "https://ops.test"}
 	if withDirectory {
 		deps.Directory = f.dir
 	}
