@@ -47,6 +47,7 @@ type fixture struct {
 	store   *objstore.Local
 	scopes  *fakeScopes
 	consent *fakeConsent
+	params  *fakeParams
 	tenant  uuid.UUID
 	// tổ chức mẫu: tỉnh 89 (xã 30001, 30002), tổ xã 30001, TW
 	p89, t30001, national uuid.UUID
@@ -61,8 +62,8 @@ func newFixture(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scopes, consent := newFakeScopes(), newFakeConsent()
-	mod := mrv.New(pool, clock.System{}, mrv.Deps{Scope: scopes, Consent: consent, Store: st})
+	scopes, consent, params := newFakeScopes(), newFakeConsent(), newFakeParams()
+	mod := mrv.New(pool, clock.System{}, mrv.Deps{Scope: scopes, Consent: consent, Store: st, Params: params})
 	log := telemetry.NewLogger("test", io.Discard)
 	appEng := httpx.NewEngine(log, 1<<20)
 	mod.RegisterApp(appEng.Group("/v1", httpx.Authenticate(iss.Verifier()), idempotency.Middleware(ops)))
@@ -72,7 +73,7 @@ func newFixture(t *testing.T) *fixture {
 	t.Cleanup(appSrv.Close)
 	t.Cleanup(adminSrv.Close)
 	f := &fixture{t: t, iss: iss, app: appSrv, admin: adminSrv, mod: mod, pool: pool, store: st, scopes: scopes,
-		consent: consent, tenant: ids.New(), p89: ids.New(), t30001: ids.New(), national: ids.New()}
+		consent: consent, params: params, tenant: ids.New(), p89: ids.New(), t30001: ids.New(), national: ids.New()}
 	scopes.set(f.p89, authz.Scope{Units: []string{"89", "30001", "30002"}})
 	scopes.set(f.t30001, authz.Scope{Units: []string{"30001"}})
 	scopes.set(f.national, authz.Scope{All: true})
@@ -165,8 +166,8 @@ func (f *fixture) approveSeed(tid uuid.UUID) {
 	r := setter.adm(http.MethodPost, "/v1/mrv/catalog/seed", nil)
 	expect(f.t, r, 200, "")
 	items, _ := r.body["items"].([]any)
-	if len(items) != 2 {
-		f.t.Fatalf("seed phải tạo 2 danh mục: %v", r.body)
+	if len(items) != 4 {
+		f.t.Fatalf("seed phải tạo 4 danh mục: %v", r.body)
 	}
 	for _, it := range items {
 		v, _ := it.(map[string]any)["version"].(map[string]any)

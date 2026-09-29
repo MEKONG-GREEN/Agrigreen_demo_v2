@@ -9,6 +9,8 @@ import (
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
+	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation"
 	simport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
@@ -27,7 +29,9 @@ type Consumer struct {
 //   - pf.mechanization.area_sync: diện tích vụ App HTX → CGH (CGH FN-07, QT-03);
 //   - pf.geo.hub_valve: van công bố MKG hub_facility / hub_capacity → mô hình đọc hub;
 //   - pf.cropcycle.gps_log, pf.extension.gps_log: log GPS sau commit (HTX US-GPS-03);
-//   - pf.simulation.snapshot: ảnh chụp đầu vào qua SupplySource + WaterwayRouter.
+//   - pf.simulation.snapshot: ảnh chụp đầu vào qua SupplySource + WaterwayRouter;
+//   - pf.mrv.farm_log_link, pf.mrv.collection_evidence (G3): liên kết nhật ký HTX / van
+//     mrv_collection_evidence → pf/mrv, ước tính CO2 TẠM đọc tham số masterdata.
 var Consumers = []Consumer{
 	{Name: mechport.AreaSyncConsumer, Role: mechanization.DBRole, Events: []string{ccport.EventCoopSeasonAreaChanged},
 		Handler: func(m Modules) inbox.Handler { return m.Mechanization.AreaSyncHandler() }},
@@ -39,4 +43,8 @@ var Consumers = []Consumer{
 		Handler: func(m Modules) inbox.Handler { return m.Extension.GpsLogHandler() }},
 	{Name: simport.SnapshotConsumer, Role: simulation.DBRole, Events: []string{simport.EventRunSubmitted},
 		Handler: func(m Modules) inbox.Handler { return m.Simulation.SnapshotHandler() }},
+	{Name: mrvport.FarmLogLinkConsumer, Role: mrv.DBRole, Events: mrvport.FarmLogLinkEvents,
+		Handler: func(m Modules) inbox.Handler { return m.MRV.FarmLogLinkHandler() }},
+	{Name: mrvport.CollectionEvidenceConsumer, Role: mrv.DBRole, Events: mrvport.CollectionEvidenceEvents,
+		Handler: func(m Modules) inbox.Handler { return m.MRV.CollectionEvidenceHandler() }},
 }

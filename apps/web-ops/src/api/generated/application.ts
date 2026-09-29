@@ -544,7 +544,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Yêu cầu xuất gói bằng chứng (mục 12) — 202 + job; worker dựng gói, lưu kèm băm ảnh chụp dữ liệu */
+        /**
+         * Yêu cầu xuất gói bằng chứng (mục 12) — 202 + job; worker dựng gói, lưu kèm băm ảnh chụp dữ liệu
+         * @description G3: khi bộ lọc không giới hạn evidence_type/review_status, ảnh chụp có thêm farm_logs (liên kết nhật ký HTX, phiên bản danh mục đã ghim), collection_evidence (bậc khối lượng qua van), comparisons (KN US-MRV-02) và estimates (rule_version + phiên bản tham số, official); gói có estimates_provisional = true khi còn ước tính tạm. Các phần này lọc theo phạm vi xã và season_code; dữ liệu G3 ghi sau as_of không làm đổi snapshot_sha256.
+         */
         post: operations["requestMrvExport"];
         delete?: never;
         options?: never;
@@ -597,6 +600,120 @@ export interface paths {
         get: operations["verifyMrvExport"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mrv/completeness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tình trạng bằng chứng theo thửa/vụ trong phạm vi (mục danh mục có/đã duyệt/thiếu, cờ bất thường FR-08)
+         * @description Vai mrv_collector, mrv_reviewer, mrv_viewer, mrv_exporter; phạm vi xã (ADR-0009). Vụ lấy từ sổ tham chiếu vụ (consumer pf.mrv.farm_log_link). anomaly=true chỉ trả vụ đang mở không có bản ghi mới ≥ mrv.anomaly_no_record_days ngày.
+         */
+        get: operations["listMrvCompleteness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mrv/seasons/{id}/completeness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tình trạng bằng chứng của một thửa/vụ */
+        get: operations["getMrvSeasonCompleteness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mrv/seasons/{id}/comparison": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Đối chiếu song song nhật ký HTX ↔ minh chứng cán bộ KN của thửa/vụ (KN US-MRV-02)
+         * @description Mỗi nhật ký HTX hiện hành kèm gợi ý tự động (match / mismatch / unverified) theo thửa, vụ và cửa sổ ± mrv.compare_window_days ngày, cùng kết quả cán bộ đã xác nhận (result, confirmed).
+         */
+        get: operations["getMrvSeasonComparison"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mrv/comparisons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cán bộ KN đánh dấu Khớp/Khác biệt, gắn với bản ghi MRV tương ứng (KN US-MRV-02)
+         * @description Vai mrv_collector, trong phạm vi. evidence_id là bản hiện hành của minh chứng cán bộ cùng thửa và vụ. mismatch bắt buộc note. Sửa kết quả = bản ghi bù (supersedes_id + correction_reason ≥ 10 ký tự).
+         */
+        post: operations["recordMrvComparison"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mrv/estimates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ước tính CO2 mới nhất theo thửa/vụ — TẠM, chờ khách ký phương pháp
+         * @description rule_version mrv.co2.estimate.v1: tấn tính = cận dưới bậc khối lượng của bằng chứng thu gom (van mrv_collection_evidence), chỉ khi thửa/vụ có minh chứng cán bộ "Đạt chuẩn" (KN US-MRV-05); tránh đốt = tấn × mrv.co2.open_burning_kg_per_t. status = official chỉ khi có phương pháp ĐÃ DUYỆT ghim đúng phiên bản các tham số đã duyệt đã dùng; ngược lại provisional kèm nhãn "Tạm — chờ khách ký phương pháp". Không số nào là chính thức ở G3 trước khi C-1 và phương pháp được ký.
+         */
+        get: operations["listMrvEstimates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mrv/seasons/{id}/estimate/recompute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tính lại ước tính của một vụ (vai mrv_reviewer) — cùng đầu vào không ghi thêm dòng */
+        post: operations["recomputeMrvEstimate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3727,6 +3844,171 @@ export interface components {
             error_code: string | null;
             /** Format: date-time */
             completed_at: string | null;
+        };
+        MrvSeason: {
+            /** Format: uuid */
+            season_ref: string;
+            /** Format: uuid */
+            plot_ref: string;
+            commune_code: string;
+            season_code: string;
+            season_year: number;
+            /** @enum {string} */
+            status: "open" | "completed" | "cancelled";
+            /** Format: date */
+            sowing_date: string | null;
+        };
+        MrvParamUse: {
+            key: string;
+            /** @description 0 khi source = default */
+            version: number;
+            /** @description Số thập phân dạng chuỗi */
+            value: string;
+            unit: string;
+            /**
+             * @description default = chưa có bản duyệt, dùng mặc định prototype (không bao giờ chính thức)
+             * @enum {string}
+             */
+            source: "approved" | "default";
+        };
+        MrvEstimateInput: {
+            /** Format: uuid */
+            evidence_ref: string;
+            revision: number;
+            collected_kg_bucket: string;
+            bucket_rule_version: string;
+            /** Format: date */
+            collected_on: string;
+            counted: boolean;
+            /** @description Cận dưới bậc (t); "0" khi không tính */
+            tonnes: string;
+            /** @description chua_co_minh_chung_dat_chuan | bac_khong_hop_le */
+            exclusion?: string;
+        };
+        MrvEstimate: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            season_ref: string;
+            /** Format: uuid */
+            plot_ref: string;
+            commune_code: string;
+            season_code: string;
+            /** @example mrv.co2.estimate.v1 */
+            rule_version: string;
+            input_sha256: string;
+            counted_tonnes: string;
+            avoided_burning_kgco2e: string;
+            transport_kgco2e: string | null;
+            /** @enum {string} */
+            transport_status: "computed" | "no_leg_data";
+            inputs: components["schemas"]["MrvEstimateInput"][];
+            params: components["schemas"]["MrvParamUse"][];
+            /** @enum {string} */
+            status: "provisional" | "official";
+            official: boolean;
+            label: string;
+            /** Format: uuid */
+            method_version_id: string | null;
+            /** Format: date-time */
+            computed_at: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            supersedes_id: string | null;
+            seq: number;
+        };
+        MrvCompletenessItem: {
+            /** @description Loại minh chứng, htx_farm_log hoặc collection_evidence */
+            key: string;
+            /** @enum {string} */
+            source: "kn_evidence" | "htx_farm_log" | "collection_evidence";
+            catalog_version: number | null;
+            /** @enum {string} */
+            status: "missing" | "present" | "approved" | "rejected";
+            count: number;
+            approved_count: number;
+        };
+        MrvCompleteness: {
+            season: components["schemas"]["MrvSeason"];
+            items: components["schemas"]["MrvCompletenessItem"][];
+            /** @description Có minh chứng cán bộ Đạt chuẩn (KN US-MRV-05) */
+            counts_toward_estimate: boolean;
+            anomaly: {
+                /** @description KN FR-08: vụ đang mở, không có bản ghi mới ≥ threshold_days */
+                no_record: boolean;
+                /** Format: date-time */
+                last_record_at: string | null;
+                days_since: number;
+                threshold_days: number;
+            };
+            estimate: components["schemas"]["MrvEstimate"] | null;
+        };
+        MrvComparison: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            evidence_id: string;
+            /** Format: uuid */
+            log_ref: string;
+            /** Format: uuid */
+            log_id: string;
+            /** Format: uuid */
+            season_ref: string;
+            /** @enum {string} */
+            result: "match" | "mismatch";
+            note: string | null;
+            file_refs: components["schemas"]["MrvFileRef"][];
+            /** Format: uuid */
+            compared_by: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            supersedes_id: string | null;
+            correction_reason: string | null;
+        };
+        MrvOfficerRecord: {
+            /** Format: uuid */
+            evidence_id: string;
+            /** Format: uuid */
+            root_id: string;
+            evidence_type: string;
+            activity_code: string;
+            /** Format: date-time */
+            event_time: string;
+            /** @enum {string} */
+            review_status: "pending" | "accepted" | "rejected";
+        };
+        MrvComparisonView: {
+            season: components["schemas"]["MrvSeason"];
+            window_days: number;
+            officer_records: components["schemas"]["MrvOfficerRecord"][];
+            lines: {
+                /** Format: uuid */
+                log_ref: string;
+                /** Format: uuid */
+                log_id: string;
+                log_version: number;
+                activity_code: string;
+                /** Format: date-time */
+                log_event_time: string;
+                location_status: string;
+                htx_review_decision: string | null;
+                /** @description Phiên bản danh mục htx_farm_log đã duyệt được ghim lúc liên kết */
+                catalog_version: number | null;
+                /** @enum {string} */
+                suggested: "match" | "mismatch" | "unverified";
+                suggested_officer_record: components["schemas"]["MrvOfficerRecord"] | null;
+                /**
+                 * @description Kết quả cán bộ xác nhận mới nhất, hoặc gợi ý
+                 * @enum {string}
+                 */
+                result: "match" | "mismatch" | "unverified";
+                confirmed: boolean;
+                comparisons: components["schemas"]["MrvComparison"][];
+            }[];
         };
         /**
          * @description procedure = quy trình kỹ thuật chuẩn quốc gia; supplement = hướng dẫn đặc thù địa phương gắn quy trình gốc; alert = cảnh báo khẩn (phát thông báo đẩy theo vùng)
@@ -7045,6 +7327,204 @@ export interface operations {
             };
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+        };
+    };
+    listMrvCompleteness: {
+        parameters: {
+            query?: {
+                admin_unit_code?: string;
+                season_code?: string;
+                plot_ref?: string;
+                anomaly?: boolean;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trang kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MrvCompleteness"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getMrvSeasonCompleteness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description season_ref */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tình trạng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MrvCompleteness"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getMrvSeasonComparison: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description season_ref */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bảng đối chiếu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MrvComparisonView"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    recordMrvComparison: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    season_ref: string;
+                    /** Format: uuid */
+                    log_ref: string;
+                    /** Format: uuid */
+                    evidence_id: string;
+                    /** @enum {string} */
+                    result: "match" | "mismatch";
+                    note?: string | null;
+                    file_refs?: {
+                        /** Format: uuid */
+                        file_ref: string;
+                        sha256: string;
+                    }[];
+                    /** Format: uuid */
+                    supersedes_id?: string | null;
+                    correction_reason?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MrvComparison"];
+                };
+            };
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MrvComparison"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listMrvEstimates: {
+        parameters: {
+            query?: {
+                season_ref?: string;
+                admin_unit_code?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trang kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MrvEstimate"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    recomputeMrvEstimate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description season_ref */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ước tính hiện hành (null khi vụ chưa có bằng chứng thu gom) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        estimate: components["schemas"]["MrvEstimate"] | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
         };
     };
     listDocuments: {

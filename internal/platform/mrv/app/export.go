@@ -289,6 +289,9 @@ func buildSnapshot(ctx context.Context, tx pgx.Tx, j domain.ExportJob) (domain.S
 		}
 		snap.Catalogs = append(snap.Catalogs, snapshotCatalog(*cat))
 	}
+	if err := addG3Sections(ctx, tx, j, &snap); err != nil {
+		return domain.Snapshot{}, err
+	}
 	snap.Sort()
 	return snap, nil
 }

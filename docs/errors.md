@@ -109,6 +109,13 @@ Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính m�
 | 404 | `mrv.export_not_found` | pf/mrv: không có yêu cầu xuất, hoặc bộ lọc của job vượt phạm vi người gọi |
 | 409 | `mrv.export_not_ready` | pf/mrv: gói chưa dựng xong (`queued`) hoặc job hỏng (`failed`) |
 | 503 | `mrv.dependency_unavailable` | pf/mrv: chưa nối phạm vi, kiểm đồng ý hoặc kho đối tượng |
+| 404 | `mrv.season_not_found` | pf/mrv G3: vụ chưa được liên kết (chưa nhận `pf.cropcycle.season.*`) hoặc nằm ngoài phạm vi đọc (không lộ sự tồn tại) |
+| 404 | `mrv.farm_log_not_found` | pf/mrv G3: nhật ký HTX (`log_ref`) chưa được liên kết vào vụ này |
+| 409 | `mrv.comparison_exists` | pf/mrv G3 (KN US-MRV-02): cặp nhật ký ↔ minh chứng đã có kết quả đối chiếu — sửa bằng bản ghi bù (`supersedes_id` + `correction_reason`) |
+| 409 | `mrv.comparison_superseded` | pf/mrv G3: `supersedes_id` trỏ tới kết quả đối chiếu đã có bản ghi bù mới hơn |
+| 404 | `mrv.comparison_not_found` | pf/mrv G3: `supersedes_id` không tồn tại hoặc không thuộc cặp nhật ký ↔ minh chứng này |
+| 404 | `mrv.method_not_found` | pf/mrv G3 (Admin API): không có phiên bản phương pháp ước tính |
+| 409 | `mrv.method_invalid_transition` | pf/mrv G3: phiên bản phương pháp đã duyệt/từ chối (bất biến) |
 
 Tự phê duyệt phiên bản danh mục trường MRV của chính mình trả mã chung `self_approval_forbidden` (R-56).
 | 404 | `content.document_not_found` | pf/content: không có tài liệu, chưa xuất bản/đã gỡ (bề mặt người đọc), hoặc ngoài phạm vi (không lộ sự tồn tại) |

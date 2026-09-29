@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -46,6 +47,9 @@ type Service struct {
 	Scope   partyport.ScopeResolver
 	Consent partyport.ConsentChecker
 	Store   objstore.Store
+	// Params: tham số masterdata đã duyệt (hệ số CO2, ngưỡng FR-08, cửa sổ đối chiếu).
+	// nil → mặc định trong mã, ước tính không bao giờ chính thức.
+	Params mdport.Params
 }
 
 func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) error {

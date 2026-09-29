@@ -3,9 +3,13 @@ package handler_test
 import (
 	"context"
 	"sync"
+	"time"
+
+	"github.com/shopspring/decimal"
 
 	"github.com/google/uuid"
 
+	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -65,3 +69,29 @@ func (f *fakeConsent) HasConsent(ctx context.Context, subject uuid.UUID, purpose
 }
 
 var _ partyport.ConsentChecker = (*fakeConsent)(nil)
+
+// fakeParams giả masterdata Params: tham số "đã duyệt" theo khóa kèm phiên bản.
+type fakeParams struct {
+	mu   sync.Mutex
+	vals map[string]mdport.ParamValue
+}
+
+func newFakeParams() *fakeParams { return &fakeParams{vals: map[string]mdport.ParamValue{}} }
+
+func (f *fakeParams) set(key, v string, version int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.vals[key] = mdport.ParamValue{Key: key, Value: decimal.RequireFromString(v), Version: version}
+}
+
+func (f *fakeParams) At(_ context.Context, key string, _ time.Time) (mdport.ParamValue, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	v, ok := f.vals[key]
+	if !ok {
+		return mdport.ParamValue{}, mdport.ErrParamNotFound
+	}
+	return v, nil
+}
+
+var _ mdport.Params = (*fakeParams)(nil)

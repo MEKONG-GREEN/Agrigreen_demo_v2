@@ -818,6 +818,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/mrv/methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách phiên bản phương pháp (param_setter, param_approver) */
+        get: operations["listMrvMethods"];
+        put?: never;
+        /**
+         * Đề xuất phương pháp ước tính CO2 (vai param_setter) — ghim phiên bản tham số masterdata; trạng thái submitted
+         * @description Chờ khách ký phương pháp (C-1). Ước tính chỉ "chính thức" khi có phương pháp ĐÃ DUYỆT (người duyệt ≠ người đề xuất, R-56) cùng rule_version và mọi tham số đã dùng là bản đã duyệt đúng phiên bản được ghim.
+         */
+        post: operations["proposeMrvMethod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mrv/methods/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt phương pháp (vai param_approver; không được là người đề xuất) */
+        post: operations["approveMrvMethod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mrv/methods/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Từ chối phương pháp (vai param_approver; bắt buộc lý do) */
+        post: operations["rejectMrvMethod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/documents": {
         parameters: {
             query?: never;
@@ -2836,6 +2891,30 @@ export interface components {
             help_vi: string | null;
             position: number;
             reserved: boolean;
+        };
+        MrvParamPin: {
+            /** @example mrv.co2.open_burning_kg_per_t */
+            key: string;
+            version: number;
+        };
+        MrvMethodVersion: {
+            /** Format: uuid */
+            id: string;
+            rule_version: string;
+            version: number;
+            /** @enum {string} */
+            status: "submitted" | "approved" | "rejected";
+            params: components["schemas"]["MrvParamPin"][];
+            source_note: string;
+            /** Format: uuid */
+            setter_ref: string;
+            /** Format: uuid */
+            approver_ref: string | null;
+            /** Format: date-time */
+            decided_at: string | null;
+            decision_note: string | null;
+            /** Format: date-time */
+            created_at: string;
         };
         MrvCatalogVersion: {
             /** Format: uuid */
@@ -5347,6 +5426,143 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MrvCatalogVersion"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listMrvMethods: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trang kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MrvMethodVersion"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    proposeMrvMethod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example mrv.co2.estimate.v1 */
+                    rule_version: string;
+                    /** @description Văn bản phương pháp đã ký */
+                    source_note: string;
+                    params: components["schemas"]["MrvParamPin"][];
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MrvMethodVersion"];
+                };
+            };
+            /** @description Đã đề xuất */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MrvMethodVersion"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    approveMrvMethod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["VersionID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã duyệt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MrvMethodVersion"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    rejectMrvMethod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["VersionID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    note: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã từ chối */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MrvMethodVersion"];
                 };
             };
             403: components["responses"]["Problem"];

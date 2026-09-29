@@ -40,5 +40,32 @@
       {"key": "gps", "label_vi": "Toạ độ lúc kiểm tra", "data_type": "geo_point", "required": true},
       {"key": "note", "label_vi": "Ghi chú", "data_type": "text", "required": false, "max": "1000"}
     ]
+    },
+  {
+    "evidence_type": "straw_handling",
+    "provisional": true,
+    "source_note": "Danh mục mẫu G3 — TẠM, chờ chốt C-1. Theo KN FR-07: cán bộ ghi nhận xử lý rơm rạ tại thửa (kèm ảnh + toạ độ) làm bằng chứng tránh đốt lộ thiên.",
+    "fields": [
+      {"key": "plot_ref", "label_vi": "Thửa ruộng", "data_type": "text", "required": true},
+      {"key": "season", "label_vi": "Vụ", "data_type": "text", "required": true},
+      {"key": "handling_method", "label_vi": "Cách xử lý rơm", "data_type": "enum", "required": true,
+       "enum_values": ["cuon_thu_gom", "vui_lap", "u_phan", "de_lai_ruong", "dot"]},
+      {"key": "observed_burning", "label_vi": "Có dấu hiệu đốt rơm", "data_type": "boolean", "required": true},
+      {"key": "photo", "label_vi": "Ảnh hiện trường", "data_type": "photo", "required": true, "min": "1", "max": "10"},
+      {"key": "gps", "label_vi": "Toạ độ lúc chụp", "data_type": "geo_point", "required": true},
+      {"key": "note", "label_vi": "Ghi chú", "data_type": "text", "required": false, "max": "1000"}
+    ]
+  },
+  {
+    "evidence_type": "htx_farm_log",
+    "provisional": true,
+    "source_note": "Danh mục mẫu G3 — TẠM, chờ chốt C-1. Nhật ký canh tác App HTX liên kết làm tham chiếu bằng chứng (KN FR-06, US-MRV-02); nội dung nhật ký ở pf/cropcycle, liên kết ghim phiên bản danh mục này.",
+    "fields": [
+      {"key": "plot_ref", "label_vi": "Thửa ruộng", "data_type": "text", "required": true},
+      {"key": "season", "label_vi": "Vụ", "data_type": "text", "required": true},
+      {"key": "activity_code", "label_vi": "Hoạt động", "data_type": "enum", "required": true,
+       "enum_values": ["lam_dat", "gieo_sa", "tuoi_nuoc", "bon_phan", "phun_thuoc", "kiem_tra", "thu_hoach"]},
+      {"key": "log_ref", "label_vi": "Mã nhật ký HTX", "data_type": "text", "required": true}
+    ]
   }
 ]

@@ -10,6 +10,7 @@ package mrv
 import (
 	"github.com/gin-gonic/gin"
 
+	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/handler"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -31,6 +32,8 @@ type Deps struct {
 	Consent partyport.ConsentChecker
 	// Store: kho đối tượng cho gói xuất (packages/<tenant>/<export_id>.json).
 	Store objstore.Store
+	// Params: tham số đã duyệt của pf/masterdata (G3: hệ số CO2, FR-08, cửa sổ đối chiếu).
+	Params mdport.Params
 }
 
 // Module là pf/mrv đã nối.
@@ -40,7 +43,7 @@ type Module struct{ svc *app.Service }
 // xuất gói chỉ dùng giao dịch do inbox.Process mở. Thiếu phụ thuộc → 503
 // mrv.dependency_unavailable ở thao tác cần nó.
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
-	return &Module{svc: &app.Service{DB: db, Clock: clk, Scope: deps.Scope, Consent: deps.Consent, Store: deps.Store}}
+	return &Module{svc: &app.Service{DB: db, Clock: clk, Scope: deps.Scope, Consent: deps.Consent, Store: deps.Store, Params: deps.Params}}
 }
 
 // RegisterApp gắn route Application API.
@@ -58,3 +61,11 @@ func (m *Module) SyncSource() syncport.Source { return app.CatalogSource{Svc: m.
 // ExportHandler là inbox.Handler của worker cho pf.mrv.export.requested
 // (consumer port.ExportConsumer, pool vai mrv_app).
 func (m *Module) ExportHandler() inbox.Handler { return m.svc.HandleExportRequested }
+
+// FarmLogLinkHandler là inbox.Handler của consumer port.FarmLogLinkConsumer (G3):
+// tham chiếu vụ + liên kết nhật ký HTX làm bằng chứng (KN US-MRV-02).
+func (m *Module) FarmLogLinkHandler() inbox.Handler { return m.svc.HandleFarmLogLink }
+
+// CollectionEvidenceHandler là inbox.Handler của consumer port.CollectionEvidenceConsumer
+// (G3): van mrv_collection_evidence, kiểm hợp đồng lúc chạy.
+func (m *Module) CollectionEvidenceHandler() inbox.Handler { return m.svc.HandleCollectionEvidence }
