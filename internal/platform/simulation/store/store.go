@@ -247,6 +247,24 @@ func ScenarioByID(ctx context.Context, tx pgx.Tx, id uuid.UUID, forUpdate bool) 
 	return &s, nil
 }
 
+// ListScenarios liệt kê kịch bản theo mã tăng dần kèm Hub đang gán; after = mã cuối trang trước (cursor).
+func ListScenarios(ctx context.Context, tx pgx.Tx, after string, limit int) ([]domain.Scenario, error) {
+	rows, err := tx.Query(ctx, "SELECT "+scnCols+" FROM pf_simulation.scenario WHERE code > $1 ORDER BY code LIMIT $2", after, limit)
+	if err != nil {
+		return nil, err
+	}
+	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (domain.Scenario, error) { return scanScenario(r) })
+	if err != nil {
+		return nil, err
+	}
+	for i := range out {
+		if out[i].Hubs, err = ScenarioHubs(ctx, tx, out[i].ID, false); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
 const shCols = `sh.id, sh.scenario_id, sh.hub_id, h.code, ST_Y(h.location), ST_X(h.location), sh.service_radius_km, sh.design_capacity_tons,
   sh.barge_payload_tons, sh.mode_field_hub, sh.mode_hub_plant, sh.land_mode, sh.sort_order, sh.active, sh.change_id`
 

@@ -3155,6 +3155,25 @@ paths:
         "201": {description: Kịch bản, content: {application/json: {schema: {$ref: "#/components/schemas/SimScenario"}}}}
         "200": {description: Gọi lặp, content: {application/json: {schema: {$ref: "#/components/schemas/SimScenario"}}}}
         "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Liệt kê kịch bản của tenant kèm Hub đang gán (cursor theo mã) — màn hình mô phỏng web
+      operationId: listScenarios
+      tags: [simulation]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200}}
+      responses:
+        "200":
+          description: Trang kịch bản
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/SimScenario"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
   /v1/scenarios:compare:
     post:
       summary: So sánh kết quả mô phỏng (CGH FN-14) — xếp theo TCO/tấn, cột No-Hub Baseline
@@ -3833,6 +3852,86 @@ paths:
                   by_season: {type: array, items: {$ref: "#/components/schemas/CropDashGroup"}}
                   by_cooperative: {type: array, items: {$ref: "#/components/schemas/CropDashGroup"}}
         "403": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/stage-map:
+    get:
+      summary: Lớp giai đoạn mùa vụ cho web GIS — GIS US-SEASON-01 (FN-13, bản đồ nhiệt) và US-YIELD-01 (FN-14, vùng chín rộ 1–3 ngày tới)
+      description: |
+        Giai đoạn suy từ ngày của vụ (ngày sạ, cổng thu hoạch, ngày thu hoạch dự kiến của SOP đã ghim) và trạng thái vụ:
+        chuan_bi (chưa tới ngày sạ) → sinh_truong → sap_thu (đã qua cổng thu hoạch) → chin_ro (tới/qua ngày dự kiến, vụ chưa đóng)
+        → da_thu (vụ hoàn thành trong 45 ngày gần nhất). `ripening` = vụ đang mở có ngày thu hoạch dự kiến trong [date+1, date+3].
+        `expected_tons` = năng suất dự kiến App HTX gửi × diện tích (BR-48: GIS không tự dự báo; null khi App HTX chưa gửi).
+        Mỗi thửa một dòng (ưu tiên vụ đang mở), tối đa 1.000 thửa (BR-25); web ghép `plot_ref` với lớp thửa của pf/geo
+        và `cooperative_ref` với ranh giới HTX. Phạm vi như bảng điều hành (quản lý HTX chỉ HTX mình, KN theo xã, nông dân theo hộ).
+      operationId: getCropStageMap
+      parameters:
+        - {name: date, in: query, description: "Ngày tra YYYY-MM-DD (giờ Việt Nam), trong vòng một năm; mặc định hôm nay", schema: {type: string, format: date}}
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: commune_code, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 1000, default: 1000}}
+      responses:
+        "200":
+          description: Lớp giai đoạn
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [date, stages, ripening_days, plots, cooperatives, truncated, limit]
+                properties:
+                  date: {type: string, format: date}
+                  stages:
+                    type: array
+                    items:
+                      type: object
+                      required: [code, label]
+                      properties:
+                        code: {$ref: "#/components/schemas/CropStage"}
+                        label: {type: string}
+                  ripening_days:
+                    type: object
+                    required: [from, to]
+                    properties:
+                      from: {type: integer}
+                      to: {type: integer}
+                  plots:
+                    type: array
+                    items:
+                      type: object
+                      required: [plot_ref, plot_code, season_ref, cooperative_ref, commune_code, variety_code, season_status, stage, sowing_date, harvest_open_date, expected_harvest_date, days_to_harvest, ripening, area_ha, expected_tons]
+                      properties:
+                        plot_ref: {type: string, format: uuid}
+                        plot_code: {type: string}
+                        season_ref: {type: string, format: uuid}
+                        cooperative_ref: {type: string, format: uuid}
+                        commune_code: {type: string}
+                        variety_code: {type: string}
+                        season_status: {type: string, enum: [open, completed]}
+                        stage: {$ref: "#/components/schemas/CropStage"}
+                        sowing_date: {type: string, format: date}
+                        harvest_open_date: {type: string, format: date}
+                        expected_harvest_date: {type: string, format: date}
+                        days_to_harvest: {type: integer}
+                        ripening: {type: boolean}
+                        area_ha: {$ref: "#/components/schemas/Decimal"}
+                        expected_tons: {type: [string, "null"]}
+                  cooperatives:
+                    type: array
+                    items:
+                      type: object
+                      required: [cooperative_ref, commune_code, dominant_stage, stage_area_ha, plot_count, ripening_plot_count, ripening_area_ha, ripening_expected_tons, earliest_ripening_date]
+                      properties:
+                        cooperative_ref: {type: string, format: uuid}
+                        commune_code: {type: string}
+                        dominant_stage: {$ref: "#/components/schemas/CropStage"}
+                        stage_area_ha: {type: object, additionalProperties: {type: string}}
+                        plot_count: {type: integer}
+                        ripening_plot_count: {type: integer}
+                        ripening_area_ha: {$ref: "#/components/schemas/Decimal"}
+                        ripening_expected_tons: {type: [string, "null"]}
+                        earliest_ripening_date: {type: [string, "null"], format: date}
+                  truncated: {type: boolean}
+                  limit: {type: integer}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   # --- hết pf/cropcycle ---
 components:
   securitySchemes:
@@ -5868,6 +5967,10 @@ components:
         lat: {type: [string, number, "null"]}
         accuracy_m: {type: [string, number, "null"]}
         source: {type: string, enum: [device, photo_exif, manual_pick, denied, no_device]}
+    CropStage:
+      type: string
+      description: "Giai đoạn mùa vụ cho bản đồ nhiệt GIS (FN-13 B2: nâu → xanh → vàng → đỏ → xám)"
+      enum: [chuan_bi, sinh_truong, sap_thu, chin_ro, da_thu]
     CropSeasonOpenInput:
       type: object
       required: [plot_ref, season_code, season_year, variety_code, sowing_date]

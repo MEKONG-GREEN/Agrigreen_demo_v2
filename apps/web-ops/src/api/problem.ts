@@ -121,6 +121,45 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "reports.schedule_not_found": "Không tìm thấy lịch gửi.",
   "reports.unit_invalid": "Mã đơn vị hành chính không còn hiệu lực hoặc không phải tỉnh/xã.",
   "reports.dependency_unavailable": "Dịch vụ báo cáo tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+  // pf/geo G2 (ranh giới HTX, kho/Hub, sức chứa, đường bộ)
+  "geo.cooperative_boundary_not_found": "HTX chưa có ranh giới, hoặc ranh giới nằm ngoài phạm vi được phân quyền.",
+  "geo.cooperative_boundary_exists": "HTX đã có ranh giới — dùng “Sửa ranh giới” để lưu phiên bản mới kèm lý do.",
+  "geo.facility_not_found": "Không tìm thấy kho/Hub.",
+  "geo.facility_code_exists": "Mã kho/Hub đã được dùng (mã giữ mãi, kể cả khi đã ngừng dùng).",
+  "geo.hub_not_found": "Hub MKG chưa được nhận qua van công bố nên chưa nhập tay sức chứa được.",
+  "geo.road_not_found": "Không tìm thấy tuyến đường bộ.",
+  "geo.feature_state_conflict": "Trạng thái đối tượng không cho phép thao tác này (đã ngừng dùng hoặc chưa ngừng dùng). Vui lòng tải lại.",
+  "geo.capacity_nothing_to_release": "Không có số sức chứa Admin nhập tay đang áp dụng để nhả cho số đồng bộ.",
+  "geo.invalid_geometry": "Hình vẽ không hợp lệ (tự cắt, vòng sai, không khép kín hoặc quá 5.000 đỉnh).",
+  "geo.too_few_points": "Hình vẽ chưa đủ điểm phân biệt hoặc các điểm thẳng hàng.",
+  "geo.area_out_of_range": "Diện tích ngoài khoảng cho phép.",
+  "geo.cooperative_invalid": "HTX không tồn tại, đã ngừng hoạt động hoặc ngoài phạm vi.",
+  // pf/waterway
+  "waterway.segment_not_found": "Không tìm thấy tuyến sông/kênh.",
+  "waterway.structure_not_found": "Không tìm thấy công trình vượt sông.",
+  "waterway.revision_conflict": "Tuyến đã được người khác sửa. Vui lòng tải lại rồi sửa trên bản mới nhất.",
+  "waterway.segment_retired": "Tuyến đã ngừng dùng — không gắn công trình được.",
+  "waterway.structure_off_segment": "Công trình nằm quá xa tuyến (quá 500 m).",
+  "waterway.build_not_found": "Không tìm thấy lượt dựng mạng.",
+  "waterway.network_version_not_found": "Không có phiên bản mạng đường thủy với số này (hoặc chưa phát hành phiên bản nào).",
+  "waterway.version_not_publishable": "Chỉ phát hành được phiên bản ở trạng thái “Đã dựng” (phiên bản này đã phát hành hoặc đã bị thay).",
+  "waterway.params_invalid": "Tham số dựng mạng không nhất quán (ngưỡng bắt điểm/nối tự động/báo cáo, lớp phương tiện). Kiểm tra tham số đường thủy.",
+  "waterway.dependency_unavailable": "Dịch vụ mạng đường thủy tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+  // pf/simulation
+  "simulation.hub_not_found": "Không tìm thấy Hub ứng viên.",
+  "simulation.hub_retired": "Hub ứng viên đã ngừng dùng — không gán vào kịch bản được.",
+  "simulation.scenario_not_found": "Không tìm thấy kịch bản.",
+  "simulation.hub_not_attached": "Hub chưa gán (hoặc đã gỡ) khỏi kịch bản.",
+  "simulation.scenario_without_hubs": "Kịch bản chưa có Hub nào — gán ít nhất một Hub trước khi chạy mô phỏng.",
+  "simulation.baseline_scenario_invalid": "Kịch bản dùng làm baseline không tồn tại.",
+  "simulation.simulation_not_found": "Không tìm thấy lượt mô phỏng.",
+  "simulation.result_not_ready": "Lượt mô phỏng chưa có kết quả (đang chờ, đang chạy hoặc bị lỗi).",
+  "simulation.params_unapproved":
+    "Không thể đánh dấu Chính thức: ảnh chụp đầu vào còn tham số chưa có phiên bản được phê duyệt (CGH FN-01 BR-04). Kết quả vẫn dùng để tham khảo.",
+  "simulation.dependency_unavailable": "Chưa nối nguồn cung HTX × vụ cho mô phỏng. Vui lòng thử lại sau.",
+  "simulation.no_supply": "Không có HTX có toạ độ nằm trong bán kính phục vụ của các Hub.",
+  // pf/cropcycle (lớp giai đoạn mùa vụ)
+  "cropcycle.out_of_scope": "Nông hộ hoặc lô ruộng này không thuộc phạm vi quản lý của bạn.",
   too_many_requests: "Quá nhiều yêu cầu. Vui lòng đợi rồi thử lại.",
   network_error: "Không kết nối được máy chủ. Vui lòng kiểm tra mạng và thử lại.",
   invalid_response: "Máy chủ trả về dữ liệu không đúng định dạng.",
@@ -178,6 +217,8 @@ export function parseRetryAfter(value: string | null | undefined, now: number = 
 
 /** Thông báo cho người dùng: ưu tiên bảng mã; mã lạ thì dùng detail/title của server. */
 export function problemMessage(p: Pick<ProblemDetails, "code" | "status" | "detail" | "title">): string {
+  // Thông báo nghiệp vụ của 422 (vd "Vui lòng nhập đầy đủ Tên tuyến và Phân loại." — docs/errors.md) nằm ở `detail`.
+  if (p.code === "validation_failed" && p.detail) return p.detail;
   const known = PROBLEM_MESSAGES[p.code];
   if (known) return known;
   if (p.detail) return p.detail;

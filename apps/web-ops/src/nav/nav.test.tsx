@@ -81,7 +81,7 @@ describe("<Sidebar>", () => {
     render(<Sidebar groups={visibleNav(p)} pathname="/htx/123" principal={p} onLogout={() => undefined} />);
     const nav = screen.getByRole("navigation");
     expect(within(nav).getByText("1. Điều hành")).toBeInTheDocument();
-    expect(within(nav).queryByText("5. Quản trị")).toBeNull();
+    expect(within(nav).queryByText("6. Quản trị")).toBeNull();
     expect(within(nav).queryByRole("link", { name: /Bản đồ CGH/ })).toBeNull();
     expect(within(nav).getByRole("link", { name: /Quản lý HTX/ })).toHaveAttribute("aria-current", "page");
     expect(screen.getByText(/Tỉnh · Đồng Tháp/)).toBeInTheDocument();

@@ -29,6 +29,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.POST("/candidate-hubs/:id/retire", h.retireHub)
 	rg.POST(`/scenarios\:compare`, h.compare)
 	rg.POST("/scenarios", h.createScenario)
+	rg.GET("/scenarios", h.listScenarios)
 	rg.GET("/scenarios/:id", h.getScenario)
 	rg.GET("/scenarios/:id/history", h.history)
 	rg.POST("/scenarios/:id/hubs", h.attachHub)
@@ -269,6 +270,24 @@ func (h Handler) createScenario(c *gin.Context) {
 		status = http.StatusOK
 	}
 	c.JSON(status, toScenario(sc))
+}
+
+func (h Handler) listScenarios(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.Query("limit"))
+	pg, err := h.Svc.ListScenarios(c.Request.Context(), c.Query("cursor"), limit)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	items := make([]scenarioDTO, 0, len(pg.Items))
+	for _, x := range pg.Items {
+		items = append(items, toScenario(x))
+	}
+	var next *string
+	if pg.Next != "" {
+		next = &pg.Next
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": next})
 }
 
 func (h Handler) getScenario(c *gin.Context) {

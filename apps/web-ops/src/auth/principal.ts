@@ -24,6 +24,10 @@ export const ROLES = {
   deviceAdmin: "device_admin",
   geoAdmin: "geo_admin",
   plotEditor: "plot_editor",
+  coopManager: "coop_manager",
+  waterwayEditor: "waterway_editor",
+  waterwayPublisher: "waterway_publisher",
+  simulationAnalyst: "simulation_analyst",
 } as const;
 
 /** Nhãn tiếng Việt của vai realm (hiển thị; mã vai vẫn gửi nguyên văn). */
@@ -46,6 +50,9 @@ export const ROLE_LABEL: Readonly<Record<string, string>> = {
   device_admin: "Quản trị thiết bị",
   geo_admin: "Quản trị dữ liệu bản đồ",
   plot_editor: "Vẽ ranh giới thửa",
+  waterway_editor: "Biên tập mạng đường thủy",
+  waterway_publisher: "Phát hành mạng đường thủy",
+  simulation_analyst: "Phân tích mô phỏng Hub",
   vault_eraser: "Xoá định danh (RB-3)",
   consent_writer: "Ghi đồng ý",
   consent_reader: "Xem đồng ý",
