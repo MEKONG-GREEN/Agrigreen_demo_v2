@@ -1,0 +1,12 @@
+{
+  "x-event-type": "mkg.depot.stock.moved",
+  "x-schema-version": 1,
+  "x-kind": "internal",
+  "type": "object",
+  "required": ["lot_ref", "kg"],
+  "properties": {
+    "lot_ref": { "type": "string", "format": "uuid" },
+    "kg":      { "type": "string" },
+    "note":    { "type": ["string", "null"] }
+  }
+}

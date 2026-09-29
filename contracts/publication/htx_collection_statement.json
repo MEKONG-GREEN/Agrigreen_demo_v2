@@ -1,0 +1,23 @@
+{
+  "name": "htx_collection_statement",
+  "version": 1,
+  "owner": "mkg/fieldops",
+  "proposed_by": "mkg-fieldops-module-owner",
+  "approved_by": "mkg-data-steward",
+  "approved_at": "2026-09-30",
+  "event": "mkg.fieldops.htx_collection_statement.published v1",
+  "consumers": ["pf/cropcycle"],
+  "purpose": "DỰ THẢO G3-0 — người đề xuất/phê duyệt là vai giữ chỗ, MKG điền người thật khi ký (Q-MKG-08); hình thức thanh toán theo cuộn hay theo tấn chờ khách (C-4). Đối soát chéo chiều mua (mục 13.3, htx_confirmation_ref): HTX xác nhận số cuộn MKG đã gom trên từng thửa qua App HTX; xác nhận quay về MKG qua Application API công khai. Chỉ số cuộn — không có khối lượng cân, yield_kg_per_roll, giá hay khách hàng.",
+  "description": "Bảng kê số cuộn MKG đã gom trên một thửa của HTX trong một ngày. Consumer giữ bản có revision lớn nhất theo statement_ref (bản bù thay bản cũ); phát lại là idempotent theo event_id.",
+  "type": "object",
+  "required": ["statement_ref", "htx_ref", "plot_ref", "collected_on", "rolls", "revision"],
+  "properties": {
+    "statement_ref": { "type": "string", "format": "uuid" },
+    "htx_ref":       { "type": "string", "format": "uuid" },
+    "plot_ref":      { "type": "string", "format": "uuid", "description": "Thửa (plot_ref của pf/geo)" },
+    "season_ref":    { "type": ["string", "null"], "format": "uuid", "description": "Vụ (pf/cropcycle), nếu MKG biết" },
+    "collected_on":  { "type": "string", "format": "date", "description": "Ngày nghiệp vụ giờ Việt Nam" },
+    "rolls":         { "type": "integer", "description": "Số cuộn công đoạn cuối (≥ 0)" },
+    "revision":      { "type": "integer" }
+  }
+}

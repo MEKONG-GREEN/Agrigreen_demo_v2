@@ -21,6 +21,14 @@ if ((Test-Path $target) -and -not $Force) {
         [System.IO.File]::AppendAllText($target, $add, (New-Object System.Text.UTF8Encoding $false))
         Write-Host "Đã bổ sung AG_KC_CLIENT_SECRET vào $target (giá trị không in ra). Tạo lại container keycloak để nhập lại realm."
     }
+    # G3 (ADR-0018): tài khoản RabbitMQ riêng của vhost mkg.internal.
+    $have = [System.IO.File]::ReadAllText($target)
+    if ($have -notmatch '(?m)^AMQP_INTERNAL_PASSWORD=') {
+        $add = "AMQP_INTERNAL_PASSWORD=$(New-Hex 24)`n"
+        if (-not $have.EndsWith("`n")) { $add = "`n" + $add }
+        [System.IO.File]::AppendAllText($target, $add, (New-Object System.Text.UTF8Encoding $false))
+        Write-Host "Đã bổ sung AMQP_INTERNAL_PASSWORD vào $target (giá trị không in ra)."
+    }
     $rng.Dispose()
     Write-Host "Đã có $target — giữ nguyên (dùng -Force để sinh lại; khi đó chạy 'docker compose down -v' vì mật khẩu DB đã đổi)."
     # Chứng thư mTLS của bề mặt Internal (api-platform ↔ optimizer): sinh nếu còn thiếu.
@@ -34,6 +42,7 @@ $lines = @(
     "AG_DB_APP_PASSWORD=$(New-Hex 24)"
     "AG_DB_PASSWORD_VAULT_APP=$(New-Hex 24)"
     "AMQP_PASSWORD=$(New-Hex 24)"
+    "AMQP_INTERNAL_PASSWORD=$(New-Hex 24)"
     "KEYCLOAK_ADMIN_PASSWORD=$(New-Hex 24)"
     "MINIO_ROOT_PASSWORD=$(New-Hex 24)"
     "S3_APP_SECRET_KEY=$(New-Hex 24)"

@@ -14,6 +14,13 @@ if [ -f "$target" ] && [ "${1:-}" != "--force" ]; then
 ')" >> "$target"
     echo "Đã bổ sung AG_KC_CLIENT_SECRET vào $target (giá trị không in ra). Tạo lại container keycloak để nhập lại realm."
   fi
+  # G3 (ADR-0018): tài khoản RabbitMQ riêng của vhost mkg.internal.
+  if ! grep -q '^AMQP_INTERNAL_PASSWORD=' "$target"; then
+    [ -z "$(tail -c1 "$target")" ] || echo >> "$target"
+    echo "AMQP_INTERNAL_PASSWORD=$(head -c 24 /dev/urandom | od -An -v -tx1 | tr -d '
+')" >> "$target"
+    echo "Đã bổ sung AMQP_INTERNAL_PASSWORD vào $target (giá trị không in ra)."
+  fi
   echo "Đã có $target — giữ nguyên (dùng --force để sinh lại; khi đó chạy 'docker compose down -v' vì mật khẩu DB đã đổi)."
   # Chứng thư mTLS của bề mặt Internal (api-platform ↔ optimizer): sinh nếu còn thiếu.
   sh "$root/scripts/gen-dev-certs.sh"
@@ -32,6 +39,7 @@ tmp="$target.tmp.$$"
   echo "AG_DB_APP_PASSWORD=$(hex 24)"
   echo "AG_DB_PASSWORD_VAULT_APP=$(hex 24)"
   echo "AMQP_PASSWORD=$(hex 24)"
+  echo "AMQP_INTERNAL_PASSWORD=$(hex 24)"
   echo "KEYCLOAK_ADMIN_PASSWORD=$(hex 24)"
   echo "MINIO_ROOT_PASSWORD=$(hex 24)"
   echo "S3_APP_SECRET_KEY=$(hex 24)"

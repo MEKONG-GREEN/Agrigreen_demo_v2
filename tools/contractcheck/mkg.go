@@ -36,6 +36,7 @@ func (ix *index) mkgRules(ann map[string]*annotated) []string {
 	}
 	for _, sf := range ix.files {
 		if !inMKG(sf.rel) {
+			p = append(p, ix.internalKindOutsideMKG(sf)...)
 			continue
 		}
 		for _, decl := range sf.file.Decls {
@@ -115,8 +116,8 @@ func (ix *index) checkPayloads(sf *srcFile, fd *ast.FuncDecl, ann map[string]*an
 		switch s := n.(type) {
 		case *ast.AssignStmt:
 			for i, l := range s.Lhs {
-				if sel, ok := l.(*ast.SelectorExpr); ok && sel.Sel.Name == "Payload" && isEventVar(sel.X) {
-					p = append(p, fmt.Sprintf("%s: gán .Payload của outbox.Event trực tiếp trong vùng mkg — dựng outbox.Event bằng literal để kiểm được hợp đồng van", ix.pos(s.Pos())))
+				if sel, ok := l.(*ast.SelectorExpr); ok && (sel.Sel.Name == "Payload" || sel.Sel.Name == "Kind") && isEventVar(sel.X) {
+					p = append(p, fmt.Sprintf("%s: gán .%s của outbox.Event trực tiếp trong vùng mkg — dựng outbox.Event bằng literal để kiểm được hợp đồng van / sự kiện nội bộ", ix.pos(s.Pos()), sel.Sel.Name))
 				}
 				if id, ok := l.(*ast.Ident); ok && i < len(s.Rhs) && s.Tok == token.DEFINE {
 					if t := litType(s.Rhs[i]); t != nil {
@@ -134,7 +135,7 @@ func (ix *index) checkPayloads(sf *srcFile, fd *ast.FuncDecl, ann map[string]*an
 			if !isOutboxEvent(s.Type, sf) {
 				return true
 			}
-			var payload ast.Expr
+			var payload, kind ast.Expr
 			for _, el := range s.Elts {
 				kv, ok := el.(*ast.KeyValueExpr)
 				if !ok {
@@ -144,8 +145,26 @@ func (ix *index) checkPayloads(sf *srcFile, fd *ast.FuncDecl, ann map[string]*an
 				if k, ok := kv.Key.(*ast.Ident); ok && k.Name == "Payload" {
 					payload = kv.Value
 				}
+				if k, ok := kv.Key.(*ast.Ident); ok && k.Name == "Kind" {
+					kind = kv.Value
+				}
+			}
+			internal, ok := outboxKind(kind, sf)
+			if !ok {
+				p = append(p, fmt.Sprintf("%s: Kind của outbox.Event trong vùng mkg phải là hằng outbox.KindPlatform hoặc outbox.KindInternal (ADR-0018)", ix.pos(kind.Pos())))
+				return true
 			}
 			if payload == nil {
+				return true
+			}
+			if internal {
+				if msg := ix.proveInternal(payload, sf, params, locals, ann); msg != "" {
+					p = append(p, fmt.Sprintf("%s: Payload của outbox.Event nội bộ (KindInternal) %s", ix.pos(payload.Pos()), msg))
+				}
+				return true
+			}
+			if name := ix.internalPayload(payload, sf, params, locals, ann); name != "" {
+				p = append(p, fmt.Sprintf("%s: Payload %s là sự kiện nội bộ MKG (//ag:internal-event) — không được phát lên exchange nền tảng, cần Kind: outbox.KindInternal (ADR-0018)", ix.pos(payload.Pos()), name))
 				return true
 			}
 			if msg := ix.provePublication(payload, sf, params, locals, ann); msg != "" {

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/mkg.fieldops.htx_collection_statement.published/v1",
+  "title": "mkg.fieldops.htx_collection_statement.published — payload",
+  "description": "DỰ THẢO G3-0. Payload đi qua van công bố htx_collection_statement v1 (contracts/publication/htx_collection_statement.json): số cuộn MKG đã gom trên một thửa của HTX trong một ngày, để HTX xác nhận (mục 13.3). Chỉ số cuộn.",
+  "x-event-type": "mkg.fieldops.htx_collection_statement.published",
+  "x-schema-version": 1,
+  "x-producer": "mkg/fieldops",
+  "x-publication": "htx_collection_statement",
+  "type": "object",
+  "required": ["statement_ref", "htx_ref", "plot_ref", "collected_on", "rolls", "revision"],
+  "properties": {
+    "statement_ref": { "type": "string", "format": "uuid" },
+    "htx_ref":       { "type": "string", "format": "uuid" },
+    "plot_ref":      { "type": "string", "format": "uuid" },
+    "season_ref":    { "type": ["string", "null"], "format": "uuid" },
+    "collected_on":  { "type": "string", "format": "date" },
+    "rolls":         { "type": "integer" },
+    "revision":      { "type": "integer" }
+  }
+}

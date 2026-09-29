@@ -58,7 +58,7 @@ jobs:
       - name: PostgreSQL 17 + PostGIS + pgRouting
         run: |
           docker build -q -t agrigreen/postgres:ci deploy/compose/postgres
-          docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=ci-superuser agrigreen/postgres:ci
+          docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=ci-superuser agrigreen/postgres:ci -c max_locks_per_transaction=256
           for i in $(seq 1 60); do
             docker exec pg pg_isready -h 127.0.0.1 -U postgres > /dev/null 2>&1 && break
             sleep 2
@@ -70,7 +70,7 @@ jobs:
           sudo systemctl stop pgbouncer || true
           sudo mkdir -p /etc/pgbouncer-ci
           : | sudo tee /etc/pgbouncer-ci/userlist.txt > /dev/null
-          for r in platform_api worker_platform party_app masterdata_app geo_app extension_app content_app mechanization_app mrv_app sync_app accounts_app notify_app reports_app cropcycle_app waterway_app simulation_app fieldops_app hub_app mkg_api vault_app ag_outbox_publisher ag_migrator; do
+          for r in platform_api worker_platform party_app masterdata_app geo_app extension_app content_app mechanization_app mrv_app sync_app accounts_app notify_app reports_app cropcycle_app waterway_app simulation_app fieldops_app hub_app mkg_api measurement_app ingest_mkg worker_internal ingest_ts ts_reader metrics_app vault_app ag_outbox_publisher ag_migrator; do
             printf '"%s" "%s"\n' "$r" "$AG_DB_APP_PASSWORD" | sudo tee -a /etc/pgbouncer-ci/userlist.txt > /dev/null
           done
           sudo tee /etc/pgbouncer-ci/pgbouncer.ini > /dev/null <<'INI'
@@ -320,7 +320,7 @@ jobs:
     strategy:
       matrix:
         # optimizer (Python) có Dockerfile và ngữ cảnh riêng (optimizer/); còn lại build từ Dockerfile gốc với CMD.
-        cmd: [api-platform, api-internal, identity-vault, worker, outbox-publisher, migrate, optimizer]
+        cmd: [api-platform, api-internal, identity-vault, worker, worker-internal, outbox-publisher, migrate, optimizer]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -405,6 +405,12 @@ jobs:
           done
           docker compose -f "$COMPOSE_FILE" exec -T rabbitmq rabbitmqctl -q list_queues name | grep -qx pf.simulation.optimizer
           test "$(docker inspect -f '{{.State.Running}} {{.RestartCount}}' "$cid")" = "true 0"
+          # ADR-0018: vhost mkg.internal chỉ cấp quyền cho mkg_internal — tài khoản nền tảng không bind được.
+          perms=$(docker compose -f "$COMPOSE_FILE" exec -T rabbitmq rabbitmqctl -q list_permissions -p mkg.internal | awk '{print $1}')
+          echo "$perms" | grep -qx mkg_internal
+          if echo "$perms" | grep -qx agrigreen; then echo "tài khoản nền tảng có quyền trên vhost mkg.internal" >&2; exit 1; fi
+          wid=$(docker compose -f "$COMPOSE_FILE" ps -q worker-internal)
+          test "$(docker inspect -f '{{.State.Health.Status}}' "$wid")" = healthy
           # Cổng Internal 8084 KHÔNG được publish ra máy chủ.
           if docker compose -f "$COMPOSE_FILE" port api-platform 8084 2>/dev/null | grep -q .; then
             echo "8084 (Internal) bị publish ra máy chủ" >&2; exit 1
@@ -430,7 +436,7 @@ jobs:
             -v "$PWD/deploy/compose/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.10-alpine \
             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
           # Caddy không lấy được chứng chỉ trong CI — chỉ dựng phần sau nó.
-          docker compose $VPS up -d --build --wait --wait-timeout 900 api-platform api-internal optimizer worker outbox-publisher web-ops
+          docker compose $VPS up -d --build --wait --wait-timeout 900 api-platform api-internal optimizer worker worker-internal outbox-publisher web-ops
           iss=$(curl -fsS --retry 30 --retry-delay 2 --retry-all-errors http://127.0.0.1:8180/realms/agrigreen/.well-known/openid-configuration | jq -r .issuer)
           test "$iss" = "https://auth.$D/realms/agrigreen"
           curl -fsS --retry 30 --retry-delay 2 --retry-all-errors -o /dev/null http://127.0.0.1:8080/readyz

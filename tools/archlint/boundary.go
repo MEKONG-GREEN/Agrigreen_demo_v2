@@ -67,6 +67,10 @@ func runBoundary(pass *analysis.Pass) (any, error) {
 			if err != nil {
 				continue
 			}
+			if msg := edgeViolation(from.path, imp); msg != "" {
+				pass.Reportf(spec.Pos(), "%s", msg)
+				continue
+			}
 			to := locate(imp)
 			if !to.internal {
 				continue
@@ -126,6 +130,47 @@ func violation(from, to loc, imp string) string {
 var zoneRoots = []struct{ root, forbidden string }{
 	{"cmd/api-platform", "mkg"},
 	{"cmd/api-internal", "platform"},
+	// G3: đơn vị triển khai của vùng mkg (mục 5) — ingest (measurement), agent biên,
+	// worker-internal (consumer vhost mkg.internal, ADR-0018).
+	{"cmd/ingest", "platform"},
+	{"cmd/edge-agent", "platform"},
+	{"cmd/worker-internal", "platform"},
+}
+
+// edgeAgentRoot là nhị phân tĩnh ở vùng biên OT (mục 14, 17): không DB, không
+// mã nghiệp vụ, chỉ đi ra tới ingest qua mTLS.
+const edgeAgentRoot = "cmd/edge-agent"
+
+// edgeWire là hợp đồng dây edge-agent ↔ ingest: chỉ thư viện chuẩn.
+const edgeWire = "internal/mkg/measurement/port/edgewire"
+
+// edgeAgentAllowed là các package của repo mà edge-agent được import (ngoài thư viện chuẩn).
+var edgeAgentAllowed = []string{"internal/shared/clock", "internal/shared/ids", "internal/shared/mass", edgeWire}
+
+// isStdlib: đường dẫn import của thư viện chuẩn không có dấu chấm ở phần đầu.
+func isStdlib(imp string) bool {
+	first, _, _ := strings.Cut(imp, "/")
+	return !strings.Contains(first, ".")
+}
+
+// edgeViolation: cmd/edge-agent chỉ import thư viện chuẩn + edgeAgentAllowed (không pgx,
+// không DB, không module nghiệp vụ); edgewire chỉ import thư viện chuẩn (ADR-0019).
+func edgeViolation(from, imp string) string {
+	if isStdlib(imp) {
+		return ""
+	}
+	if under(from, edgeWire) {
+		return "ADR-0019: " + edgeWire + " chỉ được dùng thư viện chuẩn, không import " + imp
+	}
+	if !under(from, edgeAgentRoot) {
+		return ""
+	}
+	for _, a := range edgeAgentAllowed {
+		if imp == modulePath+"/"+a {
+			return ""
+		}
+	}
+	return "ADR-0019: " + edgeAgentRoot + " chỉ được import thư viện chuẩn, internal/shared/{clock,ids,mass} và " + edgeWire + " — không import " + imp
 }
 
 func under(pkg, root string) bool {

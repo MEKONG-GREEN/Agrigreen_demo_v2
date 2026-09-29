@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/mkg.measurement.mrv_collection_evidence.published/v1",
+  "title": "mkg.measurement.mrv_collection_evidence.published — payload",
+  "description": "DỰ THẢO G3-0 (chờ C-1). Payload đi qua van công bố mrv_collection_evidence v1 (contracts/publication/mrv_collection_evidence.json): bằng chứng thu gom rơm theo thửa/vụ với khối lượng làm tròn theo bậc — không có khối lượng chính xác.",
+  "x-event-type": "mkg.measurement.mrv_collection_evidence.published",
+  "x-schema-version": 1,
+  "x-producer": "mkg/measurement",
+  "x-publication": "mrv_collection_evidence",
+  "type": "object",
+  "required": ["evidence_ref", "plot_ref", "collected_on", "collected_kg_bucket", "bucket_rule_version", "revision"],
+  "properties": {
+    "evidence_ref":        { "type": "string", "format": "uuid" },
+    "plot_ref":            { "type": "string", "format": "uuid" },
+    "season_ref":          { "type": ["string", "null"], "format": "uuid" },
+    "collected_on":        { "type": "string", "format": "date" },
+    "collected_kg_bucket": { "type": "string", "enum": ["0-500", "500-1000", "1000-2000", "2000-5000", "5000-10000", "10000+"] },
+    "bucket_rule_version": { "type": "string" },
+    "revision":            { "type": "integer" }
+  }
+}

@@ -78,9 +78,66 @@ Quy ước và quyết định đã chốt: [docs/dev/g2-conventions.md](dev/g2-
 - **Chờ khách:** các câu hỏi G2 ở [tong-hop.md](requirements/tong-hop.md#câu-hỏi-mở-g2-29092026): nhà cung cấp thời tiết/độ mặn/tile (RB-7), nguồn thủy hệ, VN-2000, bộ 57 tham số và MILP, ngưỡng k (C-3), quy tắc duyệt, ngưỡng sản lượng, cổng thu hoạch, chính sách lưu (GPS, FN-21), khóa đăng nhập GIS. Ký ADR-0016 (giấy phép Python).
 - **Chuyển sang G3 theo lộ trình:** lớp tự nhiên và thời tiết GIS (khi có nhà cung cấp), snapshot/replay/lưu trữ GIS (FN-19..21, cùng lịch sử `pf/metrics`), RB-6 và C-4 (`mkg/measurement`), số đo của R-95.
 
-## G3–G6
+## G3: Q3/2027
+
+Phụ lục A yêu cầu ba phần:
+- `pf/metrics` có lịch sử;
+- `mkg/measurement` có đường nhận số liệu cân của khách;
+- agent biên theo mẫu cân đã chốt.
+
+Thêm vào đó là MRV và fieldops G3. Quy ước, số migration, vai, sự kiện, luật vùng: [docs/dev/g3-conventions.md](dev/g3-conventions.md). Thiết kế mkg: [docs/design/mkg.md](design/mkg.md) §5.
+
+### G3-0: nền móng và hợp đồng đóng băng (30/09/2026, xong)
+
+- [x] ADR-0017: cụm `ts` (`ag_ts`) — PostgreSQL 17 phân vùng tháng, không dùng TimescaleDB TSL. `ts/000001` tạo `ts_weigh.reading_batch` và `ts_weigh.raw_reading`, chỉ ghi thêm, RLS; `migrate maintain` tạo phân vùng tiếp theo; `migratecheck` bắt R-07 và cấm timescaledb.
+- [x] ADR-0018: vhost `mkg.internal`. Có `shared.outbox.kind`, outbox-publisher định tuyến theo `kind`, `//ag:internal-event` được `contractcheck` kiểm, và khung `cmd/worker-internal` (có trong CI images và Compose, `rabbitmq-init` gỡ quyền tài khoản nền tảng).
+- [x] ADR-0019: định danh thiết bị và đồng hồ. Hợp đồng dây `contracts/edge/batch.v1.json` kèm bộ vector, gói `edgewire` (Ed25519, dạng chuẩn); archlint giới hạn import của `cmd/edge-agent`.
+- [x] Port đóng băng: `mkg/measurement/port` (`Integrator`, `TicketWriter`, `LotMass`, `DeviceRegistry`), `mkg/fieldops/port`, `pf/metrics/port` (`Source.AsOf`, `Definition`, `LayerLog`). Sự kiện nội bộ: `weigh_ticket.recorded`, `reconciliation.completed`, `roll_count.recorded`. Van dự thảo: `collection_schedule`, `htx_collection_statement`, `mrv_collection_evidence`.
+- [x] Vai DB `ingest_ts`, `ts_reader`, `measurement_app`, `ingest_mkg`, `worker_internal`, `metrics_app` (dbadmin + PgBouncer CI/Compose); vai nghiệp vụ G3 trong realm.
+
+### G3-1: lõi backend (song song, theo hợp đồng G3-0)
+
+| Đợt | Nội dung | Migration |
+|---|---|---|
+| **A1** `mkg/measurement` | Sổ thiết bị: đăng ký, duyệt (R-56), thu hồi, kỳ đăng ký. Sổ phiếu cân (`TicketWriter`, phiếu bù) và bảng chiếu `lot_mass_current`. Bảng dung sai và định mức hao hụt sấy có phiên bản, **mặc định lấy từ prototype: cờ 5 %, nghiêm trọng 15 %**. CUSTOMER_IN nhập tay kèm bằng chứng. Đối soát tách hao hụt dự kiến và bất thường; hồ sơ tranh chấp. Van `mrv_collection_evidence` | mkg 000007–000008 |
+| **A2** `cmd/ingest` | Listener mTLS, `edgewire.Verify` bằng khóa lấy từ `DeviceRegistry.Resolve`, ghi `ts_weigh` trong một giao dịch. Gửi lặp: cùng `payload_sha256` là idempotent, khác là báo động. `Integrator` `weigh.integrate.v1` (tạm, chờ C-6) → `TicketWriter` → sự kiện nội bộ. Kiểm thử bằng bộ vector | — |
+| **A3** `cmd/edge-agent` | Đệm đĩa ≥ 72 giờ, đầy thì ngừng và báo động. Interface bộ điều hợp mẫu cân (bộ mô phỏng cho tới khi có C-6). Ký lô, đẩy qua mTLS chỉ đi ra, xóa khỏi đệm chỉ khi được xác nhận. Cập nhật có ký và lùi lại được (khung). Import chỉ theo ADR-0019 | — |
+| **A4** `mkg/fieldops` G3 | Lệnh gom có duyệt. Công đoạn đếm cuộn → tập kết → xếp (proto FM-04). kg/cuộn học theo HTX. Xác nhận của HTX. Sự kiện `roll_count.recorded`. Van `collection_schedule` và `htx_collection_statement`. Nguồn thửa/HTX là interface; dùng dữ liệu tổng hợp cho tới khi chốt cấp quyền chia sẻ RB-2 | mkg 000006 |
+| **A5** `mkg/hub` G3 | Khối lượng lô lấy từ phiếu cân (consumer worker-internal, Q-MKG-04). Kiểm kê (Q-MKG-06). Chuyển kho (Q-MKG-10). Chỗ nối `hub.risk.v2` với cảm biến (`ts_env` để dành) | mkg 000009 |
+| **A6** `pf/metrics` | Định nghĩa chỉ số là tệp khai báo có phiên bản. Giá trị theo ngày theo `AsOf`/`Cutoff`; lịch sử KPI (KN US-DASH-01/02, CGH FN-09..11). Nhật ký lớp GIS, ảnh chụp và watermark, `ReplayLayer` (GIS US-EVL-01, US-SNAP-01, US-REPLAY-01, US-RETAIN-01) | pf 000036–000037 |
+| **A7** `pf/mrv` G3 | Nhận van `mrv_collection_evidence`. Đối chiếu nhật ký HTX ↔ KN (KN US-MRV-02). Chỉ tính hồ sơ đã duyệt (KN US-MRV-05). Hệ số CO2 là tham số có phiên bản, gắn cờ "chờ ký phương pháp". Package có băm ảnh chụp | pf 000038 |
+| **A8** Tích hợp và vận hành | Nối consumer `worker-internal`. Bộ sinh dữ liệu cân, cuộn, độ ẩm theo R-95 (dữ liệu golden 5800/5700 cuộn, 96,8 t). Chỉ số nghiệp vụ: độ đầy đệm agent, tỷ lệ phiếu vượt dung sai. Khung runbook tầng lạnh (R-71, chờ C-7). R-32 cho cụm ts | dự phòng pf 000039–000042, mkg 000010–000012 |
+
+### G3-2: client và liên thông
+
+| Đợt | Nội dung |
+|---|---|
+| **B1** | App hiện trường MKG (biến thể `apps/field-app` qua `packages/agrigreen_mobile`): đếm cuộn ngoại tuyến theo công đoạn, lệnh gom được giao |
+| **B2** | `apps/htx-app`: lịch gom (van `collection_schedule`), xác nhận bảng kê số cuộn (van `htx_collection_statement` → API công khai) |
+| **B3** | Web vận hành MKG (bề mặt `api-internal`): thiết bị cân, phiếu cân, đối soát, tranh chấp, dung sai/định mức |
+| **B4** | `apps/web-ops`: bảng chỉ số có lịch sử, thanh trượt phát lại GIS theo ngày (GIS US-REPLAY-01) |
+| **B5** | `apps/web-ops`: MRV — bằng chứng thu gom, đối chiếu HTX ↔ KN, xuất package |
+| **B6** | Công cụ đăng ký thiết bị: sinh khóa và chứng thư dev (`scripts/gen-dev-certs`), CLI đăng ký, bộ mô phỏng đầu cân |
+| **B7** | Compose và CI: dịch vụ `ingest` và bộ mô phỏng edge trong `compose-smoke` (mTLS, lô đi hết tới phiếu cân) |
+| **B8** | UAT G3: bảng nghiệm thu yêu cầu → kiểm thử, kịch bản E2E cân → phiếu → đối soát → MRV |
+
+### Câu hỏi khách còn mở cho G3
+
+| # | Câu | Chặn |
+|---|---|---|
+| **C-4 (quá hạn — hạn G2)** | Bảng dung sai cân; trạng thái độ ẩm khi cân (hợp đồng prototype có trần ẩm 18 % nhưng không khấu trừ) | A1 đối soát; đang dùng mặc định từ prototype |
+| C-5 | Đường nhận số liệu cân của khách (tích hợp hệ cân hay nhập tay) | A1 CUSTOMER_IN; G3 bắt đầu bằng nhập tay kèm bằng chứng |
+| C-6 | Mẫu cân và giao thức — **hạn Q1/2027, có thời gian dẫn phần cứng** | A2 thuật toán tích phân, A3 bộ điều hợp; hợp đồng dây không đổi |
+| C-7 | Cửa sổ kiểm toán số đo thô trước khi chuyển tầng lạnh | R-71, A8 runbook tầng lạnh |
+| — | Định mức hao hụt sấy (hao hụt dự kiến HUB_IN → HUB_OUT) | A1 |
+| — | Trả tiền theo cuộn hay theo tấn nhà máy cân (prototype có cả hai; theo tấn thì đối chiếu cuộn ↔ khối lượng là kiểm RB-6) | A1, A4, van `htx_collection_statement` |
+| C-1 | Danh mục trường MRV **và** phạm vi, phương pháp tCO2e (baseline, leakage, chất khô; hệ số 1460 kgCO2e/t, 0,062 / 0,021 kgCO2e/t·km mới là tham số tạm) | A7, van `mrv_collection_evidence` |
+| RB-2 | Cấp quyền chia sẻ: tài khoản dịch vụ tenant MKG đọc thửa/HTX thuộc tenant chương trình như thế nào (cấp quyền tường minh hay vai trong tenant chương trình) | A4 nguồn thửa/HTX |
+| — | Số ngày lưu, nén, lưu trữ của nhật ký lớp GIS và ảnh chụp (GIS FN-21; HTML prototype ghi 365 ngày sự kiện, 90 ngày ảnh chụp) và của số đo thô | A6, A8 |
+| Q2-05 | Ngưỡng sản lượng theo giống | A6 chỉ số, cảnh báo cropcycle |
+
+## G4–G6
 Theo Phụ lục A của tài liệu kiến trúc:
-- **G3 (Q3/2027):** metrics, MRV, measurement, edge-agent. Mẫu cân C-6 phải chốt trước Q1/2027.
 - **G4 (Q2/2028):** Kubernetes trong lãnh thổ.
 - **G5 (Q4/2028):** Public API và metering.
 - **G6 (Q1/2029):** cấu hình Phase 1, không sửa mã.

@@ -6,6 +6,10 @@
 //     bên trong thân hàm $$...$$)
 //   - không tắt cơ chế bảo vệ: DISABLE TRIGGER, DROP TRIGGER trg_immutable/trg_chain,
 //     NO FORCE / DISABLE ROW LEVEL SECURITY, DROP POLICY p_tenant
+//   - mọi thư mục cụm có mặt trong chỉ thị go:embed của migrations/embed.go (thiếu →
+//     cụm không bao giờ được áp, pgtest và migrate up bỏ qua im lặng)
+//   - cụm ts (chuỗi thời gian, ADR-0017): không tham chiếu schema pf_* / mkg_* /
+//     vault (R-07), không CREATE EXTENSION timescaledb (TSL không dùng — RB-4)
 //
 // Chạy: go run ./tools/migratecheck migrations
 package main
@@ -40,15 +44,47 @@ func main() {
 
 var nameRe = regexp.MustCompile(`^(\d{6})_[a-z0-9_]+\.up\.sql$`)
 
+var embedRe = regexp.MustCompile(`(?m)^//go:embed\s+(.+)$`)
+
+// embedded đọc các mẫu go:embed của migrations/embed.go; nil nếu không có tệp.
+func embedded(root string) (map[string]bool, error) {
+	src, err := os.ReadFile(filepath.Join(root, "embed.go"))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]bool{}
+	for _, m := range embedRe.FindAllStringSubmatch(string(src), -1) {
+		for _, pat := range strings.Fields(m[1]) {
+			out[pat] = true
+		}
+	}
+	return out, nil
+}
+
+var (
+	tsForeignSchemaRe = regexp.MustCompile(`(?i)\b(pf_[a-z_]+|mkg_[a-z_]+|vault)\.`)
+	timescaleRe       = regexp.MustCompile(`(?is)\bCREATE\s+EXTENSION\b[^;]*\btimescaledb`)
+)
+
 func checkTree(root string) ([]string, error) {
 	var problems []string
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return nil, err
 	}
+	embeds, err := embedded(root)
+	if err != nil {
+		return nil, err
+	}
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
+		}
+		if embeds != nil && !embeds[e.Name()+"/*.sql"] {
+			problems = append(problems, fmt.Sprintf("%s: thư mục cụm %s không có trong //go:embed của embed.go — migration sẽ không bao giờ được áp", filepath.Join(root, "embed.go"), e.Name()))
 		}
 		dir := filepath.Join(root, e.Name())
 		files, err := filepath.Glob(filepath.Join(dir, "*.sql"))
@@ -75,6 +111,16 @@ func checkTree(root string) ([]string, error) {
 			}
 			for _, p := range CheckSQL(string(src)) {
 				problems = append(problems, f+": "+p)
+			}
+			if timescaleRe.MatchString(string(src)) {
+				problems = append(problems, f+": ADR-0017: không dùng extension timescaledb (tính năng TSL, RB-4) — phân vùng khai báo PostgreSQL thuần")
+			}
+			if e.Name() == "ts" {
+				for _, stmt := range Statements(string(src)) {
+					if m := tsForeignSchemaRe.FindString(stmt); m != "" {
+						problems = append(problems, fmt.Sprintf("%s: R-07: migration cụm ts không được tham chiếu schema nghiệp vụ %s (%s)", f, strings.TrimSuffix(m, "."), abbreviate(stmt)))
+					}
+				}
 			}
 		}
 	}

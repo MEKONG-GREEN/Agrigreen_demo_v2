@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events-internal/mkg.measurement.weigh_ticket.recorded/v1",
+  "title": "mkg.measurement.weigh_ticket.recorded — payload (sự kiện NỘI BỘ MKG)",
+  "description": "Một phiếu cân (hoặc phiếu bù) vừa được ghi vào sổ mkg_measurement.weigh_ticket (R-70). Chỉ phát lên vhost mkg.internal (ADR-0018) — KHÔNG BAO GIỜ lên vhost nền tảng: phiếu cân và khối lượng chính xác của lô không qua van công bố. Người nhận: mkg/hub (khối lượng lô nhận, Q-MKG-04), mkg/costing (G4).",
+  "x-event-type": "mkg.measurement.weigh_ticket.recorded",
+  "x-schema-version": 1,
+  "x-producer": "mkg/measurement",
+  "x-kind": "internal",
+  "type": "object",
+  "required": ["ticket_id", "lot_ref", "point", "route", "source", "mass_kg", "event_time"],
+  "properties": {
+    "ticket_id":     { "type": "string", "format": "uuid" },
+    "lot_ref":       { "type": "string", "format": "uuid" },
+    "point":         { "type": "string", "enum": ["HUB_IN", "HUB_OUT", "CUSTOMER_IN"] },
+    "route":         { "type": "string", "enum": ["HUB", "DIRECT"] },
+    "source":        { "type": "string", "enum": ["edge", "customer_integration", "manual_evidence"] },
+    "mass_kg":       { "type": "string", "pattern": "^[0-9]+\\.[0-9]{3}$" },
+    "moisture_pct":  { "type": ["string", "null"], "pattern": "^[0-9]{1,3}\\.[0-9]{2}$" },
+    "event_time":    { "type": "string", "format": "date-time" },
+    "rule_version":  { "type": ["string", "null"], "description": "Phiên bản thuật toán tích phân (bắt buộc khi source = edge)" },
+    "supersedes_id": { "type": ["string", "null"], "format": "uuid", "description": "Phiếu bù: phiếu bị thay" }
+  }
+}

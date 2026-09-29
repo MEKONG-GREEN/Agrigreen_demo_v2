@@ -20,6 +20,13 @@ Danh sách hàng đợi duy nhất là `assembly.Queues()` (`cmd/api-platform/as
 
 Kiểm thử `cmd/worker` `TestWorkerConsumersDeclaredByPublisher` đòi mọi consumer của worker có trong `assembly.Queues()` với đúng các sự kiện — thêm consumer mới thì thêm vào `Queues()` (thường là tự động: consumer pf/notify lấy từ `notify.Module.Consumers()`, consumer liên module từ `assembly.Consumers`).
 
+### Vhost nội bộ MKG `mkg.internal` (G3, ADR-0018)
+
+- Sự kiện `shared.outbox.kind = internal` của cụm mkg được phát lên vhost riêng `mkg.internal`, không lên vhost nền tảng. Kết nối là `AG_AMQP_INTERNAL_URL`, tài khoản `mkg_internal`. Tài khoản nền tảng (`agrigreen`) **không** có quyền trên vhost này. Compose `rabbitmq-init` tạo vhost, tạo tài khoản rồi gỡ quyền mà RabbitMQ tự cấp cho người tạo. CI `compose-smoke` kiểm lại việc này.
+- Danh sách hàng đợi là `cmd/worker-internal/assembly.Queues()`. Khi khởi động, `outbox-publisher` khai báo chúng trên vhost nội bộ, dùng cùng tham số với vhost nền tảng.
+- Thiếu `AG_AMQP_INTERNAL_URL` thì sự kiện nội bộ **tồn trên outbox** (`ag.outbox.backlog` cụm mkg tăng), không bao giờ rơi sang vhost nền tảng. Đặt biến rồi khởi động lại publisher; sự kiện được phát theo thứ tự `id`.
+- Kiểm tra: `rabbitmqctl -q list_permissions -p mkg.internal` chỉ có `mkg_internal`; `rabbitmqctl -q list_queues -p mkg.internal name messages consumers`.
+
 ## Vận hành
 
 - **Thứ tự triển khai** không còn quan trọng với việc mất sự kiện, nhưng bản `outbox-publisher` phải **cùng hoặc mới hơn** bản API: publisher cũ không biết hàng đợi của consumer mới. Khi phát hành có consumer mới: cập nhật publisher trước (hoặc cùng lúc) API.

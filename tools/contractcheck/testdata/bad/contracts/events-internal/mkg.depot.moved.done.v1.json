@@ -1,0 +1,2 @@
+{ "x-event-type": "mkg.depot.moved.done", "x-schema-version": 1, "type": "object", "required": ["lot_ref"],
+  "properties": { "lot_ref": { "type": "string", "format": "uuid" }, "kg": { "type": "string" } } }

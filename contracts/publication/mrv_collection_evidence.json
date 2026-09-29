@@ -1,0 +1,23 @@
+{
+  "name": "mrv_collection_evidence",
+  "version": 1,
+  "owner": "mkg/measurement",
+  "proposed_by": "mkg-measurement-module-owner",
+  "approved_by": "mkg-data-steward",
+  "approved_at": "2026-09-30",
+  "event": "mkg.measurement.mrv_collection_evidence.published v1",
+  "consumers": ["pf/mrv"],
+  "purpose": "DỰ THẢO G3-0 — người đề xuất/phê duyệt là vai giữ chỗ (Q-MKG-08); danh mục trường MRV và phương pháp tCO2e chờ khách (C-1). MRV cần bằng chứng lượng rơm được thu (tránh đốt) theo thửa và vụ. Khối lượng LÀM TRÒN THEO BẬC để không lộ sản lượng thương mại: không có khối lượng cân chính xác, phiếu cân, số đo thô, dung sai, hao hụt, tranh chấp, giá hay khách hàng.",
+  "description": "Bằng chứng thu gom rơm của một thửa trong một vụ, khối lượng theo bậc (quy tắc bậc có phiên bản). Consumer giữ bản có revision lớn nhất theo evidence_ref; phát lại là idempotent theo event_id.",
+  "type": "object",
+  "required": ["evidence_ref", "plot_ref", "collected_on", "collected_kg_bucket", "bucket_rule_version", "revision"],
+  "properties": {
+    "evidence_ref":        { "type": "string", "format": "uuid" },
+    "plot_ref":            { "type": "string", "format": "uuid" },
+    "season_ref":          { "type": ["string", "null"], "format": "uuid" },
+    "collected_on":        { "type": "string", "format": "date" },
+    "collected_kg_bucket": { "type": "string", "enum": ["0-500", "500-1000", "1000-2000", "2000-5000", "5000-10000", "10000+"], "description": "Bậc khối lượng (kg) theo phiếu cân HUB_IN của các lô có nguồn từ thửa" },
+    "bucket_rule_version": { "type": "string", "description": "Phiên bản quy tắc chia bậc, vd mrv.bucket.v1" },
+    "revision":            { "type": "integer" }
+  }
+}

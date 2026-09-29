@@ -8,6 +8,13 @@ Mục 5 của tài liệu kiến trúc: dữ liệu từ vùng nội bộ MKG sa
 |---|---|---|---|---|
 | [`hub_facility`](hub_facility.json) | 1 | `mkg.hub.facility.published v1` | `mkg/hub` | `pf/geo` (mô hình đọc hub — đợt 2) |
 | [`hub_capacity`](hub_capacity.json) | 1 | `mkg.hub.capacity.published v1` | `mkg/hub` | `pf/geo` (mô hình đọc hub — đợt 2) |
+| [`collection_schedule`](collection_schedule.json) | 1 — **dự thảo G3-0** | `mkg.fieldops.collection_schedule.published v1` | `mkg/fieldops` | `pf/cropcycle`, `pf/notify` |
+| [`htx_collection_statement`](htx_collection_statement.json) | 1 — **dự thảo G3-0** (C-4: trả theo cuộn hay theo tấn) | `mkg.fieldops.htx_collection_statement.published v1` | `mkg/fieldops` | `pf/cropcycle` |
+| [`mrv_collection_evidence`](mrv_collection_evidence.json) | 1 — **dự thảo G3-0** (C-1) | `mkg.measurement.mrv_collection_evidence.published v1` | `mkg/measurement` | `pf/mrv` |
+
+Ba hợp đồng dự thảo có đủ siêu dữ liệu để cổng và `publication.Get` nhận (đợt G3-1 dựng được van), nhưng `proposed_by`/`approved_by` là **vai giữ chỗ** như hợp đồng hub (Q-MKG-08). Trước khi bật ở môi trường có dữ liệu thật, MKG điền người thật và ngày ký; mọi thay đổi trường theo mục "Thay đổi hợp đồng" dưới đây.
+
+**Sự kiện nội bộ MKG** (không qua van, ADR-0018) có schema riêng ở [`contracts/events-internal/`](../events-internal/) và chỉ phát lên vhost `mkg.internal`.
 
 ## Dạng tệp `<tên>.json`
 

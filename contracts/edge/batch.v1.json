@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/edge/batch/v1",
+  "title": "agrigreen.edge.batch.v1 — lô số đo có chữ ký nguồn (edge-agent → ingest)",
+  "description": "Hợp đồng ĐÃ ĐÓNG BĂNG ở G3-0 (ADR-0019). Hiện thực chuẩn: internal/mkg/measurement/port/edgewire (chỉ thư viện chuẩn Go). Chữ ký Ed25519 KHÔNG tính trên JSON mà trên DẠNG CHUẨN (xem x-canonical); bộ vector: batch.v1.vectors.json. Một lô = dãy bộ đếm liên tiếp counter_from..counter_to của một thiết bị trong một kỳ đăng ký (epoch); idempotency (device_id, epoch, counter). device_time và ntp_offset_ms chỉ là thông tin, không bao giờ dùng làm thứ tự. Đẩy qua mTLS, chỉ đi ra (mục 14).",
+  "x-canonical": [
+    "Văn bản ASCII, mỗi dòng kết thúc bằng LF (0x0A), không BOM, không CR. Thứ tự dòng cố định:",
+    "agrigreen.edge.batch.v1",
+    "device_id=<device_id>",
+    "epoch=<epoch>",
+    "counter_from=<counter_from>",
+    "counter_to=<counter_to>",
+    "key_id=<key_id>",
+    "ntp_offset_ms=<số nguyên có dấu | null>",
+    "reading=<counter>;<device_time>;<value_kg>;<1|0>;<unit>;<raw hoặc rỗng>   (một dòng mỗi số đo, counter tăng dần)",
+    "Số nguyên viết thập phân, không dấu cộng, không số 0 đứng đầu. stable: 1 = true, 0 = false.",
+    "signature = base64 chuẩn có đệm của Ed25519(khóa nguồn, dạng chuẩn). payload_sha256 = SHA-256(dạng chuẩn).",
+    "key_id = hex thường của 8 byte đầu SHA-256(khóa công khai Ed25519 32 byte)."
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "device_id", "epoch", "counter_from", "counter_to", "key_id", "ntp_offset_ms", "readings", "signature"],
+  "properties": {
+    "format":        { "const": "agrigreen.edge.batch.v1" },
+    "device_id":     { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$", "description": "Mã thiết bị trong sổ thiết bị đã duyệt (mkg/measurement), trùng CN/SAN của chứng thư mTLS client" },
+    "epoch":         { "type": "integer", "minimum": 1, "maximum": 2147483647, "description": "Kỳ đăng ký. Mất đĩa, cài lại, thay khóa → đăng ký kỳ mới; bộ đếm của kỳ cũ không bao giờ dùng lại" },
+    "counter_from":  { "type": "integer", "minimum": 1 },
+    "counter_to":    { "type": "integer", "minimum": 1, "description": "≥ counter_from; counter_to − counter_from + 1 = số phần tử readings ≤ 1000" },
+    "key_id":        { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+    "ntp_offset_ms": { "type": ["integer", "null"], "minimum": -86400000, "maximum": 86400000, "description": "Độ lệch đồng hồ thiết bị so với NTP nội bộ lúc đóng lô; null = chưa đồng bộ NTP. Bắt buộc có mặt" },
+    "readings": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["counter", "device_time", "value_kg", "stable", "unit"],
+        "properties": {
+          "counter":     { "type": "integer", "minimum": 1, "description": "= counter_from + chỉ số phần tử (liên tiếp, tăng dần)" },
+          "device_time": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$", "description": "Đồng hồ thiết bị, UTC, mili giây" },
+          "value_kg":    { "type": "string", "pattern": "^-?(0|[1-9][0-9]{0,10})\\.[0-9]{3}$", "not": { "const": "-0.000" }, "description": "Khối lượng kg, decimal dạng chuỗi, đúng 3 chữ số thập phân (R-10). Bộ điều hợp mẫu cân đã quy đổi về kg" },
+          "stable":      { "type": "boolean", "description": "Đầu cân báo ổn định" },
+          "unit":        { "type": "string", "enum": ["kg", "t"], "description": "Đơn vị đầu cân hiển thị (thông tin); value_kg luôn là kg" },
+          "raw":         { "type": "string", "pattern": "^[A-Za-z0-9+/]+={0,2}$", "description": "Tùy chọn: khung gốc từ đầu cân, base64 chuẩn có đệm, 1..256 byte sau giải mã (pháp chứng)" }
+        }
+      }
+    },
+    "signature": { "type": "string", "pattern": "^[A-Za-z0-9+/]{86}==$", "description": "Ed25519 64 byte, base64 chuẩn" }
+  }
+}
