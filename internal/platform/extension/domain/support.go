@@ -190,6 +190,12 @@ func PickAssignee(now time.Time, commune, province string, cands []DutyCandidate
 	return uuid.Nil, ruleAdmin
 }
 
+// ValidSupportCategory: loại sự cố có trong danh mục (bộ lọc danh sách cán bộ).
+func ValidSupportCategory(c string) bool { _, ok := supportCategoryTask[c]; return ok }
+
+// ValidSupportUrgency: mức khẩn hợp lệ.
+func ValidSupportUrgency(u string) bool { _, ok := supportUrgencyPriority[u]; return ok }
+
 // SupportCategories trả các loại sự cố hợp lệ (cho tài liệu API và app).
 func SupportCategories() []string {
 	out := make([]string, 0, len(supportCategoryTask))

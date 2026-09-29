@@ -1037,6 +1037,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/support-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Yêu cầu hỗ trợ của nông dân cho cán bộ (HTX US-SUPPORT-01, KN US-TASK-01/03) — kèm nhiệm vụ tự sinh hiện hành
+         * @description Vai coop_manager (chỉ HTX của mình = org_ref; hỏi HTX khác → 403 extension.out_of_scope), kn_officer /
+         *     kn_province_admin / kn_national_admin (xã/tỉnh trong phạm vi, cộng nhiệm vụ được giao cho mình), platform_admin (mọi nơi).
+         *     Mới nhất trước; cursor là next_cursor của trang trước. Không trả toạ độ — chỉ trạng thái GPS; ảnh là mã tệp (pf/files).
+         */
+        get: operations["extListSupportRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/tasks/bulk-assign": {
         parameters: {
             query?: never;
@@ -4809,6 +4831,45 @@ export interface components {
             /** Format: date-time */
             task_created_at?: string;
         };
+        /** @description Yêu cầu hỗ trợ trong danh sách của cán bộ (không có toạ độ, không PII). */
+        SupportRequestStaff: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            household_ref: string;
+            /** Format: uuid */
+            plot_ref: string | null;
+            /** Format: uuid */
+            cooperative_ref: string;
+            commune_code: string;
+            province_code: string;
+            /** @enum {string} */
+            category: "dich_hai" | "benh_lua" | "thoi_tiet" | "ky_thuat" | "may_moc" | "khac";
+            /** @enum {string} */
+            urgency: "binh_thuong" | "khan";
+            description: string;
+            /** @description Mã tệp ảnh (tải qua pf/files) */
+            photo_refs: string[];
+            photo_count: number;
+            gps_missing: boolean;
+            /** @description Độ chính xác GPS (m, decimal) */
+            gps_accuracy_m: string | null;
+            /** @description vd "Thiếu vị trí GPS" */
+            labels: string[];
+            /**
+             * Format: date-time
+             * @description Lúc bấm Gửi trên máy
+             */
+            event_time: string;
+            /**
+             * Format: date-time
+             * @description Lúc máy chủ nhận (mốc SLA 1 phút)
+             */
+            received_at: string;
+            /** @enum {string} */
+            assignment_rule: "commune_on_duty" | "province_on_duty" | "province_officer" | "admin_queue";
+            task: components["schemas"]["ExtTask"];
+        };
         SimLatLng: {
             lat: number;
             lng: number;
@@ -7529,6 +7590,45 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extListSupportRequests: {
+        parameters: {
+            query?: {
+                /** @description Trạng thái nhiệm vụ tự sinh */
+                task_status?: "new" | "assigned" | "accepted" | "in_progress" | "resolved";
+                category?: "dich_hai" | "benh_lua" | "thoi_tiet" | "ky_thuat" | "may_moc" | "khac";
+                urgency?: "binh_thuong" | "khan";
+                commune_code?: string;
+                cooperative_ref?: string;
+                /** @description true = chỉ yêu cầu thiếu vị trí GPS */
+                gps_missing?: boolean;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang, mới nhất trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["SupportRequestStaff"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            /** @description forbidden | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
