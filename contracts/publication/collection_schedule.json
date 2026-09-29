@@ -1,0 +1,23 @@
+{
+  "name": "collection_schedule",
+  "version": 1,
+  "owner": "mkg/fieldops",
+  "proposed_by": "mkg-fieldops-module-owner",
+  "approved_by": "mkg-data-steward",
+  "approved_at": "2026-09-30",
+  "event": "mkg.fieldops.collection_schedule.published v1",
+  "consumers": ["pf/cropcycle", "pf/notify"],
+  "purpose": "DỰ THẢO G3-0 — người đề xuất/phê duyệt là vai giữ chỗ, MKG điền người thật khi ký (Q-MKG-08). HTX, nông dân và cán bộ khuyến nông cần biết lịch gom rơm của MKG theo HTX/xã để không đốt rơm (mục tiêu chương trình). Chỉ khung thời gian và trạng thái — không có tổ gom, máy, giá, khối lượng hay khách hàng.",
+  "description": "Một phiên bản lịch gom (lệnh gom đã duyệt) của MKG cho một HTX trong một xã. Consumer giữ bản có revision lớn nhất theo schedule_ref; phát lại là idempotent theo event_id.",
+  "type": "object",
+  "required": ["schedule_ref", "htx_ref", "commune_code", "window_from", "window_to", "status", "revision"],
+  "properties": {
+    "schedule_ref": { "type": "string", "format": "uuid", "description": "Mã tham chiếu lệnh gom phía MKG (UUIDv7)" },
+    "htx_ref":      { "type": "string", "format": "uuid", "description": "HTX (party_ref của nền tảng, lấy qua Application API công khai)" },
+    "commune_code": { "type": "string", "pattern": "^[0-9]{5}$", "description": "Mã xã theo danh mục đơn vị hành chính sau sáp nhập 2025" },
+    "window_from":  { "type": "string", "format": "date" },
+    "window_to":    { "type": "string", "format": "date" },
+    "status":       { "type": "string", "enum": ["planned", "confirmed", "in_progress", "completed", "cancelled"] },
+    "revision":     { "type": "integer" }
+  }
+}

@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -51,6 +52,28 @@ func ValidateType(t string) error {
 	return nil
 }
 
+// Kind là loại sự kiện trên outbox, quyết định vhost RabbitMQ mà outbox-publisher
+// phát lên (ADR-0018, cột shared.outbox.kind — migration shared/000004).
+type Kind string
+
+const (
+	// KindPlatform (mặc định, giá trị rỗng cũng là platform): exchange ag.events của
+	// vhost nền tảng — mọi consumer nền tảng bind được. Từ vùng mkg chỉ được là
+	// payload van công bố (contractcheck).
+	KindPlatform Kind = "platform"
+	// KindInternal: sự kiện nội bộ MKG, phát lên vhost mkg.internal (tài khoản nền
+	// tảng không có quyền). Chỉ tên mkg.*, chỉ phát từ internal/mkg/**, payload
+	// phải là struct //ag:internal-event (contractcheck).
+	KindInternal Kind = "internal"
+)
+
+func (k Kind) orDefault() Kind {
+	if k == "" {
+		return KindPlatform
+	}
+	return k
+}
+
 // Event là sự kiện cần ghi. ID là UUIDv7, cũng là event_id.
 type Event struct {
 	ID            uuid.UUID
@@ -61,6 +84,8 @@ type Event struct {
 	TraceID       string
 	Producer      string
 	Payload       any
+	// Kind rỗng = KindPlatform.
+	Kind Kind
 }
 
 // Enqueue ghi sự kiện trong giao dịch nghiệp vụ đang mở. Ngữ cảnh trace của
@@ -69,6 +94,16 @@ type Event struct {
 func Enqueue(ctx context.Context, tx pgx.Tx, e Event) error {
 	if err := ValidateType(e.Type); err != nil {
 		return err
+	}
+	kind := e.Kind.orDefault()
+	switch kind {
+	case KindPlatform:
+	case KindInternal:
+		if !strings.HasPrefix(e.Type, "mkg.") {
+			return fmt.Errorf("outbox: sự kiện nội bộ %q phải thuộc vùng mkg (ADR-0018)", e.Type)
+		}
+	default:
+		return fmt.Errorf("outbox: loại sự kiện %q không hợp lệ", e.Kind)
 	}
 	if e.ID == uuid.Nil || e.TenantID == uuid.Nil || e.SchemaVersion < 1 || e.Producer == "" || e.OccurredAt.IsZero() {
 		return errors.New("outbox: thiếu trường bắt buộc của sự kiện")
@@ -88,10 +123,10 @@ func Enqueue(ctx context.Context, tx pgx.Tx, e Event) error {
 		parent = &tp
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO shared.outbox
-	  (id, tenant_id, event_type, schema_version, occurred_at, trace_id, producer, payload, trace_parent)
-	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)`,
+	  (id, tenant_id, event_type, schema_version, occurred_at, trace_id, producer, payload, trace_parent, kind)
+	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)`,
 		// payload gửi dạng chuỗi: ở QueryExecModeExec (PgBouncer) []byte bị mã hóa thành bytea.
-		e.ID, e.TenantID, e.Type, e.SchemaVersion, e.OccurredAt.UTC(), traceID, e.Producer, string(payload), parent)
+		e.ID, e.TenantID, e.Type, e.SchemaVersion, e.OccurredAt.UTC(), traceID, e.Producer, string(payload), parent, string(kind))
 	return err
 }
 
@@ -101,10 +136,13 @@ type Broker interface {
 }
 
 // Publisher quét outbox và phát. Pool phải dùng vai ag_outbox_publisher (BYPASSRLS).
+// Mỗi Publisher chỉ quét MỘT loại (Kind rỗng = KindPlatform) và phát qua đúng
+// Broker của vhost loại đó — sự kiện nội bộ MKG không bao giờ lên vhost nền tảng.
 type Publisher struct {
 	Pool   *pgxpool.Pool
 	Broker Broker
 	Batch  int
+	Kind   Kind
 }
 
 // PublishBatch phát tối đa Batch sự kiện chưa phát, theo thứ tự id (UUIDv7 ~
@@ -122,8 +160,8 @@ func (p *Publisher) PublishBatch(ctx context.Context) (int, error) {
 
 	rows, err := tx.Query(ctx, `SELECT id, tenant_id, event_type, schema_version, occurred_at, recorded_at,
 	    coalesce(trace_id, ''), producer, payload, coalesce(trace_parent, '')
-	  FROM shared.outbox WHERE published_at IS NULL
-	  ORDER BY id FOR UPDATE SKIP LOCKED LIMIT $1`, batch)
+	  FROM shared.outbox WHERE published_at IS NULL AND kind = $2
+	  ORDER BY id FOR UPDATE SKIP LOCKED LIMIT $1`, batch, string(p.Kind.orDefault()))
 	if err != nil {
 		return 0, err
 	}

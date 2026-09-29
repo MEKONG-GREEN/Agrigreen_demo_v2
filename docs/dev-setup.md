@@ -30,6 +30,8 @@
 | `identity-vault` | kho định danh (bề mặt Internal) | 8090 |
 | `api-platform` | Application API + Admin API (MFA); Internal API `/internal/v1` cho optimizer (mTLS, chỉ trong mạng compose) | 8080, 8082 (8084 không publish) |
 | `api-internal` | API nội bộ MKG (cụm `ag_mkg`, vai `hub_app` + `mkg_api` cho idempotency) | 8081, quản trị MFA 8083 |
+| `rabbitmq-init` | một lần: vhost `mkg.internal` + tài khoản `mkg_internal`, gỡ quyền tài khoản nền tảng (ADR-0018) | — |
+| `worker-internal` | consumer sự kiện nội bộ MKG (vhost `mkg.internal`, cụm `ag_mkg`, vai `worker_internal`) — khung G3-0 | 8086 (không publish) |
 | `optimizer` | engine mô phỏng chọn Hub (Python): queue `pf.simulation.optimizer`, gọi Internal API qua mTLS | — |
 | `outbox-publisher`, `worker` | phát outbox, consumer + job vận hành (neo chuỗi, dọn idempotency, leo thang SLA) | — |
 | `web-ops` | web vận hành Next.js | 3000 |

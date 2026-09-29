@@ -134,6 +134,18 @@ func TestTestdataBad(t *testing.T) {
 		"gán .Payload của outbox.Event trực tiếp",
 		"outbox.Event phải dùng literal có tên trường",
 		"//ag:publication chỉ dùng trong internal/mkg",
+		// sự kiện nội bộ MKG (ADR-0018)
+		"pf.party.thing.done.v1.json: sự kiện nội bộ phải thuộc vùng mkg",
+		"mkg.depot.thing.happened.v1.json: mkg.depot.thing.happened đã là sự kiện nền tảng",
+		"MovedV1.kg kiểu Go ra JSON integer, schema nội bộ mkg.depot.moved.done v1",
+		"NoSchemaV1 chú thích ag:internal-event mkg.depot.ghost.happened v1 nhưng không có schema",
+		"DualV1 không được vừa là sự kiện nội bộ vừa là sự kiện nền tảng / payload van",
+		"//ag:internal-event chỉ dùng trong internal/mkg",
+		"Payload MovedV1 là sự kiện nội bộ MKG (//ag:internal-event) — không được phát lên exchange nền tảng",
+		"Payload của outbox.Event nội bộ (KindInternal) có kiểu SitePublishedV1 không có //ag:internal-event",
+		"Kind của outbox.Event trong vùng mkg phải là hằng",
+		"gán .Kind của outbox.Event trực tiếp",
+		"outbox.KindInternal chỉ dùng trong internal/mkg",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("thiếu vi phạm %q", want)
@@ -166,6 +178,24 @@ func TestRepositoryContractsPass(t *testing.T) {
 	}
 	if len(p) != 0 {
 		t.Fatalf("hợp đồng của repo vi phạm: %v", p)
+	}
+}
+
+// ADR-0018: hai lần phát cùng một payload nội bộ trên exchange nền tảng phải bị
+// bắt ở cả hai dạng (không ghi Kind, KindPlatform tường minh).
+func TestInternalEventNeverOnPlatformExchange(t *testing.T) {
+	p, err := Check(filepath.Join("testdata", "bad"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, x := range p {
+		if strings.Contains(x, "Payload MovedV1 là sự kiện nội bộ MKG") {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Fatalf("muốn 2 vi phạm phát MovedV1 lên exchange nền tảng, có %d:\n%s", n, strings.Join(p, "\n"))
 	}
 }
 

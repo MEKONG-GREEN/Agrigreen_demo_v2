@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events-internal/mkg.fieldops.roll_count.recorded/v1",
+  "title": "mkg.fieldops.roll_count.recorded — payload (sự kiện NỘI BỘ MKG)",
+  "description": "Một bản ghi đếm cuộn (hoặc bản ghi bù) vừa được ghi vào sổ mkg_fieldops.roll_count. Chỉ vhost mkg.internal (ADR-0018). Số cuộn theo thửa/HTX đi sang nền tảng CHỈ qua hợp đồng van htx_collection_statement (dự thảo); yield_kg_per_roll không bao giờ qua van. Người nhận: mkg/measurement (đối chiếu cuộn ↔ khối lượng khi hợp đồng tính theo tấn — RB-6), mkg/costing (G4).",
+  "x-event-type": "mkg.fieldops.roll_count.recorded",
+  "x-schema-version": 1,
+  "x-producer": "mkg/fieldops",
+  "x-kind": "internal",
+  "type": "object",
+  "required": ["roll_count_id", "lot_ref", "plot_ref", "htx_ref", "rolls", "stage", "rule_version", "event_time"],
+  "properties": {
+    "roll_count_id":        { "type": "string", "format": "uuid" },
+    "lot_ref":              { "type": "string", "format": "uuid", "description": "Lô gom (stream_key lot:<uuid>)" },
+    "plot_ref":             { "type": "string", "format": "uuid" },
+    "htx_ref":              { "type": "string", "format": "uuid" },
+    "rolls":                { "type": "integer", "minimum": 0 },
+    "stage":                { "type": "string", "enum": ["bale", "gather", "boat_load"] },
+    "htx_confirmation_ref": { "type": ["string", "null"], "format": "uuid" },
+    "supersedes_id":        { "type": ["string", "null"], "format": "uuid" },
+    "device_id":            { "type": ["string", "null"] },
+    "rule_version":         { "type": "string" },
+    "event_time":           { "type": "string", "format": "date-time" }
+  }
+}
