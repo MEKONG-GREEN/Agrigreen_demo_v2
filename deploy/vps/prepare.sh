@@ -47,6 +47,10 @@ rm -f "$out/agrigreen-realm.json.tmp"
 if grep -q 'localhost' "$out/agrigreen-realm.json"; then
   echo "Realm VPS vẫn còn 'localhost' — kiểm tra lại realm dev" >&2; exit 1
 fi
+# Keycloak trong container chạy bằng uid khác → phải đọc được (realm không chứa bí mật,
+# chỉ placeholder ${AG_KC_CLIENT_SECRET}; umask 077 ở trên chỉ dành cho .env).
+chmod 755 "$root/deploy/compose/.vps" "$out"
+chmod 644 "$out/agrigreen-realm.json"
 
 echo "Xong: $envf (đã thêm biến VPS), $out/agrigreen-realm.json"
 echo "Cần bản ghi DNS A: app.$domain api.$domain auth.$domain admin.$domain → IP của VPS"

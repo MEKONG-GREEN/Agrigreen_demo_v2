@@ -69,6 +69,7 @@ services:
       KC_HOSTNAME: https://auth.${AG_DOMAIN}
       KC_HTTP_ENABLED: "true"          # TLS kết thúc ở Caddy
       KC_PROXY_HEADERS: xforwarded
+      KC_CACHE: local                  # một node: không lập cụm JGroups
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: keycloak
