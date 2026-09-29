@@ -21,6 +21,9 @@
 // Consumer pf/reports (vai reports_app): pf.reports.export (dựng tệp Excel/PDF) và
 // pf.reports.delivery (email lịch gửi báo cáo).
 //
+// Consumer pf/simulation (vai simulation_app): pf.simulation.snapshot (dựng ảnh chụp
+// đầu vào bất biến, phát pf.simulation.job.requested cho optimizer).
+//
 // Biến môi trường:
 //
 //	AG_DB_URL, AG_AMQP_URL             như G0 (AG_AMQP_URL chỉ cần khi có consumer)
@@ -96,7 +99,7 @@ func consumers(log *slog.Logger) []consumer {
 			log.Info("đồng ý đã ghi", "event", env.EventType, "event_id", env.EventID, "tenant_id", env.TenantID, "trace_id", env.TraceID, "outcome", "ok")
 			return nil
 		},
-	}, mrvExportConsumer(log), accountsOrgStatusConsumer(log)}, reportsConsumers(log)...)
+	}, mrvExportConsumer(log), accountsOrgStatusConsumer(log), simulationSnapshotConsumer(log)}, reportsConsumers(log)...)
 }
 
 func allConsumers(log *slog.Logger) []consumer {

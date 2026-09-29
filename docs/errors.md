@@ -176,6 +176,30 @@ Phản hồi phát lại theo Idempotency-Key có header `Idempotent-Replayed: t
 
 Việc xuất hỏng vĩnh viễn ghi `error_code` trên việc xuất (vd `mechanization.run_not_found` khi vụ chưa có kết quả cân đối đã lưu, `reports.object_conflict` khi đã có tệp khác nội dung dưới cùng khóa).
 
+### pf/simulation
+
+| HTTP | code | Ý nghĩa |
+|---|---|---|
+| 404 | `simulation.hub_not_found` | pf/simulation: không có Hub ứng viên (trong tenant) |
+| 409 | `simulation.hub_retired` | pf/simulation: Hub ứng viên đã ngừng dùng — không gán vào kịch bản được |
+| 404 | `simulation.scenario_not_found` | pf/simulation: không có kịch bản (trong tenant) |
+| 404 | `simulation.hub_not_attached` | pf/simulation: Hub chưa gán (hoặc đã gỡ) khỏi kịch bản |
+| 422 | `simulation.scenario_without_hubs` | pf/simulation: kịch bản chưa có Hub nào — không chạy mô phỏng |
+| 422 | `simulation.baseline_scenario_invalid` | pf/simulation: kịch bản baseline (baseline_mode = scenario) không tồn tại |
+| 404 | `simulation.simulation_not_found` | pf/simulation: không có việc mô phỏng / ảnh chụp (cũng cho /v1/jobs/{id}) |
+| 409 | `simulation.result_not_ready` | pf/simulation: việc chưa có kết quả (queued/running/failed) |
+| 409 | `simulation.params_unapproved` | pf/simulation: CGH FN-01 BR-04 — còn tham số chưa có phiên bản phê duyệt trong ảnh chụp; trường mở rộng `unapproved_parameters` |
+| 409 | `simulation.not_accepting_result` | pf/simulation (Internal API): việc không ở trạng thái chờ kết quả (chưa có ảnh chụp) |
+| 409 | `simulation.snapshot_mismatch` | pf/simulation (Internal API): phong bì kết quả mang snapshot_sha256 khác ảnh chụp đã ghim |
+| 422 | `simulation.result_invalid` | pf/simulation (Internal API): phong bì kết quả không đúng contracts/optimizer/result.v1 |
+| 500 | `simulation.snapshot_integrity` | pf/simulation: ảnh chụp đọc lại không khớp băm đã lưu |
+| 503 | `simulation.dependency_unavailable` | pf/simulation: chưa nối nguồn cung HTX × vụ (SupplySource) — việc mô phỏng hỏng với mã này |
+| 422 | `simulation.supply_invalid` | pf/simulation: nguồn cung trả dữ liệu không hợp lệ (âm, tháng vụ sai) |
+| 422 | `simulation.no_supply` | pf/simulation: không có HTX có toạ độ nằm trong bán kính phục vụ của các Hub |
+| 403 | `simulation.internal_forbidden` | pf/simulation: Internal API chỉ nhận client mTLS có CN/SAN thuộc AG_INTERNAL_CLIENT_NAMES |
+
+Việc mô phỏng hỏng ghi `error_code` trên việc: mã `simulation.*` (lỗi dựng ảnh chụp) hoặc `optimizer.*` do optimizer báo (`optimizer.snapshot_invalid`, `optimizer.snapshot_incomplete`, `optimizer.solver_unavailable`).
+
 ### pf/geo
 | HTTP | code | Ý nghĩa |
 |---|---|---|

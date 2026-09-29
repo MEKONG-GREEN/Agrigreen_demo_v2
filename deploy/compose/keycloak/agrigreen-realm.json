@@ -39,6 +39,7 @@
       { "name": "plot_editor", "description": "Vẽ/sửa/gán/ngừng dùng thửa trong phạm vi (pf/geo)" },
       { "name": "plot_viewer", "description": "Chỉ xem thửa trong phạm vi (pf/geo)" },
       { "name": "geo_admin", "description": "[MFA] Nhập tệp ranh giới thửa, ranh giới hành chính (pf/geo, Admin API)" },
+      { "name": "simulation_analyst", "description": "Dựng Hub ứng viên, kịch bản; chạy, so sánh và đánh dấu Chính thức mô phỏng chọn Hub (pf/simulation)" },
       { "name": "content_editor_national", "description": "Soạn quy trình kỹ thuật chuẩn quốc gia (pf/content, KN BR-06)" },
       { "name": "content_editor_province", "description": "Bổ sung hướng dẫn đặc thù địa phương (pf/content, KN FR-13)" },
       { "name": "content_reviewer", "description": "Duyệt và xuất bản tài liệu — không xuất bản bản do chính mình soạn (R-56)" },

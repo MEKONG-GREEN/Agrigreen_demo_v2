@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=69"]  # MIT
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agrigreen-optimizer"
+version = "2026.9.24"
+description = "AgriGreen optimizer: engine đánh giá kịch bản chọn Hub (pf/simulation), chỉ nhận dữ liệu không định danh (RB-7)"
+requires-python = ">=3.12,<3.13"
+readme = "README.md"
+# Giấy phép phụ thuộc phải thuộc deploy/policies/allowed-licenses.txt (RB-4).
+dependencies = [
+  "pydantic>=2.7,<3",       # MIT — kiểm hợp đồng ảnh chụp, mặc định từ chối trường lạ
+]
+
+[project.optional-dependencies]
+# Chế độ THỬ NGHIỆM select_hubs (MILP vị trí cơ sở).
+milp = [
+  "highspy>=1.7,<2",        # MIT
+]
+dev = [
+  "pytest>=8",              # MIT
+  "jsonschema>=4.21,<5",    # MIT — kiểm contracts/optimizer/*.schema.json
+  "pip-licenses>=5",        # MIT — cổng giấy phép trong CI
+]
+
+[project.scripts]
+agrigreen-optimizer = "agrigreen_optimizer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"

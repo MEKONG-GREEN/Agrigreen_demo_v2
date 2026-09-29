@@ -1,0 +1,1814 @@
+{
+ "schema_version": 1,
+ "snapshot_id": "00000000-0000-7000-8000-000000000005",
+ "simulation_id": "00000000-0000-7000-9000-000000000005",
+ "tenant_ref": "00000000-0000-7000-a000-000000000001",
+ "algorithm_version": "prototype-2026.09.24",
+ "network_version": "prototype-transport-routes",
+ "created_at": "2026-09-29T00:00:00Z",
+ "scenario": {
+  "scenario_id": "53a0bd04-f1e6-426f-8200-9db8ee94d660",
+  "code": "KB-0005",
+  "lifecycle_years": 10,
+  "discounted": false,
+  "baseline_mode": "no_hub",
+  "baseline_manual_cost_per_ton": null,
+  "baseline_scenario_cost_per_ton": null,
+  "plant": {
+   "plant_ref": "317158f6-81b1-4d1e-b433-c44265c5aabd",
+   "annual_demand_tons": "240000"
+  }
+ },
+ "hubs": [
+  {
+   "scenario_hub_id": "81b4f32a-b8cb-471c-ba1f-1b2fea55fc5e",
+   "hub_ref": "4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "code": "HUB-0001",
+   "sort_order": 1,
+   "service_radius_km": "40",
+   "design_capacity_tons": "30000",
+   "barge_payload_tons": null,
+   "mode_field_hub": "auto",
+   "mode_hub_plant": "auto",
+   "land_mode": "mua"
+  },
+  {
+   "scenario_hub_id": "3417622d-d251-47a3-abb9-7cd5f6d93046",
+   "hub_ref": "b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "code": "HUB-0003",
+   "sort_order": 2,
+   "service_radius_km": "40",
+   "design_capacity_tons": "30000",
+   "barge_payload_tons": null,
+   "mode_field_hub": "auto",
+   "mode_hub_plant": "auto",
+   "land_mode": "mua"
+  }
+ ],
+ "cooperatives": [
+  {
+   "cooperative_ref": "2c7c8a7a-36da-4260-af91-d0a575d8b5d2",
+   "member_count": 412,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "12400",
+     "planted_area_ha": "1758"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "10100",
+     "planted_area_ha": "1573"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "7600",
+     "planted_area_ha": "1110"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "224c78e5-240e-4dc1-a15a-235463cc42fd",
+   "member_count": 356,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "11200",
+     "planted_area_ha": "1539"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "9300",
+     "planted_area_ha": "1377"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "6800",
+     "planted_area_ha": "972"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "bf7c3931-a6bb-4be5-9bde-cecaf548dda3",
+   "member_count": 298,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "9100",
+     "planted_area_ha": "1273"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "7700",
+     "planted_area_ha": "1139"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "5400",
+     "planted_area_ha": "804"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "f82456a3-b3af-46b7-a03b-3bd7f6b9eb12",
+   "member_count": 264,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "8300",
+     "planted_area_ha": "1121"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "6900",
+     "planted_area_ha": "1003"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "4700",
+     "planted_area_ha": "708"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "dc0017dd-f562-42a7-bb55-b5f3d8e40284",
+   "member_count": 331,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "10300",
+     "planted_area_ha": "1397"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "8600",
+     "planted_area_ha": "1250"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "6100",
+     "planted_area_ha": "882"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "d88decc6-330f-40ee-b82a-0559ac9dbcd7",
+   "member_count": 388,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "11900",
+     "planted_area_ha": "1672"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "9900",
+     "planted_area_ha": "1496"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "7100",
+     "planted_area_ha": "1056"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "04285027-37cf-4cf6-9ea1-973beff978d3",
+   "member_count": 274,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "8800",
+     "planted_area_ha": "1226"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "7200",
+     "planted_area_ha": "1097"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "5000",
+     "planted_area_ha": "774"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "bec58f98-25b8-418b-915a-ac3802c240ec",
+   "member_count": 342,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "10600",
+     "planted_area_ha": "1435"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "8800",
+     "planted_area_ha": "1284"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "6300",
+     "planted_area_ha": "906"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "7a635ac9-0231-492c-8fc2-90edbfcb06c1",
+   "member_count": 301,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "9500",
+     "planted_area_ha": "1311"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "8000",
+     "planted_area_ha": "1173"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "5600",
+     "planted_area_ha": "828"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "560b4258-0f2d-40dc-a1a6-d34d881765cc",
+   "member_count": 233,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "7200",
+     "planted_area_ha": "998"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "5900",
+     "planted_area_ha": "893"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "3800",
+     "planted_area_ha": "630"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "26e67edd-4c08-4ff6-81dc-00d6988097a1",
+   "member_count": 289,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "8600",
+     "planted_area_ha": "1178"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "7100",
+     "planted_area_ha": "1054"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "4900",
+     "planted_area_ha": "744"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "aa5ca2f0-d56b-483c-ac14-657fe9a080b6",
+   "member_count": 251,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "7600",
+     "planted_area_ha": "1045"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "6300",
+     "planted_area_ha": "935"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "4200",
+     "planted_area_ha": "660"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "4829aa69-b5c0-4e43-9c24-dcf1ee08fa69",
+   "member_count": 217,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "6700",
+     "planted_area_ha": "912"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "5500",
+     "planted_area_ha": "816"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "3600",
+     "planted_area_ha": "576"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "e51f2bf3-eff1-4b5f-9b0a-fb2f63e133ad",
+   "member_count": 198,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "5900",
+     "planted_area_ha": "827"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "4800",
+     "planted_area_ha": "740"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "3100",
+     "planted_area_ha": "522"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "0f6ffa27-752c-4933-b502-49bbf3cfe09e",
+   "member_count": 364,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "11400",
+     "planted_area_ha": "1549"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "9400",
+     "planted_area_ha": "1386"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "6700",
+     "planted_area_ha": "978"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "c8bd8e3b-b6b8-4830-87be-61ef8442d9f5",
+   "member_count": 402,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "12700",
+     "planted_area_ha": "1720"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "10500",
+     "planted_area_ha": "1539"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "7500",
+     "planted_area_ha": "1086"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "5b38de61-5f9f-41f5-98c0-f91db2491ac5",
+   "member_count": 276,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "8500",
+     "planted_area_ha": "1159"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "7000",
+     "planted_area_ha": "1037"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "4800",
+     "planted_area_ha": "732"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "340b550c-902b-421f-98bc-45c430225309",
+   "member_count": 245,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "7400",
+     "planted_area_ha": "1026"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "6100",
+     "planted_area_ha": "918"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "4000",
+     "planted_area_ha": "648"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "dbd1d978-f272-4339-9248-530a00458b45",
+   "member_count": 229,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "7100",
+     "planted_area_ha": "969"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "5800",
+     "planted_area_ha": "867"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "3900",
+     "planted_area_ha": "612"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "71b303c8-f7dd-42d6-9c28-201517f387a7",
+   "member_count": 208,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "6500",
+     "planted_area_ha": "893"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "5200",
+     "planted_area_ha": "799"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "3300",
+     "planted_area_ha": "564"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "3574ab3e-50b9-448f-b601-fda81e87bb18",
+   "member_count": 236,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "7400",
+     "planted_area_ha": "1007"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "6000",
+     "planted_area_ha": "901"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "3900",
+     "planted_area_ha": "636"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "930f0138-6448-4a1f-ad75-65037494fdb3",
+   "member_count": 221,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "6900",
+     "planted_area_ha": "941"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "5600",
+     "planted_area_ha": "842"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "3600",
+     "planted_area_ha": "594"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "220d294a-6c4f-465e-8999-cb4555a34a9d",
+   "member_count": 187,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "5700",
+     "planted_area_ha": "789"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "4600",
+     "planted_area_ha": "706"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "2900",
+     "planted_area_ha": "498"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "b47dd5b5-5820-49a8-a856-68872b319488",
+   "member_count": 214,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "6600",
+     "planted_area_ha": "903"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "5300",
+     "planted_area_ha": "808"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "3400",
+     "planted_area_ha": "570"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "a8f1f6be-be27-4768-af54-c7f680d0df1f",
+   "member_count": 243,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "7600",
+     "planted_area_ha": "1036"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "6200",
+     "planted_area_ha": "927"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "4100",
+     "planted_area_ha": "654"
+    }
+   ]
+  },
+  {
+   "cooperative_ref": "61972064-5efe-401e-b65d-0d347a261539",
+   "member_count": 259,
+   "seasons": [
+    {
+     "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+     "paddy_tons": "8000",
+     "planted_area_ha": "1093"
+    },
+    {
+     "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+     "paddy_tons": "6500",
+     "planted_area_ha": "978"
+    },
+    {
+     "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+     "paddy_tons": "4300",
+     "planted_area_ha": "690"
+    }
+   ]
+  }
+ ],
+ "seasons": [
+  {
+   "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+   "season_type": "DX",
+   "end_month": 3,
+   "sort_order": 1
+  },
+  {
+   "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+   "season_type": "HT",
+   "end_month": 8,
+   "sort_order": 2
+  },
+  {
+   "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+   "season_type": "TD",
+   "end_month": 12,
+   "sort_order": 3
+  }
+ ],
+ "harvest_observations": {
+  "DX": [
+   {
+    "day_of_year": 59,
+    "tons": "300"
+   },
+   {
+    "day_of_year": 55,
+    "tons": "1800"
+   },
+   {
+    "day_of_year": 62,
+    "tons": "5200"
+   },
+   {
+    "day_of_year": 69,
+    "tons": "9100"
+   },
+   {
+    "day_of_year": 76,
+    "tons": "7600"
+   },
+   {
+    "day_of_year": 90,
+    "tons": "2400"
+   }
+  ],
+  "HT": [
+   {
+    "day_of_year": 201,
+    "tons": "5200"
+   }
+  ]
+ },
+ "radius": [
+  {
+   "cooperative_ref": "2c7c8a7a-36da-4260-af91-d0a575d8b5d2",
+   "hub_ref": "4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "radius_km": "13.029853391475694"
+  },
+  {
+   "cooperative_ref": "224c78e5-240e-4dc1-a15a-235463cc42fd",
+   "hub_ref": "4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "radius_km": "22.716702640665954"
+  },
+  {
+   "cooperative_ref": "bf7c3931-a6bb-4be5-9bde-cecaf548dda3",
+   "hub_ref": "4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "radius_km": "35.888670002918246"
+  },
+  {
+   "cooperative_ref": "dc0017dd-f562-42a7-bb55-b5f3d8e40284",
+   "hub_ref": "4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "radius_km": "33.40018761642621"
+  },
+  {
+   "cooperative_ref": "04285027-37cf-4cf6-9ea1-973beff978d3",
+   "hub_ref": "4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "radius_km": "39.494138206436354"
+  },
+  {
+   "cooperative_ref": "c8bd8e3b-b6b8-4830-87be-61ef8442d9f5",
+   "hub_ref": "4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "radius_km": "29.149750638245337"
+  },
+  {
+   "cooperative_ref": "7a635ac9-0231-492c-8fc2-90edbfcb06c1",
+   "hub_ref": "b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "radius_km": "38.287700357764166"
+  },
+  {
+   "cooperative_ref": "26e67edd-4c08-4ff6-81dc-00d6988097a1",
+   "hub_ref": "b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "radius_km": "17.409814114790322"
+  },
+  {
+   "cooperative_ref": "aa5ca2f0-d56b-483c-ac14-657fe9a080b6",
+   "hub_ref": "b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "radius_km": "22.516244307277432"
+  },
+  {
+   "cooperative_ref": "0f6ffa27-752c-4933-b502-49bbf3cfe09e",
+   "hub_ref": "b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "radius_km": "25.110214014038817"
+  },
+  {
+   "cooperative_ref": "5b38de61-5f9f-41f5-98c0-f91db2491ac5",
+   "hub_ref": "b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "radius_km": "38.31534140299702"
+  }
+ ],
+ "routes": [
+  {
+   "from": "hub:4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "to": "plant",
+   "mode": "road",
+   "distance_km": "158.833",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "122.17941508081088"
+  },
+  {
+   "from": "hub:4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "to": "plant",
+   "mode": "waterway",
+   "distance_km": "208.076",
+   "source": "tuyen_so_hoa_noi_bo",
+   "waterway_access": true
+  },
+  {
+   "from": "coop:2c7c8a7a-36da-4260-af91-d0a575d8b5d2",
+   "to": "hub:4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "mode": "road",
+   "distance_km": "16.939",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "13.029853391475694"
+  },
+  {
+   "from": "coop:2c7c8a7a-36da-4260-af91-d0a575d8b5d2",
+   "to": "hub:4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "mode": "waterway",
+   "distance_km": "18.893",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "13.029853391475694",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:224c78e5-240e-4dc1-a15a-235463cc42fd",
+   "to": "hub:4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "mode": "road",
+   "distance_km": "29.532",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "22.716702640665954"
+  },
+  {
+   "from": "coop:224c78e5-240e-4dc1-a15a-235463cc42fd",
+   "to": "hub:4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "mode": "waterway",
+   "distance_km": "32.939",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "22.716702640665954",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:bf7c3931-a6bb-4be5-9bde-cecaf548dda3",
+   "to": "hub:4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "mode": "road",
+   "distance_km": "46.655",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "35.888670002918246"
+  },
+  {
+   "from": "coop:bf7c3931-a6bb-4be5-9bde-cecaf548dda3",
+   "to": "hub:4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "mode": "waterway",
+   "distance_km": "52.039",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "35.888670002918246",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:dc0017dd-f562-42a7-bb55-b5f3d8e40284",
+   "to": "hub:4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "mode": "road",
+   "distance_km": "43.42",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "33.40018761642621"
+  },
+  {
+   "from": "coop:dc0017dd-f562-42a7-bb55-b5f3d8e40284",
+   "to": "hub:4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "mode": "waterway",
+   "distance_km": "48.43",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "33.40018761642621",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:04285027-37cf-4cf6-9ea1-973beff978d3",
+   "to": "hub:4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "mode": "road",
+   "distance_km": "51.342",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "39.494138206436354"
+  },
+  {
+   "from": "coop:04285027-37cf-4cf6-9ea1-973beff978d3",
+   "to": "hub:4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "mode": "waterway",
+   "distance_km": "57.267",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "39.494138206436354",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:c8bd8e3b-b6b8-4830-87be-61ef8442d9f5",
+   "to": "hub:4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "mode": "road",
+   "distance_km": "37.895",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "29.149750638245337"
+  },
+  {
+   "from": "coop:c8bd8e3b-b6b8-4830-87be-61ef8442d9f5",
+   "to": "hub:4a719051-5b71-40d4-9678-dbb4bfcfba33",
+   "mode": "waterway",
+   "distance_km": "42.267",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "29.149750638245337",
+   "waterway_access": false
+  },
+  {
+   "from": "hub:b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "to": "plant",
+   "mode": "road",
+   "distance_km": "169.961",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "130.73959434239816"
+  },
+  {
+   "from": "hub:b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "to": "plant",
+   "mode": "waterway",
+   "distance_km": "262.233",
+   "source": "tuyen_so_hoa_noi_bo",
+   "waterway_access": true
+  },
+  {
+   "from": "coop:7a635ac9-0231-492c-8fc2-90edbfcb06c1",
+   "to": "hub:b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "mode": "road",
+   "distance_km": "49.774",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "38.287700357764166"
+  },
+  {
+   "from": "coop:7a635ac9-0231-492c-8fc2-90edbfcb06c1",
+   "to": "hub:b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "mode": "waterway",
+   "distance_km": "115.199",
+   "source": "tuyen_so_hoa_noi_bo",
+   "waterway_access": true
+  },
+  {
+   "from": "coop:26e67edd-4c08-4ff6-81dc-00d6988097a1",
+   "to": "hub:b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "mode": "road",
+   "distance_km": "22.633",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "17.409814114790322"
+  },
+  {
+   "from": "coop:26e67edd-4c08-4ff6-81dc-00d6988097a1",
+   "to": "hub:b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "mode": "waterway",
+   "distance_km": "25.244",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "17.409814114790322",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:aa5ca2f0-d56b-483c-ac14-657fe9a080b6",
+   "to": "hub:b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "mode": "road",
+   "distance_km": "29.271",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "22.516244307277432"
+  },
+  {
+   "from": "coop:aa5ca2f0-d56b-483c-ac14-657fe9a080b6",
+   "to": "hub:b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "mode": "waterway",
+   "distance_km": "32.649",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "22.516244307277432",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:0f6ffa27-752c-4933-b502-49bbf3cfe09e",
+   "to": "hub:b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "mode": "road",
+   "distance_km": "32.643",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "25.110214014038817"
+  },
+  {
+   "from": "coop:0f6ffa27-752c-4933-b502-49bbf3cfe09e",
+   "to": "hub:b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "mode": "waterway",
+   "distance_km": "36.41",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "25.110214014038817",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:5b38de61-5f9f-41f5-98c0-f91db2491ac5",
+   "to": "hub:b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "mode": "road",
+   "distance_km": "49.81",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "38.31534140299702"
+  },
+  {
+   "from": "coop:5b38de61-5f9f-41f5-98c0-f91db2491ac5",
+   "to": "hub:b787881d-f005-459d-a8fd-dbd4b3e23071",
+   "mode": "waterway",
+   "distance_km": "55.557",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "38.31534140299702",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:2c7c8a7a-36da-4260-af91-d0a575d8b5d2",
+   "to": "plant",
+   "mode": "road",
+   "distance_km": "162.851",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "125.27036922984445"
+  },
+  {
+   "from": "coop:2c7c8a7a-36da-4260-af91-d0a575d8b5d2",
+   "to": "plant",
+   "mode": "waterway",
+   "distance_km": "181.642",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "125.27036922984445",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:224c78e5-240e-4dc1-a15a-235463cc42fd",
+   "to": "plant",
+   "mode": "road",
+   "distance_km": "188.138",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "144.72138548498378"
+  },
+  {
+   "from": "coop:224c78e5-240e-4dc1-a15a-235463cc42fd",
+   "to": "plant",
+   "mode": "waterway",
+   "distance_km": "209.846",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "144.72138548498378",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:bf7c3931-a6bb-4be5-9bde-cecaf548dda3",
+   "to": "plant",
+   "mode": "road",
+   "distance_km": "203.063",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "156.2026290565354"
+  },
+  {
+   "from": "coop:bf7c3931-a6bb-4be5-9bde-cecaf548dda3",
+   "to": "plant",
+   "mode": "waterway",
+   "distance_km": "226.494",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "156.2026290565354",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:dc0017dd-f562-42a7-bb55-b5f3d8e40284",
+   "to": "plant",
+   "mode": "road",
+   "distance_km": "169.455",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "130.34969057377293"
+  },
+  {
+   "from": "coop:dc0017dd-f562-42a7-bb55-b5f3d8e40284",
+   "to": "plant",
+   "mode": "waterway",
+   "distance_km": "189.007",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "130.34969057377293",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:04285027-37cf-4cf6-9ea1-973beff978d3",
+   "to": "plant",
+   "mode": "road",
+   "distance_km": "117.711",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "90.5469053340226"
+  },
+  {
+   "from": "coop:04285027-37cf-4cf6-9ea1-973beff978d3",
+   "to": "plant",
+   "mode": "waterway",
+   "distance_km": "131.293",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "90.5469053340226",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:7a635ac9-0231-492c-8fc2-90edbfcb06c1",
+   "to": "plant",
+   "mode": "road",
+   "distance_km": "120.193",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "92.45606318486176"
+  },
+  {
+   "from": "coop:7a635ac9-0231-492c-8fc2-90edbfcb06c1",
+   "to": "plant",
+   "mode": "waterway",
+   "distance_km": "162.202",
+   "source": "tuyen_so_hoa_noi_bo",
+   "waterway_access": true
+  },
+  {
+   "from": "coop:26e67edd-4c08-4ff6-81dc-00d6988097a1",
+   "to": "plant",
+   "mode": "road",
+   "distance_km": "147.347",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "113.34382979819746"
+  },
+  {
+   "from": "coop:26e67edd-4c08-4ff6-81dc-00d6988097a1",
+   "to": "plant",
+   "mode": "waterway",
+   "distance_km": "164.349",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "113.34382979819746",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:aa5ca2f0-d56b-483c-ac14-657fe9a080b6",
+   "to": "plant",
+   "mode": "road",
+   "distance_km": "157.931",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "121.48538426593403"
+  },
+  {
+   "from": "coop:aa5ca2f0-d56b-483c-ac14-657fe9a080b6",
+   "to": "plant",
+   "mode": "waterway",
+   "distance_km": "176.154",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "121.48538426593403",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:0f6ffa27-752c-4933-b502-49bbf3cfe09e",
+   "to": "plant",
+   "mode": "road",
+   "distance_km": "187.207",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "144.00568203107508"
+  },
+  {
+   "from": "coop:0f6ffa27-752c-4933-b502-49bbf3cfe09e",
+   "to": "plant",
+   "mode": "waterway",
+   "distance_km": "208.808",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "144.00568203107508",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:c8bd8e3b-b6b8-4830-87be-61ef8442d9f5",
+   "to": "plant",
+   "mode": "road",
+   "distance_km": "186.846",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "143.72739581592083"
+  },
+  {
+   "from": "coop:c8bd8e3b-b6b8-4830-87be-61ef8442d9f5",
+   "to": "plant",
+   "mode": "waterway",
+   "distance_km": "208.405",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "143.72739581592083",
+   "waterway_access": false
+  },
+  {
+   "from": "coop:5b38de61-5f9f-41f5-98c0-f91db2491ac5",
+   "to": "plant",
+   "mode": "road",
+   "distance_km": "217.056",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "166.96651600295746"
+  },
+  {
+   "from": "coop:5b38de61-5f9f-41f5-98c0-f91db2491ac5",
+   "to": "plant",
+   "mode": "waterway",
+   "distance_km": "242.101",
+   "source": "haversine_hieu_chinh",
+   "straight_km": "166.96651600295746",
+   "waterway_access": false
+  }
+ ],
+ "params": {
+  "set_version": "prototype-v2",
+  "all_approved": true,
+  "unapproved": [],
+  "values": [
+   {
+    "code": "admin_boundaries",
+    "number": 1,
+    "name": "Ranh giới tỉnh/thành sau sáp nhập (2025)",
+    "classification": "thi_truong",
+    "value": null,
+    "text_value": null,
+    "min": null,
+    "max": null,
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "htx_directory",
+    "number": 2,
+    "name": "Danh sách hợp tác xã (tên, địa bàn)",
+    "classification": "thi_truong",
+    "value": null,
+    "text_value": null,
+    "min": null,
+    "max": null,
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "htx_coordinates",
+    "number": 3,
+    "name": "Toạ độ GPS của từng HTX/vùng nguyên liệu",
+    "classification": "thi_truong",
+    "value": null,
+    "text_value": null,
+    "min": null,
+    "max": null,
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "planted_area",
+    "number": 4,
+    "name": "Diện tích gieo trồng theo HTX/vùng",
+    "classification": "thi_truong",
+    "value": null,
+    "text_value": null,
+    "min": null,
+    "max": null,
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "paddy_output",
+    "number": 5,
+    "name": "Sản lượng lúa theo HTX/vùng/mùa vụ (thống kê mùa vụ trước)",
+    "classification": "thi_truong",
+    "value": null,
+    "text_value": null,
+    "min": null,
+    "max": null,
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "farmer_count",
+    "number": 6,
+    "name": "Số nông hộ liên kết theo HTX",
+    "classification": "thi_truong",
+    "value": null,
+    "text_value": null,
+    "min": null,
+    "max": null,
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "season_calendar",
+    "number": 7,
+    "name": "Lịch mùa vụ (Đông Xuân / Hè Thu / Thu Đông)",
+    "classification": "thi_truong",
+    "value": null,
+    "text_value": null,
+    "min": null,
+    "max": null,
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "leg_distances",
+    "number": 8,
+    "name": "Khoảng cách Field→Hub, Hub→Plant và Field→Plant",
+    "classification": "thi_truong",
+    "value": null,
+    "text_value": null,
+    "min": null,
+    "max": null,
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "waterway_network",
+    "number": 9,
+    "name": "Mạng lưới đường thủy/kênh rạch lưu thông được cho sà lan",
+    "classification": "gia_dinh",
+    "value": null,
+    "text_value": null,
+    "min": null,
+    "max": null,
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "distance_correction",
+    "number": 10,
+    "name": "Hệ số hiệu chỉnh khoảng cách (Haversine → thực tế) theo phương thức",
+    "classification": "gia_dinh",
+    "value": "1.3",
+    "text_value": {
+     "road": "1.3",
+     "waterway": "1.45"
+    },
+    "min": "1.15",
+    "max": "1.5",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "plant_coordinates",
+    "number": 11,
+    "name": "Toạ độ GPS Nhà máy VFT",
+    "classification": "khac",
+    "value": null,
+    "text_value": null,
+    "min": null,
+    "max": null,
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "plant_annual_demand",
+    "number": 12,
+    "name": "Nhu cầu rơm hàng năm của Nhà máy VFT",
+    "classification": "thi_truong",
+    "value": "240000",
+    "text_value": null,
+    "min": "180000",
+    "max": "300000",
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "default_service_radius_km",
+    "number": 13,
+    "name": "Bán kính phục vụ mặc định cho Hub mới",
+    "classification": "gia_dinh",
+    "value": "30",
+    "text_value": null,
+    "min": "20",
+    "max": "45",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "default_design_capacity_tons",
+    "number": 14,
+    "name": "Công suất thiết kế mặc định cho Hub mới",
+    "classification": "gia_dinh",
+    "value": "60000",
+    "text_value": null,
+    "min": "40000",
+    "max": "90000",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "distance_error_threshold_pct",
+    "number": 15,
+    "name": "Ngưỡng sai số khoảng cách chấp nhận được",
+    "classification": "gia_dinh",
+    "value": "10",
+    "text_value": null,
+    "min": "5",
+    "max": "15",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "hub_coordinates",
+    "number": 16,
+    "name": "Toạ độ vị trí Hub ứng viên",
+    "classification": "khac",
+    "value": null,
+    "text_value": null,
+    "min": null,
+    "max": null,
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "straw_to_paddy_ratio",
+    "number": 17,
+    "name": "Hệ số rơm/lúa (tỷ lệ phụ phẩm)",
+    "classification": "gia_dinh",
+    "value": "1",
+    "text_value": null,
+    "min": "0.9",
+    "max": "1.35",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "collectable_ratio",
+    "number": 18,
+    "name": "Hệ số thu gom khả thi",
+    "classification": "gia_dinh",
+    "value": "45",
+    "text_value": null,
+    "min": "30",
+    "max": "60",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "loss_ratio",
+    "number": 19,
+    "name": "Hệ số hao hụt/tổn thất rơm trong lưu kho & vận chuyển",
+    "classification": "gia_dinh",
+    "value": "5",
+    "text_value": null,
+    "min": "3",
+    "max": "10",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "collection_labour_price",
+    "number": 20,
+    "name": "Đơn giá nhân công thu gom",
+    "classification": "gia_dinh",
+    "value": "180000",
+    "text_value": null,
+    "min": "140000",
+    "max": "240000",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "collection_consumable_price",
+    "number": 21,
+    "name": "Đơn giá công cụ/dụng cụ tiêu hao thu gom",
+    "classification": "gia_dinh",
+    "value": "45000",
+    "text_value": null,
+    "min": "30000",
+    "max": "70000",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "road_freight_rate",
+    "number": 22,
+    "name": "Đơn giá vận chuyển đường bộ",
+    "classification": "thi_truong",
+    "value": "2200",
+    "text_value": null,
+    "min": "1800",
+    "max": "2900",
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "waterway_freight_rate",
+    "number": 23,
+    "name": "Đơn giá vận chuyển đường thủy",
+    "classification": "thi_truong",
+    "value": "900",
+    "text_value": null,
+    "min": "650",
+    "max": "1250",
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "warehouse_build_price",
+    "number": 24,
+    "name": "Đơn giá xây dựng kho",
+    "classification": "thi_truong",
+    "value": "3.5",
+    "text_value": null,
+    "min": "2.8",
+    "max": "4.6",
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "yard_build_price",
+    "number": 25,
+    "name": "Đơn giá xây dựng sân bãi",
+    "classification": "thi_truong",
+    "value": "0.9",
+    "text_value": null,
+    "min": "0.6",
+    "max": "1.4",
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "equipment_price",
+    "number": 26,
+    "name": "Đơn giá thiết bị (máy ép kiện, xe nâng)",
+    "classification": "thi_truong",
+    "value": "850",
+    "text_value": {
+     "bale_press": "850",
+     "forklift": "620"
+    },
+    "min": "650",
+    "max": "1100",
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "road_feasible_distance_km",
+    "number": 27,
+    "name": "Ngưỡng cự ly khả thi cho vận chuyển đường bộ",
+    "classification": "gia_dinh",
+    "value": "120",
+    "text_value": null,
+    "min": "80",
+    "max": "180",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "land_lease_price",
+    "number": 28,
+    "name": "Đơn giá thuê đất/mặt bằng Hub",
+    "classification": "gia_dinh",
+    "value": "45000",
+    "text_value": null,
+    "min": "25000",
+    "max": "80000",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "warehouse_area_norm",
+    "number": 29,
+    "name": "Định mức diện tích kho",
+    "classification": "thi_truong",
+    "value": "0.85",
+    "text_value": null,
+    "min": "0.6",
+    "max": "1.2",
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "yard_area_norm",
+    "number": 30,
+    "name": "Định mức diện tích sân bãi",
+    "classification": "thi_truong",
+    "value": "0.6",
+    "text_value": null,
+    "min": "0.4",
+    "max": "0.9",
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "bale_press_capacity",
+    "number": 31,
+    "name": "Công suất máy ép kiện",
+    "classification": "thi_truong",
+    "value": "18000",
+    "text_value": null,
+    "min": "12000",
+    "max": "25000",
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "forklift_capacity",
+    "number": 32,
+    "name": "Công suất xe nâng",
+    "classification": "thi_truong",
+    "value": "25000",
+    "text_value": null,
+    "min": "18000",
+    "max": "35000",
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "truck_payload_tons",
+    "number": 33,
+    "name": "Tải trọng bình quân xe tải",
+    "classification": "thi_truong",
+    "value": "15",
+    "text_value": null,
+    "min": "10",
+    "max": "22",
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "barge_payload_tons",
+    "number": 34,
+    "name": "Tải trọng bình quân sà lan",
+    "classification": "thi_truong",
+    "value": "300",
+    "text_value": null,
+    "min": "150",
+    "max": "600",
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "peak_inventory_factor",
+    "number": 35,
+    "name": "Hệ số tồn kho cao điểm",
+    "classification": "gia_dinh",
+    "value": "0.3",
+    "text_value": null,
+    "min": "0.2",
+    "max": "0.45",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "road_speed_kmh",
+    "number": 36,
+    "name": "Tốc độ bình quân đường bộ",
+    "classification": "thi_truong",
+    "value": "40",
+    "text_value": null,
+    "min": "30",
+    "max": "55",
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "waterway_speed_kmh",
+    "number": 37,
+    "name": "Tốc độ bình quân đường thủy",
+    "classification": "thi_truong",
+    "value": "12",
+    "text_value": null,
+    "min": "8",
+    "max": "16",
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "handling_hours_per_trip",
+    "number": 38,
+    "name": "Thời gian bốc/xếp bình quân mỗi chuyến",
+    "classification": "thi_truong",
+    "value": "3.5",
+    "text_value": null,
+    "min": "2",
+    "max": "6",
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "capex_other",
+    "number": 39,
+    "name": "CAPEX ngoài xây dựng/thiết bị (đất, pháp lý, dự phòng…)",
+    "classification": "gia_dinh",
+    "value": "12000",
+    "text_value": null,
+    "min": "8000",
+    "max": "20000",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "staff_count",
+    "number": 40,
+    "name": "Số nhân sự vận hành Hub (định biên)",
+    "classification": "gia_dinh",
+    "value": "18",
+    "text_value": null,
+    "min": "12",
+    "max": "28",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "staff_salary_month",
+    "number": 41,
+    "name": "Lương bình quân nhân sự vận hành",
+    "classification": "gia_dinh",
+    "value": "9500000",
+    "text_value": null,
+    "min": "8000000",
+    "max": "13000000",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "utility_cost_year",
+    "number": 42,
+    "name": "Chi phí điện/nhiên liệu vận hành Hub",
+    "classification": "gia_dinh",
+    "value": "1800000000",
+    "text_value": null,
+    "min": "1200000000",
+    "max": "2800000000",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "maintenance_rate_pct",
+    "number": 43,
+    "name": "Tỷ lệ bảo trì thiết bị hàng năm",
+    "classification": "gia_dinh",
+    "value": "6",
+    "text_value": null,
+    "min": "4",
+    "max": "10",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "discount_rate_pct",
+    "number": 44,
+    "name": "Tỷ lệ chiết khấu (discount rate) cho TCO",
+    "classification": "gia_dinh",
+    "value": "10",
+    "text_value": null,
+    "min": "8",
+    "max": "14",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "opex_escalation_pct",
+    "number": 45,
+    "name": "Tỷ lệ tăng chi phí OPEX hàng năm (escalation)",
+    "classification": "gia_dinh",
+    "value": "5",
+    "text_value": null,
+    "min": "3",
+    "max": "8",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "ramp_up_pct",
+    "number": 46,
+    "name": "Tỷ lệ sản lượng năm đầu so với mức ổn định (ramp-up)",
+    "classification": "gia_dinh",
+    "value": "60",
+    "text_value": null,
+    "min": "40",
+    "max": "85",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "lifecycle_years",
+    "number": 47,
+    "name": "Số năm vòng đời so sánh",
+    "classification": "gia_dinh",
+    "value": "10",
+    "text_value": null,
+    "min": "7",
+    "max": "15",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "min_roi_pct",
+    "number": 48,
+    "name": "Ngưỡng ROI tối thiểu để khuyến nghị đầu tư",
+    "classification": "gia_dinh",
+    "value": null,
+    "text_value": null,
+    "min": null,
+    "max": null,
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "max_payback_years",
+    "number": 49,
+    "name": "Ngưỡng Payback Period tối đa chấp nhận được",
+    "classification": "gia_dinh",
+    "value": null,
+    "text_value": null,
+    "min": null,
+    "max": null,
+    "approved": false,
+    "param_version": null
+   },
+   {
+    "code": "boat_registered_tons",
+    "number": 50,
+    "name": "Tải trọng đăng ký của ghe chở rơm",
+    "classification": "gia_dinh",
+    "value": "100",
+    "text_value": null,
+    "min": "60",
+    "max": "150",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "boat_straw_payload_tons",
+    "number": 51,
+    "name": "Khối lượng rơm thực chở mỗi chuyến ghe",
+    "classification": "gia_dinh",
+    "value": "90",
+    "text_value": null,
+    "min": "50",
+    "max": "140",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "barge_small_payload_tons",
+    "number": 52,
+    "name": "Tải trọng sà lan nhỏ (ngoài vụ)",
+    "classification": "gia_dinh",
+    "value": "1000",
+    "text_value": null,
+    "min": "500",
+    "max": "1500",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "barge_large_payload_tons",
+    "number": 53,
+    "name": "Tải trọng sà lan lớn (ngoài vụ)",
+    "classification": "gia_dinh",
+    "value": "2000",
+    "text_value": null,
+    "min": "1500",
+    "max": "3000",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "plant_operating_days",
+    "number": 54,
+    "name": "Số ngày vận hành nhà máy trong năm",
+    "classification": "gia_dinh",
+    "value": "330",
+    "text_value": null,
+    "min": "300",
+    "max": "365",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "hub_processing_cost",
+    "number": 55,
+    "name": "Chi phí băm và nén rơm tại Hub",
+    "classification": "gia_dinh",
+    "value": "120000",
+    "text_value": null,
+    "min": "70000",
+    "max": "200000",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "hub_processing_loss_pct",
+    "number": 56,
+    "name": "Hao hụt khi băm và nén tại Hub",
+    "classification": "gia_dinh",
+    "value": "2",
+    "text_value": null,
+    "min": "0",
+    "max": "6",
+    "approved": true,
+    "param_version": 1
+   },
+   {
+    "code": "harvest_window_days",
+    "number": 57,
+    "name": "Số ngày thu hoạch rộ của một vụ",
+    "classification": "gia_dinh",
+    "value": "45",
+    "text_value": null,
+    "min": "20",
+    "max": "90",
+    "approved": true,
+    "param_version": 1
+   }
+  ]
+ },
+ "options": {
+  "mode": "evaluate",
+  "sensitivity_codes": []
+ }
+}
