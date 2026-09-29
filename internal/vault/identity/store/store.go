@@ -178,6 +178,35 @@ func ListPubKeys(ctx context.Context, tx pgx.Tx, areas []string, after uuid.UUID
 	return out, rows.Err()
 }
 
+// HouseholdPubKeys đọc khóa công khai của các chủ thể loại household chưa xóa theo ref, sắp theo ref.
+func HouseholdPubKeys(ctx context.Context, tx pgx.Tx, refs []uuid.UUID) ([]PubKey, error) {
+	rows, err := tx.Query(ctx, `SELECT s.ref, s.area_code, k.public_key
+	    FROM vault.subject s JOIN vault.subject_key k ON k.tenant_id = s.tenant_id AND k.subject_ref = s.ref
+	   WHERE s.erased_at IS NULL AND s.kind = 'household' AND s.ref = ANY($1::uuid[])
+	   ORDER BY s.ref`, refStrs(refs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []PubKey
+	for rows.Next() {
+		var p PubKey
+		if err := rows.Scan(&p.Ref, &p.AreaCode, &p.PublicKey); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+func refStrs(refs []uuid.UUID) []string {
+	out := make([]string, 0, len(refs))
+	for _, r := range refs {
+		out = append(out, r.String())
+	}
+	return out
+}
+
 // Access là một dòng sổ truy cập — chỉ mã tham chiếu, không có giá trị định danh.
 type Access struct {
 	ID          uuid.UUID

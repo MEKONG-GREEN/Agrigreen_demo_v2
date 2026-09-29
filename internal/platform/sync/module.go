@@ -16,6 +16,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
+	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/app"
@@ -84,6 +85,11 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.
 
 // RegisterAdmin gắn route Admin API.
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }
+
+// UseFarmers nối liên kết tài khoản nông dân ↔ nông hộ (pf/accounts) sau khi dựng pf/accounts:
+// thiết bị của nông dân (vai farmer, không org_ref) pull các entity của port.FarmerSource theo
+// nông hộ của mình và khóa công khai của chính các hộ đó (HTX US-SEASON-01, US-LOG-01, US-SUPPORT-01).
+func (m *Module) UseFarmers(f accport.FarmerHouseholds) { m.svc.Farmers = f }
 
 // PullEntities liệt kê entity chiều xuống đã nối (kể cả pubkey).
 func (m *Module) PullEntities() []string { return m.svc.PullEntities() }

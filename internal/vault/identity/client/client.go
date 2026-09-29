@@ -89,4 +89,11 @@ type Client interface {
 	Erase(ctx context.Context, ref uuid.UUID, reason string) error
 	// PubKeys trả khóa công khai của các chủ thể thuộc địa bàn, cho đồng bộ xuống thiết bị.
 	PubKeys(ctx context.Context, areaCodes []string) ([]PubKey, error)
+	// HouseholdPubKeys trả khóa công khai của các chủ thể NÔNG HỘ chưa xóa theo ref (1–
+	// MaxPubKeyRefs ref; ref lạ, đã xóa hoặc là người → bỏ qua), sắp theo ref. Dùng cho
+	// thiết bị của nông dân: pf/sync chỉ hỏi các nông hộ liên kết với tài khoản.
+	HouseholdPubKeys(ctx context.Context, refs []uuid.UUID) ([]PubKey, error)
 }
+
+// MaxPubKeyRefs là số ref tối đa của một lần HouseholdPubKeys.
+const MaxPubKeyRefs = 50

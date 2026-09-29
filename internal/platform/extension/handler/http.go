@@ -30,6 +30,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.GET("/tasks", h.listTasks)
 	g.POST("/tasks/bulk-assign", h.bulkAssign)
 	g.GET("/tasks/:id", h.getTask)
+	g.GET("/support-requests", h.listStaffSupport)
 	g.POST("/tasks/:id/assign", h.assignTask)
 	g.POST("/tasks/:id/status", h.updateStatus)
 

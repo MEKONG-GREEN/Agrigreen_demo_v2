@@ -158,6 +158,9 @@ export type FarmerImportResult = AppPost<"/v1/farmer-accounts/import">;
 
 // pf/extension — yêu cầu hỗ trợ của nông dân
 export type SupportRequest = S["SupportRequest"];
+/** Danh sách cán bộ GET /v1/extension/support-requests (quản lý HTX, khuyến nông). */
+export type SupportRequestStaff = S["SupportRequestStaff"];
+export type SupportCategory = SupportRequestStaff["category"];
 
 // pf/masterdata — nhập danh mục (Admin)
 export type CatalogImportResult = AS["CatalogImportResult"];

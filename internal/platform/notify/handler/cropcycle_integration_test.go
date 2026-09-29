@@ -14,6 +14,7 @@ import (
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 )
@@ -110,6 +111,12 @@ func TestFarmLogNotificationsHTXUSLOG05(t *testing.T) {
 	}
 	if in := farmer.inbox(); len(in) != 2 || !strings.Contains(in[0]["title"].(string), "đã được duyệt") {
 		t.Fatalf("phê duyệt: %v", in)
+	}
+	// Đường nông dân của pf/sync (App HTX): chỉ thông báo cá nhân, kể cả khi pf/sync truyền xã của nông hộ.
+	fs := f.mod.SyncSource().(syncport.FarmerSource)
+	ch, _, err := fs.FarmerChanges(farmer.ctx(), syncport.FarmerScope{Households: []uuid.UUID{hh}, Communes: []string{ward1}}, port.EntityNotification, 0, 100)
+	if err != nil || len(ch) != 2 {
+		t.Fatalf("pull nông dân: %v %d", err, len(ch))
 	}
 	// Tenant khác không thấy.
 	other := f.asActor(ids.New(), uuid.Nil, farmer.actor, ccport.RoleFarmer)

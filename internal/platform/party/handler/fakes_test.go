@@ -136,6 +136,10 @@ func (v *fakeVault) PubKeys(context.Context, []string) ([]client.PubKey, error) 
 	return nil, errNotImplemented
 }
 
+func (v *fakeVault) HouseholdPubKeys(context.Context, []uuid.UUID) ([]client.PubKey, error) {
+	return nil, errNotImplemented
+}
+
 func (v *fakeVault) usedPurposes() []client.Purpose {
 	v.mu.Lock()
 	defer v.mu.Unlock()

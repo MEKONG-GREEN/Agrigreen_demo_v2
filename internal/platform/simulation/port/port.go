@@ -37,6 +37,11 @@ const (
 const (
 	// SnapshotConsumer dựng ảnh chụp cho pf.simulation.run.submitted.
 	SnapshotConsumer = "pf.simulation.snapshot"
+	// OptimizerConsumer là hàng đợi của optimizer Python (optimizer/, AG_OPTIMIZER_QUEUE)
+	// nhận pf.simulation.job.requested. Khai ở đây để outbox-publisher khai báo trước
+	// hàng đợi khi khởi động (docs/runbooks/rabbitmq-queues.md) — optimizer khai báo
+	// cùng tham số khi chạy.
+	OptimizerConsumer = "pf.simulation.optimizer"
 )
 
 // RunSubmittedV1 là payload của pf.simulation.run.submitted. Worker đọc yêu cầu

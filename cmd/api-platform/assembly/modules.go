@@ -187,6 +187,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		kn.UseContacts(c) // US-DIR-02: số điện thoại cán bộ đọc từ Keycloak lúc bấm liên hệ
 	}
 	kn.UseFarmers(acc.FarmerHouseholds())                                                     // HTX US-SUPPORT-01: nông hộ của tài khoản nông dân
+	snc.UseFarmers(acc.FarmerHouseholds())                                                    // App HTX: pull của nông dân theo nông hộ liên kết
 	cc.UseFarmerHouseholds(farmerHouseholds{acc.FarmerHouseholds()})                          // HTX US-SEASON-01: thửa của nông hộ mình
 	g.UseFarmers(farmerHouseholds{acc.FarmerHouseholds()})                                    // HTX US-GPS-03: nông dân đọc log GPS của mình
 	nt.UseAreaFarmers(AreaFarmers{Plots: g.PlotHouseholds(), Accounts: acc.FarmerAccounts()}) // HTX US-NEWS-03

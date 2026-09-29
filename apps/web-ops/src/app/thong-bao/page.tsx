@@ -39,7 +39,7 @@ export default function InboxPage() {
     } catch (e) {
       setProblem(toApiProblem(e));
     }
-    const href = deepLinkHref(n.deep_link);
+    const href = deepLinkHref(n.deep_link, n.kind);
     if (href) router.push(href);
     else changed();
   };
@@ -89,7 +89,7 @@ export default function InboxPage() {
                 </span>
                 <b>{n.title}</b>
                 <span className="small">{n.body}</span>
-                {!deepLinkHref(n.deep_link) ? <span className="mute small">Không có màn hình liên kết trên web.</span> : null}
+                {!deepLinkHref(n.deep_link, n.kind) ? <span className="mute small">Không có màn hình liên kết trên web.</span> : null}
               </button>
             </li>
           ))}

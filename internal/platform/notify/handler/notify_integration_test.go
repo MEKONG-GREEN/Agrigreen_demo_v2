@@ -499,6 +499,11 @@ func TestNotificationSyncSourceCursor(t *testing.T) {
 	if err != nil || len(ch) != 2 {
 		t.Fatalf("lượt đầu: %v %d", err, len(ch))
 	}
+	// App HTX: nông dân cùng xã không nhận thông báo chủ đề (chỉ đạo, cảnh báo theo xã) qua pull.
+	farmer := f.asActor(f.tenant, uuid.Nil, ids.New(), "farmer")
+	if fch, _, err := src.(syncport.FarmerSource).FarmerChanges(farmer.ctx(), syncport.FarmerScope{Communes: []string{ward1}}, port.EntityNotification, 0, 100); err != nil || len(fch) != 0 {
+		t.Fatalf("nông dân nhận thông báo chủ đề: %v %d", err, len(fch))
+	}
 	if ch[0].Version >= ch[1].Version || last != ch[1].Version {
 		t.Fatal("version phải tăng dần, last = version lớn nhất")
 	}

@@ -35,11 +35,16 @@ type UserSpec struct {
 	Org    uuid.UUID // org_ref trong token (đơn vị công tác) — uuid.Nil: không có
 	Roles  []string
 	MFA    bool
+	// Subject là sub của token (vd tài khoản nông dân vừa tạo ở pf/accounts); uuid.Nil → ngẫu nhiên.
+	Subject uuid.UUID
 }
 
-// User phát token cho một người dùng mới (actor ngẫu nhiên).
+// User phát token cho một người dùng (actor = Subject hoặc ngẫu nhiên).
 func (s *Stack) User(spec UserSpec) *User {
-	actor := uuid.Must(uuid.NewV7())
+	actor := spec.Subject
+	if actor == uuid.Nil {
+		actor = uuid.Must(uuid.NewV7())
+	}
 	tok := s.Issuer.Sign(s.T, authztest.Token{Subject: actor, TenantID: spec.Tenant, Roles: spec.Roles, MFA: spec.MFA, OrgRef: spec.Org, TTL: 2 * time.Hour})
 	return &User{s: s, Actor: actor, Tenant: spec.Tenant, Org: spec.Org, Roles: spec.Roles, MFA: spec.MFA, Token: tok}
 }

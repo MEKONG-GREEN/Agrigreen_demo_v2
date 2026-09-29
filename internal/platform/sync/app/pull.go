@@ -9,10 +9,12 @@ import (
 	"net/http"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
+	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -81,8 +83,19 @@ func (s *Service) PullEntitiesOnly(ctx context.Context, deviceHeader, cursor str
 	if err != nil {
 		return PullResult{}, err
 	}
-	now := s.Clock.Now()
+	v := view{scope: scope}
 	fp := domain.ScopeFingerprint(scope.All, scope.Units)
+	if scope.Empty() && p.Has(accport.RoleFarmer) {
+		// Nông dân: token không có org_ref → phạm vi pf/party rỗng. Đi đường riêng theo
+		// nông hộ liên kết (chỉ entity của FarmerSource), không suy phạm vi xã.
+		if v.farmer, err = s.farmerScope(ctx, p); err != nil {
+			return PullResult{}, err
+		}
+		if v.farmer != nil {
+			fp = farmerFingerprint(*v.farmer)
+		}
+	}
+	now := s.Clock.Now()
 	cur := domain.NewCursor(p.TenantID, dev.ID, fp)
 	res := PullResult{ServerTime: now, Changes: []port.Change{}}
 	if cursor != "" {
@@ -96,8 +109,8 @@ func (s *Service) PullEntitiesOnly(ctx context.Context, deviceHeader, cursor str
 			res.Reset = true
 		}
 	}
-	if !scope.Empty() {
-		res.Changes, res.HasMore, err = s.collect(ctx, scope, &cur, limit, now, filter)
+	if !scope.Empty() || v.farmer != nil {
+		res.Changes, res.HasMore, err = s.collect(ctx, v, &cur, limit, now, filter)
 		if err != nil {
 			return PullResult{}, err
 		}
@@ -110,7 +123,7 @@ func (s *Service) PullEntitiesOnly(ctx context.Context, deviceHeader, cursor str
 
 // collect chạy vòng chia hạn mức. has_more = còn entity đã dùng đủ phần của mình
 // (có thể còn dữ liệu) hoặc chưa được hỏi ở vòng cuối.
-func (s *Service) collect(ctx context.Context, scope authz.Scope, cur *domain.Cursor, limit int, now time.Time, filter map[string]bool) ([]port.Change, bool, error) {
+func (s *Service) collect(ctx context.Context, v view, cur *domain.Cursor, limit int, now time.Time, filter map[string]bool) ([]port.Change, bool, error) {
 	out := []port.Change{}
 	var active []pager
 	for _, pg := range s.pagers {
@@ -131,7 +144,7 @@ func (s *Service) collect(ctx context.Context, scope authz.Scope, cur *domain.Cu
 				next = append(next, pg)
 				continue
 			}
-			ch, exhausted, err := pg.fetch(ctx, scope, cur, q, now)
+			ch, exhausted, err := pg.fetch(ctx, v, cur, q, now)
 			if err != nil {
 				return nil, false, err
 			}
@@ -146,23 +159,87 @@ func (s *Service) collect(ctx context.Context, scope authz.Scope, cur *domain.Cu
 	return out, len(active) > 0, nil
 }
 
+// view là phạm vi của một lượt pull: phạm vi cán bộ (scope, theo pf/party) hoặc phạm vi
+// nông dân (farmer ≠ nil, theo nông hộ liên kết) — không bao giờ cả hai.
+type view struct {
+	scope  authz.Scope
+	farmer *port.FarmerScope
+}
+
+// farmerScope tính phạm vi nông dân từ liên kết tài khoản ↔ nông hộ (pf/accounts). Chưa
+// nối pf/accounts → nil (thiết bị nông dân không nhận gì — mặc định chặn).
+func (s *Service) farmerScope(ctx context.Context, p authz.Principal) (*port.FarmerScope, error) {
+	if s.Farmers == nil {
+		return nil, nil
+	}
+	links, err := s.Farmers.HouseholdsForSubject(ctx, p.ActorRef)
+	if err != nil {
+		return nil, ErrDependency.WithDetail("không tra được nông hộ của tài khoản").WithCause(err)
+	}
+	fs := &port.FarmerScope{Households: []uuid.UUID{}, Cooperatives: []uuid.UUID{}, Communes: []string{}}
+	for _, l := range links {
+		if !slices.Contains(fs.Households, l.HouseholdRef) {
+			fs.Households = append(fs.Households, l.HouseholdRef)
+		}
+		if l.CooperativeRef != uuid.Nil && !slices.Contains(fs.Cooperatives, l.CooperativeRef) {
+			fs.Cooperatives = append(fs.Cooperatives, l.CooperativeRef)
+		}
+		if l.CommuneCode != "" && !slices.Contains(fs.Communes, l.CommuneCode) {
+			fs.Communes = append(fs.Communes, l.CommuneCode)
+		}
+	}
+	byStr := func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) }
+	slices.SortFunc(fs.Households, byStr)
+	slices.SortFunc(fs.Cooperatives, byStr)
+	slices.Sort(fs.Communes)
+	return fs, nil
+}
+
+// farmerFingerprint: đổi nông hộ liên kết (liên kết mới, hủy liên kết) → con trỏ cũ reset.
+func farmerFingerprint(fs port.FarmerScope) string {
+	keys := make([]string, 0, len(fs.Households)+len(fs.Cooperatives)+len(fs.Communes))
+	for _, h := range fs.Households {
+		keys = append(keys, "hh:"+h.String())
+	}
+	for _, c := range fs.Cooperatives {
+		keys = append(keys, "htx:"+c.String())
+	}
+	for _, c := range fs.Communes {
+		keys = append(keys, "xa:"+c)
+	}
+	return "farmer:" + domain.ScopeFingerprint(false, keys)
+}
+
 // pager đọc một entity chiều xuống, cập nhật vị trí trong cur.
 type pager interface {
 	entity() string
 	// fetch trả tối đa limit thay đổi; exhausted = chắc chắn không còn gì ở trang này.
-	fetch(ctx context.Context, scope authz.Scope, cur *domain.Cursor, limit int, now time.Time) ([]port.Change, bool, error)
+	fetch(ctx context.Context, v view, cur *domain.Cursor, limit int, now time.Time) ([]port.Change, bool, error)
 }
 
 type sourcePager struct {
-	src port.Source
-	ent string
+	src    port.Source
+	ent    string
+	farmer bool // entity nằm trong FarmerEntities của Source
 }
 
 func (p sourcePager) entity() string { return p.ent }
 
-func (p sourcePager) fetch(ctx context.Context, scope authz.Scope, cur *domain.Cursor, limit int, _ time.Time) ([]port.Change, bool, error) {
+func (p sourcePager) fetch(ctx context.Context, v view, cur *domain.Cursor, limit int, _ time.Time) ([]port.Change, bool, error) {
 	after := cur.Last[p.ent]
-	ch, last, err := p.src.Changes(ctx, scope, p.ent, after, limit)
+	var (
+		ch   []port.Change
+		last int64
+		err  error
+	)
+	if v.farmer != nil {
+		if !p.farmer {
+			return nil, true, nil // entity không phục vụ nông dân → đóng
+		}
+		ch, last, err = p.src.(port.FarmerSource).FarmerChanges(ctx, *v.farmer, p.ent, after, limit)
+	} else {
+		ch, last, err = p.src.Changes(ctx, v.scope, p.ent, after, limit)
+	}
 	var pr *problem.Problem
 	if errors.As(err, &pr) && pr.Status == http.StatusForbidden {
 		// Người gọi không có vai đọc entity này (vd nông dân với entity task): bỏ qua entity,
@@ -201,11 +278,24 @@ type pubkeyData struct {
 	PublicKey []byte    `json:"public_key"` // base64 chuẩn
 }
 
-func (p pubkeyPager) fetch(ctx context.Context, scope authz.Scope, cur *domain.Cursor, limit int, now time.Time) ([]port.Change, bool, error) {
-	if p.svc.Vault == nil || scope.All || len(scope.Units) == 0 {
+func (p pubkeyPager) fetch(ctx context.Context, v view, cur *domain.Cursor, limit int, now time.Time) ([]port.Change, bool, error) {
+	if p.svc.Vault == nil {
 		return nil, true, nil
 	}
-	keys, err := p.svc.Vault.PubKeys(ctx, scope.Units)
+	var (
+		keys []client.PubKey
+		err  error
+	)
+	switch {
+	case v.farmer != nil:
+		// Nông dân: CHỈ khóa của các nông hộ liên kết (HTX US-LOG-01, R-40 — máy mã hóa ảnh
+		// bằng khóa hộ mình), qua HouseholdPubKeys của kho (vai farmer, không cần vault_pubkey_sync).
+		keys, err = householdKeys(ctx, p.svc.Vault, v.farmer.Households)
+	case v.scope.All || len(v.scope.Units) == 0:
+		return nil, true, nil
+	default:
+		keys, err = p.svc.Vault.PubKeys(ctx, v.scope.Units)
+	}
 	if err != nil {
 		var pr *problem.Problem
 		if errors.As(err, &pr) && pr.Status == http.StatusForbidden {
@@ -248,6 +338,20 @@ func (p pubkeyPager) fetch(ctx context.Context, scope authz.Scope, cur *domain.C
 	out = append(out, port.Change{Entity: port.EntityPubKey, ID: uuid.Nil, Version: pk.Ver, Op: port.OpTombstone})
 	pk.Done = true
 	return out, true, nil
+}
+
+// householdKeys đọc khóa theo lô MaxPubKeyRefs ref; không có nông hộ → tập rỗng (lượt
+// vẫn kết thúc bằng bản ghi đánh dấu để máy xóa khóa cũ).
+func householdKeys(ctx context.Context, vc client.Client, refs []uuid.UUID) ([]client.PubKey, error) {
+	out := []client.PubKey{}
+	for batch := range slices.Chunk(refs, client.MaxPubKeyRefs) {
+		keys, err := vc.HouseholdPubKeys(ctx, batch)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, keys...)
+	}
+	return out, nil
 }
 
 func keysFingerprint(keys []client.PubKey) string {

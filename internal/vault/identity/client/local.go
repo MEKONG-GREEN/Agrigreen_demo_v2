@@ -55,6 +55,10 @@ func (l local) Erase(ctx context.Context, ref uuid.UUID, reason string) error {
 	return l.s.Erase(ctx, ref, reason)
 }
 
+func (l local) HouseholdPubKeys(ctx context.Context, refs []uuid.UUID) ([]PubKey, error) {
+	return l.s.HouseholdPubKeys(ctx, refs)
+}
+
 func (l local) PubKeys(ctx context.Context, areaCodes []string) ([]PubKey, error) {
 	return l.s.PubKeys(ctx, areaCodes)
 }

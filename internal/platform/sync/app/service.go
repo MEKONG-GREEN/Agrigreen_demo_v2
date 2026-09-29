@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/domain"
@@ -47,7 +48,10 @@ var (
 
 // Deps là phụ thuộc ngoài module, do gốc lắp ráp truyền vào.
 type Deps struct {
-	Scope     partyport.ScopeResolver
+	Scope partyport.ScopeResolver
+	// Farmers (tùy chọn): nông hộ liên kết với tài khoản nông dân (pf/accounts). Thiếu →
+	// thiết bị của nông dân không nhận gì (mặc định chặn), như trước G2 đợt 3.
+	Farmers   accport.FarmerHouseholds
 	Consent   partyport.ConsentChecker // tùy chọn: kiểm đồng ý trước khi cấp tệp minh chứng
 	Params    mdport.Params            // tùy chọn: sync.conflict_sla_hours
 	Vault     client.Client            // khóa công khai (pubkey) và mở DEK xem tệp
@@ -78,12 +82,23 @@ func NewService(db tenant.Beginner, clk clock.Clock, d Deps, sources []port.Sour
 	s := &Service{DB: db, Clock: clk, Deps: d, sinks: map[string]port.Sink{}}
 	seen := map[string]bool{port.EntityPubKey: true}
 	for _, src := range sources {
+		if fs, ok := src.(port.FarmerSource); ok {
+			for _, e := range fs.FarmerEntities() {
+				if !slices.Contains(src.Entities(), e) {
+					return nil, fmt.Errorf("sync: entity nông dân %q không thuộc Entities() của Source", e)
+				}
+			}
+		}
 		for _, e := range src.Entities() {
 			if seen[e] {
 				return nil, fmt.Errorf("sync: entity chiều xuống %q được khai hai lần", e)
 			}
 			seen[e] = true
-			s.pagers = append(s.pagers, sourcePager{src: src, ent: e})
+			pg := sourcePager{src: src, ent: e}
+			if fs, ok := src.(port.FarmerSource); ok {
+				pg.farmer = slices.Contains(fs.FarmerEntities(), e)
+			}
+			s.pagers = append(s.pagers, pg)
 		}
 	}
 	slices.SortFunc(s.pagers, func(a, b pager) int { return strings.Compare(a.entity(), b.entity()) })

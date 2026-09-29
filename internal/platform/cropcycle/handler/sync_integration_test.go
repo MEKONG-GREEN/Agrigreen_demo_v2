@@ -122,6 +122,26 @@ func TestSyncPushPull_HTX_US_LOG_04(t *testing.T) {
 	if err != nil || len(other) != 0 {
 		t.Fatalf("HTX B: %v %v", other, err)
 	}
+
+	// Đường nông dân của pf/sync (FarmerSource): phạm vi = nông hộ pf/sync truyền vào, không
+	// tra lại liên kết — chỉ hộ h1 → một vụ; SOP hệ thống vẫn xuống; không vai farmer → rỗng.
+	fs, ok := src.(syncport.FarmerSource)
+	if !ok || len(fs.FarmerEntities()) != 3 {
+		t.Fatal("cropcycle phải là FarmerSource cho sop_version, season, farm_log")
+	}
+	only := syncport.FarmerScope{Households: []uuid.UUID{f.h1}, Cooperatives: []uuid.UUID{f.coopA}}
+	if ch, _, err := fs.FarmerChanges(ctx, only, port.EntitySeason, 0, 100); err != nil || len(ch) != 1 {
+		t.Fatalf("FarmerChanges season của h1: %v %+v", err, ch)
+	}
+	if ch, _, err := fs.FarmerChanges(ctx, only, port.EntitySOPVersion, 0, 100); err != nil || len(ch) != 1 || ch[0].ID.String() != ver {
+		t.Fatalf("FarmerChanges sop_version: %v %+v", err, ch)
+	}
+	if ch, _, _ := fs.FarmerChanges(ctx, syncport.FarmerScope{}, port.EntitySeason, 0, 100); len(ch) != 0 {
+		t.Fatalf("không nông hộ: %+v", ch)
+	}
+	if ch, _, _ := fs.FarmerChanges(f.ctxFor(mb, port.RoleCoopManager), only, port.EntitySeason, 0, 100); len(ch) != 0 {
+		t.Fatalf("không vai farmer: %+v", ch)
+	}
 }
 
 // R-22: dựng lại bảng chiếu từ sổ cho kết quả giống hệt đường ghi trực tiếp.

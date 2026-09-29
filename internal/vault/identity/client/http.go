@@ -265,6 +265,26 @@ func (c *httpClient) Erase(ctx context.Context, ref uuid.UUID, reason string) er
 		in: ErasureRequest{Reason: reason}, out: &ErasureResponse{}})
 }
 
+func (c *httpClient) HouseholdPubKeys(ctx context.Context, refs []uuid.UUID) ([]PubKey, error) {
+	q := url.Values{}
+	for _, r := range refs {
+		q.Add("ref", r.String())
+	}
+	var out PubKeysResponse
+	if err := c.do(ctx, call{method: http.MethodGet, path: "/v1/pubkeys/households?" + q.Encode(), out: &out}); err != nil {
+		return nil, err
+	}
+	all := make([]PubKey, 0, len(out.Items))
+	for _, it := range out.Items {
+		ref, err := uuid.Parse(it.Ref)
+		if err != nil {
+			return nil, problem.New(http.StatusBadGateway, CodeUnavailable, "Phản hồi kho định danh sai dạng").WithCause(err)
+		}
+		all = append(all, PubKey{Ref: ref, AreaCode: it.AreaCode, PublicKey: it.PublicKey})
+	}
+	return all, nil
+}
+
 func (c *httpClient) PubKeys(ctx context.Context, areaCodes []string) ([]PubKey, error) {
 	var all []PubKey
 	cursor := ""

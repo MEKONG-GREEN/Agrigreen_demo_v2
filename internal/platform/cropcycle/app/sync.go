@@ -29,8 +29,9 @@ type SyncSource struct{ Svc *Service }
 type SyncSink struct{ Svc *Service }
 
 var (
-	_ syncport.Source = SyncSource{}
-	_ syncport.Sink   = SyncSink{}
+	_ syncport.FarmerSource = SyncSource{}
+	_ syncport.Source       = SyncSource{}
+	_ syncport.Sink         = SyncSink{}
 )
 
 // Entities thực hiện syncport.Source.
@@ -151,13 +152,36 @@ func timeStr(t *time.Time) *string {
 	return &s
 }
 
+// FarmerEntities thực hiện syncport.FarmerSource: nông dân nhận vụ, nhật ký của thửa thuộc
+// nông hộ mình và SOP đã phát hành (hệ thống + HTX của hộ).
+func (SyncSource) FarmerEntities() []string {
+	return []string{port.EntitySOPVersion, port.EntitySeason, port.EntityFarmLog}
+}
+
+// FarmerChanges thực hiện syncport.FarmerSource: phạm vi = nông hộ pf/sync tra từ liên kết
+// tài khoản (HTX US-SEASON-01, US-LOG-01). Người gọi phải có vai farmer.
+func (src SyncSource) FarmerChanges(ctx context.Context, fs syncport.FarmerScope, entity string, after int64, limit int) ([]syncport.Change, int64, error) {
+	p, ok := authz.FromContext(ctx)
+	if !ok {
+		return nil, after, problem.Unauthenticated
+	}
+	if !p.Has(port.RoleFarmer) {
+		return []syncport.Change{}, after, nil
+	}
+	return src.changes(ctx, access{p: p, kind: accFarmer, households: fs.Households, sopCoops: fs.Cooperatives}, entity, after, limit)
+}
+
 // Changes thực hiện syncport.Source.
 func (src SyncSource) Changes(ctx context.Context, scope authz.Scope, entity string, after int64, limit int) ([]syncport.Change, int64, error) {
-	s := src.Svc
-	a, ok, err := s.syncAccess(ctx, scope)
+	a, ok, err := src.Svc.syncAccess(ctx, scope)
 	if err != nil || !ok {
 		return []syncport.Change{}, after, err
 	}
+	return src.changes(ctx, a, entity, after, limit)
+}
+
+func (src SyncSource) changes(ctx context.Context, a access, entity string, after int64, limit int) ([]syncport.Change, int64, error) {
+	s := src.Svc
 	f := a.filter()
 	if f.Mode == store.FilterNone || (f.Mode == store.FilterUnits && len(f.Units) == 0) {
 		return []syncport.Change{}, after, nil
@@ -167,11 +191,15 @@ func (src SyncSource) Changes(ctx context.Context, scope authz.Scope, entity str
 	}
 	var out []syncport.Change
 	last := after
-	err = s.inTx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
+	err := s.inTx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
 		switch entity {
 		case port.EntitySOPVersion:
 			all, coop := a.sopVisibility()
-			rows, err := store.PublishedVersionsAfter(ctx, tx, all, []uuid.UUID{coop}, after, limit)
+			coops := []uuid.UUID{coop}
+			if a.kind == accFarmer && len(a.sopCoops) > 0 {
+				coops = a.sopCoops
+			}
+			rows, err := store.PublishedVersionsAfter(ctx, tx, all, coops, after, limit)
 			if err != nil {
 				return err
 			}

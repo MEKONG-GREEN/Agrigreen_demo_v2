@@ -12,6 +12,7 @@ package clienttest
 import (
 	"context"
 	"crypto/rand"
+	"slices"
 	"sort"
 	"sync"
 
@@ -259,6 +260,34 @@ func (f *Fake) Erase(ctx context.Context, ref uuid.UUID, reason string) error {
 	clear(s.priv[:])
 	s.id, s.priv, s.erased = client.Identity{Kind: s.id.Kind, AreaCode: s.id.AreaCode}, nil, true
 	return nil
+}
+
+// HouseholdPubKeys thực hiện client.Client: nông hộ chưa xóa theo ref, sắp theo Ref.
+// Như kho thật: vai farmer hoặc vai đọc khóa (nếu Principal có trong ctx); 1–MaxPubKeyRefs ref.
+func (f *Fake) HouseholdPubKeys(ctx context.Context, refs []uuid.UUID) ([]client.PubKey, error) {
+	tid, _, err := f.start(ctx, "pubkeys", "", false)
+	if err != nil {
+		return nil, err
+	}
+	if p, ok := authz.FromContext(ctx); ok && !slices.ContainsFunc([]string{client.RoleFarmer, client.RoleRegistrar, client.RoleDisplay,
+		client.RoleEvidenceViewer, client.RolePubKeySync}, p.Has) {
+		return nil, problem.Forbidden
+	}
+	if len(refs) == 0 || len(refs) > client.MaxPubKeyRefs {
+		return nil, problem.Validation.WithField("ref", "cần 1–50 mã chủ thể")
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []client.PubKey
+	for _, ref := range refs {
+		s, ok := f.subjects[ref]
+		if ok && s.tenant == tid && !s.erased && s.id.Kind == client.SubjectHousehold &&
+			!slices.ContainsFunc(out, func(k client.PubKey) bool { return k.Ref == ref }) {
+			out = append(out, client.PubKey{Ref: ref, AreaCode: s.id.AreaCode, PublicKey: append([]byte(nil), s.pub[:]...)})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Ref.String() < out[j].Ref.String() })
+	return out, nil
 }
 
 // PubKeys thực hiện client.Client, sắp theo Ref.

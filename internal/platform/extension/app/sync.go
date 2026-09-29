@@ -150,6 +150,20 @@ func (src SyncSource) Changes(ctx context.Context, sc authz.Scope, entity string
 	return out, last, err
 }
 
+// FarmerEntities thực hiện syncport.FarmerSource: nông dân chỉ nhận yêu cầu hỗ trợ của nông
+// hộ mình (HTX US-SUPPORT-01); task/directive đóng với nông dân.
+func (SyncSource) FarmerEntities() []string { return []string{port.EntitySupportRequest} }
+
+// FarmerChanges thực hiện syncport.FarmerSource (nông hộ tra lại qua pf/accounts, như REST).
+func (src SyncSource) FarmerChanges(ctx context.Context, _ syncport.FarmerScope, entity string, after int64, limit int) ([]syncport.Change, int64, error) {
+	if entity != port.EntitySupportRequest {
+		return []syncport.Change{}, after, nil
+	}
+	return src.supportChanges(ctx, after, limit)
+}
+
+var _ syncport.FarmerSource = SyncSource{}
+
 // Entities thực hiện syncport.Sink.
 func (SyncSink) Entities() []string {
 	return []string{port.EntityTaskUpdate, port.EntityFieldReport, port.EntitySupportRequest}

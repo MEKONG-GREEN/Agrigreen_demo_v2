@@ -1462,6 +1462,38 @@ paths:
                   items: {type: array, items: {$ref: "#/components/schemas/ExtTask"}}
                   next_cursor: {type: [string, "null"]}
         "403": {$ref: "#/components/responses/Problem"}
+  /v1/extension/support-requests:
+    get:
+      summary: Yêu cầu hỗ trợ của nông dân cho cán bộ (HTX US-SUPPORT-01, KN US-TASK-01/03) — kèm nhiệm vụ tự sinh hiện hành
+      description: |
+        Vai coop_manager (chỉ HTX của mình = org_ref; hỏi HTX khác → 403 extension.out_of_scope), kn_officer /
+        kn_province_admin / kn_national_admin (xã/tỉnh trong phạm vi, cộng nhiệm vụ được giao cho mình), platform_admin (mọi nơi).
+        Mới nhất trước; cursor là next_cursor của trang trước. Không trả toạ độ — chỉ trạng thái GPS; ảnh là mã tệp (pf/files).
+      operationId: extListSupportRequests
+      tags: [extension]
+      parameters:
+        - {name: task_status, in: query, schema: {type: string, enum: [new, assigned, accepted, in_progress, resolved]}, description: "Trạng thái nhiệm vụ tự sinh"}
+        - {name: category, in: query, schema: {type: string, enum: [dich_hai, benh_lua, thoi_tiet, ky_thuat, may_moc, khac]}}
+        - {name: urgency, in: query, schema: {type: string, enum: [binh_thuong, khan]}}
+        - {name: commune_code, in: query, schema: {type: string}}
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: gps_missing, in: query, schema: {type: boolean}, description: "true = chỉ yêu cầu thiếu vị trí GPS"}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang, mới nhất trước
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/SupportRequestStaff"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {description: "forbidden | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/tasks/bulk-assign:
     post:
       summary: Phân công hàng loạt trong một lần xác nhận (US-TASK-04) — chia vòng tròn; một nhiệm vụ lỗi thì cả lô không đổi
@@ -5744,6 +5776,30 @@ components:
         assigned: {type: boolean}
         last_note: {type: string}
         task_created_at: {type: string, format: date-time}
+    SupportRequestStaff:
+      type: object
+      description: Yêu cầu hỗ trợ trong danh sách của cán bộ (không có toạ độ, không PII).
+      required: [id, household_ref, plot_ref, cooperative_ref, commune_code, province_code, category, urgency, description,
+        photo_refs, photo_count, gps_missing, gps_accuracy_m, labels, event_time, received_at, assignment_rule, task]
+      properties:
+        id: {type: string, format: uuid}
+        household_ref: {type: string, format: uuid}
+        plot_ref: {type: [string, "null"], format: uuid}
+        cooperative_ref: {type: string, format: uuid}
+        commune_code: {type: string}
+        province_code: {type: string}
+        category: {type: string, enum: [dich_hai, benh_lua, thoi_tiet, ky_thuat, may_moc, khac]}
+        urgency: {type: string, enum: [binh_thuong, khan]}
+        description: {type: string}
+        photo_refs: {type: array, maxItems: 5, items: {type: string, format: uuid}, description: "Mã tệp ảnh (tải qua pf/files)"}
+        photo_count: {type: integer, minimum: 0, maximum: 5}
+        gps_missing: {type: boolean}
+        gps_accuracy_m: {type: [string, "null"], description: "Độ chính xác GPS (m, decimal)"}
+        labels: {type: array, items: {type: string}, description: "vd \"Thiếu vị trí GPS\""}
+        event_time: {type: string, format: date-time, description: "Lúc bấm Gửi trên máy"}
+        received_at: {type: string, format: date-time, description: "Lúc máy chủ nhận (mốc SLA 1 phút)"}
+        assignment_rule: {type: string, enum: [commune_on_duty, province_on_duty, province_officer, admin_queue]}
+        task: {$ref: "#/components/schemas/ExtTask"}
     # --- pf/simulation ---
 
     SimLatLng:

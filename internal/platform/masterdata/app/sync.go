@@ -29,7 +29,18 @@ import (
 //     đơn vị cũ đã sáp nhập vào một đơn vị trong phạm vi.
 type Sync struct{ Svc *Service }
 
-var _ syncport.Source = Sync{}
+var _ syncport.FarmerSource = Sync{}
+
+// FarmerEntities thực hiện syncport.FarmerSource: danh mục là dữ liệu công khai; đơn vị
+// hành chính chỉ các xã của nông hộ liên kết.
+func (Sync) FarmerEntities() []string {
+	return []string{port.SyncEntityCatalogItem, port.SyncEntityAdminUnit}
+}
+
+// FarmerChanges thực hiện syncport.FarmerSource.
+func (s Sync) FarmerChanges(ctx context.Context, fs syncport.FarmerScope, entity string, after int64, limit int) ([]syncport.Change, int64, error) {
+	return s.Changes(ctx, authz.Scope{Units: fs.Communes}, entity, after, limit)
+}
 
 // Entities thực hiện syncport.Source.
 func (Sync) Entities() []string {

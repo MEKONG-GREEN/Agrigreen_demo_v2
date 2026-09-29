@@ -29,6 +29,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/identity-vault/vaulttest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -49,9 +50,17 @@ type Modules = assembly.Modules
 
 // Build nối module bằng CHÍNH gốc lắp ráp của cmd/api-platform (assembly.Build).
 func Build(open func(role string) *pgxpool.Pool, clk clock.Clock, vault client.Client, store objstore.Store) Modules {
+	return build(open, clk, vault, store, nil)
+}
+
+func build(open func(role string) *pgxpool.Pool, clk clock.Clock, vault client.Client, store objstore.Store, dir *accounts.MemoryDirectory) Modules {
+	ext := assembly.External{Vault: vault, Store: store, CursorKey: CursorKey}
+	if dir != nil {
+		ext.Accounts = dir
+	}
 	mods, _, err := assembly.Build(context.Background(), func(_ context.Context, role string) (*pgxpool.Pool, error) {
 		return open(role), nil
-	}, clk, assembly.External{Vault: vault, Store: store, CursorKey: CursorKey})
+	}, clk, ext)
 	if err != nil {
 		panic(err)
 	}
@@ -70,6 +79,8 @@ type Stack struct {
 	Store             *objstore.Local
 	StoreDir          string
 	Logs              *LogBuffer
+	// Directory là Keycloak Admin giả (bộ nhớ) của pf/accounts — tài khoản nông dân App HTX.
+	Directory *accounts.MemoryDirectory
 }
 
 // New dựng Stack trên database của pgtest (bỏ qua kiểm thử khi không có PostgreSQL).
@@ -86,14 +97,15 @@ func New(t testing.TB) *Stack {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mods := Build(func(role string) *pgxpool.Pool { return env.Pool(t, migrations.PF, role) }, clock.System{}, vc, store)
+	kc := accounts.NewMemoryDirectory()
+	mods := build(func(role string) *pgxpool.Pool { return env.Pool(t, migrations.PF, role) }, clock.System{}, vc, store, kc)
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	verifier := iss.Verifier()
 	app := httptest.NewServer(newRouter(log, verifier, ops, mods.List(), false))
 	t.Cleanup(app.Close)
 	admin := httptest.NewServer(newRouter(log, verifier, ops, mods.List(), true))
 	t.Cleanup(admin.Close)
-	return &Stack{T: t, Env: env, Issuer: iss, App: app, Admin: admin, Vault: vsrv, Mods: mods, VaultClient: vc, Store: store, StoreDir: dir, Logs: logs}
+	return &Stack{T: t, Env: env, Issuer: iss, App: app, Admin: admin, Vault: vsrv, Mods: mods, VaultClient: vc, Store: store, StoreDir: dir, Logs: logs, Directory: kc}
 }
 
 // newRouter dùng router của cmd/api-platform (assembly).

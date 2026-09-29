@@ -7,7 +7,7 @@
 // Liên kết kích hoạt là chuỗi ngẫu nhiên — không đăng nhập được vào đâu.
 // ============================================================================
 import { uuidv7 } from "../idempotency";
-import type { CatalogItem, CatalogName, ExtTask, FarmerAccount, FarmerActivation, FarmerGrant, HouseholdListItem, Org } from "../types";
+import type { CatalogItem, CatalogName, ExtTask, FarmerAccount, FarmerActivation, FarmerGrant, HouseholdListItem, Org, SupportCategory, SupportRequestStaff } from "../types";
 import { CATALOGS, COOPERATIVES, syntheticPhone, findCoop, hexId, householdsOf, htxCoop, ORG_EVENTS, orgEvents, ORGS, OFFICER_NAMES, OFFICER_REFS, TASKS, type MockCooperative } from "./data";
 import { headerKey, parseCsv } from "./admin-ops";
 import { hasRole, inScope, isZip, json, nowIso, paginate, problem, reasonOf, validation, type Route } from "./http";
@@ -150,7 +150,7 @@ function createFarmer(p: MockPersona, a: FarmerAccess, input: { phone?: unknown;
 // --------------------------------------------------------------------------
 // Nhiệm vụ tự sinh từ yêu cầu hỗ trợ (KN US-TASK-01): nguồn htx_app cho HTX của persona Quản lý HTX
 // --------------------------------------------------------------------------
-const SUPPORT_TEXT: { category: string; text: string; urgent?: boolean }[] = [
+const SUPPORT_TEXT: { category: SupportCategory; text: string; urgent?: boolean }[] = [
   { category: "dich_hai", text: "Rầy nâu mật độ cao ở lô gần kênh, xin cán bộ xuống kiểm tra.", urgent: true },
   { category: "benh_lua", text: "Lá lúa có vết hình thoi màu nâu xám, nghi đạo ôn lá." },
   { category: "thoi_tiet", text: "Mưa lớn kéo dài, ruộng ngập sâu sau sạ 10 ngày." },
@@ -158,41 +158,90 @@ const SUPPORT_TEXT: { category: string; text: string; urgent?: boolean }[] = [
   { category: "may_moc", text: "Cần hỗ trợ đặt lịch máy gặt cho 3 lô liền kề." },
 ];
 
+/** Yêu cầu hỗ trợ đã nhận (không có `task` — ghép với nhiệm vụ hiện hành trong TASKS khi đọc). */
+type MockSupport = Omit<SupportRequestStaff, "task"> & { task_id: string };
+const SUPPORT_REQUESTS: MockSupport[] = [];
+
+// HTX khác (ngoài HTX của persona Quản lý HTX) — minh hoạ cách ly HTX.
+const OTHER_SUPPORT: { category: SupportCategory; text: string }[] = [
+  { category: "benh_lua", text: "Lúa vàng lá chín sớm ở ruộng ven đê, nhờ cán bộ xem giúp." },
+  { category: "khac", text: "Xin tài liệu hướng dẫn ghi nhật ký trên điện thoại." },
+];
+
+function pushSupport(coop: MockCooperative, n: number, t: { category: SupportCategory; text: string; urgent?: boolean }, task: ExtTask, photos: number, gpsMissing: boolean): void {
+  const received = Date.parse(task.created_at);
+  SUPPORT_REQUESTS.push({
+    id: hexId(n, "5a9e"),
+    task_id: task.task_id,
+    household_ref: task.household_ref ?? hexId(n, "40ee"),
+    plot_ref: null,
+    cooperative_ref: coop.api.ref,
+    commune_code: coop.api.admin_unit_code ?? "",
+    province_code: coop.province_code,
+    category: t.category,
+    urgency: t.urgent ? "khan" : "binh_thuong",
+    description: t.text,
+    photo_refs: Array.from({ length: photos }, (_, k) => hexId(n * 10 + k, "f11e")),
+    photo_count: photos,
+    gps_missing: gpsMissing,
+    gps_accuracy_m: gpsMissing ? null : "8",
+    labels: gpsMissing ? ["Thiếu vị trí GPS"] : [],
+    // Gửi ngoại tuyến (HTX US-SUPPORT-01 AC-2): bấm Gửi trước khi máy chủ nhận.
+    event_time: new Date(received - 60_000).toISOString(),
+    received_at: new Date(received).toISOString(),
+    assignment_rule: task.assignee_ref ? "commune_on_duty" : "admin_queue",
+  });
+}
+
+function supportTask(coop: MockCooperative, n: number, t: { category: SupportCategory; text: string; urgent?: boolean }, i: number, status: ExtTask["status"], hoursAgo: number): ExtTask {
+  const created = Date.now() - hoursAgo * 3_600_000;
+  const assignee = status === "new" ? null : (OFFICER_REFS[i % OFFICER_REFS.length] ?? null);
+  const due = created + 48 * 3_600_000;
+  const task: ExtTask = {
+    assignee_name: assignee ? (OFFICER_NAMES[assignee] ?? null) : null,
+    cooperative_name: coop.api.name,
+    commune_name: coop.commune_name,
+    task_id: hexId(n, "7a5c"),
+    commune_code: coop.api.admin_unit_code ?? "",
+    province_code: coop.province_code,
+    cooperative_ref: coop.api.ref,
+    household_ref: householdsOf(coop)[i]?.household_ref ?? null,
+    plot_ref: null,
+    category: t.category,
+    description: t.text,
+    priority: t.urgent ? "urgent" : "normal",
+    source: "htx_app",
+    status,
+    assignee_ref: assignee,
+    created_by: hexId(parseInt(coop.api.ref.slice(-4), 16) * 1000 + i, "fa2e"),
+    created_at: new Date(created).toISOString(),
+    sla_hours: "48",
+    due_at: new Date(due).toISOString(),
+    overdue: status !== "resolved" && Date.now() > due,
+    escalated_at: null,
+    escalated_unit: null,
+    escalation_org_ref: null,
+    resolved_at: status === "resolved" ? new Date(created + 20 * 3_600_000).toISOString() : null,
+    last_note: status === "in_progress" ? "Đã hẹn xuống ruộng sáng mai" : status === "resolved" ? "Đã hướng dẫn phun thuốc đặc trị, theo dõi thêm 5 ngày" : null,
+    version: 1 + i,
+  };
+  TASKS.push(task);
+  return task;
+}
+
 function seedSupportTasks(): void {
   const coop = htxCoop();
   SUPPORT_TEXT.forEach((t, i) => {
-    const created = Date.now() - (i * 9 + 2) * 3_600_000;
-    const status: ExtTask["status"] = (["new", "assigned", "in_progress", "resolved", "accepted"] as const)[i]!;
-    const assignee = status === "new" ? null : (OFFICER_REFS[i % OFFICER_REFS.length] ?? null);
-    const due = created + 48 * 3_600_000;
-    TASKS.push({
-      assignee_name: assignee ? (OFFICER_NAMES[assignee] ?? null) : null,
-      cooperative_name: coop.api.name,
-      commune_name: coop.commune_name,
-      task_id: hexId(7000 + i, "7a5c"),
-      commune_code: coop.api.admin_unit_code ?? "",
-      province_code: coop.province_code,
-      cooperative_ref: coop.api.ref,
-      household_ref: householdsOf(coop)[i]?.household_ref ?? null,
-      plot_ref: null,
-      category: t.category,
-      description: t.text,
-      priority: t.urgent ? "urgent" : "normal",
-      source: "htx_app",
-      status,
-      assignee_ref: assignee,
-      created_by: hexId(parseInt(coop.api.ref.slice(-4), 16) * 1000 + i, "fa2e"),
-      created_at: new Date(created).toISOString(),
-      sla_hours: "48",
-      due_at: new Date(due).toISOString(),
-      overdue: status !== "resolved" && Date.now() > due,
-      escalated_at: null,
-      escalated_unit: null,
-      escalation_org_ref: null,
-      resolved_at: status === "resolved" ? new Date(created + 20 * 3_600_000).toISOString() : null,
-      last_note: status === "in_progress" ? "Đã hẹn xuống ruộng sáng mai" : status === "resolved" ? "Đã hướng dẫn phun thuốc đặc trị, theo dõi thêm 5 ngày" : null,
-      version: 1 + i,
-    });
+    const status = (["new", "assigned", "in_progress", "resolved", "accepted"] as const)[i]!;
+    const task = supportTask(coop, 7000 + i, t, i, status, i * 9 + 2);
+    // Ảnh: 0, 2, 4, 1, 3 (tối đa 5); yêu cầu "Mưa lớn…" thiếu GPS (HTX US-SUPPORT-01 AC-1).
+    pushSupport(coop, 7000 + i, t, task, (i * 2) % 5, i === 2);
+  });
+  const other = COOPERATIVES.find((c) => c.api.active && c.api.ref !== coop.api.ref && c.province_code === coop.province_code);
+  if (!other) return;
+  OTHER_SUPPORT.forEach((t, i) => {
+    const task = supportTask(other, 7100 + i, t, i, i === 0 ? "assigned" : "new", i * 5 + 3);
+    pushSupport(other, 7100 + i, t, task, 1, i === 1);
   });
 }
 seedSupportTasks();
@@ -201,6 +250,42 @@ seedSupportTasks();
 // Application API
 // --------------------------------------------------------------------------
 export const htxAppRoutes: Route[] = [
+  {
+    // pf/extension: danh sách yêu cầu hỗ trợ cho cán bộ (HTX US-SUPPORT-01, KN US-TASK-01/03).
+    method: "GET",
+    pattern: /^\/v1\/extension\/support-requests$/,
+    handler: ({ url, persona }) => {
+      if (!hasRole(persona, "coop_manager", "kn_officer", "kn_province_admin", "kn_national_admin", "platform_admin")) return problem(403, "forbidden", "Forbidden");
+      const q = (k: string) => url.searchParams.get(k) ?? "";
+      const bad: { field: string; reason: string }[] = [];
+      if (q("task_status") && !["new", "assigned", "accepted", "in_progress", "resolved"].includes(q("task_status"))) bad.push({ field: "task_status", reason: "không hợp lệ" });
+      if (q("urgency") && !["binh_thuong", "khan"].includes(q("urgency"))) bad.push({ field: "urgency", reason: "phải là binh_thuong hoặc khan" });
+      if (q("gps_missing") && !["true", "false"].includes(q("gps_missing"))) bad.push({ field: "gps_missing", reason: "phải là true hoặc false" });
+      if (bad.length) return validation(bad);
+      const coopOnly = hasRole(persona, "coop_manager") && !hasRole(persona, "kn_officer", "kn_province_admin", "kn_national_admin", "platform_admin");
+      const own = persona.me.org?.ref ?? "";
+      if (coopOnly && q("cooperative_ref") && q("cooperative_ref") !== own) return problem(403, "extension.out_of_scope", "Out of scope");
+      const list = SUPPORT_REQUESTS.map((s): SupportRequestStaff | null => {
+        const { task_id, ...rest } = s;
+        const task = TASKS.find((t) => t.task_id === task_id);
+        return task ? { ...rest, task } : null;
+      })
+        .filter((s): s is SupportRequestStaff => !!s)
+        .filter(
+          (s) =>
+            (inScope(persona, s.province_code, s.commune_code) || (!coopOnly && s.task.assignee_ref === persona.me.actor_ref)) &&
+            (!coopOnly || s.cooperative_ref === own) &&
+            (!q("cooperative_ref") || s.cooperative_ref === q("cooperative_ref")) &&
+            (!q("task_status") || s.task.status === q("task_status")) &&
+            (!q("category") || s.category === q("category")) &&
+            (!q("urgency") || s.urgency === q("urgency")) &&
+            (!q("commune_code") || s.commune_code === q("commune_code")) &&
+            (!q("gps_missing") || String(s.gps_missing) === q("gps_missing")),
+        )
+        .sort((a, b) => Date.parse(b.received_at) - Date.parse(a.received_at));
+      return json(paginate(list, url));
+    },
+  },
   {
     method: "GET",
     pattern: /^\/v1\/farmer-accounts$/,
