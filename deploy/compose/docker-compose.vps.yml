@@ -1,0 +1,113 @@
+# Ghi đè cho MỘT VPS (demo/thử nghiệm, vd VPS VNPT trong lãnh thổ — RB-7). Dùng cùng file gốc:
+#
+#   sh deploy/vps/prepare.sh <domain> <email-acme> "<cidr-quản-trị>"   # sinh .env + realm VPS
+#   docker compose -f deploy/compose/docker-compose.yml -f deploy/compose/docker-compose.vps.yml up -d --build --wait
+#
+# Khác Local/Dev:
+#   - Caddy là cổng DUY NHẤT ra internet (80/443, TLS tự động). Mọi dịch vụ khác vẫn chỉ nghe 127.0.0.1.
+#     app.<domain> → web-ops · api.<domain> → Application API · auth.<domain> → Keycloak
+#     admin.<domain> → Admin API, chỉ mở cho ADMIN_ALLOW_CIDR (kể cả /admin của Keycloak).
+#   - Keycloak chạy chế độ production (`start`), dữ liệu realm lưu trong PostgreSQL (database keycloak).
+#   - Mọi địa chỉ trình duyệt thấy (issuer, CORS, redirect, NEXT_PUBLIC_*) theo AG_DOMAIN.
+# Xem docs/runbooks/vps-deploy.md.
+
+x-vps-env: &vps-env
+  AG_ENV: ${AG_ENV:-staging}
+  # Chỉ có hiệu lực khi AG_ENV=production: mọi đích phải thuộc tên miền của mình hoặc dịch vụ nội bộ.
+  AG_RESIDENCY_ALLOWLIST: ${AG_DOMAIN:?chạy deploy/vps/prepare.sh},single-label
+
+x-vps-oidc: &vps-oidc
+  AG_OIDC_ISSUER: https://auth.${AG_DOMAIN}/realms/agrigreen
+
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    depends_on:
+      web-ops: { condition: service_started }
+      api-platform: { condition: service_started }
+      keycloak: { condition: service_healthy }
+    environment:
+      AG_DOMAIN: ${AG_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?chạy deploy/vps/prepare.sh}
+      ADMIN_ALLOW_CIDR: ${ADMIN_ALLOW_CIDR:?chạy deploy/vps/prepare.sh}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+
+  # Một lần: tạo vai + database cho Keycloak (idempotent).
+  kc-db-init:
+    image: postgis/postgis:17-3.5
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: ${PG_SUPERUSER_PASSWORD}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:?chạy deploy/vps/prepare.sh}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        psql -v ON_ERROR_STOP=1 -v pw="$$KC_DB_PASSWORD" <<'SQL'
+        SELECT format('CREATE ROLE keycloak LOGIN PASSWORD %L', :'pw')
+          WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'keycloak') \gexec
+        SELECT format('ALTER ROLE keycloak PASSWORD %L', :'pw') \gexec
+        SELECT 'CREATE DATABASE keycloak OWNER keycloak'
+          WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'keycloak') \gexec
+        SQL
+        echo "kc-db-init: xong"
+    restart: "no"
+
+  keycloak:
+    command: ["start", "--import-realm"]
+    depends_on:
+      kc-db-init: { condition: service_completed_successfully }
+    environment:
+      KC_HOSTNAME: https://auth.${AG_DOMAIN}
+      KC_HTTP_ENABLED: "true"          # TLS kết thúc ở Caddy
+      KC_PROXY_HEADERS: xforwarded
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
+    # Realm sinh bởi prepare.sh (redirect/origin theo AG_DOMAIN). Chỉ nhập khi realm CHƯA có.
+    volumes: ["./.vps/keycloak:/opt/keycloak/data/import:ro"]
+
+  identity-vault:
+    environment:
+      <<: [*vps-env, *vps-oidc]
+
+  api-platform:
+    environment:
+      <<: [*vps-env, *vps-oidc]
+      AG_CORS_ORIGINS: https://app.${AG_DOMAIN}
+      AG_KC_ACTIONS_REDIRECT_URI: https://app.${AG_DOMAIN}/
+
+  outbox-publisher:
+    environment:
+      <<: *vps-env
+
+  worker:
+    environment:
+      <<: *vps-env
+      AG_KC_ACTIONS_REDIRECT_URI: https://app.${AG_DOMAIN}/
+
+  web-ops:
+    build:
+      args:
+        NEXT_PUBLIC_API_BASE_URL: https://api.${AG_DOMAIN}
+        NEXT_PUBLIC_ADMIN_API_BASE: https://admin.${AG_DOMAIN}
+        NEXT_PUBLIC_OIDC_ISSUER: https://auth.${AG_DOMAIN}/realms/agrigreen
+        NEXT_PUBLIC_OIDC_CLIENT_ID: agrigreen-web-ops
+        NEXT_PUBLIC_API_MOCK: "0"
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: https://api.${AG_DOMAIN}
+      NEXT_PUBLIC_ADMIN_API_BASE: https://admin.${AG_DOMAIN}
+      NEXT_PUBLIC_OIDC_ISSUER: https://auth.${AG_DOMAIN}/realms/agrigreen
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}

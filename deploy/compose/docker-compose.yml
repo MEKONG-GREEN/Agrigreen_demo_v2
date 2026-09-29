@@ -310,13 +310,13 @@ services:
       # NEXT_PUBLIC_* nhúng lúc build (địa chỉ trình duyệt gọi, không phải tên container).
       args:
         NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
-        NEXT_PUBLIC_ADMIN_API_BASE_URL: http://localhost:8082
+        NEXT_PUBLIC_ADMIN_API_BASE: http://localhost:8082
         NEXT_PUBLIC_OIDC_ISSUER: http://localhost:8180/realms/agrigreen
         NEXT_PUBLIC_OIDC_CLIENT_ID: agrigreen-web-ops
         NEXT_PUBLIC_API_MOCK: "0"
     environment:
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
-      NEXT_PUBLIC_ADMIN_API_BASE_URL: http://localhost:8082
+      NEXT_PUBLIC_ADMIN_API_BASE: http://localhost:8082
       NEXT_PUBLIC_OIDC_ISSUER: http://localhost:8180/realms/agrigreen
       NEXT_PUBLIC_OIDC_CLIENT_ID: agrigreen-web-ops
       NEXT_PUBLIC_API_MOCK: "0"

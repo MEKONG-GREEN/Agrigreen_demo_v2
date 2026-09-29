@@ -26,3 +26,6 @@ __pycache__/
 
 # Worktree của agent
 .claude/
+
+# Cấu hình sinh cho VPS (deploy/vps/prepare.sh)
+deploy/compose/.vps/

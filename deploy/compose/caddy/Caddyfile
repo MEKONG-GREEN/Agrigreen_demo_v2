@@ -1,0 +1,42 @@
+# Cổng vào duy nhất của VPS (docker-compose.vps.yml). TLS tự động (Let's Encrypt).
+# Biến: AG_DOMAIN, ACME_EMAIL, ADMIN_ALLOW_CIDR (một hoặc nhiều CIDR, cách nhau bởi dấu cách).
+{
+	email {$ACME_EMAIL}
+}
+
+(common) {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+}
+
+app.{$AG_DOMAIN} {
+	import common
+	reverse_proxy web-ops:3000
+}
+
+api.{$AG_DOMAIN} {
+	import common
+	reverse_proxy api-platform:8080
+}
+
+# Admin API (MFA bắt buộc ở tầng ứng dụng) — thêm lớp chặn theo IP.
+admin.{$AG_DOMAIN} {
+	import common
+	@outside not remote_ip {$ADMIN_ALLOW_CIDR}
+	respond @outside 403
+	reverse_proxy api-platform:8082
+}
+
+auth.{$AG_DOMAIN} {
+	import common
+	# Bảng điều khiển quản trị Keycloak chỉ từ mạng quản trị; đăng nhập người dùng (/realms/…) mở.
+	@kcadmin {
+		path /admin /admin/*
+		not remote_ip {$ADMIN_ALLOW_CIDR}
+	}
+	respond @kcadmin 403
+	reverse_proxy keycloak:8080
+}

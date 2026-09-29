@@ -308,11 +308,35 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS -H 'Origin: http://evil.example' -H 'Access-Control-Request-Method: GET' http://127.0.0.1:8080/v1/me)" = 403
           # Không token → 401 problem+json (xác thực bật, không mở cửa).
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/v1/me)" = 401
+      - name: Cấu hình VPS (docker-compose.vps.yml) — dựng lại với Keycloak production + PostgreSQL
+        env:
+          VPS: -f deploy/compose/docker-compose.yml -f deploy/compose/docker-compose.vps.yml
+          D: vps.example.test
+        run: |
+          set -eu
+          docker compose -f "$COMPOSE_FILE" down -v --remove-orphans
+          sh deploy/vps/prepare.sh "$D" ops@example.test "203.0.113.10/32 198.51.100.0/24"
+          docker compose $VPS config --quiet
+          docker run --rm -e AG_DOMAIN="$D" -e ACME_EMAIL=ops@example.test -e ADMIN_ALLOW_CIDR="203.0.113.10/32" \
+            -v "$PWD/deploy/compose/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.10-alpine \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          # Caddy không lấy được chứng chỉ trong CI — chỉ dựng phần sau nó.
+          docker compose $VPS up -d --build --wait --wait-timeout 900 api-platform worker outbox-publisher web-ops
+          iss=$(curl -fsS --retry 30 --retry-delay 2 --retry-all-errors http://127.0.0.1:8180/realms/agrigreen/.well-known/openid-configuration | jq -r .issuer)
+          test "$iss" = "https://auth.$D/realms/agrigreen"
+          curl -fsS --retry 30 --retry-delay 2 --retry-all-errors -o /dev/null http://127.0.0.1:8080/readyz
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS -H "Origin: https://app.$D" -H 'Access-Control-Request-Method: GET' http://127.0.0.1:8080/v1/me)" = 204
+          # Realm VPS: client ROPC chỉ-dev bị tắt (bật thì lỗi sẽ là invalid_grant do sai mật khẩu).
+          err=$(curl -s -d grant_type=password -d client_id=agrigreen-seed -d username=x -d password=x \
+            http://127.0.0.1:8180/realms/agrigreen/protocol/openid-connect/token | jq -r .error)
+          echo "agrigreen-seed → $err"
+          test "$err" != invalid_grant
+          docker compose $VPS ps
       - name: Trạng thái và log khi hỏng
         if: failure()
         run: |
-          docker compose -f "$COMPOSE_FILE" ps -a
-          docker compose -f "$COMPOSE_FILE" logs --no-color --timestamps
+          docker compose -f "$COMPOSE_FILE" -f deploy/compose/docker-compose.vps.yml ps -a || docker compose -f "$COMPOSE_FILE" ps -a
+          docker compose -f "$COMPOSE_FILE" -f deploy/compose/docker-compose.vps.yml logs --no-color --timestamps || docker compose -f "$COMPOSE_FILE" logs --no-color --timestamps
       - name: Dọn
         if: always()
         run: docker compose -f "$COMPOSE_FILE" down -v --remove-orphans
