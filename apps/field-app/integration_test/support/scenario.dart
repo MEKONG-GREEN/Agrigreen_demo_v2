@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:agrigreen_field/application/app_services.dart';
-import 'package:agrigreen_field/application/boundary_service.dart';
+import 'package:agrigreen_mobile/application/boundary_service.dart';
 import 'package:agrigreen_field/application/consent_service.dart';
 import 'package:agrigreen_mobile/data/auth/oidc_client.dart';
 import 'package:agrigreen_mobile/data/crypto/envelope.dart';

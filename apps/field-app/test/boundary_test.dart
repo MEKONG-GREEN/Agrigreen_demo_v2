@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import 'package:agrigreen_field/application/boundary_service.dart';
+import 'package:agrigreen_mobile/application/boundary_service.dart';
 import 'package:agrigreen_mobile/core/ids.dart';
 import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
 import 'package:agrigreen_mobile/data/sync/sync_api.dart';

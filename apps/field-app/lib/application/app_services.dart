@@ -27,7 +27,8 @@ import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 import 'package:agrigreen_mobile/data/sync/sync_service.dart';
 import 'package:path/path.dart' as p;
 
-import 'boundary_service.dart';
+import 'package:agrigreen_mobile/application/boundary_service.dart';
+
 import 'consent_service.dart';
 import 'directive_service.dart';
 import 'evidence_service.dart';
@@ -207,7 +208,12 @@ class AppServices {
       sync: sync,
       photos: photos,
       reports: FieldReportService(outbox: outbox, clock: pf.clock),
-      boundaries: BoundaryService(outbox: outbox, refs: refs, ids: pf.ids),
+      boundaries: BoundaryService(
+        outbox: outbox,
+        refs: refs,
+        ids: pf.ids,
+        db: db,
+      ),
       tasks: TaskService(outbox: outbox, refs: refs),
       actions: actions,
       inbox: InboxService(refs: refs, actions: actions, clock: pf.clock),

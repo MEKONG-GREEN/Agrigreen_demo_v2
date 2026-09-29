@@ -15,6 +15,7 @@ import 'households_screen.dart';
 import 'bulk_open_screen.dart';
 import 'news_screen.dart';
 import 'notifications_screen.dart';
+import 'plot_map_screen.dart';
 import 'plots_screen.dart';
 import 'review_screen.dart';
 import 'staff_screen.dart';
@@ -96,6 +97,11 @@ class HomeScreen extends ConsumerWidget {
           icon: Icons.groups,
           label: 'Nông hộ',
           onTap: () => open(const HouseholdsScreen()),
+        ),
+        BigTile(
+          icon: Icons.map_outlined,
+          label: 'Bản đồ lô ruộng',
+          onTap: () => open(const PlotMapScreen()),
         ),
         BigTile(
           icon: Icons.playlist_add,

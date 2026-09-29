@@ -9,6 +9,7 @@ import '../../domain/cropcycle.dart';
 import '../../domain/support.dart';
 import '../providers.dart';
 import '../widgets.dart';
+import 'plot_map_screen.dart' show confirmBoundaryAfterServer;
 
 class _Queue {
   const _Queue(this.records, this.files, this.actions);
@@ -42,6 +43,8 @@ String recordSummary(OutboxRecord r) {
     PushEntity.farmLogBatch =>
       '${activityLabel(p['activity_code'] as String?)} · ${((p['plot_refs'] as List?) ?? const []).length} lô',
     PushEntity.harvest => '${p['mass_kg']} kg',
+    PushEntity.plotBoundary =>
+      '${p['point_count'] ?? '?'} điểm · ≈ ${'${p['area_ha_client'] ?? ''}'.replaceAll('.', ',')} ha',
     PushEntity.supportRequest =>
       supportCategories[p['category']] ?? '${p['category']}',
     _ => '',
@@ -107,6 +110,11 @@ class _RecordCard extends ConsumerWidget {
         r.errorCode == 'cropcycle.yield_anomaly' &&
         r.replacedBy == null;
     final summary = recordSummary(r);
+    final boundary = r.entity == PushEntity.plotBoundary
+        ? ref.read(appControllerProvider).services?.boundaries.statusOfRecord(r)
+        : null;
+    final canConfirmBoundary =
+        (boundary?.canConfirm ?? false) && r.replacedBy == null;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -134,7 +142,34 @@ class _RecordCard extends ConsumerWidget {
               '${r.attempts > 1 ? ' · đã thử ${r.attempts} lần' : ''}',
               style: const TextStyle(color: AgColors.mute, fontSize: 14),
             ),
-            if (r.status == OutboxStatus.conflict)
+            if (boundary != null &&
+                (r.status == OutboxStatus.conflict ||
+                    r.status == OutboxStatus.rejected))
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  [
+                    boundary.state.label,
+                    if (r.status == OutboxStatus.rejected)
+                      rejectMessage(r.errorCode),
+                    ?boundary.detail,
+                  ].join(' · '),
+                  style: const TextStyle(color: AgColors.amber, fontSize: 15),
+                ),
+              ),
+            if (canConfirmBoundary)
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  onPressed: () async {
+                    await confirmBoundaryAfterServer(context, ref, boundary!);
+                    ref.invalidate(_queueProvider);
+                  },
+                  icon: const Icon(Icons.fact_check),
+                  label: const Text('Xác nhận giữ nguyên'),
+                ),
+              ),
+            if (r.status == OutboxStatus.conflict && boundary == null)
               const Padding(
                 padding: EdgeInsets.only(top: 6),
                 child: Text(
@@ -143,7 +178,7 @@ class _RecordCard extends ConsumerWidget {
                   style: TextStyle(color: AgColors.amber, fontSize: 15),
                 ),
               ),
-            if (r.status == OutboxStatus.rejected)
+            if (r.status == OutboxStatus.rejected && boundary == null)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(

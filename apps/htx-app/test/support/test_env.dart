@@ -26,6 +26,7 @@ import 'package:agrigreen_mobile/testing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 import 'package:pinenacl/x25519.dart' as nacl;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -149,6 +150,9 @@ const templateRef = '01920000-0000-7000-8000-0000000005f1';
 /// Hôm nay (giờ VN) của kiểm thử: 01/10/2026 10:00.
 final testNow = DateTime.utc(2026, 10, 1, 3);
 
+/// Tile PNG 1×1 trong suốt thay máy chủ tile (kiểm thử không gọi mạng).
+final Uint8List blankTilePng = img.encodePng(img.Image(width: 1, height: 1));
+
 /// Môi trường kiểm thử: máy chủ giả theo hợp đồng + mọi phụ thuộc nền tảng.
 class TestEnv {
   TestEnv({List<String> roles = const ['farmer'], FakeServer? server})
@@ -197,6 +201,7 @@ class TestEnv {
     autoSync: false,
     push: push,
     notifier: notifier,
+    tileFetcher: (_) async => blankTilePng,
   );
 
   /// Dữ liệu chiều xuống mặc định: thửa của hộ, SOP, khóa công khai hộ.

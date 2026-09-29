@@ -19,6 +19,8 @@ dependencies:
   agrigreen_mobile:
     path: ../../packages/agrigreen_mobile
   flutter_riverpod: ^3.4.3
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
   connectivity_plus: ^7.3.1
   path_provider: ^2.1.6
   path: ^1.9.1

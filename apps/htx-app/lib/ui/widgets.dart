@@ -44,6 +44,17 @@ String rejectMessage(String? code) => switch (code) {
   'cropcycle.self_review' => 'Người ghi nhật ký không được tự duyệt.',
   'cropcycle.log_state' => 'Nhật ký không còn ở trạng thái chờ duyệt.',
   'cropcycle.catalog_invalid' => 'Mã vụ/giống/máy không có hoặc đã ngừng dùng.',
+  'geo.overlap_needs_confirm' =>
+    'Ranh giới bị chồng lấn với lô đã đăng ký, vui lòng kiểm tra lại.',
+  'geo.area_deviation_needs_confirm' =>
+    'Diện tích vẽ lệch quá ngưỡng so với diện tích khai báo — cần xác nhận.',
+  'geo.overlap_cross_coop' =>
+    'Ranh giới chồng lấn với lô của HTX khác — không lưu được.',
+  'geo.out_of_scope' => 'Bạn không có quyền truy cập lô ruộng này.',
+  'geo.outside_commune' => 'Ranh giới nằm ngoài xã của lô ruộng.',
+  'geo.area_out_of_range' => 'Diện tích lô ngoài giới hạn cho phép.',
+  'geo.version_conflict' =>
+    'Ranh giới đã được sửa ở nơi khác — đồng bộ lại rồi sửa tiếp.',
   'validation_failed' => 'Dữ liệu chưa hợp lệ.',
   null => 'Bị từ chối.',
   _ => 'Bị từ chối ($code).',
