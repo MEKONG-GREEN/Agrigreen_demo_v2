@@ -359,6 +359,37 @@ Nhập hàng loạt: lý do theo dòng dùng nhãn "Thiếu Email", "Sai định
 | 422 | `hub.boundary_invalid` | Ranh giới không phải Polygon/MultiPolygon WGS84 hợp lệ |
 | 500 | `hub.valve_denied` | Van công bố từ chối payload (hợp đồng thiếu/chưa duyệt, trường ngoài hợp đồng) — lỗi lập trình, không có gì được ghi |
 
+### mkg/fieldops (API nội bộ MKG — `cmd/api-internal`, `contracts/openapi/mkg-internal.yaml`)
+
+| HTTP | code | Khi nào |
+|---|---|---|
+| 400 | `fieldops.cursor_invalid` | Con trỏ pull bị sửa, cắt, hoặc của thiết bị/tài khoản khác — pull lại không có `cursor` |
+| 403 | `self_approval_forbidden` | Người duyệt lệnh gom là người lập (hoặc người sửa kế hoạch gần nhất) — R-56; DB chặn lần hai bằng CHECK |
+| 403 | `fieldops.device_mismatch` | Thiếu header `X-Device-Id`, hoặc `device_id` của lô đồng bộ khác header |
+| 404 | `fieldops.order_not_found` | Không có lệnh gom trong tenant của token |
+| 404 | `fieldops.roll_count_not_found` | Không có bản ghi đếm cuộn cần bù |
+| 409 | `fieldops.order_transition` | Chuyển trạng thái không hợp lệ (sửa kế hoạch sau khi duyệt, duyệt lệnh không còn `planned`, đóng lệnh chưa giao tổ, hủy lệnh đã đóng/hủy) |
+| 409 | `fieldops.order_not_open` | Ghi số / mở ca trên lệnh chưa duyệt, đã đóng hoặc đã hủy |
+| 409 | `fieldops.stage_already_counted` | Công đoạn này của thửa đã có số — sửa bằng bản ghi bù |
+| 409 | `fieldops.already_corrected` | Bản ghi đã bị bù; bù bản ghi hiệu lực mới nhất |
+| 409 | `fieldops.id_reused` | `id` do máy sinh đã dùng cho bản ghi khác (khác `idem_key`) |
+| 409 | `fieldops.nothing_to_confirm` | Thửa chưa có số xếp ghe/xe nên chưa có bảng kê để HTX xác nhận |
+| 409 | `fieldops.statement_stale` | Xác nhận theo `statement_revision` cũ — MKG đã sửa số sau đó |
+| 422 | `validation_failed` | Dữ liệu vào sai (thiếu `rolls`, `loose_kg` khi có cuộn, lý do < 10 ký tự, ngày không phải YYYY-MM-DD, khung > 90 ngày, `event_time` ở tương lai…), xem `errors[]` |
+| 422 | `fieldops.plot_not_in_order` | Thửa không thuộc lệnh gom |
+| 422 | `fieldops.previous_stage_missing` | Công đoạn trước chưa có số (proto FM-03) |
+| 422 | `fieldops.stage_exceeds_previous` | Số cuộn nhiều hơn công đoạn trước (proto FM-04) — đếm lại hoặc bù công đoạn trước |
+| 422 | `fieldops.discrepancy_reason_required` | Số cuộn ít hơn công đoạn trước mà thiếu `discrepancy_reason` (proto FM-04) |
+| 422 | `fieldops.unit_mismatch` | Công đoạn trước đếm cuộn mà công đoạn sau ghi rơm rời (hoặc ngược lại) |
+| 422 | `fieldops.next_stage_conflict` | Bản bù làm công đoạn sau vi phạm FM-04 — bù công đoạn sau trước |
+| 422 | `fieldops.htx_not_found` | Application API không có (hoặc chưa chia sẻ — câu hỏi RB-2) HTX, hoặc HTX đã vô hiệu hóa |
+| 422 | `fieldops.plot_not_found` | Application API không có (hoặc chưa chia sẻ) thửa |
+| 422 | `fieldops.plot_other_htx` | Thửa không thuộc HTX của lệnh gom, là thửa nháp hoặc đã ngừng dùng |
+| 500 | `fieldops.valve_denied` | Van công bố từ chối payload — lỗi lập trình, không có gì được ghi |
+| 503 | `fieldops.directory_unavailable` | Không gọi được Application API (chưa cấu hình tài khoản dịch vụ MKG, lỗi mạng, token) |
+
+Kết quả theo bản ghi của `POST /v1/fieldops/sync/push` dùng thêm `fieldops.unknown_entity` (entity khác `roll_count`) và `fieldops.sink_failed` (lỗi hệ thống — máy giữ và tự gửi lại).
+
 ### pf/waterway
 
 Mạng đường thủy có phiên bản (mục 16; GIS FN-09, US-WATER-01/02/03). Vẽ/sửa, dựng, phát hành ở Admin API (MFA); tra lớp và định tuyến ở Application API.

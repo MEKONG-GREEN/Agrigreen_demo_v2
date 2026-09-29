@@ -20,6 +20,8 @@ security:
 tags:
   - name: hub
     description: mkg/hub — hub, kho, bãi; lô; mẻ; dịch chuyển tồn; van công bố
+  - name: fieldops
+    description: mkg/fieldops — lệnh gom, ca tổ gom, đếm cuộn theo công đoạn, xác nhận HTX, đối soát chiều mua, đồng bộ app hiện trường MKG
 paths:
   # --- mkg/hub: bề mặt quản trị (MFA) ---
   /v1/hub/facilities:
@@ -344,6 +346,300 @@ paths:
         "201": {description: Dòng bù, content: {application/json: {schema: {$ref: "#/components/schemas/Movement"}}}}
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+
+  # --- mkg/fieldops: bề mặt ứng dụng (field_collector, field_supervisor) ---
+  /v1/fieldops/orders:
+    get:
+      summary: Liệt kê lệnh gom (cursor)
+      operationId: listCollectionOrders
+      tags: [fieldops]
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [planned, approved, assigned, closed, cancelled]}}
+        - {name: htx_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 200}}
+      responses:
+        "200":
+          description: Trang lệnh gom
+          content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/CollectionOrder"}}, next_cursor: {type: [string, "null"]}}}}}
+    post:
+      summary: Lập lệnh gom (planned) — vai field_supervisor
+      description: Thửa/HTX đối chiếu với nền tảng qua Application API (tài khoản dịch vụ MKG); thửa phải thuộc HTX. Chưa công bố tới khi người KHÁC duyệt (R-56).
+      operationId: createCollectionOrder
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/CollectionPlanInput"}}}}
+      responses:
+        "201": {description: Lệnh gom, content: {application/json: {schema: {$ref: "#/components/schemas/CollectionOrderResult"}}}}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/orders/{id}:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    get:
+      summary: Lệnh gom hiện hành và lịch sử sự kiện
+      operationId: getCollectionOrder
+      tags: [fieldops]
+      responses:
+        "200": {description: Lệnh gom, content: {application/json: {schema: {type: object, properties: {order: {$ref: "#/components/schemas/CollectionOrder"}, history: {type: array, items: {type: object}}}}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/orders/{id}/revisions:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Sửa kế hoạch khi còn planned (revision + 1; người sửa thành người lập)
+      operationId: reviseCollectionOrder
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/CollectionPlanInput"}}}}
+      responses:
+        "201": {description: Lệnh gom, content: {application/json: {schema: {$ref: "#/components/schemas/CollectionOrderResult"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/orders/{id}/decision:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Duyệt (→ approved, công bố collection_schedule) hoặc từ chối (→ cancelled, bắt buộc reason)
+      description: Vai field_supervisor, KHÁC người lập (R-56 — 403 self_approval_forbidden; CHECK DB lớp hai).
+      operationId: decideCollectionOrder
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [decision], properties: {decision: {type: string, enum: [approved, rejected]}, reason: {type: string, minLength: 10}}}}}
+      responses:
+        "201": {description: Lệnh gom, content: {application/json: {schema: {$ref: "#/components/schemas/CollectionOrderResult"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/orders/{id}/assign:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Giao / đổi tổ gom (approved | assigned → assigned)
+      operationId: assignCollectionOrder
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [crew_ref], properties: {crew_ref: {type: string, format: uuid}}}}}}
+      responses:
+        "201": {description: Lệnh gom, content: {application/json: {schema: {$ref: "#/components/schemas/CollectionOrderResult"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/orders/{id}/close:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Đóng lệnh gom (assigned → closed)
+      operationId: closeCollectionOrder
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "201": {description: Lệnh gom, content: {application/json: {schema: {$ref: "#/components/schemas/CollectionOrderResult"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/orders/{id}/cancel:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Hủy lệnh gom (không xóa — sự kiện cancelled kèm lý do, RB-1)
+      operationId: cancelCollectionOrder
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [reason], properties: {reason: {type: string, minLength: 10}}}}}}
+      responses:
+        "201": {description: Lệnh gom, content: {application/json: {schema: {$ref: "#/components/schemas/CollectionOrderResult"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/orders/{id}/roll-counts:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    get:
+      summary: Sổ đếm cuộn (cả bản bị bù) + số hiệu lực theo thửa/công đoạn + tổng theo công đoạn
+      operationId: listRollCounts
+      tags: [fieldops]
+      responses:
+        "200": {description: Sổ và tổng, content: {application/json: {schema: {type: object, properties: {counts: {type: array, items: {$ref: "#/components/schemas/RollCount"}}, totals: {type: array, items: {type: object}}, order_totals: {type: object, additionalProperties: {type: integer}}}}}}}
+    post:
+      summary: Ghi số một công đoạn (bale → gather → boat_load)
+      description: |
+        proto FM-03: công đoạn trước phải có số. FM-04: bằng công đoạn trước, hoặc ít hơn kèm `discrepancy_reason`; nhiều hơn → 422.
+        FM-09: bắt buộc `rolls`; `loose_kg` chỉ khi `rolls = 0` (rơm rời). Mỗi (thửa, công đoạn) một số hiệu lực — sửa bằng bản bù.
+        boat_load → cập nhật đối soát chiều mua và công bố bảng kê `htx_collection_statement`. Phát sự kiện NỘI BỘ `mkg.fieldops.roll_count.recorded`.
+      operationId: recordRollCount
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/RollCountInput"}}}}
+      responses:
+        "201": {description: Bản ghi, content: {application/json: {schema: {$ref: "#/components/schemas/RollCountResult"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/roll-counts/{id}/corrections:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    post:
+      summary: Bản ghi bù (RB-1) — bắt buộc correction_reason; công đoạn sau vẫn phải thỏa FM-04
+      operationId: correctRollCount
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/RollCountInput"}}}}
+      responses:
+        "201": {description: Bản bù, content: {application/json: {schema: {$ref: "#/components/schemas/RollCountResult"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/orders/{id}/htx-confirmations:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    get:
+      summary: Xác nhận của HTX trên lệnh gom
+      operationId: listHTXConfirmations
+      tags: [fieldops]
+      responses:
+        "200": {description: Danh sách, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {type: object}}}}}}}
+    post:
+      summary: Ghi xác nhận / tranh chấp của HTX (G3 — nhân viên MKG ghi thay; HTX tự xác nhận qua nền tảng ở G3-2)
+      operationId: recordHTXConfirmation
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plot_ref, outcome, event_time]
+              properties:
+                plot_ref: {type: string, format: uuid}
+                outcome: {type: string, enum: [confirmed, disputed]}
+                htx_rolls: {type: integer, minimum: 0, description: "Bắt buộc khi disputed (khác số MKG)"}
+                reason: {type: string, minLength: 10, description: "Bắt buộc khi disputed"}
+                statement_revision: {type: integer, description: "Phiên bản bảng kê HTX đã xem; cũ → 409 fieldops.statement_stale"}
+                evidence_ref: {type: string, format: uuid}
+                event_time: {type: string, format: date-time}
+      responses:
+        "201": {description: Xác nhận và đối soát, content: {application/json: {schema: {type: object, properties: {confirmation: {type: object}, reconciliation: {$ref: "#/components/schemas/BuySideReconciliation"}}}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/orders/{id}/crew-shifts:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    get:
+      summary: Ca tổ gom của lệnh
+      operationId: listCrewShifts
+      tags: [fieldops]
+      responses:
+        "200": {description: Danh sách, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {type: object}}}}}}}
+    post:
+      summary: Mở / đóng ca tổ gom
+      operationId: recordCrewShift
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [crew_ref, kind, event_time]
+              properties:
+                crew_ref: {type: string, format: uuid}
+                kind: {type: string, enum: [opened, closed]}
+                headcount: {type: integer, minimum: 1, maximum: 200, description: "Bắt buộc khi opened"}
+                equipment_refs: {type: array, maxItems: 50, items: {type: string}}
+                event_time: {type: string, format: date-time}
+                device_id: {type: string}
+      responses:
+        "201": {description: Ca, content: {application/json: {schema: {type: object}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/orders/{id}/publications:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    get:
+      summary: Bản ghi đã xuất qua van (collection_schedule, htx_collection_statement) — kiểm toán
+      operationId: listFieldopsPublications
+      tags: [fieldops]
+      responses:
+        "200": {description: Danh sách, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/ValveExport"}}}}}}}
+  /v1/fieldops/reconciliation:
+    get:
+      summary: Đối soát chiều mua MKG ↔ HTX theo thửa (RB-6) — pending / match / mismatch
+      operationId: listBuySideReconciliation
+      tags: [fieldops]
+      parameters:
+        - {name: order_id, in: query, schema: {type: string, format: uuid}}
+        - {name: status, in: query, schema: {type: string, enum: [pending, match, mismatch]}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 500}}
+      responses:
+        "200":
+          description: Trang đối soát
+          content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/BuySideReconciliation"}}, page_counts: {type: object}, next_cursor: {type: [string, "null"]}}}}}
+  /v1/fieldops/htx/{id}/kg-per-roll:
+    get:
+      summary: kg/cuộn học theo HTX — nội bộ MKG, KHÔNG BAO GIỜ qua van
+      description: Σ kg cân / Σ cuộn của 30 lô gom đã cân gần nhất của HTX → toàn tenant → cấu hình (AG_FIELDOPS_KG_PER_ROLL) → 20 (tạm, chờ khách).
+      operationId: getKgPerRoll
+      tags: [fieldops]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "200":
+          description: kg/cuộn
+          content: {application/json: {schema: {type: object, properties: {htx_ref: {type: string, format: uuid}, kg_per_roll: {type: string, example: "17.0"}, source: {type: string, enum: [htx, system, config, default]}, samples: {type: integer}, rule_version: {type: string}}}}}
+  /v1/fieldops/kg-per-roll/refresh:
+    post:
+      summary: Kéo khối lượng cân của lô gom đã xếp ghe/xe từ mkg/measurement (port WeighedMass) — vai field_supervisor
+      operationId: refreshKgPerRoll
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "200": {description: Số lô vừa có khối lượng, content: {application/json: {schema: {type: object, properties: {weighed_lots_added: {type: integer}}}}}}
+  /v1/fieldops/sync/push:
+    post:
+      summary: Đồng bộ chiều lên của app hiện trường MKG (hình dạng docs/dev/sync-contract.md, hiện thực trong vùng mkg)
+      description: |
+        Header `X-Device-Id` bắt buộc, trùng `device_id`. Tối đa 500 bản ghi; entity `roll_count` (op `create` | `correct`).
+        `id` UUIDv7 máy sinh; `idem_key` dạng `dev:<device_id>:<seq>`. Kết quả theo từng bản ghi: accepted | duplicate | rejected.
+      operationId: fieldopsSyncPush
+      tags: [fieldops]
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {name: X-Device-Id, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id, records]
+              properties:
+                device_id: {type: string}
+                records:
+                  type: array
+                  maxItems: 500
+                  items:
+                    type: object
+                    required: [id, idem_key, entity, op, event_time, payload]
+                    properties:
+                      id: {type: string}
+                      idem_key: {type: string}
+                      entity: {type: string, enum: [roll_count]}
+                      op: {type: string, enum: [create, correct]}
+                      event_time: {type: string, format: date-time}
+                      supersedes_id: {type: [string, "null"]}
+                      correction_reason: {type: [string, "null"]}
+                      payload:
+                        type: object
+                        properties:
+                          order_id: {type: string, format: uuid}
+                          plot_ref: {type: string, format: uuid}
+                          stage: {type: string, enum: [bale, gather, boat_load]}
+                          rolls: {type: integer, minimum: 0}
+                          loose_kg: {$ref: "#/components/schemas/Kg"}
+                          discrepancy_reason: {type: string}
+                          htx_confirmation_ref: {type: string, format: uuid}
+      responses:
+        "200":
+          description: Kết quả theo bản ghi
+          content: {application/json: {schema: {type: object, properties: {results: {type: array, items: {type: object, properties: {id: {type: string}, status: {type: string, enum: [accepted, duplicate, rejected]}, code: {type: string}, errors: {type: array, items: {type: object}}}}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/sync/pull:
+    get:
+      summary: Đồng bộ chiều xuống — entity collection_order (đã duyệt/đang làm → upsert; khác → tombstone)
+      operationId: fieldopsSyncPull
+      tags: [fieldops]
+      parameters:
+        - {name: X-Device-Id, in: header, required: true, schema: {type: string}}
+        - {name: cursor, in: query, schema: {type: string, description: "Mờ, có chữ ký HMAC gắn tenant + tài khoản + thiết bị"}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 1000}}
+      responses:
+        "200":
+          description: Trang thay đổi
+          content: {application/json: {schema: {type: object, properties: {changes: {type: array, items: {type: object}}, next_cursor: {type: string}, has_more: {type: boolean}, server_time: {type: string, format: date-time}, reset: {type: boolean}}}}}
+        "400": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -352,6 +648,7 @@ components:
   parameters:
     IdempotencyKey: {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 8, maxLength: 200}}
     FacilityID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    OrderID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
   responses:
     Problem:
       description: Lỗi RFC 9457
@@ -464,10 +761,10 @@ components:
         as_of: {type: string, format: date-time}
     ValveExport:
       type: object
-      description: Một dòng sổ mkg_hub.valve_export; id = event_id trên outbox của cụm mkg
+      description: Một dòng sổ valve_export (mkg_hub hoặc mkg_fieldops); id = event_id trên outbox của cụm mkg
       properties:
         id: {type: string, format: uuid}
-        contract: {type: string, enum: [hub_facility, hub_capacity]}
+        contract: {type: string, enum: [hub_facility, hub_capacity, collection_schedule, htx_collection_statement]}
         contract_version: {type: integer}
         event_type: {type: string}
         schema_version: {type: integer}
@@ -476,3 +773,92 @@ components:
         payload: {type: object, description: ĐÚNG các trường của hợp đồng van}
         event_time: {type: string, format: date-time}
         recorded_at: {type: string, format: date-time}
+    CollectionPlanInput:
+      type: object
+      required: [htx_ref, window_from, window_to, plot_refs]
+      properties:
+        htx_ref: {type: string, format: uuid}
+        commune_code: {type: string, pattern: "^[0-9]{5}$", description: "Bỏ trống → mã xã của HTX từ nền tảng"}
+        window_from: {type: string, format: date}
+        window_to: {type: string, format: date, description: "≥ window_from, khung tối đa 90 ngày"}
+        plot_refs: {type: array, minItems: 1, maxItems: 200, items: {type: string, format: uuid}}
+    CollectionOrder:
+      type: object
+      properties:
+        order_id: {type: string, format: uuid, description: "= mã lô gom (lot_ref của sự kiện nội bộ) và schedule_ref của van"}
+        status: {type: string, enum: [planned, approved, assigned, closed, cancelled]}
+        revision: {type: integer}
+        htx_ref: {type: string, format: uuid}
+        commune_code: {type: string}
+        window_from: {type: string, format: date}
+        window_to: {type: string, format: date}
+        plot_refs: {type: array, items: {type: string, format: uuid}}
+        crew_ref: {type: [string, "null"], format: uuid}
+        reason: {type: [string, "null"]}
+        created_by: {type: string, format: uuid}
+        approved_by: {type: [string, "null"], format: uuid}
+        approved_at: {type: [string, "null"], format: date-time}
+        published: {type: boolean}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    CollectionOrderResult:
+      type: object
+      properties:
+        order: {$ref: "#/components/schemas/CollectionOrder"}
+        event: {type: object}
+        publications: {type: array, items: {$ref: "#/components/schemas/ValveExport"}}
+    RollCountInput:
+      type: object
+      required: [rolls, event_time]
+      properties:
+        id: {type: string, format: uuid, description: "UUIDv7 máy sinh (R-11); bỏ trống → server sinh"}
+        plot_ref: {type: string, format: uuid, description: "Bắt buộc với bản gốc"}
+        stage: {type: string, enum: [bale, gather, boat_load], description: "Bắt buộc với bản gốc"}
+        rolls: {type: integer, minimum: 0}
+        loose_kg: {$ref: "#/components/schemas/Kg"}
+        discrepancy_reason: {type: string, minLength: 10, maxLength: 500}
+        htx_confirmation_ref: {type: string, format: uuid}
+        correction_reason: {type: string, minLength: 10, maxLength: 500, description: "Bắt buộc với bản bù"}
+        event_time: {type: string, format: date-time}
+        device_id: {type: string}
+    RollCount:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        order_id: {type: string, format: uuid}
+        plot_ref: {type: string, format: uuid}
+        htx_ref: {type: string, format: uuid}
+        stage: {type: string, enum: [bale, gather, boat_load]}
+        rolls: {type: integer}
+        loose_kg: {oneOf: [{$ref: "#/components/schemas/Kg"}, {type: "null"}]}
+        discrepancy_reason: {type: [string, "null"]}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        device_id: {type: [string, "null"]}
+        rule_version: {type: string}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+    RollCountResult:
+      type: object
+      properties:
+        roll_count: {$ref: "#/components/schemas/RollCount"}
+        total: {type: object}
+        reconciliation: {oneOf: [{$ref: "#/components/schemas/BuySideReconciliation"}, {type: "null"}]}
+        publications: {type: array, items: {$ref: "#/components/schemas/ValveExport"}}
+    BuySideReconciliation:
+      type: object
+      properties:
+        order_id: {type: string, format: uuid}
+        plot_ref: {type: string, format: uuid}
+        htx_ref: {type: string, format: uuid}
+        statement_ref: {type: string, format: uuid}
+        statement_revision: {type: integer}
+        mkg_rolls: {type: integer}
+        mkg_roll_count_id: {type: string, format: uuid}
+        htx_rolls: {type: [integer, "null"]}
+        outcome: {type: [string, "null"], enum: [confirmed, disputed, null]}
+        confirmation_id: {type: [string, "null"], format: uuid}
+        confirmed_revision: {type: [integer, "null"]}
+        status: {type: string, enum: [pending, match, mismatch]}
+        updated_at: {type: string, format: date-time}
