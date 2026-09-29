@@ -68,6 +68,7 @@ type memSource struct {
 	entities []string
 	changes  map[string][]memChange
 	calls    atomic.Int64
+	forbid   map[string]bool // entity → trả 403 (người gọi không có vai đọc)
 }
 
 type memChange struct {
@@ -99,6 +100,9 @@ func (s *memSource) Changes(_ context.Context, scope authz.Scope, entity string,
 	s.calls.Add(1)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.forbid[entity] {
+		return nil, after, problem.Forbidden
+	}
 	var out []port.Change
 	last := after
 	for i, c := range s.changes[entity] {

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -78,7 +79,17 @@ func (h Handler) pull(c *gin.Context) {
 		}
 		limit = n
 	}
-	res, err := h.Svc.Pull(c.Request.Context(), c.GetHeader(port.HeaderDeviceID), c.Query("cursor"), limit)
+	// entities: tùy chọn, lọc nhóm dữ liệu (lặp tham số hoặc phân tách bằng dấu phẩy) —
+	// máy dùng khi lệnh sync_now có khóa "entities" (KN US-SYNC-02).
+	var only []string
+	for _, v := range c.QueryArray("entities") {
+		for _, e := range strings.Split(v, ",") {
+			if e = strings.TrimSpace(e); e != "" {
+				only = append(only, e)
+			}
+		}
+	}
+	res, err := h.Svc.PullEntitiesOnly(c.Request.Context(), c.GetHeader(port.HeaderDeviceID), c.Query("cursor"), limit, only)
 	if err != nil {
 		httpx.Fail(c, err)
 		return

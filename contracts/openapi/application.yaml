@@ -354,6 +354,12 @@ paths:
         - $ref: "#/components/parameters/DeviceID"
         - {name: cursor, in: query, description: "next_cursor của trang trước; bỏ trống = từ đầu", schema: {type: string}}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 1000, default: 500}}
+        - name: entities
+          in: query
+          description: "KN US-SYNC-02: chỉ đọc các entity này (phân tách dấu phẩy hoặc lặp tham số); con trỏ giữ vị trí entity khác"
+          schema: {type: array, items: {type: string}}
+          style: form
+          explode: true
       responses:
         "200":
           description: Một trang
@@ -2367,6 +2373,290 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
   # --- hết pf/reports ---
+  # --- G2: pf/accounts (tài khoản nông dân App HTX), pf/party, pf/extension (yêu cầu hỗ trợ) ---
+  /v1/farmer-accounts:
+    get:
+      summary: Tài khoản nông dân của một HTX (HTX US-ACC-01) — không dữ liệu cá nhân
+      description: Vai coop_manager (mặc định HTX của mình, không xem HTX khác), kn_officer/kn_province_admin (trong phạm vi), platform_admin.
+      operationId: listFarmerAccounts
+      tags: [accounts]
+      parameters:
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FarmerAccount"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {description: "accounts.out_of_scope", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Tạo tài khoản nông dân cho nông hộ của HTX (HTX US-ACC-01, US-LOGIN-01) và phát lượt kích hoạt QR/liên kết một lần
+      description: |
+        Tên đăng nhập = SĐT chuẩn hóa 0xxxxxxxxx; SĐT phải là SĐT chủ hộ trong kho định danh (household_ref bỏ trống → tra theo SĐT).
+        Vai farmer, required action UPDATE_PASSWORD, KHÔNG org_ref, không mật khẩu, không email/SMS (g2-conventions §1).
+        activation.link chỉ có ở phản hồi đầu (Cache-Control no-store); gọi lặp cùng Idempotency-Key trả bản đã lược liên kết.
+      operationId: createFarmerAccount
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                household_ref: {type: [string, "null"], format: uuid}
+                phone: {type: string, description: "SĐT chủ hộ (0xxxxxxxxx hoặc +84…)"}
+                full_name: {type: string}
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FarmerCreated"}
+        "200":
+          description: Phát lại (không có liên kết)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FarmerCreated"}
+        "403": {description: "forbidden | accounts.out_of_scope", $ref: "#/components/responses/Problem"}
+        "409": {description: "accounts.farmer_exists | accounts.phone_taken | accounts.org_inactive", $ref: "#/components/responses/Problem"}
+        "422": {description: "accounts.household_invalid | accounts.phone_household_mismatch", $ref: "#/components/responses/Problem"}
+        "503": {description: "accounts.dependency_unavailable", $ref: "#/components/responses/Problem"}
+  /v1/farmer-accounts/import:
+    post:
+      summary: Nhập tài khoản nông dân hàng loạt từ CSV/XLSX (HTX US-ACC-02) — kết quả theo từng dòng, dòng hợp lệ nhận liên kết kích hoạt
+      description: Cột phone (SĐT, bắt buộc), household_ref (Mã nông hộ, tùy chọn), full_name (Họ tên). Tối đa 200 dòng, 2 MB.
+      operationId: importFarmerAccounts
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          text/csv: {schema: {type: string, format: binary}}
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created, rejected, rows]
+                properties:
+                  created: {type: integer}
+                  rejected: {type: integer}
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      required: [row, status]
+                      properties:
+                        row: {type: integer}
+                        status: {type: string, enum: [created, rejected]}
+                        reason: {type: [string, "null"]}
+                        user_ref: {type: [string, "null"], format: uuid}
+                        household_ref: {type: [string, "null"], format: uuid}
+                        activation: {oneOf: [{$ref: "#/components/schemas/FarmerActivation"}, {type: "null"}]}
+        "422": {description: "accounts.import_invalid", $ref: "#/components/responses/Problem"}
+  /v1/farmer-accounts/{id}/activation:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: "user_ref (id Keycloak) của nông dân"}
+    get:
+      summary: Lượt kích hoạt của tài khoản nông dân — chỉ siêu dữ liệu (ai phát, lúc nào, hạn, đã dùng/thu hồi)
+      operationId: listFarmerActivations
+      tags: [accounts]
+      responses:
+        "200":
+          description: Mới nhất trước
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_ref: {type: string, format: uuid}
+                  items: {type: array, items: {$ref: "#/components/schemas/FarmerGrant"}}
+        "404": {description: "accounts.farmer_not_found", $ref: "#/components/responses/Problem"}
+    post:
+      summary: Phát lại liên kết/QR kích hoạt (mất QR, hết hạn, quên mật khẩu) — lượt đang mở bị thu hồi (reissued)
+      operationId: reissueFarmerActivation
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: Lượt mới (link chỉ có ở phản hồi đầu)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  activation: {$ref: "#/components/schemas/FarmerActivation"}
+        "404": {description: "accounts.farmer_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "accounts.state_conflict — tài khoản đang khóa", $ref: "#/components/responses/Problem"}
+        "503": {description: "accounts.activation_link_unavailable", $ref: "#/components/responses/Problem"}
+  /v1/farmer/households:
+    get:
+      summary: Nông hộ liên kết với tài khoản nông dân gọi (vai farmer)
+      operationId: myFarmerHouseholds
+      tags: [accounts]
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        household_ref: {type: string, format: uuid}
+                        cooperative_ref: {type: string, format: uuid}
+                        commune_code: {type: string}
+  /v1/farmer/coop-staff:
+    get:
+      summary: Danh bạ cán bộ HTX của nông dân, tìm theo tên hoặc chức vụ (HTX US-SUPPORT-02) — không có SĐT
+      operationId: farmerCoopStaff
+      tags: [accounts]
+      parameters:
+        - {name: q, in: query, schema: {type: string}, description: "Tên hoặc chức vụ, không phân biệt dấu"}
+      responses:
+        "200":
+          description: Danh sách (Cache-Control private, no-store)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        user_ref: {type: string, format: uuid}
+                        cooperative_ref: {type: string, format: uuid}
+                        display_name: {type: string}
+                        title: {type: string}
+                        has_phone: {type: boolean, description: "false → ẩn nút gọi nhanh (AC-2)"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/farmer/coop-staff/{id}/contact:
+    get:
+      summary: SĐT của cán bộ HTX lúc bấm gọi/copy (HTX US-SUPPORT-02 AC-1) — đọc từ Keycloak, không lưu, Cache-Control no-store
+      operationId: farmerCoopStaffContact
+      tags: [accounts]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: SĐT
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_ref: {type: string, format: uuid}
+                  phone: {type: string}
+        "404": {description: "accounts.staff_not_found | accounts.contact_unavailable", $ref: "#/components/responses/Problem"}
+  /v1/households/{ref}/membership:
+    post:
+      summary: Nông hộ vào / chuyển / rời HTX (KN US-HTX-02, US-HTX-05) — phát pf.party.household.membership_changed
+      description: |
+        cooperative_ref null = rời HTX. Quản lý HTX chỉ cho hộ (chưa thuộc HTX nào) vào HTX của mình hoặc rời HTX của mình;
+        cán bộ KN/quản trị trong phạm vi. Lý do 10–500 ký tự (không đi vào sự kiện). effective_date mặc định hôm nay (giờ VN).
+      operationId: changeHouseholdMembership
+      tags: [party]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                cooperative_ref: {type: [string, "null"], format: uuid}
+                effective_date: {type: string, format: date}
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "200":
+          description: Đã đổi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  household: {$ref: "#/components/schemas/Household"}
+                  change: {type: string, enum: [joined, left, transferred]}
+                  prev_cooperative_ref: {type: [string, "null"], format: uuid}
+        "403": {description: "party.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: "party.household_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "party.membership_unchanged | party.org_state_conflict", $ref: "#/components/responses/Problem"}
+        "422": {description: "party.membership_reason_required", $ref: "#/components/responses/Problem"}
+  /v1/support-requests:
+    get:
+      summary: Yêu cầu hỗ trợ của (các) nông hộ của nông dân, kèm trạng thái nhiệm vụ (HTX US-SUPPORT-01)
+      operationId: listMySupportRequests
+      tags: [extension]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Mới nhất trước
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/SupportRequest"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {description: "forbidden | extension.farmer_household_required", $ref: "#/components/responses/Problem"}
+    post:
+      summary: Nông dân gửi yêu cầu hỗ trợ (HTX US-SUPPORT-01) — cùng giao dịch tự sinh nhiệm vụ cho cán bộ khuyến nông (KN US-TASK-01)
+      description: |
+        Vai farmer. Người nhận: cán bộ xã đang trực → cán bộ tỉnh đang trực → cán bộ tỉnh → để trống (admin_queue, báo quản trị tỉnh).
+        Thiếu vị trí GPS vẫn nhận (nhãn "Thiếu vị trí GPS"). Ngoại tuyến: gửi qua pf/sync entity support_request (cùng payload).
+      operationId: submitSupportRequest
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/SupportRequestInput"}
+      responses:
+        "201":
+          description: Đã nhận, nhiệm vụ đã sinh
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  support_request: {$ref: "#/components/schemas/SupportRequest"}
+                  replayed: {type: boolean}
+        "403": {description: "forbidden | extension.farmer_household_required", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.id_reused", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed (\"Vui lòng nhập mô tả và chọn loại sự cố trước khi gửi.\", tối đa 5 ảnh) | extension.household_invalid", $ref: "#/components/responses/Problem"}
+        "503": {description: "extension.dependency_unavailable", $ref: "#/components/responses/Problem"}
+  # --- hết G2 ---
 components:
   securitySchemes:
     oidc:
@@ -3477,7 +3767,7 @@ components:
       description: Không chứa dữ liệu cá nhân. Cũng là data của entity đồng bộ "notification" (không có topic).
       properties:
         id: {type: string, format: uuid}
-        kind: {type: string, enum: [directive, alert, document, task_escalated, sync_conflict, org_deactivated]}
+        kind: {type: string, enum: [directive, alert, document, task_escalated, sync_conflict, org_deactivated, household_registered, household_membership_changed, task_assigned]}
         severity: {type: string, enum: [urgent, normal]}
         title: {type: string, maxLength: 300}
         body: {type: string, maxLength: 2000}
@@ -3507,6 +3797,11 @@ components:
       properties:
         device_id: {type: string, format: uuid}
         unit: {type: string, description: "Mã tỉnh/xã hiện hành"}
+        entities:
+          type: array
+          maxItems: 30
+          items: {type: string, pattern: "^[a-z_]{1,40}$"}
+          description: "KN US-SYNC-02: nhóm dữ liệu cần đồng bộ ngay (entity pf/sync); rỗng = tất cả. Thông điệp sync_now mang khóa entities (nối bằng dấu phẩy)."
     NudgeResult:
       type: object
       required: [nudge_id, target_kind, target, devices]
@@ -3515,7 +3810,95 @@ components:
         target_kind: {type: string, enum: [device, unit]}
         target: {type: string}
         devices: {type: integer, minimum: 0}
+        entities: {type: array, items: {type: string}}
     # --- hết pf/notify ---
+
+    # --- G2: tài khoản nông dân, yêu cầu hỗ trợ ---
+    FarmerGrant:
+      type: object
+      description: Siêu dữ liệu lượt kích hoạt — không có token
+      required: [grant_id, status, channel, issued_by, issued_at, expires_at]
+      properties:
+        grant_id: {type: string, format: uuid}
+        status: {type: string, enum: [active, used, revoked, expired]}
+        channel: {type: string, enum: [link_qr]}
+        issued_by: {type: string, format: uuid}
+        issued_at: {type: string, format: date-time}
+        expires_at: {type: string, format: date-time}
+        used_at: {type: [string, "null"], format: date-time}
+        revoked_at: {type: [string, "null"], format: date-time}
+        revoke_reason: {type: [string, "null"], enum: [reissued, account_locked, null]}
+        replaced_by: {type: [string, "null"], format: uuid}
+    FarmerActivation:
+      allOf:
+        - {$ref: "#/components/schemas/FarmerGrant"}
+        - type: object
+          properties:
+            link: {type: [string, "null"], description: "Liên kết action token một lần (Keycloak) — chỉ ở phản hồi đầu, không lưu"}
+            qr:
+              oneOf:
+                - type: object
+                  properties:
+                    format: {type: string, enum: [url]}
+                    data: {type: string}
+                    error_correction: {type: string}
+                    min_module_px: {type: integer}
+                - {type: "null"}
+            replayed: {type: boolean}
+    FarmerAccount:
+      type: object
+      required: [user_ref, household_ref, cooperative_ref, commune_code, linked_at]
+      properties:
+        user_ref: {type: string, format: uuid}
+        household_ref: {type: string, format: uuid}
+        cooperative_ref: {type: string, format: uuid}
+        commune_code: {type: string}
+        linked_at: {type: string, format: date-time}
+        enabled: {type: boolean}
+        latest_activation: {$ref: "#/components/schemas/FarmerGrant"}
+    FarmerCreated:
+      type: object
+      properties:
+        farmer: {$ref: "#/components/schemas/FarmerAccount"}
+        replayed: {type: boolean}
+        activation: {oneOf: [{$ref: "#/components/schemas/FarmerActivation"}, {type: "null"}]}
+        activation_error: {type: [string, "null"], description: "Mã lỗi khi chưa phát được liên kết (vd accounts.activation_link_unavailable)"}
+    SupportRequestInput:
+      type: object
+      required: [category, description]
+      properties:
+        id: {type: string, format: uuid, description: "UUIDv7 sinh trên máy (tùy chọn)"}
+        household_ref: {type: [string, "null"], format: uuid, description: "Bỏ trống khi tài khoản chỉ có một nông hộ"}
+        plot_ref: {type: [string, "null"], format: uuid}
+        category: {type: string, enum: [dich_hai, benh_lua, thoi_tiet, ky_thuat, may_moc, khac]}
+        urgency: {type: string, enum: [binh_thuong, khan], default: binh_thuong}
+        description: {type: string, minLength: 10, maxLength: 2000, description: "Không chứa SĐT/CCCD"}
+        photo_refs: {type: array, maxItems: 5, items: {type: string, format: uuid}}
+        location:
+          type: [object, "null"]
+          properties:
+            lat: {type: [string, number]}
+            lon: {type: [string, number]}
+        gps_accuracy_m: {type: [string, number, "null"]}
+    SupportRequest:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        household_ref: {type: string, format: uuid}
+        plot_ref: {type: [string, "null"], format: uuid}
+        category: {type: string}
+        urgency: {type: string}
+        description: {type: string}
+        photo_refs: {type: array, items: {type: string, format: uuid}}
+        gps_missing: {type: boolean}
+        labels: {type: array, items: {type: string}, description: "vd \"Thiếu vị trí GPS\""}
+        event_time: {type: string, format: date-time}
+        received_at: {type: string, format: date-time}
+        task_id: {type: string, format: uuid}
+        task_status: {type: string, enum: [new, assigned, accepted, in_progress, resolved]}
+        assigned: {type: boolean}
+        last_note: {type: string}
+        task_created_at: {type: string, format: date-time}
 
     MechForecastRun:
       type: object

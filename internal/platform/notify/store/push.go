@@ -134,9 +134,11 @@ func InsertDelivery(ctx context.Context, tx pgx.Tx, tid uuid.UUID, d domain.Deli
 // hiện tại của thiết bị.
 func OpenDeliveries(ctx context.Context, tx pgx.Tx, batch uuid.UUID) ([]domain.DeliveryJob, error) {
 	rows, err := tx.Query(ctx, `SELECT d.id, d.batch_id, d.device_id, d.notification_id, d.kind, d.urgent, d.status, d.attempts,
-	    d.created_at, d.sent_at, t.device_id IS NOT NULL AND t.disabled_at IS NULL, coalesce(t.token, ''), coalesce(t.platform, '')
+	    d.created_at, d.sent_at, t.device_id IS NOT NULL AND t.disabled_at IS NULL, coalesce(t.token, ''), coalesce(t.platform, ''),
+	    coalesce(n.entities, '{}')
 	  FROM pf_notify.push_delivery d
 	  LEFT JOIN pf_notify.push_token t ON t.tenant_id = d.tenant_id AND t.device_id = d.device_id
+	  LEFT JOIN pf_notify.nudge n ON n.tenant_id = d.tenant_id AND n.id = d.batch_id AND d.kind = 'sync_now'
 	  WHERE d.batch_id = $1 AND d.status IN ('pending', 'failed') AND d.attempts < $2
 	  ORDER BY d.id`, batch, domain.MaxDeliveryAttempts)
 	if err != nil {
@@ -149,7 +151,7 @@ func OpenDeliveries(ctx context.Context, tx pgx.Tx, batch uuid.UUID) ([]domain.D
 		var active bool
 		var tok domain.PushToken
 		if err := rows.Scan(&j.ID, &j.BatchID, &j.DeviceID, &j.NotificationID, &j.Kind, &j.Urgent, &j.Status, &j.Attempts,
-			&j.CreatedAt, &j.SentAt, &active, &tok.Token, &tok.Platform); err != nil {
+			&j.CreatedAt, &j.SentAt, &active, &tok.Token, &tok.Platform, &j.Entities); err != nil {
 			return nil, err
 		}
 		if active {
@@ -213,9 +215,12 @@ func CountNudgesSince(ctx context.Context, tx pgx.Tx, actor uuid.UUID, since tim
 }
 
 // InsertNudge ghi một yêu cầu đồng bộ ngay.
-func InsertNudge(ctx context.Context, tx pgx.Tx, tid, id, actor uuid.UUID, kind, target string, devices int, now time.Time) error {
-	_, err := tx.Exec(ctx, `INSERT INTO pf_notify.nudge (tenant_id, id, actor_ref, target_kind, target, devices, created_at)
-	  VALUES ($1, $2, $3, $4, $5, $6, $7)`, tid, id, actor, kind, target, devices, now.UTC())
+func InsertNudge(ctx context.Context, tx pgx.Tx, tid, id, actor uuid.UUID, kind, target string, devices int, entities []string, now time.Time) error {
+	if entities == nil {
+		entities = []string{}
+	}
+	_, err := tx.Exec(ctx, `INSERT INTO pf_notify.nudge (tenant_id, id, actor_ref, target_kind, target, devices, entities, created_at)
+	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, tid, id, actor, kind, target, devices, entities, now.UTC())
 	return err
 }
 

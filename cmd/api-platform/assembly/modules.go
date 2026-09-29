@@ -150,6 +150,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		Sources: []syncport.Source{md.SyncSource(), g.SyncSource(), cnt.SyncSource(), kn.SyncSource(), nt.SyncSource(), mrvMod.SyncSource()},
 		Sinks:   []syncport.Sink{g.SyncSink(), kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink()},
 	})
+	nt.UseSyncEntities(snc.PullEntities()) // KN US-SYNC-02: kiểm entities[] của nudge
 
 	accPool, err := pool(accounts.DBRole)
 	if err != nil {
@@ -161,10 +162,12 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 			return Modules{}, pools, err
 		}
 	}
-	acc := accounts.New(accPool, clk, accounts.Deps{Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs()})
+	acc := accounts.New(accPool, clk, accounts.Deps{Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs(),
+		Households: pty.Households(), Vault: ext.Vault, Params: md.Params()})
 	if c := acc.StaffContacts(); c != nil {
 		kn.UseContacts(c) // US-DIR-02: số điện thoại cán bộ đọc từ Keycloak lúc bấm liên hệ
 	}
+	kn.UseFarmers(acc.FarmerHouseholds()) // HTX US-SUPPORT-01: nông hộ của tài khoản nông dân
 
 	// pf/reports: API tạo việc xuất và cấp URL tải; worker dựng tệp (cmd/worker). Địa chỉ email tra qua pf/accounts (MailDirectory).
 	repPool, err := pool(reports.DBRole)

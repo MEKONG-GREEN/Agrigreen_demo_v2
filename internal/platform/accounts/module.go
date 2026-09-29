@@ -17,12 +17,14 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/keycloak"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
+	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	reportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
 // DBRole là vai DB riêng của module (R-05).
@@ -35,6 +37,11 @@ type Deps struct {
 	// Scope, Orgs: pf/party — phạm vi theo cây phân cấp và tra tổ chức (ADR-0009).
 	Scope partyport.ScopeResolver
 	Orgs  partyport.Orgs
+	// Households, Vault, Params: tài khoản nông dân App HTX (G2) — thành viên HTX của
+	// nông hộ, tra nông hộ theo SĐT qua chỉ mục mù, tham số activation.grant_lifespan_hours.
+	Households partyport.Households
+	Vault      client.Client
+	Params     mdport.Params
 }
 
 // Module là pf/accounts đã nối.
@@ -42,11 +49,17 @@ type Module struct{ svc *app.Service }
 
 // New tạo module với pool của vai accounts_app.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
-	return &Module{svc: &app.Service{DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs}}
+	return &Module{svc: &app.Service{DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs,
+		Households: d.Households, Vault: d.Vault, Params: d.Params}}
 }
 
-// RegisterApp: module không có route Application API.
-func (m *Module) RegisterApp(*gin.RouterGroup) {}
+// RegisterApp gắn route Application API của App HTX: tài khoản nông dân (quản lý
+// HTX, cán bộ KN) và danh bạ cán bộ HTX của nông dân.
+func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterApp(rg) }
+
+// FarmerHouseholds cho module khác: nông hộ liên kết với tài khoản nông dân
+// (cropcycle: phạm vi thửa; extension: yêu cầu hỗ trợ). Tenant lấy từ context.
+func (m *Module) FarmerHouseholds() port.FarmerHouseholds { return m.svc }
 
 // RegisterAdmin gắn route Admin API (MFA bắt buộc ở router).
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }

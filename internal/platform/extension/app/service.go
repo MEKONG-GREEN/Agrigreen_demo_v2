@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
+	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
@@ -74,6 +75,9 @@ type Service struct {
 	Coops partyport.CooperativeStats
 	// Contacts (tùy chọn): số điện thoại cán bộ ở pf/accounts cho "gọi/nhắn 1 chạm" (US-DIR-02).
 	Contacts port.StaffContacts
+	// Farmers: liên kết tài khoản nông dân ↔ nông hộ (pf/accounts) cho yêu cầu hỗ trợ
+	// từ App HTX (HTX US-SUPPORT-01). Nil → route yêu cầu hỗ trợ trả 503.
+	Farmers accport.FarmerHouseholds
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

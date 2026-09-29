@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"math"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -24,14 +25,18 @@ import (
 type NudgeInput struct {
 	DeviceID *uuid.UUID
 	Unit     string
+	// Entities: nhóm dữ liệu cần đồng bộ ngay (KN US-SYNC-02 AC: "chọn nhóm/loại dữ liệu");
+	// rỗng = tất cả. Mỗi phần tử là tên entity của pf/sync.
+	Entities []string
 }
 
 // NudgeResult là kết quả yêu cầu đồng bộ ngay.
 type NudgeResult struct {
-	ID      uuid.UUID
-	Target  string
-	Kind    string
-	Devices int
+	ID       uuid.UUID
+	Target   string
+	Kind     string
+	Devices  int
+	Entities []string
 }
 
 // RateLimited mang số giây phải chờ (header Retry-After).
@@ -51,11 +56,15 @@ func (s *Service) Nudge(ctx context.Context, in NudgeInput) (NudgeResult, *RateL
 	if (in.DeviceID == nil) == (in.Unit == "") {
 		return NudgeResult{}, nil, problem.Validation.WithField("device_id", "cần đúng một trong device_id hoặc unit")
 	}
+	entities, err := s.nudgeEntities(in.Entities)
+	if err != nil {
+		return NudgeResult{}, nil, err
+	}
 	sc, err := s.scope(ctx)
 	if err != nil {
 		return NudgeResult{}, nil, err
 	}
-	res := NudgeResult{ID: ids.New(), Kind: domain.NudgeUnit, Target: in.Unit}
+	res := NudgeResult{ID: ids.New(), Kind: domain.NudgeUnit, Target: in.Unit, Entities: entities}
 	if in.DeviceID != nil {
 		res.Kind, res.Target = domain.NudgeDevice, in.DeviceID.String()
 	} else if !sc.Allows(in.Unit) {
@@ -101,7 +110,7 @@ func (s *Service) Nudge(ctx context.Context, in NudgeInput) (NudgeResult, *RateL
 			}
 		}
 		res.Devices = len(tokens)
-		if err := store.InsertNudge(ctx, tx, p.TenantID, res.ID, p.ActorRef, res.Kind, res.Target, res.Devices, now); err != nil {
+		if err := store.InsertNudge(ctx, tx, p.TenantID, res.ID, p.ActorRef, res.Kind, res.Target, res.Devices, res.Entities, now); err != nil {
 			return err
 		}
 		// Lô gửi dùng chính mã nudge làm batch_id.
@@ -114,6 +123,31 @@ func (s *Service) Nudge(ctx context.Context, in NudgeInput) (NudgeResult, *RateL
 		return NudgeResult{}, limited, ErrNudgeRateLimited.With("retry_after_s", int(math.Ceil(limited.RetryAfter.Seconds())))
 	}
 	return res, nil, nil
+}
+
+var entityRe = regexp.MustCompile(`^[a-z_]{1,40}$`)
+
+// nudgeEntities kiểm, bỏ trùng và sắp xếp nhóm dữ liệu; biết danh sách entity của
+// pf/sync (Deps.SyncEntities) thì entity lạ → 422 notify.nudge_entity_unknown.
+func (s *Service) nudgeEntities(in []string) ([]string, error) {
+	out := []string{}
+	for _, e := range in {
+		e = strings.TrimSpace(e)
+		if !entityRe.MatchString(e) {
+			return nil, problem.Validation.WithField("entities", "tên entity 1–40 ký tự a-z, _")
+		}
+		if len(s.SyncEntities) > 0 && !slices.Contains(s.SyncEntities, e) {
+			return nil, ErrNudgeEntityUnknown.WithField("entities", "không có entity "+e)
+		}
+		if !slices.Contains(out, e) {
+			out = append(out, e)
+		}
+	}
+	if len(out) > port.MaxNudgeEntities {
+		return nil, problem.Validation.WithField("entities", "tối đa 30 nhóm dữ liệu")
+	}
+	slices.Sort(out)
+	return out, nil
 }
 
 // tokenInScope: phạm vi chụp của thiết bị giao với phạm vi người gọi.

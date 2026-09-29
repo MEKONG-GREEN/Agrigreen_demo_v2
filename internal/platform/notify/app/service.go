@@ -30,6 +30,7 @@ var (
 	ErrOutOfScope           = problem.New(http.StatusForbidden, "notify.out_of_scope", "Đơn vị nằm ngoài phạm vi của bạn")
 	ErrNudgeTargetNotFound  = problem.New(http.StatusNotFound, "notify.nudge_target_not_found", "Không có thiết bị nhận được yêu cầu đồng bộ")
 	ErrNudgeRateLimited     = problem.New(http.StatusTooManyRequests, "notify.nudge_rate_limited", "Yêu cầu đồng bộ quá dày — thử lại sau")
+	ErrNudgeEntityUnknown   = problem.New(http.StatusUnprocessableEntity, "notify.nudge_entity_unknown", "Nhóm dữ liệu không có trong hợp đồng đồng bộ")
 	ErrDependency           = problem.New(http.StatusServiceUnavailable, "notify.dependency_unavailable", "Chưa nối phụ thuộc của module thông báo")
 )
 
@@ -59,7 +60,9 @@ type Deps struct {
 	DigestTo      []string
 	NudgeCooldown time.Duration
 	NudgeHourly   int
-	Log           *slog.Logger
+	// SyncEntities: entity của pf/sync (chiều xuống) — kiểm entities[] của nudge; rỗng → chỉ kiểm dạng tên.
+	SyncEntities []string
+	Log          *slog.Logger
 }
 
 // Service là use case của module.

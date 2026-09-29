@@ -40,6 +40,12 @@ type Config struct {
 	// dùng hoàn tất liên kết kích hoạt (tùy chọn).
 	ActionsClientID    string
 	ActionsRedirectURI string
+	// ActionLinkURL: điểm cuối của phần mở rộng realm phát liên kết hành động một lần
+	// KHÔNG gửi email (tài khoản nông dân, g2-conventions §1). Rỗng → ActionLink trả
+	// port.ErrActionLinkUnsupported. Gọi bằng token tài khoản dịch vụ; thân POST
+	// {user_id, grant_id, actions, lifespan, client_id, redirect_uri} → {link}; phần mở
+	// rộng gắn token với grant_id và từ chối token của lượt cũ (port.ActionLinks).
+	ActionLinkURL string
 	// HTTP thay http.Client mặc định (kiểm thử).
 	HTTP *http.Client
 	// Now thay đồng hồ hệ thống khi tính hạn token (kiểm thử).
@@ -48,12 +54,13 @@ type Config struct {
 
 // ConfigFromEnv đọc AG_KC_ADMIN_URL, AG_KC_REALM, AG_KC_CLIENT_ID, AG_KC_CLIENT_SECRET
 // (bắt buộc cùng nhau), AG_KC_TIMEOUT (vd 10s), AG_KC_ACTIONS_CLIENT_ID,
-// AG_KC_ACTIONS_REDIRECT_URI. ok=false khi không đặt AG_KC_ADMIN_URL.
+// AG_KC_ACTIONS_REDIRECT_URI, AG_KC_ACTION_LINK_URL. ok=false khi không đặt AG_KC_ADMIN_URL.
 func ConfigFromEnv() (cfg Config, ok bool, err error) {
 	cfg = Config{
 		BaseURL: os.Getenv("AG_KC_ADMIN_URL"), Realm: os.Getenv("AG_KC_REALM"),
 		ClientID: os.Getenv("AG_KC_CLIENT_ID"), ClientSecret: os.Getenv("AG_KC_CLIENT_SECRET"),
 		ActionsClientID: os.Getenv("AG_KC_ACTIONS_CLIENT_ID"), ActionsRedirectURI: os.Getenv("AG_KC_ACTIONS_REDIRECT_URI"),
+		ActionLinkURL: os.Getenv("AG_KC_ACTION_LINK_URL"),
 	}
 	if cfg.BaseURL == "" {
 		return cfg, false, nil
@@ -82,7 +89,10 @@ type Client struct {
 	exp   time.Time
 }
 
-var _ port.Directory = (*Client)(nil)
+var (
+	_ port.Directory   = (*Client)(nil)
+	_ port.ActionLinks = (*Client)(nil)
+)
 
 // New tạo client. Không gọi mạng — token lấy ở lần gọi đầu và được lưu tới gần hạn.
 func New(cfg Config) (*Client, error) {
@@ -275,7 +285,10 @@ func userPath(id uuid.UUID) string { return "/users/" + id.String() }
 
 // CreateUser tạo người dùng đã bật, kèm thuộc tính tenant_id/org_ref và required actions.
 func (c *Client) CreateUser(ctx context.Context, nu port.NewUser) (uuid.UUID, error) {
-	attrs := map[string][]string{port.AttrTenantID: {nu.TenantID.String()}, port.AttrOrgRef: {nu.OrgRef.String()}}
+	attrs := map[string][]string{port.AttrTenantID: {nu.TenantID.String()}}
+	if nu.OrgRef != uuid.Nil { // tài khoản nông dân không có đơn vị công tác
+		attrs[port.AttrOrgRef] = []string{nu.OrgRef.String()}
+	}
 	if nu.Phone != "" {
 		attrs[port.AttrPhone] = []string{nu.Phone}
 	}
@@ -522,6 +535,67 @@ func (c *Client) ExecuteActionsEmail(ctx context.Context, id uuid.UUID, actions 
 		return fmt.Errorf("%w: %w", port.ErrEmailFailed, se)
 	}
 	return err
+}
+
+// ActionLink phát liên kết hành động một lần qua phần mở rộng realm (ActionLinkURL).
+// Thân phản hồi chứa token: không bao giờ đưa vào lỗi hay log (R-14) — lỗi chỉ mang mã HTTP.
+func (c *Client) ActionLink(ctx context.Context, id, grantID uuid.UUID, actions []string, lifespan time.Duration) (string, error) {
+	if c.cfg.ActionLinkURL == "" {
+		return "", port.ErrActionLinkUnsupported
+	}
+	body, err := json.Marshal(map[string]any{
+		"user_id": id.String(), "grant_id": grantID.String(), "actions": actions, "lifespan": int(lifespan / time.Second),
+		"client_id": c.cfg.ActionsClientID, "redirect_uri": c.cfg.ActionsRedirectURI,
+	})
+	if err != nil {
+		return "", err
+	}
+	for attempt := 0; ; attempt++ {
+		tok, err := c.accessToken(ctx)
+		if err != nil {
+			return "", err
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.ActionLinkURL, bytes.NewReader(body))
+		if err != nil {
+			return "", err
+		}
+		req.Header.Set("Authorization", "Bearer "+tok)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+		res, err := c.hc.Do(req)
+		if err != nil {
+			return "", fmt.Errorf("%w: phát liên kết hành động", port.ErrUnavailable)
+		}
+		if res.StatusCode == http.StatusUnauthorized && attempt == 0 {
+			_ = res.Body.Close()
+			c.dropToken()
+			continue
+		}
+		defer func() { _ = res.Body.Close() }()
+		se := &statusError{op: "phát liên kết hành động", status: res.StatusCode}
+		switch {
+		case res.StatusCode == http.StatusNotFound:
+			_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 1<<16))
+			return "", fmt.Errorf("%w: %w", port.ErrUserNotFound, se)
+		case res.StatusCode >= 500 || res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden:
+			_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 1<<16))
+			return "", fmt.Errorf("%w: %w", port.ErrUnavailable, se)
+		case res.StatusCode < 200 || res.StatusCode >= 300:
+			_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 1<<16))
+			return "", se
+		}
+		var out struct {
+			Link string `json:"link"`
+		}
+		if err := json.NewDecoder(io.LimitReader(res.Body, 1<<16)).Decode(&out); err != nil {
+			return "", errors.New("keycloak: phát liên kết hành động: phản hồi không đọc được")
+		}
+		u, err := url.Parse(out.Link)
+		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+			return "", errors.New("keycloak: phát liên kết hành động: liên kết không hợp lệ")
+		}
+		return out.Link, nil
+	}
 }
 
 // Logout thu hồi mọi phiên của người dùng.

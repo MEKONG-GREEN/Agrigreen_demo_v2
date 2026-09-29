@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.party.household.membership_changed/v1",
+  "title": "pf.party.household.membership_changed — payload",
+  "description": "Nông hộ vào, rời hoặc chuyển HTX (POST /v1/households/{ref}/membership): thành viên cũ được đóng (không xóa), thành viên mới được mở cùng giao dịch — KN US-HTX-02, US-HTX-05. Consumer pf/notify báo cán bộ khuyến nông của xã. Lý do không đi kèm. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.party.household.membership_changed",
+  "x-schema-version": 1,
+  "x-producer": "pf/party",
+  "type": "object",
+  "required": ["household_ref", "commune_code", "prev_cooperative_ref", "cooperative_ref", "change", "effective_date", "actor_ref", "event_time"],
+  "properties": {
+    "household_ref":        { "type": "string", "format": "uuid" },
+    "commune_code":         { "type": "string" },
+    "prev_cooperative_ref": { "type": ["string", "null"], "format": "uuid" },
+    "cooperative_ref":      { "type": ["string", "null"], "format": "uuid", "description": "null = rời HTX" },
+    "change":               { "type": "string", "enum": ["joined", "left", "transferred"] },
+    "effective_date":       { "type": "string", "format": "date", "description": "Ngày hiệu lực (giờ Việt Nam)" },
+    "actor_ref":            { "type": "string", "format": "uuid" },
+    "event_time":           { "type": "string", "format": "date-time" }
+  }
+}

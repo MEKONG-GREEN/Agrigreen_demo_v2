@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.support_request.submitted/v1",
+  "title": "pf.extension.support_request.submitted — payload",
+  "description": "Nông dân gửi yêu cầu hỗ trợ từ App HTX (HTX US-SUPPORT-01; trực tuyến hoặc ngoại tuyến qua pf/sync entity support_request). Phát CÙNG giao dịch với nhiệm vụ tự sinh (task_id, KN US-TASK-01). Không có mô tả, ảnh hay toạ độ — đọc qua API trong phạm vi. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.extension.support_request.submitted",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": ["support_request_id", "task_id", "household_ref", "cooperative_ref", "commune_code", "province_code", "category", "urgency", "photo_count", "gps_missing", "event_time", "received_at"],
+  "properties": {
+    "support_request_id": { "type": "string", "format": "uuid" },
+    "task_id":            { "type": "string", "format": "uuid" },
+    "household_ref":      { "type": "string", "format": "uuid" },
+    "cooperative_ref":    { "type": "string", "format": "uuid" },
+    "commune_code":       { "type": "string" },
+    "province_code":      { "type": "string" },
+    "category":           { "type": "string", "enum": ["dich_hai", "benh_lua", "thoi_tiet", "ky_thuat", "may_moc", "khac"] },
+    "urgency":            { "type": "string", "enum": ["binh_thuong", "khan"] },
+    "photo_count":        { "type": "integer", "minimum": 0, "maximum": 5 },
+    "gps_missing":        { "type": "boolean", "description": "true = nhãn \"Thiếu vị trí GPS\" (AC-1)" },
+    "event_time":         { "type": "string", "format": "date-time", "description": "Lúc nông dân bấm Gửi (có thể ngoại tuyến)" },
+    "received_at":        { "type": "string", "format": "date-time", "description": "Giờ máy chủ nhận — mốc SLA 1 phút" }
+  }
+}

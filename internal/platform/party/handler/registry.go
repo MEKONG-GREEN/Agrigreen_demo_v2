@@ -32,6 +32,7 @@ func (h Registry) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/cooperatives/:ref", h.getCooperative)
 	rg.GET("/cooperatives/:ref/households", h.listHouseholds)
 	rg.POST("/households", h.createHousehold)
+	rg.POST("/households/:ref/membership", h.changeMembership)
 }
 
 // RegisterAdmin gắn route Admin API (MFA bắt buộc ở router).
@@ -406,6 +407,38 @@ func (h Registry) createHousehold(c *gin.Context) {
 		status = http.StatusOK
 	}
 	c.JSON(status, body)
+}
+
+type membershipReq struct {
+	CooperativeRef *string `json:"cooperative_ref"` // null = rời HTX
+	EffectiveDate  *string `json:"effective_date"`
+	Reason         string  `json:"reason"`
+}
+
+// changeMembership: nông hộ vào / chuyển / rời HTX (KN US-HTX-02, US-HTX-05).
+func (h Registry) changeMembership(c *gin.Context) {
+	ref, err := uuid.Parse(c.Param("ref"))
+	if err != nil {
+		httpx.Fail(c, app.ErrHouseholdNotFound)
+		return
+	}
+	var req membershipReq
+	if !bindJSON(c, &req) {
+		return
+	}
+	var fe fieldErrs
+	in := app.ChangeMembershipInput{HouseholdRef: ref, Reason: req.Reason}
+	in.CooperativeRef = fe.optRef("cooperative_ref", req.CooperativeRef)
+	in.EffectiveDate = fe.date("effective_date", req.EffectiveDate)
+	if fe.fail(c) {
+		return
+	}
+	out, err := h.Reg.ChangeMembership(c.Request.Context(), in)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"household": toHouseholdDTO(out.Household), "change": out.Change, "prev_cooperative_ref": refPtr(out.Prev)})
 }
 
 // ---------------------------------------------------------------------------

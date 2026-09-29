@@ -21,6 +21,9 @@ export const KIND_LABEL: Record<Notification["kind"], string> = {
   task_escalated: "Nhiệm vụ leo thang",
   sync_conflict: "Xung đột đồng bộ",
   org_deactivated: "Tổ chức ngừng hoạt động",
+  household_registered: "Nông hộ mới từ App HTX",
+  household_membership_changed: "Nông hộ đổi HTX",
+  task_assigned: "Nhiệm vụ hỗ trợ mới",
 };
 
 export function unreadCount(api: ApiClient): Promise<number> {

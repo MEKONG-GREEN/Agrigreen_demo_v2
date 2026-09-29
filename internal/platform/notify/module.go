@@ -54,6 +54,8 @@ type Deps struct {
 	// NudgeCooldown, NudgeHourly: giới hạn đồng bộ ngay (mặc định 5 phút/đích, 30 lần/giờ/người).
 	NudgeCooldown time.Duration
 	NudgeHourly   int
+	// SyncEntities: entity chiều xuống của pf/sync để kiểm entities[] của POST /v1/sync/nudge.
+	SyncEntities []string
 }
 
 // Channels là kênh gửi ra ngoài đọc từ môi trường (cho cmd/worker).
@@ -89,6 +91,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	return &Module{svc: app.NewService(db, clk, app.Deps{
 		Scope: d.Scope, Devices: d.Devices, Staff: d.Staff, Units: d.Units, Pusher: d.Pusher, Mailer: d.Mailer,
 		DigestTo: d.DigestTo, Log: d.Log, NudgeCooldown: d.NudgeCooldown, NudgeHourly: d.NudgeHourly,
+		SyncEntities: d.SyncEntities,
 	})}
 }
 
@@ -97,6 +100,10 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.
 
 // RegisterAdmin gắn route Admin API.
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }
+
+// UseSyncEntities nối danh sách entity chiều xuống của pf/sync (kiểm entities[] của
+// POST /v1/sync/nudge, KN US-SYNC-02). Gốc lắp ráp gọi sau khi dựng pf/sync.
+func (m *Module) UseSyncEntities(entities []string) { m.svc.SyncEntities = entities }
 
 // SyncSource cho pf/sync: chiều xuống "notification".
 func (m *Module) SyncSource() syncport.Source { return app.SyncSource{Svc: m.svc} }
@@ -115,9 +122,10 @@ func (m *Module) Consumers() []Consumer {
 	return []Consumer{
 		{Name: port.ConsumerDirective, Events: []string{extport.EventDirectiveIssued}, Handler: ev},
 		{Name: port.ConsumerContent, Events: []string{contentport.EventAlertPublished, contentport.EventDocumentPublished}, Handler: ev},
-		{Name: port.ConsumerTask, Events: []string{extport.EventTaskEscalated}, Handler: ev},
+		{Name: port.ConsumerTask, Events: []string{extport.EventTaskEscalated, extport.EventTaskCreated}, Handler: ev},
 		{Name: port.ConsumerSync, Events: []string{syncport.EventConflictOpened, syncport.EventDeviceRevoked}, Handler: ev},
-		{Name: port.ConsumerParty, Events: []string{partyport.EventOrgDeactivated}, Handler: ev},
+		{Name: port.ConsumerParty, Events: []string{partyport.EventOrgDeactivated, partyport.EventHouseholdRegistered,
+			partyport.EventHouseholdMembershipChanged}, Handler: ev},
 		{Name: port.ConsumerPush, Events: []string{port.EventPushRequested}, Handler: m.svc.HandlePush},
 	}
 }

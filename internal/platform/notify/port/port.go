@@ -21,6 +21,12 @@ const (
 	KindTaskEscalated  = "task_escalated"  // nhiệm vụ leo thang lên tỉnh (KN US-TASK-02)
 	KindSyncConflict   = "sync_conflict"   // xung đột đồng bộ chờ xử lý (C-8)
 	KindOrgDeactivated = "org_deactivated" // tổ chức bị vô hiệu hóa
+	// KindHouseholdRegistered / KindHouseholdMembershipChanged: nông hộ mới từ App HTX,
+	// nông hộ vào/rời/chuyển HTX → cán bộ khuyến nông của xã (KN US-HTX-05, migration 000028).
+	KindHouseholdRegistered        = "household_registered"
+	KindHouseholdMembershipChanged = "household_membership_changed"
+	// KindTaskAssigned: nhiệm vụ tự sinh từ yêu cầu hỗ trợ App HTX → cán bộ được giao (KN US-TASK-01).
+	KindTaskAssigned = "task_assigned"
 	// KindSyncNow là thông điệp dữ liệu "đồng bộ ngay" (US-SYNC-02) — không tạo thông báo.
 	KindSyncNow = "sync_now"
 )
@@ -30,6 +36,9 @@ const (
 	SeverityUrgent = "urgent"
 	SeverityNormal = "normal"
 )
+
+// MaxNudgeEntities: số nhóm dữ liệu tối đa trong một yêu cầu đồng bộ ngay (KN US-SYNC-02).
+const MaxNudgeEntities = 30
 
 // NudgeRoles là các vai được yêu cầu thiết bị đồng bộ ngay (US-SYNC-02).
 var NudgeRoles = []string{

@@ -110,6 +110,44 @@ func TaskEscalatedTemplate(p extport.TaskEscalatedV1, occurred time.Time) Templa
 		DeepLink: "/extension/tasks/" + p.TaskID.String(), SubjectRef: ref(p.TaskID), CreatedAt: ParseTime(p.EventTime, occurred)}
 }
 
+// HouseholdRegisteredTemplate: nông hộ mới đăng ký từ App HTX (KN US-HTX-05) — không
+// nhập lại tay; hồ sơ mang đúng mã định danh chung household_ref. Không có PII.
+func HouseholdRegisteredTemplate(p partyport.HouseholdRegisteredV1, occurred time.Time) Template {
+	return Template{Kind: port.KindHouseholdRegistered, Severity: port.SeverityNormal, Title: "Nông hộ mới đăng ký từ App HTX",
+		Body:     fmt.Sprintf("Xã %s: hồ sơ nông hộ đã đồng bộ vào App Khuyến nông, không cần nhập lại.", p.CommuneCode),
+		DeepLink: "/households/" + p.HouseholdRef.String(), SubjectRef: ref(p.HouseholdRef), CreatedAt: ParseTime(p.EventTime, occurred)}
+}
+
+var membershipLabel = map[string]string{
+	partyport.MembershipJoined: "vào HTX", partyport.MembershipLeft: "rời HTX", partyport.MembershipTransferred: "chuyển HTX",
+}
+
+// MembershipChangedTemplate: nông hộ vào/rời/chuyển HTX (KN US-HTX-05).
+func MembershipChangedTemplate(p partyport.HouseholdMembershipChangedV1, occurred time.Time) Template {
+	label := membershipLabel[p.Change]
+	if label == "" {
+		label = "đổi thành viên HTX"
+	}
+	return Template{Kind: port.KindHouseholdMembershipChanged, Severity: port.SeverityNormal, Title: "Nông hộ trong địa bàn " + label,
+		Body:     fmt.Sprintf("Xã %s, hiệu lực từ %s.", p.CommuneCode, p.EffectiveDate),
+		DeepLink: "/households/" + p.HouseholdRef.String(), SubjectRef: ref(p.HouseholdRef), CreatedAt: ParseTime(p.EventTime, occurred)}
+}
+
+// TaskAssignedTemplate: nhiệm vụ tự sinh từ yêu cầu hỗ trợ của nông dân (KN US-TASK-01).
+func TaskAssignedTemplate(p extport.TaskCreatedV1, occurred time.Time) Template {
+	title := "Nhiệm vụ hỗ trợ mới từ App HTX"
+	if p.AssigneeRef == nil {
+		title = "Yêu cầu hỗ trợ chưa có cán bộ nhận — cần phân công"
+	}
+	sev := port.SeverityNormal
+	if p.Priority == "urgent" || p.Priority == "high" {
+		sev = port.SeverityUrgent
+	}
+	body := fmt.Sprintf("Xã %s, ưu tiên %s, hạn %s.", p.CommuneCode, priorityLabel[p.Priority], viTime(ParseTime(p.DueAt, occurred)))
+	return Template{Kind: port.KindTaskAssigned, Severity: sev, Title: title, Body: body,
+		DeepLink: "/extension/tasks/" + p.TaskID.String(), SubjectRef: ref(p.TaskID), CreatedAt: ParseTime(p.CreatedAt, occurred)}
+}
+
 // ConflictTemplate: xung đột đồng bộ chờ xử lý (C-8).
 func ConflictTemplate(p syncport.ConflictOpenedV1, occurred time.Time) Template {
 	return Template{Kind: port.KindSyncConflict, Severity: port.SeverityNormal, Title: "Xung đột đồng bộ cần xử lý",
