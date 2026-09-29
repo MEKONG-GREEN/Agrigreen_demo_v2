@@ -15,12 +15,15 @@ func TestBoundary(t *testing.T) {
 		"example.com/ag/internal/shared/x",
 		"example.com/ag/cmd/app",
 		"example.com/ag/cmd/identity-vault",
+		"example.com/ag/cmd/api-internal",
+		"example.com/ag/cmd/api-platform",
 	)
 }
 
 func TestNoFloat(t *testing.T) {
 	analysistest.Run(t, analysistest.TestData(), NoFloat,
 		"example.com/ag/internal/mkg/costing",
+		"example.com/ag/internal/mkg/hub",
 		"example.com/ag/internal/platform/beta/free",
 	)
 }

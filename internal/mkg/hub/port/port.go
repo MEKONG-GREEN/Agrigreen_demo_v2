@@ -1,0 +1,108 @@
+// Package port là giao diện công khai DUY NHẤT của mkg/hub mà module khác được
+// import (R-02). Module của vùng nền tảng (internal/platform/*) KHÔNG được
+// import package này (R-03): chúng chỉ thấy payload đi qua van công bố.
+package port
+
+import (
+	"context"
+	"encoding/json"
+
+	"github.com/google/uuid"
+)
+
+// Vai nghiệp vụ của module (tên vai trong Keycloak, tài khoản tenant MKG).
+const (
+	// RoleHubOperator: vận hành hub — nhận lô, chạy mẻ, xuất, sửa sai bằng bản
+	// ghi bù, chụp sức chứa; đề xuất thay đổi dữ liệu chủ cơ sở (Admin API, MFA).
+	RoleHubOperator = "hub_operator"
+	// RoleHubApprover: phê duyệt / từ chối phiên bản dữ liệu chủ cơ sở — không
+	// duyệt đề xuất của chính mình (R-56).
+	RoleHubApprover = "hub_approver"
+)
+
+// Sự kiện module phát ra. CẢ HAI đi qua van công bố (mặc định từ chối): mọi
+// sự kiện của vùng mkg lên RabbitMQ đều thấy được từ vùng nền tảng, nên payload
+// phải là hợp đồng van (tools/contractcheck cưỡng chế).
+const (
+	EventFacilityPublished = "mkg.hub.facility.published"
+	EventCapacityPublished = "mkg.hub.capacity.published"
+)
+
+// Tên hợp đồng van (contracts/publication/<tên>.json).
+const (
+	ContractHubFacility = "hub_facility"
+	ContractHubCapacity = "hub_capacity"
+)
+
+// Publication là payload được phép đi qua van. Chỉ struct có chú thích
+// //ag:publication <tên> mới được cài đặt interface này (contractcheck kiểm).
+type Publication interface {
+	PublicationName() string
+}
+
+// GeoPoint là tọa độ WGS84 dạng số JSON — json.Number giữ nguyên chuỗi thập
+// phân, không đi qua float (R-10).
+type GeoPoint struct {
+	Lat json.Number `json:"lat"`
+	Lng json.Number `json:"lng"`
+}
+
+// HubFacilityPublishedV1 là payload của van hub_facility v1.
+//
+//ag:publication hub_facility
+//ag:event mkg.hub.facility.published v1
+type HubFacilityPublishedV1 struct {
+	HubRef        uuid.UUID       `json:"hub_ref"`
+	Code          string          `json:"code"`
+	Name          string          `json:"name"`
+	Kind          string          `json:"kind"`
+	Location      GeoPoint        `json:"location"`
+	Boundary      json.RawMessage `json:"boundary,omitempty"`
+	ProvinceCode  string          `json:"province_code"`
+	Status        string          `json:"status"`
+	CapacityTons  string          `json:"capacity_tons"`
+	Unit          string          `json:"unit"`
+	EffectiveFrom string          `json:"effective_from"`
+}
+
+// PublicationName cài đặt Publication.
+func (HubFacilityPublishedV1) PublicationName() string { return "hub_facility" }
+
+// HubCapacityPublishedV1 là payload của van hub_capacity v1.
+//
+//ag:publication hub_capacity
+//ag:event mkg.hub.capacity.published v1
+type HubCapacityPublishedV1 struct {
+	HubRef        uuid.UUID `json:"hub_ref"`
+	AsOf          string    `json:"as_of"`
+	CapacityTons  string    `json:"capacity_tons"`
+	UsedTons      string    `json:"used_tons"`
+	AvailableTons string    `json:"available_tons"`
+	Unit          string    `json:"unit"`
+}
+
+// PublicationName cài đặt Publication.
+func (HubCapacityPublishedV1) PublicationName() string { return "hub_capacity" }
+
+// LotSource là một nguồn của lô (cho module mkg khác, vd mkg/costing quy kết).
+type LotSource struct {
+	Kind  string    // plot | cooperative | roll_count | supplier | lot
+	Ref   uuid.UUID //
+	Ratio string    // decimal, 6 chữ số, Σ = 1
+}
+
+// LotInfo là thông tin lô cho module mkg khác.
+type LotInfo struct {
+	LotID       uuid.UUID
+	FacilityID  uuid.UUID
+	Product     string
+	InitialKg   string // mass.Kg dạng chuỗi
+	RemainingKg string
+	Sources     []LotSource
+}
+
+// Lots cho module mkg khác (costing, logistics, measurement) đọc nguồn gốc và
+// tồn của lô. Tenant lấy từ context.
+type Lots interface {
+	LotInfo(ctx context.Context, lotID uuid.UUID) (LotInfo, error)
+}

@@ -1,0 +1,22 @@
+{
+  "name": "hub_capacity",
+  "version": 1,
+  "owner": "mkg/hub",
+  "proposed_by": "mkg-hub-module-owner",
+  "approved_by": "mkg-data-steward",
+  "approved_at": "2026-09-29",
+  "event": "mkg.hub.capacity.published v1",
+  "consumers": ["pf/geo"],
+  "purpose": "Nền tảng cần sức chứa còn trống của hub để điều phối gom rơm và mô phỏng. Chỉ đi qua con số tổng của cơ sở — không có tồn theo lô, nguồn gốc HTX/thửa, giá trị hay khách hàng.",
+  "description": "Ảnh chụp sức chứa của một cơ sở MKG tại thời điểm as_of. used_tons = tổng tồn còn lại theo lô; available_tons = max(0, capacity_tons − used_tons).",
+  "type": "object",
+  "required": ["hub_ref", "as_of", "capacity_tons", "used_tons", "available_tons", "unit"],
+  "properties": {
+    "hub_ref":        { "type": "string", "format": "uuid" },
+    "as_of":          { "type": "string", "format": "date-time" },
+    "capacity_tons":  { "type": "string", "pattern": "^[0-9]+\\.[0-9]{6}$" },
+    "used_tons":      { "type": "string", "pattern": "^[0-9]+\\.[0-9]{6}$" },
+    "available_tons": { "type": "string", "pattern": "^[0-9]+\\.[0-9]{6}$" },
+    "unit":           { "type": "string", "enum": ["t"] }
+  }
+}

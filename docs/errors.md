@@ -235,3 +235,30 @@ Tài khoản cán bộ quản lý trong Keycloak qua Admin REST (KN US-ADM-01..0
 | 503 | `accounts.dependency_unavailable` | pf/accounts: chưa cấu hình `AG_KC_*`, Keycloak không phản hồi hoặc từ chối tài khoản dịch vụ, chưa nối pf/party |
 
 Nhập hàng loạt: lý do theo dòng dùng nhãn "Thiếu Email", "Sai định dạng Email", "Sai định dạng vai trò", "SĐT đã tồn tại", "Tên đăng nhập hoặc Email đã tồn tại", "Trùng với dòng N trong tệp", "Tổ chức ngoài phạm vi phụ trách", "Vai trò vượt quyền cấp của bạn". Thao tác loạt trả `code` của từng tài khoản trong `items[]`.
+
+### mkg/hub (API nội bộ MKG — `cmd/api-internal`, `contracts/openapi/mkg-internal.yaml`)
+
+| HTTP | code | Khi nào |
+|---|---|---|
+| 404 | `hub.facility_not_found` | Cơ sở không có (hoặc chưa được duyệt lần nào) trong tenant của token |
+| 404 | `hub.version_not_found` | Không có phiên bản dữ liệu chủ số `{version}` của cơ sở |
+| 404 | `hub.lot_not_found` | Không có lô trong tenant; lô vào của mẻ không tồn tại |
+| 404 | `hub.movement_not_found` | Không có dịch chuyển tồn cần bù |
+| 403 | `self_approval_forbidden` | Người duyệt phiên bản dữ liệu chủ là người đề xuất (R-56; DB chặn lần hai bằng CHECK) |
+| 409 | `hub.code_taken` | Mã cơ sở đã dùng bởi cơ sở khác (hiện hành hoặc đang chờ duyệt) |
+| 409 | `hub.pending_version_exists` | Cơ sở đang có một phiên bản chờ duyệt — duyệt/từ chối trước khi đề xuất tiếp |
+| 409 | `hub.version_not_pending` | Phiên bản đã được duyệt hoặc từ chối |
+| 409 | `hub.facility_inactive` | Nhận lô hoặc chạy mẻ ở cơ sở đã ngừng dùng |
+| 409 | `hub.insufficient_stock` | Không đủ tồn THEO LÔ (xuất, lấy vào mẻ, hoặc bù làm tồn âm) — không có lô thì không có hàng |
+| 409 | `hub.already_corrected` | Dịch chuyển đã có dòng bù; sai tiếp thì ghi nghiệp vụ mới |
+| 409 | `hub.id_reused` | `id` lô do thiết bị sinh đã dùng cho bản ghi khác |
+| 422 | `validation_failed` | Dữ liệu vào sai (khối lượng không phải chuỗi thập phân ≤ 3 chữ số, độ ẩm ngoài 0..100, tọa độ ngoài WGS84, thiếu lý do thay đổi ≥ 10 ký tự, từ chối thiếu lý do, `event_time` ở tương lai), xem `errors[]` |
+| 422 | `hub.ratio_invalid` | Tỷ lệ nguồn của lô không hợp lệ: Σ khác 1 chính xác, > 6 chữ số, ≤ 0, trộn `mass_kg` với `ratio`, phần đóng góp < 0.000001 |
+| 422 | `hub.negative_loss` | Mẻ có khối lượng ra lớn hơn khối lượng vào |
+| 422 | `hub.lot_other_facility` | Lô vào mẻ / lô chỉ định khi xuất không thuộc cơ sở của thao tác |
+| 422 | `hub.duplicate_lot_input` | Một lô xuất hiện hai lần trong cùng mẻ / phiếu xuất |
+| 422 | `hub.allocation_mismatch` | Phân bổ tay theo lô có tổng khác lượng xuất |
+| 422 | `hub.correction_unsupported` | Bù trực tiếp chỉ cho `receive` và `dispatch`; dòng của mẻ biến đổi sửa bằng mẻ bù (câu hỏi mở Q-MKG-05) |
+| 422 | `hub.parent_invalid` | Cơ sở cha không phải hub hiện hành khác chính nó |
+| 422 | `hub.boundary_invalid` | Ranh giới không phải Polygon/MultiPolygon WGS84 hợp lệ |
+| 500 | `hub.valve_denied` | Van công bố từ chối payload (hợp đồng thiếu/chưa duyệt, trường ngoài hợp đồng) — lỗi lập trình, không có gì được ghi |

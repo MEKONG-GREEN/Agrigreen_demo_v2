@@ -1,0 +1,6 @@
+{
+  "x-event-type": "mkg.depot.thing.happened",
+  "x-schema-version": 1,
+  "type": "object",
+  "properties": { "thing_ref": { "type": "string" } }
+}
