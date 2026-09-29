@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/mkg.hub.capacity.published/v1",
+  "title": "mkg.hub.capacity.published — payload",
+  "description": "Payload đi qua van công bố hub_capacity v1 (contracts/publication/hub_capacity.json): ảnh chụp sức chứa của một cơ sở MKG. Bản ghi xuất nằm ở sổ mkg_hub.valve_export; event_id = id bản ghi xuất.",
+  "x-event-type": "mkg.hub.capacity.published",
+  "x-schema-version": 1,
+  "x-producer": "mkg/hub",
+  "x-publication": "hub_capacity",
+  "type": "object",
+  "required": ["hub_ref", "as_of", "capacity_tons", "used_tons", "available_tons", "unit"],
+  "properties": {
+    "hub_ref":        { "type": "string", "format": "uuid" },
+    "as_of":          { "type": "string", "format": "date-time" },
+    "capacity_tons":  { "type": "string", "pattern": "^[0-9]+\\.[0-9]{6}$" },
+    "used_tons":      { "type": "string", "pattern": "^[0-9]+\\.[0-9]{6}$" },
+    "available_tons": { "type": "string", "pattern": "^[0-9]+\\.[0-9]{6}$" },
+    "unit":           { "type": "string", "enum": ["t"] }
+  }
+}

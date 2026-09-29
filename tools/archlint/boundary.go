@@ -98,6 +98,13 @@ func violation(from, to loc, imp string) string {
 		}
 	}
 	if !from.internal {
+		// R-03 ở gốc lắp ráp: mỗi vùng một gốc — api-platform chỉ nối platform/*,
+		// api-internal chỉ nối mkg/* (mục 5: hai đơn vị triển khai, hai cụm DB).
+		for _, zr := range zoneRoots {
+			if under(from.path, zr.root) && to.zone == zr.forbidden {
+				return "R-03: gốc lắp ráp " + zr.root + " không được import " + to.zone + "/ (" + imp + ") — hai vùng chỉ nói chuyện qua API công khai hoặc van công bố"
+			}
+		}
 		// cmd/, tools/: gốc lắp ráp — được import gốc module (module.go) và port/.
 		if to.module != "" && to.rest != "" && !isPort(to.rest) {
 			return "R-02: gốc lắp ráp chỉ được import gốc module hoặc port/, không import " + imp
@@ -113,6 +120,17 @@ func violation(from, to loc, imp string) string {
 		return "R-02: chỉ được import port/ của module khác, không import " + imp
 	}
 	return ""
+}
+
+// zoneRoots là gốc lắp ráp theo vùng và vùng nó không được nối.
+var zoneRoots = []struct{ root, forbidden string }{
+	{"cmd/api-platform", "mkg"},
+	{"cmd/api-internal", "platform"},
+}
+
+func under(pkg, root string) bool {
+	p := modulePath + "/" + root
+	return pkg == p || strings.HasPrefix(pkg, p+"/")
 }
 
 func isPort(rest string) bool { return rest == "port" || strings.HasPrefix(rest, "port/") }

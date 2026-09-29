@@ -55,6 +55,8 @@
       { "name": "vault_pubkey_sync", "description": "Thiết bị hiện trường tải khóa công khai của hộ theo địa bàn" },
       { "name": "account_admin", "description": "[MFA] Quản trị tài khoản toàn quốc: tạo, khóa/mở khóa, phân quyền theo ma trận cấp vai (pf/accounts, KN US-ADM-01..03)" },
       { "name": "account_admin_province", "description": "[MFA] Quản trị tài khoản của một tỉnh: chỉ cấp kn_officer/coop_manager cho tổ chức trong tỉnh (pf/accounts)" },
+      { "name": "hub_operator", "description": "MKG (tài khoản tenant MKG, API nội bộ api-internal): vận hành hub — nhận lô, mẻ sấy/nén, xuất theo rủi ro, bù sai, chụp sức chứa; đề xuất dữ liệu chủ hub/kho qua bề mặt quản trị (MFA)" },
+      { "name": "hub_approver", "description": "MKG (bề mặt quản trị api-internal, bắt buộc MFA): phê duyệt/từ chối phiên bản dữ liệu chủ hub/kho — không duyệt đề xuất của chính mình (R-56); phê duyệt xuất qua van công bố" },
       { "name": "offline_access", "description": "Refresh token ngoại tuyến (app hiện trường, tối đa 72 giờ không trực tuyến — mục 15)" },
       { "name": "default-roles-agrigreen", "description": "Vai mặc định của realm — KHÔNG gồm vai nghiệp vụ nào", "composite": true, "composites": { "realm": ["offline_access"] } }
     ]

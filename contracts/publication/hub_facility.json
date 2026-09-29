@@ -1,0 +1,42 @@
+{
+  "name": "hub_facility",
+  "version": 1,
+  "owner": "mkg/hub",
+  "proposed_by": "mkg-hub-module-owner",
+  "approved_by": "mkg-data-steward",
+  "approved_at": "2026-09-29",
+  "event": "mkg.hub.facility.published v1",
+  "consumers": ["pf/geo"],
+  "purpose": "Nền tảng (pf/geo, GIS, mô phỏng chọn hub) cần biết vị trí, loại, trạng thái và sức chứa danh định của hub/kho MKG đã được phê duyệt. Không có dữ liệu cá nhân, không có giá, không có tồn kho theo lô, không có nguồn gốc lô.",
+  "description": "Một phiên bản dữ liệu chủ cơ sở (hub, kho, bãi) của MKG vừa được phê duyệt. Consumer giữ bản có effective_from mới nhất theo hub_ref; phát lại là idempotent theo event_id.",
+  "type": "object",
+  "required": ["hub_ref", "code", "name", "kind", "location", "province_code", "status", "capacity_tons", "unit", "effective_from"],
+  "properties": {
+    "hub_ref":        { "type": "string", "format": "uuid", "description": "Mã tham chiếu cơ sở phía MKG (UUIDv7) — không phải khóa của pf" },
+    "code":           { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_-]{1,31}$" },
+    "name":           { "type": "string", "description": "Tên cơ sở (không phải dữ liệu cá nhân)" },
+    "kind":           { "type": "string", "enum": ["hub", "warehouse", "yard"] },
+    "location": {
+      "type": "object",
+      "required": ["lat", "lng"],
+      "properties": {
+        "lat": { "type": "number", "description": "Vĩ độ WGS84 (EPSG:4326)" },
+        "lng": { "type": "number", "description": "Kinh độ WGS84 (EPSG:4326)" }
+      }
+    },
+    "boundary": {
+      "type": ["object", "null"],
+      "description": "Ranh giới khuôn viên dạng GeoJSON MultiPolygon WGS84 (tùy chọn)",
+      "required": ["type", "coordinates"],
+      "properties": {
+        "type":        { "type": "string", "enum": ["MultiPolygon"] },
+        "coordinates": { "type": "array", "items": { "type": "array", "items": { "type": "array", "items": { "type": "array", "items": { "type": "number" } } } } }
+      }
+    },
+    "province_code":  { "type": "string", "pattern": "^[0-9]{2}$", "description": "Mã tỉnh theo danh mục đơn vị hành chính (pf/masterdata), lưu dạng chuỗi thuần phía MKG" },
+    "status":         { "type": "string", "enum": ["active", "inactive"] },
+    "capacity_tons":  { "type": "string", "pattern": "^[0-9]+\\.[0-9]{6}$", "description": "Sức chứa danh định (tấn), decimal dạng chuỗi" },
+    "unit":           { "type": "string", "enum": ["t"] },
+    "effective_from": { "type": "string", "format": "date-time" }
+  }
+}

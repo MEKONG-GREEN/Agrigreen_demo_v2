@@ -1,0 +1,9 @@
+{
+  "name": "self_ok",
+  "version": 1,
+  "owner": "mkg/depot",
+  "proposed_by": "Alice",
+  "approved_by": " alice ",
+  "approved_at": "29/09/2026",
+  "fields": ["site_ref"]
+}

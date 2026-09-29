@@ -1,0 +1,20 @@
+{
+  "name": "depot_site",
+  "version": 1,
+  "owner": "mkg/depot",
+  "proposed_by": "alice",
+  "approved_by": "bob",
+  "approved_at": "2026-09-29",
+  "event": "mkg.depot.site.published v1",
+  "type": "object",
+  "required": ["site_ref", "code", "location", "capacity_kg", "tags"],
+  "properties": {
+    "site_ref":    { "type": "string", "format": "uuid" },
+    "code":        { "type": "string" },
+    "location":    { "type": "object", "required": ["lat", "lng"], "properties": { "lat": { "type": "number" }, "lng": { "type": "number" } } },
+    "capacity_kg": { "type": "string" },
+    "tags":        { "type": "array", "items": { "type": "string" } },
+    "zones":       { "type": "array", "items": { "type": "object", "required": ["code"], "properties": { "code": { "type": "string" }, "area": { "type": "integer" } } } },
+    "note":        { "type": ["string", "null"] }
+  }
+}

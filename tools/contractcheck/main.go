@@ -2,10 +2,14 @@
 //
 //   - Sự kiện (R-64): contracts/events/<event_type>.v<N>.json khớp tên và phiên
 //     bản; struct Go chú thích //ag:event <type> v<N> không có trường ngoài
-//     schema và có đủ trường required; so với nhánh gốc (-base) chỉ được thêm
-//     trường tùy chọn — xóa trường, đổi kiểu, thêm required → phải tăng phiên bản.
-//   - Van công bố (mục 5): struct chú thích //ag:publication <tên> chỉ được có
-//     trường nằm trong contracts/publication/<tên>.json; không có hợp đồng → hỏng.
+//     schema, có đủ trường required, KIỂU từng trường khớp schema — đệ quy vào
+//     object và mảng lồng nhau; so với nhánh gốc (-base) chỉ được thêm trường
+//     tùy chọn — xóa trường, đổi kiểu, thêm required → phải tăng phiên bản.
+//   - Van công bố (mục 5, R-03): contracts/publication/<tên>.json phải có owner,
+//     proposed_by, approved_by (≠ proposed_by, R-56), approved_at; struct chú
+//     thích //ag:publication <tên> chỉ được có trường của hợp đồng, đúng kiểu,
+//     đệ quy; không có hợp đồng → hỏng (mặc định từ chối). Vùng mkg: mọi payload
+//     sự kiện phải là hợp đồng van (xem mkg.go).
 //
 // Chạy: go run ./tools/contractcheck [-base origin/main]
 package main
@@ -15,17 +19,15 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
-	"go/parser"
-	"go/token"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/publication"
 )
 
 func main() {
@@ -47,23 +49,40 @@ func main() {
 
 // Schema là phần JSON Schema mà cổng quan tâm.
 type Schema struct {
-	EventType     string                     `json:"x-event-type"`
-	SchemaVersion int                        `json:"x-schema-version"`
-	Required      []string                   `json:"required"`
-	Properties    map[string]json.RawMessage `json:"properties"`
-}
-
-// Publication là hợp đồng van công bố.
-type Publication struct {
-	Name   string   `json:"name"`
-	Fields []string `json:"fields"`
+	EventType     string `json:"x-event-type"`
+	SchemaVersion int    `json:"x-schema-version"`
+	publication.Node
+	raw map[string]json.RawMessage // properties thô, để so tương thích ngược
 }
 
 var (
 	eventFileRe = regexp.MustCompile(`^((?:pf|mkg|vault|edge)\.[a-z_]+\.[a-z_]+\.[a-z_]+)\.v(\d+)\.json$`)
-	eventTagRe  = regexp.MustCompile(`ag:event\s+(\S+)\s+v(\d+)`)
-	pubTagRe    = regexp.MustCompile(`ag:publication\s+(\S+)`)
+	// Chỉ dòng chỉ thị (bắt đầu bằng //ag:, không có khoảng trắng) — nhắc tới
+	// chỉ thị trong văn xuôi của chú thích không phải là chú thích hợp đồng.
+	eventTagRe = regexp.MustCompile(`(?m)^//ag:event\s+(\S+)\s+v(\d+)\b`)
+	pubTagRe   = regexp.MustCompile(`(?m)^//ag:publication\s+(\S+)`)
 )
+
+func parseSchema(raw []byte) (Schema, error) {
+	var s Schema
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return s, err
+	}
+	var r struct {
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	_ = json.Unmarshal(raw, &r)
+	s.raw = r.Properties
+	return s, nil
+}
+
+// annotated là struct có chú thích hợp đồng; một struct có thể mang cả hai.
+type annotated struct {
+	decl        *typeDecl
+	pos         string
+	event       string // "<type> v<N>"
+	publication string
+}
 
 // Check chạy toàn bộ kiểm tra.
 func Check(root, base string) ([]string, error) {
@@ -81,12 +100,12 @@ func Check(root, base string) ([]string, error) {
 			problems = append(problems, f+": tên tệp phải là <vùng>.<module>.<thực thể>.<động từ>.v<N>.json (R-64)")
 			continue
 		}
-		var s Schema
 		raw, err := os.ReadFile(f)
 		if err != nil {
 			return nil, err
 		}
-		if err := json.Unmarshal(raw, &s); err != nil {
+		s, err := parseSchema(raw)
+		if err != nil {
 			problems = append(problems, f+": JSON không hợp lệ: "+err.Error())
 			continue
 		}
@@ -105,56 +124,100 @@ func Check(root, base string) ([]string, error) {
 		}
 	}
 
-	pubs := map[string]Publication{}
+	pubs := map[string]*publication.Contract{}
 	pubFiles, _ := filepath.Glob(filepath.Join(root, "contracts", "publication", "*.json"))
 	for _, f := range pubFiles {
-		var p Publication
 		raw, err := os.ReadFile(f)
 		if err != nil {
 			return nil, err
 		}
-		if err := json.Unmarshal(raw, &p); err != nil || p.Name == "" {
+		c, err := publication.Parse(raw)
+		if err != nil || c.Name == "" {
 			problems = append(problems, f+": hợp đồng công bố không hợp lệ")
 			continue
 		}
-		pubs[p.Name] = p
-	}
-
-	structs, err := annotatedStructs(filepath.Join(root, "internal"))
-	if err != nil {
-		return nil, err
-	}
-	for _, st := range structs {
-		switch st.kind {
-		case "event":
-			s, ok := schemas[st.key]
-			if !ok {
-				problems = append(problems, fmt.Sprintf("%s: struct %s chú thích ag:event %s nhưng không có schema trong contracts/events/", st.pos, st.name, st.key))
-				continue
-			}
-			for _, f := range st.fields {
-				if _, ok := s.Properties[f]; !ok {
-					problems = append(problems, fmt.Sprintf("%s: %s.%s không có trong schema %s (trường ngoài hợp đồng)", st.pos, st.name, f, st.key))
-				}
-			}
-			for _, r := range s.Required {
-				if !contains(st.fields, r) {
-					problems = append(problems, fmt.Sprintf("%s: %s thiếu trường required %s của schema %s", st.pos, st.name, r, st.key))
-				}
-			}
-		case "publication":
-			p, ok := pubs[st.key]
-			if !ok {
-				problems = append(problems, fmt.Sprintf("%s: %s chú thích ag:publication %s nhưng không có hợp đồng — mặc định từ chối", st.pos, st.name, st.key))
-				continue
-			}
-			for _, f := range st.fields {
-				if !contains(p.Fields, f) {
-					problems = append(problems, fmt.Sprintf("%s: %s.%s không có trong hợp đồng công bố %s", st.pos, st.name, f, st.key))
+		bad := false
+		for _, mp := range c.MetaProblems() {
+			problems = append(problems, f+": "+mp)
+			bad = true
+		}
+		if want := strings.TrimSuffix(filepath.Base(f), ".json"); c.Name != want {
+			problems = append(problems, fmt.Sprintf("%s: name %q phải trùng tên tệp %q", f, c.Name, want))
+			bad = true
+		}
+		if ev, ver, ok := c.EventType(); ok {
+			s, found := schemas[fmt.Sprintf("%s v%d", ev, ver)]
+			if !found {
+				problems = append(problems, fmt.Sprintf("%s: event %s v%d không có schema trong contracts/events/", f, ev, ver))
+			} else if c.Typed() {
+				// Sự kiện mang payload van không được khai trường mà van không cho qua.
+				for k := range s.Properties {
+					if _, ok := c.Properties[k]; !ok {
+						problems = append(problems, fmt.Sprintf("%s: schema sự kiện %s v%d có trường %s ngoài hợp đồng van", f, ev, ver, k))
+					}
 				}
 			}
 		}
+		if !bad { // hợp đồng thiếu người phê duyệt coi như không có: mặc định từ chối
+			pubs[c.Name] = c
+		}
 	}
+
+	ix, err := buildIndex(root)
+	if err != nil {
+		return nil, err
+	}
+	ann := map[string]*annotated{}
+	for pkg, types := range ix.types {
+		for name, d := range types {
+			a := &annotated{decl: d, pos: ix.pos(d.pos)}
+			if m := eventTagRe.FindStringSubmatch(d.doc); m != nil {
+				a.event = m[1] + " v" + m[2]
+			}
+			if m := pubTagRe.FindStringSubmatch(d.doc); m != nil {
+				a.publication = m[1]
+			}
+			if a.event != "" || a.publication != "" {
+				ann[annKey(pkg, name)] = a
+			}
+		}
+	}
+	for _, a := range ann {
+		st, isStruct := a.decl.expr.(*ast.StructType)
+		if !isStruct {
+			problems = append(problems, fmt.Sprintf("%s: %s có chú thích hợp đồng nhưng không phải struct", a.pos, a.decl.name))
+			continue
+		}
+		if a.event != "" {
+			s, ok := schemas[a.event]
+			if !ok {
+				problems = append(problems, fmt.Sprintf("%s: struct %s chú thích ag:event %s nhưng không có schema trong contracts/events/", a.pos, a.decl.name, a.event))
+			} else {
+				problems = append(problems, ix.checkStruct(a.decl.name, "", st, a.decl.file, &s.Node, "schema "+a.event, 0)...)
+			}
+		}
+		if a.publication != "" {
+			c, ok := pubs[a.publication]
+			if !ok {
+				problems = append(problems, fmt.Sprintf("%s: %s chú thích ag:publication %s nhưng không có hợp đồng đã phê duyệt — mặc định từ chối", a.pos, a.decl.name, a.publication))
+				continue
+			}
+			what := "hợp đồng công bố " + a.publication
+			if c.Typed() {
+				problems = append(problems, ix.checkStruct(a.decl.name, "", st, a.decl.file, &c.Node, what, 0)...)
+			} else {
+				for _, f := range ix.jsonFields(st, a.decl.file, 0) {
+					if !contains(c.Fields, f.name) {
+						problems = append(problems, fmt.Sprintf("%s: %s.%s không có trong %s", a.pos, a.decl.name, f.name, what))
+					}
+				}
+			}
+			if ev, ver, ok := c.EventType(); ok && a.event != "" && a.event != fmt.Sprintf("%s v%d", ev, ver) {
+				problems = append(problems, fmt.Sprintf("%s: %s chú thích ag:event %s nhưng hợp đồng %s khai event %s v%d", a.pos, a.decl.name, a.event, a.publication, ev, ver))
+			}
+		}
+	}
+	problems = append(problems, ix.mkgRules(ann)...)
 	sort.Strings(problems)
 	return problems, nil
 }
@@ -178,13 +241,13 @@ func compat(root, base, path string, cur Schema) []string {
 	if err != nil {
 		return nil // tệp mới hoặc không có git: không có gì để so
 	}
-	var old Schema
-	if json.Unmarshal(out, &old) != nil {
+	old, err := parseSchema(out)
+	if err != nil {
 		return nil
 	}
 	var problems []string
-	for name, oldDef := range old.Properties {
-		newDef, ok := cur.Properties[name]
+	for name, oldDef := range old.raw {
+		newDef, ok := cur.raw[name]
 		if !ok {
 			problems = append(problems, fmt.Sprintf("%s: xóa trường %s — phải tăng schema_version (R-64)", path, name))
 			continue
@@ -207,91 +270,4 @@ func typeOf(raw json.RawMessage) string {
 	}
 	_ = json.Unmarshal(raw, &d)
 	return fmt.Sprint(d.Type)
-}
-
-type annotated struct {
-	kind, key, name, pos string
-	fields               []string
-}
-
-func annotatedStructs(dir string) ([]annotated, error) {
-	var out []annotated
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		return nil, nil
-	}
-	fset := token.NewFileSet()
-	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() && d.Name() == "testdata" {
-			return filepath.SkipDir
-		}
-		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		f, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
-		if err != nil {
-			return err
-		}
-		for _, decl := range f.Decls {
-			gd, ok := decl.(*ast.GenDecl)
-			if !ok || gd.Tok != token.TYPE {
-				continue
-			}
-			for _, spec := range gd.Specs {
-				ts := spec.(*ast.TypeSpec)
-				st, ok := ts.Type.(*ast.StructType)
-				if !ok {
-					continue
-				}
-				doc := gd.Doc.Text()
-				if ts.Doc != nil {
-					doc += ts.Doc.Text()
-				}
-				// ast.CommentGroup.Text() bỏ dòng chỉ thị //ag:...; đọc thô.
-				for _, cg := range []*ast.CommentGroup{gd.Doc, ts.Doc} {
-					if cg == nil {
-						continue
-					}
-					for _, c := range cg.List {
-						doc += "\n" + c.Text
-					}
-				}
-				a := annotated{name: ts.Name.Name, pos: fset.Position(ts.Pos()).String(), fields: jsonFields(st)}
-				if m := eventTagRe.FindStringSubmatch(doc); m != nil {
-					a.kind, a.key = "event", m[1]+" v"+m[2]
-					out = append(out, a)
-				} else if m := pubTagRe.FindStringSubmatch(doc); m != nil {
-					a.kind, a.key = "publication", m[1]
-					out = append(out, a)
-				}
-			}
-		}
-		return nil
-	})
-	return out, err
-}
-
-func jsonFields(st *ast.StructType) []string {
-	var out []string
-	for _, f := range st.Fields.List {
-		name := ""
-		if len(f.Names) > 0 {
-			name = f.Names[0].Name
-		}
-		if f.Tag != nil {
-			tag, _ := strconv.Unquote(f.Tag.Value)
-			if j := reflect.StructTag(tag).Get("json"); j != "" {
-				if j == "-" {
-					continue
-				}
-				name = strings.Split(j, ",")[0]
-			}
-		}
-		if name != "" {
-			out = append(out, name)
-		}
-	}
-	return out
 }
