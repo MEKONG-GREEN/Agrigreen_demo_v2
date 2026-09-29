@@ -45,6 +45,7 @@ func (h Registry) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.POST("/orgs/:ref/move", h.moveOrg)
 	rg.POST("/orgs/:ref/rename", h.renameOrg)
 	rg.GET("/orgs/:ref/events", h.orgEvents)
+	rg.GET("/cooperatives/:ref/deactivation-preview", h.deactivationPreview)
 	rg.POST("/cooperatives/:ref/deactivate", h.deactivate)
 	rg.POST("/cooperatives/:ref/reactivate", h.reactivate)
 	httpx.AllowBody(rg, http.MethodPost, "/households/import", app.MaxImportBytes)
@@ -570,6 +571,24 @@ func writeOrgResult(c *gin.Context, out app.OrgResult, err error) {
 func (h Registry) renameOrg(c *gin.Context)  { status(c, "", h.Reg.RenameOrg) }
 func (h Registry) deactivate(c *gin.Context) { status(c, port.OrgCooperative, h.Reg.Deactivate) }
 func (h Registry) reactivate(c *gin.Context) { status(c, port.OrgCooperative, h.Reg.Reactivate) }
+
+// deactivationPreview: phạm vi ảnh hưởng trước khi vô hiệu hóa HTX (HTX US-HTXSTATUS-01 AC-1).
+func (h Registry) deactivationPreview(c *gin.Context) {
+	ref, ok := pathRef(c)
+	if !ok {
+		return
+	}
+	out, err := h.Reg.PreviewDeactivation(c.Request.Context(), ref)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"cooperative_ref": out.CooperativeRef.String(), "active": out.Active, "active_households": out.ActiveHouseholds,
+		"active_children": out.ActiveChildren, "open_seasons": out.OpenSeasons, "pending_logs": out.PendingLogs,
+		"season_activity_available": out.OpenSeasons != nil,
+	})
+}
 
 func (h Registry) orgEvents(c *gin.Context) {
 	ref, ok := pathRef(c)

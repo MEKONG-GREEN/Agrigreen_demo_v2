@@ -70,6 +70,8 @@ type Service struct {
 	Households partyport.Households
 	// Markers (tùy chọn): điểm pf_party.cooperative.location làm marker/dự phòng của lớp HTX.
 	Markers port.CoopMarkers
+	// Farmers (tùy chọn): nông hộ của tài khoản nông dân (pf/accounts) — vai farmer đọc log GPS của mình.
+	Farmers port.FarmerHouseholds
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

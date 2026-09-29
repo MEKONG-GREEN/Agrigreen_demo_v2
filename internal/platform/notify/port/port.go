@@ -3,6 +3,8 @@
 package port
 
 import (
+	"context"
+
 	"github.com/google/uuid"
 
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -27,6 +29,13 @@ const (
 	KindHouseholdMembershipChanged = "household_membership_changed"
 	// KindTaskAssigned: nhiệm vụ tự sinh từ yêu cầu hỗ trợ App HTX → cán bộ được giao (KN US-TASK-01).
 	KindTaskAssigned = "task_assigned"
+	// KindFarmLogPending: nông dân ghi nhật ký canh tác → quản lý HTX "nhật ký chờ duyệt"
+	// (HTX US-LOG-05; migration 000029).
+	KindFarmLogPending = "farm_log_pending"
+	// KindFarmLogReviewed: kết quả duyệt nhật ký → người ghi (HTX US-LOG-05 AC-3).
+	KindFarmLogReviewed = "farm_log_reviewed"
+	// KindSeasonOpened: nông dân tự mở vụ → quản lý HTX (HTX US-SEASON-01).
+	KindSeasonOpened = "season_opened"
 	// KindSyncNow là thông điệp dữ liệu "đồng bộ ngay" (US-SYNC-02) — không tạo thông báo.
 	KindSyncNow = "sync_now"
 )
@@ -60,7 +69,17 @@ const (
 	ConsumerSync      = "pf.notify.sync"
 	ConsumerParty     = "pf.notify.party"
 	ConsumerPush      = "pf.notify.push"
+	// ConsumerCropCycle: nhật ký chờ duyệt, kết quả duyệt, nông dân mở vụ (App HTX, G2).
+	ConsumerCropCycle = "pf.notify.cropcycle"
 )
+
+// AreaFarmers tìm tài khoản nông dân nhận cảnh báo khẩn theo địa bàn (HTX
+// US-NEWS-03): tài khoản đang liên kết (pf/accounts farmer_link) với nông hộ có thửa
+// đang dùng (pf/geo) trong các xã. communes nil = mọi xã của tenant (cảnh báo toàn
+// quốc). Gốc lắp ráp nối từ port của pf/geo và pf/accounts; không có dữ liệu cá nhân.
+type AreaFarmers interface {
+	FarmersInCommunes(ctx context.Context, tenantID uuid.UUID, communes []string) ([]uuid.UUID, error)
+}
 
 // JobEmailDigest là tên job gửi email tóm tắt chỉ đạo khẩn trong cmd/worker (-jobs).
 const JobEmailDigest = "notify_email_digest"

@@ -610,6 +610,34 @@ paths:
                 properties:
                   items: {type: array, items: {$ref: "#/components/schemas/PartyOrgEvent"}}
         "404": {$ref: "#/components/responses/Problem"}
+  /v1/cooperatives/{ref}/deactivation-preview:
+    get:
+      summary: Phạm vi ảnh hưởng trước khi vô hiệu hóa HTX (HTX US-HTXSTATUS-01 AC-1) — số nông hộ, vụ chưa xong, nhật ký chờ duyệt
+      description: >-
+        Chỉ đọc, cùng vai và phạm vi với deactivate. Vụ chưa xong và nhật ký chờ duyệt đọc từ pf/cropcycle qua gốc lắp
+        ráp; chưa nối → open_seasons, pending_logs = null và season_activity_available = false.
+      operationId: partyCooperativeDeactivationPreview
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Phạm vi ảnh hưởng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cooperative_ref, active, active_households, active_children, open_seasons, pending_logs, season_activity_available]
+                properties:
+                  cooperative_ref: {type: string, format: uuid}
+                  active: {type: boolean}
+                  active_households: {type: integer, description: Nông hộ đang là thành viên}
+                  active_children: {type: integer, description: Tổ chức con đang hoạt động (phải vô hiệu hóa trước)}
+                  open_seasons: {type: [integer, "null"], description: Vụ đang mở (chưa hoàn thành)}
+                  pending_logs: {type: [integer, "null"], description: Nhật ký canh tác chờ duyệt}
+                  season_activity_available: {type: boolean}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/cooperatives/{ref}/deactivate:
     post:
       summary: Vô hiệu hóa HTX (soft-delete) — lý do ≥ 20 ký tự; phát pf.party.org.deactivated để khóa tài khoản

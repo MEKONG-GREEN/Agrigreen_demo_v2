@@ -10,7 +10,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -64,6 +67,16 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	if err != nil {
 		return nil, err
 	}
+	// Cảnh báo khẩn tới nông dân theo địa bàn (HTX US-NEWS-03): thửa (geo_app) + liên kết
+	// tài khoản nông dân (accounts_app), mỗi module một vai.
+	geoPool, err := open(geo.DBRole)
+	if err != nil {
+		return nil, err
+	}
+	accPool, err := open(accounts.DBRole)
+	if err != nil {
+		return nil, err
+	}
 	ch, err := notify.ChannelsFromEnv(log)
 	if err != nil {
 		return nil, err
@@ -72,12 +85,14 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	md := masterdata.New(mdPool, clk)
 	kn := extension.New(extPool, clk, extension.Deps{Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs()})
 	log.Info("kênh thông báo", "event", "startup", "push", ch.Pusher.Name(), "email", ch.Mailer != nil, "outcome", "ok")
-	return notify.New(nPool, clk, notify.Deps{Staff: kn.Staff(), Units: md.AdminUnits(), Pusher: ch.Pusher, Mailer: ch.Mailer,
+	farmers := assembly.AreaFarmers{Plots: geo.New(geoPool, clk, geo.Deps{}).PlotHouseholds(),
+		Accounts: accounts.New(accPool, clk, accounts.Deps{}).FarmerAccounts()}
+	return notify.New(nPool, clk, notify.Deps{Staff: kn.Staff(), Units: md.AdminUnits(), Farmers: farmers, Pusher: ch.Pusher, Mailer: ch.Mailer,
 		DigestTo: ch.DigestTo, Log: log}), nil
 }
 
 // notifyConsumers: một consumer mỗi nhóm sự kiện (pf.notify.directive, .content,
-// .task, .sync, .party, .push), cùng chạy trên vai notify_app; idempotent qua inbox.
+// .task, .sync, .party, .cropcycle, .push), cùng chạy trên vai notify_app; idempotent qua inbox.
 func notifyConsumers(log *slog.Logger) []consumer {
 	lazy := &notifyLazy{log: log}
 	// Danh sách consumer và sự kiện lấy từ module (không cần DB để liệt kê).

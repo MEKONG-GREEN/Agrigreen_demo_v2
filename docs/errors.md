@@ -67,7 +67,7 @@ Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính m�
 | 409 | `party.org_state_conflict` | pf/party: trạng thái không cho phép (đã vô hiệu hóa, đang hoạt động, HTX đã ngừng, không có thay đổi) |
 | 409 | `party.org_has_active_children` | pf/party: vô hiệu hóa tổ chức còn tổ chức con đang hoạt động; `active_children` là số con |
 | 403 | `party.out_of_scope` | pf/party: ghi ngoài phạm vi TW → Tỉnh → Xã của người gọi (ADR-0009) |
-| 503 | `party.dependency_unavailable` | pf/party: chưa nối hoặc không gọi được masterdata / kho định danh (kể cả `GET /v1/me` của cán bộ TTKN tỉnh khi chưa nối danh mục đơn vị hành chính) |
+| 503 | `party.dependency_unavailable` | pf/party: chưa nối hoặc không gọi được masterdata / kho định danh (kể cả `GET /v1/me` của cán bộ TTKN tỉnh khi chưa nối danh mục đơn vị hành chính); `GET /v1/cooperatives/{ref}/deactivation-preview` không đọc được vụ/nhật ký của pf/cropcycle (HTX US-HTXSTATUS-01 AC-1) |
 | 422 | `party.import_invalid` | pf/party: tệp nhập (nông hộ, cây tổ chức; CSV UTF-8 hoặc .xlsx) sai mẫu — thiếu cột bắt buộc, sai định dạng, không phải UTF-8, tệp .xls cũ, ô công thức (không tính công thức; `detail` nêu ô), quá số dòng/dung lượng — từ chối cả tệp |
 | 404 | `party.household_not_found` | pf/party: `POST /v1/households/{ref}/membership` — nông hộ không có hoặc ngoài phạm vi (không lộ sự tồn tại) |
 | 409 | `party.membership_unchanged` | pf/party: nông hộ đã ở đúng trạng thái thành viên HTX yêu cầu |
@@ -145,7 +145,7 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 422 | `extension.household_invalid` | pf/extension: `household_ref` của yêu cầu hỗ trợ không thuộc tài khoản, hoặc tài khoản có nhiều nông hộ mà không chọn |
 | 404 | `extension.support_request_not_found` | pf/extension: không có yêu cầu hỗ trợ |
 | 409 | `extension.id_reused` | pf/extension: `id` do máy sinh đã dùng cho bản ghi khác |
-| 503 | `extension.dependency_unavailable` | pf/extension: chưa nối pf/party (phạm vi) hoặc pf/masterdata (đơn vị, danh mục) |
+| 503 | `extension.dependency_unavailable` | pf/extension: chưa nối pf/party (phạm vi) hoặc pf/masterdata (đơn vị, danh mục); consumer `pf.extension.gps_log` chưa nối log GPS pf/geo (sự kiện được giao lại) |
 | 404 | `extension.program_report_not_found` | pf/extension: không có báo cáo tiến độ Đề án (FR-03), hoặc ngoài phạm vi đọc |
 | 409 | `extension.program_report_approved` | pf/extension: phiên bản tiến độ Đề án đã được duyệt |
 
@@ -163,7 +163,7 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 409 | `mechanization.state_conflict` | pf/mechanization: trạng thái không cho phép (đã vô hiệu hóa, đang hoạt động, không có thay đổi, đã khóa/chưa khóa, chỉ khóa được bản ghi nhập tay) |
 | 422 | `mechanization.cooperative_invalid` | pf/mechanization: HTX không tồn tại, không phải HTX, hoặc đã ngừng hoạt động |
 | 403 | `mechanization.out_of_scope` | pf/mechanization: ghi dữ liệu của HTX ngoài phạm vi TW → Tỉnh → Xã của người gọi (ADR-0009) |
-| 503 | `mechanization.dependency_unavailable` | pf/mechanization: chưa nối hoặc không gọi được pf/party, pf/masterdata hoặc kho định danh |
+| 503 | `mechanization.dependency_unavailable` | pf/mechanization: chưa nối hoặc không gọi được pf/party, pf/masterdata hoặc kho định danh (kể cả consumer `pf.mechanization.area_sync`, CGH FN-07 — sự kiện được giao lại rồi vào DLQ) |
 | 422 | `mechanization.import_invalid` | pf/mechanization: tệp nhập máy sai mẫu (thiếu cột bắt buộc, có cột "Mã máy"/"Khâu", sai CSV/.xlsx, ô công thức, quá 500 dòng) — từ chối cả tệp |
 Phản hồi phát lại theo Idempotency-Key có header `Idempotent-Replayed: true`.
 
@@ -201,7 +201,7 @@ Việc xuất hỏng vĩnh viễn ghi `error_code` trên việc xuất (vd `mech
 | 409 | `simulation.snapshot_mismatch` | pf/simulation (Internal API): phong bì kết quả mang snapshot_sha256 khác ảnh chụp đã ghim |
 | 422 | `simulation.result_invalid` | pf/simulation (Internal API): phong bì kết quả không đúng contracts/optimizer/result.v1 |
 | 500 | `simulation.snapshot_integrity` | pf/simulation: ảnh chụp đọc lại không khớp băm đã lưu |
-| 503 | `simulation.dependency_unavailable` | pf/simulation: chưa nối nguồn cung HTX × vụ (SupplySource) — việc mô phỏng hỏng với mã này |
+| 503 | `simulation.dependency_unavailable` | pf/simulation: chưa nối nguồn cung HTX × vụ (SupplySource; G2 đợt 2 nối ở `assembly.SupplySource` từ pf/cropcycle + pf/party + pf/geo + pf/masterdata) — việc mô phỏng hỏng với mã này |
 | 422 | `simulation.supply_invalid` | pf/simulation: nguồn cung trả dữ liệu không hợp lệ (âm, tháng vụ sai) |
 | 422 | `simulation.no_supply` | pf/simulation: không có HTX có toạ độ nằm trong bán kính phục vụ của các Hub |
 | 403 | `simulation.internal_forbidden` | pf/simulation: Internal API chỉ nhận client mTLS có CN/SAN thuộc AG_INTERNAL_CLIENT_NAMES |
@@ -231,7 +231,7 @@ Việc mô phỏng hỏng ghi `error_code` trên việc: mã `simulation.*` (l�
 | 422 | `geo.cooperative_invalid` | pf/geo: HTX không tồn tại, đã ngừng hoạt động hoặc ngoài phạm vi (khi đã nối pf/party) |
 | 422 | `geo.format_invalid` | pf/geo: tệp nhập không đọc được, không có đối tượng, hoặc quá 200 đối tượng; Shapefile: không phải gói .zip, thiếu .shp/.dbf, nhiều lớp, số bản ghi .dbf khác .shp |
 | 422 | `geo.format_unsupported` | pf/geo: không nhận ra định dạng tệp — hỗ trợ GeoJSON, KML, Shapefile (.zip) |
-| 503 | `geo.dependency_unavailable` | pf/geo: chưa nối hoặc không gọi được pf/party (phạm vi), pf/masterdata (đơn vị hành chính, tham số) |
+| 503 | `geo.dependency_unavailable` | pf/geo: chưa nối hoặc không gọi được pf/party (phạm vi), pf/masterdata (đơn vị hành chính, tham số); vai `farmer` đọc `GET /v1/geo/gps-fixes` khi chưa nối liên kết tài khoản ↔ nông hộ (pf/accounts) |
 | 404 | `geo.cooperative_boundary_not_found` | pf/geo G2: HTX chưa có ranh giới, hoặc ranh giới nằm ngoài phạm vi đọc (xã; quản lý HTX: HTX khác) — không lộ sự tồn tại |
 | 409 | `geo.cooperative_boundary_exists` | pf/geo G2: HTX đã có ranh giới — sửa bằng `POST /v1/geo/cooperative-boundaries/{ref}/versions` (kèm `supersedes_id`, `correction_reason`); problem có `current_boundary_id`, `current_version`, `status` (GIS US-BND-02/03) |
 | 404 | `geo.facility_not_found` | pf/geo G2: không có kho/Hub/nhà máy của tenant với ref/mã này |
@@ -287,7 +287,7 @@ Cổng `geo.GpsLog.RecordFix` (module khác gọi, không qua HTTP) trả lỗi 
 | 404 | `cropcycle.harvest_not_found` | pf/cropcycle: không có khai báo sản lượng trong phạm vi |
 | 422 | `cropcycle.import_invalid` | pf/cropcycle: tệp nhập sản lượng không đọc được, có công thức, quá 200 dòng / 2 MB, thiếu cột mã lô/mã vụ hoặc sản lượng |
 | 409 | `cropcycle.id_reused` | pf/cropcycle: `id`/`season_ref` do máy sinh đã dùng cho bản ghi khác |
-| 503 | `cropcycle.dependency_unavailable` | pf/cropcycle: chưa nối hoặc không gọi được pf/geo, pf/party, pf/masterdata, liên kết tài khoản ↔ nông hộ (vai `farmer`) |
+| 503 | `cropcycle.dependency_unavailable` | pf/cropcycle: chưa nối hoặc không gọi được pf/geo, pf/party, pf/masterdata, liên kết tài khoản ↔ nông hộ (vai `farmer`); consumer `pf.cropcycle.gps_log` chưa nối log GPS pf/geo (sự kiện được giao lại) |
 
 Nhãn vị trí (HTX US-GPS-01/02): `location_status` = `match` (≤ `cropcycle.gps_match_tolerance_m`, mặc định 50 m) | `mismatch` | `missing`; nguồn `gps_source` luôn có. Thiếu GPS hoặc không đo được **không** chặn lưu.
 

@@ -18,6 +18,7 @@ import (
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -38,6 +39,8 @@ type Deps struct {
 	Catalogs mdport.Catalogs
 	// Farmers: liên kết tài khoản nông dân ↔ nông hộ (pf/accounts, G2). Thiếu → vai farmer nhận 503.
 	Farmers port.FarmerHouseholds
+	// GpsLog (tùy chọn): log GPS của pf/geo cho consumer port.GpsLogConsumer (HTX US-GPS-03).
+	GpsLog geoport.GpsLog
 }
 
 // Module là pf/cropcycle đã nối.
@@ -46,7 +49,7 @@ type Module struct{ svc *app.Service }
 // New tạo module với pool của vai cropcycle_app.
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Scope: deps.Scope, Orgs: deps.Orgs, Plots: deps.Plots, Params: deps.Params,
-		Catalogs: deps.Catalogs, Farmers: deps.Farmers}}
+		Catalogs: deps.Catalogs, Farmers: deps.Farmers, GpsLog: deps.GpsLog}}
 }
 
 // UseFarmerHouseholds nối liên kết tài khoản ↔ nông hộ sau khi dựng pf/accounts.
@@ -60,6 +63,15 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc
 
 // Stats cho module khác: vụ mở / nhật ký chờ duyệt theo HTX, diện tích vụ (qua port).
 func (m *Module) Stats() port.Stats { return m.svc }
+
+// UseGpsLog nối log GPS của pf/geo (consumer port.GpsLogConsumer).
+func (m *Module) UseGpsLog(g geoport.GpsLog) { m.svc.GpsLog = g }
+
+// SupplyStats cho gốc lắp ráp: sản lượng lúa HTX × vụ (nguồn cung của pf/simulation).
+func (m *Module) SupplyStats() port.SupplyStats { return m.svc }
+
+// GpsLogHandler là inbox.Handler của consumer port.GpsLogConsumer (vai cropcycle_app).
+func (m *Module) GpsLogHandler() inbox.Handler { return m.svc.HandleGpsLog }
 
 // SyncSource là chiều xuống entity sop_version, season, farm_log cho pf/sync.
 func (m *Module) SyncSource() syncport.Source { return app.SyncSource{Svc: m.svc} }

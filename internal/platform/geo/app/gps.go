@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -12,6 +13,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -142,6 +144,9 @@ type GpsPage struct {
 // ListGpsFixes đọc log trong phạm vi: xã của người gọi; quản lý HTX chỉ log gắn
 // với HTX mình. Log không xác định được xã chỉ phạm vi toàn quốc thấy.
 func (s *Service) ListGpsFixes(ctx context.Context, in GpsQueryInput) (GpsPage, error) {
+	if p, ok := authz.FromContext(ctx); ok && p.Has(port.RoleFarmer) && !slices.ContainsFunc(layerReadRoles, p.Has) {
+		return s.listFarmerGps(ctx, p, in)
+	}
 	a, err := s.access(ctx, layerReadRoles...)
 	if err != nil {
 		return GpsPage{}, err
@@ -170,14 +175,53 @@ func (s *Service) ListGpsFixes(ctx context.Context, in GpsQueryInput) (GpsPage, 
 	if err != nil {
 		return GpsPage{}, err
 	}
+	return gpsPage(items, in.Limit), nil
+}
+
+// listFarmerGps: nông dân (vai farmer) chỉ đọc log do chính mình ghi và log gắn với
+// thửa của nông hộ liên kết với tài khoản (HTX US-GPS-03; phạm vi qua FarmerHouseholds,
+// không theo xã — token nông dân không mang org_ref). Lọc actor_ref khác mình → rỗng.
+func (s *Service) listFarmerGps(ctx context.Context, p authz.Principal, in GpsQueryInput) (GpsPage, error) {
+	if s.Farmers == nil {
+		return GpsPage{}, ErrDependency.WithDetail("chưa nối liên kết tài khoản nông dân (pf/accounts)")
+	}
+	if in.Limit <= 0 {
+		in.Limit = 50
+	}
+	if in.Limit > 200 {
+		return GpsPage{}, problem.Validation.WithField("limit", "từ 1 đến 200")
+	}
+	if in.Purpose != "" && !domain.KnownGpsPurpose(in.Purpose) {
+		return GpsPage{}, problem.Validation.WithField("purpose", "phải là season_open, farm_log, harvest, support hoặc plot")
+	}
+	hh, err := s.Farmers.HouseholdsOf(ctx, p.ActorRef)
+	if err != nil {
+		return GpsPage{}, err
+	}
+	var items []store.GpsFix
+	err = s.inTx(ctx, p.TenantID, func(tx pgx.Tx) error {
+		var e error
+		items, e = store.ListGpsFixes(ctx, tx, store.GpsQuery{
+			Filter: store.Filter{All: true}, OwnActor: p.ActorRef, OwnHouseholds: hh, ActorRef: in.ActorRef, TargetRef: in.TargetRef,
+			PlotRef: in.PlotRef, Purpose: in.Purpose, Before: in.Before, Limit: in.Limit + 1,
+		})
+		return e
+	})
+	if err != nil {
+		return GpsPage{}, err
+	}
+	return gpsPage(items, in.Limit), nil
+}
+
+func gpsPage(items []store.GpsFix, limit int) GpsPage {
 	pg := GpsPage{Items: items}
-	if len(items) > in.Limit {
-		pg.Items = items[:in.Limit]
-		last := pg.Items[in.Limit-1].ID
+	if len(items) > limit {
+		pg.Items = items[:limit]
+		last := pg.Items[limit-1].ID
 		pg.Next = &last
 	}
 	if pg.Items == nil {
 		pg.Items = []store.GpsFix{}
 	}
-	return pg, nil
+	return pg
 }

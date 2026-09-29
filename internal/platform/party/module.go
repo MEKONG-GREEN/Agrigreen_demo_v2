@@ -77,6 +77,16 @@ func (m *Module) ScopeResolver() port.ScopeResolver { return m.reg }
 // gọi sau khi dựng pf/geo (pf/geo cần phạm vi của pf/party nên dựng sau).
 func (m *Module) UsePlotStats(ps geoport.PlotStats) { m.reg.Plots = ps }
 
+// UseSeasonActivity nối số vụ chưa xong / nhật ký chờ duyệt của pf/cropcycle (qua gốc
+// lắp ráp) cho cảnh báo trước khi vô hiệu hóa HTX (HTX US-HTXSTATUS-01 AC-1).
+func (m *Module) UseSeasonActivity(a port.SeasonActivity) { m.reg.Activity = a }
+
+// CoopMarkers cho pf/geo: điểm vị trí HTX làm marker lớp ranh giới HTX (GIS US-BND-02).
+func (m *Module) CoopMarkers() geoport.CoopMarkers { return m.reg }
+
+// CooperativeSites cho gốc lắp ráp: HTX đang hoạt động, vị trí, số hộ (nguồn cung mô phỏng).
+func (m *Module) CooperativeSites() port.CooperativeSites { return m.reg }
+
 // CooperativeStats cho module khác đếm HTX, hộ thành viên theo đơn vị (qua port, G-02).
 func (m *Module) CooperativeStats() port.CooperativeStats { return m.reg }
 

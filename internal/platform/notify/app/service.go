@@ -14,6 +14,7 @@ import (
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/channel"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -54,8 +55,10 @@ type Deps struct {
 	Devices syncport.Devices        // kiểm thiết bị khi gắn token đẩy
 	Staff   extport.StaffDirectory  // danh bạ cán bộ (người nhận chính xác)
 	Units   mdport.AdminUnits       // mở rộng tỉnh → xã cho thông báo chủ đề
-	Pusher  channel.Pusher          // chỉ worker cần
-	Mailer  channel.Mailer          // nil → tắt email tóm tắt
+	// Farmers: tài khoản nông dân có thửa trong địa bàn (cảnh báo khẩn HTX US-NEWS-03); nil → chỉ chủ đề.
+	Farmers port.AreaFarmers
+	Pusher  channel.Pusher // chỉ worker cần
+	Mailer  channel.Mailer // nil → tắt email tóm tắt
 	// DigestTo: hộp thư công vụ nhận email tóm tắt chỉ đạo khẩn (AG_SMTP_DIGEST_TO).
 	DigestTo      []string
 	NudgeCooldown time.Duration

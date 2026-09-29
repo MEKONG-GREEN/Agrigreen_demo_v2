@@ -21,8 +21,17 @@
 // Consumer pf/reports (vai reports_app): pf.reports.export (dựng tệp Excel/PDF) và
 // pf.reports.delivery (email lịch gửi báo cáo).
 //
-// Consumer pf/simulation (vai simulation_app): pf.simulation.snapshot (dựng ảnh chụp
-// đầu vào bất biến, phát pf.simulation.job.requested cho optimizer).
+// Consumer liên module G2 (cmd/api-platform/assembly.Consumers, dựng toàn bộ module pf
+// một lần qua assembly.Build, mỗi module một vai DB):
+//
+//	pf.mechanization.area_sync  pf.cropcycle.coop_season_area.changed → diện tích vụ CGH (CGH FN-07, QT-03)
+//	pf.geo.hub_valve            mkg.hub.facility.published / mkg.hub.capacity.published → mô hình đọc hub (kiểm hợp đồng van)
+//	pf.cropcycle.gps_log        vụ / nhật ký / sản lượng → log GPS pf/geo sau commit (HTX US-GPS-03)
+//	pf.extension.gps_log        yêu cầu hỗ trợ → log GPS pf/geo sau commit (HTX US-GPS-03)
+//	pf.simulation.snapshot      ảnh chụp đầu vào (SupplySource pf/cropcycle+party+geo, Router pf/waterway)
+//
+// Consumer pf.notify.cropcycle (vai notify_app): nhật ký chờ duyệt / kết quả duyệt / nông
+// dân mở vụ (HTX US-LOG-05, US-SEASON-01).
 // Consumer pf/waterway (vai waterway_app): pf.waterway.build (dựng phiên bản mạng
 // đường thủy từ tập đoạn đã xác nhận).
 //
@@ -34,7 +43,7 @@
 //	AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER vai của job vận hành (migration shared/000002)
 //	AG_WORKER_JOBS                     mặc định cho -jobs: all | none | anchor,idempotency,extension_escalation,notify_email_digest
 //	AG_DB_PASSWORD_EXTENSION_APP       (hoặc AG_DB_APP_PASSWORD) vai extension_app — khi có job extension_escalation
-//	AG_DB_PASSWORD_NOTIFY_APP          vai notify_app (cùng extension_app, masterdata_app) — consumer/job pf/notify
+//	AG_DB_PASSWORD_NOTIFY_APP          vai notify_app (cùng extension_app, masterdata_app, geo_app, accounts_app) — consumer/job pf/notify
 //	AG_FCM_PROJECT_ID, AG_FCM_CREDENTIALS_FILE  FCM HTTP v1 (không đặt → kênh đẩy chỉ ghi log); AG_FCM_ENDPOINT, AG_FCM_TOKEN_URL tùy chọn
 //	AG_SMTP_HOST, AG_SMTP_PORT, AG_SMTP_USERNAME, AG_SMTP_PASSWORD, AG_SMTP_FROM, AG_SMTP_DIGEST_TO  email tóm tắt (SMTP trong lãnh thổ)
 //	AG_ANCHOR_SIGNING_KEY              Ed25519 (base64 seed 32 byte) — bắt buộc khi có job anchor
@@ -101,7 +110,7 @@ func consumers(log *slog.Logger) []consumer {
 			log.Info("đồng ý đã ghi", "event", env.EventType, "event_id", env.EventID, "tenant_id", env.TenantID, "trace_id", env.TraceID, "outcome", "ok")
 			return nil
 		},
-	}, mrvExportConsumer(log), accountsOrgStatusConsumer(log), waterwayBuildConsumer(), simulationSnapshotConsumer(log)}, reportsConsumers(log)...)
+	}, mrvExportConsumer(log), accountsOrgStatusConsumer(log), waterwayBuildConsumer()}, append(reportsConsumers(log), wiredConsumers(log)...)...)
 }
 
 func allConsumers(log *slog.Logger) []consumer {

@@ -16,6 +16,10 @@ const (
 	EventTaskCreated             = "pf.extension.task.created"
 )
 
+// GpsLogConsumer là consumer của worker ghi log GPS (pf/geo) cho yêu cầu hỗ trợ SAU khi
+// giao dịch đã commit (HTX US-GPS-03 AC-3, mục đích support), idempotent theo yêu cầu.
+const GpsLogConsumer = "pf.extension.gps_log"
+
 // Quy tắc giao nhiệm vụ tự sinh (chuỗi dự phòng theo cây cấu trúc, KN US-TASK-01 AC-2).
 const (
 	AssignCommuneOnDuty  = "commune_on_duty"  // cán bộ xã đang trực (roster DutyAt)

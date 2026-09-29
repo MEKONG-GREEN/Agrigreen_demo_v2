@@ -18,6 +18,7 @@ import (
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -39,6 +40,9 @@ type Deps struct {
 	// CoopMarkers (tùy chọn): điểm vị trí HTX (pf_party.cooperative.location) làm
 	// marker/dự phòng cho lớp ranh giới HTX (GIS US-BND-02). pf/party cài ở đợt 2.
 	CoopMarkers port.CoopMarkers
+	// Farmers (tùy chọn): nông hộ của tài khoản nông dân (pf/accounts) — vai farmer đọc log
+	// GPS của mình (HTX US-GPS-03). Gốc lắp ráp nối sau khi dựng pf/accounts (UseFarmers).
+	Farmers port.FarmerHouseholds
 }
 
 // Module là pf/geo đã nối.
@@ -47,7 +51,7 @@ type Module struct{ svc *app.Service }
 // New tạo module với pool của vai geo_app.
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Scope: deps.Scope, Params: deps.Params, Units: deps.AdminUnits, Orgs: deps.Orgs, Households: deps.Households,
-		Markers: deps.CoopMarkers}}
+		Markers: deps.CoopMarkers, Farmers: deps.Farmers}}
 }
 
 // RegisterApp gắn route Application API.
@@ -67,6 +71,19 @@ func (m *Module) GpsLog() port.GpsLog { return m.svc }
 
 // HubSink cho consumer van công bố (mkg hub_facility / hub_capacity) ghi mô hình đọc hub MKG.
 func (m *Module) HubSink() port.HubSink { return m.svc }
+
+// UseFarmers nối liên kết tài khoản nông dân ↔ nông hộ (pf/accounts) sau khi module đó được dựng.
+func (m *Module) UseFarmers(f port.FarmerHouseholds) { m.svc.Farmers = f }
+
+// PlotHouseholds cho gốc lắp ráp tìm nông hộ có thửa trong các xã (cảnh báo khẩn, HTX US-NEWS-03).
+func (m *Module) PlotHouseholds() port.PlotHouseholds { return m.svc }
+
+// CoopCentroids cho gốc lắp ráp đọc tâm ranh giới HTX (nguồn cung của pf/simulation).
+func (m *Module) CoopCentroids() port.CoopCentroids { return m.svc }
+
+// HubValveHandler là inbox.Handler của consumer port.HubValveConsumer (van công bố MKG
+// hub_facility / hub_capacity → mô hình đọc hub, kiểm payload theo hợp đồng lúc chạy).
+func (m *Module) HubValveHandler() inbox.Handler { return m.svc.HandleHubPublication }
 
 // SyncSource là chiều xuống entity "plot" cho pf/sync.
 func (m *Module) SyncSource() syncport.Source { return app.SyncSource{Svc: m.svc} }

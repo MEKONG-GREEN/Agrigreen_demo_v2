@@ -113,6 +113,9 @@ type GpsQuery struct {
 	Purpose   string
 	Before    uuid.UUID // Nil = từ mới nhất
 	Limit     int
+	// OwnActor khác Nil: chỉ log do OwnActor ghi HOẶC gắn với thửa của OwnHouseholds (vai farmer).
+	OwnActor      uuid.UUID
+	OwnHouseholds []uuid.UUID
 }
 
 // ListGpsFixes trả log mới nhất trước. Log không có xã chỉ phạm vi toàn quốc thấy.
@@ -123,9 +126,11 @@ func ListGpsFixes(ctx context.Context, tx pgx.Tx, q GpsQuery) ([]GpsFix, error) 
 	    AND ($5::uuid IS NULL OR g.actor_ref = $5::uuid) AND ($6::uuid IS NULL OR g.target_ref = $6::uuid)
 	    AND ($7::uuid IS NULL OR g.plot_ref = $7::uuid) AND ($8::text = '' OR g.purpose = $8::text)
 	    AND ($9::uuid IS NULL OR g.id < $9::uuid)
+	    AND ($11::uuid IS NULL OR g.actor_ref = $11::uuid OR g.plot_ref IN (
+	      SELECT p.ref FROM pf_geo.plot p WHERE p.household_ref = ANY($12::text[]::uuid[])))
 	  ORDER BY g.id DESC LIMIT $10::int`,
 		q.All, units(q.Units), q.CoopOnly, q.Coop, nilIfZero(q.ActorRef), nilIfZero(q.TargetRef), nilIfZero(q.PlotRef), q.Purpose,
-		nilIfZero(q.Before), q.Limit)
+		nilIfZero(q.Before), q.Limit, nilIfZero(q.OwnActor), refStrs(q.OwnHouseholds))
 	if err != nil {
 		return nil, err
 	}

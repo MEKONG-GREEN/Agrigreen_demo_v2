@@ -424,6 +424,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cooperatives/{ref}/deactivation-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Phạm vi ảnh hưởng trước khi vô hiệu hóa HTX (HTX US-HTXSTATUS-01 AC-1) — số nông hộ, vụ chưa xong, nhật ký chờ duyệt
+         * @description Chỉ đọc, cùng vai và phạm vi với deactivate. Vụ chưa xong và nhật ký chờ duyệt đọc từ pf/cropcycle qua gốc lắp ráp; chưa nối → open_seasons, pending_logs = null và season_activity_available = false.
+         */
+        get: operations["partyCooperativeDeactivationPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cooperatives/{ref}/deactivate": {
         parameters: {
             query?: never;
@@ -4366,6 +4386,44 @@ export interface operations {
                 };
             };
             404: components["responses"]["Problem"];
+        };
+    };
+    partyCooperativeDeactivationPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phạm vi ảnh hưởng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        cooperative_ref: string;
+                        active: boolean;
+                        /** @description Nông hộ đang là thành viên */
+                        active_households: number;
+                        /** @description Tổ chức con đang hoạt động (phải vô hiệu hóa trước) */
+                        active_children: number;
+                        /** @description Vụ đang mở (chưa hoàn thành) */
+                        open_seasons: number | null;
+                        /** @description Nhật ký canh tác chờ duyệt */
+                        pending_logs: number | null;
+                        season_activity_available: boolean;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
         };
     };
     partyDeactivateCooperative: {

@@ -989,7 +989,7 @@ export interface paths {
         };
         /**
          * Log toạ độ GPS (HTX US-GPS-03) — chỉ đọc, mới nhất trước, theo phạm vi xã (quản lý HTX chỉ log gắn HTX mình; log không xác định được xã chỉ toàn quốc thấy)
-         * @description Ghi log chỉ qua port geo.GpsLog của module nghiệp vụ (cropcycle, extension). Log giữ ≥ 12 tháng, không bao giờ xóa.
+         * @description Ghi log chỉ qua port geo.GpsLog: consumer outbox pf.cropcycle.gps_log (mở vụ, nhật ký, khai sản lượng) và pf.extension.gps_log (yêu cầu hỗ trợ) ghi SAU khi nghiệp vụ commit, idempotent theo bản ghi. Log giữ ≥ 12 tháng, không bao giờ xóa. Vai farmer (nông dân) chỉ thấy log do chính mình ghi và log gắn với thửa của nông hộ liên kết với tài khoản; chưa nối liên kết tài khoản → 503 geo.dependency_unavailable.
          */
         get: operations["geoListGpsFixes"];
         put?: never;
@@ -4376,7 +4376,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "directive" | "alert" | "document" | "task_escalated" | "sync_conflict" | "org_deactivated" | "household_registered" | "household_membership_changed" | "task_assigned";
+            kind: "directive" | "alert" | "document" | "task_escalated" | "sync_conflict" | "org_deactivated" | "household_registered" | "household_membership_changed" | "task_assigned" | "farm_log_pending" | "farm_log_reviewed" | "season_opened";
             /** @enum {string} */
             severity: "urgent" | "normal";
             title: string;
@@ -7393,6 +7393,7 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
         };
     };
     geoUpdateGpsFix: {

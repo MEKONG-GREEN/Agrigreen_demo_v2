@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
+	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/domain"
@@ -35,7 +36,7 @@ var HandledEvents = []string{
 	extport.EventDirectiveIssued, extport.EventTaskEscalated, contentport.EventAlertPublished,
 	contentport.EventDocumentPublished, syncport.EventConflictOpened, syncport.EventDeviceRevoked,
 	partyport.EventOrgDeactivated, partyport.EventHouseholdRegistered, partyport.EventHouseholdMembershipChanged,
-	extport.EventTaskCreated,
+	extport.EventTaskCreated, ccport.EventFarmLogRecorded, ccport.EventFarmLogReviewed, ccport.EventSeasonOpened,
 }
 
 // HandleEvent là inbox.Handler cho các sự kiện nguồn: dựng thông báo, xếp lần gửi
@@ -85,7 +86,45 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 		if err != nil {
 			return err
 		}
-		return s.deliver(ctx, tx, env, []domain.Notification{domain.AlertTemplate(p, env.OccurredAt).ForAudience(a)})
+		tpl := domain.AlertTemplate(p, env.OccurredAt)
+		ns := []domain.Notification{tpl.ForAudience(a)}
+		farmers, err := s.alertFarmers(ctx, env, a)
+		if err != nil {
+			return err
+		}
+		for _, r := range farmers {
+			ns = append(ns, tpl.For(r))
+		}
+		return s.deliver(ctx, tx, env, ns)
+	case ccport.EventFarmLogRecorded:
+		var p ccport.FarmLogRecordedV1
+		if err := decode(env, &p); err != nil {
+			return err
+		}
+		// Chỉ nhật ký do nông dân tự ghi và đang là bản hiện hành: quản lý HTX ghi hộ /
+		// ghi hàng loạt đã biết nhật ký của mình, không làm tràn hộp thư.
+		if p.OnBehalf || !p.BecameCurrent || p.CooperativeRef == uuid.Nil {
+			return nil
+		}
+		return s.deliver(ctx, tx, env, []domain.Notification{domain.FarmLogPendingTemplate(p, env.OccurredAt).ForAudience(coopManagers(p.CooperativeRef))})
+	case ccport.EventFarmLogReviewed:
+		var p ccport.FarmLogReviewedV1
+		if err := decode(env, &p); err != nil {
+			return err
+		}
+		if p.AuthorRef == uuid.Nil || p.AuthorRef == p.ReviewerRef {
+			return nil
+		}
+		return s.deliver(ctx, tx, env, []domain.Notification{domain.FarmLogReviewedTemplate(p, env.OccurredAt).For(p.AuthorRef)})
+	case ccport.EventSeasonOpened:
+		var p ccport.SeasonOpenedV1
+		if err := decode(env, &p); err != nil {
+			return err
+		}
+		if p.OnBehalf || p.CooperativeRef == uuid.Nil {
+			return nil // quản lý HTX mở vụ hộ: không tự báo cho mình
+		}
+		return s.deliver(ctx, tx, env, []domain.Notification{domain.SeasonOpenedTemplate(p, env.OccurredAt).ForAudience(coopManagers(p.CooperativeRef))})
 	case contentport.EventDocumentPublished:
 		var p contentport.DocumentPublishedV1
 		if err := decode(env, &p); err != nil {
@@ -131,6 +170,34 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 		return s.deliver(ctx, tx, env, []domain.Notification{domain.OrgDeactivatedTemplate(p, env.OccurredAt).ForAudience(a)})
 	}
 	return nil // sự kiện không thuộc module: bỏ qua (binding thừa không làm hỏng hàng đợi)
+}
+
+// coopManagers là chủ đề "quản lý HTX của HTX coop" (khớp Principal.OrgRef + vai coop_manager).
+func coopManagers(coop uuid.UUID) domain.Audience {
+	c := coop
+	return domain.Audience{OrgRef: &c, Roles: []string{partyport.RoleCoopManager}}
+}
+
+// alertFarmers: tài khoản nông dân có thửa trong địa bàn cảnh báo (HTX US-NEWS-03) —
+// thông báo cá nhân vì phạm vi pf/party của nông dân rỗng (không khớp chủ đề theo
+// đơn vị). Quản lý HTX của HTX trong địa bàn đã khớp chủ đề theo xã (phạm vi = xã của HTX).
+// Chưa nối cổng → chỉ thông báo chủ đề như G1.
+func (s *Service) alertFarmers(ctx context.Context, env outbox.Envelope, a domain.Audience) ([]uuid.UUID, error) {
+	if s.Farmers == nil {
+		return nil, nil
+	}
+	var communes []string
+	if !a.National {
+		if len(a.Units) == 0 {
+			return nil, nil
+		}
+		communes = a.Units
+	}
+	refs, err := s.Farmers.FarmersInCommunes(ctx, env.TenantID, communes)
+	if err != nil {
+		return nil, err
+	}
+	return domain.DedupRefs(refs), nil
 }
 
 func decode(env outbox.Envelope, v any) error {

@@ -105,7 +105,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	g := geo.New(geoPool, clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits(), Orgs: pty.Orgs(), Households: pty.Households()})
+	g := geo.New(geoPool, clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits(), Orgs: pty.Orgs(), Households: pty.Households(),
+		CoopMarkers: pty.CoopMarkers()}) // GIS US-BND-02: điểm vị trí HTX của pf/party
 	pty.UsePlotStats(g.PlotStats()) // G-03: số thửa đã số hoá trong danh sách HTX
 
 	contentPool, err := pool(content.DBRole)
@@ -142,7 +143,10 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	cc := cropcycle.New(ccPool, clk, cropcycle.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Plots: g.Plots(), Params: md.Params(), Catalogs: md.Catalogs()})
+	cc := cropcycle.New(ccPool, clk, cropcycle.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Plots: g.Plots(), Params: md.Params(), Catalogs: md.Catalogs(),
+		GpsLog: g.GpsLog()}) // HTX US-GPS-03: log GPS qua consumer outbox pf.cropcycle.gps_log
+	pty.UseSeasonActivity(SeasonActivity{Stats: cc.Stats()}) // HTX US-HTXSTATUS-01 AC-1: vụ chưa xong / nhật ký chờ duyệt
+	kn.UseGpsLog(g.GpsLog())                                 // HTX US-GPS-03: log GPS yêu cầu hỗ trợ (pf.extension.gps_log)
 
 	syncPool, err := pool(syncmod.DBRole)
 	if err != nil {
@@ -182,8 +186,10 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if c := acc.StaffContacts(); c != nil {
 		kn.UseContacts(c) // US-DIR-02: số điện thoại cán bộ đọc từ Keycloak lúc bấm liên hệ
 	}
-	kn.UseFarmers(acc.FarmerHouseholds())                            // HTX US-SUPPORT-01: nông hộ của tài khoản nông dân
-	cc.UseFarmerHouseholds(farmerHouseholds{acc.FarmerHouseholds()}) // HTX US-SEASON-01: thửa của nông hộ mình
+	kn.UseFarmers(acc.FarmerHouseholds())                                                     // HTX US-SUPPORT-01: nông hộ của tài khoản nông dân
+	cc.UseFarmerHouseholds(farmerHouseholds{acc.FarmerHouseholds()})                          // HTX US-SEASON-01: thửa của nông hộ mình
+	g.UseFarmers(farmerHouseholds{acc.FarmerHouseholds()})                                    // HTX US-GPS-03: nông dân đọc log GPS của mình
+	nt.UseAreaFarmers(AreaFarmers{Plots: g.PlotHouseholds(), Accounts: acc.FarmerAccounts()}) // HTX US-NEWS-03
 
 	// pf/reports: API tạo việc xuất và cấp URL tải; worker dựng tệp (cmd/worker). Địa chỉ email tra qua pf/accounts (MailDirectory).
 	repPool, err := pool(reports.DBRole)
@@ -202,12 +208,15 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	}
 	ww := waterway.New(wwPool, clk, waterway.Deps{Params: md.Params(), Catalogs: md.Catalogs()})
 
-	// pf/simulation: API ghi kịch bản/yêu cầu; worker dựng ảnh chụp; optimizer (Python) tính và nộp qua RegisterInternal.
+	// pf/simulation: API ghi kịch bản/yêu cầu; worker dựng ảnh chụp qua SupplySource (pf/cropcycle
+	// + pf/party + pf/geo + pf/masterdata) và WaterwayRouter (pf/waterway); optimizer tính và nộp qua RegisterInternal.
 	simPool, err := pool(simulation.DBRole)
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	sim := simulation.New(simPool, clk, simulation.Deps{Params: simulation.MasterdataParams(md.Params())})
+	sim := simulation.New(simPool, clk, simulation.Deps{Params: simulation.MasterdataParams(md.Params()),
+		Supply: SupplySource{Seasons: cc.SupplyStats(), Coops: pty.CooperativeSites(), Centroids: g.CoopCentroids(), Catalogs: md.Catalogs()},
+		Router: WaterwayRouter{WW: ww.Router()}})
 
 	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
 		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc}, pools, nil
