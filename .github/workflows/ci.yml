@@ -138,8 +138,25 @@ jobs:
             apps/web-ops/test-results/
           retention-days: 7
 
+  agrigreen-mobile:
+    name: Lõi di động (packages/agrigreen_mobile)
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: packages/agrigreen_mobile }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { flutter-version: "3.47.5", channel: stable, cache: true }
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq libsqlite3-dev
+      - run: flutter pub get --enforce-lockfile
+      - run: dart format --output=none --set-exit-if-changed lib test
+      - run: flutter analyze --fatal-infos
+      - name: flutter test (gồm bộ vector phong bì chung với Go)
+        run: flutter test
+
   field-app:
     name: App hiện trường (Flutter)
+    needs: agrigreen-mobile
     runs-on: ubuntu-latest
     defaults:
       run: { working-directory: apps/field-app }
@@ -187,7 +204,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: "17", cache: gradle, cache-dependency-path: "apps/field-app/android/**/*.gradle*" }
+        with: { distribution: temurin, java-version: "17", cache: gradle, cache-dependency-path: "apps/*/android/**/*.gradle*" }
       - uses: subosito/flutter-action@v2
         with: { flutter-version: "3.47.5", channel: stable, cache: true }
       - run: flutter pub get --enforce-lockfile
