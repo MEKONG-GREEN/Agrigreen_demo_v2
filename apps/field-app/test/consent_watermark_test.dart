@@ -4,11 +4,11 @@ import 'dart:typed_data';
 
 import 'package:agrigreen_field/application/consent_service.dart';
 import 'package:agrigreen_field/application/task_service.dart';
-import 'package:agrigreen_field/data/crypto/envelope.dart';
-import 'package:agrigreen_field/data/photo/location_source.dart';
-import 'package:agrigreen_field/data/photo/photo_pipeline.dart';
-import 'package:agrigreen_field/data/sync/sync_api.dart';
-import 'package:agrigreen_field/domain/outbox_record.dart';
+import 'package:agrigreen_mobile/data/crypto/envelope.dart';
+import 'package:agrigreen_mobile/data/photo/location_source.dart';
+import 'package:agrigreen_mobile/data/photo/photo_pipeline.dart';
+import 'package:agrigreen_mobile/data/sync/sync_api.dart';
+import 'package:agrigreen_mobile/domain/outbox_record.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:pinenacl/x25519.dart' as nacl;

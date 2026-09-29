@@ -38,4 +38,4 @@ Metadata là JSON, nội dung là nhị phân:
 - khóa bí mật và công khai X25519 dạng hex;
 - plaintext, DEK, nonce, ciphertext, wrapped_dek.
 
-Kiểm thử phía Dart: `apps/field-app/test/envelope_vectors_test.dart`.
+Kiểm thử phía Dart: `packages/agrigreen_mobile/test/envelope_vectors_test.dart` (lõi di động dùng chung; vector Go `nacl/box` ở `packages/agrigreen_mobile/test/fixtures/go_nacl_vectors.json`).

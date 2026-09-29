@@ -1,6 +1,6 @@
-import '../core/ids.dart';
-import '../data/dial/dialer.dart';
-import '../data/sync/sync_api.dart';
+import 'package:agrigreen_mobile/core/ids.dart';
+import 'package:agrigreen_mobile/data/dial/dialer.dart';
+import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 
 /// Một dòng danh bạ trực (`GET /v1/extension/roster`, KN US-DIR-02).
 class RosterEntry {

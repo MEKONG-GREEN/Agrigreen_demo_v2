@@ -1,8 +1,8 @@
-import '../core/ids.dart';
-import '../data/outbox/outbox_repository.dart';
-import '../data/reference/reference_repository.dart';
-import '../domain/geo/boundary.dart';
-import '../domain/outbox_record.dart';
+import 'package:agrigreen_mobile/core/ids.dart';
+import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
+import 'package:agrigreen_mobile/data/reference/reference_repository.dart';
+import 'package:agrigreen_mobile/domain/geo/boundary.dart';
+import 'package:agrigreen_mobile/domain/outbox_record.dart';
 
 class OverlapHit {
   const OverlapHit(this.plotId, this.label, {required this.sameCooperative});

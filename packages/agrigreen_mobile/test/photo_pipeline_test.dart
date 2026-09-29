@@ -2,12 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:agrigreen_field/application/task_service.dart';
-import 'package:agrigreen_field/data/crypto/envelope.dart';
-import 'package:agrigreen_field/data/photo/location_source.dart';
-import 'package:agrigreen_field/data/photo/photo_pipeline.dart';
-import 'package:agrigreen_field/data/sync/sync_api.dart';
-import 'package:agrigreen_field/domain/outbox_record.dart';
+import 'package:agrigreen_mobile/data/crypto/envelope.dart';
+import 'package:agrigreen_mobile/data/photo/location_source.dart';
+import 'package:agrigreen_mobile/data/photo/photo_pipeline.dart';
+import 'package:agrigreen_mobile/data/sync/sync_api.dart';
+import 'package:agrigreen_mobile/domain/outbox_record.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pinenacl/x25519.dart' as nacl;
 
@@ -147,45 +146,5 @@ void main() {
     expect(up.fileRef, f.id);
     // Bản ghi evidence chỉ do biểu mẫu MRV tạo (payload_contract_test).
     expect(await h.outbox.list(entity: PushEntity.evidence), isEmpty);
-  });
-
-  group('nhiệm vụ hỗ trợ (US-TASK-02)', () {
-    test('chỉ đóng khi có kết quả; chuyển tiếp cần ghi chú; trạng thái cục bộ phủ lên', () async {
-      await h.refs.applyPage(
-        PullPage(
-          changes: [
-            PullChange(
-              entity: 'task',
-              id: 't1',
-              version: 1,
-              op: 'upsert',
-              data: {'title': 'Hỗ trợ phòng rầy nâu', 'status': 'assigned'},
-            ),
-          ],
-          nextCursor: 'c2',
-          hasMore: false,
-        ),
-      );
-      final svc = TaskService(outbox: h.outbox, refs: h.refs);
-      expect(await svc.openCount(), 1);
-      expect(
-        () => svc.update(taskId: 't1', status: TaskStatus.done),
-        throwsA(isA<TaskException>()),
-      );
-      expect(
-        () => svc.update(taskId: 't1', status: TaskStatus.escalated),
-        throwsA(isA<TaskException>()),
-      );
-      await svc.update(taskId: 't1', status: TaskStatus.accepted);
-      await svc.update(
-        taskId: 't1',
-        status: TaskStatus.done,
-        result: 'Đã hướng dẫn phun thuốc',
-      );
-      final t = (await svc.list()).single;
-      expect(t.status, TaskStatus.done);
-      expect(t.pendingLocal, isTrue);
-      expect(await svc.openCount(), 0);
-    });
   });
 }

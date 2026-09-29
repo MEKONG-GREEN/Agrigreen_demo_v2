@@ -1,9 +1,9 @@
 import 'package:agrigreen_field/application/directive_service.dart';
-import 'package:agrigreen_field/application/inbox_service.dart';
 import 'package:agrigreen_field/application/library_service.dart';
-import 'package:agrigreen_field/data/actions/action_queue.dart';
-import 'package:agrigreen_field/data/sync/sync_api.dart';
-import 'package:agrigreen_field/domain/deep_link.dart';
+import 'package:agrigreen_mobile/application/inbox_service.dart';
+import 'package:agrigreen_mobile/data/actions/action_queue.dart';
+import 'package:agrigreen_mobile/data/sync/sync_api.dart';
+import 'package:agrigreen_mobile/domain/deep_link.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/harness.dart';

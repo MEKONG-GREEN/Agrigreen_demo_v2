@@ -1,7 +1,7 @@
-import 'package:agrigreen_field/core/ids.dart';
-import 'package:agrigreen_field/data/outbox/outbox_repository.dart';
-import 'package:agrigreen_field/data/secure/secure_store.dart';
-import 'package:agrigreen_field/domain/outbox_record.dart';
+import 'package:agrigreen_mobile/core/ids.dart';
+import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
+import 'package:agrigreen_mobile/data/secure/secure_store.dart';
+import 'package:agrigreen_mobile/domain/outbox_record.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/harness.dart';

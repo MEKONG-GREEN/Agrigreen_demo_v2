@@ -1,4 +1,4 @@
-import 'package:agrigreen_field/data/auth/oidc_client.dart';
+import '../data/auth/oidc_client.dart';
 
 class FakeOidc implements OidcClient {
   int signIns = 0;

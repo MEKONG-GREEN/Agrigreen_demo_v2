@@ -1,5 +1,5 @@
-import '../data/actions/action_queue.dart';
-import '../data/reference/reference_repository.dart';
+import 'package:agrigreen_mobile/data/actions/action_queue.dart';
+import 'package:agrigreen_mobile/data/reference/reference_repository.dart';
 
 /// Tài liệu kỹ thuật đã tải về máy (entity `document`, pf/content).
 class LibraryDocument {

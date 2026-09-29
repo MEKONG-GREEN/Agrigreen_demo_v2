@@ -1,12 +1,12 @@
+import 'package:agrigreen_mobile/application/auth_flow.dart';
+import 'package:agrigreen_mobile/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../application/auth_flow.dart';
 import 'providers.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/pin_screen.dart';
-import 'theme.dart';
 
 class FieldApp extends StatelessWidget {
   const FieldApp({super.key});

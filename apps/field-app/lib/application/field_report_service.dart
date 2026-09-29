@@ -1,7 +1,8 @@
-import '../core/clock.dart';
-import '../data/outbox/outbox_repository.dart';
+import 'package:agrigreen_mobile/core/clock.dart';
+import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
+import 'package:agrigreen_mobile/domain/outbox_record.dart';
+
 import '../domain/field_report.dart';
-import '../domain/outbox_record.dart';
 
 export '../domain/field_report.dart';
 

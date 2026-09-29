@@ -8,31 +8,21 @@ environment:
   sdk: ^3.13.4
 
 # Mọi dependency phải có giấy phép MIT/BSD/Apache-2.0/ISC/MPL-2.0 — xem README.md.
+# Plugin của lõi (SQLCipher, secure storage, AppAuth, camera, GPS, Firebase,
+# thông báo cục bộ, url_launcher) đến qua agrigreen_mobile.
 dependencies:
   flutter:
     sdk: flutter
+  # Lõi di động dùng chung với apps/htx-app (docs/dev/g2-conventions.md §1).
+  agrigreen_mobile:
+    path: ../../packages/agrigreen_mobile
   flutter_riverpod: ^3.4.3
-  sqflite_sqlcipher: ^3.4.1
-  sqflite_common: ^2.5.13
-  flutter_secure_storage: ^11.2.0
-  uuid: ^4.6.0
-  cryptography: ^2.9.0
-  pinenacl: ^0.6.0
-  http: ^1.6.0
-  flutter_appauth: ^12.1.0
   flutter_map: ^8.3.2
   latlong2: ^0.10.1
-  geolocator: ^14.1.1
-  image_picker: ^1.2.3
   connectivity_plus: ^7.3.1
   path_provider: ^2.1.6
   path: ^1.9.1
-  crypto: ^3.0.7
-  firebase_core: ^4.15.0
   firebase_messaging: ^16.7.0
-  flutter_local_notifications: ^22.3.1
-  image: ^4.10.1
-  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -41,6 +31,10 @@ dev_dependencies:
   sqflite_common_ffi: ^2.4.3
   integration_test:
     sdk: flutter
+  # Chỉ kiểm thử import trực tiếp (bản chạy nhận qua agrigreen_mobile).
+  crypto: ^3.0.7
+  image: ^4.10.1
+  pinenacl: ^0.6.0
 
 flutter:
   uses-material-design: true

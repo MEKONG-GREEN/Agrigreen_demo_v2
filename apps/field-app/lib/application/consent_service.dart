@@ -1,10 +1,10 @@
-import '../core/clock.dart';
-import '../data/db/local_db.dart';
-import '../data/outbox/outbox_repository.dart';
-import '../domain/consent.dart';
-import '../domain/outbox_record.dart';
+import 'package:agrigreen_mobile/core/clock.dart';
+import 'package:agrigreen_mobile/data/db/local_db.dart';
+import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
+import 'package:agrigreen_mobile/domain/consent.dart';
+import 'package:agrigreen_mobile/domain/outbox_record.dart';
 
-export '../domain/consent.dart';
+export 'package:agrigreen_mobile/domain/consent.dart';
 
 /// Phiên bản văn bản đồng ý đang hiển thị trên máy. Đổi nội dung văn bản thì
 /// tăng phiên bản (máy chủ lưu `text_version` cùng bản ghi đồng ý).

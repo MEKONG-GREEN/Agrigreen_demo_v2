@@ -94,6 +94,7 @@ npm run dev:mock                  # giao diện với dữ liệu giả lập, k
 ```
 
 ```bash
+cd packages/agrigreen_mobile && flutter pub get && flutter analyze --fatal-infos && flutter test && cd ../..
 cd apps/field-app && flutter pub get && flutter analyze --fatal-infos && flutter test
 flutter test integration_test -d emulator-5554
 ```

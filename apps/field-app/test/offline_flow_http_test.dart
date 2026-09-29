@@ -1,15 +1,15 @@
 ﻿import 'dart:io';
 
 import 'package:agrigreen_field/application/app_services.dart';
-import 'package:agrigreen_field/application/push_coordinator.dart';
-import 'package:agrigreen_field/core/clock.dart';
-import 'package:agrigreen_field/core/config.dart';
-import 'package:agrigreen_field/core/ids.dart';
-import 'package:agrigreen_field/data/crypto/envelope.dart';
-import 'package:agrigreen_field/data/photo/location_source.dart';
-import 'package:agrigreen_field/data/push/push_messaging.dart';
-import 'package:agrigreen_field/data/secure/secure_store.dart';
-import 'package:agrigreen_field/data/sync/sync_api.dart';
+import 'package:agrigreen_mobile/application/push_coordinator.dart';
+import 'package:agrigreen_mobile/core/clock.dart';
+import 'package:agrigreen_mobile/core/config.dart';
+import 'package:agrigreen_mobile/core/ids.dart';
+import 'package:agrigreen_mobile/data/crypto/envelope.dart';
+import 'package:agrigreen_mobile/data/photo/location_source.dart';
+import 'package:agrigreen_mobile/data/push/push_messaging.dart';
+import 'package:agrigreen_mobile/data/secure/secure_store.dart';
+import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../integration_test/support/mock_api_server.dart';

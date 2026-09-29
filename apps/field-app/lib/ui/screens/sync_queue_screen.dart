@@ -1,13 +1,13 @@
+import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
+import 'package:agrigreen_mobile/domain/outbox_record.dart';
+import 'package:agrigreen_mobile/ui/theme.dart';
+import 'package:agrigreen_mobile/ui/widgets/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/field_report_service.dart';
-import 'field_report_screen.dart' show reportSummary;
-import '../../data/outbox/outbox_repository.dart';
-import '../../domain/outbox_record.dart';
 import '../providers.dart';
-import '../theme.dart';
-import '../widgets/common.dart';
+import 'field_report_screen.dart' show reportSummary;
 import 'plots_screen.dart' show confirmBoundary;
 
 final queueProvider = FutureProvider.autoDispose<List<OutboxRecord>>(

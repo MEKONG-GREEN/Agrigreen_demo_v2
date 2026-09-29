@@ -1,7 +1,7 @@
 import 'dart:math';
 
-import 'package:agrigreen_field/data/sync/sync_service.dart';
-import 'package:agrigreen_field/domain/outbox_record.dart';
+import 'package:agrigreen_mobile/data/sync/sync_service.dart';
+import 'package:agrigreen_mobile/domain/outbox_record.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/harness.dart';

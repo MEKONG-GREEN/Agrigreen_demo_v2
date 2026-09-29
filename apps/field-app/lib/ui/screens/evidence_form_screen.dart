@@ -1,17 +1,17 @@
+import 'package:agrigreen_mobile/data/catalog/catalog_cache.dart';
+import 'package:agrigreen_mobile/data/files/evidence_repository.dart';
+import 'package:agrigreen_mobile/data/photo/photo_pipeline.dart';
+import 'package:agrigreen_mobile/data/reference/reference_repository.dart';
+import 'package:agrigreen_mobile/domain/consent.dart';
+import 'package:agrigreen_mobile/domain/mrv.dart';
+import 'package:agrigreen_mobile/ui/theme.dart';
+import 'package:agrigreen_mobile/ui/widgets/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/evidence_service.dart';
-import '../../data/catalog/catalog_cache.dart';
-import '../../data/files/evidence_repository.dart';
-import '../../data/photo/photo_pipeline.dart';
-import '../../data/reference/reference_repository.dart';
-import '../../domain/consent.dart';
 import '../../domain/field_report.dart' show normalizeDecimal;
-import '../../domain/mrv.dart';
 import '../providers.dart';
-import '../theme.dart';
-import '../widgets/common.dart';
 import 'consent_screen.dart';
 import 'plots_screen.dart' show plotLabel;
 

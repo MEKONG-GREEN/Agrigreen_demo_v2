@@ -1,13 +1,13 @@
+import 'package:agrigreen_mobile/data/catalog/catalog_cache.dart';
+import 'package:agrigreen_mobile/data/reference/reference_repository.dart';
+import 'package:agrigreen_mobile/domain/outbox_record.dart';
+import 'package:agrigreen_mobile/ui/theme.dart';
+import 'package:agrigreen_mobile/ui/widgets/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/field_report_service.dart';
-import '../../data/catalog/catalog_cache.dart';
-import '../../data/reference/reference_repository.dart';
-import '../../domain/outbox_record.dart';
 import '../providers.dart';
-import '../theme.dart';
-import '../widgets/common.dart';
 
 /// Lựa chọn cho biểu mẫu: xã/HTX trong phạm vi (từ dữ liệu đã đồng bộ) và
 /// danh mục giống/vụ/sâu bệnh (đệm từ API masterdata).

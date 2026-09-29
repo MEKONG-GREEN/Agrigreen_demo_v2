@@ -1,18 +1,18 @@
 import 'dart:async';
 
+import 'package:agrigreen_mobile/application/auth_flow.dart';
+import 'package:agrigreen_mobile/application/push_coordinator.dart';
+import 'package:agrigreen_mobile/data/auth/oidc_client.dart';
+import 'package:agrigreen_mobile/data/auth/pin_service.dart';
+import 'package:agrigreen_mobile/data/auth/session_service.dart';
+import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
+import 'package:agrigreen_mobile/data/reference/reference_repository.dart';
+import 'package:agrigreen_mobile/data/sync/sync_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/app_services.dart';
-import '../application/auth_flow.dart';
-import '../application/push_coordinator.dart';
-import '../data/auth/oidc_client.dart';
-import '../data/auth/pin_service.dart';
-import '../data/auth/session_service.dart';
-import '../data/outbox/outbox_repository.dart';
-import '../data/reference/reference_repository.dart';
-import '../data/sync/sync_service.dart';
 
 /// Ghi đè trong `main.dart` (thiết bị) hoặc trong kiểm thử widget.
 final platformProvider = Provider<AppPlatform>(

@@ -144,7 +144,7 @@ func unhex(t *testing.T, s string) []byte {
 }
 
 // TestVectors mở bộ vector cố định; cùng tệp này được app Flutter kiểm
-// (apps/field-app/test/envelope_vectors_test.dart).
+// (packages/agrigreen_mobile/test/envelope_vectors_test.dart).
 func TestVectors(t *testing.T) {
 	if *update {
 		b, err := json.MarshalIndent(generate(t), "", "  ")

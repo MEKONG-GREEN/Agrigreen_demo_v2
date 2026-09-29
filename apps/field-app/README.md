@@ -8,25 +8,35 @@ App Flutter ngoại tuyến cho cán bộ khuyến nông xã, quản lý HTX và
 
 ## Kiến trúc
 
+Lõi dùng chung với `apps/htx-app` nằm ở package `packages/agrigreen_mobile` (path dependency, docs/dev/g2-conventions.md §1); app này chỉ giữ luồng và màn hình của khuyến nông.
+
 ```
-lib/
+packages/agrigreen_mobile/lib/
+├── agrigreen_mobile.dart  # thư viện gộp (export toàn bộ lõi); testing.dart: FakeServer, FakeOidc
 ├── core/          # Clock, UUIDv7, backoff, cấu hình (--dart-define)
-├── domain/        # thuần Dart: OutboxRecord, hình học ranh giới, toán tile XYZ, deep link, cổng đồng ý
+├── domain/        # thuần Dart: OutboxRecord, hình học ranh giới, toán tile XYZ, deep link, cổng đồng ý, MRV
 ├── data/          # hạ tầng
-│   ├── db/        # LocalDb + DbOpener (SQLCipher trên máy, FFI trong test), lược đồ, trigger chỉ ghi thêm
+│   ├── db/        # LocalDb + DbOpener (SQLCipher trên máy, FFI trong test), lược đồ + migration, trigger chỉ ghi thêm
 │   ├── secure/    # SecureStore (flutter_secure_storage / Android Keystore)
 │   ├── outbox/    # hàng đợi chiều lên: seq bền, idem_key, lô, kết quả từng bản ghi, purge 48 giờ
 │   ├── reference/ # dữ liệu chiều xuống: upsert/tombstone theo version, cursor, khóa công khai hộ
 │   ├── sync/      # HttpSyncApi (hợp đồng, X-Device-Id), SyncService (tải tệp → push → phát lại lệnh → pull → purge)
 │   ├── actions/   # ActionQueue: lệnh API idempotent xếp hàng khi ngoại tuyến (đã đọc, xác nhận chỉ đạo, lưu tài liệu)
+│   ├── catalog/   # CatalogCache: danh mục masterdata + danh mục trường MRV tải qua API
 │   ├── push/      # PushMessaging (FCM chỉ dữ liệu / bản giả), LocalNotifier, PushTokenRegistrar
 │   ├── map/       # TileStore: gói bản đồ ngoại tuyến kiểu MBTiles trong SQLCipher
 │   ├── crypto/    # phong bì AES-256-GCM + crypto_box_seal
-│   ├── files/     # ciphertext ảnh trên đĩa + bảng evidence_file
+│   ├── files/     # ciphertext ảnh trên đĩa + bảng evidence_file / evidence_form
 │   ├── photo/     # camera, GPS, đóng dấu (watermark) trong bộ nhớ, pipeline chụp → mã hóa
+│   ├── dial/      # Dialer (tel:/sms:)
 │   └── auth/      # OIDC PKCE, phiên 72 giờ, PIN, đăng ký thiết bị, xóa từ xa
-├── application/   # use case: báo cáo, ranh giới, nhiệm vụ (SLA), hộp thư, chỉ đạo, thư viện, đồng ý,
-│                  # gói bản đồ, PushCoordinator, luồng đăng nhập, AppServices
+├── application/   # AuthFlow, InboxService, PushCoordinator, TilePackService
+└── ui/            # chủ đề, widget chung (BigTile, StatusChip, …), OfflineFirstTileProvider
+
+apps/field-app/lib/
+├── domain/        # báo cáo hiện trường
+├── application/   # use case KN: báo cáo, ranh giới, nhiệm vụ (SLA), chỉ đạo, thư viện, đồng ý, minh chứng MRV,
+│                  # danh bạ trực, AppServices (ghép toàn bộ)
 └── ui/            # Riverpod (MIT) + màn hình
 ```
 
@@ -130,24 +140,26 @@ flutter run --dart-define=AG_API_BASE=https://api.dev.agrigreen.vn `
 flutter build apk --release --dart-define=...
 ```
 
-Kiểm thử chính (`test/`):
+Kiểm thử chính (`test/` của app; tệp đánh dấu *lõi* nằm ở `packages/agrigreen_mobile/test/`):
 
 | Tệp | Nội dung |
 |---|---|
-| `outbox_test.dart` | UUIDv7/idem_key/seq; crash + mở lại; rollback giữa giao dịch; seq không tái dùng sau purge; trigger chỉ ghi thêm; bản ghi bù; khóa GPS/thời gian |
-| `sync_push_test.dart` | lô 100; accepted/duplicate/conflict/rejected; purge 48 giờ; bản bù cho bản bị từ chối; mất phản hồi + crash → gửi lại y nguyên; lùi lũy thừa bền qua khởi động lại; 422; 25 vòng lỗi ngẫu nhiên vẫn **đúng một lần**; gọi chồng nhau |
-| `sync_pull_test.dart` | cursor nhiều trang; version/tombstone; loại PII nông hộ; khóa công khai hex/base64; rollback cả trang |
-| `auth_test.dart` | phiên 72 giờ; làm mới gia hạn; phát hiện lùi đồng hồ; PIN 6 số; khóa 15 phút sau 5 lần sai; bộ đếm bền; hủy PIN sau 10 lần; luồng đăng nhập |
-| `wipe_test.dart` | 403 `sync.device_revoked` → xóa CSDL, ciphertext, toàn bộ kho bí mật; 401 không xóa |
-| `envelope_test.dart`, `envelope_vectors_test.dart` | round-trip, sửa tag, sai khóa; vector Go `nacl/box.SealAnonymous` (`test/fixtures/go_nacl_vectors.json`); bộ chung `internal/shared/envelope/testdata/vectors.json` (bỏ qua nếu chưa có) |
+| *lõi* `outbox_test.dart` | UUIDv7/idem_key/seq; crash + mở lại; rollback giữa giao dịch; seq không tái dùng sau purge; trigger chỉ ghi thêm; bản ghi bù; khóa GPS/thời gian |
+| *lõi* `sync_push_test.dart` | lô 100; accepted/duplicate/conflict/rejected; purge 48 giờ; bản bù cho bản bị từ chối; mất phản hồi + crash → gửi lại y nguyên; lùi lũy thừa bền qua khởi động lại; 422; 25 vòng lỗi ngẫu nhiên vẫn **đúng một lần**; gọi chồng nhau |
+| *lõi* `sync_pull_test.dart` | cursor nhiều trang; version/tombstone; loại PII nông hộ; khóa công khai hex/base64; rollback cả trang |
+| *lõi* `auth_test.dart` | phiên 72 giờ; làm mới gia hạn; phát hiện lùi đồng hồ; PIN 6 số; khóa 15 phút sau 5 lần sai; bộ đếm bền; hủy PIN sau 10 lần; luồng đăng nhập |
+| *lõi* `wipe_test.dart` | 403 `sync.device_revoked` → xóa CSDL, ciphertext, toàn bộ kho bí mật; 401 không xóa |
+| *lõi* `envelope_test.dart`, `envelope_vectors_test.dart` | round-trip, sửa tag, sai khóa; vector Go `nacl/box.SealAnonymous` (`packages/agrigreen_mobile/test/fixtures/go_nacl_vectors.json`); bộ chung `internal/shared/envelope/testdata/vectors.json` (bỏ qua nếu chưa có) |
 | `boundary_test.dart` | ≥4 điểm, thẳng hàng, tự cắt, lõm, diện tích ha (sai lệch <1 %), chồng lấn, GeoJSON, chặn/xác nhận chồng lấn |
-| `photo_pipeline_test.dart` | không có bản rõ trên đĩa; tải tệp mất phản hồi + crash → một bản ghi evidence; nhiệm vụ |
-| `http_sync_api_test.dart` | hình dạng request/response theo hợp đồng |
-| `http_contract_g1_test.dart` | `X-Device-Id`; push-token; lệnh xếp hàng; `file_ref`; `reset` |
+| *lõi* `photo_pipeline_test.dart` | không có bản rõ trên đĩa; tải tệp mất phản hồi + crash → một bản ghi evidence |
+| `task_service_test.dart` | nhiệm vụ hỗ trợ: đóng cần kết quả, chuyển tiếp cần ghi chú |
+| *lõi* `big_tile_small_screen_test.dart` | BigTile không tràn trên màn hình nhỏ |
+| *lõi* `http_sync_api_test.dart` | hình dạng request/response theo hợp đồng |
+| *lõi* `http_contract_g1_test.dart` | `X-Device-Id`; push-token; lệnh xếp hàng; `file_ref`; `reset` |
 | `inbox_library_directive_test.dart` | hộp thư: chưa đọc, đã đọc ngoại tuyến → phát lại đúng một lần qua crash, đọc hết, 404 bỏ lệnh, bỏ bản > 30 ngày; deep link; "Đã lưu" (lưu/bỏ lưu, đã gỡ, tombstone); xác nhận chỉ đạo |
-| `push_test.dart` | `sync_now`; thông báo cục bộ **không lộ nội dung** khi khóa/nền/chưa về; token khi mở khóa/đổi; không có Firebase; `PushTokenRegistrar` (sau đăng ký, mỗi lần khởi động, lỗi 503 không chặn) |
+| *lõi* `push_test.dart` | `sync_now`; thông báo cục bộ **không lộ nội dung** khi khóa/nền/chưa về; token khi mở khóa/đổi; không có Firebase; `PushTokenRegistrar` (sau đăng ký, mỗi lần khởi động, lỗi 503 không chặn) |
 | `consent_watermark_test.dart` | chặn chụp khi chưa đồng ý; payload `consent`; rút lại; sổ đồng ý sống qua purge; watermark có trong ảnh đã giải mã; không JPEG bản rõ trên đĩa; `shredFile`; SLA |
-| `tiles_pull_test.dart` | toán tile; giới hạn khung/zoom/diện tích/số tile/dung lượng; tải, đọc lại, tải tiếp, lỗi tile, dừng; pubkey theo lượt; `reset`; `cursor_invalid` |
+| *lõi* `tiles_pull_test.dart` | toán tile; giới hạn khung/zoom/diện tích/số tile/dung lượng; tải, đọc lại, tải tiếp, lỗi tile, dừng; pubkey theo lượt; `reset`; `cursor_invalid` |
 | `payload_contract_test.dart` | `field_report`/`evidence` so với fixture JSON rút từ quy tắc Go (`test/fixtures/contract/`); lỗi theo trường như máy chủ; khóa bản ghi bù; biểu mẫu MRV: tải danh mục, đồng ý, 2 ảnh, mất mạng giữa hai ảnh → evidence chỉ tạo khi đủ ảnh |
 | `offline_flow_http_test.dart` | kịch bản tích hợp qua **HTTP thật** tới máy chủ giả `dart:io` (cùng kịch bản với emulator) |
 | `integration_test/app_flow_test.dart` | **emulator** (CI `field-app-emulator`): đăng nhập chế độ kiểm thử → PIN → đăng ký thiết bị + token → pull → vẽ thửa khi mất mạng → có mạng + `sync_now` → push accepted → đồng ý + ảnh mã hóa tải lên (mở bằng khóa hộ, có watermark) → thông báo đẩy → đánh dấu đã đọc → chuông |

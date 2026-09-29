@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:agrigreen_field/data/outbox/outbox_repository.dart';
-import 'package:agrigreen_field/data/sync/sync_api.dart';
-import 'package:agrigreen_field/domain/outbox_record.dart';
+import '../data/outbox/outbox_repository.dart';
+import '../data/sync/sync_api.dart';
+import '../domain/outbox_record.dart';
 
 /// Máy chủ giả mô phỏng hành vi hợp đồng: Idempotency-Key theo lô (gọi lặp
 /// cùng thân → phát lại phản hồi; khác thân → 422), chống trùng theo idem_key,

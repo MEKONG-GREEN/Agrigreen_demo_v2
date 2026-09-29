@@ -1,7 +1,7 @@
-import 'package:agrigreen_field/application/inbox_service.dart';
-import 'package:agrigreen_field/application/push_coordinator.dart';
-import 'package:agrigreen_field/data/push/push_messaging.dart';
-import 'package:agrigreen_field/data/push/push_token_registrar.dart';
+import 'package:agrigreen_mobile/application/inbox_service.dart';
+import 'package:agrigreen_mobile/application/push_coordinator.dart';
+import 'package:agrigreen_mobile/data/push/push_messaging.dart';
+import 'package:agrigreen_mobile/data/push/push_token_registrar.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/harness.dart';

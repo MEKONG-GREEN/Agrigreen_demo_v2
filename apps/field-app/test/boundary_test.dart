@@ -1,14 +1,14 @@
 import 'dart:math';
 
 import 'package:agrigreen_field/application/boundary_service.dart';
-import 'package:agrigreen_field/core/ids.dart';
-import 'package:agrigreen_field/data/outbox/outbox_repository.dart';
-import 'package:agrigreen_field/data/sync/sync_api.dart';
-import 'package:agrigreen_field/domain/geo/boundary.dart';
-import 'package:agrigreen_field/domain/outbox_record.dart';
+import 'package:agrigreen_mobile/core/ids.dart';
+import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
+import 'package:agrigreen_mobile/data/sync/sync_api.dart';
+import 'package:agrigreen_mobile/domain/geo/boundary.dart';
+import 'package:agrigreen_mobile/domain/outbox_record.dart';
+import 'package:agrigreen_mobile/testing.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'support/fake_server.dart';
 import 'support/harness.dart';
 
 /// Hình vuông cạnh [sideM] mét, góc tây nam tại (lat, lon).

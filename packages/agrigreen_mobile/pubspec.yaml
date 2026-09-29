@@ -1,0 +1,39 @@
+name: agrigreen_mobile
+description: "AgriGreen — lõi di động dùng chung (OIDC + PIN, SQLCipher, đồng bộ, phong bì mã hóa, ảnh, đẩy, bản đồ ngoại tuyến, giao diện chung) cho apps/field-app và apps/htx-app."
+publish_to: 'none'
+
+version: 0.1.0
+
+environment:
+  sdk: ^3.13.4
+
+# Mọi dependency phải có giấy phép MIT/BSD/Apache-2.0/ISC/MPL-2.0 — xem
+# apps/field-app/README.md. Ràng buộc phiên bản giữ y như apps/field-app để hai
+# pubspec.lock phân giải cùng phiên bản.
+dependencies:
+  flutter:
+    sdk: flutter
+  sqflite_sqlcipher: ^3.4.1
+  sqflite_common: ^2.5.13
+  flutter_secure_storage: ^11.2.0
+  uuid: ^4.6.0
+  cryptography: ^2.9.0
+  pinenacl: ^0.6.0
+  http: ^1.6.0
+  flutter_appauth: ^12.1.0
+  flutter_map: ^8.3.2
+  geolocator: ^14.1.1
+  image_picker: ^1.2.3
+  path: ^1.9.1
+  crypto: ^3.0.7
+  firebase_core: ^4.15.0
+  firebase_messaging: ^16.7.0
+  flutter_local_notifications: ^22.3.1
+  image: ^4.10.1
+  url_launcher: ^6.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  sqflite_common_ffi: ^2.4.3

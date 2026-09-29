@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:agrigreen_field/data/reference/reference_repository.dart';
-import 'package:agrigreen_field/data/sync/sync_api.dart';
+import 'package:agrigreen_mobile/data/reference/reference_repository.dart';
+import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/harness.dart';

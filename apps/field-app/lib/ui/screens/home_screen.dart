@@ -1,11 +1,11 @@
+import 'package:agrigreen_mobile/data/sync/sync_service.dart';
+import 'package:agrigreen_mobile/ui/theme.dart';
+import 'package:agrigreen_mobile/ui/widgets/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/sync/sync_service.dart';
 import '../navigation.dart';
 import '../providers.dart';
-import '../theme.dart';
-import '../widgets/common.dart';
 import 'directives_screen.dart';
 import 'evidence_form_screen.dart';
 import 'field_report_screen.dart';

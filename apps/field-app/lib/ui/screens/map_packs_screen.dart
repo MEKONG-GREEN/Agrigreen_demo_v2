@@ -1,12 +1,12 @@
+import 'package:agrigreen_mobile/application/tile_pack_service.dart';
+import 'package:agrigreen_mobile/data/map/tile_store.dart';
+import 'package:agrigreen_mobile/domain/geo/tiles.dart';
+import 'package:agrigreen_mobile/ui/theme.dart';
+import 'package:agrigreen_mobile/ui/widgets/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../application/tile_pack_service.dart';
-import '../../data/map/tile_store.dart';
-import '../../domain/geo/tiles.dart';
 import '../providers.dart';
-import '../theme.dart';
-import '../widgets/common.dart';
 
 final tilePacksProvider = FutureProvider.autoDispose<List<TilePack>>(
   (ref) => servicesOf(ref).tiles.store.packs(),

@@ -8,5 +8,5 @@ useDefault = true
 description = "Vector kiểm thử phong bì mã hóa — khóa công bố, không dùng cho dữ liệu thật"
 paths = [
   '''^internal/shared/envelope/testdata/vectors\.json$''',
-  '''^apps/field-app/test/fixtures/go_nacl_vectors\.json$''',
+  '''^packages/agrigreen_mobile/test/fixtures/go_nacl_vectors\.json$''',
 ]

@@ -1,8 +1,8 @@
+import 'package:agrigreen_mobile/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers.dart';
-import '../theme.dart';
 
 /// Đăng nhập trực tuyến OIDC (Keycloak, PKCE). Lần đầu bắt buộc có mạng.
 class LoginScreen extends ConsumerWidget {

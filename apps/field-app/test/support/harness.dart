@@ -1,22 +1,22 @@
 import 'dart:io';
 import 'dart:math';
 
-import 'package:agrigreen_field/core/backoff.dart';
-import 'package:agrigreen_field/core/clock.dart';
-import 'package:agrigreen_field/core/ids.dart';
-import 'package:agrigreen_field/data/actions/action_queue.dart';
-import 'package:agrigreen_field/data/auth/wipe_service.dart';
-import 'package:agrigreen_field/data/db/local_db.dart';
-import 'package:agrigreen_field/data/files/blob_store.dart';
-import 'package:agrigreen_field/data/files/evidence_repository.dart';
-import 'package:agrigreen_field/data/outbox/outbox_repository.dart';
-import 'package:agrigreen_field/data/reference/reference_repository.dart';
-import 'package:agrigreen_field/data/secure/secure_store.dart';
-import 'package:agrigreen_field/data/sync/sync_api.dart';
-import 'package:agrigreen_field/data/sync/sync_service.dart';
+import 'package:agrigreen_mobile/core/backoff.dart';
+import 'package:agrigreen_mobile/core/clock.dart';
+import 'package:agrigreen_mobile/core/ids.dart';
+import 'package:agrigreen_mobile/data/actions/action_queue.dart';
+import 'package:agrigreen_mobile/data/auth/wipe_service.dart';
+import 'package:agrigreen_mobile/data/db/local_db.dart';
+import 'package:agrigreen_mobile/data/files/blob_store.dart';
+import 'package:agrigreen_mobile/data/files/evidence_repository.dart';
+import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
+import 'package:agrigreen_mobile/data/reference/reference_repository.dart';
+import 'package:agrigreen_mobile/data/secure/secure_store.dart';
+import 'package:agrigreen_mobile/data/sync/sync_api.dart';
+import 'package:agrigreen_mobile/data/sync/sync_service.dart';
+import 'package:agrigreen_mobile/testing.dart';
 import 'package:path/path.dart' as p;
 
-import 'fake_server.dart';
 import 'ffi_opener.dart';
 
 const testDeviceId = '01920000-0000-7000-8000-00000000d001';

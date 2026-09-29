@@ -1,6 +1,6 @@
-import '../core/clock.dart';
-import '../data/actions/action_queue.dart';
-import '../data/reference/reference_repository.dart';
+import 'package:agrigreen_mobile/core/clock.dart';
+import 'package:agrigreen_mobile/data/actions/action_queue.dart';
+import 'package:agrigreen_mobile/data/reference/reference_repository.dart';
 
 /// Chỉ đạo khẩn/thường tới cán bộ (entity `directive`, pf/extension, KN
 /// US-TASK-03).

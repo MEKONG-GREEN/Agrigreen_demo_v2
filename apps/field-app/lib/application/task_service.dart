@@ -1,6 +1,6 @@
-import '../data/outbox/outbox_repository.dart';
-import '../data/reference/reference_repository.dart';
-import '../domain/outbox_record.dart';
+import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
+import 'package:agrigreen_mobile/data/reference/reference_repository.dart';
+import 'package:agrigreen_mobile/domain/outbox_record.dart';
 
 enum TaskStatus {
   assigned('assigned', 'Mới giao'),

@@ -1,40 +1,40 @@
 import 'dart:io';
 
+import 'package:agrigreen_mobile/application/inbox_service.dart';
+import 'package:agrigreen_mobile/application/push_coordinator.dart';
+import 'package:agrigreen_mobile/application/tile_pack_service.dart';
+import 'package:agrigreen_mobile/core/clock.dart';
+import 'package:agrigreen_mobile/core/config.dart';
+import 'package:agrigreen_mobile/core/ids.dart';
+import 'package:agrigreen_mobile/data/actions/action_queue.dart';
+import 'package:agrigreen_mobile/data/auth/device_service.dart';
+import 'package:agrigreen_mobile/data/auth/wipe_service.dart';
+import 'package:agrigreen_mobile/data/catalog/catalog_cache.dart';
+import 'package:agrigreen_mobile/data/crypto/envelope.dart';
+import 'package:agrigreen_mobile/data/db/local_db.dart';
+import 'package:agrigreen_mobile/data/dial/dialer.dart';
+import 'package:agrigreen_mobile/data/files/blob_store.dart';
+import 'package:agrigreen_mobile/data/files/evidence_repository.dart';
+import 'package:agrigreen_mobile/data/map/tile_store.dart';
+import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
+import 'package:agrigreen_mobile/data/photo/location_source.dart';
+import 'package:agrigreen_mobile/data/photo/photo_pipeline.dart';
+import 'package:agrigreen_mobile/data/push/push_messaging.dart';
+import 'package:agrigreen_mobile/data/push/push_token_registrar.dart';
+import 'package:agrigreen_mobile/data/reference/reference_repository.dart';
+import 'package:agrigreen_mobile/data/secure/secure_store.dart';
+import 'package:agrigreen_mobile/data/sync/sync_api.dart';
+import 'package:agrigreen_mobile/data/sync/sync_service.dart';
 import 'package:path/path.dart' as p;
 
-import '../core/clock.dart';
-import '../core/config.dart';
-import '../core/ids.dart';
-import '../data/actions/action_queue.dart';
-import '../data/auth/device_service.dart';
-import '../data/auth/wipe_service.dart';
-import '../data/catalog/catalog_cache.dart';
-import '../data/crypto/envelope.dart';
-import '../data/db/local_db.dart';
-import '../data/dial/dialer.dart';
-import '../data/files/blob_store.dart';
-import '../data/files/evidence_repository.dart';
-import '../data/map/tile_store.dart';
-import '../data/outbox/outbox_repository.dart';
-import '../data/photo/location_source.dart';
-import '../data/photo/photo_pipeline.dart';
-import '../data/push/push_messaging.dart';
-import '../data/push/push_token_registrar.dart';
-import '../data/reference/reference_repository.dart';
-import '../data/secure/secure_store.dart';
-import '../data/sync/sync_api.dart';
-import '../data/sync/sync_service.dart';
 import 'boundary_service.dart';
 import 'consent_service.dart';
 import 'directive_service.dart';
 import 'evidence_service.dart';
 import 'field_report_service.dart';
-import 'inbox_service.dart';
 import 'library_service.dart';
-import 'push_coordinator.dart';
 import 'roster_service.dart';
 import 'task_service.dart';
-import 'tile_pack_service.dart';
 
 /// Phụ thuộc nền tảng, thay được trong kiểm thử.
 class AppPlatform {

@@ -1,11 +1,11 @@
-import '../core/clock.dart';
-import '../core/ids.dart';
-import '../data/catalog/catalog_cache.dart';
-import '../data/files/evidence_repository.dart';
-import '../data/photo/location_source.dart';
-import '../data/photo/photo_pipeline.dart';
-import '../domain/consent.dart';
-import '../domain/mrv.dart';
+import 'package:agrigreen_mobile/core/clock.dart';
+import 'package:agrigreen_mobile/core/ids.dart';
+import 'package:agrigreen_mobile/data/catalog/catalog_cache.dart';
+import 'package:agrigreen_mobile/data/files/evidence_repository.dart';
+import 'package:agrigreen_mobile/data/photo/location_source.dart';
+import 'package:agrigreen_mobile/data/photo/photo_pipeline.dart';
+import 'package:agrigreen_mobile/domain/consent.dart';
+import 'package:agrigreen_mobile/domain/mrv.dart';
 
 class EvidenceFormException implements Exception {
   EvidenceFormException(this.message, [this.errors = const []]);

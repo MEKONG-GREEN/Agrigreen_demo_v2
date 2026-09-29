@@ -1,11 +1,11 @@
+import 'package:agrigreen_mobile/application/inbox_service.dart';
+import 'package:agrigreen_mobile/ui/theme.dart';
+import 'package:agrigreen_mobile/ui/widgets/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../application/inbox_service.dart';
 import '../navigation.dart';
 import '../providers.dart';
-import '../theme.dart';
-import '../widgets/common.dart';
 
 final inboxProvider = FutureProvider.autoDispose<List<InboxItem>>((ref) {
   ref.watch(syncStatusStreamProvider);

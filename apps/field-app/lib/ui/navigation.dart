@@ -1,6 +1,6 @@
+import 'package:agrigreen_mobile/domain/deep_link.dart';
 import 'package:flutter/material.dart';
 
-import '../domain/deep_link.dart';
 import 'screens/directives_screen.dart';
 import 'screens/library_screen.dart';
 import 'screens/notifications_screen.dart';

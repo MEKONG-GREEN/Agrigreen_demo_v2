@@ -1,11 +1,10 @@
-import 'package:agrigreen_field/application/auth_flow.dart';
-import 'package:agrigreen_field/core/clock.dart';
-import 'package:agrigreen_field/data/auth/pin_service.dart';
-import 'package:agrigreen_field/data/auth/session_service.dart';
-import 'package:agrigreen_field/data/secure/secure_store.dart';
+import 'package:agrigreen_mobile/application/auth_flow.dart';
+import 'package:agrigreen_mobile/core/clock.dart';
+import 'package:agrigreen_mobile/data/auth/pin_service.dart';
+import 'package:agrigreen_mobile/data/auth/session_service.dart';
+import 'package:agrigreen_mobile/data/secure/secure_store.dart';
+import 'package:agrigreen_mobile/testing.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'support/fake_oidc.dart';
 
 void main() {
   late MemorySecureStore store;

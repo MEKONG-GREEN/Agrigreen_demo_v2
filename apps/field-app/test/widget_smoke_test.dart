@@ -1,19 +1,18 @@
 import 'dart:io';
 
 import 'package:agrigreen_field/application/app_services.dart';
-import 'package:agrigreen_field/core/clock.dart';
-import 'package:agrigreen_field/core/config.dart';
-import 'package:agrigreen_field/core/ids.dart';
-import 'package:agrigreen_field/data/photo/location_source.dart';
-import 'package:agrigreen_field/data/photo/photo_pipeline.dart';
-import 'package:agrigreen_field/data/secure/secure_store.dart';
 import 'package:agrigreen_field/ui/app.dart';
 import 'package:agrigreen_field/ui/providers.dart';
+import 'package:agrigreen_mobile/core/clock.dart';
+import 'package:agrigreen_mobile/core/config.dart';
+import 'package:agrigreen_mobile/core/ids.dart';
+import 'package:agrigreen_mobile/data/photo/location_source.dart';
+import 'package:agrigreen_mobile/data/photo/photo_pipeline.dart';
+import 'package:agrigreen_mobile/data/secure/secure_store.dart';
+import 'package:agrigreen_mobile/testing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'support/fake_oidc.dart';
-import 'support/fake_server.dart';
 import 'support/ffi_opener.dart';
 
 class _NoCamera implements CameraSource {

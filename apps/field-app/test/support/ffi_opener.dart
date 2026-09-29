@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:agrigreen_field/data/db/local_db.dart';
+import 'package:agrigreen_mobile/data/db/local_db.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 /// Mở CSDL bằng sqlite3 FFI (không mã hóa) cho kiểm thử Dart VM. Ghi lại khóa

@@ -1,9 +1,9 @@
+import 'package:agrigreen_mobile/application/auth_flow.dart';
+import 'package:agrigreen_mobile/ui/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../application/auth_flow.dart';
 import '../providers.dart';
-import '../theme.dart';
 
 /// Nhập PIN 6 số (mở khóa) hoặc đặt PIN (lần đầu, sau đăng nhập trực tuyến).
 class PinScreen extends ConsumerStatefulWidget {

@@ -1,7 +1,7 @@
 import 'package:agrigreen_field/application/roster_service.dart';
-import 'package:agrigreen_field/core/ids.dart';
-import 'package:agrigreen_field/data/dial/dialer.dart';
-import 'package:agrigreen_field/data/sync/sync_api.dart';
+import 'package:agrigreen_mobile/core/ids.dart';
+import 'package:agrigreen_mobile/data/dial/dialer.dart';
+import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// API giả: GET theo path → JSON hoặc lỗi; ghi lại lệnh POST.

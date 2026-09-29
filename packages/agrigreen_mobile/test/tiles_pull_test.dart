@@ -1,15 +1,15 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:agrigreen_field/application/tile_pack_service.dart';
-import 'package:agrigreen_field/data/map/tile_store.dart';
-import 'package:agrigreen_field/data/sync/sync_api.dart';
-import 'package:agrigreen_field/domain/geo/tiles.dart';
+import 'package:agrigreen_mobile/application/tile_pack_service.dart';
+import 'package:agrigreen_mobile/data/map/tile_store.dart';
+import 'package:agrigreen_mobile/data/sync/sync_api.dart';
+import 'package:agrigreen_mobile/domain/geo/tiles.dart';
+import 'package:agrigreen_mobile/testing.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
-import 'support/fake_server.dart';
 import 'support/harness.dart';
 
 final _png = Uint8List.fromList([

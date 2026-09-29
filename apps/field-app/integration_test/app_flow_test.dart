@@ -1,18 +1,18 @@
 import 'dart:io';
 
 import 'package:agrigreen_field/application/app_services.dart';
-import 'package:agrigreen_field/core/clock.dart';
-import 'package:agrigreen_field/core/config.dart';
-import 'package:agrigreen_field/core/ids.dart';
-import 'package:agrigreen_field/data/crypto/envelope.dart';
-import 'package:agrigreen_field/data/db/sqlcipher_opener.dart';
-import 'package:agrigreen_field/data/photo/location_source.dart';
-import 'package:agrigreen_field/data/push/push_messaging.dart';
-import 'package:agrigreen_field/data/secure/secure_store.dart';
-import 'package:agrigreen_field/data/sync/sync_api.dart';
 import 'package:agrigreen_field/ui/app.dart';
 import 'package:agrigreen_field/ui/providers.dart';
 import 'package:agrigreen_field/ui/screens/home_screen.dart';
+import 'package:agrigreen_mobile/core/clock.dart';
+import 'package:agrigreen_mobile/core/config.dart';
+import 'package:agrigreen_mobile/core/ids.dart';
+import 'package:agrigreen_mobile/data/crypto/envelope.dart';
+import 'package:agrigreen_mobile/data/db/sqlcipher_opener.dart';
+import 'package:agrigreen_mobile/data/photo/location_source.dart';
+import 'package:agrigreen_mobile/data/push/push_messaging.dart';
+import 'package:agrigreen_mobile/data/secure/secure_store.dart';
+import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
