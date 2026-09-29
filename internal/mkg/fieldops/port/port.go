@@ -7,9 +7,13 @@
 package port
 
 import (
+	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/mass"
 )
 
 // DBRole là vai của module ở cụm mkg (schema mkg_fieldops).
@@ -104,3 +108,66 @@ const (
 	StageGather   = "gather"    // tập kết
 	StageBoatLoad = "boat_load" // xếp ghe / xe
 )
+
+// ---------------------------------------------------------------------------
+// G3 (fieldops) — thêm vào, không đổi phần đã đóng băng ở G3-0.
+// ---------------------------------------------------------------------------
+
+// HTX là hồ sơ tối thiểu của một HTX đọc từ nền tảng (không có dữ liệu cá nhân).
+type HTX struct {
+	Ref         uuid.UUID
+	CommuneCode string // admin_unit_code của HTX (mã xã 5 chữ số) — rỗng nếu nền tảng không có
+	Active      bool
+}
+
+// Plot là thông tin tối thiểu của một thửa đọc từ nền tảng.
+type Plot struct {
+	Ref            uuid.UUID
+	CooperativeRef *uuid.UUID // nil = thửa nháp chưa gán HTX
+	CommuneCode    string
+	Status         string // draft | active | retired
+}
+
+// PlatformDirectory là nguồn thửa/HTX của nền tảng. Hiện thực thật gọi
+// Application API công khai bằng tài khoản dịch vụ tenant MKG (OIDC client
+// credentials) — không bao giờ kết nối DB hay import vùng nền tảng (R-03).
+//
+// Câu hỏi RB-2 (g3-conventions §5): thửa/HTX thuộc tenant chương trình, token
+// tenant MKG sẽ thấy rỗng (404) cho tới khi có cấp quyền chia sẻ tường minh.
+// Vì vậy mọi hiện thực phải phân biệt ErrDirectoryNotFound với ErrDirectoryUnavailable.
+type PlatformDirectory interface {
+	Cooperative(ctx context.Context, htxRef uuid.UUID) (HTX, error)
+	Plot(ctx context.Context, plotRef uuid.UUID) (Plot, error)
+}
+
+// Lỗi của PlatformDirectory.
+var (
+	ErrDirectoryNotFound    = errors.New("fieldops: nền tảng không có (hoặc không chia sẻ) thửa/HTX này")
+	ErrDirectoryUnavailable = errors.New("fieldops: không gọi được Application API của nền tảng")
+)
+
+// WeighedMass cho fieldops đọc khối lượng CÂN của một lô gom (mkg/measurement,
+// điểm cân đầu tiên của lô: HUB_IN, hoặc CUSTOMER_IN với tuyến DIRECT). Dùng để
+// học kg/cuộn theo HTX (yield_kg_per_roll) — con số này KHÔNG BAO GIỜ qua van.
+// ok = false khi lô chưa được cân.
+type WeighedMass interface {
+	WeighedKg(ctx context.Context, tenantID, lotRef uuid.UUID) (kg mass.Kg, weighedAt time.Time, ok bool, err error)
+}
+
+// LotRolls là số cuộn hiệu lực của một lô gom (= lệnh gom) ở công đoạn cuối có dữ liệu.
+type LotRolls struct {
+	LotRef  uuid.UUID
+	HTXRef  uuid.UUID
+	Stage   string // công đoạn cuối có dữ liệu (boat_load nếu đã xếp ghe/xe)
+	Rolls   int
+	PerPlot map[uuid.UUID]int
+}
+
+// RollTotals cho module mkg khác (measurement: cuộn ↔ khối lượng RB-6; costing G4)
+// đọc số cuộn hiệu lực của lô gom (đã tính bản ghi bù). ErrLotNotFound khi không có lệnh gom.
+type RollTotals interface {
+	LotRolls(ctx context.Context, tenantID, lotRef uuid.UUID) (LotRolls, error)
+}
+
+// ErrLotNotFound: không có lệnh gom (lô gom) với mã này trong tenant.
+var ErrLotNotFound = errors.New("fieldops: không có lô gom")

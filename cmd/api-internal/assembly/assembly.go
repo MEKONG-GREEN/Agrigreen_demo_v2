@@ -11,12 +11,15 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/shopspring/decimal"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub"
 	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement"
@@ -34,10 +37,11 @@ type PoolOpener func(ctx context.Context, role string) (*pgxpool.Pool, error)
 type Modules struct {
 	Hub         *hub.Module
 	Measurement *measurement.Module
+	Fieldops    *fieldops.Module
 }
 
 // List trả module theo thứ tự gắn route.
-func (m Modules) List() []httpx.Module { return []httpx.Module{m.Hub, m.Measurement} }
+func (m Modules) List() []httpx.Module { return []httpx.Module{m.Hub, m.Measurement, m.Fieldops} }
 
 // OpsRole là vai vận hành của api-internal ở cụm mkg (tương đương platform_api ở
 // cụm pf): chỉ bảng vận hành shared.idempotency_key qua ag_shared_user, không có
@@ -67,6 +71,15 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules,
 	pools = append(pools, measPool)
 	// Rolls: chưa có hiện thực fieldops (đợt fieldops G3) → app.NoRolls (pending_rolls).
 	mods.Measurement = measurement.New(measPool, clk, measurement.Deps{Origins: mods.Hub.Lots()})
+	foPool, err := open(ctx, fieldops.DBRole)
+	if err != nil {
+		return mods, ops, pools, err
+	}
+	pools = append(pools, foPool)
+	fo := FieldopsOptionsFromEnv(clk)
+	// kg/cuộn học từ khối lượng cân HUB_IN (CUSTOMER_IN với tuyến DIRECT) của mkg/measurement.
+	fo.Weighed = fieldops.WeighedFromMeasurement(mods.Measurement.LotMass())
+	mods.Fieldops = fieldops.New(foPool, clk, fo)
 	return mods, ops, pools, nil
 }
 
@@ -83,6 +96,34 @@ func Jobs(mods Modules, tenantPool *pgxpool.Pool, selected string, log *slog.Log
 
 // JobNames liệt kê tên job hợp lệ của api-internal.
 func JobNames() string { return hubport.JobDailyCapacity }
+
+// FieldopsOptionsFromEnv đọc cấu hình mkg/fieldops:
+//
+//	AG_PLATFORM_API_URL, AG_PLATFORM_TOKEN_URL, AG_MKG_SA_CLIENT_ID, AG_MKG_SA_CLIENT_SECRET
+//	    tài khoản dịch vụ tenant MKG gọi Application API công khai (OIDC client credentials).
+//	    Thiếu → nguồn thửa/HTX đóng (lập lệnh gom trả 503 fieldops.directory_unavailable).
+//	AG_FIELDOPS_KG_PER_ROLL   kg/cuộn cấu hình (bậc 3 của chuỗi dự phòng; tạm, chờ khách)
+//	AG_FIELDOPS_CURSOR_KEY    khóa HMAC con trỏ pull của app hiện trường (thiếu → ngẫu nhiên theo tiến trình)
+//
+// WeighedMass (mkg/measurement) nối trong Build.
+func FieldopsOptionsFromEnv(clk clock.Clock) fieldops.Options {
+	var o fieldops.Options
+	if base := os.Getenv("AG_PLATFORM_API_URL"); base != "" {
+		o.Directory = fieldops.NewPlatformDirectory(fieldops.PlatformConfig{
+			BaseURL: base, TokenURL: os.Getenv("AG_PLATFORM_TOKEN_URL"),
+			ClientID: os.Getenv("AG_MKG_SA_CLIENT_ID"), ClientSecret: os.Getenv("AG_MKG_SA_CLIENT_SECRET"),
+		}, clk)
+	}
+	if s := os.Getenv("AG_FIELDOPS_KG_PER_ROLL"); s != "" {
+		if d, err := decimal.NewFromString(s); err == nil && d.Sign() > 0 {
+			o.KgPerRoll = &d
+		}
+	}
+	if k := os.Getenv("AG_FIELDOPS_CURSOR_KEY"); k != "" {
+		o.CursorKey = []byte(k)
+	}
+	return o
+}
 
 // Deps là phụ thuộc của router.
 type Deps struct {
