@@ -1,0 +1,17 @@
+# KN US-DASH-01 thẻ 2: số HTX có báo cáo gieo sạ trong kỳ.
+key: kn.cooperatives_reported
+version: 1
+title: Số HTX có báo cáo gieo sạ (kỳ tháng)
+description: >
+  Số cooperative_ref khác nhau trong các phiên bản báo cáo gieo sạ mới nhất của kỳ
+  tháng chứa ngày D (recorded_at < Cutoff(D)).
+unit: count
+grain: day
+aggregation: count
+source_module: pf/extension
+source: pf_extension.field_report (sổ)
+rule_version: kn.dash.v1
+effective_from: "2026-01-01"
+proposed_by: pf-metrics (G3-A5)
+approved_by: tich-hop-g3 (tạm, chờ khách)
+viewer_roles: [kn_national_admin, kn_province_admin, kn_officer]

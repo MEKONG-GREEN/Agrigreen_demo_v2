@@ -1,0 +1,17 @@
+# CGH FN-11 thẻ "HTX thiếu máy" theo vụ.
+key: cgh.coops_shortage
+version: 1
+title: Số HTX thiếu máy (theo vụ)
+description: >
+  Lần cân đối mới nhất của vụ có recorded_at < Cutoff(D); số HTX có mức đáp ứng
+  tổng thể Thiếu (trong phạm vi).
+unit: count
+grain: season
+aggregation: last
+source_module: pf/mechanization
+source: pf_mechanization.balance_run, balance_result (sổ)
+rule_version: cgh.balance.v1
+effective_from: "2026-01-01"
+proposed_by: pf-metrics (G3-A5)
+approved_by: tich-hop-g3 (tạm, chờ khách)
+viewer_roles: [cgh_viewer, cgh_admin]

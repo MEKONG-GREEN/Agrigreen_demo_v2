@@ -20,6 +20,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -117,3 +118,7 @@ func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job
 		},
 	}}
 }
+
+// MetricsSource cho pf/metrics (qua gốc lắp ráp): 4 KPI KN US-DASH-01 như hệ biết
+// lúc hết ngày D (sổ + recorded_at < Cutoff).
+func (m *Module) MetricsSource() metricsport.Source { return app.MetricsSource{Svc: m.svc} }

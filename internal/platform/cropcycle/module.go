@@ -15,6 +15,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -81,3 +82,7 @@ func (m *Module) SyncSource() syncport.Source { return app.SyncSource{Svc: m.svc
 
 // SyncSink là chiều lên entity season_open, farm_log, farm_log_batch, harvest cho pf/sync.
 func (m *Module) SyncSink() syncport.Sink { return app.SyncSink{Svc: m.svc} }
+
+// MetricsSource cho pf/metrics (qua gốc lắp ráp): diện tích vụ, năng suất theo vụ như
+// hệ biết lúc hết ngày D.
+func (m *Module) MetricsSource() metricsport.Source { return app.MetricsSource{Svc: m.svc} }

@@ -1,0 +1,17 @@
+# App HTX: diện tích gieo trồng theo vụ (nguồn của CGH FN-07 và mô phỏng).
+key: cc.season_area_ha
+version: 1
+title: Diện tích vụ (theo vụ)
+description: >
+  Tổng area_ha của sự việc mới nhất (theo seq, recorded_at < Cutoff(D)) của mỗi vụ
+  thửa thuộc vụ Scope.Dimension, trừ vụ đã hủy (cancelled).
+unit: ha
+grain: season
+aggregation: sum
+source_module: pf/cropcycle
+source: pf_cropcycle.season_event (sổ)
+rule_version: cc.season.v1
+effective_from: "2026-01-01"
+proposed_by: pf-metrics (G3-A5)
+approved_by: tich-hop-g3 (tạm, chờ khách)
+viewer_roles: [coop_manager, kn_national_admin, kn_province_admin, cgh_viewer]

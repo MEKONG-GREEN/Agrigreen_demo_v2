@@ -1,0 +1,18 @@
+# GIS / KN FN-05: số thửa đã số hoá (có ranh giới) và chưa ngừng dùng lúc hết ngày D.
+key: geo.plots_digitised
+version: 1
+title: Số thửa đã số hoá
+description: >
+  Số thửa có ít nhất một phiên bản ranh giới hiện hành (became_current) ghi nhận
+  trước Cutoff(D) và sự việc thuộc tính mới nhất trước Cutoff(D) không phải
+  retired. Địa bàn = xã của sự việc thuộc tính mới nhất.
+unit: count
+grain: day
+aggregation: count
+source_module: pf/geo
+source: pf_geo.plot_event, plot_boundary (sổ)
+rule_version: geo.plot.v1
+effective_from: "2026-01-01"
+proposed_by: pf-metrics (G3-A5)
+approved_by: tich-hop-g3 (tạm, chờ khách)
+viewer_roles: [geo_admin, plot_viewer, plot_editor, kn_national_admin, kn_province_admin]

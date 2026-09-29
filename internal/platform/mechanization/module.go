@@ -17,6 +17,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
+	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -52,3 +53,7 @@ func (m *Module) AreaFeed() port.AreaFeed { return m.svc }
 // AreaSyncHandler là inbox.Handler của consumer port.AreaSyncConsumer: nhận
 // pf.cropcycle.coop_season_area.changed và áp theo QT-03 trong giao dịch của inbox (CGH FN-07).
 func (m *Module) AreaSyncHandler() inbox.Handler { return m.svc.HandleCoopSeasonAreaChanged }
+
+// MetricsSource cho pf/metrics (qua gốc lắp ráp): mức đủ máy theo vụ từ kết quả
+// cân đối đã lưu, như hệ biết lúc hết ngày D (CGH FN-10/11).
+func (m *Module) MetricsSource() metricsport.Source { return app.MetricsSource{Svc: m.svc} }

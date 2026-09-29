@@ -13,6 +13,11 @@
 //	extension_escalation  mỗi 15 phút: leo thang nhiệm vụ khuyến nông quá SLA lên TTKN tỉnh (KN US-TASK-02)
 //	reports_schedules     mỗi 15 phút: lịch gửi báo cáo định kỳ — mỗi mốc tạo đúng một việc xuất (KN US-DASH-03)
 //	notify_email_digest   mỗi giờ: email tóm tắt chỉ đạo khẩn tới hộp thư công vụ (pf/notify, ADR-0015)
+//	metrics_snapshot      00:45 hằng ngày (sau anchor): ghi sổ chỉ số của hôm qua + ảnh chụp lớp GIS (pf/metrics, G3)
+//
+// Lệnh một lần (không chạy consumer/job): -metrics-backfill=YYYY-MM-DD:YYYY-MM-DD ghi sổ chỉ
+// số + ảnh chụp lớp cho từng ngày đã kết thúc (-metrics-tenant chọn một tenant, mặc định mọi
+// tenant có sự kiện; -metrics-keys chọn chỉ số). Dòng không đổi được giữ; khác → bản ghi bù.
 //
 // Consumer pf/notify (vai notify_app): pf.notify.directive, pf.notify.content,
 // pf.notify.task, pf.notify.sync, pf.notify.party (dựng thông báo) và pf.notify.push
@@ -76,6 +81,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics"
+	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
@@ -126,7 +133,17 @@ func main() {
 		defJobs = "all"
 	}
 	jobs := flag.String("jobs", defJobs, "job vận hành: all, none hoặc anchor,idempotency")
+	backfill := flag.String("metrics-backfill", "", "ghi sổ chỉ số + ảnh chụp lớp cho khoảng YYYY-MM-DD:YYYY-MM-DD rồi thoát")
+	bfTenant := flag.String("metrics-tenant", "", "(với -metrics-backfill) chỉ một tenant")
+	bfKeys := flag.String("metrics-keys", "", "(với -metrics-backfill) danh sách chỉ số, phân tách dấu phẩy")
 	flag.Parse()
+	if *backfill != "" {
+		if err := runMetricsBackfill(log, *backfill, *bfTenant, *bfKeys); err != nil {
+			log.Error("backfill chỉ số lỗi", "event", "metrics.backfill", "outcome", "error", "error", err.Error())
+			os.Exit(1)
+		}
+		return
+	}
 	if err := run(log, *mods, *jobs); err != nil && !errors.Is(err, context.Canceled) {
 		log.Error("dừng do lỗi", "event", "startup", "outcome", "error", "error", err.Error())
 		os.Exit(1)
@@ -392,10 +409,27 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		rep := reports.New(repPool, clk, reports.Deps{Params: md.Params(), Log: log})
 		js = append(js, rep.Jobs(reports.ScheduleTenants(out.pools[migrations.PF]), log)...)
 	}
+	if selected(jobs, metricsport.JobMetricsSnapshot) {
+		// Chỉ số có lịch sử + ảnh chụp lớp GIS: dựng module pf qua assembly.Build (mỗi nguồn một vai DB,
+		// R-05); tìm tenant bằng pool ag_outbox_publisher (neo chuỗi của ngày, dự phòng outbox).
+		mods, mpools, err := buildPlatform(ctx, direct)
+		prevClose := closeFn
+		closeFn = func() {
+			for _, p := range mpools {
+				p.Close()
+			}
+			prevClose()
+		}
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		js = append(js, mods.Metrics.Jobs(metrics.JobTenants(out.pools[migrations.PF]), log)...)
+	}
 	if len(js) == 0 {
 		closeFn()
 		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + extension.JobEscalation + ", " +
-			notifyport.JobEmailDigest + ", " + reports.JobSchedules + ")")
+			notifyport.JobEmailDigest + ", " + reports.JobSchedules + ", " + metricsport.JobMetricsSnapshot + ")")
 	}
 	out.s = &schedule.Scheduler{Clock: clk, Log: log, Jobs: js}
 	return out, closeFn, nil

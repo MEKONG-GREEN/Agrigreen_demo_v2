@@ -1,0 +1,17 @@
+# KN US-DASH-01 thẻ 4: tỷ lệ xác nhận đã đọc chỉ đạo ban hành trong kỳ.
+key: kn.directive_ack_rate_pct
+version: 1
+title: Tỷ lệ xác nhận đọc chỉ đạo (kỳ tháng)
+description: >
+  100 × số lượt xác nhận (recorded_at < Cutoff(D)) ÷ số lượt nhận của chỉ đạo ban
+  hành trong kỳ tháng chứa D (chỉ đạo recorded_at < Cutoff(D)). Không có lượt nhận → 0.
+unit: "%"
+grain: day
+aggregation: avg
+source_module: pf/extension
+source: pf_extension.directive, directive_target, directive_ack
+rule_version: kn.dash.v1
+effective_from: "2026-01-01"
+proposed_by: pf-metrics (G3-A5)
+approved_by: tich-hop-g3 (tạm, chờ khách)
+viewer_roles: [kn_national_admin, kn_province_admin, kn_officer]

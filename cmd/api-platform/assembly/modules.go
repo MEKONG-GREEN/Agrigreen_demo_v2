@@ -15,6 +15,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics"
+	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
@@ -62,11 +64,12 @@ type Modules struct {
 	Waterway      *waterway.Module
 	Simulation    *simulation.Module
 	CropCycle     *cropcycle.Module
+	Metrics       *metrics.Module
 }
 
 // List trả module theo thứ tự gắn route.
 func (m Modules) List() []httpx.Module {
-	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.Waterway, m.Simulation, m.CropCycle}
+	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.Waterway, m.Simulation, m.CropCycle, m.Metrics}
 }
 
 // Build là gốc lắp ráp DUY NHẤT: mở pool theo vai của từng module (R-05) và nối
@@ -219,8 +222,19 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		Supply: SupplySource{Seasons: cc.SupplyStats(), Coops: pty.CooperativeSites(), Centroids: g.CoopCentroids(), Catalogs: md.Catalogs()},
 		Router: WaterwayRouter{WW: ww.Router()}})
 
+	// pf/metrics (G3): chỉ số có lịch sử qua port.Source của module chủ dữ liệu (mỗi nguồn đọc
+	// bằng pool vai của module đó, R-05); nhật ký lớp GIS + phát lại, hình học as-of qua pf/geo.
+	metPool, err := pool(metrics.DBRole)
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	met := metrics.New(metPool, clk, metrics.Deps{Scope: pty.ScopeResolver(), Geometry: g.LayerGeometry(),
+		Sources: map[string]metricsport.Source{
+			"pf/extension": kn.MetricsSource(), "pf/mechanization": mech.MetricsSource(), "pf/cropcycle": cc.MetricsSource(), "pf/geo": g.MetricsSource(),
+		}})
+
 	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
-		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc}, pools, nil
+		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Metrics: met}, pools, nil
 }
 
 // farmerHouseholds chuyển port pf/accounts (liên kết tài khoản nông dân ↔ nông hộ)

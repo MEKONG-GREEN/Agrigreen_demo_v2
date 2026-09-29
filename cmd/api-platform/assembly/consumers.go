@@ -9,6 +9,8 @@ import (
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics"
+	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation"
 	simport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
@@ -27,7 +29,8 @@ type Consumer struct {
 //   - pf.mechanization.area_sync: diện tích vụ App HTX → CGH (CGH FN-07, QT-03);
 //   - pf.geo.hub_valve: van công bố MKG hub_facility / hub_capacity → mô hình đọc hub;
 //   - pf.cropcycle.gps_log, pf.extension.gps_log: log GPS sau commit (HTX US-GPS-03);
-//   - pf.simulation.snapshot: ảnh chụp đầu vào qua SupplySource + WaterwayRouter.
+//   - pf.simulation.snapshot: ảnh chụp đầu vào qua SupplySource + WaterwayRouter;
+//   - pf.metrics.layer_log (G3): nhật ký thay đổi lớp GIS từ sự kiện geo/cropcycle/mechanization/waterway (GIS US-EVL-01).
 var Consumers = []Consumer{
 	{Name: mechport.AreaSyncConsumer, Role: mechanization.DBRole, Events: []string{ccport.EventCoopSeasonAreaChanged},
 		Handler: func(m Modules) inbox.Handler { return m.Mechanization.AreaSyncHandler() }},
@@ -39,4 +42,6 @@ var Consumers = []Consumer{
 		Handler: func(m Modules) inbox.Handler { return m.Extension.GpsLogHandler() }},
 	{Name: simport.SnapshotConsumer, Role: simulation.DBRole, Events: []string{simport.EventRunSubmitted},
 		Handler: func(m Modules) inbox.Handler { return m.Simulation.SnapshotHandler() }},
+	{Name: metricsport.LayerLogConsumer, Role: metrics.DBRole, Events: metrics.LayerEvents,
+		Handler: func(m Modules) inbox.Handler { return m.Metrics.LayerLogHandler() }},
 }
