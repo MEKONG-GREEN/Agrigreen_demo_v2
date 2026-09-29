@@ -48,6 +48,8 @@
       { "name": "mrv_exporter", "description": "Yêu cầu xuất và tải gói bằng chứng MRV" },
       { "name": "device_admin", "description": "[MFA] Thu hồi thiết bị hiện trường (pf/sync, Admin API)" },
       { "name": "sync_conflict_resolver", "description": "[MFA] Xem và đóng xung đột đồng bộ (pf/sync, Admin API, C-8)" },
+      { "name": "waterway_editor", "description": "Vẽ/sửa đoạn sông/kênh, công trình vượt sông và yêu cầu dựng mạng đường thủy (pf/waterway, GIS US-WATER-02/03)" },
+      { "name": "waterway_publisher", "description": "Phát hành phiên bản mạng đường thủy — không phát hành phiên bản do chính mình dựng (pf/waterway, R-56)" },
       { "name": "vault_registrar", "description": "Kho định danh: tạo, tra, xem đầy đủ hồ sơ hộ/người (có mục đích, R-42)" },
       { "name": "vault_display", "description": "Kho định danh: chỉ nhãn hiển thị tối thiểu đã che" },
       { "name": "vault_evidence_viewer", "description": "Kho định danh: mở DEK để xem ảnh minh chứng (có mục đích và đồng ý)" },

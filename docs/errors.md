@@ -235,3 +235,24 @@ Tài khoản cán bộ quản lý trong Keycloak qua Admin REST (KN US-ADM-01..0
 | 503 | `accounts.dependency_unavailable` | pf/accounts: chưa cấu hình `AG_KC_*`, Keycloak không phản hồi hoặc từ chối tài khoản dịch vụ, chưa nối pf/party |
 
 Nhập hàng loạt: lý do theo dòng dùng nhãn "Thiếu Email", "Sai định dạng Email", "Sai định dạng vai trò", "SĐT đã tồn tại", "Tên đăng nhập hoặc Email đã tồn tại", "Trùng với dòng N trong tệp", "Tổ chức ngoài phạm vi phụ trách", "Vai trò vượt quyền cấp của bạn". Thao tác loạt trả `code` của từng tài khoản trong `items[]`.
+
+### pf/waterway
+
+Mạng đường thủy có phiên bản (mục 16; GIS FN-09, US-WATER-01/02/03). Vẽ/sửa, dựng, phát hành ở Admin API (MFA); tra lớp và định tuyến ở Application API.
+
+| HTTP | code | Ý nghĩa |
+|---|---|---|
+| 422 | `validation_failed` | pf/waterway: thiếu tên tuyến hoặc phân loại → "Vui lòng nhập đầy đủ Tên tuyến và Phân loại."; chiều rộng, độ sâu, tải trọng tối đa (hoặc tĩnh không công trình) ≤ 0 hay sai định dạng số → "Chiều rộng, độ sâu và tải trọng tối đa phải là số lớn hơn 0." (US-WATER-02/03 AC-2); hình học không phải LineString ≥ 2 đỉnh WGS84; bản sửa thiếu `reason` (5–500 ký tự) hoặc `expected_revision`. `length_m` do hệ thống tính, giá trị client gửi bị bỏ qua |
+| 404 | `waterway.segment_not_found` | pf/waterway: không có đoạn với `segment_ref` trong tenant |
+| 404 | `waterway.structure_not_found` | pf/waterway: không có công trình với `structure_ref` trong tenant |
+| 409 | `waterway.revision_conflict` | pf/waterway: `expected_revision` không phải bản hiện hành (đã có người sửa) — tải lại rồi sửa |
+| 422 | `waterway.segment_retired` | pf/waterway: gắn công trình đang dùng vào đoạn đã ngừng dùng |
+| 422 | `waterway.structure_off_segment` | pf/waterway: công trình cách tuyến quá `waterway.structure_max_offset_m` (mặc định 500 m) |
+| 404 | `waterway.build_not_found` | pf/waterway: không có job dựng với id này trong tenant |
+| 404 | `waterway.network_version_not_found` | pf/waterway: không có phiên bản với số này; định tuyến/lớp ghim `version` chưa từng phát hành; `GET /v1/waterway/networks/current` khi chưa phát hành phiên bản nào |
+| 409 | `waterway.version_not_publishable` | pf/waterway: phát hành phiên bản không ở trạng thái `built` (đã phát hành hoặc đã bị thay) |
+| 403 | `self_approval_forbidden` | pf/waterway: người phát hành là người đã yêu cầu dựng phiên bản (R-56) |
+| 422 | `waterway.params_invalid` | pf/waterway: tham số dựng từ pf/masterdata không nhất quán (cần snap ≤ nối tự động ≤ báo cáo; lớp phương tiện thiếu kích thước). Job dựng gặp lỗi này chuyển `failed` với `error_code` tương ứng |
+| 503 | `waterway.dependency_unavailable` | pf/waterway: chưa nối CSDL hoặc không đọc được tham số/danh mục pf/masterdata |
+
+Định tuyến không tìm được đường thủy (chưa phát hành mạng, điểm ngoài bán kính tiếp cận, không liên thông hoặc không đủ tải trọng) **không** là lỗi: trả `200` với `found = false`, `source = haversine` (Haversine × `waterway.haversine_factor`) và `reason`.

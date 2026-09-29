@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.waterway.network_build.requested/v1",
+  "title": "pf.waterway.network_build.requested — payload",
+  "description": "Yêu cầu dựng một phiên bản mạng đường thủy đã ghi vào pf_waterway.build_job (mẫu mục 12, R-52). Worker nạp tham số (ngưỡng snap/nối/báo cáo, biên an toàn, lớp phương tiện) đã chốt trên job và dựng từ tập đoạn ĐÃ XÁC NHẬN tại requested_at — kết quả tất định. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.waterway.network_build.requested",
+  "x-schema-version": 1,
+  "x-producer": "pf/waterway",
+  "type": "object",
+  "required": ["build_id", "requested_by", "requested_at"],
+  "properties": {
+    "build_id":     { "type": "string", "format": "uuid" },
+    "requested_by": { "type": "string", "format": "uuid", "description": "actor_ref người yêu cầu dựng (= built_by của phiên bản)" },
+    "requested_at": { "type": "string", "format": "date-time", "description": "Mốc ảnh chụp sổ đoạn/công trình (as_of)" }
+  }
+}

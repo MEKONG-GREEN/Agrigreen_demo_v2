@@ -1653,6 +1653,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/waterway/segments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tuyến sông/kênh của phiên bản mạng đã phát hành, đánh dấu tuyến phù hợp tải trọng sà lan — GIS US-WATER-01
+         * @description Mọi người dùng đã xác thực của tenant. Tuyến nháp không bao giờ xuất hiện. `passable` = tải trọng lưu thông suy ra
+         *     (rộng/sâu/công trình, có biên an toàn) ≥ `min_load_tons`; tuyến thiếu số liệu không được coi là đi được.
+         *     AC-2: `passable_count = 0` khi có `min_load_tons` → `message` "Không tìm thấy tuyến…". Chưa phát hành → `version_no = null`, `items` rỗng.
+         */
+        get: operations["listWaterwayLayer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/waterway/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Đường thủy ngắn nhất trong số các tuyến ĐI ĐƯỢC với tải trọng yêu cầu (pgr_dijkstra trên phiên bản mạng)
+         * @description Trả hình học đường đi, km (gồm chặng tiếp cận), nhãn nguồn tính (routed | digitised | haversine — Simulation FN-04 BR-04),
+         *     phiên bản mạng đã dùng và ràng buộc bất lợi nhất trên đường. Không có đường thủy (chưa phát hành, ngoài bán kính tiếp cận,
+         *     không liên thông, không đủ tải trọng) → `found = false`, khoảng cách Haversine × hệ số #10 kèm `reason`.
+         */
+        get: operations["routeWaterway"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/waterway/networks/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiên bản mạng đang có hiệu lực (để ghim vào kịch bản) */
+        get: operations["getCurrentWaterwayNetwork"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3217,6 +3278,72 @@ export interface components {
             error_code?: string | null;
             /** Format: date-time */
             completed_at?: string | null;
+        };
+        WaterwayLine: {
+            /** @enum {string} */
+            type: "LineString";
+            coordinates: number[][];
+        };
+        WaterwayLayerSegment: {
+            /** Format: uuid */
+            segment_ref: string;
+            revision: number;
+            name: string;
+            /** @enum {string} */
+            waterway_class: "kenh_chinh" | "noi_dong" | "muong" | "song";
+            data_source: string;
+            length_m: string;
+            width_m: string | null;
+            depth_m: string | null;
+            declared_max_load_tons: string | null;
+            /** @description Tải trọng lưu thông bất lợi nhất trên đoạn; null = chưa kết luận (thiếu số liệu) */
+            max_load_tons: string | null;
+            certain: boolean;
+            /** @description width | depth | clearance | declared | none | unknown:<thông số> */
+            limiting: string;
+            /** Format: uuid */
+            limiting_structure_ref: string | null;
+            passable: boolean;
+            geometry: components["schemas"]["WaterwayLine"];
+        };
+        WaterwayLimiting: {
+            max_load_tons: string | null;
+            certain: boolean;
+            reason: string;
+            /** Format: uuid */
+            segment_ref: string;
+            /** Format: uuid */
+            structure_ref: string | null;
+        };
+        WaterwayRoute: {
+            version_no: number | null;
+            found: boolean;
+            distance_km: string;
+            access_km: string;
+            /** @enum {string} */
+            source: "routed" | "digitised" | "haversine";
+            source_label: string;
+            geometry: components["schemas"]["WaterwayLine"] | null;
+            segment_refs: string[];
+            limiting: components["schemas"]["WaterwayLimiting"] | null;
+            reason: string | null;
+        };
+        WaterwayNetworkSummary: {
+            /** Format: uuid */
+            id: string;
+            version_no: number;
+            /** @enum {string} */
+            status: "published";
+            segment_set_sha256: string;
+            graph_sha256: string;
+            rule_version: string;
+            /** Format: date-time */
+            as_of?: string;
+            segment_count?: number;
+            vertex_count?: number;
+            edge_count?: number;
+            /** Format: date-time */
+            effective_from: string | null;
         };
     };
     responses: {
@@ -6575,6 +6702,96 @@ export interface operations {
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
+        };
+    };
+    listWaterwayLayer: {
+        parameters: {
+            query?: {
+                /** @description minLng,minLat,maxLng,maxLat */
+                bbox?: string;
+                min_load_tons?: string;
+                /** @description Ghim phiên bản đã từng phát hành; mặc định phiên bản đang có hiệu lực */
+                version?: number;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang (theo segment_ref) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WaterwayLayerSegment"][];
+                        next_cursor: string | null;
+                        /** @description Số tuyến trong khung (mọi trang) */
+                        total: number;
+                        /** @description Số tuyến phù hợp tải trọng trong khung (mọi trang) */
+                        passable_count: number;
+                        min_load_tons: string;
+                        version_no: number | null;
+                        message: string | null;
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    routeWaterway: {
+        parameters: {
+            query: {
+                /** @description lat,lng */
+                from: string;
+                /** @description lat,lng */
+                to: string;
+                min_load_tons?: string;
+                version?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả định tuyến */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaterwayRoute"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getCurrentWaterwayNetwork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaterwayNetworkSummary"];
+                };
+            };
+            404: components["responses"]["Problem"];
         };
     };
 }
