@@ -37,6 +37,37 @@ Nguồn: `G:\My Drive\Development`, gồm kiến trúc v3.0 và bốn bộ yêu 
 
 Cập nhật 29/09/2026 (chốt mã G1): câu 1–6 vẫn chờ khách. Thêm ba việc chờ khách chốt để đóng các dòng "một phần" của [g1-acceptance.md](../uat/g1-acceptance.md): mẫu biểu báo cáo chính thức của Bộ NN&PTNT (US-DASH-02); DCRD xác nhận phương pháp dự báo nhu cầu máy (CGH FN-09); chuyển VN-2000 khi nhập ranh giới (X9). Đã trả lời: mã và danh mục xã chính thức (X12); quy tắc chồng lấn (X10).
 
+## Câu hỏi mở G2 (29/09/2026)
+
+Các câu này đóng các dòng "một phần" và giả định tạm của [g2-acceptance.md](../uat/g2-acceptance.md) và [g2-conventions.md](../dev/g2-conventions.md). Mã hiện chạy theo "Giả định hiện tại" cho tới khi khách trả lời.
+
+| # | Câu hỏi | Giả định hiện tại | Ảnh hưởng |
+|---|---|---|---|
+| Q2-01 | Dữ liệu HTX thuộc tenant nào? | Tenant chương trình, một tenant (ADR-0009) | RB-2, mọi module G2 |
+| Q2-02 | Cho phép phần mở rộng Keycloak phát liên kết hành động (không email) để kích hoạt nông dân bằng QR? | Có, cấu hình `AG_KC_ACTION_LINK_URL`; phát lại thu hồi lượt cũ | HTX US-ACC-01/02, US-LOGIN-01 |
+| Q2-03 | GPS có phải dữ liệu cá nhân không? Lưu bao lâu? | Lưu ở pf (không định danh), sổ chỉ đọc, không xóa (≥ 12 tháng) | HTX US-GPS-03, RB-3 |
+| Q2-04 | Quy tắc duyệt nhật ký: ai duyệt, có ngoại lệ tự duyệt không? | Người ghi không tự duyệt (R-56); quản lý HTX duyệt | HTX US-LOG-05 |
+| Q2-05 | Đơn vị sản lượng, ngưỡng bất thường theo giống? | Nhập kg, hiển thị t/ha; ngưỡng là tham số tạm | HTX US-YIELD-01/03 |
+| Q2-06 | Cổng thu hoạch và thời gian cách ly thuốc (PHI)? | Theo bước thu hoạch của SOP đã ghim (offset − cửa sổ); PHI theo nguyên mẫu BR-06 | HTX US-YIELD-01 |
+| Q2-07 | Ai sở hữu và soạn SOP (TTKN, HTX, doanh nghiệp)? | `sop_admin` soạn, `param_approver` khác người soạn phát hành | HTX US-CAT-01/03 |
+| Q2-08 | Ai làm chủ dữ liệu nông hộ: KN hay HTX? Tìm nông hộ theo họ tên có được phép không? | Chung một bản ghi pf/party, định danh ở vault. Chưa tìm theo họ tên (R-04) | HTX US-HH-01, KN US-HTX-05 |
+| Q2-09 | CGH FN-07: nguồn tình trạng máy và lịch mùa vụ? | App HTX chỉ gửi diện tích theo vụ; tình trạng máy và lịch nhập tay | CGH FN-07 |
+| Q2-10 | Nhà cung cấp thời tiết và độ mặn trong lãnh thổ? | Chưa có, thẻ "chờ nguồn" | HTX US-WEATHER-01, GIS US-WX-01/02, US-NAT-01 |
+| Q2-11 | Quy tắc tách/gộp thửa? | Sửa ranh giới là phiên bản mới; chưa có tách/gộp | pf/geo, HTX US-PLOT-* |
+| Q2-12 | Người nhận email báo cáo định kỳ của HTX? | Người lập lịch và địa chỉ đã đăng ký trong Keycloak | HTX US-DASH-03 |
+| Q2-13 | Có làm Zalo Mini App không, khi nào? | Để sau (ADR-0010), chỉ phần trực tuyến | Kênh nông dân |
+| Q2-14 | Hub: MKG sở hữu (qua van) hay tenant sở hữu (kho bên thứ ba)? | Hub MKG qua van `hub_facility`/`hub_capacity`; kho bên thứ ba là `pf_geo.facility` | GIS FN-04/06, `mkg/hub` |
+| Q2-15 | Nguồn tile vệ tinh trong lãnh thổ? | Nền bản đồ chỉ từ biến môi trường; chưa có vệ tinh | HTX US-PLOT-03, GIS FN-07, US-INT-02 |
+| Q2-16 | Nguồn dữ liệu thủy hệ (VIWA?) và ai duyệt phát hành mạng? | Dữ liệu tổng hợp; `waterway_publisher` khác người dựng | GIS FN-09, `pf/waterway` |
+| Q2-17 | Có cần định tuyến đường bộ (đồ thị) không? | Chỉ lọc tuyến theo tải trọng; mô phỏng dùng Haversine hiệu chỉnh (#10) | GIS US-ROAD-01, `pf/simulation` |
+| Q2-18 | Chọn Hub tối ưu (MILP) hay đánh giá kịch bản? Giá trị và người duyệt bộ 57 tham số? | Đánh giá kịch bản; MILP thử nghiệm; #48/#49 chưa chốt | `pf/simulation`, CGH FN-01 BR-04 |
+| Q2-19 | Bản đồ địa chính và chuyển VN-2000 khi nhập? | Chỉ nhận WGS84 (`geo.crs_unsupported`) | X9, GIS US-BASE-01, US-BND-07 |
+| Q2-20 | Chính sách lưu và dọn dữ liệu lịch sử GIS (FN-21)? | Không xóa; chỉ chuyển tầng (RB-1, X1) | GIS US-RETAIN-01, US-SNAP-01, US-REPLAY-01 |
+| Q2-21 | Ngưỡng k của van dữ liệu công (C-3)? | Chưa có van dữ liệu công | Mục 5, Q-MKG-11 |
+| Q2-22 | TMS: phạm vi dữ liệu, xác thực, độ trễ ≤ 500 ms áp cho lớp nào? | Chưa có API cho TMS | GIS US-INT-02 |
+| Q2-23 | BRD GIS BR-01 chỉ có hai vai (Người dùng xem mọi dữ liệu, Admin), không tách quyền theo dữ liệu. Có chấp nhận phân quyền theo phạm vi của nền tảng không? | Theo phạm vi cây TW → Tỉnh → Xã (ADR-0009) và vai biên tập riêng (`geo_admin`, `waterway_editor`/`publisher`, `simulation_analyst`); quản lý HTX chỉ thấy HTX mình | GIS FN-01/02, mọi lớp GIS |
+| Q2-24 | GIS US-LOG-01: sai 5 lần thì khóa tới khi Admin mở, hay khóa tạm? | Khóa tạm 15 phút (realm) | GIS US-LOG-01 |
+
 ## Vai trò của prototype `mekong-green`
 Prototype `mekong-green` gồm khoảng 43k LOC TypeScript/SQLite, 120 bảng, khoảng 470 route. Nó là **đặc tả chạy được**:
 - trích quy tắc nghiệp vụ và test thành ca kiểm thử chấp nhận;

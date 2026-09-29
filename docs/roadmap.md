@@ -62,6 +62,22 @@ Quy ước và quyết định đã chốt: [docs/dev/g2-conventions.md](dev/g2-
 
 **Chờ khách** (không chặn đợt 1): nhà cung cấp thời tiết/độ mặn và tile vệ tinh trong lãnh thổ (RB-7), nguồn dữ liệu thủy hệ (VIWA) và bản đồ địa chính (VN-2000), ngưỡng k của bộ lọc dữ liệu công khai (C-3), chọn hub là tối ưu (MILP) hay đánh giá kịch bản, bộ 57 tham số mô phỏng.
 
+### Trạng thái G2 (29/09/2026)
+
+Đợt 1 và đợt 2 đã có mã, sớm hơn mốc 31/03/2027. Đối chiếu yêu cầu → kiểm thử: [docs/uat/g2-acceptance.md](uat/g2-acceptance.md). **137 yêu cầu: 96 đạt, 31 một phần, 10 ngoài G2** (G3 hoặc chờ nhà cung cấp). **CI trên GitHub chưa xác nhận** cho các commit G2, vì GitHub Actions đang bị chặn do lỗi thanh toán. Trạng thái dựa trên lần chạy kiểm thử ở máy dev.
+
+**Đã có:**
+- Backend: `platform/cropcycle` (SOP có phiên bản, vụ, nhật ký dạng sổ, duyệt, sản lượng decimal, bảng điều hành, bản đồ giai đoạn). `pf/geo` G2: ranh giới HTX, kho/Hub + sức chứa, đường bộ, log GPS, mô hình đọc hub qua van. `pf/waterway` (pgRouting, phiên bản, dựng bất đồng bộ, phát hành tách vai). `pf/simulation` + `optimizer/` Python (5 ca golden tái lập prototype, ảnh chụp bất biến không định danh). Tài khoản nông dân (SĐT, QR/liên kết một lần), yêu cầu hỗ trợ → nhiệm vụ tự động, sự kiện nông hộ, đồng bộ theo nhóm dữ liệu, CGH FN-07 (diện tích), mẫu báo cáo sản lượng HTX.
+- mkg: thiết kế chi tiết [docs/design/mkg.md](design/mkg.md); `mkg/hub`; van `hub_facility`/`hub_capacity` v1; `contractcheck` và `archlint` siết cho vùng mkg; `cmd/api-internal`.
+- Client: `packages/agrigreen_mobile` (lõi chung), `apps/htx-app` (nông dân và quản lý HTX, ngoại tuyến). web-ops: màn App HTX, bản đồ GIS nhiều lớp, biên tập bản đồ, kho/Hub, thủy hệ, mô phỏng Hub.
+- Hạ tầng: listener Internal mTLS (8084), vòng nhận optimizer (hàng đợi quorum + DLQ), khai báo trước hàng đợi RabbitMQ, job CI cho optimizer, lõi di động và App HTX.
+
+**Còn lại của G2** (chi tiết ở mục Tóm tắt của g2-acceptance):
+- **Mã:** App HTX chưa có bản đồ và vẽ thửa cho Quản lý HTX (HTX US-PLOT-01/02/05). Chưa có nhập và sao chép HTX, sao chép nông hộ, tìm nông hộ, gọi nhanh nông hộ (HTX US-HTX-02/03, US-HH-01/02/03). Chưa có màn lập lịch báo cáo cho Quản lý HTX (US-DASH-03), chuyên mục tin trên App HTX (US-NEWS-01), xem trước bài dạng mobile (US-CMS-01), ô chọn nhóm dữ liệu ở web `/dong-bo` (KN US-SYNC-02). GIS còn thiếu: cấu hình dải màu/HEX và khôi phục mặc định (US-CFG-01/02), lớp CGH trên GIS (US-INT-01), API cho TMS (US-INT-02), màn giám sát đồng bộ và cảnh báo DLQ (US-SYNC-01/02), job công bố sức chứa định kỳ (FN-06, Q-MKG-02). CGH FN-07 còn thiếu nhật ký đồng bộ và cảnh báo Admin.
+- **Hạ tầng:** phần mở rộng Keycloak phát liên kết hành động (`AG_KC_ACTION_LINK_URL`) cho kích hoạt QR của nông dân; chạy lại toàn bộ CI khi GitHub Actions hoạt động lại; đo hiệu năng lớp GIS (≤ 1,5 s) và TMS (≤ 500 ms).
+- **Chờ khách:** các câu hỏi G2 ở [tong-hop.md](requirements/tong-hop.md#câu-hỏi-mở-g2-29092026): nhà cung cấp thời tiết/độ mặn/tile (RB-7), nguồn thủy hệ, VN-2000, bộ 57 tham số và MILP, ngưỡng k (C-3), quy tắc duyệt, ngưỡng sản lượng, cổng thu hoạch, chính sách lưu (GPS, FN-21), khóa đăng nhập GIS. Ký ADR-0016 (giấy phép Python).
+- **Chuyển sang G3 theo lộ trình:** lớp tự nhiên và thời tiết GIS (khi có nhà cung cấp), snapshot/replay/lưu trữ GIS (FN-19..21, cùng lịch sử `pf/metrics`), RB-6 và C-4 (`mkg/measurement`), số đo của R-95.
+
 ## G3–G6
 Theo Phụ lục A của tài liệu kiến trúc:
 - **G3 (Q3/2027):** metrics, MRV, measurement, edge-agent. Mẫu cân C-6 phải chốt trước Q1/2027.
