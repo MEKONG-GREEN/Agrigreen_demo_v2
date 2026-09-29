@@ -70,7 +70,7 @@ export function NotificationBell() {
     }
     setOpen(false);
     refreshCount();
-    router.push(deepLinkHref(n.deep_link) ?? "/thong-bao");
+    router.push(deepLinkHref(n.deep_link, n.kind) ?? "/thong-bao");
   };
 
   const readAll = async () => {
