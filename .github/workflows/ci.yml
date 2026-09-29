@@ -201,15 +201,35 @@ jobs:
       - name: flutter build apk --debug
         run: flutter build apk --debug
 
+  htx-app:
+    name: App Hợp tác xã (Flutter)
+    needs: agrigreen-mobile
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: apps/htx-app }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { flutter-version: "3.47.5", channel: stable, cache: true }
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq libsqlite3-dev
+      - run: flutter pub get --enforce-lockfile
+      - run: dart format --output=none --set-exit-if-changed lib test integration_test
+      - run: flutter analyze --fatal-infos
+      - run: flutter test
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - name: flutter build apk --debug
+        run: flutter build apk --debug
+
   # Kiểm thử tích hợp trên emulator Android (integration_test): SQLCipher,
   # Keystore, giao diện thật; máy chủ API giả chạy trong tiến trình kiểm thử.
   # Chậm (~15–25 phút) nên chỉ chạy khi push lên main hoặc chạy tay.
   field-app-emulator:
     name: App hiện trường — tích hợp trên emulator (API 29)
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    needs: field-app
+    needs: [field-app, htx-app]
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     defaults:
       run: { working-directory: apps/field-app }
     steps:
@@ -241,6 +261,13 @@ jobs:
           flutter build apk --debug -t integration_test/app_flow_test.dart
           pkill -f GradleDaemon || true   # trả RAM cho emulator
           df -h /
+      - name: Build APK kiểm thử App HTX
+        working-directory: apps/htx-app
+        run: |
+          flutter pub get --enforce-lockfile
+          flutter build apk --debug -t integration_test/htx_flow_test.dart
+          pkill -f GradleDaemon || true
+          df -h /
       - name: flutter test integration_test
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -255,7 +282,9 @@ jobs:
           emulator-boot-timeout: 900
           emulator-options: -no-window -no-snapshot -no-metrics -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           working-directory: apps/field-app
-          script: flutter test integration_test -d emulator-5554 --reporter expanded
+          script: |
+            flutter test integration_test -d emulator-5554 --reporter expanded
+            cd ../htx-app && flutter test integration_test -d emulator-5554 --reporter expanded
 
   security:
     name: Bảo mật và giấy phép
