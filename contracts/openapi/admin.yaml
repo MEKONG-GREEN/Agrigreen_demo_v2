@@ -3131,6 +3131,27 @@ paths:
                   farm_logs: {type: integer}
                   coop_season_areas: {type: integer}
         "403": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/stats/cooperatives/{ref}:
+    get:
+      summary: Số vụ đang mở và nhật ký chờ duyệt của một HTX — cảnh báo trong hộp thoại vô hiệu hóa HTX (registry_admin, platform_admin)
+      description: HTX không có hoạt động (hoặc không thuộc tenant) → 0 / 0. Không có dữ liệu cá nhân.
+      operationId: getCropCooperativeStats
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Số liệu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cooperative_ref, open_seasons, pending_logs]
+                properties:
+                  cooperative_ref: {type: string, format: uuid}
+                  open_seasons: {type: integer}
+                  pending_logs: {type: integer}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
   # --- hết pf/cropcycle ---
 components:
   securitySchemes:

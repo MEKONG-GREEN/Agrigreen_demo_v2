@@ -261,3 +261,11 @@ fieldset.plain legend { font-size: 12.5px; font-weight: 600; color: var(--ink2);
 .dl-inline dt { color: var(--mute); }
 @media (max-width: 1280px) { .gis-grid { grid-template-columns: 260px minmax(0, 1fr); } .gis-grid > .gis-right { grid-column: 1 / -1; } }
 @media (max-width: 960px) { .gis-grid { grid-template-columns: 1fr; } }
+/* Hộp thoại (App HTX: sửa/hủy vụ, duyệt nhật ký, vô hiệu hoá HTX) */
+.dlg-back { position: fixed; inset: 0; background: rgba(8, 30, 20, .42); display: grid; place-items: center; z-index: 80; padding: 16px; }
+.dlg { background: #fff; border-radius: 16px; box-shadow: 0 24px 60px rgba(8, 30, 20, .28); width: min(640px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 20px; }
+.dlg h2 { font-size: 17px; margin-bottom: 12px; }
+.dlg-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+.qr-box { display: inline-block; padding: 12px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+.link-once { font-family: ui-monospace, Consolas, monospace; font-size: 12px; word-break: break-all; }
+.grid-input { width: 110px; }

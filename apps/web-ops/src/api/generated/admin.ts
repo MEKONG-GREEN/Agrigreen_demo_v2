@@ -2214,6 +2214,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cropcycle/stats/cooperatives/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Số vụ đang mở và nhật ký chờ duyệt của một HTX — cảnh báo trong hộp thoại vô hiệu hóa HTX (registry_admin, platform_admin)
+         * @description HTX không có hoạt động (hoặc không thuộc tenant) → 0 / 0. Không có dữ liệu cá nhân.
+         */
+        get: operations["getCropCooperativeStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7672,6 +7692,35 @@ export interface operations {
                 };
             };
             403: components["responses"]["Problem"];
+        };
+    };
+    getCropCooperativeStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số liệu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        cooperative_ref: string;
+                        open_seasons: number;
+                        pending_logs: number;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
         };
     };
 }

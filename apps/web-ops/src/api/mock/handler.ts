@@ -35,6 +35,8 @@ import { rosterRoutes } from "./roster";
 import { gisAdminRoutes, gisAppRoutes } from "./gis";
 import { simulationRoutes } from "./simulation";
 import { waterwayAdminRoutes, waterwayAppRoutes } from "./waterway";
+import { cropcycleAdminRoutes, cropcycleAppRoutes } from "./cropcycle";
+import { htxAdminRoutes, htxAppRoutes } from "./htx";
 import { personaFromAuthHeader, type MockPersona } from "./personas";
 
 function sleep(ms: number) {
@@ -115,9 +117,12 @@ const appRoutes: Route[] = [
       const status = url.searchParams.get("status");
       const priority = url.searchParams.get("priority");
       const overdue = url.searchParams.get("overdue") === "true";
+      // Quản lý HTX (không kiêm vai KN) chỉ thấy nhiệm vụ của HTX mình — như pf/extension.
+      const coopOnly = hasRole(persona, "coop_manager") && !hasRole(persona, "kn_officer", "kn_province_admin", "platform_admin");
       const list = TASKS.filter(
         (t) =>
           inScope(persona, t.province_code, t.commune_code) &&
+          (!coopOnly || t.cooperative_ref === persona.me.org?.ref) &&
           (!status || t.status === status) &&
           (!priority || t.priority === priority) &&
           (!overdue || (t.overdue && t.status !== "resolved")),
@@ -354,6 +359,8 @@ const appRoutes: Route[] = [
   ...gisAppRoutes,
   ...waterwayAppRoutes,
   ...simulationRoutes,
+  ...cropcycleAppRoutes,
+  ...htxAppRoutes,
 ];
 
 // --------------------------------------------------------------------------
@@ -576,6 +583,8 @@ const adminRoutes: Route[] = [
   ...adminOpsRoutes,
   ...gisAdminRoutes,
   ...waterwayAdminRoutes,
+  ...cropcycleAdminRoutes,
+  ...htxAdminRoutes,
 ];
 
 // --------------------------------------------------------------------------

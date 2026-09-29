@@ -1,5 +1,5 @@
 import type { ScopeLevel } from "@/auth/principal";
-import { hasRole, ROLES, type Principal } from "@/auth/principal";
+import { hasRole, KN_ROLES, ROLES, type Principal } from "@/auth/principal";
 
 export type NavIcon =
   | "dashboard"
@@ -22,7 +22,15 @@ export type NavIcon =
   | "layers"
   | "water"
   | "warehouse"
-  | "sim";
+  | "sim"
+  | "season"
+  | "journal"
+  | "approve"
+  | "harvest"
+  | "chart"
+  | "qr"
+  | "support"
+  | "sop";
 
 export interface NavItem {
   href: string;
@@ -43,6 +51,10 @@ export interface NavGroup {
 }
 
 const KN: readonly ScopeLevel[] = ["tw", "tinh", "xa"];
+/** Ghi dữ liệu mùa vụ HTX: quản lý HTX (HTX mình) và quản trị nền tảng. */
+const HTX_WRITE: readonly string[] = [ROLES.coopManager, ROLES.platformAdmin];
+/** Xem dữ liệu mùa vụ HTX: thêm cán bộ KN (chỉ đọc theo phạm vi). */
+const HTX_READ: readonly string[] = [...HTX_WRITE, ...KN_ROLES];
 
 /**
  * Menu theo vai và phạm vi. Đây CHỈ là ẩn/hiện — backend vẫn kiểm quyền từng lời gọi (R-55).
@@ -70,7 +82,17 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   },
   {
     label: "2. HTX & nông hộ",
-    items: [{ href: "/htx", label: "Quản lý HTX & nông hộ", icon: "coop", levels: KN }],
+    // App HTX (pf/cropcycle, pf/accounts): quản lý HTX ghi trong HTX mình; cán bộ KN chỉ xem trong phạm vi.
+    items: [
+      { href: "/htx", label: "Quản lý HTX & nông hộ", icon: "coop", levels: KN },
+      { href: "/htx/dashboard", label: "Bảng điều hành sản xuất", icon: "chart", roles: HTX_READ },
+      { href: "/htx/mua-vu", label: "Mùa vụ", icon: "season", roles: HTX_READ },
+      { href: "/htx/nhat-ky", label: "Nhật ký canh tác", icon: "journal", roles: HTX_READ },
+      { href: "/htx/phe-duyet", label: "Phê duyệt nhật ký", icon: "approve", roles: HTX_WRITE },
+      { href: "/htx/san-luong", label: "Sản lượng thu hoạch", icon: "harvest", roles: HTX_READ },
+      { href: "/htx/tai-khoan-nong-dan", label: "Tài khoản nông dân", icon: "qr", roles: HTX_READ },
+      { href: "/htx/yeu-cau-ho-tro", label: "Yêu cầu hỗ trợ", icon: "support", roles: HTX_READ },
+    ],
   },
   {
     label: "3. Tri thức",
@@ -97,6 +119,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     items: [
       { href: "/quan-tri/tai-khoan", label: "Tài khoản cán bộ", icon: "user", roles: [ROLES.platformAdmin, ROLES.accountAdmin, ROLES.accountAdminProvince] },
       { href: "/quan-tri/danh-muc", label: "Danh mục dùng chung", icon: "catalog", roles: [ROLES.platformAdmin, ROLES.masterdataAdmin] },
+      { href: "/quan-tri/quy-trinh", label: "Quy trình SOP", icon: "sop", roles: [ROLES.platformAdmin, ROLES.sopAdmin, ROLES.paramApprover] },
       {
         href: "/quan-tri/tham-so",
         label: "Tham số & phê duyệt",

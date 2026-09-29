@@ -2,7 +2,7 @@
 // `me` có ĐÚNG hình dạng GET /v1/me (components.schemas.Me) — mock trả nguyên văn.
 // Tổ chức của persona trùng tổ chức trong cây giả lập (ORGS) để màn hình tài khoản/tổ chức khớp nhau.
 import type { Me } from "../types";
-import { COMMUNES, communeOrgRef, DCRD_REF, MKG_REF, NATIONAL_REF, PROVINCES, provinceOrgRef } from "./data";
+import { COMMUNES, communeOrgRef, DCRD_REF, htxCoop, MKG_REF, NATIONAL_REF, PROVINCES, provinceOrgRef } from "./data";
 
 export interface MockPersona {
   id: string;
@@ -41,6 +41,8 @@ function persona(p: Omit<MockPersona, "me"> & { actor: string; roles: string[]; 
     },
   };
 }
+
+const HTX = htxCoop();
 
 const DT_ORG = { ref: provinceOrgRef(0), kind: "ttkn_province", name: "TTKN tỉnh Đồng Tháp", admin_unit_code: "82", active: true } as const;
 const DT_SCOPE = { all: false, level: "province", units: ["82", ...dtCommunes.map((c) => c.code)] } as const;
@@ -86,6 +88,17 @@ export const MOCK_PERSONAS: readonly MockPersona[] = [
     scope: { all: false, level: "commune", units: myCommune ? [myCommune.code] : [] },
   }),
   persona({
+    id: "htx",
+    title: "Quản lý HTX",
+    description: `coop_manager — ${HTX.api.name}: mở vụ, ghi nhật ký hộ, duyệt nhật ký, sản lượng, tài khoản nông dân`,
+    displayName: "Quản lý HTX (giả lập)",
+    amr: ["pwd"],
+    actor: "mock-htx-0001",
+    roles: ["coop_manager"],
+    org: { ref: HTX.api.ref, kind: "cooperative", name: HTX.api.name, admin_unit_code: HTX.api.admin_unit_code, active: true },
+    scope: { all: false, level: "cooperative", units: HTX.api.admin_unit_code ? [HTX.api.admin_unit_code] : [] },
+  }),
+  persona({
     id: "cuc",
     title: "Cục Kinh tế hợp tác & PTNT",
     description: "Cổng Bản đồ CGH — chỉ xem, toàn vùng; xuất báo cáo CGH",
@@ -100,7 +113,7 @@ export const MOCK_PERSONAS: readonly MockPersona[] = [
     id: "setter",
     title: "Quản trị nền tảng (đã qua MFA)",
     description:
-      "platform_admin + đặt/duyệt tham số, tài khoản, mẫu báo cáo, xung đột đồng bộ, dự báo CGH — thử quy tắc không tự duyệt",
+      "platform_admin + đặt/duyệt tham số, soạn SOP, tài khoản, mẫu báo cáo, xung đột đồng bộ, dự báo CGH — thử quy tắc không tự duyệt",
     displayName: "Quản trị viên A (giả lập)",
     amr: ["pwd", "otp"],
     actor: "mock-admin-setter",
@@ -108,6 +121,7 @@ export const MOCK_PERSONAS: readonly MockPersona[] = [
       "platform_admin",
       "masterdata_admin",
       "registry_admin",
+      "sop_admin",
       "param_setter",
       "param_approver",
       "account_admin",

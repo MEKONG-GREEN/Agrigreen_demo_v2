@@ -28,7 +28,12 @@ export const ROLES = {
   waterwayEditor: "waterway_editor",
   waterwayPublisher: "waterway_publisher",
   simulationAnalyst: "simulation_analyst",
+  sopAdmin: "sop_admin",
+  farmer: "farmer",
 } as const;
+
+/** Vai cán bộ khuyến nông — với dữ liệu mùa vụ HTX chỉ được XEM trong phạm vi (pf/cropcycle). */
+export const KN_ROLES: readonly string[] = [ROLES.knOfficer, ROLES.knProvinceAdmin, ROLES.knNationalAdmin];
 
 /** Nhãn tiếng Việt của vai realm (hiển thị; mã vai vẫn gửi nguyên văn). */
 export const ROLE_LABEL: Readonly<Record<string, string>> = {
@@ -53,6 +58,8 @@ export const ROLE_LABEL: Readonly<Record<string, string>> = {
   waterway_editor: "Biên tập mạng đường thủy",
   waterway_publisher: "Phát hành mạng đường thủy",
   simulation_analyst: "Phân tích mô phỏng Hub",
+  sop_admin: "Soạn quy trình SOP",
+  farmer: "Nông dân (App HTX)",
   vault_eraser: "Xoá định danh (RB-3)",
   consent_writer: "Ghi đồng ý",
   consent_reader: "Xem đồng ý",
