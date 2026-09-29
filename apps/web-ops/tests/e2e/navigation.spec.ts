@@ -21,7 +21,7 @@ test.describe("đăng nhập giả lập và điều hướng theo vai/phạm vi
     await loginAs(page, "tinh");
     await expect(sidebar(page).getByText("Tỉnh · Đồng Tháp")).toBeVisible();
     await expect(sidebar(page).getByRole("link", { name: "Đồng bộ thiết bị" })).toBeVisible();
-    await expect(sidebar(page).getByText("5. Quản trị")).toHaveCount(0);
+    await expect(sidebar(page).getByText("6. Quản trị")).toHaveCount(0);
   });
 
   test("KNV xã: không có Đồng bộ thiết bị; vào trang quản trị → không có quyền", async ({ page }) => {

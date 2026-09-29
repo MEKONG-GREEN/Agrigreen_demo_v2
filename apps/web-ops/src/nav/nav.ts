@@ -18,7 +18,11 @@ export type NavIcon =
   | "user"
   | "conflict"
   | "upload"
-  | "phone";
+  | "phone"
+  | "layers"
+  | "water"
+  | "warehouse"
+  | "sim";
 
 export interface NavItem {
   href: string;
@@ -50,6 +54,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     items: [
       { href: "/", label: "Tổng quan", icon: "dashboard", levels: KN },
       { href: "/ban-do", label: "Bản đồ khuyến nông", icon: "map", levels: KN },
+      { href: "/ban-do-gis", label: "Bản đồ GIS nhiều lớp", icon: "layers", levels: KN },
       { href: "/nhiem-vu", label: "Nhiệm vụ hỗ trợ", icon: "task", levels: KN },
       { href: "/chi-dao", label: "Chỉ đạo khẩn", icon: "megaphone", levels: KN },
       { href: "/danh-ba", label: "Danh bạ trực", icon: "phone", levels: KN },
@@ -84,7 +89,11 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     ],
   },
   {
-    label: "5. Quản trị",
+    label: "5. Logistics & mô phỏng",
+    items: [{ href: "/mo-phong", label: "Mô phỏng chọn Hub", icon: "sim", roles: [ROLES.simulationAnalyst, ROLES.platformAdmin] }],
+  },
+  {
+    label: "6. Quản trị",
     items: [
       { href: "/quan-tri/tai-khoan", label: "Tài khoản cán bộ", icon: "user", roles: [ROLES.platformAdmin, ROLES.accountAdmin, ROLES.accountAdminProvince] },
       { href: "/quan-tri/danh-muc", label: "Danh mục dùng chung", icon: "catalog", roles: [ROLES.platformAdmin, ROLES.masterdataAdmin] },
@@ -97,6 +106,14 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { href: "/quan-tri/to-chuc", label: "Cơ cấu tổ chức", icon: "org", roles: [ROLES.platformAdmin, ROLES.registryAdmin] },
       { href: "/quan-tri/nhap-nong-ho", label: "Nhập nông hộ từ tệp", icon: "coop", roles: [ROLES.platformAdmin, ROLES.registryAdmin] },
       { href: "/quan-tri/nhap-thua", label: "Nhập ranh giới thửa", icon: "upload", roles: [ROLES.platformAdmin, ROLES.geoAdmin] },
+      { href: "/quan-tri/ban-do", label: "Biên tập bản đồ", icon: "map", roles: [ROLES.platformAdmin, ROLES.geoAdmin] },
+      { href: "/quan-tri/kho-hub", label: "Kho / Hub & dung lượng", icon: "warehouse", roles: [ROLES.platformAdmin, ROLES.geoAdmin] },
+      {
+        href: "/quan-tri/thuy-he",
+        label: "Mạng đường thủy",
+        icon: "water",
+        roles: [ROLES.platformAdmin, ROLES.waterwayEditor, ROLES.waterwayPublisher],
+      },
       { href: "/quan-tri/xung-dot", label: "Xung đột đồng bộ", icon: "conflict", roles: [ROLES.platformAdmin, ROLES.conflictResolver] },
       { href: "/quan-tri/mau-bao-cao", label: "Mẫu & lịch báo cáo", icon: "report", roles: [ROLES.platformAdmin, ROLES.reportsAdmin, ROLES.masterdataAdmin] },
     ],

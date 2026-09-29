@@ -32,6 +32,9 @@ import { hasRole, inScope, isZip, json, norm, omit, pageSlice, paginate, problem
 import { coverage as mechCoverage, dashboard as mechDashboard, findRun, panel as mechPanel, RUNS } from "./mechanization";
 import { communeKpi, MISSING_BOUNDARY, opsRoutes, resolveUnit, sumKpi } from "./ops";
 import { rosterRoutes } from "./roster";
+import { gisAdminRoutes, gisAppRoutes } from "./gis";
+import { simulationRoutes } from "./simulation";
+import { waterwayAdminRoutes, waterwayAppRoutes } from "./waterway";
 import { personaFromAuthHeader, type MockPersona } from "./personas";
 
 function sleep(ms: number) {
@@ -348,6 +351,9 @@ const appRoutes: Route[] = [
   },
   ...opsRoutes,
   ...rosterRoutes,
+  ...gisAppRoutes,
+  ...waterwayAppRoutes,
+  ...simulationRoutes,
 ];
 
 // --------------------------------------------------------------------------
@@ -568,6 +574,8 @@ const adminRoutes: Route[] = [
     },
   },
   ...adminOpsRoutes,
+  ...gisAdminRoutes,
+  ...waterwayAdminRoutes,
 ];
 
 // --------------------------------------------------------------------------

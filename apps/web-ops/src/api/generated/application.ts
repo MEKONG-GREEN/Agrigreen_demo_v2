@@ -2166,7 +2166,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Liệt kê kịch bản của tenant kèm Hub đang gán (cursor theo mã) — màn hình mô phỏng web */
+        get: operations["listScenarios"];
         put?: never;
         /** Tạo kịch bản chọn Hub */
         post: operations["createScenario"];
@@ -2688,6 +2689,31 @@ export interface paths {
         };
         /** Dự kiến – thực tế, tiến độ SOP (chỉ nhật ký đã duyệt), thẻ chỉ số — HTX US-DASH-01 */
         get: operations["getCropDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/stage-map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lớp giai đoạn mùa vụ cho web GIS — GIS US-SEASON-01 (FN-13, bản đồ nhiệt) và US-YIELD-01 (FN-14, vùng chín rộ 1–3 ngày tới)
+         * @description Giai đoạn suy từ ngày của vụ (ngày sạ, cổng thu hoạch, ngày thu hoạch dự kiến của SOP đã ghim) và trạng thái vụ:
+         *     chuan_bi (chưa tới ngày sạ) → sinh_truong → sap_thu (đã qua cổng thu hoạch) → chin_ro (tới/qua ngày dự kiến, vụ chưa đóng)
+         *     → da_thu (vụ hoàn thành trong 45 ngày gần nhất). `ripening` = vụ đang mở có ngày thu hoạch dự kiến trong [date+1, date+3].
+         *     `expected_tons` = năng suất dự kiến App HTX gửi × diện tích (BR-48: GIS không tự dự báo; null khi App HTX chưa gửi).
+         *     Mỗi thửa một dòng (ưu tiên vụ đang mở), tối đa 1.000 thửa (BR-25); web ghép `plot_ref` với lớp thửa của pf/geo
+         *     và `cooperative_ref` với ranh giới HTX. Phạm vi như bảng điều hành (quản lý HTX chỉ HTX mình, KN theo xã, nông dân theo hộ).
+         */
+        get: operations["getCropStageMap"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5031,6 +5057,11 @@ export interface components {
             /** @enum {string} */
             source?: "device" | "photo_exif" | "manual_pick" | "denied" | "no_device";
         } | null;
+        /**
+         * @description Giai đoạn mùa vụ cho bản đồ nhiệt GIS (FN-13 B2: nâu → xanh → vàng → đỏ → xám)
+         * @enum {string}
+         */
+        CropStage: "chuan_bi" | "sinh_truong" | "sap_thu" | "chin_ro" | "da_thu";
         CropSeasonOpenInput: {
             /**
              * Format: uuid
@@ -9812,6 +9843,33 @@ export interface operations {
             422: components["responses"]["Problem"];
         };
     };
+    listScenarios: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trang kịch bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["SimScenario"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
     createScenario: {
         parameters: {
             query?: never;
@@ -10836,6 +10894,86 @@ export interface operations {
                 };
             };
             403: components["responses"]["Problem"];
+        };
+    };
+    getCropStageMap: {
+        parameters: {
+            query?: {
+                /** @description Ngày tra YYYY-MM-DD (giờ Việt Nam), trong vòng một năm; mặc định hôm nay */
+                date?: string;
+                cooperative_ref?: string;
+                commune_code?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lớp giai đoạn */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        date: string;
+                        stages: {
+                            code: components["schemas"]["CropStage"];
+                            label: string;
+                        }[];
+                        ripening_days: {
+                            from: number;
+                            to: number;
+                        };
+                        plots: {
+                            /** Format: uuid */
+                            plot_ref: string;
+                            plot_code: string;
+                            /** Format: uuid */
+                            season_ref: string;
+                            /** Format: uuid */
+                            cooperative_ref: string;
+                            commune_code: string;
+                            variety_code: string;
+                            /** @enum {string} */
+                            season_status: "open" | "completed";
+                            stage: components["schemas"]["CropStage"];
+                            /** Format: date */
+                            sowing_date: string;
+                            /** Format: date */
+                            harvest_open_date: string;
+                            /** Format: date */
+                            expected_harvest_date: string;
+                            days_to_harvest: number;
+                            ripening: boolean;
+                            area_ha: components["schemas"]["Decimal"];
+                            expected_tons: string | null;
+                        }[];
+                        cooperatives: {
+                            /** Format: uuid */
+                            cooperative_ref: string;
+                            commune_code: string;
+                            dominant_stage: components["schemas"]["CropStage"];
+                            stage_area_ha: {
+                                [key: string]: string;
+                            };
+                            plot_count: number;
+                            ripening_plot_count: number;
+                            ripening_area_ha: components["schemas"]["Decimal"];
+                            ripening_expected_tons: string | null;
+                            /** Format: date */
+                            earliest_ripening_date: string | null;
+                        }[];
+                        truncated: boolean;
+                        limit: number;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
 }

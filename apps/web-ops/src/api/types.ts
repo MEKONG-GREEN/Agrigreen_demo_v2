@@ -135,3 +135,51 @@ export interface Page<T> {
   items: T[];
   next_cursor: string | null;
 }
+
+// pf/geo G2 — web GIS (ranh giới HTX, kho/Hub, sức chứa, đường bộ)
+export type GeoCoopFeature = S["GeoCoopFeature"];
+export type GeoCoopLayer = S["GeoCoopLayer"];
+export type GeoCoopBoundaryVersion = S["GeoCoopBoundaryVersion"];
+export type GeoFacilityFeature = S["GeoFacilityFeature"];
+export type GeoFacilityLayer = S["GeoFacilityLayer"];
+export type GeoFacilityEvent = S["GeoFacilityEvent"];
+export type GeoCapacityView = S["GeoCapacityView"];
+export type GeoCapacitySnapshot = S["GeoCapacitySnapshot"];
+export type GeoCapacityLatest = S["GeoCapacityLatest"];
+export type GeoRoadFeature = S["GeoRoadFeature"];
+export type GeoRoadLayer = S["GeoRoadLayer"];
+export type GeoRoadSegment = S["GeoRoadSegment"];
+export type GeoLayers = AppGet<"/v1/geo/layers">;
+export type CapacityWidgets = AppGet<"/v1/geo/capacity-widgets">;
+export type CapacityWidget = CapacityWidgets["items"][number];
+export type FacilityDetail = AppGet<"/v1/geo/facilities/{ref}">;
+export type CoopImportResult = AdminPost<"/v1/geo/cooperative-boundaries/import">;
+export type FacilityImportResult = AdminPost<"/v1/geo/facilities/import">;
+
+// pf/cropcycle — lớp giai đoạn mùa vụ (GIS US-SEASON-01, US-YIELD-01)
+export type CropStageMap = AppGet<"/v1/cropcycle/stage-map">;
+export type CropStagePlot = CropStageMap["plots"][number];
+export type CropStageCoop = CropStageMap["cooperatives"][number];
+
+// pf/waterway
+export type WaterwayLayerSegment = S["WaterwayLayerSegment"];
+export type WaterwayLayer = AppGet<"/v1/waterway/segments">;
+export type WaterwayRoute = S["WaterwayRoute"];
+export type WaterwayNetworkSummary = S["WaterwayNetworkSummary"];
+export type WaterwaySegment = AS["WaterwaySegment"];
+export type WaterwayBuild = AS["WaterwayBuild"];
+export type WaterwayNetworkVersion = AS["WaterwayNetworkVersion"];
+export type WaterwayFinding = AS["WaterwayFinding"];
+export type WaterwayStructure = AS["WaterwayStructure"];
+
+// pf/simulation
+export type SimCandidateHub = S["SimCandidateHub"];
+export type SimScenario = S["SimScenario"];
+export type SimScenarioHub = S["SimScenarioHub"];
+export type SimChange = S["SimChange"];
+export type SimSimulation = S["SimSimulation"];
+export type SimSnapshotMeta = S["SimSnapshotMeta"];
+export type SimCompareRow = S["SimCompareRow"];
+export type SimCompare = AppPost<"/v1/scenarios:compare">;
+export type SimResultEnvelope = AppGet<"/v1/simulations/{id}/result">;
+export type SimJob = AppGet<"/v1/jobs/{id}">;

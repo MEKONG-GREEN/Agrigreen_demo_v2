@@ -573,3 +573,35 @@ func TestInternalAPIRequiresMTLS(t *testing.T) {
 		t.Fatal("request không TLS phải bị từ chối")
 	}
 }
+
+// CGH FN-02 (màn hình /mo-phong): liệt kê kịch bản theo mã, có cursor, kèm Hub đang gán; tách tenant; cần vai.
+func TestListScenariosPagedAndTenantScoped(t *testing.T) {
+	f := newFixture(t)
+	c := f.analyst()
+	first, _ := f.scenario(c, 10, false)
+	second, _ := f.scenario(c, 10, false)
+	pg := must(t, c.get("/v1/scenarios?limit=1"), 200, "trang 1")
+	items := pg.body["items"].([]any)
+	if len(items) != 1 || str(items[0].(map[string]any), "id") != first {
+		t.Fatalf("trang 1 phải là kịch bản đầu: %s", pg.raw)
+	}
+	if hubs := items[0].(map[string]any)["hubs"].([]any); len(hubs) != 1 {
+		t.Fatalf("kịch bản phải kèm Hub đang gán: %v", hubs)
+	}
+	next, _ := pg.body["next_cursor"].(string)
+	if next == "" {
+		t.Fatal("thiếu next_cursor")
+	}
+	pg2 := must(t, c.get("/v1/scenarios?limit=1&cursor="+next), 200, "trang 2")
+	items2 := pg2.body["items"].([]any)
+	if len(items2) != 1 || str(items2[0].(map[string]any), "id") != second || pg2.body["next_cursor"] != nil {
+		t.Fatalf("trang 2: %s", pg2.raw)
+	}
+	other := f.asTenant(ids.New(), port.RoleSimulationAnalyst)
+	if r := must(t, other.get("/v1/scenarios"), 200, "tenant khác"); len(r.body["items"].([]any)) != 0 {
+		t.Fatalf("tenant khác thấy kịch bản: %s", r.raw)
+	}
+	if r := f.asTenant(f.tenant, "kn_officer").get("/v1/scenarios"); r.status != 403 {
+		t.Fatalf("thiếu vai simulation_analyst: %d", r.status)
+	}
+}

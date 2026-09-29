@@ -354,6 +354,23 @@ func ListSeasons(ctx context.Context, tx pgx.Tx, f SeasonFilter) ([]Season, erro
 	return collectSeasons(rows)
 }
 
+// StageSeasons trả vụ cho lớp giai đoạn GIS (GIS US-SEASON-01): mọi vụ đang mở và vụ hoàn thành từ doneSince,
+// trong phạm vi, mỗi thửa ưu tiên vụ đang mở rồi vụ mở gần nhất; tối đa limit dòng (theo plot_ref).
+func StageSeasons(ctx context.Context, tx pgx.Tx, scope Filter, coop uuid.UUID, commune string, doneSince time.Time, limit int) ([]Season, error) {
+	args := append(scope.args(), nilIfZero(coop), commune, doneSince.UTC(), limit)
+	rows, err := tx.Query(ctx, "SELECT "+seasonCols+` FROM (
+	    SELECT DISTINCT ON (x.plot_ref) x.* FROM pf_cropcycle.season_current x
+	    WHERE (x.status = 'open' OR (x.status = 'completed' AND x.completed_at >= $7::timestamptz))
+	    ORDER BY x.plot_ref, (x.status = 'open') DESC, x.opened_at DESC, x.season_ref DESC) s
+	  WHERE `+scopeSQL("s", 1)+`
+	    AND ($5::uuid IS NULL OR s.cooperative_ref = $5::uuid) AND ($6::text = '' OR s.commune_code = $6::text)
+	  ORDER BY s.plot_ref LIMIT $8::int`, args...)
+	if err != nil {
+		return nil, err
+	}
+	return collectSeasons(rows)
+}
+
 // SeasonsChangedAfter trả vụ trong phạm vi có sync_seq > after (chiều xuống).
 func SeasonsChangedAfter(ctx context.Context, tx pgx.Tx, scope Filter, after int64, limit int) ([]Season, error) {
 	args := append(scope.args(), after, limit)

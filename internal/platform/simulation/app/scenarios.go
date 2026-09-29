@@ -103,6 +103,37 @@ func (s *Service) ListHubs(ctx context.Context, after string, limit int) (HubPag
 	return pg, nil
 }
 
+// ScenarioPage là một trang kịch bản.
+type ScenarioPage struct {
+	Items []domain.Scenario
+	Next  string
+}
+
+// ListScenarios liệt kê kịch bản của tenant theo mã (cursor = mã cuối trang) — màn hình mô phỏng web.
+func (s *Service) ListScenarios(ctx context.Context, after string, limit int) (ScenarioPage, error) {
+	p, err := require(ctx)
+	if err != nil {
+		return ScenarioPage{}, err
+	}
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	var items []domain.Scenario
+	if err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+		var e error
+		items, e = store.ListScenarios(ctx, tx, after, limit+1)
+		return e
+	}); err != nil {
+		return ScenarioPage{}, err
+	}
+	pg := ScenarioPage{Items: items}
+	if len(items) > limit {
+		pg.Items = items[:limit]
+		pg.Next = items[limit-1].Code
+	}
+	return pg, nil
+}
+
 // RetireHub ngừng dùng Hub kèm lý do (không xóa — RB-1, ADR-0011).
 func (s *Service) RetireHub(ctx context.Context, id uuid.UUID, reason string) (domain.CandidateHub, error) {
 	p, err := require(ctx)
