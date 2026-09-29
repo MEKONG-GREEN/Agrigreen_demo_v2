@@ -275,9 +275,14 @@ paths:
   /v1/cooperatives/{ref}/households:
     get:
       summary: Nông hộ thành viên của HTX, kèm nhãn hiển thị đã che (không bao giờ có định danh đầy đủ)
+      description: |
+        HTX US-HH-01 AC-2: `phone` tìm ĐÚNG một SĐT qua chỉ mục mù của kho định danh (mục đích registry.admin, kho ghi sổ
+        tra cứu) — trả tối đa một hộ của HTX này, SĐT lạ hoặc hộ HTX khác → danh sách rỗng; giá trị không phải SĐT → 422.
+        Không tìm theo họ tên: họ tên chỉ nằm ở kho định danh (R-04), pf không lọc được.
       operationId: listCooperativeHouseholds
       parameters:
         - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: phone, in: query, description: "SĐT chủ hộ cần tìm (khớp chính xác sau chuẩn hóa)", schema: {type: string, maxLength: 20}}
         - {name: cursor, in: query, schema: {type: string}}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
       responses:
@@ -318,6 +323,90 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/households/copy:
+    post:
+      summary: Sao chép hàng loạt nông hộ, sửa riêng họ tên/SĐT từng hồ sơ mới (HTX US-HH-02 AC-2..4)
+      description: |
+        Mỗi hồ sơ mới giữ HTX, xã, diện tích canh tác của hộ nguồn; định danh (họ tên, SĐT, CCCD, địa chỉ) là của hồ sơ mới,
+        đi thẳng vào kho định danh — định danh hộ nguồn không được đọc hay chép. Hồ sơ lỗi bị loại kèm lý do
+        ("Thiếu họ tên", "Thiếu SĐT", "SĐT đã tồn tại", "Bạn không có quyền truy cập nông hộ này.", "Không tìm thấy nông hộ nguồn"),
+        không chặn hồ sơ khác. Quản lý HTX chỉ sao chép trong HTX của mình. Tối đa 50 hồ sơ mỗi lần.
+      operationId: copyHouseholds
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                target_cooperative_ref: {type: [string, "null"], format: uuid, description: "HTX của hồ sơ mới; bỏ trống = HTX hiện tại của hộ nguồn"}
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items:
+                    type: object
+                    required: [source_ref, full_name, phone]
+                    properties:
+                      source_ref: {type: string, format: uuid}
+                      full_name: {type: string}
+                      phone: {type: string}
+                      national_id: {type: string}
+                      address: {type: string}
+      responses:
+        "200":
+          description: Kết quả từng hồ sơ
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created, rejected, rows]
+                properties:
+                  created: {type: integer}
+                  rejected: {type: integer}
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      required: [index, source_ref, status, reason, household_ref]
+                      properties:
+                        index: {type: integer, minimum: 1, description: "Thứ tự hồ sơ trong items (từ 1)"}
+                        source_ref: {type: string, format: uuid}
+                        status: {type: string, enum: [created, rejected]}
+                        reason: {type: [string, "null"], description: "Không chứa dữ liệu cá nhân"}
+                        household_ref: {type: [string, "null"], format: uuid}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/households/{ref}/contact:
+    get:
+      summary: SĐT chủ hộ lúc bấm gọi nhanh (HTX US-HH-03) — đọc từ kho định danh với mục đích extension.contact, không lưu đệm
+      description: |
+        Trả `Cache-Control: no-store`; không ghi log giá trị. Quản lý HTX chỉ gọi hộ của HTX mình (khác → 403
+        party.out_of_scope "Bạn không có quyền truy cập nông hộ này."). Chưa có SĐT / đã xóa định danh → 404
+        party.household_contact_unavailable. Máy/trình duyệt không gọi được → client báo "Không thể khởi tạo cuộc gọi trên thiết bị này." (AC-2).
+      operationId: getHouseholdContact
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: SĐT
+          headers:
+            Cache-Control: {schema: {type: string, enum: [no-store]}}
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [household_ref, phone]
+                properties:
+                  household_ref: {type: string, format: uuid}
+                  phone: {type: string}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
   # --- pf/sync --- (docs/dev/sync-contract.md)
 
@@ -2760,6 +2849,111 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/reports/recipients:
+    get:
+      summary: Người nhận chọn được cho lịch báo cáo của quản lý HTX — tài khoản đang bật, email đã xác minh, thuộc HTX của người gọi (HTX US-DASH-03)
+      description: "Chỉ quản lý HTX (coop_manager, không kèm vai KN). Email đã che; địa chỉ đầy đủ chỉ tra lúc gửi. Cache-Control no-store."
+      operationId: listReportRecipients
+      tags: [reports]
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [actor_ref, display_name, masked_email]
+                      properties:
+                        actor_ref: {type: string, format: uuid}
+                        display_name: {type: string}
+                        masked_email: {type: string, examples: ["ke•••@htx.vn"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/reports/schedules:
+    get:
+      summary: Lịch gửi báo cáo HTX của quản lý HTX (HTX US-DASH-03) — chỉ HTX của mình
+      description: Chỉ quản lý HTX; cán bộ KN, Admin CGH, quản trị dùng Admin API (MFA) → 403 ở đây.
+      operationId: listCoopReportSchedules
+      tags: [reports]
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/ReportSchedule"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Quản lý HTX lập lịch gửi báo cáo HTX (tuần/tháng, giờ Việt Nam) tới tài khoản của HTX (HTX US-DASH-03)
+      description: |
+        Mẫu HTX (vd htx.production); params.cooperative_ref luôn là HTX của người lập. `recipients` phải thuộc
+        `GET /v1/reports/recipients` — khác → 422 reports.recipient_not_in_cooperative
+        ("Email đăng ký nhận báo cáo không hợp lệ hoặc gửi thất bại, vui lòng kiểm tra lại."). Mẫu không phải HTX → 403.
+      operationId: createCoopReportSchedule
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ReportScheduleInput"}
+      responses:
+        "201":
+          description: Đã lập lịch
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportSchedule"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportSchedule"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/reports/schedules/{id}/deactivate:
+    post:
+      summary: Quản lý HTX ngừng lịch kèm lý do (không xóa; lịch sử chạy giữ nguyên)
+      operationId: deactivateCoopReportSchedule
+      tags: [reports]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [reason], properties: {reason: {type: string, minLength: 10, maxLength: 500}}}
+      responses:
+        "200":
+          description: Lịch
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ReportSchedule"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/reports/schedules/{id}/runs:
+    get:
+      summary: Các lần chạy của lịch HTX kèm kết quả gửi email (AC-2 — người lập thấy lần gửi bị bỏ/thiếu email)
+      operationId: listCoopReportScheduleRuns
+      tags: [reports]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Lần chạy
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/ReportScheduleRun"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
   # --- hết pf/reports ---
 
   # --- pf/waterway: lớp đường thủy đã phát hành và định tuyến theo tải trọng (GIS US-WATER-01, FN-09 BR-37/38; mục 16) ---
@@ -4246,6 +4440,7 @@ components:
             established_on: {type: [string, "null"], format: date}
             location: {oneOf: [{$ref: "#/components/schemas/Point"}, {type: "null"}]}
             location_provisional: {type: boolean, description: "true = chưa có toạ độ; bản đồ hiển thị tâm xã, nhãn \"vị trí tạm\""}
+            address: {type: [string, "null"], description: "Địa chỉ trụ sở HTX (HTX US-HTX-02; không phải dữ liệu cá nhân)"}
         - type: object
           description: Dữ liệu đọc bổ sung của danh sách/hồ sơ HTX (G-03)
           required: [province_code, commune_name, province_name, member_households, digitized_plots]
@@ -5628,6 +5823,52 @@ components:
         sha256: {type: [string, "null"]}
         error_code: {type: [string, "null"]}
         completed_at: {type: [string, "null"], format: date-time}
+    ReportScheduleInput:
+      type: object
+      required: [template_key, format, frequency, hour, recipients]
+      properties:
+        template_key: {type: string}
+        format: {type: string, enum: [xlsx, pdf]}
+        unit_code: {type: string}
+        params: {$ref: "#/components/schemas/ReportParams"}
+        frequency: {type: string, enum: [weekly, monthly]}
+        weekday: {type: integer, minimum: 1, maximum: 7, description: "weekly: 1 = thứ Hai"}
+        day_of_month: {type: integer, minimum: 1, maximum: 28, description: "monthly"}
+        hour: {type: integer, minimum: 0, maximum: 23, description: "Giờ Việt Nam"}
+        recipients: {type: array, minItems: 1, maxItems: 50, items: {type: string, format: uuid}}
+    ReportSchedule:
+      type: object
+      required: [id, template_key, format, params, frequency, hour, recipients, owner_ref, active, created_at, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        template_key: {type: string}
+        format: {type: string, enum: [xlsx, pdf]}
+        unit_code: {type: [string, "null"]}
+        params: {type: object}
+        frequency: {type: string, enum: [weekly, monthly]}
+        weekday: {type: [integer, "null"]}
+        day_of_month: {type: [integer, "null"]}
+        hour: {type: integer}
+        recipients: {type: array, items: {type: string, format: uuid}}
+        owner_ref: {type: string, format: uuid}
+        active: {type: boolean}
+        deactivated_reason: {type: [string, "null"]}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    ReportScheduleRun:
+      type: object
+      required: [slot_key, slot_at, status, fired_at]
+      properties:
+        slot_key: {type: string, examples: [2026-W40, 2026-10]}
+        slot_at: {type: string, format: date-time}
+        status: {type: string, enum: [queued, skipped]}
+        skip_reason: {type: [string, "null"]}
+        job_id: {type: [string, "null"], format: uuid}
+        fired_at: {type: string, format: date-time}
+        delivery_status: {type: [string, "null"], enum: [sent, skipped, failed, null]}
+        delivery_note: {type: [string, "null"]}
+        sent_count: {type: [integer, "null"]}
+        delivered_at: {type: [string, "null"], format: date-time}
     # --- hết pf/reports ---
 
     # --- pf/waterway ---

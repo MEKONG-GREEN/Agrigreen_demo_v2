@@ -55,8 +55,15 @@ var readRoles = []string{port.RolePlotViewer, port.RolePlotEditor, port.RoleGeoA
 // Vai được ghi thửa (Application API và đồng bộ).
 var writeRoles = []string{port.RolePlotEditor, authz.RolePlatformAdmin}
 
+// syncWriteRoles: ranh giới đẩy lên qua pf/sync (entity plot_boundary). Thêm quản lý HTX
+// (App HTX, HTX US-PLOT-01/02) — không cần vai plot_editor; phạm vi vẫn giới hạn ở HTX
+// của mình (access.coopOnly): thửa HTX mình, thửa nháp chưa gán mà họ vẽ nhận
+// cooperative_ref = HTX của họ; thửa HTX khác → rejected geo.out_of_scope.
+
 // Vai của Admin API.
 var adminRoles = []string{port.RoleGeoAdmin, authz.RolePlatformAdmin}
+
+var syncWriteRoles = []string{port.RolePlotEditor, port.RoleCoopManager, authz.RolePlatformAdmin}
 
 // Service là use case của pf/geo.
 type Service struct {

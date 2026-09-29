@@ -31,6 +31,12 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.GET("/exports", h.myExports)
 	g.GET("/exports/:id", h.export)
 	g.GET("/exports/:id/download", h.download)
+	// HTX US-DASH-03: quản lý HTX lập lịch trên Application API, chỉ HTX của mình.
+	g.GET("/recipients", h.coopRecipients)
+	g.GET("/schedules", h.coopSchedules)
+	g.POST("/schedules", h.createCoopSchedule)
+	g.POST("/schedules/:id/deactivate", h.coopDeactivate)
+	g.GET("/schedules/:id/runs", h.coopRuns)
 }
 
 // RegisterAdmin gắn route Admin API (MFA bắt buộc ở router).

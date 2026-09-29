@@ -85,6 +85,15 @@ func (m *Module) MailDirectory() reportsport.MailDirectory {
 	return app.MailDirectory{Dir: m.svc.Dir}
 }
 
+// ReportRecipients cho pf/reports: tài khoản đã đăng ký của một HTX (email đã xác minh)
+// để quản lý HTX chọn người nhận lịch báo cáo (HTX US-DASH-03). Chưa cấu hình Keycloak → nil.
+func (m *Module) ReportRecipients() reportsport.RecipientDirectory {
+	if m.svc.Dir == nil {
+		return nil
+	}
+	return app.MailDirectory{Dir: m.svc.Dir}
+}
+
 // StaffContacts cho pf/extension: số điện thoại của cán bộ lúc bấm "gọi/nhắn" trong
 // danh bạ trực (KN US-DIR-02). Chưa cấu hình Keycloak → nil (route liên hệ trả 503).
 func (m *Module) StaffContacts() extport.StaffContacts {

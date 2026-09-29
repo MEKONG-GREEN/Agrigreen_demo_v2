@@ -247,7 +247,21 @@ func (f *fakeMech) SeasonCompare(_ context.Context, q mechport.CompareQuery) (me
 }
 
 // fakeDirectory: email của tài khoản (pf/accounts giả).
-type fakeDirectory struct{ emails map[uuid.UUID]string }
+type fakeDirectory struct {
+	emails  map[uuid.UUID]string
+	members map[uuid.UUID]uuid.UUID // actor_ref → org_ref (tài khoản đã đăng ký của tổ chức)
+}
+
+// OrgRecipients: tài khoản của tổ chức có email (HTX US-DASH-03).
+func (f fakeDirectory) OrgRecipients(_ context.Context, _ uuid.UUID, org uuid.UUID) ([]port.Recipient, error) {
+	out := []port.Recipient{}
+	for actor, o := range f.members {
+		if e, ok := f.emails[actor]; ok && o == org {
+			out = append(out, port.Recipient{ActorRef: actor, DisplayName: "Cán bộ HTX", MaskedEmail: e[:2] + "•••"})
+		}
+	}
+	return out, nil
+}
 
 func (f fakeDirectory) EmailOf(_ context.Context, _ uuid.UUID, actor uuid.UUID) (string, error) {
 	e, ok := f.emails[actor]
@@ -285,5 +299,6 @@ var (
 	_ mechport.ReportData     = (*fakeMech)(nil)
 	_ ccport.ReportData       = (*fakeCC)(nil)
 	_ port.MailDirectory      = fakeDirectory{}
+	_ port.RecipientDirectory = fakeDirectory{}
 	_ port.Mailer             = (*fakeMailer)(nil)
 )

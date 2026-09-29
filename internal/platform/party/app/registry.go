@@ -31,6 +31,12 @@ var (
 	ErrOutOfScope       = problem.New(http.StatusForbidden, "party.out_of_scope", "Ngoài phạm vi phụ trách")
 	ErrDependency       = problem.New(http.StatusServiceUnavailable, "party.dependency_unavailable", "Dịch vụ phụ thuộc chưa sẵn sàng")
 	ErrImportInvalid    = problem.New(http.StatusUnprocessableEntity, "party.import_invalid", "Tệp nhập không đúng mẫu quy định")
+	// ErrCoopNameTaken: HTX US-HTX-03 AC-3 (và nhập hàng loạt US-HTX-02) — tên HTX đã có trong tenant.
+	ErrCoopNameTaken = problem.New(http.StatusConflict, "party.cooperative_name_taken", "Tên HTX này đã tồn tại, vui lòng chọn tên khác.")
+	// ErrPhoneTaken: sao chép nông hộ với SĐT đã có (HTX US-HH-02 AC-4, US-HH-01 AC-3).
+	ErrPhoneTaken = problem.New(http.StatusConflict, "party.household_phone_taken", "SĐT đã được sử dụng bởi nông hộ khác")
+	// ErrNoContact: chủ hộ chưa có SĐT hợp lệ trong kho định danh (HTX US-HH-03).
+	ErrNoContact = problem.New(http.StatusNotFound, "party.household_contact_unavailable", "Nông hộ chưa có số điện thoại liên hệ")
 )
 
 // Vai được đọc sổ tổ chức và HTX.

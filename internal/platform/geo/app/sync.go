@@ -220,7 +220,7 @@ func optRef(field, s string) (uuid.UUID, error) {
 // Lệch diện tích khai báo không chặn — ghi vào sự kiện pf.geo.plot_boundary.recorded.
 func (snk SyncSink) Accept(ctx context.Context, scope authz.Scope, rec syncport.Record) syncport.Result {
 	s := snk.Svc
-	p, err := authz.Require(ctx, writeRoles...)
+	p, err := authz.Require(ctx, syncWriteRoles...)
 	if err != nil {
 		return rejected(rec.ID, err)
 	}

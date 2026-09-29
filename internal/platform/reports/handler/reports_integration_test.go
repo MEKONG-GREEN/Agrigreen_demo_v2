@@ -75,11 +75,11 @@ func newFixture(t *testing.T, withDirectory bool) *fixture {
 		t.Fatal(err)
 	}
 	f.store = st
-	f.dir = fakeDirectory{emails: map[uuid.UUID]string{}}
+	f.dir = fakeDirectory{emails: map[uuid.UUID]string{}, members: map[uuid.UUID]uuid.UUID{}}
 	deps := reports.Deps{Scope: f.org, Orgs: f.org, Units: newFakeUnits(), Params: f.params, Catalogs: fakeCatalogs{}, Store: st,
 		Extension: f.ext, Mechanization: f.mech, CropCycle: f.cc, Mailer: f.mailer, LinkBase: "https://ops.test"}
 	if withDirectory {
-		deps.Directory = f.dir
+		deps.Directory, deps.Recipients = f.dir, f.dir
 	}
 	f.mod = reports.New(f.pool, f.clk, deps)
 	log := telemetry.NewLogger("test", io.Discard)

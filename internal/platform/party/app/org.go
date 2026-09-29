@@ -52,6 +52,9 @@ type CreateOrgInput struct {
 	Representative    *Representative
 	Cooperative       *domain.CooperativeProfile
 	IdemKey           string
+	// UniqueName: chặn tạo HTX trùng tên (không phân biệt hoa thường) — nhập hàng loạt
+	// và sao chép hồ sơ HTX (HTX US-HTX-02/03). Tạo đơn lẻ G1 giữ hành vi cũ.
+	UniqueName bool
 }
 
 // MoveOrgInput: di chuyển một nút (kèm cả nhánh con) sang cha mới — sáp nhập (KN US-ADM-07/08).
@@ -274,6 +277,18 @@ func (r *Registry) CreateOrg(ctx context.Context, in CreateOrgInput) (OrgResult,
 			return OrgResult{}, ErrInvalidHierarchy.WithDetail("đơn vị hành chính không thuộc địa bàn của tổ chức cấp trên")
 		}
 		code := in.Code
+		if isCoop && in.UniqueName {
+			if err := store.LockCooperativeName(ctx, tx, in.Name); err != nil {
+				return OrgResult{}, err
+			}
+			owner, err := store.CooperativeNameOwner(ctx, tx, in.Name)
+			if err != nil {
+				return OrgResult{}, err
+			}
+			if owner != uuid.Nil {
+				return OrgResult{}, ErrCoopNameTaken.With("existing_ref", owner.String())
+			}
+		}
 		if isCoop {
 			var err error
 			if code, err = store.NextCooperativeCode(ctx, tx); err != nil {
@@ -348,6 +363,9 @@ func profileDetails(p domain.CooperativeProfile) map[string]any {
 	}
 	if p.Location != nil {
 		d["lat"], d["lon"] = p.Location.Lat.String(), p.Location.Lon.String()
+	}
+	if a := strings.TrimSpace(p.Address); a != "" {
+		d["address"] = a
 	}
 	return d
 }

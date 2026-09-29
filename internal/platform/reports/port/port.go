@@ -115,6 +115,20 @@ type MailDirectory interface {
 	EmailOf(ctx context.Context, tenantID, actorRef uuid.UUID) (string, error)
 }
 
+// Recipient là một tài khoản đã đăng ký của HTX có email đã xác minh — người nhận được
+// chọn cho lịch báo cáo của quản lý HTX (HTX US-DASH-03). Email chỉ hiện đã che.
+type Recipient struct {
+	ActorRef    uuid.UUID
+	DisplayName string `pii:"true"`
+	MaskedEmail string `pii:"true"` // vd "qu•••@htx.vn"
+}
+
+// RecipientDirectory liệt kê tài khoản đang bật, email đã xác minh, thuộc tổ chức orgRef
+// (thuộc tính org_ref của tài khoản). pf/accounts hiện thực; pf/reports không lưu email.
+type RecipientDirectory interface {
+	OrgRecipients(ctx context.Context, tenantID, orgRef uuid.UUID) ([]Recipient, error)
+}
+
 // Message là một email gửi đi: không đính kèm (tệp có thể chứa dữ liệu nhạy
 // cảm) — chỉ liên kết tải ngắn hạn.
 type Message struct {

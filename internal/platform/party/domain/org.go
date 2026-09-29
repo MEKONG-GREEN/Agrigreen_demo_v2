@@ -18,8 +18,9 @@ const OrgRuleVersion = "pf.party.org/v1"
 
 // Độ dài tối thiểu của lý do.
 const (
-	MinDeactivateReason = 20 // HTX US-HTXSTATUS-01 AC-3
-	MinMoveReason       = 10 // sáp nhập/di chuyển nhánh phải có căn cứ (KN US-ADM-07/08)
+	MinDeactivateReason = 20  // HTX US-HTXSTATUS-01 AC-3
+	MinMoveReason       = 10  // sáp nhập/di chuyển nhánh phải có căn cứ (KN US-ADM-07/08)
+	MaxAddress          = 500 // địa chỉ trụ sở HTX (migration 000032)
 )
 
 // OrgAction là loại biến động trong sổ pf_party.org_event.
@@ -48,6 +49,7 @@ var (
 	ErrDeactivate    = errors.New("lý do vô hiệu hóa phải có ít nhất 20 ký tự")
 	ErrMoveReason    = errors.New("lý do di chuyển bắt buộc, ít nhất 10 ký tự")
 	ErrDate          = errors.New("ngày không hợp lệ hoặc ở tương lai")
+	ErrAddress       = errors.New("địa chỉ tối đa 500 ký tự")
 )
 
 var codeRe = regexp.MustCompile(`^[A-Za-z0-9._-]{1,40}$`)
@@ -164,6 +166,8 @@ type CooperativeProfile struct {
 	AreaHa        *decimal.Decimal
 	EstablishedOn *time.Time // ngày, 00:00 UTC
 	Location      *Point     // nil → hiển thị tâm xã, nhãn "vị trí tạm" (CGH AC-03)
+	// Address: địa chỉ trụ sở HTX (không phải dữ liệu cá nhân); rỗng = chưa khai (HTX US-HTX-02).
+	Address string
 }
 
 // Validate kiểm hồ sơ so với thời điểm now.
@@ -176,6 +180,9 @@ func (c CooperativeProfile) Validate(now time.Time) error {
 	}
 	if c.Location != nil && !c.Location.Valid() {
 		return FieldError{"cooperative.location", ErrLocation}
+	}
+	if utf8.RuneCountInString(c.Address) > MaxAddress {
+		return FieldError{"cooperative.address", ErrAddress}
 	}
 	return nil
 }

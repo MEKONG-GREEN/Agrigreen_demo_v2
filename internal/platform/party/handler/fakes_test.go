@@ -11,6 +11,7 @@ import (
 
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
@@ -118,12 +119,34 @@ func (v *fakeVault) Display(_ context.Context, purpose client.Purpose, ref uuid.
 	return client.Display{Ref: ref, Label: label, MaskedPhone: masked}, nil
 }
 
-func (v *fakeVault) Resolve(context.Context, client.Purpose, uuid.UUID) (client.Identity, error) {
-	return client.Identity{}, errNotImplemented
+func (v *fakeVault) Resolve(_ context.Context, purpose client.Purpose, ref uuid.UUID) (client.Identity, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.purposes = append(v.purposes, purpose)
+	id, ok := v.subjects[ref]
+	if !ok {
+		return client.Identity{}, client.ProblemNotFound
+	}
+	return id, nil
 }
 
-func (v *fakeVault) Lookup(context.Context, client.Purpose, string) (uuid.UUID, error) {
-	return uuid.Nil, errNotImplemented
+// Lookup tra chỉ mục mù theo SĐT (giống kho thật: giá trị không phải SĐT/CCCD → 422).
+func (v *fakeVault) Lookup(ctx context.Context, purpose client.Purpose, value string) (uuid.UUID, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.purposes = append(v.purposes, purpose)
+	value = strings.TrimSpace(value)
+	if len(value) < 9 || strings.Trim(value, "+0123456789") != "" {
+		return uuid.Nil, problem.Validation.WithField("value", "phải là SĐT Việt Nam hoặc CCCD/CMND")
+	}
+	tid, err := tenant.FromContext(ctx)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if ref, ok := v.index[tid.String()+"|p:"+value]; ok {
+		return ref, nil
+	}
+	return uuid.Nil, client.ProblemNotFound
 }
 
 func (v *fakeVault) Unwrap(context.Context, client.Purpose, uuid.UUID, []byte) ([]byte, error) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -286,14 +287,14 @@ const coopCols = `o.ref, o.kind, o.code, o.name, coalesce(o.admin_unit_code, '')
   coalesce(o.representative_ref, '00000000-0000-0000-0000-000000000000'::uuid), o.active,
   coalesce(o.status_reason, ''), o.last_seq,
   coalesce(c.tax_code, ''), c.area_ha::text, c.established_on::text,
-  ST_Y(c.location)::numeric(10,7)::text, ST_X(c.location)::numeric(10,7)::text`
+  ST_Y(c.location)::numeric(10,7)::text, ST_X(c.location)::numeric(10,7)::text, coalesce(c.head_office, '')`
 
 func scanCoop(row pgx.Row) (Cooperative, error) {
 	var c Cooperative
 	var kind string
 	var area, est, lat, lon *string
 	err := row.Scan(&c.Ref, &kind, &c.Code, &c.Name, &c.AdminUnitCode, &c.ParentRef, &c.RepresentativeRef, &c.Active,
-		&c.StatusReason, &c.LastSeq, &c.Profile.TaxCode, &area, &est, &lat, &lon)
+		&c.StatusReason, &c.LastSeq, &c.Profile.TaxCode, &area, &est, &lat, &lon, &c.Profile.Address)
 	if err != nil {
 		return c, err
 	}
@@ -333,12 +334,31 @@ func InsertCooperative(ctx context.Context, tx pgx.Tx, tenantID, ref uuid.UUID, 
 		a, b := p.Location.Lat.String(), p.Location.Lon.String()
 		lat, lon = &a, &b
 	}
-	_, err := tx.Exec(ctx, `INSERT INTO pf_party.cooperative (tenant_id, org_ref, tax_code, area_ha, established_on, location)
+	_, err := tx.Exec(ctx, `INSERT INTO pf_party.cooperative (tenant_id, org_ref, tax_code, area_ha, established_on, location, head_office)
 	  VALUES ($1, $2, $3, $4::numeric, $5::date,
 	    CASE WHEN $6::text IS NULL THEN NULL
-	         ELSE ST_SetSRID(ST_MakePoint($7::text::float8, $6::text::float8), 4326) END)`,
-		tenantID, ref, nilIfEmpty(p.TaxCode), decPtr(p.AreaHa), est, lat, lon)
+	         ELSE ST_SetSRID(ST_MakePoint($7::text::float8, $6::text::float8), 4326) END, $8)`,
+		tenantID, ref, nilIfEmpty(p.TaxCode), decPtr(p.AreaHa), est, lat, lon, nilIfEmpty(strings.TrimSpace(p.Address)))
 	return err
+}
+
+// LockCooperativeName tuần tự hóa việc tạo HTX cùng tên (không phân biệt hoa thường)
+// trong giao dịch hiện tại — khóa tư vấn tự nhả khi giao dịch kết thúc.
+func LockCooperativeName(ctx context.Context, tx pgx.Tx, name string) error {
+	_, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended('pf_party.cooperative_name:' || lower($1), 0))", strings.TrimSpace(name))
+	return err
+}
+
+// CooperativeNameOwner trả HTX đang mang tên này (không phân biệt hoa thường, bỏ
+// khoảng trắng hai đầu), Nil nếu chưa có — US-HTX-03 AC-3.
+func CooperativeNameOwner(ctx context.Context, tx pgx.Tx, name string) (uuid.UUID, error) {
+	var ref uuid.UUID
+	err := tx.QueryRow(ctx, `SELECT ref FROM pf_party.org WHERE kind = 'cooperative' AND lower(name) = lower($1) LIMIT 1`,
+		strings.TrimSpace(name)).Scan(&ref)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, nil
+	}
+	return ref, err
 }
 
 // TaxCodeOwner trả HTX đang giữ mã số thuế trong tenant, Nil nếu chưa có.

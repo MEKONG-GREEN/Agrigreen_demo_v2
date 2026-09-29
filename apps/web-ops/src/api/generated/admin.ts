@@ -478,6 +478,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cooperatives/import-template.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tệp .xlsx mẫu để nhập HTX hàng loạt (HTX US-HTX-02) */
+        get: operations["partyCooperativeImportTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cooperatives/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nhập hồ sơ HTX hàng loạt từ .xlsx hoặc CSV UTF-8 (HTX US-HTX-02), tối đa 200 dòng, 2 MB; kết quả theo dòng
+         * @description Cột (tiêu đề có/không dấu): "Tên HTX", "Địa chỉ", "Người đại diện", "SĐT", "Mã xã" (bắt buộc), "Mã số thuế",
+         *     "Diện tích (ha)", "Ngày thành lập" (YYYY-MM-DD), "Mã tổ chức cấp trên". Mã HTX do hệ thống sinh (CGH BR-01).
+         *     Người đại diện và SĐT đi thẳng vào kho định danh (mục đích registry.admin) — không lưu ở pf_party (R-04).
+         *     Tệp không đọc được (không phải .xlsx/CSV, .xls cũ, ô công thức, quá lớn) → 422 party.import_invalid với detail
+         *     bắt đầu "Sai định dạng file". Thiếu cột bắt buộc trong tiêu đề hoặc ô bắt buộc trống → TỪNG DÒNG bị loại với lý do
+         *     "Thiếu cột bắt buộc: <tên cột>"; tên HTX trùng → "Tên HTX này đã tồn tại, vui lòng chọn tên khác."; dòng hợp lệ
+         *     khác vẫn được tạo. Mỗi dòng ghi sổ với idem_key <Idempotency-Key>:row:<n> — gọi lặp không tạo trùng.
+         *     Vai: registry_admin, kn_province_admin (chỉ xã trong tỉnh), platform_admin.
+         */
+        post: operations["partyImportCooperatives"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cooperatives/{ref}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sao chép hồ sơ HTX (HTX US-HTX-03) — giữ địa bàn và cấu trúc, sửa riêng Tên và Người đại diện
+         * @description Bản sao giữ mã xã, địa chỉ, tổ chức cấp trên (nếu còn hoạt động), diện tích đăng ký, ngày thành lập của hồ sơ nguồn.
+         *     KHÔNG sao chép: Mã HTX (sinh mới), mã số thuế, toạ độ trụ sở, người đại diện (gửi `representative` mới hoặc bỏ trống).
+         *     Tên trùng HTX đã có (không phân biệt hoa thường) → 409 party.cooperative_name_taken
+         *     "Tên HTX này đã tồn tại, vui lòng chọn tên khác." Nguồn ngoài phạm vi → 404.
+         */
+        post: operations["partyCopyCooperative"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/households/import": {
         parameters: {
             query?: never;
@@ -2540,6 +2607,8 @@ export interface components {
             cooperative?: {
                 /** @description 10 hoặc 13 chữ số; duy nhất trong tenant */
                 tax_code?: string;
+                /** @description Địa chỉ trụ sở HTX (không phải dữ liệu cá nhân) */
+                address?: string;
                 /** @description Decimal dạng chuỗi */
                 area_ha?: string;
                 /** Format: date */
@@ -4496,6 +4565,132 @@ export interface operations {
             200: components["responses"]["PartyOrgChanged"];
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+        };
+    };
+    partyCooperativeImportTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp mẫu (tiêu đề + một dòng ví dụ) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    partyImportCooperatives: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+            };
+        };
+        responses: {
+            /** @description Kết quả theo dòng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        created: number;
+                        rejected: number;
+                        rows: {
+                            /** @description Số dòng trong tệp (dòng 1 là tiêu đề) */
+                            row: number;
+                            /** @enum {string} */
+                            status: "created" | "rejected";
+                            /** @description Không chứa dữ liệu cá nhân */
+                            reason: string | null;
+                            /** Format: uuid */
+                            org_ref: string | null;
+                            /** @description Mã HTX hệ thống sinh */
+                            code: string | null;
+                            /** @description Tên HTX ở dòng này */
+                            name: string | null;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    partyCopyCooperative: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    /** @description Người đại diện của bản sao — chuyển thẳng vào kho định danh */
+                    representative?: {
+                        full_name: string;
+                        phone: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        org: components["schemas"]["PartyOrg"];
+                        /** Format: uuid */
+                        source_ref: string;
+                        representative_duplicate: boolean;
+                    };
+                };
+            };
+            /** @description Đã tạo bản sao */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        org: components["schemas"]["PartyOrg"];
+                        /** Format: uuid */
+                        source_ref: string;
+                        representative_duplicate: boolean;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     partyImportHouseholds: {
