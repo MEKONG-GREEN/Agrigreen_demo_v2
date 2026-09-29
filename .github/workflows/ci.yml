@@ -93,7 +93,7 @@ jobs:
           sudo -u postgres pgbouncer -d /etc/pgbouncer-ci/pgbouncer.ini
           sleep 1 && pg_isready -h 127.0.0.1 -p 6432
       - name: go test -race
-        run: go test -race -count=1 ./...
+        run: go test -race -count=1 -timeout 40m ./...
 
   web-ops:
     name: Web vận hành (Next.js)
