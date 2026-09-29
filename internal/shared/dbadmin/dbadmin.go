@@ -71,6 +71,19 @@ var Roles = []Role{
 	// (idempotency) cho api-internal, không có quyền nghiệp vụ (Q-MKG-07).
 	{Name: "mkg_api", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
 	{Name: "vault_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.Vault}},
+	// G3 (docs/dev/g3-conventions.md §3).
+	// mkg/measurement: vai module (sổ phiếu cân, đối soát, tranh chấp, dung sai, sổ thiết bị).
+	{Name: "measurement_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
+	// cmd/ingest phía cụm mkg: đọc sổ thiết bị đã duyệt, ghi phiếu cân dẫn xuất (R-70) — quyền do migration measurement cấp.
+	{Name: "ingest_mkg", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
+	// cmd/worker-internal: consumer của vhost mkg.internal — chỉ shared.inbox (qua ag_shared_user) + quyền module cấp thêm.
+	{Name: "worker_internal", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
+	// cmd/ingest phía cụm ts: INSERT + SELECT trên ts_weigh (migration ts/000001), không UPDATE/DELETE.
+	{Name: "ingest_ts", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.TS}},
+	// Đọc chuỗi thời gian (tích phân lại, bằng chứng tranh chấp, xuất tầng lạnh): chỉ SELECT.
+	{Name: "ts_reader", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.TS}},
+	// pf/metrics: định nghĩa chỉ số, giá trị theo ngày, ảnh chụp + watermark, nhật ký lớp (GIS FN-18..21).
+	{Name: "metrics_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
 }
 
 // PasswordFor đọc mật khẩu của vai từ AG_DB_PASSWORD_<VAI>, rồi AG_DB_APP_PASSWORD.
@@ -153,6 +166,8 @@ func Bootstrap(ctx context.Context, adminURL, dbSuffix string) error {
 var Extensions = map[migrations.Cluster][]string{
 	migrations.PF:  {"postgis", "pgrouting"}, // pgrouting: pf/waterway (G2)
 	migrations.MKG: {"postgis"},
+	// migrations.TS: không cần extension — PostgreSQL 17 phân vùng khai báo thuần,
+	// TimescaleDB TSL không dùng (ADR-0017, RB-4).
 }
 
 func ensureExtensions(ctx context.Context, adminURL string, c migrations.Cluster, dbName string) error {

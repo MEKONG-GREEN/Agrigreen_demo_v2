@@ -17,6 +17,11 @@ func TestBoundary(t *testing.T) {
 		"example.com/ag/cmd/identity-vault",
 		"example.com/ag/cmd/api-internal",
 		"example.com/ag/cmd/api-platform",
+		// G3: gốc lắp ráp vùng mkg + luật agent biên (ADR-0019).
+		"example.com/ag/cmd/edge-agent",
+		"example.com/ag/cmd/worker-internal",
+		"example.com/ag/cmd/ingest",
+		"example.com/ag/internal/mkg/measurement/port/edgewire",
 	)
 }
 

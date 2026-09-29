@@ -10,7 +10,7 @@ AG_DB_PASSWORD_AG_MIGRATOR=… \
 migrate maintain            # mặc định 24 tháng tới; AG_PARTITION_MONTHS_AHEAD=36 để đổi
 ```
 
-- Lệnh tìm bảng sổ trong mọi cụm theo đúng tiêu chí của `shared.v_missing_immutability` (bảng có cột `row_hash`), rồi gọi `shared.create_monthly_partitions` cho từng bảng.
+- Lệnh tìm bảng sổ trong mọi cụm theo đúng tiêu chí của `shared.v_missing_immutability` (bảng có cột `row_hash`), cùng mọi bảng **chỉ ghi thêm có phân vùng không có chuỗi băm** (`shared.apply_append_only` — chuỗi thời gian cụm `ts`, vd `ts_weigh.raw_reading`, ADR-0017; `opsjobs.AppendOnlyPartitionedTables`), rồi gọi `shared.create_monthly_partitions` cho từng bảng.
 - Phân vùng mới được áp RLS và trigger chặn TRUNCATE (`shared.secure_partition`). Cổng catalog vẫn sạch.
 - Lệnh idempotent. Chạy lặp lại chỉ tạo phần còn thiếu (`TestEnsurePartitionsIdempotent`).
 - Lịch đề xuất là CronJob ngày 1 hằng tháng, cộng một lần sau mỗi `migrate up`. Không cần leader: DDL đã tự tuần tự hóa.

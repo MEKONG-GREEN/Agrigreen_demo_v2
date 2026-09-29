@@ -6,7 +6,8 @@ import (
 )
 
 func TestEmbeddedContractsApproved(t *testing.T) {
-	for _, n := range []string{"hub_facility", "hub_capacity"} {
+	// hub_*: G2; collection_schedule, htx_collection_statement, mrv_collection_evidence: dự thảo G3-0.
+	for _, n := range []string{"hub_facility", "hub_capacity", "collection_schedule", "htx_collection_statement", "mrv_collection_evidence"} {
 		c, err := Get(n)
 		if err != nil {
 			t.Fatalf("%s: %v", n, err)

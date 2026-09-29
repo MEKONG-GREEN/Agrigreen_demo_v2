@@ -1,5 +1,8 @@
-// Lệnh ingest: nhận số đo từ agent biên và telemetry qua mTLS (mục 13.2, 14).
-// Thuộc module mkg/measurement — làm ở G3 khi chốt mẫu cân (câu hỏi C-6).
+// Lệnh ingest: nhận lô số đo có chữ ký nguồn từ agent biên qua mTLS (mục 13.2,
+// 14; ADR-0019), ghi ts_weigh (cụm ts, vai ingest_ts) và tích phân phiếu cân (R-70,
+// cụm mkg, vai ingest_mkg). Gốc lắp ráp vùng mkg — không import internal/platform/*.
+// Hợp đồng đã đóng băng ở G3-0: internal/mkg/measurement/port (+ edgewire).
+// Hiện thực ở G3-1 (đợt A2).
 package main
 
 import (
@@ -8,6 +11,6 @@ import (
 )
 
 func main() {
-	fmt.Fprintln(os.Stderr, "ingest: chưa triển khai — thuộc cổng G3 (mkg/measurement, chờ C-6)")
+	fmt.Fprintln(os.Stderr, "ingest: chưa triển khai — G3-1 đợt A2 (hợp đồng measurement/port + edgewire đã có)")
 	os.Exit(2)
 }

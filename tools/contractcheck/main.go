@@ -10,6 +10,10 @@
 //     thích //ag:publication <tên> chỉ được có trường của hợp đồng, đúng kiểu,
 //     đệ quy; không có hợp đồng → hỏng (mặc định từ chối). Vùng mkg: mọi payload
 //     sự kiện phải là hợp đồng van (xem mkg.go).
+//   - Sự kiện nội bộ MKG (ADR-0018): struct //ag:internal-event <type> v<N> chỉ
+//     trong internal/mkg/**, schema ở contracts/events-internal/, chỉ phát với
+//     outbox.KindInternal (vhost mkg.internal) — không bao giờ lên exchange nền
+//     tảng (xem internal.go).
 //
 // Chạy: go run ./tools/contractcheck [-base origin/main]
 package main
@@ -82,13 +86,14 @@ type annotated struct {
 	pos         string
 	event       string // "<type> v<N>"
 	publication string
+	internal    string // //ag:internal-event "<type> v<N>" (ADR-0018)
 }
 
-// Check chạy toàn bộ kiểm tra.
-func Check(root, base string) ([]string, error) {
+// loadSchemas đọc mọi schema sự kiện trong contracts/<sub>/, khóa "<type> v<N>".
+func loadSchemas(root, base, sub string) (map[string]Schema, []string, error) {
 	var problems []string
 	schemas := map[string]Schema{}
-	evDir := filepath.Join(root, "contracts", "events")
+	evDir := filepath.Join(root, "contracts", sub)
 	files, _ := filepath.Glob(filepath.Join(evDir, "*.json"))
 	for _, f := range files {
 		name := filepath.Base(f)
@@ -102,7 +107,7 @@ func Check(root, base string) ([]string, error) {
 		}
 		raw, err := os.ReadFile(f)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		s, err := parseSchema(raw)
 		if err != nil {
@@ -123,6 +128,22 @@ func Check(root, base string) ([]string, error) {
 			problems = append(problems, compat(root, base, f, s)...)
 		}
 	}
+	return schemas, problems, nil
+}
+
+// Check chạy toàn bộ kiểm tra.
+func Check(root, base string) ([]string, error) {
+	schemas, problems, err := loadSchemas(root, base, "events")
+	if err != nil {
+		return nil, err
+	}
+	// Sự kiện nội bộ MKG (ADR-0018): schema riêng, chỉ vùng mkg, không trùng tên sự kiện nền tảng.
+	internalSchemas, ip, err := loadSchemas(root, base, internalEventsDir)
+	if err != nil {
+		return nil, err
+	}
+	problems = append(problems, ip...)
+	problems = append(problems, internalSchemaRules(root, schemas, internalSchemas)...)
 
 	pubs := map[string]*publication.Contract{}
 	pubFiles, _ := filepath.Glob(filepath.Join(root, "contracts", "publication", "*.json"))
@@ -177,11 +198,15 @@ func Check(root, base string) ([]string, error) {
 			if m := pubTagRe.FindStringSubmatch(d.doc); m != nil {
 				a.publication = m[1]
 			}
-			if a.event != "" || a.publication != "" {
+			if m := internalTagRe.FindStringSubmatch(d.doc); m != nil {
+				a.internal = m[1] + " v" + m[2]
+			}
+			if a.event != "" || a.publication != "" || a.internal != "" {
 				ann[annKey(pkg, name)] = a
 			}
 		}
 	}
+	problems = append(problems, ix.internalEventRules(ann, internalSchemas)...)
 	for _, a := range ann {
 		st, isStruct := a.decl.expr.(*ast.StructType)
 		if !isStruct {

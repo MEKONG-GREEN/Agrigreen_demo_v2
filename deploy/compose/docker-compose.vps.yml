@@ -98,6 +98,11 @@ services:
     environment:
       <<: *vps-env
 
+  # Consumer sự kiện nội bộ MKG (vhost mkg.internal, ADR-0018): không ra internet.
+  worker-internal:
+    environment:
+      <<: *vps-env
+
   worker:
     environment:
       <<: *vps-env

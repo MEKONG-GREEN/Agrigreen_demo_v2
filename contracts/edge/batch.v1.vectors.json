@@ -1,0 +1,722 @@
+{
+  "format": "agrigreen.edge.batch.v1",
+  "note": "Vector kiểm thử hợp đồng lô số đo edge-agent → ingest (ADR-0019). KHÓA CHỈ DÙNG CHO KIỂM THỬ — không bao giờ đăng ký vào sổ thiết bị. canonical là dạng chuẩn đã ký (LF cuối mỗi dòng).",
+  "private_seed_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "public_key_hex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+  "key_id": "56475aa75463474c",
+  "valid": [
+    {
+      "name": "three_readings_with_raw",
+      "json": {
+        "format": "agrigreen.edge.batch.v1",
+        "device_id": "scale-hub01-in",
+        "epoch": 1,
+        "counter_from": 41,
+        "counter_to": 43,
+        "key_id": "56475aa75463474c",
+        "ntp_offset_ms": -12,
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T00:14:22.100Z",
+            "value_kg": "0.000",
+            "stable": true,
+            "unit": "kg"
+          },
+          {
+            "counter": 42,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "value_kg": "1250.500",
+            "stable": false,
+            "unit": "kg",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg=="
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "value_kg": "1250.520",
+            "stable": true,
+            "unit": "kg"
+          }
+        ],
+        "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+      },
+      "canonical": "agrigreen.edge.batch.v1\ndevice_id=scale-hub01-in\nepoch=1\ncounter_from=41\ncounter_to=43\nkey_id=56475aa75463474c\nntp_offset_ms=-12\nreading=41;2026-12-03T00:14:22.100Z;0.000;1;kg;\nreading=42;2026-12-03T00:14:22.600Z;1250.500;0;kg;U1QsR1MsKzAwMTI1MC41a2cNCg==\nreading=43;2026-12-03T00:14:23.100Z;1250.520;1;kg;\n",
+      "payload_sha256_hex": "b6ab9ef690dee0f37a7996e66b32c2c23e8ab15ac990ca306be2ebcba0ebcb39",
+      "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+    },
+    {
+      "name": "single_reading_ntp_unsynced_tonnes_display",
+      "json": {
+        "format": "agrigreen.edge.batch.v1",
+        "device_id": "scale-hub01-out",
+        "epoch": 2,
+        "counter_from": 1,
+        "counter_to": 1,
+        "key_id": "56475aa75463474c",
+        "ntp_offset_ms": null,
+        "readings": [
+          {
+            "counter": 1,
+            "device_time": "2026-12-31T23:59:59.999Z",
+            "value_kg": "-0.500",
+            "stable": false,
+            "unit": "t"
+          }
+        ],
+        "signature": "c2DcCOubP+JoX/dlIdI+CDuYm1LNjatNgtXN86QXQXLMDSn2ACSQOP35YVn+XjKhPb3PFpMSzHMLbCM21ASJBw=="
+      },
+      "canonical": "agrigreen.edge.batch.v1\ndevice_id=scale-hub01-out\nepoch=2\ncounter_from=1\ncounter_to=1\nkey_id=56475aa75463474c\nntp_offset_ms=null\nreading=1;2026-12-31T23:59:59.999Z;-0.500;0;t;\n",
+      "payload_sha256_hex": "e35026baefac19363de8f9753b2451e0a433cea76b57c1e211a35f165815b738",
+      "signature": "c2DcCOubP+JoX/dlIdI+CDuYm1LNjatNgtXN86QXQXLMDSn2ACSQOP35YVn+XjKhPb3PFpMSzHMLbCM21ASJBw=="
+    }
+  ],
+  "invalid": [
+    {
+      "name": "tampered_value_after_signing",
+      "json": {
+        "counter_from": 41,
+        "counter_to": 43,
+        "device_id": "scale-hub01-in",
+        "epoch": 1,
+        "format": "agrigreen.edge.batch.v1",
+        "key_id": "56475aa75463474c",
+        "ntp_offset_ms": -12,
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T00:14:22.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "0.000"
+          },
+          {
+            "counter": 42,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg==",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "1250.500"
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "1350.520"
+          }
+        ],
+        "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+      },
+      "code": "edge.signature"
+    },
+    {
+      "name": "tampered_stable_after_signing",
+      "json": {
+        "counter_from": 41,
+        "counter_to": 43,
+        "device_id": "scale-hub01-in",
+        "epoch": 1,
+        "format": "agrigreen.edge.batch.v1",
+        "key_id": "56475aa75463474c",
+        "ntp_offset_ms": -12,
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T00:14:22.100Z",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "0.000"
+          },
+          {
+            "counter": 42,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg==",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "1250.500"
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "1250.520"
+          }
+        ],
+        "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+      },
+      "code": "edge.signature"
+    },
+    {
+      "name": "tampered_ntp_offset_after_signing",
+      "json": {
+        "counter_from": 41,
+        "counter_to": 43,
+        "device_id": "scale-hub01-in",
+        "epoch": 1,
+        "format": "agrigreen.edge.batch.v1",
+        "key_id": "56475aa75463474c",
+        "ntp_offset_ms": 0,
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T00:14:22.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "0.000"
+          },
+          {
+            "counter": 42,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg==",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "1250.500"
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "1250.520"
+          }
+        ],
+        "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+      },
+      "code": "edge.signature"
+    },
+    {
+      "name": "counter_gap",
+      "json": {
+        "counter_from": 41,
+        "counter_to": 43,
+        "device_id": "scale-hub01-in",
+        "epoch": 1,
+        "format": "agrigreen.edge.batch.v1",
+        "key_id": "56475aa75463474c",
+        "ntp_offset_ms": -12,
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T00:14:22.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "0.000"
+          },
+          {
+            "counter": 44,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg==",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "1250.500"
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "1250.520"
+          }
+        ],
+        "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+      },
+      "code": "edge.counter_range"
+    },
+    {
+      "name": "count_mismatch",
+      "json": {
+        "counter_from": 41,
+        "counter_to": 44,
+        "device_id": "scale-hub01-in",
+        "epoch": 1,
+        "format": "agrigreen.edge.batch.v1",
+        "key_id": "56475aa75463474c",
+        "ntp_offset_ms": -12,
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T00:14:22.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "0.000"
+          },
+          {
+            "counter": 42,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg==",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "1250.500"
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "1250.520"
+          }
+        ],
+        "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+      },
+      "code": "edge.counter_range"
+    },
+    {
+      "name": "value_two_decimals",
+      "json": {
+        "counter_from": 41,
+        "counter_to": 43,
+        "device_id": "scale-hub01-in",
+        "epoch": 1,
+        "format": "agrigreen.edge.batch.v1",
+        "key_id": "56475aa75463474c",
+        "ntp_offset_ms": -12,
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T00:14:22.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "0.000"
+          },
+          {
+            "counter": 42,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg==",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "1250.50"
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "1250.520"
+          }
+        ],
+        "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+      },
+      "code": "edge.reading"
+    },
+    {
+      "name": "value_negative_zero",
+      "json": {
+        "counter_from": 41,
+        "counter_to": 43,
+        "device_id": "scale-hub01-in",
+        "epoch": 1,
+        "format": "agrigreen.edge.batch.v1",
+        "key_id": "56475aa75463474c",
+        "ntp_offset_ms": -12,
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T00:14:22.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "-0.000"
+          },
+          {
+            "counter": 42,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg==",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "1250.500"
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "1250.520"
+          }
+        ],
+        "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+      },
+      "code": "edge.reading"
+    },
+    {
+      "name": "device_time_offset_not_utc",
+      "json": {
+        "counter_from": 41,
+        "counter_to": 43,
+        "device_id": "scale-hub01-in",
+        "epoch": 1,
+        "format": "agrigreen.edge.batch.v1",
+        "key_id": "56475aa75463474c",
+        "ntp_offset_ms": -12,
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T07:14:22.100+07:00",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "0.000"
+          },
+          {
+            "counter": 42,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg==",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "1250.500"
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "1250.520"
+          }
+        ],
+        "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+      },
+      "code": "edge.reading"
+    },
+    {
+      "name": "raw_base64_unpadded",
+      "json": {
+        "counter_from": 41,
+        "counter_to": 43,
+        "device_id": "scale-hub01-in",
+        "epoch": 1,
+        "format": "agrigreen.edge.batch.v1",
+        "key_id": "56475aa75463474c",
+        "ntp_offset_ms": -12,
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T00:14:22.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "0.000"
+          },
+          {
+            "counter": 42,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "1250.500"
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "1250.520"
+          }
+        ],
+        "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+      },
+      "code": "edge.reading"
+    },
+    {
+      "name": "unit_unknown",
+      "json": {
+        "counter_from": 41,
+        "counter_to": 43,
+        "device_id": "scale-hub01-in",
+        "epoch": 1,
+        "format": "agrigreen.edge.batch.v1",
+        "key_id": "56475aa75463474c",
+        "ntp_offset_ms": -12,
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T00:14:22.100Z",
+            "stable": true,
+            "unit": "lb",
+            "value_kg": "0.000"
+          },
+          {
+            "counter": 42,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg==",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "1250.500"
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "1250.520"
+          }
+        ],
+        "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+      },
+      "code": "edge.reading"
+    },
+    {
+      "name": "key_id_other_key",
+      "json": {
+        "counter_from": 41,
+        "counter_to": 43,
+        "device_id": "scale-hub01-in",
+        "epoch": 1,
+        "format": "agrigreen.edge.batch.v1",
+        "key_id": "0000000000000000",
+        "ntp_offset_ms": -12,
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T00:14:22.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "0.000"
+          },
+          {
+            "counter": 42,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg==",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "1250.500"
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "1250.520"
+          }
+        ],
+        "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+      },
+      "code": "edge.key_id"
+    },
+    {
+      "name": "unknown_field",
+      "json": {
+        "battery_pct": 80,
+        "counter_from": 41,
+        "counter_to": 43,
+        "device_id": "scale-hub01-in",
+        "epoch": 1,
+        "format": "agrigreen.edge.batch.v1",
+        "key_id": "56475aa75463474c",
+        "ntp_offset_ms": -12,
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T00:14:22.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "0.000"
+          },
+          {
+            "counter": 42,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg==",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "1250.500"
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "1250.520"
+          }
+        ],
+        "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+      },
+      "code": "edge.decode"
+    },
+    {
+      "name": "missing_ntp_offset",
+      "json": {
+        "counter_from": 41,
+        "counter_to": 43,
+        "device_id": "scale-hub01-in",
+        "epoch": 1,
+        "format": "agrigreen.edge.batch.v1",
+        "key_id": "56475aa75463474c",
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T00:14:22.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "0.000"
+          },
+          {
+            "counter": 42,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg==",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "1250.500"
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "1250.520"
+          }
+        ],
+        "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+      },
+      "code": "edge.decode"
+    },
+    {
+      "name": "counter_float",
+      "json": {
+        "counter_from": 41,
+        "counter_to": 43,
+        "device_id": "scale-hub01-in",
+        "epoch": 1.5,
+        "format": "agrigreen.edge.batch.v1",
+        "key_id": "56475aa75463474c",
+        "ntp_offset_ms": -12,
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T00:14:22.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "0.000"
+          },
+          {
+            "counter": 42,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg==",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "1250.500"
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "1250.520"
+          }
+        ],
+        "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+      },
+      "code": "edge.decode"
+    },
+    {
+      "name": "wrong_format",
+      "json": {
+        "counter_from": 41,
+        "counter_to": 43,
+        "device_id": "scale-hub01-in",
+        "epoch": 1,
+        "format": "agrigreen.edge.batch.v2",
+        "key_id": "56475aa75463474c",
+        "ntp_offset_ms": -12,
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T00:14:22.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "0.000"
+          },
+          {
+            "counter": 42,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg==",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "1250.500"
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "1250.520"
+          }
+        ],
+        "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+      },
+      "code": "edge.format"
+    },
+    {
+      "name": "device_id_uppercase",
+      "json": {
+        "counter_from": 41,
+        "counter_to": 43,
+        "device_id": "Scale-01",
+        "epoch": 1,
+        "format": "agrigreen.edge.batch.v1",
+        "key_id": "56475aa75463474c",
+        "ntp_offset_ms": -12,
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T00:14:22.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "0.000"
+          },
+          {
+            "counter": 42,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg==",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "1250.500"
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "1250.520"
+          }
+        ],
+        "signature": "G5m50t63SI/7OBQ0iivJSpyy2PFi1O/D1cjIC3O5l3Cn6wXs+A2rM3x6UlMNAPk4ido02qhRDhagDw1/anCKCw=="
+      },
+      "code": "edge.device_id"
+    },
+    {
+      "name": "signature_short",
+      "json": {
+        "counter_from": 41,
+        "counter_to": 43,
+        "device_id": "scale-hub01-in",
+        "epoch": 1,
+        "format": "agrigreen.edge.batch.v1",
+        "key_id": "56475aa75463474c",
+        "ntp_offset_ms": -12,
+        "readings": [
+          {
+            "counter": 41,
+            "device_time": "2026-12-03T00:14:22.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "0.000"
+          },
+          {
+            "counter": 42,
+            "device_time": "2026-12-03T00:14:22.600Z",
+            "raw": "U1QsR1MsKzAwMTI1MC41a2cNCg==",
+            "stable": false,
+            "unit": "kg",
+            "value_kg": "1250.500"
+          },
+          {
+            "counter": 43,
+            "device_time": "2026-12-03T00:14:23.100Z",
+            "stable": true,
+            "unit": "kg",
+            "value_kg": "1250.520"
+          }
+        ],
+        "signature": "AAAA"
+      },
+      "code": "edge.signature"
+    }
+  ]
+}

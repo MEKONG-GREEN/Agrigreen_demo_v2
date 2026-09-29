@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/mkg.fieldops.collection_schedule.published/v1",
+  "title": "mkg.fieldops.collection_schedule.published — payload",
+  "description": "DỰ THẢO G3-0. Payload đi qua van công bố collection_schedule v1 (contracts/publication/collection_schedule.json): một phiên bản lịch gom rơm của MKG cho một HTX/xã. Bản ghi xuất nằm ở sổ mkg_fieldops.valve_export; event_id = id bản ghi xuất.",
+  "x-event-type": "mkg.fieldops.collection_schedule.published",
+  "x-schema-version": 1,
+  "x-producer": "mkg/fieldops",
+  "x-publication": "collection_schedule",
+  "type": "object",
+  "required": ["schedule_ref", "htx_ref", "commune_code", "window_from", "window_to", "status", "revision"],
+  "properties": {
+    "schedule_ref": { "type": "string", "format": "uuid" },
+    "htx_ref":      { "type": "string", "format": "uuid" },
+    "commune_code": { "type": "string", "pattern": "^[0-9]{5}$" },
+    "window_from":  { "type": "string", "format": "date" },
+    "window_to":    { "type": "string", "format": "date" },
+    "status":       { "type": "string", "enum": ["planned", "confirmed", "in_progress", "completed", "cancelled"] },
+    "revision":     { "type": "integer" }
+  }
+}

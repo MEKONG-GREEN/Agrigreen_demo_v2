@@ -18,5 +18,8 @@
 | 0014 | [Thư viện xuất Excel/PDF và giấy phép phông chữ nhúng](0014-thu-vien-xuat-bao-cao-va-phong-chu.md) | Đề xuất |
 | 0015 | [Kênh đẩy thông báo và RB-7](0015-kenh-day-thong-bao-rb7.md) | Đề xuất — đã hiện thực ở pf/notify |
 | 0016 | [Giấy phép phụ thuộc Python của optimizer](0016-giay-phep-python.md) | Đề xuất |
+| 0017 | [Kho chuỗi thời gian — PostgreSQL phân vùng tháng ở cụm `ts`](0017-kho-chuoi-thoi-gian.md) | Đề xuất — hiện thực ở G3-0 |
+| 0018 | [Sự kiện nội bộ MKG — vhost RabbitMQ `mkg.internal` (Q-MKG-01)](0018-su-kien-noi-bo-mkg.md) | Đề xuất — hiện thực ở G3-0 |
+| 0019 | [Định danh thiết bị cân, ký tại nguồn và đồng hồ](0019-dinh-danh-thiet-bi-va-dong-ho.md) | Đề xuất — hợp đồng dây đóng băng ở G3-0 |
 
-ADR 0001–0008 là danh sách bắt buộc ở Phụ lục B của tài liệu kiến trúc. ADR 0009–0016 phát sinh khi tổng hợp BRD và khi dựng G0.
+ADR 0001–0008 là danh sách bắt buộc ở Phụ lục B của tài liệu kiến trúc. ADR 0009–0016 phát sinh khi tổng hợp BRD và khi dựng G0. ADR 0017–0019 là nền của cổng G3 ([g3-conventions](../dev/g3-conventions.md)).

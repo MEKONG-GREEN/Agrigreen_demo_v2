@@ -12,11 +12,11 @@
 | Thuộc tính | Giá trị |
 |---|---|
 | Chủ dữ liệu | Mekong Green (MKG) — một pháp nhân, **một tenant** (§2) |
-| Đơn vị triển khai | `cmd/api-internal` (API nội bộ MKG: bề mặt ứng dụng + bề mặt quản trị MFA), `worker-internal` (G3, tách khỏi `cmd/worker` của nền tảng), `cmd/ingest` + `cmd/edge-agent` (G3, measurement) |
+| Đơn vị triển khai | `cmd/api-internal` (API nội bộ MKG: bề mặt ứng dụng + bề mặt quản trị MFA), `cmd/worker-internal` (khung từ G3-0: consumer vhost `mkg.internal`, ADR-0018), `cmd/ingest` + `cmd/edge-agent` (G3, measurement; hợp đồng dây đóng băng ở G3-0, ADR-0019) |
 | Cụm DB | `ag_mkg` — **database và tài khoản riêng** với `ag_pf` (R-05, mục 5). ĐTK 1 có thể chung instance |
-| Schema | `mkg_<module>`; chuỗi thời gian cân thô ở cụm `ts` (`ts_weigh.raw_reading`, G3) |
+| Schema | `mkg_<module>`; chuỗi thời gian cân thô ở cụm `ts` (`ag_ts`, `ts_weigh.reading_batch` + `ts_weigh.raw_reading` — đã có từ G3-0, ADR-0017) |
 | Mã nguồn | `internal/mkg/<module>/{port,domain,app,store,handler}` + `module.go` (mẫu `internal/platform/party`) |
-| Gốc lắp ráp | **Chỉ** `cmd/api-internal/assembly` (và `worker-internal` từ G3). `tools/archlint` hỏng build nếu `cmd/api-platform` import `internal/mkg/*` hoặc `cmd/api-internal` import `internal/platform/*` (R-03 ở gốc lắp ráp) |
+| Gốc lắp ráp | **Chỉ** `cmd/api-internal/assembly` và `cmd/worker-internal/assembly` (cùng `cmd/ingest`, `cmd/edge-agent`). `tools/archlint` hỏng build nếu `cmd/api-platform` import `internal/mkg/*` hoặc `cmd/api-internal`, `cmd/ingest`, `cmd/edge-agent`, `cmd/worker-internal` import `internal/platform/*` (R-03 ở gốc lắp ráp); `cmd/edge-agent` chỉ thư viện chuẩn + `shared/{clock,ids,mass}` + `edgewire` |
 
 ### 1.1 Ba cửa giữa hai vùng (mục 5) — cách hiện thực
 
@@ -45,7 +45,7 @@
 ### 3.1 Nguyên tắc
 
 1. **Mặc định từ chối** (mục 5). Chỉ trường có trong hợp đồng đã phê duyệt đi qua; kiểm ở 2 lớp: build (`tools/contractcheck`) và chạy (`contracts/publication.Contract.Validate`, cả object lồng).
-2. **Mọi sự kiện của vùng mkg lên RabbitMQ là công bố.** Exchange hiện tại dùng chung; consumer pf bind được mọi routing key. Vì vậy `contractcheck` bắt: struct `//ag:event` trong `internal/mkg/**` phải kèm `//ag:publication`, và mọi `outbox.Event.Payload` trong `internal/mkg/**` phải chứng minh được là hợp đồng van. Tích hợp **nội bộ** giữa các module mkg đi qua `port/` đồng bộ trong cùng tiến trình (G2–G3) — xem Q-MKG-01 về exchange/vhost nội bộ.
+2. **Mọi sự kiện của vùng mkg lên vhost nền tảng là công bố.** Exchange `ag.events` của vhost nền tảng dùng chung; consumer pf bind được mọi routing key. Vì vậy `contractcheck` bắt: struct `//ag:event` trong `internal/mkg/**` phải kèm `//ag:publication`, và mọi `outbox.Event.Payload` (kind `platform`) trong `internal/mkg/**` phải chứng minh được là hợp đồng van. Sự kiện **nội bộ** giữa các module mkg (G3, Q-MKG-01 đã chốt — ADR-0018) mang `//ag:internal-event`, schema ở `contracts/events-internal/`, chỉ phát với `outbox.KindInternal` lên vhost riêng `mkg.internal` mà tài khoản nền tảng không có quyền; `contractcheck` bắt payload nội bộ không bao giờ đi kind `platform`. Mặc định vẫn là `port/` đồng bộ trong cùng tiến trình.
 3. **Sổ xuất là bằng chứng** (RB-1): `mkg_<module>.valve_export` lưu đúng byte đã kiểm, `payload_sha256`, `contract`, `contract_version`, `event_type`, `schema_version`, `subject_ref`, `actor_ref`; `id` = `event_id` trên outbox. Outbox **không** phải sổ (R-60).
 4. **Không bao giờ qua van:** dữ liệu cá nhân (RB-3, R-14), giá mua/bán, giá thành, biên lợi nhuận, `yield_kg_per_roll` (chỉ số biên lợi nhuận, mục 13.3), danh tính và điều khoản khách hàng, hồ sơ tranh chấp, số đo cân thô, tồn **theo lô** và nguồn gốc lô tới thửa/HTX (kết hợp với khối lượng lộ thông tin thương mại), bút toán.
 
@@ -55,9 +55,9 @@
 |---|---|---|---|---|---|
 | `hub_facility` v1 | mkg/hub | `hub_ref, code, name, kind, location{lat,lng}, boundary?, province_code, status, capacity_tons, unit, effective_from` | Nền tảng (GIS, mô phỏng chọn hub, điều phối gom) cần vị trí, loại, trạng thái, sức chứa danh định của cơ sở **đã phê duyệt**. Là dữ liệu hạ tầng, không cá nhân, không giá | pf/geo (mô hình đọc hub, đợt 2) | **Đã có** — phát khi duyệt phiên bản dữ liệu chủ |
 | `hub_capacity` v1 | mkg/hub | `hub_ref, as_of, capacity_tons, used_tons, available_tons, unit` | Điều phối gom rơm cần sức chứa còn trống. Chỉ con số tổng của cơ sở — không lô, không nguồn gốc | pf/geo | **Đã có** — phát khi duyệt và khi chụp (`POST …/capacity-snapshots`) |
-| `collection_schedule` (đề xuất) | mkg/fieldops | `htx_ref, commune_code, window_from, window_to, status` | HTX/cán bộ KN cần biết lịch gom để không đốt rơm (mục tiêu chương trình) | pf/cropcycle, notify | G3 — cần MKG phê duyệt |
-| `htx_collection_statement` (đề xuất) | mkg/fieldops | `htx_ref, plot_ref, collected_on, rolls, statement_ref` | Đối soát chéo chiều mua (mục 13.3, `htx_confirmation_ref`): HTX xác nhận số cuộn trên app HTX. Không có giá, không khối lượng cân | pf/cropcycle (HTX xác nhận) → quay về MKG qua API công khai | G3 — cần chốt với khách (C-4) |
-| `mrv_collection_evidence` (đề xuất) | mkg/measurement | `plot_ref, season_ref, collected_kg_bucket, collected_on` | MRV cần lượng rơm được thu (tránh đốt) theo thửa; khối lượng làm tròn theo bậc để không lộ sản lượng thương mại | pf/mrv | G3 — chờ C-1 (danh mục trường MRV) |
+| `collection_schedule` v1 (**dự thảo G3-0**) | mkg/fieldops | `schedule_ref, htx_ref, commune_code, window_from, window_to, status, revision` | HTX/cán bộ KN cần biết lịch gom để không đốt rơm (mục tiêu chương trình) | pf/cropcycle, notify | Tệp hợp đồng + schema sự kiện + struct `fieldops/port` đã có; người phê duyệt là vai giữ chỗ — cần MKG phê duyệt |
+| `htx_collection_statement` v1 (**dự thảo G3-0**) | mkg/fieldops | `statement_ref, htx_ref, plot_ref, season_ref?, collected_on, rolls, revision` | Đối soát chéo chiều mua (mục 13.3, `htx_confirmation_ref`): HTX xác nhận số cuộn trên app HTX. Không có giá, không khối lượng cân | pf/cropcycle (HTX xác nhận) → quay về MKG qua API công khai | Dự thảo đã có — cần chốt với khách (C-4: trả theo cuộn hay theo tấn) |
+| `mrv_collection_evidence` v1 (**dự thảo G3-0**) | mkg/measurement | `evidence_ref, plot_ref, season_ref?, collected_on, collected_kg_bucket, bucket_rule_version, revision` | MRV cần lượng rơm được thu (tránh đốt) theo thửa; khối lượng làm tròn theo bậc để không lộ sản lượng thương mại | pf/mrv | Dự thảo đã có — chờ C-1 (danh mục trường MRV, phương pháp tCO2e) |
 
 Hợp đồng mới: PR riêng, `proposed_by` ≠ `approved_by` (R-56), đi kèm schema sự kiện `mkg.<module>.<thực thể>.published v<N>`.
 
@@ -169,7 +169,7 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 | Nguồn ngoài | Thửa, HTX của nền tảng: gọi Application API công khai bằng tài khoản dịch vụ tenant MKG (cửa "tiêu thụ không đặc quyền"); lưu `plot_ref`, `htx_ref` UUID thuần (R-06) |
 | Đồng bộ ngoại tuyến | App hiện trường MKG (Flutter, `apps/field-app` biến thể MKG) — engine đồng bộ riêng vùng mkg; `id` UUIDv7 + `idem_key` do máy sinh (R-11, mục 15); không ghi đè, xung đột giữ cả hai |
 | Vai DB / nghiệp vụ | `fieldops_app` (đã có) / `field_collector`, `field_supervisor` (duyệt lệnh gom ≠ người lập) |
-| Migration | mkg 000004 (G3) |
+| Migration | mkg 000006 (G3) — g3-conventions §2 |
 
 ### 5.2 `mkg/measurement` — ba điểm cân, phiếu cân dẫn xuất, đối soát (mục 13) — **event sourcing mức B: sổ là nguồn**
 
@@ -179,11 +179,12 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 | Aggregate | `WeighTicket`, `Reconciliation`, `Dispute`, `ToleranceTable` (có phiên bản, người đặt ≠ người duyệt) |
 | Sổ | `ts_weigh.raw_reading` (cụm ts, chuỗi thời gian, không xóa — R-71), `weigh_ticket` (`lot:<id>`, ghi `rule_version` thuật toán tích phân + khoảng `raw_reading` đã dùng), `reconciliation` (`lot:<id>`), `dispute_event` (`dispute:<id>`), `tolerance_version` |
 | Bảng chiếu | `lot_mass_current` (HUB_IN/HUB_OUT/CUSTOMER_IN của mỗi lô), `dispute_current` |
-| Sự kiện | **Nội bộ** (vd phiếu cân đã ghi → hub/costing): đồng bộ qua `port/` ở G3; nếu cần bất đồng bộ → exchange nội bộ (Q-MKG-01). Công bố: `mrv_collection_evidence` (§3.2) |
+| Sự kiện | **Nội bộ** (vhost `mkg.internal`, ADR-0018): `mkg.measurement.weigh_ticket.recorded` v1, `mkg.measurement.reconciliation.completed` v1 (schema `contracts/events-internal/`, struct `measurement/port`); mặc định vẫn là `port/` đồng bộ. Công bố: `mrv_collection_evidence` (§3.2) |
 | Bất biến | Phiếu cân chỉ do ingest tạo (R-70); lô `route = DIRECT` không tính hao hụt tách lớp; dung sai theo phiên bản có hiệu lực **lúc sự việc** (mục 16) |
-| Vai DB / nghiệp vụ | `measurement_app` (mới), `ingest_mkg` (mới, chỉ INSERT `raw_reading` + `weigh_ticket`) / `scale_supervisor`, `reconciliation_officer`, `dispute_officer`, `tolerance_approver` |
+| Vai DB / nghiệp vụ | `measurement_app`, `ingest_mkg` (cụm mkg: đọc sổ thiết bị, ghi phiếu cân), `ingest_ts` + `ts_reader` (cụm ts) — đã khai ở G3-0 / `scale_supervisor`, `device_approver`, `reconciliation_officer`, `dispute_officer`, `tolerance_approver` |
 | R-10 | Package `measurement` đã nằm trong `agnofloat` |
-| Migration | mkg 000005 + cụm ts 000001 (G3) |
+| Migration | mkg 000007–000008 + cụm ts 000001 (**đã có ở G3-0**: `ts_weigh.reading_batch`, `ts_weigh.raw_reading`) |
+| Hợp đồng đóng băng (G3-0) | `measurement/port`: `Integrator`, `TicketWriter`, `LotMass`, `DeviceRegistry`; `measurement/port/edgewire` + `contracts/edge/batch.v1.json` (ADR-0019) |
 
 ### 5.3 `mkg/hub` — xem §4.
 
@@ -197,7 +198,7 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 | Bảng chiếu | `trip_current` |
 | Nguồn ngoài | Đồ thị đường thủy / tuyến đường bộ của nền tảng (`pf/waterway`, OSRM) — qua Application API công khai (không import `pf/waterway`, R-03); **kết quả định tuyến đã dùng lưu bền vững** vào chặng (tái hiện chi phí, mục 16) |
 | Vai DB / nghiệp vụ | `logistics_app` (mới) / `dispatcher`, `driver` (ghi mốc chuyến trên app) |
-| Migration | mkg 000006 (G3–G4) |
+| Migration | G4 — cấp từ mkg 000013 |
 
 ### 5.5 `mkg/orders` — đơn hàng, giao nhận
 
@@ -208,7 +209,7 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 | Sổ | `order_event` (`order:<id>`), `delivery_event`; giá `numeric(18,4)` đơn giá, `numeric(18,2)` tiền qua `shared/money` (R-10, `agnofloat` đã áp `orders`) |
 | Phê duyệt | Giá/chiết khấu vượt ngưỡng: `sales_officer` lập, `sales_approver` duyệt (R-56) |
 | Vai DB | `orders_app` (mới) |
-| Migration | mkg 000007 (G4) |
+| Migration | G4 — cấp từ mkg 000013 |
 
 ### 5.6 `mkg/costing` — giá thành, quyết toán, quy đổi cuộn → tấn — **event sourcing mức B: sổ là nguồn**
 
@@ -221,7 +222,7 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 | Đóng kỳ | Theo mẫu mục 12: `POST …/periods/{id}/close` → 202 + job; worker-internal tính; ảnh chụp đầu vào bất biến; người đóng ≠ người lập bút toán điều chỉnh (R-56) |
 | Vai DB / nghiệp vụ | `costing_app` (mới) / `cost_accountant`, `period_closer` |
 | R-10 | `agnofloat` đã áp `costing` |
-| Migration | mkg 000008 (G4) |
+| Migration | G4 — cấp từ mkg 000013 |
 
 ### 5.7 `mkg/acctbridge` — bút toán tổng hợp → kế toán pháp định
 
@@ -231,23 +232,24 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 | Sổ | `summary_journal` (`period:<id>`: tài khoản, số tiền tổng, `source_hash` = băm tập kết quả costing đã tổng hợp), `push_attempt` (bảng vận hành) |
 | Luồng | Kỳ costing đã đóng → dựng bút toán tổng hợp (job, mẫu mục 12) → `chief_accountant` duyệt (≠ người dựng) → đẩy qua bộ điều hợp; lỗi → thử lại, DLQ, cảnh báo (R-62). Nhà cung cấp trong lãnh thổ (RB-7) |
 | Vai DB / nghiệp vụ | `acctbridge_app` (mới) / `accounting_bridge_operator`, `chief_accountant` |
-| Migration | mkg 000009 (G4) |
+| Migration | G4 — cấp từ mkg 000013 |
 
 ### 5.8 Bảng tổng hợp cụm / vai / migration
 
+Số chính thức theo [g3-conventions §2](../dev/g3-conventions.md#2-số-migration) (người tích hợp cấp ở G3-0, 30/09/2026).
+
 | Module | Schema | Vai DB | Migration | Có sẵn? |
 |---|---|---|---|---|
-| fieldops | `mkg_fieldops` | `fieldops_app` | 000001 (roll_count), 000004 (G3) | vai + 000001 đã có |
-| hub | `mkg_hub` | `hub_app` | **000002** (master, lô, mẻ, xuất, dịch chuyển), **000003** (sổ van) | **đã làm** |
-| measurement | `mkg_measurement` + `ts_weigh` | `measurement_app`, `ingest_mkg` | 000005 + ts 000001 | cần thêm vai, cụm ts |
-| logistics | `mkg_logistics` | `logistics_app` | 000006 | cần thêm vai |
-| orders | `mkg_orders` | `orders_app` | 000007 | cần thêm vai |
-| costing | `mkg_costing` | `costing_app` | 000008 | cần thêm vai |
-| acctbridge | `mkg_acctbridge` | `acctbridge_app` | 000009 | cần thêm vai |
+| fieldops | `mkg_fieldops` | `fieldops_app` | 000001 (roll_count), **000006** (G3) | vai + 000001 đã có; `fieldops/port` (tên vai, sự kiện nội bộ, van dự thảo) đã có |
+| hub | `mkg_hub` | `hub_app` | **000002** (master, lô, mẻ, xuất, dịch chuyển), **000003** (sổ van), **000009** (G3: khối lượng từ phiếu cân, kiểm kê, `hub.risk.v2`) | 000002–000003 **đã làm** |
+| measurement | `mkg_measurement` + `ts_weigh` (cụm ts) | `measurement_app`, `ingest_mkg` (mkg); `ingest_ts`, `ts_reader` (ts) | **000007–000008** + ts **000001** | vai + ts 000001 + port đóng băng **đã có (G3-0)** |
+| logistics | `mkg_logistics` | `logistics_app` | G4 (từ 000013) | cần thêm vai |
+| orders | `mkg_orders` | `orders_app` | G4 (từ 000013) | cần thêm vai |
+| costing | `mkg_costing` | `costing_app` | G4 (từ 000013) | cần thêm vai |
+| acctbridge | `mkg_acctbridge` | `acctbridge_app` | G4 (từ 000013) | cần thêm vai |
+| dự phòng G3 | | | **000010–000012** | xin người tích hợp |
 | API nội bộ | `shared.idempotency_key` cụm mkg | `mkg_api` (tương đương `platform_api`) | — (quyền qua `ag_shared_user`, shared 000001) | **đã làm** — `cmd/api-internal/assembly.OpsRole` (Q-MKG-07 đóng) |
-| worker-internal | `shared.inbox` cụm mkg | `worker_internal` | — | G3 |
-
----
+| worker-internal | `shared.inbox` cụm mkg | `worker_internal` | — | **khung đã có (G3-0)**: `cmd/worker-internal`, vhost `mkg.internal` (ADR-0018) |
 
 ## 6. Tuân thủ bảy ràng buộc cứng (mục 3)
 
@@ -288,7 +290,8 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 |---|---|
 | **G2 đợt 1 (xong)** | Tài liệu này; `mkg/hub` (000002, 000003); van `hub_facility`/`hub_capacity` v1; `cmd/api-internal` có gốc lắp ráp; `contractcheck` siết (siêu dữ liệu phê duyệt, kiểu lồng nhau, luật vùng mkg); `archlint` R-03 ở gốc lắp ráp + `agnofloat` cho `mkg/hub` |
 | G2 đợt 2 | `pf/geo` tiêu thụ van (`HubSink`, inbox, mô hình đọc hub); vai `mkg_api` + `worker_internal` ở `dbadmin`; Compose/Helm cho `api-internal`; client OIDC dịch vụ cho tenant MKG; job chụp sức chứa định kỳ (Q-MKG-02) |
-| G3 | `mkg/measurement` + cụm ts + `cmd/ingest` + agent biên theo mẫu cân đã chốt (C-6); `mkg/fieldops` G3 (lệnh gom, app hiện trường MKG, xác nhận HTX); hub nhận khối lượng từ phiếu cân; cảm biến môi trường kho → điểm rủi ro có cảnh báo (`hub.risk.v2`); hợp đồng `collection_schedule`, `htx_collection_statement`, `mrv_collection_evidence` nếu được duyệt; `worker-internal` |
+| G3-0 (xong) | Cụm ts + `ts_weigh` (ADR-0017); vhost `mkg.internal`, `outbox.kind`, `//ag:internal-event`, `cmd/worker-internal` (ADR-0018); hợp đồng dây edge ↔ ingest + sổ thiết bị (ADR-0019); port đóng băng `measurement`, `fieldops`, `pf/metrics`; van dự thảo `collection_schedule`, `htx_collection_statement`, `mrv_collection_evidence`; vai DB G3 |
+| G3 | `mkg/measurement` + `cmd/ingest` + agent biên theo mẫu cân đã chốt (C-6); `mkg/fieldops` G3 (lệnh gom, app hiện trường MKG, xác nhận HTX); hub nhận khối lượng từ phiếu cân; cảm biến môi trường kho → điểm rủi ro có cảnh báo (`hub.risk.v2`); hợp đồng `collection_schedule`, `htx_collection_statement`, `mrv_collection_evidence` nếu được duyệt; `worker-internal` |
 | G4 | `mkg/logistics`, `mkg/orders`, `mkg/costing` (đóng kỳ theo mẫu mục 12), `mkg/acctbridge`; diễn tập dựng lại bảng chiếu trên bản sao dữ liệu thật (R-22); tách đơn vị triển khai bằng cấu hình; diễn tập tải ĐTK 2 |
 
 ---
@@ -297,7 +300,7 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 
 | # | Câu hỏi | Đề xuất | Ai | Chặn |
 |---|---|---|---|---|
-| Q-MKG-01 | Sự kiện **nội bộ** giữa các module mkg (vd phiếu cân → costing) đi đâu, khi exchange RabbitMQ dùng chung với nền tảng? | Vhost/exchange `mkg.internal` riêng mà vai của nền tảng không bind được; khi có, thêm chú thích `//ag:internal-event` được `contractcheck` chấp nhận cho payload chỉ phát vào exchange đó. Tới lúc đó: tích hợp nội bộ bằng `port/` đồng bộ | Kiến trúc + vận hành | measurement, costing (G3) |
+| Q-MKG-01 | Sự kiện **nội bộ** giữa các module mkg (vd phiếu cân → costing) đi đâu, khi exchange RabbitMQ dùng chung với nền tảng? | **Đã chốt (G3-0, ADR-0018):** vhost `mkg.internal` riêng, tài khoản nền tảng không có quyền; `shared.outbox.kind`; `//ag:internal-event` + `contracts/events-internal/`; `contractcheck` bắt payload nội bộ không đi vhost nền tảng; consumer ở `cmd/worker-internal` | Kiến trúc + vận hành | — |
 | Q-MKG-02 | Tần suất công bố `hub_capacity`: theo mỗi dịch chuyển, theo lịch, hay theo ngưỡng thay đổi? | Job 15 phút + khi thay đổi > 5% sức chứa; hiện chỉ khi duyệt và khi chụp tay | MKG vận hành | pf/geo độ tươi dữ liệu |
 | Q-MKG-03 | Phạm vi người vận hành theo hub (người ở hub A không thao tác hub B)? | Gán `facility_scope` trong claim hoặc bảng phân công ở mkg/hub, kiểm ở `app/` | MKG | ĐTK 2 nhiều hub |
 | Q-MKG-04 | Khối lượng lô: nhập tay ở hub hay lấy từ phiếu cân `HUB_IN` (RB-6)? | G2 nhập tay; G3 lô `receipt` bắt buộc `weigh_ticket_ref` khi hub có cân; nhập tay chỉ khi cân hỏng, có lý do | MKG + thương mại (C-4) | measurement |
@@ -316,7 +319,8 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 | Chủ đề | Tài liệu kiến trúc | Hiện thực | Lý do |
 |---|---|---|---|
 | Sổ xuất của van | "Tệp hợp đồng… CI hỏng build khi có trường ngoài hợp đồng" | Thêm sổ `valve_export` + kiểm lúc chạy + vận chuyển qua `shared.outbox` cụm mkg | Bằng chứng "đã công bố gì" (RB-1) và mặc định từ chối cả lúc chạy; dùng lại `outbox-publisher` đã quét mọi cụm, không thêm tiến trình |
-| Sự kiện của vùng mkg | Mục 13.2 nêu `mkg.measurement.weigh_ticket.recorded` qua outbox | G2: mọi sự kiện mkg lên hàng đợi phải là hợp đồng van | Exchange dùng chung → không có "sự kiện nội bộ" thật sự; xem Q-MKG-01 |
+| Sự kiện của vùng mkg | Mục 13.2 nêu `mkg.measurement.weigh_ticket.recorded` qua outbox | G2: mọi sự kiện mkg lên hàng đợi phải là hợp đồng van. G3: sự kiện nội bộ đi vhost riêng `mkg.internal` (`outbox.kind = internal`) | Exchange dùng chung → cần vhost riêng để có "sự kiện nội bộ" thật sự (ADR-0018) |
+| Kho chuỗi thời gian | Mục 4: TimescaleDB | PostgreSQL 17 phân vùng tháng thuần ở cụm `ts`, bố cục tương thích Timescale, không TSL | RB-4 (giấy phép TSL), nhà cung cấp trong lãnh thổ (ADR-0017) |
 | Vai phê duyệt dữ liệu chủ hub | R-56: `param_setter`/`param_approver` | `hub_operator`/`hub_approver` (R-56 giữ nguyên) | Tách thẩm quyền hạ tầng MKG khỏi thẩm quyền tham số nền tảng (§4.4) |
 | Loại cơ sở | "hub: mẻ sấy, mẻ nén, tồn kho" | `kind ∈ {hub, warehouse, yard}`; kho/bãi có thể thuộc hub (`parent_facility_id`) | Prototype có hub/kho/bãi; nền tảng cần cả ba để điều phối |
 | Khóa duy nhất sổ | Mẫu 8.1 có `UNIQUE (tenant_id, idem_key)` | `shared.ledger_idem` + `shared.chain_head` | ADR-0012 (bảng phân vùng) |

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events-internal/mkg.measurement.reconciliation.completed/v1",
+  "title": "mkg.measurement.reconciliation.completed — payload (sự kiện NỘI BỘ MKG)",
+  "description": "Đối soát một lô hoàn tất (RB-6, mục 13.1): HUB_IN → HUB_OUT tách hao hụt dự kiến (định mức sấy có phiên bản) và bất thường; HUB_OUT → CUSTOMER_IN so bảng dung sai có phiên bản (C-4). Chỉ vhost mkg.internal (ADR-0018) — dung sai, hao hụt, tranh chấp KHÔNG BAO GIỜ qua van. Người nhận: mkg/hub (cảnh báo), mkg/costing (G4: quy kết hao hụt).",
+  "x-event-type": "mkg.measurement.reconciliation.completed",
+  "x-schema-version": 1,
+  "x-producer": "mkg/measurement",
+  "x-kind": "internal",
+  "type": "object",
+  "required": ["reconciliation_id", "lot_ref", "route", "outcome", "rule_version", "event_time"],
+  "properties": {
+    "reconciliation_id":  { "type": "string", "format": "uuid" },
+    "lot_ref":            { "type": "string", "format": "uuid" },
+    "route":              { "type": "string", "enum": ["HUB", "DIRECT"] },
+    "hub_in_kg":          { "type": ["string", "null"], "pattern": "^[0-9]+\\.[0-9]{3}$" },
+    "hub_out_kg":         { "type": ["string", "null"], "pattern": "^[0-9]+\\.[0-9]{3}$" },
+    "customer_in_kg":     { "type": ["string", "null"], "pattern": "^[0-9]+\\.[0-9]{3}$" },
+    "expected_loss_kg":   { "type": ["string", "null"], "pattern": "^-?[0-9]+\\.[0-9]{3}$" },
+    "abnormal_loss_kg":   { "type": ["string", "null"], "pattern": "^-?[0-9]+\\.[0-9]{3}$" },
+    "commercial_diff_kg": { "type": ["string", "null"], "pattern": "^-?[0-9]+\\.[0-9]{3}$", "description": "CUSTOMER_IN − HUB_OUT" },
+    "outcome":            { "type": "string", "enum": ["within_tolerance", "loss_alert", "dispute_opened", "direct_aggregate"] },
+    "tolerance_version":  { "type": ["string", "null"], "description": "Phiên bản bảng dung sai có hiệu lực LÚC SỰ VIỆC (mục 16)" },
+    "loss_norm_version":  { "type": ["string", "null"], "description": "Phiên bản định mức hao hụt sấy (chờ khách)" },
+    "dispute_id":         { "type": ["string", "null"], "format": "uuid" },
+    "rule_version":       { "type": "string" },
+    "event_time":         { "type": "string", "format": "date-time" }
+  }
+}

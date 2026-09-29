@@ -62,6 +62,14 @@
       { "name": "account_admin_province", "description": "[MFA] Quản trị tài khoản của một tỉnh: chỉ cấp kn_officer/coop_manager cho tổ chức trong tỉnh (pf/accounts)" },
       { "name": "hub_operator", "description": "MKG (tài khoản tenant MKG, API nội bộ api-internal): vận hành hub — nhận lô, mẻ sấy/nén, xuất theo rủi ro, bù sai, chụp sức chứa; đề xuất dữ liệu chủ hub/kho qua bề mặt quản trị (MFA)" },
       { "name": "hub_approver", "description": "MKG (bề mặt quản trị api-internal, bắt buộc MFA): phê duyệt/từ chối phiên bản dữ liệu chủ hub/kho — không duyệt đề xuất của chính mình (R-56); phê duyệt xuất qua van công bố" },
+      { "name": "scale_supervisor", "description": "MKG (G3, mkg/measurement): giám sát cân — đề xuất đăng ký/thu hồi thiết bị cân, nhập phiếu CUSTOMER_IN tay có bằng chứng, xem số đo thô" },
+      { "name": "device_approver", "description": "MKG (G3, mkg/measurement, bề mặt quản trị MFA): duyệt đăng ký thiết bị cân (khóa nguồn Ed25519 + chứng thư mTLS) — không duyệt đề xuất của chính mình (R-56)" },
+      { "name": "reconciliation_officer", "description": "MKG (G3, mkg/measurement): chạy và xác nhận đối soát HUB_IN → HUB_OUT → CUSTOMER_IN (RB-6)" },
+      { "name": "dispute_officer", "description": "MKG (G3, mkg/measurement): mở, bổ sung bằng chứng, đóng hồ sơ tranh chấp thương mại" },
+      { "name": "tolerance_approver", "description": "MKG (G3, mkg/measurement, bề mặt quản trị MFA): duyệt phiên bản bảng dung sai và định mức hao hụt sấy — người đặt ≠ người duyệt (R-56)" },
+      { "name": "field_collector", "description": "MKG (G3, mkg/fieldops): tổ gom — đếm cuộn tại thửa trên app hiện trường MKG (ngoại tuyến)" },
+      { "name": "field_supervisor", "description": "MKG (G3, mkg/fieldops): lập/duyệt lệnh gom (người duyệt ≠ người lập, R-56), đối chiếu số cuộn" },
+      { "name": "metrics_viewer", "description": "Nền tảng (G3, pf/metrics): xem chỉ số và lịch sử trong phạm vi cây TW → Tỉnh → Xã" },
       { "name": "offline_access", "description": "Refresh token ngoại tuyến (app hiện trường, tối đa 72 giờ không trực tuyến — mục 15)" },
       { "name": "default-roles-agrigreen", "description": "Vai mặc định của realm — KHÔNG gồm vai nghiệp vụ nào", "composite": true, "composites": { "realm": ["offline_access"] } }
     ]

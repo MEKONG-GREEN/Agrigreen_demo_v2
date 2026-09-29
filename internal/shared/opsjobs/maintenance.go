@@ -67,8 +67,37 @@ type PartitionReport struct {
 	Partitioned bool  // false: bảng sổ không phân vùng — bỏ qua
 }
 
+// AppendOnlyPartitionedTables liệt kê bảng CHỈ GHI THÊM phân vùng không có chuỗi
+// băm (shared.apply_append_only — chuỗi thời gian ts_*, ADR-0017): bảng cha phân
+// vùng có trigger trg_immutable của shared.fn_immutable và không có cột row_hash.
+func AppendOnlyPartitionedTables(ctx context.Context, pool *pgxpool.Pool) ([]string, error) {
+	rows, err := pool.Query(ctx, `SELECT format('%I.%I', n.nspname, c.relname)
+	  FROM pg_class c
+	  JOIN pg_namespace n ON n.oid = c.relnamespace
+	  WHERE c.relkind = 'p' AND NOT c.relispartition
+	    AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+	    AND EXISTS (SELECT 1 FROM pg_trigger t WHERE t.tgrelid = c.oid AND t.tgname = 'trg_immutable'
+	                AND t.tgfoid = 'shared.fn_immutable'::regproc)
+	    AND NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = 'row_hash' AND NOT a.attisdropped)
+	  ORDER BY 1`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
 // EnsurePartitions tạo trước phân vùng tháng (UTC) từ tháng hiện tại tới
-// monthsAhead tháng cho mọi bảng sổ. Chạy bằng ag_migrator (owner). Idempotent.
+// monthsAhead tháng cho mọi bảng sổ và mọi bảng chỉ ghi thêm phân vùng (chuỗi
+// thời gian ts_*). Chạy bằng ag_migrator (owner). Idempotent.
 func EnsurePartitions(ctx context.Context, pool *pgxpool.Pool, monthsAhead int) ([]PartitionReport, error) {
 	if monthsAhead <= 0 {
 		monthsAhead = 24
@@ -76,6 +105,13 @@ func EnsurePartitions(ctx context.Context, pool *pgxpool.Pool, monthsAhead int) 
 	tables, err := LedgerTables(ctx, pool)
 	if err != nil {
 		return nil, err
+	}
+	appendOnly, err := AppendOnlyPartitionedTables(ctx, pool)
+	if err != nil {
+		return nil, err
+	}
+	for _, t := range appendOnly {
+		tables = append(tables, LedgerTable{Table: t})
 	}
 	count := func(t string) (int, error) {
 		var n int

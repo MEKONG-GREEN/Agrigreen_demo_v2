@@ -1,8 +1,11 @@
 // Lệnh outbox-publisher: quét shared.outbox của mọi cụm và phát lên RabbitMQ
 // (mục 12). Chạy bằng vai ag_outbox_publisher (BYPASSRLS, chỉ sửa được cột trạng thái).
 //
-//	AG_DB_URL      URL gốc tới PostgreSQL (host, cổng, sslmode)
-//	AG_AMQP_URL    URL RabbitMQ
+//	AG_DB_URL             URL gốc tới PostgreSQL (host, cổng, sslmode)
+//	AG_AMQP_URL           URL RabbitMQ của vhost nền tảng (sự kiện kind = platform, mọi cụm)
+//	AG_AMQP_INTERNAL_URL  URL RabbitMQ của vhost mkg.internal (ADR-0018): sự kiện kind = internal
+//	                      của cụm mkg. Thiếu → sự kiện nội bộ tồn trên outbox (metric backlog báo),
+//	                      KHÔNG BAO GIỜ phát chúng lên vhost nền tảng.
 //
 // Khi khởi động, TRƯỚC khi phát thông điệp đầu tiên, lệnh khai báo mọi hàng đợi consumer
 // của cụm pf (assembly.Queues: consumer của worker + optimizer) cùng DLQ và binding — sự
@@ -24,6 +27,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
+	internalassembly "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/worker-internal/assembly"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
@@ -72,6 +76,22 @@ func run() error {
 	}
 	log.Info("đã khai báo hàng đợi consumer", "event", "startup", "queues", len(assembly.Queues()), "outcome", "ok")
 
+	// Vhost mkg.internal: kết nối và tài khoản riêng (ADR-0018).
+	var internalBroker *outbox.Rabbit
+	if u := os.Getenv("AG_AMQP_INTERNAL_URL"); u != "" {
+		internalBroker, err = outbox.DialRabbit(u)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = internalBroker.Close() }()
+		if err := declareInternalQueues(internalBroker); err != nil {
+			return err
+		}
+		log.Info("đã khai báo hàng đợi vhost mkg.internal", "event", "startup", "queues", len(internalassembly.Queues()), "outcome", "ok")
+	} else {
+		log.Warn("thiếu AG_AMQP_INTERNAL_URL — sự kiện nội bộ MKG tồn trên outbox cụm mkg", "event", "startup", "outcome", "degraded")
+	}
+
 	var wg sync.WaitGroup
 	pools := map[string]*pgxpool.Pool{}
 	for _, c := range migrations.Clusters {
@@ -85,15 +105,21 @@ func run() error {
 		}
 		defer pool.Close()
 		pools[string(c)] = pool
-		p := &outbox.Publisher{Pool: pool, Broker: broker, Batch: 100}
+		publishers := []*outbox.Publisher{{Pool: pool, Broker: broker, Batch: 100, Kind: outbox.KindPlatform}}
+		if c == migrations.MKG && internalBroker != nil {
+			publishers = append(publishers, &outbox.Publisher{Pool: pool, Broker: internalBroker, Batch: 100, Kind: outbox.KindInternal})
+		}
 		cluster := string(c)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			p.Run(ctx, 500*time.Millisecond, func(err error) {
-				log.Warn("phát outbox lỗi", "event", "outbox.publish", "cluster", cluster, "outcome", "retry", "error", err.Error())
-			})
-		}()
+		for _, p := range publishers {
+			kind := string(p.Kind)
+			wg.Add(1)
+			go func(p *outbox.Publisher) {
+				defer wg.Done()
+				p.Run(ctx, 500*time.Millisecond, func(err error) {
+					log.Warn("phát outbox lỗi", "event", "outbox.publish", "cluster", cluster, "kind", kind, "outcome", "retry", "error", err.Error())
+				})
+			}(p)
+		}
 	}
 	if _, err := outbox.RegisterBacklogMetrics(pools); err != nil {
 		log.Warn("không đăng ký được metric outbox", "event", "startup", "outcome", "error", "error", err.Error())
@@ -111,4 +137,14 @@ func declareQueues(b *outbox.Rabbit) error {
 	}
 	defer func() { _ = ch.Close() }()
 	return assembly.DeclareQueues(ch)
+}
+
+// declareInternalQueues khai báo hàng đợi consumer của worker-internal trên vhost mkg.internal.
+func declareInternalQueues(b *outbox.Rabbit) error {
+	ch, err := b.Channel()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = ch.Close() }()
+	return internalassembly.DeclareQueues(ch)
 }
