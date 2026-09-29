@@ -1,0 +1,31 @@
+# Render Blueprint — BẢN DEMO Web vận hành với DỮ LIỆU GIẢ LẬP (NEXT_PUBLIC_API_MOCK=1).
+# Không gọi backend, Keycloak hay vault; không chứa dữ liệu thật (RB-7: dữ liệu thật phải lưu
+# trú trong lãnh thổ nên backend không deploy lên Render). Cùng chế độ CI chạy E2E Playwright.
+services:
+  - type: web
+    name: agrigreen-web-ops-demo
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    rootDir: apps/web-ops
+    # output: standalone → chép static/public vào bản standalone như Dockerfile.
+    buildCommand: >-
+      npm ci --no-audit --no-fund &&
+      npm run build:mock &&
+      cp -r .next/static .next/standalone/.next/static &&
+      cp -r public .next/standalone/public
+    startCommand: node .next/standalone/server.js
+    healthCheckPath: /login
+    autoDeploy: true
+    buildFilter:
+      paths: ["apps/web-ops/**", "render.yaml"]
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: HOSTNAME
+        value: 0.0.0.0
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: NEXT_PUBLIC_API_MOCK
+        value: "1"
