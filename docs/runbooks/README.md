@@ -5,6 +5,7 @@ Các job vận hành dùng chung cho mọi cụm (`ag_pf`, `ag_mkg`, `ag_vault`)
 | Việc | Khi nào | Chạy bằng | Vai DB | Runbook |
 |---|---|---|---|---|
 | Neo chuỗi + manifest ký số | 00:30 giờ VN hằng ngày | `cmd/worker` (leader) | `ag_outbox_publisher` | [anchor.md](anchor.md) |
+| Ghi sổ chỉ số + ảnh chụp lớp GIS (pf/metrics) | 00:45 giờ VN hằng ngày (sau neo); backfill khi cần | `cmd/worker` (leader), `worker -metrics-backfill` | `metrics_app` + vai nguồn; tenant qua `ag_outbox_publisher` | [metrics.md](metrics.md) |
 | Dọn Idempotency-Key hết hạn | mỗi giờ | `cmd/worker` (leader) | `ag_outbox_publisher` | mục dưới |
 | Tạo trước phân vùng tháng | hằng tháng, sau mỗi `migrate up` | `migrate maintain` | `ag_migrator` | [partitions.md](partitions.md) |
 | Xác minh chuỗi băm | hằng tuần, sau mỗi lần phục hồi | `migrate verify-chains` | `ag_migrator` | [verify-chains.md](verify-chains.md) |

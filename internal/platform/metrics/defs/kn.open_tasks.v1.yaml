@@ -1,0 +1,17 @@
+# KN US-DASH-01 thẻ 3: nhiệm vụ hỗ trợ đang mở lúc hết ngày D.
+key: kn.open_tasks
+version: 1
+title: Nhiệm vụ hỗ trợ đang mở (cuối ngày)
+description: >
+  Số nhiệm vụ mà sự việc mới nhất (theo seq) có recorded_at < Cutoff(D) mang
+  status_after khác resolved. Địa bàn lấy từ thuộc tính không đổi của nhiệm vụ.
+unit: count
+grain: day
+aggregation: last
+source_module: pf/extension
+source: pf_extension.task_event (sổ)
+rule_version: kn.dash.v1
+effective_from: "2026-01-01"
+proposed_by: pf-metrics (G3-A5)
+approved_by: tich-hop-g3 (tạm, chờ khách)
+viewer_roles: [kn_national_admin, kn_province_admin, kn_officer]

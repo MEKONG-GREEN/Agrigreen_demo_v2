@@ -4439,6 +4439,155 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
   # --- hết pf/cropcycle ---
+  # --- pf/metrics ---
+  /v1/metrics/definitions:
+    get:
+      summary: Định nghĩa chỉ số có phiên bản (tệp khai báo trong kho mã — mục 16)
+      description: |
+        Mọi phiên bản định nghĩa người gọi xem được: `metrics_viewer`, `platform_admin` xem tất cả; vai nghiệp vụ (KN, CGH,
+        HTX, GIS) xem chỉ số khai `viewer_roles` chứa vai đó. Không xem được định nghĩa nào → 403.
+      operationId: listMetricDefinitions
+      tags: [metrics]
+      responses:
+        "200":
+          description: Danh sách phiên bản
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MetricDefinition"}}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/metrics/{key}/values:
+    get:
+      summary: Lịch sử giá trị chỉ số theo ngày đã chốt — KN US-DASH-01/02, CGH FN-10/11
+      description: |
+        Giá trị ngày D là giá trị "như hệ biết lúc hết ngày D" (bản ghi nguồn có `recorded_at` < `cutoff` = 00:00 giờ VN ngày
+        D+1), ghi sổ bởi job `metrics_snapshot` (00:45) hoặc backfill. Kỳ đã chốt không bị sửa: tính lại tạo dòng mới
+        `supersedes_id` + `correction_reason`; mặc định trả dòng hiện hành mỗi ngày, `history=true` trả cả dòng đã bị thay.
+        Phạm vi: `unit` rỗng = toàn tenant (chỉ phạm vi TW); `unit` = mã tỉnh/xã trong phạm vi người gọi (chỉ số KN, CGH ghi
+        theo tỉnh; HTX, GIS theo xã). Chỉ số theo vụ (`grain = season`) cần `dimension` (vd `DX-2026`); thiếu → `items`
+        rỗng và `dimensions` là các vụ đã ghi. Mặc định `to` = hôm qua, `from` = `to` − 30 ngày; tối đa 400 ngày.
+      operationId: listMetricValues
+      tags: [metrics]
+      parameters:
+        - {name: key, in: path, required: true, schema: {type: string, example: kn.sown_area_ha}}
+        - {name: from, in: query, schema: {type: string, format: date}}
+        - {name: to, in: query, schema: {type: string, format: date}}
+        - {name: unit, in: query, description: "Mã đơn vị hành chính; rỗng = toàn tenant", schema: {type: string}}
+        - {name: dimension, in: query, description: "Chiều của chỉ số theo vụ, vd DX-2026", schema: {type: string}}
+        - {name: history, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Chuỗi giá trị theo ngày tăng dần
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [key, title, unit, grain, scope_unit, dimension, from, to, items, dimensions]
+                properties:
+                  key: {type: string}
+                  title: {type: string}
+                  unit: {type: string}
+                  grain: {type: string, enum: [day, season]}
+                  scope_unit: {type: string}
+                  dimension: {type: string}
+                  from: {type: string, format: date}
+                  to: {type: string, format: date}
+                  items: {type: array, items: {$ref: "#/components/schemas/MetricValue"}}
+                  dimensions: {type: array, items: {type: string}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/gis/events:
+    get:
+      summary: Nhật ký thay đổi lớp GIS (chỉ ghi thêm, trước/sau + nguồn) — GIS US-EVL-01
+      description: |
+        Mỗi thay đổi đối tượng trên một lớp (tạo, sửa, ngừng dùng, khôi phục) nhận từ sự kiện của module chủ lớp, theo
+        `recorded_at` ∈ [00:00 VN ngày `from`, cutoff ngày `to`). Mặc định 7 ngày tới hôm nay. Người không có phạm vi TW chỉ
+        thấy đối tượng có `commune_code`/`province_code` trong phạm vi (lớp nền không có địa bàn luôn thấy). Hình học không
+        chép vào nhật ký: `after.geometry_ref` trỏ dòng sổ bất biến của pf/geo (xem `/v1/gis/replay?geometry=true`).
+        Vai: `metrics_viewer`, `platform_admin`, `geo_admin`, `plot_viewer`, `plot_editor`, `kn_national_admin`, `kn_province_admin`, `cgh_viewer`.
+      operationId: listGisLayerEvents
+      tags: [metrics]
+      parameters:
+        - {name: layer, in: query, schema: {type: string, enum: [plot, coop_boundary, facility, season_stage, cgh_balance, waterway]}}
+        - {name: feature_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: from, in: query, schema: {type: string, format: date}}
+        - {name: to, in: query, schema: {type: string, format: date}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 100}}
+      responses:
+        "200":
+          description: Một trang theo (recorded_at, id)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor, from, to]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/GisLayerEvent"}}
+                  next_cursor: {type: [string, "null"]}
+                  from: {type: string, format: date}
+                  to: {type: string, format: date}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/gis/snapshots/{date}:
+    get:
+      summary: Ảnh chụp cuối ngày của các lớp GIS (dựng từ nhật ký, kèm watermark) — GIS US-SNAP-01
+      description: |
+        Ảnh chụp đã lưu của đúng ngày `date` (job `metrics_snapshot` 00:45 chụp hôm qua). Chưa chụp → `items` rỗng (dùng
+        `/v1/gis/replay`). Lọc phạm vi như `/v1/gis/events`.
+      operationId: listGisSnapshots
+      tags: [metrics]
+      parameters:
+        - {name: date, in: path, required: true, schema: {type: string, format: date}}
+        - {name: layers, in: query, description: "Danh sách lớp, phân tách dấu phẩy; mặc định mọi lớp", schema: {type: string}}
+      responses:
+        "200":
+          description: Ảnh chụp theo lớp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [business_date, items]
+                properties:
+                  business_date: {type: string, format: date}
+                  items: {type: array, items: {$ref: "#/components/schemas/GisLayerState"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/gis/replay:
+    get:
+      summary: Mọi lớp GIS như hệ biết lúc hết ngày X — GIS US-REPLAY-01
+      description: |
+        Phát lại = ảnh chụp mới nhất ≤ `date` + các thay đổi sau watermark của ảnh chụp và trước cutoff(`date`), áp theo
+        (recorded_at, id); bằng đúng việc dựng thẳng từ nhật ký. Ngày hôm nay = trạng thái hiện tại. `geometry=true` → kèm
+        hình học GeoJSON as-of tra qua pf/geo theo `geometry_ref`. Ngày tương lai → 422 `metrics.future_date`.
+      operationId: replayGisLayers
+      tags: [metrics]
+      parameters:
+        - {name: date, in: query, required: true, schema: {type: string, format: date}}
+        - {name: layers, in: query, schema: {type: string}}
+        - {name: geometry, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Trạng thái theo lớp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [business_date, cutoff, items]
+                properties:
+                  business_date: {type: string, format: date}
+                  cutoff: {type: string, format: date-time}
+                  items: {type: array, items: {$ref: "#/components/schemas/GisLayerState"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -4560,6 +4709,86 @@ components:
                     season_ref: {type: string, format: uuid}
                     harvest_id: {type: string, format: uuid}
   schemas:
+    # --- pf/metrics ---
+    MetricDefinition:
+      type: object
+      required: [key, version, title, description, unit, grain, aggregation, source_module, source, rule_version, effective_from, proposed_by, approved_by, file]
+      properties:
+        key: {type: string}
+        version: {type: integer}
+        title: {type: string}
+        description: {type: string}
+        unit: {type: string}
+        grain: {type: string, enum: [day, season]}
+        aggregation: {type: string, enum: [sum, count, avg, max, last]}
+        source_module: {type: string}
+        source: {type: string}
+        rule_version: {type: string}
+        effective_from: {type: string, format: date}
+        proposed_by: {type: string}
+        approved_by: {type: string}
+        file: {type: string}
+    MetricWatermark:
+      type: object
+      required: [last_event_id, recorded_at]
+      properties:
+        last_event_id: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+    MetricValue:
+      type: object
+      required: [id, business_date, value, definition_version, cutoff, watermark, computed_at, supersedes_id, correction_reason, current]
+      properties:
+        id: {type: string, format: uuid}
+        business_date: {type: string, format: date}
+        value: {type: string, description: "Số thập phân dạng chuỗi (R-10)"}
+        definition_version: {type: integer}
+        cutoff: {type: string, format: date-time}
+        watermark:
+          oneOf:
+            - {$ref: "#/components/schemas/MetricWatermark"}
+            - {type: "null"}
+        computed_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        current: {type: boolean}
+    GisLayerEvent:
+      type: object
+      required: [id, layer, feature_ref, op, before, after, source_event_id, source_type, source_module, event_time, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        layer: {type: string}
+        feature_ref: {type: string, format: uuid}
+        op: {type: string, enum: [create, update, retire, restore]}
+        before: {type: [object, "null"], additionalProperties: true}
+        after: {type: [object, "null"], additionalProperties: true}
+        source_event_id: {type: string, format: uuid}
+        source_type: {type: string}
+        source_module: {type: string}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+    GisLayerFeature:
+      type: object
+      required: [feature_ref, attributes, retired]
+      properties:
+        feature_ref: {type: string, format: uuid}
+        attributes: {type: [object, "null"], additionalProperties: true}
+        retired: {type: boolean}
+        geometry: {type: object, additionalProperties: true, description: "GeoJSON as-of (chỉ khi geometry=true)"}
+    GisLayerState:
+      type: object
+      required: [layer, business_date, watermark, basis, base_snapshot_date, feature_count, features]
+      properties:
+        layer: {type: string}
+        business_date: {type: string, format: date}
+        watermark:
+          oneOf:
+            - {$ref: "#/components/schemas/MetricWatermark"}
+            - {type: "null"}
+        basis: {type: string, enum: [snapshot, replay]}
+        base_snapshot_date: {type: [string, "null"], format: date}
+        feature_count: {type: integer}
+        features: {type: array, items: {$ref: "#/components/schemas/GisLayerFeature"}}
+        recorded_at: {type: string, format: date-time}
     Problem:
       type: object
       required: [type, title, status, code]

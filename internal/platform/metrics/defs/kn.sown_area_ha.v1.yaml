@@ -1,0 +1,18 @@
+# KN US-DASH-01 thẻ 1: diện tích đã sạ báo cáo trong kỳ.
+key: kn.sown_area_ha
+version: 1
+title: Diện tích đã sạ báo cáo (kỳ tháng)
+description: >
+  Tổng sown_area_ha của phiên bản báo cáo gieo sạ (sowing_progress) mới nhất theo
+  từng khóa phiên bản, của kỳ tháng chứa ngày D, chỉ tính bản ghi có
+  recorded_at < Cutoff(D). Bản ghi bù ghi nhận sau Cutoff(D) không đổi giá trị của D.
+unit: ha
+grain: day
+aggregation: sum
+source_module: pf/extension
+source: pf_extension.field_report (sổ, phiên bản mới nhất theo stream_key)
+rule_version: kn.dash.v1
+effective_from: "2026-01-01"
+proposed_by: pf-metrics (G3-A5)
+approved_by: tich-hop-g3 (tạm, chờ khách)
+viewer_roles: [kn_national_admin, kn_province_admin, kn_officer]

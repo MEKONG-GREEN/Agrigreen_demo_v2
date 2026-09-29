@@ -461,3 +461,21 @@ Mạng đường thủy có phiên bản (mục 16; GIS FN-09, US-WATER-01/02/03
 | 503 | `waterway.dependency_unavailable` | pf/waterway: chưa nối CSDL hoặc không đọc được tham số/danh mục pf/masterdata |
 
 Định tuyến không tìm được đường thủy (chưa phát hành mạng, điểm ngoài bán kính tiếp cận, không liên thông hoặc không đủ tải trọng) **không** là lỗi: trả `200` với `found = false`, `source = haversine` (Haversine × `waterway.haversine_factor`) và `reason`.
+
+### pf/metrics
+
+Chỉ số có lịch sử và nhật ký lớp GIS (G3-A5; `GET /v1/metrics/*`, `GET /v1/gis/*`).
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 404 | `metrics.unknown_metric` | pf/metrics: không có định nghĩa chỉ số với `key` (hoặc chưa có phiên bản hiệu lực vào ngày D) |
+| 422 | `metrics.not_closed` | pf/metrics: ngày nghiệp vụ chưa kết thúc (trước `Cutoff(D)` = 00:00 giờ VN ngày D+1) — job/backfill không ghi, không chụp |
+| 403 | `metrics.out_of_scope` | pf/metrics: `unit` ngoài phạm vi người gọi, hoặc xin phạm vi toàn tenant (`unit` rỗng) khi không có phạm vi TW; tài khoản chưa gắn đơn vị (nhật ký lớp) |
+| 422 | `metrics.range_too_large` | pf/metrics: khoảng `from`..`to` quá 400 ngày hoặc `from` > `to` |
+| 404 | `metrics.unknown_layer` | pf/metrics: lớp GIS không có (`plot`, `coop_boundary`, `facility`, `season_stage`, `cgh_balance`, `waterway`) |
+| 422 | `metrics.future_date` | pf/metrics: phát lại một ngày ở tương lai |
+| 422 | `metrics.invalid_layer_change` | pf/metrics: dòng nhật ký lớp thiếu `feature_ref`/`source_event_id`/`source_type`/`event_time`, `op` lạ, hoặc `create` có `before` (chỉ `LayerLog.Append`) |
+| 409 | `metrics.definition_edited` | pf/metrics (job/backfill): tệp `defs/<key>.v<n>.yaml` của phiên bản đã dùng bị sửa tại chỗ (băm khác `definition_pin`) — thêm phiên bản mới thay vì sửa |
+| 503 | `metrics.dependency_unavailable` | pf/metrics: chưa nối CSDL, nguồn chỉ số của module chủ dữ liệu, pf/party (phạm vi) hoặc pf/geo (hình học) |
+
+Nguồn không có dữ liệu cho một phạm vi/ngày (vd vụ chưa có lần cân đối trước cutoff) **không** là lỗi API: job không ghi dòng (`port.ErrNoData`), API trả danh sách rỗng.

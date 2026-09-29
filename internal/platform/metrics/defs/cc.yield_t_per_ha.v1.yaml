@@ -1,0 +1,18 @@
+# App HTX: năng suất bình quân gia quyền theo vụ.
+key: cc.yield_t_per_ha
+version: 1
+title: Năng suất bình quân (theo vụ)
+description: >
+  Σ mass_kg ÷ 1000 ÷ Σ area_ha của khai báo sản lượng mới nhất (theo seq,
+  recorded_at < Cutoff(D)) của mỗi vụ thửa thuộc vụ Scope.Dimension. Làm tròn 4
+  chữ số. Không có khai báo → không ghi giá trị.
+unit: t/ha
+grain: season
+aggregation: avg
+source_module: pf/cropcycle
+source: pf_cropcycle.harvest_declaration (sổ)
+rule_version: cc.harvest.v1
+effective_from: "2026-01-01"
+proposed_by: pf-metrics (G3-A5)
+approved_by: tich-hop-g3 (tạm, chờ khách)
+viewer_roles: [coop_manager, kn_national_admin, kn_province_admin, cgh_viewer]

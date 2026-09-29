@@ -80,6 +80,10 @@ type Scope struct {
 	Units    []string
 	// OrgRef: HTX / tổ chức khi chỉ số theo tổ chức (tùy chọn).
 	OrgRef *uuid.UUID
+	// Dimension (G3-A5, thêm — tương thích ngược): chiều phụ của chỉ số có
+	// grain khác ngày, vd mã vụ "DX-2026" cho chỉ số theo vụ (CGH FN-10/11).
+	// Rỗng với chỉ số theo ngày.
+	Dimension string
 }
 
 // Value là giá trị chỉ số của một ngày nghiệp vụ trong một phạm vi.

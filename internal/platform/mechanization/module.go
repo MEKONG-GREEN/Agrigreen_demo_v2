@@ -24,6 +24,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/store"
+	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
@@ -90,3 +91,7 @@ func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job
 func (m *Module) RunAreaFeedCheck(ctx context.Context, tenants app.TenantLister) (int, error) {
 	return m.svc.RunAreaFeedCheck(ctx, tenants)
 }
+
+// MetricsSource cho pf/metrics (qua gốc lắp ráp): mức đủ máy theo vụ từ kết quả
+// cân đối đã lưu, như hệ biết lúc hết ngày D (CGH FN-10/11).
+func (m *Module) MetricsSource() metricsport.Source { return app.MetricsSource{Svc: m.svc} }

@@ -9,6 +9,8 @@ import (
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics"
+	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
 	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation"
@@ -32,6 +34,7 @@ type Consumer struct {
 //   - pf.simulation.snapshot: ảnh chụp đầu vào qua SupplySource + WaterwayRouter;
 //   - pf.mrv.farm_log_link, pf.mrv.collection_evidence (G3): liên kết nhật ký HTX / van
 //     mrv_collection_evidence → pf/mrv, ước tính CO2 TẠM đọc tham số masterdata.
+//   - pf.metrics.layer_log (G3): nhật ký thay đổi lớp GIS từ sự kiện geo/cropcycle/mechanization/waterway (GIS US-EVL-01).
 var Consumers = []Consumer{
 	{Name: mechport.AreaSyncConsumer, Role: mechanization.DBRole, Events: []string{ccport.EventCoopSeasonAreaChanged},
 		Handler: func(m Modules) inbox.Handler { return m.Mechanization.AreaSyncHandler() }},
@@ -47,4 +50,6 @@ var Consumers = []Consumer{
 		Handler: func(m Modules) inbox.Handler { return m.MRV.FarmLogLinkHandler() }},
 	{Name: mrvport.CollectionEvidenceConsumer, Role: mrv.DBRole, Events: mrvport.CollectionEvidenceEvents,
 		Handler: func(m Modules) inbox.Handler { return m.MRV.CollectionEvidenceHandler() }},
+	{Name: metricsport.LayerLogConsumer, Role: metrics.DBRole, Events: metrics.LayerEvents,
+		Handler: func(m Modules) inbox.Handler { return m.Metrics.LayerLogHandler() }},
 }

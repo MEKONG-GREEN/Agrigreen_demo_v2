@@ -3076,10 +3076,215 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/metrics/definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Định nghĩa chỉ số có phiên bản (tệp khai báo trong kho mã — mục 16)
+         * @description Mọi phiên bản định nghĩa người gọi xem được: `metrics_viewer`, `platform_admin` xem tất cả; vai nghiệp vụ (KN, CGH,
+         *     HTX, GIS) xem chỉ số khai `viewer_roles` chứa vai đó. Không xem được định nghĩa nào → 403.
+         */
+        get: operations["listMetricDefinitions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/metrics/{key}/values": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lịch sử giá trị chỉ số theo ngày đã chốt — KN US-DASH-01/02, CGH FN-10/11
+         * @description Giá trị ngày D là giá trị "như hệ biết lúc hết ngày D" (bản ghi nguồn có `recorded_at` < `cutoff` = 00:00 giờ VN ngày
+         *     D+1), ghi sổ bởi job `metrics_snapshot` (00:45) hoặc backfill. Kỳ đã chốt không bị sửa: tính lại tạo dòng mới
+         *     `supersedes_id` + `correction_reason`; mặc định trả dòng hiện hành mỗi ngày, `history=true` trả cả dòng đã bị thay.
+         *     Phạm vi: `unit` rỗng = toàn tenant (chỉ phạm vi TW); `unit` = mã tỉnh/xã trong phạm vi người gọi (chỉ số KN, CGH ghi
+         *     theo tỉnh; HTX, GIS theo xã). Chỉ số theo vụ (`grain = season`) cần `dimension` (vd `DX-2026`); thiếu → `items`
+         *     rỗng và `dimensions` là các vụ đã ghi. Mặc định `to` = hôm qua, `from` = `to` − 30 ngày; tối đa 400 ngày.
+         */
+        get: operations["listMetricValues"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/gis/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Nhật ký thay đổi lớp GIS (chỉ ghi thêm, trước/sau + nguồn) — GIS US-EVL-01
+         * @description Mỗi thay đổi đối tượng trên một lớp (tạo, sửa, ngừng dùng, khôi phục) nhận từ sự kiện của module chủ lớp, theo
+         *     `recorded_at` ∈ [00:00 VN ngày `from`, cutoff ngày `to`). Mặc định 7 ngày tới hôm nay. Người không có phạm vi TW chỉ
+         *     thấy đối tượng có `commune_code`/`province_code` trong phạm vi (lớp nền không có địa bàn luôn thấy). Hình học không
+         *     chép vào nhật ký: `after.geometry_ref` trỏ dòng sổ bất biến của pf/geo (xem `/v1/gis/replay?geometry=true`).
+         *     Vai: `metrics_viewer`, `platform_admin`, `geo_admin`, `plot_viewer`, `plot_editor`, `kn_national_admin`, `kn_province_admin`, `cgh_viewer`.
+         */
+        get: operations["listGisLayerEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/gis/snapshots/{date}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ảnh chụp cuối ngày của các lớp GIS (dựng từ nhật ký, kèm watermark) — GIS US-SNAP-01
+         * @description Ảnh chụp đã lưu của đúng ngày `date` (job `metrics_snapshot` 00:45 chụp hôm qua). Chưa chụp → `items` rỗng (dùng
+         *     `/v1/gis/replay`). Lọc phạm vi như `/v1/gis/events`.
+         */
+        get: operations["listGisSnapshots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/gis/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mọi lớp GIS như hệ biết lúc hết ngày X — GIS US-REPLAY-01
+         * @description Phát lại = ảnh chụp mới nhất ≤ `date` + các thay đổi sau watermark của ảnh chụp và trước cutoff(`date`), áp theo
+         *     (recorded_at, id); bằng đúng việc dựng thẳng từ nhật ký. Ngày hôm nay = trạng thái hiện tại. `geometry=true` → kèm
+         *     hình học GeoJSON as-of tra qua pf/geo theo `geometry_ref`. Ngày tương lai → 422 `metrics.future_date`.
+         */
+        get: operations["replayGisLayers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        MetricDefinition: {
+            key: string;
+            version: number;
+            title: string;
+            description: string;
+            unit: string;
+            /** @enum {string} */
+            grain: "day" | "season";
+            /** @enum {string} */
+            aggregation: "sum" | "count" | "avg" | "max" | "last";
+            source_module: string;
+            source: string;
+            rule_version: string;
+            /** Format: date */
+            effective_from: string;
+            proposed_by: string;
+            approved_by: string;
+            file: string;
+        };
+        MetricWatermark: {
+            /** Format: uuid */
+            last_event_id: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        MetricValue: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            business_date: string;
+            /** @description Số thập phân dạng chuỗi (R-10) */
+            value: string;
+            definition_version: number;
+            /** Format: date-time */
+            cutoff: string;
+            watermark: components["schemas"]["MetricWatermark"] | null;
+            /** Format: date-time */
+            computed_at: string;
+            /** Format: uuid */
+            supersedes_id: string | null;
+            correction_reason: string | null;
+            current: boolean;
+        };
+        GisLayerEvent: {
+            /** Format: uuid */
+            id: string;
+            layer: string;
+            /** Format: uuid */
+            feature_ref: string;
+            /** @enum {string} */
+            op: "create" | "update" | "retire" | "restore";
+            before: {
+                [key: string]: unknown;
+            } | null;
+            after: {
+                [key: string]: unknown;
+            } | null;
+            /** Format: uuid */
+            source_event_id: string;
+            source_type: string;
+            source_module: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        GisLayerFeature: {
+            /** Format: uuid */
+            feature_ref: string;
+            attributes: {
+                [key: string]: unknown;
+            } | null;
+            retired: boolean;
+            /** @description GeoJSON as-of (chỉ khi geometry=true) */
+            geometry?: {
+                [key: string]: unknown;
+            };
+        };
+        GisLayerState: {
+            layer: string;
+            /** Format: date */
+            business_date: string;
+            watermark: components["schemas"]["MetricWatermark"] | null;
+            /** @enum {string} */
+            basis: "snapshot" | "replay";
+            /** Format: date */
+            base_snapshot_date: string | null;
+            feature_count: number;
+            features: components["schemas"]["GisLayerFeature"][];
+            /** Format: date-time */
+            recorded_at?: string;
+        };
         Problem: {
             /** Format: uri */
             type: string;
@@ -12317,6 +12522,179 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+        };
+    };
+    listMetricDefinitions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách phiên bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MetricDefinition"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    listMetricValues: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                /** @description Mã đơn vị hành chính; rỗng = toàn tenant */
+                unit?: string;
+                /** @description Chiều của chỉ số theo vụ, vd DX-2026 */
+                dimension?: string;
+                history?: boolean;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chuỗi giá trị theo ngày tăng dần */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        key: string;
+                        title: string;
+                        unit: string;
+                        /** @enum {string} */
+                        grain: "day" | "season";
+                        scope_unit: string;
+                        dimension: string;
+                        /** Format: date */
+                        from: string;
+                        /** Format: date */
+                        to: string;
+                        items: components["schemas"]["MetricValue"][];
+                        dimensions: string[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listGisLayerEvents: {
+        parameters: {
+            query?: {
+                layer?: "plot" | "coop_boundary" | "facility" | "season_stage" | "cgh_balance" | "waterway";
+                feature_ref?: string;
+                from?: string;
+                to?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang theo (recorded_at, id) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["GisLayerEvent"][];
+                        next_cursor: string | null;
+                        /** Format: date */
+                        from: string;
+                        /** Format: date */
+                        to: string;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listGisSnapshots: {
+        parameters: {
+            query?: {
+                /** @description Danh sách lớp, phân tách dấu phẩy; mặc định mọi lớp */
+                layers?: string;
+            };
+            header?: never;
+            path: {
+                date: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ảnh chụp theo lớp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        business_date: string;
+                        items: components["schemas"]["GisLayerState"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    replayGisLayers: {
+        parameters: {
+            query: {
+                date: string;
+                layers?: string;
+                geometry?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trạng thái theo lớp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        business_date: string;
+                        /** Format: date-time */
+                        cutoff: string;
+                        items: components["schemas"]["GisLayerState"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
         };
     };
 }

@@ -1,0 +1,18 @@
+# CGH FN-09/10/11: mức đủ máy theo vụ — kết quả cân đối ĐÃ LƯU, xu hướng nhiều năm.
+key: cgh.coop_sufficiency_pct
+version: 1
+title: Tỷ lệ HTX đủ máy (theo vụ)
+description: >
+  Lần cân đối mới nhất của vụ (Scope.Dimension, vd DX-2026) có recorded_at <
+  Cutoff(D); 100 × số HTX có mức đáp ứng tổng thể Đủ hoặc Thừa ÷ số HTX trong lần
+  cân đối (trong phạm vi). Không có lần cân đối → không ghi giá trị.
+unit: "%"
+grain: season
+aggregation: last
+source_module: pf/mechanization
+source: pf_mechanization.balance_run, balance_result (sổ)
+rule_version: cgh.balance.v1
+effective_from: "2026-01-01"
+proposed_by: pf-metrics (G3-A5)
+approved_by: tich-hop-g3 (tạm, chờ khách)
+viewer_roles: [cgh_viewer, cgh_admin]

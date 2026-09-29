@@ -15,6 +15,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	wwport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/port"
@@ -94,3 +95,9 @@ func (m *Module) SyncSource() syncport.Source { return app.SyncSource{Svc: m.svc
 
 // SyncSink là chiều lên entity "plot_boundary" cho pf/sync.
 func (m *Module) SyncSink() syncport.Sink { return app.SyncSink{Svc: m.svc} }
+
+// MetricsSource cho pf/metrics (qua gốc lắp ráp): số thửa đã số hoá như hệ biết lúc hết ngày D.
+func (m *Module) MetricsSource() metricsport.Source { return app.MetricsSource{Svc: m.svc} }
+
+// LayerGeometry cho pf/metrics: hình học as-of theo id dòng sổ bất biến (phát lại lớp GIS).
+func (m *Module) LayerGeometry() metricsport.GeometryResolver { return app.MetricsSource{Svc: m.svc} }
