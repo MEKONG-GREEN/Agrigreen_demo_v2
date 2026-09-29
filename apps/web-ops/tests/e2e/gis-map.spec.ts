@@ -84,6 +84,31 @@ test.describe("Bản đồ GIS nhiều lớp (GIS FN-01/04/13/14/15, US-ROAD-01,
     await expect(page.getByTestId("waterways-notice")).toContainText("Không tìm thấy tuyến sông/kênh phù hợp tải trọng sà lan 5000 tấn");
   });
 
+  test("GIS US-INT-01: lớp Tình trạng máy CGH (thiếu/thừa) — chú giải 5 mức, điểm theo HTX; không gọi API khi thiếu vai", async ({ page }) => {
+    await loginAs(page, "setter", "/ban-do-gis");
+    const toggle = page.getByLabel("Tình trạng máy CGH (thiếu/thừa)");
+    await expect(toggle).toBeEnabled();
+    await expect(toggle).not.toBeChecked();
+    await toggle.check();
+    const legend = page.getByRole("list", { name: "Chú giải tình trạng máy CGH" });
+    await expect(legend.locator("li")).toHaveText(["Thiếu", "Cần chú ý", "Đủ", "Thừa", "Chưa có dữ liệu"]);
+    await expect(legend.locator('li[data-status="thieu"]')).toHaveAttribute("data-color", "#A3372A");
+    await expect.poll(() => countOf(page, "count-cgh"), { timeout: 20_000 }).toBeGreaterThan(0);
+    await expect(page.getByText("GIS chỉ hiển thị, không tự tính lại")).toBeVisible();
+    // GIS US-CFG-01: ngưỡng chú giải kho/Hub theo quy chuẩn hiển thị đã duyệt.
+    await expect(page.getByRole("list", { name: "Chú giải dung lượng kho/Hub" }).locator('li[data-capacity="near_full"]')).toContainText("≥ 60%");
+
+    const mech: string[] = [];
+    page.on("request", (r) => {
+      if (r.url().includes("/v1/mechanization/")) mech.push(r.url());
+    });
+    await loginAs(page, "tinh", "/ban-do-gis");
+    await expect(page.getByLabel("Tình trạng máy CGH (thiếu/thừa)")).toBeDisabled();
+    await expect(page.getByTestId("cgh-locked")).toContainText("cần vai Xem hoặc Quản trị Bản đồ CGH");
+    await expect.poll(() => countOf(page, "count-coops"), { timeout: 20_000 }).toBeGreaterThan(0);
+    expect(mech).toEqual([]);
+  });
+
   test("tắt lớp → không tải lớp đó; cán bộ tỉnh chỉ thấy HTX trong phạm vi", async ({ page }) => {
     await loginAs(page, "tinh", "/ban-do-gis");
     await expect.poll(() => countOf(page, "count-coops"), { timeout: 20_000 }).toBeGreaterThan(0);

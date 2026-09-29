@@ -2,25 +2,33 @@
 
 import type { LayerSpecification } from "maplibre-gl";
 import { useMemo, useState, type FormEvent } from "react";
+import { loadBoundaries, mergeBoundaries } from "@/api/adapters/boundaries";
 import { listAllCooperatives } from "@/api/adapters/cooperatives";
 import { unwrap } from "@/api/client";
 import { collectPages } from "@/api/pagination";
 import type { WaterwayLayerSegment } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
+import { hasRole, ROLES } from "@/auth/principal";
+import { COVERAGE_STYLES, fromMechStatus, type CoverageStatus } from "@/cgh/coverage";
+import { communeCentroids } from "@/cgh/pins";
 import { LayerMap, type Viewport } from "@/components/LayerMap";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { PageHead } from "@/components/ui";
 import { formatDecimal, formatInt } from "@/lib/decimal";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { useAsync } from "@/lib/useAsync";
 import { formatLength } from "@/gis/geometry";
-import { capacityMarkers, coopLayers, plotLayer, roadLayer, waterwayLayer } from "@/gis/layers";
-import { CAPACITY, limitingLabel, RIPENING_OUTLINE, ROAD_CLASS, ROAD_COLOR, STAGES, WATERWAY_CLASS } from "@/gis/legend";
+import { useDisplayPalette } from "@/gis/displayConfig";
+import { capacityMarkers, cghLayer, CGH_LEGEND_ORDER, coopLayers, plotLayer, roadLayer, waterwayLayer } from "@/gis/layers";
+import { capacityLegend, capacityStyle, limitingLabel, ROAD_CLASS, ROAD_COLOR, stages as stageLegend, WATERWAY_CLASS, type DisplayPalette } from "@/gis/legend";
 
 const MAP_LABEL = "Bản đồ GIS nhiều lớp";
 const MAX_FEATURES = 1000;
 
-const LAYERS: LayerSpecification[] = [
+/** Lớp vẽ theo bảng màu quy chuẩn hiển thị đang hiệu lực (GIS US-CFG-01) — tính lại khi bảng màu đổi. */
+function mapLayers(palette: DisplayPalette): LayerSpecification[] {
+  const RIPENING_OUTLINE = palette.ripeningOutline;
+  return [
   { id: "coops-fill", type: "fill", source: "coops", paint: { "fill-color": ["coalesce", ["get", "fill"], "#9fd8b4"], "fill-opacity": 0.55 } },
   { id: "coops-line", type: "line", source: "coops", paint: { "line-color": "#0b4a2f", "line-width": 1.2 } },
   { id: "ripening-line", type: "line", source: "ripening", paint: { "line-color": RIPENING_OUTLINE, "line-width": 4, "line-dasharray": [1.5, 1] } },
@@ -51,9 +59,23 @@ const LAYERS: LayerSpecification[] = [
     source: "coopMarkers",
     paint: { "circle-radius": 6, "circle-color": ["coalesce", ["get", "fill"], "#f0871a"], "circle-stroke-color": "#0b4a2f", "circle-stroke-width": 2 },
   },
-];
+  {
+    // GIS US-INT-01: tình trạng máy CGH theo HTX — màu do Bản đồ CGH trả (GIS chỉ hiển thị, không tính lại).
+    id: "cgh-markers",
+    type: "circle",
+    source: "cgh",
+    paint: {
+      "circle-radius": 8,
+      "circle-color": ["coalesce", ["get", "color"], "#9AA5A0"],
+      "circle-stroke-color": ["case", ["==", ["get", "provisional"], true], "#ffffff", "#1d2b24"],
+      "circle-stroke-width": 2,
+      "circle-opacity": 0.9,
+    },
+  },
+  ];
+}
 
-type LayerKey = "coops" | "plots" | "stages" | "ripening" | "facilities" | "roads" | "waterways";
+type LayerKey = "coops" | "plots" | "stages" | "ripening" | "facilities" | "roads" | "waterways" | "cgh";
 const LAYER_LABEL: Record<LayerKey, string> = {
   coops: "Ranh giới HTX",
   plots: "Thửa ruộng (phóng to)",
@@ -62,6 +84,7 @@ const LAYER_LABEL: Record<LayerKey, string> = {
   facilities: "Kho / Hub (dung lượng)",
   roads: "Đường bộ",
   waterways: "Đường thủy",
+  cgh: "Tình trạng máy CGH (thiếu/thừa)",
 };
 
 function decimalOk(s: string): boolean {
@@ -73,9 +96,13 @@ function decimalOk(s: string): boolean {
  * thửa chỉ khi zoom ≥ ngưỡng (BR-24), nền chỉ từ NEXT_PUBLIC_MAP_STYLE_URL (không gọi tile/API ngoài — RB-7).
  */
 export default function GisMapPage() {
-  const { api } = useAuth();
+  const { api, principal } = useAuth();
+  const { palette } = useDisplayPalette();
+  const layers = useMemo(() => mapLayers(palette), [palette]);
+  // Lớp CGH đọc API pf/mechanization — chỉ vai xem/quản trị Bản đồ CGH (không gọi API khi thiếu vai).
+  const canCgh = hasRole(principal, ROLES.cghViewer, ROLES.cghAdmin, ROLES.platformAdmin);
   const [vp, setVp] = useState<Viewport | null>(null);
-  const [show, setShow] = useState<Record<LayerKey, boolean>>({ coops: true, plots: true, stages: true, ripening: true, facilities: true, roads: true, waterways: true });
+  const [show, setShow] = useState<Record<LayerKey, boolean>>({ coops: true, plots: true, stages: true, ripening: true, facilities: true, roads: true, waterways: true, cgh: false });
   const [roadInput, setRoadInput] = useState("");
   const [roadLoad, setRoadLoad] = useState<string | null>(null);
   const [bargeInput, setBargeInput] = useState("");
@@ -121,8 +148,37 @@ export default function GisMapPage() {
     [api, show.stages, show.ripening, date],
   );
 
-  const coopFc = useMemo(() => coopLayers(coops.data, names, stages.data, { colorByStage: show.stages, ripening: show.ripening }), [coops.data, names, stages.data, show.stages, show.ripening]);
-  const plotFc = useMemo(() => plotLayer(plots.data, stages.data, show.stages), [plots.data, stages.data, show.stages]);
+  const cghOn = show.cgh && canCgh;
+  // Kết quả cân đối đã lưu mới nhất cấp HTX (GET /v1/mechanization/coverage?level=cooperative).
+  const cgh = useAsync(
+    () => (cghOn ? unwrap(api.GET("/v1/mechanization/coverage", { params: { query: { level: "cooperative" } } })) : Promise.resolve(null)),
+    [api, cghOn],
+  );
+  const coopLocs = useMemo(() => new Map((coopsList.data ?? []).map((c) => [c.ref, c])), [coopsList.data]);
+  // HTX chưa có toạ độ → tâm xã (như Bản đồ CGH): chỉ tải ranh giới xã của tỉnh cần "vị trí tạm".
+  const needProvinces = useMemo(() => {
+    if (!cgh.data || !coopsList.data) return "";
+    const set = new Set<string>();
+    for (const i of cgh.data.items) {
+      const l = i.cooperative_ref ? coopLocs.get(i.cooperative_ref) : undefined;
+      if ((!l?.location || l.location_provisional) && i.province_code) set.add(i.province_code);
+    }
+    return Array.from(set).sort().join(",");
+  }, [cgh.data, coopLocs, coopsList.data]);
+  const communeAreas = useAsync(
+    async () => (needProvinces ? mergeBoundaries(await Promise.all(needProvinces.split(",").map((p) => loadBoundaries(api, { level: "commune", parent: p }, 9)))) : null),
+    [api, needProvinces],
+  );
+  const centroids = useMemo(() => communeCentroids(communeAreas.data?.collection), [communeAreas.data]);
+  const cghFc = useMemo(() => cghLayer(cghOn ? cgh.data?.items : null, coopLocs, centroids), [cghOn, cgh.data, coopLocs, centroids]);
+  const cghLegend = useMemo(() => {
+    const server = new Map<CoverageStatus, string>();
+    for (const l of cgh.data?.legend ?? []) if (!server.has(fromMechStatus(l.status))) server.set(fromMechStatus(l.status), l.color);
+    return CGH_LEGEND_ORDER.map((st) => ({ status: st, label: COVERAGE_STYLES[st].label, color: server.get(st) ?? COVERAGE_STYLES[st].fill }));
+  }, [cgh.data]);
+
+  const coopFc = useMemo(() => coopLayers(coops.data, names, stages.data, { colorByStage: show.stages, ripening: show.ripening }, palette), [coops.data, names, stages.data, show.stages, show.ripening, palette]);
+  const plotFc = useMemo(() => plotLayer(plots.data, stages.data, show.stages, palette), [plots.data, stages.data, show.stages, palette]);
   const sources = useMemo(
     () => ({
       coops: coopFc.areas,
@@ -131,13 +187,14 @@ export default function GisMapPage() {
       plots: plotFc,
       roads: roadLayer(roads.data, !!roadLoad),
       waterways: waterwayLayer(waterways.data?.items, !!bargeLoad),
+      cgh: cghFc.fc,
     }),
-    [coopFc, plotFc, roads.data, roadLoad, waterways.data, bargeLoad],
+    [coopFc, plotFc, roads.data, roadLoad, waterways.data, bargeLoad, cghFc],
   );
   const markers = useMemo(() => capacityMarkers(widgets.data?.items, (ref) => {
     const w = widgets.data?.items.find((x) => x.ref === ref);
     if (w) setSelected({ kind: "facility", props: w as unknown as Record<string, unknown> });
-  }), [widgets.data]);
+  }, palette), [widgets.data, palette]);
 
   const ripeCoops = useMemo(() => (stages.data?.cooperatives ?? []).filter((c) => c.ripening_plot_count > 0).sort((a, b) => (a.earliest_ripening_date ?? "").localeCompare(b.earliest_ripening_date ?? "")), [stages.data]);
   const stageShare = useMemo(() => {
@@ -159,7 +216,11 @@ export default function GisMapPage() {
   };
 
   const truncated = [coops.data?.truncated && "ranh giới HTX", plots.data?.plots?.truncated && "thửa", widgets.data?.truncated && "kho/Hub", roads.data?.truncated && "đường bộ", (waterways.data?.head?.total ?? 0) > MAX_FEATURES && "đường thủy"].filter(Boolean);
-  const errors = [coops.error, plots.error, widgets.error, roads.error, waterways.error, stages.error, coopsList.error].filter((e) => !!e);
+  // Lớp CGH: chưa có lần cân đối đã lưu → thông báo riêng, không coi là lỗi.
+  const cghNoRun = cgh.error?.code === "mechanization.run_not_found";
+  const errors = [coops.error, plots.error, widgets.error, roads.error, waterways.error, stages.error, coopsList.error, cghNoRun ? null : cgh.error].filter((e) => !!e);
+  const legendStages = stageLegend(palette);
+  const legendCapacity = capacityLegend(palette, widgets.data?.thresholds);
 
   return (
     <>
@@ -171,12 +232,26 @@ export default function GisMapPage() {
         <aside className="card sec gis-side" aria-label="Lớp bản đồ và chú giải">
           <fieldset className="plain">
             <legend>Lớp bản đồ</legend>
-            {(Object.keys(LAYER_LABEL) as LayerKey[]).map((k) => (
-              <label key={k} className="row small" style={{ marginBottom: 4 }}>
-                <input type="checkbox" checked={show[k]} onChange={(e) => setShow((s) => ({ ...s, [k]: e.target.checked }))} />
-                {LAYER_LABEL[k]}
-              </label>
-            ))}
+            {(Object.keys(LAYER_LABEL) as LayerKey[]).map((k) => {
+              const locked = k === "cgh" && !canCgh;
+              return (
+                <label key={k} className="row small" style={{ marginBottom: 4 }}>
+                  <input
+                    type="checkbox"
+                    checked={show[k] && !locked}
+                    disabled={locked}
+                    aria-describedby={locked ? "gis-cgh-locked" : undefined}
+                    onChange={(e) => setShow((s) => ({ ...s, [k]: e.target.checked }))}
+                  />
+                  {LAYER_LABEL[k]}
+                </label>
+              );
+            })}
+            {!canCgh ? (
+              <p id="gis-cgh-locked" className="small mute" data-testid="cgh-locked">
+                Lớp Tình trạng máy CGH cần vai Xem hoặc Quản trị Bản đồ CGH.
+              </p>
+            ) : null}
           </fieldset>
           <form className="stack" style={{ marginTop: 12 }} onSubmit={applyLoads} aria-label="Tra cứu tải trọng tuyến">
             <div className="field">
@@ -215,15 +290,15 @@ export default function GisMapPage() {
             Chú giải giai đoạn mùa vụ
           </h3>
           <ul className="legend" aria-label="Chú giải giai đoạn mùa vụ" style={{ marginTop: 6 }}>
-            {STAGES.map((s) => (
-              <li key={s.code} data-stage={s.code}>
+            {legendStages.map((s) => (
+              <li key={s.code} data-stage={s.code} data-color={s.color}>
                 <span className="sw" style={{ background: s.color }} aria-hidden="true" />
                 {s.label}
                 {stageTotal > 0 ? <span className="mute small">· {formatDecimal(((stageShare.get(s.code) ?? 0) / stageTotal) * 100, 0)}%</span> : null}
               </li>
             ))}
             <li>
-              <span className="sw" style={{ background: "transparent", border: `3px dashed ${RIPENING_OUTLINE}` }} aria-hidden="true" />
+              <span className="sw" style={{ background: "transparent", border: `3px dashed ${palette.ripeningOutline}` }} aria-hidden="true" />
               Vùng chín rộ 1–3 ngày tới
             </li>
           </ul>
@@ -231,15 +306,32 @@ export default function GisMapPage() {
             Dung lượng kho/Hub
           </h3>
           <ul className="legend" aria-label="Chú giải dung lượng kho/Hub" style={{ marginTop: 6 }}>
-            {Object.entries(CAPACITY).map(([k, v]) => (
-              <li key={k}>
+            {legendCapacity.map((v) => (
+              <li key={v.code} data-capacity={v.code} data-color={v.color}>
                 <span className="sw" style={{ background: v.color }} aria-hidden="true" />
                 {v.label}
-                {k === "near_full" && widgets.data ? <span className="mute small">≥ {widgets.data.thresholds.warn_pct}%</span> : null}
-                {k === "full" && widgets.data ? <span className="mute small">≥ {widgets.data.thresholds.full_pct}%</span> : null}
+                {v.note ? <span className="mute small">{v.note}</span> : null}
               </li>
             ))}
           </ul>
+          {cghOn ? (
+            <>
+              <h3 className="small" style={{ marginTop: 14 }}>
+                Tình trạng máy CGH theo HTX
+              </h3>
+              <ul className="legend" aria-label="Chú giải tình trạng máy CGH" style={{ marginTop: 6 }}>
+                {cghLegend.map((l) => (
+                  <li key={l.status} data-status={l.status} data-color={l.color}>
+                    <span className="sw" style={{ background: l.color, borderRadius: 8 }} aria-hidden="true" />
+                    {l.label}
+                  </li>
+                ))}
+              </ul>
+              <p className="small mute" style={{ marginTop: 6 }}>
+                Kết quả cân đối đã lưu của Bản đồ CGH{cgh.data?.run ? ` (lúc ${formatDateTime(cgh.data.run.computed_at)})` : ""} — GIS chỉ hiển thị, không tự tính lại. Vòng viền trắng = vị trí tạm (tâm xã).
+              </p>
+            </>
+          ) : null}
           <h3 className="small" style={{ marginTop: 14 }}>
             Đường bộ / đường thủy
           </h3>
@@ -269,6 +361,12 @@ export default function GisMapPage() {
               <span data-testid="count-plots">Thửa: {formatInt(plots.data?.plots?.features.length ?? 0)}</span>
               <span data-testid="count-facilities">Kho/Hub: {formatInt(widgets.data?.items.length ?? 0)}</span>
               <span data-testid="count-roads">Tuyến đường bộ: {formatInt(roads.data?.features.length ?? 0)}</span>
+              {cghOn ? (
+                <span data-testid="count-cgh">
+                  HTX có tình trạng máy CGH: {formatInt(cghFc.fc.features.length)}
+                  {cghFc.unplaced > 0 ? ` (${formatInt(cghFc.unplaced)} chưa định vị)` : ""}
+                </span>
+              ) : null}
               <span data-testid="count-waterways">
                 Tuyến thủy: {formatInt(waterways.data?.items.length ?? 0)}
                 {bargeLoad && waterways.data?.head ? ` (đi được ${formatInt(waterways.data.head.passable_count)})` : ""}
@@ -289,6 +387,11 @@ export default function GisMapPage() {
                 {waterways.data.head.message}
               </p>
             ) : null}
+            {cghOn && cghNoRun ? (
+              <p className="notice" role="status" data-testid="cgh-notice" style={{ marginTop: 8 }}>
+                Chưa có kết quả cân đối máy CGH đã lưu — lớp Tình trạng máy CGH chưa có dữ liệu.
+              </p>
+            ) : null}
             {truncated.length > 0 ? (
               <p className="notice" role="status" style={{ marginTop: 8 }}>
                 Đã đạt giới hạn {formatInt(MAX_FEATURES)} đối tượng cho lớp {truncated.join(", ")} — phóng to để xem đủ.
@@ -298,7 +401,7 @@ export default function GisMapPage() {
           <LayerMap
             label={MAP_LABEL}
             sources={sources}
-            layers={LAYERS}
+            layers={layers}
             initial={{ center: [105.75, 10.2], zoom: 8.3 }}
             visibility={{
               "coops-fill": show.coops,
@@ -309,6 +412,7 @@ export default function GisMapPage() {
               "plots-line": show.plots,
               "roads-line": show.roads,
               "waterways-line": show.waterways,
+              "cgh-markers": cghOn,
             }}
             markers={show.facilities ? markers : []}
             onViewport={setVp}
@@ -317,7 +421,7 @@ export default function GisMapPage() {
         </div>
 
         <aside className="card sec gis-side gis-right" aria-label="Chi tiết và cảnh báo">
-          {selected ? <Selected sel={selected} onClose={() => setSelected(null)} /> : <p className="small mute">Bấm một đối tượng trên bản đồ để xem chi tiết.</p>}
+          {selected ? <Selected sel={selected} palette={palette} onClose={() => setSelected(null)} /> : <p className="small mute">Bấm một đối tượng trên bản đồ để xem chi tiết.</p>}
           <section aria-labelledby="ripe-h" style={{ marginTop: 14 }}>
             <h2 id="ripe-h" className="small" style={{ fontSize: 14 }}>
               Cảnh báo chín rộ 1–3 ngày tới ({formatInt(ripeCoops.length)} vùng)
@@ -373,7 +477,7 @@ export default function GisMapPage() {
   );
 }
 
-function Selected({ sel, onClose }: { sel: { kind: string; props: Record<string, unknown> }; onClose: () => void }) {
+function Selected({ sel, palette, onClose }: { sel: { kind: string; props: Record<string, unknown> }; palette: DisplayPalette; onClose: () => void }) {
   const p = sel.props;
   const str = (k: string) => (p[k] === null || p[k] === undefined || p[k] === "null" ? "—" : String(p[k]));
   let title = str("name");
@@ -401,12 +505,23 @@ function Selected({ sel, onClose }: { sel: { kind: string; props: Record<string,
       ["Chiều dài", formatLength(str("length_m"))],
     ];
   } else if (sel.kind === "facility") {
-    const cls = CAPACITY[(p.class as keyof typeof CAPACITY) ?? "unknown"] ?? CAPACITY.unknown;
+    const cls = capacityStyle(typeof p.class === "string" ? p.class : null, palette);
     rows = [
       ["Mức lấp đầy", p.fill_pct ? `${formatDecimal(String(p.fill_pct), 1)}% — ${cls.label}` : cls.label],
       ["Sức chứa / đã dùng", p.capacity ? `${formatDecimal(String(p.capacity), 0)} / ${formatDecimal(String(p.used), 0)} tấn` : "—"],
       ["Nguồn số liệu", str("source")],
       ["Nguồn MKG", p.origin === "mkg" ? "Hub MKG (van công bố)" : "Kho của tenant"],
+    ];
+  } else if (sel.kind === "cgh") {
+    const num = (k: string) => (typeof p[k] === "number" ? formatInt(p[k] as number) : "—");
+    rows = [
+      ["Mã HTX", str("code")],
+      ["Tình trạng máy", str("status_label")],
+      ["Mức đáp ứng", p.coverage_pct && p.coverage_pct !== "null" ? `${formatDecimal(String(p.coverage_pct), 1)}%` : "—"],
+      ["Nhu cầu (máy)", num("required_whole")],
+      ["Máy hoạt động (năng lực)", num("capacity")],
+      ["Tổng số máy", num("machines_total")],
+      ["Vị trí", p.provisional === true ? "Vị trí tạm (tâm xã)" : "Theo hồ sơ HTX"],
     ];
   }
   return (

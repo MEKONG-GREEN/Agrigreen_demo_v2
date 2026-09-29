@@ -13,6 +13,10 @@ Các job vận hành dùng chung cho mọi cụm (`ag_pf`, `ag_mkg`, `ag_vault`)
 | Kiểm đích trong lãnh thổ (RB-7) | mỗi lần khởi động ở production | `internal/shared/residency` | — | [residency.md](residency.md) |
 | Deploy một VPS (demo/thử nghiệm) | khi dựng hoặc cập nhật | `docker-compose.vps.yml`, `deploy/vps/prepare.sh` | — | [vps-deploy.md](vps-deploy.md) |
 | Khai báo trước hàng đợi consumer RabbitMQ | mỗi lần `outbox-publisher` khởi động | `cmd/outbox-publisher` (`assembly.Queues`) | — | [rabbitmq-queues.md](rabbitmq-queues.md) |
+| Giám sát đồng bộ tích hợp, DLQ, cảnh báo Admin | liên tục; cảnh báo khi DLQ > 0 | màn `/quan-tri/giam-sat-dong-bo`, Prometheus + Alertmanager | `sync_app` | [integration-alerts.md](integration-alerts.md) |
+| Kiểm độ tươi dữ liệu App HTX (CGH FN-07) | mỗi giờ | `cmd/worker` (leader, job `mechanization_area_feed_check`) | `ag_outbox_publisher` (tìm tenant), `mechanization_app` | [integration-alerts.md](integration-alerts.md) |
+| Công bố sức chứa kho/Hub theo ngày (GIS US-WH-01) | 01:15 giờ VN hằng ngày, chạy bù khi khởi động | `cmd/api-internal` (leader cụm mkg, job `hub_capacity_daily`; cần `AG_MKG_DB_DIRECT_URL`) | `ag_outbox_publisher` (tìm tenant), `hub_app` | mục dưới |
+| Bản đồ chuẩn hóa cho TMS, đo độ trễ lớp | khi đổi truy vấn lớp; UAT | kiểm thử `TestStandardMapForTMSLatency_…` | `geo_app` | [gis-performance.md](gis-performance.md) |
 | Dựng lại bảng chiếu | diễn tập G4, khi nghi lệch | theo module | vai của module | [rebuild-projection.md](rebuild-projection.md) |
 
 ## Leader
@@ -25,6 +29,12 @@ Nhiều bản `worker` chạy song song được. Chỉ bản giữ khóa tư v�
 
 Chạy worker không có lịch: `worker -jobs=none`. Chỉ chạy lịch, không consumer: `worker -modules=none`.
 
+## Công bố sức chứa kho/Hub theo ngày (mkg)
+
+`cmd/api-internal` chạy lịch của vùng mkg khi có `AG_MKG_DB_DIRECT_URL` (nối **thẳng** cụm mkg, không qua PgBouncer) hoặc `AG_MKG_JOBS=all|hub_capacity_daily`; `AG_MKG_JOBS=none` tắt. Chỉ bản giữ khóa tư vấn `727101` trên database `ag_mkg` chạy. Job `hub_capacity_daily` chụp sức chứa mọi cơ sở đang dùng và xuất qua van `hub_capacity` (sổ `mkg_hub.valve_export` + outbox cụm mkg); khóa chống trùng `capacity-daily:<hub>:<YYYY-MM-DD>` nên chạy lại cùng ngày không xuất thêm. pf/geo nhận qua consumer `pf.geo.hub_valve` (số nhập tay của Admin vẫn được giữ — BR-52). Log: `event=job.hub_capacity_daily`, `published`, `skipped`.
+
+Compose Local/Dev chưa đặt `AG_MKG_DB_DIRECT_URL` cho `api-internal` (không sửa `deploy/**` trong đợt này) — thêm `AG_MKG_DB_DIRECT_URL: postgres://postgres:5432/?sslmode=disable` để bật.
+
 ## Dọn Idempotency-Key
 
 Hàm `shared.purge_expired_idempotency(batch)` (migration `shared/000002`) xóa theo lô các khóa quá `expires_at` (48 giờ, R-51). Job gọi lặp tới khi lô trả ít hơn `batch`. Log: `event=job.idempotency`, `deleted=<số>`. Bảng phình to thì kiểm log `job.run outcome=error`.
@@ -35,7 +45,7 @@ Có khi đặt `AG_OTLP_ENDPOINT`. Ngưỡng dưới đây là đề xuất, ch�
 
 | Metric | Nguồn | Cảnh báo đề xuất |
 |---|---|---|
-| `ag.rabbitmq.dlq.depth{queue}` | worker (cần `AG_RABBITMQ_MGMT_URL`) | > 0 trong 5 phút (R-62) |
+| `ag.rabbitmq.dlq.depth{queue}` | worker (cần `AG_RABBITMQ_MGMT_URL`) | > 0 trong 5 phút (R-62) — luật Prometheus cụ thể và cách xử lý: [integration-alerts.md](integration-alerts.md) |
 | `ag.outbox.backlog{cluster}` | outbox-publisher | > 1000 trong 10 phút |
 | `ag.outbox.oldest_age{cluster}` | outbox-publisher | > 300 giây |
 | `ag.projection.lag{projection}` | module có bảng chiếu, qua `telemetry.RegisterProjectionLag` | > 60 giây (chưa có nguồn ở G1) |

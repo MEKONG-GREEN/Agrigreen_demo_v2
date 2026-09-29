@@ -25,6 +25,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
@@ -169,7 +170,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		Sources: []syncport.Source{md.SyncSource(), g.SyncSource(), cnt.SyncSource(), kn.SyncSource(), nt.SyncSource(), mrvMod.SyncSource(), cc.SyncSource()},
 		Sinks:   []syncport.Sink{g.SyncSink(), kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink(), cc.SyncSink()},
 	})
-	nt.UseSyncEntities(snc.PullEntities()) // KN US-SYNC-02: kiểm entities[] của nudge
+	nt.UseSyncEntities(snc.PullEntities())               // KN US-SYNC-02: kiểm entities[] của nudge
+	snc.UseIntegrations(queueNames(), dlqDepthFromEnv()) // GIS US-SYNC-01: màn giám sát đồng bộ
 
 	accPool, err := pool(accounts.DBRole)
 	if err != nil {
@@ -208,6 +210,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		return Modules{}, pools, err
 	}
 	ww := waterway.New(wwPool, clk, waterway.Deps{Params: md.Params(), Catalogs: md.Catalogs()})
+	g.UseWaterways(ww.Layer()) // GIS US-INT-02: lớp đường thủy của bản đồ chuẩn hóa
 
 	// pf/simulation: API ghi kịch bản/yêu cầu; worker dựng ảnh chụp qua SupplySource (pf/cropcycle
 	// + pf/party + pf/geo + pf/masterdata) và WaterwayRouter (pf/waterway); optimizer tính và nộp qua RegisterInternal.
@@ -253,4 +256,24 @@ func FileStoreFromEnv(ctx context.Context) (objstore.Store, error) {
 		return nil, nil
 	}
 	return objstore.FromEnv(ctx)
+}
+
+// queueNames là tên mọi consumer đã khai (Queues) cho màn giám sát đồng bộ (GIS US-SYNC-01).
+func queueNames() []string {
+	qs := Queues()
+	out := make([]string, 0, len(qs))
+	for _, q := range qs {
+		out = append(out, q.Name)
+	}
+	return out
+}
+
+// dlqDepthFromEnv đọc độ sâu DLQ qua RabbitMQ management API (AG_RABBITMQ_MGMT_URL); chưa cấu
+// hình → nil (màn giám sát hiện "không đo được").
+func dlqDepthFromEnv() func(context.Context) (map[string]int64, error) {
+	u := os.Getenv("AG_RABBITMQ_MGMT_URL")
+	if u == "" {
+		return nil
+	}
+	return func(ctx context.Context) (map[string]int64, error) { return inbox.DLQDepth(ctx, nil, u) }
 }

@@ -344,8 +344,10 @@ func (h Handler) openSession(c *gin.Context) {
 }
 
 type closeReq struct {
-	CounterTo *int64 `json:"counter_to"`
-	EventTime string `json:"event_time"`
+	CounterTo   *int64  `json:"counter_to"`
+	MoisturePct *string `json:"moisture_pct"`
+	TareKg      *string `json:"tare_kg"`
+	EventTime   string  `json:"event_time"`
 }
 
 func (h Handler) closeSession(c *gin.Context) {
@@ -362,10 +364,19 @@ func (h Handler) closeSession(c *gin.Context) {
 	if req.CounterTo == nil {
 		x.add("counter_to", "bắt buộc")
 	}
+	moist := ""
+	if req.MoisturePct != nil {
+		moist = x.pct("moisture_pct", *req.MoisturePct).StringFixed(2)
+	}
+	var tare *mass.Kg
+	if req.TareKg != nil {
+		k := x.kg("tare_kg", *req.TareKg)
+		tare = &k
+	}
 	if x.fail(c) {
 		return
 	}
-	s, rep, err := h.Svc.CloseSession(c.Request.Context(), id, *req.CounterTo, at, idem(c))
+	s, rep, err := h.Svc.CloseSession(c.Request.Context(), id, *req.CounterTo, moist, tare, at, idem(c))
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -875,7 +886,7 @@ func (h Handler) listParams(kind string) gin.HandlerFunc {
 		}
 		def := domain.DefaultTolerance()
 		c.JSON(http.StatusOK, gin.H{"items": items, "provisional_default": gin.H{"label": domain.ProvisionalLabel,
-			"note": "Chưa có phiên bản duyệt có hiệu lực → dùng mặc định tạm (prototype, chờ khách C-4)",
+			"note":                "Chưa có phiên bản duyệt có hiệu lực → dùng mặc định tạm (prototype, chờ khách C-4)",
 			"commercial_flag_pct": def.CommercialFlag.StringFixed(2), "commercial_critical_pct": def.CommercialCrit.StringFixed(2)}})
 	}
 }

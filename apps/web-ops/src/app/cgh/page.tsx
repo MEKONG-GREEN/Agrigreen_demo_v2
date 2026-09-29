@@ -6,6 +6,7 @@ import { unitLabel } from "@/api/adapters/units";
 import { ForecastSection } from "@/cgh/ForecastSection";
 import { unwrap } from "@/api/client";
 import { collectPages } from "@/api/pagination";
+import { AreaFreshness } from "@/cgh/AreaFreshness";
 import { CoopPanel } from "@/cgh/CoopPanel";
 import { buildPins, communeCentroids, pinsToGeoJSON, searchPins } from "@/cgh/pins";
 import type { MechCoverageItem, MechGroup } from "@/api/types";
@@ -151,6 +152,8 @@ export default function CghPortalPage() {
           </>
         }
       />
+
+      <AreaFreshness season={run ? { season_code: run.season_code, season_year: run.season_year } : null} coopNames={coopNames} />
 
       <section className="grid4" aria-label="Chỉ số tổng quan" style={{ marginBottom: 16 }}>
         <KpiTile color="green" icon="tractor" label="Tổng số máy" value={kpis ? formatInt(kpis.total_machines) : dash.loading ? "…" : null} />

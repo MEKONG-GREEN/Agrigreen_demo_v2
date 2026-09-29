@@ -56,6 +56,8 @@ Mã lỗi của module có dạng `<module>.<lỗi>`.
 | 403 | `masterdata.param_not_setter` | pf/masterdata: gửi duyệt phiên bản do người khác đặt |
 | 422 | `masterdata.param_threshold_order` | pf/masterdata: mốc ngưỡng CGH (QT-02) lệch thứ tự so với hai mốc đã duyệt tại ngày hiệu lực — phải Cần chú ý < Đủ < Thừa (kiểm khi đề xuất và khi duyệt) |
 | 422 | `masterdata.param_correction_required` | pf/masterdata: đã có bản duyệt cùng `effective_from` — phải nêu `correction_reason` (bản ghi bù) |
+| 422 | `masterdata.param_percent_thresholds` | pf/masterdata: bộ ngưỡng % của quy chuẩn hiển thị GIS (`geo.hub_capacity_warn_pct` < `geo.hub_capacity_full_pct`) lệch thứ tự hoặc ngoài 0–100 % — "Ngưỡng % phải tăng dần và nằm trong khoảng 0–100%." (GIS US-CFG-01 AC-2; kiểm khi đề xuất và khi duyệt). Mã màu sai định dạng trả `validation_failed` trường `text`: "Mã màu không đúng định dạng HEX (ví dụ: #1E90FF)." |
+| 404 | `masterdata.param_no_default` | pf/masterdata: khóa không có giá trị mặc định nhúng để "Khôi phục mặc định" (GIS US-CFG-02 AC-2) |
 | 422 | `masterdata.catalog_import_invalid` | pf/masterdata: tệp nhập danh mục (HTX US-CAT-02; CSV UTF-8 hoặc .xlsx) sai mẫu — thiếu cột `catalog`/`code`/`name`, ô công thức, quá 500 dòng hoặc 2 MB — từ chối cả tệp (dòng lỗi riêng lẻ nằm trong `rows[].reason`, không phải lỗi HTTP) |
 | 404 | `masterdata.catalog_import_not_found` | pf/masterdata: không có lần nhập danh mục với mã đó trong tenant |
 
@@ -358,6 +360,56 @@ Nhập hàng loạt: lý do theo dòng dùng nhãn "Thiếu Email", "Sai định
 | 422 | `hub.parent_invalid` | Cơ sở cha không phải hub hiện hành khác chính nó |
 | 422 | `hub.boundary_invalid` | Ranh giới không phải Polygon/MultiPolygon WGS84 hợp lệ |
 | 500 | `hub.valve_denied` | Van công bố từ chối payload (hợp đồng thiếu/chưa duyệt, trường ngoài hợp đồng) — lỗi lập trình, không có gì được ghi |
+
+### mkg/measurement (API nội bộ MKG — `cmd/api-internal`, `contracts/openapi/mkg-internal.yaml`)
+
+| HTTP | code | Khi nào |
+|---|---|---|
+| 404 | `measurement.lot_not_found` | Lô chưa có phiếu cân (hoặc chưa được đối soát) trong tenant của token |
+| 404 | `measurement.ticket_not_found` | Không có phiếu cân |
+| 404 | `measurement.device_not_found` | Không có thiết bị cân / kỳ đăng ký |
+| 404 | `measurement.session_not_found` | Không có phiên cân |
+| 404 | `measurement.version_not_found` | Không có phiên bản dung sai / định mức hao hụt số `{seq}` |
+| 404 | `measurement.dispute_not_found` | Không có hồ sơ tranh chấp |
+| 404 | `measurement.import_not_found` | Không có lần nhập số cân của khách |
+| 403 | `self_approval_forbidden` | Người duyệt thiết bị / dung sai / định mức là người đề xuất (R-56; DB chặn lần hai bằng CHECK) |
+| 409 | `measurement.device_taken` | `device_id` đã đăng ký ở tài khoản khác (một thiết bị gắn một tenant mãi mãi) |
+| 409 | `measurement.pending_exists` | Thiết bị đang có đề xuất đăng ký chờ duyệt |
+| 409 | `measurement.not_pending` | Đề xuất không còn chờ duyệt |
+| 409 | `measurement.device_not_active` | Thiết bị / kỳ đăng ký không hiệu lực (chưa duyệt, đã thu hồi, đã có kỳ mới) |
+| 409 | `measurement.session_conflict` | Thiết bị (kỳ) đang có phiên mở, hoặc `counter_from` không lớn hơn `counter_to` của phiên đã đóng trước |
+| 409 | `measurement.session_closed` | Phiên cân đã đóng |
+| 409 | `measurement.reconciliation_incomplete` | Lô chưa đủ phiếu để đối soát (HUB: đủ ba điểm; DIRECT: CUSTOMER_IN) |
+| 409 | `measurement.dispute_transition` | Thao tác không hợp lệ ở trạng thái hồ sơ (vd kết luận khi chưa xem xét; thêm bằng chứng khi đã đóng) |
+| 409 | `measurement.no_hub_in` | Lập bằng chứng MRV khi lô chưa có phiếu HUB_IN |
+| 409 | `measurement.no_plot_sources` | Lô không có nguồn thửa (hoặc chưa nối nguồn gốc lô mkg/hub) |
+| 422 | `measurement.invalid_ticket` | Phiếu vi phạm hợp đồng TicketWriter: đã có phiếu hiệu lực ở điểm cân (cần `supersedes_id`), phiếu bù trỏ phiếu khác lô/điểm hoặc đã bị bù, HUB_IN/HUB_OUT trên lô DIRECT, tuyến khác tuyến của lô, nhập tay thiếu bằng chứng/lý do, `id` đã dùng |
+| 422 | `measurement.window_incomplete` | Cửa sổ số đo có bộ đếm thiếu (không bao giờ nội suy) |
+| 422 | `validation_failed` | Dữ liệu vào sai (khối lượng không phải chuỗi ≤ 3 chữ số, phần trăm ngoài 0..100 hoặc > 2 chữ số, khóa Ed25519 không 32 byte, `cert_sha256` không phải hex 64, lý do < 10 ký tự, ngưỡng nghiêm trọng < ngưỡng cờ, khoảng ẩm không liền nhau) |
+| 500 | `measurement.valve_denied` | Van công bố từ chối payload `mrv_collection_evidence` (hợp đồng thiếu, trường ngoài hợp đồng) — không có gì được ghi |
+
+### mkg/measurement — ingest (`cmd/ingest`, `POST /v1/ingest/batches` qua mTLS)
+
+Agent biên nhận `200` + `{device_id, epoch, high_water_counter}` khi lô đã commit (gửi lặp cùng lô trả đúng xác nhận cũ) và chỉ xóa đệm tới `high_water_counter`. `429` và `5xx` → gửi lại sau; mọi `4xx` khác → **không** gửi lại, cách ly lô và báo động (ADR-0019).
+
+| HTTP | code | Khi nào |
+|---|---|---|
+| 400 | `edge.decode` | Thân không phải lô `agrigreen.edge.batch.v1`: JSON hỏng, khóa lạ, thiếu khóa (kể cả `ntp_offset_ms`), dữ liệu thừa |
+| 422 | `edge.format` · `edge.device_id` · `edge.epoch` · `edge.counter_range` · `edge.ntp_offset` · `edge.reading` | Lô sai ràng buộc hợp đồng (`edgewire.Validate`; mã như `contracts/edge/batch.v1.vectors.json`) |
+| 422 | `edge.key_id` | `key_id` của lô không khớp khóa nguồn đã duyệt của kỳ `(device_id, epoch)` |
+| 422 | `edge.signature` | Chữ ký Ed25519 sai dạng hoặc không hợp lệ với khóa đã duyệt |
+| 401 | `ingest.client_cert_required` | Không có chứng thư mTLS client (listener đã chặn ở bắt tay; mã này là lớp phòng thủ thứ hai) |
+| 403 | `ingest.device_mismatch` | `device_id` của lô không trùng CN/SAN của chứng thư client (R-16) |
+| 403 | `ingest.unknown_device` | `(device_id, epoch)` chưa đăng ký hoặc chưa được duyệt trong sổ thiết bị |
+| 403 | `ingest.cert_mismatch` | Chứng thư client hợp lệ với CA nhưng không phải chứng thư đã duyệt của kỳ (SHA-256 DER khác) |
+| 403 | `ingest.device_revoked` | Thiết bị đã bị thu hồi — lô đã nhận trước đó giữ nguyên (RB-1) |
+| 409 | `ingest.epoch_superseded` | Kỳ đăng ký đã được thay; bộ đếm của kỳ cũ không bao giờ nhận thêm — đăng ký kỳ mới |
+| 409 | `ingest.batch_conflict` | Đã có lô cùng `(device_id, epoch, counter_from)` nhưng khác `payload_sha256`/`counter_to` — báo động (thiết bị hỏng hoặc bị giả), không ghi gì |
+| 409 | `ingest.counter_regression` | Lô chồng lấn hoặc lùi bộ đếm so với lô cuối đã nhận của `(device_id, epoch)`. Khoảng trống thì được nhận và giám sát báo mất lô |
+| 413 | `payload_too_large` | Thân vượt `edgewire.MaxBodyBytes` (1 MiB) |
+| 429 | `ingest.rate_limited` | Vượt tốc độ theo thiết bị (`AG_INGEST_RATE_PER_MIN`, `AG_INGEST_RATE_BURST`); có `Retry-After` |
+
+Mã của vòng tích phân (không trả qua HTTP; nhãn `code` của metric `ag.ingest.integrations` và log `event=ingest.integrate`): `ingest.window_incomplete` (cửa sổ thiếu bộ đếm — thử lại, báo động sau `AG_INGEST_STUCK_AFTER`), `ingest.no_stable_readings`, `ingest.non_positive_net` (tổng ≤ bì), `ingest.window_too_large`, `ingest.window_corrupt`, `measurement.invalid_ticket` (TicketWriter từ chối).
 
 ### pf/waterway
 

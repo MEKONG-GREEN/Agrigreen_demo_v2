@@ -110,8 +110,9 @@ type Integration struct {
 	RuleVersion string
 	// Gaps: bộ đếm bị thiếu trong cửa sổ (lô mất). Có Gaps → Integrate trả ErrWindowIncomplete.
 	Gaps []int64
-	// ReadingsSHA256 (thêm ở G3-A2, tùy chọn): SHA-256 hex thường của các số đo đã
-	// dùng theo dạng chuẩn của thuật toán — ghim vào phiếu để tích phân lại kiểm được.
+	// ReadingsSHA256: hex thường của SHA-256 trên dạng chuẩn của các số đo trong
+	// cửa sổ (bổ sung G3-1, tương thích ngược; xem internal/mkg/measurement/ingest
+	// WindowDigest) — ghi vào phiếu để xác minh lại khoảng raw_reading đã dùng (R-70).
 	ReadingsSHA256 string
 }
 

@@ -59,6 +59,21 @@ describe("menu theo phạm vi và vai", () => {
     expect(h).not.toContain("/cgh");
   });
 
+  it("GIS US-CFG-01: Quy chuẩn hiển thị bản đồ cho người đặt/duyệt tham số; không cho cán bộ KN", () => {
+    expect(hrefs(persona("setter"))).toContain("/quan-tri/hien-thi");
+    expect(hrefs(persona("approver"))).toContain("/quan-tri/hien-thi");
+    for (const id of ["tw", "tinh", "xa", "cuc", "htx", "account-tinh"]) expect(hrefs(persona(id))).not.toContain("/quan-tri/hien-thi");
+  });
+
+  it("GIS US-SYNC-01: Giám sát đồng bộ cho platform_admin / device_admin", () => {
+    expect(hrefs(persona("setter"))).toContain("/quan-tri/giam-sat-dong-bo");
+    expect(hrefs(persona("approver"))).not.toContain("/quan-tri/giam-sat-dong-bo");
+    expect(hrefs(persona("tinh"))).not.toContain("/quan-tri/giam-sat-dong-bo");
+    const dev = buildPrincipal({ sub: "d1", realm_access: { roles: ["device_admin"] } }, null);
+    expect(hrefs(dev)).toContain("/quan-tri/giam-sat-dong-bo");
+    expect(findNavItem("/quan-tri/giam-sat-dong-bo")?.label).toBe("Giám sát đồng bộ");
+  });
+
   it("chưa xác định phạm vi và không có vai → không thấy gì (mặc định chặn)", () => {
     const p = buildPrincipal({ sub: "u1" }, null);
     expect(hrefs(p)).toEqual([]);

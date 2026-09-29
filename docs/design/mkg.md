@@ -173,6 +173,13 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 
 ### 5.2 `mkg/measurement` — ba điểm cân, phiếu cân dẫn xuất, đối soát (mục 13) — **event sourcing mức B: sổ là nguồn**
 
+> **ĐÃ HIỆN THỰC (G3-A2, 30/09/2026)** — migration mkg 000007–000008, schema `mkg_measurement`, vai `measurement_app` / `ingest_mkg`.
+> - Sổ: `device_version` + `device_decision` (R-56 app + CHECK DB), `weighing_session` (cửa sổ bộ đếm, bì, ẩm), `weigh_ticket` (`lot:<id>`; `rule_version`, thiết bị/kỳ/khoảng bộ đếm, `batch_ids`, `readings_sha256`, bằng chứng tay; bù bằng `supersedes_id`), `lot_terms` (cách tính giá — tạm tới G4), `tolerance_version` / `loss_norm_version` + `param_decision` (có phiên bản, áp theo thời điểm cân; mặc định tạm cờ 5 % / nghiêm trọng 15 %, định mức sấy theo khoảng ẩm — **chờ khách**), `reconciliation` (`lot:<id>`, lần sau thay lần trước), `dispute_event`, `customer_weight_import` (C-5 tạm), `valve_export`.
+> - Bảng chiếu (cùng giao dịch, dựng lại qua `POST /v1/measurement/projections/rebuild`): `lot_mass_current`, `lot_yield_current`, `dispute_current`, `device_current` (kèm sức khỏe từ ingest), `weighing_session_current`, `param_current`, `lot_terms_current`.
+> - Hai bảng xuyên tenant KHÔNG RLS, chỉ ghi thêm, chỉ khóa + tenant: `device_directory` (ingest suy ra tenant từ thiết bị, R-16) và `session_directory` (vòng tích phân tìm tenant có phiên đã đóng).
+> - Cổng: `TicketWriter`, `LotMass`, `DeviceRegistry` (+ mới `DeviceHealth`, `WeighingSessions`, `RollTotals`) ở `measurement/port`; `measurement.NewIngestPorts` cho `cmd/ingest` (sổ thiết bị, `PendingSessions`, bì theo cửa sổ, sổ phiếu).
+> - RB-6: hợp đồng `per_tonne` → kiểm chéo cuộn ↔ khối lượng có cờ; `per_bale` → chỉ tham khảo. Số cuộn qua `RollTotals` (fieldops chưa nối → `pending_rolls`).
+
 | Mục | Thiết kế |
 |---|---|
 | Trách nhiệm | Nhận số đo cân thô từ agent biên (qua `cmd/ingest`), tích phân thành phiếu cân theo cửa sổ lô (R-70), ba điểm `HUB_IN`, `HUB_OUT`, `CUSTOMER_IN`; tách hao hụt dự kiến/bất thường; đối soát `HUB_OUT → CUSTOMER_IN` theo bảng dung sai có phiên bản (RB-6, C-4); hồ sơ tranh chấp |
@@ -301,7 +308,7 @@ Số chính thức theo [g3-conventions §2](../dev/g3-conventions.md#2-số-mig
 | # | Câu hỏi | Đề xuất | Ai | Chặn |
 |---|---|---|---|---|
 | Q-MKG-01 | Sự kiện **nội bộ** giữa các module mkg (vd phiếu cân → costing) đi đâu, khi exchange RabbitMQ dùng chung với nền tảng? | **Đã chốt (G3-0, ADR-0018):** vhost `mkg.internal` riêng, tài khoản nền tảng không có quyền; `shared.outbox.kind`; `//ag:internal-event` + `contracts/events-internal/`; `contractcheck` bắt payload nội bộ không đi vhost nền tảng; consumer ở `cmd/worker-internal` | Kiến trúc + vận hành | — |
-| Q-MKG-02 | Tần suất công bố `hub_capacity`: theo mỗi dịch chuyển, theo lịch, hay theo ngưỡng thay đổi? | Job 15 phút + khi thay đổi > 5% sức chứa; hiện chỉ khi duyệt và khi chụp tay | MKG vận hành | pf/geo độ tươi dữ liệu |
+| Q-MKG-02 | Tần suất công bố `hub_capacity`: theo mỗi dịch chuyển, theo lịch, hay theo ngưỡng thay đổi? | G2: job `hub_capacity_daily` của `api-internal` công bố mỗi cơ sở đang dùng **một lần mỗi ngày** (01:15 giờ VN, theo GIS US-WH-01 AC-2 "chu kỳ đồng bộ theo ngày"), cộng khi duyệt và khi chụp tay. Đề xuất bổ sung khi chốt: khi thay đổi > 5 % sức chứa | MKG vận hành | pf/geo độ tươi dữ liệu |
 | Q-MKG-03 | Phạm vi người vận hành theo hub (người ở hub A không thao tác hub B)? | Gán `facility_scope` trong claim hoặc bảng phân công ở mkg/hub, kiểm ở `app/` | MKG | ĐTK 2 nhiều hub |
 | Q-MKG-04 | Khối lượng lô: nhập tay ở hub hay lấy từ phiếu cân `HUB_IN` (RB-6)? | G2 nhập tay; G3 lô `receipt` bắt buộc `weigh_ticket_ref` khi hub có cân; nhập tay chỉ khi cân hỏng, có lý do | MKG + thương mại (C-4) | measurement |
 | Q-MKG-05 | Sửa sai một mẻ biến đổi (ghi nhầm lô vào/khối lượng ra)? | "Mẻ bù": bản ghi `batch` mới `supersedes_id` + lý do, bù ngược mọi dịch chuyển của mẻ gốc nếu lô ra chưa bị dùng; lô ra đã dùng → chỉ bù bằng điều chỉnh kiểm kê có duyệt | MKG vận hành | — |

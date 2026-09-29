@@ -71,17 +71,22 @@ func (s *Service) HandleCoopSeasonAreaChanged(ctx context.Context, tx pgx.Tx, en
 	if err != nil {
 		return err
 	}
+	evID := env.EventID
+	incoming := domain.SeasonArea{CooperativeRef: ci.Ref, Season: sn, AreaHa: area, SourceAt: at}
 	if ok, _ := domain.ResolveArea(cur, domain.AreaFromAppHTX); !ok {
-		return nil // QT-03: Admin đã khóa — giữ giá trị nhập tay, không ghi sổ
+		// QT-03: Admin đã khóa — giữ giá trị nhập tay, không ghi sổ; nhật ký FN-07 ghi "giữ bản khóa".
+		return logSync(ctx, tx, env.TenantID, port.SyncActorRef, incoming, port.SourceAppHTX, store.SyncKeptLocked, &evID, s.now())
 	}
 	if cur != nil && cur.Source == domain.AreaFromAppHTX && at.Before(cur.SourceAt) {
-		return nil // ReasonStale
+		return logSync(ctx, tx, env.TenantID, port.SyncActorRef, incoming, port.SourceAppHTX, store.SyncStaleIgnored, &evID, s.now()) // ReasonStale
 	}
 	a := domain.SeasonArea{ID: ids.New(), CooperativeRef: ci.Ref, Season: sn}
 	if cur != nil {
 		a = *cur
 	}
 	a.CommuneCode, a.AreaHa, a.Source, a.SourceAt, a.Locked = ci.CommuneCode, area, domain.AreaFromAppHTX, at, false
-	_, err = writeAreaTx(ctx, tx, pr, a, domain.AreaSynced, "", s.now(), key)
-	return classify(err)
+	if _, err = writeAreaTx(ctx, tx, pr, a, domain.AreaSynced, "", s.now(), key); err != nil {
+		return classify(err)
+	}
+	return logSync(ctx, tx, env.TenantID, port.SyncActorRef, a, port.SourceAppHTX, store.SyncApplied, &evID, s.now())
 }

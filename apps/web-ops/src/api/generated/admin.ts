@@ -310,6 +310,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/masterdata/params/restore-default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Khôi phục mặc định / xóa cấu hình hiển thị (GIS US-CFG-02 AC-2) — tạo PHIÊN BẢN NHÁP mới mang giá trị mặc định nhúng, áp dụng khi được duyệt (R-56)
+         * @description Không xóa phiên bản nào (RB-1, ADR-0011): "Xóa" một cấu hình = khôi phục giá trị mặc định bằng phiên bản mới,
+         *     hiệu lực từ lúc đề xuất. Phiên bản đi qua gửi duyệt → phê duyệt bởi người khác người đặt; giá trị cũ vẫn
+         *     trong sổ param_approved (tra cứu, kiểm toán). Vai param_setter. Khóa không có mặc định → 404 masterdata.param_no_default.
+         */
+        post: operations["restoreParamDefault"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/orgs": {
         parameters: {
             query?: never;
@@ -581,6 +603,46 @@ export interface paths {
         put?: never;
         /** Đóng xung đột; phát pf.sync.conflict.resolved để module sở hữu entity áp quyết định bằng bản ghi bù */
         post: operations["syncResolveConflict"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sync/integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Giám sát đồng bộ tích hợp theo nguồn (GIS US-SYNC-01 AC-1) — mỗi consumer một dòng
+         * @description Gộp lần xử lý thành công (shared.inbox) và thất bại (pf_sync.integration_failure) theo consumer trong cửa sổ
+         *     window_hours (mặc định 24, tối đa 720): số sự kiện xử lý, lần thành công gần nhất, số lần lỗi, số sự kiện vào
+         *     hàng chờ lỗi (DLQ), mã lỗi gần nhất (đã chuẩn hóa, không có thông điệp tự do — R-14), độ sâu DLQ hiện tại
+         *     (RabbitMQ management API; null khi chưa cấu hình AG_RABBITMQ_MGMT_URL). Vai platform_admin, device_admin.
+         */
+        get: operations["syncIntegrations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sync/integrations/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhật ký đồng bộ tích hợp (GIS US-SYNC-01 AC-1) — thời điểm, nguồn, số bản ghi, thành công/lỗi, mã lỗi; mới nhất trước */
+        get: operations["syncIntegrationLog"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2401,6 +2463,42 @@ export interface components {
             source_doc: string;
             correction_reason?: string;
         };
+        /** @description Tình trạng một luồng đồng bộ (consumer) — GIS US-SYNC-01 */
+        SyncIntegration: {
+            /** @example pf.mechanization.area_sync */
+            consumer: string;
+            /** @description Nhãn nguồn tích hợp (tiếng Việt) */
+            source: string;
+            /** @enum {string} */
+            status: "ok" | "error" | "idle";
+            processed_count: number;
+            /** Format: date-time */
+            last_processed_at: string | null;
+            last_event_type: string | null;
+            failure_count: number;
+            dead_lettered_count: number;
+            /** Format: date-time */
+            last_failure_at: string | null;
+            last_error_code: string | null;
+            /** @description null = không đo được (chưa cấu hình management API) */
+            dlq_depth: number | null;
+        };
+        SyncIntegrationLogEntry: {
+            /** Format: date-time */
+            at: string;
+            consumer: string;
+            source: string;
+            event_type: string;
+            /** Format: uuid */
+            event_id: string;
+            /** @enum {string} */
+            status: "ok" | "error";
+            /** @description Số bản ghi của lần đồng bộ (mỗi sự kiện một bản ghi) */
+            record_count: number;
+            error_code: string | null;
+            delivery_count: number;
+            dead_lettered: boolean;
+        };
         ParamVersion: {
             /** Format: uuid */
             id: string;
@@ -3797,8 +3895,11 @@ export interface operations {
                             key: string;
                             name: string;
                             unit: string;
-                            /** @enum {string} */
-                            kind: "decimal" | "text";
+                            /**
+                             * @description color = mã màu HEX #RRGGBB (GIS US-CFG-01)
+                             * @enum {string}
+                             */
+                            kind: "decimal" | "text" | "color";
                             min: string | null;
                             max: string | null;
                             current: null | {
@@ -4186,6 +4287,52 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    restoreParamDefault: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example gis.stage_color:chin_ro */
+                    key: string;
+                    /** @description Lý do (≥ 10 ký tự); bỏ trống → "Khôi phục giá trị mặc định (GIS US-CFG-02)" */
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParamVersion"];
+                };
+            };
+            /** @description Phiên bản nháp mang giá trị mặc định */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParamVersion"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description masterdata.param_no_default */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed (mã màu HEX, ngưỡng %) | masterdata.param_percent_thresholds */
             422: components["responses"]["Problem"];
         };
     };
@@ -4741,6 +4888,71 @@ export interface operations {
             404: components["responses"]["Problem"];
             /** @description sync.conflict_state — đã đóng */
             409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    syncIntegrations: {
+        parameters: {
+            query?: {
+                window_hours?: number;
+                /** @description Lọc theo nguồn (tên consumer) */
+                consumer?: string;
+                status?: "ok" | "error" | "idle";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tình trạng từng luồng đồng bộ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        since: string;
+                        dlq_available: boolean;
+                        items: components["schemas"]["SyncIntegration"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    syncIntegrationLog: {
+        parameters: {
+            query?: {
+                consumer?: string;
+                status?: "ok" | "error";
+                /** @description Mặc định: to − 7 ngày */
+                from?: string;
+                to?: string;
+                cursor?: components["parameters"]["Cursor"];
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang nhật ký */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        next_cursor: string | null;
+                        items: components["schemas"]["SyncIntegrationLogEntry"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
         };
     };

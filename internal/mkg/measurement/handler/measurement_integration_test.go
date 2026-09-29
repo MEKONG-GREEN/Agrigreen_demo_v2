@@ -271,7 +271,9 @@ func TestHubReconciliationDisputeLifecycle(t *testing.T) {
 		t.Fatalf("đầu vào không đổi phải trả lần trước: %s", r2.raw)
 	}
 	// Vòng đời: resolve trước review → 409; thêm bằng chứng; review; resolve; đóng rồi không nhận thêm.
-	act := func(b map[string]any) resp { return dp.app(http.MethodPost, "/v1/measurement/disputes/"+did+"/actions", b) }
+	act := func(b map[string]any) resp {
+		return dp.app(http.MethodPost, "/v1/measurement/disputes/"+did+"/actions", b)
+	}
 	if r := off.app(http.MethodPost, "/v1/measurement/disputes/"+did+"/actions", map[string]any{"action": "start_review"}); r.status != http.StatusForbidden {
 		t.Fatalf("vai: %d", r.status)
 	}

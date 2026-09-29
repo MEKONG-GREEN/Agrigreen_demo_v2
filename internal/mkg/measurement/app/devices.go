@@ -15,6 +15,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/mass"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -352,7 +353,7 @@ func (s *Service) sessionReplay(ctx context.Context, tx pgx.Tx, key string, out 
 
 // CloseSession đóng cửa sổ lô tại counter_to (scale_supervisor). Ingest đọc cửa
 // sổ đã đóng qua port.WeighingSessions để tích phân (R-70).
-func (s *Service) CloseSession(ctx context.Context, id uuid.UUID, counterTo int64, at time.Time, idem string) (out port.Session, replayed bool, err error) {
+func (s *Service) CloseSession(ctx context.Context, id uuid.UUID, counterTo int64, moisturePct string, tare *mass.Kg, at time.Time, idem string) (out port.Session, replayed bool, err error) {
 	p, err := authz.Require(ctx, port.RoleScaleSupervisor)
 	if err != nil {
 		return out, false, err
@@ -379,6 +380,7 @@ func (s *Service) CloseSession(ctx context.Context, id uuid.UUID, counterTo int6
 		}
 		sess := *cur
 		sess.Window.CounterTo = counterTo
+		sess.MoisturePct, sess.TareKg = moisturePct, tare
 		e := store.SessionEvent{ID: ids.New(), Action: "close", Session: sess, EventTime: at, ActorRef: p.ActorRef, IdemKey: idem}
 		if err := insert(store.InsertSessionEvent(ctx, tx, p.TenantID, &e)); err != nil {
 			return err

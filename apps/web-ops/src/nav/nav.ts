@@ -126,6 +126,13 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: "param",
         roles: [ROLES.platformAdmin, ROLES.paramSetter, ROLES.paramApprover],
       },
+      {
+        // GIS US-CFG-01/02: bảng màu và ngưỡng % bản đồ là tham số có phê duyệt (R-56).
+        href: "/quan-tri/hien-thi",
+        label: "Quy chuẩn hiển thị bản đồ",
+        icon: "layers",
+        roles: [ROLES.platformAdmin, ROLES.paramSetter, ROLES.paramApprover],
+      },
       { href: "/quan-tri/to-chuc", label: "Cơ cấu tổ chức", icon: "org", roles: [ROLES.platformAdmin, ROLES.registryAdmin] },
       { href: "/quan-tri/nhap-nong-ho", label: "Nhập nông hộ từ tệp", icon: "coop", roles: [ROLES.platformAdmin, ROLES.registryAdmin] },
       { href: "/quan-tri/nhap-thua", label: "Nhập ranh giới thửa", icon: "upload", roles: [ROLES.platformAdmin, ROLES.geoAdmin] },
@@ -138,6 +145,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         roles: [ROLES.platformAdmin, ROLES.waterwayEditor, ROLES.waterwayPublisher],
       },
       { href: "/quan-tri/xung-dot", label: "Xung đột đồng bộ", icon: "conflict", roles: [ROLES.platformAdmin, ROLES.conflictResolver] },
+      // GIS US-SYNC-01/02: tình trạng luồng đồng bộ tích hợp, hàng chờ lỗi (DLQ).
+      { href: "/quan-tri/giam-sat-dong-bo", label: "Giám sát đồng bộ", icon: "sync", roles: [ROLES.platformAdmin, ROLES.deviceAdmin] },
       { href: "/quan-tri/mau-bao-cao", label: "Mẫu & lịch báo cáo", icon: "report", roles: [ROLES.platformAdmin, ROLES.reportsAdmin, ROLES.masterdataAdmin] },
     ],
   },

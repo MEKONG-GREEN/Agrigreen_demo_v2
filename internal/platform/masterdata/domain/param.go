@@ -9,6 +9,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 )
 
 // ParamRuleVersion ghim vào mọi dòng sổ param_approved.
@@ -47,7 +49,56 @@ var (
 	ErrNotSubmitted    = errors.New("chỉ phê duyệt/từ chối được phiên bản đã gửi duyệt")
 	ErrDecisionNote    = errors.New("lý do từ chối bắt buộc, 10–500 ký tự")
 	ErrCorrectionNeeds = errors.New("đã có phiên bản được duyệt cùng effective_from: phải nêu correction_reason (bản ghi bù)")
+	// ErrHexColor: thông điệp đúng của GIS US-CFG-01 AC-2 / US-CFG-02 AC-3 (hiển thị nguyên văn).
+	ErrHexColor error = UserMessage("Mã màu không đúng định dạng HEX (ví dụ: #1E90FF).")
+	// ErrPercentRange: thông điệp đúng của GIS US-CFG-01 AC-2 / US-CFG-02 AC-3 (hiển thị nguyên văn).
+	ErrPercentRange error = UserMessage("Ngưỡng % phải tăng dần và nằm trong khoảng 0–100%.")
 )
+
+// UserMessage là lỗi mang thông điệp hiển thị nguyên văn cho người dùng (câu hoàn chỉnh theo AC).
+type UserMessage string
+
+func (m UserMessage) Error() string { return string(m) }
+
+// hexColorRe: "#RRGGBB" (6 chữ số hệ 16, hoa hoặc thường).
+var hexColorRe = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
+
+// IsHexColor kiểm mã màu HEX "#RRGGBB".
+func IsHexColor(s string) bool { return hexColorRe.MatchString(s) }
+
+// validateKind kiểm giá trị theo kiểu của khóa trong sổ đăng ký (GIS US-CFG-01 AC-2):
+// khóa màu phải là chuỗi HEX; ngưỡng % của nhóm ngưỡng GIS phải nằm trong 0–100.
+func (v ParamVersion) validateKind() error {
+	sp := SpecOf(v.Key)
+	switch {
+	case sp.Kind == ParamKindColor:
+		if v.Text == nil || !IsHexColor(*v.Text) {
+			return FieldError{"text", ErrHexColor}
+		}
+	case IsPercentThreshold(v.Key) && v.Value != nil:
+		if v.Value.IsNegative() || v.Value.GreaterThan(decimal.NewFromInt(100)) {
+			return FieldError{"value", ErrPercentRange}
+		}
+	}
+	return nil
+}
+
+// PercentThresholdGroups là các bộ ngưỡng % của quy chuẩn hiển thị GIS: mỗi bộ phải tăng
+// dần nghiêm ngặt và nằm trong 0–100 % (GIS US-CFG-01 AC-1). Bộ ngưỡng CGH (0–500 %,
+// "Thừa" > 100 %) kiểm riêng ở app (checkThresholdOrder).
+var PercentThresholdGroups = [][]string{{port.ParamHubCapacityWarn, port.ParamHubCapacityFull}}
+
+// IsPercentThreshold cho biết khóa thuộc một bộ ngưỡng % GIS.
+func IsPercentThreshold(key string) bool {
+	for _, g := range PercentThresholdGroups {
+		for _, k := range g {
+			if k == key {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 // ValidateParamKey kiểm khóa tham số.
 func ValidateParamKey(k string) error {
@@ -100,7 +151,7 @@ func (v ParamVersion) ValidateProposal() error {
 	case v.CorrectionReason != nil && utf8.RuneCountInString(strings.TrimSpace(*v.CorrectionReason)) < 10:
 		return FieldError{"correction_reason", ErrCorrection}
 	}
-	return nil
+	return v.validateKind()
 }
 
 // CanSubmit: chỉ phiên bản nháp, chỉ bởi chính người đặt.

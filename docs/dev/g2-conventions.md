@@ -37,9 +37,12 @@ Vai đã khai trong `internal/shared/dbadmin/dbadmin.go` và userlist PgBouncer 
 | pf | 000026 | extension: yêu cầu hỗ trợ (HTX US-SUPPORT-01 → KN US-TASK-01) | `pf_extension` | `extension_app` |
 | pf | 000027 | masterdata: tham số và danh mục G2 (cropcycle, GIS, waterway, simulation) | `pf_masterdata` | `masterdata_app` |
 | pf | 000028 | notify / sync: bổ sung G2 (người nhận theo thửa, lọc nhóm dữ liệu) | theo module | theo module |
-| pf | 000029–000034 | dự phòng đợt 2 — xin số từ người tích hợp | | |
+| pf | 000029–000033 | dự phòng đợt 2 — xin số từ người tích hợp | | |
+| pf | 000034 | sync / notify: nhật ký lần xử lý thất bại của consumer (giám sát đồng bộ, GIS US-SYNC-01/02); loại thông báo `integration_dead_lettered`, `area_feed_stale` | `pf_sync`, `pf_notify` | `sync_app`, `notify_app` |
+| pf | 000035 | mechanization: nhật ký đồng bộ diện tích vụ App HTX, cảnh báo độ tươi (CGH FN-07) | `pf_mechanization` | `mechanization_app` |
 | mkg | 000002 | mkg/hub: hub, kho, lô, dịch chuyển tồn | `mkg_hub` | `hub_app` |
 | mkg | 000003 | mkg/hub: bảng xuất van công bố (outbox của van) | `mkg_hub` | `hub_app` |
+| mkg | 000005 | mkg/hub: quyền đọc hai cột cho job công bố sức chứa theo ngày (GIS US-WH-01) | `mkg_hub` | `ag_outbox_publisher` (chỉ đọc) |
 
 ## 3. Hạ tầng mới
 
@@ -63,10 +66,12 @@ Vai đã khai trong `internal/shared/dbadmin/dbadmin.go` và userlist PgBouncer 
 | `pf.geo.cooperative_boundary.recorded`, `pf.geo.facility.recorded` | geo | GIS |
 | `pf.waterway.network.published` | waterway | simulation |
 | `pf.simulation.job.requested` / `.completed` | simulation | optimizer / notify |
-| `mkg.hub.facility.published`, `mkg.hub.capacity.published` (van `hub_facility`, `hub_capacity`) | mkg/hub | pf/geo (mô hình đọc hub) |
+| `mkg.hub.facility.published`, `mkg.hub.capacity.published` (van `hub_facility`, `hub_capacity`) | mkg/hub (khi duyệt, chụp tay, và job `hub_capacity_daily` mỗi ngày) | pf/geo (mô hình đọc hub) |
+| `pf.sync.integration.dead_lettered` | pf/sync (worker, lần giao cuối trước DLQ) | notify (Admin nền tảng, GIS US-SYNC-02) |
+| `pf.mechanization.area_feed.stale` | mechanization (job `mechanization_area_feed_check`) | notify (Admin CGH, CGH FN-07) |
 
 Tên dạng `pf.<module>.<thực thể>.<động từ quá khứ>`; schema ở `contracts/events/<tên>.v1.json`; struct có `//ag:event <tên> v1` (và `//ag:publication <hợp đồng>` nếu đi qua van).
 
 ## 5. Vai mới
 
-`farmer` (nông dân, phạm vi = thửa của hộ mình qua liên kết tài khoản ↔ nông hộ), `coop_manager` (đã có), `sop_admin` (soạn SOP; phát hành cần `param_approver` khác người soạn), `waterway_editor` (vẽ/sửa mạng), `waterway_publisher` (phát hành phiên bản mạng, khác người dựng), `simulation_analyst`, `hub_operator` (mkg). Khai hằng ở `port/` của module; thêm vào realm `deploy/compose/keycloak/agrigreen-realm.json` (kiểm thử `realm_test.go` đòi đủ mọi hằng `Role*`).
+`farmer` (nông dân, phạm vi = thửa của hộ mình qua liên kết tài khoản ↔ nông hộ), `coop_manager` (đã có), `sop_admin` (soạn SOP; phát hành cần `param_approver` khác người soạn), `waterway_editor` (vẽ/sửa mạng), `waterway_publisher` (phát hành phiên bản mạng, khác người dựng), `simulation_analyst`, `hub_operator` (mkg), `map_consumer` (tài khoản dịch vụ TMS đọc bản đồ chuẩn hóa `GET /v1/geo/standard-map`, GIS US-INT-02). Khai hằng ở `port/` của module; thêm vào realm `deploy/compose/keycloak/agrigreen-realm.json` (kiểm thử `realm_test.go` đòi đủ mọi hằng `Role*`).

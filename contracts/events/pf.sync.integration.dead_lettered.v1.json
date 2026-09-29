@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.sync.integration.dead_lettered/v1",
+  "title": "pf.sync.integration.dead_lettered — payload",
+  "description": "Một sự kiện đồng bộ tích hợp đã hết số lần thử (x-delivery-limit) và vào hàng chờ lỗi <consumer>.dlq (GIS US-SYNC-02 AC-1). pf/notify báo Admin nền tảng. Không có dữ liệu nghiệp vụ hay thông điệp lỗi tự do — chỉ mã lỗi đã chuẩn hóa (R-14).",
+  "x-event-type": "pf.sync.integration.dead_lettered",
+  "x-schema-version": 1,
+  "x-producer": "pf/sync",
+  "type": "object",
+  "required": ["failure_id", "consumer", "source", "event_id", "event_type", "error_code", "delivery_count", "recorded_at"],
+  "properties": {
+    "failure_id":     { "type": "string", "format": "uuid", "description": "id dòng pf_sync.integration_failure" },
+    "consumer":       { "type": "string", "description": "tên consumer (hàng đợi) của worker" },
+    "source":         { "type": "string", "description": "nhãn nguồn tích hợp (tiếng Việt)" },
+    "event_id":       { "type": "string", "format": "uuid", "description": "sự kiện gốc đã vào DLQ" },
+    "event_type":     { "type": "string" },
+    "error_code":     { "type": "string", "description": "mã problem, db:<SQLSTATE>, timeout, canceled hoặc internal" },
+    "delivery_count": { "type": "integer", "minimum": 0, "description": "x-delivery-count của lần giao cuối" },
+    "recorded_at":    { "type": "string", "format": "date-time" }
+  }
+}

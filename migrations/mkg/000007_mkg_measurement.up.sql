@@ -162,6 +162,8 @@ CREATE TABLE mkg_measurement.weighing_session (
   epoch             integer     NOT NULL CHECK (epoch >= 1),
   counter_from      bigint      NOT NULL CHECK (counter_from >= 0),
   counter_to        bigint      NULL,
+  moisture_pct      numeric(5,2)  NULL CHECK (moisture_pct IS NULL OR (moisture_pct >= 0 AND moisture_pct <= 100)),  -- đo lúc đóng phiên (C-4 tạm)
+  tare_kg           numeric(14,3) NULL CHECK (tare_kg IS NULL OR tare_kg >= 0),  -- bì của cửa sổ (xe/ghe rỗng) — tích phân lại tất định
   event_time        timestamptz NOT NULL,
   recorded_at       timestamptz NOT NULL DEFAULT now(),
   supersedes_id     uuid        NULL,
@@ -175,6 +177,7 @@ CREATE TABLE mkg_measurement.weighing_session (
   PRIMARY KEY (id, recorded_at),
   CHECK ((supersedes_id IS NULL) = (correction_reason IS NULL)),
   CHECK ((action = 'close') = (counter_to IS NOT NULL)),
+  CHECK (action = 'close' OR (moisture_pct IS NULL AND tare_kg IS NULL)),
   CHECK (counter_to IS NULL OR counter_to >= counter_from)
 ) PARTITION BY RANGE (recorded_at);
 CREATE INDEX weighing_session_idem   ON mkg_measurement.weighing_session (tenant_id, idem_key);
@@ -192,6 +195,8 @@ CREATE TABLE mkg_measurement.weighing_session_current (
   epoch           integer     NOT NULL,
   counter_from    bigint      NOT NULL,
   counter_to      bigint      NULL,
+  moisture_pct    numeric(5,2)  NULL,
+  tare_kg         numeric(14,3) NULL,
   status          text        NOT NULL CHECK (status IN ('open', 'closed')),
   opened_at       timestamptz NOT NULL,
   opened_by       uuid        NOT NULL,
@@ -206,6 +211,23 @@ CREATE TABLE mkg_measurement.weighing_session_current (
 CREATE UNIQUE INDEX weighing_session_current_one_open ON mkg_measurement.weighing_session_current (tenant_id, device_id, epoch) WHERE status = 'open';
 CREATE INDEX weighing_session_current_lot ON mkg_measurement.weighing_session_current (tenant_id, lot_ref);
 SELECT shared.apply_tenant_rls('mkg_measurement.weighing_session_current');
+
+-- Hàng phiên đã đóng (xuyên tenant, KHÔNG RLS, chỉ ghi thêm): vòng tích phân của
+-- ingest (tiến trình hệ thống, vai NOBYPASSRLS) cần biết tenant nào có phiên đã
+-- đóng để mở giao dịch tenant đó. Chỉ (session_id, tenant_id, closed_at) — không
+-- lô, không cửa sổ, không khối lượng; chi tiết đọc trong giao dịch tenant (RLS).
+CREATE TABLE mkg_measurement.session_directory (
+  session_id uuid        PRIMARY KEY,
+  tenant_id  uuid        NOT NULL,
+  closed_at  timestamptz NOT NULL
+);
+CREATE INDEX session_directory_closed ON mkg_measurement.session_directory (closed_at);
+COMMENT ON TABLE mkg_measurement.session_directory IS
+  'ag:no-rls hàng phiên cân đã đóng cho vòng tích phân của ingest tìm tenant (R-70); chỉ session_id/tenant_id/closed_at; chỉ ghi thêm';
+CREATE TRIGGER trg_immutable BEFORE UPDATE OR DELETE ON mkg_measurement.session_directory
+  FOR EACH ROW EXECUTE FUNCTION shared.fn_immutable();
+CREATE TRIGGER trg_immutable_trunc BEFORE TRUNCATE ON mkg_measurement.session_directory
+  FOR EACH STATEMENT EXECUTE FUNCTION shared.fn_immutable();
 
 -- ---------------------------------------------------------------------------
 -- 4. Phiếu cân — sổ là nguồn
@@ -336,10 +358,10 @@ SELECT shared.apply_tenant_rls('mkg_measurement.lot_terms_current');
 -- 6. Quyền
 -- ---------------------------------------------------------------------------
 -- Vai module: sổ chỉ SELECT + INSERT; bảng chiếu được UPDATE (R-21), DELETE chỉ để dựng lại (R-22).
-GRANT SELECT, INSERT ON mkg_measurement.device_directory TO measurement_app;
+GRANT SELECT, INSERT ON mkg_measurement.device_directory, mkg_measurement.session_directory TO measurement_app;
 GRANT SELECT, INSERT ON mkg_measurement.device_version, mkg_measurement.device_decision, mkg_measurement.weighing_session,
                         mkg_measurement.weigh_ticket, mkg_measurement.lot_terms TO measurement_app;
-REVOKE UPDATE, DELETE, TRUNCATE ON mkg_measurement.device_directory, mkg_measurement.device_version,
+REVOKE UPDATE, DELETE, TRUNCATE ON mkg_measurement.device_directory, mkg_measurement.session_directory, mkg_measurement.device_version,
                                    mkg_measurement.device_decision, mkg_measurement.weighing_session,
                                    mkg_measurement.weigh_ticket, mkg_measurement.lot_terms FROM measurement_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON mkg_measurement.device_current, mkg_measurement.weighing_session_current,
@@ -349,12 +371,13 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON mkg_measurement.device_current, mkg_meas
 -- DeviceHealth / WeighingSessions cần, không hơn:
 --   * DeviceRegistry.Resolve: đọc thư mục + kỳ đăng ký;
 --   * DeviceHealth: UPDATE chỉ các cột sức khỏe của device_current;
---   * WeighingSessions + kiểm SessionRef: đọc phiên cân;
+--   * WeighingSessions / PendingSessions / TareSource + kiểm SessionRef: đọc hàng
+--     phiên đã đóng (xuyên tenant) và phiên cân (trong tenant);
 --   * TicketWriter.Record: SELECT + INSERT sổ phiếu, SELECT/INSERT/UPDATE bảng
 --     chiếu lot_mass_current cùng giao dịch (R-21); outbox qua ag_shared_user.
 -- Không có quyền nào trên thiết bị (đăng ký/duyệt), phiên (mở/đóng), dung sai,
 -- đối soát, tranh chấp, van.
-GRANT SELECT ON mkg_measurement.device_directory, mkg_measurement.device_current,
+GRANT SELECT ON mkg_measurement.device_directory, mkg_measurement.device_current, mkg_measurement.session_directory,
                 mkg_measurement.weighing_session_current TO ingest_mkg;
 GRANT UPDATE (last_seen_at, buffer_pct, clock_skew_ms, last_counter, health_updated_at) ON mkg_measurement.device_current TO ingest_mkg;
 GRANT SELECT, INSERT ON mkg_measurement.weigh_ticket TO ingest_mkg;

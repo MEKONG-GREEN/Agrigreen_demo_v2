@@ -88,6 +88,7 @@ const (
 // Session là một phiên cân của lô ở một điểm cân: thiết bị + cửa sổ bộ đếm.
 type Session struct {
 	ID          uuid.UUID
+	TenantID    uuid.UUID
 	LotRef      uuid.UUID
 	Point       WeighPoint
 	Route       Route
@@ -97,6 +98,11 @@ type Session struct {
 	Window   Window
 	OpenedAt time.Time
 	ClosedAt *time.Time
+	ClosedBy *uuid.UUID
+	// MoisturePct: độ ẩm đo lúc đóng phiên, "12.50"; rỗng = không đo (C-4 tạm).
+	MoisturePct string
+	// TareKg: bì của cửa sổ (xe/ghe rỗng); nil = 0 (cân sàn đã về 0). Ghi ở sổ → tích phân lại tất định.
+	TareKg *mass.Kg
 }
 
 // WeighingSessions cho ingest đọc cửa sổ lô đã đóng để tích phân (R-70).

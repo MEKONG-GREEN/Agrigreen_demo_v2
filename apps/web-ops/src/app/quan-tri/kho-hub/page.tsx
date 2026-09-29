@@ -18,7 +18,8 @@ import type { UploadFile } from "@/lib/files";
 import { toApiProblem, useAsync } from "@/lib/useAsync";
 import { boundsOf, DrawSection, EditorMap, ImportResult, rawBody, ReasonField, REGION_BBOX, SpatialFileInput } from "@/gis/editor";
 import { draftGeometry, validateDraft, type DrawMode, type LngLat } from "@/gis/geometry";
-import { CAPACITY, CAPACITY_SOURCE, CAPACITY_UNIT, FACILITY_KIND, fillLabel } from "@/gis/legend";
+import { useDisplayPalette } from "@/gis/displayConfig";
+import { CAPACITY_SOURCE, CAPACITY_UNIT, capacityStyle, FACILITY_KIND, fillLabel } from "@/gis/legend";
 
 const TABS = [
   { id: "list", label: "Danh sách & dung lượng" },
@@ -31,6 +32,7 @@ type Facility = GeoFacilityFeature;
 /** Kho/Hub: danh sách, chi tiết, nhập tay dung lượng, nhả số đồng bộ (GIS US-WH-01, BR-52); vẽ/sửa (US-BND-05/06); nhập tệp (US-BND-08). */
 export default function FacilityAdminPage() {
   const { api } = useAuth();
+  const { palette } = useDisplayPalette();
   const [tab, setTab] = useState("list");
   const [version, setVersion] = useState(0);
   const [selRef, setSelRef] = useState<string | null>(null);
@@ -64,6 +66,7 @@ export default function FacilityAdminPage() {
                   <tbody>
                     {items.map((f) => {
                       const c = f.properties.capacity;
+                      const cls = capacityStyle(c?.class, palette);
                       return (
                         <tr key={f.properties.ref} data-ref={f.properties.ref} className={f.properties.ref === selRef ? "hl" : undefined}>
                           <td>
@@ -77,8 +80,8 @@ export default function FacilityAdminPage() {
                           </td>
                           <td>{FACILITY_KIND[f.properties.kind]}</td>
                           <td className="num">
-                            <span className="chip" style={{ background: "#fff", color: CAPACITY[c?.class ?? "unknown"].color, border: `1px solid ${CAPACITY[c?.class ?? "unknown"].color}` }}>
-                              {fillLabel(c?.fill_pct)} · {CAPACITY[c?.class ?? "unknown"].label}
+                            <span className="chip" style={{ background: "#fff", color: cls.color, border: `1px solid ${cls.color}` }}>
+                              {fillLabel(c?.fill_pct)} · {cls.label}
                             </span>
                           </td>
                           <td className="small">
@@ -131,7 +134,8 @@ export default function FacilityAdminPage() {
 }
 
 function CapacityBox({ c }: { c: GeoCapacityView }) {
-  const cls = CAPACITY[c.class];
+  const { palette } = useDisplayPalette();
+  const cls = capacityStyle(c.class, palette);
   return (
     <dl className="kv" style={{ gridTemplateColumns: "150px 1fr" }} data-testid="capacity-view">
       <dt>Mức lấp đầy</dt>

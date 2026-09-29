@@ -1,7 +1,9 @@
 // Chuyển dữ liệu API → FeatureCollection vẽ được cho LayerMap (tách khỏi trang để kiểm thử Vitest).
-import type { CapacityWidget, CropStageMap, GeoCoopLayer, GeoLayers, GeoRoadLayer, WaterwayLayerSegment } from "@/api/types";
+import type { CapacityWidget, CropStageMap, GeoCoopLayer, GeoLayers, GeoRoadLayer, MechCoverageItem, WaterwayLayerSegment } from "@/api/types";
+import type { CoverageStatus } from "@/cgh/coverage";
+import { buildPins, type CoopLocation } from "@/cgh/pins";
 import type { AnyFeatureCollection, HtmlMarker } from "@/components/LayerMap";
-import { CAPACITY, FACILITY_KIND, fillLabel, stageColor, stageLabel } from "./legend";
+import { capacityStyle, DEFAULT_PALETTE, FACILITY_KIND, fillLabel, stageColor, stageLabel, type DisplayPalette } from "./legend";
 import type { LngLat } from "./geometry";
 
 const EMPTY: AnyFeatureCollection = { type: "FeatureCollection", features: [] };
@@ -16,7 +18,7 @@ export interface CoopLayers {
  * Ranh giới HTX (polygon) + HTX chưa có ranh giới (marker — FN-04 B2), tô theo giai đoạn trội khi bật lớp mùa vụ
  * (GIS US-SEASON-01), viền đỏ vùng chín rộ 1–3 ngày tới (US-YIELD-01).
  */
-export function coopLayers(layer: GeoCoopLayer | null | undefined, names: ReadonlyMap<string, string>, stages: CropStageMap | null | undefined, opts: { colorByStage: boolean; ripening: boolean }): CoopLayers {
+export function coopLayers(layer: GeoCoopLayer | null | undefined, names: ReadonlyMap<string, string>, stages: CropStageMap | null | undefined, opts: { colorByStage: boolean; ripening: boolean }, palette: DisplayPalette = DEFAULT_PALETTE): CoopLayers {
   if (!layer) return { areas: EMPTY, markers: EMPTY, ripening: EMPTY };
   const byCoop = new Map((stages?.cooperatives ?? []).map((c) => [c.cooperative_ref, c]));
   const areas: AnyFeatureCollection["features"] = [];
@@ -31,7 +33,7 @@ export function coopLayers(layer: GeoCoopLayer | null | undefined, names: Readon
       name,
       stage: st?.dominant_stage ?? null,
       stage_label: st ? stageLabel(st.dominant_stage) : null,
-      fill: opts.colorByStage && st ? stageColor(st.dominant_stage) : "#9fd8b4",
+      fill: opts.colorByStage && st ? stageColor(st.dominant_stage, palette) : "#9fd8b4",
       ripening_tons: st?.ripening_expected_tons ?? null,
       area_ha: f.properties.area_ha ?? null,
     };
@@ -46,7 +48,7 @@ export function coopLayers(layer: GeoCoopLayer | null | undefined, names: Readon
 }
 
 /** Thửa (chỉ khi zoom ≥ ngưỡng — BR-24) tô theo giai đoạn của vụ trên thửa. */
-export function plotLayer(layers: GeoLayers | null | undefined, stages: CropStageMap | null | undefined, colorByStage: boolean): AnyFeatureCollection {
+export function plotLayer(layers: GeoLayers | null | undefined, stages: CropStageMap | null | undefined, colorByStage: boolean, palette: DisplayPalette = DEFAULT_PALETTE): AnyFeatureCollection {
   const plots = layers?.plots;
   if (!plots) return EMPTY;
   const byPlot = new Map((stages?.plots ?? []).map((p) => [p.plot_ref, p]));
@@ -65,7 +67,7 @@ export function plotLayer(layers: GeoLayers | null | undefined, stages: CropStag
           stage: s?.stage ?? null,
           stage_label: s ? stageLabel(s.stage) : "Chưa có vụ",
           ripening: s?.ripening ?? false,
-          fill: colorByStage && s ? stageColor(s.stage) : "#c9e7b8",
+          fill: colorByStage && s ? stageColor(s.stage, palette) : "#c9e7b8",
         },
       };
     }),
@@ -109,9 +111,9 @@ export function waterwayLayer(items: readonly WaterwayLayerSegment[] | null | un
 }
 
 /** Widget % dung lượng trên marker Hub/kho (GIS US-HUB-01 AC-1): màu theo lớp, % làm tròn. */
-export function capacityMarkers(items: readonly CapacityWidget[] | null | undefined, onClick?: (ref: string) => void): HtmlMarker[] {
+export function capacityMarkers(items: readonly CapacityWidget[] | null | undefined, onClick?: (ref: string) => void, palette: DisplayPalette = DEFAULT_PALETTE): HtmlMarker[] {
   return (items ?? []).map((w) => {
-    const cls = CAPACITY[w.class];
+    const cls = capacityStyle(w.class, palette);
     const unit = w.unit === "tan" ? "tấn" : (w.unit ?? "");
     return {
       id: w.ref,
@@ -123,4 +125,48 @@ export function capacityMarkers(items: readonly CapacityWidget[] | null | undefi
       onClick: onClick ? () => onClick(w.ref) : undefined,
     };
   });
+}
+
+/** Thứ tự chú giải lớp CGH trên GIS (GIS US-INT-01): Thiếu / Cần chú ý / Đủ / Thừa / Chưa có dữ liệu. */
+export const CGH_LEGEND_ORDER: readonly CoverageStatus[] = ["thieu", "chu_y", "du", "thua", "khong_du_lieu"];
+
+/**
+ * Lớp "Tình trạng máy CGH" (GIS US-INT-01): mỗi HTX một điểm, màu = `overall.color` của KẾT QUẢ CÂN ĐỐI ĐÃ LƯU
+ * (Bản đồ CGH) — GIS chỉ hiển thị, không tính lại. Vị trí: toạ độ hồ sơ HTX, thiếu thì tâm xã (vị trí tạm).
+ */
+export function cghLayer(
+  items: readonly MechCoverageItem[] | null | undefined,
+  locations: ReadonlyMap<string, CoopLocation>,
+  centroids: ReadonlyMap<string, [number, number]>,
+): { fc: AnyFeatureCollection; unplaced: number } {
+  if (!items) return { fc: EMPTY, unplaced: 0 };
+  const { pins, unplaced } = buildPins(items, locations, centroids);
+  const byRef = new Map(items.filter((i) => i.cooperative_ref).map((i) => [i.cooperative_ref!, i]));
+  return {
+    unplaced,
+    fc: {
+      type: "FeatureCollection",
+      features: pins.map((p) => {
+        const g = byRef.get(p.ref)?.overall;
+        return {
+          type: "Feature",
+          id: p.ref,
+          geometry: { type: "Point", coordinates: [p.lng, p.lat] },
+          properties: {
+            ref: p.ref,
+            name: p.name,
+            code: p.code,
+            status: p.status,
+            status_label: p.statusLabel,
+            color: p.color,
+            provisional: p.provisional,
+            coverage_pct: g?.coverage_pct ?? null,
+            required_whole: g?.required_whole ?? null,
+            capacity: g?.capacity ?? null,
+            machines_total: g?.machines_total ?? null,
+          },
+        };
+      }),
+    },
+  };
 }

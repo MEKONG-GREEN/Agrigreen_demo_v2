@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -262,16 +263,17 @@ type SessionEvent struct {
 func InsertSessionEvent(ctx context.Context, tx pgx.Tx, tid uuid.UUID, e *SessionEvent) error {
 	s := e.Session
 	var to *int64
+	var moist, tare *string
 	if e.Action == "close" {
 		v := s.Window.CounterTo
-		to = &v
+		to, moist, tare = &v, strPtr(s.MoisturePct), kgArg(s.TareKg)
 	}
 	return tx.QueryRow(ctx, `INSERT INTO mkg_measurement.weighing_session
 	    (id, tenant_id, stream_key, session_id, action, lot_ref, point, route, facility_ref, scale_device_id, epoch, counter_from,
-	     counter_to, event_time, actor_ref, idem_key, rule_version)
-	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING seq`,
+	     counter_to, moisture_pct, tare_kg, event_time, actor_ref, idem_key, rule_version)
+	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::numeric, $15::numeric, $16, $17, $18, $19) RETURNING seq`,
 		e.ID, tid, SessionStream(s.ID), s.ID, e.Action, s.LotRef, string(s.Point), string(s.Route), s.FacilityRef, s.Window.DeviceID,
-		s.Window.Epoch, s.Window.CounterFrom, to, e.EventTime.UTC(), e.ActorRef, e.IdemKey, domain.RuleSession).Scan(&e.Seq)
+		s.Window.Epoch, s.Window.CounterFrom, to, moist, tare, e.EventTime.UTC(), e.ActorRef, e.IdemKey, domain.RuleSession).Scan(&e.Seq)
 }
 
 // SessionEventByIdem trả session_id của sự kiện phiên có idem_key.
@@ -287,18 +289,25 @@ func SessionEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*uuid.UUID,
 	return &id, nil
 }
 
-const sessionCols = `session_id, lot_ref, point, route, facility_ref, device_id, epoch, counter_from, counter_to, status, opened_at, closed_at`
+const sessionCols = `session_id, tenant_id, lot_ref, point, route, facility_ref, device_id, epoch, counter_from, counter_to, status,
+  opened_at, closed_at, closed_by, moisture_pct::text, tare_kg::text`
 
 func scanSession(row pgx.Row) (port.Session, error) {
 	var s port.Session
 	var point, route, status string
 	var to *int64
-	err := row.Scan(&s.ID, &s.LotRef, &point, &route, &s.FacilityRef, &s.Window.DeviceID, &s.Window.Epoch, &s.Window.CounterFrom,
-		&to, &status, &s.OpenedAt, &s.ClosedAt)
+	var moist, tare *string
+	err := row.Scan(&s.ID, &s.TenantID, &s.LotRef, &point, &route, &s.FacilityRef, &s.Window.DeviceID, &s.Window.Epoch, &s.Window.CounterFrom,
+		&to, &status, &s.OpenedAt, &s.ClosedAt, &s.ClosedBy, &moist, &tare)
+	if err != nil {
+		return s, err
+	}
 	s.Point, s.Route, s.Status = port.WeighPoint(point), port.Route(route), port.SessionStatus(status)
 	if to != nil {
 		s.Window.CounterTo = *to
 	}
+	s.MoisturePct = deref(moist)
+	s.TareKg, err = kgScan(tare)
 	return s, err
 }
 
@@ -340,7 +349,77 @@ func UpsertSessionOpen(ctx context.Context, tx pgx.Tx, tid uuid.UUID, e SessionE
 // CloseSession đóng phiên trong bảng chiếu.
 func CloseSession(ctx context.Context, tx pgx.Tx, e SessionEvent) error {
 	_, err := tx.Exec(ctx, `UPDATE mkg_measurement.weighing_session_current
-	   SET status = 'closed', counter_to = $2, closed_at = $3, closed_by = $4, last_seq = $5, updated_at = now()
-	 WHERE session_id = $1`, e.Session.ID, e.Session.Window.CounterTo, e.EventTime.UTC(), e.ActorRef, e.Seq)
+	   SET status = 'closed', counter_to = $2, closed_at = $3, closed_by = $4, last_seq = $5, moisture_pct = $6::numeric,
+	       tare_kg = $7::numeric, updated_at = now()
+	 WHERE session_id = $1`, e.Session.ID, e.Session.Window.CounterTo, e.EventTime.UTC(), e.ActorRef, e.Seq,
+		strPtr(e.Session.MoisturePct), kgArg(e.Session.TareKg))
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO mkg_measurement.session_directory (session_id, tenant_id, closed_at) VALUES ($1, shared.current_tenant(), $2)`,
+		e.Session.ID, e.EventTime.UTC())
 	return err
+}
+
+// PendingTenants trả các tenant có phiên đã đóng (hàng xuyên tenant, không RLS).
+func PendingTenants(ctx context.Context, tx pgx.Tx) ([]uuid.UUID, error) {
+	rows, err := tx.Query(ctx, "SELECT DISTINCT tenant_id FROM mkg_measurement.session_directory ORDER BY tenant_id")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
+// PendingSessions trả phiên đã đóng của tenant hiện tại mà lô CHƯA có phiếu hiệu
+// lực ở điểm cân của phiên (cũ trước). Phiếu tay (cân hỏng) cũng làm phiên hết chờ.
+func PendingSessions(ctx context.Context, tx pgx.Tx, limit int) ([]port.Session, error) {
+	rows, err := tx.Query(ctx, "SELECT "+sessionColsQ("s")+` FROM mkg_measurement.weighing_session_current s
+	  LEFT JOIN mkg_measurement.lot_mass_current m ON m.lot_ref = s.lot_ref
+	  WHERE s.status = 'closed'
+	    AND ((s.point = 'HUB_IN' AND m.hub_in_ticket IS NULL) OR (s.point = 'HUB_OUT' AND m.hub_out_ticket IS NULL))
+	  ORDER BY s.closed_at, s.session_id LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []port.Session
+	for rows.Next() {
+		s, err := scanSession(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+func sessionColsQ(a string) string {
+	cols := strings.Split(sessionCols, ",")
+	for i, c := range cols {
+		cols[i] = a + "." + strings.TrimSpace(c)
+	}
+	return strings.Join(cols, ", ")
+}
+
+// SessionByWindow tìm phiên đã đóng đúng cửa sổ (thiết bị, kỳ, bộ đếm).
+func SessionByWindow(ctx context.Context, tx pgx.Tx, w port.Window) (*port.Session, error) {
+	s, err := scanSession(tx.QueryRow(ctx, "SELECT "+sessionCols+` FROM mkg_measurement.weighing_session_current
+	  WHERE device_id = $1 AND epoch = $2 AND counter_from = $3 AND counter_to = $4 AND status = 'closed'`,
+		w.DeviceID, w.Epoch, w.CounterFrom, w.CounterTo))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
 }

@@ -11,17 +11,20 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub"
+	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 )
 
 // PoolOpener mở pool cho một vai DB của cụm mkg.
@@ -66,6 +69,20 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules,
 	mods.Measurement = measurement.New(measPool, clk, measurement.Deps{Origins: mods.Hub.Lots()})
 	return mods, ops, pools, nil
 }
+
+// Jobs trả job định kỳ của vùng mkg được chọn (danh sách phân tách bằng dấu phẩy hoặc "all"):
+// hub_capacity_daily — công bố sức chứa theo ngày qua van hub_capacity (GIS US-WH-01 AC-2).
+// tenantPool là pool vai ag_outbox_publisher của cụm mkg (tìm tenant xuyên RLS, chỉ đọc cột).
+func Jobs(mods Modules, tenantPool *pgxpool.Pool, selected string, log *slog.Logger) []schedule.Job {
+	var out []schedule.Job
+	if selected == "all" || strings.Contains(","+selected+",", ","+hubport.JobDailyCapacity+",") {
+		out = append(out, mods.Hub.Jobs(hub.ActiveHubTenants(tenantPool), log)...)
+	}
+	return out
+}
+
+// JobNames liệt kê tên job hợp lệ của api-internal.
+func JobNames() string { return hubport.JobDailyCapacity }
 
 // Deps là phụ thuộc của router.
 type Deps struct {

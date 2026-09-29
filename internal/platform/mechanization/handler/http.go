@@ -35,6 +35,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.GET("/dashboard", h.dashboard)
 	g.GET("/trend", h.trend)
 	h.registerForecastApp(g)
+	h.registerAreaSyncApp(g) // CGH FN-07: nhật ký đồng bộ, độ tươi
 }
 
 // RegisterAdmin gắn route Admin API (MFA bắt buộc ở router) — chỉ cgh_admin ghi.

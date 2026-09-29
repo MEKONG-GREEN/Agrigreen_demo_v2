@@ -20,6 +20,13 @@ const (
 	RoleHubApprover = "hub_approver"
 )
 
+// SystemActorRef là actor_ref của tác nhân hệ thống (job công bố sức chứa định kỳ theo ngày,
+// GIS US-WH-01 AC-2) — không phải người.
+var SystemActorRef = uuid.MustParse("00000000-0000-0000-0000-00000000c0b1")
+
+// JobDailyCapacity là tên job công bố sức chứa định kỳ của api-internal (AG_MKG_JOBS).
+const JobDailyCapacity = "hub_capacity_daily"
+
 // Sự kiện module phát ra. CẢ HAI đi qua van công bố (mặc định từ chối): mọi
 // sự kiện của vùng mkg lên RabbitMQ đều thấy được từ vùng nền tảng, nên payload
 // phải là hợp đồng van (tools/contractcheck cưỡng chế).

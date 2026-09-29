@@ -131,7 +131,10 @@ func (s *Service) RecordArea(ctx context.Context, in AreaInput) (AreaResult, err
 		a.Locked = a.Locked || in.Lock
 		r, err := writeAreaTx(ctx, tx, p, a, domain.AreaRecorded, "", now, in.IdemKey)
 		res = r
-		return err
+		if err != nil {
+			return err
+		}
+		return logSync(ctx, tx, p.TenantID, p.ActorRef, a, port.SourceManual, store.SyncApplied, nil, now) // CGH FN-07 B5
 	})
 	return res, classify(err)
 }
@@ -256,18 +259,22 @@ func (s *Service) ApplySyncedArea(ctx context.Context, in port.SyncedArea) (port
 		if err != nil {
 			return err
 		}
-		if ok, reason := domain.ResolveArea(cur, domain.AreaFromAppHTX); !ok {
-			out.Reason = reason
-			return nil
-		}
 		a := domain.SeasonArea{ID: ids.New(), CooperativeRef: ci.Ref, Season: sn}
 		if cur != nil {
 			a = *cur
 		}
+		if ok, reason := domain.ResolveArea(cur, domain.AreaFromAppHTX); !ok {
+			out.Reason = reason
+			kept := a
+			kept.AreaHa, kept.SourceAt = in.AreaHa, at
+			return logSync(ctx, tx, p.TenantID, p.ActorRef, kept, port.SourceAppHTX, store.SyncKeptLocked, nil, now)
+		}
 		a.CommuneCode, a.AreaHa, a.Source, a.SourceAt, a.Locked = ci.CommuneCode, in.AreaHa, domain.AreaFromAppHTX, at, false
-		_, err = writeAreaTx(ctx, tx, p, a, domain.AreaSynced, "", now, in.IdemKey)
-		out.Applied = err == nil
-		return err
+		if _, err = writeAreaTx(ctx, tx, p, a, domain.AreaSynced, "", now, in.IdemKey); err != nil {
+			return err
+		}
+		out.Applied = true
+		return logSync(ctx, tx, p.TenantID, p.ActorRef, a, port.SourceAppHTX, store.SyncApplied, nil, now)
 	})
 	return out, classify(err)
 }

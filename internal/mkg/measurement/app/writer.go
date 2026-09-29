@@ -13,6 +13,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/mass"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -230,6 +231,58 @@ func (w *Writer) ReportHealth(ctx context.Context, tid uuid.UUID, h port.HealthR
 		}
 		return err
 	})
+}
+
+// PendingSessions trả phiên đã đóng chưa có phiếu ở điểm cân của phiên, trên MỌI
+// tenant (tenant lấy từ hàng session_directory không RLS, chi tiết đọc trong giao
+// dịch tenant). Cũ trước theo từng tenant; tối đa limit phiên.
+func (w *Writer) PendingSessions(ctx context.Context, limit int) ([]port.Session, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	var tids []uuid.UUID
+	err := func() error {
+		tx, err := w.DB.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})
+		if err != nil {
+			return err
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		tids, err = store.PendingTenants(ctx, tx)
+		return err
+	}()
+	if err != nil {
+		return nil, err
+	}
+	var out []port.Session
+	for _, tid := range tids {
+		if len(out) >= limit {
+			break
+		}
+		err := tenant.WithTenantTx(ctx, w.DB, tid, func(tx pgx.Tx) error {
+			ss, err := store.PendingSessions(ctx, tx, limit-len(out))
+			out = append(out, ss...)
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+// TareKg trả bì đã ghi lúc đóng phiên của đúng cửa sổ (0 khi không ghi) — tất định
+// cho tích phân lại khi tranh chấp.
+func (w *Writer) TareKg(ctx context.Context, tid uuid.UUID, win port.Window) (mass.Kg, error) {
+	var out mass.Kg
+	err := tenant.WithTenantTx(ctx, w.DB, tid, func(tx pgx.Tx) error {
+		s, err := store.SessionByWindow(ctx, tx, win)
+		if err != nil || s == nil || s.TareKg == nil {
+			return err
+		}
+		out = *s.TareKg
+		return nil
+	})
+	return out, err
 }
 
 // Session cài đặt port.WeighingSessions.

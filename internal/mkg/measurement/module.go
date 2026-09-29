@@ -9,11 +9,14 @@
 package measurement
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 
 	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/handler"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/ingest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -68,4 +71,35 @@ type Ingest struct {
 func NewIngest(db tenant.Beginner, clk clock.Clock) Ingest {
 	w := &app.Writer{DB: db, Clock: clk}
 	return Ingest{Tickets: w, Devices: w, Health: w, Sessions: w, LotMass: w}
+}
+
+// NewIngestPorts dựng cổng cho vòng tích phân + bộ nhận của cmd/ingest trên pool
+// vai ingest_mkg: sổ thiết bị, hàng phiên đã đóng (xuyên tenant), bì theo cửa sổ,
+// sổ phiếu (idempotent theo IdemKey ingest:<session>:<rule_version>).
+func NewIngestPorts(db tenant.Beginner, clk clock.Clock) IngestPorts {
+	w := &app.Writer{DB: db, Clock: clk}
+	return IngestPorts{Devices: w, Sessions: ingestSessions{w}, Tare: w, Tickets: w}
+}
+
+// ingestSessions chuyển port.Session của module sang ingest.Session.
+type ingestSessions struct{ w *app.Writer }
+
+func (s ingestSessions) PendingSessions(ctx context.Context, limit int) ([]ingest.Session, error) {
+	ss, err := s.w.PendingSessions(ctx, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ingest.Session, 0, len(ss))
+	for _, x := range ss {
+		is := ingest.Session{ID: x.ID, TenantID: x.TenantID, LotRef: x.LotRef, Point: x.Point, Route: x.Route, Window: x.Window,
+			MoisturePct: x.MoisturePct}
+		if x.ClosedBy != nil {
+			is.ActorRef = *x.ClosedBy
+		}
+		if x.ClosedAt != nil {
+			is.ClosedAt = *x.ClosedAt
+		}
+		out = append(out, is)
+	}
+	return out, nil
 }

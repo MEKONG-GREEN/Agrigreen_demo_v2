@@ -78,12 +78,14 @@ type sessionDTO struct {
 	Status      string     `json:"status"`
 	OpenedAt    time.Time  `json:"opened_at"`
 	ClosedAt    *time.Time `json:"closed_at"`
+	MoisturePct *string    `json:"moisture_pct"`
+	TareKg      *mass.Kg   `json:"tare_kg"`
 }
 
 func toSession(s port.Session) sessionDTO {
 	out := sessionDTO{ID: s.ID, LotRef: s.LotRef, Point: string(s.Point), Route: string(s.Route), FacilityRef: s.FacilityRef,
 		DeviceID: s.Window.DeviceID, Epoch: s.Window.Epoch, CounterFrom: s.Window.CounterFrom, Status: string(s.Status),
-		OpenedAt: s.OpenedAt, ClosedAt: s.ClosedAt}
+		OpenedAt: s.OpenedAt, ClosedAt: s.ClosedAt, MoisturePct: opt(s.MoisturePct), TareKg: s.TareKg}
 	if s.Status == port.SessionClosed {
 		to := s.Window.CounterTo
 		out.CounterTo = &to
@@ -173,27 +175,27 @@ func toLotMass(m store.LotMass) lotMassDTO {
 }
 
 type reconDTO struct {
-	ID                uuid.UUID  `json:"id"`
-	LotRef            uuid.UUID  `json:"lot_ref"`
-	Route             string     `json:"route"`
-	PricingBasis      string     `json:"pricing_basis"`
-	HubInKg           *mass.Kg   `json:"hub_in_kg"`
-	HubOutKg          *mass.Kg   `json:"hub_out_kg"`
-	CustomerInKg      *mass.Kg   `json:"customer_in_kg"`
-	HubInMoisturePct  *string    `json:"hub_in_moisture_pct"`
-	Internal          any        `json:"internal"`
-	Commercial        any        `json:"commercial"`
-	RollCheck         any        `json:"roll_check"`
-	YieldKgPerRoll    *mass.Kg   `json:"yield_kg_per_roll"`
-	YieldAggregated   bool       `json:"yield_aggregated"`
-	Outcome           string     `json:"outcome"`
-	ToleranceVersion  string     `json:"tolerance_version"`
-	LossNormVersion   *string    `json:"loss_norm_version"`
-	DisputeID         *uuid.UUID `json:"dispute_id"`
-	SupersedesID      *uuid.UUID `json:"supersedes_id"`
-	RuleVersion       string     `json:"rule_version"`
-	EventTime         time.Time  `json:"event_time"`
-	RecordedAt        time.Time  `json:"recorded_at"`
+	ID               uuid.UUID  `json:"id"`
+	LotRef           uuid.UUID  `json:"lot_ref"`
+	Route            string     `json:"route"`
+	PricingBasis     string     `json:"pricing_basis"`
+	HubInKg          *mass.Kg   `json:"hub_in_kg"`
+	HubOutKg         *mass.Kg   `json:"hub_out_kg"`
+	CustomerInKg     *mass.Kg   `json:"customer_in_kg"`
+	HubInMoisturePct *string    `json:"hub_in_moisture_pct"`
+	Internal         any        `json:"internal"`
+	Commercial       any        `json:"commercial"`
+	RollCheck        any        `json:"roll_check"`
+	YieldKgPerRoll   *mass.Kg   `json:"yield_kg_per_roll"`
+	YieldAggregated  bool       `json:"yield_aggregated"`
+	Outcome          string     `json:"outcome"`
+	ToleranceVersion string     `json:"tolerance_version"`
+	LossNormVersion  *string    `json:"loss_norm_version"`
+	DisputeID        *uuid.UUID `json:"dispute_id"`
+	SupersedesID     *uuid.UUID `json:"supersedes_id"`
+	RuleVersion      string     `json:"rule_version"`
+	EventTime        time.Time  `json:"event_time"`
+	RecordedAt       time.Time  `json:"recorded_at"`
 }
 
 func toRecon(r store.Reconciliation) reconDTO {
