@@ -46,6 +46,8 @@ Vai đã khai trong `internal/shared/dbadmin/dbadmin.go` và userlist PgBouncer 
 - **pgRouting** có sẵn ở cụm pf (`dbadmin.Extensions`): máy dev Windows 4.0.1; CI và Compose dùng image `deploy/compose/postgres` (PostGIS 17-3.5 + `postgresql-17-pgrouting` từ pgdg). **Chỉ dùng `pgr_dijkstra` / `pgr_ksp`** (có ở cả 3.x và 4.x). Dựng topology bằng Go (không `pgr_createTopology`, đã bỏ ở 4.0).
 - **Python 3.12** cho `optimizer/`: gói riêng có `pyproject.toml`, kiểm thử `pytest`, giấy phép phụ thuộc thuộc `deploy/policies/allowed-licenses.txt` (OR-Tools Apache-2.0, HiGHS MIT). Chỉ nhận dữ liệu không định danh (RB-7).
 - **Flutter**: `packages/agrigreen_mobile` (lõi chung), `apps/field-app`, `apps/htx-app`. SDK 3.47.5.
+- **Optimizer ↔ api-platform**: optimizer nhận `pf.simulation.job.requested` qua hàng đợi quorum `pf.simulation.optimizer` (DLQ `pf.simulation.optimizer.dlq`, giới hạn giao 5 lần), nộp kết quả qua listener Internal mTLS của api-platform ở cổng **8084** (`AG_INTERNAL_HTTP_ADDR`; không bao giờ publish ra ngoài mạng nội bộ). Chứng chỉ dev: `scripts/gen-dev-certs.*` → `deploy/compose/.certs/` (production dùng PKI nội bộ trong lãnh thổ).
+- **mkg_api**: vai DB của `cmd/api-internal` cho bảng vận hành (idempotency) ở cụm mkg.
 
 ## 4. Sự kiện G2 (tên đã chốt)
 
