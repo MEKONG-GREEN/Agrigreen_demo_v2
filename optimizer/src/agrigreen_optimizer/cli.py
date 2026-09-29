@@ -1,8 +1,9 @@
 """Điểm vào dòng lệnh.
 
     agrigreen-optimizer evaluate --snapshot snapshot.json --out result.json
-    agrigreen-optimizer handle-event --event envelope.json --api https://api-platform-internal:8083 \
+    agrigreen-optimizer handle-event --event envelope.json --api https://api-platform:8084 \
         --cert optimizer.crt --key optimizer.key --ca ca.crt
+    agrigreen-optimizer consume      # vòng nhận RabbitMQ (cấu hình qua biến môi trường, xem consumer.py)
 
 `-` là stdin/stdout. Mã thoát: 0 = xong, 2 = ảnh chụp không hợp lệ/tính hỏng (kết
 quả vẫn được ghi, status = failed), 1 = lỗi hạ tầng (worker).
@@ -46,7 +47,13 @@ def main(argv: list[str] | None = None) -> int:
     he.add_argument("--cert", default=os.environ.get("AG_OPTIMIZER_CLIENT_CERT"))
     he.add_argument("--key", default=os.environ.get("AG_OPTIMIZER_CLIENT_KEY"))
     he.add_argument("--ca", default=os.environ.get("AG_INTERNAL_CA"))
+    sub.add_parser("consume", help="nhận pf.simulation.job.requested từ RabbitMQ, ACK sau khi nộp kết quả")
     args = ap.parse_args(argv)
+
+    if args.cmd == "consume":  # pragma: no cover - cần RabbitMQ thật
+        from .consumer import main as consume_main
+
+        return consume_main()
 
     if args.cmd == "evaluate":
         env = process(_read(args.snapshot))

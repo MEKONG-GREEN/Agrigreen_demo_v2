@@ -15,6 +15,9 @@
 //	AG_VAULT_URL         địa chỉ identity-vault (vd https://identity-vault:8090)
 //	AG_VAULT_CLIENT_CERT, AG_VAULT_CLIENT_KEY, AG_VAULT_CA  mTLS tới kho định danh (tùy chọn ở Local/Dev)
 //	AG_OTLP_ENDPOINT     bật OpenTelemetry (ADR-0013)
+//	AG_INTERNAL_HTTP_ADDR  (tùy chọn) Internal API /internal/v1 cho optimizer — chỉ trong mạng cụm, mTLS bắt buộc;
+//	                       không đặt → tắt. Đặt thì cần AG_INTERNAL_TLS_CERT, AG_INTERNAL_TLS_KEY, AG_INTERNAL_CLIENT_CA
+//	AG_INTERNAL_CLIENT_NAMES  CN/DNS SAN client được phép (mặc định optimizer)
 package main
 
 import (
@@ -29,6 +32,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
@@ -93,7 +97,11 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	mods, pools, err := buildModules(ctx, open, clock.System{}, External{Vault: client.NewHTTP(vaultURL, vaultHTTP)})
+	internalCfg, err := internalConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	built, pools, err := assembly.Build(ctx, open, clock.System{}, External{Vault: client.NewHTTP(vaultURL, vaultHTTP)})
 	for _, p := range pools {
 		defer p.Close()
 	}
@@ -109,16 +117,27 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	d := Deps{Log: log, Verifier: verifier, Ops: ops, Modules: mods, Pools: pools, CORSOrigins: origins}
+	d := Deps{Log: log, Verifier: verifier, Ops: ops, Modules: built.List(), Pools: pools, CORSOrigins: origins}
 	servers := []*http.Server{
 		{Addr: env("AG_HTTP_ADDR", ":8080"), Handler: NewRouter(d)},
 		{Addr: env("AG_ADMIN_HTTP_ADDR", ":8082"), Handler: NewAdminRouter(d)},
 	}
-	errc := make(chan error, len(servers))
 	for _, s := range servers {
 		s.ReadHeaderTimeout, s.ReadTimeout, s.WriteTimeout = 5*time.Second, 30*time.Second, 30*time.Second
-		go func(s *http.Server) { errc <- s.ListenAndServe() }(s)
-		log.Info("lắng nghe", "event", "startup", "addr", s.Addr, "outcome", "ok")
+	}
+	if internalCfg != nil {
+		servers = append(servers, newInternalServer(internalCfg, NewInternalRouter(log, built.Simulation.RegisterInternal)))
+	}
+	errc := make(chan error, len(servers))
+	for _, s := range servers {
+		go func(s *http.Server) {
+			if s.TLSConfig != nil {
+				errc <- s.ListenAndServeTLS("", "")
+				return
+			}
+			errc <- s.ListenAndServe()
+		}(s)
+		log.Info("lắng nghe", "event", "startup", "addr", s.Addr, "mtls", s.TLSConfig != nil, "outcome", "ok")
 	}
 	select {
 	case <-ctx.Done():

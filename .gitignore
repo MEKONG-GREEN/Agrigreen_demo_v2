@@ -2,6 +2,8 @@
 .env
 *.env.local
 deploy/compose/.env
+# Chứng thư mTLS dev (scripts/gen-dev-certs.*)
+deploy/compose/.certs/
 *.pw
 *.pem
 *.key

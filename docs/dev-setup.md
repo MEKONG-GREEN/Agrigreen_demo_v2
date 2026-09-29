@@ -10,11 +10,12 @@
    sh scripts/gen-dev-secrets.sh          # Linux, macOS, CI
    ```
    Chạy lại khi đã có `.env` thì script giữ nguyên tệp. `-Force` / `--force` sinh lại — khi đó chạy `docker compose ... down -v` trước, vì mật khẩu DB đã lưu trong volume.
+   Script cũng gọi `scripts/gen-dev-certs` (`.ps1` / `.sh`, cần `openssl` — Git for Windows có sẵn) để sinh chứng thư mTLS dev của bề mặt Internal (api-platform ↔ optimizer) vào `deploy/compose/.certs/` (gitignore). Thiếu tệp thì `docker compose` báo lỗi bind mount.
 2. **Dựng và chờ mọi dịch vụ sẵn sàng:**
    ```bash
    docker compose -f deploy/compose/docker-compose.yml up -d --build --wait
    ```
-3. **Kiểm:** `curl http://127.0.0.1:8080/readyz`, `curl http://127.0.0.1:8090/readyz`, mở http://localhost:3000.
+3. **Kiểm:** `curl http://127.0.0.1:8080/readyz`, `curl http://127.0.0.1:8090/readyz`, `curl http://127.0.0.1:8081/readyz`, mở http://localhost:3000.
 
 | Dịch vụ | Vai trò | Địa chỉ trên máy (chỉ 127.0.0.1) |
 |---|---|---|
@@ -27,7 +28,9 @@
 | `seaweedfs`, `s3-init` | kho S3 (SeaweedFS — MinIO đã ngừng phát hành image công khai); `s3-init` tạo bucket, thử bật versioning; tài khoản ứng dụng `agrigreen-app` chỉ Read/Write/List trên bucket | 9000 |
 | `otel-collector` | nhận OTLP, in ra log (exporter `debug`) | 4317, 4318 |
 | `identity-vault` | kho định danh (bề mặt Internal) | 8090 |
-| `api-platform` | Application API + Admin API (MFA) | 8080, 8082 |
+| `api-platform` | Application API + Admin API (MFA); Internal API `/internal/v1` cho optimizer (mTLS, chỉ trong mạng compose) | 8080, 8082 (8084 không publish) |
+| `api-internal` | API nội bộ MKG (cụm `ag_mkg`, vai `hub_app` + `mkg_api` cho idempotency) | 8081, quản trị MFA 8083 |
+| `optimizer` | engine mô phỏng chọn Hub (Python): queue `pf.simulation.optimizer`, gọi Internal API qua mTLS | — |
 | `outbox-publisher`, `worker` | phát outbox, consumer + job vận hành (neo chuỗi, dọn idempotency, leo thang SLA) | — |
 | `web-ops` | web vận hành Next.js | 3000 |
 

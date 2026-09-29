@@ -67,6 +67,9 @@ var Roles = []Role{
 	{Name: "simulation_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
 	{Name: "fieldops_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
 	{Name: "hub_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
+	// mkg_api: tương đương platform_api ở cụm mkg — chỉ bảng vận hành trong schema shared
+	// (idempotency) cho api-internal, không có quyền nghiệp vụ (Q-MKG-07).
+	{Name: "mkg_api", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
 	{Name: "vault_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.Vault}},
 }
 

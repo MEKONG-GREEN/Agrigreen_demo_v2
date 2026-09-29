@@ -34,20 +34,28 @@ type Modules struct {
 // List trả module theo thứ tự gắn route.
 func (m Modules) List() []httpx.Module { return []httpx.Module{m.Hub} }
 
+// OpsRole là vai vận hành của api-internal ở cụm mkg (tương đương platform_api ở
+// cụm pf): chỉ bảng vận hành shared.idempotency_key qua ag_shared_user, không có
+// quyền nghiệp vụ (Q-MKG-07).
+const OpsRole = "mkg_api"
+
 // Build mở pool theo vai của từng module và nối port giữa các module mkg.
 // Thêm mkg/fieldops, measurement, logistics, orders, costing, acctbridge ở đây.
 //
-// ops là pool dùng cho bảng vận hành shared.idempotency_key của cụm mkg. G2 chưa
-// có vai vận hành riêng cho api-internal (tương đương platform_api ở cụm pf) nên
-// dùng pool của hub_app (thành viên ag_shared_user) — câu hỏi mở Q-MKG-07.
+// ops là pool của vai OpsRole cho idempotency (cũng nằm trong pools để /readyz kiểm).
 func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules, ops *pgxpool.Pool, pools []*pgxpool.Pool, err error) {
-	hubPool, err := open(ctx, hub.DBRole)
+	ops, err = open(ctx, OpsRole)
 	if err != nil {
 		return mods, nil, pools, err
 	}
+	pools = append(pools, ops)
+	hubPool, err := open(ctx, hub.DBRole)
+	if err != nil {
+		return mods, ops, pools, err
+	}
 	pools = append(pools, hubPool)
 	mods.Hub = hub.New(hubPool, clk)
-	return mods, hubPool, pools, nil
+	return mods, ops, pools, nil
 }
 
 // Deps là phụ thuộc của router.

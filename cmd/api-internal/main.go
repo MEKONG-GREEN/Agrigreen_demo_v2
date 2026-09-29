@@ -11,6 +11,9 @@
 //	AG_OIDC_ISSUER, AG_OIDC_AUDIENCE, AG_OIDC_JWKS_URL (tùy chọn) — như api-platform
 //	AG_OTLP_ENDPOINT     bật OpenTelemetry (ADR-0013)
 //
+// `api-internal -healthcheck <url>`: GET url, thoát 0 khi 200 — healthcheck của Docker
+// (ảnh distroless không có curl/wget).
+//
 // Thiếu AG_MKG_DB_URL: chạy chế độ G0 (chỉ /healthz) để đơn vị triển khai cũ
 // không hỏng khi chưa cấu hình cụm mkg.
 package main
@@ -41,6 +44,9 @@ import (
 )
 
 func main() {
+	if len(os.Args) == 3 && os.Args[1] == "-healthcheck" {
+		os.Exit(healthcheck(os.Args[2]))
+	}
 	log := telemetry.NewLogger("api-internal", os.Stdout)
 	if err := run(log); err != nil {
 		log.Error("dừng do lỗi", "event", "startup", "outcome", "error", "error", err.Error())
@@ -100,6 +106,20 @@ func run(log *slog.Logger) error {
 		{Addr: env("AG_HTTP_ADDR", ":8081"), Handler: assembly.NewRouter(d)},
 		{Addr: env("AG_ADMIN_HTTP_ADDR", ":8083"), Handler: assembly.NewAdminRouter(d)},
 	})
+}
+
+// healthcheck gọi url (chỉ địa chỉ loopback do người vận hành cấu hình) và trả mã thoát.
+func healthcheck(url string) int {
+	c := &http.Client{Timeout: 2 * time.Second}
+	resp, err := c.Get(url) //nolint:gosec,noctx // URL cố định trong cấu hình healthcheck
+	if err != nil {
+		return 1
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 1
+	}
+	return 0
 }
 
 func healthOnly(log *slog.Logger) http.Handler {

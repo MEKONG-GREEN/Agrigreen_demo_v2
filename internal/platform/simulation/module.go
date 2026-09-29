@@ -27,6 +27,10 @@ import (
 // DBRole là vai DB riêng của module (R-05).
 const DBRole = "simulation_app"
 
+// MaxInternalBodyBytes là giới hạn thân request của Internal API (phong bì kết
+// quả, handler.MaxResultBytes) — gốc lắp ráp dùng để dựng engine của listener nội bộ.
+const MaxInternalBodyBytes = handler.MaxResultBytes
+
 // Deps là cổng của module khác. Supply/Router chỉ worker cần.
 type Deps struct {
 	Params port.ParamSet     // MasterdataParams(md.Params()); nil → giá trị danh mục, không "Chính thức" được

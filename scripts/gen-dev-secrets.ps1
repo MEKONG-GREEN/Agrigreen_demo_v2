@@ -23,6 +23,8 @@ if ((Test-Path $target) -and -not $Force) {
     }
     $rng.Dispose()
     Write-Host "Đã có $target — giữ nguyên (dùng -Force để sinh lại; khi đó chạy 'docker compose down -v' vì mật khẩu DB đã đổi)."
+    # Chứng thư mTLS của bề mặt Internal (api-platform ↔ optimizer): sinh nếu còn thiếu.
+    & (Join-Path $PSScriptRoot 'gen-dev-certs.ps1')
     exit 0
 }
 
@@ -50,3 +52,5 @@ $rng.Dispose()
 # LF, UTF-8 không BOM — Docker Compose đọc được trên mọi nền tảng.
 [System.IO.File]::WriteAllText($target, (($lines -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding $false))
 Write-Host "Đã ghi $target (giá trị không in ra)."
+# Chứng thư mTLS của bề mặt Internal (api-platform ↔ optimizer) vào deploy/compose/.certs.
+& (Join-Path $PSScriptRoot 'gen-dev-certs.ps1') -Force:$Force

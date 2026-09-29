@@ -15,4 +15,6 @@ COPY --from=build /wheels /wheels
 RUN pip install --no-cache-dir --no-index --find-links /wheels agrigreen-optimizer[milp] && rm -rf /wheels
 USER 10001:10001
 ENTRYPOINT ["agrigreen-optimizer"]
-CMD ["--help"]
+# Mặc định: vòng nhận RabbitMQ (pf.simulation.job.requested) — cấu hình qua biến môi trường,
+# xem src/agrigreen_optimizer/consumer.py. `evaluate`/`handle-event` vẫn gọi được bằng cách đổi CMD.
+CMD ["consume"]

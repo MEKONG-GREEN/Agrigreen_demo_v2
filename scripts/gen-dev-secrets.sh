@@ -15,6 +15,8 @@ if [ -f "$target" ] && [ "${1:-}" != "--force" ]; then
     echo "Đã bổ sung AG_KC_CLIENT_SECRET vào $target (giá trị không in ra). Tạo lại container keycloak để nhập lại realm."
   fi
   echo "Đã có $target — giữ nguyên (dùng --force để sinh lại; khi đó chạy 'docker compose down -v' vì mật khẩu DB đã đổi)."
+  # Chứng thư mTLS của bề mặt Internal (api-platform ↔ optimizer): sinh nếu còn thiếu.
+  sh "$root/scripts/gen-dev-certs.sh"
   exit 0
 fi
 
@@ -46,3 +48,5 @@ tmp="$target.tmp.$$"
 } > "$tmp"
 mv "$tmp" "$target"
 echo "Đã ghi $target (giá trị không in ra)."
+# Chứng thư mTLS của bề mặt Internal (api-platform ↔ optimizer) vào deploy/compose/.certs.
+sh "$root/scripts/gen-dev-certs.sh" ${1:+"$1"}

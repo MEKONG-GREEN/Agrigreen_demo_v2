@@ -11,6 +11,7 @@ readme = "README.md"
 # Giấy phép phụ thuộc phải thuộc deploy/policies/allowed-licenses.txt (RB-4).
 dependencies = [
   "pydantic>=2.7,<3",       # MIT — kiểm hợp đồng ảnh chụp, mặc định từ chối trường lạ
+  "pika>=1.3,<2",           # BSD-3-Clause — client AMQP 0-9-1 (vòng nhận RabbitMQ, consumer.py), thuần Python
 ]
 
 [project.optional-dependencies]

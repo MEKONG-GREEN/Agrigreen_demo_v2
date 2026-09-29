@@ -70,7 +70,7 @@ jobs:
           sudo systemctl stop pgbouncer || true
           sudo mkdir -p /etc/pgbouncer-ci
           : | sudo tee /etc/pgbouncer-ci/userlist.txt > /dev/null
-          for r in platform_api worker_platform party_app masterdata_app geo_app extension_app content_app mechanization_app mrv_app sync_app accounts_app notify_app reports_app cropcycle_app waterway_app simulation_app fieldops_app hub_app vault_app ag_outbox_publisher ag_migrator; do
+          for r in platform_api worker_platform party_app masterdata_app geo_app extension_app content_app mechanization_app mrv_app sync_app accounts_app notify_app reports_app cropcycle_app waterway_app simulation_app fieldops_app hub_app mkg_api vault_app ag_outbox_publisher ag_migrator; do
             printf '"%s" "%s"\n' "$r" "$AG_DB_APP_PASSWORD" | sudo tee -a /etc/pgbouncer-ci/userlist.txt > /dev/null
           done
           sudo tee /etc/pgbouncer-ci/pgbouncer.ini > /dev/null <<'INI'
@@ -155,8 +155,12 @@ jobs:
         run: |
           pip-licenses --packages pydantic pydantic-core annotated-types typing-inspection highspy \
             --allow-only="MIT;MIT License"
-          # typing-extensions (PSF-2.0) và numpy (BSD-3-Clause gộp): chờ quyết định cập nhật danh mục giấy phép
+          pip-licenses --packages pika --allow-only="BSD-3-Clause;BSD License"
+          # typing-extensions (PSF-2.0) và numpy (BSD-3-Clause gộp): chờ ADR-0016 (Đề xuất) — chỉ in ra
           pip-licenses --packages typing-extensions numpy --format=markdown
+          # Thư viện nhị phân gói kèm trong wheel numpy (OpenBLAS, LAPACK, runtime GCC…) — dữ liệu cho ADR-0016.
+          lic=$(python -c 'import glob, os, numpy; g = glob.glob(os.path.join(os.path.dirname(os.path.dirname(numpy.__file__)), "numpy-*.dist-info", "licenses", "LICENSE.txt")); print(g[0] if g else "/dev/null")')
+          grep -E '^(Name|License):' "$lic" || true
       - name: Docker build (non-root)
         run: docker build -t agrigreen/optimizer:ci .
 
@@ -286,14 +290,20 @@ jobs:
       id-token: write   # ký keyless bằng cosign
     strategy:
       matrix:
-        cmd: [api-platform, api-internal, identity-vault, worker, outbox-publisher, migrate]
+        # optimizer (Python) có Dockerfile và ngữ cảnh riêng (optimizer/); còn lại build từ Dockerfile gốc với CMD.
+        cmd: [api-platform, api-internal, identity-vault, worker, outbox-publisher, migrate, optimizer]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - name: Tên image (ghcr bắt buộc chữ thường)
         run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/agrigreen-${{ matrix.cmd }}:${{ github.sha }}" >> "$GITHUB_ENV"
       - name: Build
-        run: docker build --load --build-arg CMD=${{ matrix.cmd }} -t "$IMAGE" .
+        run: |
+          if [ "${{ matrix.cmd }}" = optimizer ]; then
+            docker build --load -t "$IMAGE" optimizer
+          else
+            docker build --load --build-arg CMD=${{ matrix.cmd }} -t "$IMAGE" .
+          fi
       - name: SBOM
         uses: anchore/sbom-action@v0
         with:
@@ -343,12 +353,41 @@ jobs:
           check http://127.0.0.1:8082/readyz
           check http://127.0.0.1:8090/healthz
           check http://127.0.0.1:8090/readyz
+          # API nội bộ MKG (cụm ag_mkg qua PgBouncer, vai mkg_api + hub_app).
+          check http://127.0.0.1:8081/healthz
+          check http://127.0.0.1:8081/readyz
+          check http://127.0.0.1:8083/healthz
+          check http://127.0.0.1:8083/readyz
           check http://127.0.0.1:3000/
           # CORS: preflight từ web vận hành được phép, origin lạ bị chặn.
           test "$(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS -H 'Origin: http://localhost:3000' -H 'Access-Control-Request-Method: GET' http://127.0.0.1:8080/v1/me)" = 204
           test "$(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS -H 'Origin: http://evil.example' -H 'Access-Control-Request-Method: GET' http://127.0.0.1:8080/v1/me)" = 403
           # Không token → 401 problem+json (xác thực bật, không mở cửa).
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/v1/me)" = 401
+      - name: Internal API (mTLS) và optimizer
+        run: |
+          set -eu
+          # optimizer đang chạy và đã khai báo queue của nó (đã nối RabbitMQ).
+          cid=$(docker compose -f "$COMPOSE_FILE" ps -q optimizer)
+          test "$(docker inspect -f '{{.State.Running}}' "$cid")" = true
+          for i in $(seq 1 30); do
+            docker compose -f "$COMPOSE_FILE" exec -T rabbitmq rabbitmqctl -q list_queues name | grep -qx pf.simulation.optimizer && break
+            sleep 2
+          done
+          docker compose -f "$COMPOSE_FILE" exec -T rabbitmq rabbitmqctl -q list_queues name | grep -qx pf.simulation.optimizer
+          test "$(docker inspect -f '{{.State.Running}} {{.RestartCount}}' "$cid")" = "true 0"
+          # Cổng Internal 8084 KHÔNG được publish ra máy chủ.
+          if docker compose -f "$COMPOSE_FILE" port api-platform 8084 2>/dev/null | grep -q .; then
+            echo "8084 (Internal) bị publish ra máy chủ" >&2; exit 1
+          fi
+          # Trong mạng compose: không chứng thư client → bắt tay TLS hỏng; chứng thư optimizer → 200.
+          net=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$cid")
+          curlc() { docker run --rm --network "$net" -v "$PWD/deploy/compose/.certs:/certs:ro" curlimages/curl:8.15.0 "$@"; }
+          if curlc -fsS --max-time 5 --cacert /certs/ca.crt -o /dev/null https://api-platform:8084/healthz; then
+            echo "Internal API nhận kết nối không có chứng thư client" >&2; exit 1
+          fi
+          test "$(curlc -s --max-time 5 --cacert /certs/ca.crt --cert /certs/optimizer.crt --key /certs/optimizer.key \
+            -o /dev/null -w '%{http_code}' https://api-platform:8084/healthz)" = 200
       - name: Cấu hình VPS (docker-compose.vps.yml) — dựng lại với Keycloak production + PostgreSQL
         env:
           VPS: -f deploy/compose/docker-compose.yml -f deploy/compose/docker-compose.vps.yml
@@ -362,10 +401,11 @@ jobs:
             -v "$PWD/deploy/compose/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.10-alpine \
             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
           # Caddy không lấy được chứng chỉ trong CI — chỉ dựng phần sau nó.
-          docker compose $VPS up -d --build --wait --wait-timeout 900 api-platform worker outbox-publisher web-ops
+          docker compose $VPS up -d --build --wait --wait-timeout 900 api-platform api-internal optimizer worker outbox-publisher web-ops
           iss=$(curl -fsS --retry 30 --retry-delay 2 --retry-all-errors http://127.0.0.1:8180/realms/agrigreen/.well-known/openid-configuration | jq -r .issuer)
           test "$iss" = "https://auth.$D/realms/agrigreen"
           curl -fsS --retry 30 --retry-delay 2 --retry-all-errors -o /dev/null http://127.0.0.1:8080/readyz
+          curl -fsS --retry 30 --retry-delay 2 --retry-all-errors -o /dev/null http://127.0.0.1:8081/readyz
           test "$(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS -H "Origin: https://app.$D" -H 'Access-Control-Request-Method: GET' http://127.0.0.1:8080/v1/me)" = 204
           # Realm VPS: client ROPC chỉ-dev bị tắt (bật thì lỗi sẽ là invalid_grant do sai mật khẩu).
           err=$(curl -s -d grant_type=password -d client_id=agrigreen-seed -d username=x -d password=x \

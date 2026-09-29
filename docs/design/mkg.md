@@ -244,7 +244,7 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 | orders | `mkg_orders` | `orders_app` | 000007 | cần thêm vai |
 | costing | `mkg_costing` | `costing_app` | 000008 | cần thêm vai |
 | acctbridge | `mkg_acctbridge` | `acctbridge_app` | 000009 | cần thêm vai |
-| API nội bộ | `shared.idempotency_key` cụm mkg | `mkg_api` (tương đương `platform_api`) | — | **thiếu** — G2 tạm dùng pool `hub_app` (Q-MKG-07) |
+| API nội bộ | `shared.idempotency_key` cụm mkg | `mkg_api` (tương đương `platform_api`) | — (quyền qua `ag_shared_user`, shared 000001) | **đã làm** — `cmd/api-internal/assembly.OpsRole` (Q-MKG-07 đóng) |
 | worker-internal | `shared.inbox` cụm mkg | `worker_internal` | — | G3 |
 
 ---
@@ -303,7 +303,7 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 | Q-MKG-04 | Khối lượng lô: nhập tay ở hub hay lấy từ phiếu cân `HUB_IN` (RB-6)? | G2 nhập tay; G3 lô `receipt` bắt buộc `weigh_ticket_ref` khi hub có cân; nhập tay chỉ khi cân hỏng, có lý do | MKG + thương mại (C-4) | measurement |
 | Q-MKG-05 | Sửa sai một mẻ biến đổi (ghi nhầm lô vào/khối lượng ra)? | "Mẻ bù": bản ghi `batch` mới `supersedes_id` + lý do, bù ngược mọi dịch chuyển của mẻ gốc nếu lô ra chưa bị dùng; lô ra đã dùng → chỉ bù bằng điều chỉnh kiểm kê có duyệt | MKG vận hành | — |
 | Q-MKG-06 | Kiểm kê (WH FN-20..23) ở hub: điều chỉnh cấp lô có phê duyệt | Thêm `stocktake` + dịch chuyển `adjustment` (tăng → lô điều chỉnh có nguồn `kind = stocktake`; giảm → trừ theo thứ tự rủi ro) — migration mkg mới | MKG | G3 |
-| Q-MKG-07 | Vai vận hành cho `api-internal` trên `shared.idempotency_key` cụm mkg | Thêm vai `mkg_api` (thành viên `ag_shared_user`, chỉ CONNECT `ag_mkg`) vào `dbadmin` và userlist PgBouncer | Người tích hợp | Tách quyền (hiện dùng pool `hub_app`) |
+| Q-MKG-07 | Vai vận hành cho `api-internal` trên `shared.idempotency_key` cụm mkg | **Đã đóng (G2 đợt 2):** vai `mkg_api` (thành viên `ag_shared_user`, chỉ CONNECT `ag_mkg`) trong `dbadmin`, userlist PgBouncer (CI + compose); không cần migration vì quyền trên `shared.idempotency_key` cấp cho `ag_shared_user` | Người tích hợp | Tách quyền khỏi pool `hub_app` |
 | Q-MKG-08 | Người đề xuất / phê duyệt thật của hợp đồng van `hub_facility`, `hub_capacity` | Tệp hợp đồng đang ghi vai `mkg-hub-module-owner` / `mkg-data-steward` — MKG điền người thật khi ký | MKG | — |
 | Q-MKG-09 | Tham số quy tắc rủi ro (90 ngày, ngưỡng ẩm 18%, trọng số) có phiên bản ở đâu, khi mkg không được dùng `pf/masterdata` (R-03)? | Bảng tham số có phiên bản trong `mkg_hub` (người đặt ≠ người duyệt) ở G3; G2 dùng hằng `hub.risk.v1` ghim vào phiếu xuất | MKG | — |
 | Q-MKG-10 | Chuyển kho giữa hai cơ sở MKG | Phiếu xuất (`destination_ref` = cơ sở đích) + nhận ở đích với nguồn `kind = lot` tỷ lệ 1 — giữ chuỗi nguồn gốc | MKG | G3 |

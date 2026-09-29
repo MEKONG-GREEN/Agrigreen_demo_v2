@@ -26,14 +26,41 @@ Dịch vụ tính mô phỏng chọn Hub cho `pf/simulation`. Đây là ngoại 
    - tính, rồi `POST /internal/v1/simulations/{id}/result`.
 5. Go ghi kết quả bất biến và phát `pf.simulation.job.completed`.
 
-Việc nhận từ RabbitMQ (ACK sau khi POST thành công) là lớp bọc ngoài `handle-event`. Lớp này chưa làm ở đợt 1 (xem báo cáo tích hợp).
+## Vòng nhận RabbitMQ (`agrigreen-optimizer consume`)
+
+`consumer.py` bọc `handle_event` — lệnh mặc định của image Docker. Topology **giống hệt** consumer Go (`internal/shared/inbox.DeclareQueue`):
+
+| Thành phần | Giá trị |
+|---|---|
+| Exchange sự kiện / thư chết | `ag.events` (topic, routing key = event_type) / `ag.dlx` |
+| Queue | `pf.simulation.optimizer` (quorum, `x-delivery-limit` 5, thư chết → `ag.dlx` khoá `pf.simulation.optimizer`), bind `pf.simulation.job.requested` |
+| DLQ | `pf.simulation.optimizer.dlq` (quorum, không tự xóa — R-62) |
+
+- **ACK chỉ sau khi POST kết quả thành công** (201, hoặc 200 khi nộp lặp). Ảnh chụp không hợp lệ vẫn được nộp với `status = failed` rồi ACK.
+- **Lỗi vĩnh viễn** (phong bì hỏng, thiếu trường, sai event_type, băm lệch, HTTP 4xx trừ 408/429): NACK không requeue, thông điệp sang DLQ ngay.
+- **Lỗi tạm thời** (mạng/TLS, HTTP 5xx, 408, 429, lỗi bất ngờ): chờ `AG_OPTIMIZER_RETRY_BASE_S × 2^x-delivery-count` giây (tối đa 60) rồi NACK requeue. Quorum queue đếm lần giao, quá 5 lần thì sang DLQ.
+- Tính ở luồng phụ. Luồng kết nối giữ heartbeat và nhận ACK/NACK qua `add_callback_threadsafe` (mẫu chuẩn của pika). Mất kết nối thì nối lại, lùi dần tới 30 s. SIGTERM thì dừng; thông điệp đang dở chưa ACK nên broker giao lại, và nộp lặp là idempotent.
+- `traceparent` trong header AMQP được chuyển sang Internal API (R-90).
+
+Biến môi trường:
+
+| Biến | Ý nghĩa |
+|---|---|
+| `AG_AMQP_URL` | `amqp://user:pass@rabbitmq:5672/` (bắt buộc) |
+| `AG_INTERNAL_API_URL` | `https://api-platform:8084`, listener Internal của api-platform (bắt buộc) |
+| `AG_OPTIMIZER_CLIENT_CERT`, `AG_OPTIMIZER_CLIENT_KEY`, `AG_INTERNAL_CA` | mTLS: chứng thư client CN/SAN `optimizer` và CA của máy chủ |
+| `AG_OPTIMIZER_QUEUE` | mặc định `pf.simulation.optimizer` |
+| `AG_OPTIMIZER_PREFETCH` | mặc định 1 |
+| `AG_OPTIMIZER_RETRY_BASE_S` | mặc định 2 |
+
+Phía api-platform bật listener bằng `AG_INTERNAL_HTTP_ADDR` (`:8084`) cùng `AG_INTERNAL_TLS_CERT`, `AG_INTERNAL_TLS_KEY`, `AG_INTERNAL_CLIENT_CA`. Không đặt thì listener tắt. Đặt địa chỉ mà thiếu tệp nào thì api-platform từ chối khởi động. Ở Docker Compose, chứng thư dev do `scripts/gen-dev-certs.sh` hoặc `.ps1` sinh vào `deploy/compose/.certs/` (gitignore); `gen-dev-secrets` tự gọi script này. Cổng 8084 chỉ mở trong mạng compose.
 
 ## Chạy
 
 ```powershell
 cd optimizer
 python -m pip install -e ".[dev,milp]"   # Python 3.12 (py -3.12)
-python -m pytest                        # 45 kiểm thử; test_select_hubs tự bỏ qua nếu thiếu highspy
+python -m pytest                        # 56 kiểm thử (gồm vòng nhận với broker giả); test_select_hubs tự bỏ qua nếu thiếu highspy
 agrigreen-optimizer evaluate --snapshot ..\contracts\optimizer\examples\snapshot.example.json --out result.json
 ```
 
@@ -43,9 +70,20 @@ Kiểm giấy phép (RB-4, danh sách `deploy/policies/allowed-licenses.txt`):
 
 ```powershell
 pip-licenses --packages pydantic pydantic-core annotated-types typing-inspection highspy --allow-only="MIT;MIT License"
+pip-licenses --packages pika --allow-only="BSD-3-Clause;BSD License"
 ```
 
-`typing_extensions` là phụ thuộc bắt buộc của pydantic, giấy phép **PSF-2.0**, không có trong danh sách cho phép. `numpy` là phụ thuộc của highspy, giấy phép gộp `BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0`. Người tích hợp cần một ADR cho hai gói này hoặc bổ sung chúng vào danh sách cho phép.
+Phụ thuộc runtime (bản đã kiểm 29/09/2026):
+
+| Gói | Giấy phép | Trạng thái |
+|---|---|---|
+| pydantic, pydantic-core, annotated-types, typing-inspection | MIT | cho phép |
+| highspy (`[milp]`) | MIT | cho phép |
+| pika | BSD-3-Clause (pip-licenses báo "BSD License") | cho phép; thuần Python, không có phụ thuộc |
+| typing-extensions (phụ thuộc bắt buộc của pydantic) | PSF-2.0 | **chưa** có trong danh sách |
+| numpy (phụ thuộc của highspy) | `BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0` | **chưa** đủ: 0BSD, Zlib, CC0-1.0 chưa có trong danh sách |
+
+Hai dòng cuối chờ [ADR-0016](../docs/adr/0016-giay-phep-python.md) (trạng thái "Đề xuất"). Tới khi ADR được chấp nhận, CI chỉ in giấy phép của hai gói này ra, không chặn.
 
 Docker (non-root, slim): `docker build -t agrigreen/optimizer optimizer`.
 
