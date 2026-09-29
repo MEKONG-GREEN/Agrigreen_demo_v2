@@ -714,6 +714,120 @@ paths:
         "200": {$ref: "#/components/responses/PartyOrgChanged"}
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
+  /v1/cooperatives/import-template.xlsx:
+    get:
+      summary: Tệp .xlsx mẫu để nhập HTX hàng loạt (HTX US-HTX-02)
+      operationId: partyCooperativeImportTemplate
+      responses:
+        "200":
+          description: Tệp mẫu (tiêu đề + một dòng ví dụ)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/cooperatives/import:
+    post:
+      summary: Nhập hồ sơ HTX hàng loạt từ .xlsx hoặc CSV UTF-8 (HTX US-HTX-02), tối đa 200 dòng, 2 MB; kết quả theo dòng
+      description: |
+        Cột (tiêu đề có/không dấu): "Tên HTX", "Địa chỉ", "Người đại diện", "SĐT", "Mã xã" (bắt buộc), "Mã số thuế",
+        "Diện tích (ha)", "Ngày thành lập" (YYYY-MM-DD), "Mã tổ chức cấp trên". Mã HTX do hệ thống sinh (CGH BR-01).
+        Người đại diện và SĐT đi thẳng vào kho định danh (mục đích registry.admin) — không lưu ở pf_party (R-04).
+        Tệp không đọc được (không phải .xlsx/CSV, .xls cũ, ô công thức, quá lớn) → 422 party.import_invalid với detail
+        bắt đầu "Sai định dạng file". Thiếu cột bắt buộc trong tiêu đề hoặc ô bắt buộc trống → TỪNG DÒNG bị loại với lý do
+        "Thiếu cột bắt buộc: <tên cột>"; tên HTX trùng → "Tên HTX này đã tồn tại, vui lòng chọn tên khác."; dòng hợp lệ
+        khác vẫn được tạo. Mỗi dòng ghi sổ với idem_key <Idempotency-Key>:row:<n> — gọi lặp không tạo trùng.
+        Vai: registry_admin, kn_province_admin (chỉ xã trong tỉnh), platform_admin.
+      operationId: partyImportCooperatives
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: {type: string}
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+            schema: {type: string, format: binary}
+      responses:
+        "200":
+          description: Kết quả theo dòng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created, rejected, rows]
+                properties:
+                  created: {type: integer}
+                  rejected: {type: integer}
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      required: [row, status, reason, org_ref, code, name]
+                      properties:
+                        row: {type: integer, description: "Số dòng trong tệp (dòng 1 là tiêu đề)"}
+                        status: {type: string, enum: [created, rejected]}
+                        reason: {type: [string, "null"], description: "Không chứa dữ liệu cá nhân"}
+                        org_ref: {type: [string, "null"], format: uuid}
+                        code: {type: [string, "null"], description: "Mã HTX hệ thống sinh"}
+                        name: {type: [string, "null"], description: "Tên HTX ở dòng này"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/cooperatives/{ref}/copy:
+    post:
+      summary: Sao chép hồ sơ HTX (HTX US-HTX-03) — giữ địa bàn và cấu trúc, sửa riêng Tên và Người đại diện
+      description: |
+        Bản sao giữ mã xã, địa chỉ, tổ chức cấp trên (nếu còn hoạt động), diện tích đăng ký, ngày thành lập của hồ sơ nguồn.
+        KHÔNG sao chép: Mã HTX (sinh mới), mã số thuế, toạ độ trụ sở, người đại diện (gửi `representative` mới hoặc bỏ trống).
+        Tên trùng HTX đã có (không phân biệt hoa thường) → 409 party.cooperative_name_taken
+        "Tên HTX này đã tồn tại, vui lòng chọn tên khác." Nguồn ngoài phạm vi → 404.
+      operationId: partyCopyCooperative
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string, maxLength: 200}
+                representative:
+                  type: object
+                  required: [full_name, phone]
+                  description: Người đại diện của bản sao — chuyển thẳng vào kho định danh
+                  properties:
+                    full_name: {type: string}
+                    phone: {type: string}
+      responses:
+        "201":
+          description: Đã tạo bản sao
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [org, source_ref, representative_duplicate]
+                properties:
+                  org: {$ref: "#/components/schemas/PartyOrg"}
+                  source_ref: {type: string, format: uuid}
+                  representative_duplicate: {type: boolean}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [org, source_ref, representative_duplicate]
+                properties:
+                  org: {$ref: "#/components/schemas/PartyOrg"}
+                  source_ref: {type: string, format: uuid}
+                  representative_duplicate: {type: boolean}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/households/import:
     post:
       summary: Nhập nông hộ từ CSV UTF-8 hoặc Excel .xlsx (dòng đầu là tiêu đề), tối đa 200 dòng, 2 MB; kết quả theo từng dòng
@@ -3693,6 +3807,7 @@ components:
           type: object
           properties:
             tax_code: {type: string, description: "10 hoặc 13 chữ số; duy nhất trong tenant"}
+            address: {type: string, maxLength: 500, description: "Địa chỉ trụ sở HTX (không phải dữ liệu cá nhân)"}
             area_ha: {type: string, description: "Decimal dạng chuỗi"}
             established_on: {type: string, format: date}
             location:

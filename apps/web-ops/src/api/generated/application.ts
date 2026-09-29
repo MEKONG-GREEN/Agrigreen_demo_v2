@@ -260,7 +260,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Nông hộ thành viên của HTX, kèm nhãn hiển thị đã che (không bao giờ có định danh đầy đủ) */
+        /**
+         * Nông hộ thành viên của HTX, kèm nhãn hiển thị đã che (không bao giờ có định danh đầy đủ)
+         * @description HTX US-HH-01 AC-2: `phone` tìm ĐÚNG một SĐT qua chỉ mục mù của kho định danh (mục đích registry.admin, kho ghi sổ
+         *     tra cứu) — trả tối đa một hộ của HTX này, SĐT lạ hoặc hộ HTX khác → danh sách rỗng; giá trị không phải SĐT → 422.
+         *     Không tìm theo họ tên: họ tên chỉ nằm ở kho định danh (R-04), pf không lọc được.
+         */
         get: operations["listCooperativeHouseholds"];
         put?: never;
         post?: never;
@@ -281,6 +286,51 @@ export interface paths {
         put?: never;
         /** Tạo nông hộ — định danh chủ hộ đi thẳng vào kho định danh; trùng SĐT/CCCD → dùng lại mã cũ, báo "trùng" */
         post: operations["createHousehold"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/households/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sao chép hàng loạt nông hộ, sửa riêng họ tên/SĐT từng hồ sơ mới (HTX US-HH-02 AC-2..4)
+         * @description Mỗi hồ sơ mới giữ HTX, xã, diện tích canh tác của hộ nguồn; định danh (họ tên, SĐT, CCCD, địa chỉ) là của hồ sơ mới,
+         *     đi thẳng vào kho định danh — định danh hộ nguồn không được đọc hay chép. Hồ sơ lỗi bị loại kèm lý do
+         *     ("Thiếu họ tên", "Thiếu SĐT", "SĐT đã tồn tại", "Bạn không có quyền truy cập nông hộ này.", "Không tìm thấy nông hộ nguồn"),
+         *     không chặn hồ sơ khác. Quản lý HTX chỉ sao chép trong HTX của mình. Tối đa 50 hồ sơ mỗi lần.
+         */
+        post: operations["copyHouseholds"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/households/{ref}/contact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SĐT chủ hộ lúc bấm gọi nhanh (HTX US-HH-03) — đọc từ kho định danh với mục đích extension.contact, không lưu đệm
+         * @description Trả `Cache-Control: no-store`; không ghi log giá trị. Quản lý HTX chỉ gọi hộ của HTX mình (khác → 403
+         *     party.out_of_scope "Bạn không có quyền truy cập nông hộ này."). Chưa có SĐT / đã xóa định danh → 404
+         *     party.household_contact_unavailable. Máy/trình duyệt không gọi được → client báo "Không thể khởi tạo cuộc gọi trên thiết bị này." (AC-2).
+         */
+        get: operations["getHouseholdContact"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2009,6 +2059,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reports/recipients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Người nhận chọn được cho lịch báo cáo của quản lý HTX — tài khoản đang bật, email đã xác minh, thuộc HTX của người gọi (HTX US-DASH-03)
+         * @description Chỉ quản lý HTX (coop_manager, không kèm vai KN). Email đã che; địa chỉ đầy đủ chỉ tra lúc gửi. Cache-Control no-store.
+         */
+        get: operations["listReportRecipients"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lịch gửi báo cáo HTX của quản lý HTX (HTX US-DASH-03) — chỉ HTX của mình
+         * @description Chỉ quản lý HTX; cán bộ KN, Admin CGH, quản trị dùng Admin API (MFA) → 403 ở đây.
+         */
+        get: operations["listCoopReportSchedules"];
+        put?: never;
+        /**
+         * Quản lý HTX lập lịch gửi báo cáo HTX (tuần/tháng, giờ Việt Nam) tới tài khoản của HTX (HTX US-DASH-03)
+         * @description Mẫu HTX (vd htx.production); params.cooperative_ref luôn là HTX của người lập. `recipients` phải thuộc
+         *     `GET /v1/reports/recipients` — khác → 422 reports.recipient_not_in_cooperative
+         *     ("Email đăng ký nhận báo cáo không hợp lệ hoặc gửi thất bại, vui lòng kiểm tra lại."). Mẫu không phải HTX → 403.
+         */
+        post: operations["createCoopReportSchedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/schedules/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Quản lý HTX ngừng lịch kèm lý do (không xóa; lịch sử chạy giữ nguyên) */
+        post: operations["deactivateCoopReportSchedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/schedules/{id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Các lần chạy của lịch HTX kèm kết quả gửi email (AC-2 — người lập thấy lần gửi bị bỏ/thiếu email) */
+        get: operations["listCoopReportScheduleRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/waterway/segments": {
         parameters: {
             query?: never;
@@ -3102,6 +3232,8 @@ export interface components {
             location: components["schemas"]["Point"] | null;
             /** @description true = chưa có toạ độ; bản đồ hiển thị tâm xã, nhãn "vị trí tạm" */
             location_provisional: boolean;
+            /** @description Địa chỉ trụ sở HTX (HTX US-HTX-02; không phải dữ liệu cá nhân) */
+            address?: string | null;
         } & {
             /** @description Mã tỉnh hiện hành của xã nơi HTX đặt trụ sở */
             province_code: string | null;
@@ -4846,6 +4978,67 @@ export interface components {
             /** Format: date-time */
             completed_at?: string | null;
         };
+        ReportScheduleInput: {
+            template_key: string;
+            /** @enum {string} */
+            format: "xlsx" | "pdf";
+            unit_code?: string;
+            params?: components["schemas"]["ReportParams"];
+            /** @enum {string} */
+            frequency: "weekly" | "monthly";
+            /** @description weekly: 1 = thứ Hai */
+            weekday?: number;
+            /** @description monthly */
+            day_of_month?: number;
+            /** @description Giờ Việt Nam */
+            hour: number;
+            recipients: string[];
+        };
+        ReportSchedule: {
+            /** Format: uuid */
+            id: string;
+            template_key: string;
+            /** @enum {string} */
+            format: "xlsx" | "pdf";
+            unit_code?: string | null;
+            params: Record<string, never>;
+            /** @enum {string} */
+            frequency: "weekly" | "monthly";
+            weekday?: number | null;
+            day_of_month?: number | null;
+            hour: number;
+            recipients: string[];
+            /** Format: uuid */
+            owner_ref: string;
+            active: boolean;
+            deactivated_reason?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ReportScheduleRun: {
+            /**
+             * @example 2026-W40
+             * @example 2026-10
+             */
+            slot_key: string;
+            /** Format: date-time */
+            slot_at: string;
+            /** @enum {string} */
+            status: "queued" | "skipped";
+            skip_reason?: string | null;
+            /** Format: uuid */
+            job_id?: string | null;
+            /** Format: date-time */
+            fired_at: string;
+            /** @enum {string|null} */
+            delivery_status?: "sent" | "skipped" | "failed" | null;
+            delivery_note?: string | null;
+            sent_count?: number | null;
+            /** Format: date-time */
+            delivered_at?: string | null;
+        };
         WaterwayLine: {
             /** @enum {string} */
             type: "LineString";
@@ -6168,6 +6361,8 @@ export interface operations {
     listCooperativeHouseholds: {
         parameters: {
             query?: {
+                /** @description SĐT chủ hộ cần tìm (khớp chính xác sau chuẩn hóa) */
+                phone?: string;
                 cursor?: string;
                 limit?: number;
             };
@@ -6231,6 +6426,94 @@ export interface operations {
             403: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    copyHouseholds: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: uuid
+                     * @description HTX của hồ sơ mới; bỏ trống = HTX hiện tại của hộ nguồn
+                     */
+                    target_cooperative_ref?: string | null;
+                    items: {
+                        /** Format: uuid */
+                        source_ref: string;
+                        full_name: string;
+                        phone: string;
+                        national_id?: string;
+                        address?: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Kết quả từng hồ sơ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        created: number;
+                        rejected: number;
+                        rows: {
+                            /** @description Thứ tự hồ sơ trong items (từ 1) */
+                            index: number;
+                            /** Format: uuid */
+                            source_ref: string;
+                            /** @enum {string} */
+                            status: "created" | "rejected";
+                            /** @description Không chứa dữ liệu cá nhân */
+                            reason: string | null;
+                            /** Format: uuid */
+                            household_ref: string | null;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    getHouseholdContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description SĐT */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        household_ref: string;
+                        phone: string;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
     };
@@ -9697,6 +9980,156 @@ export interface operations {
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
+        };
+    };
+    listReportRecipients: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            actor_ref: string;
+                            display_name: string;
+                            /** @example ke•••@htx.vn */
+                            masked_email: string;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    listCoopReportSchedules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ReportSchedule"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    createCoopReportSchedule: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportScheduleInput"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSchedule"];
+                };
+            };
+            /** @description Đã lập lịch */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSchedule"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    deactivateCoopReportSchedule: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Lịch */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSchedule"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listCoopReportScheduleRuns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lần chạy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ReportScheduleRun"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
         };
     };
     listWaterwayLayer: {

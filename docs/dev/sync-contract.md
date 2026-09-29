@@ -122,6 +122,8 @@ Phản hồi `200` trả kết quả **theo từng bản ghi**. Một bản ghi 
 
 `id` của bản ghi là `boundary_id` (UUIDv7 máy sinh) của phiên bản ranh giới.
 
+Vai được đẩy: `plot_editor`, `coop_manager`, `platform_admin` (vai khác → `rejected forbidden`). Quản lý HTX (App HTX, HTX US-PLOT-01/02) không cần `plot_editor`: chỉ tạo/sửa thửa của HTX mình — thửa mới bỏ trống `cooperative_ref` nhận HTX của người vẽ, ghi HTX khác → `rejected geo.out_of_scope`, sửa thửa HTX khác → `rejected geo.plot_not_found`.
+
 ```json
 {
   "plot_ref": "0191…",

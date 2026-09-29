@@ -30,7 +30,8 @@ export type NavIcon =
   | "chart"
   | "qr"
   | "support"
-  | "sop";
+  | "sop"
+  | "plot";
 
 export interface NavItem {
   href: string;
@@ -86,10 +87,14 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     items: [
       { href: "/htx", label: "Quản lý HTX & nông hộ", icon: "coop", levels: KN },
       { href: "/htx/dashboard", label: "Bảng điều hành sản xuất", icon: "chart", roles: HTX_READ },
+      { href: "/htx/nong-ho", label: "Quản lý nông hộ", icon: "coop", roles: HTX_READ },
+      { href: "/htx/lo-ruong", label: "Lô ruộng & ranh giới", icon: "plot", roles: HTX_READ },
       { href: "/htx/mua-vu", label: "Mùa vụ", icon: "season", roles: HTX_READ },
       { href: "/htx/nhat-ky", label: "Nhật ký canh tác", icon: "journal", roles: HTX_READ },
       { href: "/htx/phe-duyet", label: "Phê duyệt nhật ký", icon: "approve", roles: HTX_WRITE },
       { href: "/htx/san-luong", label: "Sản lượng thu hoạch", icon: "harvest", roles: HTX_READ },
+      // HTX US-DASH-03: lịch trên Application API chỉ cho quản lý HTX (cán bộ/quản trị dùng /quan-tri/mau-bao-cao).
+      { href: "/htx/lich-bao-cao", label: "Lịch gửi báo cáo", icon: "report", roles: [ROLES.coopManager] },
       { href: "/htx/tai-khoan-nong-dan", label: "Tài khoản nông dân", icon: "qr", roles: HTX_READ },
       { href: "/htx/yeu-cau-ho-tro", label: "Yêu cầu hỗ trợ", icon: "support", roles: HTX_READ },
     ],
@@ -135,6 +140,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       },
       { href: "/quan-tri/to-chuc", label: "Cơ cấu tổ chức", icon: "org", roles: [ROLES.platformAdmin, ROLES.registryAdmin] },
       { href: "/quan-tri/nhap-nong-ho", label: "Nhập nông hộ từ tệp", icon: "coop", roles: [ROLES.platformAdmin, ROLES.registryAdmin] },
+      { href: "/quan-tri/bai-viet", label: "Soạn bài viết", icon: "library", roles: [ROLES.contentEditorNational, ROLES.contentEditorProvince] },
       { href: "/quan-tri/nhap-thua", label: "Nhập ranh giới thửa", icon: "upload", roles: [ROLES.platformAdmin, ROLES.geoAdmin] },
       { href: "/quan-tri/ban-do", label: "Biên tập bản đồ", icon: "map", roles: [ROLES.platformAdmin, ROLES.geoAdmin] },
       { href: "/quan-tri/kho-hub", label: "Kho / Hub & dung lượng", icon: "warehouse", roles: [ROLES.platformAdmin, ROLES.geoAdmin] },

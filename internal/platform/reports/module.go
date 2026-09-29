@@ -52,9 +52,11 @@ type Deps struct {
 	Mechanization mechport.ReportData
 	CropCycle     ccport.ReportData  // pf/cropcycle: báo cáo sản lượng HTX (HTX US-DASH-02, US-DASH-03)
 	Directory     port.MailDirectory // pf/accounts hiện thực; nil → bỏ gửi email
-	Mailer        port.Mailer
-	LinkBase      string // AG_WEB_OPS_URL: liên kết trang việc xuất trong email
-	Log           *slog.Logger
+	// Recipients: tài khoản của HTX để quản lý HTX chọn người nhận lịch (HTX US-DASH-03); nil → 503.
+	Recipients port.RecipientDirectory
+	Mailer     port.Mailer
+	LinkBase   string // AG_WEB_OPS_URL: liên kết trang việc xuất trong email
+	Log        *slog.Logger
 }
 
 // Module là pf/reports đã nối.
@@ -65,7 +67,7 @@ type Module struct{ svc *app.Service }
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	return &Module{svc: &app.Service{
 		DB: db, Clock: clk, Log: d.Log, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
-		Store: d.Store, Extension: d.Extension, Mechanization: d.Mechanization, CropCycle: d.CropCycle, Directory: d.Directory, Mailer: d.Mailer,
+		Store: d.Store, Extension: d.Extension, Mechanization: d.Mechanization, CropCycle: d.CropCycle, Directory: d.Directory, Recipients: d.Recipients, Mailer: d.Mailer,
 		LinkBase: d.LinkBase,
 	}}
 }

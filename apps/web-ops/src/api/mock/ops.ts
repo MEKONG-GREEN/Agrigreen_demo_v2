@@ -2,6 +2,7 @@
 // /v1/dashboard (G-02), /v1/geo/admin-boundaries?level= (G-05), chi tiết nhiệm vụ/tài liệu, danh mục cá nhân (US-LIB-05),
 // chỉ đạo khẩn (US-TASK-03), hộp thư thông báo + đồng bộ ngay (pf/notify), xung đột ranh giới, dự báo CGH (FN-09),
 // xuất báo cáo bất đồng bộ (pf/reports). Trạng thái giữ trong bộ nhớ tab.
+import { KNOWN_ENTITIES } from "@/lib/syncEntities";
 import { uuidv7 } from "../idempotency";
 import type {
   BoundaryConflict,
@@ -363,7 +364,12 @@ export const MOCK_DEVICES = Array.from({ length: 8 }, (_, i) => ({
 
 export function nudge(p: MockPersona, body: unknown): Response {
   if (!hasRole(p, "kn_province_admin", "kn_national_admin", "device_admin", "platform_admin")) return problem(403, "forbidden", "Forbidden");
-  const input = (body ?? {}) as { device_id?: unknown; unit?: unknown };
+  const input = (body ?? {}) as { device_id?: unknown; unit?: unknown; entities?: unknown };
+  // KN US-SYNC-02: entities[] — tên hợp lệ, có entity chiều xuống; rỗng = tất cả.
+  const entities = Array.isArray(input.entities) ? input.entities.filter((e): e is string => typeof e === "string") : [];
+  if (entities.length > 30) return validation([{ field: "entities", reason: "tối đa 30 nhóm dữ liệu" }]);
+  const unknown = entities.find((e) => !KNOWN_ENTITIES.has(e));
+  if (unknown) return problem(422, "notify.nudge_entity_unknown", "Unknown entity", { errors: [{ field: "entities", reason: `không có entity ${unknown}` }] });
   const device = typeof input.device_id === "string" && input.device_id ? input.device_id : null;
   const unit = typeof input.unit === "string" && input.unit ? input.unit : null;
   if ((device ? 1 : 0) + (unit ? 1 : 0) !== 1) return validation([{ field: "device_id", reason: "Chọn đúng một trong mã thiết bị hoặc đơn vị" }]);
@@ -387,7 +393,7 @@ export function nudge(p: MockPersona, body: unknown): Response {
     return problem(429, "notify.nudge_rate_limited", "Rate limited", { retry_after_s: retry }, { "Retry-After": String(retry) });
   }
   NUDGED.set(key, Date.now());
-  return json({ nudge_id: uuidv7(), target_kind: device ? "device" : "unit", target: device ?? unit, devices }, 202);
+  return json({ nudge_id: uuidv7(), target_kind: device ? "device" : "unit", target: device ?? unit, devices, entities }, 202);
 }
 
 // --------------------------------------------------------------------------

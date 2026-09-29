@@ -202,6 +202,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	rep := reports.New(repPool, clk, reports.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(), Store: store,
 		Extension: kn.ReportData(), Mechanization: mech.ReportData(), CropCycle: cc.ReportData(), Directory: acc.MailDirectory(),
+		Recipients: acc.ReportRecipients(), // HTX US-DASH-03: người nhận = tài khoản của HTX
 	})
 
 	// pf/waterway (G2): API ghi sổ đoạn/công trình, tạo job dựng và phát hành; worker dựng đồ thị (cmd/worker).

@@ -37,6 +37,7 @@ import { simulationRoutes } from "./simulation";
 import { waterwayAdminRoutes, waterwayAppRoutes } from "./waterway";
 import { cropcycleAdminRoutes, cropcycleAppRoutes } from "./cropcycle";
 import { htxAdminRoutes, htxAppRoutes } from "./htx";
+import { htxGapAdminRoutes, htxGapAppRoutes } from "./htx-gaps";
 import { personaFromAuthHeader, type MockPersona } from "./personas";
 import { checkDisplayProposal, DISPLAY_DEFAULTS, displayConfig, isColorKey, isPercentKey, PERCENT_TITLE, RESTORE_REASON } from "./display";
 import { areaSyncRoutes } from "./areasync";
@@ -101,6 +102,8 @@ function findPlot(ref: string | undefined): { plot: PlotFeature; index: number; 
 const cghAllowed = (p: MockPersona) => p.me.org?.kind === "dcrd" || hasRole(p, "platform_admin", "cgh_viewer", "cgh_admin");
 
 const appRoutes: Route[] = [
+  // Hoàn thiện App HTX (G2) — đặt trước để ghi đè danh sách nông hộ (lọc ?phone=).
+  ...htxGapAppRoutes,
   // --- pf/party: người gọi + phạm vi ---
   { method: "GET", pattern: /^\/v1\/me$/, handler: ({ persona }) => json(persona.me) },
 
@@ -388,6 +391,7 @@ function findVersion(id: string | undefined): ParamVersion | undefined {
 const importedPhones = new Set<string>();
 
 const adminRoutes: Route[] = [
+  ...htxGapAdminRoutes,
   {
     method: "GET",
     pattern: /^\/v1\/masterdata\/catalogs\/([a-z_]+)\/items$/,

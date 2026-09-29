@@ -6,6 +6,8 @@ import { cooperativesPage, coopPlace } from "@/api/adapters/cooperatives";
 import { listChildUnits } from "@/api/adapters/units";
 import { usePagedList } from "@/api/pagination";
 import { useAuth } from "@/auth/AuthProvider";
+import { hasRole, ROLES } from "@/auth/principal";
+import { CoopImportPanel } from "@/htx/CoopImport";
 import { Icon } from "@/components/Icon";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { Empty, LoadMore, Loading, PageHead } from "@/components/ui";
@@ -27,6 +29,9 @@ export default function CooperativesPage() {
   const [q, setQ] = useState("");
   const [unit, setUnit] = useState("");
   const [includeInactive, setIncludeInactive] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [version, setVersion] = useState(0);
+  const canImport = hasRole(principal, ROLES.registryAdmin, ROLES.platformAdmin, ROLES.knProvinceAdmin);
   const dq = useDebounced(q);
 
   // Bộ lọc địa bàn: TW chọn tỉnh; tỉnh chọn xã trực thuộc; xã không cần lọc.
@@ -37,12 +42,24 @@ export default function CooperativesPage() {
   const list = usePagedList(
     (cursor) =>
       cooperativesPage(api, { q: dq || undefined, admin_unit: unit || undefined, include_inactive: includeInactive || undefined, cursor, limit: 20 }),
-    [api, dq, unit, includeInactive],
+    [api, dq, unit, includeInactive, version],
   );
 
   return (
     <>
-      <PageHead title="Quản lý HTX & nông hộ" subtitle="Danh sách HTX, tổ hợp tác trong phạm vi được phân quyền" />
+      <PageHead
+        title="Quản lý HTX & nông hộ"
+        subtitle="Danh sách HTX, tổ hợp tác trong phạm vi được phân quyền"
+        actions={
+          canImport ? (
+            <button type="button" className="btn btn-o btn-sm" onClick={() => setImporting((v) => !v)} aria-expanded={importing}>
+              <Icon name="upload" size={15} />
+              Nhập HTX từ Excel
+            </button>
+          ) : null
+        }
+      />
+      {importing ? <CoopImportPanel onDone={() => setVersion((v) => v + 1)} /> : null}
       <div className="card sec">
         <form className="row" role="search" onSubmit={(e) => e.preventDefault()} style={{ marginBottom: 14 }}>
           <div className="field" style={{ flex: "1 1 260px" }}>

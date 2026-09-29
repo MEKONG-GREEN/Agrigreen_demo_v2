@@ -19,7 +19,10 @@ import (
 // tenant; mọi trường hợp khác trả reportsport.ErrNoEmail (người nhận bị bỏ qua).
 type MailDirectory struct{ Dir port.Directory }
 
-var _ reportsport.MailDirectory = MailDirectory{}
+var (
+	_ reportsport.MailDirectory      = MailDirectory{}
+	_ reportsport.RecipientDirectory = MailDirectory{}
+)
 
 // ErrNoDirectory: chưa cấu hình Keycloak Admin REST (AG_KC_*).
 var ErrNoDirectory = errors.New("accounts: chưa cấu hình Keycloak Admin REST")

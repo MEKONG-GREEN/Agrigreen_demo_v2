@@ -3,16 +3,20 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { assignPlot, cooperativePlotsPage, coopPlace, draftPlotsInCommune, getCooperative, householdsPage } from "@/api/adapters/cooperatives";
+import { assignPlot, cooperativePlotsPage, coopPlace, draftPlotsInCommune, getCooperative } from "@/api/adapters/cooperatives";
 import { newIdempotencyKey } from "@/api/idempotency";
 import { usePagedList } from "@/api/pagination";
 import { ApiProblem } from "@/api/problem";
-import type { ConsentState, Cooperative, PlotFeature, PlotStatus } from "@/api/types";
+import type { Cooperative, CoopCopyResult, PlotFeature, PlotStatus } from "@/api/types";
 import { unwrap } from "@/api/client";
 import { useAuth } from "@/auth/AuthProvider";
 import { hasRole, ROLES } from "@/auth/principal";
 import { Icon } from "@/components/Icon";
 import { ReasonDialog } from "@/htx/common";
+import { HouseholdsPanel } from "@/htx/HouseholdsPanel";
+import { Dialog } from "@/components/Dialog";
+import { normalizePhone } from "@/htx/rules";
+import { toApiProblem } from "@/lib/useAsync";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { Tabs } from "@/components/Tabs";
 import { Empty, LoadMore, Loading, PageHead } from "@/components/ui";
@@ -26,35 +30,12 @@ const PLOT_STATUS: Record<PlotStatus, { cls: string; text: string }> = {
   retired: { cls: "c-mute", text: "Ngừng dùng" },
 };
 
-/** Mục đích xử lý dữ liệu (R-42) → nhãn ngắn. */
-const PURPOSE: Record<string, string> = {
-  "mrv.evidence": "MRV",
-  "extension.field_support": "Hỗ trợ hiện trường",
-};
-
-/** Huy hiệu đồng ý chia sẻ dữ liệu theo mục đích (G-04). Chưa có bản ghi → "Chưa đồng ý". */
-function ConsentBadges({ consents }: { consents: ConsentState[] | undefined }) {
-  if (!consents || consents.length === 0) return <span className="chip c-mute">Chưa đồng ý</span>;
-  return (
-    <span className="row" style={{ gap: 4 }}>
-      {consents.map((c) => (
-        <span
-          key={c.purpose}
-          className={`chip ${c.status === "granted" ? "c-ok" : "c-warn"}`}
-          title={`${c.status === "granted" ? "Đồng ý" : "Đã rút đồng ý"} lúc ${formatDateTime(c.event_time)}`}
-        >
-          {c.status === "granted" ? "Đồng ý" : "Đã rút"} · {PURPOSE[c.purpose] ?? c.purpose}
-        </span>
-      ))}
-    </span>
-  );
-}
-
 function Overview({ c }: { c: Cooperative }) {
   const rows: [string, string][] = [
     ["Mã HTX", c.code],
     ["Mã số thuế", c.tax_code ?? "—"],
     ["Địa bàn", coopPlace(c)],
+    ["Địa chỉ trụ sở", c.address ?? "—"],
     ["Hộ thành viên", c.member_households === undefined ? "—" : formatInt(c.member_households)],
     ["Thửa đã số hoá", c.digitized_plots === null || c.digitized_plots === undefined ? "—" : formatInt(c.digitized_plots)],
     ["Ngày thành lập", formatDate(c.established_on)],
@@ -74,59 +55,6 @@ function Overview({ c }: { c: Cooperative }) {
         </div>
       ))}
     </dl>
-  );
-}
-
-function Households({ coop }: { coop: Cooperative }) {
-  const { api } = useAuth();
-  const id = coop.ref;
-  const list = usePagedList((cursor) => householdsPage(api, id, cursor, 20), [api, id]);
-  const communeName = (code: string) => (code === coop.admin_unit_code ? (coop.commune_name ?? code) : code);
-  return (
-    <>
-      <div className="alert alert-info" style={{ marginBottom: 12 }}>
-        <Icon name="info" />
-        <span>
-          Thông tin định danh nông hộ (họ tên, SĐT, CCCD, địa chỉ) được lưu tách trong kho định danh mã hoá. Web vận hành chỉ
-          hiển thị <b style={{ display: "inline" }}>nhãn đã che</b> do máy chủ trả về.
-        </span>
-      </div>
-      {list.error ? <ProblemAlert problem={list.error} onRetry={list.reload} /> : null}
-      <div className="tbl-wrap">
-        <table className="tbl">
-          <caption className="sr-only">Nông hộ thành viên (nhãn đã che)</caption>
-          <thead>
-            <tr>
-              <th scope="col">Nông hộ (đã che)</th>
-              <th scope="col">SĐT (đã che)</th>
-              <th scope="col">Xã</th>
-              <th scope="col" className="num">Diện tích canh tác (ha)</th>
-              <th scope="col">Vào HTX</th>
-              <th scope="col">Đồng ý chia sẻ dữ liệu</th>
-              <th scope="col">Trạng thái</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.items.map((h) => (
-              <tr key={h.household_ref}>
-                <td>{h.label_unavailable ? <span className="mute">Không hiển thị được nhãn</span> : h.label}</td>
-                <td style={{ fontFamily: "ui-monospace, Consolas, monospace" }}>{h.masked_phone || "—"}</td>
-                <td>{communeName(h.commune_code)}</td>
-                <td className="num">{formatDecimal(h.cultivated_area_ha, 2)}</td>
-                <td>{formatDate(h.member_since)}</td>
-                <td>
-                  <ConsentBadges consents={h.consents} />
-                </td>
-                <td>{h.active ? <span className="chip c-ok">Thành viên</span> : <span className="chip c-mute">Đã rời</span>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {list.loading ? <Loading /> : null}
-      {!list.loading && list.items.length === 0 && !list.error ? <Empty>Chưa có nông hộ.</Empty> : null}
-      <LoadMore hasMore={list.hasMore} loading={list.loading} onClick={list.loadMore} />
-    </>
   );
 }
 
@@ -321,14 +249,96 @@ function DeactivateDialog({ coop, onClose, onDone }: { coop: Cooperative; onClos
   );
 }
 
+/**
+ * Sao chép hồ sơ HTX (HTX US-HTX-03, Admin API): bản sao giữ địa bàn và cấu trúc của hồ sơ nguồn; chỉ Tên và
+ * Người đại diện được sửa riêng — người đại diện của hồ sơ nguồn KHÔNG được sao chép. Tên trùng → thông báo AC-3.
+ */
+function CopyCoopDialog({ coop, onClose }: { coop: Cooperative; onClose: () => void }) {
+  const { adminApi } = useAuth();
+  const [name, setName] = useState(`${coop.name} (bản sao)`);
+  const [repName, setRepName] = useState("");
+  const [repPhone, setRepPhone] = useState("");
+  const [touched, setTouched] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<ApiProblem | null>(null);
+  const [done, setDone] = useState<CoopCopyResult | null>(null);
+  const [key, setKey] = useState(newIdempotencyKey);
+  const nameErr = !name.trim() ? "Nhập tên HTX." : name.trim().toLowerCase() === coop.name.trim().toLowerCase() ? "Tên HTX này đã tồn tại, vui lòng chọn tên khác." : null;
+  const repErr = repName.trim() || repPhone.trim() ? (!repName.trim() ? "Nhập họ tên người đại diện." : !normalizePhone(repPhone) ? "SĐT phải có dạng 0xxxxxxxxx (10 chữ số) hoặc +84…" : null) : null;
+  const touch = () => setKey(newIdempotencyKey());
+  const submit = async () => {
+    setTouched(true);
+    if (nameErr || repErr) return;
+    setBusy(true);
+    setProblem(null);
+    try {
+      const representative = repName.trim() ? { full_name: repName.trim(), phone: normalizePhone(repPhone)! } : undefined;
+      const r = await unwrap(
+        adminApi.POST("/v1/cooperatives/{ref}/copy", { params: { path: { ref: coop.ref }, header: { "Idempotency-Key": key } }, body: { name: name.trim(), representative } }),
+      );
+      setDone(r);
+    } catch (e) {
+      setProblem(toApiProblem(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Dialog
+      title={`Sao chép hồ sơ ${coop.name}`}
+      onClose={onClose}
+      actions={
+        done ? null : (
+          <button type="button" className="btn btn-p btn-sm" disabled={busy} onClick={() => void submit()}>
+            {busy ? "Đang lưu…" : "Lưu bản sao"}
+          </button>
+        )
+      }
+    >
+      {done ? (
+        <p role="status">
+          Đã tạo <Link href={`/htx/${done.org.ref}`}>{done.org.name}</Link> (Mã {done.org.code}).
+        </p>
+      ) : (
+        <div className="stack" style={{ gap: 10 }}>
+          <p className="small mute">
+            Giữ nguyên địa bàn ({coopPlace(coop)}), địa chỉ trụ sở, tổ chức cấp trên, diện tích đăng ký, ngày thành lập. Không sao chép Mã HTX (hệ thống sinh
+            mới), mã số thuế, toạ độ trụ sở và người đại diện.
+          </p>
+          <div className="field">
+            <label htmlFor="cp-coop-name">Tên HTX của bản sao</label>
+            <input id="cp-coop-name" className="input" value={name} aria-invalid={touched && !!nameErr} onChange={(e) => { setName(e.target.value); touch(); }} />
+            {touched && nameErr ? <span className="err small">{nameErr}</span> : null}
+          </div>
+          <div className="row" style={{ alignItems: "flex-start" }}>
+            <div className="field" style={{ flex: "1 1 200px" }}>
+              <label htmlFor="cp-rep-name">Người đại diện</label>
+              <input id="cp-rep-name" className="input" value={repName} autoComplete="off" onChange={(e) => { setRepName(e.target.value); touch(); }} />
+            </div>
+            <div className="field" style={{ flex: "1 1 160px" }}>
+              <label htmlFor="cp-rep-phone">SĐT người đại diện</label>
+              <input id="cp-rep-phone" className="input" inputMode="tel" value={repPhone} autoComplete="off" onChange={(e) => { setRepPhone(e.target.value); touch(); }} />
+            </div>
+          </div>
+          {touched && repErr ? <span className="err small">{repErr}</span> : null}
+          <span className="small mute">Người đại diện và SĐT được lưu mã hoá trong kho định danh, không nằm trong hồ sơ HTX.</span>
+          {problem ? <ProblemAlert problem={problem} /> : null}
+        </div>
+      )}
+    </Dialog>
+  );
+}
+
 export default function CooperativeDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? "";
   const { api, principal } = useAuth();
   const [tab, setTab] = useState("overview");
   const [deactivating, setDeactivating] = useState(false);
+  const [copying, setCopying] = useState(false);
   const coop = useAsync(() => getCooperative(api, id), [api, id]);
   const canDeactivate = hasRole(principal, ROLES.registryAdmin, ROLES.platformAdmin);
+  const canCopy = hasRole(principal, ROLES.registryAdmin, ROLES.platformAdmin, ROLES.knProvinceAdmin);
 
   return (
     <>
@@ -345,6 +355,11 @@ export default function CooperativeDetailPage() {
             actions={
               <>
                 {coop.data.active ? <span className="chip c-ok">Đang hoạt động</span> : <span className="chip c-mute">Đã vô hiệu hoá</span>}
+                {canCopy ? (
+                  <button type="button" className="btn btn-o btn-sm" onClick={() => setCopying(true)}>
+                    Sao chép hồ sơ
+                  </button>
+                ) : null}
                 {coop.data.active && canDeactivate ? (
                   <button type="button" className="btn btn-o btn-sm" onClick={() => setDeactivating(true)}>
                     Vô hiệu hoá HTX
@@ -353,6 +368,7 @@ export default function CooperativeDetailPage() {
               </>
             }
           />
+          {copying ? <CopyCoopDialog coop={coop.data} onClose={() => setCopying(false)} /> : null}
           {deactivating ? (
             <DeactivateDialog
               coop={coop.data}
@@ -375,7 +391,7 @@ export default function CooperativeDetailPage() {
               ]}
             >
               {tab === "overview" ? <Overview c={coop.data} /> : null}
-              {tab === "households" ? <Households coop={coop.data} /> : null}
+              {tab === "households" ? <HouseholdsPanel coop={coop.data} /> : null}
               {tab === "plots" ? <PlotsTab coop={coop.data} /> : null}
             </Tabs>
           </div>

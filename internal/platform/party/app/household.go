@@ -40,6 +40,9 @@ type CreateHouseholdInput struct {
 	// Source: nguồn đăng ký ghi vào pf.party.household.registered; rỗng → suy từ vai
 	// (quản lý HTX → htx_app, còn lại → kn_app).
 	Source string
+	// RejectDuplicate: chủ hộ đã có trong kho định danh (trùng SĐT/CCCD) → lỗi
+	// party.household_phone_taken thay vì dùng lại mã cũ (sao chép hàng loạt, HTX US-HH-02).
+	RejectDuplicate bool
 }
 
 // HouseholdResult là kết quả tạo một nông hộ.
@@ -131,6 +134,8 @@ func (r *Registry) createHousehold(ctx context.Context, p authz.Principal, sc au
 	})
 	dup := false
 	switch {
+	case errors.Is(err, client.ErrDuplicate) && in.RejectDuplicate:
+		return HouseholdResult{}, ErrPhoneTaken
 	case errors.Is(err, client.ErrDuplicate) && created.Ref != uuid.Nil:
 		dup = true
 	case err != nil:
@@ -211,7 +216,10 @@ type HouseholdPage struct {
 
 // ListHouseholds liệt kê nông hộ của một HTX trong phạm vi, kèm nhãn hiển thị
 // qua kho định danh (mục đích extension.field_support) — không bao giờ trả định danh đầy đủ.
-func (r *Registry) ListHouseholds(ctx context.Context, coopRef, after uuid.UUID, limit int) (HouseholdPage, error) {
+//
+// phone khác rỗng: tìm đúng SĐT qua chỉ mục mù của kho định danh (HTX US-HH-01 AC-2) —
+// trả tối đa một hộ của HTX này. Họ tên chỉ nằm ở kho (R-04) nên không tìm theo tên.
+func (r *Registry) ListHouseholds(ctx context.Context, coopRef, after uuid.UUID, limit int, phone string) (HouseholdPage, error) {
 	p, err := authz.Require(ctx, householdReaderRoles...)
 	if err != nil {
 		return HouseholdPage{}, err
@@ -223,11 +231,29 @@ func (r *Registry) ListHouseholds(ctx context.Context, coopRef, after uuid.UUID,
 	if err != nil {
 		return HouseholdPage{}, err
 	}
+	phone = strings.TrimSpace(phone)
+	byPhone := uuid.Nil
+	if phone != "" {
+		// Kho định danh tự kiểm vai vault_registrar trên token được chuyển tiếp.
+		if byPhone, err = r.householdByPhone(ctx, phone); err != nil {
+			return HouseholdPage{}, err
+		}
+	}
 	var coop *store.Cooperative
 	var items []domain.Household
 	err = tenant.WithTenantTx(ctx, r.DB, p.TenantID, func(tx pgx.Tx) error {
 		var e error
 		if coop, e = store.CooperativeByRef(ctx, tx, coopRef); e != nil || coop == nil || !visible(sc, coop.AdminUnitCode) {
+			return e
+		}
+		if phone != "" {
+			if byPhone == uuid.Nil {
+				return nil
+			}
+			h, e := store.HouseholdByRef(ctx, tx, byPhone)
+			if e == nil && h != nil && h.CooperativeRef == coopRef {
+				items = []domain.Household{*h}
+			}
 			return e
 		}
 		items, e = store.ListHouseholdsByCooperative(ctx, tx, coopRef, after, limit+1)

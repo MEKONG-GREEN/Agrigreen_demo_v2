@@ -37,7 +37,8 @@ Vai đã khai trong `internal/shared/dbadmin/dbadmin.go` và userlist PgBouncer 
 | pf | 000026 | extension: yêu cầu hỗ trợ (HTX US-SUPPORT-01 → KN US-TASK-01) | `pf_extension` | `extension_app` |
 | pf | 000027 | masterdata: tham số và danh mục G2 (cropcycle, GIS, waterway, simulation) | `pf_masterdata` | `masterdata_app` |
 | pf | 000028 | notify / sync: bổ sung G2 (người nhận theo thửa, lọc nhóm dữ liệu) | theo module | theo module |
-| pf | 000029–000033 | dự phòng đợt 2 — xin số từ người tích hợp | | |
+| pf | 000029–000031, 000033 | dự phòng đợt 2 — không dùng | | |
+| pf | 000032 | party: địa chỉ trụ sở HTX `cooperative.head_office`, chỉ mục tên HTX (HTX US-HTX-02/03) | `pf_party` | `party_app` |
 | pf | 000034 | sync / notify: nhật ký lần xử lý thất bại của consumer (giám sát đồng bộ, GIS US-SYNC-01/02); loại thông báo `integration_dead_lettered`, `area_feed_stale` | `pf_sync`, `pf_notify` | `sync_app`, `notify_app` |
 | pf | 000035 | mechanization: nhật ký đồng bộ diện tích vụ App HTX, cảnh báo độ tươi (CGH FN-07) | `pf_mechanization` | `mechanization_app` |
 | mkg | 000002 | mkg/hub: hub, kho, lô, dịch chuyển tồn | `mkg_hub` | `hub_app` |

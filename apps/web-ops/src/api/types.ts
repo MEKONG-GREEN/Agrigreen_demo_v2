@@ -125,6 +125,20 @@ export type ReportDownload = AppGet<"/v1/reports/exports/{id}/download">;
 export type AdminReportTemplate = AdminGet<"/v1/reports/templates">["items"][number];
 export type ReportSchedule = AS["ReportSchedule"];
 export type ReportScheduleRun = AdminGet<"/v1/reports/schedules/{id}/runs">["items"][number];
+/** HTX US-DASH-03: người nhận chọn được cho lịch của quản lý HTX (Application API). */
+export type ReportRecipient = AppGet<"/v1/reports/recipients">["items"][number];
+export type ReportScheduleInput = S["ReportScheduleInput"];
+
+// pf/party — hoàn thiện App HTX (HTX US-HTX-02/03, US-HH-02/03)
+export type CoopProfileImportResult = AdminPost<"/v1/cooperatives/import">;
+export type CoopCopyResult = AdminPost<"/v1/cooperatives/{ref}/copy">;
+export type HouseholdCopyResult = AppPost<"/v1/households/copy">;
+export type HouseholdCopyItem = AppPaths["/v1/households/copy"]["post"]["requestBody"]["content"]["application/json"]["items"][number];
+
+// pf/content — soạn bài (Admin)
+export type ContentVersion = AS["ContentVersion"];
+export type ContentAdminDocument = AS["ContentAdminDocument"];
+export type ContentCategory = NonNullable<AS["ContentInput"]["category"]>;
 
 // pf/cropcycle (App HTX: SOP, vụ, nhật ký, duyệt, sản lượng, bảng điều hành)
 export type CropSOPStep = S["CropSOPStep"];

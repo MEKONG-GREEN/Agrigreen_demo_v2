@@ -103,9 +103,10 @@ type Service struct {
 	Mechanization mechport.ReportData
 	CropCycle     ccport.ReportData // HTX US-DASH-02: sản lượng HTX
 
-	Directory port.MailDirectory // nil → bỏ gửi email kèm cảnh báo
-	Mailer    port.Mailer        // nil → bỏ gửi email kèm cảnh báo
-	LinkBase  string             // URL gốc web-ops: <LinkBase>/reports/exports/<id>
+	Directory  port.MailDirectory      // nil → bỏ gửi email kèm cảnh báo
+	Recipients port.RecipientDirectory // nil → màn lập lịch của quản lý HTX trả 503
+	Mailer     port.Mailer             // nil → bỏ gửi email kèm cảnh báo
+	LinkBase   string                  // URL gốc web-ops: <LinkBase>/reports/exports/<id>
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }
