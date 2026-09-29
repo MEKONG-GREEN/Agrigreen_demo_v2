@@ -1,9 +1,11 @@
 import 'package:agrigreen_mobile/core/clock.dart';
 import 'package:agrigreen_mobile/core/ids.dart';
 import 'package:agrigreen_mobile/data/catalog/catalog_cache.dart';
+import 'package:agrigreen_mobile/data/files/evidence_repository.dart';
 import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
 import 'package:agrigreen_mobile/data/photo/location_source.dart';
 import 'package:agrigreen_mobile/data/reference/reference_repository.dart';
+import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 import 'package:agrigreen_mobile/domain/outbox_record.dart';
 
 import '../domain/cropcycle.dart';
@@ -70,6 +72,58 @@ class LogEntry {
       : reviewStatusLabel(view.status);
 }
 
+/// Cấu hình vụ vừa hoàn thành của thửa (HTX US-SEASON-03).
+class PreviousConfig {
+  const PreviousConfig({
+    required this.seasonRef,
+    required this.seasonCode,
+    required this.seasonYear,
+    required this.varietyCode,
+    this.sopVersionId,
+    this.offline = false,
+  });
+  final String seasonRef;
+  final String seasonCode;
+  final int seasonYear;
+  final String varietyCode;
+  final String? sopVersionId;
+
+  /// Suy từ dữ liệu trên máy (mất mạng) — máy chủ lấy lại cấu hình thật khi
+  /// nhận (`copy_previous: true`).
+  final bool offline;
+}
+
+/// Kế hoạch ghi nhật ký hàng loạt (HTX US-LOG-03): thửa được ghi và thửa bị
+/// loại kèm lý do (AC-2).
+class BatchPlan {
+  const BatchPlan(this.included, this.skipped);
+  final List<(PlotItem, Season)> included;
+
+  /// Mã thửa → lý do.
+  final Map<String, String> skipped;
+}
+
+/// Một lượt ghi hàng loạt đã lưu trên máy + kết quả máy chủ (sau đồng bộ).
+class BatchSummary {
+  const BatchSummary({
+    required this.record,
+    required this.activityCode,
+    required this.plotCodes,
+    required this.accepted,
+    required this.serverSkipped,
+  });
+  final OutboxRecord record;
+  final String activityCode;
+  final List<String> plotCodes;
+
+  /// Số dòng nhật ký máy chủ đã tạo (entity `farm_log` có `batch_ref`).
+  final int accepted;
+
+  /// Thửa đã gửi mà máy chủ không tạo dòng (chưa mở vụ / ngoài phạm vi lúc
+  /// máy chủ nhận). Chỉ có nghĩa khi bản ghi đã gửi và pull đã về.
+  final List<String> serverSkipped;
+}
+
 /// Mùa vụ + nhật ký + sản lượng (pf/cropcycle), ghi qua hàng đợi đồng bộ nên
 /// **mọi thao tác ghi đều làm được khi ngoại tuyến** (HTX US-LOG-04,
 /// US-YIELD-01 AC-3). Quy tắc kiểm trên máy trùng máy chủ; máy chủ vẫn quyết.
@@ -82,7 +136,11 @@ class CropService {
     required LocationSource location,
     required Clock clock,
     required IdGenerator ids,
-  }) : _outbox = outbox,
+    SyncApi? api,
+    EvidenceRepository? evidence,
+  }) : _api = api,
+       _evidence = evidence,
+       _outbox = outbox,
        _refs = refs,
        _catalogs = catalogs,
        _profile = profile,
@@ -97,6 +155,13 @@ class CropService {
   final LocationSource _location;
   final Clock _clock;
   final IdGenerator _ids;
+
+  /// API cho lời gọi chỉ đọc khi có mạng (cấu hình vụ trước); null = chỉ dữ
+  /// liệu trên máy.
+  final SyncApi? _api;
+
+  /// Ảnh đã chụp (tọa độ đóng dấu lúc chụp — dự phòng GPS, HTX US-GPS-02).
+  final EvidenceRepository? _evidence;
 
   DateTime today() => vnToday(_clock.now());
 
@@ -135,6 +200,43 @@ class CropService {
     for (final r in await _refs.list(RefEntity.season)) Season.fromJson(r.data),
   ];
 
+  /// Bản sửa/hủy vụ trên máy (`season_open` op correct) chưa bị từ chối, theo
+  /// `season_ref`, cũ trước.
+  Future<Map<String, List<OutboxRecord>>> _localCorrections() async {
+    final m = <String, List<OutboxRecord>>{};
+    for (final r in await _outbox.list(entity: PushEntity.seasonOpen)) {
+      if (r.op != RecordOp.correct) continue;
+      if (r.status != OutboxStatus.pending && r.status != OutboxStatus.sent) {
+        continue;
+      }
+      m.putIfAbsent('${r.payload['season_ref']}', () => []).add(r);
+    }
+    for (final l in m.values) {
+      l.sort((a, b) => a.seq.compareTo(b.seq));
+    }
+    return m;
+  }
+
+  /// Phủ bản sửa/hủy trên máy lên vụ. Bản đã phản ánh (máy chủ trả
+  /// `current_event_id` = id bản ghi) và mọi bản cũ hơn được bỏ qua.
+  static Season _overlay(Season s, List<OutboxRecord>? recs) {
+    if (recs == null || recs.isEmpty) return s;
+    final seen = recs.indexWhere((r) => r.id == s.currentEventId);
+    var cur = s;
+    for (final r in recs.skip(seen + 1)) {
+      final p = r.payload;
+      cur = cur.applyLocal(
+        eventId: r.id,
+        pending: r.status == OutboxStatus.pending,
+        varietyCode: p['variety_code'] as String?,
+        sowingDate: parseDay(p['sowing_date'] as String?),
+        sopVersionId: p['sop_version_id'] as String?,
+        cancel: p['cancel'] == true,
+      );
+    }
+    return cur;
+  }
+
   /// Vụ mở trên máy mà máy chủ chưa gửi xuống (chờ đồng bộ / vừa gửi).
   Future<List<Season>> _localSeasons(Set<String> known) async {
     final out = <Season>[];
@@ -158,6 +260,9 @@ class CropService {
           'area_ha': plot?.areaHa,
           'household_ref': plot?.householdRef,
           'cooperative_ref': plot?.cooperativeRef,
+          // id sự kiện mở vụ = id bản ghi (sync-contract) → supersedes_id khi
+          // sửa/hủy vụ trước khi máy chủ gửi vụ xuống.
+          'current_event_id': r.id,
         }, localPending: r.status == OutboxStatus.pending),
       );
     }
@@ -167,12 +272,16 @@ class CropService {
   Future<List<Season>> seasons() async {
     final pulled = await _pulledSeasons();
     final local = await _localSeasons({for (final s in pulled) s.seasonRef});
-    final all = [...local, ...pulled]
-      ..sort(
-        (a, b) => (b.sowingDate ?? DateTime.utc(0)).compareTo(
-          a.sowingDate ?? DateTime.utc(0),
-        ),
-      );
+    final fixes = await _localCorrections();
+    final all =
+        [
+          for (final s in [...local, ...pulled])
+            _overlay(s, fixes[s.seasonRef]),
+        ]..sort(
+          (a, b) => (b.sowingDate ?? DateTime.utc(0)).compareTo(
+            a.sowingDate ?? DateTime.utc(0),
+          ),
+        );
     return all;
   }
 
@@ -268,16 +377,20 @@ class CropService {
     required int seasonYear,
     required String varietyCode,
     required DateTime sowingDate,
+    PreviousConfig? copied,
   }) async {
     final err = checkSowingDate(sowingDate, today());
     if (err != null) throw CropError(err);
     if (seasonCode.isEmpty || varietyCode.isEmpty) {
       throw CropError('Chọn vụ và giống lúa.');
     }
+    // HTX US-SEASON-04 AC-1: chặn mở vụ trùng ngay trên máy.
     if (await openSeasonFor(plot.ref) != null) {
-      throw CropError('Lô ${plot.code} đang canh tác vụ khác.');
+      throw CropError(msgSeasonAlreadyOpen);
     }
-    final sop = await sopForVariety(varietyCode);
+    final sop = copied?.sopVersionId != null
+        ? await sopById(copied!.sopVersionId)
+        : await sopForVariety(varietyCode);
     final loc = await _location.current();
     return _outbox.enqueue(
       entity: PushEntity.seasonOpen,
@@ -290,10 +403,146 @@ class CropService {
         'season_year': seasonYear,
         'variety_code': varietyCode,
         'sowing_date': formatDay(sowingDate),
-        'sop_version_id': ?sop?.id,
+        'sop_version_id': ?(sop?.id ?? copied?.sopVersionId),
+        // HTX US-SEASON-03: máy chủ lấy giống + SOP của vụ vừa hoàn thành.
+        if (copied != null) 'copy_previous': true,
         'gps': gpsPayload(loc),
       },
     );
+  }
+
+  // ---- sao chép cấu hình vụ trước (HTX US-SEASON-03) ----
+
+  /// Giống + SOP của vụ vừa hoàn thành trên thửa. Có mạng → `GET
+  /// /v1/cropcycle/plots/{ref}/previous-config`; mất mạng → vụ gần nhất trên
+  /// máy. Vụ gần nhất chưa hoàn thành → chặn (AC-2).
+  Future<PreviousConfig> previousConfig(PlotItem plot) async {
+    final api = _api;
+    if (api != null) {
+      try {
+        final j = await api.getJson(
+          '/v1/cropcycle/plots/${plot.ref}/previous-config',
+        );
+        return PreviousConfig(
+          seasonRef: '${j['season_ref']}',
+          seasonCode: '${j['season_code'] ?? ''}',
+          seasonYear: (j['season_year'] as num?)?.toInt() ?? 0,
+          varietyCode: '${j['variety_code'] ?? ''}',
+          sopVersionId: j['sop_version_id'] as String?,
+        );
+      } on NetworkException {
+        // dùng dữ liệu trên máy
+      } on ApiException catch (e) {
+        if (e is DeviceRevokedException || e is UnauthenticatedException) {
+          rethrow;
+        }
+        if (e.code == 'cropcycle.previous_season_not_completed') {
+          throw CropError(msgPreviousNotDone);
+        }
+        if (e.code == 'cropcycle.no_previous_season') {
+          throw CropError(msgNoPreviousSeason);
+        }
+        // Lỗi khác (5xx, 404 thửa chưa về máy chủ…) → dữ liệu trên máy.
+      }
+    }
+    final mine = [
+      for (final s in await seasons())
+        if (s.plotRef == plot.ref) s,
+    ];
+    if (mine.isEmpty) throw CropError(msgNoPreviousSeason);
+    // seasons() đã xếp mới nhất trước theo ngày sạ.
+    if (mine.first.isOpen) throw CropError(msgPreviousNotDone);
+    final done = mine.where((s) => s.status == 'completed').firstOrNull;
+    if (done == null) throw CropError(msgNoPreviousSeason);
+    return PreviousConfig(
+      seasonRef: done.seasonRef,
+      seasonCode: done.seasonCode,
+      seasonYear: done.seasonYear,
+      varietyCode: done.varietyCode,
+      sopVersionId: done.sopVersionId,
+      offline: true,
+    );
+  }
+
+  // ---- sửa / hủy vụ (bản ghi bù `season_open` op correct) ----
+
+  Future<String> _correctableEventId(Season season) async {
+    if (!season.isOpen) {
+      throw CropError('Chỉ sửa hoặc hủy được vụ đang mở.');
+    }
+    if (season.harvestId != null || await hasLocalHarvest(season.seasonRef)) {
+      throw CropError(
+        'Vụ đã khai sản lượng — sửa khai báo sản lượng thay vì sửa vụ.',
+      );
+    }
+    final ev = season.currentEventId;
+    if (ev == null) {
+      throw CropError('Chưa có dữ liệu vụ từ máy chủ — đồng bộ rồi thử lại.');
+    }
+    return ev;
+  }
+
+  /// Sửa vụ đang mở (giống / ngày sạ) — nông dân và quản lý HTX, làm được khi
+  /// ngoại tuyến. `supersedes_id` = sự kiện hiện hành của vụ; lý do ≥ 10 ký tự.
+  Future<OutboxRecord> correctSeason({
+    required Season season,
+    required String reason,
+    String? varietyCode,
+    DateTime? sowingDate,
+  }) async {
+    final ev = await _correctableEventId(season);
+    final r = checkReason(reason);
+    if (r != null) throw CropError(r);
+    final newVariety = varietyCode != null && varietyCode != season.varietyCode
+        ? varietyCode
+        : null;
+    final newSowing = sowingDate != null && sowingDate != season.sowingDate
+        ? sowingDate
+        : null;
+    if (newVariety == null && newSowing == null) {
+      throw CropError('Chưa thay đổi giống hoặc ngày gieo sạ.');
+    }
+    if (newSowing != null) {
+      final err = checkSowingDate(newSowing, today());
+      if (err != null) throw CropError(err);
+    }
+    final sop = newVariety == null ? null : await sopForVariety(newVariety);
+    try {
+      return await _outbox.correctRemote(
+        entity: PushEntity.seasonOpen,
+        supersedesId: ev,
+        reason: reason,
+        payload: {
+          'season_ref': season.seasonRef,
+          'variety_code': ?newVariety,
+          if (newSowing != null) 'sowing_date': formatDay(newSowing),
+          'sop_version_id': ?sop?.id,
+        },
+      );
+    } on OutboxException catch (e) {
+      throw CropError(e.message);
+    }
+  }
+
+  /// Hủy vụ mở nhầm (chưa khai sản lượng) — lý do ≥ 10 ký tự. Máy chủ gửi
+  /// tombstone vụ; thửa trở lại "Chưa mở vụ".
+  Future<OutboxRecord> cancelSeason({
+    required Season season,
+    required String reason,
+  }) async {
+    final ev = await _correctableEventId(season);
+    final r = checkReason(reason);
+    if (r != null) throw CropError(r);
+    try {
+      return await _outbox.correctRemote(
+        entity: PushEntity.seasonOpen,
+        supersedesId: ev,
+        reason: reason,
+        payload: {'season_ref': season.seasonRef, 'cancel': true},
+      );
+    } on OutboxException catch (e) {
+      throw CropError(e.message);
+    }
   }
 
   /// Mở vụ cho nhiều thửa trên máy (quản lý HTX, khi ngoại tuyến): mỗi thửa
@@ -319,7 +568,10 @@ class CropService {
         opened++;
       } on CropError catch (e) {
         if (e.message == msgSowingWindow) rethrow;
-        skipped[p.code] = e.message;
+        // Nhãn lý do của HTX US-SEASON-04 AC-2.
+        skipped[p.code] = e.message == msgSeasonAlreadyOpen
+            ? 'Lô đang canh tác vụ khác'
+            : e.message;
       }
     }
     return (opened, skipped);
@@ -339,7 +591,9 @@ class CropService {
     if (season == null || !season.isOpen) throw CropError(msgSeasonNotOpen);
     if (note.length > 2000) throw CropError('Ghi chú tối đa 2000 ký tự.');
     // GPS + thời gian tự đính kèm; thiếu GPS không chặn (HTX US-GPS-01 AC-4).
+    // GPS yếu / không có → tọa độ đóng dấu trên ảnh vừa chụp (US-GPS-02).
     final loc = await _location.current();
+    final gps = gpsWithPhotoFallback(loc, await _photoGps(fileRefs));
     return _outbox.enqueue(
       entity: PushEntity.farmLog,
       payload: {
@@ -351,9 +605,112 @@ class CropService {
         'inputs': inputs,
         'note': note.trim(),
         'file_refs': fileRefs,
-        'gps': gpsPayload(loc),
+        'gps': gps,
       },
     );
+  }
+
+  Future<List<Map<String, Object?>>> _photoGps(List<String> fileRefs) async {
+    final ev = _evidence;
+    if (ev == null) return const [];
+    final out = <Map<String, Object?>>[];
+    for (final id in fileRefs) {
+      final g = (await ev.byId(id))?.meta['gps'];
+      if (g is Map) out.add(g.cast<String, Object?>());
+    }
+    return out;
+  }
+
+  // ---- nhật ký hàng loạt (HTX US-LOG-03) ----
+
+  /// Tối đa thửa mỗi lượt (máy chủ `MaxBulk`).
+  static const maxBatchPlots = 200;
+
+  /// Thửa có vụ đang mở trên máy được ghi; thửa khác bị loại kèm lý do.
+  Future<BatchPlan> planBatch(List<PlotItem> plots) async {
+    final included = <(PlotItem, Season)>[];
+    final skipped = <String, String>{};
+    for (final p in plots) {
+      final se = await openSeasonFor(p.ref);
+      if (se == null) {
+        skipped[p.code] = skipNotOpen;
+      } else {
+        included.add((p, se));
+      }
+    }
+    return BatchPlan(included, skipped);
+  }
+
+  /// Ghi hàng loạt: MỘT bản ghi `farm_log_batch` (một đầu lô, máy chủ tạo
+  /// một dòng mỗi thửa — AC-1). Thửa chưa mở vụ bị loại trước khi gửi; máy chủ
+  /// còn loại thêm thửa ngoài phạm vi / đã đóng vụ lúc nhận (AC-2). Vị trí:
+  /// chọn lô từ danh sách (`manual_pick`, máy chủ tự gắn — US-GPS-02 AC-2).
+  Future<(OutboxRecord, BatchPlan)> recordBatch({
+    required List<PlotItem> plots,
+    required FarmActivity activity,
+    List<String> machineCodes = const [],
+    List<Map<String, Object?>> inputs = const [],
+    String note = '',
+  }) async {
+    if (plots.isEmpty) {
+      throw CropError('Chọn ít nhất 1 lô ruộng để ghi nhật ký hàng loạt.');
+    }
+    if (plots.length > maxBatchPlots) {
+      throw CropError('Tối đa $maxBatchPlots lô ruộng mỗi lượt.');
+    }
+    if (note.length > 2000) throw CropError('Ghi chú tối đa 2000 ký tự.');
+    final plan = await planBatch(plots);
+    if (plan.included.isEmpty) {
+      final why = [
+        for (final e in plan.skipped.entries) 'Lô ${e.key}: ${e.value}',
+      ].join('; ');
+      throw CropError('Không còn lô hợp lệ để ghi ($why).');
+    }
+    final rec = await _outbox.enqueue(
+      entity: PushEntity.farmLogBatch,
+      payload: {
+        'plot_refs': [for (final (p, _) in plan.included) p.ref],
+        'activity_code': activity.code,
+        'machine_codes': machineCodes,
+        'inputs': inputs,
+        'note': note.trim(),
+      },
+    );
+    return (rec, plan);
+  }
+
+  /// Các lượt ghi hàng loạt trên máy (mới trước) kèm kết quả máy chủ.
+  Future<List<BatchSummary>> batches() async {
+    final codes = {for (final p in await plots()) p.ref: p.code};
+    final lines = <String, Set<String>>{};
+    for (final r in await _refs.list(RefEntity.farmLog)) {
+      final b = r.data['batch_ref'];
+      if (b != null) {
+        lines.putIfAbsent('$b', () => {}).add('${r.data['plot_ref']}');
+      }
+    }
+    final out = <BatchSummary>[];
+    for (final r in await _outbox.list(entity: PushEntity.farmLogBatch)) {
+      final refs = [
+        for (final p in (r.payload['plot_refs'] as List?) ?? const []) '$p',
+      ];
+      final got = lines[r.id] ?? const <String>{};
+      out.add(
+        BatchSummary(
+          record: r,
+          activityCode: '${r.payload['activity_code']}',
+          plotCodes: [for (final p in refs) codes[p] ?? p],
+          accepted: got.length,
+          serverSkipped: r.status == OutboxStatus.sent && got.isNotEmpty
+              ? [
+                  for (final p in refs)
+                    if (!got.contains(p)) codes[p] ?? p,
+                ]
+              : const [],
+        ),
+      );
+    }
+    return out;
   }
 
   /// Nội dung sửa được của nhật ký (không có GPS/thời gian — khóa, AC-3).
@@ -439,6 +796,42 @@ class CropService {
       if (seasonRef != null && v.seasonRef != seasonRef) continue;
       seen.add(v.id);
       out.add(LogEntry(view: v, local: localById[v.id]));
+    }
+    // Dòng của lượt ghi hàng loạt chưa về từ máy chủ (HTX US-LOG-03).
+    // Máy chủ đã gửi dòng nào của lượt → dữ liệu máy chủ là chuẩn (kể cả thửa
+    // máy chủ bỏ qua) — không hiện dòng trên máy nữa.
+    final batched = {
+      for (final r in await _refs.list(RefEntity.farmLog))
+        if (r.data['batch_ref'] != null) '${r.data['batch_ref']}',
+    };
+    final plotOfSeason = seasonRef == null
+        ? null
+        : (await seasonByRef(seasonRef))?.plotRef;
+    for (final r in await _outbox.list(entity: PushEntity.farmLogBatch)) {
+      if (batched.contains(r.id) ||
+          r.status == OutboxStatus.rejected ||
+          r.status == OutboxStatus.superseded) {
+        continue;
+      }
+      final p = r.payload;
+      for (final plot in (p['plot_refs'] as List?) ?? const []) {
+        if (seasonRef != null && plot != plotOfSeason) continue;
+        out.add(
+          LogEntry(
+            view: FarmLogView.fromJson({
+              ...p,
+              'id': '${r.id}:$plot',
+              'plot_ref': plot,
+              'season_ref': seasonRef ?? '',
+              'event_time': r.eventTime,
+              'gps_source': GpsSourceCode.manualPick,
+              'batch_ref': r.id,
+              'status': 'pending',
+            }),
+            local: r,
+          ),
+        );
+      }
     }
     for (final r in localById.values) {
       if (seen.contains(r.id) || r.status == OutboxStatus.superseded) continue;

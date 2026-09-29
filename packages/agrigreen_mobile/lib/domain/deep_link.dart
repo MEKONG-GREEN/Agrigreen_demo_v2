@@ -1,6 +1,9 @@
 /// Đích điều hướng trong app từ `deep_link` của thông báo (schema
 /// `Notification.deep_link`): `/extension/directives/{id}`, `/documents/{ref}`,
-/// `/extension/tasks/{id}`, `/sync/conflicts/{id}`, `/orgs/{ref}`.
+/// `/extension/tasks/{id}`, `/sync/conflicts/{id}`, `/orgs/{ref}`; G2 (App
+/// HTX, pf/notify `cropcycle.go`): `/cropcycle/farm-logs/{id}` (kind
+/// `farm_log_pending` / `farm_log_reviewed`), `/cropcycle/seasons/{ref}` (kind
+/// `season_opened`). Cảnh báo khẩn cấp (`alert`) dùng `/documents/{ref}`.
 sealed class DeepLink {
   const DeepLink();
 
@@ -24,6 +27,10 @@ sealed class DeepLink {
         seg[1] == 'conflicts' &&
         isId(seg[2])) {
       return ConflictLink(seg[2]);
+    }
+    if (seg.length == 3 && seg[0] == 'cropcycle' && isId(seg[2])) {
+      if (seg[1] == 'farm-logs') return FarmLogLink(seg[2]);
+      if (seg[1] == 'seasons') return SeasonLink(seg[2]);
     }
     if (seg.length == 1 && seg[0] == 'notifications') return const InboxLink();
     return const InboxLink();
@@ -72,4 +79,24 @@ class ConflictLink extends DeepLink {
   bool operator ==(Object other) => other is ConflictLink && other.id == id;
   @override
   int get hashCode => Object.hash('c', id);
+}
+
+/// Nhật ký canh tác (id phiên bản) — G2 App HTX.
+class FarmLogLink extends DeepLink {
+  const FarmLogLink(this.id);
+  final String id;
+  @override
+  bool operator ==(Object other) => other is FarmLogLink && other.id == id;
+  @override
+  int get hashCode => Object.hash('fl', id);
+}
+
+/// Vụ (`season_ref`) — G2 App HTX.
+class SeasonLink extends DeepLink {
+  const SeasonLink(this.ref);
+  final String ref;
+  @override
+  bool operator ==(Object other) => other is SeasonLink && other.ref == ref;
+  @override
+  int get hashCode => Object.hash('se', ref);
 }

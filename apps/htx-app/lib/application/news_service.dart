@@ -109,6 +109,15 @@ class NewsService {
     return out;
   }
 
+  /// Bài theo `document_ref` (deep link `/documents/{ref}` của cảnh báo khẩn
+  /// cấp — HTX US-NEWS-03). null = chưa đồng bộ về máy.
+  Future<NewsArticle?> article(String ref) async {
+    for (final a in await articles()) {
+      if (a.ref == ref) return a;
+    }
+    return null;
+  }
+
   Future<List<NewsArticle>> saved() async => [
     for (final a in await articles())
       if (a.saved) a,

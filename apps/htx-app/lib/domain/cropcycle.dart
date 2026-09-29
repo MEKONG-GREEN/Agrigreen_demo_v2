@@ -269,6 +269,39 @@ class Season {
 
   bool get isOpen => status == 'open';
 
+  /// Áp bản sửa/hủy vụ trên máy (chưa phản ánh vào dữ liệu kéo về). Đổi ngày
+  /// sạ / giống → bỏ mốc máy chủ đã tính để tính lại theo SOP.
+  Season applyLocal({
+    required String eventId,
+    required bool pending,
+    String? varietyCode,
+    DateTime? sowingDate,
+    String? sopVersionId,
+    bool cancel = false,
+  }) {
+    final changed = sowingDate != null || varietyCode != null;
+    return Season(
+      seasonRef: seasonRef,
+      plotRef: plotRef,
+      plotCode: plotCode,
+      householdRef: householdRef,
+      cooperativeRef: cooperativeRef,
+      communeCode: communeCode,
+      seasonCode: seasonCode,
+      seasonYear: seasonYear,
+      varietyCode: varietyCode ?? this.varietyCode,
+      sopVersionId: varietyCode != null ? sopVersionId : this.sopVersionId,
+      sowingDate: sowingDate ?? this.sowingDate,
+      expectedHarvestDate: changed ? null : expectedHarvestDate,
+      harvestOpenDate: changed ? null : harvestOpenDate,
+      areaHa: areaHa,
+      status: cancel ? 'cancelled' : status,
+      currentEventId: eventId,
+      harvestId: harvestId,
+      localPending: localPending || pending,
+    );
+  }
+
   factory Season.fromJson(Map<String, Object?> j, {bool localPending = false}) {
     String? s(Object? v) => v == null || '$v'.isEmpty ? null : '$v';
     return Season(
@@ -303,6 +336,28 @@ const msgHarvestTooEarly =
 /// Thông báo chặn ghi nhật ký khi chưa mở vụ (HTX US-LOG-02 AC-2).
 const msgSeasonNotOpen =
     'Lô ruộng này chưa được mở vụ. Vui lòng mở vụ trước khi ghi nhật ký.';
+
+/// Chặn mở vụ trùng (HTX US-SEASON-04 AC-1, trùng `cropcycle.season_already_open`).
+const msgSeasonAlreadyOpen =
+    'Lô ruộng đang canh tác vụ khác, không thể mở vụ mới.';
+
+/// Lý do bỏ qua của lượt ghi hàng loạt (HTX US-LOG-03 AC-2; trùng
+/// `app.SkipNotOpen` / `app.SkipOutOfScope` của máy chủ).
+const skipNotOpen = 'Lô chưa mở vụ';
+const skipOutOfScope = 'Lô không thuộc quyền quản lý';
+
+/// Sao chép cấu hình vụ trước (HTX US-SEASON-03 AC-2).
+const msgPreviousNotDone =
+    'Lô ruộng đang canh tác vụ hiện hành — chỉ sao chép được khi lô đã hoàn thành vụ.';
+const msgNoPreviousSeason = 'Lô ruộng chưa có vụ đã hoàn thành để sao chép.';
+
+/// Lý do sửa/hủy vụ tối thiểu (máy chủ `domain.ValidReason`, sync-contract).
+const minCorrectionReason = 10;
+const msgReasonTooShort = 'Nhập lý do (ít nhất 10 ký tự).';
+
+/// null = lý do hợp lệ.
+String? checkReason(String reason) =>
+    reason.trim().length < minCorrectionReason ? msgReasonTooShort : null;
 
 /// Thông báo khi cố sửa GPS/thời gian (HTX US-LOG-01 AC-3).
 const msgLockedGpsTime =
@@ -343,6 +398,7 @@ class FarmLogView {
     this.fileRefs = const [],
     this.onBehalf = false,
     this.reviewNote,
+    this.batchRef,
   });
 
   /// id phiên bản (dùng làm `supersedes_id` khi bổ sung).
@@ -366,6 +422,9 @@ class FarmLogView {
   /// pending | approved | needs_supplement
   final String status;
   final String? reviewNote;
+
+  /// Đầu lô của lượt ghi hàng loạt (HTX US-LOG-03) = id bản ghi `farm_log_batch`.
+  final String? batchRef;
 
   factory FarmLogView.fromJson(Map<String, Object?> j) => FarmLogView(
     id: '${j['id']}',
@@ -391,6 +450,9 @@ class FarmLogView {
     onBehalf: j['on_behalf'] == true,
     status: '${j['status'] ?? 'pending'}',
     reviewNote: j['review_note'] as String?,
+    batchRef: j['batch_ref'] == null || '${j['batch_ref']}'.isEmpty
+        ? null
+        : '${j['batch_ref']}',
   );
 }
 
@@ -401,16 +463,25 @@ String reviewStatusLabel(String s) => switch (s) {
   _ => 'Chờ duyệt',
 };
 
-/// Nhãn vị trí cho người duyệt (HTX US-LOG-05 AC-1, US-GPS-01 AC-3/4).
+/// Nhãn vị trí cho người duyệt (HTX US-LOG-05 AC-1, US-GPS-01 AC-3/4,
+/// US-GPS-02 AC-1).
 String? locationLabel(String locationStatus, String gpsSource) {
   if (locationStatus == 'mismatch') return 'Vị trí không khớp';
-  if (locationStatus == 'missing' ||
-      gpsSource == GpsSourceCode.denied ||
-      gpsSource == GpsSourceCode.noDevice) {
+  if (gpsSource == GpsSourceCode.noDevice) return 'Không có GPS thiết bị';
+  if (locationStatus == 'missing' || gpsSource == GpsSourceCode.denied) {
     return 'Thiếu GPS';
   }
   return null;
 }
+
+/// Nguồn xác thực vị trí — luôn có nhãn, không để trống (HTX US-GPS-02 AC-2).
+String gpsSourceLabel(String gpsSource) => switch (gpsSource) {
+  GpsSourceCode.device => 'Nguồn vị trí: GPS thiết bị',
+  GpsSourceCode.photoExif => 'Nguồn vị trí: tọa độ ảnh chụp',
+  GpsSourceCode.manualPick => 'Nguồn vị trí: chọn lô từ danh sách',
+  GpsSourceCode.noDevice => 'Nguồn vị trí: không có GPS thiết bị',
+  _ => 'Nguồn vị trí: thiếu GPS (chưa cấp quyền)',
+};
 
 // ---------------------------------------------------------------------------
 // GPS (hợp đồng: `gps: {lon, lat, accuracy_m, source}`, decimal dạng chuỗi)
@@ -418,6 +489,8 @@ String? locationLabel(String locationStatus, String gpsSource) {
 
 abstract final class GpsSourceCode {
   static const device = 'device';
+  static const photoExif = 'photo_exif';
+  static const manualPick = 'manual_pick';
   static const denied = 'denied';
   static const noDevice = 'no_device';
 }
@@ -439,6 +512,36 @@ Map<String, Object?> gpsPayload(LocationResult r) {
     if (f.accuracyM != null) 'accuracy_m': f.accuracyM!.toStringAsFixed(1),
     'source': GpsSourceCode.device,
   };
+}
+
+/// GPS có dự phòng tọa độ ảnh (HTX US-GPS-02): GPS thiết bị tốt → `device`;
+/// yếu / không có / bị từ chối mà một ảnh đính kèm có tọa độ tốt hơn →
+/// `photo_exif` (tọa độ đóng dấu lúc chụp); không có gì → như [gpsPayload].
+Map<String, Object?> gpsWithPhotoFallback(
+  LocationResult r,
+  Iterable<Map<String, Object?>> photoGps,
+) {
+  if (r.status == GpsStatus.ok && r.fix != null) return gpsPayload(r);
+  double? asNum(Object? v) => v is num ? v.toDouble() : null;
+  Map<String, Object?>? best;
+  double? bestAcc;
+  for (final g in photoGps) {
+    final lat = asNum(g['lat']), lon = asNum(g['lon']);
+    if (lat == null || lon == null) continue;
+    final acc = asNum(g['accuracy_m']) ?? 9999;
+    if (best == null || acc < bestAcc!) {
+      best = {
+        'lat': lat.toStringAsFixed(7),
+        'lon': lon.toStringAsFixed(7),
+        if (g['accuracy_m'] != null) 'accuracy_m': acc.toStringAsFixed(1),
+        'source': GpsSourceCode.photoExif,
+      };
+      bestAcc = acc;
+    }
+  }
+  final devAcc = r.fix?.accuracyM ?? (r.fix == null ? null : 9999);
+  if (best != null && (devAcc == null || bestAcc! < devAcc)) return best;
+  return gpsPayload(r);
 }
 
 String gpsLabel(LocationResult r) => switch (r.status) {

@@ -199,4 +199,84 @@ void main() {
       );
     });
   });
+
+  group('HTX US-GPS-02: nguồn xác thực vị trí', () {
+    test('nhãn: không có GPS thiết bị; nguồn luôn có nhãn (AC-2)', () {
+      expect(locationLabel('missing', 'no_device'), 'Không có GPS thiết bị');
+      expect(locationLabel('missing', 'denied'), 'Thiếu GPS');
+      for (final src in [
+        'device',
+        'photo_exif',
+        'manual_pick',
+        'no_device',
+        'denied',
+        '',
+      ]) {
+        expect(gpsSourceLabel(src), startsWith('Nguồn vị trí: '));
+      }
+      expect(gpsSourceLabel('manual_pick'), contains('chọn lô từ danh sách'));
+      expect(gpsSourceLabel('photo_exif'), contains('tọa độ ảnh'));
+    });
+
+    test('GPS tốt → device; yếu mà ảnh chính xác hơn → photo_exif; không '
+        'ảnh → như cũ', () {
+      const good = LocationResult(
+        GpsStatus.ok,
+        GpsFix(lat: 10, lon: 105, accuracyM: 5),
+      );
+      final photo = [
+        {'lat': 10.1, 'lon': 105.1, 'accuracy_m': 8.0},
+      ];
+      expect(gpsWithPhotoFallback(good, photo)['source'], 'device');
+      const weak = LocationResult(
+        GpsStatus.weak,
+        GpsFix(lat: 10, lon: 105, accuracyM: 60),
+      );
+      expect(gpsWithPhotoFallback(weak, photo), {
+        'lat': '10.1000000',
+        'lon': '105.1000000',
+        'accuracy_m': '8.0',
+        'source': 'photo_exif',
+      });
+      expect(gpsWithPhotoFallback(weak, const [])['source'], 'device');
+      expect(
+        gpsWithPhotoFallback(const LocationResult(GpsStatus.denied), [
+          {'lat': null},
+        ]),
+        {'source': 'denied'},
+      );
+    });
+  });
+
+  test('HTX sửa/hủy vụ: lý do ≥ 10 ký tự; phủ bản sửa trên máy lên vụ', () {
+    expect(checkReason('  ngắn  '), msgReasonTooShort);
+    expect(checkReason('Ghi nhầm ngày sạ'), isNull);
+    final s = Season.fromJson({
+      'season_ref': 'r',
+      'plot_ref': 'p',
+      'season_code': 'TD',
+      'season_year': 2026,
+      'variety_code': 'OM18',
+      'sowing_date': '2026-09-25',
+      'harvest_open_date': '2027-01-10',
+      'status': 'open',
+      'current_event_id': 'e1',
+    });
+    final fixed = s.applyLocal(
+      eventId: 'e2',
+      pending: true,
+      sowingDate: DateTime.utc(2026, 9, 20),
+    );
+    expect(fixed.sowingDate, DateTime.utc(2026, 9, 20));
+    expect(fixed.harvestOpenDate, isNull, reason: 'tính lại theo SOP');
+    expect(fixed.currentEventId, 'e2');
+    expect(fixed.localPending, isTrue);
+    expect(fixed.varietyCode, 'OM18');
+    final cancelled = fixed.applyLocal(
+      eventId: 'e3',
+      pending: true,
+      cancel: true,
+    );
+    expect(cancelled.isOpen, isFalse);
+  });
 }

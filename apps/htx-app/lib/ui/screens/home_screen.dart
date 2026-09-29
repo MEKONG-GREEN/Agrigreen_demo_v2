@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/roles.dart';
+import '../navigation.dart';
 import '../providers.dart';
 import '../widgets.dart';
+import 'batch_log_screen.dart';
 import 'dashboard_screen.dart';
 import 'farm_log_screen.dart';
 import 'harvest_screen.dart';
@@ -33,6 +35,23 @@ class HomeScreen extends ConsumerWidget {
             .then((_) => ref.invalidate(homeSummaryProvider));
     final s = summary.value;
     final today = ref.read(appControllerProvider).services?.crop.today();
+    // Thông báo được chạm (kể cả trước khi mở khóa) → mở đúng màn hình.
+    void consumeLink(String? link) {
+      if (link == null) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final l = ref.read(pendingDeepLinkProvider.notifier).take();
+        if (l != null && context.mounted) {
+          openDeepLink(
+            context,
+            ref,
+            l,
+          ).then((_) => ref.invalidate(homeSummaryProvider));
+        }
+      });
+    }
+
+    ref.listen(pendingDeepLinkProvider, (_, next) => consumeLink(next));
+    consumeLink(ref.read(pendingDeepLinkProvider));
 
     final tiles = switch (mode) {
       HtxMode.farmer => [
@@ -87,6 +106,11 @@ class HomeScreen extends ConsumerWidget {
           icon: Icons.edit_note,
           label: 'Ghi nhật ký hộ',
           onTap: () => open(const PlotsScreen(manager: true)),
+        ),
+        BigTile(
+          icon: Icons.library_add_check_outlined,
+          label: 'Nhật ký hàng loạt',
+          onTap: () => open(const BatchLogScreen()),
         ),
         BigTile(
           icon: Icons.fact_check_outlined,

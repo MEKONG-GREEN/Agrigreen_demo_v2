@@ -16,7 +16,10 @@ final _reviewProvider = FutureProvider.autoDispose<List<ReviewItem>>(
 /// thị rõ (AC-1); Phê duyệt → "Đã duyệt" (AC-2); Yêu cầu bổ sung → trả nông
 /// dân kèm ghi chú (AC-3). Lệnh xếp hàng khi ngoại tuyến.
 class ReviewScreen extends ConsumerWidget {
-  const ReviewScreen({super.key});
+  const ReviewScreen({super.key, this.highlightLogId});
+
+  /// Mở từ thông báo `farm_log_pending`: nhật ký này lên đầu, viền nổi bật.
+  final String? highlightLogId;
 
   Future<void> _needsSupplement(
     BuildContext context,
@@ -82,31 +85,49 @@ class ReviewScreen extends ConsumerWidget {
       body: q.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Lỗi: $e')),
-        data: (items) => items.isEmpty
-            ? const Center(
-                child: Text(
-                  'Không có nhật ký chờ duyệt.',
-                  style: TextStyle(fontSize: 17),
-                ),
-              )
-            : ListView(
-                padding: const EdgeInsets.all(8),
-                children: [
-                  for (final it in items)
-                    _ReviewCard(
-                      item: it,
-                      onApprove: () => _run(
-                        context,
-                        ref,
-                        () =>
-                            ref.services.manager.review(it.log, approve: true),
-                        'Đã phê duyệt — chờ gửi.',
-                      ),
-                      onSupplement: () =>
-                          _needsSupplement(context, ref, it.log),
-                    ),
-                ],
+        data: (all) {
+          final hl = highlightLogId;
+          final items = [
+            ...all.where((i) => i.log.id == hl),
+            ...all.where((i) => i.log.id != hl),
+          ];
+          final missing = hl != null && items.every((i) => i.log.id != hl);
+          if (items.isEmpty && !missing) {
+            return const Center(
+              child: Text(
+                'Không có nhật ký chờ duyệt.',
+                style: TextStyle(fontSize: 17),
               ),
+            );
+          }
+          return ListView(
+            padding: const EdgeInsets.all(8),
+            children: [
+              if (missing)
+                const Card(
+                  color: AgColors.amberBg,
+                  child: ListTile(
+                    leading: Icon(Icons.info_outline),
+                    title: Text(
+                      'Nhật ký trong thông báo đã được xử lý hoặc chưa đồng bộ về máy.',
+                    ),
+                  ),
+                ),
+              for (final it in items)
+                _ReviewCard(
+                  highlight: it.log.id == hl,
+                  item: it,
+                  onApprove: () => _run(
+                    context,
+                    ref,
+                    () => ref.services.manager.review(it.log, approve: true),
+                    'Đã phê duyệt — chờ gửi.',
+                  ),
+                  onSupplement: () => _needsSupplement(context, ref, it.log),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -117,8 +138,10 @@ class _ReviewCard extends StatelessWidget {
     required this.item,
     required this.onApprove,
     required this.onSupplement,
+    this.highlight = false,
   });
   final ReviewItem item;
+  final bool highlight;
   final VoidCallback onApprove;
   final VoidCallback onSupplement;
 
@@ -128,6 +151,13 @@ class _ReviewCard extends StatelessWidget {
     final loc = locationLabel(l.locationStatus, l.gpsSource);
     final act = FarmActivity.parse(l.activityCode);
     return Card(
+      key: highlight ? const ValueKey('review-highlight') : null,
+      shape: highlight
+          ? RoundedRectangleBorder(
+              side: const BorderSide(color: AgColors.g700, width: 2),
+              borderRadius: BorderRadius.circular(12),
+            )
+          : null,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -163,6 +193,12 @@ class _ReviewCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Tag(loc, color: AgColors.red),
+              ),
+            // HTX US-GPS-02 AC-2: luôn ghi rõ nguồn xác thực vị trí.
+            if (l.gpsSource.isNotEmpty)
+              Text(
+                gpsSourceLabel(l.gpsSource),
+                style: const TextStyle(color: AgColors.mute, fontSize: 14),
               ),
             const SizedBox(height: 8),
             if (item.failed != null)

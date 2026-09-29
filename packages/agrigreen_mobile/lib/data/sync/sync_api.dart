@@ -111,7 +111,14 @@ abstract class SyncApi {
     required List<OutboxRecord> records,
   });
 
-  Future<PullPage> pull({String? cursor, required int limit});
+  /// `GET /v1/sync/pull`. [entities] (G2, KN US-SYNC-02): chỉ đọc các entity
+  /// này (`?entities=plot,task`); máy chủ giữ vị trí con trỏ của entity khác.
+  /// null/rỗng = mọi entity (như G1).
+  Future<PullPage> pull({
+    String? cursor,
+    required int limit,
+    List<String>? entities,
+  });
 
   /// `POST /v1/files` multipart: phần `meta` (JSON phong bì) + `blob`
   /// (ciphertext) + `file_ref` (UUIDv7 máy sinh, tùy chọn).
@@ -268,11 +275,20 @@ class HttpSyncApi implements SyncApi {
   }
 
   @override
-  Future<PullPage> pull({String? cursor, required int limit}) async {
+  Future<PullPage> pull({
+    String? cursor,
+    required int limit,
+    List<String>? entities,
+  }) async {
     final h = await _headers(json: false);
     final res = await _send(
       () => _client.get(
-        _u('/v1/sync/pull', {'cursor': ?cursor, 'limit': '$limit'}),
+        _u('/v1/sync/pull', {
+          'cursor': ?cursor,
+          'limit': '$limit',
+          if (entities != null && entities.isNotEmpty)
+            'entities': entities.join(','),
+        }),
         headers: h,
       ),
     );

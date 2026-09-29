@@ -49,6 +49,9 @@ class FakeServer implements SyncApi {
   final Map<String?, PullPage> pages = {};
   final List<String?> pullCursors = [];
 
+  /// `entities` của từng lời gọi pull (null = mọi entity).
+  final List<List<String>?> pullEntities = [];
+
   int get pushCalls => pushBatchKeys.length;
 
   void _guard() {
@@ -127,11 +130,29 @@ class FakeServer implements SyncApi {
   }
 
   @override
-  Future<PullPage> pull({String? cursor, required int limit}) async {
+  Future<PullPage> pull({
+    String? cursor,
+    required int limit,
+    List<String>? entities,
+  }) async {
     _guard();
     pullCursors.add(cursor);
-    return pages[cursor] ??
+    pullEntities.add(entities);
+    final page =
+        pages[cursor] ??
         PullPage(changes: const [], nextCursor: cursor, hasMore: false);
+    if (entities == null || entities.isEmpty) return page;
+    // Lọc theo entity như máy chủ (`?entities=`).
+    return PullPage(
+      changes: [
+        for (final c in page.changes)
+          if (entities.contains(c.entity)) c,
+      ],
+      nextCursor: page.nextCursor,
+      hasMore: page.hasMore,
+      serverTime: page.serverTime,
+      reset: page.reset,
+    );
   }
 
   @override

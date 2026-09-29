@@ -6,7 +6,9 @@ import 'inbox_service.dart';
 /// Phần của app đã mở khóa mà kênh đẩy cần dùng.
 abstract class PushHost {
   /// Đồng bộ ngay (push → phát lại lệnh → pull), bỏ qua thời điểm lùi.
-  Future<void> syncNow();
+  /// [entities] (KN US-SYNC-02): chỉ pull các entity này; null = toàn bộ —
+  /// chuyển thẳng cho `SyncService.syncOnce(entities:)`.
+  Future<void> syncNow({Set<String>? entities});
 
   /// Thông báo đã có trên máy sau khi đồng bộ (null nếu chưa về).
   Future<InboxItem?> notification(String id);
@@ -16,7 +18,8 @@ abstract class PushHost {
 }
 
 /// Xử lý thông điệp đẩy chỉ-dữ-liệu (ADR-0015):
-/// - `{kind: "sync_now"}` → đồng bộ ngay (US-SYNC-02);
+/// - `{kind: "sync_now"}` → đồng bộ ngay (US-SYNC-02); có `entities` → chỉ
+///   pull các entity đó (G2, KN US-SYNC-02);
 /// - `{kind, notification_id}` → pull để lấy nội dung, rồi hiện thông báo cục
 ///   bộ. **Tiêu đề chung "Có thông báo mới"** khi app chưa mở khóa, không ở
 ///   tiền cảnh, hoặc nội dung chưa đồng bộ về — màn hình khóa không lộ nội dung.
@@ -84,7 +87,7 @@ class PushCoordinator {
     if (m.isSyncNow) {
       if (h == null) return; // chưa mở khóa: đồng bộ ngay khi mở khóa
       syncNowHandled++;
-      await h.syncNow();
+      await h.syncNow(entities: m.entities);
       return;
     }
     final id = m.notificationId;

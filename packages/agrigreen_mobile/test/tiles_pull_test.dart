@@ -307,7 +307,11 @@ void main() {
 class _CursorInvalidOnce extends FakeServer {
   final cursors = <String?>[];
   @override
-  Future<PullPage> pull({String? cursor, required int limit}) async {
+  Future<PullPage> pull({
+    String? cursor,
+    required int limit,
+    List<String>? entities,
+  }) async {
     cursors.add(cursor);
     if (cursor == 'tampered') throw ApiException(400, 'sync.cursor_invalid');
     return const PullPage(changes: [], nextCursor: 'fresh', hasMore: false);

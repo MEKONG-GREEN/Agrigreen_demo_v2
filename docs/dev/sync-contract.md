@@ -32,7 +32,7 @@ Thân: `{ "device_id": "<UUIDv7 sinh trên máy>", "platform": "android" | "ios"
 ```
 
 - `limit` mặc định 500, tối đa 1000. `data` không có khi `op = tombstone`.
-- `entities` (G2, KN US-SYNC-02, tùy chọn): chỉ đọc các entity liệt kê — `?entities=plot,task` hoặc lặp `?entities=plot&entities=task`. Con trỏ giữ nguyên vị trí của entity không đọc, nên lượt pull đầy đủ sau đó không mất thay đổi. Entity không có → `422 validation_failed` (trường `entities`). Máy dùng khi thông điệp `sync_now` có khóa `entities`.
+- `entities` (G2, KN US-SYNC-02, tùy chọn): chỉ đọc các entity liệt kê — `?entities=plot,task` hoặc lặp `?entities=plot&entities=task`. Con trỏ giữ nguyên vị trí của entity không đọc, nên lượt pull đầy đủ sau đó không mất thay đổi. Entity không có → `422 validation_failed` (trường `entities`). Máy dùng khi thông điệp `sync_now` có khóa `entities` (`packages/agrigreen_mobile`: `PushMessage.entities` → `SyncService.syncOnce(entities:)`; chiều lên vẫn gửi hết; tên sai dạng / quá 30 → pull toàn bộ; trang pull một phần mang `reset = true` bị bỏ và máy pull đầy đủ từ con trỏ cũ, vì áp `reset` sẽ thay toàn bộ dữ liệu tham chiếu).
 - Source trả `403` cho người gọi (không có vai đọc entity, vd nông dân với `task`) → entity đó bị bỏ qua trong trang, các entity khác vẫn đồng bộ (như `pubkey`).
 - `cursor` là chuỗi **mờ, có chữ ký HMAC** (khóa `AG_SYNC_CURSOR_KEY`), gắn với tenant + thiết bị + phạm vi. Sửa, cắt, hoặc dùng con trỏ của thiết bị khác → `400 sync.cursor_invalid`; máy pull lại không có `cursor`. Không có `cursor` = từ đầu.
 - Các entity chia đều hạn mức trang theo vòng (round-robin); phần entity dùng không hết chia lại cho entity còn dữ liệu. `has_more = true` có thể theo sau bởi một trang rỗng `has_more = false`.

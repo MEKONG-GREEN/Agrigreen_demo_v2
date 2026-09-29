@@ -144,16 +144,24 @@ class SyncService {
 
   /// Chạy một lượt đồng bộ. [force] bỏ qua thời điểm lùi (nút "Đồng bộ ngay").
   /// Gọi chồng nhau thì dùng chung lượt đang chạy.
-  Future<SyncReport?> syncOnce({bool force = false}) {
+  ///
+  /// [entities] (KN US-SYNC-02, thông điệp `sync_now` có khóa `entities`):
+  /// chiều lên vẫn gửi hết, chiều xuống chỉ pull các entity này
+  /// (`?entities=`). Máy chủ giữ vị trí con trỏ của entity không đọc nên lượt
+  /// đầy đủ sau đó không mất thay đổi. null/rỗng = pull toàn bộ.
+  Future<SyncReport?> syncOnce({bool force = false, Set<String>? entities}) {
     if (_wipe.wiped) return Future.value(null);
     final running = _running;
     if (running != null) return running.then((_) => null);
-    final f = _run(force);
+    final only = entities == null || entities.isEmpty
+        ? null
+        : (entities.toList()..sort());
+    final f = _run(force, only);
     _running = f;
     return f.whenComplete(() => _running = null);
   }
 
-  Future<SyncReport?> _run(bool force) async {
+  Future<SyncReport?> _run(bool force, List<String>? entities) async {
     final prev = await status();
     if (!force &&
         prev.nextAttemptAt != null &&
@@ -174,7 +182,7 @@ class SyncService {
       await _evidence.flushForms(_outbox);
       await _pushAll(report);
       await _replayActions(report);
-      await _pullAll(report);
+      await _pullAll(report, entities);
       await afterPull?.call();
       report.purged = await _outbox.purgeAcked(retention);
       await _evidence.purgeUploaded(retention);
@@ -306,12 +314,16 @@ class SyncService {
     }
   }
 
-  Future<void> _pullAll(SyncReport report) async {
+  Future<void> _pullAll(SyncReport report, [List<String>? entities]) async {
     var restarted = false;
     for (var guard = 0; guard < 10000; guard++) {
       PullPage page;
       try {
-        page = await _api.pull(cursor: await _refs.cursor(), limit: pullLimit);
+        page = await _api.pull(
+          cursor: await _refs.cursor(),
+          limit: pullLimit,
+          entities: entities,
+        );
       } on ApiException catch (e) {
         // Con trỏ bị sửa / của thiết bị khác → pull lại từ đầu (một lần).
         if (e.status == 400 && e.code == 'sync.cursor_invalid' && !restarted) {
@@ -320,6 +332,13 @@ class SyncService {
           continue;
         }
         rethrow;
+      }
+      if (entities != null && page.reset) {
+        // Phạm vi đã đổi: trang `reset` chỉ mang một phần entity mà áp nó sẽ
+        // thay TOÀN BỘ dữ liệu tham chiếu → bỏ trang, pull đầy đủ từ con trỏ cũ
+        // (máy chủ trả lại `reset` cho lượt đầy đủ).
+        entities = null;
+        continue;
       }
       await _refs.applyPage(page);
       report.pulled += page.changes.length;

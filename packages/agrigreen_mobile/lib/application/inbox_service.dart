@@ -46,6 +46,10 @@ class InboxItem {
     'task_escalated' => 'Nhiệm vụ leo thang',
     'sync_conflict' => 'Xung đột đồng bộ',
     'org_deactivated' => 'Tổ chức',
+    'farm_log_pending' => 'Nhật ký chờ duyệt',
+    'farm_log_reviewed' => 'Kết quả duyệt nhật ký',
+    'season_opened' => 'Mở vụ',
+    'task_assigned' => 'Nhiệm vụ mới',
     _ => 'Thông báo',
   };
 }

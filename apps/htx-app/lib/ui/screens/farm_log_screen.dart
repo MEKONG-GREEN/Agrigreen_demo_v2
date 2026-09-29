@@ -7,6 +7,7 @@ import '../../application/crop_service.dart';
 import '../../domain/cropcycle.dart';
 import '../providers.dart';
 import '../widgets.dart';
+import 'batch_log_screen.dart';
 import 'plots_screen.dart' show LogCard;
 
 class _LogData {
@@ -125,7 +126,25 @@ class _FarmLogScreenState extends ConsumerState<FarmLogScreen> {
   Widget build(BuildContext context) {
     final data = ref.watch(_logDataProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Ghi nhật ký canh tác')),
+      appBar: AppBar(
+        title: const Text('Ghi nhật ký canh tác'),
+        actions: [
+          // HTX US-LOG-03: nông dân có nhiều lô cùng hoạt động trong ngày.
+          if (widget.seasonRef == null)
+            IconButton(
+              tooltip: 'Ghi hàng loạt nhiều lô',
+              iconSize: 28,
+              icon: const Icon(Icons.library_add_check_outlined),
+              onPressed: () => Navigator.of(context)
+                  .push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const BatchLogScreen(),
+                    ),
+                  )
+                  .then((_) => ref.invalidate(_logDataProvider)),
+            ),
+        ],
+      ),
       body: data.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Lỗi: $e')),
@@ -200,7 +219,7 @@ class _FarmLogScreenState extends ConsumerState<FarmLogScreen> {
                 childAspectRatio: 1.05,
                 children: [
                   for (final a in FarmActivity.values)
-                    _ActivityTile(
+                    ActivityTile(
                       activity: a,
                       selected: _activity == a,
                       onTap: () => setState(() => _activity = a),
@@ -352,8 +371,10 @@ class _FarmLogScreenState extends ConsumerState<FarmLogScreen> {
   }
 }
 
-class _ActivityTile extends StatelessWidget {
-  const _ActivityTile({
+/// Ô chọn hoạt động bằng biểu tượng (dùng chung cho ghi hàng loạt).
+class ActivityTile extends StatelessWidget {
+  const ActivityTile({
+    super.key,
     required this.activity,
     required this.selected,
     required this.onTap,

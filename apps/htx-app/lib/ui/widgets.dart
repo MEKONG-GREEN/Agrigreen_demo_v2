@@ -31,7 +31,12 @@ String rejectMessage(String? code) => switch (code) {
   'cropcycle.yield_negative' => 'Sản lượng không được âm.',
   'cropcycle.locked_fields' => msgLockedGpsTime,
   'cropcycle.concurrent_edit' =>
-    'Nhật ký đã được sửa ở nơi khác — tải lại rồi sửa tiếp.',
+    'Dữ liệu đã được sửa ở nơi khác — đồng bộ lại rồi sửa tiếp.',
+  'cropcycle.season_state' =>
+    'Vụ không còn mở (đã khai sản lượng hoặc đã hủy) — không sửa/hủy được.',
+  'cropcycle.batch_empty' => 'Không còn lô hợp lệ trong lượt ghi hàng loạt (chưa mở vụ hoặc ngoài phạm vi).',
+  'cropcycle.previous_season_not_completed' => msgPreviousNotDone,
+  'cropcycle.no_previous_season' => msgNoPreviousSeason,
   'cropcycle.out_of_scope' =>
     'Nông hộ hoặc lô ruộng này không thuộc phạm vi quản lý của bạn.',
   'cropcycle.phi_violation' =>

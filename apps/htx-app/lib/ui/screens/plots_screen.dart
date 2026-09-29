@@ -9,6 +9,7 @@ import '../widgets.dart';
 import 'farm_log_screen.dart';
 import 'harvest_screen.dart';
 import 'open_season_screen.dart';
+import 'season_edit_screen.dart';
 import 'supplement_screen.dart';
 
 class PlotRow {
@@ -235,6 +236,38 @@ class PlotDetailScreen extends ConsumerWidget {
                       style: const TextStyle(color: AgColors.mute),
                     ),
                   ),
+                // Sửa / hủy vụ mở nhầm (bản ghi bù, lý do ≥ 10 ký tự) — chỉ
+                // khi chưa khai sản lượng (máy chủ: cropcycle.season_state).
+                if (!d.harvestQueued && se.harvestId == null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () =>
+                              open(SeasonEditScreen(seasonRef: se.seasonRef)),
+                          icon: const Icon(Icons.edit_calendar),
+                          label: const Text('Sửa vụ'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AgColors.red,
+                          ),
+                          onPressed: () async {
+                            if (await confirmCancelSeason(context, ref, se)) {
+                              ref.invalidate(plotDetailProvider(plotRef));
+                            }
+                          },
+                          icon: const Icon(Icons.cancel_outlined),
+                          label: const Text('Hủy vụ'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
               const SizedBox(height: 16),
               if (d.logs.isNotEmpty)
@@ -300,6 +333,16 @@ class LogCard extends StatelessWidget {
             if (v.note.isNotEmpty) Text(v.note),
             if (loc != null)
               Padding(padding: const EdgeInsets.only(top: 4), child: Tag(loc)),
+            if (v.gpsSource.isNotEmpty)
+              Text(
+                gpsSourceLabel(v.gpsSource),
+                style: const TextStyle(color: AgColors.mute, fontSize: 14),
+              ),
+            if (v.batchRef != null)
+              const Text(
+                'Ghi hàng loạt',
+                style: TextStyle(color: AgColors.mute, fontSize: 14),
+              ),
             if (v.reviewNote != null && v.reviewNote!.isNotEmpty)
               Text(
                 'Quản lý HTX: ${v.reviewNote}',

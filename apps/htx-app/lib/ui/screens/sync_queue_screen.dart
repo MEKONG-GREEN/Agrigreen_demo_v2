@@ -30,9 +30,17 @@ final _queueProvider = FutureProvider.autoDispose<_Queue>((ref) async {
 String recordSummary(OutboxRecord r) {
   final p = r.payload;
   return switch (r.entity) {
+    PushEntity.seasonOpen when p['cancel'] == true => 'Hủy vụ',
+    PushEntity.seasonOpen when r.op == RecordOp.correct => [
+      'Sửa vụ',
+      if (p['variety_code'] != null) 'giống ${p['variety_code']}',
+      if (p['sowing_date'] != null) 'sạ ${p['sowing_date']}',
+    ].join(' · '),
     PushEntity.seasonOpen =>
       'Vụ ${p['season_code'] ?? ''} ${p['season_year'] ?? ''} · sạ ${p['sowing_date'] ?? ''}',
     PushEntity.farmLog => activityLabel(p['activity_code'] as String?),
+    PushEntity.farmLogBatch =>
+      '${activityLabel(p['activity_code'] as String?)} · ${((p['plot_refs'] as List?) ?? const []).length} lô',
     PushEntity.harvest => '${p['mass_kg']} kg',
     PushEntity.supportRequest =>
       supportCategories[p['category']] ?? '${p['category']}',

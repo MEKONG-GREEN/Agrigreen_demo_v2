@@ -1,9 +1,11 @@
 import 'package:agrigreen_mobile/application/inbox_service.dart';
+import 'package:agrigreen_mobile/domain/deep_link.dart';
 import 'package:agrigreen_mobile/ui/theme.dart';
 import 'package:agrigreen_mobile/ui/widgets/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../navigation.dart';
 import '../providers.dart';
 
 final _inboxProvider = FutureProvider.autoDispose<List<InboxItem>>(
@@ -11,7 +13,8 @@ final _inboxProvider = FutureProvider.autoDispose<List<InboxItem>>(
 );
 
 /// Hộp thư (entity `notification`, 30 ngày): nhật ký được duyệt / cần bổ sung,
-/// cảnh báo khẩn cấp (HTX US-NEWS-03). Đánh dấu đã đọc xếp hàng khi ngoại tuyến.
+/// cảnh báo khẩn cấp (HTX US-NEWS-03). Đánh dấu đã đọc xếp hàng khi ngoại tuyến;
+/// chạm → mở đúng màn hình theo `deep_link` (navigation.dart).
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
 
@@ -58,6 +61,8 @@ class NotificationsScreen extends ConsumerWidget {
                         onTap: () async {
                           await ref.services.inbox.markRead(n.id);
                           ref.invalidate(_inboxProvider);
+                          if (n.link is InboxLink || !context.mounted) return;
+                          await openDeepLink(context, ref, n.deepLink);
                         },
                       ),
                     ),

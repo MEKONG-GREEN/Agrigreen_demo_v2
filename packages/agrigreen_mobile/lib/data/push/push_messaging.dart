@@ -1,7 +1,7 @@
 import 'dart:async';
 
 /// Thông điệp đẩy chỉ-dữ-liệu (ADR-0015): `{kind, notification_id}` hoặc
-/// `{kind: "sync_now"}`. Không có tiêu đề, nội dung hay dữ liệu cá nhân.
+/// `{kind: "sync_now", entities?: "plot,task"}`. Không có tiêu đề, nội dung hay dữ liệu cá nhân.
 class PushMessage {
   const PushMessage(this.data);
   final Map<String, String> data;
@@ -13,6 +13,28 @@ class PushMessage {
   }
 
   bool get isSyncNow => kind == 'sync_now';
+
+  /// Tên entity cần pull của `sync_now` (G2, KN US-SYNC-02: khóa `entities`,
+  /// nối bằng dấu phẩy). null = không có / sai dạng → pull toàn bộ (tương
+  /// thích ngược; tên lạ không bao giờ làm bỏ lượt đồng bộ).
+  Set<String>? get entities {
+    final raw = data['entities'];
+    if (raw == null) return null;
+    final out = <String>{};
+    for (final p in raw.split(',')) {
+      final e = p.trim();
+      if (e.isEmpty) continue;
+      if (!_entityName.hasMatch(e)) return null;
+      out.add(e);
+    }
+    if (out.isEmpty || out.length > maxNudgeEntities) return null;
+    return out;
+  }
+
+  static final _entityName = RegExp(r'^[a-z][a-z0-9_]{0,63}$');
+
+  /// Như `notify/port.MaxNudgeEntities`.
+  static const maxNudgeEntities = 30;
 }
 
 /// Kênh đẩy (FCM trên máy; bản giả trong kiểm thử — không cần Firebase).

@@ -224,6 +224,8 @@ class HtxServices {
       location: pf.location,
       clock: pf.clock,
       ids: pf.ids,
+      api: api,
+      evidence: evidence,
     );
     return HtxServices._(
       platform: pf,
@@ -272,8 +274,8 @@ class _ServicesPushHost implements PushHost {
   final HtxServices _s;
 
   @override
-  Future<void> syncNow() async {
-    await _s.sync.syncOnce(force: true);
+  Future<void> syncNow({Set<String>? entities}) async {
+    await _s.sync.syncOnce(force: true, entities: entities);
   }
 
   @override

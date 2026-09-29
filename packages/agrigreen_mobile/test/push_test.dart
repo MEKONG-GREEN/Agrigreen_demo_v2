@@ -15,8 +15,12 @@ class _Host implements PushHost {
       item?.id == id ? item : null;
   @override
   Future<void> setPushToken(String token) async => tokens.add(token);
+  final entityRequests = <Set<String>?>[];
   @override
-  Future<void> syncNow() async => syncs++;
+  Future<void> syncNow({Set<String>? entities}) async {
+    syncs++;
+    entityRequests.add(entities);
+  }
 }
 
 const _item = InboxItem(

@@ -17,6 +17,7 @@ import 'package:agrigreen_mobile/data/dial/dialer.dart';
 import 'package:agrigreen_mobile/data/files/blob_store.dart';
 import 'package:agrigreen_mobile/data/photo/location_source.dart';
 import 'package:agrigreen_mobile/data/photo/photo_pipeline.dart';
+import 'package:agrigreen_mobile/data/push/push_messaging.dart';
 import 'package:agrigreen_mobile/data/secure/secure_store.dart';
 import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
 import 'package:agrigreen_mobile/data/sync/sync_api.dart';
@@ -165,6 +166,11 @@ class TestEnv {
   final MemoryBlobStore blobs = MemoryBlobStore();
   final List<String> copied = [];
   final JwtOidc oidc;
+
+  /// Kênh đẩy giả (FCM) và thông báo cục bộ ghi lại — `notifier.tap(link)`
+  /// mô phỏng người dùng chạm thông báo.
+  final FakePushMessaging push = FakePushMessaging();
+  final RecordingLocalNotifier notifier = RecordingLocalNotifier();
   final householdKey = nacl.PrivateKey.fromSeed(
     Uint8List(32)..fillRange(0, 32, 7),
   );
@@ -189,6 +195,8 @@ class TestEnv {
     dialer: dialer,
     blobStore: blobs,
     autoSync: false,
+    push: push,
+    notifier: notifier,
   );
 
   /// Dữ liệu chiều xuống mặc định: thửa của hộ, SOP, khóa công khai hộ.

@@ -250,8 +250,8 @@ class _ServicesPushHost implements PushHost {
   final AppServices _s;
 
   @override
-  Future<void> syncNow() async {
-    await _s.sync.syncOnce(force: true);
+  Future<void> syncNow({Set<String>? entities}) async {
+    await _s.sync.syncOnce(force: true, entities: entities);
   }
 
   @override

@@ -60,6 +60,10 @@ class _OpenSeasonScreenState extends ConsumerState<OpenSeasonScreen> {
   String? _variety;
   String? _sopName;
   bool _sopResolved = false;
+
+  /// Cấu hình vụ trước đã sao chép (HTX US-SEASON-03); đổi giống → bỏ.
+  PreviousConfig? _copied;
+  bool _copying = false;
   final _date = TextEditingController();
   String? _error;
   bool _saving = false;
@@ -79,10 +83,40 @@ class _OpenSeasonScreenState extends ConsumerState<OpenSeasonScreen> {
     super.dispose();
   }
 
+  /// HTX US-SEASON-03: lấy giống + SOP của vụ vừa hoàn thành trên lô.
+  Future<void> _copyPrevious(List<PlotItem> plots) async {
+    final plot = plots.where((p) => p.ref == _plot).firstOrNull;
+    if (plot == null) return;
+    final crop = ref.services.crop;
+    setState(() => _copying = true);
+    try {
+      final c = await crop.previousConfig(plot);
+      final sop = await crop.sopById(c.sopVersionId);
+      if (!mounted) return;
+      setState(() {
+        _copied = c;
+        _variety = c.varietyCode;
+        _sopName = sop?.name;
+        _sopResolved = true;
+        _error = null;
+      });
+      showMessage(
+        context,
+        'Đã sao chép giống ${c.varietyCode} và quy trình của vụ '
+        '${c.seasonCode} ${c.seasonYear}.',
+      );
+    } on CropError catch (e) {
+      setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _copying = false);
+    }
+  }
+
   Future<void> _pickVariety(String code) async {
     setState(() {
       _variety = code;
       _sopResolved = false;
+      _copied = null;
     });
     final sop = await ref.services.crop.sopForVariety(code);
     if (!mounted) return;
@@ -144,6 +178,7 @@ class _OpenSeasonScreenState extends ConsumerState<OpenSeasonScreen> {
         seasonYear: _year,
         varietyCode: _variety!,
         sowingDate: parseDisplayDay(_date.text)!,
+        copied: _copied,
       );
       if (!mounted) return;
       showMessage(context, 'Đã mở vụ cho lô ${plot.code} — Chờ đồng bộ.');
@@ -275,6 +310,22 @@ class _OpenSeasonScreenState extends ConsumerState<OpenSeasonScreen> {
   ];
 
   List<Widget> _stepVariety(_OpenData d) => [
+    OutlinedButton.icon(
+      key: const ValueKey('copy-previous'),
+      onPressed: _copying ? null : () => _copyPrevious(d.plots),
+      icon: const Icon(Icons.content_copy),
+      label: const Text('Sao chép cấu hình vụ trước'),
+    ),
+    if (_copied != null)
+      Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Text(
+          'Theo vụ ${_copied!.seasonCode} ${_copied!.seasonYear}'
+          '${_copied!.offline ? ' (dữ liệu trên máy — máy chủ kiểm lại khi đồng bộ)' : ''}',
+          style: const TextStyle(color: AgColors.g700),
+        ),
+      ),
+    const SizedBox(height: 12),
     Text('Chọn giống lúa', style: Theme.of(context).textTheme.titleMedium),
     if (d.varieties.isEmpty)
       const Text('Chưa có danh mục giống trên máy — đồng bộ khi có mạng.'),

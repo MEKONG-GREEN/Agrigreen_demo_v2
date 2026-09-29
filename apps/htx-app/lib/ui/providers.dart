@@ -63,6 +63,23 @@ final pushCoordinatorProvider = Provider<PushCoordinator>((ref) {
   return c;
 });
 
+/// Đường dẫn trong app chờ mở (thông báo được chạm, kể cả trước khi mở
+/// khóa). HomeScreen tiêu thụ.
+class PendingDeepLink extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void set(String? link) => state = link;
+  String? take() {
+    final v = state;
+    state = null;
+    return v;
+  }
+}
+
+final pendingDeepLinkProvider = NotifierProvider<PendingDeepLink, String?>(
+  PendingDeepLink.new,
+);
+
 final authFlowProvider = Provider<AuthFlow>(
   (ref) => AuthFlow(
     session: ref.watch(sessionServiceProvider),
@@ -95,11 +112,13 @@ class AppState {
 class AppController extends Notifier<AppState> {
   StreamSubscription<bool>? _conn;
   StreamSubscription<SyncStatus>? _status;
+  StreamSubscription<String?>? _taps;
   Timer? _timer;
 
   @override
   AppState build() {
     ref.onDispose(_stopAutoSync);
+    ref.onDispose(() => unawaited(_taps?.cancel()));
     Future.microtask(_init);
     return const AppState(AuthView(AuthStage.loading));
   }
@@ -108,8 +127,18 @@ class AppController extends Notifier<AppState> {
   PushCoordinator get _push => ref.read(pushCoordinatorProvider);
 
   Future<void> _init() async {
+    final push = _push;
+    _taps = push.taps.listen(
+      (link) => ref
+          .read(pendingDeepLinkProvider.notifier)
+          .set(link ?? '/notifications'),
+    );
     try {
-      await _push.start();
+      await push.start();
+      final launched = await push.launchPayload();
+      if (launched != null) {
+        ref.read(pendingDeepLinkProvider.notifier).set(launched);
+      }
     } catch (_) {
       // Kênh đẩy lỗi không chặn app (hộp thư vẫn đồng bộ qua pull).
     }

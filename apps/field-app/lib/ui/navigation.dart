@@ -13,7 +13,8 @@ Widget screenForDeepLink(DeepLink link) => switch (link) {
   TaskLink(:final id) => TasksScreen(highlightTaskId: id),
   DocumentLink(:final ref) => DocumentScreen(documentRef: ref),
   ConflictLink() => const SyncQueueScreen(),
-  InboxLink() => const NotificationsScreen(),
+  // Đường dẫn App HTX (nhật ký/vụ) không có màn hình ở app hiện trường.
+  InboxLink() || FarmLogLink() || SeasonLink() => const NotificationsScreen(),
 };
 
 Future<void> openDeepLink(BuildContext context, String? raw) =>
