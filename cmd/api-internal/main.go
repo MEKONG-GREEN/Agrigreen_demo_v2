@@ -10,6 +10,10 @@
 //	AG_DB_VIA_PGBOUNCER  =1 khi đi qua PgBouncer transaction mode
 //	AG_OIDC_ISSUER, AG_OIDC_AUDIENCE, AG_OIDC_JWKS_URL (tùy chọn) — như api-platform
 //	AG_OTLP_ENDPOINT     bật OpenTelemetry (ADR-0013)
+//	AG_MKG_JOBS          job định kỳ: all | none | hub_capacity_daily — chỉ leader chạy. Mặc định all
+//	                     khi có AG_MKG_DB_DIRECT_URL, none khi không
+//	AG_MKG_DB_DIRECT_URL URL nối THẲNG cụm mkg (không qua PgBouncer) cho khóa leader + tìm tenant
+//	                     (vai ag_outbox_publisher, AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER)
 //
 // `api-internal -healthcheck <url>`: GET url, thoát 0 khi 200 — healthcheck của Docker
 // (ảnh distroless không có curl/wget).
@@ -38,7 +42,9 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/leader"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
@@ -102,6 +108,41 @@ func run(log *slog.Logger) error {
 		return err
 	}
 	d := assembly.Deps{Log: log, Verifier: verifier, Ops: ops, Modules: mods.List(), Pools: pools}
+	// Lịch job của vùng mkg (GIS US-WH-01 AC-2: công bố sức chứa theo ngày qua van). Chỉ MỘT bản
+	// api-internal chạy (khóa advisory trên kết nối THẲNG tới cụm mkg, không qua PgBouncer): mặc
+	// định bật khi có AG_MKG_DB_DIRECT_URL; tìm tenant bằng vai ag_outbox_publisher, ghi bằng vai
+	// của module (R-05).
+	direct := os.Getenv("AG_MKG_DB_DIRECT_URL")
+	defJobs := "none"
+	if direct != "" {
+		defJobs = "all"
+	}
+	if jobs := env("AG_MKG_JOBS", defJobs); jobs == "none" {
+		log.Info("không chạy job định kỳ mkg (đặt AG_MKG_DB_DIRECT_URL hoặc AG_MKG_JOBS)", "event", "startup", "outcome", "ok")
+	} else {
+		if direct == "" {
+			direct = base
+		}
+		dsn, err := dbadmin.RoleURL(direct, migrations.MKG, "", dbadmin.OutboxPublisher)
+		if err != nil {
+			return err
+		}
+		jobPool, err := db.Open(ctx, dsn, db.Options{AppName: "api-internal-jobs", MaxConns: 2})
+		if err != nil {
+			return err
+		}
+		defer jobPool.Close()
+		sched := &schedule.Scheduler{Clock: clock.System{}, Log: log, Jobs: assembly.Jobs(mods, jobPool, jobs, log)}
+		if len(sched.Jobs) == 0 {
+			return errors.New("AG_MKG_JOBS không chọn job hợp lệ nào (all, none, " + assembly.JobNames() + ")")
+		}
+		go func() {
+			if err := leader.Run(ctx, jobPool, leader.LockSchedules, 15*time.Second, leader.Options{}, log, sched.Run); err != nil &&
+				!errors.Is(err, context.Canceled) {
+				log.Error("lịch job mkg dừng", "event", "jobs", "outcome", "error", "error", err.Error())
+			}
+		}()
+	}
 	return serve(ctx, log, []*http.Server{
 		{Addr: env("AG_HTTP_ADDR", ":8081"), Handler: assembly.NewRouter(d)},
 		{Addr: env("AG_ADMIN_HTTP_ADDR", ":8083"), Handler: assembly.NewAdminRouter(d)},

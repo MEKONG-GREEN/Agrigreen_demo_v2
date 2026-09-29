@@ -30,8 +30,10 @@
       "enum": [
         "",
         "manual",
-        "org_deactivated"
-      ]
+        "org_deactivated",
+        "brute_force"
+      ],
+      "description": "Nguyên nhân khóa trước đó; brute_force = Keycloak khóa do đăng nhập sai nhiều lần (GIS US-LOG-01 AC-3), Admin mở khóa"
     },
     "actor_ref": {
       "type": "string",

@@ -65,6 +65,8 @@ type Service struct {
 	DB    tenant.Beginner // pool vai sync_app
 	Clock clock.Clock
 	Deps
+	// Integration: phụ thuộc tùy chọn của màn giám sát đồng bộ tích hợp (GIS US-SYNC-01).
+	Integration IntegrationDeps
 
 	pagers []pager
 	sinks  map[string]port.Sink

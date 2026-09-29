@@ -52,6 +52,9 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc
 // Router cho pf/simulation: định tuyến ghim phiên bản mạng (qua port).
 func (m *Module) Router() port.Router { return m.svc }
 
+// Layer cho pf/geo: lớp tuyến đường thủy theo khung nhìn của bản đồ chuẩn hóa (GIS US-INT-02).
+func (m *Module) Layer() port.Layer { return m.svc }
+
 // BuildHandler là inbox.Handler của worker cho pf.waterway.network_build.requested
 // (consumer port.BuildConsumer, pool vai waterway_app).
 func (m *Module) BuildHandler() inbox.Handler { return m.svc.HandleBuildRequested }

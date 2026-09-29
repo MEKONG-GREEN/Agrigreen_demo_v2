@@ -82,4 +82,10 @@ type Directory interface {
 	ExecuteActionsEmail(ctx context.Context, id uuid.UUID, actions []string, lifespan time.Duration) error
 	// Logout thu hồi mọi phiên đang hoạt động (KN US-ADM-01 AC-3).
 	Logout(ctx context.Context, id uuid.UUID) error
+	// BruteForceLocked cho biết tài khoản đang bị khóa do đăng nhập sai nhiều lần (chống dò
+	// mật khẩu, realm permanentLockout — GIS US-LOG-01 AC-3). Keycloak ≥ 24 không tắt
+	// "enabled" khi khóa vĩnh viễn nên phải hỏi riêng (attack-detection).
+	BruteForceLocked(ctx context.Context, id uuid.UUID) (bool, error)
+	// ClearBruteForce xóa trạng thái khóa do đăng nhập sai (Admin mở khóa).
+	ClearBruteForce(ctx context.Context, id uuid.UUID) error
 }

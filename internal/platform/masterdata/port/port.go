@@ -98,9 +98,14 @@ const (
 	// định khi giống chưa có ngưỡng (nguyên mẫu: min = yield_min × 0,4; max = yield_max × 1,25).
 	ParamYieldAnomalyMinPrefix = "cropcycle.yield_anomaly_min_t_per_ha"
 	ParamYieldAnomalyMaxPrefix = "cropcycle.yield_anomaly_max_t_per_ha"
-	// ParamHubCapacityWarn / Critical: ngưỡng cảnh báo sức chứa hub/kho (%) — geo.
-	ParamHubCapacityWarn     = "geo.hub_capacity_warn_pct"
-	ParamHubCapacityCritical = "geo.hub_capacity_critical_pct"
+	// ParamHubCapacityWarn / Full: ngưỡng % lấp đầy hub/kho — "sắp đầy" / "đã đầy" (GIS US-HUB-01,
+	// US-CFG-01). Cùng khóa pf/geo đọc (geo/port.ParamHubCapacityWarnPct / FullPct); phải tăng dần
+	// trong 0–100 % (kiểm lúc đề xuất và lúc duyệt). Khóa cũ "geo.hub_capacity_critical_pct" của
+	// seed 000027 không module nào đọc — thay bằng full_pct (seed chỉ thêm khóa mới).
+	ParamHubCapacityWarn = "geo.hub_capacity_warn_pct"
+	ParamHubCapacityFull = "geo.hub_capacity_full_pct"
+	// ParamPlotLayerMinZoom: mức zoom tối thiểu để lớp bản đồ trả polygon thửa (GIS BR-24) — geo.
+	ParamPlotLayerMinZoom = "geo.plot_layer_min_zoom"
 	// ParamWaterwaySnapTolerance, AutoJoin, GapReport: dựng mạng đường thủy (m) — waterway.
 	ParamWaterwaySnapTolerance = "waterway.snap_tolerance_m"
 	ParamWaterwayAutoJoin      = "waterway.autojoin_m"
@@ -110,6 +115,29 @@ const (
 	ParamHaversineFactor = "distance.haversine_factor"
 	// ParamActivationGrantLifespan: hạn liên kết/QR kích hoạt tài khoản nông dân (giờ) — accounts.
 	ParamActivationGrantLifespan = "activation.grant_lifespan_hours"
+)
+
+// Quy chuẩn hiển thị dùng chung của bản đồ GIS (GIS US-CFG-01/02, FN-03): tham số chuỗi mã
+// màu HEX "#RRGGBB", có phiên bản và phê duyệt như mọi tham số (R-56: người đặt ≠ người duyệt,
+// nên "áp dụng ngay" của AC = áp dụng NGAY KHI ĐƯỢC DUYỆT). Web đọc qua
+// GET /v1/masterdata/display-config.
+const (
+	// ParamGISStageColorPrefix + ":<giai đoạn>" — màu heatmap giai đoạn mùa vụ (FN-13 BR-11):
+	// chuan_bi, sinh_truong, sap_thu, chin_ro, da_thu, none (chưa có vụ).
+	ParamGISStageColorPrefix = "gis.stage_color"
+	// ParamGISCapacityColorPrefix + ":<mức>" — màu mức lấp đầy kho/Hub: available, near_full, full, unknown.
+	ParamGISCapacityColorPrefix = "gis.capacity_color"
+	// ParamGISRipeningOutline: viền nổi bật vùng chín rộ 1–3 ngày tới (GIS US-YIELD-01).
+	ParamGISRipeningOutline = "gis.ripening_outline_color"
+	// ParamCGHAreaFeedStaleHours: ngưỡng độ tươi dữ liệu diện tích vụ từ App HTX (giờ) —
+	// quá ngưỡng thì Admin CGH được cảnh báo và màn CGH báo đang dùng dữ liệu dự phòng (CGH FN-07 AC-03).
+	ParamCGHAreaFeedStaleHours = "cgh.area_feed_stale_hours"
+)
+
+// StageCodes / CapacityClasses là các chiều của bảng màu GIS.
+var (
+	StageCodes      = []string{"chuan_bi", "sinh_truong", "sap_thu", "chin_ro", "da_thu", "none"}
+	CapacityClasses = []string{"available", "near_full", "full", "unknown"}
 )
 
 // YieldAnomalyKey dựng khóa ngưỡng năng suất bất thường theo giống.

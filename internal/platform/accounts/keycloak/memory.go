@@ -33,6 +33,8 @@ type memUser struct {
 	u     port.User
 	roles []string
 	otp   bool
+	// bruteForce: khóa do đăng nhập sai nhiều lần (realm permanentLockout) — enabled vẫn true.
+	bruteForce bool
 }
 
 // SentEmail là một lần gửi liên kết hành động (không chứa địa chỉ email).
@@ -415,5 +417,40 @@ func (m *Memory) Logout(_ context.Context, id uuid.UUID) error {
 		return err
 	}
 	m.logout[id]++
+	return nil
+}
+
+// LockByBruteForce giả lập Keycloak khóa vĩnh viễn tài khoản sau 5 lần sai (kiểm thử GIS US-LOG-01).
+func (m *Memory) LockByBruteForce(id uuid.UUID) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if u, err := m.get(id); err == nil {
+		u.bruteForce = true
+	}
+}
+
+// BruteForceLocked thực hiện port.Directory.
+func (m *Memory) BruteForceLocked(_ context.Context, id uuid.UUID) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u, err := m.get(id)
+	if err != nil {
+		return false, err
+	}
+	return u.bruteForce, nil
+}
+
+// ClearBruteForce thực hiện port.Directory.
+func (m *Memory) ClearBruteForce(_ context.Context, id uuid.UUID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.fail("ClearBruteForce"); err != nil {
+		return err
+	}
+	u, err := m.get(id)
+	if err != nil {
+		return err
+	}
+	u.bruteForce = false
 	return nil
 }

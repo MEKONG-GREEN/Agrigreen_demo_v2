@@ -36,6 +36,11 @@ const (
 	KindFarmLogReviewed = "farm_log_reviewed"
 	// KindSeasonOpened: nông dân tự mở vụ → quản lý HTX (HTX US-SEASON-01).
 	KindSeasonOpened = "season_opened"
+	// KindIntegrationDeadLettered: một sự kiện đồng bộ tích hợp hết số lần thử và vào hàng chờ
+	// lỗi (DLQ) → Admin nền tảng (GIS US-SYNC-02 AC-1; migration 000034).
+	KindIntegrationDeadLettered = "integration_dead_lettered"
+	// KindAreaFeedStale: dữ liệu diện tích vụ App HTX quá ngưỡng độ tươi → Admin CGH (CGH FN-07 AC-02/AC-03).
+	KindAreaFeedStale = "area_feed_stale"
 	// KindSyncNow là thông điệp dữ liệu "đồng bộ ngay" (US-SYNC-02) — không tạo thông báo.
 	KindSyncNow = "sync_now"
 )
@@ -71,6 +76,9 @@ const (
 	ConsumerPush      = "pf.notify.push"
 	// ConsumerCropCycle: nhật ký chờ duyệt, kết quả duyệt, nông dân mở vụ (App HTX, G2).
 	ConsumerCropCycle = "pf.notify.cropcycle"
+	// ConsumerIntegration: cảnh báo Admin về đồng bộ tích hợp — sự kiện vào DLQ (GIS US-SYNC-02),
+	// dữ liệu App HTX quá hạn độ tươi (CGH FN-07).
+	ConsumerIntegration = "pf.notify.integration"
 )
 
 // AreaFarmers tìm tài khoản nông dân nhận cảnh báo khẩn theo địa bàn (HTX

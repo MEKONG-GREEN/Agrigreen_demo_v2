@@ -23,6 +23,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -90,6 +91,25 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc
 // thiết bị của nông dân (vai farmer, không org_ref) pull các entity của port.FarmerSource theo
 // nông hộ của mình và khóa công khai của chính các hộ đó (HTX US-SEASON-01, US-LOG-01, US-SUPPORT-01).
 func (m *Module) UseFarmers(f accport.FarmerHouseholds) { m.svc.Farmers = f }
+
+// UseIntegrations nối danh sách consumer đã khai và (tùy chọn) bộ đọc độ sâu DLQ cho màn giám
+// sát đồng bộ tích hợp (GIS US-SYNC-01).
+func (m *Module) UseIntegrations(consumers []string, dlq func(context.Context) (map[string]int64, error)) {
+	m.svc.Integration = app.IntegrationDeps{Consumers: consumers, DLQDepth: dlq}
+}
+
+// FailureRecorder dựng inbox.FailureRecorder ghi lần xử lý thất bại của consumer vào
+// pf_sync.integration_failure (vai sync_app) và phát pf.sync.integration.dead_lettered ở lần
+// giao cuối (GIS US-SYNC-01/02). Không cần dựng module đầy đủ — worker dùng cho mọi consumer.
+func FailureRecorder(db tenant.Beginner, clk clock.Clock) inbox.FailureRecorder {
+	svc := &app.Service{DB: db, Clock: clk}
+	return func(ctx context.Context, f inbox.Failure) error {
+		return svc.RecordFailure(ctx, port.ConsumerFailure{
+			TenantID: f.Envelope.TenantID, EventID: f.Envelope.EventID, Consumer: f.Consumer, EventType: f.Envelope.EventType,
+			ErrorCode: app.ErrorCode(f.Err), DeliveryCount: int(f.DeliveryCount), DeadLettered: f.DeadLettered, EventTime: f.Envelope.OccurredAt,
+		})
+	}
+}
 
 // PullEntities liệt kê entity chiều xuống đã nối (kể cả pubkey).
 func (m *Module) PullEntities() []string { return m.svc.PullEntities() }

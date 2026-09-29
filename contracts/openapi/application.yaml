@@ -196,6 +196,38 @@ paths:
               schema: {$ref: "#/components/schemas/ParamValue"}
         "404": {description: masterdata.param_not_found, $ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /v1/masterdata/display-config:
+    get:
+      summary: Quy chuẩn hiển thị dùng chung của bản đồ GIS đang hiệu lực (GIS US-CFG-01/02) — bảng màu heatmap giai đoạn, màu mức lấp đầy kho/Hub, ngưỡng %
+      description: |
+        Mọi người dùng đã xác thực đọc được (legend web). Giá trị là phiên bản ĐÃ DUYỆT đang hiệu lực (người đặt ≠
+        người duyệt, R-56 — "áp dụng ngay" của AC nghĩa là áp dụng ngay khi được duyệt); khóa chưa có phiên bản duyệt
+        → giá trị mặc định nhúng (source = default).
+      operationId: getDisplayConfig
+      tags: [masterdata]
+      responses:
+        "200":
+          description: Quy chuẩn hiển thị
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [as_of, stage_colors, capacity_colors, ripening_outline_color, hub_capacity_warn_pct, hub_capacity_full_pct, plot_layer_min_zoom]
+                properties:
+                  as_of: {type: string, format: date-time}
+                  stage_colors:
+                    type: object
+                    description: "Theo mã giai đoạn: chuan_bi, sinh_truong, sap_thu, chin_ro, da_thu, none"
+                    additionalProperties: {$ref: "#/components/schemas/DisplayValue"}
+                  capacity_colors:
+                    type: object
+                    description: "Theo mức: available, near_full, full, unknown"
+                    additionalProperties: {$ref: "#/components/schemas/DisplayValue"}
+                  ripening_outline_color: {$ref: "#/components/schemas/DisplayValue"}
+                  hub_capacity_warn_pct: {$ref: "#/components/schemas/DisplayValue"}
+                  hub_capacity_full_pct: {$ref: "#/components/schemas/DisplayValue"}
+                  plot_layer_min_zoom: {$ref: "#/components/schemas/DisplayValue"}
+        "401": {$ref: "#/components/responses/Problem"}
   /v1/me:
     get:
       summary: Người gọi hiện tại, đơn vị công tác và phạm vi dữ liệu đã giải (pf/party, ADR-0009)
@@ -1100,6 +1132,34 @@ paths:
                   roads: {oneOf: [{$ref: "#/components/schemas/GeoRoadLayer"}, {type: "null"}]}
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/standard-map:
+    get:
+      summary: Bản đồ chuẩn hóa chỉ đọc cho ứng dụng tiêu thụ (TMS — mkg/logistics), GIS US-INT-02 / FN-17
+      description: |
+        MỘT lần gọi trả mọi lớp nền đã chuẩn hóa trong khung nhìn dạng GeoJSON FeatureCollection (properties.layer):
+        admin_boundaries (ranh giới tỉnh/xã theo zoom), cooperatives (ranh giới/marker HTX), facilities (kho/Hub kèm
+        widget sức chứa), roads (đường bộ, lọc tải trọng), waterways (tuyến đường thủy của phiên bản đang phát hành,
+        cờ passable theo tải trọng) cùng danh sách bản đồ nền đã cấu hình (gis.basemap_url:<loại>; rỗng khi nhà cung
+        cấp tile chưa chọn — RB-7). Không có thửa hay dữ liệu cá nhân. Tài khoản dịch vụ vai map_consumer đọc toàn
+        tenant; người dùng bản đồ khác theo phạm vi. Mỗi lớp ≤ limit (≤ 1.000) đối tượng. Độ trễ mục tiêu p95 < 500 ms
+        (đo ở docs/runbooks/gis-performance.md).
+      operationId: geoStandardMap
+      parameters:
+        - {name: bbox, in: query, required: true, description: "minLon,minLat,maxLon,maxLat (WGS84)", schema: {type: string}}
+        - {name: zoom, in: query, schema: {type: integer, minimum: 0, maximum: 22, default: 12}}
+        - {name: layers, in: query, description: "admin_boundaries,cooperatives,facilities,roads,waterways (mặc định: tất cả)", schema: {type: string}}
+        - {name: admin_level, in: query, description: "Mặc định theo zoom: < 10 tỉnh, ≥ 10 xã", schema: {type: string, enum: [province, commune]}}
+        - {name: min_load_tons, in: query, description: "Tải trọng phương tiện (tấn) — lọc đường bộ, đánh dấu đường thủy đi được", schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 1000, default: 1000}}
+      responses:
+        "200":
+          description: Bản đồ chuẩn hóa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/GeoStandardMap"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {description: geo.dependency_unavailable, $ref: "#/components/responses/Problem"}
   /v1/geo/cooperative-boundaries:
     get:
       summary: Ranh giới HTX trong khung nhìn thuộc phạm vi (GIS FN-04 B2) — kèm marker (điểm pf_party.cooperative.location nếu có, không thì điểm trong vùng); HTX chưa có ranh giới hiện bằng điểm
@@ -2490,6 +2550,56 @@ paths:
                             area_ha: {$ref: "#/components/schemas/Decimal"}
                             imported_at: {type: string, format: date-time}
                   missing: {type: array, items: {type: string}, description: "Mã đơn vị chưa nhập ranh giới"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/mechanization/area-sync-status:
+    get:
+      summary: Độ tươi dữ liệu App HTX và lần đồng bộ gần nhất theo HTX của một vụ (CGH FN-07 B5, AC-03) — chỉ báo "đang dùng dữ liệu nhập tay dự phòng"
+      operationId: mechAreaSyncStatus
+      parameters:
+        - {name: season_code, in: query, required: true, schema: {type: string}}
+        - {name: season_year, in: query, required: true, schema: {type: integer}}
+      responses:
+        "200":
+          description: Độ tươi và nhật ký mới nhất theo HTX
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [last_app_htx_at, threshold_hours, stale, fallback_manual, message, items]
+                properties:
+                  last_app_htx_at: {type: [string, "null"], format: date-time}
+                  threshold_hours: {type: string, description: "cgh.area_feed_stale_hours (mặc định 48)"}
+                  stale: {type: boolean}
+                  fallback_manual: {type: boolean}
+                  message: {type: [string, "null"]}
+                  items:
+                    type: array
+                    items: {$ref: "#/components/schemas/MechAreaSyncCoop"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/mechanization/area-sync-log:
+    get:
+      summary: Nhật ký đồng bộ và cập nhật thủ công diện tích vụ (CGH FN-07 B5, BR-04) — Admin CGH
+      operationId: mechAreaSyncLog
+      parameters:
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: season_code, in: query, schema: {type: string}}
+        - {name: season_year, in: query, schema: {type: integer}}
+        - {name: source, in: query, schema: {type: string, enum: [app_htx, manual]}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang nhật ký, mới nhất trước
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  next_cursor: {type: [string, "null"]}
+                  items: {type: array, items: {$ref: "#/components/schemas/MechAreaSyncLog"}}
+        "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
   /v1/mechanization/forecasts:
     get:
@@ -4163,6 +4273,100 @@ components:
         deactivation_reason: {type: [string, "null"]}
         revision: {type: integer}
         updated_at: {type: string, format: date-time}
+    DisplayValue:
+      type: object
+      required: [key, value, default, version, source]
+      properties:
+        key: {type: string, examples: ["gis.stage_color:chin_ro"]}
+        value: {type: string, description: "Mã màu HEX #RRGGBB hoặc số thập phân dạng chuỗi"}
+        default: {type: string}
+        version: {type: integer, description: "0 = chưa có phiên bản duyệt"}
+        source: {type: string, enum: [approved, default]}
+    MechAreaSyncLog:
+      type: object
+      required: [id, cooperative_ref, season_code, season_year, source, source_label, outcome, area_ha, source_at, event_id, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        cooperative_ref: {type: string, format: uuid}
+        season_code: {type: string}
+        season_year: {type: integer}
+        source: {type: string, enum: [app_htx, manual]}
+        source_label: {type: string}
+        outcome: {type: string, enum: [applied, kept_locked, stale_ignored], description: "Kết quả áp QT-03"}
+        area_ha: {type: string}
+        source_at: {type: string, format: date-time}
+        event_id: {type: [string, "null"], format: uuid}
+        recorded_at: {type: string, format: date-time}
+    MechAreaSyncCoop:
+      type: object
+      required: [id, cooperative_ref, season_code, season_year, source, source_label, outcome, area_ha, source_at, event_id, recorded_at, sync_count, stale]
+      properties:
+        id: {type: string, format: uuid}
+        cooperative_ref: {type: string, format: uuid}
+        season_code: {type: string}
+        season_year: {type: integer}
+        source: {type: string, enum: [app_htx, manual]}
+        source_label: {type: string}
+        outcome: {type: string, enum: [applied, kept_locked, stale_ignored]}
+        area_ha: {type: string}
+        source_at: {type: string, format: date-time}
+        event_id: {type: [string, "null"], format: uuid}
+        recorded_at: {type: string, format: date-time}
+        sync_count: {type: integer}
+        stale: {type: boolean, description: "Bản App HTX của HTX cũ hơn ngưỡng độ tươi"}
+    GeoStandardMap:
+      type: object
+      description: Bản đồ chuẩn hóa cho TMS (GIS US-INT-02)
+      required: [schema, type, generated_at, bbox, zoom, admin_level, features, layers, basemaps, basemap_notice, capacity_thresholds]
+      properties:
+        schema: {type: string, enum: [agrigreen.standard_map/v1]}
+        type: {type: string, enum: [FeatureCollection]}
+        generated_at: {type: string, format: date-time}
+        bbox: {type: array, items: {type: number}, minItems: 4, maxItems: 4}
+        zoom: {type: integer}
+        admin_level: {type: string, enum: [province, commune]}
+        features:
+          type: array
+          items:
+            type: object
+            required: [type, id, geometry, properties]
+            properties:
+              type: {type: string, enum: [Feature]}
+              id: {type: string}
+              geometry: {type: object}
+              properties:
+                type: object
+                required: [layer]
+                properties:
+                  layer: {type: string, enum: [admin_boundaries, cooperatives, facilities, roads, waterways]}
+                additionalProperties: true
+        layers:
+          type: object
+          additionalProperties:
+            type: object
+            required: [count, truncated]
+            properties:
+              count: {type: integer}
+              truncated: {type: boolean}
+              passable_count: {type: integer}
+              version_no: {type: integer}
+        basemaps:
+          type: array
+          items:
+            type: object
+            required: [kind, url]
+            properties:
+              kind: {type: string, enum: [street, satellite, terrain]}
+              url: {type: string}
+        basemap_notice: {type: [string, "null"]}
+        capacity_thresholds:
+          oneOf:
+            - type: object
+              required: [warn_pct, full_pct]
+              properties:
+                warn_pct: {type: string}
+                full_pct: {type: string}
+            - {type: "null"}
     ParamValue:
       type: object
       required: [key, value, text, unit, version, effective_from, source_doc, approved_at, param_version_id, supersedes_id, seq]
@@ -5427,7 +5631,7 @@ components:
       description: Không chứa dữ liệu cá nhân. Cũng là data của entity đồng bộ "notification" (không có topic).
       properties:
         id: {type: string, format: uuid}
-        kind: {type: string, enum: [directive, alert, document, task_escalated, sync_conflict, org_deactivated, household_registered, household_membership_changed, task_assigned, farm_log_pending, farm_log_reviewed, season_opened]}
+        kind: {type: string, enum: [directive, alert, document, task_escalated, sync_conflict, org_deactivated, household_registered, household_membership_changed, task_assigned, farm_log_pending, farm_log_reviewed, season_opened, integration_dead_lettered, area_feed_stale]}
         severity: {type: string, enum: [urgent, normal]}
         title: {type: string, maxLength: 300}
         body: {type: string, maxLength: 2000}

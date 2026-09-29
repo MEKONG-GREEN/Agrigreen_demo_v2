@@ -20,15 +20,15 @@ Ba trạng thái:
 | Mục | Số yêu cầu | đạt | một phần | ngoài G2 → G3/… |
 |---|---|---|---|---|
 | 2. Lộ trình G2 | 11 | 11 | 0 | 0 |
-| 3. Chuyển từ G1 | 10 | 4 | 4 | 2 |
+| 3. Chuyển từ G1 | 10 | 5 | 3 | 2 |
 | 4. App HTX (Backlog v4.0) | 48 | 33 | 15 | 0 |
-| 5. GIS (Backlog v1.1) | 38 | 23 | 9 | 6 |
+| 5. GIS (Backlog v1.1) | 38 | 29 | 3 | 6 |
 | 6. Cổng kiến trúc G2 | 30 | 25 | 3 | 2 |
-| **Tổng** | **137** | **96** | **31** | **10** |
+| **Tổng** | **137** | **103** | **24** | **10** |
 
 **Ghi chú môi trường (không tính theo dòng):** CI trên GitHub **chưa được xác nhận** cho các commit G2, vì GitHub Actions đang bị chặn do lỗi thanh toán. Các job mới (`optimizer`, `agrigreen-mobile`, `htx-app`, kiểm thử App HTX trên emulator trong `field-app-emulator`) và `compose-smoke` có api-internal, optimizer, mTLS chưa chạy trên runner. Trạng thái trong bảng dựa trên lần chạy kiểm thử tại máy dev.
 
-**31 dòng "một phần"**: phần còn thiếu và loại của từng dòng.
+**24 dòng "một phần"** (cập nhật 30/09/2026 sau đợt đóng GIS/tích hợp; bảng chi tiết dưới đây giữ nguyên văn cũ cho các dòng đã đóng — xem mục 3 và 5): phần còn thiếu và loại của từng dòng.
 
 | Yêu cầu | Còn thiếu | Loại |
 |---|---|---|
@@ -128,9 +128,9 @@ CI (`.github/workflows/ci.yml`): `lint`, `test`, `web-ops`, `web-e2e`, `optimize
 | KN US-SYNC-01 hai chiều với App HTX | App HTX và app KN dùng chung bản ghi pf. `TestFarmerDevicePullsOwnHouseholdOnly` (stack thật: nông dân chỉ nhận dữ liệu hộ mình, không nhận entity của cán bộ), `TestFarmerPullByLinkedHouseholds`, `TestFarmerPlotSyncByHousehold_HTX_US_SEASON_01`, `TestSyncPushPull_HTX_US_LOG_04`, `TestSupportRequestViaSync`, `TestHouseholdPubKeysFarmer` | **đạt** |
 | KN US-SYNC-02 chọn nhóm/loại dữ liệu | `TestNudgeEntitiesFilterKNUSSYNC02` (`entities[]` trong `sync_now`), `TestPullEntitiesFilterKNUSSYNC02` (`?entities=`, entity lạ → 422); lõi: `sync_nudge_entities_test.dart`; App HTX: `nudge_deeplink_test.dart` | **một phần**: thiếu ô chọn nhóm dữ liệu trên web `/dong-bo` |
 | KN US-TASK-01 tự sinh nhiệm vụ từ yêu cầu App HTX | `TestSupportRequestCreatesTaskWithDutyFallback` (cùng giao dịch, mốc giờ máy chủ nhận ≤ 1 phút, chuỗi trực xã → tỉnh → quản trị), `TestTaskCreatedNotifiesAssigneeKNUSTASK01`, `TestStaffSupportListScopeAndFields`; WEB-E2E `htx-support.spec.ts` | **đạt** |
-| CGH FN-07 Tích hợp App HTX | `TestCGHFN07AreaSyncConsumerIdempotentAndRespectsLock` (QT-03 trong giao dịch inbox, giữ bản Admin đã khóa, bỏ sự kiện cũ hơn, cách ly tenant), `TestResolveAreaQT03`, `TestStatsPort` | **một phần**: diện tích đạt; thiếu tình trạng máy, lịch mùa vụ, nhật ký đồng bộ + cảnh báo Admin, fallback theo độ tươi |
+| CGH FN-07 Tích hợp App HTX | `TestCGHFN07AreaSyncConsumerIdempotentAndRespectsLock` (QT-03 trong giao dịch inbox, giữ bản Admin đã khóa, bỏ sự kiện cũ hơn, cách ly tenant), `TestResolveAreaQT03`, `TestStatsPort` ; `TestCGHFN07AreaSyncLogFreshnessAndStaleAlert` (nhật ký đồng bộ, độ tươi, job cảnh báo một lần/ngày), `TestIntegrationAlertsNotifyAdmin_GIS_US_SYNC_02_CGH_FN07` | **một phần**: diện tích, nhật ký đồng bộ, cảnh báo Admin và chỉ báo độ tươi đạt; còn tình trạng máy và lịch mùa vụ từ App HTX (App HTX không thu — chờ khách chốt nguồn) |
 | GIS FN-04 ranh giới HTX/Hub | Mục 5, GIS US-BND-01..08 | **đạt** |
-| GIS FN-06 kho/Hub | Mục 5, GIS US-WH-01 | **một phần** (đồng bộ định kỳ) |
+| GIS FN-06 kho/Hub | Mục 5, GIS US-WH-01; `TestDailyCapacityPublication_GIS_US_WH_01` | **đạt** |
 | GIS FN-07 giao thông, thủy hệ, tự nhiên, tile | Đường bộ và thủy hệ: mục 5 (FN-08/09). WEB-E2E `gis-map.spec.ts` kiểm nền bản đồ chỉ lấy từ biến môi trường, không gọi dịch vụ ngoài | **một phần**: tile vệ tinh chờ nhà cung cấp; lớp tự nhiên ngoài G2 |
 | RB-6 đối soát số đo ở biên | — | **ngoài G2 → G3** (`mkg/measurement`) |
 | R-95 phần số đo (số cuộn, sản lượng quy đổi, độ ẩm) | — | **ngoài G2 → G3** |
@@ -245,9 +245,9 @@ CI (`.github/workflows/ci.yml`): `lint`, `test`, `web-ops`, `web-e2e`, `optimize
 | Story (FN) | Kiểm thử | Trạng thái |
 |---|---|---|
 | GIS US-ACC-01 (FN-01) tài khoản | `TestCreateUserUSADM01`, `TestLockUnlockNeedsReason`, `TestBulkActions` (G1); WEB-E2E `accounts.spec.ts` | **đạt**. Liên kết một lần thay mật khẩu tạm (X2) |
-| GIS US-LOG-01 (FN-02) đăng nhập | `TestKeycloakRealmCoversRolesAndClaims` (5 lần/15 phút, không tự đăng ký; realm bật `loginWithEmailAllowed`), `TestVerifyBuildsPrincipal`; WEB-E2E `navigation.spec.ts`, `gis-admin.spec.ts` (KNV xã không vào màn biên tập) | **một phần**: khóa tạm 15 phút thay vì tới khi Admin mở |
-| GIS US-CFG-01 (FN-03) thêm cấu hình | `TestHubCapacityWidgetThresholds_GIS_US_HUB_01`, `TestLayersZoomGate_GIS_BR24`, `TestG2ParamsSeeded`, `TestSelfApprovalBlocked` | **một phần**: thiếu dải màu + kiểm HEX |
-| GIS US-CFG-02 (FN-03) sửa/khôi phục | `TestParamCorrectionSupersedes`, `TestParamLookupAtEventTime` | **một phần**: thiếu khôi phục mặc định |
+| GIS US-LOG-01 (FN-02) đăng nhập | `TestKeycloakRealmCoversRolesAndClaims` (5 lần/15 phút, `permanentLockout`, thông báo "Tài khoản đã bị khóa…"), `TestUnlockClearsBruteForceLockout_GIS_US_LOG_01`, `TestContractHTTPAgainstEmulator` (attack-detection), `TestVerifyBuildsPrincipal`; WEB-E2E `navigation.spec.ts`, `gis-admin.spec.ts` | **đạt**. Khóa tới khi Admin mở (API mở khóa xóa trạng thái chống dò) |
+| GIS US-CFG-01 (FN-03) thêm cấu hình | `TestDisplayPaletteHexValidation_GIS_US_CFG_01`, `TestPercentThresholdsAscending0to100_GIS_US_CFG_01`, `TestHubCapacityWidgetThresholds_GIS_US_HUB_01`, `TestG2ParamsSeeded`, `TestSelfApprovalBlocked` | **đạt** (backend). "Áp dụng ngay" = ngay khi được duyệt (R-56). Màn web `/quan-tri/hien-thi` + legend đọc display-config: đang hoàn thiện |
+| GIS US-CFG-02 (FN-03) sửa/khôi phục | `TestRestoreDefaultIsNewVersion_GIS_US_CFG_02`, `TestParamCorrectionSupersedes`, `TestParamLookupAtEventTime` | **đạt**. Xóa = khôi phục mặc định bằng phiên bản mới (RB-1); Snapshot ngày thuộc US-SNAP-01 |
 | GIS US-BND-01 (FN-04) danh sách HTX | `TestCoopMarkersFallback_GIS_US_BND_02`, `TestCoopMarkersAndSites`; WEB-E2E `gis-map.spec.ts` | **đạt**. Toạ độ HTX nằm trong nền tảng (pf/party, pf/geo), không cần gọi "API HTX" theo ngày |
 | GIS US-BND-02 (FN-04) thêm ranh giới HTX | `TestCoopBoundaryLedger_GIS_US_BND_02_03`, `TestCoopBoundaryScope_GIS_US_BND_02`, `TestCoopMarkersFallback_GIS_US_BND_02`; WEB-E2E `gis-admin.spec.ts` | **đạt** |
 | GIS US-BND-03 (FN-04) sửa/xóa mềm HTX | `TestCoopBoundaryLedger_GIS_US_BND_02_03` (bản ghi bù có lý do, ẩn khỏi bản đồ nhưng giữ lịch sử, chuỗi băm); WEB-E2E `gis-admin.spec.ts` | **đạt** |
@@ -260,8 +260,8 @@ CI (`.github/workflows/ci.yml`): `lint`, `test`, `web-ops`, `web-e2e`, `optimize
 | GIS US-PLOT-02 (FN-05) vẽ thửa | E2E-05, `TestBoundaryValidationRules`, `TestOverlapRules` (G1) | **đạt** |
 | GIS US-PLOT-03 (FN-05) sửa/xóa mềm thửa | `TestCorrectionCreatesNewVersion`, tests/acceptance `TestPrototypeNgungDungThuaCoLyDo` (G1) | **đạt** |
 | GIS US-PLOT-04 (FN-05) nhập thửa | `TestImportGeoJSONAndKML`, `TestImportShapefileZip` (G1) | **đạt** |
-| GIS US-WH-01 (FN-06) dung lượng kho | `TestCapacityManualNotOverwritten_BR52_GIS_US_WH_01`, `TestCapacitySnapshotValveOnlyContractFields`; WEB-E2E `gis-admin.spec.ts` | **một phần**: thiếu đồng bộ định kỳ |
-| GIS US-BASE-01 (FN-07) ranh giới đa cấp & thửa theo zoom | `TestAdminBoundaryAndCommuneContainment`, `TestAdminBoundariesByParentG05`, `TestLayersZoomGate_GIS_BR24`, `TestBBoxLimitAndScope`; WEB-E2E `gis-map.spec.ts` | **một phần**: chưa đo 1,5 s; dữ liệu địa chính chờ khách |
+| GIS US-WH-01 (FN-06) dung lượng kho | `TestDailyCapacityPublication_GIS_US_WH_01` (job `hub_capacity_daily` của api-internal, idempotent theo hub × ngày), `TestCapacityManualNotOverwritten_BR52_GIS_US_WH_01`, `TestCapacitySnapshotValveOnlyContractFields`; WEB-E2E `gis-admin.spec.ts` | **đạt** |
+| GIS US-BASE-01 (FN-07) ranh giới đa cấp & thửa theo zoom | `TestAdminBoundaryAndCommuneContainment`, `TestAdminBoundariesByParentG05`, `TestLayersZoomGate_GIS_BR24`, `TestBBoxLimitAndScope`, `TestStandardMapForTMSLatency_GIS_US_INT_02_US_BASE_01` (1.000 polygon p95 86,8 ms, [gis-performance.md](../runbooks/gis-performance.md)); WEB-E2E `gis-map.spec.ts` | **một phần**: chỉ còn dữ liệu địa chính (VN-2000) chờ khách |
 | GIS US-ROAD-01 (FN-08) tra tuyến đường bộ theo tải trọng | `TestRoadLedger_GIS_US_ROAD_01_02_03`; WEB-E2E `gis-map.spec.ts` | **đạt**. Lọc theo tải trọng, không định tuyến đường bộ (mô phỏng dùng Haversine hiệu chỉnh) |
 | GIS US-ROAD-02 (FN-08) vẽ tuyến đường bộ | `TestRoadLedger_GIS_US_ROAD_01_02_03` (chiều dài trắc địa tự tính, thông báo đúng câu chữ); WEB-E2E `gis-admin.spec.ts` | **đạt** |
 | GIS US-ROAD-03 (FN-08) sửa tuyến đường bộ | `TestRoadLedger_GIS_US_ROAD_01_02_03` (sửa là phiên bản mới) | **đạt** |
@@ -274,14 +274,14 @@ CI (`.github/workflows/ci.yml`): `lint`, `test`, `web-ops`, `web-e2e`, `optimize
 | GIS US-SEASON-01 (FN-13) bản đồ nhiệt giai đoạn | `TestSeasonStageFollowsSeasonDates`, `TestStageMap_GIS_US_SEASON_01_US_YIELD_01` (giai đoạn trội theo HTX tô polygon); WEB-E2E `gis-map.spec.ts` | **đạt**. Bảng màu cố định; cấu hình màu thuộc GIS US-CFG-01 |
 | GIS US-YIELD-01 (FN-14) cảnh báo vùng chín rộ | `TestRipeningWindowOneToThreeDays`, `TestStageMap_GIS_US_SEASON_01_US_YIELD_01` (1–3 ngày tới, kèm sản lượng dự kiến của App HTX, không tính lại); WEB-E2E `gis-map.spec.ts` | **đạt** |
 | GIS US-HUB-01 (FN-15) widget dung lượng Hub | `TestCapacityClass_GIS_US_HUB_01`, `TestHubCapacityWidgetThresholds_GIS_US_HUB_01`; WEB-E2E `gis-map.spec.ts`, `gis-admin.spec.ts` | **đạt** |
-| GIS US-INT-01 (FN-16) đồng bộ App HTX, CGH, ERP | `TestStageMap_GIS_US_SEASON_01_US_YIELD_01`, `TestHubValveConsumerValidatesContractAndIsIdempotent`, `TestCapacityManualNotOverwritten_BR52_GIS_US_WH_01` (AC-2) | **một phần**: thiếu lớp CGH |
-| GIS US-INT-02 (FN-17) bản đồ chuẩn hóa cho TMS | `TestLayersZoomGate_GIS_BR24` (lớp gộp theo khung nhìn) | **một phần**: chưa có API cho TMS, chưa đo 500 ms |
+| GIS US-INT-01 (FN-16) đồng bộ App HTX, CGH, ERP | `TestStageMap_GIS_US_SEASON_01_US_YIELD_01`, `TestHubValveConsumerValidatesContractAndIsIdempotent`, `TestCapacityManualNotOverwritten_BR52_GIS_US_WH_01` (AC-2) | **một phần**: lớp CGH trên `/ban-do-gis` (dùng API mechanization có sẵn) đang hoàn thiện ở web |
+| GIS US-INT-02 (FN-17) bản đồ chuẩn hóa cho TMS | `TestStandardMapForTMSLatency_GIS_US_INT_02_US_BASE_01` (`GET /v1/geo/standard-map`, 5 lớp một lần gọi, vai `map_consumer`, p95 45,7 ms < 500 ms), `TestLayerPortForStandardMap_GIS_US_INT_02` | **một phần**: chỉ còn bản đồ nền (tile) chờ nhà cung cấp (RB-7) và phạm vi TMS chờ khách |
 | GIS US-EVL-01 (FN-18) nhật ký sự kiện thay đổi | `TestCoopBoundaryLedger_GIS_US_BND_02_03`, `TestFacilityLedger_GIS_US_BND_05_06`, `TestGISUSWater03ReviseByCompensatingRecord`, `TestAppendOnlySixWays`, `TestChainSequenceAndTamperDetection` | **đạt**. Sổ chỉ ghi thêm theo từng lớp (thời điểm nghiệp vụ và thời điểm ghi, người ghi, `supersedes_id`, chuỗi băm) |
 | GIS US-SNAP-01 (FN-19) snapshot theo ngày | — | **ngoài G2 → G3** (lịch sử `pf/metrics`) |
 | GIS US-REPLAY-01 (FN-20) xem lại theo ngày | — | **ngoài G2 → G3**. Sổ đã đủ để tái dựng; chưa có màn và API |
 | GIS US-RETAIN-01 (FN-21) chính sách lưu và dọn | — | **ngoài G2**: chờ khách chốt chính sách lưu; "dọn" phải là chuyển tầng, không xóa (RB-1, X1) |
-| GIS US-SYNC-01 (FN-22) giám sát đồng bộ | `TestOutboxToInboxExactlyOnceEffect`, `TestDLQDepth`, `TestConflictSLA` | **một phần**: thiếu màn giám sát |
-| GIS US-SYNC-02 (FN-23) retry & dead-letter | `TestDLQDepth`, `TestWorkerConsumersDeclaredByPublisher`; pytest `test_permanent_errors_go_to_dlq`, `test_post_5xx_requeues_with_backoff_not_ack`, `test_topology_matches_go_inbox`; [rabbitmq-queues.md](../runbooks/rabbitmq-queues.md) | **một phần**: cảnh báo Admin mới là metric |
+| GIS US-SYNC-01 (FN-22) giám sát đồng bộ | `TestIntegrationMonitor_GIS_US_SYNC_01_02` (`GET /v1/sync/integrations`, `/log`), `TestOutboxToInboxExactlyOnceEffect`, `TestDLQDepth` | **đạt** (backend). Màn `/quan-tri/giam-sat-dong-bo`: đang hoàn thiện ở web |
+| GIS US-SYNC-02 (FN-23) retry & dead-letter | `TestDLQDepth`, `TestWorkerConsumersDeclaredByPublisher`; pytest `test_permanent_errors_go_to_dlq`, `test_post_5xx_requeues_with_backoff_not_ack`, `test_topology_matches_go_inbox`; `TestIntegrationErrorCode_GIS_US_SYNC_02`, `TestIntegrationAlertsNotifyAdmin_GIS_US_SYNC_02_CGH_FN07`; [rabbitmq-queues.md](../runbooks/rabbitmq-queues.md), luật Prometheus [integration-alerts.md](../runbooks/integration-alerts.md) | **đạt** |
 
 ## 6. Cổng kiến trúc G2
 

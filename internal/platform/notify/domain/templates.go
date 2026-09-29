@@ -8,6 +8,7 @@ import (
 
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
+	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
@@ -160,4 +161,23 @@ func OrgDeactivatedTemplate(p partyport.OrgDeactivatedV1, occurred time.Time) Te
 	return Template{Kind: port.KindOrgDeactivated, Severity: port.SeverityNormal, Title: "Một tổ chức trong địa bàn đã bị vô hiệu hóa",
 		Body:     fmt.Sprintf("Tài khoản thuộc tổ chức đã bị khóa; %d hộ thành viên bị ảnh hưởng.", p.ActiveHouseholds),
 		DeepLink: "/orgs/" + p.OrgRef.String(), SubjectRef: ref(p.OrgRef), CreatedAt: ParseTime(p.EventTime, occurred)}
+}
+
+// DeadLetterTemplate: sự kiện đồng bộ tích hợp vào hàng chờ lỗi (GIS US-SYNC-02 AC-1) → Admin.
+// Chỉ nêu nguồn, loại sự kiện và mã lỗi đã chuẩn hóa — không có dữ liệu nghiệp vụ.
+func DeadLetterTemplate(p syncport.IntegrationDeadLetteredV1, occurred time.Time) Template {
+	return Template{Kind: port.KindIntegrationDeadLettered, Severity: port.SeverityUrgent,
+		Title: "Đồng bộ tích hợp lỗi — sự kiện đã vào hàng chờ lỗi (DLQ)",
+		Body: fmt.Sprintf("Nguồn %s không xử lý được sự kiện %s sau %d lần thử (mã lỗi %s). Kiểm tra màn Giám sát đồng bộ và runbook hàng đợi.",
+			p.Source, p.EventType, p.DeliveryCount+1, p.ErrorCode),
+		DeepLink: "/sync/integrations/" + p.FailureID.String(), SubjectRef: ref(p.FailureID), CreatedAt: ParseTime(p.RecordedAt, occurred)}
+}
+
+// AreaFeedStaleTemplate: dữ liệu diện tích vụ App HTX quá ngưỡng độ tươi (CGH FN-07) → Admin CGH.
+func AreaFeedStaleTemplate(p mechport.AreaFeedStaleV1, occurred time.Time) Template {
+	return Template{Kind: port.KindAreaFeedStale, Severity: port.SeverityNormal,
+		Title: "Dữ liệu App HTX chưa cập nhật quá ngưỡng độ tươi",
+		Body: fmt.Sprintf("Lần đồng bộ diện tích vụ gần nhất lúc %s, quá %s giờ — Bản đồ CGH đang dùng dữ liệu nhập tay dự phòng.",
+			viTime(ParseTime(p.LastSyncAt, occurred)), p.ThresholdHours),
+		DeepLink: "/mechanization/area-sync-log", CreatedAt: ParseTime(p.DetectedAt, occurred)}
 }

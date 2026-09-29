@@ -153,7 +153,7 @@ paths:
                         key: {type: string}
                         name: {type: string}
                         unit: {type: string}
-                        kind: {type: string, enum: [decimal, text]}
+                        kind: {type: string, enum: [decimal, text, color], description: "color = mã màu HEX #RRGGBB (GIS US-CFG-01)"}
                         min: {type: [string, "null"]}
                         max: {type: [string, "null"]}
                         current:
@@ -433,6 +433,43 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /v1/masterdata/params/restore-default:
+    post:
+      summary: Khôi phục mặc định / xóa cấu hình hiển thị (GIS US-CFG-02 AC-2) — tạo PHIÊN BẢN NHÁP mới mang giá trị mặc định nhúng, áp dụng khi được duyệt (R-56)
+      description: |
+        Không xóa phiên bản nào (RB-1, ADR-0011): "Xóa" một cấu hình = khôi phục giá trị mặc định bằng phiên bản mới,
+        hiệu lực từ lúc đề xuất. Phiên bản đi qua gửi duyệt → phê duyệt bởi người khác người đặt; giá trị cũ vẫn
+        trong sổ param_approved (tra cứu, kiểm toán). Vai param_setter. Khóa không có mặc định → 404 masterdata.param_no_default.
+      operationId: restoreParamDefault
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key]
+              properties:
+                key: {type: string, examples: ["gis.stage_color:chin_ro"]}
+                reason: {type: string, description: "Lý do (≥ 10 ký tự); bỏ trống → \"Khôi phục giá trị mặc định (GIS US-CFG-02)\""}
+      responses:
+        "201":
+          description: Phiên bản nháp mang giá trị mặc định
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ParamVersion"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ParamVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: masterdata.param_no_default, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed (mã màu HEX, ngưỡng %) | masterdata.param_percent_thresholds", $ref: "#/components/responses/Problem"}
   # --- pf/party: tổ chức, HTX, nông hộ ---
 
   /v1/orgs:
@@ -870,6 +907,61 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
         "409": {description: "sync.conflict_state — đã đóng", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/sync/integrations:
+    get:
+      summary: Giám sát đồng bộ tích hợp theo nguồn (GIS US-SYNC-01 AC-1) — mỗi consumer một dòng
+      description: |
+        Gộp lần xử lý thành công (shared.inbox) và thất bại (pf_sync.integration_failure) theo consumer trong cửa sổ
+        window_hours (mặc định 24, tối đa 720): số sự kiện xử lý, lần thành công gần nhất, số lần lỗi, số sự kiện vào
+        hàng chờ lỗi (DLQ), mã lỗi gần nhất (đã chuẩn hóa, không có thông điệp tự do — R-14), độ sâu DLQ hiện tại
+        (RabbitMQ management API; null khi chưa cấu hình AG_RABBITMQ_MGMT_URL). Vai platform_admin, device_admin.
+      operationId: syncIntegrations
+      parameters:
+        - {name: window_hours, in: query, schema: {type: integer, minimum: 1, maximum: 720, default: 24}}
+        - {name: consumer, in: query, description: "Lọc theo nguồn (tên consumer)", schema: {type: string}}
+        - {name: status, in: query, schema: {type: string, enum: [ok, error, idle]}}
+      responses:
+        "200":
+          description: Tình trạng từng luồng đồng bộ
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [since, dlq_available, items]
+                properties:
+                  since: {type: string, format: date-time}
+                  dlq_available: {type: boolean}
+                  items:
+                    type: array
+                    items: {$ref: "#/components/schemas/SyncIntegration"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/sync/integrations/log:
+    get:
+      summary: Nhật ký đồng bộ tích hợp (GIS US-SYNC-01 AC-1) — thời điểm, nguồn, số bản ghi, thành công/lỗi, mã lỗi; mới nhất trước
+      operationId: syncIntegrationLog
+      parameters:
+        - {name: consumer, in: query, schema: {type: string}}
+        - {name: status, in: query, schema: {type: string, enum: [ok, error]}}
+        - {name: from, in: query, description: "Mặc định: to − 7 ngày", schema: {type: string, format: date-time}}
+        - {name: to, in: query, schema: {type: string, format: date-time}}
+        - $ref: "#/components/parameters/Cursor"
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang nhật ký
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  next_cursor: {type: [string, "null"]}
+                  items:
+                    type: array
+                    items: {$ref: "#/components/schemas/SyncIntegrationLogEntry"}
+        "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
   # --- hết pf/sync ---
 
@@ -3460,6 +3552,36 @@ components:
         effective_from: {type: string, description: "RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam"}
         source_doc: {type: string, maxLength: 300, description: "Số/ngày văn bản ban hành (bắt buộc — CGH FN-02 B3)"}
         correction_reason: {type: string, minLength: 10}
+    SyncIntegration:
+      type: object
+      description: Tình trạng một luồng đồng bộ (consumer) — GIS US-SYNC-01
+      required: [consumer, source, status, processed_count, last_processed_at, last_event_type, failure_count, dead_lettered_count, last_failure_at, last_error_code, dlq_depth]
+      properties:
+        consumer: {type: string, examples: ["pf.mechanization.area_sync"]}
+        source: {type: string, description: "Nhãn nguồn tích hợp (tiếng Việt)"}
+        status: {type: string, enum: [ok, error, idle]}
+        processed_count: {type: integer}
+        last_processed_at: {type: [string, "null"], format: date-time}
+        last_event_type: {type: [string, "null"]}
+        failure_count: {type: integer}
+        dead_lettered_count: {type: integer}
+        last_failure_at: {type: [string, "null"], format: date-time}
+        last_error_code: {type: [string, "null"]}
+        dlq_depth: {type: [integer, "null"], description: "null = không đo được (chưa cấu hình management API)"}
+    SyncIntegrationLogEntry:
+      type: object
+      required: [at, consumer, source, event_type, event_id, status, record_count, error_code, delivery_count, dead_lettered]
+      properties:
+        at: {type: string, format: date-time}
+        consumer: {type: string}
+        source: {type: string}
+        event_type: {type: string}
+        event_id: {type: string, format: uuid}
+        status: {type: string, enum: [ok, error]}
+        record_count: {type: integer, description: "Số bản ghi của lần đồng bộ (mỗi sự kiện một bản ghi)"}
+        error_code: {type: [string, "null"]}
+        delivery_count: {type: integer}
+        dead_lettered: {type: boolean}
     ParamVersion:
       type: object
       required: [id, key, version, value, text, unit, effective_from, source_doc, status, setter_ref, created_at]

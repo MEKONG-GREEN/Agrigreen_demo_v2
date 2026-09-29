@@ -69,12 +69,16 @@ func roleConstants(t *testing.T) map[string]string {
 }
 
 type realmFile struct {
-	RegistrationAllowed bool   `json:"registrationAllowed"`
-	BruteForceProtected bool   `json:"bruteForceProtected"`
-	FailureFactor       int    `json:"failureFactor"`
-	MaxDeltaTimeSeconds int    `json:"maxDeltaTimeSeconds"`
-	PasswordPolicy      string `json:"passwordPolicy"`
-	Roles               struct {
+	RegistrationAllowed bool `json:"registrationAllowed"`
+	BruteForceProtected bool `json:"bruteForceProtected"`
+	FailureFactor       int  `json:"failureFactor"`
+	MaxDeltaTimeSeconds int  `json:"maxDeltaTimeSeconds"`
+	// GIS US-LOG-01 AC-3: khóa tới khi Admin mở (không tự mở sau thời gian chờ).
+	PermanentLockout     bool                         `json:"permanentLockout"`
+	MaxTemporaryLockouts int                          `json:"maxTemporaryLockouts"`
+	LocalizationTexts    map[string]map[string]string `json:"localizationTexts"`
+	PasswordPolicy       string                       `json:"passwordPolicy"`
+	Roles                struct {
 		Realm []struct {
 			Name        string `json:"name"`
 			Description string `json:"description"`
@@ -113,6 +117,14 @@ func TestKeycloakRealmCoversRolesAndClaims(t *testing.T) {
 		!strings.Contains(realm.PasswordPolicy, "length(") {
 		t.Errorf("chính sách đăng nhập: đăng ký=%v chống dò=%v sai tối đa=%d cửa sổ=%ds mật khẩu=%q",
 			realm.RegistrationAllowed, realm.BruteForceProtected, realm.FailureFactor, realm.MaxDeltaTimeSeconds, realm.PasswordPolicy)
+	}
+	// GIS US-LOG-01 AC-3: sai 5 lần/15 phút → khóa VĨNH VIỄN tới khi Admin mở khóa (pf/accounts
+	// unlock xóa trạng thái attack-detection), thông báo đúng văn bản của AC.
+	const lockedMsg = "Tài khoản đã bị khóa, vui lòng liên hệ Admin để mở khóa."
+	if !realm.PermanentLockout || realm.MaxTemporaryLockouts != 0 || realm.LocalizationTexts["vi"]["accountPermanentlyDisabledMessage"] != lockedMsg ||
+		realm.LocalizationTexts["vi"]["accountDisabledMessage"] != lockedMsg {
+		t.Errorf("GIS US-LOG-01 AC-3: permanentLockout=%v maxTemporaryLockouts=%d thông báo=%q", realm.PermanentLockout,
+			realm.MaxTemporaryLockouts, realm.LocalizationTexts["vi"]["accountPermanentlyDisabledMessage"])
 	}
 	have := map[string]string{}
 	for _, r := range realm.Roles.Realm {

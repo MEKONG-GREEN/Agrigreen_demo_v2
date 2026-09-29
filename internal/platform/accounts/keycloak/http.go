@@ -603,3 +603,20 @@ func (c *Client) Logout(ctx context.Context, id uuid.UUID) error {
 	_, err := c.do(ctx, "thu hồi phiên", http.MethodPost, userPath(id)+"/logout", nil, nil, nil)
 	return err
 }
+
+func bruteForcePath(id uuid.UUID) string { return "/attack-detection/brute-force/users/" + id.String() }
+
+// BruteForceLocked đọc GET /attack-detection/brute-force/users/{id} (trường "disabled").
+func (c *Client) BruteForceLocked(ctx context.Context, id uuid.UUID) (bool, error) {
+	var st struct {
+		Disabled bool `json:"disabled"`
+	}
+	_, err := c.do(ctx, "đọc trạng thái khóa đăng nhập sai", http.MethodGet, bruteForcePath(id), nil, nil, &st)
+	return st.Disabled, err
+}
+
+// ClearBruteForce gọi DELETE /attack-detection/brute-force/users/{id} (Admin mở khóa).
+func (c *Client) ClearBruteForce(ctx context.Context, id uuid.UUID) error {
+	_, err := c.do(ctx, "mở khóa đăng nhập sai", http.MethodDelete, bruteForcePath(id), nil, nil, nil)
+	return err
+}

@@ -56,6 +56,8 @@ Mã lỗi của module có dạng `<module>.<lỗi>`.
 | 403 | `masterdata.param_not_setter` | pf/masterdata: gửi duyệt phiên bản do người khác đặt |
 | 422 | `masterdata.param_threshold_order` | pf/masterdata: mốc ngưỡng CGH (QT-02) lệch thứ tự so với hai mốc đã duyệt tại ngày hiệu lực — phải Cần chú ý < Đủ < Thừa (kiểm khi đề xuất và khi duyệt) |
 | 422 | `masterdata.param_correction_required` | pf/masterdata: đã có bản duyệt cùng `effective_from` — phải nêu `correction_reason` (bản ghi bù) |
+| 422 | `masterdata.param_percent_thresholds` | pf/masterdata: bộ ngưỡng % của quy chuẩn hiển thị GIS (`geo.hub_capacity_warn_pct` < `geo.hub_capacity_full_pct`) lệch thứ tự hoặc ngoài 0–100 % — "Ngưỡng % phải tăng dần và nằm trong khoảng 0–100%." (GIS US-CFG-01 AC-2; kiểm khi đề xuất và khi duyệt). Mã màu sai định dạng trả `validation_failed` trường `text`: "Mã màu không đúng định dạng HEX (ví dụ: #1E90FF)." |
+| 404 | `masterdata.param_no_default` | pf/masterdata: khóa không có giá trị mặc định nhúng để "Khôi phục mặc định" (GIS US-CFG-02 AC-2) |
 | 422 | `masterdata.catalog_import_invalid` | pf/masterdata: tệp nhập danh mục (HTX US-CAT-02; CSV UTF-8 hoặc .xlsx) sai mẫu — thiếu cột `catalog`/`code`/`name`, ô công thức, quá 500 dòng hoặc 2 MB — từ chối cả tệp (dòng lỗi riêng lẻ nằm trong `rows[].reason`, không phải lỗi HTTP) |
 | 404 | `masterdata.catalog_import_not_found` | pf/masterdata: không có lần nhập danh mục với mã đó trong tenant |
 

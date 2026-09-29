@@ -231,6 +231,10 @@ func derefEv(e *domain.Event) domain.Event {
 	return *e
 }
 
+// LockCauseBruteForce là nguyên nhân khóa ghi vào chi tiết sự kiện mở khóa khi tài khoản bị
+// Keycloak khóa do đăng nhập sai nhiều lần (không phải trạng thái của bảng account).
+const LockCauseBruteForce = "brute_force"
+
 // Unlock mở khóa tài khoản (HTX US-ACC-01 AC-6: đăng nhập lại ngay, không cần reset).
 // Tổ chức đang bị vô hiệu hóa → không mở được (kích hoạt lại tổ chức sẽ mở).
 func (s *Service) Unlock(ctx context.Context, in LockInput) (Result, error) {
@@ -259,7 +263,13 @@ func (s *Service) unlock(ctx context.Context, a *actor, in LockInput) (Result, e
 		return Result{}, err
 	}
 	cur := t.state()
-	if cur.Enabled && t.user.Enabled {
+	// GIS US-LOG-01 AC-3: khóa do đăng nhập sai 5 lần/15 phút (realm permanentLockout) chỉ mở
+	// khi Admin mở khóa — Keycloak giữ enabled = true nên phải hỏi trạng thái chống dò riêng.
+	bruteForce, err := s.Dir.BruteForceLocked(ctx, t.user.ID)
+	if err != nil {
+		return Result{}, dirErr(err)
+	}
+	if cur.Enabled && t.user.Enabled && !bruteForce {
 		return Result{}, ErrState.WithDetail("Tài khoản đang hoạt động.")
 	}
 	o, err := s.org(ctx, a, t.user.OrgRef)
@@ -269,12 +279,20 @@ func (s *Service) unlock(ctx context.Context, a *actor, in LockInput) (Result, e
 	if o != nil && !o.Active {
 		return Result{}, ErrOrgInactive.WithDetail("Tổ chức của tài khoản đang bị vô hiệu hóa; kích hoạt lại tổ chức để mở khóa.")
 	}
+	if bruteForce {
+		if err := s.Dir.ClearBruteForce(ctx, t.user.ID); err != nil {
+			return Result{}, dirErr(err)
+		}
+	}
 	if !t.user.Enabled {
 		if err := s.Dir.SetEnabled(ctx, t.user.ID, true); err != nil {
 			return Result{}, dirErr(err)
 		}
 	}
 	prevCause := string(cur.LockCause)
+	if prevCause == "" && bruteForce {
+		prevCause = LockCauseBruteForce
+	}
 	acc := cur
 	acc.Enabled, acc.LockCause = true, ""
 	ev := newEvent(a.p.TenantID, a.p.ActorRef, acc, domain.ActionUnlocked, s.now(), in.IdemKey, in.Reason)
