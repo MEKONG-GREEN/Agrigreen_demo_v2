@@ -30,7 +30,9 @@ type Feature struct {
 	Props  map[string]string
 	Geom   MultiPolygon
 	Points int
-	Err    error
+	// Point: đối tượng điểm (marker) — chỉ khi đọc bằng ParseFeaturesPoints (GIS US-BND-08).
+	Point *Position
+	Err   error
 }
 
 // DetectFormat đoán định dạng từ tham số, tên tệp hoặc nội dung.
@@ -67,15 +69,25 @@ func DetectFormat(explicit, fileName string, data []byte) string {
 // ParseFeatures đọc tệp theo định dạng. Lỗi trả về là lỗi cả tệp; lỗi từng đối
 // tượng nằm ở Feature.Err.
 func ParseFeatures(format string, data []byte) ([]Feature, error) {
+	return parseFeatures(format, data, false)
+}
+
+// ParseFeaturesPoints như ParseFeatures nhưng nhận cả đối tượng điểm (Point) —
+// Feature.Point thay cho Geom (nhập vị trí kho/Hub, GIS US-BND-08).
+func ParseFeaturesPoints(format string, data []byte) ([]Feature, error) {
+	return parseFeatures(format, data, true)
+}
+
+func parseFeatures(format string, data []byte, pts bool) ([]Feature, error) {
 	var feats []Feature
 	var err error
 	switch format {
 	case FormatGeoJSON:
-		feats, err = parseGeoJSONFeatures(data)
+		feats, err = parseGeoJSONFeatures(data, pts)
 	case FormatKML:
-		feats, err = parseKML(data)
+		feats, err = parseKML(data, pts)
 	case FormatShapefile:
-		feats, err = parseShapefileZip(data)
+		feats, err = parseShapefileZip(data, pts)
 	default:
 		return nil, violation(CodeFormatUnsupported, "Không nhận ra định dạng tệp — hỗ trợ GeoJSON (.geojson/.json), KML (.kml) và Shapefile (gói .zip)")
 	}
@@ -103,7 +115,7 @@ type rawFeature struct {
 	CRS        json.RawMessage            `json:"crs"`
 }
 
-func parseGeoJSONFeatures(data []byte) ([]Feature, error) {
+func parseGeoJSONFeatures(data []byte, pts bool) ([]Feature, error) {
 	data = bytes.TrimPrefix(data, []byte("\xef\xbb\xbf"))
 	var top rawFeature
 	if err := json.Unmarshal(data, &top); err != nil {
@@ -121,11 +133,16 @@ func parseGeoJSONFeatures(data []byte) ([]Feature, error) {
 				out = append(out, Feature{Index: i + 1, Err: violation(CodeFormat, "đối tượng không phải GeoJSON Feature")})
 				continue
 			}
-			out = append(out, geoJSONFeature(i+1, f))
+			out = append(out, geoJSONFeature(i+1, f, pts))
 		}
 		return out, nil
 	case "Feature":
-		return []Feature{geoJSONFeature(1, top)}, nil
+		return []Feature{geoJSONFeature(1, top, pts)}, nil
+	case "Point":
+		if pts {
+			pos, err := ParsePoint(data)
+			return []Feature{{Index: 1, Props: map[string]string{}, Point: pos, Err: err}}, nil
+		}
 	case "Polygon", "MultiPolygon":
 		mp, n, err := ParseGeometry(data)
 		return []Feature{{Index: 1, Props: map[string]string{}, Geom: mp, Points: n, Err: err}}, nil
@@ -133,7 +150,7 @@ func parseGeoJSONFeatures(data []byte) ([]Feature, error) {
 	return nil, violation(CodeFormat, "GeoJSON phải là FeatureCollection, Feature hoặc Polygon/MultiPolygon")
 }
 
-func geoJSONFeature(idx int, f rawFeature) Feature {
+func geoJSONFeature(idx int, f rawFeature, pts bool) Feature {
 	out := Feature{Index: idx, Props: map[string]string{}}
 	for k, v := range f.Properties {
 		var s string
@@ -150,8 +167,21 @@ func geoJSONFeature(idx int, f rawFeature) Feature {
 		out.Err = err
 		return out
 	}
+	if pts && geometryType(f.Geometry) == "Point" {
+		out.Point, out.Err = ParsePoint(f.Geometry)
+		return out
+	}
 	out.Geom, out.Points, out.Err = ParseGeometry(f.Geometry)
 	return out
+}
+
+// geometryType đọc trường type của một hình GeoJSON ("" nếu không đọc được).
+func geometryType(raw json.RawMessage) string {
+	var g struct {
+		Type string `json:"type"`
+	}
+	_ = json.Unmarshal(raw, &g)
+	return g.Type
 }
 
 func firstProp(p map[string]string, keys ...string) string {
@@ -171,13 +201,14 @@ type kmlPlacemark struct {
 	name   strings.Builder
 	props  map[string]string
 	polys  []Polygon
+	point  *Position
 	other  string
 	badPos bool
 }
 
 // parseKML đọc mọi Placemark, lấy Polygon (kể cả trong MultiGeometry), tên và
 // ExtendedData (Data/value, SimpleData) làm thuộc tính.
-func parseKML(data []byte) ([]Feature, error) {
+func parseKML(data []byte, pts bool) ([]Feature, error) {
 	dec := xml.NewDecoder(bytes.NewReader(data))
 	var (
 		out      []Feature
@@ -186,6 +217,7 @@ func parseKML(data []byte) ([]Feature, error) {
 		text     strings.Builder
 		dataName string
 		inPoly   bool
+		inPoint  bool
 	)
 	within := func(name string) bool {
 		for _, s := range stack {
@@ -220,6 +252,9 @@ func parseKML(data []byte) ([]Feature, error) {
 				if cur != nil && !inPoly && cur.other == "" {
 					cur.other = name
 				}
+				if name == "Point" && cur != nil && !inPoly {
+					inPoint = true
+				}
 			case "Data", "SimpleData":
 				dataName = ""
 				for _, a := range t.Attr {
@@ -247,6 +282,14 @@ func parseKML(data []byte) ([]Feature, error) {
 						cur.props[dataName] = strings.TrimSpace(text.String())
 					}
 				case "coordinates":
+					if inPoint && !inPoly && cur.point == nil {
+						r, ok := parseKMLCoords(text.String())
+						if !ok || len(r) != 1 {
+							cur.badPos = true
+						} else {
+							cur.point = &r[0]
+						}
+					}
 					if inPoly && len(cur.polys) > 0 {
 						r, ok := parseKMLCoords(text.String())
 						if !ok {
@@ -262,8 +305,10 @@ func parseKML(data []byte) ([]Feature, error) {
 					}
 				case "Polygon":
 					inPoly = false
+				case "Point":
+					inPoint = false
 				case "Placemark":
-					out = append(out, cur.feature(len(out)+1))
+					out = append(out, cur.feature(len(out)+1, pts))
 					cur = nil
 				}
 			}
@@ -276,7 +321,7 @@ func parseKML(data []byte) ([]Feature, error) {
 	return out, nil
 }
 
-func (k *kmlPlacemark) feature(idx int) Feature {
+func (k *kmlPlacemark) feature(idx int, pts bool) Feature {
 	f := Feature{Index: idx, Name: k.name.String(), Props: k.props}
 	if f.Name == "" {
 		f.Name = firstProp(k.props, "name", "ten", "ten_thua")
@@ -284,6 +329,9 @@ func (k *kmlPlacemark) feature(idx int) Feature {
 	switch {
 	case k.badPos:
 		f.Err = violation(CodeInvalidGeometry, "toạ độ KML phải có dạng kinh_độ,vĩ_độ[,độ_cao]")
+	case pts && len(k.polys) == 0 && k.point != nil:
+		f.Point = k.point
+		f.Err = checkPosition(*k.point)
 	case len(k.polys) == 0 && k.other != "":
 		f.Err = violation(CodeInvalidGeometry, "chỉ nhận vùng khép kín (Polygon), không nhận "+k.other)
 	case len(k.polys) == 0:

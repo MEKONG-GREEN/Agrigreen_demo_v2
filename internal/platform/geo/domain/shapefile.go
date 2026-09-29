@@ -35,6 +35,9 @@ const (
 // Kiểu hình trong .shp.
 const (
 	shpNull     = 0
+	shpPoint    = 1
+	shpPointZ   = 11
+	shpPointM   = 21
 	shpPolygon  = 5
 	shpPolygonZ = 15
 	shpPolygonM = 25
@@ -51,7 +54,7 @@ var ErrShapefileNotZip = violation(CodeFormat,
 
 // parseShapefileZip đọc gói .zip Shapefile thành các đối tượng. Lỗi trả về là lỗi
 // cả tệp (thiếu tệp, hệ toạ độ không hỗ trợ, không phải lớp vùng).
-func parseShapefileZip(data []byte) ([]Feature, error) {
+func parseShapefileZip(data []byte, pts bool) ([]Feature, error) {
 	if !bytes.HasPrefix(data, []byte("PK")) {
 		return nil, ErrShapefileNotZip
 	}
@@ -116,7 +119,7 @@ func parseShapefileZip(data []byte) ([]Feature, error) {
 		}
 		cpg = string(b)
 	}
-	shapes, err := readSHP(shp)
+	shapes, err := readSHP(shp, pts)
 	if err != nil {
 		return nil, err
 	}
@@ -140,9 +143,13 @@ func parseShapefileZip(data []byte) ([]Feature, error) {
 				f.Name = "Tờ " + f.Props["so_to"] + " thửa " + f.Props["so_thua"]
 			}
 		}
-		if s.err != nil {
+		switch {
+		case s.err != nil:
 			f.Err = s.err
-		} else {
+		case s.point != nil:
+			f.Point = s.point
+			f.Err = checkPosition(*s.point)
+		default:
 			f.Geom = s.geom
 			f.Points, f.Err = f.Geom.Normalize()
 		}
@@ -243,18 +250,20 @@ func wktName(w string) string {
 // ---------------------------------------------------------------------------
 
 type shpShape struct {
-	geom MultiPolygon
-	err  error
+	geom  MultiPolygon
+	point *Position // lớp điểm (chỉ khi nhận điểm)
+	err   error
 }
 
 // readSHP đọc tuần tự các bản ghi. Mỗi bản ghi thành một hình hoặc một lỗi riêng.
-func readSHP(b []byte) ([]shpShape, error) {
+func readSHP(b []byte, pts bool) ([]shpShape, error) {
 	if len(b) < 100 || binary.BigEndian.Uint32(b[0:4]) != 9994 {
 		return nil, violation(CodeFormat, "Tệp .shp không đúng định dạng Shapefile")
 	}
 	typ := int32(binary.LittleEndian.Uint32(b[32:36]))
-	switch typ {
-	case shpPolygon, shpPolygonZ, shpPolygonM, shpNull:
+	switch {
+	case typ == shpPolygon || typ == shpPolygonZ || typ == shpPolygonM || typ == shpNull:
+	case pts && (typ == shpPoint || typ == shpPointZ || typ == shpPointM):
 	default:
 		n := shpTypeNames[typ]
 		if n == "" {
@@ -270,13 +279,26 @@ func readSHP(b []byte) ([]shpShape, error) {
 		if clen < 4 || end > len(b) || end < start {
 			return nil, violation(CodeFormat, "Tệp .shp bị cắt cụt hoặc hỏng (bản ghi "+strconv.Itoa(len(out)+1)+")")
 		}
-		out = append(out, parsePolygonRecord(b[start:end]))
+		out = append(out, parseRecord(b[start:end], pts))
 		if len(out) > MaxFeatures {
 			return nil, violation(CodeFormat, "Tối đa "+strconv.Itoa(MaxFeatures)+" đối tượng mỗi lần nhập")
 		}
 		off = end
 	}
 	return out, nil
+}
+
+// parseRecord đọc một bản ghi: điểm (khi nhận điểm) hoặc vùng.
+func parseRecord(c []byte, pts bool) shpShape {
+	typ := int32(binary.LittleEndian.Uint32(c[0:4]))
+	if pts && (typ == shpPoint || typ == shpPointZ || typ == shpPointM) {
+		if len(c) < 20 {
+			return shpShape{err: violation(CodeInvalidGeometry, "bản ghi Point hỏng")}
+		}
+		p := Position{math.Float64frombits(binary.LittleEndian.Uint64(c[4:])), math.Float64frombits(binary.LittleEndian.Uint64(c[12:]))}
+		return shpShape{point: &p}
+	}
+	return parsePolygonRecord(c)
 }
 
 func parsePolygonRecord(c []byte) shpShape {

@@ -1316,6 +1316,381 @@ paths:
                         area_ha: {type: [string, "null"]}
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  # --- pf/geo G2: ranh giới HTX (nhập tệp), kho/Hub + sức chứa (BR-52: chỉ Admin nhập tay), đường bộ ---
+  # Vai geo_admin (hoặc platform_admin); phạm vi TW → Tỉnh → Xã theo tổ chức của người gọi. Đọc qua Application API.
+  /v1/geo/cooperative-boundaries/import:
+    post:
+      summary: Nhập hàng loạt ranh giới HTX từ GeoJSON/KML/Shapefile (.zip) (GIS US-BND-07) — HTX theo cooperative_ref hoặc Mã HTX (cooperative_code/ma_htx/MA_HTX); HTX đã có ranh giới → phiên bản mới thay phiên bản hiện hành
+      description: |
+        Cùng giới hạn và quy tắc hệ toạ độ như /v1/geo/plots/import: chỉ WGS84 (EPSG:4326) — hệ khác → 422 geo.crs_unsupported
+        cho cả tệp. Đối tượng lỗi bị loại kèm mã/lý do, đối tượng hợp lệ vẫn được nạp. Idem_key từng đối tượng =
+        Idempotency-Key + ":" + thứ tự.
+      operationId: geoImportCoopBoundaries
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: format, in: query, schema: {type: string, enum: [geojson, kml, shapefile]}}
+        - {name: file_name, in: query, schema: {type: string}}
+        - {name: reason, in: query, schema: {type: string, minLength: 10}, description: "Lý do khi thay ranh giới đang có; mặc định nêu tên tệp"}
+      requestBody:
+        required: true
+        content:
+          application/geo+json: {schema: {type: object}}
+          application/json: {schema: {type: object}}
+          application/vnd.google-earth.kml+xml: {schema: {type: string}}
+          application/zip: {schema: {type: string, format: binary}}
+      responses:
+        "200":
+          description: Kết quả theo đối tượng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [format, accepted, duplicate, rejected, features]
+                properties:
+                  format: {type: string, enum: [geojson, kml, shapefile]}
+                  accepted: {type: integer}
+                  duplicate: {type: integer}
+                  rejected: {type: integer}
+                  features:
+                    type: array
+                    items:
+                      type: object
+                      required: [index, name, status, replaced, code, reason, cooperative_ref, boundary_id, version, area_ha]
+                      properties:
+                        index: {type: integer}
+                        name: {type: [string, "null"]}
+                        status: {type: string, enum: [accepted, duplicate, rejected]}
+                        replaced: {type: boolean}
+                        code: {type: [string, "null"]}
+                        reason: {type: [string, "null"]}
+                        cooperative_ref: {type: [string, "null"], format: uuid}
+                        boundary_id: {type: [string, "null"], format: uuid}
+                        version: {type: integer}
+                        area_ha: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/geo/facilities:
+    post:
+      summary: Thêm kho/Hub/nhà máy của tenant (GIS US-BND-05 AC-1) — gắn Marker (point) và/hoặc vẽ khuôn viên (polygon); thiếu tên hoặc địa chỉ (tỉnh/xã) → "Vui lòng nhập đầy đủ Tên Hub và Địa chỉ."; sức chứa ≤ 0 hoặc sai định dạng → "Sức chứa phải là số lớn hơn 0." (AC-2)
+      description: Hub của MKG không tạo ở đây — đến qua van công bố hub_facility. Sự kiện pf.geo.facility.recorded.
+      operationId: geoCreateFacility
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/GeoFacilityInput"}
+      responses:
+        "201": {$ref: "#/components/responses/GeoFacilityWritten"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/facilities/import:
+    post:
+      summary: Nhập hàng loạt vị trí kho/Hub từ GeoJSON/KML/Shapefile (GIS US-BND-08) — đối tượng điểm (marker) hoặc vùng (khuôn viên); thuộc tính name/ten, code/ma, kind/loai, capacity/suc_chua, unit/don_vi, province_code/ma_tinh, commune_code/ma_xa
+      operationId: geoImportFacilities
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: format, in: query, schema: {type: string, enum: [geojson, kml, shapefile]}}
+        - {name: file_name, in: query, schema: {type: string}}
+        - {name: kind, in: query, schema: {type: string, enum: [kho, hub, nha_may]}, description: "Mặc định khi thiếu thuộc tính loại (không có → hub)"}
+        - {name: province_code, in: query, schema: {type: string}, description: "Mặc định khi thiếu province_code/ma_tinh"}
+        - {name: commune_code, in: query, schema: {type: string}, description: "Mặc định khi thiếu commune_code/ma_xa"}
+        - {name: unit, in: query, schema: {type: string, enum: [tan, m3, ke]}}
+      requestBody:
+        required: true
+        content:
+          application/geo+json: {schema: {type: object}}
+          application/json: {schema: {type: object}}
+          application/vnd.google-earth.kml+xml: {schema: {type: string}}
+          application/zip: {schema: {type: string, format: binary}}
+      responses:
+        "200":
+          description: Kết quả theo đối tượng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [format, accepted, duplicate, rejected, features]
+                properties:
+                  format: {type: string, enum: [geojson, kml, shapefile]}
+                  accepted: {type: integer}
+                  duplicate: {type: integer}
+                  rejected: {type: integer}
+                  features:
+                    type: array
+                    items:
+                      type: object
+                      required: [index, name, status, code, reason, facility_ref, facility_code]
+                      properties:
+                        index: {type: integer}
+                        name: {type: [string, "null"]}
+                        status: {type: string, enum: [accepted, duplicate, rejected]}
+                        code: {type: [string, "null"]}
+                        reason: {type: [string, "null"]}
+                        facility_ref: {type: [string, "null"], format: uuid}
+                        facility_code: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/facilities/{ref}/versions:
+    post:
+      summary: Sửa kho/Hub (GIS US-BND-06 AC-1/AC-3) — bản ghi bù trỏ supersedes_id (= current_event_id) kèm lý do; trường bỏ trống giữ nguyên; sai phiên bản → 409 geo.version_conflict
+      operationId: geoUpdateFacility
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/GeoFacilityInput"
+                - type: object
+                  required: [supersedes_id, correction_reason]
+                  properties:
+                    supersedes_id: {type: string, format: uuid}
+                    correction_reason: {type: string, minLength: 10}
+                    remove_polygon: {type: boolean, default: false}
+      responses:
+        "201": {$ref: "#/components/responses/GeoFacilityWritten"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/facilities/{ref}/retire:
+    post:
+      summary: Xóa mềm kho/Hub (GIS US-BND-06 AC-2, BR-14/19) — ẩn khỏi bản đồ và danh sách vận hành; Event Log giữ người xóa, thời gian, lý do
+      operationId: geoRetireFacility
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/GeoReason"}
+      responses:
+        "200": {$ref: "#/components/responses/GeoFacilityWritten"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/facilities/{ref}/restore:
+    post:
+      summary: Khôi phục kho/Hub đã ngừng dùng
+      operationId: geoRestoreFacility
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/GeoReason"}
+      responses:
+        "200": {$ref: "#/components/responses/GeoFacilityWritten"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/facilities/{ref}/capacity:
+    post:
+      summary: Admin nhập tay sức chứa/dung lượng đã dùng của kho/Hub (GIS US-WH-01, BR-52) — có hiệu lực ngay, lần đồng bộ sau KHÔNG ghi đè; sửa ảnh chụp = supersedes_id + correction_reason
+      operationId: geoRecordFacilityCapacity
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/GeoCapacityInput"}
+      responses:
+        "201": {$ref: "#/components/responses/GeoCapacityWritten"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/facilities/{ref}/capacity/release:
+    post:
+      summary: Admin xác nhận áp dụng số đồng bộ thay số nhập tay (BR-52) — ghi dòng sổ release kèm lý do; không có số nhập tay → 409 geo.capacity_nothing_to_release
+      operationId: geoReleaseFacilityCapacity
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/GeoReason"}
+      responses:
+        "200": {$ref: "#/components/responses/GeoCapacityWritten"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/hubs/{ref}/capacity:
+    post:
+      summary: Admin nhập tay sức chứa hub MKG khi van công bố chưa tích hợp xong (BR-52); hub chưa nhận qua van → 404 geo.hub_not_found
+      operationId: geoRecordHubCapacity
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/GeoCapacityInput"}
+      responses:
+        "201": {$ref: "#/components/responses/GeoCapacityWritten"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/hubs/{ref}/capacity/release:
+    post:
+      summary: Admin xác nhận áp dụng số của van cho hub MKG (BR-52)
+      operationId: geoReleaseHubCapacity
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/GeoReason"}
+      responses:
+        "200": {$ref: "#/components/responses/GeoCapacityWritten"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/capacity/import:
+    post:
+      summary: Nhập hàng loạt ảnh chụp sức chứa (BRD FN-06 "nhập file theo mẫu"; nguồn import — số Admin, BR-52) — mỗi dòng theo facility_code hoặc hub_ref; tối đa 500 dòng
+      operationId: geoImportCapacities
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  maxItems: 500
+                  items:
+                    type: object
+                    required: [capacity, used]
+                    properties:
+                      facility_code: {type: string}
+                      hub_ref: {type: string, format: uuid}
+                      capacity: {$ref: "#/components/schemas/GeoDecimal"}
+                      used: {$ref: "#/components/schemas/GeoDecimal"}
+                      unit: {type: string, enum: [tan, m3, ke]}
+                      as_of: {type: string, format: date-time}
+      responses:
+        "200":
+          description: Kết quả theo dòng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accepted, duplicate, rejected, items]
+                properties:
+                  accepted: {type: integer}
+                  duplicate: {type: integer}
+                  rejected: {type: integer}
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [index, status, code, reason, snapshot_id]
+                      properties:
+                        index: {type: integer}
+                        status: {type: string, enum: [accepted, duplicate, rejected]}
+                        code: {type: [string, "null"]}
+                        reason: {type: [string, "null"]}
+                        snapshot_id: {type: [string, "null"], format: uuid}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/roads:
+    post:
+      summary: Vẽ mới tuyến đường bộ (GIS US-ROAD-02 AC-1) — chiều dài trắc địa tính trong DB; thiếu tên/phân loại → "Vui lòng nhập đầy đủ Tên tuyến và Phân loại."; tải trọng ≤ 0 hoặc sai định dạng → "Tải trọng tối đa phải là số lớn hơn 0." (AC-2)
+      operationId: geoCreateRoad
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/GeoRoadInput"}
+      responses:
+        "201": {$ref: "#/components/responses/GeoRoadWritten"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/roads/{ref}/versions:
+    post:
+      summary: Sửa tuyến (GIS US-ROAD-03 AC-1) — kéo/thêm/xóa điểm, đổi tên/phân loại/tải trọng; phiên bản mới trỏ supersedes_id (= segment_id hiện hành) kèm lý do; trường bỏ trống giữ nguyên
+      operationId: geoCorrectRoad
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/GeoRoadInput"
+                - type: object
+                  required: [supersedes_id, correction_reason]
+                  properties:
+                    supersedes_id: {type: string, format: uuid}
+                    correction_reason: {type: string, minLength: 10}
+      responses:
+        "201": {$ref: "#/components/responses/GeoRoadWritten"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/roads/{ref}/retire:
+    post:
+      summary: Ngừng dùng tuyến (xóa mềm, giữ lịch sử)
+      operationId: geoRetireRoad
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/GeoReason"}
+      responses:
+        "200": {$ref: "#/components/responses/GeoRoadWritten"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/roads/{ref}/restore:
+    post:
+      summary: Khôi phục tuyến đã ngừng dùng
+      operationId: geoRestoreRoad
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/GeoReason"}
+      responses:
+        "200": {$ref: "#/components/responses/GeoRoadWritten"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   # --- hết pf/geo ---
 
   # --- pf/mechanization: Bản đồ CGH — ghi dữ liệu chủ, vụ mùa, chạy cân đối (chỉ cgh_admin; Cục KTHT → 403) ---
@@ -2252,6 +2627,40 @@ components:
       content:
         application/problem+json:
           schema: {$ref: "#/components/schemas/Problem"}
+    GeoFacilityWritten:
+      description: Kho/Hub sau khi ghi và dòng sổ vừa ghi (hình dạng như GET /v1/geo/facilities/{ref} của Application API)
+      headers:
+        Location: {schema: {type: string}}
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [facility, event]
+            properties:
+              facility: {type: object, description: "GeoJSON Feature (điểm marker) — xem GeoFacilityFeature ở application.yaml"}
+              event: {type: object, description: "Dòng sổ facility_event — xem GeoFacilityEvent ở application.yaml"}
+    GeoCapacityWritten:
+      description: Dòng sổ sức chứa vừa ghi và sức chứa hiệu lực sau đó (BR-52)
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [snapshot, capacity]
+            properties:
+              snapshot: {type: object, description: "Xem GeoCapacitySnapshot ở application.yaml"}
+              capacity: {type: object, description: "Xem GeoCapacityView ở application.yaml (source, fill_pct, class, sync_differs, pending_sync)"}
+    GeoRoadWritten:
+      description: Tuyến sau khi ghi và phiên bản vừa ghi
+      headers:
+        Location: {schema: {type: string}}
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [road, segment]
+            properties:
+              road: {type: object, description: "GeoJSON Feature LineString — xem GeoRoadFeature ở application.yaml"}
+              segment: {type: object, description: "Xem GeoRoadSegment ở application.yaml"}
     PartyOrgChanged:
       description: Trạng thái sau biến động và dòng sổ vừa ghi
       content:
@@ -2510,6 +2919,56 @@ components:
       type: object
       properties:
         note: {type: string, maxLength: 500, description: "Bắt buộc (≥ 10 ký tự) khi từ chối"}
+    # --- pf/geo G2 ---
+    GeoDecimal:
+      description: Số thập phân (chuỗi hoặc số JSON); sai định dạng → thông báo nghiệp vụ tương ứng
+      oneOf:
+        - {type: string, pattern: "^-?[0-9]+(\\.[0-9]+)?$"}
+        - {type: number}
+    GeoReason:
+      type: object
+      required: [reason]
+      properties:
+        reason: {type: string, minLength: 10}
+    GeoFacilityInput:
+      type: object
+      description: Tạo — name, capacity, province_code, commune_code ("địa chỉ" là đơn vị hành chính; không lưu địa chỉ chữ ngoài vault, R-04) và point hoặc polygon bắt buộc. Sửa — trường bỏ trống giữ nguyên.
+      properties:
+        ref: {type: string, format: uuid, description: "UUIDv7; bỏ trống → server sinh"}
+        kind: {type: string, enum: [kho, hub, nha_may]}
+        code: {type: string, pattern: "^[0-9A-Za-z][0-9A-Za-z._-]{0,39}$", description: "Bỏ trống → sinh từ loại + ref"}
+        name: {type: string, maxLength: 200}
+        point: {type: object, description: "GeoJSON Point WGS84 (marker)"}
+        polygon: {type: object, description: "GeoJSON Polygon/MultiPolygon WGS84 (khuôn viên); không có point → marker là điểm trong vùng"}
+        province_code: {type: string}
+        commune_code: {type: string}
+        capacity: {$ref: "#/components/schemas/GeoDecimal"}
+        unit: {type: string, enum: [tan, m3, ke], default: tan}
+        event_time: {type: string, format: date-time}
+        device_id: {type: string}
+    GeoCapacityInput:
+      type: object
+      required: [capacity, used]
+      properties:
+        capacity: {$ref: "#/components/schemas/GeoDecimal"}
+        used: {$ref: "#/components/schemas/GeoDecimal"}
+        unit: {type: string, enum: [tan, m3, ke], description: "Mặc định đơn vị của cơ sở"}
+        as_of: {type: string, format: date-time, description: "Thời điểm số liệu; mặc định hiện tại"}
+        supersedes_id: {type: string, format: uuid, description: "Sửa một ảnh chụp đã nhập (kèm correction_reason)"}
+        correction_reason: {type: string, minLength: 10}
+    GeoRoadInput:
+      type: object
+      description: Tạo — name, road_class, max_load_tons, geometry, province_code bắt buộc. Sửa — trường bỏ trống giữ nguyên.
+      properties:
+        ref: {type: string, format: uuid}
+        name: {type: string, maxLength: 200}
+        road_class: {type: string, enum: [quoc_lo, tinh_lo, huyen_lo, truc_xa, bo_ruong]}
+        max_load_tons: {$ref: "#/components/schemas/GeoDecimal"}
+        geometry: {type: object, description: "GeoJSON LineString WGS84, ≥ 2 điểm phân biệt"}
+        province_code: {type: string}
+        event_time: {type: string, format: date-time}
+        device_id: {type: string}
+    # --- hết pf/geo G2 ---
     PartyOrg:
       type: object
       required: [ref, kind, code, name, admin_unit_code, parent_ref, representative_ref, active]

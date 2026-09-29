@@ -1,6 +1,8 @@
 // Package geo là module pf/geo: thửa ruộng có ranh giới theo phiên bản (sổ chỉ
 // ghi thêm), kiểm chồng lấn, nhập GeoJSON/KML, ranh giới hành chính dùng chung
-// và đồng bộ ngoại tuyến (KN FN-05, HTX FN-07, GIS FN-05/FN-07).
+// và đồng bộ ngoại tuyến (KN FN-05, HTX FN-07, GIS FN-05/FN-07); G2: ranh giới
+// HTX, kho/Hub và sức chứa, hub MKG qua van, đường bộ, log GPS (GIS FN-04/06/08/15,
+// HTX US-GPS-03).
 //
 // Module khác chỉ được import geo/port (R-02). Tệp này nối các lớp cho
 // cmd/api-platform.
@@ -34,6 +36,9 @@ type Deps struct {
 	Orgs partyport.Orgs
 	// Households (tùy chọn): kiểm nông hộ là thành viên đang hoạt động của HTX sở hữu thửa khi gán.
 	Households partyport.Households
+	// CoopMarkers (tùy chọn): điểm vị trí HTX (pf_party.cooperative.location) làm
+	// marker/dự phòng cho lớp ranh giới HTX (GIS US-BND-02). pf/party cài ở đợt 2.
+	CoopMarkers port.CoopMarkers
 }
 
 // Module là pf/geo đã nối.
@@ -41,7 +46,8 @@ type Module struct{ svc *app.Service }
 
 // New tạo module với pool của vai geo_app.
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
-	return &Module{svc: &app.Service{DB: db, Clock: clk, Scope: deps.Scope, Params: deps.Params, Units: deps.AdminUnits, Orgs: deps.Orgs, Households: deps.Households}}
+	return &Module{svc: &app.Service{DB: db, Clock: clk, Scope: deps.Scope, Params: deps.Params, Units: deps.AdminUnits, Orgs: deps.Orgs, Households: deps.Households,
+		Markers: deps.CoopMarkers}}
 }
 
 // RegisterApp gắn route Application API.
@@ -55,6 +61,12 @@ func (m *Module) Plots() port.Plots { return m.svc }
 
 // PlotStats cho module khác đọc thống kê thửa đã số hoá (qua port, G-02/G-03).
 func (m *Module) PlotStats() port.PlotStats { return m.svc }
+
+// GpsLog cho module khác ghi log GPS (HTX US-GPS-03) qua port; geo ghi trong giao dịch riêng.
+func (m *Module) GpsLog() port.GpsLog { return m.svc }
+
+// HubSink cho consumer van công bố (mkg hub_facility / hub_capacity) ghi mô hình đọc hub MKG.
+func (m *Module) HubSink() port.HubSink { return m.svc }
 
 // SyncSource là chiều xuống entity "plot" cho pf/sync.
 func (m *Module) SyncSource() syncport.Source { return app.SyncSource{Svc: m.svc} }

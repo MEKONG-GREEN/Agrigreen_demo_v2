@@ -68,6 +68,8 @@ type Service struct {
 	Orgs   partyport.Orgs          // tùy chọn — có thì kiểm HTX khi gán
 	// Households (tùy chọn): có thì kiểm nông hộ thuộc đúng HTX của thửa khi gán.
 	Households partyport.Households
+	// Markers (tùy chọn): điểm pf_party.cooperative.location làm marker/dự phòng của lớp HTX.
+	Markers port.CoopMarkers
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }
