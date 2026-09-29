@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.geo.cooperative_boundary.recorded/v1",
+  "title": "pf.geo.cooperative_boundary.recorded — payload",
+  "description": "Một dòng sổ ranh giới HTX đã được ghi vào pf_geo.cooperative_boundary (GIS US-BND-02/03/07, BRD FN-04): phiên bản đầu, phiên bản sửa (bản ghi bù trỏ supersedes_id kèm lý do), ngừng dùng (xóa mềm, BR-14) hoặc khôi phục. Không mang hình — consumer đọc qua GET /v1/geo/cooperative-boundaries/{ref}. Không có dữ liệu cá nhân.",
+  "x-event-type": "pf.geo.cooperative_boundary.recorded",
+  "x-schema-version": 1,
+  "x-producer": "pf/geo",
+  "type": "object",
+  "required": ["cooperative_ref", "boundary_id", "version", "action", "status", "area_ha", "point_count", "source", "commune_code", "supersedes_id", "correction_reason", "actor_ref", "event_time"],
+  "properties": {
+    "cooperative_ref":   { "type": "string", "format": "uuid", "description": "HTX trong sổ pf/party" },
+    "boundary_id":       { "type": "string", "format": "uuid", "description": "Dòng sổ vừa ghi" },
+    "version":           { "type": "integer", "minimum": 1, "description": "= seq trong chuỗi băm của HTX" },
+    "action":            { "type": "string", "enum": ["recorded", "retired", "restored"] },
+    "status":            { "type": "string", "enum": ["active", "retired"], "description": "Trạng thái sau sự việc" },
+    "area_ha":           { "type": "string", "pattern": "^[0-9]+\\.[0-9]{4}$", "description": "Diện tích trắc địa (ha), tính trong DB" },
+    "point_count":       { "type": "integer", "minimum": 4 },
+    "source":            { "type": "string", "enum": ["geo_web", "htx_app", "import_file", "party_sync"] },
+    "commune_code":      { "type": "string", "description": "Đơn vị hành chính của HTX lúc ghi" },
+    "supersedes_id":     { "type": ["string", "null"], "format": "uuid", "description": "Dòng sổ bị thay; null ở phiên bản đầu" },
+    "correction_reason": { "type": ["string", "null"], "minLength": 10, "description": "Lý do sửa/ngừng dùng/khôi phục" },
+    "actor_ref":         { "type": "string", "format": "uuid" },
+    "event_time":        { "type": "string", "format": "date-time" }
+  }
+}

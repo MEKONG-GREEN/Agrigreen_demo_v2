@@ -80,9 +80,38 @@ func (f *fakeUnits) Current(_ context.Context, code string, _ time.Time) ([]stri
 }
 
 // fakeParams trả ngưỡng chồng lấn đã "phê duyệt"; nil = chưa có phiên bản (mặc định 1%).
-type fakeParams struct{ tolerance *decimal.Decimal }
+// values: tham số khác đã "phê duyệt" (G2: ngưỡng widget Hub, zoom lớp thửa).
+type fakeParams struct {
+	tolerance *decimal.Decimal
+	values    *paramValues
+}
+
+// paramValues là bảng tham số đổi được giữa các request của kiểm thử.
+type paramValues struct {
+	mu sync.Mutex
+	m  map[string]decimal.Decimal
+}
+
+func (p *paramValues) set(key string, v decimal.Decimal) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.m[key] = v
+}
+
+func (p *paramValues) get(key string) (decimal.Decimal, bool) {
+	if p == nil {
+		return decimal.Zero, false
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	v, ok := p.m[key]
+	return v, ok
+}
 
 func (f fakeParams) At(_ context.Context, key string, _ time.Time) (mdport.ParamValue, error) {
+	if v, ok := f.values.get(key); ok {
+		return mdport.ParamValue{Key: key, Value: v, Version: 1}, nil
+	}
 	if key != "geo.overlap_tolerance_pct" || f.tolerance == nil {
 		return mdport.ParamValue{}, mdport.ErrParamNotFound
 	}

@@ -893,6 +893,269 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/geo/cooperative-boundaries/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nhập hàng loạt ranh giới HTX từ GeoJSON/KML/Shapefile (.zip) (GIS US-BND-07) — HTX theo cooperative_ref hoặc Mã HTX (cooperative_code/ma_htx/MA_HTX); HTX đã có ranh giới → phiên bản mới thay phiên bản hiện hành
+         * @description Cùng giới hạn và quy tắc hệ toạ độ như /v1/geo/plots/import: chỉ WGS84 (EPSG:4326) — hệ khác → 422 geo.crs_unsupported
+         *     cho cả tệp. Đối tượng lỗi bị loại kèm mã/lý do, đối tượng hợp lệ vẫn được nạp. Idem_key từng đối tượng =
+         *     Idempotency-Key + ":" + thứ tự.
+         */
+        post: operations["geoImportCoopBoundaries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/facilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Thêm kho/Hub/nhà máy của tenant (GIS US-BND-05 AC-1) — gắn Marker (point) và/hoặc vẽ khuôn viên (polygon); thiếu tên hoặc địa chỉ (tỉnh/xã) → "Vui lòng nhập đầy đủ Tên Hub và Địa chỉ."; sức chứa ≤ 0 hoặc sai định dạng → "Sức chứa phải là số lớn hơn 0." (AC-2)
+         * @description Hub của MKG không tạo ở đây — đến qua van công bố hub_facility. Sự kiện pf.geo.facility.recorded.
+         */
+        post: operations["geoCreateFacility"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/facilities/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Nhập hàng loạt vị trí kho/Hub từ GeoJSON/KML/Shapefile (GIS US-BND-08) — đối tượng điểm (marker) hoặc vùng (khuôn viên); thuộc tính name/ten, code/ma, kind/loai, capacity/suc_chua, unit/don_vi, province_code/ma_tinh, commune_code/ma_xa */
+        post: operations["geoImportFacilities"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/facilities/{ref}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa kho/Hub (GIS US-BND-06 AC-1/AC-3) — bản ghi bù trỏ supersedes_id (= current_event_id) kèm lý do; trường bỏ trống giữ nguyên; sai phiên bản → 409 geo.version_conflict */
+        post: operations["geoUpdateFacility"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/facilities/{ref}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xóa mềm kho/Hub (GIS US-BND-06 AC-2, BR-14/19) — ẩn khỏi bản đồ và danh sách vận hành; Event Log giữ người xóa, thời gian, lý do */
+        post: operations["geoRetireFacility"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/facilities/{ref}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Khôi phục kho/Hub đã ngừng dùng */
+        post: operations["geoRestoreFacility"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/facilities/{ref}/capacity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Admin nhập tay sức chứa/dung lượng đã dùng của kho/Hub (GIS US-WH-01, BR-52) — có hiệu lực ngay, lần đồng bộ sau KHÔNG ghi đè; sửa ảnh chụp = supersedes_id + correction_reason */
+        post: operations["geoRecordFacilityCapacity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/facilities/{ref}/capacity/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Admin xác nhận áp dụng số đồng bộ thay số nhập tay (BR-52) — ghi dòng sổ release kèm lý do; không có số nhập tay → 409 geo.capacity_nothing_to_release */
+        post: operations["geoReleaseFacilityCapacity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/hubs/{ref}/capacity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Admin nhập tay sức chứa hub MKG khi van công bố chưa tích hợp xong (BR-52); hub chưa nhận qua van → 404 geo.hub_not_found */
+        post: operations["geoRecordHubCapacity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/hubs/{ref}/capacity/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Admin xác nhận áp dụng số của van cho hub MKG (BR-52) */
+        post: operations["geoReleaseHubCapacity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/capacity/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Nhập hàng loạt ảnh chụp sức chứa (BRD FN-06 "nhập file theo mẫu"; nguồn import — số Admin, BR-52) — mỗi dòng theo facility_code hoặc hub_ref; tối đa 500 dòng */
+        post: operations["geoImportCapacities"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/roads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Vẽ mới tuyến đường bộ (GIS US-ROAD-02 AC-1) — chiều dài trắc địa tính trong DB; thiếu tên/phân loại → "Vui lòng nhập đầy đủ Tên tuyến và Phân loại."; tải trọng ≤ 0 hoặc sai định dạng → "Tải trọng tối đa phải là số lớn hơn 0." (AC-2) */
+        post: operations["geoCreateRoad"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/roads/{ref}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa tuyến (GIS US-ROAD-03 AC-1) — kéo/thêm/xóa điểm, đổi tên/phân loại/tải trọng; phiên bản mới trỏ supersedes_id (= segment_id hiện hành) kèm lý do; trường bỏ trống giữ nguyên */
+        post: operations["geoCorrectRoad"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/roads/{ref}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ngừng dùng tuyến (xóa mềm, giữ lịch sử) */
+        post: operations["geoRetireRoad"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/roads/{ref}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Khôi phục tuyến đã ngừng dùng */
+        post: operations["geoRestoreRoad"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/mechanization/owners": {
         parameters: {
             query?: never;
@@ -1920,6 +2183,74 @@ export interface components {
             /** @description Bắt buộc (≥ 10 ký tự) khi từ chối */
             note?: string;
         };
+        /** @description Số thập phân (chuỗi hoặc số JSON); sai định dạng → thông báo nghiệp vụ tương ứng */
+        GeoDecimal: string | number;
+        GeoReason: {
+            reason: string;
+        };
+        /** @description Tạo — name, capacity, province_code, commune_code ("địa chỉ" là đơn vị hành chính; không lưu địa chỉ chữ ngoài vault, R-04) và point hoặc polygon bắt buộc. Sửa — trường bỏ trống giữ nguyên. */
+        GeoFacilityInput: {
+            /**
+             * Format: uuid
+             * @description UUIDv7; bỏ trống → server sinh
+             */
+            ref?: string;
+            /** @enum {string} */
+            kind?: "kho" | "hub" | "nha_may";
+            /** @description Bỏ trống → sinh từ loại + ref */
+            code?: string;
+            name?: string;
+            /** @description GeoJSON Point WGS84 (marker) */
+            point?: Record<string, never>;
+            /** @description GeoJSON Polygon/MultiPolygon WGS84 (khuôn viên); không có point → marker là điểm trong vùng */
+            polygon?: Record<string, never>;
+            province_code?: string;
+            commune_code?: string;
+            capacity?: components["schemas"]["GeoDecimal"];
+            /**
+             * @default tan
+             * @enum {string}
+             */
+            unit: "tan" | "m3" | "ke";
+            /** Format: date-time */
+            event_time?: string;
+            device_id?: string;
+        };
+        GeoCapacityInput: {
+            capacity: components["schemas"]["GeoDecimal"];
+            used: components["schemas"]["GeoDecimal"];
+            /**
+             * @description Mặc định đơn vị của cơ sở
+             * @enum {string}
+             */
+            unit?: "tan" | "m3" | "ke";
+            /**
+             * Format: date-time
+             * @description Thời điểm số liệu; mặc định hiện tại
+             */
+            as_of?: string;
+            /**
+             * Format: uuid
+             * @description Sửa một ảnh chụp đã nhập (kèm correction_reason)
+             */
+            supersedes_id?: string;
+            correction_reason?: string;
+        };
+        /** @description Tạo — name, road_class, max_load_tons, geometry, province_code bắt buộc. Sửa — trường bỏ trống giữ nguyên. */
+        GeoRoadInput: {
+            /** Format: uuid */
+            ref?: string;
+            name?: string;
+            /** @enum {string} */
+            road_class?: "quoc_lo" | "tinh_lo" | "huyen_lo" | "truc_xa" | "bo_ruong";
+            max_load_tons?: components["schemas"]["GeoDecimal"];
+            /** @description GeoJSON LineString WGS84, ≥ 2 điểm phân biệt */
+            geometry?: Record<string, never>;
+            province_code?: string;
+            /** Format: date-time */
+            event_time?: string;
+            device_id?: string;
+        };
         PartyOrg: {
             /** Format: uuid */
             ref: string;
@@ -2783,6 +3114,50 @@ export interface components {
             };
             content: {
                 "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Kho/Hub sau khi ghi và dòng sổ vừa ghi (hình dạng như GET /v1/geo/facilities/{ref} của Application API) */
+        GeoFacilityWritten: {
+            headers: {
+                Location?: string;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    /** @description GeoJSON Feature (điểm marker) — xem GeoFacilityFeature ở application.yaml */
+                    facility: Record<string, never>;
+                    /** @description Dòng sổ facility_event — xem GeoFacilityEvent ở application.yaml */
+                    event: Record<string, never>;
+                };
+            };
+        };
+        /** @description Dòng sổ sức chứa vừa ghi và sức chứa hiệu lực sau đó (BR-52) */
+        GeoCapacityWritten: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    /** @description Xem GeoCapacitySnapshot ở application.yaml */
+                    snapshot: Record<string, never>;
+                    /** @description Xem GeoCapacityView ở application.yaml (source, fill_pct, class, sync_differs, pending_sync) */
+                    capacity: Record<string, never>;
+                };
+            };
+        };
+        /** @description Tuyến sau khi ghi và phiên bản vừa ghi */
+        GeoRoadWritten: {
+            headers: {
+                Location?: string;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    /** @description GeoJSON Feature LineString — xem GeoRoadFeature ở application.yaml */
+                    road: Record<string, never>;
+                    /** @description Xem GeoRoadSegment ở application.yaml */
+                    segment: Record<string, never>;
+                };
             };
         };
         /** @description Trạng thái sau biến động và dòng sổ vừa ghi */
@@ -4570,6 +4945,461 @@ export interface operations {
                 };
             };
             403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoImportCoopBoundaries: {
+        parameters: {
+            query?: {
+                format?: "geojson" | "kml" | "shapefile";
+                file_name?: string;
+                /** @description Lý do khi thay ranh giới đang có; mặc định nêu tên tệp */
+                reason?: string;
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/geo+json": Record<string, never>;
+                "application/json": Record<string, never>;
+                "application/vnd.google-earth.kml+xml": string;
+                "application/zip": string;
+            };
+        };
+        responses: {
+            /** @description Kết quả theo đối tượng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        format: "geojson" | "kml" | "shapefile";
+                        accepted: number;
+                        duplicate: number;
+                        rejected: number;
+                        features: {
+                            index: number;
+                            name: string | null;
+                            /** @enum {string} */
+                            status: "accepted" | "duplicate" | "rejected";
+                            replaced: boolean;
+                            code: string | null;
+                            reason: string | null;
+                            /** Format: uuid */
+                            cooperative_ref: string | null;
+                            /** Format: uuid */
+                            boundary_id: string | null;
+                            version: number;
+                            area_ha: string | null;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    geoCreateFacility: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeoFacilityInput"];
+            };
+        };
+        responses: {
+            201: components["responses"]["GeoFacilityWritten"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoImportFacilities: {
+        parameters: {
+            query?: {
+                format?: "geojson" | "kml" | "shapefile";
+                file_name?: string;
+                /** @description Mặc định khi thiếu thuộc tính loại (không có → hub) */
+                kind?: "kho" | "hub" | "nha_may";
+                /** @description Mặc định khi thiếu province_code/ma_tinh */
+                province_code?: string;
+                /** @description Mặc định khi thiếu commune_code/ma_xa */
+                commune_code?: string;
+                unit?: "tan" | "m3" | "ke";
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/geo+json": Record<string, never>;
+                "application/json": Record<string, never>;
+                "application/vnd.google-earth.kml+xml": string;
+                "application/zip": string;
+            };
+        };
+        responses: {
+            /** @description Kết quả theo đối tượng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        format: "geojson" | "kml" | "shapefile";
+                        accepted: number;
+                        duplicate: number;
+                        rejected: number;
+                        features: {
+                            index: number;
+                            name: string | null;
+                            /** @enum {string} */
+                            status: "accepted" | "duplicate" | "rejected";
+                            code: string | null;
+                            reason: string | null;
+                            /** Format: uuid */
+                            facility_ref: string | null;
+                            facility_code: string | null;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoUpdateFacility: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeoFacilityInput"] & {
+                    /** Format: uuid */
+                    supersedes_id: string;
+                    correction_reason: string;
+                    /** @default false */
+                    remove_polygon?: boolean;
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["GeoFacilityWritten"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoRetireFacility: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeoReason"];
+            };
+        };
+        responses: {
+            200: components["responses"]["GeoFacilityWritten"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoRestoreFacility: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeoReason"];
+            };
+        };
+        responses: {
+            200: components["responses"]["GeoFacilityWritten"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoRecordFacilityCapacity: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeoCapacityInput"];
+            };
+        };
+        responses: {
+            201: components["responses"]["GeoCapacityWritten"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoReleaseFacilityCapacity: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeoReason"];
+            };
+        };
+        responses: {
+            200: components["responses"]["GeoCapacityWritten"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoRecordHubCapacity: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeoCapacityInput"];
+            };
+        };
+        responses: {
+            201: components["responses"]["GeoCapacityWritten"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoReleaseHubCapacity: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeoReason"];
+            };
+        };
+        responses: {
+            200: components["responses"]["GeoCapacityWritten"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoImportCapacities: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    items: {
+                        facility_code?: string;
+                        /** Format: uuid */
+                        hub_ref?: string;
+                        capacity: components["schemas"]["GeoDecimal"];
+                        used: components["schemas"]["GeoDecimal"];
+                        /** @enum {string} */
+                        unit?: "tan" | "m3" | "ke";
+                        /** Format: date-time */
+                        as_of?: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Kết quả theo dòng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        accepted: number;
+                        duplicate: number;
+                        rejected: number;
+                        items: {
+                            index: number;
+                            /** @enum {string} */
+                            status: "accepted" | "duplicate" | "rejected";
+                            code: string | null;
+                            reason: string | null;
+                            /** Format: uuid */
+                            snapshot_id: string | null;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoCreateRoad: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeoRoadInput"];
+            };
+        };
+        responses: {
+            201: components["responses"]["GeoRoadWritten"];
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoCorrectRoad: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeoRoadInput"] & {
+                    /** Format: uuid */
+                    supersedes_id: string;
+                    correction_reason: string;
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["GeoRoadWritten"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoRetireRoad: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeoReason"];
+            };
+        };
+        responses: {
+            200: components["responses"]["GeoRoadWritten"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoRestoreRoad: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeoReason"];
+            };
+        };
+        responses: {
+            200: components["responses"]["GeoRoadWritten"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
         };
     };

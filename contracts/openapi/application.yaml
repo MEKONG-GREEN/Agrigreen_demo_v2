@@ -1053,6 +1053,349 @@ paths:
                       area_ha: {$ref: "#/components/schemas/Decimal"}
                       imported_at: {type: string, format: date-time}
         "404": {$ref: "#/components/responses/Problem"}
+  # --- pf/geo G2: lớp nền GIS (ranh giới HTX, kho/Hub + sức chứa, đường bộ), log GPS ---
+  # Lớp hạ tầng (kho/Hub, đường bộ) là dữ liệu dùng chung: lọc theo vai, không theo phạm vi.
+  # Ranh giới HTX và log GPS lọc theo phạm vi TW → Tỉnh → Xã; quản lý HTX chỉ HTX mình.
+  /v1/geo/layers:
+    get:
+      summary: Lớp bản đồ web GIS gộp theo khung nhìn (BRD FN-01, BR-24/25) — mỗi lớp tối đa 1.000 đối tượng; polygon thửa chỉ khi zoom ≥ geo.plot_layer_min_zoom (mặc định 13)
+      operationId: geoLayers
+      parameters:
+        - {name: bbox, in: query, required: true, description: "minLon,minLat,maxLon,maxLat (WGS84)", schema: {type: string}}
+        - {name: zoom, in: query, schema: {type: integer, minimum: 0, maximum: 22, default: 12}}
+        - {name: layers, in: query, description: "Danh sách lớp, phân cách dấu phẩy", schema: {type: string, default: "cooperatives,plots,facilities,roads"}}
+        - {name: min_load_tons, in: query, description: "Lọc lớp đường bộ theo tải trọng phương tiện (tấn)", schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 1000, default: 1000}}
+      responses:
+        "200":
+          description: Các lớp đã yêu cầu (null = không yêu cầu hoặc zoom chưa đủ)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [zoom, plot_min_zoom, plots_notice, cooperatives, plots, facilities, roads]
+                properties:
+                  zoom: {type: integer}
+                  plot_min_zoom: {type: integer}
+                  plots_notice: {type: [string, "null"], description: "Thông báo khi zoom chưa đủ để tải polygon thửa"}
+                  cooperatives: {oneOf: [{$ref: "#/components/schemas/GeoCoopLayer"}, {type: "null"}]}
+                  plots:
+                    oneOf:
+                      - type: object
+                        required: [type, features, truncated]
+                        properties:
+                          type: {type: string, enum: [FeatureCollection]}
+                          features: {type: array, items: {$ref: "#/components/schemas/PlotFeature"}}
+                          truncated: {type: boolean}
+                      - {type: "null"}
+                  facilities: {oneOf: [{$ref: "#/components/schemas/GeoFacilityLayer"}, {type: "null"}]}
+                  roads: {oneOf: [{$ref: "#/components/schemas/GeoRoadLayer"}, {type: "null"}]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/cooperative-boundaries:
+    get:
+      summary: Ranh giới HTX trong khung nhìn thuộc phạm vi (GIS FN-04 B2) — kèm marker (điểm pf_party.cooperative.location nếu có, không thì điểm trong vùng); HTX chưa có ranh giới hiện bằng điểm
+      operationId: geoCoopBoundariesInBBox
+      parameters:
+        - {name: bbox, in: query, required: true, schema: {type: string}}
+        - {name: zoom, in: query, schema: {type: integer, minimum: 0, maximum: 22, default: 12}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 1000, default: 1000}}
+      responses:
+        "200":
+          description: FeatureCollection
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/GeoCoopLayer"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Vẽ ranh giới đầu tiên của HTX (GIS US-BND-02 AC-1) — diện tích trắc địa tính trong DB; HTX đã có ranh giới → 409 geo.cooperative_boundary_exists (dùng /versions)
+      description: |
+        Vai plot_editor (cán bộ KN trong phạm vi), coop_manager (chỉ HTX của mình; bỏ trống cooperative_ref = HTX mình),
+        geo_admin, platform_admin. Tên, địa chỉ HTX thuộc sổ pf/party; thiếu HTX → 422 với detail
+        "Vui lòng nhập đầy đủ Tên HTX và Địa chỉ." (US-BND-02 AC-2). Sự kiện pf.geo.cooperative_boundary.recorded.
+      operationId: geoCreateCoopBoundary
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/GeoCoopShapeInput"
+                - type: object
+                  properties:
+                    cooperative_ref: {type: [string, "null"], format: uuid}
+                    commune_code: {type: string, description: "Chỉ dùng khi chưa nối pf/party (có party thì lấy đơn vị của HTX)"}
+      responses:
+        "201": {$ref: "#/components/responses/GeoCoopWritten"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/geo/cooperative-boundaries/{ref}:
+    get:
+      summary: Ranh giới HTX hiện hành kèm mọi phiên bản (lịch sử chỉ đọc, gồm ngừng dùng/khôi phục và người thao tác); ngoài phạm vi → 404
+      operationId: geoGetCoopBoundary
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Ranh giới
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cooperative, versions]
+                properties:
+                  cooperative: {$ref: "#/components/schemas/GeoCoopFeature"}
+                  versions: {type: array, items: {$ref: "#/components/schemas/GeoCoopBoundaryVersion"}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/geo/cooperative-boundaries/{ref}/versions:
+    post:
+      summary: Sửa ranh giới HTX (GIS US-BND-03 AC-1) — phiên bản mới trỏ supersedes_id (= boundary_id hiện hành) kèm lý do ≥ 10 ký tự; sai phiên bản → 409 geo.version_conflict
+      operationId: geoCorrectCoopBoundary
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/GeoCoopShapeInput"
+                - type: object
+                  required: [supersedes_id, correction_reason]
+                  properties:
+                    supersedes_id: {type: string, format: uuid}
+                    correction_reason: {type: string, minLength: 10}
+      responses:
+        "201": {$ref: "#/components/responses/GeoCoopWritten"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/cooperative-boundaries/{ref}/retire:
+    post:
+      summary: Xóa mềm ranh giới HTX (GIS US-BND-03 AC-2, BR-14) — ẩn khỏi bản đồ dùng chung; dòng sổ mới giữ hình, lý do, người xóa
+      operationId: geoRetireCoopBoundary
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/GeoReasonInput"}
+      responses:
+        "200": {$ref: "#/components/responses/GeoCoopWritten"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/cooperative-boundaries/{ref}/restore:
+    post:
+      summary: Khôi phục ranh giới HTX đã ngừng dùng (BR-14)
+      operationId: geoRestoreCoopBoundary
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/GeoReasonInput"}
+      responses:
+        "200": {$ref: "#/components/responses/GeoCoopWritten"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/facilities:
+    get:
+      summary: Kho/Hub/nhà máy trong khung nhìn — của tenant (origin tenant) và hub MKG nhận qua van (origin mkg), kèm sức chứa hiệu lực (BR-52) và lớp màu (GIS FN-04 B2, US-WH-01 AC-1)
+      operationId: geoFacilitiesInBBox
+      parameters:
+        - {name: bbox, in: query, required: true, schema: {type: string}}
+        - {name: kind, in: query, schema: {type: string, enum: [kho, hub, nha_may]}}
+        - {name: include_retired, in: query, schema: {type: boolean, default: false}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 1000, default: 1000}}
+      responses:
+        "200":
+          description: FeatureCollection
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/GeoFacilityLayer"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/facilities/{ref}:
+    get:
+      summary: Kho/Hub của tenant kèm Event Log (BR-14/19), sức chứa hiệu lực và lịch sử ảnh chụp sức chứa
+      operationId: geoGetFacility
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Cơ sở
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [facility, events, capacity, capacity_history]
+                properties:
+                  facility: {$ref: "#/components/schemas/GeoFacilityFeature"}
+                  events: {type: array, items: {$ref: "#/components/schemas/GeoFacilityEvent"}}
+                  capacity: {$ref: "#/components/schemas/GeoCapacityView"}
+                  capacity_history: {type: array, items: {$ref: "#/components/schemas/GeoCapacitySnapshot"}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/geo/hubs/{ref}/capacity:
+    get:
+      summary: Sức chứa hiệu lực và lịch sử của hub MKG (nhận qua van hub_capacity; số Admin nhập tay không bị ghi đè — BR-52)
+      operationId: geoHubCapacity
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Sức chứa
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [hub_ref, capacity, capacity_history]
+                properties:
+                  hub_ref: {type: string, format: uuid}
+                  capacity: {$ref: "#/components/schemas/GeoCapacityView"}
+                  capacity_history: {type: array, items: {$ref: "#/components/schemas/GeoCapacitySnapshot"}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/geo/capacity-widgets:
+    get:
+      summary: Widget dung lượng trên marker Hub/kho (GIS US-HUB-01, FN-15, BR-50) — % lấp đầy và lớp màu theo ngưỡng geo.hub_capacity_warn_pct / geo.hub_capacity_full_pct (mặc định 60/85)
+      operationId: geoCapacityWidgets
+      parameters:
+        - {name: bbox, in: query, required: true, schema: {type: string}}
+        - {name: kind, in: query, schema: {type: string, enum: [kho, hub, nha_may]}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 1000, default: 1000}}
+      responses:
+        "200":
+          description: Marker kèm %
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, truncated, thresholds]
+                properties:
+                  truncated: {type: boolean}
+                  thresholds: {$ref: "#/components/schemas/GeoCapacityThresholds"}
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [origin, ref, kind, code, name, lon, lat, capacity, used, free, unit, fill_pct, class, source, sync_differs]
+                      properties:
+                        origin: {type: string, enum: [tenant, mkg]}
+                        ref: {type: string, format: uuid}
+                        kind: {type: string, enum: [kho, hub, nha_may]}
+                        code: {type: string}
+                        name: {type: string}
+                        lon: {type: string}
+                        lat: {type: string}
+                        capacity: {type: [string, "null"]}
+                        used: {type: [string, "null"]}
+                        free: {type: [string, "null"]}
+                        unit: {type: [string, "null"]}
+                        fill_pct: {type: [string, "null"]}
+                        class: {type: string, enum: [available, near_full, full, unknown]}
+                        source: {type: [string, "null"], enum: [manual, import, valve, null]}
+                        sync_differs: {type: boolean}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/roads:
+    get:
+      summary: Tuyến đường bộ trong khung nhìn (GIS US-ROAD-01, BR-29/30) — chỉ tuyến có tải trọng cho phép ≥ min_load_tons; chiều dài trắc địa; không tuyến phù hợp → none_matched + notice (AC-2)
+      operationId: geoRoadsInBBox
+      parameters:
+        - {name: bbox, in: query, required: true, schema: {type: string}}
+        - {name: min_load_tons, in: query, schema: {type: string}, description: "Tải trọng phương tiện (tấn), > 0"}
+        - {name: road_class, in: query, schema: {type: string, enum: [quoc_lo, tinh_lo, huyen_lo, truc_xa, bo_ruong]}}
+        - {name: zoom, in: query, schema: {type: integer, minimum: 0, maximum: 22, default: 17}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 1000, default: 1000}}
+      responses:
+        "200":
+          description: FeatureCollection
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/GeoRoadLayer"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/roads/{ref}:
+    get:
+      summary: Tuyến đường bộ kèm mọi phiên bản
+      operationId: geoGetRoad
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Tuyến
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [road, versions]
+                properties:
+                  road: {$ref: "#/components/schemas/GeoRoadFeature"}
+                  versions: {type: array, items: {$ref: "#/components/schemas/GeoRoadSegment"}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/geo/gps-fixes:
+    get:
+      summary: Log toạ độ GPS (HTX US-GPS-03) — chỉ đọc, mới nhất trước, theo phạm vi xã (quản lý HTX chỉ log gắn HTX mình; log không xác định được xã chỉ toàn quốc thấy)
+      description: Ghi log chỉ qua port geo.GpsLog của module nghiệp vụ (cropcycle, extension). Log giữ ≥ 12 tháng, không bao giờ xóa.
+      operationId: geoListGpsFixes
+      parameters:
+        - {name: actor_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: target_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: plot_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: purpose, in: query, schema: {type: string, enum: [season_open, farm_log, harvest, support, plot]}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/GeoGpsFix"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/geo/gps-fixes/{id}:
+    put:
+      summary: Luôn từ chối — log GPS chỉ đọc (HTX US-GPS-03 AC-1)
+      operationId: geoUpdateGpsFix
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "405": {$ref: "#/components/responses/Problem"}
+    patch:
+      summary: Luôn từ chối — log GPS chỉ đọc (HTX US-GPS-03 AC-1)
+      operationId: geoPatchGpsFix
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "405": {$ref: "#/components/responses/Problem"}
+    delete:
+      summary: Luôn từ chối — "Dữ liệu log chỉ đọc, không thể chỉnh sửa hoặc xóa." (HTX US-GPS-03 AC-1)
+      operationId: geoDeleteGpsFix
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "405": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/geo G2 ---
+
   # Nghiệp vụ khuyến nông (ADR-0011): nhiệm vụ hỗ trợ + SLA, chỉ đạo khẩn, báo cáo hiện trường,
 
   # dashboard 4 KPI, danh bạ trực. Vai: kn_officer, kn_province_admin, kn_national_admin,
@@ -2480,6 +2823,18 @@ components:
       content:
         application/problem+json:
           schema: {$ref: "#/components/schemas/Problem"}
+    GeoCoopWritten:
+      description: Ranh giới HTX sau khi ghi và dòng sổ vừa ghi (gọi lặp cùng Idempotency-Key → phản hồi như lần đầu)
+      headers:
+        Location: {schema: {type: string}}
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [cooperative, boundary]
+            properties:
+              cooperative: {$ref: "#/components/schemas/GeoCoopFeature"}
+              boundary: {$ref: "#/components/schemas/GeoCoopBoundaryVersion"}
     ExtTaskWritten:
       description: Sự việc đã ghi (pf/extension)
       content:
@@ -3100,6 +3455,281 @@ components:
       properties:
         type: {type: string, enum: [Polygon, MultiPolygon]}
         coordinates: {type: array}
+    # --- pf/geo G2 ---
+    GeoPointGeometry:
+      type: object
+      description: GeoJSON Point WGS84 [kinh độ, vĩ độ]
+      required: [type, coordinates]
+      properties:
+        type: {type: string, enum: [Point]}
+        coordinates: {type: array, items: {type: number}, minItems: 2, maxItems: 3}
+    GeoLineStringGeometry:
+      type: object
+      description: GeoJSON LineString WGS84, ≥ 2 điểm phân biệt
+      required: [type, coordinates]
+      properties:
+        type: {type: string, enum: [LineString]}
+        coordinates: {type: array, items: {type: array, items: {type: number}}}
+    GeoReasonInput:
+      type: object
+      required: [reason]
+      properties:
+        reason: {type: string, minLength: 10}
+    GeoCoopShapeInput:
+      type: object
+      required: [geometry]
+      properties:
+        boundary_id: {type: string, format: uuid, description: "UUIDv7 sinh trên máy; bỏ trống → server sinh"}
+        geometry: {$ref: "#/components/schemas/PolygonGeometry"}
+        source: {type: string, enum: [geo_web, htx_app, import_file], description: "Mặc định geo_web (quản lý HTX: htx_app)"}
+        event_time: {type: string, format: date-time}
+        device_id: {type: [string, "null"]}
+    GeoCoopFeature:
+      type: object
+      required: [type, id, geometry, properties]
+      properties:
+        type: {type: string, enum: [Feature]}
+        id: {type: string, format: uuid}
+        geometry:
+          oneOf:
+            - $ref: "#/components/schemas/PolygonGeometry"
+            - $ref: "#/components/schemas/GeoPointGeometry"
+        properties:
+          type: object
+          required: [cooperative_ref, marker_source]
+          properties:
+            cooperative_ref: {type: string, format: uuid}
+            code: {type: string, description: "Chỉ ở marker HTX chưa có ranh giới"}
+            name: {type: string, description: "Chỉ ở marker HTX chưa có ranh giới"}
+            commune_code: {type: string}
+            status: {type: [string, "null"], enum: [active, retired, null], description: "null = HTX chưa có ranh giới (chỉ marker)"}
+            status_reason: {type: [string, "null"]}
+            version: {type: integer}
+            boundary_id: {type: [string, "null"], format: uuid}
+            area_ha: {$ref: "#/components/schemas/Decimal"}
+            source: {type: string}
+            revision: {type: integer}
+            marker: {$ref: "#/components/schemas/GeoPointGeometry"}
+            marker_source: {type: string, enum: [party_location, point_on_surface]}
+            created_at: {type: string, format: date-time}
+            updated_at: {type: string, format: date-time}
+    GeoCoopBoundaryVersion:
+      type: object
+      required: [boundary_id, cooperative_ref, version, action, area_ha, point_count, source, commune_code, event_time, recorded_at, supersedes_id, correction_reason, actor_ref]
+      properties:
+        boundary_id: {type: string, format: uuid}
+        cooperative_ref: {type: string, format: uuid}
+        version: {type: integer}
+        action: {type: string, enum: [recorded, retired, restored]}
+        area_ha: {$ref: "#/components/schemas/Decimal"}
+        point_count: {type: integer}
+        source: {type: string, enum: [geo_web, htx_app, import_file, party_sync]}
+        commune_code: {type: string}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid, description: "Người vẽ/sửa/xóa"}
+        device_id: {type: [string, "null"]}
+        geometry: {$ref: "#/components/schemas/PolygonGeometry"}
+    GeoCoopLayer:
+      type: object
+      required: [type, features, truncated, limit]
+      properties:
+        type: {type: string, enum: [FeatureCollection]}
+        features: {type: array, items: {$ref: "#/components/schemas/GeoCoopFeature"}}
+        truncated: {type: boolean}
+        limit: {type: integer}
+    GeoCapacityThresholds:
+      type: object
+      required: [warn_pct, full_pct]
+      properties:
+        warn_pct: {$ref: "#/components/schemas/Decimal"}
+        full_pct: {$ref: "#/components/schemas/Decimal"}
+    GeoCapacityLatest:
+      type: object
+      required: [source, snapshot_id, as_of, capacity, used, unit, released, released_at]
+      properties:
+        source: {type: string, enum: [manual, import, valve]}
+        snapshot_id: {type: string, format: uuid}
+        as_of: {type: string, format: date-time}
+        capacity: {$ref: "#/components/schemas/Decimal"}
+        used: {$ref: "#/components/schemas/Decimal"}
+        unit: {type: string, enum: [tan, m3, ke]}
+        released: {type: boolean, description: "Số Admin đã được nhả (BR-52)"}
+        released_at: {type: [string, "null"], format: date-time}
+    GeoCapacityView:
+      type: object
+      description: Sức chứa hiệu lực theo BR-52 — số Admin (manual/import) mới nhất chưa nhả, nếu không có thì số của van.
+      required: [capacity, used, unit, source, as_of, snapshot_id, fill_pct, class, sync_differs, pending_sync, by_source]
+      properties:
+        capacity: {type: [string, "null"]}
+        used: {type: [string, "null"]}
+        unit: {type: [string, "null"]}
+        source: {type: [string, "null"], enum: [manual, import, valve, null]}
+        as_of: {type: [string, "null"], format: date-time}
+        snapshot_id: {type: [string, "null"], format: uuid}
+        fill_pct: {type: [string, "null"]}
+        class: {type: string, enum: [available, near_full, full, unknown]}
+        sync_differs: {type: boolean, description: "Van có số mới hơn, khác số Admin đang áp dụng — chờ Admin xác nhận (release)"}
+        pending_sync: {oneOf: [{$ref: "#/components/schemas/GeoCapacityLatest"}, {type: "null"}]}
+        by_source: {type: array, items: {$ref: "#/components/schemas/GeoCapacityLatest"}}
+    GeoCapacitySnapshot:
+      type: object
+      required: [id, subject_kind, subject_ref, seq, action, source, as_of, capacity, used, unit, recorded_at, supersedes_id, correction_reason, actor_ref]
+      properties:
+        id: {type: string, format: uuid}
+        subject_kind: {type: string, enum: [facility, hub]}
+        subject_ref: {type: string, format: uuid}
+        seq: {type: integer}
+        action: {type: string, enum: [snapshot, release]}
+        source: {type: string, enum: [manual, import, valve]}
+        as_of: {type: string, format: date-time}
+        capacity: {type: [string, "null"]}
+        used: {type: [string, "null"]}
+        unit: {type: [string, "null"]}
+        recorded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+    GeoFacilityFeature:
+      type: object
+      required: [type, id, geometry, properties]
+      properties:
+        type: {type: string, enum: [Feature]}
+        id: {type: string, format: uuid}
+        geometry: {$ref: "#/components/schemas/GeoPointGeometry"}
+        properties:
+          type: object
+          required: [origin, ref, kind, code, name, unit, status, version]
+          properties:
+            origin: {type: string, enum: [tenant, mkg], description: "tenant = pf_geo.facility (vd kho bên thứ ba); mkg = hub MKG qua van công bố"}
+            ref: {type: string, format: uuid}
+            kind: {type: string, enum: [kho, hub, nha_may]}
+            code: {type: string}
+            name: {type: string}
+            province_code: {type: [string, "null"]}
+            commune_code: {type: [string, "null"]}
+            nominal_capacity: {type: [string, "null"]}
+            unit: {type: string, enum: [tan, m3, ke]}
+            status: {type: string, enum: [active, retired]}
+            status_reason: {type: [string, "null"]}
+            version: {type: integer}
+            current_event_id: {type: string, format: uuid, description: "Dùng làm supersedes_id khi sửa"}
+            area_ha: {type: [string, "null"]}
+            footprint: {oneOf: [{$ref: "#/components/schemas/PolygonGeometry"}, {type: "null"}]}
+            capacity: {$ref: "#/components/schemas/GeoCapacityView"}
+            revision: {type: integer}
+            created_at: {type: string, format: date-time}
+            updated_at: {type: string, format: date-time}
+    GeoFacilityEvent:
+      type: object
+      required: [id, facility_ref, version, action, kind, code, name, lon, lat, has_polygon, province_code, commune_code, capacity, unit, status, event_time, recorded_at, supersedes_id, correction_reason, actor_ref]
+      properties:
+        id: {type: string, format: uuid}
+        facility_ref: {type: string, format: uuid}
+        version: {type: integer}
+        action: {type: string, enum: [created, updated, retired, restored]}
+        kind: {type: string, enum: [kho, hub, nha_may]}
+        code: {type: string}
+        name: {type: string}
+        lon: {type: string}
+        lat: {type: string}
+        has_polygon: {type: boolean}
+        province_code: {type: string}
+        commune_code: {type: string}
+        capacity: {$ref: "#/components/schemas/Decimal"}
+        unit: {type: string, enum: [tan, m3, ke]}
+        status: {type: string, enum: [active, retired]}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+    GeoFacilityLayer:
+      type: object
+      required: [type, features, truncated, limit, thresholds]
+      properties:
+        type: {type: string, enum: [FeatureCollection]}
+        features: {type: array, items: {$ref: "#/components/schemas/GeoFacilityFeature"}}
+        truncated: {type: boolean}
+        limit: {type: integer}
+        thresholds: {$ref: "#/components/schemas/GeoCapacityThresholds"}
+    GeoRoadFeature:
+      type: object
+      required: [type, id, geometry, properties]
+      properties:
+        type: {type: string, enum: [Feature]}
+        id: {type: string, format: uuid}
+        geometry: {$ref: "#/components/schemas/GeoLineStringGeometry"}
+        properties:
+          type: object
+          required: [ref, name, road_class, max_load_tons, length_m, province_code, status, version, segment_id]
+          properties:
+            ref: {type: string, format: uuid}
+            name: {type: string}
+            road_class: {type: string, enum: [quoc_lo, tinh_lo, huyen_lo, truc_xa, bo_ruong]}
+            max_load_tons: {$ref: "#/components/schemas/Decimal"}
+            length_m: {$ref: "#/components/schemas/Decimal"}
+            province_code: {type: string}
+            status: {type: string, enum: [active, retired]}
+            status_reason: {type: [string, "null"]}
+            version: {type: integer}
+            segment_id: {type: string, format: uuid, description: "Dùng làm supersedes_id khi sửa"}
+            revision: {type: integer}
+            created_at: {type: string, format: date-time}
+            updated_at: {type: string, format: date-time}
+    GeoRoadSegment:
+      type: object
+      required: [segment_id, road_ref, version, action, name, road_class, max_load_tons, length_m, point_count, province_code, event_time, recorded_at, supersedes_id, correction_reason, actor_ref]
+      properties:
+        segment_id: {type: string, format: uuid}
+        road_ref: {type: string, format: uuid}
+        version: {type: integer}
+        action: {type: string, enum: [recorded, retired, restored]}
+        name: {type: string}
+        road_class: {type: string, enum: [quoc_lo, tinh_lo, huyen_lo, truc_xa, bo_ruong]}
+        max_load_tons: {$ref: "#/components/schemas/Decimal"}
+        length_m: {$ref: "#/components/schemas/Decimal"}
+        point_count: {type: integer}
+        province_code: {type: string}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+        geometry: {$ref: "#/components/schemas/GeoLineStringGeometry"}
+    GeoRoadLayer:
+      type: object
+      required: [type, features, truncated, limit, matched, none_matched, notice]
+      properties:
+        type: {type: string, enum: [FeatureCollection]}
+        features: {type: array, items: {$ref: "#/components/schemas/GeoRoadFeature"}}
+        truncated: {type: boolean}
+        limit: {type: integer}
+        matched: {type: integer}
+        none_matched: {type: boolean, description: "Đã lọc theo tải trọng mà không có tuyến nào (US-ROAD-01 AC-2)"}
+        notice: {type: [string, "null"]}
+    GeoGpsFix:
+      type: object
+      required: [id, seq, actor_ref, device_id, purpose, target_ref, plot_ref, commune_code, cooperative_ref, point, accuracy_m, source, distance_to_plot_m, captured_at, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        actor_ref: {type: string, format: uuid}
+        device_id: {type: [string, "null"]}
+        purpose: {type: string, enum: [season_open, farm_log, harvest, support, plot]}
+        target_ref: {type: [string, "null"], format: uuid}
+        plot_ref: {type: [string, "null"], format: uuid}
+        commune_code: {type: [string, "null"]}
+        cooperative_ref: {type: [string, "null"], format: uuid}
+        point: {oneOf: [{$ref: "#/components/schemas/GeoPointGeometry"}, {type: "null"}]}
+        accuracy_m: {type: [string, "null"]}
+        source: {type: string, enum: [device, photo_exif, manual_pick]}
+        distance_to_plot_m: {type: [string, "null"], description: "Khoảng cách trắc địa tới ranh giới hiện hành của lô (0 = trong lô)"}
+        captured_at: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+    # --- hết pf/geo G2 ---
     PlotProperties:
       type: object
       required: [ref, code, name, commune_code, cooperative_ref, household_ref, status, status_reason, version, boundary_id, area_ha, source, needs_review, revision, created_at, updated_at]

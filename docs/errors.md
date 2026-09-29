@@ -200,6 +200,19 @@ Việc xuất hỏng vĩnh viễn ghi `error_code` trên việc xuất (vd `mech
 | 422 | `geo.format_invalid` | pf/geo: tệp nhập không đọc được, không có đối tượng, hoặc quá 200 đối tượng; Shapefile: không phải gói .zip, thiếu .shp/.dbf, nhiều lớp, số bản ghi .dbf khác .shp |
 | 422 | `geo.format_unsupported` | pf/geo: không nhận ra định dạng tệp — hỗ trợ GeoJSON, KML, Shapefile (.zip) |
 | 503 | `geo.dependency_unavailable` | pf/geo: chưa nối hoặc không gọi được pf/party (phạm vi), pf/masterdata (đơn vị hành chính, tham số) |
+| 404 | `geo.cooperative_boundary_not_found` | pf/geo G2: HTX chưa có ranh giới, hoặc ranh giới nằm ngoài phạm vi đọc (xã; quản lý HTX: HTX khác) — không lộ sự tồn tại |
+| 409 | `geo.cooperative_boundary_exists` | pf/geo G2: HTX đã có ranh giới — sửa bằng `POST /v1/geo/cooperative-boundaries/{ref}/versions` (kèm `supersedes_id`, `correction_reason`); problem có `current_boundary_id`, `current_version`, `status` (GIS US-BND-02/03) |
+| 404 | `geo.facility_not_found` | pf/geo G2: không có kho/Hub/nhà máy của tenant với ref/mã này |
+| 409 | `geo.facility_code_exists` | pf/geo G2: mã kho/Hub (hoặc `ref` do máy sinh) đã được dùng — mã giữ mãi, kể cả khi đã ngừng dùng |
+| 404 | `geo.hub_not_found` | pf/geo G2: chưa nhận hub MKG này qua van công bố (`hub_facility`) nên chưa nhập tay sức chứa được |
+| 404 | `geo.road_not_found` | pf/geo G2: không có tuyến đường bộ |
+| 409 | `geo.feature_state_conflict` | pf/geo G2: trạng thái ranh giới HTX / kho-Hub / tuyến không cho phép thao tác (sửa khi đã ngừng dùng, ngừng dùng hai lần, khôi phục khi chưa ngừng dùng) |
+| 409 | `geo.capacity_nothing_to_release` | pf/geo G2: không có số sức chứa Admin nhập (manual/import) đang áp dụng để nhả (BR-52) |
+| 405 | `geo.gps_log_read_only` | pf/geo G2: "Dữ liệu log chỉ đọc, không thể chỉnh sửa hoặc xóa." — mọi PUT/PATCH/DELETE vào log GPS, kể cả Admin (HTX US-GPS-03 AC-1) |
+
+Thông báo nghiệp vụ G2 nằm ở `detail` của `validation_failed` (422), đúng câu chữ backlog GIS: kho/Hub thiếu tên hoặc địa chỉ (= `province_code` + `commune_code`; pf không lưu địa chỉ chữ, R-04) → "Vui lòng nhập đầy đủ Tên Hub và Địa chỉ."; sức chứa ≤ 0 hoặc sai định dạng số → "Sức chứa phải là số lớn hơn 0." (US-BND-05/06 AC-2/AC-3); tuyến thiếu tên hoặc phân loại → "Vui lòng nhập đầy đủ Tên tuyến và Phân loại."; tải trọng tối đa ≤ 0 hoặc sai định dạng → "Tải trọng tối đa phải là số lớn hơn 0." (US-ROAD-02/03 AC-2); ranh giới HTX thiếu HTX → "Vui lòng nhập đầy đủ Tên HTX và Địa chỉ." (US-BND-02 AC-2 — tên, địa chỉ HTX nằm ở sổ pf/party). Ranh giới HTX, khuôn viên kho và tuyến dùng chung `geo.invalid_geometry`, `geo.crs_unsupported`, `geo.area_out_of_range` (ranh giới HTX: 0,01–100.000 ha), `geo.version_conflict` (problem có `current_boundary_id` / `current_event_id` / `current_segment_id`).
+
+Cổng `geo.GpsLog.RecordFix` (module khác gọi, không qua HTTP) trả lỗi bọc `port.ErrGpsFixInvalid` khi dữ liệu sai (thiếu actor, mục đích/nguồn lạ, không có toạ độ mà không phải chọn lô thủ công kèm `plot_ref`, `captured_at` ở tương lai) — module gọi không nên thử lại; lỗi khác (DB) thì đưa vào hàng đợi của mình và gọi lại cùng ID.
 
 Đồng bộ ngoại tuyến `plot_boundary` (docs/dev/sync-contract.md): không chặn được máy — chồng lấn HTX khác, sửa trên phiên bản cũ, hoặc chồng lấn cùng HTX chưa xác nhận **không** bị từ chối; bản ghi được giữ, trả `status = conflict` kèm `conflict_id`. Chồng lấn cùng HTX có `confirm_overlap: true` → `accepted` (xung đột vẫn mở để xem xét). Lệch diện tích khai báo không chặn. Bản ghi sai trả `rejected` với các mã ở trên.
 

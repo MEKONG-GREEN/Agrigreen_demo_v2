@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.geo.facility.recorded/v1",
+  "title": "pf.geo.facility.recorded — payload",
+  "description": "Một dòng sổ cơ sở kho/Hub/nhà máy CỦA TENANT (vd kho bên thứ ba) đã được ghi vào pf_geo.facility_event (GIS US-BND-05/06/08, BRD FN-04/FN-06): tạo, sửa (bản ghi bù trỏ supersedes_id kèm lý do), ngừng dùng (xóa mềm, BR-14/19) hoặc khôi phục. Hub của MKG không phát sự kiện này (đến qua van công bố hub_facility). Không mang khuôn viên (pf không lưu địa chỉ chữ — R-04) — consumer đọc qua GET /v1/geo/facilities/{ref}. Không có dữ liệu cá nhân.",
+  "x-event-type": "pf.geo.facility.recorded",
+  "x-schema-version": 1,
+  "x-producer": "pf/geo",
+  "type": "object",
+  "required": ["facility_ref", "event_id", "version", "action", "kind", "code", "name", "status", "province_code", "commune_code", "lon", "lat", "has_polygon", "capacity", "unit", "supersedes_id", "correction_reason", "actor_ref", "event_time"],
+  "properties": {
+    "facility_ref":      { "type": "string", "format": "uuid" },
+    "event_id":          { "type": "string", "format": "uuid", "description": "Dòng sổ vừa ghi" },
+    "version":           { "type": "integer", "minimum": 1, "description": "= seq trong chuỗi băm của cơ sở" },
+    "action":            { "type": "string", "enum": ["created", "updated", "retired", "restored"] },
+    "kind":              { "type": "string", "enum": ["kho", "hub", "nha_may"] },
+    "code":              { "type": "string", "maxLength": 40 },
+    "name":              { "type": "string", "maxLength": 200 },
+    "status":            { "type": "string", "enum": ["active", "retired"] },
+    "province_code":     { "type": "string" },
+    "commune_code":      { "type": ["string", "null"], "description": "Luôn có với cơ sở tạo từ G2 (địa chỉ = tỉnh + xã)" },
+    "lon":               { "type": "string", "description": "Kinh độ marker WGS84, 7 chữ số thập phân" },
+    "lat":               { "type": "string", "description": "Vĩ độ marker WGS84, 7 chữ số thập phân" },
+    "has_polygon":       { "type": "boolean", "description": "Có ranh giới khuôn viên" },
+    "capacity":          { "type": "string", "pattern": "^[0-9]+\\.[0-9]{3}$", "description": "Sức chứa danh định theo unit" },
+    "unit":              { "type": "string", "enum": ["tan", "m3", "ke"] },
+    "supersedes_id":     { "type": ["string", "null"], "format": "uuid" },
+    "correction_reason": { "type": ["string", "null"], "minLength": 10 },
+    "actor_ref":         { "type": "string", "format": "uuid" },
+    "event_time":        { "type": "string", "format": "date-time" }
+  }
+}

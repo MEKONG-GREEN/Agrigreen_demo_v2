@@ -770,6 +770,255 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/geo/layers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lớp bản đồ web GIS gộp theo khung nhìn (BRD FN-01, BR-24/25) — mỗi lớp tối đa 1.000 đối tượng; polygon thửa chỉ khi zoom ≥ geo.plot_layer_min_zoom (mặc định 13) */
+        get: operations["geoLayers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/cooperative-boundaries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ranh giới HTX trong khung nhìn thuộc phạm vi (GIS FN-04 B2) — kèm marker (điểm pf_party.cooperative.location nếu có, không thì điểm trong vùng); HTX chưa có ranh giới hiện bằng điểm */
+        get: operations["geoCoopBoundariesInBBox"];
+        put?: never;
+        /**
+         * Vẽ ranh giới đầu tiên của HTX (GIS US-BND-02 AC-1) — diện tích trắc địa tính trong DB; HTX đã có ranh giới → 409 geo.cooperative_boundary_exists (dùng /versions)
+         * @description Vai plot_editor (cán bộ KN trong phạm vi), coop_manager (chỉ HTX của mình; bỏ trống cooperative_ref = HTX mình),
+         *     geo_admin, platform_admin. Tên, địa chỉ HTX thuộc sổ pf/party; thiếu HTX → 422 với detail
+         *     "Vui lòng nhập đầy đủ Tên HTX và Địa chỉ." (US-BND-02 AC-2). Sự kiện pf.geo.cooperative_boundary.recorded.
+         */
+        post: operations["geoCreateCoopBoundary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/cooperative-boundaries/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ranh giới HTX hiện hành kèm mọi phiên bản (lịch sử chỉ đọc, gồm ngừng dùng/khôi phục và người thao tác); ngoài phạm vi → 404 */
+        get: operations["geoGetCoopBoundary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/cooperative-boundaries/{ref}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa ranh giới HTX (GIS US-BND-03 AC-1) — phiên bản mới trỏ supersedes_id (= boundary_id hiện hành) kèm lý do ≥ 10 ký tự; sai phiên bản → 409 geo.version_conflict */
+        post: operations["geoCorrectCoopBoundary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/cooperative-boundaries/{ref}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xóa mềm ranh giới HTX (GIS US-BND-03 AC-2, BR-14) — ẩn khỏi bản đồ dùng chung; dòng sổ mới giữ hình, lý do, người xóa */
+        post: operations["geoRetireCoopBoundary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/cooperative-boundaries/{ref}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Khôi phục ranh giới HTX đã ngừng dùng (BR-14) */
+        post: operations["geoRestoreCoopBoundary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/facilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kho/Hub/nhà máy trong khung nhìn — của tenant (origin tenant) và hub MKG nhận qua van (origin mkg), kèm sức chứa hiệu lực (BR-52) và lớp màu (GIS FN-04 B2, US-WH-01 AC-1) */
+        get: operations["geoFacilitiesInBBox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/facilities/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kho/Hub của tenant kèm Event Log (BR-14/19), sức chứa hiệu lực và lịch sử ảnh chụp sức chứa */
+        get: operations["geoGetFacility"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/hubs/{ref}/capacity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sức chứa hiệu lực và lịch sử của hub MKG (nhận qua van hub_capacity; số Admin nhập tay không bị ghi đè — BR-52) */
+        get: operations["geoHubCapacity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/capacity-widgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Widget dung lượng trên marker Hub/kho (GIS US-HUB-01, FN-15, BR-50) — % lấp đầy và lớp màu theo ngưỡng geo.hub_capacity_warn_pct / geo.hub_capacity_full_pct (mặc định 60/85) */
+        get: operations["geoCapacityWidgets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/roads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tuyến đường bộ trong khung nhìn (GIS US-ROAD-01, BR-29/30) — chỉ tuyến có tải trọng cho phép ≥ min_load_tons; chiều dài trắc địa; không tuyến phù hợp → none_matched + notice (AC-2) */
+        get: operations["geoRoadsInBBox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/roads/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tuyến đường bộ kèm mọi phiên bản */
+        get: operations["geoGetRoad"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/gps-fixes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Log toạ độ GPS (HTX US-GPS-03) — chỉ đọc, mới nhất trước, theo phạm vi xã (quản lý HTX chỉ log gắn HTX mình; log không xác định được xã chỉ toàn quốc thấy)
+         * @description Ghi log chỉ qua port geo.GpsLog của module nghiệp vụ (cropcycle, extension). Log giữ ≥ 12 tháng, không bao giờ xóa.
+         */
+        get: operations["geoListGpsFixes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/gps-fixes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Luôn từ chối — log GPS chỉ đọc (HTX US-GPS-03 AC-1) */
+        put: operations["geoUpdateGpsFix"];
+        post?: never;
+        /** Luôn từ chối — "Dữ liệu log chỉ đọc, không thể chỉnh sửa hoặc xóa." (HTX US-GPS-03 AC-1) */
+        delete: operations["geoDeleteGpsFix"];
+        options?: never;
+        head?: never;
+        /** Luôn từ chối — log GPS chỉ đọc (HTX US-GPS-03 AC-1) */
+        patch: operations["geoPatchGpsFix"];
+        trace?: never;
+    };
     "/v1/extension/tasks": {
         parameters: {
             query?: never;
@@ -2475,6 +2724,348 @@ export interface components {
             type: "Polygon" | "MultiPolygon";
             coordinates: unknown[];
         };
+        /** @description GeoJSON Point WGS84 [kinh độ, vĩ độ] */
+        GeoPointGeometry: {
+            /** @enum {string} */
+            type: "Point";
+            coordinates: number[];
+        };
+        /** @description GeoJSON LineString WGS84, ≥ 2 điểm phân biệt */
+        GeoLineStringGeometry: {
+            /** @enum {string} */
+            type: "LineString";
+            coordinates: number[][];
+        };
+        GeoReasonInput: {
+            reason: string;
+        };
+        GeoCoopShapeInput: {
+            /**
+             * Format: uuid
+             * @description UUIDv7 sinh trên máy; bỏ trống → server sinh
+             */
+            boundary_id?: string;
+            geometry: components["schemas"]["PolygonGeometry"];
+            /**
+             * @description Mặc định geo_web (quản lý HTX: htx_app)
+             * @enum {string}
+             */
+            source?: "geo_web" | "htx_app" | "import_file";
+            /** Format: date-time */
+            event_time?: string;
+            device_id?: string | null;
+        };
+        GeoCoopFeature: {
+            /** @enum {string} */
+            type: "Feature";
+            /** Format: uuid */
+            id: string;
+            geometry: components["schemas"]["PolygonGeometry"] | components["schemas"]["GeoPointGeometry"];
+            properties: {
+                /** Format: uuid */
+                cooperative_ref: string;
+                /** @description Chỉ ở marker HTX chưa có ranh giới */
+                code?: string;
+                /** @description Chỉ ở marker HTX chưa có ranh giới */
+                name?: string;
+                commune_code?: string;
+                /**
+                 * @description null = HTX chưa có ranh giới (chỉ marker)
+                 * @enum {string|null}
+                 */
+                status?: "active" | "retired" | null;
+                status_reason?: string | null;
+                version?: number;
+                /** Format: uuid */
+                boundary_id?: string | null;
+                area_ha?: components["schemas"]["Decimal"];
+                source?: string;
+                revision?: number;
+                marker?: components["schemas"]["GeoPointGeometry"];
+                /** @enum {string} */
+                marker_source: "party_location" | "point_on_surface";
+                /** Format: date-time */
+                created_at?: string;
+                /** Format: date-time */
+                updated_at?: string;
+            };
+        };
+        GeoCoopBoundaryVersion: {
+            /** Format: uuid */
+            boundary_id: string;
+            /** Format: uuid */
+            cooperative_ref: string;
+            version: number;
+            /** @enum {string} */
+            action: "recorded" | "retired" | "restored";
+            area_ha: components["schemas"]["Decimal"];
+            point_count: number;
+            /** @enum {string} */
+            source: "geo_web" | "htx_app" | "import_file" | "party_sync";
+            commune_code: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            supersedes_id: string | null;
+            correction_reason: string | null;
+            /**
+             * Format: uuid
+             * @description Người vẽ/sửa/xóa
+             */
+            actor_ref: string;
+            device_id?: string | null;
+            geometry?: components["schemas"]["PolygonGeometry"];
+        };
+        GeoCoopLayer: {
+            /** @enum {string} */
+            type: "FeatureCollection";
+            features: components["schemas"]["GeoCoopFeature"][];
+            truncated: boolean;
+            limit: number;
+        };
+        GeoCapacityThresholds: {
+            warn_pct: components["schemas"]["Decimal"];
+            full_pct: components["schemas"]["Decimal"];
+        };
+        GeoCapacityLatest: {
+            /** @enum {string} */
+            source: "manual" | "import" | "valve";
+            /** Format: uuid */
+            snapshot_id: string;
+            /** Format: date-time */
+            as_of: string;
+            capacity: components["schemas"]["Decimal"];
+            used: components["schemas"]["Decimal"];
+            /** @enum {string} */
+            unit: "tan" | "m3" | "ke";
+            /** @description Số Admin đã được nhả (BR-52) */
+            released: boolean;
+            /** Format: date-time */
+            released_at: string | null;
+        };
+        /** @description Sức chứa hiệu lực theo BR-52 — số Admin (manual/import) mới nhất chưa nhả, nếu không có thì số của van. */
+        GeoCapacityView: {
+            capacity: string | null;
+            used: string | null;
+            unit: string | null;
+            /** @enum {string|null} */
+            source: "manual" | "import" | "valve" | null;
+            /** Format: date-time */
+            as_of: string | null;
+            /** Format: uuid */
+            snapshot_id: string | null;
+            fill_pct: string | null;
+            /** @enum {string} */
+            class: "available" | "near_full" | "full" | "unknown";
+            /** @description Van có số mới hơn, khác số Admin đang áp dụng — chờ Admin xác nhận (release) */
+            sync_differs: boolean;
+            pending_sync: components["schemas"]["GeoCapacityLatest"] | null;
+            by_source: components["schemas"]["GeoCapacityLatest"][];
+        };
+        GeoCapacitySnapshot: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            subject_kind: "facility" | "hub";
+            /** Format: uuid */
+            subject_ref: string;
+            seq: number;
+            /** @enum {string} */
+            action: "snapshot" | "release";
+            /** @enum {string} */
+            source: "manual" | "import" | "valve";
+            /** Format: date-time */
+            as_of: string;
+            capacity: string | null;
+            used: string | null;
+            unit: string | null;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            supersedes_id: string | null;
+            correction_reason: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+        };
+        GeoFacilityFeature: {
+            /** @enum {string} */
+            type: "Feature";
+            /** Format: uuid */
+            id: string;
+            geometry: components["schemas"]["GeoPointGeometry"];
+            properties: {
+                /**
+                 * @description tenant = pf_geo.facility (vd kho bên thứ ba); mkg = hub MKG qua van công bố
+                 * @enum {string}
+                 */
+                origin: "tenant" | "mkg";
+                /** Format: uuid */
+                ref: string;
+                /** @enum {string} */
+                kind: "kho" | "hub" | "nha_may";
+                code: string;
+                name: string;
+                province_code?: string | null;
+                commune_code?: string | null;
+                nominal_capacity?: string | null;
+                /** @enum {string} */
+                unit: "tan" | "m3" | "ke";
+                /** @enum {string} */
+                status: "active" | "retired";
+                status_reason?: string | null;
+                version: number;
+                /**
+                 * Format: uuid
+                 * @description Dùng làm supersedes_id khi sửa
+                 */
+                current_event_id?: string;
+                area_ha?: string | null;
+                footprint?: components["schemas"]["PolygonGeometry"] | null;
+                capacity?: components["schemas"]["GeoCapacityView"];
+                revision?: number;
+                /** Format: date-time */
+                created_at?: string;
+                /** Format: date-time */
+                updated_at?: string;
+            };
+        };
+        GeoFacilityEvent: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            facility_ref: string;
+            version: number;
+            /** @enum {string} */
+            action: "created" | "updated" | "retired" | "restored";
+            /** @enum {string} */
+            kind: "kho" | "hub" | "nha_may";
+            code: string;
+            name: string;
+            lon: string;
+            lat: string;
+            has_polygon: boolean;
+            province_code: string;
+            commune_code: string;
+            capacity: components["schemas"]["Decimal"];
+            /** @enum {string} */
+            unit: "tan" | "m3" | "ke";
+            /** @enum {string} */
+            status: "active" | "retired";
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            supersedes_id: string | null;
+            correction_reason: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+        };
+        GeoFacilityLayer: {
+            /** @enum {string} */
+            type: "FeatureCollection";
+            features: components["schemas"]["GeoFacilityFeature"][];
+            truncated: boolean;
+            limit: number;
+            thresholds: components["schemas"]["GeoCapacityThresholds"];
+        };
+        GeoRoadFeature: {
+            /** @enum {string} */
+            type: "Feature";
+            /** Format: uuid */
+            id: string;
+            geometry: components["schemas"]["GeoLineStringGeometry"];
+            properties: {
+                /** Format: uuid */
+                ref: string;
+                name: string;
+                /** @enum {string} */
+                road_class: "quoc_lo" | "tinh_lo" | "huyen_lo" | "truc_xa" | "bo_ruong";
+                max_load_tons: components["schemas"]["Decimal"];
+                length_m: components["schemas"]["Decimal"];
+                province_code: string;
+                /** @enum {string} */
+                status: "active" | "retired";
+                status_reason?: string | null;
+                version: number;
+                /**
+                 * Format: uuid
+                 * @description Dùng làm supersedes_id khi sửa
+                 */
+                segment_id: string;
+                revision?: number;
+                /** Format: date-time */
+                created_at?: string;
+                /** Format: date-time */
+                updated_at?: string;
+            };
+        };
+        GeoRoadSegment: {
+            /** Format: uuid */
+            segment_id: string;
+            /** Format: uuid */
+            road_ref: string;
+            version: number;
+            /** @enum {string} */
+            action: "recorded" | "retired" | "restored";
+            name: string;
+            /** @enum {string} */
+            road_class: "quoc_lo" | "tinh_lo" | "huyen_lo" | "truc_xa" | "bo_ruong";
+            max_load_tons: components["schemas"]["Decimal"];
+            length_m: components["schemas"]["Decimal"];
+            point_count: number;
+            province_code: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            supersedes_id: string | null;
+            correction_reason: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+            geometry?: components["schemas"]["GeoLineStringGeometry"];
+        };
+        GeoRoadLayer: {
+            /** @enum {string} */
+            type: "FeatureCollection";
+            features: components["schemas"]["GeoRoadFeature"][];
+            truncated: boolean;
+            limit: number;
+            matched: number;
+            /** @description Đã lọc theo tải trọng mà không có tuyến nào (US-ROAD-01 AC-2) */
+            none_matched: boolean;
+            notice: string | null;
+        };
+        GeoGpsFix: {
+            /** Format: uuid */
+            id: string;
+            seq: number;
+            /** Format: uuid */
+            actor_ref: string;
+            device_id: string | null;
+            /** @enum {string} */
+            purpose: "season_open" | "farm_log" | "harvest" | "support" | "plot";
+            /** Format: uuid */
+            target_ref: string | null;
+            /** Format: uuid */
+            plot_ref: string | null;
+            commune_code: string | null;
+            /** Format: uuid */
+            cooperative_ref: string | null;
+            point: components["schemas"]["GeoPointGeometry"] | null;
+            accuracy_m: string | null;
+            /** @enum {string} */
+            source: "device" | "photo_exif" | "manual_pick";
+            /** @description Khoảng cách trắc địa tới ranh giới hiện hành của lô (0 = trong lô) */
+            distance_to_plot_m: string | null;
+            /** Format: date-time */
+            captured_at: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
         PlotProperties: {
             /** Format: uuid */
             ref: string;
@@ -3354,6 +3945,19 @@ export interface components {
             };
             content: {
                 "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Ranh giới HTX sau khi ghi và dòng sổ vừa ghi (gọi lặp cùng Idempotency-Key → phản hồi như lần đầu) */
+        GeoCoopWritten: {
+            headers: {
+                Location?: string;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    cooperative: components["schemas"]["GeoCoopFeature"];
+                    boundary: components["schemas"]["GeoCoopBoundaryVersion"];
+                };
             };
         };
         /** @description Sự việc đã ghi (pf/extension) */
@@ -4901,6 +5505,469 @@ export interface operations {
                 };
             };
             404: components["responses"]["Problem"];
+        };
+    };
+    geoLayers: {
+        parameters: {
+            query: {
+                /** @description minLon,minLat,maxLon,maxLat (WGS84) */
+                bbox: string;
+                zoom?: number;
+                /** @description Danh sách lớp, phân cách dấu phẩy */
+                layers?: string;
+                /** @description Lọc lớp đường bộ theo tải trọng phương tiện (tấn) */
+                min_load_tons?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Các lớp đã yêu cầu (null = không yêu cầu hoặc zoom chưa đủ) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        zoom: number;
+                        plot_min_zoom: number;
+                        /** @description Thông báo khi zoom chưa đủ để tải polygon thửa */
+                        plots_notice: string | null;
+                        cooperatives: components["schemas"]["GeoCoopLayer"] | null;
+                        plots: {
+                            /** @enum {string} */
+                            type: "FeatureCollection";
+                            features: components["schemas"]["PlotFeature"][];
+                            truncated: boolean;
+                        } | null;
+                        facilities: components["schemas"]["GeoFacilityLayer"] | null;
+                        roads: components["schemas"]["GeoRoadLayer"] | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoCoopBoundariesInBBox: {
+        parameters: {
+            query: {
+                bbox: string;
+                zoom?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description FeatureCollection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeoCoopLayer"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoCreateCoopBoundary: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeoCoopShapeInput"] & {
+                    /** Format: uuid */
+                    cooperative_ref?: string | null;
+                    /** @description Chỉ dùng khi chưa nối pf/party (có party thì lấy đơn vị của HTX) */
+                    commune_code?: string;
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["GeoCoopWritten"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    geoGetCoopBoundary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ranh giới */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        cooperative: components["schemas"]["GeoCoopFeature"];
+                        versions: components["schemas"]["GeoCoopBoundaryVersion"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    geoCorrectCoopBoundary: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeoCoopShapeInput"] & {
+                    /** Format: uuid */
+                    supersedes_id: string;
+                    correction_reason: string;
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["GeoCoopWritten"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoRetireCoopBoundary: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeoReasonInput"];
+            };
+        };
+        responses: {
+            200: components["responses"]["GeoCoopWritten"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoRestoreCoopBoundary: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeoReasonInput"];
+            };
+        };
+        responses: {
+            200: components["responses"]["GeoCoopWritten"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoFacilitiesInBBox: {
+        parameters: {
+            query: {
+                bbox: string;
+                kind?: "kho" | "hub" | "nha_may";
+                include_retired?: boolean;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description FeatureCollection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeoFacilityLayer"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoGetFacility: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cơ sở */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        facility: components["schemas"]["GeoFacilityFeature"];
+                        events: components["schemas"]["GeoFacilityEvent"][];
+                        capacity: components["schemas"]["GeoCapacityView"];
+                        capacity_history: components["schemas"]["GeoCapacitySnapshot"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    geoHubCapacity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sức chứa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        hub_ref: string;
+                        capacity: components["schemas"]["GeoCapacityView"];
+                        capacity_history: components["schemas"]["GeoCapacitySnapshot"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    geoCapacityWidgets: {
+        parameters: {
+            query: {
+                bbox: string;
+                kind?: "kho" | "hub" | "nha_may";
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Marker kèm % */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        truncated: boolean;
+                        thresholds: components["schemas"]["GeoCapacityThresholds"];
+                        items: {
+                            /** @enum {string} */
+                            origin: "tenant" | "mkg";
+                            /** Format: uuid */
+                            ref: string;
+                            /** @enum {string} */
+                            kind: "kho" | "hub" | "nha_may";
+                            code: string;
+                            name: string;
+                            lon: string;
+                            lat: string;
+                            capacity: string | null;
+                            used: string | null;
+                            free: string | null;
+                            unit: string | null;
+                            fill_pct: string | null;
+                            /** @enum {string} */
+                            class: "available" | "near_full" | "full" | "unknown";
+                            /** @enum {string|null} */
+                            source: "manual" | "import" | "valve" | null;
+                            sync_differs: boolean;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoRoadsInBBox: {
+        parameters: {
+            query: {
+                bbox: string;
+                /** @description Tải trọng phương tiện (tấn), > 0 */
+                min_load_tons?: string;
+                road_class?: "quoc_lo" | "tinh_lo" | "huyen_lo" | "truc_xa" | "bo_ruong";
+                zoom?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description FeatureCollection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeoRoadLayer"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoGetRoad: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tuyến */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        road: components["schemas"]["GeoRoadFeature"];
+                        versions: components["schemas"]["GeoRoadSegment"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    geoListGpsFixes: {
+        parameters: {
+            query?: {
+                actor_ref?: string;
+                target_ref?: string;
+                plot_ref?: string;
+                purpose?: "season_open" | "farm_log" | "harvest" | "support" | "plot";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["GeoGpsFix"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    geoUpdateGpsFix: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            405: components["responses"]["Problem"];
+        };
+    };
+    geoDeleteGpsFix: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            405: components["responses"]["Problem"];
+        };
+    };
+    geoPatchGpsFix: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            405: components["responses"]["Problem"];
         };
     };
     extListTasks: {

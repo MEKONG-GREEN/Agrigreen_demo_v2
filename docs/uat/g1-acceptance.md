@@ -217,7 +217,7 @@ Kịch bản chỉ gọi qua HTTP, trừ hai việc mà ở production do worker
 
 | FN | Nội dung | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| FN-04 | Ranh giới HTX/Hub | `TestAdminBoundaryAndCommuneContainment` (ranh giới hành chính, toạ độ điểm HTX) | **ngoài G1 → G2** — polygon HTX và Hub thuộc `mkg/hub` |
+| FN-04 | Ranh giới HTX/Hub | `TestAdminBoundaryAndCommuneContainment` (ranh giới hành chính, toạ độ điểm HTX) | **ngoài G1 → G2** — polygon ranh giới HTX thuộc `pf/geo` (sổ `cooperative_boundary`, G2); kho/Hub của tenant ở `pf/geo` (`facility`); Hub của MKG đến từ `mkg/hub` qua van công bố (`hub_facility`, `hub_capacity`) vào mô hình đọc `pf_geo.hub_view` |
 | FN-05 | Thửa ruộng: vẽ, sửa, nhập | E2E-05, `TestImportGeoJSONAndKML`, `TestImportShapefileZip`, `TestCorrectionCreatesNewVersion`, `TestBBoxLimitAndScope` | **đạt**. "Xóa" là `retire` + khôi phục, không xóa cứng (X1) |
 | FN-06 | Kho/Hub | — | **ngoài G1 → G2** |
 | FN-07 | Dữ liệu nền theo zoom | `TestAdminBoundaryAndCommuneContainment`, `TestAdminBoundariesByParentG05` (ranh giới hành chính theo cấp, `zoom`) | **ngoài G1 → G2** cho lớp giao thông, thủy hệ, tự nhiên và tile (cùng `pf/waterway`). Phần G1 — ranh giới hành chính theo cấp/zoom — đạt |

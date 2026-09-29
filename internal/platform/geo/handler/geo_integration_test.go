@@ -50,14 +50,18 @@ type fixture struct {
 	orgA, orgB, coopA, coopB uuid.UUID
 }
 
-func newFixture(t *testing.T) *fixture {
+func newFixture(t *testing.T, opts ...func(*geo.Deps)) *fixture {
 	env := pgtest.Get(t)
 	iss := authztest.New(t)
 	pool := env.Pool(t, migrations.PF, geo.DBRole)
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	sc := newFakeScope()
 	tol := decimal.NewFromInt(1)
-	mod := geo.New(pool, clock.System{}, geo.Deps{Scope: sc, Params: fakeParams{tolerance: &tol}, AdminUnits: newFakeUnits()})
+	deps := geo.Deps{Scope: sc, Params: fakeParams{tolerance: &tol}, AdminUnits: newFakeUnits()}
+	for _, o := range opts {
+		o(&deps)
+	}
+	mod := geo.New(pool, clock.System{}, deps)
 	log := telemetry.NewLogger("test", io.Discard)
 	appEng := httpx.NewEngine(log, 4<<20)
 	mod.RegisterApp(appEng.Group("/v1", httpx.Authenticate(iss.Verifier()), idempotency.Middleware(ops)))
