@@ -2367,6 +2367,486 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
   # --- hết pf/reports ---
+  # --- pf/cropcycle (App HTX: SOP, vụ, nhật ký, sản lượng, bảng điều hành) ---
+  /v1/cropcycle/sops:
+    get:
+      summary: Mẫu SOP đã ban hành nhìn thấy được (hệ thống + riêng của HTX người gọi)
+      operationId: listCropSOPs
+      parameters:
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CropSOPTemplate"}}
+                  next_cursor: {type: [string, "null"]}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/sops/{ref}:
+    get:
+      summary: Mẫu SOP kèm các phiên bản ĐÃ PHÁT HÀNH
+      operationId: getCropSOP
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: Mẫu, content: {application/json: {schema: {$ref: "#/components/schemas/CropSOP"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/sop-versions/{id}:
+    get:
+      summary: Một phiên bản SOP đã phát hành (bước, mốc thu hoạch)
+      operationId: getCropSOPVersion
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Phiên bản
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, template]
+                properties:
+                  version: {$ref: "#/components/schemas/CropSOPVersion"}
+                  template: {$ref: "#/components/schemas/CropSOPTemplate"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/variety-bindings:
+    get:
+      summary: Gắn giống lúa ↔ mẫu SOP mặc định (tự gán khi mở vụ, HTX US-SEASON-01 AC-1)
+      operationId: listCropVarietyBindings
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CropVarietyBinding"}}
+  /v1/cropcycle/seasons:
+    post:
+      summary: Mở vụ cho một thửa (nông dân tự mở; quản lý HTX mở hộ) — HTX US-SEASON-01/03/04
+      description: |
+        Ngày sạ trong [hôm nay − 15, hôm nay + 30] (giờ Việt Nam). SOP tự gán theo giống nếu không chỉ định.
+        `copy_previous: true` lấy giống + SOP của vụ vừa hoàn thành (chặn nếu vụ gần nhất chưa hoàn thành).
+        Mỗi thửa tối đa một vụ đang mở. GPS thiếu/lệch không chặn lưu (nhãn `location_status`).
+      operationId: openCropSeason
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/CropSeasonOpenInput"}}}
+      responses:
+        "201": {$ref: "#/components/responses/CropSeasonWritten"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Vụ trong phạm vi (nông dân — hộ mình; quản lý HTX — HTX mình; KN — xã; quản trị — tất cả)
+      operationId: listCropSeasons
+      parameters:
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: plot_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: status, in: query, schema: {type: string, enum: [open, completed, cancelled]}}
+        - {name: season_code, in: query, schema: {type: string}}
+        - {name: season_year, in: query, schema: {type: integer}}
+        - {name: variety_code, in: query, schema: {type: string}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CropSeason"}}
+                  next_cursor: {type: [string, "null"]}
+  /v1/cropcycle/seasons/bulk-open:
+    post:
+      summary: Mở vụ hàng loạt (quản lý HTX) — thửa lỗi bị bỏ qua kèm lý do (HTX US-SEASON-02, US-SEASON-04 AC-2)
+      operationId: bulkOpenCropSeasons
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plot_refs, season_code, season_year, variety_code, sowing_date]
+              properties:
+                plot_refs: {type: array, maxItems: 200, items: {type: string, format: uuid}}
+                season_code: {type: string}
+                season_year: {type: integer}
+                variety_code: {type: string}
+                sowing_date: {type: string, format: date}
+                sop_version_id: {type: [string, "null"], format: uuid}
+      responses:
+        "200":
+          description: Kết quả theo thửa
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [opened, skipped, items]
+                properties:
+                  opened: {type: integer}
+                  skipped: {type: integer}
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [plot_ref, status]
+                      properties:
+                        plot_ref: {type: string, format: uuid}
+                        status: {type: string, enum: [opened, skipped]}
+                        season_ref: {type: string, format: uuid}
+                        code: {type: string}
+                        reason: {type: string, description: "vd \"Lô đang canh tác vụ khác\", \"Lô không thuộc quyền quản lý\""}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/seasons/{ref}:
+    get:
+      summary: Vụ kèm lịch sử sự kiện, bước SOP đã ghim, tiến độ và sản lượng
+      operationId: getCropSeason
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: Vụ, content: {application/json: {schema: {$ref: "#/components/schemas/CropSeasonDetail"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/seasons/{ref}/corrections:
+    post:
+      summary: Sửa vụ đang mở bằng bản ghi bù (supersedes_id = current_event_id)
+      operationId: correctCropSeason
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [supersedes_id, correction_reason]
+              properties:
+                id: {type: [string, "null"], format: uuid}
+                supersedes_id: {type: string, format: uuid}
+                correction_reason: {type: string, minLength: 10}
+                variety_code: {type: [string, "null"]}
+                sowing_date: {type: [string, "null"], format: date}
+                sop_version_id: {type: [string, "null"], format: uuid}
+      responses:
+        "201": {$ref: "#/components/responses/CropSeasonWritten"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/seasons/{ref}/cancel:
+    post:
+      summary: Hủy vụ mở nhầm (bản ghi bù, vụ chưa khai sản lượng)
+      operationId: cancelCropSeason
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [supersedes_id, reason]
+              properties:
+                supersedes_id: {type: string, format: uuid}
+                reason: {type: string, minLength: 10}
+      responses:
+        "201": {$ref: "#/components/responses/CropSeasonWritten"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/seasons/{ref}/harvest:
+    post:
+      summary: Khai sản lượng — đóng vụ trong cùng giao dịch (HTX US-YIELD-01, US-YIELD-03)
+      operationId: declareCropHarvest
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/CropHarvestInput"}}}
+      responses:
+        "201": {$ref: "#/components/responses/CropHarvestWritten"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/plots/{ref}/previous-config:
+    get:
+      summary: Giống + SOP của vụ vừa hoàn thành trên thửa (HTX US-SEASON-03)
+      operationId: getCropPreviousConfig
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Cấu hình
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [season_ref, season_code, season_year, variety_code, sop_template_ref, sop_version_id, sop_version_no]
+                properties:
+                  season_ref: {type: string, format: uuid}
+                  season_code: {type: string}
+                  season_year: {type: integer}
+                  variety_code: {type: string}
+                  sop_template_ref: {type: string, format: uuid}
+                  sop_version_id: {type: string, format: uuid}
+                  sop_version_no: {type: integer}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/harvests/bulk:
+    post:
+      summary: Bảng nhập nhanh sản lượng — lưu nhiều lô trong một lần bấm (HTX US-YIELD-02 AC-2)
+      operationId: bulkCropHarvests
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rows]
+              properties:
+                cooperative_ref: {type: [string, "null"], format: uuid, description: "Quản trị: HTX để tra mã lô; quản lý HTX bỏ trống"}
+                rows:
+                  type: array
+                  maxItems: 200
+                  items:
+                    type: object
+                    properties:
+                      season_ref: {type: string, format: uuid}
+                      plot_code: {type: string}
+                      harvest_date: {type: string, format: date}
+                      mass_kg: {type: [string, "null"]}
+                      moisture_pct: {type: [string, "null"]}
+                      confirm_anomaly: {type: boolean}
+      responses:
+        "200": {$ref: "#/components/responses/CropBulkHarvest"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/harvests/import:
+    post:
+      summary: Nhập sản lượng từ Excel .xlsx / CSV (HTX US-YIELD-02 AC-1) — dòng lỗi bị bỏ qua kèm lý do
+      description: "Cột: Mã lô (plot_code) hoặc Mã vụ (season_ref); Sản lượng kg (mass_kg) hoặc Sản lượng tấn (tonnes); Ngày thu hoạch; Độ ẩm; Xác nhận bất thường. Tối đa 200 dòng, 2 MB."
+      operationId: importCropHarvests
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+          text/csv: {schema: {type: string}}
+      responses:
+        "200": {$ref: "#/components/responses/CropBulkHarvest"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/harvests/{id}/corrections:
+    post:
+      summary: Sửa sản lượng bằng bản ghi bù thay khai báo hiện hành
+      operationId: correctCropHarvest
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CropHarvestInput"
+                - type: object
+                  required: [correction_reason]
+                  properties:
+                    correction_reason: {type: string, minLength: 10}
+      responses:
+        "201": {$ref: "#/components/responses/CropHarvestWritten"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/farm-logs:
+    post:
+      summary: Ghi nhật ký canh tác (HTX US-LOG-01; ghi hộ US-LOG-02) — cần vụ đang mở
+      operationId: recordCropFarmLog
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/CropFarmLogInput"}}}
+      responses:
+        "201": {$ref: "#/components/responses/CropFarmLogWritten"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Nhật ký (phiên bản hiện hành) trong phạm vi — vd danh sách chờ duyệt (HTX US-LOG-05)
+      operationId: listCropFarmLogs
+      parameters:
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: season_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: status, in: query, schema: {type: string, enum: [pending, approved, needs_supplement]}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CropFarmLogState"}}
+                  next_cursor: {type: [string, "null"]}
+  /v1/cropcycle/farm-logs/batch:
+    post:
+      summary: Ghi nhật ký hàng loạt — một đầu lô + một dòng mỗi thửa (HTX US-LOG-03)
+      operationId: recordCropFarmLogBatch
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CropFarmLogContent"
+                - type: object
+                  required: [plot_refs]
+                  properties:
+                    id: {type: [string, "null"], format: uuid}
+                    plot_refs: {type: array, maxItems: 200, items: {type: string, format: uuid}}
+                    gps: {$ref: "#/components/schemas/CropGPS"}
+                    event_time: {type: [string, "null"], format: date-time}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [batch_ref, requested, accepted, skipped, lines]
+                properties:
+                  batch_ref: {type: string, format: uuid}
+                  requested: {type: integer}
+                  accepted: {type: integer}
+                  skipped:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        plot_ref: {type: string, format: uuid}
+                        code: {type: string}
+                        reason: {type: string}
+                  lines: {type: array, items: {$ref: "#/components/schemas/CropFarmLog"}}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/farm-logs/{id}:
+    get:
+      summary: Một phiên bản nhật ký kèm trạng thái duyệt và mọi phiên bản
+      operationId: getCropFarmLog
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Nhật ký
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [log, state, versions]
+                properties:
+                  log: {$ref: "#/components/schemas/CropFarmLog"}
+                  state: {$ref: "#/components/schemas/CropFarmLogState"}
+                  versions: {type: array, items: {$ref: "#/components/schemas/CropFarmLog"}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/farm-logs/{id}/corrections:
+    post:
+      summary: Sửa nhật ký bằng bản ghi bù — giữ nguyên thời gian và GPS (HTX US-LOG-01 AC-3)
+      operationId: correctCropFarmLog
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CropFarmLogContent"
+                - type: object
+                  required: [correction_reason]
+                  properties:
+                    id: {type: [string, "null"], format: uuid}
+                    correction_reason: {type: string, minLength: 10}
+                    event_time: {type: [string, "null"], format: date-time, description: "Nếu gửi phải trùng bản gốc"}
+                    gps: {$ref: "#/components/schemas/CropGPS"}
+      responses:
+        "201": {$ref: "#/components/responses/CropFarmLogWritten"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/farm-logs/{id}/reviews:
+    post:
+      summary: Duyệt / yêu cầu bổ sung nhật ký (quản lý HTX; người ghi không tự duyệt) — HTX US-LOG-05
+      operationId: reviewCropFarmLog
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: {type: string, enum: [approved, needs_supplement]}
+                note: {type: string, maxLength: 1000, description: "Bắt buộc khi needs_supplement"}
+      responses:
+        "201":
+          description: Đã duyệt
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [review_id, decision, state]
+                properties:
+                  review_id: {type: string, format: uuid}
+                  decision: {type: string}
+                  state: {$ref: "#/components/schemas/CropFarmLogState"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/dashboard:
+    get:
+      summary: Dự kiến – thực tế, tiến độ SOP (chỉ nhật ký đã duyệt), thẻ chỉ số — HTX US-DASH-01
+      operationId: getCropDashboard
+      parameters:
+        - {name: season_code, in: query, schema: {type: string}}
+        - {name: season_year, in: query, schema: {type: integer}}
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: variety_code, in: query, schema: {type: string}}
+      responses:
+        "200":
+          description: Số liệu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [totals, by_variety, by_season, by_cooperative]
+                properties:
+                  totals: {$ref: "#/components/schemas/CropDashGroup"}
+                  by_variety: {type: array, items: {$ref: "#/components/schemas/CropDashGroup"}}
+                  by_season: {type: array, items: {$ref: "#/components/schemas/CropDashGroup"}}
+                  by_cooperative: {type: array, items: {$ref: "#/components/schemas/CropDashGroup"}}
+        "403": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/cropcycle ---
 components:
   securitySchemes:
     oidc:
@@ -2406,6 +2886,60 @@ components:
       description: Mục đích xử lý dữ liệu cá nhân (R-42)
       schema: {type: string, enum: [mrv.evidence, extension.field_support]}
   responses:
+    CropSeasonWritten:
+      description: Sự kiện vụ đã ghi (pf/cropcycle). Gọi lặp cùng Idempotency-Key trả lại đúng phản hồi.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [season, event]
+            properties:
+              season: {$ref: "#/components/schemas/CropSeason"}
+              event: {$ref: "#/components/schemas/CropSeasonEvent"}
+    CropHarvestWritten:
+      description: Khai báo sản lượng đã ghi (pf/cropcycle)
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [harvest, season]
+            properties:
+              harvest: {$ref: "#/components/schemas/CropHarvest"}
+              season: {$ref: "#/components/schemas/CropSeason"}
+    CropFarmLogWritten:
+      description: Phiên bản nhật ký đã ghi (pf/cropcycle)
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [log, state]
+            properties:
+              log: {$ref: "#/components/schemas/CropFarmLog"}
+              state: {$ref: "#/components/schemas/CropFarmLogState"}
+    CropBulkHarvest:
+      description: Kết quả nhập sản lượng theo dòng (HTX US-YIELD-02)
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [accepted, duplicate, rejected, rows]
+            properties:
+              accepted: {type: integer}
+              duplicate: {type: integer}
+              rejected: {type: integer}
+              rows:
+                type: array
+                items:
+                  type: object
+                  required: [row, status]
+                  properties:
+                    row: {type: integer}
+                    status: {type: string, enum: [accepted, duplicate, rejected]}
+                    code: {type: string}
+                    reason: {type: string}
+                    needs_confirm: {type: boolean}
+                    season_ref: {type: string, format: uuid}
+                    harvest_id: {type: string, format: uuid}
     Problem:
       description: RFC 9457
       content:
@@ -3671,3 +4205,318 @@ components:
         error_code: {type: [string, "null"]}
         completed_at: {type: [string, "null"], format: date-time}
     # --- hết pf/reports ---
+    # --- pf/cropcycle ---
+    CropSOPStep:
+      type: object
+      required: [seq, name, activity_code, day_offset, window_days, mandatory]
+      properties:
+        seq: {type: integer, minimum: 1, description: "Liên tục 1..n (HTX US-CAT-01 AC-6)"}
+        name: {type: string, maxLength: 200}
+        stage_code: {type: string}
+        activity_code: {type: string, enum: [lam_dat, gieo_sa, tuoi_nuoc, bon_phan, phun_thuoc, kiem_tra, thu_hoach]}
+        day_offset: {type: integer, minimum: -60, maximum: 365, description: "Ngày so với ngày gieo sạ"}
+        window_days: {type: integer, minimum: 0, maximum: 60}
+        mandatory: {type: boolean}
+        evidence_kinds: {type: array, items: {type: string, enum: [anh_hien_truong, hoa_don_vat_tu, phieu_kiem_nghiem, ghi_chu, khac]}}
+        phi_days: {type: integer, minimum: 0, maximum: 120, description: "Thời gian cách ly sau phun thuốc"}
+        instruction: {type: string}
+    CropSOPTemplate:
+      type: object
+      required: [ref, code, name, crop, scope, status, latest_version]
+      properties:
+        ref: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        crop: {type: string}
+        scope: {type: string, enum: [system, htx]}
+        cooperative_ref: {type: [string, "null"], format: uuid}
+        standard: {type: [string, "null"]}
+        description: {type: [string, "null"]}
+        status: {type: string, enum: [draft, published, retired]}
+        status_reason: {type: [string, "null"]}
+        source_template_ref: {type: [string, "null"], format: uuid}
+        latest_version: {type: integer}
+        published_version: {type: [integer, "null"]}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    CropSOPVersion:
+      type: object
+      required: [id, template_ref, version_no, status, steps]
+      properties:
+        id: {type: string, format: uuid}
+        template_ref: {type: string, format: uuid}
+        version_no: {type: integer}
+        status: {type: string, enum: [draft, published]}
+        steps: {type: array, items: {$ref: "#/components/schemas/CropSOPStep"}}
+        harvest_day_offset: {type: [integer, "null"]}
+        harvest_window_days: {type: [integer, "null"]}
+        source_version_ref: {type: [string, "null"], format: uuid}
+        change_note: {type: [string, "null"]}
+        authored_by: {type: string, format: uuid}
+        authored_at: {type: string, format: date-time}
+        published_by: {type: [string, "null"], format: uuid}
+        published_at: {type: [string, "null"], format: date-time}
+    CropSOP:
+      allOf:
+        - $ref: "#/components/schemas/CropSOPTemplate"
+        - type: object
+          required: [versions]
+          properties:
+            versions: {type: array, items: {$ref: "#/components/schemas/CropSOPVersion"}}
+    CropVarietyBinding:
+      type: object
+      required: [variety_code, template_ref, bound_by, bound_at]
+      properties:
+        variety_code: {type: string}
+        template_ref: {type: string, format: uuid}
+        note: {type: [string, "null"]}
+        bound_by: {type: string, format: uuid}
+        bound_at: {type: string, format: date-time}
+    CropGPS:
+      type: [object, "null"]
+      description: "Vị trí (HTX US-GPS-01/02). lon/lat decimal; nguồn device|photo_exif cần toạ độ; manual_pick|denied|no_device không có toạ độ"
+      properties:
+        lon: {type: [string, number, "null"]}
+        lat: {type: [string, number, "null"]}
+        accuracy_m: {type: [string, number, "null"]}
+        source: {type: string, enum: [device, photo_exif, manual_pick, denied, no_device]}
+    CropSeasonOpenInput:
+      type: object
+      required: [plot_ref, season_code, season_year, variety_code, sowing_date]
+      properties:
+        id: {type: [string, "null"], format: uuid, description: "id sự kiện (UUIDv7) — tùy chọn"}
+        season_ref: {type: [string, "null"], format: uuid, description: "UUIDv7 máy sinh — tùy chọn"}
+        plot_ref: {type: string, format: uuid}
+        season_code: {type: string}
+        season_year: {type: integer}
+        variety_code: {type: string}
+        sowing_date: {type: string, format: date}
+        sop_version_id: {type: [string, "null"], format: uuid}
+        copy_previous: {type: boolean}
+        gps: {$ref: "#/components/schemas/CropGPS"}
+        event_time: {type: [string, "null"], format: date-time}
+        device_id: {type: [string, "null"]}
+    CropSeason:
+      type: object
+      required: [season_ref, plot_ref, plot_code, cooperative_ref, commune_code, season_code, season_year, variety_code, sop_version_id,
+        sowing_date, expected_harvest_date, harvest_open_date, area_ha, status, current_event_id, version, location_status, gps_source, on_behalf]
+      properties:
+        season_ref: {type: string, format: uuid}
+        plot_ref: {type: string, format: uuid}
+        plot_code: {type: string}
+        household_ref: {type: [string, "null"], format: uuid}
+        cooperative_ref: {type: string, format: uuid}
+        commune_code: {type: string}
+        season_code: {type: string}
+        season_year: {type: integer}
+        variety_code: {type: string}
+        sop_template_ref: {type: string, format: uuid}
+        sop_version_id: {type: string, format: uuid}
+        sop_version_no: {type: integer}
+        sowing_date: {type: string, format: date}
+        expected_harvest_date: {type: string, format: date}
+        harvest_open_date: {type: string, format: date, description: "Sớm nhất được khai sản lượng"}
+        area_ha: {$ref: "#/components/schemas/Decimal"}
+        expected_yield_t_per_ha: {type: [string, "null"]}
+        status: {type: string, enum: [open, completed, cancelled]}
+        current_event_id: {type: string, format: uuid, description: "Dùng làm supersedes_id khi sửa/hủy"}
+        version: {type: integer}
+        location_status: {type: string, enum: [match, mismatch, missing]}
+        gps_source: {type: string}
+        on_behalf: {type: boolean}
+        opened_by: {type: string, format: uuid}
+        opened_at: {type: string, format: date-time}
+        copied_from_season_ref: {type: [string, "null"], format: uuid}
+        harvest_id: {type: [string, "null"], format: uuid}
+        completed_at: {type: [string, "null"], format: date-time}
+        updated_at: {type: string, format: date-time}
+    CropSeasonEvent:
+      type: object
+      required: [id, seq, action, event_time]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        action: {type: string, enum: [opened, corrected, completed, cancelled]}
+        variety_code: {type: string}
+        sop_version_id: {type: string, format: uuid}
+        sowing_date: {type: string, format: date}
+        location_status: {type: string}
+        gps_source: {type: string}
+        distance_m: {type: [string, "null"]}
+        on_behalf: {type: boolean}
+        channel: {type: string}
+        actor_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        harvest_id: {type: [string, "null"], format: uuid}
+    CropSeasonDetail:
+      allOf:
+        - $ref: "#/components/schemas/CropSeason"
+        - type: object
+          required: [events, steps]
+          properties:
+            events: {type: array, items: {$ref: "#/components/schemas/CropSeasonEvent"}}
+            steps: {type: array, items: {$ref: "#/components/schemas/CropSOPStep"}}
+            progress:
+              type: [object, "null"]
+              properties:
+                sop_steps: {type: integer}
+                sop_mandatory_steps: {type: integer}
+                sop_steps_done: {type: integer, description: "Chỉ nhật ký đã duyệt"}
+                sop_mandatory_done: {type: integer}
+                approved_logs: {type: integer}
+                pending_logs: {type: integer}
+                expected_kg: {type: [string, "null"]}
+                actual_kg: {type: [string, "null"]}
+                actual_yield_t_per_ha: {type: [string, "null"]}
+            harvest:
+              oneOf:
+                - $ref: "#/components/schemas/CropHarvest"
+                - type: "null"
+    CropHarvestInput:
+      type: object
+      required: [mass_kg]
+      properties:
+        id: {type: [string, "null"], format: uuid}
+        harvest_date: {type: [string, "null"], format: date}
+        mass_kg: {type: string, description: "kg, decimal dạng chuỗi ≤ 3 chữ số lẻ (shared/mass)"}
+        moisture_pct: {type: [string, number, "null"]}
+        confirm_anomaly: {type: boolean, description: "Xác nhận cố ý khi cropcycle.yield_anomaly (HTX US-YIELD-03)"}
+        gps: {$ref: "#/components/schemas/CropGPS"}
+        event_time: {type: [string, "null"], format: date-time}
+        device_id: {type: [string, "null"]}
+    CropHarvest:
+      type: object
+      required: [id, season_ref, harvest_date, mass_kg, area_ha, yield_t_per_ha, anomaly_confirmed, source]
+      properties:
+        id: {type: string, format: uuid}
+        season_ref: {type: string, format: uuid}
+        plot_ref: {type: string, format: uuid}
+        cooperative_ref: {type: string, format: uuid}
+        household_ref: {type: [string, "null"], format: uuid}
+        variety_code: {type: string}
+        season_code: {type: string}
+        season_year: {type: integer}
+        harvest_date: {type: string, format: date}
+        mass_kg: {type: string}
+        area_ha: {type: string}
+        yield_t_per_ha: {type: string}
+        moisture_pct: {type: [string, "null"]}
+        anomaly_kind: {type: [string, "null"], enum: [zero, above_threshold, null]}
+        anomaly_threshold_t_per_ha: {type: [string, "null"]}
+        anomaly_confirmed: {type: boolean}
+        source: {type: string, enum: [app, web, excel, sync]}
+        location_status: {type: string}
+        gps_source: {type: string}
+        distance_m: {type: [string, "null"]}
+        on_behalf: {type: boolean}
+        actor_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+    CropFarmLogContent:
+      type: object
+      required: [activity_code]
+      properties:
+        activity_code: {type: string, enum: [lam_dat, gieo_sa, tuoi_nuoc, bon_phan, phun_thuoc, kiem_tra, thu_hoach]}
+        sop_step_seq: {type: [integer, "null"]}
+        machine_codes: {type: array, maxItems: 20, items: {type: string}, description: "Danh mục machine_type (HTX US-LOG-01 AC-2)"}
+        inputs:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            required: [name, qty, unit]
+            properties:
+              name: {type: string}
+              qty: {type: [string, number]}
+              unit: {type: string}
+        note: {type: string, maxLength: 2000, description: "Không chứa SĐT/CCCD"}
+        file_refs: {type: array, maxItems: 20, items: {type: string, format: uuid}, description: "Tệp minh chứng mã hóa (POST /v1/files)"}
+    CropFarmLogInput:
+      allOf:
+        - $ref: "#/components/schemas/CropFarmLogContent"
+        - type: object
+          properties:
+            id: {type: [string, "null"], format: uuid}
+            season_ref: {type: [string, "null"], format: uuid}
+            plot_ref: {type: [string, "null"], format: uuid, description: "Vụ đang mở của thửa (khi không gửi season_ref)"}
+            gps: {$ref: "#/components/schemas/CropGPS"}
+            event_time: {type: [string, "null"], format: date-time}
+            device_id: {type: [string, "null"]}
+    CropFarmLog:
+      type: object
+      required: [id, log_ref, version, season_ref, plot_ref, activity_code, event_time, location_status, became_current]
+      properties:
+        id: {type: string, format: uuid}
+        log_ref: {type: string, format: uuid}
+        version: {type: integer}
+        season_ref: {type: string, format: uuid}
+        plot_ref: {type: string, format: uuid}
+        household_ref: {type: [string, "null"], format: uuid}
+        cooperative_ref: {type: string, format: uuid}
+        commune_code: {type: string}
+        activity_code: {type: string}
+        sop_step_seq: {type: [integer, "null"]}
+        event_time: {type: string, format: date-time}
+        gps: {$ref: "#/components/schemas/CropGPS"}
+        location_status: {type: string, enum: [match, mismatch, missing]}
+        distance_m: {type: [string, "null"]}
+        machine_codes: {type: array, items: {type: string}}
+        inputs: {type: array, items: {type: object, properties: {name: {type: string}, qty: {type: string}, unit: {type: string}}}}
+        note: {type: [string, "null"]}
+        file_refs: {type: array, items: {type: string, format: uuid}}
+        batch_ref: {type: [string, "null"], format: uuid}
+        on_behalf: {type: boolean}
+        channel: {type: string}
+        author_ref: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        became_current: {type: boolean}
+    CropFarmLogState:
+      type: object
+      required: [id, log_ref, version, season_ref, status, location_status]
+      properties:
+        id: {type: string, format: uuid}
+        log_ref: {type: string, format: uuid}
+        version: {type: integer}
+        season_ref: {type: string, format: uuid}
+        plot_ref: {type: string, format: uuid}
+        household_ref: {type: [string, "null"], format: uuid}
+        cooperative_ref: {type: string, format: uuid}
+        activity_code: {type: string}
+        sop_step_seq: {type: [integer, "null"]}
+        event_time: {type: string, format: date-time}
+        location_status: {type: string}
+        gps_source: {type: string}
+        distance_m: {type: [string, "null"]}
+        author_ref: {type: string, format: uuid}
+        on_behalf: {type: boolean}
+        batch_ref: {type: [string, "null"], format: uuid}
+        status: {type: string, enum: [pending, approved, needs_supplement, superseded]}
+        superseded_by: {type: [string, "null"], format: uuid}
+        review_note: {type: [string, "null"]}
+        reviewed_by: {type: [string, "null"], format: uuid}
+        reviewed_at: {type: [string, "null"], format: date-time}
+    CropDashGroup:
+      type: object
+      required: [seasons, open_seasons, completed_seasons, households, area_ha, expected_kg, actual_kg, harvested_area_ha, approved_logs, pending_logs]
+      properties:
+        key: {type: string, description: "Mã giống / \"<vụ>:<năm>\" / cooperative_ref"}
+        seasons: {type: integer}
+        open_seasons: {type: integer}
+        completed_seasons: {type: integer}
+        households: {type: integer}
+        area_ha: {type: string}
+        expected_kg: {type: string}
+        actual_kg: {type: string}
+        harvested_area_ha: {type: string}
+        actual_yield_t_per_ha: {type: [string, "null"]}
+        sop_progress_pct: {type: [string, "null"], description: "Bước SOP có nhật ký ĐÃ DUYỆT / tổng bước (HTX US-LOG-05 AC-2)"}
+        approved_logs: {type: integer}
+        pending_logs: {type: integer}
+    # --- hết pf/cropcycle ---

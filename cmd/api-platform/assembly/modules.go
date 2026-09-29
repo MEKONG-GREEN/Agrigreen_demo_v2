@@ -9,6 +9,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
@@ -55,11 +56,12 @@ type Modules struct {
 	Notify        *notify.Module
 	Accounts      *accounts.Module
 	Reports       *reports.Module
+	CropCycle     *cropcycle.Module
 }
 
 // List trả module theo thứ tự gắn route.
 func (m Modules) List() []httpx.Module {
-	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports}
+	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.CropCycle}
 }
 
 // Build là gốc lắp ráp DUY NHẤT: mở pool theo vai của từng module (R-05) và nối
@@ -129,6 +131,14 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	}
 	mrvMod := mrv.New(mrvPool, clk, mrv.Deps{Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Store: store})
 
+	// pf/cropcycle (App HTX): SOP, vụ, nhật ký, sản lượng. Liên kết tài khoản nông dân ↔ nông hộ
+	// (port.FarmerHouseholds) nối khi pf/accounts có (G2 000025) — tới lúc đó vai farmer nhận 503.
+	ccPool, err := pool(cropcycle.DBRole)
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	cc := cropcycle.New(ccPool, clk, cropcycle.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Plots: g.Plots(), Params: md.Params(), Catalogs: md.Catalogs()})
+
 	syncPool, err := pool(syncmod.DBRole)
 	if err != nil {
 		return Modules{}, pools, err
@@ -147,8 +157,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	snc := syncmod.New(syncPool, clk, syncmod.Deps{
 		Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Params: md.Params(), Vault: ext.Vault,
 		Store: store, CursorKey: cursorKey(ext),
-		Sources: []syncport.Source{md.SyncSource(), g.SyncSource(), cnt.SyncSource(), kn.SyncSource(), nt.SyncSource(), mrvMod.SyncSource()},
-		Sinks:   []syncport.Sink{g.SyncSink(), kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink()},
+		Sources: []syncport.Source{md.SyncSource(), g.SyncSource(), cnt.SyncSource(), kn.SyncSource(), nt.SyncSource(), mrvMod.SyncSource(), cc.SyncSource()},
+		Sinks:   []syncport.Sink{g.SyncSink(), kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink(), cc.SyncSink()},
 	})
 
 	accPool, err := pool(accounts.DBRole)
@@ -176,7 +186,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		Extension: kn.ReportData(), Mechanization: mech.ReportData(), Directory: acc.MailDirectory(),
 	})
 
-	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc, Reports: rep}, pools, nil
+	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc, Reports: rep, CropCycle: cc}, pools, nil
 }
 
 func cursorKey(ext External) []byte {

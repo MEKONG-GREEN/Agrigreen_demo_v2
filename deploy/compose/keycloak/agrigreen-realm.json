@@ -33,6 +33,8 @@
       { "name": "kn_province_admin", "description": "Cán bộ TTKN tỉnh — đọc/ghi, phân công, chỉ đạo trong tỉnh" },
       { "name": "kn_officer", "description": "Cán bộ khuyến nông xã / Tổ KNCĐ — đọc/ghi trong xã phụ trách" },
       { "name": "coop_manager", "description": "Quản lý HTX/THT — nông hộ, thửa của chính HTX mình" },
+      { "name": "farmer", "description": "Nông dân — thửa của nông hộ mình (liên kết tài khoản ↔ nông hộ): mở vụ, ghi nhật ký, khai sản lượng (pf/cropcycle, App HTX)" },
+      { "name": "sop_admin", "description": "Soạn quy trình SOP, nhân bản, gắn giống ↔ SOP (pf/cropcycle, Admin API); phát hành cần param_approver khác người soạn" },
       { "name": "cgh_viewer", "description": "Cục KTHT — xem bản đồ cơ giới hóa, chỉ đọc hồ sơ HTX" },
       { "name": "cgh_sync", "description": "Tài khoản dịch vụ nạp dữ liệu diện tích/lịch mùa vụ từ App HTX (FN-07, G2)" },
       { "name": "cgh_admin", "description": "[MFA] Quản trị dữ liệu bản đồ cơ giới hóa (pf/mechanization, Admin API)" },

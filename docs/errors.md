@@ -203,6 +203,49 @@ Việc xuất hỏng vĩnh viễn ghi `error_code` trên việc xuất (vd `mech
 
 Đồng bộ ngoại tuyến `plot_boundary` (docs/dev/sync-contract.md): không chặn được máy — chồng lấn HTX khác, sửa trên phiên bản cũ, hoặc chồng lấn cùng HTX chưa xác nhận **không** bị từ chối; bản ghi được giữ, trả `status = conflict` kèm `conflict_id`. Chồng lấn cùng HTX có `confirm_overlap: true` → `accepted` (xung đột vẫn mở để xem xét). Lệch diện tích khai báo không chặn. Bản ghi sai trả `rejected` với các mã ở trên.
 
+### pf/cropcycle
+
+| HTTP | code | Ý nghĩa |
+|---|---|---|
+| 404 | `cropcycle.sop_not_found` | pf/cropcycle: không có mẫu/phiên bản SOP, hoặc (Application API) mẫu chưa ban hành / mẫu riêng của HTX khác |
+| 409 | `cropcycle.sop_name_taken` | pf/cropcycle: "Tên SOP này đã tồn tại, vui lòng chọn tên khác." — so tên đã chuẩn hóa (chữ thường, gộp khoảng trắng), kể cả khi nhân bản (HTX US-CAT-01 AC-6, US-CAT-03 AC-3) |
+| 409 | `cropcycle.sop_code_taken` | pf/cropcycle: mã mẫu SOP đã dùng |
+| 422 | `cropcycle.sop_step_order` | pf/cropcycle: "Thứ tự bước không hợp lệ, vui lòng kiểm tra lại." — `seq` phải liên tục 1..n theo thứ tự gửi (HTX US-CAT-01 AC-6) |
+| 422 | `cropcycle.sop_harvest_step_missing` | pf/cropcycle: phát hành quy trình không có bước `thu_hoach` |
+| 409 | `cropcycle.sop_state` | pf/cropcycle: sửa phiên bản đã phát hành (tạo phiên bản mới), hai bản nháp cùng lúc, thao tác trên mẫu đã ngừng dùng |
+| 422 | `cropcycle.sop_not_published` | pf/cropcycle: ghim vào vụ một phiên bản chưa phát hành hoặc của mẫu đã ngừng dùng |
+| 422 | `cropcycle.no_sop_for_variety` | pf/cropcycle: giống chưa gắn mẫu SOP đã ban hành — chọn `sop_version_id` khi mở vụ (HTX US-SEASON-01 AC-1) |
+| 422 | `cropcycle.binding_invalid` | pf/cropcycle: chỉ gắn giống với mẫu SOP **hệ thống** đã ban hành |
+| 404 | `cropcycle.season_not_found` | pf/cropcycle: không có vụ trong phạm vi đọc |
+| 404 | `cropcycle.plot_not_found` | pf/cropcycle: pf/geo không có thửa |
+| 422 | `cropcycle.plot_invalid` | pf/cropcycle: thửa chưa gán HTX (nháp), đã ngừng dùng hoặc không có diện tích |
+| 403 | `cropcycle.out_of_scope` | pf/cropcycle: "Nông hộ hoặc lô ruộng này không thuộc phạm vi quản lý của bạn." — quản lý HTX ghi cho HTX khác, nông dân ghi cho hộ khác (HTX US-SEASON-02 AC-2) |
+| 403 | `cropcycle.read_only` | pf/cropcycle: cán bộ KN chỉ được đọc dữ liệu mùa vụ |
+| 422 | `cropcycle.sowing_date_out_of_window` | pf/cropcycle: "Ngày gieo sạ phải trong khoảng 15 ngày trước đến 30 ngày sau ngày hiện tại." (ngày nghiệp vụ giờ Việt Nam, HTX US-SEASON-01 AC-2) |
+| 409 | `cropcycle.season_already_open` | pf/cropcycle: "Lô ruộng đang canh tác vụ khác, không thể mở vụ mới." (HTX US-SEASON-04); có `open_season_ref` |
+| 409 | `cropcycle.previous_season_not_completed` | pf/cropcycle: sao chép cấu hình vụ trước khi vụ gần nhất chưa hoàn thành (HTX US-SEASON-03 AC-2) |
+| 409 | `cropcycle.no_previous_season` | pf/cropcycle: thửa chưa có vụ để sao chép cấu hình |
+| 422 | `cropcycle.cooperative_inactive` | pf/cropcycle: HTX không tồn tại hoặc đã ngừng hoạt động |
+| 422 | `cropcycle.catalog_invalid` | pf/cropcycle: mã giống / vụ / máy không có hoặc đã ngừng dùng trong danh mục masterdata |
+| 409 | `cropcycle.season_not_open` | pf/cropcycle: "Lô ruộng này chưa được mở vụ. Vui lòng mở vụ trước khi ghi nhật ký." (HTX US-LOG-02 AC-2); cũng khi vụ đã đóng |
+| 409 | `cropcycle.season_state` | pf/cropcycle: sửa/hủy vụ không còn mở; khai sản lượng lần hai (dùng bản ghi bù) |
+| 409 | `cropcycle.concurrent_edit` | pf/cropcycle: `supersedes_id` không phải phiên bản hiện hành (vụ, nhật ký, sản lượng); có `current_*` |
+| 422 | `cropcycle.locked_fields` | pf/cropcycle: "Tọa độ GPS và thời gian không thể chỉnh sửa sau khi lưu." (HTX US-LOG-01 AC-3) |
+| 404 | `cropcycle.log_not_found` | pf/cropcycle: không có nhật ký trong phạm vi |
+| 409 | `cropcycle.log_state` | pf/cropcycle: duyệt nhật ký không ở trạng thái chờ duyệt (bị thay, đã duyệt, chờ bổ sung) |
+| 403 | `cropcycle.self_review` | pf/cropcycle: người ghi phiên bản nhật ký không được tự duyệt |
+| 422 | `cropcycle.batch_empty` | pf/cropcycle: lượt ghi hàng loạt không còn lô hợp lệ; có `skipped` (HTX US-LOG-03 AC-2) |
+| 409 | `cropcycle.harvest_too_early` | pf/cropcycle: "Lô ruộng chưa đến giai đoạn thu hoạch, chưa thể khai báo sản lượng." — trước ngày sạ + offset − cửa sổ của bước thu hoạch SOP đã ghim; có `harvest_open_date` (HTX US-YIELD-01 AC-1) |
+| 409 | `cropcycle.phi_violation` | pf/cropcycle: ngày thu hoạch trước khi hết thời gian cách ly của lần phun thuốc gắn bước SOP có `phi_days`; có `earliest_harvest_date` |
+| 422 | `cropcycle.yield_negative` | pf/cropcycle: sản lượng âm |
+| 409 | `cropcycle.yield_anomaly` | pf/cropcycle: sản lượng 0 hoặc năng suất vượt ngưỡng theo giống (`cropcycle.yield_anomaly_max_t_per_ha[:giống]`, mặc định 12 t/ha); `needs_confirm`, `anomaly_kind`, `yield_t_per_ha`, `threshold_t_per_ha`. Gửi lại với `confirm_anomaly: true` (HTX US-YIELD-03) |
+| 404 | `cropcycle.harvest_not_found` | pf/cropcycle: không có khai báo sản lượng trong phạm vi |
+| 422 | `cropcycle.import_invalid` | pf/cropcycle: tệp nhập sản lượng không đọc được, có công thức, quá 200 dòng / 2 MB, thiếu cột mã lô/mã vụ hoặc sản lượng |
+| 409 | `cropcycle.id_reused` | pf/cropcycle: `id`/`season_ref` do máy sinh đã dùng cho bản ghi khác |
+| 503 | `cropcycle.dependency_unavailable` | pf/cropcycle: chưa nối hoặc không gọi được pf/geo, pf/party, pf/masterdata, liên kết tài khoản ↔ nông hộ (vai `farmer`) |
+
+Nhãn vị trí (HTX US-GPS-01/02): `location_status` = `match` (≤ `cropcycle.gps_match_tolerance_m`, mặc định 50 m) | `mismatch` | `missing`; nguồn `gps_source` luôn có. Thiếu GPS hoặc không đo được **không** chặn lưu.
+
 ### pf/notify
 
 | HTTP | code | Ý nghĩa |

@@ -1653,6 +1653,356 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cropcycle/sops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mẫu SOP đã ban hành nhìn thấy được (hệ thống + riêng của HTX người gọi) */
+        get: operations["listCropSOPs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/sops/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mẫu SOP kèm các phiên bản ĐÃ PHÁT HÀNH */
+        get: operations["getCropSOP"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/sop-versions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một phiên bản SOP đã phát hành (bước, mốc thu hoạch) */
+        get: operations["getCropSOPVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/variety-bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Gắn giống lúa ↔ mẫu SOP mặc định (tự gán khi mở vụ, HTX US-SEASON-01 AC-1) */
+        get: operations["listCropVarietyBindings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/seasons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vụ trong phạm vi (nông dân — hộ mình; quản lý HTX — HTX mình; KN — xã; quản trị — tất cả) */
+        get: operations["listCropSeasons"];
+        put?: never;
+        /**
+         * Mở vụ cho một thửa (nông dân tự mở; quản lý HTX mở hộ) — HTX US-SEASON-01/03/04
+         * @description Ngày sạ trong [hôm nay − 15, hôm nay + 30] (giờ Việt Nam). SOP tự gán theo giống nếu không chỉ định.
+         *     `copy_previous: true` lấy giống + SOP của vụ vừa hoàn thành (chặn nếu vụ gần nhất chưa hoàn thành).
+         *     Mỗi thửa tối đa một vụ đang mở. GPS thiếu/lệch không chặn lưu (nhãn `location_status`).
+         */
+        post: operations["openCropSeason"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/seasons/bulk-open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mở vụ hàng loạt (quản lý HTX) — thửa lỗi bị bỏ qua kèm lý do (HTX US-SEASON-02, US-SEASON-04 AC-2) */
+        post: operations["bulkOpenCropSeasons"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/seasons/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vụ kèm lịch sử sự kiện, bước SOP đã ghim, tiến độ và sản lượng */
+        get: operations["getCropSeason"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/seasons/{ref}/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa vụ đang mở bằng bản ghi bù (supersedes_id = current_event_id) */
+        post: operations["correctCropSeason"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/seasons/{ref}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy vụ mở nhầm (bản ghi bù, vụ chưa khai sản lượng) */
+        post: operations["cancelCropSeason"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/seasons/{ref}/harvest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Khai sản lượng — đóng vụ trong cùng giao dịch (HTX US-YIELD-01, US-YIELD-03) */
+        post: operations["declareCropHarvest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/plots/{ref}/previous-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Giống + SOP của vụ vừa hoàn thành trên thửa (HTX US-SEASON-03) */
+        get: operations["getCropPreviousConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/harvests/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bảng nhập nhanh sản lượng — lưu nhiều lô trong một lần bấm (HTX US-YIELD-02 AC-2) */
+        post: operations["bulkCropHarvests"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/harvests/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nhập sản lượng từ Excel .xlsx / CSV (HTX US-YIELD-02 AC-1) — dòng lỗi bị bỏ qua kèm lý do
+         * @description Cột: Mã lô (plot_code) hoặc Mã vụ (season_ref); Sản lượng kg (mass_kg) hoặc Sản lượng tấn (tonnes); Ngày thu hoạch; Độ ẩm; Xác nhận bất thường. Tối đa 200 dòng, 2 MB.
+         */
+        post: operations["importCropHarvests"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/harvests/{id}/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa sản lượng bằng bản ghi bù thay khai báo hiện hành */
+        post: operations["correctCropHarvest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/farm-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhật ký (phiên bản hiện hành) trong phạm vi — vd danh sách chờ duyệt (HTX US-LOG-05) */
+        get: operations["listCropFarmLogs"];
+        put?: never;
+        /** Ghi nhật ký canh tác (HTX US-LOG-01; ghi hộ US-LOG-02) — cần vụ đang mở */
+        post: operations["recordCropFarmLog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/farm-logs/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi nhật ký hàng loạt — một đầu lô + một dòng mỗi thửa (HTX US-LOG-03) */
+        post: operations["recordCropFarmLogBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/farm-logs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một phiên bản nhật ký kèm trạng thái duyệt và mọi phiên bản */
+        get: operations["getCropFarmLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/farm-logs/{id}/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa nhật ký bằng bản ghi bù — giữ nguyên thời gian và GPS (HTX US-LOG-01 AC-3) */
+        post: operations["correctCropFarmLog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/farm-logs/{id}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt / yêu cầu bổ sung nhật ký (quản lý HTX; người ghi không tự duyệt) — HTX US-LOG-05 */
+        post: operations["reviewCropFarmLog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dự kiến – thực tế, tiến độ SOP (chỉ nhật ký đã duyệt), thẻ chỉ số — HTX US-DASH-01 */
+        get: operations["getCropDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3218,8 +3568,462 @@ export interface components {
             /** Format: date-time */
             completed_at?: string | null;
         };
+        CropSOPStep: {
+            /** @description Liên tục 1..n (HTX US-CAT-01 AC-6) */
+            seq: number;
+            name: string;
+            stage_code?: string;
+            /** @enum {string} */
+            activity_code: "lam_dat" | "gieo_sa" | "tuoi_nuoc" | "bon_phan" | "phun_thuoc" | "kiem_tra" | "thu_hoach";
+            /** @description Ngày so với ngày gieo sạ */
+            day_offset: number;
+            window_days: number;
+            mandatory: boolean;
+            evidence_kinds?: ("anh_hien_truong" | "hoa_don_vat_tu" | "phieu_kiem_nghiem" | "ghi_chu" | "khac")[];
+            /** @description Thời gian cách ly sau phun thuốc */
+            phi_days?: number;
+            instruction?: string;
+        };
+        CropSOPTemplate: {
+            /** Format: uuid */
+            ref: string;
+            code: string;
+            name: string;
+            crop: string;
+            /** @enum {string} */
+            scope: "system" | "htx";
+            /** Format: uuid */
+            cooperative_ref?: string | null;
+            standard?: string | null;
+            description?: string | null;
+            /** @enum {string} */
+            status: "draft" | "published" | "retired";
+            status_reason?: string | null;
+            /** Format: uuid */
+            source_template_ref?: string | null;
+            latest_version: number;
+            published_version?: number | null;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        CropSOPVersion: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            template_ref: string;
+            version_no: number;
+            /** @enum {string} */
+            status: "draft" | "published";
+            steps: components["schemas"]["CropSOPStep"][];
+            harvest_day_offset?: number | null;
+            harvest_window_days?: number | null;
+            /** Format: uuid */
+            source_version_ref?: string | null;
+            change_note?: string | null;
+            /** Format: uuid */
+            authored_by?: string;
+            /** Format: date-time */
+            authored_at?: string;
+            /** Format: uuid */
+            published_by?: string | null;
+            /** Format: date-time */
+            published_at?: string | null;
+        };
+        CropSOP: components["schemas"]["CropSOPTemplate"] & {
+            versions: components["schemas"]["CropSOPVersion"][];
+        };
+        CropVarietyBinding: {
+            variety_code: string;
+            /** Format: uuid */
+            template_ref: string;
+            note?: string | null;
+            /** Format: uuid */
+            bound_by: string;
+            /** Format: date-time */
+            bound_at: string;
+        };
+        /** @description Vị trí (HTX US-GPS-01/02). lon/lat decimal; nguồn device|photo_exif cần toạ độ; manual_pick|denied|no_device không có toạ độ */
+        CropGPS: {
+            lon?: string | number | null;
+            lat?: string | number | null;
+            accuracy_m?: string | number | null;
+            /** @enum {string} */
+            source?: "device" | "photo_exif" | "manual_pick" | "denied" | "no_device";
+        } | null;
+        CropSeasonOpenInput: {
+            /**
+             * Format: uuid
+             * @description id sự kiện (UUIDv7) — tùy chọn
+             */
+            id?: string | null;
+            /**
+             * Format: uuid
+             * @description UUIDv7 máy sinh — tùy chọn
+             */
+            season_ref?: string | null;
+            /** Format: uuid */
+            plot_ref: string;
+            season_code: string;
+            season_year: number;
+            variety_code: string;
+            /** Format: date */
+            sowing_date: string;
+            /** Format: uuid */
+            sop_version_id?: string | null;
+            copy_previous?: boolean;
+            gps?: components["schemas"]["CropGPS"];
+            /** Format: date-time */
+            event_time?: string | null;
+            device_id?: string | null;
+        };
+        CropSeason: {
+            /** Format: uuid */
+            season_ref: string;
+            /** Format: uuid */
+            plot_ref: string;
+            plot_code: string;
+            /** Format: uuid */
+            household_ref?: string | null;
+            /** Format: uuid */
+            cooperative_ref: string;
+            commune_code: string;
+            season_code: string;
+            season_year: number;
+            variety_code: string;
+            /** Format: uuid */
+            sop_template_ref?: string;
+            /** Format: uuid */
+            sop_version_id: string;
+            sop_version_no?: number;
+            /** Format: date */
+            sowing_date: string;
+            /** Format: date */
+            expected_harvest_date: string;
+            /**
+             * Format: date
+             * @description Sớm nhất được khai sản lượng
+             */
+            harvest_open_date: string;
+            area_ha: components["schemas"]["Decimal"];
+            expected_yield_t_per_ha?: string | null;
+            /** @enum {string} */
+            status: "open" | "completed" | "cancelled";
+            /**
+             * Format: uuid
+             * @description Dùng làm supersedes_id khi sửa/hủy
+             */
+            current_event_id: string;
+            version: number;
+            /** @enum {string} */
+            location_status: "match" | "mismatch" | "missing";
+            gps_source: string;
+            on_behalf: boolean;
+            /** Format: uuid */
+            opened_by?: string;
+            /** Format: date-time */
+            opened_at?: string;
+            /** Format: uuid */
+            copied_from_season_ref?: string | null;
+            /** Format: uuid */
+            harvest_id?: string | null;
+            /** Format: date-time */
+            completed_at?: string | null;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        CropSeasonEvent: {
+            /** Format: uuid */
+            id: string;
+            seq: number;
+            /** @enum {string} */
+            action: "opened" | "corrected" | "completed" | "cancelled";
+            variety_code?: string;
+            /** Format: uuid */
+            sop_version_id?: string;
+            /** Format: date */
+            sowing_date?: string;
+            location_status?: string;
+            gps_source?: string;
+            distance_m?: string | null;
+            on_behalf?: boolean;
+            channel?: string;
+            /** Format: uuid */
+            actor_ref?: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at?: string;
+            /** Format: uuid */
+            supersedes_id?: string | null;
+            correction_reason?: string | null;
+            /** Format: uuid */
+            harvest_id?: string | null;
+        };
+        CropSeasonDetail: components["schemas"]["CropSeason"] & {
+            events: components["schemas"]["CropSeasonEvent"][];
+            steps: components["schemas"]["CropSOPStep"][];
+            progress?: {
+                sop_steps?: number;
+                sop_mandatory_steps?: number;
+                /** @description Chỉ nhật ký đã duyệt */
+                sop_steps_done?: number;
+                sop_mandatory_done?: number;
+                approved_logs?: number;
+                pending_logs?: number;
+                expected_kg?: string | null;
+                actual_kg?: string | null;
+                actual_yield_t_per_ha?: string | null;
+            } | null;
+            harvest?: components["schemas"]["CropHarvest"] | null;
+        };
+        CropHarvestInput: {
+            /** Format: uuid */
+            id?: string | null;
+            /** Format: date */
+            harvest_date?: string | null;
+            /** @description kg, decimal dạng chuỗi ≤ 3 chữ số lẻ (shared/mass) */
+            mass_kg: string;
+            moisture_pct?: string | number | null;
+            /** @description Xác nhận cố ý khi cropcycle.yield_anomaly (HTX US-YIELD-03) */
+            confirm_anomaly?: boolean;
+            gps?: components["schemas"]["CropGPS"];
+            /** Format: date-time */
+            event_time?: string | null;
+            device_id?: string | null;
+        };
+        CropHarvest: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            season_ref: string;
+            /** Format: uuid */
+            plot_ref?: string;
+            /** Format: uuid */
+            cooperative_ref?: string;
+            /** Format: uuid */
+            household_ref?: string | null;
+            variety_code?: string;
+            season_code?: string;
+            season_year?: number;
+            /** Format: date */
+            harvest_date: string;
+            mass_kg: string;
+            area_ha: string;
+            yield_t_per_ha: string;
+            moisture_pct?: string | null;
+            /** @enum {string|null} */
+            anomaly_kind?: "zero" | "above_threshold" | null;
+            anomaly_threshold_t_per_ha?: string | null;
+            anomaly_confirmed: boolean;
+            /** @enum {string} */
+            source: "app" | "web" | "excel" | "sync";
+            location_status?: string;
+            gps_source?: string;
+            distance_m?: string | null;
+            on_behalf?: boolean;
+            /** Format: uuid */
+            actor_ref?: string;
+            /** Format: date-time */
+            event_time?: string;
+            /** Format: date-time */
+            recorded_at?: string;
+            /** Format: uuid */
+            supersedes_id?: string | null;
+            correction_reason?: string | null;
+        };
+        CropFarmLogContent: {
+            /** @enum {string} */
+            activity_code: "lam_dat" | "gieo_sa" | "tuoi_nuoc" | "bon_phan" | "phun_thuoc" | "kiem_tra" | "thu_hoach";
+            sop_step_seq?: number | null;
+            /** @description Danh mục machine_type (HTX US-LOG-01 AC-2) */
+            machine_codes?: string[];
+            inputs?: {
+                name: string;
+                qty: string | number;
+                unit: string;
+            }[];
+            /** @description Không chứa SĐT/CCCD */
+            note?: string;
+            /** @description Tệp minh chứng mã hóa (POST /v1/files) */
+            file_refs?: string[];
+        };
+        CropFarmLogInput: components["schemas"]["CropFarmLogContent"] & {
+            /** Format: uuid */
+            id?: string | null;
+            /** Format: uuid */
+            season_ref?: string | null;
+            /**
+             * Format: uuid
+             * @description Vụ đang mở của thửa (khi không gửi season_ref)
+             */
+            plot_ref?: string | null;
+            gps?: components["schemas"]["CropGPS"];
+            /** Format: date-time */
+            event_time?: string | null;
+            device_id?: string | null;
+        };
+        CropFarmLog: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            log_ref: string;
+            version: number;
+            /** Format: uuid */
+            season_ref: string;
+            /** Format: uuid */
+            plot_ref: string;
+            /** Format: uuid */
+            household_ref?: string | null;
+            /** Format: uuid */
+            cooperative_ref?: string;
+            commune_code?: string;
+            activity_code: string;
+            sop_step_seq?: number | null;
+            /** Format: date-time */
+            event_time: string;
+            gps?: components["schemas"]["CropGPS"];
+            /** @enum {string} */
+            location_status: "match" | "mismatch" | "missing";
+            distance_m?: string | null;
+            machine_codes?: string[];
+            inputs?: {
+                name?: string;
+                qty?: string;
+                unit?: string;
+            }[];
+            note?: string | null;
+            file_refs?: string[];
+            /** Format: uuid */
+            batch_ref?: string | null;
+            on_behalf?: boolean;
+            channel?: string;
+            /** Format: uuid */
+            author_ref?: string;
+            /** Format: date-time */
+            recorded_at?: string;
+            /** Format: uuid */
+            supersedes_id?: string | null;
+            correction_reason?: string | null;
+            became_current: boolean;
+        };
+        CropFarmLogState: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            log_ref: string;
+            version: number;
+            /** Format: uuid */
+            season_ref: string;
+            /** Format: uuid */
+            plot_ref?: string;
+            /** Format: uuid */
+            household_ref?: string | null;
+            /** Format: uuid */
+            cooperative_ref?: string;
+            activity_code?: string;
+            sop_step_seq?: number | null;
+            /** Format: date-time */
+            event_time?: string;
+            location_status: string;
+            gps_source?: string;
+            distance_m?: string | null;
+            /** Format: uuid */
+            author_ref?: string;
+            on_behalf?: boolean;
+            /** Format: uuid */
+            batch_ref?: string | null;
+            /** @enum {string} */
+            status: "pending" | "approved" | "needs_supplement" | "superseded";
+            /** Format: uuid */
+            superseded_by?: string | null;
+            review_note?: string | null;
+            /** Format: uuid */
+            reviewed_by?: string | null;
+            /** Format: date-time */
+            reviewed_at?: string | null;
+        };
+        CropDashGroup: {
+            /** @description Mã giống / "<vụ>:<năm>" / cooperative_ref */
+            key?: string;
+            seasons: number;
+            open_seasons: number;
+            completed_seasons: number;
+            households: number;
+            area_ha: string;
+            expected_kg: string;
+            actual_kg: string;
+            harvested_area_ha: string;
+            actual_yield_t_per_ha?: string | null;
+            /** @description Bước SOP có nhật ký ĐÃ DUYỆT / tổng bước (HTX US-LOG-05 AC-2) */
+            sop_progress_pct?: string | null;
+            approved_logs: number;
+            pending_logs: number;
+        };
     };
     responses: {
+        /** @description Sự kiện vụ đã ghi (pf/cropcycle). Gọi lặp cùng Idempotency-Key trả lại đúng phản hồi. */
+        CropSeasonWritten: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    season: components["schemas"]["CropSeason"];
+                    event: components["schemas"]["CropSeasonEvent"];
+                };
+            };
+        };
+        /** @description Khai báo sản lượng đã ghi (pf/cropcycle) */
+        CropHarvestWritten: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    harvest: components["schemas"]["CropHarvest"];
+                    season: components["schemas"]["CropSeason"];
+                };
+            };
+        };
+        /** @description Phiên bản nhật ký đã ghi (pf/cropcycle) */
+        CropFarmLogWritten: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    log: components["schemas"]["CropFarmLog"];
+                    state: components["schemas"]["CropFarmLogState"];
+                };
+            };
+        };
+        /** @description Kết quả nhập sản lượng theo dòng (HTX US-YIELD-02) */
+        CropBulkHarvest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    accepted: number;
+                    duplicate: number;
+                    rejected: number;
+                    rows: {
+                        row: number;
+                        /** @enum {string} */
+                        status: "accepted" | "duplicate" | "rejected";
+                        code?: string;
+                        reason?: string;
+                        needs_confirm?: boolean;
+                        /** Format: uuid */
+                        season_ref?: string;
+                        /** Format: uuid */
+                        harvest_id?: string;
+                    }[];
+                };
+            };
+        };
         /** @description RFC 9457 */
         Problem: {
             headers: {
@@ -6575,6 +7379,652 @@ export interface operations {
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
+        };
+    };
+    listCropSOPs: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CropSOPTemplate"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    getCropSOP: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mẫu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropSOP"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    getCropSOPVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        version: components["schemas"]["CropSOPVersion"];
+                        template: components["schemas"]["CropSOPTemplate"];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    listCropVarietyBindings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CropVarietyBinding"][];
+                    };
+                };
+            };
+        };
+    };
+    listCropSeasons: {
+        parameters: {
+            query?: {
+                cooperative_ref?: string;
+                plot_ref?: string;
+                status?: "open" | "completed" | "cancelled";
+                season_code?: string;
+                season_year?: number;
+                variety_code?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CropSeason"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+        };
+    };
+    openCropSeason: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CropSeasonOpenInput"];
+            };
+        };
+        responses: {
+            201: components["responses"]["CropSeasonWritten"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    bulkOpenCropSeasons: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    plot_refs: string[];
+                    season_code: string;
+                    season_year: number;
+                    variety_code: string;
+                    /** Format: date */
+                    sowing_date: string;
+                    /** Format: uuid */
+                    sop_version_id?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Kết quả theo thửa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        opened: number;
+                        skipped: number;
+                        items: {
+                            /** Format: uuid */
+                            plot_ref: string;
+                            /** @enum {string} */
+                            status: "opened" | "skipped";
+                            /** Format: uuid */
+                            season_ref?: string;
+                            code?: string;
+                            /** @description vd "Lô đang canh tác vụ khác", "Lô không thuộc quyền quản lý" */
+                            reason?: string;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getCropSeason: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Vụ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropSeasonDetail"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    correctCropSeason: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    id?: string | null;
+                    /** Format: uuid */
+                    supersedes_id: string;
+                    correction_reason: string;
+                    variety_code?: string | null;
+                    /** Format: date */
+                    sowing_date?: string | null;
+                    /** Format: uuid */
+                    sop_version_id?: string | null;
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["CropSeasonWritten"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    cancelCropSeason: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    supersedes_id: string;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["CropSeasonWritten"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    declareCropHarvest: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CropHarvestInput"];
+            };
+        };
+        responses: {
+            201: components["responses"]["CropHarvestWritten"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getCropPreviousConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cấu hình */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        season_ref: string;
+                        season_code: string;
+                        season_year: number;
+                        variety_code: string;
+                        /** Format: uuid */
+                        sop_template_ref: string;
+                        /** Format: uuid */
+                        sop_version_id: string;
+                        sop_version_no: number;
+                    };
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    bulkCropHarvests: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: uuid
+                     * @description Quản trị: HTX để tra mã lô; quản lý HTX bỏ trống
+                     */
+                    cooperative_ref?: string | null;
+                    rows: {
+                        /** Format: uuid */
+                        season_ref?: string;
+                        plot_code?: string;
+                        /** Format: date */
+                        harvest_date?: string;
+                        mass_kg?: string | null;
+                        moisture_pct?: string | null;
+                        confirm_anomaly?: boolean;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["CropBulkHarvest"];
+            403: components["responses"]["Problem"];
+        };
+    };
+    importCropHarvests: {
+        parameters: {
+            query?: {
+                cooperative_ref?: string;
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                "text/csv": string;
+            };
+        };
+        responses: {
+            200: components["responses"]["CropBulkHarvest"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    correctCropHarvest: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CropHarvestInput"] & {
+                    correction_reason: string;
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["CropHarvestWritten"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    listCropFarmLogs: {
+        parameters: {
+            query?: {
+                cooperative_ref?: string;
+                season_ref?: string;
+                status?: "pending" | "approved" | "needs_supplement";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CropFarmLogState"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+        };
+    };
+    recordCropFarmLog: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CropFarmLogInput"];
+            };
+        };
+        responses: {
+            201: components["responses"]["CropFarmLogWritten"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    recordCropFarmLogBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CropFarmLogContent"] & {
+                    /** Format: uuid */
+                    id?: string | null;
+                    plot_refs: string[];
+                    gps?: components["schemas"]["CropGPS"];
+                    /** Format: date-time */
+                    event_time?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        batch_ref: string;
+                        requested: number;
+                        accepted: number;
+                        skipped: {
+                            /** Format: uuid */
+                            plot_ref?: string;
+                            code?: string;
+                            reason?: string;
+                        }[];
+                        lines: components["schemas"]["CropFarmLog"][];
+                    };
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
+    getCropFarmLog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nhật ký */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        log: components["schemas"]["CropFarmLog"];
+                        state: components["schemas"]["CropFarmLogState"];
+                        versions: components["schemas"]["CropFarmLog"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    correctCropFarmLog: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CropFarmLogContent"] & {
+                    /** Format: uuid */
+                    id?: string | null;
+                    correction_reason: string;
+                    /**
+                     * Format: date-time
+                     * @description Nếu gửi phải trùng bản gốc
+                     */
+                    event_time?: string | null;
+                    gps?: components["schemas"]["CropGPS"];
+                };
+            };
+        };
+        responses: {
+            201: components["responses"]["CropFarmLogWritten"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    reviewCropFarmLog: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "approved" | "needs_supplement";
+                    /** @description Bắt buộc khi needs_supplement */
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã duyệt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        review_id: string;
+                        decision: string;
+                        state: components["schemas"]["CropFarmLogState"];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    getCropDashboard: {
+        parameters: {
+            query?: {
+                season_code?: string;
+                season_year?: number;
+                cooperative_ref?: string;
+                variety_code?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số liệu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        totals: components["schemas"]["CropDashGroup"];
+                        by_variety: components["schemas"]["CropDashGroup"][];
+                        by_season: components["schemas"]["CropDashGroup"][];
+                        by_cooperative: components["schemas"]["CropDashGroup"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
         };
     };
 }

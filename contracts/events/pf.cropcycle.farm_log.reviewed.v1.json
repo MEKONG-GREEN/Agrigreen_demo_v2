@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.cropcycle.farm_log.reviewed/v1",
+  "title": "pf.cropcycle.farm_log.reviewed — payload",
+  "description": "Quản lý HTX duyệt (approved) hoặc yêu cầu bổ sung (needs_supplement, kèm note) một phiên bản nhật ký (HTX US-LOG-05). pf/notify báo người ghi (author_ref). reviewer_ref ≠ author_ref.",
+  "x-event-type": "pf.cropcycle.farm_log.reviewed",
+  "x-schema-version": 1,
+  "x-producer": "pf/cropcycle",
+  "type": "object",
+  "required": [
+    "review_id",
+    "log_id",
+    "log_ref",
+    "season_ref",
+    "cooperative_ref",
+    "decision",
+    "note",
+    "author_ref",
+    "reviewer_ref",
+    "event_time"
+  ],
+  "properties": {
+    "review_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "log_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "log_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "season_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "cooperative_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "approved",
+        "needs_supplement"
+      ]
+    },
+    "note": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "author_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "reviewer_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

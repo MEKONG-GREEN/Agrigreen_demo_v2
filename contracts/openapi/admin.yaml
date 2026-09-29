@@ -2212,6 +2212,212 @@ paths:
                         delivered_at: {type: [string, "null"], format: date-time}
         "404": {$ref: "#/components/responses/Problem"}
   # --- hết pf/reports ---
+  # --- pf/cropcycle: soạn / phát hành SOP (HTX US-CAT-01, US-CAT-03), dựng lại bảng chiếu ---
+  /v1/cropcycle/sops:
+    get:
+      summary: Mọi mẫu SOP, kể cả nháp (sop_admin, param_approver, platform_admin)
+      operationId: adminListCropSOPs
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [draft, published, retired]}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CropSOPTemplate"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Tạo mẫu SOP với bản nháp phiên bản 1 (sop_admin)
+      operationId: createCropSOP
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name, steps]
+              properties:
+                code: {type: string, pattern: "^[A-Z0-9][A-Z0-9_.-]{1,39}$"}
+                name: {type: string, maxLength: 200, description: "Duy nhất (không phân biệt hoa thường, khoảng trắng)"}
+                crop: {type: string, default: lua}
+                scope: {type: string, enum: [system, htx], default: system}
+                cooperative_ref: {type: [string, "null"], format: uuid}
+                standard: {type: string}
+                description: {type: string, maxLength: 2000}
+                steps: {type: array, maxItems: 100, items: {$ref: "#/components/schemas/CropSOPStep"}}
+                change_note: {type: string}
+      responses:
+        "201": {description: Đã tạo, content: {application/json: {schema: {$ref: "#/components/schemas/CropSOP"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/sops/{ref}:
+    get:
+      summary: Mẫu SOP kèm mọi phiên bản
+      operationId: adminGetCropSOP
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: Mẫu, content: {application/json: {schema: {$ref: "#/components/schemas/CropSOP"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/sops/{ref}/versions:
+    post:
+      summary: Tạo bản nháp phiên bản mới (steps bỏ trống = chép phiên bản mới nhất)
+      operationId: newCropSOPVersion
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                steps: {type: [array, "null"], items: {$ref: "#/components/schemas/CropSOPStep"}}
+                change_note: {type: string}
+      responses:
+        "201": {description: Đã tạo, content: {application/json: {schema: {$ref: "#/components/schemas/CropSOP"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/sops/{ref}/clone:
+    post:
+      summary: Nhân bản mẫu SOP giữ nguyên bước và thứ tự (HTX US-CAT-03)
+      operationId: cloneCropSOP
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string}
+                code: {type: string, description: "Bỏ trống → tự sinh"}
+                scope: {type: string, enum: [system, htx]}
+                cooperative_ref: {type: [string, "null"], format: uuid}
+      responses:
+        "201": {description: Bản sao (nháp), content: {application/json: {schema: {$ref: "#/components/schemas/CropSOP"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/sops/{ref}/retire:
+    post:
+      summary: Ngừng dùng mẫu (không xóa; vụ đã ghim giữ phiên bản)
+      operationId: retireCropSOP
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 10}
+      responses:
+        "200": {description: Đã ngừng dùng, content: {application/json: {schema: {$ref: "#/components/schemas/CropSOP"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/sop-versions/{id}:
+    get:
+      summary: Một phiên bản SOP (kể cả nháp)
+      operationId: adminGetCropSOPVersion
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Phiên bản
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, template]
+                properties:
+                  version: {$ref: "#/components/schemas/CropSOPVersion"}
+                  template: {$ref: "#/components/schemas/CropSOPTemplate"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/sop-versions/{id}/steps:
+    post:
+      summary: Thay bước của bản nháp (bản đã phát hành bất biến → 409 cropcycle.sop_state)
+      operationId: updateCropSOPDraft
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [steps]
+              properties:
+                steps: {type: array, items: {$ref: "#/components/schemas/CropSOPStep"}}
+                change_note: {type: string}
+      responses:
+        "200": {description: Đã sửa, content: {application/json: {schema: {$ref: "#/components/schemas/CropSOP"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/sop-versions/{id}/publish:
+    post:
+      summary: Phát hành bản nháp — param_approver khác người soạn (R-56); phải có bước thu hoạch
+      operationId: publishCropSOP
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: Đã phát hành (phát pf.cropcycle.sop.published), content: {application/json: {schema: {$ref: "#/components/schemas/CropSOP"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/variety-bindings:
+    post:
+      summary: Gắn giống lúa với mẫu SOP hệ thống đã ban hành (thay gắn cũ, không xóa)
+      operationId: bindCropVariety
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [variety_code, template_ref]
+              properties:
+                variety_code: {type: string}
+                template_ref: {type: string, format: uuid}
+                note: {type: string, maxLength: 500}
+      responses:
+        "200": {description: Gắn hiện hành, content: {application/json: {schema: {$ref: "#/components/schemas/CropVarietyBinding"}}}}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/cropcycle/projections/rebuild:
+    post:
+      summary: Dựng lại bảng chiếu season_current, farm_log_current, coop_season_area, yield_summary từ sổ (R-22, platform_admin)
+      operationId: rebuildCropProjections
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Số dòng đã dựng lại
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [seasons, farm_logs, coop_season_areas]
+                properties:
+                  seasons: {type: integer}
+                  farm_logs: {type: integer}
+                  coop_season_areas: {type: integer}
+        "403": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/cropcycle ---
 components:
   securitySchemes:
     oidc:
@@ -3026,6 +3232,74 @@ components:
         account: {$ref: "#/components/schemas/AccountsAccount"}
         details: {type: object, description: "vd required actions, prev_org_ref, source_event_id — không PII"}
     # --- hết pf/accounts ---
+    # --- pf/cropcycle ---
+    CropSOPStep:
+      type: object
+      required: [seq, name, activity_code, day_offset, window_days, mandatory]
+      properties:
+        seq: {type: integer, minimum: 1, description: "Liên tục 1..n (HTX US-CAT-01 AC-6)"}
+        name: {type: string, maxLength: 200}
+        stage_code: {type: string}
+        activity_code: {type: string, enum: [lam_dat, gieo_sa, tuoi_nuoc, bon_phan, phun_thuoc, kiem_tra, thu_hoach]}
+        day_offset: {type: integer, minimum: -60, maximum: 365, description: "Ngày so với ngày gieo sạ"}
+        window_days: {type: integer, minimum: 0, maximum: 60}
+        mandatory: {type: boolean}
+        evidence_kinds: {type: array, items: {type: string, enum: [anh_hien_truong, hoa_don_vat_tu, phieu_kiem_nghiem, ghi_chu, khac]}}
+        phi_days: {type: integer, minimum: 0, maximum: 120, description: "Thời gian cách ly sau phun thuốc"}
+        instruction: {type: string}
+    CropSOPTemplate:
+      type: object
+      required: [ref, code, name, crop, scope, status, latest_version]
+      properties:
+        ref: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        crop: {type: string}
+        scope: {type: string, enum: [system, htx]}
+        cooperative_ref: {type: [string, "null"], format: uuid}
+        standard: {type: [string, "null"]}
+        description: {type: [string, "null"]}
+        status: {type: string, enum: [draft, published, retired]}
+        status_reason: {type: [string, "null"]}
+        source_template_ref: {type: [string, "null"], format: uuid}
+        latest_version: {type: integer}
+        published_version: {type: [integer, "null"]}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    CropSOPVersion:
+      type: object
+      required: [id, template_ref, version_no, status, steps]
+      properties:
+        id: {type: string, format: uuid}
+        template_ref: {type: string, format: uuid}
+        version_no: {type: integer}
+        status: {type: string, enum: [draft, published]}
+        steps: {type: array, items: {$ref: "#/components/schemas/CropSOPStep"}}
+        harvest_day_offset: {type: [integer, "null"]}
+        harvest_window_days: {type: [integer, "null"]}
+        source_version_ref: {type: [string, "null"], format: uuid}
+        change_note: {type: [string, "null"]}
+        authored_by: {type: string, format: uuid}
+        authored_at: {type: string, format: date-time}
+        published_by: {type: [string, "null"], format: uuid}
+        published_at: {type: [string, "null"], format: date-time}
+    CropSOP:
+      allOf:
+        - $ref: "#/components/schemas/CropSOPTemplate"
+        - type: object
+          required: [versions]
+          properties:
+            versions: {type: array, items: {$ref: "#/components/schemas/CropSOPVersion"}}
+    CropVarietyBinding:
+      type: object
+      required: [variety_code, template_ref, bound_by, bound_at]
+      properties:
+        variety_code: {type: string}
+        template_ref: {type: string, format: uuid}
+        note: {type: [string, "null"]}
+        bound_by: {type: string, format: uuid}
+        bound_at: {type: string, format: date-time}
+    # --- hết pf/cropcycle ---
   requestBodies:
     ContentTransition:
       required: true
