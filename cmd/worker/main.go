@@ -73,6 +73,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	amqp "github.com/rabbitmq/amqp091-go"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
@@ -104,7 +105,7 @@ type consumer struct {
 
 func consumers(log *slog.Logger) []consumer {
 	return append([]consumer{{
-		name: "pf.audit.consent", cluster: migrations.PF, role: "worker_platform",
+		name: assembly.AuditConsentConsumer, cluster: migrations.PF, role: "worker_platform",
 		events: []string{port.EventConsentRecorded},
 		handler: func(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
 			log.Info("đồng ý đã ghi", "event", env.EventType, "event_id", env.EventID, "tenant_id", env.TenantID, "trace_id", env.TraceID, "outcome", "ok")

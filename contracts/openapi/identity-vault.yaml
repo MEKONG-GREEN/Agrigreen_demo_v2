@@ -208,6 +208,37 @@ paths:
                   next_cursor: { type: [string, "null"] }
         "403": { $ref: "#/components/responses/Problem" }
         "422": { $ref: "#/components/responses/Problem" }
+  /v1/pubkeys/households:
+    get:
+      summary: Khóa công khai của nông hộ chưa xóa theo ref (thiết bị nông dân — vai farmer; không liệt kê theo địa bàn)
+      description: |
+        Vai `farmer` (App HTX) hoặc các vai đọc khóa của `/v1/pubkeys`. 1–50 `ref`; ref lạ, đã xóa định danh,
+        chủ thể loại người hoặc thuộc tenant khác bị bỏ qua. pf/sync chỉ hỏi các nông hộ liên kết với tài khoản
+        nông dân (entity `pubkey` của pull), để máy mã hóa ảnh bằng khóa của hộ mình (R-40).
+      operationId: listHouseholdPubKeys
+      parameters:
+        - { name: ref, in: query, required: true, style: form, explode: true, schema: { type: array, minItems: 1, maxItems: 50, items: { type: string, format: uuid } } }
+      responses:
+        "200":
+          description: Khóa của các nông hộ tìm thấy, sắp theo ref
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [ref, area_code, public_key]
+                      properties:
+                        ref: { type: string, format: uuid }
+                        area_code: { type: string }
+                        public_key: { type: string, contentEncoding: base64 }
+                  next_cursor: { type: "null" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
 components:
   securitySchemes:
     oidc:

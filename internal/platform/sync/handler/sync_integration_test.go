@@ -21,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
+	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	syncmod "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/store"
@@ -65,7 +66,11 @@ type fixture struct {
 	tenant  uuid.UUID
 }
 
-type opts struct{ slaHours *decimal.Decimal }
+type opts struct {
+	slaHours *decimal.Decimal
+	extra    []port.Source            // Source thêm (vd FarmerSource)
+	farmers  accport.FarmerHouseholds // nối UseFarmers
+}
 
 func newFixture(t *testing.T, o ...opts) *fixture {
 	t.Helper()
@@ -89,8 +94,11 @@ func newFixture(t *testing.T, o ...opts) *fixture {
 	f.mod = syncmod.New(f.pool, f.clk, syncmod.Deps{
 		Scope: f.scope, Consent: f.consent, Params: fakeParams{hours: op.slaHours}, Vault: f.vault, Store: objs,
 		CursorKey: []byte("khoa-con-tro-kiem-thu-0123456789abcdef"),
-		Sources:   []port.Source{f.source}, Sinks: []port.Sink{f.sink},
+		Sources:   append([]port.Source{f.source}, op.extra...), Sinks: []port.Sink{f.sink},
 	})
+	if op.farmers != nil {
+		f.mod.UseFarmers(op.farmers)
+	}
 	log := telemetry.NewLogger("test", io.Discard)
 	appEng := httpx.NewEngine(log, 1<<20)
 	f.mod.RegisterApp(appEng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), idempotency.Middleware(ops)))

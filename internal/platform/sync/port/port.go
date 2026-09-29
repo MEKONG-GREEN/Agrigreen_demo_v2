@@ -43,6 +43,27 @@ type Source interface {
 	Changes(ctx context.Context, scope authz.Scope, entity string, after int64, limit int) (changes []Change, last int64, err error)
 }
 
+// FarmerScope là phạm vi pull của tài khoản NÔNG DÂN (vai farmer, token không có org_ref
+// nên phạm vi pf/party rỗng): các nông hộ liên kết với tài khoản (pf/accounts) và xã của
+// chúng (và HTX của chúng). Communes CHỈ dùng cho dữ liệu công khai theo địa bàn (tin/tài liệu, đơn vị hành
+// chính); dữ liệu gắn với hộ (thửa, vụ, nhật ký, yêu cầu hỗ trợ) phải lọc theo Households.
+type FarmerScope struct {
+	Households   []uuid.UUID
+	Cooperatives []uuid.UUID // HTX của các nông hộ lúc liên kết (vd SOP riêng của HTX)
+	Communes     []string
+}
+
+// FarmerSource là Source phục vụ cả thiết bị của nông dân. pf/sync CHỈ gọi FarmerChanges
+// (không bao giờ gọi Changes với phạm vi rỗng hay phạm vi suy từ xã) cho các entity trong
+// FarmerEntities khi người gọi là nông dân; entity của Source không hiện thực interface
+// này, hoặc không có trong FarmerEntities, luôn đóng với nông dân (mặc định chặn).
+// Cursor dùng chung với Changes (cùng vị trí trong con trỏ của thiết bị).
+type FarmerSource interface {
+	Source
+	FarmerEntities() []string
+	FarmerChanges(ctx context.Context, fs FarmerScope, entity string, after int64, limit int) (changes []Change, last int64, err error)
+}
+
 // Op của bản ghi chiều lên: chỉ ghi thêm (mục 15).
 const (
 	OpCreate  = "create"

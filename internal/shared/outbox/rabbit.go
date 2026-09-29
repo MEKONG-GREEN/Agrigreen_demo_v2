@@ -114,5 +114,9 @@ func (c HeaderCarrier) Keys() []string {
 	return out
 }
 
+// Channel mở một kênh mới trên cùng kết nối (vd khai báo hàng đợi consumer lúc khởi
+// động); người gọi đóng kênh. Kênh phát (confirm) không bị ảnh hưởng.
+func (r *Rabbit) Channel() (*amqp.Channel, error) { return r.conn.Channel() }
+
 // Close đóng kết nối.
 func (r *Rabbit) Close() error { return r.conn.Close() }

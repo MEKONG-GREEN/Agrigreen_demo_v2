@@ -21,7 +21,21 @@ import (
 // đọc ở web làm thông báo đi xuống máy lần nữa với read_at.
 type SyncSource struct{ Svc *Service }
 
-var _ syncport.Source = SyncSource{}
+var _ syncport.FarmerSource = SyncSource{}
+
+// FarmerEntities thực hiện syncport.FarmerSource.
+func (SyncSource) FarmerEntities() []string { return []string{port.EntityNotification} }
+
+// FarmerChanges thực hiện syncport.FarmerSource: nông dân CHỈ nhận thông báo cá nhân gửi
+// tới chính mình (kết quả duyệt nhật ký, cảnh báo khẩn theo thửa — HTX US-LOG-05,
+// US-NEWS-03); thông báo chủ đề theo vai/đơn vị/toàn quốc là của cán bộ.
+func (src SyncSource) FarmerChanges(ctx context.Context, _ syncport.FarmerScope, entity string, after int64, limit int) ([]syncport.Change, int64, error) {
+	p, err := principal(ctx)
+	if err != nil {
+		return nil, after, err
+	}
+	return src.changes(ctx, p, domain.Viewer{ActorRef: p.ActorRef, Roles: p.Roles}, entity, after, limit)
+}
 
 // Entities thực hiện syncport.Source.
 func (SyncSource) Entities() []string { return []string{port.EntityNotification} }
@@ -56,14 +70,17 @@ func ToData(n domain.Notification) NotificationData {
 
 // Changes thực hiện syncport.Source.
 func (src SyncSource) Changes(ctx context.Context, scope authz.Scope, entity string, after int64, limit int) ([]syncport.Change, int64, error) {
-	s := src.Svc
 	p, err := principal(ctx)
 	if err != nil {
 		return nil, after, err
 	}
-	v := domain.Viewer{ActorRef: p.ActorRef, OrgRef: p.OrgRef, Roles: p.Roles, Scope: scope}
+	return src.changes(ctx, p, domain.Viewer{ActorRef: p.ActorRef, OrgRef: p.OrgRef, Roles: p.Roles, Scope: scope}, entity, after, limit)
+}
+
+func (src SyncSource) changes(ctx context.Context, p authz.Principal, v domain.Viewer, entity string, after int64, limit int) ([]syncport.Change, int64, error) {
+	s := src.Svc
 	var items []domain.Notification
-	err = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
+	err := tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
 		var e error
 		items, e = store.SyncChanges(ctx, tx, v, s.now().Add(-SyncWindow), after, limit)
 		return e

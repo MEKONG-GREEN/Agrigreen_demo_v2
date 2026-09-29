@@ -39,6 +39,7 @@ func (h Handler) Register(rg *gin.RouterGroup) {
 	rg.POST("/subjects/:ref/unwrap", h.unwrap)
 	rg.POST("/subjects/:ref/erasure", h.Idem, h.erase)
 	rg.GET("/pubkeys", h.pubkeys)
+	rg.GET("/pubkeys/households", h.householdPubkeys)
 }
 
 func purposeOf(c *gin.Context, body string) client.Purpose {
@@ -165,6 +166,34 @@ func (h Handler) erase(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, client.ErasureResponse{Ref: ref.String(), Erased: true})
+}
+
+// householdPubkeys: GET /v1/pubkeys/households?ref=…&ref=… — khóa công khai theo ref nông hộ.
+func (h Handler) householdPubkeys(c *gin.Context) {
+	var refs []uuid.UUID
+	for _, a := range c.QueryArray("ref") {
+		for _, part := range strings.Split(a, ",") {
+			if part = strings.TrimSpace(part); part == "" {
+				continue
+			}
+			u, err := uuid.Parse(part)
+			if err != nil {
+				httpx.Fail(c, problem.Validation.WithField("ref", "phải là UUID"))
+				return
+			}
+			refs = append(refs, u)
+		}
+	}
+	items, err := h.Svc.HouseholdPubKeys(c.Request.Context(), refs)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	resp := client.PubKeysResponse{Items: make([]client.PubKeyItem, 0, len(items))}
+	for _, it := range items {
+		resp.Items = append(resp.Items, client.PubKeyItem{Ref: it.Ref.String(), AreaCode: it.AreaCode, PublicKey: it.PublicKey})
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h Handler) pubkeys(c *gin.Context) {

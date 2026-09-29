@@ -464,6 +464,65 @@ func TestPubKeysPaging(t *testing.T) {
 	}
 }
 
+// HTX US-LOG-01 (ảnh nhật ký mã hóa trên máy nông dân, R-40): vai farmer đọc khóa công
+// khai THEO REF nông hộ, không liệt kê theo địa bàn; chủ thể người, đã xóa, tenant khác và
+// ref lạ bị bỏ qua; 1–50 ref.
+func TestHouseholdPubKeysFarmer(t *testing.T) {
+	s, _ := newService(t)
+	tid := ids.New()
+	reg := as(tid, true, client.RoleRegistrar, client.RoleEraser)
+	mk := func(kind client.SubjectKind, phone string) uuid.UUID {
+		in := sample(phone)
+		in.Kind = kind
+		c, err := s.Create(reg, client.PurposeRegistryAdmin, in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c.Ref
+	}
+	h1, h2, person, erased := mk(client.SubjectHousehold, "0901000901"), mk(client.SubjectHousehold, "0901000902"),
+		mk(client.SubjectPerson, "0901000903"), mk(client.SubjectHousehold, "0901000904")
+	if err := s.Erase(reg, erased, "yêu cầu xóa của chủ hộ theo RB-3"); err != nil {
+		t.Fatal(err)
+	}
+	other, err := s.Create(as(ids.New(), false, client.RoleRegistrar), client.PurposeRegistryAdmin, sample("0901000905"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	farmer := as(tid, false, client.RoleFarmer)
+	keys, err := s.HouseholdPubKeys(farmer, []uuid.UUID{h2, h1, person, erased, other.Ref, ids.New(), h1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys) != 2 || len(keys[0].PublicKey) != 32 || keys[0].Ref.String() > keys[1].Ref.String() {
+		t.Fatalf("chỉ 2 nông hộ của tenant, chưa xóa, sắp theo ref: %+v", keys)
+	}
+	for _, k := range keys {
+		if k.Ref != h1 && k.Ref != h2 {
+			t.Fatalf("ref lạ: %v", k.Ref)
+		}
+	}
+	if _, err := s.PubKeys(farmer, []string{"82-28783"}); code(err) != "forbidden" {
+		t.Fatalf("farmer không được liệt kê theo địa bàn: %v", err)
+	}
+	if _, err := s.HouseholdPubKeys(as(tid, false, "kn_officer"), []uuid.UUID{h1}); code(err) != "forbidden" {
+		t.Fatalf("vai khác không đọc được: %v", err)
+	}
+	if _, err := s.HouseholdPubKeys(farmer, nil); code(err) != "validation_failed" {
+		t.Fatalf("thiếu ref: %v", err)
+	}
+	many := make([]uuid.UUID, client.MaxPubKeyRefs+1)
+	for i := range many {
+		many[i] = ids.New()
+	}
+	if _, err := s.HouseholdPubKeys(farmer, many); code(err) != "validation_failed" {
+		t.Fatalf("quá 50 ref: %v", err)
+	}
+	if got, err := client.NewLocal(s).HouseholdPubKeys(as(tid, false, client.RolePubKeySync), []uuid.UUID{h1}); err != nil || len(got) != 1 {
+		t.Fatalf("vai đọc khóa qua NewLocal: %v %v", got, err)
+	}
+}
+
 // RB-1/RB-2: cổng catalog của cụm vault phải sạch — access_log là sổ đủ trigger,
 // các bảng xóa được không bị coi là sổ, mọi bảng có RLS.
 func TestCatalogGates(t *testing.T) {

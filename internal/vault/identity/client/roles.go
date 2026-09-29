@@ -16,12 +16,18 @@ import (
 //	Unwrap               RoleEvidenceViewer
 //	Erase                RoleEraser + MFA
 //	PubKeys              RoleRegistrar, RoleDisplay, RoleEvidenceViewer, RolePubKeySync
+//	HouseholdPubKeys     như PubKeys, cộng RoleFarmer
 const (
 	RoleRegistrar      = "vault_registrar"       // cán bộ quản lý hồ sơ hộ/người: tạo, tra, xem đầy đủ
 	RoleDisplay        = "vault_display"         // chỉ nhãn hiển thị tối thiểu
 	RoleEvidenceViewer = "vault_evidence_viewer" // mở DEK để xem ảnh minh chứng
 	RoleEraser         = "vault_eraser"          // xóa định danh theo yêu cầu (RB-3), bắt buộc MFA
 	RolePubKeySync     = "vault_pubkey_sync"     // thiết bị hiện trường tải khóa công khai theo địa bàn
+	// RoleFarmer là vai nông dân của App HTX (cùng tên vai của pf/accounts). Kho chỉ cho vai
+	// này đọc khóa công khai THEO REF nông hộ (HouseholdPubKeys) — không liệt kê theo địa
+	// bàn, không đọc định danh. Kho chỉ nhận lời gọi từ pf qua mTLS nội bộ; pf/sync giới hạn
+	// ref vào các nông hộ liên kết với tài khoản (R-40: máy mã hóa ảnh bằng khóa hộ mình).
+	RoleFarmer = "farmer"
 )
 
 // PurposeErasure là mục đích ghi vào sổ truy cập cho thao tác xóa định danh.

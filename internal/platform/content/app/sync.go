@@ -25,7 +25,19 @@ import (
 // ra khỏi phạm vi; khi phạm vi của NGƯỜI GỌI đổi, pf/sync yêu cầu làm mới toàn bộ.
 type Sync struct{ Svc *Service }
 
-var _ syncport.Source = Sync{}
+var _ syncport.FarmerSource = Sync{}
+
+// FarmerEntities thực hiện syncport.FarmerSource: tin/tài liệu đã phát hành cho toàn quốc,
+// tỉnh hoặc xã của nông hộ liên kết (HTX US-NEWS-01), và thư viện đã lưu của chính người gọi.
+func (Sync) FarmerEntities() []string {
+	return []string{port.SyncEntityDocument, port.SyncEntityLibrary}
+}
+
+// FarmerChanges thực hiện syncport.FarmerSource: đối tượng xem = xã của các nông hộ (và tỉnh
+// cha, như phạm vi cán bộ xã).
+func (s Sync) FarmerChanges(ctx context.Context, fs syncport.FarmerScope, entity string, after int64, limit int) ([]syncport.Change, int64, error) {
+	return s.Changes(ctx, authz.Scope{Units: fs.Communes}, entity, after, limit)
+}
 
 // Entities thực hiện syncport.Source.
 func (Sync) Entities() []string { return []string{port.SyncEntityDocument, port.SyncEntityLibrary} }

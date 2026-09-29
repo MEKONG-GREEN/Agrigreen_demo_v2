@@ -9,7 +9,10 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"io"
+	"slices"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -528,6 +531,33 @@ func (s *Service) PubKeysPage(ctx context.Context, areas []string, after uuid.UU
 		out = append(out, client.PubKey{Ref: r.Ref, AreaCode: r.AreaCode, PublicKey: r.PublicKey})
 	}
 	return out, next, nil
+}
+
+// HouseholdPubKeys trả khóa công khai của các nông hộ chưa xóa theo ref (client.Client).
+// Vai farmer chỉ đọc được theo ref, không liệt kê theo địa bàn; ref lạ/đã xóa/người → bỏ qua.
+func (s *Service) HouseholdPubKeys(ctx context.Context, refs []uuid.UUID) ([]client.PubKey, error) {
+	p, err := authz.Require(ctx, append(slices.Clone(pubKeyRoles), client.RoleFarmer)...)
+	if err != nil {
+		return nil, err
+	}
+	refs = slices.Compact(slices.SortedFunc(slices.Values(refs), func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) }))
+	if len(refs) == 0 || len(refs) > client.MaxPubKeyRefs {
+		return nil, problem.Validation.WithField("ref", fmt.Sprintf("cần 1–%d mã chủ thể", client.MaxPubKeyRefs))
+	}
+	var rows []store.PubKey
+	err = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
+		var e error
+		rows, e = store.HouseholdPubKeys(ctx, tx, refs)
+		return e
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]client.PubKey, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, client.PubKey{Ref: r.Ref, AreaCode: r.AreaCode, PublicKey: r.PublicKey})
+	}
+	return out, nil
 }
 
 // PubKeys trả mọi khóa công khai của chủ thể chưa xóa thuộc các địa bàn.

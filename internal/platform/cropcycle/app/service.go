@@ -140,6 +140,8 @@ type access struct {
 	kind       accessKind
 	sc         authz.Scope
 	households []uuid.UUID
+	// sopCoops (chỉ đồng bộ của nông dân): HTX của các nông hộ liên kết — nhận SOP riêng của HTX.
+	sopCoops []uuid.UUID
 }
 
 // access tính quyền của người gọi có một trong roles.

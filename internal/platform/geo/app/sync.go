@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -29,8 +30,9 @@ type SyncSource struct{ Svc *Service }
 type SyncSink struct{ Svc *Service }
 
 var (
-	_ syncport.Source = SyncSource{}
-	_ syncport.Sink   = SyncSink{}
+	_ syncport.FarmerSource = SyncSource{}
+	_ syncport.Source       = SyncSource{}
+	_ syncport.Sink         = SyncSink{}
 )
 
 // Entities thực hiện syncport.Source.
@@ -69,6 +71,38 @@ func refPtr(u uuid.UUID) *string {
 	return &s
 }
 
+// FarmerEntities thực hiện syncport.FarmerSource: nông dân nhận thửa của nông hộ mình.
+func (SyncSource) FarmerEntities() []string { return []string{port.EntityPlot} }
+
+// FarmerChanges thực hiện syncport.FarmerSource (App HTX): chỉ thửa của các nông hộ liên kết
+// với tài khoản; thửa ngừng dùng hoặc đã chuyển sang nông hộ khác → tombstone. Không bao
+// giờ theo xã — thửa của hộ khác cùng xã không đi xuống máy nông dân.
+func (src SyncSource) FarmerChanges(ctx context.Context, fs syncport.FarmerScope, entity string, after int64, limit int) ([]syncport.Change, int64, error) {
+	if entity != port.EntityPlot {
+		return nil, after, fmt.Errorf("geo: entity %q không thuộc module", entity)
+	}
+	p, ok := authz.FromContext(ctx)
+	if !ok {
+		return nil, after, problem.Unauthenticated
+	}
+	if !p.Has(port.RoleFarmer) || len(fs.Households) == 0 {
+		return []syncport.Change{}, after, nil
+	}
+	if limit <= 0 || limit > 1000 {
+		limit = 500
+	}
+	var rows []store.Plot
+	err := tenant.WithTenantTx(ctx, src.Svc.DB, p.TenantID, func(tx pgx.Tx) error {
+		var e error
+		rows, e = store.ChangesAfterForHouseholds(ctx, tx, fs.Households, after, limit)
+		return e
+	})
+	if err != nil {
+		return nil, after, err
+	}
+	return plotChanges(rows, after, func(r store.Plot) bool { return slices.Contains(fs.Households, r.HouseholdRef) })
+}
+
 // Changes thực hiện syncport.Source. Con trỏ là pf_geo.plot.sync_seq. Thửa ngừng
 // dùng, hoặc (với quản lý HTX) đã chuyển sang HTX khác → tombstone. Thửa ở xã
 // ngoài phạm vi không bao giờ hiện trên máy (xã của thửa không đổi) nên bỏ qua.
@@ -96,12 +130,17 @@ func (src SyncSource) Changes(ctx context.Context, scope authz.Scope, entity str
 	if err != nil {
 		return nil, after, err
 	}
+	return plotChanges(rows, after, func(r store.Plot) bool { return a.sees(r.CommuneCode, r.CooperativeRef) })
+}
+
+// plotChanges dựng thay đổi chiều xuống; thửa ngừng dùng hoặc người gọi không còn thấy → tombstone.
+func plotChanges(rows []store.Plot, after int64, sees func(store.Plot) bool) ([]syncport.Change, int64, error) {
 	out := make([]syncport.Change, 0, len(rows))
 	last := after
 	for _, r := range rows {
 		last = r.SyncSeq
 		ch := syncport.Change{Entity: port.EntityPlot, ID: r.Ref, Version: r.Revision}
-		if r.Status == port.StatusRetired || !a.sees(r.CommuneCode, r.CooperativeRef) {
+		if r.Status == port.StatusRetired || !sees(r) {
 			ch.Op = syncport.OpTombstone
 			out = append(out, ch)
 			continue

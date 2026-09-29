@@ -521,6 +521,26 @@ func ChangesAfter(ctx context.Context, tx pgx.Tx, all bool, communes []string, a
 	return collectPlots(rows)
 }
 
+// ChangesAfterForHouseholds là ChangesAfter của thiết bị nông dân: thửa hiện thuộc một nông
+// hộ trong households, hoặc từng được gán cho một nông hộ đó (sự kiện plot_event) — để thửa
+// đã chuyển sang hộ khác vẫn đi xuống (bên gọi trả tombstone).
+func ChangesAfterForHouseholds(ctx context.Context, tx pgx.Tx, households []uuid.UUID, after int64, limit int) ([]Plot, error) {
+	hh := make([]string, 0, len(households))
+	for _, h := range households {
+		hh = append(hh, h.String())
+	}
+	rows, err := tx.Query(ctx, "SELECT "+plotCols+`, ST_AsGeoJSON(p.geom, 7)
+	  FROM pf_geo.plot p
+	  WHERE p.sync_seq > $2::bigint
+	    AND (p.household_ref = ANY($1::uuid[])
+	      OR EXISTS (SELECT 1 FROM pf_geo.plot_event e WHERE e.plot_ref = p.ref AND e.household_ref = ANY($1::uuid[])))
+	  ORDER BY p.sync_seq LIMIT $3::int`, hh, after, limit)
+	if err != nil {
+		return nil, err
+	}
+	return collectPlots(rows)
+}
+
 func collectPlots(rows pgx.Rows) ([]Plot, error) {
 	defer rows.Close()
 	var out []Plot

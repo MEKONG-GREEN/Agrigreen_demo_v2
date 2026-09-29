@@ -3,6 +3,11 @@
 //
 //	AG_DB_URL      URL gốc tới PostgreSQL (host, cổng, sslmode)
 //	AG_AMQP_URL    URL RabbitMQ
+//
+// Khi khởi động, TRƯỚC khi phát thông điệp đầu tiên, lệnh khai báo mọi hàng đợi consumer
+// của cụm pf (assembly.Queues: consumer của worker + optimizer) cùng DLQ và binding — sự
+// kiện phát trước lần khởi động đầu của một consumer không bị mất (docs/runbooks/rabbitmq-queues.md).
+//
 //	AG_OTLP_ENDPOINT, ...  OpenTelemetry: span publish nối trace của request gốc; metric
 //	               ag.outbox.backlog, ag.outbox.oldest_age theo cụm (mục 19)
 package main
@@ -17,6 +22,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
@@ -60,6 +67,10 @@ func run() error {
 		return err
 	}
 	defer func() { _ = broker.Close() }()
+	if err := declareQueues(broker); err != nil {
+		return err
+	}
+	log.Info("đã khai báo hàng đợi consumer", "event", "startup", "queues", len(assembly.Queues()), "outcome", "ok")
 
 	var wg sync.WaitGroup
 	pools := map[string]*pgxpool.Pool{}
@@ -90,4 +101,14 @@ func run() error {
 	log.Info("đang chạy", "event", "startup", "outcome", "ok")
 	wg.Wait()
 	return nil
+}
+
+// declareQueues khai báo hàng đợi consumer trên một kênh riêng rồi đóng kênh.
+func declareQueues(b *outbox.Rabbit) error {
+	ch, err := b.Channel()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = ch.Close() }()
+	return assembly.DeclareQueues(ch)
 }
