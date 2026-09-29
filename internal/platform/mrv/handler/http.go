@@ -32,6 +32,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/mrv/exports/:id", h.export)
 	rg.GET("/mrv/exports/:id/package", h.packageURL)
 	rg.GET("/mrv/exports/:id/verify", h.verify)
+	h.registerG3App(rg)
 }
 
 // RegisterAdmin gắn route Admin API (MFA bắt buộc): danh mục trường có phê duyệt.
@@ -43,6 +44,7 @@ func (h Handler) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.POST("/mrv/catalog/versions/:id/submit", h.submit)
 	rg.POST("/mrv/catalog/versions/:id/approve", h.approve)
 	rg.POST("/mrv/catalog/versions/:id/reject", h.reject)
+	h.registerG3Admin(rg)
 }
 
 func idem(c *gin.Context) string { return idempotency.KeyFromContext(c.Request.Context()) }

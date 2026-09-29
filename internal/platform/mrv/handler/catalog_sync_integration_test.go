@@ -71,7 +71,7 @@ func TestSyncMRVCatalogApprovedOnly(t *testing.T) {
 	f.approveSeed(tid)
 	ctx = syncCtx(tid, port.RoleCollector)
 	ch, cur := pullCatalogs(t, src, ctx, 0)
-	if len(ch) != 2 || cur <= 0 {
+	if len(ch) != 4 || cur <= 0 {
 		t.Fatalf("lượt đầu: %+v, con trỏ %d", ch, cur)
 	}
 	for _, c := range ch {
@@ -127,7 +127,7 @@ func TestSyncMRVCatalogApprovedOnly(t *testing.T) {
 	r = col2.app(http.MethodGet, "/v1/mrv/evidence-types", nil)
 	expect(t, r, 200, "")
 	items := r.body["items"].([]any)
-	if len(items) != 2 {
+	if len(items) != 4 {
 		t.Fatalf("evidence-types: %v", r.body)
 	}
 	awd, chk := items[0].(map[string]any), items[1].(map[string]any)

@@ -603,6 +603,11 @@ paths:
   /v1/mrv/exports:
     post:
       summary: Yêu cầu xuất gói bằng chứng (mục 12) — 202 + job; worker dựng gói, lưu kèm băm ảnh chụp dữ liệu
+      description: >-
+        G3: khi bộ lọc không giới hạn evidence_type/review_status, ảnh chụp có thêm farm_logs (liên kết nhật ký HTX, phiên bản
+        danh mục đã ghim), collection_evidence (bậc khối lượng qua van), comparisons (KN US-MRV-02) và estimates (rule_version +
+        phiên bản tham số, official); gói có estimates_provisional = true khi còn ước tính tạm. Các phần này lọc theo phạm vi xã
+        và season_code; dữ liệu G3 ghi sau as_of không làm đổi snapshot_sha256.
       operationId: requestMrvExport
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -682,6 +687,162 @@ paths:
                   match: {type: boolean}
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
+  # --- pf/mrv G3: liên kết bằng chứng, đối chiếu (KN US-MRV-02), đủ hồ sơ + bất thường (KN FR-08), ước tính CO2 TẠM ---
+  /v1/mrv/completeness:
+    get:
+      summary: Tình trạng bằng chứng theo thửa/vụ trong phạm vi (mục danh mục có/đã duyệt/thiếu, cờ bất thường FR-08)
+      description: >-
+        Vai mrv_collector, mrv_reviewer, mrv_viewer, mrv_exporter; phạm vi xã (ADR-0009). Vụ lấy từ sổ tham chiếu vụ
+        (consumer pf.mrv.farm_log_link). anomaly=true chỉ trả vụ đang mở không có bản ghi mới ≥ mrv.anomaly_no_record_days ngày.
+      operationId: listMrvCompleteness
+      parameters:
+        - {name: admin_unit_code, in: query, schema: {type: string}}
+        - {name: season_code, in: query, schema: {type: string}}
+        - {name: plot_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: anomaly, in: query, schema: {type: boolean}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Trang kết quả
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MrvCompleteness"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/seasons/{id}/completeness:
+    get:
+      summary: Tình trạng bằng chứng của một thửa/vụ
+      operationId: getMrvSeasonCompleteness
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: season_ref}
+      responses:
+        "200":
+          description: Tình trạng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvCompleteness"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/seasons/{id}/comparison:
+    get:
+      summary: Đối chiếu song song nhật ký HTX ↔ minh chứng cán bộ KN của thửa/vụ (KN US-MRV-02)
+      description: >-
+        Mỗi nhật ký HTX hiện hành kèm gợi ý tự động (match / mismatch / unverified) theo thửa, vụ và cửa sổ
+        ± mrv.compare_window_days ngày, cùng kết quả cán bộ đã xác nhận (result, confirmed).
+      operationId: getMrvSeasonComparison
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: season_ref}
+      responses:
+        "200":
+          description: Bảng đối chiếu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvComparisonView"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/comparisons:
+    post:
+      summary: Cán bộ KN đánh dấu Khớp/Khác biệt, gắn với bản ghi MRV tương ứng (KN US-MRV-02)
+      description: >-
+        Vai mrv_collector, trong phạm vi. evidence_id là bản hiện hành của minh chứng cán bộ cùng thửa và vụ.
+        mismatch bắt buộc note. Sửa kết quả = bản ghi bù (supersedes_id + correction_reason ≥ 10 ký tự).
+      operationId: recordMrvComparison
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [season_ref, log_ref, evidence_id, result]
+              properties:
+                season_ref: {type: string, format: uuid}
+                log_ref: {type: string, format: uuid}
+                evidence_id: {type: string, format: uuid}
+                result: {type: string, enum: [match, mismatch]}
+                note: {type: [string, "null"], maxLength: 1000}
+                file_refs:
+                  type: array
+                  items:
+                    type: object
+                    required: [file_ref, sha256]
+                    properties:
+                      file_ref: {type: string, format: uuid}
+                      sha256: {type: string, pattern: "^[0-9a-f]{64}$"}
+                supersedes_id: {type: [string, "null"], format: uuid}
+                correction_reason: {type: [string, "null"], minLength: 10, maxLength: 1000}
+      responses:
+        "200":
+          description: Gọi lặp cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvComparison"}
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvComparison"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/estimates:
+    get:
+      summary: Ước tính CO2 mới nhất theo thửa/vụ — TẠM, chờ khách ký phương pháp
+      description: >-
+        rule_version mrv.co2.estimate.v1: tấn tính = cận dưới bậc khối lượng của bằng chứng thu gom (van
+        mrv_collection_evidence), chỉ khi thửa/vụ có minh chứng cán bộ "Đạt chuẩn" (KN US-MRV-05); tránh đốt = tấn ×
+        mrv.co2.open_burning_kg_per_t. status = official chỉ khi có phương pháp ĐÃ DUYỆT ghim đúng phiên bản các tham số
+        đã duyệt đã dùng; ngược lại provisional kèm nhãn "Tạm — chờ khách ký phương pháp". Không số nào là chính thức ở G3
+        trước khi C-1 và phương pháp được ký.
+      operationId: listMrvEstimates
+      parameters:
+        - {name: season_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: admin_unit_code, in: query, schema: {type: string}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Trang kết quả
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MrvEstimate"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/seasons/{id}/estimate/recompute:
+    post:
+      summary: Tính lại ước tính của một vụ (vai mrv_reviewer) — cùng đầu vào không ghi thêm dòng
+      operationId: recomputeMrvEstimate
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}, description: season_ref}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Ước tính hiện hành (null khi vụ chưa có bằng chứng thu gom)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [estimate]
+                properties:
+                  estimate:
+                    oneOf:
+                      - {$ref: "#/components/schemas/MrvEstimate"}
+                      - {type: "null"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
   # Chỉ tài liệu ĐÃ XUẤT BẢN trong phạm vi người gọi: toàn quốc + tỉnh + xã của mình (ADR-0009).
 
   /v1/documents:
@@ -4625,6 +4786,150 @@ components:
         evidence_count: {type: [integer, "null"]}
         error_code: {type: [string, "null"]}
         completed_at: {type: [string, "null"], format: date-time}
+    MrvSeason:
+      type: object
+      required: [season_ref, plot_ref, commune_code, season_code, season_year, status, sowing_date]
+      properties:
+        season_ref: {type: string, format: uuid}
+        plot_ref: {type: string, format: uuid}
+        commune_code: {type: string}
+        season_code: {type: string}
+        season_year: {type: integer}
+        status: {type: string, enum: [open, completed, cancelled]}
+        sowing_date: {type: [string, "null"], format: date}
+    MrvParamUse:
+      type: object
+      required: [key, version, value, unit, source]
+      properties:
+        key: {type: string}
+        version: {type: integer, description: "0 khi source = default"}
+        value: {type: string, description: Số thập phân dạng chuỗi}
+        unit: {type: string}
+        source: {type: string, enum: [approved, default], description: "default = chưa có bản duyệt, dùng mặc định prototype (không bao giờ chính thức)"}
+    MrvEstimateInput:
+      type: object
+      required: [evidence_ref, revision, collected_kg_bucket, bucket_rule_version, collected_on, counted, tonnes]
+      properties:
+        evidence_ref: {type: string, format: uuid}
+        revision: {type: integer}
+        collected_kg_bucket: {type: string}
+        bucket_rule_version: {type: string}
+        collected_on: {type: string, format: date}
+        counted: {type: boolean}
+        tonnes: {type: string, description: "Cận dưới bậc (t); \"0\" khi không tính"}
+        exclusion: {type: string, description: "chua_co_minh_chung_dat_chuan | bac_khong_hop_le"}
+    MrvEstimate:
+      type: object
+      required: [id, season_ref, plot_ref, commune_code, season_code, rule_version, input_sha256, counted_tonnes, avoided_burning_kgco2e,
+        transport_kgco2e, transport_status, inputs, params, status, official, label, method_version_id, computed_at, recorded_at, supersedes_id, seq]
+      properties:
+        id: {type: string, format: uuid}
+        season_ref: {type: string, format: uuid}
+        plot_ref: {type: string, format: uuid}
+        commune_code: {type: string}
+        season_code: {type: string}
+        rule_version: {type: string, examples: [mrv.co2.estimate.v1]}
+        input_sha256: {type: string}
+        counted_tonnes: {type: string}
+        avoided_burning_kgco2e: {type: string}
+        transport_kgco2e: {type: [string, "null"]}
+        transport_status: {type: string, enum: [computed, no_leg_data]}
+        inputs: {type: array, items: {$ref: "#/components/schemas/MrvEstimateInput"}}
+        params: {type: array, items: {$ref: "#/components/schemas/MrvParamUse"}}
+        status: {type: string, enum: [provisional, official]}
+        official: {type: boolean}
+        label: {type: string}
+        method_version_id: {type: [string, "null"], format: uuid}
+        computed_at: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        seq: {type: integer}
+    MrvCompletenessItem:
+      type: object
+      required: [key, source, catalog_version, status, count, approved_count]
+      properties:
+        key: {type: string, description: "Loại minh chứng, htx_farm_log hoặc collection_evidence"}
+        source: {type: string, enum: [kn_evidence, htx_farm_log, collection_evidence]}
+        catalog_version: {type: [integer, "null"]}
+        status: {type: string, enum: [missing, present, approved, rejected]}
+        count: {type: integer}
+        approved_count: {type: integer}
+    MrvCompleteness:
+      type: object
+      required: [season, items, counts_toward_estimate, anomaly, estimate]
+      properties:
+        season: {$ref: "#/components/schemas/MrvSeason"}
+        items: {type: array, items: {$ref: "#/components/schemas/MrvCompletenessItem"}}
+        counts_toward_estimate: {type: boolean, description: "Có minh chứng cán bộ Đạt chuẩn (KN US-MRV-05)"}
+        anomaly:
+          type: object
+          required: [no_record, last_record_at, days_since, threshold_days]
+          properties:
+            no_record: {type: boolean, description: "KN FR-08: vụ đang mở, không có bản ghi mới ≥ threshold_days"}
+            last_record_at: {type: [string, "null"], format: date-time}
+            days_since: {type: integer}
+            threshold_days: {type: integer}
+        estimate:
+          oneOf:
+            - {$ref: "#/components/schemas/MrvEstimate"}
+            - {type: "null"}
+    MrvComparison:
+      type: object
+      required: [id, evidence_id, log_ref, log_id, season_ref, result, note, file_refs, compared_by, event_time, recorded_at, supersedes_id, correction_reason]
+      properties:
+        id: {type: string, format: uuid}
+        evidence_id: {type: string, format: uuid}
+        log_ref: {type: string, format: uuid}
+        log_id: {type: string, format: uuid}
+        season_ref: {type: string, format: uuid}
+        result: {type: string, enum: [match, mismatch]}
+        note: {type: [string, "null"]}
+        file_refs: {type: array, items: {$ref: "#/components/schemas/MrvFileRef"}}
+        compared_by: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+    MrvOfficerRecord:
+      type: object
+      required: [evidence_id, root_id, evidence_type, activity_code, event_time, review_status]
+      properties:
+        evidence_id: {type: string, format: uuid}
+        root_id: {type: string, format: uuid}
+        evidence_type: {type: string}
+        activity_code: {type: string}
+        event_time: {type: string, format: date-time}
+        review_status: {type: string, enum: [pending, accepted, rejected]}
+    MrvComparisonView:
+      type: object
+      required: [season, window_days, lines, officer_records]
+      properties:
+        season: {$ref: "#/components/schemas/MrvSeason"}
+        window_days: {type: integer}
+        officer_records: {type: array, items: {$ref: "#/components/schemas/MrvOfficerRecord"}}
+        lines:
+          type: array
+          items:
+            type: object
+            required: [log_ref, log_id, log_version, activity_code, log_event_time, location_status, htx_review_decision, catalog_version,
+              suggested, suggested_officer_record, result, confirmed, comparisons]
+            properties:
+              log_ref: {type: string, format: uuid}
+              log_id: {type: string, format: uuid}
+              log_version: {type: integer}
+              activity_code: {type: string}
+              log_event_time: {type: string, format: date-time}
+              location_status: {type: string}
+              htx_review_decision: {type: [string, "null"]}
+              catalog_version: {type: [integer, "null"], description: "Phiên bản danh mục htx_farm_log đã duyệt được ghim lúc liên kết"}
+              suggested: {type: string, enum: [match, mismatch, unverified]}
+              suggested_officer_record:
+                oneOf:
+                  - {$ref: "#/components/schemas/MrvOfficerRecord"}
+                  - {type: "null"}
+              result: {type: string, enum: [match, mismatch, unverified], description: "Kết quả cán bộ xác nhận mới nhất, hoặc gợi ý"}
+              confirmed: {type: boolean}
+              comparisons: {type: array, items: {$ref: "#/components/schemas/MrvComparison"}}
     ContentKind:
       type: string
       enum: [procedure, guide, news, alert, supplement]

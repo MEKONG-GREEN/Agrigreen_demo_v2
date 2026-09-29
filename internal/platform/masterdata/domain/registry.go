@@ -79,6 +79,12 @@ var ParamRegistry = []ParamSpec{
 	{Key: port.ParamWaterwayGapReport, Name: "Ngưỡng báo khoảng hở mạng đường thủy", Unit: "m", Kind: ParamKindDecimal, Min: "0", Max: "100000"},
 	{Key: port.ParamHaversineFactor, Name: "Hệ số hiệu chỉnh Haversine → cự ly thực tế", Unit: "lần", Kind: ParamKindDecimal, Min: "1", Max: "3", Dimensional: true},
 	{Key: port.ParamActivationGrantLifespan, Name: "Hạn liên kết/QR kích hoạt tài khoản nông dân", Unit: "giờ", Kind: ParamKindDecimal, Min: "1", Max: "720"},
+	// G3 pf/mrv (seeddata/params.json) — hệ số CO2 TẠM, chờ khách ký phương pháp (C-1).
+	{Key: "mrv.co2.open_burning_kg_per_t", Name: "Hệ số phát thải đốt rơm lộ thiên (tạm, chờ ký phương pháp)", Unit: "kgCO2e/t", Kind: ParamKindDecimal, Min: "0", Max: "10000"},
+	{Key: "mrv.co2.transport_road_kg_per_tkm", Name: "Hệ số phát thải vận chuyển đường bộ (tạm)", Unit: "kgCO2e/t·km", Kind: ParamKindDecimal, Min: "0", Max: "10"},
+	{Key: "mrv.co2.transport_waterway_kg_per_tkm", Name: "Hệ số phát thải vận chuyển đường thủy (tạm)", Unit: "kgCO2e/t·km", Kind: ParamKindDecimal, Min: "0", Max: "10"},
+	{Key: "mrv.anomaly_no_record_days", Name: "Số ngày không có bản ghi mới → cảnh báo bất thường", Unit: "ngày", Kind: ParamKindDecimal, Min: "1", Max: "120"},
+	{Key: "mrv.compare_window_days", Name: "Cửa sổ ghép nhật ký HTX ↔ minh chứng cán bộ", Unit: "ngày", Kind: ParamKindDecimal, Min: "0", Max: "30"},
 }
 
 var stageNames = map[string]string{

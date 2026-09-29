@@ -1021,6 +1021,110 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/methods:
+    post:
+      summary: Đề xuất phương pháp ước tính CO2 (vai param_setter) — ghim phiên bản tham số masterdata; trạng thái submitted
+      description: >-
+        Chờ khách ký phương pháp (C-1). Ước tính chỉ "chính thức" khi có phương pháp ĐÃ DUYỆT (người duyệt ≠ người đề xuất,
+        R-56) cùng rule_version và mọi tham số đã dùng là bản đã duyệt đúng phiên bản được ghim.
+      operationId: proposeMrvMethod
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rule_version, params, source_note]
+              properties:
+                rule_version: {type: string, examples: [mrv.co2.estimate.v1]}
+                source_note: {type: string, minLength: 5, maxLength: 1000, description: Văn bản phương pháp đã ký}
+                params:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items: {$ref: "#/components/schemas/MrvParamPin"}
+      responses:
+        "200":
+          description: Gọi lặp cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvMethodVersion"}
+        "201":
+          description: Đã đề xuất
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvMethodVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Danh sách phiên bản phương pháp (param_setter, param_approver)
+      operationId: listMrvMethods
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Trang kết quả
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MrvMethodVersion"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/methods/{id}/approve:
+    post:
+      summary: Duyệt phương pháp (vai param_approver; không được là người đề xuất)
+      operationId: approveMrvMethod
+      parameters:
+        - $ref: "#/components/parameters/VersionID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: {type: string, maxLength: 500}
+      responses:
+        "200":
+          description: Đã duyệt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvMethodVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/methods/{id}/reject:
+    post:
+      summary: Từ chối phương pháp (vai param_approver; bắt buộc lý do)
+      operationId: rejectMrvMethod
+      parameters:
+        - $ref: "#/components/parameters/VersionID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties:
+                note: {type: string, minLength: 5, maxLength: 500}
+      responses:
+        "200":
+          description: Đã từ chối
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MrvMethodVersion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   # --- pf/content: soạn, duyệt, xuất bản tài liệu (content_editor_national, content_editor_province, content_reviewer) ---
 
   # Người duyệt xuất bản không được là tác giả phiên bản (R-56 → self_approval_forbidden).
@@ -3669,6 +3773,27 @@ components:
         help_vi: {type: [string, "null"]}
         position: {type: integer}
         reserved: {type: boolean}
+    MrvParamPin:
+      type: object
+      required: [key, version]
+      properties:
+        key: {type: string, examples: [mrv.co2.open_burning_kg_per_t]}
+        version: {type: integer, minimum: 1}
+    MrvMethodVersion:
+      type: object
+      required: [id, rule_version, version, status, params, source_note, setter_ref, approver_ref, decided_at, decision_note, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        rule_version: {type: string}
+        version: {type: integer}
+        status: {type: string, enum: [submitted, approved, rejected]}
+        params: {type: array, items: {$ref: "#/components/schemas/MrvParamPin"}}
+        source_note: {type: string}
+        setter_ref: {type: string, format: uuid}
+        approver_ref: {type: [string, "null"], format: uuid}
+        decided_at: {type: [string, "null"], format: date-time}
+        decision_note: {type: [string, "null"]}
+        created_at: {type: string, format: date-time}
     MrvCatalogVersion:
       type: object
       required: [id, evidence_type, version, status, provisional, source_note, fields, setter_ref, approver_ref, submitted_at, decided_at, decision_note, created_at]

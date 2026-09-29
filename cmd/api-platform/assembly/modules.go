@@ -135,7 +135,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	mrvMod := mrv.New(mrvPool, clk, mrv.Deps{Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Store: store})
+	mrvMod := mrv.New(mrvPool, clk, mrv.Deps{Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Store: store, Params: md.Params()})
 
 	// pf/cropcycle (App HTX): SOP, vụ, nhật ký, sản lượng. Liên kết tài khoản nông dân ↔ nông hộ
 	// (port.FarmerHouseholds) nối sau khi dựng pf/accounts (bên dưới).

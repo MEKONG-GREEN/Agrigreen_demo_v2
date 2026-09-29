@@ -449,7 +449,23 @@ func (s *Service) Review(ctx context.Context, in ReviewInput) (r domain.Review, 
 		if err := store.InsertReview(ctx, tx, &r, e.AdminUnitCode); err != nil {
 			return ledger.Classify(err)
 		}
-		return store.SetReview(ctx, tx, e.RootID, r.Decision, r.ID)
+		if err := store.SetReview(ctx, tx, e.RootID, r.Decision, r.ID); err != nil {
+			return err
+		}
+		// G3: chỉ minh chứng đã duyệt được tính vào ước tính (KN US-MRV-05) → tính lại
+		// ước tính TẠM của các vụ cùng thửa + mã vụ trong cùng giao dịch.
+		if e.PlotRef != nil && e.SeasonCode != nil {
+			refs, err := store.SeasonRefsOf(ctx, tx, *e.PlotRef, *e.SeasonCode)
+			if err != nil {
+				return err
+			}
+			for _, ref := range refs {
+				if err := s.recompute(ctx, tx, p.TenantID, ref, p.ActorRef); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
 	})
 	if errors.Is(err, ledger.ErrDuplicate) {
 		var prev *domain.Review

@@ -178,9 +178,16 @@ type SnapshotEvidence struct {
 }
 
 // Snapshot là ảnh chụp dữ liệu của gói — phần được băm.
+//
+// Các phần G3 (liên kết nhật ký HTX, bằng chứng thu gom, đối chiếu, ước tính) có
+// omitempty: gói G1 không có dữ liệu G3 tại as_of dựng lại cho ra đúng băm cũ.
 type Snapshot struct {
-	Catalogs []SnapshotCatalog  `json:"catalogs"`
-	Evidence []SnapshotEvidence `json:"evidence"`
+	Catalogs    []SnapshotCatalog    `json:"catalogs"`
+	Evidence    []SnapshotEvidence   `json:"evidence"`
+	FarmLogs    []SnapshotFarmLog    `json:"farm_logs,omitempty"`
+	Collections []SnapshotCollection `json:"collection_evidence,omitempty"`
+	Comparisons []SnapshotComparison `json:"comparisons,omitempty"`
+	Estimates   []SnapshotEstimate   `json:"estimates,omitempty"`
 }
 
 // Sort đặt thứ tự ổn định: danh mục theo (loại, phiên bản), minh chứng theo root_id.
@@ -193,6 +200,10 @@ func (s *Snapshot) Sort() {
 		return a.Version < b.Version
 	})
 	sort.Slice(s.Evidence, func(i, j int) bool { return s.Evidence[i].RootID < s.Evidence[j].RootID })
+	sort.Slice(s.FarmLogs, func(i, j int) bool { return s.FarmLogs[i].LogRef < s.FarmLogs[j].LogRef })
+	sort.Slice(s.Collections, func(i, j int) bool { return s.Collections[i].EvidenceRef < s.Collections[j].EvidenceRef })
+	sort.Slice(s.Comparisons, func(i, j int) bool { return s.Comparisons[i].ID < s.Comparisons[j].ID })
+	sort.Slice(s.Estimates, func(i, j int) bool { return s.Estimates[i].SeasonRef < s.Estimates[j].SeasonRef })
 	if s.Catalogs == nil {
 		s.Catalogs = []SnapshotCatalog{}
 	}
@@ -239,15 +250,17 @@ func CanonicalJSON(v any) ([]byte, error) {
 
 // Package là nội dung tệp gói xuất lưu ở kho đối tượng.
 type Package struct {
-	Format         string          `json:"format"`
-	ExportID       string          `json:"export_id"`
-	TenantID       string          `json:"tenant_id"`
-	AsOf           string          `json:"as_of"`
-	RequestedBy    string          `json:"requested_by"`
-	Filters        ExportFilters   `json:"filters"`
-	Provisional    bool            `json:"provisional"` // có danh mục tạm (chờ C-1) trong gói
-	SnapshotSHA256 string          `json:"snapshot_sha256"`
-	Snapshot       json.RawMessage `json:"snapshot"`
+	Format      string        `json:"format"`
+	ExportID    string        `json:"export_id"`
+	TenantID    string        `json:"tenant_id"`
+	AsOf        string        `json:"as_of"`
+	RequestedBy string        `json:"requested_by"`
+	Filters     ExportFilters `json:"filters"`
+	Provisional bool          `json:"provisional"` // có danh mục tạm (chờ C-1) trong gói
+	// EstimatesProvisional: gói có ước tính CO2 chưa chính thức ("chờ khách ký phương pháp").
+	EstimatesProvisional bool            `json:"estimates_provisional,omitempty"`
+	SnapshotSHA256       string          `json:"snapshot_sha256"`
+	Snapshot             json.RawMessage `json:"snapshot"`
 }
 
 // BuildPackage dựng gói từ job và ảnh chụp. Nội dung chỉ phụ thuộc dữ liệu tại
@@ -258,14 +271,17 @@ func BuildPackage(job ExportJob, s Snapshot) (body []byte, snapshotSHA string, e
 	if err != nil {
 		return nil, "", err
 	}
-	prov := false
+	prov, estProv := false, false
 	for _, c := range s.Catalogs {
 		prov = prov || c.Provisional
+	}
+	for _, e := range s.Estimates {
+		estProv = estProv || !e.Official
 	}
 	p := Package{
 		Format: PackageFormat, ExportID: job.ID.String(), TenantID: job.TenantID.String(),
 		AsOf: FormatTime(job.RequestedAt), RequestedBy: job.RequestedBy.String(), Filters: job.Filters.Normalize(),
-		Provisional: prov, SnapshotSHA256: sum, Snapshot: canon,
+		Provisional: prov, EstimatesProvisional: estProv, SnapshotSHA256: sum, Snapshot: canon,
 	}
 	body, err = CanonicalJSON(p)
 	if err != nil {
