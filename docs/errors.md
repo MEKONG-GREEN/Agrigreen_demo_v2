@@ -177,7 +177,7 @@ Phản hồi phát lại theo Idempotency-Key có header `Idempotent-Replayed: t
 | 404 | `reports.export_not_found` | pf/reports: không có việc xuất, hoặc người gọi không phải người yêu cầu và phạm vi không bao trọn |
 | 409 | `reports.export_not_ready` | pf/reports: việc xuất chưa xong hoặc đã hỏng — chưa có tệp để tải |
 | 429 | `reports.export_quota_exceeded` | pf/reports: vượt hạn mức xuất trong ngày (giờ Việt Nam) của người gọi — tham số `reports.daily_export_quota`, mặc định 50 (mục 18 DLP) |
-| 403 | `reports.out_of_scope` | pf/reports: đơn vị ngoài phạm vi TW → Tỉnh → Xã của người gọi, hoặc tài khoản chưa gắn đơn vị (ADR-0009) |
+| 403 | `reports.out_of_scope` | pf/reports: đơn vị ngoài phạm vi TW → Tỉnh → Xã của người gọi, hoặc tài khoản chưa gắn đơn vị (ADR-0009); mẫu `htx.production`: quản lý HTX lọc/lập lịch HTX khác hoặc tài khoản chưa gắn HTX (HTX US-DASH-02/03) |
 | 404 | `reports.schedule_not_found` | pf/reports: không có lịch gửi, hoặc ngoài phạm vi xem |
 | 422 | `reports.unit_invalid` | pf/reports: mã đơn vị hành chính không còn hiệu lực hoặc không phải tỉnh/xã |
 | 503 | `reports.dependency_unavailable` | pf/reports: chưa nối pf/party, pf/masterdata, kho đối tượng hoặc cổng dữ liệu của module nguồn |

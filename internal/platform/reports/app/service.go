@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
+	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
@@ -52,20 +53,33 @@ const DownloadTTL = 10 * time.Minute
 
 // Nhóm vai.
 var (
-	knRoles       = []string{extport.RoleKNOfficer, extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin, authz.RolePlatformAdmin}
-	cghRoles      = []string{mechport.RoleCGHViewer, mechport.RoleCGHAdmin, authz.RolePlatformAdmin}
-	allReaders    = []string{extport.RoleKNOfficer, extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin, mechport.RoleCGHViewer, mechport.RoleCGHAdmin, port.RoleReportsAdmin, port.RoleMasterdataAdmin, authz.RolePlatformAdmin}
+	knRoles  = []string{extport.RoleKNOfficer, extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin, authz.RolePlatformAdmin}
+	cghRoles = []string{mechport.RoleCGHViewer, mechport.RoleCGHAdmin, authz.RolePlatformAdmin}
+	// HTX US-DASH-02: quản lý HTX (chỉ HTX mình) và cán bộ KN theo phạm vi xã/tỉnh.
+	htxRoles      = append([]string{ccport.RoleCoopManager}, knRoles...)
+	allReaders    = []string{extport.RoleKNOfficer, extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin, mechport.RoleCGHViewer, mechport.RoleCGHAdmin, ccport.RoleCoopManager, port.RoleReportsAdmin, port.RoleMasterdataAdmin, authz.RolePlatformAdmin}
 	templateAdmin = []string{port.RoleReportsAdmin, port.RoleMasterdataAdmin, authz.RolePlatformAdmin}
-	// Lập lịch: cán bộ quản lý (TTKN QG/tỉnh — US-DASH-03) và Admin CGH.
-	schedulers = []string{extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin, mechport.RoleCGHAdmin, authz.RolePlatformAdmin}
+	// Lập lịch: cán bộ quản lý (TTKN QG/tỉnh — KN US-DASH-03), Admin CGH và quản lý HTX
+	// (HTX US-DASH-03, chỉ mẫu HTX — rolesFor chặn mẫu khác).
+	schedulers = []string{extport.RoleKNProvinceAdmin, extport.RoleKNNationalAdmin, mechport.RoleCGHAdmin, ccport.RoleCoopManager, authz.RolePlatformAdmin}
 )
 
 // rolesFor trả vai được xuất từ một nguồn dữ liệu.
 func rolesFor(source string) []string {
-	if domain.Sources[source].Module == "mechanization" {
+	switch domain.Sources[source].Module {
+	case "mechanization":
 		return cghRoles
+	case "cropcycle":
+		return htxRoles
 	}
 	return knRoles
+}
+
+// coopOnly: người gọi xem số liệu HTX CHỈ của HTX mình (Principal.OrgRef) — quản lý
+// HTX không kèm vai KN/quản trị (HTX US-DASH-01 AC-3). Phạm vi xã của tổ chức HTX
+// (pf/party) KHÔNG dùng cho nguồn HTX: một xã có nhiều HTX.
+func coopOnly(p authz.Principal) bool {
+	return p.Has(ccport.RoleCoopManager) && !hasAny(p, knRoles)
 }
 
 func hasAny(p authz.Principal, roles []string) bool {
@@ -87,6 +101,7 @@ type Service struct {
 
 	Extension     extport.ReportData
 	Mechanization mechport.ReportData
+	CropCycle     ccport.ReportData // HTX US-DASH-02: sản lượng HTX
 
 	Directory port.MailDirectory // nil → bỏ gửi email kèm cảnh báo
 	Mailer    port.Mailer        // nil → bỏ gửi email kèm cảnh báo

@@ -36,11 +36,11 @@ func (s *Service) CreateSchedule(ctx context.Context, in ScheduleInput) (domain.
 	if in.IdemKey == "" {
 		return domain.Schedule{}, false, problem.IdempotencyRequired
 	}
-	sc, err := s.scope(ctx, p)
+	sc, err := s.reach(ctx, p)
 	if err != nil {
 		return domain.Schedule{}, false, err
 	}
-	if sc.Empty() {
+	if sc.Empty() && !coopOnly(p) {
 		return domain.Schedule{}, false, ErrOutOfScope.WithDetail("tài khoản chưa gắn đơn vị công tác")
 	}
 	sch := in.Schedule
@@ -74,13 +74,18 @@ func (s *Service) CreateSchedule(ctx context.Context, in ScheduleInput) (domain.
 		if params.Period == "" && domain.Sources[t.Def.Source].NeedsPeriod {
 			params.Period = domain.MonthOf(now) // chỉ để kiểm; kỳ thật tính theo từng mốc
 		}
-		norm, err := s.normalizeParams(ctx, t.Def, params, sc, now)
+		// HTX US-DASH-03: lịch của quản lý HTX chỉ trong HTX của người lập.
+		jsc, err := jobScope(p, sc, t.Def, &params)
+		if err != nil {
+			return err
+		}
+		norm, err := s.normalizeParams(ctx, t.Def, params, jsc, now)
 		if err != nil {
 			return err
 		}
 		norm.Period = ""
 		sch.ID, sch.TenantID, sch.TemplateKey, sch.Params, sch.UnitCode = ids.New(), p.TenantID, t.Key, norm, norm.UnitCode
-		sch.OwnerRef, sch.OwnerRoles, sch.ScopeAll, sch.ScopeUnits = p.ActorRef, p.Roles, sc.All, sc.Units
+		sch.OwnerRef, sch.OwnerRoles, sch.ScopeAll, sch.ScopeUnits = p.ActorRef, p.Roles, jsc.All, jsc.Units
 		sch.Active, sch.CreatedAt, sch.UpdatedAt, sch.IdemKey = true, now, now, in.IdemKey
 		return store.InsertSchedule(ctx, tx, &sch)
 	})
@@ -91,6 +96,10 @@ func (s *Service) CreateSchedule(ctx context.Context, in ScheduleInput) (domain.
 func scheduleVisible(p authz.Principal, sc authz.Scope, s domain.Schedule) bool {
 	if s.OwnerRef == p.ActorRef || sc.All {
 		return true
+	}
+	if coopOnly(p) {
+		// HTX US-DASH-03: quản lý HTX thấy lịch HTX của HTX mình.
+		return p.OrgRef != uuid.Nil && s.Params.CoopScoped(s.ScopeAll, s.ScopeUnits) && s.Params.CooperativeRef == p.OrgRef.String()
 	}
 	if s.ScopeAll {
 		return false
@@ -109,7 +118,7 @@ func (s *Service) ListSchedules(ctx context.Context) ([]domain.Schedule, error) 
 	if err != nil {
 		return nil, err
 	}
-	sc, err := s.scope(ctx, p)
+	sc, err := s.reach(ctx, p)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +149,7 @@ func (s *Service) DeactivateSchedule(ctx context.Context, id uuid.UUID, reason s
 	if n := len([]rune(reason)); n < 10 || n > 500 {
 		return domain.Schedule{}, problem.Validation.WithField("reason", "bắt buộc, 10–500 ký tự")
 	}
-	sc, err := s.scope(ctx, p)
+	sc, err := s.reach(ctx, p)
 	if err != nil {
 		return domain.Schedule{}, err
 	}
@@ -171,7 +180,7 @@ func (s *Service) ScheduleRuns(ctx context.Context, id uuid.UUID) ([]store.Run, 
 	if err != nil {
 		return nil, err
 	}
-	sc, err := s.scope(ctx, p)
+	sc, err := s.reach(ctx, p)
 	if err != nil {
 		return nil, err
 	}

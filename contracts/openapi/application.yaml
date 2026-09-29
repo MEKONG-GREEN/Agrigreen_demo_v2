@@ -2656,6 +2656,10 @@ paths:
         "422": {$ref: "#/components/responses/Problem"}
     post:
       summary: Yêu cầu xuất báo cáo (Excel/PDF) — 202 + việc xuất; worker dựng tệp. Phạm vi giải lúc yêu cầu (ADR-0009)
+      description: >-
+        Mẫu htx.production (nguồn cropcycle.production — HTX US-DASH-02): sản lượng dự kiến – thực tế, diện tích, số nông hộ,
+        tiến độ SOP theo HTX × vụ × giống, cùng số liệu bảng điều hành GET /v1/cropcycle/dashboard. Quản lý HTX chỉ xuất HTX
+        của mình (params.cooperative_ref được gán); cán bộ KN theo phạm vi xã/tỉnh; platform_admin toàn bộ.
       operationId: requestReportExport
       tags: [reports]
       parameters:
@@ -5539,7 +5543,7 @@ components:
         title: {type: string, minLength: 5, maxLength: 200}
         source:
           type: string
-          enum: [extension.sowing, extension.growth_pest, extension.program_progress, extension.tasks_sla, extension.period_summary, mechanization.summary, mechanization.shortage_by_coop, mechanization.season_compare]
+          enum: [extension.sowing, extension.growth_pest, extension.program_progress, extension.tasks_sla, extension.period_summary, mechanization.summary, mechanization.shortage_by_coop, mechanization.season_compare, cropcycle.production]
         grouping: {type: string, enum: [national, province, commune, cooperative]}
         columns: {type: array, minItems: 1, maxItems: 40, items: {$ref: "#/components/schemas/ReportColumn"}}
         formats: {type: array, items: {type: string, enum: [xlsx, pdf]}}
@@ -5569,6 +5573,8 @@ components:
         season_year_b: {type: integer}
         run_id: {type: string, format: uuid, description: "CGH: lần cân đối đã lưu; rỗng = mới nhất của vụ"}
         machine_type: {type: string}
+        cooperative_ref: {type: string, format: uuid, description: "HTX US-DASH-02 (cropcycle.production): lọc HTX. Quản lý HTX luôn là HTX của mình (HTX khác → 403 reports.out_of_scope)"}
+        variety_code: {type: string, description: "HTX US-DASH-02 (cropcycle.production): lọc giống lúa"}
     ReportExport:
       type: object
       required: [id, template_key, template_version, title, format, params, status, trigger, requested_by, requested_at]

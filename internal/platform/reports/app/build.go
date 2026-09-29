@@ -176,6 +176,19 @@ func (s *Service) buildDataset(ctx context.Context, j domain.Job) (domain.Datase
 			return domain.Dataset{}, ErrDependency.WithDetail("chưa nối cổng dữ liệu pf/mechanization")
 		}
 		b, err = s.buildMechanization(ctx, j, sc, n)
+	case "cropcycle":
+		if s.CropCycle == nil {
+			return domain.Dataset{}, ErrDependency.WithDetail("chưa nối cổng dữ liệu pf/cropcycle")
+		}
+		b, err = s.buildHTX(ctx, j, sc, n)
+		if err != nil {
+			return domain.Dataset{}, err
+		}
+		ds := domain.Build(j.Def, j.Params.Level, b.rows, b.total)
+		ds.Meta = append(meta, b.meta...)
+		ds.Provisional = b.provisional
+		ds.Notes = append(b.notes, ds.Notes...)
+		return ds, nil
 	}
 	if err != nil {
 		return domain.Dataset{}, err

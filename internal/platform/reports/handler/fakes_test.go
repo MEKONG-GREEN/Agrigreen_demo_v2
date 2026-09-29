@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
+	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
@@ -85,7 +86,7 @@ func (f *fakeParams) At(_ context.Context, key string, at time.Time) (mdport.Par
 type fakeCatalogs struct{}
 
 var catalogNames = map[string]string{
-	"season/HT": "Hè Thu", "rice_variety/ST25": "ST25", "rice_variety/OM5451": "OM 5451", "pest/ray_nau": "Rầy nâu",
+	"season/HT": "Hè Thu", "season/DX": "Đông Xuân", "rice_variety/ST25": "ST25", "rice_variety/OM5451": "OM 5451", "pest/ray_nau": "Rầy nâu",
 	"farm_stage/lam_dat": "Làm đất", "machine_type/MLD": "Máy làm đất",
 }
 
@@ -104,7 +105,7 @@ type orgTree struct {
 	orgs  map[uuid.UUID]partyport.Org
 	scope map[uuid.UUID]authz.Scope
 
-	national, pAG, pCT, tBinhDuc, tCaiKhe, dcrd, coop uuid.UUID
+	national, pAG, pCT, tBinhDuc, tCaiKhe, dcrd, coop, coopCaiKhe uuid.UUID
 }
 
 func newOrgTree() *orgTree {
@@ -122,6 +123,7 @@ func newOrgTree() *orgTree {
 	o.tBinhDuc = add(partyport.OrgExtensionTeam, cBinhDuc, "Tổ KNCĐ Bình Đức", authz.Scope{Units: []string{cBinhDuc}})
 	o.tCaiKhe = add(partyport.OrgExtensionTeam, cCaiKhe, "Tổ KNCĐ Cái Khế", authz.Scope{Units: []string{cCaiKhe}})
 	o.coop = add(partyport.OrgCooperative, cBinhDuc, "HTX Lúa Xanh Bình Đức", authz.Scope{Units: []string{cBinhDuc}})
+	o.coopCaiKhe = add(partyport.OrgCooperative, cCaiKhe, "HTX Cái Khế", authz.Scope{Units: []string{cCaiKhe}})
 	return o
 }
 
@@ -281,6 +283,7 @@ var (
 	_ mdport.Catalogs         = fakeCatalogs{}
 	_ extport.ReportData      = (*fakeExt)(nil)
 	_ mechport.ReportData     = (*fakeMech)(nil)
+	_ ccport.ReportData       = (*fakeCC)(nil)
 	_ port.MailDirectory      = fakeDirectory{}
 	_ port.Mailer             = (*fakeMailer)(nil)
 )

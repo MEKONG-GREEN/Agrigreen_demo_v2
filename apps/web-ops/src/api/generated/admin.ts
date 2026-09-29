@@ -1792,7 +1792,10 @@ export interface paths {
         /** Lịch gửi người gọi được xem (người lập hoặc phạm vi bao trọn) */
         get: operations["listReportSchedules"];
         put?: never;
-        /** Lập lịch gửi báo cáo (tuần/tháng, giờ Việt Nam). Người nhận là actor_ref — email tra lúc gửi, không lưu */
+        /**
+         * Lập lịch gửi báo cáo (tuần/tháng, giờ Việt Nam). Người nhận là actor_ref — email tra lúc gửi, không lưu
+         * @description HTX US-DASH-03 — quản lý HTX (coop_manager) lập lịch mẫu htx.production, chỉ trong HTX của mình (params.cooperative_ref được gán; HTX khác → 403).
+         */
         post: operations["createReportSchedule"];
         delete?: never;
         options?: never;
@@ -2241,7 +2244,7 @@ export interface components {
         ReportDefinition: {
             title: string;
             /** @enum {string} */
-            source: "extension.sowing" | "extension.growth_pest" | "extension.program_progress" | "extension.tasks_sla" | "extension.period_summary" | "mechanization.summary" | "mechanization.shortage_by_coop" | "mechanization.season_compare";
+            source: "extension.sowing" | "extension.growth_pest" | "extension.program_progress" | "extension.tasks_sla" | "extension.period_summary" | "mechanization.summary" | "mechanization.shortage_by_coop" | "mechanization.season_compare" | "cropcycle.production";
             /** @enum {string} */
             grouping: "national" | "province" | "commune" | "cooperative";
             columns: {

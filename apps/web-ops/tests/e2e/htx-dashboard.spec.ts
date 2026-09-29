@@ -22,14 +22,35 @@ test("HTX US-DASH-01: thẻ chỉ số + biểu đồ dự kiến – thực t�
   await expect(page.getByRole("img", { name: /Biểu đồ sản lượng/ })).toContainText("Dự kiến:");
 });
 
-test("HTX US-DASH-02: xuất CSV khớp bộ lọc hiện hành (xuất phía trình duyệt — chưa có mẫu báo cáo HTX)", async ({ page }) => {
+test("HTX US-DASH-02: xuất báo cáo sản lượng qua pf/reports — việc xuất nền khớp bộ lọc → tải Excel/PDF", async ({ page }) => {
   await loginAs(page, "htx", "/htx/dashboard");
-  await expect(page.getByRole("note")).toContainText("Chưa có mẫu báo cáo sản lượng HTX");
+  await expect(page.getByRole("note")).toContainText("dựng nền ở máy chủ");
   await page.getByLabel("Vụ", { exact: true }).selectOption("HT");
+  await page.getByLabel("Định dạng").selectOption("xlsx");
+  await page.getByRole("button", { name: "Xuất báo cáo" }).click();
+  const status = page.getByRole("status").filter({ hasText: "Báo cáo sản lượng HTX" });
+  await expect(status).toContainText("Tệp đã sẵn sàng", { timeout: 15_000 });
+  await expect(page.getByRole("button", { name: "Tải CSV dự phòng" })).toHaveCount(0); // CSV chỉ là dự phòng khi API lỗi
   const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Xuất Excel (CSV)" }).click();
-  const file = await download;
-  expect(file.suggestedFilename()).toMatch(/^san-luong-htx-\d{4}-HT\.csv$/);
+  await page.getByRole("button", { name: "Tải xuống" }).click();
+  expect((await download).suggestedFilename()).toMatch(/^htx\.production/);
+
+  await page.getByLabel("Định dạng").selectOption("pdf");
+  await page.getByRole("button", { name: "Xuất báo cáo" }).click();
+  await expect(status).toContainText("(PDF): Tệp đã sẵn sàng", { timeout: 15_000 });
+  const pdf = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Tải xuống" }).click();
+  expect((await pdf).suggestedFilename()).toMatch(/^htx\.production.*\.pdf$/);
+});
+
+test("HTX US-DASH-02: API báo cáo lỗi → thông báo lỗi + tải CSV dự phòng dựng trên trình duyệt", async ({ page }) => {
+  await loginAs(page, "htx", "/htx/dashboard");
+  await page.getByLabel("Năm").fill("1999"); // máy chủ chỉ nhận năm vụ 2000–2100 → 422
+  await page.getByRole("button", { name: "Xuất báo cáo" }).click();
+  await expect(page.getByRole("alert")).toBeVisible();
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Tải CSV dự phòng" }).click();
+  expect((await download).suggestedFilename()).toMatch(/^san-luong-htx-1999\.csv$/);
 });
 
 test("HTX US-DASH-01 AC-4: quản trị xem toàn bộ hoặc lọc từng HTX, nhóm theo HTX", async ({ page }) => {
