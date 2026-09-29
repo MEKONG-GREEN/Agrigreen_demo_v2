@@ -29,6 +29,9 @@ export const ROLES = {
   waterwayPublisher: "waterway_publisher",
   simulationAnalyst: "simulation_analyst",
   sopAdmin: "sop_admin",
+  contentEditorNational: "content_editor_national",
+  contentEditorProvince: "content_editor_province",
+  contentReviewer: "content_reviewer",
   farmer: "farmer",
 } as const;
 

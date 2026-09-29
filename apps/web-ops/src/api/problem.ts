@@ -53,6 +53,11 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "party.import_invalid":
     "Tệp nhập sai mẫu (thiếu cột bắt buộc, không phải CSV UTF-8/.xlsx, tệp .xls cũ, có ô công thức hoặc quá số dòng). Cả tệp bị từ chối.",
   "party.dependency_unavailable": "Dịch vụ danh bạ tổ chức/kho định danh tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+  "party.cooperative_name_taken": "Tên HTX này đã tồn tại, vui lòng chọn tên khác.",
+  "party.household_phone_taken": "SĐT đã được sử dụng bởi nông hộ khác",
+  "party.household_contact_unavailable": "Nông hộ chưa có số điện thoại liên hệ trong kho định danh — không gọi nhanh được.",
+  "party.household_not_found": "Không tìm thấy nông hộ, hoặc nông hộ nằm ngoài phạm vi được phân quyền.",
+  "reports.recipient_not_in_cooperative": "Email đăng ký nhận báo cáo không hợp lệ hoặc gửi thất bại, vui lòng kiểm tra lại.",
   // pf/geo
   "geo.admin_boundary_not_found": "Chưa nhập ranh giới hành chính cho đơn vị này.",
   "geo.plot_not_found": "Không tìm thấy thửa, hoặc thửa nằm ngoài phạm vi.",
@@ -267,9 +272,13 @@ export function parseRetryAfter(value: string | null | undefined, now: number = 
 }
 
 /** Thông báo cho người dùng: ưu tiên bảng mã; mã lạ thì dùng detail/title của server. */
+const PREFER_DETAIL: ReadonlySet<string> = new Set(["party.out_of_scope", "party.import_invalid"]);
+
 export function problemMessage(p: Pick<ProblemDetails, "code" | "status" | "detail" | "title">): string {
   // Thông báo nghiệp vụ của 422 (vd "Vui lòng nhập đầy đủ Tên tuyến và Phân loại." — docs/errors.md) nằm ở `detail`.
   if (p.code === "validation_failed" && p.detail) return p.detail;
+  // Thông điệp AC nằm ở detail: "Bạn không có quyền truy cập nông hộ này." (HTX US-HH-01 AC-3), "Sai định dạng file: …" (US-HTX-02).
+  if (PREFER_DETAIL.has(p.code) && p.detail) return p.detail;
   const known = PROBLEM_MESSAGES[p.code];
   if (known) return known;
   if (p.detail) return p.detail;

@@ -38,6 +38,7 @@ Vai đã khai trong `internal/shared/dbadmin/dbadmin.go` và userlist PgBouncer 
 | pf | 000027 | masterdata: tham số và danh mục G2 (cropcycle, GIS, waterway, simulation) | `pf_masterdata` | `masterdata_app` |
 | pf | 000028 | notify / sync: bổ sung G2 (người nhận theo thửa, lọc nhóm dữ liệu) | theo module | theo module |
 | pf | 000029–000034 | dự phòng đợt 2 — xin số từ người tích hợp | | |
+| pf | 000032 | party: địa chỉ trụ sở HTX `cooperative.head_office`, chỉ mục tên HTX (HTX US-HTX-02/03) | `pf_party` | `party_app` |
 | mkg | 000002 | mkg/hub: hub, kho, lô, dịch chuyển tồn | `mkg_hub` | `hub_app` |
 | mkg | 000003 | mkg/hub: bảng xuất van công bố (outbox của van) | `mkg_hub` | `hub_app` |
 

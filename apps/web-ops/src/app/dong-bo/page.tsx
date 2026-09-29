@@ -15,6 +15,7 @@ import { useNow } from "@/components/SlaCountdown";
 import { Loading, PageHead } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
 import { toApiProblem, useAsync } from "@/lib/useAsync";
+import { describeEntities, entitiesOf, SYNC_GROUPS } from "@/lib/syncEntities";
 
 const keyOf = (t: NudgeInput) => (t.device_id ? `device:${t.device_id}` : `unit:${t.unit ?? ""}`);
 
@@ -23,7 +24,7 @@ const keyOf = (t: NudgeInput) => (t.device_id ? `device:${t.device_id}` : `unit:
  * Giới hạn 1 lần/5 phút mỗi đích, 30 lần/giờ mỗi người: 429 notify.nudge_rate_limited kèm Retry-After →
  * khoá nút của đích đó và đếm ngược.
  */
-function useNudge() {
+function useNudge(entities: string[]) {
   const { api } = useAuth();
   const [busy, setBusy] = useState<string | null>(null);
   const [retryUntil, setRetryUntil] = useState<Record<string, number>>({});
@@ -39,7 +40,8 @@ function useNudge() {
       return next;
     });
     try {
-      const r = await unwrap(api.POST("/v1/sync/nudge", { params: { header: { "Idempotency-Key": newIdempotencyKey() } }, body: target }));
+      const body: NudgeInput = entities.length > 0 ? { ...target, entities } : target;
+      const r = await unwrap(api.POST("/v1/sync/nudge", { params: { header: { "Idempotency-Key": newIdempotencyKey() } }, body }));
       setResults((s) => ({ ...s, [k]: r }));
     } catch (e) {
       const p = toApiProblem(e);
@@ -65,7 +67,7 @@ function NudgeButton({ target, n, now }: { target: NudgeInput; n: ReturnType<typ
       </button>
       {r && !p ? (
         <span className="small" role="status" style={{ color: "var(--g800)" }}>
-          Đã xếp lượt gửi tới {r.devices} thiết bị.
+          Đã xếp lượt gửi tới {r.devices} thiết bị — {describeEntities(r.entities)}.
         </span>
       ) : null}
       {p ? <ProblemAlert problem={p} /> : null}
@@ -118,7 +120,15 @@ function DeviceList({ n, now }: { n: ReturnType<typeof useNudge>; now: number })
 export default function SyncNudgePage() {
   const { api, principal } = useAuth();
   const now = useNow(1000);
-  const n = useNudge();
+  const [groups, setGroups] = useState<Set<string>>(new Set());
+  const n = useNudge(entitiesOf(groups));
+  const toggleGroup = (id: string) =>
+    setGroups((g) => {
+      const next = new Set(g);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const province = principal?.level === "tinh" ? (principal.scopeUnits.find((u) => u.length === 2) ?? null) : null;
   const units = useAsync(async () => {
     const list = (await listChildUnits(api, province)).map((u) => ({ code: u.code, name: u.name }));
@@ -145,6 +155,26 @@ export default function SyncNudgePage() {
           thiết bị/đơn vị chỉ được yêu cầu 1 lần trong 5 phút; mỗi người tối đa 30 lần/giờ.
         </span>
       </div>
+      <section className="card sec" style={{ marginBottom: 16 }} aria-labelledby="nd-groups">
+        <div className="sec-h">
+          <h2 id="nd-groups">Nhóm dữ liệu</h2>
+          <span className="mute small">Không chọn nhóm nào = đồng bộ tất cả</span>
+        </div>
+        <fieldset className="plain">
+          <legend className="sr-only">Nhóm dữ liệu cần đồng bộ ngay</legend>
+          <div className="check-grid">
+            {SYNC_GROUPS.map((g) => (
+              <label key={g.id} className="row small" style={{ gap: 6 }}>
+                <input type="checkbox" checked={groups.has(g.id)} onChange={() => toggleGroup(g.id)} />
+                {g.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <p className="small mute" role="status" style={{ marginTop: 6 }}>
+          Sẽ đồng bộ: {groups.size === 0 ? "tất cả dữ liệu" : describeEntities(entitiesOf(groups))}
+        </p>
+      </section>
       <section className="card sec" style={{ marginBottom: 16 }} aria-labelledby="nd-unit">
         <div className="sec-h">
           <h2 id="nd-unit">Theo đơn vị</h2>

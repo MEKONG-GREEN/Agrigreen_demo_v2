@@ -76,7 +76,19 @@ describe("menu theo phạm vi và vai", () => {
 });
 
 describe("menu App HTX theo vai", () => {
-  const HTX_PAGES = ["/htx/dashboard", "/htx/mua-vu", "/htx/nhat-ky", "/htx/phe-duyet", "/htx/san-luong", "/htx/tai-khoan-nong-dan", "/htx/yeu-cau-ho-tro"];
+  const HTX_PAGES = [
+    "/htx/dashboard",
+    "/htx/nong-ho",
+    "/htx/lo-ruong",
+    "/htx/mua-vu",
+    "/htx/nhat-ky",
+    "/htx/phe-duyet",
+    "/htx/san-luong",
+    "/htx/lich-bao-cao",
+    "/htx/tai-khoan-nong-dan",
+    "/htx/yeu-cau-ho-tro",
+  ];
+  const MANAGER_ONLY = ["/htx/phe-duyet", "/htx/lich-bao-cao"];
 
   it("Quản lý HTX chỉ thấy màn hình HTX của mình, vào thẳng bảng điều hành sản xuất", () => {
     const p = persona("htx");
@@ -84,11 +96,11 @@ describe("menu App HTX theo vai", () => {
     expect(homeFor(p)).toBe("/htx/dashboard");
   });
 
-  it("cán bộ KN xem được (chỉ đọc) nhưng không có màn hình phê duyệt", () => {
+  it("cán bộ KN xem được (chỉ đọc) nhưng không có màn hình phê duyệt và lịch báo cáo HTX", () => {
     for (const id of ["xa", "tinh", "tw"]) {
       const h = hrefs(persona(id));
-      expect(h).toEqual(expect.arrayContaining(HTX_PAGES.filter((x) => x !== "/htx/phe-duyet")));
-      expect(h).not.toContain("/htx/phe-duyet");
+      expect(h).toEqual(expect.arrayContaining(HTX_PAGES.filter((x) => !MANAGER_ONLY.includes(x))));
+      for (const x of MANAGER_ONLY) expect(h).not.toContain(x);
     }
     expect(hrefs(persona("cuc")).some((x) => x.startsWith("/htx"))).toBe(false);
   });

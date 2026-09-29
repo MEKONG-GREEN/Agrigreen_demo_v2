@@ -55,8 +55,8 @@ type Deps struct {
 	// Recipients: tài khoản của HTX để quản lý HTX chọn người nhận lịch (HTX US-DASH-03); nil → 503.
 	Recipients port.RecipientDirectory
 	Mailer     port.Mailer
-	LinkBase      string // AG_WEB_OPS_URL: liên kết trang việc xuất trong email
-	Log           *slog.Logger
+	LinkBase   string // AG_WEB_OPS_URL: liên kết trang việc xuất trong email
+	Log        *slog.Logger
 }
 
 // Module là pf/reports đã nối.

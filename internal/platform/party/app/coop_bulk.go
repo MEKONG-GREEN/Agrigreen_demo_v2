@@ -130,10 +130,9 @@ func (r *Registry) ImportCooperatives(ctx context.Context, src io.Reader, idemKe
 			if reason == "" {
 				in.IdemKey = fmt.Sprintf("%s:row:%d", idemKey, rec.Line)
 				out, err := r.createCoopUnique(ctx, in)
-				switch {
-				case err == nil:
+				if err == nil {
 					row.Status, row.OrgRef, row.Code = CoopRowCreated, out.Org.Ref, out.Org.Code
-				default:
+				} else {
 					var pr *problem.Problem
 					if !errors.As(err, &pr) || pr.Status >= 500 {
 						return CoopImportResult{}, err // lỗi hệ thống: dừng, client gọi lại cùng khóa

@@ -4,7 +4,7 @@
 // Hình dạng phản hồi theo contracts/openapi/application.yaml và admin.yaml.
 import { uuidv7 } from "../idempotency";
 import type { ContentKind, ReportSchedule } from "../types";
-import { COOPERATIVES, findCoop, householdCount, householdRefOf, householdsOf, htxCoop, syntheticPhone, type MockCooperative } from "./data";
+import { COOPERATIVES, findCoop, householdCount, householdRefOf, householdsOf, syntheticPhone, type MockCooperative } from "./data";
 import { headerKey, parseCsv } from "./admin-ops";
 import { hasRole, inScope, isZip, json, nowIso, opaque, paginate, problem, reasonOf, validation, type Route } from "./http";
 import type { MockPersona } from "./personas";
@@ -475,7 +475,7 @@ export const htxGapAdminRoutes: Route[] = [
       const last = d.versions[d.versions.length - 1]!;
       if (last.status !== "draft") return problem(409, "content.invalid_transition", "Không có bản nháp để gửi duyệt");
       if (!last.title.trim() || !last.category) {
-        return problem(422, "validation_failed", "Vui lòng nhập tiêu đề và chọn chuyên mục trước khi xuất bản.", { errors: [{ field: "category", reason: "bắt buộc với tin tức" }] });
+        return validation([{ field: "category", reason: "Vui lòng nhập tiêu đề và chọn chuyên mục trước khi xuất bản." }]);
       }
       last.status = "review";
       return json({ document: docView(d) });

@@ -133,6 +133,7 @@ export const MOCK_PERSONAS: readonly MockPersona[] = [
       "waterway_editor",
       "waterway_publisher",
       "simulation_analyst",
+      "content_editor_national",
     ],
     org: MKG_ORG,
     scope: { all: true, level: "national", units: [] },
