@@ -51,9 +51,11 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
-// wireMeasurement nối hiện thực cổng mkg/measurement trên pool ingest_mkg. Người
-// tích hợp gán khi module measurement (store sổ thiết bị, phiên cân, phiếu cân) có mặt.
-var wireMeasurement func(ctx context.Context, pool *pgxpool.Pool, clk clock.Clock) (measurement.IngestPorts, error)
+// wireMeasurement nối hiện thực cổng mkg/measurement trên pool ingest_mkg (G3-A2):
+// sổ thiết bị, hàng phiên đã đóng, bì theo cửa sổ, sổ phiếu cân.
+var wireMeasurement = func(_ context.Context, pool *pgxpool.Pool, clk clock.Clock) (measurement.IngestPorts, error) {
+	return measurement.NewIngestPorts(pool, clk), nil
+}
 
 func main() {
 	if len(os.Args) == 3 && os.Args[1] == "-healthcheck" {

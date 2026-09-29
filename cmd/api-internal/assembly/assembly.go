@@ -19,6 +19,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub"
 	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
@@ -31,11 +32,12 @@ type PoolOpener func(ctx context.Context, role string) (*pgxpool.Pool, error)
 
 // Modules là các module mkg đã nối.
 type Modules struct {
-	Hub *hub.Module
+	Hub         *hub.Module
+	Measurement *measurement.Module
 }
 
 // List trả module theo thứ tự gắn route.
-func (m Modules) List() []httpx.Module { return []httpx.Module{m.Hub} }
+func (m Modules) List() []httpx.Module { return []httpx.Module{m.Hub, m.Measurement} }
 
 // OpsRole là vai vận hành của api-internal ở cụm mkg (tương đương platform_api ở
 // cụm pf): chỉ bảng vận hành shared.idempotency_key qua ag_shared_user, không có
@@ -58,6 +60,13 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules,
 	}
 	pools = append(pools, hubPool)
 	mods.Hub = hub.New(hubPool, clk)
+	measPool, err := open(ctx, measurement.DBRole)
+	if err != nil {
+		return mods, ops, pools, err
+	}
+	pools = append(pools, measPool)
+	// Rolls: chưa có hiện thực fieldops (đợt fieldops G3) → app.NoRolls (pending_rolls).
+	mods.Measurement = measurement.New(measPool, clk, measurement.Deps{Origins: mods.Hub.Lots()})
 	return mods, ops, pools, nil
 }
 

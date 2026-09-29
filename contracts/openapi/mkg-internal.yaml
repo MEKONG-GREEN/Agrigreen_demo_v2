@@ -18,6 +18,8 @@ servers:
 security:
   - oidc: []
 tags:
+  - name: measurement
+    description: mkg/measurement — sổ thiết bị cân, phiên cân, phiếu cân ba điểm, dung sai / định mức có phiên bản, đối soát, tranh chấp, nhập số cân khách, van MRV
   - name: hub
     description: mkg/hub — hub, kho, bãi; lô; mẻ; dịch chuyển tồn; van công bố
 paths:
@@ -128,6 +130,7 @@ paths:
       responses:
         "200": {description: Số dòng đã dựng, content: {application/json: {schema: {type: object, properties: {lot_balances: {type: integer}}}}}}
   # --- mkg/hub: bề mặt ứng dụng ---
+
   /v1/hub/facilities/{id}:
     parameters: [{$ref: "#/components/parameters/FacilityID"}]
     get:
@@ -277,7 +280,7 @@ paths:
               required: [mass_kg]
               properties:
                 mass_kg: {$ref: "#/components/schemas/Kg"}
-                destination_ref: {type: string, format: uuid, description: Chuyến / đơn hàng (mkg/logistics, mkg/orders)}
+                destination_ref: {type: string, format: uuid, description: Chuyến / đơn hàng (mkg/logistics, mkg/orders): ''}
                 allocations:
                   type: array
                   description: Rỗng → theo đề xuất rủi ro; có → chỉ định tay, tổng phải bằng mass_kg
@@ -348,6 +351,7 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
   # --- mkg/hub G3 (migration mkg 000009): tham số, kiểm kê, chuyển kho, đo lường ---
+
   /v1/hub/params/{set}:
     parameters: [{name: set, in: path, required: true, schema: {type: string, enum: [risk, weigh]}}]
     get:
@@ -543,6 +547,371 @@ paths:
       responses:
         "200": {description: Tổng hợp, content: {application/json: {schema: {type: object, properties: {lots: {type: integer}, loss_alerts: {type: integer}, hub_in_kg: {$ref: "#/components/schemas/Kg"}, hub_out_kg: {$ref: "#/components/schemas/Kg"}, expected_loss_kg: {$ref: "#/components/schemas/Kg"}, abnormal_loss_kg: {$ref: "#/components/schemas/Kg"}}}}}}
         "404": {$ref: "#/components/responses/Problem"}
+  /v1/measurement/devices:
+    post:
+      summary: "[Quản trị] Đề xuất đăng ký một kỳ thiết bị cân (khóa nguồn Ed25519 + băm chứng thư mTLS)"
+      description: Vai scale_supervisor. Hiệu lực khi người KHÁC có vai device_approver duyệt (R-56). Kỳ (epoch) tăng dần, không dùng lại (ADR-0019).
+      operationId: proposeScaleDevice
+      tags: [measurement]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id, facility_ref, point, public_key, cert_sha256, scale_model]
+              properties:
+                device_id: {type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$", description: Trùng CN/SAN chứng thư mTLS}
+                epoch: {type: integer, minimum: 1, description: Bỏ trống = kỳ kế tiếp}
+                facility_ref: {type: string, format: uuid}
+                point: {type: string, enum: [HUB_IN, HUB_OUT]}
+                public_key: {type: string, description: Khóa công khai Ed25519 32 byte, base64 chuẩn: ''}
+                cert_sha256: {type: string, pattern: "^[0-9a-f]{64}$"}
+                scale_model: {type: string, maxLength: 100, description: Mẫu cân (C-6)}
+      responses:
+        "201": {description: Kỳ chờ duyệt, content: {application/json: {schema: {$ref: "#/components/schemas/ScaleDevice"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Liệt kê kỳ đăng ký thiết bị cân (kèm sức khỏe do ingest báo)
+      operationId: listScaleDevices
+      tags: [measurement]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 200}}
+      responses:
+        "200": {description: Trang thiết bị, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/ScaleDevice"}}, next_cursor: {type: [string, "null"]}}}}}}
+  /v1/measurement/devices/{device_id}:
+    get:
+      summary: Mọi kỳ đăng ký của một thiết bị
+      operationId: getScaleDevice
+      tags: [measurement]
+      parameters: [{name: device_id, in: path, required: true, schema: {type: string}}]
+      responses:
+        "200": {description: Các kỳ, content: {application/json: {schema: {type: object, properties: {device_id: {type: string}, epochs: {type: array, items: {$ref: "#/components/schemas/ScaleDevice"}}}}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/measurement/devices/{device_id}/epochs/{epoch}/decision:
+    post:
+      summary: "[Quản trị] Duyệt / từ chối đề xuất đăng ký"
+      description: Vai device_approver, khác người đề xuất (R-56, CHECK DB). Duyệt kỳ mới → kỳ cũ đang hiệu lực thành superseded.
+      operationId: decideScaleDevice
+      tags: [measurement]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}, {name: device_id, in: path, required: true, schema: {type: string}}, {name: epoch, in: path, required: true, schema: {type: integer}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/Decision"}}}}
+      responses:
+        "201": {description: Đã quyết định, content: {application/json: {schema: {$ref: "#/components/schemas/ScaleDevice"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/measurement/devices/{device_id}/epochs/{epoch}/revoke:
+    post:
+      summary: "[Quản trị] Thu hồi ngay một kỳ đăng ký (lô mới bị ingest từ chối)"
+      description: Vai device_approver hoặc scale_supervisor; thu hồi chỉ giảm tin cậy nên không cần người thứ hai. Bắt buộc lý do ≥ 10 ký tự.
+      operationId: revokeScaleDevice
+      tags: [measurement]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}, {name: device_id, in: path, required: true, schema: {type: string}}, {name: epoch, in: path, required: true, schema: {type: integer}}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [reason], properties: {reason: {type: string, minLength: 10}}}}}}
+      responses:
+        "201": {description: Đã thu hồi, content: {application/json: {schema: {$ref: "#/components/schemas/ScaleDevice"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/measurement/tolerance-versions:
+    post:
+      summary: "[Quản trị] Đề xuất phiên bản bảng dung sai (C-4 — TẠM, chờ khách)"
+      description: Vai reconciliation_officer. Áp theo THỜI ĐIỂM CÂN ≥ effective_from sau khi tolerance_approver khác người đặt duyệt. Chưa có phiên bản duyệt → mặc định tạm prototype (cờ 5 %, nghiêm trọng 15 %).
+      operationId: proposeToleranceVersion
+      tags: [measurement]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [commercial_flag_pct, commercial_critical_pct, roll_flag_pct, roll_critical_pct, effective_from, reason]
+              properties:
+                commercial_flag_pct: {$ref: "#/components/schemas/Pct"}
+                commercial_critical_pct: {$ref: "#/components/schemas/Pct"}
+                roll_flag_pct: {$ref: "#/components/schemas/Pct"}
+                roll_critical_pct: {$ref: "#/components/schemas/Pct"}
+                effective_from: {type: string, format: date-time}
+                provisional: {type: boolean, default: true}
+                reason: {type: string, minLength: 10}
+      responses:
+        "201": {description: Phiên bản chờ duyệt, content: {application/json: {schema: {$ref: "#/components/schemas/ParamVersion"}}}}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Liệt kê phiên bản dung sai (cả hai bề mặt)
+      operationId: listToleranceVersions
+      tags: [measurement]
+      responses:
+        "200": {description: Phiên bản, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/ParamVersion"}}, provisional_default: {type: object}}}}}}
+  /v1/measurement/tolerance-versions/{seq}/decision:
+    post:
+      summary: "[Quản trị] Duyệt / từ chối phiên bản dung sai"
+      description: Vai tolerance_approver ≠ người đặt (R-56, CHECK DB). Từ chối cần lý do.
+      operationId: decideToleranceVersion
+      tags: [measurement]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}, {name: seq, in: path, required: true, schema: {type: integer}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/Decision"}}}}
+      responses:
+        "201": {description: Đã quyết định, content: {application/json: {schema: {$ref: "#/components/schemas/ParamVersion"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/measurement/loss-norm-versions:
+    post:
+      summary: "[Quản trị] Đề xuất phiên bản định mức hao hụt sấy theo độ ẩm (TẠM, chờ khách)"
+      description: Vai reconciliation_officer. bands là các khoảng ẩm [from, to) liền nhau; chỉ hao hụt BẤT THƯỜNG > abnormal_alert_pct % HUB_IN mới cảnh báo.
+      operationId: proposeLossNormVersion
+      tags: [measurement]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bands, default_loss_pct, abnormal_alert_pct, effective_from, reason]
+              properties:
+                bands: {type: array, items: {type: object, required: [moisture_from, moisture_to, loss_pct], properties: {moisture_from: {$ref: "#/components/schemas/Pct"}, moisture_to: {$ref: "#/components/schemas/Pct"}, loss_pct: {$ref: "#/components/schemas/Pct"}}}}
+                default_loss_pct: {$ref: "#/components/schemas/Pct"}
+                abnormal_alert_pct: {$ref: "#/components/schemas/Pct"}
+                effective_from: {type: string, format: date-time}
+                provisional: {type: boolean, default: true}
+                reason: {type: string, minLength: 10}
+      responses:
+        "201": {description: Phiên bản chờ duyệt, content: {application/json: {schema: {$ref: "#/components/schemas/ParamVersion"}}}}
+    get:
+      summary: Liệt kê phiên bản định mức hao hụt
+      operationId: listLossNormVersions
+      tags: [measurement]
+      responses:
+        "200": {description: Phiên bản, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/ParamVersion"}}}}}}}
+  /v1/measurement/loss-norm-versions/{seq}/decision:
+    post:
+      summary: "[Quản trị] Duyệt / từ chối phiên bản định mức hao hụt"
+      operationId: decideLossNormVersion
+      tags: [measurement]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}, {name: seq, in: path, required: true, schema: {type: integer}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/Decision"}}}}
+      responses:
+        "201": {description: Đã quyết định, content: {application/json: {schema: {$ref: "#/components/schemas/ParamVersion"}}}}
+  /v1/measurement/projections/rebuild:
+    post:
+      summary: "[Quản trị] Dựng lại bảng chiếu lot_mass_current, lot_yield_current, dispute_current từ sổ (R-22)"
+      operationId: rebuildMeasurementProjections
+      tags: [measurement]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "200": {description: Số lô / hồ sơ đã dựng, content: {application/json: {schema: {type: object, additionalProperties: {type: integer}}}}}
+  # --- mkg/measurement: bề mặt ứng dụng ---
+
+  /v1/measurement/sessions:
+    post:
+      summary: Mở phiên cân của lô trên một thiết bị (cửa sổ theo BỘ ĐẾM)
+      description: Vai scale_supervisor. Điểm cân và cơ sở lấy từ kỳ đăng ký đang hiệu lực. Một thiết bị một phiên mở; cửa sổ không chồng phiên đã đóng.
+      operationId: openWeighingSession
+      tags: [measurement]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [lot_ref, device_id, epoch, counter_from], properties: {id: {type: string, format: uuid}, lot_ref: {type: string, format: uuid}, device_id: {type: string}, epoch: {type: integer}, counter_from: {type: integer, minimum: 0}, event_time: {type: string, format: date-time}}}}}
+      responses:
+        "201": {description: Phiên mở, content: {application/json: {schema: {$ref: "#/components/schemas/WeighingSession"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/measurement/sessions/{id}:
+    get:
+      summary: Đọc phiên cân
+      operationId: getWeighingSession
+      tags: [measurement]
+      parameters: [{$ref: "#/components/parameters/MeasurementID"}]
+      responses:
+        "200": {description: Phiên, content: {application/json: {schema: {$ref: "#/components/schemas/WeighingSession"}}}}
+  /v1/measurement/sessions/{id}/close:
+    post:
+      summary: Đóng phiên cân tại counter_to (kèm bì, độ ẩm) — ingest tích phân cửa sổ thành phiếu (R-70)
+      operationId: closeWeighingSession
+      tags: [measurement]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}, {$ref: "#/components/parameters/MeasurementID"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [counter_to], properties: {counter_to: {type: integer}, tare_kg: {$ref: "#/components/schemas/Kg"}, moisture_pct: {$ref: "#/components/schemas/Pct"}, event_time: {type: string, format: date-time}}}}}
+      responses:
+        "201": {description: Phiên đóng, content: {application/json: {schema: {$ref: "#/components/schemas/WeighingSession"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/measurement/tickets/{id}:
+    get:
+      summary: Đọc một phiếu cân
+      operationId: getWeighTicket
+      tags: [measurement]
+      parameters: [{$ref: "#/components/parameters/MeasurementID"}]
+      responses:
+        "200": {description: Phiếu, content: {application/json: {schema: {$ref: "#/components/schemas/WeighTicket"}}}}
+  /v1/measurement/lots/{id}/tickets:
+    parameters: [{$ref: "#/components/parameters/MeasurementID"}]
+    get:
+      summary: Mọi phiếu của lô (kể cả phiếu đã bị bù) + khối lượng hiệu lực ba điểm
+      operationId: listLotTickets
+      tags: [measurement]
+      responses:
+        "200": {description: Phiếu và khối lượng lô, content: {application/json: {schema: {type: object, properties: {mass: {type: object}, tickets: {type: array, items: {$ref: "#/components/schemas/WeighTicket"}}}}}}}
+    post:
+      summary: Phiếu nhập tay có bằng chứng (CUSTOMER_IN khi chưa tích hợp hệ cân khách — C-5; HUB_IN/HUB_OUT khi cân hỏng — Q-MKG-04)
+      description: Vai scale_supervisor. Bắt buộc evidence_ref và reason. Phiếu mới cùng điểm phải là phiếu bù (supersedes_id + correction_reason). Lô đủ phiếu → đối soát CÙNG giao dịch; vượt dung sai → mở tranh chấp.
+      operationId: recordManualTicket
+      tags: [measurement]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mass_kg, weighed_at, evidence_ref, reason]
+              properties:
+                id: {type: string, format: uuid}
+                point: {type: string, enum: [HUB_IN, HUB_OUT, CUSTOMER_IN], default: CUSTOMER_IN}
+                route: {type: string, enum: [HUB, DIRECT], default: HUB}
+                mass_kg: {$ref: "#/components/schemas/Kg"}
+                moisture_pct: {$ref: "#/components/schemas/Pct"}
+                moisture_state: {type: string, enum: [not_measured, as_received, after_drying]}
+                weighed_at: {type: string, format: date-time}
+                evidence_ref: {type: string, format: uuid}
+                customer_ref: {type: string, format: uuid}
+                reason: {type: string, minLength: 10}
+                supersedes_id: {type: string, format: uuid}
+                correction_reason: {type: string, minLength: 10}
+      responses:
+        "201": {description: Phiếu (và đối soát nếu có), content: {application/json: {schema: {type: object, properties: {ticket: {$ref: "#/components/schemas/WeighTicket"}, reconciliation: {oneOf: [{$ref: "#/components/schemas/Reconciliation"}, {type: "null"}]}}}}}}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/measurement/lots/{id}/terms:
+    post:
+      summary: Đặt cách tính giá của lô (per_tonne | per_bale) — tạm tới G4 orders
+      description: Vai reconciliation_officer. per_tonne → kiểm chéo cuộn ↔ khối lượng chính thức (RB-6); per_bale → chỉ tham khảo. Mặc định khi chưa đặt là per_tonne.
+      operationId: setLotTerms
+      tags: [measurement]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}, {$ref: "#/components/parameters/MeasurementID"}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [pricing_basis], properties: {pricing_basis: {type: string, enum: [per_tonne, per_bale]}, contract_ref: {type: string, format: uuid}, customer_ref: {type: string, format: uuid}, reason: {type: string, minLength: 10, description: Bắt buộc khi đổi}}}}}}
+      responses:
+        "201": {description: Đã đặt}
+  /v1/measurement/lots/{id}/reconciliations:
+    parameters: [{$ref: "#/components/parameters/MeasurementID"}]
+    post:
+      summary: Đối soát lô (HUB_IN → HUB_OUT → CUSTOMER_IN; DIRECT chỉ CUSTOMER_IN)
+      description: Vai reconciliation_officer. Đầu vào không đổi so với lần trước → 200 trả lần trước. Phát sự kiện NỘI BỘ mkg.measurement.reconciliation.completed.
+      operationId: reconcileLot
+      tags: [measurement]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "201": {description: Lần đối soát mới, content: {application/json: {schema: {$ref: "#/components/schemas/Reconciliation"}}}}
+        "200": {description: Không đổi / phát lại}
+        "409": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Lịch sử đối soát của lô (mới nhất trước)
+      operationId: listReconciliations
+      tags: [measurement]
+      responses:
+        "200": {description: Lịch sử, content: {application/json: {schema: {type: object, properties: {latest: {$ref: "#/components/schemas/Reconciliation"}, items: {type: array, items: {$ref: "#/components/schemas/Reconciliation"}}}}}}}
+  /v1/measurement/lots/{id}/yield:
+    get:
+      summary: Sản lượng quy đổi yield_kg_per_roll = mass(HUB_IN) / cuộn (DIRECT → CUSTOMER_IN, gộp) — không bao giờ qua van
+      operationId: getLotYield
+      tags: [measurement]
+      parameters: [{$ref: "#/components/parameters/MeasurementID"}]
+      responses:
+        "200": {description: Sản lượng quy đổi}
+  /v1/measurement/lots/{id}/mrv-evidence:
+    post:
+      summary: Công bố bằng chứng thu gom qua van mrv_collection_evidence (dự thảo, C-1) — khối lượng THEO BẬC mỗi thửa nguồn
+      operationId: publishMRVEvidence
+      tags: [measurement]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}, {$ref: "#/components/parameters/MeasurementID"}]
+      requestBody: {required: false, content: {application/json: {schema: {type: object, properties: {season_ref: {type: string, format: uuid}}}}}}
+      responses:
+        "201": {description: Bản ghi van đã xuất}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/measurement/lots/{id}/publications:
+    get:
+      summary: Bản ghi đã xuất qua van của lô (kiểm toán)
+      operationId: listMeasurementPublications
+      tags: [measurement]
+      parameters: [{$ref: "#/components/parameters/MeasurementID"}]
+      responses:
+        "200": {description: Bản ghi van}
+  /v1/measurement/customer-weight-imports:
+    post:
+      summary: Nhập số cân của khách (tệp / API / tay có bằng chứng — C-5, TẠM)
+      description: Vai scale_supervisor. Mỗi dòng → một phiếu CUSTOMER_IN (file/api → customer_integration; manual → manual_evidence), cùng giao dịch; một dòng sai → cả lần bị từ chối. Tối đa 200 dòng.
+      operationId: importCustomerWeights
+      tags: [measurement]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channel, rows]
+              properties:
+                channel: {type: string, enum: [file, api, manual]}
+                customer_ref: {type: string, format: uuid}
+                evidence_ref: {type: string, format: uuid, description: Bắt buộc với file và manual}
+                file_sha256: {type: string, pattern: "^[0-9a-f]{64}$"}
+                reason: {type: string, minLength: 10, description: Bắt buộc với manual}
+                rows:
+                  type: array
+                  maxItems: 200
+                  items: {type: object, required: [lot_ref, mass_kg, weighed_at], properties: {lot_ref: {type: string, format: uuid}, route: {type: string, enum: [HUB, DIRECT]}, mass_kg: {$ref: "#/components/schemas/Kg"}, moisture_pct: {$ref: "#/components/schemas/Pct"}, weighed_at: {type: string, format: date-time}, customer_ticket_no: {type: string}}}
+      responses:
+        "201": {description: Lần nhập + đối soát tự động}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/measurement/customer-weight-imports/{id}:
+    get:
+      summary: Đọc một lần nhập
+      operationId: getCustomerWeightImport
+      tags: [measurement]
+      parameters: [{$ref: "#/components/parameters/MeasurementID"}]
+      responses:
+        "200": {description: Lần nhập}
+  /v1/measurement/disputes:
+    get:
+      summary: Liệt kê hồ sơ tranh chấp
+      operationId: listDisputes
+      tags: [measurement]
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [open, under_review, resolved, cancelled]}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 200}}
+      responses:
+        "200": {description: Trang hồ sơ}
+  /v1/measurement/disputes/{id}:
+    get:
+      summary: Hồ sơ tranh chấp kèm lịch sử
+      operationId: getDispute
+      tags: [measurement]
+      parameters: [{$ref: "#/components/parameters/MeasurementID"}]
+      responses:
+        "200": {description: Hồ sơ}
+  /v1/measurement/disputes/{id}/actions:
+    post:
+      summary: Thao tác hồ sơ (add_evidence | start_review | resolve | cancel)
+      description: Vai dispute_officer. Vòng đời open → under_review → resolved | cancelled; bằng chứng thêm khi còn mở.
+      operationId: actOnDispute
+      tags: [measurement]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}, {$ref: "#/components/parameters/MeasurementID"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [action], properties: {action: {type: string, enum: [add_evidence, start_review, resolve, cancel]}, evidence_refs: {type: array, items: {type: string, format: uuid}}, resolution: {type: string, enum: [customer_weight, mkg_weight, agreed_weight]}, agreed_kg: {$ref: "#/components/schemas/Kg"}, note: {type: string, minLength: 10}}}}}
+      responses:
+        "201": {description: Hồ sơ sau thao tác}
+        "409": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -551,6 +920,7 @@ components:
   parameters:
     IdempotencyKey: {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 8, maxLength: 200}}
     FacilityID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    MeasurementID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
   responses:
     Problem:
       description: Lỗi RFC 9457
@@ -573,6 +943,10 @@ components:
         state: {type: string, enum: [pending, approved, rejected]}
         decided_by: {type: [string, "null"], format: uuid}
         decided_at: {type: [string, "null"], format: date-time}
+        kind: {type: string, enum: [tolerance, loss_norm]}
+        status: {type: string, enum: [pending, approved, rejected]}
+        provisional: {type: boolean}
+        values: {type: object}
     Stocktake:
       type: object
       properties:
@@ -718,3 +1092,72 @@ components:
         payload: {type: object, description: ĐÚNG các trường của hợp đồng van}
         event_time: {type: string, format: date-time}
         recorded_at: {type: string, format: date-time}
+    Decision:
+      type: object
+      required: [decision]
+      properties:
+        decision: {type: string, enum: [approved, rejected]}
+        reason: {type: string, minLength: 10, description: Bắt buộc khi rejected}
+    ScaleDevice:
+      type: object
+      properties:
+        device_id: {type: string}
+        epoch: {type: integer}
+        facility_ref: {type: string, format: uuid}
+        point: {type: string, enum: [HUB_IN, HUB_OUT]}
+        public_key: {type: string}
+        key_id: {type: string}
+        cert_sha256: {type: string}
+        scale_model: {type: string}
+        status: {type: string, enum: [pending, active, rejected, revoked, superseded]}
+        proposed_by: {type: string, format: uuid}
+        decided_by: {type: [string, "null"], format: uuid}
+        revoked_at: {type: [string, "null"], format: date-time}
+        health: {type: object, properties: {last_seen_at: {type: [string, "null"]}, buffer_pct: {type: [string, "null"]}, clock_skew_ms: {type: [integer, "null"]}, last_counter: {type: [integer, "null"]}}}
+    WeighingSession:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        lot_ref: {type: string, format: uuid}
+        point: {type: string}
+        route: {type: string}
+        device_id: {type: string}
+        epoch: {type: integer}
+        counter_from: {type: integer}
+        counter_to: {type: [integer, "null"]}
+        status: {type: string, enum: [open, closed]}
+        moisture_pct: {type: [string, "null"]}
+        tare_kg: {type: [string, "null"]}
+    WeighTicket:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        lot_ref: {type: string, format: uuid}
+        point: {type: string, enum: [HUB_IN, HUB_OUT, CUSTOMER_IN]}
+        route: {type: string, enum: [HUB, DIRECT]}
+        source: {type: string, enum: [edge, customer_integration, manual_evidence]}
+        mass_kg: {$ref: "#/components/schemas/Kg"}
+        moisture_pct: {type: [string, "null"]}
+        moisture_state: {type: string, enum: [not_measured, as_received, after_drying]}
+        rule_version: {type: [string, "null"]}
+        window: {type: [object, "null"], description: "Thiết bị, kỳ, khoảng bộ đếm, reading_batch, readings_sha256 (R-70)"}
+        evidence_ref: {type: [string, "null"], format: uuid}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        effective: {type: boolean}
+    Reconciliation:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        lot_ref: {type: string, format: uuid}
+        route: {type: string}
+        pricing_basis: {type: string, enum: [per_tonne, per_bale]}
+        internal: {type: object, description: "status normal|abnormal|gain|not_applicable; loss_kg, loss_norm_pct, expected_loss_kg, abnormal_loss_kg"}
+        commercial: {type: object, description: "status within|flag|critical|not_applicable; diff_kg (CUSTOMER_IN − HUB_OUT), diff_pct"}
+        roll_check: {type: object, description: "status pending_rolls|within|flag|critical|informational; rolls, kg_per_roll_estimate, estimate_kg, variance_pct"}
+        yield_kg_per_roll: {type: [string, "null"]}
+        yield_aggregated: {type: boolean}
+        outcome: {type: string, enum: [within_tolerance, loss_alert, dispute_opened, direct_aggregate]}
+        tolerance_version: {type: string}
+        loss_norm_version: {type: [string, "null"]}
+        dispute_id: {type: [string, "null"], format: uuid}
+        supersedes_id: {type: [string, "null"], format: uuid}

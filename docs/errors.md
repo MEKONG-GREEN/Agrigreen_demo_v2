@@ -384,6 +384,33 @@ Nhập hàng loạt: lý do theo dòng dùng nhãn "Thiếu Email", "Sai định
 | 422 | `hub.transfer_wrong_facility` | G3: nhận ở cơ sở không phải đích của phiếu chuyển |
 | 422 | `hub.transfer_ticket_invalid` | G3: phiếu cân không phải phiếu HUB_IN (đến) của một lô nguồn thuộc phiếu chuyển, hoặc lặp |
 
+### mkg/measurement (API nội bộ MKG — `cmd/api-internal`, `contracts/openapi/mkg-internal.yaml`)
+
+| HTTP | code | Khi nào |
+|---|---|---|
+| 404 | `measurement.lot_not_found` | Lô chưa có phiếu cân (hoặc chưa được đối soát) trong tenant của token |
+| 404 | `measurement.ticket_not_found` | Không có phiếu cân |
+| 404 | `measurement.device_not_found` | Không có thiết bị cân / kỳ đăng ký |
+| 404 | `measurement.session_not_found` | Không có phiên cân |
+| 404 | `measurement.version_not_found` | Không có phiên bản dung sai / định mức hao hụt số `{seq}` |
+| 404 | `measurement.dispute_not_found` | Không có hồ sơ tranh chấp |
+| 404 | `measurement.import_not_found` | Không có lần nhập số cân của khách |
+| 403 | `self_approval_forbidden` | Người duyệt thiết bị / dung sai / định mức là người đề xuất (R-56; DB chặn lần hai bằng CHECK) |
+| 409 | `measurement.device_taken` | `device_id` đã đăng ký ở tài khoản khác (một thiết bị gắn một tenant mãi mãi) |
+| 409 | `measurement.pending_exists` | Thiết bị đang có đề xuất đăng ký chờ duyệt |
+| 409 | `measurement.not_pending` | Đề xuất không còn chờ duyệt |
+| 409 | `measurement.device_not_active` | Thiết bị / kỳ đăng ký không hiệu lực (chưa duyệt, đã thu hồi, đã có kỳ mới) |
+| 409 | `measurement.session_conflict` | Thiết bị (kỳ) đang có phiên mở, hoặc `counter_from` không lớn hơn `counter_to` của phiên đã đóng trước |
+| 409 | `measurement.session_closed` | Phiên cân đã đóng |
+| 409 | `measurement.reconciliation_incomplete` | Lô chưa đủ phiếu để đối soát (HUB: đủ ba điểm; DIRECT: CUSTOMER_IN) |
+| 409 | `measurement.dispute_transition` | Thao tác không hợp lệ ở trạng thái hồ sơ (vd kết luận khi chưa xem xét; thêm bằng chứng khi đã đóng) |
+| 409 | `measurement.no_hub_in` | Lập bằng chứng MRV khi lô chưa có phiếu HUB_IN |
+| 409 | `measurement.no_plot_sources` | Lô không có nguồn thửa (hoặc chưa nối nguồn gốc lô mkg/hub) |
+| 422 | `measurement.invalid_ticket` | Phiếu vi phạm hợp đồng TicketWriter: đã có phiếu hiệu lực ở điểm cân (cần `supersedes_id`), phiếu bù trỏ phiếu khác lô/điểm hoặc đã bị bù, HUB_IN/HUB_OUT trên lô DIRECT, tuyến khác tuyến của lô, nhập tay thiếu bằng chứng/lý do, `id` đã dùng |
+| 422 | `measurement.window_incomplete` | Cửa sổ số đo có bộ đếm thiếu (không bao giờ nội suy) |
+| 422 | `validation_failed` | Dữ liệu vào sai (khối lượng không phải chuỗi ≤ 3 chữ số, phần trăm ngoài 0..100 hoặc > 2 chữ số, khóa Ed25519 không 32 byte, `cert_sha256` không phải hex 64, lý do < 10 ký tự, ngưỡng nghiêm trọng < ngưỡng cờ, khoảng ẩm không liền nhau) |
+| 500 | `measurement.valve_denied` | Van công bố từ chối payload `mrv_collection_evidence` (hợp đồng thiếu, trường ngoài hợp đồng) — không có gì được ghi |
+
 ### mkg/measurement — ingest (`cmd/ingest`, `POST /v1/ingest/batches` qua mTLS)
 
 Agent biên nhận `200` + `{device_id, epoch, high_water_counter}` khi lô đã commit (gửi lặp cùng lô trả đúng xác nhận cũ) và chỉ xóa đệm tới `high_water_counter`. `429` và `5xx` → gửi lại sau; mọi `4xx` khác → **không** gửi lại, cách ly lô và báo động (ADR-0019).

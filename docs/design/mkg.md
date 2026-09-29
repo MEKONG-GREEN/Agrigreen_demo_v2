@@ -187,6 +187,13 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 
 ### 5.2 `mkg/measurement` — ba điểm cân, phiếu cân dẫn xuất, đối soát (mục 13) — **event sourcing mức B: sổ là nguồn**
 
+> **ĐÃ HIỆN THỰC (G3-A2, 30/09/2026)** — migration mkg 000007–000008, schema `mkg_measurement`, vai `measurement_app` / `ingest_mkg`.
+> - Sổ: `device_version` + `device_decision` (R-56 app + CHECK DB), `weighing_session` (cửa sổ bộ đếm, bì, ẩm), `weigh_ticket` (`lot:<id>`; `rule_version`, thiết bị/kỳ/khoảng bộ đếm, `batch_ids`, `readings_sha256`, bằng chứng tay; bù bằng `supersedes_id`), `lot_terms` (cách tính giá — tạm tới G4), `tolerance_version` / `loss_norm_version` + `param_decision` (có phiên bản, áp theo thời điểm cân; mặc định tạm cờ 5 % / nghiêm trọng 15 %, định mức sấy theo khoảng ẩm — **chờ khách**), `reconciliation` (`lot:<id>`, lần sau thay lần trước), `dispute_event`, `customer_weight_import` (C-5 tạm), `valve_export`.
+> - Bảng chiếu (cùng giao dịch, dựng lại qua `POST /v1/measurement/projections/rebuild`): `lot_mass_current`, `lot_yield_current`, `dispute_current`, `device_current` (kèm sức khỏe từ ingest), `weighing_session_current`, `param_current`, `lot_terms_current`.
+> - Hai bảng xuyên tenant KHÔNG RLS, chỉ ghi thêm, chỉ khóa + tenant: `device_directory` (ingest suy ra tenant từ thiết bị, R-16) và `session_directory` (vòng tích phân tìm tenant có phiên đã đóng).
+> - Cổng: `TicketWriter`, `LotMass`, `DeviceRegistry` (+ mới `DeviceHealth`, `WeighingSessions`, `RollTotals`) ở `measurement/port`; `measurement.NewIngestPorts` cho `cmd/ingest` (sổ thiết bị, `PendingSessions`, bì theo cửa sổ, sổ phiếu).
+> - RB-6: hợp đồng `per_tonne` → kiểm chéo cuộn ↔ khối lượng có cờ; `per_bale` → chỉ tham khảo. Số cuộn qua `RollTotals` (fieldops chưa nối → `pending_rolls`).
+
 | Mục | Thiết kế |
 |---|---|
 | Trách nhiệm | Nhận số đo cân thô từ agent biên (qua `cmd/ingest`), tích phân thành phiếu cân theo cửa sổ lô (R-70), ba điểm `HUB_IN`, `HUB_OUT`, `CUSTOMER_IN`; tách hao hụt dự kiến/bất thường; đối soát `HUB_OUT → CUSTOMER_IN` theo bảng dung sai có phiên bản (RB-6, C-4); hồ sơ tranh chấp |
