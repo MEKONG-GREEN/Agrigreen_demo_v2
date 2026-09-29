@@ -110,6 +110,9 @@ type Integration struct {
 	RuleVersion string
 	// Gaps: bộ đếm bị thiếu trong cửa sổ (lô mất). Có Gaps → Integrate trả ErrWindowIncomplete.
 	Gaps []int64
+	// ReadingsSHA256 (thêm ở G3-A2, tùy chọn): SHA-256 hex thường của các số đo đã
+	// dùng theo dạng chuẩn của thuật toán — ghim vào phiếu để tích phân lại kiểm được.
+	ReadingsSHA256 string
 }
 
 // Integrator tích phân luồng số đo thô thành khối lượng (R-70). CHỈ ingest gọi
@@ -136,6 +139,13 @@ type TicketDraft struct {
 	MassKg  mass.Kg // ≥ 0
 	// MoisturePct: độ ẩm tại cân dạng decimal chuỗi "12.50" (numeric(5,2)); rỗng = không đo. Trạng thái ẩm khi cân chờ C-4.
 	MoisturePct string
+	// MoistureState (thêm ở G3-A2, tùy chọn — C-4 tạm): MoistureNotMeasured |
+	// MoistureAsReceived | MoistureAfterDrying. Rỗng → suy ra từ MoisturePct.
+	MoistureState string
+	// SessionRef (thêm ở G3-A2, tùy chọn): phiên cân (weighing_session) mà cửa sổ thuộc về.
+	SessionRef *uuid.UUID
+	// Reason (thêm ở G3-A2): lý do nhập tay — bắt buộc (≥ 10 ký tự) khi Source = SourceManualEvidence.
+	Reason string
 	// EventTime: lúc cân tại hiện trường (R-13) — với SourceEdge là received_at của lô cuối cửa sổ.
 	EventTime time.Time
 	// Integration: bắt buộc khi Source = SourceEdge (R-70), nil với nguồn khác.
