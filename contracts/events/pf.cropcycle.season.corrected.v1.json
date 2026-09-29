@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.cropcycle.season.corrected/v1",
+  "title": "pf.cropcycle.season.corrected — payload",
+  "description": "Bản ghi bù của vụ: sửa (action = corrected) hoặc hủy vụ mở nhầm (action = cancelled). Thay sự kiện hiện hành supersedes_id.",
+  "x-event-type": "pf.cropcycle.season.corrected",
+  "x-schema-version": 1,
+  "x-producer": "pf/cropcycle",
+  "type": "object",
+  "required": [
+    "season_ref",
+    "event_id",
+    "action",
+    "status",
+    "plot_ref",
+    "household_ref",
+    "cooperative_ref",
+    "commune_code",
+    "season_code",
+    "season_year",
+    "variety_code",
+    "sop_version_id",
+    "sowing_date",
+    "expected_harvest_date",
+    "supersedes_id",
+    "correction_reason",
+    "actor_ref",
+    "event_time"
+  ],
+  "properties": {
+    "season_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "corrected",
+        "cancelled"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "completed",
+        "cancelled"
+      ]
+    },
+    "plot_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "household_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "cooperative_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "commune_code": {
+      "type": "string"
+    },
+    "season_code": {
+      "type": "string"
+    },
+    "season_year": {
+      "type": "integer"
+    },
+    "variety_code": {
+      "type": "string"
+    },
+    "sop_version_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "sowing_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "expected_harvest_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "supersedes_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "correction_reason": {
+      "type": "string",
+      "minLength": 10
+    },
+    "actor_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

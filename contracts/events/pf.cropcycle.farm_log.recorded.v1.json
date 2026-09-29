@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.cropcycle.farm_log.recorded/v1",
+  "title": "pf.cropcycle.farm_log.recorded — payload",
+  "description": "Một phiên bản nhật ký canh tác đã ghi (mới hoặc bản ghi bù). Không mang toạ độ, ghi chú, vật tư — consumer đọc qua API. became_current = false: bản ghi bù ngoại tuyến trên phiên bản cũ (xung đột).",
+  "x-event-type": "pf.cropcycle.farm_log.recorded",
+  "x-schema-version": 1,
+  "x-producer": "pf/cropcycle",
+  "type": "object",
+  "required": [
+    "log_id",
+    "log_ref",
+    "version",
+    "season_ref",
+    "plot_ref",
+    "household_ref",
+    "cooperative_ref",
+    "commune_code",
+    "activity_code",
+    "sop_step_seq",
+    "location_status",
+    "gps_source",
+    "batch_ref",
+    "became_current",
+    "supersedes_id",
+    "on_behalf",
+    "author_ref",
+    "event_time"
+  ],
+  "properties": {
+    "log_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "log_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "version": {
+      "type": "integer"
+    },
+    "season_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "plot_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "household_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "cooperative_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "commune_code": {
+      "type": "string"
+    },
+    "activity_code": {
+      "type": "string",
+      "enum": [
+        "lam_dat",
+        "gieo_sa",
+        "tuoi_nuoc",
+        "bon_phan",
+        "phun_thuoc",
+        "kiem_tra",
+        "thu_hoach"
+      ]
+    },
+    "sop_step_seq": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "location_status": {
+      "type": "string",
+      "enum": [
+        "match",
+        "mismatch",
+        "missing"
+      ]
+    },
+    "gps_source": {
+      "type": "string",
+      "enum": [
+        "device",
+        "photo_exif",
+        "manual_pick",
+        "denied",
+        "no_device"
+      ]
+    },
+    "batch_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "became_current": {
+      "type": "boolean"
+    },
+    "supersedes_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "on_behalf": {
+      "type": "boolean"
+    },
+    "author_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

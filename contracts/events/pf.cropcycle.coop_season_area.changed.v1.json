@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.cropcycle.coop_season_area.changed/v1",
+  "title": "pf.cropcycle.coop_season_area.changed — payload",
+  "description": "Tổng diện tích vụ (đang mở + đã hoàn thành) của HTX theo vụ/năm sau thay đổi. pf/mechanization áp qua AreaFeed.ApplySyncedArea (CGH FN-07), dùng event_id làm khóa chống trùng.",
+  "x-event-type": "pf.cropcycle.coop_season_area.changed",
+  "x-schema-version": 1,
+  "x-producer": "pf/cropcycle",
+  "type": "object",
+  "required": [
+    "cooperative_ref",
+    "season_code",
+    "season_year",
+    "area_ha",
+    "seasons",
+    "open_seasons",
+    "completed_seasons",
+    "source_at"
+  ],
+  "properties": {
+    "cooperative_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "season_code": {
+      "type": "string"
+    },
+    "season_year": {
+      "type": "integer"
+    },
+    "area_ha": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]{4}$",
+      "description": "decimal dạng chuỗi (ha)"
+    },
+    "seasons": {
+      "type": "integer"
+    },
+    "open_seasons": {
+      "type": "integer"
+    },
+    "completed_seasons": {
+      "type": "integer"
+    },
+    "source_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

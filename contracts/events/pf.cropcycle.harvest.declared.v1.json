@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.cropcycle.harvest.declared/v1",
+  "title": "pf.cropcycle.harvest.declared — payload",
+  "description": "Khai báo sản lượng (mới hoặc bản ghi bù thay supersedes_id). Khối lượng kg (shared/mass), năng suất t/ha tính từ diện tích ảnh chụp.",
+  "x-event-type": "pf.cropcycle.harvest.declared",
+  "x-schema-version": 1,
+  "x-producer": "pf/cropcycle",
+  "type": "object",
+  "required": [
+    "harvest_id",
+    "season_ref",
+    "plot_ref",
+    "household_ref",
+    "cooperative_ref",
+    "commune_code",
+    "season_code",
+    "season_year",
+    "variety_code",
+    "harvest_date",
+    "mass_kg",
+    "area_ha",
+    "yield_t_per_ha",
+    "anomaly_kind",
+    "anomaly_confirmed",
+    "source",
+    "supersedes_id",
+    "actor_ref",
+    "event_time"
+  ],
+  "properties": {
+    "harvest_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "season_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "plot_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "household_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "cooperative_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "commune_code": {
+      "type": "string"
+    },
+    "season_code": {
+      "type": "string"
+    },
+    "season_year": {
+      "type": "integer"
+    },
+    "variety_code": {
+      "type": "string"
+    },
+    "harvest_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "mass_kg": {
+      "type": "string",
+      "pattern": "^-?[0-9]+\\.[0-9]{3}$",
+      "description": "kg, shared/mass"
+    },
+    "area_ha": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]{4}$",
+      "description": "decimal dạng chuỗi (ha)"
+    },
+    "yield_t_per_ha": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]{4}$",
+      "description": "t/ha decimal"
+    },
+    "anomaly_kind": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "zero",
+        "above_threshold",
+        null
+      ]
+    },
+    "anomaly_confirmed": {
+      "type": "boolean"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "app",
+        "web",
+        "excel",
+        "sync"
+      ]
+    },
+    "supersedes_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "actor_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

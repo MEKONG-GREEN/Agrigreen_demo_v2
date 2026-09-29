@@ -4,11 +4,13 @@ import (
 	"context"
 	"os"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
@@ -59,11 +61,12 @@ type Modules struct {
 	Reports       *reports.Module
 	Waterway      *waterway.Module
 	Simulation    *simulation.Module
+	CropCycle     *cropcycle.Module
 }
 
 // List trả module theo thứ tự gắn route.
 func (m Modules) List() []httpx.Module {
-	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.Waterway, m.Simulation}
+	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.Waterway, m.Simulation, m.CropCycle}
 }
 
 // Build là gốc lắp ráp DUY NHẤT: mở pool theo vai của từng module (R-05) và nối
@@ -133,6 +136,14 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	}
 	mrvMod := mrv.New(mrvPool, clk, mrv.Deps{Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Store: store})
 
+	// pf/cropcycle (App HTX): SOP, vụ, nhật ký, sản lượng. Liên kết tài khoản nông dân ↔ nông hộ
+	// (port.FarmerHouseholds) nối sau khi dựng pf/accounts (bên dưới).
+	ccPool, err := pool(cropcycle.DBRole)
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	cc := cropcycle.New(ccPool, clk, cropcycle.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Plots: g.Plots(), Params: md.Params(), Catalogs: md.Catalogs()})
+
 	syncPool, err := pool(syncmod.DBRole)
 	if err != nil {
 		return Modules{}, pools, err
@@ -151,8 +162,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	snc := syncmod.New(syncPool, clk, syncmod.Deps{
 		Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Params: md.Params(), Vault: ext.Vault,
 		Store: store, CursorKey: cursorKey(ext),
-		Sources: []syncport.Source{md.SyncSource(), g.SyncSource(), cnt.SyncSource(), kn.SyncSource(), nt.SyncSource(), mrvMod.SyncSource()},
-		Sinks:   []syncport.Sink{g.SyncSink(), kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink()},
+		Sources: []syncport.Source{md.SyncSource(), g.SyncSource(), cnt.SyncSource(), kn.SyncSource(), nt.SyncSource(), mrvMod.SyncSource(), cc.SyncSource()},
+		Sinks:   []syncport.Sink{g.SyncSink(), kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink(), cc.SyncSink()},
 	})
 	nt.UseSyncEntities(snc.PullEntities()) // KN US-SYNC-02: kiểm entities[] của nudge
 
@@ -171,7 +182,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if c := acc.StaffContacts(); c != nil {
 		kn.UseContacts(c) // US-DIR-02: số điện thoại cán bộ đọc từ Keycloak lúc bấm liên hệ
 	}
-	kn.UseFarmers(acc.FarmerHouseholds()) // HTX US-SUPPORT-01: nông hộ của tài khoản nông dân
+	kn.UseFarmers(acc.FarmerHouseholds())                            // HTX US-SUPPORT-01: nông hộ của tài khoản nông dân
+	cc.UseFarmerHouseholds(farmerHouseholds{acc.FarmerHouseholds()}) // HTX US-SEASON-01: thửa của nông hộ mình
 
 	// pf/reports: API tạo việc xuất và cấp URL tải; worker dựng tệp (cmd/worker). Địa chỉ email tra qua pf/accounts (MailDirectory).
 	repPool, err := pool(reports.DBRole)
@@ -198,7 +210,23 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	sim := simulation.New(simPool, clk, simulation.Deps{Params: simulation.MasterdataParams(md.Params())})
 
 	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
-		Reports: rep, Waterway: ww, Simulation: sim}, pools, nil
+		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc}, pools, nil
+}
+
+// farmerHouseholds chuyển port pf/accounts (liên kết tài khoản nông dân ↔ nông hộ)
+// sang port của pf/cropcycle.
+type farmerHouseholds struct{ src accport.FarmerHouseholds }
+
+func (f farmerHouseholds) HouseholdsOf(ctx context.Context, actorRef uuid.UUID) ([]uuid.UUID, error) {
+	links, err := f.src.HouseholdsForSubject(ctx, actorRef)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]uuid.UUID, 0, len(links))
+	for _, l := range links {
+		out = append(out, l.HouseholdRef)
+	}
+	return out, nil
 }
 
 func cursorKey(ext External) []byte {

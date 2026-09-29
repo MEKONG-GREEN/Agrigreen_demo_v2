@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.cropcycle.season.opened/v1",
+  "title": "pf.cropcycle.season.opened — payload",
+  "description": "Vụ mới được mở cho một thửa (HTX US-SEASON-01/02). Ảnh chụp thửa, HTX, xã, diện tích và phiên bản SOP đã ghim. Không có dữ liệu cá nhân.",
+  "x-event-type": "pf.cropcycle.season.opened",
+  "x-schema-version": 1,
+  "x-producer": "pf/cropcycle",
+  "type": "object",
+  "required": [
+    "season_ref",
+    "event_id",
+    "plot_ref",
+    "plot_code",
+    "household_ref",
+    "cooperative_ref",
+    "commune_code",
+    "season_code",
+    "season_year",
+    "variety_code",
+    "sop_version_id",
+    "sowing_date",
+    "expected_harvest_date",
+    "area_ha",
+    "location_status",
+    "on_behalf",
+    "actor_ref",
+    "event_time"
+  ],
+  "properties": {
+    "season_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "plot_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "plot_code": {
+      "type": "string"
+    },
+    "household_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "cooperative_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "commune_code": {
+      "type": "string"
+    },
+    "season_code": {
+      "type": "string"
+    },
+    "season_year": {
+      "type": "integer"
+    },
+    "variety_code": {
+      "type": "string"
+    },
+    "sop_version_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "sowing_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "expected_harvest_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "area_ha": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]{4}$",
+      "description": "decimal dạng chuỗi (ha)"
+    },
+    "location_status": {
+      "type": "string",
+      "enum": [
+        "match",
+        "mismatch",
+        "missing"
+      ]
+    },
+    "on_behalf": {
+      "type": "boolean"
+    },
+    "actor_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

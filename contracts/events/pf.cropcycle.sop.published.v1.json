@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.cropcycle.sop.published/v1",
+  "title": "pf.cropcycle.sop.published — payload",
+  "description": "Một phiên bản quy trình SOP đã được phát hành (param_approver khác người soạn, R-56). Phiên bản đã phát hành bất biến; pf/sync đưa xuống thiết bị (entity sop_version).",
+  "x-event-type": "pf.cropcycle.sop.published",
+  "x-schema-version": 1,
+  "x-producer": "pf/cropcycle",
+  "type": "object",
+  "required": [
+    "template_ref",
+    "code",
+    "name",
+    "scope",
+    "cooperative_ref",
+    "version_id",
+    "version_no",
+    "step_count",
+    "harvest_day_offset",
+    "harvest_window_days",
+    "authored_by",
+    "published_by",
+    "published_at"
+  ],
+  "properties": {
+    "template_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "code": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "system",
+        "htx"
+      ]
+    },
+    "cooperative_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "version_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "version_no": {
+      "type": "integer"
+    },
+    "step_count": {
+      "type": "integer"
+    },
+    "harvest_day_offset": {
+      "type": "integer"
+    },
+    "harvest_window_days": {
+      "type": "integer"
+    },
+    "authored_by": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "published_by": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

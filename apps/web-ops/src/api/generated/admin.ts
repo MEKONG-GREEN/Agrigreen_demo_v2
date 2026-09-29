@@ -2023,6 +2023,177 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cropcycle/sops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mọi mẫu SOP, kể cả nháp (sop_admin, param_approver, platform_admin) */
+        get: operations["adminListCropSOPs"];
+        put?: never;
+        /** Tạo mẫu SOP với bản nháp phiên bản 1 (sop_admin) */
+        post: operations["createCropSOP"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/sops/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mẫu SOP kèm mọi phiên bản */
+        get: operations["adminGetCropSOP"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/sops/{ref}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tạo bản nháp phiên bản mới (steps bỏ trống = chép phiên bản mới nhất) */
+        post: operations["newCropSOPVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/sops/{ref}/clone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Nhân bản mẫu SOP giữ nguyên bước và thứ tự (HTX US-CAT-03) */
+        post: operations["cloneCropSOP"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/sops/{ref}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ngừng dùng mẫu (không xóa; vụ đã ghim giữ phiên bản) */
+        post: operations["retireCropSOP"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/sop-versions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một phiên bản SOP (kể cả nháp) */
+        get: operations["adminGetCropSOPVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/sop-versions/{id}/steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thay bước của bản nháp (bản đã phát hành bất biến → 409 cropcycle.sop_state) */
+        post: operations["updateCropSOPDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/sop-versions/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Phát hành bản nháp — param_approver khác người soạn (R-56); phải có bước thu hoạch */
+        post: operations["publishCropSOP"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/variety-bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gắn giống lúa với mẫu SOP hệ thống đã ban hành (thay gắn cũ, không xóa) */
+        post: operations["bindCropVariety"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/projections/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dựng lại bảng chiếu season_current, farm_log_current, coop_season_area, yield_summary từ sổ (R-22, platform_admin) */
+        post: operations["rebuildCropProjections"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3144,6 +3315,82 @@ export interface components {
             gap_m: string | null;
             auto_fixed: boolean;
             message: string;
+        };
+        CropSOPStep: {
+            /** @description Liên tục 1..n (HTX US-CAT-01 AC-6) */
+            seq: number;
+            name: string;
+            stage_code?: string;
+            /** @enum {string} */
+            activity_code: "lam_dat" | "gieo_sa" | "tuoi_nuoc" | "bon_phan" | "phun_thuoc" | "kiem_tra" | "thu_hoach";
+            /** @description Ngày so với ngày gieo sạ */
+            day_offset: number;
+            window_days: number;
+            mandatory: boolean;
+            evidence_kinds?: ("anh_hien_truong" | "hoa_don_vat_tu" | "phieu_kiem_nghiem" | "ghi_chu" | "khac")[];
+            /** @description Thời gian cách ly sau phun thuốc */
+            phi_days?: number;
+            instruction?: string;
+        };
+        CropSOPTemplate: {
+            /** Format: uuid */
+            ref: string;
+            code: string;
+            name: string;
+            crop: string;
+            /** @enum {string} */
+            scope: "system" | "htx";
+            /** Format: uuid */
+            cooperative_ref?: string | null;
+            standard?: string | null;
+            description?: string | null;
+            /** @enum {string} */
+            status: "draft" | "published" | "retired";
+            status_reason?: string | null;
+            /** Format: uuid */
+            source_template_ref?: string | null;
+            latest_version: number;
+            published_version?: number | null;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        CropSOPVersion: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            template_ref: string;
+            version_no: number;
+            /** @enum {string} */
+            status: "draft" | "published";
+            steps: components["schemas"]["CropSOPStep"][];
+            harvest_day_offset?: number | null;
+            harvest_window_days?: number | null;
+            /** Format: uuid */
+            source_version_ref?: string | null;
+            change_note?: string | null;
+            /** Format: uuid */
+            authored_by?: string;
+            /** Format: date-time */
+            authored_at?: string;
+            /** Format: uuid */
+            published_by?: string | null;
+            /** Format: date-time */
+            published_at?: string | null;
+        };
+        CropSOP: components["schemas"]["CropSOPTemplate"] & {
+            versions: components["schemas"]["CropSOPVersion"][];
+        };
+        CropVarietyBinding: {
+            variety_code: string;
+            /** Format: uuid */
+            template_ref: string;
+            note?: string | null;
+            /** Format: uuid */
+            bound_by: string;
+            /** Format: date-time */
+            bound_at: string;
         };
         ParamValue: {
             key: string;
@@ -7026,6 +7273,347 @@ export interface operations {
                 };
             };
             404: components["responses"]["Problem"];
+        };
+    };
+    adminListCropSOPs: {
+        parameters: {
+            query?: {
+                status?: "draft" | "published" | "retired";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CropSOPTemplate"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    createCropSOP: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                    /** @description Duy nhất (không phân biệt hoa thường, khoảng trắng) */
+                    name: string;
+                    /** @default lua */
+                    crop?: string;
+                    /**
+                     * @default system
+                     * @enum {string}
+                     */
+                    scope?: "system" | "htx";
+                    /** Format: uuid */
+                    cooperative_ref?: string | null;
+                    standard?: string;
+                    description?: string;
+                    steps: components["schemas"]["CropSOPStep"][];
+                    change_note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropSOP"];
+                };
+            };
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    adminGetCropSOP: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mẫu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropSOP"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    newCropSOPVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    steps?: components["schemas"]["CropSOPStep"][] | null;
+                    change_note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropSOP"];
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    cloneCropSOP: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    /** @description Bỏ trống → tự sinh */
+                    code?: string;
+                    /** @enum {string} */
+                    scope?: "system" | "htx";
+                    /** Format: uuid */
+                    cooperative_ref?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Bản sao (nháp) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropSOP"];
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    retireCropSOP: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ngừng dùng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropSOP"];
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    adminGetCropSOPVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        version: components["schemas"]["CropSOPVersion"];
+                        template: components["schemas"]["CropSOPTemplate"];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    updateCropSOPDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    steps: components["schemas"]["CropSOPStep"][];
+                    change_note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã sửa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropSOP"];
+                };
+            };
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    publishCropSOP: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã phát hành (phát pf.cropcycle.sop.published) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropSOP"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    bindCropVariety: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    variety_code: string;
+                    /** Format: uuid */
+                    template_ref: string;
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Gắn hiện hành */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CropVarietyBinding"];
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
+    rebuildCropProjections: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số dòng đã dựng lại */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        seasons: number;
+                        farm_logs: number;
+                        coop_season_areas: number;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
         };
     };
 }
