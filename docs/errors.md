@@ -361,6 +361,29 @@ Nhập hàng loạt: lý do theo dòng dùng nhãn "Thiếu Email", "Sai định
 | 422 | `hub.boundary_invalid` | Ranh giới không phải Polygon/MultiPolygon WGS84 hợp lệ |
 | 500 | `hub.valve_denied` | Van công bố từ chối payload (hợp đồng thiếu/chưa duyệt, trường ngoài hợp đồng) — lỗi lập trình, không có gì được ghi |
 
+### mkg/measurement — ingest (`cmd/ingest`, `POST /v1/ingest/batches` qua mTLS)
+
+Agent biên nhận `200` + `{device_id, epoch, high_water_counter}` khi lô đã commit (gửi lặp cùng lô trả đúng xác nhận cũ) và chỉ xóa đệm tới `high_water_counter`. `429` và `5xx` → gửi lại sau; mọi `4xx` khác → **không** gửi lại, cách ly lô và báo động (ADR-0019).
+
+| HTTP | code | Khi nào |
+|---|---|---|
+| 400 | `edge.decode` | Thân không phải lô `agrigreen.edge.batch.v1`: JSON hỏng, khóa lạ, thiếu khóa (kể cả `ntp_offset_ms`), dữ liệu thừa |
+| 422 | `edge.format` · `edge.device_id` · `edge.epoch` · `edge.counter_range` · `edge.ntp_offset` · `edge.reading` | Lô sai ràng buộc hợp đồng (`edgewire.Validate`; mã như `contracts/edge/batch.v1.vectors.json`) |
+| 422 | `edge.key_id` | `key_id` của lô không khớp khóa nguồn đã duyệt của kỳ `(device_id, epoch)` |
+| 422 | `edge.signature` | Chữ ký Ed25519 sai dạng hoặc không hợp lệ với khóa đã duyệt |
+| 401 | `ingest.client_cert_required` | Không có chứng thư mTLS client (listener đã chặn ở bắt tay; mã này là lớp phòng thủ thứ hai) |
+| 403 | `ingest.device_mismatch` | `device_id` của lô không trùng CN/SAN của chứng thư client (R-16) |
+| 403 | `ingest.unknown_device` | `(device_id, epoch)` chưa đăng ký hoặc chưa được duyệt trong sổ thiết bị |
+| 403 | `ingest.cert_mismatch` | Chứng thư client hợp lệ với CA nhưng không phải chứng thư đã duyệt của kỳ (SHA-256 DER khác) |
+| 403 | `ingest.device_revoked` | Thiết bị đã bị thu hồi — lô đã nhận trước đó giữ nguyên (RB-1) |
+| 409 | `ingest.epoch_superseded` | Kỳ đăng ký đã được thay; bộ đếm của kỳ cũ không bao giờ nhận thêm — đăng ký kỳ mới |
+| 409 | `ingest.batch_conflict` | Đã có lô cùng `(device_id, epoch, counter_from)` nhưng khác `payload_sha256`/`counter_to` — báo động (thiết bị hỏng hoặc bị giả), không ghi gì |
+| 409 | `ingest.counter_regression` | Lô chồng lấn hoặc lùi bộ đếm so với lô cuối đã nhận của `(device_id, epoch)`. Khoảng trống thì được nhận và giám sát báo mất lô |
+| 413 | `payload_too_large` | Thân vượt `edgewire.MaxBodyBytes` (1 MiB) |
+| 429 | `ingest.rate_limited` | Vượt tốc độ theo thiết bị (`AG_INGEST_RATE_PER_MIN`, `AG_INGEST_RATE_BURST`); có `Retry-After` |
+
+Mã của vòng tích phân (không trả qua HTTP; nhãn `code` của metric `ag.ingest.integrations` và log `event=ingest.integrate`): `ingest.window_incomplete` (cửa sổ thiếu bộ đếm — thử lại, báo động sau `AG_INGEST_STUCK_AFTER`), `ingest.no_stable_readings`, `ingest.non_positive_net` (tổng ≤ bì), `ingest.window_too_large`, `ingest.window_corrupt`, `measurement.invalid_ticket` (TicketWriter từ chối).
+
 ### pf/waterway
 
 Mạng đường thủy có phiên bản (mục 16; GIS FN-09, US-WATER-01/02/03). Vẽ/sửa, dựng, phát hành ở Admin API (MFA); tra lớp và định tuyến ở Application API.
