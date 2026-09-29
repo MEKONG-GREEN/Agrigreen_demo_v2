@@ -61,7 +61,8 @@ x-s3-env: &s3-env
 services:
   # ---------------------------------------------------------------- hạ tầng
   postgres:
-    image: postgis/postgis:17-3.5
+    image: agrigreen/postgres:dev   # postgis/postgis:17-3.5 + pgRouting (deploy/compose/postgres)
+    build: { context: ./postgres, dockerfile: Dockerfile }
     environment:
       POSTGRES_PASSWORD: ${PG_SUPERUSER_PASSWORD:?chạy scripts/gen-dev-secrets để sinh deploy/compose/.env}
     command: ["postgres", "-c", "max_connections=300", "-c", "wal_level=logical", "-c", "shared_preload_libraries=pg_stat_statements"]

@@ -52,6 +52,16 @@ Mã đã có đủ các phần của kế hoạch S1–S5, sớm hơn mốc 15/1
 - `pf/waterway` (pgRouting, có phiên bản), `pf/simulation`, `optimizer/`.
 - Thiết kế chi tiết `mkg/*` và các hợp đồng van công bố đầu tiên.
 
+Quy ước và quyết định đã chốt: [docs/dev/g2-conventions.md](dev/g2-conventions.md). Phạm vi từ backlog: App HTX 48 story (13 đã có ở G1, 17 một phần, 18 mới), GIS 38 story.
+
+| Đợt | Nội dung |
+|---|---|
+| Hạ tầng (29/09) | pgRouting ở cụm pf (image `deploy/compose/postgres`), vai `cropcycle_app`, `waterway_app`, `simulation_app`, `hub_app`, cấp số migration |
+| Đợt 1 — backend và lõi | `platform/cropcycle` (SOP, vụ, nhật ký, duyệt, thu hoạch, dashboard) · `pf/geo` G2 (ranh giới HTX, kho/cơ sở, đường bộ, log GPS) · `pf/waterway` · `pf/simulation` + `optimizer/` (Python) · thiết kế mkg + `mkg/hub` + van `hub_facility`/`hub_capacity` + siết contractcheck · tài khoản nông dân (SĐT, QR kích hoạt) + yêu cầu hỗ trợ → nhiệm vụ tự động + đồng bộ theo nhóm dữ liệu · tách `packages/agrigreen_mobile` từ field-app |
+| Đợt 2 — client và liên thông | `apps/htx-app` (Flutter, ngoại tuyến) · web-ops: màn HTX (vụ, duyệt, sản lượng, dashboard, SOP), lớp GIS, waterway, mô phỏng · nối sự kiện (CGH FN-07, cảnh báo tới nông dân, van → mô hình đọc hub) · UAT G2 |
+
+**Chờ khách** (không chặn đợt 1): nhà cung cấp thời tiết/độ mặn và tile vệ tinh trong lãnh thổ (RB-7), nguồn dữ liệu thủy hệ (VIWA) và bản đồ địa chính (VN-2000), ngưỡng k của bộ lọc dữ liệu công khai (C-3), chọn hub là tối ưu (MILP) hay đánh giá kịch bản, bộ 57 tham số mô phỏng.
+
 ## G3–G6
 Theo Phụ lục A của tài liệu kiến trúc:
 - **G3 (Q3/2027):** metrics, MRV, measurement, edge-agent. Mẫu cân C-6 phải chốt trước Q1/2027.

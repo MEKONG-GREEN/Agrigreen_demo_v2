@@ -61,7 +61,12 @@ var Roles = []Role{
 	{Name: "accounts_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
 	{Name: "notify_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
 	{Name: "reports_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
+	// G2 (docs/dev/g2-conventions.md).
+	{Name: "cropcycle_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
+	{Name: "waterway_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
+	{Name: "simulation_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
 	{Name: "fieldops_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
+	{Name: "hub_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
 	{Name: "vault_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.Vault}},
 }
 
@@ -143,7 +148,7 @@ func Bootstrap(ctx context.Context, adminURL, dbSuffix string) error {
 // tạo ở Bootstrap vì ag_migrator không phải superuser. Migration chỉ giả định
 // chúng đã có (CREATE EXTENSION IF NOT EXISTS trong migration là no-op).
 var Extensions = map[migrations.Cluster][]string{
-	migrations.PF:  {"postgis"},
+	migrations.PF:  {"postgis", "pgrouting"}, // pgrouting: pf/waterway (G2)
 	migrations.MKG: {"postgis"},
 }
 
