@@ -71,8 +71,15 @@ var ErrSelfApproval = errors.New("authz: tự phê duyệt")
 // EnsureDistinctApprover chặn một người phê duyệt thay đổi do chính mình đặt
 // (R-56). Gọi ở app/, không ở UI.
 func EnsureDistinctApprover(setter uuid.UUID, approver Principal) error {
-	if !approver.Has(RoleParamApprover) {
-		return problem.Forbidden.WithDetail("cần vai " + RoleParamApprover)
+	return EnsureDistinctApproverFor(setter, approver, RoleParamApprover)
+}
+
+// EnsureDistinctApproverFor là EnsureDistinctApprover với vai phê duyệt riêng của
+// module (vd waterway_publisher phát hành phiên bản mạng — người phát hành không
+// được là người dựng). Gọi ở app/, không ở UI.
+func EnsureDistinctApproverFor(setter uuid.UUID, approver Principal, role string) error {
+	if !approver.Has(role) {
+		return problem.Forbidden.WithDetail("cần vai " + role)
 	}
 	if setter == approver.ActorRef {
 		return problem.SelfApproval.WithCause(ErrSelfApproval)

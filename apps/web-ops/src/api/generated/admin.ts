@@ -1513,6 +1513,215 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/waterway/segments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bản hiện hành của các đoạn (kể cả nháp) — vai waterway_editor, waterway_publisher hoặc platform_admin */
+        get: operations["listWaterwaySegments"];
+        put?: never;
+        /**
+         * Vẽ mới tuyến sông/kênh (kể cả nhánh rẽ) — GIS US-WATER-02, BR-39
+         * @description Vai waterway_editor. Chiều dài do hệ thống tính (geodesic) — `length_m` gửi lên bị bỏ qua (AC-1).
+         *     Thiếu tên/phân loại hoặc số đo ≤ 0/sai định dạng → 422 với thông báo AC-2. Tuyến `draft` không bao giờ vào đồ thị.
+         */
+        post: operations["createWaterwaySegment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/waterway/segments/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một đoạn — bản hiện hành và toàn bộ lịch sử sửa */
+        get: operations["getWaterwaySegment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/waterway/segments/{ref}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sửa tuyến (kéo/thêm/xóa điểm, thuộc tính, xác nhận, ngừng dùng) — GIS US-WATER-03, BR-40
+         * @description Bản ghi bù (RB-1): thay toàn bộ nội dung, trỏ về bản trước, bắt buộc `reason` và `expected_revision` = số sửa hiện hành
+         *     (khác → 409 waterway.revision_conflict). Thay đổi vào lớp bản đồ dùng chung sau khi dựng và phát hành phiên bản mạng mới.
+         */
+        post: operations["reviseWaterwaySegment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/waterway/structures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bản hiện hành của công trình, lọc theo đoạn */
+        get: operations["listWaterwayStructures"];
+        put?: never;
+        /**
+         * Ghi công trình vượt sông (cầu, cống, âu thuyền, đường dây điện) gắn với một đoạn
+         * @description Vai waterway_editor. Vị trí phải cách tuyến ≤ waterway.structure_max_offset_m (mặc định 500 m).
+         */
+        post: operations["createWaterwayStructure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/waterway/structures/{ref}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa công trình (bản ghi bù; ngừng dùng = status retired) */
+        post: operations["reviseWaterwayStructure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/waterway/networks/builds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Yêu cầu dựng phiên bản mạng (R-52 — 202 + job, worker dựng)
+         * @description Vai waterway_editor. Tham số dựng (snap 25 m, nối tự động 150 m, báo cáo 1 km, nối chữ T 20 m, biên an toàn,
+         *     lớp phương tiện) chốt lúc yêu cầu; worker dựng từ các đoạn ĐÃ XÁC NHẬN tại `requested_at` — tất định.
+         *     Tập đoạn trùng một phiên bản built/published → job hoàn tất với `reused = true`, không tạo phiên bản mới.
+         */
+        post: operations["requestWaterwayBuild"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/waterway/networks/builds/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái job dựng */
+        get: operations["getWaterwayBuild"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/waterway/networks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiên bản mạng, mới → cũ */
+        get: operations["listWaterwayNetworks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/waterway/networks/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một phiên bản mạng */
+        get: operations["getWaterwayNetwork"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/waterway/networks/{version}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Phát hành phiên bản mạng — vai waterway_publisher, KHÁC người dựng (R-56)
+         * @description Phiên bản đang phát hành chuyển sang `superseded` (giữ nguyên, vẫn định tuyến được khi ghim `version`);
+         *     chỉ một phiên bản có hiệu lực. Phát sự kiện pf.waterway.network.published.
+         */
+        post: operations["publishWaterwayNetwork"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/waterway/networks/{version}/findings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phát hiện khi dựng (giao cắt, nối chữ T, khe hở đã nối/chỉ báo cáo, đầu treo, tuyến cô lập) */
+        get: operations["listWaterwayFindings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2329,6 +2538,223 @@ export interface components {
             account: components["schemas"]["AccountsAccount"];
             /** @description vd required actions, prev_org_ref, source_event_id — không PII */
             details?: Record<string, never>;
+        };
+        /** @description GeoJSON LineString WGS84 [kinh độ, vĩ độ], ≥ 2 đỉnh phân biệt */
+        WaterwayLineString: {
+            /** @enum {string} */
+            type: "LineString";
+            coordinates: number[][];
+        };
+        WaterwayLocation: {
+            lat: number;
+            lng: number;
+        };
+        /** @description Số thập phân > 0 (chuỗi hoặc số); null = chưa khai báo */
+        WaterwayMeasure: string | number | null;
+        WaterwaySegmentInput: {
+            name: string;
+            /**
+             * @description GIS BR-35 + sông
+             * @enum {string}
+             */
+            waterway_class: "kenh_chinh" | "noi_dong" | "muong" | "song";
+            /**
+             * @default draft
+             * @enum {string}
+             */
+            status: "draft" | "confirmed" | "retired";
+            geometry: components["schemas"]["WaterwayLineString"];
+            width_m?: components["schemas"]["WaterwayMeasure"];
+            depth_m?: components["schemas"]["WaterwayMeasure"];
+            max_load_tons?: components["schemas"]["WaterwayMeasure"];
+            /**
+             * @default digitised
+             * @enum {string}
+             */
+            data_source: "digitised" | "official" | "survey" | "osm";
+            note?: string | null;
+            /** Format: date-time */
+            event_time?: string;
+        };
+        WaterwayRevision: {
+            /** @description Số sửa hiện hành mà bản sửa dựa vào */
+            expected_revision: number;
+            reason: string;
+        };
+        WaterwaySegment: {
+            /** Format: uuid */
+            segment_ref: string;
+            /**
+             * Format: uuid
+             * @description id của bản sửa
+             */
+            id: string;
+            revision: number;
+            name: string;
+            /** @enum {string} */
+            waterway_class: "kenh_chinh" | "noi_dong" | "muong" | "song";
+            /** @enum {string} */
+            status: "draft" | "confirmed" | "retired";
+            geometry: components["schemas"]["WaterwayLineString"];
+            /** @description Geodesic, CSDL tính (US-WATER-02 AC-1) */
+            length_m: string;
+            width_m: string | null;
+            /** @description Độ sâu khống chế mùa khô */
+            depth_m: string | null;
+            /** @description Tải trọng khai báo */
+            max_load_tons: string | null;
+            data_source: string;
+            note: string | null;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            supersedes_id: string | null;
+            correction_reason: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+            seq: number;
+        };
+        WaterwayStructureInput: {
+            /** @enum {string} */
+            kind: "cau" | "cong" | "au_thuyen" | "duong_day_dien";
+            name: string;
+            /**
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "retired";
+            /** Format: uuid */
+            segment_ref: string;
+            location: components["schemas"]["WaterwayLocation"];
+            clearance_height_m?: components["schemas"]["WaterwayMeasure"];
+            clearance_width_m?: components["schemas"]["WaterwayMeasure"];
+            depth_m?: components["schemas"]["WaterwayMeasure"];
+            /** Format: date */
+            survey_date?: string;
+            /**
+             * @default survey
+             * @enum {string}
+             */
+            data_source: "digitised" | "official" | "survey" | "osm";
+            note?: string | null;
+            /** Format: date-time */
+            event_time?: string;
+        };
+        WaterwayStructure: {
+            /** Format: uuid */
+            structure_ref: string;
+            /** Format: uuid */
+            id: string;
+            revision: number;
+            /** @enum {string} */
+            kind: "cau" | "cong" | "au_thuyen" | "duong_day_dien";
+            name: string;
+            /** @enum {string} */
+            status: "active" | "retired";
+            /** Format: uuid */
+            segment_ref: string;
+            location: components["schemas"]["WaterwayLocation"];
+            clearance_height_m: string | null;
+            clearance_width_m: string | null;
+            depth_m: string | null;
+            /** Format: date */
+            survey_date: string | null;
+            data_source: string;
+            note: string | null;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            supersedes_id: string | null;
+            correction_reason: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+        };
+        /** @description Ảnh chụp tham số dựng (số thập phân dạng chuỗi) */
+        WaterwayBuildParams: {
+            tolerances?: {
+                snap_m?: string;
+                auto_join_max_m?: string;
+                report_gap_max_m?: string;
+                on_segment_m?: string;
+            };
+            safety?: {
+                width_factor?: string;
+                under_keel_m?: string;
+                air_gap_m?: string;
+            };
+            vessels?: {
+                code?: string;
+                tons?: string;
+                beam_m?: string;
+                draft_m?: string;
+                air_draft_m?: string;
+            }[];
+        };
+        WaterwayBuild: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            status: "queued" | "completed" | "failed";
+            /** Format: uuid */
+            requested_by: string;
+            /**
+             * Format: date-time
+             * @description Mốc as_of của sổ đoạn/công trình
+             */
+            requested_at: string;
+            network_version_no: number | null;
+            reused: boolean | null;
+            error_code: string | null;
+            /** Format: date-time */
+            completed_at: string | null;
+            params: components["schemas"]["WaterwayBuildParams"];
+        };
+        WaterwayNetworkVersion: {
+            /** Format: uuid */
+            id: string;
+            version_no: number;
+            /** @enum {string} */
+            status: "built" | "published" | "superseded";
+            segment_set_sha256: string;
+            graph_sha256: string;
+            rule_version: string;
+            /** Format: date-time */
+            as_of: string;
+            segment_count: number;
+            structure_count: number;
+            vertex_count: number;
+            edge_count: number;
+            component_count: number;
+            finding_count: number;
+            /** Format: uuid */
+            build_id: string;
+            /** Format: uuid */
+            built_by: string;
+            /** Format: date-time */
+            built_at: string;
+            /** Format: uuid */
+            published_by: string | null;
+            /** Format: date-time */
+            published_at: string | null;
+            /** Format: date-time */
+            effective_from: string | null;
+            /** Format: date-time */
+            superseded_at: string | null;
+            params: components["schemas"]["WaterwayBuildParams"];
+        };
+        WaterwayFinding: {
+            id: number;
+            /** @enum {string} */
+            kind: "crossing" | "t_join" | "gap_joined" | "gap_reported" | "dangling" | "isolated";
+            segment_refs: string[];
+            location: components["schemas"]["WaterwayLocation"];
+            gap_m: string | null;
+            auto_fixed: boolean;
+            message: string;
         };
         ParamValue: {
             key: string;
@@ -5299,6 +5725,362 @@ export interface operations {
                             /** Format: date-time */
                             delivered_at?: string | null;
                         }[];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    listWaterwaySegments: {
+        parameters: {
+            query?: {
+                status?: "draft" | "confirmed" | "retired";
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang (theo segment_ref) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WaterwaySegment"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    createWaterwaySegment: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WaterwaySegmentInput"];
+            };
+        };
+        responses: {
+            /** @description Bản sửa số 1 đã ghi */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaterwaySegment"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getWaterwaySegment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đoạn */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        head: components["schemas"]["WaterwaySegment"];
+                        history: components["schemas"]["WaterwaySegment"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    reviseWaterwaySegment: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WaterwaySegmentInput"] & components["schemas"]["WaterwayRevision"];
+            };
+        };
+        responses: {
+            /** @description Bản sửa mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaterwaySegment"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listWaterwayStructures: {
+        parameters: {
+            query?: {
+                segment_ref?: string;
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WaterwayStructure"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    createWaterwayStructure: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WaterwayStructureInput"];
+            };
+        };
+        responses: {
+            /** @description Công trình đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaterwayStructure"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    reviseWaterwayStructure: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WaterwayStructureInput"] & components["schemas"]["WaterwayRevision"];
+            };
+        };
+        responses: {
+            /** @description Bản sửa mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaterwayStructure"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    requestWaterwayBuild: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Job đã nhận */
+            202: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaterwayBuild"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getWaterwayBuild: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["VersionID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Job */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaterwayBuild"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    listWaterwayNetworks: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WaterwayNetworkVersion"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    getWaterwayNetwork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaterwayNetworkVersion"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    publishWaterwayNetwork: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản đã phát hành */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaterwayNetworkVersion"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    listWaterwayFindings: {
+        parameters: {
+            query?: {
+                kind?: "crossing" | "t_join" | "gap_joined" | "gap_reported" | "dangling" | "isolated";
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang (theo id) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["WaterwayFinding"][];
+                        next_cursor: string | null;
                     };
                 };
             };

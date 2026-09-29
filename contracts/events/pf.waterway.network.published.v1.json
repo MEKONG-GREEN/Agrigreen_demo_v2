@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.waterway.network.published/v1",
+  "title": "pf.waterway.network.published — payload",
+  "description": "Một phiên bản mạng đường thủy đã được phát hành (người phát hành khác người dựng, R-56) và trở thành phiên bản có hiệu lực duy nhất của tenant; phiên bản trước (nếu có) chuyển sang superseded nhưng vẫn định tuyến được khi được ghim. pf/simulation ghim version_no vào ảnh chụp đầu vào (mục 16). Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.waterway.network.published",
+  "x-schema-version": 1,
+  "x-producer": "pf/waterway",
+  "type": "object",
+  "required": ["network_version_id", "version_no", "segment_set_sha256", "graph_sha256", "effective_from", "published_by", "built_by", "supersedes_version_no", "vertex_count", "edge_count", "rule_version", "superseded_version_id"],
+  "properties": {
+    "network_version_id":    { "type": "string", "format": "uuid" },
+    "version_no":            { "type": "integer", "minimum": 1 },
+    "segment_set_sha256":    { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "Băm tập đoạn/công trình đã xác nhận + tham số dựng" },
+    "graph_sha256":          { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "Băm đồ thị đã dựng (đỉnh, cạnh, tải trọng suy ra, phát hiện)" },
+    "effective_from":        { "type": "string", "format": "date-time" },
+    "published_by":          { "type": "string", "format": "uuid" },
+    "built_by":              { "type": "string", "format": "uuid" },
+    "supersedes_version_no": { "type": ["integer", "null"], "minimum": 1, "description": "Phiên bản phát hành trước bị thay; null nếu là lần phát hành đầu" },
+    "vertex_count":          { "type": "integer", "minimum": 0 },
+    "edge_count":            { "type": "integer", "minimum": 0 },
+    "rule_version":          { "type": "string", "description": "Phiên bản quy tắc dựng/suy tải trọng" },
+    "superseded_version_id": { "type": ["string", "null"], "format": "uuid" }
+  }
+}
