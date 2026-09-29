@@ -8,8 +8,11 @@ import { newIdempotencyKey } from "@/api/idempotency";
 import { usePagedList } from "@/api/pagination";
 import { ApiProblem } from "@/api/problem";
 import type { ConsentState, Cooperative, PlotFeature, PlotStatus } from "@/api/types";
+import { unwrap } from "@/api/client";
 import { useAuth } from "@/auth/AuthProvider";
+import { hasRole, ROLES } from "@/auth/principal";
 import { Icon } from "@/components/Icon";
+import { ReasonDialog } from "@/htx/common";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { Tabs } from "@/components/Tabs";
 import { Empty, LoadMore, Loading, PageHead } from "@/components/ui";
@@ -278,12 +281,54 @@ function Plots({ id }: { id: string }) {
   );
 }
 
+/**
+ * Hộp thoại vô hiệu hoá HTX (Admin API, registry_admin / platform_admin): hiện số vụ đang mở và nhật ký
+ * chờ duyệt (GET /v1/cropcycle/stats/cooperatives/{ref}) để cảnh báo phạm vi ảnh hưởng; lý do ≥ 20 ký tự.
+ */
+function DeactivateDialog({ coop, onClose, onDone }: { coop: Cooperative; onClose: () => void; onDone: () => void }) {
+  const { adminApi } = useAuth();
+  const stats = useAsync(() => unwrap(adminApi.GET("/v1/cropcycle/stats/cooperatives/{ref}", { params: { path: { ref: coop.ref } } })), [adminApi, coop.ref]);
+  return (
+    <ReasonDialog
+      title={`Vô hiệu hoá ${coop.name}`}
+      label="Lý do vô hiệu hoá (ít nhất 20 ký tự, ghi vào sổ biến động)"
+      min={20}
+      danger
+      confirmText="Vô hiệu hoá HTX"
+      onClose={onClose}
+      run={async (reason, key) => {
+        await unwrap(adminApi.POST("/v1/cooperatives/{ref}/deactivate", { params: { path: { ref: coop.ref }, header: { "Idempotency-Key": key } }, body: { reason } }));
+        onDone();
+      }}
+    >
+      <div className="alert alert-warn small" role="note" aria-label="Hoạt động đang dở">
+        <Icon name="alert" />
+        <span>
+          {stats.error ? (
+            <>Không đọc được số liệu mùa vụ ({stats.error.code}).</>
+          ) : stats.data ? (
+            <>
+              HTX đang có <b style={{ display: "inline" }}>{formatInt(stats.data.open_seasons)} vụ đang mở</b> và{" "}
+              <b style={{ display: "inline" }}>{formatInt(stats.data.pending_logs)} nhật ký chờ duyệt</b>. Sau khi vô hiệu hoá, tài khoản của HTX bị khóa; vụ và nhật ký được giữ nguyên
+              (không xoá).
+            </>
+          ) : (
+            "Đang đọc số vụ đang mở và nhật ký chờ duyệt…"
+          )}
+        </span>
+      </div>
+    </ReasonDialog>
+  );
+}
+
 export default function CooperativeDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? "";
-  const { api } = useAuth();
+  const { api, principal } = useAuth();
   const [tab, setTab] = useState("overview");
+  const [deactivating, setDeactivating] = useState(false);
   const coop = useAsync(() => getCooperative(api, id), [api, id]);
+  const canDeactivate = hasRole(principal, ROLES.registryAdmin, ROLES.platformAdmin);
 
   return (
     <>
@@ -297,8 +342,27 @@ export default function CooperativeDetailPage() {
           <PageHead
             title={coop.data.name}
             subtitle={`${coop.data.code} · ${coopPlace(coop.data)}`}
-            actions={coop.data.active ? <span className="chip c-ok">Đang hoạt động</span> : <span className="chip c-mute">Đã vô hiệu hoá</span>}
+            actions={
+              <>
+                {coop.data.active ? <span className="chip c-ok">Đang hoạt động</span> : <span className="chip c-mute">Đã vô hiệu hoá</span>}
+                {coop.data.active && canDeactivate ? (
+                  <button type="button" className="btn btn-o btn-sm" onClick={() => setDeactivating(true)}>
+                    Vô hiệu hoá HTX
+                  </button>
+                ) : null}
+              </>
+            }
           />
+          {deactivating ? (
+            <DeactivateDialog
+              coop={coop.data}
+              onClose={() => setDeactivating(false)}
+              onDone={() => {
+                setDeactivating(false);
+                coop.reload();
+              }}
+            />
+          ) : null}
           <div className="card sec">
             <Tabs
               label="Thông tin HTX"

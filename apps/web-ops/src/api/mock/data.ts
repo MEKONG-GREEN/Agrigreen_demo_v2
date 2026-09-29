@@ -44,7 +44,7 @@ const pick = <T,>(arr: readonly T[], r: () => number = rnd): T => arr[Math.floor
 const int = (min: number, max: number, r: () => number = rnd) => Math.floor(min + r() * (max - min + 1));
 const iso = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString();
 
-function hexId(n: number, prefix: string): string {
+export function hexId(n: number, prefix: string): string {
   const h = n.toString(16).padStart(12, "0");
   return `01927b3e-${prefix}-7000-8000-${h}`;
 }
@@ -240,10 +240,33 @@ export function findCoop(ref: string | undefined): MockCooperative | undefined {
 const SURNAMES = ["Nguyễn", "Trần", "Lê", "Phạm", "Huỳnh", "Võ", "Đặng", "Bùi"];
 const INITIALS = "ABCDĐGHKLMNPQSTVX";
 
+/** Số nông hộ giả lập của HTX (householdsOf) và mã nông hộ thứ i (vòng). */
+export function householdCount(coop: MockCooperative): number {
+  return Math.min(coop.member_households, 57);
+}
+export function householdRefOf(coop: MockCooperative, i: number): string {
+  return hexId(parseInt(coop.api.ref.slice(-4), 16) * 1000 + (i % householdCount(coop)), "a0e0");
+}
+
+/** SĐT chủ hộ TỔNG HỢP (seed-synthetic) dạng 09990xxxxx — không phải số thật; chỉ mock pf/accounts dùng để khớp. */
+export function syntheticPhone(coop: MockCooperative, index: number): string {
+  const base = (parseInt(coop.api.ref.slice(-3), 16) % 900) * 100;
+  return `09990${String(base + index).padStart(5, "0")}`;
+}
+
+/**
+ * HTX của persona "Quản lý HTX" (coop_manager): HTX đang hoạt động đầu tiên ở xã của KNV xã giả lập
+ * (xã đầu tiên của Đồng Tháp) — để KNV xã thấy cùng dữ liệu mùa vụ ở chế độ chỉ đọc.
+ */
+export function htxCoop(): MockCooperative {
+  const commune = COMMUNES.find((c) => c.province_code === "82");
+  return COOPERATIVES.find((c) => c.api.active && c.api.admin_unit_code === commune?.code) ?? COOPERATIVES.find((c) => c.api.active)!;
+}
+
 /** GET /v1/cooperatives/{ref}/households — nhãn ĐÃ CHE sinh ngẫu nhiên, không tương ứng người thật. */
 export function householdsOf(coop: MockCooperative): HouseholdListItem[] {
   const r = mulberry32(parseInt(coop.api.ref.slice(-6), 16));
-  const n = Math.min(coop.member_households, 57);
+  const n = householdCount(coop);
   return Array.from({ length: n }, (_, i): HouseholdListItem => {
     const unavailable = r() < 0.04;
     const a = INITIALS[Math.floor(r() * INITIALS.length)] ?? "V";
@@ -258,14 +281,14 @@ export function householdsOf(coop: MockCooperative): HouseholdListItem[] {
     if (i % 4 === 0) consents.push({ purpose: "extension.field_support", status: "granted", event_time: iso(60) });
     return {
       consents,
-      household_ref: hexId(parseInt(coop.api.ref.slice(-4), 16) * 1000 + i, "a0e0"),
+      household_ref: householdRefOf(coop, i),
       cooperative_ref: coop.api.ref,
       commune_code: coop.api.admin_unit_code ?? "",
       cultivated_area_ha: r() < 0.05 ? null : `${(0.3 + r() * 4.5).toFixed(4)}`,
       member_since: `202${Math.floor(r() * 6)}-0${1 + Math.floor(r() * 9)}-15`,
       active: r() > 0.06,
       label: unavailable ? "" : `${pick(SURNAMES, r)} ${a}. ${b}.`,
-      masked_phone: `09******${String(Math.floor(r() * 100)).padStart(2, "0")}`,
+      masked_phone: `09******${syntheticPhone(coop, i).slice(-2)}`,
       label_unavailable: unavailable,
     };
   });
@@ -288,7 +311,8 @@ export function plotsOf(coop: MockCooperative): PlotFeature[] {
         name: i % 3 === 0 ? `Thửa ${i + 1} ấp ${1 + (i % 5)}` : null,
         commune_code: coop.api.admin_unit_code ?? "",
         cooperative_ref: status === "draft" ? null : coop.api.ref,
-        household_ref: null,
+        // Thửa đang dùng thuộc một nông hộ của HTX (vòng theo householdsOf) — App HTX mở vụ theo nông hộ.
+        household_ref: status === "active" ? householdRefOf(coop, i) : null,
         status,
         status_reason: status === "retired" ? "Chuyển mục đích sử dụng đất (giả lập)" : null,
         version: 1 + (i % 3),

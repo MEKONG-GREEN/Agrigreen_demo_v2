@@ -13,6 +13,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/store"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
@@ -692,4 +694,25 @@ func (s *Service) SeasonAreas(ctx context.Context, coop uuid.UUID, seasonCode st
 			AreaHa: r.AreaHa, Seasons: r.Seasons, OpenSeasons: r.OpenSeasons, CompletedSeasons: r.CompletedSeasons})
 	}
 	return out, nil
+}
+
+// CooperativeActivity trả số vụ đang mở và nhật ký chờ duyệt của một HTX cho hộp
+// thoại vô hiệu hóa HTX (Admin API, vai registry_admin / platform_admin). HTX không
+// có hoạt động (hoặc không thuộc tenant) → 0 / 0; không có dữ liệu cá nhân.
+func (s *Service) CooperativeActivity(ctx context.Context, coop uuid.UUID) (port.CoopActivity, error) {
+	p, err := authz.Require(ctx, partyport.RoleRegistryAdmin, authz.RolePlatformAdmin)
+	if err != nil {
+		return port.CoopActivity{}, err
+	}
+	out := port.CoopActivity{CooperativeRef: coop}
+	err = s.inTx(ctx, p.TenantID, func(tx pgx.Tx) error {
+		rows, e := store.ActivityByCooperative(ctx, tx, false, []uuid.UUID{coop})
+		for _, r := range rows {
+			if r.CooperativeRef == coop {
+				out.OpenSeasons, out.PendingLogs = r.OpenSeasons, r.PendingLogs
+			}
+		}
+		return e
+	})
+	return out, err
 }

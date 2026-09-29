@@ -69,6 +69,7 @@ func (h Handler) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.POST("/cropcycle/sop-versions/:id/publish", h.publish)
 	rg.POST("/cropcycle/variety-bindings", h.bind)
 	rg.POST("/cropcycle/projections/rebuild", h.rebuild)
+	rg.GET("/cropcycle/stats/cooperatives/:ref", h.coopStats)
 }
 
 // ---------------------------------------------------------------------------
@@ -465,6 +466,21 @@ func (h Handler) rebuild(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"seasons": r.Seasons, "farm_logs": r.Logs, "coop_season_areas": r.CoopAreas})
+}
+
+// coopStats: số vụ đang mở / nhật ký chờ duyệt của HTX — cảnh báo trong hộp thoại
+// vô hiệu hóa HTX (Admin API, không dữ liệu cá nhân).
+func (h Handler) coopStats(c *gin.Context) {
+	ref, ok := pathID(c, "ref", problem.NotFound)
+	if !ok {
+		return
+	}
+	a, err := h.Svc.CooperativeActivity(c.Request.Context(), ref)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"cooperative_ref": a.CooperativeRef.String(), "open_seasons": a.OpenSeasons, "pending_logs": a.PendingLogs})
 }
 
 // ---------------------------------------------------------------------------

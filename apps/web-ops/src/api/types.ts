@@ -126,6 +126,42 @@ export type AdminReportTemplate = AdminGet<"/v1/reports/templates">["items"][num
 export type ReportSchedule = AS["ReportSchedule"];
 export type ReportScheduleRun = AdminGet<"/v1/reports/schedules/{id}/runs">["items"][number];
 
+// pf/cropcycle (App HTX: SOP, vụ, nhật ký, duyệt, sản lượng, bảng điều hành)
+export type CropSOPStep = S["CropSOPStep"];
+export type CropActivity = CropSOPStep["activity_code"];
+export type CropSOPTemplate = S["CropSOPTemplate"];
+export type CropSOPVersion = S["CropSOPVersion"];
+export type CropSOP = S["CropSOP"];
+export type AdminCropSOP = AS["CropSOP"];
+export type CropVarietyBinding = S["CropVarietyBinding"];
+export type CropSeason = S["CropSeason"];
+export type CropSeasonDetail = S["CropSeasonDetail"];
+export type CropSeasonEvent = S["CropSeasonEvent"];
+export type CropBulkOpenResult = AppPost<"/v1/cropcycle/seasons/bulk-open">;
+export type CropPreviousConfig = AppGet<"/v1/cropcycle/plots/{ref}/previous-config">;
+export type CropFarmLog = S["CropFarmLog"];
+export type CropFarmLogState = S["CropFarmLogState"];
+export type CropFarmLogDetail = AppGet<"/v1/cropcycle/farm-logs/{id}">;
+export type CropLogBatchResult = AppPost<"/v1/cropcycle/farm-logs/batch">;
+export type CropHarvest = S["CropHarvest"];
+export type CropBulkHarvestResult = AppPost<"/v1/cropcycle/harvests/bulk">;
+export type CropDashGroup = S["CropDashGroup"];
+export type CropDashboard = AppGet<"/v1/cropcycle/dashboard">;
+export type CropCoopStats = AdminGet<"/v1/cropcycle/stats/cooperatives/{ref}">;
+
+// pf/accounts — tài khoản nông dân (App HTX)
+export type FarmerAccount = S["FarmerAccount"];
+export type FarmerGrant = S["FarmerGrant"];
+export type FarmerActivation = S["FarmerActivation"];
+export type FarmerCreated = S["FarmerCreated"];
+export type FarmerImportResult = AppPost<"/v1/farmer-accounts/import">;
+
+// pf/extension — yêu cầu hỗ trợ của nông dân
+export type SupportRequest = S["SupportRequest"];
+
+// pf/masterdata — nhập danh mục (Admin)
+export type CatalogImportResult = AS["CatalogImportResult"];
+
 // pf/party — GET /v1/me (người gọi + phạm vi đã giải)
 export type Me = S["Me"];
 export type MeScopeLevel = Me["scope"]["level"];

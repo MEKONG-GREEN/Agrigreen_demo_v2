@@ -1,17 +1,106 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ChangeEvent, type FormEvent } from "react";
 import { ATTR_LABEL } from "@/admin/catalogs";
 import { unwrap } from "@/api/client";
+import { newIdempotencyKey } from "@/api/idempotency";
 import { usePagedList } from "@/api/pagination";
-import type { CatalogName } from "@/api/types";
+import type { ApiProblem } from "@/api/problem";
+import type { CatalogImportResult, CatalogName } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
 import { MfaNotice } from "@/components/MfaNotice";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { Empty, LoadMore, Loading, PageHead } from "@/components/ui";
+import { ResultList } from "@/htx/common";
+import { toCsv } from "@/htx/rules";
+import { readUpload, saveBlob, type UploadFile } from "@/lib/files";
 import { formatDateTime } from "@/lib/format";
-import { useAsync } from "@/lib/useAsync";
+import { toApiProblem, useAsync } from "@/lib/useAsync";
+
+const IMPORT_STATUS = { created: "Đã tạo", skipped: "Bỏ qua (đã có)", rejected: "Lỗi" } as const;
+
+/** Nhập danh mục hàng loạt từ Excel/CSV (Admin POST /v1/masterdata/catalog-imports, HTX US-CAT-02): dòng lỗi kèm lý do ngay trên màn hình. */
+function CatalogImport({ onDone }: { onDone: () => void }) {
+  const { adminApi } = useAuth();
+  const [file, setFile] = useState<UploadFile | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<ApiProblem | null>(null);
+  const [result, setResult] = useState<CatalogImportResult | null>(null);
+  const [key, setKey] = useState(newIdempotencyKey);
+  const ok = !!file && (file.kind === "xlsx" || file.kind === "csv");
+  const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    setResult(null);
+    setProblem(null);
+    setFile(f ? await readUpload(f) : null);
+    setKey(newIdempotencyKey());
+  };
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!file || !ok) return;
+    setBusy(true);
+    setProblem(null);
+    try {
+      const res = await unwrap(
+        adminApi.POST("/v1/masterdata/catalog-imports", {
+          params: { header: { "Idempotency-Key": key } },
+          body: file.body as unknown as string,
+          bodySerializer: (b: unknown) => b as BodyInit,
+          headers: { "Content-Type": file.contentType },
+        }),
+      );
+      setResult(res);
+      onDone();
+    } catch (err) {
+      setProblem(toApiProblem(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const template = () =>
+    saveBlob(
+      new Blob([toCsv([["catalog", "code", "name", "growth_days", "expected_yield_t_per_ha"], ["rice_variety", "OM9582", "OM9582", "95", "6.8"]])], { type: "text/csv;charset=utf-8" }),
+      "mau-nhap-danh-muc.csv",
+    );
+  return (
+    <form className="panel stack" style={{ gap: 8, marginBottom: 16 }} onSubmit={(e) => void submit(e)} aria-label="Nhập danh mục từ tệp">
+      <b>Nhập danh mục hàng loạt (.xlsx hoặc CSV, tối đa 500 dòng)</b>
+      <span className="small mute">Cột catalog (mã danh mục, vd rice_variety), code, name; cột khác là thuộc tính (vd growth_days). Dòng hợp lệ được tạo trong một lần nhập, dòng lỗi không chặn dòng khác.</span>
+      <div className="row">
+        <input type="file" aria-label="Tệp danh mục" accept=".xlsx,.csv" onChange={(e) => void onFile(e)} />
+        <button type="submit" className="btn btn-p btn-sm" disabled={!ok || busy}>
+          {busy ? "Đang nhập…" : "Nhập"}
+        </button>
+        <button type="button" className="btn btn-o btn-sm" onClick={template}>
+          <Icon name="download" size={15} />
+          Tải tệp mẫu
+        </button>
+      </div>
+      {file && !ok ? <span className="err small">Chỉ nhận .xlsx hoặc CSV UTF-8 (không nhận .xls cũ).</span> : null}
+      {problem ? <ProblemAlert problem={problem} /> : null}
+      {result ? (
+        <>
+          <p role="status">
+            <b>
+              {result.created} dòng đã tạo · {result.skipped} bỏ qua · {result.rejected} dòng lỗi (tổng {result.total})
+            </b>
+          </p>
+          <ResultList
+            caption="Kết quả nhập danh mục theo dòng"
+            rows={result.rows.map((r) => ({
+              key: String(r.row),
+              label: `Dòng ${r.row}${r.code ? ` · ${r.catalog ?? ""}/${r.code}` : ""}`,
+              ok: r.status !== "rejected",
+              status: IMPORT_STATUS[r.status],
+              reason: r.reason,
+            }))}
+          />
+        </>
+      ) : null}
+    </form>
+  );
+}
 
 /** Danh mục dùng chung — Admin API GET /v1/masterdata/catalogs (G-06) + /{catalog}/items (MFA bắt buộc). */
 export default function CatalogsPage() {
@@ -21,6 +110,7 @@ export default function CatalogsPage() {
   const current = (picked ?? catalogs.data?.items[0]?.catalog ?? "rice_variety") as CatalogName;
   const setCurrent = setPicked;
   const [includeInactive, setIncludeInactive] = useState(true);
+  const [showImport, setShowImport] = useState(false);
 
   const items = usePagedList(
     (cursor) =>
@@ -35,7 +125,24 @@ export default function CatalogsPage() {
 
   return (
     <>
-      <PageHead title="Danh mục dùng chung" subtitle="Giống lúa, khâu sản xuất, chủng loại máy, mùa vụ, sâu bệnh… dùng chung cho mọi ứng dụng" />
+      <PageHead
+        title="Danh mục dùng chung"
+        subtitle="Giống lúa, khâu sản xuất, chủng loại máy, mùa vụ, sâu bệnh… dùng chung cho mọi ứng dụng"
+        actions={
+          <button type="button" className="btn btn-o btn-sm" aria-expanded={showImport} onClick={() => setShowImport((v) => !v)}>
+            <Icon name="upload" size={15} />
+            Nhập từ Excel
+          </button>
+        }
+      />
+      {showImport ? (
+        <CatalogImport
+          onDone={() => {
+            catalogs.reload();
+            items.reload();
+          }}
+        />
+      ) : null}
       <div className="alert alert-info" style={{ marginBottom: 16 }}>
         <Icon name="info" />
         <span>

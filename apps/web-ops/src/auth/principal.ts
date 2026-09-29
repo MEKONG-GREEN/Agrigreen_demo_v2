@@ -24,7 +24,13 @@ export const ROLES = {
   deviceAdmin: "device_admin",
   geoAdmin: "geo_admin",
   plotEditor: "plot_editor",
+  coopManager: "coop_manager",
+  sopAdmin: "sop_admin",
+  farmer: "farmer",
 } as const;
+
+/** Vai cán bộ khuyến nông — với dữ liệu mùa vụ HTX chỉ được XEM trong phạm vi (pf/cropcycle). */
+export const KN_ROLES: readonly string[] = [ROLES.knOfficer, ROLES.knProvinceAdmin, ROLES.knNationalAdmin];
 
 /** Nhãn tiếng Việt của vai realm (hiển thị; mã vai vẫn gửi nguyên văn). */
 export const ROLE_LABEL: Readonly<Record<string, string>> = {
@@ -46,6 +52,8 @@ export const ROLE_LABEL: Readonly<Record<string, string>> = {
   device_admin: "Quản trị thiết bị",
   geo_admin: "Quản trị dữ liệu bản đồ",
   plot_editor: "Vẽ ranh giới thửa",
+  sop_admin: "Soạn quy trình SOP",
+  farmer: "Nông dân (App HTX)",
   vault_eraser: "Xoá định danh (RB-3)",
   consent_writer: "Ghi đồng ý",
   consent_reader: "Xem đồng ý",

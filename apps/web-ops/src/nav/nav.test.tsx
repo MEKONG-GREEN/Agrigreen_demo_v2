@@ -75,6 +75,31 @@ describe("menu theo phạm vi và vai", () => {
   });
 });
 
+describe("menu App HTX theo vai", () => {
+  const HTX_PAGES = ["/htx/dashboard", "/htx/mua-vu", "/htx/nhat-ky", "/htx/phe-duyet", "/htx/san-luong", "/htx/tai-khoan-nong-dan", "/htx/yeu-cau-ho-tro"];
+
+  it("Quản lý HTX chỉ thấy màn hình HTX của mình, vào thẳng bảng điều hành sản xuất", () => {
+    const p = persona("htx");
+    expect(hrefs(p)).toEqual(HTX_PAGES);
+    expect(homeFor(p)).toBe("/htx/dashboard");
+  });
+
+  it("cán bộ KN xem được (chỉ đọc) nhưng không có màn hình phê duyệt", () => {
+    for (const id of ["xa", "tinh", "tw"]) {
+      const h = hrefs(persona(id));
+      expect(h).toEqual(expect.arrayContaining(HTX_PAGES.filter((x) => x !== "/htx/phe-duyet")));
+      expect(h).not.toContain("/htx/phe-duyet");
+    }
+    expect(hrefs(persona("cuc")).some((x) => x.startsWith("/htx"))).toBe(false);
+  });
+
+  it("Quy trình SOP cho người soạn và người phê duyệt", () => {
+    expect(hrefs(persona("setter"))).toContain("/quan-tri/quy-trinh");
+    expect(hrefs(persona("approver"))).toContain("/quan-tri/quy-trinh");
+    expect(hrefs(persona("htx"))).not.toContain("/quan-tri/quy-trinh");
+  });
+});
+
 describe("<Sidebar>", () => {
   it("hiển thị nhóm đánh số và phạm vi của người dùng tỉnh", () => {
     const p = persona("tinh");
