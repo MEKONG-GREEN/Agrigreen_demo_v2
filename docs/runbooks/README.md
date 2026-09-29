@@ -18,6 +18,7 @@ Các job vận hành dùng chung cho mọi cụm (`ag_pf`, `ag_mkg`, `ag_vault`)
 | Công bố sức chứa kho/Hub theo ngày (GIS US-WH-01) | 01:15 giờ VN hằng ngày, chạy bù khi khởi động | `cmd/api-internal` (leader cụm mkg, job `hub_capacity_daily`; cần `AG_MKG_DB_DIRECT_URL`) | `ag_outbox_publisher` (tìm tenant), `hub_app` | mục dưới |
 | Bản đồ chuẩn hóa cho TMS, đo độ trễ lớp | khi đổi truy vấn lớp; UAT | kiểm thử `TestStandardMapForTMSLatency_…` | `geo_app` | [gis-performance.md](gis-performance.md) |
 | Dựng lại bảng chiếu | diễn tập G4, khi nghi lệch | theo module | vai của module | [rebuild-projection.md](rebuild-projection.md) |
+| Agent biên đọc cân: cài, đăng ký, thay khóa, cập nhật | khi lắp/đổi cân, mất đĩa, phát hành | `cmd/edge-agent` | — | [edge-agent.md](edge-agent.md) |
 
 ## Leader
 
