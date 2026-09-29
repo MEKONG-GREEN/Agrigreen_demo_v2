@@ -138,6 +138,28 @@ jobs:
             apps/web-ops/test-results/
           retention-days: 7
 
+  optimizer:
+    name: Optimizer (Python 3.12 — pytest, giấy phép)
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: optimizer }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: optimizer/pyproject.toml }
+      - name: Cài đặt
+        run: python -m pip install --upgrade pip && pip install ".[dev,milp]"
+      - name: pytest (golden prototype, hợp đồng contracts/optimizer, RB-7)
+        run: python -m pytest -q
+      - name: Giấy phép phụ thuộc runtime (RB-4)
+        run: |
+          pip-licenses --packages pydantic pydantic-core annotated-types typing-inspection highspy \
+            --allow-only="MIT;MIT License"
+          # typing-extensions (PSF-2.0) và numpy (BSD-3-Clause gộp): chờ quyết định cập nhật danh mục giấy phép
+          pip-licenses --packages typing-extensions numpy --format=markdown
+      - name: Docker build (non-root)
+        run: docker build -t agrigreen/optimizer:ci .
+
   agrigreen-mobile:
     name: Lõi di động (packages/agrigreen_mobile)
     runs-on: ubuntu-latest
