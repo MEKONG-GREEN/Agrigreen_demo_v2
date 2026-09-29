@@ -17,12 +17,16 @@ class OfflineFirstTileProvider extends TileProvider {
     required this.urlTemplate,
     http.Client? client,
     this.userAgent = 'vn.agrigreen.field',
+    this.fetchRemote,
   }) : _client = client ?? http.Client();
 
   final TileStore? store;
   final String urlTemplate;
   final String userAgent;
   final http.Client _client;
+
+  /// Thay cách tải tile trực tuyến (kiểm thử); null = HTTP theo [urlTemplate].
+  final Future<Uint8List> Function(TileId t)? fetchRemote;
 
   @override
   ImageProvider getImage(TileCoordinates coordinates, TileLayer options) =>
@@ -34,6 +38,8 @@ class OfflineFirstTileProvider extends TileProvider {
   Future<Uint8List> _bytes(TileId t) async {
     final local = await store?.tile(t);
     if (local != null) return local;
+    final remote = fetchRemote;
+    if (remote != null) return remote(t);
     final res = await _client
         .get(
           Uri.parse(tileUrl(urlTemplate, t)),

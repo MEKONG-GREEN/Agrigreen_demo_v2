@@ -1,8 +1,11 @@
-import 'package:agrigreen_mobile/core/ids.dart';
-import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
-import 'package:agrigreen_mobile/data/reference/reference_repository.dart';
-import 'package:agrigreen_mobile/domain/geo/boundary.dart';
-import 'package:agrigreen_mobile/domain/outbox_record.dart';
+import 'dart:convert';
+
+import '../core/ids.dart';
+import '../data/db/local_db.dart';
+import '../data/outbox/outbox_repository.dart';
+import '../data/reference/reference_repository.dart';
+import '../domain/geo/boundary.dart';
+import '../domain/outbox_record.dart';
 
 class OverlapHit {
   const OverlapHit(this.plotId, this.label, {required this.sameCooperative});
@@ -30,8 +33,18 @@ class BoundaryException implements Exception {
 
 enum BoundaryMethod { gps, map }
 
-/// Ngưỡng lệch diện tích khai báo cần xác nhận (HTX US-PLOT-02 AC-3).
+/// Nguồn ranh giới gửi lên pf/geo (`domain.Source*`).
+abstract final class BoundarySource {
+  static const knFieldApp = 'kn_field_app';
+  static const htxApp = 'htx_app';
+}
+
+/// Ngưỡng lệch diện tích khai báo cần xác nhận mặc định (HTX US-PLOT-02 AC-3)
+/// khi chưa tải được tham số `geo.area_deviation_max_pct`.
 const areaDeviationConfirmPct = 5.0;
+
+/// Thông báo khi quản lý HTX mở/sửa lô của HTX khác (HTX US-PLOT-01 AC-4).
+const msgPlotNotOwned = 'Bạn không có quyền truy cập lô ruộng này.';
 
 /// Mã `rejected` của pf/geo mà người vẽ xác nhận được để gửi lại với
 /// `confirm_overlap: true` (application.yaml: geo.overlap_needs_confirm,
@@ -64,6 +77,57 @@ class PlotBoundaryStatus {
   bool get canConfirm => state == PlotSyncState.needsConfirm;
 }
 
+/// Bản nháp đang vẽ (chưa bấm lưu) — giữ trong CSDL SQLCipher để mất mạng,
+/// tắt app hay hết pin giữa lúc đi ranh giới không mất điểm (HTX US-PLOT-05
+/// AC-1).
+class BoundaryDraft {
+  const BoundaryDraft(this.points, {this.accuracies = const [], this.method});
+  final List<GeoPoint> points;
+
+  /// Sai số (m) từng điểm, cùng thứ tự [points]; null = điểm chọn trên bản đồ.
+  final List<double?> accuracies;
+  final BoundaryMethod? method;
+
+  /// Sai số lớn nhất trong các điểm GPS; null = không có điểm GPS.
+  double? get worstAccuracyM {
+    double? w;
+    for (final a in accuracies) {
+      if (a != null && (w == null || a > w)) w = a;
+    }
+    return w;
+  }
+
+  Map<String, Object?> toJson() => {
+    'points': [
+      for (var i = 0; i < points.length; i++)
+        [
+          points[i].lat,
+          points[i].lon,
+          if (i < accuracies.length && accuracies[i] != null) accuracies[i],
+        ],
+    ],
+    'method': ?method?.name,
+  };
+
+  static BoundaryDraft? fromJson(Object? j) {
+    if (j is! Map) return null;
+    final pts = <GeoPoint>[];
+    final acc = <double?>[];
+    for (final e in (j['points'] as List?) ?? const []) {
+      if (e is List && e.length >= 2) {
+        pts.add(GeoPoint((e[0]! as num).toDouble(), (e[1]! as num).toDouble()));
+        acc.add(e.length > 2 ? (e[2] as num?)?.toDouble() : null);
+      }
+    }
+    final m = j['method'];
+    return BoundaryDraft(
+      pts,
+      accuracies: acc,
+      method: BoundaryMethod.values.where((x) => x.name == m).firstOrNull,
+    );
+  }
+}
+
 /// Parse "1,25" / "1.25" → 1.25; rỗng → null; sai → ném [BoundaryException].
 double? parseDeclaredHa(String? s) {
   final t = s?.trim().replaceAll(',', '.') ?? '';
@@ -79,23 +143,59 @@ double? parseDeclaredHa(String? s) {
 double areaDeviationPct(double drawnHa, double declaredHa) =>
     (drawnHa - declaredHa).abs() / declaredHa * 100;
 
+String _plotCoop(Map<String, Object?> d) =>
+    ((d['cooperative_ref'] ?? d['cooperative_id']) as String?) ?? '';
+
 /// Vẽ ranh giới thửa (KN epic C, HTX epic D), kể cả ngoại tuyến. Payload theo
 /// `BoundaryPayload` của pf/geo (sync-contract, "Payload plot_boundary").
+/// Dùng chung cho app hiện trường (cán bộ KN, `source: kn_field_app`) và App
+/// HTX (quản lý HTX, `source: htx_app`, chỉ lô của HTX mình + lô nháp).
 class BoundaryService {
   BoundaryService({
     required OutboxRepository outbox,
     required ReferenceRepository refs,
     required IdGenerator ids,
+    this.source = BoundarySource.knFieldApp,
+    LocalDb? db,
+    Future<double> Function()? deviationLimitPct,
+    Future<String?> Function()? ownCooperative,
   }) : _outbox = outbox,
        _refs = refs,
-       _ids = ids;
+       _ids = ids,
+       _db = db,
+       _limit = deviationLimitPct,
+       _own = ownCooperative;
 
   final OutboxRepository _outbox;
   final ReferenceRepository _refs;
   final IdGenerator _ids;
+  final LocalDb? _db;
+  final Future<double> Function()? _limit;
+
+  /// HTX của người vẽ (quản lý HTX). null → không giới hạn theo HTX (cán bộ KN).
+  final Future<String?> Function()? _own;
+
+  /// `source` của payload (pf/geo `domain.Source*`).
+  final String source;
 
   static String? _coopOf(Map<String, Object?> d) =>
       (d['cooperative_ref'] ?? d['cooperative_id']) as String?;
+
+  /// Ngưỡng lệch diện tích (%) đang áp dụng (`geo.area_deviation_max_pct`).
+  Future<double> deviationLimit() async =>
+      await _limit?.call() ?? areaDeviationConfirmPct;
+
+  /// HTX của người vẽ, nếu app giới hạn theo HTX.
+  Future<String?> ownCooperative() async => _own?.call();
+
+  /// Người vẽ có được xem/sửa lô [plot] không (HTX US-PLOT-01 AC-3/AC-4):
+  /// quản lý HTX chỉ lô của HTX mình và lô nháp chưa gán HTX.
+  Future<bool> canEdit(RefRow plot) async {
+    if (_own == null) return true;
+    final own = await _own();
+    final coop = _plotCoop(plot.data);
+    return coop.isEmpty || (own != null && coop == own);
+  }
 
   Future<BoundaryCheck> check(
     List<GeoPoint> points, {
@@ -125,15 +225,66 @@ class BoundaryService {
     return BoundaryCheck(v, hits);
   }
 
+  /// Vòng ranh giới của các thửa khác trên máy (vẽ nền khi đang vẽ).
+  Future<List<List<GeoPoint>>> otherRings({String? exceptPlotId}) async {
+    final out = <List<GeoPoint>>[];
+    for (final p in await _refs.list(RefEntity.plot)) {
+      if (p.id == exceptPlotId) continue;
+      final r = ringFromGeoJson(p.data['boundary'] ?? p.data['geometry']);
+      if (r != null && r.length >= 3) out.add(r);
+    }
+    return out;
+  }
+
+  /// Xã (đơn vị hành chính cấp xã) đã đồng bộ về máy — chọn xã cho thửa mới.
+  Future<List<RefRow>> communes() async => [
+    for (final u in await _refs.list(RefEntity.adminUnit))
+      if (u.data['level'] == null ||
+          u.data['level'] == 'commune' ||
+          u.data['level'] == 'xa')
+        u,
+  ];
+
+  // ---- bản nháp đang vẽ (HTX US-PLOT-05 AC-1) ----
+
+  static String _draftKey(String? plotId) =>
+      'boundary.draft.${plotId ?? 'new'}';
+
+  Future<void> saveDraft(String? plotId, BoundaryDraft d) async {
+    final db = _db;
+    if (db == null) return;
+    await db.setMeta(
+      _draftKey(plotId),
+      d.points.isEmpty ? null : jsonEncode(d.toJson()),
+    );
+  }
+
+  Future<BoundaryDraft?> loadDraft(String? plotId) async {
+    final v = await _db?.getMeta(_draftKey(plotId));
+    if (v == null) return null;
+    try {
+      final d = BoundaryDraft.fromJson(jsonDecode(v));
+      return d == null || d.points.isEmpty ? null : d;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  Future<void> clearDraft(String? plotId) async =>
+      _db?.setMeta(_draftKey(plotId), null);
+
   /// Lưu ranh giới vào hàng đợi.
   ///
   /// - [plotId] null = thửa mới: `op: create`, `plot_ref` UUIDv7 máy sinh,
-  ///   bắt buộc [communeCode].
+  ///   bắt buộc [communeCode]. Quản lý HTX: thửa mới gán HTX của mình (mỗi lô
+  ///   một HTX — HTX US-PLOT-01 AC-3).
   /// - Thửa đã có phiên bản ranh giới trên máy chủ (`boundary_id`): `op:
   ///   correct` với `supersedes_id = boundary_id`, bắt buộc [correctionReason]
-  ///   ≥ 10 ký tự.
+  ///   ≥ 10 ký tự. Dùng chung một bản ghi thửa với phần KN vẽ trước (AC-2).
   /// - [acknowledgeOverlap] (người vẽ đã xác nhận chồng lấn cùng HTX hoặc lệch
-  ///   diện tích > 5 %) → `confirm_overlap: true`.
+  ///   diện tích > ngưỡng) → `confirm_overlap: true`.
+  ///
+  /// Lưu xong thì xóa bản nháp của thửa.
   Future<OutboxRecord> save({
     required List<GeoPoint> points,
     required BoundaryMethod method,
@@ -147,7 +298,18 @@ class BoundaryService {
     bool acknowledgeOverlap = false,
     double? worstAccuracyM,
   }) async {
-    final c = await check(points, plotId: plotId, cooperativeId: cooperativeId);
+    final existing = plotId == null
+        ? null
+        : await _refs.get(RefEntity.plot, plotId);
+    if (existing != null && !await canEdit(existing)) {
+      throw BoundaryException(msgPlotNotOwned);
+    }
+    final own = await ownCooperative();
+    final coop =
+        cooperativeId ??
+        (existing == null ? null : _coopOf(existing.data)) ??
+        (existing == null ? own : null);
+    final c = await check(points, plotId: plotId, cooperativeId: coop);
     if (!c.validation.ok) {
       throw BoundaryException(c.validation.errors.first.message);
     }
@@ -164,17 +326,14 @@ class BoundaryService {
     final deviation = declaredAreaHa == null
         ? null
         : areaDeviationPct(c.validation.areaHa, declaredAreaHa);
-    if (deviation != null &&
-        deviation > areaDeviationConfirmPct &&
-        !acknowledgeOverlap) {
+    final limit = await deviationLimit();
+    if (deviation != null && deviation > limit && !acknowledgeOverlap) {
       throw BoundaryException(
         'Diện tích vẽ lệch ${deviation.toStringAsFixed(1)} % so với diện tích '
-        'khai báo. Hãy kiểm tra lại hoặc xác nhận giữ nguyên.',
+        'khai báo (ngưỡng ${limit.toStringAsFixed(0)} %). Hãy kiểm tra lại '
+        'hoặc xác nhận giữ nguyên.',
       );
     }
-    final existing = plotId == null
-        ? null
-        : await _refs.get(RefEntity.plot, plotId);
     final boundaryId = existing?.data['boundary_id'] as String?;
     final commune =
         communeCode ??
@@ -184,12 +343,12 @@ class BoundaryService {
       'plot_ref': plotId ?? _ids.newId(),
       'name': ?name,
       'commune_code': ?commune,
-      'cooperative_ref': ?cooperativeId,
+      'cooperative_ref': ?coop,
       'household_ref': ?householdRef,
       'geometry': toGeoJsonPolygon(c.validation.ring),
       'gps_accuracy_m': ?worstAccuracyM?.toStringAsFixed(1),
       'declared_area_ha': ?declaredAreaHa?.toStringAsFixed(4),
-      'source': 'kn_field_app',
+      'source': source,
       'confirm_overlap': acknowledgeOverlap,
       // Thông tin phụ cho màn hình trên máy (máy chủ bỏ qua trường lạ).
       'area_ha_client': formatHa(c.validation.areaHa),
@@ -197,6 +356,7 @@ class BoundaryService {
       'method': method.name,
       'overlap_plot_ids': [for (final o in c.overlaps) o.plotId],
     };
+    final OutboxRecord rec;
     if (boundaryId != null) {
       final reason = correctionReason?.trim() ?? '';
       if (reason.length < 10) {
@@ -204,17 +364,23 @@ class BoundaryService {
           'Cần ghi lý do sửa ranh giới (ít nhất 10 ký tự).',
         );
       }
-      return _outbox.correctRemote(
+      rec = await _outbox.correctRemote(
         entity: PushEntity.plotBoundary,
         supersedesId: boundaryId,
         reason: reason,
         payload: payload,
       );
+    } else {
+      if (plotId == null && (commune == null || commune.isEmpty)) {
+        throw BoundaryException('Chọn xã của thửa trước khi lưu.');
+      }
+      rec = await _outbox.enqueue(
+        entity: PushEntity.plotBoundary,
+        payload: payload,
+      );
     }
-    if (plotId == null && (commune == null || commune.isEmpty)) {
-      throw BoundaryException('Chọn xã của thửa trước khi lưu.');
-    }
-    return _outbox.enqueue(entity: PushEntity.plotBoundary, payload: payload);
+    await clearDraft(plotId);
+    return rec;
   }
 
   /// Trạng thái ranh giới của [plotId] theo bản ghi mới nhất trên máy.
@@ -226,6 +392,25 @@ class BoundaryService {
       return statusOfRecord(r);
     }
     return const PlotBoundaryStatus(PlotSyncState.none);
+  }
+
+  /// Ranh giới vẽ trên máy chưa có thửa trên máy chủ (thửa mới chờ đồng bộ,
+  /// xung đột hoặc bị từ chối) — hiện trên bản đồ để không vẽ trùng.
+  Future<List<OutboxRecord>> localNewPlots() async {
+    final known = {for (final p in await _refs.list(RefEntity.plot)) p.id};
+    final seen = <String>{};
+    final out = <OutboxRecord>[];
+    for (final r in await _outbox.list(entity: PushEntity.plotBoundary)) {
+      final ref = '${r.payload['plot_ref']}';
+      if (r.op != RecordOp.create || known.contains(ref) || !seen.add(ref)) {
+        continue;
+      }
+      if (r.status == OutboxStatus.superseded || r.replacedBy != null) {
+        continue;
+      }
+      out.add(r);
+    }
+    return out;
   }
 
   /// Bản ghi `plot_boundary` cần người dùng xem lại (xung đột/bị từ chối).

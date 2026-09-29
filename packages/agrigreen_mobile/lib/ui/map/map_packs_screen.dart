@@ -1,23 +1,19 @@
-import 'package:agrigreen_mobile/application/tile_pack_service.dart';
-import 'package:agrigreen_mobile/data/map/tile_store.dart';
-import 'package:agrigreen_mobile/domain/geo/tiles.dart';
-import 'package:agrigreen_mobile/ui/theme.dart';
-import 'package:agrigreen_mobile/ui/widgets/common.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../providers.dart';
-
-final tilePacksProvider = FutureProvider.autoDispose<List<TilePack>>(
-  (ref) => servicesOf(ref).tiles.store.packs(),
-);
+import '../../application/tile_pack_service.dart';
+import '../../data/map/tile_store.dart';
+import '../../domain/geo/tiles.dart';
+import '../theme.dart';
+import '../widgets/common.dart';
 
 String _mb(int bytes) => '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 
-/// Gói bản đồ ngoại tuyến theo địa bàn (US-MAP-03). Tile lưu trong CSDL mã hóa.
-class MapPacksScreen extends ConsumerStatefulWidget {
+/// Gói bản đồ ngoại tuyến theo địa bàn (KN US-MAP-03, HTX US-PLOT-05). Tile
+/// lưu trong CSDL mã hóa. Dùng chung cho app hiện trường và App HTX.
+class MapPacksScreen extends StatefulWidget {
   const MapPacksScreen({
     super.key,
+    required this.service,
     this.proposal,
     this.minZoom = 12,
     this.maxZoom = 17,
@@ -27,19 +23,23 @@ class MapPacksScreen extends ConsumerStatefulWidget {
   final GeoBBox? proposal;
   final int minZoom;
   final int maxZoom;
+  final TilePackService service;
 
   @override
-  ConsumerState<MapPacksScreen> createState() => _MapPacksScreenState();
+  State<MapPacksScreen> createState() => _MapPacksScreenState();
 }
 
-class _MapPacksScreenState extends ConsumerState<MapPacksScreen> {
+class _MapPacksScreenState extends State<MapPacksScreen> {
   late int _maxZoom = widget.maxZoom;
+  late Future<List<TilePack>> _packs = widget.service.store.packs();
+
+  void _reload() => setState(() => _packs = widget.service.store.packs());
   TileDownloadProgress? _progress;
   bool _cancel = false;
   bool _running = false;
 
   Future<void> _download(TilePackPlan plan) async {
-    final svc = ref.services.tiles;
+    final svc = widget.service;
     setState(() {
       _running = true;
       _cancel = false;
@@ -67,14 +67,13 @@ class _MapPacksScreenState extends ConsumerState<MapPacksScreen> {
       if (mounted) showMessage(context, e.message, error: true);
     } finally {
       if (mounted) setState(() => _running = false);
-      ref.invalidate(tilePacksProvider);
+      if (mounted) _reload();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final packs = ref.watch(tilePacksProvider);
-    final svc = ref.services.tiles;
+    final svc = widget.service;
     TilePackPlan? plan;
     String? planError;
     final b = widget.proposal;
@@ -155,44 +154,49 @@ class _MapPacksScreenState extends ConsumerState<MapPacksScreen> {
             'Gói đã tải',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
-          packs.when(
-            loading: () => const LinearProgressIndicator(),
-            error: (e, _) => Text('Lỗi: $e'),
-            data: (list) => Column(
-              children: [
-                if (list.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: Text(
-                      'Chưa có gói bản đồ nào. Mở màn vẽ ranh giới, di chuyển tới địa bàn rồi chạm biểu tượng tải.',
-                    ),
+          FutureBuilder<List<TilePack>>(
+            future: _packs,
+            builder: (context, snap) => snap.hasError
+                ? Text('Lỗi: ${snap.error}')
+                : !snap.hasData
+                ? const LinearProgressIndicator()
+                : Column(
+                    children: [
+                      if (snap.data!.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: Text(
+                            'Chưa có gói bản đồ nào. Mở màn vẽ ranh giới, di chuyển tới địa bàn rồi chạm biểu tượng tải.',
+                          ),
+                        ),
+                      for (final p in snap.data!)
+                        Card(
+                          child: ListTile(
+                            leading: Icon(
+                              p.status == 'ready'
+                                  ? Icons.map
+                                  : Icons.error_outline,
+                              color: p.status == 'ready'
+                                  ? AgColors.g700
+                                  : AgColors.amber,
+                            ),
+                            title: Text(p.name),
+                            subtitle: Text(
+                              '${p.tileCount} ô · ${_mb(p.bytes)} · mức ${p.minZoom}–${p.maxZoom}'
+                              '${p.status == 'ready' ? '' : ' · chưa đủ'}',
+                            ),
+                            trailing: IconButton(
+                              tooltip: 'Xóa gói',
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () async {
+                                await svc.store.deletePack(p.id);
+                                _reload();
+                              },
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                for (final p in list)
-                  Card(
-                    child: ListTile(
-                      leading: Icon(
-                        p.status == 'ready' ? Icons.map : Icons.error_outline,
-                        color: p.status == 'ready'
-                            ? AgColors.g700
-                            : AgColors.amber,
-                      ),
-                      title: Text(p.name),
-                      subtitle: Text(
-                        '${p.tileCount} ô · ${_mb(p.bytes)} · mức ${p.minZoom}–${p.maxZoom}'
-                        '${p.status == 'ready' ? '' : ' · chưa đủ'}',
-                      ),
-                      trailing: IconButton(
-                        tooltip: 'Xóa gói',
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () async {
-                          await svc.store.deletePack(p.id);
-                          ref.invalidate(tilePacksProvider);
-                        },
-                      ),
-                    ),
-                  ),
-              ],
-            ),
           ),
           const SizedBox(height: 12),
           const Text(

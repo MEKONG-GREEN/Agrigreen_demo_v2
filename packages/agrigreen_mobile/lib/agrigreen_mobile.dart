@@ -5,6 +5,7 @@
 /// migration cục bộ; hàng đợi chiều lên (UUIDv7 + idem_key), push/pull theo
 /// cursor, xung đột, lệnh API xếp hàng; phong bì mã hóa (sealed box); ảnh mã
 /// hóa ngay khi chụp + watermark; hộp thư và kênh đẩy; gói bản đồ ngoại tuyến;
+/// vẽ ranh giới thửa (đi GPS / chọn trên bản đồ, nháp ngoại tuyến);
 /// chủ đề và widget chung. Màn hình và luồng nghiệp vụ riêng nằm ở từng app.
 ///
 /// Có thể import thư viện này, hoặc từng tệp (`package:agrigreen_mobile/data/sync/sync_api.dart`, …).
@@ -12,6 +13,7 @@
 library;
 
 export 'application/auth_flow.dart';
+export 'application/boundary_service.dart';
 export 'application/inbox_service.dart';
 export 'application/push_coordinator.dart';
 export 'application/tile_pack_service.dart';
@@ -50,6 +52,8 @@ export 'domain/geo/boundary.dart';
 export 'domain/geo/tiles.dart';
 export 'domain/mrv.dart';
 export 'domain/outbox_record.dart';
+export 'ui/map/boundary_editor_screen.dart';
+export 'ui/map/map_packs_screen.dart';
 export 'ui/map/offline_tile_provider.dart';
 export 'ui/theme.dart';
 export 'ui/widgets/common.dart';

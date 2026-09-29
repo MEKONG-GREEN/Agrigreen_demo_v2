@@ -1,6 +1,6 @@
 # Nghiệm thu cổng G2: yêu cầu → kiểm thử
 
-Lập ngày 29/09/2026 trên `main` tại `d86f958`. Mỗi yêu cầu có đúng một dòng. Tên kiểm thử trong bảng đều đã tra trong mã. Khi lập bảng, kiểm thử Go được chạy lại trên máy dev (PostgreSQL 17 + PostGIS + pgRouting): 44 gói gồm mọi module pf/mkg có kiểm thử, `cmd/api-platform`, `cmd/worker`, `contracts`, `tools`, `tests/acceptance`, `tests/e2e`, và **tất cả đạt**. Kiểm thử Flutter, Vitest, Playwright và pytest **không chạy lại trong lần rà này**; số ca ở mục 1 đếm trong mã nguồn.
+Lập ngày 29/09/2026 trên `main` tại `d86f958`. Mỗi yêu cầu có đúng một dòng. Tên kiểm thử trong bảng đều đã tra trong mã. Khi lập bảng, kiểm thử Go được chạy lại trên máy dev (PostgreSQL 17 + PostGIS + pgRouting): 44 gói gồm mọi module pf/mkg có kiểm thử, `cmd/api-platform`, `cmd/worker`, `contracts`, `tools`, `tests/acceptance`, `tests/e2e`, và **tất cả đạt**. Kiểm thử Flutter, Vitest, Playwright và pytest **không chạy lại trong lần rà này**; số ca ở mục 1 đếm trong mã nguồn. Cập nhật 30/09/2026 (App HTX: bản đồ và vẽ ranh giới lô, tin theo chuyên mục, gọi nhanh nông hộ): `flutter test` của lõi, App HTX và app hiện trường được chạy lại, **tất cả đạt**; số ca Flutter ở mục 1 là số của lần chạy này.
 
 Yêu cầu lấy từ:
 - [docs/roadmap.md](../roadmap.md), dòng G2, và [g2-conventions.md](../dev/g2-conventions.md);
@@ -21,14 +21,14 @@ Ba trạng thái:
 |---|---|---|---|---|
 | 2. Lộ trình G2 | 11 | 11 | 0 | 0 |
 | 3. Chuyển từ G1 | 10 | 4 | 4 | 2 |
-| 4. App HTX (Backlog v4.0) | 48 | 33 | 15 | 0 |
+| 4. App HTX (Backlog v4.0) | 48 | 37 | 11 | 0 |
 | 5. GIS (Backlog v1.1) | 38 | 23 | 9 | 6 |
 | 6. Cổng kiến trúc G2 | 30 | 25 | 3 | 2 |
-| **Tổng** | **137** | **96** | **31** | **10** |
+| **Tổng** | **137** | **100** | **27** | **10** |
 
 **Ghi chú môi trường (không tính theo dòng):** CI trên GitHub **chưa được xác nhận** cho các commit G2, vì GitHub Actions đang bị chặn do lỗi thanh toán. Các job mới (`optimizer`, `agrigreen-mobile`, `htx-app`, kiểm thử App HTX trên emulator trong `field-app-emulator`) và `compose-smoke` có api-internal, optimizer, mTLS chưa chạy trên runner. Trạng thái trong bảng dựa trên lần chạy kiểm thử tại máy dev.
 
-**31 dòng "một phần"**: phần còn thiếu và loại của từng dòng.
+**27 dòng "một phần"**: phần còn thiếu và loại của từng dòng.
 
 | Yêu cầu | Còn thiếu | Loại |
 |---|---|---|
@@ -42,14 +42,10 @@ Ba trạng thái:
 | HTX US-HTX-03 Sao chép hồ sơ HTX | **Chưa làm** | mã |
 | HTX US-HH-01 Hồ sơ nông hộ | Tạo, chống trùng và phạm vi đã đạt. **AC-2 tìm theo SĐT hoặc họ tên chưa có**: họ tên chủ hộ chỉ nằm ở vault nên không lọc được ở pf (R-04). Muốn tìm đúng SĐT phải thêm API tra blind index qua vault, có mục đích | mã + quyết định PII |
 | HTX US-HH-02 Nhập/sao chép nông hộ | Nhập (CSV/.xlsx) đạt. **AC-2 sao chép hàng loạt chưa làm** | mã |
-| HTX US-HH-03 Gọi nhanh nông hộ | **Chưa làm**. Danh sách nông hộ trên App HTX chỉ có nhãn đã che. Gọi cần đọc SĐT từ vault lúc bấm, có mục đích (như KN US-DIR-02) | mã |
-| HTX US-PLOT-01 Xem & sửa ranh giới lô | Đạt: dùng chung một bản ghi `pf/geo`, mỗi lô một HTX, API cho `coop_manager`. **Còn thiếu màn bản đồ thửa cho Quản lý HTX** (App HTX không có bản đồ; web `/ban-do` chỉ cho cán bộ KN) | mã (client) |
-| HTX US-PLOT-02 Đánh dấu ranh giới bằng GPS | Quy tắc ≥ 4 điểm, lệch diện tích 5 % có ở app hiện trường (cán bộ KN, G1). **App HTX chưa có màn đi GPS khép vùng** | mã (client) |
-| HTX US-PLOT-03 Chọn ranh giới trên ảnh vệ tinh | **Nhà cung cấp tile vệ tinh chưa chọn** (RB-7); App HTX chưa có màn vẽ | chờ khách + mã |
-| HTX US-PLOT-05 Vẽ ranh giới offline | Vẽ ngoại tuyến có ở app hiện trường (G1). **App HTX chưa có màn vẽ** | mã (client) |
+| HTX US-HH-03 Gọi nhanh nông hộ | App HTX đạt: nút gọi cạnh từng nông hộ, SĐT đọc lúc bấm, không lưu trên máy; máy không gọi được thì báo đúng AC-2. **Backend chưa có `GET /v1/households/{ref}/contact`** (đọc SĐT từ vault có mục đích, `no-store`). Khi route trả 404 `not_found`, app ẩn nút gọi | mã (backend) |
+| HTX US-PLOT-03 Chọn ranh giới trên ảnh vệ tinh | Chế độ chạm chọn góc trên bản đồ đã có trên App HTX, dùng cùng ràng buộc với đo GPS. Nền bản đồ lấy theo `AG_TILE_URL`. **Nhà cung cấp tile vệ tinh chưa chọn** (RB-7) | chờ khách |
 | HTX US-WEATHER-01 Thời tiết vùng | **Nhà cung cấp thời tiết trong lãnh thổ chưa chọn** (RB-7, ADR-0007). Thẻ thời tiết hiện "chờ nguồn" | chờ khách |
 | HTX US-CMS-01 Soạn bài viết | Soạn, xuất bản và bắt buộc tiêu đề/chuyên mục đã đạt; API đọc phiên bản cho xem trước (`AdminVersion`). **Web chưa có khung xem trước dạng mobile (AC-1)**. Bài mới xuống máy theo lượt đồng bộ/đẩy, không tức thì (AC-2) | mã (web) |
-| HTX US-NEWS-01 Tin tức khuyến nông | Chuyên mục có ở pf/content, ở bộ lọc `GET /v1/documents?category=` và trong entity đồng bộ `document` (`category`). **App HTX chưa hiện và lọc theo chuyên mục (AC-2)** | mã (app) |
 | HTX US-DASH-03 Lập lịch gửi báo cáo | Lịch theo HTX và gửi email đã đạt ở backend. **Chưa có màn lập lịch cho Quản lý HTX**: `/bao-cao` chỉ mở cho cán bộ KN/Cục, `/quan-tri/mau-bao-cao` cho quản trị. Người nhận email cần khách chốt | mã (web) + chờ khách |
 | GIS US-CFG-01 Thêm cấu hình | Ngưỡng có phiên bản và phê duyệt (`geo.hub_capacity_warn_pct/full_pct`, `geo.plot_layer_min_zoom`) đã đạt. **Chưa có tham số dải màu heatmap, chưa kiểm HEX**. Kiểm "ngưỡng tăng dần 0–100 %" mới có cho ngưỡng CGH | mã |
 | GIS US-CFG-02 Sửa/xóa/khôi phục mặc định | Sửa bằng phiên bản mới đã đạt. **Chưa có "khôi phục mặc định"**. Ghi Snapshot ngày chuyển sau (US-SNAP-01) | mã |
@@ -90,8 +86,8 @@ $env:CI='1'; npm run e2e # Playwright: 86 ca; G2 thêm htx-*, gis-map, gis-admin
 Di động (Flutter 3.47.5):
 
 ```powershell
-cd packages/agrigreen_mobile; cmd /c "flutter test"      # lõi chung: 92 ca (g2_entities_test, sync_nudge_entities_test, …)
-cd apps/htx-app;            cmd /c "flutter test"      # App HTX: 53 ca (đếm trong mã)
+cd packages/agrigreen_mobile; cmd /c "flutter test"      # lõi chung: 101 ca (g2_entities_test, sync_nudge_entities_test, boundary_service_test, …)
+cd apps/htx-app;            cmd /c "flutter test"      # App HTX: 64 ca (plot_boundary_test, news_category_call_test, …)
 flutter test integration_test -d emulator-5554           # htx_flow_test: đăng nhập → PIN → mở vụ, nhật ký có ảnh, yêu cầu hỗ trợ ngoại tuyến
 cd apps/field-app;          cmd /c "flutter test"      # app hiện trường: 55 ca (sau khi tách lõi)
 ```
@@ -163,17 +159,17 @@ CI (`.github/workflows/ci.yml`): `lint`, `test`, `web-ops`, `web-e2e`, `optimize
 | HTX US-HTX-03 sao chép hồ sơ HTX | — | **một phần**: chưa làm |
 | HTX US-HH-01 hồ sơ nông hộ | `TestHouseholdDedupeViaVault` (AC-3 SĐT trùng), `TestCommuneOfficerCannotCreateOutsideCommune`, E2E-03 (G1) | **một phần**: thiếu tìm theo SĐT/họ tên (AC-2) |
 | HTX US-HH-02 nhập/sao chép nông hộ | `TestImportHouseholdsCSV`, `TestImportHouseholdsXLSX` (G1) | **một phần**: thiếu sao chép hàng loạt (AC-2) |
-| HTX US-HH-03 gọi nhanh nông hộ | — | **một phần**: chưa làm |
+| HTX US-HH-03 gọi nhanh nông hộ | App: `news_category_call_test.dart` (HTX US-HH-03: bấm biểu tượng điện thoại → `tel:` với SĐT đọc lúc bấm, SĐT không nằm trong CSDL máy; máy không gọi được → "Không thể khởi tạo cuộc gọi trên thiết bị này."; route 404 `not_found` → ẩn nút) | **một phần**: app đạt; chờ backend `GET /v1/households/{ref}/contact` trả `{phone}`, `no-store` |
 
 ### D. Lô ruộng và GPS
 
 | Story | Kiểm thử | Trạng thái |
 |---|---|---|
-| HTX US-PLOT-01 xem & sửa ranh giới lô | `TestOverlapRules`, `TestCorrectionCreatesNewVersion` (fixture có vai `coop_manager`), `TestFarmerPlotSyncByHousehold_HTX_US_SEASON_01`, tests/acceptance `TestPrototypeGanThuaChoHTXVaNongHo` (AC-3) | **một phần**: thiếu màn bản đồ cho Quản lý HTX |
-| HTX US-PLOT-02 đánh dấu ranh giới bằng GPS | App hiện trường: `boundary_test.dart` (< 4 điểm, thẳng hàng, lệch diện tích > 5 %) (G1) | **một phần**: App HTX chưa có màn |
-| HTX US-PLOT-03 chọn trên ảnh vệ tinh | — | **một phần**: tile vệ tinh chờ nhà cung cấp; chưa có màn |
+| HTX US-PLOT-01 xem & sửa ranh giới lô | `TestOverlapRules`, `TestCorrectionCreatesNewVersion` (fixture có vai `coop_manager`), `TestFarmerPlotSyncByHousehold_HTX_US_SEASON_01`, tests/acceptance `TestPrototypeGanThuaChoHTXVaNongHo` (AC-3); App HTX: `plot_boundary_test.dart` (HTX US-PLOT-01: màn "Lô ruộng & Ranh giới GPS" hiện lô KN vẽ trước với nhãn "Nháp - KN vẽ trước", lô nháp chưa gán HTX; lô HTX khác không hiện, sửa bị chặn "Bạn không có quyền truy cập lô ruộng này."; sửa lô KN tạo bản bù `correct` cùng `plot_ref`, `supersedes_id` là phiên bản KN, `source: htx_app`); lõi: `boundary_service_test.dart` | **đạt** |
+| HTX US-PLOT-02 đánh dấu ranh giới bằng GPS | App HTX: `plot_boundary_test.dart` (HTX US-PLOT-02: < 4 điểm hoặc thẳng hàng bị chặn với thông báo AC-2; GPS yếu thì cảnh báo "±35 m", có nút "Đánh dấu lại" và "Chọn trên bản đồ"; lệch diện tích vượt tham số `geo.area_deviation_max_pct` phải xác nhận; khép vùng tạo lô mới của HTX mình, `method: gps`); lõi: `boundary_service_test.dart` (ngưỡng theo tham số); app hiện trường: `boundary_test.dart` (G1) | **đạt**. Màn vẽ dùng chung ở lõi (`BoundaryEditorScreen`, `BoundaryService`) với app hiện trường |
+| HTX US-PLOT-03 chọn trên ảnh vệ tinh | App HTX: `plot_boundary_test.dart` (HTX US-PLOT-03: chế độ "Chọn trên bản đồ" chạm góc; ở chế độ đi GPS chạm bản đồ không thêm điểm; cùng ràng buộc ≥ 4 điểm không thẳng hàng; `method: map`) | **một phần**: nền theo `AG_TILE_URL`; tile vệ tinh chờ nhà cung cấp (RB-7) |
 | HTX US-PLOT-04 cảnh báo chồng lấn | `TestOverlapRules`, `TestClassifyOverlaps`; WEB-E2E `htx.spec.ts`, `conflicts.spec.ts` (G1) | **đạt**. Quy tắc X10 áp dụng cho mọi client |
-| HTX US-PLOT-05 vẽ ranh giới offline | App hiện trường: `boundary_test.dart`, `integration_test/app_flow_test.dart` (G1) | **một phần**: App HTX chưa có màn vẽ |
+| HTX US-PLOT-05 vẽ ranh giới offline | App HTX: `plot_boundary_test.dart` (HTX US-PLOT-05: mất sóng giữa lúc đi ranh giới, điểm lưu tạm trong CSDL mã hóa và khôi phục khi mở lại màn; lưu vào hàng đợi; có mạng thì đồng bộ đúng một bản ghi kể cả khi mất phản hồi; máy chủ báo chồng lấn thì bản ghi thành xung đột trong hàng đợi, xác nhận tạo bản bù `confirm_overlap`; nền bản đồ đọc gói tile trong CSDL, không cần mạng); lõi: `boundary_service_test.dart` (nháp còn sau khi app tắt đột ngột); app hiện trường: `boundary_test.dart`, `integration_test/app_flow_test.dart` (G1) | **đạt** |
 | HTX US-GPS-01 xác thực vị trí khai báo | `TestGPSNormalizeAndStatus`, `TestFarmLogRecord_HTX_US_LOG_01_02` (nhãn không chặn lưu), `TestOpenSeasonFarmer_HTX_US_SEASON_01`, `TestGpsFixLog_HTX_US_GPS_03` (khoảng cách trắc địa tới lô); app: `domain_test.dart` (từ chối quyền → `denied`, không chặn), `farm_log_flow_test.dart` (AC-4); WEB-E2E `htx-logs.spec.ts` ("Vị trí không khớp", "Thiếu GPS") | **đạt**. Ngưỡng 50 m là tham số `cropcycle.gps_match_tolerance_m` |
 | HTX US-GPS-02 xác thực khi GPS yếu | App: `domain_test.dart` (nguồn `photo_exif`, nhãn "Không có GPS thiết bị", nguồn luôn có nhãn), `season_fix_test.dart` (GPS-02) | **đạt** |
 | HTX US-GPS-03 log lịch sử toạ độ | `TestGpsFixLog_HTX_US_GPS_03` (chỉ đọc, sửa/xóa → 405 `geo.gps_log_read_only` kể cả Admin), `TestGpsLogConsumerAfterCommit_HTX_US_GPS_03` (ghi sau commit, lỗi geo tạm thời → giao lại, nghiệp vụ không bị chặn), `TestSupportRequestGpsLogConsumer_HTX_US_GPS_03`, `TestFarmerReadsOwnGpsLog_HTX_US_GPS_03` | **đạt**. Sổ phân vùng tháng, không xóa (≥ 12 tháng, AC-2). GPS là dữ liệu cá nhân hay không, thời hạn lưu: chờ khách |
@@ -220,7 +216,7 @@ CI (`.github/workflows/ci.yml`): `lint`, `test`, `web-ops`, `web-e2e`, `optimize
 |---|---|---|
 | HTX US-CMS-01 soạn bài viết | `TestPublishNewVersionKeepsOld`, `TestBodySanitisedOnSave`, `TestAuthorCannotSelfApprove` (G1) | **một phần**: thiếu xem trước dạng mobile trên web |
 | HTX US-CMS-02 nhân bản & trích xuất | `TestAlertPublishedEvent` (nhân bản thành bản nháp giữ nội dung, AC-1), `TestExtract`, `TestExtractPDFRejects` (AC-2: trích thất bại → soạn tay) | **đạt** |
-| HTX US-NEWS-01 xem tin tức | `TestSearchAccentInsensitive` (lọc `category`), `TestSyncRetireTombstone`; app: `news_queue_screen_test.dart` | **một phần**: App HTX chưa phân loại theo chuyên mục |
+| HTX US-NEWS-01 xem tin tức | `TestSearchAccentInsensitive` (lọc `category`), `TestSyncRetireTombstone`; app: `news_queue_screen_test.dart`, `news_category_call_test.dart` (HTX US-NEWS-01: danh sách chia nhóm theo `document.category`, chip lọc chỉ hiện đúng chuyên mục, không trộn; cảnh báo khẩn vẫn trên cùng) | **đạt**. Bài mới xuống máy theo lượt đồng bộ hoặc đẩy (như US-CMS-01 AC-2) |
 | HTX US-NEWS-02 lưu tin đọc offline | `TestSyncRetireTombstone`, `TestPersonalLibraryUSLIB05`; app: `news_queue_screen_test.dart` (lưu ngoại tuyến, bài đã gỡ vẫn đọc được kèm nhãn) | **đạt** |
 | HTX US-NEWS-03 cảnh báo khẩn cấp | `TestAlertPublishedEvent`, `TestAlertReachesFarmersAndCoopManagersInAreaHTXUSNEWS03` (nông dân có thửa trong vùng, không tới ngoài vùng), `TestAreaFarmersAndSeasonActivityAdapters`, `TestPushDataOnlyAndPerDeviceFailures` (AC-3); app: `nudge_deeplink_test.dart` | **đạt**. FCM thật cần `AG_FCM_*` |
 

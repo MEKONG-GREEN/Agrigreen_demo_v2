@@ -5,10 +5,13 @@ import 'package:agrigreen_mobile/ui/widgets/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../application/boundary_service.dart';
+import 'package:agrigreen_mobile/application/boundary_service.dart';
+
 import '../providers.dart';
 import 'boundary_screen.dart';
-import 'map_packs_screen.dart';
+
+import 'package:agrigreen_mobile/ui/map/map_packs_screen.dart';
+
 import 'notifications_screen.dart' show unawaitedSync;
 
 final plotsProvider = FutureProvider.autoDispose<List<RefRow>>(
@@ -119,7 +122,9 @@ class PlotsScreen extends ConsumerWidget {
             iconSize: 28,
             icon: const Icon(Icons.offline_pin),
             onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const MapPacksScreen()),
+              MaterialPageRoute<void>(
+                builder: (_) => MapPacksScreen(service: ref.services.tiles),
+              ),
             ),
           ),
         ],

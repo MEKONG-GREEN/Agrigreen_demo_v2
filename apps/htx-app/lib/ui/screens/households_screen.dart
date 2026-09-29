@@ -1,4 +1,5 @@
 import 'package:agrigreen_mobile/ui/theme.dart';
+import 'package:agrigreen_mobile/ui/widgets/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,13 +12,33 @@ final _householdsProvider = FutureProvider.autoDispose<List<HouseholdItem>>(
 );
 
 /// Nông hộ của HTX (quản lý HTX). Chạm → lô của hộ → mở vụ hộ / ghi nhật ký
-/// hộ (HTX US-SEASON-02, US-LOG-02).
-class HouseholdsScreen extends ConsumerWidget {
+/// hộ (HTX US-SEASON-02, US-LOG-02); biểu tượng điện thoại → gọi nhanh (HTX
+/// US-HH-03, SĐT đọc từ máy chủ lúc bấm, không lưu trên máy).
+class HouseholdsScreen extends ConsumerStatefulWidget {
   const HouseholdsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HouseholdsScreen> createState() => _HouseholdsScreenState();
+}
+
+class _HouseholdsScreenState extends ConsumerState<HouseholdsScreen> {
+  String? _calling;
+
+  Future<void> _call(HouseholdItem h) async {
+    setState(() => _calling = h.ref);
+    try {
+      await ref.services.manager.callHousehold(h.ref);
+    } on ManagerException catch (e) {
+      if (mounted) showMessage(context, e.message, error: true);
+    } finally {
+      if (mounted) setState(() => _calling = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final list = ref.watch(_householdsProvider);
+    final canCall = ref.services.manager.householdCallAvailable;
     return Scaffold(
       appBar: AppBar(title: const Text('Nông hộ của HTX')),
       body: list.when(
@@ -49,7 +70,30 @@ class HouseholdsScreen extends ConsumerWidget {
                             '${h.plots} lô ruộng',
                           ].join(' · '),
                         ),
-                        trailing: const Icon(Icons.chevron_right),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (canCall)
+                              IconButton(
+                                tooltip: 'Gọi ${h.label}',
+                                iconSize: 28,
+                                color: AgColors.g700,
+                                icon: _calling == h.ref
+                                    ? const SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.phone),
+                                onPressed: _calling == null
+                                    ? () => _call(h)
+                                    : null,
+                              ),
+                            const Icon(Icons.chevron_right),
+                          ],
+                        ),
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => HouseholdPlotsScreen(household: h),

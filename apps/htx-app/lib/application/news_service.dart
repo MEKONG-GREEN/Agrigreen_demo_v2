@@ -11,6 +11,7 @@ class NewsArticle {
     required this.saved,
     required this.available,
     this.publishedAt,
+    this.category,
     this.urgent = false,
     this.pending = false,
   });
@@ -19,6 +20,10 @@ class NewsArticle {
   final String summary;
   final String body;
   final String? publishedAt;
+
+  /// Chuyên mục (`document.category` của pf/content): technique, pest_warning,
+  /// policy, market, event; null = chưa phân loại (HTX US-NEWS-01 AC-2).
+  final String? category;
 
   /// Cảnh báo khẩn cấp (HTX US-NEWS-03) — hiện trên cùng, màu đỏ.
   final bool urgent;
@@ -31,6 +36,38 @@ class NewsArticle {
 
   /// Lưu/bỏ lưu trên máy, chưa gửi lên máy chủ.
   final bool pending;
+}
+
+/// Chuyên mục tin tức theo thứ tự hiển thị (pf/content `domain.Categories`).
+const newsCategories = <String, String>{
+  'technique': 'Kỹ thuật',
+  'pest_warning': 'Cảnh báo sâu bệnh',
+  'policy': 'Chính sách',
+  'market': 'Thị trường',
+  'event': 'Sự kiện',
+};
+
+/// Khóa nhóm của bài chưa có / có chuyên mục lạ.
+const newsOtherCategory = 'other';
+
+String newsCategoryLabel(String? c) =>
+    newsCategories[c] ?? (c == null || c == newsOtherCategory ? 'Khác' : c);
+
+/// Khóa nhóm của bài: chuyên mục đã biết, còn lại gộp "Khác".
+String newsCategoryKey(NewsArticle a) =>
+    newsCategories.containsKey(a.category) ? a.category! : newsOtherCategory;
+
+/// Chia bài theo chuyên mục (thứ tự [newsCategories], "Khác" cuối), giữ thứ tự
+/// trong nhóm (khẩn cấp trước, mới trước) — không trộn chuyên mục (AC-2).
+List<(String, List<NewsArticle>)> groupByCategory(List<NewsArticle> list) {
+  final m = <String, List<NewsArticle>>{};
+  for (final a in list) {
+    (m[newsCategoryKey(a)] ??= []).add(a);
+  }
+  return [
+    for (final k in [...newsCategories.keys, newsOtherCategory])
+      if (m[k] != null) (k, m[k]!),
+  ];
 }
 
 /// Nhãn của bài đã lưu bị gỡ (HTX US-NEWS-02 AC-2).
@@ -76,6 +113,7 @@ class NewsService {
       summary: s(doc?['summary']),
       body: s(doc?['body']),
       publishedAt: doc?['published_at'] as String?,
+      category: (doc?['category'] ?? item?['category']) as String?,
       urgent:
           doc?['severity'] == 'urgent' ||
           doc?['kind'] == 'urgent_alert' ||

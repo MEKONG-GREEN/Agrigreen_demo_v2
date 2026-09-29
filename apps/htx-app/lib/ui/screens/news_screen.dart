@@ -23,9 +23,41 @@ class NewsScreen extends ConsumerStatefulWidget {
 class _NewsScreenState extends ConsumerState<NewsScreen> {
   bool _savedOnly = false;
 
+  /// Chuyên mục đang lọc; null = tất cả, chia nhóm theo chuyên mục.
+  String? _category;
+
+  Widget _card(NewsArticle a, {bool showCategory = false}) => Card(
+    color: a.urgent ? AgColors.redBg : null,
+    child: ListTile(
+      leading: Icon(
+        a.urgent ? Icons.warning_amber : Icons.article,
+        color: a.urgent ? AgColors.red : AgColors.g700,
+      ),
+      title: Text(a.title),
+      subtitle: Text(
+        [
+          if (showCategory) newsCategoryLabel(a.category),
+          if (!a.available) 'Đã gỡ',
+          if (a.saved) 'Đã lưu',
+          a.summary,
+        ].where((x) => x.isNotEmpty).join(' · '),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      onTap: () => Navigator.of(context)
+          .push(
+            MaterialPageRoute<void>(builder: (_) => ArticleScreen(article: a)),
+          )
+          .then((_) => ref.invalidate(_newsProvider)),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final news = ref.watch(_newsProvider);
+    final present = {
+      for (final a in news.value ?? const <NewsArticle>[]) newsCategoryKey(a),
+    };
     return Scaffold(
       appBar: AppBar(title: const Text('Tin tức & Khuyến nông')),
       body: Column(
@@ -41,6 +73,34 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
               onSelectionChanged: (s) => setState(() => _savedOnly = s.first),
             ),
           ),
+          // Lọc theo chuyên mục (HTX US-NEWS-01 AC-2).
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: ChoiceChip(
+                    label: const Text('Mọi chuyên mục'),
+                    selected: _category == null,
+                    onSelected: (_) => setState(() => _category = null),
+                  ),
+                ),
+                for (final k in [...newsCategories.keys, newsOtherCategory])
+                  if (present.contains(k))
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ChoiceChip(
+                        label: Text(newsCategoryLabel(k)),
+                        selected: _category == k,
+                        onSelected: (on) =>
+                            setState(() => _category = on ? k : null),
+                      ),
+                    ),
+              ],
+            ),
+          ),
           Expanded(
             child: news.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -48,7 +108,9 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
               data: (all) {
                 final list = [
                   for (final a in all)
-                    if (!_savedOnly || a.saved) a,
+                    if ((!_savedOnly || a.saved) &&
+                        (_category == null || newsCategoryKey(a) == _category))
+                      a,
                 ];
                 if (list.isEmpty) {
                   return const Center(
@@ -58,38 +120,45 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                     ),
                   );
                 }
-                return ListView.builder(
+                if (_category != null) {
+                  return ListView(
+                    padding: const EdgeInsets.all(8),
+                    children: [for (final a in list) _card(a)],
+                  );
+                }
+                // Cảnh báo khẩn cấp luôn trên cùng (HTX US-NEWS-03), rồi
+                // từng chuyên mục riêng.
+                final urgent = [
+                  for (final a in list)
+                    if (a.urgent) a,
+                ];
+                return ListView(
                   padding: const EdgeInsets.all(8),
-                  itemCount: list.length,
-                  itemBuilder: (_, i) {
-                    final a = list[i];
-                    return Card(
-                      color: a.urgent ? AgColors.redBg : null,
-                      child: ListTile(
-                        leading: Icon(
-                          a.urgent ? Icons.warning_amber : Icons.article,
-                          color: a.urgent ? AgColors.red : AgColors.g700,
+                  children: [
+                    if (urgent.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 12, 4, 4),
+                        child: Text(
+                          'Cảnh báo khẩn (${urgent.length})',
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
-                        title: Text(a.title),
-                        subtitle: Text(
-                          [
-                            if (!a.available) 'Đã gỡ',
-                            if (a.saved) 'Đã lưu',
-                            a.summary,
-                          ].where((x) => x.isNotEmpty).join(' · '),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        onTap: () => Navigator.of(context)
-                            .push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => ArticleScreen(article: a),
-                              ),
-                            )
-                            .then((_) => ref.invalidate(_newsProvider)),
                       ),
-                    );
-                  },
+                      for (final a in urgent) _card(a, showCategory: true),
+                    ],
+                    for (final (k, items) in groupByCategory([
+                      for (final a in list)
+                        if (!a.urgent) a,
+                    ])) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 12, 4, 4),
+                        child: Text(
+                          '${newsCategoryLabel(k)} (${items.length})',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                      for (final a in items) _card(a),
+                    ],
+                  ],
                 );
               },
             ),

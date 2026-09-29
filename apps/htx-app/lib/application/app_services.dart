@@ -1,7 +1,10 @@
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:agrigreen_mobile/application/boundary_service.dart';
 import 'package:agrigreen_mobile/application/inbox_service.dart';
 import 'package:agrigreen_mobile/application/push_coordinator.dart';
+import 'package:agrigreen_mobile/application/tile_pack_service.dart';
 import 'package:agrigreen_mobile/core/clock.dart';
 import 'package:agrigreen_mobile/core/config.dart';
 import 'package:agrigreen_mobile/core/ids.dart';
@@ -14,6 +17,7 @@ import 'package:agrigreen_mobile/data/db/local_db.dart';
 import 'package:agrigreen_mobile/data/dial/dialer.dart';
 import 'package:agrigreen_mobile/data/files/blob_store.dart';
 import 'package:agrigreen_mobile/data/files/evidence_repository.dart';
+import 'package:agrigreen_mobile/data/map/tile_store.dart';
 import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
 import 'package:agrigreen_mobile/data/photo/location_source.dart';
 import 'package:agrigreen_mobile/data/photo/photo_pipeline.dart';
@@ -23,6 +27,7 @@ import 'package:agrigreen_mobile/data/reference/reference_repository.dart';
 import 'package:agrigreen_mobile/data/secure/secure_store.dart';
 import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 import 'package:agrigreen_mobile/data/sync/sync_service.dart';
+import 'package:agrigreen_mobile/domain/geo/tiles.dart';
 import 'package:path/path.dart' as p;
 
 import 'crop_service.dart';
@@ -57,6 +62,7 @@ class HtxPlatform {
     this.blobStore,
     this.onlineChanges,
     this.autoSync = true,
+    this.tileFetcher,
   });
 
   final AppConfig config;
@@ -91,6 +97,10 @@ class HtxPlatform {
 
   /// Tự đồng bộ theo chu kỳ (tắt trong kiểm thử widget).
   final bool autoSync;
+
+  /// Tải tile trực tuyến khi gói ngoại tuyến không có (kiểm thử); null = HTTP
+  /// theo `AG_TILE_URL`.
+  final Future<Uint8List> Function(TileId t)? tileFetcher;
 }
 
 /// Toàn bộ dịch vụ sau khi mở khóa (CSDL đã mở).
@@ -116,6 +126,8 @@ class HtxServices {
     required this.staff,
     required this.news,
     required this.manager,
+    required this.boundaries,
+    required this.tiles,
   });
 
   final HtxPlatform platform;
@@ -138,6 +150,13 @@ class HtxServices {
   final StaffService staff;
   final NewsService news;
   final ManagerService manager;
+
+  /// Vẽ ranh giới lô (quản lý HTX — HTX US-PLOT-01/02/03/05), dùng chung lõi
+  /// với app hiện trường; `source: htx_app`, chỉ lô của HTX mình + lô nháp.
+  final BoundaryService boundaries;
+
+  /// Gói bản đồ ngoại tuyến (vẽ ranh giới khi mất sóng — HTX US-PLOT-05).
+  final TilePackService tiles;
 
   late final PushHost pushHost = _ServicesPushHost(this);
 
@@ -259,6 +278,23 @@ class HtxServices {
         profile: profile,
         clock: pf.clock,
         ids: pf.ids,
+        dialer: pf.dialer,
+      ),
+      boundaries: BoundaryService(
+        outbox: outbox,
+        refs: refs,
+        ids: pf.ids,
+        db: db,
+        source: BoundarySource.htxApp,
+        deviationLimitPct: profile.areaDeviationMaxPct,
+        ownCooperative: profile.cooperativeRef,
+      ),
+      tiles: TilePackService(
+        store: TileStore(db),
+        urlTemplate: pf.config.tileUrlTemplate,
+        clock: pf.clock,
+        ids: pf.ids,
+        userAgent: 'vn.agrigreen.htx (offline-pack)',
       ),
     );
   }

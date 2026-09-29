@@ -4,6 +4,7 @@ import 'package:agrigreen_mobile/core/clock.dart';
 import 'package:agrigreen_mobile/core/ids.dart';
 import 'package:agrigreen_mobile/data/actions/action_queue.dart';
 import 'package:agrigreen_mobile/data/db/local_db.dart';
+import 'package:agrigreen_mobile/data/dial/dialer.dart';
 import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 
 import '../domain/cropcycle.dart';
@@ -23,6 +24,9 @@ class HouseholdItem {
   final String? code;
   final int plots;
 }
+
+/// Máy không gọi điện được (HTX US-HH-03 AC-2).
+const msgCannotCall = 'Không thể khởi tạo cuộc gọi trên thiết bị này.';
 
 class ManagerException implements Exception {
   ManagerException(this.message);
@@ -87,7 +91,9 @@ class ManagerService {
     required ProfileService profile,
     required Clock clock,
     required IdGenerator ids,
-  }) : _api = api,
+    Dialer dialer = const UrlLauncherDialer(),
+  }) : _dialer = dialer,
+       _api = api,
        _db = db,
        _actions = actions,
        _crop = crop,
@@ -95,6 +101,7 @@ class ManagerService {
        _clock = clock,
        _ids = ids;
 
+  final Dialer _dialer;
   final SyncApi _api;
   final LocalDb _db;
   final ActionQueue _actions;
@@ -173,6 +180,59 @@ class ManagerService {
       }
     }
     return out;
+  }
+
+  /// false sau khi máy chủ trả 404 `not_found` cho route liên hệ nông hộ
+  /// (bản API chưa có `GET /v1/households/{ref}/contact`) → ẩn nút gọi.
+  bool get householdCallAvailable => _callAvailable;
+  bool _callAvailable = true;
+
+  /// SĐT của nông hộ, đọc từ vault qua API **lúc bấm gọi** (`Cache-Control:
+  /// no-store`), không lưu trên máy, không ghi log (R-04, R-14).
+  Future<String> householdPhone(String householdRef) async {
+    final Map<String, Object?> j;
+    try {
+      j = await _api.getJson('/v1/households/$householdRef/contact');
+    } on NetworkException {
+      throw ManagerException('Cần có mạng để lấy số điện thoại nông hộ.');
+    } on DeviceRevokedException {
+      rethrow;
+    } on ApiException catch (e) {
+      if (e.status == 404 && e.code == 'not_found') {
+        _callAvailable = false;
+        throw ManagerException(
+          'Máy chủ chưa hỗ trợ gọi nhanh nông hộ. Hãy cập nhật hệ thống.',
+        );
+      }
+      throw ManagerException(switch (e.code) {
+        // Cùng quy ước với accounts.contact_unavailable (danh bạ cán bộ).
+        final c when c.endsWith('.contact_unavailable') =>
+          'Nông hộ chưa có số điện thoại hợp lệ.',
+        _ when e.status == 404 => 'Không tìm thấy nông hộ.',
+        _ when e.status == 403 => 'Nông hộ không thuộc HTX bạn quản lý.',
+        _ => 'Không lấy được số điện thoại (${e.code}).',
+      });
+    }
+    final phone = j['phone'];
+    if (phone is! String || phone.replaceAll(RegExp(r'[^\d]'), '').length < 9) {
+      throw ManagerException('Nông hộ chưa có số điện thoại hợp lệ.');
+    }
+    return phone.trim();
+  }
+
+  /// Gọi nhanh nông hộ (HTX US-HH-03 AC-1): lấy SĐT rồi mở trình quay số.
+  /// Máy không gọi được → [msgCannotCall] (AC-2), không treo màn hình.
+  Future<void> callHousehold(String householdRef) async {
+    final phone = await householdPhone(householdRef);
+    bool ok;
+    try {
+      ok = await _dialer.open(
+        Uri(scheme: 'tel', path: phone.replaceAll(RegExp(r'[^\d+]'), '')),
+      );
+    } catch (_) {
+      ok = false;
+    }
+    if (!ok) throw ManagerException(msgCannotCall);
   }
 
   Future<List<PlotItem>> plotsOf(String householdRef) async => [

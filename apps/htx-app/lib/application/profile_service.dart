@@ -19,7 +19,9 @@ class FarmerHousehold {
 /// - `GET /v1/me` → vai, tổ chức (HTX của quản lý);
 /// - `GET /v1/farmer/households` (vai farmer) → nông hộ của tài khoản;
 /// - `GET /v1/masterdata/catalogs/machine_type` → danh mục máy (HTX US-LOG-01 AC-2);
-/// - `GET /v1/cropcycle/variety-bindings` → giống ↔ SOP (HTX US-SEASON-01 AC-1).
+/// - `GET /v1/cropcycle/variety-bindings` → giống ↔ SOP (HTX US-SEASON-01 AC-1);
+/// - `GET /v1/masterdata/params/value?key=geo.area_deviation_max_pct` (quản
+///   lý HTX) → ngưỡng lệch diện tích khi vẽ ranh giới (HTX US-PLOT-02 AC-3).
 ///
 /// Chưa tải được bao giờ → vai lấy từ access token (`realm_access.roles`).
 class ProfileService {
@@ -38,6 +40,13 @@ class ProfileService {
   static const _meKey = 'htx.me';
   static const _householdsKey = 'htx.farmer_households';
   static const _bindingsKey = 'htx.variety_bindings';
+  static const _deviationKey = 'htx.param.geo.area_deviation_max_pct';
+
+  /// Khóa tham số ngưỡng lệch diện tích (pf/masterdata, seed 5 %).
+  static const areaDeviationParam = 'geo.area_deviation_max_pct';
+
+  /// Mặc định khi chưa tải được tham số.
+  static const defaultAreaDeviationPct = 5.0;
 
   Future<Object?> _get(String key) async {
     final v = await _db.getMeta(key);
@@ -83,6 +92,13 @@ class ProfileService {
     ];
   }
 
+  /// Ngưỡng lệch diện tích (%) đã duyệt, đệm từ lượt đồng bộ gần nhất.
+  Future<double> areaDeviationMaxPct() async {
+    final v = await _db.getMeta(_deviationKey);
+    final d = v == null ? null : double.tryParse(v);
+    return d == null || d <= 0 ? defaultAreaDeviationPct : d;
+  }
+
   /// Mã mẫu SOP mặc định của giống (null nếu chưa gắn / chưa tải).
   Future<String?> templateForVariety(String varietyCode) async {
     final j = await _get(_bindingsKey);
@@ -106,6 +122,18 @@ class ProfileService {
       await _guard(() async {
         final j = await api.getJson('/v1/farmer/households');
         await _put(_householdsKey, (j['items'] as List?) ?? const []);
+      });
+    }
+    if (modeFor(await roles()) == HtxMode.manager) {
+      await _guard(() async {
+        final j = await api.getJson(
+          '/v1/masterdata/params/value',
+          query: {'key': areaDeviationParam},
+        );
+        final v = j['value'];
+        if (v is String && double.tryParse(v) != null) {
+          await _db.setMeta(_deviationKey, v);
+        }
       });
     }
     await _guard(() async {
