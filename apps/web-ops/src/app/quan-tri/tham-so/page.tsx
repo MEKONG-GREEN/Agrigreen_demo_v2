@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { approvalBlockReason, proposeBlockReason, submitBlockReason } from "@/admin/approval";
 import { actorLabel, groupParamVersions, proposeParam, submitParam, type ParamView } from "@/admin/params";
@@ -271,16 +272,23 @@ export default function ParamsPage() {
                 <h2 id={`h-${p.key}`}>{p.label}</h2>
                 <code className="mute small">{p.key}</code>
               </div>
-              <button
-                type="button"
-                className="btn btn-o btn-sm"
-                disabled={!!proposeBlock}
-                title={proposeBlock ?? undefined}
-                onClick={() => setEditing((e) => (e === p.key ? null : p.key))}
-                aria-expanded={editing === p.key}
-              >
-                Đề xuất thay đổi
-              </button>
+              {p.kind === "color" ? (
+                // Mã màu HEX (GIS US-CFG-01) đề xuất ở màn chuyên dụng — có kiểm HEX và xem trước màu.
+                <Link href="/quan-tri/hien-thi" className="btn btn-o btn-sm">
+                  Đề xuất tại Quy chuẩn hiển thị bản đồ
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-o btn-sm"
+                  disabled={!!proposeBlock}
+                  title={proposeBlock ?? undefined}
+                  onClick={() => setEditing((e) => (e === p.key ? null : p.key))}
+                  aria-expanded={editing === p.key}
+                >
+                  Đề xuất thay đổi
+                </button>
+              )}
             </div>
             {p.current ? (
               <p>

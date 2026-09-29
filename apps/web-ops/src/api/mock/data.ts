@@ -573,6 +573,9 @@ export const PARAM_VERSIONS: ParamVersion[] = [
   version({ key: "cgh.norm_ha_per_machine:MGD:thu_hoach", value: "90", unit: "ha/máy/vụ", version: 1 }),
   version({ key: "cgh.norm_ha_per_machine:MPT:cham_soc", value: "260", unit: "ha/máy/vụ", version: 1 }),
   version({ key: "extension.task_sla_hours", value: "24", unit: "giờ", version: 1, effective_from: "2026-07-01T00:00:00+07:00", source_doc: "Quyết định TTKNQG (giả lập) 12/QĐ" }),
+  // Ngưỡng lấp đầy kho/Hub đã duyệt (GIS US-HUB-01) — khác mặc định nhúng 80/95 để minh hoạ nguồn "Đã duyệt".
+  version({ key: "geo.hub_capacity_warn_pct", value: "60", unit: "%", version: 1, source_doc: "QĐ quy chuẩn hiển thị GIS (giả lập) 07/QĐ" }),
+  version({ key: "geo.hub_capacity_full_pct", value: "85", unit: "%", version: 1, source_doc: "QĐ quy chuẩn hiển thị GIS (giả lập) 07/QĐ" }),
   // Chờ duyệt do "người đặt" (persona setter) gửi — người này KHÔNG được tự duyệt (R-56).
   version({
     key: "cgh.norm_ha_per_machine:MGD:thu_hoach",
@@ -626,7 +629,7 @@ export interface MockParamDef {
   key: string;
   name: string;
   unit: string;
-  kind: "decimal" | "text";
+  kind: "decimal" | "text" | "color";
   min: string | null;
   max: string | null;
 }
@@ -641,4 +644,19 @@ export const PARAM_REGISTRY: MockParamDef[] = [
   { key: "geo.overlap_tolerance_pct", name: "Ngưỡng chồng lấn ranh giới thửa", unit: "%", kind: "decimal", min: "0", max: "100" },
   { key: "reports.daily_export_quota", name: "Hạn mức xuất báo cáo mỗi ngày", unit: "lần/người/ngày", kind: "decimal", min: "1", max: "1000" },
   { key: "sync.conflict_sla_hours", name: "SLA xử lý xung đột đồng bộ", unit: "giờ", kind: "decimal", min: "1", max: "720" },
+  // Quy chuẩn hiển thị bản đồ GIS (GIS US-CFG-01/02) — màu HEX là tham số kiểu "color" (giá trị ở `text`).
+  { key: "gis.stage_color:chuan_bi", name: "Màu giai đoạn — Chuẩn bị đất", unit: "", kind: "color", min: null, max: null },
+  { key: "gis.stage_color:sinh_truong", name: "Màu giai đoạn — Sinh trưởng", unit: "", kind: "color", min: null, max: null },
+  { key: "gis.stage_color:sap_thu", name: "Màu giai đoạn — Sắp thu hoạch", unit: "", kind: "color", min: null, max: null },
+  { key: "gis.stage_color:chin_ro", name: "Màu giai đoạn — Chín rộ / đang thu hoạch", unit: "", kind: "color", min: null, max: null },
+  { key: "gis.stage_color:da_thu", name: "Màu giai đoạn — Đã thu hoạch", unit: "", kind: "color", min: null, max: null },
+  { key: "gis.stage_color:none", name: "Màu giai đoạn — Chưa có vụ", unit: "", kind: "color", min: null, max: null },
+  { key: "gis.capacity_color:available", name: "Màu lấp đầy kho/Hub — Còn chỗ", unit: "", kind: "color", min: null, max: null },
+  { key: "gis.capacity_color:near_full", name: "Màu lấp đầy kho/Hub — Sắp đầy", unit: "", kind: "color", min: null, max: null },
+  { key: "gis.capacity_color:full", name: "Màu lấp đầy kho/Hub — Đã đầy", unit: "", kind: "color", min: null, max: null },
+  { key: "gis.capacity_color:unknown", name: "Màu lấp đầy kho/Hub — Chưa có số liệu", unit: "", kind: "color", min: null, max: null },
+  { key: "gis.ripening_outline_color", name: "Màu viền vùng chín rộ 1–3 ngày tới", unit: "", kind: "color", min: null, max: null },
+  { key: "geo.hub_capacity_warn_pct", name: "Ngưỡng Sắp đầy kho/Hub", unit: "%", kind: "decimal", min: "0", max: "100" },
+  { key: "geo.hub_capacity_full_pct", name: "Ngưỡng Đã đầy kho/Hub", unit: "%", kind: "decimal", min: "0", max: "100" },
+  { key: "geo.plot_layer_min_zoom", name: "Mức zoom tối thiểu lớp thửa", unit: "", kind: "decimal", min: "1", max: "22" },
 ];

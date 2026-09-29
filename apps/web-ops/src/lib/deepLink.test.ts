@@ -33,6 +33,16 @@ describe("deepLinkHref — liên kết thông báo sang trang web", () => {
     expect(deepLinkHref(`/extension/tasks/${ID}`, "task_assigned")).toBe(`/nhiem-vu?task=${ID}`);
   });
 
+  it("GIS US-SYNC-02: integration_dead_lettered → màn Giám sát đồng bộ", () => {
+    expect(deepLinkHref(`/sync/integrations/${ID}`, "integration_dead_lettered")).toBe("/quan-tri/giam-sat-dong-bo");
+    expect(deepLinkHref(null, "integration_dead_lettered")).toBe("/quan-tri/giam-sat-dong-bo");
+  });
+
+  it("CGH FN-07: area_feed_stale → Bản đồ CGH (banner độ tươi + nhật ký đồng bộ)", () => {
+    expect(deepLinkHref("/mechanization/area-sync-log", "area_feed_stale")).toBe("/cgh");
+    expect(deepLinkHref("", "area_feed_stale")).toBe("/cgh");
+  });
+
   it("không có kind vẫn nhận dạng theo đường dẫn (nhật ký mặc định → phê duyệt)", () => {
     expect(deepLinkHref(`/cropcycle/farm-logs/${ID}`)).toBe("/htx/phe-duyet");
     expect(deepLinkHref(`/extension/tasks/${ID}?x=1#y`)).toBe(`/nhiem-vu?task=${ID}`);

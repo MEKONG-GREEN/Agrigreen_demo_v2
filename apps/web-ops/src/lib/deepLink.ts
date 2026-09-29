@@ -22,6 +22,10 @@ const RULES: readonly Rule[] = [
   // household_registered / household_membership_changed (KN US-HTX-05): thông báo chỉ mang mã nông hộ
   // và mã xã (không có mã HTX) → danh sách HTX & nông hộ trong địa bàn của cán bộ.
   { re: new RegExp(`^/households/(${UUID})$`), to: () => "/htx" },
+  // integration_dead_lettered (GIS US-SYNC-02): sự kiện đồng bộ vào hàng chờ lỗi → màn Giám sát đồng bộ.
+  { re: new RegExp(`^/sync/integrations/(${UUID})$`), to: () => "/quan-tri/giam-sat-dong-bo" },
+  // area_feed_stale (CGH FN-07): dữ liệu App HTX quá ngưỡng độ tươi → Bản đồ CGH (banner + nhật ký đồng bộ).
+  { re: /^\/mechanization\/(area-sync-log)$/, to: () => "/cgh" },
 ];
 
 /** Trang đích theo loại thông báo khi `deep_link` trống hoặc không nhận dạng được. */
@@ -31,6 +35,8 @@ const KIND_FALLBACK: Readonly<Record<string, string>> = {
   season_opened: "/htx/mua-vu",
   household_registered: "/htx",
   household_membership_changed: "/htx",
+  integration_dead_lettered: "/quan-tri/giam-sat-dong-bo",
+  area_feed_stale: "/cgh",
 };
 
 export function deepLinkHref(deepLink: string | null | undefined, kind?: string | null): string | null {

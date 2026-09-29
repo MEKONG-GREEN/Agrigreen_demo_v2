@@ -21,10 +21,12 @@ import { centroidOf, lineLengthM, parseBBox, polygonAreaM2, touchesBBox, type Ln
 import { COMMUNES, COOPERATIVES, hexagon, mulberry32, PROVINCES, plotsOf, type MockCooperative } from "./data";
 import { hasRole, inScope, isZip, iso, json, nowIso, problem, reasonOf, validation, type Ctx, type Route } from "./http";
 import type { MockPersona } from "./personas";
+import { hubThresholds } from "./display";
 
 const MAX = 1000;
 const PLOT_MIN_ZOOM = 13;
-const THRESHOLDS = { warn_pct: "60", full_pct: "85" };
+// Ngưỡng lấp đầy kho/Hub = tham số quy chuẩn hiển thị đang hiệu lực (GIS US-CFG-01), đọc mỗi lần gọi.
+const THRESHOLDS = () => hubThresholds();
 const GEO_WRITERS = ["geo_admin", "platform_admin"];
 const BOUNDARY_WRITERS = ["plot_editor", "coop_manager", "geo_admin", "platform_admin"];
 
@@ -285,7 +287,7 @@ export function capacityView(st: FacilityState): GeoCapacityView {
   const cap = Number(applied.capacity);
   const used = Number(applied.used);
   const pct = cap > 0 ? (used / cap) * 100 : null;
-  const cls = pct === null ? "unknown" : pct >= Number(THRESHOLDS.full_pct) ? "full" : pct >= Number(THRESHOLDS.warn_pct) ? "near_full" : "available";
+  const cls = pct === null ? "unknown" : pct >= Number(THRESHOLDS().full_pct) ? "full" : pct >= Number(THRESHOLDS().warn_pct) ? "near_full" : "available";
   const differs = !!manual && !!valve && valve.as_of > manual.as_of && (valve.capacity !== manual.capacity || valve.used !== manual.used);
   const pending = differs && valve ? bySource.find((b) => b.snapshot_id === valve.id) ?? null : null;
   return {
@@ -745,7 +747,7 @@ export const gisAppRoutes: Route[] = [
         plots_notice: want.has("plots") && !plotsOk ? `Phóng to tới mức ${PLOT_MIN_ZOOM} (khoảng 1:10.000) để tải polygon thửa ruộng.` : null,
         cooperatives: want.has("cooperatives") ? coopLayer(ctx.persona, bb, limit) : null,
         plots: want.has("plots") && plotsOk ? plotsIn(ctx.persona, bb, limit) : null,
-        facilities: want.has("facilities") ? { type: "FeatureCollection", features: facilitiesIn(ctx, bb).slice(0, limit).map(facilityFeature), truncated: false, limit, thresholds: THRESHOLDS } : null,
+        facilities: want.has("facilities") ? { type: "FeatureCollection", features: facilitiesIn(ctx, bb).slice(0, limit).map(facilityFeature), truncated: false, limit, thresholds: THRESHOLDS() } : null,
         roads,
       });
     }),
@@ -826,7 +828,7 @@ export const gisAppRoutes: Route[] = [
     handler: withBBox((ctx, bb) => {
       const all = facilitiesIn(ctx, bb);
       const limit = limitOf(ctx);
-      return json({ type: "FeatureCollection", features: all.slice(0, limit).map(facilityFeature), truncated: all.length > limit, limit, thresholds: THRESHOLDS });
+      return json({ type: "FeatureCollection", features: all.slice(0, limit).map(facilityFeature), truncated: all.length > limit, limit, thresholds: THRESHOLDS() });
     }),
   },
   {
@@ -874,7 +876,7 @@ export const gisAppRoutes: Route[] = [
           sync_differs: c.sync_differs,
         };
       });
-      return json({ items, truncated: all.length > limit, thresholds: THRESHOLDS });
+      return json({ items, truncated: all.length > limit, thresholds: THRESHOLDS() });
     }),
   },
   { method: "GET", pattern: /^\/v1\/geo\/roads$/, handler: withBBox((ctx, bb) => {

@@ -27,8 +27,8 @@ export const KIND_LABEL: Record<Notification["kind"], string> = {
   farm_log_pending: "Nhật ký chờ duyệt",
   farm_log_reviewed: "Kết quả duyệt nhật ký",
   season_opened: "Nông dân mở vụ",
-  integration_dead_lettered: "Lỗi tích hợp (DLQ)",
-  area_feed_stale: "Dữ liệu diện tích CGH quá hạn",
+  integration_dead_lettered: "Đồng bộ vào hàng chờ lỗi",
+  area_feed_stale: "Dữ liệu App HTX quá hạn độ tươi",
 };
 
 export function unreadCount(api: ApiClient): Promise<number> {

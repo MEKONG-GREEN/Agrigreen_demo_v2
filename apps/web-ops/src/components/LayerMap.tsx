@@ -72,7 +72,8 @@ function draftData(d: DraftShape | null | undefined): GeoJsonData {
 
 /**
  * Bản đồ nhiều lớp dùng chung cho web GIS (MapLibre, BSD-3-Clause).
- * - `sources` cập nhật dữ liệu bằng setData; `layers` đọc một lần lúc khởi tạo (paint theo thuộc tính).
+ * - `sources` cập nhật dữ liệu bằng setData; `layers` thêm một lần lúc khởi tạo, sau đó chỉ cập nhật `paint` khi đổi
+ *   (bảng màu quy chuẩn hiển thị). Mọi khóa nguồn phải có ngay từ lần vẽ đầu.
  * - `onViewport` báo khung nhìn (bbox, zoom) sau mỗi lần dừng kéo/zoom → trang tải theo viewport (GIS BR-25).
  * - `draft` vẽ nét đang biên tập (điểm/tuyến/vùng); đỉnh kéo được.
  */
@@ -206,6 +207,27 @@ export function LayerMap({
     if (!ready || !map) return;
     for (const [id, fc] of Object.entries(sources)) (map.getSource(id) as GeoJSONSource | undefined)?.setData((fc ?? EMPTY) as GeoJsonData);
   }, [ready, sources]);
+
+  // Màu theo quy chuẩn hiển thị (GIS US-CFG-01): `layers` đổi paint → cập nhật paint của lớp đã thêm.
+  // Chỉ đặt thuộc tính THỰC SỰ đổi: đặt lại paint theo dữ liệu buộc MapLibre dựng lại tile của nguồn.
+  const appliedPaint = useRef(new Map<string, string>());
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    type Name = Parameters<MlMap["setPaintProperty"]>[1];
+    type Value = Parameters<MlMap["setPaintProperty"]>[2];
+    const seen = appliedPaint.current;
+    for (const l of layers) {
+      const paint = (l as { paint?: Record<string, unknown> }).paint ?? {};
+      for (const [k, v] of Object.entries(paint)) {
+        const id = `${l.id}|${k}`;
+        const json = JSON.stringify(v);
+        const prev = seen.get(id) ?? JSON.stringify((initRef.current.layers.find((x) => x.id === l.id) as { paint?: Record<string, unknown> } | undefined)?.paint?.[k]);
+        seen.set(id, json);
+        if (prev !== json && map.getLayer(l.id)) map.setPaintProperty(l.id, k as Name, v as Value);
+      }
+    }
+  }, [ready, layers]);
 
   // Bật/tắt lớp.
   useEffect(() => {

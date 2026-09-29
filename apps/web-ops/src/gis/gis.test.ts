@@ -18,8 +18,22 @@ import {
   type LngLat,
 } from "./geometry";
 import { measureDraft } from "./DrawPanel";
-import { capacityMarkers, coopLayers, waterwayLayer } from "./layers";
-import { fillLabel, limitingLabel, stageColor, STAGES } from "./legend";
+import { capacityMarkers, cghLayer, coopLayers, plotLayer, waterwayLayer } from "./layers";
+import {
+  capacityLegend,
+  DEFAULT_PALETTE,
+  fillLabel,
+  HEX_COLOR_ERROR,
+  isHexColor,
+  limitingLabel,
+  paletteFromConfig,
+  PERCENT_ERROR,
+  stageColor,
+  stages as stageLegend,
+  validateThresholds,
+  type DisplayConfig,
+} from "./legend";
+import type { MechCoverageItem } from "@/api/types";
 
 describe("hình học trắc địa (GIS BR-41: chiều dài/diện tích tự tính theo hình vẽ)", () => {
   it("Haversine: 1° kinh độ ở xích đạo ≈ 111,2 km; 0 khi trùng điểm", () => {
@@ -85,9 +99,9 @@ describe("hình học trắc địa (GIS BR-41: chiều dài/diện tích tự t
 
 describe("chú giải và lớp bản đồ", () => {
   it("GIS FN-13 B2: 5 giai đoạn nâu → xanh → vàng → đỏ → xám", () => {
-    expect(STAGES.map((s) => s.code)).toEqual(["chuan_bi", "sinh_truong", "sap_thu", "chin_ro", "da_thu"]);
+    expect(stageLegend().map((s) => s.code)).toEqual(["chuan_bi", "sinh_truong", "sap_thu", "chin_ro", "da_thu"]);
     expect(stageColor("chin_ro")).toBe("#D6452F");
-    expect(stageColor("không có")).toBe("#cfd8d3");
+    expect(stageColor("không có")).toBe("#CFD8D3");
   });
 
   it("GIS US-SEASON-01 / US-YIELD-01: polygon HTX tô theo giai đoạn trội; viền chín rộ; HTX chưa có ranh giới → marker", () => {
@@ -129,6 +143,127 @@ describe("chú giải và lớp bản đồ", () => {
     expect(m!.title).toMatch(/Sắp đầy, còn trống 800 tấn/);
     expect(m!.className).toBe("mkg");
     expect(fillLabel(null)).toBe("?");
+  });
+});
+
+function dv(key: string, value: string, def: string, version = 1): DisplayConfig["ripening_outline_color"] {
+  return { key, value, default: def, version, source: version > 0 ? "approved" : "default" };
+}
+
+function config(over: Partial<DisplayConfig> = {}): DisplayConfig {
+  const stageDefaults = DEFAULT_PALETTE.stage;
+  const capDefaults = DEFAULT_PALETTE.capacity;
+  return {
+    as_of: "2026-09-30T00:00:00Z",
+    stage_colors: Object.fromEntries(Object.entries(stageDefaults).map(([k, v]) => [k, dv(`gis.stage_color:${k}`, v, v, 0)])),
+    capacity_colors: Object.fromEntries(Object.entries(capDefaults).map(([k, v]) => [k, dv(`gis.capacity_color:${k}`, v, v, 0)])),
+    ripening_outline_color: dv("gis.ripening_outline_color", "#B3261E", "#B3261E", 0),
+    hub_capacity_warn_pct: dv("geo.hub_capacity_warn_pct", "80", "80", 0),
+    hub_capacity_full_pct: dv("geo.hub_capacity_full_pct", "95", "95", 0),
+    plot_layer_min_zoom: dv("geo.plot_layer_min_zoom", "13", "13", 0),
+    ...over,
+  };
+}
+
+describe("quy chuẩn hiển thị bản đồ (GIS US-CFG-01/02)", () => {
+  it("GIS US-CFG-01: paletteFromConfig lấy màu đã duyệt, chuẩn hoá HEX in hoa; không có cấu hình → mặc định", () => {
+    const cfg = config({
+      stage_colors: { ...config().stage_colors, chin_ro: dv("gis.stage_color:chin_ro", "#1e90ff", "#D6452F", 2) },
+      ripening_outline_color: dv("gis.ripening_outline_color", "#112233", "#B3261E", 1),
+      hub_capacity_warn_pct: dv("geo.hub_capacity_warn_pct", "70.5", "80", 1),
+    });
+    const p = paletteFromConfig(cfg);
+    expect(p.stage.chin_ro).toBe("#1E90FF");
+    expect(stageColor("chin_ro", p)).toBe("#1E90FF");
+    expect(stageLegend(p).find((s) => s.code === "chin_ro")!.color).toBe("#1E90FF");
+    expect(p.ripeningOutline).toBe("#112233");
+    expect(p.warnPct).toBe("70.5");
+    expect(paletteFromConfig(null)).toEqual(DEFAULT_PALETTE);
+    expect(paletteFromConfig(undefined).stage.sap_thu).toBe("#E0B000");
+  });
+
+  it("GIS US-CFG-01: giá trị sai định dạng → dùng mặc định của khóa đó (từng khóa); ngưỡng lệch thứ tự → cặp mặc định", () => {
+    const cfg = config({
+      stage_colors: { ...config().stage_colors, sap_thu: dv("gis.stage_color:sap_thu", "vàng", "#E0B000") },
+      capacity_colors: { available: dv("gis.capacity_color:available", "#12345", "#1F7A38") },
+      hub_capacity_warn_pct: dv("geo.hub_capacity_warn_pct", "96", "80"),
+    });
+    const p = paletteFromConfig(cfg);
+    expect(p.stage.sap_thu).toBe("#E0B000");
+    expect(p.capacity.available).toBe("#1F7A38");
+    expect(p.capacity.full).toBe("#B3261E");
+    expect([p.warnPct, p.fullPct]).toEqual(["80", "95"]);
+  });
+
+  it("GIS US-CFG-01: isHexColor chỉ nhận #RRGGBB; thông điệp HEX đúng AC", () => {
+    expect(isHexColor("#1E90FF")).toBe(true);
+    expect(isHexColor("#1e90ff")).toBe(true);
+    for (const bad of ["1E90FF", "#1E90F", "#1E90FFF", "#GGGGGG", "red", "", null, undefined]) expect(isHexColor(bad)).toBe(false);
+    expect(HEX_COLOR_ERROR).toBe("Mã màu không đúng định dạng HEX (ví dụ: #1E90FF).");
+  });
+
+  it("GIS US-CFG-01 AC-2: validateThresholds — tăng dần nghiêm ngặt, trong 0–100%, chuỗi thập phân", () => {
+    expect(PERCENT_ERROR).toBe("Ngưỡng % phải tăng dần và nằm trong khoảng 0–100%.");
+    expect(validateThresholds("80", "95")).toBeNull();
+    expect(validateThresholds("0", "100")).toBeNull();
+    expect(validateThresholds("79.99", "80")).toBeNull();
+    expect(validateThresholds("95", "80")).toBe(PERCENT_ERROR);
+    expect(validateThresholds("80", "80")).toBe(PERCENT_ERROR);
+    expect(validateThresholds("80", "100.01")).toBe(PERCENT_ERROR);
+    expect(validateThresholds("-1", "50")).toBe(PERCENT_ERROR);
+    expect(validateThresholds("abc", "50")).toBe(PERCENT_ERROR);
+    expect(validateThresholds("", "50")).toBe(PERCENT_ERROR);
+  });
+
+  it("GIS US-CFG-01: chú giải dung lượng lấy ngưỡng từ display-config, ưu tiên ngưỡng của widget khi có", () => {
+    const p = paletteFromConfig(config({ hub_capacity_warn_pct: dv("geo.hub_capacity_warn_pct", "70", "80") }));
+    const l = capacityLegend(p);
+    expect(l.map((x) => x.code)).toEqual(["available", "near_full", "full", "unknown"]);
+    expect(l.find((x) => x.code === "near_full")!.note).toBe("≥ 70%");
+    expect(l.find((x) => x.code === "full")!.note).toBe("≥ 95%");
+    expect(capacityLegend(p, { warn_pct: "60", full_pct: "85" }).find((x) => x.code === "full")!.note).toBe("≥ 85%");
+  });
+
+  it("GIS US-CFG-02: màu mới áp lên lớp HTX/thửa/marker kho khi truyền bảng màu", () => {
+    const p = paletteFromConfig(
+      config({
+        stage_colors: { ...config().stage_colors, sap_thu: dv("gis.stage_color:sap_thu", "#010203", "#E0B000") },
+        capacity_colors: { ...config().capacity_colors, near_full: dv("gis.capacity_color:near_full", "#0A0B0C", "#C27C0E") },
+      }),
+    );
+    const layer = {
+      type: "FeatureCollection",
+      features: [{ type: "Feature", id: "a", geometry: { type: "Polygon", coordinates: [[[105, 10], [105.1, 10], [105.1, 10.1], [105, 10]]] }, properties: { cooperative_ref: "a", marker_source: "party_location" } }],
+    } as unknown as GeoCoopLayer;
+    const st = { cooperatives: [{ cooperative_ref: "a", dominant_stage: "sap_thu", ripening_plot_count: 0 }], plots: [{ plot_ref: "p1", stage: "sap_thu", ripening: false }] } as unknown as CropStageMap;
+    expect(coopLayers(layer, new Map(), st, { colorByStage: true, ripening: false }, p).areas.features[0]!.properties!.fill).toBe("#010203");
+    const plots = { plots: { type: "FeatureCollection", features: [{ type: "Feature", geometry: null, properties: { ref: "p1", code: "T1" } }] } } as never;
+    expect(plotLayer(plots, st, true, p).features[0]!.properties!.fill).toBe("#010203");
+    const w = { ref: "h", kind: "hub", name: "Hub X", lon: "105.5", lat: "10.2", fill_pct: "82", class: "near_full", free: null, unit: "tan", origin: "tenant" } as unknown as CapacityWidget;
+    expect(capacityMarkers([w], undefined, p)[0]!.color).toBe("#0A0B0C");
+  });
+});
+
+describe("lớp Tình trạng máy CGH trên GIS (GIS US-INT-01)", () => {
+  const group = (status: string, color: string, pct: string | null) => ({ required: "3.0000", required_whole: 3, capacity: 2, machines_total: 4, coverage_pct: pct, status, status_label: status === "shortage" ? "Thiếu" : "Đủ", color });
+  const item = (ref: string, commune: string, status: string, color: string) =>
+    ({ unit_code: null, cooperative_ref: ref, name: `HTX ${ref}`, province_code: "82", commune_code: commune, cooperatives: 1, cooperative_code: `HTX-${ref}`, overall: group(status, color, "66.67"), stages: {} }) as unknown as MechCoverageItem;
+
+  it("GIS US-INT-01: màu lấy đúng overall.color do Bản đồ CGH trả (không tính lại); vị trí hồ sơ hoặc tâm xã (vị trí tạm)", () => {
+    const items = [item("a", "82001", "shortage", "#A3372A"), item("b", "82002", "sufficient", "#1F7A38"), item("c", "99999", "sufficient", "#1F7A38")];
+    const locs = new Map([
+      ["a", { ref: "a", location: { lat: "10.5", lon: "105.6" }, location_provisional: false }],
+      ["b", { ref: "b", location: null, location_provisional: true }],
+      ["c", { ref: "c", location: null, location_provisional: true }],
+    ]);
+    const out = cghLayer(items, locs, new Map([["82002", [105.7, 10.4] as [number, number]]]));
+    expect(out.unplaced).toBe(1);
+    expect(out.fc.features).toHaveLength(2);
+    const [a, b] = out.fc.features;
+    expect(a!.properties).toMatchObject({ color: "#A3372A", status: "thieu", provisional: false, required_whole: 3, capacity: 2, machines_total: 4, coverage_pct: "66.67", code: "HTX-a" });
+    expect(a!.geometry).toEqual({ type: "Point", coordinates: [105.6, 10.5] });
+    expect(b!.properties).toMatchObject({ color: "#1F7A38", provisional: true });
+    expect(cghLayer(null, locs, new Map()).fc.features).toHaveLength(0);
   });
 });
 
