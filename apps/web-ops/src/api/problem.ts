@@ -44,6 +44,8 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "masterdata.param_version_not_found": "Không tìm thấy phiên bản tham số.",
   "masterdata.param_invalid_transition": "Trạng thái phiên bản không cho phép thao tác này (có thể đã được người khác xử lý). Vui lòng tải lại.",
   "masterdata.param_not_setter": "Chỉ người đặt tham số mới được gửi duyệt phiên bản này.",
+  "masterdata.param_percent_thresholds": "Ngưỡng % phải tăng dần và nằm trong khoảng 0–100%.",
+  "masterdata.param_no_default": "Tham số này không có giá trị mặc định để khôi phục.",
   "masterdata.param_correction_required":
     "Đã có phiên bản được duyệt cùng ngày hiệu lực. Nhập “Lý do sửa” (ít nhất 10 ký tự) để ghi bản ghi bù.",
   // pf/party
