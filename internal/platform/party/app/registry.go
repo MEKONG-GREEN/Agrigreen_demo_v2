@@ -59,6 +59,9 @@ type Registry struct {
 	Vault client.Client     // có thể nil khi chưa nối
 	// Plots (tùy chọn): thống kê thửa đã số hoá của pf/geo cho danh sách HTX (G-03).
 	Plots geoport.PlotStats
+	// Activity (tùy chọn): vụ chưa xong / nhật ký chờ duyệt (pf/cropcycle) cho màn cảnh báo
+	// trước khi vô hiệu hóa HTX (HTX US-HTXSTATUS-01 AC-1).
+	Activity port.SeasonActivity
 }
 
 var (

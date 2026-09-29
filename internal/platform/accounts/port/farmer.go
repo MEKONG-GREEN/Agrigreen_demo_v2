@@ -35,6 +35,13 @@ type FarmerHouseholds interface {
 	HouseholdsForSubject(ctx context.Context, subject uuid.UUID) ([]HouseholdLink, error)
 }
 
+// FarmerAccounts là chiều ngược của FarmerHouseholds: tài khoản nông dân đang liên
+// kết với các nông hộ — pf/notify (qua gốc lắp ráp) gửi cảnh báo khẩn tới nông dân có
+// thửa trong địa bàn (HTX US-NEWS-03). Tenant lấy từ context; kết quả không trùng.
+type FarmerAccounts interface {
+	SubjectsForHouseholds(ctx context.Context, households []uuid.UUID) ([]uuid.UUID, error)
+}
+
 // ActionLinks phát liên kết hành động MỘT LẦN của Keycloak (action token
 // execute-actions, vd UPDATE_PASSWORD) và TRẢ VỀ liên kết thay vì gửi email — để
 // quản lý HTX in QR / gửi liên kết cho nông dân không có email (g2-conventions §1).

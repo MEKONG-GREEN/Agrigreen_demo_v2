@@ -3,8 +3,8 @@
 // (FN-06, QT-03), cân đối cung–cầu lưu theo vụ (FN-09, QT-01/QT-02) và API đọc
 // cho cổng Cục KTHT / Admin (FN-08, FN-10, FN-11).
 //
-// Ngoài phạm vi G1: FN-07 kéo dữ liệu từ App HTX (App HTX thuộc G2 — chỉ có
-// đường nhập tay; port.AreaFeed đã áp QT-03 cho bộ đồng bộ G2), FN-12 nhật ký
+// G2: FN-07 nhận diện tích vụ App HTX qua consumer port.AreaSyncConsumer
+// (pf.cropcycle.coop_season_area.changed → QT-03, AreaSyncHandler). Ngoài phạm vi: FN-12 nhật ký
 // truy cập bị từ chối và lỗi đồng bộ (log nền tảng), FN-01 tài khoản (Keycloak).
 //
 // Module khác chỉ được import mechanization/port (R-02). Tệp này nối các lớp cho
@@ -18,6 +18,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -47,3 +48,7 @@ func (m *Module) ReportData() port.ReportData { return app.ReportData{Svc: m.svc
 
 // AreaFeed cho bộ đồng bộ App HTX (FN-07, G2) áp diện tích vụ theo QT-03.
 func (m *Module) AreaFeed() port.AreaFeed { return m.svc }
+
+// AreaSyncHandler là inbox.Handler của consumer port.AreaSyncConsumer: nhận
+// pf.cropcycle.coop_season_area.changed và áp theo QT-03 trong giao dịch của inbox (CGH FN-07).
+func (m *Module) AreaSyncHandler() inbox.Handler { return m.svc.HandleCoopSeasonAreaChanged }

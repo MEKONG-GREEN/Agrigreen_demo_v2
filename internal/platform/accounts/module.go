@@ -61,6 +61,9 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.
 // (cropcycle: phạm vi thửa; extension: yêu cầu hỗ trợ). Tenant lấy từ context.
 func (m *Module) FarmerHouseholds() port.FarmerHouseholds { return m.svc }
 
+// FarmerAccounts cho gốc lắp ráp: tài khoản nông dân của các nông hộ (cảnh báo khẩn theo địa bàn).
+func (m *Module) FarmerAccounts() port.FarmerAccounts { return m.svc }
+
 // RegisterAdmin gắn route Admin API (MFA bắt buộc ở router).
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }
 

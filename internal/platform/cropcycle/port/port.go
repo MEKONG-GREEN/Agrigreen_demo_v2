@@ -95,6 +95,34 @@ type Stats interface {
 	SeasonAreas(ctx context.Context, coop uuid.UUID, seasonCode string, year int) ([]CoopSeasonArea, error)
 }
 
+// CoopSeasonSupply là sản lượng lúa theo HTX × vụ của một năm: vụ chưa khai sản
+// lượng tính theo sản lượng dự kiến (diện tích × năng suất kỳ vọng của giống), vụ đã
+// khai tính theo sản lượng thực tế; vụ bị hủy không tính. Không có dữ liệu cá nhân.
+type CoopSeasonSupply struct {
+	CooperativeRef  uuid.UUID
+	SeasonCode      string
+	SeasonYear      int
+	AreaHa          decimal.Decimal
+	PaddyKg         decimal.Decimal
+	HarvestedAreaHa decimal.Decimal // phần diện tích đã khai sản lượng thực tế
+	Seasons         int
+}
+
+// SupplyStats là cổng đọc nguồn cung cho mô phỏng chọn Hub (pf/simulation qua gốc lắp
+// ráp, tham số #4, #5). Tenant lấy từ context; không kiểm phạm vi.
+type SupplyStats interface {
+	SeasonSupply(ctx context.Context, year int) ([]CoopSeasonSupply, error)
+}
+
+// GpsLogConsumer là consumer của worker ghi log GPS (pf/geo GpsLog) cho vụ, nhật ký,
+// khai sản lượng SAU khi giao dịch nghiệp vụ đã commit (HTX US-GPS-03 AC-3): nhận sự
+// kiện của chính module, đọc toạ độ ở sổ của mình, gọi RecordFix với khóa chống trùng
+// theo bản ghi — lỗi tạm thời thì giao lại, không chặn nghiệp vụ.
+const GpsLogConsumer = "pf.cropcycle.gps_log"
+
+// GpsLogEvents là các sự kiện consumer GpsLogConsumer đăng ký.
+var GpsLogEvents = []string{EventSeasonOpened, EventFarmLogRecorded, EventHarvestDeclared}
+
 // ErrNotFound: không có bản ghi (dùng trong port khi cần).
 var ErrNotFound = errors.New("cropcycle: không có bản ghi")
 

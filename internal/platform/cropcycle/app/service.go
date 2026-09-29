@@ -97,6 +97,7 @@ type Service struct {
 	Params   mdport.Params           // tùy chọn: ngưỡng GPS, ngưỡng năng suất bất thường
 	Catalogs mdport.Catalogs         // tùy chọn: giống lúa, vụ, máy (thiếu → chỉ kiểm dạng mã)
 	Farmers  port.FarmerHouseholds   // liên kết tài khoản ↔ nông hộ; thiếu → vai farmer nhận 503
+	GpsLog   geoport.GpsLog          // log GPS của pf/geo (consumer port.GpsLogConsumer); thiếu → consumer lỗi, giao lại
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

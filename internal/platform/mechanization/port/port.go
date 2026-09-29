@@ -72,6 +72,14 @@ type AreaFeedResult struct {
 	Reason string
 }
 
+// AreaSyncConsumer là consumer của worker nhận pf.cropcycle.coop_season_area.changed
+// và áp diện tích vụ App HTX theo QT-03 (CGH FN-07, G2), idempotent theo event_id.
+const AreaSyncConsumer = "pf.mechanization.area_sync"
+
+// SyncActorRef là actor_ref ghi vào sổ diện tích vụ cho bản đồng bộ App HTX (tác
+// nhân hệ thống vai cgh_sync, không phải người).
+var SyncActorRef = uuid.MustParse("00000000-0000-0000-0000-00000000c907")
+
 // AreaFeed là cửa nhận diện tích vụ từ App HTX (FN-07). App HTX thuộc G2: G1 chỉ
 // có đường nhập tay, cửa này đã áp đúng QT-03 để bộ đồng bộ G2 gọi. Người gọi
 // phải có vai RoleCGHSync hoặc RoleCGHAdmin.

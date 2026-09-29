@@ -21,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
+	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/app"
@@ -43,10 +44,12 @@ const DBRole = "notify_app"
 // thiếu Staff → dùng thông báo chủ đề; thiếu Units → không mở rộng tỉnh ra xã;
 // thiếu Pusher → consumer gửi đẩy lỗi (vào DLQ); thiếu Mailer → tắt email tóm tắt.
 type Deps struct {
-	Scope    partyport.ScopeResolver
-	Devices  syncport.Devices
-	Staff    extport.StaffDirectory
-	Units    mdport.AdminUnits
+	Scope   partyport.ScopeResolver
+	Devices syncport.Devices
+	Staff   extport.StaffDirectory
+	Units   mdport.AdminUnits
+	// Farmers (tùy chọn): nông dân có thửa trong địa bàn cảnh báo khẩn (HTX US-NEWS-03).
+	Farmers  port.AreaFarmers
 	Pusher   channel.Pusher
 	Mailer   channel.Mailer
 	DigestTo []string
@@ -89,7 +92,7 @@ type Module struct{ svc *app.Service }
 // New tạo module với pool của vai notify_app.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	return &Module{svc: app.NewService(db, clk, app.Deps{
-		Scope: d.Scope, Devices: d.Devices, Staff: d.Staff, Units: d.Units, Pusher: d.Pusher, Mailer: d.Mailer,
+		Scope: d.Scope, Devices: d.Devices, Staff: d.Staff, Units: d.Units, Farmers: d.Farmers, Pusher: d.Pusher, Mailer: d.Mailer,
 		DigestTo: d.DigestTo, Log: d.Log, NudgeCooldown: d.NudgeCooldown, NudgeHourly: d.NudgeHourly,
 		SyncEntities: d.SyncEntities,
 	})}
@@ -100,6 +103,10 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.
 
 // RegisterAdmin gắn route Admin API.
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }
+
+// UseAreaFarmers nối cổng tìm nông dân theo địa bàn (pf/geo + pf/accounts) cho cảnh báo khẩn
+// (HTX US-NEWS-03). Gốc lắp ráp gọi sau khi dựng pf/accounts.
+func (m *Module) UseAreaFarmers(f port.AreaFarmers) { m.svc.Farmers = f }
 
 // UseSyncEntities nối danh sách entity chiều xuống của pf/sync (kiểm entities[] của
 // POST /v1/sync/nudge, KN US-SYNC-02). Gốc lắp ráp gọi sau khi dựng pf/sync.
@@ -126,6 +133,7 @@ func (m *Module) Consumers() []Consumer {
 		{Name: port.ConsumerSync, Events: []string{syncport.EventConflictOpened, syncport.EventDeviceRevoked}, Handler: ev},
 		{Name: port.ConsumerParty, Events: []string{partyport.EventOrgDeactivated, partyport.EventHouseholdRegistered,
 			partyport.EventHouseholdMembershipChanged}, Handler: ev},
+		{Name: port.ConsumerCropCycle, Events: []string{ccport.EventFarmLogRecorded, ccport.EventFarmLogReviewed, ccport.EventSeasonOpened}, Handler: ev},
 		{Name: port.ConsumerPush, Events: []string{port.EventPushRequested}, Handler: m.svc.HandlePush},
 	}
 }

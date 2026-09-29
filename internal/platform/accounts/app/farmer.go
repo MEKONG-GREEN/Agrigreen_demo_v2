@@ -567,6 +567,19 @@ func (s *Service) HouseholdsForSubject(ctx context.Context, subject uuid.UUID) (
 
 var _ port.FarmerHouseholds = (*Service)(nil)
 
+// SubjectsForHouseholds thực hiện port.FarmerAccounts (HTX US-NEWS-03). Tenant lấy từ context.
+func (s *Service) SubjectsForHouseholds(ctx context.Context, households []uuid.UUID) ([]uuid.UUID, error) {
+	var out []uuid.UUID
+	err := tenant.FromCtxTx(ctx, s.DB, func(tx pgx.Tx) error {
+		var e error
+		out, e = store.SubjectsForHouseholds(ctx, tx, households)
+		return e
+	})
+	return out, err
+}
+
+var _ port.FarmerAccounts = (*Service)(nil)
+
 // MyHouseholds: nông dân xem nông hộ liên kết với tài khoản của mình (US-LOGIN-01: phạm vi theo vai).
 func (s *Service) MyHouseholds(ctx context.Context) ([]port.HouseholdLink, error) {
 	p, err := authz.Require(ctx, port.RoleFarmer)

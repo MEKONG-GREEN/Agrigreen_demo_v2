@@ -23,6 +23,7 @@ import (
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -66,6 +67,12 @@ func (m *Module) UseContacts(c port.StaffContacts) { m.svc.Contacts = c }
 // UseFarmers nối cổng liên kết tài khoản nông dân ↔ nông hộ (pf/accounts) — yêu cầu
 // hỗ trợ từ App HTX (HTX US-SUPPORT-01 → KN US-TASK-01). Gốc lắp ráp gọi sau khi dựng pf/accounts.
 func (m *Module) UseFarmers(f accport.FarmerHouseholds) { m.svc.Farmers = f }
+
+// UseGpsLog nối log GPS của pf/geo (consumer port.GpsLogConsumer, HTX US-GPS-03).
+func (m *Module) UseGpsLog(g geoport.GpsLog) { m.svc.GpsLog = g }
+
+// GpsLogHandler là inbox.Handler của consumer port.GpsLogConsumer (vai extension_app).
+func (m *Module) GpsLogHandler() inbox.Handler { return m.svc.HandleGpsLog }
 
 // StaffNames cho module khác tra tên cán bộ trong danh bạ (qua port, G-07/G-09).
 func (m *Module) StaffNames() port.StaffNames { return m.svc }

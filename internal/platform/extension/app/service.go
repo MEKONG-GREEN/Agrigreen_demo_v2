@@ -78,6 +78,8 @@ type Service struct {
 	// Farmers: liên kết tài khoản nông dân ↔ nông hộ (pf/accounts) cho yêu cầu hỗ trợ
 	// từ App HTX (HTX US-SUPPORT-01). Nil → route yêu cầu hỗ trợ trả 503.
 	Farmers accport.FarmerHouseholds
+	// GpsLog (tùy chọn): log GPS của pf/geo cho consumer port.GpsLogConsumer (HTX US-GPS-03).
+	GpsLog geoport.GpsLog
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

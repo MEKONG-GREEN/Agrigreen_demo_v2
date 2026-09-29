@@ -85,6 +85,23 @@ func LinksByCooperative(ctx context.Context, tx pgx.Tx, coop, after uuid.UUID, l
 	  WHERE cooperative_ref = $1 AND unlinked_at IS NULL AND id > $2 ORDER BY id LIMIT $3`, coop, after, limit))
 }
 
+// SubjectsForHouseholds trả user_ref (không trùng) có liên kết đang dùng với các nông hộ.
+func SubjectsForHouseholds(ctx context.Context, tx pgx.Tx, households []uuid.UUID) ([]uuid.UUID, error) {
+	if len(households) == 0 {
+		return []uuid.UUID{}, nil
+	}
+	s := make([]string, 0, len(households))
+	for _, h := range households {
+		s = append(s, h.String())
+	}
+	rows, err := tx.Query(ctx, `SELECT DISTINCT user_ref FROM pf_accounts.farmer_link
+	  WHERE household_ref = ANY($1::uuid[]) AND unlinked_at IS NULL ORDER BY user_ref`, s)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+}
+
 // FarmerUsers trả tập user_ref có liên kết nông dân đang dùng trong refs.
 func FarmerUsers(ctx context.Context, tx pgx.Tx, refs []uuid.UUID) (map[uuid.UUID]bool, error) {
 	out := map[uuid.UUID]bool{}

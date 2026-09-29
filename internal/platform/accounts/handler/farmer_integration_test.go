@@ -235,6 +235,13 @@ func TestFarmerAccountCreateScopeHTXUSACC01(t *testing.T) {
 	if other, _ := f.mod.FarmerHouseholds().HouseholdsForSubject(tenant.WithID(context.Background(), ids.New()), user); len(other) != 0 {
 		t.Fatal("tenant khác không thấy liên kết")
 	}
+	// Chiều ngược FarmerAccounts: nông hộ → tài khoản (cảnh báo khẩn theo địa bàn, HTX US-NEWS-03).
+	if subs, err := f.mod.FarmerAccounts().SubjectsForHouseholds(ctx, []uuid.UUID{own, ids.New()}); err != nil || len(subs) != 1 || subs[0] != user {
+		t.Fatalf("SubjectsForHouseholds: %v %v", subs, err)
+	}
+	if subs, _ := f.mod.FarmerAccounts().SubjectsForHouseholds(tenant.WithID(context.Background(), ids.New()), []uuid.UUID{own}); len(subs) != 0 {
+		t.Fatal("tenant khác không thấy tài khoản")
+	}
 	// Nông dân tự xem nông hộ của mình.
 	farmer := f.asUser(f.tenant, user, port.RoleFarmer)
 	if mh := farmer.get("/v1/farmer/households"); mh.status != http.StatusOK || len(mh.body["items"].([]any)) != 1 {
