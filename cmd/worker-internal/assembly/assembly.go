@@ -12,6 +12,10 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
+	fieldport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub"
+	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
+	measport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 )
@@ -33,10 +37,22 @@ type Consumer struct {
 	Build func(clk clock.Clock) inbox.Handler
 }
 
-// Consumers là sổ đăng ký consumer nội bộ. G3-0: rỗng. Đợt G3-1 thêm consumer ở
-// đây (vd mkg.hub.weigh_ticket ← mkg.measurement.weigh_ticket.recorded). Kiểm thử
-// của package đòi tên và sự kiện đúng quy ước.
-var Consumers = []Consumer{}
+// Consumers là sổ đăng ký consumer nội bộ. Kiểm thử của package đòi tên và sự
+// kiện đúng quy ước. Mỗi consumer: quorum queue + DLQ (Name + ".dlq"), giao tối
+// đa inbox.DeliveryLimit lần rồi sang DLQ, idempotent qua shared.inbox (R-61).
+//
+// G3 (mkg/hub, vai hub_app):
+//   - mkg.hub.weigh_ticket   ← mkg.measurement.weigh_ticket.recorded (Q-MKG-04: khối lượng lô HUB_IN, gắn HUB_OUT ↔ phiếu xuất);
+//   - mkg.hub.roll_count     ← mkg.fieldops.roll_count.recorded (hàng dự kiến về);
+//   - mkg.hub.reconciliation ← mkg.measurement.reconciliation.completed (quy kết hao hụt theo cơ sở).
+var Consumers = []Consumer{
+	{Name: hubport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Role: hub.DBRole,
+		Build: func(clk clock.Clock) inbox.Handler { return hub.NewConsumers(clk).WeighTicket() }},
+	{Name: hubport.RollCountConsumer, Events: []string{fieldport.EventRollCountRecorded}, Role: hub.DBRole,
+		Build: func(clk clock.Clock) inbox.Handler { return hub.NewConsumers(clk).RollCount() }},
+	{Name: hubport.ReconciliationConsumer, Events: []string{measport.EventReconciliationCompleted}, Role: hub.DBRole,
+		Build: func(clk clock.Clock) inbox.Handler { return hub.NewConsumers(clk).Reconciliation() }},
+}
 
 // Queue là một hàng đợi consumer trên vhost mkg.internal.
 type Queue struct {

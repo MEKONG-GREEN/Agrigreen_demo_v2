@@ -67,6 +67,12 @@ type ReceiveInput struct {
 	EventTime   time.Time
 	DeviceID    *string
 	IdemKey     string
+	// WeighTicketRef (G3, Q-MKG-04): phiếu cân HUB_IN đã về hub (sự kiện nội bộ) —
+	// id lô = lot_ref của phiếu, khối lượng = phiếu (Mass để trống hoặc bằng phiếu).
+	WeighTicketRef *uuid.UUID
+	// ManualReason: lý do nhập tay (cân hỏng) — bắt buộc khi tham số hub.weigh.v1
+	// ticket_required = true và không có WeighTicketRef.
+	ManualReason string
 }
 
 // ReceiveResult là kết quả nhận lô.
@@ -87,21 +93,18 @@ func (s *Service) Receive(ctx context.Context, in ReceiveInput) (res ReceiveResu
 	if !domain.ValidProduct(in.Product) {
 		return res, false, problem.Validation.WithField("product", "straw_bale, straw_loose, dried_straw hoặc compressed_bale")
 	}
-	if in.Mass.Decimal().Sign() <= 0 {
+	if in.WeighTicketRef == nil && in.Mass.Decimal().Sign() <= 0 {
 		return res, false, problem.Validation.WithField("mass_kg", "phải > 0")
+	}
+	if in.Mass.Decimal().IsNegative() {
+		return res, false, problem.Validation.WithField("mass_kg", "phải > 0")
+	}
+	manualReason := strings.TrimSpace(in.ManualReason)
+	if n := len([]rune(manualReason)); n > 0 && (n < 10 || n > 500) {
+		return res, false, problem.Validation.WithField("manual_reason", "10..500 ký tự")
 	}
 	sources, err := domain.BuildSources(in.Sources)
 	if err != nil {
-		return res, false, mapErr(err)
-	}
-	id := ids.New()
-	if in.LotID != nil {
-		id = *in.LotID
-	}
-	code := in.Code
-	if code == "" {
-		code = domain.LotCode(id)
-	} else if err := domain.ValidLotCode(code); err != nil {
 		return res, false, mapErr(err)
 	}
 	replayed, err = s.write(ctx, p.TenantID, func(tx pgx.Tx) error {
@@ -109,7 +112,24 @@ func (s *Service) Receive(ctx context.Context, in ReceiveInput) (res ReceiveResu
 		if err != nil {
 			return err
 		}
+		id := ids.New()
 		if in.LotID != nil {
+			id = *in.LotID
+		}
+		w, err := s.receiptBasis(ctx, tx, &in, manualReason)
+		if err != nil {
+			return err
+		}
+		if w != nil {
+			id = w.LotID
+		}
+		code := in.Code
+		if code == "" {
+			code = domain.LotCode(id)
+		} else if err := domain.ValidLotCode(code); err != nil {
+			return mapErr(err)
+		}
+		if in.LotID != nil || w != nil {
 			if prev, err := store.LotByID(ctx, tx, id); err != nil {
 				return err
 			} else if prev != nil {
@@ -132,6 +152,9 @@ func (s *Service) Receive(ctx context.Context, in ReceiveInput) (res ReceiveResu
 			return err
 		}
 		if err := store.InsertBalance(ctx, tx, p.TenantID, res.Lot, in.Mass, res.Movement.Seq); err != nil {
+			return err
+		}
+		if err := s.recordReceiptBasis(ctx, tx, p.TenantID, p.ActorRef, res.Lot, w, manualReason); err != nil {
 			return err
 		}
 		used, err := store.UsedKg(ctx, tx, f.ID)
@@ -357,62 +380,13 @@ func (s *Service) Dispatch(ctx context.Context, in DispatchInput) (res DispatchR
 	if in.Mass.Decimal().Sign() <= 0 {
 		return res, false, problem.Validation.WithField("mass_kg", "phải > 0")
 	}
-	rule := domain.RiskV1
-	now := s.Clock.Now()
 	replayed, err = s.write(ctx, p.TenantID, func(tx pgx.Tx) error {
 		f, err := activeFacility(ctx, tx, in.FacilityID, false)
 		if err != nil {
 			return err
 		}
-		lots, err := store.Balances(ctx, tx, f.ID, true)
-		if err != nil {
-			return err
-		}
-		ranked := rule.Rank(lots, now)
-		var allocs []domain.Allocation
-		strategy := "risk_suggested"
-		if len(in.Allocations) == 0 {
-			if allocs, err = domain.Allocate(ranked, in.Mass); err != nil {
-				return mapErr(err)
-			}
-		} else {
-			strategy = "manual"
-			if allocs, err = manualAllocations(ranked, in.Allocations, in.Mass); err != nil {
-				return err
-			}
-		}
-		res.Dispatch = store.Dispatch{
-			ID: ids.New(), TenantID: p.TenantID, FacilityID: f.ID, Mass: in.Mass, DestinationRef: in.DestinationRef,
-			Allocations: allocs, Strategy: strategy, RuleVersion: rule.Version, EventTime: in.EventTime, ActorRef: p.ActorRef,
-			IdemKey: in.IdemKey,
-		}
-		if err := insert(store.InsertDispatch(ctx, tx, &res.Dispatch, in.DeviceID)); err != nil {
-			return err
-		}
-		rem := map[uuid.UUID]mass.Kg{}
-		for _, l := range lots {
-			rem[l.LotID] = l.Remaining
-		}
-		ref := "dispatch"
-		for _, a := range allocs {
-			after, err := domain.Apply(rem[a.LotID], mass.Kg{}.Sub(a.MassKg))
-			if err != nil {
-				return mapErr(err)
-			}
-			m := domain.Movement{
-				ID: ids.New(), TenantID: p.TenantID, FacilityID: f.ID, LotID: a.LotID, Kind: domain.MoveDispatch,
-				Qty: mass.Kg{}.Sub(a.MassKg), BalanceAfter: after, RefType: &ref, RefID: &res.Dispatch.ID, EventTime: in.EventTime,
-				ActorRef: p.ActorRef, IdemKey: in.IdemKey + ":mv:" + a.LotID.String(),
-			}
-			if err := insert(store.InsertMovement(ctx, tx, &m, in.DeviceID)); err != nil {
-				return err
-			}
-			if err := store.SetBalance(ctx, tx, a.LotID, after, m.Seq); err != nil {
-				return err
-			}
-			res.Movements = append(res.Movements, m)
-		}
-		return nil
+		res, err = s.dispatchTx(ctx, tx, p.TenantID, p.ActorRef, f.ID, in, domain.MoveDispatch, "dispatch", nil)
+		return err
 	}, func(tx pgx.Tx) (bool, error) {
 		d, err := store.DispatchByIdem(ctx, tx, in.IdemKey)
 		if err != nil || d == nil {
@@ -426,6 +400,93 @@ func (s *Service) Dispatch(ctx context.Context, in DispatchInput) (res DispatchR
 		return true, nil
 	})
 	return res, replayed, err
+}
+
+// rank xếp lô còn tồn của cơ sở theo hub.risk.v2 (tham số hiện hành hoặc mặc
+// định tạm) với cảnh báo môi trường từ EnvReadings; trả chuỗi ghim phiên bản.
+func (s *Service) rank(ctx context.Context, tx pgx.Tx, tid, facility uuid.UUID, lots []domain.Balance, now time.Time) ([]domain.Ranked, string, error) {
+	rp, pinned, err := activeRisk(ctx, tx)
+	if err != nil {
+		return nil, "", err
+	}
+	var readings []domain.EnvReading
+	if len(lots) > 0 {
+		from := lots[0].ReceivedAt
+		for _, l := range lots {
+			if l.ReceivedAt.Before(from) {
+				from = l.ReceivedAt
+			}
+		}
+		rs, err := s.env().Readings(ctx, tid, facility, from, now)
+		if err != nil {
+			return nil, "", err
+		}
+		for _, r := range rs {
+			readings = append(readings, domain.EnvReading{FacilityID: r.FacilityID, SensorID: r.SensorID, HumidityPct: r.HumidityPct, TempC: r.TempC, At: r.At})
+		}
+	}
+	return rp.RankV2(pinned, lots, readings, now), pinned, nil
+}
+
+// dispatchTx ghi phiếu xuất + dịch chuyển kind (dispatch | transfer_out) trong tx đã mở.
+// refType/refID của dịch chuyển: "dispatch"/id phiếu, hoặc "transfer"/id phiếu chuyển.
+func (s *Service) dispatchTx(ctx context.Context, tx pgx.Tx, tid, actor, facility uuid.UUID, in DispatchInput, kind domain.MovementKind,
+	refType string, refID *uuid.UUID) (res DispatchResult, err error) {
+	lots, err := store.Balances(ctx, tx, facility, true)
+	if err != nil {
+		return res, err
+	}
+	ranked, version, err := s.rank(ctx, tx, tid, facility, lots, s.Clock.Now())
+	if err != nil {
+		return res, err
+	}
+	var allocs []domain.Allocation
+	strategy := "risk_suggested"
+	if len(in.Allocations) == 0 {
+		if allocs, err = domain.Allocate(ranked, in.Mass); err != nil {
+			return res, mapErr(err)
+		}
+	} else {
+		strategy = "manual"
+		if allocs, err = manualAllocations(ranked, in.Allocations, in.Mass); err != nil {
+			return res, err
+		}
+	}
+	res.Dispatch = store.Dispatch{
+		ID: ids.New(), TenantID: tid, FacilityID: facility, Mass: in.Mass, DestinationRef: in.DestinationRef,
+		Allocations: allocs, Strategy: strategy, RuleVersion: version, EventTime: in.EventTime, ActorRef: actor,
+		IdemKey: in.IdemKey,
+	}
+	if err := insert(store.InsertDispatch(ctx, tx, &res.Dispatch, in.DeviceID)); err != nil {
+		return res, err
+	}
+	if refID == nil {
+		refID = &res.Dispatch.ID
+	}
+	rem := map[uuid.UUID]mass.Kg{}
+	for _, l := range lots {
+		rem[l.LotID] = l.Remaining
+	}
+	for _, a := range allocs {
+		after, err := domain.Apply(rem[a.LotID], mass.Kg{}.Sub(a.MassKg))
+		if err != nil {
+			return res, mapErr(err)
+		}
+		ref := refType
+		m := domain.Movement{
+			ID: ids.New(), TenantID: tid, FacilityID: facility, LotID: a.LotID, Kind: kind,
+			Qty: mass.Kg{}.Sub(a.MassKg), BalanceAfter: after, RefType: &ref, RefID: refID, EventTime: in.EventTime,
+			ActorRef: actor, IdemKey: in.IdemKey + ":mv:" + a.LotID.String(),
+		}
+		if err := insert(store.InsertMovement(ctx, tx, &m, in.DeviceID)); err != nil {
+			return res, err
+		}
+		if err := store.SetBalance(ctx, tx, a.LotID, after, m.Seq); err != nil {
+			return res, err
+		}
+		res.Movements = append(res.Movements, m)
+	}
+	return res, nil
 }
 
 func manualAllocations(ranked []domain.Ranked, req []domain.Allocation, total mass.Kg) ([]domain.Allocation, error) {
@@ -560,7 +621,11 @@ func (s *Service) Inventory(ctx context.Context, facility uuid.UUID) (Inventory,
 		for _, l := range lots {
 			used = used.Add(l.Remaining)
 		}
-		inv = Inventory{Facility: *f, Lots: domain.RiskV1.Rank(lots, now), Capacity: domain.Snapshot(f.ID, now, f.Spec.Capacity, used), Rule: domain.RiskV1.Version}
+		ranked, version, err := s.rank(ctx, tx, tenantOf(ctx), f.ID, lots, now)
+		if err != nil {
+			return err
+		}
+		inv = Inventory{Facility: *f, Lots: ranked, Capacity: domain.Snapshot(f.ID, now, f.Spec.Capacity, used), Rule: version}
 		return nil
 	})
 	return inv, err

@@ -154,7 +154,7 @@ paths:
                   facility: {$ref: "#/components/schemas/Facility"}
                   lots: {type: array, items: {$ref: "#/components/schemas/RankedLot"}}
                   capacity: {$ref: "#/components/schemas/Capacity"}
-                  risk_rule: {type: string, example: hub.risk.v1}
+                  risk_rule: {type: string, example: "hub.risk.v2#0"}
   /v1/hub/facilities/{id}/dispatch-suggestion:
     parameters: [{$ref: "#/components/parameters/FacilityID"}]
     get:
@@ -188,9 +188,12 @@ paths:
           application/json:
             schema:
               type: object
-              required: [product, mass_kg, sources]
+              required: [product, sources]
+              description: mass_kg bắt buộc trừ khi có weigh_ticket_ref (G3, Q-MKG-04).
               properties:
                 id: {type: string, format: uuid, description: UUIDv7 do thiết bị sinh (R-11)}
+                weigh_ticket_ref: {type: string, format: uuid, description: "G3: phiếu cân HUB_IN đã về hub — id lô và khối lượng theo phiếu"}
+                manual_reason: {type: string, minLength: 10, maxLength: 500, description: "G3: lý do nhập tay (cân hỏng) — bắt buộc khi tham số hub.weigh.v1 ticket_required"}
                 code: {type: string, pattern: "^[A-Z0-9][A-Z0-9_-]{1,39}$"}
                 product: {$ref: "#/components/schemas/Product"}
                 mass_kg: {$ref: "#/components/schemas/Kg"}
@@ -202,7 +205,7 @@ paths:
                     type: object
                     required: [kind, ref]
                     properties:
-                      kind: {type: string, enum: [plot, cooperative, roll_count, supplier, lot]}
+                      kind: {type: string, enum: [plot, cooperative, roll_count, supplier, lot, stocktake]}
                       ref: {type: string, format: uuid}
                       mass_kg: {$ref: "#/components/schemas/Kg"}
                       ratio: {type: string, pattern: "^[0-9]+(\\.[0-9]{1,6})?$"}
@@ -344,6 +347,202 @@ paths:
         "201": {description: Dòng bù, content: {application/json: {schema: {$ref: "#/components/schemas/Movement"}}}}
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  # --- mkg/hub G3 (migration mkg 000009): tham số, kiểm kê, chuyển kho, đo lường ---
+  /v1/hub/params/{set}:
+    parameters: [{name: set, in: path, required: true, schema: {type: string, enum: [risk, weigh]}}]
+    get:
+      summary: "[Quản trị] Bộ tham số có phiên bản (hub.risk.v2 / hub.weigh.v1) và bộ đang áp dụng"
+      description: "active_version dạng hub.risk.v2#n; #0 = mặc định tạm (chờ khách, C-4)."
+      operationId: getHubParams
+      tags: [hub]
+      responses:
+        "200": {description: Phiên bản mới trước, content: {application/json: {schema: {type: object, properties: {param_set: {type: string}, active_version: {type: string}, active: {type: object}, items: {type: array, items: {$ref: "#/components/schemas/ParamVersion"}}}}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/hub/params/{set}/versions:
+    parameters: [{name: set, in: path, required: true, schema: {type: string, enum: [risk, weigh]}}]
+    post:
+      summary: "[Quản trị] Đề xuất phiên bản tham số (chờ duyệt)"
+      description: "Vai hub_operator. Một phiên bản chờ mỗi bộ. risk: age_horizon_days, age_weight, moisture_warn_pct, moisture_span_pct, moisture_weight, alert_saturation, alert_weight (Σ trọng số = 100), humidity_warn_pct, humidity_crit_pct, temp_warn_c, temp_crit_c, crit_alert_weight. weigh: tolerance_pct, tolerance_min_kg, ticket_required, kg_per_roll_default. Khóa lạ bị từ chối."
+      operationId: proposeHubParams
+      tags: [hub]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [params, reason]
+              properties:
+                params: {type: object}
+                reason: {type: string, minLength: 10, maxLength: 500}
+                effective_from: {type: string, format: date-time}
+      responses:
+        "201": {description: Phiên bản chờ duyệt, content: {application/json: {schema: {$ref: "#/components/schemas/ParamVersion"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/hub/params/{set}/versions/{version}/decision:
+    parameters:
+      - {name: set, in: path, required: true, schema: {type: string, enum: [risk, weigh]}}
+      - {name: version, in: path, required: true, schema: {type: integer, minimum: 1}}
+    post:
+      summary: "[Quản trị] Duyệt / từ chối phiên bản tham số"
+      description: Vai hub_approver, KHÁC người đặt (R-56; DB chặn lần hai bằng CHECK).
+      operationId: decideHubParams
+      tags: [hub]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [decision], properties: {decision: {type: string, enum: [approved, rejected]}, reason: {type: string, minLength: 10}}}}}
+      responses:
+        "201": {description: Quyết định, content: {application/json: {schema: {$ref: "#/components/schemas/ParamVersion"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/hub/facilities/{id}/stocktakes:
+    parameters: [{$ref: "#/components/parameters/FacilityID"}]
+    post:
+      summary: Ghi một lần đếm kiểm kê (Q-MKG-06) — chờ duyệt
+      description: Vai hub_operator. Dòng theo dạng hàng, phủ mọi dạng hàng đang có tồn; sổ chụp lúc đếm. Một phiên chờ mỗi cơ sở; đếm lại = supersedes_id + reason.
+      operationId: submitHubStocktake
+      tags: [hub]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lines]
+              properties:
+                lines: {type: array, minItems: 1, items: {type: object, required: [product, counted_kg], properties: {product: {$ref: "#/components/schemas/Product"}, counted_kg: {$ref: "#/components/schemas/Kg"}}}}
+                note: {type: string, maxLength: 500}
+                supersedes_id: {type: string, format: uuid}
+                reason: {type: string, minLength: 10}
+                event_time: {type: string, format: date-time}
+      responses:
+        "201": {description: Phiên chờ duyệt, content: {application/json: {schema: {$ref: "#/components/schemas/Stocktake"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Phiên kiểm kê của cơ sở (mới trước)
+      operationId: listHubStocktakes
+      tags: [hub]
+      responses:
+        "200": {description: Danh sách, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/Stocktake"}}}}}}}
+  /v1/hub/stocktakes/{id}:
+    get:
+      summary: Một phiên kiểm kê kèm dịch chuyển điều chỉnh
+      operationId: getHubStocktake
+      tags: [hub]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "200": {description: Phiên kiểm kê, content: {application/json: {schema: {$ref: "#/components/schemas/Stocktake"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/hub/stocktakes/{id}/decision:
+    post:
+      summary: Duyệt / từ chối phiên kiểm kê
+      description: "Vai hub_approver, KHÁC người đếm (R-56, app + CHECK DB). Duyệt: sổ phải còn đúng lúc đếm (không thì 409 hub.stocktake_stale); thừa → lô origin stocktake; thiếu → trừ theo hub.risk.v2; dịch chuyển adjustment ref stocktake."
+      operationId: decideHubStocktake
+      tags: [hub]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [decision], properties: {decision: {type: string, enum: [approved, rejected]}, reason: {type: string, minLength: 10}}}}}
+      responses:
+        "201": {description: Quyết định + điều chỉnh, content: {application/json: {schema: {$ref: "#/components/schemas/Stocktake"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/hub/facilities/{id}/transfers:
+    parameters: [{$ref: "#/components/parameters/FacilityID"}]
+    post:
+      summary: Xuất chuyển kho sang cơ sở khác (Q-MKG-10) — đang đi đường
+      description: Vai hub_operator. Phiếu xuất destination_ref = cơ sở đích, dịch chuyển transfer_out; allocations rỗng → theo hub.risk.v2.
+      operationId: startHubTransfer
+      tags: [hub]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to_facility_id, mass_kg]
+              properties:
+                to_facility_id: {type: string, format: uuid}
+                mass_kg: {$ref: "#/components/schemas/Kg"}
+                allocations: {type: array, items: {type: object, required: [lot_id, mass_kg], properties: {lot_id: {type: string, format: uuid}, mass_kg: {$ref: "#/components/schemas/Kg"}}}}
+                event_time: {type: string, format: date-time}
+      responses:
+        "201": {description: Phiếu chuyển, content: {application/json: {schema: {$ref: "#/components/schemas/Transfer"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/hub/facilities/{id}/transfers/{transfer}/receipt:
+    parameters:
+      - {$ref: "#/components/parameters/FacilityID"}
+      - {name: transfer, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Nhận hàng chuyển ở cơ sở đích
+      description: "Vai hub_operator. mass_kg (tay) hoặc weigh_ticket_refs (phiếu HUB_IN của lô nguồn đã về — Σ). Mỗi lô nguồn → lô mới origin transfer, nguồn kind = lot tỷ lệ 1; hao hụt đường = xuất − nhận."
+      operationId: receiveHubTransfer
+      tags: [hub]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mass_kg: {$ref: "#/components/schemas/Kg"}
+                weigh_ticket_refs: {type: array, items: {type: string, format: uuid}}
+                event_time: {type: string, format: date-time}
+      responses:
+        "201": {description: Phiếu chuyển đã nhận, content: {application/json: {schema: {$ref: "#/components/schemas/Transfer"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/hub/transfers/{id}:
+    get:
+      summary: Phiếu chuyển kho
+      operationId: getHubTransfer
+      tags: [hub]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "200": {description: Phiếu chuyển, content: {application/json: {schema: {$ref: "#/components/schemas/Transfer"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/hub/lots/{id}/measurements:
+    get:
+      summary: Phiếu cân ↔ lô, hàng dự kiến về, hao hụt đã quy kết (cả khi lô chưa về hub)
+      operationId: getHubLotMeasurements
+      tags: [hub]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "200":
+          description: Đo lường của lô
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lot_ref: {type: string, format: uuid}
+                  hub_in: {type: [object, "null"]}
+                  hub_out: {type: [object, "null"]}
+                  links: {type: array, items: {type: object, properties: {outcome: {type: string, enum: [pending, receipt, manual_receipt, within_tolerance, adjusted, variance_unresolved, transfer_arrival, dispatch_linked, dispatch_variance, dispatch_unmatched, stale]}}}}
+                  expected_rolls: {type: object, additionalProperties: {type: integer}}
+                  expected_kg: {oneOf: [{$ref: "#/components/schemas/Kg"}, {type: "null"}]}
+                  weigh_param_version: {type: string}
+                  loss: {type: [object, "null"]}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/hub/facilities/{id}/losses:
+    parameters: [{$ref: "#/components/parameters/FacilityID"}]
+    get:
+      summary: Hao hụt đã quy kết cho cơ sở (đối soát hiện hành của mỗi lô)
+      operationId: getHubFacilityLosses
+      tags: [hub]
+      responses:
+        "200": {description: Tổng hợp, content: {application/json: {schema: {type: object, properties: {lots: {type: integer}, loss_alerts: {type: integer}, hub_in_kg: {$ref: "#/components/schemas/Kg"}, hub_out_kg: {$ref: "#/components/schemas/Kg"}, expected_loss_kg: {$ref: "#/components/schemas/Kg"}, abnormal_loss_kg: {$ref: "#/components/schemas/Kg"}}}}}}
+        "404": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -360,6 +559,49 @@ components:
     Kg: {type: string, pattern: "^-?[0-9]+(\\.[0-9]{1,3})?$", example: "1520.500"}
     Pct: {type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,2})?$", example: "14.50"}
     Product: {type: string, enum: [straw_bale, straw_loose, dried_straw, compressed_bale]}
+    ParamVersion:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        param_set: {type: string, enum: [risk, weigh]}
+        version: {type: integer}
+        rule_version: {type: string, enum: [hub.risk.v2, hub.weigh.v1]}
+        params: {type: object}
+        reason: {type: string}
+        effective_from: {type: string, format: date-time}
+        proposed_by: {type: string, format: uuid}
+        state: {type: string, enum: [pending, approved, rejected]}
+        decided_by: {type: [string, "null"], format: uuid}
+        decided_at: {type: [string, "null"], format: date-time}
+    Stocktake:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        facility_id: {type: string, format: uuid}
+        status: {type: string, enum: [pending, approved, rejected, superseded]}
+        lines: {type: array, items: {type: object, properties: {product: {$ref: "#/components/schemas/Product"}, book_kg: {$ref: "#/components/schemas/Kg"}, counted_kg: {$ref: "#/components/schemas/Kg"}, variance_kg: {$ref: "#/components/schemas/Kg"}}}}
+        book_kg: {$ref: "#/components/schemas/Kg"}
+        counted_kg: {$ref: "#/components/schemas/Kg"}
+        variance_kg: {$ref: "#/components/schemas/Kg"}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        counted_by: {type: string, format: uuid}
+        decided_by: {type: [string, "null"], format: uuid}
+        adjustments: {type: array, items: {type: object, properties: {lot_id: {type: string, format: uuid}, movement_id: {type: string, format: uuid}, qty_kg: {$ref: "#/components/schemas/Kg"}}}}
+    Transfer:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        from_facility_id: {type: string, format: uuid}
+        to_facility_id: {type: string, format: uuid}
+        dispatch_id: {type: string, format: uuid}
+        status: {type: string, enum: [in_transit, received]}
+        dispatched_kg: {$ref: "#/components/schemas/Kg"}
+        received_kg: {oneOf: [{$ref: "#/components/schemas/Kg"}, {type: "null"}]}
+        loss_kg: {oneOf: [{$ref: "#/components/schemas/Kg"}, {type: "null"}]}
+        source_lots: {type: array, items: {type: object}}
+        received_lots: {type: array, items: {type: object}}
+        dispatched_at: {type: string, format: date-time}
+        received_at: {type: [string, "null"], format: date-time}
     FacilitySpecInput:
       type: object
       required: [code, name, kind, location, province_code, capacity_kg, effective_from]

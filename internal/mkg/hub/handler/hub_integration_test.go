@@ -308,7 +308,7 @@ func TestDispatchByDegradationRisk(t *testing.T) {
 	sg := op.app(http.MethodGet, "/v1/hub/facilities/"+fac+"/dispatch-suggestion?mass_kg=450", nil)
 	mustStatus(t, sg, http.StatusOK, "đề xuất")
 	ls := arr(sg.body, "lots")
-	if len(ls) != 2 || ls[0]["lot_id"] != wet || ls[0]["risk_score"] != "35.4" || ls[1]["risk_score"] != "26.7" || sg.body["risk_rule"] != "hub.risk.v1" {
+	if len(ls) != 2 || ls[0]["lot_id"] != wet || ls[0]["risk_score"] != "35.4" || ls[1]["risk_score"] != "26.7" || sg.body["risk_rule"] != "hub.risk.v2#0" { // G3: v2 mặc định tạm, không cảm biến → cùng điểm v1
 		t.Fatalf("lô ẩm rủi ro cao phải đứng trước lô cũ: %s", sg.raw)
 	}
 	if r := op.app(http.MethodPost, "/v1/hub/facilities/"+fac+"/dispatches", map[string]any{"mass_kg": "800.001"}); code(r) != "hub.insufficient_stock" {

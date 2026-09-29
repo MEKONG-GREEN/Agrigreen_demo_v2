@@ -358,6 +358,25 @@ Nhập hàng loạt: lý do theo dòng dùng nhãn "Thiếu Email", "Sai định
 | 422 | `hub.parent_invalid` | Cơ sở cha không phải hub hiện hành khác chính nó |
 | 422 | `hub.boundary_invalid` | Ranh giới không phải Polygon/MultiPolygon WGS84 hợp lệ |
 | 500 | `hub.valve_denied` | Van công bố từ chối payload (hợp đồng thiếu/chưa duyệt, trường ngoài hợp đồng) — lỗi lập trình, không có gì được ghi |
+| 404 | `hub.param_set_not_found` | G3: bộ tham số không phải `risk` / `weigh` |
+| 404 | `hub.param_version_not_found` | G3: không có phiên bản tham số số `{version}` |
+| 409 | `hub.param_pending_exists` | G3: bộ tham số đang có phiên bản chờ duyệt |
+| 409 | `hub.weigh_ticket_unknown` | G3 (Q-MKG-04): nhận lô với `weigh_ticket_ref` mà hub chưa nhận sự kiện phiếu cân HUB_IN — thử lại sau |
+| 409 | `hub.weigh_ticket_used` | G3: phiếu cân đã dùng cho lần nhận khác (hoặc đã áp vào lô nhập tay) |
+| 422 | `hub.weigh_ticket_lot_mismatch` | G3: `id` lô khác `lot_ref` của phiếu cân |
+| 422 | `hub.weigh_mass_mismatch` | G3: `mass_kg` khác khối lượng phiếu cân (để trống để lấy theo phiếu); nhận chuyển kho: khác Σ phiếu |
+| 422 | `hub.weigh_ticket_required` | G3: tham số `hub.weigh.v1` bật `ticket_required` — cần `weigh_ticket_ref`, hoặc `manual_reason` (10..500 ký tự) khi cân hỏng |
+| 404 | `hub.stocktake_not_found` | G3 (Q-MKG-06): không có phiên kiểm kê trong tenant |
+| 409 | `hub.stocktake_pending_exists` | G3: cơ sở đang có phiên kiểm kê chờ duyệt — duyệt/từ chối, hoặc đếm lại với `supersedes_id` + `reason` |
+| 409 | `hub.stocktake_not_pending` | G3: phiên kiểm kê đã duyệt / từ chối / bị thay |
+| 409 | `hub.stocktake_stale` | G3: tồn theo sổ đã đổi kể từ lúc đếm — đếm lại |
+| 422 | `hub.stocktake_lines_invalid` | G3: dòng kiểm kê lặp dạng hàng hoặc thiếu một dạng hàng đang có tồn |
+| 403 | `self_approval_forbidden` | G3: người duyệt phiên kiểm kê là người đếm; người duyệt tham số là người đặt (R-56; DB chặn lần hai bằng CHECK) |
+| 404 | `hub.transfer_not_found` | G3 (Q-MKG-10): không có phiếu chuyển kho |
+| 409 | `hub.transfer_not_in_transit` | G3: phiếu chuyển đã nhận |
+| 422 | `hub.transfer_same_facility` | G3: cơ sở đích trùng cơ sở đi |
+| 422 | `hub.transfer_wrong_facility` | G3: nhận ở cơ sở không phải đích của phiếu chuyển |
+| 422 | `hub.transfer_ticket_invalid` | G3: phiếu cân không phải phiếu HUB_IN (đến) của một lô nguồn thuộc phiếu chuyển, hoặc lặp |
 
 ### pf/waterway
 
