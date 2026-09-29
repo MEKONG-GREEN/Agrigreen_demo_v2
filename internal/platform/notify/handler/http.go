@@ -161,8 +161,9 @@ func (h Handler) pushToken(c *gin.Context) {
 }
 
 type nudgeReq struct {
-	DeviceID *string `json:"device_id"`
-	Unit     string  `json:"unit"`
+	DeviceID *string  `json:"device_id"`
+	Unit     string   `json:"unit"`
+	Entities []string `json:"entities"`
 }
 
 func (h Handler) nudge(c *gin.Context) {
@@ -170,7 +171,7 @@ func (h Handler) nudge(c *gin.Context) {
 	if !bindJSON(c, &req) {
 		return
 	}
-	in := app.NudgeInput{Unit: req.Unit}
+	in := app.NudgeInput{Unit: req.Unit, Entities: req.Entities}
 	if req.DeviceID != nil {
 		id, err := uuid.Parse(*req.DeviceID)
 		if err != nil {
@@ -187,5 +188,6 @@ func (h Handler) nudge(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	c.JSON(http.StatusAccepted, gin.H{"nudge_id": res.ID.String(), "target_kind": res.Kind, "target": res.Target, "devices": res.Devices})
+	c.JSON(http.StatusAccepted, gin.H{"nudge_id": res.ID.String(), "target_kind": res.Kind, "target": res.Target, "devices": res.Devices,
+		"entities": res.Entities})
 }

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.party.household.registered/v1",
+  "title": "pf.party.household.registered — payload",
+  "description": "Nông hộ MỚI được ghi ở pf_party (App HTX, App Khuyến nông hoặc nhập tệp). Không phát khi trùng chỉ mục mù của kho định danh (dùng lại mã cũ) — KN US-HTX-05: đúng mã định danh chung household_ref, không tạo bản ghi trùng. Consumer pf/notify báo cán bộ khuyến nông của xã (chỉ source = htx_app). Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.party.household.registered",
+  "x-schema-version": 1,
+  "x-producer": "pf/party",
+  "type": "object",
+  "required": ["household_ref", "commune_code", "cooperative_ref", "member_since", "source", "actor_ref", "event_time"],
+  "properties": {
+    "household_ref":   { "type": "string", "format": "uuid", "description": "Mã tham chiếu kho định danh của nông hộ" },
+    "commune_code":    { "type": "string", "description": "Mã xã hiện hành của nông hộ" },
+    "cooperative_ref": { "type": ["string", "null"], "format": "uuid", "description": "HTX lúc đăng ký; null nếu chưa là thành viên" },
+    "member_since":    { "type": ["string", "null"], "format": "date" },
+    "source":          { "type": "string", "enum": ["htx_app", "kn_app", "import"] },
+    "actor_ref":       { "type": "string", "format": "uuid" },
+    "event_time":      { "type": "string", "format": "date-time" }
+  }
+}

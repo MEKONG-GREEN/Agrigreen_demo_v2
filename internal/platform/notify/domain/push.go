@@ -16,6 +16,9 @@ type PushMessage struct {
 	Kind           string
 	NotificationID *uuid.UUID // nil với sync_now
 	Urgent         bool
+	// Entities: nhóm dữ liệu cần đồng bộ ngay (chỉ với sync_now; rỗng = tất cả). Tên entity
+	// của pf/sync — không phải dữ liệu cá nhân hay mã đơn vị (RB-7).
+	Entities []string
 }
 
 // Data là cặp khóa–giá trị của thông điệp dữ liệu. Đây là TOÀN BỘ những gì rời
@@ -24,6 +27,9 @@ func (m PushMessage) Data() map[string]string {
 	d := map[string]string{"kind": m.Kind}
 	if m.NotificationID != nil {
 		d["notification_id"] = m.NotificationID.String()
+	}
+	if len(m.Entities) > 0 {
+		d["entities"] = strings.Join(m.Entities, ",")
 	}
 	return d
 }

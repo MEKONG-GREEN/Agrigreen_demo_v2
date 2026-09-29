@@ -24,7 +24,7 @@ const CatalogRuleVersion = "pf.masterdata.catalog/v1"
 const CatalogFormat = "agrigreen.catalogs/v1"
 
 // Catalogs là các danh mục module quản lý.
-var Catalogs = []string{port.CatalogRiceVariety, port.CatalogFarmStage, port.CatalogMachineType, port.CatalogSeason, port.CatalogPest}
+var Catalogs = []string{port.CatalogRiceVariety, port.CatalogFarmStage, port.CatalogMachineType, port.CatalogSeason, port.CatalogPest, port.CatalogVesselClass}
 
 // Hành động ghi vào sổ lịch sử danh mục.
 const (
@@ -41,7 +41,7 @@ var itemCodeRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$`)
 
 // Lỗi kiểm dữ liệu danh mục.
 var (
-	ErrCatalogUnknown = errors.New("danh mục không tồn tại; dùng rice_variety, farm_stage, machine_type, season hoặc pest")
+	ErrCatalogUnknown = errors.New("danh mục không tồn tại; dùng rice_variety, farm_stage, machine_type, season, pest hoặc vessel_class")
 	ErrItemCode       = errors.New("mã mục 1–40 ký tự [A-Za-z0-9_.-]")
 	ErrItemName       = errors.New("tên bắt buộc, tối đa 200 ký tự")
 	ErrReason         = fmt.Errorf("lý do bắt buộc, %d–500 ký tự", MinReasonLen)
@@ -151,6 +151,17 @@ func yield(s string) (string, error) {
 	return d.String(), nil
 }
 
+// positiveDec: số thập phân > 0, ≤ max, tối đa 4 chữ số lẻ (kích thước phương tiện, tải trọng).
+func positiveDec(max int64) func(string) (string, error) {
+	return func(s string) (string, error) {
+		d, err := decimal.NewFromString(strings.TrimSpace(s))
+		if err != nil || !d.IsPositive() || d.GreaterThan(decimal.NewFromInt(max)) || d.Exponent() < -4 {
+			return "", fmt.Errorf("phải là số thập phân > 0 và ≤ %d, tối đa 4 chữ số lẻ", max)
+		}
+		return d.String(), nil
+	}
+}
+
 func stageRef(s string) (string, error) {
 	if !itemCodeRe.MatchString(s) {
 		return "", errors.New("phải là mã khâu sản xuất")
@@ -180,6 +191,16 @@ var attrSpecs = map[string]map[string]attrSpec{
 	port.CatalogPest: {
 		"kind":        {true, oneOf("sau_hai", "benh_hai", "dong_vat_hai", "co_dai")},
 		"description": {false, text(500)},
+	},
+	port.CatalogVesselClass: {
+		"capacity_t":      {true, positiveDec(100000)},
+		"beam_m":          {true, positiveDec(100)},
+		"draft_m":         {true, positiveDec(50)},
+		"air_draft_m":     {true, positiveDec(100)},
+		"min_width_m":     {true, positiveDec(500)},
+		"min_depth_m":     {true, positiveDec(50)},
+		"min_clearance_m": {true, positiveDec(100)},
+		"description":     {false, text(500)},
 	},
 }
 

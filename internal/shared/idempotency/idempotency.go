@@ -45,6 +45,15 @@ func KeyFromContext(ctx context.Context) string {
 	return s
 }
 
+// storedBodyKey là khóa gin.Context của thân thay thế sẽ được LƯU (SetStoredBody).
+const storedBodyKey = "idempotency.stored_body"
+
+// SetStoredBody đặt thân phản hồi được LƯU để phát lại, thay cho thân thật đã gửi
+// cho client. Dùng khi phản hồi mang bí mật chỉ được trao MỘT lần (vd liên kết kích
+// hoạt tài khoản chứa action token): bản lưu 48 giờ ở shared.idempotency_key không
+// được chứa bí mật đó. Gọi lặp cùng khóa nhận bản đã lược bí mật.
+func SetStoredBody(c *gin.Context, body []byte) { c.Set(storedBodyKey, body) }
+
 type capture struct {
 	gin.ResponseWriter
 	buf bytes.Buffer
@@ -167,8 +176,14 @@ func Middleware(db tenant.Beginner) gin.HandlerFunc {
 			if v := w.Header().Get("Location"); v != "" {
 				loc = &v
 			}
+			body := w.buf.Bytes()
+			if v, ok := c.Get(storedBodyKey); ok {
+				if b, ok := v.([]byte); ok {
+					body = b
+				}
+			}
 			_, err := tx.Exec(finish, `UPDATE shared.idempotency_key SET status = $3, response_body = $4, content_type = $5, location = $6
-			    WHERE tenant_id = $1 AND idem_key = $2`, p.TenantID, key, status, w.buf.Bytes(), ct, loc)
+			    WHERE tenant_id = $1 AND idem_key = $2`, p.TenantID, key, status, body, ct, loc)
 			return err
 		})
 		if err != nil {

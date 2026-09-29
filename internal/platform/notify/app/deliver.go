@@ -74,7 +74,7 @@ func (s *Service) sendOne(ctx context.Context, j domain.DeliveryJob) (string, *s
 		return domain.DeliveryDropped, code("no_active_token")
 	}
 	err := s.Pusher.Send(ctx, domain.PushMessage{Token: j.Token.Token, Platform: j.Token.Platform, Kind: j.Kind,
-		NotificationID: j.NotificationID, Urgent: j.Urgent})
+		NotificationID: j.NotificationID, Urgent: j.Urgent, Entities: j.Entities})
 	switch {
 	case err == nil:
 		return domain.DeliverySent, nil

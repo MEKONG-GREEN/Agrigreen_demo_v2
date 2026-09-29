@@ -104,6 +104,7 @@ func (r *Registry) ImportHouseholds(ctx context.Context, src io.Reader) (ImportR
 		row := ImportRow{Row: rec.Line} // số dòng trong tệp (dòng 1 là tiêu đề)
 		in, reason := r.parseImportRow(ctx, p.TenantID, rec, col, coops)
 		if reason == "" {
+			in.Source = port.HouseholdSourceImport
 			out, err := r.createHousehold(ctx, p, sc, in)
 			switch {
 			case err == nil && out.Duplicate:

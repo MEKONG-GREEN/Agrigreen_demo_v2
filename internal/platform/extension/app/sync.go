@@ -30,7 +30,9 @@ var (
 )
 
 // Entities thực hiện syncport.Source.
-func (SyncSource) Entities() []string { return []string{port.EntityTask, port.EntityDirective} }
+func (SyncSource) Entities() []string {
+	return []string{port.EntityTask, port.EntityDirective, port.EntitySupportRequest}
+}
 
 // taskData là dữ liệu nhiệm vụ gửi xuống máy — không có dữ liệu cá nhân (mục 10.4).
 type taskData struct {
@@ -82,6 +84,9 @@ func timeStr(t *time.Time) *string {
 // Changes thực hiện syncport.Source: nhiệm vụ trong phạm vi hoặc được giao cho
 // người gọi; chỉ đạo người gọi là người nhận (cấp giám sát: cả chỉ đạo trong phạm vi).
 func (src SyncSource) Changes(ctx context.Context, sc authz.Scope, entity string, after int64, limit int) ([]syncport.Change, int64, error) {
+	if entity == port.EntitySupportRequest {
+		return src.supportChanges(ctx, after, limit)
+	}
 	p, err := authz.Require(ctx, taskReaders...)
 	if err != nil {
 		return nil, after, err
@@ -146,7 +151,9 @@ func (src SyncSource) Changes(ctx context.Context, sc authz.Scope, entity string
 }
 
 // Entities thực hiện syncport.Sink.
-func (SyncSink) Entities() []string { return []string{port.EntityTaskUpdate, port.EntityFieldReport} }
+func (SyncSink) Entities() []string {
+	return []string{port.EntityTaskUpdate, port.EntityFieldReport, port.EntitySupportRequest}
+}
 
 // Accept thực hiện syncport.Sink: idempotent theo IdemKey; một bản ghi lỗi trả
 // rejected, không làm hỏng cả lô.
@@ -171,6 +178,8 @@ func (snk SyncSink) Accept(ctx context.Context, sc authz.Scope, rec syncport.Rec
 		evTime = &t
 	}
 	switch rec.Entity {
+	case port.EntitySupportRequest:
+		return snk.acceptSupport(ctx, rec, res, device, evTime)
 	case port.EntityTaskUpdate:
 		if dup, err := snk.seen(ctx, p.TenantID, rec.IdemKey, false); err != nil {
 			return reject(res, err)

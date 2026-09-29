@@ -39,6 +39,9 @@ func (h Handler) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.POST("/masterdata/catalogs/:catalog/items/:code/deactivate", h.setActive(false))
 	rg.POST("/masterdata/catalogs/:catalog/items/:code/reactivate", h.setActive(true))
 	rg.GET("/masterdata/catalogs/:catalog/items/:code/history", h.history)
+	httpx.AllowBody(rg, http.MethodPost, "/masterdata/catalog-imports", app.MaxCatalogImportBytes)
+	rg.POST("/masterdata/catalog-imports", h.importCatalogs)
+	rg.GET("/masterdata/catalog-imports/:id", h.catalogImport)
 	rg.POST("/masterdata/params/versions", h.propose)
 	rg.GET("/masterdata/params/versions", h.versions)
 	rg.GET("/masterdata/params/versions/:id", h.version)
@@ -268,6 +271,31 @@ func (h Handler) history(c *gin.Context) {
 		items = append(items, toChangeDTO(ch))
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": encodeCursor(pg.Next)})
+}
+
+// importCatalogs: nhập danh mục hàng loạt từ CSV/XLSX (HTX US-CAT-02). Thân là tệp
+// (text/csv hoặc .xlsx; định dạng nhận theo chữ ký tệp). Kết quả theo từng dòng.
+func (h Handler) importCatalogs(c *gin.Context) {
+	res, err := h.Svc.ImportCatalogs(c.Request.Context(), c.Request.Body, idempotency.KeyFromContext(c.Request.Context()))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+func (h Handler) catalogImport(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		httpx.Fail(c, app.ErrCatalogImportNotFound)
+		return
+	}
+	res, err := h.Svc.CatalogImport(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, res)
 }
 
 // ---------------------------------------------------------------------------

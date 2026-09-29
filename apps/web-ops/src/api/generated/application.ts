@@ -1963,6 +1963,167 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/farmer-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tài khoản nông dân của một HTX (HTX US-ACC-01) — không dữ liệu cá nhân
+         * @description Vai coop_manager (mặc định HTX của mình, không xem HTX khác), kn_officer/kn_province_admin (trong phạm vi), platform_admin.
+         */
+        get: operations["listFarmerAccounts"];
+        put?: never;
+        /**
+         * Tạo tài khoản nông dân cho nông hộ của HTX (HTX US-ACC-01, US-LOGIN-01) và phát lượt kích hoạt QR/liên kết một lần
+         * @description Tên đăng nhập = SĐT chuẩn hóa 0xxxxxxxxx; SĐT phải là SĐT chủ hộ trong kho định danh (household_ref bỏ trống → tra theo SĐT).
+         *     Vai farmer, required action UPDATE_PASSWORD, KHÔNG org_ref, không mật khẩu, không email/SMS (g2-conventions §1).
+         *     activation.link chỉ có ở phản hồi đầu (Cache-Control no-store); gọi lặp cùng Idempotency-Key trả bản đã lược liên kết.
+         */
+        post: operations["createFarmerAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/farmer-accounts/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nhập tài khoản nông dân hàng loạt từ CSV/XLSX (HTX US-ACC-02) — kết quả theo từng dòng, dòng hợp lệ nhận liên kết kích hoạt
+         * @description Cột phone (SĐT, bắt buộc), household_ref (Mã nông hộ, tùy chọn), full_name (Họ tên). Tối đa 200 dòng, 2 MB.
+         */
+        post: operations["importFarmerAccounts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/farmer-accounts/{id}/activation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description user_ref (id Keycloak) của nông dân */
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Lượt kích hoạt của tài khoản nông dân — chỉ siêu dữ liệu (ai phát, lúc nào, hạn, đã dùng/thu hồi) */
+        get: operations["listFarmerActivations"];
+        put?: never;
+        /** Phát lại liên kết/QR kích hoạt (mất QR, hết hạn, quên mật khẩu) — lượt đang mở bị thu hồi (reissued) */
+        post: operations["reissueFarmerActivation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/farmer/households": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nông hộ liên kết với tài khoản nông dân gọi (vai farmer) */
+        get: operations["myFarmerHouseholds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/farmer/coop-staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh bạ cán bộ HTX của nông dân, tìm theo tên hoặc chức vụ (HTX US-SUPPORT-02) — không có SĐT */
+        get: operations["farmerCoopStaff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/farmer/coop-staff/{id}/contact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** SĐT của cán bộ HTX lúc bấm gọi/copy (HTX US-SUPPORT-02 AC-1) — đọc từ Keycloak, không lưu, Cache-Control no-store */
+        get: operations["farmerCoopStaffContact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/households/{ref}/membership": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nông hộ vào / chuyển / rời HTX (KN US-HTX-02, US-HTX-05) — phát pf.party.household.membership_changed
+         * @description cooperative_ref null = rời HTX. Quản lý HTX chỉ cho hộ (chưa thuộc HTX nào) vào HTX của mình hoặc rời HTX của mình;
+         *     cán bộ KN/quản trị trong phạm vi. Lý do 10–500 ký tự (không đi vào sự kiện). effective_date mặc định hôm nay (giờ VN).
+         */
+        post: operations["changeHouseholdMembership"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/support-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Yêu cầu hỗ trợ của (các) nông hộ của nông dân, kèm trạng thái nhiệm vụ (HTX US-SUPPORT-01) */
+        get: operations["listMySupportRequests"];
+        put?: never;
+        /**
+         * Nông dân gửi yêu cầu hỗ trợ (HTX US-SUPPORT-01) — cùng giao dịch tự sinh nhiệm vụ cho cán bộ khuyến nông (KN US-TASK-01)
+         * @description Vai farmer. Người nhận: cán bộ xã đang trực → cán bộ tỉnh đang trực → cán bộ tỉnh → để trống (admin_queue, báo quản trị tỉnh).
+         *     Thiếu vị trí GPS vẫn nhận (nhãn "Thiếu vị trí GPS"). Ngoại tuyến: gửi qua pf/sync entity support_request (cùng payload).
+         */
+        post: operations["submitSupportRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3684,6 +3845,8 @@ export interface components {
             device_id?: string;
             /** @description Mã tỉnh/xã hiện hành */
             unit?: string;
+            /** @description KN US-SYNC-02: nhóm dữ liệu cần đồng bộ ngay (entity pf/sync); rỗng = tất cả. Thông điệp sync_now mang khóa entities (nối bằng dấu phẩy). */
+            entities?: string[];
         };
         NudgeResult: {
             /** Format: uuid */
@@ -3692,6 +3855,7 @@ export interface components {
             target_kind: "device" | "unit";
             target: string;
             devices: number;
+            entities?: string[];
         };
         /** @description Lần chạy dự báo nhu cầu (FN-09) — phương pháp TẠM cgh.forecast/v1, cần DCRD xác nhận (docs/dev/cgh-forecast.md) */
         MechForecastRun: {
@@ -3935,6 +4099,117 @@ export interface components {
             edge_count?: number;
             /** Format: date-time */
             effective_from: string | null;
+        };
+        /** @description Siêu dữ liệu lượt kích hoạt — không có token */
+        FarmerGrant: {
+            /** Format: uuid */
+            grant_id: string;
+            /** @enum {string} */
+            status: "active" | "used" | "revoked" | "expired";
+            /** @enum {string} */
+            channel: "link_qr";
+            /** Format: uuid */
+            issued_by: string;
+            /** Format: date-time */
+            issued_at: string;
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: date-time */
+            used_at?: string | null;
+            /** Format: date-time */
+            revoked_at?: string | null;
+            /** @enum {string|null} */
+            revoke_reason?: "reissued" | "account_locked" | null;
+            /** Format: uuid */
+            replaced_by?: string | null;
+        };
+        FarmerActivation: components["schemas"]["FarmerGrant"] & {
+            /** @description Liên kết action token một lần (Keycloak) — chỉ ở phản hồi đầu, không lưu */
+            link?: string | null;
+            qr?: {
+                /** @enum {string} */
+                format?: "url";
+                data?: string;
+                error_correction?: string;
+                min_module_px?: number;
+            } | null;
+            replayed?: boolean;
+        };
+        FarmerAccount: {
+            /** Format: uuid */
+            user_ref: string;
+            /** Format: uuid */
+            household_ref: string;
+            /** Format: uuid */
+            cooperative_ref: string;
+            commune_code: string;
+            /** Format: date-time */
+            linked_at: string;
+            enabled?: boolean;
+            latest_activation?: components["schemas"]["FarmerGrant"];
+        };
+        FarmerCreated: {
+            farmer?: components["schemas"]["FarmerAccount"];
+            replayed?: boolean;
+            activation?: components["schemas"]["FarmerActivation"] | null;
+            /** @description Mã lỗi khi chưa phát được liên kết (vd accounts.activation_link_unavailable) */
+            activation_error?: string | null;
+        };
+        SupportRequestInput: {
+            /**
+             * Format: uuid
+             * @description UUIDv7 sinh trên máy (tùy chọn)
+             */
+            id?: string;
+            /**
+             * Format: uuid
+             * @description Bỏ trống khi tài khoản chỉ có một nông hộ
+             */
+            household_ref?: string | null;
+            /** Format: uuid */
+            plot_ref?: string | null;
+            /** @enum {string} */
+            category: "dich_hai" | "benh_lua" | "thoi_tiet" | "ky_thuat" | "may_moc" | "khac";
+            /**
+             * @default binh_thuong
+             * @enum {string}
+             */
+            urgency: "binh_thuong" | "khan";
+            /** @description Không chứa SĐT/CCCD */
+            description: string;
+            photo_refs?: string[];
+            location?: {
+                lat?: string | number;
+                lon?: string | number;
+            } | null;
+            gps_accuracy_m?: string | number | null;
+        };
+        SupportRequest: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            household_ref?: string;
+            /** Format: uuid */
+            plot_ref?: string | null;
+            category?: string;
+            urgency?: string;
+            description?: string;
+            photo_refs?: string[];
+            gps_missing?: boolean;
+            /** @description vd "Thiếu vị trí GPS" */
+            labels?: string[];
+            /** Format: date-time */
+            event_time?: string;
+            /** Format: date-time */
+            received_at?: string;
+            /** Format: uuid */
+            task_id?: string;
+            /** @enum {string} */
+            task_status?: "new" | "assigned" | "accepted" | "in_progress" | "resolved";
+            assigned?: boolean;
+            last_note?: string;
+            /** Format: date-time */
+            task_created_at?: string;
         };
     };
     responses: {
@@ -7859,6 +8134,394 @@ export interface operations {
                 };
             };
             404: components["responses"]["Problem"];
+        };
+    };
+    listFarmerAccounts: {
+        parameters: {
+            query?: {
+                cooperative_ref?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["FarmerAccount"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            /** @description accounts.out_of_scope */
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    createFarmerAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    household_ref?: string | null;
+                    /** @description SĐT chủ hộ (0xxxxxxxxx hoặc +84…) */
+                    phone: string;
+                    full_name?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Phát lại (không có liên kết) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FarmerCreated"];
+                };
+            };
+            /** @description Đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FarmerCreated"];
+                };
+            };
+            /** @description forbidden | accounts.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description accounts.farmer_exists | accounts.phone_taken | accounts.org_inactive */
+            409: components["responses"]["Problem"];
+            /** @description accounts.household_invalid | accounts.phone_household_mismatch */
+            422: components["responses"]["Problem"];
+            /** @description accounts.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    importFarmerAccounts: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+            };
+        };
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        created: number;
+                        rejected: number;
+                        rows: {
+                            row: number;
+                            /** @enum {string} */
+                            status: "created" | "rejected";
+                            reason?: string | null;
+                            /** Format: uuid */
+                            user_ref?: string | null;
+                            /** Format: uuid */
+                            household_ref?: string | null;
+                            activation?: components["schemas"]["FarmerActivation"] | null;
+                        }[];
+                    };
+                };
+            };
+            /** @description accounts.import_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    listFarmerActivations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description user_ref (id Keycloak) của nông dân */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mới nhất trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        user_ref?: string;
+                        items?: components["schemas"]["FarmerGrant"][];
+                    };
+                };
+            };
+            /** @description accounts.farmer_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    reissueFarmerActivation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description user_ref (id Keycloak) của nông dân */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lượt mới (link chỉ có ở phản hồi đầu) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        activation?: components["schemas"]["FarmerActivation"];
+                    };
+                };
+            };
+            /** @description accounts.farmer_not_found */
+            404: components["responses"]["Problem"];
+            /** @description accounts.state_conflict — tài khoản đang khóa */
+            409: components["responses"]["Problem"];
+            /** @description accounts.activation_link_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    myFarmerHouseholds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: {
+                            /** Format: uuid */
+                            household_ref?: string;
+                            /** Format: uuid */
+                            cooperative_ref?: string;
+                            commune_code?: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    farmerCoopStaff: {
+        parameters: {
+            query?: {
+                /** @description Tên hoặc chức vụ, không phân biệt dấu */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách (Cache-Control private, no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: {
+                            /** Format: uuid */
+                            user_ref?: string;
+                            /** Format: uuid */
+                            cooperative_ref?: string;
+                            display_name?: string;
+                            title?: string;
+                            /** @description false → ẩn nút gọi nhanh (AC-2) */
+                            has_phone?: boolean;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    farmerCoopStaffContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description SĐT */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        user_ref?: string;
+                        phone?: string;
+                    };
+                };
+            };
+            /** @description accounts.staff_not_found | accounts.contact_unavailable */
+            404: components["responses"]["Problem"];
+        };
+    };
+    changeHouseholdMembership: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    cooperative_ref?: string | null;
+                    /** Format: date */
+                    effective_date?: string;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã đổi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        household?: components["schemas"]["Household"];
+                        /** @enum {string} */
+                        change?: "joined" | "left" | "transferred";
+                        /** Format: uuid */
+                        prev_cooperative_ref?: string | null;
+                    };
+                };
+            };
+            /** @description party.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description party.household_not_found */
+            404: components["responses"]["Problem"];
+            /** @description party.membership_unchanged | party.org_state_conflict */
+            409: components["responses"]["Problem"];
+            /** @description party.membership_reason_required */
+            422: components["responses"]["Problem"];
+        };
+    };
+    listMySupportRequests: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mới nhất trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["SupportRequest"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            /** @description forbidden | extension.farmer_household_required */
+            403: components["responses"]["Problem"];
+        };
+    };
+    submitSupportRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupportRequestInput"];
+            };
+        };
+        responses: {
+            /** @description Đã nhận, nhiệm vụ đã sinh */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        support_request?: components["schemas"]["SupportRequest"];
+                        replayed?: boolean;
+                    };
+                };
+            };
+            /** @description forbidden | extension.farmer_household_required */
+            403: components["responses"]["Problem"];
+            /** @description extension.id_reused */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed ("Vui lòng nhập mô tả và chọn loại sự cố trước khi gửi.", tối đa 5 ảnh) | extension.household_invalid */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
         };
     };
 }

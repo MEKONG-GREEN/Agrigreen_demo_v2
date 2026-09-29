@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
@@ -61,6 +62,10 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 
 // UseContacts nối cổng số điện thoại cán bộ (pf/accounts) sau khi module đó được dựng.
 func (m *Module) UseContacts(c port.StaffContacts) { m.svc.Contacts = c }
+
+// UseFarmers nối cổng liên kết tài khoản nông dân ↔ nông hộ (pf/accounts) — yêu cầu
+// hỗ trợ từ App HTX (HTX US-SUPPORT-01 → KN US-TASK-01). Gốc lắp ráp gọi sau khi dựng pf/accounts.
+func (m *Module) UseFarmers(f accport.FarmerHouseholds) { m.svc.Farmers = f }
 
 // StaffNames cho module khác tra tên cán bộ trong danh bạ (qua port, G-07/G-09).
 func (m *Module) StaffNames() port.StaffNames { return m.svc }

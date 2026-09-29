@@ -72,6 +72,35 @@ func InsertHousehold(ctx context.Context, tx pgx.Tx, tenantID uuid.UUID, h domai
 	return err == nil, err
 }
 
+// OpenMembershipSince đọc ngày bắt đầu của thành viên HTX đang mở (khóa dòng); nil nếu không có.
+func OpenMembershipSince(ctx context.Context, tx pgx.Tx, household uuid.UUID) (*time.Time, error) {
+	var since string
+	err := tx.QueryRow(ctx, `SELECT since_date::text FROM pf_party.household_membership
+	  WHERE household_ref = $1 AND until_date IS NULL FOR UPDATE`, household).Scan(&since)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	t, err := time.Parse(time.DateOnly, since)
+	return &t, err
+}
+
+// CloseMembership đóng thành viên HTX đang mở tại ngày until (không xóa — lịch sử giữ nguyên).
+func CloseMembership(ctx context.Context, tx pgx.Tx, household uuid.UUID, until time.Time) error {
+	_, err := tx.Exec(ctx, `UPDATE pf_party.household_membership SET until_date = $2::date
+	  WHERE household_ref = $1 AND until_date IS NULL`, household, until.Format(time.DateOnly))
+	return err
+}
+
+// OpenMembership mở thành viên HTX mới từ ngày since.
+func OpenMembership(ctx context.Context, tx pgx.Tx, tenantID, household, coop uuid.UUID, since time.Time) error {
+	_, err := tx.Exec(ctx, `INSERT INTO pf_party.household_membership (tenant_id, id, household_ref, org_ref, since_date)
+	  VALUES ($1, $2, $3, $4, $5::date)`, tenantID, ids.New(), household, coop, since.Format(time.DateOnly))
+	return err
+}
+
 // ListHouseholdsByCooperative liệt kê nông hộ đang là thành viên của HTX, phân trang cursor.
 func ListHouseholdsByCooperative(ctx context.Context, tx pgx.Tx, coop, after uuid.UUID, limit int) ([]domain.Household, error) {
 	rows, err := tx.Query(ctx, "SELECT "+householdCols+householdFrom+`

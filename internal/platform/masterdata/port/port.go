@@ -85,6 +85,36 @@ const (
 	ParamCGHCoverageSurplusFrom = "cgh.coverage.surplus_min_pct"    // Thừa ≥ giá trị
 )
 
+// Khóa tham số G2 (seed ở seeddata/params.json, migration 000027). Module khác
+// đọc qua Params.At với ĐÚNG các khóa này.
+const (
+	// ParamGPSMatchTolerance: ngưỡng khớp GPS nhật ký ↔ thửa (m) — cropcycle.
+	ParamGPSMatchTolerance = "cropcycle.gps_match_tolerance_m"
+	// ParamSowingWindowBefore / After: cửa sổ gieo sạ quanh ngày kế hoạch (ngày) — cropcycle.
+	ParamSowingWindowBefore = "cropcycle.sowing_window_before_days"
+	ParamSowingWindowAfter  = "cropcycle.sowing_window_after_days"
+	// ParamYieldAnomalyMinPrefix / MaxPrefix: ngưỡng năng suất bất thường (t/ha). Khóa
+	// theo giống = tiền tố + ":<mã giống>" (YieldAnomalyKey); khóa không chiều là mặc
+	// định khi giống chưa có ngưỡng (nguyên mẫu: min = yield_min × 0,4; max = yield_max × 1,25).
+	ParamYieldAnomalyMinPrefix = "cropcycle.yield_anomaly_min_t_per_ha"
+	ParamYieldAnomalyMaxPrefix = "cropcycle.yield_anomaly_max_t_per_ha"
+	// ParamHubCapacityWarn / Critical: ngưỡng cảnh báo sức chứa hub/kho (%) — geo.
+	ParamHubCapacityWarn     = "geo.hub_capacity_warn_pct"
+	ParamHubCapacityCritical = "geo.hub_capacity_critical_pct"
+	// ParamWaterwaySnapTolerance, AutoJoin, GapReport: dựng mạng đường thủy (m) — waterway.
+	ParamWaterwaySnapTolerance = "waterway.snap_tolerance_m"
+	ParamWaterwayAutoJoin      = "waterway.autojoin_m"
+	ParamWaterwayGapReport     = "waterway.gap_report_m"
+	// ParamHaversineFactor: hệ số hiệu chỉnh Haversine → cự ly thực tế (nguyên mẫu tham số #10).
+	// Theo phương thức: ParamHaversineFactor + ":road" | ":waterway".
+	ParamHaversineFactor = "distance.haversine_factor"
+	// ParamActivationGrantLifespan: hạn liên kết/QR kích hoạt tài khoản nông dân (giờ) — accounts.
+	ParamActivationGrantLifespan = "activation.grant_lifespan_hours"
+)
+
+// YieldAnomalyKey dựng khóa ngưỡng năng suất bất thường theo giống.
+func YieldAnomalyKey(prefix, varietyCode string) string { return prefix + ":" + varietyCode }
+
 // CatalogItem là một mục danh mục dùng chung (giống lúa, khâu, loại máy, vụ...).
 type CatalogItem struct {
 	Catalog string // vd "rice_variety", "farm_stage", "machine_type", "season"
@@ -115,6 +145,11 @@ const (
 	CatalogMachineType = "machine_type" // attrs: farm_stage (khâu tự gán theo chủng loại, CGH BR-02)
 	CatalogSeason      = "season"       // attrs: start_month, end_month (tùy chọn)
 	CatalogPest        = "pest"         // attrs: kind (sau_hai | benh_hai | dong_vat_hai)
+	// CatalogVesselClass: lớp phương tiện thủy (G2 waterway/simulation). Mã: ghe_100,
+	// sa_lan_1000, sa_lan_2000. attrs (decimal, m hoặc tấn): capacity_t, beam_m, draft_m,
+	// air_draft_m và điều kiện tối thiểu của tuyến đã cộng biên an toàn: min_width_m
+	// (= beam × 1,5), min_depth_m (= draft + 0,4), min_clearance_m (= air_draft + 0,5).
+	CatalogVesselClass = "vessel_class"
 )
 
 // Vai nghiệp vụ của module (tên vai trong Keycloak).

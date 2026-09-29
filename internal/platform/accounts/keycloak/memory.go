@@ -23,6 +23,7 @@ type Memory struct {
 	order   []uuid.UUID
 	users   map[uuid.UUID]*memUser
 	sent    []SentEmail
+	links   []IssuedLink
 	logout  map[uuid.UUID]int
 	failFor map[string]error // tên thao tác → lỗi giả
 	now     func() time.Time
@@ -41,13 +42,25 @@ type SentEmail struct {
 	Lifespan time.Duration
 }
 
-var _ port.Directory = (*Memory)(nil)
+// IssuedLink là một liên kết hành động đã phát (ActionLink). Chỉ kiểm thử đọc Link.
+type IssuedLink struct {
+	UserID   uuid.UUID
+	GrantID  uuid.UUID
+	Actions  []string
+	Lifespan time.Duration
+	Link     string
+}
+
+var (
+	_ port.Directory   = (*Memory)(nil)
+	_ port.ActionLinks = (*Memory)(nil)
+)
 
 // NewMemory tạo Directory trong bộ nhớ. realmRoles rỗng → mọi vai trong
 // port.ManagedRoles cùng platform_admin, offline_access, cgh_sync.
 func NewMemory(realmRoles ...string) *Memory {
 	if len(realmRoles) == 0 {
-		realmRoles = append(slices.Clone(port.ManagedRoles), "platform_admin", "offline_access", "cgh_sync")
+		realmRoles = append(slices.Clone(port.ManagedRoles), "platform_admin", "offline_access", "cgh_sync", port.RoleFarmer)
 	}
 	return &Memory{
 		realm: realmRoles, users: map[uuid.UUID]*memUser{}, logout: map[uuid.UUID]int{},
@@ -357,6 +370,41 @@ func (m *Memory) ExecuteActionsEmail(_ context.Context, id uuid.UUID, actions []
 	}
 	m.sent = append(m.sent, SentEmail{UserID: id, Actions: slices.Clone(actions), Lifespan: lifespan})
 	return nil
+}
+
+// ActionLink thực hiện port.ActionLinks: liên kết giả có token ngẫu nhiên (mỗi lần một token mới).
+func (m *Memory) ActionLink(_ context.Context, id, grantID uuid.UUID, actions []string, lifespan time.Duration) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.fail("ActionLink"); err != nil {
+		return "", err
+	}
+	u, err := m.get(id)
+	if err != nil {
+		return "", err
+	}
+	if !u.u.Enabled {
+		return "", port.ErrUserNotFound
+	}
+	link := "https://kc.test/realms/agrigreen/login-actions/action-token?key=" + uuid.NewString() + uuid.NewString()
+	m.links = append(m.links, IssuedLink{UserID: id, GrantID: grantID, Actions: slices.Clone(actions), Lifespan: lifespan, Link: link})
+	return link, nil
+}
+
+// Links trả các liên kết hành động đã phát.
+func (m *Memory) Links() []IssuedLink {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.links)
+}
+
+// CompleteActions mô phỏng người dùng hoàn tất liên kết: bỏ các required action đã làm.
+func (m *Memory) CompleteActions(id uuid.UUID, actions ...string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if u, ok := m.users[id]; ok {
+		u.u.RequiredActions = slices.DeleteFunc(u.u.RequiredActions, func(a string) bool { return slices.Contains(actions, a) })
+	}
 }
 
 // Logout thực hiện port.Directory.

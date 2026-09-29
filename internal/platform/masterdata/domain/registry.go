@@ -14,6 +14,7 @@ var catalogNames = map[string]string{
 	port.CatalogMachineType: "Chủng loại máy",
 	port.CatalogSeason:      "Mùa vụ",
 	port.CatalogPest:        "Sâu bệnh, dịch hại",
+	port.CatalogVesselClass: "Lớp phương tiện thủy",
 }
 
 // CatalogName trả tên tiếng Việt của danh mục; không biết → chính mã.
@@ -65,6 +66,19 @@ var ParamRegistry = []ParamSpec{
 	{Key: "geo.overlap_tolerance_pct", Name: "Ngưỡng chồng lấn ranh giới thửa", Unit: "%", Kind: ParamKindDecimal, Min: "0", Max: "100"},
 	{Key: "geo.area_deviation_max_pct", Name: "Ngưỡng lệch diện tích khai báo", Unit: "%", Kind: ParamKindDecimal, Min: "0", Max: "100"},
 	{Key: "sync.conflict_sla_hours", Name: "SLA xử lý xung đột đồng bộ", Unit: "giờ", Kind: ParamKindDecimal, Min: "1", Max: "720"},
+	// G2 (migration 000027, seeddata/params.json).
+	{Key: port.ParamGPSMatchTolerance, Name: "Ngưỡng khớp GPS nhật ký ↔ thửa", Unit: "m", Kind: ParamKindDecimal, Min: "0", Max: "1000"},
+	{Key: port.ParamSowingWindowBefore, Name: "Cửa sổ gieo sạ trước ngày kế hoạch", Unit: "ngày", Kind: ParamKindDecimal, Min: "0", Max: "120"},
+	{Key: port.ParamSowingWindowAfter, Name: "Cửa sổ gieo sạ sau ngày kế hoạch", Unit: "ngày", Kind: ParamKindDecimal, Min: "0", Max: "120"},
+	{Key: port.ParamYieldAnomalyMinPrefix, Name: "Năng suất thấp bất thường", Unit: "t/ha", Kind: ParamKindDecimal, Min: "0", Max: "30", Dimensional: true},
+	{Key: port.ParamYieldAnomalyMaxPrefix, Name: "Năng suất cao bất thường", Unit: "t/ha", Kind: ParamKindDecimal, Min: "0", Max: "30", Dimensional: true},
+	{Key: port.ParamHubCapacityWarn, Name: "Ngưỡng cảnh báo sức chứa hub/kho", Unit: "%", Kind: ParamKindDecimal, Min: "0", Max: "100"},
+	{Key: port.ParamHubCapacityCritical, Name: "Ngưỡng nguy cấp sức chứa hub/kho", Unit: "%", Kind: ParamKindDecimal, Min: "0", Max: "100"},
+	{Key: port.ParamWaterwaySnapTolerance, Name: "Dung sai bắt điểm mạng đường thủy", Unit: "m", Kind: ParamKindDecimal, Min: "0", Max: "1000"},
+	{Key: port.ParamWaterwayAutoJoin, Name: "Khoảng tự nối đoạn đường thủy", Unit: "m", Kind: ParamKindDecimal, Min: "0", Max: "5000"},
+	{Key: port.ParamWaterwayGapReport, Name: "Ngưỡng báo khoảng hở mạng đường thủy", Unit: "m", Kind: ParamKindDecimal, Min: "0", Max: "100000"},
+	{Key: port.ParamHaversineFactor, Name: "Hệ số hiệu chỉnh Haversine → cự ly thực tế", Unit: "lần", Kind: ParamKindDecimal, Min: "1", Max: "3", Dimensional: true},
+	{Key: port.ParamActivationGrantLifespan, Name: "Hạn liên kết/QR kích hoạt tài khoản nông dân", Unit: "giờ", Kind: ParamKindDecimal, Min: "1", Max: "720"},
 }
 
 var stageNames = map[string]string{

@@ -34,7 +34,8 @@ var (
 var HandledEvents = []string{
 	extport.EventDirectiveIssued, extport.EventTaskEscalated, contentport.EventAlertPublished,
 	contentport.EventDocumentPublished, syncport.EventConflictOpened, syncport.EventDeviceRevoked,
-	partyport.EventOrgDeactivated,
+	partyport.EventOrgDeactivated, partyport.EventHouseholdRegistered, partyport.EventHouseholdMembershipChanged,
+	extport.EventTaskCreated,
 }
 
 // HandleEvent là inbox.Handler cho các sự kiện nguồn: dựng thông báo, xếp lần gửi
@@ -48,6 +49,27 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 			return err
 		}
 		return s.onDirective(ctx, tx, env, p)
+	case extport.EventTaskCreated:
+		var p extport.TaskCreatedV1
+		if err := decode(env, &p); err != nil {
+			return err
+		}
+		return s.onTaskCreated(ctx, tx, env, p)
+	case partyport.EventHouseholdRegistered:
+		var p partyport.HouseholdRegisteredV1
+		if err := decode(env, &p); err != nil {
+			return err
+		}
+		if p.Source != partyport.HouseholdSourceHTXApp {
+			return nil // chỉ báo nông hộ đến từ App HTX (KN US-HTX-05); nhập tệp không làm tràn hộp thư
+		}
+		return s.onCommuneHousehold(ctx, tx, env, p.CommuneCode, domain.HouseholdRegisteredTemplate(p, env.OccurredAt))
+	case partyport.EventHouseholdMembershipChanged:
+		var p partyport.HouseholdMembershipChangedV1
+		if err := decode(env, &p); err != nil {
+			return err
+		}
+		return s.onCommuneHousehold(ctx, tx, env, p.CommuneCode, domain.MembershipChangedTemplate(p, env.OccurredAt))
 	case extport.EventTaskEscalated:
 		var p extport.TaskEscalatedV1
 		if err := decode(env, &p); err != nil {
@@ -186,6 +208,48 @@ func (s *Service) onTaskEscalated(ctx context.Context, tx pgx.Tx, env outbox.Env
 		ns = append(ns, tpl.ForAudience(domain.Audience{Units: []string{p.ProvinceCode}, Roles: []string{partyport.RoleKNProvinceAdmin}}))
 	}
 	return s.deliver(ctx, tx, env, ns)
+}
+
+// onCommuneHousehold: người nhận là cán bộ khuyến nông cấp XÃ của xã có nông hộ
+// (danh bạ trực); xã chưa có ai trong danh bạ → thông báo chủ đề cho vai kn_officer của xã.
+func (s *Service) onCommuneHousehold(ctx context.Context, tx pgx.Tx, env outbox.Envelope, commune string, tpl domain.Template) error {
+	if commune == "" {
+		return nil
+	}
+	var recipients []uuid.UUID
+	if s.Staff != nil {
+		staff, err := s.Staff.ActiveStaff(ctx, env.TenantID, []string{commune})
+		if err != nil {
+			return err
+		}
+		for _, st := range staff {
+			if st.UnitCode == commune {
+				recipients = append(recipients, st.ActorRef)
+			}
+		}
+	}
+	var ns []domain.Notification
+	for _, r := range domain.DedupRefs(recipients) {
+		ns = append(ns, tpl.For(r))
+	}
+	if len(ns) == 0 {
+		ns = append(ns, tpl.ForAudience(domain.Audience{Units: []string{commune}, Roles: []string{partyport.RoleKNOfficer}}))
+	}
+	return s.deliver(ctx, tx, env, ns)
+}
+
+// onTaskCreated: nhiệm vụ tự sinh từ App HTX (KN US-TASK-01) → người được giao; không
+// ai được giao (admin_queue) → thông báo chủ đề cho quản trị TTKN tỉnh để gán lại.
+func (s *Service) onTaskCreated(ctx context.Context, tx pgx.Tx, env outbox.Envelope, p extport.TaskCreatedV1) error {
+	tpl := domain.TaskAssignedTemplate(p, env.OccurredAt)
+	if p.AssigneeRef != nil && *p.AssigneeRef != uuid.Nil {
+		return s.deliver(ctx, tx, env, []domain.Notification{tpl.For(*p.AssigneeRef)})
+	}
+	unit := p.ProvinceCode
+	if unit == "" {
+		unit = p.CommuneCode
+	}
+	return s.deliver(ctx, tx, env, []domain.Notification{tpl.ForAudience(domain.Audience{Units: []string{unit}, Roles: []string{partyport.RoleKNProvinceAdmin}})})
 }
 
 // contentAudience: national (hoặc không có đơn vị) → toàn quốc; còn lại → các đơn

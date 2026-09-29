@@ -14,7 +14,10 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
@@ -34,6 +37,9 @@ type CreateHouseholdInput struct {
 	CommuneCode      string // rỗng = xã của HTX
 	CultivatedAreaHa *decimal.Decimal
 	MemberSince      *time.Time
+	// Source: nguồn đăng ký ghi vào pf.party.household.registered; rỗng → suy từ vai
+	// (quản lý HTX → htx_app, còn lại → kn_app).
+	Source string
 }
 
 // HouseholdResult là kết quả tạo một nông hộ.
@@ -144,6 +150,8 @@ func (r *Registry) createHousehold(ctx context.Context, p authz.Principal, sc au
 		res.Created = inserted
 		if !inserted {
 			res.Duplicate = true
+		} else if err := enqueueRegistered(ctx, tx, p, h, householdSource(p, in.Source), now); err != nil {
+			return err
 		}
 		cur, err := store.HouseholdByRef(ctx, tx, h.Ref)
 		if err != nil {
@@ -155,6 +163,35 @@ func (r *Registry) createHousehold(ctx context.Context, p authz.Principal, sc au
 		return nil
 	})
 	return res, err
+}
+
+func householdSource(p authz.Principal, src string) string {
+	switch {
+	case src != "":
+		return src
+	case p.Has(port.RoleCoopManager) && !p.Has(port.RoleKNOfficer) && !p.Has(port.RoleKNProvinceAdmin) && !p.Has(port.RoleRegistryAdmin):
+		return port.HouseholdSourceHTXApp
+	}
+	return port.HouseholdSourceKNApp
+}
+
+// enqueueRegistered phát pf.party.household.registered cùng giao dịch ghi nông hộ (KN US-HTX-05).
+func enqueueRegistered(ctx context.Context, tx pgx.Tx, p authz.Principal, h domain.Household, source string, now time.Time) error {
+	pl := port.HouseholdRegisteredV1{HouseholdRef: h.Ref, CommuneCode: h.CommuneCode, Source: source, ActorRef: p.ActorRef,
+		EventTime: now.UTC().Format(time.RFC3339)}
+	if h.CooperativeRef != uuid.Nil {
+		c := h.CooperativeRef
+		pl.CooperativeRef = &c
+		since := h.CreatedAt.Format(time.DateOnly) // như store.InsertHousehold
+		if h.MemberSince != nil {
+			since = h.MemberSince.Format(time.DateOnly)
+		}
+		pl.MemberSince = &since
+	}
+	return outbox.Enqueue(ctx, tx, outbox.Event{
+		ID: ids.New(), TenantID: p.TenantID, Type: port.EventHouseholdRegistered, SchemaVersion: 1, OccurredAt: now,
+		TraceID: telemetry.TraceID(ctx), Producer: "pf/party", Payload: pl,
+	})
 }
 
 // HouseholdView là nông hộ kèm nhãn hiển thị tối thiểu từ kho định danh.

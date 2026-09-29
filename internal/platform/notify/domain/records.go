@@ -62,6 +62,8 @@ type Delivery struct {
 type DeliveryJob struct {
 	Delivery
 	Token *PushToken
+	// Entities: nhóm dữ liệu của lệnh sync_now (rỗng = tất cả, KN US-SYNC-02).
+	Entities []string
 }
 
 // DigestItem là một chỉ đạo khẩn chờ đưa vào email tóm tắt.

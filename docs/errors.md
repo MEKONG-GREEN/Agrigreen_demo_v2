@@ -56,6 +56,8 @@ Mã lỗi của module có dạng `<module>.<lỗi>`.
 | 403 | `masterdata.param_not_setter` | pf/masterdata: gửi duyệt phiên bản do người khác đặt |
 | 422 | `masterdata.param_threshold_order` | pf/masterdata: mốc ngưỡng CGH (QT-02) lệch thứ tự so với hai mốc đã duyệt tại ngày hiệu lực — phải Cần chú ý < Đủ < Thừa (kiểm khi đề xuất và khi duyệt) |
 | 422 | `masterdata.param_correction_required` | pf/masterdata: đã có bản duyệt cùng `effective_from` — phải nêu `correction_reason` (bản ghi bù) |
+| 422 | `masterdata.catalog_import_invalid` | pf/masterdata: tệp nhập danh mục (HTX US-CAT-02; CSV UTF-8 hoặc .xlsx) sai mẫu — thiếu cột `catalog`/`code`/`name`, ô công thức, quá 500 dòng hoặc 2 MB — từ chối cả tệp (dòng lỗi riêng lẻ nằm trong `rows[].reason`, không phải lỗi HTTP) |
+| 404 | `masterdata.catalog_import_not_found` | pf/masterdata: không có lần nhập danh mục với mã đó trong tenant |
 
 Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính mình trả mã chung `self_approval_forbidden` (R-56).
 | 404 | `party.org_not_found` | pf/party: không có tổ chức/HTX, hoặc nằm ngoài phạm vi đọc (không lộ sự tồn tại) |
@@ -67,6 +69,9 @@ Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính m�
 | 403 | `party.out_of_scope` | pf/party: ghi ngoài phạm vi TW → Tỉnh → Xã của người gọi (ADR-0009) |
 | 503 | `party.dependency_unavailable` | pf/party: chưa nối hoặc không gọi được masterdata / kho định danh (kể cả `GET /v1/me` của cán bộ TTKN tỉnh khi chưa nối danh mục đơn vị hành chính) |
 | 422 | `party.import_invalid` | pf/party: tệp nhập (nông hộ, cây tổ chức; CSV UTF-8 hoặc .xlsx) sai mẫu — thiếu cột bắt buộc, sai định dạng, không phải UTF-8, tệp .xls cũ, ô công thức (không tính công thức; `detail` nêu ô), quá số dòng/dung lượng — từ chối cả tệp |
+| 404 | `party.household_not_found` | pf/party: `POST /v1/households/{ref}/membership` — nông hộ không có hoặc ngoài phạm vi (không lộ sự tồn tại) |
+| 409 | `party.membership_unchanged` | pf/party: nông hộ đã ở đúng trạng thái thành viên HTX yêu cầu |
+| 422 | `party.membership_reason_required` | pf/party: đổi thành viên HTX phải nêu lý do 10–500 ký tự |
 | 403 | `sync.device_unregistered` | pf/sync: thiếu/sai header `X-Device-Id`, thiết bị chưa đăng ký trong tenant, hoặc đăng ký bởi tài khoản khác |
 | 403 | `sync.device_revoked` | pf/sync: thiết bị đã bị thu hồi — app **xóa dữ liệu cục bộ** và khóa token; đăng ký lại cùng mã cũng trả mã này |
 | 409 | `sync.device_taken` | pf/sync: `device_id` đã được tài khoản khác đăng ký |
@@ -136,6 +141,9 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 422 | `extension.unit_invalid` | pf/extension: mã đơn vị hành chính không còn hiệu lực hoặc sai cấp (nhiệm vụ/báo cáo gắn xã; chốt kỳ theo tỉnh) |
 | 404 | `extension.staff_not_found` | pf/extension: cán bộ chưa có (hoặc đã ngừng) trong danh bạ trực |
 | 404 | `extension.contact_unavailable` | pf/extension: cán bộ trong danh bạ chưa khai số điện thoại ở tài khoản (hoặc tài khoản đã khóa) — không gọi/nhắn 1 chạm được (US-DIR-02) |
+| 403 | `extension.farmer_household_required` | pf/extension: tài khoản nông dân chưa liên kết nông hộ nào (HTX US-SUPPORT-01) |
+| 422 | `extension.household_invalid` | pf/extension: `household_ref` của yêu cầu hỗ trợ không thuộc tài khoản, hoặc tài khoản có nhiều nông hộ mà không chọn |
+| 404 | `extension.support_request_not_found` | pf/extension: không có yêu cầu hỗ trợ |
 | 409 | `extension.id_reused` | pf/extension: `id` do máy sinh đã dùng cho bản ghi khác |
 | 503 | `extension.dependency_unavailable` | pf/extension: chưa nối pf/party (phạm vi) hoặc pf/masterdata (đơn vị, danh mục) |
 | 404 | `extension.program_report_not_found` | pf/extension: không có báo cáo tiến độ Đề án (FR-03), hoặc ngoài phạm vi đọc |
@@ -226,6 +234,7 @@ Cổng `geo.GpsLog.RecordFix` (module khác gọi, không qua HTTP) trả lỗi 
 | 403 | `notify.out_of_scope` | pf/notify: `POST /v1/sync/nudge` với `unit` ngoài phạm vi người gọi |
 | 404 | `notify.nudge_target_not_found` | pf/notify: `device_id` không có token đẩy đang dùng hoặc ngoài phạm vi (trừ vai `device_admin`, `platform_admin`) |
 | 429 | `notify.nudge_rate_limited` | pf/notify: đích đã được yêu cầu đồng bộ trong 5 phút qua, hoặc người gọi vượt 30 lần/giờ; có `retry_after_s` và header `Retry-After` |
+| 422 | `notify.nudge_entity_unknown` | pf/notify: `entities[]` của `POST /v1/sync/nudge` có tên không phải entity chiều xuống của pf/sync (KN US-SYNC-02) |
 | 503 | `notify.dependency_unavailable` | pf/notify: chưa nối sổ thiết bị của pf/sync |
 ### pf/accounts
 
@@ -243,6 +252,13 @@ Tài khoản cán bộ quản lý trong Keycloak qua Admin REST (KN US-ADM-01..0
 | 409 | `accounts.org_inactive` | pf/accounts: gán tài khoản vào tổ chức đã vô hiệu hóa, hoặc mở khóa khi tổ chức của tài khoản đang vô hiệu hóa (kích hoạt lại tổ chức sẽ tự mở) |
 | 422 | `accounts.org_invalid` | pf/accounts: không có tổ chức với `org_ref` trong tenant |
 | 422 | `accounts.import_invalid` | pf/accounts: tệp nhập không phải CSV/XLSX đọc được, thiếu cột bắt buộc (`email`, `org_ref`, `roles`, `full_name` hoặc `first_name`/`last_name`), không có dòng dữ liệu hoặc quá 200 dòng — từ chối cả tệp |
+| 422 | `accounts.household_invalid` | pf/accounts: tài khoản nông dân — nông hộ không có, đã ngừng, chưa là thành viên HTX đang hoạt động, hoặc SĐT không khớp nông hộ nào |
+| 422 | `accounts.phone_household_mismatch` | pf/accounts: SĐT không phải SĐT chủ hộ của `household_ref` đã chọn (tra chỉ mục mù kho định danh) |
+| 409 | `accounts.farmer_exists` | pf/accounts: nông hộ đã có tài khoản nông dân đang dùng |
+| 404 | `accounts.farmer_not_found` | pf/accounts: không có tài khoản nông dân hoặc ngoài HTX/phạm vi của người gọi |
+| 503 | `accounts.activation_link_unavailable` | pf/accounts: Keycloak chưa có phần mở rộng phát liên kết hành động (`AG_KC_ACTION_LINK_URL`) — tài khoản vẫn được tạo, phát lại lượt kích hoạt sau |
+| 404 | `accounts.staff_not_found` | pf/accounts: danh bạ cán bộ HTX — tài khoản không thuộc HTX của nông dân (HTX US-SUPPORT-02) |
+| 404 | `accounts.contact_unavailable` | pf/accounts: cán bộ HTX chưa có SĐT hợp lệ — app ẩn nút gọi nhanh (HTX US-SUPPORT-02 AC-2) |
 | 422 | `validation_failed` | pf/accounts: lý do khóa/mở khóa dưới 20 ký tự; email/SĐT/tên đăng nhập sai dạng; thiếu vai; vai sai loại tổ chức (`coop_manager` → "Vui lòng chọn HTX liên kết.") |
 | 502 | `accounts.email_failed` | pf/accounts: Keycloak không gửi được email liên kết (SMTP lỗi) khi gửi lại; khi tạo tài khoản thì trả 201 với `activation_email_sent = false` |
 | 503 | `accounts.dependency_unavailable` | pf/accounts: chưa cấu hình `AG_KC_*`, Keycloak không phản hồi hoặc từ chối tài khoản dịch vụ, chưa nối pf/party |

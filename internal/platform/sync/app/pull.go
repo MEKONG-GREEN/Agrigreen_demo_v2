@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"sort"
 	"time"
 
@@ -43,6 +44,14 @@ type PullResult struct {
 // trang theo vòng (round-robin) để một entity nhiều thay đổi không chặn entity
 // khác; phần hạn mức entity dùng không hết chia lại cho entity còn dữ liệu.
 func (s *Service) Pull(ctx context.Context, deviceHeader, cursor string, limit int) (PullResult, error) {
+	return s.PullEntitiesOnly(ctx, deviceHeader, cursor, limit, nil)
+}
+
+// PullEntitiesOnly như Pull nhưng chỉ đọc các entity trong only (rỗng = tất cả) — máy
+// nhận lệnh sync_now kèm "entities" (KN US-SYNC-02: đồng bộ ngay một nhóm dữ liệu).
+// Con trỏ giữ nguyên vị trí của entity không được đọc, nên lượt pull đầy đủ sau đó
+// không mất thay đổi nào. Entity lạ → 422.
+func (s *Service) PullEntitiesOnly(ctx context.Context, deviceHeader, cursor string, limit int, only []string) (PullResult, error) {
 	p, err := principal(ctx)
 	if err != nil {
 		return PullResult{}, err
@@ -50,6 +59,17 @@ func (s *Service) Pull(ctx context.Context, deviceHeader, cursor string, limit i
 	dev, err := s.checkDevice(ctx, p, deviceHeader)
 	if err != nil {
 		return PullResult{}, err
+	}
+	var filter map[string]bool
+	if len(only) > 0 {
+		known := s.PullEntities()
+		filter = map[string]bool{}
+		for _, e := range only {
+			if !slices.Contains(known, e) {
+				return PullResult{}, problem.Validation.WithField("entities", "không có entity "+e)
+			}
+			filter[e] = true
+		}
 	}
 	if limit <= 0 {
 		limit = DefaultPullLimit
@@ -77,7 +97,7 @@ func (s *Service) Pull(ctx context.Context, deviceHeader, cursor string, limit i
 		}
 	}
 	if !scope.Empty() {
-		res.Changes, res.HasMore, err = s.collect(ctx, scope, &cur, limit, now)
+		res.Changes, res.HasMore, err = s.collect(ctx, scope, &cur, limit, now, filter)
 		if err != nil {
 			return PullResult{}, err
 		}
@@ -90,9 +110,14 @@ func (s *Service) Pull(ctx context.Context, deviceHeader, cursor string, limit i
 
 // collect chạy vòng chia hạn mức. has_more = còn entity đã dùng đủ phần của mình
 // (có thể còn dữ liệu) hoặc chưa được hỏi ở vòng cuối.
-func (s *Service) collect(ctx context.Context, scope authz.Scope, cur *domain.Cursor, limit int, now time.Time) ([]port.Change, bool, error) {
+func (s *Service) collect(ctx context.Context, scope authz.Scope, cur *domain.Cursor, limit int, now time.Time, filter map[string]bool) ([]port.Change, bool, error) {
 	out := []port.Change{}
-	active := append([]pager(nil), s.pagers...)
+	var active []pager
+	for _, pg := range s.pagers {
+		if filter == nil || filter[pg.entity()] {
+			active = append(active, pg)
+		}
+	}
 	remaining := limit
 	for remaining > 0 && len(active) > 0 {
 		share, extra := remaining/len(active), remaining%len(active)
@@ -138,6 +163,12 @@ func (p sourcePager) entity() string { return p.ent }
 func (p sourcePager) fetch(ctx context.Context, scope authz.Scope, cur *domain.Cursor, limit int, _ time.Time) ([]port.Change, bool, error) {
 	after := cur.Last[p.ent]
 	ch, last, err := p.src.Changes(ctx, scope, p.ent, after, limit)
+	var pr *problem.Problem
+	if errors.As(err, &pr) && pr.Status == http.StatusForbidden {
+		// Người gọi không có vai đọc entity này (vd nông dân với entity task): bỏ qua entity,
+		// các entity khác vẫn đồng bộ — như pubkey.
+		return nil, true, nil
+	}
 	if err != nil {
 		return nil, false, err
 	}

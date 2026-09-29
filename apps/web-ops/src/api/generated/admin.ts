@@ -4,6 +4,44 @@
  */
 
 export interface paths {
+    "/v1/masterdata/catalog-imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nhập danh mục hàng loạt từ CSV/XLSX (HTX US-CAT-02) — dòng hợp lệ được tạo trong một lần nhập, dòng lỗi kèm lý do
+         * @description Vai masterdata_admin. Cột catalog (Danh mục), code (Mã), name (Tên); cột khác là thuộc tính của mục (vd growth_days).
+         *     Mục đã có cùng nội dung → skipped; khác nội dung → rejected (sửa từng mục bằng PUT). Tối đa 500 dòng, 2 MB.
+         */
+        post: operations["importCatalogItems"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/masterdata/catalog-imports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xem lại kết quả một lần nhập danh mục (US-CAT-02 AC-2) */
+        get: operations["getCatalogImport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/masterdata/seed": {
         parameters: {
             query?: never;
@@ -2808,11 +2846,30 @@ export interface components {
             reason: string | null;
             machine: components["schemas"]["MechMachine"];
         };
+        CatalogImportResult: {
+            /** Format: uuid */
+            import_id: string;
+            total: number;
+            created: number;
+            skipped: number;
+            rejected: number;
+            replayed: boolean;
+            rows: {
+                row: number;
+                /** @enum {string} */
+                status: "created" | "skipped" | "rejected";
+                catalog?: string;
+                code?: string;
+                reason?: string;
+            }[];
+        };
         NudgeInput: {
             /** Format: uuid */
             device_id?: string;
             /** @description Mã tỉnh/xã hiện hành */
             unit?: string;
+            /** @description KN US-SYNC-02: nhóm dữ liệu cần đồng bộ ngay (entity pf/sync); rỗng = tất cả. Thông điệp sync_now mang khóa entities (nối bằng dấu phẩy). */
+            entities?: string[];
         };
         NudgeResult: {
             /** Format: uuid */
@@ -2821,6 +2878,7 @@ export interface components {
             target_kind: "device" | "unit";
             target: string;
             devices: number;
+            entities?: string[];
         };
         /** @description Tài khoản đọc từ Keycloak — dữ liệu cá nhân chỉ hiển thị cho quản trị viên, không lưu ở pf, không ghi log */
         AccountsUser: {
@@ -3281,6 +3339,59 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    importCatalogItems: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+            };
+        };
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogImportResult"];
+                };
+            };
+            /** @description masterdata.catalog_import_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    getCatalogImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogImportResult"];
+                };
+            };
+            /** @description masterdata.catalog_import_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
     seedMasterdata: {
         parameters: {
             query?: never;

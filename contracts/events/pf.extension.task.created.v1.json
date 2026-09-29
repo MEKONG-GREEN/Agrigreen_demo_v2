@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.task.created/v1",
+  "title": "pf.extension.task.created — payload",
+  "description": "Nhiệm vụ hỗ trợ mới (G2: nhiệm vụ tự sinh từ yêu cầu hỗ trợ App HTX, source = htx_app — KN US-TASK-01). Người nhận chọn theo chuỗi: cán bộ xã đang trực → cán bộ tỉnh đang trực → cán bộ tỉnh → admin_queue (không ai, quản trị tỉnh gán lại). Consumer pf/notify báo người được giao. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.extension.task.created",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": ["task_id", "source", "commune_code", "province_code", "cooperative_ref", "category", "priority", "status", "assignee_ref", "assignment_rule", "support_request_id", "due_at", "created_at", "seq"],
+  "properties": {
+    "task_id":            { "type": "string", "format": "uuid" },
+    "source":             { "type": "string", "enum": ["officer", "coop_manager", "htx_app"] },
+    "commune_code":       { "type": "string" },
+    "province_code":      { "type": "string" },
+    "cooperative_ref":    { "type": ["string", "null"], "format": "uuid" },
+    "category":           { "type": "string", "enum": ["sau_benh", "ky_thuat", "co_gioi", "khac"] },
+    "priority":           { "type": "string", "enum": ["low", "normal", "high", "urgent"] },
+    "status":             { "type": "string", "enum": ["new", "assigned"] },
+    "assignee_ref":       { "type": ["string", "null"], "format": "uuid" },
+    "assignment_rule":    { "type": "string", "enum": ["commune_on_duty", "province_on_duty", "province_officer", "admin_queue"] },
+    "support_request_id": { "type": ["string", "null"], "format": "uuid" },
+    "due_at":             { "type": "string", "format": "date-time" },
+    "created_at":         { "type": "string", "format": "date-time" },
+    "seq":                { "type": "integer", "minimum": 1 }
+  }
+}

@@ -18,6 +18,42 @@ servers:
 security:
   - oidc: []
 paths:
+  /v1/masterdata/catalog-imports:
+    post:
+      summary: Nhập danh mục hàng loạt từ CSV/XLSX (HTX US-CAT-02) — dòng hợp lệ được tạo trong một lần nhập, dòng lỗi kèm lý do
+      description: |
+        Vai masterdata_admin. Cột catalog (Danh mục), code (Mã), name (Tên); cột khác là thuộc tính của mục (vd growth_days).
+        Mục đã có cùng nội dung → skipped; khác nội dung → rejected (sửa từng mục bằng PUT). Tối đa 500 dòng, 2 MB.
+      operationId: importCatalogItems
+      tags: [masterdata]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          text/csv: {schema: {type: string, format: binary}}
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CatalogImportResult"}
+        "422": {description: "masterdata.catalog_import_invalid", $ref: "#/components/responses/Problem"}
+  /v1/masterdata/catalog-imports/{id}:
+    get:
+      summary: Xem lại kết quả một lần nhập danh mục (US-CAT-02 AC-2)
+      operationId: getCatalogImport
+      tags: [masterdata]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CatalogImportResult"}
+        "404": {description: "masterdata.catalog_import_not_found", $ref: "#/components/responses/Problem"}
   /v1/masterdata/seed:
     post:
       summary: Nạp dữ liệu nền nhúng cho tenant của người gọi (chạy lặp an toàn)
@@ -3699,11 +3735,37 @@ components:
     # --- hết pf/mechanization ---
 
     # --- pf/notify ---
+    CatalogImportResult:
+      type: object
+      required: [import_id, total, created, skipped, rejected, rows, replayed]
+      properties:
+        import_id: {type: string, format: uuid}
+        total: {type: integer}
+        created: {type: integer}
+        skipped: {type: integer}
+        rejected: {type: integer}
+        replayed: {type: boolean}
+        rows:
+          type: array
+          items:
+            type: object
+            required: [row, status]
+            properties:
+              row: {type: integer}
+              status: {type: string, enum: [created, skipped, rejected]}
+              catalog: {type: string}
+              code: {type: string}
+              reason: {type: string}
     NudgeInput:
       type: object
       properties:
         device_id: {type: string, format: uuid}
         unit: {type: string, description: "Mã tỉnh/xã hiện hành"}
+        entities:
+          type: array
+          maxItems: 30
+          items: {type: string, pattern: "^[a-z_]{1,40}$"}
+          description: "KN US-SYNC-02: nhóm dữ liệu cần đồng bộ ngay (entity pf/sync); rỗng = tất cả. Thông điệp sync_now mang khóa entities (nối bằng dấu phẩy)."
     NudgeResult:
       type: object
       required: [nudge_id, target_kind, target, devices]
@@ -3712,6 +3774,7 @@ components:
         target_kind: {type: string, enum: [device, unit]}
         target: {type: string}
         devices: {type: integer, minimum: 0}
+        entities: {type: array, items: {type: string}}
     # --- hết pf/notify ---
 
     # --- pf/accounts ---

@@ -20,6 +20,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/store"
+	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -29,6 +30,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
 // Mã lỗi của module (docs/errors.md).
@@ -63,6 +65,11 @@ type Service struct {
 	Orgs  partyport.Orgs          // nil → ErrDependency
 	// ActionsLifespan: hạn liên kết kích hoạt; 0 → DefaultActionsLifespan.
 	ActionsLifespan time.Duration
+	// Households, Vault, Params: tài khoản nông dân (G2) — thành viên HTX của nông hộ
+	// (pf/party), tra nông hộ theo SĐT (kho định danh), hạn lượt kích hoạt (pf/masterdata).
+	Households partyport.Households
+	Vault      client.Client
+	Params     mdport.Params
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }
