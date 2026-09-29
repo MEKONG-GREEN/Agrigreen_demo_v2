@@ -9,12 +9,18 @@
 package hub
 
 import (
+	"context"
+	"log/slog"
+	"time"
+
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -37,3 +43,33 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc
 
 // Lots cho module mkg khác đọc nguồn gốc và tồn của lô (qua port).
 func (m *Module) Lots() port.Lots { return m.svc }
+
+// ActiveHubTenants dựng bộ tìm tenant có cơ sở đang dùng từ pool vai ag_outbox_publisher.
+func ActiveHubTenants(pool *pgxpool.Pool) app.TenantLister { return app.ActiveHubTenants(pool) }
+
+// Jobs trả job định kỳ của module cho bộ lập lịch của api-internal (chỉ chạy ở leader): công
+// bố sức chứa mọi cơ sở đang dùng qua van hub_capacity mỗi ngày lúc 01:15 giờ Việt Nam, chạy
+// bù khi khởi động (idempotent theo cơ sở × ngày) — GIS FN-06 / US-WH-01 AC-2, Q-MKG-02.
+func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job {
+	return []schedule.Job{{
+		Name: port.JobDailyCapacity, Spec: schedule.Daily{Hour: app.DailyCapacityHour, Minute: app.DailyCapacityMinute},
+		RunOnStart: true, Timeout: 30 * time.Minute,
+		Run: func(ctx context.Context) error {
+			r, err := m.svc.PublishDailyCapacity(ctx, tenants)
+			if log != nil {
+				outcome := "ok"
+				if err != nil {
+					outcome = "error"
+				}
+				log.Info("công bố sức chứa định kỳ", "event", "job."+port.JobDailyCapacity, "published", r.Published,
+					"skipped", r.Skipped, "outcome", outcome)
+			}
+			return err
+		},
+	}}
+}
+
+// PublishDailyCapacity chạy một lượt công bố định kỳ (kiểm thử, công cụ vận hành).
+func (m *Module) PublishDailyCapacity(ctx context.Context, tenants app.TenantLister) (app.DailyResult, error) {
+	return m.svc.PublishDailyCapacity(ctx, tenants)
+}

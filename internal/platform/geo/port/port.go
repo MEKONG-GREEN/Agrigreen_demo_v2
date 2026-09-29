@@ -18,6 +18,10 @@ const (
 	RolePlotViewer = "plot_viewer"
 	// RoleGeoAdmin: Admin API — nhập tệp ranh giới thửa, ranh giới hành chính.
 	RoleGeoAdmin = "geo_admin"
+	// RoleMapConsumer: ứng dụng tiêu thụ (TMS — mkg/logistics) đọc bản đồ chuẩn hóa chỉ đọc
+	// GET /v1/geo/standard-map bằng tài khoản dịch vụ (GIS US-INT-02 / FN-17). Chỉ lớp nền
+	// không định danh (ranh giới hành chính, HTX, kho/Hub, đường bộ, đường thủy) — không có thửa.
+	RoleMapConsumer = "map_consumer"
 	// RoleCoopManager là vai quản lý HTX (khai ở pf/party). Người gọi có vai này
 	// chỉ thấy/ghi thửa của chính HTX mình (Principal.OrgRef) và thửa nháp chưa
 	// gán HTX trong xã (HTX US-PLOT-01 AC-1, AC-4).

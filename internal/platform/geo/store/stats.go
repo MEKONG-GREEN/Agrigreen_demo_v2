@@ -89,3 +89,31 @@ func AdminBoundariesByLevel(ctx context.Context, tx pgx.Tx, level string) ([]str
 	}
 	return pgx.CollectRows(rows, pgx.RowTo[string])
 }
+
+// AdminBoundariesInBBox đọc hình hiện hành của các đơn vị cấp level giao khung nhìn (chỉ mục
+// gist admin_boundary_geom), tối đa limit, sắp theo mã; simplifyDeg > 0 thì đơn giản hóa.
+func AdminBoundariesInBBox(ctx context.Context, tx pgx.Tx, b BBox, level string, simplifyDeg float64, limit int) ([]AdminBoundary, error) {
+	rows, err := tx.Query(ctx, `SELECT id, unit_code, level, name, source, imported_by, imported_at,
+	    (ST_Area(geom::geography) / 10000)::numeric(14,4)::text,
+	    ST_AsGeoJSON(CASE WHEN $6::float8 > 0 THEN ST_SimplifyPreserveTopology(geom, $6::float8) ELSE geom END, 7)
+	  FROM pf_geo.admin_boundary
+	  WHERE superseded_at IS NULL AND level = $5 AND geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)
+	  ORDER BY unit_code LIMIT $7`, b.MinLon, b.MinLat, b.MaxLon, b.MaxLat, level, simplifyDeg, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []AdminBoundary
+	for rows.Next() {
+		var ab AdminBoundary
+		var area string
+		if err := rows.Scan(&ab.ID, &ab.UnitCode, &ab.Level, &ab.Name, &ab.Source, &ab.ImportedBy, &ab.ImportedAt, &area, &ab.GeoJSON); err != nil {
+			return nil, err
+		}
+		if ab.AreaHa, err = decimal.NewFromString(area); err != nil {
+			return nil, err
+		}
+		out = append(out, ab)
+	}
+	return out, rows.Err()
+}

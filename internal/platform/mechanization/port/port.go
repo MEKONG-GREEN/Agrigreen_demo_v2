@@ -30,7 +30,24 @@ const PurposeMachineOwner client.Purpose = "mechanization.owner"
 // Sự kiện module phát ra (schema trong contracts/events/).
 const (
 	EventBalanceComputed = "pf.mechanization.balance.computed"
+	// EventAreaFeedStale: dữ liệu diện tích vụ từ App HTX quá ngưỡng độ tươi
+	// (cgh.area_feed_stale_hours) — pf/notify báo Admin CGH (CGH FN-07 BR-04, AC-02/AC-03).
+	EventAreaFeedStale = "pf.mechanization.area_feed.stale"
 )
+
+// JobAreaFeedCheck là tên job kiểm độ tươi dữ liệu App HTX trong cmd/worker (-jobs).
+const JobAreaFeedCheck = "mechanization_area_feed_check"
+
+// AreaFeedStaleV1 là payload của pf.mechanization.area_feed.stale, schema_version 1: lần
+// đồng bộ App HTX gần nhất của tenant đã cũ hơn ngưỡng. Không có dữ liệu cá nhân.
+//
+//ag:event pf.mechanization.area_feed.stale v1
+type AreaFeedStaleV1 struct {
+	LastSyncAt     string `json:"last_sync_at"`
+	ThresholdHours string `json:"threshold_hours"` // decimal dạng chuỗi
+	AlertDate      string `json:"alert_date"`      // YYYY-MM-DD (giờ Việt Nam)
+	DetectedAt     string `json:"detected_at"`
+}
 
 // BalanceComputedV1 là payload của pf.mechanization.balance.computed: một lần
 // cân đối cung–cầu (FN-09) đã được lưu bất biến. Không chứa dữ liệu cá nhân.

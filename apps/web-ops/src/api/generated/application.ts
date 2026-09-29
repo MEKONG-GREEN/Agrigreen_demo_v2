@@ -157,6 +157,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/masterdata/display-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Quy chuẩn hiển thị dùng chung của bản đồ GIS đang hiệu lực (GIS US-CFG-01/02) — bảng màu heatmap giai đoạn, màu mức lấp đầy kho/Hub, ngưỡng %
+         * @description Mọi người dùng đã xác thực đọc được (legend web). Giá trị là phiên bản ĐÃ DUYỆT đang hiệu lực (người đặt ≠
+         *     người duyệt, R-56 — "áp dụng ngay" của AC nghĩa là áp dụng ngay khi được duyệt); khóa chưa có phiên bản duyệt
+         *     → giá trị mặc định nhúng (source = default).
+         */
+        get: operations["getDisplayConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me": {
         parameters: {
             query?: never;
@@ -779,6 +801,32 @@ export interface paths {
         };
         /** Lớp bản đồ web GIS gộp theo khung nhìn (BRD FN-01, BR-24/25) — mỗi lớp tối đa 1.000 đối tượng; polygon thửa chỉ khi zoom ≥ geo.plot_layer_min_zoom (mặc định 13) */
         get: operations["geoLayers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/geo/standard-map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bản đồ chuẩn hóa chỉ đọc cho ứng dụng tiêu thụ (TMS — mkg/logistics), GIS US-INT-02 / FN-17
+         * @description MỘT lần gọi trả mọi lớp nền đã chuẩn hóa trong khung nhìn dạng GeoJSON FeatureCollection (properties.layer):
+         *     admin_boundaries (ranh giới tỉnh/xã theo zoom), cooperatives (ranh giới/marker HTX), facilities (kho/Hub kèm
+         *     widget sức chứa), roads (đường bộ, lọc tải trọng), waterways (tuyến đường thủy của phiên bản đang phát hành,
+         *     cờ passable theo tải trọng) cùng danh sách bản đồ nền đã cấu hình (gis.basemap_url:<loại>; rỗng khi nhà cung
+         *     cấp tile chưa chọn — RB-7). Không có thửa hay dữ liệu cá nhân. Tài khoản dịch vụ vai map_consumer đọc toàn
+         *     tenant; người dùng bản đồ khác theo phạm vi. Mỗi lớp ≤ limit (≤ 1.000) đối tượng. Độ trễ mục tiêu p95 < 500 ms
+         *     (đo ở docs/runbooks/gis-performance.md).
+         */
+        get: operations["geoStandardMap"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1742,6 +1790,40 @@ export interface paths {
         };
         /** G-05: ranh giới hành chính hiện hành theo cấp và đơn vị cha (FeatureCollection); đơn vị chưa có hình ở missing */
         get: operations["listAdminBoundaries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mechanization/area-sync-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Độ tươi dữ liệu App HTX và lần đồng bộ gần nhất theo HTX của một vụ (CGH FN-07 B5, AC-03) — chỉ báo "đang dùng dữ liệu nhập tay dự phòng" */
+        get: operations["mechAreaSyncStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mechanization/area-sync-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhật ký đồng bộ và cập nhật thủ công diện tích vụ (CGH FN-07 B5, BR-04) — Admin CGH */
+        get: operations["mechAreaSyncLog"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2830,6 +2912,106 @@ export interface components {
             revision: number;
             /** Format: date-time */
             updated_at: string;
+        };
+        DisplayValue: {
+            /** @example gis.stage_color:chin_ro */
+            key: string;
+            /** @description Mã màu HEX #RRGGBB hoặc số thập phân dạng chuỗi */
+            value: string;
+            default: string;
+            /** @description 0 = chưa có phiên bản duyệt */
+            version: number;
+            /** @enum {string} */
+            source: "approved" | "default";
+        };
+        MechAreaSyncLog: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            cooperative_ref: string;
+            season_code: string;
+            season_year: number;
+            /** @enum {string} */
+            source: "app_htx" | "manual";
+            source_label: string;
+            /**
+             * @description Kết quả áp QT-03
+             * @enum {string}
+             */
+            outcome: "applied" | "kept_locked" | "stale_ignored";
+            area_ha: string;
+            /** Format: date-time */
+            source_at: string;
+            /** Format: uuid */
+            event_id: string | null;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        MechAreaSyncCoop: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            cooperative_ref: string;
+            season_code: string;
+            season_year: number;
+            /** @enum {string} */
+            source: "app_htx" | "manual";
+            source_label: string;
+            /** @enum {string} */
+            outcome: "applied" | "kept_locked" | "stale_ignored";
+            area_ha: string;
+            /** Format: date-time */
+            source_at: string;
+            /** Format: uuid */
+            event_id: string | null;
+            /** Format: date-time */
+            recorded_at: string;
+            sync_count: number;
+            /** @description Bản App HTX của HTX cũ hơn ngưỡng độ tươi */
+            stale: boolean;
+        };
+        /** @description Bản đồ chuẩn hóa cho TMS (GIS US-INT-02) */
+        GeoStandardMap: {
+            /** @enum {string} */
+            schema: "agrigreen.standard_map/v1";
+            /** @enum {string} */
+            type: "FeatureCollection";
+            /** Format: date-time */
+            generated_at: string;
+            bbox: number[];
+            zoom: number;
+            /** @enum {string} */
+            admin_level: "province" | "commune";
+            features: {
+                /** @enum {string} */
+                type: "Feature";
+                id: string;
+                geometry: Record<string, never>;
+                properties: {
+                    /** @enum {string} */
+                    layer: "admin_boundaries" | "cooperatives" | "facilities" | "roads" | "waterways";
+                } & {
+                    [key: string]: unknown;
+                };
+            }[];
+            layers: {
+                [key: string]: {
+                    count: number;
+                    truncated: boolean;
+                    passable_count?: number;
+                    version_no?: number;
+                };
+            };
+            basemaps: {
+                /** @enum {string} */
+                kind: "street" | "satellite" | "terrain";
+                url: string;
+            }[];
+            basemap_notice: string | null;
+            capacity_thresholds: {
+                warn_pct: string;
+                full_pct: string;
+            } | null;
         };
         ParamValue: {
             key: string;
@@ -4427,7 +4609,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "directive" | "alert" | "document" | "task_escalated" | "sync_conflict" | "org_deactivated" | "household_registered" | "household_membership_changed" | "task_assigned" | "farm_log_pending" | "farm_log_reviewed" | "season_opened";
+            kind: "directive" | "alert" | "document" | "task_escalated" | "sync_conflict" | "org_deactivated" | "household_registered" | "household_membership_changed" | "task_assigned" | "farm_log_pending" | "farm_log_reviewed" | "season_opened" | "integration_dead_lettered" | "area_feed_stale";
             /** @enum {string} */
             severity: "urgent" | "normal";
             title: string;
@@ -5838,6 +6020,42 @@ export interface operations {
             422: components["responses"]["Problem"];
         };
     };
+    getDisplayConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quy chuẩn hiển thị */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        as_of: string;
+                        /** @description Theo mã giai đoạn: chuan_bi, sinh_truong, sap_thu, chin_ro, da_thu, none */
+                        stage_colors: {
+                            [key: string]: components["schemas"]["DisplayValue"];
+                        };
+                        /** @description Theo mức: available, near_full, full, unknown */
+                        capacity_colors: {
+                            [key: string]: components["schemas"]["DisplayValue"];
+                        };
+                        ripening_outline_color: components["schemas"]["DisplayValue"];
+                        hub_capacity_warn_pct: components["schemas"]["DisplayValue"];
+                        hub_capacity_full_pct: components["schemas"]["DisplayValue"];
+                        plot_layer_min_zoom: components["schemas"]["DisplayValue"];
+                    };
+                };
+            };
+            401: components["responses"]["Problem"];
+        };
+    };
     getMe: {
         parameters: {
             query?: never;
@@ -7119,6 +7337,41 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+        };
+    };
+    geoStandardMap: {
+        parameters: {
+            query: {
+                /** @description minLon,minLat,maxLon,maxLat (WGS84) */
+                bbox: string;
+                zoom?: number;
+                /** @description admin_boundaries,cooperatives,facilities,roads,waterways (mặc định: tất cả) */
+                layers?: string;
+                /** @description Mặc định theo zoom: < 10 tỉnh, ≥ 10 xã */
+                admin_level?: "province" | "commune";
+                /** @description Tải trọng phương tiện (tấn) — lọc đường bộ, đánh dấu đường thủy đi được */
+                min_load_tons?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bản đồ chuẩn hóa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeoStandardMap"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            /** @description geo.dependency_unavailable */
+            503: components["responses"]["Problem"];
         };
     };
     geoCoopBoundariesInBBox: {
@@ -9031,6 +9284,72 @@ export interface operations {
                     };
                 };
             };
+            422: components["responses"]["Problem"];
+        };
+    };
+    mechAreaSyncStatus: {
+        parameters: {
+            query: {
+                season_code: string;
+                season_year: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Độ tươi và nhật ký mới nhất theo HTX */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        last_app_htx_at: string | null;
+                        /** @description cgh.area_feed_stale_hours (mặc định 48) */
+                        threshold_hours: string;
+                        stale: boolean;
+                        fallback_manual: boolean;
+                        message: string | null;
+                        items: components["schemas"]["MechAreaSyncCoop"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    mechAreaSyncLog: {
+        parameters: {
+            query?: {
+                cooperative_ref?: string;
+                season_code?: string;
+                season_year?: number;
+                source?: "app_htx" | "manual";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang nhật ký, mới nhất trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        next_cursor: string | null;
+                        items: components["schemas"]["MechAreaSyncLog"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
         };
     };

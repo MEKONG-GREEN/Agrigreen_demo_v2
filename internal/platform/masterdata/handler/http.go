@@ -27,6 +27,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/masterdata/catalogs/:catalog", h.listItems(false))
 	rg.GET("/masterdata/catalogs/:catalog/:code", h.item)
 	rg.GET("/masterdata/params/value", h.paramValue)
+	rg.GET("/masterdata/display-config", h.displayConfig)
 }
 
 // RegisterAdmin gắn route quản trị vào nhóm /v1 của Admin API (MFA bắt buộc).
@@ -48,6 +49,7 @@ func (h Handler) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.POST("/masterdata/params/versions/:id/submit", h.submit)
 	rg.POST("/masterdata/params/versions/:id/approve", h.approve)
 	rg.POST("/masterdata/params/versions/:id/reject", h.reject)
+	rg.POST("/masterdata/params/restore-default", h.restoreDefault)
 	h.registerRegistry(rg)
 }
 

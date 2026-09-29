@@ -50,6 +50,8 @@ func newEmulator(t *testing.T) *emulator {
 	mux.HandleFunc("GET "+base+"/users/{id}/credentials", e.auth(e.creds))
 	mux.HandleFunc("PUT "+base+"/users/{id}/execute-actions-email", e.auth(e.actions))
 	mux.HandleFunc("POST "+base+"/users/{id}/logout", e.auth(e.logout))
+	mux.HandleFunc("GET "+base+"/attack-detection/brute-force/users/{id}", e.auth(e.bruteForce))
+	mux.HandleFunc("DELETE "+base+"/attack-detection/brute-force/users/{id}", e.auth(e.clearBruteForce))
 	e.srv = httptest.NewServer(mux)
 	t.Cleanup(e.srv.Close)
 	return e
@@ -326,6 +328,25 @@ func (e *emulator) actions(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 
 func (e *emulator) logout(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	if err := e.mem.Logout(r.Context(), id); err != nil {
+		fail(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// bruteForce: GET /attack-detection/brute-force/users/{id} như Keycloak 26 (enabled giữ nguyên).
+func (e *emulator) bruteForce(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	locked, err := e.mem.BruteForceLocked(r.Context(), id)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"disabled": locked, "numFailures": 5, "lastIPFailure": "n/a"})
+}
+
+func (e *emulator) clearBruteForce(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	if err := e.mem.ClearBruteForce(r.Context(), id); err != nil {
 		fail(w, err)
 		return
 	}

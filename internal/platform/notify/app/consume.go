@@ -14,11 +14,13 @@ import (
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/store"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 )
@@ -37,6 +39,7 @@ var HandledEvents = []string{
 	contentport.EventDocumentPublished, syncport.EventConflictOpened, syncport.EventDeviceRevoked,
 	partyport.EventOrgDeactivated, partyport.EventHouseholdRegistered, partyport.EventHouseholdMembershipChanged,
 	extport.EventTaskCreated, ccport.EventFarmLogRecorded, ccport.EventFarmLogReviewed, ccport.EventSeasonOpened,
+	syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale,
 }
 
 // HandleEvent là inbox.Handler cho các sự kiện nguồn: dựng thông báo, xếp lần gửi
@@ -148,6 +151,20 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 			a = domain.Audience{National: true, Roles: []string{syncport.RoleConflictResolver}}
 		}
 		return s.deliver(ctx, tx, env, []domain.Notification{domain.ConflictTemplate(p, env.OccurredAt).ForAudience(a)})
+	case syncport.EventIntegrationDeadLettered:
+		var p syncport.IntegrationDeadLetteredV1
+		if err := decode(env, &p); err != nil {
+			return err
+		}
+		a := domain.Audience{National: true, Roles: []string{authz.RolePlatformAdmin}}
+		return s.deliver(ctx, tx, env, []domain.Notification{domain.DeadLetterTemplate(p, env.OccurredAt).ForAudience(a)})
+	case mechport.EventAreaFeedStale:
+		var p mechport.AreaFeedStaleV1
+		if err := decode(env, &p); err != nil {
+			return err
+		}
+		a := domain.Audience{National: true, Roles: []string{mechport.RoleCGHAdmin}}
+		return s.deliver(ctx, tx, env, []domain.Notification{domain.AreaFeedStaleTemplate(p, env.OccurredAt).ForAudience(a)})
 	case syncport.EventDeviceRevoked:
 		var p syncport.DeviceRevokedV1
 		if err := decode(env, &p); err != nil {

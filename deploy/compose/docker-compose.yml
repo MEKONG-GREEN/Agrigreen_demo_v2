@@ -304,6 +304,8 @@ services:
       AG_PF_DB_URL: postgres://pgbouncer:6432/?sslmode=disable
       AG_DB_VIA_PGBOUNCER: "1"
       AG_DB_APP_PASSWORD: ${AG_DB_APP_PASSWORD}
+      # Màn giám sát đồng bộ (GIS US-SYNC-01): độ sâu DLQ qua management API.
+      AG_RABBITMQ_MGMT_URL: http://agrigreen:${AMQP_PASSWORD}@rabbitmq:15672
       AG_VAULT_URL: http://identity-vault:8090
       AG_SYNC_CURSOR_KEY: ${AG_SYNC_CURSOR_KEY:?chạy scripts/gen-dev-secrets}
       AG_CORS_ORIGINS: ${AG_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
@@ -332,6 +334,8 @@ services:
       AG_HTTP_ADDR: ":8081"
       AG_ADMIN_HTTP_ADDR: ":8083"
       AG_MKG_DB_URL: postgres://pgbouncer:6432/?sslmode=disable
+      # Job hub_capacity_daily: khóa leader mức phiên nối THẲNG PostgreSQL (không qua PgBouncer).
+      AG_MKG_DB_DIRECT_URL: postgres://postgres:5432/?sslmode=disable
       AG_DB_VIA_PGBOUNCER: "1"
       AG_DB_APP_PASSWORD: ${AG_DB_APP_PASSWORD}
     # Ảnh distroless không có curl: chính binary kiểm /readyz (cmd/api-internal -healthcheck).

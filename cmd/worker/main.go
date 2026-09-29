@@ -13,6 +13,11 @@
 //	extension_escalation  mỗi 15 phút: leo thang nhiệm vụ khuyến nông quá SLA lên TTKN tỉnh (KN US-TASK-02)
 //	reports_schedules     mỗi 15 phút: lịch gửi báo cáo định kỳ — mỗi mốc tạo đúng một việc xuất (KN US-DASH-03)
 //	notify_email_digest   mỗi giờ: email tóm tắt chỉ đạo khẩn tới hộp thư công vụ (pf/notify, ADR-0015)
+//	mechanization_area_feed_check  mỗi giờ: dữ liệu diện tích vụ App HTX quá ngưỡng độ tươi → báo Admin CGH (CGH FN-07)
+//
+// Mọi consumer ghi lần xử lý thất bại vào pf_sync.integration_failure (vai sync_app — màn
+// giám sát đồng bộ, GIS US-SYNC-01); lần giao cuối trước DLQ phát pf.sync.integration.dead_lettered
+// → pf/notify báo Admin nền tảng (GIS US-SYNC-02).
 //
 // Consumer pf/notify (vai notify_app): pf.notify.directive, pf.notify.content,
 // pf.notify.task, pf.notify.sync, pf.notify.party (dựng thông báo) và pf.notify.push
@@ -43,6 +48,8 @@
 //	AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER vai của job vận hành (migration shared/000002)
 //	AG_WORKER_JOBS                     mặc định cho -jobs: all | none | anchor,idempotency,extension_escalation,notify_email_digest
 //	AG_DB_PASSWORD_EXTENSION_APP       (hoặc AG_DB_APP_PASSWORD) vai extension_app — khi có job extension_escalation
+//	AG_DB_PASSWORD_SYNC_APP            vai sync_app — ghi lần xử lý thất bại của consumer (giám sát đồng bộ)
+//	AG_DB_PASSWORD_MECHANIZATION_APP   vai mechanization_app — job mechanization_area_feed_check
 //	AG_DB_PASSWORD_NOTIFY_APP          vai notify_app (cùng extension_app, masterdata_app, geo_app, accounts_app) — consumer/job pf/notify
 //	AG_FCM_PROJECT_ID, AG_FCM_CREDENTIALS_FILE  FCM HTTP v1 (không đặt → kênh đẩy chỉ ghi log); AG_FCM_ENDPOINT, AG_FCM_TOKEN_URL tùy chọn
 //	AG_SMTP_HOST, AG_SMTP_PORT, AG_SMTP_USERNAME, AG_SMTP_PASSWORD, AG_SMTP_FROM, AG_SMTP_DIGEST_TO  email tóm tắt (SMTP trong lãnh thổ)
@@ -76,11 +83,14 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
+	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
+	syncmod "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
@@ -206,6 +216,21 @@ func startConsumers(ctx context.Context, log *slog.Logger, base, mods string, er
 		}
 		_ = conn.Close()
 	}
+	// GIS US-SYNC-01/02: mọi lần xử lý thất bại ghi vào pf_sync.integration_failure (vai
+	// sync_app, giao dịch riêng) cho màn giám sát đồng bộ; lần giao cuối (vào DLQ) phát
+	// pf.sync.integration.dead_lettered → pf/notify báo Admin.
+	recDSN, err := dbadmin.RoleURL(base, migrations.PF, "", syncmod.DBRole)
+	if err != nil {
+		closeFn()
+		return 0, func() {}, err
+	}
+	recPool, err := db.Open(ctx, recDSN, db.Options{AppName: "worker-sync-monitor", MaxConns: 2})
+	if err != nil {
+		closeFn()
+		return 0, func() {}, err
+	}
+	pools = append(pools, recPool)
+	rec := syncmod.FailureRecorder(recPool, clock.System{})
 	started := 0
 	for _, c := range allConsumers(log) {
 		if !selected(mods, c.name) {
@@ -232,7 +257,7 @@ func startConsumers(ctx context.Context, log *slog.Logger, base, mods string, er
 			return 0, func() {}, err
 		}
 		started++
-		go func(c consumer) { errc <- inbox.Consume(ctx, ch, pool, c.name, c.handler, log) }(c)
+		go func(c consumer) { errc <- inbox.ConsumeWith(ctx, ch, pool, c.name, c.handler, log, rec) }(c)
 	}
 	return started, closeFn, nil
 }
@@ -392,10 +417,26 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		rep := reports.New(repPool, clk, reports.Deps{Params: md.Params(), Log: log})
 		js = append(js, rep.Jobs(reports.ScheduleTenants(out.pools[migrations.PF]), log)...)
 	}
+	if selected(jobs, mechport.JobAreaFeedCheck) {
+		// Độ tươi dữ liệu App HTX (CGH FN-07 AC-02/AC-03): tìm tenant bằng ag_outbox_publisher
+		// (hai cột), ghi cảnh báo bằng vai mechanization_app; ngưỡng đọc qua pf/masterdata (R-05).
+		mechPool, err := openPF(ctx, direct, mechanization.DBRole, &closeFn)
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		mdPool, err := openPF(ctx, direct, masterdata.DBRole, &closeFn)
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		mech := mechanization.New(mechPool, clk, mechanization.Deps{Params: masterdata.New(mdPool, clk).Params()})
+		js = append(js, mech.Jobs(mechanization.FeedTenants(out.pools[migrations.PF]), log)...)
+	}
 	if len(js) == 0 {
 		closeFn()
 		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + extension.JobEscalation + ", " +
-			notifyport.JobEmailDigest + ", " + reports.JobSchedules + ")")
+			notifyport.JobEmailDigest + ", " + reports.JobSchedules + ", " + mechport.JobAreaFeedCheck + ")")
 	}
 	out.s = &schedule.Scheduler{Clock: clk, Log: log, Jobs: js}
 	return out, closeFn, nil

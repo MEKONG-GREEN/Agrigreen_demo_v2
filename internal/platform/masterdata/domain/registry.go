@@ -39,6 +39,8 @@ func CatalogAttrs(c string) []string {
 const (
 	ParamKindDecimal = "decimal"
 	ParamKindText    = "text"
+	// ParamKindColor: tham số chuỗi là mã màu HEX "#RRGGBB" (GIS US-CFG-01 AC-2).
+	ParamKindColor = "color"
 )
 
 // ParamSpec là mô tả của một khóa tham số trong sổ đăng ký (G-07). Min/Max là
@@ -73,7 +75,13 @@ var ParamRegistry = []ParamSpec{
 	{Key: port.ParamYieldAnomalyMinPrefix, Name: "Năng suất thấp bất thường", Unit: "t/ha", Kind: ParamKindDecimal, Min: "0", Max: "30", Dimensional: true},
 	{Key: port.ParamYieldAnomalyMaxPrefix, Name: "Năng suất cao bất thường", Unit: "t/ha", Kind: ParamKindDecimal, Min: "0", Max: "30", Dimensional: true},
 	{Key: port.ParamHubCapacityWarn, Name: "Ngưỡng cảnh báo sức chứa hub/kho", Unit: "%", Kind: ParamKindDecimal, Min: "0", Max: "100"},
-	{Key: port.ParamHubCapacityCritical, Name: "Ngưỡng nguy cấp sức chứa hub/kho", Unit: "%", Kind: ParamKindDecimal, Min: "0", Max: "100"},
+	{Key: port.ParamHubCapacityFull, Name: "Ngưỡng đã đầy sức chứa hub/kho", Unit: "%", Kind: ParamKindDecimal, Min: "0", Max: "100"},
+	{Key: port.ParamPlotLayerMinZoom, Name: "Mức zoom tối thiểu hiện polygon lô/thửa", Unit: "zoom", Kind: ParamKindDecimal, Min: "0", Max: "22"},
+	// Quy chuẩn hiển thị GIS (GIS US-CFG-01/02).
+	{Key: port.ParamGISStageColorPrefix, Name: "Màu heatmap giai đoạn mùa vụ", Kind: ParamKindColor, Dimensional: true},
+	{Key: port.ParamGISCapacityColorPrefix, Name: "Màu mức lấp đầy kho/Hub", Kind: ParamKindColor, Dimensional: true},
+	{Key: port.ParamGISRipeningOutline, Name: "Màu viền vùng chín rộ", Kind: ParamKindColor},
+	{Key: port.ParamCGHAreaFeedStaleHours, Name: "Ngưỡng độ tươi diện tích vụ từ App HTX", Unit: "giờ", Kind: ParamKindDecimal, Min: "1", Max: "720"},
 	{Key: port.ParamWaterwaySnapTolerance, Name: "Dung sai bắt điểm mạng đường thủy", Unit: "m", Kind: ParamKindDecimal, Min: "0", Max: "1000"},
 	{Key: port.ParamWaterwayAutoJoin, Name: "Khoảng tự nối đoạn đường thủy", Unit: "m", Kind: ParamKindDecimal, Min: "0", Max: "5000"},
 	{Key: port.ParamWaterwayGapReport, Name: "Ngưỡng báo khoảng hở mạng đường thủy", Unit: "m", Kind: ParamKindDecimal, Min: "0", Max: "100000"},
@@ -83,6 +91,13 @@ var ParamRegistry = []ParamSpec{
 
 var stageNames = map[string]string{
 	"lam_dat": "làm đất", "gieo_sa": "gieo sạ/cấy", "cham_soc": "chăm sóc", "thu_hoach": "thu hoạch", "sau_thu_hoach": "sau thu hoạch",
+}
+
+// dimNames là nhãn tiếng Việt của chiều bảng màu GIS.
+var dimNames = map[string]string{
+	"chuan_bi": "Chuẩn bị đất", "sinh_truong": "Sinh trưởng", "sap_thu": "Sắp thu hoạch", "chin_ro": "Chín rộ / đang thu hoạch",
+	"da_thu": "Đã thu hoạch", "none": "Chưa có vụ",
+	"available": "Còn chỗ", "near_full": "Sắp đầy", "full": "Đã đầy", "unknown": "Chưa có số liệu",
 }
 
 // SpecOf trả mô tả của một khóa cụ thể: khóa đã biết, khóa có chiều của một tiền
@@ -111,6 +126,9 @@ func dimLabel(base, dims string) string {
 			st = parts[1]
 		}
 		return parts[0] + " × khâu " + st
+	}
+	if n, ok := dimNames[dims]; ok && (base == port.ParamGISStageColorPrefix || base == port.ParamGISCapacityColorPrefix) {
+		return n
 	}
 	return strings.Join(parts, " × ")
 }

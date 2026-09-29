@@ -12,13 +12,21 @@
 package mechanization
 
 import (
+	"context"
+	"log/slog"
+	"time"
+
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -52,3 +60,33 @@ func (m *Module) AreaFeed() port.AreaFeed { return m.svc }
 // AreaSyncHandler là inbox.Handler của consumer port.AreaSyncConsumer: nhận
 // pf.cropcycle.coop_season_area.changed và áp theo QT-03 trong giao dịch của inbox (CGH FN-07).
 func (m *Module) AreaSyncHandler() inbox.Handler { return m.svc.HandleCoopSeasonAreaChanged }
+
+// FeedTenants dựng bộ tìm tenant đã từng nhận dữ liệu App HTX từ pool vai
+// ag_outbox_publisher (worker, nối thẳng) cho job port.JobAreaFeedCheck.
+func FeedTenants(pool *pgxpool.Pool) app.TenantLister {
+	return func(ctx context.Context) ([]uuid.UUID, error) { return store.FeedTenants(ctx, pool) }
+}
+
+// Jobs trả job định kỳ của module (chỉ chạy ở leader): kiểm độ tươi dữ liệu diện tích vụ App
+// HTX mỗi giờ, báo Admin CGH tối đa một lần mỗi ngày (CGH FN-07 AC-02/AC-03).
+func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job {
+	return []schedule.Job{{
+		Name: port.JobAreaFeedCheck, Spec: schedule.Every{Interval: time.Hour}, RunOnStart: true, Timeout: 10 * time.Minute,
+		Run: func(ctx context.Context) error {
+			n, err := m.svc.RunAreaFeedCheck(ctx, tenants)
+			if log != nil {
+				outcome := "ok"
+				if err != nil {
+					outcome = "error"
+				}
+				log.Info("kiểm độ tươi dữ liệu App HTX", "event", "job."+port.JobAreaFeedCheck, "alerts", n, "outcome", outcome)
+			}
+			return err
+		},
+	}}
+}
+
+// RunAreaFeedCheck chạy một lượt job kiểm độ tươi (kiểm thử, công cụ vận hành).
+func (m *Module) RunAreaFeedCheck(ctx context.Context, tenants app.TenantLister) (int, error) {
+	return m.svc.RunAreaFeedCheck(ctx, tenants)
+}

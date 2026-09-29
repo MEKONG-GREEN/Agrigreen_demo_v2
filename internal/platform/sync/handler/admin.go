@@ -19,6 +19,8 @@ func (h Handler) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.GET("/sync/conflicts", h.listConflicts)
 	rg.GET("/sync/conflicts/:id", h.getConflict)
 	rg.POST("/sync/conflicts/:id/resolve", h.resolve)
+	rg.GET("/sync/integrations", h.integrations)
+	rg.GET("/sync/integrations/log", h.integrationLog)
 }
 
 func (h Handler) listDevices(c *gin.Context) {

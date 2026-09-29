@@ -22,6 +22,7 @@ import (
 // kho/Hub + widget sức chứa, đường bộ, lớp gộp), ghi ranh giới HTX, đọc log GPS.
 func (h Handler) registerG2App(rg *gin.RouterGroup) {
 	rg.GET("/geo/layers", h.layers)
+	rg.GET("/geo/standard-map", h.standardMap) // GIS US-INT-02: bản đồ chuẩn hóa cho TMS
 	rg.GET("/geo/cooperative-boundaries", h.coopBBox)
 	rg.POST("/geo/cooperative-boundaries", h.coopCreate)
 	rg.GET("/geo/cooperative-boundaries/:ref", h.coopGet)

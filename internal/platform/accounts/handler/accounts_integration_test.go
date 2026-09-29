@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -744,5 +745,42 @@ func TestNoDirectoryIs503(t *testing.T) {
 	_ = json.NewDecoder(res.Body).Decode(&m)
 	if res.StatusCode != http.StatusServiceUnavailable || m["code"] != "accounts.dependency_unavailable" {
 		t.Fatalf("%d %v", res.StatusCode, m)
+	}
+}
+
+// GIS US-LOG-01 AC-3: sai mật khẩu 5 lần/15 phút → Keycloak khóa VĨNH VIỄN (realm
+// permanentLockout, enabled vẫn true) tới khi Admin mở: API mở khóa nhận ra khóa chống dò,
+// xóa trạng thái khóa ở Keycloak, ghi sự kiện mở khóa (prev_cause = brute_force) có lý do.
+func TestUnlockClearsBruteForceLockout_GIS_US_LOG_01(t *testing.T) {
+	f := newFixture(t)
+	nat := f.nationalAdmin()
+	id := nat.create(person(f.team30292, "kn_officer"))
+	path := "/v1/accounts/users/" + id.String()
+	// Chưa bị khóa → mở khóa là xung đột trạng thái.
+	if r := nat.do(http.MethodPost, path+"/unlock", map[string]any{"reason": "Mở thử khi đang hoạt động"}); r.status != http.StatusConflict {
+		t.Fatalf("mở khóa tài khoản đang hoạt động: %d %v", r.status, r.body)
+	}
+	f.dir.LockByBruteForce(id)
+	if locked, _ := f.dir.BruteForceLocked(context.Background(), id); !locked {
+		t.Fatal("giả lập khóa chống dò")
+	}
+	if r := nat.do(http.MethodPost, path+"/unlock", map[string]any{"reason": "ok"}); r.status != http.StatusUnprocessableEntity {
+		t.Fatalf("mở khóa thiếu lý do: %d", r.status)
+	}
+	r := nat.do(http.MethodPost, path+"/unlock", map[string]any{"reason": "Người dùng đã xác minh danh tính qua điện thoại"})
+	if r.status != http.StatusOK || r.body["account"].(map[string]any)["enabled"] != true {
+		t.Fatalf("mở khóa: %d %v", r.status, r.body)
+	}
+	if locked, _ := f.dir.BruteForceLocked(context.Background(), id); locked {
+		t.Fatal("Keycloak phải xóa trạng thái khóa chống dò")
+	}
+	ev := nat.do(http.MethodGet, path+"/events", nil)
+	items := ev.body["items"].([]any)
+	last := items[0].(map[string]any)
+	if last["action"] != "unlocked" {
+		last = items[len(items)-1].(map[string]any)
+	}
+	if last["action"] != "unlocked" || !strings.Contains(fmt.Sprint(last), "brute_force") {
+		t.Fatalf("sự kiện mở khóa phải ghi nguyên nhân brute_force: %v", items)
 	}
 }

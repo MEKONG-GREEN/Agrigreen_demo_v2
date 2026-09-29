@@ -42,6 +42,10 @@ var (
 	ErrNotSetter       = problem.New(http.StatusForbidden, "masterdata.param_not_setter", "Chỉ người đặt được gửi duyệt phiên bản của mình")
 	ErrThresholdOrder  = problem.New(http.StatusUnprocessableEntity, "masterdata.param_threshold_order",
 		"Ngưỡng mức đáp ứng CGH phải tăng dần: Cần chú ý < Đủ < Thừa")
+	// ErrPercentThresholds: bộ ngưỡng % GIS lệch thứ tự hoặc ngoài 0–100 % (GIS US-CFG-01 AC-2).
+	ErrPercentThresholds = problem.New(http.StatusUnprocessableEntity, "masterdata.param_percent_thresholds", domain.ErrPercentRange.Error())
+	// ErrNoDefault: khóa không có giá trị mặc định để khôi phục (GIS US-CFG-02 AC-2).
+	ErrNoDefault          = problem.New(http.StatusNotFound, "masterdata.param_no_default", "Tham số không có giá trị mặc định để khôi phục")
 	ErrCorrectionRequired = problem.New(http.StatusUnprocessableEntity, "masterdata.param_correction_required",
 		"Đã có phiên bản được duyệt cùng ngày hiệu lực: phải nêu correction_reason")
 )

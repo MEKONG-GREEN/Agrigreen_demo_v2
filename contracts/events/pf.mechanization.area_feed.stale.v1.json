@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.mechanization.area_feed.stale/v1",
+  "title": "pf.mechanization.area_feed.stale — payload",
+  "description": "Dữ liệu diện tích vụ nhận từ App HTX quá ngưỡng độ tươi cgh.area_feed_stale_hours (CGH FN-07 BR-04, AC-02/AC-03): tối đa một lần mỗi tenant mỗi ngày nghiệp vụ. pf/notify báo Admin CGH. Không có dữ liệu cá nhân.",
+  "x-event-type": "pf.mechanization.area_feed.stale",
+  "x-schema-version": 1,
+  "x-producer": "pf/mechanization",
+  "type": "object",
+  "required": ["last_sync_at", "threshold_hours", "alert_date", "detected_at"],
+  "properties": {
+    "last_sync_at":    { "type": "string", "format": "date-time", "description": "lần nhận dữ liệu App HTX gần nhất" },
+    "threshold_hours": { "type": "string", "description": "ngưỡng độ tươi (giờ, decimal dạng chuỗi)" },
+    "alert_date":      { "type": "string", "format": "date", "description": "ngày nghiệp vụ (giờ Việt Nam) của cảnh báo" },
+    "detected_at":     { "type": "string", "format": "date-time" }
+  }
+}

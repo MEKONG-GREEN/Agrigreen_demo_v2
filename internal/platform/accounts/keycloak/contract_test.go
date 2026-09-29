@@ -127,6 +127,20 @@ func runContract(t *testing.T, d port.Directory, mem *Memory) {
 	if err := d.Logout(ctx, idA); err != nil || mem.Logouts(idA) != 1 {
 		t.Fatalf("logout: %v %d", err, mem.Logouts(idA))
 	}
+	// GIS US-LOG-01 AC-3: khóa vĩnh viễn do đăng nhập sai — đọc và xóa qua attack-detection.
+	if locked, err := d.BruteForceLocked(ctx, idA); err != nil || locked {
+		t.Fatalf("chưa bị khóa chống dò: %v %v", locked, err)
+	}
+	mem.LockByBruteForce(idA)
+	if locked, err := d.BruteForceLocked(ctx, idA); err != nil || !locked {
+		t.Fatalf("khóa chống dò: %v %v", locked, err)
+	}
+	if err := d.ClearBruteForce(ctx, idA); err != nil {
+		t.Fatal(err)
+	}
+	if locked, _ := d.BruteForceLocked(ctx, idA); locked {
+		t.Fatal("sau khi mở khóa")
+	}
 
 	if _, err := d.GetUser(ctx, uuid.New()); !errors.Is(err, port.ErrUserNotFound) {
 		t.Fatalf("không có người dùng: %v", err)

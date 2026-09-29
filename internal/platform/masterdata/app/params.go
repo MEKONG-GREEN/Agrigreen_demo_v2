@@ -192,6 +192,9 @@ var thresholdOrder = []string{port.ParamCGHCoverageAttention, port.ParamCGHCover
 // Mốc chưa cấu hình thì bỏ qua. Muốn dời cả bộ ngưỡng: duyệt theo thứ tự giữ
 // được tăng dần (vd nâng ngưỡng Thừa trước, hạ ngưỡng Cần chú ý trước).
 func checkThresholdOrder(ctx context.Context, tx pgx.Tx, v domain.ParamVersion) error {
+	if err := checkPercentGroups(ctx, tx, v); err != nil {
+		return err
+	}
 	idx := -1
 	for i, k := range thresholdOrder {
 		if k == v.Key {
@@ -377,4 +380,51 @@ func (s *Service) paramAt(ctx context.Context, tid uuid.UUID, key string, at tim
 		return domain.Approved{}, ErrParamNotFound
 	}
 	return *a, nil
+}
+
+// checkPercentGroups kiểm bộ ngưỡng % của quy chuẩn hiển thị GIS (GIS US-CFG-01 AC-1/AC-2,
+// US-CFG-02 AC-3): giá trị đề xuất cùng các mốc còn lại ĐÃ DUYỆT của bộ, có hiệu lực tại
+// effective_from, phải tăng dần nghiêm ngặt và nằm trong 0–100 %.
+func checkPercentGroups(ctx context.Context, tx pgx.Tx, v domain.ParamVersion) error {
+	if v.Value == nil {
+		return nil
+	}
+	for _, g := range domain.PercentThresholdGroups {
+		idx := -1
+		for i, k := range g {
+			if k == v.Key {
+				idx = i
+			}
+		}
+		if idx < 0 {
+			continue
+		}
+		vals := make([]*decimal.Decimal, len(g))
+		for i, k := range g {
+			if i == idx {
+				vals[i] = v.Value
+				continue
+			}
+			a, err := store.ApprovedAt(ctx, tx, k, v.EffectiveFrom)
+			if err != nil {
+				return err
+			}
+			if a != nil {
+				vals[i] = a.Value
+			}
+		}
+		hundred := decimal.NewFromInt(100)
+		for i := range vals {
+			if vals[i] != nil && (vals[i].IsNegative() || vals[i].GreaterThan(hundred)) {
+				return ErrPercentThresholds.WithDetail(g[i] + " = " + vals[i].String() + " nằm ngoài 0–100 %")
+			}
+			for j := i + 1; j < len(vals); j++ {
+				if vals[i] != nil && vals[j] != nil && !vals[i].LessThan(*vals[j]) {
+					return ErrPercentThresholds.WithDetail(g[i] + " = " + vals[i].String() + " phải nhỏ hơn " + g[j] + " = " +
+						vals[j].String() + " (tại ngày hiệu lực của phiên bản)")
+				}
+			}
+		}
+	}
+	return nil
 }
