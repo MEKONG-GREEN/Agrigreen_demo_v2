@@ -79,7 +79,7 @@ type BatchConfig struct {
 
 // IngestConfig: đích đẩy lô qua mTLS (chỉ đi ra).
 type IngestConfig struct {
-	// URL đầy đủ của điểm nhận lô, vd https://ingest.mkg.internal:8443/v1/edge/batches.
+	// URL đầy đủ của điểm nhận lô, vd https://ingest.mkg.internal:8443/v1/ingest/batches.
 	URL string `json:"url"`
 	// CAFile: CA nội bộ để xác minh máy chủ ingest.
 	CAFile string `json:"ca_file"`
@@ -140,7 +140,7 @@ const (
 	defaultStaleReading  = 60 * time.Second
 	defaultHealthyAfter  = 2 * time.Minute
 	defaultMaxAttempts   = 3
-	defaultIngestPath    = "/v1/edge/batches"
+	defaultIngestPath    = "/v1/ingest/batches"
 	minBufferHours       = 72
 	recordOverheadBytes  = 8   // khung: độ dài + CRC
 	recordEstimateNoRaw  = 120 // JSON một số đo không raw (đo thực tế ~105 byte)

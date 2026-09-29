@@ -24,7 +24,7 @@ import (
 
 // Giao thức đẩy lô tới cmd/ingest (đề xuất của agent; cmd/ingest phải khớp):
 //
-//	POST <ingest.url>   (mặc định đường dẫn /v1/edge/batches), mTLS, Content-Type: application/json
+//	POST <ingest.url>   (mặc định đường dẫn /v1/ingest/batches), mTLS, Content-Type: application/json
 //	thân: một lô agrigreen.edge.batch.v1 (contracts/edge/batch.v1.json)
 //
 //	200/201 → lô đã commit (kể cả gửi lặp idempotent). Thân JSON TÙY CHỌN; nếu có

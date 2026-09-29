@@ -195,7 +195,7 @@ type fakeIngest struct {
 func (f *fakeIngest) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if r.URL.Path != "/v1/edge/batches" || r.TLS == nil || len(r.TLS.PeerCertificates) == 0 || r.TLS.PeerCertificates[0].Subject.CommonName != "scale-hub01-in" {
+	if r.URL.Path != "/v1/ingest/batches" || r.TLS == nil || len(r.TLS.PeerCertificates) == 0 || r.TLS.PeerCertificates[0].Subject.CommonName != "scale-hub01-in" {
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
@@ -235,7 +235,7 @@ func startIngest(t *testing.T, cfg *Config, k ed25519.PrivateKey, codes ...int) 
 	srv.TLS = &tls.Config{Certificates: []tls.Certificate{pki.Server}, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: pki.Pool, MinVersion: tls.VersionTLS13}
 	srv.StartTLS()
 	t.Cleanup(srv.Close)
-	cfg.Ingest.URL = srv.URL + "/v1/edge/batches"
+	cfg.Ingest.URL = srv.URL + "/v1/ingest/batches"
 	cfg.Ingest.CAFile, cfg.Ingest.CertFile, cfg.Ingest.CertKeyFile = pki.CAFile, pki.CertFile, pki.KeyFile
 	return f
 }
@@ -357,7 +357,7 @@ func TestPushRejectedRaisesAlarmKeepsBuffer(t *testing.T) {
 // Không có chứng thư client → ingest (mTLS bắt buộc) từ chối bắt tay.
 func TestMTLSRequiresClientCert(t *testing.T) {
 	cfg, _ := enrolled(t, 1<<20)
-	cfg.Ingest.URL = "https://127.0.0.1:1/v1/edge/batches"
+	cfg.Ingest.URL = "https://127.0.0.1:1/v1/ingest/batches"
 	if _, err := NewMTLSClient(cfg.Ingest); err == nil {
 		t.Fatal("mong lỗi thiếu chứng thư client")
 	}

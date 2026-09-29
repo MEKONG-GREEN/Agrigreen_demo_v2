@@ -83,7 +83,7 @@ Cấu hình là một tệp JSON. Khóa lạ bị từ chối.
   "buffer":  { "max_rate_hz": 10, "hours": 72 },
   "batch":   { "max_readings": 1000, "max_wait": "2s" },
   "ingest":  {
-    "url": "https://ingest.mkg.internal:8443/v1/edge/batches",
+    "url": "https://ingest.mkg.internal:8443/v1/ingest/batches",
     "ca_file": "/etc/edge-agent/ca.crt",
     "cert_file": "/etc/edge-agent/client.crt",
     "cert_key_file": "/var/lib/edge-agent/client.key"
@@ -161,7 +161,7 @@ Bộ đếm của một kỳ **không bao giờ dùng lại** (ADR-0019 §5).
 
 Đây là **đề xuất của agent**. `cmd/ingest` (đợt A2) phải khớp; nếu cần đổi thì báo người tích hợp.
 
-- Yêu cầu: `POST <ingest.url>` (mặc định `/v1/edge/batches`), TLS 1.3 kèm chứng thư client, `Content-Type: application/json`.
+- Yêu cầu: `POST <ingest.url>` (mặc định `/v1/ingest/batches`), TLS 1.3 kèm chứng thư client, `Content-Type: application/json`.
   - Thân là một lô `agrigreen.edge.batch.v1`.
   - Header `Idempotency-Key: <device_id>/<epoch>/<counter_from>` chỉ để tham khảo. Khóa thật là `(device_id, epoch, counter_from)` trong lô.
 - `200`/`201`: lô đã commit, kể cả khi gửi lặp idempotent. Thân phản hồi tùy chọn. Nếu có `counter_to` hoặc `payload_sha256` thì phải khớp lô đã gửi, lệch thì agent bật báo động `payload_conflict`.
