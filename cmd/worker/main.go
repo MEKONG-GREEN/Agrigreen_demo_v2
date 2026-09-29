@@ -21,6 +21,8 @@
 // Consumer pf/reports (vai reports_app): pf.reports.export (dựng tệp Excel/PDF) và
 // pf.reports.delivery (email lịch gửi báo cáo).
 //
+// Consumer pf/simulation (vai simulation_app): pf.simulation.snapshot (dựng ảnh chụp
+// đầu vào bất biến, phát pf.simulation.job.requested cho optimizer).
 // Consumer pf/waterway (vai waterway_app): pf.waterway.build (dựng phiên bản mạng
 // đường thủy từ tập đoạn đã xác nhận).
 //
@@ -99,7 +101,7 @@ func consumers(log *slog.Logger) []consumer {
 			log.Info("đồng ý đã ghi", "event", env.EventType, "event_id", env.EventID, "tenant_id", env.TenantID, "trace_id", env.TraceID, "outcome", "ok")
 			return nil
 		},
-	}, mrvExportConsumer(log), accountsOrgStatusConsumer(log), waterwayBuildConsumer()}, reportsConsumers(log)...)
+	}, mrvExportConsumer(log), accountsOrgStatusConsumer(log), waterwayBuildConsumer(), simulationSnapshotConsumer(log)}, reportsConsumers(log)...)
 }
 
 func allConsumers(log *slog.Logger) []consumer {

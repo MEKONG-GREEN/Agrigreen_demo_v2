@@ -2124,6 +2124,228 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/candidate-hubs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Liệt kê Hub ứng viên (cursor theo mã) */
+        get: operations["listCandidateHubs"];
+        put?: never;
+        /** Tạo Hub ứng viên (CGH FN-02) */
+        post: operations["createCandidateHub"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/candidate-hubs/{id}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ngừng dùng Hub ứng viên kèm lý do (không xóa) */
+        post: operations["retireCandidateHub"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/scenarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tạo kịch bản chọn Hub */
+        post: operations["createScenario"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/scenarios:compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** So sánh kết quả mô phỏng (CGH FN-14) — xếp theo TCO/tấn, cột No-Hub Baseline */
+        post: operations["compareScenarios"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/scenarios/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Đọc kịch bản kèm Hub đang gán */
+        get: operations["getScenario"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/scenarios/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sổ thay đổi kịch bản (kiểm toán, bản ghi bù) */
+        get: operations["getScenarioHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/scenarios/{id}/hubs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gán Hub vào kịch bản hoặc sửa cấu hình (trường không gửi giữ nguyên, FN-02 BR-03) */
+        post: operations["attachScenarioHub"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/scenarios/{id}/hubs/{hub_id}/detach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gỡ Hub khỏi kịch bản bằng bản ghi bù kèm lý do */
+        post: operations["detachScenarioHub"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/simulations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chạy mô phỏng (mục 12) — 202 + Location /v1/jobs/{id}; ảnh chụp dựng ở worker, optimizer tính */
+        post: operations["submitSimulation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/simulations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái mô phỏng, ảnh chụp đã ghim, cờ Chính thức */
+        get: operations["getSimulation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/simulations/{id}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kết quả bất biến (khối result của contracts/optimizer/result.v1) kèm độ nhạy */
+        get: operations["getSimulationResult"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/simulations/{id}/mark-official": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đánh dấu Chính thức — chỉ khi mọi tham số của ảnh chụp đã phê duyệt (FN-01 BR-04) */
+        post: operations["markSimulationOfficial"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái việc dài (R-52) — hiện phục vụ việc mô phỏng (id việc = id mô phỏng) */
+        get: operations["getJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4210,6 +4432,170 @@ export interface components {
             last_note?: string;
             /** Format: date-time */
             task_created_at?: string;
+        };
+        SimLatLng: {
+            lat: number;
+            lng: number;
+        };
+        SimReason: {
+            reason: string;
+        };
+        SimCandidateHub: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+            location: components["schemas"]["SimLatLng"];
+            unit_code?: string | null;
+            /** @enum {string} */
+            status: "active" | "retired";
+            retired_reason?: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        SimPlant: {
+            /** Format: uuid */
+            plant_ref?: string | null;
+            location: components["schemas"]["SimLatLng"];
+            /** @description null → tham số #12 */
+            annual_demand_tons?: string | null;
+        };
+        SimScenarioHub: {
+            /** Format: uuid */
+            scenario_hub_id: string;
+            /** Format: uuid */
+            hub_id: string;
+            hub_code: string;
+            service_radius_km: string;
+            design_capacity_tons: string;
+            barge_payload_tons?: string | null;
+            /** @enum {string} */
+            mode_field_hub: "auto" | "road" | "waterway";
+            /** @enum {string} */
+            mode_hub_plant: "auto" | "road" | "waterway";
+            /** @enum {string} */
+            land_mode: "mua" | "thue";
+            sort_order: number;
+        };
+        SimScenario: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+            plant: components["schemas"]["SimPlant"];
+            lifecycle_years: number;
+            discounted: boolean;
+            /** @enum {string} */
+            baseline_mode: "no_hub" | "manual" | "scenario";
+            baseline_manual_cost_per_ton?: string | null;
+            /** Format: uuid */
+            baseline_scenario_id?: string | null;
+            reference_year: number;
+            version: number;
+            hubs: components["schemas"]["SimScenarioHub"][];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        SimChange: {
+            /** Format: uuid */
+            id: string;
+            seq: number;
+            /** @enum {string} */
+            kind: "created" | "hub_attached" | "hub_updated" | "hub_detached" | "simulation_requested" | "simulation_completed" | "simulation_failed" | "marked_official";
+            /** Format: uuid */
+            hub_id?: string | null;
+            /** Format: uuid */
+            simulation_id?: string | null;
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            supersedes_id?: string | null;
+            correction_reason?: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+        };
+        SimSnapshotMeta: {
+            /** Format: uuid */
+            id: string;
+            sha256: string;
+            param_set_version: string;
+            all_params_approved: boolean;
+            network_version: string;
+            algorithm_version: string;
+            cooperative_count: number;
+            route_count: number;
+            /** Format: date-time */
+            created_at: string;
+        };
+        SimSimulation: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            scenario_id: string;
+            scenario_version: number;
+            /** @enum {string} */
+            status: "queued" | "running" | "completed" | "failed";
+            options: {
+                /** @enum {string} */
+                mode?: "evaluate" | "select_hubs";
+                sensitivity_codes?: string[];
+                max_hubs?: number | null;
+            };
+            /** Format: uuid */
+            requested_by: string;
+            /** Format: date-time */
+            requested_at: string;
+            /** Format: date-time */
+            completed_at?: string | null;
+            error_code?: string | null;
+            error_detail?: string | null;
+            snapshot?: null | components["schemas"]["SimSnapshotMeta"];
+            has_result: boolean;
+            official: boolean;
+            official_eligible: boolean;
+            /** Format: date-time */
+            official_at?: string | null;
+            links: {
+                [key: string]: string;
+            };
+        };
+        SimCompareRow: {
+            /** Format: uuid */
+            simulation_id?: string | null;
+            /** Format: uuid */
+            scenario_id?: string | null;
+            code: string;
+            name: string;
+            official?: boolean;
+            is_baseline_column: boolean;
+            parameter_set_version?: string;
+            lifecycle_years: number;
+            discounted: boolean;
+            hub_count: number;
+            delivered_tons: string;
+            capex: string;
+            opex_year1?: string;
+            collection_cost?: string;
+            transportation_cost?: string;
+            warehouse_cost?: string;
+            handling_cost?: string;
+            total_delivered_logistics_cost?: string;
+            cost_per_ton?: string | null;
+            tco: string;
+            tco_per_ton?: string | null;
+            lifecycle_cost_per_ton?: string | null;
+            roi_pct?: string | null;
+            payback_years?: number | null;
+            payback_status: string;
+            plant_demand_coverage_pct?: string;
+            shortfall_warnings?: number;
         };
     };
     responses: {
@@ -8522,6 +8908,482 @@ export interface operations {
             422: components["responses"]["Problem"];
             /** @description extension.dependency_unavailable */
             503: components["responses"]["Problem"];
+        };
+    };
+    listCandidateHubs: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trang Hub */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["SimCandidateHub"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+        };
+    };
+    createCandidateHub: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    location: components["schemas"]["SimLatLng"];
+                    unit_code?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimCandidateHub"];
+                };
+            };
+            /** @description Hub đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimCandidateHub"];
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
+    retireCandidateHub: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimReason"];
+            };
+        };
+        responses: {
+            /** @description Hub */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimCandidateHub"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    createScenario: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    plant: components["schemas"]["SimPlant"];
+                    /** @description 0/không gửi = tham số #47 */
+                    lifecycle_years?: number;
+                    discounted?: boolean;
+                    /** @enum {string} */
+                    baseline_mode?: "no_hub" | "manual" | "scenario";
+                    baseline_manual_cost_per_ton?: string | null;
+                    /** Format: uuid */
+                    baseline_scenario_id?: string | null;
+                    reference_year: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimScenario"];
+                };
+            };
+            /** @description Kịch bản */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimScenario"];
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
+    compareScenarios: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    simulation_ids: string[];
+                    /** @default true */
+                    include_baseline?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Bảng so sánh (blocked khác null khi khác vòng đời/chế độ chiết khấu — BR-02) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        rows: components["schemas"]["SimCompareRow"][];
+                        sorted_by: string;
+                        blocked: string | null;
+                        warnings: string[];
+                    };
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
+    getScenario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kịch bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimScenario"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    getScenarioHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dòng sổ theo seq */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["SimChange"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    attachScenarioHub: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    hub_id: string;
+                    service_radius_km?: string;
+                    /** @description TỒN KHO TỐI ĐA (tấn) */
+                    design_capacity_tons?: string;
+                    barge_payload_tons?: string;
+                    /** @enum {string} */
+                    mode_field_hub?: "auto" | "road" | "waterway";
+                    /** @enum {string} */
+                    mode_hub_plant?: "auto" | "road" | "waterway";
+                    /** @enum {string} */
+                    land_mode?: "mua" | "thue";
+                };
+            };
+        };
+        responses: {
+            /** @description Kịch bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimScenario"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    detachScenarioHub: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                hub_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimReason"];
+            };
+        };
+        responses: {
+            /** @description Kịch bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimScenario"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    submitSimulation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    scenario_id: string;
+                    /** @description FN-18: chạy kèm độ nhạy (bộ mặc định) */
+                    sensitivity?: boolean;
+                    sensitivity_codes?: string[];
+                    /**
+                     * @description select_hubs: THỬ NGHIỆM (MILP)
+                     * @enum {string}
+                     */
+                    mode?: "evaluate" | "select_hubs";
+                    max_hubs?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã nhận */
+            202: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimSimulation"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getSimulation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mô phỏng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimSimulation"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    getSimulationResult: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        simulation_id: string;
+                        /** Format: uuid */
+                        scenario_id: string;
+                        /** @enum {string} */
+                        status: "tham_khao" | "chinh_thuc";
+                        official: boolean;
+                        official_eligible: boolean;
+                        snapshot?: components["schemas"]["SimSnapshotMeta"];
+                        engine_version: string;
+                        algorithm_version: string;
+                        result_sha256: string;
+                        /** Format: date-time */
+                        received_at: string;
+                        result: {
+                            [key: string]: unknown;
+                        };
+                        sensitivity?: {
+                            [key: string]: unknown;
+                        } | null;
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    markSimulationOfficial: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mô phỏng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimSimulation"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    getJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Việc */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** @enum {string} */
+                        kind: "simulation";
+                        /** @enum {string} */
+                        status: "queued" | "running" | "completed" | "failed";
+                        error_code?: string | null;
+                        /** Format: date-time */
+                        requested_at: string;
+                        /** Format: date-time */
+                        completed_at?: string | null;
+                        links: {
+                            [key: string]: string;
+                        };
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
         };
     };
 }

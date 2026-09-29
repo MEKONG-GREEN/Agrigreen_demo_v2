@@ -3069,6 +3069,284 @@ paths:
         "422": {description: "validation_failed (\"Vui lòng nhập mô tả và chọn loại sự cố trước khi gửi.\", tối đa 5 ảnh) | extension.household_invalid", $ref: "#/components/responses/Problem"}
         "503": {description: "extension.dependency_unavailable", $ref: "#/components/responses/Problem"}
   # --- hết G2 ---
+
+  # --- pf/simulation ---
+  /v1/candidate-hubs:
+    post:
+      summary: Tạo Hub ứng viên (CGH FN-02)
+      operationId: createCandidateHub
+      tags: [simulation]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, location]
+              properties:
+                name: {type: string, minLength: 2, maxLength: 200}
+                location: {$ref: "#/components/schemas/SimLatLng"}
+                unit_code: {type: string}
+      responses:
+        "201": {description: Hub đã tạo, content: {application/json: {schema: {$ref: "#/components/schemas/SimCandidateHub"}}}}
+        "200": {description: Gọi lặp, content: {application/json: {schema: {$ref: "#/components/schemas/SimCandidateHub"}}}}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Liệt kê Hub ứng viên (cursor theo mã)
+      operationId: listCandidateHubs
+      tags: [simulation]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200}}
+      responses:
+        "200":
+          description: Trang Hub
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/SimCandidateHub"}}
+                  next_cursor: {type: [string, "null"]}
+  /v1/candidate-hubs/{id}/retire:
+    post:
+      summary: Ngừng dùng Hub ứng viên kèm lý do (không xóa)
+      operationId: retireCandidateHub
+      tags: [simulation]
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/SimReason"}}}}
+      responses:
+        "200": {description: Hub, content: {application/json: {schema: {$ref: "#/components/schemas/SimCandidateHub"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/scenarios:
+    post:
+      summary: Tạo kịch bản chọn Hub
+      operationId: createScenario
+      tags: [simulation]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, plant, reference_year]
+              properties:
+                name: {type: string, minLength: 2, maxLength: 200}
+                plant: {$ref: "#/components/schemas/SimPlant"}
+                lifecycle_years: {type: integer, minimum: 0, maximum: 50, description: "0/không gửi = tham số #47"}
+                discounted: {type: boolean}
+                baseline_mode: {type: string, enum: [no_hub, manual, scenario]}
+                baseline_manual_cost_per_ton: {type: [string, "null"]}
+                baseline_scenario_id: {type: [string, "null"], format: uuid}
+                reference_year: {type: integer, minimum: 2000, maximum: 2100}
+      responses:
+        "201": {description: Kịch bản, content: {application/json: {schema: {$ref: "#/components/schemas/SimScenario"}}}}
+        "200": {description: Gọi lặp, content: {application/json: {schema: {$ref: "#/components/schemas/SimScenario"}}}}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/scenarios:compare:
+    post:
+      summary: So sánh kết quả mô phỏng (CGH FN-14) — xếp theo TCO/tấn, cột No-Hub Baseline
+      operationId: compareScenarios
+      tags: [simulation]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [simulation_ids]
+              properties:
+                simulation_ids: {type: array, minItems: 1, maxItems: 20, items: {type: string, format: uuid}}
+                include_baseline: {type: boolean, default: true}
+      responses:
+        "200":
+          description: Bảng so sánh (blocked khác null khi khác vòng đời/chế độ chiết khấu — BR-02)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rows, sorted_by, blocked, warnings]
+                properties:
+                  rows: {type: array, items: {$ref: "#/components/schemas/SimCompareRow"}}
+                  sorted_by: {type: string}
+                  blocked: {type: [string, "null"]}
+                  warnings: {type: array, items: {type: string}}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/scenarios/{id}:
+    get:
+      summary: Đọc kịch bản kèm Hub đang gán
+      operationId: getScenario
+      tags: [simulation]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "200": {description: Kịch bản, content: {application/json: {schema: {$ref: "#/components/schemas/SimScenario"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/scenarios/{id}/history:
+    get:
+      summary: Sổ thay đổi kịch bản (kiểm toán, bản ghi bù)
+      operationId: getScenarioHistory
+      tags: [simulation]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "200":
+          description: Dòng sổ theo seq
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/SimChange"}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/scenarios/{id}/hubs:
+    post:
+      summary: Gán Hub vào kịch bản hoặc sửa cấu hình (trường không gửi giữ nguyên, FN-02 BR-03)
+      operationId: attachScenarioHub
+      tags: [simulation]
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hub_id]
+              properties:
+                hub_id: {type: string, format: uuid}
+                service_radius_km: {type: string}
+                design_capacity_tons: {type: string, description: "TỒN KHO TỐI ĐA (tấn)"}
+                barge_payload_tons: {type: string}
+                mode_field_hub: {type: string, enum: [auto, road, waterway]}
+                mode_hub_plant: {type: string, enum: [auto, road, waterway]}
+                land_mode: {type: string, enum: [mua, thue]}
+      responses:
+        "200": {description: Kịch bản, content: {application/json: {schema: {$ref: "#/components/schemas/SimScenario"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/scenarios/{id}/hubs/{hub_id}/detach:
+    post:
+      summary: Gỡ Hub khỏi kịch bản bằng bản ghi bù kèm lý do
+      operationId: detachScenarioHub
+      tags: [simulation]
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: hub_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/SimReason"}}}}
+      responses:
+        "200": {description: Kịch bản, content: {application/json: {schema: {$ref: "#/components/schemas/SimScenario"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/simulations:
+    post:
+      summary: Chạy mô phỏng (mục 12) — 202 + Location /v1/jobs/{id}; ảnh chụp dựng ở worker, optimizer tính
+      operationId: submitSimulation
+      tags: [simulation]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scenario_id]
+              properties:
+                scenario_id: {type: string, format: uuid}
+                sensitivity: {type: boolean, description: "FN-18: chạy kèm độ nhạy (bộ mặc định)"}
+                sensitivity_codes: {type: array, items: {type: string}}
+                mode: {type: string, enum: [evaluate, select_hubs], description: "select_hubs: THỬ NGHIỆM (MILP)"}
+                max_hubs: {type: [integer, "null"], minimum: 1}
+      responses:
+        "202":
+          description: Đã nhận
+          headers: {Location: {schema: {type: string}}}
+          content: {application/json: {schema: {$ref: "#/components/schemas/SimSimulation"}}}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/simulations/{id}:
+    get:
+      summary: Trạng thái mô phỏng, ảnh chụp đã ghim, cờ Chính thức
+      operationId: getSimulation
+      tags: [simulation]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "200": {description: Mô phỏng, content: {application/json: {schema: {$ref: "#/components/schemas/SimSimulation"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/simulations/{id}/result:
+    get:
+      summary: Kết quả bất biến (khối result của contracts/optimizer/result.v1) kèm độ nhạy
+      operationId: getSimulationResult
+      tags: [simulation]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [simulation_id, scenario_id, status, official, official_eligible, engine_version, algorithm_version, result_sha256, received_at, result]
+                properties:
+                  simulation_id: {type: string, format: uuid}
+                  scenario_id: {type: string, format: uuid}
+                  status: {type: string, enum: [tham_khao, chinh_thuc]}
+                  official: {type: boolean}
+                  official_eligible: {type: boolean}
+                  snapshot: {$ref: "#/components/schemas/SimSnapshotMeta"}
+                  engine_version: {type: string}
+                  algorithm_version: {type: string}
+                  result_sha256: {type: string}
+                  received_at: {type: string, format: date-time}
+                  result: {type: object, additionalProperties: true}
+                  sensitivity: {type: [object, "null"], additionalProperties: true}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/simulations/{id}/mark-official:
+    post:
+      summary: Đánh dấu Chính thức — chỉ khi mọi tham số của ảnh chụp đã phê duyệt (FN-01 BR-04)
+      operationId: markSimulationOfficial
+      tags: [simulation]
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: Mô phỏng, content: {application/json: {schema: {$ref: "#/components/schemas/SimSimulation"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/jobs/{id}:
+    get:
+      summary: Trạng thái việc dài (R-52) — hiện phục vụ việc mô phỏng (id việc = id mô phỏng)
+      operationId: getJob
+      tags: [simulation]
+      parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        "200":
+          description: Việc
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, kind, status, requested_at, links]
+                properties:
+                  id: {type: string, format: uuid}
+                  kind: {type: string, enum: [simulation]}
+                  status: {type: string, enum: [queued, running, completed, failed]}
+                  error_code: {type: [string, "null"]}
+                  requested_at: {type: string, format: date-time}
+                  completed_at: {type: [string, "null"], format: date-time}
+                  links: {type: object, additionalProperties: {type: string}}
+        "404": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/simulation ---
 components:
   securitySchemes:
     oidc:
@@ -4821,3 +5099,154 @@ components:
         assigned: {type: boolean}
         last_note: {type: string}
         task_created_at: {type: string, format: date-time}
+    # --- pf/simulation ---
+    SimLatLng:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat: {type: number, minimum: -90, maximum: 90}
+        lng: {type: number, minimum: -180, maximum: 180}
+    SimReason:
+      type: object
+      required: [reason]
+      properties:
+        reason: {type: string, minLength: 10, maxLength: 500}
+    SimCandidateHub:
+      type: object
+      required: [id, code, name, location, status, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        location: {$ref: "#/components/schemas/SimLatLng"}
+        unit_code: {type: [string, "null"]}
+        status: {type: string, enum: [active, retired]}
+        retired_reason: {type: [string, "null"]}
+        created_at: {type: string, format: date-time}
+    SimPlant:
+      type: object
+      required: [location]
+      properties:
+        plant_ref: {type: [string, "null"], format: uuid}
+        location: {$ref: "#/components/schemas/SimLatLng"}
+        annual_demand_tons: {type: [string, "null"], description: "null → tham số #12"}
+    SimScenarioHub:
+      type: object
+      required: [scenario_hub_id, hub_id, hub_code, service_radius_km, design_capacity_tons, mode_field_hub, mode_hub_plant, land_mode, sort_order]
+      properties:
+        scenario_hub_id: {type: string, format: uuid}
+        hub_id: {type: string, format: uuid}
+        hub_code: {type: string}
+        service_radius_km: {type: string}
+        design_capacity_tons: {type: string}
+        barge_payload_tons: {type: [string, "null"]}
+        mode_field_hub: {type: string, enum: [auto, road, waterway]}
+        mode_hub_plant: {type: string, enum: [auto, road, waterway]}
+        land_mode: {type: string, enum: [mua, thue]}
+        sort_order: {type: integer}
+    SimScenario:
+      type: object
+      required: [id, code, name, plant, lifecycle_years, discounted, baseline_mode, reference_year, version, hubs, created_at, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        plant: {$ref: "#/components/schemas/SimPlant"}
+        lifecycle_years: {type: integer}
+        discounted: {type: boolean}
+        baseline_mode: {type: string, enum: [no_hub, manual, scenario]}
+        baseline_manual_cost_per_ton: {type: [string, "null"]}
+        baseline_scenario_id: {type: [string, "null"], format: uuid}
+        reference_year: {type: integer}
+        version: {type: integer}
+        hubs: {type: array, items: {$ref: "#/components/schemas/SimScenarioHub"}}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    SimChange:
+      type: object
+      required: [id, seq, kind, payload, event_time, recorded_at, actor_ref]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        kind: {type: string, enum: [created, hub_attached, hub_updated, hub_detached, simulation_requested, simulation_completed, simulation_failed, marked_official]}
+        hub_id: {type: [string, "null"], format: uuid}
+        simulation_id: {type: [string, "null"], format: uuid}
+        payload: {type: object, additionalProperties: true}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+    SimSnapshotMeta:
+      type: object
+      required: [id, sha256, param_set_version, all_params_approved, network_version, algorithm_version, cooperative_count, route_count, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        sha256: {type: string}
+        param_set_version: {type: string}
+        all_params_approved: {type: boolean}
+        network_version: {type: string}
+        algorithm_version: {type: string}
+        cooperative_count: {type: integer}
+        route_count: {type: integer}
+        created_at: {type: string, format: date-time}
+    SimSimulation:
+      type: object
+      required: [id, scenario_id, scenario_version, status, options, requested_by, requested_at, has_result, official, official_eligible, links]
+      properties:
+        id: {type: string, format: uuid}
+        scenario_id: {type: string, format: uuid}
+        scenario_version: {type: integer}
+        status: {type: string, enum: [queued, running, completed, failed]}
+        options:
+          type: object
+          properties:
+            mode: {type: string, enum: [evaluate, select_hubs]}
+            sensitivity_codes: {type: array, items: {type: string}}
+            max_hubs: {type: [integer, "null"]}
+        requested_by: {type: string, format: uuid}
+        requested_at: {type: string, format: date-time}
+        completed_at: {type: [string, "null"], format: date-time}
+        error_code: {type: [string, "null"]}
+        error_detail: {type: [string, "null"]}
+        snapshot:
+          oneOf:
+            - {type: "null"}
+            - {$ref: "#/components/schemas/SimSnapshotMeta"}
+        has_result: {type: boolean}
+        official: {type: boolean}
+        official_eligible: {type: boolean}
+        official_at: {type: [string, "null"], format: date-time}
+        links: {type: object, additionalProperties: {type: string}}
+    SimCompareRow:
+      type: object
+      required: [code, name, is_baseline_column, lifecycle_years, discounted, hub_count, delivered_tons, capex, tco, payback_status]
+      properties:
+        simulation_id: {type: [string, "null"], format: uuid}
+        scenario_id: {type: [string, "null"], format: uuid}
+        code: {type: string}
+        name: {type: string}
+        official: {type: boolean}
+        is_baseline_column: {type: boolean}
+        parameter_set_version: {type: string}
+        lifecycle_years: {type: integer}
+        discounted: {type: boolean}
+        hub_count: {type: integer}
+        delivered_tons: {type: string}
+        capex: {type: string}
+        opex_year1: {type: string}
+        collection_cost: {type: string}
+        transportation_cost: {type: string}
+        warehouse_cost: {type: string}
+        handling_cost: {type: string}
+        total_delivered_logistics_cost: {type: string}
+        cost_per_ton: {type: [string, "null"]}
+        tco: {type: string}
+        tco_per_ton: {type: [string, "null"]}
+        lifecycle_cost_per_ton: {type: [string, "null"]}
+        roi_pct: {type: [string, "null"]}
+        payback_years: {type: [integer, "null"]}
+        payback_status: {type: string}
+        plant_demand_coverage_pct: {type: string}
+        shortfall_warnings: {type: integer}
+    # --- hết pf/simulation ---

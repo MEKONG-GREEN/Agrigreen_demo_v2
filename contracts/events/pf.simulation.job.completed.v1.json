@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.simulation.job.completed/v1",
+  "title": "pf.simulation.job.completed — payload",
+  "description": "Việc mô phỏng kết thúc: kết quả bất biến đã lưu (completed) hoặc hỏng (failed, kèm error_code — lỗi dựng ảnh chụp simulation.* hoặc lỗi tính optimizer.*). official_eligible = mọi tham số của ảnh chụp đã phê duyệt (FN-01 BR-04). Consumer: pf/notify báo người yêu cầu. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.simulation.job.completed",
+  "x-schema-version": 1,
+  "x-producer": "pf/simulation",
+  "type": "object",
+  "required": ["simulation_id", "scenario_id", "requested_by", "status", "error_code", "result_sha256", "official_eligible", "completed_at"],
+  "properties": {
+    "simulation_id":     { "type": "string", "format": "uuid" },
+    "scenario_id":       { "type": "string", "format": "uuid" },
+    "requested_by":      { "type": "string", "format": "uuid" },
+    "status":            { "type": "string", "enum": ["completed", "failed"] },
+    "error_code":        { "type": ["string", "null"] },
+    "result_sha256":     { "type": ["string", "null"], "description": "sha256 của phong bì kết quả đã nhận" },
+    "official_eligible": { "type": "boolean" },
+    "completed_at":      { "type": "string", "format": "date-time" }
+  }
+}

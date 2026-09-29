@@ -17,6 +17,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation"
 	syncmod "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway"
@@ -57,11 +58,12 @@ type Modules struct {
 	Accounts      *accounts.Module
 	Reports       *reports.Module
 	Waterway      *waterway.Module
+	Simulation    *simulation.Module
 }
 
 // List trả module theo thứ tự gắn route.
 func (m Modules) List() []httpx.Module {
-	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.Waterway}
+	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.Waterway, m.Simulation}
 }
 
 // Build là gốc lắp ráp DUY NHẤT: mở pool theo vai của từng module (R-05) và nối
@@ -188,7 +190,15 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	}
 	ww := waterway.New(wwPool, clk, waterway.Deps{Params: md.Params(), Catalogs: md.Catalogs()})
 
-	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc, Reports: rep, Waterway: ww}, pools, nil
+	// pf/simulation: API ghi kịch bản/yêu cầu; worker dựng ảnh chụp; optimizer (Python) tính và nộp qua RegisterInternal.
+	simPool, err := pool(simulation.DBRole)
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	sim := simulation.New(simPool, clk, simulation.Deps{Params: simulation.MasterdataParams(md.Params())})
+
+	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
+		Reports: rep, Waterway: ww, Simulation: sim}, pools, nil
 }
 
 func cursorKey(ext External) []byte {

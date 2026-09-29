@@ -1,0 +1,287 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/optimizer/result/v1",
+  "title": "optimizer → pf/simulation: phong bì kết quả (POST /internal/v1/simulations/{id}/result)",
+  "description": "Kết quả đánh giá kịch bản, ánh xạ ScenarioResult của prototype mekong-green (types.ts, ENGINE_VERSION 2026.09.24) sang snake_case, bỏ tên/toạ độ (RB-7). Không có thời điểm tính: cùng ảnh chụp → cùng byte. Trạng thái 'Chính thức' do pf/simulation quyết định từ ảnh chụp (FN-01 BR-04); can_be_marked_official chỉ là tham khảo.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "simulation_id", "snapshot_id", "snapshot_sha256", "algorithm_version", "engine_version", "mode", "status", "error", "result", "sensitivity", "selection"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "simulation_id": { "type": ["string", "null"] },
+    "snapshot_id": { "type": ["string", "null"] },
+    "snapshot_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "algorithm_version": { "type": "string" },
+    "engine_version": { "type": "string" },
+    "mode": { "enum": ["evaluate", "select_hubs"] },
+    "status": { "enum": ["completed", "failed"] },
+    "error": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object", "additionalProperties": false, "required": ["code", "message"],
+          "properties": { "code": { "type": "string", "pattern": "^optimizer\\.[a-z_]+$" }, "message": { "type": "string" } }
+        }
+      ]
+    },
+    "result": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/scenarioResult" }] },
+    "sensitivity": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/sensitivity" }] },
+    "selection": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["experimental", "solver", "solver_status", "max_hubs", "selected_hub_refs", "objective_annual_vnd", "note"],
+          "properties": {
+            "experimental": { "const": true },
+            "solver": { "type": "string" },
+            "solver_status": { "type": "string" },
+            "max_hubs": { "type": "integer" },
+            "selected_hub_refs": { "type": "array", "items": { "type": "string" } },
+            "objective_annual_vnd": { "type": "number" },
+            "note": { "type": "string" }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "num": { "type": "number" },
+    "numOrNull": { "type": ["number", "null"] },
+    "season": {
+      "type": "object", "additionalProperties": false,
+      "required": ["season_key", "total_available_tons", "collectable_tons", "delivered_tons", "paddy_tons", "planted_area_ha"],
+      "properties": {
+        "season_key": { "type": "string" },
+        "total_available_tons": { "$ref": "#/$defs/num" }, "collectable_tons": { "$ref": "#/$defs/num" },
+        "delivered_tons": { "$ref": "#/$defs/num" }, "paddy_tons": { "$ref": "#/$defs/num" }, "planted_area_ha": { "$ref": "#/$defs/num" }
+      }
+    },
+    "leg": {
+      "type": "object", "additionalProperties": false,
+      "required": ["leg", "label", "mode", "mode_decided_by", "waterway_suggested", "tons", "weighted_avg_distance_km", "ton_km", "cost", "trips", "vehicles_required", "lead_time_hours"],
+      "properties": {
+        "leg": { "enum": ["field_hub", "hub_plant", "field_plant"] },
+        "label": { "type": "string" },
+        "mode": { "enum": ["road", "waterway"] },
+        "mode_decided_by": { "enum": ["mac_dinh", "goi_y_he_thong", "nguoi_dung_ghi_de"] },
+        "waterway_suggested": { "type": "boolean" },
+        "tons": { "$ref": "#/$defs/num" }, "weighted_avg_distance_km": { "$ref": "#/$defs/num" }, "ton_km": { "$ref": "#/$defs/num" },
+        "cost": { "$ref": "#/$defs/num" }, "trips": { "type": "integer" }, "vehicles_required": { "type": "integer" },
+        "lead_time_hours": { "$ref": "#/$defs/num" }
+      }
+    },
+    "capex": {
+      "type": "object", "additionalProperties": false,
+      "required": ["construction", "warehouse_construction", "yard_construction", "equipment", "bale_press", "forklift", "other", "total"],
+      "properties": {
+        "construction": { "$ref": "#/$defs/num" }, "warehouse_construction": { "$ref": "#/$defs/num" }, "yard_construction": { "$ref": "#/$defs/num" },
+        "equipment": { "$ref": "#/$defs/num" }, "bale_press": { "$ref": "#/$defs/num" }, "forklift": { "$ref": "#/$defs/num" },
+        "other": { "$ref": "#/$defs/num" }, "total": { "$ref": "#/$defs/num" }
+      }
+    },
+    "opex": {
+      "type": "object", "additionalProperties": false,
+      "required": ["staff", "utilities", "maintenance", "land_lease", "processing", "other_opex", "total", "handling_cost_annual", "warehouse_cost_annual"],
+      "properties": {
+        "staff": { "$ref": "#/$defs/num" }, "utilities": { "$ref": "#/$defs/num" }, "maintenance": { "$ref": "#/$defs/num" },
+        "land_lease": { "$ref": "#/$defs/num" }, "processing": { "$ref": "#/$defs/num" }, "other_opex": { "$ref": "#/$defs/num" },
+        "total": { "$ref": "#/$defs/num" }, "handling_cost_annual": { "$ref": "#/$defs/num" }, "warehouse_cost_annual": { "$ref": "#/$defs/num" }
+      }
+    },
+    "costs": {
+      "type": "object", "additionalProperties": false,
+      "required": ["collection_cost", "warehouse_cost", "handling_cost", "transportation_cost", "transportation_field_hub", "transportation_hub_plant", "total_delivered_logistics_cost", "cost_per_ton", "cost_per_ton_note"],
+      "properties": {
+        "collection_cost": { "$ref": "#/$defs/num" }, "warehouse_cost": { "$ref": "#/$defs/num" }, "handling_cost": { "$ref": "#/$defs/num" },
+        "transportation_cost": { "$ref": "#/$defs/num" }, "transportation_field_hub": { "$ref": "#/$defs/num" }, "transportation_hub_plant": { "$ref": "#/$defs/num" },
+        "total_delivered_logistics_cost": { "$ref": "#/$defs/num" },
+        "cost_per_ton": { "$ref": "#/$defs/numOrNull", "description": "null = Không xác định (FN-11 BR-04)" },
+        "cost_per_ton_note": { "type": "string" }
+      }
+    },
+    "cooperative": {
+      "type": "object", "additionalProperties": false,
+      "required": ["cooperative_ref", "radius_distance_km", "distance_to_hub_km", "distance_to_hub_source", "distance_to_hub_source_label", "distance_to_plant_km", "distance_to_plant_source", "distance_to_plant_source_label", "member_count", "planted_area_ha", "seasons", "total_available_tons", "collectable_tons", "delivered_tons"],
+      "properties": {
+        "cooperative_ref": { "type": "string" },
+        "radius_distance_km": { "$ref": "#/$defs/num" },
+        "distance_to_hub_km": { "$ref": "#/$defs/num" }, "distance_to_hub_source": { "type": "string" }, "distance_to_hub_source_label": { "type": "string" },
+        "distance_to_plant_km": { "$ref": "#/$defs/num" }, "distance_to_plant_source": { "type": "string" }, "distance_to_plant_source_label": { "type": "string" },
+        "member_count": { "type": "integer" }, "planted_area_ha": { "$ref": "#/$defs/num" },
+        "seasons": { "type": "array", "items": { "$ref": "#/$defs/season" } },
+        "total_available_tons": { "$ref": "#/$defs/num" }, "collectable_tons": { "$ref": "#/$defs/num" }, "delivered_tons": { "$ref": "#/$defs/num" }
+      }
+    },
+    "flowHub": {
+      "type": "object", "additionalProperties": false,
+      "required": ["key", "code", "max_inventory_tons", "barge_payload_tons", "received_from_field_tons", "stored_after_processing_tons", "processing_loss_tons", "shipped_to_plant_tons", "peak_inventory_tons", "peak_inventory_day_label", "average_inventory_tons", "ending_inventory_tons", "overflow_tons", "days_at_capacity", "utilization_pct", "full_barge_trips", "partial_barge_trips", "field_hub_ton_km", "hub_plant_ton_km", "inventory_curve", "warnings"],
+      "properties": {
+        "key": { "type": "string" }, "code": { "type": "string" },
+        "max_inventory_tons": { "$ref": "#/$defs/num" }, "barge_payload_tons": { "$ref": "#/$defs/num" },
+        "received_from_field_tons": { "$ref": "#/$defs/num" }, "stored_after_processing_tons": { "$ref": "#/$defs/num" },
+        "processing_loss_tons": { "$ref": "#/$defs/num" }, "shipped_to_plant_tons": { "$ref": "#/$defs/num" },
+        "peak_inventory_tons": { "$ref": "#/$defs/num" }, "peak_inventory_day_label": { "type": "string" },
+        "average_inventory_tons": { "$ref": "#/$defs/num" }, "ending_inventory_tons": { "$ref": "#/$defs/num" },
+        "overflow_tons": { "$ref": "#/$defs/num" }, "days_at_capacity": { "type": "integer" }, "utilization_pct": { "$ref": "#/$defs/num" },
+        "full_barge_trips": { "type": "integer" }, "partial_barge_trips": { "type": "integer" },
+        "field_hub_ton_km": { "$ref": "#/$defs/num" }, "hub_plant_ton_km": { "$ref": "#/$defs/num" },
+        "inventory_curve": { "type": "array", "minItems": 365, "maxItems": 365, "items": { "$ref": "#/$defs/num" } },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "flow": {
+      "type": "object", "additionalProperties": false,
+      "required": ["harvest_days", "no_harvest_days", "harvest_windows", "calendar_sources", "plant_daily_demand_tons", "plant_operating_days", "plant_received_tons", "plant_consumed_tons", "plant_unmet_tons", "plant_unmet_days", "plant_peak_stock_tons", "coverage_pct", "direct_field_plant_tons", "field_hub_tons", "hub_plant_tons", "uncollected_tons", "uncollected_pct", "direct_field_plant_ton_km", "field_hub_ton_km", "hub_plant_ton_km", "boat_trips_direct", "boat_trips_to_hub", "barge_trips_full", "barge_trips_partial", "network_peak_inventory_tons", "hubs", "months", "warnings", "notes"],
+      "properties": {
+        "harvest_days": { "type": "integer" }, "no_harvest_days": { "type": "integer" },
+        "harvest_windows": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": false, "required": ["from_label", "to_label", "days", "tons"],
+            "properties": { "from_label": { "type": "string" }, "to_label": { "type": "string" }, "days": { "type": "integer" }, "tons": { "$ref": "#/$defs/num" } } }
+        },
+        "calendar_sources": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": false, "required": ["season_key", "source", "source_label"],
+            "properties": { "season_key": { "type": "string" }, "source": { "enum": ["thuc_te", "suy_dien"] }, "source_label": { "type": "string" } } }
+        },
+        "plant_daily_demand_tons": { "$ref": "#/$defs/num" }, "plant_operating_days": { "type": "integer" },
+        "plant_received_tons": { "$ref": "#/$defs/num" }, "plant_consumed_tons": { "$ref": "#/$defs/num" },
+        "plant_unmet_tons": { "$ref": "#/$defs/num" }, "plant_unmet_days": { "type": "integer" },
+        "plant_peak_stock_tons": { "$ref": "#/$defs/num" }, "coverage_pct": { "$ref": "#/$defs/num" },
+        "direct_field_plant_tons": { "$ref": "#/$defs/num" }, "field_hub_tons": { "$ref": "#/$defs/num" },
+        "hub_plant_tons": { "$ref": "#/$defs/num" }, "uncollected_tons": { "$ref": "#/$defs/num" }, "uncollected_pct": { "$ref": "#/$defs/num" },
+        "direct_field_plant_ton_km": { "$ref": "#/$defs/num" }, "field_hub_ton_km": { "$ref": "#/$defs/num" }, "hub_plant_ton_km": { "$ref": "#/$defs/num" },
+        "boat_trips_direct": { "type": "integer" }, "boat_trips_to_hub": { "type": "integer" },
+        "barge_trips_full": { "type": "integer" }, "barge_trips_partial": { "type": "integer" },
+        "network_peak_inventory_tons": { "$ref": "#/$defs/num" },
+        "hubs": { "type": "array", "items": { "$ref": "#/$defs/flowHub" } },
+        "months": {
+          "type": "array", "minItems": 12, "maxItems": 12,
+          "items": { "type": "object", "additionalProperties": false,
+            "required": ["month", "label", "harvest_tons", "direct_to_plant_tons", "to_hub_tons", "hub_to_plant_tons", "plant_consumed_tons", "plant_unmet_tons", "hub_inventory_end_tons", "uncollected_tons"],
+            "properties": {
+              "month": { "type": "integer" }, "label": { "type": "string" },
+              "harvest_tons": { "$ref": "#/$defs/num" }, "direct_to_plant_tons": { "$ref": "#/$defs/num" }, "to_hub_tons": { "$ref": "#/$defs/num" },
+              "hub_to_plant_tons": { "$ref": "#/$defs/num" }, "plant_consumed_tons": { "$ref": "#/$defs/num" }, "plant_unmet_tons": { "$ref": "#/$defs/num" },
+              "hub_inventory_end_tons": { "$ref": "#/$defs/num" }, "uncollected_tons": { "$ref": "#/$defs/num" }
+            } }
+        },
+        "warnings": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "hub": {
+      "type": "object", "additionalProperties": false,
+      "required": ["hub_ref", "scenario_hub_id", "code", "service_radius_km", "design_capacity_tons", "land_mode", "cooperatives", "cooperative_count", "seasons", "total_available_tons", "collectable_tons", "delivered_tons", "capacity_warning", "distance_to_plant_km", "distance_to_plant_source", "distance_to_plant_source_label", "legs", "flow", "sizing", "capex", "opex", "costs", "lead_time_hours", "warnings"],
+      "properties": {
+        "hub_ref": { "type": "string" }, "scenario_hub_id": { "type": "string" }, "code": { "type": "string" },
+        "service_radius_km": { "$ref": "#/$defs/num" }, "design_capacity_tons": { "$ref": "#/$defs/num" }, "land_mode": { "enum": ["mua", "thue"] },
+        "cooperatives": { "type": "array", "items": { "$ref": "#/$defs/cooperative" } },
+        "cooperative_count": { "type": "integer" },
+        "seasons": { "type": "array", "items": { "$ref": "#/$defs/season" } },
+        "total_available_tons": { "$ref": "#/$defs/num" }, "collectable_tons": { "$ref": "#/$defs/num" }, "delivered_tons": { "$ref": "#/$defs/num" },
+        "capacity_warning": {
+          "oneOf": [{ "type": "null" }, { "type": "object", "additionalProperties": false, "required": ["shortfall_pct", "message"],
+            "properties": { "shortfall_pct": { "$ref": "#/$defs/num" }, "message": { "type": "string" } } }]
+        },
+        "distance_to_plant_km": { "$ref": "#/$defs/num" }, "distance_to_plant_source": { "type": "string" }, "distance_to_plant_source_label": { "type": "string" },
+        "legs": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "$ref": "#/$defs/leg" } },
+        "flow": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/flowHub" }] },
+        "sizing": {
+          "type": "object", "additionalProperties": false,
+          "required": ["peak_inventory_tons", "peak_inventory_source", "warehouse_capacity_tons", "warehouse_area_m2", "yard_area_m2", "bale_press_count", "forklift_count", "estimate_notice"],
+          "properties": {
+            "peak_inventory_tons": { "$ref": "#/$defs/num" }, "peak_inventory_source": { "enum": ["mo_phong_theo_ngay", "he_so_uoc_luong"] },
+            "warehouse_capacity_tons": { "$ref": "#/$defs/num" }, "warehouse_area_m2": { "$ref": "#/$defs/num" }, "yard_area_m2": { "$ref": "#/$defs/num" },
+            "bale_press_count": { "type": "integer" }, "forklift_count": { "type": "integer" }, "estimate_notice": { "type": "string" }
+          }
+        },
+        "capex": { "$ref": "#/$defs/capex" }, "opex": { "$ref": "#/$defs/opex" }, "costs": { "$ref": "#/$defs/costs" },
+        "lead_time_hours": { "$ref": "#/$defs/num" },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "financial": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lifecycle_years", "discounted", "discount_rate_pct", "opex_escalation_pct", "ramp_up_pct", "capex", "tco", "lifetime_delivered_tons", "tco_per_ton", "lifecycle_cost", "lifecycle_cost_per_ton", "roi_pct", "payback_years", "payback_status", "baseline_cost_per_ton", "baseline_source", "baseline_source_label", "yearly_cashflow"],
+      "properties": {
+        "lifecycle_years": { "type": "integer" }, "discounted": { "type": "boolean" },
+        "discount_rate_pct": { "$ref": "#/$defs/num" }, "opex_escalation_pct": { "$ref": "#/$defs/num" }, "ramp_up_pct": { "$ref": "#/$defs/num" },
+        "capex": { "$ref": "#/$defs/num" }, "tco": { "$ref": "#/$defs/num" }, "lifetime_delivered_tons": { "$ref": "#/$defs/num" },
+        "tco_per_ton": { "$ref": "#/$defs/numOrNull" }, "lifecycle_cost": { "$ref": "#/$defs/num" }, "lifecycle_cost_per_ton": { "$ref": "#/$defs/numOrNull" },
+        "roi_pct": { "$ref": "#/$defs/numOrNull" }, "payback_years": { "type": ["integer", "null"] },
+        "payback_status": { "enum": ["hoan_von", "khong_hoan_von", "khong_hoan_von_trong_ky", "thieu_baseline"] },
+        "baseline_cost_per_ton": { "$ref": "#/$defs/numOrNull" },
+        "baseline_source": { "enum": ["no_hub", "scenario", "manual", "thieu_baseline"] }, "baseline_source_label": { "type": "string" },
+        "yearly_cashflow": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": false, "required": ["year", "delivered_tons", "opex", "savings", "cumulative_savings"],
+            "properties": { "year": { "type": "integer" }, "delivered_tons": { "$ref": "#/$defs/num" }, "opex": { "$ref": "#/$defs/num" },
+              "savings": { "$ref": "#/$defs/num" }, "cumulative_savings": { "$ref": "#/$defs/num" } } }
+        }
+      }
+    },
+    "baseline": {
+      "type": "object", "additionalProperties": false,
+      "required": ["available", "cooperative_count", "excluded_cooperatives", "excluded_supply_pct", "collection_cost", "transportation_cost", "capex", "warehouse_cost", "handling_cost", "total_delivered_logistics_cost", "delivered_tons", "baseline_cost_per_ton", "advisory_only", "legs"],
+      "properties": {
+        "available": { "type": "boolean" }, "reason": { "type": "string" }, "cooperative_count": { "type": "integer" },
+        "excluded_cooperatives": { "type": "array", "items": { "type": "object" } }, "excluded_supply_pct": { "$ref": "#/$defs/num" },
+        "collection_cost": { "$ref": "#/$defs/num" }, "transportation_cost": { "$ref": "#/$defs/num" },
+        "capex": { "const": 0 }, "warehouse_cost": { "const": 0 }, "handling_cost": { "const": 0 },
+        "total_delivered_logistics_cost": { "$ref": "#/$defs/num" }, "delivered_tons": { "$ref": "#/$defs/num" },
+        "baseline_cost_per_ton": { "$ref": "#/$defs/numOrNull" }, "advisory_only": { "type": "boolean" },
+        "legs": { "type": "array", "items": { "$ref": "#/$defs/leg" } }
+      }
+    },
+    "scenarioResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["engine_version", "scenario_id", "scenario_code", "status", "parameter_set_version", "plant", "hubs", "hub_count", "seasons", "total_available_tons", "collectable_tons", "delivered_tons", "costs", "capex", "opex", "financial", "baseline", "flow", "plant_demand_coverage_pct", "plant_demand_warning", "unapproved_parameters", "can_be_marked_official", "warnings", "notes", "lineage"],
+      "properties": {
+        "engine_version": { "type": "string" }, "scenario_id": { "type": "string" }, "scenario_code": { "type": "string" },
+        "status": { "const": "tham_khao" }, "parameter_set_version": { "type": "string" },
+        "plant": { "type": "object", "additionalProperties": false, "required": ["plant_ref", "annual_demand_tons"],
+          "properties": { "plant_ref": { "type": ["string", "null"] }, "annual_demand_tons": { "$ref": "#/$defs/num" } } },
+        "hubs": { "type": "array", "items": { "$ref": "#/$defs/hub" } }, "hub_count": { "type": "integer" },
+        "seasons": { "type": "array", "items": { "$ref": "#/$defs/season" } },
+        "total_available_tons": { "$ref": "#/$defs/num" }, "collectable_tons": { "$ref": "#/$defs/num" }, "delivered_tons": { "$ref": "#/$defs/num" },
+        "costs": { "$ref": "#/$defs/costs" }, "capex": { "$ref": "#/$defs/capex" }, "opex": { "$ref": "#/$defs/opex" },
+        "financial": { "$ref": "#/$defs/financial" }, "baseline": { "$ref": "#/$defs/baseline" }, "flow": { "$ref": "#/$defs/flow" },
+        "plant_demand_coverage_pct": { "$ref": "#/$defs/num" }, "plant_demand_warning": { "type": ["string", "null"] },
+        "unapproved_parameters": { "type": "array", "items": { "type": "object", "required": ["code", "number", "name"],
+          "properties": { "code": { "type": "string" }, "number": { "type": "integer" }, "name": { "type": "string" } } } },
+        "can_be_marked_official": { "type": "boolean" },
+        "warnings": { "type": "array", "items": { "type": "string" } }, "notes": { "type": "array", "items": { "type": "string" } },
+        "lineage": { "type": "object", "additionalProperties": false, "required": ["engine_version", "parameter_set_version", "network_version", "input_counts"],
+          "properties": { "engine_version": { "type": "string" }, "parameter_set_version": { "type": "string" }, "network_version": { "type": ["string", "null"] },
+            "input_counts": { "type": "object", "additionalProperties": { "type": "integer" } } } }
+      }
+    },
+    "triple": { "type": "object", "additionalProperties": false, "required": ["min", "base", "max"],
+      "properties": { "min": { "$ref": "#/$defs/numOrNull" }, "base": { "$ref": "#/$defs/numOrNull" }, "max": { "$ref": "#/$defs/numOrNull" } } },
+    "sensitivity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["parameter_set_version", "base_tco_per_ton", "base_lifecycle_cost_per_ton", "rows", "skipped", "high_sensitivity", "swing_pct", "method"],
+      "properties": {
+        "parameter_set_version": { "type": "string" },
+        "base_tco_per_ton": { "$ref": "#/$defs/numOrNull" }, "base_lifecycle_cost_per_ton": { "$ref": "#/$defs/numOrNull" },
+        "rows": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": false,
+            "required": ["code", "number", "min", "base", "max", "tco_per_ton", "lifecycle_cost_per_ton", "cost_per_ton", "roi_pct", "payback_years", "swing"],
+            "properties": {
+              "code": { "type": "string" }, "number": { "type": ["integer", "null"] },
+              "min": { "$ref": "#/$defs/num" }, "base": { "$ref": "#/$defs/num" }, "max": { "$ref": "#/$defs/num" },
+              "tco_per_ton": { "$ref": "#/$defs/triple" }, "lifecycle_cost_per_ton": { "$ref": "#/$defs/triple" },
+              "cost_per_ton": { "$ref": "#/$defs/triple" }, "roi_pct": { "$ref": "#/$defs/triple" }, "payback_years": { "$ref": "#/$defs/triple" },
+              "swing": { "$ref": "#/$defs/num" }
+            } }
+        },
+        "skipped": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["code", "reason"],
+          "properties": { "code": { "type": "string" }, "reason": { "type": "string" } } } },
+        "high_sensitivity": { "type": "boolean" }, "swing_pct": { "$ref": "#/$defs/num" }, "method": { "type": "string" }
+      }
+    }
+  }
+}

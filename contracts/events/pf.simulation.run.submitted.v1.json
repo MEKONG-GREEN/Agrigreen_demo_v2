@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.simulation.run.submitted/v1",
+  "title": "pf.simulation.run.submitted — payload",
+  "description": "Yêu cầu mô phỏng đã ghi vào pf_simulation.simulation (mục 12, R-52). Consumer pf.simulation.snapshot (worker Go) dựng ảnh chụp đầu vào bất biến qua SupplySource/Router/ParamSet rồi phát pf.simulation.job.requested. Worker đọc yêu cầu từ bảng, không từ sự kiện. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.simulation.run.submitted",
+  "x-schema-version": 1,
+  "x-producer": "pf/simulation",
+  "type": "object",
+  "required": ["simulation_id", "scenario_id", "requested_by", "requested_at"],
+  "properties": {
+    "simulation_id": { "type": "string", "format": "uuid", "description": "= job_id của /v1/jobs/{id}" },
+    "scenario_id":   { "type": "string", "format": "uuid" },
+    "requested_by":  { "type": "string", "format": "uuid", "description": "actor_ref người yêu cầu" },
+    "requested_at":  { "type": "string", "format": "date-time" }
+  }
+}

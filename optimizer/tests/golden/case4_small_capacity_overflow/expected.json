@@ -1,0 +1,2129 @@
+{
+ "engine_version": "2026.09.24",
+ "result": {
+  "scenarioId": "1656093d-cdf2-4792-bfb0-bc9203706bf0",
+  "scenarioCode": "KB-0004",
+  "status": "tham_khao",
+  "parameterSetVersion": 2,
+  "plant": {
+   "id": "317158f6-81b1-4d1e-b433-c44265c5aabd",
+   "annualDemandTons": 240000
+  },
+  "hubs": [
+   {
+    "hubId": "e1c594f5-9250-4a88-a11b-1de15794e081",
+    "scenarioHubId": "9cd914ff-ea2e-44ee-b498-4d42c206f2d6",
+    "code": "HUB-0002",
+    "serviceRadiusKm": 45,
+    "designCapacityTons": 5000,
+    "landMode": "mua",
+    "cooperatives": [
+     {
+      "htxId": "2c7c8a7a-36da-4260-af91-d0a575d8b5d2",
+      "radiusDistanceKm": 32.707,
+      "distanceToHubKm": 42.52,
+      "distanceToHubSource": "haversine_hieu_chinh",
+      "distanceToHubSourceLabel": "Haversine hiệu chỉnh",
+      "distanceToPlantKm": 162.851,
+      "distanceToPlantSource": "haversine_hieu_chinh",
+      "distanceToPlantSourceLabel": "Haversine hiệu chỉnh",
+      "memberCount": 412,
+      "plantedAreaHa": 4441,
+      "seasons": [
+       {
+        "seasonId": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+        "totalAvailableTons": 12400,
+        "collectableTons": 5580,
+        "deliveredTons": 5301,
+        "paddyTons": 12400,
+        "plantedAreaHa": 1758
+       },
+       {
+        "seasonId": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+        "totalAvailableTons": 10100,
+        "collectableTons": 4545,
+        "deliveredTons": 4318,
+        "paddyTons": 10100,
+        "plantedAreaHa": 1573
+       },
+       {
+        "seasonId": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+        "totalAvailableTons": 7600,
+        "collectableTons": 3420,
+        "deliveredTons": 3249,
+        "paddyTons": 7600,
+        "plantedAreaHa": 1110
+       }
+      ],
+      "totalAvailableTons": 30100,
+      "collectableTons": 13545,
+      "deliveredTons": 12868
+     },
+     {
+      "htxId": "d88decc6-330f-40ee-b82a-0559ac9dbcd7",
+      "radiusDistanceKm": 23.114,
+      "distanceToHubKm": 30.048,
+      "distanceToHubSource": "haversine_hieu_chinh",
+      "distanceToHubSourceLabel": "Haversine hiệu chỉnh",
+      "distanceToPlantKm": 102.29,
+      "distanceToPlantSource": "haversine_hieu_chinh",
+      "distanceToPlantSourceLabel": "Haversine hiệu chỉnh",
+      "memberCount": 388,
+      "plantedAreaHa": 4224,
+      "seasons": [
+       {
+        "seasonId": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+        "totalAvailableTons": 11900,
+        "collectableTons": 5355,
+        "deliveredTons": 5087,
+        "paddyTons": 11900,
+        "plantedAreaHa": 1672
+       },
+       {
+        "seasonId": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+        "totalAvailableTons": 9900,
+        "collectableTons": 4455,
+        "deliveredTons": 4232,
+        "paddyTons": 9900,
+        "plantedAreaHa": 1496
+       },
+       {
+        "seasonId": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+        "totalAvailableTons": 7100,
+        "collectableTons": 3195,
+        "deliveredTons": 3035,
+        "paddyTons": 7100,
+        "plantedAreaHa": 1056
+       }
+      ],
+      "totalAvailableTons": 28900,
+      "collectableTons": 13005,
+      "deliveredTons": 12354
+     },
+     {
+      "htxId": "04285027-37cf-4cf6-9ea1-973beff978d3",
+      "radiusDistanceKm": 30.473,
+      "distanceToHubKm": 39.614,
+      "distanceToHubSource": "haversine_hieu_chinh",
+      "distanceToHubSourceLabel": "Haversine hiệu chỉnh",
+      "distanceToPlantKm": 117.711,
+      "distanceToPlantSource": "haversine_hieu_chinh",
+      "distanceToPlantSourceLabel": "Haversine hiệu chỉnh",
+      "memberCount": 274,
+      "plantedAreaHa": 3097,
+      "seasons": [
+       {
+        "seasonId": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+        "totalAvailableTons": 8800,
+        "collectableTons": 3960,
+        "deliveredTons": 3762,
+        "paddyTons": 8800,
+        "plantedAreaHa": 1226
+       },
+       {
+        "seasonId": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+        "totalAvailableTons": 7200,
+        "collectableTons": 3240,
+        "deliveredTons": 3078,
+        "paddyTons": 7200,
+        "plantedAreaHa": 1097
+       },
+       {
+        "seasonId": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+        "totalAvailableTons": 5000,
+        "collectableTons": 2250,
+        "deliveredTons": 2138,
+        "paddyTons": 5000,
+        "plantedAreaHa": 774
+       }
+      ],
+      "totalAvailableTons": 21000,
+      "collectableTons": 9450,
+      "deliveredTons": 8978
+     },
+     {
+      "htxId": "7a635ac9-0231-492c-8fc2-90edbfcb06c1",
+      "radiusDistanceKm": 34.299,
+      "distanceToHubKm": 44.588,
+      "distanceToHubSource": "haversine_hieu_chinh",
+      "distanceToHubSourceLabel": "Haversine hiệu chỉnh",
+      "distanceToPlantKm": 120.193,
+      "distanceToPlantSource": "haversine_hieu_chinh",
+      "distanceToPlantSourceLabel": "Haversine hiệu chỉnh",
+      "memberCount": 301,
+      "plantedAreaHa": 3312,
+      "seasons": [
+       {
+        "seasonId": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+        "totalAvailableTons": 9500,
+        "collectableTons": 4275,
+        "deliveredTons": 4061,
+        "paddyTons": 9500,
+        "plantedAreaHa": 1311
+       },
+       {
+        "seasonId": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+        "totalAvailableTons": 8000,
+        "collectableTons": 3600,
+        "deliveredTons": 3420,
+        "paddyTons": 8000,
+        "plantedAreaHa": 1173
+       },
+       {
+        "seasonId": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+        "totalAvailableTons": 5600,
+        "collectableTons": 2520,
+        "deliveredTons": 2394,
+        "paddyTons": 5600,
+        "plantedAreaHa": 828
+       }
+      ],
+      "totalAvailableTons": 23100,
+      "collectableTons": 10395,
+      "deliveredTons": 9875
+     },
+     {
+      "htxId": "26e67edd-4c08-4ff6-81dc-00d6988097a1",
+      "radiusDistanceKm": 38.424,
+      "distanceToHubKm": 49.952,
+      "distanceToHubSource": "haversine_hieu_chinh",
+      "distanceToHubSourceLabel": "Haversine hiệu chỉnh",
+      "distanceToPlantKm": 147.347,
+      "distanceToPlantSource": "haversine_hieu_chinh",
+      "distanceToPlantSourceLabel": "Haversine hiệu chỉnh",
+      "memberCount": 289,
+      "plantedAreaHa": 2976,
+      "seasons": [
+       {
+        "seasonId": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+        "totalAvailableTons": 8600,
+        "collectableTons": 3870,
+        "deliveredTons": 3677,
+        "paddyTons": 8600,
+        "plantedAreaHa": 1178
+       },
+       {
+        "seasonId": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+        "totalAvailableTons": 7100,
+        "collectableTons": 3195,
+        "deliveredTons": 3035,
+        "paddyTons": 7100,
+        "plantedAreaHa": 1054
+       },
+       {
+        "seasonId": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+        "totalAvailableTons": 4900,
+        "collectableTons": 2205,
+        "deliveredTons": 2095,
+        "paddyTons": 4900,
+        "plantedAreaHa": 744
+       }
+      ],
+      "totalAvailableTons": 20600,
+      "collectableTons": 9270,
+      "deliveredTons": 8807
+     },
+     {
+      "htxId": "c8bd8e3b-b6b8-4830-87be-61ef8442d9f5",
+      "radiusDistanceKm": 44.658,
+      "distanceToHubKm": 58.056,
+      "distanceToHubSource": "haversine_hieu_chinh",
+      "distanceToHubSourceLabel": "Haversine hiệu chỉnh",
+      "distanceToPlantKm": 186.846,
+      "distanceToPlantSource": "haversine_hieu_chinh",
+      "distanceToPlantSourceLabel": "Haversine hiệu chỉnh",
+      "memberCount": 402,
+      "plantedAreaHa": 4345,
+      "seasons": [
+       {
+        "seasonId": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+        "totalAvailableTons": 12700,
+        "collectableTons": 5715,
+        "deliveredTons": 5429,
+        "paddyTons": 12700,
+        "plantedAreaHa": 1720
+       },
+       {
+        "seasonId": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+        "totalAvailableTons": 10500,
+        "collectableTons": 4725,
+        "deliveredTons": 4489,
+        "paddyTons": 10500,
+        "plantedAreaHa": 1539
+       },
+       {
+        "seasonId": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+        "totalAvailableTons": 7500,
+        "collectableTons": 3375,
+        "deliveredTons": 3206,
+        "paddyTons": 7500,
+        "plantedAreaHa": 1086
+       }
+      ],
+      "totalAvailableTons": 30700,
+      "collectableTons": 13815,
+      "deliveredTons": 13124
+     }
+    ],
+    "cooperativeCount": 6,
+    "seasons": [
+     {
+      "seasonId": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+      "totalAvailableTons": 63900,
+      "collectableTons": 28755,
+      "deliveredTons": 27317,
+      "paddyTons": 63900,
+      "plantedAreaHa": 8865
+     },
+     {
+      "seasonId": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+      "totalAvailableTons": 52800,
+      "collectableTons": 23760,
+      "deliveredTons": 22572,
+      "paddyTons": 52800,
+      "plantedAreaHa": 7932
+     },
+     {
+      "seasonId": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+      "totalAvailableTons": 37700,
+      "collectableTons": 16965,
+      "deliveredTons": 16117,
+      "paddyTons": 37700,
+      "plantedAreaHa": 5598
+     }
+    ],
+    "totalAvailableTons": 154400,
+    "collectableTons": 69480,
+    "deliveredTons": 66006,
+    "capacityWarning": {
+     "shortfallPct": 78.52
+    },
+    "distanceToPlantKm": 129.732,
+    "distanceToPlantSourceLabel": "Haversine hiệu chỉnh",
+    "legs": [
+     {
+      "leg": "field_plant",
+      "label": "Ruộng → Nhà máy (ghe 100 tấn, chở thẳng)",
+      "mode": "waterway",
+      "modeDecidedBy": "mac_dinh",
+      "waterwaySuggested": false,
+      "tons": 62599,
+      "weightedAvgDistanceKm": 141.696,
+      "tonKm": 8870045,
+      "cost": 7983040950,
+      "trips": 696,
+      "vehiclesRequired": 8,
+      "leadTimeHours": 15.31
+     },
+     {
+      "leg": "field_hub",
+      "label": "Ruộng → Hub (ghe 100 tấn)",
+      "mode": "road",
+      "modeDecidedBy": "mac_dinh",
+      "waterwaySuggested": false,
+      "tons": 6881,
+      "weightedAvgDistanceKm": 44.18,
+      "tonKm": 304005,
+      "cost": 668811010,
+      "vehiclesRequired": null,
+      "leadTimeHours": 4.6
+     },
+     {
+      "leg": "hub_plant",
+      "label": "Hub → Nhà máy (sà lan 1.000 tấn, đầy tải)",
+      "mode": "waterway",
+      "modeDecidedBy": "goi_y_he_thong",
+      "waterwaySuggested": true,
+      "tons": 6743,
+      "weightedAvgDistanceKm": 190.265,
+      "tonKm": 1282957,
+      "cost": 1154661206,
+      "trips": 9,
+      "vehiclesRequired": 1,
+      "leadTimeHours": 19.36
+     }
+    ],
+    "flow": {
+     "key": "9cd914ff-ea2e-44ee-b498-4d42c206f2d6",
+     "code": "HUB-0002",
+     "maxInventoryTons": 5000,
+     "bargePayloadTons": 1000,
+     "receivedFromFieldTons": 6881,
+     "storedAfterProcessingTons": 6743,
+     "processingLossTons": 138,
+     "shippedToPlantTons": 6743,
+     "peakInventoryTons": 1074,
+     "peakInventoryDayLabel": "14/03",
+     "averageInventoryTons": 138,
+     "endingInventoryTons": 0,
+     "overflowTons": 0,
+     "daysAtCapacity": 0,
+     "utilizationPct": 21.48,
+     "fullBargeTrips": 5,
+     "partialBargeTrips": 4,
+     "fieldHubTonKm": 304001,
+     "hubPlantTonKm": 874832,
+     "inventoryCurve": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      583,
+      583,
+      583,
+      583,
+      583,
+      583,
+      583,
+      583,
+      583,
+      583,
+      328,
+      328,
+      328,
+      328,
+      328,
+      328,
+      328,
+      328,
+      328,
+      328,
+      1074,
+      1074,
+      1074,
+      1074,
+      1074,
+      1074,
+      74,
+      74,
+      74,
+      74,
+      74,
+      616,
+      616,
+      616,
+      616,
+      616,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      246,
+      246,
+      246,
+      246,
+      246,
+      246,
+      246,
+      246,
+      246,
+      246,
+      829,
+      829,
+      829,
+      829,
+      829,
+      829,
+      829,
+      829,
+      829,
+      829,
+      445,
+      445,
+      445,
+      445,
+      445,
+      445,
+      445,
+      445,
+      445,
+      445,
+      445,
+      61,
+      61,
+      61,
+      61,
+      61,
+      61,
+      61,
+      61,
+      61,
+      61,
+      408,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      248,
+      248,
+      248,
+      248,
+      248,
+      248,
+      248,
+      248,
+      248,
+      248,
+      688,
+      688,
+      688,
+      688,
+      688,
+      688,
+      688,
+      688,
+      688,
+      688,
+      688,
+      128,
+      128,
+      128,
+      128,
+      128,
+      128,
+      128,
+      128,
+      128,
+      128,
+      543,
+      543,
+      543,
+      543,
+      543,
+      543,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "warningCount": 2
+    },
+    "sizing": {
+     "peakInventoryTons": 1074,
+     "warehouseCapacityTons": 1074,
+     "warehouseAreaM2": 913,
+     "yardAreaM2": 644,
+     "balePressCount": 4,
+     "forkliftCount": 3,
+     "peakInventorySource": "mo_phong_theo_ngay",
+     "estimateNotice": "Ước tính — Peak Inventory 1.074 tấn lấy từ mô phỏng luồng rơm theo ngày (tồn kho cao nhất trong năm vận hành ổn định), không còn dùng hệ số tồn kho cao điểm — đóng rủi ro RS-06."
+    },
+    "capex": {
+     "warehouseConstruction": 3195500000,
+     "yardConstruction": 579600000,
+     "construction": 3775100000,
+     "balePress": 3400000000,
+     "forklift": 1860000000,
+     "equipment": 5260000000,
+     "other": 12000000000,
+     "total": 21035100000
+    },
+    "opex": {
+     "staff": 2052000000,
+     "utilities": 1800000000,
+     "maintenance": 315600000,
+     "landLease": 0,
+     "processing": 825720000,
+     "otherOpex": 0,
+     "total": 4993320000,
+     "handlingCostAnnual": 3193320000,
+     "warehouseCostAnnual": 1800000000
+    },
+    "costs": {
+     "collectionCost": 15633000000,
+     "warehouseCost": 1800000000,
+     "handlingCost": 3193320000,
+     "transportationCost": 9806513166,
+     "transportationFieldHub": 8651851960,
+     "transportationHubPlant": 1154661206,
+     "totalDeliveredLogisticsCost": 30432833166,
+     "costPerTon": 461062,
+     "costPerTonNote": "chưa gồm khấu hao đầu tư"
+    },
+    "leadTimeHours": 23.96,
+    "warningCount": 1
+   }
+  ],
+  "hubCount": 1,
+  "seasons": [
+   {
+    "seasonId": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+    "totalAvailableTons": 63900,
+    "collectableTons": 28755,
+    "deliveredTons": 27317,
+    "paddyTons": 63900,
+    "plantedAreaHa": 8865
+   },
+   {
+    "seasonId": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+    "totalAvailableTons": 52800,
+    "collectableTons": 23760,
+    "deliveredTons": 22572,
+    "paddyTons": 52800,
+    "plantedAreaHa": 7932
+   },
+   {
+    "seasonId": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+    "totalAvailableTons": 37700,
+    "collectableTons": 16965,
+    "deliveredTons": 16117,
+    "paddyTons": 37700,
+    "plantedAreaHa": 5598
+   }
+  ],
+  "totalAvailableTons": 154400,
+  "collectableTons": 69480,
+  "deliveredTons": 66006,
+  "costs": {
+   "collectionCost": 15633000000,
+   "warehouseCost": 1800000000,
+   "handlingCost": 3193320000,
+   "transportationCost": 9806513166,
+   "transportationFieldHub": 8651851960,
+   "transportationHubPlant": 1154661206,
+   "totalDeliveredLogisticsCost": 30432833166,
+   "costPerTon": 461062,
+   "costPerTonNote": "chưa gồm khấu hao đầu tư"
+  },
+  "capex": {
+   "warehouseConstruction": 3195500000,
+   "yardConstruction": 579600000,
+   "construction": 3775100000,
+   "balePress": 3400000000,
+   "forklift": 1860000000,
+   "equipment": 5260000000,
+   "other": 12000000000,
+   "total": 21035100000
+  },
+  "opex": {
+   "staff": 2052000000,
+   "utilities": 1800000000,
+   "maintenance": 315600000,
+   "landLease": 0,
+   "processing": 825720000,
+   "otherOpex": 0,
+   "total": 4993320000,
+   "handlingCostAnnual": 3193320000,
+   "warehouseCostAnnual": 1800000000
+  },
+  "financial": {
+   "lifecycleYears": 10,
+   "discounted": false,
+   "discountRatePct": 10,
+   "opexEscalationPct": 5,
+   "rampUpPct": 60,
+   "capex": 21035100000,
+   "tco": 83840542356,
+   "lifetimeDeliveredTons": 633658,
+   "tcoPerTon": 132312,
+   "lifecycleCost": 391643178804,
+   "lifecycleCostPerTon": 618068,
+   "roiPct": 156.85,
+   "paybackYears": 5,
+   "paybackStatus": "hoan_von",
+   "baselineCostPerTon": 546328,
+   "baselineSource": "no_hub",
+   "baselineSourceLabel": "No-Hub Baseline (tự tính, FN-17)",
+   "yearlyCashflow": [
+    {
+     "year": 1,
+     "deliveredTons": 39604,
+     "opex": 4993320000,
+     "savings": 3376840558,
+     "cumulativeSavings": 3376840558
+    },
+    {
+     "year": 2,
+     "deliveredTons": 66006,
+     "opex": 5242986000,
+     "savings": 5628067596,
+     "cumulativeSavings": 9004908154
+    },
+    {
+     "year": 3,
+     "deliveredTons": 66006,
+     "opex": 5505135300,
+     "savings": 5628067596,
+     "cumulativeSavings": 14632975750
+    },
+    {
+     "year": 4,
+     "deliveredTons": 66006,
+     "opex": 5780392065,
+     "savings": 5628067596,
+     "cumulativeSavings": 20261043346
+    },
+    {
+     "year": 5,
+     "deliveredTons": 66006,
+     "opex": 6069411668,
+     "savings": 5628067596,
+     "cumulativeSavings": 25889110942
+    },
+    {
+     "year": 6,
+     "deliveredTons": 66006,
+     "opex": 6372882252,
+     "savings": 5628067596,
+     "cumulativeSavings": 31517178538
+    },
+    {
+     "year": 7,
+     "deliveredTons": 66006,
+     "opex": 6691526364,
+     "savings": 5628067596,
+     "cumulativeSavings": 37145246134
+    },
+    {
+     "year": 8,
+     "deliveredTons": 66006,
+     "opex": 7026102682,
+     "savings": 5628067596,
+     "cumulativeSavings": 42773313730
+    },
+    {
+     "year": 9,
+     "deliveredTons": 66006,
+     "opex": 7377407817,
+     "savings": 5628067596,
+     "cumulativeSavings": 48401381326
+    },
+    {
+     "year": 10,
+     "deliveredTons": 66006,
+     "opex": 7746278207,
+     "savings": 5628067596,
+     "cumulativeSavings": 54029448922
+    }
+   ]
+  },
+  "baseline": {
+   "available": true,
+   "cooperativeCount": 6,
+   "excludedCooperatives": [],
+   "excludedSupplyPct": 0,
+   "collectionCost": 15633000000,
+   "transportationCost": 20427913836,
+   "capex": 0,
+   "warehouseCost": 0,
+   "handlingCost": 0,
+   "totalDeliveredLogisticsCost": 36060913836,
+   "deliveredTons": 66006,
+   "baselineCostPerTon": 546328,
+   "advisoryOnly": false,
+   "legs": [
+    {
+     "leg": "field_plant",
+     "label": "Ruộng → Nhà máy (không qua Hub)",
+     "mode": "road",
+     "modeDecidedBy": "mac_dinh",
+     "waterwaySuggested": true,
+     "tons": 69480,
+     "weightedAvgDistanceKm": 147.981,
+     "tonKm": 10281741,
+     "cost": 20427913836,
+     "trips": 4632,
+     "vehiclesRequired": 27,
+     "leadTimeHours": 8.62
+    }
+   ]
+  },
+  "flow": {
+   "harvestDays": 135,
+   "noHarvestDays": 230,
+   "harvestWindows": [
+    {
+     "fromLabel": "15/02",
+     "toLabel": "31/03",
+     "days": 45,
+     "tons": 28755
+    },
+    {
+     "fromLabel": "18/07",
+     "toLabel": "31/08",
+     "days": 45,
+     "tons": 23760
+    },
+    {
+     "fromLabel": "17/11",
+     "toLabel": "31/12",
+     "days": 45,
+     "tons": 16965
+    }
+   ],
+   "calendarSources": [
+    {
+     "source": "suy_dien",
+     "sourceLabel": "Suy diễn: 45 ngày cuối tháng 3"
+    },
+    {
+     "source": "suy_dien",
+     "sourceLabel": "Suy diễn: 45 ngày cuối tháng 8"
+    },
+    {
+     "source": "suy_dien",
+     "sourceLabel": "Suy diễn: 45 ngày cuối tháng 12"
+    }
+   ],
+   "plantDailyDemandTons": 727.27,
+   "plantOperatingDays": 330,
+   "plantReceivedTons": 65875,
+   "plantConsumedTons": 65875,
+   "plantUnmetTons": 174125,
+   "plantUnmetDays": 290,
+   "plantPeakStockTons": 1831,
+   "coveragePct": 27.45,
+   "directFieldPlantTons": 62599,
+   "fieldHubTons": 6881,
+   "hubPlantTons": 6743,
+   "uncollectedTons": 0,
+   "uncollectedPct": 0,
+   "directFieldPlantTonKm": 8870046,
+   "fieldHubTonKm": 304001,
+   "hubPlantTonKm": 874832,
+   "boatTripsDirect": 696,
+   "boatTripsToHub": 77,
+   "bargeTripsFull": 5,
+   "bargeTripsPartial": 4,
+   "networkPeakInventoryTons": 1074,
+   "hubs": [
+    {
+     "key": "9cd914ff-ea2e-44ee-b498-4d42c206f2d6",
+     "code": "HUB-0002",
+     "maxInventoryTons": 5000,
+     "bargePayloadTons": 1000,
+     "receivedFromFieldTons": 6881,
+     "storedAfterProcessingTons": 6743,
+     "processingLossTons": 138,
+     "shippedToPlantTons": 6743,
+     "peakInventoryTons": 1074,
+     "peakInventoryDayLabel": "14/03",
+     "averageInventoryTons": 138,
+     "endingInventoryTons": 0,
+     "overflowTons": 0,
+     "daysAtCapacity": 0,
+     "utilizationPct": 21.48,
+     "fullBargeTrips": 5,
+     "partialBargeTrips": 4,
+     "fieldHubTonKm": 304001,
+     "hubPlantTonKm": 874832,
+     "inventoryCurve": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      583,
+      583,
+      583,
+      583,
+      583,
+      583,
+      583,
+      583,
+      583,
+      583,
+      328,
+      328,
+      328,
+      328,
+      328,
+      328,
+      328,
+      328,
+      328,
+      328,
+      1074,
+      1074,
+      1074,
+      1074,
+      1074,
+      1074,
+      74,
+      74,
+      74,
+      74,
+      74,
+      616,
+      616,
+      616,
+      616,
+      616,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      246,
+      246,
+      246,
+      246,
+      246,
+      246,
+      246,
+      246,
+      246,
+      246,
+      829,
+      829,
+      829,
+      829,
+      829,
+      829,
+      829,
+      829,
+      829,
+      829,
+      445,
+      445,
+      445,
+      445,
+      445,
+      445,
+      445,
+      445,
+      445,
+      445,
+      445,
+      61,
+      61,
+      61,
+      61,
+      61,
+      61,
+      61,
+      61,
+      61,
+      61,
+      408,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      248,
+      248,
+      248,
+      248,
+      248,
+      248,
+      248,
+      248,
+      248,
+      248,
+      688,
+      688,
+      688,
+      688,
+      688,
+      688,
+      688,
+      688,
+      688,
+      688,
+      688,
+      128,
+      128,
+      128,
+      128,
+      128,
+      128,
+      128,
+      128,
+      128,
+      128,
+      543,
+      543,
+      543,
+      543,
+      543,
+      543,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "warningCount": 2
+    }
+   ],
+   "months": [
+    {
+     "month": 1,
+     "label": "Tháng 1",
+     "harvestTons": 0,
+     "directToPlantTons": 0,
+     "toHubTons": 0,
+     "hubToPlantTons": 0,
+     "plantConsumedTons": 167,
+     "plantUnmetTons": 20924,
+     "hubInventoryEndTons": 0,
+     "uncollectedTons": 0
+    },
+    {
+     "month": 2,
+     "label": "Tháng 2",
+     "harvestTons": 7911,
+     "directToPlantTons": 7317,
+     "toHubTons": 595,
+     "hubToPlantTons": 0,
+     "plantConsumedTons": 6951,
+     "plantUnmetTons": 11231,
+     "hubInventoryEndTons": 583,
+     "uncollectedTons": 0
+    },
+    {
+     "month": 3,
+     "label": "Tháng 3",
+     "harvestTons": 20844,
+     "directToPlantTons": 18769,
+     "toHubTons": 2075,
+     "hubToPlantTons": 2616,
+     "plantConsumedTons": 20169,
+     "plantUnmetTons": 195,
+     "hubInventoryEndTons": 0,
+     "uncollectedTons": 0
+    },
+    {
+     "month": 4,
+     "label": "Tháng 4",
+     "harvestTons": 0,
+     "directToPlantTons": 0,
+     "toHubTons": 0,
+     "hubToPlantTons": 0,
+     "plantConsumedTons": 147,
+     "plantUnmetTons": 19489,
+     "hubInventoryEndTons": 0,
+     "uncollectedTons": 0
+    },
+    {
+     "month": 5,
+     "label": "Tháng 5",
+     "harvestTons": 0,
+     "directToPlantTons": 0,
+     "toHubTons": 0,
+     "hubToPlantTons": 0,
+     "plantConsumedTons": 0,
+     "plantUnmetTons": 20364,
+     "hubInventoryEndTons": 0,
+     "uncollectedTons": 0
+    },
+    {
+     "month": 6,
+     "label": "Tháng 6",
+     "harvestTons": 0,
+     "directToPlantTons": 0,
+     "toHubTons": 0,
+     "hubToPlantTons": 0,
+     "plantConsumedTons": 0,
+     "plantUnmetTons": 19636,
+     "hubInventoryEndTons": 0,
+     "uncollectedTons": 0
+    },
+    {
+     "month": 7,
+     "label": "Tháng 7",
+     "harvestTons": 6537,
+     "directToPlantTons": 5691,
+     "toHubTons": 846,
+     "hubToPlantTons": 0,
+     "plantConsumedTons": 5407,
+     "plantUnmetTons": 14957,
+     "hubInventoryEndTons": 829,
+     "uncollectedTons": 0
+    },
+    {
+     "month": 8,
+     "label": "Tháng 8",
+     "harvestTons": 17223,
+     "directToPlantTons": 15611,
+     "toHubTons": 1611,
+     "hubToPlantTons": 2408,
+     "plantConsumedTons": 17118,
+     "plantUnmetTons": 3245,
+     "hubInventoryEndTons": 0,
+     "uncollectedTons": 0
+    },
+    {
+     "month": 9,
+     "label": "Tháng 9",
+     "harvestTons": 0,
+     "directToPlantTons": 0,
+     "toHubTons": 0,
+     "hubToPlantTons": 0,
+     "plantConsumedTons": 0,
+     "plantUnmetTons": 19636,
+     "hubInventoryEndTons": 0,
+     "uncollectedTons": 0
+    },
+    {
+     "month": 10,
+     "label": "Tháng 10",
+     "harvestTons": 0,
+     "directToPlantTons": 0,
+     "toHubTons": 0,
+     "hubToPlantTons": 0,
+     "plantConsumedTons": 0,
+     "plantUnmetTons": 20364,
+     "hubInventoryEndTons": 0,
+     "uncollectedTons": 0
+    },
+    {
+     "month": 11,
+     "label": "Tháng 11",
+     "harvestTons": 4668,
+     "directToPlantTons": 3966,
+     "toHubTons": 702,
+     "hubToPlantTons": 0,
+     "plantConsumedTons": 3768,
+     "plantUnmetTons": 15869,
+     "hubInventoryEndTons": 688,
+     "uncollectedTons": 0
+    },
+    {
+     "month": 12,
+     "label": "Tháng 12",
+     "harvestTons": 12297,
+     "directToPlantTons": 11245,
+     "toHubTons": 1053,
+     "hubToPlantTons": 1719,
+     "plantConsumedTons": 12149,
+     "plantUnmetTons": 8215,
+     "hubInventoryEndTons": 0,
+     "uncollectedTons": 0
+    }
+   ],
+   "warningCount": 3
+  },
+  "plantDemandCoveragePct": 27.5,
+  "plantDemandWarning": "Kịch bản không đáp ứng nhu cầu nhà máy: thiếu 72.5% (173.994 tấn/năm).",
+  "unapprovedParameters": [],
+  "canBeMarkedOfficial": true,
+  "warningCount": 5
+ },
+ "calendar": [
+  {
+   "season_key": "2a46e8af-795b-44c5-9235-a465e3d6fca3",
+   "source": "suy_dien",
+   "days": [
+    {
+     "dayOfYear": 46,
+     "weight": 0.010582010582010585
+    },
+    {
+     "dayOfYear": 47,
+     "weight": 0.012025012025012029
+    },
+    {
+     "dayOfYear": 48,
+     "weight": 0.013468013468013473
+    },
+    {
+     "dayOfYear": 49,
+     "weight": 0.014911014911014915
+    },
+    {
+     "dayOfYear": 50,
+     "weight": 0.016354016354016357
+    },
+    {
+     "dayOfYear": 51,
+     "weight": 0.0177970177970178
+    },
+    {
+     "dayOfYear": 52,
+     "weight": 0.019240019240019245
+    },
+    {
+     "dayOfYear": 53,
+     "weight": 0.020683020683020685
+    },
+    {
+     "dayOfYear": 54,
+     "weight": 0.022126022126022132
+    },
+    {
+     "dayOfYear": 55,
+     "weight": 0.023569023569023573
+    },
+    {
+     "dayOfYear": 56,
+     "weight": 0.025012025012025017
+    },
+    {
+     "dayOfYear": 57,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 58,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 59,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 60,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 61,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 62,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 63,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 64,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 65,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 66,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 67,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 68,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 69,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 70,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 71,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 72,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 73,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 74,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 75,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 76,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 77,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 78,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 79,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 80,
+     "weight": 0.02501202501202502
+    },
+    {
+     "dayOfYear": 81,
+     "weight": 0.023569023569023576
+    },
+    {
+     "dayOfYear": 82,
+     "weight": 0.02212602212602213
+    },
+    {
+     "dayOfYear": 83,
+     "weight": 0.020683020683020685
+    },
+    {
+     "dayOfYear": 84,
+     "weight": 0.019240019240019245
+    },
+    {
+     "dayOfYear": 85,
+     "weight": 0.017797017797017804
+    },
+    {
+     "dayOfYear": 86,
+     "weight": 0.01635401635401636
+    },
+    {
+     "dayOfYear": 87,
+     "weight": 0.014911014911014916
+    },
+    {
+     "dayOfYear": 88,
+     "weight": 0.013468013468013471
+    },
+    {
+     "dayOfYear": 89,
+     "weight": 0.012025012025012027
+    },
+    {
+     "dayOfYear": 90,
+     "weight": 0.010582010582010585
+    }
+   ]
+  },
+  {
+   "season_key": "ac2a5a6e-2d36-468c-bb03-b2a64f986a68",
+   "source": "suy_dien",
+   "days": [
+    {
+     "dayOfYear": 199,
+     "weight": 0.010582010582010585
+    },
+    {
+     "dayOfYear": 200,
+     "weight": 0.012025012025012029
+    },
+    {
+     "dayOfYear": 201,
+     "weight": 0.013468013468013473
+    },
+    {
+     "dayOfYear": 202,
+     "weight": 0.014911014911014915
+    },
+    {
+     "dayOfYear": 203,
+     "weight": 0.016354016354016357
+    },
+    {
+     "dayOfYear": 204,
+     "weight": 0.0177970177970178
+    },
+    {
+     "dayOfYear": 205,
+     "weight": 0.019240019240019245
+    },
+    {
+     "dayOfYear": 206,
+     "weight": 0.020683020683020685
+    },
+    {
+     "dayOfYear": 207,
+     "weight": 0.022126022126022132
+    },
+    {
+     "dayOfYear": 208,
+     "weight": 0.023569023569023573
+    },
+    {
+     "dayOfYear": 209,
+     "weight": 0.025012025012025017
+    },
+    {
+     "dayOfYear": 210,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 211,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 212,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 213,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 214,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 215,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 216,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 217,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 218,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 219,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 220,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 221,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 222,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 223,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 224,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 225,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 226,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 227,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 228,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 229,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 230,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 231,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 232,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 233,
+     "weight": 0.02501202501202502
+    },
+    {
+     "dayOfYear": 234,
+     "weight": 0.023569023569023576
+    },
+    {
+     "dayOfYear": 235,
+     "weight": 0.02212602212602213
+    },
+    {
+     "dayOfYear": 236,
+     "weight": 0.020683020683020685
+    },
+    {
+     "dayOfYear": 237,
+     "weight": 0.019240019240019245
+    },
+    {
+     "dayOfYear": 238,
+     "weight": 0.017797017797017804
+    },
+    {
+     "dayOfYear": 239,
+     "weight": 0.01635401635401636
+    },
+    {
+     "dayOfYear": 240,
+     "weight": 0.014911014911014916
+    },
+    {
+     "dayOfYear": 241,
+     "weight": 0.013468013468013471
+    },
+    {
+     "dayOfYear": 242,
+     "weight": 0.012025012025012027
+    },
+    {
+     "dayOfYear": 243,
+     "weight": 0.010582010582010585
+    }
+   ]
+  },
+  {
+   "season_key": "ff8e500d-76a3-4103-954e-f66c42adbbe1",
+   "source": "suy_dien",
+   "days": [
+    {
+     "dayOfYear": 321,
+     "weight": 0.010582010582010585
+    },
+    {
+     "dayOfYear": 322,
+     "weight": 0.012025012025012029
+    },
+    {
+     "dayOfYear": 323,
+     "weight": 0.013468013468013473
+    },
+    {
+     "dayOfYear": 324,
+     "weight": 0.014911014911014915
+    },
+    {
+     "dayOfYear": 325,
+     "weight": 0.016354016354016357
+    },
+    {
+     "dayOfYear": 326,
+     "weight": 0.0177970177970178
+    },
+    {
+     "dayOfYear": 327,
+     "weight": 0.019240019240019245
+    },
+    {
+     "dayOfYear": 328,
+     "weight": 0.020683020683020685
+    },
+    {
+     "dayOfYear": 329,
+     "weight": 0.022126022126022132
+    },
+    {
+     "dayOfYear": 330,
+     "weight": 0.023569023569023573
+    },
+    {
+     "dayOfYear": 331,
+     "weight": 0.025012025012025017
+    },
+    {
+     "dayOfYear": 332,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 333,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 334,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 335,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 336,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 337,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 338,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 339,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 340,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 341,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 342,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 343,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 344,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 345,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 346,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 347,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 348,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 349,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 350,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 351,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 352,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 353,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 354,
+     "weight": 0.02645502645502646
+    },
+    {
+     "dayOfYear": 355,
+     "weight": 0.02501202501202502
+    },
+    {
+     "dayOfYear": 356,
+     "weight": 0.023569023569023576
+    },
+    {
+     "dayOfYear": 357,
+     "weight": 0.02212602212602213
+    },
+    {
+     "dayOfYear": 358,
+     "weight": 0.020683020683020685
+    },
+    {
+     "dayOfYear": 359,
+     "weight": 0.019240019240019245
+    },
+    {
+     "dayOfYear": 360,
+     "weight": 0.017797017797017804
+    },
+    {
+     "dayOfYear": 361,
+     "weight": 0.01635401635401636
+    },
+    {
+     "dayOfYear": 362,
+     "weight": 0.014911014911014916
+    },
+    {
+     "dayOfYear": 363,
+     "weight": 0.013468013468013471
+    },
+    {
+     "dayOfYear": 364,
+     "weight": 0.012025012025012027
+    },
+    {
+     "dayOfYear": 365,
+     "weight": 0.010582010582010585
+    }
+   ]
+  }
+ ],
+ "sensitivity": null
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.simulation.job.requested/v1",
+  "title": "pf.simulation.job.requested — payload",
+  "description": "Ảnh chụp đầu vào bất biến đã ghi (pf_simulation.input_snapshot). Optimizer (Python) GET snapshot_path qua Internal API (mTLS, header X-Tenant-ID = tenant_id của phong bì), kiểm sha256 các byte nhận được bằng snapshot_sha256, tính theo contracts/optimizer, rồi POST result_path. Không chứa dữ liệu cá nhân; ảnh chụp cũng không (RB-7).",
+  "x-event-type": "pf.simulation.job.requested",
+  "x-schema-version": 1,
+  "x-producer": "pf/simulation",
+  "type": "object",
+  "required": ["simulation_id", "snapshot_id", "snapshot_sha256", "snapshot_path", "result_path", "algorithm_version", "mode", "requested_at"],
+  "properties": {
+    "simulation_id":     { "type": "string", "format": "uuid" },
+    "snapshot_id":       { "type": "string", "format": "uuid" },
+    "snapshot_sha256":   { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "snapshot_path":     { "type": "string", "description": "/internal/v1/simulations/{id}/snapshot" },
+    "result_path":       { "type": "string", "description": "/internal/v1/simulations/{id}/result" },
+    "algorithm_version": { "type": "string", "description": "Phiên bản thuật toán optimizer đã ghim" },
+    "mode":              { "type": "string", "enum": ["evaluate", "select_hubs"], "description": "select_hubs: THỬ NGHIỆM (MILP)" },
+    "requested_at":      { "type": "string", "format": "date-time" }
+  }
+}

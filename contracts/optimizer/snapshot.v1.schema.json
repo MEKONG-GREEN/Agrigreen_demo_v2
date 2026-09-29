@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/optimizer/snapshot/v1",
+  "title": "pf/simulation → optimizer: ảnh chụp đầu vào bất biến (input_snapshot)",
+  "description": "Ảnh chụp do worker pf/simulation dựng (mục 12, 16): bộ tham số đã giải kèm cờ phê duyệt, phiên bản mạng đường thủy, KẾT QUẢ ĐỊNH TUYẾN đã dùng (lưu bền vững), nguồn cung theo HTX × vụ, algorithm_version. KHÔNG chứa định danh (RB-7): chỉ mã tham chiếu UUID, không tên, không toạ độ — mô hình không cần toạ độ vì mọi khoảng cách (kể cả khoảng cách chim bay xét bán kính FN-05) đã tính sẵn. Mặc định từ chối trường lạ ở mọi cấp. Số thập phân là chuỗi (decimal của nền tảng). sha256 tính trên đúng byte JSON do Internal API trả.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "snapshot_id", "simulation_id", "tenant_ref", "algorithm_version", "network_version", "created_at", "scenario", "hubs", "cooperatives", "seasons", "harvest_observations", "radius", "routes", "params", "options"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "snapshot_id": { "$ref": "#/$defs/uuid" },
+    "simulation_id": { "$ref": "#/$defs/uuid" },
+    "tenant_ref": { "$ref": "#/$defs/uuid" },
+    "algorithm_version": { "type": "string", "minLength": 1, "maxLength": 100, "description": "Phiên bản thuật toán optimizer được ghim khi dựng ảnh chụp" },
+    "network_version": { "type": "string", "minLength": 1, "maxLength": 100, "description": "Phiên bản mạng đường thủy đã phát hành (pf/waterway) dùng khi định tuyến; 'none' nếu chưa có mạng" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario_id", "code", "lifecycle_years", "discounted", "baseline_mode", "plant"],
+      "properties": {
+        "scenario_id": { "$ref": "#/$defs/uuid" },
+        "code": { "type": "string", "maxLength": 40 },
+        "lifecycle_years": { "type": "integer", "minimum": 1, "maximum": 50 },
+        "discounted": { "type": "boolean" },
+        "baseline_mode": { "enum": ["no_hub", "manual", "scenario"] },
+        "baseline_manual_cost_per_ton": { "$ref": "#/$defs/decimalOrNull" },
+        "baseline_scenario_id": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "baseline_scenario_cost_per_ton": { "$ref": "#/$defs/decimalOrNull" },
+        "plant": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "plant_ref": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+            "annual_demand_tons": { "$ref": "#/$defs/decimalOrNull" }
+          }
+        }
+      }
+    },
+    "hubs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scenario_hub_id", "hub_ref", "code", "sort_order", "service_radius_km", "design_capacity_tons", "mode_field_hub", "mode_hub_plant", "land_mode"],
+        "properties": {
+          "scenario_hub_id": { "$ref": "#/$defs/uuid" },
+          "hub_ref": { "$ref": "#/$defs/uuid" },
+          "code": { "type": "string", "maxLength": 40 },
+          "sort_order": { "type": "integer" },
+          "service_radius_km": { "$ref": "#/$defs/decimal" },
+          "design_capacity_tons": { "$ref": "#/$defs/decimal", "description": "Công suất = TỒN KHO TỐI ĐA (tấn)" },
+          "barge_payload_tons": { "$ref": "#/$defs/decimalOrNull" },
+          "mode_field_hub": { "enum": ["auto", "road", "waterway"] },
+          "mode_hub_plant": { "enum": ["auto", "road", "waterway"] },
+          "land_mode": { "enum": ["mua", "thue"] }
+        }
+      }
+    },
+    "cooperatives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cooperative_ref", "member_count", "seasons"],
+        "properties": {
+          "cooperative_ref": { "$ref": "#/$defs/uuid" },
+          "member_count": { "type": "integer", "minimum": 0 },
+          "seasons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["season_key", "paddy_tons", "planted_area_ha"],
+              "properties": {
+                "season_key": { "type": "string", "minLength": 1, "maxLength": 80 },
+                "paddy_tons": { "$ref": "#/$defs/decimal" },
+                "planted_area_ha": { "$ref": "#/$defs/decimal" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "seasons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["season_key", "season_type", "end_month", "sort_order"],
+        "properties": {
+          "season_key": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "season_type": { "type": "string", "pattern": "^[A-Z]{1,8}$" },
+          "end_month": { "type": "integer", "minimum": 1, "maximum": 12 },
+          "sort_order": { "type": "integer" }
+        }
+      }
+    },
+    "harvest_observations": {
+      "type": "object",
+      "description": "Đường cong thu hoạch thực tế theo loại vụ (DX/HT/TD): tấn theo ngày trong năm (1–365, 29/02 gộp 28/02)",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["day_of_year", "tons"],
+          "properties": {
+            "day_of_year": { "type": "integer", "minimum": 1, "maximum": 365 },
+            "tons": { "$ref": "#/$defs/decimal" }
+          }
+        }
+      }
+    },
+    "radius": {
+      "type": "array",
+      "description": "Khoảng cách chim bay HTX ↔ Hub cho các cặp nằm trong bán kính phục vụ (FN-05)",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cooperative_ref", "hub_ref", "radius_km"],
+        "properties": {
+          "cooperative_ref": { "$ref": "#/$defs/uuid" },
+          "hub_ref": { "$ref": "#/$defs/uuid" },
+          "radius_km": { "$ref": "#/$defs/decimal" }
+        }
+      }
+    },
+    "routes": {
+      "type": "array",
+      "description": "Kết quả định tuyến ĐÃ DÙNG (FN-04), kèm nhãn nguồn tính (BR-04)",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to", "mode", "distance_km", "source"],
+        "properties": {
+          "from": { "$ref": "#/$defs/node" },
+          "to": { "$ref": "#/$defs/node" },
+          "mode": { "enum": ["road", "waterway"] },
+          "distance_km": { "$ref": "#/$defs/decimal" },
+          "source": { "enum": ["routing_thuc_te", "tuyen_so_hoa_noi_bo", "haversine_hieu_chinh"] },
+          "straight_km": { "$ref": "#/$defs/decimalOrNull", "description": "Chỉ với nguồn haversine_hieu_chinh: khoảng cách chim bay trước hệ số #10" },
+          "waterway_access": { "type": ["boolean", "null"], "description": "Chỉ với mode waterway: hai điểm tiếp giáp mạng thủy (FN-08 BR-04b)" }
+        }
+      }
+    },
+    "params": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["set_version", "all_approved", "unapproved", "values"],
+      "properties": {
+        "set_version": { "type": "string", "minLength": 1, "maxLength": 100, "description": "sha256 của (khóa, phiên bản) mọi tham số đã giải" },
+        "all_approved": { "type": "boolean", "description": "FN-01 BR-04: mọi tham số đã dùng đến từ phiên bản ĐÃ PHÊ DUYỆT" },
+        "unapproved": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code", "number", "name"],
+            "properties": { "code": { "type": "string" }, "number": { "type": "integer" }, "name": { "type": "string" } }
+          }
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code", "number", "name", "classification", "approved"],
+            "properties": {
+              "code": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+              "number": { "type": "integer", "minimum": 1, "maximum": 99 },
+              "name": { "type": "string", "maxLength": 200 },
+              "classification": { "enum": ["thi_truong", "gia_dinh", "khac"] },
+              "value": { "$ref": "#/$defs/decimalOrNull" },
+              "text_value": { "type": ["object", "null"], "additionalProperties": { "$ref": "#/$defs/decimal" } },
+              "min": { "$ref": "#/$defs/decimalOrNull" },
+              "max": { "$ref": "#/$defs/decimalOrNull" },
+              "approved": { "type": "boolean" },
+              "param_version": { "type": ["integer", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "enum": ["evaluate", "select_hubs"], "description": "select_hubs: THỬ NGHIỆM (MILP)" },
+        "sensitivity_codes": { "type": "array", "items": { "type": "string" } },
+        "max_hubs": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$" },
+    "decimal": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]+)?([eE][-+]?[0-9]+)?$" },
+    "decimalOrNull": { "oneOf": [{ "$ref": "#/$defs/decimal" }, { "type": "null" }] },
+    "node": { "type": "string", "pattern": "^((coop|hub):[0-9a-fA-F-]{36}|plant)$" }
+  }
+}
