@@ -45,7 +45,7 @@ const (
 
 func validSourceKind(k SourceKind) bool {
 	switch k {
-	case SourcePlot, SourceCooperative, SourceRollCount, SourceSupplier, SourceLot:
+	case SourcePlot, SourceCooperative, SourceRollCount, SourceSupplier, SourceLot, SourceStocktake:
 		return true
 	}
 	return false
@@ -147,7 +147,7 @@ func BuildSources(in []SourceInput) ([]Source, error) {
 	for i, s := range in {
 		f := "sources[" + itoa(i) + "]"
 		if !validSourceKind(s.Kind) {
-			return nil, fieldErr(f+".kind", "phải là plot, cooperative, roll_count, supplier hoặc lot")
+			return nil, fieldErr(f+".kind", "phải là plot, cooperative, roll_count, supplier, lot hoặc stocktake")
 		}
 		if s.Ref == uuid.Nil {
 			return nil, fieldErr(f+".ref", "bắt buộc, UUID")
@@ -189,7 +189,7 @@ type Lot struct {
 	Seq         int64
 	Code        string
 	Product     Product
-	Origin      string // receipt | transform
+	Origin      string // receipt | transform | stocktake | transfer
 	BatchID     *uuid.UUID
 	Initial     mass.Kg
 	MoisturePct *decimal.Decimal

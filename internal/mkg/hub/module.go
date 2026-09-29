@@ -20,6 +20,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -73,3 +74,26 @@ func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job
 func (m *Module) PublishDailyCapacity(ctx context.Context, tenants app.TenantLister) (app.DailyResult, error) {
 	return m.svc.PublishDailyCapacity(ctx, tenants)
 }
+
+// WithEnv gắn nguồn số đo cảm biến kho cho hub.risk.v2 (mặc định port.NoEnvReadings).
+func (m *Module) WithEnv(env port.EnvReadings) *Module {
+	m.svc.Env = env
+	return m
+}
+
+// Consumers là handler sự kiện NỘI BỘ MKG của hub cho cmd/worker-internal
+// (vhost mkg.internal, ADR-0018). Handler chỉ dùng giao dịch inbox được giao
+// (vai hub_app, tenant của phong bì) — không cần pool.
+type Consumers struct{ c app.Consumer }
+
+// NewConsumers dựng handler consumer của hub.
+func NewConsumers(clk clock.Clock) Consumers { return Consumers{c: app.Consumer{Clock: clk}} }
+
+// WeighTicket: mkg.measurement.weigh_ticket.recorded → khối lượng lô (Q-MKG-04).
+func (c Consumers) WeighTicket() inbox.Handler { return c.c.HandleWeighTicket }
+
+// RollCount: mkg.fieldops.roll_count.recorded → hàng dự kiến về.
+func (c Consumers) RollCount() inbox.Handler { return c.c.HandleRollCount }
+
+// Reconciliation: mkg.measurement.reconciliation.completed → quy kết hao hụt.
+func (c Consumers) Reconciliation() inbox.Handler { return c.c.HandleReconciliation }

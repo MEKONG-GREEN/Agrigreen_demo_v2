@@ -41,6 +41,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.POST("/hub/facilities/:id/capacity-snapshots", h.capacitySnapshot)
 	rg.GET("/hub/lots/:id", h.getLot)
 	rg.POST("/hub/movements/:id/corrections", h.correct)
+	h.registerG3App(rg)
 }
 
 // RegisterAdmin gắn route dữ liệu chủ và phê duyệt vào nhóm /v1 của bề mặt quản trị (MFA).
@@ -50,6 +51,7 @@ func (h Handler) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.GET("/hub/facilities/:id/versions", h.versions)
 	rg.POST("/hub/facilities/:id/versions/:version/decision", h.decide)
 	rg.POST("/hub/projections/rebuild", h.rebuild)
+	h.registerG3Admin(rg)
 }
 
 func bind(c *gin.Context, v any) bool {
@@ -441,6 +443,9 @@ type receiveReq struct {
 	Sources     []sourceReq `json:"sources"`
 	EventTime   string      `json:"event_time"`
 	DeviceID    *string     `json:"device_id"`
+	// G3 (Q-MKG-04)
+	WeighTicketRef *string `json:"weigh_ticket_ref"`
+	ManualReason   string  `json:"manual_reason"`
 }
 
 func (h Handler) receive(c *gin.Context) {
@@ -464,7 +469,11 @@ func (h Handler) receive(c *gin.Context) {
 			in.LotID = &id
 		}
 	}
-	in.Mass = x.kg("mass_kg", req.MassKg)
+	in.WeighTicketRef = x.uuidPtr("weigh_ticket_ref", req.WeighTicketRef)
+	in.ManualReason = req.ManualReason
+	if in.WeighTicketRef == nil || req.MassKg != "" {
+		in.Mass = x.kg("mass_kg", req.MassKg)
+	}
 	in.MoisturePct = x.pct("moisture_pct", req.MoisturePct)
 	in.EventTime = x.time("event_time", req.EventTime, false)
 	for i, s := range req.Sources {

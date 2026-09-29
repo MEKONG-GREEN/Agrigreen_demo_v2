@@ -70,16 +70,20 @@ type Ranked struct {
 	Balance
 	Risk    decimal.Decimal
 	AgeDays int64
+	Alerts  int // số cảnh báo môi trường đã tính (hub.risk.v2; v1 luôn 0)
 }
 
 // Rank sắp lô còn tồn theo rủi ro giảm dần, rồi nhận sớm trước, rồi id (tất định).
-func (r RiskRule) Rank(lots []Balance, now time.Time) []Ranked {
+func (r RiskRule) Rank(lots []Balance, now time.Time) []Ranked { return r.rank(lots, now, nil) }
+
+func (r RiskRule) rank(lots []Balance, now time.Time, alerts map[uuid.UUID]int) []Ranked {
 	out := make([]Ranked, 0, len(lots))
 	for _, b := range lots {
 		if b.Remaining.Decimal().Sign() <= 0 {
 			continue
 		}
-		out = append(out, Ranked{Balance: b, Risk: r.Score(b, now, 0), AgeDays: int64(now.Sub(b.ReceivedAt) / (24 * time.Hour))})
+		n := alerts[b.LotID]
+		out = append(out, Ranked{Balance: b, Risk: r.Score(b, now, n), AgeDays: int64(now.Sub(b.ReceivedAt) / (24 * time.Hour)), Alerts: n})
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		if c := out[i].Risk.Cmp(out[j].Risk); c != 0 {

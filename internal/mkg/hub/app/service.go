@@ -56,6 +56,15 @@ var (
 type Service struct {
 	DB    tenant.Beginner // pool vai hub_app (cụm mkg)
 	Clock clock.Clock
+	// Env: số đo cảm biến kho cho hub.risk.v2; nil = port.NoEnvReadings (G3 chưa có ts_env).
+	Env port.EnvReadings
+}
+
+func (s *Service) env() port.EnvReadings {
+	if s.Env == nil {
+		return port.NoEnvReadings{}
+	}
+	return s.Env
 }
 
 var _ port.Lots = (*Service)(nil)
@@ -79,6 +88,8 @@ func mapErr(err error) error {
 		return ErrCorrectionKind
 	case errors.Is(err, domain.ErrFacilityInactive):
 		return ErrFacilityInactive
+	case errors.Is(err, domain.ErrStocktakeLines):
+		return ErrStocktakeLines
 	case errors.Is(err, domain.ErrDuplicateLotInput):
 		return ErrDuplicateLotInput
 	case errors.Is(err, domain.ErrRatioSum), errors.Is(err, domain.ErrRatioPrecision), errors.Is(err, domain.ErrShareTooSmall),
@@ -125,6 +136,12 @@ func (s *Service) read(ctx context.Context, fn func(pgx.Tx) error) error {
 		return err
 	}
 	return mapErr(tenant.WithTenantTx(ctx, s.DB, p.TenantID, fn))
+}
+
+// tenantOf là tenant của principal đã xác thực (s.read đã kiểm vai).
+func tenantOf(ctx context.Context) uuid.UUID {
+	p, _ := authz.FromContext(ctx)
+	return p.TenantID
 }
 
 func requireIdem(key string) error {

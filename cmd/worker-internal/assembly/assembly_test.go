@@ -3,10 +3,52 @@ package assembly
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 )
+
+// G3 hub: ba consumer nội bộ, vai hub_app, handler dựng được (Q-MKG-04, Q-MKG-06/10 phụ thuộc).
+func TestHubG3ConsumersRegistered(t *testing.T) {
+	want := map[string]string{
+		"mkg.hub.weigh_ticket":   "mkg.measurement.weigh_ticket.recorded",
+		"mkg.hub.roll_count":     "mkg.fieldops.roll_count.recorded",
+		"mkg.hub.reconciliation": "mkg.measurement.reconciliation.completed",
+	}
+	got := map[string]bool{}
+	for _, c := range Consumers {
+		ev, ok := want[c.Name]
+		if !ok {
+			continue
+		}
+		got[c.Name] = true
+		if c.Role != "hub_app" || len(c.Events) != 1 || c.Events[0] != ev || c.Build(clock.System{}) == nil {
+			t.Errorf("%s: vai %q sự kiện %v", c.Name, c.Role, c.Events)
+		}
+	}
+	if len(got) != len(want) {
+		t.Fatalf("thiếu consumer hub G3: %v", got)
+	}
+}
+
+// R-03: worker-internal (và mọi module nó nối) không phụ thuộc internal/platform/*, kể cả gián tiếp.
+func TestNoPlatformDependency(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("không có go trong PATH")
+	}
+	out, err := exec.Command("go", "list", "-deps", "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/worker-internal").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range strings.Fields(string(out)) {
+		if strings.Contains(p, "/internal/platform/") || strings.HasSuffix(p, "/internal/platform") {
+			t.Errorf("R-03: worker-internal phụ thuộc %s", p)
+		}
+	}
+}
 
 // Mọi consumer nội bộ: tên mkg.<module>.<việc> duy nhất, có handler, chỉ nghe sự
 // kiện nội bộ mkg.* có schema ở contracts/events-internal/ (ADR-0018).

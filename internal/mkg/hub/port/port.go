@@ -6,8 +6,10 @@ package port
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
 
 // Vai nghiệp vụ của module (tên vai trong Keycloak, tài khoản tenant MKG).
@@ -112,4 +114,43 @@ type LotInfo struct {
 // tồn của lô. Tenant lấy từ context.
 type Lots interface {
 	LotInfo(ctx context.Context, lotID uuid.UUID) (LotInfo, error)
+}
+
+// ---------------------------------------------------------------------------
+// G3: consumer sự kiện nội bộ (cmd/worker-internal, vhost mkg.internal) và cảm biến
+// ---------------------------------------------------------------------------
+
+// Tên consumer (hàng đợi quorum trên vhost mkg.internal, DLQ = tên + ".dlq").
+const (
+	// WeighTicketConsumer: mkg.measurement.weigh_ticket.recorded → khối lượng lô nhận
+	// (HUB_IN, Q-MKG-04) và gắn phiếu HUB_OUT với phiếu xuất.
+	WeighTicketConsumer = "mkg.hub.weigh_ticket"
+	// RollCountConsumer: mkg.fieldops.roll_count.recorded → hàng dự kiến về (tùy chọn).
+	RollCountConsumer = "mkg.hub.roll_count"
+	// ReconciliationConsumer: mkg.measurement.reconciliation.completed → quy kết hao hụt theo cơ sở.
+	ReconciliationConsumer = "mkg.hub.reconciliation"
+)
+
+// EnvReading là một số đo môi trường kho (độ ẩm %, nhiệt độ °C) của một cơ sở.
+type EnvReading struct {
+	FacilityID  uuid.UUID
+	SensorID    string
+	HumidityPct *decimal.Decimal
+	TempC       *decimal.Decimal
+	At          time.Time
+}
+
+// EnvReadings là nguồn số đo cảm biến kho cho hub.risk.v2. G3 chỉ có stub
+// NoEnvReadings (chưa có cảm biến); nguồn thật đọc cụm ts schema ts_env (ts
+// 000002 dự phòng) khi có — không đổi quy tắc chấm điểm.
+type EnvReadings interface {
+	Readings(ctx context.Context, tenantID, facilityID uuid.UUID, from, to time.Time) ([]EnvReading, error)
+}
+
+// NoEnvReadings là stub: không có cảm biến → không có cảnh báo môi trường.
+type NoEnvReadings struct{}
+
+// Readings cài đặt EnvReadings.
+func (NoEnvReadings) Readings(context.Context, uuid.UUID, uuid.UUID, time.Time, time.Time) ([]EnvReading, error) {
+	return nil, nil
 }
