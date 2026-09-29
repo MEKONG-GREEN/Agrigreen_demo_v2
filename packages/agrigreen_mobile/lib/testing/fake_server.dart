@@ -164,6 +164,21 @@ class FakeServer implements SyncApi {
 
   /// path → JSON trả cho GET (danh mục).
   final Map<String, Map<String, Object?>> getResponses = {};
+
+  /// Bộ xử lý GET tùy biến (app kiểm thử API có tham số truy vấn). Trả null →
+  /// dùng [getResponses]. Ném [ApiException]/[NetworkException] để mô phỏng lỗi.
+  Future<Map<String, Object?>?> Function(
+    String path,
+    Map<String, String>? query,
+  )?
+  onGet;
+
+  /// Bộ xử lý POST lệnh tùy biến (phản hồi theo nội dung). Trả null → mặc định.
+  Future<Map<String, Object?>?> Function(
+    String path,
+    Map<String, Object?>? body,
+  )?
+  onPost;
   final List<String> gets = [];
 
   @override
@@ -172,6 +187,12 @@ class FakeServer implements SyncApi {
     Map<String, String>? query,
   }) async {
     _guard();
+    final h = onGet;
+    if (h != null) {
+      gets.add(path);
+      final r = await h(path, query);
+      if (r != null) return r;
+    }
     final key = query == null || query['evidence_type'] == null
         ? path
         : '$path?evidence_type=${query['evidence_type']}';
@@ -210,6 +231,13 @@ class FakeServer implements SyncApi {
     }
     final err = actionErrors[path];
     if (err != null) throw ApiException(err.$1, err.$2);
+    final prev = _actionResponses[idempotencyKey];
+    if (prev != null) return prev;
+    final h = onPost;
+    if (h != null) {
+      final r = await h(path, body);
+      if (r != null) return _actionResponses[idempotencyKey] = r;
+    }
     return _actionResponses.putIfAbsent(
       idempotencyKey,
       () => {'path': path, 'body': body},

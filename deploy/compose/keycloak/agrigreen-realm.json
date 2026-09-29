@@ -224,6 +224,18 @@
       "attributes": { "pkce.code.challenge.method": "S256" },
       "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"],
       "optionalClientScopes": ["offline_access"]
+    },
+    {
+      "clientId": "agrigreen-htx-app",
+      "name": "App Hợp tác xã (Flutter) — nông dân, quản lý HTX; tên đăng nhập là SĐT",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["vn.agrigreen.htx:/oauth2redirect"],
+      "attributes": { "pkce.code.challenge.method": "S256" },
+      "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"],
+      "optionalClientScopes": ["offline_access"]
     }
   ]
 }

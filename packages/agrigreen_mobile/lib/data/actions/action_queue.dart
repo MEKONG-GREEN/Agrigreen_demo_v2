@@ -22,7 +22,11 @@ enum ApiActionKind {
   librarySave('library_save'),
 
   /// `POST /v1/documents/{ref}/unsave`
-  libraryUnsave('library_unsave');
+  libraryUnsave('library_unsave'),
+
+  /// G2 (App HTX): `POST /v1/cropcycle/farm-logs/{id}/reviews {decision, note}`
+  /// — quản lý HTX duyệt / yêu cầu bổ sung nhật ký (HTX US-LOG-05).
+  farmLogReview('farm_log_review');
 
   const ApiActionKind(this.code);
   final String code;
@@ -35,6 +39,7 @@ enum ApiActionKind {
     ApiActionKind.directiveAck => '/v1/extension/directives/$target/ack',
     ApiActionKind.librarySave => '/v1/documents/$target/save',
     ApiActionKind.libraryUnsave => '/v1/documents/$target/unsave',
+    ApiActionKind.farmLogReview => '/v1/cropcycle/farm-logs/$target/reviews',
   };
 }
 
@@ -161,6 +166,17 @@ class ActionQueue {
       'api_action',
       where: where.join(' AND '),
       whereArgs: args,
+      orderBy: 'seq',
+    );
+    return rows.map(ApiAction.fromRow).toList();
+  }
+
+  /// Mọi lệnh của [kind] (kể cả đã thất bại, để hiển thị lỗi), theo `seq`.
+  Future<List<ApiAction>> ofKind(ApiActionKind kind) async {
+    final rows = await _sql.query(
+      'api_action',
+      where: 'kind = ?',
+      whereArgs: [kind.code],
       orderBy: 'seq',
     );
     return rows.map(ApiAction.fromRow).toList();
