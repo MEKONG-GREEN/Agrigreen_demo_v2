@@ -1,13 +1,37 @@
 import 'dart:convert';
 
-/// Thực thể chiều lên G1 (hợp đồng đồng bộ).
+/// Thực thể chiều lên (hợp đồng đồng bộ): G1 và G2 (App HTX).
 abstract final class PushEntity {
   static const plotBoundary = 'plot_boundary';
   static const fieldReport = 'field_report';
   static const taskUpdate = 'task_update';
   static const consent = 'consent';
   static const evidence = 'evidence';
-  static const all = {plotBoundary, fieldReport, taskUpdate, consent, evidence};
+
+  /// G2 pf/cropcycle (App HTX): mở/sửa/hủy vụ (HTX US-SEASON-01).
+  static const seasonOpen = 'season_open';
+
+  /// G2 pf/cropcycle: nhật ký canh tác (HTX US-LOG-01/02/04).
+  static const farmLog = 'farm_log';
+
+  /// G2 pf/cropcycle: nhật ký hàng loạt — một đầu lô (HTX US-LOG-03).
+  static const farmLogBatch = 'farm_log_batch';
+
+  /// G2 pf/cropcycle: khai báo sản lượng (HTX US-YIELD-01).
+  static const harvest = 'harvest';
+
+  /// G2 pf/extension: yêu cầu hỗ trợ của nông dân (HTX US-SUPPORT-01).
+  static const supportRequest = 'support_request';
+
+  static const g1 = {plotBoundary, fieldReport, taskUpdate, consent, evidence};
+  static const g2 = {
+    seasonOpen,
+    farmLog,
+    farmLogBatch,
+    harvest,
+    supportRequest,
+  };
+  static const all = {...g1, ...g2};
 }
 
 enum RecordOp {

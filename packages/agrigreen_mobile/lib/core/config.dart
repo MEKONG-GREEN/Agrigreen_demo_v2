@@ -48,7 +48,15 @@ class AppConfig {
     this.fcm,
   });
 
-  factory AppConfig.fromEnvironment() => AppConfig(
+  /// [oidcClientId]/[oidcRedirectUrl] khác nhau theo app: mặc định là app hiện
+  /// trường (`agrigreen-field-app`); App HTX truyền `agrigreen-htx-app` và
+  /// `vn.agrigreen.htx:/oauth2redirect`.
+  factory AppConfig.fromEnvironment({
+    String oidcClientId = 'agrigreen-field-app',
+    String oidcRedirectUrl = 'vn.agrigreen.field:/oauth2redirect',
+  }) => AppConfig(
+    oidcClientId: oidcClientId,
+    oidcRedirectUrl: oidcRedirectUrl,
     apiBaseUrl: const String.fromEnvironment(
       'AG_API_BASE',
       defaultValue: 'https://api.dev.agrigreen.vn',

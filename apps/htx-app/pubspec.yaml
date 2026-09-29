@@ -1,0 +1,40 @@
+name: agrigreen_htx
+description: "AgriGreen — App Hợp tác xã (nông dân, quản lý HTX): mở vụ, nhật ký canh tác, sản lượng, hỗ trợ — ngoại tuyến."
+publish_to: 'none'
+
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.4
+
+# Mọi dependency phải có giấy phép MIT/BSD/Apache-2.0/ISC/MPL-2.0
+# (deploy/policies/allowed-licenses.txt). Plugin của lõi (SQLCipher, secure
+# storage, AppAuth, camera, GPS, Firebase, thông báo cục bộ, url_launcher) đến
+# qua agrigreen_mobile. Ràng buộc phiên bản giữ y như apps/field-app để các
+# pubspec.lock phân giải cùng phiên bản.
+dependencies:
+  flutter:
+    sdk: flutter
+  # Lõi di động dùng chung với apps/field-app (docs/dev/g2-conventions.md §1).
+  agrigreen_mobile:
+    path: ../../packages/agrigreen_mobile
+  flutter_riverpod: ^3.4.3
+  connectivity_plus: ^7.3.1
+  path_provider: ^2.1.6
+  path: ^1.9.1
+  firebase_messaging: ^16.7.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  sqflite_common_ffi: ^2.4.3
+  integration_test:
+    sdk: flutter
+  # Chỉ kiểm thử import trực tiếp (bản chạy nhận qua agrigreen_mobile).
+  crypto: ^3.0.7
+  image: ^4.10.1
+  pinenacl: ^0.6.0
+
+flutter:
+  uses-material-design: true

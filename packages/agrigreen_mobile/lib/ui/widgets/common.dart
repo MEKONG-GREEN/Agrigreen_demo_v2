@@ -123,6 +123,11 @@ String entityLabel(String entity) => switch (entity) {
   PushEntity.taskUpdate => 'Cập nhật nhiệm vụ',
   PushEntity.consent => 'Đồng ý của nông hộ',
   PushEntity.evidence => 'Ảnh minh chứng',
+  PushEntity.seasonOpen => 'Mở vụ',
+  PushEntity.farmLog => 'Nhật ký canh tác',
+  PushEntity.farmLogBatch => 'Nhật ký hàng loạt',
+  PushEntity.harvest => 'Khai báo sản lượng',
+  PushEntity.supportRequest => 'Yêu cầu hỗ trợ',
   _ => entity,
 };
 

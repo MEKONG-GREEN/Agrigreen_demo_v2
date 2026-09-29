@@ -7,8 +7,20 @@ import '../../core/clock.dart';
 import '../db/local_db.dart';
 import '../sync/sync_api.dart';
 
-/// Thực thể chiều xuống G1.
+/// Thực thể chiều xuống G1 và G2 (App HTX).
 abstract final class RefEntity {
+  /// G2 pf/cropcycle: phiên bản SOP đã phát hành (bất biến).
+  static const sopVersion = 'sop_version';
+
+  /// G2 pf/cropcycle: vụ trong phạm vi (`id` = season_ref).
+  static const season = 'season';
+
+  /// G2 pf/cropcycle: phiên bản nhật ký kèm trạng thái duyệt.
+  static const farmLog = 'farm_log';
+
+  /// G2 pf/extension: yêu cầu hỗ trợ của nông hộ (vai farmer).
+  static const supportRequest = 'support_request';
+
   static const catalogItem = 'catalog_item';
   static const adminUnit = 'admin_unit';
   static const cooperative = 'cooperative';
