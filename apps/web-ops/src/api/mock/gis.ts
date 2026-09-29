@@ -91,11 +91,12 @@ function coopVisible(p: MockPersona, c: MockCooperative): boolean {
   return inScope(p, c.province_code, c.api.admin_unit_code);
 }
 
-function coopFeature(st: CoopState): GeoCoopFeature {
+/** forLayer: ranh giới đã ngừng dùng ẩn khỏi bản đồ dùng chung (chỉ còn marker); đọc chi tiết vẫn trả hình kèm status. */
+function coopFeature(st: CoopState, forLayer = false): GeoCoopFeature {
   const c = st.coop;
   const cur = st.versions[st.versions.length - 1];
   const marker = { type: "Point" as const, coordinates: [+c.lnglat[0].toFixed(6), +c.lnglat[1].toFixed(6)] };
-  if (!cur || st.status !== "active") {
+  if (!cur || (forLayer && st.status !== "active")) {
     return {
       type: "Feature",
       id: c.api.ref,
@@ -111,8 +112,8 @@ function coopFeature(st: CoopState): GeoCoopFeature {
       cooperative_ref: c.api.ref,
       boundary_id: cur.boundary_id,
       version: cur.version,
-      status: "active",
-      status_reason: null,
+      status: st.status === "retired" ? "retired" : "active",
+      status_reason: st.status === "retired" ? cur.correction_reason : null,
       area_ha: cur.area_ha,
       source: cur.source,
       commune_code: cur.commune_code,
@@ -133,7 +134,7 @@ function coopInBBox(st: CoopState, bb: [number, number, number, number]): boolea
 
 function coopLayer(p: MockPersona, bb: [number, number, number, number], limit: number) {
   const all = Array.from(COOP_STATE.values()).filter((s) => coopVisible(p, s.coop) && coopInBBox(s, bb) && s.coop.api.active);
-  return { type: "FeatureCollection" as const, features: all.slice(0, limit).map(coopFeature), truncated: all.length > limit, limit };
+  return { type: "FeatureCollection" as const, features: all.slice(0, limit).map((s) => coopFeature(s, true)), truncated: all.length > limit, limit };
 }
 
 /** Kiểm vùng GeoJSON từ client: ≥ 4 đỉnh (3 phân biệt), vòng khép. */
