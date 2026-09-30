@@ -4742,6 +4742,75 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/extdata/sources:
+    get:
+      summary: "pf/extdata (ADR-0007): nguồn dữ liệu ngoài đã bật — thời tiết, độ mặn, tile. Không trả URL (có thể chứa khóa API)"
+      operationId: extdataSources
+      responses:
+        "200":
+          description: Danh mục nguồn (mặc định rỗng khi chưa cấu hình AG_EXTDATA_SOURCES)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ExtDataSource"}}
+        "401": {$ref: "#/components/responses/Problem"}
+  /v1/extdata/{source}/point:
+    get:
+      summary: "pf/extdata (ADR-0007): dữ liệu điểm qua proxy khử định danh — tọa độ làm thô về tâm ô lưới trước khi gọi nhà cung cấp; đệm theo ô"
+      operationId: extdataPoint
+      parameters:
+        - {name: source, in: path, required: true, schema: {type: string, pattern: "^[a-z][a-z0-9_]{1,30}$"}}
+        - {name: lat, in: query, required: true, description: "Vĩ độ thập phân (chuỗi)", schema: {type: string}}
+        - {name: lon, in: query, required: true, description: "Kinh độ thập phân (chuỗi)", schema: {type: string}}
+      responses:
+        "200":
+          description: "Dữ liệu của ô lưới (data là JSON nguyên văn của nhà cung cấp). Cache-Control: private, max-age = thời gian đệm còn lại"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [source, kind, cell, fetched_at, cached, data]
+                properties:
+                  source: {type: string}
+                  kind: {type: string, enum: [weather, salinity]}
+                  cell:
+                    type: object
+                    required: [lat, lon, size_deg]
+                    properties:
+                      lat: {type: string, description: "Vĩ độ tâm ô"}
+                      lon: {type: string, description: "Kinh độ tâm ô"}
+                      size_deg: {type: string, description: "Cạnh ô (độ), ≥ 0.05"}
+                  fetched_at: {type: string, format: date-time}
+                  cached: {type: boolean}
+                  data: {description: "JSON của nhà cung cấp"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extdata.unknown_source", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extdata.outside_territory", $ref: "#/components/responses/Problem"}
+        "502": {description: "extdata.provider_unavailable", $ref: "#/components/responses/Problem"}
+  /v1/extdata/{source}/tiles/{z}/{x}/{y}:
+    get:
+      summary: "pf/extdata (ADR-0007): tile bản đồ/vệ tinh qua proxy — zoom ≤ max_zoom của nguồn, tile phải giao vùng phục vụ; y có thể kèm đuôi .png"
+      operationId: extdataTile
+      parameters:
+        - {name: source, in: path, required: true, schema: {type: string}}
+        - {name: z, in: path, required: true, schema: {type: integer, minimum: 0, maximum: 18}}
+        - {name: x, in: path, required: true, schema: {type: integer, minimum: 0}}
+        - {name: y, in: path, required: true, schema: {type: string, pattern: "^[0-9]+([.][a-z]+)?$"}}
+      responses:
+        "200":
+          description: Tile nhị phân
+          content:
+            image/png: {schema: {type: string, format: binary}}
+            image/jpeg: {schema: {type: string, format: binary}}
+            image/webp: {schema: {type: string, format: binary}}
+            application/x-protobuf: {schema: {type: string, format: binary}}
+        "401": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extdata.unknown_source", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extdata.zoom_too_high | extdata.outside_territory", $ref: "#/components/responses/Problem"}
+        "502": {description: "extdata.provider_unavailable", $ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -4863,6 +4932,18 @@ components:
                     season_ref: {type: string, format: uuid}
                     harvest_id: {type: string, format: uuid}
   schemas:
+    ExtDataSource:
+      type: object
+      required: [id, kind, in_territory, ttl_seconds, fake]
+      properties:
+        id: {type: string}
+        kind: {type: string, enum: [weather, salinity, tile]}
+        in_territory: {type: boolean, description: "Đích thuộc AG_RESIDENCY_ALLOWLIST (RB-7)"}
+        adr: {type: string, description: "ADR riêng của nguồn ngoài lãnh thổ (ADR-0007)"}
+        cell_deg: {type: string, description: "Cạnh ô lưới (nguồn điểm)"}
+        max_zoom: {type: integer, description: "Trần zoom (nguồn tile)"}
+        ttl_seconds: {type: integer}
+        fake: {type: boolean, description: "Nhà cung cấp giả (Local/Dev)"}
     HtxCollectionSchedule:
       type: object
       description: Lịch gom rơm MKG của một HTX (van collection_schedule) — chỉ khung thời gian và trạng thái.

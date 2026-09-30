@@ -8,6 +8,8 @@
 //	agnofloat   R-10 — cấm float trong package tiền và khối lượng
 //	agnotimenow R-12 — cấm time.Now trong domain/
 //	agpiilog    R-14 — cấm log trường pii:"true"
+//	agnoharddelete RB-1, ADR-0011 — cấm DELETE FROM / TRUNCATE trong internal/platform, internal/mkg
+//	            (trừ hàm Rebuild*/Clear* dựng lại bảng chiếu từ sổ, R-22)
 //
 // Chạy: go run ./tools/archlint ./...
 package main
@@ -15,5 +17,5 @@ package main
 import "golang.org/x/tools/go/analysis/multichecker"
 
 func main() {
-	multichecker.Main(Boundary, NoFloat, NoTimeNow, PIILog)
+	multichecker.Main(Boundary, NoFloat, NoTimeNow, PIILog, NoHardDelete)
 }

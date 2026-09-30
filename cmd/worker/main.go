@@ -16,6 +16,10 @@
 //	mechanization_area_feed_check  mỗi giờ: dữ liệu diện tích vụ App HTX quá ngưỡng độ tươi → báo Admin CGH (CGH FN-07)
 //	metrics_snapshot      00:45 hằng ngày (sau anchor): ghi sổ chỉ số của hôm qua + ảnh chụp lớp GIS (pf/metrics, G3)
 //
+// Khi có lịch, worker đăng ký hai gauge của ADR-0006 (gauges.go): ag.sync.conflict.overdue
+// (xung đột đồng bộ quá SLA, theo tenant) và ag.db.standby_replication_lag (chỉ khi có
+// AG_DB_STANDBY_URL).
+//
 // Mọi consumer ghi lần xử lý thất bại vào pf_sync.integration_failure (vai sync_app — màn
 // giám sát đồng bộ, GIS US-SYNC-01); lần giao cuối trước DLQ phát pf.sync.integration.dead_lettered
 // → pf/notify báo Admin nền tảng (GIS US-SYNC-02).
@@ -203,6 +207,11 @@ func run(log *slog.Logger, mods, jobs string) error {
 		}
 		defer closeFn()
 		lockPool := sched.pools[migrations.PF]
+		direct := os.Getenv("AG_DB_DIRECT_URL")
+		if direct == "" {
+			direct = base
+		}
+		defer registerGauges(ctx, log, direct, lockPool)() // ADR-0006: xung đột quá SLA, độ trễ standby
 		started++
 		go func() {
 			errc <- leader.Run(ctx, lockPool, leader.LockSchedules, 15*time.Second, leader.Options{}, log, sched.s.Run)

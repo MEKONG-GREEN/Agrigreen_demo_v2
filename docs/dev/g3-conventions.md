@@ -60,6 +60,8 @@ Chỉ dùng số đã cấp. Số trống có thể còn lại giữa các kho�
 | pf | 000036–000037 | metrics: định nghĩa, giá trị theo ngày, ảnh chụp + watermark, nhật ký lớp GIS | `pf_metrics` | `metrics_app` |
 | pf | 000038 | mrv G3: liên kết bằng chứng thu gom (van `mrv_collection_evidence`), đối chiếu nhật ký HTX ↔ KN (KN US-MRV-02) | `pf_mrv` | `mrv_app` |
 | pf | 000039–000042 | **dự phòng** G3 — xin người tích hợp | | |
+| pf | 000043 | sync: quyền đọc `(tenant_id, status)` của `pf_sync.conflict` cho `ag_outbox_publisher` — gauge `ag.sync.conflict.overdue` ở worker (ADR-0006, [trien-khai-g1](../adr/trien-khai-g1.md)) | `pf_sync` | `ag_outbox_publisher` (chỉ đọc) |
+| pf | 000044 | cấp cho đợt triển khai ADR G1 — không dùng | | |
 | mkg | 000010 | G3-2 tích hợp: `mkg_measurement.lot_collection(_current)` (lô cân ↔ lệnh gom), cột `ticket_ref`/`supersedes_ticket_ref` của `mkg_fieldops.weighed_loading_current`, sổ `mkg_fieldops.roll_count_location` (GPS app hiện trường) | `mkg_measurement`, `mkg_fieldops` | `measurement_app` (+ `ingest_mkg` SELECT bảng chiếu), `fieldops_app` |
 | mkg | 000011–000012 | **dự phòng** G3 — xin người tích hợp | | |
 
