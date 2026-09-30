@@ -57,6 +57,8 @@
 //	AG_DB_DIRECT_URL                   (tùy chọn) URL nối THẲNG PostgreSQL cho job + khóa leader;
 //	                                   mặc định AG_DB_URL. Không trỏ vào PgBouncer.
 //	AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER vai của job vận hành (migration shared/000002)
+//	AG_CLUSTERS                        (tùy chọn) cụm của job neo/dọn idempotency, mặc định mọi cụm;
+//	                                   phải có pf (cmd/internal/clusterenv, G4 tách vùng)
 //	AG_WORKER_JOBS                     mặc định cho -jobs: all | none | anchor,idempotency,extension_escalation,notify_email_digest
 //	AG_DB_PASSWORD_EXTENSION_APP       (hoặc AG_DB_APP_PASSWORD) vai extension_app — khi có job extension_escalation
 //	AG_DB_PASSWORD_SYNC_APP            vai sync_app — ghi lần xử lý thất bại của consumer (giám sát đồng bộ)
@@ -92,6 +94,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/clusterenv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
@@ -304,13 +307,24 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 	if direct == "" {
 		direct = os.Getenv("AG_DB_URL")
 	}
+	// Tách theo vùng (G4, RB-5): AG_CLUSTERS giới hạn cụm của job vận hành (neo, dọn
+	// idempotency). Bản worker vùng nền tảng ở Kubernetes: AG_CLUSTERS=pf; cụm mkg/ts/vault
+	// neo và dọn bằng CronJob `migrate anchor|purge-idempotency` của vùng đó. Cụm pf bắt buộc
+	// (khóa leader và các job pf).
+	clusters, err := clusterenv.Selected()
+	if err != nil {
+		return nil, func() {}, err
+	}
+	if !clusterenv.Has(clusters, migrations.PF) {
+		return nil, func() {}, errors.New("worker: AG_CLUSTERS phải có cụm pf (khóa leader, job pf)")
+	}
 	out := &opsSchedule{pools: map[migrations.Cluster]*pgxpool.Pool{}}
 	closeFn := func() {
 		for _, p := range out.pools {
 			p.Close()
 		}
 	}
-	for _, c := range migrations.Clusters {
+	for _, c := range clusters {
 		dsn, err := dbadmin.RoleURL(direct, c, "", dbadmin.OutboxPublisher)
 		if err != nil {
 			closeFn()
@@ -343,7 +357,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			Run: func(ctx context.Context) error {
 				day := opsjobs.AnchorDateFor(clk.Now())
 				var errs []error
-				for _, c := range migrations.Clusters {
+				for _, c := range clusters {
 					r, err := opsjobs.AnchorDaily(ctx, out.pools[c], store, signer, string(c), day)
 					if err != nil {
 						errs = append(errs, err)
@@ -361,7 +375,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			Name: "idempotency", Spec: schedule.Every{Interval: time.Hour}, RunOnStart: true, Timeout: 15 * time.Minute,
 			Run: func(ctx context.Context) error {
 				var errs []error
-				for _, c := range migrations.Clusters {
+				for _, c := range clusters {
 					n, err := opsjobs.PurgeIdempotency(ctx, out.pools[c], 5000)
 					if err != nil {
 						errs = append(errs, err)

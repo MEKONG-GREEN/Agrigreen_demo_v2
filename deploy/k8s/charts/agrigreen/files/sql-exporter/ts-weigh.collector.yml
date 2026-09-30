@@ -1,0 +1,23 @@
+# Collector cho sql_exporter — target `ts` (database ag_ts), vai `ts_monitor` (migration ts 000003).
+# Cặp với mkg-measurement.collector.yml (target `mkg`, vai `mkg_monitor`). ts_monitor NOBYPASSRLS, không
+# SELECT được ts_weigh.* (số đo thô, chữ ký): chỉ EXECUTE hàm gộp SECURITY DEFINER của schema ts_monitor.
+#   postgres://ts_monitor:<mật khẩu>@pgbouncer:6432/ag_ts?sslmode=disable
+collector_name: agrigreen_ts_weigh
+min_interval: 60s
+
+metrics:
+  # Lô gần nhất theo thiết bị — kiểm chéo với device_current.last_seen_at.
+  - metric_name: ag_ts_device_last_batch_timestamp_seconds
+    type: gauge
+    help: "Thời điểm (unix) received_at của lô gần nhất theo thiết bị/kỳ (ts_weigh.reading_batch, 7 ngày)"
+    key_labels: [device_id, epoch]
+    values: [ts]
+    query: |
+      SELECT device_id, epoch, last_batch_ts AS ts FROM ts_monitor.device_last_batch()
+
+  - metric_name: ag_ts_batches_1h
+    type: gauge
+    help: "Số lô số đo nhận trong 1 giờ qua (toàn cụm ts)"
+    values: [n]
+    query: |
+      SELECT ts_monitor.batches_1h() AS n

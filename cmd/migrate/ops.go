@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/clusterenv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/opsjobs"
@@ -20,8 +21,12 @@ func eachCluster(ctx context.Context, app string, fn func(c migrations.Cluster, 
 	if err != nil {
 		return err
 	}
-	for _, c := range migrations.Clusters {
-		dsn, err := dbadmin.RoleURL(base, c, "", dbadmin.Migrator)
+	clusters, err := clusterenv.Selected()
+	if err != nil {
+		return err
+	}
+	for _, c := range clusters {
+		dsn, err := dbadmin.RoleURL(clusterenv.BaseURL(c, base), c, "", dbadmin.Migrator)
 		if err != nil {
 			return err
 		}
@@ -111,5 +116,38 @@ func verifyChains(ctx context.Context) error {
 		return fmt.Errorf("%d/%d chuỗi đứt — xử lý như sự cố P1 (docs/runbooks/verify-chains.md)", broken, total)
 	}
 	fmt.Printf("chuỗi băm: %d chuỗi hợp lệ\n", total)
+	return nil
+}
+
+// purgeIdempotency: như job idempotency của worker (R-51) nhưng chạy một lần, cho vùng
+// không có lịch worker (vd CronJob vùng mkg/vault ở Kubernetes). Vai ag_outbox_publisher,
+// nối thẳng.
+func purgeIdempotency(ctx context.Context) error {
+	base, err := need("AG_DB_URL")
+	if err != nil {
+		return err
+	}
+	clusters, err := clusterenv.Selected()
+	if err != nil {
+		return err
+	}
+	const batch = 5000
+	for _, c := range clusters {
+		dsn, err := dbadmin.RoleURL(clusterenv.BaseURL(c, base), c, "", dbadmin.OutboxPublisher)
+		if err != nil {
+			return err
+		}
+		pool, err := db.Open(ctx, dsn, db.Options{AppName: "migrate-purge-idempotency", MaxConns: 2})
+		if err != nil {
+			return err
+		}
+		total, err := opsjobs.PurgeIdempotency(ctx, pool, batch)
+		if err != nil {
+			pool.Close()
+			return fmt.Errorf("%s: %w", c, err)
+		}
+		pool.Close()
+		fmt.Printf("%s: xóa %d Idempotency-Key hết hạn\n", c, total)
+	}
 	return nil
 }

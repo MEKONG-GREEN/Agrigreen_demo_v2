@@ -1,0 +1,212 @@
+{{- /*
+Đơn vị triển khai (mục 5): mỗi app một Deployment trong namespace của vùng. Bí mật CHỈ từ Secret
+cùng namespace (secretEnv, envFromSecrets) — Pod vùng mkg không thể nhận bí mật của vùng pf.
+Cứng hóa (mục 18): non-root, rootfs chỉ đọc, bỏ capability, seccomp, không gắn token ServiceAccount.
+*/ -}}
+{{- $root := . }}
+{{- range $name, $app := .Values.apps }}
+{{- if and (ne $app.enabled false) (include "agrigreen.on" (dict "root" $root "zone" $app.zone)) }}
+{{- $ns := include "agrigreen.ns" (dict "root" $root "zone" $app.zone) }}
+{{- $uid := $app.runAsUser | default 65532 }}
+{{- $res := index $root.Values.common.resources ($app.size | default "medium") }}
+{{- $ports := $app.ports | default dict }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $app.zone) | nindent 4 }}
+    app.kubernetes.io/name: {{ $name }}
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $app.zone) | nindent 4 }}
+    app.kubernetes.io/name: {{ $name }}
+  annotations:
+    # Stakater Reloader (Apache-2.0): khởi động lại khi Secret/ConfigMap (chứng thư xoay vòng) đổi.
+    reloader.stakater.com/auto: "true"
+spec:
+{{- if not (and $app.hpa $app.hpa.enabled) }}
+  replicas: {{ $app.replicas | default 1 }}
+{{- end }}
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  template:
+    metadata:
+      labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $app.zone) | nindent 8 }}
+        app.kubernetes.io/name: {{ $name }}
+    spec:
+      serviceAccountName: {{ $name }}
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext: {{- include "agrigreen.podSecurity" (dict "uid" $uid) | nindent 8 }}
+{{- with (index ($root.Values.scheduling.nodeSelectorByZone | default dict) $app.zone) }}
+      nodeSelector: {{ toJson . }}
+{{- end }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ $name }}
+{{- with $root.Values.global.imagePullSecrets }}
+      imagePullSecrets: {{ toJson . }}
+{{- end }}
+      containers:
+        - name: {{ $name }}
+          image: {{ include "agrigreen.image" (dict "root" $root "image" $app.image) }}
+          imagePullPolicy: {{ $root.Values.global.imagePullPolicy }}
+{{- with $app.args }}
+          args: {{ toJson . }}
+{{- end }}
+          securityContext: {{- include "agrigreen.containerSecurity" . | nindent 12 }}
+{{- if $ports }}
+          ports:
+{{- range $pn, $pv := $ports }}
+            - { name: {{ $pn }}, containerPort: {{ $pv }}, protocol: TCP }
+{{- end }}
+{{- end }}
+          env:
+{{- if ne $app.goService false }}
+{{- include "agrigreen.goEnv" $root | nindent 12 }}
+{{- end }}
+{{- range $k, $v := $app.env }}
+            - name: {{ $k }}
+              value: {{ include "agrigreen.envValue" (dict "root" $root "value" $v) | quote }}
+{{- end }}
+{{- range $app.secretEnv }}
+            - name: {{ .name }}
+              valueFrom:
+                secretKeyRef: { name: {{ .secret }}, key: {{ .key | quote }} }
+{{- end }}
+{{- with $app.envFromSecrets }}
+          envFrom:
+{{- range . }}
+            - secretRef: { name: {{ . }} }
+{{- end }}
+{{- end }}
+          resources: {{ toJson $res }}
+{{- with $app.probes }}
+{{- range $kind, $p := . }}
+          {{ $kind }}Probe:
+{{- if $p.tcp }}
+            tcpSocket: { port: {{ $p.tcp }} }
+{{- else }}
+            httpGet: { path: {{ $p.path }}, port: {{ $p.port }} }
+{{- end }}
+{{- if eq $kind "readiness" }}
+            periodSeconds: 5
+            failureThreshold: 3
+{{- else }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 6
+{{- end }}
+            timeoutSeconds: 3
+{{- end }}
+{{- end }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+{{- range $i, $d := $app.tmpDirs }}
+{{- if ne $d "/tmp" }}
+            - { name: {{ printf "tmp-%d" $i }}, mountPath: {{ $d }} }
+{{- end }}
+{{- end }}
+{{- range $i, $c := $app.certs }}
+            - { name: {{ printf "cert-%d" $i }}, mountPath: {{ $c.mountPath }}, readOnly: true }
+{{- end }}
+{{- range $i, $c := $app.configMaps }}
+            - { name: {{ printf "cm-%d" $i }}, mountPath: {{ $c.mountPath }}, readOnly: true }
+{{- end }}
+      volumes:
+        - { name: tmp, emptyDir: { sizeLimit: 256Mi } }
+{{- range $i, $d := $app.tmpDirs }}
+{{- if ne $d "/tmp" }}
+        - { name: {{ printf "tmp-%d" $i }}, emptyDir: { sizeLimit: 512Mi } }
+{{- end }}
+{{- end }}
+{{- range $i, $c := $app.certs }}
+        - name: {{ printf "cert-%d" $i }}
+          secret: { secretName: {{ $c.secret }}, defaultMode: 0440 }
+{{- end }}
+{{- range $i, $c := $app.configMaps }}
+        - name: {{ printf "cm-%d" $i }}
+          configMap: { name: {{ $c.configMap }} }
+{{- end }}
+{{- range $svc := $app.services }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $svc.name }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $app.zone) | nindent 4 }}
+    app.kubernetes.io/name: {{ $name }}
+{{- with $svc.annotations }}
+  annotations: {{ toJson . }}
+{{- end }}
+spec:
+  type: {{ $svc.type | default "ClusterIP" }}
+{{- if $svc.sourceRangesFrom }}
+{{- with (index $root.Values.external $svc.sourceRangesFrom) }}
+  loadBalancerSourceRanges: {{ toJson . }}
+{{- end }}
+  externalTrafficPolicy: Local
+{{- end }}
+  selector:
+    app.kubernetes.io/name: {{ $name }}
+  ports:
+{{- range $svc.ports }}
+    - { name: {{ . }}, port: {{ index $ports . }}, targetPort: {{ . }}, protocol: TCP }
+{{- end }}
+{{- end }}
+{{- with $app.pdb }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $app.zone) | nindent 4 }}
+    app.kubernetes.io/name: {{ $name }}
+spec:
+  minAvailable: {{ .minAvailable }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+{{- end }}
+{{- if and $app.hpa $app.hpa.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $name }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $app.zone) | nindent 4 }}
+    app.kubernetes.io/name: {{ $name }}
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: {{ $name }} }
+  minReplicas: {{ $app.hpa.minReplicas }}
+  maxReplicas: {{ $app.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: {{ $app.hpa.cpu }} }
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+{{- end }}
+{{- end }}
+{{- end }}
