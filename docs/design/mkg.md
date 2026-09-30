@@ -278,7 +278,7 @@ Số chính thức theo [g3-conventions §2](../dev/g3-conventions.md#2-số-mig
 | logistics | `mkg_logistics` (+ `ts_fleet` cụm ts, tùy chọn) | `logistics_app` | **000015** (+ ts **000004**) | vai + schema (000014) + `logistics/port` **đã có (G4-0)** |
 | orders | `mkg_orders` | `orders_app` | **000016** | vai + schema + `orders/port` **đã có (G4-0)** |
 | costing | `mkg_costing` | `costing_app` | **000017–000018** | vai + schema + `costing/port` **đã có (G4-0)** |
-| acctbridge | `mkg_acctbridge` | `acctbridge_app` | **000019** | vai + schema + `acctbridge/port` **đã có (G4-0)** |
+| acctbridge | `mkg_acctbridge` | `acctbridge_app` | **000019** | vai + schema + `acctbridge/port` (G4-0); module + 000019 **đã làm (G4)** — hợp đồng bộ điều hợp: [acctbridge-adapter.md](../dev/acctbridge-adapter.md) |
 | G4-0 | bốn schema trên | — | **000014** (chỉ schema + USAGE); pf **000046** (`waterway_routes`) | **đã có** |
 | dự phòng G4 | | | **000020–000021** (mkg), pf 000047 | xin người tích hợp |
 | G3 tích hợp / nghiệm thu / giám sát | | | **000010**, **000012**, **000013** (000011 bỏ trống) | **đã có** |

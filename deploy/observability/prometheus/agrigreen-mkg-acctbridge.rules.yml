@@ -1,0 +1,41 @@
+# Luật cảnh báo Prometheus — cầu kế toán mkg/acctbridge (bút toán tổng hợp → phần mềm kế toán pháp định,
+# mục 16; R-62: sự kiện vào DLQ sinh cảnh báo, không bao giờ tự xóa). Kiểm: promtool check rules (CI job lint).
+# Xử lý: docs/dev/acctbridge-adapter.md mục "Vận hành".
+#
+# Nguồn metric (OTLP → OpenTelemetry Collector, exporter prometheus: dấu chấm → gạch dưới, counter thêm _total):
+#   ag_acctbridge_push_attempts_total{adapter, outcome}    lần gọi bộ điều hợp (succeeded | unavailable | rejected)
+#   ag_acctbridge_push_dead_lettered_total{reason}         bút toán vào DLQ của module (push_failed): rejected | retry_exhausted
+#   ag_acctbridge_journals_pushed_total                    bút toán đã được phần mềm kế toán nhận
+#   ag_acctbridge_build_failed_total{code}                 job dựng bút toán kết thúc lỗi (mapping_missing, source_mismatch…)
+#
+# DLQ RabbitMQ của consumer mkg.acctbridge.* (lỗi hạ tầng của worker) đã có cảnh báo chung cho mọi hàng đợi
+# vhost mkg.internal ở agrigreen-mkg-ingest.rules.yml — không lặp ở đây.
+#
+# Mức (mục 23): severity=page (P1/P2 — gọi trực), ticket (P3 — xử lý trong giờ làm việc). Ngưỡng "tạm".
+groups:
+  - name: agrigreen-mkg-acctbridge
+    rules:
+      # R-62: bút toán vào DLQ (đích từ chối hoặc hết lượt thử lại) — kỳ chưa sang phần mềm kế toán.
+      - alert: AgrigreenAcctbridgePushDeadLettered
+        expr: sum by (reason) (increase(ag_acctbridge_push_dead_lettered_total[1h])) > 0
+        for: 0m
+        labels: { severity: page, priority: P2, area: accounting }
+        annotations:
+          summary: "Bút toán tổng hợp vào DLQ (lý do {{ $labels.reason }})"
+          description: "GET /v1/acctbridge/journals?status=push_failed; xử lý nguyên nhân (ánh xạ tài khoản, kỳ đích đã khóa, kho đối tượng) rồi POST …/retry-push. docs/dev/acctbridge-adapter.md mục Vận hành."
+      # Đích tạm không nhận liên tục (đang thử lại có giãn cách, chưa vào DLQ).
+      - alert: AgrigreenAcctbridgePushRetrying
+        expr: sum by (adapter) (increase(ag_acctbridge_push_attempts_total{outcome="unavailable"}[1h])) >= 3
+        for: 15m
+        labels: { severity: ticket, priority: P3, area: accounting }
+        annotations:
+          summary: "Bộ điều hợp {{ $labels.adapter }} tạm không nhận {{ $value }} lần trong 1 giờ"
+          description: "Kiểm kho đối tượng trong lãnh thổ / kết nối phần mềm kế toán; AG_ACCTBRIDGE_ADAPTER có đang là unconfigured không."
+      # Job dựng lỗi nghiệp vụ (thiếu ánh xạ đã duyệt, băm kết quả costing lệch).
+      - alert: AgrigreenAcctbridgeBuildFailed
+        expr: sum by (code) (increase(ag_acctbridge_build_failed_total[6h])) > 0
+        for: 0m
+        labels: { severity: ticket, priority: P3, area: accounting }
+        annotations:
+          summary: "Job dựng bút toán tổng hợp lỗi ({{ $labels.code }})"
+          description: "mapping_missing: kế toán trưởng duyệt bảng ánh xạ rồi POST /v1/acctbridge/periods/{id}/journal-builds; source_mismatch: đối chiếu lần đóng kỳ của mkg/costing."

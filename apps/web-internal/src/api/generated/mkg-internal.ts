@@ -2970,6 +2970,213 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/acctbridge/journals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Liệt kê bút toán tổng hợp (mới → cũ)
+         * @description Vai accounting_bridge_operator hoặc chief_accountant. Có ở cả hai bề mặt. Chỉ tổng theo (tài khoản, bên, nhóm, chiều) — không giao dịch chi tiết.
+         */
+        get: operations["listAcctbridgeJournals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/acctbridge/journals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Đọc một bút toán tổng hợp (dòng + các lần đẩy) */
+        get: operations["getAcctbridgeJournal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/acctbridge/journals/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Tải tệp xuất của bút toán (CSV hoặc XML, tất định byte-cho-byte)
+         * @description Cùng byte với tệp bộ xuất tệp đã ghi vào kho đối tượng khi đẩy (docs/dev/acctbridge-adapter.md). UTF-8 không BOM;
+         *     CSV dấu `;`, xuống dòng CRLF; XML xuống dòng LF. Header `X-Content-SHA256` là băm nội dung.
+         */
+        get: operations["exportAcctbridgeJournal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/acctbridge/journals/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * [Quản trị] Duyệt bút toán built và tạo job đẩy lần 1 (202)
+         * @description Vai chief_accountant; người duyệt KHÁC người dựng (403 self_approval_forbidden; CHECK DB lớp hai — R-56). Bút toán tự dựng khi đóng kỳ có người dựng = người đóng kỳ.
+         */
+        post: operations["approveAcctbridgeJournal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/acctbridge/journals/{id}/retry-push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Đẩy lại bút toán đã vào DLQ (push_failed) — job mới, lần thử kế tiếp, cùng khóa idempotency (202)
+         * @description Vai accounting_bridge_operator, sau khi xử lý nguyên nhân (R-62). Lỗi tạm thời được thử lại tự động theo lịch giãn cách, không cần gọi.
+         */
+        post: operations["retryAcctbridgePush"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/acctbridge/periods/{id}/journal-builds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description period_id của mkg/costing */
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Yêu cầu dựng lại bút toán của kỳ theo phiên bản ánh xạ hiện hành (202 + job, mẫu mục 12)
+         * @description Vai accounting_bridge_operator. Chỉ TRƯỚC khi đẩy: bản mới supersedes bản cũ (bản cũ giữ nguyên, trạng thái superseded).
+         *     Bút toán đã đẩy không bao giờ sửa (409 acctbridge.journal_pushed_immutable) — điều chỉnh đến từ bút toán điều chỉnh của costing ở kỳ sau.
+         */
+        post: operations["rebuildAcctbridgeJournal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/acctbridge/jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Trạng thái job dựng / đẩy */
+        get: operations["getAcctbridgeJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/acctbridge/mappings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Các phiên bản bảng ánh xạ tài khoản, phiên bản hiệu lực hôm nay và bảng mặc định tạm */
+        get: operations["listAcctbridgeMappings"];
+        put?: never;
+        /**
+         * [Quản trị] Đề xuất phiên bản ánh xạ (pending tới khi chief_accountant KHÁC duyệt, R-56)
+         * @description Vai accounting_bridge_operator. Không gửi `rules` = bảng mặc định tạm (provisional). Tối đa một phiên bản chờ duyệt.
+         */
+        post: operations["proposeAcctbridgeMapping"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/acctbridge/mappings/{id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description version_id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** [Quản trị] Duyệt / từ chối phiên bản ánh xạ — người quyết định KHÁC người đề xuất (403; CHECK DB) */
+        post: operations["decideAcctbridgeMapping"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/acctbridge/projections/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** [Quản trị] Dựng lại bảng chiếu ánh xạ + bút toán từ sổ (R-22, diễn tập) */
+        post: operations["rebuildAcctbridgeProjections"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4454,6 +4661,143 @@ export interface components {
                 label?: string;
             };
             versions?: components["schemas"]["CostingParamVersion"][];
+        };
+        AcctbridgeJournalLine: {
+            line_no?: number;
+            /** @description Số hiệu tài khoản theo bảng ánh xạ có phiên bản (chờ khách) */
+            account?: string;
+            /** @enum {string} */
+            side?: "debit" | "credit";
+            amount?: components["schemas"]["Money"];
+            category?: string;
+            /** @description Mã chiều đã ánh xạ, vd htx:<uuid> — không dữ liệu cá nhân */
+            dimension?: string;
+            description?: string;
+        };
+        AcctbridgeJournal: {
+            /** Format: uuid */
+            journal_id?: string;
+            /** Format: uuid */
+            period_id?: string;
+            period_code?: string;
+            version?: number;
+            /** @enum {string} */
+            status?: "built" | "approved" | "pushed" | "push_failed" | "superseded";
+            /** Format: uuid */
+            close_run_id?: string;
+            /** @description = result_set_sha256 của kỳ costing */
+            source_hash?: string;
+            lines_sha256?: string;
+            mapping_version?: number;
+            /** @enum {string} */
+            currency?: "VND";
+            line_count?: number;
+            total_debit?: components["schemas"]["Money"];
+            total_credit?: components["schemas"]["Money"];
+            /** Format: uuid */
+            built_by?: string;
+            /** Format: date-time */
+            built_at?: string;
+            /** Format: uuid */
+            build_job_id?: string;
+            /** Format: uuid */
+            supersedes_journal_id?: string | null;
+            /** Format: uuid */
+            superseded_by?: string | null;
+            /** Format: uuid */
+            approved_by?: string | null;
+            /** Format: date-time */
+            approved_at?: string | null;
+            adapter?: string | null;
+            external_ref?: string | null;
+            artifact_sha256?: string | null;
+            /** Format: date-time */
+            pushed_at?: string | null;
+            push_attempts?: number;
+            last_failure_code?: string | null;
+            /** Format: date-time */
+            next_retry_at?: string | null;
+            /** @description Chỉ ở GET /v1/acctbridge/journals/{id} */
+            lines?: components["schemas"]["AcctbridgeJournalLine"][];
+        };
+        AcctbridgePushAttempt: {
+            attempt?: number;
+            /** Format: uuid */
+            job_id?: string;
+            adapter?: string;
+            /** @enum {string} */
+            outcome?: "succeeded" | "unavailable" | "rejected";
+            error_code?: string | null;
+            external_ref?: string | null;
+            artifact_sha256?: string | null;
+            /** Format: date-time */
+            next_retry_at?: string | null;
+            /** Format: date-time */
+            started_at?: string;
+            /** Format: date-time */
+            finished_at?: string;
+        };
+        AcctbridgeJob: {
+            /** Format: uuid */
+            job_id?: string;
+            /** @enum {string} */
+            kind?: "build" | "push";
+            /** @enum {string} */
+            status?: "queued" | "done" | "failed";
+            /** Format: uuid */
+            period_id?: string;
+            period_code?: string;
+            /** Format: uuid */
+            close_run_id?: string;
+            expected_source_hash?: string;
+            mapping_version?: number | null;
+            /** Format: uuid */
+            journal_id?: string | null;
+            attempt?: number | null;
+            /** @description acctbridge.mapping_missing | period_not_closed | source_mismatch | empty_period | journal_pushed_immutable | journal_not_pushable | adapter_unavailable | adapter_rejected | retry_exhausted */
+            failure_code?: string | null;
+            /** Format: uuid */
+            requested_by?: string;
+            /** Format: date-time */
+            requested_at?: string;
+            /** Format: date-time */
+            completed_at?: string | null;
+        };
+        AcctbridgePushJob: {
+            journal?: components["schemas"]["AcctbridgeJournal"];
+            job?: components["schemas"]["AcctbridgeJob"];
+        };
+        AcctbridgeMappingRule: {
+            /** @description costing/port.CostCategory */
+            category: string;
+            /** @description "*" = mọi chiều */
+            dimension_kind: string;
+            debit_account: string;
+            credit_account: string;
+            /** @enum {string} */
+            dimension_on: "none" | "debit" | "credit";
+        };
+        AcctbridgeMapping: {
+            /** Format: uuid */
+            version_id?: string;
+            version?: number;
+            /** @enum {string} */
+            status?: "pending" | "approved" | "rejected";
+            rules?: components["schemas"]["AcctbridgeMappingRule"][];
+            rules_sha256?: string;
+            /** Format: date */
+            effective_from?: string;
+            provisional?: boolean;
+            /** Format: uuid */
+            proposed_by?: string;
+            proposal_reason?: string;
+            /** Format: date-time */
+            proposed_at?: string;
+            /** Format: uuid */
+            decided_by?: string | null;
+            /** Format: date-time */
+            decided_at?: string | null;
+            decision_reason?: string | null;
         };
     };
     responses: {
@@ -9870,6 +10214,352 @@ export interface operations {
                     };
                 };
             };
+        };
+    };
+    listAcctbridgeJournals: {
+        parameters: {
+            query?: {
+                period_id?: string;
+                status?: "built" | "approved" | "pushed" | "push_failed" | "superseded";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trang bút toán (không kèm dòng) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: components["schemas"]["AcctbridgeJournal"][];
+                        next_cursor?: string | null;
+                    };
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
+    getAcctbridgeJournal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bút toán */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        journal?: components["schemas"]["AcctbridgeJournal"];
+                        push_attempts?: components["schemas"]["AcctbridgePushAttempt"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    exportAcctbridgeJournal: {
+        parameters: {
+            query?: {
+                format?: "csv" | "xml";
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp xuất */
+            200: {
+                headers: {
+                    "X-Content-SHA256"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                    "application/xml": string;
+                };
+            };
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    approveAcctbridgeJournal: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gọi lặp cùng khóa (phát lại) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Đã duyệt; job đẩy */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcctbridgePushJob"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    retryAcctbridgePush: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gọi lặp cùng khóa (phát lại) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Job đẩy */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcctbridgePushJob"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    rebuildAcctbridgeJournal: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description period_id của mkg/costing */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gọi lặp cùng khóa (phát lại) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Job dựng */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        job?: components["schemas"]["AcctbridgeJob"];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    getAcctbridgeJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Job */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        job?: components["schemas"]["AcctbridgeJob"];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    listAcctbridgeMappings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ánh xạ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        versions?: components["schemas"]["AcctbridgeMapping"][];
+                        effective?: components["schemas"]["AcctbridgeMapping"] | null;
+                        default_rules?: components["schemas"]["AcctbridgeMappingRule"][];
+                        /** @description Mặc định VAS kiểu TT200 — tạm, chờ khách */
+                        default_provisional?: boolean;
+                    };
+                };
+            };
+        };
+    };
+    proposeAcctbridgeMapping: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    rules?: components["schemas"]["AcctbridgeMappingRule"][];
+                    /** Format: date */
+                    effective_from?: string;
+                    provisional?: boolean;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng khóa (phát lại) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Phiên bản chờ duyệt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        mapping?: components["schemas"]["AcctbridgeMapping"];
+                    };
+                };
+            };
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    decideAcctbridgeMapping: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description version_id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "approved" | "rejected";
+                    /** @description Bắt buộc khi rejected */
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Phiên bản */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        mapping?: components["schemas"]["AcctbridgeMapping"];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    rebuildAcctbridgeProjections: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        mapping_events?: number;
+                        journal_events?: number;
+                        journals?: number;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
         };
     };
 }

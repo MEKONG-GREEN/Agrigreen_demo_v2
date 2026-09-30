@@ -21,6 +21,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/mkgwire"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/acctbridge"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/costing"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops"
 	foport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
@@ -47,11 +48,12 @@ type Modules struct {
 	Logistics   *logistics.Module
 	Orders      *orders.Module // G4: hợp đồng mua rơm, đơn mua/phiếu nhận, đơn bán/giao nhận (orders_app)
 	Costing     *costing.Module
+	Acctbridge  *acctbridge.Module
 }
 
 // List trả module theo thứ tự gắn route.
 func (m Modules) List() []httpx.Module {
-	return []httpx.Module{m.Hub, m.Measurement, m.Fieldops, m.Logistics, m.Orders, m.Costing}
+	return []httpx.Module{m.Hub, m.Measurement, m.Fieldops, m.Logistics, m.Orders, m.Costing, m.Acctbridge}
 }
 
 // OpsRole là vai vận hành của api-internal ở cụm mkg (tương đương platform_api ở
@@ -128,6 +130,14 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules,
 		Trips:      mods.Logistics.Trips(),
 		Deliveries: mods.Orders.Deliveries(),
 	})
+	// G4 mkg/acctbridge (vai acctbridge_app): HTTP + job thử lại đẩy. API không dựng bút toán (worker dựng)
+	// nên không cần costing.ClosedPeriods ở đây; bộ điều hợp dùng cho đẩy lại chạy ở worker-internal.
+	abPool, err := open(ctx, acctbridge.DBRole)
+	if err != nil {
+		return mods, ops, pools, err
+	}
+	pools = append(pools, abPool)
+	mods.Acctbridge = acctbridge.New(abPool, clk, acctbridge.Deps{RetryMax: acctbridge.RetryMaxFromEnv()})
 	return mods, ops, pools, nil
 }
 
@@ -152,12 +162,16 @@ func Jobs(mods Modules, tenantPool *pgxpool.Pool, selected string, log *slog.Log
 		interval, _ := time.ParseDuration(os.Getenv("AG_FIELDOPS_HARVEST_POLL_INTERVAL"))
 		out = append(out, mods.Fieldops.HarvestJobs(tid, interval, log)...)
 	}
+	if selected == "all" || strings.Contains(","+selected+",", ","+acctbridge.JobPushRetry+",") {
+		// R-62: đẩy lại bút toán tổng hợp có hạn thử lại (giãn cách mũ) — tenant tìm qua vai ag_outbox_publisher.
+		out = append(out, mods.Acctbridge.Jobs(acctbridge.PendingRetryTenants(tenantPool), log)...)
+	}
 	return out
 }
 
 // JobNames liệt kê tên job hợp lệ của api-internal.
 func JobNames() string {
-	return hubport.JobDailyCapacity + ", " + foport.JobHTXResponses + ", " + foport.JobHarvestDates
+	return hubport.JobDailyCapacity + ", " + foport.JobHTXResponses + ", " + foport.JobHarvestDates + ", " + acctbridge.JobPushRetry
 }
 
 // FieldopsOptionsFromEnv đọc cấu hình mkg/fieldops:

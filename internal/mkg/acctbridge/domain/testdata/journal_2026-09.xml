@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SummaryJournal xmlns="urn:agrigreen:mkg:acctbridge:summary-journal:v1" schema="acctbridge.export.v1" journalId="0192a000-0000-7000-8000-000000000001" periodId="0192a000-0000-7000-8000-000000000002" periodCode="2026-09" closeRunId="0192a000-0000-7000-8000-000000000003" currency="VND" sourceHash="9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08" mappingVersion="1" totalDebit="497300000.50" totalCredit="497300000.50" lineCount="11">
+  <Line no="1" account="131" side="debit" amount="310000000.00" category="sales_revenue" dimension="customer:0192a000-0000-7000-8000-00000000c001">Tổng hợp sales_revenue kỳ 2026-09</Line>
+  <Line no="2" account="152" side="debit" amount="165000000.50" category="straw_purchase" dimension="">Tổng hợp straw_purchase kỳ 2026-09</Line>
+  <Line no="3" account="627" side="debit" amount="12000000.00" category="hub_processing" dimension="">Tổng hợp hub_processing kỳ 2026-09</Line>
+  <Line no="4" account="627" side="debit" amount="2200000.00" category="transport_road" dimension="">Tổng hợp transport_road kỳ 2026-09</Line>
+  <Line no="5" account="627" side="debit" amount="8100000.00" category="transport_waterway" dimension="">Tổng hợp transport_waterway kỳ 2026-09</Line>
+  <Line no="6" account="331" side="credit" amount="12000000.00" category="hub_processing" dimension="">Tổng hợp hub_processing kỳ 2026-09</Line>
+  <Line no="7" account="331" side="credit" amount="119500000.00" category="straw_purchase" dimension="htx:0192a000-0000-7000-8000-00000000a001">Tổng hợp straw_purchase kỳ 2026-09</Line>
+  <Line no="8" account="331" side="credit" amount="45500000.50" category="straw_purchase" dimension="htx:0192a000-0000-7000-8000-00000000a002">Tổng hợp straw_purchase kỳ 2026-09</Line>
+  <Line no="9" account="331" side="credit" amount="2200000.00" category="transport_road" dimension="">Tổng hợp transport_road kỳ 2026-09</Line>
+  <Line no="10" account="331" side="credit" amount="8100000.00" category="transport_waterway" dimension="">Tổng hợp transport_waterway kỳ 2026-09</Line>
+  <Line no="11" account="511" side="credit" amount="310000000.00" category="sales_revenue" dimension="">Tổng hợp sales_revenue kỳ 2026-09</Line>
+</SummaryJournal>

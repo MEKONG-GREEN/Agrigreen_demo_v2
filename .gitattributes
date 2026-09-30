@@ -3,3 +3,5 @@
 *.png binary
 *.jpg binary
 *.ttf binary
+# Golden byte-cho-byte của tệp xuất kế toán (CSV CRLF, XML LF) — không chuẩn hóa xuống dòng.
+internal/mkg/acctbridge/domain/testdata/** -text

@@ -575,6 +575,25 @@ Cảnh báo không chặn (trường của phiếu nhận, không phải lỗi):
 | 422 | `costing.carbon_split_invalid` | Tỷ lệ chia carbon đang áp dụng (nông hộ + cơ quan + VVB) không bằng 100 |
 | 422 | `validation_failed` | Dữ liệu vào sai (tiền không phải chuỗi ≤ 2 chữ số, khối lượng ≤ 3 chữ số, mã kỳ không phải YYYY-MM, nhóm chi phí không ghi tay được, lý do < 10 ký tự, giá ≤ 0, tham số ngoài miền — vd ẩm độ chỉ `none` tới khi có công thức C-4) |
 | 503 | `costing.contracts_unavailable` | Chưa đọc được hợp đồng mua rơm (`orders/port.Contracts` chưa nối hoặc lỗi) — lập quyết toán không đoán giá |
+### mkg/acctbridge (API nội bộ MKG — `cmd/api-internal`, `contracts/openapi/mkg-internal.yaml`)
+
+| HTTP | code | Khi nào |
+|---|---|---|
+| 403 | `self_approval_forbidden` | Kế toán trưởng duyệt bút toán do chính mình dựng (bút toán tự dựng khi đóng kỳ có người dựng = người đóng kỳ; dựng lại tay = người yêu cầu), hoặc duyệt / từ chối phiên bản ánh xạ do chính mình đề xuất — R-56; DB chặn lần hai bằng CHECK |
+| 404 | `acctbridge.journal_not_found` | Không có bút toán tổng hợp trong tenant của token |
+| 404 | `acctbridge.job_not_found` | Không có job dựng / đẩy |
+| 404 | `acctbridge.mapping_not_found` | Không có phiên bản ánh xạ tài khoản cần quyết định |
+| 404 | `acctbridge.period_unknown` | Yêu cầu dựng lại cho kỳ chưa từng nhận sự kiện `mkg.costing.period.closed` |
+| 409 | `acctbridge.journal_not_built` | Duyệt bút toán không ở trạng thái `built` (đã duyệt, đã bị bản dựng lại thay thế…) |
+| 409 | `acctbridge.journal_not_retryable` | Đẩy lại bút toán không ở trạng thái `push_failed` (lỗi tạm thời được thử lại tự động theo lịch) |
+| 409 | `acctbridge.journal_pushed_immutable` | Duyệt / dựng lại bút toán đã đẩy sang phần mềm kế toán — không bao giờ sửa; điều chỉnh bằng bút toán điều chỉnh của costing ở kỳ sau |
+| 409 | `acctbridge.rebuild_no_change` | Dựng lại khi bút toán hiện hành đã dựng theo đúng lần đóng kỳ và phiên bản ánh xạ hiện hành |
+| 409 | `acctbridge.mapping_pending` | Đề xuất phiên bản ánh xạ khi đang có phiên bản chờ duyệt |
+| 409 | `acctbridge.mapping_decided` | Phiên bản ánh xạ đã được duyệt hoặc từ chối |
+| 422 | `validation_failed` | Bảng ánh xạ sai (tài khoản không phải số hiệu, Nợ = Có, trùng nhóm × chiều, `dimension_on` lạ), lý do < 10 ký tự, `effective_from` không phải YYYY-MM-DD, `status` lọc lạ |
+| 422 | `acctbridge.format_unsupported` | Tải tệp xuất với `format` khác `csv` / `xml` |
+
+Mã kết quả của job và lần đẩy (cột `failure_code` / `error_code`, không phải lỗi HTTP): `acctbridge.mapping_missing` (chưa có phiên bản ánh xạ được duyệt hiệu lực đến cuối kỳ, hoặc thiếu quy tắc cho một nhóm × chiều), `acctbridge.period_not_closed` (costing trả kỳ chưa đóng / không có), `acctbridge.source_mismatch` (lần đóng kỳ hoặc `result_set_sha256` của costing khác sự kiện), `acctbridge.empty_period` (không có số phát sinh), `acctbridge.journal_pushed_immutable` (sự kiện đóng kỳ mới cho kỳ đã đẩy), `acctbridge.journal_not_pushable` (bút toán bị thay thế trước khi đẩy), `acctbridge.adapter_unavailable` (đích tạm không nhận — hẹn thử lại giãn cách), `acctbridge.adapter_rejected` (đích từ chối — DLQ), `acctbridge.retry_exhausted` (hết `acctbridge.push.retry_max` lần — DLQ).
 
 ### pf/waterway
 

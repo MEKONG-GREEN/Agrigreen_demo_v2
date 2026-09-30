@@ -28,6 +28,8 @@ tags:
     description: mkg/orders (G4) — hợp đồng mua rơm với HTX (CT-01..03), đơn mua + phiếu nhận hàng ↔ đơn mua (> 3 % chỉ cảnh báo), đơn bán, lịch giao, biên bản giao nhận liên kết CUSTOMER_IN. Giá, khách không bao giờ qua van
   - name: costing
     description: mkg/costing — giá thành theo lô (sổ là nguồn, mức B), quy đổi cuộn → tấn, phân bổ, quy kết hao hụt, kỳ + đóng kỳ (202 + job), quyết toán HTX, chia doanh thu carbon, tham số có phiên bản
+  - name: acctbridge
+    description: mkg/acctbridge — bút toán TỔNG HỢP theo kỳ (một chiều, tháng) tới phần mềm kế toán pháp định; bảng ánh xạ tài khoản có phiên bản; đẩy, thử lại, DLQ (mục 16, R-62)
   - name: hub
     description: mkg/hub — hub, kho, bãi; lô; mẻ; dịch chuyển tồn; van công bố
 paths:
@@ -2585,6 +2587,185 @@ paths:
       parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
       responses:
         "200": {description: Số dòng đã dựng theo bảng, content: {application/json: {schema: {type: object, additionalProperties: {type: integer}}}}}
+  # --- mkg/acctbridge: bút toán tổng hợp → phần mềm kế toán pháp định (mục 16) ---
+  /v1/acctbridge/journals:
+    get:
+      summary: Liệt kê bút toán tổng hợp (mới → cũ)
+      description: Vai accounting_bridge_operator hoặc chief_accountant. Có ở cả hai bề mặt. Chỉ tổng theo (tài khoản, bên, nhóm, chiều) — không giao dịch chi tiết.
+      operationId: listAcctbridgeJournals
+      tags: [acctbridge]
+      parameters:
+        - {name: period_id, in: query, schema: {type: string, format: uuid}}
+        - {name: status, in: query, schema: {type: string, enum: [built, approved, pushed, push_failed, superseded]}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200}}
+      responses:
+        "200":
+          description: Trang bút toán (không kèm dòng)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/AcctbridgeJournal"}}
+                  next_cursor: {type: [string, "null"]}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/acctbridge/journals/{id}:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: Đọc một bút toán tổng hợp (dòng + các lần đẩy)
+      operationId: getAcctbridgeJournal
+      tags: [acctbridge]
+      responses:
+        "200":
+          description: Bút toán
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  journal: {$ref: "#/components/schemas/AcctbridgeJournal"}
+                  push_attempts: {type: array, items: {$ref: "#/components/schemas/AcctbridgePushAttempt"}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/acctbridge/journals/{id}/export:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: Tải tệp xuất của bút toán (CSV hoặc XML, tất định byte-cho-byte)
+      description: |
+        Cùng byte với tệp bộ xuất tệp đã ghi vào kho đối tượng khi đẩy (docs/dev/acctbridge-adapter.md). UTF-8 không BOM;
+        CSV dấu `;`, xuống dòng CRLF; XML xuống dòng LF. Header `X-Content-SHA256` là băm nội dung.
+      operationId: exportAcctbridgeJournal
+      tags: [acctbridge]
+      parameters: [{name: format, in: query, schema: {type: string, enum: [csv, xml], default: csv}}]
+      responses:
+        "200":
+          description: Tệp xuất
+          headers:
+            X-Content-SHA256: {schema: {type: string, pattern: "^[0-9a-f]{64}$"}}
+          content:
+            text/csv: {schema: {type: string}}
+            application/xml: {schema: {type: string}}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/acctbridge/journals/{id}/approve:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    post:
+      summary: "[Quản trị] Duyệt bút toán built và tạo job đẩy lần 1 (202)"
+      description: Vai chief_accountant; người duyệt KHÁC người dựng (403 self_approval_forbidden; CHECK DB lớp hai — R-56). Bút toán tự dựng khi đóng kỳ có người dựng = người đóng kỳ.
+      operationId: approveAcctbridgeJournal
+      tags: [acctbridge]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "202": {description: Đã duyệt; job đẩy, content: {application/json: {schema: {$ref: "#/components/schemas/AcctbridgePushJob"}}}}
+        "200": {description: Gọi lặp cùng khóa (phát lại)}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/acctbridge/journals/{id}/retry-push:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    post:
+      summary: Đẩy lại bút toán đã vào DLQ (push_failed) — job mới, lần thử kế tiếp, cùng khóa idempotency (202)
+      description: Vai accounting_bridge_operator, sau khi xử lý nguyên nhân (R-62). Lỗi tạm thời được thử lại tự động theo lịch giãn cách, không cần gọi.
+      operationId: retryAcctbridgePush
+      tags: [acctbridge]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "202": {description: Job đẩy, content: {application/json: {schema: {$ref: "#/components/schemas/AcctbridgePushJob"}}}}
+        "200": {description: Gọi lặp cùng khóa (phát lại)}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/acctbridge/periods/{id}/journal-builds:
+    parameters: [{name: id, in: path, required: true, description: period_id của mkg/costing, schema: {type: string, format: uuid}}]
+    post:
+      summary: Yêu cầu dựng lại bút toán của kỳ theo phiên bản ánh xạ hiện hành (202 + job, mẫu mục 12)
+      description: |
+        Vai accounting_bridge_operator. Chỉ TRƯỚC khi đẩy: bản mới supersedes bản cũ (bản cũ giữ nguyên, trạng thái superseded).
+        Bút toán đã đẩy không bao giờ sửa (409 acctbridge.journal_pushed_immutable) — điều chỉnh đến từ bút toán điều chỉnh của costing ở kỳ sau.
+      operationId: rebuildAcctbridgeJournal
+      tags: [acctbridge]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "202": {description: Job dựng, content: {application/json: {schema: {type: object, properties: {job: {$ref: "#/components/schemas/AcctbridgeJob"}}}}}}
+        "200": {description: Gọi lặp cùng khóa (phát lại)}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/acctbridge/jobs/{id}:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: Trạng thái job dựng / đẩy
+      operationId: getAcctbridgeJob
+      tags: [acctbridge]
+      responses:
+        "200": {description: Job, content: {application/json: {schema: {type: object, properties: {job: {$ref: "#/components/schemas/AcctbridgeJob"}}}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/acctbridge/mappings:
+    get:
+      summary: Các phiên bản bảng ánh xạ tài khoản, phiên bản hiệu lực hôm nay và bảng mặc định tạm
+      operationId: listAcctbridgeMappings
+      tags: [acctbridge]
+      responses:
+        "200":
+          description: Ánh xạ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versions: {type: array, items: {$ref: "#/components/schemas/AcctbridgeMapping"}}
+                  effective: {oneOf: [{$ref: "#/components/schemas/AcctbridgeMapping"}, {type: "null"}]}
+                  default_rules: {type: array, items: {$ref: "#/components/schemas/AcctbridgeMappingRule"}}
+                  default_provisional: {type: boolean, description: "Mặc định VAS kiểu TT200 — tạm, chờ khách"}
+    post:
+      summary: "[Quản trị] Đề xuất phiên bản ánh xạ (pending tới khi chief_accountant KHÁC duyệt, R-56)"
+      description: Vai accounting_bridge_operator. Không gửi `rules` = bảng mặc định tạm (provisional). Tối đa một phiên bản chờ duyệt.
+      operationId: proposeAcctbridgeMapping
+      tags: [acctbridge]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                rules: {type: array, maxItems: 500, items: {$ref: "#/components/schemas/AcctbridgeMappingRule"}}
+                effective_from: {type: string, format: date}
+                provisional: {type: boolean}
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201": {description: Phiên bản chờ duyệt, content: {application/json: {schema: {type: object, properties: {mapping: {$ref: "#/components/schemas/AcctbridgeMapping"}}}}}}
+        "200": {description: Gọi lặp cùng khóa (phát lại)}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/acctbridge/mappings/{id}/decision:
+    parameters: [{name: id, in: path, required: true, description: version_id, schema: {type: string, format: uuid}}]
+    post:
+      summary: "[Quản trị] Duyệt / từ chối phiên bản ánh xạ — người quyết định KHÁC người đề xuất (403; CHECK DB)"
+      operationId: decideAcctbridgeMapping
+      tags: [acctbridge]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [decision], properties: {decision: {type: string, enum: [approved, rejected]}, reason: {type: string, minLength: 10, description: "Bắt buộc khi rejected"}}}}}
+      responses:
+        "201": {description: Phiên bản, content: {application/json: {schema: {type: object, properties: {mapping: {$ref: "#/components/schemas/AcctbridgeMapping"}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/acctbridge/projections/rebuild:
+    post:
+      summary: "[Quản trị] Dựng lại bảng chiếu ánh xạ + bút toán từ sổ (R-22, diễn tập)"
+      operationId: rebuildAcctbridgeProjections
+      tags: [acctbridge]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "200": {description: Kết quả, content: {application/json: {schema: {type: object, properties: {mapping_events: {type: integer}, journal_events: {type: integer}, journals: {type: integer}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -3621,3 +3802,104 @@ components:
         default_label: {type: string, example: "tạm, chờ khách"}
         active: {type: object, properties: {value: {type: string}, seq: {type: integer}, pinned: {type: string}, label: {type: string}}}
         versions: {type: array, items: {$ref: "#/components/schemas/CostingParamVersion"}}
+    AcctbridgeJournalLine:
+      type: object
+      properties:
+        line_no: {type: integer}
+        account: {type: string, description: "Số hiệu tài khoản theo bảng ánh xạ có phiên bản (chờ khách)"}
+        side: {type: string, enum: [debit, credit]}
+        amount: {$ref: "#/components/schemas/Money"}
+        category: {type: string}
+        dimension: {type: string, description: "Mã chiều đã ánh xạ, vd htx:<uuid> — không dữ liệu cá nhân"}
+        description: {type: string}
+    AcctbridgeJournal:
+      type: object
+      properties:
+        journal_id: {type: string, format: uuid}
+        period_id: {type: string, format: uuid}
+        period_code: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}
+        version: {type: integer, minimum: 1}
+        status: {type: string, enum: [built, approved, pushed, push_failed, superseded]}
+        close_run_id: {type: string, format: uuid}
+        source_hash: {type: string, description: "= result_set_sha256 của kỳ costing"}
+        lines_sha256: {type: string}
+        mapping_version: {type: integer}
+        currency: {type: string, enum: [VND]}
+        line_count: {type: integer}
+        total_debit: {$ref: "#/components/schemas/Money"}
+        total_credit: {$ref: "#/components/schemas/Money"}
+        built_by: {type: string, format: uuid}
+        built_at: {type: string, format: date-time}
+        build_job_id: {type: string, format: uuid}
+        supersedes_journal_id: {type: [string, "null"], format: uuid}
+        superseded_by: {type: [string, "null"], format: uuid}
+        approved_by: {type: [string, "null"], format: uuid}
+        approved_at: {type: [string, "null"], format: date-time}
+        adapter: {type: [string, "null"]}
+        external_ref: {type: [string, "null"]}
+        artifact_sha256: {type: [string, "null"]}
+        pushed_at: {type: [string, "null"], format: date-time}
+        push_attempts: {type: integer}
+        last_failure_code: {type: [string, "null"]}
+        next_retry_at: {type: [string, "null"], format: date-time}
+        lines: {type: array, items: {$ref: "#/components/schemas/AcctbridgeJournalLine"}, description: "Chỉ ở GET /v1/acctbridge/journals/{id}"}
+    AcctbridgePushAttempt:
+      type: object
+      properties:
+        attempt: {type: integer}
+        job_id: {type: string, format: uuid}
+        adapter: {type: string}
+        outcome: {type: string, enum: [succeeded, unavailable, rejected]}
+        error_code: {type: [string, "null"]}
+        external_ref: {type: [string, "null"]}
+        artifact_sha256: {type: [string, "null"]}
+        next_retry_at: {type: [string, "null"], format: date-time}
+        started_at: {type: string, format: date-time}
+        finished_at: {type: string, format: date-time}
+    AcctbridgeJob:
+      type: object
+      properties:
+        job_id: {type: string, format: uuid}
+        kind: {type: string, enum: [build, push]}
+        status: {type: string, enum: [queued, done, failed]}
+        period_id: {type: string, format: uuid}
+        period_code: {type: string}
+        close_run_id: {type: string, format: uuid}
+        expected_source_hash: {type: string}
+        mapping_version: {type: [integer, "null"]}
+        journal_id: {type: [string, "null"], format: uuid}
+        attempt: {type: [integer, "null"]}
+        failure_code: {type: [string, "null"], description: "acctbridge.mapping_missing | period_not_closed | source_mismatch | empty_period | journal_pushed_immutable | journal_not_pushable | adapter_unavailable | adapter_rejected | retry_exhausted"}
+        requested_by: {type: string, format: uuid}
+        requested_at: {type: string, format: date-time}
+        completed_at: {type: [string, "null"], format: date-time}
+    AcctbridgePushJob:
+      type: object
+      properties:
+        journal: {$ref: "#/components/schemas/AcctbridgeJournal"}
+        job: {$ref: "#/components/schemas/AcctbridgeJob"}
+    AcctbridgeMappingRule:
+      type: object
+      required: [category, dimension_kind, debit_account, credit_account, dimension_on]
+      properties:
+        category: {type: string, description: "costing/port.CostCategory"}
+        dimension_kind: {type: string, description: "\"*\" = mọi chiều"}
+        debit_account: {type: string, pattern: "^[0-9]{3,4}[0-9A-Za-z.]{0,16}$"}
+        credit_account: {type: string, pattern: "^[0-9]{3,4}[0-9A-Za-z.]{0,16}$"}
+        dimension_on: {type: string, enum: [none, debit, credit]}
+    AcctbridgeMapping:
+      type: object
+      properties:
+        version_id: {type: string, format: uuid}
+        version: {type: integer}
+        status: {type: string, enum: [pending, approved, rejected]}
+        rules: {type: array, items: {$ref: "#/components/schemas/AcctbridgeMappingRule"}}
+        rules_sha256: {type: string}
+        effective_from: {type: string, format: date}
+        provisional: {type: boolean}
+        proposed_by: {type: string, format: uuid}
+        proposal_reason: {type: string}
+        proposed_at: {type: string, format: date-time}
+        decided_by: {type: [string, "null"], format: uuid}
+        decided_at: {type: [string, "null"], format: date-time}
+        decision_reason: {type: [string, "null"]}
