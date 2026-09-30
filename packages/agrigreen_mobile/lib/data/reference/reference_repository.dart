@@ -21,6 +21,10 @@ abstract final class RefEntity {
   /// G2 pf/extension: yêu cầu hỗ trợ của nông hộ (vai farmer).
   static const supportRequest = 'support_request';
 
+  /// G3 mkg/fieldops (App hiện trường MKG, `GET /v1/fieldops/sync/pull`):
+  /// lệnh gom đã duyệt / đang làm (`id` = order_id).
+  static const collectionOrder = 'collection_order';
+
   static const catalogItem = 'catalog_item';
   static const adminUnit = 'admin_unit';
   static const cooperative = 'cooperative';

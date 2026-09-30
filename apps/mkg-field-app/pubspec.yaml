@@ -1,0 +1,34 @@
+name: agrigreen_mkg_field
+description: "Mekong Green — App hiện trường MKG (tổ gom, giám sát gom): lệnh gom, đếm cuộn theo công đoạn, ca tổ gom, đối soát chiều mua — ngoại tuyến."
+publish_to: 'none'
+
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.4
+
+# Mọi dependency phải có giấy phép MIT/BSD/Apache-2.0/ISC/MPL-2.0
+# (deploy/policies/allowed-licenses.txt). Plugin của lõi (SQLCipher, secure
+# storage, AppAuth, GPS…) đến qua agrigreen_mobile. Ràng buộc phiên bản giữ y
+# như apps/htx-app để các pubspec.lock phân giải cùng phiên bản.
+dependencies:
+  flutter:
+    sdk: flutter
+  # Lõi di động dùng chung với apps/field-app và apps/htx-app.
+  agrigreen_mobile:
+    path: ../../packages/agrigreen_mobile
+  flutter_riverpod: ^3.4.3
+  connectivity_plus: ^7.3.1
+  path_provider: ^2.1.6
+  path: ^1.9.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  sqflite_common_ffi: ^2.4.3
+  integration_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

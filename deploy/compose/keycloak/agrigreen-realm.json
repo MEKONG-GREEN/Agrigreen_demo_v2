@@ -271,6 +271,18 @@
       "optionalClientScopes": ["offline_access"]
     },
     {
+      "clientId": "agrigreen-mkg-field-app",
+      "name": "App hiện trường MKG (Flutter) — tổ gom (field_collector), giám sát gom (field_supervisor); gọi api-internal vùng mkg",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["vn.agrigreen.mkgfield:/oauth2redirect"],
+      "attributes": { "pkce.code.challenge.method": "S256" },
+      "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"],
+      "optionalClientScopes": ["offline_access"]
+    },
+    {
       "clientId": "agrigreen-tms",
       "name": "TMS (mkg/logistics) — tài khoản dịch vụ đọc bản đồ chuẩn hóa (GIS US-INT-02)",
       "description": "Client credentials, không đăng nhập người dùng. Bí mật do Keycloak sinh (lấy ở trang quản trị). Thuộc tính tenant_id của service-account-agrigreen-tms đặt theo tenant của triển khai (docs/runbooks/gis-performance.md).",

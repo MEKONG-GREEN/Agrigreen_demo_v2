@@ -160,7 +160,18 @@ class HttpSyncApi implements SyncApi {
     this.deviceId,
     http.Client? client,
     this.timeout = const Duration(seconds: 30),
+    this.pushPath = defaultPushPath,
+    this.pullPath = defaultPullPath,
   }) : _client = client ?? http.Client();
+
+  static const defaultPushPath = '/v1/sync/push';
+  static const defaultPullPath = '/v1/sync/pull';
+
+  /// Đường dẫn đồng bộ (cùng hình dạng hợp đồng sync-contract). Mặc định của
+  /// nền tảng; App hiện trường MKG dùng `/v1/fieldops/sync/push|pull` của
+  /// api-internal (vùng mkg).
+  final String pushPath;
+  final String pullPath;
 
   final String baseUrl;
   final AccessTokenProvider accessToken;
@@ -263,7 +274,7 @@ class HttpSyncApi implements SyncApi {
     final h = await _headers(idem: batchKey);
     final res = await _send(
       () => _client.post(
-        _u('/v1/sync/push'),
+        _u(pushPath),
         headers: h,
         body: encodePushBody(deviceId, records),
       ),
@@ -283,7 +294,7 @@ class HttpSyncApi implements SyncApi {
     final h = await _headers(json: false);
     final res = await _send(
       () => _client.get(
-        _u('/v1/sync/pull', {
+        _u(pullPath, {
           'cursor': ?cursor,
           'limit': '$limit',
           if (entities != null && entities.isNotEmpty)

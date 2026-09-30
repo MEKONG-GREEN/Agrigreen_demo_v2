@@ -75,12 +75,18 @@ class OutboxRepository {
     required String deviceId,
     required Clock clock,
     required IdGenerator ids,
+    Set<String> entities = PushEntity.all,
   }) : _db = db,
        _deviceId = deviceId,
        _clock = clock,
-       _ids = ids;
+       _ids = ids,
+       _entities = entities;
 
   final LocalDb _db;
+
+  /// Thực thể được phép xếp hàng. Mặc định thực thể của nền tảng; App hiện
+  /// trường MKG truyền [PushEntity.mkgFieldops] (đồng bộ vùng mkg).
+  final Set<String> _entities;
   final String _deviceId;
   final Clock _clock;
   final IdGenerator _ids;
@@ -88,8 +94,13 @@ class OutboxRepository {
   static const _seqKey = 'outbox.seq';
 
   /// `rejected` mà máy tự gửi lại (sync-contract: `sync.sink_failed`; pf/geo trả
-  /// `internal_error` khi lỗi hệ thống).
-  static const retriableRejectCodes = {'sync.sink_failed', 'internal_error'};
+  /// `internal_error` khi lỗi hệ thống; đồng bộ vùng mkg trả
+  /// `fieldops.sink_failed`).
+  static const retriableRejectCodes = {
+    'sync.sink_failed',
+    'internal_error',
+    'fieldops.sink_failed',
+  };
 
   Database get _sql => _db.db;
 
@@ -229,7 +240,7 @@ class OutboxRepository {
     String? correctionReason,
     DatabaseExecutor? tx,
   }) async {
-    if (!PushEntity.all.contains(entity)) {
+    if (!_entities.contains(entity)) {
       throw OutboxException('Thực thể không hợp lệ: $entity');
     }
     Future<OutboxRecord> run(DatabaseExecutor t) async {

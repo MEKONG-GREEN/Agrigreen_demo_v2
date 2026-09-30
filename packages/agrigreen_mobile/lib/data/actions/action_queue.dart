@@ -26,7 +26,12 @@ enum ApiActionKind {
 
   /// G2 (App HTX): `POST /v1/cropcycle/farm-logs/{id}/reviews {decision, note}`
   /// — quản lý HTX duyệt / yêu cầu bổ sung nhật ký (HTX US-LOG-05).
-  farmLogReview('farm_log_review');
+  farmLogReview('farm_log_review'),
+
+  /// G3 (App hiện trường MKG, api-internal): `POST
+  /// /v1/fieldops/orders/{id}/crew-shifts {crew_ref, kind, headcount,
+  /// event_time, device_id}` — mở / đóng ca tổ gom.
+  fieldopsCrewShift('fieldops_crew_shift');
 
   const ApiActionKind(this.code);
   final String code;
@@ -40,6 +45,8 @@ enum ApiActionKind {
     ApiActionKind.librarySave => '/v1/documents/$target/save',
     ApiActionKind.libraryUnsave => '/v1/documents/$target/unsave',
     ApiActionKind.farmLogReview => '/v1/cropcycle/farm-logs/$target/reviews',
+    ApiActionKind.fieldopsCrewShift =>
+      '/v1/fieldops/orders/$target/crew-shifts',
   };
 }
 
