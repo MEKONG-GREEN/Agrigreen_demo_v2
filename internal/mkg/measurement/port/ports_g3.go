@@ -50,8 +50,10 @@ type RollTotal struct {
 
 // RollTotals là cửa đọc số cuộn của fieldops cho measurement (cùng tiến trình,
 // hoặc bảng chiếu dựng từ sự kiện nội bộ mkg.fieldops.roll_count.recorded).
-// ErrNotFound khi lô chưa có số cuộn. Hiện thực thật do đợt fieldops G3 cung cấp;
-// measurement có bản giả để chạy khi chưa nối.
+// ErrNotFound khi lô chưa có số cuộn. Hiện thực thật: adapter ở gốc lắp ráp
+// (cmd/internal/mkgwire, G3-2) trên fieldops/port.RollTotals; measurement có bản giả
+// app.NoRolls khi chưa nối. lotRef là MÃ LỆNH GOM đã phân giải qua CollectionLinks
+// (ports_g3_2.go); hiện thực nên cài thêm RollTotalsAsOf.
 type RollTotals interface {
 	RollTotal(ctx context.Context, tenantID, lotRef uuid.UUID) (RollTotal, error)
 }

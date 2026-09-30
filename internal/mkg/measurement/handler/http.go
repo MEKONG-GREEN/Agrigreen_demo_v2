@@ -41,6 +41,8 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET(base+"/lots/:id/tickets", h.lotTickets)
 	rg.POST(base+"/lots/:id/tickets", h.manualTicket)
 	rg.POST(base+"/lots/:id/terms", h.setTerms)
+	rg.POST(base+"/lots/:id/collection", h.linkCollection)
+	rg.GET(base+"/lots/:id/collection", h.getCollection)
 	rg.POST(base+"/lots/:id/reconciliations", h.reconcile)
 	rg.GET(base+"/lots/:id/reconciliations", h.reconciliations)
 	rg.GET(base+"/lots/:id/yield", h.yield)
@@ -317,6 +319,8 @@ type openReq struct {
 	Epoch       int     `json:"epoch"`
 	CounterFrom int64   `json:"counter_from"`
 	EventTime   string  `json:"event_time"`
+	// CollectionOrderRef (G3-2, tùy chọn): lệnh gom của mkg/fieldops mà lô cân này chở.
+	CollectionOrderRef *string `json:"collection_order_ref"`
 }
 
 func (h Handler) openSession(c *gin.Context) {
@@ -328,6 +332,7 @@ func (h Handler) openSession(c *gin.Context) {
 	id := x.v7("id", req.ID)
 	lot := x.ref("lot_ref", &req.LotRef)
 	at := x.time("event_time", req.EventTime, false)
+	order := x.ref("collection_order_ref", req.CollectionOrderRef)
 	if lot == nil && !x.bad {
 		x.add("lot_ref", "bắt buộc")
 	}
@@ -335,7 +340,7 @@ func (h Handler) openSession(c *gin.Context) {
 		return
 	}
 	s, rep, err := h.Svc.OpenSession(c.Request.Context(), app.OpenSessionInput{ID: id, LotRef: *lot, DeviceID: req.DeviceID, Epoch: req.Epoch,
-		CounterFrom: req.CounterFrom, EventTime: at, IdemKey: idem(c)})
+		CounterFrom: req.CounterFrom, EventTime: at, IdemKey: idem(c), CollectionOrderRef: order})
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -519,6 +524,62 @@ func (h Handler) setTerms(c *gin.Context) {
 	}
 	created(c, rep, gin.H{"id": t.ID, "lot_ref": t.LotRef, "pricing_basis": t.Basis, "contract_ref": t.ContractRef,
 		"customer_ref": t.CustomerRef, "seq": t.Seq})
+}
+
+// ---------------------------------------------------------------------------
+// Liên kết lô cân ↔ lệnh gom (G3-2)
+// ---------------------------------------------------------------------------
+
+type collectionReq struct {
+	CollectionOrderRef *string `json:"collection_order_ref"`
+	Reason             string  `json:"reason"`
+}
+
+func collectionBody(l port.CollectionLink, row *store.CollectionLink) gin.H {
+	b := gin.H{"lot_ref": l.LotRef, "collection_order_ref": l.CollectionOrderRef, "explicit": l.Explicit}
+	if row != nil {
+		b["id"], b["seq"], b["origin"], b["session_ref"], b["supersedes_id"] = row.ID, row.Seq, row.Origin, row.SessionRef, row.SupersedesID
+		b["event_time"] = row.EventTime.UTC()
+	}
+	return b
+}
+
+func (h Handler) linkCollection(c *gin.Context) {
+	lot, ok := pathID(c, app.ErrLotNotFound)
+	if !ok {
+		return
+	}
+	var req collectionReq
+	if !bind(c, &req) {
+		return
+	}
+	x := newV()
+	order := x.ref("collection_order_ref", req.CollectionOrderRef)
+	if order == nil && !x.bad {
+		x.add("collection_order_ref", "bắt buộc")
+	}
+	if x.fail(c) {
+		return
+	}
+	l, rep, err := h.Svc.LinkCollection(c.Request.Context(), lot, *order, req.Reason, idem(c))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	created(c, rep, collectionBody(port.CollectionLink{LotRef: l.LotRef, CollectionOrderRef: l.CollectionOrderRef, Explicit: true}, &l))
+}
+
+func (h Handler) getCollection(c *gin.Context) {
+	lot, ok := pathID(c, app.ErrLotNotFound)
+	if !ok {
+		return
+	}
+	l, row, err := h.Svc.Collection(c.Request.Context(), lot)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, collectionBody(l, row))
 }
 
 // ---------------------------------------------------------------------------

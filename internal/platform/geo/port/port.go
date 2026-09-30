@@ -79,7 +79,49 @@ type Plots interface {
 const (
 	EventPlotCreated          = "pf.geo.plot.created"
 	EventPlotBoundaryRecorded = "pf.geo.plot_boundary.recorded"
+	// EventPlotRetired / EventPlotRestored: ngừng dùng (xóa mềm, GIS BR-17) và khôi
+	// phục thửa — cùng giao dịch với dòng sổ pf_geo.plot_event (GIS US-EVL-01).
+	EventPlotRetired  = "pf.geo.plot.retired"
+	EventPlotRestored = "pf.geo.plot.restored"
 )
+
+// PlotRetiredV1 là payload của pf.geo.plot.retired, schema_version 1:
+// status_before ∈ {draft, active}, status_after = retired. Không có dữ liệu cá nhân
+// (không household_ref), không mang hình (ranh giới không đổi). PlotEventID = dòng
+// sổ pf_geo.plot_event vừa ghi.
+//
+//ag:event pf.geo.plot.retired v1
+type PlotRetiredV1 struct {
+	PlotRef        uuid.UUID  `json:"plot_ref"`
+	PlotEventID    uuid.UUID  `json:"plot_event_id"`
+	Code           string     `json:"code"`
+	CommuneCode    string     `json:"commune_code"`
+	CooperativeRef *uuid.UUID `json:"cooperative_ref"`
+	StatusBefore   string     `json:"status_before"`
+	StatusAfter    string     `json:"status_after"`
+	Reason         string     `json:"reason"`
+	ActorRef       uuid.UUID  `json:"actor_ref"`
+	EventTime      string     `json:"event_time"`
+}
+
+// PlotRestoredV1 là payload của pf.geo.plot.restored, schema_version 1:
+// status_before = retired, status_after ∈ {draft, active} theo HTX. NeedsReview =
+// khôi phục đã mở xung đột chồng lấn cùng HTX (người dùng xác nhận giữ nguyên).
+//
+//ag:event pf.geo.plot.restored v1
+type PlotRestoredV1 struct {
+	PlotRef        uuid.UUID  `json:"plot_ref"`
+	PlotEventID    uuid.UUID  `json:"plot_event_id"`
+	Code           string     `json:"code"`
+	CommuneCode    string     `json:"commune_code"`
+	CooperativeRef *uuid.UUID `json:"cooperative_ref"`
+	StatusBefore   string     `json:"status_before"`
+	StatusAfter    string     `json:"status_after"`
+	Reason         string     `json:"reason"`
+	NeedsReview    bool       `json:"needs_review"`
+	ActorRef       uuid.UUID  `json:"actor_ref"`
+	EventTime      string     `json:"event_time"`
+}
 
 // PlotCreatedV1 là payload của pf.geo.plot.created, schema_version 1.
 //

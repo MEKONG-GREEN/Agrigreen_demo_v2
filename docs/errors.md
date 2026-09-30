@@ -416,6 +416,8 @@ Nhập hàng loạt: lý do theo dòng dùng nhãn "Thiếu Email", "Sai định
 | 409 | `measurement.dispute_transition` | Thao tác không hợp lệ ở trạng thái hồ sơ (vd kết luận khi chưa xem xét; thêm bằng chứng khi đã đóng) |
 | 409 | `measurement.no_hub_in` | Lập bằng chứng MRV khi lô chưa có phiếu HUB_IN |
 | 409 | `measurement.no_plot_sources` | Lô không có nguồn thửa (hoặc chưa nối nguồn gốc lô mkg/hub) |
+| 409 | `measurement.no_customer_in` | G3-2: lập bằng chứng MRV cho lô DIRECT khi chưa có phiếu CUSTOMER_IN |
+| 409 | `measurement.collection_link_conflict` | G3-2: lệnh gom đã gắn với lô cân khác, hoặc lô đã gắn lệnh gom khác mà không có lý do đổi (mở phiên cân có `collection_order_ref`, `POST …/lots/{id}/collection`) |
 | 422 | `measurement.invalid_ticket` | Phiếu vi phạm hợp đồng TicketWriter: đã có phiếu hiệu lực ở điểm cân (cần `supersedes_id`), phiếu bù trỏ phiếu khác lô/điểm hoặc đã bị bù, HUB_IN/HUB_OUT trên lô DIRECT, tuyến khác tuyến của lô, nhập tay thiếu bằng chứng/lý do, `id` đã dùng |
 | 422 | `measurement.window_incomplete` | Cửa sổ số đo có bộ đếm thiếu (không bao giờ nội suy) |
 | 422 | `validation_failed` | Dữ liệu vào sai (khối lượng không phải chuỗi ≤ 3 chữ số, phần trăm ngoài 0..100 hoặc > 2 chữ số, khóa Ed25519 không 32 byte, `cert_sha256` không phải hex 64, lý do < 10 ký tự, ngưỡng nghiêm trọng < ngưỡng cờ, khoảng ẩm không liền nhau) |

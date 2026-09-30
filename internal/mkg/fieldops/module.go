@@ -24,6 +24,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
 	mport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -117,6 +118,19 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.
 
 // RegisterAdmin: fieldops không có route quản trị ở G3.
 func (m *Module) RegisterAdmin(*gin.RouterGroup) {}
+
+// KgPerRoll cho measurement đọc ước lượng kg/cuộn có mốc thời điểm (G3-2, tenant tường minh).
+func (m *Module) KgPerRoll() port.KgPerRollEstimates { return m.svc }
+
+// Consumers là handler sự kiện NỘI BỘ MKG của fieldops cho cmd/worker-internal (vai
+// fieldops_app, giao dịch inbox — không cần pool).
+type Consumers struct{ svc *app.Service }
+
+// NewConsumers dựng handler consumer của fieldops.
+func NewConsumers(clk clock.Clock) Consumers { return Consumers{svc: &app.Service{Clock: clk}} }
+
+// WeighTicket: mkg.measurement.weigh_ticket.recorded → bảng đệm học kg/cuộn (G3-2).
+func (c Consumers) WeighTicket() inbox.Handler { return c.svc.HandleWeighTicket }
 
 // RollTotals cho module mkg khác (measurement RB-6, costing G4) đọc số cuộn của lô gom.
 func (m *Module) RollTotals() port.RollTotals { return m.svc }

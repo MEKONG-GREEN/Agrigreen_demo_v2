@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.agrigreen.vn/events-internal/mkg.measurement.weigh_ticket.recorded/v1",
   "title": "mkg.measurement.weigh_ticket.recorded — payload (sự kiện NỘI BỘ MKG)",
-  "description": "Một phiếu cân (hoặc phiếu bù) vừa được ghi vào sổ mkg_measurement.weigh_ticket (R-70). Chỉ phát lên vhost mkg.internal (ADR-0018) — KHÔNG BAO GIỜ lên vhost nền tảng: phiếu cân và khối lượng chính xác của lô không qua van công bố. Người nhận: mkg/hub (khối lượng lô nhận, Q-MKG-04), mkg/costing (G4).",
+  "description": "Một phiếu cân (hoặc phiếu bù) vừa được ghi vào sổ mkg_measurement.weigh_ticket (R-70). Chỉ phát lên vhost mkg.internal (ADR-0018) — KHÔNG BAO GIỜ lên vhost nền tảng: phiếu cân và khối lượng chính xác của lô không qua van công bố. Người nhận: mkg/hub (khối lượng lô nhận, Q-MKG-04), mkg/fieldops (học kg/cuộn, G3-2), mkg/costing (G4).",
   "x-event-type": "mkg.measurement.weigh_ticket.recorded",
   "x-schema-version": 1,
   "x-producer": "mkg/measurement",
@@ -19,6 +19,7 @@
     "moisture_pct":  { "type": ["string", "null"], "pattern": "^[0-9]{1,3}\\.[0-9]{2}$" },
     "event_time":    { "type": "string", "format": "date-time" },
     "rule_version":  { "type": ["string", "null"], "description": "Phiên bản thuật toán tích phân (bắt buộc khi source = edge)" },
-    "supersedes_id": { "type": ["string", "null"], "format": "uuid", "description": "Phiếu bù: phiếu bị thay" }
+    "supersedes_id": { "type": ["string", "null"], "format": "uuid", "description": "Phiếu bù: phiếu bị thay" },
+    "collection_order_ref": { "type": ["string", "null"], "format": "uuid", "description": "Thêm ở G3-2 (tùy chọn, tương thích ngược): lệnh gom (lô gom mkg/fieldops) liên kết tường minh với lô; null/vắng = quy ước đồng nhất lot_ref = mã lệnh gom" }
   }
 }

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.geo.plot.retired/v1",
+  "title": "pf.geo.plot.retired — payload",
+  "description": "Một thửa đã bị ngừng dùng (xóa mềm, GIS BR-17): dòng sổ pf_geo.plot_event action = retired, cùng giao dịch. Thửa ẩn khỏi bản đồ nhưng giữ lịch sử; khôi phục được bằng pf.geo.plot.restored. Nhật ký lớp GIS (pf/metrics, GIS US-EVL-01) ghi op = retire. Không chứa dữ liệu cá nhân (không household_ref); không mang hình — ranh giới không đổi.",
+  "x-event-type": "pf.geo.plot.retired",
+  "x-schema-version": 1,
+  "x-producer": "pf/geo",
+  "type": "object",
+  "required": ["plot_ref", "plot_event_id", "code", "commune_code", "cooperative_ref", "status_before", "status_after", "reason", "actor_ref", "event_time"],
+  "properties": {
+    "plot_ref":        { "type": "string", "format": "uuid" },
+    "plot_event_id":   { "type": "string", "format": "uuid", "description": "Dòng sổ pf_geo.plot_event vừa ghi" },
+    "code":            { "type": "string", "maxLength": 40, "description": "Mã thửa hiển thị, vd TH0000001" },
+    "commune_code":    { "type": "string", "description": "Mã xã hiện hành (pf/masterdata)" },
+    "cooperative_ref": { "type": ["string", "null"], "format": "uuid" },
+    "status_before":   { "type": "string", "enum": ["draft", "active"] },
+    "status_after":    { "type": "string", "enum": ["retired"] },
+    "reason":          { "type": "string", "minLength": 10, "description": "Lý do ngừng dùng (bắt buộc, ≥ 10 ký tự)" },
+    "actor_ref":       { "type": "string", "format": "uuid" },
+    "event_time":      { "type": "string", "format": "date-time" }
+  }
+}

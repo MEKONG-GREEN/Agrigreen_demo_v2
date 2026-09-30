@@ -45,6 +45,9 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc
 // Lots cho module mkg khác đọc nguồn gốc và tồn của lô (qua port).
 func (m *Module) Lots() port.Lots { return m.svc }
 
+// LotOrigins cho module mkg khác đọc nguồn gốc lô với tenant tường minh, không cần vai hub (G3-2).
+func (m *Module) LotOrigins() port.LotOrigins { return m.svc }
+
 // ActiveHubTenants dựng bộ tìm tenant có cơ sở đang dùng từ pool vai ag_outbox_publisher.
 func ActiveHubTenants(pool *pgxpool.Pool) app.TenantLister { return app.ActiveHubTenants(pool) }
 

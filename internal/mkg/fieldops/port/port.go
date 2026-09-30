@@ -161,6 +161,9 @@ type LotRolls struct {
 	Stage   string // công đoạn cuối có dữ liệu (boat_load nếu đã xếp ghe/xe)
 	Rolls   int
 	PerPlot map[uuid.UUID]int
+	// HTXConfirmed (G3-2): mọi thửa của lô ở công đoạn cuối đã được HTX xác nhận khớp
+	// (đối soát chiều mua status = match, mục 13.3).
+	HTXConfirmed bool
 }
 
 // RollTotals cho module mkg khác (measurement: cuộn ↔ khối lượng RB-6; costing G4)
@@ -171,3 +174,25 @@ type RollTotals interface {
 
 // ErrLotNotFound: không có lệnh gom (lô gom) với mã này trong tenant.
 var ErrLotNotFound = errors.New("fieldops: không có lô gom")
+
+// ---------------------------------------------------------------------------
+// G3-2 (tích hợp measurement) — thêm vào, không đổi phần đã có.
+// ---------------------------------------------------------------------------
+
+// KgPerRollEstimate là ước lượng kg/cuộn (yield_kg_per_roll — KHÔNG BAO GIỜ qua van).
+type KgPerRollEstimate struct {
+	Kg      mass.Kg // làm tròn 0,1 kg
+	Source  string  // htx_learned | system | config | default
+	Samples int
+}
+
+// KgPerRollEstimates cho measurement (đối soát cuộn ↔ khối lượng, RB-6) đọc ước lượng
+// kg/cuộn của một HTX với tenant tường minh, chỉ học từ lô gom đã cân TRƯỚC mốc before
+// và không gồm excludeLot (chính lô đang đối soát) — tất định khi chạy lại.
+type KgPerRollEstimates interface {
+	KgPerRollAsOf(ctx context.Context, tenantID, htxRef uuid.UUID, before time.Time, excludeLot uuid.UUID) (KgPerRollEstimate, error)
+}
+
+// WeighTicketConsumer: hàng đợi nội bộ mkg.measurement.weigh_ticket.recorded → bảng đệm
+// học kg/cuộn (thay đường làm mới tay RefreshWeighings — đường tay vẫn giữ để chạy bù).
+const WeighTicketConsumer = "mkg.fieldops.weigh_ticket"

@@ -30,11 +30,13 @@ const (
 	RuleImport       = "measurement.customer_import.v1" // C-5 tạm
 	RuleValve        = "measurement.valve.v1"
 	RuleMRVBucket    = "mrv.bucket.v1"
-	ProvisionalLabel = "provisional-default"
-	MinReasonLen     = 10
-	MaxReasonLen     = 500
-	PctScale         = 2
-	defaultKgPerRoll = "20"
+	// RuleCollectionLink: liên kết lô cân ↔ lệnh gom (G3-2). Không có liên kết = quy ước đồng nhất.
+	RuleCollectionLink = "measurement.collection_link.v1"
+	ProvisionalLabel   = "provisional-default"
+	MinReasonLen       = 10
+	MaxReasonLen       = 500
+	PctScale           = 2
+	defaultKgPerRoll   = "20"
 )
 
 // FieldError là lỗi dữ liệu vào gắn với một trường.

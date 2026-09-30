@@ -724,7 +724,7 @@ paths:
       parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
       requestBody:
         required: true
-        content: {application/json: {schema: {type: object, required: [lot_ref, device_id, epoch, counter_from], properties: {id: {type: string, format: uuid}, lot_ref: {type: string, format: uuid}, device_id: {type: string}, epoch: {type: integer}, counter_from: {type: integer, minimum: 0}, event_time: {type: string, format: date-time}}}}}
+        content: {application/json: {schema: {type: object, required: [lot_ref, device_id, epoch, counter_from], properties: {id: {type: string, format: uuid}, lot_ref: {type: string, format: uuid}, device_id: {type: string}, epoch: {type: integer}, counter_from: {type: integer, minimum: 0}, event_time: {type: string, format: date-time}, collection_order_ref: {type: string, format: uuid, description: "G3-2: lệnh gom (lô gom mkg/fieldops) mà lô cân chở — ghi liên kết tường minh lô ↔ lệnh gom (409 measurement.collection_link_conflict nếu lệnh gom đã gắn lô khác)"}}}}}
       responses:
         "201": {description: Phiên mở, content: {application/json: {schema: {$ref: "#/components/schemas/WeighingSession"}}}}
         "409": {$ref: "#/components/responses/Problem"}
@@ -803,6 +803,29 @@ paths:
       requestBody: {required: true, content: {application/json: {schema: {type: object, required: [pricing_basis], properties: {pricing_basis: {type: string, enum: [per_tonne, per_bale]}, contract_ref: {type: string, format: uuid}, customer_ref: {type: string, format: uuid}, reason: {type: string, minLength: 10, description: Bắt buộc khi đổi}}}}}}
       responses:
         "201": {description: Đã đặt}
+  /v1/measurement/lots/{id}/collection:
+    parameters: [{$ref: "#/components/parameters/MeasurementID"}]
+    post:
+      summary: Gắn lô cân với lệnh gom của mkg/fieldops (G3-2)
+      description: >-
+        Vai reconciliation_officer hoặc scale_supervisor. Dùng cho lô DIRECT (chỉ CUSTOMER_IN) hoặc khi phiên cân không mang
+        collection_order_ref. Một lệnh gom thuộc tối đa một lô cân. Đổi lệnh gom của lô cần `reason` (bản ghi bù, RB-1).
+        Gắn xong đối soát lại lô nếu đã đủ phiếu (số cuộn của lệnh gom vào đối chiếu RB-6). Không có liên kết = quy ước
+        đồng nhất (lot_ref là mã lệnh gom).
+      operationId: linkLotCollection
+      tags: [measurement]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [collection_order_ref], properties: {collection_order_ref: {type: string, format: uuid}, reason: {type: string, minLength: 10, maxLength: 500, description: Bắt buộc khi đổi}}}}}}
+      responses:
+        "201": {description: Đã gắn, content: {application/json: {schema: {$ref: "#/components/schemas/LotCollection"}}}}
+        "200": {description: Phát lại}
+        "409": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Liên kết hiện hành lô cân ↔ lệnh gom (explicit = false → quy ước đồng nhất)
+      operationId: getLotCollection
+      tags: [measurement]
+      responses:
+        "200": {description: Liên kết, content: {application/json: {schema: {$ref: "#/components/schemas/LotCollection"}}}}
   /v1/measurement/lots/{id}/reconciliations:
     parameters: [{$ref: "#/components/parameters/MeasurementID"}]
     post:
@@ -832,6 +855,10 @@ paths:
   /v1/measurement/lots/{id}/mrv-evidence:
     post:
       summary: Công bố bằng chứng thu gom qua van mrv_collection_evidence (dự thảo, C-1) — khối lượng THEO BẬC mỗi thửa nguồn
+      description: >-
+        Tuyến HUB: HUB_IN × tỷ lệ thửa của lô hub (mass_basis HUB_IN). Tuyến DIRECT (G3-2): CUSTOMER_IN × tỷ lệ thửa theo số
+        cuộn của lệnh gom liên kết, gắn cờ gộp (mass_basis CUSTOMER_IN_AGGREGATED). 409 measurement.no_hub_in /
+        measurement.no_customer_in / measurement.no_plot_sources.
       operationId: publishMRVEvidence
       tags: [measurement]
       parameters: [{$ref: "#/components/parameters/IdempotencyKey"}, {$ref: "#/components/parameters/MeasurementID"}]
@@ -1188,6 +1215,8 @@ paths:
                           loose_kg: {$ref: "#/components/schemas/Kg"}
                           discrepancy_reason: {type: string}
                           htx_confirmation_ref: {type: string, format: uuid}
+                          gps: {$ref: "#/components/schemas/GPSFix"}
+                          gps_status: {$ref: "#/components/schemas/GPSStatus"}
       responses:
         "200":
           description: Kết quả theo bản ghi
@@ -1505,6 +1534,34 @@ components:
         correction_reason: {type: string, minLength: 10, maxLength: 500, description: "Bắt buộc với bản bù"}
         event_time: {type: string, format: date-time}
         device_id: {type: string}
+        gps: {$ref: "#/components/schemas/GPSFix"}
+        gps_status: {$ref: "#/components/schemas/GPSStatus"}
+    GPSFix:
+      type: object
+      description: >-
+        G3-2: dấu GPS tùy chọn của app hiện trường — không bao giờ chặn lưu (tọa độ hỏng → gps_status = invalid, bỏ tọa độ).
+        Nhận `lng` hoặc `lon`; số JSON đọc dạng thập phân (không float), làm tròn 7 chữ số.
+      properties:
+        lat: {type: number, minimum: -90, maximum: 90}
+        lng: {type: number, minimum: -180, maximum: 180}
+        lon: {type: number, minimum: -180, maximum: 180}
+        accuracy_m: {type: number, minimum: 0}
+    GPSStatus:
+      type: string
+      description: "Trạng thái máy báo; giá trị lạ lưu là unknown"
+      enum: [ok, weak, denied, unavailable, timeout, no_device]
+    LotCollection:
+      type: object
+      properties:
+        lot_ref: {type: string, format: uuid}
+        collection_order_ref: {type: string, format: uuid}
+        explicit: {type: boolean}
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        origin: {type: string, enum: [session, manual]}
+        session_ref: {type: [string, "null"], format: uuid}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        event_time: {type: string, format: date-time}
     RollCount:
       type: object
       properties:
@@ -1523,6 +1580,11 @@ components:
         rule_version: {type: string}
         event_time: {type: string, format: date-time}
         recorded_at: {type: string, format: date-time}
+        gps:
+          type: object
+          description: "G3-2 (chỉ ở GET …/roll-counts): tọa độ dạng chuỗi thập phân"
+          properties: {lat: {type: string}, lng: {type: string}, accuracy_m: {type: [string, "null"]}}
+        gps_status: {type: string, enum: [ok, weak, denied, unavailable, timeout, no_device, invalid, unknown]}
     RollCountResult:
       type: object
       properties:

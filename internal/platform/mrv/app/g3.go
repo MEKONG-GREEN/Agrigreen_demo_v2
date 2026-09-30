@@ -232,6 +232,9 @@ type collectionEvidenceV1 struct {
 	Bucket      string     `json:"collected_kg_bucket"`
 	BucketRule  string     `json:"bucket_rule_version"`
 	Revision    int64      `json:"revision"`
+	// MassBasis (G3-2, tùy chọn): HUB_IN (vắng mặt) hoặc CUSTOMER_IN_AGGREGATED (tuyến DIRECT —
+	// khối lượng khách cân, gộp). Bậc vẫn tính như nhau; cờ gộp chỉ là chỉ báo (chờ C-1).
+	MassBasis string `json:"mass_basis"`
 }
 
 // HandleCollectionEvidence kiểm payload bằng bộ kiểm hợp đồng lúc chạy

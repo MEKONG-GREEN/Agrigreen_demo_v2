@@ -59,7 +59,7 @@ func TestConsumerRegistry(t *testing.T) {
 			t.Errorf("tên hàng đợi %q sai quy ước hoặc trùng", c.Name)
 		}
 		seen[c.Name] = true
-		if c.Build == nil || len(c.Events) == 0 {
+		if (c.Build == nil && c.BuildWith == nil) || len(c.Events) == 0 {
 			t.Errorf("%s: thiếu handler hoặc sự kiện", c.Name)
 		}
 		for _, e := range c.Events {
@@ -95,5 +95,27 @@ func TestFrozenInternalSchemasExist(t *testing.T) {
 		if _, err := os.Stat(p); err != nil {
 			t.Errorf("thiếu %s: %v", p, err)
 		}
+	}
+}
+
+// G3-2: consumer tích hợp fieldops ↔ measurement, đúng vai và sự kiện.
+func TestG32ConsumersRegistered(t *testing.T) {
+	want := map[string][2]string{
+		"mkg.fieldops.weigh_ticket":  {"fieldops_app", "mkg.measurement.weigh_ticket.recorded"},
+		"mkg.measurement.roll_count": {"measurement_app", "mkg.fieldops.roll_count.recorded"},
+	}
+	n := 0
+	for _, c := range Consumers {
+		w, ok := want[c.Name]
+		if !ok {
+			continue
+		}
+		n++
+		if c.Role != w[0] || len(c.Events) != 1 || c.Events[0] != w[1] {
+			t.Errorf("%s: vai %q sự kiện %v", c.Name, c.Role, c.Events)
+		}
+	}
+	if n != len(want) {
+		t.Fatalf("thiếu consumer G3-2: %d/%d", n, len(want))
 	}
 }

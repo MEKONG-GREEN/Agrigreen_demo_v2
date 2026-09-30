@@ -276,6 +276,9 @@ type OpenSessionInput struct {
 	CounterFrom int64
 	EventTime   time.Time
 	IdemKey     string
+	// CollectionOrderRef (G3-2, tùy chọn): lệnh gom mà lô cân chở — ghi liên kết tường minh
+	// lô ↔ lệnh gom cùng giao dịch (sổ lot_collection).
+	CollectionOrderRef *uuid.UUID
 }
 
 // OpenSession mở cửa sổ lô (scale_supervisor). Điểm cân, cơ sở lấy từ kỳ đăng ký
@@ -329,6 +332,12 @@ func (s *Service) OpenSession(ctx context.Context, in OpenSessionInput) (out por
 		}
 		if err := store.UpsertSessionOpen(ctx, tx, p.TenantID, e); err != nil {
 			return mapErr(err)
+		}
+		if in.CollectionOrderRef != nil {
+			if _, _, err := linkTx(ctx, tx, p.TenantID, p.ActorRef, in.LotRef, *in.CollectionOrderRef, store.LinkFromSession, &id, "",
+				in.IdemKey+"#collection", at); err != nil {
+				return err
+			}
 		}
 		cur, err := store.GetSession(ctx, tx, id, false)
 		if cur != nil {

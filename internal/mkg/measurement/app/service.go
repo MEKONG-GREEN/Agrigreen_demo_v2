@@ -40,6 +40,7 @@ var (
 	ErrIncomplete        = problem.New(409, "measurement.reconciliation_incomplete", "Lô chưa đủ phiếu cân để đối soát")
 	ErrDisputeTransition = problem.New(409, "measurement.dispute_transition", "Thao tác không hợp lệ ở trạng thái hiện tại của hồ sơ")
 	ErrNoHubIn           = problem.New(409, "measurement.no_hub_in", "Lô chưa có phiếu HUB_IN để lập bằng chứng MRV")
+	ErrNoCustomerIn      = problem.New(409, "measurement.no_customer_in", "Lô DIRECT chưa có phiếu CUSTOMER_IN để lập bằng chứng MRV")
 	ErrNoPlotSources     = problem.New(409, "measurement.no_plot_sources", "Lô không có nguồn thửa để lập bằng chứng MRV")
 	ErrValveDenied       = problem.New(500, "measurement.valve_denied", "Van công bố từ chối payload")
 )
@@ -59,7 +60,8 @@ type Service struct {
 	Clock   clock.Clock
 	Writer  *Writer
 	Rolls   port.RollTotals
-	Origins hubport.Lots // nguồn gốc lô (thửa + tỷ lệ) cho van MRV
+	Origins hubport.LotOrigins   // nguồn gốc lô hub (thửa + tỷ lệ) cho van MRV, tenant tường minh
+	Plots   port.CollectionPlots // tỷ lệ thửa theo lệnh gom (fieldops) — lô DIRECT / lô không có ở hub
 }
 
 // Vai đọc.
