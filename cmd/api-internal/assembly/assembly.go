@@ -132,6 +132,9 @@ type Deps struct {
 	Ops      *pgxpool.Pool
 	Modules  []httpx.Module
 	Pools    []*pgxpool.Pool
+	// CORSOrigins là origin trình duyệt được gọi chéo (AG_CORS_ORIGINS, khớp chính xác) —
+	// web nội bộ MKG (apps/web-internal).
+	CORSOrigins []string
 }
 
 const maxBody = 1 << 20
@@ -156,6 +159,7 @@ func health(d Deps) func(r *gin.Engine) {
 // NewRouter dựng bề mặt ứng dụng của API nội bộ MKG.
 func NewRouter(d Deps) *gin.Engine {
 	r := httpx.NewEngine(d.Log, maxBody)
+	r.Use(httpx.CORS(d.CORSOrigins)) // trước mọi route: preflight đi qua cả nhánh 404/405
 	health(d)(r)
 	v1 := r.Group("/v1", httpx.Authenticate(d.Verifier), idempotency.Middleware(d.Ops))
 	for _, m := range d.Modules {
@@ -167,6 +171,7 @@ func NewRouter(d Deps) *gin.Engine {
 // NewAdminRouter dựng bề mặt quản trị của API nội bộ MKG: MFA bắt buộc.
 func NewAdminRouter(d Deps) *gin.Engine {
 	r := httpx.NewEngine(d.Log, maxBody)
+	r.Use(httpx.CORS(d.CORSOrigins))
 	health(d)(r)
 	v1 := r.Group("/v1", httpx.Authenticate(d.Verifier), httpx.RequireMFA(), idempotency.Middleware(d.Ops))
 	for _, m := range d.Modules {

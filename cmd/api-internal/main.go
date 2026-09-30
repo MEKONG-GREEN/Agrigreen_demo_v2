@@ -107,7 +107,11 @@ func run(log *slog.Logger) error {
 	} else if verifier, err = authz.NewVerifier(ctx, issuer, audience); err != nil {
 		return err
 	}
-	d := assembly.Deps{Log: log, Verifier: verifier, Ops: ops, Modules: mods.List(), Pools: pools}
+	origins, err := httpx.CORSOriginsFromEnv()
+	if err != nil {
+		return err
+	}
+	d := assembly.Deps{Log: log, Verifier: verifier, Ops: ops, Modules: mods.List(), Pools: pools, CORSOrigins: origins}
 	// Lịch job của vùng mkg (GIS US-WH-01 AC-2: công bố sức chứa theo ngày qua van). Chỉ MỘT bản
 	// api-internal chạy (khóa advisory trên kết nối THẲNG tới cụm mkg, không qua PgBouncer): mặc
 	// định bật khi có AG_MKG_DB_DIRECT_URL; tìm tenant bằng vai ag_outbox_publisher, ghi bằng vai

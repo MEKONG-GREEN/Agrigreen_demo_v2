@@ -345,6 +345,8 @@ services:
       AG_MKG_DB_URL: postgres://pgbouncer:6432/?sslmode=disable
       # Job hub_capacity_daily: khóa leader mức phiên nối THẲNG PostgreSQL (không qua PgBouncer).
       AG_MKG_DB_DIRECT_URL: postgres://postgres:5432/?sslmode=disable
+      # Web nội bộ MKG (apps/web-internal) gọi chéo từ trình duyệt.
+      AG_CORS_ORIGINS: ${AG_MKG_CORS_ORIGINS:-http://localhost:3001,http://127.0.0.1:3001}
       AG_DB_VIA_PGBOUNCER: "1"
       AG_DB_APP_PASSWORD: ${AG_DB_APP_PASSWORD}
     # Ảnh distroless không có curl: chính binary kiểm /readyz (cmd/api-internal -healthcheck).
@@ -557,6 +559,25 @@ services:
     depends_on:
       api-platform: { condition: service_started }
     ports: ["127.0.0.1:3000:3000"]
+    restart: unless-stopped
+
+  web-internal:
+    <<: *hardened
+    image: agrigreen/web-internal:dev
+    build:
+      context: ../../apps/web-internal
+      dockerfile: Dockerfile
+      # NEXT_PUBLIC_* nhúng lúc build: web nội bộ MKG CHỈ gọi api-internal (vùng mkg).
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8081
+        NEXT_PUBLIC_ADMIN_API_BASE: http://localhost:8083
+        NEXT_PUBLIC_OIDC_ISSUER: http://localhost:8180/realms/agrigreen
+        NEXT_PUBLIC_OIDC_CLIENT_ID: agrigreen-web-internal
+        NEXT_PUBLIC_API_MOCK: "0"
+    tmpfs: ["/tmp", "/app/.next/cache:uid=1000,gid=1000,mode=0755"]
+    depends_on:
+      api-internal: { condition: service_started }
+    ports: ["127.0.0.1:3001:3001"]
     restart: unless-stopped
 
 volumes:

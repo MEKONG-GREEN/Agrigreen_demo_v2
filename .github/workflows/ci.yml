@@ -205,6 +205,68 @@ jobs:
       - name: flutter build apk --debug
         run: flutter build apk --debug
 
+  web-internal:
+    name: Web nội bộ MKG (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: apps/web-internal }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", cache: npm, cache-dependency-path: apps/web-internal/package-lock.json }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check:api
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Giấy phép npm (RB-4)
+        run: npx --yes license-checker-rseidelsohn --production --excludePrivatePackages --excludePackages "sharp;@img/sharp-libvips-linux-x64;@img/sharp-libvips-linuxmusl-x64" --onlyAllow "MIT;BSD-2-Clause;BSD-3-Clause;Apache-2.0;ISC;MPL-2.0;0BSD;BlueOak-1.0.0;CC0-1.0;Python-2.0;CC-BY-4.0"
+      - name: Docker image (build thử)
+        run: docker build -t agrigreen/web-internal:ci .
+
+  web-internal-e2e:
+    name: Web nội bộ MKG — E2E (Playwright, dữ liệu giả lập)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run: { working-directory: apps/web-internal }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", cache: npm, cache-dependency-path: apps/web-internal/package-lock.json }
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-web-internal
+          path: |
+            apps/web-internal/playwright-report/
+            apps/web-internal/test-results/
+          retention-days: 7
+
+  mkg-field-app:
+    name: App hiện trường MKG (Flutter)
+    needs: agrigreen-mobile
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: apps/mkg-field-app }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { flutter-version: "3.47.5", channel: stable, cache: true }
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq libsqlite3-dev
+      - run: flutter pub get --enforce-lockfile
+      - run: dart format --output=none --set-exit-if-changed lib test integration_test
+      - run: flutter analyze --fatal-infos
+      - run: flutter test
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - name: flutter build apk --debug
+        run: flutter build apk --debug
+
   htx-app:
     name: App Hợp tác xã (Flutter)
     needs: agrigreen-mobile
@@ -231,9 +293,9 @@ jobs:
   field-app-emulator:
     name: App hiện trường — tích hợp trên emulator (API 29)
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    needs: [field-app, htx-app]
+    needs: [field-app, htx-app, mkg-field-app]
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     defaults:
       run: { working-directory: apps/field-app }
     steps:
@@ -272,6 +334,13 @@ jobs:
           flutter build apk --debug -t integration_test/htx_flow_test.dart
           pkill -f GradleDaemon || true
           df -h /
+      - name: Build APK kiểm thử App hiện trường MKG
+        working-directory: apps/mkg-field-app
+        run: |
+          flutter pub get --enforce-lockfile
+          flutter build apk --debug -t integration_test/mkg_flow_test.dart
+          pkill -f GradleDaemon || true
+          df -h /
       - name: flutter test integration_test
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -289,6 +358,7 @@ jobs:
           script: |
             flutter test integration_test -d emulator-5554 --reporter expanded
             cd ../htx-app && flutter test integration_test -d emulator-5554 --reporter expanded
+            cd ../mkg-field-app && flutter test integration_test -d emulator-5554 --reporter expanded
 
   security:
     name: Bảo mật và giấy phép
