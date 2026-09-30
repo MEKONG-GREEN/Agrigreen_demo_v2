@@ -41,6 +41,10 @@ jobs:
           BASE=""
           if [ "${{ github.event_name }}" = "pull_request" ]; then BASE="origin/${{ github.base_ref }}"; fi
           go run ./tools/contractcheck -base "$BASE"
+      - name: promtool — luật cảnh báo (deploy/observability)
+        run: |
+          docker run --rm --entrypoint /bin/promtool -v "$PWD/deploy/observability:/obs:ro" prom/prometheus:v3.5.0 \
+            check rules /obs/prometheus/agrigreen-mkg-ingest.rules.yml
 
   test:
     name: Kiểm thử (sổ, RLS qua PgBouncer, idempotency)
@@ -320,7 +324,7 @@ jobs:
     strategy:
       matrix:
         # optimizer (Python) có Dockerfile và ngữ cảnh riêng (optimizer/); còn lại build từ Dockerfile gốc với CMD.
-        cmd: [api-platform, api-internal, identity-vault, worker, worker-internal, outbox-publisher, migrate, optimizer]
+        cmd: [api-platform, api-internal, ingest, identity-vault, worker, worker-internal, outbox-publisher, migrate, optimizer]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -354,6 +358,37 @@ jobs:
           DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE")
           curl -sSfL https://github.com/sigstore/cosign/releases/download/v3.1.3/cosign-linux-amd64 -o cosign && chmod +x cosign
           ./cosign sign --yes "$DIGEST"
+
+  # Agent biên là nhị phân tĩnh cài trên máy tại hub (không phải image): build linux/amd64 +
+  # arm64 với CGO_ENABLED=0, kiểm tĩnh thật, kèm SHA-256. Ký manifest cập nhật (edge-agent
+  # update sign) làm ở bước phát hành bằng khóa phát hành giữ ngoài CI (docs/runbooks/edge-agent.md §6).
+  edge-agent:
+    name: edge-agent — nhị phân tĩnh (${{ matrix.goarch }})
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - name: Build CGO_ENABLED=0
+        env: { CGO_ENABLED: "0", GOOS: linux, GOARCH: "${{ matrix.goarch }}" }
+        run: |
+          set -eu
+          mkdir -p dist
+          out=dist/edge-agent-linux-${{ matrix.goarch }}
+          go build -trimpath -ldflags "-s -w -X main.version=0.0.0-ci.${GITHUB_SHA::12}" -o "$out" ./cmd/edge-agent
+          file "$out"
+          file "$out" | grep -q 'statically linked'
+          (cd dist && sha256sum "$(basename "$out")" > "$(basename "$out").sha256")
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: edge-agent-linux-${{ matrix.goarch }}
+          path: dist/
+          retention-days: 30
 
   compose-smoke:
     name: Compose Local/Dev — dựng toàn bộ stack và kiểm healthz/readyz
@@ -423,6 +458,44 @@ jobs:
           fi
           test "$(curlc -s --max-time 5 --cacert /certs/ca.crt --cert /certs/optimizer.crt --key /certs/optimizer.key \
             -o /dev/null -w '%{http_code}' https://api-platform:8084/healthz)" = 200
+      - name: Ingest + agent biên mô phỏng — đầu-cuối tới ts_weigh (ADR-0017/0019)
+        run: |
+          set -eu
+          dc() { docker compose -f "$COMPOSE_FILE" "$@"; }
+          # ingest healthy, /healthz + /readyz (8091 chỉ trong mạng compose → gọi bằng chính binary).
+          iid=$(dc ps -q ingest)
+          test "$(docker inspect -f '{{.State.Health.Status}}' "$iid")" = healthy
+          dc exec -T ingest /app -healthcheck http://127.0.0.1:8091/healthz
+          dc exec -T ingest /app -healthcheck http://127.0.0.1:8091/readyz
+          # 8443 chỉ publish trên 127.0.0.1; 8091 không publish.
+          test "$(dc port ingest 8443)" = "127.0.0.1:8443"
+          if dc port ingest 8091 2>/dev/null | grep -q .; then echo "8091 (ops ingest) bị publish ra máy chủ" >&2; exit 1; fi
+          # mTLS bắt buộc: không chứng thư client → bắt tay hỏng.
+          if curl -fsS --max-time 5 --cacert deploy/compose/.certs/ca.crt -o /dev/null -X POST https://localhost:8443/v1/ingest/batches; then
+            echo "ingest nhận kết nối không có chứng thư client" >&2; exit 1
+          fi
+          # Bước một lần của edge-sim thành công; agent đang chạy.
+          for s in edge-sim-init edge-sim-enroll; do
+            test "$(docker inspect -f '{{.State.ExitCode}}' "$(dc ps -aq "$s")")" = 0
+          done
+          eid=$(dc ps -q edge-sim)
+          test "$(docker inspect -f '{{.State.Running}}' "$eid")" = true
+          # Sổ thiết bị: đề xuất (scale_supervisor) + duyệt (device_approver, khác người) qua Admin API,
+          # rồi chờ lô đầu tiên vào ts_weigh.reading_batch.
+          sh scripts/dev-edge-bootstrap.sh --wait 180
+          # Chạy lại idempotent (kỳ đã active → giữ nguyên).
+          sh scripts/dev-edge-bootstrap.sh | grep -q 'đã active'
+          n=$(dc exec -T postgres psql -U postgres -d ag_ts -tAc \
+            "SELECT count(*) FROM ts_weigh.raw_reading WHERE device_id = 'edge-sim-01'" | tr -d '\r ')
+          echo "raw_reading: $n"; test "$n" -gt 0
+          # Agent ghi nhận xác nhận của ingest (acked_counter > 0) và không khởi động lại.
+          dc exec -T edge-sim /app info -config /etc/edge-agent/run.json | jq -e '.acked_counter > 0'
+          test "$(docker inspect -f '{{.RestartCount}}' "$eid")" = 0
+          # worker-internal đang tiêu thụ trên vhost mkg.internal (hàng đợi + DLQ đã khai báo, có consumer).
+          q=$(dc exec -T rabbitmq rabbitmqctl -q list_queues -p mkg.internal name consumers)
+          echo "$q"
+          echo "$q" | awk '$1 == "mkg.hub.weigh_ticket" && $2 > 0 {ok=1} END {exit !ok}'
+          echo "$q" | awk '$1 == "mkg.hub.weigh_ticket.dlq" {ok=1} END {exit !ok}'
       - name: Cấu hình VPS (docker-compose.vps.yml) — dựng lại với Keycloak production + PostgreSQL
         env:
           VPS: -f deploy/compose/docker-compose.yml -f deploy/compose/docker-compose.vps.yml
@@ -436,7 +509,7 @@ jobs:
             -v "$PWD/deploy/compose/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.10-alpine \
             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
           # Caddy không lấy được chứng chỉ trong CI — chỉ dựng phần sau nó.
-          docker compose $VPS up -d --build --wait --wait-timeout 900 api-platform api-internal optimizer worker worker-internal outbox-publisher web-ops
+          docker compose $VPS up -d --build --wait --wait-timeout 900 api-platform api-internal ingest optimizer worker worker-internal outbox-publisher web-ops
           iss=$(curl -fsS --retry 30 --retry-delay 2 --retry-all-errors http://127.0.0.1:8180/realms/agrigreen/.well-known/openid-configuration | jq -r .issuer)
           test "$iss" = "https://auth.$D/realms/agrigreen"
           curl -fsS --retry 30 --retry-delay 2 --retry-all-errors -o /dev/null http://127.0.0.1:8080/readyz

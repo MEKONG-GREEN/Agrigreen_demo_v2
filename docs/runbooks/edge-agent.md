@@ -10,6 +10,8 @@ Việc của agent:
 - đẩy lô qua **mTLS, chỉ đi ra** tới `cmd/ingest`;
 - chỉ gỡ số đo khỏi đệm sau khi ingest xác nhận.
 
+Phía máy chủ (ingest, duyệt thiết bị trong sổ, thay khóa, cảnh báo, agent mô phỏng trong Compose): [ingest.md](ingest.md).
+
 Agent không mở cổng nào ra mạng. `/healthz` và `/metrics` chỉ nghe `127.0.0.1`.
 
 > Mẫu cân và giao thức còn chờ khách chốt (C-6). Ba bộ điều hợp dưới đây là bản **tạm, chờ khách**. Chốt C-6 chỉ đổi bộ điều hợp, không đổi hợp đồng dây.

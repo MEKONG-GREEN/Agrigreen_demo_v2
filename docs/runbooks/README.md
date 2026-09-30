@@ -20,6 +20,7 @@ Các job vận hành dùng chung cho mọi cụm (`ag_pf`, `ag_mkg`, `ag_vault`)
 | Bản đồ chuẩn hóa cho TMS, đo độ trễ lớp | khi đổi truy vấn lớp; UAT | kiểm thử `TestStandardMapForTMSLatency_…` | `geo_app` | [gis-performance.md](gis-performance.md) |
 | Dựng lại bảng chiếu | diễn tập G4, khi nghi lệch | theo module | vai của module | [rebuild-projection.md](rebuild-projection.md) |
 | Agent biên đọc cân: cài, đăng ký, thay khóa, cập nhật | khi lắp/đổi cân, mất đĩa, phát hành | `cmd/edge-agent` | — | [edge-agent.md](edge-agent.md) |
+| Nhận số đo cân (ingest), duyệt thiết bị hai người, thay khóa, mất đĩa, vhost `mkg.internal`, cảnh báo, tầng lạnh `ts` | khi lắp/đổi cân, sự cố, hết cửa sổ C-7 | `cmd/ingest`, Admin API mkg, `scripts/dev-edge-bootstrap.sh` (dev) | `ingest_ts`, `ts_reader`, `ingest_mkg` | [ingest.md](ingest.md) |
 
 ## Leader
 

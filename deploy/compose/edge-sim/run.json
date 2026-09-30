@@ -1,0 +1,19 @@
+{
+  "device_id": "edge-sim-01",
+  "data_dir": "/var/lib/edge-agent",
+  "adapter": {
+    "type": "simulator",
+    "simulator": { "seed": 20260930, "rate_hz": 2, "load_min_kg": 800, "load_max_kg": 1500 }
+  },
+  "buffer": { "max_rate_hz": 2, "hours": 72 },
+  "batch": { "max_readings": 1000, "max_wait": "2s" },
+  "ingest": {
+    "url": "https://ingest:8443/v1/ingest/batches",
+    "ca_file": "/certs/ca.crt",
+    "cert_file": "/var/lib/edge-agent/tls/device.crt",
+    "cert_key_file": "/var/lib/edge-agent/tls/device.key",
+    "backoff_base": "1s",
+    "backoff_max": "10s"
+  },
+  "health": { "listen": "127.0.0.1:9108", "stale_reading": "60s" }
+}

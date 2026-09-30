@@ -1,0 +1,147 @@
+# Luật cảnh báo Prometheus — nhận số đo cân (cmd/ingest, cmd/edge-agent, mkg/measurement,
+# vhost mkg.internal). Runbook: docs/runbooks/ingest.md mục 7. Kiểm: promtool check rules
+# (CI job lint).
+#
+# Nguồn metric:
+#   ag_ingest_*          cmd/ingest qua OTLP → OpenTelemetry Collector (exporter prometheus,
+#                        tên OTel thay dấu chấm bằng gạch dưới, counter thêm _total — integration-alerts.md mục 3)
+#   edge_*               /metrics cục bộ của agent (127.0.0.1:9108), Prometheus agent tại hub remote-write qua VPN
+#   ag_mkg_*, ag_ts_*    sql_exporter với deploy/observability/sql-exporter/mkg-measurement.collector.yml
+#                        (cần vai giám sát chỉ đọc — chưa có, xem collector)
+#   rabbitmq_detailed_*  plugin rabbitmq_prometheus, /metrics/detailed?vhost=mkg.internal&family=queue_coarse_metrics
+#
+# Mức (mục 23): severity=page (P1/P2 — gọi trực), ticket (P3 — xử lý trong giờ làm việc).
+# Ngưỡng ghi "tạm" là mặc định chờ khách chốt (C-4 dung sai, C-6 mẫu cân, C-7 cửa sổ kiểm toán).
+groups:
+  - name: agrigreen-edge-buffer
+    rules:
+      # Mục 14/19: đệm đĩa ≥ 72 giờ; đầy → agent NGỪNG ghi số đo mới. Phía thiết bị.
+      - alert: AgrigreenEdgeBufferHigh
+        expr: max by (device_id) (edge_buffer_fill_ratio) > 0.7
+        for: 15m
+        labels: { severity: ticket, priority: P3, area: edge }
+        annotations:
+          summary: "Đệm agent {{ $labels.device_id }} đầy {{ $value | humanizePercentage }} (> 70 %)"
+          description: "Ingest không nhận lô hoặc mạng OT/VPN gián đoạn. Xem docs/runbooks/ingest.md mục 7.1."
+      - alert: AgrigreenEdgeBufferCritical
+        expr: max by (device_id) (edge_buffer_fill_ratio) > 0.9
+        for: 5m
+        labels: { severity: page, priority: P1, area: edge }
+        annotations:
+          summary: "Đệm agent {{ $labels.device_id }} đầy {{ $value | humanizePercentage }} (> 90 %) — sắp mất số đo"
+          description: "Khi đầy agent từ chối số đo mới (edge_readings_refused_total tăng). Khôi phục đường đẩy ngay."
+      # Cùng ngưỡng nhưng từ số agent tự báo trong lô (thấy được khi không scrape được máy biên).
+      - alert: AgrigreenEdgeBufferHighReported
+        expr: max by (device_id) (ag_mkg_device_buffer_pct) > 70
+        for: 15m
+        labels: { severity: ticket, priority: P3, area: edge }
+        annotations:
+          summary: "Agent {{ $labels.device_id }} báo đệm {{ $value }} % (> 70 %)"
+      - alert: AgrigreenEdgeBufferCriticalReported
+        expr: max by (device_id) (ag_mkg_device_buffer_pct) > 90
+        for: 5m
+        labels: { severity: page, priority: P1, area: edge }
+        annotations:
+          summary: "Agent {{ $labels.device_id }} báo đệm {{ $value }} % (> 90 %)"
+
+  - name: agrigreen-edge-connectivity
+    rules:
+      # §23 P2: thiết bị đã đăng ký (kỳ active) không có lô quá ngưỡng (tạm 15 phút; chỉnh theo
+      # giờ hoạt động của hub khi có lịch cân).
+      - alert: AgrigreenEdgeAgentDisconnected
+        expr: (time() - max by (device_id, epoch) (ag_mkg_device_last_seen_timestamp_seconds{status="active"})) > 900
+        for: 5m
+        labels: { severity: page, priority: P2, area: edge }
+        annotations:
+          summary: "Thiết bị {{ $labels.device_id }} (kỳ {{ $labels.epoch }}) không gửi lô {{ $value | humanizeDuration }}"
+          description: "Kiểm VPN/OT, dịch vụ edge-agent, edge_alarm tại chỗ, lô bị từ chối (ag_ingest_batches_total{outcome=\"rejected\"}). docs/runbooks/ingest.md mục 7.2."
+      # Không lô nào được nhận trong khi có thiết bị active (ingest hỏng hoặc mọi agent mất kết nối).
+      - alert: AgrigreenIngestNoAcceptedBatches
+        expr: |
+          (sum(rate(ag_ingest_batches_total{outcome="accepted"}[15m])) or on() vector(0)) == 0
+          and on() count(ag_mkg_device_last_seen_timestamp_seconds{status="active"}) > 0
+        for: 15m
+        labels: { severity: page, priority: P2, area: ingest }
+        annotations:
+          summary: "Ingest không nhận lô nào trong 15 phút dù có thiết bị đang hiệu lực"
+      - alert: AgrigreenIngestBatchesRejected
+        expr: sum by (code) (increase(ag_ingest_batches_total{outcome="rejected"}[15m])) > 0
+        labels: { severity: ticket, priority: P3, area: ingest }
+        annotations:
+          summary: "Ingest từ chối lô: {{ $labels.code }} ({{ $value }} trong 15 phút)"
+          description: "unknown_device/cert_mismatch/device_revoked → sổ thiết bị hoặc chứng thư; edge.* → hợp đồng/chữ ký. docs/runbooks/ingest.md mục 7.3."
+      - alert: AgrigreenIngestCounterGap
+        expr: increase(ag_ingest_counter_gaps_total[1h]) > 0
+        labels: { severity: ticket, priority: P3, area: ingest }
+        annotations:
+          summary: "Thiếu {{ $value }} bộ đếm giữa các lô trong 1 giờ (mất lô tại thiết bị)"
+
+  - name: agrigreen-ingest-quality
+    rules:
+      # ADR-0019: thời gian thiết bị chỉ là thông tin; tỉ lệ lô bị gắn cờ lệch đồng hồ cao →
+      # NTP nội bộ/chrony hỏng. Ngưỡng tạm 5 % trong 30 phút.
+      - alert: AgrigreenIngestClockSkewFlagged
+        expr: |
+          sum(rate(ag_ingest_clock_skew_flagged_total[15m]))
+            / clamp_min(sum(rate(ag_ingest_batches_total{outcome="accepted"}[15m])), 1e-9) > 0.05
+        for: 30m
+        labels: { severity: ticket, priority: P3, area: ingest }
+        annotations:
+          summary: "{{ $value | humanizePercentage }} lô bị gắn cờ lệch đồng hồ (> 5 %)"
+      # Phiên cân kẹt (thiếu lô, không có số đo ổn định…) — cần người xử lý (R-70).
+      - alert: AgrigreenIngestIntegrationStuck
+        expr: increase(ag_ingest_integration_stuck_total[30m]) > 0
+        labels: { severity: page, priority: P2, area: ingest }
+        annotations:
+          summary: "Có phiên cân kẹt tích phân (ag.ingest.integration.stuck)"
+          description: "Xem log ingest event=ingest.integration outcome=stuck; docs/runbooks/ingest.md mục 7.4."
+      # §19: tỉ lệ đối soát vượt dung sai thương mại trong 24 giờ (tạm 10 %, dung sai chờ C-4).
+      - alert: AgrigreenOverToleranceRateHigh
+        expr: |
+          sum(ag_mkg_reconciliations_24h{commercial_status=~"flag|critical"})
+            / clamp_min(sum(ag_mkg_reconciliations_24h{commercial_status!="not_applicable"}), 1) > 0.10
+        for: 1h
+        labels: { severity: ticket, priority: P3, area: measurement }
+        annotations:
+          summary: "{{ $value | humanizePercentage }} đối soát 24 giờ qua vượt dung sai (> 10 %, tạm — C-4)"
+      - alert: AgrigreenOverToleranceCritical
+        expr: sum(ag_mkg_reconciliations_24h{commercial_status="critical"}) > 0
+        labels: { severity: ticket, priority: P3, area: measurement }
+        annotations:
+          summary: "{{ $value }} đối soát mức nghiêm trọng trong 24 giờ qua — tranh chấp đã tự mở"
+      - alert: AgrigreenDisputesOpenHigh
+        expr: sum(ag_mkg_disputes_open) > 10
+        for: 1h
+        labels: { severity: ticket, priority: P3, area: measurement }
+        annotations:
+          summary: "{{ $value }} tranh chấp khối lượng đang mở (> 10, tạm)"
+      - alert: AgrigreenDisputeOpenTooLong
+        expr: max(ag_mkg_dispute_oldest_open_timestamp_seconds) > 0 and (time() - max(ag_mkg_dispute_oldest_open_timestamp_seconds)) > 7 * 86400
+        labels: { severity: ticket, priority: P3, area: measurement }
+        annotations:
+          summary: "Có tranh chấp mở quá 7 ngày (tạm)"
+
+  - name: agrigreen-mkg-internal
+    rules:
+      # R-62 / ADR-0018: DLQ của consumer nội bộ trên vhost mkg.internal. Worker nền tảng KHÔNG
+      # đọc được vhost này (tài khoản agrigreen không có quyền) nên ag_rabbitmq_dlq_depth không có
+      # các hàng đợi mkg.* — lấy từ plugin rabbitmq_prometheus.
+      - alert: AgrigreenMkgInternalDLQNotEmpty
+        expr: max by (queue) (rabbitmq_detailed_queue_messages{vhost="mkg.internal", queue=~".+\\.dlq"}) > 0
+        for: 5m
+        labels: { severity: page, priority: P2, area: mkg-internal, rule: R-62 }
+        annotations:
+          summary: "DLQ {{ $labels.queue }} (vhost mkg.internal) có {{ $value }} thông điệp"
+          description: "Sự kiện nội bộ MKG hết lượt giao. docs/runbooks/ingest.md mục 6.3 — không xóa DLQ."
+      - alert: AgrigreenMkgInternalNoConsumer
+        expr: max by (queue) (rabbitmq_detailed_queue_consumers{vhost="mkg.internal", queue!~".+\\.dlq"}) == 0
+        for: 10m
+        labels: { severity: page, priority: P2, area: mkg-internal }
+        annotations:
+          summary: "Hàng đợi {{ $labels.queue }} (mkg.internal) không có consumer — worker-internal dừng?"
+      - alert: AgrigreenMkgInternalMetricsAbsent
+        expr: absent(rabbitmq_detailed_queue_messages{vhost="mkg.internal"})
+        for: 15m
+        labels: { severity: ticket, priority: P3, area: mkg-internal }
+        annotations:
+          summary: "Không có metric hàng đợi vhost mkg.internal — kiểm scrape rabbitmq_prometheus"

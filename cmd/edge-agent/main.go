@@ -11,7 +11,7 @@
 // Lệnh con:
 //
 //	edge-agent run     -config cfg.json          chạy agent
-//	edge-agent enroll  -config cfg.json -epoch N [-rotate] [-abandon-buffer]
+//	edge-agent enroll  -config cfg.json -epoch N [-rotate] [-abandon-buffer] [-skip-if-enrolled]
 //	edge-agent info    -config cfg.json          in key_id, khóa công khai, SHA-256 chứng thư
 //	edge-agent update  apply|guard|commit|rollback|status|sign|keygen …
 //	edge-agent version
@@ -214,14 +214,55 @@ func Enroll(cfg *Config, epoch int, rotate, abandon bool, now time.Time, log *sl
 	}, nil
 }
 
+// ExistingEnrollment trả thông tin kỳ đang đăng ký (không sinh khóa, không đổi tệp)
+// khi data_dir đã có state.json của đúng thiết bị và khóa nguồn khớp key_id.
+// ok = false khi chưa đăng ký. Trạng thái có nhưng hỏng/khóa mất/khóa lệch → lỗi
+// (không che mất đĩa: xử lý theo docs/runbooks/edge-agent.md mục 4).
+func ExistingEnrollment(cfg *Config) (res EnrollResult, ok bool, err error) {
+	st, err := ReadState(cfg.DataDir)
+	if errors.Is(err, os.ErrNotExist) {
+		return res, false, nil
+	}
+	if err != nil {
+		return res, false, err
+	}
+	if st.DeviceID != cfg.DeviceID {
+		return res, false, fmt.Errorf("state.json thuộc thiết bị %s, cấu hình là %s", st.DeviceID, cfg.DeviceID)
+	}
+	k, err := LoadSourceKey(cfg.KeyFile)
+	if err != nil {
+		return res, false, fmt.Errorf("%w: %w", ErrKeyLost, err)
+	}
+	pub := k.Public().(ed25519.PublicKey)
+	if edgewire.KeyID(pub) != st.KeyID {
+		return res, false, ErrKeyLost
+	}
+	return EnrollResult{
+		DeviceID: st.DeviceID, Epoch: st.Epoch, KeyID: st.KeyID,
+		PublicKeyHex: hex.EncodeToString(pub), PublicKeyBase64: base64.StdEncoding.EncodeToString(pub),
+	}, true, nil
+}
+
 func cmdEnroll(args []string, stdout io.Writer, log *slog.Logger) error {
 	fs := flag.NewFlagSet("enroll", flag.ContinueOnError)
 	epoch := fs.Int("epoch", 0, "kỳ đăng ký do sổ thiết bị cấp (lần đầu 1; thay khóa/mất đĩa: N+1)")
 	rotate := fs.Bool("rotate", false, "thay khóa: đăng ký kỳ mới cho thiết bị đã đăng ký")
 	abandon := fs.Bool("abandon-buffer", false, "lưu trữ đệm/trạng thái cũ không thể gửi (mất đĩa một phần, mất khóa)")
+	skip := fs.Bool("skip-if-enrolled", false, "đã đăng ký (state + khóa khớp) thì chỉ in kỳ hiện tại và thoát 0 — cho bước dựng tự động (Compose dev)")
 	cfg, err := loadConfigFlag(fs, args)
 	if err != nil {
 		return err
+	}
+	if *skip && !*rotate {
+		cur, ok, err := ExistingEnrollment(cfg)
+		if err != nil {
+			return err
+		}
+		if ok {
+			b, _ := json.MarshalIndent(cur, "", "  ")
+			_, _ = fmt.Fprintf(stdout, "%s\n\nĐã đăng ký kỳ %d — giữ nguyên (không sinh khóa mới).\n", b, cur.Epoch)
+			return nil
+		}
 	}
 	res, err := Enroll(cfg, *epoch, *rotate, *abandon, time.Now(), log)
 	if err != nil {
@@ -246,6 +287,7 @@ func cmdInfo(args []string, stdout io.Writer) error {
 	if k, err := LoadSourceKey(cfg.KeyFile); err == nil {
 		pub := k.Public().(ed25519.PublicKey)
 		out["key_id"], out["public_key_hex"] = edgewire.KeyID(pub), hex.EncodeToString(pub)
+		out["public_key_base64"] = base64.StdEncoding.EncodeToString(pub) // dạng Admin API sổ thiết bị nhận
 	} else {
 		out["key_error"] = err.Error()
 	}

@@ -10,6 +10,8 @@
 #   identity-vault      http://localhost:8090   (bề mặt Internal — production chỉ mTLS trong cụm)
 #   API nội bộ MKG      http://localhost:8081   (/healthz, /readyz) · quản trị MKG (MFA) http://localhost:8083
 #   Internal API pf     https://api-platform:8084 — mTLS, CHỈ trong mạng compose (optimizer), không mở ra máy
+#   ingest (nhận lô)    https://localhost:8443  — mTLS chứng thư thiết bị; /healthz, /readyz ở ingest:8091 trong mạng compose
+#   edge-sim            agent biên mô phỏng → ingest; đăng ký sổ thiết bị: sh scripts/dev-edge-bootstrap.sh
 #   Keycloak            http://localhost:8180   (realm agrigreen; issuer = http://localhost:8180/realms/agrigreen)
 #   S3 (SeaweedFS)      http://localhost:9000
 #   RabbitMQ            http://localhost:15672
@@ -68,6 +70,13 @@ x-internal-server-certs: &internal-server-certs
   - { type: bind, source: ./.certs/ca.crt, target: /certs/ca.crt, read_only: true, bind: { create_host_path: false } }
   - { type: bind, source: ./.certs/api-platform.crt, target: /certs/api-platform.crt, read_only: true, bind: { create_host_path: false } }
   - { type: bind, source: ./.certs/api-platform.key, target: /certs/api-platform.key, read_only: true, bind: { create_host_path: false } }
+
+# Listener nhận lô mTLS của cmd/ingest (ADR-0019): chứng thư máy chủ + CA cấp chứng thư
+# thiết bị. Dev dùng chung CA nội bộ; production nên có CA riêng cho thiết bị biên.
+x-ingest-server-certs: &ingest-server-certs
+  - { type: bind, source: ./.certs/ca.crt, target: /certs/ca.crt, read_only: true, bind: { create_host_path: false } }
+  - { type: bind, source: ./.certs/ingest.crt, target: /certs/ingest.crt, read_only: true, bind: { create_host_path: false } }
+  - { type: bind, source: ./.certs/ingest.key, target: /certs/ingest.key, read_only: true, bind: { create_host_path: false } }
 
 x-optimizer-client-certs: &optimizer-client-certs
   - { type: bind, source: ./.certs/ca.crt, target: /certs/ca.crt, read_only: true, bind: { create_host_path: false } }
@@ -408,6 +417,101 @@ services:
       start_period: 10s
       retries: 20
 
+  # Nhận lô số đo có chữ ký nguồn từ agent biên qua mTLS (vùng mkg, mục 13.2/14, ADR-0017/0019):
+  # ghi ts_weigh (cụm ag_ts, vai ingest_ts/ts_reader) và tích phân phiếu cân (cụm ag_mkg, vai
+  # ingest_mkg) — hai pool qua PgBouncer, không câu SQL nào chạm cả hai cụm (R-07).
+  # 8091: /healthz, /readyz thuần HTTP — chỉ trong mạng compose. 8443: nhận lô mTLS — chỉ
+  # 127.0.0.1 của máy (VPS: địa chỉ giao diện VPN/OT qua AG_INGEST_BIND_ADDR, xem
+  # docs/runbooks/ingest.md; KHÔNG bao giờ qua Caddy/internet).
+  ingest:
+    <<: *go-app
+    image: agrigreen/ingest:dev
+    build: { context: ../.., dockerfile: Dockerfile, args: { CMD: ingest } }
+    depends_on:
+      migrate-up: { condition: service_completed_successfully }
+      pgbouncer: { condition: service_healthy }
+    environment:
+      <<: *otel-env
+      AG_HTTP_ADDR: ":8091"
+      AG_INGEST_HTTP_ADDR: ":8443"
+      AG_INGEST_TLS_CERT: /certs/ingest.crt
+      AG_INGEST_TLS_KEY: /certs/ingest.key
+      AG_INGEST_CLIENT_CA: /certs/ca.crt
+      AG_TS_DB_URL: postgres://pgbouncer:6432/?sslmode=disable
+      AG_MKG_DB_URL: postgres://pgbouncer:6432/?sslmode=disable
+      AG_DB_VIA_PGBOUNCER: "1"
+      AG_DB_APP_PASSWORD: ${AG_DB_APP_PASSWORD}
+      # Tham số tạm (chờ khách): ngưỡng cờ lệch đồng hồ, phiên kẹt — mặc định trong cmd/ingest.
+      AG_INGEST_INTEGRATE_INTERVAL: 15s
+    volumes: *ingest-server-certs
+    healthcheck:
+      test: ["CMD", "/app", "-healthcheck", "http://127.0.0.1:8091/readyz"]
+      interval: 5s
+      timeout: 3s
+      start_period: 10s
+      retries: 20
+    expose: ["8091", "8443"]
+    ports: ["${AG_INGEST_BIND_ADDR:-127.0.0.1}:8443:8443"]
+
+  # ---------------------------------------------------------------- agent biên mô phỏng (chỉ dev)
+  # edge-sim = cmd/edge-agent với bộ điều hợp simulator, đẩy lô tới https://ingest:8443.
+  # Ba bước (docs/runbooks/ingest.md mục 2):
+  #   edge-sim-init    (root, một lần) chép chứng thư client dev device-edge-sim-01.* từ
+  #                    scripts/gen-dev-certs vào volume, khóa 0600 chủ 65532 (agent từ chối khóa
+  #                    đọc được bởi người khác — tệp bind từ máy là 0644).
+  #   edge-sim-enroll  (một lần, idempotent) `edge-agent enroll -skip-if-enrolled`: sinh khóa ký
+  #                    nguồn Ed25519 + state.json kỳ 1 trong volume; chạy lại giữ nguyên.
+  #   edge-sim         `edge-agent run`. Lô bị ingest từ chối (403 unknown_device) cho tới khi
+  #                    sổ thiết bị có kỳ đã duyệt: chạy scripts/dev-edge-bootstrap.sh (đề xuất
+  #                    bằng scale_supervisor, duyệt bằng device_approver KHÁC người — R-56).
+  # docker-compose.vps.yml tắt ba dịch vụ này (profile dev-sim).
+  edge-sim-init:
+    <<: *hardened
+    image: busybox:1.37
+    cap_add: ["CHOWN", "DAC_OVERRIDE", "FOWNER"]
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        mkdir -p /data/tls
+        cp /src/device.crt /data/tls/device.crt
+        cp /src/device.key /data/tls/device.key
+        chmod 700 /data /data/tls
+        chmod 644 /data/tls/device.crt
+        chmod 600 /data/tls/device.key
+        chown -R 65532:65532 /data
+        echo "edge-sim-init: chứng thư client đã chép vào volume"
+    volumes:
+      - { type: volume, source: edge_sim_data, target: /data }
+      - { type: bind, source: ./.certs/device-edge-sim-01.crt, target: /src/device.crt, read_only: true, bind: { create_host_path: false } }
+      - { type: bind, source: ./.certs/device-edge-sim-01.key, target: /src/device.key, read_only: true, bind: { create_host_path: false } }
+    restart: "no"
+
+  edge-sim-enroll:
+    <<: *hardened
+    image: agrigreen/edge-agent:dev
+    build: { context: ../.., dockerfile: Dockerfile, args: { CMD: edge-agent } }
+    depends_on:
+      edge-sim-init: { condition: service_completed_successfully }
+    command: ["enroll", "-config", "/etc/edge-agent/enroll.json", "-epoch", "1", "-skip-if-enrolled"]
+    volumes:
+      - { type: volume, source: edge_sim_data, target: /var/lib/edge-agent }
+      - { type: bind, source: ./edge-sim, target: /etc/edge-agent, read_only: true }
+    restart: "no"
+
+  edge-sim:
+    <<: *go-app
+    image: agrigreen/edge-agent:dev
+    build: { context: ../.., dockerfile: Dockerfile, args: { CMD: edge-agent } }
+    depends_on:
+      edge-sim-enroll: { condition: service_completed_successfully }
+      ingest: { condition: service_healthy }
+    command: ["run", "-config", "/etc/edge-agent/run.json"]
+    volumes:
+      - { type: volume, source: edge_sim_data, target: /var/lib/edge-agent }
+      - { type: bind, source: ./edge-sim, target: /etc/edge-agent, read_only: true }
+      - { type: bind, source: ./.certs/ca.crt, target: /certs/ca.crt, read_only: true, bind: { create_host_path: false } }
+
   worker:
     <<: *go-app
     image: agrigreen/worker:dev
@@ -458,3 +562,5 @@ services:
 volumes:
   pgdata: {}
   objects: {}
+  # data_dir của edge-sim (state.json, WAL, source.key, tls/). Xóa volume = "mất đĩa" → kỳ mới.
+  edge_sim_data: {}

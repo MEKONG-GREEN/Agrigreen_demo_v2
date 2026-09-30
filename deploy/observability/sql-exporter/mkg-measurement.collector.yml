@@ -1,0 +1,80 @@
+# Collector cho sql_exporter (github.com/burningalchemist/sql_exporter, MIT) — chỉ số VẬN HÀNH
+# của mkg/measurement + ts_weigh mà tiến trình Go chưa xuất qua OTLP (docs/runbooks/ingest.md mục 7).
+# Chỉ đọc cột vận hành/đếm — không số đo, không khối lượng, không danh tính khách (van: không qua).
+#
+# Cần một vai giám sát CHỈ ĐỌC xuyên tenant (RLS) ở cụm mkg và ts — CHƯA có (xin người tích hợp:
+# vai `mkg_monitor`/`ts_monitor` hoặc view SECURITY DEFINER chỉ trả các cột dưới). Tới lúc đó
+# collector này là đặc tả; luật ở prometheus/agrigreen-mkg-ingest.rules.yml dựa vào tên metric này.
+#
+# Hai target: `mkg` (database ag_mkg) chạy các metric ag_mkg_*; `ts` (database ag_ts) chạy ag_ts_*.
+collector_name: agrigreen_mkg_measurement
+min_interval: 60s
+
+metrics:
+  # Thiết bị có kỳ đang hiệu lực: lần cuối ingest nhận lô (chưa nhận → thời điểm duyệt).
+  - metric_name: ag_mkg_device_last_seen_timestamp_seconds
+    type: gauge
+    help: "Thời điểm (unix) ingest nhận lô gần nhất của kỳ thiết bị; chưa có lô → thời điểm duyệt"
+    key_labels: [device_id, epoch, point, status]
+    values: [ts]
+    query: |
+      SELECT device_id, epoch::text AS epoch, point, status,
+             extract(epoch FROM coalesce(last_seen_at, decided_at, proposed_at)) AS ts
+      FROM mkg_measurement.device_current
+      WHERE status IN ('active', 'pending')
+
+  # Độ đầy đệm agent tự báo (phía máy chủ — thấy được cả khi không scrape được máy biên).
+  - metric_name: ag_mkg_device_buffer_pct
+    type: gauge
+    help: "Độ đầy đệm đĩa (%) agent báo trong lô gần nhất"
+    key_labels: [device_id, epoch]
+    values: [buffer_pct]
+    query: |
+      SELECT device_id, epoch::text AS epoch, buffer_pct::float8 AS buffer_pct
+      FROM mkg_measurement.device_current
+      WHERE status = 'active' AND buffer_pct IS NOT NULL
+
+  # Đối soát 24 giờ qua theo trạng thái thương mại (§19: tỉ lệ phiếu vượt dung sai).
+  - metric_name: ag_mkg_reconciliations_24h
+    type: gauge
+    help: "Số lần đối soát ghi trong 24 giờ qua theo commercial_status"
+    key_labels: [commercial_status]
+    values: [n]
+    query: |
+      SELECT commercial_status, count(*)::float8 AS n
+      FROM mkg_measurement.reconciliation
+      WHERE recorded_at > now() - interval '24 hours'
+      GROUP BY commercial_status
+
+  # Tranh chấp đang mở / đang xem xét theo mức.
+  - metric_name: ag_mkg_disputes_open
+    type: gauge
+    help: "Số tranh chấp khối lượng đang open/under_review"
+    key_labels: [severity]
+    values: [n]
+    query: |
+      SELECT severity, count(*)::float8 AS n
+      FROM mkg_measurement.dispute_current
+      WHERE status IN ('open', 'under_review')
+      GROUP BY severity
+
+  - metric_name: ag_mkg_dispute_oldest_open_timestamp_seconds
+    type: gauge
+    help: "Thời điểm (unix) mở của tranh chấp đang mở lâu nhất (0 = không có)"
+    values: [ts]
+    query: |
+      SELECT coalesce(extract(epoch FROM min(opened_at)), 0) AS ts
+      FROM mkg_measurement.dispute_current
+      WHERE status IN ('open', 'under_review')
+
+  # Cụm ts (target riêng): lô gần nhất theo thiết bị — kiểm chéo với device_current.last_seen_at.
+  - metric_name: ag_ts_device_last_batch_timestamp_seconds
+    type: gauge
+    help: "Thời điểm (unix) received_at của lô gần nhất theo thiết bị/kỳ (ts_weigh.reading_batch)"
+    key_labels: [device_id, epoch]
+    values: [ts]
+    query: |
+      SELECT device_id, epoch::text AS epoch, extract(epoch FROM max(received_at)) AS ts
+      FROM ts_weigh.reading_batch
+      WHERE received_at > now() - interval '7 days'
+      GROUP BY device_id, epoch
