@@ -2,7 +2,7 @@
 // (xem README — khoảng trống hợp đồng), nên giao diện nhớ mã người dùng vừa tạo/xem để chọn lại nhanh.
 // Chỉ trong bộ nhớ tab — không lưu trình duyệt (không có dữ liệu cá nhân, nhưng cũng không cần bền).
 
-export type RecentKind = "lot" | "session" | "transfer" | "htx" | "facility";
+export type RecentKind = "lot" | "session" | "transfer" | "htx" | "facility" | "customer";
 export interface RecentItem {
   kind: RecentKind;
   id: string;

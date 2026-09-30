@@ -5,14 +5,18 @@
 // Idempotent-Replayed, tự phê duyệt → 403 self_approval_forbidden (R-56), bề mặt quản trị cần MFA →
 // 403 mfa_required, route của bề mặt quản trị gọi nhầm bề mặt ứng dụng → 404 (như gin).
 // ============================================================================
+import { acctbridgeAdminRoutes, acctbridgeRoutes } from "./acctbridge";
+import { costingAdminRoutes, costingRoutes } from "./costing";
 import { fieldopsRoutes } from "./fieldops";
 import { hubAdminRoutes, hubAppRoutes } from "./hub";
 import { problem, type Route } from "./http";
+import { logisticsAdminRoutes, logisticsRoutes } from "./logistics";
 import { measurementAdminRoutes, measurementAppRoutes } from "./measurement";
+import { ordersAdminRoutes, ordersRoutes } from "./orders";
 import { personaFromAuthHeader, type MockPersona } from "./personas";
 
-const appRoutes: Route[] = [...hubAppRoutes, ...measurementAppRoutes, ...fieldopsRoutes];
-const adminRoutes: Route[] = [...hubAdminRoutes, ...measurementAdminRoutes];
+const appRoutes: Route[] = [...hubAppRoutes, ...measurementAppRoutes, ...fieldopsRoutes, ...logisticsRoutes, ...ordersRoutes, ...costingRoutes, ...acctbridgeRoutes];
+const adminRoutes: Route[] = [...hubAdminRoutes, ...measurementAdminRoutes, ...logisticsAdminRoutes, ...ordersAdminRoutes, ...costingAdminRoutes, ...acctbridgeAdminRoutes];
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));

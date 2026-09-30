@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 
 /** Mã persona giả lập (src/api/mock/personas.ts). */
-export type Persona = "dieu-phoi" | "phe-duyet" | "hub" | "can" | "hien-truong";
+export type Persona = "dieu-phoi" | "phe-duyet" | "hub" | "can" | "hien-truong" | "van-tai" | "tai-xe" | "kinh-doanh" | "truong-kinh-doanh" | "ban-hang" | "ke-toan" | "ke-toan-truong";
 
 export const TITLES: Record<Persona, string> = {
   "dieu-phoi": "Điều phối vận hành MKG (đã qua MFA)",
@@ -9,6 +9,13 @@ export const TITLES: Record<Persona, string> = {
   hub: "Nhân viên hub — chưa qua MFA",
   can: "Giám sát cân (đã qua MFA)",
   "hien-truong": "Tổ gom hiện trường",
+  "van-tai": "Điều phối vận tải (đã qua MFA)",
+  "tai-xe": "Tài xế / chủ ghe",
+  "kinh-doanh": "Nhân viên kinh doanh — có vai duyệt (đã qua MFA)",
+  "truong-kinh-doanh": "Trưởng kinh doanh — người duyệt (đã qua MFA)",
+  "ban-hang": "Nhân viên bán hàng (không có vai duyệt)",
+  "ke-toan": "Kế toán giá thành (đã qua MFA)",
+  "ke-toan-truong": "Kế toán trưởng (đã qua MFA)",
 };
 
 /** Mã tất định của dữ liệu giả lập (src/api/mock/db.ts — sid(nhóm, số)). */
@@ -24,6 +31,15 @@ export const IDS = {
   plotB2: sid(8, 6),
   crew: sid(9, 2),
 } as const;
+
+/** Kỳ tháng theo giờ Việt Nam, lùi `back` tháng (như src/api/mock/g4common.ts monthVn). */
+export function monthVn(back = 0): string {
+  const t = new Date(Date.now() + 7 * 3_600_000);
+  return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() - back, 1)).toISOString().slice(0, 7);
+}
+
+/** Thông báo tự phê duyệt bị chặn (R-56). */
+export const SELF_APPROVAL = /Không được tự phê duyệt/;
 
 const MOCK_KEY = "agi.mock.persona";
 
@@ -59,4 +75,9 @@ export function status(page: Page) {
 /** Thông báo lỗi của trang (bỏ vùng thông báo điều hướng của Next.js cũng mang role="alert"). */
 export function alert(page: Page) {
   return page.locator('[role="alert"]:not(#__next-route-announcer__)');
+}
+
+/** Vùng không phải ô nhập có aria-label (khối thông tin, bảng kê, panel). */
+export function labelled(page: Page, name: string) {
+  return page.locator(`[aria-label="${name}"]`);
 }
