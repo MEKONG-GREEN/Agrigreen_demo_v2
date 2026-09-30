@@ -296,7 +296,9 @@ func TestFieldopsTenantLeakParallel(t *testing.T) {
 		sign := func(roles ...string) string {
 			return f.iss.Sign(t, authztest.Token{Subject: ids.New(), TenantID: tid, Roles: roles})
 		}
-		supA, supB, col := sign(port.RoleFieldSupervisor), sign(port.RoleFieldSupervisor), sign(port.RoleFieldCollector)
+		supA, supB := sign(port.RoleFieldSupervisor), sign(port.RoleFieldSupervisor)
+		colActor := ids.New()
+		col := f.iss.Sign(t, authztest.Token{Subject: colActor, TenantID: tid, Roles: []string{port.RoleFieldCollector}})
 		htx, plot := ids.New(), ids.New()
 		f.dir.AddHTX(htx, "31117")
 		f.dir.AddPlot(plot, htx, "31117")
@@ -314,8 +316,15 @@ func TestFieldopsTenantLeakParallel(t *testing.T) {
 			if _, err := post(supB, "/v1/fieldops/orders/"+id+"/decision", map[string]any{"decision": "approved"}, http.StatusCreated); err != nil {
 				return err
 			}
-			crew := ids.New().String()
-			if _, err := post(supA, "/v1/fieldops/orders/"+id+"/assign", map[string]any{"crew_ref": crew}, http.StatusCreated); err != nil {
+			// Sổ tổ gom (FM-06/07): mỗi vòng một tổ mới (mã theo vòng), thành viên là tài khoản tổ gom.
+			c, err := post(supA, "/v1/fieldops/crews", map[string]any{"code": fmt.Sprintf("TO-%d-%d", i, r), "name": "Tổ gom thử",
+				"member_refs": []string{colActor.String()}, "capacity_unit": "bales", "capacity_per_day": "5000"}, http.StatusCreated)
+			if err != nil {
+				return err
+			}
+			cm, _ := c["crew"].(map[string]any)
+			crew, _ := cm["crew_id"].(string)
+			if _, err := post(supA, "/v1/fieldops/orders/"+id+"/assign", map[string]any{"crew_ref": crew, "expected_bales": 120}, http.StatusCreated); err != nil {
 				return err
 			}
 			if _, err := post(col, "/v1/fieldops/orders/"+id+"/crew-shifts", map[string]any{"crew_ref": crew, "kind": "opened", "headcount": 6,
@@ -351,5 +360,7 @@ func TestFieldopsTenantLeakParallel(t *testing.T) {
 		"mkg_fieldops.collection_order_event", "mkg_fieldops.collection_order_current", "mkg_fieldops.crew_shift",
 		"mkg_fieldops.roll_total_current", "mkg_fieldops.htx_confirmation", "mkg_fieldops.buyside_reconciliation_current",
 		"mkg_fieldops.weighed_loading_current", "mkg_fieldops.valve_export", "mkg_fieldops.roll_count",
+		"mkg_fieldops.crew_event", "mkg_fieldops.crew_current", "mkg_fieldops.crew_assignment", "mkg_fieldops.crew_assignment_current",
+		"mkg_fieldops.roll_count_harvest", "mkg_fieldops.order_plot_harvest_current",
 	})
 }

@@ -61,7 +61,8 @@ Chỉ dùng số đã cấp. Số trống có thể còn lại giữa các kho�
 | pf | 000038 | mrv G3: liên kết bằng chứng thu gom (van `mrv_collection_evidence`), đối chiếu nhật ký HTX ↔ KN (KN US-MRV-02) | `pf_mrv` | `mrv_app` |
 | pf | 000039–000042 | **dự phòng** G3 — xin người tích hợp | | |
 | mkg | 000010 | G3-2 tích hợp: `mkg_measurement.lot_collection(_current)` (lô cân ↔ lệnh gom), cột `ticket_ref`/`supersedes_ticket_ref` của `mkg_fieldops.weighed_loading_current`, sổ `mkg_fieldops.roll_count_location` (GPS app hiện trường) | `mkg_measurement`, `mkg_fieldops` | `measurement_app` (+ `ingest_mkg` SELECT bảng chiếu), `fieldops_app` |
-| mkg | 000011–000012 | **dự phòng** G3 — xin người tích hợp | | |
+| mkg | 000011 | **dự phòng** G3 — xin người tích hợp | | |
+| mkg | 000012 | Nghiệm thu G3 (proto FM-01/02/06/07/08): sổ tổ gom `crew_event`/`crew_current`, phân công có năng lực `crew_assignment(_current)`, kiểm ngày gặt `roll_count_harvest`, bảng đệm ngày gặt `order_plot_harvest_current`, tham số có phiên bản `param_version`/`param_current` (`baling_deadline_days`, mặc định 3 — tạm, chờ khách) | `mkg_fieldops` | `fieldops_app` |
 
 - `pf` 000030–000035 và `mkg` 000004–000005 để dành cho phần còn lại của G2; G3 không dùng.
 - Module G4 (`logistics`, `orders`, `costing`, `acctbridge`) sẽ được cấp số từ 000013 cụm mkg ([mkg.md §5.8](../design/mkg.md#58-bảng-tổng-hợp-cụm--vai--migration)).

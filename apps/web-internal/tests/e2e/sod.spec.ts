@@ -114,6 +114,9 @@ test.describe("Phân tách nhiệm vụ (R-56)", () => {
     await page.getByRole("button", { name: "Mở lệnh …000004" }).click();
     await page.getByRole("button", { name: "Duyệt lệnh gom" }).click();
     await expect(page.getByText("Đã duyệt lệnh gom — công bố collection_schedule")).toBeVisible();
+    await page.getByLabel("Số cuộn dự kiến").fill("1200");
+    await page.getByRole("button", { name: "Gợi ý tổ gom" }).click();
+    await expect(page.getByRole("list", { name: "Gợi ý tổ gom" })).toContainText("TO-01");
     await page.getByLabel("Mã tổ gom").fill(IDS.crew);
     await page.getByRole("button", { name: "Giao tổ gom" }).click();
     await expect(page.getByText("Đã giao tổ gom", { exact: true })).toBeVisible();

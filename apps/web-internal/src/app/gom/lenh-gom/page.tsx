@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { idem, unwrap, unwrapAs } from "@/api/client";
-import type { CollectionOrder, CollectionPlanInput, OrderDetail, OrderStatus } from "@/api/types";
+import type { CollectionOrder, CollectionPlanInput, CrewSuggestions, OrderDetail, OrderStatus } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { hasRole, ROLES } from "@/auth/principal";
 import { ActionStatus, Chip, Ref, RefPicker, Section, SelectField, SelfHint, TextField, useAction } from "@/components/kit";
@@ -14,6 +14,7 @@ import { ORDER_STATUS_LABEL, shortRef, validReason } from "@/lib/rules";
 import { useAsync } from "@/lib/useAsync";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const BALES = /^[1-9][0-9]{0,6}$/;
 const EVENT_LABEL: Record<string, string> = { planned: "Lập", revised: "Sửa kế hoạch", approved: "Duyệt", rejected: "Từ chối", assigned: "Giao tổ", closed: "Đóng", cancelled: "Huỷ" };
 
 interface PlanForm {
@@ -65,6 +66,9 @@ function OrderPanel({ id, onChanged, knownHtx }: { id: string; onChanged: () => 
   const act = useAction();
   const [reason, setReason] = useState("");
   const [crew, setCrew] = useState("");
+  const [bales, setBales] = useState("");
+  const [rank, setRank] = useState<number | null>(null);
+  const [sugg, setSugg] = useState<CrewSuggestions | null>(null);
   const [revise, setRevise] = useState<PlanForm | null>(null);
   const sup = hasRole(principal, ROLES.fieldSupervisor);
   if (d.loading) return <Loading />;
@@ -132,8 +136,46 @@ function OrderPanel({ id, onChanged, knownHtx }: { id: string; onChanged: () => 
           {o.status === "planned" ? <SelfHint proposer={o.created_by} /> : null}
           <div className="grid2">
             <TextField label="Lý do (từ chối / huỷ)" value={reason} onChange={setReason} hint="Ít nhất 10 ký tự" />
-            {o.status === "approved" || o.status === "assigned" ? <TextField label="Mã tổ gom" value={crew} onChange={setCrew} hint="UUID tổ gom" /> : null}
+            {o.status === "approved" || o.status === "assigned" ? (
+              <>
+                <TextField label="Số cuộn dự kiến" value={bales} onChange={setBales} hint="Khối lượng việc — kiểm năng lực/ngày của tổ (FM-06)" />
+                <TextField
+                  label="Mã tổ gom"
+                  value={crew}
+                  onChange={(v) => {
+                    setCrew(v);
+                    setRank(null);
+                  }}
+                  hint="UUID tổ gom trong sổ tổ gom, hoặc chọn từ gợi ý"
+                />
+              </>
+            ) : null}
           </div>
+          {sugg ? (
+            <ul className="list-plain small" aria-label="Gợi ý tổ gom">
+              {sugg.suggestions?.length ? null : <li>Không tổ nào đang hoạt động còn đủ năng lực (FM-06/07).</li>}
+              {sugg.suggestions?.map((g) => (
+                <li key={g.crew_ref} className="row">
+                  <b>#{g.rank}</b> {g.code} · {g.name} · tải cao nhất {g.peak_load}/{g.capacity_per_day} {g.capacity_unit}/ngày{g.local ? " · cùng xã" : ""}
+                  <button
+                    type="button"
+                    className="btn btn-o btn-sm"
+                    onClick={() => {
+                      setCrew(g.crew_ref ?? "");
+                      setRank(g.rank ?? null);
+                    }}
+                  >
+                    Chọn {g.code}
+                  </button>
+                </li>
+              ))}
+              {sugg.unfit?.map((g) => (
+                <li key={g.crew_ref}>
+                  {g.code}: {g.unfit === "over_capacity" ? `vượt năng lực ngày ${formatDate(g.over_day)}` : "khác đơn vị năng lực"}
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <div className="row">
             {o.status === "planned" ? (
               <>
@@ -158,9 +200,41 @@ function OrderPanel({ id, onChanged, knownHtx }: { id: string; onChanged: () => 
               </>
             ) : null}
             {o.status === "approved" || o.status === "assigned" ? (
-              <button type="button" className="btn btn-p btn-sm" disabled={act.busy || !UUID.test(crew.trim())} onClick={() => void run(() => unwrap(api.POST("/v1/fieldops/orders/{id}/assign", { params: p(), body: { crew_ref: crew.trim() } })), "Đã giao tổ gom")}>
-                {o.status === "assigned" ? "Đổi tổ gom" : "Giao tổ gom"}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="btn btn-o btn-sm"
+                  disabled={act.busy || !BALES.test(bales.trim())}
+                  onClick={() =>
+                    void act
+                      .run(() => unwrapAs<CrewSuggestions>(api.GET("/v1/fieldops/orders/{id}/crew-suggestions", { params: { path: { id }, query: { expected_bales: Number(bales.trim()) } } })), "Đã gợi ý tổ gom")
+                      .then((r) => {
+                        if (r) setSugg(r);
+                      })
+                  }
+                >
+                  Gợi ý tổ gom
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-p btn-sm"
+                  disabled={act.busy || !UUID.test(crew.trim()) || !BALES.test(bales.trim())}
+                  onClick={() =>
+                    void run(
+                      () =>
+                        unwrap(
+                          api.POST("/v1/fieldops/orders/{id}/assign", {
+                            params: p(),
+                            body: rank ? { crew_ref: crew.trim(), expected_bales: Number(bales.trim()), mode: "suggested", suggestion_rank: rank } : { crew_ref: crew.trim(), expected_bales: Number(bales.trim()), mode: "manual" },
+                          }),
+                        ),
+                      "Đã giao tổ gom",
+                    )
+                  }
+                >
+                  {o.status === "assigned" ? "Đổi tổ gom" : "Giao tổ gom"}
+                </button>
+              </>
             ) : null}
             {o.status === "assigned" ? (
               <button type="button" className="btn btn-o btn-sm" disabled={act.busy} onClick={() => void run(() => unwrap(api.POST("/v1/fieldops/orders/{id}/close", { params: p() })), "Đã đóng lệnh gom")}>

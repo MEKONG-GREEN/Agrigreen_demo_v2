@@ -797,6 +797,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/measurement/lots/{id}/collection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["MeasurementID"];
+            };
+            cookie?: never;
+        };
+        /** Liên kết hiện hành lô cân ↔ lệnh gom (explicit = false → quy ước đồng nhất) */
+        get: operations["getLotCollection"];
+        put?: never;
+        /**
+         * Gắn lô cân với lệnh gom của mkg/fieldops (G3-2)
+         * @description Vai reconciliation_officer hoặc scale_supervisor. Dùng cho lô DIRECT (chỉ CUSTOMER_IN) hoặc khi phiên cân không mang collection_order_ref. Một lệnh gom thuộc tối đa một lô cân. Đổi lệnh gom của lô cần `reason` (bản ghi bù, RB-1). Gắn xong đối soát lại lô nếu đã đủ phiếu (số cuộn của lệnh gom vào đối chiếu RB-6). Không có liên kết = quy ước đồng nhất (lot_ref là mã lệnh gom).
+         */
+        post: operations["linkLotCollection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/measurement/lots/{id}/reconciliations": {
         parameters: {
             query?: never;
@@ -846,7 +869,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Công bố bằng chứng thu gom qua van mrv_collection_evidence (dự thảo, C-1) — khối lượng THEO BẬC mỗi thửa nguồn */
+        /**
+         * Công bố bằng chứng thu gom qua van mrv_collection_evidence (dự thảo, C-1) — khối lượng THEO BẬC mỗi thửa nguồn
+         * @description Tuyến HUB: HUB_IN × tỷ lệ thửa của lô hub (mass_basis HUB_IN). Tuyến DIRECT (G3-2): CUSTOMER_IN × tỷ lệ thửa theo số cuộn của lệnh gom liên kết, gắn cờ gộp (mass_basis CUSTOMER_IN_AGGREGATED). 409 measurement.no_hub_in / measurement.no_customer_in / measurement.no_plot_sources.
+         */
         post: operations["publishMRVEvidence"];
         delete?: never;
         options?: never;
@@ -1054,8 +1080,58 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Giao / đổi tổ gom (approved | assigned → assigned) */
+        /**
+         * Giao / đổi tổ gom (approved | assigned → assigned) — kiểm năng lực tổ
+         * @description proto FM-07: `crew_ref` phải có trong sổ tổ gom và đang `active` (lạ → 422 `fieldops.crew_unknown`, ngừng → 409 `fieldops.crew_inactive`).
+         *     proto FM-06: mỗi ngày của [planned_from, planned_to] (mặc định = khung lệnh gom), tải các lệnh `assigned` khác của tổ + tải việc này
+         *     (khối lượng theo đơn vị năng lực của tổ ÷ số ngày) ≤ `capacity_per_day`; vượt → 409 `fieldops.crew_over_capacity`, trừ khi giám sát
+         *     giao tay kèm `override_reason` (phân công gắn `over_capacity = true`, cảnh báo `fieldops.crew_over_capacity_override`).
+         *     proto FM-08: `mode = suggested` là xác nhận gợi ý (không bao giờ vượt năng lực). Giao lại đúng tổ với đúng việc đang giao → 200,
+         *     không sinh phân công mới. Cảnh báo không chặn: `fieldops.planned_before_harvest`, `fieldops.baling_deadline_at_risk`,
+         *     `fieldops.harvest_date_unknown`, `fieldops.harvest_date_unavailable`.
+         */
         post: operations["assignCollectionOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/fieldops/orders/{id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        /** Lịch sử phân công của lệnh gom (sổ crew_assignment) */
+        get: operations["listCrewAssignments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/fieldops/orders/{id}/crew-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Gợi ý tổ gom cho lệnh (proto FM-08) — chỉ đọc, giám sát xác nhận bằng POST …/assign mode = suggested
+         * @description Tổ đang hoạt động (FM-07), vừa năng lực mọi ngày (FM-06); xếp hạng: gần nhất (xã của lệnh thuộc `service_communes` của tổ) → ít tải nhất (tải cao nhất/ngày sau khi giao ÷ năng lực) → mã tổ. Tất định: cùng dữ liệu → cùng kết quả. Vai field_supervisor.
+         */
+        get: operations["suggestCrews"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1285,10 +1361,211 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Đồng bộ chiều xuống — entity collection_order (đã duyệt/đang làm → upsert; khác → tombstone) */
+        /**
+         * Đồng bộ chiều xuống — entity collection_order (đã duyệt/đang làm → upsert; khác → tombstone)
+         * @description Lọc theo sổ tổ gom: field_supervisor nhận mọi lệnh đã duyệt/đang làm; field_collector chỉ nhận upsert cho lệnh ĐÃ GIAO cho tổ mà tài khoản là thành viên — lệnh chưa giao / giao tổ khác → tombstone. Đổi tổ / đổi thành viên đẩy thay đổi xuống ở lần pull sau.
+         */
         get: operations["fieldopsSyncPull"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/fieldops/crews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sổ tổ gom (cursor = mã tổ cuối) */
+        get: operations["listCrews"];
+        put?: never;
+        /**
+         * Thêm tổ gom (active, phiên bản 1) — vai field_supervisor
+         * @description Thành viên là subject tài khoản MKG (UUID, không có dữ liệu cá nhân). Năng lực/ngày theo cuộn (số nguyên) hoặc ha.
+         */
+        post: operations["createCrew"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/fieldops/crews/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Tổ gom hiện hành và mọi phiên bản */
+        get: operations["getCrew"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/fieldops/crews/{id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Phiên bản mới của tổ (tên, thành viên, năng lực, xã phục vụ) — không đổi trạng thái
+         * @description `expected_version` khác phiên bản hiện hành → 409 fieldops.crew_version_conflict. Lệnh đang giao cho tổ đi xuống lại máy (lọc pull theo thành viên).
+         */
+        post: operations["reviseCrew"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/fieldops/crews/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ngừng tổ gom (không xóa, RB-1) — tổ ngừng không nhận việc mới (proto FM-07) */
+        post: operations["deactivateCrew"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/fieldops/crews/{id}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bật lại tổ gom */
+        post: operations["reactivateCrew"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/fieldops/baling-deadlines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Hạn cuộn sau gặt theo (lệnh gom đang mở, thửa) — proto FM-02
+         * @description Hạn = ngày gặt + `baling_deadline_days` (tham số có phiên bản; chưa duyệt → 3 ngày, `param_version = provisional-default`, TẠM, chờ khách). Quá hạn không chặn ghi nhưng gắn cờ (`overdue`, `baled_late`; `status=flagged` = cả hai). Ngày gặt từ bảng đệm (bề mặt partner của nền tảng); chưa biết → `harvest_unknown`.
+         */
+        get: operations["listBalingDeadlines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/fieldops/harvest-dates/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Làm mới bảng đệm ngày gặt của mọi lệnh gom đang mở (GET /v1/partner/season-harvest-dates của nền tảng) — vai field_supervisor
+         * @description Job `fieldops_harvest_dates` (AG_MKG_JOBS) chạy cùng việc này theo chu kỳ.
+         */
+        post: operations["refreshHarvestDates"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/fieldops/params/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: "baling_deadline_days";
+            };
+            cookie?: never;
+        };
+        /** Các phiên bản tham số và giá trị hiệu lực hôm nay */
+        get: operations["getFieldopsParam"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/fieldops/params/{key}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: "baling_deadline_days";
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đề xuất phiên bản tham số (pending tới khi người KHÁC duyệt, R-56) */
+        post: operations["proposeFieldopsParam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/fieldops/params/{key}/versions/{version}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: "baling_deadline_days";
+                version: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt / từ chối phiên bản tham số — người quyết định KHÁC người đề xuất (403 self_approval_forbidden; CHECK DB lớp hai) */
+        post: operations["decideFieldopsParam"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1686,6 +1963,8 @@ export interface components {
             created_at?: string;
             /** Format: date-time */
             updated_at?: string;
+            /** @description proto FM-02: ít nhất một thửa đã quá hạn cuộn sau gặt mà chưa cuộn */
+            baling_overdue?: boolean;
         };
         CollectionOrderResult: {
             order?: components["schemas"]["CollectionOrder"];
@@ -1718,6 +1997,38 @@ export interface components {
             /** Format: date-time */
             event_time: string;
             device_id?: string;
+            gps?: components["schemas"]["GPSFix"];
+            gps_status?: components["schemas"]["GPSStatus"];
+        };
+        /** @description G3-2: dấu GPS tùy chọn của app hiện trường — không bao giờ chặn lưu (tọa độ hỏng → gps_status = invalid, bỏ tọa độ). Nhận `lng` hoặc `lon`; số JSON đọc dạng thập phân (không float), làm tròn 7 chữ số. */
+        GPSFix: {
+            lat?: number;
+            lng?: number;
+            lon?: number;
+            accuracy_m?: number;
+        };
+        /**
+         * @description Trạng thái máy báo; giá trị lạ lưu là unknown
+         * @enum {string}
+         */
+        GPSStatus: "ok" | "weak" | "denied" | "unavailable" | "timeout" | "no_device";
+        LotCollection: {
+            /** Format: uuid */
+            lot_ref?: string;
+            /** Format: uuid */
+            collection_order_ref?: string;
+            explicit?: boolean;
+            /** Format: uuid */
+            id?: string;
+            seq?: number;
+            /** @enum {string} */
+            origin?: "session" | "manual";
+            /** Format: uuid */
+            session_ref?: string | null;
+            /** Format: uuid */
+            supersedes_id?: string | null;
+            /** Format: date-time */
+            event_time?: string;
         };
         RollCount: {
             /** Format: uuid */
@@ -1743,12 +2054,23 @@ export interface components {
             event_time?: string;
             /** Format: date-time */
             recorded_at?: string;
+            /** @description G3-2 (chỉ ở GET …/roll-counts): tọa độ dạng chuỗi thập phân */
+            gps?: {
+                lat?: string;
+                lng?: string;
+                accuracy_m?: string | null;
+            };
+            /** @enum {string} */
+            gps_status?: "ok" | "weak" | "denied" | "unavailable" | "timeout" | "no_device" | "invalid" | "unknown";
+            harvest_check?: components["schemas"]["HarvestCheck"];
         };
         RollCountResult: {
             roll_count?: components["schemas"]["RollCount"];
             total?: Record<string, never>;
             reconciliation?: components["schemas"]["BuySideReconciliation"] | null;
             publications?: components["schemas"]["ValveExport"][];
+            harvest_check?: components["schemas"]["HarvestCheck"] | null;
+            warnings?: ("fieldops.harvest_date_unknown" | "fieldops.harvest_date_unavailable")[];
         };
         BuySideReconciliation: {
             /** Format: uuid */
@@ -1773,6 +2095,214 @@ export interface components {
             status?: "pending" | "match" | "mismatch";
             /** Format: date-time */
             updated_at?: string;
+        };
+        /** @description proto FM-01 (chỉ bản ghi cuộn gốc, công đoạn bale): ngày cuộn so với ngày gặt của thửa. ok = biết ngày gặt, cuộn không trước ngày gặt (cuộn trước → 422 fieldops.before_harvest); unknown = nền tảng chưa có / chưa chia sẻ (RB-2); unavailable = không gọi được nền tảng và không có bảng đệm. unknown/unavailable vẫn ghi được nhưng GẮN CỜ. */
+        HarvestCheck: {
+            /** @enum {string} */
+            check?: "ok" | "unknown" | "unavailable";
+            /** Format: date */
+            bale_date?: string;
+            /** Format: date */
+            harvest_date?: string | null;
+            /** @enum {string|null} */
+            harvest_kind?: "expected" | "actual" | null;
+            /** Format: uuid */
+            season_ref?: string | null;
+            /** @enum {string} */
+            source?: "partner" | "cache" | "none";
+            rule_version?: string;
+        };
+        CrewInput: {
+            /** @description Lưu in hoa, duy nhất trong tenant */
+            code: string;
+            name: string;
+            /** @description Subject tài khoản MKG (field_collector) */
+            member_refs: string[];
+            /** @enum {string} */
+            capacity_unit: "bales" | "ha";
+            /** @description Chuỗi thập phân > 0; bales: số nguyên */
+            capacity_per_day: string;
+            /** @description Xã phục vụ — tiêu chí 'gần nhất' của gợi ý FM-08 */
+            service_communes?: string[];
+            /** @description Chỉ khi sửa: phiên bản client đã xem */
+            expected_version?: number;
+        };
+        CrewStatusInput: {
+            reason: string;
+            expected_version?: number;
+        };
+        Crew: {
+            /** Format: uuid */
+            crew_id?: string;
+            code?: string;
+            name?: string;
+            member_refs?: string[];
+            /** @enum {string} */
+            capacity_unit?: "bales" | "ha";
+            capacity_per_day?: string;
+            service_communes?: string[];
+            /** @enum {string} */
+            status?: "active" | "inactive";
+            version?: number;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        CrewEvent: {
+            /** Format: uuid */
+            id?: string;
+            seq?: number;
+            /** @enum {string} */
+            kind?: "created" | "revised" | "deactivated" | "reactivated";
+            version?: number;
+            snapshot?: components["schemas"]["Crew"];
+            reason?: string | null;
+            /** Format: uuid */
+            actor_ref?: string;
+            /** Format: date-time */
+            event_time?: string;
+            /** Format: date-time */
+            recorded_at?: string;
+        };
+        CrewResult: {
+            crew?: components["schemas"]["Crew"];
+            event?: components["schemas"]["CrewEvent"];
+        };
+        AssignInput: {
+            /** Format: uuid */
+            crew_ref: string;
+            /**
+             * Format: date
+             * @description Bỏ trống → window_from; trong khung lệnh gom
+             */
+            planned_from?: string;
+            /**
+             * Format: date
+             * @description Bỏ trống → window_to
+             */
+            planned_to?: string;
+            /** @description Bắt buộc khi tổ tính năng lực theo cuộn */
+            expected_bales?: number;
+            /** @description Bắt buộc khi tổ tính năng lực theo ha */
+            expected_ha?: string;
+            /**
+             * @default manual
+             * @enum {string}
+             */
+            mode: "manual" | "suggested";
+            /** @description Chỉ với mode = suggested */
+            suggestion_rank?: number;
+            /** @description Giám sát giao VƯỢT năng lực (chỉ manual, FM-06) */
+            override_reason?: string;
+        };
+        AssignResult: {
+            order?: components["schemas"]["CollectionOrder"];
+            event?: Record<string, never> | null;
+            publications?: components["schemas"]["ValveExport"][];
+            assignment?: components["schemas"]["CrewAssignment"];
+            warnings?: ("fieldops.crew_over_capacity_override" | "fieldops.planned_before_harvest" | "fieldops.baling_deadline_at_risk" | "fieldops.harvest_date_unknown" | "fieldops.harvest_date_unavailable")[];
+        };
+        CrewAssignment: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            order_id?: string;
+            /** Format: uuid */
+            order_event_id?: string;
+            /** Format: uuid */
+            crew_ref?: string;
+            crew_version?: number;
+            /** @enum {string} */
+            capacity_unit?: "bales" | "ha";
+            capacity_per_day?: string;
+            /** Format: date */
+            planned_from?: string;
+            /** Format: date */
+            planned_to?: string;
+            expected_qty?: string;
+            daily_load?: string;
+            /** @description Tải cao nhất/ngày của tổ trong khoảng sau khi giao */
+            peak_load?: string;
+            over_capacity?: boolean;
+            override_reason?: string | null;
+            /** @enum {string} */
+            mode?: "manual" | "suggested";
+            suggestion_rank?: number | null;
+            rule_version?: string;
+            /** Format: uuid */
+            actor_ref?: string;
+            /** Format: date-time */
+            event_time?: string;
+        };
+        CrewSuggestion: {
+            /** @description 1 = gợi ý hàng đầu; null với tổ không vừa */
+            rank?: number | null;
+            /** Format: uuid */
+            crew_ref?: string;
+            code?: string;
+            name?: string;
+            /** @enum {string} */
+            capacity_unit?: "bales" | "ha";
+            capacity_per_day?: string;
+            /** @description Xã của lệnh gom thuộc service_communes của tổ */
+            local?: boolean;
+            daily_load?: string | null;
+            peak_load?: string | null;
+            load_ratio?: string | null;
+            /** Format: date */
+            over_day?: string | null;
+            /** @enum {string|null} */
+            unfit?: "over_capacity" | "unit_mismatch" | null;
+        };
+        BalingDeadline: {
+            /** Format: uuid */
+            order_id?: string;
+            /** Format: uuid */
+            plot_ref?: string;
+            /** Format: uuid */
+            htx_ref?: string;
+            /** Format: uuid */
+            crew_ref?: string | null;
+            order_status?: string;
+            /** @enum {string} */
+            harvest_check?: "ok" | "unknown" | "unavailable";
+            /** Format: date */
+            harvest_date?: string | null;
+            /** @enum {string|null} */
+            harvest_kind?: "expected" | "actual" | null;
+            /** Format: uuid */
+            season_ref?: string | null;
+            /** Format: date */
+            baled_on?: string | null;
+            /** Format: date */
+            deadline?: string | null;
+            days_on_field?: number | null;
+            /** @enum {string} */
+            status?: "harvest_unknown" | "not_harvested" | "pending" | "overdue" | "baled_on_time" | "baled_late";
+            overdue?: boolean;
+            flagged?: boolean;
+        };
+        FieldopsParam: {
+            /** @enum {string} */
+            param_key?: "baling_deadline_days";
+            /** Format: uuid */
+            version_id?: string;
+            version_seq?: number;
+            value?: string;
+            /** Format: date */
+            effective_from?: string;
+            provisional?: boolean;
+            /** @enum {string} */
+            status?: "pending" | "approved" | "rejected";
+            /** Format: uuid */
+            proposed_by?: string;
+            proposal_reason?: string;
+            /** Format: uuid */
+            decided_by?: string | null;
+            /** Format: date-time */
+            decided_at?: string | null;
+            decision_reason?: string | null;
         };
     };
     responses: {
@@ -3094,6 +3624,11 @@ export interface operations {
                     counter_from: number;
                     /** Format: date-time */
                     event_time?: string;
+                    /**
+                     * Format: uuid
+                     * @description G3-2: lệnh gom (lô gom mkg/fieldops) mà lô cân chở — ghi liên kết tường minh lô ↔ lệnh gom (409 measurement.collection_link_conflict nếu lệnh gom đã gắn lô khác)
+                     */
+                    collection_order_ref?: string;
                 };
             };
         };
@@ -3306,6 +3841,69 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    getLotCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["MeasurementID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Liên kết */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LotCollection"];
+                };
+            };
+        };
+    };
+    linkLotCollection: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["MeasurementID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    collection_order_ref: string;
+                    /** @description Bắt buộc khi đổi */
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Phát lại */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Đã gắn */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LotCollection"];
+                };
+            };
+            409: components["responses"]["Problem"];
         };
     };
     listReconciliations: {
@@ -3657,6 +4255,9 @@ export interface operations {
                     "application/json": {
                         order?: components["schemas"]["CollectionOrder"];
                         history?: Record<string, never>[];
+                        assignment?: components["schemas"]["CrewAssignment"] | null;
+                        baling?: components["schemas"]["BalingDeadline"][];
+                        baling_deadline_days?: number;
                     };
                 };
             };
@@ -3739,23 +4340,96 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    /** Format: uuid */
-                    crew_ref: string;
-                };
+                "application/json": components["schemas"]["AssignInput"];
             };
         };
         responses: {
-            /** @description Lệnh gom */
+            /** @description Giao lại đúng việc đang giao — không đổi (FM-08) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignResult"];
+                };
+            };
+            /** @description Lệnh gom + phân công */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CollectionOrderResult"];
+                    "application/json": components["schemas"]["AssignResult"];
                 };
             };
             409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listCrewAssignments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phân công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: components["schemas"]["CrewAssignment"][];
+                    };
+                };
+            };
+        };
+    };
+    suggestCrews: {
+        parameters: {
+            query?: {
+                planned_from?: string;
+                planned_to?: string;
+                expected_bales?: number;
+                expected_ha?: string;
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gợi ý */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        order_id?: string;
+                        commune_code?: string;
+                        /** Format: date */
+                        planned_from?: string;
+                        /** Format: date */
+                        planned_to?: string;
+                        suggested?: components["schemas"]["CrewSuggestion"] | null;
+                        suggestions?: components["schemas"]["CrewSuggestion"][];
+                        unfit?: components["schemas"]["CrewSuggestion"][];
+                        inactive_crews?: number;
+                        rule_version?: string;
+                    };
+                };
+            };
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     closeCollectionOrder: {
@@ -4183,6 +4857,8 @@ export interface operations {
                             discrepancy_reason?: string;
                             /** Format: uuid */
                             htx_confirmation_ref?: string;
+                            gps?: components["schemas"]["GPSFix"];
+                            gps_status?: components["schemas"]["GPSStatus"];
                         };
                     }[];
                 };
@@ -4240,6 +4916,345 @@ export interface operations {
                 };
             };
             400: components["responses"]["Problem"];
+        };
+    };
+    listCrews: {
+        parameters: {
+            query?: {
+                status?: "active" | "inactive";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trang tổ gom */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: components["schemas"]["Crew"][];
+                        next_cursor?: string | null;
+                    };
+                };
+            };
+        };
+    };
+    createCrew: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrewInput"];
+            };
+        };
+        responses: {
+            /** @description Tổ gom */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrewResult"];
+                };
+            };
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getCrew: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tổ gom */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        crew?: components["schemas"]["Crew"];
+                        history?: components["schemas"]["CrewEvent"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    reviseCrew: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrewInput"];
+            };
+        };
+        responses: {
+            /** @description Tổ gom */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrewResult"];
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    deactivateCrew: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrewStatusInput"];
+            };
+        };
+        responses: {
+            /** @description Tổ gom */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrewResult"];
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    reactivateCrew: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrewStatusInput"];
+            };
+        };
+        responses: {
+            /** @description Tổ gom */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrewResult"];
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    listBalingDeadlines: {
+        parameters: {
+            query?: {
+                status?: "flagged" | "overdue" | "baled_late" | "pending" | "not_harvested" | "baled_on_time" | "harvest_unknown";
+                order_id?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trang hạn cuộn */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: components["schemas"]["BalingDeadline"][];
+                        next_cursor?: string | null;
+                        baling_deadline_days?: number;
+                        param_version?: string;
+                        provisional?: boolean;
+                        /** Format: date */
+                        today?: string;
+                        rule_version?: string;
+                    };
+                };
+            };
+        };
+    };
+    refreshHarvestDates: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        plots?: number;
+                        known?: number;
+                        unknown?: number;
+                        unavailable?: number;
+                    };
+                };
+            };
+        };
+    };
+    getFieldopsParam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: "baling_deadline_days";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tham số */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        param_key?: string;
+                        effective_value?: number;
+                        param_version?: string;
+                        provisional?: boolean;
+                        default_value?: number;
+                        versions?: components["schemas"]["FieldopsParam"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    proposeFieldopsParam: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                key: "baling_deadline_days";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description baling_deadline_days: số ngày nguyên 0..60 */
+                    value: string;
+                    /** Format: date */
+                    effective_from?: string;
+                    /**
+                     * @description Tạm, chờ khách
+                     * @default true
+                     */
+                    provisional?: boolean;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Phiên bản */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        param?: components["schemas"]["FieldopsParam"];
+                    };
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
+    decideFieldopsParam: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                key: "baling_deadline_days";
+                version: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "approved" | "rejected";
+                    /** @description Bắt buộc khi rejected */
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Phiên bản */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        param?: components["schemas"]["FieldopsParam"];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
         };
     };
 }

@@ -26,10 +26,10 @@ Ba trạng thái:
 | 6. Mục 14 — agent biên | 6 | 6 | 0 | 0 |
 | 7. Cổng kiến trúc G3 (mục 16, 17, 19; RB; ADR) | 22 | 18 | 4 | 0 |
 | 8. MRV (KN US-MRV-01..06, FR-07, FR-08) | 8 | 5 | 3 | 0 |
-| 9. Quy tắc prototype (FM-01..10, cân nhà máy) | 12 | 5 | 5 | 2 |
+| 9. Quy tắc prototype (FM-01..10, cân nhà máy) | 12 | 10 | 0 | 2 |
 | 10. Lộ trình G3-2 (client, liên thông) | 8 | 7 | 1 | 0 |
 | 11. Câu hỏi khách và hạ tầng còn lại | 3 | 0 | 3 | 0 |
-| **Tổng** | **78** | **56** | **20** | **2** |
+| **Tổng** | **78** | **61** | **15** | **2** |
 
 **Ghi chú môi trường (không tính theo dòng):** CI trên GitHub **chưa được xác nhận** cho các commit G3, vì GitHub Actions vẫn bị chặn do lỗi thanh toán. Các hạng mục chỉ kiểm được trên runner **chưa được xác minh**:
 - `compose-smoke` bản G3: dịch vụ `ingest` + agent mô phỏng `edge-sim`, `scripts/dev-edge-bootstrap.sh` (đề xuất + duyệt thiết bị hai người qua Admin API), lô tới `ts_weigh.reading_batch`, consumer trên vhost `mkg.internal`, tài khoản nền tảng **không** có quyền trên `mkg.internal`;
@@ -39,7 +39,9 @@ Ba trạng thái:
 
 Trạng thái trong bảng dựa trên lần chạy kiểm thử ở máy dev.
 
-**20 dòng "một phần"**: phần còn thiếu và loại của từng dòng.
+**Cập nhật 30/09/2026 (bù khoảng trống fieldops, mkg 000012):** proto FM-01, FM-02, FM-06, FM-07, FM-08 chuyển từ "một phần" sang "đạt" (mục 9); kiểm thử Go chạy lại trên máy dev, tất cả đạt.
+
+**15 dòng "một phần"**: phần còn thiếu và loại của từng dòng.
 
 | Yêu cầu | Còn thiếu | Loại |
 |---|---|---|
@@ -54,11 +56,6 @@ Trạng thái trong bảng dựa trên lần chạy kiểm thử ở máy dev.
 | KN US-MRV-04 Ghi nhận sâu bệnh/thiên tai | Báo cáo sâu bệnh có ở `pf/extension` (G1, FR-02). **Chưa làm** nhãn "Cảnh báo khẩn" tự bật khi vượt ngưỡng; ngưỡng nguy hiểm chưa có | mã + chờ khách |
 | KN US-MRV-06 Leo thang hồ sơ quá hạn | **Chưa làm** job leo thang hồ sơ MRV chờ duyệt quá hạn (leo thang SLA hiện chỉ có cho nhiệm vụ `pf/extension`); thời hạn xử lý theo BRD chưa có số | mã + chờ khách |
 | KN FR-08 Cảnh báo bất thường nhật ký HTX | Cờ "không có bản ghi mới N ngày khi vụ đang mở" đã đạt. **Chưa làm** cờ "ghi AWD nhưng vùng chưa đủ hạ tầng" (chưa có dữ liệu hạ tầng thủy lợi) và thông báo tự động tới KNV phụ trách | mã + chờ khách |
-| proto FM-01 Không cuộn trước ngày gặt | **Chưa làm**: fieldops chưa đọc ngày thu hoạch của thửa (cần đọc `pf/cropcycle` qua Application API công khai, cùng câu hỏi RB-2) | mã |
-| proto FM-02 Cuộn xong trong N ngày sau gặt | **Chưa làm** cờ rơm nằm ruộng quá hạn; N (prototype `MAX_DAYS_AFTER_HARVEST`) là tham số chưa có | mã + chờ khách |
-| proto FM-06 Phân công không vượt năng lực tổ | Giao tổ gom cho lệnh gom bằng tay (`POST /v1/fieldops/orders/{id}/assign`) đã có. **Chưa làm** năng lực cuộn/ngày của tổ và cảnh báo vượt | mã |
-| proto FM-07 Chỉ tổ đang hoạt động nhận việc | **Chưa làm** sổ tổ gom có trạng thái (hiện `crew_ref` là mã tham chiếu) | mã |
-| proto FM-08 Phân công tự động không trùng | **Chưa làm** phân công tự động (G3 chỉ giao tay) | mã |
 | B7 Compose và CI cho ingest + edge-sim | Dịch vụ, bootstrap và job đã có trong Compose/workflow. **Chưa chạy trên runner** (GitHub Actions bị chặn) | hạ tầng |
 | C-5 Đường nhận số cân của khách | G3 nhận bằng **nhập tay kèm bằng chứng** (`POST /v1/measurement/lots/{id}/tickets`, điểm `CUSTOMER_IN`) và **nhập lô** (`POST /v1/measurement/customer-weight-imports`, kênh `api`). **Tích hợp hệ cân của khách chờ C-5** | chờ khách |
 | Định mức hao hụt sấy (HUB_IN → HUB_OUT) | Định mức là tham số có phiên bản, tách hao hụt dự kiến và bất thường; **số định mức thật chưa có** (đang là mặc định tạm) | chờ khách |
@@ -209,14 +206,14 @@ RB-4 (giấy phép) không đổi so với G2: ADR-0016 vẫn chưa ký (không 
 
 | Quy tắc | Kiểm thử | Trạng thái |
 |---|---|---|
-| proto FM-01 không cuộn trước ngày gặt | — | **một phần**: chưa làm |
-| proto FM-02 cuộn xong trong N ngày sau gặt | — | **một phần**: chưa làm |
+| proto FM-01 không cuộn trước ngày gặt | `TestBaleBeforeHarvestRejectedFM01` (trước ngày gặt → 422 `fieldops.before_harvest`, cả khi nền tảng lỗi nhờ bảng đệm; chưa biết ngày gặt → ghi được, gắn cờ `unknown`/`unavailable` + cảnh báo; push đồng bộ từ chối theo bản ghi; CHECK DB lớp hai), `TestSelectSeasonAndBaleDateFM01`, `TestPlatformHTTPSeasonHarvestDatesFM01` | **đạt**. Ngày gặt đọc qua cổng `fieldops/port.HarvestDates` (bản giả + bộ điều hợp HTTP `GET /v1/partner/season-harvest-dates?plot_ref=`); bề mặt partner của nền tảng (ADR-0020) do người tích hợp nối |
+| proto FM-02 cuộn xong trong N ngày sau gặt | `TestBalingDeadlineOverdueFM02` (quá hạn chưa cuộn → cờ trên thửa, lệnh gom, danh sách `GET /v1/fieldops/baling-deadlines`; cuộn trễ ghi được nhưng `baled_late`; N có phiên bản, người đề xuất ≠ người duyệt, CHECK DB), `TestBalingStateFM02` | **đạt**. N = `baling_deadline_days`, mặc định 3 ngày (prototype `MAX_DAYS_AFTER_HARVEST`) — **tạm, chờ khách**; job `fieldops_harvest_dates` làm mới ngày gặt |
 | proto FM-03 công đoạn sau chỉ ghi khi công đoạn trước có số | `TestStageEqualityFM04` (ca FM-03), `TestStageCountsFM04` | **đạt** |
 | proto FM-04 số cuộn không tăng qua công đoạn; ít hơn cần lý do; sửa = bản ghi bù | `TestStageEqualityFM04`, `TestStageCountsFM04`, `TestRollCountCorrectionByCompensation`, `TestSyncPushIdempotentAndPull`, E2E-G3-05; Flutter `domain_test.dart`, `field_service_test.dart` (App hiện trường MKG) | **đạt**. G3 chốt "bằng hoặc ít hơn kèm lý do" (g3-conventions §1.1) |
 | proto FM-05 mỗi lượt xuống ghe một chuyến vận tải thủy | — | **ngoài G3 → G4** (`mkg/logistics`) |
-| proto FM-06 phân công không vượt năng lực tổ | `TestOrderApprovalSeparationOfDuties` (giao tổ bằng tay) | **một phần**: chưa có năng lực tổ |
-| proto FM-07 chỉ tổ đang hoạt động nhận việc | — | **một phần**: chưa làm |
-| proto FM-08 phân công tự động không trùng | — | **một phần**: chưa làm |
+| proto FM-06 phân công không vượt năng lực tổ | `TestAssignCapacityCheckFM06` (vượt → 409 `fieldops.crew_over_capacity`; giám sát giao tay kèm lý do → gắn cờ `over_capacity`; đơn vị cuộn/ha; lệnh đóng trả năng lực; CHECK DB), `TestCheckCapacityFM06`, `TestOrderApprovalSeparationOfDuties` | **đạt** |
+| proto FM-07 chỉ tổ đang hoạt động nhận việc | `TestCrewDirectoryVersionedFM07` (sổ tổ gom có phiên bản, không xóa cứng; tổ ngừng → 409 `fieldops.crew_inactive`, tổ lạ → 422 `fieldops.crew_unknown`; RLS), `TestNormalizeCrew`, `TestSyncPullFiltersByCrewMembership` (pull của tổ gom lọc theo thành viên tổ) | **đạt** |
+| proto FM-08 phân công tự động không trùng | `TestAutoAssignSuggestionFM08` (gợi ý tất định: đang hoạt động, vừa năng lực, gần nhất rồi ít tải nhất; giám sát xác nhận `mode = suggested`; xác nhận lặp → 200, không sinh phân công mới), `TestSuggestDeterministicFM08` | **đạt**. Gợi ý theo từng lệnh gom (chỉ đọc); "gần nhất" = xã của lệnh thuộc xã phục vụ của tổ (chưa có tọa độ tổ/thửa) |
 | proto FM-09 ở ruộng đếm cuộn; tấn chỉ khi không có cuộn; kg/cuộn học theo HTX | `TestBaleCountMandatoryFM09`, `TestKgPerRollFallbackChain`, `TestKgPerRollLearningFallback`, `TestWeighTicketConsumerLearnsKgPerRoll`, `TestRollCountGPSOptionalNeverBlocks` | **đạt**. kg/cuộn không bao giờ qua van |
 | proto FM-10 cân nhà máy lệch > 5 % so với ước tính theo cuộn → cờ; > 15 % nghiêm trọng | `TestGoldenPrototypeSeedRollVsMass` (+10 % cờ; +15,11 % nghiêm trọng), `TestCollectionLinkDrivesRollCheck`, `TestMKGPlanGoldenPrototypeLot`, E2E-G3-11 | **đạt** |
 | proto plant-weighing: chỉ ghi thêm, tịnh = tổng − bì > 0, số cuộn nhà máy đếm lại | `TestNormalizeDraftRules`, `TestIntegrateV1Golden` (bì ≥ tổng → từ chối), `TestIngestTicketIdempotencyCorrectionAndGrants` | **đạt** |

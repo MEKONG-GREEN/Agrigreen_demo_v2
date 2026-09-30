@@ -67,6 +67,9 @@ type Service struct {
 	CursorKey []byte
 	// Feed: luồng phản hồi của HTX trên nền tảng (G3-2); nil = không kéo.
 	Feed port.HTXResponseFeed
+	// Harvest: ngày gặt theo vụ của thửa (bề mặt partner của nền tảng, FM-01/02); nil = chưa
+	// nối → mọi kiểm ngày gặt gắn cờ unavailable (vẫn cho ghi, không bao giờ im lặng).
+	Harvest port.HarvestDates
 
 	feed feedState
 }

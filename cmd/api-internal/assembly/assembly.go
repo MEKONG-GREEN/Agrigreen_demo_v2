@@ -106,11 +106,19 @@ func Jobs(mods Modules, tenantPool *pgxpool.Pool, selected string, log *slog.Log
 		interval, _ := time.ParseDuration(os.Getenv("AG_FIELDOPS_HTX_POLL_INTERVAL"))
 		out = append(out, mods.Fieldops.Jobs(tid, interval, log)...)
 	}
+	if selected == "all" || strings.Contains(","+selected+",", ","+foport.JobHarvestDates+",") {
+		// FM-01/02: bảng đệm ngày gặt của lệnh gom đang mở, đọc bề mặt partner của nền tảng.
+		tid, _ := uuid.Parse(os.Getenv("AG_MKG_TENANT_ID"))
+		interval, _ := time.ParseDuration(os.Getenv("AG_FIELDOPS_HARVEST_POLL_INTERVAL"))
+		out = append(out, mods.Fieldops.HarvestJobs(tid, interval, log)...)
+	}
 	return out
 }
 
 // JobNames liệt kê tên job hợp lệ của api-internal.
-func JobNames() string { return hubport.JobDailyCapacity + ", " + foport.JobHTXResponses }
+func JobNames() string {
+	return hubport.JobDailyCapacity + ", " + foport.JobHTXResponses + ", " + foport.JobHarvestDates
+}
 
 // FieldopsOptionsFromEnv đọc cấu hình mkg/fieldops:
 //
@@ -121,6 +129,9 @@ func JobNames() string { return hubport.JobDailyCapacity + ", " + foport.JobHTXR
 //	AG_FIELDOPS_CURSOR_KEY    khóa HMAC con trỏ pull của app hiện trường (thiếu → ngẫu nhiên theo tiến trình)
 //	AG_MKG_TENANT_ID          tenant MKG của tài khoản dịch vụ (job fieldops_htx_responses kéo phản hồi HTX, G3-2)
 //	AG_FIELDOPS_HTX_POLL_INTERVAL chu kỳ kéo phản hồi HTX (Go duration, mặc định 5m)
+//	AG_FIELDOPS_HARVEST_POLL_INTERVAL chu kỳ làm mới ngày gặt (job fieldops_harvest_dates, mặc định 1h)
+//	    Ngày gặt đọc qua GET /v1/partner/season-harvest-dates (cùng tài khoản dịch vụ); thiếu cấu
+//	    hình → kiểm ngày gặt gắn cờ unavailable (vẫn cho ghi, FM-01).
 //
 // WeighedMass (mkg/measurement) nối trong Build.
 func FieldopsOptionsFromEnv(clk clock.Clock) fieldops.Options {
@@ -131,6 +142,10 @@ func FieldopsOptionsFromEnv(clk clock.Clock) fieldops.Options {
 			ClientID: os.Getenv("AG_MKG_SA_CLIENT_ID"), ClientSecret: os.Getenv("AG_MKG_SA_CLIENT_SECRET"),
 		}, clk)
 		o.Feed = fieldops.NewPlatformFeed(fieldops.PlatformConfig{
+			BaseURL: base, TokenURL: os.Getenv("AG_PLATFORM_TOKEN_URL"),
+			ClientID: os.Getenv("AG_MKG_SA_CLIENT_ID"), ClientSecret: os.Getenv("AG_MKG_SA_CLIENT_SECRET"),
+		}, clk)
+		o.Harvest = fieldops.NewPlatformHarvestDates(fieldops.PlatformConfig{
 			BaseURL: base, TokenURL: os.Getenv("AG_PLATFORM_TOKEN_URL"),
 			ClientID: os.Getenv("AG_MKG_SA_CLIENT_ID"), ClientSecret: os.Getenv("AG_MKG_SA_CLIENT_SECRET"),
 		}, clk)

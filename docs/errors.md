@@ -451,10 +451,12 @@ Mã của vòng tích phân (không trả qua HTTP; nhãn `code` của metric `a
 | HTTP | code | Khi nào |
 |---|---|---|
 | 400 | `fieldops.cursor_invalid` | Con trỏ pull bị sửa, cắt, hoặc của thiết bị/tài khoản khác — pull lại không có `cursor` |
-| 403 | `self_approval_forbidden` | Người duyệt lệnh gom là người lập (hoặc người sửa kế hoạch gần nhất) — R-56; DB chặn lần hai bằng CHECK |
+| 403 | `self_approval_forbidden` | Người duyệt lệnh gom là người lập (hoặc người sửa kế hoạch gần nhất); người duyệt / từ chối phiên bản tham số (`baling_deadline_days`) là người đề xuất — R-56; DB chặn lần hai bằng CHECK |
 | 403 | `fieldops.device_mismatch` | Thiếu header `X-Device-Id`, hoặc `device_id` của lô đồng bộ khác header |
 | 404 | `fieldops.order_not_found` | Không có lệnh gom trong tenant của token |
 | 404 | `fieldops.roll_count_not_found` | Không có bản ghi đếm cuộn cần bù |
+| 404 | `fieldops.crew_not_found` | Không có tổ gom (đường dẫn `/v1/fieldops/crews/{id}`) trong tenant của token |
+| 404 | `fieldops.param_not_found` | Khóa tham số lạ (G3 chỉ có `baling_deadline_days`) hoặc không có phiên bản cần quyết định |
 | 409 | `fieldops.order_transition` | Chuyển trạng thái không hợp lệ (sửa kế hoạch sau khi duyệt, duyệt lệnh không còn `planned`, đóng lệnh chưa giao tổ, hủy lệnh đã đóng/hủy) |
 | 409 | `fieldops.order_not_open` | Ghi số / mở ca trên lệnh chưa duyệt, đã đóng hoặc đã hủy |
 | 409 | `fieldops.stage_already_counted` | Công đoạn này của thửa đã có số — sửa bằng bản ghi bù |
@@ -462,6 +464,12 @@ Mã của vòng tích phân (không trả qua HTTP; nhãn `code` của metric `a
 | 409 | `fieldops.id_reused` | `id` do máy sinh đã dùng cho bản ghi khác (khác `idem_key`) |
 | 409 | `fieldops.nothing_to_confirm` | Thửa chưa có số xếp ghe/xe nên chưa có bảng kê để HTX xác nhận |
 | 409 | `fieldops.statement_stale` | Xác nhận theo `statement_revision` cũ — MKG đã sửa số sau đó |
+| 409 | `fieldops.crew_inactive` | Giao việc cho tổ gom đã ngừng hoạt động (proto FM-07) — bật lại tổ hoặc chọn tổ khác |
+| 409 | `fieldops.crew_over_capacity` | Tải/ngày của tổ (các lệnh `assigned` khác + việc này) vượt `capacity_per_day` ít nhất một ngày (proto FM-06); `detail` nêu ngày và tải. Giám sát giao tay được vượt khi ghi `override_reason`; xác nhận gợi ý (`mode = suggested`) không bao giờ vượt |
+| 409 | `fieldops.crew_code_taken` | Mã tổ gom đã dùng cho tổ khác trong tenant |
+| 409 | `fieldops.crew_version_conflict` | `expected_version` khác phiên bản hiện hành của tổ — tải lại rồi sửa |
+| 409 | `fieldops.crew_transition` | Ngừng tổ đã ngừng, bật lại tổ đang hoạt động |
+| 409 | `fieldops.param_already_decided` | Phiên bản tham số đã được duyệt hoặc từ chối |
 | 422 | `validation_failed` | Dữ liệu vào sai (thiếu `rolls`, `loose_kg` khi có cuộn, lý do < 10 ký tự, ngày không phải YYYY-MM-DD, khung > 90 ngày, `event_time` ở tương lai…), xem `errors[]` |
 | 422 | `fieldops.plot_not_in_order` | Thửa không thuộc lệnh gom |
 | 422 | `fieldops.previous_stage_missing` | Công đoạn trước chưa có số (proto FM-03) |
@@ -472,10 +480,15 @@ Mã của vòng tích phân (không trả qua HTTP; nhãn `code` của metric `a
 | 422 | `fieldops.htx_not_found` | Application API không có (hoặc chưa chia sẻ — câu hỏi RB-2) HTX, hoặc HTX đã vô hiệu hóa |
 | 422 | `fieldops.plot_not_found` | Application API không có (hoặc chưa chia sẻ) thửa |
 | 422 | `fieldops.plot_other_htx` | Thửa không thuộc HTX của lệnh gom, là thửa nháp hoặc đã ngừng dùng |
+| 422 | `fieldops.before_harvest` | Số cuộn công đoạn `bale` có ngày (giờ VN của `event_time`) trước ngày gặt của thửa (proto FM-01). Ngày gặt đọc từ nền tảng (bề mặt partner), mất kết nối thì dùng bảng đệm. Chưa biết ngày gặt → KHÔNG lỗi, bản ghi gắn cờ `harvest_check.check = unknown/unavailable` và cảnh báo |
+| 422 | `fieldops.crew_unknown` | `crew_ref` khi giao việc không có trong sổ tổ gom của tenant |
+| 422 | `fieldops.workload_required` | Giao / gợi ý thiếu khối lượng việc theo đơn vị năng lực của tổ (`expected_bales` với tổ `bales`, `expected_ha` với tổ `ha`) |
 | 500 | `fieldops.valve_denied` | Van công bố từ chối payload — lỗi lập trình, không có gì được ghi |
 | 503 | `fieldops.directory_unavailable` | Không gọi được Application API (chưa cấu hình tài khoản dịch vụ MKG, lỗi mạng, token) |
 
 Kết quả theo bản ghi của `POST /v1/fieldops/sync/push` dùng thêm `fieldops.unknown_entity` (entity khác `roll_count`) và `fieldops.sink_failed` (lỗi hệ thống — máy giữ và tự gửi lại).
+
+Cảnh báo không chặn (mảng `warnings` của kết quả ghi, không phải lỗi): `fieldops.harvest_date_unknown`, `fieldops.harvest_date_unavailable` (FM-01, chưa biết ngày gặt), `fieldops.planned_before_harvest` (ngày bắt đầu dự kiến trước ngày gặt), `fieldops.baling_deadline_at_risk` (ngày kết thúc dự kiến sau hạn cuộn FM-02), `fieldops.crew_over_capacity_override` (giám sát giao vượt năng lực kèm lý do, FM-06).
 
 ### pf/waterway
 

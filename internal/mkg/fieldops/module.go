@@ -44,6 +44,9 @@ type Options struct {
 	CursorKey []byte
 	// Feed: luồng phản hồi của HTX trên nền tảng (G3-2); nil → job kéo phản hồi không làm gì.
 	Feed port.HTXResponseFeed
+	// Harvest: ngày gặt theo vụ của thửa (bề mặt partner, FM-01/02); nil → mọi kiểm ngày gặt
+	// gắn cờ unavailable (vẫn cho ghi) và không có job làm mới bảng đệm.
+	Harvest port.HarvestDates
 }
 
 // Module là mkg/fieldops đã nối.
@@ -59,7 +62,7 @@ func New(db tenant.Beginner, clk clock.Clock, o Options) *Module {
 		_, _ = rand.Read(o.CursorKey)
 	}
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Directory: o.Directory, Weighed: o.Weighed,
-		ConfiguredKgPerRoll: o.KgPerRoll, CursorKey: o.CursorKey, Feed: o.Feed}}
+		ConfiguredKgPerRoll: o.KgPerRoll, CursorKey: o.CursorKey, Feed: o.Feed, Harvest: o.Harvest}}
 }
 
 // NewPlatformFeed tạo luồng phản hồi của HTX qua Application API công khai (tài khoản dịch
@@ -82,6 +85,41 @@ func (m *Module) Jobs(tid uuid.UUID, interval time.Duration, log *slog.Logger) [
 	if m.svc.Feed == nil || tid == uuid.Nil {
 		return nil
 	}
+	return m.htxJobs(tid, interval, log)
+}
+
+// HarvestJobs trả job làm mới bảng đệm ngày gặt (FM-01/02) của các lệnh gom đang mở mỗi
+// interval (mặc định 1 giờ) cho tenant MKG tid. Không có nguồn ngày gặt → không có job.
+func (m *Module) HarvestJobs(tid uuid.UUID, interval time.Duration, log *slog.Logger) []schedule.Job {
+	if m.svc.Harvest == nil || tid == uuid.Nil {
+		return nil
+	}
+	if interval <= 0 {
+		interval = time.Hour
+	}
+	return []schedule.Job{{
+		Name: port.JobHarvestDates, Spec: schedule.Every{Interval: interval}, RunOnStart: true, Timeout: 30 * time.Minute,
+		Run: func(ctx context.Context) error {
+			r, err := m.svc.RefreshHarvestDates(ctx, tid)
+			if log != nil {
+				outcome := "ok"
+				if err != nil {
+					outcome = "error"
+				}
+				log.Info("làm mới ngày gặt", "event", "job."+port.JobHarvestDates, "plots", r.Plots, "known", r.Known,
+					"unknown", r.Unknown, "unavailable", r.Unavailable, "outcome", outcome)
+			}
+			return err
+		},
+	}}
+}
+
+// RefreshHarvestDates chạy một lượt làm mới bảng đệm ngày gặt cho tenant tid (job, kiểm thử).
+func (m *Module) RefreshHarvestDates(ctx context.Context, tid uuid.UUID) (app.HarvestRefresh, error) {
+	return m.svc.RefreshHarvestDates(ctx, tid)
+}
+
+func (m *Module) htxJobs(tid uuid.UUID, interval time.Duration, log *slog.Logger) []schedule.Job {
 	if interval <= 0 {
 		interval = 5 * time.Minute
 	}
@@ -107,6 +145,12 @@ type PlatformConfig = adapter.PlatformConfig
 
 // NewPlatformDirectory tạo PlatformDirectory qua Application API công khai (OIDC client credentials).
 func NewPlatformDirectory(cfg PlatformConfig, clk clock.Clock) port.PlatformDirectory {
+	return adapter.NewPlatformHTTP(cfg, func() time.Time { return clk.Now() })
+}
+
+// NewPlatformHarvestDates tạo nguồn ngày gặt qua bề mặt partner của nền tảng
+// (GET /v1/partner/season-harvest-dates, tài khoản dịch vụ tenant MKG).
+func NewPlatformHarvestDates(cfg PlatformConfig, clk clock.Clock) port.HarvestDates {
 	return adapter.NewPlatformHTTP(cfg, func() time.Time { return clk.Now() })
 }
 

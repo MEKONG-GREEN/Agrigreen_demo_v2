@@ -52,6 +52,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.POST("/fieldops/kg-per-roll/refresh", h.refreshWeighings)
 	rg.POST("/fieldops/sync/push", h.push)
 	rg.GET("/fieldops/sync/pull", h.pull)
+	h.registerCrews(rg)
 }
 
 func bind(c *gin.Context, v any) bool {
@@ -259,23 +260,6 @@ func (h Handler) decide(c *gin.Context) {
 	})
 }
 
-func (h Handler) assign(c *gin.Context) {
-	id, ok := pathID(c, app.ErrOrderNotFound)
-	if !ok {
-		return
-	}
-	var req decideReq
-	if !bind(c, &req) {
-		return
-	}
-	x := newV()
-	crew := x.uuid("crew_ref", req.CrewRef)
-	if x.fail(c) {
-		return
-	}
-	h.orderResult(c, func() (app.OrderResult, bool, error) { return h.Svc.Assign(c.Request.Context(), id, crew, idem(c)) })
-}
-
 func (h Handler) close(c *gin.Context) {
 	id, ok := pathID(c, app.ErrOrderNotFound)
 	if !ok {
@@ -303,16 +287,23 @@ func (h Handler) getOrder(c *gin.Context) {
 	if !ok {
 		return
 	}
-	o, hist, err := h.Svc.Order(c.Request.Context(), id)
+	vw, err := h.Svc.Order(c.Request.Context(), id)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	evs := make([]orderEventDTO, 0, len(hist))
-	for _, e := range hist {
+	evs := make([]orderEventDTO, 0, len(vw.History))
+	for _, e := range vw.History {
 		evs = append(evs, toOrderEvent(e))
 	}
-	c.JSON(http.StatusOK, gin.H{"order": toOrder(o), "history": evs})
+	o := toOrder(vw.Order)
+	o.BalingOverdue = vw.BalingAlert
+	var asg *assignmentDTO
+	if vw.Assignment != nil {
+		asg = toAssignment(*vw.Assignment)
+	}
+	c.JSON(http.StatusOK, gin.H{"order": o, "history": evs, "assignment": asg, "baling": toBalings(vw.Baling),
+		"baling_deadline_days": vw.BalingDays})
 }
 
 func (h Handler) listOrders(c *gin.Context) {
@@ -335,7 +326,9 @@ func (h Handler) listOrders(c *gin.Context) {
 	}
 	items := make([]orderDTO, 0, len(pg.Items))
 	for _, o := range pg.Items {
-		items = append(items, toOrder(o))
+		d := toOrder(o)
+		d.BalingOverdue = pg.Overdue[o.OrderID]
+		items = append(items, d)
 	}
 	var next *string
 	if pg.Next != nil {
@@ -438,6 +431,9 @@ func (h Handler) counts(c *gin.Context) {
 	counts := make([]rollDTO, 0, len(vw.Counts))
 	for _, r := range vw.Counts {
 		d := toRoll(r)
+		if hc, ok := vw.Harvest[r.ID]; ok {
+			d.Harvest = toHarvestCheck(&hc)
+		}
 		if l, ok := vw.Locations[r.ID]; ok {
 			d.GPSStatus = &l.Status
 			if l.Lat != nil {

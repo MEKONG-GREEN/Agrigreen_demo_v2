@@ -176,9 +176,9 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 | Mục | Thiết kế |
 |---|---|
 | Trách nhiệm | Lệnh gom theo HTX/xã/khung thời gian; phân công tổ gom (máy cuộn, xe); **đếm cuộn tại thửa** (sổ đã có từ G0); nhật ký sản xuất; xác nhận của HTX (`htx_confirmation_ref`, mục 13.3) |
-| Aggregate | `CollectionOrder` (lệnh gom), `RollCount` (đếm cuộn — dữ liệu mức tài chính, mục 15), `CrewShift` |
-| Sổ | `roll_count` (`lot:<collection_lot>`; đã có — mkg 000001), `collection_order_event` (`order:<id>`), `crew_shift` (`crew:<id>`), `htx_confirmation` (`order:<id>`) |
-| Bảng chiếu | `collection_order_current`, `roll_total_current` (theo lệnh gom, theo thửa) |
+| Aggregate | `CollectionOrder` (lệnh gom), `RollCount` (đếm cuộn — dữ liệu mức tài chính, mục 15), `CrewShift`, `Crew` (sổ tổ gom có phiên bản, mkg 000012) |
+| Sổ | `roll_count` (`lot:<collection_lot>`; đã có — mkg 000001), `collection_order_event` (`order:<id>`), `crew_shift` (`crew:<id>`), `htx_confirmation` (`order:<id>`); mkg 000012: `crew_event` (`crewdir:<id>`), `crew_assignment` (`assign:<order_id>`, năng lực FM-06/07/08), `roll_count_harvest` (`harvest:<roll_count_id>`, FM-01), `param_version` (`param:<key>`, `baling_deadline_days` FM-02) |
+| Bảng chiếu | `collection_order_current`, `roll_total_current` (theo lệnh gom, theo thửa); mkg 000012: `crew_current`, `crew_assignment_current`, `order_plot_harvest_current` (bảng đệm ngày gặt từ bề mặt partner của nền tảng, cổng `port.HarvestDates`), `param_current` |
 | Sự kiện | Không sự kiện rời vùng ở G3 ngoài hợp đồng `collection_schedule`, `htx_collection_statement` (§3.2) khi được duyệt |
 | Liên kết | → `hub` (lô `receipt` có nguồn `roll_count`/`plot`), → `measurement` (cửa sổ lô để tích phân phiếu cân), → `costing` (quy đổi cuộn → tấn) — qua `port/` |
 | Nguồn ngoài | Thửa, HTX của nền tảng: gọi Application API công khai bằng tài khoản dịch vụ tenant MKG (cửa "tiêu thụ không đặc quyền"); lưu `plot_ref`, `htx_ref` UUID thuần (R-06) |
@@ -269,7 +269,7 @@ Số chính thức theo [g3-conventions §2](../dev/g3-conventions.md#2-số-mig
 | orders | `mkg_orders` | `orders_app` | G4 (từ 000013) | cần thêm vai |
 | costing | `mkg_costing` | `costing_app` | G4 (từ 000013) | cần thêm vai |
 | acctbridge | `mkg_acctbridge` | `acctbridge_app` | G4 (từ 000013) | cần thêm vai |
-| dự phòng G3 | | | **000010–000012** | xin người tích hợp |
+| dự phòng G3 | | | **000010–000012** | xin người tích hợp (000012: fieldops tổ gom, ngày gặt, hạn cuộn — nghiệm thu G3) |
 | API nội bộ | `shared.idempotency_key` cụm mkg | `mkg_api` (tương đương `platform_api`) | — (quyền qua `ag_shared_user`, shared 000001) | **đã làm** — `cmd/api-internal/assembly.OpsRole` (Q-MKG-07 đóng) |
 | worker-internal | `shared.inbox` cụm mkg | `worker_internal` | — | **khung đã có (G3-0)**: `cmd/worker-internal`, vhost `mkg.internal` (ADR-0018) |
 

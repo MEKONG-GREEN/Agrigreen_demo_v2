@@ -45,6 +45,10 @@ type CountResult struct {
 	Total   store.Total
 	Recon   *store.Recon
 	Exports []store.ValveExport
+	// Harvest: kết quả kiểm ngày gặt (FM-01) — chỉ bản ghi cuộn gốc (công đoạn bale).
+	Harvest *store.HarvestCheck
+	// Warnings: cảnh báo không chặn (vd fieldops.harvest_date_unknown).
+	Warnings []string
 }
 
 // RecordCount ghi số một công đoạn (field_collector hoặc field_supervisor).
@@ -80,8 +84,25 @@ func (s *Service) count(ctx context.Context, p authz.Principal, in CountInput) (
 	if in.ID != nil && in.ID.Version() != 7 {
 		return CountResult{}, false, problem.Validation.WithField("id", "UUIDv7")
 	}
+	// FM-01: bản ghi cuộn gốc — đọc ngày gặt của thửa từ nền tảng NGOÀI giao dịch DB.
+	var live *store.PlotHarvest
+	if !correction && in.Stage == port.StageBale {
+		var o *store.Order
+		if err := tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
+			var e error
+			o, e = store.GetOrder(ctx, tx, in.OrderID, false)
+			return e
+		}); err != nil {
+			return CountResult{}, false, mapErr(err)
+		}
+		if o != nil && o.HasPlot(in.PlotRef) {
+			h := s.fetchHarvest(ctx, o.OrderID, in.PlotRef, o.WindowFrom)
+			live = &h
+		}
+	}
 	var res CountResult
 	replayed, err := s.write(ctx, p.TenantID, func(tx pgx.Tx) error {
+		res = CountResult{}
 		// id do máy sinh đã dùng cho bản ghi khác (khác idem_key) — kiểm trước mọi quy tắc nghiệp vụ.
 		if in.ID != nil {
 			if taken, err := store.IDTaken(ctx, tx, *in.ID); err != nil {
@@ -150,6 +171,28 @@ func (s *Service) count(ctx context.Context, p authz.Principal, in CountInput) (
 				}
 			}
 		}
+		var hc *store.HarvestCheck
+		if live != nil {
+			h, source, err := resolveHarvest(ctx, tx, *live)
+			if err != nil {
+				return err
+			}
+			baleDay := domain.Day(in.EventTime)
+			if h.Check == domain.HarvestOK {
+				if err := domain.CheckBaleDate(baleDay, *h.Date); err != nil {
+					return ErrBeforeHarvest.WithDetail("ngày cuộn " + baleDay.Format(dateLayout) + " trước ngày gặt " + h.Date.Format(dateLayout))
+				}
+			}
+			if live.Check != domain.HarvestUnavailable {
+				if err := store.PutPlotHarvest(ctx, tx, p.TenantID, *live); err != nil {
+					return err
+				}
+			}
+			hc = &store.HarvestCheck{BaleDate: baleDay, Check: h.Check, HarvestDate: h.Date, SeasonRef: h.SeasonRef, Kind: h.Kind, Source: source}
+			if w := harvestWarning(h.Check); w != "" {
+				res.Warnings = append(res.Warnings, w)
+			}
+		}
 		id := ids.New()
 		if in.ID != nil {
 			id = *in.ID
@@ -170,6 +213,12 @@ func (s *Service) count(ctx context.Context, p authz.Principal, in CountInput) (
 			if err := store.InsertLocation(ctx, tx, rc, *in.Location); err != nil {
 				return err
 			}
+		}
+		if hc != nil {
+			if err := store.InsertHarvestCheck(ctx, tx, rc, hc); err != nil {
+				return err
+			}
+			res.Harvest = hc
 		}
 		// Sự kiện NỘI BỘ MKG (ADR-0018): measurement (RB-6), costing (G4).
 		if err := outbox.Enqueue(ctx, tx, outbox.Event{
@@ -238,6 +287,18 @@ func (s *Service) replayCount(ctx context.Context, idem string, res *CountResult
 		if err != nil {
 			return false, err
 		}
+		if rc.Stage == port.StageBale {
+			hs, err := store.HarvestChecksOf(ctx, tx, rc.OrderID)
+			if err != nil {
+				return false, err
+			}
+			if h, ok := hs[rc.ID]; ok {
+				res.Harvest = &h
+				if w := harvestWarning(h.Check); w != "" {
+					res.Warnings = append(res.Warnings, w)
+				}
+			}
+		}
 		if t != nil {
 			res.Total = *t
 		}
@@ -263,7 +324,8 @@ func (s *Service) replayCount(ctx context.Context, idem string, res *CountResult
 type CountsView struct {
 	Counts    []store.RollCount
 	Totals    []store.Total
-	Locations map[uuid.UUID]store.Location // dấu GPS theo roll_count_id (G3-2)
+	Locations map[uuid.UUID]store.Location     // dấu GPS theo roll_count_id (G3-2)
+	Harvest   map[uuid.UUID]store.HarvestCheck // kiểm ngày gặt theo roll_count_id (FM-01)
 }
 
 // Counts đọc sổ đếm cuộn (cả bản bị bù) và số hiệu lực theo thửa/công đoạn.
@@ -282,7 +344,10 @@ func (s *Service) Counts(ctx context.Context, orderID uuid.UUID) (CountsView, er
 		if v.Totals, err = store.Totals(ctx, tx, orderID); err != nil {
 			return err
 		}
-		v.Locations, err = store.LocationsOf(ctx, tx, orderID)
+		if v.Locations, err = store.LocationsOf(ctx, tx, orderID); err != nil {
+			return err
+		}
+		v.Harvest, err = store.HarvestChecksOf(ctx, tx, orderID)
 		return err
 	})
 	if err == nil && !found {

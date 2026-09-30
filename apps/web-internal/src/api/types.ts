@@ -40,6 +40,9 @@ export type RankedLot = S["RankedLot"];
 export type Allocation = S["Allocation"];
 export type Capacity = S["Capacity"];
 export type ValveExport = S["ValveExport"];
+export type Crew = S["Crew"];
+export type CrewSuggestion = S["CrewSuggestion"];
+export type CrewSuggestions = Get<"/v1/fieldops/orders/{id}/crew-suggestions">;
 export type Stocktake = S["Stocktake"];
 export interface TransferLot {
   source_lot_id?: string | null;

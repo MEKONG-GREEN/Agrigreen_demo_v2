@@ -16,6 +16,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 var communeRe = regexp.MustCompile(`^[0-9]{5}$`)
@@ -133,19 +134,26 @@ func (s *Service) CreateOrder(ctx context.Context, in PlanInput) (OrderResult, b
 		return res, false, err
 	}
 	var pl plan
+	var harvests []store.PlotHarvest
+	orderID := ids.New()
 	if prev == nil {
 		if pl, err = s.validatePlan(ctx, in); err != nil {
 			return res, false, err
 		}
+		// FM-01/02: ngày gặt của các thửa vào bảng đệm (ngoài giao dịch; chưa biết → gắn cờ, không chặn).
+		harvests = s.fetchPlots(ctx, store.Order{OrderID: orderID, WindowFrom: pl.from, PlotRefs: pl.plots})
 	}
 	now := s.Clock.Now()
 	replayed, err := s.write(ctx, p.TenantID, func(tx pgx.Tx) error {
 		e := store.OrderEvent{
-			ID: ids.New(), TenantID: p.TenantID, OrderID: ids.New(), Kind: domain.OrderPlanned, Revision: 1,
+			ID: ids.New(), TenantID: p.TenantID, OrderID: orderID, Kind: domain.OrderPlanned, Revision: 1,
 			HTXRef: pl.htx, CommuneCode: pl.commune, WindowFrom: pl.from, WindowTo: pl.to, PlotRefs: pl.plots,
 			CreatorRef: p.ActorRef, EventTime: now, ActorRef: p.ActorRef, IdemKey: in.IdemKey,
 		}
-		return s.applyEvent(ctx, tx, &e, &res)
+		if err := s.applyEvent(ctx, tx, &e, &res); err != nil {
+			return err
+		}
+		return putHarvests(ctx, tx, p.TenantID, orderID, harvests)
 	}, s.replayOrder(ctx, in.IdemKey, &res))
 	return res, replayed, err
 }
@@ -163,12 +171,18 @@ func (s *Service) ReviseOrder(ctx context.Context, orderID uuid.UUID, in PlanInp
 	if err != nil {
 		return OrderResult{}, false, err
 	}
-	return s.transition(ctx, p, orderID, domain.OrderPlanned, in.IdemKey, func(e *store.OrderEvent, o store.Order) error {
+	harvests := s.fetchPlots(ctx, store.Order{OrderID: orderID, WindowFrom: pl.from, PlotRefs: pl.plots})
+	res, replayed, err := s.transition(ctx, p, orderID, domain.OrderPlanned, in.IdemKey, func(e *store.OrderEvent, o store.Order) error {
 		e.Revision = o.Revision + 1
 		e.HTXRef, e.CommuneCode, e.WindowFrom, e.WindowTo, e.PlotRefs = pl.htx, pl.commune, pl.from, pl.to, pl.plots
 		e.CreatorRef = p.ActorRef
 		return nil
 	})
+	if err == nil && !replayed {
+		// Bảng đệm, dựng lại được: ghi sau sự kiện (lỗi ở đây không làm hỏng lệnh gom).
+		_ = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error { return putHarvests(ctx, tx, p.TenantID, orderID, harvests) })
+	}
+	return res, replayed, err
 }
 
 // Decide duyệt (approved) hoặc từ chối (cancelled kèm lý do) lệnh gom planned.
@@ -197,24 +211,6 @@ func (s *Service) Decide(ctx context.Context, orderID uuid.UUID, approve bool, r
 			return problem.SelfApproval.WithCause(authz.ErrSelfApproval)
 		}
 		e.Reason = strPtr(r)
-		return nil
-	})
-}
-
-// Assign giao (hoặc đổi) tổ gom cho lệnh đã duyệt.
-func (s *Service) Assign(ctx context.Context, orderID, crewRef uuid.UUID, idem string) (OrderResult, bool, error) {
-	p, err := authz.Require(ctx, RoleSupervisor)
-	if err != nil {
-		return OrderResult{}, false, err
-	}
-	if err := requireIdem(idem); err != nil {
-		return OrderResult{}, false, err
-	}
-	if crewRef == uuid.Nil {
-		return OrderResult{}, false, problem.Validation.WithField("crew_ref", "bắt buộc, UUID")
-	}
-	return s.transition(ctx, p, orderID, domain.OrderAssigned, idem, func(e *store.OrderEvent, _ store.Order) error {
-		e.CrewRef = &crewRef
 		return nil
 	})
 }
@@ -335,31 +331,51 @@ func (s *Service) replayOrder(ctx context.Context, idem string, res *OrderResult
 	}
 }
 
+// OrderView là lệnh gom hiện hành kèm lịch sử, phân công và hạn cuộn theo thửa (FM-02).
+type OrderView struct {
+	Order       store.Order
+	History     []store.OrderEvent
+	Assignment  *store.Assignment
+	Baling      []BalingItem
+	BalingDays  int
+	BalingAlert bool // ít nhất một thửa quá hạn cuộn chưa cuộn (FM-02)
+}
+
 // Order đọc lệnh gom hiện hành.
-func (s *Service) Order(ctx context.Context, id uuid.UUID) (store.Order, []store.OrderEvent, error) {
-	var o *store.Order
-	var hist []store.OrderEvent
+func (s *Service) Order(ctx context.Context, id uuid.UUID) (OrderView, error) {
+	var v OrderView
+	found := false
 	err := s.read(ctx, func(tx pgx.Tx) error {
-		var e error
-		if o, e = store.GetOrder(ctx, tx, id, false); e != nil || o == nil {
+		o, e := store.GetOrder(ctx, tx, id, false)
+		if e != nil || o == nil {
 			return e
 		}
-		hist, e = store.OrderEvents(ctx, tx, id)
-		return e
+		found, v.Order = true, *o
+		if v.History, e = store.OrderEvents(ctx, tx, id); e != nil {
+			return e
+		}
+		if v.Assignment, e = store.CurrentAssignment(ctx, tx, id); e != nil {
+			return e
+		}
+		b, days, e := s.orderBaling(ctx, tx, []uuid.UUID{id})
+		if e != nil {
+			return e
+		}
+		v.Baling, v.BalingDays, v.BalingAlert = b[id], days, OverdueFlags(b)[id]
+		return nil
 	})
-	if err != nil {
-		return store.Order{}, nil, err
+	if err == nil && !found {
+		err = ErrOrderNotFound
 	}
-	if o == nil {
-		return store.Order{}, nil, ErrOrderNotFound
-	}
-	return *o, hist, nil
+	return v, err
 }
 
 // OrderPage là một trang lệnh gom.
 type OrderPage struct {
 	Items []store.Order
 	Next  *uuid.UUID
+	// Overdue: lệnh có ít nhất một thửa quá hạn cuộn (FM-02).
+	Overdue map[uuid.UUID]bool
 }
 
 // Orders liệt kê lệnh gom, cursor theo order_id (R-53).
@@ -367,21 +383,25 @@ func (s *Service) Orders(ctx context.Context, status string, htx *uuid.UUID, aft
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	var items []store.Order
+	var pg OrderPage
 	err := s.read(ctx, func(tx pgx.Tx) error {
-		var e error
-		items, e = store.ListOrders(ctx, tx, status, htx, after, limit+1)
+		items, e := store.ListOrders(ctx, tx, status, htx, after, limit+1)
+		if e != nil {
+			return e
+		}
+		if len(items) > limit {
+			items = items[:limit]
+			last := items[limit-1].OrderID
+			pg.Next = &last
+		}
+		pg.Items = items
+		idsOf := make([]uuid.UUID, 0, len(items))
+		for _, o := range items {
+			idsOf = append(idsOf, o.OrderID)
+		}
+		b, _, e := s.orderBaling(ctx, tx, idsOf)
+		pg.Overdue = OverdueFlags(b)
 		return e
 	})
-	var pg OrderPage
-	if err != nil {
-		return pg, err
-	}
-	if len(items) > limit {
-		items = items[:limit]
-		last := items[limit-1].OrderID
-		pg.Next = &last
-	}
-	pg.Items = items
-	return pg, nil
+	return pg, err
 }

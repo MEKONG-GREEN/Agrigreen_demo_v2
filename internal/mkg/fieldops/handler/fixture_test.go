@@ -43,6 +43,7 @@ type fixture struct {
 	clk     *clock.Fixed
 	dir     *adapter.FakeDirectory
 	weighed *adapter.FakeWeighed
+	harvest *adapter.FakeHarvestDates
 	svc     *app.Service
 	tenant  uuid.UUID
 	htx     uuid.UUID
@@ -56,7 +57,7 @@ func newFixture(t *testing.T, cfgKg *decimal.Decimal) *fixture {
 	pool := env.Pool(t, migrations.MKG, port.DBRole)
 	clk := clock.NewFixed(time.Now().UTC().Truncate(time.Second))
 	f := &fixture{t: t, env: env, pool: pool, clk: clk, dir: adapter.NewFakeDirectory(), weighed: adapter.NewFakeWeighed(),
-		tenant: ids.New(), htx: ids.New()}
+		harvest: adapter.NewFakeHarvestDates(), tenant: ids.New(), htx: ids.New()}
 	f.dir.AddHTX(f.htx, "31117")
 	for i := 0; i < 2; i++ {
 		p := ids.New()
@@ -64,7 +65,7 @@ func newFixture(t *testing.T, cfgKg *decimal.Decimal) *fixture {
 		f.plots = append(f.plots, p)
 	}
 	f.svc = &app.Service{DB: pool, Clock: clk, Directory: f.dir, Weighed: f.weighed, ConfiguredKgPerRoll: cfgKg,
-		CursorKey: []byte("khoa-thu-nghiem")}
+		CursorKey: []byte("khoa-thu-nghiem"), Harvest: f.harvest}
 	f.iss = authztest.New(t)
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)
 	handler.Handler{Svc: f.svc}.RegisterApp(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), idempotency.Middleware(pool)))
@@ -214,4 +215,34 @@ func (f *fixture) inTenant(fn func(tx pgx.Tx) error) {
 	if err := tenant.WithTenantTx(context.Background(), f.pool, f.tenant, fn); err != nil {
 		f.t.Fatal(err)
 	}
+}
+
+// crewBody là thân tạo tổ gom (năng lực theo cuộn/ngày).
+func crewBody(code, capacity string, members ...uuid.UUID) map[string]any {
+	ms := make([]string, 0, len(members))
+	for _, m := range members {
+		ms = append(ms, m.String())
+	}
+	if len(ms) == 0 {
+		ms = append(ms, ids.New().String())
+	}
+	return map[string]any{"code": code, "name": "Tổ " + code, "member_refs": ms, "capacity_unit": "bales", "capacity_per_day": capacity,
+		"service_communes": []string{"31117"}}
+}
+
+// crew tạo một tổ gom đang hoạt động (giám sát) và trả crew_id.
+func (f *fixture) crew(code, capacity string, members ...uuid.UUID) string {
+	f.t.Helper()
+	r := f.supervisor().post("/v1/fieldops/crews", crewBody(code, capacity, members...))
+	mustStatus(f.t, r, http.StatusCreated, "tạo tổ gom "+code)
+	return str(r.body, "crew", "crew_id")
+}
+
+// assign giao tổ cho lệnh gom với số cuộn dự kiến (khung ngày = khung lệnh gom nếu extra không đặt).
+func (f *fixture) assign(c caller, order, crew string, bales int, extra map[string]any) resp {
+	body := map[string]any{"crew_ref": crew, "expected_bales": bales}
+	for k, v := range extra {
+		body[k] = v
+	}
+	return c.post("/v1/fieldops/orders/"+order+"/assign", body)
 }

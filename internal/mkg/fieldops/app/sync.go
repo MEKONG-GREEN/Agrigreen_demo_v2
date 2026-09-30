@@ -254,10 +254,10 @@ func (s *Service) decodeCursor(p authz.Principal, device, c string) (int64, erro
 // Pull trả thay đổi lệnh gom sau con trỏ. Lệnh đã duyệt/đang làm → upsert; lệnh
 // chưa duyệt, đã đóng hoặc hủy → tombstone (ngừng hiển thị trên máy).
 //
-// Lọc theo tổ (G3-2, CHƯA làm — ghi nhận): lệnh đã giao tổ (crew_ref) lẽ ra chỉ xuống máy
-// của tổ đó, nhưng G3 chưa có quan hệ người dùng → tổ gom (crew_ref chỉ là UUID trên lệnh,
-// ca tổ do chính app ghi SAU khi thấy lệnh). Khi có danh bạ tổ (claim org_ref = tổ, hoặc
-// sổ thành viên tổ), lọc ở đây: tổ khác → tombstone; field_supervisor vẫn thấy mọi lệnh.
+// Lọc theo tổ (nghiệm thu G3, sổ tổ gom): field_supervisor thấy mọi lệnh; field_collector
+// (không có vai giám sát) chỉ nhận upsert cho lệnh ĐÃ GIAO (assigned) cho tổ mà tài khoản là
+// thành viên (crew_current.member_refs) — lệnh khác (chưa giao, giao tổ khác) → tombstone.
+// Đổi tổ / đổi thành viên đẩy sync_seq của lệnh nên máy cũ nhận tombstone, máy mới nhận upsert.
 func (s *Service) Pull(ctx context.Context, device, cursor string, limit int) (PullPage, error) {
 	p, err := authz.Require(ctx, RoleCollector, RoleSupervisor)
 	if err != nil {
@@ -277,8 +277,15 @@ func (s *Service) Pull(ctx context.Context, device, cursor string, limit int) (P
 		return PullPage{}, err
 	}
 	var orders []store.Order
+	supervisor := p.Has(RoleSupervisor)
+	var mine map[uuid.UUID]bool
 	if err := s.read(ctx, func(tx pgx.Tx) error {
 		var e error
+		if !supervisor {
+			if mine, e = store.CrewsOfMember(ctx, tx, p.ActorRef); e != nil {
+				return e
+			}
+		}
 		orders, e = store.OrdersSince(ctx, tx, seq, limit+1)
 		return e
 	}); err != nil {
@@ -290,7 +297,11 @@ func (s *Service) Pull(ctx context.Context, device, cursor string, limit int) (P
 	}
 	for _, o := range orders {
 		c := Change{Entity: EntityOrder, ID: o.OrderID, Version: o.SyncSeq, Op: "tombstone"}
-		if domain.Countable(o.Status) {
+		visible := domain.Countable(o.Status)
+		if visible && !supervisor {
+			visible = o.Status == domain.OrderAssigned && o.CrewRef != nil && mine[*o.CrewRef]
+		}
+		if visible {
 			c.Op = "upsert"
 			c.Data, _ = json.Marshal(OrderSyncData{
 				OrderID: o.OrderID, Status: o.Status, Revision: o.Revision, HTXRef: o.HTXRef, CommuneCode: o.CommuneCode,

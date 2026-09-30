@@ -29,6 +29,8 @@ type orderDTO struct {
 	Published   bool        `json:"published"`
 	CreatedAt   time.Time   `json:"created_at"`
 	UpdatedAt   time.Time   `json:"updated_at"`
+	// BalingOverdue (FM-02): ít nhất một thửa đã quá hạn cuộn sau gặt mà chưa cuộn.
+	BalingOverdue bool `json:"baling_overdue"`
 }
 
 func toOrder(o store.Order) orderDTO {
@@ -102,6 +104,32 @@ type rollDTO struct {
 	// G3-2: dấu GPS tùy chọn (sổ roll_count_location) — chỉ có ở GET …/roll-counts.
 	GPS       *gpsDTO `json:"gps,omitempty"`
 	GPSStatus *string `json:"gps_status,omitempty"`
+	// Kiểm ngày gặt (FM-01) của bản ghi cuộn gốc — chỉ có ở GET …/roll-counts.
+	Harvest *harvestCheckDTO `json:"harvest_check,omitempty"`
+}
+
+// harvestCheckDTO là kết quả kiểm ngày gặt (FM-01) của một bản ghi cuộn gốc.
+type harvestCheckDTO struct {
+	Check       string     `json:"check"` // ok | unknown | unavailable
+	BaleDate    string     `json:"bale_date"`
+	HarvestDate *string    `json:"harvest_date"`
+	HarvestKind *string    `json:"harvest_kind"`
+	SeasonRef   *uuid.UUID `json:"season_ref"`
+	Source      string     `json:"source"` // partner | cache | none
+	RuleVersion string     `json:"rule_version"`
+}
+
+func toHarvestCheck(h *store.HarvestCheck) *harvestCheckDTO {
+	if h == nil {
+		return nil
+	}
+	d := &harvestCheckDTO{Check: h.Check, BaleDate: h.BaleDate.Format(dateLayout), HarvestKind: h.Kind, SeasonRef: h.SeasonRef,
+		Source: h.Source, RuleVersion: h.RuleVersion}
+	if h.HarvestDate != nil {
+		s := h.HarvestDate.Format(dateLayout)
+		d.HarvestDate = &s
+	}
+	return d
 }
 
 // gpsDTO là tọa độ dạng chuỗi thập phân (không float, R-10).
@@ -167,7 +195,8 @@ func toRecon(r store.Recon) reconDTO {
 }
 
 func toCountResult(r app.CountResult) map[string]any {
-	out := map[string]any{"roll_count": toRoll(r.Count), "total": toTotal(r.Total), "publications": toExports(r.Exports)}
+	out := map[string]any{"roll_count": toRoll(r.Count), "total": toTotal(r.Total), "publications": toExports(r.Exports),
+		"harvest_check": toHarvestCheck(r.Harvest), "warnings": nonNil(r.Warnings)}
 	if r.Recon != nil {
 		out["reconciliation"] = toRecon(*r.Recon)
 	} else {

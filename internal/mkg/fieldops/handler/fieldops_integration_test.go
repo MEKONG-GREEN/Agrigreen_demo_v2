@@ -85,8 +85,8 @@ func TestOrderApprovalSeparationOfDuties(t *testing.T) {
 	})
 
 	// Giao tổ, đóng; hủy lệnh đã đóng bị chặn.
-	crew := ids.New().String()
-	mustStatus(t, creator.post("/v1/fieldops/orders/"+id+"/assign", map[string]any{"crew_ref": crew}), http.StatusCreated, "giao tổ")
+	crew := f.crew("TO-SOD", "5000")
+	mustStatus(t, f.assign(creator, id, crew, 1000, nil), http.StatusCreated, "giao tổ")
 	cl := creator.post("/v1/fieldops/orders/"+id+"/close", map[string]any{})
 	mustStatus(t, cl, http.StatusCreated, "đóng")
 	if p, _ := arr(cl.body, "publications")[0]["payload"].(map[string]any); str(p, "status") != "completed" {
@@ -341,7 +341,7 @@ func TestValvePayloadContractFieldsOnly(t *testing.T) {
 	f.count(col, id, p, port.StageBale, 50, nil)
 	f.count(col, id, p, port.StageGather, 50, nil)
 	f.count(col, id, p, port.StageBoatLoad, 50, nil)
-	f.supervisor().post("/v1/fieldops/orders/"+id+"/assign", map[string]any{"crew_ref": ids.New().String()})
+	mustStatus(t, f.assign(f.supervisor(), id, f.crew("TO-VAN", "5000"), 150, nil), http.StatusCreated, "giao tổ")
 	r := f.supervisor().get("/v1/fieldops/orders/" + id + "/publications")
 	items := arr(r.body, "items")
 	if len(items) != 3 {
@@ -373,6 +373,8 @@ func TestSyncPushIdempotentAndPull(t *testing.T) {
 	id := f.approvedOrder()
 	col := f.collector()
 	col.device = ids.New().String()
+	// Lọc pull theo tổ: tài khoản tổ gom là thành viên tổ được giao lệnh này.
+	mustStatus(t, f.assign(f.supervisor(), id, f.crew("TO-SYNC", "5000", col.actor), 200, nil), http.StatusCreated, "giao tổ")
 	rec := func(stage string, rolls int, seq string) map[string]any {
 		return map[string]any{
 			"id": ids.New().String(), "idem_key": "dev:" + col.device + ":" + seq, "entity": "roll_count", "op": "create",

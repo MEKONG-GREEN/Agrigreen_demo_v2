@@ -1,5 +1,5 @@
 // Backend giả lập mkg/fieldops — theo contracts/openapi/mkg-internal.yaml và DTO backend (handler/dto.go).
-import type { CollectionOrder, HtxConfirmation, RollCount, Stage } from "../types";
+import type { CollectionOrder, Crew, HtxConfirmation, RollCount, Stage } from "../types";
 import { isKg, normKg } from "@/lib/kg";
 import { checkStage, STAGES } from "@/lib/rules";
 import { remember } from "@/lib/recent";
@@ -7,6 +7,7 @@ import {
   buySide,
   buySideFor,
   confirmations,
+  CREW,
   fieldPublications,
   HTX_COMMUNE,
   kgPerRoll,
@@ -25,6 +26,13 @@ import {
 import { created, forbidden, hasRole, json, nowIso, pageSlice, problem, route, selfApproval, str, validation, UUID_RE, type Route } from "./http";
 
 const SUP = "field_supervisor";
+
+// Sổ tổ gom giả lập (FM-06/07/08): hai tổ đang hoạt động theo cuộn/ngày, một tổ đã ngừng.
+const crews: Crew[] = [
+  { crew_id: CREW.t1, code: "TO-01", name: "Tổ gom Vĩnh Bình", member_refs: [], capacity_unit: "bales", capacity_per_day: "1500", service_communes: [], status: "active", version: 1 },
+  { crew_id: CREW.t2, code: "TO-02", name: "Tổ gom Tân Hiệp", member_refs: [], capacity_unit: "bales", capacity_per_day: "3000", service_communes: [], status: "active", version: 1 },
+  { crew_id: newId(), code: "TO-99", name: "Tổ gom đã giải thể", member_refs: [], capacity_unit: "bales", capacity_per_day: "9000", service_communes: [], status: "inactive", version: 2 },
+];
 const COL = "field_collector";
 
 function orderOr404(id: string): CollectionOrder | Response {
@@ -164,6 +172,32 @@ export const fieldopsRoutes: Route[] = [
     const pub = publish(fieldPublications, o.order_id!, "collection_schedule", "mkg.fieldops.collection_schedule.published", { schedule_ref: o.order_id, htx_ref: o.htx_ref, commune_code: o.commune_code, window_from: o.window_from, window_to: o.window_to, plot_refs: o.plot_refs, status: "approved" }, nowIso());
     return result(o, orderEvent(o.order_id!, "approved", persona.actor, nowIso()), [pub]);
   }),
+  route("GET", "/v1/fieldops/crews", ({ url }) => {
+    const status = url.searchParams.get("status");
+    return json({ items: crews.filter((c) => !status || c.status === status), next_cursor: null });
+  }),
+  // Gợi ý tổ (proto FM-08) — giả lập tối giản: tổ đang hoạt động, đơn vị cuộn, đủ năng lực/ngày theo khung lệnh; xếp theo tỷ lệ tải rồi mã.
+  route("GET", "/v1/fieldops/orders/:id/crew-suggestions", ({ params, url, persona }) => {
+    if (!hasRole(persona, SUP)) return forbidden();
+    const o = orderOr404(params[0]!);
+    if (o instanceof Response) return o;
+    const bales = Number(url.searchParams.get("expected_bales") ?? "");
+    if (!(bales > 0)) return problem(422, "fieldops.workload_required", "Workload required");
+    const days = Math.max(1, Math.round((Date.parse(o.window_to!) - Date.parse(o.window_from!)) / 86_400_000) + 1);
+    const daily = bales / days;
+    const view = crews
+      .filter((c) => c.status === "active")
+      .map((c) => ({ c, ratio: daily / Number(c.capacity_per_day) }))
+      .sort((a, b) => a.ratio - b.ratio || a.c.code!.localeCompare(b.c.code!));
+    const fit = view.filter((v) => v.ratio <= 1);
+    const row = (v: (typeof view)[number], rank: number | null) => ({
+      rank, crew_ref: v.c.crew_id, code: v.c.code, name: v.c.name, capacity_unit: v.c.capacity_unit, capacity_per_day: v.c.capacity_per_day,
+      local: true, daily_load: daily.toFixed(3), peak_load: daily.toFixed(3), load_ratio: v.ratio.toFixed(4), over_day: rank ? null : o.window_from, unfit: rank ? null : "over_capacity",
+    });
+    const suggestions = fit.map((v, i) => row(v, i + 1));
+    return json({ order_id: o.order_id, commune_code: o.commune_code, planned_from: o.window_from, planned_to: o.window_to, suggested: suggestions[0] ?? null, suggestions,
+      unfit: view.filter((v) => v.ratio > 1).map((v) => row(v, null)), inactive_crews: crews.filter((c) => c.status !== "active").length, rule_version: "fieldops.crew_assignment.v1" });
+  }),
   route("POST", "/v1/fieldops/orders/:id/assign", ({ params, body, persona }) => {
     if (!hasRole(persona, SUP)) return forbidden();
     const o = orderOr404(params[0]!);
@@ -171,6 +205,10 @@ export const fieldopsRoutes: Route[] = [
     if (o.status !== "approved" && o.status !== "assigned") return problem(409, "fieldops.order_transition", "Order must be approved");
     const crew = str(body, "crew_ref");
     if (!UUID_RE.test(crew)) return validation([{ field: "crew_ref", reason: "UUID tổ gom" }]);
+    const c = crews.find((x) => x.crew_id === crew);
+    if (!c) return problem(422, "fieldops.crew_unknown", "Crew unknown");
+    if (c.status !== "active") return problem(409, "fieldops.crew_inactive", "Crew inactive (FM-07)");
+    if (!(Number(body.expected_bales) > 0)) return problem(422, "fieldops.workload_required", "Workload required");
     o.status = "assigned";
     o.crew_ref = crew;
     o.updated_at = nowIso();

@@ -974,7 +974,7 @@ paths:
       operationId: getCollectionOrder
       tags: [fieldops]
       responses:
-        "200": {description: Lệnh gom, content: {application/json: {schema: {type: object, properties: {order: {$ref: "#/components/schemas/CollectionOrder"}, history: {type: array, items: {type: object}}}}}}}
+        "200": {description: Lệnh gom, content: {application/json: {schema: {type: object, properties: {order: {$ref: "#/components/schemas/CollectionOrder"}, history: {type: array, items: {type: object}}, assignment: {oneOf: [{$ref: "#/components/schemas/CrewAssignment"}, {type: "null"}]}, baling: {type: array, items: {$ref: "#/components/schemas/BalingDeadline"}}, baling_deadline_days: {type: integer}}}}}}
         "404": {$ref: "#/components/responses/Problem"}
   /v1/fieldops/orders/{id}/revisions:
     parameters: [{$ref: "#/components/parameters/OrderID"}]
@@ -1005,14 +1005,65 @@ paths:
   /v1/fieldops/orders/{id}/assign:
     parameters: [{$ref: "#/components/parameters/OrderID"}]
     post:
-      summary: Giao / đổi tổ gom (approved | assigned → assigned)
+      summary: Giao / đổi tổ gom (approved | assigned → assigned) — kiểm năng lực tổ
+      description: |
+        proto FM-07: `crew_ref` phải có trong sổ tổ gom và đang `active` (lạ → 422 `fieldops.crew_unknown`, ngừng → 409 `fieldops.crew_inactive`).
+        proto FM-06: mỗi ngày của [planned_from, planned_to] (mặc định = khung lệnh gom), tải các lệnh `assigned` khác của tổ + tải việc này
+        (khối lượng theo đơn vị năng lực của tổ ÷ số ngày) ≤ `capacity_per_day`; vượt → 409 `fieldops.crew_over_capacity`, trừ khi giám sát
+        giao tay kèm `override_reason` (phân công gắn `over_capacity = true`, cảnh báo `fieldops.crew_over_capacity_override`).
+        proto FM-08: `mode = suggested` là xác nhận gợi ý (không bao giờ vượt năng lực). Giao lại đúng tổ với đúng việc đang giao → 200,
+        không sinh phân công mới. Cảnh báo không chặn: `fieldops.planned_before_harvest`, `fieldops.baling_deadline_at_risk`,
+        `fieldops.harvest_date_unknown`, `fieldops.harvest_date_unavailable`.
       operationId: assignCollectionOrder
       tags: [fieldops]
       parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
-      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [crew_ref], properties: {crew_ref: {type: string, format: uuid}}}}}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/AssignInput"}}}}
       responses:
-        "201": {description: Lệnh gom, content: {application/json: {schema: {$ref: "#/components/schemas/CollectionOrderResult"}}}}
+        "201": {description: Lệnh gom + phân công, content: {application/json: {schema: {$ref: "#/components/schemas/AssignResult"}}}}
+        "200": {description: Giao lại đúng việc đang giao — không đổi (FM-08), content: {application/json: {schema: {$ref: "#/components/schemas/AssignResult"}}}}
         "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/orders/{id}/assignments:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    get:
+      summary: Lịch sử phân công của lệnh gom (sổ crew_assignment)
+      operationId: listCrewAssignments
+      tags: [fieldops]
+      responses:
+        "200": {description: Phân công, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/CrewAssignment"}}}}}}}
+  /v1/fieldops/orders/{id}/crew-suggestions:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    get:
+      summary: Gợi ý tổ gom cho lệnh (proto FM-08) — chỉ đọc, giám sát xác nhận bằng POST …/assign mode = suggested
+      description: >-
+        Tổ đang hoạt động (FM-07), vừa năng lực mọi ngày (FM-06); xếp hạng: gần nhất (xã của lệnh thuộc `service_communes` của tổ) →
+        ít tải nhất (tải cao nhất/ngày sau khi giao ÷ năng lực) → mã tổ. Tất định: cùng dữ liệu → cùng kết quả. Vai field_supervisor.
+      operationId: suggestCrews
+      tags: [fieldops]
+      parameters:
+        - {name: planned_from, in: query, schema: {type: string, format: date}}
+        - {name: planned_to, in: query, schema: {type: string, format: date}}
+        - {name: expected_bales, in: query, schema: {type: integer, minimum: 1}}
+        - {name: expected_ha, in: query, schema: {type: string, pattern: "^[0-9]+(\\.[0-9]{1,3})?$"}}
+      responses:
+        "200":
+          description: Gợi ý
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  order_id: {type: string, format: uuid}
+                  commune_code: {type: string}
+                  planned_from: {type: string, format: date}
+                  planned_to: {type: string, format: date}
+                  suggested: {oneOf: [{$ref: "#/components/schemas/CrewSuggestion"}, {type: "null"}]}
+                  suggestions: {type: array, items: {$ref: "#/components/schemas/CrewSuggestion"}}
+                  unfit: {type: array, items: {$ref: "#/components/schemas/CrewSuggestion"}}
+                  inactive_crews: {type: integer}
+                  rule_version: {type: string}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/fieldops/orders/{id}/close:
     parameters: [{$ref: "#/components/parameters/OrderID"}]
     post:
@@ -1225,6 +1276,9 @@ paths:
   /v1/fieldops/sync/pull:
     get:
       summary: Đồng bộ chiều xuống — entity collection_order (đã duyệt/đang làm → upsert; khác → tombstone)
+      description: >-
+        Lọc theo sổ tổ gom: field_supervisor nhận mọi lệnh đã duyệt/đang làm; field_collector chỉ nhận upsert cho lệnh ĐÃ GIAO cho tổ mà
+        tài khoản là thành viên — lệnh chưa giao / giao tổ khác → tombstone. Đổi tổ / đổi thành viên đẩy thay đổi xuống ở lần pull sau.
       operationId: fieldopsSyncPull
       tags: [fieldops]
       parameters:
@@ -1236,6 +1290,149 @@ paths:
           description: Trang thay đổi
           content: {application/json: {schema: {type: object, properties: {changes: {type: array, items: {type: object}}, next_cursor: {type: string}, has_more: {type: boolean}, server_time: {type: string, format: date-time}, reset: {type: boolean}}}}}
         "400": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/crews:
+    get:
+      summary: Sổ tổ gom (cursor = mã tổ cuối)
+      operationId: listCrews
+      tags: [fieldops]
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [active, inactive]}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 200}}
+      responses:
+        "200": {description: Trang tổ gom, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/Crew"}}, next_cursor: {type: [string, "null"]}}}}}}
+    post:
+      summary: Thêm tổ gom (active, phiên bản 1) — vai field_supervisor
+      description: Thành viên là subject tài khoản MKG (UUID, không có dữ liệu cá nhân). Năng lực/ngày theo cuộn (số nguyên) hoặc ha.
+      operationId: createCrew
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/CrewInput"}}}}
+      responses:
+        "201": {description: Tổ gom, content: {application/json: {schema: {$ref: "#/components/schemas/CrewResult"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/crews/{id}:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: Tổ gom hiện hành và mọi phiên bản
+      operationId: getCrew
+      tags: [fieldops]
+      responses:
+        "200": {description: Tổ gom, content: {application/json: {schema: {type: object, properties: {crew: {$ref: "#/components/schemas/Crew"}, history: {type: array, items: {$ref: "#/components/schemas/CrewEvent"}}}}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/crews/{id}/revisions:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    post:
+      summary: Phiên bản mới của tổ (tên, thành viên, năng lực, xã phục vụ) — không đổi trạng thái
+      description: "`expected_version` khác phiên bản hiện hành → 409 fieldops.crew_version_conflict. Lệnh đang giao cho tổ đi xuống lại máy (lọc pull theo thành viên)."
+      operationId: reviseCrew
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/CrewInput"}}}}
+      responses:
+        "201": {description: Tổ gom, content: {application/json: {schema: {$ref: "#/components/schemas/CrewResult"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/crews/{id}/deactivate:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    post:
+      summary: Ngừng tổ gom (không xóa, RB-1) — tổ ngừng không nhận việc mới (proto FM-07)
+      operationId: deactivateCrew
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/CrewStatusInput"}}}}
+      responses:
+        "201": {description: Tổ gom, content: {application/json: {schema: {$ref: "#/components/schemas/CrewResult"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/crews/{id}/reactivate:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    post:
+      summary: Bật lại tổ gom
+      operationId: reactivateCrew
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/CrewStatusInput"}}}}
+      responses:
+        "201": {description: Tổ gom, content: {application/json: {schema: {$ref: "#/components/schemas/CrewResult"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/baling-deadlines:
+    get:
+      summary: Hạn cuộn sau gặt theo (lệnh gom đang mở, thửa) — proto FM-02
+      description: >-
+        Hạn = ngày gặt + `baling_deadline_days` (tham số có phiên bản; chưa duyệt → 3 ngày, `param_version = provisional-default`, TẠM,
+        chờ khách). Quá hạn không chặn ghi nhưng gắn cờ (`overdue`, `baled_late`; `status=flagged` = cả hai). Ngày gặt từ bảng đệm
+        (bề mặt partner của nền tảng); chưa biết → `harvest_unknown`.
+      operationId: listBalingDeadlines
+      tags: [fieldops]
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [flagged, overdue, baled_late, pending, not_harvested, baled_on_time, harvest_unknown]}}
+        - {name: order_id, in: query, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 500}}
+      responses:
+        "200":
+          description: Trang hạn cuộn
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/BalingDeadline"}}
+                  next_cursor: {type: [string, "null"]}
+                  baling_deadline_days: {type: integer}
+                  param_version: {type: string}
+                  provisional: {type: boolean}
+                  today: {type: string, format: date}
+                  rule_version: {type: string}
+  /v1/fieldops/harvest-dates/refresh:
+    post:
+      summary: Làm mới bảng đệm ngày gặt của mọi lệnh gom đang mở (GET /v1/partner/season-harvest-dates của nền tảng) — vai field_supervisor
+      description: Job `fieldops_harvest_dates` (AG_MKG_JOBS) chạy cùng việc này theo chu kỳ.
+      operationId: refreshHarvestDates
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "200": {description: Kết quả, content: {application/json: {schema: {type: object, properties: {plots: {type: integer}, known: {type: integer}, unknown: {type: integer}, unavailable: {type: integer}}}}}}
+  /v1/fieldops/params/{key}:
+    parameters: [{name: key, in: path, required: true, schema: {type: string, enum: [baling_deadline_days]}}]
+    get:
+      summary: Các phiên bản tham số và giá trị hiệu lực hôm nay
+      operationId: getFieldopsParam
+      tags: [fieldops]
+      responses:
+        "200":
+          description: Tham số
+          content: {application/json: {schema: {type: object, properties: {param_key: {type: string}, effective_value: {type: integer}, param_version: {type: string}, provisional: {type: boolean}, default_value: {type: integer}, versions: {type: array, items: {$ref: "#/components/schemas/FieldopsParam"}}}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/params/{key}/versions:
+    parameters: [{name: key, in: path, required: true, schema: {type: string, enum: [baling_deadline_days]}}]
+    post:
+      summary: Đề xuất phiên bản tham số (pending tới khi người KHÁC duyệt, R-56)
+      operationId: proposeFieldopsParam
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [value, reason], properties: {value: {type: string, description: "baling_deadline_days: số ngày nguyên 0..60"}, effective_from: {type: string, format: date}, provisional: {type: boolean, default: true, description: "Tạm, chờ khách"}, reason: {type: string, minLength: 10, maxLength: 500}}}}}
+      responses:
+        "201": {description: Phiên bản, content: {application/json: {schema: {type: object, properties: {param: {$ref: "#/components/schemas/FieldopsParam"}}}}}}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/params/{key}/versions/{version}/decision:
+    parameters:
+      - {name: key, in: path, required: true, schema: {type: string, enum: [baling_deadline_days]}}
+      - {name: version, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Duyệt / từ chối phiên bản tham số — người quyết định KHÁC người đề xuất (403 self_approval_forbidden; CHECK DB lớp hai)
+      operationId: decideFieldopsParam
+      tags: [fieldops]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [decision], properties: {decision: {type: string, enum: [approved, rejected]}, reason: {type: string, minLength: 10, description: "Bắt buộc khi rejected"}}}}}
+      responses:
+        "201": {description: Phiên bản, content: {application/json: {schema: {type: object, properties: {param: {$ref: "#/components/schemas/FieldopsParam"}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -1514,6 +1711,7 @@ components:
         published: {type: boolean}
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
+        baling_overdue: {type: boolean, description: "proto FM-02: ít nhất một thửa đã quá hạn cuộn sau gặt mà chưa cuộn"}
     CollectionOrderResult:
       type: object
       properties:
@@ -1585,6 +1783,7 @@ components:
           description: "G3-2 (chỉ ở GET …/roll-counts): tọa độ dạng chuỗi thập phân"
           properties: {lat: {type: string}, lng: {type: string}, accuracy_m: {type: [string, "null"]}}
         gps_status: {type: string, enum: [ok, weak, denied, unavailable, timeout, no_device, invalid, unknown]}
+        harvest_check: {$ref: "#/components/schemas/HarvestCheck"}
     RollCountResult:
       type: object
       properties:
@@ -1592,6 +1791,8 @@ components:
         total: {type: object}
         reconciliation: {oneOf: [{$ref: "#/components/schemas/BuySideReconciliation"}, {type: "null"}]}
         publications: {type: array, items: {$ref: "#/components/schemas/ValveExport"}}
+        harvest_check: {oneOf: [{$ref: "#/components/schemas/HarvestCheck"}, {type: "null"}]}
+        warnings: {type: array, items: {type: string, enum: [fieldops.harvest_date_unknown, fieldops.harvest_date_unavailable]}}
     BuySideReconciliation:
       type: object
       properties:
@@ -1608,3 +1809,157 @@ components:
         confirmed_revision: {type: [integer, "null"]}
         status: {type: string, enum: [pending, match, mismatch]}
         updated_at: {type: string, format: date-time}
+    HarvestCheck:
+      type: object
+      description: >-
+        proto FM-01 (chỉ bản ghi cuộn gốc, công đoạn bale): ngày cuộn so với ngày gặt của thửa. ok = biết ngày gặt, cuộn không trước
+        ngày gặt (cuộn trước → 422 fieldops.before_harvest); unknown = nền tảng chưa có / chưa chia sẻ (RB-2); unavailable = không gọi
+        được nền tảng và không có bảng đệm. unknown/unavailable vẫn ghi được nhưng GẮN CỜ.
+      properties:
+        check: {type: string, enum: [ok, unknown, unavailable]}
+        bale_date: {type: string, format: date}
+        harvest_date: {type: [string, "null"], format: date}
+        harvest_kind: {type: [string, "null"], enum: [expected, actual, null]}
+        season_ref: {type: [string, "null"], format: uuid}
+        source: {type: string, enum: [partner, cache, none]}
+        rule_version: {type: string}
+    CrewInput:
+      type: object
+      required: [code, name, member_refs, capacity_unit, capacity_per_day]
+      properties:
+        code: {type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{1,31}$", description: "Lưu in hoa, duy nhất trong tenant"}
+        name: {type: string, minLength: 2, maxLength: 200}
+        member_refs: {type: array, minItems: 1, maxItems: 100, items: {type: string, format: uuid}, description: "Subject tài khoản MKG (field_collector)"}
+        capacity_unit: {type: string, enum: [bales, ha]}
+        capacity_per_day: {type: string, description: "Chuỗi thập phân > 0; bales: số nguyên"}
+        service_communes: {type: array, maxItems: 50, items: {type: string, pattern: "^[0-9]{5}$"}, description: "Xã phục vụ — tiêu chí 'gần nhất' của gợi ý FM-08"}
+        expected_version: {type: integer, description: "Chỉ khi sửa: phiên bản client đã xem"}
+    CrewStatusInput:
+      type: object
+      required: [reason]
+      properties:
+        reason: {type: string, minLength: 10, maxLength: 500}
+        expected_version: {type: integer}
+    Crew:
+      type: object
+      properties:
+        crew_id: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        member_refs: {type: array, items: {type: string, format: uuid}}
+        capacity_unit: {type: string, enum: [bales, ha]}
+        capacity_per_day: {type: string}
+        service_communes: {type: array, items: {type: string}}
+        status: {type: string, enum: [active, inactive]}
+        version: {type: integer}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    CrewEvent:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        kind: {type: string, enum: [created, revised, deactivated, reactivated]}
+        version: {type: integer}
+        snapshot: {$ref: "#/components/schemas/Crew"}
+        reason: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+    CrewResult:
+      type: object
+      properties:
+        crew: {$ref: "#/components/schemas/Crew"}
+        event: {$ref: "#/components/schemas/CrewEvent"}
+    AssignInput:
+      type: object
+      required: [crew_ref]
+      properties:
+        crew_ref: {type: string, format: uuid}
+        planned_from: {type: string, format: date, description: "Bỏ trống → window_from; trong khung lệnh gom"}
+        planned_to: {type: string, format: date, description: "Bỏ trống → window_to"}
+        expected_bales: {type: integer, minimum: 1, description: "Bắt buộc khi tổ tính năng lực theo cuộn"}
+        expected_ha: {type: string, pattern: "^[0-9]+(\\.[0-9]{1,3})?$", description: "Bắt buộc khi tổ tính năng lực theo ha"}
+        mode: {type: string, enum: [manual, suggested], default: manual}
+        suggestion_rank: {type: integer, minimum: 1, description: "Chỉ với mode = suggested"}
+        override_reason: {type: string, minLength: 10, maxLength: 500, description: "Giám sát giao VƯỢT năng lực (chỉ manual, FM-06)"}
+    AssignResult:
+      type: object
+      properties:
+        order: {$ref: "#/components/schemas/CollectionOrder"}
+        event: {type: [object, "null"]}
+        publications: {type: array, items: {$ref: "#/components/schemas/ValveExport"}}
+        assignment: {$ref: "#/components/schemas/CrewAssignment"}
+        warnings:
+          type: array
+          items: {type: string, enum: [fieldops.crew_over_capacity_override, fieldops.planned_before_harvest, fieldops.baling_deadline_at_risk, fieldops.harvest_date_unknown, fieldops.harvest_date_unavailable]}
+    CrewAssignment:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        order_id: {type: string, format: uuid}
+        order_event_id: {type: string, format: uuid}
+        crew_ref: {type: string, format: uuid}
+        crew_version: {type: integer}
+        capacity_unit: {type: string, enum: [bales, ha]}
+        capacity_per_day: {type: string}
+        planned_from: {type: string, format: date}
+        planned_to: {type: string, format: date}
+        expected_qty: {type: string}
+        daily_load: {type: string}
+        peak_load: {type: string, description: "Tải cao nhất/ngày của tổ trong khoảng sau khi giao"}
+        over_capacity: {type: boolean}
+        override_reason: {type: [string, "null"]}
+        mode: {type: string, enum: [manual, suggested]}
+        suggestion_rank: {type: [integer, "null"]}
+        rule_version: {type: string}
+        actor_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+    CrewSuggestion:
+      type: object
+      properties:
+        rank: {type: [integer, "null"], description: "1 = gợi ý hàng đầu; null với tổ không vừa"}
+        crew_ref: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        capacity_unit: {type: string, enum: [bales, ha]}
+        capacity_per_day: {type: string}
+        local: {type: boolean, description: "Xã của lệnh gom thuộc service_communes của tổ"}
+        daily_load: {type: [string, "null"]}
+        peak_load: {type: [string, "null"]}
+        load_ratio: {type: [string, "null"]}
+        over_day: {type: [string, "null"], format: date}
+        unfit: {type: [string, "null"], enum: [over_capacity, unit_mismatch, null]}
+    BalingDeadline:
+      type: object
+      properties:
+        order_id: {type: string, format: uuid}
+        plot_ref: {type: string, format: uuid}
+        htx_ref: {type: string, format: uuid}
+        crew_ref: {type: [string, "null"], format: uuid}
+        order_status: {type: string}
+        harvest_check: {type: string, enum: [ok, unknown, unavailable]}
+        harvest_date: {type: [string, "null"], format: date}
+        harvest_kind: {type: [string, "null"], enum: [expected, actual, null]}
+        season_ref: {type: [string, "null"], format: uuid}
+        baled_on: {type: [string, "null"], format: date}
+        deadline: {type: [string, "null"], format: date}
+        days_on_field: {type: [integer, "null"]}
+        status: {type: string, enum: [harvest_unknown, not_harvested, pending, overdue, baled_on_time, baled_late]}
+        overdue: {type: boolean}
+        flagged: {type: boolean}
+    FieldopsParam:
+      type: object
+      properties:
+        param_key: {type: string, enum: [baling_deadline_days]}
+        version_id: {type: string, format: uuid}
+        version_seq: {type: integer}
+        value: {type: string}
+        effective_from: {type: string, format: date}
+        provisional: {type: boolean}
+        status: {type: string, enum: [pending, approved, rejected]}
+        proposed_by: {type: string, format: uuid}
+        proposal_reason: {type: string}
+        decided_by: {type: [string, "null"], format: uuid}
+        decided_at: {type: [string, "null"], format: date-time}
+        decision_reason: {type: [string, "null"]}
