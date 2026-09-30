@@ -125,6 +125,7 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "logistics.vessel_not_found": "Không có phương tiện trong danh mục.",
   "logistics.param_not_found": "Khoá tham số lạ hoặc không có phiên bản cần quyết định.",
   "logistics.route_snapshot_not_found": "Chặng không có ảnh chụp định tuyến (km nhập tay) hoặc không thuộc kế hoạch hiệu lực.",
+  "logistics.not_assigned_driver": "Chuyến này không giao cho bạn: chỉ tài xế được giao (hoặc điều phối viên) mới ghi được mốc chuyến.",
   "logistics.trip_transition": "Trạng thái chuyến chỉ đi tiến: kế hoạch → xuất phát → đến → hoàn tất; chỉ huỷ khi chưa đến nơi.",
   "logistics.trip_closed": "Chuyến đã hoàn tất hoặc đã huỷ — không gán phương tiện, lập chặng hay ghi mốc nữa.",
   "logistics.vessel_code_taken": "Số hiệu phương tiện (đã bỏ khoảng trắng, chữ hoa) đã có trong danh mục (GH-01).",

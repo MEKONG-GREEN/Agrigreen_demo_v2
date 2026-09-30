@@ -299,7 +299,7 @@ function seedTrip(id: string, status: LogisticsTrip["status"], mode: "road" | "w
 }
 
 function addLegCosts(legs: LogisticsLeg[]): string {
-  return moneyOf(legs.reduce((s, l) => s + cents(l.planned_cost), 0n));
+  return moneyOf(legs.reduce((s, l) => s + cents(l.planned_cost ?? "0.00"), 0n));
 }
 
 const P = {
@@ -356,7 +356,7 @@ function completionCost(t: LogisticsTrip, actualKg: string): { cost: string; sou
     if (v.rate_type === "per_ton") return { cost: moneyOf(divRound(grams(actualKg) * priceUnits(v.rate_vnd), 100_000_000n)), source: "vessel_rate", version: null };
     return { cost: legCost(actualKg, kgOf(km), v.rate_vnd), source: "vessel_rate", version: null };
   }
-  const total = (t.legs ?? []).reduce((s, l) => s + cents(legCost(actualKg, l.distance_km, l.rate_vnd_per_t_km)), 0n);
+  const total = (t.legs ?? []).reduce((s, l) => s + cents(legCost(actualKg, l.distance_km, l.rate_vnd_per_t_km ?? "0")), 0n);
   return { cost: moneyOf(total), source: "param_rate", version: t.legs?.[0]?.param_version ?? null };
 }
 
