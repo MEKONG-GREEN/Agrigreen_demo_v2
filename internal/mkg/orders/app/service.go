@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
+	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -60,6 +61,9 @@ var (
 type Service struct {
 	DB    tenant.Beginner // pool vai orders_app (cụm mkg)
 	Clock clock.Clock
+	// Stock (G4, O-05): tồn hub theo dạng hàng (hub/port.Stock, pool vai hub_app, tenant tường minh) để cảnh
+	// báo thiếu tồn khi lập / xác nhận / đọc đơn bán. Nil → kiểm tồn "unavailable" (không cảnh báo, không chặn).
+	Stock hubport.Stock
 }
 
 var (

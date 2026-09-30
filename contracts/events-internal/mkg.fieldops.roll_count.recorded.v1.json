@@ -20,6 +20,7 @@
     "supersedes_id":        { "type": ["string", "null"], "format": "uuid" },
     "device_id":            { "type": ["string", "null"] },
     "rule_version":         { "type": "string" },
-    "event_time":           { "type": "string", "format": "date-time" }
+    "event_time":           { "type": "string", "format": "date-time" },
+    "vessel_code":          { "type": ["string", "null"], "maxLength": 32, "description": "G4 (tùy chọn, tương thích ngược v1): số hiệu ghe/sà lan đã chuẩn hóa (proto GH-01) khi xếp ghe (boat_load); mkg/logistics gán phương tiện của chuyến FM-05 nếu khớp danh mục" }
   }
 }

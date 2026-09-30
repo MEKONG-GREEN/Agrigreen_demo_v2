@@ -10,8 +10,10 @@
 //	AG_DB_VIA_PGBOUNCER  =1 khi đi qua PgBouncer transaction mode
 //	AG_OIDC_ISSUER, AG_OIDC_AUDIENCE, AG_OIDC_JWKS_URL (tùy chọn) — như api-platform
 //	AG_OTLP_ENDPOINT     bật OpenTelemetry (ADR-0013)
-//	AG_MKG_JOBS          job định kỳ: all | none | hub_capacity_daily — chỉ leader chạy. Mặc định all
+//	AG_MKG_JOBS          job định kỳ: all | none | danh sách (hub_capacity_daily, fieldops_htx_responses,
+//	                     fieldops_harvest_dates, logistics_alerts, acctbridge_push_retry) — chỉ leader chạy. Mặc định all
 //	                     khi có AG_MKG_DB_DIRECT_URL, none khi không
+//	AG_LOGISTICS_ALERT_INTERVAL chu kỳ job logistics_alerts (Go duration, mặc định 15m — L-08)
 //	AG_MKG_DB_DIRECT_URL URL nối THẲNG cụm mkg (không qua PgBouncer) cho khóa leader + tìm tenant
 //	                     (vai ag_outbox_publisher, AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER)
 //

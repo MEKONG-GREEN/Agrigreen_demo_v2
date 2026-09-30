@@ -28,3 +28,40 @@ Sổ là nguồn, bảng chiếu `*_current` là dữ liệu dẫn xuất (mục
 - Chạy trên bản phục hồi từ sao lưu production vào môi trường sạch (mục 22). Staging chỉ dùng dữ liệu ẩn danh (R-95).
 - Ghi lại thời gian dựng lại cho từng bảng và băm tổng trước/sau. Hai băm phải bằng nhau.
 - Chạy `migrate verify-chains` trước khi dựng lại. Chuỗi đứt thì dựng lại vô nghĩa, xử lý theo [verify-chains.md](verify-chains.md) trước.
+
+### Công cụ `cmd/rebuilddrill` (cụm mkg)
+
+G4 hiện thực diễn tập bằng Go thay cho hàm SQL `rebuild_<bảng>` của khuôn trên: mỗi module mkg có bảng chiếu dựng lại
+bằng **cùng mã** với `POST /v1/<module>/projections/rebuild` (`<module>.Module.RebuildTenant`, tenant tường minh — chỉ công
+cụ vận hành gọi, API vẫn kiểm vai). Với mỗi tenant và mỗi module, lệnh:
+
+1. băm mọi bảng chiếu của schema module (`*_current`, cộng `mkg_hub.lot_balance`) bằng vai DB của chính module (RLS theo
+   tenant): số dòng + SHA-256 của các dòng `to_jsonb(dòng) - 'updated_at'` sắp theo văn bản (bỏ cột DEFAULT `now()`);
+2. dựng lại từ sổ trong một giao dịch của module (xóa + phát lại sổ; ghi sổ + chiếu cùng giao dịch nên khóa theo module);
+3. băm lại và so. Mọi bảng phải **khớp** (`rows_before = rows_after`, `sha256_before = sha256_after`).
+
+Module chưa có hàm dựng lại (hiện là `mkg/fieldops` — bảng chiếu ghi cùng giao dịch với sổ, chưa có lệnh dựng lại) vẫn được
+băm, báo cáo ghi **chưa có** — mục mở (R-22 đòi mọi bảng chiếu có lệnh dựng lại). Cụm pf (nền tảng) không thuộc công cụ này
+(R-03: gốc lắp ráp một vùng).
+
+Chạy (máy vận hành trong vùng mkg, trỏ vào **bản sao**; lệnh GHI bảng chiếu nên bắt buộc `-confirm-copy`):
+
+```
+AG_MKG_DB_URL=postgres://<host bản sao>:5432/?sslmode=require \
+AG_DB_APP_PASSWORD=… \
+go run ./cmd/rebuilddrill -confirm-copy -out rebuild-drill-$(date +%F).md -json rebuild-drill-$(date +%F).json
+```
+
+- `-tenants uuid,uuid` giới hạn tenant (mặc định: mọi tenant có sự kiện trên `shared.outbox` của cụm mkg, đọc bằng vai
+  `ag_outbox_publisher`); `-modules hub,costing` giới hạn module; `AG_DB_SUFFIX` cho database có hậu tố (như pgtest).
+- Mã thoát 0 = mọi bảng khớp; 1 = có bảng **LỆCH** hoặc lỗi dựng lại (báo cáo vẫn ghi); 2 = sai cấu hình.
+- Lưu `rebuild-drill-<ngày>.md` + `.json` vào hồ sơ diễn tập (cùng biên bản phục hồi, [restore-drill.md](restore-drill.md)) và ghi
+  kết quả vào dòng A-4 của [g4-acceptance.md](../uat/g4-acceptance.md).
+
+Bảng lệch nghĩa là bảng chiếu hiện hành **không** bằng sổ: sau lần chạy, bảng đã được dựng lại theo sổ trên bản sao — mở sự
+cố (P1 nếu là số liệu tài chính: costing, acctbridge, orders), tìm nguyên nhân ghi chiếu lệch trước khi dựng lại trên production
+theo quy trình trên (phê duyệt thay đổi, `APPLY`).
+
+Kiểm thử: `cmd/rebuilddrill` `TestRebuildDrillChecksumsBeforeAfter_R22` (dữ liệu sinh qua consumer thật của logistics / orders /
+costing trên database kiểm thử; bảng chiếu bị sửa tay → báo LỆCH, lần sau khớp lại), `TestRebuildDrillRequiresConfirmCopy`.
+Máy dev chỉ có dữ liệu tổng hợp — diễn tập trên bản sao dữ liệu thật chạy ở staging / môi trường phục hồi (hạ tầng).

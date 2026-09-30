@@ -9,6 +9,8 @@
 //	AG_DB_VIA_PGBOUNCER    =1 khi đi qua PgBouncer transaction mode
 //	AG_AMQP_INTERNAL_URL   URL RabbitMQ của vhost mkg.internal (tài khoản riêng của vùng mkg)
 //	AG_HEALTH_ADDR         /healthz, /readyz — mặc định :8086 (chỉ trong mạng nội bộ)
+//	AG_WORKER_INTERNAL_CONSUMERS  (tùy chọn) tên hàng đợi phân tách dấu phẩy hoặc all (mặc định) — tách bản
+//	                       worker-internal theo consumer bằng cấu hình (RB-5, G4). Hàng đợi vẫn khai báo đủ.
 //	AG_OTLP_ENDPOINT, ...  OpenTelemetry (shared/telemetry)
 //
 // `worker-internal -healthcheck <url>`: GET url, thoát 0 khi 200 — healthcheck Docker (distroless).
@@ -113,9 +115,13 @@ func run(log *slog.Logger) error {
 	}
 	_ = setup.Close()
 
-	errc := make(chan error, len(assembly.Consumers)+1)
+	selected, err := assembly.Select(os.Getenv(assembly.EnvConsumers))
+	if err != nil {
+		return err
+	}
+	errc := make(chan error, len(selected)+1)
 	clk := clock.System{}
-	for _, c := range assembly.Consumers {
+	for _, c := range selected {
 		p, err := pool(c.Role)
 		if err != nil {
 			return err
@@ -130,9 +136,9 @@ func run(log *slog.Logger) error {
 		}
 		go func(name string) { errc <- inbox.Consume(ctx, ch, p, name, h, log) }(c.Name)
 	}
-	log.Info("đang chạy", "event", "startup", "consumers", len(assembly.Consumers), "outcome", "ok")
+	log.Info("đang chạy", "event", "startup", "consumers", len(selected), "outcome", "ok")
 
-	srv := &http.Server{Addr: env("AG_HEALTH_ADDR", ":8086"), Handler: healthRouter(log, pools, conn),
+	srv := &http.Server{Addr: env("AG_HEALTH_ADDR", ":8086"), Handler: healthRouter(log, pools, conn, len(selected)),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -159,7 +165,7 @@ func env(k, def string) string {
 	return def
 }
 
-func healthRouter(log *slog.Logger, pools map[string]*pgxpool.Pool, conn *amqp.Connection) http.Handler {
+func healthRouter(log *slog.Logger, pools map[string]*pgxpool.Pool, conn *amqp.Connection, consumers int) http.Handler {
 	r := httpx.NewEngine(log, 1<<10)
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok", "zone": "mkg"}) })
 	r.GET("/readyz", func(c *gin.Context) {
@@ -175,7 +181,7 @@ func healthRouter(log *slog.Logger, pools map[string]*pgxpool.Pool, conn *amqp.C
 			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "amqp_unavailable"})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"status": "ready", "zone": "mkg", "consumers": len(assembly.Consumers)})
+		c.JSON(http.StatusOK, gin.H{"status": "ready", "zone": "mkg", "consumers": consumers})
 	})
 	return r
 }

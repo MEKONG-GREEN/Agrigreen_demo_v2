@@ -180,7 +180,8 @@ rabbitmq:
 
 # ---------------------------------------------------------------- Ứng dụng
 # probes: dùng đúng endpoint của mã (cmd/*): /healthz (sống), /readyz (mọi pool ping được).
-# worker, outbox-publisher, optimizer CHƯA có endpoint sức khỏe → không probe HTTP (mục mở).
+# worker (:8087), outbox-publisher (:8088), worker-internal (:8086): AG_HEALTH_ADDR (cmd/internal/healthsrv, G4).
+# optimizer (Python) CHƯA có endpoint sức khỏe → không probe HTTP (mục mở).
 common:
   pgbouncerUrl: "postgres://pg-%s-pooler.{{ .Values.namespaces.data }}.svc.{{ .Values.global.clusterDomain }}:5432/?sslmode=require"
   s3:
@@ -256,7 +257,10 @@ apps:
     image: { repository: worker }
     replicas: 2   # nhiều bản an toàn: lịch chỉ chạy ở leader (khóa 727101)
     size: medium
+    ports: { health: 8087 }
+    probes: { readiness: { path: /readyz, port: health }, liveness: { path: /healthz, port: health } }
     env:
+      AG_HEALTH_ADDR: ":8087"
       AG_DB_URL: "pooler:pf"
       AG_DB_VIA_PGBOUNCER: "1"
       AG_DB_DIRECT_URL: "direct:pf"
@@ -284,7 +288,10 @@ apps:
     image: { repository: outbox-publisher }
     replicas: 2   # FOR UPDATE SKIP LOCKED — nhiều bản an toàn
     size: small
+    ports: { health: 8088 }
+    probes: { readiness: { path: /readyz, port: health }, liveness: { path: /healthz, port: health } }
     env:
+      AG_HEALTH_ADDR: ":8088"
       AG_DB_URL: "direct:pf"
       AG_CLUSTERS: pf
     envFromSecrets: [pf-db-outbox]
@@ -386,7 +393,10 @@ apps:
     image: { repository: outbox-publisher }
     replicas: 2
     size: small
+    ports: { health: 8088 }
+    probes: { readiness: { path: /readyz, port: health }, liveness: { path: /healthz, port: health } }
     env:
+      AG_HEALTH_ADDR: ":8088"
       AG_DB_URL: "direct:mkg"
       AG_MKG_DB_URL: "direct:mkg"
       AG_TS_DB_URL: "direct:ts"

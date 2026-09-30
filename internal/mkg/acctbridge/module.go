@@ -67,6 +67,13 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.
 // RegisterAdmin gắn route bề mặt quản trị (MFA).
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }
 
+// RebuildTenant dựng lại bảng chiếu của tenant từ sổ, tenant tường minh, không kiểm vai — CHỈ cho công cụ diễn
+// tập R-22 trên bản sao database (cmd/rebuilddrill). Trả số dòng theo bảng chiếu.
+func (m *Module) RebuildTenant(ctx context.Context, tid uuid.UUID) (map[string]int64, error) {
+	r, err := m.svc.RebuildTenant(ctx, tid)
+	return map[string]int64{"mapping_current": int64(r.MappingEvents), "journal_current": int64(r.Journals)}, err
+}
+
 // PendingRetryTenants liệt kê tenant có bút toán đến hạn thử lại — pool vai ag_outbox_publisher của cụm mkg
 // (chỉ đọc tenant_id, status, next_retry_at; mkg 000019).
 func PendingRetryTenants(pool *pgxpool.Pool) app.TenantLister {

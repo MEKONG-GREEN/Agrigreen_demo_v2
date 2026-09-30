@@ -133,6 +133,38 @@ func DatabaseName(c migrations.Cluster, suffix string) string {
 // Bootstrap tạo (hoặc cập nhật) mọi vai và database. adminURL là tài khoản
 // quản trị cụm. Chạy lặp an toàn; nhiều tiến trình kiểm thử chạy song song được.
 func Bootstrap(ctx context.Context, adminURL, dbSuffix string) error {
+	return BootstrapClusters(ctx, adminURL, dbSuffix, migrations.Clusters)
+}
+
+// RolesFor trả các vai cần có khi chỉ dựng các cụm clusters (AG_CLUSTERS, G4 tách đơn vị triển khai theo vùng —
+// RB-5): vai nhóm NOLOGIN không gắn cụm (ag_shared_user, chủ hàm giám sát — đích MemberOf của vai khác) và mọi vai
+// được CONNECT ít nhất một cụm đã chọn. Giữ thứ tự của Roles (vai nhóm trước thành viên).
+func RolesFor(clusters []migrations.Cluster) []Role {
+	want := map[migrations.Cluster]bool{}
+	for _, c := range clusters {
+		want[c] = true
+	}
+	var out []Role
+	for _, r := range Roles {
+		keep := len(r.Clusters) == 0
+		for _, c := range r.Clusters {
+			keep = keep || want[c]
+		}
+		if keep {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// BootstrapClusters như Bootstrap nhưng chỉ tạo vai và database của các cụm clusters (cmd/migrate bootstrap
+// đọc AG_CLUSTERS qua cmd/internal/clusterenv; rỗng = mọi cụm — hành vi cũ). Vai nhiều cụm (ag_migrator,
+// ag_outbox_publisher) chỉ được GRANT CONNECT trên database của cụm đã chọn.
+func BootstrapClusters(ctx context.Context, adminURL, dbSuffix string, clusters []migrations.Cluster) error {
+	if len(clusters) == 0 {
+		return errors.New("dbadmin: không có cụm nào để dựng")
+	}
+	roles := RolesFor(clusters)
 	conn, err := connectRetry(ctx, adminURL)
 	if err != nil {
 		return fmt.Errorf("dbadmin: kết nối quản trị: %w", err)
@@ -145,12 +177,12 @@ func Bootstrap(ctx context.Context, adminURL, dbSuffix string) error {
 	}
 	defer conn.Exec(context.WithoutCancel(ctx), "SELECT pg_advisory_unlock(727001)") //nolint:errcheck
 
-	for _, r := range Roles {
+	for _, r := range roles {
 		if err := ensureRole(ctx, conn, r); err != nil {
 			return err
 		}
 	}
-	for _, c := range migrations.Clusters {
+	for _, c := range clusters {
 		name := DatabaseName(c, dbSuffix)
 		var exists bool
 		if err := conn.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1)", name).Scan(&exists); err != nil {
@@ -164,7 +196,7 @@ func Bootstrap(ctx context.Context, adminURL, dbSuffix string) error {
 		if _, err := conn.Exec(ctx, fmt.Sprintf("REVOKE ALL ON DATABASE %s FROM PUBLIC", ident(name))); err != nil {
 			return err
 		}
-		for _, r := range Roles {
+		for _, r := range roles {
 			for _, rc := range r.Clusters {
 				if rc == c && r.Login {
 					if _, err := conn.Exec(ctx, fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s", ident(name), ident(r.Name))); err != nil {

@@ -183,12 +183,15 @@ type payableDTO struct {
 	PaymentTermDays int       `json:"payment_term_days"`
 	ParamVersion    string    `json:"param_version"`
 	RecordedAt      time.Time `json:"recorded_at"`
+	// Bản bù (RB-1): phiếu HUB_IN bù sau khi phiếu nhận đã duyệt → khoản phải trả mới thay khoản cũ.
+	SupersedesID     *uuid.UUID `json:"supersedes_id"`
+	CorrectionReason *string    `json:"correction_reason"`
 }
 
 func payableOf(p store.Payable) payableDTO {
 	return payableDTO{PayableID: p.ID, ReceiptID: p.ReceiptID, POID: p.POID, SupplierRef: p.SupplierRef, Unit: p.Unit, Qty: qty(p.Unit, p.Qty),
 		UnitPrice: price(p.UnitPrice), Amount: amount(p.Amount), DueDate: date(p.DueDate), PaymentTermDays: p.PaymentTermDays,
-		ParamVersion: p.ParamVersion, RecordedAt: p.RecordedAt}
+		ParamVersion: p.ParamVersion, RecordedAt: p.RecordedAt, SupersedesID: p.SupersedesID, CorrectionReason: p.CorrectionReason}
 }
 
 type orderDTO struct {
@@ -213,6 +216,37 @@ type orderDTO struct {
 	Reason             *string       `json:"reason"`
 	EventTime          time.Time     `json:"event_time"`
 	Deliveries         []deliveryDTO `json:"deliveries,omitempty"`
+	// G4 O-05: kiểm tồn hub (đơn draft / confirmed) — thiếu tồn chỉ cảnh báo (warnings: orders.stock_shortage).
+	StockCheck *stockCheckDTO `json:"stock_check,omitempty"`
+	Warnings   []string       `json:"warnings,omitempty"`
+}
+
+type stockCheckDTO struct {
+	Source       string  `json:"source"` // hub | unavailable
+	Product      string  `json:"product"`
+	OrderedKg    string  `json:"ordered_kg"`
+	AvailableKg  *string `json:"available_kg"`
+	ShortageKg   *string `json:"shortage_kg"`
+	Facilities   int     `json:"facilities"`
+	Shortage     bool    `json:"shortage"`
+	Blocking     bool    `json:"blocking"`
+	ParamVersion string  `json:"param_version"`
+}
+
+func stockCheckOf(c *app.StockCheck) (*stockCheckDTO, []string) {
+	if c == nil {
+		return nil, nil
+	}
+	d := &stockCheckDTO{Source: c.Source, Product: c.Product, OrderedKg: kg(c.OrderedKg), Facilities: c.Facilities, Shortage: c.Shortage,
+		Blocking: c.Blocking, ParamVersion: c.ParamVersion}
+	if c.Source == app.StockSourceHub {
+		a, s := kg(c.AvailableKg), kg(c.ShortageKg)
+		d.AvailableKg, d.ShortageKg = &a, &s
+	}
+	if c.Shortage {
+		return d, []string{app.WarnStockShortage}
+	}
+	return d, nil
 }
 
 func orderOf(o store.SalesOrder) orderDTO {
@@ -225,6 +259,7 @@ func orderOf(o store.SalesOrder) orderDTO {
 
 func soViewOf(v app.SOView) orderDTO {
 	d := orderOf(v.Order)
+	d.StockCheck, d.Warnings = stockCheckOf(v.Stock)
 	d.Deliveries = make([]deliveryDTO, 0, len(v.Deliveries))
 	for _, x := range v.Deliveries {
 		d.Deliveries = append(d.Deliveries, deliveryOf(x))

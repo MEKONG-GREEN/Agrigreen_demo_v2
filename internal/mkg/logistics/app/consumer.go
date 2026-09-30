@@ -52,8 +52,9 @@ func (c Consumer) kgPerRoll(ctx context.Context, tid uuid.UUID, ev fieldport.Rol
 }
 
 // HandleRollCount — proto FM-05: mỗi lượt xuống ghe (đếm cuộn công đoạn boat_load) sinh MỘT chuyến đường
-// thủy planned, chưa gán phương tiện (sự kiện chưa mang số hiệu ghe — g4-conventions §4), tấn ước = cuộn ×
-// kg/cuộn. Bản bù đếm cuộn → sửa tấn ước của chuyến còn mở (revised) hoặc hủy nếu về 0 cuộn. Lỗi lập chuyến
+// thủy planned, tấn ước = cuộn × kg/cuộn. Sự kiện mang số hiệu ghe (vessel_code, trường tùy chọn G4) khớp danh
+// mục → chuyến được gán phương tiện ngay (cảnh báo ngừng / đăng kiểm / quá tải như gán tay); không khớp → cờ
+// vessel_unregistered + no_vehicle (điều phối gán sau); không có số hiệu → no_vehicle. Bản bù đếm cuộn → sửa tấn ước của chuyến còn mở (revised) hoặc hủy nếu về 0 cuộn. Lỗi lập chuyến
 // không bao giờ chặn ghi đếm cuộn (consumer chạy sau, bất đồng bộ).
 func (c Consumer) HandleRollCount(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
 	if env.EventType != fieldport.EventRollCountRecorded {
@@ -86,11 +87,36 @@ func (c Consumer) HandleRollCount(ctx context.Context, tx pgx.Tx, env outbox.Env
 		return nil // không có cuộn nào xuống ghe → không lập chuyến
 	}
 	order := ev.LotRef
-	_, err := newTrip(ctx, tx, env.TenantID, ConsumerActor, store.TripEvent{
-		Mode: port.ModeWaterway, CollectionOrderRef: &order, PlannedKg: &est, Cargo: cargo, SourceRef: &src,
-		EventTime: ev.EventTime, IdemKey: idem, DeviceID: ev.DeviceID,
+	vehicle, flags, err := vesselFromCode(ctx, tx, ev.VesselCode)
+	if err != nil {
+		return err
+	}
+	_, err = newTrip(ctx, tx, env.TenantID, ConsumerActor, store.TripEvent{
+		Mode: port.ModeWaterway, CollectionOrderRef: &order, PlannedKg: &est, Cargo: cargo, SourceRef: &src, VehicleRef: vehicle,
+		Flags: flags, EventTime: ev.EventTime, IdemKey: idem, DeviceID: ev.DeviceID,
 	})
 	return err
+}
+
+// vesselFromCode tra số hiệu ghe (đã chuẩn hóa ở fieldops; chuẩn hóa lại theo GH-01) trong danh mục phương tiện:
+// khớp → vessel_id; không khớp → cờ vessel_unregistered (proto FM-05: cảnh báo ghe ngoài danh mục, không chặn).
+func vesselFromCode(ctx context.Context, tx pgx.Tx, code *string) (*uuid.UUID, []string, error) {
+	if code == nil {
+		return nil, nil, nil
+	}
+	n := domain.NormalizeCode(*code)
+	if n == "" {
+		return nil, nil, nil
+	}
+	v, err := store.VesselByCode(ctx, tx, n)
+	if err != nil {
+		return nil, nil, err
+	}
+	if v == nil {
+		return nil, []string{domain.FlagVesselUnregistered}, nil
+	}
+	id := v.VesselID
+	return &id, nil, nil
 }
 
 func (c Consumer) reviseFromRolls(ctx context.Context, tx pgx.Tx, cur *store.Trip, ev fieldport.RollCountRecordedV1, est mass.Kg,

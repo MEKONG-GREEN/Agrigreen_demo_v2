@@ -14,6 +14,7 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	fieldport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
@@ -57,6 +58,12 @@ func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 }
 
 // RegisterApp gắn route vận hành (bề mặt ứng dụng).
+// RebuildTenant dựng lại bảng chiếu của tenant từ sổ, tenant tường minh, không kiểm vai — CHỈ cho công cụ diễn
+// tập R-22 trên bản sao database (cmd/rebuilddrill). Trả số dòng theo bảng chiếu.
+func (m *Module) RebuildTenant(ctx context.Context, tid uuid.UUID) (map[string]int64, error) {
+	return m.svc.RebuildTenant(ctx, tid)
+}
+
 func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterApp(rg) }
 
 // RegisterAdmin gắn route đăng ký / duyệt (bề mặt quản trị, MFA).

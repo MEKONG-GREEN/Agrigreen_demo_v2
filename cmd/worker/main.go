@@ -76,6 +76,9 @@
 //	AG_KC_CLIENT_ID, AG_KC_CLIENT_SECRET  pf.accounts.org_status (khóa/mở tài khoản theo trạng thái tổ chức)
 //	AG_DB_PASSWORD_ACCOUNTS_APP        (hoặc AG_DB_APP_PASSWORD) vai accounts_app của consumer đó
 //	AG_OTLP_ENDPOINT, ...              OpenTelemetry (shared/telemetry)
+//	AG_HEALTH_ADDR                     /healthz, /readyz (pool ping + kết nối RabbitMQ) — mặc định :8087, chỉ mạng nội bộ
+//
+// `worker -healthcheck <url>`: GET url, thoát 0 khi 200 — healthcheck Docker (distroless).
 package main
 
 import (
@@ -95,6 +98,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/clusterenv"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/healthsrv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
@@ -147,6 +151,9 @@ func allConsumers(log *slog.Logger) []consumer {
 }
 
 func main() {
+	if len(os.Args) == 3 && os.Args[1] == "-healthcheck" {
+		os.Exit(healthsrv.Healthcheck(os.Args[2]))
+	}
 	log := telemetry.NewLogger("worker", os.Stdout)
 	mods := flag.String("modules", "all", "danh sách consumer, phân tách bằng dấu phẩy, all hoặc none")
 	defJobs := os.Getenv("AG_WORKER_JOBS")
@@ -198,13 +205,15 @@ func run(log *slog.Logger, mods, jobs string) error {
 
 	errc := make(chan error, 8)
 	started := 0
+	hs := healthsrv.New("platform") // G4 (k8s probe): /healthz sống, /readyz pool + RabbitMQ
 	if mods != "none" {
-		n, closeFn, err := startConsumers(ctx, log, base, mods, errc)
+		n, closeFn, err := startConsumers(ctx, log, base, mods, errc, hs)
 		if err != nil {
 			return err
 		}
 		defer closeFn()
 		started += n
+		hs.Info("consumers", n)
 	}
 	if jobs != "none" {
 		sched, closeFn, err := buildSchedule(ctx, log, jobs)
@@ -218,6 +227,13 @@ func run(log *slog.Logger, mods, jobs string) error {
 			direct = base
 		}
 		defer registerGauges(ctx, log, direct, lockPool)() // ADR-0006: xung đột quá SLA, độ trễ standby
+		hs.Add("jobs_db", healthsrv.Pools(func() []*pgxpool.Pool {
+			out := make([]*pgxpool.Pool, 0, len(sched.pools))
+			for _, p := range sched.pools {
+				out = append(out, p)
+			}
+			return out
+		}))
 		started++
 		go func() {
 			errc <- leader.Run(ctx, lockPool, leader.LockSchedules, 15*time.Second, leader.Options{}, log, sched.s.Run)
@@ -229,11 +245,12 @@ func run(log *slog.Logger, mods, jobs string) error {
 	if _, err := inbox.RegisterDLQMetrics(nil, os.Getenv("AG_RABBITMQ_MGMT_URL")); err != nil {
 		log.Warn("không đăng ký được metric DLQ", "event", "startup", "outcome", "error", "error", err.Error())
 	}
+	defer hs.Start("", ":8087", log, errc)()
 	log.Info("đang chạy", "event", "startup", "consumers", mods, "jobs", jobs, "outcome", "ok")
 	return <-errc
 }
 
-func startConsumers(ctx context.Context, log *slog.Logger, base, mods string, errc chan<- error) (int, func(), error) {
+func startConsumers(ctx context.Context, log *slog.Logger, base, mods string, errc chan<- error, hs *healthsrv.Server) (int, func(), error) {
 	amqpURL := os.Getenv("AG_AMQP_URL")
 	if amqpURL == "" {
 		return 0, func() {}, errors.New("thiếu AG_AMQP_URL (hoặc chạy -modules=none)")
@@ -263,6 +280,8 @@ func startConsumers(ctx context.Context, log *slog.Logger, base, mods string, er
 		return 0, func() {}, err
 	}
 	pools = append(pools, recPool)
+	hs.Add("amqp", healthsrv.Closed(conn.IsClosed))
+	hs.Add("db", healthsrv.Pools(func() []*pgxpool.Pool { return pools }))
 	rec := syncmod.FailureRecorder(recPool, clock.System{})
 	started := 0
 	for _, c := range allConsumers(log) {

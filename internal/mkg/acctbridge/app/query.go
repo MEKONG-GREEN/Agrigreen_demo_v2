@@ -127,9 +127,15 @@ func (s *Service) RebuildProjections(ctx context.Context) (RebuildResult, error)
 	if err != nil {
 		return RebuildResult{}, err
 	}
+	return s.RebuildTenant(ctx, p.TenantID)
+}
+
+// RebuildTenant dựng lại bảng chiếu của tenant tid từ sổ — tenant TƯỜNG MINH, không kiểm vai: chỉ cho công cụ
+// vận hành chạy trên BẢN SAO database (diễn tập R-22, cmd/rebuilddrill). API dùng RebuildProjections (có vai).
+func (s *Service) RebuildTenant(ctx context.Context, tid uuid.UUID) (RebuildResult, error) {
 	var res RebuildResult
-	err = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
-		if err := store.LockMapping(ctx, tx, p.TenantID); err != nil {
+	err := tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
+		if err := store.LockMapping(ctx, tx, tid); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, "LOCK TABLE mkg_acctbridge.journal_current IN SHARE ROW EXCLUSIVE MODE"); err != nil {

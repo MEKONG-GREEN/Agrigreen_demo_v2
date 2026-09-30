@@ -9,8 +9,11 @@
 package orders
 
 import (
+	"context"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
+	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders/port"
@@ -26,8 +29,17 @@ const DBRole = port.DBRole
 type Module struct{ svc *app.Service }
 
 // New tạo module với pool của vai orders_app (cụm mkg).
-func New(db tenant.Beginner, clk clock.Clock) *Module {
-	return &Module{svc: &app.Service{DB: db, Clock: clk}}
+func New(db tenant.Beginner, clk clock.Clock) *Module { return NewWith(db, clk, Options{}) }
+
+// Options là phụ thuộc tùy chọn của module (G4 tích hợp).
+type Options struct {
+	// Stock: tồn hub theo dạng hàng (hub/port.Stock) — cảnh báo thiếu tồn đơn bán (O-05). Nil → không kiểm.
+	Stock hubport.Stock
+}
+
+// NewWith tạo module với phụ thuộc tùy chọn.
+func NewWith(db tenant.Beginner, clk clock.Clock, o Options) *Module {
+	return &Module{svc: &app.Service{DB: db, Clock: clk, Stock: o.Stock}}
 }
 
 // RegisterApp gắn route (API nội bộ MKG, bề mặt ứng dụng).
@@ -35,6 +47,12 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.
 
 // RegisterAdmin gắn route quản trị (MFA): dựng lại bảng chiếu (R-22).
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }
+
+// RebuildTenant dựng lại bảng chiếu của tenant từ sổ, tenant tường minh, không kiểm vai — CHỈ cho công cụ diễn
+// tập R-22 trên bản sao database (cmd/rebuilddrill). Trả số dòng theo bảng chiếu.
+func (m *Module) RebuildTenant(ctx context.Context, tid uuid.UUID) (map[string]int64, error) {
+	return m.svc.RebuildTenant(ctx, tid)
+}
 
 // Contracts cho mkg/costing (quyết toán HTX) đọc điều khoản hợp đồng mua rơm (tenant tường minh).
 func (m *Module) Contracts() port.Contracts { return m.svc }

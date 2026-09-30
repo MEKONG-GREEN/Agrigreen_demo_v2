@@ -1,0 +1,42 @@
+# Luật cảnh báo Prometheus — vận tải mkg/logistics (L-08, L-10; proto GH-02 + nhắc ghe chưa cân). Chỉ CẢNH BÁO,
+# không chặn nghiệp vụ. Kiểm: promtool check rules (CI job lint). Nguồn: job logistics_alerts của api-internal
+# (AG_MKG_JOBS, chỉ leader, mặc định mỗi 15 phút — AG_LOGISTICS_ALERT_INTERVAL); chi tiết từng thông báo:
+# GET /v1/logistics/alert-notices (điều phối), bảng mkg_logistics.alert_notice (chống gửi lặp).
+#
+# Nguồn metric (OTLP → OpenTelemetry Collector, exporter prometheus: dấu chấm → gạch dưới, counter thêm _total):
+#   ag_logistics_alerts_open{kind}             điều kiện đang mở ở lượt quét gần nhất (mọi tenant):
+#                                              trip_unweighed | registration_expired | registration_expiring
+#   ag_logistics_alert_notices_total{kind}     thông báo MỚI đã ghi (mỗi chuyến / mỗi (ghe, hạn đăng kiểm) một lần)
+#   ag_logistics_alerts_scans_total{outcome}   lượt quét: ok | error
+#
+# Ngưỡng nghiệp vụ là tham số có phiên bản của module (logistics.trip.unweighed_alert_hours = 48,
+# logistics.vessel.expiry_warn_days = 30 — tạm, chờ khách), KHÔNG lặp ở đây: luật chỉ báo khi job đã thấy điều kiện.
+#
+# Mức (mục 23): severity=page (P1/P2 — gọi trực), ticket (P3 — xử lý trong giờ làm việc).
+groups:
+  - name: agrigreen-mkg-logistics
+    rules:
+      # Nhắc ghe chưa cân: xuống ghe quá N giờ chưa có phiếu cân HUB_IN → vận hành, điều phối, kho kiểm ghe.
+      - alert: AgrigreenLogisticsBoatUnweighed
+        expr: max(ag_logistics_alerts_open{kind="trip_unweighed"}) > 0
+        for: 30m
+        labels: { severity: ticket, priority: P3, area: logistics }
+        annotations:
+          summary: "{{ $value }} chuyến ghe đã xuống ghe quá ngưỡng mà chưa cân"
+          description: "GET /v1/logistics/alert-notices?kind=trip_unweighed (mã chuyến, giờ chờ); kiểm ghe đã về hub chưa, phiếu cân HUB_IN có về measurement không."
+      # GH-02: đăng kiểm hết hạn — vẫn cho xếp hàng (chỉ cảnh báo), nhưng cần gia hạn / ngừng phương tiện.
+      - alert: AgrigreenLogisticsRegistrationExpired
+        expr: max(ag_logistics_alerts_open{kind="registration_expired"}) > 0
+        for: 1h
+        labels: { severity: ticket, priority: P3, area: logistics }
+        annotations:
+          summary: "{{ $value }} phương tiện đang dùng đã hết hạn đăng kiểm"
+          description: "GET /v1/logistics/alert-notices?kind=registration_expired; cập nhật danh mục ghe (POST /v1/logistics/vessels/{id}/versions) khi đã gia hạn hoặc chuyển trạng thái ngừng."
+      # Job quét lỗi (DB / tham số) — cảnh báo L-08 không còn được cập nhật.
+      - alert: AgrigreenLogisticsAlertScanFailing
+        expr: sum(increase(ag_logistics_alerts_scans_total{outcome="error"}[1h])) > 0
+        for: 15m
+        labels: { severity: ticket, priority: P3, area: logistics }
+        annotations:
+          summary: "Job logistics_alerts lỗi {{ $value }} lượt trong 1 giờ"
+          description: "Xem log api-internal (event job.logistics_alerts); kiểm vai ag_outbox_publisher (SELECT tenant_id, status trên trip_current / vessel_current, mkg 000020) và vai logistics_app."

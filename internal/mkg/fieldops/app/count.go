@@ -37,6 +37,10 @@ type CountInput struct {
 	// Location (G3-2): dấu GPS tùy chọn của app hiện trường — ghi sổ roll_count_location,
 	// không bao giờ chặn lưu (domain.ParseLocation không lỗi).
 	Location *domain.Location
+	// VesselCode (G4, proto FM-05): số hiệu ghe/sà lan tùy chọn khi xếp ghe (boat_load) — chuẩn hóa như danh
+	// mục ghe (GH-01), ghi sổ roll_count_vessel, mang trong roll_count.recorded để mkg/logistics gán phương tiện.
+	// Bản bù không gửi số hiệu → giữ số hiệu của bản bị bù.
+	VesselCode *string
 }
 
 // CountResult là kết quả ghi số.
@@ -49,6 +53,8 @@ type CountResult struct {
 	Harvest *store.HarvestCheck
 	// Warnings: cảnh báo không chặn (vd fieldops.harvest_date_unknown).
 	Warnings []string
+	// VesselCode: số hiệu ghe đã chuẩn hóa của bản ghi xếp ghe (G4), nil nếu không có.
+	VesselCode *string
 }
 
 // RecordCount ghi số một công đoạn (field_collector hoặc field_supervisor).
@@ -77,6 +83,11 @@ func (s *Service) count(ctx context.Context, p authz.Principal, in CountInput) (
 	}
 	if err := domain.ValidateCount(in.Count, correction); err != nil {
 		return CountResult{}, false, mapErr(err)
+	}
+	if !correction { // bản bù: công đoạn lấy từ bản bị bù, kiểm trong giao dịch
+		if _, err := domain.CheckVesselCode("vessel_code", in.VesselCode, in.Stage); err != nil {
+			return CountResult{}, false, mapErr(err)
+		}
 	}
 	if err := domain.CheckEventTime("event_time", in.EventTime, s.Clock.Now()); err != nil {
 		return CountResult{}, false, mapErr(err)
@@ -159,6 +170,15 @@ func (s *Service) count(ctx context.Context, p authz.Principal, in CountInput) (
 		if err := domain.CheckAgainstPrevious(stage, in.Count, prevCount); err != nil {
 			return err
 		}
+		vessel, err := domain.CheckVesselCode("vessel_code", in.VesselCode, stage)
+		if err != nil {
+			return err
+		}
+		if vessel == nil && correction && stage == port.StageBoatLoad {
+			if vessel, err = store.VesselCodeOf(ctx, tx, target.ID); err != nil {
+				return err
+			}
+		}
 		if correction {
 			next, err := store.TotalFor(ctx, tx, orderID, plot, domain.NextStage(stage))
 			if err != nil {
@@ -216,6 +236,12 @@ func (s *Service) count(ctx context.Context, p authz.Principal, in CountInput) (
 				return err
 			}
 		}
+		if vessel != nil {
+			if err := store.InsertVesselCode(ctx, tx, rc, *vessel); err != nil {
+				return err
+			}
+			res.VesselCode = vessel
+		}
 		if hc != nil {
 			if err := store.InsertHarvestCheck(ctx, tx, rc, hc); err != nil {
 				return err
@@ -229,7 +255,7 @@ func (s *Service) count(ctx context.Context, p authz.Principal, in CountInput) (
 			Payload: port.RollCountRecordedV1{
 				RollCountID: rc.ID, LotRef: rc.OrderID, PlotRef: rc.PlotRef, HTXRef: rc.HTXRef, Rolls: rc.Rolls, Stage: rc.Stage,
 				HTXConfirmationRef: rc.HTXConfirmationRef, SupersedesID: rc.SupersedesID, DeviceID: rc.DeviceID,
-				RuleVersion: rc.RuleVersion, EventTime: rc.EventTime,
+				RuleVersion: rc.RuleVersion, EventTime: rc.EventTime, VesselCode: vessel,
 			},
 		}); err != nil {
 			return err
@@ -285,6 +311,9 @@ func (s *Service) replayCount(ctx context.Context, idem string, res *CountResult
 			return false, err
 		}
 		res.Count = *rc
+		if res.VesselCode, err = store.VesselCodeOf(ctx, tx, rc.ID); err != nil {
+			return false, err
+		}
 		t, err := store.TotalFor(ctx, tx, rc.OrderID, rc.PlotRef, rc.Stage)
 		if err != nil {
 			return false, err
@@ -328,6 +357,7 @@ type CountsView struct {
 	Totals    []store.Total
 	Locations map[uuid.UUID]store.Location     // dấu GPS theo roll_count_id (G3-2)
 	Harvest   map[uuid.UUID]store.HarvestCheck // kiểm ngày gặt theo roll_count_id (FM-01)
+	Vessels   map[uuid.UUID]string             // số hiệu ghe của bản ghi xếp ghe theo roll_count_id (G4)
 }
 
 // Counts đọc sổ đếm cuộn (cả bản bị bù) và số hiệu lực theo thửa/công đoạn.
@@ -347,6 +377,9 @@ func (s *Service) Counts(ctx context.Context, orderID uuid.UUID) (CountsView, er
 			return err
 		}
 		if v.Locations, err = store.LocationsOf(ctx, tx, orderID); err != nil {
+			return err
+		}
+		if v.Vessels, err = store.VesselCodesOf(ctx, tx, orderID); err != nil {
 			return err
 		}
 		v.Harvest, err = store.HarvestChecksOf(ctx, tx, orderID)

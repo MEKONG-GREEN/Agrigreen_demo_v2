@@ -97,7 +97,8 @@ Chỉ dùng số đã cấp. golang-migrate **không** áp số nhỏ hơn số 
 | mkg | 000017 | costing (1/2): sổ `cost_entry` (`lot:<id>`), `conversion_result` (cuộn → tấn, ẩm), `allocation_result`, tham số có phiên bản, bảng chiếu `lot_cost_current` | `mkg_costing` | `costing_app` |
 | mkg | 000018 | costing (2/2): `period_event`, job đóng kỳ + ảnh chụp đầu vào bất biến, `period_summary` (kết quả đóng kỳ), `settlement_event` + bảng chiếu quyết toán (R-56 CHECK), chia doanh thu carbon | `mkg_costing` | `costing_app` |
 | mkg | 000019 | acctbridge: bảng ánh xạ tài khoản có phiên bản, `summary_journal` (`period:<id>`), duyệt (R-56 CHECK), job, `push_attempt` (bảng vận hành) | `mkg_acctbridge` | `acctbridge_app` |
-| mkg | 000020–000021 | **dự phòng G4** — xin người tích hợp (vd diễn tập R-22, bổ sung sau nghiệm thu) | | |
+| mkg | **000020** | G4 tích hợp (**đã có**, 01/10/2026): sổ `mkg_fieldops.roll_count_vessel` (số hiệu ghe của bản ghi xếp ghe), sổ `mkg_logistics.trip_milestone_fix` (accuracy_m của mốc), bảng vận hành chỉ ghi thêm `mkg_logistics.alert_notice` (L-08), nới CHECK mốc `departed`/`arrived` của `trip_event` (lat/lng NULL khi không GPS, CHECK cặp lat/lng), `ag_outbox_publisher` đọc `(tenant_id, status)` của `trip_current`/`vessel_current` | `mkg_fieldops`, `mkg_logistics` | `fieldops_app`, `logistics_app`, `ag_outbox_publisher` |
+| mkg | 000021 | **dự phòng G4** — xin người tích hợp | | |
 | ts | 000004 | **tùy chọn** — telemetry phương tiện `ts_fleet` (logistics): phân vùng tháng như `ts_weigh`, `apply_append_only`, RLS; `ingest_ts` INSERT + SELECT, `ts_reader` SELECT | `ts_fleet` | `ingest_ts`, `ts_reader` |
 | ts | 000005+ | dự phòng `ts_env` (cảm biến kho, `hub.risk.v2`) — **chuyển** từ ts 000004 của g3-conventions | `ts_env` | xin khi làm |
 | pf | 000044 | **bỏ trống** (không dùng; 000045 đã chạy) | | |
@@ -138,6 +139,8 @@ Hằng trong `port/`, đã có trong realm Keycloak (`TestKeycloakRealmCoversRol
 
 Tài xế, chủ ghe, nhân viên MKG: định danh ở vault tenant MKG, trong mkg chỉ `*_ref` (RB-3). Prototype lưu tên tài xế văn bản tự do — **không** làm thế.
 
+**`driver_ref` = `sub` của token** (quyết định tích hợp 01/10/2026): tài xế là tài khoản Keycloak của tenant MKG (vai `driver`); `driver_ref` của chuyến là `sub` (= `authz.Principal.ActorRef`), như `member_refs` của tổ gom fieldops. Tên, điện thoại ở vault tenant MKG, khóa theo cùng `sub` — mkg không giữ PII. Người **chỉ** có vai `driver` (không `dispatcher`): danh sách chuyến tự lọc `driver_ref = sub`, đọc chuyến khác → 404, ghi mốc chuyến khác → 403 `logistics.not_assigned_driver`, không thấy cước (chuyến, chặng). Chủ ghe thuê ngoài không có tài khoản: `driver_ref` rỗng, điều phối ghi mốc thay.
+
 ## 4. Sự kiện G4
 
 Tất cả là **sự kiện nội bộ** (`contracts/events-internal/<tên>.v1.json` + struct `//ag:internal-event` trong `port/`, phát với `outbox.KindInternal` lên vhost `mkg.internal`). Không có hợp đồng van mới ở G4: chuyến, cước, giá, giá thành, quyết toán, bút toán **không bao giờ** qua van.
@@ -166,7 +169,7 @@ Sự kiện G3 mà module G4 nhận:
 
 - Consumer idempotent qua `shared.inbox` (R-61; kiểm thử giao lặp); DLQ = tên + `.dlq` (R-62).
 - Consumer chỉ ghi sổ đầu vào / đánh dấu cần tính lại; **không** tự đóng kỳ. Ảnh chụp đầu vào của đóng kỳ đọc lại qua `port/` với `asOf`.
-- Sự kiện `roll_count.recorded` hiện **không có số hiệu ghe**. Logistics lập chuyến `planned` chưa gán phương tiện, điều phối gán sau. Muốn có số hiệu ngay thì fieldops thêm trường **tùy chọn** (tương thích ngược, schema + struct) — đề xuất qua người tích hợp, không tự sửa module khác.
+- `roll_count.recorded` v1 có trường **tùy chọn** `vessel_code` (tích hợp 01/10/2026 — thêm trường tùy chọn là tương thích ngược theo `contractcheck -base`, không lên v2): số hiệu ghe/sà lan người thu gom nhập khi xếp ghe (`boat_load`), chuẩn hóa như GH-01. Logistics gán phương tiện của chuyến FM-05 khi số hiệu khớp danh mục; không khớp → cờ `vessel_unregistered` + `no_vehicle`; vắng (app cũ) → `no_vehicle`, điều phối gán sau. API app hiện trường (`POST …/roll-counts`, `sync/push`) đã nhận `vessel_code`; **ô nhập trên app Flutter chưa có** (việc của agent app).
 - Tên hằng: `logistics/port` (`EventTripCompleted`, `RollCountConsumer`, `WeighTicketConsumer`), `orders/port` (`EventDeliveryAccepted`, `WeighTicketConsumer`), `costing/port` (`EventPeriodClosed`, `EventSettlementApproved`, `EventPeriodCloseRequested`, sáu `*Consumer`, `PeriodCloseConsumer`), `acctbridge/port` (`EventJournalPushed`, `EventJournalBuildRequested`, `EventJournalPushRequested`, `PeriodClosedConsumer`, `JournalBuildConsumer`, `JournalPushConsumer`). `cmd/worker-internal/assembly` `TestG4FrozenInternalContracts` kiểm schema và tên hàng đợi.
 
 ## 5. Vùng và cửa
@@ -208,7 +211,20 @@ Gốc lắp ráp: **chưa** nối module G4 (chưa có module). Chỗ nối ghi 
 - Mã story ghi tiền tố: `proto FM-05`, `proto GH-02`, `proto PM-03`, `proto CT-01`, `GIS FN-08 BR-04`…
 - Máy dev (Windows, PostgreSQL 17 cục bộ, không Docker/RabbitMQ/Kubernetes): như g3-conventions §7. Kubernetes, NetworkPolicy, PKI nội bộ chỉ kiểm được trên cụm — ghi trong báo cáo.
 
-## 8. Giả định tạm (ghi trong báo cáo nếu bám vào)
+## 8. Quyết định tích hợp G4 (01/10/2026)
+
+| Chủ đề | Quyết định |
+|---|---|
+| worker-internal ↔ costing | Mọi consumer costing dựng qua `assembly.CostingDeps`: `Origins` (pool `hub_app`), `Contracts` + `Deliveries` (pool `orders_app`), `Trips` (pool `logistics_app`) — chỉ đọc, tenant tường minh, không GRANT chéo schema. `buildAcctbridge` đọc `ClosedPeriods` trên pool `costing_app` (kiểm thử đầu–cuối `TestWorkerInternalCostingToAcctbridgeWiring_G4`) |
+| L-08 thông báo | MKG không có kênh thông báo riêng (pf/notify ở vùng nền tảng, R-03). Job `logistics_alerts` (api-internal, `AG_MKG_JOBS`, mỗi `AG_LOGISTICS_ALERT_INTERVAL`, mặc định 15 phút) ghi **một** thông báo mỗi điều kiện vào `mkg_logistics.alert_notice` (chống lặp: theo chuyến / theo (ghe, hạn đăng kiểm)), đọc qua `GET /v1/logistics/alert-notices`, và đặt gauge `ag_logistics_alerts_open{kind}` → Alertmanager gửi (luật `agrigreen-mkg-logistics.rules.yml`). Đẩy tới điện thoại (FCM) để sau — cần kênh thông báo vùng mkg |
+| Bù phiếu HUB_IN sau duyệt | Phiếu nhận đã duyệt không mở lại: ghi bản bù `corrected` (vẫn `approved`, người duyệt giữ nguyên, kiểm ↔ đơn mua lại, chỉ cảnh báo) + bản bù khoản phải trả đơn mua khác (`supersedes_id`, số lượng + tiền mới, giữ hạn + điều khoản đã chốt lúc duyệt). Khoản phải trả hiệu lực = dòng mới nhất của stream `payable:<receipt>`. Rơm: không phải trả ở orders (O-11) |
+| O-05 thiếu tồn | Cổng đọc thêm `hub/port.Stock.StockByProduct` (tồn sổ `lot_balance` theo dạng hàng / cơ sở, tenant tường minh — chưa trừ phiếu xuất chờ duyệt). Orders tính `stock_check` lúc lập / xác nhận / đọc đơn draft|confirmed, không lưu; thiếu → `warnings: [orders.stock_shortage]`, không chặn; `orders.sales.stock_shortage_blocking` giữ 0 (giá trị 1 hiện chỉ hiển thị `blocking: true`, chưa chặn — chờ khách) |
+| Mốc chuyến không GPS | `lat`/`lng` tùy chọn (NULL, không bao giờ 0,0; app cũ gửi 0,0 → coi như không có); `accuracy_m` tùy chọn ở sổ riêng `trip_milestone_fix`. Delta `updated_since` theo `trip_current.recorded_at` (sự kiện cuối) |
+| Tách cụm | `migrate bootstrap` theo `AG_CLUSTERS` (`dbadmin.BootstrapClusters`, `RolesFor`): chỉ vai + database của cụm chọn, vai nhóm NOLOGIN luôn có; rỗng = mọi cụm |
+| Sức khỏe | `worker` (:8087) và `outbox-publisher` (:8088) có `/healthz`, `/readyz` qua `AG_HEALTH_ADDR` (`cmd/internal/healthsrv`), `-healthcheck <url>`; chart có probe |
+| Diễn tập R-22 | `cmd/rebuilddrill` (gốc lắp ráp vùng mkg): băm → `Module.RebuildTenant` → băm, báo cáo Markdown + JSON ([rebuild-projection.md](../runbooks/rebuild-projection.md#diễn-tập-g4)). `mkg/fieldops` chưa có hàm dựng lại (mục mở) |
+
+## 9. Giả định tạm (ghi trong báo cáo nếu bám vào)
 
 - Một tenant MKG, một bên cấp (tenant chương trình) cho `waterway_routes`; nhiều bên cấp → tham số `grantor` (`AG_PARTNER_GRANTOR_TENANT`).
 - Tiền tệ duy nhất VND. Kỳ theo tháng dương lịch, giờ Việt Nam.

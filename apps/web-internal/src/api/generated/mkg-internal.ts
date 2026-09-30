@@ -1580,8 +1580,11 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Liệt kê chuyến (mới nhất trước), lọc trạng thái, con trỏ
-         * @description Vai dispatcher hoặc driver.
+         * Liệt kê chuyến (mới nhất trước), lọc trạng thái, "chuyến của tôi", delta, con trỏ
+         * @description Vai dispatcher hoặc driver. G4 tích hợp (app tài xế): `assigned_to_me=true` → chỉ chuyến có `driver_ref` = `sub` của token
+         *     (tài khoản tài xế tenant MKG — g4-conventions §3.2); người CHỈ có vai driver luôn bị lọc như vậy và KHÔNG thấy cước
+         *     (`planned_cost`, `actual_cost`, `cost_source`, đơn giá / cước của chặng bị bỏ). `updated_since` → chế độ delta: chuyến có sự kiện
+         *     ghi sau mốc (kể cả hủy / hoàn tất), sắp `recorded_at` tăng dần, `cursor` theo `recorded_at`.
          */
         get: operations["listLogisticsTrips"];
         put?: never;
@@ -1718,8 +1721,11 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Mốc chuyến của tài xế (departed / arrived) có GPS + event_time — từng bậc (L-02)
-         * @description Vai driver (hoặc dispatcher). Nhảy bậc / lùi → 409 logistics.trip_transition. Header X-Device-Id tùy chọn.
+         * Mốc chuyến của tài xế (departed / arrived) + event_time, GPS tùy chọn — từng bậc (L-02)
+         * @description Vai driver (hoặc dispatcher). Chỉ TÀI XẾ ĐƯỢC GIAO (`driver_ref` = `sub`) hoặc điều phối ghi mốc — tài xế khác → 403
+         *     `logistics.not_assigned_driver`. Nhảy bậc / lùi → 409 logistics.trip_transition. `lat`/`lng` tùy chọn: vắng / null (máy không có GPS)
+         *     → lưu NULL, không bao giờ 0,0 (app cũ gửi 0,0 → coi như không có GPS); chỉ một trong hai → 422. `accuracy_m` tùy chọn (chỉ kèm tọa
+         *     độ, sổ `trip_milestone_fix`). Header X-Device-Id tùy chọn.
          */
         post: operations["recordLogisticsMilestone"];
         delete?: never;
@@ -1836,6 +1842,28 @@ export interface paths {
         };
         /** Cảnh báo vận hành — chuyến xuống ghe quá N giờ chưa cân (#48 giờ), phương tiện hết / sắp hết hạn đăng kiểm */
         get: operations["logisticsAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/alert-notices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Thông báo cảnh báo L-08 đã gửi (job logistics_alerts) — mới nhất trước
+         * @description Vai dispatcher. Job `logistics_alerts` của api-internal (AG_MKG_JOBS) quét định kỳ ghe chưa cân quá
+         *     `logistics.trip.unweighed_alert_hours` và phương tiện hết / sắp hết hạn đăng kiểm; mỗi điều kiện MỘT thông báo (chống lặp),
+         *     metric `ag_logistics_alerts_open{kind}` cho Alertmanager (deploy/observability/prometheus/agrigreen-mkg-logistics.rules.yml).
+         */
+        get: operations["listLogisticsAlertNotices"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3604,7 +3632,10 @@ export interface components {
             device_id?: string;
             gps?: components["schemas"]["GPSFix"];
             gps_status?: components["schemas"]["GPSStatus"];
+            vessel_code?: components["schemas"]["VesselCode"];
         };
+        /** @description G4 (proto FM-05, tùy chọn): số hiệu ghe/sà lan khi xếp ghe — chỉ công đoạn boat_load (khác → 422). Chuẩn hóa như danh mục ghe (bỏ khoảng trắng, chữ hoa — GH-01; ≤ 32 ký tự chữ, số, . - /). Bản bù không gửi → giữ số hiệu cũ. mkg/logistics gán phương tiện của chuyến FM-05 khi số hiệu khớp danh mục. */
+        VesselCode: string | null;
         /** @description G3-2: dấu GPS tùy chọn của app hiện trường — không bao giờ chặn lưu (tọa độ hỏng → gps_status = invalid, bỏ tọa độ). Nhận `lng` hoặc `lon`; số JSON đọc dạng thập phân (không float), làm tròn 7 chữ số. */
         GPSFix: {
             lat?: number;
@@ -3668,6 +3699,8 @@ export interface components {
             /** @enum {string} */
             gps_status?: "ok" | "weak" | "denied" | "unavailable" | "timeout" | "no_device" | "invalid" | "unknown";
             harvest_check?: components["schemas"]["HarvestCheck"];
+            /** @description G4: số hiệu ghe đã chuẩn hóa của bản ghi xếp ghe (boat_load) */
+            vessel_code?: string;
         };
         RollCountResult: {
             roll_count?: components["schemas"]["RollCount"];
@@ -3924,6 +3957,7 @@ export interface components {
             lat: string;
             lng: string;
         };
+        /** @description `rate_vnd_per_t_km`, `planned_cost` vắng với người chỉ có vai driver (G4 tích hợp). */
         LogisticsLeg: {
             /** Format: uuid */
             leg_id: string;
@@ -3953,8 +3987,8 @@ export interface components {
             network_version: number | null;
             manual_reason?: string | null;
             mass_kg?: string | null;
-            rate_vnd_per_t_km: string;
-            planned_cost: string;
+            rate_vnd_per_t_km?: string;
+            planned_cost?: string;
             param_version: string;
             flags: string[];
             rule_version: string;
@@ -3984,7 +4018,9 @@ export interface components {
             }[];
             planned_kg?: string | null;
             actual_kg?: string | null;
+            /** @description Vắng khi chưa có chặng hoặc người gọi chỉ có vai driver */
             planned_cost?: string | null;
+            /** @description Vắng khi chưa hoàn tất hoặc người gọi chỉ có vai driver */
             actual_cost?: string | null;
             /** @enum {string|null} */
             cost_source?: "param_rate" | "manual" | "vessel_rate" | null;
@@ -4037,10 +4073,34 @@ export interface components {
             param_version?: string | null;
             lat?: string | null;
             lng?: string | null;
+            /** @description Độ chính xác GPS của mốc (sổ trip_milestone_fix) — chỉ có khi app gửi */
+            accuracy_m?: string;
             /** Format: uuid */
             source_ref?: string | null;
             flags: string[];
             rule_version: string;
+        };
+        LogisticsAlertNotice: {
+            /** Format: uuid */
+            notice_id: string;
+            /** @enum {string} */
+            kind: "trip_unweighed" | "registration_expired" | "registration_expiring";
+            /**
+             * Format: uuid
+             * @description trip_id | vessel_id
+             */
+            subject_ref: string;
+            /** @description Mã chuyến CH… | số hiệu phương tiện */
+            subject_code: string;
+            /** @description Vai nhận (dispatcher, hub_operator) */
+            audience: string[];
+            detail: {
+                [key: string]: string;
+            };
+            param_version: string;
+            rule_version: string;
+            /** Format: date-time */
+            noticed_at: string;
         };
         LogisticsVesselInput: {
             /** @description Số hiệu — chuẩn hóa bỏ khoảng trắng, chữ hoa (GH-01) */
@@ -4305,6 +4365,26 @@ export interface components {
             param_version?: string;
             /** Format: date-time */
             recorded_at?: string;
+            /**
+             * Format: uuid
+             * @description Bản bù (RB-1): phiếu HUB_IN bù sau khi phiếu nhận đã duyệt
+             */
+            supersedes_id?: string | null;
+            correction_reason?: string | null;
+        };
+        /** @description O-05 (proto stockWarning): tồn hub của dạng hàng (hub/port.Stock) so với khối lượng đơn — chỉ cảnh báo, không lưu */
+        OrdersStockCheck: {
+            /** @enum {string} */
+            source?: "hub" | "unavailable";
+            product?: components["schemas"]["Product"];
+            ordered_kg?: components["schemas"]["Kg"];
+            available_kg?: string | null;
+            shortage_kg?: string | null;
+            facilities?: number;
+            shortage?: boolean;
+            /** @description orders.sales.stock_shortage_blocking (mặc định 0 — chỉ cảnh báo) */
+            blocking?: boolean;
+            param_version?: string;
         };
         OrdersSalesOrder: {
             /** Format: uuid */
@@ -4341,6 +4421,8 @@ export interface components {
             /** Format: date-time */
             event_time?: string;
             deliveries?: components["schemas"]["OrdersDelivery"][];
+            stock_check?: components["schemas"]["OrdersStockCheck"];
+            warnings?: "orders.stock_shortage"[];
         };
         OrdersDelivery: {
             /** Format: uuid */
@@ -7382,6 +7464,7 @@ export interface operations {
                             htx_confirmation_ref?: string;
                             gps?: components["schemas"]["GPSFix"];
                             gps_status?: components["schemas"]["GPSStatus"];
+                            vessel_code?: components["schemas"]["VesselCode"];
                         };
                     }[];
                 };
@@ -7784,6 +7867,8 @@ export interface operations {
         parameters: {
             query?: {
                 status?: "planned" | "departed" | "arrived" | "completed" | "cancelled";
+                assigned_to_me?: boolean;
+                updated_since?: string;
                 cursor?: string;
                 limit?: number;
             };
@@ -8026,14 +8111,17 @@ export interface operations {
                     kind: "departed" | "arrived";
                     /** Format: date-time */
                     event_time: string;
-                    lat: string;
-                    lng: string;
+                    lat?: string | null;
+                    lng?: string | null;
+                    /** @description mét ≥ 0, chỉ kèm tọa độ */
+                    accuracy_m?: string | null;
                 };
             };
         };
         responses: {
             200: components["responses"]["LogisticsTripResult"];
             201: components["responses"]["LogisticsTripResult"];
+            403: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
         };
@@ -8202,6 +8290,35 @@ export interface operations {
                     };
                 };
             };
+        };
+    };
+    listLogisticsAlertNotices: {
+        parameters: {
+            query?: {
+                kind?: "trip_unweighed" | "registration_expired" | "registration_expiring";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trang thông báo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["LogisticsAlertNotice"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     getLogisticsParam: {

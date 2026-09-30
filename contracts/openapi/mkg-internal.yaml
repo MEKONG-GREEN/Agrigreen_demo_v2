@@ -1276,6 +1276,7 @@ paths:
                           htx_confirmation_ref: {type: string, format: uuid}
                           gps: {$ref: "#/components/schemas/GPSFix"}
                           gps_status: {$ref: "#/components/schemas/GPSStatus"}
+                          vessel_code: {$ref: "#/components/schemas/VesselCode"}
       responses:
         "200":
           description: Kết quả theo bản ghi
@@ -1444,12 +1445,18 @@ paths:
   # --- mkg/logistics (G4, mkg.md §5.4): chuyến, chặng, danh mục ghe, tham số cước ---
   /v1/logistics/trips:
     get:
-      summary: Liệt kê chuyến (mới nhất trước), lọc trạng thái, con trỏ
-      description: Vai dispatcher hoặc driver.
+      summary: Liệt kê chuyến (mới nhất trước), lọc trạng thái, "chuyến của tôi", delta, con trỏ
+      description: |
+        Vai dispatcher hoặc driver. G4 tích hợp (app tài xế): `assigned_to_me=true` → chỉ chuyến có `driver_ref` = `sub` của token
+        (tài khoản tài xế tenant MKG — g4-conventions §3.2); người CHỈ có vai driver luôn bị lọc như vậy và KHÔNG thấy cước
+        (`planned_cost`, `actual_cost`, `cost_source`, đơn giá / cước của chặng bị bỏ). `updated_since` → chế độ delta: chuyến có sự kiện
+        ghi sau mốc (kể cả hủy / hoàn tất), sắp `recorded_at` tăng dần, `cursor` theo `recorded_at`.
       operationId: listLogisticsTrips
       tags: [logistics]
       parameters:
         - {name: status, in: query, schema: {type: string, enum: [planned, departed, arrived, completed, cancelled]}}
+        - {name: assigned_to_me, in: query, schema: {type: boolean, default: false}}
+        - {name: updated_since, in: query, schema: {type: string, format: date-time}}
         - {name: cursor, in: query, schema: {type: string}}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
       responses:
@@ -1597,8 +1604,12 @@ paths:
   /v1/logistics/trips/{id}/milestones:
     parameters: [{$ref: "#/components/parameters/TripID"}]
     post:
-      summary: Mốc chuyến của tài xế (departed / arrived) có GPS + event_time — từng bậc (L-02)
-      description: Vai driver (hoặc dispatcher). Nhảy bậc / lùi → 409 logistics.trip_transition. Header X-Device-Id tùy chọn.
+      summary: Mốc chuyến của tài xế (departed / arrived) + event_time, GPS tùy chọn — từng bậc (L-02)
+      description: |
+        Vai driver (hoặc dispatcher). Chỉ TÀI XẾ ĐƯỢC GIAO (`driver_ref` = `sub`) hoặc điều phối ghi mốc — tài xế khác → 403
+        `logistics.not_assigned_driver`. Nhảy bậc / lùi → 409 logistics.trip_transition. `lat`/`lng` tùy chọn: vắng / null (máy không có GPS)
+        → lưu NULL, không bao giờ 0,0 (app cũ gửi 0,0 → coi như không có GPS); chỉ một trong hai → 422. `accuracy_m` tùy chọn (chỉ kèm tọa
+        độ, sổ `trip_milestone_fix`). Header X-Device-Id tùy chọn.
       operationId: recordLogisticsMilestone
       tags: [logistics]
       parameters:
@@ -1606,10 +1617,11 @@ paths:
         - {name: X-Device-Id, in: header, schema: {type: string}}
       requestBody:
         required: true
-        content: {application/json: {schema: {type: object, required: [kind, event_time, lat, lng], properties: {kind: {type: string, enum: [departed, arrived]}, event_time: {type: string, format: date-time}, lat: {type: string}, lng: {type: string}}}}}
+        content: {application/json: {schema: {type: object, required: [kind, event_time], properties: {kind: {type: string, enum: [departed, arrived]}, event_time: {type: string, format: date-time}, lat: {type: [string, "null"]}, lng: {type: [string, "null"]}, accuracy_m: {type: [string, "null"], description: "mét ≥ 0, chỉ kèm tọa độ"}}}}}
       responses:
         "201": {$ref: "#/components/responses/LogisticsTripResult"}
         "200": {$ref: "#/components/responses/LogisticsTripResult"}
+        "403": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
   /v1/logistics/trips/{id}/completion:
@@ -1712,6 +1724,25 @@ paths:
         "200":
           description: Cảnh báo
           content: {application/json: {schema: {type: object, required: [unweighed_hours, unweighed_trips, vessels], properties: {unweighed_hours: {type: integer}, unweighed_param_version: {type: string}, unweighed_trips: {type: array, items: {$ref: "#/components/schemas/LogisticsTrip"}}, vessels: {type: array, items: {$ref: "#/components/schemas/LogisticsVessel"}}}}}}
+  /v1/logistics/alert-notices:
+    get:
+      summary: Thông báo cảnh báo L-08 đã gửi (job logistics_alerts) — mới nhất trước
+      description: |
+        Vai dispatcher. Job `logistics_alerts` của api-internal (AG_MKG_JOBS) quét định kỳ ghe chưa cân quá
+        `logistics.trip.unweighed_alert_hours` và phương tiện hết / sắp hết hạn đăng kiểm; mỗi điều kiện MỘT thông báo (chống lặp),
+        metric `ag_logistics_alerts_open{kind}` cho Alertmanager (deploy/observability/prometheus/agrigreen-mkg-logistics.rules.yml).
+      operationId: listLogisticsAlertNotices
+      tags: [logistics]
+      parameters:
+        - {name: kind, in: query, schema: {type: string, enum: [trip_unweighed, registration_expired, registration_expiring]}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Trang thông báo
+          content: {application/json: {schema: {type: object, required: [items, next_cursor], properties: {items: {type: array, items: {$ref: "#/components/schemas/LogisticsAlertNotice"}}, next_cursor: {type: [string, "null"]}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/logistics/params/{key}:
     parameters: [{$ref: "#/components/parameters/LogisticsParamKey"}]
     get:
@@ -3083,6 +3114,14 @@ components:
         device_id: {type: string}
         gps: {$ref: "#/components/schemas/GPSFix"}
         gps_status: {$ref: "#/components/schemas/GPSStatus"}
+        vessel_code: {$ref: "#/components/schemas/VesselCode"}
+    VesselCode:
+      type: [string, "null"]
+      maxLength: 64
+      description: >-
+        G4 (proto FM-05, tùy chọn): số hiệu ghe/sà lan khi xếp ghe — chỉ công đoạn boat_load (khác → 422). Chuẩn hóa như danh mục ghe
+        (bỏ khoảng trắng, chữ hoa — GH-01; ≤ 32 ký tự chữ, số, . - /). Bản bù không gửi → giữ số hiệu cũ. mkg/logistics gán phương tiện của
+        chuyến FM-05 khi số hiệu khớp danh mục.
     GPSFix:
       type: object
       description: >-
@@ -3133,6 +3172,7 @@ components:
           properties: {lat: {type: string}, lng: {type: string}, accuracy_m: {type: [string, "null"]}}
         gps_status: {type: string, enum: [ok, weak, denied, unavailable, timeout, no_device, invalid, unknown]}
         harvest_check: {$ref: "#/components/schemas/HarvestCheck"}
+        vessel_code: {type: string, description: "G4: số hiệu ghe đã chuẩn hóa của bản ghi xếp ghe (boat_load)"}
     RollCountResult:
       type: object
       properties:
@@ -3322,7 +3362,8 @@ components:
         lng: {type: string}
     LogisticsLeg:
       type: object
-      required: [leg_id, seq, plan_revision, mode, from, to, distance_km, route_source, route_snapshot_ref, network_version, rate_vnd_per_t_km, planned_cost, param_version, flags, rule_version]
+      required: [leg_id, seq, plan_revision, mode, from, to, distance_km, route_source, route_snapshot_ref, network_version, param_version, flags, rule_version]
+      description: "`rate_vnd_per_t_km`, `planned_cost` vắng với người chỉ có vai driver (G4 tích hợp)."
       properties:
         leg_id: {type: string, format: uuid}
         seq: {type: integer}
@@ -3356,8 +3397,8 @@ components:
         cargo: {type: array, items: {type: object, properties: {lot_ref: {type: string, format: uuid}, mass_kg: {type: string}, ticket_ref: {type: [string, "null"], format: uuid}}}}
         planned_kg: {type: [string, "null"]}
         actual_kg: {type: [string, "null"]}
-        planned_cost: {type: [string, "null"]}
-        actual_cost: {type: [string, "null"]}
+        planned_cost: {type: [string, "null"], description: "Vắng khi chưa có chặng hoặc người gọi chỉ có vai driver"}
+        actual_cost: {type: [string, "null"], description: "Vắng khi chưa hoàn tất hoặc người gọi chỉ có vai driver"}
         cost_source: {type: [string, "null"], enum: [param_rate, manual, vessel_rate, null]}
         plan_revision: {type: integer}
         planned_at: {type: string, format: date-time}
@@ -3392,9 +3433,23 @@ components:
         param_version: {type: [string, "null"]}
         lat: {type: [string, "null"]}
         lng: {type: [string, "null"]}
+        accuracy_m: {type: string, description: "Độ chính xác GPS của mốc (sổ trip_milestone_fix) — chỉ có khi app gửi"}
         source_ref: {type: [string, "null"], format: uuid}
         flags: {type: array, items: {type: string}}
         rule_version: {type: string}
+    LogisticsAlertNotice:
+      type: object
+      required: [notice_id, kind, subject_ref, subject_code, audience, detail, param_version, rule_version, noticed_at]
+      properties:
+        notice_id: {type: string, format: uuid}
+        kind: {type: string, enum: [trip_unweighed, registration_expired, registration_expiring]}
+        subject_ref: {type: string, format: uuid, description: "trip_id | vessel_id"}
+        subject_code: {type: string, description: "Mã chuyến CH… | số hiệu phương tiện"}
+        audience: {type: array, items: {type: string}, description: "Vai nhận (dispatcher, hub_operator)"}
+        detail: {type: object, additionalProperties: {type: string}}
+        param_version: {type: string}
+        rule_version: {type: string}
+        noticed_at: {type: string, format: date-time}
     LogisticsVesselInput:
       type: object
       required: [code, kind]
@@ -3576,6 +3631,21 @@ components:
         payment_term_days: {type: integer}
         param_version: {type: string}
         recorded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid, description: "Bản bù (RB-1): phiếu HUB_IN bù sau khi phiếu nhận đã duyệt"}
+        correction_reason: {type: [string, "null"]}
+    OrdersStockCheck:
+      type: object
+      description: "O-05 (proto stockWarning): tồn hub của dạng hàng (hub/port.Stock) so với khối lượng đơn — chỉ cảnh báo, không lưu"
+      properties:
+        source: {type: string, enum: [hub, unavailable]}
+        product: {$ref: "#/components/schemas/Product"}
+        ordered_kg: {$ref: "#/components/schemas/Kg"}
+        available_kg: {type: [string, "null"]}
+        shortage_kg: {type: [string, "null"]}
+        facilities: {type: integer}
+        shortage: {type: boolean}
+        blocking: {type: boolean, description: "orders.sales.stock_shortage_blocking (mặc định 0 — chỉ cảnh báo)"}
+        param_version: {type: string}
     OrdersSalesOrder:
       type: object
       properties:
@@ -3600,6 +3670,8 @@ components:
         reason: {type: [string, "null"]}
         event_time: {type: string, format: date-time}
         deliveries: {type: array, items: {$ref: "#/components/schemas/OrdersDelivery"}}
+        stock_check: {$ref: "#/components/schemas/OrdersStockCheck"}
+        warnings: {type: array, items: {type: string, enum: [orders.stock_shortage]}}
     OrdersDelivery:
       type: object
       properties:

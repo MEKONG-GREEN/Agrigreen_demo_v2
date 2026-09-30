@@ -59,6 +59,8 @@ type Service struct {
 	Waterway port.WaterwayRoutes
 	// Road: định tuyến đường bộ; nil → Haversine × tham số logistics.route.road_haversine_factor (#10).
 	Road port.RoadRoutes
+	// Metrics: bộ đo job cảnh báo L-08 (nil → noop).
+	Metrics *Metrics
 }
 
 var _ port.Trips = (*Service)(nil)

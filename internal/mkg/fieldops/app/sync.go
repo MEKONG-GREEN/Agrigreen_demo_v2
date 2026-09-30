@@ -66,6 +66,9 @@ type RollCountPayload struct {
 	// máy báo (ok | weak | denied | unavailable | timeout | no_device).
 	GPS       json.RawMessage `json:"gps"`
 	GPSStatus string          `json:"gps_status"`
+	// VesselCode (G4, tùy chọn): số hiệu ghe/sà lan khi xếp ghe (boat_load) — proto FM-05. App hiện trường
+	// chưa gửi (thêm ô nhập sau); máy chủ đã nhận.
+	VesselCode *string `json:"vessel_code"`
 }
 
 // FieldIssue là lỗi theo trường của một bản ghi.
@@ -160,6 +163,7 @@ func (s *Service) pushOne(ctx context.Context, p authz.Principal, device string,
 	}
 	in.Count = domain.Count{Rolls: *pl.Rolls, DiscrepancyReason: pl.DiscrepancyReason}
 	in.Location = domain.ParseLocation(pl.GPSStatus, pl.GPS)
+	in.VesselCode = pl.VesselCode
 	if pl.LooseKg != nil {
 		k, err := mass.ParseKg(*pl.LooseKg)
 		if err != nil {

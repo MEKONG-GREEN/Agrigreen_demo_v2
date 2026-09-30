@@ -146,19 +146,19 @@ var Consumers = []Consumer{
 		Build: func(clk clock.Clock) inbox.Handler { return orders.NewConsumers(clk).WeighTicket() }},
 	// G4 (mkg/costing, vai costing_app): đầu vào giá thành + job đóng kỳ (mẫu mục 12).
 	{Name: costport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Role: costing.DBRole,
-		Build: func(clk clock.Clock) inbox.Handler { return costing.NewConsumers(clk, costing.Deps{}).WeighTicket() }},
+		BuildWith: buildCosting(costing.Consumers.WeighTicket)},
 	{Name: costport.ReconciliationConsumer, Events: []string{measport.EventReconciliationCompleted}, Role: costing.DBRole,
-		BuildWith: buildCostingReconciliation},
+		BuildWith: buildCosting(costing.Consumers.Reconciliation)},
 	{Name: costport.RollCountConsumer, Events: []string{fieldport.EventRollCountRecorded}, Role: costing.DBRole,
-		Build: func(clk clock.Clock) inbox.Handler { return costing.NewConsumers(clk, costing.Deps{}).RollCount() }},
+		BuildWith: buildCosting(costing.Consumers.RollCount)},
 	{Name: costport.TripConsumer, Events: []string{logport.EventTripCompleted}, Role: costing.DBRole,
-		Build: func(clk clock.Clock) inbox.Handler { return costing.NewConsumers(clk, costing.Deps{}).Trip() }},
+		BuildWith: buildCosting(costing.Consumers.Trip)},
 	{Name: costport.DeliveryConsumer, Events: []string{ordport.EventDeliveryAccepted}, Role: costing.DBRole,
-		Build: func(clk clock.Clock) inbox.Handler { return costing.NewConsumers(clk, costing.Deps{}).Delivery() }},
+		BuildWith: buildCosting(costing.Consumers.Delivery)},
 	{Name: costport.JournalPushedConsumer, Events: []string{abport.EventJournalPushed}, Role: costing.DBRole,
-		Build: func(clk clock.Clock) inbox.Handler { return costing.NewConsumers(clk, costing.Deps{}).JournalPushed() }},
+		BuildWith: buildCosting(costing.Consumers.JournalPushed)},
 	{Name: costport.PeriodCloseConsumer, Events: []string{costport.EventPeriodCloseRequested}, Role: costing.DBRole,
-		Build: func(clk clock.Clock) inbox.Handler { return costing.NewConsumers(clk, costing.Deps{}).PeriodClose() }},
+		BuildWith: buildCosting(costing.Consumers.PeriodClose)},
 	// G4 (mkg/acctbridge, vai acctbridge_app): đóng kỳ → job dựng → dựng; duyệt → job đẩy → đẩy (R-62).
 	{Name: abport.PeriodClosedConsumer, Events: []string{costport.EventPeriodClosed}, Role: acctbridge.DBRole,
 		BuildWith: buildAcctbridge(acctbridge.Consumers.PeriodClosed)},
@@ -168,14 +168,43 @@ var Consumers = []Consumer{
 		BuildWith: buildAcctbridge(acctbridge.Consumers.JournalPush)},
 }
 
-// buildCostingReconciliation: costing quy kết hao hụt về lô nguồn — đọc nguồn gốc lô qua
-// hub/port.LotOrigins trên pool vai hub_app (chỉ đọc, tenant tường minh).
-func buildCostingReconciliation(clk clock.Clock, pool PoolFor) (inbox.Handler, error) {
+// CostingDeps dựng cổng đọc của mkg/costing ở worker-internal, mỗi cổng trên pool vai của module CHỦ dữ
+// liệu (chỉ đọc, tenant tường minh — không GRANT chéo schema, g4-conventions §3.1):
+//   - Origins (hub_app): nguồn gốc lô → quy kết hao hụt về lô nguồn (C-07);
+//   - Contracts (orders_app): hợp đồng mua rơm → làm mới quyết toán theo tấn/cuộn sau phiếu cân / đếm cuộn;
+//   - Trips (logistics_app): ghe chưa cân của lệnh gom (PM-02) + đọc lại chuyến khi đóng kỳ (asOf);
+//   - Deliveries (orders_app): đọc lại giao nhận đã chấp nhận khi đóng kỳ (asOf).
+func CostingDeps(clk clock.Clock, pool PoolFor) (costing.Deps, error) {
 	hp, err := pool(hub.DBRole)
 	if err != nil {
-		return nil, err
+		return costing.Deps{}, err
 	}
-	return costing.NewConsumers(clk, costing.Deps{Origins: hub.New(hp, clk).LotOrigins()}).Reconciliation(), nil
+	op, err := pool(orders.DBRole)
+	if err != nil {
+		return costing.Deps{}, err
+	}
+	lp, err := pool(logistics.DBRole)
+	if err != nil {
+		return costing.Deps{}, err
+	}
+	om := orders.New(op, clk)
+	return costing.Deps{
+		Origins:    hub.New(hp, clk).LotOrigins(),
+		Contracts:  om.Contracts(),
+		Trips:      logistics.New(lp, clk, logistics.Options{}).Trips(),
+		Deliveries: om.Deliveries(),
+	}, nil
+}
+
+// buildCosting dựng một consumer của mkg/costing (vai costing_app) với đủ cổng đọc CostingDeps.
+func buildCosting(pick func(costing.Consumers) inbox.Handler) func(clock.Clock, PoolFor) (inbox.Handler, error) {
+	return func(clk clock.Clock, pool PoolFor) (inbox.Handler, error) {
+		deps, err := CostingDeps(clk, pool)
+		if err != nil {
+			return nil, err
+		}
+		return pick(costing.NewConsumers(clk, deps)), nil
+	}
 }
 
 // RollCountReconcileConsumer: mkg.fieldops.roll_count.recorded → measurement đối soát lại.

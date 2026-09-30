@@ -356,6 +356,8 @@ type countReq struct {
 	// GPS (G3-2, tùy chọn, không bao giờ chặn lưu): {lat, lng|lon, accuracy_m} + trạng thái máy báo.
 	GPS       json.RawMessage `json:"gps"`
 	GPSStatus string          `json:"gps_status"`
+	// VesselCode (G4, tùy chọn): số hiệu ghe/sà lan khi xếp ghe (boat_load) — proto FM-05.
+	VesselCode *string `json:"vessel_code"`
 }
 
 func (h Handler) countInput(c *gin.Context, correction bool) (app.CountInput, bool) {
@@ -379,6 +381,7 @@ func (h Handler) countInput(c *gin.Context, correction bool) (app.CountInput, bo
 	in.HTXConfirmationRef = x.uuidPtr("htx_confirmation_ref", req.HTXConfirmationRef)
 	in.EventTime = x.time("event_time", req.EventTime)
 	in.Location = domain.ParseLocation(req.GPSStatus, req.GPS)
+	in.VesselCode = req.VesselCode
 	return in, !x.fail(c)
 }
 
@@ -433,6 +436,9 @@ func (h Handler) counts(c *gin.Context) {
 		d := toRoll(r)
 		if hc, ok := vw.Harvest[r.ID]; ok {
 			d.Harvest = toHarvestCheck(&hc)
+		}
+		if v, ok := vw.Vessels[r.ID]; ok {
+			d.VesselCode = &v
 		}
 		if l, ok := vw.Locations[r.ID]; ok {
 			d.GPSStatus = &l.Status

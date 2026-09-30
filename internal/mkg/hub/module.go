@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/app"
@@ -47,6 +48,16 @@ func (m *Module) Lots() port.Lots { return m.svc }
 
 // LotOrigins cho module mkg khác đọc nguồn gốc lô với tenant tường minh, không cần vai hub (G3-2).
 func (m *Module) LotOrigins() port.LotOrigins { return m.svc }
+
+// RebuildTenant dựng lại bảng chiếu của tenant từ sổ, tenant tường minh, không kiểm vai — CHỈ cho công cụ diễn
+// tập R-22 trên bản sao database (cmd/rebuilddrill). Trả số dòng theo bảng chiếu.
+func (m *Module) RebuildTenant(ctx context.Context, tid uuid.UUID) (map[string]int64, error) {
+	n, err := m.svc.RebuildTenant(ctx, tid)
+	return map[string]int64{"lot_balance": n}, err
+}
+
+// Stock (G4) cho mkg/orders đọc tồn theo dạng hàng / cơ sở với tenant tường minh (cảnh báo thiếu tồn O-05).
+func (m *Module) Stock() port.Stock { return m.svc }
 
 // ActiveHubTenants dựng bộ tìm tenant có cơ sở đang dùng từ pool vai ag_outbox_publisher.
 func ActiveHubTenants(pool *pgxpool.Pool) app.TenantLister { return app.ActiveHubTenants(pool) }

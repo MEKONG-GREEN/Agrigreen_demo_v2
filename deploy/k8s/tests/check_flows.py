@@ -433,7 +433,7 @@ def structure_checks(env: str, docs: list[dict], values: dict, r: Report):
         NS["mkg"]: ("pg-pf", "pg-vault"),
         NS["vault"]: ("pg-pf", "pg-mkg", "pg-ts"),
     }
-    no_probe_ok = {"worker", "outbox-publisher-pf", "outbox-publisher-mkg", "optimizer"}
+    no_probe_ok = {"optimizer"}  # worker, outbox-publisher: AG_HEALTH_ADDR (cmd/internal/healthsrv, G4)
     workloads = []
     for d in by_kind.get("Deployment", []):
         workloads.append((d, d["spec"]["template"]["spec"]))

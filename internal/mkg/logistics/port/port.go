@@ -30,6 +30,10 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/money"
 )
 
+// JobAlerts là tên job cảnh báo định kỳ (L-08: ghe chưa cân > N giờ, đăng kiểm hết / sắp hết hạn) của
+// api-internal (AG_MKG_JOBS) — G4 tích hợp.
+const JobAlerts = "logistics_alerts"
+
 // DBRole là vai của module ở cụm mkg (schema mkg_logistics, mkg 000014/000015).
 const DBRole = "logistics_app"
 

@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/money"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 )
 
@@ -81,7 +84,69 @@ func (s *Service) hubInArrived(ctx context.Context, tx pgx.Tx, env outbox.Envelo
 			return err
 		}
 	}
+	if tk.SupersedesTicketID != nil {
+		return s.compensateApprovedReceipts(ctx, tx, env.TenantID, tk, now)
+	}
 	return nil
+}
+
+// compensateApprovedReceipts — phiếu HUB_IN bị bù (measurement) SAU KHI phiếu nhận đã duyệt (RB-1): không sửa
+// phiếu nhận / khoản phải trả đã ghi; ghi bản bù phiếu nhận (kind corrected, supersedes_id = dòng hiệu lực,
+// vẫn approved, kiểm ↔ đơn mua lại theo tấn mới — chỉ cảnh báo) và, với đơn mua KHÁC theo kg lấy số từ phiếu
+// cân, bản bù khoản phải trả (supersedes_id = khoản hiệu lực, số lượng + số tiền mới, giữ hạn và điều khoản đã
+// chốt lúc duyệt). Rơm: phải trả chỉ từ quyết toán costing (costing tự làm mới theo phiếu bù).
+func (s *Service) compensateApprovedReceipts(ctx context.Context, tx pgx.Tx, tid uuid.UUID, tk store.Ticket, now time.Time) error {
+	rs, err := store.ApprovedReceiptsWithTicket(ctx, tx, *tk.SupersedesTicketID)
+	if err != nil {
+		return err
+	}
+	for i := range rs {
+		r := rs[i]
+		prev, prevQty := r.LastEventID, r.ReceivedQty
+		attachHubIn(&r, tk.TicketID, tk.MassKg)
+		if err := checkReceipt(ctx, tx, &r, tk.TicketTime); err != nil {
+			return err
+		}
+		r.Status = "approved" // đã duyệt: bản bù không mở lại phê duyệt (người duyệt giữ nguyên, R-56)
+		reason := fmt.Sprintf("Phiếu HUB_IN %s (measurement) thay phiếu %s sau khi phiếu nhận đã duyệt — bản bù tự động (RB-1)",
+			tk.TicketID, *tk.SupersedesTicketID)
+		r.Meta = store.Meta{ID: ids.New(), EventTime: now, ActorRef: ConsumerActor, RuleVersion: domain.RuleReceipt,
+			IdemKey: "ticket:" + tk.TicketID.String() + ":receipt:" + r.ReceiptID.String() + ":corrected", SupersedesID: &prev, CorrectionReason: &reason}
+		r.Kind = "corrected"
+		if err := store.InsertReceiptEvent(ctx, tx, tid, &r); err != nil {
+			return err
+		}
+		if r.Category != domain.CategoryOther || !r.ReceivedQty.Valid || (prevQty.Valid && prevQty.Decimal.Equal(r.ReceivedQty.Decimal)) {
+			continue
+		}
+		if err := compensatePayable(ctx, tx, tid, r, reason, now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// compensatePayable ghi bản bù khoản phải trả của phiếu nhận đã duyệt theo số nhận mới (RB-1).
+func compensatePayable(ctx context.Context, tx pgx.Tx, tid uuid.UUID, r store.Receipt, reason string, now time.Time) error {
+	cur, err := store.PayableOfReceipt(ctx, tx, r.ReceiptID)
+	if err != nil || cur == nil {
+		return err
+	}
+	price, err := money.ParsePrice(r.UnitPrice.String())
+	if err != nil {
+		return err
+	}
+	amt, err := domain.LineAmount(r.Unit, r.ReceivedQty.Decimal, price)
+	if err != nil {
+		return err
+	}
+	prev := cur.ID
+	pay := store.Payable{Meta: store.Meta{ID: ids.New(), EventTime: now, ActorRef: ConsumerActor, RuleVersion: domain.RulePayable,
+		IdemKey: "payable:" + r.ReceiptID.String() + ":ticket:" + r.TicketRef.String(), SupersedesID: &prev, CorrectionReason: &reason},
+		ReceiptID: r.ReceiptID, ReceiptEventID: r.ID, POID: r.POID, Category: r.Category, SupplierRef: r.SupplierRef, Unit: r.Unit,
+		Qty: r.ReceivedQty.Decimal, UnitPrice: r.UnitPrice, Amount: amt.Decimal(), DueDate: cur.DueDate, PaymentTermDays: cur.PaymentTermDays,
+		ParamVersion: cur.ParamVersion}
+	return store.InsertPayable(ctx, tx, tid, &pay)
 }
 
 func (s *Service) customerInArrived(ctx context.Context, tx pgx.Tx, env outbox.Envelope, tk store.Ticket) error {
