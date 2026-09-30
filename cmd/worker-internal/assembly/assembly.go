@@ -22,6 +22,8 @@ import (
 	logport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/logistics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement"
 	measport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders"
+	ordport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 )
@@ -115,6 +117,9 @@ var Consumers = []Consumer{
 		BuildWith: buildLogisticsRollCount},
 	{Name: logport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Role: logistics.DBRole,
 		Build: func(clk clock.Clock) inbox.Handler { return logistics.NewConsumers(clk, nil).WeighTicket() }},
+	// G4 (mkg/orders, vai orders_app): HUB_IN → phiếu nhận hàng ↔ đơn mua; CUSTOMER_IN → giao nhận.
+	{Name: ordport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Role: orders.DBRole,
+		Build: func(clk clock.Clock) inbox.Handler { return orders.NewConsumers(clk).WeighTicket() }},
 }
 
 // RollCountReconcileConsumer: mkg.fieldops.roll_count.recorded → measurement đối soát lại.

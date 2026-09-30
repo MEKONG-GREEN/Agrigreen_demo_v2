@@ -27,6 +27,7 @@ import (
 	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/logistics"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
@@ -43,11 +44,12 @@ type Modules struct {
 	Measurement *measurement.Module
 	Fieldops    *fieldops.Module
 	Logistics   *logistics.Module
+	Orders      *orders.Module // G4: hợp đồng mua rơm, đơn mua/phiếu nhận, đơn bán/giao nhận (orders_app)
 }
 
 // List trả module theo thứ tự gắn route.
 func (m Modules) List() []httpx.Module {
-	return []httpx.Module{m.Hub, m.Measurement, m.Fieldops, m.Logistics}
+	return []httpx.Module{m.Hub, m.Measurement, m.Fieldops, m.Logistics, m.Orders}
 }
 
 // OpsRole là vai vận hành của api-internal ở cụm mkg (tương đương platform_api ở
@@ -104,6 +106,13 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules,
 	}
 	pools = append(pools, logPool)
 	mods.Logistics = logistics.New(logPool, clk, LogisticsOptionsFromEnv(clk))
+	// G4 mkg/orders: costing đọc mods.Orders.Contracts() / Deliveries() khi được nối.
+	ordPool, err := open(ctx, orders.DBRole)
+	if err != nil {
+		return mods, ops, pools, err
+	}
+	pools = append(pools, ordPool)
+	mods.Orders = orders.New(ordPool, clk)
 	return mods, ops, pools, nil
 }
 

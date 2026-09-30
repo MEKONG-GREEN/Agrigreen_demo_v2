@@ -1919,6 +1919,595 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/orders/contracts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Liệt kê hợp đồng mua rơm (phiên bản mới nhất của mỗi hợp đồng) */
+        get: operations["listOrdersContracts"];
+        put?: never;
+        /**
+         * Lập hợp đồng mua rơm với HTX (phiên bản 1, chờ duyệt) — proto CT-01..03
+         * @description Vai sales_officer. CT-02 giá > 0, cam kết > 0, kết thúc ≥ bắt đầu; CT-03 per_tonne | per_bale; trần ẩm lưu, chưa cưỡng chế (C-4). CT-01 HTX đã có hợp đồng hiệu lực chồng thời gian → 409 orders.contract_overlap.
+         */
+        post: operations["proposeOrdersContract"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/contract-terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Điều khoản hợp đồng hiệu lực của HTX tại một ngày (Contracts.ContractFor — không có → 404 orders.no_contract, không đoán giá) */
+        get: operations["getOrdersContractTerms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/contracts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        /** Mọi phiên bản của hợp đồng (mới nhất trước) */
+        get: operations["getOrdersContract"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/contracts/{id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đề xuất phiên bản mới (chờ duyệt) cho hợp đồng đang hiệu lực — reason bắt buộc */
+        post: operations["reviseOrdersContract"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/contracts/{id}/versions/{version}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+                version: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt / từ chối phiên bản hợp đồng — sales_approver KHÁC người lập (403 self_approval_forbidden; CHECK DB lớp hai); duyệt thay phiên bản hiệu lực trước (superseded) */
+        post: operations["decideOrdersContract"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/contracts/{id}/terminate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chấm dứt hợp đồng đang hiệu lực (sales_approver, có lý do) */
+        post: operations["terminateOrdersContract"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/purchase-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Liệt kê đơn mua */
+        get: operations["listOrdersPurchaseOrders"];
+        put?: never;
+        /** Lập đơn mua (nháp) — rơm lấy giá hợp đồng hiệu lực; không hợp đồng thì bắt buộc nhập giá (422 orders.price_required — không đoán giá) */
+        post: operations["createOrdersPurchaseOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/purchase-orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        /** Đơn mua kèm phiếu nhận hàng */
+        get: operations["getOrdersPurchaseOrder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/purchase-orders/{id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt / từ chối đơn mua nháp — sales_approver KHÁC người lập (R-56) */
+        post: operations["decideOrdersPurchaseOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/purchase-orders/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy đơn mua (nháp / đã duyệt chưa có phiếu nhận hiệu lực), có lý do */
+        post: operations["cancelOrdersPurchaseOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/purchase-orders/{id}/receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lập phiếu nhận hàng ↔ đơn mua đã duyệt (proto createGoodsReceipt)
+         * @description Rơm theo kg: số nhận = tịnh phiếu cân HUB_IN của lot_ref (measurement), không nhập tay; phiếu chưa về → awaiting_weigh, consumer mkg.orders.weigh_ticket gắn khi về.
+         *     Theo cuộn: received_qty = số cuộn đếm. Lệch đơn mua > orders.receipt.po_variance_warn_pct (mặc định 3, tạm chờ khách) → needs_variance_report + audit_note; CHỈ cảnh báo, không chặn.
+         */
+        post: operations["createOrdersReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/receipts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        /** Phiếu nhận hàng (kiểm ↔ đơn mua, khoản phải trả nếu có) */
+        get: operations["getOrdersReceipt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/receipts/{id}/variance-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi biên bản chênh lệch (ghi chú + tệp ở kho đối tượng) */
+        post: operations["fileOrdersVarianceReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/receipts/{id}/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bù số nhận nhập tay (cuộn / kg đơn mua khác) trước khi duyệt — bản ghi bù supersedes, có lý do (RB-1) */
+        post: operations["correctOrdersReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/receipts/{id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt / từ chối phiếu nhận — sales_approver KHÁC người lập; không bị chặn bởi chênh lệch. Đơn mua KHÁC → đúng một khoản phải trả; rơm → không (chỉ từ quyết toán costing) */
+        post: operations["decideOrdersReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/payables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Khoản phải trả đơn mua KHÁC (một khoản mỗi phiếu nhận đã duyệt) */
+        get: operations["listOrdersPayables"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/sales-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Liệt kê đơn bán */
+        get: operations["listOrdersSalesOrders"];
+        put?: never;
+        /** Lập đơn bán nháp — khách là customer_ref (vault), không PII; giá / chiết khấu vượt ngưỡng (tham số chờ khách) → cần sales_approver xác nhận */
+        post: operations["createOrdersSalesOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/sales-orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        /** Đơn bán kèm lịch giao */
+        get: operations["getOrdersSalesOrder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/sales-orders/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xác nhận đơn nháp — vượt ngưỡng giá/chiết khấu → chỉ sales_approver KHÁC người lập (403 orders.price_approval_required / self_approval_forbidden; CHECK DB) */
+        post: operations["confirmOrdersSalesOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/sales-orders/{id}/advance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chuyển trạng thái đơn bán chỉ tiến (proto advanceSalesOrder); hủy từ draft/confirmed có lý do */
+        post: operations["advanceOrdersSalesOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/sales-orders/{id}/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thêm lượt giao vào lịch giao (đơn đã xác nhận / đang giao) */
+        post: operations["planOrdersDelivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/deliveries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        /** Giao nhận */
+        get: operations["getOrdersDelivery"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/deliveries/{id}/dispatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xuất giao (planned → dispatched); đơn bán confirmed → delivering */
+        post: operations["dispatchOrdersDelivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/deliveries/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Biên bản giao nhận — khối lượng = phiếu CUSTOMER_IN đã gắn (không nhập tay; 409 orders.customer_in_missing); phát mkg.orders.delivery.accepted (nội bộ) */
+        post: operations["acceptOrdersDelivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/deliveries/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Khách từ chối lượt giao đã xuất (có lý do) */
+        post: operations["rejectOrdersDelivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/deliveries/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy lượt giao chưa xuất (có lý do) */
+        post: operations["cancelOrdersDelivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/deliveries/{id}/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chấp nhận bù (supersedes dòng accepted trước, có lý do) + sự kiện bản bù — phiếu CUSTOMER_IN khác của cùng lô hoặc phiếu hiệu lực */
+        post: operations["correctOrdersDelivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/params/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: components["parameters"]["OrdersParamKey"];
+            };
+            cookie?: never;
+        };
+        /** Các phiên bản tham số và giá trị hiệu lực hôm nay (mặc định tạm, chờ khách) */
+        get: operations["getOrdersParam"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/params/{key}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: components["parameters"]["OrdersParamKey"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đề xuất phiên bản tham số (pending tới khi sales_approver KHÁC duyệt, R-56) */
+        post: operations["proposeOrdersParam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/params/{key}/versions/{version}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: components["parameters"]["OrdersParamKey"];
+                version: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt / từ chối phiên bản tham số — người quyết định KHÁC người đề xuất (403 self_approval_forbidden; CHECK DB) */
+        post: operations["decideOrdersParam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/projections/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** [Quản trị] Dựng lại mọi bảng chiếu của orders thẳng từ sổ (R-22) */
+        post: operations["rebuildOrdersProjections"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2857,6 +3446,297 @@ export interface components {
             decided_at?: string | null;
             decision_reason?: string | null;
         };
+        /**
+         * @description Đơn giá VND numeric(18,4) — /tấn hoặc /cuộn
+         * @example 650000.0000
+         */
+        Price: string;
+        /**
+         * @description Tiền VND numeric(18,2)
+         * @example 24813134.93
+         */
+        Amount: string;
+        OrdersDecision: {
+            /** @enum {string} */
+            decision: "approved" | "rejected";
+            /** @description Bắt buộc khi rejected */
+            reason?: string;
+        };
+        OrdersReason: {
+            reason: string;
+        };
+        OrdersContractInput: {
+            /**
+             * Format: uuid
+             * @description Bắt buộc khi lập; bỏ qua khi sửa (giữ HTX của hợp đồng)
+             */
+            htx_ref?: string;
+            /** @enum {string} */
+            basis: "per_tonne" | "per_bale";
+            unit_price: components["schemas"]["Price"];
+            committed_kg: components["schemas"]["Kg"];
+            max_moisture_pct?: components["schemas"]["Pct"];
+            /** Format: date */
+            valid_from: string;
+            /** Format: date */
+            valid_to: string;
+            note?: string;
+            /** @description Bắt buộc khi sửa (phiên bản mới) */
+            reason?: string;
+        };
+        OrdersContract: {
+            /** Format: uuid */
+            contract_id?: string;
+            version?: number;
+            /** @enum {string} */
+            status?: "pending" | "active" | "rejected" | "superseded" | "terminated";
+            /** @example HDR00001 */
+            code?: string;
+            /** Format: uuid */
+            htx_ref?: string;
+            /** @enum {string} */
+            basis?: "per_tonne" | "per_bale";
+            unit_price?: components["schemas"]["Price"];
+            committed_kg?: components["schemas"]["Kg"];
+            /** @description Lưu, chưa cưỡng chế (C-4) */
+            max_moisture_pct?: string | null;
+            /** Format: date */
+            valid_from?: string;
+            /** Format: date */
+            valid_to?: string;
+            note?: string | null;
+            /** Format: uuid */
+            proposed_by?: string;
+            /** Format: uuid */
+            approved_by?: string | null;
+            reason?: string | null;
+            /** Format: date-time */
+            event_time?: string;
+        };
+        OrdersContractVersions: {
+            /** Format: uuid */
+            contract_id?: string;
+            versions?: components["schemas"]["OrdersContract"][];
+        };
+        OrdersContractTerms: {
+            /** Format: uuid */
+            contract_id?: string;
+            code?: string;
+            /** Format: uuid */
+            htx_ref?: string;
+            /** @enum {string} */
+            basis?: "per_tonne" | "per_bale";
+            unit_price?: components["schemas"]["Price"];
+            committed_kg?: components["schemas"]["Kg"];
+            max_moisture_pct?: string | null;
+            /** Format: date */
+            valid_from?: string;
+            /** Format: date */
+            valid_to?: string;
+            version?: number;
+        };
+        OrdersPurchaseOrder: {
+            /** Format: uuid */
+            po_id?: string;
+            /** @enum {string} */
+            status?: "draft" | "approved" | "rejected" | "cancelled";
+            /** @example PO000001 */
+            code?: string;
+            /** @enum {string} */
+            category?: "straw" | "other";
+            /** Format: uuid */
+            supplier_ref?: string;
+            /** Format: uuid */
+            contract_ref?: string | null;
+            contract_version?: number | null;
+            /** Format: uuid */
+            facility_ref?: string | null;
+            /** @enum {string} */
+            unit?: "kg" | "bale";
+            ordered_qty?: string;
+            unit_price?: components["schemas"]["Price"];
+            /** @enum {string} */
+            price_source?: "contract" | "entered";
+            /** Format: date */
+            expected_date?: string | null;
+            description?: string | null;
+            /** Format: uuid */
+            created_by?: string;
+            /** Format: uuid */
+            approved_by?: string | null;
+            reason?: string | null;
+            /** Format: date-time */
+            event_time?: string;
+            receipts?: components["schemas"]["OrdersReceipt"][];
+        };
+        OrdersReceipt: {
+            /** Format: uuid */
+            receipt_id?: string;
+            /** Format: uuid */
+            po_id?: string;
+            /** @enum {string} */
+            status?: "awaiting_weigh" | "pending_approval" | "approved" | "rejected";
+            /** @example GRN000001 */
+            code?: string;
+            /** @enum {string} */
+            category?: "straw" | "other";
+            /** Format: uuid */
+            supplier_ref?: string;
+            /** Format: uuid */
+            lot_ref?: string | null;
+            /** @enum {string} */
+            unit?: "kg" | "bale";
+            ordered_qty?: string;
+            /**
+             * Format: uuid
+             * @description Phiếu cân HUB_IN (measurement)
+             */
+            ticket_ref?: string | null;
+            ticket_kg?: string | null;
+            received_qty?: string | null;
+            /** @enum {string|null} */
+            qty_source?: "ticket" | "count" | "entered" | null;
+            /** @description Có dấu, 2 số lẻ */
+            variance_pct?: string | null;
+            threshold_pct?: string | null;
+            /** @example orders.receipt.po_variance_warn_pct:default */
+            param_version?: string | null;
+            /** @description |chênh| > ngưỡng → cần biên bản chênh lệch; CHỈ cảnh báo, không chặn */
+            needs_variance_report?: boolean;
+            audit_note?: string | null;
+            report_note?: string | null;
+            /** Format: uuid */
+            report_file_ref?: string | null;
+            /** Format: uuid */
+            created_by?: string;
+            /** Format: uuid */
+            approved_by?: string | null;
+            reason?: string | null;
+            /** Format: date-time */
+            event_time?: string;
+            payable?: components["schemas"]["OrdersPayable"];
+        };
+        OrdersPayable: {
+            /** Format: uuid */
+            payable_id?: string;
+            /** Format: uuid */
+            receipt_id?: string;
+            /** Format: uuid */
+            po_id?: string;
+            /** Format: uuid */
+            supplier_ref?: string;
+            /** @enum {string} */
+            unit?: "kg" | "bale";
+            qty?: string;
+            unit_price?: components["schemas"]["Price"];
+            amount?: components["schemas"]["Amount"];
+            /** Format: date */
+            due_date?: string;
+            payment_term_days?: number;
+            param_version?: string;
+            /** Format: date-time */
+            recorded_at?: string;
+        };
+        OrdersSalesOrder: {
+            /** Format: uuid */
+            order_id?: string;
+            /** @enum {string} */
+            status?: "draft" | "confirmed" | "delivering" | "delivered" | "completed" | "cancelled";
+            /** @example SO000001 */
+            code?: string;
+            /**
+             * Format: uuid
+             * @description Định danh khách ở vault — không PII trong mkg
+             */
+            customer_ref?: string;
+            product?: components["schemas"]["Product"];
+            ordered_kg?: components["schemas"]["Kg"];
+            list_price?: string | null;
+            unit_price?: components["schemas"]["Price"];
+            discount_pct?: components["schemas"]["Pct"];
+            net_price?: components["schemas"]["Price"];
+            amount?: components["schemas"]["Amount"];
+            needs_price_approval?: boolean;
+            /** @description Phiên bản ngưỡng lệch giá, chiết khấu đã áp */
+            price_rule?: string;
+            payment_term_days?: number;
+            /** Format: date */
+            delivery_from?: string | null;
+            /** Format: date */
+            delivery_to?: string | null;
+            /** Format: uuid */
+            created_by?: string;
+            /** Format: uuid */
+            approved_by?: string | null;
+            reason?: string | null;
+            /** Format: date-time */
+            event_time?: string;
+            deliveries?: components["schemas"]["OrdersDelivery"][];
+        };
+        OrdersDelivery: {
+            /** Format: uuid */
+            delivery_id?: string;
+            /** Format: uuid */
+            order_id?: string;
+            /** @enum {string} */
+            status?: "planned" | "dispatched" | "accepted" | "rejected" | "cancelled";
+            /** @example GN000001 */
+            code?: string;
+            /** Format: uuid */
+            customer_ref?: string;
+            /** @enum {string} */
+            route?: "HUB" | "DIRECT";
+            /** Format: uuid */
+            lot_ref?: string;
+            /** Format: uuid */
+            trip_ref?: string | null;
+            /** Format: date */
+            planned_date?: string;
+            planned_kg?: components["schemas"]["Kg"];
+            unit_price?: components["schemas"]["Price"];
+            /** Format: uuid */
+            customer_in_ticket_ref?: string | null;
+            ticket_kg?: string | null;
+            accepted_kg?: string | null;
+            amount?: string | null;
+            /** Format: date-time */
+            accepted_at?: string | null;
+            /**
+             * Format: uuid
+             * @description = event_id của mkg.orders.delivery.accepted hiệu lực
+             */
+            acceptance_id?: string | null;
+            /** Format: uuid */
+            dispute_ref?: string | null;
+            /** Format: uuid */
+            evidence_file_ref?: string | null;
+            /** @enum {string|null} */
+            evidence_kind?: "epod" | "minutes" | "ebill" | null;
+            reason?: string | null;
+            rule_version?: string;
+            /** Format: date-time */
+            event_time?: string;
+        };
+        OrdersParam: {
+            param_key?: string;
+            /** Format: uuid */
+            version_id?: string;
+            version_seq?: number;
+            value?: string;
+            /** Format: date */
+            effective_from?: string;
+            provisional?: boolean;
+            /** @enum {string} */
+            status?: "pending" | "approved" | "rejected";
+            /** Format: uuid */
+            proposed_by?: string;
+            proposal_reason?: string;
+            /** Format: uuid */
+            decided_by?: string | null;
+            /** Format: date-time */
+            decided_at?: string | null;
+            decision_reason?: string | null;
+        };
     };
     responses: {
         /** @description Lỗi RFC 9457 */
@@ -2906,6 +3786,7 @@ export interface components {
         OrderID: string;
         TripID: string;
         LogisticsParamKey: "logistics.rate.road_vnd_per_t_km" | "logistics.rate.waterway_vnd_per_t_km" | "logistics.mode.road_feasible_km" | "logistics.vessel.straw_payload_tons" | "logistics.vessel.payload_warn_factor" | "logistics.vessel.expiry_warn_days" | "logistics.trip.unweighed_alert_hours" | "logistics.route.road_haversine_factor";
+        OrdersParamKey: "orders.receipt.po_variance_warn_pct" | "orders.sales.price_approval_delta_pct" | "orders.sales.discount_approval_pct" | "orders.payment_term_days" | "orders.sales.stock_shortage_blocking";
     };
     requestBodies: never;
     headers: never;
@@ -6388,6 +7269,1091 @@ export interface operations {
                 content: {
                     "application/json": {
                         trip_current?: number;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    listOrdersContracts: {
+        parameters: {
+            query?: {
+                htx_ref?: string;
+                status?: "pending" | "active" | "rejected" | "superseded" | "terminated";
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hợp đồng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: components["schemas"]["OrdersContract"][];
+                    };
+                };
+            };
+        };
+    };
+    proposeOrdersContract: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrdersContractInput"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng khóa (phát lại) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Hợp đồng */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrdersContractVersions"];
+                };
+            };
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getOrdersContractTerms: {
+        parameters: {
+            query: {
+                htx_ref: string;
+                /** @description Mặc định hôm nay (giờ VN) */
+                on?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Điều khoản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrdersContractTerms"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    getOrdersContract: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hợp đồng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrdersContractVersions"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    reviseOrdersContract: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrdersContractInput"];
+            };
+        };
+        responses: {
+            /** @description Hợp đồng */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrdersContractVersions"];
+                };
+            };
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    decideOrdersContract: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["OrderID"];
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrdersDecision"];
+            };
+        };
+        responses: {
+            /** @description Hợp đồng */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrdersContractVersions"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    terminateOrdersContract: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrdersReason"];
+            };
+        };
+        responses: {
+            /** @description Hợp đồng */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrdersContractVersions"];
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    listOrdersPurchaseOrders: {
+        parameters: {
+            query?: {
+                supplier_ref?: string;
+                status?: "draft" | "approved" | "rejected" | "cancelled";
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đơn mua */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: components["schemas"]["OrdersPurchaseOrder"][];
+                    };
+                };
+            };
+        };
+    };
+    createOrdersPurchaseOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    category: "straw" | "other";
+                    /**
+                     * Format: uuid
+                     * @description HTX (rơm) hoặc nhà cung cấp — *_ref, định danh ở vault
+                     */
+                    supplier_ref: string;
+                    /** Format: uuid */
+                    facility_ref?: string | null;
+                    /**
+                     * @description Rơm có hợp đồng: rỗng = theo cách tính hợp đồng (per_tonne ↔ kg, per_bale ↔ bale)
+                     * @enum {string}
+                     */
+                    unit?: "kg" | "bale";
+                    /** @description kg (3 số lẻ) hoặc số cuộn nguyên, > 0 */
+                    ordered_qty: string;
+                    unit_price?: components["schemas"]["Price"];
+                    /** Format: date */
+                    expected_date?: string;
+                    description?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đơn mua */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        purchase_order?: components["schemas"]["OrdersPurchaseOrder"];
+                    };
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
+    getOrdersPurchaseOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đơn mua */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        purchase_order?: components["schemas"]["OrdersPurchaseOrder"];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    decideOrdersPurchaseOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrdersDecision"];
+            };
+        };
+        responses: {
+            /** @description Đơn mua */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        purchase_order?: components["schemas"]["OrdersPurchaseOrder"];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    cancelOrdersPurchaseOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrdersReason"];
+            };
+        };
+        responses: {
+            /** @description Đơn mua */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        purchase_order?: components["schemas"]["OrdersPurchaseOrder"];
+                    };
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    createOrdersReceipt: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    lot_ref?: string | null;
+                    received_qty?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Phiếu nhận */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        receipt?: components["schemas"]["OrdersReceipt"];
+                    };
+                };
+            };
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getOrdersReceipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiếu nhận */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        receipt?: components["schemas"]["OrdersReceipt"];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    fileOrdersVarianceReport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    note: string;
+                    /** Format: uuid */
+                    file_ref?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Phiếu nhận */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        receipt?: components["schemas"]["OrdersReceipt"];
+                    };
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    correctOrdersReceipt: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    received_qty: string;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Phiếu nhận */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        receipt?: components["schemas"]["OrdersReceipt"];
+                    };
+                };
+            };
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    decideOrdersReceipt: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrdersDecision"];
+            };
+        };
+        responses: {
+            /** @description Phiếu nhận */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        receipt?: components["schemas"]["OrdersReceipt"];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    listOrdersPayables: {
+        parameters: {
+            query?: {
+                po_id?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phải trả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: components["schemas"]["OrdersPayable"][];
+                        next_cursor?: string;
+                    };
+                };
+            };
+        };
+    };
+    listOrdersSalesOrders: {
+        parameters: {
+            query?: {
+                customer_ref?: string;
+                status?: "draft" | "confirmed" | "delivering" | "delivered" | "completed" | "cancelled";
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đơn bán */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: components["schemas"]["OrdersSalesOrder"][];
+                    };
+                };
+            };
+        };
+    };
+    createOrdersSalesOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    customer_ref: string;
+                    product: components["schemas"]["Product"];
+                    ordered_kg: components["schemas"]["Kg"];
+                    list_price?: components["schemas"]["Price"];
+                    unit_price: components["schemas"]["Price"];
+                    discount_pct?: components["schemas"]["Pct"];
+                    /** Format: date */
+                    delivery_from?: string;
+                    /** Format: date */
+                    delivery_to?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đơn bán */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        sales_order?: components["schemas"]["OrdersSalesOrder"];
+                    };
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
+    getOrdersSalesOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đơn bán */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        sales_order?: components["schemas"]["OrdersSalesOrder"];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    confirmOrdersSalesOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đơn bán */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        sales_order?: components["schemas"]["OrdersSalesOrder"];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    advanceOrdersSalesOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    status: "delivering" | "delivered" | "completed" | "cancelled";
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đơn bán */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        sales_order?: components["schemas"]["OrdersSalesOrder"];
+                    };
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    planOrdersDelivery: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    lot_ref: string;
+                    /** @enum {string} */
+                    route: "HUB" | "DIRECT";
+                    /** Format: date */
+                    planned_date: string;
+                    planned_kg: components["schemas"]["Kg"];
+                    /** Format: uuid */
+                    trip_ref?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Giao nhận */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        delivery?: components["schemas"]["OrdersDelivery"];
+                    };
+                };
+            };
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getOrdersDelivery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Giao nhận */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        delivery?: components["schemas"]["OrdersDelivery"];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    dispatchOrdersDelivery: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    trip_ref?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Giao nhận */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        delivery?: components["schemas"]["OrdersDelivery"];
+                    };
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    acceptOrdersDelivery: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    evidence: {
+                        /** Format: uuid */
+                        file_ref: string;
+                        /** @enum {string} */
+                        kind: "epod" | "minutes" | "ebill";
+                    };
+                    /**
+                     * Format: uuid
+                     * @description Hồ sơ tranh chấp của measurement
+                     */
+                    dispute_ref?: string | null;
+                    /** Format: date-time */
+                    accepted_at?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Giao nhận */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        delivery?: components["schemas"]["OrdersDelivery"];
+                    };
+                };
+            };
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rejectOrdersDelivery: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrdersReason"];
+            };
+        };
+        responses: {
+            /** @description Giao nhận */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        delivery?: components["schemas"]["OrdersDelivery"];
+                    };
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    cancelOrdersDelivery: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrdersReason"];
+            };
+        };
+        responses: {
+            /** @description Giao nhận */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        delivery?: components["schemas"]["OrdersDelivery"];
+                    };
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    correctOrdersDelivery: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["OrderID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    customer_in_ticket_ref?: string | null;
+                    /** Format: uuid */
+                    dispute_ref?: string | null;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Giao nhận */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        delivery?: components["schemas"]["OrdersDelivery"];
+                    };
+                };
+            };
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getOrdersParam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: components["parameters"]["OrdersParamKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tham số */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        param_key?: string;
+                        effective_value?: string;
+                        param_version?: string;
+                        provisional?: boolean;
+                        default_value?: string;
+                        note?: string;
+                        versions?: components["schemas"]["OrdersParam"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    proposeOrdersParam: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                key: components["parameters"]["OrdersParamKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    value: string;
+                    /** Format: date */
+                    effective_from?: string;
+                    /**
+                     * @description Tạm, chờ khách
+                     * @default true
+                     */
+                    provisional?: boolean;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Phiên bản */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        param?: components["schemas"]["OrdersParam"];
+                    };
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
+    decideOrdersParam: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                key: components["parameters"]["OrdersParamKey"];
+                version: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrdersDecision"];
+            };
+        };
+        responses: {
+            /** @description Phiên bản */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        param?: components["schemas"]["OrdersParam"];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    rebuildOrdersProjections: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số dòng đã dựng theo bảng chiếu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
                     };
                 };
             };
