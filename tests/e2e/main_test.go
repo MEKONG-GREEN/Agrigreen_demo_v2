@@ -3,6 +3,10 @@
 // của pgtest và chạy kịch bản "G1 — một vụ Đông Xuân ở Cần Thơ" chỉ qua HTTP,
 // trừ hai chỗ mà ở production do worker làm: job leo thang SLA (đồng hồ giả) và
 // handler inbox xuất gói MRV.
+//
+// Cổng G3 (docs/uat/g3-acceptance.md): TestG3FieldToCustomer dựng thêm phía MKG
+// (cmd/api-internal/assembly, ingest mTLS) và thay outbox-publisher + RabbitMQ bằng bơm
+// outbox gọi đúng sổ consumer của cmd/worker và cmd/worker-internal (g3_stack_test.go).
 package e2e
 
 import (

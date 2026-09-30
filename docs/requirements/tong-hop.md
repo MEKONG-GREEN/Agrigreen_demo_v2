@@ -1,4 +1,4 @@
-# Tổng hợp yêu cầu (27/09/2026, cập nhật 29/09/2026)
+# Tổng hợp yêu cầu (27/09/2026, cập nhật 30/09/2026)
 
 Nguồn: `G:\My Drive\Development`, gồm kiến trúc v3.0 và bốn bộ yêu cầu (BRD, Backlog, prototype).
 
@@ -67,6 +67,27 @@ Các câu này đóng các dòng "một phần" và giả định tạm của [g
 | Q2-22 | TMS: phạm vi dữ liệu, xác thực, độ trễ ≤ 500 ms áp cho lớp nào? | Chưa có API cho TMS | GIS US-INT-02 |
 | Q2-23 | BRD GIS BR-01 chỉ có hai vai (Người dùng xem mọi dữ liệu, Admin), không tách quyền theo dữ liệu. Có chấp nhận phân quyền theo phạm vi của nền tảng không? | Theo phạm vi cây TW → Tỉnh → Xã (ADR-0009) và vai biên tập riêng (`geo_admin`, `waterway_editor`/`publisher`, `simulation_analyst`); quản lý HTX chỉ thấy HTX mình | GIS FN-01/02, mọi lớp GIS |
 | Q2-24 | GIS US-LOG-01: sai 5 lần thì khóa tới khi Admin mở, hay khóa tạm? | Khóa tạm 15 phút (realm) | GIS US-LOG-01 |
+
+## Câu hỏi mở G3 (30/09/2026)
+
+Các câu này đóng các dòng "một phần" của [g3-acceptance.md](../uat/g3-acceptance.md). Mã hiện chạy theo "Giả định hiện tại" (tham số có phiên bản, gắn nhãn "tạm, chờ khách") cho tới khi khách trả lời.
+
+| # | Câu hỏi | Giả định hiện tại | Ảnh hưởng |
+|---|---|---|---|
+| Q3-01 (C-4) | Bảng dung sai cân thật? Trạng thái ẩm khi cân và có khấu trừ ẩm không? | Cờ > 5 %, nghiêm trọng > 15 % (prototype); ghi `moisture_state`, không khấu trừ | `mkg/measurement` đối soát |
+| Q3-02 (C-5) | Nhận số cân của khách bằng cách nào: tích hợp hệ cân nhà máy hay nhập tay? | Nhập tay kèm bằng chứng + nhập lô (kênh `api`) | CUSTOMER_IN |
+| Q3-03 (C-6) | Mẫu cân và giao thức (hạn Q1/2027)? | Bộ điều hợp modbus-tcp/serial-ascii + bộ mô phỏng; `weigh.integrate.v1` tạm | agent biên, ingest |
+| Q3-04 (C-7) | Cửa sổ kiểm toán số đo thô trước khi chuyển tầng lạnh? | Mọi dữ liệu ở tầng nóng; tầng lạnh là runbook thủ công | R-71, `ts_weigh` |
+| Q3-05 | Định mức hao hụt sấy/lưu HUB_IN → HUB_OUT? | Tham số tạm có phiên bản | hao hụt nội bộ |
+| Q3-06 | Hợp đồng trả theo cuộn hay theo tấn nhà máy cân? | Hỗ trợ cả hai; theo tấn thì đối chiếu cuộn ↔ khối lượng là kiểm RB-6 | `mkg/measurement`, `mkg/fieldops` |
+| Q3-07 (C-1) | Danh mục trường MRV chính thức; phạm vi và phương pháp tCO2e (baseline, leakage, chất khô)? | Ước tính luôn TẠM; hệ số 1460 kgCO2e/t, 0,062 / 0,021 kgCO2e/t·km là tham số tạm | `pf/mrv`, van `mrv_collection_evidence` |
+| Q3-08 (RB-2, Q-MKG-12) | MKG đọc HTX/thửa/phản hồi HTX của tenant chương trình bằng cấp quyền chia sẻ tường minh hay vai trong tenant chương trình? | Tài khoản dịch vụ tenant MKG qua Application API; thử nghiệm dùng một tenant | `mkg/fieldops`, `pf/cropcycle` |
+| Q3-09 (FN-21) | Số ngày lưu, nén, lưu trữ của nhật ký lớp GIS, ảnh chụp và số đo thô? | Không xóa; chỉ chuyển tầng (RB-1, X1) | `pf/metrics`, `ts_weigh` |
+| Q3-10 | Ngưỡng "Cảnh báo khẩn" sâu bệnh/thiên tai (KN US-MRV-04) và thời hạn xử lý hồ sơ MRV (US-MRV-06)? | Chưa có | `pf/mrv`, `pf/extension` |
+| Q3-11 | Số ngày tối đa từ gặt tới cuộn xong (proto FM-02) và năng lực cuộn/ngày của tổ gom (FM-06)? | Chưa kiểm | `mkg/fieldops` |
+| Q3-12 | Nguồn dữ liệu hạ tầng thủy lợi cho cờ "ghi AWD nhưng vùng chưa đủ hạ tầng" (KN FR-08)? | Chỉ có cờ "không có bản ghi mới" | `pf/mrv` |
+
+Việc hạ tầng (không cần khách): vai giám sát `mkg_monitor`/`ts_monitor` cho cảnh báo SQL; CA thiết bị riêng cho production; chạy lại CI khi GitHub Actions hoạt động lại.
 
 ## Vai trò của prototype `mekong-green`
 Prototype `mekong-green` gồm khoảng 43k LOC TypeScript/SQLite, 120 bảng, khoảng 470 route. Nó là **đặc tả chạy được**:

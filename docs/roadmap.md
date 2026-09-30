@@ -121,6 +121,17 @@ Thêm vào đó là MRV và fieldops G3. Quy ước, số migration, vai, sự k
 | **B7** | Compose và CI: dịch vụ `ingest` và bộ mô phỏng edge trong `compose-smoke` (mTLS, lô đi hết tới phiếu cân) |
 | **B8** | UAT G3: bảng nghiệm thu yêu cầu → kiểm thử, kịch bản E2E cân → phiếu → đối soát → MRV |
 
+### Trạng thái G3 (30/09/2026)
+
+G3-0, G3-1 và G3-2 đã có mã, sớm hơn mốc Q3/2027. Đối chiếu yêu cầu → kiểm thử: [docs/uat/g3-acceptance.md](uat/g3-acceptance.md). **78 yêu cầu: 56 đạt, 20 một phần, 2 ngoài G3** (FM-05 vận tải thủy và phiếu nhận ↔ đơn mua, cả hai sang G4). Kịch bản đầu–cuối `TestG3FieldToCustomer` (lệnh gom → đếm cuộn → bảng kê HTX xác nhận trên nền tảng → cân HUB_IN qua ingest mTLS → nhận hub → HUB_OUT → CUSTOMER_IN tranh chấp → van MRV → phát lại GIS, chỉ số ngày) đạt trên máy dev. **CI trên GitHub chưa xác nhận** (GitHub Actions bị chặn do thanh toán): `compose-smoke` có ingest + edge-sim, PgBouncer cho bảng G3 (R-32), emulator App hiện trường MKG, image Docker, build tĩnh edge-agent, `promtool`.
+
+**Đã có:** cụm `ts` + `cmd/ingest` (R-70, R-71), `cmd/edge-agent` (đệm ≥ 72 giờ, Ed25519 + bộ đếm, mTLS đi ra, cập nhật có ký), `mkg/measurement` (ba điểm cân, dung sai/định mức có phiên bản, đối soát, tranh chấp, nhập số cân khách, van MRV), `mkg/fieldops` G3 (lệnh gom có duyệt, FM-03/04/09, kg/cuộn học theo HTX, xác nhận HTX qua nền tảng), `mkg/hub` G3, `worker-internal` trên vhost `mkg.internal`, `pf/metrics` (lịch sử chỉ số, nhật ký lớp GIS, ảnh chụp, phát lại), `pf/mrv` G3, seed MKG (R-95); client: App hiện trường MKG, lịch gom/bảng kê trên App HTX và web-ops, web nội bộ MKG, màn chỉ số, phát lại GIS, MRV.
+
+**Còn lại của G3** (chi tiết ở mục Tóm tắt của g3-acceptance):
+- **Mã:** proto FM-01/02 (ràng buộc ngày gặt — cần đọc ngày thu hoạch qua API công khai), FM-06/07/08 (năng lực, trạng thái tổ gom, phân công tự động); KN US-MRV-04 (nhãn cảnh báo khẩn sâu bệnh), US-MRV-06 (leo thang hồ sơ MRV quá hạn), FR-08 (cờ AWD thiếu hạ tầng, thông báo KNV).
+- **Hạ tầng:** chạy lại toàn bộ CI; vai giám sát `mkg_monitor`/`ts_monitor` cho cảnh báo SQL; CA thiết bị riêng cho production; job tầng lạnh `ts_weigh` (sau C-7).
+- **Chờ khách:** C-4, C-5, C-6, C-7, định mức hao hụt sấy, phương pháp tCO2e + C-1, RB-2 cấp quyền chia sẻ (Q-MKG-12), số ngày lưu FN-21 — bảng dưới và [tong-hop.md](requirements/tong-hop.md#câu-hỏi-mở-g3-30092026).
+
 ### Câu hỏi khách còn mở cho G3
 
 | # | Câu | Chặn |
