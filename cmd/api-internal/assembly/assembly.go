@@ -21,6 +21,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/mkgwire"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/costing"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops"
 	foport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub"
@@ -45,11 +46,12 @@ type Modules struct {
 	Fieldops    *fieldops.Module
 	Logistics   *logistics.Module
 	Orders      *orders.Module // G4: hợp đồng mua rơm, đơn mua/phiếu nhận, đơn bán/giao nhận (orders_app)
+	Costing     *costing.Module
 }
 
 // List trả module theo thứ tự gắn route.
 func (m Modules) List() []httpx.Module {
-	return []httpx.Module{m.Hub, m.Measurement, m.Fieldops, m.Logistics, m.Orders}
+	return []httpx.Module{m.Hub, m.Measurement, m.Fieldops, m.Logistics, m.Orders, m.Costing}
 }
 
 // OpsRole là vai vận hành của api-internal ở cụm mkg (tương đương platform_api ở
@@ -106,13 +108,26 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules,
 	}
 	pools = append(pools, logPool)
 	mods.Logistics = logistics.New(logPool, clk, LogisticsOptionsFromEnv(clk))
-	// G4 mkg/orders: costing đọc mods.Orders.Contracts() / Deliveries() khi được nối.
+	// G4 mkg/orders: hợp đồng mua rơm, đơn mua/phiếu nhận, đơn bán/giao nhận.
 	ordPool, err := open(ctx, orders.DBRole)
 	if err != nil {
 		return mods, ops, pools, err
 	}
 	pools = append(pools, ordPool)
 	mods.Orders = orders.New(ordPool, clk)
+	// G4 costing (costing_app): nguồn gốc lô hub (quy kết hao hụt), hợp đồng mua rơm + giao nhận của
+	// mkg/orders, chuyến của mkg/logistics (ghe chưa cân, đọc lại khi đóng kỳ).
+	costPool, err := open(ctx, costing.DBRole)
+	if err != nil {
+		return mods, ops, pools, err
+	}
+	pools = append(pools, costPool)
+	mods.Costing = costing.New(costPool, clk, costing.Deps{
+		Origins:    mods.Hub.LotOrigins(),
+		Contracts:  mods.Orders.Contracts(),
+		Trips:      mods.Logistics.Trips(),
+		Deliveries: mods.Orders.Deliveries(),
+	})
 	return mods, ops, pools, nil
 }
 

@@ -546,6 +546,35 @@ Cảnh báo không chặn (mảng `warnings` của kết quả ghi, không phả
 | 422 | `orders.ticket_unknown` | Bù giao nhận với `customer_in_ticket_ref` chưa nhận từ measurement, hoặc không phải CUSTOMER_IN của cùng lô |
 
 Cảnh báo không chặn (trường của phiếu nhận, không phải lỗi): `needs_variance_report = true` + `audit_note` khi |nhận − đặt| / đặt × 100 > `orders.receipt.po_variance_warn_pct` (mặc định 3, tạm chờ khách — proto `RECEIPT_VARIANCE_TOLERANCE_PCT`); duyệt vẫn được, biên bản chênh lệch ghi qua `POST /v1/orders/receipts/{id}/variance-report`.
+### mkg/costing (API nội bộ MKG — `cmd/api-internal`, `contracts/openapi/mkg-internal.yaml`, tag costing)
+
+| HTTP | code | Khi nào |
+|---|---|---|
+| 404 | `costing.period_not_found` | Không có kỳ giá thành trong tenant của token |
+| 404 | `costing.job_not_found` | Không có job đóng kỳ |
+| 404 | `costing.entry_not_found` | Không có bút toán giá thành (điều chỉnh) |
+| 404 | `costing.allocation_not_found` | Không có kết quả phân bổ (đọc / tính lại) |
+| 404 | `costing.lot_not_found` | Lô chưa có bút toán giá thành |
+| 404 | `costing.conversion_not_found` | Lệnh gom chưa có quy đổi cuộn → tấn (thiếu số cuộn hoặc phiếu cân HUB_IN / CUSTOMER_IN) |
+| 404 | `costing.settlement_not_found` | Không có quyết toán HTX |
+| 404 | `costing.param_not_found` | Khóa tham số giá thành không có (`costing.*` — `costing/port.Param*`) |
+| 404 | `costing.param_version_not_found` | Không có phiên bản tham số `{seq}` |
+| 403 | `self_approval_forbidden` | Duyệt tham số / quyết toán do chính mình đặt / lập, hoặc người đóng kỳ đã lập bút toán điều chỉnh của kỳ (R-56; DB chặn lần hai bằng CHECK / trigger) |
+| 409 | `costing.period_not_open` | Bút toán / quyết toán / doanh thu carbon vào kỳ không mở (đang đóng, đã đóng, đã posted — trigger DB); đóng kỳ không ở trạng thái `open`. Kỳ đã đóng KHÔNG mở lại: sai sót ghi bằng bút toán điều chỉnh ở kỳ đang mở |
+| 409 | `costing.period_not_ended` | Đóng kỳ trước khi hết tháng (giờ Việt Nam) |
+| 409 | `costing.period_not_closed` | Đọc kết quả đóng kỳ của kỳ chưa đóng (port: `ErrPeriodNotClosed`) |
+| 409 | `costing.entry_superseded` | Điều chỉnh bút toán đã bị bút toán khác thay — điều chỉnh bút toán hiệu lực |
+| 409 | `costing.allocation_superseded` | Tính lại kết quả phân bổ đã bị tính lại — tính lại kết quả hiệu lực |
+| 409 | `costing.settlement_exists` | Lệnh gom đã có quyết toán gốc (proto PM-01: một lệnh gom một quyết toán) |
+| 409 | `costing.settlement_not_ready` | Duyệt khi chưa có giá (PM-03), còn chờ cân đủ mọi ghe (PM-02), hoặc số tiền ≤ 0 |
+| 409 | `costing.settlement_frozen` | Hủy / duyệt lại quyết toán đã duyệt — khoản phải trả chỉ hoàn bằng quyết toán điều chỉnh (bút toán đảo) |
+| 409 | `costing.settlement_paid` | Hủy quyết toán đã trả — lập quyết toán điều chỉnh |
+| 409 | `costing.settlement_transition` | Thao tác không hợp lệ ở trạng thái quyết toán (nhập giá khi đã có hợp đồng, trả khi chưa duyệt, điều chỉnh khi chưa duyệt…) |
+| 409 | `costing.param_pending_exists` | Khóa tham số đang có phiên bản chờ duyệt |
+| 409 | `costing.param_not_pending` | Phiên bản tham số đã được quyết định |
+| 422 | `costing.carbon_split_invalid` | Tỷ lệ chia carbon đang áp dụng (nông hộ + cơ quan + VVB) không bằng 100 |
+| 422 | `validation_failed` | Dữ liệu vào sai (tiền không phải chuỗi ≤ 2 chữ số, khối lượng ≤ 3 chữ số, mã kỳ không phải YYYY-MM, nhóm chi phí không ghi tay được, lý do < 10 ký tự, giá ≤ 0, tham số ngoài miền — vd ẩm độ chỉ `none` tới khi có công thức C-4) |
+| 503 | `costing.contracts_unavailable` | Chưa đọc được hợp đồng mua rơm (`orders/port.Contracts` chưa nối hoặc lỗi) — lập quyết toán không đoán giá |
 
 ### pf/waterway
 
