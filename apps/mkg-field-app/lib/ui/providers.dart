@@ -54,14 +54,26 @@ class AppState {
     this.services,
     this.busy = false,
     this.mode = FieldMode.none,
+    this.driver = false,
   });
   final AuthView view;
   final MkgServices? services;
   final bool busy;
   final FieldMode mode;
 
-  AppState copyWith({bool? busy}) =>
-      AppState(view, services: services, busy: busy ?? this.busy, mode: mode);
+  /// Có vai tài xế (G4 mkg/logistics) — độc lập với [mode].
+  final bool driver;
+
+  /// Chỉ là tài xế: trang chủ là "Chuyến của tôi".
+  bool get driverOnly => driver && mode == FieldMode.none;
+
+  AppState copyWith({bool? busy}) => AppState(
+    view,
+    services: services,
+    busy: busy ?? this.busy,
+    mode: mode,
+    driver: driver,
+  );
 }
 
 /// Đăng nhập OIDC → phiên ngoại tuyến 72 giờ + PIN (lõi AuthFlow) → mở CSDL
@@ -88,7 +100,12 @@ class AppController extends Notifier<AppState> {
             accessToken: ref.read(sessionServiceProvider).accessToken,
             onWiped: _onWiped,
           );
-      state = AppState(v, services: services, mode: await services.mode());
+      state = AppState(
+        v,
+        services: services,
+        mode: await services.mode(),
+        driver: await services.driver(),
+      );
       _startAutoSync(services);
       unawaited(services.sync.syncOnce(force: true));
     } else {

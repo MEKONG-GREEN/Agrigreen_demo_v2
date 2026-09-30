@@ -5,7 +5,15 @@ import 'dart:convert';
 abstract final class FieldRole {
   static const collector = 'field_collector';
   static const supervisor = 'field_supervisor';
+
+  /// G4 mkg/logistics (`logistics/port.RoleDriver`): tài xế / chủ ghe ghi mốc
+  /// chuyến. Độc lập với [FieldMode] — một tài khoản có thể vừa tổ gom vừa
+  /// tài xế.
+  static const driver = 'driver';
 }
+
+/// Tài khoản có vai tài xế (mkg/logistics).
+bool isDriver(Iterable<String> roles) => roles.contains(FieldRole.driver);
 
 enum FieldMode {
   /// Tổ gom: đếm cuộn, mở/đóng ca.

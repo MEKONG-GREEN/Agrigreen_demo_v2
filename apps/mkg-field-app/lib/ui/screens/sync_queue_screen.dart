@@ -6,13 +6,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/fieldops.dart';
+import '../../domain/trips.dart';
 import '../providers.dart';
 
 class _Queue {
-  const _Queue(this.records, this.pendingActions, this.failedActions);
+  const _Queue(
+    this.records,
+    this.pendingActions,
+    this.failedActions,
+    this.milestoneConflicts,
+    this.tripCodes,
+  );
   final List<OutboxRecord> records;
   final int pendingActions;
   final List<ApiAction> failedActions;
+
+  /// Mốc chuyến bị máy chủ từ chối (409 `logistics.*`…).
+  final List<LocalMilestone> milestoneConflicts;
+  final Map<String, String> tripCodes;
 }
 
 final _queueProvider = FutureProvider.autoDispose<_Queue>((ref) async {
@@ -21,6 +32,8 @@ final _queueProvider = FutureProvider.autoDispose<_Queue>((ref) async {
     await s.outbox.list(limit: 300),
     await s.actions.pendingCount(),
     await s.field.failedShiftActions(),
+    await s.trips.conflicts(),
+    {for (final v in await s.trips.trips()) v.trip.tripId: v.trip.code},
   );
 });
 
@@ -70,7 +83,9 @@ class SyncQueueScreen extends ConsumerWidget {
                     Icons.cloud_upload,
                     color: AgColors.amber,
                   ),
-                  title: Text('${d.pendingActions} thao tác ca chờ gửi'),
+                  title: Text(
+                    '${d.pendingActions} thao tác (ca / mốc chuyến) chờ gửi',
+                  ),
                 ),
               ),
             for (final a in d.failedActions)
@@ -81,6 +96,22 @@ class SyncQueueScreen extends ConsumerWidget {
                     '${a.body?['kind'] == 'opened' ? 'Mở' : 'Đóng'} ca · lệnh ${shortRef(a.target ?? '')}',
                   ),
                   subtitle: Text(rejectMessage(a.lastError)),
+                ),
+              ),
+            for (final m in d.milestoneConflicts)
+              Card(
+                key: ValueKey('ms-conflict-${m.actionId}'),
+                color: AgColors.redBg,
+                child: ListTile(
+                  leading: const Icon(Icons.error_outline, color: AgColors.red),
+                  title: Text(
+                    '${m.milestone.label} · chuyến '
+                    '${d.tripCodes[m.tripId] ?? shortRef(m.tripId)}',
+                  ),
+                  subtitle: Text(
+                    'Lúc ${formatLocal(m.eventTime)} — '
+                    '${logisticsMessage(m.errorCode)}',
+                  ),
                 ),
               ),
             if (d.records.isEmpty)

@@ -25,6 +25,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'fake_logistics.dart';
+
 /// SQLite trong bộ nhớ, cùng isolate (dùng được trong `testWidgets`).
 class MemoryDbOpener implements DbOpener {
   MemoryDbOpener() {
@@ -123,6 +125,32 @@ class FakeMkgServer extends FakeServer {
   final List<(String, Map<String, Object?>?)> posts = [];
   bool offline = false;
 
+  /// G4 mkg/logistics giả (chuyến, mốc tài xế).
+  final FakeLogistics logistics = FakeLogistics();
+
+  static final _milestonePath = RegExp(
+    r'^/v1/logistics/trips/([^/]+)/milestones$',
+  );
+
+  @override
+  Future<Map<String, Object?>> postAction({
+    required String path,
+    required String idempotencyKey,
+    Map<String, Object?>? body,
+  }) async {
+    final m = _milestonePath.firstMatch(path);
+    if (m == null) {
+      return super.postAction(
+        path: path,
+        idempotencyKey: idempotencyKey,
+        body: body,
+      );
+    }
+    if (offline) throw NetworkException('offline');
+    actionCalls.add((path, idempotencyKey));
+    return logistics.milestone(m.group(1)!, idempotencyKey, body);
+  }
+
   @override
   Future<List<PushResult>> push({
     required String batchKey,
@@ -168,6 +196,9 @@ class FakeMkgServer extends FakeServer {
   FakeMkgServer() {
     onGet = (path, query) async {
       if (offline) throw NetworkException('offline');
+      if (path.startsWith('/v1/logistics/')) {
+        return logistics.get(path, query);
+      }
       final m = RegExp(
         r'^/v1/fieldops/orders/([^/]+)/(roll-counts|crew-shifts)$',
       ).firstMatch(path);

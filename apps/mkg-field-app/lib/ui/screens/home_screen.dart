@@ -10,6 +10,7 @@ import 'approval_screen.dart';
 import 'order_detail_screen.dart';
 import 'reconciliation_screen.dart';
 import 'sync_queue_screen.dart';
+import 'trip_list_screen.dart';
 
 /// Trang chủ: trạng thái đồng bộ + lệnh gom của tôi (pull `collection_order`);
 /// giám sát gom có thêm "Duyệt lệnh gom" và "Đối soát chiều mua".
@@ -19,6 +20,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(appControllerProvider.select((a) => a.mode));
+    final driver = ref.watch(appControllerProvider.select((a) => a.driver));
     final home = ref.watch(homeProvider);
     Future<void> syncNow() async {
       await ref.services.sync.syncOnce(force: true);
@@ -41,13 +43,13 @@ class HomeScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(12),
           children: [
-            if (mode == FieldMode.none)
+            if (mode == FieldMode.none && !driver)
               const Card(
                 color: AgColors.amberBg,
                 child: Padding(
                   padding: EdgeInsets.all(14),
                   child: Text(
-                    'Tài khoản chưa có vai tổ gom / giám sát gom. Liên hệ quản trị Mekong Green.',
+                    'Tài khoản chưa có vai tổ gom / giám sát gom / tài xế. Liên hệ quản trị Mekong Green.',
                     style: TextStyle(fontSize: 16),
                   ),
                 ),
@@ -87,6 +89,22 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
             ),
+            if (driver) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const ValueKey('my-trips'),
+                onPressed: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const TripListScreen(),
+                    ),
+                  );
+                  ref.invalidate(homeProvider);
+                },
+                icon: const Icon(Icons.local_shipping),
+                label: const Text('Chuyến của tôi'),
+              ),
+            ],
             if (mode == FieldMode.supervisor) ...[
               const SizedBox(height: 8),
               Wrap(

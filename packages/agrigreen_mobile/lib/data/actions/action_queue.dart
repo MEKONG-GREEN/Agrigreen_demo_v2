@@ -31,7 +31,12 @@ enum ApiActionKind {
   /// G3 (App hiện trường MKG, api-internal): `POST
   /// /v1/fieldops/orders/{id}/crew-shifts {crew_ref, kind, headcount,
   /// event_time, device_id}` — mở / đóng ca tổ gom.
-  fieldopsCrewShift('fieldops_crew_shift');
+  fieldopsCrewShift('fieldops_crew_shift'),
+
+  /// G4 (App hiện trường MKG — tài xế, api-internal): `POST
+  /// /v1/logistics/trips/{id}/milestones {kind, event_time, lat, lng}` — mốc
+  /// xuất phát / đến của chuyến (chỉ tiến, L-02).
+  logisticsMilestone('logistics_milestone');
 
   const ApiActionKind(this.code);
   final String code;
@@ -47,6 +52,8 @@ enum ApiActionKind {
     ApiActionKind.farmLogReview => '/v1/cropcycle/farm-logs/$target/reviews',
     ApiActionKind.fieldopsCrewShift =>
       '/v1/fieldops/orders/$target/crew-shifts',
+    ApiActionKind.logisticsMilestone =>
+      '/v1/logistics/trips/$target/milestones',
   };
 }
 

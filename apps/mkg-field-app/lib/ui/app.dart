@@ -7,6 +7,7 @@ import 'providers.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/pin_screen.dart';
+import 'screens/trip_list_screen.dart';
 
 class MkgFieldApp extends StatelessWidget {
   const MkgFieldApp({super.key});
@@ -35,7 +36,11 @@ class _AuthGate extends ConsumerWidget {
       AuthStage.needsPinSetup => const PinScreen(setup: true),
       AuthStage.locked => const PinScreen(setup: false),
       AuthStage.unlocked =>
-        st.services == null ? const LoginScreen() : const HomeScreen(),
+        st.services == null
+            ? const LoginScreen()
+            : st.driverOnly
+            ? const TripListScreen(asHome: true)
+            : const HomeScreen(),
     };
   }
 }

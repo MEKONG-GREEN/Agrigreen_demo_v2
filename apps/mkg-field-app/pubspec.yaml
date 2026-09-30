@@ -27,6 +27,9 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
   sqflite_common_ffi: ^2.4.3
+  # MockClient (package:http/testing.dart) cho kiểm thử HTTP mốc chuyến —
+  # cùng ràng buộc với lõi agrigreen_mobile.
+  http: ^1.6.0
   integration_test:
     sdk: flutter
 

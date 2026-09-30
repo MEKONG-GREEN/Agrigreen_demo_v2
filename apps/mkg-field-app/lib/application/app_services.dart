@@ -20,6 +20,7 @@ import 'package:path/path.dart' as p;
 
 import '../domain/roles.dart';
 import 'field_service.dart';
+import 'trip_service.dart';
 
 /// Client OIDC công khai của App hiện trường MKG
 /// (deploy/compose/keycloak/agrigreen-realm.json).
@@ -100,6 +101,7 @@ class MkgServices {
     required this.wipe,
     required this.sync,
     required this.field,
+    required this.trips,
   });
 
   final MkgPlatform platform;
@@ -113,10 +115,16 @@ class MkgServices {
   final SyncService sync;
   final FieldService field;
 
+  /// Mốc chuyến của tài xế (G4 mkg/logistics).
+  final TripService trips;
+
   Future<String?> _token() => platform.store.read(SecureKeys.accessToken);
 
   /// Vai đọc từ access token đã lưu (dùng được khi ngoại tuyến).
   Future<FieldMode> mode() async => modeFor(rolesFromJwt(await _token()));
+
+  /// Có vai tài xế (G4) — đọc từ access token đã lưu.
+  Future<bool> driver() async => isDriver(rolesFromJwt(await _token()));
 
   static Future<MkgServices> open(
     MkgPlatform pf, {
@@ -164,6 +172,18 @@ class MkgServices {
           subjectFromJwt(await pf.store.read(SecureKeys.accessToken)),
       gpsTimeout: pf.gpsTimeout,
     );
+    final trips = TripService(
+      db: db,
+      actions: actions,
+      api: api,
+      location: pf.location,
+      clock: pf.clock,
+      subject: () async =>
+          subjectFromJwt(await pf.store.read(SecureKeys.accessToken)),
+      roles: () async =>
+          rolesFromJwt(await pf.store.read(SecureKeys.accessToken)),
+      gpsTimeout: pf.gpsTimeout,
+    );
     final sync = SyncService(
       db: db,
       api: api,
@@ -178,8 +198,12 @@ class MkgServices {
       pullLimit: pf.config.pullLimit,
       retention: pf.config.ackRetention,
       actions: actions,
-      // Số hiệu lực theo thửa/công đoạn không có entity pull: tải qua API.
-      afterPull: field.refreshAllCounts,
+      // Số hiệu lực theo thửa/công đoạn và chuyến của tài xế không có entity
+      // pull: tải qua API (chuyến chỉ khi có vai driver).
+      afterPull: () async {
+        await field.refreshAllCounts();
+        await trips.refresh();
+      },
     );
     return MkgServices._(
       platform: pf,
@@ -192,6 +216,7 @@ class MkgServices {
       wipe: wipe,
       sync: sync,
       field: field,
+      trips: trips,
     );
   }
 
