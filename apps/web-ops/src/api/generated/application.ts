@@ -3293,10 +3293,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extdata/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** pf/extdata (ADR-0007): nguồn dữ liệu ngoài đã bật — thời tiết, độ mặn, tile. Không trả URL (có thể chứa khóa API) */
+        get: operations["extdataSources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extdata/{source}/point": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** pf/extdata (ADR-0007): dữ liệu điểm qua proxy khử định danh — tọa độ làm thô về tâm ô lưới trước khi gọi nhà cung cấp; đệm theo ô */
+        get: operations["extdataPoint"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extdata/{source}/tiles/{z}/{x}/{y}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** pf/extdata (ADR-0007): tile bản đồ/vệ tinh qua proxy — zoom ≤ max_zoom của nguồn, tile phải giao vùng phục vụ; y có thể kèm đuôi .png */
+        get: operations["extdataTile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ExtDataSource: {
+            id: string;
+            /** @enum {string} */
+            kind: "weather" | "salinity" | "tile";
+            /** @description Đích thuộc AG_RESIDENCY_ALLOWLIST (RB-7) */
+            in_territory: boolean;
+            /** @description ADR riêng của nguồn ngoài lãnh thổ (ADR-0007) */
+            adr?: string;
+            /** @description Cạnh ô lưới (nguồn điểm) */
+            cell_deg?: string;
+            /** @description Trần zoom (nguồn tile) */
+            max_zoom?: number;
+            ttl_seconds: number;
+            /** @description Nhà cung cấp giả (Local/Dev) */
+            fake: boolean;
+        };
         /** @description Lịch gom rơm MKG của một HTX (van collection_schedule) — chỉ khung thời gian và trạng thái. */
         HtxCollectionSchedule: {
             /** Format: uuid */
@@ -13030,6 +13097,115 @@ export interface operations {
             404: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
+        };
+    };
+    extdataSources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh mục nguồn (mặc định rỗng khi chưa cấu hình AG_EXTDATA_SOURCES) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ExtDataSource"][];
+                    };
+                };
+            };
+            401: components["responses"]["Problem"];
+        };
+    };
+    extdataPoint: {
+        parameters: {
+            query: {
+                /** @description Vĩ độ thập phân (chuỗi) */
+                lat: string;
+                /** @description Kinh độ thập phân (chuỗi) */
+                lon: string;
+            };
+            header?: never;
+            path: {
+                source: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dữ liệu của ô lưới (data là JSON nguyên văn của nhà cung cấp). Cache-Control: private, max-age = thời gian đệm còn lại */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        source: string;
+                        /** @enum {string} */
+                        kind: "weather" | "salinity";
+                        cell: {
+                            /** @description Vĩ độ tâm ô */
+                            lat: string;
+                            /** @description Kinh độ tâm ô */
+                            lon: string;
+                            /** @description Cạnh ô (độ), ≥ 0.05 */
+                            size_deg: string;
+                        };
+                        /** Format: date-time */
+                        fetched_at: string;
+                        cached: boolean;
+                        /** @description JSON của nhà cung cấp */
+                        data: unknown;
+                    };
+                };
+            };
+            401: components["responses"]["Problem"];
+            /** @description extdata.unknown_source */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | extdata.outside_territory */
+            422: components["responses"]["Problem"];
+            /** @description extdata.provider_unavailable */
+            502: components["responses"]["Problem"];
+        };
+    };
+    extdataTile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source: string;
+                z: number;
+                x: number;
+                y: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tile nhị phân */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/webp": string;
+                    "application/x-protobuf": string;
+                };
+            };
+            401: components["responses"]["Problem"];
+            /** @description extdata.unknown_source */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | extdata.zoom_too_high | extdata.outside_territory */
+            422: components["responses"]["Problem"];
+            /** @description extdata.provider_unavailable */
+            502: components["responses"]["Problem"];
         };
     };
 }

@@ -19,6 +19,9 @@ const (
 	MetricDLQDepth      = "ag.rabbitmq.dlq.depth"        // số thông điệp trong DLQ, theo queue (R-62)
 	MetricProjectionLag = "ag.projection.lag"            // giây, độ trễ bảng chiếu so với sổ (R-21)
 	MetricJobRuns       = "ag.job.runs"                  // số lần chạy job vận hành, theo job + outcome
+	// MetricStandbyLag: giây, độ trễ áp WAL của bản sao chờ theo cluster (ADR-0006:
+	// standby_replication_lag_seconds có cảnh báo) — db.RegisterStandbyLag.
+	MetricStandbyLag = "ag.db.standby_replication_lag"
 )
 
 type httpInstruments struct {

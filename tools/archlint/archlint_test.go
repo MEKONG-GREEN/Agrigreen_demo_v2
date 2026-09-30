@@ -40,3 +40,8 @@ func TestNoTimeNow(t *testing.T) {
 func TestPIILog(t *testing.T) {
 	analysistest.Run(t, analysistest.TestData(), PIILog, "example.com/ag/internal/platform/beta/pii")
 }
+
+// RB-1, ADR-0011: không xóa cứng dữ liệu nghiệp vụ; chỉ Rebuild*/Clear* dựng lại bảng chiếu.
+func TestNoHardDelete_ADR0011(t *testing.T) {
+	analysistest.Run(t, analysistest.TestData(), NoHardDelete, "example.com/ag/internal/platform/beta/store")
+}

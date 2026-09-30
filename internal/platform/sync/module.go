@@ -9,10 +9,14 @@ package sync
 import (
 	"context"
 	"crypto/rand"
+	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
@@ -73,6 +77,22 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	return &Module{svc: svc}
 }
 
+// ErrCursorKey: khóa HMAC con trỏ pull không dùng được (ADR-0006).
+var ErrCursorKey = errors.New("sync: AG_SYNC_CURSOR_KEY")
+
+// CheckCursorKey kiểm khóa HMAC con trỏ trước khi dựng module (ADR-0006, sync-contract.md):
+// khóa có thì phải ≥ 32 byte; ở production bắt buộc có — khóa ngẫu nhiên theo tiến trình
+// làm con trỏ hỏng sau mỗi lần khởi động lại và giữa các bản chạy song song.
+func CheckCursorKey(key []byte, production bool) error {
+	switch {
+	case len(key) == 0 && production:
+		return fmt.Errorf("%w: bắt buộc ở production (khóa ngẫu nhiên chỉ cho Local/Dev)", ErrCursorKey)
+	case len(key) > 0 && len(key) < 32:
+		return fmt.Errorf("%w: phải có ít nhất 32 byte", ErrCursorKey)
+	}
+	return nil
+}
+
 // NewDevices dựng cổng đọc sổ thiết bị (port.Devices) từ pool vai sync_app, độc
 // lập với module (không cần Source/Sink) — gốc lắp ráp dùng khi module khác vừa cần
 // kiểm thiết bị vừa là Source của pf/sync.
@@ -122,6 +142,29 @@ func (m *Module) ConflictSLA(ctx context.Context, tenantID uuid.UUID) (port.Conf
 // RegisterSLAMetrics đăng ký gauge ag.sync.conflict.overdue (theo tenant_id) trên
 // meter OpenTelemetry chung; tenants trả danh sách tenant cần đo.
 func (m *Module) RegisterSLAMetrics(tenants func(context.Context) ([]uuid.UUID, error)) (metric.Registration, error) {
+	return registerSLA(m.svc, tenants)
+}
+
+// RegisterConflictSLAMetrics đăng ký gauge ag.sync.conflict.overdue mà không cần dựng
+// module đầy đủ (worker, ADR-0006 + mục 19): db là pool vai sync_app, tenants thường là
+// ConflictTenants(pool ag_outbox_publisher).
+func RegisterConflictSLAMetrics(db tenant.Beginner, clk clock.Clock, tenants func(context.Context) ([]uuid.UUID, error)) (metric.Registration, error) {
+	return registerSLA(&app.Service{DB: db, Clock: clk}, tenants)
+}
+
+// ConflictTenants liệt kê tenant có xung đột đồng bộ đang mở, đọc bằng pool vai
+// ag_outbox_publisher (hai cột tenant_id, status — migration pf 000043).
+func ConflictTenants(pool *pgxpool.Pool) func(context.Context) ([]uuid.UUID, error) {
+	return func(ctx context.Context) ([]uuid.UUID, error) {
+		rows, err := pool.Query(ctx, "SELECT DISTINCT tenant_id FROM pf_sync.conflict WHERE status = 'open'")
+		if err != nil {
+			return nil, err
+		}
+		return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	}
+}
+
+func registerSLA(svc *app.Service, tenants func(context.Context) ([]uuid.UUID, error)) (metric.Registration, error) {
 	mt := telemetry.Meter()
 	g, err := mt.Int64ObservableGauge(MetricConflictOverdue,
 		metric.WithDescription("Số xung đột đồng bộ đang mở đã quá SLA (C-8)"))
@@ -134,7 +177,7 @@ func (m *Module) RegisterSLAMetrics(tenants func(context.Context) ([]uuid.UUID, 
 			return err
 		}
 		for _, t := range ts {
-			s, err := m.svc.ConflictSLA(ctx, t)
+			s, err := svc.ConflictSLA(ctx, t)
 			if err != nil {
 				return err
 			}

@@ -515,3 +515,16 @@ Chỉ số có lịch sử và nhật ký lớp GIS (G3-A5; `GET /v1/metrics/*`,
 | 503 | `metrics.dependency_unavailable` | pf/metrics: chưa nối CSDL, nguồn chỉ số của module chủ dữ liệu, pf/party (phạm vi) hoặc pf/geo (hình học) |
 
 Nguồn không có dữ liệu cho một phạm vi/ngày (vd vụ chưa có lần cân đối trước cutoff) **không** là lỗi API: job không ghi dòng (`port.ErrNoData`), API trả danh sách rỗng.
+
+### pf/extdata
+
+Proxy khử định danh cho nguồn dữ liệu ngoài — thời tiết, độ mặn, tile (ADR-0007, RB-7; `GET /v1/extdata/*`).
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 404 | `extdata.unknown_source` | pf/extdata: nguồn chưa bật trong `AG_EXTDATA_SOURCES` (mặc định chặn), hoặc gọi sai loại (nguồn tile gọi `/point`, nguồn điểm gọi `/tiles`) |
+| 422 | `extdata.outside_territory` | pf/extdata: điểm hoặc tile ngoài vùng phục vụ (lãnh thổ Việt Nam, khung vĩ độ 6–24, kinh độ 102–118) — proxy không phải proxy mở |
+| 422 | `extdata.zoom_too_high` | pf/extdata: zoom tile vượt `max_zoom` của nguồn (problem có thêm `max_zoom`) |
+| 502 | `extdata.provider_unavailable` | pf/extdata: nhà cung cấp không phản hồi, trả mã khác 200, thân không phải JSON, quá lớn hoặc loại tile không cho phép. Lỗi không nêu URL (có thể chứa khóa API) |
+
+Tọa độ sai dạng, thiếu `lat`/`lon`, `z/x/y` không phải số trả `validation_failed`.

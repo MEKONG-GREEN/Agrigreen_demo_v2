@@ -15,7 +15,7 @@ Lộ trình theo Phụ lục A của tài liệu kiến trúc v3.0. Kế hoạch
 - [x] ADR 0001–0013
 - [x] CI xanh toàn bộ trên GitHub, kể cả R-32 qua PgBouncer và build/ký 6 image (27/09/2026)
 - [x] Chạy thử Compose trên máy có Docker (job CI `compose-smoke`: dựng toàn bộ stack, kiểm healthz/readyz)
-- [ ] MKG ký các ADR đề xuất: 0006, 0007, 0009, 0010, 0011
+- [x] Chấp nhận các ADR đề xuất 0006, 0007, 0009, 0010, 0011 (30/09/2026, chủ sản phẩm quyết định trong phiên làm việc). Đối chiếu cam kết → mã → kiểm thử: [trien-khai-g1.md](adr/trien-khai-g1.md). ADR 0014–0019 vẫn ở trạng thái Đề xuất
 
 ## G1: ĐTK 1, ngày 15/12/2026
 
@@ -43,7 +43,7 @@ Mã đã có đủ các phần của kế hoạch S1–S5, sớm hơn mốc 15/1
 **Còn lại của G1** (không chặn mã; chi tiết ở mục Tóm tắt của g1-acceptance):
 - **Chờ khách:** danh mục trường MRV chính thức (C-1); mẫu biểu báo cáo chính thức của Bộ (US-DASH-02); DCRD xác nhận phương pháp dự báo CGH (FN-09); chuyển VN-2000 khi nhập (X9).
 - **Mã:** chọn nhóm dữ liệu khi đồng bộ ngay (US-SYNC-02, cùng liên thông App HTX ở G2). Bản đồ CGH cấp HTX (FN-08: ghim, gom cụm, panel máy, tra cứu) đã xong 29/09.
-- **Hạ tầng:** workflow `restore-drill` đã chạy xanh (29/09/2026); còn chạy thử trên Keycloak/SMTP/FCM thật trong lãnh thổ; MKG ký các ADR đề xuất.
+- **Hạ tầng:** workflow `restore-drill` đã chạy xanh (29/09/2026); còn chạy thử trên Keycloak/SMTP/FCM thật trong lãnh thổ. Năm ADR G1 đã được chấp nhận ngày 30/09/2026 ([trien-khai-g1.md](adr/trien-khai-g1.md)); còn thêm luật Prometheus cho `ag_sync_conflict_overdue` và `ag_db_standby_replication_lag_seconds` vào `deploy/observability`.
 - Chuyển sang G2 theo lộ trình: App HTX (US-HTX-05, US-SYNC-01, US-TASK-01 tự động, CGH FN-07), Hub/kho và lớp GIS nền (GIS FN-04/06/07). Sang G3: đối soát đo lường RB-6, số đo của R-95.
 ## G2: 31/03/2027
 - App HTX:

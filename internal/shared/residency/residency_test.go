@@ -118,6 +118,27 @@ func TestNonPIIAllowlistOnlyForPushChannels(t *testing.T) {
 	}
 }
 
+// ADR-0007: nguồn thời tiết/tile nước ngoài chỉ qua proxy khử định danh (AG_EXTDATA_*),
+// và chỉ khi đích thuộc AG_NONPII_ALLOWLIST; ngoài danh mục → dừng.
+func TestExtDataForeignSourceOnlyViaNonPIIList_ADR0007(t *testing.T) {
+	m := prodEnv()
+	m["AG_EXTDATA_WX_URL"] = "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+	get, environ := envOf(m)
+	if err := Check(get, environ); !errors.Is(err, ErrViolation) || !strings.Contains(err.Error(), "AG_EXTDATA_WX_URL") {
+		t.Fatalf("nguồn ngoài chưa vào AG_NONPII_ALLOWLIST phải bị chặn: %v", err)
+	}
+	m["AG_NONPII_ALLOWLIST"] = "open-meteo.com"
+	get, environ = envOf(m)
+	if err := Check(get, environ); err != nil {
+		t.Fatalf("nguồn ngoài trong AG_NONPII_ALLOWLIST (qua proxy khử định danh) phải qua: %v", err)
+	}
+	m["AG_S3_ENDPOINT"] = "api.open-meteo.com"
+	get, environ = envOf(m)
+	if err := Check(get, environ); !errors.Is(err, ErrViolation) || !strings.Contains(err.Error(), "AG_S3_ENDPOINT") {
+		t.Fatalf("AG_NONPII_ALLOWLIST không được mở cho kho đối tượng: %v", err)
+	}
+}
+
 func TestSingleLabelOnlyWhenListed(t *testing.T) {
 	m := prodEnv()
 	m["AG_RESIDENCY_ALLOWLIST"] = "agrigreen.vn,.viettelidc.com.vn,10.20.0.0/16,203.0.113.10"
