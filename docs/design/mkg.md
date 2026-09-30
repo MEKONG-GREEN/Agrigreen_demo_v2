@@ -219,20 +219,24 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 | Aggregate | `Trip`, `Leg` |
 | Sổ | `trip_event` (`trip:<id>`: planned, departed, arrived, cancelled), `leg_event` |
 | Bảng chiếu | `trip_current` |
-| Nguồn ngoài | Đồ thị đường thủy / tuyến đường bộ của nền tảng (`pf/waterway`, OSRM) — qua Application API công khai (không import `pf/waterway`, R-03); **kết quả định tuyến đã dùng lưu bền vững** vào chặng (tái hiện chi phí, mục 16) |
-| Vai DB / nghiệp vụ | `logistics_app` (mới) / `dispatcher`, `driver` (ghi mốc chuyến trên app) |
-| Migration | G4 — cấp từ mkg 000013 |
+| Nguồn ngoài | Đồ thị đường thủy của nền tảng (`pf/waterway`) — qua bề mặt đối tác `GET/POST /v1/partner/waterway/route` của Application API công khai, cấp quyền `waterway_routes` (ADR-0020, pf 000046, **đã có ở G4-0**; không import `pf/waterway`, R-03); đường bộ: Haversine × hệ số #10 tới khi có OSRM trong lãnh thổ; **kết quả định tuyến đã dùng lưu nguyên văn + SHA-256** vào chặng (`route_snapshot`, tái hiện chi phí, mục 16). Cổng MKG: `logistics/port.WaterwayRoutes`, `RoadRoutes` |
+| Sự kiện | Nội bộ `mkg.logistics.trip.completed` v1 → costing; nhận `roll_count.recorded` (`boat_load` → chuyến, proto FM-05) và `weigh_ticket.recorded` (đóng chuyến với tấn thật) |
+| Vai DB / nghiệp vụ | `logistics_app` (G4-0, dbadmin) / `dispatcher`, `driver` (ghi mốc chuyến trên app) |
+| Migration | mkg **000015** (schema ở 000014); tùy chọn ts **000004** `ts_fleet` — [g4-conventions §2](../dev/g4-conventions.md#2-số-migration) |
+| Port đóng băng (G4-0) | `logistics/port`: `Trips`, `WaterwayRoutes`, `RoadRoutes`, `TripCompletedV1` |
 
 ### 5.5 `mkg/orders` — đơn hàng, giao nhận
 
 | Mục | Thiết kế |
 |---|---|
-| Trách nhiệm | Đơn bán (khách, dạng hàng, khối lượng, giá — **không bao giờ qua van**), lịch giao, biên bản giao nhận, liên kết `CUSTOMER_IN` của measurement |
-| Aggregate | `SalesOrder`, `Delivery` |
+| Trách nhiệm | Đơn bán (khách, dạng hàng, khối lượng, giá — **không bao giờ qua van**), lịch giao, biên bản giao nhận, liên kết `CUSTOMER_IN` của measurement; **chiều mua** (G4-0): hợp đồng mua rơm với HTX (theo tấn / theo cuộn, proto CT-01..03), đơn mua, phiếu nhận hàng ↔ đơn mua (> 3 % chỉ cảnh báo, cần biên bản chênh lệch) |
+| Aggregate | `SalesOrder`, `Delivery`, `PurchaseContract`, `PurchaseOrder`, `GoodsReceipt` |
 | Sổ | `order_event` (`order:<id>`), `delivery_event`; giá `numeric(18,4)` đơn giá, `numeric(18,2)` tiền qua `shared/money` (R-10, `agnofloat` đã áp `orders`) |
 | Phê duyệt | Giá/chiết khấu vượt ngưỡng: `sales_officer` lập, `sales_approver` duyệt (R-56) |
-| Vai DB | `orders_app` (mới) |
-| Migration | G4 — cấp từ mkg 000013 |
+| Sự kiện | Nội bộ `mkg.orders.delivery.accepted` v1 → costing; nhận `weigh_ticket.recorded` (CUSTOMER_IN → giao nhận, HUB_IN → nhận hàng) |
+| Vai DB | `orders_app` (G4-0, dbadmin) |
+| Migration | mkg **000016** (schema ở 000014) |
+| Port đóng băng (G4-0) | `orders/port`: `Deliveries`, `Contracts`, `ReceiptCheck`, `DeliveryAcceptedV1` |
 
 ### 5.6 `mkg/costing` — giá thành, quyết toán, quy đổi cuộn → tấn — **event sourcing mức B: sổ là nguồn**
 
@@ -243,9 +247,12 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 | Sổ (nguồn sự thật) | `cost_entry` (`lot:<id>`), `allocation_result` (`period:<id>`), `settlement_event` (`settlement:<id>`), `period_event` (mở/đóng kỳ) |
 | Quy tắc | **Mỗi phép tính ghim `rule_version`** vào bản ghi kết quả (mục 16); định mức theo **thời điểm sự việc**; tính lại quá khứ dùng `recorded_at` (R-13) — ghi kết quả mới `supersedes_id`, không sửa |
 | Đóng kỳ | Theo mẫu mục 12: `POST …/periods/{id}/close` → 202 + job; worker-internal tính; ảnh chụp đầu vào bất biến; người đóng ≠ người lập bút toán điều chỉnh (R-56) |
-| Vai DB / nghiệp vụ | `costing_app` (mới) / `cost_accountant`, `period_closer` |
+| Quyết toán HTX | Theo prototype "phiếu mua rơm" PM-01..04: theo cuộn → ngay; theo tấn → chờ cân đủ; không hợp đồng → người xác nhận nhập giá; `cost_accountant` lập ≠ `chief_accountant` duyệt; một khoản phải trả, hạn 15 ngày (tạm) |
+| Sự kiện | Nội bộ `mkg.costing.period.closed` v1 → acctbridge, `mkg.costing.settlement.approved` v1, `mkg.costing.period_close.requested` v1 (job); nhận `weigh_ticket`, `reconciliation`, `roll_count`, `trip.completed`, `delivery.accepted`, `journal.pushed` |
+| Vai DB / nghiệp vụ | `costing_app` (G4-0, dbadmin) / `cost_accountant`, `period_closer`, `chief_accountant` |
 | R-10 | `agnofloat` đã áp `costing` |
-| Migration | G4 — cấp từ mkg 000013 |
+| Migration | mkg **000017** (sổ giá thành) + **000018** (kỳ, đóng kỳ, quyết toán) |
+| Port đóng băng (G4-0) | `costing/port`: `ClosedPeriods` → `PeriodSummary`, `CostCategory`, khóa tham số (chia carbon 45 % / 70-15-15 — tạm, chờ khách) |
 
 ### 5.7 `mkg/acctbridge` — bút toán tổng hợp → kế toán pháp định
 
@@ -254,23 +261,27 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 | Trách nhiệm | **Chỉ đẩy bút toán tổng hợp theo kỳ, một chiều, tần suất tháng** tới phần mềm kế toán pháp định (mua ngoài). Không đẩy giao dịch chi tiết (mục 16) |
 | Sổ | `summary_journal` (`period:<id>`: tài khoản, số tiền tổng, `source_hash` = băm tập kết quả costing đã tổng hợp), `push_attempt` (bảng vận hành) |
 | Luồng | Kỳ costing đã đóng → dựng bút toán tổng hợp (job, mẫu mục 12) → `chief_accountant` duyệt (≠ người dựng) → đẩy qua bộ điều hợp; lỗi → thử lại, DLQ, cảnh báo (R-62). Nhà cung cấp trong lãnh thổ (RB-7) |
-| Vai DB / nghiệp vụ | `acctbridge_app` (mới) / `accounting_bridge_operator`, `chief_accountant` |
-| Migration | G4 — cấp từ mkg 000013 |
+| Bộ điều hợp | `acctbridge/port.LedgerAdapter{Name; Push(ctx, SummaryJournal) (ExternalRef, error)}`; nhà cung cấp **chưa chốt** → G4 có bộ xuất tệp CSV/XML (tất định, SHA-256, kho đối tượng trong lãnh thổ) + bộ giả. Bảng ánh xạ tài khoản có phiên bản |
+| Sự kiện | Nội bộ `mkg.acctbridge.journal.pushed` v1 → costing; job `journal_build.requested`, `journal_push.requested`; nhận `mkg.costing.period.closed` |
+| Vai DB / nghiệp vụ | `acctbridge_app` (G4-0, dbadmin) / `accounting_bridge_operator`, `chief_accountant` |
+| Migration | mkg **000019** (schema ở 000014) |
 
 ### 5.8 Bảng tổng hợp cụm / vai / migration
 
-Số chính thức theo [g3-conventions §2](../dev/g3-conventions.md#2-số-migration) (người tích hợp cấp ở G3-0, 30/09/2026).
+Số chính thức theo [g3-conventions §2](../dev/g3-conventions.md#2-số-migration) (G3-0) và [g4-conventions §2](../dev/g4-conventions.md#2-số-migration) (G4-0, 30/09/2026).
 
 | Module | Schema | Vai DB | Migration | Có sẵn? |
 |---|---|---|---|---|
 | fieldops | `mkg_fieldops` | `fieldops_app` | 000001 (roll_count), **000006** (G3) | vai + 000001 đã có; `fieldops/port` (tên vai, sự kiện nội bộ, van dự thảo) đã có |
 | hub | `mkg_hub` | `hub_app` | **000002** (master, lô, mẻ, xuất, dịch chuyển), **000003** (sổ van), **000009** (G3: khối lượng từ phiếu cân, kiểm kê, `hub.risk.v2`) | 000002–000003 **đã làm** |
 | measurement | `mkg_measurement` + `ts_weigh` (cụm ts) | `measurement_app`, `ingest_mkg` (mkg); `ingest_ts`, `ts_reader` (ts) | **000007–000008** + ts **000001** | vai + ts 000001 + port đóng băng **đã có (G3-0)** |
-| logistics | `mkg_logistics` | `logistics_app` | G4 (từ 000013) | cần thêm vai |
-| orders | `mkg_orders` | `orders_app` | G4 (từ 000013) | cần thêm vai |
-| costing | `mkg_costing` | `costing_app` | G4 (từ 000013) | cần thêm vai |
-| acctbridge | `mkg_acctbridge` | `acctbridge_app` | G4 (từ 000013) | cần thêm vai |
-| dự phòng G3 | | | **000010–000012** | xin người tích hợp (000012: fieldops tổ gom, ngày gặt, hạn cuộn — nghiệm thu G3) |
+| logistics | `mkg_logistics` (+ `ts_fleet` cụm ts, tùy chọn) | `logistics_app` | **000015** (+ ts **000004**) | vai + schema (000014) + `logistics/port` **đã có (G4-0)** |
+| orders | `mkg_orders` | `orders_app` | **000016** | vai + schema + `orders/port` **đã có (G4-0)** |
+| costing | `mkg_costing` | `costing_app` | **000017–000018** | vai + schema + `costing/port` **đã có (G4-0)** |
+| acctbridge | `mkg_acctbridge` | `acctbridge_app` | **000019** | vai + schema + `acctbridge/port` **đã có (G4-0)** |
+| G4-0 | bốn schema trên | — | **000014** (chỉ schema + USAGE); pf **000046** (`waterway_routes`) | **đã có** |
+| dự phòng G4 | | | **000020–000021** (mkg), pf 000047 | xin người tích hợp |
+| G3 tích hợp / nghiệm thu / giám sát | | | **000010**, **000012**, **000013** (000011 bỏ trống) | **đã có** |
 | API nội bộ | `shared.idempotency_key` cụm mkg | `mkg_api` (tương đương `platform_api`) | — (quyền qua `ag_shared_user`, shared 000001) | **đã làm** — `cmd/api-internal/assembly.OpsRole` (Q-MKG-07 đóng) |
 | worker-internal | `shared.inbox` cụm mkg | `worker_internal` | — | **khung đã có (G3-0)**: `cmd/worker-internal`, vhost `mkg.internal` (ADR-0018) |
 
@@ -315,7 +326,8 @@ Số chính thức theo [g3-conventions §2](../dev/g3-conventions.md#2-số-mig
 | G2 đợt 2 | `pf/geo` tiêu thụ van (`HubSink`, inbox, mô hình đọc hub); vai `mkg_api` + `worker_internal` ở `dbadmin`; Compose/Helm cho `api-internal`; client OIDC dịch vụ cho tenant MKG; job chụp sức chứa định kỳ (Q-MKG-02) |
 | G3-0 (xong) | Cụm ts + `ts_weigh` (ADR-0017); vhost `mkg.internal`, `outbox.kind`, `//ag:internal-event`, `cmd/worker-internal` (ADR-0018); hợp đồng dây edge ↔ ingest + sổ thiết bị (ADR-0019); port đóng băng `measurement`, `fieldops`, `pf/metrics`; van dự thảo `collection_schedule`, `htx_collection_statement`, `mrv_collection_evidence`; vai DB G3 |
 | G3 | `mkg/measurement` + `cmd/ingest` + agent biên theo mẫu cân đã chốt (C-6); `mkg/fieldops` G3 (lệnh gom, app hiện trường MKG, xác nhận HTX); hub nhận khối lượng từ phiếu cân; cảm biến môi trường kho → điểm rủi ro có cảnh báo (`hub.risk.v2`); hợp đồng `collection_schedule`, `htx_collection_statement`, `mrv_collection_evidence` nếu được duyệt; `worker-internal` |
-| G4 | `mkg/logistics`, `mkg/orders`, `mkg/costing` (đóng kỳ theo mẫu mục 12), `mkg/acctbridge`; diễn tập dựng lại bảng chiếu trên bản sao dữ liệu thật (R-22); tách đơn vị triển khai bằng cấu hình; diễn tập tải ĐTK 2 |
+| G4-0 (xong, 30/09/2026) | [g4-conventions](../dev/g4-conventions.md): số migration (mkg 000014 schema, 000015 logistics, 000016 orders, 000017–000018 costing, 000019 acctbridge, 000020–000021 dự phòng; ts 000004 `ts_fleet`; pf 000046 `waterway_routes`, 000047 dự phòng); vai DB `logistics_app`, `orders_app`, `costing_app`, `acctbridge_app`; vai nghiệp vụ `dispatcher`, `driver`, `sales_officer`, `sales_approver`, `cost_accountant`, `period_closer`, `chief_accountant`, `accounting_bridge_operator`; port đóng băng bốn module; tám sự kiện nội bộ; bề mặt đối tác `/v1/partner/waterway/route` (đã hiện thực phía nền tảng); `agnofloat` phủ `mkg/logistics` |
+| G4 | `mkg/logistics`, `mkg/orders`, `mkg/costing` (đóng kỳ theo mẫu mục 12), `mkg/acctbridge`; diễn tập dựng lại bảng chiếu trên bản sao dữ liệu thật (R-22) và phục hồi; tách đơn vị triển khai bằng cấu hình; diễn tập tải ĐTK 2; Kubernetes trong lãnh thổ, phân vùng mạng ADR-0008, PKI nội bộ (agent hạ tầng). Nghiệm thu: [g4-acceptance](../uat/g4-acceptance.md) |
 
 ---
 

@@ -228,6 +228,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	}
 	ww := waterway.New(wwPool, clk, waterway.Deps{Params: md.Params(), Catalogs: md.Catalogs()})
 	g.UseWaterways(ww.Layer()) // GIS US-INT-02: lớp đường thủy của bản đồ chuẩn hóa
+	// G4-0 (ADR-0020): bề mặt đối tác /v1/partner/waterway/route cho mkg/logistics (loại waterway_routes).
+	ww.UseSharing(pty.PartnerAccess())
 
 	// pf/simulation: API ghi kịch bản/yêu cầu; worker dựng ảnh chụp qua SupplySource (pf/cropcycle
 	// + pf/party + pf/geo + pf/masterdata) và WaterwayRouter (pf/waterway); optimizer tính và nộp qua RegisterInternal.

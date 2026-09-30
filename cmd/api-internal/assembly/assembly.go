@@ -52,7 +52,12 @@ func (m Modules) List() []httpx.Module { return []httpx.Module{m.Hub, m.Measurem
 const OpsRole = "mkg_api"
 
 // Build mở pool theo vai của từng module và nối port giữa các module mkg.
-// Thêm mkg/fieldops, measurement, logistics, orders, costing, acctbridge ở đây.
+//
+// G4 (CHỖ NỐI — docs/dev/g4-conventions.md §6): logistics (logistics_app; WaterwayRoutes qua bề mặt
+// đối tác, cùng tài khoản dịch vụ AG_MKG_SA_* của fieldops), orders (orders_app), costing
+// (costing_app; đọc hub.LotOrigins, measurement.LotMass, logistics.Trips, orders.Deliveries/Contracts),
+// acctbridge (acctbridge_app; costing.ClosedPeriods, LedgerAdapter theo AG_ACCTBRIDGE_ADAPTER). Thêm
+// trường vào Modules và List theo thứ tự phụ thuộc: logistics, orders → costing → acctbridge.
 //
 // ops là pool của vai OpsRole cho idempotency (cũng nằm trong pools để /readyz kiểm).
 func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules, ops *pgxpool.Pool, pools []*pgxpool.Pool, err error) {

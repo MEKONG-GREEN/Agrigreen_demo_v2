@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events-internal/mkg.acctbridge.journal.pushed/v1",
+  "title": "mkg.acctbridge.journal.pushed — payload (sự kiện NỘI BỘ MKG)",
+  "description": "Bút toán tổng hợp của một kỳ đã được phần mềm kế toán pháp định nhận (một chiều, tần suất tháng, mục 16). source_hash = result_set_sha256 của kỳ costing. Chỉ vhost mkg.internal — bút toán KHÔNG BAO GIỜ qua van. Người nhận: mkg/costing (kỳ → posted).",
+  "x-event-type": "mkg.acctbridge.journal.pushed",
+  "x-schema-version": 1,
+  "x-producer": "mkg/acctbridge",
+  "x-kind": "internal",
+  "type": "object",
+  "required": [
+    "journal_id",
+    "period_id",
+    "period_code",
+    "close_run_id",
+    "source_hash",
+    "adapter",
+    "external_ref",
+    "line_count",
+    "total_debit",
+    "total_credit",
+    "attempt",
+    "mapping_version",
+    "pushed_at",
+    "event_time"
+  ],
+  "properties": {
+    "journal_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "period_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "period_code": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}$"
+    },
+    "close_run_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "source_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "adapter": {
+      "type": "string"
+    },
+    "external_ref": {
+      "type": "string"
+    },
+    "line_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "total_debit": {
+      "type": "string",
+      "pattern": "^-?[0-9]+\\.[0-9]{2}$"
+    },
+    "total_credit": {
+      "type": "string",
+      "pattern": "^-?[0-9]+\\.[0-9]{2}$"
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "mapping_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "pushed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

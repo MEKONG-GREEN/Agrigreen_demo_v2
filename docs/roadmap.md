@@ -147,8 +147,35 @@ G3-0, G3-1 và G3-2 đã có mã, sớm hơn mốc Q3/2027. Đối chiếu yêu 
 | — | Số ngày lưu, nén, lưu trữ của nhật ký lớp GIS và ảnh chụp (GIS FN-21; HTML prototype ghi 365 ngày sự kiện, 90 ngày ảnh chụp) và của số đo thô | A6, A8 |
 | Q2-05 | Ngưỡng sản lượng theo giống | A6 chỉ số, cảnh báo cropcycle |
 
-## G4–G6
+## G4: Q2/2028
+
+Phụ lục A: Kubernetes được quản trị; diễn tập tải ĐTK 2; tách đơn vị triển khai bằng cấu hình; dựng lại bảng chiếu; phục hồi. Thêm vào đó là bốn module còn lại của vùng mkg (`mkg/logistics`, `mkg/orders`, `mkg/costing` có đóng kỳ, `mkg/acctbridge`) và hai dòng "ngoài G3 → G4" (proto FM-05, phiếu nhận ↔ đơn mua > 3 %). Quy ước, số migration, vai, sự kiện, tham số tạm: [docs/dev/g4-conventions.md](dev/g4-conventions.md). Nghiệm thu: [docs/uat/g4-acceptance.md](uat/g4-acceptance.md).
+
+### G4-0: nền móng và hợp đồng đóng băng (30/09/2026, xong)
+
+- [x] Số migration: mkg 000014 (schema bốn module, đã có), 000015 logistics, 000016 orders, 000017–000018 costing, 000019 acctbridge, 000020–000021 dự phòng; ts 000004 `ts_fleet` (tùy chọn; `ts_env` chuyển sang 000005+); pf 000046 `waterway_routes` (đã có), 000047 dự phòng.
+- [x] Vai DB `logistics_app`, `orders_app`, `costing_app`, `acctbridge_app` (dbadmin + PgBouncer CI/Compose); vai nghiệp vụ `dispatcher`, `driver`, `sales_officer`, `sales_approver`, `cost_accountant`, `period_closer`, `chief_accountant`, `accounting_bridge_operator` (hằng `port/` + realm).
+- [x] Port đóng băng: `logistics/port` (`Trips`, `WaterwayRoutes`, `RoadRoutes`), `orders/port` (`Deliveries`, `Contracts`), `costing/port` (`ClosedPeriods`), `acctbridge/port` (`LedgerAdapter`). Tám sự kiện nội bộ: `trip.completed`, `delivery.accepted`, `period.closed`, `settlement.approved`, `journal.pushed` và ba sự kiện job.
+- [x] Bề mặt đối tác `GET/POST /v1/partner/waterway/route` (loại cấp quyền `waterway_routes`, ADR-0020) — **đã hiện thực phía nền tảng** (`pf/waterway` + `pf/party`, sổ đọc).
+- [x] `agnofloat` phủ `mkg/logistics` (costing, orders, acctbridge đã phủ theo tên).
+
+### G4-1: module và client (song song, theo hợp đồng G4-0)
+
+| Đợt | Nội dung | Migration |
+|---|---|---|
+| **L** `mkg/logistics` | Chuyến, chặng, mốc; FM-05 (xuống ghe → chuyến), GH-01..03 (danh mục ghe, đăng kiểm chỉ cảnh báo, cước thuê ghe); định tuyến qua `/v1/partner/waterway/route` lưu nguyên văn; đóng chuyến bằng phiếu cân; `trip.completed` | mkg 000015 (+ ts 000004) |
+| **O** `mkg/orders` | Hợp đồng mua rơm CT-01..03, đơn mua + phiếu nhận (> 3 % cảnh báo), đơn bán, giao nhận ↔ `CUSTOMER_IN`, duyệt giá R-56; `delivery.accepted` | mkg 000016 |
+| **C** `mkg/costing` | Sổ giá thành mức B, quy đổi cuộn → tấn, phân bổ đa chặng, quy kết hao hụt theo tỷ lệ nguồn, kỳ + đóng kỳ (202 + job), quyết toán HTX PM-01..04, chia carbon; `period.closed`, `settlement.approved` | mkg 000017–000018 |
+| **A** `mkg/acctbridge` | Bút toán tổng hợp theo kỳ, ánh xạ tài khoản có phiên bản, duyệt R-56, bộ xuất tệp CSV/XML + bộ giả, thử lại + DLQ; `journal.pushed` | mkg 000019 |
+| **W** web nội bộ + app | `apps/web-internal`: chuyến, đơn, kỳ, quyết toán, bút toán; app tài xế/chủ ghe (mốc chuyến) | — |
+| **H** hạ tầng (song song) | Kubernetes trong lãnh thổ, namespace theo vùng + NetworkPolicy mặc định từ chối (ADR-0008, R-81), PKI nội bộ mTLS; tách đơn vị triển khai bằng cấu hình | — |
+| **E** E2E + diễn tập | Kịch bản ruộng → ghe → hub → khách → giá thành → đóng kỳ → bút toán; diễn tập R-22 trên bản sao ẩn danh; diễn tập tải ĐTK 2; diễn tập phục hồi | dự phòng mkg 000020–000021 |
+
+### Trạng thái G4 (30/09/2026)
+
+G4-0 xong: nền móng, hợp đồng đóng băng, bề mặt đối tác định tuyến đường thủy. Chưa có mã module G4. Mọi dòng của [g4-acceptance.md](uat/g4-acceptance.md) đang "chưa làm". Câu hỏi khách mới: nhà cung cấp phần mềm kế toán + chế độ kế toán; khóa phân bổ chi phí; công thức giá quyết toán; tỷ lệ chia doanh thu carbon; ngưỡng duyệt giá/chiết khấu; quy đổi ẩm (C-4).
+
+## G5–G6
 Theo Phụ lục A của tài liệu kiến trúc:
-- **G4 (Q2/2028):** Kubernetes trong lãnh thổ.
 - **G5 (Q4/2028):** Public API và metering.
 - **G6 (Q1/2029):** cấu hình Phase 1, không sửa mã.

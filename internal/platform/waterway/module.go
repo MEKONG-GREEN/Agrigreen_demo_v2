@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/port"
@@ -42,6 +43,10 @@ type Module struct{ svc *app.Service }
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 	return &Module{svc: &app.Service{DB: db, Read: deps.Read, Clock: clk, Params: deps.Params, Catalogs: deps.Catalogs}}
 }
+
+// UseSharing nối cổng cấp quyền chia sẻ của pf/party (ADR-0020): bề mặt đối tác
+// /v1/partner/waterway/route cho mkg/logistics (loại waterway_routes, G4-0).
+func (m *Module) UseSharing(pa partyport.PartnerAccess) { m.svc.Sharing = pa }
 
 // RegisterApp gắn route Application API.
 func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterApp(rg) }

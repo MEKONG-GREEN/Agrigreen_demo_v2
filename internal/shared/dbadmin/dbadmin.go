@@ -94,6 +94,12 @@ var Roles = []Role{
 	{Name: "ts_reader", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.TS}},
 	// pf/metrics: định nghĩa chỉ số, giá trị theo ngày, ảnh chụp + watermark, nhật ký lớp (GIS FN-18..21).
 	{Name: "metrics_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
+	// G4 (docs/dev/g4-conventions.md §3): bốn module mkg mới — mỗi module một vai, chỉ CONNECT ag_mkg;
+	// schema + USAGE do mkg 000014 tạo, bảng và GRANT do migration của từng module.
+	{Name: "logistics_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
+	{Name: "orders_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
+	{Name: "costing_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
+	{Name: "acctbridge_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
 	// sql_exporter (mục 19): chỉ EXECUTE hàm gộp trong schema mkg_monitor / ts_monitor — không SELECT bảng
 	// gốc, không thuộc ag_shared_user, NOBYPASSRLS (deploy/observability/sql-exporter).
 	{Name: MKGMonitor, Login: true, Clusters: []migrations.Cluster{migrations.MKG}},

@@ -27,6 +27,9 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/waterway/segments", h.layer)
 	rg.GET("/waterway/routes", h.route)
 	rg.GET("/waterway/networks/current", h.current)
+	// Bề mặt đối tác (ADR-0020, G4-0): vai mkg_sync + cấp quyền waterway_routes.
+	rg.GET("/partner/waterway/route", h.partnerRouteGet)
+	rg.POST("/partner/waterway/route", h.partnerRoutePost)
 }
 
 // RegisterAdmin gắn route Admin API (MFA bắt buộc): vẽ/sửa mạng, dựng, phát hành.

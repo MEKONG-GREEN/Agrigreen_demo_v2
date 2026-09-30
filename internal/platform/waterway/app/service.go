@@ -14,6 +14,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -47,6 +48,9 @@ type Service struct {
 	Clock    clock.Clock
 	Params   mdport.Params
 	Catalogs mdport.Catalogs
+	// Sharing (G4-0): cổng cấp quyền chia sẻ của pf/party cho bề mặt đối tác
+	// /v1/partner/waterway/route (loại waterway_routes, ADR-0020). Nil → 403 party.share_grant_missing.
+	Sharing partyport.PartnerAccess
 }
 
 func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) error {

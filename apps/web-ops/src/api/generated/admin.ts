@@ -3775,7 +3775,7 @@ export interface components {
             bound_at: string;
         };
         /** @enum {string} */
-        ShareKind: "cooperative_directory" | "plot_directory" | "season_harvest_dates" | "htx_collection_responses" | "valve_hub" | "valve_collection" | "valve_mrv_evidence";
+        ShareKind: "cooperative_directory" | "plot_directory" | "season_harvest_dates" | "htx_collection_responses" | "waterway_routes" | "valve_hub" | "valve_collection" | "valve_mrv_evidence";
         ShareGrant: {
             /** Format: uuid */
             id: string;

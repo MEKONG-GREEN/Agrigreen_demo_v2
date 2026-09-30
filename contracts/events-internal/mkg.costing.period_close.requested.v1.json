@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events-internal/mkg.costing.period_close.requested/v1",
+  "title": "mkg.costing.period_close.requested — payload (sự kiện NỘI BỘ MKG)",
+  "description": "Yêu cầu đóng kỳ theo mẫu mục 12: API đã ghi ảnh chụp đầu vào bất biến + job cùng giao dịch và trả 202 + job_id. Worker-internal (consumer mkg.costing.period_close) nạp ảnh chụp từ bảng job, KHÔNG từ sự kiện. Chỉ vhost mkg.internal.",
+  "x-event-type": "mkg.costing.period_close.requested",
+  "x-schema-version": 1,
+  "x-producer": "mkg/costing",
+  "x-kind": "internal",
+  "type": "object",
+  "required": [
+    "job_id",
+    "period_id",
+    "requested_by",
+    "requested_at"
+  ],
+  "properties": {
+    "job_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "period_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "requested_by": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "requested_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

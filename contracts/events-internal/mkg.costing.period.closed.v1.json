@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events-internal/mkg.costing.period.closed/v1",
+  "title": "mkg.costing.period.closed — payload (sự kiện NỘI BỘ MKG)",
+  "description": "Một kỳ giá thành (tháng) đóng xong theo mẫu mục 12: ảnh chụp đầu vào bất biến (input_snapshot_sha256), tập kết quả tổng hợp (result_set_sha256 = source_hash của bút toán tổng hợp). Kỳ đã đóng không mở lại. Chỉ vhost mkg.internal — giá thành KHÔNG BAO GIỜ qua van. Người nhận: mkg/acctbridge (dựng bút toán tổng hợp; chi tiết đọc qua costing/port.ClosedPeriods).",
+  "x-event-type": "mkg.costing.period.closed",
+  "x-schema-version": 1,
+  "x-producer": "mkg/costing",
+  "x-kind": "internal",
+  "type": "object",
+  "required": [
+    "period_id",
+    "period_code",
+    "from",
+    "to",
+    "close_run_id",
+    "input_snapshot_sha256",
+    "result_set_sha256",
+    "line_count",
+    "closed_by",
+    "rule_version",
+    "event_time"
+  ],
+  "properties": {
+    "period_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "period_code": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}$"
+    },
+    "from": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "to": {
+      "type": "string",
+      "format": "date-time",
+      "description": "độc quyền"
+    },
+    "close_run_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "input_snapshot_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "result_set_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "line_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "closed_by": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "rule_version": {
+      "type": "string"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

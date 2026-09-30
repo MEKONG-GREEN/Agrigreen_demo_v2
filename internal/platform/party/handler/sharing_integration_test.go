@@ -239,3 +239,32 @@ func TestShareGrantorAmbiguous_ADR0020(t *testing.T) {
 		t.Fatalf("bên cấp thứ nhất chưa có HTX: %v", r.body)
 	}
 }
+
+// G4-0 (pf 000046, proto FM-05): loại waterway_routes đề xuất, duyệt được qua sổ thật (CHECK DB mở rộng)
+// và bên nhận thấy loại này trong /v1/partner/grants; loại lạ vẫn bị CHECK DB chặn.
+func TestShareGrantWaterwayRoutesKind_G4(t *testing.T) {
+	f := newFixture(t)
+	mkg := ids.New()
+	a, b := f.as(f.tenant, uuid.Nil, authz.RolePlatformAdmin), f.as(f.tenant, uuid.Nil, authz.RolePlatformAdmin)
+	r := a.adminDo(http.MethodPost, "/v1/share-grants", proposal(mkg, port.KindWaterwayRoutes))
+	wantStatus(t, r, http.StatusCreated, "đề xuất waterway_routes")
+	wantStatus(t, b.adminDo(http.MethodPost, "/v1/share-grants/"+str(r.body, "id")+"/approve", nil), http.StatusCreated, "duyệt")
+	g := f.as(mkg, uuid.Nil, port.RolePartnerSync).appDo(http.MethodGet, "/v1/partner/grants", nil)
+	it := items(g)
+	if len(it) != 1 {
+		t.Fatalf("cấp quyền bên nhận: %v", g.body)
+	}
+	if k, _ := it[0]["kinds"].([]any); len(k) != 1 || k[0] != port.KindWaterwayRoutes {
+		t.Fatalf("loại: %v", it[0])
+	}
+	err := tenant.WithTenantTx(context.Background(), f.pool, f.tenant, func(tx pgx.Tx) error {
+		_, e := tx.Exec(context.Background(), `INSERT INTO pf_party.share_grant_event (id, tenant_id, stream_key, grant_id, action, grantee_tenant_id,
+		    kinds, purpose, valid_from, valid_to, proposed_by, event_time, actor_ref, idem_key, rule_version)
+		  VALUES ($1, $2, 'grant:y', $3, 'proposed', $4, ARRAY['road_routes'], 'Loại lạ phải bị CHECK chặn', now(), now() + interval '1 day',
+		    $5, now(), $5, $6, 'test')`, ids.New(), f.tenant, ids.New(), mkg, a.actor, "test:"+ids.New().String())
+		return e
+	})
+	if err == nil {
+		t.Fatal("CHECK DB phải chặn loại dữ liệu lạ")
+	}
+}

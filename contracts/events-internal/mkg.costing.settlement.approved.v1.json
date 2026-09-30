@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events-internal/mkg.costing.settlement.approved/v1",
+  "title": "mkg.costing.settlement.approved — payload (sự kiện NỘI BỘ MKG)",
+  "description": "Quyết toán mua rơm của một HTX được duyệt (người duyệt ≠ người lập, R-56) — hoặc quyết toán điều chỉnh (supersedes_id). Theo tấn: chỉ khi mọi ghe đã cân; theo cuộn: số cuộn × đơn giá; không hợp đồng → người xác nhận nhập giá (proto PM-01..04). Ghi đúng một khoản phải trả, hạn thanh toán tạm 15 ngày. Chỉ vhost mkg.internal — giá, số tiền KHÔNG BAO GIỜ qua van. Người nhận: chưa có consumer bắt buộc ở G4-0.",
+  "x-event-type": "mkg.costing.settlement.approved",
+  "x-schema-version": 1,
+  "x-producer": "mkg/costing",
+  "x-kind": "internal",
+  "type": "object",
+  "required": [
+    "settlement_id",
+    "htx_ref",
+    "basis",
+    "unit_price",
+    "amount",
+    "due_on",
+    "prepared_by",
+    "approved_by",
+    "rule_version",
+    "event_time"
+  ],
+  "properties": {
+    "settlement_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "period_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "htx_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "collection_order_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "contract_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "basis": {
+      "type": "string",
+      "enum": [
+        "per_tonne",
+        "per_bale"
+      ]
+    },
+    "rolls": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "mass_kg": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]+\\.[0-9]{3}$"
+    },
+    "unit_price": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]{4}$"
+    },
+    "amount": {
+      "type": "string",
+      "pattern": "^-?[0-9]+\\.[0-9]{2}$"
+    },
+    "due_on": {
+      "type": "string",
+      "format": "date"
+    },
+    "prepared_by": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "approved_by": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "rule_version": {
+      "type": "string"
+    },
+    "supersedes_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

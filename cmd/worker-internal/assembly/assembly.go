@@ -78,6 +78,14 @@ func buildMeasurementRollCount(clk clock.Clock, pool PoolFor) (inbox.Handler, er
 //   - mkg.hub.weigh_ticket   ← mkg.measurement.weigh_ticket.recorded (Q-MKG-04: khối lượng lô HUB_IN, gắn HUB_OUT ↔ phiếu xuất);
 //   - mkg.hub.roll_count     ← mkg.fieldops.roll_count.recorded (hàng dự kiến về);
 //   - mkg.hub.reconciliation ← mkg.measurement.reconciliation.completed (quy kết hao hụt theo cơ sở).
+//
+// G4 (CHỖ NỐI — docs/dev/g4-conventions.md §4; tên hàng đợi và sự kiện là hằng trong port/ của
+// module, đóng băng ở G4-0). Agent module thêm dòng của mình vào danh sách dưới khi module tồn tại:
+//   - logistics_app:  logport.RollCountConsumer ← roll_count.recorded (FM-05), logport.WeighTicketConsumer ← weigh_ticket.recorded;
+//   - orders_app:     ordport.WeighTicketConsumer ← weigh_ticket.recorded (CUSTOMER_IN → giao nhận; HUB_IN → nhận hàng ↔ đơn mua);
+//   - costing_app:    costport.{WeighTicket,Reconciliation,RollCount,Trip,Delivery,JournalPushed}Consumer,
+//     costport.PeriodCloseConsumer ← period_close.requested (job đóng kỳ, mẫu mục 12);
+//   - acctbridge_app: abport.PeriodClosedConsumer ← period.closed, abport.JournalBuildConsumer, abport.JournalPushConsumer.
 var Consumers = []Consumer{
 	{Name: hubport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Role: hub.DBRole,
 		Build: func(clk clock.Clock) inbox.Handler { return hub.NewConsumers(clk).WeighTicket() }},

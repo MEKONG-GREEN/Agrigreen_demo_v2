@@ -29,6 +29,10 @@ func TestNoFloat(t *testing.T) {
 	analysistest.Run(t, analysistest.TestData(), NoFloat,
 		"example.com/ag/internal/mkg/costing",
 		"example.com/ag/internal/mkg/hub",
+		// G4-0: bốn module mkg mới — logistics theo vùng, orders/acctbridge theo tên đoạn (kể cả package con).
+		"example.com/ag/internal/mkg/logistics/app",
+		"example.com/ag/internal/mkg/orders/domain",
+		"example.com/ag/internal/mkg/acctbridge/adapter",
 		"example.com/ag/internal/platform/beta/free",
 	)
 }

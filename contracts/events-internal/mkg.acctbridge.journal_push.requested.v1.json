@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events-internal/mkg.acctbridge.journal_push.requested/v1",
+  "title": "mkg.acctbridge.journal_push.requested — payload (sự kiện NỘI BỘ MKG)",
+  "description": "Yêu cầu đẩy một bút toán tổng hợp ĐÃ DUYỆT (chief_accountant ≠ người dựng) qua bộ điều hợp phần mềm kế toán. Thử lại = job mới, cùng khóa idempotency của bút toán. Chỉ vhost mkg.internal.",
+  "x-event-type": "mkg.acctbridge.journal_push.requested",
+  "x-schema-version": 1,
+  "x-producer": "mkg/acctbridge",
+  "x-kind": "internal",
+  "type": "object",
+  "required": [
+    "job_id",
+    "journal_id",
+    "attempt",
+    "requested_by",
+    "requested_at"
+  ],
+  "properties": {
+    "job_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "journal_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "requested_by": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "requested_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events-internal/mkg.acctbridge.journal_build.requested/v1",
+  "title": "mkg.acctbridge.journal_build.requested — payload (sự kiện NỘI BỘ MKG)",
+  "description": "Yêu cầu dựng bút toán tổng hợp của một kỳ costing đã đóng (mẫu mục 12). Worker-internal (consumer mkg.acctbridge.journal_build) nạp ảnh chụp (PeriodSummary + bảng ánh xạ tài khoản có phiên bản) từ bảng job. Chỉ vhost mkg.internal.",
+  "x-event-type": "mkg.acctbridge.journal_build.requested",
+  "x-schema-version": 1,
+  "x-producer": "mkg/acctbridge",
+  "x-kind": "internal",
+  "type": "object",
+  "required": [
+    "job_id",
+    "period_id",
+    "close_run_id",
+    "requested_by",
+    "requested_at"
+  ],
+  "properties": {
+    "job_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "period_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "close_run_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "requested_by": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "requested_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

@@ -3423,6 +3423,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/partner/waterway/route": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Định tuyến đường thủy trên mạng đã phát hành của tenant bên cấp (loại waterway_routes, proto FM-05, ADR-0020)
+         * @description Cho mkg/logistics (G4): chuyến vận tải thủy của MKG định tuyến trên mạng pf/waterway CÓ PHIÊN BẢN của tenant chương
+         *     trình. Kiểm cấp quyền `waterway_routes` rồi mới định tuyến ở tenant bên cấp (RLS, không BYPASSRLS); tham số (bán kính
+         *     tiếp cận, hệ số Haversine #10) là của bên cấp. Ghi một dòng `partner_read_log` trước khi trả (lỗi → 503). Chỉ hạ tầng:
+         *     hình học, km, nguồn tính, phiên bản mạng, đoạn, ràng buộc tải trọng — không dữ liệu cá nhân. MKG lưu bền vững kết quả
+         *     đã dùng vào chặng (mục 16). Không có đường thủy → `found = false`, Haversine × hệ số kèm `reason`.
+         */
+        get: operations["routePartnerWaterway"];
+        put?: never;
+        /**
+         * Định tuyến đường thủy qua dãy điểm (chuyến nhiều điểm dừng) ở tenant bên cấp (loại waterway_routes, ADR-0020)
+         * @description Chỉ đọc, nhưng là POST (thân có dãy điểm) nên bắt buộc `Idempotency-Key` (R-51): gọi lặp cùng khóa trả lại đúng kết quả
+         *     đầu. Một chặng cho mỗi cặp điểm liên tiếp, cùng một phiên bản mạng. 2–25 điểm.
+         */
+        post: operations["routePartnerWaterwayPoints"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/gis/replay": {
         parameters: {
             query?: never;
@@ -6733,11 +6762,52 @@ export interface components {
             id: string;
             /** Format: uuid */
             grantor_tenant_id: string;
-            kinds: ("cooperative_directory" | "plot_directory" | "season_harvest_dates" | "htx_collection_responses" | "valve_hub" | "valve_collection" | "valve_mrv_evidence")[];
+            kinds: ("cooperative_directory" | "plot_directory" | "season_harvest_dates" | "htx_collection_responses" | "waterway_routes" | "valve_hub" | "valve_collection" | "valve_mrv_evidence")[];
             /** Format: date-time */
             valid_from: string;
             /** Format: date-time */
             valid_to: string;
+        };
+        PartnerWaterwayPoint: {
+            lat: number;
+            lng: number;
+        };
+        PartnerWaterwayRouteRequest: {
+            points: components["schemas"]["PartnerWaterwayPoint"][];
+            min_load_tons?: string | null;
+            /** @description Ghim phiên bản mạng; vắng = phiên bản đang phát hành */
+            version?: number | null;
+        };
+        PartnerWaterwayLeg: {
+            from: components["schemas"]["PartnerWaterwayPoint"];
+            to: components["schemas"]["PartnerWaterwayPoint"];
+            found: boolean;
+            /** @description km, 3 chữ số thập phân, gồm chặng tiếp cận */
+            distance_km: string;
+            access_km: string;
+            /** @enum {string} */
+            source: "routed" | "digitised" | "haversine";
+            geometry: components["schemas"]["WaterwayLine"] | null;
+            segment_refs: string[];
+            limiting: components["schemas"]["WaterwayLimiting"] | null;
+            reason: string | null;
+        };
+        /** @description Kết quả định tuyến cho bên nhận (ADR-0020) — hạ tầng, không dữ liệu cá nhân. MKG lưu nguyên văn vào chặng (mục 16). */
+        PartnerWaterwayRoute: {
+            /** Format: uuid */
+            grantor_tenant_id: string;
+            /** @description null = bên cấp chưa phát hành mạng (mọi chặng Haversine) */
+            network_version: number | null;
+            /** @description mọi chặng đều có đường thủy */
+            found: boolean;
+            distance_km: string;
+            /**
+             * @description nguồn yếu nhất trong các chặng
+             * @enum {string}
+             */
+            source: "routed" | "digitised" | "haversine";
+            limiting: components["schemas"]["WaterwayLimiting"] | null;
+            legs: components["schemas"]["PartnerWaterwayLeg"][];
         };
         /** @description HTX cho bên nhận — không người đại diện, không mã số thuế, không nông hộ */
         PartnerCooperative: {
@@ -13590,6 +13660,81 @@ export interface operations {
                 };
             };
             403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    routePartnerWaterway: {
+        parameters: {
+            query: {
+                /**
+                 * @description Tenant BÊN CẤP (ADR-0020) — không phải tenant người gọi (tenant người gọi luôn lấy từ token, R-16). Vắng mặt → chỉ nhận
+                 *     khi đúng một bên cấp có loại dữ liệu này (nhiều bên cấp → 422 party.share_grantor_ambiguous).
+                 */
+                grantor?: components["parameters"]["PartnerGrantor"];
+                /** @description lat,lng */
+                from: string;
+                /** @description lat,lng */
+                to: string;
+                min_load_tons?: string;
+                /** @description Ghim phiên bản mạng; vắng = phiên bản đang phát hành */
+                version?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả định tuyến (một chặng) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerWaterwayRoute"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    routePartnerWaterwayPoints: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Tenant BÊN CẤP (ADR-0020) — không phải tenant người gọi (tenant người gọi luôn lấy từ token, R-16). Vắng mặt → chỉ nhận
+                 *     khi đúng một bên cấp có loại dữ liệu này (nhiều bên cấp → 422 party.share_grantor_ambiguous).
+                 */
+                grantor?: components["parameters"]["PartnerGrantor"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PartnerWaterwayRouteRequest"];
+            };
+        };
+        responses: {
+            /** @description Kết quả định tuyến (mỗi cặp điểm một chặng) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerWaterwayRoute"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };

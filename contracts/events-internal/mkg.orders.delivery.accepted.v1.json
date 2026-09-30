@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events-internal/mkg.orders.delivery.accepted/v1",
+  "title": "mkg.orders.delivery.accepted — payload (sự kiện NỘI BỘ MKG)",
+  "description": "Giao nhận cho khách được chấp nhận: biên bản giao nhận liên kết phiếu cân CUSTOMER_IN của mkg/measurement (căn cứ khối lượng), hoặc bản bù (supersedes_id). Chỉ vhost mkg.internal (ADR-0018) — giá bán, khách, điều khoản KHÔNG BAO GIỜ qua van. Người nhận: mkg/costing (doanh thu, khối lượng giao theo lô).",
+  "x-event-type": "mkg.orders.delivery.accepted",
+  "x-schema-version": 1,
+  "x-producer": "mkg/orders",
+  "x-kind": "internal",
+  "type": "object",
+  "required": [
+    "delivery_id",
+    "order_ref",
+    "customer_ref",
+    "route",
+    "customer_in_ticket_ref",
+    "lots",
+    "accepted_kg",
+    "unit_price",
+    "amount",
+    "accepted_at",
+    "rule_version",
+    "event_time"
+  ],
+  "properties": {
+    "delivery_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "order_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "customer_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "route": {
+      "type": "string",
+      "enum": [
+        "HUB",
+        "DIRECT"
+      ]
+    },
+    "trip_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "customer_in_ticket_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "lots": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "lot_ref",
+          "mass_kg"
+        ],
+        "properties": {
+          "lot_ref": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mass_kg": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]{3}$"
+          }
+        }
+      }
+    },
+    "accepted_kg": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]{3}$"
+    },
+    "unit_price": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]{4}$",
+      "description": "VND/tấn numeric(18,4)"
+    },
+    "amount": {
+      "type": "string",
+      "pattern": "^-?[0-9]+\\.[0-9]{2}$",
+      "description": "VND numeric(18,2)"
+    },
+    "dispute_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "accepted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "rule_version": {
+      "type": "string"
+    },
+    "supersedes_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "evidence": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "file_ref",
+        "kind"
+      ],
+      "properties": {
+        "file_ref": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "epod",
+            "minutes",
+            "ebill"
+          ]
+        }
+      }
+    }
+  }
+}

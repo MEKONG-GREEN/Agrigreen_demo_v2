@@ -68,12 +68,12 @@ Chỉ dùng số đã cấp. Số trống có thể còn lại giữa các kho�
 | mkg | 000011 | **dự phòng** G3 — xin người tích hợp | | |
 | mkg | 000012 | Nghiệm thu G3 (proto FM-01/02/06/07/08): sổ tổ gom `crew_event`/`crew_current`, phân công có năng lực `crew_assignment(_current)`, kiểm ngày gặt `roll_count_harvest`, bảng đệm ngày gặt `order_plot_harvest_current`, tham số có phiên bản `param_version`/`param_current` (`baling_deadline_days`, mặc định 3 — tạm, chờ khách) | `mkg_fieldops` | `fieldops_app` |
 | mkg | 000013 | giám sát vận hành: schema `mkg_monitor`, hàm gộp SECURITY DEFINER cho sql_exporter (mục 19) | `mkg_monitor` | `mkg_monitor` (EXECUTE), chủ hàm `mkg_monitor_owner` |
-| ts | 000004+ | **dự phòng** `ts_env`: cảm biến kho, telemetry phương tiện | `ts_env` | xin khi làm |
-| ts | 000003 | giám sát vận hành: schema `ts_monitor`, hàm gộp SECURITY DEFINER (`ts_env` chuyển sang ts 000004 trở đi) | `ts_monitor` | `ts_monitor` (EXECUTE), chủ hàm `ts_monitor_owner` |
+| ts | 000004 | **cấp cho G4** (`ts_fleet`, telemetry phương tiện — [g4-conventions §2](g4-conventions.md#2-số-migration)); `ts_env` (cảm biến kho) chuyển sang ts 000005+ | `ts_fleet` | `ingest_ts`, `ts_reader` |
+| ts | 000003 | giám sát vận hành: schema `ts_monitor`, hàm gộp SECURITY DEFINER (`ts_env` chuyển sang ts 000005 trở đi — G4-0) | `ts_monitor` | `ts_monitor` (EXECUTE), chủ hàm `ts_monitor_owner` |
 | pf | 000045 | mrv cảnh báo: sổ `pf_mrv.alert` (KN US-MRV-04, US-MRV-06, FR-08), loại thông báo `mrv_*` của `pf_notify` | `pf_mrv`, `pf_notify` | `mrv_app` (+ `ag_outbox_publisher` hai cột `evidence_current`) |
 
 - `pf` 000030–000035 và `mkg` 000004–000005 để dành cho phần còn lại của G2; G3 không dùng.
-- Module G4 (`logistics`, `orders`, `costing`, `acctbridge`) sẽ được cấp số từ 000013 cụm mkg ([mkg.md §5.8](../design/mkg.md#58-bảng-tổng-hợp-cụm--vai--migration)).
+- Module G4 (`logistics`, `orders`, `costing`, `acctbridge`) dùng mkg 000014–000021, ts 000004, pf 000046–000047 — [g4-conventions §2](g4-conventions.md#2-số-migration) (G4-0).
 - Migration cụm `ts` **không** được tham chiếu schema `pf_*`, `mkg_*`, `vault` (R-07) và **không** dùng `timescaledb`. `migratecheck` cưỡng chế cả hai điều này, và cũng đòi mọi thư mục cụm có trong `//go:embed` của `migrations/embed.go`.
 
 ## 3. Vai

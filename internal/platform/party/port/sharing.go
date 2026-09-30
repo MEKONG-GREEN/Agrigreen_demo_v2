@@ -31,14 +31,19 @@ const (
 	KindPlotDirectory          = "plot_directory"           // thửa: hình học, diện tích, xã, HTX, trạng thái — không nông hộ
 	KindSeasonHarvestDates     = "season_harvest_dates"     // vụ: ngày gieo, ngày thu hoạch dự kiến/mở (proto FM-01/02)
 	KindHTXCollectionResponses = "htx_collection_responses" // phản hồi của HTX với bảng kê thu gom (RB-6 chiều mua)
+	// KindWaterwayRoutes (G4-0, pf 000046): định tuyến trên mạng đường thủy đã phát hành của bên cấp
+	// (pf/waterway) cho chuyến vận tải thủy của mkg/logistics (proto FM-05) — hình học, km, phiên bản
+	// mạng, ràng buộc tải trọng; không dữ liệu cá nhân.
+	KindWaterwayRoutes = "waterway_routes"
 	// Bên nhận → nền tảng (van công bố ghi vào tenant bên cấp).
 	KindValveHub         = "valve_hub"          // hub_facility, hub_capacity → pf/geo hub_view
 	KindValveCollection  = "valve_collection"   // collection_schedule, htx_collection_statement → pf/cropcycle
 	KindValveMRVEvidence = "valve_mrv_evidence" // mrv_collection_evidence → pf/mrv
 )
 
-// ShareKinds là mọi loại hợp lệ (khớp CHECK của migration pf 000042).
+// ShareKinds là mọi loại hợp lệ (khớp CHECK của migration pf 000042, mở rộng ở pf 000046).
 var ShareKinds = []string{KindCooperativeDirectory, KindPlotDirectory, KindSeasonHarvestDates, KindHTXCollectionResponses,
+	KindWaterwayRoutes,
 	KindValveHub, KindValveCollection, KindValveMRVEvidence}
 
 // ValidKind cho biết k có là loại dữ liệu của cấp quyền.

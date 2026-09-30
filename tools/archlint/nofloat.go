@@ -14,13 +14,15 @@ var floatFreeSegments = []string{"costing", "measurement", "orders", "acctbridge
 // NoFloat cấm float32/float64 trong package tiền và khối lượng (R-10).
 var NoFloat = &analysis.Analyzer{
 	Name: "agnofloat",
-	Doc:  "cấm float32/float64 trong costing, measurement, orders, acctbridge, metering, mkg/hub, shared/money, shared/mass (R-10)",
+	Doc:  "cấm float32/float64 trong costing, measurement, orders, acctbridge, metering, mkg/hub, mkg/logistics, shared/money, shared/mass (R-10)",
 	Run:  runNoFloat,
 }
 
 // floatFreeZones là module có khối lượng ở mọi lớp (lô, tồn, hao hụt): cấm float
-// trong toàn module, không chỉ theo tên package.
-var floatFreeZones = []string{"/internal/mkg/hub"}
+// trong toàn module, không chỉ theo tên package. G4-0: mkg/logistics (khối lượng chở, cước,
+// km, tọa độ đều decimal); costing, orders, acctbridge đã phủ theo tên đoạn (floatFreeSegments)
+// nên mọi package con app/, domain/, store/, handler/, adapter/ của chúng cũng bị cấm float.
+var floatFreeZones = []string{"/internal/mkg/hub", "/internal/mkg/logistics"}
 
 func floatFree(pkg string) bool {
 	for _, z := range floatFreeZones {
