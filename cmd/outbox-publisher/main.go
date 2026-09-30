@@ -18,6 +18,9 @@
 //
 //	AG_OTLP_ENDPOINT, ...  OpenTelemetry: span publish nối trace của request gốc; metric
 //	               ag.outbox.backlog, ag.outbox.oldest_age theo cụm (mục 19)
+//	AG_HEALTH_ADDR /healthz, /readyz (mọi pool ping được) — mặc định :8088, chỉ mạng nội bộ (probe k8s)
+//
+// `outbox-publisher -healthcheck <url>`: GET url, thoát 0 khi 200 — healthcheck Docker (distroless).
 package main
 
 import (
@@ -33,6 +36,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/clusterenv"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/healthsrv"
 	internalassembly "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/worker-internal/assembly"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
@@ -44,6 +48,9 @@ import (
 )
 
 func main() {
+	if len(os.Args) == 3 && os.Args[1] == "-healthcheck" {
+		os.Exit(healthsrv.Healthcheck(os.Args[2]))
+	}
 	log := telemetry.NewLogger("outbox-publisher", os.Stdout)
 	if err := run(); err != nil {
 		log.Error("dừng do lỗi", "event", "startup", "outcome", "error", "error", err.Error())
@@ -138,9 +145,33 @@ func run() error {
 	if _, err := outbox.RegisterBacklogMetrics(pools); err != nil {
 		log.Warn("không đăng ký được metric outbox", "event", "startup", "outcome", "error", "error", err.Error())
 	}
+	// G4 (k8s probe): /healthz sống; /readyz khi mọi pool cụm ping được.
+	hs := healthsrv.New("platform")
+	if !clusterenv.Has(clusters, migrations.PF) {
+		hs = healthsrv.New("mkg")
+	}
+	hs.Add("db", healthsrv.Pools(func() []*pgxpool.Pool {
+		out := make([]*pgxpool.Pool, 0, len(pools))
+		for _, p := range pools {
+			out = append(out, p)
+		}
+		return out
+	}))
+	hs.Info("clusters", len(clusters))
+	errc := make(chan error, 1)
+	stopHealth := hs.Start("", ":8088", log, errc)
+	defer stopHealth()
 	log.Info("đang chạy", "event", "startup", "outcome", "ok")
-	wg.Wait()
-	return nil
+	done := make(chan struct{})
+	go func() { wg.Wait(); close(done) }()
+	select {
+	case <-done:
+		return nil
+	case err := <-errc:
+		stop()
+		wg.Wait()
+		return err
+	}
 }
 
 // declareQueues khai báo hàng đợi consumer trên một kênh riêng rồi đóng kênh.

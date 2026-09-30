@@ -49,6 +49,13 @@ func New(db tenant.Beginner, clk clock.Clock, o Options) *Module {
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Waterway: o.Waterway, Road: o.Road, Metrics: app.NewMetrics(telemetry.Meter())}}
 }
 
+// RebuildTenant dựng lại bảng chiếu của tenant từ sổ, tenant tường minh, không kiểm vai — CHỈ cho công cụ diễn
+// tập R-22 trên bản sao database (cmd/rebuilddrill). Trả số dòng theo bảng chiếu.
+func (m *Module) RebuildTenant(ctx context.Context, tid uuid.UUID) (map[string]int64, error) {
+	n, err := m.svc.RebuildTenant(ctx, tid)
+	return map[string]int64{"trip_current": n}, err
+}
+
 // JobAlerts là tên job cảnh báo định kỳ L-08 của api-internal (AG_MKG_JOBS).
 const JobAlerts = port.JobAlerts
 

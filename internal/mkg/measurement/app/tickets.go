@@ -185,18 +185,24 @@ func (s *Service) RebuildProjections(ctx context.Context) (map[string]int64, err
 	if err != nil {
 		return nil, err
 	}
+	return s.RebuildTenant(ctx, p.TenantID)
+}
+
+// RebuildTenant dựng lại bảng chiếu của tenant tid từ sổ — tenant TƯỜNG MINH, không kiểm vai: chỉ cho công cụ
+// vận hành chạy trên BẢN SAO database (diễn tập R-22, cmd/rebuilddrill). API dùng RebuildProjections (có vai).
+func (s *Service) RebuildTenant(ctx context.Context, tid uuid.UUID) (map[string]int64, error) {
 	out := map[string]int64{}
-	err = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
-		n, err := store.RebuildLotMass(ctx, tx, p.TenantID)
+	err := tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
+		n, err := store.RebuildLotMass(ctx, tx, tid)
 		if err != nil {
 			return err
 		}
 		out["lot_mass_current"] = n
-		if n, err = store.RebuildYield(ctx, tx, p.TenantID); err != nil {
+		if n, err = store.RebuildYield(ctx, tx, tid); err != nil {
 			return err
 		}
 		out["lot_yield_current"] = n
-		n, err = store.RebuildDisputes(ctx, tx, p.TenantID)
+		n, err = store.RebuildDisputes(ctx, tx, tid)
 		out["dispute_current"] = n
 		return err
 	})

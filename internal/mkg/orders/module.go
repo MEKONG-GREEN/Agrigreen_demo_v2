@@ -9,7 +9,9 @@
 package orders
 
 import (
+	"context"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders/app"
@@ -45,6 +47,12 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.
 
 // RegisterAdmin gắn route quản trị (MFA): dựng lại bảng chiếu (R-22).
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }
+
+// RebuildTenant dựng lại bảng chiếu của tenant từ sổ, tenant tường minh, không kiểm vai — CHỈ cho công cụ diễn
+// tập R-22 trên bản sao database (cmd/rebuilddrill). Trả số dòng theo bảng chiếu.
+func (m *Module) RebuildTenant(ctx context.Context, tid uuid.UUID) (map[string]int64, error) {
+	return m.svc.RebuildTenant(ctx, tid)
+}
 
 // Contracts cho mkg/costing (quyết toán HTX) đọc điều khoản hợp đồng mua rơm (tenant tường minh).
 func (m *Module) Contracts() port.Contracts { return m.svc }

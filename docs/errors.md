@@ -495,6 +495,8 @@ Mã của vòng tích phân (không trả qua HTTP; nhãn `code` của metric `a
 
 Kết quả theo bản ghi của `POST /v1/fieldops/sync/push` dùng thêm `fieldops.unknown_entity` (entity khác `roll_count`) và `fieldops.sink_failed` (lỗi hệ thống — máy giữ và tự gửi lại).
 
+Số hiệu ghe (G4, trường tùy chọn `vessel_code` của bản ghi đếm, proto FM-05): gửi ở công đoạn khác `boat_load`, dài quá 32 ký tự (sau chuẩn hóa) hoặc có ký tự ngoài chữ / số / `.` `-` `/` → 422 `validation_failed` (`errors[].field = vessel_code`, hoặc `payload.vessel_code` qua sync push — kết quả `rejected`).
+
 Cảnh báo không chặn (mảng `warnings` của kết quả ghi, không phải lỗi): `fieldops.harvest_date_unknown`, `fieldops.harvest_date_unavailable` (FM-01, chưa biết ngày gặt), `fieldops.planned_before_harvest` (ngày bắt đầu dự kiến trước ngày gặt), `fieldops.baling_deadline_at_risk` (ngày kết thúc dự kiến sau hạn cuộn FM-02), `fieldops.crew_over_capacity_override` (giám sát giao vượt năng lực kèm lý do, FM-06).
 
 ### mkg/logistics (API nội bộ MKG — `cmd/api-internal`, `contracts/openapi/mkg-internal.yaml`, tag logistics)
@@ -503,7 +505,8 @@ Cảnh báo không chặn (mảng `warnings` của kết quả ghi, không phả
 |---|---|---|
 | 403 | `forbidden` | Thiếu vai: lập / hủy chuyến, gán phương tiện, lập chặng, hoàn tất, danh mục ghe, đề xuất tham số cần `dispatcher`; mốc chuyến cần `driver` (hoặc `dispatcher`); duyệt tham số cần `chief_accountant` |
 | 403 | `self_approval_forbidden` | Người duyệt / từ chối phiên bản tham số cước là người đề xuất (R-56); DB chặn lần hai bằng CHECK |
-| 404 | `logistics.trip_not_found` | Không có chuyến trong tenant của token |
+| 403 | `logistics.not_assigned_driver` | G4 tích hợp: người chỉ có vai `driver` ghi mốc cho chuyến không giao cho mình (`driver_ref` ≠ `sub` của token). Điều phối ghi được cho mọi chuyến |
+| 404 | `logistics.trip_not_found` | Không có chuyến trong tenant của token; người chỉ có vai `driver` đọc chuyến không giao cho mình (không lộ sự tồn tại) |
 | 404 | `logistics.vessel_not_found` | Không có phương tiện trong danh mục của tenant |
 | 404 | `logistics.param_not_found` | Khóa tham số lạ hoặc không có phiên bản cần quyết định |
 | 404 | `logistics.route_snapshot_not_found` | Chặng không có ảnh chụp định tuyến (km nhập tay) hoặc không thuộc kế hoạch hiệu lực |
@@ -512,11 +515,14 @@ Cảnh báo không chặn (mảng `warnings` của kết quả ghi, không phả
 | 409 | `logistics.vessel_code_taken` | Số hiệu (đã chuẩn hóa: bỏ khoảng trắng, chữ hoa) đã có trong danh mục (proto GH-01) |
 | 409 | `logistics.vessel_version_stale` | `expected_version` khác phiên bản hiện hành của phương tiện |
 | 409 | `logistics.param_decided` | Phiên bản tham số đã được duyệt hoặc từ chối |
-| 422 | `validation_failed` | Dữ liệu vào sai (phương thức, tọa độ, kg, lý do < 10 ký tự, `event_time` ở tương lai, loại đơn giá không có đơn giá…), xem `errors[]` |
+| 422 | `validation_failed` | Dữ liệu vào sai (phương thức, tọa độ, kg, lý do < 10 ký tự, `event_time` ở tương lai, loại đơn giá không có đơn giá, mốc chuyến chỉ có một trong `lat`/`lng`, `accuracy_m` âm hoặc không kèm tọa độ, `assigned_to_me` ≠ true/false, `updated_since` không phải RFC 3339…), xem `errors[]` |
 | 422 | `logistics.manual_km_reason_required` | `manual_km` không kèm `manual_reason` (10–500 ký tự) |
 | 422 | `logistics.correction_reason_required` | Hoàn tất lại chuyến đã `completed` (bản bù) mà thiếu `correction_reason` |
 
 Định tuyến **không bao giờ** là lỗi của API: nền tảng lỗi, thiếu cấp quyền `waterway_routes` (403 của `/v1/partner/waterway/route`) hoặc mạng không có đường → chặng dự phòng Haversine × #10 (nhãn `haversine`). Cảnh báo không chặn (mảng `warnings` / `flags`): `no_vehicle`, `no_route`, `vessel_unregistered`, `vessel_inactive`, `registration_expired`, `registration_expiring` (GH-02), `payload_exceeded` (FM-05, > 1,1 × tải), `weigh_variance` (lệch cân > 5 %), `routing_unavailable`, `no_waterway_route`, `waterway_suggested` (decideMode), `rolls_corrected`.
+
+Thông báo cảnh báo L-08 (job `logistics_alerts`, `GET /v1/logistics/alert-notices`, không phải lỗi): `trip_unweighed` (xuống ghe quá `logistics.trip.unweighed_alert_hours` chưa cân), `registration_expired`, `registration_expiring` (GH-02).
+
 ### mkg/orders (API nội bộ MKG — `cmd/api-internal`, `contracts/openapi/mkg-internal.yaml`, tag `orders`)
 
 | HTTP | code | Khi nào |
@@ -545,7 +551,9 @@ Cảnh báo không chặn (mảng `warnings` của kết quả ghi, không phả
 | 422 | `orders.price_required` | Đơn mua rơm không có hợp đồng hiệu lực tại ngày dự kiến nhận và không nhập đơn giá — hệ thống không đoán giá |
 | 422 | `orders.ticket_unknown` | Bù giao nhận với `customer_in_ticket_ref` chưa nhận từ measurement, hoặc không phải CUSTOMER_IN của cùng lô |
 
-Cảnh báo không chặn (trường của phiếu nhận, không phải lỗi): `needs_variance_report = true` + `audit_note` khi |nhận − đặt| / đặt × 100 > `orders.receipt.po_variance_warn_pct` (mặc định 3, tạm chờ khách — proto `RECEIPT_VARIANCE_TOLERANCE_PCT`); duyệt vẫn được, biên bản chênh lệch ghi qua `POST /v1/orders/receipts/{id}/variance-report`.
+Cảnh báo không chặn (trường của phiếu nhận, không phải lỗi): `needs_variance_report = true` + `audit_note` khi |nhận − đặt| / đặt × 100 > `orders.receipt.po_variance_warn_pct` (mặc định 3, tạm chờ khách — proto `RECEIPT_VARIANCE_TOLERANCE_PCT`); duyệt vẫn được, biên bản chênh lệch ghi qua `POST /v1/orders/receipts/{id}/variance-report`. Phiếu cân HUB_IN bị bù SAU KHI phiếu nhận đã duyệt → bản bù phiếu nhận (`corrected`, vẫn `approved`) + bản bù khoản phải trả đơn mua khác (`supersedes_id`, RB-1) — không phải lỗi.
+
+Cảnh báo không chặn của đơn bán (mảng `warnings` + `stock_check`, O-05 proto stockWarning): `orders.stock_shortage` — tồn hub của dạng hàng (mọi cơ sở, `hub/port.Stock`) < khối lượng đơn; `orders.sales.stock_shortage_blocking` = 0 nên lập / xác nhận vẫn được. `stock_check.source = unavailable` khi chưa đọc được hub (không cảnh báo).
 ### mkg/costing (API nội bộ MKG — `cmd/api-internal`, `contracts/openapi/mkg-internal.yaml`, tag costing)
 
 | HTTP | code | Khi nào |

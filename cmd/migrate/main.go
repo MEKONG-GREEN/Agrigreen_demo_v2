@@ -53,7 +53,12 @@ func run(cmd string) error {
 		if err != nil {
 			return err
 		}
-		return dbadmin.Bootstrap(ctx, admin, "")
+		// AG_CLUSTERS (G4, RB-5): chỉ dựng vai + database của cụm được chọn; rỗng = mọi cụm.
+		clusters, err := clusterenv.Selected()
+		if err != nil {
+			return err
+		}
+		return dbadmin.BootstrapClusters(ctx, admin, "", clusters)
 	case "up":
 		base, err := need("AG_DB_URL")
 		if err != nil {

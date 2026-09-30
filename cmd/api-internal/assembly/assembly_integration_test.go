@@ -72,7 +72,9 @@ func TestOrdersStockShortageWarningFromHub_O05(t *testing.T) {
 	env := pgtest.Get(t)
 	ctx := context.Background()
 	clk := clock.NewFixed(time.Now().UTC().Truncate(time.Second))
-	open := func(_ context.Context, role string) (*pgxpool.Pool, error) { return env.Pool(t, migrations.MKG, role), nil }
+	open := func(_ context.Context, role string) (*pgxpool.Pool, error) {
+		return env.Pool(t, migrations.MKG, role), nil
+	}
 	mods, ops, pools, err := Build(ctx, open, clk)
 	if err != nil {
 		t.Fatal(err)

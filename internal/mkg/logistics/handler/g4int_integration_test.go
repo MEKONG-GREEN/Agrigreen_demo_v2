@@ -192,7 +192,9 @@ func TestLogisticsDriverScopeMilestonesAndDelta_G4(t *testing.T) {
 	}
 
 	// Mục 9: tài xế khác → 403; điều phối ghi được cho mọi chuyến.
-	ms := func(c caller, trip string, body map[string]any) resp { return c.post("/v1/logistics/trips/"+trip+"/milestones", body) }
+	ms := func(c caller, trip string, body map[string]any) resp {
+		return c.post("/v1/logistics/trips/"+trip+"/milestones", body)
+	}
 	mustCode(t, ms(drvB, a, map[string]any{"kind": "departed", "event_time": f.ts(-time.Minute)}), http.StatusForbidden,
 		"logistics.not_assigned_driver", "tài xế không được giao")
 	mustStatus(t, ms(d, b, map[string]any{"kind": "departed", "event_time": f.ts(-time.Minute), "lat": "10.1", "lng": "105.1"}),

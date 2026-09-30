@@ -689,8 +689,14 @@ func (s *Service) RebuildProjections(ctx context.Context) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	return s.RebuildTenant(ctx, p.TenantID)
+}
+
+// RebuildTenant dựng lại bảng chiếu của tenant tid từ sổ — tenant TƯỜNG MINH, không kiểm vai: chỉ cho công cụ
+// vận hành chạy trên BẢN SAO database (diễn tập R-22, cmd/rebuilddrill). API dùng RebuildProjections (có vai).
+func (s *Service) RebuildTenant(ctx context.Context, tid uuid.UUID) (int64, error) {
 	var n int64
-	_, err = s.write(ctx, p.TenantID, func(tx pgx.Tx) error {
+	_, err := s.write(ctx, tid, func(tx pgx.Tx) error {
 		var e error
 		n, e = store.RebuildTrips(ctx, tx)
 		return e

@@ -31,7 +31,9 @@ var ErrNotAssignedDriver = problem.New(403, "logistics.not_assigned_driver", "Ch
 func DriverOnly(p authz.Principal) bool { return p.Has(RoleDriver) && !p.Has(RoleDispatcher) }
 
 // assignedTo cho biết chuyến giao cho người gọi.
-func assignedTo(t *store.Trip, p authz.Principal) bool { return t.DriverRef != nil && *t.DriverRef == p.ActorRef }
+func assignedTo(t *store.Trip, p authz.Principal) bool {
+	return t.DriverRef != nil && *t.DriverRef == p.ActorRef
+}
 
 // TripQuery là truy vấn danh sách chuyến.
 type TripQuery struct {
@@ -73,14 +75,14 @@ func (s *Service) QueryTrips(ctx context.Context, q TripQuery) ([]store.Trip, bo
 
 // Loại thông báo.
 const (
-	NoticeTripUnweighed         = "trip_unweighed"
-	NoticeRegistrationExpired   = "registration_expired"
-	NoticeRegistrationExpiring  = "registration_expiring"
-	RuleAlertNotice             = "logistics.alert_notice.v1"
-	MetricAlertsOpen            = "ag.logistics.alerts.open"
-	MetricAlertNotices          = "ag.logistics.alert.notices"
-	MetricAlertScans            = "ag.logistics.alerts.scans"
-	alertKindAttr               = "kind"
+	NoticeTripUnweighed        = "trip_unweighed"
+	NoticeRegistrationExpired  = "registration_expired"
+	NoticeRegistrationExpiring = "registration_expiring"
+	RuleAlertNotice            = "logistics.alert_notice.v1"
+	MetricAlertsOpen           = "ag.logistics.alerts.open"
+	MetricAlertNotices         = "ag.logistics.alert.notices"
+	MetricAlertScans           = "ag.logistics.alerts.scans"
+	alertKindAttr              = "kind"
 )
 
 // Người nhận theo loại (vai trong Keycloak; proto nhắc ghe chưa cân: vận hành, điều phối, kho).
@@ -197,7 +199,7 @@ func (s *Service) scanTenant(ctx context.Context, tx pgx.Tx, tid uuid.UUID, out 
 			DedupeKey: NoticeTripUnweighed + ":" + t.TripID.String(), Audience: AudienceUnweighed, ParamVersion: h.Version,
 			RuleVersion: RuleAlertNotice, NoticedAt: now,
 			Detail: map[string]string{"planned_at": t.PlannedAt.UTC().Format(time.RFC3339), "status": string(t.Status),
-				"threshold_hours": h.Value.String(), "hours_waiting": itoa(int(now.Sub(t.PlannedAt).Hours()))}}
+				"threshold_hours": h.Value.String(), "hours_waiting": itoa(int(now.Sub(t.PlannedAt) / time.Hour))}}
 		if t.VehicleRef != nil {
 			n.Detail["vehicle_ref"] = t.VehicleRef.String()
 		}

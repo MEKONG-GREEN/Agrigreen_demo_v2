@@ -135,6 +135,8 @@ var zoneRoots = []struct{ root, forbidden string }{
 	{"cmd/ingest", "platform"},
 	{"cmd/edge-agent", "platform"},
 	{"cmd/worker-internal", "platform"},
+	// G4: công cụ diễn tập dựng lại bảng chiếu cụm mkg (R-22) — chỉ nối module mkg.
+	{"cmd/rebuilddrill", "platform"},
 }
 
 // edgeAgentRoot là nhị phân tĩnh ở vùng biên OT (mục 14, 17): không DB, không
