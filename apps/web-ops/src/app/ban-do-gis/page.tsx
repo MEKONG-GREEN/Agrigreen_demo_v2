@@ -6,9 +6,9 @@ import { loadBoundaries, mergeBoundaries } from "@/api/adapters/boundaries";
 import { listAllCooperatives } from "@/api/adapters/cooperatives";
 import { unwrap } from "@/api/client";
 import { collectPages } from "@/api/pagination";
-import type { WaterwayLayerSegment } from "@/api/types";
+import type { GisReplay, WaterwayLayerSegment } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
-import { hasRole, ROLES } from "@/auth/principal";
+import { GIS_HISTORY_ROLES, hasRole, ROLES } from "@/auth/principal";
 import { COVERAGE_STYLES, fromMechStatus, type CoverageStatus } from "@/cgh/coverage";
 import { communeCentroids } from "@/cgh/pins";
 import { LayerMap, type Viewport } from "@/components/LayerMap";
@@ -20,6 +20,8 @@ import { useAsync } from "@/lib/useAsync";
 import { formatLength } from "@/gis/geometry";
 import { useDisplayPalette } from "@/gis/displayConfig";
 import { capacityMarkers, cghLayer, CGH_LEGEND_ORDER, coopLayers, plotLayer, roadLayer, waterwayLayer } from "@/gis/layers";
+import { ReplayPanel } from "@/gis/ReplayPanel";
+import { LAYER_NAME, REPLAY_COLOR, replayFeatureCollection } from "@/gis/replay";
 import { capacityLegend, capacityStyle, limitingLabel, ROAD_CLASS, ROAD_COLOR, stages as stageLegend, WATERWAY_CLASS, type DisplayPalette } from "@/gis/legend";
 
 const MAP_LABEL = "Bản đồ GIS nhiều lớp";
@@ -72,6 +74,10 @@ function mapLayers(palette: DisplayPalette): LayerSpecification[] {
       "circle-opacity": 0.9,
     },
   },
+  // GIS US-REPLAY-01: mọi lớp as-of một ngày (màu theo lớp, chỉ đọc).
+  { id: "replay-fill", type: "fill", source: "replay", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": ["get", "color"], "fill-opacity": 0.35 } },
+  { id: "replay-line", type: "line", source: "replay", filter: ["!=", ["geometry-type"], "Point"], paint: { "line-color": ["get", "color"], "line-width": 2 } },
+  { id: "replay-point", type: "circle", source: "replay", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 7, "circle-color": ["get", "color"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 2 } },
   ];
 }
 
@@ -110,6 +116,10 @@ export default function GisMapPage() {
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [date, setDate] = useState("");
   const [selected, setSelected] = useState<{ kind: string; props: Record<string, unknown> } | null>(null);
+  const [replay, setReplay] = useState<GisReplay | null>(null);
+  const canHistory = hasRole(principal, ...GIS_HISTORY_ROLES);
+  const replayFc = useMemo(() => (replay ? replayFeatureCollection(replay.items) : null), [replay]);
+  const live = !replay;
   const zoom = Math.floor(vp?.zoom ?? 0);
   const bbox = vp?.bbox ?? null;
 
@@ -188,8 +198,9 @@ export default function GisMapPage() {
       roads: roadLayer(roads.data, !!roadLoad),
       waterways: waterwayLayer(waterways.data?.items, !!bargeLoad),
       cgh: cghFc.fc,
+      replay: replayFc,
     }),
-    [coopFc, plotFc, roads.data, roadLoad, waterways.data, bargeLoad, cghFc],
+    [coopFc, plotFc, roads.data, roadLoad, waterways.data, bargeLoad, cghFc, replayFc],
   );
   const markers = useMemo(() => capacityMarkers(widgets.data?.items, (ref) => {
     const w = widgets.data?.items.find((x) => x.ref === ref);
@@ -392,6 +403,15 @@ export default function GisMapPage() {
                 Chưa có kết quả cân đối máy CGH đã lưu — lớp Tình trạng máy CGH chưa có dữ liệu.
               </p>
             ) : null}
+            {replay ? (
+              <p className="notice" role="status" data-testid="replay-map-status" style={{ marginTop: 8 }}>
+                Đang xem lại ngày {formatDate(replay.business_date)}: {formatInt(replayFc?.features.length ?? 0)} đối tượng có hình học ·{" "}
+                {Object.keys(REPLAY_COLOR)
+                  .filter((l) => replay.items.some((i) => i.layer === l))
+                  .map((l) => LAYER_NAME[l])
+                  .join(", ")}
+              </p>
+            ) : null}
             {truncated.length > 0 ? (
               <p className="notice" role="status" style={{ marginTop: 8 }}>
                 Đã đạt giới hạn {formatInt(MAX_FEATURES)} đối tượng cho lớp {truncated.join(", ")} — phóng to để xem đủ.
@@ -404,17 +424,20 @@ export default function GisMapPage() {
             layers={layers}
             initial={{ center: [105.75, 10.2], zoom: 8.3 }}
             visibility={{
-              "coops-fill": show.coops,
-              "coops-line": show.coops,
-              "coop-markers": show.coops,
-              "ripening-line": show.coops && show.ripening,
-              "plots-fill": show.plots,
-              "plots-line": show.plots,
-              "roads-line": show.roads,
-              "waterways-line": show.waterways,
-              "cgh-markers": cghOn,
+              "coops-fill": live && show.coops,
+              "coops-line": live && show.coops,
+              "coop-markers": live && show.coops,
+              "ripening-line": live && show.coops && show.ripening,
+              "plots-fill": live && show.plots,
+              "plots-line": live && show.plots,
+              "roads-line": live && show.roads,
+              "waterways-line": live && show.waterways,
+              "cgh-markers": live && cghOn,
+              "replay-fill": !live,
+              "replay-line": !live,
+              "replay-point": !live,
             }}
-            markers={show.facilities ? markers : []}
+            markers={live && show.facilities ? markers : []}
             onViewport={setVp}
             onFeatureClick={(layer, props) => setSelected({ kind: layer.split("-")[0] ?? layer, props })}
           />
@@ -473,6 +496,13 @@ export default function GisMapPage() {
           ) : null}
         </aside>
       </div>
+      {canHistory ? (
+        <ReplayPanel replay={replay} onReplay={setReplay} />
+      ) : (
+        <p className="small mute" style={{ marginTop: 16 }} data-testid="replay-locked">
+          Xem lại theo ngày và nhật ký thay đổi lớp cần vai xem chỉ số/bản đồ cấp tỉnh trở lên (vd TTKN tỉnh, quản trị dữ liệu bản đồ).
+        </p>
+      )}
     </>
   );
 }

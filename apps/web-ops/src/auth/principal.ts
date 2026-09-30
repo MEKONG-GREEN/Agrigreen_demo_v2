@@ -33,7 +33,28 @@ export const ROLES = {
   contentEditorProvince: "content_editor_province",
   contentReviewer: "content_reviewer",
   farmer: "farmer",
+  mrvCollector: "mrv_collector",
+  mrvReviewer: "mrv_reviewer",
+  mrvViewer: "mrv_viewer",
+  mrvExporter: "mrv_exporter",
+  metricsViewer: "metrics_viewer",
+  plotViewer: "plot_viewer",
 } as const;
+
+/** Vai đọc màn hình MRV (pf/mrv): thu, duyệt, xem, xuất. */
+export const MRV_ROLES: readonly string[] = [ROLES.mrvCollector, ROLES.mrvReviewer, ROLES.mrvViewer, ROLES.mrvExporter];
+
+/** Vai đọc nhật ký/ảnh chụp/phát lại lớp GIS (GET /v1/gis/events|snapshots|replay). */
+export const GIS_HISTORY_ROLES: readonly string[] = [
+  ROLES.metricsViewer,
+  ROLES.platformAdmin,
+  ROLES.geoAdmin,
+  ROLES.plotViewer,
+  ROLES.plotEditor,
+  ROLES.knNationalAdmin,
+  ROLES.knProvinceAdmin,
+  ROLES.cghViewer,
+];
 
 /** Vai cán bộ khuyến nông — với dữ liệu mùa vụ HTX chỉ được XEM trong phạm vi (pf/cropcycle). */
 export const KN_ROLES: readonly string[] = [ROLES.knOfficer, ROLES.knProvinceAdmin, ROLES.knNationalAdmin];
@@ -63,6 +84,12 @@ export const ROLE_LABEL: Readonly<Record<string, string>> = {
   simulation_analyst: "Phân tích mô phỏng Hub",
   sop_admin: "Soạn quy trình SOP",
   farmer: "Nông dân (App HTX)",
+  mrv_collector: "Thu minh chứng MRV",
+  mrv_reviewer: "Duyệt minh chứng MRV",
+  mrv_viewer: "Xem minh chứng MRV",
+  mrv_exporter: "Xuất gói bằng chứng MRV",
+  metrics_viewer: "Xem chỉ số & lịch sử",
+  plot_viewer: "Xem thửa",
   vault_eraser: "Xoá định danh (RB-3)",
   consent_writer: "Ghi đồng ý",
   consent_reader: "Xem đồng ý",

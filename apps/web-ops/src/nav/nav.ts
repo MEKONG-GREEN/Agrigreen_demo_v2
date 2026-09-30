@@ -1,5 +1,5 @@
 import type { ScopeLevel } from "@/auth/principal";
-import { hasRole, KN_ROLES, ROLES, type Principal } from "@/auth/principal";
+import { hasRole, KN_ROLES, MRV_ROLES, ROLES, type Principal } from "@/auth/principal";
 
 export type NavIcon =
   | "dashboard"
@@ -72,6 +72,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { href: "/chi-dao", label: "Chỉ đạo khẩn", icon: "megaphone", levels: KN },
       { href: "/danh-ba", label: "Danh bạ trực", icon: "phone", levels: KN },
       { href: "/bao-cao", label: "Báo cáo & xuất dữ liệu", icon: "report", levels: [...KN, "cuc"] },
+      // pf/mrv G3: đủ hồ sơ, đối chiếu HTX ↔ KN (KN US-MRV-02), bất thường FR-08, ước tính CO2 tạm.
+      { href: "/mrv", label: "MRV: hồ sơ & đối chiếu", icon: "approve", roles: [...MRV_ROLES, ROLES.platformAdmin] },
       {
         href: "/dong-bo",
         label: "Đồng bộ thiết bị",
@@ -150,6 +152,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: "water",
         roles: [ROLES.platformAdmin, ROLES.waterwayEditor, ROLES.waterwayPublisher],
       },
+      // pf/metrics: định nghĩa chỉ số có phiên bản — chỉ xem.
+      { href: "/quan-tri/chi-so", label: "Định nghĩa chỉ số", icon: "chart", roles: [ROLES.platformAdmin, ROLES.metricsViewer] },
+      // pf/mrv: phương pháp ước tính CO2 — đề xuất/duyệt khác người (R-56), chờ khách ký (C-1).
+      { href: "/quan-tri/mrv-phuong-phap", label: "Phương pháp ước tính MRV", icon: "param", roles: [ROLES.platformAdmin, ROLES.paramSetter, ROLES.paramApprover] },
       { href: "/quan-tri/xung-dot", label: "Xung đột đồng bộ", icon: "conflict", roles: [ROLES.platformAdmin, ROLES.conflictResolver] },
       // GIS US-SYNC-01/02: tình trạng luồng đồng bộ tích hợp, hàng chờ lỗi (DLQ).
       { href: "/quan-tri/giam-sat-dong-bo", label: "Giám sát đồng bộ", icon: "sync", roles: [ROLES.platformAdmin, ROLES.deviceAdmin] },

@@ -43,13 +43,16 @@ test.describe("Bản đồ GIS nhiều lớp (GIS FN-01/04/13/14/15, US-ROAD-01,
     // GIS BR-24: thửa chỉ khi zoom ≥ 13.
     await expect(page.getByTestId("plots-notice")).toContainText("Phóng to tới mức 13");
     expect(await countOf(page, "count-plots")).toBe(0);
-    const center = await page.evaluate((label) => {
-      const map = (window as unknown as { __agMaps?: Record<string, MapLike> }).__agMaps?.[label];
-      const f = map?.querySourceFeatures("coops").find((x) => x.geometry.type === "Polygon");
-      const ring = (f?.geometry.coordinates as number[][][] | undefined)?.[0];
-      return ring ? [ring.reduce((s, p) => s + p[0]!, 0) / ring.length, ring.reduce((s, p) => s + p[1]!, 0) / ring.length] : null;
-    }, MAP);
-    expect(center).not.toBeNull();
+    const findCenter = () =>
+      page.evaluate((label) => {
+        const map = (window as unknown as { __agMaps?: Record<string, MapLike> }).__agMaps?.[label];
+        const f = map?.querySourceFeatures("coops").find((x) => x.geometry.type === "Polygon");
+        const ring = (f?.geometry.coordinates as number[][][] | undefined)?.[0];
+        return ring ? [ring.reduce((s, p) => s + p[0]!, 0) / ring.length, ring.reduce((s, p) => s + p[1]!, 0) / ring.length] : null;
+      }, MAP);
+    // Ô GeoJSON được dựng bất đồng bộ trong worker sau setData — chờ tới khi truy vấn được đối tượng.
+    await expect.poll(findCenter, { timeout: 20_000 }).not.toBeNull();
+    const center = await findCenter();
     await jump(page, center![0]!, center![1]!, 14);
     await expect.poll(() => countOf(page, "count-plots"), { timeout: 20_000 }).toBeGreaterThan(0);
     await expect(page.getByTestId("plots-notice")).toHaveCount(0);

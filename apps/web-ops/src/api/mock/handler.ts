@@ -42,6 +42,8 @@ import { personaFromAuthHeader, type MockPersona } from "./personas";
 import { checkDisplayProposal, DISPLAY_DEFAULTS, displayConfig, isColorKey, isPercentKey, PERCENT_TITLE, RESTORE_REASON } from "./display";
 import { areaSyncRoutes } from "./areasync";
 import { syncMonitorRoutes } from "./syncmonitor";
+import { metricsRoutes } from "./metrics";
+import { mrvAdminRoutes, mrvAppRoutes } from "./mrv";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -371,6 +373,8 @@ const appRoutes: Route[] = [
   ...simulationRoutes,
   ...cropcycleAppRoutes,
   ...htxAppRoutes,
+  ...metricsRoutes,
+  ...mrvAppRoutes,
 ];
 
 // --------------------------------------------------------------------------
@@ -647,6 +651,7 @@ const adminRoutes: Route[] = [
   ...waterwayAdminRoutes,
   ...cropcycleAdminRoutes,
   ...htxAdminRoutes,
+  ...mrvAdminRoutes,
 ];
 
 // --------------------------------------------------------------------------

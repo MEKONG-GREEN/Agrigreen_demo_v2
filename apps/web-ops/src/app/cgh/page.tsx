@@ -20,6 +20,13 @@ import { formatDecimal, formatInt } from "@/lib/decimal";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { useAsync } from "@/lib/useAsync";
 import { useUnits } from "@/lib/useUnits";
+import { MetricHistory, type MetricOption } from "@/metrics/MetricHistory";
+
+/** Chỉ số CGH theo vụ (pf/metrics, grain = season): xu hướng nhiều ngày của kết quả cân đối đã lưu (FN-10/11). */
+const CGH_METRICS: MetricOption[] = [
+  { key: "cgh.coop_sufficiency_pct", label: "Tỷ lệ HTX đủ máy (%)", digits: 1 },
+  { key: "cgh.coops_shortage", label: "Số HTX thiếu máy", digits: 0 },
+];
 
 const SEASON_NAME: Record<string, string> = { DX: "Đông Xuân", HT: "Hè Thu", TD: "Thu Đông" };
 
@@ -337,6 +344,14 @@ export default function CghPortalPage() {
         {dash.loading && !dash.data ? <Loading /> : null}
         {dash.data && priority.length === 0 ? <p className="mute small">Chưa có HTX nào trong kết quả cân đối.</p> : null}
       </section>
+      <div style={{ marginTop: 16 }}>
+        <MetricHistory
+          title="Xu hướng cân đối máy theo vụ (lịch sử đã chốt)"
+          metrics={CGH_METRICS}
+          seasonal
+          units={[{ code: "", name: "Toàn vùng" }, ...(areas.data?.collection.features ?? []).map((f) => ({ code: f.properties.code, name: f.properties.name }))]}
+        />
+      </div>
       <ForecastSection coopNames={coopNames} />
     </>
   );

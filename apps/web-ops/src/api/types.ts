@@ -236,3 +236,28 @@ export type SimCompareRow = S["SimCompareRow"];
 export type SimCompare = AppPost<"/v1/scenarios:compare">;
 export type SimResultEnvelope = AppGet<"/v1/simulations/{id}/result">;
 export type SimJob = AppGet<"/v1/jobs/{id}">;
+
+// pf/metrics — chỉ số có phiên bản, lịch sử ngày đã chốt (KN US-DASH-01/02), nhật ký lớp GIS (US-EVL/SNAP/REPLAY-01)
+export type MetricDefinition = S["MetricDefinition"];
+export type MetricValue = S["MetricValue"];
+export type MetricValues = AppGet<"/v1/metrics/{key}/values">;
+export type GisLayerEvent = S["GisLayerEvent"];
+export type GisLayerFeature = S["GisLayerFeature"];
+export type GisLayerState = S["GisLayerState"];
+export type GisLayerName = NonNullable<NonNullable<AppPaths["/v1/gis/events"]["get"]["parameters"]["query"]>["layer"]>;
+export type GisEventsPage = AppGet<"/v1/gis/events">;
+export type GisReplay = AppGet<"/v1/gis/replay">;
+export type GisSnapshots = AppGet<"/v1/gis/snapshots/{date}">;
+
+// pf/mrv G3 — đủ hồ sơ, đối chiếu HTX ↔ KN (KN US-MRV-02), bất thường FR-08, ước tính CO2 tạm, phương pháp
+export type MrvSeason = S["MrvSeason"];
+export type MrvCompleteness = S["MrvCompleteness"];
+export type MrvCompletenessItem = S["MrvCompletenessItem"];
+export type MrvEstimate = S["MrvEstimate"];
+export type MrvComparison = S["MrvComparison"];
+export type MrvComparisonView = S["MrvComparisonView"];
+export type MrvComparisonLine = MrvComparisonView["lines"][number];
+export type MrvOfficerRecord = S["MrvOfficerRecord"];
+export type MrvComparisonInput = NonNullable<AppPaths["/v1/mrv/comparisons"]["post"]["requestBody"]>["content"]["application/json"];
+export type MrvMethodVersion = AS["MrvMethodVersion"];
+export type MrvParamPin = AS["MrvParamPin"];

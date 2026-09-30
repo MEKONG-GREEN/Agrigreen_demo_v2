@@ -10,6 +10,15 @@ import { KpiTile, Loading, PageHead } from "@/components/ui";
 import { formatDecimal, formatInt } from "@/lib/decimal";
 import { formatDateTime } from "@/lib/format";
 import { useAsync } from "@/lib/useAsync";
+import { MetricHistory, type MetricOption } from "@/metrics/MetricHistory";
+
+/** Chỉ số KN có lịch sử ngày đã chốt (pf/metrics, internal/platform/metrics/defs). */
+const KN_METRICS: MetricOption[] = [
+  { key: "kn.sown_area_ha", label: "Diện tích đã sạ báo cáo (ha)", digits: 0 },
+  { key: "kn.cooperatives_reported", label: "Số HTX có báo cáo gieo sạ", digits: 0 },
+  { key: "kn.open_tasks", label: "Nhiệm vụ hỗ trợ đang mở", digits: 0 },
+  { key: "kn.directive_ack_rate_pct", label: "Tỷ lệ xác nhận đọc chỉ đạo (%)", digits: 1 },
+];
 
 const LEVEL_TITLE = { national: "toàn quốc", province: "tỉnh", commune: "xã" } as const;
 const CHILD_LABEL = { national: "tỉnh", province: "xã", commune: "xã" } as const;
@@ -164,6 +173,15 @@ export default function DashboardPage() {
               </div>
             </section>
           ) : null}
+          <MetricHistory
+            title="Diễn biến theo ngày (lịch sử đã chốt)"
+            metrics={KN_METRICS}
+            defaultUnit={data.unit ?? ""}
+            units={[
+              { code: data.unit ?? "", name: data.level === "national" ? "Toàn quốc" : `Toàn ${LEVEL_TITLE[data.level]} ${unitName ?? ""}`.trim() },
+              ...(data.level === "commune" ? [] : data.children.map((c) => ({ code: c.unit, name: c.name ?? c.unit }))),
+            ]}
+          />
           <p className="mute small">
             Nguồn số liệu: {data.sources.join(", ")}. Tổng = tổng các đơn vị con; mục tiêu diện tích là tham số đã phê duyệt của đơn vị.
           </p>
