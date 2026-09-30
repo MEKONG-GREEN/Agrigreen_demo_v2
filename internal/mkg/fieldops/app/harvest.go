@@ -36,7 +36,7 @@ func (s *Service) fetchHarvest(ctx context.Context, orderID, plot uuid.UUID, anc
 	if s.Harvest == nil {
 		return h
 	}
-	seasons, err := s.Harvest.SeasonHarvestDates(ctx, plot)
+	xs, err := s.Harvest.PlotSeasons(ctx, plot)
 	switch {
 	case errors.Is(err, port.ErrDirectoryNotFound):
 		h.Check = domain.HarvestUnknown
@@ -44,13 +44,13 @@ func (s *Service) fetchHarvest(ctx context.Context, orderID, plot uuid.UUID, anc
 	case err != nil:
 		return h
 	}
-	sel := domain.SelectSeason(seasons, anchor)
+	sel := domain.SelectSeason(domain.SeasonsFrom(xs), anchor)
 	if sel == nil {
 		h.Check = domain.HarvestUnknown
 		return h
 	}
-	d, kind := sel.HarvestDate, sel.Kind
-	h.Check, h.Date, h.SeasonRef, h.Kind = domain.HarvestOK, &d, sel.SeasonRef, &kind
+	d := sel.Expected
+	h.Check, h.Date, h.OpenDate, h.SeasonRef = domain.HarvestOK, &d, sel.Open, sel.SeasonRef
 	return h
 }
 

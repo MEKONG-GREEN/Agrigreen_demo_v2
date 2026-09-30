@@ -16,10 +16,10 @@ import (
 type PlotHarvest struct {
 	OrderID   uuid.UUID
 	PlotRef   uuid.UUID
-	Check     string // ok | unknown | unavailable
-	Date      *time.Time
+	Check     string     // ok | unknown | unavailable
+	Date      *time.Time // ngày gặt dự kiến (gốc hạn FM-02)
+	OpenDate  *time.Time // ngày mở cửa sổ gặt (mốc FM-01); nil = dùng Date
 	SeasonRef *uuid.UUID
-	Kind      *string
 	FetchedAt time.Time
 }
 
@@ -27,21 +27,21 @@ type PlotHarvest struct {
 // không đè một ngày gặt đã biết.
 func PutPlotHarvest(ctx context.Context, tx pgx.Tx, tid uuid.UUID, h PlotHarvest) error {
 	_, err := tx.Exec(ctx, `INSERT INTO mkg_fieldops.order_plot_harvest_current AS c
-	    (tenant_id, order_id, plot_ref, harvest_check, harvest_date, season_ref, harvest_kind, fetched_at)
+	    (tenant_id, order_id, plot_ref, harvest_check, harvest_date, harvest_open_date, season_ref, fetched_at)
 	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	  ON CONFLICT (tenant_id, order_id, plot_ref) DO UPDATE SET
 	    harvest_check = EXCLUDED.harvest_check, harvest_date = EXCLUDED.harvest_date, season_ref = EXCLUDED.season_ref,
-	    harvest_kind = EXCLUDED.harvest_kind, fetched_at = EXCLUDED.fetched_at, updated_at = now()
+	    harvest_open_date = EXCLUDED.harvest_open_date, fetched_at = EXCLUDED.fetched_at, updated_at = now()
 	  WHERE NOT (EXCLUDED.harvest_check = 'unavailable' AND c.harvest_check = 'ok')`,
-		tid, h.OrderID, h.PlotRef, h.Check, h.Date, h.SeasonRef, h.Kind, h.FetchedAt.UTC())
+		tid, h.OrderID, h.PlotRef, h.Check, h.Date, h.OpenDate, h.SeasonRef, h.FetchedAt.UTC())
 	return err
 }
 
-const plotHarvestCols = `order_id, plot_ref, harvest_check, harvest_date, season_ref, harvest_kind, fetched_at`
+const plotHarvestCols = `order_id, plot_ref, harvest_check, harvest_date, harvest_open_date, season_ref, fetched_at`
 
 func scanPlotHarvest(row pgx.Row) (PlotHarvest, error) {
 	var h PlotHarvest
-	err := row.Scan(&h.OrderID, &h.PlotRef, &h.Check, &h.Date, &h.SeasonRef, &h.Kind, &h.FetchedAt)
+	err := row.Scan(&h.OrderID, &h.PlotRef, &h.Check, &h.Date, &h.OpenDate, &h.SeasonRef, &h.FetchedAt)
 	return h, err
 }
 
@@ -84,8 +84,8 @@ type HarvestCheck struct {
 	BaleDate    time.Time
 	Check       string
 	HarvestDate *time.Time
+	OpenDate    *time.Time
 	SeasonRef   *uuid.UUID
-	Kind        *string
 	Source      string // partner | cache | none
 	RuleVersion string
 }
@@ -94,17 +94,17 @@ type HarvestCheck struct {
 func InsertHarvestCheck(ctx context.Context, tx pgx.Tx, r RollCount, h *HarvestCheck) error {
 	h.RollCountID, h.OrderID, h.PlotRef, h.RuleVersion = r.ID, r.OrderID, r.PlotRef, domain.RuleHarvestCheck
 	_, err := tx.Exec(ctx, `INSERT INTO mkg_fieldops.roll_count_harvest
-	    (id, tenant_id, stream_key, roll_count_id, order_id, plot_ref, bale_date, harvest_check, harvest_date, season_ref, harvest_kind,
+	    (id, tenant_id, stream_key, roll_count_id, order_id, plot_ref, bale_date, harvest_check, harvest_date, harvest_open_date, season_ref,
 	     harvest_source, event_time, actor_ref, device_id, idem_key, rule_version)
 	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
-		ids.New(), r.TenantID, "harvest:"+r.ID.String(), r.ID, r.OrderID, r.PlotRef, h.BaleDate, h.Check, h.HarvestDate, h.SeasonRef,
-		h.Kind, h.Source, r.EventTime, r.ActorRef, r.DeviceID, r.IdemKey+":harvest", h.RuleVersion)
+		ids.New(), r.TenantID, "harvest:"+r.ID.String(), r.ID, r.OrderID, r.PlotRef, h.BaleDate, h.Check, h.HarvestDate, h.OpenDate, h.SeasonRef,
+		h.Source, r.EventTime, r.ActorRef, r.DeviceID, r.IdemKey+":harvest", h.RuleVersion)
 	return err
 }
 
 // HarvestChecksOf đọc kết quả kiểm ngày gặt của mọi bản ghi cuộn của một lệnh gom.
 func HarvestChecksOf(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) (map[uuid.UUID]HarvestCheck, error) {
-	rows, err := tx.Query(ctx, `SELECT roll_count_id, order_id, plot_ref, bale_date, harvest_check, harvest_date, season_ref, harvest_kind,
+	rows, err := tx.Query(ctx, `SELECT roll_count_id, order_id, plot_ref, bale_date, harvest_check, harvest_date, harvest_open_date, season_ref,
 	    harvest_source, rule_version FROM mkg_fieldops.roll_count_harvest WHERE order_id = $1`, orderID)
 	if err != nil {
 		return nil, err
@@ -113,7 +113,7 @@ func HarvestChecksOf(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) (map[uui
 	out := map[uuid.UUID]HarvestCheck{}
 	for rows.Next() {
 		var h HarvestCheck
-		if err := rows.Scan(&h.RollCountID, &h.OrderID, &h.PlotRef, &h.BaleDate, &h.Check, &h.HarvestDate, &h.SeasonRef, &h.Kind,
+		if err := rows.Scan(&h.RollCountID, &h.OrderID, &h.PlotRef, &h.BaleDate, &h.Check, &h.HarvestDate, &h.OpenDate, &h.SeasonRef,
 			&h.Source, &h.RuleVersion); err != nil {
 			return nil, err
 		}
@@ -132,7 +132,7 @@ type BalingRow struct {
 	HarvestCheck *string
 	HarvestDate  *time.Time
 	SeasonRef    *uuid.UUID
-	HarvestKind  *string
+	HarvestOpen  *time.Time
 	// BaledAt: event_time của bản ghi cuộn GỐC đầu tiên còn hiệu lực có số (nil = chưa cuộn).
 	BaledAt *time.Time
 }
@@ -145,7 +145,7 @@ func BalingRows(ctx context.Context, tx pgx.Tx, orderIDs []uuid.UUID, after [2]u
 		only = uuidStrings(orderIDs)
 	}
 	rows, err := tx.Query(ctx, `
-	  SELECT o.order_id, p.plot_ref, o.htx_ref, o.crew_ref, o.status, h.harvest_check, h.harvest_date, h.season_ref, h.harvest_kind,
+	  SELECT o.order_id, p.plot_ref, o.htx_ref, o.crew_ref, o.status, h.harvest_check, h.harvest_date, h.season_ref, h.harvest_open_date,
 	         CASE WHEN t.plot_ref IS NOT NULL AND (t.rolls > 0 OR t.loose_kg IS NOT NULL) THEN (
 	           SELECT min(r.event_time) FROM mkg_fieldops.roll_count r
 	           WHERE r.order_id = o.order_id AND r.plot_ref = p.plot_ref AND r.stage = 'bale' AND r.supersedes_id IS NULL) END
@@ -168,7 +168,7 @@ func BalingRows(ctx context.Context, tx pgx.Tx, orderIDs []uuid.UUID, after [2]u
 	for rows.Next() {
 		var b BalingRow
 		if err := rows.Scan(&b.OrderID, &b.PlotRef, &b.HTXRef, &b.CrewRef, &b.OrderStatus, &b.HarvestCheck, &b.HarvestDate, &b.SeasonRef,
-			&b.HarvestKind, &b.BaledAt); err != nil {
+			&b.HarvestOpen, &b.BaledAt); err != nil {
 			return nil, err
 		}
 		out = append(out, b)

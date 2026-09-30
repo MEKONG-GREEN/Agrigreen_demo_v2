@@ -161,9 +161,9 @@ CREATE TABLE mkg_fieldops.roll_count_harvest (
   plot_ref          uuid        NOT NULL,
   bale_date         date        NOT NULL,                   -- ngày nghiệp vụ (giờ VN) của event_time bản ghi cuộn
   harvest_check     text        NOT NULL CHECK (harvest_check IN ('ok', 'unknown', 'unavailable')),
-  harvest_date      date        NULL,
+  harvest_date      date        NULL,                   -- ngày gặt dự kiến của vụ (expected_harvest_date) — gốc hạn FM-02
+  harvest_open_date date        NULL,                   -- ngày mở cửa sổ gặt của vụ (harvest_open_date) — mốc FM-01
   season_ref        uuid        NULL,
-  harvest_kind      text        NULL CHECK (harvest_kind IS NULL OR harvest_kind IN ('expected', 'actual')),
   harvest_source    text        NOT NULL CHECK (harvest_source IN ('partner', 'cache', 'none')),
   event_time        timestamptz NOT NULL,
   recorded_at       timestamptz NOT NULL DEFAULT now(),
@@ -178,7 +178,7 @@ CREATE TABLE mkg_fieldops.roll_count_harvest (
   PRIMARY KEY (id, recorded_at),
   CHECK ((supersedes_id IS NULL) = (correction_reason IS NULL)),
   CHECK ((harvest_check = 'ok') = (harvest_date IS NOT NULL)),
-  CHECK (harvest_check <> 'ok' OR bale_date >= harvest_date),          -- FM-01 ở tầng DB (lớp hai sau app/)
+  CHECK (harvest_check <> 'ok' OR bale_date >= coalesce(harvest_open_date, harvest_date)),  -- FM-01 ở tầng DB (lớp hai sau app/)
   CHECK ((harvest_source = 'none') = (harvest_check <> 'ok'))
 ) PARTITION BY RANGE (recorded_at);
 CREATE INDEX roll_count_harvest_idem   ON mkg_fieldops.roll_count_harvest (tenant_id, idem_key);
@@ -191,9 +191,9 @@ CREATE TABLE mkg_fieldops.order_plot_harvest_current (
   order_id      uuid        NOT NULL,
   plot_ref      uuid        NOT NULL,
   harvest_check text        NOT NULL CHECK (harvest_check IN ('ok', 'unknown', 'unavailable')),
-  harvest_date  date        NULL,
-  season_ref    uuid        NULL,
-  harvest_kind  text        NULL CHECK (harvest_kind IS NULL OR harvest_kind IN ('expected', 'actual')),
+  harvest_date      date        NULL,               -- ngày gặt dự kiến (gốc hạn cuộn FM-02)
+  harvest_open_date date        NULL,               -- ngày mở cửa sổ gặt (mốc FM-01)
+  season_ref        uuid        NULL,
   fetched_at    timestamptz NOT NULL,
   updated_at    timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (tenant_id, order_id, plot_ref),

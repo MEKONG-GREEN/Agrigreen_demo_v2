@@ -703,6 +703,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/mrv/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cảnh báo MRV trong phạm vi — Cảnh báo khẩn, AWD thiếu hạ tầng, hồ sơ quá hạn (G3)
+         * @description KN US-MRV-04 (pest_urgent: nhãn Cảnh báo khẩn tự bật khi vượt ngưỡng), KN FR-08 (awd_no_infrastructure: nhật ký App HTX ghi AWD nhưng vùng chưa đủ hạ tầng), KN US-MRV-06 (review_overdue: level 1 đã báo người duyệt, level 2 đã leo thang lên quản trị TTKN tỉnh). Mỗi cảnh báo phát pf.mrv.alert.raised → pf/notify. Vai đọc minh chứng (mrv_collector, mrv_reviewer, mrv_viewer, mrv_exporter); lọc theo phạm vi xã của người gọi.
+         */
+        get: operations["listMrvAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/mrv/seasons/{id}/estimate/recompute": {
         parameters: {
             query?: never;
@@ -3240,7 +3260,7 @@ export interface paths {
          * @description Chỉ `coop_manager` của đúng HTX. `revision` phải là bản hiện hành (409 `cropcycle.collection_statement_stale`).
          *     `confirmed`: số HTX = số MKG. `disputed`: bắt buộc `htx_rolls` (≠ số MKG) và `reason` 10–500 ký tự, không chứa SĐT/CCCD.
          *     Đã có phản hồi cho cùng revision → bắt buộc `reason`; bản mới thay bản trước (sổ chỉ ghi thêm, `supersedes_id`).
-         *     MKG kéo phản hồi về qua `GET /v1/cropcycle/htx-collection/responses`.
+         *     MKG kéo phản hồi về qua `GET /v1/partner/htx-collection/responses` (ADR-0020).
          */
         post: operations["respondHtxCollectionStatement"];
         delete?: never;
@@ -3257,12 +3277,144 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Luồng phản hồi của HTX cho MKG kéo về (tài khoản dịch vụ vai mkg_sync) — G3-2
-         * @description Nền tảng → MKG chỉ qua Application API công khai (g3-conventions §5). Chỉ vai `mkg_sync`; chỉ phản hồi thuộc bảng kê
-         *     do chính tenant của tài khoản gửi qua van; không có người phản hồi. Con trỏ `after` = `cursor` cuối (tăng dần, không bỏ sót
-         *     dòng commit muộn). MKG ghi mỗi dòng thành `mkg_fieldops.htx_confirmation` kênh `platform` (idempotent).
+         * Bí danh của GET /v1/partner/htx-collection/responses (ADR-0020)
+         * @description Giữ để tương thích G3-2. Cùng kiểm cấp quyền chia sẻ `htx_collection_responses`, cùng sổ đọc, cùng dữ liệu với
+         *     `GET /v1/partner/htx-collection/responses`. MKG dùng đường của bề mặt đối tác.
          */
         get: operations["listHtxCollectionResponseFeed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/partner/grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cấp quyền chia sẻ đang hiệu lực mà tenant người gọi nhận (ADR-0020) */
+        get: operations["listPartnerGrants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/partner/cooperatives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Danh bạ HTX của tenant bên cấp (loại cooperative_directory, ADR-0020)
+         * @description Không người đại diện, không mã số thuế, không nông hộ. Con trỏ theo `ref`.
+         */
+        get: operations["listPartnerCooperatives"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/partner/cooperatives/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một HTX của tenant bên cấp (loại cooperative_directory, ADR-0020) */
+        get: operations["getPartnerCooperative"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/partner/plots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Danh bạ thửa của tenant bên cấp (loại plot_directory, ADR-0020)
+         * @description Hình học, diện tích, xã, HTX, trạng thái — không nông hộ, không tên thửa. Con trỏ theo `ref`.
+         */
+        get: operations["listPartnerPlots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/partner/plots/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một thửa của tenant bên cấp (loại plot_directory, ADR-0020) */
+        get: operations["getPartnerPlot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/partner/season-harvest-dates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ngày gieo / thu hoạch của vụ ở tenant bên cấp (loại season_harvest_dates, proto FM-01/02, ADR-0020)
+         * @description Không nông hộ, không sản lượng. Con trỏ `after` = `cursor` cuối (đổi khi vụ đổi).
+         */
+        get: operations["listPartnerSeasonHarvestDates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/partner/htx-collection/responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Luồng phản hồi của HTX cho MKG kéo về (loại htx_collection_responses, RB-6 chiều mua, ADR-0020)
+         * @description Đọc ở tenant bên cấp; chỉ phản hồi thuộc bảng kê do chính tenant người gọi gửi qua van (`source_tenant_id`); không có
+         *     người phản hồi. Con trỏ `after` = `cursor` cuối (tăng dần, không bỏ sót dòng commit muộn). MKG ghi mỗi dòng thành
+         *     `mkg_fieldops.htx_confirmation` kênh `platform` (idempotent).
+         */
+        get: operations["listPartnerHtxCollectionResponses"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3293,10 +3445,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extdata/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** pf/extdata (ADR-0007): nguồn dữ liệu ngoài đã bật — thời tiết, độ mặn, tile. Không trả URL (có thể chứa khóa API) */
+        get: operations["extdataSources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extdata/{source}/point": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** pf/extdata (ADR-0007): dữ liệu điểm qua proxy khử định danh — tọa độ làm thô về tâm ô lưới trước khi gọi nhà cung cấp; đệm theo ô */
+        get: operations["extdataPoint"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extdata/{source}/tiles/{z}/{x}/{y}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** pf/extdata (ADR-0007): tile bản đồ/vệ tinh qua proxy — zoom ≤ max_zoom của nguồn, tile phải giao vùng phục vụ; y có thể kèm đuôi .png */
+        get: operations["extdataTile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ExtDataSource: {
+            id: string;
+            /** @enum {string} */
+            kind: "weather" | "salinity" | "tile";
+            /** @description Đích thuộc AG_RESIDENCY_ALLOWLIST (RB-7) */
+            in_territory: boolean;
+            /** @description ADR riêng của nguồn ngoài lãnh thổ (ADR-0007) */
+            adr?: string;
+            /** @description Cạnh ô lưới (nguồn điểm) */
+            cell_deg?: string;
+            /** @description Trần zoom (nguồn tile) */
+            max_zoom?: number;
+            ttl_seconds: number;
+            /** @description Nhà cung cấp giả (Local/Dev) */
+            fake: boolean;
+        };
         /** @description Lịch gom rơm MKG của một HTX (van collection_schedule) — chỉ khung thời gian và trạng thái. */
         HtxCollectionSchedule: {
             /** Format: uuid */
@@ -4144,6 +4363,8 @@ export interface components {
              * @enum {string}
              */
             review_status?: "pending" | "accepted" | "rejected";
+            /** @description Chỉ có trong danh sách: bản hiện hành mang nhãn Cảnh báo khẩn (KN US-MRV-04) */
+            urgent?: boolean;
         };
         MrvReview: {
             /** Format: uuid */
@@ -4172,6 +4393,50 @@ export interface components {
             review_status: "pending" | "accepted" | "rejected";
             chain: components["schemas"]["MrvEvidence"][];
             reviews: components["schemas"]["MrvReview"][];
+            /** @description Phiên bản đang xem mang nhãn Cảnh báo khẩn — tự bật khi vượt ngưỡng (KN US-MRV-04) */
+            urgent?: boolean;
+            /** @description Mọi cảnh báo của chuỗi minh chứng, cũ → mới */
+            alerts?: components["schemas"]["MrvAlert"][];
+        };
+        /** @description Một cảnh báo MRV (sổ pf_mrv.alert, chỉ ghi thêm). pest_urgent (mrv.pest_urgent.v1): loại sâu bệnh/thiên tai thuộc mrv.urgent.categories VÀ (cấp ≥ mrv.urgent.min_severity HOẶC diện tích ≥ mrv.urgent.min_area_ha); awd_no_infrastructure (mrv.awd_infra.v1): nhật ký App HTX có mã hoạt động thuộc mrv.awd.activity_codes mà thửa/xã chưa có minh chứng irrigation_infrastructure đạt (KN FR-08); review_overdue (mrv.review_overdue.v1): hồ sơ chờ duyệt quá mrv.review_sla_hours (level 1, người duyệt) / mrv.review_escalate_hours (level 2, quản trị TTKN tỉnh) (KN US-MRV-06). Mọi ngưỡng là tham số có phiên bản — TẠM, chờ khách; params ghi phiên bản đã dùng. */
+        MrvAlert: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "pest_urgent" | "awd_no_infrastructure" | "review_overdue";
+            level: number;
+            /** @enum {string} */
+            severity: "urgent" | "normal";
+            /** @description Nhãn hiển thị, vd Cảnh báo khẩn */
+            label: string;
+            admin_unit_code: string;
+            /** @enum {string} */
+            subject_type: "evidence" | "farm_log";
+            /**
+             * Format: uuid
+             * @description Phiên bản minh chứng hoặc log_id của nhật ký HTX
+             */
+            subject_id: string;
+            /**
+             * Format: uuid
+             * @description Gốc chuỗi minh chứng hoặc log_ref
+             */
+            subject_root_id: string;
+            /** Format: uuid */
+            plot_ref: string | null;
+            /** Format: uuid */
+            season_ref: string | null;
+            /** @description Đầu vào đã đánh giá (không có dữ liệu cá nhân) */
+            detail: {
+                [key: string]: unknown;
+            };
+            params: components["schemas"]["MrvParamUse"][];
+            rule_version: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            seq: number;
         };
         MrvExportFilters: {
             evidence_type?: string;
@@ -6463,6 +6728,95 @@ export interface components {
             approved_logs: number;
             pending_logs: number;
         };
+        PartnerGrant: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            grantor_tenant_id: string;
+            kinds: ("cooperative_directory" | "plot_directory" | "season_harvest_dates" | "htx_collection_responses" | "valve_hub" | "valve_collection" | "valve_mrv_evidence")[];
+            /** Format: date-time */
+            valid_from: string;
+            /** Format: date-time */
+            valid_to: string;
+        };
+        /** @description HTX cho bên nhận — không người đại diện, không mã số thuế, không nông hộ */
+        PartnerCooperative: {
+            /** Format: uuid */
+            ref: string;
+            code: string;
+            name: string;
+            commune_code: string | null;
+            active: boolean;
+            /** @description Độ, 7 chữ số thập phân (vị trí hồ sơ HTX) */
+            lon: string | null;
+            lat: string | null;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /** @description Thửa cho bên nhận — không nông hộ, không tên thửa, không người tạo */
+        PartnerPlot: {
+            /** Format: uuid */
+            ref: string;
+            code: string;
+            commune_code: string;
+            /** Format: uuid */
+            cooperative_ref: string | null;
+            /** @enum {string} */
+            status: "draft" | "active" | "retired";
+            /** @description Decimal dạng chuỗi */
+            area_ha: string;
+            /** @description GeoJSON MultiPolygon (EPSG:4326) */
+            geometry: Record<string, never>;
+            revision: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        PartnerSeasonDates: {
+            /** Format: uuid */
+            season_ref: string;
+            /** Format: uuid */
+            plot_ref: string;
+            /** Format: uuid */
+            cooperative_ref: string;
+            commune_code: string;
+            season_code: string;
+            season_year: number;
+            /** Format: date */
+            sowing_date: string;
+            /** Format: date */
+            expected_harvest_date: string;
+            /** Format: date */
+            harvest_open_date: string;
+            /** @enum {string} */
+            status: "open" | "completed" | "cancelled";
+            /** Format: date-time */
+            completed_at: string | null;
+            cursor: number;
+        };
+        HtxCollectionResponseFeedPage: {
+            next_cursor: number;
+            items: {
+                /** Format: uuid */
+                response_id: string;
+                cursor: number;
+                /** Format: uuid */
+                statement_ref: string;
+                statement_revision: number;
+                /** Format: uuid */
+                htx_ref: string;
+                /** Format: uuid */
+                plot_ref: string;
+                mkg_rolls: number;
+                /** @enum {string} */
+                outcome: "confirmed" | "disputed";
+                htx_rolls: number;
+                reason: string | null;
+                /** Format: date-time */
+                responded_at: string;
+                /** Format: uuid */
+                supersedes_response_id: string | null;
+            }[];
+        };
     };
     responses: {
         /** @description RFC 9457 */
@@ -6562,6 +6916,11 @@ export interface components {
         };
     };
     parameters: {
+        /**
+         * @description Tenant BÊN CẤP (ADR-0020) — không phải tenant người gọi (tenant người gọi luôn lấy từ token, R-16). Vắng mặt → chỉ nhận
+         *     khi đúng một bên cấp có loại dữ liệu này (nhiều bên cấp → 422 party.share_grantor_ambiguous).
+         */
+        PartnerGrantor: string;
         IdempotencyKey: string;
         /** @description Thời điểm tra (RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam). Mặc định là hiện tại. */
         At: string;
@@ -7854,6 +8213,36 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["MrvEstimate"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listMrvAlerts: {
+        parameters: {
+            query?: {
+                kind?: "pest_urgent" | "awd_no_infrastructure" | "review_overdue";
+                admin_unit_code?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trang kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MrvAlert"][];
                         next_cursor: string | null;
                     };
                 };
@@ -12953,6 +13342,11 @@ export interface operations {
     listHtxCollectionResponseFeed: {
         parameters: {
             query?: {
+                /**
+                 * @description Tenant BÊN CẤP (ADR-0020) — không phải tenant người gọi (tenant người gọi luôn lấy từ token, R-16). Vắng mặt → chỉ nhận
+                 *     khi đúng một bên cấp có loại dữ liệu này (nhiều bên cấp → 422 party.share_grantor_ambiguous).
+                 */
+                grantor?: components["parameters"]["PartnerGrantor"];
                 after?: number;
                 limit?: number;
             };
@@ -12968,34 +13362,236 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    "application/json": components["schemas"]["HtxCollectionResponseFeedPage"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    listPartnerGrants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cấp quyền đang hiệu lực */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
                     "application/json": {
-                        next_cursor: number;
-                        items: {
-                            /** Format: uuid */
-                            response_id: string;
-                            cursor: number;
-                            /** Format: uuid */
-                            statement_ref: string;
-                            statement_revision: number;
-                            /** Format: uuid */
-                            htx_ref: string;
-                            /** Format: uuid */
-                            plot_ref: string;
-                            mkg_rolls: number;
-                            /** @enum {string} */
-                            outcome: "confirmed" | "disputed";
-                            htx_rolls: number;
-                            reason: string | null;
-                            /** Format: date-time */
-                            responded_at: string;
-                            /** Format: uuid */
-                            supersedes_response_id: string | null;
-                        }[];
+                        items: components["schemas"]["PartnerGrant"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    listPartnerCooperatives: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Tenant BÊN CẤP (ADR-0020) — không phải tenant người gọi (tenant người gọi luôn lấy từ token, R-16). Vắng mặt → chỉ nhận
+                 *     khi đúng một bên cấp có loại dữ liệu này (nhiều bên cấp → 422 party.share_grantor_ambiguous).
+                 */
+                grantor?: components["parameters"]["PartnerGrantor"];
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang danh bạ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["PartnerCooperative"][];
+                        /** Format: uuid */
+                        next_cursor: string | null;
                     };
                 };
             };
             403: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    getPartnerCooperative: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Tenant BÊN CẤP (ADR-0020) — không phải tenant người gọi (tenant người gọi luôn lấy từ token, R-16). Vắng mặt → chỉ nhận
+                 *     khi đúng một bên cấp có loại dữ liệu này (nhiều bên cấp → 422 party.share_grantor_ambiguous).
+                 */
+                grantor?: components["parameters"]["PartnerGrantor"];
+            };
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description HTX */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerCooperative"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    listPartnerPlots: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Tenant BÊN CẤP (ADR-0020) — không phải tenant người gọi (tenant người gọi luôn lấy từ token, R-16). Vắng mặt → chỉ nhận
+                 *     khi đúng một bên cấp có loại dữ liệu này (nhiều bên cấp → 422 party.share_grantor_ambiguous).
+                 */
+                grantor?: components["parameters"]["PartnerGrantor"];
+                cooperative_ref?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang danh bạ thửa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["PartnerPlot"][];
+                        /** Format: uuid */
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    getPartnerPlot: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Tenant BÊN CẤP (ADR-0020) — không phải tenant người gọi (tenant người gọi luôn lấy từ token, R-16). Vắng mặt → chỉ nhận
+                 *     khi đúng một bên cấp có loại dữ liệu này (nhiều bên cấp → 422 party.share_grantor_ambiguous).
+                 */
+                grantor?: components["parameters"]["PartnerGrantor"];
+            };
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thửa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerPlot"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    listPartnerSeasonHarvestDates: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Tenant BÊN CẤP (ADR-0020) — không phải tenant người gọi (tenant người gọi luôn lấy từ token, R-16). Vắng mặt → chỉ nhận
+                 *     khi đúng một bên cấp có loại dữ liệu này (nhiều bên cấp → 422 party.share_grantor_ambiguous).
+                 */
+                grantor?: components["parameters"]["PartnerGrantor"];
+                plot_ref?: string;
+                after?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["PartnerSeasonDates"][];
+                        next_cursor: number;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    listPartnerHtxCollectionResponses: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Tenant BÊN CẤP (ADR-0020) — không phải tenant người gọi (tenant người gọi luôn lấy từ token, R-16). Vắng mặt → chỉ nhận
+                 *     khi đúng một bên cấp có loại dữ liệu này (nhiều bên cấp → 422 party.share_grantor_ambiguous).
+                 */
+                grantor?: components["parameters"]["PartnerGrantor"];
+                after?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang luồng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HtxCollectionResponseFeedPage"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
         };
     };
     replayGisLayers: {
@@ -13030,6 +13626,115 @@ export interface operations {
             404: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
+        };
+    };
+    extdataSources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh mục nguồn (mặc định rỗng khi chưa cấu hình AG_EXTDATA_SOURCES) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ExtDataSource"][];
+                    };
+                };
+            };
+            401: components["responses"]["Problem"];
+        };
+    };
+    extdataPoint: {
+        parameters: {
+            query: {
+                /** @description Vĩ độ thập phân (chuỗi) */
+                lat: string;
+                /** @description Kinh độ thập phân (chuỗi) */
+                lon: string;
+            };
+            header?: never;
+            path: {
+                source: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dữ liệu của ô lưới (data là JSON nguyên văn của nhà cung cấp). Cache-Control: private, max-age = thời gian đệm còn lại */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        source: string;
+                        /** @enum {string} */
+                        kind: "weather" | "salinity";
+                        cell: {
+                            /** @description Vĩ độ tâm ô */
+                            lat: string;
+                            /** @description Kinh độ tâm ô */
+                            lon: string;
+                            /** @description Cạnh ô (độ), ≥ 0.05 */
+                            size_deg: string;
+                        };
+                        /** Format: date-time */
+                        fetched_at: string;
+                        cached: boolean;
+                        /** @description JSON của nhà cung cấp */
+                        data: unknown;
+                    };
+                };
+            };
+            401: components["responses"]["Problem"];
+            /** @description extdata.unknown_source */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | extdata.outside_territory */
+            422: components["responses"]["Problem"];
+            /** @description extdata.provider_unavailable */
+            502: components["responses"]["Problem"];
+        };
+    };
+    extdataTile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source: string;
+                z: number;
+                x: number;
+                y: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tile nhị phân */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/webp": string;
+                    "application/x-protobuf": string;
+                };
+            };
+            401: components["responses"]["Problem"];
+            /** @description extdata.unknown_source */
+            404: components["responses"]["Problem"];
+            /** @description validation_failed | extdata.zoom_too_high | extdata.outside_territory */
+            422: components["responses"]["Problem"];
+            /** @description extdata.provider_unavailable */
+            502: components["responses"]["Problem"];
         };
     };
 }

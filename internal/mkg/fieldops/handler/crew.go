@@ -412,7 +412,7 @@ type balingDTO struct {
 	OrderStatus  string     `json:"order_status"`
 	HarvestCheck string     `json:"harvest_check"`
 	HarvestDate  *string    `json:"harvest_date"`
-	HarvestKind  *string    `json:"harvest_kind"`
+	HarvestOpen  *string    `json:"harvest_open_date"`
 	SeasonRef    *uuid.UUID `json:"season_ref"`
 	BaledOn      *string    `json:"baled_on"`
 	Deadline     *string    `json:"deadline"`
@@ -436,10 +436,10 @@ func toBaling(b app.BalingItem) balingDTO {
 		check = *b.Row.HarvestCheck
 	}
 	d := balingDTO{OrderID: b.Row.OrderID, PlotRef: b.Row.PlotRef, HTXRef: b.Row.HTXRef, CrewRef: b.Row.CrewRef, OrderStatus: b.Row.OrderStatus,
-		HarvestCheck: check, HarvestKind: b.Row.HarvestKind, SeasonRef: b.Row.SeasonRef, Deadline: datePtr(b.Baling.Deadline),
+		HarvestCheck: check, SeasonRef: b.Row.SeasonRef, Deadline: datePtr(b.Baling.Deadline),
 		DaysOnField: b.Baling.DaysOnField, Status: b.Baling.Status, Overdue: b.Baling.Status == domain.BalingOverdue, Flagged: b.Baling.Flagged()}
 	if check == domain.HarvestOK {
-		d.HarvestDate = datePtr(b.Row.HarvestDate)
+		d.HarvestDate, d.HarvestOpen = datePtr(b.Row.HarvestDate), datePtr(b.Row.HarvestOpen)
 	}
 	if b.Row.BaledAt != nil {
 		day := domain.Day(*b.Row.BaledAt)

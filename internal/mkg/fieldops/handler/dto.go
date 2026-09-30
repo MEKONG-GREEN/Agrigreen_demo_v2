@@ -113,7 +113,7 @@ type harvestCheckDTO struct {
 	Check       string     `json:"check"` // ok | unknown | unavailable
 	BaleDate    string     `json:"bale_date"`
 	HarvestDate *string    `json:"harvest_date"`
-	HarvestKind *string    `json:"harvest_kind"`
+	HarvestOpen *string    `json:"harvest_open_date"`
 	SeasonRef   *uuid.UUID `json:"season_ref"`
 	Source      string     `json:"source"` // partner | cache | none
 	RuleVersion string     `json:"rule_version"`
@@ -123,7 +123,7 @@ func toHarvestCheck(h *store.HarvestCheck) *harvestCheckDTO {
 	if h == nil {
 		return nil
 	}
-	d := &harvestCheckDTO{Check: h.Check, BaleDate: h.BaleDate.Format(dateLayout), HarvestKind: h.Kind, SeasonRef: h.SeasonRef,
+	d := &harvestCheckDTO{Check: h.Check, BaleDate: h.BaleDate.Format(dateLayout), HarvestOpen: datePtr(h.OpenDate), SeasonRef: h.SeasonRef,
 		Source: h.Source, RuleVersion: h.RuleVersion}
 	if h.HarvestDate != nil {
 		s := h.HarvestDate.Format(dateLayout)

@@ -15,7 +15,7 @@ Lộ trình theo Phụ lục A của tài liệu kiến trúc v3.0. Kế hoạch
 - [x] ADR 0001–0013
 - [x] CI xanh toàn bộ trên GitHub, kể cả R-32 qua PgBouncer và build/ký 6 image (27/09/2026)
 - [x] Chạy thử Compose trên máy có Docker (job CI `compose-smoke`: dựng toàn bộ stack, kiểm healthz/readyz)
-- [ ] MKG ký các ADR đề xuất: 0006, 0007, 0009, 0010, 0011
+- [x] Chấp nhận các ADR đề xuất 0006, 0007, 0009, 0010, 0011 (30/09/2026, chủ sản phẩm quyết định trong phiên làm việc). Đối chiếu cam kết → mã → kiểm thử: [trien-khai-g1.md](adr/trien-khai-g1.md). ADR 0014–0019 vẫn ở trạng thái Đề xuất
 
 ## G1: ĐTK 1, ngày 15/12/2026
 
@@ -43,7 +43,7 @@ Mã đã có đủ các phần của kế hoạch S1–S5, sớm hơn mốc 15/1
 **Còn lại của G1** (không chặn mã; chi tiết ở mục Tóm tắt của g1-acceptance):
 - **Chờ khách:** danh mục trường MRV chính thức (C-1); mẫu biểu báo cáo chính thức của Bộ (US-DASH-02); DCRD xác nhận phương pháp dự báo CGH (FN-09); chuyển VN-2000 khi nhập (X9).
 - **Mã:** chọn nhóm dữ liệu khi đồng bộ ngay (US-SYNC-02, cùng liên thông App HTX ở G2). Bản đồ CGH cấp HTX (FN-08: ghim, gom cụm, panel máy, tra cứu) đã xong 29/09.
-- **Hạ tầng:** workflow `restore-drill` đã chạy xanh (29/09/2026); còn chạy thử trên Keycloak/SMTP/FCM thật trong lãnh thổ; MKG ký các ADR đề xuất.
+- **Hạ tầng:** workflow `restore-drill` đã chạy xanh (29/09/2026); còn chạy thử trên Keycloak/SMTP/FCM thật trong lãnh thổ. Năm ADR G1 đã được chấp nhận ngày 30/09/2026 ([trien-khai-g1.md](adr/trien-khai-g1.md)); còn thêm luật Prometheus cho `ag_sync_conflict_overdue` và `ag_db_standby_replication_lag_seconds` vào `deploy/observability`.
 - Chuyển sang G2 theo lộ trình: App HTX (US-HTX-05, US-SYNC-01, US-TASK-01 tự động, CGH FN-07), Hub/kho và lớp GIS nền (GIS FN-04/06/07). Sang G3: đối soát đo lường RB-6, số đo của R-95.
 ## G2: 31/03/2027
 - App HTX:
@@ -130,7 +130,7 @@ G3-0, G3-1 và G3-2 đã có mã, sớm hơn mốc Q3/2027. Đối chiếu yêu 
 **Còn lại của G3** (chi tiết ở mục Tóm tắt của g3-acceptance):
 - **Mã:** proto FM-01/02 (ràng buộc ngày gặt — cần đọc ngày thu hoạch qua API công khai), FM-06/07/08 (năng lực, trạng thái tổ gom, phân công tự động); KN US-MRV-04 (nhãn cảnh báo khẩn sâu bệnh), US-MRV-06 (leo thang hồ sơ MRV quá hạn), FR-08 (cờ AWD thiếu hạ tầng, thông báo KNV).
 - **Hạ tầng:** chạy lại toàn bộ CI; vai giám sát `mkg_monitor`/`ts_monitor` cho cảnh báo SQL; CA thiết bị riêng cho production; job tầng lạnh `ts_weigh` (sau C-7).
-- **Chờ khách:** C-4, C-5, C-6, C-7, định mức hao hụt sấy, phương pháp tCO2e + C-1, RB-2 cấp quyền chia sẻ (Q-MKG-12), số ngày lưu FN-21 — bảng dưới và [tong-hop.md](requirements/tong-hop.md#câu-hỏi-mở-g3-30092026).
+- **Chờ khách:** C-4, C-5, C-6, C-7, định mức hao hụt sấy, phương pháp tCO2e + C-1, số ngày lưu FN-21. RB-2 (Q-MKG-12) đã chốt 30/09/2026 — [ADR-0020](adr/0020-lien-thong-platform-mkg-khac-tenant.md) — bảng dưới và [tong-hop.md](requirements/tong-hop.md#câu-hỏi-mở-g3-30092026).
 
 ### Câu hỏi khách còn mở cho G3
 
@@ -143,7 +143,7 @@ G3-0, G3-1 và G3-2 đã có mã, sớm hơn mốc Q3/2027. Đối chiếu yêu 
 | — | Định mức hao hụt sấy (hao hụt dự kiến HUB_IN → HUB_OUT) | A1 |
 | — | Trả tiền theo cuộn hay theo tấn nhà máy cân (prototype có cả hai; theo tấn thì đối chiếu cuộn ↔ khối lượng là kiểm RB-6) | A1, A4, van `htx_collection_statement` |
 | C-1 | Danh mục trường MRV **và** phạm vi, phương pháp tCO2e (baseline, leakage, chất khô; hệ số 1460 kgCO2e/t, 0,062 / 0,021 kgCO2e/t·km mới là tham số tạm) | A7, van `mrv_collection_evidence` |
-| RB-2 | Cấp quyền chia sẻ: tài khoản dịch vụ tenant MKG đọc thửa/HTX thuộc tenant chương trình như thế nào (cấp quyền tường minh hay vai trong tenant chương trình) | A4 nguồn thửa/HTX |
+| RB-2 | ~~Cấp quyền chia sẻ: tài khoản dịch vụ tenant MKG đọc thửa/HTX thuộc tenant chương trình như thế nào~~ — **đã chốt** (MKG tenant riêng, cấp quyền chia sẻ tường minh, ADR-0020) | A4 nguồn thửa/HTX |
 | — | Số ngày lưu, nén, lưu trữ của nhật ký lớp GIS và ảnh chụp (GIS FN-21; HTML prototype ghi 365 ngày sự kiện, 90 ngày ảnh chụp) và của số đo thô | A6, A8 |
 | Q2-05 | Ngưỡng sản lượng theo giống | A6 chỉ số, cảnh báo cropcycle |
 

@@ -19,6 +19,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port/porttest"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
@@ -49,6 +51,8 @@ type fixture struct {
 	consent *fakeConsent
 	params  *fakeParams
 	tenant  uuid.UUID
+	mkg     uuid.UUID         // tenant MKG riêng (ADR-0020): tenant phong bì van mrv_collection_evidence
+	share   *porttest.Sharing // cấp quyền chia sẻ giả tenant → mkg (valve_mrv_evidence)
 	// tổ chức mẫu: tỉnh 89 (xã 30001, 30002), tổ xã 30001, TW
 	p89, t30001, national uuid.UUID
 }
@@ -73,7 +77,9 @@ func newFixture(t *testing.T) *fixture {
 	t.Cleanup(appSrv.Close)
 	t.Cleanup(adminSrv.Close)
 	f := &fixture{t: t, iss: iss, app: appSrv, admin: adminSrv, mod: mod, pool: pool, store: st, scopes: scopes,
-		consent: consent, params: params, tenant: ids.New(), p89: ids.New(), t30001: ids.New(), national: ids.New()}
+		consent: consent, params: params, tenant: ids.New(), mkg: ids.New(), share: porttest.New(), p89: ids.New(), t30001: ids.New(), national: ids.New()}
+	f.share.Grant(f.tenant, f.mkg, partyport.KindValveMRVEvidence)
+	mod.UseValveGrants(f.share)
 	scopes.set(f.p89, authz.Scope{Units: []string{"89", "30001", "30002"}})
 	scopes.set(f.t30001, authz.Scope{Units: []string{"30001"}})
 	scopes.set(f.national, authz.Scope{All: true})
@@ -166,8 +172,8 @@ func (f *fixture) approveSeed(tid uuid.UUID) {
 	r := setter.adm(http.MethodPost, "/v1/mrv/catalog/seed", nil)
 	expect(f.t, r, 200, "")
 	items, _ := r.body["items"].([]any)
-	if len(items) != 4 {
-		f.t.Fatalf("seed phải tạo 4 danh mục: %v", r.body)
+	if len(items) != 6 {
+		f.t.Fatalf("seed phải tạo 6 danh mục: %v", r.body)
 	}
 	for _, it := range items {
 		v, _ := it.(map[string]any)["version"].(map[string]any)

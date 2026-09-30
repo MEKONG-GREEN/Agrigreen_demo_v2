@@ -20,6 +20,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port/porttest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -52,14 +53,16 @@ type fixture struct {
 	params   *fakeParams
 	farmers  *fakeFarmers
 	tenant   uuid.UUID
-	coopA    uuid.UUID // xã 31117
-	coopB    uuid.UUID // xã 31120
-	knA      uuid.UUID // tổ KN xã 31117
-	h1, h2   uuid.UUID // nông hộ của HTX A
-	h3, h4   uuid.UUID // h3: HTX A; h4: HTX B
-	p1, p2   uuid.UUID // thửa HTX A (h1, h2); p2 lệch GPS 120 m
-	p3, p4   uuid.UUID // p3: HTX A (h3); p4: HTX B (h4)
-	p5       uuid.UUID // thửa thứ hai của h1
+	mkg      uuid.UUID         // tenant MKG riêng (ADR-0020) — tenant phong bì van, tenant tài khoản mkg_sync
+	share    *porttest.Sharing // cấp quyền chia sẻ giả tenant → mkg (pf/party)
+	coopA    uuid.UUID         // xã 31117
+	coopB    uuid.UUID         // xã 31120
+	knA      uuid.UUID         // tổ KN xã 31117
+	h1, h2   uuid.UUID         // nông hộ của HTX A
+	h3, h4   uuid.UUID         // h3: HTX A; h4: HTX B
+	p1, p2   uuid.UUID         // thửa HTX A (h1, h2); p2 lệch GPS 120 m
+	p3, p4   uuid.UUID         // p3: HTX A (h3); p4: HTX B (h4)
+	p5       uuid.UUID         // thửa thứ hai của h1
 	sopAdmin caller
 	approver caller
 }
@@ -69,7 +72,7 @@ func newFixture(t *testing.T) *fixture {
 	iss := authztest.New(t)
 	pool := env.Pool(t, migrations.PF, cropcycle.DBRole)
 	ops := env.Pool(t, migrations.PF, "platform_api")
-	f := &fixture{t: t, iss: iss, pool: pool, clk: clock.NewFixed(startTime), tenant: ids.New(),
+	f := &fixture{t: t, iss: iss, pool: pool, clk: clock.NewFixed(startTime), tenant: ids.New(), mkg: ids.New(), share: porttest.New(),
 		coopA: ids.New(), coopB: ids.New(), knA: ids.New(), h1: ids.New(), h2: ids.New(), h3: ids.New(), h4: ids.New(),
 		p1: ids.New(), p2: ids.New(), p3: ids.New(), p4: ids.New(), p5: ids.New()}
 	sc := &fakeScope{scopes: map[uuid.UUID]authz.Scope{f.knA: {Units: []string{"31117"}}}}
@@ -92,6 +95,8 @@ func newFixture(t *testing.T) *fixture {
 	f.farmers = &fakeFarmers{links: map[uuid.UUID][]uuid.UUID{}}
 	f.mod = cropcycle.New(pool, f.clk, cropcycle.Deps{Scope: sc, Orgs: f.orgs, Plots: f.plots, Params: f.params,
 		Catalogs: newFakeCatalogs(), Farmers: f.farmers})
+	f.share.Grant(f.tenant, f.mkg, partyport.ShareKinds...) // ADR-0020: tenant chương trình → tenant MKG, mọi loại
+	f.mod.UseSharing(f.share, f.share)
 	log := telemetry.NewLogger("test", io.Discard)
 	appEng := httpx.NewEngine(log, 4<<20)
 	f.mod.RegisterApp(appEng.Group("/v1", httpx.Authenticate(iss.Verifier()), idempotency.Middleware(ops)))

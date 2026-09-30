@@ -53,5 +53,6 @@ prototype: 5 800 → 5 700 cuộn, ghe 4 400 cuộn cân 96,8 t bị cờ +10 %;
 - Một số phản hồi chưa khai lược đồ (tranh chấp, sản lượng, lần nhập, xuất hàng, thao tác tranh chấp) → kiểu ở
   `src/api/types.ts` mô tả DTO backend; nên bổ sung vào `mkg-internal.yaml`.
 - Chưa có API tải tệp bằng chứng trong vùng mkg → `evidence_ref` nhập UUID.
-- Tên HTX/thửa ở nền tảng (RB-2 chờ chốt) → giao diện hiện mã rút gọn.
+- Tên HTX/thửa ở nền tảng: RB-2 đã chốt (ADR-0020 — bề mặt đối tác `/v1/partner/*` qua cấp quyền chia sẻ), nhưng api-internal chưa có route
+  chuyển tiếp danh bạ cho web → giao diện vẫn hiện mã rút gọn.
 - api-internal chưa bật CORS (`httpx.CORS` như api-platform) → trình duyệt ở :3001 chưa gọi thẳng được :8081/:8083.

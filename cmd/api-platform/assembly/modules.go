@@ -2,6 +2,7 @@ package assembly
 
 import (
 	"context"
+	"log/slog"
 	"os"
 
 	"github.com/google/uuid"
@@ -11,6 +12,7 @@ import (
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
@@ -29,6 +31,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
@@ -66,11 +69,12 @@ type Modules struct {
 	Simulation    *simulation.Module
 	CropCycle     *cropcycle.Module
 	Metrics       *metrics.Module
+	ExtData       *extdata.Module // proxy khử định danh nguồn ngoài (ADR-0007), không vai DB
 }
 
 // List trả module theo thứ tự gắn route.
 func (m Modules) List() []httpx.Module {
-	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.Waterway, m.Simulation, m.CropCycle, m.Metrics}
+	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.Waterway, m.Simulation, m.CropCycle, m.Metrics, m.ExtData}
 }
 
 // Build là gốc lắp ráp DUY NHẤT: mở pool theo vai của từng module (R-05) và nối
@@ -150,7 +154,12 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	cc := cropcycle.New(ccPool, clk, cropcycle.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Plots: g.Plots(), Params: md.Params(), Catalogs: md.Catalogs(),
 		GpsLog: g.GpsLog()}) // HTX US-GPS-03: log GPS qua consumer outbox pf.cropcycle.gps_log
 	pty.UseSeasonActivity(SeasonActivity{Stats: cc.Stats()}) // HTX US-HTXSTATUS-01 AC-1: vụ chưa xong / nhật ký chờ duyệt
-	kn.UseGpsLog(g.GpsLog())                                 // HTX US-GPS-03: log GPS yêu cầu hỗ trợ (pf.extension.gps_log)
+	// ADR-0020 (RB-2, Q-MKG-12): MKG là tenant riêng — bề mặt đối tác /v1/partner/* kiểm cấp quyền
+	// chia sẻ của pf/party; consumer van MKG ghi vào tenant bên cấp đã cấp valve_* cho tenant phong bì.
+	g.UseSharing(pty.PartnerAccess(), pty.ValveGrants())
+	cc.UseSharing(pty.PartnerAccess(), pty.ValveGrants())
+	mrvMod.UseValveGrants(pty.ValveGrants())
+	kn.UseGpsLog(g.GpsLog()) // HTX US-GPS-03: log GPS yêu cầu hỗ trợ (pf.extension.gps_log)
 
 	syncPool, err := pool(syncmod.DBRole)
 	if err != nil {
@@ -167,6 +176,10 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		Scope: pty.ScopeResolver(), Devices: syncmod.NewDevices(syncPool), Staff: kn.Staff(), Units: md.AdminUnits(),
 	})
 
+	// ADR-0006: con trỏ pull ký HMAC — production bắt buộc AG_SYNC_CURSOR_KEY ≥ 32 byte.
+	if err := syncmod.CheckCursorKey(cursorKey(ext), residency.Production(os.Getenv)); err != nil {
+		return Modules{}, pools, err
+	}
 	snc := syncmod.New(syncPool, clk, syncmod.Deps{
 		Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Params: md.Params(), Vault: ext.Vault,
 		Store: store, CursorKey: cursorKey(ext),
@@ -237,8 +250,15 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 			"pf/extension": kn.MetricsSource(), "pf/mechanization": mech.MetricsSource(), "pf/cropcycle": cc.MetricsSource(), "pf/geo": g.MetricsSource(),
 		}})
 
+	// pf/extdata (ADR-0007): thời tiết/độ mặn/tile qua proxy khử định danh; danh mục nguồn
+	// AG_EXTDATA_* (mặc định rỗng). Cấu hình sai (vd nguồn ngoài lãnh thổ thiếu ADR ở production) → lỗi khởi động.
+	ed, err := extdata.FromEnv(os.Getenv, clk, slog.Default())
+	if err != nil {
+		return Modules{}, pools, err
+	}
+
 	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
-		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Metrics: met}, pools, nil
+		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Metrics: met, ExtData: ed}, pools, nil
 }
 
 // farmerHouseholds chuyển port pf/accounts (liên kết tài khoản nông dân ↔ nông hộ)

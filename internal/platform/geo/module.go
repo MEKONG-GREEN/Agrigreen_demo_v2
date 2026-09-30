@@ -77,6 +77,12 @@ func (m *Module) HubSink() port.HubSink { return m.svc }
 // UseWaterways nối lớp tuyến đường thủy (pf/waterway) cho bản đồ chuẩn hóa (GIS US-INT-02).
 func (m *Module) UseWaterways(l wwport.Layer) { m.svc.Waterways = l }
 
+// UseSharing nối cổng cấp quyền chia sẻ của pf/party (ADR-0020): bề mặt đối tác /v1/partner/plots
+// và định tuyến van hub_facility / hub_capacity về tenant bên cấp.
+func (m *Module) UseSharing(pa partyport.PartnerAccess, vg partyport.ValveGrants) {
+	m.svc.Sharing, m.svc.ValveGrants = pa, vg
+}
+
 // UseFarmers nối liên kết tài khoản nông dân ↔ nông hộ (pf/accounts) sau khi module đó được dựng.
 func (m *Module) UseFarmers(f port.FarmerHouseholds) { m.svc.Farmers = f }
 

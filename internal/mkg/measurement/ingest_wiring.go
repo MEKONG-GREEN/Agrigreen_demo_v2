@@ -19,7 +19,9 @@ type (
 
 // Hàm và hằng của ingest cho gốc lắp ráp.
 var (
-	IngestServerTLS        = ingest.ServerTLS
+	IngestServerTLS = ingest.ServerTLS
+	// IngestRequireDeviceCA: AG_INGEST_CLIENT_CA phải là CA thiết bị riêng (không ký chứng thư máy chủ).
+	IngestRequireDeviceCA  = ingest.RequireSeparateDeviceCA
 	NewIngestMetrics       = ingest.NewMetrics
 	NewIngestRateLimiter   = ingest.NewRateLimiter
 	ErrIngestPortsNotWired = ingest.ErrPortsNotWired

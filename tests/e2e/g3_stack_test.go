@@ -73,8 +73,8 @@ type mkgStack struct {
 
 // newMKGStack dựng phía MKG (gọi ở mức kiểm thử gốc — server sống suốt kịch bản). saToken trả
 // token tài khoản dịch vụ tenant MKG mà endpoint token giả cấp cho client credentials của
-// mkg/fieldops (RB-2: chưa có cấp quyền chia sẻ).
-func newMKGStack(t *testing.T, s *harness.Stack, saToken func() string, devices ...string) *mkgStack {
+// mkg/fieldops; grantor là tenant chương trình (AG_PARTNER_GRANTOR_TENANT, ADR-0020).
+func newMKGStack(t *testing.T, s *harness.Stack, saToken func() string, grantor uuid.UUID, devices ...string) *mkgStack {
 	t.Helper()
 	ctx := context.Background()
 	clk := clock.System{}
@@ -90,6 +90,7 @@ func newMKGStack(t *testing.T, s *harness.Stack, saToken func() string, devices 
 	t.Setenv("AG_PLATFORM_TOKEN_URL", tok.URL)
 	t.Setenv("AG_MKG_SA_CLIENT_ID", "agrigreen-mkg-sync")
 	t.Setenv("AG_MKG_SA_CLIENT_SECRET", "dev-only")
+	t.Setenv("AG_PARTNER_GRANTOR_TENANT", grantor.String())
 	open := func(_ context.Context, role string) (*pgxpool.Pool, error) {
 		return s.Env.Pool(t, migrations.MKG, role), nil
 	}
@@ -330,19 +331,20 @@ type delivery struct {
 	handler  inbox.Handler
 }
 
-// pump giữ trạng thái giao sự kiện của một tenant.
+// pump giữ trạng thái giao sự kiện của các tenant của kịch bản (ADR-0020: tenant chương trình và
+// tenant MKG là HAI tenant — van MKG mang tenant MKG, consumer nền tảng ghi vào tenant bên cấp).
 type pump struct {
 	t         *testing.T
 	s         *harness.Stack
-	tid       uuid.UUID
+	tids      []uuid.UUID
 	seen      map[uuid.UUID]bool
 	delivered []delivery
 	// byType đếm lượt xử lý theo (consumer) — kiểm luồng đi đúng consumer.
 	byConsumer map[string]int
 }
 
-func newPump(t *testing.T, s *harness.Stack, tid uuid.UUID) *pump {
-	return &pump{t: t, s: s, tid: tid, seen: map[uuid.UUID]bool{}, byConsumer: map[string]int{}}
+func newPump(t *testing.T, s *harness.Stack, tids ...uuid.UUID) *pump {
+	return &pump{t: t, s: s, tids: tids, seen: map[uuid.UUID]bool{}, byConsumer: map[string]int{}}
 }
 
 type outboxRow struct {
@@ -354,8 +356,12 @@ func (p *pump) rows(c migrations.Cluster) []outboxRow {
 	p.t.Helper()
 	ctx := context.Background()
 	pool := p.s.Env.Pool(p.t, c, dbadmin.OutboxPublisher)
+	tids := make([]string, 0, len(p.tids))
+	for _, t := range p.tids {
+		tids = append(tids, t.String())
+	}
 	rs, err := pool.Query(ctx, `SELECT id, tenant_id, event_type, schema_version, occurred_at, recorded_at, producer, payload, kind
-	  FROM shared.outbox WHERE tenant_id = $1 ORDER BY id`, p.tid)
+	  FROM shared.outbox WHERE tenant_id = ANY($1::text[]::uuid[]) ORDER BY id`, tids)
 	if err != nil {
 		p.t.Fatal(err)
 	}

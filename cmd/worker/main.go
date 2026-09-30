@@ -15,6 +15,11 @@
 //	notify_email_digest   mỗi giờ: email tóm tắt chỉ đạo khẩn tới hộp thư công vụ (pf/notify, ADR-0015)
 //	mechanization_area_feed_check  mỗi giờ: dữ liệu diện tích vụ App HTX quá ngưỡng độ tươi → báo Admin CGH (CGH FN-07)
 //	metrics_snapshot      00:45 hằng ngày (sau anchor): ghi sổ chỉ số của hôm qua + ảnh chụp lớp GIS (pf/metrics, G3)
+//	mrv_review_escalation mỗi 15 phút: hồ sơ MRV chờ duyệt quá hạn → báo người duyệt, rồi quản trị TTKN tỉnh (KN US-MRV-06)
+//
+// Khi có lịch, worker đăng ký hai gauge của ADR-0006 (gauges.go): ag.sync.conflict.overdue
+// (xung đột đồng bộ quá SLA, theo tenant) và ag.db.standby_replication_lag (chỉ khi có
+// AG_DB_STANDBY_URL).
 //
 // Mọi consumer ghi lần xử lý thất bại vào pf_sync.integration_failure (vai sync_app — màn
 // giám sát đồng bộ, GIS US-SYNC-01); lần giao cuối trước DLQ phát pf.sync.integration.dead_lettered
@@ -93,6 +98,8 @@ import (
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
+	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
@@ -203,6 +210,11 @@ func run(log *slog.Logger, mods, jobs string) error {
 		}
 		defer closeFn()
 		lockPool := sched.pools[migrations.PF]
+		direct := os.Getenv("AG_DB_DIRECT_URL")
+		if direct == "" {
+			direct = base
+		}
+		defer registerGauges(ctx, log, direct, lockPool)() // ADR-0006: xung đột quá SLA, độ trễ standby
 		started++
 		go func() {
 			errc <- leader.Run(ctx, lockPool, leader.LockSchedules, 15*time.Second, leader.Options{}, log, sched.s.Run)
@@ -468,10 +480,27 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		}
 		js = append(js, mods.Metrics.Jobs(metrics.JobTenants(out.pools[migrations.PF]), log)...)
 	}
+	if selected(jobs, mrvport.JobReviewEscalator) {
+		// Leo thang hồ sơ MRV quá hạn (KN US-MRV-06): tìm tenant bằng ag_outbox_publisher (hai cột),
+		// ghi cảnh báo + sự kiện bằng vai mrv_app; SLA đọc qua pf/masterdata bằng vai của nó (R-05).
+		mrvPool, err := openPF(ctx, direct, mrv.DBRole, &closeFn)
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		mdPool, err := openPF(ctx, direct, masterdata.DBRole, &closeFn)
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		mrvMod := mrv.New(mrvPool, clk, mrv.Deps{Params: masterdata.New(mdPool, clk).Params()})
+		js = append(js, mrvMod.Jobs(mrv.PendingTenants(out.pools[migrations.PF]), log)...)
+	}
 	if len(js) == 0 {
 		closeFn()
 		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + extension.JobEscalation + ", " +
-			notifyport.JobEmailDigest + ", " + reports.JobSchedules + ", " + mechport.JobAreaFeedCheck + ", " + metricsport.JobMetricsSnapshot + ")")
+			notifyport.JobEmailDigest + ", " + reports.JobSchedules + ", " + mechport.JobAreaFeedCheck + ", " + metricsport.JobMetricsSnapshot +
+			", " + mrvport.JobReviewEscalator + ")")
 	}
 	out.s = &schedule.Scheduler{Clock: clk, Log: log, Jobs: js}
 	return out, closeFn, nil

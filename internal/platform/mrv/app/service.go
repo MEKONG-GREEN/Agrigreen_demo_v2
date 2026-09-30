@@ -50,6 +50,9 @@ type Service struct {
 	// Params: tham số masterdata đã duyệt (hệ số CO2, ngưỡng FR-08, cửa sổ đối chiếu).
 	// nil → mặc định trong mã, ước tính không bao giờ chính thức.
 	Params mdport.Params
+	// ValveGrants (ADR-0020): tenant bên cấp nhận van mrv_collection_evidence của tenant phong bì
+	// (pf/party). Thiếu → consumer van từ chối (DLQ, party.valve_share_grant_missing).
+	ValveGrants partyport.ValveGrants
 }
 
 func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) error {

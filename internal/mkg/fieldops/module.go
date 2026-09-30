@@ -46,7 +46,7 @@ type Options struct {
 	Feed port.HTXResponseFeed
 	// Harvest: ngày gặt theo vụ của thửa (bề mặt partner, FM-01/02); nil → mọi kiểm ngày gặt
 	// gắn cờ unavailable (vẫn cho ghi) và không có job làm mới bảng đệm.
-	Harvest port.HarvestDates
+	Harvest port.HarvestCalendar
 }
 
 // Module là mkg/fieldops đã nối.
@@ -148,9 +148,9 @@ func NewPlatformDirectory(cfg PlatformConfig, clk clock.Clock) port.PlatformDire
 	return adapter.NewPlatformHTTP(cfg, func() time.Time { return clk.Now() })
 }
 
-// NewPlatformHarvestDates tạo nguồn ngày gặt qua bề mặt partner của nền tảng
-// (GET /v1/partner/season-harvest-dates, tài khoản dịch vụ tenant MKG).
-func NewPlatformHarvestDates(cfg PlatformConfig, clk clock.Clock) port.HarvestDates {
+// NewPlatformHarvestCalendar tạo nguồn ngày gặt qua bề mặt partner của nền tảng (ADR-0020,
+// GET /v1/partner/season-harvest-dates, cấp quyền season_harvest_dates) cho proto FM-01/02.
+func NewPlatformHarvestCalendar(cfg PlatformConfig, clk clock.Clock) port.HarvestCalendar {
 	return adapter.NewPlatformHTTP(cfg, func() time.Time { return clk.Now() })
 }
 

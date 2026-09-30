@@ -80,6 +80,32 @@ func WithTenantTxOptions(ctx context.Context, db Beginner, tid uuid.UUID, opts p
 	return nil
 }
 
+// Within chạy fn trong CÙNG giao dịch tx nhưng với ngữ cảnh tenant tid (SET LOCAL), rồi
+// trả ngữ cảnh về tenant trước đó. Dùng khi một giao dịch hợp lệ phải chạm dữ liệu của
+// tenant khác sau khi app/ đã kiểm một cấp quyền chia sẻ tường minh (ADR-0020) — vd
+// consumer van ghi vào tenant bên cấp, hoặc ghi bảng chiếu cấp quyền ở tenant bên nhận.
+// RLS vẫn áp dụng đầy đủ (không có vai BYPASSRLS): fn chỉ thấy và ghi được dòng của tid.
+// fn trả lỗi → không khôi phục (giao dịch sẽ bị rollback).
+func Within(ctx context.Context, tx pgx.Tx, tid uuid.UUID, fn func() error) error {
+	if tid == uuid.Nil {
+		return ErrMissing
+	}
+	var prev string
+	if err := tx.QueryRow(ctx, "SELECT coalesce(current_setting('app.tenant_id', true), '')").Scan(&prev); err != nil {
+		return fmt.Errorf("tenant: đọc ngữ cảnh: %w", err)
+	}
+	if _, err := tx.Exec(ctx, "SELECT set_config('app.tenant_id', $1, true)", tid.String()); err != nil {
+		return fmt.Errorf("tenant: đặt ngữ cảnh: %w", err)
+	}
+	if err := fn(); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, "SELECT set_config('app.tenant_id', $1, true)", prev); err != nil {
+		return fmt.Errorf("tenant: khôi phục ngữ cảnh: %w", err)
+	}
+	return nil
+}
+
 // FromCtxTx lấy tenant từ context rồi gọi WithTenantTx.
 func FromCtxTx(ctx context.Context, db Beginner, fn func(pgx.Tx) error) error {
 	tid, err := FromContext(ctx)

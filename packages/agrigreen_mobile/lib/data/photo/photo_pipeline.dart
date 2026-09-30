@@ -61,22 +61,7 @@ class ImagePickerCameraSource implements CameraSource {
 Future<void> shredFile(File f) async {
   try {
     if (!await f.exists()) return;
-    final len = await f.length();
-    final raf = await f.open(mode: FileMode.writeOnlyAppend);
-    try {
-      await raf.setPosition(0);
-      const chunk = 64 * 1024;
-      final zeros = Uint8List(chunk);
-      var left = len;
-      while (left > 0) {
-        final n = left < chunk ? left : chunk;
-        await raf.writeFrom(zeros, 0, n);
-        left -= n;
-      }
-      await raf.flush();
-    } finally {
-      await raf.close();
-    }
+    await overwriteWithZeros(f);
     await f.delete();
   } catch (_) {
     try {
@@ -84,6 +69,40 @@ Future<void> shredFile(File f) async {
     } catch (_) {
       // đã bị xóa
     }
+  }
+}
+
+/// Ghi 0 đè lên đúng [f.length] byte của tệp, TẠI CHỖ, rồi flush.
+///
+/// Dart không có chế độ "đọc-ghi, không cắt, vị trí 0": `FileMode.write`/
+/// `writeOnly` cắt tệp (O_TRUNC — nội dung cũ vẫn nằm trên đĩa), còn
+/// `append`/`writeOnlyAppend` mở không cắt và chỉ ĐẶT vị trí ở cuối (không dùng
+/// O_APPEND), nên sau `setPosition(0)` các lần ghi đè lên nội dung cũ. Dùng
+/// `FileMode.append` (đọc-ghi) và kiểm lại độ dài sau khi ghi: nếu nền tảng nào
+/// đó nối vào cuối thay vì ghi đè thì báo lỗi, không coi là đã hủy.
+Future<void> overwriteWithZeros(File f) async {
+  final len = await f.length();
+  final raf = await f.open(mode: FileMode.append);
+  try {
+    await raf.setPosition(0);
+    const chunk = 64 * 1024;
+    final zeros = Uint8List(chunk);
+    var left = len;
+    while (left > 0) {
+      final n = left < chunk ? left : chunk;
+      await raf.writeFrom(zeros, 0, n);
+      left -= n;
+    }
+    await raf.flush();
+    final after = await raf.length();
+    if (after != len) {
+      throw FileSystemException(
+        'ghi đè không tại chỗ (độ dài $len → $after)',
+        f.path,
+      );
+    }
+  } finally {
+    await raf.close();
   }
 }
 

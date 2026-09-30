@@ -286,7 +286,7 @@ func (s *Service) planWarnings(ctx context.Context, tx pgx.Tx, o store.Order, w 
 			add(harvestWarning(check))
 			continue
 		}
-		if w.From.Before(*h.Date) {
+		if w.From.Before(domain.EarliestHarvest(*h.Date, h.OpenDate)) {
 			add(WarnPlannedBeforeHarvest)
 		}
 		if w.To.After(domain.AddDays(*h.Date, days)) {

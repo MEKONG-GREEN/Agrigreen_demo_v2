@@ -43,7 +43,7 @@ type fixture struct {
 	clk     *clock.Fixed
 	dir     *adapter.FakeDirectory
 	weighed *adapter.FakeWeighed
-	harvest *adapter.FakeHarvestDates
+	harvest *adapter.FakeHarvestCalendar
 	svc     *app.Service
 	tenant  uuid.UUID
 	htx     uuid.UUID
@@ -57,7 +57,7 @@ func newFixture(t *testing.T, cfgKg *decimal.Decimal) *fixture {
 	pool := env.Pool(t, migrations.MKG, port.DBRole)
 	clk := clock.NewFixed(time.Now().UTC().Truncate(time.Second))
 	f := &fixture{t: t, env: env, pool: pool, clk: clk, dir: adapter.NewFakeDirectory(), weighed: adapter.NewFakeWeighed(),
-		harvest: adapter.NewFakeHarvestDates(), tenant: ids.New(), htx: ids.New()}
+		harvest: adapter.NewFakeHarvestCalendar(), tenant: ids.New(), htx: ids.New()}
 	f.dir.AddHTX(f.htx, "31117")
 	for i := 0; i < 2; i++ {
 		p := ids.New()

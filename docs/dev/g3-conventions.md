@@ -53,16 +53,24 @@ Chỉ dùng số đã cấp. Số trống có thể còn lại giữa các kho�
 | shared | 000003 | `shared.apply_append_only`; `v_missing_immutability` bắt mọi bảng `ts_*` (G3-0, đã có) | `shared` | `ag_migrator` |
 | shared | 000004 | `shared.outbox.kind` + CHECK `internal ⇒ mkg.*` (G3-0, đã có) | `shared` | `ag_migrator` |
 | ts | **000001** | `ts_weigh.reading_batch`, `ts_weigh.raw_reading` (G3-0, đã có) | `ts_weigh` | `ingest_ts`, `ts_reader` |
-| ts | 000002 | **dự phòng** `ts_env`: cảm biến kho, telemetry phương tiện | `ts_env` | xin khi làm |
+| ts | 000002 | **bỏ trống** (không dùng: golang-migrate không áp số nhỏ hơn số đã chạy) | | |
 | mkg | 000006 | fieldops G3: lệnh gom, công đoạn đếm, xác nhận HTX, sổ van `valve_export` | `mkg_fieldops` | `fieldops_app` |
 | mkg | 000007–000008 | measurement: sổ thiết bị, phiếu cân, bảng chiếu `lot_mass_current`, dung sai/định mức có phiên bản, đối soát, tranh chấp, sổ van | `mkg_measurement` | `measurement_app`, `ingest_mkg` |
 | mkg | 000009 | hub G3: khối lượng lô từ phiếu cân (Q-MKG-04), kiểm kê (Q-MKG-06), `hub.risk.v2` | `mkg_hub` | `hub_app` |
 | pf | 000036–000037 | metrics: định nghĩa, giá trị theo ngày, ảnh chụp + watermark, nhật ký lớp GIS | `pf_metrics` | `metrics_app` |
 | pf | 000038 | mrv G3: liên kết bằng chứng thu gom (van `mrv_collection_evidence`), đối chiếu nhật ký HTX ↔ KN (KN US-MRV-02) | `pf_mrv` | `mrv_app` |
-| pf | 000039–000042 | **dự phòng** G3 — xin người tích hợp | | |
+| pf | 000039 | **bỏ trống** (không dùng) | | |
+| pf | 000040–000041 | G3-2: cropcycle/notify thu gom HTX (bảng kê, phản hồi) | `pf_cropcycle`, `pf_notify` | `cropcycle_app`, `notify_app` |
+| pf | 000042 | party: cấp quyền chia sẻ giữa hai tenant (ADR-0020, RB-2) — `share_grant_event` (sổ), `share_grant` (bên cấp), `share_grant_inbound` (bên nhận), `partner_read_log` (sổ đọc) | `pf_party` | `party_app` |
+| pf | 000043 | sync: quyền đọc `(tenant_id, status)` của `pf_sync.conflict` cho `ag_outbox_publisher` — gauge `ag.sync.conflict.overdue` ở worker (ADR-0006, [trien-khai-g1](../adr/trien-khai-g1.md)) | `pf_sync` | `ag_outbox_publisher` (chỉ đọc) |
+| pf | 000044 | cấp cho đợt triển khai ADR G1 — không dùng | | |
 | mkg | 000010 | G3-2 tích hợp: `mkg_measurement.lot_collection(_current)` (lô cân ↔ lệnh gom), cột `ticket_ref`/`supersedes_ticket_ref` của `mkg_fieldops.weighed_loading_current`, sổ `mkg_fieldops.roll_count_location` (GPS app hiện trường) | `mkg_measurement`, `mkg_fieldops` | `measurement_app` (+ `ingest_mkg` SELECT bảng chiếu), `fieldops_app` |
 | mkg | 000011 | **dự phòng** G3 — xin người tích hợp | | |
 | mkg | 000012 | Nghiệm thu G3 (proto FM-01/02/06/07/08): sổ tổ gom `crew_event`/`crew_current`, phân công có năng lực `crew_assignment(_current)`, kiểm ngày gặt `roll_count_harvest`, bảng đệm ngày gặt `order_plot_harvest_current`, tham số có phiên bản `param_version`/`param_current` (`baling_deadline_days`, mặc định 3 — tạm, chờ khách) | `mkg_fieldops` | `fieldops_app` |
+| mkg | 000013 | giám sát vận hành: schema `mkg_monitor`, hàm gộp SECURITY DEFINER cho sql_exporter (mục 19) | `mkg_monitor` | `mkg_monitor` (EXECUTE), chủ hàm `mkg_monitor_owner` |
+| ts | 000004+ | **dự phòng** `ts_env`: cảm biến kho, telemetry phương tiện | `ts_env` | xin khi làm |
+| ts | 000003 | giám sát vận hành: schema `ts_monitor`, hàm gộp SECURITY DEFINER (`ts_env` chuyển sang ts 000004 trở đi) | `ts_monitor` | `ts_monitor` (EXECUTE), chủ hàm `ts_monitor_owner` |
+| pf | 000045 | mrv cảnh báo: sổ `pf_mrv.alert` (KN US-MRV-04, US-MRV-06, FR-08), loại thông báo `mrv_*` của `pf_notify` | `pf_mrv`, `pf_notify` | `mrv_app` (+ `ag_outbox_publisher` hai cột `evidence_current`) |
 
 - `pf` 000030–000035 và `mkg` 000004–000005 để dành cho phần còn lại của G2; G3 không dùng.
 - Module G4 (`logistics`, `orders`, `costing`, `acctbridge`) sẽ được cấp số từ 000013 cụm mkg ([mkg.md §5.8](../design/mkg.md#58-bảng-tổng-hợp-cụm--vai--migration)).
@@ -80,6 +88,9 @@ Vai DB đã khai trong `internal/shared/dbadmin/dbadmin.go` và trong userlist P
 | `ingest_mkg` | mkg | `cmd/ingest` | đọc sổ thiết bị đã duyệt, ghi phiếu cân + outbox (mkg 000007–000008 cấp) |
 | `worker_internal` | mkg | `cmd/worker-internal` | `shared.inbox` qua `ag_shared_user`; consumer ghi nghiệp vụ bằng vai module |
 | `metrics_app` | pf | `pf/metrics` | schema `pf_metrics` (pf 000036–000037 cấp) |
+| `mkg_monitor` | mkg | sql_exporter (mục 19) | NOBYPASSRLS; chỉ `EXECUTE` hàm `mkg_monitor.*` (số đếm/tuổi gộp xuyên tenant); **không** SELECT bảng gốc |
+| `ts_monitor` | ts | sql_exporter (mục 19) | như trên với `ts_monitor.*` |
+| `mkg_monitor_owner`, `ts_monitor_owner` | mkg, ts | chủ hàm SECURITY DEFINER | NOLOGIN, BYPASSRLS, chỉ SELECT theo cột vận hành; `ag_migrator` là thành viên để chuyển chủ hàm |
 
 Vai nghiệp vụ đã có hằng trong `port/` và có trong realm Keycloak:
 - `mkg/measurement`: `scale_supervisor`, `device_approver`, `reconciliation_officer`, `dispute_officer`, `tolerance_approver`;
@@ -117,12 +128,23 @@ Ba hợp đồng van dự thảo đã có struct Go ở `fieldops/port` và `mea
 
 | Chiều | Cơ chế | G3 |
 |---|---|---|
-| MKG → nền tảng | **Chỉ van công bố** (`contracts/publication/`, mặc định từ chối, sổ `valve_export`) | 3 hợp đồng dự thảo ở mục 4 |
-| Nền tảng → MKG | **Chỉ Application API công khai**, gọi bằng **tài khoản dịch vụ thuộc tenant MKG** (OIDC client credentials). Không có kết nối DB từ `mkg` sang `pf`, không import (R-03) | fieldops đọc thửa/HTX; logistics (G4) đọc tuyến |
+| MKG → nền tảng | **Chỉ van công bố** (`contracts/publication/`, mặc định từ chối, sổ `valve_export`). Consumer nền tảng ghi vào tenant **bên cấp** đã cấp loại `valve_*` cho tenant phong bì; không có cấp quyền → DLQ `party.valve_share_grant_missing` (ADR-0020) | 3 hợp đồng dự thảo ở mục 4 + `hub_facility`, `hub_capacity` |
+| Nền tảng → MKG | **Chỉ bề mặt đối tác `/v1/partner/*` của Application API công khai**, gọi bằng **tài khoản dịch vụ thuộc tenant MKG** (OIDC client credentials, vai `mkg_sync`), và chỉ khi tenant chương trình đã duyệt một **cấp quyền chia sẻ** có loại dữ liệu đó (ADR-0020). Không có kết nối DB từ `mkg` sang `pf`, không import (R-03) | fieldops đọc HTX/thửa/ngày thu hoạch/phản hồi HTX; logistics (G4) đọc tuyến |
 | Trong MKG | `port/` đồng bộ trong cùng tiến trình (mặc định) hoặc sự kiện nội bộ trên vhost `mkg.internal` | measurement ↔ hub ↔ fieldops |
 | Biên → MKG | edge-agent → `cmd/ingest` qua mTLS (vùng biên OT, VPN), chỉ đi ra | lô `agrigreen.edge.batch.v1` |
 
-**Câu hỏi RB-2 — cấp quyền chia sẻ.** Thửa, HTX và nông hộ thuộc tenant chương trình (ADR-0009). Token của tenant MKG gọi Application API sẽ thấy **rỗng** vì RLS. Muốn MKG đọc được thì cần một **cấp quyền chia sẻ** tường minh: bên cấp là tenant, bên nhận là tenant, kèm phạm vi, mục đích và hạn dùng, kiểm ở `app/` và có nhật ký. Cách khác là cấp cho tài khoản dịch vụ MKG một vai chỉ đọc bên trong tenant chương trình. Chờ khách và người tích hợp chốt. Tới lúc đó fieldops G3 dùng dữ liệu tổng hợp (R-95) sau một interface nguồn thửa/HTX.
+**RB-2 — đã chốt (ADR-0020, chủ sản phẩm 29–30/09/2026).** MKG là **tenant riêng**, không dùng chung tenant với nền tảng.
+- Thửa, HTX, nông hộ, vụ thuộc tenant chương trình (ADR-0009).
+- Tenant chương trình (bên cấp) cấp cho tenant MKG (bên nhận) một **cấp quyền chia sẻ** trong `pf/party` (migration pf 000042):
+  - phạm vi `cooperative_directory`, `plot_directory`, `season_harvest_dates`, `htx_collection_responses`, `valve_hub`, `valve_collection`, `valve_mrv_evidence`;
+  - mục đích, hạn;
+  - `platform_admin` đề xuất ≠ `platform_admin` duyệt (R-56); thu hồi được.
+- Bề mặt đối tác `/v1/partner/*`:
+  - kiểm cấp quyền rồi mới đặt ngữ cảnh tenant bên cấp **tường minh**; không vai BYPASSRLS;
+  - chỉ trả trường tối thiểu, không dữ liệu cá nhân;
+  - mọi lần đọc ghi sổ `pf_party.partner_read_log`.
+- `tenant.Within` là cách **duy nhất** đổi tenant trong một giao dịch, chỉ dùng sau một kiểm cấp quyền ở `app/`.
+- Cấu hình MKG: `AG_PARTNER_GRANTOR_TENANT`.
 
 **Không bao giờ qua van**, kể cả ở G3:
 - số đo cân thô, phiếu cân, khối lượng chính xác của lô;

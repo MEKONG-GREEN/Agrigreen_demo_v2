@@ -15,8 +15,9 @@ import (
 
 var _ port.HTXResponseFeed = (*PlatformHTTP)(nil)
 
-// HTXResponses gọi GET /v1/cropcycle/htx-collection/responses (vai mkg_sync). 403/404 (chưa
-// cấp vai / chưa chia sẻ, RB-2) → Unavailable: job không tiến con trỏ, thử lại lượt sau.
+// HTXResponses gọi GET /v1/partner/htx-collection/responses (vai mkg_sync, cấp quyền
+// htx_collection_responses — ADR-0020). 403/404 (chưa cấp vai / chưa cấp quyền / đã thu hồi)
+// → Unavailable: job không tiến con trỏ, thử lại lượt sau.
 func (c *PlatformHTTP) HTXResponses(ctx context.Context, after int64, limit int) (port.HTXResponsePage, error) {
 	var body struct {
 		Items []struct {
@@ -34,10 +35,10 @@ func (c *PlatformHTTP) HTXResponses(ctx context.Context, after int64, limit int)
 		} `json:"items"`
 		NextCursor int64 `json:"next_cursor"`
 	}
-	path := "/v1/cropcycle/htx-collection/responses?after=" + strconv.FormatInt(after, 10) + "&limit=" + strconv.Itoa(limit)
+	path := c.partnerPath("/v1/partner/htx-collection/responses?after=" + strconv.FormatInt(after, 10) + "&limit=" + strconv.Itoa(limit))
 	if err := c.get(ctx, path, &body); err != nil {
 		if errors.Is(err, port.ErrDirectoryNotFound) {
-			return port.HTXResponsePage{}, unavailable("luồng phản hồi HTX: chưa cấp vai mkg_sync / chưa chia sẻ (RB-2)")
+			return port.HTXResponsePage{}, unavailable("luồng phản hồi HTX: chưa cấp vai mkg_sync / chưa có cấp quyền chia sẻ htx_collection_responses (ADR-0020)")
 		}
 		return port.HTXResponsePage{}, err
 	}

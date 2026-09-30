@@ -16,6 +16,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -124,7 +125,12 @@ func (s *Service) HandleHubPublication(ctx context.Context, _ pgx.Tx, env outbox
 	if err := c.Validate(env.Payload); err != nil {
 		return fmt.Errorf("%w (%s): %w", errValve, env.EventType, err)
 	}
-	ctx = tenant.WithID(ctx, env.TenantID)
+	// ADR-0020: MKG là tenant riêng — ghi vào tenant BÊN CẤP đã cấp valve_hub cho tenant phong bì
+	// (mỗi bên cấp một lần, idempotent theo HubSink). Không có cấp quyền → lỗi → DLQ.
+	grantors, err := partyport.ValveTargets(ctx, s.ValveGrants, env.TenantID, partyport.KindValveHub, s.now())
+	if err != nil {
+		return err
+	}
 	if name == port.ContractHubCapacity {
 		h, err := capacityFromValve(env.Payload)
 		if err != nil {
@@ -133,15 +139,23 @@ func (s *Service) HandleHubPublication(ctx context.Context, _ pgx.Tx, env outbox
 		if !h.CapacityTons.IsPositive() {
 			return nil // cơ sở chưa khai sức chứa danh định: không có % lấp đầy để hiển thị
 		}
-		_, err = s.AppendHubCapacity(ctx, h)
-		return err
+		for _, g := range grantors {
+			if _, err := s.AppendHubCapacity(tenant.WithID(ctx, g), h); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 	h, err := facilityFromValve(env.Payload)
 	if err != nil {
 		return err
 	}
-	_, err = s.UpsertHubFacility(ctx, h)
-	return err
+	for _, g := range grantors {
+		if _, err := s.UpsertHubFacility(tenant.WithID(ctx, g), h); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func facilityFromValve(raw []byte) (port.HubFacility, error) {

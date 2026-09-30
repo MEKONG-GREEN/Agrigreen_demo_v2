@@ -77,6 +77,13 @@ Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính m�
 | 404 | `party.household_not_found` | pf/party: `POST /v1/households/{ref}/membership` — nông hộ không có hoặc ngoài phạm vi (không lộ sự tồn tại) |
 | 409 | `party.membership_unchanged` | pf/party: nông hộ đã ở đúng trạng thái thành viên HTX yêu cầu |
 | 422 | `party.membership_reason_required` | pf/party: đổi thành viên HTX phải nêu lý do 10–500 ký tự |
+| 404 | `party.share_grant_not_found` | pf/party (ADR-0020): không có cấp quyền chia sẻ trong tenant bên cấp của người gọi (bên nhận không xem được sổ của bên cấp) |
+| 409 | `party.share_grant_state` | pf/party (ADR-0020): chỉ duyệt được bản `proposed` còn hạn; bản đã thu hồi không thao tác được nữa |
+| 403 | `party.share_grant_missing` | pf/party (ADR-0020): bề mặt đối tác `/v1/partner/*` — tenant người gọi không có cấp quyền chia sẻ ĐANG HIỆU LỰC (đã duyệt, trong hạn, chưa thu hồi) có loại dữ liệu này, hoặc `grantor` không cấp cho tenant người gọi. Cũng trả cho `GET /v1/cropcycle/htx-collection/responses` (bí danh) |
+| 422 | `party.share_grantor_ambiguous` | pf/party (ADR-0020): nhiều tenant bên cấp cùng cấp loại dữ liệu này cho tenant người gọi — truyền tham số `grantor` |
+| 404 | `party.partner_not_found` | pf/party (ADR-0020): `GET /v1/partner/cooperatives/{ref}` — bên cấp không có HTX này (lần đọc vẫn được ghi sổ) |
+| 503 | `party.partner_audit_unavailable` | pf/party (ADR-0020): không ghi được sổ đọc `pf_party.partner_read_log` — bề mặt đối tác không trả dữ liệu chưa ghi sổ |
+| — | `party.valve_share_grant_missing` | pf/party (ADR-0020), lỗi consumer (không phải HTTP): phong bì van MKG (`hub_facility`, `hub_capacity`, `collection_schedule`, `htx_collection_statement`, `mrv_collection_evidence`) mang tenant chưa được bên cấp nào cấp loại `valve_*` tương ứng → consumer `pf.geo.hub_valve` / `pf.cropcycle.htx_collection_valve` / `pf.mrv.collection_evidence` trả lỗi, giao lại rồi DLQ (R-62). Duyệt cấp quyền rồi chuyển lại từ DLQ (xử lý idempotent) |
 | 403 | `sync.device_unregistered` | pf/sync: thiếu/sai header `X-Device-Id`, thiết bị chưa đăng ký trong tenant, hoặc đăng ký bởi tài khoản khác |
 | 403 | `sync.device_revoked` | pf/sync: thiết bị đã bị thu hồi — app **xóa dữ liệu cục bộ** và khóa token; đăng ký lại cùng mã cũng trả mã này |
 | 409 | `sync.device_taken` | pf/sync: `device_id` đã được tài khoản khác đăng ký |
@@ -480,7 +487,7 @@ Mã của vòng tích phân (không trả qua HTTP; nhãn `code` của metric `a
 | 422 | `fieldops.htx_not_found` | Application API không có (hoặc chưa chia sẻ — câu hỏi RB-2) HTX, hoặc HTX đã vô hiệu hóa |
 | 422 | `fieldops.plot_not_found` | Application API không có (hoặc chưa chia sẻ) thửa |
 | 422 | `fieldops.plot_other_htx` | Thửa không thuộc HTX của lệnh gom, là thửa nháp hoặc đã ngừng dùng |
-| 422 | `fieldops.before_harvest` | Số cuộn công đoạn `bale` có ngày (giờ VN của `event_time`) trước ngày gặt của thửa (proto FM-01). Ngày gặt đọc từ nền tảng (bề mặt partner), mất kết nối thì dùng bảng đệm. Chưa biết ngày gặt → KHÔNG lỗi, bản ghi gắn cờ `harvest_check.check = unknown/unavailable` và cảnh báo |
+| 422 | `fieldops.before_harvest` | Số cuộn công đoạn `bale` có ngày (giờ VN của `event_time`) trước ngày gặt của thửa (proto FM-01) — mốc là ngày mở cửa sổ gặt của vụ (`harvest_open_date`, không có thì ngày gặt dự kiến). Vụ đọc qua bề mặt partner `GET /v1/partner/season-harvest-dates` (ADR-0020, cấp quyền `season_harvest_dates`), mất kết nối thì dùng bảng đệm. Chưa biết ngày gặt → KHÔNG lỗi, bản ghi gắn cờ `harvest_check.check = unknown/unavailable` và cảnh báo |
 | 422 | `fieldops.crew_unknown` | `crew_ref` khi giao việc không có trong sổ tổ gom của tenant |
 | 422 | `fieldops.workload_required` | Giao / gợi ý thiếu khối lượng việc theo đơn vị năng lực của tổ (`expected_bales` với tổ `bales`, `expected_ha` với tổ `ha`) |
 | 500 | `fieldops.valve_denied` | Van công bố từ chối payload — lỗi lập trình, không có gì được ghi |
@@ -528,3 +535,16 @@ Chỉ số có lịch sử và nhật ký lớp GIS (G3-A5; `GET /v1/metrics/*`,
 | 503 | `metrics.dependency_unavailable` | pf/metrics: chưa nối CSDL, nguồn chỉ số của module chủ dữ liệu, pf/party (phạm vi) hoặc pf/geo (hình học) |
 
 Nguồn không có dữ liệu cho một phạm vi/ngày (vd vụ chưa có lần cân đối trước cutoff) **không** là lỗi API: job không ghi dòng (`port.ErrNoData`), API trả danh sách rỗng.
+
+### pf/extdata
+
+Proxy khử định danh cho nguồn dữ liệu ngoài — thời tiết, độ mặn, tile (ADR-0007, RB-7; `GET /v1/extdata/*`).
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 404 | `extdata.unknown_source` | pf/extdata: nguồn chưa bật trong `AG_EXTDATA_SOURCES` (mặc định chặn), hoặc gọi sai loại (nguồn tile gọi `/point`, nguồn điểm gọi `/tiles`) |
+| 422 | `extdata.outside_territory` | pf/extdata: điểm hoặc tile ngoài vùng phục vụ (lãnh thổ Việt Nam, khung vĩ độ 6–24, kinh độ 102–118) — proxy không phải proxy mở |
+| 422 | `extdata.zoom_too_high` | pf/extdata: zoom tile vượt `max_zoom` của nguồn (problem có thêm `max_zoom`) |
+| 502 | `extdata.provider_unavailable` | pf/extdata: nhà cung cấp không phản hồi, trả mã khác 200, thân không phải JSON, quá lớn hoặc loại tile không cho phép. Lỗi không nêu URL (có thể chứa khóa API) |
+
+Tọa độ sai dạng, thiếu `lat`/`lon`, `z/x/y` không phải số trả `validation_failed`.

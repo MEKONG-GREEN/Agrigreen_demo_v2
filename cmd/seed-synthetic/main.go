@@ -42,8 +42,9 @@
 // 12–22 %. Lô đầu là lô golden của seed prototype: 5 800/5 700/4 400 cuộn, HUB_IN 96,8 t,
 // ước 88 t → +10 % gắn cờ. Cần cmd/ingest chạy vòng tích phân (phiếu HUB_IN/HUB_OUT được
 // chờ tối đa -mkg-wait). Thửa/HTX là mã tổng hợp: nguồn thửa/HTX của fieldops phải trả
-// được chúng (RB-2 — cấp quyền chia sẻ chưa chốt; ở Local dùng nguồn giả hoặc dữ liệu của
-// kế hoạch platform).
+// được chúng qua bề mặt đối tác /v1/partner/* (ADR-0020: MKG là tenant riêng, cần cấp quyền
+// chia sẻ đã duyệt từ tenant chương trình; ở Local dùng nguồn giả hoặc dữ liệu của kế hoạch
+// platform kèm cấp quyền).
 //
 //	-mkg-url           AG_SEED_MKG_URL           api-internal ứng dụng, mặc định http://localhost:8081
 //	-mkg-admin-url     AG_SEED_MKG_ADMIN_URL     api-internal quản trị (MFA), mặc định http://localhost:8083

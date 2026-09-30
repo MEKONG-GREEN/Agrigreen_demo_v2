@@ -18,6 +18,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/store"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -47,8 +48,12 @@ var paramDefaults = map[string]struct{ value, unit string }{
 }
 
 // param đọc tham số đã duyệt có hiệu lực tại at; chưa có → mặc định (Source = default).
+// Tham số chuỗi (textParamDefaults, vd danh sách mã) lấy giá trị từ ParamValue.Text.
 func (s *Service) param(ctx context.Context, key string, at time.Time) (domain.ParamUse, error) {
-	def := paramDefaults[key]
+	def, isText := textParamDefaults[key]
+	if !isText {
+		def = paramDefaults[key]
+	}
 	out := domain.ParamUse{Key: key, Value: def.value, Unit: def.unit, Source: domain.ParamSourceDefault}
 	if s.Params == nil {
 		return out, nil
@@ -64,7 +69,11 @@ func (s *Service) param(ctx context.Context, key string, at time.Time) (domain.P
 	if unit == "" {
 		unit = def.unit
 	}
-	return domain.ParamUse{Key: key, Version: v.Version, Value: v.Value.String(), Unit: unit, Source: domain.ParamSourceApproved}, nil
+	val := v.Value.String()
+	if isText {
+		val = v.Text
+	}
+	return domain.ParamUse{Key: key, Version: v.Version, Value: val, Unit: unit, Source: domain.ParamSourceApproved}, nil
 }
 
 func (s *Service) intParam(ctx context.Context, key string, at time.Time) (int, error) {
@@ -193,11 +202,15 @@ func (s *Service) HandleFarmLogLink(ctx context.Context, tx pgx.Tx, env outbox.E
 		}
 		t := occurred(env, p.EventTime)
 		ver, plot, commune, act, loc, cur := p.Version, p.PlotRef, p.CommuneCode, p.ActivityCode, p.LocationStatus, p.BecameCurrent
-		return store.InsertFarmLogLink(ctx, tx, env.TenantID, store.FarmLogRow{
+		if err := store.InsertFarmLogLink(ctx, tx, env.TenantID, store.FarmLogRow{
 			Kind: "recorded", LogID: p.LogID, LogRef: p.LogRef, LogVersion: &ver, SeasonRef: p.SeasonRef, PlotRef: &plot,
 			CommuneCode: &commune, ActivityCode: &act, LocationStatus: &loc, BecameCurrent: &cur, AuthorRef: p.AuthorRef,
 			CatalogVersion: pin, LogEventTime: t, EventTime: env.OccurredAt, IdemKey: key,
-		})
+		}); err != nil {
+			return err
+		}
+		// KN FR-08: ghi AWD nhưng thửa/xã chưa có minh chứng hạ tầng đạt → cờ + thông báo cán bộ xã.
+		return s.flagAWDInfra(ctx, tx, env.TenantID, p, t)
 	case port.EventFarmLogReviewed:
 		var p farmLogReviewedV1
 		if err := json.Unmarshal(env.Payload, &p); err != nil {
@@ -263,7 +276,23 @@ func (s *Service) HandleCollectionEvidence(ctx context.Context, tx pgx.Tx, env o
 	if _, ok := domain.BucketLowerKg(p.Bucket); !ok || p.Revision < 0 || p.BucketRule == "" {
 		return fmt.Errorf("%w: bậc/revision/bucket_rule_version", errValve)
 	}
-	ctx = tenant.WithID(ctx, env.TenantID)
+	// ADR-0020: MKG là tenant riêng — ghi vào tenant BÊN CẤP (tenant chương trình có vụ/thửa) đã cấp
+	// valve_mrv_evidence cho tenant phong bì. Không có cấp quyền → lỗi → DLQ.
+	grantors, err := partyport.ValveTargets(ctx, s.ValveGrants, env.TenantID, partyport.KindValveMRVEvidence, s.Clock.Now())
+	if err != nil {
+		return err
+	}
+	for _, g := range grantors {
+		gctx := tenant.WithID(ctx, g)
+		if err := tenant.Within(ctx, tx, g, func() error { return s.receiveEvidence(gctx, tx, env, g, p, on) }); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// receiveEvidence ghi một bằng chứng thu gom vào tenant tid (tx đang ở ngữ cảnh tid).
+func (s *Service) receiveEvidence(ctx context.Context, tx pgx.Tx, env outbox.Envelope, tid uuid.UUID, p collectionEvidenceV1, on time.Time) error {
 	key := store.CollectionIdemKey(p.EvidenceRef, p.Revision)
 	if dup, err := store.IdemExists(ctx, tx, "collection_evidence", key); err != nil || dup {
 		return err
@@ -272,13 +301,13 @@ func (s *Service) HandleCollectionEvidence(ctx context.Context, tx pgx.Tx, env o
 		EvidenceRef: p.EvidenceRef, Revision: p.Revision, PlotRef: p.PlotRef, SeasonRef: p.SeasonRef, CollectedOn: on,
 		Bucket: p.Bucket, BucketRule: p.BucketRule, SourceEventID: env.EventID, EventTime: env.OccurredAt, IdemKey: key,
 	}
-	if err := store.InsertCollection(ctx, tx, env.TenantID, &row); err != nil {
+	if err := store.InsertCollection(ctx, tx, tid, &row); err != nil {
 		return err
 	}
 	if p.SeasonRef == nil {
 		return nil // chưa gắn vụ: lưu làm bằng chứng, không tính (không có thửa/vụ để đối chiếu duyệt)
 	}
-	return s.recompute(ctx, tx, env.TenantID, *p.SeasonRef, store.SystemActor)
+	return s.recompute(ctx, tx, tid, *p.SeasonRef, store.SystemActor)
 }
 
 // ---------------------------------------------------------------------------

@@ -41,13 +41,14 @@ func (f *fixture) dbRejects(what, want, sql string, args ...any) {
 }
 
 // proto FM-01: không cuộn trước ngày gặt của thửa (ngày gặt từ nền tảng qua cổng
-// HarvestDates — bề mặt partner). Chưa biết ngày gặt → vẫn ghi nhưng gắn cờ và cảnh báo;
+// HarvestCalendar — bề mặt partner ADR-0020). Chưa biết ngày gặt → vẫn ghi nhưng gắn cờ và cảnh báo;
 // nền tảng không gọi được → dùng bảng đệm; không có bảng đệm → cờ unavailable. Không im lặng.
 func TestBaleBeforeHarvestRejectedFM01(t *testing.T) {
 	f := newFixture(t, nil)
 	p0, p1 := f.plots[0], f.plots[1]
-	f.harvest.Set(p0, nil, f.day(2), port.HarvestExpected) // gặt dự kiến sau 2 ngày
-	id := f.approvedOrder()                                // lập lệnh → bảng đệm ngày gặt
+	season := ids.New()
+	f.harvest.Set(p0, season, f.day(2), "", "open") // gặt dự kiến sau 2 ngày
+	id := f.approvedOrder()                         // lập lệnh → bảng đệm ngày gặt
 	col := f.collector()
 
 	r := f.count(col, id, p0, port.StageBale, 100, nil)
@@ -62,7 +63,7 @@ func TestBaleBeforeHarvestRejectedFM01(t *testing.T) {
 	f.harvest.Down = false
 
 	// HTX khai gặt thực tế hôm qua → cuộn được; nguồn partner, ghi kết quả vào sổ.
-	f.harvest.Set(p0, nil, f.day(-1), port.HarvestActual)
+	f.harvest.Set(p0, season, f.day(-1), f.day(-4), "open") // đã tới cửa sổ gặt
 	ok := f.count(col, id, p0, port.StageBale, 100, nil)
 	mustStatus(t, ok, http.StatusCreated, "cuộn sau ngày gặt")
 	if str(ok.body, "harvest_check", "check") != "ok" || str(ok.body, "harvest_check", "harvest_date") != f.day(-1) ||
@@ -97,7 +98,7 @@ func TestBaleBeforeHarvestRejectedFM01(t *testing.T) {
 	f.harvest.Down = false
 
 	// Đồng bộ app hiện trường: bản ghi trước ngày gặt → rejected theo từng bản ghi.
-	f.harvest.Set(p0, nil, f.day(3), port.HarvestExpected)
+	f.harvest.Set(p0, season, f.day(3), "", "open")
 	id3 := f.approvedOrder()
 	mustStatus(t, f.assign(f.supervisor(), id3, f.crew("TO-FM01", "5000", col.actor), 100, nil), http.StatusCreated, "giao tổ")
 	col.device = ids.New().String()
@@ -122,8 +123,9 @@ func TestBaleBeforeHarvestRejectedFM01(t *testing.T) {
 func TestBalingDeadlineOverdueFM02(t *testing.T) {
 	f := newFixture(t, nil)
 	p0, p1 := f.plots[0], f.plots[1]
-	f.harvest.Set(p0, nil, f.day(-5), port.HarvestActual)
-	f.harvest.Set(p1, nil, f.day(-1), port.HarvestActual)
+	season := ids.New()
+	f.harvest.Set(p0, season, f.day(-5), f.day(-8), "open")
+	f.harvest.Set(p1, season, f.day(-1), f.day(-4), "open")
 	id := f.approvedOrder()
 	sup := f.supervisor()
 

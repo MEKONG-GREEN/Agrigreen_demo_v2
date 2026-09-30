@@ -21,6 +21,20 @@ Các job vận hành dùng chung cho mọi cụm (`ag_pf`, `ag_mkg`, `ag_vault`)
 | Dựng lại bảng chiếu | diễn tập G4, khi nghi lệch | theo module | vai của module | [rebuild-projection.md](rebuild-projection.md) |
 | Agent biên đọc cân: cài, đăng ký, thay khóa, cập nhật | khi lắp/đổi cân, mất đĩa, phát hành | `cmd/edge-agent` | — | [edge-agent.md](edge-agent.md) |
 | Nhận số đo cân (ingest), duyệt thiết bị hai người, thay khóa, mất đĩa, vhost `mkg.internal`, cảnh báo, tầng lạnh `ts` | khi lắp/đổi cân, sự cố, hết cửa sổ C-7 | `cmd/ingest`, Admin API mkg, `scripts/dev-edge-bootstrap.sh` (dev) | `ingest_ts`, `ts_reader`, `ingest_mkg` | [ingest.md](ingest.md) |
+| PKI thiết bị: CA thiết bị riêng trong lãnh thổ, cấp/thu hồi chứng thư, thay CA | dựng một lần; mỗi kỳ thiết bị; kiểm hằng quý | CA ngoại tuyến + CA trung gian (HSM), `scripts/gen-dev-certs` (dev) | — | [device-pki.md](device-pki.md) |
+| Giám sát SQL xuyên tenant (sql_exporter) | liên tục (60 s) | `deploy/observability/sql-exporter/*.collector.yml` | `mkg_monitor`, `ts_monitor` (chỉ EXECUTE hàm gộp) | [ingest.md](ingest.md) mục 7 |
+| Leo thang hồ sơ MRV chờ duyệt quá hạn (KN US-MRV-06) | mỗi 15 phút | `cmd/worker` (leader, job `mrv_review_escalation`) | `ag_outbox_publisher` (tìm tenant), `mrv_app` | mục dưới |
+
+## Leo thang hồ sơ MRV quá hạn (pf/mrv)
+
+Job `mrv_review_escalation` (mỗi 15 phút, chạy bù khi khởi động) tìm tenant có hồ sơ chờ duyệt bằng `ag_outbox_publisher`. Vai này chỉ đọc hai cột `tenant_id` và `review_status` của `pf_mrv.evidence_current` (pf 000045). Job ghi bằng vai `mrv_app`, theo hai mức:
+
+- Hồ sơ vào hệ thống quá `mrv.review_sla_hours` (mặc định 72) → cảnh báo mức 1 cho người duyệt (`mrv_reviewer`).
+- Quá `mrv.review_escalate_hours` (mặc định 120) → mức 2 cho quản trị TTKN tỉnh (`kn_province_admin`).
+
+Hai mặc định trên là **tạm, chờ khách**; đổi bằng tham số masterdata có duyệt hai người.
+
+Khóa chống trùng `overdue:<phiên bản hồ sơ>:<mức>`: chạy lại hoặc chạy chồng không báo hai lần. Sửa hồ sơ (bản ghi bù) tạo phiên bản mới với hạn mới. Log: `event=job.mrv_review_escalation`, `raised`. Xem cảnh báo: `GET /v1/mrv/alerts?kind=review_overdue`.
 
 ## Leader
 
@@ -37,6 +51,20 @@ Chạy worker không có lịch: `worker -jobs=none`. Chỉ chạy lịch, khôn
 `cmd/api-internal` chạy lịch của vùng mkg khi có `AG_MKG_DB_DIRECT_URL` (nối **thẳng** cụm mkg, không qua PgBouncer) hoặc `AG_MKG_JOBS=all|hub_capacity_daily`; `AG_MKG_JOBS=none` tắt. Chỉ bản giữ khóa tư vấn `727101` trên database `ag_mkg` chạy. Job `hub_capacity_daily` chụp sức chứa mọi cơ sở đang dùng và xuất qua van `hub_capacity` (sổ `mkg_hub.valve_export` + outbox cụm mkg); khóa chống trùng `capacity-daily:<hub>:<YYYY-MM-DD>` nên chạy lại cùng ngày không xuất thêm. pf/geo nhận qua consumer `pf.geo.hub_valve` (số nhập tay của Admin vẫn được giữ — BR-52). Log: `event=job.hub_capacity_daily`, `published`, `skipped`.
 
 Compose Local/Dev chưa đặt `AG_MKG_DB_DIRECT_URL` cho `api-internal` (không sửa `deploy/**` trong đợt này) — thêm `AG_MKG_DB_DIRECT_URL: postgres://postgres:5432/?sslmode=disable` để bật.
+
+## Cấp quyền chia sẻ nền tảng → MKG (ADR-0020)
+
+MKG là tenant **riêng**. Muốn MKG đọc được HTX, thửa, ngày thu hoạch, phản hồi HTX, và muốn nền tảng nhận van MKG vào tenant chương trình, cần một cấp quyền chia sẻ.
+
+Các bước ở tenant chương trình (Admin API, MFA):
+1. Một `platform_admin` gọi `POST /v1/share-grants` với `grantee_tenant_id` = tenant MKG, `kinds`, `purpose`, `valid_to`.
+2. Một `platform_admin` **khác** gọi `POST /v1/share-grants/{id}/approve`.
+3. Thu hồi: `POST /v1/share-grants/{id}/revoke` kèm lý do.
+4. Sổ đọc của MKG: `GET /v1/share-grants/{id}/reads`.
+
+Cấu hình `api-internal`: `AG_PLATFORM_API_URL`, `AG_PLATFORM_TOKEN_URL`, `AG_MKG_SA_CLIENT_SECRET`, `AG_MKG_TENANT_ID`, `AG_PARTNER_GRANTOR_TENANT` = tenant chương trình (`deploy/compose/.env.example`).
+
+DLQ `pf.geo.hub_valve`, `pf.cropcycle.htx_collection_valve`, `pf.mrv.collection_evidence` có lỗi `party.valve_share_grant_missing` nghĩa là tenant phong bì chưa có cấp quyền `valve_*` đang hiệu lực. Duyệt cấp quyền rồi chuyển lại thông điệp từ DLQ; xử lý là idempotent.
 
 ## Dọn Idempotency-Key
 
@@ -55,4 +83,6 @@ Có khi đặt `AG_OTLP_ENDPOINT`. Ngưỡng dưới đây là đề xuất, ch�
 | `ag.job.runs{job,outcome="error"}` | worker | tăng bất kỳ; job `anchor` lỗi là P1 (mục 23) |
 | không có `ag.job.runs{job="anchor",outcome="ok"}` trong 26 giờ | worker | P1: mất neo hằng ngày |
 | `http.server.request.duration` | api-* | p95 > 2 giây (R-52) |
+| `ag.sync.conflict.overdue{tenant_id}` | worker khi có lịch (`registerGauges`; tenant qua `ag_outbox_publisher`, migration pf 000043; đếm bằng `sync_app`) | > 0 trong 1 giờ — xung đột đồng bộ quá SLA C-8 (tạm 72 giờ, tham số `sync.conflict_sla_hours`, ADR-0006). Xử lý ở Admin `GET /v1/sync/conflicts?overdue=true` (vai `sync_conflict_resolver`). Luật Prometheus đề xuất: `max by (tenant_id) (ag_sync_conflict_overdue) > 0` for 1h |
+| `ag.db.standby_replication_lag` (giây, `cluster`) | worker khi đặt `AG_DB_STANDBY_URL` (DSN tới bản sao chờ; vai thường, không cần quyền giám sát) | > 60 giây trong 5 phút (cảnh báo), > 300 giây (P1) — ADR-0006. Luật đề xuất: `max(ag_db_standby_replication_lag_seconds) > 60` for 5m; thiếu số đo khi đã cấu hình standby (`absent(...)` 15m) = cấu hình sai hoặc DSN trỏ vào primary. Tệp luật ở `deploy/observability/prometheus/` do người tích hợp thêm |
 | `ag.extension.support_task.latency{assignment_rule}` (giây) | api-platform | p99 > 60 giây trong 5 phút — KN US-TASK-01 (nhiệm vụ tự sinh ≤ 1 phút từ lúc nhận yêu cầu hỗ trợ). Kiểm pool `extension_app`, khóa trên `task_current`. Thêm cảnh báo nghiệp vụ: số yêu cầu `assignment_rule="admin_queue"` > 0 trong 1 giờ → danh bạ trực của xã/tỉnh trống |

@@ -2096,7 +2096,7 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
         };
-        /** @description proto FM-01 (chỉ bản ghi cuộn gốc, công đoạn bale): ngày cuộn so với ngày gặt của thửa. ok = biết ngày gặt, cuộn không trước ngày gặt (cuộn trước → 422 fieldops.before_harvest); unknown = nền tảng chưa có / chưa chia sẻ (RB-2); unavailable = không gọi được nền tảng và không có bảng đệm. unknown/unavailable vẫn ghi được nhưng GẮN CỜ. */
+        /** @description proto FM-01 (chỉ bản ghi cuộn gốc, công đoạn bale): ngày cuộn so với ngày gặt của thửa (mốc = harvest_open_date, không có thì harvest_date dự kiến). ok = biết ngày gặt, cuộn không trước mốc (cuộn trước → 422 fieldops.before_harvest); unknown = nền tảng chưa có / chưa chia sẻ (RB-2); unavailable = không gọi được nền tảng và không có bảng đệm. unknown/unavailable vẫn ghi được nhưng GẮN CỜ. */
         HarvestCheck: {
             /** @enum {string} */
             check?: "ok" | "unknown" | "unavailable";
@@ -2104,8 +2104,11 @@ export interface components {
             bale_date?: string;
             /** Format: date */
             harvest_date?: string | null;
-            /** @enum {string|null} */
-            harvest_kind?: "expected" | "actual" | null;
+            /**
+             * Format: date
+             * @description Ngày mở cửa sổ gặt của vụ (mốc FM-01); harvest_date = ngày gặt dự kiến (gốc hạn FM-02)
+             */
+            harvest_open_date?: string | null;
             /** Format: uuid */
             season_ref?: string | null;
             /** @enum {string} */
@@ -2269,8 +2272,11 @@ export interface components {
             harvest_check?: "ok" | "unknown" | "unavailable";
             /** Format: date */
             harvest_date?: string | null;
-            /** @enum {string|null} */
-            harvest_kind?: "expected" | "actual" | null;
+            /**
+             * Format: date
+             * @description Ngày mở cửa sổ gặt của vụ (mốc FM-01); harvest_date = ngày gặt dự kiến (gốc hạn FM-02)
+             */
+            harvest_open_date?: string | null;
             /** Format: uuid */
             season_ref?: string | null;
             /** Format: date */

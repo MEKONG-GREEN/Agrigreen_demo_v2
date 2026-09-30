@@ -10,6 +10,7 @@
 //	AG_RESIDENCY_ALLOWLIST  danh mục trong lãnh thổ, phân tách bằng dấu phẩy — BẮT BUỘC ở production
 //	AG_NONPII_ALLOWLIST     (tùy chọn) đích ngoài lãnh thổ CHỈ nhận dữ liệu không định danh
 //	                        (vd FCM data-only: fcm.googleapis.com) — chỉ áp cho biến đẩy thông báo
+//	                        và nguồn dữ liệu ngoài qua proxy khử định danh AG_EXTDATA_* (ADR-0007)
 //
 // Mỗi mục của danh mục là một trong:
 //
@@ -48,8 +49,11 @@ var endpointSuffixes = []string{"_URL", "_URLS", "_ENDPOINT", "_HOST", "_ISSUER"
 
 // nonPIIPrefixes là biến được phép trỏ ra ngoài lãnh thổ nếu đích thuộc
 // AG_NONPII_ALLOWLIST: kênh đẩy thông báo chỉ mang dữ liệu không định danh
-// (data-only, mã tham chiếu) — ADR bắt buộc theo mục 21.
-var nonPIIPrefixes = []string{"AG_FCM_", "AG_APNS_", "AG_PUSH_"}
+// (data-only, mã tham chiếu) — ADR bắt buộc theo mục 21. AG_EXTDATA_*: nguồn dữ
+// liệu ngoài (thời tiết, độ mặn, tile) CHỈ đi qua proxy khử định danh pf/extdata
+// (ADR-0007: không định danh, tọa độ làm thô theo lưới); pf/extdata còn đòi mỗi
+// nguồn ngoài lãnh thổ có mã ADR riêng (AG_EXTDATA_<ID>_ADR).
+var nonPIIPrefixes = []string{"AG_FCM_", "AG_APNS_", "AG_PUSH_", "AG_EXTDATA_"}
 
 // ErrViolation là lỗi gốc của mọi vi phạm RB-7.
 var ErrViolation = errors.New("RB-7: đích ngoài danh mục nhà cung cấp trong lãnh thổ")

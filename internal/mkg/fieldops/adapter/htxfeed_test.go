@@ -21,7 +21,7 @@ func TestPlatformHTTPHTXResponses_RB6(t *testing.T) {
 			_, _ = w.Write([]byte(`{"access_token":"tok","expires_in":300}`))
 		case forbid:
 			w.WriteHeader(http.StatusForbidden)
-		case r.URL.Path == "/v1/cropcycle/htx-collection/responses" && r.URL.Query().Get("after") == "5":
+		case r.URL.Path == "/v1/partner/htx-collection/responses" && r.URL.Query().Get("after") == "5":
 			_, _ = w.Write([]byte(`{"items":[{"response_id":"01a0ef9b-06f2-7cb7-82da-47322010d95b","cursor":7,
 			  "statement_ref":"01a0ef9b-0636-75ba-bc0b-050263dc5060","statement_revision":2,"htx_ref":"01a0ef9b-0632-7d35-8331-b7a9529a6fea",
 			  "plot_ref":"01a0ef9b-0632-7d3c-94e1-e407905ddc59","mkg_rolls":40,"outcome":"disputed","htx_rolls":38,

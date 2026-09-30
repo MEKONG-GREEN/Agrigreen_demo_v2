@@ -29,6 +29,9 @@ type Cursor struct {
 	Scope  string           `json:"sc"`           // dấu vân tay phạm vi lúc phát con trỏ
 	Last   map[string]int64 `json:"s"`            // entity → cursor lớn nhất đã giao (port.Source)
 	PK     *PubKeyCursor    `json:"pk,omitempty"` // trạng thái lượt gửi khóa công khai
+	// RR là entity được xét ĐẦU TIÊN ở trang kế tiếp (vòng chia hạn mức xoay mỗi trang).
+	// Không có (con trỏ cũ) → bắt đầu từ entity đầu danh sách.
+	RR string `json:"rr,omitempty"`
 }
 
 // PubKeyCursor là vị trí trong một lượt gửi tập khóa công khai của địa bàn.

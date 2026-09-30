@@ -1812,14 +1812,14 @@ components:
     HarvestCheck:
       type: object
       description: >-
-        proto FM-01 (chỉ bản ghi cuộn gốc, công đoạn bale): ngày cuộn so với ngày gặt của thửa. ok = biết ngày gặt, cuộn không trước
-        ngày gặt (cuộn trước → 422 fieldops.before_harvest); unknown = nền tảng chưa có / chưa chia sẻ (RB-2); unavailable = không gọi
+        proto FM-01 (chỉ bản ghi cuộn gốc, công đoạn bale): ngày cuộn so với ngày gặt của thửa (mốc = harvest_open_date, không có thì
+        harvest_date dự kiến). ok = biết ngày gặt, cuộn không trước mốc (cuộn trước → 422 fieldops.before_harvest); unknown = nền tảng chưa có / chưa chia sẻ (RB-2); unavailable = không gọi
         được nền tảng và không có bảng đệm. unknown/unavailable vẫn ghi được nhưng GẮN CỜ.
       properties:
         check: {type: string, enum: [ok, unknown, unavailable]}
         bale_date: {type: string, format: date}
         harvest_date: {type: [string, "null"], format: date}
-        harvest_kind: {type: [string, "null"], enum: [expected, actual, null]}
+        harvest_open_date: {type: [string, "null"], format: date, description: "Ngày mở cửa sổ gặt của vụ (mốc FM-01); harvest_date = ngày gặt dự kiến (gốc hạn FM-02)"}
         season_ref: {type: [string, "null"], format: uuid}
         source: {type: string, enum: [partner, cache, none]}
         rule_version: {type: string}
@@ -1940,7 +1940,7 @@ components:
         order_status: {type: string}
         harvest_check: {type: string, enum: [ok, unknown, unavailable]}
         harvest_date: {type: [string, "null"], format: date}
-        harvest_kind: {type: [string, "null"], enum: [expected, actual, null]}
+        harvest_open_date: {type: [string, "null"], format: date, description: "Ngày mở cửa sổ gặt của vụ (mốc FM-01); harvest_date = ngày gặt dự kiến (gốc hạn FM-02)"}
         season_ref: {type: [string, "null"], format: uuid}
         baled_on: {type: [string, "null"], format: date}
         deadline: {type: [string, "null"], format: date}

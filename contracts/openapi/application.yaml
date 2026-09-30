@@ -942,6 +942,33 @@ paths:
                   next_cursor: {type: [string, "null"]}
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /v1/mrv/alerts:
+    get:
+      summary: Cảnh báo MRV trong phạm vi — Cảnh báo khẩn, AWD thiếu hạ tầng, hồ sơ quá hạn (G3)
+      description: >-
+        KN US-MRV-04 (pest_urgent: nhãn Cảnh báo khẩn tự bật khi vượt ngưỡng), KN FR-08 (awd_no_infrastructure: nhật ký App
+        HTX ghi AWD nhưng vùng chưa đủ hạ tầng), KN US-MRV-06 (review_overdue: level 1 đã báo người duyệt, level 2 đã leo
+        thang lên quản trị TTKN tỉnh). Mỗi cảnh báo phát pf.mrv.alert.raised → pf/notify. Vai đọc minh chứng
+        (mrv_collector, mrv_reviewer, mrv_viewer, mrv_exporter); lọc theo phạm vi xã của người gọi.
+      operationId: listMrvAlerts
+      parameters:
+        - {name: kind, in: query, schema: {type: string, enum: [pest_urgent, awd_no_infrastructure, review_overdue]}}
+        - {name: admin_unit_code, in: query, schema: {type: string}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Trang kết quả
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MrvAlert"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/mrv/seasons/{id}/estimate/recompute:
     post:
       summary: Tính lại ước tính của một vụ (vai mrv_reviewer) — cùng đầu vào không ghi thêm dòng
@@ -4638,7 +4665,7 @@ paths:
         Chỉ `coop_manager` của đúng HTX. `revision` phải là bản hiện hành (409 `cropcycle.collection_statement_stale`).
         `confirmed`: số HTX = số MKG. `disputed`: bắt buộc `htx_rolls` (≠ số MKG) và `reason` 10–500 ký tự, không chứa SĐT/CCCD.
         Đã có phản hồi cho cùng revision → bắt buộc `reason`; bản mới thay bản trước (sổ chỉ ghi thêm, `supersedes_id`).
-        MKG kéo phản hồi về qua `GET /v1/cropcycle/htx-collection/responses`.
+        MKG kéo phản hồi về qua `GET /v1/partner/htx-collection/responses` (ADR-0020).
       operationId: respondHtxCollectionStatement
       tags: [cropcycle]
       parameters:
@@ -4673,14 +4700,14 @@ paths:
         "422": {$ref: "#/components/responses/Problem"}
   /v1/cropcycle/htx-collection/responses:
     get:
-      summary: Luồng phản hồi của HTX cho MKG kéo về (tài khoản dịch vụ vai mkg_sync) — G3-2
+      summary: Bí danh của GET /v1/partner/htx-collection/responses (ADR-0020)
       description: |
-        Nền tảng → MKG chỉ qua Application API công khai (g3-conventions §5). Chỉ vai `mkg_sync`; chỉ phản hồi thuộc bảng kê
-        do chính tenant của tài khoản gửi qua van; không có người phản hồi. Con trỏ `after` = `cursor` cuối (tăng dần, không bỏ sót
-        dòng commit muộn). MKG ghi mỗi dòng thành `mkg_fieldops.htx_confirmation` kênh `platform` (idempotent).
+        Giữ để tương thích G3-2. Cùng kiểm cấp quyền chia sẻ `htx_collection_responses`, cùng sổ đọc, cùng dữ liệu với
+        `GET /v1/partner/htx-collection/responses`. MKG dùng đường của bề mặt đối tác.
       operationId: listHtxCollectionResponseFeed
       tags: [cropcycle]
       parameters:
+        - $ref: "#/components/parameters/PartnerGrantor"
         - {name: after, in: query, schema: {type: integer, minimum: 0, default: 0}}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 200}}
       responses:
@@ -4688,31 +4715,161 @@ paths:
           description: Một trang luồng
           content:
             application/json:
+              schema: {$ref: "#/components/schemas/HtxCollectionResponseFeedPage"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  # --- Bề mặt đối tác (ADR-0020, RB-2 / Q-MKG-12): tài khoản dịch vụ tenant BÊN NHẬN (MKG, vai mkg_sync) đọc dữ liệu
+  # tối thiểu của tenant BÊN CẤP (tenant chương trình) sau khi kiểm cấp quyền chia sẻ đang hiệu lực; mọi lời gọi ghi sổ
+  # pf_party.partner_read_log. Không có cấp quyền / đã thu hồi / hết hạn / loại không được cấp → 403 party.share_grant_missing.
+  /v1/partner/grants:
+    get:
+      summary: Cấp quyền chia sẻ đang hiệu lực mà tenant người gọi nhận (ADR-0020)
+      operationId: listPartnerGrants
+      tags: [partner]
+      responses:
+        "200":
+          description: Cấp quyền đang hiệu lực
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/PartnerGrant"}}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/partner/cooperatives:
+    get:
+      summary: Danh bạ HTX của tenant bên cấp (loại cooperative_directory, ADR-0020)
+      description: Không người đại diện, không mã số thuế, không nông hộ. Con trỏ theo `ref`.
+      operationId: listPartnerCooperatives
+      tags: [partner]
+      parameters:
+        - $ref: "#/components/parameters/PartnerGrantor"
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 200}}
+      responses:
+        "200":
+          description: Một trang danh bạ
+          content:
+            application/json:
               schema:
                 type: object
                 required: [items, next_cursor]
                 properties:
-                  next_cursor: {type: integer}
-                  items:
-                    type: array
-                    items:
-                      type: object
-                      required: [response_id, cursor, statement_ref, statement_revision, htx_ref, plot_ref, mkg_rolls, outcome, htx_rolls, reason, responded_at, supersedes_response_id]
-                      properties:
-                        response_id: {type: string, format: uuid}
-                        cursor: {type: integer}
-                        statement_ref: {type: string, format: uuid}
-                        statement_revision: {type: integer}
-                        htx_ref: {type: string, format: uuid}
-                        plot_ref: {type: string, format: uuid}
-                        mkg_rolls: {type: integer}
-                        outcome: {type: string, enum: [confirmed, disputed]}
-                        htx_rolls: {type: integer}
-                        reason: {type: [string, "null"]}
-                        responded_at: {type: string, format: date-time}
-                        supersedes_response_id: {type: [string, "null"], format: uuid}
+                  items: {type: array, items: {$ref: "#/components/schemas/PartnerCooperative"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/partner/cooperatives/{ref}:
+    get:
+      summary: Một HTX của tenant bên cấp (loại cooperative_directory, ADR-0020)
+      operationId: getPartnerCooperative
+      tags: [partner]
+      parameters:
+        - $ref: "#/components/parameters/PartnerGrantor"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: HTX
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PartnerCooperative"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/partner/plots:
+    get:
+      summary: Danh bạ thửa của tenant bên cấp (loại plot_directory, ADR-0020)
+      description: Hình học, diện tích, xã, HTX, trạng thái — không nông hộ, không tên thửa. Con trỏ theo `ref`.
+      operationId: listPartnerPlots
+      tags: [partner]
+      parameters:
+        - $ref: "#/components/parameters/PartnerGrantor"
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 200}}
+      responses:
+        "200":
+          description: Một trang danh bạ thửa
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/PartnerPlot"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/partner/plots/{ref}:
+    get:
+      summary: Một thửa của tenant bên cấp (loại plot_directory, ADR-0020)
+      operationId: getPartnerPlot
+      tags: [partner]
+      parameters:
+        - $ref: "#/components/parameters/PartnerGrantor"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PartnerPlot"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/partner/season-harvest-dates:
+    get:
+      summary: Ngày gieo / thu hoạch của vụ ở tenant bên cấp (loại season_harvest_dates, proto FM-01/02, ADR-0020)
+      description: Không nông hộ, không sản lượng. Con trỏ `after` = `cursor` cuối (đổi khi vụ đổi).
+      operationId: listPartnerSeasonHarvestDates
+      tags: [partner]
+      parameters:
+        - $ref: "#/components/parameters/PartnerGrantor"
+        - {name: plot_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: after, in: query, schema: {type: integer, minimum: 0, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 200}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/PartnerSeasonDates"}}
+                  next_cursor: {type: integer}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/partner/htx-collection/responses:
+    get:
+      summary: Luồng phản hồi của HTX cho MKG kéo về (loại htx_collection_responses, RB-6 chiều mua, ADR-0020)
+      description: |
+        Đọc ở tenant bên cấp; chỉ phản hồi thuộc bảng kê do chính tenant người gọi gửi qua van (`source_tenant_id`); không có
+        người phản hồi. Con trỏ `after` = `cursor` cuối (tăng dần, không bỏ sót dòng commit muộn). MKG ghi mỗi dòng thành
+        `mkg_fieldops.htx_confirmation` kênh `platform` (idempotent).
+      operationId: listPartnerHtxCollectionResponses
+      tags: [partner]
+      parameters:
+        - $ref: "#/components/parameters/PartnerGrantor"
+        - {name: after, in: query, schema: {type: integer, minimum: 0, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 200}}
+      responses:
+        "200":
+          description: Một trang luồng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HtxCollectionResponseFeedPage"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/gis/replay:
     get:
       summary: Mọi lớp GIS như hệ biết lúc hết ngày X — GIS US-REPLAY-01
@@ -4742,12 +4899,88 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/extdata/sources:
+    get:
+      summary: "pf/extdata (ADR-0007): nguồn dữ liệu ngoài đã bật — thời tiết, độ mặn, tile. Không trả URL (có thể chứa khóa API)"
+      operationId: extdataSources
+      responses:
+        "200":
+          description: Danh mục nguồn (mặc định rỗng khi chưa cấu hình AG_EXTDATA_SOURCES)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ExtDataSource"}}
+        "401": {$ref: "#/components/responses/Problem"}
+  /v1/extdata/{source}/point:
+    get:
+      summary: "pf/extdata (ADR-0007): dữ liệu điểm qua proxy khử định danh — tọa độ làm thô về tâm ô lưới trước khi gọi nhà cung cấp; đệm theo ô"
+      operationId: extdataPoint
+      parameters:
+        - {name: source, in: path, required: true, schema: {type: string, pattern: "^[a-z][a-z0-9_]{1,30}$"}}
+        - {name: lat, in: query, required: true, description: "Vĩ độ thập phân (chuỗi)", schema: {type: string}}
+        - {name: lon, in: query, required: true, description: "Kinh độ thập phân (chuỗi)", schema: {type: string}}
+      responses:
+        "200":
+          description: "Dữ liệu của ô lưới (data là JSON nguyên văn của nhà cung cấp). Cache-Control: private, max-age = thời gian đệm còn lại"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [source, kind, cell, fetched_at, cached, data]
+                properties:
+                  source: {type: string}
+                  kind: {type: string, enum: [weather, salinity]}
+                  cell:
+                    type: object
+                    required: [lat, lon, size_deg]
+                    properties:
+                      lat: {type: string, description: "Vĩ độ tâm ô"}
+                      lon: {type: string, description: "Kinh độ tâm ô"}
+                      size_deg: {type: string, description: "Cạnh ô (độ), ≥ 0.05"}
+                  fetched_at: {type: string, format: date-time}
+                  cached: {type: boolean}
+                  data: {description: "JSON của nhà cung cấp"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extdata.unknown_source", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extdata.outside_territory", $ref: "#/components/responses/Problem"}
+        "502": {description: "extdata.provider_unavailable", $ref: "#/components/responses/Problem"}
+  /v1/extdata/{source}/tiles/{z}/{x}/{y}:
+    get:
+      summary: "pf/extdata (ADR-0007): tile bản đồ/vệ tinh qua proxy — zoom ≤ max_zoom của nguồn, tile phải giao vùng phục vụ; y có thể kèm đuôi .png"
+      operationId: extdataTile
+      parameters:
+        - {name: source, in: path, required: true, schema: {type: string}}
+        - {name: z, in: path, required: true, schema: {type: integer, minimum: 0, maximum: 18}}
+        - {name: x, in: path, required: true, schema: {type: integer, minimum: 0}}
+        - {name: y, in: path, required: true, schema: {type: string, pattern: "^[0-9]+([.][a-z]+)?$"}}
+      responses:
+        "200":
+          description: Tile nhị phân
+          content:
+            image/png: {schema: {type: string, format: binary}}
+            image/jpeg: {schema: {type: string, format: binary}}
+            image/webp: {schema: {type: string, format: binary}}
+            application/x-protobuf: {schema: {type: string, format: binary}}
+        "401": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extdata.unknown_source", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extdata.zoom_too_high | extdata.outside_territory", $ref: "#/components/responses/Problem"}
+        "502": {description: "extdata.provider_unavailable", $ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
       type: openIdConnect
       openIdConnectUrl: https://auth.agrigreen.vn/realms/agrigreen/.well-known/openid-configuration
   parameters:
+    PartnerGrantor:
+      name: grantor
+      in: query
+      description: |
+        Tenant BÊN CẤP (ADR-0020) — không phải tenant người gọi (tenant người gọi luôn lấy từ token, R-16). Vắng mặt → chỉ nhận
+        khi đúng một bên cấp có loại dữ liệu này (nhiều bên cấp → 422 party.share_grantor_ambiguous).
+      schema: {type: string, format: uuid}
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -4863,6 +5096,18 @@ components:
                     season_ref: {type: string, format: uuid}
                     harvest_id: {type: string, format: uuid}
   schemas:
+    ExtDataSource:
+      type: object
+      required: [id, kind, in_territory, ttl_seconds, fake]
+      properties:
+        id: {type: string}
+        kind: {type: string, enum: [weather, salinity, tile]}
+        in_territory: {type: boolean, description: "Đích thuộc AG_RESIDENCY_ALLOWLIST (RB-7)"}
+        adr: {type: string, description: "ADR riêng của nguồn ngoài lãnh thổ (ADR-0007)"}
+        cell_deg: {type: string, description: "Cạnh ô lưới (nguồn điểm)"}
+        max_zoom: {type: integer, description: "Trần zoom (nguồn tile)"}
+        ttl_seconds: {type: integer}
+        fake: {type: boolean, description: "Nhà cung cấp giả (Local/Dev)"}
     HtxCollectionSchedule:
       type: object
       description: Lịch gom rơm MKG của một HTX (van collection_schedule) — chỉ khung thời gian và trạng thái.
@@ -5565,6 +5810,7 @@ components:
         correction_reason: {type: [string, "null"]}
         seq: {type: integer}
         review_status: {type: string, enum: [pending, accepted, rejected], description: "Chỉ có trong danh sách"}
+        urgent: {type: boolean, description: "Chỉ có trong danh sách: bản hiện hành mang nhãn Cảnh báo khẩn (KN US-MRV-04)"}
     MrvReview:
       type: object
       required: [id, evidence_id, root_id, decision, reason, reviewer_ref, event_time, recorded_at, seq]
@@ -5588,6 +5834,37 @@ components:
         review_status: {type: string, enum: [pending, accepted, rejected]}
         chain: {type: array, items: {$ref: "#/components/schemas/MrvEvidence"}}
         reviews: {type: array, items: {$ref: "#/components/schemas/MrvReview"}}
+        urgent: {type: boolean, description: "Phiên bản đang xem mang nhãn Cảnh báo khẩn — tự bật khi vượt ngưỡng (KN US-MRV-04)"}
+        alerts: {type: array, items: {$ref: "#/components/schemas/MrvAlert"}, description: "Mọi cảnh báo của chuỗi minh chứng, cũ → mới"}
+    MrvAlert:
+      type: object
+      description: >-
+        Một cảnh báo MRV (sổ pf_mrv.alert, chỉ ghi thêm). pest_urgent (mrv.pest_urgent.v1): loại sâu bệnh/thiên tai
+        thuộc mrv.urgent.categories VÀ (cấp ≥ mrv.urgent.min_severity HOẶC diện tích ≥ mrv.urgent.min_area_ha);
+        awd_no_infrastructure (mrv.awd_infra.v1): nhật ký App HTX có mã hoạt động thuộc mrv.awd.activity_codes mà thửa/xã
+        chưa có minh chứng irrigation_infrastructure đạt (KN FR-08); review_overdue (mrv.review_overdue.v1): hồ sơ chờ
+        duyệt quá mrv.review_sla_hours (level 1, người duyệt) / mrv.review_escalate_hours (level 2, quản trị TTKN tỉnh)
+        (KN US-MRV-06). Mọi ngưỡng là tham số có phiên bản — TẠM, chờ khách; params ghi phiên bản đã dùng.
+      required: [id, kind, level, severity, label, admin_unit_code, subject_type, subject_id, subject_root_id, plot_ref, season_ref,
+        detail, params, rule_version, event_time, recorded_at, seq]
+      properties:
+        id: {type: string, format: uuid}
+        kind: {type: string, enum: [pest_urgent, awd_no_infrastructure, review_overdue]}
+        level: {type: integer, minimum: 0, maximum: 2}
+        severity: {type: string, enum: [urgent, normal]}
+        label: {type: string, description: "Nhãn hiển thị, vd Cảnh báo khẩn"}
+        admin_unit_code: {type: string}
+        subject_type: {type: string, enum: [evidence, farm_log]}
+        subject_id: {type: string, format: uuid, description: "Phiên bản minh chứng hoặc log_id của nhật ký HTX"}
+        subject_root_id: {type: string, format: uuid, description: "Gốc chuỗi minh chứng hoặc log_ref"}
+        plot_ref: {type: [string, "null"], format: uuid}
+        season_ref: {type: [string, "null"], format: uuid}
+        detail: {type: object, additionalProperties: true, description: "Đầu vào đã đánh giá (không có dữ liệu cá nhân)"}
+        params: {type: array, items: {$ref: "#/components/schemas/MrvParamUse"}}
+        rule_version: {type: string}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        seq: {type: integer}
     MrvExportFilters:
       type: object
       properties:
@@ -7455,3 +7732,82 @@ components:
         approved_logs: {type: integer}
         pending_logs: {type: integer}
     # --- hết pf/cropcycle ---
+    # --- Bề mặt đối tác (ADR-0020) ---
+    PartnerGrant:
+      type: object
+      required: [id, grantor_tenant_id, kinds, valid_from, valid_to]
+      properties:
+        id: {type: string, format: uuid}
+        grantor_tenant_id: {type: string, format: uuid}
+        kinds:
+          type: array
+          items: {type: string, enum: [cooperative_directory, plot_directory, season_harvest_dates, htx_collection_responses, valve_hub, valve_collection, valve_mrv_evidence]}
+        valid_from: {type: string, format: date-time}
+        valid_to: {type: string, format: date-time}
+    PartnerCooperative:
+      type: object
+      description: HTX cho bên nhận — không người đại diện, không mã số thuế, không nông hộ
+      required: [ref, code, name, commune_code, active, lon, lat, updated_at]
+      properties:
+        ref: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        commune_code: {type: [string, "null"]}
+        active: {type: boolean}
+        lon: {type: [string, "null"], description: "Độ, 7 chữ số thập phân (vị trí hồ sơ HTX)"}
+        lat: {type: [string, "null"]}
+        updated_at: {type: string, format: date-time}
+    PartnerPlot:
+      type: object
+      description: Thửa cho bên nhận — không nông hộ, không tên thửa, không người tạo
+      required: [ref, code, commune_code, cooperative_ref, status, area_ha, geometry, revision, updated_at]
+      properties:
+        ref: {type: string, format: uuid}
+        code: {type: string}
+        commune_code: {type: string}
+        cooperative_ref: {type: [string, "null"], format: uuid}
+        status: {type: string, enum: [draft, active, retired]}
+        area_ha: {type: string, description: "Decimal dạng chuỗi"}
+        geometry: {type: object, description: "GeoJSON MultiPolygon (EPSG:4326)"}
+        revision: {type: integer}
+        updated_at: {type: string, format: date-time}
+    PartnerSeasonDates:
+      type: object
+      required: [season_ref, plot_ref, cooperative_ref, commune_code, season_code, season_year, sowing_date, expected_harvest_date, harvest_open_date, status, completed_at, cursor]
+      properties:
+        season_ref: {type: string, format: uuid}
+        plot_ref: {type: string, format: uuid}
+        cooperative_ref: {type: string, format: uuid}
+        commune_code: {type: string}
+        season_code: {type: string}
+        season_year: {type: integer}
+        sowing_date: {type: string, format: date}
+        expected_harvest_date: {type: string, format: date}
+        harvest_open_date: {type: string, format: date}
+        status: {type: string, enum: [open, completed, cancelled]}
+        completed_at: {type: [string, "null"], format: date-time}
+        cursor: {type: integer}
+    HtxCollectionResponseFeedPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        next_cursor: {type: integer}
+        items:
+          type: array
+          items:
+            type: object
+            required: [response_id, cursor, statement_ref, statement_revision, htx_ref, plot_ref, mkg_rolls, outcome, htx_rolls, reason, responded_at, supersedes_response_id]
+            properties:
+              response_id: {type: string, format: uuid}
+              cursor: {type: integer}
+              statement_ref: {type: string, format: uuid}
+              statement_revision: {type: integer}
+              htx_ref: {type: string, format: uuid}
+              plot_ref: {type: string, format: uuid}
+              mkg_rolls: {type: integer}
+              outcome: {type: string, enum: [confirmed, disputed]}
+              htx_rolls: {type: integer}
+              reason: {type: [string, "null"]}
+              responded_at: {type: string, format: date-time}
+              supersedes_response_id: {type: [string, "null"], format: uuid}
+    # --- hết bề mặt đối tác ---

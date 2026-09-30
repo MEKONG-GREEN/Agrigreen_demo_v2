@@ -84,6 +84,13 @@ func (f *fakeParams) set(key, v string, version int) {
 	f.vals[key] = mdport.ParamValue{Key: key, Value: decimal.RequireFromString(v), Version: version}
 }
 
+// setText đặt tham số CHUỖI (vd danh sách mã) "đã duyệt".
+func (f *fakeParams) setText(key, text string, version int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.vals[key] = mdport.ParamValue{Key: key, Text: text, Version: version}
+}
+
 func (f *fakeParams) At(_ context.Context, key string, _ time.Time) (mdport.ParamValue, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

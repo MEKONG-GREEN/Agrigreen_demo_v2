@@ -26,9 +26,17 @@ func dp(s string) *time.Time { d := day(s); return &d }
 // cuộn trước ngày gặt bị từ chối; ngày nghiệp vụ theo giờ Việt Nam.
 func TestSelectSeasonAndBaleDateFM01(t *testing.T) {
 	s1, s2 := ids.New(), ids.New()
-	seasons := []port.SeasonHarvest{
-		{SeasonRef: &s1, HarvestDate: day("2026-03-01"), Kind: port.HarvestActual},
-		{SeasonRef: &s2, HarvestDate: day("2026-10-05"), Kind: port.HarvestExpected},
+	seasons := SeasonsFrom([]port.SeasonDates{
+		{SeasonRef: s1, ExpectedHarvestDate: "2026-03-01", HarvestOpenDate: "2026-02-25", Status: "completed"},
+		{SeasonRef: s2, ExpectedHarvestDate: "2026-10-05", HarvestOpenDate: "2026-10-09", Status: "open"},
+		{SeasonRef: ids.New(), ExpectedHarvestDate: "2026-10-02", Status: "cancelled"},
+		{SeasonRef: ids.New(), ExpectedHarvestDate: "05/10/2026", Status: "open"},
+	})
+	if len(seasons) != 2 || seasons[0].Open == nil || !seasons[0].Open.Equal(day("2026-02-25")) || seasons[1].Open != nil {
+		t.Fatalf("chuẩn hóa vụ (bỏ vụ hủy, ngày sai, ngày mở sau ngày dự kiến): %+v", seasons)
+	}
+	if e := EarliestHarvest(seasons[0].Expected, seasons[0].Open); !e.Equal(day("2026-02-25")) {
+		t.Fatalf("mốc FM-01 = ngày mở cửa sổ gặt: %v", e)
 	}
 	if got := SelectSeason(seasons, day("2026-10-01")); got == nil || *got.SeasonRef != s2 {
 		t.Fatalf("khung 01/10 → vụ gặt 05/10: %+v", got)
@@ -37,7 +45,7 @@ func TestSelectSeasonAndBaleDateFM01(t *testing.T) {
 		t.Fatalf("khung 01/04 → vụ gặt 01/03: %+v", got)
 	}
 	// Đảo thứ tự đầu vào không đổi kết quả.
-	rev := []port.SeasonHarvest{seasons[1], seasons[0]}
+	rev := []Season{seasons[1], seasons[0]}
 	if a, b := SelectSeason(seasons, day("2026-10-01")), SelectSeason(rev, day("2026-10-01")); *a.SeasonRef != *b.SeasonRef {
 		t.Fatal("chọn vụ phải tất định")
 	}

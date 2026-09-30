@@ -179,8 +179,10 @@ func (s *Service) count(ctx context.Context, p authz.Principal, in CountInput) (
 			}
 			baleDay := domain.Day(in.EventTime)
 			if h.Check == domain.HarvestOK {
-				if err := domain.CheckBaleDate(baleDay, *h.Date); err != nil {
-					return ErrBeforeHarvest.WithDetail("ngày cuộn " + baleDay.Format(dateLayout) + " trước ngày gặt " + h.Date.Format(dateLayout))
+				earliest := domain.EarliestHarvest(*h.Date, h.OpenDate)
+				if err := domain.CheckBaleDate(baleDay, earliest); err != nil {
+					return ErrBeforeHarvest.WithDetail("ngày cuộn " + baleDay.Format(dateLayout) + " trước ngày gặt " + earliest.Format(dateLayout) +
+						" (mở cửa sổ gặt của vụ)")
 				}
 			}
 			if live.Check != domain.HarvestUnavailable {
@@ -188,7 +190,7 @@ func (s *Service) count(ctx context.Context, p authz.Principal, in CountInput) (
 					return err
 				}
 			}
-			hc = &store.HarvestCheck{BaleDate: baleDay, Check: h.Check, HarvestDate: h.Date, SeasonRef: h.SeasonRef, Kind: h.Kind, Source: source}
+			hc = &store.HarvestCheck{BaleDate: baleDay, Check: h.Check, HarvestDate: h.Date, OpenDate: h.OpenDate, SeasonRef: h.SeasonRef, Source: source}
 			if w := harvestWarning(h.Check); w != "" {
 				res.Warnings = append(res.Warnings, w)
 			}

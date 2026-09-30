@@ -6,8 +6,9 @@
 #   ag_ingest_*          cmd/ingest qua OTLP → OpenTelemetry Collector (exporter prometheus,
 #                        tên OTel thay dấu chấm bằng gạch dưới, counter thêm _total — integration-alerts.md mục 3)
 #   edge_*               /metrics cục bộ của agent (127.0.0.1:9108), Prometheus agent tại hub remote-write qua VPN
-#   ag_mkg_*, ag_ts_*    sql_exporter với deploy/observability/sql-exporter/mkg-measurement.collector.yml
-#                        (cần vai giám sát chỉ đọc — chưa có, xem collector)
+#   ag_mkg_*             sql_exporter, deploy/observability/sql-exporter/mkg-measurement.collector.yml (vai mkg_monitor)
+#   ag_ts_*              sql_exporter, deploy/observability/sql-exporter/ts-weigh.collector.yml (vai ts_monitor)
+#                        (vai chỉ EXECUTE hàm gộp SECURITY DEFINER — migration mkg 000013, ts 000003)
 #   rabbitmq_detailed_*  plugin rabbitmq_prometheus, /metrics/detailed?vhost=mkg.internal&family=queue_coarse_metrics
 #
 # Mức (mục 23): severity=page (P1/P2 — gọi trực), ticket (P3 — xử lý trong giờ làm việc).

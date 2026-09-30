@@ -18,7 +18,7 @@ import (
 // g3Ledgers là các sổ G3 có kiểm idem_key trước khi ghi (consumer: lỗi trong
 // giao dịch của inbox.Process làm hỏng cả giao dịch, nên không dựa vào 23505).
 var g3Ledgers = map[string]bool{
-	"season_link": true, "farm_log_link": true, "collection_evidence": true, "log_comparison": true, "estimate": true,
+	"season_link": true, "farm_log_link": true, "collection_evidence": true, "log_comparison": true, "estimate": true, "alert": true,
 }
 
 // IdemExists cho biết sổ G3 đã có dòng với idem_key.

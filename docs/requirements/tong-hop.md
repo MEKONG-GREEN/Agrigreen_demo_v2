@@ -81,7 +81,7 @@ Các câu này đóng các dòng "một phần" của [g3-acceptance.md](../uat/
 | Q3-05 | Định mức hao hụt sấy/lưu HUB_IN → HUB_OUT? | Tham số tạm có phiên bản | hao hụt nội bộ |
 | Q3-06 | Hợp đồng trả theo cuộn hay theo tấn nhà máy cân? | Hỗ trợ cả hai; theo tấn thì đối chiếu cuộn ↔ khối lượng là kiểm RB-6 | `mkg/measurement`, `mkg/fieldops` |
 | Q3-07 (C-1) | Danh mục trường MRV chính thức; phạm vi và phương pháp tCO2e (baseline, leakage, chất khô)? | Ước tính luôn TẠM; hệ số 1460 kgCO2e/t, 0,062 / 0,021 kgCO2e/t·km là tham số tạm | `pf/mrv`, van `mrv_collection_evidence` |
-| Q3-08 (RB-2, Q-MKG-12) | MKG đọc HTX/thửa/phản hồi HTX của tenant chương trình bằng cấp quyền chia sẻ tường minh hay vai trong tenant chương trình? | Tài khoản dịch vụ tenant MKG qua Application API; thử nghiệm dùng một tenant | `mkg/fieldops`, `pf/cropcycle` |
+| Q3-08 (RB-2, Q-MKG-12) | MKG đọc HTX/thửa/phản hồi HTX của tenant chương trình bằng cấp quyền chia sẻ tường minh hay vai trong tenant chương trình? | **Đã chốt 29–30/09/2026 (chủ sản phẩm):** MKG là tenant riêng, chỉ liên thông dữ liệu cần thiết qua hệ thống nội bộ → cấp quyền chia sẻ tường minh ([ADR-0020](../adr/0020-lien-thong-platform-mkg-khac-tenant.md)) | `pf/party`, `pf/geo`, `pf/cropcycle`, `pf/mrv`, `mkg/fieldops` |
 | Q3-09 (FN-21) | Số ngày lưu, nén, lưu trữ của nhật ký lớp GIS, ảnh chụp và số đo thô? | Không xóa; chỉ chuyển tầng (RB-1, X1) | `pf/metrics`, `ts_weigh` |
 | Q3-10 | Ngưỡng "Cảnh báo khẩn" sâu bệnh/thiên tai (KN US-MRV-04) và thời hạn xử lý hồ sơ MRV (US-MRV-06)? | Chưa có | `pf/mrv`, `pf/extension` |
 | Q3-11 | Số ngày tối đa từ gặt tới cuộn xong (proto FM-02) và năng lực cuộn/ngày của tổ gom (FM-06)? | Chưa kiểm | `mkg/fieldops` |

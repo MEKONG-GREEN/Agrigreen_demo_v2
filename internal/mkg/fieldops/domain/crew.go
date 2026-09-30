@@ -160,16 +160,56 @@ const (
 	HarvestUnavailable = "unavailable" // không gọi được nền tảng, không có bảng đệm → cho ghi, gắn cờ
 )
 
-// SelectSeason chọn vụ của thửa ứng với lệnh gom: vụ có ngày gặt GẦN NGÀY BẮT ĐẦU khung
-// lệnh gom nhất (hòa → vụ sau; cùng ngày → 'actual' trước 'expected', rồi season_ref). Tất
-// định với cùng dữ liệu. nil khi không có vụ nào.
-func SelectSeason(seasons []port.SeasonHarvest, anchor time.Time) *port.SeasonHarvest {
+// Season là ngày gặt của một vụ trên thửa, chuẩn hóa từ port.SeasonDates (ngày nghiệp vụ, 00:00 UTC).
+type Season struct {
+	SeasonRef *uuid.UUID
+	Expected  time.Time  // ngày gặt dự kiến (expected_harvest_date) — gốc hạn cuộn FM-02 (như harvest_date của prototype)
+	Open      *time.Time // ngày mở cửa sổ gặt (harvest_open_date, theo SOP) — mốc FM-01; nil = dùng Expected
+}
+
+// SeasonsFrom chuẩn hóa các vụ đọc qua port.HarvestCalendar: bỏ vụ đã hủy và vụ không có ngày
+// gặt dự kiến hợp lệ; ngày mở gặt sai dạng hoặc sau ngày dự kiến bị bỏ qua.
+func SeasonsFrom(xs []port.SeasonDates) []Season {
+	out := make([]Season, 0, len(xs))
+	for _, x := range xs {
+		if x.Status == "cancelled" {
+			continue
+		}
+		exp, err := time.Parse(time.DateOnly, x.ExpectedHarvestDate)
+		if err != nil {
+			continue
+		}
+		s := Season{Expected: exp}
+		if o, err := time.Parse(time.DateOnly, x.HarvestOpenDate); err == nil && !o.After(exp) {
+			s.Open = &o
+		}
+		if x.SeasonRef != uuid.Nil {
+			r := x.SeasonRef
+			s.SeasonRef = &r
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
+// EarliestHarvest là mốc FM-01: ngày mở cửa sổ gặt nếu có, không thì ngày gặt dự kiến.
+func EarliestHarvest(expected time.Time, open *time.Time) time.Time {
+	if open != nil && open.Before(expected) {
+		return *open
+	}
+	return expected
+}
+
+// SelectSeason chọn vụ của thửa ứng với lệnh gom: vụ có ngày gặt dự kiến GẦN NGÀY BẮT ĐẦU
+// khung lệnh gom nhất (hòa → vụ sau, rồi season_ref). Tất định với cùng dữ liệu. nil khi
+// không có vụ nào.
+func SelectSeason(seasons []Season, anchor time.Time) *Season {
 	if len(seasons) == 0 {
 		return nil
 	}
-	xs := append([]port.SeasonHarvest(nil), seasons...)
-	dist := func(s port.SeasonHarvest) int {
-		d := DaysBetween(anchor, s.HarvestDate)
+	xs := append([]Season(nil), seasons...)
+	dist := func(s Season) int {
+		d := DaysBetween(anchor, s.Expected)
 		if d < 0 {
 			return -d
 		}
@@ -180,18 +220,15 @@ func SelectSeason(seasons []port.SeasonHarvest, anchor time.Time) *port.SeasonHa
 		if da, db := dist(a), dist(b); da != db {
 			return da < db
 		}
-		if !a.HarvestDate.Equal(b.HarvestDate) {
-			return a.HarvestDate.After(b.HarvestDate)
-		}
-		if a.Kind != b.Kind {
-			return a.Kind == port.HarvestActual
+		if !a.Expected.Equal(b.Expected) {
+			return a.Expected.After(b.Expected)
 		}
 		return seasonKey(a) < seasonKey(b)
 	})
 	return &xs[0]
 }
 
-func seasonKey(s port.SeasonHarvest) string {
+func seasonKey(s Season) string {
 	if s.SeasonRef == nil {
 		return ""
 	}
