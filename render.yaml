@@ -10,9 +10,12 @@ services:
     branch: main
     rootDir: apps/web-ops
     # output: standalone → chép static/public vào bản standalone như Dockerfile.
+    # --include=dev: nếu NODE_ENV=production (đặt trên dashboard/env group) npm ci bỏ devDependencies
+    # (cross-env, typescript) → build lỗi. Gói free 512 MB: bước kiểm kiểu của `next build` hết
+    # bộ nhớ → bỏ qua (CI chạy `npm run typecheck` riêng) và giới hạn heap để GC chạy sớm.
     buildCommand: >-
-      npm ci --no-audit --no-fund &&
-      npm run build:mock &&
+      npm ci --include=dev --no-audit --no-fund &&
+      AG_SKIP_BUILD_TYPECHECK=1 NODE_OPTIONS=--max-old-space-size=400 npm run build:mock &&
       cp -r .next/static .next/standalone/.next/static &&
       cp -r public .next/standalone/public
     startCommand: node .next/standalone/server.js

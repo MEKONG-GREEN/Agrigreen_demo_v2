@@ -14,6 +14,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Không dùng tối ưu ảnh của Next → không cần sharp. Loại sharp/libvips (LGPL-3.0, ngoài
   // deploy/policies/allowed-licenses.txt) khỏi bản standalone chạy trong image.
+  // Render free (512 MB): `tsc` trong `next build` hết bộ nhớ. Bản demo bỏ bước này; CI vẫn chạy
+  // `npm run typecheck` riêng nên mã lỗi kiểu không vào main.
+  typescript: { ignoreBuildErrors: process.env.AG_SKIP_BUILD_TYPECHECK === "1" },
   images: { unoptimized: true },
   outputFileTracingExcludes: {
     "*": ["node_modules/sharp/**", "node_modules/@img/**"],
