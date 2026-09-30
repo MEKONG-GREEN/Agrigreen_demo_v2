@@ -374,5 +374,12 @@ func RebuildLotMass(ctx context.Context, tx pgx.Tx, tid uuid.UUID) (int64, error
 		}
 		lots[t.LotRef] = true
 	}
+	// as_of / last_seq của bảng chiếu sống = lớn nhất trên MỌI phiếu đã áp (kể cả phiếu đã bị bù); dòng mới của
+	// LockLotMass mang now() của lần dựng lại → đặt lại từ sổ để dựng lại = bảng chiếu hiện hành (R-22, rà E2E G4).
+	if _, err := tx.Exec(ctx, `UPDATE mkg_measurement.lot_mass_current c SET as_of = m.as_of, last_seq = m.last_seq
+	  FROM (SELECT lot_ref, max(recorded_at) AS as_of, max(seq) AS last_seq FROM mkg_measurement.weigh_ticket GROUP BY lot_ref) m
+	 WHERE c.lot_ref = m.lot_ref`); err != nil {
+		return 0, err
+	}
 	return int64(len(lots)), nil
 }

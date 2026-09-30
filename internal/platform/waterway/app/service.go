@@ -176,6 +176,11 @@ func (s *Service) vessels(ctx context.Context, at time.Time) ([]domain.VesselCla
 		v := domain.VesselClass{Code: it.Code}
 		var errs []error
 		for attr, dst := range map[string]*decimal.Decimal{"tons": &v.Tons, "beam_m": &v.BeamM, "draft_m": &v.DraftM, "air_draft_m": &v.AirDraftM} {
+			if attr == "tons" && it.Attrs["tons"] == "" {
+				// Lược đồ danh mục pf/masterdata (domain.catalogSchemas, seeddata/catalogs.json) đặt tải là capacity_t —
+				// không có "tons" (rà E2E G4: mọi lần dựng mạng trên dữ liệu chủ đã nạp đều 422 waterway.params_invalid).
+				attr = "capacity_t"
+			}
 			d, err := it.Decimal(attr)
 			errs = append(errs, err)
 			*dst = d

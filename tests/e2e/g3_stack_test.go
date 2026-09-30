@@ -341,6 +341,16 @@ type pump struct {
 	delivered []delivery
 	// byType đếm lượt xử lý theo (consumer) — kiểm luồng đi đúng consumer.
 	byConsumer map[string]int
+	// clk là đồng hồ của handler worker-internal (nil = đồng hồ hệ thống). G4 đặt đồng hồ "đầu tháng sau"
+	// cho job đóng kỳ / dựng / đẩy bút toán (kỳ tháng phải kết thúc mới đóng được).
+	clk clock.Clock
+}
+
+func (p *pump) clock() clock.Clock {
+	if p.clk == nil {
+		return clock.System{}
+	}
+	return p.clk
 }
 
 func newPump(t *testing.T, s *harness.Stack, tids ...uuid.UUID) *pump {
@@ -414,7 +424,7 @@ func (p *pump) deliver(c migrations.Cluster, r outboxRow) int {
 			if !slices.Contains(wc.Events, r.env.EventType) {
 				continue
 			}
-			h, err := wc.Handler(clock.System{}, poolFor)
+			h, err := wc.Handler(p.clock(), poolFor)
 			if err != nil {
 				p.t.Fatal(err)
 			}

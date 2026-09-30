@@ -180,7 +180,19 @@ func (s *Service) OnTrip(ctx context.Context, tx pgx.Tx, tid uuid.UUID, ev logpo
 	for _, c := range ev.Cargo {
 		in.Cargo = append(in.Cargo, CargoLot{LotRef: c.LotRef, MassKg: c.MassKg})
 	}
-	return s.ingestSource(ctx, tx, tid, AllocTripCost, ev.TripID, ev.SupersedesID, ev.EventTime, in, "trip:")
+	if err := s.ingestSource(ctx, tx, tid, AllocTripCost, ev.TripID, ev.SupersedesID, ev.EventTime, in, "trip:"); err != nil {
+		return err
+	}
+	// PM-02: chuyến ghe của lệnh gom vừa hoàn tất → làm mới quyết toán chưa duyệt (hết "chờ cân"). Không phụ thuộc
+	// thứ tự giao giữa hàng đợi mkg.costing.weigh_ticket và mkg.logistics.weigh_ticket (E2E G4): phiếu cân tới costing
+	// trước khi logistics đóng chuyến thì quyết toán còn awaiting_weighing tới sự kiện này.
+	if ev.CollectionOrderRef == nil {
+		return nil
+	}
+	if err := store.LockKey(ctx, tx, "order:"+ev.CollectionOrderRef.String()); err != nil {
+		return err
+	}
+	return s.refreshSettlements(ctx, tx, tid, *ev.CollectionOrderRef)
 }
 
 // OnDelivery: mkg.orders.delivery.accepted → doanh thu giao nhận theo lô (khối lượng CUSTOMER_IN).

@@ -17,6 +17,7 @@ import (
 	ordport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/mass"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/money"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -153,6 +154,44 @@ func TestSettlementPerTonneAwaitsWeighing_PM02_C11(t *testing.T) {
 	r = prep.app(http.MethodGet, "/v1/costing/settlements/"+id, nil)
 	if str(r.body, "status") != "pending_confirmation" || str(r.body, "mass_kg") != "96800.000" || str(r.body, "amount") != "14520000.00" {
 		t.Fatalf("cân đủ → tấn cân × giá: %s", r.raw)
+	}
+	mustStatus(t, f.chief().adm(http.MethodPost, "/v1/costing/settlements/"+id+"/approve", nil), http.StatusCreated, "duyệt")
+}
+
+// PM-02 (lỗi thứ tự giao, rà E2E G4): phiếu HUB_IN tới costing TRƯỚC khi logistics đóng chuyến ghe (hai hàng đợi
+// khác nhau, RabbitMQ không bảo đảm thứ tự) → quyết toán còn chờ cân; trip.completed của lệnh gom tới sau phải làm
+// mới quyết toán (hết chờ cân) — không cần phiếu cân mới. Giao lặp không ghi thêm.
+func TestSettlementRefreshedOnTripCompleted_PM02(t *testing.T) {
+	f := newFixture(t)
+	tid := f.tenant
+	order, htx, lot, trip := ids.New(), ids.New(), ids.New(), ids.New()
+	f.contracts.set(htx, ordport.PricingPerTonne, "650000")
+	f.trips.forLot[order] = []logport.TripView{{TripID: trip, Status: logport.TripArrived}}
+	prep := f.accountant()
+	r := prep.app(http.MethodPost, "/v1/costing/settlements", settle(order, htx))
+	mustStatus(t, r, http.StatusCreated, "lập")
+	id := str(r.body, "id")
+	f.hubIn(tid, lot, order, "96800") // logistics chưa đóng chuyến
+	if r = prep.app(http.MethodGet, "/v1/costing/settlements/"+id, nil); str(r.body, "status") != "awaiting_weighing" {
+		t.Fatalf("chuyến chưa hoàn tất → chờ cân: %s", r.raw)
+	}
+	f.trips.forLot[order] = []logport.TripView{{TripID: trip, Status: logport.TripCompleted}}
+	ev := logport.TripCompletedV1{TripID: trip, Mode: logport.ModeWaterway, CollectionOrderRef: &order,
+		Cargo: []logport.TripCargoV1{{LotRef: order, MassKg: mass.MustKg("96800")}}, ActualKg: mass.MustKg("96800"),
+		ActualCost: money.MustAmount("4840000.00"), CostSource: logport.CostByVesselRate, RuleVersion: "logistics.trip_cost.v1",
+		EventTime: f.clk.Now().Add(-time.Minute)}
+	eid := ids.New()
+	f.deliver(tid, port.TripConsumer, f.cons.Trip(), logport.EventTripCompleted, ev, eid)
+	r = prep.app(http.MethodGet, "/v1/costing/settlements/"+id, nil)
+	if str(r.body, "status") != "pending_confirmation" || str(r.body, "amount") != "62920000.00" {
+		t.Fatalf("trip.completed phải làm mới quyết toán theo tấn: %s", r.raw)
+	}
+	n := f.count(tid, "SELECT count(*) FROM mkg_costing.settlement_event WHERE settlement_id = $1", uuid.MustParse(id))
+	if f.deliver(tid, port.TripConsumer, f.cons.Trip(), logport.EventTripCompleted, ev, eid) {
+		t.Fatal("giao lặp phải bị inbox bỏ qua")
+	}
+	if m := f.count(tid, "SELECT count(*) FROM mkg_costing.settlement_event WHERE settlement_id = $1", uuid.MustParse(id)); m != n {
+		t.Fatalf("giao lặp ghi thêm sổ quyết toán: %d → %d", n, m)
 	}
 	mustStatus(t, f.chief().adm(http.MethodPost, "/v1/costing/settlements/"+id+"/approve", nil), http.StatusCreated, "duyệt")
 }

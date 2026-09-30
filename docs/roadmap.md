@@ -171,9 +171,14 @@ Phụ lục A: Kubernetes được quản trị; diễn tập tải ĐTK 2; tác
 | **H** hạ tầng (song song) | Kubernetes trong lãnh thổ, namespace theo vùng + NetworkPolicy mặc định từ chối (ADR-0008, R-81), PKI nội bộ mTLS; tách đơn vị triển khai bằng cấu hình | — |
 | **E** E2E + diễn tập | Kịch bản ruộng → ghe → hub → khách → giá thành → đóng kỳ → bút toán; diễn tập R-22 trên bản sao ẩn danh; diễn tập tải ĐTK 2; diễn tập phục hồi | dự phòng mkg 000020–000021 |
 
-### Trạng thái G4 (30/09/2026)
+### Trạng thái G4 (01/10/2026)
 
-G4-0 xong: nền móng, hợp đồng đóng băng, bề mặt đối tác định tuyến đường thủy. Chưa có mã module G4. Mọi dòng của [g4-acceptance.md](uat/g4-acceptance.md) đang "chưa làm". Câu hỏi khách mới: nhà cung cấp phần mềm kế toán + chế độ kế toán; khóa phân bổ chi phí; công thức giá quyết toán; tỷ lệ chia doanh thu carbon; ngưỡng duyệt giá/chiết khấu; quy đổi ẩm (C-4).
+G4-0 và G4-1 đã có mã trên nhánh `sub/g4` (sớm hơn mốc Q2/2028): bốn module `mkg/logistics`, `mkg/orders`, `mkg/costing` (đóng kỳ 202 + job), `mkg/acctbridge` (bộ xuất tệp CSV/XML), web nội bộ (W-01), app tài xế (W-02), chart Kubernetes theo vùng + NetworkPolicy + PKI + OpenTofu, `tools/loadgen`, `cmd/rebuilddrill`. Đối chiếu yêu cầu → kiểm thử: [docs/uat/g4-acceptance.md](uat/g4-acceptance.md). **85 yêu cầu: 59 đạt, 13 một phần, 13 chưa làm, 0 ngoài G4** (trước khi rà E2E: 51 / 5 / 29). Kịch bản đầu–cuối `TestG4TripToLedger` (hợp đồng mua rơm → xếp ghe có số hiệu ghe → chuyến thủy định tuyến qua bề mặt đối tác sau cấp quyền `waterway_routes` → mốc tài xế → HUB_IN qua ingest đóng chuyến + phiếu nhận ↔ đơn mua → giao nhận CUSTOMER_IN → quyết toán HTX → đóng kỳ → bút toán tổng hợp duyệt + đẩy → kỳ `posted`; nhánh sửa sai HUB_IN bù sau duyệt + điều chỉnh trễ vào kỳ mở kế tiếp; R-22, R-61, cách ly tenant, không dữ liệu G4 qua van) đạt trên máy dev. Rà E2E sửa ba lỗi: `pf/waterway` không đọc được danh mục lớp phương tiện của `pf/masterdata` (`capacity_t`), quyết toán theo tấn kẹt "chờ cân" khi phiếu cân tới costing trước khi chuyến đóng, dựng lại `lot_mass_current` lệch `as_of`.
+
+Còn lại:
+- **mã**: chứng từ ePOD / e-bill (L-11); thông báo hàng đến mang mã chuyến (T-1); costing đọc ước lượng kg/cuộn (C-04); hàm dựng lại bảng chiếu `mkg/fieldops`; phần G4 của `cmd/drill` (A-5); nguồn độ trễ bảng chiếu + chỉ số job đóng kỳ (K-12); bộ sinh dữ liệu tổng hợp cho chuyến / đơn / kỳ (K-14); telemetry `ts_fleet` (tùy chọn).
+- **chờ khách**: nhà cung cấp phần mềm kế toán + chế độ kế toán + hệ thống tài khoản (Q-1, B-09); khóa phân bổ chi phí (Q-2); công thức giá quyết toán, hạn thanh toán (Q-3); tỷ lệ chia doanh thu carbon (Q-4); ngưỡng duyệt giá / chiết khấu (Q-5); quy đổi ẩm (Q-6, C-4); đơn giá cước, ngưỡng đường thủy, tải ghe (Q-7); khối lượng ĐTK 2 cho diễn tập tải.
+- **hạ tầng**: cụm Kubernetes được quản trị trong lãnh thổ (chưa chọn nhà cung cấp), áp NetworkPolicy / PKI / mTLS / admission ký image trên cụm, CA thiết bị production + VPN biên, sao lưu pgBackRest + diễn tập phục hồi, diễn tập tải ĐTK 2 và R-22 trên bản sao dữ liệu thật ở staging, PgBouncer thật, `promtool`, CI (GitHub Actions bị chặn do thanh toán), kiểm thử máy ảo app.
 
 ## G5–G6
 Theo Phụ lục A của tài liệu kiến trúc:

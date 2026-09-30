@@ -232,3 +232,20 @@ Gốc lắp ráp: **chưa** nối module G4 (chưa có module). Chỗ nối ghi 
 - Doanh thu giao nhận = khối lượng `CUSTOMER_IN` được chấp nhận × đơn giá đơn bán (không trừ chênh tranh chấp cho tới khi hồ sơ tranh chấp đóng).
 - Chưa có OSRM; đường bộ = Haversine × 1,3.
 - Bộ điều hợp kế toán mặc định = xuất tệp CSV (UTF-8, `;`, số thập phân dấu chấm) và XML; tên tệp tất định `<period_code>_<journal_id>.<ext>`.
+
+## 10. Mục mở (rà E2E, 01/10/2026)
+
+Kịch bản `TestG4TripToLedger` đạt; bảng nghiệm thu: 85 yêu cầu — 59 đạt, 13 một phần, 13 chưa làm ([g4-acceptance.md](../uat/g4-acceptance.md)).
+
+Đã sửa khi rà E2E (không đổi hợp đồng):
+- `pf/waterway` đọc tải lớp phương tiện ở `capacity_t` (lược đồ `vessel_class` của `pf/masterdata`), giữ `tons` tương thích — trước đó mọi lần dựng mạng trên dữ liệu chủ đã nạp đều 422 `waterway.params_invalid`.
+- `mkg/costing`: `trip.completed` của lệnh gom làm mới quyết toán chưa duyệt (PM-02) — không còn phụ thuộc thứ tự giữa hàng đợi `mkg.costing.weigh_ticket` và `mkg.logistics.weigh_ticket`.
+- `mkg/measurement`: `RebuildLotMass` đặt `as_of` / `last_seq` từ sổ phiếu (dựng lại = bảng chiếu hiện hành, R-22).
+
+Còn mở:
+
+| Loại | Việc |
+|---|---|
+| mã | Chứng từ chuyến ePOD / e-bill (L-11); thông báo hàng đến mang mã chuyến cho hub/kho (T-1); ô nhập số hiệu ghe trên app Flutter (nếu chưa gộp); costing đọc ước lượng kg/cuộn của fieldops (C-04); hàm dựng lại bảng chiếu `mkg/fieldops` (R-22); phần G4 của `cmd/drill` (A-5); đăng ký nguồn `ag.projection.lag` cho module G4 + chỉ số / luật job đóng kỳ lỗi (K-12); `cmd/seed-synthetic -plan mkg` cho chuyến, đơn, kỳ, quyết toán (K-14); telemetry `ts_fleet` (tùy chọn) |
+| chờ khách | Q-1..Q-7 (phần mềm kế toán + chế độ + hệ thống tài khoản, khóa phân bổ, công thức giá quyết toán + hạn, tỷ lệ carbon, ngưỡng duyệt giá, quy đổi ẩm, đơn giá cước / ngưỡng đường thủy / tải ghe); khối lượng ĐTK 2 của diễn tập tải |
+| hạ tầng | Cụm Kubernetes được quản trị trong lãnh thổ; NetworkPolicy, PKI / mTLS, xoay chứng thư, admission ký image trên cụm; CA thiết bị production + VPN biên; pgBackRest + diễn tập phục hồi; diễn tập tải và R-22 trên staging (bản sao ẩn danh); PgBouncer thật; `promtool`; CI; máy ảo app |
