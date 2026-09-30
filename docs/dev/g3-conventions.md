@@ -53,7 +53,7 @@ Chỉ dùng số đã cấp. Số trống có thể còn lại giữa các kho�
 | shared | 000003 | `shared.apply_append_only`; `v_missing_immutability` bắt mọi bảng `ts_*` (G3-0, đã có) | `shared` | `ag_migrator` |
 | shared | 000004 | `shared.outbox.kind` + CHECK `internal ⇒ mkg.*` (G3-0, đã có) | `shared` | `ag_migrator` |
 | ts | **000001** | `ts_weigh.reading_batch`, `ts_weigh.raw_reading` (G3-0, đã có) | `ts_weigh` | `ingest_ts`, `ts_reader` |
-| ts | 000002 | **dự phòng** `ts_env`: cảm biến kho, telemetry phương tiện | `ts_env` | xin khi làm |
+| ts | 000002 | **bỏ trống** (không dùng: golang-migrate không áp số nhỏ hơn số đã chạy) | | |
 | mkg | 000006 | fieldops G3: lệnh gom, công đoạn đếm, xác nhận HTX, sổ van `valve_export` | `mkg_fieldops` | `fieldops_app` |
 | mkg | 000007–000008 | measurement: sổ thiết bị, phiếu cân, bảng chiếu `lot_mass_current`, dung sai/định mức có phiên bản, đối soát, tranh chấp, sổ van | `mkg_measurement` | `measurement_app`, `ingest_mkg` |
 | mkg | 000009 | hub G3: khối lượng lô từ phiếu cân (Q-MKG-04), kiểm kê (Q-MKG-06), `hub.risk.v2` | `mkg_hub` | `hub_app` |
@@ -65,7 +65,8 @@ Chỉ dùng số đã cấp. Số trống có thể còn lại giữa các kho�
 | mkg | 000010 | G3-2 tích hợp: `mkg_measurement.lot_collection(_current)` (lô cân ↔ lệnh gom), cột `ticket_ref`/`supersedes_ticket_ref` của `mkg_fieldops.weighed_loading_current`, sổ `mkg_fieldops.roll_count_location` (GPS app hiện trường) | `mkg_measurement`, `mkg_fieldops` | `measurement_app` (+ `ingest_mkg` SELECT bảng chiếu), `fieldops_app` |
 | mkg | 000011–000012 | **dự phòng** G3 — xin người tích hợp | | |
 | mkg | 000013 | giám sát vận hành: schema `mkg_monitor`, hàm gộp SECURITY DEFINER cho sql_exporter (mục 19) | `mkg_monitor` | `mkg_monitor` (EXECUTE), chủ hàm `mkg_monitor_owner` |
-| ts | 000003 | giám sát vận hành: schema `ts_monitor`, hàm gộp SECURITY DEFINER (ts 000002 vẫn để dành `ts_env`) | `ts_monitor` | `ts_monitor` (EXECUTE), chủ hàm `ts_monitor_owner` |
+| ts | 000004+ | **dự phòng** `ts_env`: cảm biến kho, telemetry phương tiện | `ts_env` | xin khi làm |
+| ts | 000003 | giám sát vận hành: schema `ts_monitor`, hàm gộp SECURITY DEFINER (`ts_env` chuyển sang ts 000004 trở đi) | `ts_monitor` | `ts_monitor` (EXECUTE), chủ hàm `ts_monitor_owner` |
 | pf | 000045 | mrv cảnh báo: sổ `pf_mrv.alert` (KN US-MRV-04, US-MRV-06, FR-08), loại thông báo `mrv_*` của `pf_notify` | `pf_mrv`, `pf_notify` | `mrv_app` (+ `ag_outbox_publisher` hai cột `evidence_current`) |
 
 - `pf` 000030–000035 và `mkg` 000004–000005 để dành cho phần còn lại của G2; G3 không dùng.
