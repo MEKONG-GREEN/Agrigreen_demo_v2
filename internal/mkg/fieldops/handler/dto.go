@@ -99,6 +99,16 @@ type rollDTO struct {
 	ActorRef           uuid.UUID  `json:"actor_ref"`
 	EventTime          time.Time  `json:"event_time"`
 	RecordedAt         time.Time  `json:"recorded_at"`
+	// G3-2: dấu GPS tùy chọn (sổ roll_count_location) — chỉ có ở GET …/roll-counts.
+	GPS       *gpsDTO `json:"gps,omitempty"`
+	GPSStatus *string `json:"gps_status,omitempty"`
+}
+
+// gpsDTO là tọa độ dạng chuỗi thập phân (không float, R-10).
+type gpsDTO struct {
+	Lat       string  `json:"lat"`
+	Lng       string  `json:"lng"`
+	AccuracyM *string `json:"accuracy_m"`
 }
 
 func toRoll(r store.RollCount) rollDTO {

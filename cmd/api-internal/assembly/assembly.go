@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/mkgwire"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub"
 	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
@@ -69,17 +70,22 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules,
 		return mods, ops, pools, err
 	}
 	pools = append(pools, measPool)
-	// Rolls: chưa có hiện thực fieldops (đợt fieldops G3) → app.NoRolls (pending_rolls).
-	mods.Measurement = measurement.New(measPool, clk, measurement.Deps{Origins: mods.Hub.Lots()})
+	// G3-2: số cuộn + tỷ lệ thửa từ mkg/fieldops qua adapter mkgwire.Rolls (gán sau khi dựng
+	// fieldops); nguồn gốc lô hub đọc với tenant tường minh (không cần vai hub).
+	rolls := &mkgwire.Rolls{}
+	mods.Measurement = measurement.New(measPool, clk, measurement.Deps{Rolls: rolls, Origins: mods.Hub.LotOrigins(), Plots: rolls})
 	foPool, err := open(ctx, fieldops.DBRole)
 	if err != nil {
 		return mods, ops, pools, err
 	}
 	pools = append(pools, foPool)
 	fo := FieldopsOptionsFromEnv(clk)
-	// kg/cuộn học từ khối lượng cân HUB_IN (CUSTOMER_IN với tuyến DIRECT) của mkg/measurement.
-	fo.Weighed = fieldops.WeighedFromMeasurement(mods.Measurement.LotMass())
+	// kg/cuộn học từ khối lượng cân HUB_IN (CUSTOMER_IN với tuyến DIRECT) của mkg/measurement,
+	// lệnh gom → lô cân qua liên kết lot_collection (đường làm mới tay; consumer
+	// mkg.fieldops.weigh_ticket ở worker-internal là đường chính).
+	fo.Weighed = mkgwire.Weighed{Links: mods.Measurement.CollectionLinks(), Lots: mods.Measurement.LotMass()}
 	mods.Fieldops = fieldops.New(foPool, clk, fo)
+	rolls.Totals, rolls.KgPerRoll = mods.Fieldops.RollTotals(), mods.Fieldops.KgPerRoll()
 	return mods, ops, pools, nil
 }
 

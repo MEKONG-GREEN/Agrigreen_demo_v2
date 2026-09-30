@@ -20,17 +20,19 @@ import (
 // LayerEvents là các sự kiện nền tảng mà consumer pf.metrics.layer_log nhận để ghi
 // nhật ký lớp GIS (GIS US-EVL-01). Mỗi lớp lấy từ module chủ của nó:
 //
-//	plot           pf.geo.plot.created, pf.geo.plot_boundary.recorded (chỉ phiên bản thành hiện hành)
+//	plot           pf.geo.plot.created, pf.geo.plot_boundary.recorded (chỉ phiên bản thành hiện hành),
+//	               pf.geo.plot.retired (op retire — ẩn khỏi phát lại), pf.geo.plot.restored (op restore)
 //	coop_boundary  pf.geo.cooperative_boundary.recorded
 //	facility       pf.geo.facility.recorded
 //	season_stage   pf.cropcycle.season.opened / completed / corrected
 //	cgh_balance    pf.mechanization.balance.computed (một đối tượng mỗi vụ)
 //	waterway       pf.waterway.network.published (một đối tượng: mạng phát hành)
 //
-// Chưa có nguồn: thời tiết (FN-19 "giữ cảnh báo lớn nhất ngày" — bỏ qua), ngừng
-// dùng/khôi phục thửa (pf/geo chưa phát sự kiện), hub MKG (van hub_* chỉ cho pf/geo).
+// Chưa có nguồn: thời tiết (FN-19 "giữ cảnh báo lớn nhất ngày" — bỏ qua), hub MKG
+// (van hub_* chỉ cho pf/geo).
 var LayerEvents = []string{
-	geoport.EventPlotCreated, geoport.EventPlotBoundaryRecorded, geoport.EventCooperativeBoundaryRecorded, geoport.EventFacilityRecorded,
+	geoport.EventPlotCreated, geoport.EventPlotBoundaryRecorded, geoport.EventPlotRetired, geoport.EventPlotRestored,
+	geoport.EventCooperativeBoundaryRecorded, geoport.EventFacilityRecorded,
 	ccport.EventSeasonOpened, ccport.EventSeasonCompleted, ccport.EventSeasonCorrected,
 	mechport.EventBalanceComputed, wwport.EventNetworkPublished,
 }
@@ -128,6 +130,20 @@ func patchesOf(env outbox.Envelope) ([]patch, time.Time, error) {
 			"boundary_version": p.Version, "area_ha": p.AreaHa, "source": p.Source, "correction_reason": strp(p.CorrectionReason),
 			"geometry_ref": geomRef("plot_boundary", p.BoundaryID),
 		}}}, eventTime(p.EventTime, env.OccurredAt), nil
+	// Ngừng dùng/khôi phục thửa: ghép vào thuộc tính trước (giữ ranh giới, diện tích);
+	// status_change_reason = lý do của lần đổi trạng thái gần nhất.
+	case geoport.EventPlotRetired:
+		p, err := decode[geoport.PlotRetiredV1](env)
+		return []patch{{Layer: port.LayerPlot, Feature: p.PlotRef, Op: port.LayerRetire, Attrs: map[string]any{
+			"commune_code": p.CommuneCode, "cooperative_ref": uuidp(p.CooperativeRef), "status": p.StatusAfter,
+			"status_change_reason": p.Reason, "plot_event_id": p.PlotEventID.String(),
+		}}}, eventTime(p.EventTime, env.OccurredAt), err
+	case geoport.EventPlotRestored:
+		p, err := decode[geoport.PlotRestoredV1](env)
+		return []patch{{Layer: port.LayerPlot, Feature: p.PlotRef, Op: port.LayerRestore, Attrs: map[string]any{
+			"commune_code": p.CommuneCode, "cooperative_ref": uuidp(p.CooperativeRef), "status": p.StatusAfter,
+			"status_change_reason": p.Reason, "plot_event_id": p.PlotEventID.String(),
+		}}}, eventTime(p.EventTime, env.OccurredAt), err
 	case geoport.EventCooperativeBoundaryRecorded:
 		p, err := decode[geoport.CooperativeBoundaryRecordedV1](env)
 		op := port.LayerCreate

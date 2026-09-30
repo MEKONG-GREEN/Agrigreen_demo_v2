@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
+	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
+	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	simport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation/port"
 )
 
@@ -43,4 +45,20 @@ func TestWorkerConsumersDeclaredByPublisher(t *testing.T) {
 	if ev := queues[simport.OptimizerConsumer]; len(ev) != 1 || ev[0] != simport.EventJobRequested {
 		t.Fatalf("hàng đợi optimizer: %v", ev)
 	}
+}
+
+// GIS US-EVL-01: hàng đợi pf.metrics.layer_log bind cả ngừng dùng/khôi phục thửa của pf/geo.
+func TestLayerLogQueueBindsPlotRetireRestore(t *testing.T) {
+	for _, q := range assembly.Queues() {
+		if q.Name != metricsport.LayerLogConsumer {
+			continue
+		}
+		for _, ev := range []string{geoport.EventPlotCreated, geoport.EventPlotRetired, geoport.EventPlotRestored} {
+			if !slices.Contains(q.Events, ev) {
+				t.Fatalf("hàng đợi %s thiếu %s: %v", q.Name, ev, q.Events)
+			}
+		}
+		return
+	}
+	t.Fatalf("không có hàng đợi %s", metricsport.LayerLogConsumer)
 }

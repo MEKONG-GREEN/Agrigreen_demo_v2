@@ -60,7 +60,8 @@ Chỉ dùng số đã cấp. Số trống có thể còn lại giữa các kho�
 | pf | 000036–000037 | metrics: định nghĩa, giá trị theo ngày, ảnh chụp + watermark, nhật ký lớp GIS | `pf_metrics` | `metrics_app` |
 | pf | 000038 | mrv G3: liên kết bằng chứng thu gom (van `mrv_collection_evidence`), đối chiếu nhật ký HTX ↔ KN (KN US-MRV-02) | `pf_mrv` | `mrv_app` |
 | pf | 000039–000042 | **dự phòng** G3 — xin người tích hợp | | |
-| mkg | 000010–000012 | **dự phòng** G3 — xin người tích hợp | | |
+| mkg | 000010 | G3-2 tích hợp: `mkg_measurement.lot_collection(_current)` (lô cân ↔ lệnh gom), cột `ticket_ref`/`supersedes_ticket_ref` của `mkg_fieldops.weighed_loading_current`, sổ `mkg_fieldops.roll_count_location` (GPS app hiện trường) | `mkg_measurement`, `mkg_fieldops` | `measurement_app` (+ `ingest_mkg` SELECT bảng chiếu), `fieldops_app` |
+| mkg | 000011–000012 | **dự phòng** G3 — xin người tích hợp | | |
 
 - `pf` 000030–000035 và `mkg` 000004–000005 để dành cho phần còn lại của G2; G3 không dùng.
 - Module G4 (`logistics`, `orders`, `costing`, `acctbridge`) sẽ được cấp số từ 000013 cụm mkg ([mkg.md §5.8](../design/mkg.md#58-bảng-tổng-hợp-cụm--vai--migration)).
@@ -96,12 +97,13 @@ RabbitMQ:
 
 | Sự kiện | Loại | Phát | Nhận |
 |---|---|---|---|
-| `mkg.measurement.weigh_ticket.recorded` v1 | **nội bộ** (`contracts/events-internal/`) | measurement (ingest) | hub (khối lượng lô), costing (G4) |
+| `mkg.measurement.weigh_ticket.recorded` v1 (+ `collection_order_ref` tùy chọn, G3-2) | **nội bộ** (`contracts/events-internal/`) | measurement (ingest) | hub (khối lượng lô), fieldops (`mkg.fieldops.weigh_ticket`: học kg/cuộn, G3-2), costing (G4) |
 | `mkg.measurement.reconciliation.completed` v1 | **nội bộ** | measurement | hub (cảnh báo), costing (G4) |
-| `mkg.fieldops.roll_count.recorded` v1 | **nội bộ** | fieldops | measurement (cuộn ↔ khối lượng, RB-6), costing (G4) |
+| `mkg.fieldops.roll_count.recorded` v1 | **nội bộ** | fieldops | measurement (`mkg.measurement.roll_count`: đối soát lại khi số cuộn về, RB-6, G3-2), hub, costing (G4) |
 | `mkg.fieldops.collection_schedule.published` v1 | van `collection_schedule` (**dự thảo**) | fieldops | pf/cropcycle, pf/notify |
 | `mkg.fieldops.htx_collection_statement.published` v1 | van `htx_collection_statement` (**dự thảo**) | fieldops | pf/cropcycle (HTX xác nhận → quay về MKG qua API công khai) |
 | `mkg.measurement.mrv_collection_evidence.published` v1 | van `mrv_collection_evidence` (**dự thảo**, C-1) | measurement | pf/mrv |
+| `pf.geo.plot.retired` v1, `pf.geo.plot.restored` v1 | nền tảng (`contracts/events/`) | pf/geo (cùng giao dịch với `plot_event`) | pf/metrics nhật ký lớp `plot` (GIS US-EVL-01) |
 | `pf.metrics.*`, `pf.mrv.*` G3 | nền tảng | — | đợt G3-1 đặt tên theo `pf.<module>.<thực thể>.<động từ>` |
 
 Cách phát:
@@ -173,7 +175,7 @@ Gốc lắp ráp (archlint):
   - replay = dựng thẳng từ nhật ký;
   - sự kiện nội bộ giao lặp → kết quả như giao một lần (R-61).
 - Mã story ghi tiền tố: `GIS US-EVL-01`, `KN US-MRV-02`, `KN US-DASH-01`, `CGH FN-10`. Quy tắc lấy từ prototype ghi `proto FM-04`, `proto plant-weighing`.
-- Dữ liệu tổng hợp (R-95) cho cân, cuộn, độ ẩm theo phân phối thực tế: `cmd/seed-synthetic` G3.
+- Dữ liệu tổng hợp (R-95) cho cân, cuộn, độ ẩm theo phân phối thực tế: `cmd/seed-synthetic -plan mkg` (G3-2; cờ `-mkg-*` ghi ở chú thích package `cmd/seed-synthetic/main.go`). Tất định theo `-seed`, từ chối `AG_ENV=production`; lô đầu là lô golden của prototype (5 800/5 700/4 400 cuộn, HUB_IN 96,8 t, +10 % cờ); `-mkg-over-pct` (mặc định 10) là tỷ lệ lô CUSTOMER_IN vượt dung sai. Kiểm thử `TestMKGPlanGoldenPrototypeLot`, `TestMKGSeedEndToEnd` (api-internal + ingest thật trong tiến trình).
 
 ## 8. Giả định tạm (ghi trong báo cáo nếu bám vào)
 

@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/publication"
+	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/store"
@@ -165,10 +166,18 @@ func (s *Service) Import(ctx context.Context, id uuid.UUID) (store.Import, error
 // Van mrv_collection_evidence (dự thảo, chờ C-1)
 // ---------------------------------------------------------------------------
 
-// PublishMRVEvidence lập bằng chứng thu gom cho MỖI thửa nguồn của lô: khối lượng
-// = HUB_IN × tỷ lệ nguồn thửa, chỉ gửi BẬC (mrv.bucket.v1). Không bao giờ gửi
-// khối lượng chính xác, lô, phiếu, dung sai, tranh chấp hay khách (mục 5).
-// Idempotent theo khóa; mỗi lần xuất lại cùng (lô, thửa) giữ evidence_ref, tăng revision.
+// PublishMRVEvidence lập bằng chứng thu gom cho MỖI thửa nguồn của lô, chỉ gửi BẬC
+// (mrv.bucket.v1). Không bao giờ gửi khối lượng chính xác, lô, phiếu, dung sai, tranh
+// chấp hay khách (mục 5). Idempotent theo khóa; mỗi lần xuất lại cùng (lô, thửa) giữ
+// evidence_ref, tăng revision.
+//
+//   - Tuyến HUB: khối lượng = HUB_IN × tỷ lệ nguồn thửa của lô hub (mass_basis HUB_IN).
+//   - Tuyến DIRECT (G3-2): không có HUB_IN — khối lượng = CUSTOMER_IN × tỷ lệ thửa, gắn cờ
+//     GỘP (mass_basis CUSTOMER_IN_AGGREGATED: chưa tách hao hụt vận chuyển / ẩm).
+//
+// Tỷ lệ thửa: nguồn `plot` của lô hub (hub/port.LotOrigins, tenant tường minh — không
+// cần vai hub); lô không có ở hub hoặc không có nguồn thửa → tỷ lệ theo số cuộn của lệnh
+// gom liên kết (port.CollectionPlots, mkg/fieldops).
 func (s *Service) PublishMRVEvidence(ctx context.Context, lot uuid.UUID, season *uuid.UUID, idem string) (out []store.ValveExport, replayed bool, err error) {
 	p, err := authz.Require(ctx, port.RoleReconciliationOfficer)
 	if err != nil {
@@ -177,25 +186,9 @@ func (s *Service) PublishMRVEvidence(ctx context.Context, lot uuid.UUID, season 
 	if err := requireIdem(idem); err != nil {
 		return nil, false, err
 	}
-	if s.Origins == nil {
-		return nil, false, ErrNoPlotSources.WithDetail("chưa nối nguồn gốc lô (mkg/hub)")
-	}
-	info, err := s.Origins.LotInfo(ctx, lot)
+	plots, err := s.plotShares(ctx, p.TenantID, lot)
 	if err != nil {
-		return nil, false, ErrNoPlotSources.WithCause(err)
-	}
-	type share struct {
-		plot  uuid.UUID
-		ratio string
-	}
-	var plots []share
-	for _, src := range info.Sources {
-		if src.Kind == "plot" {
-			plots = append(plots, share{src.Ref, src.Ratio})
-		}
-	}
-	if len(plots) == 0 {
-		return nil, false, ErrNoPlotSources
+		return nil, false, err
 	}
 	replayed, err = s.write(ctx, p.TenantID, func(tx pgx.Tx) error {
 		lm, err := store.GetLotMass(ctx, tx, lot, false)
@@ -205,8 +198,15 @@ func (s *Service) PublishMRVEvidence(ctx context.Context, lot uuid.UUID, season 
 		if lm == nil {
 			return ErrNoHubIn
 		}
-		hin, ok := lm.Points[port.PointHubIn]
+		point, basis := port.PointHubIn, port.MassBasisHubIn
+		if lm.Route == port.RouteDirect {
+			point, basis = port.PointCustomerIn, port.MassBasisCustomerInAggregated
+		}
+		hin, ok := lm.Points[point]
 		if !ok {
+			if lm.Route == port.RouteDirect {
+				return ErrNoCustomerIn
+			}
 			return ErrNoHubIn
 		}
 		c, err := publication.Get(port.ContractMRVCollectionEvidence)
@@ -218,11 +218,11 @@ func (s *Service) PublishMRVEvidence(ctx context.Context, lot uuid.UUID, season 
 			return ErrValveDenied.WithDetail("hợp đồng không khai sự kiện")
 		}
 		for _, sh := range plots {
-			kg, err := domain.ShareOf(hin.Kg, sh.ratio)
+			kg, err := domain.ShareOf(hin.Kg, sh.Ratio)
 			if err != nil {
 				return err
 			}
-			prev, err := store.LastValveFor(ctx, tx, lot, sh.plot)
+			prev, err := store.LastValveFor(ctx, tx, lot, sh.PlotRef)
 			if err != nil {
 				return err
 			}
@@ -231,8 +231,8 @@ func (s *Service) PublishMRVEvidence(ctx context.Context, lot uuid.UUID, season 
 				evidence, rev = prev.SubjectRef, prev.Revision+1
 			}
 			pub := port.MRVCollectionEvidencePublishedV1{
-				EvidenceRef: evidence, PlotRef: sh.plot, SeasonRef: season, CollectedOn: clock.BusinessDate(hin.At).String(),
-				CollectedKgBucket: domain.Bucket(kg), BucketRuleVersion: domain.RuleMRVBucket, Revision: rev,
+				EvidenceRef: evidence, PlotRef: sh.PlotRef, SeasonRef: season, CollectedOn: clock.BusinessDate(hin.At).String(),
+				CollectedKgBucket: domain.Bucket(kg), BucketRuleVersion: domain.RuleMRVBucket, Revision: rev, MassBasis: basis,
 			}
 			raw, err := json.Marshal(pub)
 			if err != nil {
@@ -242,8 +242,8 @@ func (s *Service) PublishMRVEvidence(ctx context.Context, lot uuid.UUID, season 
 				return ErrValveDenied.WithCause(err)
 			}
 			x := store.ValveExport{ID: ids.New(), Contract: c.Name, ContractVersion: c.Version, EventType: evType, SchemaVersion: evVer,
-				SubjectRef: evidence, SourceRef: lot, PlotRef: sh.plot, Revision: rev, Payload: raw, EventTime: s.Clock.Now(),
-				ActorRef: p.ActorRef, IdemKey: idem + "#" + sh.plot.String()}
+				SubjectRef: evidence, SourceRef: lot, PlotRef: sh.PlotRef, Revision: rev, Payload: raw, EventTime: s.Clock.Now(),
+				ActorRef: p.ActorRef, IdemKey: idem + "#" + sh.PlotRef.String()}
 			if err := insert(store.InsertValveExport(ctx, tx, p.TenantID, &x)); err != nil {
 				return err
 			}
@@ -259,7 +259,7 @@ func (s *Service) PublishMRVEvidence(ctx context.Context, lot uuid.UUID, season 
 	}, func(tx pgx.Tx) (bool, error) {
 		out = nil
 		for _, sh := range plots {
-			v, err := store.ValveByIdem(ctx, tx, idem+"#"+sh.plot.String())
+			v, err := store.ValveByIdem(ctx, tx, idem+"#"+sh.PlotRef.String())
 			if err != nil || v == nil {
 				return false, err
 			}
@@ -268,6 +268,42 @@ func (s *Service) PublishMRVEvidence(ctx context.Context, lot uuid.UUID, season 
 		return true, nil
 	})
 	return out, replayed, err
+}
+
+// plotShares trả tỷ lệ thửa của lô: nguồn thửa của lô hub, không có thì theo lệnh gom.
+func (s *Service) plotShares(ctx context.Context, tid, lot uuid.UUID) ([]port.PlotShare, error) {
+	if s.Origins == nil && s.Plots == nil {
+		return nil, ErrNoPlotSources.WithDetail("chưa nối nguồn gốc lô (mkg/hub) hay lệnh gom (mkg/fieldops)")
+	}
+	var plots []port.PlotShare
+	if s.Origins != nil {
+		info, err := s.Origins.LotOrigin(ctx, tid, lot)
+		switch {
+		case err == nil:
+			for _, src := range info.Sources {
+				if src.Kind == "plot" {
+					plots = append(plots, port.PlotShare{PlotRef: src.Ref, Ratio: src.Ratio})
+				}
+			}
+		case !errors.Is(err, hubport.ErrLotNotFound):
+			return nil, ErrNoPlotSources.WithCause(err)
+		}
+	}
+	if len(plots) == 0 && s.Plots != nil {
+		link, err := s.Writer.CollectionOfLot(ctx, tid, lot)
+		if err != nil {
+			return nil, err
+		}
+		ps, err := s.Plots.CollectionPlots(ctx, tid, link.CollectionOrderRef)
+		if err != nil && !errors.Is(err, port.ErrNotFound) {
+			return nil, ErrNoPlotSources.WithCause(err)
+		}
+		plots = ps
+	}
+	if len(plots) == 0 {
+		return nil, ErrNoPlotSources
+	}
+	return plots, nil
 }
 
 // Publications liệt kê bản ghi đã xuất qua van của một lô (kiểm toán).

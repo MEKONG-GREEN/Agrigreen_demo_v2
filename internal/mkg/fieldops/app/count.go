@@ -34,6 +34,9 @@ type CountInput struct {
 	DeviceID           *string
 	HTXConfirmationRef *uuid.UUID
 	IdemKey            string
+	// Location (G3-2): dấu GPS tùy chọn của app hiện trường — ghi sổ roll_count_location,
+	// không bao giờ chặn lưu (domain.ParseLocation không lỗi).
+	Location *domain.Location
 }
 
 // CountResult là kết quả ghi số.
@@ -163,6 +166,11 @@ func (s *Service) count(ctx context.Context, p authz.Principal, in CountInput) (
 		if err := store.UpsertTotal(ctx, tx, p.TenantID, rc); err != nil {
 			return err
 		}
+		if in.Location != nil {
+			if err := store.InsertLocation(ctx, tx, rc, *in.Location); err != nil {
+				return err
+			}
+		}
 		// Sự kiện NỘI BỘ MKG (ADR-0018): measurement (RB-6), costing (G4).
 		if err := outbox.Enqueue(ctx, tx, outbox.Event{
 			ID: ids.New(), TenantID: p.TenantID, Type: port.EventRollCountRecorded, SchemaVersion: 1, OccurredAt: rc.EventTime,
@@ -182,6 +190,10 @@ func (s *Service) count(ctx context.Context, p authz.Principal, in CountInput) (
 		}
 		res.Total = *t
 		if stage == port.StageBoatLoad {
+			// G3-2: lô đã cân mà số xếp ghe/xe được sửa → bảng đệm học kg/cuộn theo số mới.
+			if err := store.RefreshWeighedRolls(ctx, tx, orderID); err != nil {
+				return err
+			}
 			return s.statement(ctx, tx, p, rc, &res)
 		}
 		return nil
@@ -249,8 +261,9 @@ func (s *Service) replayCount(ctx context.Context, idem string, res *CountResult
 
 // CountsView là sổ đếm cuộn và số hiệu lực của một lệnh gom.
 type CountsView struct {
-	Counts []store.RollCount
-	Totals []store.Total
+	Counts    []store.RollCount
+	Totals    []store.Total
+	Locations map[uuid.UUID]store.Location // dấu GPS theo roll_count_id (G3-2)
 }
 
 // Counts đọc sổ đếm cuộn (cả bản bị bù) và số hiệu lực theo thửa/công đoạn.
@@ -266,7 +279,10 @@ func (s *Service) Counts(ctx context.Context, orderID uuid.UUID) (CountsView, er
 		if v.Counts, err = store.RollCounts(ctx, tx, orderID); err != nil {
 			return err
 		}
-		v.Totals, err = store.Totals(ctx, tx, orderID)
+		if v.Totals, err = store.Totals(ctx, tx, orderID); err != nil {
+			return err
+		}
+		v.Locations, err = store.LocationsOf(ctx, tx, orderID)
 		return err
 	})
 	if err == nil && !found {
@@ -300,13 +316,16 @@ func (s *Service) LotRolls(ctx context.Context, tenantID, lotRef uuid.UUID) (por
 				out.Stage = t.Stage
 			}
 		}
+		plots := make([]uuid.UUID, 0, len(ts))
 		for _, t := range ts {
 			if t.Stage == out.Stage {
 				out.PerPlot[t.PlotRef] = t.Rolls
 				out.Rolls += t.Rolls
+				plots = append(plots, t.PlotRef)
 			}
 		}
-		return nil
+		out.HTXConfirmed, err = store.AllMatched(ctx, tx, lotRef, plots)
+		return err
 	})
 	if errors.Is(err, port.ErrLotNotFound) {
 		return out, port.ErrLotNotFound

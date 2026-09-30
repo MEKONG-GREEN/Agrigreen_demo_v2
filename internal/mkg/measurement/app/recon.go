@@ -71,7 +71,7 @@ func (s *Service) reconcileTx(ctx context.Context, tx pgx.Tx, p authz.Principal,
 	if terms != nil {
 		basis = terms.Basis
 	}
-	hin, hinT, _ := pmKg(lm, port.PointHubIn)
+	hin, hinT, hinAt := pmKg(lm, port.PointHubIn)
 	hout, houtT, houtAt := pmKg(lm, port.PointHubOut)
 	cin, cinT, cinAt := pmKg(lm, port.PointCustomerIn)
 
@@ -91,12 +91,13 @@ func (s *Service) reconcileTx(ctx context.Context, tx pgx.Tx, p authz.Principal,
 	if err != nil {
 		return nil, false, err
 	}
-	var rolls *port.RollTotal
-	rt, err := s.rolls().RollTotal(ctx, p.TenantID, lot)
-	switch {
-	case err == nil:
-		rolls = &rt
-	case !errors.Is(err, port.ErrNotFound):
+	// Số cuộn của lệnh gom liên kết (G3-2); ước lượng kg/cuộn học trước phiếu cân đầu tiên.
+	weighedAt := hinAt
+	if lm.Route == port.RouteDirect || weighedAt.IsZero() {
+		weighedAt = cinAt
+	}
+	rolls, err := s.rollTotal(ctx, tx, p.TenantID, lot, weighedAt)
+	if err != nil {
 		return nil, false, err
 	}
 	in := domain.ReconcileInput{Route: lm.Route, Basis: basis, HubIn: hin, HubOut: hout, CustomerIn: cin, HubInMoisture: lm.HubInMoisture,

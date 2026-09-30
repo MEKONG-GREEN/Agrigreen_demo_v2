@@ -18,6 +18,7 @@
     "collected_on":        { "type": "string", "format": "date" },
     "collected_kg_bucket": { "type": "string", "enum": ["0-500", "500-1000", "1000-2000", "2000-5000", "5000-10000", "10000+"], "description": "Bậc khối lượng (kg) theo phiếu cân HUB_IN của các lô có nguồn từ thửa" },
     "bucket_rule_version": { "type": "string", "description": "Phiên bản quy tắc chia bậc, vd mrv.bucket.v1" },
-    "revision":            { "type": "integer" }
+    "revision":            { "type": "integer" },
+    "mass_basis":          { "type": "string", "enum": ["HUB_IN", "CUSTOMER_IN_AGGREGATED"], "description": "Thêm ở G3-2 (tùy chọn, tương thích ngược): căn cứ khối lượng của bậc — HUB_IN (lô qua hub) hoặc CUSTOMER_IN_AGGREGATED (tuyến DIRECT: phiếu khách cân, gộp, không tách hao hụt — chỉ báo). Vắng mặt = HUB_IN" }
   }
 }

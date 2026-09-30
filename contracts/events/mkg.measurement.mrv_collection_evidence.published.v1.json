@@ -16,6 +16,7 @@
     "collected_on":        { "type": "string", "format": "date" },
     "collected_kg_bucket": { "type": "string", "enum": ["0-500", "500-1000", "1000-2000", "2000-5000", "5000-10000", "10000+"] },
     "bucket_rule_version": { "type": "string" },
-    "revision":            { "type": "integer" }
+    "revision":            { "type": "integer" },
+    "mass_basis":          { "type": "string", "enum": ["HUB_IN", "CUSTOMER_IN_AGGREGATED"], "description": "Thêm ở G3-2 (tùy chọn): căn cứ khối lượng; vắng mặt = HUB_IN" }
   }
 }

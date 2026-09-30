@@ -5,6 +5,7 @@ package handler
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -359,6 +360,9 @@ type countReq struct {
 	CorrectionReason   string  `json:"correction_reason"`
 	EventTime          string  `json:"event_time"`
 	DeviceID           *string `json:"device_id"`
+	// GPS (G3-2, tùy chọn, không bao giờ chặn lưu): {lat, lng|lon, accuracy_m} + trạng thái máy báo.
+	GPS       json.RawMessage `json:"gps"`
+	GPSStatus string          `json:"gps_status"`
 }
 
 func (h Handler) countInput(c *gin.Context, correction bool) (app.CountInput, bool) {
@@ -381,6 +385,7 @@ func (h Handler) countInput(c *gin.Context, correction bool) (app.CountInput, bo
 	in.Count.DiscrepancyReason = req.DiscrepancyReason
 	in.HTXConfirmationRef = x.uuidPtr("htx_confirmation_ref", req.HTXConfirmationRef)
 	in.EventTime = x.time("event_time", req.EventTime)
+	in.Location = domain.ParseLocation(req.GPSStatus, req.GPS)
 	return in, !x.fail(c)
 }
 
@@ -432,7 +437,14 @@ func (h Handler) counts(c *gin.Context) {
 	}
 	counts := make([]rollDTO, 0, len(vw.Counts))
 	for _, r := range vw.Counts {
-		counts = append(counts, toRoll(r))
+		d := toRoll(r)
+		if l, ok := vw.Locations[r.ID]; ok {
+			d.GPSStatus = &l.Status
+			if l.Lat != nil {
+				d.GPS = &gpsDTO{Lat: *l.Lat, Lng: *l.Lng, AccuracyM: l.AccuracyM}
+			}
+		}
+		counts = append(counts, d)
 	}
 	totals := make([]totalDTO, 0, len(vw.Totals))
 	perStage := map[string]int{}

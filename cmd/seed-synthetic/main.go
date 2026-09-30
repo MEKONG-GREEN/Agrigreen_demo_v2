@@ -31,7 +31,32 @@
 //	-kc-otp    AG_SEED_KC_OTP     mã TOTP 6 số hiện tại
 //	-seed      AG_SEED_SEED       hạt giống, mặc định 1
 //	-scale     AG_SEED_SCALE      small | medium, mặc định small
-//	AG_ENV=production → từ chối chạy.
+//	-plan      AG_SEED_PLAN       platform (mặc định) | mkg
+//	AG_ENV=production → từ chối chạy (cả hai kế hoạch).
+//
+// Kế hoạch MKG (-plan mkg, R-95 G3-2) gọi API nội bộ MKG (cmd/api-internal) và đẩy lô số
+// đo ký Ed25519 kiểu agent biên tới cmd/ingest qua mTLS; tất định theo -seed:
+// lệnh gom (lập + duyệt bởi hai người), số cuộn bale → gather → boat_load, cách tính giá
+// (theo tấn / theo cuộn), phiên cân HUB_IN/HUB_OUT (liên kết collection_order_ref), lô
+// DIRECT gắn lệnh gom tay, số cân CUSTOMER_IN của khách với x % lô vượt dung sai, độ ẩm
+// 12–22 %. Lô đầu là lô golden của seed prototype: 5 800/5 700/4 400 cuộn, HUB_IN 96,8 t,
+// ước 88 t → +10 % gắn cờ. Cần cmd/ingest chạy vòng tích phân (phiếu HUB_IN/HUB_OUT được
+// chờ tối đa -mkg-wait). Thửa/HTX là mã tổng hợp: nguồn thửa/HTX của fieldops phải trả
+// được chúng (RB-2 — cấp quyền chia sẻ chưa chốt; ở Local dùng nguồn giả hoặc dữ liệu của
+// kế hoạch platform).
+//
+//	-mkg-url           AG_SEED_MKG_URL           api-internal ứng dụng, mặc định http://localhost:8081
+//	-mkg-admin-url     AG_SEED_MKG_ADMIN_URL     api-internal quản trị (MFA), mặc định http://localhost:8083
+//	-mkg-ingest-url    AG_SEED_MKG_INGEST_URL    cmd/ingest mTLS, mặc định https://localhost:8443
+//	-mkg-token         AG_SEED_MKG_TOKEN         token tenant MKG: field_supervisor, field_collector,
+//	                                             scale_supervisor, reconciliation_officer, có MFA
+//	-mkg-approver-token AG_SEED_MKG_APPROVER_TOKEN token NGƯỜI KHÁC: field_supervisor + device_approver (R-56)
+//	-mkg-client-cert / -mkg-client-key  AG_SEED_MKG_CLIENT_CERT / _KEY  PEM chứng thư client mTLS
+//	                                             (scripts/gen-dev-certs) có CN/SAN = hai mã thiết bị
+//	-mkg-ingest-ca     AG_SEED_MKG_INGEST_CA     PEM CA của chứng thư máy chủ ingest
+//	-mkg-device-in / -mkg-device-out             mã thiết bị (mặc định syn-scale-<seed>-in / -out)
+//	-mkg-over-pct      AG_SEED_MKG_OVER_PCT      % lô CUSTOMER_IN vượt dung sai thương mại, mặc định 10
+//	-mkg-wait          AG_SEED_MKG_WAIT          chờ phiếu cân sau khi đóng phiên, mặc định 2m
 package main
 
 import (
@@ -64,6 +89,8 @@ type Config struct {
 	HTTP             *http.Client
 	Log              *slog.Logger
 	Today            time.Time // rỗng → hôm nay theo giờ Việt Nam
+	Plan             string    // platform | mkg
+	MKG              MKGConfig // -plan mkg
 }
 
 // ErrProduction: bộ sinh không bao giờ chạy trên production (R-95).
@@ -82,7 +109,11 @@ func main() {
 	if err == nil {
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
-		_, err = Run(ctx, cfg)
+		if cfg.Plan == "mkg" {
+			_, err = RunMKG(ctx, cfg.MKG)
+		} else {
+			_, err = Run(ctx, cfg)
+		}
 	}
 	if err != nil {
 		log.Error("dừng do lỗi", "event", "seed.run", "outcome", "error", "error", err.Error())
@@ -104,14 +135,44 @@ func parseFlags(args []string, log *slog.Logger) (Config, error) {
 	fs.StringVar(&cfg.KC.Username, "kc-user", os.Getenv("AG_SEED_KC_USER"), "người dùng quản trị dev")
 	fs.StringVar(&cfg.KC.OTP, "kc-otp", os.Getenv("AG_SEED_KC_OTP"), "mã TOTP hiện tại")
 	cfg.KC.Password = os.Getenv("AG_SEED_KC_PASSWORD")
+	fs.StringVar(&cfg.Plan, "plan", envOr("AG_SEED_PLAN", "platform"), "platform | mkg")
+	m := &cfg.MKG
+	fs.StringVar(&m.AppURL, "mkg-url", envOr("AG_SEED_MKG_URL", "http://localhost:8081"), "API nội bộ MKG (ứng dụng)")
+	fs.StringVar(&m.AdminURL, "mkg-admin-url", envOr("AG_SEED_MKG_ADMIN_URL", "http://localhost:8083"), "API nội bộ MKG (quản trị)")
+	fs.StringVar(&m.IngestURL, "mkg-ingest-url", envOr("AG_SEED_MKG_INGEST_URL", "https://localhost:8443"), "cmd/ingest mTLS")
+	fs.StringVar(&m.Operator, "mkg-token", os.Getenv("AG_SEED_MKG_TOKEN"), "token vận hành tenant MKG")
+	fs.StringVar(&m.Approver, "mkg-approver-token", os.Getenv("AG_SEED_MKG_APPROVER_TOKEN"), "token người duyệt (khác người đề xuất)")
+	certFile := fs.String("mkg-client-cert", os.Getenv("AG_SEED_MKG_CLIENT_CERT"), "PEM chứng thư client mTLS")
+	keyFile := fs.String("mkg-client-key", os.Getenv("AG_SEED_MKG_CLIENT_KEY"), "PEM khóa client mTLS")
+	caFile := fs.String("mkg-ingest-ca", os.Getenv("AG_SEED_MKG_INGEST_CA"), "PEM CA máy chủ ingest")
+	fs.StringVar(&m.DeviceIn, "mkg-device-in", "", "mã thiết bị HUB_IN")
+	fs.StringVar(&m.DeviceOut, "mkg-device-out", "", "mã thiết bị HUB_OUT")
+	over := fs.String("mkg-over-pct", envOr("AG_SEED_MKG_OVER_PCT", "10"), "% lô vượt dung sai")
+	fs.DurationVar(&m.Wait, "mkg-wait", 2*time.Minute, "chờ phiếu cân")
 	if err := fs.Parse(args); err != nil {
 		return cfg, err
+	}
+	if cfg.Plan != "platform" && cfg.Plan != "mkg" {
+		return cfg, fmt.Errorf("-plan phải là platform hoặc mkg")
+	}
+	if n, err := strconv.Atoi(*over); err == nil {
+		m.OverPct = n
+	} else {
+		return cfg, fmt.Errorf("-mkg-over-pct phải là số nguyên")
+	}
+	if cfg.Plan == "mkg" && *certFile != "" {
+		hc, der, err := mkgIngestClient(*certFile, *keyFile, *caFile)
+		if err != nil {
+			return cfg, err
+		}
+		m.IngestHTTP, m.ClientCert = hc, der
 	}
 	n, err := strconv.ParseUint(*seed, 10, 64)
 	if err != nil {
 		return cfg, fmt.Errorf("-seed phải là số nguyên không âm")
 	}
 	cfg.Seed = n
+	m.Seed, m.Scale, m.Env, m.Log = n, cfg.Scale, cfg.Env, log
 	cfg.Token = strings.TrimSpace(*token)
 	if cfg.Token == "" && *tokenFile != "" {
 		b, err := os.ReadFile(*tokenFile) //nolint:gosec // đường dẫn do người vận hành truyền vào

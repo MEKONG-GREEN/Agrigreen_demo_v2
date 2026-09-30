@@ -19,6 +19,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/mass"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 func (s *Service) operator(ctx context.Context, idem string, eventTime *time.Time) (authz.Principal, error) {
@@ -705,6 +706,35 @@ func (s *Service) LotInfo(ctx context.Context, id uuid.UUID) (port.LotInfo, erro
 		info.Sources = append(info.Sources, port.LotSource{Kind: string(src.Kind), Ref: src.Ref, Ratio: src.Ratio.StringFixed(domain.RatioScale)})
 	}
 	return info, nil
+}
+
+// LotOrigin cài đặt port.LotOrigins: tenant tường minh, không kiểm vai (chỉ đọc lô + dịch chuyển).
+func (s *Service) LotOrigin(ctx context.Context, tid, id uuid.UUID) (port.LotInfo, error) {
+	var info port.LotInfo
+	err := tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
+		l, err := store.LotByID(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		if l == nil {
+			return port.ErrLotNotFound
+		}
+		ms, err := store.MovementsOfLot(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		var rem mass.Kg
+		for _, m := range ms {
+			rem = rem.Add(m.Qty)
+		}
+		info = port.LotInfo{LotID: l.ID, FacilityID: l.FacilityID, Product: string(l.Product), InitialKg: l.Initial.String(),
+			RemainingKg: rem.String()}
+		for _, src := range l.Sources {
+			info.Sources = append(info.Sources, port.LotSource{Kind: string(src.Kind), Ref: src.Ref, Ratio: src.Ratio.StringFixed(domain.RatioScale)})
+		}
+		return nil
+	})
+	return info, err
 }
 
 // RebuildProjections dựng lại bảng chiếu tồn theo lô của tenant từ sổ (R-22).

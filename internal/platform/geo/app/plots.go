@@ -724,6 +724,14 @@ func (s *Service) Retire(ctx context.Context, in RetireInput) (AttrResult, error
 		if err := store.SetAttrs(ctx, tx, p); err != nil {
 			return AttrResult{}, err
 		}
+		// GIS US-EVL-01: cùng giao dịch với dòng sổ (outbox).
+		if err := enqueue(ctx, tx, ev.TenantID, port.EventPlotRetired, ev.EventTime, port.PlotRetiredV1{
+			PlotRef: p.Ref, PlotEventID: ev.ID, Code: p.Code, CommuneCode: p.CommuneCode, CooperativeRef: uuidPtr(p.CooperativeRef),
+			StatusBefore: plot.Status, StatusAfter: p.Status, Reason: ev.Reason, ActorRef: ev.ActorRef,
+			EventTime: ev.EventTime.Format(time.RFC3339),
+		}); err != nil {
+			return AttrResult{}, err
+		}
 		cur, err := store.PlotByRef(ctx, tx, p.Ref, false)
 		if err != nil {
 			return AttrResult{}, err
@@ -804,6 +812,14 @@ func (s *Service) Restore(ctx context.Context, in RestoreInput) (AttrResult, err
 			if err := store.SetNeedsReview(ctx, tx, p.Ref, true); err != nil {
 				return AttrResult{}, err
 			}
+		}
+		// GIS US-EVL-01: cùng giao dịch với dòng sổ (outbox).
+		if err := enqueue(ctx, tx, ev.TenantID, port.EventPlotRestored, ev.EventTime, port.PlotRestoredV1{
+			PlotRef: p.Ref, PlotEventID: ev.ID, Code: p.Code, CommuneCode: p.CommuneCode, CooperativeRef: uuidPtr(p.CooperativeRef),
+			StatusBefore: plot.Status, StatusAfter: p.Status, Reason: ev.Reason, NeedsReview: len(conflicts) > 0,
+			ActorRef: ev.ActorRef, EventTime: ev.EventTime.Format(time.RFC3339),
+		}); err != nil {
+			return AttrResult{}, err
 		}
 		cur, err := store.PlotByRef(ctx, tx, p.Ref, false)
 		if err != nil {

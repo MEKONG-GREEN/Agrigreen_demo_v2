@@ -10,15 +10,21 @@ package measurement
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 
+	fieldport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
 	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/ingest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -29,8 +35,12 @@ const DBRole = port.DBRole
 type Deps struct {
 	// Rolls: số cuộn từ mkg/fieldops; nil → app.NoRolls (đối soát ghi pending_rolls).
 	Rolls port.RollTotals
-	// Origins: nguồn gốc lô từ mkg/hub (thửa + tỷ lệ) cho van MRV; nil → van MRV từ chối.
-	Origins hubport.Lots
+	// Origins: nguồn gốc lô từ mkg/hub (thửa + tỷ lệ) cho van MRV, tenant tường minh (không
+	// cần vai hub — G3-2).
+	Origins hubport.LotOrigins
+	// Plots: tỷ lệ thửa theo lệnh gom (mkg/fieldops) cho van MRV khi lô không có ở hub
+	// (tuyến DIRECT). Origins và Plots cùng nil → van MRV từ chối.
+	Plots port.CollectionPlots
 }
 
 // Module là mkg/measurement đã nối.
@@ -42,7 +52,8 @@ type Module struct {
 // New tạo module với pool của vai measurement_app (cụm mkg).
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 	w := &app.Writer{DB: db, Clock: clk}
-	return &Module{w: w, svc: &app.Service{DB: db, Clock: clk, Writer: w, Rolls: deps.Rolls, Origins: deps.Origins}}
+	return &Module{w: w, svc: &app.Service{DB: db, Clock: clk, Writer: w, Rolls: deps.Rolls, Origins: deps.Origins,
+		Plots: deps.Plots}}
 }
 
 // RegisterApp gắn route vận hành (bề mặt ứng dụng).
@@ -53,6 +64,9 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc
 
 // LotMass cho hub / costing đọc khối lượng chuẩn của lô (port.LotMass).
 func (m *Module) LotMass() port.LotMass { return m.w }
+
+// CollectionLinks phân giải lô cân ↔ lệnh gom (G3-2, tenant tường minh).
+func (m *Module) CollectionLinks() port.CollectionLinks { return m.w }
 
 // Tickets là TicketWriter của module (vai measurement_app).
 func (m *Module) Tickets() port.TicketWriter { return m.w }
@@ -102,4 +116,28 @@ func (s ingestSessions) PendingSessions(ctx context.Context, limit int) ([]inges
 		out = append(out, is)
 	}
 	return out, nil
+}
+
+// Consumers là handler sự kiện NỘI BỘ MKG của measurement cho cmd/worker-internal
+// (vhost mkg.internal, ADR-0018). Handler chỉ dùng giao dịch inbox được giao (vai
+// measurement_app, tenant của phong bì); số cuộn đọc qua deps.Rolls (fieldops, pool riêng).
+type Consumers struct{ svc *app.Service }
+
+// NewConsumers dựng handler consumer của measurement.
+func NewConsumers(clk clock.Clock, deps Deps) Consumers {
+	return Consumers{svc: &app.Service{Clock: clk, Writer: &app.Writer{Clock: clk}, Rolls: deps.Rolls}}
+}
+
+// RollCount: mkg.fieldops.roll_count.recorded → đối soát lại lô cân liên kết (RB-6, G3-2).
+func (c Consumers) RollCount() inbox.Handler {
+	return func(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
+		if env.EventType != fieldport.EventRollCountRecorded {
+			return nil
+		}
+		var r fieldport.RollCountRecordedV1
+		if err := json.Unmarshal(env.Payload, &r); err != nil {
+			return fmt.Errorf("measurement: payload %s không hợp lệ: %w", env.EventType, err)
+		}
+		return c.svc.RollCountRecorded(ctx, tx, env.TenantID, r.LotRef, r.RollCountID)
+	}
 }

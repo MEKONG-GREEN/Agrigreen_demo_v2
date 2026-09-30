@@ -274,6 +274,83 @@ func Samples(ctx context.Context, tx pgx.Tx, htx *uuid.UUID, limit int) ([]domai
 	return out, rows.Err()
 }
 
+// SamplesBefore như Samples nhưng chỉ lô cân trước before và bỏ exclude (tất định cho đối soát).
+func SamplesBefore(ctx context.Context, tx pgx.Tx, htx *uuid.UUID, before time.Time, exclude uuid.UUID, limit int) ([]domain.WeighedSample, error) {
+	rows, err := tx.Query(ctx, `SELECT order_id, rolls, weighed_kg::text FROM mkg_fieldops.weighed_loading_current
+	    WHERE ($1::uuid IS NULL OR htx_ref = $1) AND weighed_at < $2 AND order_id <> $3
+	    ORDER BY weighed_at DESC, order_id DESC LIMIT $4`, htx, before.UTC(), exclude, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.WeighedSample
+	for rows.Next() {
+		var s domain.WeighedSample
+		var k string
+		if err := rows.Scan(&s.LotRef, &s.Rolls, &k); err != nil {
+			return nil, err
+		}
+		if s.WeighedKg, err = mass.ParseKg(k); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+// WeighedTicket là phiếu nguồn của dòng bảng đệm (nil nếu dòng do làm mới tay).
+type WeighedTicket struct {
+	TicketRef           *uuid.UUID
+	SupersedesTicketRef *uuid.UUID
+}
+
+// WeighedOf đọc phiếu nguồn của dòng bảng đệm của lô gom (nil khi chưa có dòng).
+func WeighedOf(ctx context.Context, tx pgx.Tx, order uuid.UUID) (*WeighedTicket, error) {
+	var w WeighedTicket
+	err := tx.QueryRow(ctx, `SELECT ticket_ref, supersedes_ticket_ref FROM mkg_fieldops.weighed_loading_current WHERE order_id = $1`,
+		order).Scan(&w.TicketRef, &w.SupersedesTicketRef)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &w, nil
+}
+
+// PutWeighedTicket ghi khối lượng cân của lô gom theo phiếu (consumer nội bộ).
+func PutWeighedTicket(ctx context.Context, tx pgx.Tx, tenantID uuid.UUID, u Unweighed, kg mass.Kg, at time.Time, ticket uuid.UUID,
+	supersedes *uuid.UUID) error {
+	_, err := tx.Exec(ctx, `INSERT INTO mkg_fieldops.weighed_loading_current
+	    (tenant_id, order_id, htx_ref, rolls, weighed_kg, weighed_at, ticket_ref, supersedes_ticket_ref)
+	  VALUES ($1, $2, $3, $4, $5::numeric, $6, $7, $8)
+	  ON CONFLICT (tenant_id, order_id) DO UPDATE SET rolls = EXCLUDED.rolls, weighed_kg = EXCLUDED.weighed_kg,
+	    weighed_at = EXCLUDED.weighed_at, ticket_ref = EXCLUDED.ticket_ref, supersedes_ticket_ref = EXCLUDED.supersedes_ticket_ref,
+	    updated_at = now()`,
+		tenantID, u.OrderID, u.HTXRef, u.Rolls, kg.String(), at.UTC(), ticket, supersedes)
+	return err
+}
+
+// RefreshWeighedRolls cập nhật số cuộn xếp ghe/xe của dòng bảng đệm đã có (bản ghi bù ở
+// công đoạn boat_load sau khi cân). Không có dòng → không làm gì.
+func RefreshWeighedRolls(ctx context.Context, tx pgx.Tx, order uuid.UUID) error {
+	_, err := tx.Exec(ctx, `UPDATE mkg_fieldops.weighed_loading_current w SET rolls = t.n, updated_at = now()
+	    FROM (SELECT sum(rolls)::int AS n FROM mkg_fieldops.roll_total_current WHERE order_id = $1 AND stage = 'boat_load') t
+	    WHERE w.order_id = $1 AND t.n > 0 AND w.rolls <> t.n`, order)
+	return err
+}
+
+// AllMatched cho biết mọi thửa của lô gom có đối soát chiều mua và đều match.
+func AllMatched(ctx context.Context, tx pgx.Tx, order uuid.UUID, plots []uuid.UUID) (bool, error) {
+	if len(plots) == 0 {
+		return false, nil
+	}
+	var n int
+	err := tx.QueryRow(ctx, `SELECT count(*) FROM mkg_fieldops.buyside_reconciliation_current
+	    WHERE order_id = $1 AND plot_ref = ANY($2::uuid[]) AND status = 'match'`, order, uuidStrings(plots)).Scan(&n)
+	return n == len(plots), err
+}
+
 // Unweighed là một lô gom đã xếp ghe/xe chưa có khối lượng cân trong bảng đệm.
 type Unweighed struct {
 	OrderID uuid.UUID

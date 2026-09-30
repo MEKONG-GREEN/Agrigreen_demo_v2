@@ -42,6 +42,9 @@ type MRVCollectionEvidencePublishedV1 struct {
 	CollectedKgBucket string     `json:"collected_kg_bucket"`
 	BucketRuleVersion string     `json:"bucket_rule_version"`
 	Revision          int        `json:"revision"`
+	// MassBasis (thêm ở G3-2, tùy chọn trong hợp đồng — tương thích ngược): HUB_IN, hoặc
+	// CUSTOMER_IN_AGGREGATED cho tuyến DIRECT (khối lượng khách cân, gộp, không tách hao hụt).
+	MassBasis string `json:"mass_basis"`
 }
 
 // PublicationName cài đặt Publication.
@@ -62,6 +65,9 @@ type WeighTicketRecordedV1 struct {
 	EventTime    time.Time    `json:"event_time"`
 	RuleVersion  *string      `json:"rule_version"`
 	SupersedesID *uuid.UUID   `json:"supersedes_id"`
+	// CollectionOrderRef (thêm ở G3-2, tùy chọn — tương thích ngược): lệnh gom liên kết
+	// TƯỜNG MINH với lô (sổ lot_collection); null = quy ước đồng nhất (lot_ref là mã lệnh gom).
+	CollectionOrderRef *uuid.UUID `json:"collection_order_ref"`
 }
 
 // ReconciliationCompletedV1 là payload khi đối soát một lô hoàn tất (RB-6):

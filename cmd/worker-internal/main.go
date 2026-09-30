@@ -124,7 +124,10 @@ func run(log *slog.Logger) error {
 		if err != nil {
 			return err
 		}
-		h := c.Build(clk)
+		h, err := c.Handler(clk, pool)
+		if err != nil {
+			return err
+		}
 		go func(name string) { errc <- inbox.Consume(ctx, ch, p, name, h, log) }(c.Name)
 	}
 	log.Info("đang chạy", "event", "startup", "consumers", len(assembly.Consumers), "outcome", "ok")

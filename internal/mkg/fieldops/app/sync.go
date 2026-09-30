@@ -62,6 +62,10 @@ type RollCountPayload struct {
 	LooseKg            *string `json:"loose_kg"`
 	DiscrepancyReason  string  `json:"discrepancy_reason"`
 	HTXConfirmationRef *string `json:"htx_confirmation_ref"`
+	// GPS (G3-2, tùy chọn, không bao giờ chặn lưu): {lat, lon|lng, accuracy_m} và trạng thái
+	// máy báo (ok | weak | denied | unavailable | timeout | no_device).
+	GPS       json.RawMessage `json:"gps"`
+	GPSStatus string          `json:"gps_status"`
 }
 
 // FieldIssue là lỗi theo trường của một bản ghi.
@@ -155,6 +159,7 @@ func (s *Service) pushOne(ctx context.Context, p authz.Principal, device string,
 		return bad("payload.rolls", "bắt buộc số cuộn (proto FM-09)")
 	}
 	in.Count = domain.Count{Rolls: *pl.Rolls, DiscrepancyReason: pl.DiscrepancyReason}
+	in.Location = domain.ParseLocation(pl.GPSStatus, pl.GPS)
 	if pl.LooseKg != nil {
 		k, err := mass.ParseKg(*pl.LooseKg)
 		if err != nil {
@@ -248,6 +253,11 @@ func (s *Service) decodeCursor(p authz.Principal, device, c string) (int64, erro
 
 // Pull trả thay đổi lệnh gom sau con trỏ. Lệnh đã duyệt/đang làm → upsert; lệnh
 // chưa duyệt, đã đóng hoặc hủy → tombstone (ngừng hiển thị trên máy).
+//
+// Lọc theo tổ (G3-2, CHƯA làm — ghi nhận): lệnh đã giao tổ (crew_ref) lẽ ra chỉ xuống máy
+// của tổ đó, nhưng G3 chưa có quan hệ người dùng → tổ gom (crew_ref chỉ là UUID trên lệnh,
+// ca tổ do chính app ghi SAU khi thấy lệnh). Khi có danh bạ tổ (claim org_ref = tổ, hoặc
+// sổ thành viên tổ), lọc ở đây: tổ khác → tombstone; field_supervisor vẫn thấy mọi lệnh.
 func (s *Service) Pull(ctx context.Context, device, cursor string, limit int) (PullPage, error) {
 	p, err := authz.Require(ctx, RoleCollector, RoleSupervisor)
 	if err != nil {

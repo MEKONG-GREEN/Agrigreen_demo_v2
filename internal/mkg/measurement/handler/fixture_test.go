@@ -61,19 +61,34 @@ func (r *fakeRolls) set(lot uuid.UUID, rolls int64, kpr string) {
 	r.m[lot] = port.RollTotal{LotRef: lot, Rolls: rolls, KgPerRollEstimate: mass.MustKg(kpr), EstimateSource: "default"}
 }
 
-// fakeLots là nguồn gốc lô giả (mkg/hub port.Lots).
+// fakeLots là nguồn gốc lô giả (mkg/hub port.LotOrigins).
 type fakeLots struct {
 	mu sync.Mutex
 	m  map[uuid.UUID]hubport.LotInfo
 }
 
-func (l *fakeLots) LotInfo(_ context.Context, id uuid.UUID) (hubport.LotInfo, error) {
+func (l *fakeLots) LotOrigin(_ context.Context, _, id uuid.UUID) (hubport.LotInfo, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if v, ok := l.m[id]; ok {
 		return v, nil
 	}
-	return hubport.LotInfo{}, port.ErrNotFound
+	return hubport.LotInfo{}, hubport.ErrLotNotFound
+}
+
+// fakePlots là tỷ lệ thửa theo lệnh gom giả (port.CollectionPlots, G3-2).
+type fakePlots struct {
+	mu sync.Mutex
+	m  map[uuid.UUID][]port.PlotShare
+}
+
+func (p *fakePlots) CollectionPlots(_ context.Context, _, order uuid.UUID) ([]port.PlotShare, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if v, ok := p.m[order]; ok {
+		return v, nil
+	}
+	return nil, port.ErrNotFound
 }
 
 type fixture struct {
@@ -88,6 +103,7 @@ type fixture struct {
 	tenant     uuid.UUID
 	rolls      *fakeRolls
 	lots       *fakeLots
+	plots      *fakePlots
 	mod        *measurement.Module
 }
 
@@ -98,7 +114,8 @@ func newFixture(t *testing.T) *fixture {
 	clk := clock.NewFixed(time.Now().UTC().Truncate(time.Second))
 	rolls := &fakeRolls{m: map[uuid.UUID]port.RollTotal{}}
 	lots := &fakeLots{m: map[uuid.UUID]hubport.LotInfo{}}
-	mod := measurement.New(pool, clk, measurement.Deps{Rolls: rolls, Origins: lots})
+	plots := &fakePlots{m: map[uuid.UUID][]port.PlotShare{}}
+	mod := measurement.New(pool, clk, measurement.Deps{Rolls: rolls, Origins: lots, Plots: plots})
 	iss := authztest.New(t)
 	log := telemetry.NewLogger("test", io.Discard)
 	appEng := httpx.NewEngine(log, 1<<20)
@@ -109,7 +126,7 @@ func newFixture(t *testing.T) *fixture {
 	t.Cleanup(a.Close)
 	t.Cleanup(ad.Close)
 	return &fixture{t: t, env: env, iss: iss, app: a, admin: ad, pool: pool, ingestPool: ingestPool, ingest: measurement.NewIngest(ingestPool, clk),
-		clk: clk, tenant: ids.New(), rolls: rolls, lots: lots, mod: mod}
+		clk: clk, tenant: ids.New(), rolls: rolls, lots: lots, plots: plots, mod: mod}
 }
 
 type caller struct {

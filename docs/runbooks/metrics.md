@@ -47,7 +47,7 @@ Consumer `pf.metrics.layer_log` (vai `metrics_app`) nhận các sự kiện dư�
 
 | Lớp | Sự kiện nguồn |
 |---|---|
-| `plot` | `pf.geo.plot.created`, `pf.geo.plot_boundary.recorded` (chỉ bản thành hiện hành) |
+| `plot` | `pf.geo.plot.created`, `pf.geo.plot_boundary.recorded` (chỉ bản thành hiện hành), `pf.geo.plot.retired` (→ `retire`, phát lại ẩn thửa), `pf.geo.plot.restored` (→ `restore`) |
 | `coop_boundary` | `pf.geo.cooperative_boundary.recorded` |
 | `facility` | `pf.geo.facility.recorded` |
 | `season_stage` | `pf.cropcycle.season.opened`, `.completed`, `.corrected` (hủy → `retire`) |
@@ -57,7 +57,6 @@ Consumer `pf.metrics.layer_log` (vai `metrics_app`) nhận các sự kiện dư�
 Nguồn chưa có:
 
 - **Thời tiết** (FN-19 "giữ cảnh báo lớn nhất ngày"): chưa có module thời tiết.
-- **Ngừng dùng / khôi phục thửa:** pf/geo chưa phát sự kiện. Nhật ký lớp `plot` sẽ thiếu các thay đổi này cho tới khi có sự kiện, ví dụ `pf.geo.plot.retired`.
 - **Hub MKG:** van `hub_facility` và `hub_capacity` hiện chỉ cho pf/geo.
 
 Hình học **không** chép vào nhật ký. `after.geometry_ref` trỏ dòng sổ hình học bất biến của pf/geo (`plot_boundary`, `cooperative_boundary`, `facility_event`). `GET /v1/gis/replay?geometry=true` tra hình học as-of qua `geo.LayerGeometry()`.

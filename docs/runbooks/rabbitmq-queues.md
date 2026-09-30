@@ -24,6 +24,7 @@ Kiểm thử `cmd/worker` `TestWorkerConsumersDeclaredByPublisher` đòi mọi c
 
 - Sự kiện `shared.outbox.kind = internal` của cụm mkg được phát lên vhost riêng `mkg.internal`, không lên vhost nền tảng. Kết nối là `AG_AMQP_INTERNAL_URL`, tài khoản `mkg_internal`. Tài khoản nền tảng (`agrigreen`) **không** có quyền trên vhost này. Compose `rabbitmq-init` tạo vhost, tạo tài khoản rồi gỡ quyền mà RabbitMQ tự cấp cho người tạo. CI `compose-smoke` kiểm lại việc này.
 - Danh sách hàng đợi là `cmd/worker-internal/assembly.Queues()`. Khi khởi động, `outbox-publisher` khai báo chúng trên vhost nội bộ, dùng cùng tham số với vhost nền tảng.
+- G3-2 thêm `mkg.fieldops.weigh_ticket` (vai `fieldops_app`: phiếu cân → bảng đệm học kg/cuộn) và `mkg.measurement.roll_count` (vai `measurement_app`; handler mở thêm pool `fieldops_app` để đọc số cuộn). Hai consumer idempotent theo inbox; DLQ của `mkg.measurement.roll_count` thường do fieldops không đọc được (kiểm quyền/mật khẩu vai `fieldops_app` qua PgBouncer). Đường tay `POST /v1/fieldops/kg-per-roll/refresh` vẫn còn để chạy bù.
 - Thiếu `AG_AMQP_INTERNAL_URL` thì sự kiện nội bộ **tồn trên outbox** (`ag.outbox.backlog` cụm mkg tăng), không bao giờ rơi sang vhost nền tảng. Đặt biến rồi khởi động lại publisher; sự kiện được phát theo thứ tự `id`.
 - Kiểm tra: `rabbitmqctl -q list_permissions -p mkg.internal` chỉ có `mkg_internal`; `rabbitmqctl -q list_queues -p mkg.internal name messages consumers`.
 

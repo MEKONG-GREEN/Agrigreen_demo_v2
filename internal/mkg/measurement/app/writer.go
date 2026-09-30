@@ -130,6 +130,10 @@ func recordTx(ctx context.Context, tx pgx.Tx, tid uuid.UUID, d port.TicketDraft,
 		TicketID: t.ID, LotRef: t.LotRef, Point: t.Point, Route: t.Route, Source: t.Source, MassKg: t.MassKg,
 		EventTime: t.EventTime.UTC(), SupersedesID: t.Supersedes,
 	}
+	// G3-2: lệnh gom liên kết tường minh (nil = quy ước đồng nhất lot_ref = lệnh gom).
+	if ev.CollectionOrderRef, err = store.CollectionOrderRefOf(ctx, tx, t.LotRef); err != nil {
+		return t, false, err
+	}
 	if t.MoisturePct != "" {
 		m := t.MoisturePct
 		ev.MoisturePct = &m

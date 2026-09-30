@@ -6,6 +6,7 @@ package port
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -115,6 +116,17 @@ type LotInfo struct {
 type Lots interface {
 	LotInfo(ctx context.Context, lotID uuid.UUID) (LotInfo, error)
 }
+
+// LotOrigins là cửa đọc nguồn gốc lô với tenant TƯỜNG MINH (G3-2), không kiểm vai hub:
+// dùng cho module mkg khác gọi cùng tiến trình từ ngữ cảnh không có vai hub (vd
+// measurement lập bằng chứng MRV bằng vai reconciliation_officer, consumer nội bộ).
+// Chỉ đọc; RLS theo tenantID. ErrLotNotFound khi lô không có trong tenant.
+type LotOrigins interface {
+	LotOrigin(ctx context.Context, tenantID, lotID uuid.UUID) (LotInfo, error)
+}
+
+// ErrLotNotFound: lô không có trong tenant (LotOrigins).
+var ErrLotNotFound = errors.New("hub: không có lô")
 
 // ---------------------------------------------------------------------------
 // G3: consumer sự kiện nội bộ (cmd/worker-internal, vhost mkg.internal) và cảm biến
