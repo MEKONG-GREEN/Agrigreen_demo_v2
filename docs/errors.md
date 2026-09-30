@@ -497,6 +497,26 @@ Kết quả theo bản ghi của `POST /v1/fieldops/sync/push` dùng thêm `fiel
 
 Cảnh báo không chặn (mảng `warnings` của kết quả ghi, không phải lỗi): `fieldops.harvest_date_unknown`, `fieldops.harvest_date_unavailable` (FM-01, chưa biết ngày gặt), `fieldops.planned_before_harvest` (ngày bắt đầu dự kiến trước ngày gặt), `fieldops.baling_deadline_at_risk` (ngày kết thúc dự kiến sau hạn cuộn FM-02), `fieldops.crew_over_capacity_override` (giám sát giao vượt năng lực kèm lý do, FM-06).
 
+### mkg/acctbridge (API nội bộ MKG — `cmd/api-internal`, `contracts/openapi/mkg-internal.yaml`)
+
+| HTTP | code | Khi nào |
+|---|---|---|
+| 403 | `self_approval_forbidden` | Kế toán trưởng duyệt bút toán do chính mình dựng (bút toán tự dựng khi đóng kỳ có người dựng = người đóng kỳ; dựng lại tay = người yêu cầu), hoặc duyệt / từ chối phiên bản ánh xạ do chính mình đề xuất — R-56; DB chặn lần hai bằng CHECK |
+| 404 | `acctbridge.journal_not_found` | Không có bút toán tổng hợp trong tenant của token |
+| 404 | `acctbridge.job_not_found` | Không có job dựng / đẩy |
+| 404 | `acctbridge.mapping_not_found` | Không có phiên bản ánh xạ tài khoản cần quyết định |
+| 404 | `acctbridge.period_unknown` | Yêu cầu dựng lại cho kỳ chưa từng nhận sự kiện `mkg.costing.period.closed` |
+| 409 | `acctbridge.journal_not_built` | Duyệt bút toán không ở trạng thái `built` (đã duyệt, đã bị bản dựng lại thay thế…) |
+| 409 | `acctbridge.journal_not_retryable` | Đẩy lại bút toán không ở trạng thái `push_failed` (lỗi tạm thời được thử lại tự động theo lịch) |
+| 409 | `acctbridge.journal_pushed_immutable` | Duyệt / dựng lại bút toán đã đẩy sang phần mềm kế toán — không bao giờ sửa; điều chỉnh bằng bút toán điều chỉnh của costing ở kỳ sau |
+| 409 | `acctbridge.rebuild_no_change` | Dựng lại khi bút toán hiện hành đã dựng theo đúng lần đóng kỳ và phiên bản ánh xạ hiện hành |
+| 409 | `acctbridge.mapping_pending` | Đề xuất phiên bản ánh xạ khi đang có phiên bản chờ duyệt |
+| 409 | `acctbridge.mapping_decided` | Phiên bản ánh xạ đã được duyệt hoặc từ chối |
+| 422 | `validation_failed` | Bảng ánh xạ sai (tài khoản không phải số hiệu, Nợ = Có, trùng nhóm × chiều, `dimension_on` lạ), lý do < 10 ký tự, `effective_from` không phải YYYY-MM-DD, `status` lọc lạ |
+| 422 | `acctbridge.format_unsupported` | Tải tệp xuất với `format` khác `csv` / `xml` |
+
+Mã kết quả của job và lần đẩy (cột `failure_code` / `error_code`, không phải lỗi HTTP): `acctbridge.mapping_missing` (chưa có phiên bản ánh xạ được duyệt hiệu lực đến cuối kỳ, hoặc thiếu quy tắc cho một nhóm × chiều), `acctbridge.period_not_closed` (costing trả kỳ chưa đóng / không có), `acctbridge.source_mismatch` (lần đóng kỳ hoặc `result_set_sha256` của costing khác sự kiện), `acctbridge.empty_period` (không có số phát sinh), `acctbridge.journal_pushed_immutable` (sự kiện đóng kỳ mới cho kỳ đã đẩy), `acctbridge.journal_not_pushable` (bút toán bị thay thế trước khi đẩy), `acctbridge.adapter_unavailable` (đích tạm không nhận — hẹn thử lại giãn cách), `acctbridge.adapter_rejected` (đích từ chối — DLQ), `acctbridge.retry_exhausted` (hết `acctbridge.push.retry_max` lần — DLQ).
+
 ### pf/waterway
 
 Mạng đường thủy có phiên bản (mục 16; GIS FN-09, US-WATER-01/02/03). Vẽ/sửa, dựng, phát hành ở Admin API (MFA); tra lớp và định tuyến ở Application API.

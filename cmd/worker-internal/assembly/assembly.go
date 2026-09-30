@@ -8,12 +8,16 @@
 package assembly
 
 import (
+	"context"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/mkgwire"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/acctbridge"
+	abport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/acctbridge/port"
+	costport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/costing/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops"
 	fieldport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub"
@@ -68,6 +72,22 @@ func buildMeasurementRollCount(clk clock.Clock, pool PoolFor) (inbox.Handler, er
 	return measurement.NewConsumers(clk, measurement.Deps{Rolls: rolls}).RollCount(), nil
 }
 
+// buildAcctbridge dựng consumer của mkg/acctbridge (vai acctbridge_app): bộ điều hợp kế toán theo
+// AG_ACCTBRIDGE_ADAPTER (mặc định xuất tệp vào kho đối tượng trong lãnh thổ). costing/port.ClosedPeriods CHƯA
+// nối (mkg/costing làm song song ở G4) — job dựng trả lỗi tạm thời tới khi người tích hợp nối
+// costing.Module.ClosedPeriods() (pool vai costing_app) vào Deps.Periods ở đây.
+func buildAcctbridge(pick func(acctbridge.Consumers) inbox.Handler) func(clock.Clock, PoolFor) (inbox.Handler, error) {
+	return func(clk clock.Clock, pool PoolFor) (inbox.Handler, error) {
+		p, err := pool(acctbridge.DBRole)
+		if err != nil {
+			return nil, err
+		}
+		ad, _ := acctbridge.AdapterFromEnv(context.Background(), clk)
+		var periods costport.ClosedPeriods // người tích hợp G4: costing.Module.ClosedPeriods()
+		return pick(acctbridge.NewConsumers(p, clk, acctbridge.Deps{Periods: periods, Adapter: ad, RetryMax: acctbridge.RetryMaxFromEnv()})), nil
+	}
+}
+
 // Consumers là sổ đăng ký consumer nội bộ. Kiểm thử của package đòi tên và sự
 // kiện đúng quy ước. Mỗi consumer: quorum queue + DLQ (Name + ".dlq"), giao tối
 // đa inbox.DeliveryLimit lần rồi sang DLQ, idempotent qua shared.inbox (R-61).
@@ -99,6 +119,13 @@ var Consumers = []Consumer{
 	// G3-2 (mkg/measurement, vai measurement_app): số cuộn mới → đối soát lại lô (RB-6).
 	{Name: RollCountReconcileConsumer, Events: []string{fieldport.EventRollCountRecorded}, Role: measurement.DBRole,
 		BuildWith: buildMeasurementRollCount},
+	// G4 (mkg/acctbridge, vai acctbridge_app): đóng kỳ → job dựng → dựng; duyệt → job đẩy → đẩy (R-62).
+	{Name: abport.PeriodClosedConsumer, Events: []string{costport.EventPeriodClosed}, Role: acctbridge.DBRole,
+		BuildWith: buildAcctbridge(acctbridge.Consumers.PeriodClosed)},
+	{Name: abport.JournalBuildConsumer, Events: []string{abport.EventJournalBuildRequested}, Role: acctbridge.DBRole,
+		BuildWith: buildAcctbridge(acctbridge.Consumers.JournalBuild)},
+	{Name: abport.JournalPushConsumer, Events: []string{abport.EventJournalPushRequested}, Role: acctbridge.DBRole,
+		BuildWith: buildAcctbridge(acctbridge.Consumers.JournalPush)},
 }
 
 // RollCountReconcileConsumer: mkg.fieldops.roll_count.recorded → measurement đối soát lại.

@@ -25,11 +25,11 @@ Bốn trạng thái:
 | 5. `mkg/logistics` | 13 | 0 | 0 | 13 | 0 |
 | 6. `mkg/orders` | 11 | 0 | 0 | 11 | 0 |
 | 7. `mkg/costing` | 16 | 0 | 0 | 16 | 0 |
-| 8. `mkg/acctbridge` | 9 | 0 | 0 | 9 | 0 |
+| 8. `mkg/acctbridge` | 9 | 7 | 1 | 1 | 0 |
 | 9. Cổng kiến trúc G4 (RB, R-xx, vùng, hạ tầng) | 14 | 0 | 0 | 14 | 0 |
 | 10. Client và kịch bản đầu–cuối | 4 | 0 | 0 | 4 | 0 |
 | 11. Câu hỏi khách | 7 | 0 | 0 | 7 | 0 |
-| **Tổng** | **81** | **0** | **0** | **81** | **0** |
+| **Tổng** | **81** | **7** | **1** | **73** | **0** |
 
 Đã có ở G4-0 (nền móng, không tính là đạt dòng nào): bề mặt đối tác `/v1/partner/waterway/route` phía nền tảng (`TestPartnerWaterwayRoute_ADR0020`, `TestShareGrantWaterwayRoutesKind_G4`), hợp đồng sự kiện nội bộ (`TestG4FrozenInternalContracts`), vai trong realm (`TestKeycloakRealmCoversRolesAndClaims`), `agnofloat` cho bốn module (`TestNoFloat`).
 
@@ -130,14 +130,14 @@ Như [g3-acceptance.md §1](g3-acceptance.md#1-cách-chạy). Kịch bản E2E G
 
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| B-01 | Chỉ bút toán **tổng hợp** theo kỳ, một chiều, tần suất tháng; không giao dịch chi tiết | — | **chưa làm** |
-| B-02 | `period.closed` → job dựng bút toán (mẫu mục 12, ảnh chụp = `PeriodSummary` + ánh xạ tài khoản) — idempotent theo `(period_id, close_run_id)` | — | **chưa làm** |
-| B-03 | Σ Nợ = Σ Có > 0; `source_hash` = `result_set_sha256` của kỳ; cùng đầu vào → cùng dòng | — | **chưa làm** |
-| B-04 | `chief_accountant` duyệt ≠ người dựng (R-56 app/ + CHECK DB) | — | **chưa làm** |
-| B-05 | Bảng ánh xạ (nhóm × chiều) → tài khoản có phiên bản, đề xuất ≠ duyệt | — | **chưa làm** |
-| B-06 | `LedgerAdapter` bộ xuất tệp CSV + XML tất định byte-cho-byte, SHA-256, kho đối tượng trong lãnh thổ (RB-7) + bộ giả | — | **chưa làm** |
-| B-07 | Đẩy idempotent (đẩy lại → cùng `ExternalRef`); lỗi tạm thời → thử lại giãn cách; lỗi vĩnh viễn → DLQ + cảnh báo (R-62) | — | **chưa làm** |
-| B-08 | Sự kiện `mkg.acctbridge.journal.pushed` v1 | — | **chưa làm** |
+| B-01 | Chỉ bút toán **tổng hợp** theo kỳ, một chiều, tần suất tháng; không giao dịch chi tiết | `TestAcctbridgeFlow_B01_B08`, `TestBuildBalanced_B03` (chỉ tổng theo tài khoản × nhóm × chiều; không sự kiện nền tảng) | **đạt** |
+| B-02 | `period.closed` → job dựng bút toán (mẫu mục 12, ảnh chụp = `PeriodSummary` + ánh xạ tài khoản) — idempotent theo `(period_id, close_run_id)` | `TestAcctbridgeFlow_B01_B08` (giao lặp + sự kiện khác cùng kỳ → một job), `TestAcctbridgeBuildFailures_B02` (thiếu ánh xạ, băm lệch, kỳ chưa đóng, costing chưa nối → giao lại). `ClosedPeriods` giả | **một phần** (mã: nối `costing.ClosedPeriods` ở `cmd/worker-internal/assembly` khi có module costing — người tích hợp) |
+| B-03 | Σ Nợ = Σ Có > 0; `source_hash` = `result_set_sha256` của kỳ; cùng đầu vào → cùng dòng | `TestBuildBalanced_B03`, `TestBuildDeterministic_B03`, `TestAcctbridgeSourceHashStable_B03` (+ CHECK DB `total_debit = total_credit > 0`) | **đạt** |
+| B-04 | `chief_accountant` duyệt ≠ người dựng (R-56 app/ + CHECK DB) | `TestAcctbridgeSoD_B04` (403 app/ + CHECK sổ và bảng chiếu, MFA bề mặt quản trị) | **đạt** |
+| B-05 | Bảng ánh xạ (nhóm × chiều) → tài khoản có phiên bản, đề xuất ≠ duyệt | `TestAcctbridgeMappingVersions_B05`, `TestValidateRules_B05`, `TestAcctbridgeSoD_B04`, `TestAcctbridgeCorrectionBeforePushOnly` (dựng lại theo phiên bản mới). Mặc định VAS kiểu TT200 **tạm, chờ khách** | **đạt** |
+| B-06 | `LedgerAdapter` bộ xuất tệp CSV + XML tất định byte-cho-byte, SHA-256, kho đối tượng trong lãnh thổ (RB-7) + bộ giả | `TestExportGolden_B06` (golden), `TestFileExportIdempotent_B06`, `TestFakeAndUnconfigured`, `TestAcctbridgeFlow_B01_B08` (tệp tải về = tệp ở kho); hợp đồng: [acctbridge-adapter.md](../dev/acctbridge-adapter.md) | **đạt** |
+| B-07 | Đẩy idempotent (đẩy lại → cùng `ExternalRef`); lỗi tạm thời → thử lại giãn cách; lỗi vĩnh viễn → DLQ + cảnh báo (R-62) | `TestAcctbridgePushIdempotent_B07` (giao dịch hỏng sau khi đích nhận → một `ExternalRef`), `TestAcctbridgeRetryVersusDLQ_R62`, `TestBackoff_R62`; luật `deploy/observability/prometheus/agrigreen-mkg-acctbridge.rules.yml` (promtool chưa chạy cục bộ — không có Docker) | **đạt** |
+| B-08 | Sự kiện `mkg.acctbridge.journal.pushed` v1 | `TestAcctbridgeFlow_B01_B08` (outbox `internal`, payload đúng hợp đồng), `TestG4FrozenInternalContracts` | **đạt** |
 | B-09 | Nhà cung cấp phần mềm kế toán thật: bộ điều hợp + kiểm giấy phép (RB-4) | — | **chưa làm** (chờ khách) |
 
 ## 9. Cổng kiến trúc G4 (RB, R-xx, vùng, hạ tầng)

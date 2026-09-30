@@ -44,7 +44,8 @@ jobs:
       - name: promtool — luật cảnh báo (deploy/observability)
         run: |
           docker run --rm --entrypoint /bin/promtool -v "$PWD/deploy/observability:/obs:ro" prom/prometheus:v3.5.0 \
-            check rules /obs/prometheus/agrigreen-mkg-ingest.rules.yml /obs/prometheus/agrigreen-platform.rules.yml
+            check rules /obs/prometheus/agrigreen-mkg-ingest.rules.yml /obs/prometheus/agrigreen-platform.rules.yml \
+            /obs/prometheus/agrigreen-mkg-acctbridge.rules.yml
 
   test:
     name: Kiểm thử (sổ, RLS qua PgBouncer, idempotency)
