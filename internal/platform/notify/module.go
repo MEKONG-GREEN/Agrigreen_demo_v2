@@ -25,6 +25,7 @@ import (
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
+	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/channel"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/handler"
@@ -137,6 +138,7 @@ func (m *Module) Consumers() []Consumer {
 		{Name: port.ConsumerCropCycle, Events: []string{ccport.EventFarmLogRecorded, ccport.EventFarmLogReviewed, ccport.EventSeasonOpened,
 			ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived}, Handler: ev},
 		{Name: port.ConsumerIntegration, Events: []string{syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale}, Handler: ev},
+		{Name: port.ConsumerMRV, Events: []string{mrvport.EventAlertRaised}, Handler: ev},
 		{Name: port.ConsumerPush, Events: []string{port.EventPushRequested}, Handler: m.svc.HandlePush},
 	}
 }

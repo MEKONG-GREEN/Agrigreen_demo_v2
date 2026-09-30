@@ -703,6 +703,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/mrv/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cảnh báo MRV trong phạm vi — Cảnh báo khẩn, AWD thiếu hạ tầng, hồ sơ quá hạn (G3)
+         * @description KN US-MRV-04 (pest_urgent: nhãn Cảnh báo khẩn tự bật khi vượt ngưỡng), KN FR-08 (awd_no_infrastructure: nhật ký App HTX ghi AWD nhưng vùng chưa đủ hạ tầng), KN US-MRV-06 (review_overdue: level 1 đã báo người duyệt, level 2 đã leo thang lên quản trị TTKN tỉnh). Mỗi cảnh báo phát pf.mrv.alert.raised → pf/notify. Vai đọc minh chứng (mrv_collector, mrv_reviewer, mrv_viewer, mrv_exporter); lọc theo phạm vi xã của người gọi.
+         */
+        get: operations["listMrvAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/mrv/seasons/{id}/estimate/recompute": {
         parameters: {
             query?: never;
@@ -4211,6 +4231,8 @@ export interface components {
              * @enum {string}
              */
             review_status?: "pending" | "accepted" | "rejected";
+            /** @description Chỉ có trong danh sách: bản hiện hành mang nhãn Cảnh báo khẩn (KN US-MRV-04) */
+            urgent?: boolean;
         };
         MrvReview: {
             /** Format: uuid */
@@ -4239,6 +4261,50 @@ export interface components {
             review_status: "pending" | "accepted" | "rejected";
             chain: components["schemas"]["MrvEvidence"][];
             reviews: components["schemas"]["MrvReview"][];
+            /** @description Phiên bản đang xem mang nhãn Cảnh báo khẩn — tự bật khi vượt ngưỡng (KN US-MRV-04) */
+            urgent?: boolean;
+            /** @description Mọi cảnh báo của chuỗi minh chứng, cũ → mới */
+            alerts?: components["schemas"]["MrvAlert"][];
+        };
+        /** @description Một cảnh báo MRV (sổ pf_mrv.alert, chỉ ghi thêm). pest_urgent (mrv.pest_urgent.v1): loại sâu bệnh/thiên tai thuộc mrv.urgent.categories VÀ (cấp ≥ mrv.urgent.min_severity HOẶC diện tích ≥ mrv.urgent.min_area_ha); awd_no_infrastructure (mrv.awd_infra.v1): nhật ký App HTX có mã hoạt động thuộc mrv.awd.activity_codes mà thửa/xã chưa có minh chứng irrigation_infrastructure đạt (KN FR-08); review_overdue (mrv.review_overdue.v1): hồ sơ chờ duyệt quá mrv.review_sla_hours (level 1, người duyệt) / mrv.review_escalate_hours (level 2, quản trị TTKN tỉnh) (KN US-MRV-06). Mọi ngưỡng là tham số có phiên bản — TẠM, chờ khách; params ghi phiên bản đã dùng. */
+        MrvAlert: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "pest_urgent" | "awd_no_infrastructure" | "review_overdue";
+            level: number;
+            /** @enum {string} */
+            severity: "urgent" | "normal";
+            /** @description Nhãn hiển thị, vd Cảnh báo khẩn */
+            label: string;
+            admin_unit_code: string;
+            /** @enum {string} */
+            subject_type: "evidence" | "farm_log";
+            /**
+             * Format: uuid
+             * @description Phiên bản minh chứng hoặc log_id của nhật ký HTX
+             */
+            subject_id: string;
+            /**
+             * Format: uuid
+             * @description Gốc chuỗi minh chứng hoặc log_ref
+             */
+            subject_root_id: string;
+            /** Format: uuid */
+            plot_ref: string | null;
+            /** Format: uuid */
+            season_ref: string | null;
+            /** @description Đầu vào đã đánh giá (không có dữ liệu cá nhân) */
+            detail: {
+                [key: string]: unknown;
+            };
+            params: components["schemas"]["MrvParamUse"][];
+            rule_version: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            seq: number;
         };
         MrvExportFilters: {
             evidence_type?: string;
@@ -7921,6 +7987,36 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["MrvEstimate"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listMrvAlerts: {
+        parameters: {
+            query?: {
+                kind?: "pest_urgent" | "awd_no_infrastructure" | "review_overdue";
+                admin_unit_code?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trang kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MrvAlert"][];
                         next_cursor: string | null;
                     };
                 };

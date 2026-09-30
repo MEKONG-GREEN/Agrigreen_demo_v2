@@ -15,6 +15,7 @@ import (
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
+	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/store"
@@ -40,7 +41,7 @@ var HandledEvents = []string{
 	partyport.EventOrgDeactivated, partyport.EventHouseholdRegistered, partyport.EventHouseholdMembershipChanged,
 	extport.EventTaskCreated, ccport.EventFarmLogRecorded, ccport.EventFarmLogReviewed, ccport.EventSeasonOpened,
 	ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived,
-	syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale,
+	syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale, mrvport.EventAlertRaised,
 }
 
 // HandleEvent là inbox.Handler cho các sự kiện nguồn: dựng thông báo, xếp lần gửi
@@ -184,6 +185,12 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 		}
 		a := domain.Audience{National: true, Roles: []string{mechport.RoleCGHAdmin}}
 		return s.deliver(ctx, tx, env, []domain.Notification{domain.AreaFeedStaleTemplate(p, env.OccurredAt).ForAudience(a)})
+	case mrvport.EventAlertRaised:
+		var p mrvport.AlertRaisedV1
+		if err := decode(env, &p); err != nil {
+			return err
+		}
+		return s.onMRVAlert(ctx, tx, env, p)
 	case syncport.EventDeviceRevoked:
 		var p syncport.DeviceRevokedV1
 		if err := decode(env, &p); err != nil {
@@ -454,4 +461,39 @@ func (s *Service) queueDeliveries(ctx context.Context, tx pgx.Tx, tid, batch uui
 		ID: ids.New(), TenantID: tid, Type: port.EventPushRequested, SchemaVersion: 1, OccurredAt: now,
 		Producer: port.EventProducerName, Payload: port.PushRequestedV1{BatchID: batch, Kind: kind, Deliveries: count},
 	})
+}
+
+// Vai nhận cảnh báo MRV theo chủ đề (G3).
+var (
+	// mrvUpperRoles: "cấp trên" của cán bộ xã — người duyệt MRV (TTKN tỉnh) và quản trị TTKN tỉnh (KN US-MRV-04).
+	mrvUpperRoles = []string{mrvport.RoleReviewer, partyport.RoleKNProvinceAdmin}
+	// mrvReviewerRoles: mức 1 của leo thang hồ sơ quá hạn (KN US-MRV-06).
+	mrvReviewerRoles = []string{mrvport.RoleReviewer}
+	// mrvProvinceRoles: mức 2 — quản trị TTKN tỉnh.
+	mrvProvinceRoles = []string{partyport.RoleKNProvinceAdmin}
+)
+
+// onMRVAlert: pest_urgent → người duyệt + quản trị TTKN tỉnh có phạm vi gồm xã (thông báo khẩn);
+// awd_no_infrastructure → cán bộ khuyến nông XÃ phụ trách (danh bạ trực, không có thì chủ đề
+// kn_officer của xã — KN FR-08 "thông báo KNV phụ trách"); review_overdue mức 1 → người duyệt,
+// mức 2 → quản trị TTKN tỉnh (KN US-MRV-06). Giao lặp: chỉ mục (sự kiện, người nhận) chặn trùng.
+func (s *Service) onMRVAlert(ctx context.Context, tx pgx.Tx, env outbox.Envelope, p mrvport.AlertRaisedV1) error {
+	if p.AdminUnitCode == "" {
+		return nil
+	}
+	tpl := domain.MRVAlertTemplate(p, env.OccurredAt)
+	unit := []string{p.AdminUnitCode}
+	switch p.Kind {
+	case mrvport.AlertPestUrgent:
+		return s.deliver(ctx, tx, env, []domain.Notification{tpl.ForAudience(domain.Audience{Units: unit, Roles: mrvUpperRoles})})
+	case mrvport.AlertAWDNoInfrastructure:
+		return s.onCommuneHousehold(ctx, tx, env, p.AdminUnitCode, tpl)
+	case mrvport.AlertReviewOverdue:
+		roles := mrvReviewerRoles
+		if p.Level >= mrvport.OverdueLevelProvinceAdmin {
+			roles = mrvProvinceRoles
+		}
+		return s.deliver(ctx, tx, env, []domain.Notification{tpl.ForAudience(domain.Audience{Units: unit, Roles: roles})})
+	}
+	return nil
 }

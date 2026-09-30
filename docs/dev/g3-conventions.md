@@ -64,6 +64,9 @@ Chỉ dùng số đã cấp. Số trống có thể còn lại giữa các kho�
 | pf | 000044 | cấp cho đợt triển khai ADR G1 — không dùng | | |
 | mkg | 000010 | G3-2 tích hợp: `mkg_measurement.lot_collection(_current)` (lô cân ↔ lệnh gom), cột `ticket_ref`/`supersedes_ticket_ref` của `mkg_fieldops.weighed_loading_current`, sổ `mkg_fieldops.roll_count_location` (GPS app hiện trường) | `mkg_measurement`, `mkg_fieldops` | `measurement_app` (+ `ingest_mkg` SELECT bảng chiếu), `fieldops_app` |
 | mkg | 000011–000012 | **dự phòng** G3 — xin người tích hợp | | |
+| mkg | 000013 | giám sát vận hành: schema `mkg_monitor`, hàm gộp SECURITY DEFINER cho sql_exporter (mục 19) | `mkg_monitor` | `mkg_monitor` (EXECUTE), chủ hàm `mkg_monitor_owner` |
+| ts | 000003 | giám sát vận hành: schema `ts_monitor`, hàm gộp SECURITY DEFINER (ts 000002 vẫn để dành `ts_env`) | `ts_monitor` | `ts_monitor` (EXECUTE), chủ hàm `ts_monitor_owner` |
+| pf | 000045 | mrv cảnh báo: sổ `pf_mrv.alert` (KN US-MRV-04, US-MRV-06, FR-08), loại thông báo `mrv_*` của `pf_notify` | `pf_mrv`, `pf_notify` | `mrv_app` (+ `ag_outbox_publisher` hai cột `evidence_current`) |
 
 - `pf` 000030–000035 và `mkg` 000004–000005 để dành cho phần còn lại của G2; G3 không dùng.
 - Module G4 (`logistics`, `orders`, `costing`, `acctbridge`) sẽ được cấp số từ 000013 cụm mkg ([mkg.md §5.8](../design/mkg.md#58-bảng-tổng-hợp-cụm--vai--migration)).
@@ -81,6 +84,9 @@ Vai DB đã khai trong `internal/shared/dbadmin/dbadmin.go` và trong userlist P
 | `ingest_mkg` | mkg | `cmd/ingest` | đọc sổ thiết bị đã duyệt, ghi phiếu cân + outbox (mkg 000007–000008 cấp) |
 | `worker_internal` | mkg | `cmd/worker-internal` | `shared.inbox` qua `ag_shared_user`; consumer ghi nghiệp vụ bằng vai module |
 | `metrics_app` | pf | `pf/metrics` | schema `pf_metrics` (pf 000036–000037 cấp) |
+| `mkg_monitor` | mkg | sql_exporter (mục 19) | NOBYPASSRLS; chỉ `EXECUTE` hàm `mkg_monitor.*` (số đếm/tuổi gộp xuyên tenant); **không** SELECT bảng gốc |
+| `ts_monitor` | ts | sql_exporter (mục 19) | như trên với `ts_monitor.*` |
+| `mkg_monitor_owner`, `ts_monitor_owner` | mkg, ts | chủ hàm SECURITY DEFINER | NOLOGIN, BYPASSRLS, chỉ SELECT theo cột vận hành; `ag_migrator` là thành viên để chuyển chủ hàm |
 
 Vai nghiệp vụ đã có hằng trong `port/` và có trong realm Keycloak:
 - `mkg/measurement`: `scale_supervisor`, `device_approver`, `reconciliation_officer`, `dispute_officer`, `tolerance_approver`;

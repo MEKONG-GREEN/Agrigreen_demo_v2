@@ -26,6 +26,7 @@ func (h Handler) registerG3App(rg *gin.RouterGroup) {
 	rg.POST("/mrv/comparisons", h.recordComparison)
 	rg.GET("/mrv/estimates", h.estimates)
 	rg.POST("/mrv/seasons/:id/estimate/recompute", h.recompute)
+	rg.GET("/mrv/alerts", h.alerts)
 }
 
 // registerG3Admin gắn route Admin API G3 (phương pháp có phê duyệt).
@@ -440,4 +441,23 @@ func (h Handler) decideMethod(c *gin.Context, approve bool) {
 		return
 	}
 	c.JSON(http.StatusOK, toMethodDTO(m))
+}
+
+// alerts: GET /v1/mrv/alerts — cảnh báo MRV trong phạm vi (KN US-MRV-04, US-MRV-06, FR-08).
+func (h Handler) alerts(c *gin.Context) {
+	after, limit, ok := cursor(c)
+	if !ok {
+		return
+	}
+	pg, err := h.Svc.Alerts(c.Request.Context(), app.AlertFilter{Kind: c.Query("kind"), AdminUnitCode: c.Query("admin_unit_code"),
+		After: after, Limit: limit})
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	items := make([]alertDTO, 0, len(pg.Items))
+	for _, a := range pg.Items {
+		items = append(items, toAlertDTO(a))
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": nextCursor(pg.Next)})
 }

@@ -57,6 +57,41 @@
     ]
   },
   {
+    "evidence_type": "pest_disaster",
+    "provisional": true,
+    "source_note": "Danh mục mẫu G3 — TẠM, chờ chốt C-1. Theo KN US-MRV-04: ghi nhận sâu bệnh/thiên tai (loại, cấp gây hại 1–5, diện tích ảnh hưởng); vượt ngưỡng (tham số mrv.urgent.*) → tự gắn nhãn Cảnh báo khẩn.",
+    "fields": [
+      {"key": "plot_ref", "label_vi": "Thửa ruộng (bỏ trống nếu cả vùng)", "data_type": "text", "required": false},
+      {"key": "season", "label_vi": "Vụ", "data_type": "text", "required": false},
+      {"key": "hazard_kind", "label_vi": "Nhóm", "data_type": "enum", "required": true, "enum_values": ["sau_benh", "thien_tai"]},
+      {"key": "category", "label_vi": "Loại dịch hại / thiên tai", "data_type": "enum", "required": true,
+       "enum_values": ["ray_nau", "dao_on", "dao_on_co_bong", "sau_cuon_la", "vang_lun_xoan_la", "oc_buou_vang", "chuot",
+                       "lu_lut", "han_han", "xam_nhap_man", "bao_loc", "mua_da", "khac"]},
+      {"key": "severity_level", "label_vi": "Mức độ gây hại", "data_type": "integer", "unit": "cấp", "required": true, "min": "1", "max": "5",
+       "help_vi": "Cấp 1 (nhẹ) – 5 (rất nặng)"},
+      {"key": "affected_area_ha", "label_vi": "Diện tích ảnh hưởng", "data_type": "decimal", "unit": "ha", "required": true,
+       "min": "0", "max": "100000", "max_scale": 2},
+      {"key": "photo", "label_vi": "Ảnh hiện trường", "data_type": "photo", "required": true, "min": "1", "max": "10"},
+      {"key": "gps", "label_vi": "Toạ độ lúc chụp", "data_type": "geo_point", "required": true},
+      {"key": "note", "label_vi": "Ghi chú", "data_type": "text", "required": false, "max": "1000"}
+    ]
+  },
+  {
+    "evidence_type": "irrigation_infrastructure",
+    "provisional": true,
+    "source_note": "Danh mục mẫu G3 — TẠM, chờ chốt C-1. Theo KN FR-08: cán bộ xã xác nhận hạ tầng tưới tiêu chủ động đủ cho AWD (ống quan trắc, bờ bao, cống/kênh điều tiết) của một thửa, hoặc cả xã khi không gắn thửa. Nhật ký App HTX ghi AWD mà chưa có xác nhận đạt → cờ bất thường.",
+    "fields": [
+      {"key": "plot_ref", "label_vi": "Thửa ruộng (bỏ trống = cả xã)", "data_type": "text", "required": false},
+      {"key": "infra_ready", "label_vi": "Hạ tầng đủ cho AWD", "data_type": "boolean", "required": true},
+      {"key": "monitoring_tube", "label_vi": "Có ống quan trắc mực nước", "data_type": "boolean", "required": true},
+      {"key": "bund_ok", "label_vi": "Bờ bao giữ nước", "data_type": "boolean", "required": true},
+      {"key": "water_control", "label_vi": "Cống/kênh điều tiết chủ động", "data_type": "boolean", "required": true},
+      {"key": "photo", "label_vi": "Ảnh hiện trường", "data_type": "photo", "required": true, "min": "1", "max": "10"},
+      {"key": "gps", "label_vi": "Toạ độ lúc kiểm tra", "data_type": "geo_point", "required": true},
+      {"key": "note", "label_vi": "Ghi chú", "data_type": "text", "required": false, "max": "1000"}
+    ]
+  },
+  {
     "evidence_type": "htx_farm_log",
     "provisional": true,
     "source_note": "Danh mục mẫu G3 — TẠM, chờ chốt C-1. Nhật ký canh tác App HTX liên kết làm tham chiếu bằng chứng (KN FR-06, US-MRV-02); nội dung nhật ký ở pf/cropcycle, liên kết ghim phiên bản danh mục này.",

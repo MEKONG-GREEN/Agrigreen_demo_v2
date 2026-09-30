@@ -108,7 +108,8 @@ services:
   # Nhận lô mTLS từ agent biên (ADR-0019): CHỈ từ vùng OT/VPN. Caddy KHÔNG định tuyến tới
   # ingest; 8443 bind vào AG_INGEST_BIND_ADDR (đặt trong .env = địa chỉ giao diện WireGuard/VPN
   # của VPS, vd 10.88.0.1; mặc định 127.0.0.1) và tường lửa chỉ mở 8443 cho dải VPN của hub.
-  # Chứng thư thiết bị do CA nội bộ ký CSR của `edge-agent enroll` (docs/runbooks/ingest.md).
+  # Chứng thư thiết bị do CA THIẾT BỊ riêng ký CSR của `edge-agent enroll`; AG_INGEST_CLIENT_CA chỉ chứa CA
+  # thiết bị (ingest từ chối khởi động nếu CA này ký chứng thư máy chủ — docs/runbooks/device-pki.md).
   ingest:
     environment:
       <<: *vps-env

@@ -8,16 +8,24 @@
 package mrv
 
 import (
+	"context"
+	"log/slog"
+	"time"
+
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/handler"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -69,3 +77,37 @@ func (m *Module) FarmLogLinkHandler() inbox.Handler { return m.svc.HandleFarmLog
 // CollectionEvidenceHandler là inbox.Handler của consumer port.CollectionEvidenceConsumer
 // (G3): van mrv_collection_evidence, kiểm hợp đồng lúc chạy.
 func (m *Module) CollectionEvidenceHandler() inbox.Handler { return m.svc.HandleCollectionEvidence }
+
+// PendingTenants dựng bộ tìm tenant có hồ sơ chờ duyệt cho job leo thang (pool vai
+// ag_outbox_publisher, chỉ đọc hai cột evidence_current — pf 000045).
+func PendingTenants(pool *pgxpool.Pool) app.TenantLister { return app.PendingTenants(pool) }
+
+// EscalateOverdue leo thang hồ sơ quá hạn của một tenant tại now (KN US-MRV-06) — thân job;
+// kiểm thử gọi trực tiếp với thời điểm giả.
+func (m *Module) EscalateOverdue(ctx context.Context, tid uuid.UUID, now time.Time) (int, error) {
+	return m.svc.EscalateOverdue(ctx, tid, now)
+}
+
+// RunEscalation chạy leo thang cho mọi tenant của tenants tại giờ đồng hồ module.
+func (m *Module) RunEscalation(ctx context.Context, tenants app.TenantLister) (int, error) {
+	return m.svc.RunEscalation(ctx, tenants)
+}
+
+// Jobs trả job port.JobReviewEscalator (mỗi 15 phút, chạy ở leader): leo thang hồ sơ MRV chờ
+// duyệt quá hạn — mức 1 người duyệt, mức 2 quản trị TTKN tỉnh. Idempotent theo (phiên bản, mức).
+func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job {
+	return []schedule.Job{{
+		Name: port.JobReviewEscalator, Spec: schedule.Every{Interval: 15 * time.Minute}, RunOnStart: true, Timeout: 10 * time.Minute,
+		Run: func(ctx context.Context) error {
+			n, err := m.svc.RunEscalation(ctx, tenants)
+			if log != nil {
+				outcome := "ok"
+				if err != nil {
+					outcome = "error"
+				}
+				log.Info("leo thang hồ sơ MRV quá hạn", "event", "job."+port.JobReviewEscalator, "raised", n, "outcome", outcome)
+			}
+			return err
+		},
+	}}
+}

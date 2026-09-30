@@ -9,7 +9,9 @@
 //	AG_HTTP_ADDR                   bề mặt vận hành HTTP thuần (/healthz, /readyz), mặc định :8091 — chỉ trong cụm
 //	AG_INGEST_HTTP_ADDR            listener nhận lô mTLS, mặc định :8443
 //	AG_INGEST_TLS_CERT, AG_INGEST_TLS_KEY   chứng thư máy chủ
-//	AG_INGEST_CLIENT_CA            CA cấp chứng thư client của thiết bị (bắt buộc)
+//	AG_INGEST_CLIENT_CA            CA THIẾT BỊ cấp chứng thư client (bắt buộc; tách khỏi CA dịch vụ nội bộ)
+//	AG_INGEST_REQUIRE_DEVICE_CA    1 = từ chối khởi động nếu AG_INGEST_CLIENT_CA đã ký chứng thư máy chủ
+//	                               (luôn bật khi AG_ENV=production; docs/runbooks/device-pki.md)
 //	AG_TS_DB_URL                   URL gốc tới cụm ts (host, cổng, sslmode) — vai ingest_ts, ts_reader
 //	AG_MKG_DB_URL                  URL gốc tới cụm mkg — vai ingest_mkg
 //	AG_DB_PASSWORD_<VAI> hoặc AG_DB_APP_PASSWORD; AG_DB_VIA_PGBOUNCER=1 qua PgBouncer
@@ -147,6 +149,12 @@ func run(log *slog.Logger) error {
 	tlsCfg, err := measurement.IngestServerTLS(os.Getenv("AG_INGEST_TLS_CERT"), os.Getenv("AG_INGEST_TLS_KEY"), os.Getenv("AG_INGEST_CLIENT_CA"))
 	if err != nil {
 		return err
+	}
+	// Chỉ CA thiết bị xác thực client của bề mặt nhận lô (production: CA thiết bị riêng trong lãnh thổ).
+	if residency.Production(os.Getenv) || os.Getenv("AG_INGEST_REQUIRE_DEVICE_CA") == "1" {
+		if err := measurement.IngestRequireDeviceCA(os.Getenv("AG_INGEST_TLS_CERT"), os.Getenv("AG_INGEST_CLIENT_CA")); err != nil {
+			return err
+		}
 	}
 	shutdownOTel, err := telemetry.Setup(ctx, "ingest")
 	if err != nil {

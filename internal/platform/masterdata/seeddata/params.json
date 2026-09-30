@@ -59,6 +59,12 @@
     {"key": "mrv.co2.transport_road_kg_per_tkm", "value": "0.062", "unit": "kgCO2e/t·km", "effective_from": "2026-01-01", "source_doc": "TẠM — chờ khách ký phương pháp (C-1). Nguyên mẫu mekong-green: vận chuyển đường bộ"},
     {"key": "mrv.co2.transport_waterway_kg_per_tkm", "value": "0.021", "unit": "kgCO2e/t·km", "effective_from": "2026-01-01", "source_doc": "TẠM — chờ khách ký phương pháp (C-1). Nguyên mẫu mekong-green: vận chuyển đường thủy"},
     {"key": "mrv.anomaly_no_record_days", "value": "14", "unit": "ngày", "effective_from": "2026-01-01", "source_doc": "BRD App Khuyến nông FR-08 — không có bản ghi mới 2 tuần"},
-    {"key": "mrv.compare_window_days", "value": "3", "unit": "ngày", "effective_from": "2026-01-01", "source_doc": "KN US-MRV-02 — cửa sổ ghép nhật ký HTX ↔ minh chứng cán bộ (mặc định G3, chờ MKG xác nhận)"}
+    {"key": "mrv.compare_window_days", "value": "3", "unit": "ngày", "effective_from": "2026-01-01", "source_doc": "KN US-MRV-02 — cửa sổ ghép nhật ký HTX ↔ minh chứng cán bộ (mặc định G3, chờ MKG xác nhận)"},
+    {"key": "mrv.urgent.categories", "text": "ray_nau,dao_on,dao_on_co_bong,sau_cuon_la,vang_lun_xoan_la,lu_lut,han_han,xam_nhap_man,bao_loc", "unit": "", "effective_from": "2026-01-01", "source_doc": "KN US-MRV-04 — loại sâu bệnh/thiên tai bật Cảnh báo khẩn (TẠM, chờ khách)"},
+    {"key": "mrv.urgent.min_severity", "value": "4", "unit": "cấp", "effective_from": "2026-01-01", "source_doc": "KN US-MRV-04 — cấp gây hại từ đó bật Cảnh báo khẩn (TẠM, chờ khách)"},
+    {"key": "mrv.urgent.min_area_ha", "value": "5", "unit": "ha", "effective_from": "2026-01-01", "source_doc": "KN US-MRV-04 — diện tích ảnh hưởng từ đó bật Cảnh báo khẩn (TẠM, chờ khách)"},
+    {"key": "mrv.awd.activity_codes", "text": "tuoi_nuoc", "unit": "", "effective_from": "2026-01-01", "source_doc": "KN FR-08 — mã hoạt động nhật ký HTX coi là ghi AWD (TẠM, chờ danh mục htx_farm_log chốt C-1)"},
+    {"key": "mrv.review_sla_hours", "value": "72", "unit": "giờ", "effective_from": "2026-01-01", "source_doc": "KN US-MRV-06 — thời hạn xử lý hồ sơ MRV chờ duyệt; quá hạn báo người duyệt (TẠM, BRD chưa có số)"},
+    {"key": "mrv.review_escalate_hours", "value": "120", "unit": "giờ", "effective_from": "2026-01-01", "source_doc": "KN US-MRV-06 — quá hạn này leo thang lên quản trị TTKN tỉnh (TẠM, BRD chưa có số)"}
   ]
 }

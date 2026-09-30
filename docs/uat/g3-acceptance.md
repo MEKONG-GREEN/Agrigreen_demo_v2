@@ -1,6 +1,6 @@
 # Nghiệm thu cổng G3: yêu cầu → kiểm thử
 
-Lập ngày 30/09/2026 trên `main` tại `371175c` (sau mọi nhánh G3-2), thêm kịch bản đầu–cuối `TestG3FieldToCustomer` (`tests/e2e/g3_scenario_test.go`). Mỗi yêu cầu có đúng một dòng. Tên kiểm thử trong bảng đều đã tra trong mã. Khi lập bảng, kiểm thử Go được chạy lại trên máy dev (PostgreSQL 17 + PostGIS + pgRouting, cụm `pf`, `mkg`, `ts`): `go test -count=1 -p 2 ./...`, **tất cả đạt**. Kiểm thử Flutter (App HTX, App hiện trường MKG), Vitest và Playwright (web-ops, web-internal) **không chạy lại trong lần rà này**; chúng được liệt kê theo tên tệp và tên ca trong mã nguồn.
+Lập ngày 30/09/2026 trên `main` tại `371175c` (sau mọi nhánh G3-2), thêm kịch bản đầu–cuối `TestG3FieldToCustomer` (`tests/e2e/g3_scenario_test.go`). Cập nhật cùng ngày sau đợt đóng khoảng trống G3: KN US-MRV-04, US-MRV-06, FR-08 (AWD/hạ tầng), vai giám sát `mkg_monitor`/`ts_monitor` (19-3), CA thiết bị riêng (mã + dev + runbook). Mỗi yêu cầu có đúng một dòng. Tên kiểm thử trong bảng đều đã tra trong mã. Khi lập bảng, kiểm thử Go được chạy lại trên máy dev (PostgreSQL 17 + PostGIS + pgRouting, cụm `pf`, `mkg`, `ts`): `go test -count=1 -p 2 ./...`, **tất cả đạt**. Kiểm thử Flutter (App HTX, App hiện trường MKG), Vitest và Playwright (web-ops, web-internal) **không chạy lại trong lần rà này**; chúng được liệt kê theo tên tệp và tên ca trong mã nguồn.
 
 Yêu cầu lấy từ:
 - [docs/roadmap.md](../roadmap.md), mục G3 (G3-0, G3-1, G3-2), và [g3-conventions.md](../dev/g3-conventions.md);
@@ -24,12 +24,12 @@ Ba trạng thái:
 | 4. Chuyển từ G2 và GIS FN-18..21 | 7 | 5 | 2 | 0 |
 | 5. Mục 13 — đo lường, ba điểm cân | 9 | 8 | 1 | 0 |
 | 6. Mục 14 — agent biên | 6 | 6 | 0 | 0 |
-| 7. Cổng kiến trúc G3 (mục 16, 17, 19; RB; ADR) | 22 | 18 | 4 | 0 |
-| 8. MRV (KN US-MRV-01..06, FR-07, FR-08) | 8 | 5 | 3 | 0 |
+| 7. Cổng kiến trúc G3 (mục 16, 17, 19; RB; ADR) | 22 | 19 | 3 | 0 |
+| 8. MRV (KN US-MRV-01..06, FR-07, FR-08) | 8 | 8 | 0 | 0 |
 | 9. Quy tắc prototype (FM-01..10, cân nhà máy) | 12 | 5 | 5 | 2 |
 | 10. Lộ trình G3-2 (client, liên thông) | 8 | 7 | 1 | 0 |
 | 11. Câu hỏi khách và hạ tầng còn lại | 3 | 0 | 3 | 0 |
-| **Tổng** | **78** | **56** | **20** | **2** |
+| **Tổng** | **78** | **60** | **16** | **2** |
 
 **Ghi chú môi trường (không tính theo dòng):** CI trên GitHub **chưa được xác nhận** cho các commit G3, vì GitHub Actions vẫn bị chặn do lỗi thanh toán. Các hạng mục chỉ kiểm được trên runner **chưa được xác minh**:
 - `compose-smoke` bản G3: dịch vụ `ingest` + agent mô phỏng `edge-sim`, `scripts/dev-edge-bootstrap.sh` (đề xuất + duyệt thiết bị hai người qua Admin API), lô tới `ts_weigh.reading_batch`, consumer trên vhost `mkg.internal`, tài khoản nền tảng **không** có quyền trên `mkg.internal`;
@@ -39,7 +39,7 @@ Ba trạng thái:
 
 Trạng thái trong bảng dựa trên lần chạy kiểm thử ở máy dev.
 
-**20 dòng "một phần"**: phần còn thiếu và loại của từng dòng.
+**16 dòng "một phần"**: phần còn thiếu và loại của từng dòng.
 
 | Yêu cầu | Còn thiếu | Loại |
 |---|---|---|
@@ -50,10 +50,6 @@ Trạng thái trong bảng dựa trên lần chạy kiểm thử ở máy dev.
 | Mục 16 — ước tính tCO2e chính thức | Ước tính luôn **TẠM**; chỉ chính thức khi phương pháp được duyệt bởi người khác và ghim tham số đã duyệt. **Phạm vi, phương pháp tCO2e (baseline, leakage, chất khô) và danh mục trường MRV chính thức (C-1) chờ khách**; hệ số 1460 kgCO2e/t, 0,062 / 0,021 kgCO2e/t·km là tạm | chờ khách |
 | RB-2 Cấp quyền chia sẻ nền tảng → MKG | Tài khoản dịch vụ tenant MKG gọi Application API công khai (client credentials) để đọc HTX/thửa và luồng phản hồi HTX. **Chưa có cấp quyền chia sẻ tenant chương trình → tenant MKG (Q-MKG-12)**: kịch bản E2E dùng một tenant cho cả hai vùng | chờ khách |
 | Mục 19 — luật cảnh báo Prometheus | `deploy/observability/prometheus/agrigreen-mkg-ingest.rules.yml` (đệm agent, ingest từ chối/khoảng trống/lệch đồng hồ/kẹt tích phân, DLQ `mkg.internal`). **`promtool check rules` chỉ chạy ở CI**, chưa xác minh; chưa nối Alertmanager | hạ tầng |
-| Mục 19 — cảnh báo nghiệp vụ theo SQL | Collector `deploy/observability/sql-exporter/mkg-measurement.collector.yml` (tỷ lệ phiếu vượt dung sai, tranh chấp mở lâu) là đặc tả: **cần vai giám sát chỉ đọc xuyên tenant `mkg_monitor`/`ts_monitor`** (hoặc view SECURITY DEFINER) — chưa cấp | hạ tầng |
-| KN US-MRV-04 Ghi nhận sâu bệnh/thiên tai | Báo cáo sâu bệnh có ở `pf/extension` (G1, FR-02). **Chưa làm** nhãn "Cảnh báo khẩn" tự bật khi vượt ngưỡng; ngưỡng nguy hiểm chưa có | mã + chờ khách |
-| KN US-MRV-06 Leo thang hồ sơ quá hạn | **Chưa làm** job leo thang hồ sơ MRV chờ duyệt quá hạn (leo thang SLA hiện chỉ có cho nhiệm vụ `pf/extension`); thời hạn xử lý theo BRD chưa có số | mã + chờ khách |
-| KN FR-08 Cảnh báo bất thường nhật ký HTX | Cờ "không có bản ghi mới N ngày khi vụ đang mở" đã đạt. **Chưa làm** cờ "ghi AWD nhưng vùng chưa đủ hạ tầng" (chưa có dữ liệu hạ tầng thủy lợi) và thông báo tự động tới KNV phụ trách | mã + chờ khách |
 | proto FM-01 Không cuộn trước ngày gặt | **Chưa làm**: fieldops chưa đọc ngày thu hoạch của thửa (cần đọc `pf/cropcycle` qua Application API công khai, cùng câu hỏi RB-2) | mã |
 | proto FM-02 Cuộn xong trong N ngày sau gặt | **Chưa làm** cờ rơm nằm ruộng quá hạn; N (prototype `MAX_DAYS_AFTER_HARVEST`) là tham số chưa có | mã + chờ khách |
 | proto FM-06 Phân công không vượt năng lực tổ | Giao tổ gom cho lệnh gom bằng tay (`POST /v1/fieldops/orders/{id}/assign`) đã có. **Chưa làm** năng lực cuộn/ngày của tổ và cảnh báo vượt | mã |
@@ -62,7 +58,7 @@ Trạng thái trong bảng dựa trên lần chạy kiểm thử ở máy dev.
 | B7 Compose và CI cho ingest + edge-sim | Dịch vụ, bootstrap và job đã có trong Compose/workflow. **Chưa chạy trên runner** (GitHub Actions bị chặn) | hạ tầng |
 | C-5 Đường nhận số cân của khách | G3 nhận bằng **nhập tay kèm bằng chứng** (`POST /v1/measurement/lots/{id}/tickets`, điểm `CUSTOMER_IN`) và **nhập lô** (`POST /v1/measurement/customer-weight-imports`, kênh `api`). **Tích hợp hệ cân của khách chờ C-5** | chờ khách |
 | Định mức hao hụt sấy (HUB_IN → HUB_OUT) | Định mức là tham số có phiên bản, tách hao hụt dự kiến và bất thường; **số định mức thật chưa có** (đang là mặc định tạm) | chờ khách |
-| CA thiết bị riêng | Dev dùng chung CA nội bộ với Internal API (`scripts/gen-dev-certs`); production cần **CA thiết bị riêng** + quy trình ký CSR và thu hồi ([ingest.md](../runbooks/ingest.md)) — chưa dựng | hạ tầng |
+| CA thiết bị riêng | Mã và dev đã tách CA: `scripts/gen-dev-certs` ký chứng thư thiết bị bằng `device-ca` riêng; ingest chỉ tin CA này (`AG_INGEST_CLIENT_CA`) và từ chối khởi động nếu CA client đã ký chứng thư máy chủ (`AG_ENV=production`, Compose `AG_INGEST_REQUIRE_DEVICE_CA=1`); quy trình production ở [device-pki.md](../runbooks/device-pki.md). **Còn lại:** dựng CA gốc ngoại tuyến + CA trung gian HSM trong lãnh thổ theo runbook | hạ tầng |
 
 **2 dòng "ngoài G3"**:
 - **proto FM-05** (mỗi lượt xuống ghe sinh một chuyến vận tải đường thủy): `mkg/logistics`, G4;
@@ -180,7 +176,7 @@ R-03 (mkg ↔ pf không import nhau) do `archlint` (`TestBoundary`) và `TestNoP
 | 17-4 | RB-2 cấp quyền chia sẻ tenant chương trình → tenant MKG | `TestMKGSyncResponseFeed_RB6_RB2`, `TestPlatformHTTPClientCredentials`, `TestPlatformHTTPHTXResponses_RB6` | **một phần**: chờ khách (Q-MKG-12) |
 | 19-1 | Chỉ số vận hành agent/ingest (độ đầy đệm, lô từ chối, khoảng trống bộ đếm, lệch đồng hồ, phiên kẹt) | `TestHealthzAndMetrics`, `TestIngestClockSkewFlagged`, `TestIngestIntegrationLoopEndToEnd` (báo động một lần sau ngưỡng), `TestIngestConflictRegressionAndGap`, `TestHealthcheckExitCode`, `TestOpsRouterNotConfigured` | **đạt** |
 | 19-2 | Luật cảnh báo Prometheus | `deploy/observability/prometheus/agrigreen-mkg-ingest.rules.yml` (17 luật) | **một phần**: `promtool` chỉ ở CI |
-| 19-3 | Cảnh báo nghiệp vụ theo SQL (vượt dung sai, tranh chấp mở lâu) | `deploy/observability/sql-exporter/mkg-measurement.collector.yml` | **một phần**: thiếu vai `mkg_monitor` |
+| 19-3 | Cảnh báo nghiệp vụ theo SQL (vượt dung sai, tranh chấp mở lâu) | `TestMonitorRolesCannotReadBaseTables`, `TestMonitorFunctionsAggregateAcrossTenants`; collector `deploy/observability/sql-exporter/mkg-measurement.collector.yml` (vai `mkg_monitor`) + `ts-weigh.collector.yml` (vai `ts_monitor`) | **đạt**. Hai vai (mkg 000013, ts 000003) chỉ EXECUTE hàm gộp SECURITY DEFINER, không SELECT được bảng gốc; hàm đếm xuyên tenant, không trả tenant/khối lượng. sql_exporter chưa có trong Compose; luật Prometheus: dòng 19-2 |
 | RB-1 | Chỉ ghi thêm, sửa bằng bản ghi bù (cả cụm ts) | E2E-G3-14 (17 sổ), `TestTSWeighAppendOnly`, `TestRollCountCorrectionByCompensation`, `TestWeighTicketConsumerIdempotentCompensating`, `TestIngestTicketIdempotencyCorrectionAndGrants`, `TestKNDash02RecordIdempotentAndRecomputeSupersedes`, `TestHTXRespondStatement_RB6_BuySide` (đổi ý = bản thay có lý do) | **đạt** |
 | RB-2 | Cách ly tenant (song song, xen kẽ kết nối) | `TestFieldopsTenantLeakParallel`, `TestMeasurementTenantLeakParallel`, `TestHubTenantLeakParallel`, `TestTSWeighTenantLeakParallel`, `TestMetricsTenantLeakParallel`, `TestMRVTenantLeakParallel`, `TestIngestTenantIsolationTS`, `TestTSWeighTenantIsolation`, `TestG3TenantIsolationAndScope`, E2E-G3-15 | **đạt**. Chưa qua PgBouncer thật (ghi chú môi trường) |
 | RB-3 | PII chỉ ở vault; không PII qua van, outbox, log | `TestHTXRespondStatement_RB6_BuySide` (lý do chứa SĐT bị chặn), `TestCollectionValveDefaultDeny_RB6`, `TestMKGSyncResponseFeed_RB6_RB2` (luồng không mang người phản hồi), E2E-G3-15 | **đạt** |
@@ -199,11 +195,11 @@ RB-4 (giấy phép) không đổi so với G2: ADR-0016 vẫn chưa ký (không 
 | KN US-MRV-01 ghi nhật ký AWD (ảnh + toạ độ, trong địa bàn) | `TestEvidenceValidationAndScope`, `TestConsentRequired`, `TestCorrectionChain` (G1) | **đạt** (G1) |
 | KN US-MRV-02 đối chiếu nhật ký HTX ↔ KN (Khớp/Khác biệt + ghi chú) | `TestG3FarmLogLinkIdempotentPinnedKNUSMRV02`, `TestG3ComparisonRecordKNUSMRV02`, `TestSuggestMatchKNUSMRV02`; Vitest `mrv.test.ts`; WEB-E2E `mrv.spec.ts` | **đạt** |
 | KN US-MRV-03 kiểm tra thực địa theo danh mục chuẩn | `TestCatalogSoDAndVersionPinning`, `TestCatalogDefinitionValidation` (G1, loại `field_checklist`) | **đạt** (G1). Danh mục tạm, chờ C-1 |
-| KN US-MRV-04 ghi nhận sâu bệnh/thiên tai, tự gắn "Cảnh báo khẩn" | — | **một phần**: chưa làm nhãn tự động; ngưỡng chờ khách |
+| KN US-MRV-04 ghi nhận sâu bệnh/thiên tai, tự gắn "Cảnh báo khẩn" | `TestPestUrgentLabelKNUSMRV04`, `TestPestUrgentRuleKNUSMRV04`, `TestMRVAlertNotificationsKNUSMRV04_06_FR08` | **đạt**. Loại minh chứng `pest_disaster` (loại, cấp 1–5, diện tích). Quy tắc `mrv.pest_urgent.v1`: loại thuộc `mrv.urgent.categories` VÀ (cấp ≥ `mrv.urgent.min_severity` hoặc diện tích ≥ `mrv.urgent.min_area_ha`) → nhãn tự bật trên đúng phiên bản (sổ `pf_mrv.alert`), thông báo khẩn tới người duyệt + quản trị TTKN tỉnh. Ngưỡng là tham số có phiên bản — mặc định 4 / 5 ha / danh sách 9 loại là **tạm, chờ khách** |
 | KN US-MRV-05 duyệt hồ sơ MRV; chỉ hồ sơ đạt chuẩn tính vào giảm phát thải | `TestReviewerIsNotCapturer`, `TestG3OnlyApprovedEvidenceCountsKNUSMRV05`, `TestComputeEstimateOnlyApprovedCountsKNUSMRV05`; Vitest `mrv.test.ts`; WEB-E2E `mrv.spec.ts` | **đạt** |
-| KN US-MRV-06 leo thang hồ sơ quá hạn | — | **một phần**: chưa làm |
+| KN US-MRV-06 leo thang hồ sơ quá hạn | `TestReviewOverdueEscalationKNUSMRV06`, `TestOverdueLevelKNUSMRV06`, `TestMRVAlertNotificationsKNUSMRV04_06_FR08` | **đạt**. Job `mrv_review_escalation` (15 phút). Quá `mrv.review_sla_hours` → mức 1 người duyệt; quá `mrv.review_escalate_hours` → mức 2 quản trị TTKN tỉnh. Idempotent theo (phiên bản hồ sơ, mức). Mặc định 72 / 120 giờ là **tạm, chờ khách** (BRD chưa có số) |
 | KN FR-07 ghi nhận xử lý rơm rạ (bằng chứng MRV) | `TestG3OnlyApprovedEvidenceCountsKNUSMRV05` (loại `straw_handling`), `TestG3CollectionValveContractAndIdempotency` (bằng chứng thu gom từ MKG), E2E-G3-12 | **đạt**. Trường chi tiết theo danh mục tạm (C-1) |
-| KN FR-08 cảnh báo bất thường nhật ký HTX | `TestG3NoRecordAnomalyKNFR08`, `TestNoRecordAnomalyKNFR08`; WEB-E2E `mrv.spec.ts` ("Bất thường (FR-08)") | **một phần**: thiếu cờ AWD/hạ tầng và thông báo KNV |
+| KN FR-08 cảnh báo bất thường nhật ký HTX | `TestG3NoRecordAnomalyKNFR08`, `TestNoRecordAnomalyKNFR08`, `TestAWDWithoutInfrastructureFlagKNFR08`, `TestAWDNeedsInfrastructureKNFR08`, `TestMRVAlertNotificationsKNUSMRV04_06_FR08`; WEB-E2E `mrv.spec.ts` ("Bất thường (FR-08)") | **đạt**. Cờ "ghi AWD nhưng vùng chưa đủ hạ tầng": nhật ký HTX có mã thuộc `mrv.awd.activity_codes` (tạm `tuoi_nuoc`) mà thửa/xã chưa có minh chứng `irrigation_infrastructure` đạt → cờ + thông báo cán bộ xã phụ trách (danh bạ, không có thì chủ đề `kn_officer` của xã). Danh mục hạ tầng tạm, chờ C-1 |
 
 ## 9. Quy tắc prototype (FM-01..10, cân nhà máy)
 
@@ -241,7 +237,7 @@ RB-4 (giấy phép) không đổi so với G2: ADR-0016 vẫn chưa ký (không 
 |---|---|---|
 | C-5 đường nhận số cân của khách (tích hợp hệ cân) | `TestCustomerWeightImportIdempotent`, `TestHubReconciliationDisputeLifecycle` (đường tạm) | **một phần**: chờ khách |
 | Định mức hao hụt sấy HUB_IN → HUB_OUT | `TestLossNormBands`, `TestToleranceVersionsSoDAndEventTime` (cơ chế phiên bản) | **một phần**: chờ khách |
-| CA thiết bị riêng cho production | `TestIngestMTLSListener` (CA khác bị từ chối) | **một phần**: hạ tầng |
+| CA thiết bị riêng cho production | `TestIngestMTLSListener` (CA khác bị từ chối), `TestRequireSeparateDeviceCA` (CA dịch vụ trong `AG_INGEST_CLIENT_CA` → từ chối khởi động) | **một phần**: hạ tầng — mã, dev và runbook [device-pki.md](../runbooks/device-pki.md) đã có; CA production chưa dựng |
 
 Các câu hỏi khách G3 khác nằm ở dòng tương ứng (C-4 mục 4, C-6 A-3, C-7 R-71, C-1 và phương pháp tCO2e 16-6, RB-2 17-4, FN-21 mục 4) và ở [tong-hop.md](../requirements/tong-hop.md#câu-hỏi-mở-g3-30092026).
 

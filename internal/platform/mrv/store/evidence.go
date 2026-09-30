@@ -240,6 +240,8 @@ type ListFilter struct {
 type Listed struct {
 	Evidence     domain.Evidence
 	ReviewStatus domain.ReviewStatus
+	// Urgent: bản hiện hành mang nhãn "Cảnh báo khẩn" (KN US-MRV-04) — điền ở app/.
+	Urgent bool
 }
 
 // ListCurrent phân trang bản hiện hành theo root_id (R-53), trong phạm vi.
