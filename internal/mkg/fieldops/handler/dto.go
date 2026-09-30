@@ -106,6 +106,8 @@ type rollDTO struct {
 	GPSStatus *string `json:"gps_status,omitempty"`
 	// Kiểm ngày gặt (FM-01) của bản ghi cuộn gốc — chỉ có ở GET …/roll-counts.
 	Harvest *harvestCheckDTO `json:"harvest_check,omitempty"`
+	// G4 (proto FM-05): số hiệu ghe/sà lan đã chuẩn hóa của bản ghi xếp ghe (boat_load).
+	VesselCode *string `json:"vessel_code,omitempty"`
 }
 
 // harvestCheckDTO là kết quả kiểm ngày gặt (FM-01) của một bản ghi cuộn gốc.
@@ -195,7 +197,9 @@ func toRecon(r store.Recon) reconDTO {
 }
 
 func toCountResult(r app.CountResult) map[string]any {
-	out := map[string]any{"roll_count": toRoll(r.Count), "total": toTotal(r.Total), "publications": toExports(r.Exports),
+	rc := toRoll(r.Count)
+	rc.VesselCode = r.VesselCode
+	out := map[string]any{"roll_count": rc, "total": toTotal(r.Total), "publications": toExports(r.Exports),
 		"harvest_check": toHarvestCheck(r.Harvest), "warnings": nonNil(r.Warnings)}
 	if r.Recon != nil {
 		out["reconciliation"] = toRecon(*r.Recon)

@@ -116,7 +116,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules,
 		return mods, ops, pools, err
 	}
 	pools = append(pools, ordPool)
-	mods.Orders = orders.New(ordPool, clk)
+	mods.Orders = orders.NewWith(ordPool, clk, orders.Options{Stock: mods.Hub.Stock()}) // O-05: cảnh báo thiếu tồn
 	// G4 costing (costing_app): nguồn gốc lô hub (quy kết hao hụt), hợp đồng mua rơm + giao nhận của
 	// mkg/orders, chuyến của mkg/logistics (ghe chưa cân, đọc lại khi đóng kỳ).
 	costPool, err := open(ctx, costing.DBRole)
@@ -162,6 +162,11 @@ func Jobs(mods Modules, tenantPool *pgxpool.Pool, selected string, log *slog.Log
 		interval, _ := time.ParseDuration(os.Getenv("AG_FIELDOPS_HARVEST_POLL_INTERVAL"))
 		out = append(out, mods.Fieldops.HarvestJobs(tid, interval, log)...)
 	}
+	if selected == "all" || strings.Contains(","+selected+",", ","+logistics.JobAlerts+",") {
+		// L-08: cảnh báo ghe chưa cân > N giờ, đăng kiểm hết / sắp hết hạn (AG_LOGISTICS_ALERT_INTERVAL, mặc định 15m).
+		interval, _ := time.ParseDuration(os.Getenv("AG_LOGISTICS_ALERT_INTERVAL"))
+		out = append(out, mods.Logistics.Jobs(logistics.ActiveTenants(tenantPool), interval, log)...)
+	}
 	if selected == "all" || strings.Contains(","+selected+",", ","+acctbridge.JobPushRetry+",") {
 		// R-62: đẩy lại bút toán tổng hợp có hạn thử lại (giãn cách mũ) — tenant tìm qua vai ag_outbox_publisher.
 		out = append(out, mods.Acctbridge.Jobs(acctbridge.PendingRetryTenants(tenantPool), log)...)
@@ -171,7 +176,8 @@ func Jobs(mods Modules, tenantPool *pgxpool.Pool, selected string, log *slog.Log
 
 // JobNames liệt kê tên job hợp lệ của api-internal.
 func JobNames() string {
-	return hubport.JobDailyCapacity + ", " + foport.JobHTXResponses + ", " + foport.JobHarvestDates + ", " + acctbridge.JobPushRetry
+	return hubport.JobDailyCapacity + ", " + foport.JobHTXResponses + ", " + foport.JobHarvestDates + ", " + logistics.JobAlerts + ", " +
+		acctbridge.JobPushRetry
 }
 
 // FieldopsOptionsFromEnv đọc cấu hình mkg/fieldops:

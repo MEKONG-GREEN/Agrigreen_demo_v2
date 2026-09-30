@@ -19,6 +19,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/logistics/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/logistics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/logistics/store"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -50,6 +51,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/logistics/vessels/:id", h.getVessel)
 	rg.POST("/logistics/vessels/:id/versions", h.reviseVessel)
 	rg.GET("/logistics/alerts", h.alerts)
+	rg.GET("/logistics/alert-notices", h.notices)
 	rg.GET("/logistics/params/:key", h.params)
 	rg.POST("/logistics/params/:key/versions", h.propose)
 	rg.POST("/logistics/params/:key/versions/:version/decision", h.decide)
@@ -211,8 +213,8 @@ type legDTO struct {
 	NetworkVersion   *int        `json:"network_version"`
 	ManualReason     *string     `json:"manual_reason"`
 	MassKg           *string     `json:"mass_kg"`
-	RateVNDPerTKm    string      `json:"rate_vnd_per_t_km"`
-	PlannedCost      string      `json:"planned_cost"`
+	RateVNDPerTKm    string      `json:"rate_vnd_per_t_km,omitempty"` // bỏ với người chỉ có vai driver (G4 mục 10)
+	PlannedCost      string      `json:"planned_cost,omitempty"`
 	ParamVersion     string      `json:"param_version"`
 	Flags            []string    `json:"flags"`
 	RuleVersion      string      `json:"rule_version"`
@@ -230,9 +232,9 @@ type tripDTO struct {
 	Cargo              []cargoDTO `json:"cargo"`
 	PlannedKg          *string    `json:"planned_kg"`
 	ActualKg           *string    `json:"actual_kg"`
-	PlannedCost        *string    `json:"planned_cost"`
-	ActualCost         *string    `json:"actual_cost"`
-	CostSource         *string    `json:"cost_source"`
+	PlannedCost        *string    `json:"planned_cost,omitempty"` // cước: bỏ với người chỉ có vai driver (G4 mục 10)
+	ActualCost         *string    `json:"actual_cost,omitempty"`
+	CostSource         *string    `json:"cost_source,omitempty"`
 	PlanRevision       int        `json:"plan_revision"`
 	PlannedAt          string     `json:"planned_at"`
 	DepartedAt         *string    `json:"departed_at"`
@@ -334,6 +336,7 @@ type eventDTO struct {
 	ParamVersion     *string  `json:"param_version"`
 	Lat              *string  `json:"lat"`
 	Lng              *string  `json:"lng"`
+	AccuracyM        *string  `json:"accuracy_m,omitempty"`
 	SourceRef        *string  `json:"source_ref"`
 	Flags            []string `json:"flags"`
 	RuleVersion      string   `json:"rule_version"`
@@ -351,8 +354,8 @@ func toEvent(e store.TripEvent) eventDTO {
 	d := eventDTO{EventID: e.ID.String(), Kind: e.Kind, Status: string(e.Status), Seq: e.Seq, EventTime: e.EventTime.UTC().Format(time.RFC3339Nano),
 		RecordedAt: e.RecordedAt.UTC().Format(time.RFC3339Nano), ActorRef: e.ActorRef.String(), SupersedesID: ref(e.SupersedesID),
 		CorrectionReason: e.CorrectionReason, Reason: e.Reason, ActualKg: kgp(e.ActualKg), ActualCost: amt(e.ActualCost),
-		ParamVersion: e.ParamVersion, Lat: decp(e.Lat), Lng: decp(e.Lng), SourceRef: ref(e.SourceRef), Flags: flagsOrEmpty(e.Flags),
-		RuleVersion: e.RuleVersion}
+		ParamVersion: e.ParamVersion, Lat: decp(e.Lat), Lng: decp(e.Lng), AccuracyM: decp(e.AccuracyM), SourceRef: ref(e.SourceRef),
+		Flags: flagsOrEmpty(e.Flags), RuleVersion: e.RuleVersion}
 	if e.CostSource != nil {
 		s := string(*e.CostSource)
 		d.CostSource = &s
@@ -360,12 +363,36 @@ func toEvent(e store.TripEvent) eventDTO {
 	return d
 }
 
-func tripBody(r app.TripResult) gin.H {
-	body := gin.H{"trip": toTrip(r.Trip, r.Legs), "warnings": flagsOrEmpty(r.Trip.Flags)}
+func tripBody(c *gin.Context, r app.TripResult) gin.H {
+	t, ev := toTrip(r.Trip, r.Legs), toEvent(r.Event)
+	if driverOnly(c) {
+		t, ev = hideCosts(t), hideEventCosts(ev)
+	}
+	body := gin.H{"trip": t, "warnings": flagsOrEmpty(r.Trip.Flags)}
 	if r.Event.ID != uuid.Nil {
-		body["event"] = toEvent(r.Event)
+		body["event"] = ev
 	}
 	return body
+}
+
+// driverOnly: người gọi chỉ có vai driver (không điều phối) — không thấy cước (G4 tích hợp mục 10).
+func driverOnly(c *gin.Context) bool {
+	p, ok := authz.FromContext(c.Request.Context())
+	return ok && app.DriverOnly(p)
+}
+
+// hideCosts bỏ cước kế hoạch / thực, nguồn cước, đơn giá và cước của chặng.
+func hideCosts(d tripDTO) tripDTO {
+	d.PlannedCost, d.ActualCost, d.CostSource = nil, nil, nil
+	for i := range d.Legs {
+		d.Legs[i].RateVNDPerTKm, d.Legs[i].PlannedCost = "", ""
+	}
+	return d
+}
+
+func hideEventCosts(e eventDTO) eventDTO {
+	e.ActualCost, e.CostSource = nil, nil
+	return e
 }
 
 // ---------------------------------------------------------------------------
@@ -415,7 +442,7 @@ func (h Handler) createTrip(c *gin.Context) {
 		return
 	}
 	c.Header("Location", "/v1/logistics/trips/"+r.Trip.TripID.String())
-	created(c, replayed, tripBody(r))
+	created(c, replayed, tripBody(c, r))
 }
 
 func (h Handler) getTrip(c *gin.Context) {
@@ -428,7 +455,11 @@ func (h Handler) getTrip(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"trip": toTrip(r.Trip, r.Legs)})
+	d := toTrip(r.Trip, r.Legs)
+	if driverOnly(c) {
+		d = hideCosts(d)
+	}
+	c.JSON(http.StatusOK, gin.H{"trip": d})
 }
 
 func (h Handler) tripEvents(c *gin.Context) {
@@ -448,6 +479,10 @@ func (h Handler) tripEvents(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": out})
 }
 
+// listTrips: GET /v1/logistics/trips?status=&assigned_to_me=true&updated_since=RFC3339&cursor=&limit=
+//   - assigned_to_me=true → chỉ chuyến có driver_ref = sub của token; người chỉ có vai driver luôn bị lọc như vậy;
+//   - updated_since → chế độ delta: chuyến có sự kiện ghi sau mốc (kể cả hủy / hoàn tất), sắp recorded_at tăng dần,
+//     con trỏ theo recorded_at; không có → sắp planned_at giảm dần như trước (tương thích).
 func (h Handler) listTrips(c *gin.Context) {
 	at, id, ok := app.DecodeCursor(c.Query("cursor"))
 	if !ok {
@@ -461,20 +496,79 @@ func (h Handler) listTrips(c *gin.Context) {
 		httpx.Fail(c, problem.Validation.WithField("status", "planned | departed | arrived | completed | cancelled"))
 		return
 	}
-	n := limit(c)
-	ts, err := h.Svc.ListTrips(c.Request.Context(), status, at, id, n)
+	q := app.TripQuery{Status: status, AfterAt: at, AfterID: id, Limit: limit(c)}
+	switch c.Query("assigned_to_me") {
+	case "", "false":
+	case "true":
+		q.AssignedToMe = true
+	default:
+		httpx.Fail(c, problem.Validation.WithField("assigned_to_me", "true | false"))
+		return
+	}
+	if s := c.Query("updated_since"); s != "" {
+		t, err := time.Parse(time.RFC3339Nano, s)
+		if err != nil {
+			httpx.Fail(c, problem.Validation.WithField("updated_since", "RFC 3339 có múi giờ"))
+			return
+		}
+		q.UpdatedSince = &t
+	}
+	ts, hide, err := h.Svc.QueryTrips(c.Request.Context(), q)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
 	items := make([]tripDTO, 0, len(ts))
 	for _, t := range ts {
-		items = append(items, toTrip(t, nil))
+		d := toTrip(t, nil)
+		if hide {
+			d = hideCosts(d)
+		}
+		items = append(items, d)
 	}
 	var next *string
-	if len(ts) == n {
+	if len(ts) > 0 && len(ts) == q.Limit {
 		last := ts[len(ts)-1]
-		s := app.EncodeCursor(last.PlannedAt, last.TripID)
+		cur := last.PlannedAt
+		if q.UpdatedSince != nil {
+			cur = last.RecordedAt
+		}
+		s := app.EncodeCursor(cur, last.TripID)
+		next = &s
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": next})
+}
+
+// notices: GET /v1/logistics/alert-notices?kind=&cursor=&limit= — thông báo cảnh báo L-08 đã ghi (điều phối).
+func (h Handler) notices(c *gin.Context) {
+	at, id, ok := app.DecodeCursor(c.Query("cursor"))
+	if !ok {
+		httpx.Fail(c, problem.Validation.WithField("cursor", "con trỏ không hợp lệ"))
+		return
+	}
+	kind := c.Query("kind")
+	switch kind {
+	case "", app.NoticeTripUnweighed, app.NoticeRegistrationExpired, app.NoticeRegistrationExpiring:
+	default:
+		httpx.Fail(c, problem.Validation.WithField("kind", "trip_unweighed | registration_expired | registration_expiring"))
+		return
+	}
+	n := limit(c)
+	ns, err := h.Svc.Notices(c.Request.Context(), kind, at, id, n)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	items := make([]gin.H, 0, len(ns))
+	for _, x := range ns {
+		items = append(items, gin.H{"notice_id": x.ID.String(), "kind": x.Kind, "subject_ref": x.SubjectRef.String(), "subject_code": x.SubjectCode,
+			"audience": x.Audience, "detail": x.Detail, "param_version": x.ParamVersion, "rule_version": x.RuleVersion,
+			"noticed_at": x.NoticedAt.UTC().Format(time.RFC3339Nano)})
+	}
+	var next *string
+	if len(ns) == n {
+		last := ns[len(ns)-1]
+		s := app.EncodeCursor(last.NoticedAt, last.ID)
 		next = &s
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": next})
@@ -505,7 +599,7 @@ func (h Handler) assign(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	created(c, replayed, tripBody(r))
+	created(c, replayed, tripBody(c, r))
 }
 
 type legReq struct {
@@ -551,7 +645,7 @@ func (h Handler) planLegs(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	created(c, replayed, tripBody(r))
+	created(c, replayed, tripBody(c, r))
 }
 
 func (h Handler) snapshot(c *gin.Context) {
@@ -575,11 +669,15 @@ func (h Handler) snapshot(c *gin.Context) {
 		"rule_version": s.RuleVersion})
 }
 
+// milestoneReq: lat/lng tùy chọn (null / vắng = máy không có GPS → lưu NULL, không bao giờ 0,0); accuracy_m tùy
+// chọn. App cũ gửi {kind, event_time, lat, lng} vẫn hợp lệ. (0, 0) — không bao giờ là vị trí ở VN — coi như không
+// có GPS (app cũ gửi 0,0 khi thiếu tọa độ).
 type milestoneReq struct {
-	Kind      string          `json:"kind"`
-	EventTime string          `json:"event_time"`
-	Lat       decimal.Decimal `json:"lat"`
-	Lng       decimal.Decimal `json:"lng"`
+	Kind      string           `json:"kind"`
+	EventTime string           `json:"event_time"`
+	Lat       *decimal.Decimal `json:"lat"`
+	Lng       *decimal.Decimal `json:"lng"`
+	AccuracyM *decimal.Decimal `json:"accuracy_m"`
 }
 
 func (h Handler) milestone(c *gin.Context) {
@@ -600,13 +698,16 @@ func (h Handler) milestone(c *gin.Context) {
 	if d := c.GetHeader(DeviceHeader); d != "" {
 		dev = &d
 	}
+	if req.Lat != nil && req.Lng != nil && req.Lat.IsZero() && req.Lng.IsZero() {
+		req.Lat, req.Lng, req.AccuracyM = nil, nil, nil
+	}
 	r, replayed, err := h.Svc.RecordMilestone(c.Request.Context(), id, app.MilestoneInput{Kind: req.Kind, EventTime: at, Lat: req.Lat,
-		Lng: req.Lng, DeviceID: dev, IdemKey: idem(c)})
+		Lng: req.Lng, AccuracyM: req.AccuracyM, DeviceID: dev, IdemKey: idem(c)})
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	created(c, replayed, tripBody(r))
+	created(c, replayed, tripBody(c, r))
 }
 
 type completeReq struct {
@@ -646,7 +747,7 @@ func (h Handler) complete(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	created(c, replayed, tripBody(r))
+	created(c, replayed, tripBody(c, r))
 }
 
 func (h Handler) cancel(c *gin.Context) {
@@ -665,7 +766,7 @@ func (h Handler) cancel(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	created(c, replayed, tripBody(r))
+	created(c, replayed, tripBody(c, r))
 }
 
 func (h Handler) rebuild(c *gin.Context) {

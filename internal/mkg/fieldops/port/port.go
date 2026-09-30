@@ -54,6 +54,10 @@ type RollCountRecordedV1 struct {
 	DeviceID           *string    `json:"device_id"`
 	RuleVersion        string     `json:"rule_version"`
 	EventTime          time.Time  `json:"event_time"`
+	// VesselCode (G4, tùy chọn — tương thích ngược v1): số hiệu ghe/sà lan người thu gom nhập khi xếp ghe
+	// (công đoạn boat_load), đã chuẩn hóa (bỏ khoảng trắng, chữ hoa — proto GH-01). mkg/logistics gán
+	// phương tiện của chuyến FM-05 khi số hiệu khớp danh mục ghe. Vắng/null ở mọi công đoạn khác.
+	VesselCode *string `json:"vessel_code,omitempty"`
 }
 
 // Sự kiện van (dự thảo) — payload là hợp đồng van, phát với outbox.KindPlatform.

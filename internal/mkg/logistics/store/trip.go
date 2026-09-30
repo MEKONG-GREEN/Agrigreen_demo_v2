@@ -44,6 +44,7 @@ type TripEvent struct {
 	CostSource         *port.CostSource
 	Cargo              []Cargo
 	Lat, Lng           *decimal.Decimal
+	AccuracyM          *decimal.Decimal // không ở trip_event: sổ trip_milestone_fix (mkg 000020)
 	CompletedAt        *time.Time
 	Reason             *string
 	Flags              []string

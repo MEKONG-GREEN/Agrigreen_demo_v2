@@ -9,9 +9,14 @@
 package logistics
 
 import (
+	"context"
+	"log/slog"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	fieldport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/logistics/adapter"
@@ -20,6 +25,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/logistics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -39,7 +46,52 @@ type Module struct{ svc *app.Service }
 
 // New tạo module với pool của vai logistics_app (cụm mkg).
 func New(db tenant.Beginner, clk clock.Clock, o Options) *Module {
-	return &Module{svc: &app.Service{DB: db, Clock: clk, Waterway: o.Waterway, Road: o.Road}}
+	return &Module{svc: &app.Service{DB: db, Clock: clk, Waterway: o.Waterway, Road: o.Road, Metrics: app.NewMetrics(telemetry.Meter())}}
+}
+
+// JobAlerts là tên job cảnh báo định kỳ L-08 của api-internal (AG_MKG_JOBS).
+const JobAlerts = port.JobAlerts
+
+// ActiveTenants liệt kê tenant có chuyến mở hoặc phương tiện đang dùng — pool vai ag_outbox_publisher của cụm mkg
+// (chỉ đọc tenant_id, status; mkg 000020).
+func ActiveTenants(pool *pgxpool.Pool) app.TenantLister {
+	return func(ctx context.Context) ([]uuid.UUID, error) {
+		rows, err := pool.Query(ctx, `SELECT tenant_id FROM mkg_logistics.trip_current WHERE status IN ('planned', 'departed', 'arrived')
+		  UNION SELECT tenant_id FROM mkg_logistics.vessel_current WHERE status = 'active'`)
+		if err != nil {
+			return nil, err
+		}
+		return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	}
+}
+
+// Jobs trả job định kỳ của module (api-internal, chỉ leader): mỗi interval (mặc định 15 phút) quét ghe chưa cân
+// quá N giờ và đăng kiểm hết / sắp hết hạn → thông báo alert_notice (chống lặp) + metric cho Alertmanager (L-08).
+func (m *Module) Jobs(tenants app.TenantLister, interval time.Duration, log *slog.Logger) []schedule.Job {
+	if interval <= 0 {
+		interval = 15 * time.Minute
+	}
+	return []schedule.Job{{
+		Name: JobAlerts, Spec: schedule.Every{Interval: interval}, RunOnStart: true, Timeout: 5 * time.Minute,
+		Run: func(ctx context.Context) error {
+			r, err := m.svc.ScanAlerts(ctx, tenants)
+			if log != nil {
+				outcome := "ok"
+				if err != nil {
+					outcome = "error"
+				}
+				log.Info("quét cảnh báo logistics", "event", "job."+JobAlerts, "tenants", r.Tenants,
+					"unweighed", r.Open[app.NoticeTripUnweighed], "expired", r.Open[app.NoticeRegistrationExpired],
+					"expiring", r.Open[app.NoticeRegistrationExpiring], "outcome", outcome)
+			}
+			return err
+		},
+	}}
+}
+
+// ScanAlerts chạy một lượt quét cảnh báo (kiểm thử, công cụ vận hành).
+func (m *Module) ScanAlerts(ctx context.Context, tenants app.TenantLister) (app.AlertScan, error) {
+	return m.svc.ScanAlerts(ctx, tenants)
 }
 
 // PlatformConfig là cấu hình tài khoản dịch vụ MKG gọi Application API (cùng biến với fieldops).

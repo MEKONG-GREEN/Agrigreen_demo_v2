@@ -365,11 +365,13 @@ func (s *Service) AssignVehicle(ctx context.Context, trip, vehicle uuid.UUID, dr
 	})
 }
 
-// MilestoneInput là mốc chuyến của tài xế.
+// MilestoneInput là mốc chuyến của tài xế. Tọa độ tùy chọn (máy không có GPS → nil, lưu NULL, không bao giờ
+// 0,0); AccuracyM tùy chọn (sổ trip_milestone_fix).
 type MilestoneInput struct {
 	Kind      string // departed | arrived
 	EventTime time.Time
-	Lat, Lng  decimal.Decimal
+	Lat, Lng  *decimal.Decimal
+	AccuracyM *decimal.Decimal
 	DeviceID  *string
 	IdemKey   string
 }
@@ -391,16 +393,35 @@ func (s *Service) RecordMilestone(ctx context.Context, trip uuid.UUID, in Milest
 	if in.EventTime.After(s.Clock.Now().Add(5 * time.Minute)) {
 		return TripResult{}, false, problem.Validation.WithField("event_time", "không được ở tương lai")
 	}
-	if !domain.ValidPoint(port.GeoPoint{Lat: in.Lat, Lng: in.Lng}) {
+	if (in.Lat == nil) != (in.Lng == nil) {
+		return TripResult{}, false, problem.Validation.WithField("lng", "gửi cả lat và lng, hoặc bỏ cả hai (không có GPS)")
+	}
+	if in.Lat != nil && !domain.ValidPoint(port.GeoPoint{Lat: *in.Lat, Lng: *in.Lng}) {
 		return TripResult{}, false, problem.Validation.WithField("lat", "tọa độ WGS84")
 	}
-	return s.tripOp(ctx, []string{RoleDriver, RoleDispatcher}, trip, in.IdemKey, func(_ pgx.Tx, p authz.Principal, cur *store.Trip) (*store.TripEvent, error) {
+	if in.AccuracyM != nil && (in.AccuracyM.Sign() < 0 || in.Lat == nil || in.AccuracyM.GreaterThan(decimal.NewFromInt(9_999_999))) {
+		return TripResult{}, false, problem.Validation.WithField("accuracy_m", "mét ≥ 0, chỉ kèm tọa độ")
+	}
+	return s.tripOp(ctx, []string{RoleDriver, RoleDispatcher}, trip, in.IdemKey, func(tx pgx.Tx, p authz.Principal, cur *store.Trip) (*store.TripEvent, error) {
+		if !p.Has(RoleDispatcher) && !assignedTo(cur, p) {
+			return nil, ErrNotAssignedDriver // G4 tích hợp mục 9: chỉ tài xế được giao (hoặc điều phối)
+		}
 		if err := domain.CanTransition(cur.Status, target); err != nil {
 			return nil, err
 		}
 		e := base(cur, in.Kind, target, p.ActorRef, in.EventTime, in.IdemKey)
-		lat, lng := in.Lat.Round(7), in.Lng.Round(7)
-		e.Lat, e.Lng, e.DeviceID = &lat, &lng, in.DeviceID
+		e.DeviceID = in.DeviceID
+		if in.Lat != nil {
+			lat, lng := in.Lat.Round(7), in.Lng.Round(7)
+			e.Lat, e.Lng = &lat, &lng
+		}
+		if in.AccuracyM != nil {
+			a := in.AccuracyM.Round(2)
+			e.AccuracyM = &a
+			if err := store.InsertMilestoneFix(ctx, tx, e, a); err != nil {
+				return nil, err
+			}
+		}
 		return &e, nil
 	})
 }
@@ -589,15 +610,17 @@ func (s *Service) CompleteTrip(ctx context.Context, trip uuid.UUID, in CompleteI
 // Đọc
 // ---------------------------------------------------------------------------
 
-// GetTrip đọc chuyến + chặng hiệu lực (điều phối, tài xế).
+// GetTrip đọc chuyến + chặng hiệu lực (điều phối, tài xế). Người chỉ có vai tài xế chỉ đọc chuyến giao cho
+// mình (chuyến khác → 404, không lộ sự tồn tại).
 func (s *Service) GetTrip(ctx context.Context, trip uuid.UUID) (TripResult, error) {
 	var res TripResult
+	p, _ := authz.FromContext(ctx)
 	err := s.read(ctx, func(tx pgx.Tx) error {
 		t, err := store.GetTrip(ctx, tx, trip, false)
 		if err != nil {
 			return err
 		}
-		if t == nil {
+		if t == nil || (DriverOnly(p) && !assignedTo(t, p)) {
 			return ErrTripNotFound
 		}
 		res.Trip = *t
@@ -607,21 +630,13 @@ func (s *Service) GetTrip(ctx context.Context, trip uuid.UUID) (TripResult, erro
 	return res, err
 }
 
-// ListTrips liệt kê chuyến theo con trỏ (planned_at, trip_id) giảm dần.
+// ListTrips liệt kê chuyến theo con trỏ (planned_at, trip_id) giảm dần (giữ cho tương thích; xem QueryTrips).
 func (s *Service) ListTrips(ctx context.Context, status string, afterAt *time.Time, afterID uuid.UUID, limit int) ([]store.Trip, error) {
-	if limit <= 0 || limit > 200 {
-		limit = 50
-	}
-	var out []store.Trip
-	err := s.read(ctx, func(tx pgx.Tx) error {
-		var e error
-		out, e = store.ListTrips(ctx, tx, status, afterAt, afterID, limit)
-		return e
-	})
+	out, _, err := s.QueryTrips(ctx, TripQuery{Status: status, AfterAt: afterAt, AfterID: afterID, Limit: limit})
 	return out, err
 }
 
-// TripEvents đọc sổ của một chuyến (điều phối — kiểm toán).
+// TripEvents đọc sổ của một chuyến (điều phối — kiểm toán), kèm accuracy_m của mốc (sổ trip_milestone_fix).
 func (s *Service) TripEvents(ctx context.Context, trip uuid.UUID) ([]store.TripEvent, error) {
 	var out []store.TripEvent
 	err := s.read(ctx, func(tx pgx.Tx) error {
@@ -629,6 +644,15 @@ func (s *Service) TripEvents(ctx context.Context, trip uuid.UUID) ([]store.TripE
 		out, e = store.TripEvents(ctx, tx, trip)
 		if e == nil && len(out) == 0 {
 			return ErrTripNotFound
+		}
+		if e != nil {
+			return e
+		}
+		fx, e := store.MilestoneFixes(ctx, tx, trip)
+		for i := range out {
+			if a, ok := fx[out[i].ID]; ok {
+				out[i].AccuracyM = &a
+			}
 		}
 		return e
 	}, RoleDispatcher)

@@ -31,7 +31,7 @@ import (
 func TestLogisticsL02ForwardOnlyStatus(t *testing.T) {
 	f := newFixture(t)
 	d, drv := f.dispatcher(), f.driver()
-	trip := f.createTrip(d, "road", ids.New(), "12000")
+	trip := f.createTripFor(d, "road", ids.New(), "12000", drv.actor) // G4 mục 9: chỉ tài xế được giao ghi mốc
 	ms := func(kind string) resp {
 		return drv.post("/v1/logistics/trips/"+trip+"/milestones", map[string]any{"kind": kind, "event_time": f.ts(-time.Minute),
 			"lat": "10.0452", "lng": "105.7469"})
@@ -494,7 +494,7 @@ func TestLogisticsL01ProjectionRebuildEqualsLive(t *testing.T) {
 	fm05 := f.tripsForLot(f.tenant, lot)[0].TripID.String()
 	mustStatus(t, d.post("/v1/logistics/trips/"+fm05+"/legs", map[string]any{"legs": []any{waterLeg()}}), http.StatusCreated, "chặng")
 	f.weigh(f.tenant, lot, "90000", nil)
-	a := f.createTrip(d, "road", ids.New(), "12000")
+	a := f.createTripFor(d, "road", ids.New(), "12000", drv.actor)
 	mustStatus(t, d.post("/v1/logistics/trips/"+a+"/legs", map[string]any{"legs": []any{roadLeg("10.0452", "105.7469", "10.386", "105.4352")}}),
 		http.StatusCreated, "chặng a")
 	mustStatus(t, d.post("/v1/logistics/trips/"+a+"/legs", map[string]any{"legs": []any{roadLeg("10.0452", "105.7469", "10.5", "105.5")}}),

@@ -98,6 +98,13 @@ func OpenReceiptsOfLot(ctx context.Context, tx pgx.Tx, lot uuid.UUID) ([]Receipt
 	    WHERE lot_ref = $1 AND status IN ('awaiting_weigh', 'pending_approval') ORDER BY code FOR UPDATE`, lot)
 }
 
+// ApprovedReceiptsWithTicket liệt kê phiếu nhận ĐÃ DUYỆT đang gắn phiếu cân ticket (phiếu HUB_IN bị bù sau
+// khi duyệt → bản bù phiếu nhận + bù khoản phải trả, RB-1). Khóa dòng.
+func ApprovedReceiptsWithTicket(ctx context.Context, tx pgx.Tx, ticket uuid.UUID) ([]Receipt, error) {
+	return queryReceipts(ctx, tx, "SELECT "+receiptSelect+` FROM mkg_orders.receipt_current
+	    WHERE ticket_ref = $1 AND status = 'approved' ORDER BY code FOR UPDATE`, ticket)
+}
+
 func queryReceipts(ctx context.Context, tx pgx.Tx, q string, args ...any) ([]Receipt, error) {
 	rows, err := tx.Query(ctx, q, args...)
 	if err != nil {
@@ -132,25 +139,27 @@ type Payable struct {
 	ParamVersion    string
 }
 
-// InsertPayable ghi khoản phải trả (idem_key 'payable:<receipt_id>' → đúng một khoản mỗi phiếu nhận).
+// InsertPayable ghi khoản phải trả (idem_key 'payable:<receipt_id>' → đúng một khoản mỗi phiếu nhận). Bản bù
+// (phiếu HUB_IN bù sau khi duyệt, RB-1) mang supersedes_id = dòng trước + lý do, cùng stream 'payable:<receipt_id>'.
 func InsertPayable(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p *Payable) error {
 	return tx.QueryRow(ctx, `INSERT INTO mkg_orders.payable_event
 	    (id, tenant_id, stream_key, receipt_id, receipt_event_id, po_id, category, supplier_ref, unit, qty, unit_price, amount, due_date,
-	     payment_term_days, param_version, event_time, actor_ref, idem_key, rule_version)
-	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::numeric, $11::numeric, $12::numeric, $13, $14, $15, $16, $17, $18, $19)
+	     payment_term_days, param_version, event_time, actor_ref, idem_key, rule_version, supersedes_id, correction_reason)
+	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::numeric, $11::numeric, $12::numeric, $13, $14, $15, $16, $17, $18, $19, $20, $21)
 	  RETURNING seq, recorded_at`,
 		p.ID, tid, "payable:"+p.ReceiptID.String(), p.ReceiptID, p.ReceiptEventID, p.POID, p.Category, p.SupplierRef, p.Unit, p.Qty.String(),
 		p.UnitPrice.String(), p.Amount.StringFixed(2), p.DueDate, p.PaymentTermDays, p.ParamVersion, p.EventTime.UTC(), p.ActorRef, p.IdemKey,
-		p.RuleVersion).Scan(&p.Seq, &p.RecordedAt)
+		p.RuleVersion, p.SupersedesID, p.CorrectionReason).Scan(&p.Seq, &p.RecordedAt)
 }
 
 const payableSelect = `id, seq, recorded_at, event_time, actor_ref, idem_key, rule_version, receipt_id, receipt_event_id, po_id, category,
-  supplier_ref, unit, qty::text, unit_price::text, amount::text, due_date, payment_term_days, param_version`
+  supplier_ref, unit, qty::text, unit_price::text, amount::text, due_date, payment_term_days, param_version, supersedes_id, correction_reason`
 
 func scanPayable(row pgx.Row) (Payable, error) {
 	var p Payable
 	err := row.Scan(&p.ID, &p.Seq, &p.RecordedAt, &p.EventTime, &p.ActorRef, &p.IdemKey, &p.RuleVersion, &p.ReceiptID, &p.ReceiptEventID,
-		&p.POID, &p.Category, &p.SupplierRef, &p.Unit, &p.Qty, &p.UnitPrice, &p.Amount, &p.DueDate, &p.PaymentTermDays, &p.ParamVersion)
+		&p.POID, &p.Category, &p.SupplierRef, &p.Unit, &p.Qty, &p.UnitPrice, &p.Amount, &p.DueDate, &p.PaymentTermDays, &p.ParamVersion,
+		&p.SupersedesID, &p.CorrectionReason)
 	return p, err
 }
 
@@ -173,7 +182,9 @@ func Payables(ctx context.Context, tx pgx.Tx, po *uuid.UUID, after *uuid.UUID, l
 	return out, rows.Err()
 }
 
-// PayableOfReceipt trả khoản phải trả của phiếu nhận (nil = không có).
+// PayableOfReceipt trả khoản phải trả HIỆU LỰC của phiếu nhận — dòng mới nhất của stream (bản bù thay bản
+// trước); nil = không có.
 func PayableOfReceipt(ctx context.Context, tx pgx.Tx, receipt uuid.UUID) (*Payable, error) {
-	return noRows(scanPayable(tx.QueryRow(ctx, "SELECT "+payableSelect+" FROM mkg_orders.payable_event WHERE receipt_id = $1 LIMIT 1", receipt)))
+	return noRows(scanPayable(tx.QueryRow(ctx, "SELECT "+payableSelect+` FROM mkg_orders.payable_event WHERE receipt_id = $1
+	    ORDER BY seq DESC LIMIT 1`, receipt)))
 }

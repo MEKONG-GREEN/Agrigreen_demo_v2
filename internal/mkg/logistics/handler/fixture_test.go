@@ -209,6 +209,15 @@ func (f *fixture) createTrip(c caller, mode string, lot uuid.UUID, kg string) st
 	return str(r.body, "trip", "trip_id")
 }
 
+// createTripFor lập chuyến tay giao cho tài xế driver (driver_ref = sub của token tài xế); trả trip_id.
+func (f *fixture) createTripFor(c caller, mode string, lot uuid.UUID, kg string, driver uuid.UUID) string {
+	f.t.Helper()
+	r := c.post("/v1/logistics/trips", map[string]any{"mode": mode, "driver_ref": driver.String(),
+		"cargo": []map[string]any{{"lot_ref": lot.String(), "mass_kg": kg}}})
+	mustStatus(f.t, r, http.StatusCreated, "lập chuyến có tài xế")
+	return str(r.body, "trip", "trip_id")
+}
+
 // waterLeg là một chặng đường thủy từ điểm tập kết tới hub.
 func waterLeg() map[string]any {
 	return map[string]any{"mode": "waterway",

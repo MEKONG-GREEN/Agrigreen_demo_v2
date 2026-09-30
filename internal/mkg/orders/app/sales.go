@@ -36,6 +36,8 @@ type SOInput struct {
 type SOView struct {
 	Order      store.SalesOrder
 	Deliveries []store.Delivery
+	// Stock: kiểm tồn hub (O-05) — chỉ đơn draft / confirmed; thiếu tồn chỉ cảnh báo.
+	Stock *StockCheck
 }
 
 // CreateSO lập đơn bán nháp (proto createSalesOrder): khối lượng > 0, đơn giá > 0 (Go thêm). Ngưỡng lệch
@@ -136,6 +138,9 @@ func (s *Service) CreateSO(ctx context.Context, in SOInput) (SOView, bool, error
 		}
 		return loadSO(ctx, tx, o.OrderID, &out)
 	}, s.replaySO(ctx, in.IdemKey, &out))
+	if err == nil {
+		s.withStock(ctx, p.TenantID, &out)
+	}
 	return out, replayed, err
 }
 
@@ -177,6 +182,9 @@ func (s *Service) ConfirmSO(ctx context.Context, id uuid.UUID, idem string) (SOV
 		}
 		return loadSO(ctx, tx, id, &out)
 	}, s.replaySO(ctx, idem, &out))
+	if err == nil {
+		s.withStock(ctx, p.TenantID, &out)
+	}
 	return out, replayed, err
 }
 
@@ -233,6 +241,11 @@ func (s *Service) advance(ctx context.Context, tx pgx.Tx, tid uuid.UUID, o *stor
 func (s *Service) SO(ctx context.Context, id uuid.UUID) (SOView, error) {
 	var out SOView
 	err := s.read(ctx, func(tx pgx.Tx) error { return loadSO(ctx, tx, id, &out) })
+	if err == nil {
+		if p, ok := authz.FromContext(ctx); ok {
+			s.withStock(ctx, p.TenantID, &out)
+		}
+	}
 	return out, err
 }
 
