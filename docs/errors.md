@@ -497,6 +497,36 @@ Kết quả theo bản ghi của `POST /v1/fieldops/sync/push` dùng thêm `fiel
 
 Cảnh báo không chặn (mảng `warnings` của kết quả ghi, không phải lỗi): `fieldops.harvest_date_unknown`, `fieldops.harvest_date_unavailable` (FM-01, chưa biết ngày gặt), `fieldops.planned_before_harvest` (ngày bắt đầu dự kiến trước ngày gặt), `fieldops.baling_deadline_at_risk` (ngày kết thúc dự kiến sau hạn cuộn FM-02), `fieldops.crew_over_capacity_override` (giám sát giao vượt năng lực kèm lý do, FM-06).
 
+### mkg/orders (API nội bộ MKG — `cmd/api-internal`, `contracts/openapi/mkg-internal.yaml`, tag `orders`)
+
+| HTTP | code | Khi nào |
+|---|---|---|
+| 403 | `self_approval_forbidden` | Người duyệt hợp đồng / đơn mua / phiếu nhận / phiên bản tham số, hoặc người xác nhận đơn bán vượt ngưỡng giá, là người lập — R-56; DB chặn lần hai bằng CHECK |
+| 403 | `orders.price_approval_required` | Xác nhận đơn bán có giá lệch giá bảng / chiết khấu vượt ngưỡng (`orders.sales.price_approval_delta_pct`, `orders.sales.discount_approval_pct` — tạm, chờ khách, mặc định 0) mà người gọi không có vai `sales_approver` |
+| 404 | `orders.contract_not_found` | Không có hợp đồng / phiên bản trong tenant của token |
+| 404 | `orders.no_contract` | `GET /v1/orders/contract-terms`: HTX không có hợp đồng mua rơm hiệu lực tại ngày đó (port `ErrNoContract` — quyết toán không đoán giá, proto PM-03) |
+| 404 | `orders.po_not_found` | Không có đơn mua |
+| 404 | `orders.receipt_not_found` | Không có phiếu nhận hàng |
+| 404 | `orders.sales_order_not_found` | Không có đơn bán |
+| 404 | `orders.delivery_not_found` | Không có giao nhận |
+| 404 | `orders.param_not_found` | Khóa tham số lạ hoặc không có phiên bản cần quyết định |
+| 409 | `orders.contract_overlap` | proto CT-01: HTX đã có hợp đồng hiệu lực chồng thời gian (khi lập, và kiểm lại khi duyệt) — chấm dứt hợp đồng cũ trước |
+| 409 | `orders.contract_transition` | Sửa hợp đồng không hiệu lực / đang có phiên bản chờ duyệt; duyệt phiên bản không `pending`; chấm dứt hợp đồng không có phiên bản hiệu lực |
+| 409 | `orders.po_transition` | Duyệt đơn mua không ở `draft`; hủy đơn đã hủy / bị từ chối hoặc đã có phiếu nhận hiệu lực |
+| 409 | `orders.po_not_approved` | Lập phiếu nhận hàng cho đơn mua chưa duyệt |
+| 409 | `orders.receipt_not_weighed` | Duyệt phiếu nhận `awaiting_weigh` (chưa có phiếu cân HUB_IN của lô) |
+| 409 | `orders.receipt_transition` | Thao tác trên phiếu nhận đã duyệt / từ chối (bù số nhận, quyết định lại) |
+| 409 | `orders.order_transition` | Đơn bán chỉ chuyển tiến (proto advanceSalesOrder): lùi / lặp trạng thái, hủy sau khi đang giao, lập lịch giao cho đơn chưa xác nhận |
+| 409 | `orders.delivery_transition` | Xuất giao lượt không `planned`; chấp nhận lượt chưa `dispatched`; bù giao nhận chưa `accepted`; hủy / từ chối sai trạng thái |
+| 409 | `orders.customer_in_missing` | Chấp nhận (hoặc bù) giao nhận khi chưa có phiếu cân CUSTOMER_IN của lô — khối lượng chấp nhận chỉ lấy từ measurement, không nhập tay |
+| 409 | `orders.param_already_decided` | Phiên bản tham số đã được duyệt hoặc từ chối |
+| 422 | `validation_failed` | Dữ liệu vào sai: proto CT-02 (giá / cam kết ≤ 0, kết thúc trước bắt đầu), CT-03 (cách tính khác `per_tonne`/`per_bale`), khối lượng / đơn giá ≤ 0, số cuộn lẻ, chiết khấu ngoài 0..<100, lý do < 10 ký tự, rơm theo kg mà nhập tay `received_qty`, đơn giá khác hợp đồng…, xem `errors[]` |
+| 422 | `orders.basis_mismatch` | Đơn vị đơn mua rơm khác cách tính của hợp đồng hiệu lực (per_tonne ↔ kg, per_bale ↔ bale) |
+| 422 | `orders.price_required` | Đơn mua rơm không có hợp đồng hiệu lực tại ngày dự kiến nhận và không nhập đơn giá — hệ thống không đoán giá |
+| 422 | `orders.ticket_unknown` | Bù giao nhận với `customer_in_ticket_ref` chưa nhận từ measurement, hoặc không phải CUSTOMER_IN của cùng lô |
+
+Cảnh báo không chặn (trường của phiếu nhận, không phải lỗi): `needs_variance_report = true` + `audit_note` khi |nhận − đặt| / đặt × 100 > `orders.receipt.po_variance_warn_pct` (mặc định 3, tạm chờ khách — proto `RECEIPT_VARIANCE_TOLERANCE_PCT`); duyệt vẫn được, biên bản chênh lệch ghi qua `POST /v1/orders/receipts/{id}/variance-report`.
+
 ### pf/waterway
 
 Mạng đường thủy có phiên bản (mục 16; GIS FN-09, US-WATER-01/02/03). Vẽ/sửa, dựng, phát hành ở Admin API (MFA); tra lớp và định tuyến ở Application API.

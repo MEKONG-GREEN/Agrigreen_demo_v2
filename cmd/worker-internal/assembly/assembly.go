@@ -20,6 +20,8 @@ import (
 	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement"
 	measport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders"
+	ordport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 )
@@ -99,6 +101,9 @@ var Consumers = []Consumer{
 	// G3-2 (mkg/measurement, vai measurement_app): số cuộn mới → đối soát lại lô (RB-6).
 	{Name: RollCountReconcileConsumer, Events: []string{fieldport.EventRollCountRecorded}, Role: measurement.DBRole,
 		BuildWith: buildMeasurementRollCount},
+	// G4 (mkg/orders, vai orders_app): HUB_IN → phiếu nhận hàng ↔ đơn mua; CUSTOMER_IN → giao nhận.
+	{Name: ordport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Role: orders.DBRole,
+		Build: func(clk clock.Clock) inbox.Handler { return orders.NewConsumers(clk).WeighTicket() }},
 }
 
 // RollCountReconcileConsumer: mkg.fieldops.roll_count.recorded → measurement đối soát lại.

@@ -195,7 +195,21 @@ type ReceiptCheck struct {
 	NeedsVarianceReport bool
 	ThresholdPct        string
 	ParamVersion        int
+	// Thêm ở G4 (orders, tương thích ngược): đơn vị đơn mua "kg" | "bale". Với "bale" kiểm theo số
+	// cuộn (OrderedBales/ReceivedBales); OrderedKg rỗng, ReceivedKg = tịnh phiếu HUB_IN nếu đã có.
+	Unit          string
+	OrderedBales  *int64
+	ReceivedBales *int64
 }
+
+// Receipts cho module mkg khác đọc kết quả kiểm phiếu nhận hàng ↔ đơn mua (interface MỚI ở G4,
+// không thuộc phần đóng băng G4-0). Phiếu chưa có số nhận → (nil, nil).
+type Receipts interface {
+	ReceiptCheck(ctx context.Context, tenantID, receiptID uuid.UUID) (*ReceiptCheck, error)
+}
+
+// ErrReceiptNotFound: không có phiếu nhận hàng (interface Receipts).
+var ErrReceiptNotFound = errors.New("orders: không có phiếu nhận hàng")
 
 // Lỗi ổn định của port (problem.* mã orders.* — docs/errors.md).
 var (

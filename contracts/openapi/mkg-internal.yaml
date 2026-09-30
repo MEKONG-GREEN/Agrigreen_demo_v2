@@ -24,6 +24,8 @@ tags:
     description: mkg/measurement — sổ thiết bị cân, phiên cân, phiếu cân ba điểm, dung sai / định mức có phiên bản, đối soát, tranh chấp, nhập số cân khách, van MRV
   - name: hub
     description: mkg/hub — hub, kho, bãi; lô; mẻ; dịch chuyển tồn; van công bố
+  - name: orders
+    description: mkg/orders (G4) — hợp đồng mua rơm với HTX (CT-01..03), đơn mua + phiếu nhận hàng ↔ đơn mua (> 3 % chỉ cảnh báo), đơn bán, lịch giao, biên bản giao nhận liên kết CUSTOMER_IN. Giá, khách không bao giờ qua van
 paths:
   # --- mkg/hub: bề mặt quản trị (MFA) ---
   /v1/hub/facilities:
@@ -1433,6 +1435,452 @@ paths:
         "201": {description: Phiên bản, content: {application/json: {schema: {type: object, properties: {param: {$ref: "#/components/schemas/FieldopsParam"}}}}}}
         "403": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
+  # --- mkg/orders (G4): bề mặt ứng dụng — sales_officer lập, sales_approver duyệt (R-56) ---
+  /v1/orders/contracts:
+    get:
+      summary: Liệt kê hợp đồng mua rơm (phiên bản mới nhất của mỗi hợp đồng)
+      operationId: listOrdersContracts
+      tags: [orders]
+      parameters:
+        - {name: htx_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: status, in: query, schema: {type: string, enum: [pending, active, rejected, superseded, terminated]}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 200}}
+      responses:
+        "200": {description: Hợp đồng, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/OrdersContract"}}}}}}}
+    post:
+      summary: Lập hợp đồng mua rơm với HTX (phiên bản 1, chờ duyệt) — proto CT-01..03
+      description: Vai sales_officer. CT-02 giá > 0, cam kết > 0, kết thúc ≥ bắt đầu; CT-03 per_tonne | per_bale; trần ẩm lưu, chưa cưỡng chế (C-4). CT-01 HTX đã có hợp đồng hiệu lực chồng thời gian → 409 orders.contract_overlap.
+      operationId: proposeOrdersContract
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/OrdersContractInput"}}}
+      responses:
+        "201": {description: Hợp đồng, content: {application/json: {schema: {$ref: "#/components/schemas/OrdersContractVersions"}}}}
+        "200": {description: Gọi lặp cùng khóa (phát lại)}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/orders/contract-terms:
+    get:
+      summary: Điều khoản hợp đồng hiệu lực của HTX tại một ngày (Contracts.ContractFor — không có → 404 orders.no_contract, không đoán giá)
+      operationId: getOrdersContractTerms
+      tags: [orders]
+      parameters:
+        - {name: htx_ref, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: "on", in: query, schema: {type: string, format: date}, description: "Mặc định hôm nay (giờ VN)"}
+      responses:
+        "200": {description: Điều khoản, content: {application/json: {schema: {$ref: "#/components/schemas/OrdersContractTerms"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/orders/contracts/{id}:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    get:
+      summary: Mọi phiên bản của hợp đồng (mới nhất trước)
+      operationId: getOrdersContract
+      tags: [orders]
+      responses:
+        "200": {description: Hợp đồng, content: {application/json: {schema: {$ref: "#/components/schemas/OrdersContractVersions"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/orders/contracts/{id}/revisions:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Đề xuất phiên bản mới (chờ duyệt) cho hợp đồng đang hiệu lực — reason bắt buộc
+      operationId: reviseOrdersContract
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/OrdersContractInput"}}}
+      responses:
+        "201": {description: Hợp đồng, content: {application/json: {schema: {$ref: "#/components/schemas/OrdersContractVersions"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/orders/contracts/{id}/versions/{version}/decision:
+    parameters:
+      - {$ref: "#/components/parameters/OrderID"}
+      - {name: version, in: path, required: true, schema: {type: integer, minimum: 1}}
+    post:
+      summary: Duyệt / từ chối phiên bản hợp đồng — sales_approver KHÁC người lập (403 self_approval_forbidden; CHECK DB lớp hai); duyệt thay phiên bản hiệu lực trước (superseded)
+      operationId: decideOrdersContract
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/OrdersDecision"}}}
+      responses:
+        "201": {description: Hợp đồng, content: {application/json: {schema: {$ref: "#/components/schemas/OrdersContractVersions"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/orders/contracts/{id}/terminate:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Chấm dứt hợp đồng đang hiệu lực (sales_approver, có lý do)
+      operationId: terminateOrdersContract
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/OrdersReason"}}}
+      responses:
+        "201": {description: Hợp đồng, content: {application/json: {schema: {$ref: "#/components/schemas/OrdersContractVersions"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/orders/purchase-orders:
+    get:
+      summary: Liệt kê đơn mua
+      operationId: listOrdersPurchaseOrders
+      tags: [orders]
+      parameters:
+        - {name: supplier_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: status, in: query, schema: {type: string, enum: [draft, approved, rejected, cancelled]}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 200}}
+      responses:
+        "200": {description: Đơn mua, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/OrdersPurchaseOrder"}}}}}}}
+    post:
+      summary: Lập đơn mua (nháp) — rơm lấy giá hợp đồng hiệu lực; không hợp đồng thì bắt buộc nhập giá (422 orders.price_required — không đoán giá)
+      operationId: createOrdersPurchaseOrder
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [category, supplier_ref, ordered_qty]
+              properties:
+                category: {type: string, enum: [straw, other]}
+                supplier_ref: {type: string, format: uuid, description: "HTX (rơm) hoặc nhà cung cấp — *_ref, định danh ở vault"}
+                facility_ref: {type: [string, "null"], format: uuid}
+                unit: {type: string, enum: [kg, bale], description: "Rơm có hợp đồng: rỗng = theo cách tính hợp đồng (per_tonne ↔ kg, per_bale ↔ bale)"}
+                ordered_qty: {type: string, description: "kg (3 số lẻ) hoặc số cuộn nguyên, > 0"}
+                unit_price: {$ref: "#/components/schemas/Price"}
+                expected_date: {type: string, format: date}
+                description: {type: string, maxLength: 1000}
+      responses:
+        "201": {description: Đơn mua, content: {application/json: {schema: {type: object, properties: {purchase_order: {$ref: "#/components/schemas/OrdersPurchaseOrder"}}}}}}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/orders/purchase-orders/{id}:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    get:
+      summary: Đơn mua kèm phiếu nhận hàng
+      operationId: getOrdersPurchaseOrder
+      tags: [orders]
+      responses:
+        "200": {description: Đơn mua, content: {application/json: {schema: {type: object, properties: {purchase_order: {$ref: "#/components/schemas/OrdersPurchaseOrder"}}}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/orders/purchase-orders/{id}/decision:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Duyệt / từ chối đơn mua nháp — sales_approver KHÁC người lập (R-56)
+      operationId: decideOrdersPurchaseOrder
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/OrdersDecision"}}}
+      responses:
+        "201": {description: Đơn mua, content: {application/json: {schema: {type: object, properties: {purchase_order: {$ref: "#/components/schemas/OrdersPurchaseOrder"}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/orders/purchase-orders/{id}/cancel:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Hủy đơn mua (nháp / đã duyệt chưa có phiếu nhận hiệu lực), có lý do
+      operationId: cancelOrdersPurchaseOrder
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/OrdersReason"}}}
+      responses:
+        "201": {description: Đơn mua, content: {application/json: {schema: {type: object, properties: {purchase_order: {$ref: "#/components/schemas/OrdersPurchaseOrder"}}}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/orders/purchase-orders/{id}/receipts:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Lập phiếu nhận hàng ↔ đơn mua đã duyệt (proto createGoodsReceipt)
+      description: |
+        Rơm theo kg: số nhận = tịnh phiếu cân HUB_IN của lot_ref (measurement), không nhập tay; phiếu chưa về → awaiting_weigh, consumer mkg.orders.weigh_ticket gắn khi về.
+        Theo cuộn: received_qty = số cuộn đếm. Lệch đơn mua > orders.receipt.po_variance_warn_pct (mặc định 3, tạm chờ khách) → needs_variance_report + audit_note; CHỈ cảnh báo, không chặn.
+      operationId: createOrdersReceipt
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, properties: {lot_ref: {type: [string, "null"], format: uuid}, received_qty: {type: [string, "null"]}}}}}
+      responses:
+        "201": {description: Phiếu nhận, content: {application/json: {schema: {type: object, properties: {receipt: {$ref: "#/components/schemas/OrdersReceipt"}}}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/orders/receipts/{id}:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    get:
+      summary: Phiếu nhận hàng (kiểm ↔ đơn mua, khoản phải trả nếu có)
+      operationId: getOrdersReceipt
+      tags: [orders]
+      responses:
+        "200": {description: Phiếu nhận, content: {application/json: {schema: {type: object, properties: {receipt: {$ref: "#/components/schemas/OrdersReceipt"}}}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/orders/receipts/{id}/variance-report:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Ghi biên bản chênh lệch (ghi chú + tệp ở kho đối tượng)
+      operationId: fileOrdersVarianceReport
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [note], properties: {note: {type: string, minLength: 10, maxLength: 2000}, file_ref: {type: [string, "null"], format: uuid}}}}}
+      responses:
+        "201": {description: Phiếu nhận, content: {application/json: {schema: {type: object, properties: {receipt: {$ref: "#/components/schemas/OrdersReceipt"}}}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/orders/receipts/{id}/corrections:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Bù số nhận nhập tay (cuộn / kg đơn mua khác) trước khi duyệt — bản ghi bù supersedes, có lý do (RB-1)
+      operationId: correctOrdersReceipt
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [received_qty, reason], properties: {received_qty: {type: string}, reason: {type: string, minLength: 10, maxLength: 500}}}}}
+      responses:
+        "201": {description: Phiếu nhận, content: {application/json: {schema: {type: object, properties: {receipt: {$ref: "#/components/schemas/OrdersReceipt"}}}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/orders/receipts/{id}/decision:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Duyệt / từ chối phiếu nhận — sales_approver KHÁC người lập; không bị chặn bởi chênh lệch. Đơn mua KHÁC → đúng một khoản phải trả; rơm → không (chỉ từ quyết toán costing)
+      operationId: decideOrdersReceipt
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/OrdersDecision"}}}
+      responses:
+        "201": {description: Phiếu nhận, content: {application/json: {schema: {type: object, properties: {receipt: {$ref: "#/components/schemas/OrdersReceipt"}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/orders/payables:
+    get:
+      summary: Khoản phải trả đơn mua KHÁC (một khoản mỗi phiếu nhận đã duyệt)
+      operationId: listOrdersPayables
+      tags: [orders]
+      parameters:
+        - {name: po_id, in: query, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 200}}
+      responses:
+        "200": {description: Phải trả, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/OrdersPayable"}}, next_cursor: {type: string}}}}}}
+  /v1/orders/sales-orders:
+    get:
+      summary: Liệt kê đơn bán
+      operationId: listOrdersSalesOrders
+      tags: [orders]
+      parameters:
+        - {name: customer_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: status, in: query, schema: {type: string, enum: [draft, confirmed, delivering, delivered, completed, cancelled]}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 200}}
+      responses:
+        "200": {description: Đơn bán, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/OrdersSalesOrder"}}}}}}}
+    post:
+      summary: Lập đơn bán nháp — khách là customer_ref (vault), không PII; giá / chiết khấu vượt ngưỡng (tham số chờ khách) → cần sales_approver xác nhận
+      operationId: createOrdersSalesOrder
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customer_ref, product, ordered_kg, unit_price]
+              properties:
+                customer_ref: {type: string, format: uuid}
+                product: {$ref: "#/components/schemas/Product"}
+                ordered_kg: {$ref: "#/components/schemas/Kg"}
+                list_price: {$ref: "#/components/schemas/Price"}
+                unit_price: {$ref: "#/components/schemas/Price"}
+                discount_pct: {$ref: "#/components/schemas/Pct"}
+                delivery_from: {type: string, format: date}
+                delivery_to: {type: string, format: date}
+      responses:
+        "201": {description: Đơn bán, content: {application/json: {schema: {type: object, properties: {sales_order: {$ref: "#/components/schemas/OrdersSalesOrder"}}}}}}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/orders/sales-orders/{id}:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    get:
+      summary: Đơn bán kèm lịch giao
+      operationId: getOrdersSalesOrder
+      tags: [orders]
+      responses:
+        "200": {description: Đơn bán, content: {application/json: {schema: {type: object, properties: {sales_order: {$ref: "#/components/schemas/OrdersSalesOrder"}}}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/orders/sales-orders/{id}/confirm:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Xác nhận đơn nháp — vượt ngưỡng giá/chiết khấu → chỉ sales_approver KHÁC người lập (403 orders.price_approval_required / self_approval_forbidden; CHECK DB)
+      operationId: confirmOrdersSalesOrder
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "201": {description: Đơn bán, content: {application/json: {schema: {type: object, properties: {sales_order: {$ref: "#/components/schemas/OrdersSalesOrder"}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/orders/sales-orders/{id}/advance:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Chuyển trạng thái đơn bán chỉ tiến (proto advanceSalesOrder); hủy từ draft/confirmed có lý do
+      operationId: advanceOrdersSalesOrder
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [status], properties: {status: {type: string, enum: [delivering, delivered, completed, cancelled]}, reason: {type: string, minLength: 10, maxLength: 500}}}}}
+      responses:
+        "201": {description: Đơn bán, content: {application/json: {schema: {type: object, properties: {sales_order: {$ref: "#/components/schemas/OrdersSalesOrder"}}}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/orders/sales-orders/{id}/deliveries:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Thêm lượt giao vào lịch giao (đơn đã xác nhận / đang giao)
+      operationId: planOrdersDelivery
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [lot_ref, route, planned_date, planned_kg], properties: {lot_ref: {type: string, format: uuid}, route: {type: string, enum: [HUB, DIRECT]}, planned_date: {type: string, format: date}, planned_kg: {$ref: "#/components/schemas/Kg"}, trip_ref: {type: [string, "null"], format: uuid}}}}}
+      responses:
+        "201": {description: Giao nhận, content: {application/json: {schema: {type: object, properties: {delivery: {$ref: "#/components/schemas/OrdersDelivery"}}}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/orders/deliveries/{id}:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    get:
+      summary: Giao nhận
+      operationId: getOrdersDelivery
+      tags: [orders]
+      responses:
+        "200": {description: Giao nhận, content: {application/json: {schema: {type: object, properties: {delivery: {$ref: "#/components/schemas/OrdersDelivery"}}}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/orders/deliveries/{id}/dispatch:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Xuất giao (planned → dispatched); đơn bán confirmed → delivering
+      operationId: dispatchOrdersDelivery
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {trip_ref: {type: [string, "null"], format: uuid}}}}}
+      responses:
+        "201": {description: Giao nhận, content: {application/json: {schema: {type: object, properties: {delivery: {$ref: "#/components/schemas/OrdersDelivery"}}}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/orders/deliveries/{id}/accept:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Biên bản giao nhận — khối lượng = phiếu CUSTOMER_IN đã gắn (không nhập tay; 409 orders.customer_in_missing); phát mkg.orders.delivery.accepted (nội bộ)
+      operationId: acceptOrdersDelivery
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [evidence], properties: {evidence: {type: object, required: [file_ref, kind], properties: {file_ref: {type: string, format: uuid}, kind: {type: string, enum: [epod, minutes, ebill]}}}, dispute_ref: {type: [string, "null"], format: uuid, description: "Hồ sơ tranh chấp của measurement"}, accepted_at: {type: string, format: date-time}}}}}
+      responses:
+        "201": {description: Giao nhận, content: {application/json: {schema: {type: object, properties: {delivery: {$ref: "#/components/schemas/OrdersDelivery"}}}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/orders/deliveries/{id}/reject:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Khách từ chối lượt giao đã xuất (có lý do)
+      operationId: rejectOrdersDelivery
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/OrdersReason"}}}
+      responses:
+        "201": {description: Giao nhận, content: {application/json: {schema: {type: object, properties: {delivery: {$ref: "#/components/schemas/OrdersDelivery"}}}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/orders/deliveries/{id}/cancel:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Hủy lượt giao chưa xuất (có lý do)
+      operationId: cancelOrdersDelivery
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/OrdersReason"}}}
+      responses:
+        "201": {description: Giao nhận, content: {application/json: {schema: {type: object, properties: {delivery: {$ref: "#/components/schemas/OrdersDelivery"}}}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/orders/deliveries/{id}/corrections:
+    parameters: [{$ref: "#/components/parameters/OrderID"}]
+    post:
+      summary: Chấp nhận bù (supersedes dòng accepted trước, có lý do) + sự kiện bản bù — phiếu CUSTOMER_IN khác của cùng lô hoặc phiếu hiệu lực
+      operationId: correctOrdersDelivery
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [reason], properties: {customer_in_ticket_ref: {type: [string, "null"], format: uuid}, dispute_ref: {type: [string, "null"], format: uuid}, reason: {type: string, minLength: 10, maxLength: 500}}}}}
+      responses:
+        "201": {description: Giao nhận, content: {application/json: {schema: {type: object, properties: {delivery: {$ref: "#/components/schemas/OrdersDelivery"}}}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/orders/params/{key}:
+    parameters: [{$ref: "#/components/parameters/OrdersParamKey"}]
+    get:
+      summary: Các phiên bản tham số và giá trị hiệu lực hôm nay (mặc định tạm, chờ khách)
+      operationId: getOrdersParam
+      tags: [orders]
+      responses:
+        "200":
+          description: Tham số
+          content: {application/json: {schema: {type: object, properties: {param_key: {type: string}, effective_value: {type: string}, param_version: {type: string}, provisional: {type: boolean}, default_value: {type: string}, note: {type: string}, versions: {type: array, items: {$ref: "#/components/schemas/OrdersParam"}}}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/orders/params/{key}/versions:
+    parameters: [{$ref: "#/components/parameters/OrdersParamKey"}]
+    post:
+      summary: Đề xuất phiên bản tham số (pending tới khi sales_approver KHÁC duyệt, R-56)
+      operationId: proposeOrdersParam
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [value, reason], properties: {value: {type: string}, effective_from: {type: string, format: date}, provisional: {type: boolean, default: true, description: "Tạm, chờ khách"}, reason: {type: string, minLength: 10, maxLength: 500}}}}}
+      responses:
+        "201": {description: Phiên bản, content: {application/json: {schema: {type: object, properties: {param: {$ref: "#/components/schemas/OrdersParam"}}}}}}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/orders/params/{key}/versions/{version}/decision:
+    parameters:
+      - {$ref: "#/components/parameters/OrdersParamKey"}
+      - {name: version, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Duyệt / từ chối phiên bản tham số — người quyết định KHÁC người đề xuất (403 self_approval_forbidden; CHECK DB)
+      operationId: decideOrdersParam
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/OrdersDecision"}}}
+      responses:
+        "201": {description: Phiên bản, content: {application/json: {schema: {type: object, properties: {param: {$ref: "#/components/schemas/OrdersParam"}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  # --- mkg/orders: bề mặt quản trị (MFA) ---
+  /v1/orders/projections/rebuild:
+    post:
+      summary: "[Quản trị] Dựng lại mọi bảng chiếu của orders thẳng từ sổ (R-22)"
+      operationId: rebuildOrdersProjections
+      tags: [orders]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "200": {description: Số dòng đã dựng theo bảng chiếu, content: {application/json: {schema: {type: object, additionalProperties: {type: integer}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -1443,6 +1891,7 @@ components:
     FacilityID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
     MeasurementID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
     OrderID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    OrdersParamKey: {name: key, in: path, required: true, schema: {type: string, enum: [orders.receipt.po_variance_warn_pct, orders.sales.price_approval_delta_pct, orders.sales.discount_approval_pct, orders.payment_term_days, orders.sales.stock_shortage_blocking]}}
   responses:
     Problem:
       description: Lỗi RFC 9457
@@ -1952,6 +2401,200 @@ components:
       type: object
       properties:
         param_key: {type: string, enum: [baling_deadline_days]}
+        version_id: {type: string, format: uuid}
+        version_seq: {type: integer}
+        value: {type: string}
+        effective_from: {type: string, format: date}
+        provisional: {type: boolean}
+        status: {type: string, enum: [pending, approved, rejected]}
+        proposed_by: {type: string, format: uuid}
+        proposal_reason: {type: string}
+        decided_by: {type: [string, "null"], format: uuid}
+        decided_at: {type: [string, "null"], format: date-time}
+        decision_reason: {type: [string, "null"]}
+    # --- mkg/orders (G4) — giá, tiền, khách KHÔNG BAO GIỜ qua van ---
+    Price: {type: string, pattern: "^[0-9]+(\\.[0-9]{1,4})?$", example: "650000.0000", description: "Đơn giá VND numeric(18,4) — /tấn hoặc /cuộn"}
+    Amount: {type: string, pattern: "^-?[0-9]+\\.[0-9]{2}$", example: "24813134.93", description: "Tiền VND numeric(18,2)"}
+    OrdersDecision:
+      type: object
+      required: [decision]
+      properties:
+        decision: {type: string, enum: [approved, rejected]}
+        reason: {type: string, minLength: 10, maxLength: 500, description: "Bắt buộc khi rejected"}
+    OrdersReason:
+      type: object
+      required: [reason]
+      properties:
+        reason: {type: string, minLength: 10, maxLength: 500}
+    OrdersContractInput:
+      type: object
+      required: [basis, unit_price, committed_kg, valid_from, valid_to]
+      properties:
+        htx_ref: {type: string, format: uuid, description: "Bắt buộc khi lập; bỏ qua khi sửa (giữ HTX của hợp đồng)"}
+        basis: {type: string, enum: [per_tonne, per_bale]}
+        unit_price: {$ref: "#/components/schemas/Price"}
+        committed_kg: {$ref: "#/components/schemas/Kg"}
+        max_moisture_pct: {$ref: "#/components/schemas/Pct"}
+        valid_from: {type: string, format: date}
+        valid_to: {type: string, format: date}
+        note: {type: string, maxLength: 1000}
+        reason: {type: string, minLength: 10, maxLength: 500, description: "Bắt buộc khi sửa (phiên bản mới)"}
+    OrdersContract:
+      type: object
+      properties:
+        contract_id: {type: string, format: uuid}
+        version: {type: integer}
+        status: {type: string, enum: [pending, active, rejected, superseded, terminated]}
+        code: {type: string, example: HDR00001}
+        htx_ref: {type: string, format: uuid}
+        basis: {type: string, enum: [per_tonne, per_bale]}
+        unit_price: {$ref: "#/components/schemas/Price"}
+        committed_kg: {$ref: "#/components/schemas/Kg"}
+        max_moisture_pct: {type: [string, "null"], description: "Lưu, chưa cưỡng chế (C-4)"}
+        valid_from: {type: string, format: date}
+        valid_to: {type: string, format: date}
+        note: {type: [string, "null"]}
+        proposed_by: {type: string, format: uuid}
+        approved_by: {type: [string, "null"], format: uuid}
+        reason: {type: [string, "null"]}
+        event_time: {type: string, format: date-time}
+    OrdersContractVersions:
+      type: object
+      properties:
+        contract_id: {type: string, format: uuid}
+        versions: {type: array, items: {$ref: "#/components/schemas/OrdersContract"}}
+    OrdersContractTerms:
+      type: object
+      properties:
+        contract_id: {type: string, format: uuid}
+        code: {type: string}
+        htx_ref: {type: string, format: uuid}
+        basis: {type: string, enum: [per_tonne, per_bale]}
+        unit_price: {$ref: "#/components/schemas/Price"}
+        committed_kg: {$ref: "#/components/schemas/Kg"}
+        max_moisture_pct: {type: [string, "null"]}
+        valid_from: {type: string, format: date}
+        valid_to: {type: string, format: date}
+        version: {type: integer}
+    OrdersPurchaseOrder:
+      type: object
+      properties:
+        po_id: {type: string, format: uuid}
+        status: {type: string, enum: [draft, approved, rejected, cancelled]}
+        code: {type: string, example: PO000001}
+        category: {type: string, enum: [straw, other]}
+        supplier_ref: {type: string, format: uuid}
+        contract_ref: {type: [string, "null"], format: uuid}
+        contract_version: {type: [integer, "null"]}
+        facility_ref: {type: [string, "null"], format: uuid}
+        unit: {type: string, enum: [kg, bale]}
+        ordered_qty: {type: string}
+        unit_price: {$ref: "#/components/schemas/Price"}
+        price_source: {type: string, enum: [contract, entered]}
+        expected_date: {type: [string, "null"], format: date}
+        description: {type: [string, "null"]}
+        created_by: {type: string, format: uuid}
+        approved_by: {type: [string, "null"], format: uuid}
+        reason: {type: [string, "null"]}
+        event_time: {type: string, format: date-time}
+        receipts: {type: array, items: {$ref: "#/components/schemas/OrdersReceipt"}}
+    OrdersReceipt:
+      type: object
+      properties:
+        receipt_id: {type: string, format: uuid}
+        po_id: {type: string, format: uuid}
+        status: {type: string, enum: [awaiting_weigh, pending_approval, approved, rejected]}
+        code: {type: string, example: GRN000001}
+        category: {type: string, enum: [straw, other]}
+        supplier_ref: {type: string, format: uuid}
+        lot_ref: {type: [string, "null"], format: uuid}
+        unit: {type: string, enum: [kg, bale]}
+        ordered_qty: {type: string}
+        ticket_ref: {type: [string, "null"], format: uuid, description: "Phiếu cân HUB_IN (measurement)"}
+        ticket_kg: {type: [string, "null"]}
+        received_qty: {type: [string, "null"]}
+        qty_source: {type: [string, "null"], enum: [ticket, count, entered, null]}
+        variance_pct: {type: [string, "null"], description: "Có dấu, 2 số lẻ"}
+        threshold_pct: {type: [string, "null"]}
+        param_version: {type: [string, "null"], example: "orders.receipt.po_variance_warn_pct:default"}
+        needs_variance_report: {type: boolean, description: "|chênh| > ngưỡng → cần biên bản chênh lệch; CHỈ cảnh báo, không chặn"}
+        audit_note: {type: [string, "null"]}
+        report_note: {type: [string, "null"]}
+        report_file_ref: {type: [string, "null"], format: uuid}
+        created_by: {type: string, format: uuid}
+        approved_by: {type: [string, "null"], format: uuid}
+        reason: {type: [string, "null"]}
+        event_time: {type: string, format: date-time}
+        payable: {$ref: "#/components/schemas/OrdersPayable"}
+    OrdersPayable:
+      type: object
+      properties:
+        payable_id: {type: string, format: uuid}
+        receipt_id: {type: string, format: uuid}
+        po_id: {type: string, format: uuid}
+        supplier_ref: {type: string, format: uuid}
+        unit: {type: string, enum: [kg, bale]}
+        qty: {type: string}
+        unit_price: {$ref: "#/components/schemas/Price"}
+        amount: {$ref: "#/components/schemas/Amount"}
+        due_date: {type: string, format: date}
+        payment_term_days: {type: integer}
+        param_version: {type: string}
+        recorded_at: {type: string, format: date-time}
+    OrdersSalesOrder:
+      type: object
+      properties:
+        order_id: {type: string, format: uuid}
+        status: {type: string, enum: [draft, confirmed, delivering, delivered, completed, cancelled]}
+        code: {type: string, example: SO000001}
+        customer_ref: {type: string, format: uuid, description: "Định danh khách ở vault — không PII trong mkg"}
+        product: {$ref: "#/components/schemas/Product"}
+        ordered_kg: {$ref: "#/components/schemas/Kg"}
+        list_price: {type: [string, "null"]}
+        unit_price: {$ref: "#/components/schemas/Price"}
+        discount_pct: {$ref: "#/components/schemas/Pct"}
+        net_price: {$ref: "#/components/schemas/Price"}
+        amount: {$ref: "#/components/schemas/Amount"}
+        needs_price_approval: {type: boolean}
+        price_rule: {type: string, description: "Phiên bản ngưỡng lệch giá, chiết khấu đã áp"}
+        payment_term_days: {type: integer}
+        delivery_from: {type: [string, "null"], format: date}
+        delivery_to: {type: [string, "null"], format: date}
+        created_by: {type: string, format: uuid}
+        approved_by: {type: [string, "null"], format: uuid}
+        reason: {type: [string, "null"]}
+        event_time: {type: string, format: date-time}
+        deliveries: {type: array, items: {$ref: "#/components/schemas/OrdersDelivery"}}
+    OrdersDelivery:
+      type: object
+      properties:
+        delivery_id: {type: string, format: uuid}
+        order_id: {type: string, format: uuid}
+        status: {type: string, enum: [planned, dispatched, accepted, rejected, cancelled]}
+        code: {type: string, example: GN000001}
+        customer_ref: {type: string, format: uuid}
+        route: {type: string, enum: [HUB, DIRECT]}
+        lot_ref: {type: string, format: uuid}
+        trip_ref: {type: [string, "null"], format: uuid}
+        planned_date: {type: string, format: date}
+        planned_kg: {$ref: "#/components/schemas/Kg"}
+        unit_price: {$ref: "#/components/schemas/Price"}
+        customer_in_ticket_ref: {type: [string, "null"], format: uuid}
+        ticket_kg: {type: [string, "null"]}
+        accepted_kg: {type: [string, "null"]}
+        amount: {type: [string, "null"]}
+        accepted_at: {type: [string, "null"], format: date-time}
+        acceptance_id: {type: [string, "null"], format: uuid, description: "= event_id của mkg.orders.delivery.accepted hiệu lực"}
+        dispute_ref: {type: [string, "null"], format: uuid}
+        evidence_file_ref: {type: [string, "null"], format: uuid}
+        evidence_kind: {type: [string, "null"], enum: [epod, minutes, ebill, null]}
+        reason: {type: [string, "null"]}
+        rule_version: {type: string}
+        event_time: {type: string, format: date-time}
+    OrdersParam:
+      type: object
+      properties:
+        param_key: {type: string}
         version_id: {type: string, format: uuid}
         version_seq: {type: integer}
         value: {type: string}

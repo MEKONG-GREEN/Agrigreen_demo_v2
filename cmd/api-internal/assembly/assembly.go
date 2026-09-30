@@ -26,6 +26,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub"
 	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
@@ -41,10 +42,13 @@ type Modules struct {
 	Hub         *hub.Module
 	Measurement *measurement.Module
 	Fieldops    *fieldops.Module
+	Orders      *orders.Module // G4: hợp đồng mua rơm, đơn mua/phiếu nhận, đơn bán/giao nhận (orders_app)
 }
 
 // List trả module theo thứ tự gắn route.
-func (m Modules) List() []httpx.Module { return []httpx.Module{m.Hub, m.Measurement, m.Fieldops} }
+func (m Modules) List() []httpx.Module {
+	return []httpx.Module{m.Hub, m.Measurement, m.Fieldops, m.Orders}
+}
 
 // OpsRole là vai vận hành của api-internal ở cụm mkg (tương đương platform_api ở
 // cụm pf): chỉ bảng vận hành shared.idempotency_key qua ag_shared_user, không có
@@ -93,6 +97,13 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules,
 	fo.Weighed = mkgwire.Weighed{Links: mods.Measurement.CollectionLinks(), Lots: mods.Measurement.LotMass()}
 	mods.Fieldops = fieldops.New(foPool, clk, fo)
 	rolls.Totals, rolls.KgPerRoll = mods.Fieldops.RollTotals(), mods.Fieldops.KgPerRoll()
+	// G4 mkg/orders: costing đọc mods.Orders.Contracts() / Deliveries() khi được nối.
+	ordPool, err := open(ctx, orders.DBRole)
+	if err != nil {
+		return mods, ops, pools, err
+	}
+	pools = append(pools, ordPool)
+	mods.Orders = orders.New(ordPool, clk)
 	return mods, ops, pools, nil
 }
 

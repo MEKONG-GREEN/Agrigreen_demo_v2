@@ -21,15 +21,15 @@ Bốn trạng thái:
 | Mục | Số yêu cầu | đạt | một phần | chưa làm | ngoài G4 |
 |---|---|---|---|---|---|
 | 3. Phụ lục A (G4) | 5 | 0 | 0 | 5 | 0 |
-| 4. Chuyển từ G3 | 2 | 0 | 0 | 2 | 0 |
+| 4. Chuyển từ G3 | 2 | 1 | 0 | 1 | 0 |
 | 5. `mkg/logistics` | 13 | 0 | 0 | 13 | 0 |
-| 6. `mkg/orders` | 11 | 0 | 0 | 11 | 0 |
+| 6. `mkg/orders` | 11 | 10 | 1 | 0 | 0 |
 | 7. `mkg/costing` | 16 | 0 | 0 | 16 | 0 |
 | 8. `mkg/acctbridge` | 9 | 0 | 0 | 9 | 0 |
 | 9. Cổng kiến trúc G4 (RB, R-xx, vùng, hạ tầng) | 14 | 0 | 0 | 14 | 0 |
 | 10. Client và kịch bản đầu–cuối | 4 | 0 | 0 | 4 | 0 |
 | 11. Câu hỏi khách | 7 | 0 | 0 | 7 | 0 |
-| **Tổng** | **81** | **0** | **0** | **81** | **0** |
+| **Tổng** | **81** | **11** | **1** | **69** | **0** |
 
 Đã có ở G4-0 (nền móng, không tính là đạt dòng nào): bề mặt đối tác `/v1/partner/waterway/route` phía nền tảng (`TestPartnerWaterwayRoute_ADR0020`, `TestShareGrantWaterwayRoutesKind_G4`), hợp đồng sự kiện nội bộ (`TestG4FrozenInternalContracts`), vai trong realm (`TestKeycloakRealmCoversRolesAndClaims`), `agnofloat` cho bốn module (`TestNoFloat`).
 
@@ -69,7 +69,7 @@ Như [g3-acceptance.md §1](g3-acceptance.md#1-cách-chạy). Kịch bản E2E G
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
 | T-1 | proto FM-05: mỗi lượt xuống ghe sinh một chuyến vận tải đường thủy (số hiệu ghe, tấn ước theo cuộn; lỗi TMS / không xác định đích → chỉ cảnh báo, đếm cuộn vẫn ghi; thông báo hàng đến mang mã chuyến) | — (phía nền tảng định tuyến: `TestPartnerWaterwayRoute_ADR0020`) | **chưa làm** (`mkg/logistics`) |
-| T-2 | proto phiếu nhận hàng ↔ đơn mua: lệch > 3 % → cần biên bản chênh lệch + ghi chú kiểm toán, **không chặn** | — | **chưa làm** (`mkg/orders`) |
+| T-2 | proto phiếu nhận hàng ↔ đơn mua: lệch > 3 % → cần biên bản chênh lệch + ghi chú kiểm toán, **không chặn** | `TestReceiptVsPOVariancePerTonne_T2` (HUB_IN qua consumer, trước/sau phiếu nhận), `TestReceiptVsPOVariancePerBale_T2` (theo cuộn, bù có lý do), `TestCheckReceiptThresholdBothUnits_T2`, `TestReceiptVarianceParamVersioned` (ngưỡng có phiên bản) | **đạt** (ngưỡng 3 % tạm, chờ khách) |
 
 ## 5. `mkg/logistics` (mkg.md §5.4)
 
@@ -93,17 +93,17 @@ Như [g3-acceptance.md §1](g3-acceptance.md#1-cách-chạy). Kịch bản E2E G
 
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| O-01 | proto CT-01: một hợp đồng mua rơm hiệu lực mỗi HTX mỗi kỳ; chồng lấn → từ chối | — | **chưa làm** |
-| O-02 | proto CT-02/03: giá > 0, tấn cam kết > 0, kết thúc ≥ bắt đầu; cách tính `per_tonne` / `per_bale`; trần ẩm lưu, chưa cưỡng chế (C-4) | — | **chưa làm** |
-| O-03 | Hợp đồng, đơn mua, đơn bán: người lập `sales_officer` ≠ người duyệt `sales_approver` ở app/ **và** CHECK DB (R-56) | — | **chưa làm** |
-| O-04 | Đơn mua: tấn > 0, giá > 0; `draft → approved`, hủy có lý do | — | **chưa làm** |
-| O-05 | Đơn bán: tấn > 0, đơn giá > 0; trạng thái chỉ tiến; thiếu tồn chỉ cảnh báo | — | **chưa làm** |
-| O-06 | Giá / chiết khấu vượt ngưỡng (tham số có phiên bản, chờ khách) cần `sales_approver` | — | **chưa làm** |
-| O-07 | Giao nhận: biên bản liên kết phiếu `CUSTOMER_IN` (khối lượng chuẩn từ measurement, không nhập tay); tuyến HUB/DIRECT; tranh chấp liên kết hồ sơ measurement | — | **chưa làm** |
-| O-08 | Sự kiện `mkg.orders.delivery.accepted` v1 (bản bù); giá, khách không bao giờ qua van | — | **chưa làm** |
-| O-09 | Tiền `numeric(18,2)`, đơn giá `numeric(18,4)` qua `shared/money` (R-10) | — | **chưa làm** |
-| O-10 | `Contracts.ContractFor`: không có hợp đồng → `ErrNoContract` (quyết toán không đoán giá) | — | **chưa làm** |
-| O-11 | Một nguồn khoản phải trả đơn mua (phiếu nhận đã duyệt) — không ghi trùng như prototype | — | **chưa làm** |
+| O-01 | proto CT-01: một hợp đồng mua rơm hiệu lực mỗi HTX mỗi kỳ; chồng lấn → từ chối | `TestContractLifecycle_CT01_CT02_SoD` (409 `orders.contract_overlap` khi lập và kiểm lại khi duyệt), `TestValidateContract_CT02_CT03` (chồng lấn theo ngày, hai đầu tính) | **đạt** |
+| O-02 | proto CT-02/03: giá > 0, tấn cam kết > 0, kết thúc ≥ bắt đầu; cách tính `per_tonne` / `per_bale`; trần ẩm lưu, chưa cưỡng chế (C-4) | `TestContractLifecycle_CT01_CT02_SoD`, `TestValidateContract_CT02_CT03` (+ CHECK mkg 000016); hợp đồng có phiên bản (sửa = phiên bản mới, duyệt → cũ `superseded`) | **đạt** (quy đổi ẩm chờ khách — Q-6) |
+| O-03 | Hợp đồng, đơn mua, đơn bán: người lập `sales_officer` ≠ người duyệt `sales_approver` ở app/ **và** CHECK DB (R-56) | `TestContractLifecycle_CT01_CT02_SoD` (403 + CHECK 23514), `TestPurchaseOrderRules_O04`, `TestSalesOrderPriceApproval_O06` (403 + CHECK 23514), `TestReceiptVarianceParamVersioned` (tham số); phiếu nhận: CHECK `receipt_event` | **đạt** |
+| O-04 | Đơn mua: tấn > 0, giá > 0; `draft → approved`, hủy có lý do | `TestPurchaseOrderRules_O04` | **đạt** |
+| O-05 | Đơn bán: tấn > 0, đơn giá > 0; trạng thái chỉ tiến; thiếu tồn chỉ cảnh báo | `TestSalesOrderForwardOnly_O05`, `TestSalesOrderForwardOnly_O05Domain` | **một phần** — **mã**: cảnh báo thiếu tồn chưa làm (mkg/hub chưa có cổng tồn theo dạng hàng; tham số `orders.sales.stock_shortage_blocking` = 0 đã có) |
+| O-06 | Giá / chiết khấu vượt ngưỡng (tham số có phiên bản, chờ khách) cần `sales_approver` | `TestSalesOrderPriceApproval_O06` (403 `orders.price_approval_required`, `self_approval_forbidden`), `TestCheckPriceApproval_O06`; ngưỡng ghim vào `price_rule` | **đạt** (ngưỡng tạm 0 — chờ khách Q-5) |
+| O-07 | Giao nhận: biên bản liên kết phiếu `CUSTOMER_IN` (khối lượng chuẩn từ measurement, không nhập tay); tuyến HUB/DIRECT; tranh chấp liên kết hồ sơ measurement | `TestDeliveryCustomerInAccepted_O07_O08` (consumer `mkg.orders.weigh_ticket` gắn phiếu; 409 `orders.customer_in_missing`; CHECK `accepted_kg = ticket_kg`; `dispute_ref`), `TestDeliveryCompensatingCorrection_RB1` (DIRECT) | **đạt** |
+| O-08 | Sự kiện `mkg.orders.delivery.accepted` v1 (bản bù); giá, khách không bao giờ qua van | `TestDeliveryCustomerInAccepted_O07_O08` (`KindInternal`, đúng trường hợp đồng), `TestDeliveryCompensatingCorrection_RB1` (phiếu bù → chấp nhận bù tự động + `supersedes_id`; `Deliveries.Accepted` theo `asOf`), `contractcheck` | **đạt** |
+| O-09 | Tiền `numeric(18,2)`, đơn giá `numeric(18,4)` qua `shared/money` (R-10) | `TestLineAmountDecimalRounding_O09`, `TestNoFloat` (archlint phủ `orders`) | **đạt** |
+| O-10 | `Contracts.ContractFor`: không có hợp đồng → `ErrNoContract` (quyết toán không đoán giá) | `TestContractForErrNoContract_O10` (+ đơn mua rơm không hợp đồng không giá → 422 `orders.price_required`) | **đạt** |
+| O-11 | Một nguồn khoản phải trả đơn mua (phiếu nhận đã duyệt) — không ghi trùng như prototype | `TestOtherPurchasePayableSingleSource_O11` (đúng một khoản, duyệt lặp không ghi thêm), `TestReceiptVsPOVariancePerTonne_T2` (rơm: 0 khoản — chỉ từ quyết toán costing) | **đạt** |
 
 ## 7. `mkg/costing` (mkg.md §5.6, mục 16)
 
@@ -144,8 +144,8 @@ Như [g3-acceptance.md §1](g3-acceptance.md#1-cách-chạy). Kịch bản E2E G
 
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| K-01 | RB-1: mọi sổ mới chỉ ghi thêm — sáu phép thử UPDATE/DELETE/TRUNCATE, `v_missing_immutability` rỗng, `verify_chain` | — | **chưa làm** |
-| K-02 | RB-2: cách ly tenant mọi bảng G4, kể cả song song qua PgBouncer (R-32) | — | **chưa làm** |
+| K-01 | RB-1: mọi sổ mới chỉ ghi thêm — sáu phép thử UPDATE/DELETE/TRUNCATE, `v_missing_immutability` rỗng, `verify_chain` | orders: `TestOrdersLedgersAppendOnlySixWays_R20` (8 sổ, `verify_chain`), `TestCatalogGates` | **chưa làm** (còn logistics, costing, acctbridge) |
+| K-02 | RB-2: cách ly tenant mọi bảng G4, kể cả song song qua PgBouncer (R-32) | orders: `TestOrdersTenantLeakParallel` (15 bảng) | **chưa làm** (còn logistics, costing, acctbridge) |
 | K-03 | R-10: `agnofloat` phủ toàn bộ bốn module (không float ở bất kỳ package con nào) | `TestNoFloat` (luật, G4-0) | **chưa làm** (chờ mã module) |
 | K-04 | R-03/R-05: bốn module không import `platform/*`, mỗi module một vai chỉ quyền trên schema của nó, không đọc chéo schema | — | **chưa làm** |
 | K-05 | ADR-0018: tám sự kiện nội bộ chỉ đi `KindInternal`; giao lặp → như một lần (R-61); DLQ (R-62) | `TestG4FrozenInternalContracts` (hợp đồng, G4-0) | **chưa làm** |
