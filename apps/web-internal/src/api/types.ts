@@ -319,3 +319,53 @@ export interface CrewShift {
 }
 export type BuySidePage = Get<"/v1/fieldops/reconciliation">;
 export type KgPerRoll = Get<"/v1/fieldops/htx/{id}/kg-per-roll">;
+
+// ---------------------------------------------------------------------------
+// G4: mkg/logistics, mkg/orders, mkg/costing, mkg/acctbridge — kiểu sinh từ hợp đồng
+// ---------------------------------------------------------------------------
+export type LogisticsTrip = S["LogisticsTrip"];
+export type LogisticsLeg = S["LogisticsLeg"];
+export type LogisticsTripEvent = S["LogisticsTripEvent"];
+export type LogisticsVessel = S["LogisticsVessel"];
+export type LogisticsVesselInput = S["LogisticsVesselInput"];
+export type LogisticsParam = S["LogisticsParam"];
+export type LogisticsEndpointInput = S["LogisticsEndpointInput"];
+export type LogisticsParamView = Get<"/v1/logistics/params/{key}">;
+export type LogisticsParamKey = paths["/v1/logistics/params/{key}"]["parameters"]["path"]["key"];
+export type LogisticsAlerts = Get<"/v1/logistics/alerts">;
+export type RouteSnapshot = Get<"/v1/logistics/trips/{id}/legs/{leg}/route-snapshot">;
+export type TripResult = Post<"/v1/logistics/trips">;
+
+export type OrdersContract = S["OrdersContract"];
+export type OrdersContractInput = S["OrdersContractInput"];
+export type OrdersContractVersions = S["OrdersContractVersions"];
+export type OrdersPurchaseOrder = S["OrdersPurchaseOrder"];
+export type OrdersReceipt = S["OrdersReceipt"];
+export type OrdersPayable = S["OrdersPayable"];
+export type OrdersSalesOrder = S["OrdersSalesOrder"];
+export type OrdersDelivery = S["OrdersDelivery"];
+export type OrdersParam = S["OrdersParam"];
+export type OrdersParamView = Get<"/v1/orders/params/{key}">;
+export type OrdersParamKey = paths["/v1/orders/params/{key}"]["parameters"]["path"]["key"];
+
+export type CostCategory = S["CostCategory"];
+export type CostEntry = S["CostEntry"];
+export type CostingAllocation = S["CostingAllocation"];
+export type CostingCloseJob = S["CostingCloseJob"];
+export type CostingLotCost = S["CostingLotCost"];
+export type CostingParam = S["CostingParam"];
+export type CostingParamVersion = S["CostingParamVersion"];
+export type CostingPeriod = S["CostingPeriod"];
+export type CostingSettlement = S["CostingSettlement"];
+export type CarbonRevenueResult = Post<"/v1/costing/carbon-revenue">;
+export type CostingConversion = Get<"/v1/costing/collections/{id}/conversion">;
+
+export type AcctbridgeJournal = S["AcctbridgeJournal"];
+export type AcctbridgeJournalLine = S["AcctbridgeJournalLine"];
+export type AcctbridgeJob = S["AcctbridgeJob"];
+export type AcctbridgeMapping = S["AcctbridgeMapping"];
+export type AcctbridgeMappingRule = S["AcctbridgeMappingRule"];
+export type AcctbridgePushAttempt = S["AcctbridgePushAttempt"];
+export type AcctbridgePushJob = S["AcctbridgePushJob"];
+export type AcctbridgeJournalDetail = Get<"/v1/acctbridge/journals/{id}">;
+export type AcctbridgeMappings = Get<"/v1/acctbridge/mappings">;

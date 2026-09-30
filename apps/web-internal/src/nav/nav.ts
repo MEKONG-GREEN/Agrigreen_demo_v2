@@ -23,6 +23,10 @@ const R = ROLES;
 const HUB = [R.hubOperator, R.hubApprover];
 const MEAS = [R.scaleSupervisor, R.reconciliationOfficer, R.disputeOfficer, R.deviceApprover, R.toleranceApprover];
 const FIELD = [R.fieldSupervisor, R.fieldCollector];
+const TRIPS = [R.dispatcher, R.driver];
+const SALES = [R.salesOfficer, R.salesApprover];
+const COST = [R.costAccountant, R.periodCloser, R.chiefAccountant];
+const BRIDGE = [R.accountingBridgeOperator, R.chiefAccountant];
 
 /** Menu theo vai. Đây CHỈ là ẩn/hiện — api-internal kiểm quyền từng lời gọi (R-55). */
 export const NAV_GROUPS: readonly NavGroup[] = [
@@ -64,6 +68,41 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { href: "/gom/dem-cuon", label: "Đếm cuộn & xác nhận HTX", icon: "harvest", roles: FIELD },
       { href: "/gom/doi-soat", label: "Đối soát chiều mua", icon: "approve", roles: FIELD },
       { href: "/gom/kg-cuon", label: "kg/cuộn theo HTX", icon: "chart", roles: [R.fieldSupervisor] },
+    ],
+  },
+  {
+    label: "4. Vận tải",
+    items: [
+      { href: "/van-tai/chuyen", label: "Chuyến & chặng", icon: "map", roles: TRIPS },
+      { href: "/van-tai/phuong-tien", label: "Danh mục ghe / xe", icon: "water", roles: [R.dispatcher] },
+      { href: "/van-tai/canh-bao", label: "Cảnh báo vận tải", icon: "bell", roles: [R.dispatcher] },
+      { href: "/van-tai/tham-so", label: "Tham số cước", icon: "param", roles: [R.dispatcher, R.chiefAccountant] },
+    ],
+  },
+  {
+    label: "5. Đơn hàng",
+    items: [
+      { href: "/don-hang/hop-dong", label: "Hợp đồng mua rơm", icon: "journal", roles: SALES },
+      { href: "/don-hang/don-mua", label: "Đơn mua & phiếu nhận", icon: "download", roles: SALES },
+      { href: "/don-hang/don-ban", label: "Đơn bán & giao nhận", icon: "upload", roles: SALES },
+      { href: "/don-hang/tham-so", label: "Tham số đơn hàng", icon: "param", roles: SALES },
+    ],
+  },
+  {
+    label: "6. Giá thành & quyết toán",
+    items: [
+      { href: "/gia-thanh/ky", label: "Kỳ giá thành", icon: "clock", roles: COST },
+      { href: "/gia-thanh/lo", label: "Giá thành lô & phân bổ", icon: "chart", roles: COST },
+      { href: "/gia-thanh/quyet-toan", label: "Quyết toán HTX", icon: "approve", roles: COST },
+      { href: "/gia-thanh/carbon", label: "Chia doanh thu carbon", icon: "leaf", roles: [R.costAccountant] },
+      { href: "/gia-thanh/tham-so", label: "Tham số giá thành", icon: "param", roles: [R.costAccountant, R.chiefAccountant], admin: true },
+    ],
+  },
+  {
+    label: "7. Kế toán",
+    items: [
+      { href: "/ke-toan/but-toan", label: "Bút toán tổng hợp", icon: "report", roles: BRIDGE },
+      { href: "/ke-toan/anh-xa", label: "Ánh xạ tài khoản", icon: "catalog", roles: BRIDGE, admin: true },
     ],
   },
 ];

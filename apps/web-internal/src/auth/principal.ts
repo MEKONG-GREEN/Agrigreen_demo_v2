@@ -1,4 +1,4 @@
-/** Vai realm Keycloak của vùng MKG (hằng trong internal/mkg/{hub,measurement,fieldops}/port, deploy/compose/keycloak/agrigreen-realm.json). */
+/** Vai realm Keycloak của vùng MKG (hằng trong internal/mkg/<module>/port, deploy/compose/keycloak/agrigreen-realm.json). */
 export const ROLES = {
   hubOperator: "hub_operator",
   hubApprover: "hub_approver",
@@ -9,6 +9,15 @@ export const ROLES = {
   toleranceApprover: "tolerance_approver",
   fieldCollector: "field_collector",
   fieldSupervisor: "field_supervisor",
+  // G4 (internal/mkg/{logistics,orders,costing,acctbridge}/port)
+  dispatcher: "dispatcher",
+  driver: "driver",
+  salesOfficer: "sales_officer",
+  salesApprover: "sales_approver",
+  costAccountant: "cost_accountant",
+  periodCloser: "period_closer",
+  chiefAccountant: "chief_accountant",
+  accountingBridgeOperator: "accounting_bridge_operator",
 } as const;
 
 export const ROLE_LABEL: Readonly<Record<string, string>> = {
@@ -21,6 +30,14 @@ export const ROLE_LABEL: Readonly<Record<string, string>> = {
   tolerance_approver: "Duyệt dung sai / định mức",
   field_collector: "Tổ gom hiện trường",
   field_supervisor: "Giám sát lệnh gom",
+  dispatcher: "Điều phối vận tải",
+  driver: "Tài xế / chủ ghe",
+  sales_officer: "Nhân viên kinh doanh",
+  sales_approver: "Duyệt đơn / giá / hợp đồng",
+  cost_accountant: "Kế toán giá thành",
+  period_closer: "Đóng kỳ giá thành",
+  chief_accountant: "Kế toán trưởng",
+  accounting_bridge_operator: "Vận hành cầu nối kế toán",
 };
 
 export function roleLabel(role: string): string {

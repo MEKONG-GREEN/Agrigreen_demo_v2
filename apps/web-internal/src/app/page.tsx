@@ -16,8 +16,12 @@ export default function OverviewPage() {
   const seeHub = hasRole(principal, ROLES.hubOperator, ROLES.hubApprover);
   const seeMeas = hasRole(principal, ROLES.disputeOfficer, ROLES.reconciliationOfficer);
   const seeField = hasRole(principal, ROLES.fieldSupervisor, ROLES.fieldCollector);
+  const seeTrips = hasRole(principal, ROLES.dispatcher, ROLES.driver);
+  const seeSales = hasRole(principal, ROLES.salesOfficer, ROLES.salesApprover);
+  const seeCost = hasRole(principal, ROLES.costAccountant, ROLES.periodCloser, ROLES.chiefAccountant);
+  const seeBridge = hasRole(principal, ROLES.accountingBridgeOperator, ROLES.chiefAccountant);
   const data = useAsync(async () => {
-    const [hubs, disputes, planned] = await Promise.all([
+    const [hubs, disputes, planned, trips, sales, settlements, journals] = await Promise.all([
       seeHub
         ? unwrap(api.GET("/v1/hub/facilities")).then((r) =>
             Promise.all((r.items ?? []).map((f) => unwrap(api.GET("/v1/hub/facilities/{id}/inventory", { params: { path: { id: f.id! } } })))),
@@ -25,9 +29,13 @@ export default function OverviewPage() {
         : Promise.resolve([]),
       seeMeas ? unwrapAs<DisputePage>(api.GET("/v1/measurement/disputes", { params: { query: { status: "open" } } })) : Promise.resolve(null),
       seeField ? unwrap(api.GET("/v1/fieldops/orders", { params: { query: { status: "planned" } } })) : Promise.resolve(null),
+      seeTrips ? unwrap(api.GET("/v1/logistics/trips", { params: { query: { limit: 200 } } })).then((r) => r.items) : Promise.resolve(null),
+      seeSales ? unwrap(api.GET("/v1/orders/sales-orders", { params: { query: { status: "draft" } } })).then((r) => r.items ?? []) : Promise.resolve(null),
+      seeCost ? unwrap(api.GET("/v1/costing/settlements", { params: { query: { status: "pending_confirmation" } } })).then((r) => r.items ?? []) : Promise.resolve(null),
+      seeBridge ? unwrap(api.GET("/v1/acctbridge/journals")).then((r) => r.items ?? []) : Promise.resolve(null),
     ]);
-    return { hubs, disputes, planned };
-  }, [api, seeHub, seeMeas, seeField]);
+    return { hubs, disputes, planned, trips, sales, settlements, journals };
+  }, [api, seeHub, seeMeas, seeField, seeTrips, seeSales, seeCost, seeBridge]);
 
   const used = data.data?.hubs.reduce((s, h) => s + Number(h.capacity?.used_kg ?? 0), 0) ?? 0;
   const cap = data.data?.hubs.reduce((s, h) => s + Number(h.capacity?.capacity_kg ?? 0), 0) ?? 0;
@@ -42,6 +50,10 @@ export default function OverviewPage() {
           {seeHub ? <KpiTile label="Cơ sở đang hoạt động" value={String(data.data.hubs.length)} color="blue" icon="layers" /> : null}
           {seeMeas ? <KpiTile label="Tranh chấp đang mở" value={String(data.data.disputes?.items.length ?? 0)} color="red" icon="conflict" /> : null}
           {seeField ? <KpiTile label="Lệnh gom chờ duyệt" value={String(data.data.planned?.items?.length ?? 0)} color="orange" icon="tractor" /> : null}
+          {data.data.trips ? <KpiTile label="Chuyến đang chạy" value={String(data.data.trips.filter((t) => t.status === "departed" || t.status === "arrived").length)} color="blue" icon="map" footer={`${data.data.trips.filter((t) => t.flags?.length).length} chuyến có cờ cảnh báo`} /> : null}
+          {data.data.sales ? <KpiTile label="Đơn bán nháp cần duyệt giá" value={String(data.data.sales.filter((o) => o.needs_price_approval).length)} color="orange" icon="upload" /> : null}
+          {data.data.settlements ? <KpiTile label="Quyết toán HTX chờ duyệt" value={String(data.data.settlements.length)} color="violet" icon="approve" /> : null}
+          {data.data.journals ? <KpiTile label="Bút toán chờ duyệt / đẩy lỗi" value={`${data.data.journals.filter((j) => j.status === "built").length} / ${data.data.journals.filter((j) => j.status === "push_failed").length}`} color="red" icon="report" /> : null}
         </div>
       ) : null}
       {data.data && seeHub ? (

@@ -27,9 +27,9 @@ Bốn trạng thái:
 | 7. `mkg/costing` | 16 | 14 | 2 | 0 | 0 |
 | 8. `mkg/acctbridge` | 9 | 7 | 1 | 1 | 0 |
 | 9. Cổng kiến trúc G4 (RB, R-xx, vùng, hạ tầng) | 14 | 0 | 0 | 14 | 0 |
-| 10. Client và kịch bản đầu–cuối | 4 | 0 | 0 | 4 | 0 |
+| 10. Client và kịch bản đầu–cuối | 4 | 1 | 0 | 3 | 0 |
 | 11. Câu hỏi khách | 7 | 0 | 0 | 7 | 0 |
-| **Tổng** | **81** | **42** | **6** | **33** | **0** |
+| **Tổng** | **81** | **43** | **6** | **32** | **0** |
 
 Đã có ở G4-0 (nền móng, không tính là đạt dòng nào): bề mặt đối tác `/v1/partner/waterway/route` phía nền tảng (`TestPartnerWaterwayRoute_ADR0020`, `TestShareGrantWaterwayRoutesKind_G4`), hợp đồng sự kiện nội bộ (`TestG4FrozenInternalContracts`), vai trong realm (`TestKeycloakRealmCoversRolesAndClaims`), `agnofloat` cho bốn module (`TestNoFloat`).
 
@@ -163,7 +163,7 @@ Như [g3-acceptance.md §1](g3-acceptance.md#1-cách-chạy). Kịch bản E2E G
 
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| W-01 | Web nội bộ MKG (`apps/web-internal`): chuyến + danh mục ghe, đơn mua/bán, hợp đồng, giao nhận, kỳ + đóng kỳ, quyết toán, bút toán tổng hợp; màn duyệt tách vai (R-56) | — | **chưa làm** |
+| W-01 | Web nội bộ MKG (`apps/web-internal`): chuyến + danh mục ghe, đơn mua/bán, hợp đồng, giao nhận, kỳ + đóng kỳ, quyết toán, bút toán tổng hợp; màn duyệt tách vai (R-56) | WEB-E2E `logistics.spec.ts` (6: chặng đường thuỷ + ảnh chụp băm khớp nguyên văn, km tay cần lý do, huỷ có lý do, hoàn tất cờ lệch cân + bản bù, tài xế chỉ ghi mốc, danh mục ghe chuẩn hoá + phiên bản, cảnh báo 48 giờ / đăng kiểm, tham số dispatcher ≠ chief_accountant), `orders.spec.ts` (7: hợp đồng tự duyệt bị chặn + chồng lấn CT-01, phiếu nhận lệch +7,56 % cần biên bản không chặn, một khoản phải trả, đơn bán `orders.price_approval_required` + tự duyệt, giao nhận theo CUSTOMER_IN / `orders.customer_in_missing`, tham số, phân quyền), `costing.spec.ts` (6: đóng kỳ R-56 + `period_not_ended` + 202 → job → đã đóng, đ/t + điều chỉnh + tính lại phân bổ, quyết toán theo cuộn tự duyệt bị chặn → duyệt → đã trả, không hợp đồng → nhập giá, theo tấn chờ cân `settlement_not_ready`, chia carbon, tham số bề mặt quản trị), `acctbridge.spec.ts` (4: đóng kỳ → bút toán cân, người đóng kỳ không tự duyệt → người khác duyệt → đẩy → kỳ posted, DLQ → đẩy lại, tải CSV/XML kiểm X-Content-SHA256, ánh xạ đề xuất ≠ duyệt + dựng lại → bản cũ bị thay, phân quyền); Vitest `src/lib/g4.test.ts` (tiền VND BigInt, SHA-256, trạng thái chỉ tiến, mọi mã `logistics.*`/`orders.*`/`costing.*`/`acctbridge.*` của docs/errors.md có nhãn tiếng Việt), `src/api/mock/g4mock.test.ts`, `src/components/g4kit.test.tsx` | **đạt** (trên backend giả lập theo hợp đồng `mkg-internal.yaml`; gọi api-internal thật còn chờ CORS — khoảng trống ghi ở `apps/web-internal/README.md`) |
 | W-02 | App tài xế / chủ ghe: mốc chuyến (ngoại tuyến như app hiện trường MKG) | — | **chưa làm** |
 | W-03 | Kịch bản đầu–cuối `TestG4FieldToLedger` (mục 2) | — | **chưa làm** |
 | W-04 | CI: job `test` qua PgBouncer có vai G4; `compose-smoke` có consumer G4 trên `mkg.internal` | userlist CI/Compose có vai G4 (G4-0) | **chưa làm** (CI chưa chạy được — GitHub Actions bị chặn) |
