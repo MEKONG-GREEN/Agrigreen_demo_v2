@@ -22,6 +22,8 @@ tags:
     description: mkg/fieldops — lệnh gom, ca tổ gom, đếm cuộn theo công đoạn, xác nhận HTX, đối soát chiều mua, đồng bộ app hiện trường MKG
   - name: measurement
     description: mkg/measurement — sổ thiết bị cân, phiên cân, phiếu cân ba điểm, dung sai / định mức có phiên bản, đối soát, tranh chấp, nhập số cân khách, van MRV
+  - name: logistics
+    description: mkg/logistics — chuyến xe/ghe/sà lan (trạng thái chỉ tiến), chặng đường thủy/đường bộ có ảnh chụp định tuyến nguyên văn + SHA-256, danh mục ghe, tham số cước có phiên bản
   - name: hub
     description: mkg/hub — hub, kho, bãi; lô; mẻ; dịch chuyển tồn; van công bố
 paths:
@@ -1433,6 +1435,328 @@ paths:
         "201": {description: Phiên bản, content: {application/json: {schema: {type: object, properties: {param: {$ref: "#/components/schemas/FieldopsParam"}}}}}}
         "403": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
+  # --- mkg/logistics (G4, mkg.md §5.4): chuyến, chặng, danh mục ghe, tham số cước ---
+  /v1/logistics/trips:
+    get:
+      summary: Liệt kê chuyến (mới nhất trước), lọc trạng thái, con trỏ
+      description: Vai dispatcher hoặc driver.
+      operationId: listLogisticsTrips
+      tags: [logistics]
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [planned, departed, arrived, completed, cancelled]}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Trang chuyến
+          content: {application/json: {schema: {type: object, required: [items, next_cursor], properties: {items: {type: array, items: {$ref: "#/components/schemas/LogisticsTrip"}}, next_cursor: {type: [string, "null"]}}}}}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Lập chuyến planned (điều phối)
+      description: |
+        Vai dispatcher. Tấn kế hoạch mặc định = Σ khối lượng lô. Chuyến đường thủy từ lượt xuống ghe do consumer
+        `mkg.logistics.roll_count` lập (proto FM-05), không qua route này. Cảnh báo (`warnings`) không chặn.
+      operationId: createLogisticsTrip
+      tags: [logistics]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode: {type: string, enum: [road, waterway]}
+                vehicle_ref: {type: [string, "null"], format: uuid}
+                driver_ref: {type: [string, "null"], format: uuid, description: "Tài xế ở vault tenant MKG (RB-3)"}
+                collection_order_ref: {type: [string, "null"], format: uuid}
+                delivery_ref: {type: [string, "null"], format: uuid}
+                cargo: {type: array, maxItems: 50, items: {type: object, required: [lot_ref, mass_kg], properties: {lot_ref: {type: string, format: uuid}, mass_kg: {$ref: "#/components/schemas/Kg"}}}}
+                planned_kg: {$ref: "#/components/schemas/Kg"}
+                event_time: {type: string, format: date-time}
+      responses:
+        "201": {$ref: "#/components/responses/LogisticsTripResult"}
+        "200": {$ref: "#/components/responses/LogisticsTripResult"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/trips/{id}:
+    parameters: [{$ref: "#/components/parameters/TripID"}]
+    get:
+      summary: Chuyến + chặng hiệu lực
+      operationId: getLogisticsTrip
+      tags: [logistics]
+      responses:
+        "200": {description: Chuyến, content: {application/json: {schema: {type: object, required: [trip], properties: {trip: {$ref: "#/components/schemas/LogisticsTrip"}}}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/trips/{id}/events:
+    parameters: [{$ref: "#/components/parameters/TripID"}]
+    get:
+      summary: Sổ chuyến (kiểm toán) — mọi bản ghi, kể cả bản bù
+      operationId: listLogisticsTripEvents
+      tags: [logistics]
+      responses:
+        "200": {description: Sổ, content: {application/json: {schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/LogisticsTripEvent"}}}}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/trips/{id}/vehicle:
+    parameters: [{$ref: "#/components/parameters/TripID"}]
+    post:
+      summary: Gán phương tiện / tài xế (chuyến planned|departed)
+      description: |
+        Vai dispatcher. Chỉ CẢNH BÁO (không chặn — proto FM-05, GH-02): ghe ngoài danh mục (`vessel_unregistered`), ngừng
+        (`vessel_inactive`), hết / sắp hết hạn đăng kiểm (`registration_expired` / `registration_expiring`), tấn ước > 1,1 × tải rơm
+        thực chở (`payload_exceeded`, tham số #51).
+      operationId: assignLogisticsVehicle
+      tags: [logistics]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [vehicle_ref], properties: {vehicle_ref: {type: string, format: uuid}, driver_ref: {type: [string, "null"], format: uuid}}}}}
+      responses:
+        "201": {$ref: "#/components/responses/LogisticsTripResult"}
+        "200": {$ref: "#/components/responses/LogisticsTripResult"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/trips/{id}/legs:
+    parameters: [{$ref: "#/components/parameters/TripID"}]
+    post:
+      summary: Lập (lại) các chặng — định tuyến, lưu nguyên văn + SHA-256, cước kế hoạch
+      description: |
+        Vai dispatcher. Mỗi lần gọi là một phiên bản kế hoạch mới (`plan_revision`). Đường thủy: `GET/POST /v1/partner/waterway/route`
+        của nền tảng (ADR-0020, cấp quyền `waterway_routes`); phản hồi NGUYÊN VĂN + SHA-256 lưu ở `route_snapshot` (mục 16). Nền tảng
+        lỗi / thiếu cấp quyền / không có đường → dự phòng Haversine × #10 (nhãn `haversine`, cờ `routing_unavailable` /
+        `no_waterway_route`) — không bao giờ chặn. `manual_km` bỏ qua định tuyến, bắt buộc `manual_reason`. Đường bộ: Haversine × #10
+        (chưa có OSRM); xa hơn #27 và có kênh → cờ `waterway_suggested` (proto decideMode). Cước kế hoạch = tấn kế hoạch × km × đơn giá
+        tham số theo phương thức (#22/#23), ghim `param_version` + `rule_version`.
+      operationId: planLogisticsLegs
+      tags: [logistics]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [legs]
+              properties:
+                legs:
+                  type: array
+                  minItems: 1
+                  maxItems: 24
+                  items:
+                    type: object
+                    required: [mode, from, to]
+                    properties:
+                      mode: {type: string, enum: [road, waterway]}
+                      from: {$ref: "#/components/schemas/LogisticsEndpointInput"}
+                      to: {$ref: "#/components/schemas/LogisticsEndpointInput"}
+                      manual_km: {type: [string, "null"], pattern: "^[0-9]+(\\.[0-9]{1,3})?$"}
+                      manual_reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201": {$ref: "#/components/responses/LogisticsTripResult"}
+        "200": {$ref: "#/components/responses/LogisticsTripResult"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/trips/{id}/legs/{leg}/route-snapshot:
+    parameters:
+      - {$ref: "#/components/parameters/TripID"}
+      - {name: leg, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: Ảnh chụp định tuyến nguyên văn của chặng (không gọi lại nền tảng)
+      operationId: getLogisticsRouteSnapshot
+      tags: [logistics]
+      responses:
+        "200":
+          description: Ảnh chụp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [snapshot_id, trip_id, leg_id, provider, request, raw_base64, raw_sha256, network_version, fetched_at]
+                properties:
+                  snapshot_id: {type: string, format: uuid}
+                  trip_id: {type: string, format: uuid}
+                  leg_id: {type: string, format: uuid}
+                  provider: {type: string, enum: [pf_partner_waterway, road_haversine]}
+                  request: {type: object}
+                  raw_base64: {type: string, description: "Nguyên văn thân phản hồi (base64)"}
+                  raw_sha256: {type: string, pattern: "^[0-9a-f]{64}$"}
+                  grantor_tenant: {type: [string, "null"], format: uuid}
+                  network_version: {type: [integer, "null"]}
+                  fetched_at: {type: string, format: date-time}
+                  recorded_at: {type: string, format: date-time}
+                  rule_version: {type: string}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/trips/{id}/milestones:
+    parameters: [{$ref: "#/components/parameters/TripID"}]
+    post:
+      summary: Mốc chuyến của tài xế (departed / arrived) có GPS + event_time — từng bậc (L-02)
+      description: Vai driver (hoặc dispatcher). Nhảy bậc / lùi → 409 logistics.trip_transition. Header X-Device-Id tùy chọn.
+      operationId: recordLogisticsMilestone
+      tags: [logistics]
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+        - {name: X-Device-Id, in: header, schema: {type: string}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [kind, event_time, lat, lng], properties: {kind: {type: string, enum: [departed, arrived]}, event_time: {type: string, format: date-time}, lat: {type: string}, lng: {type: string}}}}}
+      responses:
+        "201": {$ref: "#/components/responses/LogisticsTripResult"}
+        "200": {$ref: "#/components/responses/LogisticsTripResult"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/trips/{id}/completion:
+    parameters: [{$ref: "#/components/parameters/TripID"}]
+    post:
+      summary: Hoàn tất chuyến (tấn thật + cước thực) hoặc BẢN BÙ của chuyến đã hoàn tất
+      description: |
+        Vai dispatcher. Cước: `actual_cost` (nhập tay, bắt buộc `reason` — chứng từ) → `manual`; không có → đơn giá thuê ghe (GH-03,
+        `vessel_rate`) hoặc tấn thật × km × đơn giá tham số (`param_rate`). Chuyến đã completed → bắt buộc `correction_reason`, ghi
+        bản bù `supersedes_id` và phát lại `mkg.logistics.trip.completed` (RB-1). Đường chính là consumer phiếu cân `mkg.logistics.weigh_ticket`.
+      operationId: completeLogisticsTrip
+      tags: [logistics]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [actual_kg]
+              properties:
+                actual_kg: {$ref: "#/components/schemas/Kg"}
+                ticket_ref: {type: [string, "null"], format: uuid}
+                actual_cost: {type: [string, "null"], pattern: "^[0-9]+(\\.[0-9]{1,2})?$"}
+                reason: {type: string, minLength: 10, maxLength: 500}
+                correction_reason: {type: string, minLength: 10, maxLength: 500}
+                event_time: {type: string, format: date-time}
+      responses:
+        "201": {$ref: "#/components/responses/LogisticsTripResult"}
+        "200": {$ref: "#/components/responses/LogisticsTripResult"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/trips/{id}/cancel:
+    parameters: [{$ref: "#/components/parameters/TripID"}]
+    post:
+      summary: Hủy chuyến planned|departed có lý do
+      operationId: cancelLogisticsTrip
+      tags: [logistics]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [reason], properties: {reason: {type: string, minLength: 10, maxLength: 500}}}}}
+      responses:
+        "201": {$ref: "#/components/responses/LogisticsTripResult"}
+        "200": {$ref: "#/components/responses/LogisticsTripResult"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/vessels:
+    get:
+      summary: Danh mục phương tiện kèm trạng thái đăng kiểm (GH-02)
+      operationId: listLogisticsVessels
+      tags: [logistics]
+      parameters: [{name: status, in: query, schema: {type: string, enum: [active, inactive]}}]
+      responses:
+        "200": {description: Danh mục, content: {application/json: {schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/LogisticsVessel"}}}}}}}
+    post:
+      summary: Thêm phương tiện (số hiệu chuẩn hóa duy nhất — GH-01)
+      operationId: createLogisticsVessel
+      tags: [logistics]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/LogisticsVesselInput"}}}
+      responses:
+        "201": {$ref: "#/components/responses/LogisticsVesselResult"}
+        "200": {$ref: "#/components/responses/LogisticsVesselResult"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/vessels/{id}:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: Một phương tiện
+      operationId: getLogisticsVessel
+      tags: [logistics]
+      responses:
+        "200": {$ref: "#/components/responses/LogisticsVesselResult"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/vessels/{id}/versions:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    post:
+      summary: Phiên bản mới của phương tiện (lý do, theo expected_version)
+      operationId: reviseLogisticsVessel
+      tags: [logistics]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/LogisticsVesselInput"}}}
+      responses:
+        "201": {$ref: "#/components/responses/LogisticsVesselResult"}
+        "200": {$ref: "#/components/responses/LogisticsVesselResult"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/alerts:
+    get:
+      summary: Cảnh báo vận hành — chuyến xuống ghe quá N giờ chưa cân (#48 giờ), phương tiện hết / sắp hết hạn đăng kiểm
+      operationId: logisticsAlerts
+      tags: [logistics]
+      responses:
+        "200":
+          description: Cảnh báo
+          content: {application/json: {schema: {type: object, required: [unweighed_hours, unweighed_trips, vessels], properties: {unweighed_hours: {type: integer}, unweighed_param_version: {type: string}, unweighed_trips: {type: array, items: {$ref: "#/components/schemas/LogisticsTrip"}}, vessels: {type: array, items: {$ref: "#/components/schemas/LogisticsVessel"}}}}}}
+  /v1/logistics/params/{key}:
+    parameters: [{$ref: "#/components/parameters/LogisticsParamKey"}]
+    get:
+      summary: Các phiên bản tham số và giá trị hiệu lực hôm nay (mặc định tạm, chờ khách)
+      operationId: getLogisticsParam
+      tags: [logistics]
+      responses:
+        "200":
+          description: Tham số
+          content: {application/json: {schema: {type: object, properties: {key: {type: string}, default: {type: string}, effective: {type: object, properties: {value: {type: string}, param_version: {type: string}, provisional: {type: boolean}}}, versions: {type: array, items: {$ref: "#/components/schemas/LogisticsParam"}}}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/params/{key}/versions:
+    parameters: [{$ref: "#/components/parameters/LogisticsParamKey"}]
+    post:
+      summary: Đề xuất phiên bản tham số (dispatcher) — pending tới khi chief_accountant KHÁC duyệt (R-56)
+      operationId: proposeLogisticsParam
+      tags: [logistics]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [value, reason], properties: {value: {type: string}, effective_from: {type: string, format: date}, provisional: {type: boolean, default: false}, reason: {type: string, minLength: 10, maxLength: 500}}}}}
+      responses:
+        "201": {description: Phiên bản, content: {application/json: {schema: {type: object, properties: {param: {$ref: "#/components/schemas/LogisticsParam"}}}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/params/{key}/versions/{version}/decision:
+    parameters:
+      - {$ref: "#/components/parameters/LogisticsParamKey"}
+      - {name: version, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Duyệt / từ chối phiên bản tham số — chief_accountant KHÁC người đề xuất (403 self_approval_forbidden; CHECK DB)
+      operationId: decideLogisticsParam
+      tags: [logistics]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [decision], properties: {decision: {type: string, enum: [approved, rejected]}, reason: {type: string, minLength: 10, description: "Bắt buộc khi rejected"}}}}}
+      responses:
+        "201": {description: Phiên bản, content: {application/json: {schema: {type: object, properties: {param: {$ref: "#/components/schemas/LogisticsParam"}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/projections/rebuild:
+    post:
+      summary: "[Quản trị] Dựng lại trip_current thẳng từ sổ (R-22)"
+      operationId: rebuildLogisticsProjections
+      tags: [logistics]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "200": {description: Số chuyến đã dựng lại, content: {application/json: {schema: {type: object, properties: {trip_current: {type: integer}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -1443,10 +1767,24 @@ components:
     FacilityID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
     MeasurementID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
     OrderID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    TripID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    LogisticsParamKey:
+      name: key
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [logistics.rate.road_vnd_per_t_km, logistics.rate.waterway_vnd_per_t_km, logistics.mode.road_feasible_km, logistics.vessel.straw_payload_tons, logistics.vessel.payload_warn_factor, logistics.vessel.expiry_warn_days, logistics.trip.unweighed_alert_hours, logistics.route.road_haversine_factor]
   responses:
     Problem:
       description: Lỗi RFC 9457
       content: {application/problem+json: {schema: {type: object, properties: {type: {type: string}, title: {type: string}, status: {type: integer}, code: {type: string}, trace_id: {type: string}}}}}
+    LogisticsTripResult:
+      description: Chuyến sau thao tác (200 = gọi lặp cùng Idempotency-Key); warnings = cờ cảnh báo, không chặn
+      content: {application/json: {schema: {type: object, required: [trip, warnings], properties: {trip: {$ref: "#/components/schemas/LogisticsTrip"}, warnings: {type: array, items: {type: string}}, event: {$ref: "#/components/schemas/LogisticsTripEvent"}}}}}
+    LogisticsVesselResult:
+      description: Phương tiện
+      content: {application/json: {schema: {type: object, required: [vessel], properties: {vessel: {$ref: "#/components/schemas/LogisticsVessel"}}}}}
   schemas:
     Kg: {type: string, pattern: "^-?[0-9]+(\\.[0-9]{1,3})?$", example: "1520.500"}
     Pct: {type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,2})?$", example: "14.50"}
@@ -1952,6 +2290,141 @@ components:
       type: object
       properties:
         param_key: {type: string, enum: [baling_deadline_days]}
+        version_id: {type: string, format: uuid}
+        version_seq: {type: integer}
+        value: {type: string}
+        effective_from: {type: string, format: date}
+        provisional: {type: boolean}
+        status: {type: string, enum: [pending, approved, rejected]}
+        proposed_by: {type: string, format: uuid}
+        proposal_reason: {type: string}
+        decided_by: {type: [string, "null"], format: uuid}
+        decided_at: {type: [string, "null"], format: date-time}
+        decision_reason: {type: [string, "null"]}
+    LogisticsEndpointInput:
+      type: object
+      required: [kind, lat, lng]
+      properties:
+        kind: {type: string, enum: [plot, collection_point, facility, customer_site, point]}
+        ref: {type: [string, "null"], format: uuid}
+        lat: {type: string, description: "WGS84, chuỗi thập phân (R-10)"}
+        lng: {type: string}
+    LogisticsLeg:
+      type: object
+      required: [leg_id, seq, plan_revision, mode, from, to, distance_km, route_source, route_snapshot_ref, network_version, rate_vnd_per_t_km, planned_cost, param_version, flags, rule_version]
+      properties:
+        leg_id: {type: string, format: uuid}
+        seq: {type: integer}
+        plan_revision: {type: integer}
+        mode: {type: string, enum: [road, waterway]}
+        from: {type: object, properties: {kind: {type: string}, ref: {type: [string, "null"], format: uuid}, lat: {type: string}, lng: {type: string}}}
+        to: {type: object, properties: {kind: {type: string}, ref: {type: [string, "null"], format: uuid}, lat: {type: string}, lng: {type: string}}}
+        distance_km: {type: string}
+        route_source: {type: string, enum: [routed, digitised, haversine, manual]}
+        route_snapshot_ref: {type: [string, "null"], format: uuid}
+        network_version: {type: [integer, "null"]}
+        manual_reason: {type: [string, "null"]}
+        mass_kg: {type: [string, "null"]}
+        rate_vnd_per_t_km: {type: string}
+        planned_cost: {type: string}
+        param_version: {type: string}
+        flags: {type: array, items: {type: string}}
+        rule_version: {type: string}
+    LogisticsTrip:
+      type: object
+      required: [trip_id, code, status, mode, cargo, planned_at, flags, rule_version, recorded_at]
+      properties:
+        trip_id: {type: string, format: uuid}
+        code: {type: string, pattern: "^CH[0-9]{6,}$"}
+        status: {type: string, enum: [planned, departed, arrived, completed, cancelled]}
+        mode: {type: string, enum: [road, waterway]}
+        vehicle_ref: {type: [string, "null"], format: uuid}
+        driver_ref: {type: [string, "null"], format: uuid}
+        collection_order_ref: {type: [string, "null"], format: uuid}
+        delivery_ref: {type: [string, "null"], format: uuid}
+        cargo: {type: array, items: {type: object, properties: {lot_ref: {type: string, format: uuid}, mass_kg: {type: string}, ticket_ref: {type: [string, "null"], format: uuid}}}}
+        planned_kg: {type: [string, "null"]}
+        actual_kg: {type: [string, "null"]}
+        planned_cost: {type: [string, "null"]}
+        actual_cost: {type: [string, "null"]}
+        cost_source: {type: [string, "null"], enum: [param_rate, manual, vessel_rate, null]}
+        plan_revision: {type: integer}
+        planned_at: {type: string, format: date-time}
+        departed_at: {type: [string, "null"], format: date-time}
+        arrived_at: {type: [string, "null"], format: date-time}
+        completed_at: {type: [string, "null"], format: date-time}
+        cancelled_at: {type: [string, "null"], format: date-time}
+        cancel_reason: {type: [string, "null"]}
+        ticket_ref: {type: [string, "null"], format: uuid}
+        source_ref: {type: [string, "null"], format: uuid, description: "roll_count_id của lượt xuống ghe (FM-05)"}
+        flags: {type: array, items: {type: string}, description: "Cảnh báo — không chặn (no_vehicle, no_route, payload_exceeded, registration_expired, weigh_variance, routing_unavailable…)"}
+        rule_version: {type: string}
+        recorded_at: {type: string, format: date-time}
+        legs: {type: array, items: {$ref: "#/components/schemas/LogisticsLeg"}}
+    LogisticsTripEvent:
+      type: object
+      required: [event_id, kind, status, seq, event_time, recorded_at, actor_ref, flags, rule_version]
+      properties:
+        event_id: {type: string, format: uuid}
+        kind: {type: string, enum: [planned, revised, vehicle_assigned, departed, arrived, completed, cancelled]}
+        status: {type: string}
+        seq: {type: integer}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        reason: {type: [string, "null"]}
+        actual_kg: {type: [string, "null"]}
+        actual_cost: {type: [string, "null"]}
+        cost_source: {type: [string, "null"]}
+        param_version: {type: [string, "null"]}
+        lat: {type: [string, "null"]}
+        lng: {type: [string, "null"]}
+        source_ref: {type: [string, "null"], format: uuid}
+        flags: {type: array, items: {type: string}}
+        rule_version: {type: string}
+    LogisticsVesselInput:
+      type: object
+      required: [code, kind]
+      properties:
+        code: {type: string, description: "Số hiệu — chuẩn hóa bỏ khoảng trắng, chữ hoa (GH-01)"}
+        kind: {type: string, enum: [ghe, sa_lan, truck]}
+        name: {type: string}
+        owner_ref: {type: [string, "null"], format: uuid, description: "Chủ ghe ở vault tenant MKG (RB-3)"}
+        registered_tons: {type: [string, "null"]}
+        straw_payload_tons: {type: [string, "null"], description: "Tải rơm thực chở; trống = tham số #51 (90 t) với ghe"}
+        registration_expiry: {type: [string, "null"], format: date}
+        rate_type: {type: string, enum: ["", per_ton, per_trip, per_ton_km]}
+        rate_vnd: {type: [string, "null"], description: "> 0 khi có rate_type (GH-01)"}
+        status: {type: string, enum: [active, inactive]}
+        reason: {type: string, minLength: 10, maxLength: 500, description: "Bắt buộc khi sửa"}
+        expected_version: {type: integer, description: "Sửa: phiên bản hiện hành"}
+    LogisticsVessel:
+      type: object
+      required: [vessel_id, version, code, kind, status, registration_status]
+      properties:
+        vessel_id: {type: string, format: uuid}
+        version: {type: integer}
+        code: {type: string}
+        kind: {type: string, enum: [ghe, sa_lan, truck]}
+        name: {type: [string, "null"]}
+        owner_ref: {type: [string, "null"], format: uuid}
+        registered_tons: {type: [string, "null"]}
+        straw_payload_tons: {type: [string, "null"]}
+        registration_expiry: {type: [string, "null"], format: date}
+        rate_type: {type: [string, "null"]}
+        rate_vnd: {type: [string, "null"]}
+        status: {type: string, enum: [active, inactive]}
+        registration_status: {type: string, enum: [unknown, valid, expiring, expired]}
+        registration_days_left: {type: [integer, "null"]}
+        warning: {type: [string, "null"]}
+        warn_param_version: {type: string}
+        updated_at: {type: string, format: date-time}
+    LogisticsParam:
+      type: object
+      properties:
+        key: {type: string}
         version_id: {type: string, format: uuid}
         version_seq: {type: integer}
         value: {type: string}

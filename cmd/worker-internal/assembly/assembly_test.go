@@ -119,3 +119,25 @@ func TestG32ConsumersRegistered(t *testing.T) {
 		t.Fatalf("thiếu consumer G3-2: %d/%d", n, len(want))
 	}
 }
+
+// G4 mkg/logistics (proto FM-05): hai consumer của vai logistics_app, đúng sự kiện.
+func TestG4LogisticsConsumersRegistered(t *testing.T) {
+	want := map[string]string{
+		"mkg.logistics.roll_count":   "mkg.fieldops.roll_count.recorded",
+		"mkg.logistics.weigh_ticket": "mkg.measurement.weigh_ticket.recorded",
+	}
+	n := 0
+	for _, c := range Consumers {
+		e, ok := want[c.Name]
+		if !ok {
+			continue
+		}
+		n++
+		if c.Role != "logistics_app" || len(c.Events) != 1 || c.Events[0] != e {
+			t.Errorf("%s: vai %q sự kiện %v", c.Name, c.Role, c.Events)
+		}
+	}
+	if n != len(want) {
+		t.Fatalf("thiếu consumer logistics: %d/%d", n, len(want))
+	}
+}

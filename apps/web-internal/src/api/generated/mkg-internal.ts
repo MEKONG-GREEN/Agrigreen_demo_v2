@@ -1572,6 +1572,353 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/logistics/trips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Liệt kê chuyến (mới nhất trước), lọc trạng thái, con trỏ
+         * @description Vai dispatcher hoặc driver.
+         */
+        get: operations["listLogisticsTrips"];
+        put?: never;
+        /**
+         * Lập chuyến planned (điều phối)
+         * @description Vai dispatcher. Tấn kế hoạch mặc định = Σ khối lượng lô. Chuyến đường thủy từ lượt xuống ghe do consumer
+         *     `mkg.logistics.roll_count` lập (proto FM-05), không qua route này. Cảnh báo (`warnings`) không chặn.
+         */
+        post: operations["createLogisticsTrip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/trips/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["TripID"];
+            };
+            cookie?: never;
+        };
+        /** Chuyến + chặng hiệu lực */
+        get: operations["getLogisticsTrip"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/trips/{id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["TripID"];
+            };
+            cookie?: never;
+        };
+        /** Sổ chuyến (kiểm toán) — mọi bản ghi, kể cả bản bù */
+        get: operations["listLogisticsTripEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/trips/{id}/vehicle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["TripID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Gán phương tiện / tài xế (chuyến planned|departed)
+         * @description Vai dispatcher. Chỉ CẢNH BÁO (không chặn — proto FM-05, GH-02): ghe ngoài danh mục (`vessel_unregistered`), ngừng
+         *     (`vessel_inactive`), hết / sắp hết hạn đăng kiểm (`registration_expired` / `registration_expiring`), tấn ước > 1,1 × tải rơm
+         *     thực chở (`payload_exceeded`, tham số #51).
+         */
+        post: operations["assignLogisticsVehicle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/trips/{id}/legs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["TripID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lập (lại) các chặng — định tuyến, lưu nguyên văn + SHA-256, cước kế hoạch
+         * @description Vai dispatcher. Mỗi lần gọi là một phiên bản kế hoạch mới (`plan_revision`). Đường thủy: `GET/POST /v1/partner/waterway/route`
+         *     của nền tảng (ADR-0020, cấp quyền `waterway_routes`); phản hồi NGUYÊN VĂN + SHA-256 lưu ở `route_snapshot` (mục 16). Nền tảng
+         *     lỗi / thiếu cấp quyền / không có đường → dự phòng Haversine × #10 (nhãn `haversine`, cờ `routing_unavailable` /
+         *     `no_waterway_route`) — không bao giờ chặn. `manual_km` bỏ qua định tuyến, bắt buộc `manual_reason`. Đường bộ: Haversine × #10
+         *     (chưa có OSRM); xa hơn #27 và có kênh → cờ `waterway_suggested` (proto decideMode). Cước kế hoạch = tấn kế hoạch × km × đơn giá
+         *     tham số theo phương thức (#22/#23), ghim `param_version` + `rule_version`.
+         */
+        post: operations["planLogisticsLegs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/trips/{id}/legs/{leg}/route-snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["TripID"];
+                leg: string;
+            };
+            cookie?: never;
+        };
+        /** Ảnh chụp định tuyến nguyên văn của chặng (không gọi lại nền tảng) */
+        get: operations["getLogisticsRouteSnapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/trips/{id}/milestones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["TripID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mốc chuyến của tài xế (departed / arrived) có GPS + event_time — từng bậc (L-02)
+         * @description Vai driver (hoặc dispatcher). Nhảy bậc / lùi → 409 logistics.trip_transition. Header X-Device-Id tùy chọn.
+         */
+        post: operations["recordLogisticsMilestone"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/trips/{id}/completion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["TripID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hoàn tất chuyến (tấn thật + cước thực) hoặc BẢN BÙ của chuyến đã hoàn tất
+         * @description Vai dispatcher. Cước: `actual_cost` (nhập tay, bắt buộc `reason` — chứng từ) → `manual`; không có → đơn giá thuê ghe (GH-03,
+         *     `vessel_rate`) hoặc tấn thật × km × đơn giá tham số (`param_rate`). Chuyến đã completed → bắt buộc `correction_reason`, ghi
+         *     bản bù `supersedes_id` và phát lại `mkg.logistics.trip.completed` (RB-1). Đường chính là consumer phiếu cân `mkg.logistics.weigh_ticket`.
+         */
+        post: operations["completeLogisticsTrip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/trips/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["TripID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy chuyến planned|departed có lý do */
+        post: operations["cancelLogisticsTrip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/vessels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh mục phương tiện kèm trạng thái đăng kiểm (GH-02) */
+        get: operations["listLogisticsVessels"];
+        put?: never;
+        /** Thêm phương tiện (số hiệu chuẩn hóa duy nhất — GH-01) */
+        post: operations["createLogisticsVessel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/vessels/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Một phương tiện */
+        get: operations["getLogisticsVessel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/vessels/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Phiên bản mới của phương tiện (lý do, theo expected_version) */
+        post: operations["reviseLogisticsVessel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cảnh báo vận hành — chuyến xuống ghe quá N giờ chưa cân (#48 giờ), phương tiện hết / sắp hết hạn đăng kiểm */
+        get: operations["logisticsAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/params/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: components["parameters"]["LogisticsParamKey"];
+            };
+            cookie?: never;
+        };
+        /** Các phiên bản tham số và giá trị hiệu lực hôm nay (mặc định tạm, chờ khách) */
+        get: operations["getLogisticsParam"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/params/{key}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: components["parameters"]["LogisticsParamKey"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đề xuất phiên bản tham số (dispatcher) — pending tới khi chief_accountant KHÁC duyệt (R-56) */
+        post: operations["proposeLogisticsParam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/params/{key}/versions/{version}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: components["parameters"]["LogisticsParamKey"];
+                version: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt / từ chối phiên bản tham số — chief_accountant KHÁC người đề xuất (403 self_approval_forbidden; CHECK DB) */
+        post: operations["decideLogisticsParam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/projections/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** [Quản trị] Dựng lại trip_current thẳng từ sổ (R-22) */
+        post: operations["rebuildLogisticsProjections"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2310,6 +2657,206 @@ export interface components {
             decided_at?: string | null;
             decision_reason?: string | null;
         };
+        LogisticsEndpointInput: {
+            /** @enum {string} */
+            kind: "plot" | "collection_point" | "facility" | "customer_site" | "point";
+            /** Format: uuid */
+            ref?: string | null;
+            /** @description WGS84, chuỗi thập phân (R-10) */
+            lat: string;
+            lng: string;
+        };
+        LogisticsLeg: {
+            /** Format: uuid */
+            leg_id: string;
+            seq: number;
+            plan_revision: number;
+            /** @enum {string} */
+            mode: "road" | "waterway";
+            from: {
+                kind?: string;
+                /** Format: uuid */
+                ref?: string | null;
+                lat?: string;
+                lng?: string;
+            };
+            to: {
+                kind?: string;
+                /** Format: uuid */
+                ref?: string | null;
+                lat?: string;
+                lng?: string;
+            };
+            distance_km: string;
+            /** @enum {string} */
+            route_source: "routed" | "digitised" | "haversine" | "manual";
+            /** Format: uuid */
+            route_snapshot_ref: string | null;
+            network_version: number | null;
+            manual_reason?: string | null;
+            mass_kg?: string | null;
+            rate_vnd_per_t_km: string;
+            planned_cost: string;
+            param_version: string;
+            flags: string[];
+            rule_version: string;
+        };
+        LogisticsTrip: {
+            /** Format: uuid */
+            trip_id: string;
+            code: string;
+            /** @enum {string} */
+            status: "planned" | "departed" | "arrived" | "completed" | "cancelled";
+            /** @enum {string} */
+            mode: "road" | "waterway";
+            /** Format: uuid */
+            vehicle_ref?: string | null;
+            /** Format: uuid */
+            driver_ref?: string | null;
+            /** Format: uuid */
+            collection_order_ref?: string | null;
+            /** Format: uuid */
+            delivery_ref?: string | null;
+            cargo: {
+                /** Format: uuid */
+                lot_ref?: string;
+                mass_kg?: string;
+                /** Format: uuid */
+                ticket_ref?: string | null;
+            }[];
+            planned_kg?: string | null;
+            actual_kg?: string | null;
+            planned_cost?: string | null;
+            actual_cost?: string | null;
+            /** @enum {string|null} */
+            cost_source?: "param_rate" | "manual" | "vessel_rate" | null;
+            plan_revision?: number;
+            /** Format: date-time */
+            planned_at: string;
+            /** Format: date-time */
+            departed_at?: string | null;
+            /** Format: date-time */
+            arrived_at?: string | null;
+            /** Format: date-time */
+            completed_at?: string | null;
+            /** Format: date-time */
+            cancelled_at?: string | null;
+            cancel_reason?: string | null;
+            /** Format: uuid */
+            ticket_ref?: string | null;
+            /**
+             * Format: uuid
+             * @description roll_count_id của lượt xuống ghe (FM-05)
+             */
+            source_ref?: string | null;
+            /** @description Cảnh báo — không chặn (no_vehicle, no_route, payload_exceeded, registration_expired, weigh_variance, routing_unavailable…) */
+            flags: string[];
+            rule_version: string;
+            /** Format: date-time */
+            recorded_at: string;
+            legs?: components["schemas"]["LogisticsLeg"][];
+        };
+        LogisticsTripEvent: {
+            /** Format: uuid */
+            event_id: string;
+            /** @enum {string} */
+            kind: "planned" | "revised" | "vehicle_assigned" | "departed" | "arrived" | "completed" | "cancelled";
+            status: string;
+            seq: number;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: uuid */
+            supersedes_id?: string | null;
+            correction_reason?: string | null;
+            reason?: string | null;
+            actual_kg?: string | null;
+            actual_cost?: string | null;
+            cost_source?: string | null;
+            param_version?: string | null;
+            lat?: string | null;
+            lng?: string | null;
+            /** Format: uuid */
+            source_ref?: string | null;
+            flags: string[];
+            rule_version: string;
+        };
+        LogisticsVesselInput: {
+            /** @description Số hiệu — chuẩn hóa bỏ khoảng trắng, chữ hoa (GH-01) */
+            code: string;
+            /** @enum {string} */
+            kind: "ghe" | "sa_lan" | "truck";
+            name?: string;
+            /**
+             * Format: uuid
+             * @description Chủ ghe ở vault tenant MKG (RB-3)
+             */
+            owner_ref?: string | null;
+            registered_tons?: string | null;
+            /** @description Tải rơm thực chở; trống = tham số #51 (90 t) với ghe */
+            straw_payload_tons?: string | null;
+            /** Format: date */
+            registration_expiry?: string | null;
+            /** @enum {string} */
+            rate_type?: "" | "per_ton" | "per_trip" | "per_ton_km";
+            /** @description > 0 khi có rate_type (GH-01) */
+            rate_vnd?: string | null;
+            /** @enum {string} */
+            status?: "active" | "inactive";
+            /** @description Bắt buộc khi sửa */
+            reason?: string;
+            /** @description Sửa: phiên bản hiện hành */
+            expected_version?: number;
+        };
+        LogisticsVessel: {
+            /** Format: uuid */
+            vessel_id: string;
+            version: number;
+            code: string;
+            /** @enum {string} */
+            kind: "ghe" | "sa_lan" | "truck";
+            name?: string | null;
+            /** Format: uuid */
+            owner_ref?: string | null;
+            registered_tons?: string | null;
+            straw_payload_tons?: string | null;
+            /** Format: date */
+            registration_expiry?: string | null;
+            rate_type?: string | null;
+            rate_vnd?: string | null;
+            /** @enum {string} */
+            status: "active" | "inactive";
+            /** @enum {string} */
+            registration_status: "unknown" | "valid" | "expiring" | "expired";
+            registration_days_left?: number | null;
+            warning?: string | null;
+            warn_param_version?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        LogisticsParam: {
+            key?: string;
+            /** Format: uuid */
+            version_id?: string;
+            version_seq?: number;
+            value?: string;
+            /** Format: date */
+            effective_from?: string;
+            provisional?: boolean;
+            /** @enum {string} */
+            status?: "pending" | "approved" | "rejected";
+            /** Format: uuid */
+            proposed_by?: string;
+            proposal_reason?: string;
+            /** Format: uuid */
+            decided_by?: string | null;
+            /** Format: date-time */
+            decided_at?: string | null;
+            decision_reason?: string | null;
+        };
     };
     responses: {
         /** @description Lỗi RFC 9457 */
@@ -2327,12 +2874,38 @@ export interface components {
                 };
             };
         };
+        /** @description Chuyến sau thao tác (200 = gọi lặp cùng Idempotency-Key); warnings = cờ cảnh báo, không chặn */
+        LogisticsTripResult: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    trip: components["schemas"]["LogisticsTrip"];
+                    warnings: string[];
+                    event?: components["schemas"]["LogisticsTripEvent"];
+                };
+            };
+        };
+        /** @description Phương tiện */
+        LogisticsVesselResult: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    vessel: components["schemas"]["LogisticsVessel"];
+                };
+            };
+        };
     };
     parameters: {
         IdempotencyKey: string;
         FacilityID: string;
         MeasurementID: string;
         OrderID: string;
+        TripID: string;
+        LogisticsParamKey: "logistics.rate.road_vnd_per_t_km" | "logistics.rate.waterway_vnd_per_t_km" | "logistics.mode.road_feasible_km" | "logistics.vessel.straw_payload_tons" | "logistics.vessel.payload_warn_factor" | "logistics.vessel.expiry_warn_days" | "logistics.trip.unweighed_alert_hours" | "logistics.route.road_haversine_factor";
     };
     requestBodies: never;
     headers: never;
@@ -5261,6 +5834,564 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+        };
+    };
+    listLogisticsTrips: {
+        parameters: {
+            query?: {
+                status?: "planned" | "departed" | "arrived" | "completed" | "cancelled";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trang chuyến */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["LogisticsTrip"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
+    createLogisticsTrip: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    mode: "road" | "waterway";
+                    /** Format: uuid */
+                    vehicle_ref?: string | null;
+                    /**
+                     * Format: uuid
+                     * @description Tài xế ở vault tenant MKG (RB-3)
+                     */
+                    driver_ref?: string | null;
+                    /** Format: uuid */
+                    collection_order_ref?: string | null;
+                    /** Format: uuid */
+                    delivery_ref?: string | null;
+                    cargo?: {
+                        /** Format: uuid */
+                        lot_ref: string;
+                        mass_kg: components["schemas"]["Kg"];
+                    }[];
+                    planned_kg?: components["schemas"]["Kg"];
+                    /** Format: date-time */
+                    event_time?: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["LogisticsTripResult"];
+            201: components["responses"]["LogisticsTripResult"];
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getLogisticsTrip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["TripID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chuyến */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        trip: components["schemas"]["LogisticsTrip"];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    listLogisticsTripEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["TripID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sổ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["LogisticsTripEvent"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    assignLogisticsVehicle: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["TripID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    vehicle_ref: string;
+                    /** Format: uuid */
+                    driver_ref?: string | null;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["LogisticsTripResult"];
+            201: components["responses"]["LogisticsTripResult"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    planLogisticsLegs: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["TripID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    legs: {
+                        /** @enum {string} */
+                        mode: "road" | "waterway";
+                        from: components["schemas"]["LogisticsEndpointInput"];
+                        to: components["schemas"]["LogisticsEndpointInput"];
+                        manual_km?: string | null;
+                        manual_reason?: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["LogisticsTripResult"];
+            201: components["responses"]["LogisticsTripResult"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getLogisticsRouteSnapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["TripID"];
+                leg: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ảnh chụp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        snapshot_id: string;
+                        /** Format: uuid */
+                        trip_id: string;
+                        /** Format: uuid */
+                        leg_id: string;
+                        /** @enum {string} */
+                        provider: "pf_partner_waterway" | "road_haversine";
+                        request: Record<string, never>;
+                        /** @description Nguyên văn thân phản hồi (base64) */
+                        raw_base64: string;
+                        raw_sha256: string;
+                        /** Format: uuid */
+                        grantor_tenant?: string | null;
+                        network_version: number | null;
+                        /** Format: date-time */
+                        fetched_at: string;
+                        /** Format: date-time */
+                        recorded_at?: string;
+                        rule_version?: string;
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    recordLogisticsMilestone: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "X-Device-Id"?: string;
+            };
+            path: {
+                id: components["parameters"]["TripID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    kind: "departed" | "arrived";
+                    /** Format: date-time */
+                    event_time: string;
+                    lat: string;
+                    lng: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["LogisticsTripResult"];
+            201: components["responses"]["LogisticsTripResult"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    completeLogisticsTrip: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["TripID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    actual_kg: components["schemas"]["Kg"];
+                    /** Format: uuid */
+                    ticket_ref?: string | null;
+                    actual_cost?: string | null;
+                    reason?: string;
+                    correction_reason?: string;
+                    /** Format: date-time */
+                    event_time?: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["LogisticsTripResult"];
+            201: components["responses"]["LogisticsTripResult"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    cancelLogisticsTrip: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["TripID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["LogisticsTripResult"];
+            201: components["responses"]["LogisticsTripResult"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listLogisticsVessels: {
+        parameters: {
+            query?: {
+                status?: "active" | "inactive";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh mục */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["LogisticsVessel"][];
+                    };
+                };
+            };
+        };
+    };
+    createLogisticsVessel: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LogisticsVesselInput"];
+            };
+        };
+        responses: {
+            200: components["responses"]["LogisticsVesselResult"];
+            201: components["responses"]["LogisticsVesselResult"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getLogisticsVessel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["LogisticsVesselResult"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    reviseLogisticsVessel: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LogisticsVesselInput"];
+            };
+        };
+        responses: {
+            200: components["responses"]["LogisticsVesselResult"];
+            201: components["responses"]["LogisticsVesselResult"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    logisticsAlerts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cảnh báo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        unweighed_hours: number;
+                        unweighed_param_version?: string;
+                        unweighed_trips: components["schemas"]["LogisticsTrip"][];
+                        vessels: components["schemas"]["LogisticsVessel"][];
+                    };
+                };
+            };
+        };
+    };
+    getLogisticsParam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: components["parameters"]["LogisticsParamKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tham số */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        key?: string;
+                        default?: string;
+                        effective?: {
+                            value?: string;
+                            param_version?: string;
+                            provisional?: boolean;
+                        };
+                        versions?: components["schemas"]["LogisticsParam"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    proposeLogisticsParam: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                key: components["parameters"]["LogisticsParamKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    value: string;
+                    /** Format: date */
+                    effective_from?: string;
+                    /** @default false */
+                    provisional?: boolean;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Phiên bản */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        param?: components["schemas"]["LogisticsParam"];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    decideLogisticsParam: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                key: components["parameters"]["LogisticsParamKey"];
+                version: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "approved" | "rejected";
+                    /** @description Bắt buộc khi rejected */
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Phiên bản */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        param?: components["schemas"]["LogisticsParam"];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    rebuildLogisticsProjections: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số chuyến đã dựng lại */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        trip_current?: number;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
         };
     };
 }
