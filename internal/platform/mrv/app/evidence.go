@@ -192,6 +192,13 @@ func (s *Service) Capture(ctx context.Context, scope authz.Scope, in CaptureInpu
 	if !scope.Allows(e.AdminUnitCode) {
 		return e, false, ErrOutOfScope
 	}
+	// KN US-MRV-04: tham số ngưỡng khẩn đọc trước giao dịch (masterdata, pool khác).
+	var pest *pestRule
+	if e.EvidenceType == port.EvidencePestDisaster {
+		if pest, err = s.pestRule(ctx, e.EventTime); err != nil {
+			return e, false, err
+		}
+	}
 	if e.HouseholdRef != nil {
 		if s.Consent == nil {
 			return e, false, ErrDependencyUnavailable
@@ -238,7 +245,11 @@ func (s *Service) Capture(ctx context.Context, scope authz.Scope, in CaptureInpu
 		if err := store.InsertEvidence(ctx, tx, &e); err != nil {
 			return ledger.Classify(err)
 		}
-		return store.UpsertCurrent(ctx, tx, e)
+		if err := store.UpsertCurrent(ctx, tx, e); err != nil {
+			return err
+		}
+		// Vượt ngưỡng nguy hiểm → tự bật nhãn "Cảnh báo khẩn" + thông báo cấp trên (cùng giao dịch).
+		return s.flagPest(ctx, tx, e, pest)
 	})
 	if errors.Is(err, ledger.ErrDuplicate) {
 		// Hai request cùng khóa chạy song song: bên thua đọc lại bản ghi của bên thắng.
@@ -302,6 +313,8 @@ type EvidenceView struct {
 	ReviewStatus domain.ReviewStatus // của bản hiện hành
 	Chain        []domain.Evidence   // mọi phiên bản (sửa sai), cũ → mới
 	Reviews      []domain.Review     // mọi quyết định duyệt của chuỗi
+	// Alerts: mọi cảnh báo của chuỗi (nhãn "Cảnh báo khẩn" KN US-MRV-04, leo thang quá hạn KN US-MRV-06).
+	Alerts []store.AlertRow
 }
 
 // Get đọc một phiên bản minh chứng trong phạm vi người gọi (ngoài phạm vi → 404).
@@ -334,7 +347,10 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (EvidenceView, error) {
 		if v.Chain, err = store.Chain(ctx, tx, e.RootID); err != nil {
 			return err
 		}
-		v.Reviews, err = store.ReviewsOfRoot(ctx, tx, e.RootID)
+		if v.Reviews, err = store.ReviewsOfRoot(ctx, tx, e.RootID); err != nil {
+			return err
+		}
+		v.Alerts, err = store.AlertsOfRoots(ctx, tx, []uuid.UUID{e.RootID})
 		return err
 	})
 	return v, err
@@ -375,6 +391,17 @@ func (s *Service) List(ctx context.Context, in ListInput) (Page[store.Listed], e
 			EvidenceType: in.EvidenceType, AdminUnitCode: in.AdminUnitCode, ReviewStatus: in.ReviewStatus,
 			All: sc.All, Units: sc.Units,
 		}, in.After, limit+1)
+		if e != nil {
+			return e
+		}
+		heads := make([]uuid.UUID, 0, len(items))
+		for _, it := range items {
+			heads = append(heads, it.Evidence.ID)
+		}
+		urgent, e := store.UrgentHeads(ctx, tx, heads)
+		for i := range items {
+			items[i].Urgent = urgent[items[i].Evidence.ID]
+		}
 		return e
 	})
 	if err != nil {

@@ -37,13 +37,23 @@ const (
 	Migrator        = "ag_migrator"
 	SharedUser      = "ag_shared_user"
 	OutboxPublisher = "ag_outbox_publisher"
+	// Vai giám sát vận hành (G3, mục 19) và chủ hàm SECURITY DEFINER của chúng.
+	MKGMonitor      = "mkg_monitor"
+	TSMonitor       = "ts_monitor"
+	MKGMonitorOwner = "mkg_monitor_owner"
+	TSMonitorOwner  = "ts_monitor_owner"
 )
 
 // Roles là danh mục vai. Mỗi module một vai riêng chỉ có quyền trên schema của
 // nó (R-05) — thêm module mới thì thêm vai ở đây và GRANT trong migration.
 var Roles = []Role{
 	{Name: SharedUser, Login: false},
-	{Name: Migrator, Login: true, Clusters: migrations.Clusters},
+	// Chủ các hàm giám sát SECURITY DEFINER (mkg 000013, ts 000003): NOLOGIN, BYPASSRLS để đếm xuyên
+	// tenant, chỉ được SELECT theo CỘT vận hành do migration cấp. Tạo trước ag_migrator vì ag_migrator
+	// là thành viên (cần để ALTER FUNCTION … OWNER TO); không thêm quyền bảng nào ag_migrator chưa có.
+	{Name: MKGMonitorOwner, Login: false, BypassRLS: true},
+	{Name: TSMonitorOwner, Login: false, BypassRLS: true},
+	{Name: Migrator, Login: true, MemberOf: []string{MKGMonitorOwner, TSMonitorOwner}, Clusters: migrations.Clusters},
 	{Name: OutboxPublisher, Login: true, BypassRLS: true, Clusters: migrations.Clusters},
 	// platform_api: chỉ bảng vận hành trong schema shared (idempotency) của cụm pf, không có quyền nghiệp vụ.
 	{Name: "platform_api", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
@@ -84,6 +94,10 @@ var Roles = []Role{
 	{Name: "ts_reader", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.TS}},
 	// pf/metrics: định nghĩa chỉ số, giá trị theo ngày, ảnh chụp + watermark, nhật ký lớp (GIS FN-18..21).
 	{Name: "metrics_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
+	// sql_exporter (mục 19): chỉ EXECUTE hàm gộp trong schema mkg_monitor / ts_monitor — không SELECT bảng
+	// gốc, không thuộc ag_shared_user, NOBYPASSRLS (deploy/observability/sql-exporter).
+	{Name: MKGMonitor, Login: true, Clusters: []migrations.Cluster{migrations.MKG}},
+	{Name: TSMonitor, Login: true, Clusters: []migrations.Cluster{migrations.TS}},
 }
 
 // PasswordFor đọc mật khẩu của vai từ AG_DB_PASSWORD_<VAI>, rồi AG_DB_APP_PASSWORD.

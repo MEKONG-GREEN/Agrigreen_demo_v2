@@ -52,6 +52,7 @@ type evidenceDTO struct {
 	CorrectionReason *string                    `json:"correction_reason"`
 	Seq              int64                      `json:"seq"`
 	ReviewStatus     *string                    `json:"review_status,omitempty"`
+	Urgent           *bool                      `json:"urgent,omitempty"`
 }
 
 func toEvidenceDTO(e domain.Evidence) evidenceDTO {
@@ -91,6 +92,58 @@ func toListedDTO(l store.Listed) evidenceDTO {
 	d := toEvidenceDTO(l.Evidence)
 	s := string(l.ReviewStatus)
 	d.ReviewStatus = &s
+	u := l.Urgent
+	d.Urgent = &u
+	return d
+}
+
+// alertDTO là một cảnh báo MRV (sổ pf_mrv.alert).
+type alertDTO struct {
+	ID            string            `json:"id"`
+	Kind          string            `json:"kind"`
+	Level         int               `json:"level"`
+	Severity      string            `json:"severity"`
+	Label         string            `json:"label"`
+	AdminUnitCode string            `json:"admin_unit_code"`
+	SubjectType   string            `json:"subject_type"`
+	SubjectID     string            `json:"subject_id"`
+	SubjectRootID string            `json:"subject_root_id"`
+	PlotRef       *string           `json:"plot_ref"`
+	SeasonRef     *string           `json:"season_ref"`
+	Detail        json.RawMessage   `json:"detail"`
+	Params        []domain.ParamUse `json:"params"`
+	RuleVersion   string            `json:"rule_version"`
+	EventTime     string            `json:"event_time"`
+	RecordedAt    string            `json:"recorded_at"`
+	Seq           int64             `json:"seq"`
+}
+
+var alertLabels = map[string]string{
+	"pest_urgent": "Cảnh báo khẩn", "awd_no_infrastructure": "Ghi AWD nhưng vùng chưa đủ hạ tầng",
+	"review_overdue": "Hồ sơ quá hạn xử lý",
+}
+
+func toAlertDTO(a store.AlertRow) alertDTO {
+	d := alertDTO{
+		ID: a.ID.String(), Kind: a.Kind, Level: a.Level, Severity: a.Severity, Label: alertLabels[a.Kind],
+		AdminUnitCode: a.AdminUnitCode, SubjectType: a.SubjectType, SubjectID: a.SubjectID.String(),
+		SubjectRootID: a.SubjectRootID.String(), Detail: a.Detail, Params: a.Params, RuleVersion: a.RuleVersion,
+		EventTime: ts(a.EventTime), RecordedAt: ts(a.RecordedAt), Seq: a.Seq,
+	}
+	if a.Kind == "review_overdue" {
+		d.Label += map[int]string{1: " — đã báo người duyệt", 2: " — đã leo thang lên quản trị TTKN tỉnh"}[a.Level]
+	}
+	if a.PlotRef != nil {
+		s := a.PlotRef.String()
+		d.PlotRef = &s
+	}
+	if a.SeasonRef != nil {
+		s := a.SeasonRef.String()
+		d.SeasonRef = &s
+	}
+	if d.Params == nil {
+		d.Params = []domain.ParamUse{}
+	}
 	return d
 }
 
@@ -120,12 +173,22 @@ type evidenceViewDTO struct {
 	ReviewStatus string        `json:"review_status"`
 	Chain        []evidenceDTO `json:"chain"`
 	Reviews      []reviewDTO   `json:"reviews"`
+	// Urgent: phiên bản đang xem mang nhãn "Cảnh báo khẩn" (KN US-MRV-04).
+	Urgent bool       `json:"urgent"`
+	Alerts []alertDTO `json:"alerts"`
 }
 
 func toViewDTO(v app.EvidenceView) evidenceViewDTO {
 	d := evidenceViewDTO{
 		Evidence: toEvidenceDTO(v.Evidence), HeadID: v.HeadID.String(), IsCurrent: v.HeadID == v.Evidence.ID,
 		ReviewStatus: string(v.ReviewStatus), Chain: make([]evidenceDTO, 0, len(v.Chain)), Reviews: make([]reviewDTO, 0, len(v.Reviews)),
+		Alerts: make([]alertDTO, 0, len(v.Alerts)),
+	}
+	for _, a := range v.Alerts {
+		d.Alerts = append(d.Alerts, toAlertDTO(a))
+		if a.Kind == "pest_urgent" && a.SubjectID == v.Evidence.ID {
+			d.Urgent = true
+		}
 	}
 	for _, e := range v.Chain {
 		d.Chain = append(d.Chain, toEvidenceDTO(e))

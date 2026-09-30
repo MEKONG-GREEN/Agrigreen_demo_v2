@@ -47,8 +47,12 @@ var paramDefaults = map[string]struct{ value, unit string }{
 }
 
 // param đọc tham số đã duyệt có hiệu lực tại at; chưa có → mặc định (Source = default).
+// Tham số chuỗi (textParamDefaults, vd danh sách mã) lấy giá trị từ ParamValue.Text.
 func (s *Service) param(ctx context.Context, key string, at time.Time) (domain.ParamUse, error) {
-	def := paramDefaults[key]
+	def, isText := textParamDefaults[key]
+	if !isText {
+		def = paramDefaults[key]
+	}
 	out := domain.ParamUse{Key: key, Value: def.value, Unit: def.unit, Source: domain.ParamSourceDefault}
 	if s.Params == nil {
 		return out, nil
@@ -64,7 +68,11 @@ func (s *Service) param(ctx context.Context, key string, at time.Time) (domain.P
 	if unit == "" {
 		unit = def.unit
 	}
-	return domain.ParamUse{Key: key, Version: v.Version, Value: v.Value.String(), Unit: unit, Source: domain.ParamSourceApproved}, nil
+	val := v.Value.String()
+	if isText {
+		val = v.Text
+	}
+	return domain.ParamUse{Key: key, Version: v.Version, Value: val, Unit: unit, Source: domain.ParamSourceApproved}, nil
 }
 
 func (s *Service) intParam(ctx context.Context, key string, at time.Time) (int, error) {
@@ -193,11 +201,15 @@ func (s *Service) HandleFarmLogLink(ctx context.Context, tx pgx.Tx, env outbox.E
 		}
 		t := occurred(env, p.EventTime)
 		ver, plot, commune, act, loc, cur := p.Version, p.PlotRef, p.CommuneCode, p.ActivityCode, p.LocationStatus, p.BecameCurrent
-		return store.InsertFarmLogLink(ctx, tx, env.TenantID, store.FarmLogRow{
+		if err := store.InsertFarmLogLink(ctx, tx, env.TenantID, store.FarmLogRow{
 			Kind: "recorded", LogID: p.LogID, LogRef: p.LogRef, LogVersion: &ver, SeasonRef: p.SeasonRef, PlotRef: &plot,
 			CommuneCode: &commune, ActivityCode: &act, LocationStatus: &loc, BecameCurrent: &cur, AuthorRef: p.AuthorRef,
 			CatalogVersion: pin, LogEventTime: t, EventTime: env.OccurredAt, IdemKey: key,
-		})
+		}); err != nil {
+			return err
+		}
+		// KN FR-08: ghi AWD nhưng thửa/xã chưa có minh chứng hạ tầng đạt → cờ + thông báo cán bộ xã.
+		return s.flagAWDInfra(ctx, tx, env.TenantID, p, t)
 	case port.EventFarmLogReviewed:
 		var p farmLogReviewedV1
 		if err := json.Unmarshal(env.Payload, &p); err != nil {

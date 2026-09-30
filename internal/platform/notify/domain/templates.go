@@ -9,6 +9,7 @@ import (
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
+	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
@@ -180,4 +181,37 @@ func AreaFeedStaleTemplate(p mechport.AreaFeedStaleV1, occurred time.Time) Templ
 		Body: fmt.Sprintf("Lần đồng bộ diện tích vụ gần nhất lúc %s, quá %s giờ — Bản đồ CGH đang dùng dữ liệu nhập tay dự phòng.",
 			viTime(ParseTime(p.LastSyncAt, occurred)), p.ThresholdHours),
 		DeepLink: "/mechanization/area-sync-log", CreatedAt: ParseTime(p.DetectedAt, occurred)}
+}
+
+// MRVAlertTemplate: cảnh báo MRV (pf.mrv.alert.raised, G3). Chỉ mã tham chiếu và mã xã — không có
+// giá trị minh chứng hay dữ liệu cá nhân.
+func MRVAlertTemplate(p mrvport.AlertRaisedV1, occurred time.Time) Template {
+	t := Template{Severity: p.Severity, CreatedAt: ParseTime(p.EventTime, occurred)}
+	if t.Severity != port.SeverityUrgent {
+		t.Severity = port.SeverityNormal
+	}
+	if id, err := uuid.Parse(p.SubjectRootID); err == nil {
+		t.SubjectRef = &id
+	}
+	switch p.Kind {
+	case mrvport.AlertPestUrgent:
+		t.Kind, t.Severity = port.KindMRVUrgent, port.SeverityUrgent
+		t.Title = "Cảnh báo khẩn: sâu bệnh/thiên tai vượt ngưỡng"
+		t.Body = fmt.Sprintf("Xã %s: ghi nhận sâu bệnh/thiên tai vượt ngưỡng nguy hiểm — nguy cơ lan rộng, cần xử lý ngay.", p.AdminUnitCode)
+		t.DeepLink = "/mrv/evidence/" + p.SubjectID
+	case mrvport.AlertAWDNoInfrastructure:
+		t.Kind = port.KindMRVAnomaly
+		t.Title = "Nhật ký HTX bất thường: ghi AWD nhưng vùng chưa đủ hạ tầng"
+		t.Body = fmt.Sprintf("Xã %s: nhật ký App HTX ghi tưới ướt khô xen kẽ (AWD) cho thửa chưa có xác nhận hạ tầng tưới tiêu — cần kiểm tra thực địa.", p.AdminUnitCode)
+		t.DeepLink = "/mrv/alerts/" + p.AlertID
+	default:
+		t.Kind = port.KindMRVOverdue
+		t.Title = "Hồ sơ MRV quá hạn xử lý"
+		if p.Level >= mrvport.OverdueLevelProvinceAdmin {
+			t.Title = "Hồ sơ MRV quá hạn xử lý đã leo thang lên tỉnh"
+		}
+		t.Body = fmt.Sprintf("Xã %s: hồ sơ MRV chờ duyệt đã quá thời hạn xử lý.", p.AdminUnitCode)
+		t.DeepLink = "/mrv/evidence/" + p.SubjectID
+	}
+	return t
 }

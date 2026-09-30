@@ -21,6 +21,20 @@ Các job vận hành dùng chung cho mọi cụm (`ag_pf`, `ag_mkg`, `ag_vault`)
 | Dựng lại bảng chiếu | diễn tập G4, khi nghi lệch | theo module | vai của module | [rebuild-projection.md](rebuild-projection.md) |
 | Agent biên đọc cân: cài, đăng ký, thay khóa, cập nhật | khi lắp/đổi cân, mất đĩa, phát hành | `cmd/edge-agent` | — | [edge-agent.md](edge-agent.md) |
 | Nhận số đo cân (ingest), duyệt thiết bị hai người, thay khóa, mất đĩa, vhost `mkg.internal`, cảnh báo, tầng lạnh `ts` | khi lắp/đổi cân, sự cố, hết cửa sổ C-7 | `cmd/ingest`, Admin API mkg, `scripts/dev-edge-bootstrap.sh` (dev) | `ingest_ts`, `ts_reader`, `ingest_mkg` | [ingest.md](ingest.md) |
+| PKI thiết bị: CA thiết bị riêng trong lãnh thổ, cấp/thu hồi chứng thư, thay CA | dựng một lần; mỗi kỳ thiết bị; kiểm hằng quý | CA ngoại tuyến + CA trung gian (HSM), `scripts/gen-dev-certs` (dev) | — | [device-pki.md](device-pki.md) |
+| Giám sát SQL xuyên tenant (sql_exporter) | liên tục (60 s) | `deploy/observability/sql-exporter/*.collector.yml` | `mkg_monitor`, `ts_monitor` (chỉ EXECUTE hàm gộp) | [ingest.md](ingest.md) mục 7 |
+| Leo thang hồ sơ MRV chờ duyệt quá hạn (KN US-MRV-06) | mỗi 15 phút | `cmd/worker` (leader, job `mrv_review_escalation`) | `ag_outbox_publisher` (tìm tenant), `mrv_app` | mục dưới |
+
+## Leo thang hồ sơ MRV quá hạn (pf/mrv)
+
+Job `mrv_review_escalation` (mỗi 15 phút, chạy bù khi khởi động) tìm tenant có hồ sơ chờ duyệt bằng `ag_outbox_publisher`. Vai này chỉ đọc hai cột `tenant_id` và `review_status` của `pf_mrv.evidence_current` (pf 000045). Job ghi bằng vai `mrv_app`, theo hai mức:
+
+- Hồ sơ vào hệ thống quá `mrv.review_sla_hours` (mặc định 72) → cảnh báo mức 1 cho người duyệt (`mrv_reviewer`).
+- Quá `mrv.review_escalate_hours` (mặc định 120) → mức 2 cho quản trị TTKN tỉnh (`kn_province_admin`).
+
+Hai mặc định trên là **tạm, chờ khách**; đổi bằng tham số masterdata có duyệt hai người.
+
+Khóa chống trùng `overdue:<phiên bản hồ sơ>:<mức>`: chạy lại hoặc chạy chồng không báo hai lần. Sửa hồ sơ (bản ghi bù) tạo phiên bản mới với hạn mới. Log: `event=job.mrv_review_escalation`, `raised`. Xem cảnh báo: `GET /v1/mrv/alerts?kind=review_overdue`.
 
 ## Leader
 

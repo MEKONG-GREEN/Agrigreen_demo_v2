@@ -45,6 +45,13 @@ const (
 	KindCollectionSchedule = "collection_schedule"
 	// KindCollectionStatement: MKG gửi bảng kê số cuộn (hoặc bản sửa) → quản lý HTX xác nhận / tranh chấp (G3-2).
 	KindCollectionStatement = "collection_statement"
+	// KindMRVUrgent: minh chứng sâu bệnh/thiên tai tự gắn nhãn "Cảnh báo khẩn" → người duyệt + quản trị
+	// TTKN tỉnh của địa bàn (KN US-MRV-04; migration 000045).
+	KindMRVUrgent = "mrv_urgent"
+	// KindMRVAnomaly: nhật ký App HTX ghi AWD nhưng vùng chưa đủ hạ tầng → cán bộ khuyến nông xã phụ trách (KN FR-08).
+	KindMRVAnomaly = "mrv_anomaly"
+	// KindMRVOverdue: hồ sơ MRV chờ duyệt quá hạn — mức 1 người duyệt, mức 2 quản trị TTKN tỉnh (KN US-MRV-06).
+	KindMRVOverdue = "mrv_overdue"
 	// KindSyncNow là thông điệp dữ liệu "đồng bộ ngay" (US-SYNC-02) — không tạo thông báo.
 	KindSyncNow = "sync_now"
 )
@@ -83,6 +90,8 @@ const (
 	// ConsumerIntegration: cảnh báo Admin về đồng bộ tích hợp — sự kiện vào DLQ (GIS US-SYNC-02),
 	// dữ liệu App HTX quá hạn độ tươi (CGH FN-07).
 	ConsumerIntegration = "pf.notify.integration"
+	// ConsumerMRV: cảnh báo MRV (pf.mrv.alert.raised) — nhãn khẩn, bất thường AWD, leo thang quá hạn (G3).
+	ConsumerMRV = "pf.notify.mrv"
 )
 
 // AreaFarmers tìm tài khoản nông dân nhận cảnh báo khẩn theo địa bàn (HTX

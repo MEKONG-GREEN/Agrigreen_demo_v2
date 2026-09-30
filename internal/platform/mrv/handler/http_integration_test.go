@@ -166,8 +166,8 @@ func (f *fixture) approveSeed(tid uuid.UUID) {
 	r := setter.adm(http.MethodPost, "/v1/mrv/catalog/seed", nil)
 	expect(f.t, r, 200, "")
 	items, _ := r.body["items"].([]any)
-	if len(items) != 4 {
-		f.t.Fatalf("seed phải tạo 4 danh mục: %v", r.body)
+	if len(items) != 6 {
+		f.t.Fatalf("seed phải tạo 6 danh mục: %v", r.body)
 	}
 	for _, it := range items {
 		v, _ := it.(map[string]any)["version"].(map[string]any)

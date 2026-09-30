@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.mrv.alert.raised/v1",
+  "title": "pf.mrv.alert.raised — payload",
+  "description": "Một cảnh báo MRV đã ghi vào sổ pf_mrv.alert (G3): pest_urgent — minh chứng sâu bệnh/thiên tai vượt ngưỡng nguy hiểm, tự gắn nhãn Cảnh báo khẩn (KN US-MRV-04); awd_no_infrastructure — nhật ký App HTX ghi AWD nhưng thửa/xã chưa có minh chứng hạ tầng đạt (KN FR-08); review_overdue — hồ sơ chờ duyệt quá hạn xử lý, level 1 người duyệt, level 2 quản trị TTKN tỉnh (KN US-MRV-06). pf/notify dựng thông báo. Không có dữ liệu cá nhân hay giá trị minh chứng.",
+  "x-event-type": "pf.mrv.alert.raised",
+  "x-schema-version": 1,
+  "x-producer": "pf/mrv",
+  "type": "object",
+  "required": ["alert_id", "kind", "level", "severity", "admin_unit_code", "subject_type", "subject_id", "subject_root_id", "plot_ref", "season_ref", "rule_version", "event_time"],
+  "properties": {
+    "alert_id":        { "type": "string", "format": "uuid" },
+    "kind":            { "type": "string", "enum": ["pest_urgent", "awd_no_infrastructure", "review_overdue"] },
+    "level":           { "type": "integer", "minimum": 0, "maximum": 2, "description": "review_overdue: 1 = người duyệt, 2 = quản trị TTKN tỉnh; loại khác: 0" },
+    "severity":        { "type": "string", "enum": ["urgent", "normal"] },
+    "admin_unit_code": { "type": "string", "description": "Mã xã của minh chứng / nhật ký" },
+    "subject_type":    { "type": "string", "enum": ["evidence", "farm_log"] },
+    "subject_id":      { "type": "string", "format": "uuid", "description": "Phiên bản minh chứng (evidence.id) hoặc log_id của nhật ký HTX" },
+    "subject_root_id": { "type": "string", "format": "uuid", "description": "Gốc chuỗi minh chứng (root_id) hoặc log_ref" },
+    "plot_ref":        { "type": ["string", "null"], "format": "uuid" },
+    "season_ref":      { "type": ["string", "null"], "format": "uuid" },
+    "rule_version":    { "type": "string" },
+    "event_time":      { "type": "string", "format": "date-time" }
+  }
+}
