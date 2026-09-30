@@ -65,6 +65,10 @@ type Service struct {
 	ConfiguredKgPerRoll *decimal.Decimal
 	// CursorKey: khóa HMAC của con trỏ pull.
 	CursorKey []byte
+	// Feed: luồng phản hồi của HTX trên nền tảng (G3-2); nil = không kéo.
+	Feed port.HTXResponseFeed
+
+	feed feedState
 }
 
 var _ port.RollTotals = (*Service)(nil)

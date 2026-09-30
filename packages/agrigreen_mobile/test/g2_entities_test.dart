@@ -31,6 +31,18 @@ void main() {
     },
   );
 
+  test('entity chiều lên G3-2 htx_collection_response (RB-6 chiều mua) vào hàng đợi và push', () async {
+    await h.outbox.enqueue(
+      entity: PushEntity.htxCollectionResponse,
+      payload: {'statement_ref': 's-1', 'revision': 1, 'outcome': 'confirmed'},
+    );
+    await h.sync.syncOnce(force: true);
+    expect(h.fake.ledger.values.map((w) => w['entity']).toSet(), {
+      PushEntity.htxCollectionResponse,
+    });
+    expect(PushEntity.all.containsAll(PushEntity.g3), isTrue);
+  });
+
   test(
     'lệnh duyệt nhật ký xếp hàng → POST /v1/cropcycle/farm-logs/{id}/reviews',
     () async {

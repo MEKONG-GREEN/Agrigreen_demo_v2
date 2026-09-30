@@ -16,10 +16,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops"
+	foport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub"
 	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement"
@@ -91,11 +93,18 @@ func Jobs(mods Modules, tenantPool *pgxpool.Pool, selected string, log *slog.Log
 	if selected == "all" || strings.Contains(","+selected+",", ","+hubport.JobDailyCapacity+",") {
 		out = append(out, mods.Hub.Jobs(hub.ActiveHubTenants(tenantPool), log)...)
 	}
+	if selected == "all" || strings.Contains(","+selected+",", ","+foport.JobHTXResponses+",") {
+		// Nền tảng → MKG chỉ qua Application API công khai: kéo phản hồi của HTX cho tenant MKG
+		// AG_MKG_TENANT_ID (tenant của tài khoản dịch vụ agrigreen-mkg-sync). Thiếu → không có job.
+		tid, _ := uuid.Parse(os.Getenv("AG_MKG_TENANT_ID"))
+		interval, _ := time.ParseDuration(os.Getenv("AG_FIELDOPS_HTX_POLL_INTERVAL"))
+		out = append(out, mods.Fieldops.Jobs(tid, interval, log)...)
+	}
 	return out
 }
 
 // JobNames liệt kê tên job hợp lệ của api-internal.
-func JobNames() string { return hubport.JobDailyCapacity }
+func JobNames() string { return hubport.JobDailyCapacity + ", " + foport.JobHTXResponses }
 
 // FieldopsOptionsFromEnv đọc cấu hình mkg/fieldops:
 //
@@ -104,12 +113,18 @@ func JobNames() string { return hubport.JobDailyCapacity }
 //	    Thiếu → nguồn thửa/HTX đóng (lập lệnh gom trả 503 fieldops.directory_unavailable).
 //	AG_FIELDOPS_KG_PER_ROLL   kg/cuộn cấu hình (bậc 3 của chuỗi dự phòng; tạm, chờ khách)
 //	AG_FIELDOPS_CURSOR_KEY    khóa HMAC con trỏ pull của app hiện trường (thiếu → ngẫu nhiên theo tiến trình)
+//	AG_MKG_TENANT_ID          tenant MKG của tài khoản dịch vụ (job fieldops_htx_responses kéo phản hồi HTX, G3-2)
+//	AG_FIELDOPS_HTX_POLL_INTERVAL chu kỳ kéo phản hồi HTX (Go duration, mặc định 5m)
 //
 // WeighedMass (mkg/measurement) nối trong Build.
 func FieldopsOptionsFromEnv(clk clock.Clock) fieldops.Options {
 	var o fieldops.Options
 	if base := os.Getenv("AG_PLATFORM_API_URL"); base != "" {
 		o.Directory = fieldops.NewPlatformDirectory(fieldops.PlatformConfig{
+			BaseURL: base, TokenURL: os.Getenv("AG_PLATFORM_TOKEN_URL"),
+			ClientID: os.Getenv("AG_MKG_SA_CLIENT_ID"), ClientSecret: os.Getenv("AG_MKG_SA_CLIENT_SECRET"),
+		}, clk)
+		o.Feed = fieldops.NewPlatformFeed(fieldops.PlatformConfig{
 			BaseURL: base, TokenURL: os.Getenv("AG_PLATFORM_TOKEN_URL"),
 			ClientID: os.Getenv("AG_MKG_SA_CLIENT_ID"), ClientSecret: os.Getenv("AG_MKG_SA_CLIENT_SECRET"),
 		}, clk)

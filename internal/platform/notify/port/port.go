@@ -41,6 +41,10 @@ const (
 	KindIntegrationDeadLettered = "integration_dead_lettered"
 	// KindAreaFeedStale: dữ liệu diện tích vụ App HTX quá ngưỡng độ tươi → Admin CGH (CGH FN-07 AC-02/AC-03).
 	KindAreaFeedStale = "area_feed_stale"
+	// KindCollectionSchedule: MKG công bố / đổi lịch gom rơm của HTX → quản lý HTX (G3-2; migration 000041).
+	KindCollectionSchedule = "collection_schedule"
+	// KindCollectionStatement: MKG gửi bảng kê số cuộn (hoặc bản sửa) → quản lý HTX xác nhận / tranh chấp (G3-2).
+	KindCollectionStatement = "collection_statement"
 	// KindSyncNow là thông điệp dữ liệu "đồng bộ ngay" (US-SYNC-02) — không tạo thông báo.
 	KindSyncNow = "sync_now"
 )

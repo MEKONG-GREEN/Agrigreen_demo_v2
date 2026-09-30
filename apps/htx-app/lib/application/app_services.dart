@@ -30,6 +30,7 @@ import 'package:agrigreen_mobile/data/sync/sync_service.dart';
 import 'package:agrigreen_mobile/domain/geo/tiles.dart';
 import 'package:path/path.dart' as p;
 
+import 'collection_service.dart';
 import 'crop_service.dart';
 import 'manager_service.dart';
 import 'news_service.dart';
@@ -123,6 +124,7 @@ class HtxServices {
     required this.profile,
     required this.crop,
     required this.support,
+    required this.collection,
     required this.staff,
     required this.news,
     required this.manager,
@@ -147,6 +149,9 @@ class HtxServices {
   final ProfileService profile;
   final CropService crop;
   final SupportService support;
+
+  /// Thu gom rơm MKG (G3-2): lịch gom, bảng kê số cuộn, xác nhận/tranh chấp.
+  final CollectionService collection;
   final StaffService staff;
   final NewsService news;
   final ManagerService manager;
@@ -268,6 +273,7 @@ class HtxServices {
         refs: refs,
         location: pf.location,
       ),
+      collection: CollectionService(outbox: outbox, refs: refs),
       staff: StaffService(api: api, dialer: pf.dialer),
       news: NewsService(refs: refs, actions: actions),
       manager: ManagerService(

@@ -74,6 +74,10 @@ func (m *Module) UseGpsLog(g geoport.GpsLog) { m.svc.GpsLog = g }
 // SupplyStats cho gốc lắp ráp: sản lượng lúa HTX × vụ (nguồn cung của pf/simulation).
 func (m *Module) SupplyStats() port.SupplyStats { return m.svc }
 
+// CollectionValveHandler là inbox.Handler của consumer port.CollectionValveConsumer (van MKG
+// collection_schedule / htx_collection_statement → sổ nhận + bảng chiếu, vai cropcycle_app).
+func (m *Module) CollectionValveHandler() inbox.Handler { return m.svc.HandleCollectionValve }
+
 // GpsLogHandler là inbox.Handler của consumer port.GpsLogConsumer (vai cropcycle_app).
 func (m *Module) GpsLogHandler() inbox.Handler { return m.svc.HandleGpsLog }
 

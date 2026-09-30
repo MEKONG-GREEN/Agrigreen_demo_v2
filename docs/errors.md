@@ -300,6 +300,9 @@ Cổng `geo.GpsLog.RecordFix` (module khác gọi, không qua HTTP) trả lỗi 
 | 404 | `cropcycle.harvest_not_found` | pf/cropcycle: không có khai báo sản lượng trong phạm vi |
 | 422 | `cropcycle.import_invalid` | pf/cropcycle: tệp nhập sản lượng không đọc được, có công thức, quá 200 dòng / 2 MB, thiếu cột mã lô/mã vụ hoặc sản lượng |
 | 409 | `cropcycle.id_reused` | pf/cropcycle: `id`/`season_ref` do máy sinh đã dùng cho bản ghi khác |
+| 404 | `cropcycle.collection_statement_not_found` | pf/cropcycle (G3-2): không có bảng kê thu gom MKG trong phạm vi (quản lý HTX chỉ thấy bảng kê của HTX mình) |
+| 409 | `cropcycle.collection_statement_stale` | pf/cropcycle (G3-2): phản hồi theo `revision` cũ — MKG đã gửi bản sửa; `current_revision` là bản hiện hành |
+| 403 | `cropcycle.collection_manager_only` | pf/cropcycle (G3-2): chỉ `coop_manager` của đúng HTX (`org_ref`) được xác nhận/tranh chấp bảng kê |
 | 503 | `cropcycle.dependency_unavailable` | pf/cropcycle: chưa nối hoặc không gọi được pf/geo, pf/party, pf/masterdata, liên kết tài khoản ↔ nông hộ (vai `farmer`); consumer `pf.cropcycle.gps_log` chưa nối log GPS pf/geo (sự kiện được giao lại) |
 
 Nhãn vị trí (HTX US-GPS-01/02): `location_status` = `match` (≤ `cropcycle.gps_match_tolerance_m`, mặc định 50 m) | `mismatch` | `missing`; nguồn `gps_source` luôn có. Thiếu GPS hoặc không đo được **không** chặn lưu.

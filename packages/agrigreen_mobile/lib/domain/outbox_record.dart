@@ -27,7 +27,12 @@ abstract final class PushEntity {
   /// `POST /v1/fieldops/sync/push` của vùng mkg, KHÔNG phải pf/sync.
   static const rollCount = 'roll_count';
 
+  /// G3-2 pf/cropcycle: quản lý HTX xác nhận / tranh chấp bảng kê số cuộn
+  /// thu gom MKG (RB-6 chiều mua).
+  static const htxCollectionResponse = 'htx_collection_response';
+
   static const g1 = {plotBoundary, fieldReport, taskUpdate, consent, evidence};
+  static const g3 = {htxCollectionResponse};
   static const g2 = {
     seasonOpen,
     farmLog,
@@ -37,7 +42,7 @@ abstract final class PushEntity {
   };
 
   /// Thực thể của nền tảng (`/v1/sync/push`) — mặc định của OutboxRepository.
-  static const all = {...g1, ...g2};
+  static const all = {...g1, ...g2, ...g3};
 
   /// Thực thể của đồng bộ vùng mkg (`/v1/fieldops/sync/push`).
   static const mkgFieldops = {rollCount};

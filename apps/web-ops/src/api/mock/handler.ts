@@ -44,6 +44,7 @@ import { areaSyncRoutes } from "./areasync";
 import { syncMonitorRoutes } from "./syncmonitor";
 import { metricsRoutes } from "./metrics";
 import { mrvAdminRoutes, mrvAppRoutes } from "./mrv";
+import { collectionRoutes } from "./collection";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -375,6 +376,7 @@ const appRoutes: Route[] = [
   ...htxAppRoutes,
   ...metricsRoutes,
   ...mrvAppRoutes,
+  ...collectionRoutes,
 ];
 
 // --------------------------------------------------------------------------

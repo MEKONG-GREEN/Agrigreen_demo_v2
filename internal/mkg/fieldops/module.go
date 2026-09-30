@@ -9,10 +9,13 @@
 package fieldops
 
 import (
+	"context"
 	"crypto/rand"
+	"log/slog"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/adapter"
@@ -21,6 +24,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
 	mport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -37,6 +41,8 @@ type Options struct {
 	KgPerRoll *decimal.Decimal
 	// CursorKey: khóa HMAC con trỏ pull; rỗng → khóa ngẫu nhiên theo tiến trình.
 	CursorKey []byte
+	// Feed: luồng phản hồi của HTX trên nền tảng (G3-2); nil → job kéo phản hồi không làm gì.
+	Feed port.HTXResponseFeed
 }
 
 // Module là mkg/fieldops đã nối.
@@ -52,7 +58,47 @@ func New(db tenant.Beginner, clk clock.Clock, o Options) *Module {
 		_, _ = rand.Read(o.CursorKey)
 	}
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Directory: o.Directory, Weighed: o.Weighed,
-		ConfiguredKgPerRoll: o.KgPerRoll, CursorKey: o.CursorKey}}
+		ConfiguredKgPerRoll: o.KgPerRoll, CursorKey: o.CursorKey, Feed: o.Feed}}
+}
+
+// NewPlatformFeed tạo luồng phản hồi của HTX qua Application API công khai (tài khoản dịch
+// vụ tenant MKG, client agrigreen-mkg-sync, vai mkg_sync).
+func NewPlatformFeed(cfg PlatformConfig, clk clock.Clock) port.HTXResponseFeed {
+	return adapter.NewPlatformHTTP(cfg, func() time.Time { return clk.Now() })
+}
+
+// FeedResult là kết quả một lượt kéo phản hồi của HTX.
+type FeedResult = app.FeedResult
+
+// SyncHTXResponses chạy một lượt kéo phản hồi của HTX cho tenant MKG tid (job, kiểm thử).
+func (m *Module) SyncHTXResponses(ctx context.Context, tid uuid.UUID) (FeedResult, error) {
+	return m.svc.SyncHTXResponses(ctx, tid)
+}
+
+// Jobs trả job định kỳ của module cho bộ lập lịch của api-internal (chỉ leader chạy): kéo phản
+// hồi của HTX mỗi interval (mặc định 5 phút) cho tenant MKG tid. Không có luồng → không có job.
+func (m *Module) Jobs(tid uuid.UUID, interval time.Duration, log *slog.Logger) []schedule.Job {
+	if m.svc.Feed == nil || tid == uuid.Nil {
+		return nil
+	}
+	if interval <= 0 {
+		interval = 5 * time.Minute
+	}
+	return []schedule.Job{{
+		Name: port.JobHTXResponses, Spec: schedule.Every{Interval: interval}, RunOnStart: true, Timeout: 10 * time.Minute,
+		Run: func(ctx context.Context) error {
+			r, err := m.svc.SyncHTXResponses(ctx, tid)
+			if log != nil {
+				outcome := "ok"
+				if err != nil {
+					outcome = "error"
+				}
+				log.Info("kéo phản hồi của HTX", "event", "job."+port.JobHTXResponses, "recorded", r.Recorded,
+					"duplicate", r.Duplicate, "skipped", r.Skipped, "cursor", r.Cursor, "outcome", outcome)
+			}
+			return err
+		},
+	}}
 }
 
 // PlatformConfig là cấu hình tài khoản dịch vụ MKG gọi Application API.

@@ -36,6 +36,7 @@
 //
 //	pf.mechanization.area_sync  pf.cropcycle.coop_season_area.changed → diện tích vụ CGH (CGH FN-07, QT-03)
 //	pf.geo.hub_valve            mkg.hub.facility.published / mkg.hub.capacity.published → mô hình đọc hub (kiểm hợp đồng van)
+//	pf.cropcycle.htx_collection_valve  mkg.fieldops.collection_schedule/htx_collection_statement.published → lịch gom, bảng kê HTX
 //	pf.cropcycle.gps_log        vụ / nhật ký / sản lượng → log GPS pf/geo sau commit (HTX US-GPS-03)
 //	pf.extension.gps_log        yêu cầu hỗ trợ → log GPS pf/geo sau commit (HTX US-GPS-03)
 //	pf.simulation.snapshot      ảnh chụp đầu vào (SupplySource pf/cropcycle+party+geo, Router pf/waterway)

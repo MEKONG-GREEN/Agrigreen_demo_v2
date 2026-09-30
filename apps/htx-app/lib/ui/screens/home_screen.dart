@@ -13,6 +13,7 @@ import 'farm_log_screen.dart';
 import 'harvest_screen.dart';
 import 'households_screen.dart';
 import 'bulk_open_screen.dart';
+import 'collection_screen.dart';
 import 'news_screen.dart';
 import 'notifications_screen.dart';
 import 'plot_map_screen.dart';
@@ -123,6 +124,11 @@ class HomeScreen extends ConsumerWidget {
           label: 'Duyệt nhật ký',
           badge: (s?.reviewPending ?? 0) > 0 ? '${s!.reviewPending}' : null,
           onTap: () => open(const ReviewScreen()),
+        ),
+        BigTile(
+          icon: Icons.agriculture,
+          label: 'Thu gom rơm MKG',
+          onTap: () => open(const CollectionScreen()),
         ),
         BigTile(
           icon: Icons.bar_chart,

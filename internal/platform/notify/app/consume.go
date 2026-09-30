@@ -39,6 +39,7 @@ var HandledEvents = []string{
 	contentport.EventDocumentPublished, syncport.EventConflictOpened, syncport.EventDeviceRevoked,
 	partyport.EventOrgDeactivated, partyport.EventHouseholdRegistered, partyport.EventHouseholdMembershipChanged,
 	extport.EventTaskCreated, ccport.EventFarmLogRecorded, ccport.EventFarmLogReviewed, ccport.EventSeasonOpened,
+	ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived,
 	syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale,
 }
 
@@ -128,6 +129,24 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 			return nil // quản lý HTX mở vụ hộ: không tự báo cho mình
 		}
 		return s.deliver(ctx, tx, env, []domain.Notification{domain.SeasonOpenedTemplate(p, env.OccurredAt).ForAudience(coopManagers(p.CooperativeRef))})
+	case ccport.EventCollectionScheduleReceived:
+		var p ccport.CollectionScheduleReceivedV1
+		if err := decode(env, &p); err != nil {
+			return err
+		}
+		if p.CooperativeRef == uuid.Nil {
+			return nil
+		}
+		return s.deliver(ctx, tx, env, []domain.Notification{domain.CollectionScheduleTemplate(p, env.OccurredAt).ForAudience(coopManagers(p.CooperativeRef))})
+	case ccport.EventCollectionStatementReceived:
+		var p ccport.CollectionStatementReceivedV1
+		if err := decode(env, &p); err != nil {
+			return err
+		}
+		if p.CooperativeRef == uuid.Nil {
+			return nil
+		}
+		return s.deliver(ctx, tx, env, []domain.Notification{domain.CollectionStatementTemplate(p, env.OccurredAt).ForAudience(coopManagers(p.CooperativeRef))})
 	case contentport.EventDocumentPublished:
 		var p contentport.DocumentPublishedV1
 		if err := decode(env, &p); err != nil {
