@@ -31,8 +31,9 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
-// fakePlatform là Application API nền tảng giả cho nguồn thửa/HTX của fieldops (RB-2: ở
-// Local chưa có cấp quyền chia sẻ) — token client credentials + /v1/cooperatives, /v1/plots.
+// fakePlatform là bề mặt đối tác giả của nền tảng cho nguồn thửa/HTX của fieldops (ADR-0020:
+// cấp quyền chia sẻ coi như đã duyệt) — token client credentials + /v1/partner/cooperatives,
+// /v1/partner/plots.
 func fakePlatform(t *testing.T, plan MKGPlan) *httptest.Server {
 	plots := map[string]string{}
 	for _, l := range plan.Lots {
@@ -44,17 +45,16 @@ func fakePlatform(t *testing.T, plan MKGPlan) *httptest.Server {
 	mux.HandleFunc("POST /token", func(w http.ResponseWriter, _ *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "sa", "expires_in": 3600})
 	})
-	mux.HandleFunc("GET /v1/cooperatives/{ref}", func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]any{"ref": r.PathValue("ref"), "admin_unit_code": "31117", "active": true})
+	mux.HandleFunc("GET /v1/partner/cooperatives/{ref}", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"ref": r.PathValue("ref"), "commune_code": "31117", "active": true})
 	})
-	mux.HandleFunc("GET /v1/plots/{ref}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /v1/partner/plots/{ref}", func(w http.ResponseWriter, r *http.Request) {
 		htx, ok := plots[r.PathValue("ref")]
 		if !ok {
 			http.NotFound(w, r)
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"plot": map[string]any{"properties": map[string]any{
-			"ref": r.PathValue("ref"), "commune_code": "31117", "cooperative_ref": htx, "status": "active"}}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"ref": r.PathValue("ref"), "commune_code": "31117", "cooperative_ref": htx, "status": "active"})
 	})
 	s := httptest.NewServer(mux)
 	t.Cleanup(s.Close)

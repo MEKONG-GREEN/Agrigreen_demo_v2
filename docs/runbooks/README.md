@@ -38,6 +38,20 @@ Chạy worker không có lịch: `worker -jobs=none`. Chỉ chạy lịch, khôn
 
 Compose Local/Dev chưa đặt `AG_MKG_DB_DIRECT_URL` cho `api-internal` (không sửa `deploy/**` trong đợt này) — thêm `AG_MKG_DB_DIRECT_URL: postgres://postgres:5432/?sslmode=disable` để bật.
 
+## Cấp quyền chia sẻ nền tảng → MKG (ADR-0020)
+
+MKG là tenant **riêng**. Muốn MKG đọc được HTX, thửa, ngày thu hoạch, phản hồi HTX, và muốn nền tảng nhận van MKG vào tenant chương trình, cần một cấp quyền chia sẻ.
+
+Các bước ở tenant chương trình (Admin API, MFA):
+1. Một `platform_admin` gọi `POST /v1/share-grants` với `grantee_tenant_id` = tenant MKG, `kinds`, `purpose`, `valid_to`.
+2. Một `platform_admin` **khác** gọi `POST /v1/share-grants/{id}/approve`.
+3. Thu hồi: `POST /v1/share-grants/{id}/revoke` kèm lý do.
+4. Sổ đọc của MKG: `GET /v1/share-grants/{id}/reads`.
+
+Cấu hình `api-internal`: `AG_PLATFORM_API_URL`, `AG_PLATFORM_TOKEN_URL`, `AG_MKG_SA_CLIENT_SECRET`, `AG_MKG_TENANT_ID`, `AG_PARTNER_GRANTOR_TENANT` = tenant chương trình (`deploy/compose/.env.example`).
+
+DLQ `pf.geo.hub_valve`, `pf.cropcycle.htx_collection_valve`, `pf.mrv.collection_evidence` có lỗi `party.valve_share_grant_missing` nghĩa là tenant phong bì chưa có cấp quyền `valve_*` đang hiệu lực. Duyệt cấp quyền rồi chuyển lại thông điệp từ DLQ; xử lý là idempotent.
+
 ## Dọn Idempotency-Key
 
 Hàm `shared.purge_expired_idempotency(batch)` (migration `shared/000002`) xóa theo lô các khóa quá `expires_at` (48 giờ, R-51). Job gọi lặp tới khi lô trả ít hơn `batch`. Log: `event=job.idempotency`, `deleted=<số>`. Bảng phình to thì kiểm log `job.run outcome=error`.

@@ -1,17 +1,20 @@
 // Package adapter: hiện thực các cổng ngoài của mkg/fieldops.
 //
-//   - PlatformHTTP: port.PlatformDirectory qua Application API CÔNG KHAI của
-//     nền tảng, xác thực bằng tài khoản dịch vụ tenant MKG (OIDC client
-//     credentials). Chỉ thư viện chuẩn HTTP — không import vùng nền tảng (R-03),
-//     không kết nối DB pf.
+//   - PlatformHTTP: port.PlatformDirectory qua bề mặt đối tác /v1/partner/* của
+//     Application API CÔNG KHAI của nền tảng, xác thực bằng tài khoản dịch vụ tenant
+//     MKG (OIDC client credentials). Chỉ thư viện chuẩn HTTP — không import vùng nền
+//     tảng (R-03), không kết nối DB pf.
 //   - FakeDirectory: bản giả trong bộ nhớ cho kiểm thử / dữ liệu tổng hợp (R-95).
 //   - Unconfigured: đóng khi chưa cấu hình (mọi lời gọi → ErrDirectoryUnavailable).
 //   - FakeWeighed, LotMassWeighed: port.WeighedMass (giả / qua measurement/port.LotMass).
 //
-// Câu hỏi RB-2 (g3-conventions §5): thửa/HTX thuộc tenant chương trình, token
-// tenant MKG sẽ nhận 404 do RLS cho tới khi có cấp quyền chia sẻ tường minh.
-// PlatformHTTP quy 404 → ErrDirectoryNotFound, nên lệnh gom bị từ chối
-// fieldops.htx_not_found / fieldops.plot_not_found thay vì âm thầm nhận ref lạ.
+// ADR-0020 (RB-2, Q-MKG-12 — chủ sản phẩm chốt 29–30/09/2026): MKG là tenant RIÊNG; thửa/HTX
+// thuộc tenant chương trình (bên cấp) và chỉ đọc được khi bên cấp đã duyệt một cấp quyền chia sẻ
+// (cooperative_directory, plot_directory, season_harvest_dates, htx_collection_responses) cho
+// tenant MKG. PlatformConfig.GrantorTenant (AG_PARTNER_GRANTOR_TENANT) chọn bên cấp; rỗng → nền
+// tảng tự chọn khi chỉ có đúng một bên cấp. Nền tảng trả 403 party.share_grant_missing khi chưa
+// cấp / đã thu hồi / hết hạn: PlatformHTTP quy 403/404 → ErrDirectoryNotFound, nên lệnh gom bị
+// từ chối fieldops.htx_not_found / fieldops.plot_not_found thay vì âm thầm nhận ref lạ.
 package adapter
 
 import (
@@ -21,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -36,7 +40,10 @@ type PlatformConfig struct {
 	TokenURL     string // endpoint token OIDC của realm
 	ClientID     string // tài khoản dịch vụ thuộc tenant MKG
 	ClientSecret string //nolint:gosec // cấu hình, không log
-	Timeout      time.Duration
+	// GrantorTenant là tenant bên cấp (tenant chương trình) của cấp quyền chia sẻ — tham số
+	// grantor của /v1/partner/*. Rỗng → nền tảng tự chọn khi chỉ có một bên cấp (ADR-0020).
+	GrantorTenant string
+	Timeout       time.Duration
 }
 
 // PlatformHTTP là port.PlatformDirectory qua Application API công khai.
@@ -100,6 +107,18 @@ func (c *PlatformHTTP) accessToken(ctx context.Context) (string, error) {
 	return c.token, nil
 }
 
+// partnerPath thêm tham số grantor (nếu cấu hình) vào đường dẫn bề mặt đối tác.
+func (c *PlatformHTTP) partnerPath(path string) string {
+	if c.cfg.GrantorTenant == "" {
+		return path
+	}
+	sep := "?"
+	if strings.Contains(path, "?") {
+		sep = "&"
+	}
+	return path + sep + "grantor=" + url.QueryEscape(c.cfg.GrantorTenant)
+}
+
 func (c *PlatformHTTP) get(ctx context.Context, path string, v any) error {
 	tok, err := c.accessToken(ctx)
 	if err != nil {
@@ -118,7 +137,7 @@ func (c *PlatformHTTP) get(ctx context.Context, path string, v any) error {
 	defer func() { _ = resp.Body.Close() }()
 	switch {
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusForbidden:
-		return port.ErrDirectoryNotFound // RB-2: ngoài phạm vi / chưa chia sẻ trông như không có
+		return port.ErrDirectoryNotFound // ADR-0020: chưa cấp quyền / đã thu hồi / không có — trông như không có
 	case resp.StatusCode == http.StatusUnauthorized:
 		c.mu.Lock()
 		c.token = ""
@@ -133,40 +152,73 @@ func (c *PlatformHTTP) get(ctx context.Context, path string, v any) error {
 	return nil
 }
 
-// Cooperative gọi GET /v1/cooperatives/{ref} (schema Cooperative của application.yaml).
+// Cooperative gọi GET /v1/partner/cooperatives/{ref} (schema PartnerCooperative, cấp quyền
+// cooperative_directory — ADR-0020).
 func (c *PlatformHTTP) Cooperative(ctx context.Context, ref uuid.UUID) (port.HTX, error) {
 	var body struct {
-		Ref           uuid.UUID `json:"ref"`
-		AdminUnitCode *string   `json:"admin_unit_code"`
-		Active        bool      `json:"active"`
+		Ref         uuid.UUID `json:"ref"`
+		CommuneCode *string   `json:"commune_code"`
+		Active      bool      `json:"active"`
 	}
-	if err := c.get(ctx, "/v1/cooperatives/"+ref.String(), &body); err != nil {
+	if err := c.get(ctx, c.partnerPath("/v1/partner/cooperatives/"+ref.String()), &body); err != nil {
 		return port.HTX{}, err
 	}
 	h := port.HTX{Ref: body.Ref, Active: body.Active}
-	if body.AdminUnitCode != nil {
-		h.CommuneCode = *body.AdminUnitCode
+	if body.CommuneCode != nil {
+		h.CommuneCode = *body.CommuneCode
 	}
 	return h, nil
 }
 
-// Plot gọi GET /v1/plots/{ref} (plot.properties của PlotFeature).
+// Plot gọi GET /v1/partner/plots/{ref} (schema PartnerPlot, cấp quyền plot_directory — ADR-0020).
 func (c *PlatformHTTP) Plot(ctx context.Context, ref uuid.UUID) (port.Plot, error) {
 	var body struct {
-		Plot struct {
-			Properties struct {
-				Ref            uuid.UUID  `json:"ref"`
-				CommuneCode    string     `json:"commune_code"`
-				CooperativeRef *uuid.UUID `json:"cooperative_ref"`
-				Status         string     `json:"status"`
-			} `json:"properties"`
-		} `json:"plot"`
+		Ref            uuid.UUID  `json:"ref"`
+		CommuneCode    string     `json:"commune_code"`
+		CooperativeRef *uuid.UUID `json:"cooperative_ref"`
+		Status         string     `json:"status"`
 	}
-	if err := c.get(ctx, "/v1/plots/"+ref.String(), &body); err != nil {
+	if err := c.get(ctx, c.partnerPath("/v1/partner/plots/"+ref.String()), &body); err != nil {
 		return port.Plot{}, err
 	}
-	pr := body.Plot.Properties
-	return port.Plot{Ref: pr.Ref, CooperativeRef: pr.CooperativeRef, CommuneCode: pr.CommuneCode, Status: pr.Status}, nil
+	return port.Plot{Ref: body.Ref, CooperativeRef: body.CooperativeRef, CommuneCode: body.CommuneCode, Status: body.Status}, nil
+}
+
+var _ port.HarvestCalendar = (*PlatformHTTP)(nil)
+
+// PlotSeasons gọi GET /v1/partner/season-harvest-dates?plot_ref= (cấp quyền season_harvest_dates —
+// ADR-0020; proto FM-01/02). 403/404 → ErrDirectoryNotFound.
+func (c *PlatformHTTP) PlotSeasons(ctx context.Context, plot uuid.UUID) ([]port.SeasonDates, error) {
+	var out []port.SeasonDates
+	after := int64(0)
+	for range 20 { // ≤ 20 trang × 200 vụ cho một thửa là quá đủ
+		var body struct {
+			Items []struct {
+				SeasonRef           uuid.UUID `json:"season_ref"`
+				PlotRef             uuid.UUID `json:"plot_ref"`
+				SeasonCode          string    `json:"season_code"`
+				SeasonYear          int       `json:"season_year"`
+				SowingDate          string    `json:"sowing_date"`
+				ExpectedHarvestDate string    `json:"expected_harvest_date"`
+				HarvestOpenDate     string    `json:"harvest_open_date"`
+				Status              string    `json:"status"`
+			} `json:"items"`
+			NextCursor int64 `json:"next_cursor"`
+		}
+		path := c.partnerPath("/v1/partner/season-harvest-dates?plot_ref=" + plot.String() + "&after=" + strconv.FormatInt(after, 10))
+		if err := c.get(ctx, path, &body); err != nil {
+			return nil, err
+		}
+		for _, it := range body.Items {
+			out = append(out, port.SeasonDates{SeasonRef: it.SeasonRef, PlotRef: it.PlotRef, SeasonCode: it.SeasonCode, SeasonYear: it.SeasonYear,
+				SowingDate: it.SowingDate, ExpectedHarvestDate: it.ExpectedHarvestDate, HarvestOpenDate: it.HarvestOpenDate, Status: it.Status})
+		}
+		if len(body.Items) == 0 || body.NextCursor <= after {
+			break
+		}
+		after = body.NextCursor
+	}
+	return out, nil
 }
 
 // FakeDirectory là PlatformDirectory trong bộ nhớ (kiểm thử, dữ liệu tổng hợp R-95).

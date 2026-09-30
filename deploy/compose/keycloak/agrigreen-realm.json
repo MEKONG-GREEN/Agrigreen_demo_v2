@@ -89,7 +89,7 @@
       { "name": "field_supervisor", "description": "MKG (G3, mkg/fieldops): lập/duyệt lệnh gom (người duyệt ≠ người lập, R-56), đối chiếu số cuộn" },
       { "name": "metrics_viewer", "description": "Nền tảng (G3, pf/metrics): xem chỉ số và lịch sử trong phạm vi cây TW → Tỉnh → Xã" },
       { "name": "map_consumer", "description": "Ứng dụng tiêu thụ (TMS — mkg/logistics) đọc bản đồ chuẩn hóa GET /v1/geo/standard-map bằng tài khoản dịch vụ (GIS US-INT-02). Chỉ lớp nền không định danh, không có thửa" },
-      { "name": "mkg_sync", "description": "Tài khoản dịch vụ MKG (client agrigreen-mkg-sync, G3-2): kéo phản hồi xác nhận/tranh chấp của HTX với bảng kê thu gom — chỉ phản hồi thuộc bảng kê do chính tenant đó gửi qua van" },
+      { "name": "mkg_sync", "description": "Tài khoản dịch vụ tenant MKG (client agrigreen-mkg-sync): đọc bề mặt đối tác /v1/partner/* (danh bạ HTX, thửa, ngày thu hoạch, phản hồi HTX) — chỉ khi tenant chương trình đã duyệt cấp quyền chia sẻ loại đó (ADR-0020)" },
       { "name": "offline_access", "description": "Refresh token ngoại tuyến (app hiện trường, tối đa 72 giờ không trực tuyến — mục 15)" },
       { "name": "default-roles-agrigreen", "description": "Vai mặc định của realm — KHÔNG gồm vai nghiệp vụ nào", "composite": true, "composites": { "realm": ["offline_access"] } }
     ]
@@ -316,8 +316,8 @@
     },
     {
       "clientId": "agrigreen-mkg-sync",
-      "name": "MKG (api-internal, mkg/fieldops) — tài khoản dịch vụ kéo phản hồi của HTX về MKG (G3-2)",
-      "description": "Client credentials, không đăng nhập người dùng. Thuộc tính tenant_id của service-account-agrigreen-mkg-sync đặt theo tenant MKG (nguồn van). Chỉ vai mkg_sync: GET /v1/cropcycle/htx-collection/responses. Cấp quyền chia sẻ thửa/HTX (RB-2) chờ khách.",
+      "name": "MKG (api-internal, mkg/fieldops) — tài khoản dịch vụ đọc bề mặt đối tác của nền tảng (ADR-0020)",
+      "description": "Client credentials, không đăng nhập người dùng. Thuộc tính tenant_id của service-account-agrigreen-mkg-sync đặt theo tenant MKG (tenant riêng, khác tenant chương trình — ADR-0020). Chỉ vai mkg_sync: bề mặt đối tác /v1/partner/* của Application API, đọc được khi tenant chương trình đã duyệt cấp quyền chia sẻ (POST /v1/share-grants, Admin API).",
       "enabled": true,
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",

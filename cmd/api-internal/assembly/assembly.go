@@ -115,8 +115,11 @@ func JobNames() string { return hubport.JobDailyCapacity + ", " + foport.JobHTXR
 // FieldopsOptionsFromEnv đọc cấu hình mkg/fieldops:
 //
 //	AG_PLATFORM_API_URL, AG_PLATFORM_TOKEN_URL, AG_MKG_SA_CLIENT_ID, AG_MKG_SA_CLIENT_SECRET
-//	    tài khoản dịch vụ tenant MKG gọi Application API công khai (OIDC client credentials).
-//	    Thiếu → nguồn thửa/HTX đóng (lập lệnh gom trả 503 fieldops.directory_unavailable).
+//	    tài khoản dịch vụ tenant MKG gọi bề mặt đối tác /v1/partner/* của Application API công khai
+//	    (OIDC client credentials). Thiếu → nguồn thửa/HTX đóng (lập lệnh gom trả 503
+//	    fieldops.directory_unavailable).
+//	AG_PARTNER_GRANTOR_TENANT tenant chương trình (bên cấp) của cấp quyền chia sẻ (ADR-0020) — tham số
+//	    grantor của /v1/partner/*. Rỗng → nền tảng tự chọn khi chỉ có đúng một bên cấp.
 //	AG_FIELDOPS_KG_PER_ROLL   kg/cuộn cấu hình (bậc 3 của chuỗi dự phòng; tạm, chờ khách)
 //	AG_FIELDOPS_CURSOR_KEY    khóa HMAC con trỏ pull của app hiện trường (thiếu → ngẫu nhiên theo tiến trình)
 //	AG_MKG_TENANT_ID          tenant MKG của tài khoản dịch vụ (job fieldops_htx_responses kéo phản hồi HTX, G3-2)
@@ -126,14 +129,13 @@ func JobNames() string { return hubport.JobDailyCapacity + ", " + foport.JobHTXR
 func FieldopsOptionsFromEnv(clk clock.Clock) fieldops.Options {
 	var o fieldops.Options
 	if base := os.Getenv("AG_PLATFORM_API_URL"); base != "" {
-		o.Directory = fieldops.NewPlatformDirectory(fieldops.PlatformConfig{
+		cfg := fieldops.PlatformConfig{
 			BaseURL: base, TokenURL: os.Getenv("AG_PLATFORM_TOKEN_URL"),
 			ClientID: os.Getenv("AG_MKG_SA_CLIENT_ID"), ClientSecret: os.Getenv("AG_MKG_SA_CLIENT_SECRET"),
-		}, clk)
-		o.Feed = fieldops.NewPlatformFeed(fieldops.PlatformConfig{
-			BaseURL: base, TokenURL: os.Getenv("AG_PLATFORM_TOKEN_URL"),
-			ClientID: os.Getenv("AG_MKG_SA_CLIENT_ID"), ClientSecret: os.Getenv("AG_MKG_SA_CLIENT_SECRET"),
-		}, clk)
+			GrantorTenant: strings.TrimSpace(os.Getenv("AG_PARTNER_GRANTOR_TENANT")),
+		}
+		o.Directory = fieldops.NewPlatformDirectory(cfg, clk)
+		o.Feed = fieldops.NewPlatformFeed(cfg, clk)
 	}
 	if s := os.Getenv("AG_FIELDOPS_KG_PER_ROLL"); s != "" {
 		if d, err := decimal.NewFromString(s); err == nil && d.Sign() > 0 {

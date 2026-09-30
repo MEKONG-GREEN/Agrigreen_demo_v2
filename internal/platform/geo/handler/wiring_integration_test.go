@@ -3,8 +3,10 @@ package handler_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +15,8 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port/porttest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
@@ -42,8 +46,14 @@ func valveEnv(t *testing.T, tid uuid.UUID, typ string, payload map[string]any) o
 // GIS FN-04/US-HUB-01 + van công bố MKG (R-03): consumer pf.geo.hub_valve kiểm payload
 // theo hợp đồng hub_facility / hub_capacity lúc chạy (trường lạ → từ chối, không ghi),
 // ghi mô hình đọc hub qua HubSink, idempotent theo event_id và phiên bản effective_from.
+// ADR-0020: phong bì của tenant MKG riêng được ghi vào tenant bên cấp (cấp quyền valve_hub);
+// tenant phong bì chưa có cấp quyền → party.valve_share_grant_missing (DLQ), không ghi.
 func TestHubValveConsumerValidatesContractAndIsIdempotent(t *testing.T) {
 	g := newG2(t)
+	mkg := ids.New()
+	share := porttest.New()
+	share.Grant(g.tenant, mkg, partyport.KindValveHub)
+	g.mod.UseSharing(share, share)
 	h := g.mod.HubValveHandler()
 	ctx := context.Background()
 	run := func(env outbox.Envelope) (bool, error) {
@@ -62,7 +72,7 @@ func TestHubValveConsumerValidatesContractAndIsIdempotent(t *testing.T) {
 		return m
 	}
 	// Trường ngoài hợp đồng (vd tồn theo lô) → van từ chối, không ghi.
-	if _, err := run(valveEnv(t, g.tenant, port.EventMKGHubFacilityPublished, facility("Kho MKG", eff, map[string]any{"lots": []any{}}))); err == nil {
+	if _, err := run(valveEnv(t, mkg, port.EventMKGHubFacilityPublished, facility("Kho MKG", eff, map[string]any{"lots": []any{}}))); err == nil {
 		t.Fatal("trường ngoài hợp đồng phải bị từ chối")
 	}
 	widget := func() map[string]any {
@@ -79,7 +89,7 @@ func TestHubValveConsumerValidatesContractAndIsIdempotent(t *testing.T) {
 	if widget() != nil {
 		t.Fatal("payload bị từ chối không được ghi")
 	}
-	env := valveEnv(t, g.tenant, port.EventMKGHubFacilityPublished, facility("Kho MKG Cờ Đỏ", eff, nil))
+	env := valveEnv(t, mkg, port.EventMKGHubFacilityPublished, facility("Kho MKG Cờ Đỏ", eff, nil))
 	if ok, err := run(env); err != nil || !ok {
 		t.Fatalf("hub_facility hợp lệ: %v %v", ok, err)
 	}
@@ -87,17 +97,17 @@ func TestHubValveConsumerValidatesContractAndIsIdempotent(t *testing.T) {
 		t.Fatalf("giao lặp: %v %v", ok, err)
 	}
 	// Bản effective_from cũ hơn → giữ bản mới.
-	if _, err := run(valveEnv(t, g.tenant, port.EventMKGHubFacilityPublished, facility("Tên cũ", eff.Add(-time.Hour), nil))); err != nil {
+	if _, err := run(valveEnv(t, mkg, port.EventMKGHubFacilityPublished, facility("Tên cũ", eff.Add(-time.Hour), nil))); err != nil {
 		t.Fatal(err)
 	}
 	capP := map[string]any{"hub_ref": hub.String(), "as_of": eff.Add(time.Hour).Format(time.RFC3339), "capacity_tons": "1200.000000",
 		"used_tons": "300.000000", "available_tons": "900.000000", "unit": "t"}
-	capEnv := valveEnv(t, g.tenant, port.EventMKGHubCapacityPublished, capP)
+	capEnv := valveEnv(t, mkg, port.EventMKGHubCapacityPublished, capP)
 	if ok, err := run(capEnv); err != nil || !ok {
 		t.Fatalf("hub_capacity: %v %v", ok, err)
 	}
 	// Cùng (hub_ref, as_of) qua sự kiện khác (MKG phát lại) → HubSink bỏ qua.
-	if _, err := run(valveEnv(t, g.tenant, port.EventMKGHubCapacityPublished, capP)); err != nil {
+	if _, err := run(valveEnv(t, mkg, port.EventMKGHubCapacityPublished, capP)); err != nil {
 		t.Fatal(err)
 	}
 	w := widget()
@@ -111,8 +121,16 @@ func TestHubValveConsumerValidatesContractAndIsIdempotent(t *testing.T) {
 	// Sai kiểu (capacity_tons là số) → từ chối.
 	bad := map[string]any{"hub_ref": hub.String(), "as_of": eff.Format(time.RFC3339), "capacity_tons": 12, "used_tons": "1.000000",
 		"available_tons": "11.000000", "unit": "t"}
-	if _, err := run(valveEnv(t, g.tenant, port.EventMKGHubCapacityPublished, bad)); err == nil {
+	if _, err := run(valveEnv(t, mkg, port.EventMKGHubCapacityPublished, bad)); err == nil {
 		t.Fatal("sai kiểu phải bị từ chối")
+	}
+	// Chưa có cấp quyền valve_hub cho tenant phong bì → lỗi rõ mã, không ghi.
+	if _, err := run(valveEnv(t, ids.New(), port.EventMKGHubFacilityPublished, facility("Kho lạ", eff.Add(time.Hour), nil))); !errors.Is(err, partyport.ErrValveGrantMissing) {
+		t.Fatalf("không có cấp quyền → party.valve_share_grant_missing: %v", err)
+	}
+	// Tenant MKG (phong bì) không có dòng hub ở pf — hub nằm ở tenant bên cấp.
+	if r := g.as(mkg, uuid.Nil, port.RolePlotViewer).appDo(http.MethodGet, g2BBox("/v1/geo/capacity-widgets"), nil); len(list(r.body, "items")) != 0 {
+		t.Fatalf("tenant MKG không được có hub ở pf: %s", r.raw)
 	}
 	// Tenant khác không thấy hub.
 	other := g.as(ids.New(), uuid.Nil, port.RolePlotViewer)
@@ -207,4 +225,51 @@ func TestPlotHouseholdsAndCoopCentroids(t *testing.T) {
 		c.Lon.InexactFloat64() < baseLon || c.Lon.InexactFloat64() > baseLon+500*dLon {
 		t.Fatalf("tâm ranh giới HTX: %v %v", cs, err)
 	}
+}
+
+// ADR-0020 (RB-2): bề mặt đối tác /v1/partner/plots — tài khoản dịch vụ tenant MKG đọc thửa của tenant
+// bên cấp qua cấp quyền plot_directory: hình học + diện tích + xã + HTX, KHÔNG nông hộ / tên thửa;
+// mỗi lời gọi ghi sổ đọc; không cấp quyền / loại khác → 403; thu hồi → 403; vai khác → 403.
+func TestPartnerPlotDirectory_ADR0020(t *testing.T) {
+	g := newG2(t)
+	mkg := ids.New()
+	share := porttest.New()
+	grant := share.Grant(g.tenant, mkg, partyport.KindPlotDirectory)
+	g.mod.UseSharing(share, share)
+	hh := ids.New()
+	r := g.managerA().appDo(http.MethodPost, "/v1/plots", map[string]any{"commune_code": "31117", "cooperative_ref": g.coopA.String(),
+		"household_ref": hh.String(), "name": "Ruộng nhà ông Ba", "geometry": rect(0, 0, 100, 100)})
+	expect(t, r, http.StatusCreated, "tạo thửa")
+	plot := str(r.body, "plot", "id")
+	sa := g.as(mkg, uuid.Nil, partyport.RolePartnerSync)
+	r = sa.appDo(http.MethodGet, "/v1/partner/plots/"+plot+"?grantor="+g.tenant.String(), nil)
+	expect(t, r, http.StatusOK, "thửa qua bề mặt đối tác")
+	if str(r.body, "ref") != plot || str(r.body, "cooperative_ref") != g.coopA.String() || str(r.body, "commune_code") != "31117" ||
+		str(r.body, "area_ha") == "" || str(r.body, "geometry", "type") != "MultiPolygon" {
+		t.Fatalf("danh bạ thửa: %s", r.raw)
+	}
+	for _, k := range []string{"household_ref", "name", "created_by"} {
+		if _, ok := r.body[k]; ok {
+			t.Fatalf("bề mặt đối tác không được mang %s: %s", k, r.raw)
+		}
+	}
+	if strings.Contains(string(r.raw), hh.String()) || strings.Contains(string(r.raw), "ông Ba") {
+		t.Fatalf("lộ nông hộ: %s", r.raw)
+	}
+	r = sa.appDo(http.MethodGet, "/v1/partner/plots?cooperative_ref="+g.coopA.String(), nil)
+	if len(list(r.body, "items")) != 1 {
+		t.Fatalf("danh sách thửa của HTX: %s", r.raw)
+	}
+	if n := share.ReadCount(); n != 2 {
+		t.Fatalf("mỗi lời gọi một dòng sổ đọc: %d", n)
+	}
+	// Không cấp quyền (tenant khác), loại khác, vai khác → 403.
+	expect(t, g.as(ids.New(), uuid.Nil, partyport.RolePartnerSync).appDo(http.MethodGet, "/v1/partner/plots/"+plot, nil), http.StatusForbidden, "không cấp quyền")
+	third := ids.New()
+	share.Grant(g.tenant, third, partyport.KindCooperativeDirectory)
+	expect(t, g.as(third, uuid.Nil, partyport.RolePartnerSync).appDo(http.MethodGet, "/v1/partner/plots/"+plot, nil), http.StatusForbidden, "loại không được cấp")
+	expect(t, g.as(mkg, uuid.Nil, port.RolePlotViewer).appDo(http.MethodGet, "/v1/partner/plots/"+plot, nil), http.StatusForbidden, "vai khác")
+	// Thu hồi → 403.
+	share.Revoke(grant.ID)
+	expect(t, sa.appDo(http.MethodGet, "/v1/partner/plots/"+plot, nil), http.StatusForbidden, "đã thu hồi")
 }

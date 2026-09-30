@@ -46,6 +46,10 @@ func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Scope: deps.Scope, Consent: deps.Consent, Store: deps.Store, Params: deps.Params}}
 }
 
+// UseValveGrants nối cổng cấp quyền chia sẻ của pf/party (ADR-0020): van mrv_collection_evidence
+// của tenant MKG ghi vào tenant bên cấp.
+func (m *Module) UseValveGrants(vg partyport.ValveGrants) { m.svc.ValveGrants = vg }
+
 // RegisterApp gắn route Application API.
 func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterApp(rg) }
 

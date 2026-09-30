@@ -82,6 +82,12 @@ type Service struct {
 	Farmers port.FarmerHouseholds
 	// Waterways (tùy chọn): lớp tuyến đường thủy (pf/waterway) cho bản đồ chuẩn hóa (GIS US-INT-02).
 	Waterways wwport.Layer
+	// Sharing (ADR-0020): kiểm cấp quyền chia sẻ + sổ đọc cho bề mặt đối tác /v1/partner/plots
+	// (pf/party). Thiếu → 403 party.share_grant_missing (mặc định từ chối).
+	Sharing partyport.PartnerAccess
+	// ValveGrants (ADR-0020): tenant bên cấp nhận van hub_facility / hub_capacity của tenant phong
+	// bì (pf/party). Thiếu → consumer van từ chối (DLQ, party.valve_share_grant_missing).
+	ValveGrants partyport.ValveGrants
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

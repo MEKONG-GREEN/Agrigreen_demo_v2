@@ -150,7 +150,12 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	cc := cropcycle.New(ccPool, clk, cropcycle.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Plots: g.Plots(), Params: md.Params(), Catalogs: md.Catalogs(),
 		GpsLog: g.GpsLog()}) // HTX US-GPS-03: log GPS qua consumer outbox pf.cropcycle.gps_log
 	pty.UseSeasonActivity(SeasonActivity{Stats: cc.Stats()}) // HTX US-HTXSTATUS-01 AC-1: vụ chưa xong / nhật ký chờ duyệt
-	kn.UseGpsLog(g.GpsLog())                                 // HTX US-GPS-03: log GPS yêu cầu hỗ trợ (pf.extension.gps_log)
+	// ADR-0020 (RB-2, Q-MKG-12): MKG là tenant riêng — bề mặt đối tác /v1/partner/* kiểm cấp quyền
+	// chia sẻ của pf/party; consumer van MKG ghi vào tenant bên cấp đã cấp valve_* cho tenant phong bì.
+	g.UseSharing(pty.PartnerAccess(), pty.ValveGrants())
+	cc.UseSharing(pty.PartnerAccess(), pty.ValveGrants())
+	mrvMod.UseValveGrants(pty.ValveGrants())
+	kn.UseGpsLog(g.GpsLog()) // HTX US-GPS-03: log GPS yêu cầu hỗ trợ (pf.extension.gps_log)
 
 	syncPool, err := pool(syncmod.DBRole)
 	if err != nil {

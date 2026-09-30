@@ -21,5 +21,6 @@
 | 0017 | [Kho chuỗi thời gian — PostgreSQL phân vùng tháng ở cụm `ts`](0017-kho-chuoi-thoi-gian.md) | Đề xuất — hiện thực ở G3-0 |
 | 0018 | [Sự kiện nội bộ MKG — vhost RabbitMQ `mkg.internal` (Q-MKG-01)](0018-su-kien-noi-bo-mkg.md) | Đề xuất — hiện thực ở G3-0 |
 | 0019 | [Định danh thiết bị cân, ký tại nguồn và đồng hồ](0019-dinh-danh-thiet-bi-va-dong-ho.md) | Đề xuất — hợp đồng dây đóng băng ở G3-0 |
+| 0020 | [Liên thông nền tảng ↔ MKG khác tenant bằng cấp quyền chia sẻ (RB-2, Q-MKG-12)](0020-lien-thong-platform-mkg-khac-tenant.md) | Chấp nhận — chủ sản phẩm chốt 29–30/09/2026; hiện thực ở pf 000042 |
 
-ADR 0001–0008 là danh sách bắt buộc ở Phụ lục B của tài liệu kiến trúc. ADR 0009–0016 phát sinh khi tổng hợp BRD và khi dựng G0. ADR 0017–0019 là nền của cổng G3 ([g3-conventions](../dev/g3-conventions.md)).
+ADR 0001–0008 là danh sách bắt buộc ở Phụ lục B của tài liệu kiến trúc. ADR 0009–0016 phát sinh khi tổng hợp BRD và khi dựng G0. ADR 0017–0019 là nền của cổng G3 ([g3-conventions](../dev/g3-conventions.md)). ADR-0020 đóng câu hỏi RB-2 (MKG là tenant riêng).

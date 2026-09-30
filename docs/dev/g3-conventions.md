@@ -59,7 +59,8 @@ Chỉ dùng số đã cấp. Số trống có thể còn lại giữa các kho�
 | mkg | 000009 | hub G3: khối lượng lô từ phiếu cân (Q-MKG-04), kiểm kê (Q-MKG-06), `hub.risk.v2` | `mkg_hub` | `hub_app` |
 | pf | 000036–000037 | metrics: định nghĩa, giá trị theo ngày, ảnh chụp + watermark, nhật ký lớp GIS | `pf_metrics` | `metrics_app` |
 | pf | 000038 | mrv G3: liên kết bằng chứng thu gom (van `mrv_collection_evidence`), đối chiếu nhật ký HTX ↔ KN (KN US-MRV-02) | `pf_mrv` | `mrv_app` |
-| pf | 000039–000042 | **dự phòng** G3 — xin người tích hợp | | |
+| pf | 000039–000041 | **dự phòng** G3 (000040–000041 đã dùng ở G3-2: cropcycle/notify thu gom HTX) — xin người tích hợp | | |
+| pf | 000042 | party: cấp quyền chia sẻ giữa hai tenant (ADR-0020, RB-2) — `share_grant_event` (sổ), `share_grant` (bên cấp), `share_grant_inbound` (bên nhận), `partner_read_log` (sổ đọc) | `pf_party` | `party_app` |
 | mkg | 000010 | G3-2 tích hợp: `mkg_measurement.lot_collection(_current)` (lô cân ↔ lệnh gom), cột `ticket_ref`/`supersedes_ticket_ref` của `mkg_fieldops.weighed_loading_current`, sổ `mkg_fieldops.roll_count_location` (GPS app hiện trường) | `mkg_measurement`, `mkg_fieldops` | `measurement_app` (+ `ingest_mkg` SELECT bảng chiếu), `fieldops_app` |
 | mkg | 000011–000012 | **dự phòng** G3 — xin người tích hợp | | |
 
@@ -116,12 +117,23 @@ Ba hợp đồng van dự thảo đã có struct Go ở `fieldops/port` và `mea
 
 | Chiều | Cơ chế | G3 |
 |---|---|---|
-| MKG → nền tảng | **Chỉ van công bố** (`contracts/publication/`, mặc định từ chối, sổ `valve_export`) | 3 hợp đồng dự thảo ở mục 4 |
-| Nền tảng → MKG | **Chỉ Application API công khai**, gọi bằng **tài khoản dịch vụ thuộc tenant MKG** (OIDC client credentials). Không có kết nối DB từ `mkg` sang `pf`, không import (R-03) | fieldops đọc thửa/HTX; logistics (G4) đọc tuyến |
+| MKG → nền tảng | **Chỉ van công bố** (`contracts/publication/`, mặc định từ chối, sổ `valve_export`). Consumer nền tảng ghi vào tenant **bên cấp** đã cấp loại `valve_*` cho tenant phong bì; không có cấp quyền → DLQ `party.valve_share_grant_missing` (ADR-0020) | 3 hợp đồng dự thảo ở mục 4 + `hub_facility`, `hub_capacity` |
+| Nền tảng → MKG | **Chỉ bề mặt đối tác `/v1/partner/*` của Application API công khai**, gọi bằng **tài khoản dịch vụ thuộc tenant MKG** (OIDC client credentials, vai `mkg_sync`), và chỉ khi tenant chương trình đã duyệt một **cấp quyền chia sẻ** có loại dữ liệu đó (ADR-0020). Không có kết nối DB từ `mkg` sang `pf`, không import (R-03) | fieldops đọc HTX/thửa/ngày thu hoạch/phản hồi HTX; logistics (G4) đọc tuyến |
 | Trong MKG | `port/` đồng bộ trong cùng tiến trình (mặc định) hoặc sự kiện nội bộ trên vhost `mkg.internal` | measurement ↔ hub ↔ fieldops |
 | Biên → MKG | edge-agent → `cmd/ingest` qua mTLS (vùng biên OT, VPN), chỉ đi ra | lô `agrigreen.edge.batch.v1` |
 
-**Câu hỏi RB-2 — cấp quyền chia sẻ.** Thửa, HTX và nông hộ thuộc tenant chương trình (ADR-0009). Token của tenant MKG gọi Application API sẽ thấy **rỗng** vì RLS. Muốn MKG đọc được thì cần một **cấp quyền chia sẻ** tường minh: bên cấp là tenant, bên nhận là tenant, kèm phạm vi, mục đích và hạn dùng, kiểm ở `app/` và có nhật ký. Cách khác là cấp cho tài khoản dịch vụ MKG một vai chỉ đọc bên trong tenant chương trình. Chờ khách và người tích hợp chốt. Tới lúc đó fieldops G3 dùng dữ liệu tổng hợp (R-95) sau một interface nguồn thửa/HTX.
+**RB-2 — đã chốt (ADR-0020, chủ sản phẩm 29–30/09/2026).** MKG là **tenant riêng**, không dùng chung tenant với nền tảng.
+- Thửa, HTX, nông hộ, vụ thuộc tenant chương trình (ADR-0009).
+- Tenant chương trình (bên cấp) cấp cho tenant MKG (bên nhận) một **cấp quyền chia sẻ** trong `pf/party` (migration pf 000042):
+  - phạm vi `cooperative_directory`, `plot_directory`, `season_harvest_dates`, `htx_collection_responses`, `valve_hub`, `valve_collection`, `valve_mrv_evidence`;
+  - mục đích, hạn;
+  - `platform_admin` đề xuất ≠ `platform_admin` duyệt (R-56); thu hồi được.
+- Bề mặt đối tác `/v1/partner/*`:
+  - kiểm cấp quyền rồi mới đặt ngữ cảnh tenant bên cấp **tường minh**; không vai BYPASSRLS;
+  - chỉ trả trường tối thiểu, không dữ liệu cá nhân;
+  - mọi lần đọc ghi sổ `pf_party.partner_read_log`.
+- `tenant.Within` là cách **duy nhất** đổi tenant trong một giao dịch, chỉ dùng sau một kiểm cấp quyền ở `app/`.
+- Cấu hình MKG: `AG_PARTNER_GRANTOR_TENANT`.
 
 **Không bao giờ qua van**, kể cả ở G3:
 - số đo cân thô, phiếu cân, khối lượng chính xác của lô;
