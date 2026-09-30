@@ -21,6 +21,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/mkgwire"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/costing"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops"
 	foport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub"
@@ -41,10 +42,13 @@ type Modules struct {
 	Hub         *hub.Module
 	Measurement *measurement.Module
 	Fieldops    *fieldops.Module
+	Costing     *costing.Module
 }
 
 // List trả module theo thứ tự gắn route.
-func (m Modules) List() []httpx.Module { return []httpx.Module{m.Hub, m.Measurement, m.Fieldops} }
+func (m Modules) List() []httpx.Module {
+	return []httpx.Module{m.Hub, m.Measurement, m.Fieldops, m.Costing}
+}
 
 // OpsRole là vai vận hành của api-internal ở cụm mkg (tương đương platform_api ở
 // cụm pf): chỉ bảng vận hành shared.idempotency_key qua ag_shared_user, không có
@@ -93,6 +97,14 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules,
 	fo.Weighed = mkgwire.Weighed{Links: mods.Measurement.CollectionLinks(), Lots: mods.Measurement.LotMass()}
 	mods.Fieldops = fieldops.New(foPool, clk, fo)
 	rolls.Totals, rolls.KgPerRoll = mods.Fieldops.RollTotals(), mods.Fieldops.KgPerRoll()
+	// G4 costing (costing_app): nguồn gốc lô hub (quy kết hao hụt). Contracts / Trips / Deliveries nối
+	// khi mkg/orders, mkg/logistics có module (người tích hợp) — tới lúc đó lập quyết toán trả 503.
+	costPool, err := open(ctx, costing.DBRole)
+	if err != nil {
+		return mods, ops, pools, err
+	}
+	pools = append(pools, costPool)
+	mods.Costing = costing.New(costPool, clk, costing.Deps{Origins: mods.Hub.LotOrigins()})
 	return mods, ops, pools, nil
 }
 

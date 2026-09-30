@@ -1572,6 +1572,468 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/costing/lots/{id}/cost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Giá thành lô theo nhóm (proto buildCostChain)
+         * @description Vai cost_accountant / period_closer / chief_accountant. Tổng chi phí không gồm giá mua rơm (quyết toán HTX, tính riêng — proto D03),
+         *     doanh thu, carbon, khấu hao. đ/t = tổng / tấn giao; tấn giao = 0 → `cost_per_tonne = null`, `cost_per_tonne_undetermined = true`.
+         */
+        get: operations["getCostingLotCost"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/lots/{id}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        /** Bút toán giá thành của lô theo chuỗi sổ (lot:<id>) */
+        get: operations["listCostingLotEntries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ghi tay bút toán chi phí (gom, vật tư, lưu kho, bốc xếp…) vào kỳ của event_time
+         * @description Vai cost_accountant. Kỳ phải mở (409 costing.period_not_open) — sai sót sau đóng kỳ dùng `…/entries/{id}/adjust`. Doanh thu, carbon, mua rơm không ghi tay.
+         */
+        post: operations["createCostEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/entries/{id}/adjust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bút toán điều chỉnh (supersedes) ở kỳ ĐANG MỞ — kể cả cho bút toán của kỳ đã đóng
+         * @description Vai cost_accountant. Dòng mới ở kỳ tháng hiện tại, `supersedes_id` = dòng cũ, `delta_amount` = số mới − số cũ, `late_from` = kỳ gốc.
+         *     Người lập điều chỉnh của một kỳ không được đóng kỳ đó (R-56). Dòng đã bị thay → 409 costing.entry_superseded.
+         */
+        post: operations["adjustCostEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/allocations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        /** Một kết quả phân bổ (ghim rule_version + param_pins; supersedes_id / superseded_by) */
+        get: operations["getCostingAllocation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/allocations/{id}/recompute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tính lại kết quả phân bổ (R-13) — kết quả MỚI supersedes_id, kết quả cũ không đổi
+         * @description Vai cost_accountant. Đầu vào đã lưu + tham số tại thời điểm SỰ VIỆC theo quyết định có recorded_at ≤ `as_of` (bỏ trống = mọi quyết định đã ghi).
+         *     Kết quả trùng băm → 200 `changed = false`; khác → 201 kết quả mới + bút toán delta (kỳ đã đóng → kỳ đang mở).
+         */
+        post: operations["recomputeCostingAllocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/sources/{id}/allocations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        /** Mọi kết quả phân bổ (kể cả đã bị thay) của một nguồn — phiếu cân, chuyến, giao nhận, lô (quy kết hao hụt) */
+        get: operations["listCostingSourceAllocations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/collections/{id}/conversion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        /** Quy đổi cuộn → tấn hiệu lực của lệnh gom (yield_kg_per_roll = kg(HUB_IN) / cuộn; ẩm — không quy đổi, C-4) */
+        get: operations["getCostingConversion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kỳ giá thành tháng (mới trước) */
+        get: operations["listCostingPeriods"];
+        put?: never;
+        /** Mở kỳ tháng tường minh (kỳ cũng tự mở khi có bút toán đầu tiên) */
+        post: operations["openCostingPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/periods/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        /** Kỳ kèm kết quả đóng kỳ (dòng tổng hợp tất định, result_set_sha256) */
+        get: operations["getCostingPeriod"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/periods/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Yêu cầu đóng kỳ — 202 + job (mẫu mục 12)
+         * @description Vai period_closer, KHÁC người lập bút toán điều chỉnh của kỳ (403 self_approval_forbidden; DB chặn lần hai bằng CHECK + trigger — R-56).
+         *     Trong một giao dịch: khóa kỳ (bút toán mới xếp hàng sau), chụp đầu vào bất biến + SHA-256, ghi job, kỳ → closing, outbox
+         *     `mkg.costing.period_close.requested`. worker-internal tổng hợp, ghi kết quả, kỳ → closed, phát `mkg.costing.period.closed`.
+         *     Kỳ không mở → 409 costing.period_not_open (không bao giờ mở lại); kỳ chưa hết tháng → 409 costing.period_not_ended.
+         */
+        post: operations["closeCostingPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/period-close-jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        /** Trạng thái job đóng kỳ */
+        get: operations["getCostingCloseJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/settlements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Quyết toán HTX */
+        get: operations["listCostingSettlements"];
+        put?: never;
+        /**
+         * Lập quyết toán HTX cho một lệnh gom (proto PM-01..03)
+         * @description Vai cost_accountant (người lập). Giá từ hợp đồng mua rơm hiệu lực ngày gặt (orders/port.Contracts): theo cuộn → số cuộn × giá ngay;
+         *     theo tấn → chờ cân đủ mọi ghe (`awaiting_weighing`), làm mới sau mỗi lần cân. Không có hợp đồng → `blocked_reason = no_contract`,
+         *     không có số tiền (hệ thống không đoán giá). Một lệnh gom một quyết toán gốc (409 costing.settlement_exists).
+         */
+        post: operations["createCostingSettlement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/settlements/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        /** Một quyết toán HTX */
+        get: operations["getCostingSettlement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/settlements/{id}/price": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Nhập giá thỏa thuận khi không có hợp đồng (proto PM-03) — người nhập giá trở thành người lập */
+        post: operations["priceCostingSettlement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/settlements/{id}/pay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi đã trả khoản phải trả đã duyệt */
+        post: operations["payCostingSettlement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/settlements/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hủy quyết toán chưa duyệt (lý do bắt buộc); đã duyệt → 409 settlement_frozen; đã trả → 409 settlement_paid */
+        post: operations["cancelCostingSettlement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/settlements/{id}/adjust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Quyết toán điều chỉnh (âm = đảo) cho quyết toán đã duyệt / đã trả — đi qua duyệt như gốc */
+        post: operations["adjustCostingSettlement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/settlements/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * [Quản trị] Duyệt quyết toán (proto PM-04) — một khoản phải trả, hạn 15 ngày (tạm), đóng băng
+         * @description Vai chief_accountant, KHÁC người lập (403 self_approval_forbidden; CHECK DB approved_by <> prepared_by — R-56).
+         *     Chưa có giá / chờ cân / số tiền ≤ 0 → 409 costing.settlement_not_ready. Phát `mkg.costing.settlement.approved` (nội bộ, không qua van).
+         */
+        post: operations["approveCostingSettlement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/carbon-revenue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ghi doanh thu carbon và chia 45 % giữ lại / 70-15-15 (tham số có phiên bản — tạm, chờ khách)
+         * @description Vai cost_accountant. Chỉ chia số tiền đã có; KHÔNG tính tCO2e (pf/mrv, chờ C-1). VVB nhận phần dư làm tròn.
+         */
+        post: operations["recordCarbonRevenue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/params": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tham số giá thành có phiên bản (giá trị đang áp dụng + lịch sử); mặc định */
+        get: operations["listCostingParams"];
+        put?: never;
+        /** [Quản trị] Đề xuất phiên bản tham số (cost_accountant); một phiên bản chờ mỗi khóa */
+        post: operations["proposeCostingParam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/params/{key}/versions/{seq}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                seq: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** [Quản trị] Duyệt / từ chối phiên bản tham số (chief_accountant ≠ người đặt — R-56 app + CHECK DB) */
+        post: operations["decideCostingParam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/costing/projections/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** [Quản trị] Dựng lại mọi bảng chiếu costing từ sổ (R-22) */
+        post: operations["rebuildCostingProjections"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2310,6 +2772,262 @@ export interface components {
             decided_at?: string | null;
             decision_reason?: string | null;
         };
+        /**
+         * @description VND numeric(18,2) — chuỗi (R-10)
+         * @example 1250000.50
+         */
+        Money: string;
+        /**
+         * @description đơn giá numeric(18,4) — chuỗi
+         * @example 150000.0000
+         */
+        UnitPrice: string;
+        /** @enum {string} */
+        CostCategory: "straw_purchase" | "collection_labour" | "consumables" | "transport_road" | "transport_waterway" | "hub_processing" | "storage" | "handling" | "loss" | "sales_revenue" | "carbon_revenue" | "carbon_share";
+        /** @description Một dòng sổ cost_entry (stream lot:<id>). Tổng theo kỳ = Σ delta_amount; dòng điều chỉnh / tính lại trỏ supersedes_id. */
+        CostEntry: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            lot_ref?: string;
+            /** @example 2026-09 */
+            period_code?: string;
+            /** @description Kỳ của sự việc khi kỳ đó đã đóng */
+            late_from?: string | null;
+            category?: components["schemas"]["CostCategory"];
+            amount?: components["schemas"]["Money"];
+            delta_amount?: components["schemas"]["Money"];
+            mass_kg?: string | null;
+            delta_mass_kg?: string | null;
+            /** @enum {string} */
+            dimension_kind?: "facility" | "htx" | "customer" | "mode" | "none";
+            /** Format: uuid */
+            dimension_ref?: string | null;
+            /** @enum {string} */
+            source_kind?: "hub_processing" | "trip" | "delivery" | "manual" | "adjusting";
+            /** Format: uuid */
+            source_ref?: string | null;
+            /** Format: uuid */
+            allocation_ref?: string | null;
+            /** @enum {string} */
+            entry_kind?: "normal" | "adjusting";
+            note?: string | null;
+            /** Format: date-time */
+            event_time?: string;
+            /** Format: date-time */
+            recorded_at?: string;
+            /** Format: uuid */
+            supersedes_id?: string | null;
+            correction_reason?: string | null;
+            /** Format: uuid */
+            actor_ref?: string;
+            rule_version?: string;
+            seq?: number;
+        };
+        CostingLotCost: {
+            /** Format: uuid */
+            lot_ref?: string;
+            categories?: {
+                category?: components["schemas"]["CostCategory"];
+                amount?: components["schemas"]["Money"];
+                mass_kg?: string | null;
+                entries?: number;
+            }[];
+            total_cost?: components["schemas"]["Money"];
+            revenue?: components["schemas"]["Money"];
+            delivered_kg?: components["schemas"]["Kg"];
+            cost_per_tonne?: string | null;
+            cost_per_tonne_undetermined?: boolean;
+            note?: string;
+        };
+        /** @description Kết quả phân bổ (sổ allocation_result, stream period:<id>). Không bao giờ sửa — tính lại ghi kết quả mới supersedes_id. */
+        CostingAllocation: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            period_ref?: string;
+            /** @enum {string} */
+            kind?: "hub_processing" | "trip_cost" | "delivery_revenue" | "loss_attribution";
+            /** Format: uuid */
+            source_ref?: string;
+            /** Format: date-time */
+            source_event_time?: string;
+            /** @description mass | equal | self | origins */
+            basis?: string;
+            total_amount?: string | null;
+            total_kg?: string | null;
+            lines?: {
+                [key: string]: unknown;
+            }[];
+            inputs?: {
+                [key: string]: unknown;
+            };
+            inputs_sha256?: string;
+            result_sha256?: string;
+            /** @description khóa tham số → số phiên bản (0 = mặc định tạm, chờ khách) */
+            param_pins?: {
+                [key: string]: number;
+            };
+            /** Format: date-time */
+            params_as_of?: string;
+            rule_version?: string;
+            /** Format: uuid */
+            supersedes_id?: string | null;
+            /** Format: uuid */
+            superseded_by?: string | null;
+            correction_reason?: string | null;
+            /** Format: date-time */
+            recorded_at?: string;
+            /** @description Chỉ có ở phản hồi tính lại */
+            changed?: boolean;
+        };
+        CostingPeriod: {
+            /** Format: uuid */
+            id?: string;
+            /** @example 2026-09 */
+            code?: string;
+            /** Format: date-time */
+            from?: string;
+            /** Format: date-time */
+            to?: string;
+            /** @enum {string} */
+            status?: "open" | "closing" | "closed" | "posted";
+            /** Format: date-time */
+            opened_at?: string;
+            /** Format: uuid */
+            close_run_id?: string | null;
+            /** Format: uuid */
+            closed_by?: string | null;
+            /** Format: date-time */
+            closed_at?: string | null;
+            /** Format: uuid */
+            journal_ref?: string | null;
+            /** Format: date-time */
+            posted_at?: string | null;
+            summary?: {
+                /** Format: uuid */
+                close_run_id?: string;
+                lines?: {
+                    category?: components["schemas"]["CostCategory"];
+                    dimension_kind?: string;
+                    /** Format: uuid */
+                    dimension_ref?: string | null;
+                    amount?: components["schemas"]["Money"];
+                    mass_kg?: string | null;
+                    entries?: number;
+                }[];
+                line_count?: number;
+                input_snapshot_sha256?: string;
+                result_set_sha256?: string;
+                /** Format: uuid */
+                closed_by?: string;
+                /** Format: date-time */
+                closed_at?: string;
+                rule_version?: string;
+            } | null;
+        };
+        CostingCloseJob: {
+            /** Format: uuid */
+            job_id?: string;
+            /** @enum {string} */
+            kind?: "costing.period_close";
+            /** Format: uuid */
+            period_id?: string;
+            period_code?: string;
+            /** @enum {string} */
+            status?: "queued" | "completed" | "failed";
+            /** Format: uuid */
+            requested_by?: string;
+            /** Format: date-time */
+            requested_at?: string;
+            /** Format: date-time */
+            as_of?: string;
+            input_snapshot_sha256?: string;
+            snapshot_counts?: {
+                entries?: number;
+                settlements?: number;
+                carbon?: number;
+            };
+            error_code?: string | null;
+            /** Format: date-time */
+            completed_at?: string | null;
+        };
+        /** @description Quyết toán HTX (sổ settlement_event, stream settlement:<id>). Giá, số tiền KHÔNG BAO GIỜ qua van. */
+        CostingSettlement: {
+            /** Format: uuid */
+            id?: string;
+            /** @enum {string} */
+            kind?: "original" | "adjustment";
+            /** @enum {string} */
+            status?: "awaiting_weighing" | "pending_confirmation" | "approved" | "paid" | "cancelled";
+            /** Format: uuid */
+            collection_order_ref?: string;
+            /** Format: uuid */
+            htx_ref?: string;
+            /** Format: date */
+            harvest_date?: string;
+            /** Format: uuid */
+            contract_ref?: string | null;
+            contract_version?: number | null;
+            /** @enum {string|null} */
+            basis?: "per_tonne" | "per_bale" | null;
+            /** @enum {string|null} */
+            price_source?: "contract" | "manual" | null;
+            unit_price?: string | null;
+            rolls?: number | null;
+            mass_kg?: string | null;
+            gross_amount?: string | null;
+            deductions?: components["schemas"]["Money"];
+            amount?: string | null;
+            /** @enum {string|null} */
+            blocked_reason?: "no_contract" | "awaiting_weighing" | "no_rolls" | null;
+            /** Format: date */
+            due_on?: string | null;
+            /** Format: uuid */
+            period_ref?: string | null;
+            /** Format: uuid */
+            prepared_by?: string;
+            /** Format: uuid */
+            approved_by?: string | null;
+            /** Format: date-time */
+            approved_at?: string | null;
+            /** Format: uuid */
+            supersedes_id?: string | null;
+            rule_version?: string;
+        };
+        CostingParamVersion: {
+            key?: string;
+            seq?: number;
+            value?: string;
+            reason?: string;
+            /** Format: date-time */
+            effective_from?: string;
+            /** Format: uuid */
+            proposed_by?: string;
+            /** Format: date-time */
+            recorded_at?: string;
+            /** @enum {string|null} */
+            decision?: "approved" | "rejected" | null;
+            /** Format: uuid */
+            decided_by?: string | null;
+            /** Format: date-time */
+            decided_at?: string | null;
+            decision_reason?: string | null;
+        };
+        CostingParam: {
+            key?: string;
+            default?: string;
+            default_source?: string;
+            /** @example tạm, chờ khách */
+            default_label?: string;
+            active?: {
+                value?: string;
+                seq?: number;
+                pinned?: string;
+                label?: string;
+            };
+            versions?: components["schemas"]["CostingParamVersion"][];
+        };
     };
     responses: {
         /** @description Lỗi RFC 9457 */
@@ -2333,6 +3051,7 @@ export interface components {
         FacilityID: string;
         MeasurementID: string;
         OrderID: string;
+        CostingID: string;
     };
     requestBodies: never;
     headers: never;
@@ -5261,6 +5980,799 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+        };
+    };
+    getCostingLotCost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Giá thành lô */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostingLotCost"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    listCostingLotEntries: {
+        parameters: {
+            query?: {
+                after_seq?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trang bút toán */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: components["schemas"]["CostEntry"][];
+                        next_after_seq?: number | null;
+                    };
+                };
+            };
+        };
+    };
+    createCostEntry: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    lot_ref: string;
+                    /** @enum {string} */
+                    category: "collection_labour" | "consumables" | "transport_road" | "transport_waterway" | "hub_processing" | "storage" | "handling" | "loss";
+                    amount: components["schemas"]["Money"];
+                    mass_kg?: components["schemas"]["Kg"];
+                    /** @enum {string} */
+                    dimension_kind?: "facility" | "htx" | "customer" | "mode" | "none";
+                    /** Format: uuid */
+                    dimension_ref?: string;
+                    /** Format: date-time */
+                    event_time?: string;
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng khóa (phát lại) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bút toán */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostEntry"];
+                };
+            };
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    adjustCostEntry: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    amount: components["schemas"]["Money"];
+                    mass_kg?: components["schemas"]["Kg"];
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Bút toán điều chỉnh */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostEntry"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    getCostingAllocation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostingAllocation"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    recomputeCostingAllocation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date-time */
+                    as_of?: string;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Không đổi (changed = false) hoặc phát lại */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Kết quả mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostingAllocation"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    listCostingSourceAllocations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cũ trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: components["schemas"]["CostingAllocation"][];
+                    };
+                };
+            };
+        };
+    };
+    getCostingConversion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quy đổi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id?: string;
+                        /** Format: uuid */
+                        collection_order_ref?: string;
+                        rolls?: number;
+                        weighed_kg?: components["schemas"]["Kg"];
+                        /** @enum {string} */
+                        weigh_point?: "HUB_IN" | "CUSTOMER_IN";
+                        yield_kg_per_roll?: components["schemas"]["Kg"];
+                        moisture_rule?: string;
+                        converted_kg?: components["schemas"]["Kg"];
+                        inputs_sha256?: string;
+                        param_pins?: {
+                            [key: string]: number;
+                        };
+                        rule_version?: string;
+                        /** Format: uuid */
+                        supersedes_id?: string | null;
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    listCostingPeriods: {
+        parameters: {
+            query?: {
+                before?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trang kỳ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: components["schemas"]["CostingPeriod"][];
+                        next_before?: string | null;
+                    };
+                };
+            };
+        };
+    };
+    openCostingPeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Kỳ */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostingPeriod"];
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
+    getCostingPeriod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kỳ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostingPeriod"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    closeCostingPeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Job đã nhận */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostingCloseJob"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    getCostingCloseJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Job */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostingCloseJob"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    listCostingSettlements: {
+        parameters: {
+            query?: {
+                status?: "awaiting_weighing" | "pending_confirmation" | "approved" | "paid" | "cancelled";
+                collection_order_ref?: string;
+                before?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mới trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: components["schemas"]["CostingSettlement"][];
+                    };
+                };
+            };
+        };
+    };
+    createCostingSettlement: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    collection_order_ref: string;
+                    /** Format: uuid */
+                    htx_ref: string;
+                    /** Format: date */
+                    harvest_date: string;
+                    deductions?: components["schemas"]["Money"];
+                    /** @description Bắt buộc khi có khấu trừ */
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Quyết toán */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostingSettlement"];
+                };
+            };
+            409: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    getCostingSettlement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quyết toán */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostingSettlement"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    priceCostingSettlement: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    basis: "per_tonne" | "per_bale";
+                    unit_price: components["schemas"]["UnitPrice"];
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Quyết toán */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostingSettlement"];
+                };
+            };
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    payCostingSettlement: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quyết toán */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostingSettlement"];
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    cancelCostingSettlement: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Quyết toán */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostingSettlement"];
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    adjustCostingSettlement: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    amount: components["schemas"]["Money"];
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Quyết toán điều chỉnh */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostingSettlement"];
+                };
+            };
+            409: components["responses"]["Problem"];
+        };
+    };
+    approveCostingSettlement: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["CostingID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã duyệt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostingSettlement"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    recordCarbonRevenue: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    amount: components["schemas"]["Money"];
+                    /** Format: date-time */
+                    event_time?: string;
+                    reference?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Khoản carbon + phần chia */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id?: string;
+                        period_code?: string;
+                        revenue_amount?: components["schemas"]["Money"];
+                        retained_amount?: components["schemas"]["Money"];
+                        farmers_amount?: components["schemas"]["Money"];
+                        authority_amount?: components["schemas"]["Money"];
+                        verifier_amount?: components["schemas"]["Money"];
+                        param_pins?: {
+                            [key: string]: number;
+                        };
+                        /** @example tạm, chờ khách */
+                        label?: string;
+                    };
+                };
+            };
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listCostingParams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mọi khóa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: components["schemas"]["CostingParam"][];
+                    };
+                };
+            };
+        };
+    };
+    proposeCostingParam: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    key: string;
+                    value: string;
+                    reason: string;
+                    /** Format: date-time */
+                    effective_from?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Phiên bản chờ duyệt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostingParamVersion"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    decideCostingParam: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                key: string;
+                seq: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "approved" | "rejected";
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Quyết định đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostingParamVersion"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    rebuildCostingProjections: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số dòng đã dựng theo bảng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
         };
     };
 }

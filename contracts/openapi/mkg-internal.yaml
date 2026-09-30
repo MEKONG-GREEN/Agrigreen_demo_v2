@@ -24,6 +24,8 @@ tags:
     description: mkg/measurement — sổ thiết bị cân, phiên cân, phiếu cân ba điểm, dung sai / định mức có phiên bản, đối soát, tranh chấp, nhập số cân khách, van MRV
   - name: hub
     description: mkg/hub — hub, kho, bãi; lô; mẻ; dịch chuyển tồn; van công bố
+  - name: costing
+    description: mkg/costing — giá thành theo lô (sổ là nguồn, mức B), quy đổi cuộn → tấn, phân bổ, quy kết hao hụt, kỳ + đóng kỳ (202 + job), quyết toán HTX, chia doanh thu carbon, tham số có phiên bản
 paths:
   # --- mkg/hub: bề mặt quản trị (MFA) ---
   /v1/hub/facilities:
@@ -1433,6 +1435,384 @@ paths:
         "201": {description: Phiên bản, content: {application/json: {schema: {type: object, properties: {param: {$ref: "#/components/schemas/FieldopsParam"}}}}}}
         "403": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
+  # --- mkg/costing: bề mặt ứng dụng (event sourcing mức B — sổ là nguồn; tiền/khối lượng là chuỗi) ---
+  /v1/costing/lots/{id}/cost:
+    parameters: [{$ref: "#/components/parameters/CostingID"}]
+    get:
+      summary: Giá thành lô theo nhóm (proto buildCostChain)
+      description: |
+        Vai cost_accountant / period_closer / chief_accountant. Tổng chi phí không gồm giá mua rơm (quyết toán HTX, tính riêng — proto D03),
+        doanh thu, carbon, khấu hao. đ/t = tổng / tấn giao; tấn giao = 0 → `cost_per_tonne = null`, `cost_per_tonne_undetermined = true`.
+      operationId: getCostingLotCost
+      tags: [costing]
+      responses:
+        "200": {description: Giá thành lô, content: {application/json: {schema: {$ref: "#/components/schemas/CostingLotCost"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/costing/lots/{id}/entries:
+    parameters: [{$ref: "#/components/parameters/CostingID"}]
+    get:
+      summary: Bút toán giá thành của lô theo chuỗi sổ (lot:<id>)
+      operationId: listCostingLotEntries
+      tags: [costing]
+      parameters:
+        - {name: after_seq, in: query, schema: {type: integer, minimum: 0}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 500}}
+      responses:
+        "200":
+          description: Trang bút toán
+          content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/CostEntry"}}, next_after_seq: {type: [integer, "null"]}}}}}
+  /v1/costing/entries:
+    post:
+      summary: Ghi tay bút toán chi phí (gom, vật tư, lưu kho, bốc xếp…) vào kỳ của event_time
+      description: Vai cost_accountant. Kỳ phải mở (409 costing.period_not_open) — sai sót sau đóng kỳ dùng `…/entries/{id}/adjust`. Doanh thu, carbon, mua rơm không ghi tay.
+      operationId: createCostEntry
+      tags: [costing]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lot_ref, category, amount]
+              properties:
+                lot_ref: {type: string, format: uuid}
+                category: {type: string, enum: [collection_labour, consumables, transport_road, transport_waterway, hub_processing, storage, handling, loss]}
+                amount: {$ref: "#/components/schemas/Money"}
+                mass_kg: {$ref: "#/components/schemas/Kg"}
+                dimension_kind: {type: string, enum: [facility, htx, customer, mode, none]}
+                dimension_ref: {type: string, format: uuid}
+                event_time: {type: string, format: date-time}
+                note: {type: string, maxLength: 500}
+      responses:
+        "201": {description: Bút toán, content: {application/json: {schema: {$ref: "#/components/schemas/CostEntry"}}}}
+        "200": {description: Gọi lặp cùng khóa (phát lại)}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/costing/entries/{id}/adjust:
+    parameters: [{$ref: "#/components/parameters/CostingID"}]
+    post:
+      summary: Bút toán điều chỉnh (supersedes) ở kỳ ĐANG MỞ — kể cả cho bút toán của kỳ đã đóng
+      description: |
+        Vai cost_accountant. Dòng mới ở kỳ tháng hiện tại, `supersedes_id` = dòng cũ, `delta_amount` = số mới − số cũ, `late_from` = kỳ gốc.
+        Người lập điều chỉnh của một kỳ không được đóng kỳ đó (R-56). Dòng đã bị thay → 409 costing.entry_superseded.
+      operationId: adjustCostEntry
+      tags: [costing]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [amount, reason], properties: {amount: {$ref: "#/components/schemas/Money"}, mass_kg: {$ref: "#/components/schemas/Kg"}, reason: {type: string, minLength: 10, maxLength: 500}}}}}
+      responses:
+        "201": {description: Bút toán điều chỉnh, content: {application/json: {schema: {$ref: "#/components/schemas/CostEntry"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/costing/allocations/{id}:
+    parameters: [{$ref: "#/components/parameters/CostingID"}]
+    get:
+      summary: Một kết quả phân bổ (ghim rule_version + param_pins; supersedes_id / superseded_by)
+      operationId: getCostingAllocation
+      tags: [costing]
+      responses:
+        "200": {description: Kết quả, content: {application/json: {schema: {$ref: "#/components/schemas/CostingAllocation"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/costing/allocations/{id}/recompute:
+    parameters: [{$ref: "#/components/parameters/CostingID"}]
+    post:
+      summary: Tính lại kết quả phân bổ (R-13) — kết quả MỚI supersedes_id, kết quả cũ không đổi
+      description: |
+        Vai cost_accountant. Đầu vào đã lưu + tham số tại thời điểm SỰ VIỆC theo quyết định có recorded_at ≤ `as_of` (bỏ trống = mọi quyết định đã ghi).
+        Kết quả trùng băm → 200 `changed = false`; khác → 201 kết quả mới + bút toán delta (kỳ đã đóng → kỳ đang mở).
+      operationId: recomputeCostingAllocation
+      tags: [costing]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [reason], properties: {as_of: {type: string, format: date-time}, reason: {type: string, minLength: 10, maxLength: 500}}}}}
+      responses:
+        "201": {description: Kết quả mới, content: {application/json: {schema: {$ref: "#/components/schemas/CostingAllocation"}}}}
+        "200": {description: Không đổi (changed = false) hoặc phát lại}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/costing/sources/{id}/allocations:
+    parameters: [{$ref: "#/components/parameters/CostingID"}]
+    get:
+      summary: Mọi kết quả phân bổ (kể cả đã bị thay) của một nguồn — phiếu cân, chuyến, giao nhận, lô (quy kết hao hụt)
+      operationId: listCostingSourceAllocations
+      tags: [costing]
+      responses:
+        "200": {description: Cũ trước, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/CostingAllocation"}}}}}}}
+  /v1/costing/collections/{id}/conversion:
+    parameters: [{$ref: "#/components/parameters/CostingID"}]
+    get:
+      summary: Quy đổi cuộn → tấn hiệu lực của lệnh gom (yield_kg_per_roll = kg(HUB_IN) / cuộn; ẩm — không quy đổi, C-4)
+      operationId: getCostingConversion
+      tags: [costing]
+      responses:
+        "200":
+          description: Quy đổi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: {type: string, format: uuid}
+                  collection_order_ref: {type: string, format: uuid}
+                  rolls: {type: integer}
+                  weighed_kg: {$ref: "#/components/schemas/Kg"}
+                  weigh_point: {type: string, enum: [HUB_IN, CUSTOMER_IN]}
+                  yield_kg_per_roll: {$ref: "#/components/schemas/Kg"}
+                  moisture_rule: {type: string}
+                  converted_kg: {$ref: "#/components/schemas/Kg"}
+                  inputs_sha256: {type: string}
+                  param_pins: {type: object, additionalProperties: {type: integer}}
+                  rule_version: {type: string}
+                  supersedes_id: {type: [string, "null"], format: uuid}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/costing/periods:
+    get:
+      summary: Kỳ giá thành tháng (mới trước)
+      operationId: listCostingPeriods
+      tags: [costing]
+      parameters:
+        - {name: before, in: query, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 120}}
+      responses:
+        "200": {description: Trang kỳ, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/CostingPeriod"}}, next_before: {type: [string, "null"]}}}}}}
+    post:
+      summary: Mở kỳ tháng tường minh (kỳ cũng tự mở khi có bút toán đầu tiên)
+      operationId: openCostingPeriod
+      tags: [costing]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [code], properties: {code: {type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"}}}}}
+      responses:
+        "201": {description: Kỳ, content: {application/json: {schema: {$ref: "#/components/schemas/CostingPeriod"}}}}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/costing/periods/{id}:
+    parameters: [{$ref: "#/components/parameters/CostingID"}]
+    get:
+      summary: Kỳ kèm kết quả đóng kỳ (dòng tổng hợp tất định, result_set_sha256)
+      operationId: getCostingPeriod
+      tags: [costing]
+      responses:
+        "200": {description: Kỳ, content: {application/json: {schema: {$ref: "#/components/schemas/CostingPeriod"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/costing/periods/{id}/close:
+    parameters: [{$ref: "#/components/parameters/CostingID"}]
+    post:
+      summary: Yêu cầu đóng kỳ — 202 + job (mẫu mục 12)
+      description: |
+        Vai period_closer, KHÁC người lập bút toán điều chỉnh của kỳ (403 self_approval_forbidden; DB chặn lần hai bằng CHECK + trigger — R-56).
+        Trong một giao dịch: khóa kỳ (bút toán mới xếp hàng sau), chụp đầu vào bất biến + SHA-256, ghi job, kỳ → closing, outbox
+        `mkg.costing.period_close.requested`. worker-internal tổng hợp, ghi kết quả, kỳ → closed, phát `mkg.costing.period.closed`.
+        Kỳ không mở → 409 costing.period_not_open (không bao giờ mở lại); kỳ chưa hết tháng → 409 costing.period_not_ended.
+      operationId: closeCostingPeriod
+      tags: [costing]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "202": {description: Job đã nhận, content: {application/json: {schema: {$ref: "#/components/schemas/CostingCloseJob"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/costing/period-close-jobs/{id}:
+    parameters: [{$ref: "#/components/parameters/CostingID"}]
+    get:
+      summary: Trạng thái job đóng kỳ
+      operationId: getCostingCloseJob
+      tags: [costing]
+      responses:
+        "200": {description: Job, content: {application/json: {schema: {$ref: "#/components/schemas/CostingCloseJob"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/costing/settlements:
+    get:
+      summary: Quyết toán HTX
+      operationId: listCostingSettlements
+      tags: [costing]
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [awaiting_weighing, pending_confirmation, approved, paid, cancelled]}}
+        - {name: collection_order_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: before, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 200}}
+      responses:
+        "200": {description: Mới trước, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/CostingSettlement"}}}}}}}
+    post:
+      summary: Lập quyết toán HTX cho một lệnh gom (proto PM-01..03)
+      description: |
+        Vai cost_accountant (người lập). Giá từ hợp đồng mua rơm hiệu lực ngày gặt (orders/port.Contracts): theo cuộn → số cuộn × giá ngay;
+        theo tấn → chờ cân đủ mọi ghe (`awaiting_weighing`), làm mới sau mỗi lần cân. Không có hợp đồng → `blocked_reason = no_contract`,
+        không có số tiền (hệ thống không đoán giá). Một lệnh gom một quyết toán gốc (409 costing.settlement_exists).
+      operationId: createCostingSettlement
+      tags: [costing]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [collection_order_ref, htx_ref, harvest_date]
+              properties:
+                collection_order_ref: {type: string, format: uuid}
+                htx_ref: {type: string, format: uuid}
+                harvest_date: {type: string, format: date}
+                deductions: {$ref: "#/components/schemas/Money"}
+                reason: {type: string, minLength: 10, maxLength: 500, description: Bắt buộc khi có khấu trừ}
+      responses:
+        "201": {description: Quyết toán, content: {application/json: {schema: {$ref: "#/components/schemas/CostingSettlement"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/costing/settlements/{id}:
+    parameters: [{$ref: "#/components/parameters/CostingID"}]
+    get:
+      summary: Một quyết toán HTX
+      operationId: getCostingSettlement
+      tags: [costing]
+      responses:
+        "200": {description: Quyết toán, content: {application/json: {schema: {$ref: "#/components/schemas/CostingSettlement"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/costing/settlements/{id}/price:
+    parameters: [{$ref: "#/components/parameters/CostingID"}]
+    post:
+      summary: Nhập giá thỏa thuận khi không có hợp đồng (proto PM-03) — người nhập giá trở thành người lập
+      operationId: priceCostingSettlement
+      tags: [costing]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [basis, unit_price, reason], properties: {basis: {type: string, enum: [per_tonne, per_bale]}, unit_price: {$ref: "#/components/schemas/UnitPrice"}, reason: {type: string, minLength: 10, maxLength: 500}}}}}
+      responses:
+        "201": {description: Quyết toán, content: {application/json: {schema: {$ref: "#/components/schemas/CostingSettlement"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/costing/settlements/{id}/pay:
+    parameters: [{$ref: "#/components/parameters/CostingID"}]
+    post:
+      summary: Ghi đã trả khoản phải trả đã duyệt
+      operationId: payCostingSettlement
+      tags: [costing]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "201": {description: Quyết toán, content: {application/json: {schema: {$ref: "#/components/schemas/CostingSettlement"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/costing/settlements/{id}/cancel:
+    parameters: [{$ref: "#/components/parameters/CostingID"}]
+    post:
+      summary: Hủy quyết toán chưa duyệt (lý do bắt buộc); đã duyệt → 409 settlement_frozen; đã trả → 409 settlement_paid
+      operationId: cancelCostingSettlement
+      tags: [costing]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [reason], properties: {reason: {type: string, minLength: 10, maxLength: 500}}}}}
+      responses:
+        "201": {description: Quyết toán, content: {application/json: {schema: {$ref: "#/components/schemas/CostingSettlement"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/costing/settlements/{id}/adjust:
+    parameters: [{$ref: "#/components/parameters/CostingID"}]
+    post:
+      summary: Quyết toán điều chỉnh (âm = đảo) cho quyết toán đã duyệt / đã trả — đi qua duyệt như gốc
+      operationId: adjustCostingSettlement
+      tags: [costing]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [amount, reason], properties: {amount: {$ref: "#/components/schemas/Money"}, reason: {type: string, minLength: 10, maxLength: 500}}}}}
+      responses:
+        "201": {description: Quyết toán điều chỉnh, content: {application/json: {schema: {$ref: "#/components/schemas/CostingSettlement"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/costing/settlements/{id}/approve:
+    parameters: [{$ref: "#/components/parameters/CostingID"}]
+    post:
+      summary: "[Quản trị] Duyệt quyết toán (proto PM-04) — một khoản phải trả, hạn 15 ngày (tạm), đóng băng"
+      description: |
+        Vai chief_accountant, KHÁC người lập (403 self_approval_forbidden; CHECK DB approved_by <> prepared_by — R-56).
+        Chưa có giá / chờ cân / số tiền ≤ 0 → 409 costing.settlement_not_ready. Phát `mkg.costing.settlement.approved` (nội bộ, không qua van).
+      operationId: approveCostingSettlement
+      tags: [costing]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "201": {description: Đã duyệt, content: {application/json: {schema: {$ref: "#/components/schemas/CostingSettlement"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/costing/carbon-revenue:
+    post:
+      summary: Ghi doanh thu carbon và chia 45 % giữ lại / 70-15-15 (tham số có phiên bản — tạm, chờ khách)
+      description: Vai cost_accountant. Chỉ chia số tiền đã có; KHÔNG tính tCO2e (pf/mrv, chờ C-1). VVB nhận phần dư làm tròn.
+      operationId: recordCarbonRevenue
+      tags: [costing]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [amount], properties: {amount: {$ref: "#/components/schemas/Money"}, event_time: {type: string, format: date-time}, reference: {type: string, maxLength: 200}}}}}
+      responses:
+        "201":
+          description: Khoản carbon + phần chia
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: {type: string, format: uuid}
+                  period_code: {type: string}
+                  revenue_amount: {$ref: "#/components/schemas/Money"}
+                  retained_amount: {$ref: "#/components/schemas/Money"}
+                  farmers_amount: {$ref: "#/components/schemas/Money"}
+                  authority_amount: {$ref: "#/components/schemas/Money"}
+                  verifier_amount: {$ref: "#/components/schemas/Money"}
+                  param_pins: {type: object, additionalProperties: {type: integer}}
+                  label: {type: string, example: "tạm, chờ khách"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/costing/params:
+    get:
+      summary: Tham số giá thành có phiên bản (giá trị đang áp dụng + lịch sử); mặc định #0 = tạm, chờ khách
+      operationId: listCostingParams
+      tags: [costing]
+      responses:
+        "200": {description: Mọi khóa, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/CostingParam"}}}}}}}
+    post:
+      summary: "[Quản trị] Đề xuất phiên bản tham số (cost_accountant); một phiên bản chờ mỗi khóa"
+      operationId: proposeCostingParam
+      tags: [costing]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [key, value, reason], properties: {key: {type: string}, value: {type: string}, reason: {type: string, minLength: 10, maxLength: 500}, effective_from: {type: string, format: date-time}}}}}
+      responses:
+        "201": {description: Phiên bản chờ duyệt, content: {application/json: {schema: {$ref: "#/components/schemas/CostingParamVersion"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/costing/params/{key}/versions/{seq}/decision:
+    parameters:
+      - {name: key, in: path, required: true, schema: {type: string}}
+      - {name: seq, in: path, required: true, schema: {type: integer, minimum: 1}}
+    post:
+      summary: "[Quản trị] Duyệt / từ chối phiên bản tham số (chief_accountant ≠ người đặt — R-56 app + CHECK DB)"
+      operationId: decideCostingParam
+      tags: [costing]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [decision], properties: {decision: {type: string, enum: [approved, rejected]}, reason: {type: string, minLength: 10, maxLength: 500}}}}}
+      responses:
+        "201": {description: Quyết định đã ghi, content: {application/json: {schema: {$ref: "#/components/schemas/CostingParamVersion"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/costing/projections/rebuild:
+    post:
+      summary: "[Quản trị] Dựng lại mọi bảng chiếu costing từ sổ (R-22)"
+      operationId: rebuildCostingProjections
+      tags: [costing]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "200": {description: Số dòng đã dựng theo bảng, content: {application/json: {schema: {type: object, additionalProperties: {type: integer}}}}}
 components:
   securitySchemes:
     oidc:
@@ -1443,6 +1823,7 @@ components:
     FacilityID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
     MeasurementID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
     OrderID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    CostingID: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
   responses:
     Problem:
       description: Lỗi RFC 9457
@@ -1963,3 +2344,164 @@ components:
         decided_by: {type: [string, "null"], format: uuid}
         decided_at: {type: [string, "null"], format: date-time}
         decision_reason: {type: [string, "null"]}
+    # --- mkg/costing ---
+    Money: {type: string, pattern: "^-?[0-9]+(\\.[0-9]{1,2})?$", example: "1250000.50", description: "VND numeric(18,2) — chuỗi (R-10)"}
+    UnitPrice: {type: string, pattern: "^[0-9]+(\\.[0-9]{1,4})?$", example: "150000.0000", description: "đơn giá numeric(18,4) — chuỗi"}
+    CostCategory: {type: string, enum: [straw_purchase, collection_labour, consumables, transport_road, transport_waterway, hub_processing, storage, handling, loss, sales_revenue, carbon_revenue, carbon_share]}
+    CostEntry:
+      type: object
+      description: Một dòng sổ cost_entry (stream lot:<id>). Tổng theo kỳ = Σ delta_amount; dòng điều chỉnh / tính lại trỏ supersedes_id.
+      properties:
+        id: {type: string, format: uuid}
+        lot_ref: {type: string, format: uuid}
+        period_code: {type: string, example: "2026-09"}
+        late_from: {type: [string, "null"], description: Kỳ của sự việc khi kỳ đó đã đóng}
+        category: {$ref: "#/components/schemas/CostCategory"}
+        amount: {$ref: "#/components/schemas/Money"}
+        delta_amount: {$ref: "#/components/schemas/Money"}
+        mass_kg: {type: [string, "null"]}
+        delta_mass_kg: {type: [string, "null"]}
+        dimension_kind: {type: string, enum: [facility, htx, customer, mode, none]}
+        dimension_ref: {type: [string, "null"], format: uuid}
+        source_kind: {type: string, enum: [hub_processing, trip, delivery, manual, adjusting]}
+        source_ref: {type: [string, "null"], format: uuid}
+        allocation_ref: {type: [string, "null"], format: uuid}
+        entry_kind: {type: string, enum: [normal, adjusting]}
+        note: {type: [string, "null"]}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+        rule_version: {type: string}
+        seq: {type: integer}
+    CostingLotCost:
+      type: object
+      properties:
+        lot_ref: {type: string, format: uuid}
+        categories:
+          type: array
+          items: {type: object, properties: {category: {$ref: "#/components/schemas/CostCategory"}, amount: {$ref: "#/components/schemas/Money"}, mass_kg: {type: [string, "null"]}, entries: {type: integer}}}
+        total_cost: {$ref: "#/components/schemas/Money"}
+        revenue: {$ref: "#/components/schemas/Money"}
+        delivered_kg: {$ref: "#/components/schemas/Kg"}
+        cost_per_tonne: {type: [string, "null"]}
+        cost_per_tonne_undetermined: {type: boolean}
+        note: {type: string}
+    CostingAllocation:
+      type: object
+      description: Kết quả phân bổ (sổ allocation_result, stream period:<id>). Không bao giờ sửa — tính lại ghi kết quả mới supersedes_id.
+      properties:
+        id: {type: string, format: uuid}
+        period_ref: {type: string, format: uuid}
+        kind: {type: string, enum: [hub_processing, trip_cost, delivery_revenue, loss_attribution]}
+        source_ref: {type: string, format: uuid}
+        source_event_time: {type: string, format: date-time}
+        basis: {type: string, description: "mass | equal | self | origins"}
+        total_amount: {type: [string, "null"]}
+        total_kg: {type: [string, "null"]}
+        lines: {type: array, items: {type: object, additionalProperties: true}}
+        inputs: {type: object, additionalProperties: true}
+        inputs_sha256: {type: string}
+        result_sha256: {type: string}
+        param_pins: {type: object, additionalProperties: {type: integer}, description: "khóa tham số → số phiên bản (0 = mặc định tạm, chờ khách)"}
+        params_as_of: {type: string, format: date-time}
+        rule_version: {type: string}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        superseded_by: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        recorded_at: {type: string, format: date-time}
+        changed: {type: boolean, description: Chỉ có ở phản hồi tính lại}
+    CostingPeriod:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string, example: "2026-09"}
+        from: {type: string, format: date-time}
+        to: {type: string, format: date-time}
+        status: {type: string, enum: [open, closing, closed, posted]}
+        opened_at: {type: string, format: date-time}
+        close_run_id: {type: [string, "null"], format: uuid}
+        closed_by: {type: [string, "null"], format: uuid}
+        closed_at: {type: [string, "null"], format: date-time}
+        journal_ref: {type: [string, "null"], format: uuid}
+        posted_at: {type: [string, "null"], format: date-time}
+        summary:
+          type: [object, "null"]
+          properties:
+            close_run_id: {type: string, format: uuid}
+            lines:
+              type: array
+              items: {type: object, properties: {category: {$ref: "#/components/schemas/CostCategory"}, dimension_kind: {type: string}, dimension_ref: {type: [string, "null"], format: uuid}, amount: {$ref: "#/components/schemas/Money"}, mass_kg: {type: [string, "null"]}, entries: {type: integer}}}
+            line_count: {type: integer}
+            input_snapshot_sha256: {type: string}
+            result_set_sha256: {type: string}
+            closed_by: {type: string, format: uuid}
+            closed_at: {type: string, format: date-time}
+            rule_version: {type: string}
+    CostingCloseJob:
+      type: object
+      properties:
+        job_id: {type: string, format: uuid}
+        kind: {type: string, enum: [costing.period_close]}
+        period_id: {type: string, format: uuid}
+        period_code: {type: string}
+        status: {type: string, enum: [queued, completed, failed]}
+        requested_by: {type: string, format: uuid}
+        requested_at: {type: string, format: date-time}
+        as_of: {type: string, format: date-time}
+        input_snapshot_sha256: {type: string}
+        snapshot_counts: {type: object, properties: {entries: {type: integer}, settlements: {type: integer}, carbon: {type: integer}}}
+        error_code: {type: [string, "null"]}
+        completed_at: {type: [string, "null"], format: date-time}
+    CostingSettlement:
+      type: object
+      description: Quyết toán HTX (sổ settlement_event, stream settlement:<id>). Giá, số tiền KHÔNG BAO GIỜ qua van.
+      properties:
+        id: {type: string, format: uuid}
+        kind: {type: string, enum: [original, adjustment]}
+        status: {type: string, enum: [awaiting_weighing, pending_confirmation, approved, paid, cancelled]}
+        collection_order_ref: {type: string, format: uuid}
+        htx_ref: {type: string, format: uuid}
+        harvest_date: {type: string, format: date}
+        contract_ref: {type: [string, "null"], format: uuid}
+        contract_version: {type: [integer, "null"]}
+        basis: {type: [string, "null"], enum: [per_tonne, per_bale, null]}
+        price_source: {type: [string, "null"], enum: [contract, manual, null]}
+        unit_price: {type: [string, "null"]}
+        rolls: {type: [integer, "null"]}
+        mass_kg: {type: [string, "null"]}
+        gross_amount: {type: [string, "null"]}
+        deductions: {$ref: "#/components/schemas/Money"}
+        amount: {type: [string, "null"]}
+        blocked_reason: {type: [string, "null"], enum: [no_contract, awaiting_weighing, no_rolls, null]}
+        due_on: {type: [string, "null"], format: date}
+        period_ref: {type: [string, "null"], format: uuid}
+        prepared_by: {type: string, format: uuid}
+        approved_by: {type: [string, "null"], format: uuid}
+        approved_at: {type: [string, "null"], format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        rule_version: {type: string}
+    CostingParamVersion:
+      type: object
+      properties:
+        key: {type: string}
+        seq: {type: integer}
+        value: {type: string}
+        reason: {type: string}
+        effective_from: {type: string, format: date-time}
+        proposed_by: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+        decision: {type: [string, "null"], enum: [approved, rejected, null]}
+        decided_by: {type: [string, "null"], format: uuid}
+        decided_at: {type: [string, "null"], format: date-time}
+        decision_reason: {type: [string, "null"]}
+    CostingParam:
+      type: object
+      properties:
+        key: {type: string}
+        default: {type: string}
+        default_source: {type: string}
+        default_label: {type: string, example: "tạm, chờ khách"}
+        active: {type: object, properties: {value: {type: string}, seq: {type: integer}, pinned: {type: string}, label: {type: string}}}
+        versions: {type: array, items: {$ref: "#/components/schemas/CostingParamVersion"}}

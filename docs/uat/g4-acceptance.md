@@ -24,12 +24,12 @@ Bốn trạng thái:
 | 4. Chuyển từ G3 | 2 | 0 | 0 | 2 | 0 |
 | 5. `mkg/logistics` | 13 | 0 | 0 | 13 | 0 |
 | 6. `mkg/orders` | 11 | 0 | 0 | 11 | 0 |
-| 7. `mkg/costing` | 16 | 0 | 0 | 16 | 0 |
+| 7. `mkg/costing` | 16 | 14 | 2 | 0 | 0 |
 | 8. `mkg/acctbridge` | 9 | 0 | 0 | 9 | 0 |
 | 9. Cổng kiến trúc G4 (RB, R-xx, vùng, hạ tầng) | 14 | 0 | 0 | 14 | 0 |
 | 10. Client và kịch bản đầu–cuối | 4 | 0 | 0 | 4 | 0 |
 | 11. Câu hỏi khách | 7 | 0 | 0 | 7 | 0 |
-| **Tổng** | **81** | **0** | **0** | **81** | **0** |
+| **Tổng** | **81** | **14** | **2** | **65** | **0** |
 
 Đã có ở G4-0 (nền móng, không tính là đạt dòng nào): bề mặt đối tác `/v1/partner/waterway/route` phía nền tảng (`TestPartnerWaterwayRoute_ADR0020`, `TestShareGrantWaterwayRoutesKind_G4`), hợp đồng sự kiện nội bộ (`TestG4FrozenInternalContracts`), vai trong realm (`TestKeycloakRealmCoversRolesAndClaims`), `agnofloat` cho bốn module (`TestNoFloat`).
 
@@ -109,22 +109,22 @@ Như [g3-acceptance.md §1](g3-acceptance.md#1-cách-chạy). Kịch bản E2E G
 
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| C-01 | Event sourcing mức B: sổ là nguồn; `POST /v1/costing/projections/rebuild` = dựng thẳng từ sổ (R-22) | — | **chưa làm** |
-| C-02 | Mỗi phép tính ghim `rule_version`; tính lại dùng `recorded_at` (R-13), ghi kết quả mới `supersedes_id`, không sửa | — | **chưa làm** |
-| C-03 | Tham số theo **thời điểm sự việc**, có phiên bản, `cost_accountant` đặt ≠ `chief_accountant` duyệt | — | **chưa làm** |
-| C-04 | Quy đổi cuộn → tấn (proto FM-09): tấn = cuộn × kg/cuộn / 1000; kg/cuộn học theo HTX → hệ thống → cấu hình → 20, ghi nguồn | — | **chưa làm** |
-| C-05 | Quy đổi ẩm độ — cơ chế tham số, mặc định không quy đổi (C-4) | — | **chưa làm** |
-| C-06 | Phân bổ chi phí đa chặng (gom, vận chuyển đường bộ/thủy, sấy/nén #55, lưu kho, bốc xếp) về lô theo khóa phân bổ có phiên bản (mặc định khối lượng) | — | **chưa làm** |
-| C-07 | Quy kết hao hụt về lô nguồn theo **tỷ lệ nguồn của lô** (`hub/port.LotOrigins`, Σ = 1); hao hụt dự kiến #19/#56 vs bất thường (từ đối soát measurement) | — | **chưa làm** |
-| C-08 | proto buildCostChain: đ/t = tổng / tấn giao; tấn giao = 0 → "không xác định"; không gồm khấu hao; giá mua rơm tách nhóm | — | **chưa làm** |
-| C-09 | Đóng kỳ theo mẫu mục 12: `POST …/periods/{id}/close` → 202 + job; ảnh chụp đầu vào bất biến có băm; worker-internal tính; giao lặp → một kết quả (R-61) | — | **chưa làm** |
-| C-10 | Kỳ đã đóng không mở lại; điều chỉnh ở kỳ mở, trỏ kết quả cũ; `period_closer` ≠ người lập bút toán điều chỉnh (R-56 app/ + CHECK DB) | — | **chưa làm** |
-| C-11 | proto PM-01/02: một lệnh gom một quyết toán; theo cuộn → ngay; theo tấn → chờ cân đủ mọi ghe, làm mới sau mỗi lần cân tới khi duyệt | — | **chưa làm** |
-| C-12 | proto PM-03: không hợp đồng → không có số tiền, người xác nhận nhập giá | — | **chưa làm** |
-| C-13 | proto PM-04: duyệt (`chief_accountant` ≠ người lập) ghi **một** khoản phải trả, hạn 15 ngày (tạm), đóng băng; đã trả không hủy (quyết toán điều chỉnh); đã duyệt chỉ hoàn bằng bút toán đảo; `settlement.approved` | — | **chưa làm** |
-| C-14 | Chia doanh thu carbon 45 % / 70-15-15 (VVB nhận phần dư) — tham số có phiên bản, tạm chờ khách | — | **chưa làm** |
-| C-15 | proto D03: khoản phải trả là nợ phải trả, không cộng vào chi phí | — | **chưa làm** |
-| C-16 | Sự kiện `mkg.costing.period.closed` v1; nhận `journal.pushed` → kỳ `posted`; consumer G3 (`weigh_ticket`, `reconciliation`, `roll_count`) và G4 (`trip`, `delivery`) idempotent | — | **chưa làm** |
+| C-01 | Event sourcing mức B: sổ là nguồn; `POST /v1/costing/projections/rebuild` = dựng thẳng từ sổ (R-22) | `TestCostingPeriodLifecycle_C01_C09_C10_C16` (dựng lại = hiện hành, hai lần), `TestParamsRecomputeSupersedes_C02_C03`, `TestSettlementPerBaleApprove_PM02_PM04_C11_C13` (settlement_current) | **đạt** |
+| C-02 | Mỗi phép tính ghim `rule_version`; tính lại dùng `recorded_at` (R-13), ghi kết quả mới `supersedes_id`, không sửa | `TestParamsRecomputeSupersedes_C02_C03` (ghim `rule_version` + `param_pins`, tính lại `as_of` trước quyết định → không đổi, tính lại → kết quả mới `supersedes_id`, kết quả cũ không đổi) | **đạt** |
+| C-03 | Tham số theo **thời điểm sự việc**, có phiên bản, `cost_accountant` đặt ≠ `chief_accountant` duyệt | `TestParamsRecomputeSupersedes_C02_C03` (tự duyệt 403 + CHECK DB, tham số theo thời điểm sự việc), `TestParamsDefaultsProvisional_C03` | **đạt** |
+| C-04 | Quy đổi cuộn → tấn (proto FM-09): tấn = cuộn × kg/cuộn / 1000; kg/cuộn học theo HTX → hệ thống → cấu hình → 20, ghi nguồn | `TestConvertRollsToTonnes_C04_C05`, `TestCostingPeriodLifecycle_C01_C09_C10_C16` (yield 22,000 kg/cuộn từ HUB_IN / số cuộn qua consumer) | **một phần** (mã: chuỗi dự phòng kg/cuộn học theo HTX → hệ thống → cấu hình → 20 ở fieldops `RollTotals`; costing ghi kg/cuộn THỰC từ HUB_IN, chưa đọc ước lượng) |
+| C-05 | Quy đổi ẩm độ — cơ chế tham số, mặc định không quy đổi (C-4) | `TestConvertRollsToTonnes_C04_C05` (tham số `costing.moisture.base_pct` = none, từ chối giá trị khác) | **một phần** (chờ khách C-4: công thức quy đổi ẩm) |
+| C-06 | Phân bổ chi phí đa chặng (gom, vận chuyển đường bộ/thủy, sấy/nén #55, lưu kho, bốc xếp) về lô theo khóa phân bổ có phiên bản (mặc định khối lượng) | `TestSplitAmountByMass_C06`, `TestCostingPeriodLifecycle_C01_C09_C10_C16` (cước 60/40 theo khối lượng), `TestParamsRecomputeSupersedes_C02_C03` (bản bù chuyến) | **đạt** (khóa phân bổ mặc định `mass` — chờ khách Q-2) |
+| C-07 | Quy kết hao hụt về lô nguồn theo **tỷ lệ nguồn của lô** (`hub/port.LotOrigins`, Σ = 1); hao hụt dự kiến #19/#56 vs bất thường (từ đối soát measurement) | `TestAttributeLossBySourceProportions_C07`, `TestCostingPeriodLifecycle_C01_C09_C10_C16` (0,6/0,4 → 300/200 kg) | **đạt** |
+| C-08 | proto buildCostChain: đ/t = tổng / tấn giao; tấn giao = 0 → "không xác định"; không gồm khấu hao; giá mua rơm tách nhóm | `TestCostPerTonne_C08`, `TestCostingPeriodLifecycle_C01_C09_C10_C16` (đ/t = 149 066,67; lô chưa giao → không xác định) | **đạt** |
+| C-09 | Đóng kỳ theo mẫu mục 12: `POST …/periods/{id}/close` → 202 + job; ảnh chụp đầu vào bất biến có băm; worker-internal tính; giao lặp → một kết quả (R-61) | `TestCostingPeriodLifecycle_C01_C09_C10_C16` (202 + job, outbox, ảnh chụp đọc lại → cùng băm, giao lặp job → một kết quả), `TestPeriodCloseGoldenDeterministic_C09` (golden số + băm), `TestPeriodCloserNotAdjuster_C10` (idempotent POST close) | **đạt** |
+| C-10 | Kỳ đã đóng không mở lại; điều chỉnh ở kỳ mở, trỏ kết quả cũ; `period_closer` ≠ người lập bút toán điều chỉnh (R-56 app/ + CHECK DB) | `TestCostingPeriodLifecycle_C01_C09_C10_C16` (không mở lại: 409 + trigger; điều chỉnh sau đóng ở kỳ mở), `TestPeriodCloserNotAdjuster_C10` (403 + trigger + CHECK DB) | **đạt** |
+| C-11 | proto PM-01/02: một lệnh gom một quyết toán; theo cuộn → ngay; theo tấn → chờ cân đủ mọi ghe, làm mới sau mỗi lần cân tới khi duyệt | `TestSettlementPerBaleApprove_PM02_PM04_C11_C13`, `TestSettlementPerTonneAwaitsWeighing_PM02_C11` | **đạt** |
+| C-12 | proto PM-03: không hợp đồng → không có số tiền, người xác nhận nhập giá | `TestSettlementNoContract_PM03`, `TestComputeSettlement_PM02_PM03` | **đạt** |
+| C-13 | proto PM-04: duyệt (`chief_accountant` ≠ người lập) ghi **một** khoản phải trả, hạn 15 ngày (tạm), đóng băng; đã trả không hủy (quyết toán điều chỉnh); đã duyệt chỉ hoàn bằng bút toán đảo; `settlement.approved` | `TestSettlementPerBaleApprove_PM02_PM04_C11_C13` (tự duyệt 403 + CHECK DB, hạn 15 ngày, một `settlement.approved`, đóng băng, hủy sau duyệt/trả 409, quyết toán điều chỉnh) | **đạt** (hạn 15 ngày tạm, chờ khách Q-3) |
+| C-14 | Chia doanh thu carbon 45 % / 70-15-15 (VVB nhận phần dư) — tham số có phiên bản, tạm chờ khách | `TestSplitCarbon_C14`, `TestCarbonRevenueSplit_C14` | **đạt** (tỷ lệ tạm, chờ khách Q-4) |
+| C-15 | proto D03: khoản phải trả là nợ phải trả, không cộng vào chi phí | `TestSettlementPerBaleApprove_PM02_PM04_C11_C13` (không có bút toán chi phí lô từ quyết toán), `TestPeriodCloseGoldenDeterministic_C09` (straw_purchase × htx một lần) | **đạt** |
+| C-16 | Sự kiện `mkg.costing.period.closed` v1; nhận `journal.pushed` → kỳ `posted`; consumer G3 (`weigh_ticket`, `reconciliation`, `roll_count`) và G4 (`trip`, `delivery`) idempotent | `TestCostingPeriodLifecycle_C01_C09_C10_C16` (period.closed, journal.pushed → posted, giao lặp mọi consumer), `TestCostingTenantLeakParallel` | **đạt** |
 
 ## 8. `mkg/acctbridge` (mkg.md §5.7, mục 16)
 

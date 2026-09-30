@@ -14,12 +14,17 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/mkgwire"
+	abport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/acctbridge/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/costing"
+	costport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/costing/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops"
 	fieldport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub"
 	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
+	logport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/logistics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement"
 	measport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
+	ordport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 )
@@ -99,6 +104,31 @@ var Consumers = []Consumer{
 	// G3-2 (mkg/measurement, vai measurement_app): số cuộn mới → đối soát lại lô (RB-6).
 	{Name: RollCountReconcileConsumer, Events: []string{fieldport.EventRollCountRecorded}, Role: measurement.DBRole,
 		BuildWith: buildMeasurementRollCount},
+	// G4 (mkg/costing, vai costing_app): đầu vào giá thành + job đóng kỳ (mẫu mục 12).
+	{Name: costport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Role: costing.DBRole,
+		Build: func(clk clock.Clock) inbox.Handler { return costing.NewConsumers(clk, costing.Deps{}).WeighTicket() }},
+	{Name: costport.ReconciliationConsumer, Events: []string{measport.EventReconciliationCompleted}, Role: costing.DBRole,
+		BuildWith: buildCostingReconciliation},
+	{Name: costport.RollCountConsumer, Events: []string{fieldport.EventRollCountRecorded}, Role: costing.DBRole,
+		Build: func(clk clock.Clock) inbox.Handler { return costing.NewConsumers(clk, costing.Deps{}).RollCount() }},
+	{Name: costport.TripConsumer, Events: []string{logport.EventTripCompleted}, Role: costing.DBRole,
+		Build: func(clk clock.Clock) inbox.Handler { return costing.NewConsumers(clk, costing.Deps{}).Trip() }},
+	{Name: costport.DeliveryConsumer, Events: []string{ordport.EventDeliveryAccepted}, Role: costing.DBRole,
+		Build: func(clk clock.Clock) inbox.Handler { return costing.NewConsumers(clk, costing.Deps{}).Delivery() }},
+	{Name: costport.JournalPushedConsumer, Events: []string{abport.EventJournalPushed}, Role: costing.DBRole,
+		Build: func(clk clock.Clock) inbox.Handler { return costing.NewConsumers(clk, costing.Deps{}).JournalPushed() }},
+	{Name: costport.PeriodCloseConsumer, Events: []string{costport.EventPeriodCloseRequested}, Role: costing.DBRole,
+		Build: func(clk clock.Clock) inbox.Handler { return costing.NewConsumers(clk, costing.Deps{}).PeriodClose() }},
+}
+
+// buildCostingReconciliation: costing quy kết hao hụt về lô nguồn — đọc nguồn gốc lô qua
+// hub/port.LotOrigins trên pool vai hub_app (chỉ đọc, tenant tường minh).
+func buildCostingReconciliation(clk clock.Clock, pool PoolFor) (inbox.Handler, error) {
+	hp, err := pool(hub.DBRole)
+	if err != nil {
+		return nil, err
+	}
+	return costing.NewConsumers(clk, costing.Deps{Origins: hub.New(hp, clk).LotOrigins()}).Reconciliation(), nil
 }
 
 // RollCountReconcileConsumer: mkg.fieldops.roll_count.recorded → measurement đối soát lại.
