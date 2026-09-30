@@ -55,6 +55,8 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 
 	rg.GET("/cropcycle/dashboard", h.dashboard)
 	rg.GET("/cropcycle/stage-map", h.stageMap)
+
+	h.registerCollection(rg)
 }
 
 // RegisterAdmin gắn route Admin API (MFA bắt buộc): soạn, phát hành SOP; dựng lại bảng chiếu.

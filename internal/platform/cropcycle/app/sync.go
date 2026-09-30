@@ -36,7 +36,7 @@ var (
 
 // Entities thực hiện syncport.Source.
 func (SyncSource) Entities() []string {
-	return []string{port.EntitySOPVersion, port.EntitySeason, port.EntityFarmLog}
+	return []string{port.EntitySOPVersion, port.EntitySeason, port.EntityFarmLog, port.EntityCollectionSchedule, port.EntityCollectionStatement}
 }
 
 // syncAccess tính quyền đọc cho đồng bộ: cán bộ KN dùng phạm vi pf/sync truyền vào.
@@ -182,6 +182,9 @@ func (src SyncSource) Changes(ctx context.Context, scope authz.Scope, entity str
 
 func (src SyncSource) changes(ctx context.Context, a access, entity string, after int64, limit int) ([]syncport.Change, int64, error) {
 	s := src.Svc
+	if entity == port.EntityCollectionSchedule || entity == port.EntityCollectionStatement {
+		return src.collectionChanges(ctx, a, entity, after, limit)
+	}
 	f := a.filter()
 	if f.Mode == store.FilterNone || (f.Mode == store.FilterUnits && len(f.Units) == 0) {
 		return []syncport.Change{}, after, nil
@@ -315,7 +318,7 @@ func nonNilInputs(s []domain.Input) []domain.Input {
 
 // Entities thực hiện syncport.Sink.
 func (SyncSink) Entities() []string {
-	return []string{port.EntitySeasonOpen, port.EntityFarmLog, port.EntityLogBatch, port.EntityHarvest}
+	return []string{port.EntitySeasonOpen, port.EntityFarmLog, port.EntityLogBatch, port.EntityHarvest, port.EntityCollectionResponse}
 }
 
 // GPSPayload là vị trí gửi lên (số thập phân dạng chuỗi).
@@ -488,6 +491,8 @@ func (snk SyncSink) Accept(ctx context.Context, scope authz.Scope, rec syncport.
 		replayed, err = snk.batch(ctx, a, rec, device)
 	case port.EntityHarvest:
 		replayed, err = snk.harvest(ctx, a, rec, device)
+	case port.EntityCollectionResponse:
+		replayed, err = snk.collectionResponse(ctx, rec, device)
 	default:
 		err = problem.Validation.WithField("entity", "không thuộc module pf/cropcycle")
 	}

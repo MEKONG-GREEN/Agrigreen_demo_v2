@@ -23,7 +23,12 @@ abstract final class PushEntity {
   /// G2 pf/extension: yêu cầu hỗ trợ của nông dân (HTX US-SUPPORT-01).
   static const supportRequest = 'support_request';
 
+  /// G3-2 pf/cropcycle: quản lý HTX xác nhận / tranh chấp bảng kê số cuộn
+  /// thu gom MKG (RB-6 chiều mua).
+  static const htxCollectionResponse = 'htx_collection_response';
+
   static const g1 = {plotBoundary, fieldReport, taskUpdate, consent, evidence};
+  static const g3 = {htxCollectionResponse};
   static const g2 = {
     seasonOpen,
     farmLog,
@@ -31,7 +36,7 @@ abstract final class PushEntity {
     harvest,
     supportRequest,
   };
-  static const all = {...g1, ...g2};
+  static const all = {...g1, ...g2, ...g3};
 }
 
 enum RecordOp {

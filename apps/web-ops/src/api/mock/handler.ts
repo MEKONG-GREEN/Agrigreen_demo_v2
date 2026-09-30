@@ -42,6 +42,7 @@ import { personaFromAuthHeader, type MockPersona } from "./personas";
 import { checkDisplayProposal, DISPLAY_DEFAULTS, displayConfig, isColorKey, isPercentKey, PERCENT_TITLE, RESTORE_REASON } from "./display";
 import { areaSyncRoutes } from "./areasync";
 import { syncMonitorRoutes } from "./syncmonitor";
+import { collectionRoutes } from "./collection";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -371,6 +372,7 @@ const appRoutes: Route[] = [
   ...simulationRoutes,
   ...cropcycleAppRoutes,
   ...htxAppRoutes,
+  ...collectionRoutes,
 ];
 
 // --------------------------------------------------------------------------

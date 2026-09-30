@@ -102,8 +102,9 @@ describe("menu App HTX theo vai", () => {
     "/htx/lich-bao-cao",
     "/htx/tai-khoan-nong-dan",
     "/htx/yeu-cau-ho-tro",
+    "/htx/thu-gom",
   ];
-  const MANAGER_ONLY = ["/htx/phe-duyet", "/htx/lich-bao-cao"];
+  const MANAGER_ONLY = ["/htx/phe-duyet", "/htx/lich-bao-cao", "/htx/thu-gom"];
 
   it("Quản lý HTX chỉ thấy màn hình HTX của mình, vào thẳng bảng điều hành sản xuất", () => {
     const p = persona("htx");

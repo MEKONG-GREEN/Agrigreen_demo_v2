@@ -30,6 +30,8 @@ type Consumer struct {
 // Consumers là các consumer G2 đợt 2 cần port của nhiều module (liệt kê không cần DB):
 //   - pf.mechanization.area_sync: diện tích vụ App HTX → CGH (CGH FN-07, QT-03);
 //   - pf.geo.hub_valve: van công bố MKG hub_facility / hub_capacity → mô hình đọc hub;
+//   - pf.cropcycle.htx_collection_valve (G3-2): van MKG collection_schedule / htx_collection_statement
+//     → sổ nhận + bảng chiếu cho quản lý HTX (kiểm hợp đồng van lúc chạy);
 //   - pf.cropcycle.gps_log, pf.extension.gps_log: log GPS sau commit (HTX US-GPS-03);
 //   - pf.simulation.snapshot: ảnh chụp đầu vào qua SupplySource + WaterwayRouter;
 //   - pf.mrv.farm_log_link, pf.mrv.collection_evidence (G3): liên kết nhật ký HTX / van
@@ -40,6 +42,8 @@ var Consumers = []Consumer{
 		Handler: func(m Modules) inbox.Handler { return m.Mechanization.AreaSyncHandler() }},
 	{Name: geoport.HubValveConsumer, Role: geo.DBRole, Events: []string{geoport.EventMKGHubFacilityPublished, geoport.EventMKGHubCapacityPublished},
 		Handler: func(m Modules) inbox.Handler { return m.Geo.HubValveHandler() }},
+	{Name: ccport.CollectionValveConsumer, Role: cropcycle.DBRole, Events: ccport.CollectionValveEvents,
+		Handler: func(m Modules) inbox.Handler { return m.CropCycle.CollectionValveHandler() }},
 	{Name: ccport.GpsLogConsumer, Role: cropcycle.DBRole, Events: ccport.GpsLogEvents,
 		Handler: func(m Modules) inbox.Handler { return m.CropCycle.GpsLogHandler() }},
 	{Name: extport.GpsLogConsumer, Role: extension.DBRole, Events: []string{extport.EventSupportRequestSubmitted},

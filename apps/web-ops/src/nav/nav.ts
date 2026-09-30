@@ -97,6 +97,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { href: "/htx/lich-bao-cao", label: "Lịch gửi báo cáo", icon: "report", roles: [ROLES.coopManager] },
       { href: "/htx/tai-khoan-nong-dan", label: "Tài khoản nông dân", icon: "qr", roles: HTX_READ },
       { href: "/htx/yeu-cau-ho-tro", label: "Yêu cầu hỗ trợ", icon: "support", roles: HTX_READ },
+      { href: "/htx/thu-gom", label: "Thu gom rơm MKG", icon: "harvest", roles: HTX_WRITE },
     ],
   },
   {

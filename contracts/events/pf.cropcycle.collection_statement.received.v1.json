@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.cropcycle.collection_statement.received/v1",
+  "title": "pf.cropcycle.collection_statement.received — payload",
+  "description": "pf/cropcycle nhận bảng kê số cuộn MKG đã gom trên một thửa (hoặc bản sửa) qua van htx_collection_statement (G3-2). pf/notify báo quản lý HTX cần xác nhận hoặc tranh chấp theo revision này. Chỉ số cuộn.",
+  "x-event-type": "pf.cropcycle.collection_statement.received",
+  "x-schema-version": 1,
+  "x-producer": "pf/cropcycle",
+  "type": "object",
+  "required": ["statement_ref", "cooperative_ref", "plot_ref", "collected_on", "rolls", "revision", "first"],
+  "properties": {
+    "statement_ref": { "type": "string", "format": "uuid" },
+    "cooperative_ref": { "type": "string", "format": "uuid" },
+    "plot_ref": { "type": "string", "format": "uuid" },
+    "collected_on": { "type": "string", "format": "date" },
+    "rolls": { "type": "integer" },
+    "revision": { "type": "integer" },
+    "first": { "type": "boolean" }
+  }
+}

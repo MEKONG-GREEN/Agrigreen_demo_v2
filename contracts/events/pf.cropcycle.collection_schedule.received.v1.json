@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.cropcycle.collection_schedule.received/v1",
+  "title": "pf.cropcycle.collection_schedule.received — payload",
+  "description": "pf/cropcycle nhận bản mới (revision lớn hơn) của lịch gom MKG qua van collection_schedule (G3-2). pf/notify báo quản lý HTX. Chỉ khung thời gian và trạng thái.",
+  "x-event-type": "pf.cropcycle.collection_schedule.received",
+  "x-schema-version": 1,
+  "x-producer": "pf/cropcycle",
+  "type": "object",
+  "required": ["schedule_ref", "cooperative_ref", "commune_code", "window_from", "window_to", "status", "revision", "first"],
+  "properties": {
+    "schedule_ref": { "type": "string", "format": "uuid" },
+    "cooperative_ref": { "type": "string", "format": "uuid" },
+    "commune_code": { "type": "string" },
+    "window_from": { "type": "string", "format": "date" },
+    "window_to": { "type": "string", "format": "date" },
+    "status": { "type": "string", "enum": ["planned", "confirmed", "in_progress", "completed", "cancelled"] },
+    "revision": { "type": "integer" },
+    "first": { "type": "boolean" }
+  }
+}

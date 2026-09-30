@@ -89,6 +89,7 @@
       { "name": "field_supervisor", "description": "MKG (G3, mkg/fieldops): lập/duyệt lệnh gom (người duyệt ≠ người lập, R-56), đối chiếu số cuộn" },
       { "name": "metrics_viewer", "description": "Nền tảng (G3, pf/metrics): xem chỉ số và lịch sử trong phạm vi cây TW → Tỉnh → Xã" },
       { "name": "map_consumer", "description": "Ứng dụng tiêu thụ (TMS — mkg/logistics) đọc bản đồ chuẩn hóa GET /v1/geo/standard-map bằng tài khoản dịch vụ (GIS US-INT-02). Chỉ lớp nền không định danh, không có thửa" },
+      { "name": "mkg_sync", "description": "Tài khoản dịch vụ MKG (client agrigreen-mkg-sync, G3-2): kéo phản hồi xác nhận/tranh chấp của HTX với bảng kê thu gom — chỉ phản hồi thuộc bảng kê do chính tenant đó gửi qua van" },
       { "name": "offline_access", "description": "Refresh token ngoại tuyến (app hiện trường, tối đa 72 giờ không trực tuyến — mục 15)" },
       { "name": "default-roles-agrigreen", "description": "Vai mặc định của realm — KHÔNG gồm vai nghiệp vụ nào", "composite": true, "composites": { "realm": ["offline_access"] } }
     ]
@@ -105,6 +106,12 @@
       "enabled": true,
       "serviceAccountClientId": "agrigreen-tms",
       "realmRoles": ["map_consumer"]
+    },
+    {
+      "username": "service-account-agrigreen-mkg-sync",
+      "enabled": true,
+      "serviceAccountClientId": "agrigreen-mkg-sync",
+      "realmRoles": ["mkg_sync"]
     }
   ],
   "defaultRole": { "name": "default-roles-agrigreen", "composite": true },
@@ -274,6 +281,19 @@
       "clientId": "agrigreen-tms",
       "name": "TMS (mkg/logistics) — tài khoản dịch vụ đọc bản đồ chuẩn hóa (GIS US-INT-02)",
       "description": "Client credentials, không đăng nhập người dùng. Bí mật do Keycloak sinh (lấy ở trang quản trị). Thuộc tính tenant_id của service-account-agrigreen-tms đặt theo tenant của triển khai (docs/runbooks/gis-performance.md).",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": ["basic", "roles", "agrigreen-claims"]
+    },
+    {
+      "clientId": "agrigreen-mkg-sync",
+      "name": "MKG (api-internal, mkg/fieldops) — tài khoản dịch vụ kéo phản hồi của HTX về MKG (G3-2)",
+      "description": "Client credentials, không đăng nhập người dùng. Thuộc tính tenant_id của service-account-agrigreen-mkg-sync đặt theo tenant MKG (nguồn van). Chỉ vai mkg_sync: GET /v1/cropcycle/htx-collection/responses. Cấp quyền chia sẻ thửa/HTX (RB-2) chờ khách.",
       "enabled": true,
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",

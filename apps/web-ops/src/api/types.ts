@@ -176,6 +176,11 @@ export type SupportRequest = S["SupportRequest"];
 export type SupportRequestStaff = S["SupportRequestStaff"];
 export type SupportCategory = SupportRequestStaff["category"];
 
+// pf/cropcycle G3-2 — thu gom rơm MKG phía HTX (van collection_schedule / htx_collection_statement)
+export type HtxCollectionSchedule = S["HtxCollectionSchedule"];
+export type HtxCollectionStatement = S["HtxCollectionStatement"];
+export type HtxCollectionResponse = S["HtxCollectionResponse"];
+
 // pf/masterdata — nhập danh mục (Admin)
 export type CatalogImportResult = AS["CatalogImportResult"];
 

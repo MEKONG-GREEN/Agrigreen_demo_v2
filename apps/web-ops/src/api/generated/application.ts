@@ -3167,6 +3167,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cropcycle/htx-collection/schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lịch gom rơm MKG của HTX (qua van collection_schedule) — G3-2
+         * @description Bản revision lớn nhất theo `schedule_ref`. Quản lý HTX chỉ thấy HTX mình; quản trị toàn tenant (lọc
+         *     `cooperative_ref`); cán bộ KN theo xã trong phạm vi. Mới nhất trước, cursor = `schedule_ref` cuối.
+         */
+        get: operations["listHtxCollectionSchedules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/htx-collection/statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bảng kê số cuộn MKG đã gom theo thửa (qua van htx_collection_statement) — RB-6 chiều mua, G3-2
+         * @description `status`: `pending` = HTX chưa phản hồi revision hiện hành; `confirmed` / `disputed` = phản hồi cho revision hiện hành.
+         *     Quản lý HTX chỉ HTX mình; quản trị toàn tenant.
+         */
+        get: operations["listHtxCollectionStatements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/htx-collection/statements/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một bảng kê kèm lịch sử phản hồi của HTX — G3-2 */
+        get: operations["getHtxCollectionStatement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/htx-collection/statements/{ref}/responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Quản lý HTX xác nhận hoặc tranh chấp bảng kê — RB-6 chiều mua, G3-2
+         * @description Chỉ `coop_manager` của đúng HTX. `revision` phải là bản hiện hành (409 `cropcycle.collection_statement_stale`).
+         *     `confirmed`: số HTX = số MKG. `disputed`: bắt buộc `htx_rolls` (≠ số MKG) và `reason` 10–500 ký tự, không chứa SĐT/CCCD.
+         *     Đã có phản hồi cho cùng revision → bắt buộc `reason`; bản mới thay bản trước (sổ chỉ ghi thêm, `supersedes_id`).
+         *     MKG kéo phản hồi về qua `GET /v1/cropcycle/htx-collection/responses`.
+         */
+        post: operations["respondHtxCollectionStatement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cropcycle/htx-collection/responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Luồng phản hồi của HTX cho MKG kéo về (tài khoản dịch vụ vai mkg_sync) — G3-2
+         * @description Nền tảng → MKG chỉ qua Application API công khai (g3-conventions §5). Chỉ vai `mkg_sync`; chỉ phản hồi thuộc bảng kê
+         *     do chính tenant của tài khoản gửi qua van; không có người phản hồi. Con trỏ `after` = `cursor` cuối (tăng dần, không bỏ sót
+         *     dòng commit muộn). MKG ghi mỗi dòng thành `mkg_fieldops.htx_confirmation` kênh `platform` (idempotent).
+         */
+        get: operations["listHtxCollectionResponseFeed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/gis/replay": {
         parameters: {
             query?: never;
@@ -3193,6 +3297,61 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description Lịch gom rơm MKG của một HTX (van collection_schedule) — chỉ khung thời gian và trạng thái. */
+        HtxCollectionSchedule: {
+            /** Format: uuid */
+            schedule_ref: string;
+            /** Format: uuid */
+            cooperative_ref: string;
+            commune_code: string;
+            /** Format: date */
+            window_from: string;
+            /** Format: date */
+            window_to: string;
+            /** @enum {string} */
+            status: "planned" | "confirmed" | "in_progress" | "completed" | "cancelled";
+            revision: number;
+            /** Format: date-time */
+            published_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        HtxCollectionResponse: {
+            /** Format: uuid */
+            id: string;
+            revision: number;
+            /** @enum {string} */
+            outcome: "confirmed" | "disputed";
+            htx_rolls: number;
+            reason: string | null;
+            /** Format: date-time */
+            responded_at: string;
+            /** Format: uuid */
+            supersedes_id?: string | null;
+        };
+        /** @description Bảng kê số cuộn MKG đã gom trên một thửa (van htx_collection_statement) kèm phản hồi hiện hành của HTX. */
+        HtxCollectionStatement: {
+            /** Format: uuid */
+            statement_ref: string;
+            /** Format: uuid */
+            cooperative_ref: string;
+            /** Format: uuid */
+            plot_ref: string;
+            plot_code: string | null;
+            /** Format: uuid */
+            season_ref: string | null;
+            /** Format: date */
+            collected_on: string;
+            rolls: number;
+            revision: number;
+            /** @description HTX chưa phản hồi revision hiện hành */
+            pending: boolean;
+            response: components["schemas"]["HtxCollectionResponse"] | null;
+            /** Format: date-time */
+            published_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
         MetricDefinition: {
             key: string;
             version: number;
@@ -12660,6 +12819,182 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listHtxCollectionSchedules: {
+        parameters: {
+            query?: {
+                cooperative_ref?: string;
+                status?: "planned" | "confirmed" | "in_progress" | "completed" | "cancelled";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang lịch gom */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HtxCollectionSchedule"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listHtxCollectionStatements: {
+        parameters: {
+            query?: {
+                cooperative_ref?: string;
+                status?: "pending" | "confirmed" | "disputed";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang bảng kê */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HtxCollectionStatement"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getHtxCollectionStatement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bảng kê */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statement: components["schemas"]["HtxCollectionStatement"];
+                        responses: components["schemas"]["HtxCollectionResponse"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    respondHtxCollectionStatement: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    revision: number;
+                    /** @enum {string} */
+                    outcome: "confirmed" | "disputed";
+                    htx_rolls?: number | null;
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi phản hồi (gọi lặp cùng Idempotency-Key → phản hồi như lần đầu) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        response: components["schemas"]["HtxCollectionResponse"];
+                        statement: components["schemas"]["HtxCollectionStatement"];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listHtxCollectionResponseFeed: {
+        parameters: {
+            query?: {
+                after?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang luồng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        next_cursor: number;
+                        items: {
+                            /** Format: uuid */
+                            response_id: string;
+                            cursor: number;
+                            /** Format: uuid */
+                            statement_ref: string;
+                            statement_revision: number;
+                            /** Format: uuid */
+                            htx_ref: string;
+                            /** Format: uuid */
+                            plot_ref: string;
+                            mkg_rolls: number;
+                            /** @enum {string} */
+                            outcome: "confirmed" | "disputed";
+                            htx_rolls: number;
+                            reason: string | null;
+                            /** Format: date-time */
+                            responded_at: string;
+                            /** Format: uuid */
+                            supersedes_response_id: string | null;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
         };
     };

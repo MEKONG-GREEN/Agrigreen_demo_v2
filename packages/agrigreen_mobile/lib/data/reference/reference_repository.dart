@@ -21,6 +21,12 @@ abstract final class RefEntity {
   /// G2 pf/extension: yêu cầu hỗ trợ của nông hộ (vai farmer).
   static const supportRequest = 'support_request';
 
+  /// G3-2 pf/cropcycle: lịch gom rơm MKG của HTX (quản lý HTX).
+  static const htxCollectionSchedule = 'htx_collection_schedule';
+
+  /// G3-2 pf/cropcycle: bảng kê số cuộn MKG đã gom theo lô + phản hồi hiện hành.
+  static const htxCollectionStatement = 'htx_collection_statement';
+
   static const catalogItem = 'catalog_item';
   static const adminUnit = 'admin_unit';
   static const cooperative = 'cooperative';

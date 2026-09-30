@@ -128,6 +128,7 @@ String entityLabel(String entity) => switch (entity) {
   PushEntity.farmLogBatch => 'Nhật ký hàng loạt',
   PushEntity.harvest => 'Khai báo sản lượng',
   PushEntity.supportRequest => 'Yêu cầu hỗ trợ',
+  PushEntity.htxCollectionResponse => 'Phản hồi bảng kê thu gom',
   _ => entity,
 };
 

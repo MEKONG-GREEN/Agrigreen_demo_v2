@@ -45,6 +45,8 @@ String recordSummary(OutboxRecord r) {
     PushEntity.harvest => '${p['mass_kg']} kg',
     PushEntity.plotBoundary =>
       '${p['point_count'] ?? '?'} điểm · ≈ ${'${p['area_ha_client'] ?? ''}'.replaceAll('.', ',')} ha',
+    PushEntity.htxCollectionResponse =>
+      '${p['outcome'] == 'confirmed' ? 'Xác nhận' : 'Tranh chấp'} bảng kê · bản ${p['revision']}',
     PushEntity.supportRequest =>
       supportCategories[p['category']] ?? '${p['category']}',
     _ => '',
