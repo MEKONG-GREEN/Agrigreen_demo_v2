@@ -1,0 +1,137 @@
+{{- /*
+PostgreSQL theo cụm (CloudNativePG, Apache-2.0): mỗi migrations.Cluster một cụm vật lý riêng
+(mục 5, "hai sổ tách vật lý"; vault "cụm riêng" trong namespace Định danh). PgBouncer transaction
+mode = CNPG Pooler (R-30). Sao lưu pgBackRest (mục 22) qua plugin CNPG-I của Dalibo.
+*/ -}}
+{{- if .Values.postgres.enabled }}
+{{- $root := . }}
+{{- $pg := .Values.postgres }}
+{{- range $c, $cl := $pg.clusters }}
+{{- if include "agrigreen.on" (dict "root" $root "zone" $cl.zone) }}
+{{- $ns := include "agrigreen.ns" (dict "root" $root "zone" $cl.zone) }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg-{{ $c }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $cl.zone) | nindent 4 }}
+    agrigreen.vn/db-cluster: {{ $c }}
+spec:
+  instances: {{ $cl.instances | default $pg.instances }}
+  imageName: {{ tpl $pg.image $root }}
+  primaryUpdateStrategy: unsupervised
+  # dbadmin.Bootstrap cần superuser (vai + database + extension); secret pg-<cụm>-superuser.
+  enableSuperuserAccess: {{ not $cl.keycloak }}
+  postgresql:
+    parameters: {{ toJson $pg.parameters }}
+    shared_preload_libraries: [pg_stat_statements]
+  bootstrap:
+    initdb:
+{{- if $cl.keycloak }}
+      database: {{ $cl.database }}
+      owner: keycloak
+{{- else }}
+      # Database/vai thật do Job db-migrate-{{ $c }} (dbadmin.Bootstrap) tạo: {{ $cl.database }}.
+      database: app
+      owner: app
+{{- end }}
+  storage:
+    size: {{ $cl.storage }}
+{{- with $pg.storageClass }}
+    storageClass: {{ . }}
+{{- end }}
+  walStorage:
+    size: {{ $cl.walStorage }}
+{{- with $pg.storageClass }}
+    storageClass: {{ . }}
+{{- end }}
+  resources:
+    requests: { cpu: {{ $cl.cpu | quote }}, memory: {{ $cl.memory }} }
+    limits: { cpu: {{ $cl.cpu | quote }}, memory: {{ $cl.memory }} }
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+    podAntiAffinityType: required
+{{- with (index ($root.Values.scheduling.nodeSelectorByZone | default dict) $cl.zone) }}
+    nodeSelector: {{ toJson . }}
+{{- end }}
+  monitoring:
+    enablePodMonitor: false   # PodMonitor riêng ở observability.yaml (nhãn chọn của Prometheus)
+{{- if and $pg.backup.enabled (not $cl.keycloak) }}
+  plugins:
+    - name: {{ $pg.backup.pluginName }}
+      parameters:
+        stanzaRef: pg-{{ $c }}
+{{- end }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pg-{{ $c }}-pooler
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $cl.zone) | nindent 4 }}
+spec:
+  cluster: { name: pg-{{ $c }} }
+  instances: {{ $pg.pooler.instances }}
+  type: rw
+  pgbouncer:
+    poolMode: {{ $pg.pooler.poolMode }}
+    parameters: {{ toJson $pg.pooler.parameters }}
+  template:
+    metadata:
+      labels:
+        agrigreen.vn/zone: {{ $cl.zone }}
+    spec:
+{{- with (index ($root.Values.scheduling.nodeSelectorByZone | default dict) $cl.zone) }}
+      nodeSelector: {{ toJson . }}
+{{- end }}
+      containers: []
+{{- if and $pg.backup.enabled (not $cl.keycloak) }}
+---
+# Plugin pgBackRest của Dalibo (Apache-2.0) — đối chiếu tên trường với phiên bản plugin đã ghim
+# (docs/runbooks/k8s-deploy.md mục 5). Kho sao lưu trong lãnh thổ, có khóa đối tượng (RB-7, mục 22).
+apiVersion: pgbackrest.dalibo.com/v1
+kind: Stanza
+metadata:
+  name: pg-{{ $c }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $cl.zone) | nindent 4 }}
+spec:
+  stanzaConfiguration:
+    name: pg-{{ $c }}
+    s3Repositories:
+      - bucket: {{ index ($pg.backup.s3.bucketByCluster | default dict) $c | default $pg.backup.s3.bucket }}
+        endpoint: {{ $pg.backup.s3.endpoint }}
+        region: {{ $pg.backup.s3.region }}
+        repoPath: /pg-{{ $c }}
+        uriStyle: {{ $pg.backup.s3.uriStyle }}
+        verifyTLS: {{ $pg.backup.s3.verifyTLS }}
+        retentionPolicy:
+          full: {{ $pg.backup.retentionFull }}
+          fullType: count
+        secretRef:
+          accessKeyId: { name: pg-backup-s3, key: ACCESS_KEY_ID }
+          secretAccessKey: { name: pg-backup-s3, key: ACCESS_SECRET_KEY }
+{{- range $kind, $sched := (dict "full" $pg.backup.fullSchedule "diff" $pg.backup.diffSchedule) }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: pg-{{ $c }}-{{ $kind }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $cl.zone) | nindent 4 }}
+spec:
+  schedule: {{ $sched | quote }}
+  backupOwnerReference: self
+  cluster: { name: pg-{{ $c }} }
+  method: plugin
+  pluginConfiguration:
+    name: {{ $pg.backup.pluginName }}
+    parameters:
+      type: {{ $kind }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

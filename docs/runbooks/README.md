@@ -4,15 +4,18 @@ Các job vận hành dùng chung cho mọi cụm (`ag_pf`, `ag_mkg`, `ag_vault`)
 
 | Việc | Khi nào | Chạy bằng | Vai DB | Runbook |
 |---|---|---|---|---|
-| Neo chuỗi + manifest ký số | 00:30 giờ VN hằng ngày | `cmd/worker` (leader) | `ag_outbox_publisher` | [anchor.md](anchor.md) |
+| Neo chuỗi + manifest ký số | 00:30 giờ VN hằng ngày | `cmd/worker` (leader) — Kubernetes G4: chỉ cụm pf (`AG_CLUSTERS=pf`); cụm mkg/ts/vault bằng CronJob `anchor-mkg`, `anchor-vault` (`migrate anchor`) | `ag_outbox_publisher` | [anchor.md](anchor.md), [k8s-deploy.md](k8s-deploy.md) mục 5 |
 | Ghi sổ chỉ số + ảnh chụp lớp GIS (pf/metrics) | 00:45 giờ VN hằng ngày (sau neo); backfill khi cần | `cmd/worker` (leader), `worker -metrics-backfill` | `metrics_app` + vai nguồn; tenant qua `ag_outbox_publisher` | [metrics.md](metrics.md) |
-| Dọn Idempotency-Key hết hạn | mỗi giờ | `cmd/worker` (leader) | `ag_outbox_publisher` | mục dưới |
+| Dọn Idempotency-Key hết hạn | mỗi giờ | `cmd/worker` (leader); Kubernetes G4 cụm mkg/ts/vault: CronJob `purge-idempotency-<vùng>` (`migrate purge-idempotency`) | `ag_outbox_publisher` | mục dưới |
 | Tạo trước phân vùng tháng | hằng tháng, sau mỗi `migrate up` | `migrate maintain` | `ag_migrator` | [partitions.md](partitions.md) |
 | Xác minh chuỗi băm | hằng tuần, sau mỗi lần phục hồi | `migrate verify-chains` | `ag_migrator` | [verify-chains.md](verify-chains.md) |
 | Sao lưu PostgreSQL (pgBackRest) + kho đối tượng (`objsync`) | full tuần, diff ngày, WAL liên tục; objsync hằng ngày | pgBackRest, `cmd/objsync` | — | [backup.md](backup.md) |
 | Diễn tập phục hồi | CI hằng tuần; thủ công hằng quý trên môi trường sạch | `cmd/drill` | quản trị cụm, chỉ đọc | [restore-drill.md](restore-drill.md) |
 | Kiểm đích trong lãnh thổ (RB-7) | mỗi lần khởi động ở production | `internal/shared/residency` | — | [residency.md](residency.md) |
 | Deploy một VPS (demo/thử nghiệm) | khi dựng hoặc cập nhật | `docker-compose.vps.yml`, `deploy/vps/prepare.sh` | — | [vps-deploy.md](vps-deploy.md) |
+| Triển khai Kubernetes trong lãnh thổ (G4): cài theo vùng, nâng cấp, lùi lại, bí mật, tách vùng, NetworkPolicy ADR-0008 | khi dựng cụm; mỗi phát hành | chart `deploy/k8s/charts/agrigreen`, `deploy/k8s/check.ps1`, OpenTofu `deploy/iac/opentofu` | theo vùng | [k8s-deploy.md](k8s-deploy.md) |
+| PKI production: CA dịch vụ (cert-manager, mTLS) + CA thiết bị (step-ca + HSM), xoay vòng CA | dựng một lần; lá dịch vụ tự gia hạn 90 ngày; kiểm hằng quý | `deploy/k8s/charts/agrigreen/templates/pki.yaml` | — | [pki.md](pki.md) |
+| Diễn tập tải ĐTK 2 (sync push/pull, ingest, đọc) + chuyển đổi dự phòng DB giữa lúc đồng bộ | G4, rồi mỗi thay đổi lớn về khối lượng | `tools/loadgen` (staging, dữ liệu tổng hợp) | — | [load-drill.md](load-drill.md) |
 | Khai báo trước hàng đợi consumer RabbitMQ | mỗi lần `outbox-publisher` khởi động | `cmd/outbox-publisher` (`assembly.Queues`) | — | [rabbitmq-queues.md](rabbitmq-queues.md) |
 | Giám sát đồng bộ tích hợp, DLQ, cảnh báo Admin | liên tục; cảnh báo khi DLQ > 0 | màn `/quan-tri/giam-sat-dong-bo`, Prometheus + Alertmanager | `sync_app` | [integration-alerts.md](integration-alerts.md) |
 | Kiểm độ tươi dữ liệu App HTX (CGH FN-07) | mỗi giờ | `cmd/worker` (leader, job `mechanization_area_feed_check`) | `ag_outbox_publisher` (tìm tenant), `mechanization_app` | [integration-alerts.md](integration-alerts.md) |

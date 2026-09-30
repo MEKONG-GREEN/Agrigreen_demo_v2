@@ -7,8 +7,13 @@
 //	migrate maintain    tạo trước phân vùng tháng cho mọi bảng sổ ở mọi cụm (AG_PARTITION_MONTHS_AHEAD, mặc định 24)
 //	migrate verify-chains  chạy shared.verify_chain cho mọi chuỗi trong chain_head; có chỗ đứt → mã thoát 1
 //	migrate anchor      neo mọi cụm một lần + manifest ký số (AG_ANCHOR_DATE, mặc định ngày vừa kết thúc)
+//	migrate purge-idempotency  xóa Idempotency-Key hết hạn ở mọi cụm (vai ag_outbox_publisher) — CronJob
+//	                    của vùng không chạy lịch worker (G4 Kubernetes, docs/runbooks/k8s-deploy.md)
 //
 // Mật khẩu vai: AG_DB_PASSWORD_<VAI> hoặc AG_DB_APP_PASSWORD.
+//
+// Tách theo vùng (G4, RB-5): AG_CLUSTERS chọn cụm (mặc định mọi cụm), AG_<CỤM>_DB_URL đặt
+// URL gốc riêng từng cụm (cmd/internal/clusterenv). bootstrap chưa lọc theo cụm (dbadmin).
 package main
 
 import (
@@ -16,14 +21,14 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/clusterenv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "dùng: migrate bootstrap|up|verify|maintain|verify-chains|anchor")
+		fmt.Fprintln(os.Stderr, "dùng: migrate bootstrap|up|verify|maintain|verify-chains|anchor|purge-idempotency")
 		os.Exit(2)
 	}
 	if err := run(os.Args[1]); err != nil {
@@ -54,8 +59,12 @@ func run(cmd string) error {
 		if err != nil {
 			return err
 		}
-		for _, c := range migrations.Clusters {
-			if err := dbadmin.Migrate(base, c, ""); err != nil {
+		clusters, err := clusterenv.Selected()
+		if err != nil {
+			return err
+		}
+		for _, c := range clusters {
+			if err := dbadmin.Migrate(clusterenv.BaseURL(c, base), c, ""); err != nil {
 				return err
 			}
 			fmt.Println("đã áp migration:", dbadmin.DatabaseName(c, ""))
@@ -66,9 +75,13 @@ func run(cmd string) error {
 		if err != nil {
 			return err
 		}
+		clusters, err := clusterenv.Selected()
+		if err != nil {
+			return err
+		}
 		bad := 0
-		for _, c := range migrations.Clusters {
-			dsn, err := dbadmin.RoleURL(base, c, "", dbadmin.Migrator)
+		for _, c := range clusters {
+			dsn, err := dbadmin.RoleURL(clusterenv.BaseURL(c, base), c, "", dbadmin.Migrator)
 			if err != nil {
 				return err
 			}
@@ -107,6 +120,8 @@ func run(cmd string) error {
 		return verifyChains(ctx)
 	case "anchor":
 		return anchorNow(ctx)
+	case "purge-idempotency":
+		return purgeIdempotency(ctx)
 	}
 	return fmt.Errorf("lệnh không hỗ trợ: %s", cmd)
 }

@@ -1,0 +1,13 @@
+apiVersion: v2
+name: agrigreen
+description: >-
+  AgriGreen G4 — Kubernetes được quản trị trong lãnh thổ (Phụ lục A). Một chart, tách đơn vị
+  triển khai theo vùng bằng cấu hình (RB-5, R-01): mỗi vùng một namespace, NetworkPolicy mặc
+  định từ chối theo ADR-0008, bí mật theo vùng. Xem docs/runbooks/k8s-deploy.md.
+type: application
+version: 0.1.0
+appVersion: "g4"
+kubeVersion: ">=1.29.0-0"
+# Không có chart phụ thuộc: các operator (CloudNativePG, RabbitMQ Cluster/Topology Operator,
+# cert-manager, trust-manager, External Secrets, Prometheus Operator, bộ điều khiển Ingress)
+# cài riêng theo docs/runbooks/k8s-deploy.md mục 2; chart này chỉ tạo tài nguyên của chúng.

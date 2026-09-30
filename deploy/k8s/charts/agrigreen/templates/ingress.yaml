@@ -1,0 +1,38 @@
+{{- /*
+Biên/DMZ (mục 11, 17): Ingress trong namespace của Service đích; bộ điều khiển (Traefik, MIT) chạy ở
+agrigreen-edge-ingress. Gateway chỉ làm TLS, định tuyến, giới hạn tần suất (R-55); backend tự xác minh
+token (R-54). Không có Ingress cho Internal API (8084), identity-vault, ingest (Biên OT qua VPN).
+*/ -}}
+{{- if .Values.ingress.enabled }}
+{{- $root := . }}
+{{- range $h := .Values.ingress.hosts }}
+{{- if include "agrigreen.on" (dict "root" $root "zone" $h.zone) }}
+{{- $host := tpl $h.host $root }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $h.service }}-{{ $h.port }}
+  namespace: {{ include "agrigreen.ns" (dict "root" $root "zone" $h.zone) }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $h.zone) | nindent 4 }}
+{{- with $root.Values.ingress.annotations }}
+  annotations: {{ toJson . }}
+{{- end }}
+spec:
+  ingressClassName: {{ $root.Values.ingress.className }}
+  tls:
+    - hosts: [{{ $host | quote }}]
+      secretName: {{ $root.Values.ingress.tlsSecret }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $h.service }}
+                port: { number: {{ $h.port }} }
+{{- end }}
+{{- end }}
+{{- end }}

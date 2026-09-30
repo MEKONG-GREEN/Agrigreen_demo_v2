@@ -1,0 +1,19 @@
+# Luật cảnh báo nền tảng (pf) — ADR-0006 (docs/adr/trien-khai-g1.md). Ngưỡng là đề xuất
+# (tạm, chờ khách) — xem docs/runbooks/README.md mục "Chỉ số và cảnh báo".
+groups:
+  - name: agrigreen-platform-sync
+    rules:
+      - alert: AgDBStandbyReplicationLagHigh
+        expr: max(ag_db_standby_replication_lag_seconds) > 60
+        for: 5m
+        labels: { severity: warning, priority: P3 }
+        annotations:
+          summary: "Bản sao đọc (standby) trễ quá 60 giây"
+          description: "ADR-0006: truy vấn đọc đồ thị/metrics có thể thấy dữ liệu cũ. Kiểm WAL và mạng tới standby."
+      - alert: AgSyncConflictOverdue
+        expr: max(ag_sync_conflict_overdue) > 0
+        for: 1h
+        labels: { severity: warning, priority: P3 }
+        annotations:
+          summary: "Có xung đột đồng bộ quá hạn xử lý (C-8)"
+          description: "ADR-0006: xung đột offline chờ đối soát quá SLA. Mở màn Xung đột đồng bộ (sync_conflict_resolver)."

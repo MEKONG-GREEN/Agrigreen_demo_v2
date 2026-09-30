@@ -6,12 +6,12 @@ import (
 	"os"
 	"time"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/clusterenv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/opsjobs"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
 // anchorNow: neo mọi cụm một lần cho ngày AG_ANCHOR_DATE (YYYY-MM-DD, mặc định
@@ -41,8 +41,12 @@ func anchorNow(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	for _, c := range migrations.Clusters {
-		dsn, err := dbadmin.RoleURL(base, c, "", dbadmin.OutboxPublisher)
+	clusters, err := clusterenv.Selected()
+	if err != nil {
+		return err
+	}
+	for _, c := range clusters {
+		dsn, err := dbadmin.RoleURL(clusterenv.BaseURL(c, base), c, "", dbadmin.OutboxPublisher)
 		if err != nil {
 			return err
 		}

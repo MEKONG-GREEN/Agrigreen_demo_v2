@@ -1,0 +1,38 @@
+# Staging — "giống sản xuất về cấu hình" (mục 21), dữ liệu ẩn danh hóa không đảo ngược được hoặc
+# tổng hợp (R-95). Dùng cho diễn tập tải ĐTK 2 (docs/runbooks/load-drill.md) và diễn tập phục hồi.
+# Dải/endpoint là CHỖ GIỮ (RFC 5737) — chờ chọn nhà cung cấp.
+global:
+  env: staging        # guard RB-7 chỉ bật ở production; staging vẫn chỉ dùng hạ tầng trong lãnh thổ
+  domain: staging.agrigreen.example.vn
+  imageRegistry: registry.example.vn/agrigreen
+  residencyAllowlist: "svc.cluster.local,single-label,staging.agrigreen.example.vn,s3.example.vn,10.0.0.0/8"
+
+external:
+  objectStorage: ["192.0.2.110/32"]
+  kms: ["192.0.2.120/32"]
+  smtp: ["192.0.2.130/32"]
+  otVpn: ["198.51.100.0/24"]
+  adminVpn: ["198.51.100.128/25"]
+  kubeAPI: ["203.0.113.2/32"]
+  hsm: ["192.0.2.140/32"]
+  nodes: ["10.30.0.0/16"]
+  gitRepo: ["192.0.2.150/32"]
+
+common:
+  s3:
+    endpoint: s3.example.vn
+    bucket: agrigreen-staging-objects
+
+postgres:
+  backup:
+    s3:
+      bucket: agrigreen-staging-pg-backup
+      bucketByCluster: { vault: agrigreen-staging-vault-backup }
+
+externalSecrets:
+  remotePrefix: agrigreen/staging
+
+apps:
+  identity-vault:
+    env:
+      AG_VAULT_KEK_ID: staging-kek-1

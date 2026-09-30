@@ -1,0 +1,167 @@
+{{- /*
+Quan sát (mục 19, ADR-0013): Prometheus Operator (Apache-2.0) chọn ServiceMonitor/PodMonitor/
+PrometheusRule theo .Values.observability.selectorLabels. Luật = bản sao của deploy/observability/
+prometheus/*.rules.yml (files/prometheus; check_flows.py kiểm hai bản giống hệt).
+Nguồn metric: dịch vụ Go đẩy OTLP → otel-collector (exporter prometheus :8889); sql_exporter (:9399,
+vai mkg_monitor/ts_monitor); RabbitMQ rabbitmq_prometheus (:15692, /metrics/detailed); CNPG (:9187).
+*/ -}}
+{{- if .Values.observability.enabled }}
+{{- $root := . }}
+{{- $sel := .Values.observability.selectorLabels }}
+{{- $o := "{{" }}{{- $c := "}}" }}
+{{- if include "agrigreen.on" (dict "root" $root "zone" "ops") }}
+{{- $ns := include "agrigreen.ns" (dict "root" $root "zone" "ops") }}
+{{- range $path, $_ := $root.Files.Glob "files/prometheus/*.rules.yml" }}
+{{- $rules := $root.Files.Get $path | fromYaml }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ base $path | trimSuffix ".rules.yml" }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" "ops") | nindent 4 }}
+{{- toYaml $sel | nindent 4 }}
+  annotations:
+    agrigreen.vn/source: {{ printf "deploy/observability/prometheus/%s" (base $path) | quote }}
+spec:
+  groups: {{ toJson $rules.groups }}
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" "ops") | nindent 4 }}
+data:
+  config.yaml: |
+    # Nhận OTLP từ dịch vụ Go (R-90), xuất metric cho Prometheus. Trace/log: đặt exporter tới
+    # Tempo/Loki TỰ VẬN HÀNH TRONG LÃNH THỔ (RB-7) — chưa chốt, tạm debug.
+    extensions:
+      health_check: { endpoint: 0.0.0.0:13133 }
+    receivers:
+      otlp:
+        protocols:
+          grpc: { endpoint: 0.0.0.0:4317 }
+          http: { endpoint: 0.0.0.0:4318 }
+    processors:
+      memory_limiter: { check_interval: 1s, limit_mib: 400 }
+      batch: {}
+    exporters:
+      prometheus:
+        endpoint: 0.0.0.0:8889
+        resource_to_telemetry_conversion: { enabled: false }
+      debug: { verbosity: basic }
+    service:
+      extensions: [health_check]
+      pipelines:
+        metrics: { receivers: [otlp], processors: [memory_limiter, batch], exporters: [prometheus] }
+        traces: { receivers: [otlp], processors: [memory_limiter, batch], exporters: [debug] }
+        logs: { receivers: [otlp], processors: [memory_limiter, batch], exporters: [debug] }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sql-exporter-collectors
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" "ops") | nindent 4 }}
+data:
+{{- range $path, $_ := $root.Files.Glob "files/sql-exporter/*.collector.yml" }}
+  {{ base $path }}: |
+{{ $root.Files.Get $path | indent 4 }}
+{{- end }}
+{{- if $root.Values.externalSecrets.enabled }}
+---
+# Cấu hình sql_exporter có DSN (mật khẩu vai giám sát) → Secret dựng bởi External Secrets.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: sql-exporter-config
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" "ops") | nindent 4 }}
+spec:
+  refreshInterval: {{ $root.Values.externalSecrets.refreshInterval }}
+  secretStoreRef: { kind: ClusterSecretStore, name: {{ $root.Values.externalSecrets.store }} }
+  target:
+    name: sql-exporter-config
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        sql_exporter.yml: |
+          global: { scrape_timeout: 10s, min_interval: 60s, max_connections: 2, max_idle_connections: 1 }
+          collector_files: ["/etc/sql_exporter/collectors/*.collector.yml"]
+          jobs:
+            - job_name: agrigreen-mkg
+              collectors: [agrigreen_mkg_measurement]
+              static_configs:
+                - targets:
+                    mkg: {{ printf "postgres://mkg_monitor:%s .mkg | urlquery %s@pg-mkg-pooler.%s.%s:5432/ag_mkg?sslmode=require" $o $c (include "agrigreen.ns" (dict "root" $root "zone" "data")) (include "agrigreen.svcSuffix" $root) | quote }}
+            - job_name: agrigreen-ts
+              collectors: [agrigreen_ts_weigh]
+              static_configs:
+                - targets:
+                    ts: {{ printf "postgres://ts_monitor:%s .ts | urlquery %s@pg-ts-pooler.%s.%s:5432/ag_ts?sslmode=require" $o $c (include "agrigreen.ns" (dict "root" $root "zone" "data")) (include "agrigreen.svcSuffix" $root) | quote }}
+  data:
+    - secretKey: mkg
+      remoteRef: { key: {{ printf "%s/db/mkg" $root.Values.externalSecrets.remotePrefix | quote }}, property: AG_DB_PASSWORD_MKG_MONITOR }
+    - secretKey: ts
+      remoteRef: { key: {{ printf "%s/db/ts" $root.Values.externalSecrets.remotePrefix | quote }}, property: AG_DB_PASSWORD_TS_MONITOR }
+{{- end }}
+{{- range $svc := list "otel-collector" "sql-exporter" }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $svc }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" "ops") | nindent 4 }}
+{{- toYaml $sel | nindent 4 }}
+spec:
+  selector:
+    matchLabels: { app.kubernetes.io/name: {{ $svc }} }
+  endpoints:
+    - port: metrics
+      interval: {{ $root.Values.observability.scrapeInterval }}
+{{- end }}
+{{- end }}
+{{- if include "agrigreen.on" (dict "root" $root "zone" "data") }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: rabbitmq
+  namespace: {{ include "agrigreen.ns" (dict "root" $root "zone" "data") }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" "data") | nindent 4 }}
+{{- toYaml $sel | nindent 4 }}
+spec:
+  selector:
+    matchLabels: { app.kubernetes.io/name: {{ $root.Values.rabbitmq.name }}, app.kubernetes.io/component: rabbitmq }
+  endpoints:
+    - { port: prometheus, path: /metrics, interval: {{ $root.Values.observability.scrapeInterval }} }
+    # Theo hàng đợi của vhost mkg.internal (luật AgrigreenMkgInternal*).
+    - port: prometheus
+      path: /metrics/detailed
+      interval: {{ $root.Values.observability.scrapeInterval }}
+      params:
+        vhost: [{{ $root.Values.rabbitmq.vhosts.internal.name | quote }}]
+        family: [queue_coarse_metrics, queue_consumer_count]
+{{- end }}
+{{- range $zone := list "data" "vault" }}
+{{- if include "agrigreen.on" (dict "root" $root "zone" $zone) }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: cnpg-instances
+  namespace: {{ include "agrigreen.ns" (dict "root" $root "zone" $zone) }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $zone) | nindent 4 }}
+{{- toYaml $sel | nindent 4 }}
+spec:
+  selector:
+    matchLabels: { cnpg.io/podRole: instance }
+  podMetricsEndpoints:
+    - { port: metrics, interval: {{ $root.Values.observability.scrapeInterval }} }
+{{- end }}
+{{- end }}
+{{- end }}

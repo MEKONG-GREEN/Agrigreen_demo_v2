@@ -11,6 +11,11 @@
 // của cụm pf (assembly.Queues: consumer của worker + optimizer) cùng DLQ và binding — sự
 // kiện phát trước lần khởi động đầu của một consumer không bị mất (docs/runbooks/rabbitmq-queues.md).
 //
+// Tách theo vùng (G4 Kubernetes, RB-5): AG_CLUSTERS chọn cụm (mặc định mọi cụm, như Compose),
+// AG_<CỤM>_DB_URL đặt URL gốc riêng từng cụm (cmd/internal/clusterenv). Bản vùng nền tảng:
+// AG_CLUSTERS=pf; bản vùng mkg: AG_CLUSTERS=mkg,ts (+ AG_AMQP_INTERNAL_URL). Hàng đợi pf chỉ
+// khai báo khi có cụm pf; vhost mkg.internal chỉ nối khi có cụm mkg.
+//
 //	AG_OTLP_ENDPOINT, ...  OpenTelemetry: span publish nối trace của request gốc; metric
 //	               ag.outbox.backlog, ag.outbox.oldest_age theo cụm (mục 19)
 package main
@@ -27,6 +32,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/clusterenv"
 	internalassembly "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/worker-internal/assembly"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
@@ -66,19 +72,27 @@ func run() error {
 	if base == "" || amqpURL == "" {
 		return errors.New("thiếu AG_DB_URL hoặc AG_AMQP_URL")
 	}
+	clusters, err := clusterenv.Selected()
+	if err != nil {
+		return err
+	}
 	broker, err := outbox.DialRabbit(amqpURL)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = broker.Close() }()
-	if err := declareQueues(broker); err != nil {
-		return err
+	// Hàng đợi consumer của cụm pf chỉ do bản publisher phụ trách cụm pf khai báo: bản của
+	// vùng mkg (AG_CLUSTERS=mkg,ts) chỉ có quyền phát lên ag.events của vhost nền tảng (van).
+	if clusterenv.Has(clusters, migrations.PF) {
+		if err := declareQueues(broker); err != nil {
+			return err
+		}
+		log.Info("đã khai báo hàng đợi consumer", "event", "startup", "queues", len(assembly.Queues()), "outcome", "ok")
 	}
-	log.Info("đã khai báo hàng đợi consumer", "event", "startup", "queues", len(assembly.Queues()), "outcome", "ok")
 
 	// Vhost mkg.internal: kết nối và tài khoản riêng (ADR-0018).
 	var internalBroker *outbox.Rabbit
-	if u := os.Getenv("AG_AMQP_INTERNAL_URL"); u != "" {
+	if u := os.Getenv("AG_AMQP_INTERNAL_URL"); u != "" && clusterenv.Has(clusters, migrations.MKG) {
 		internalBroker, err = outbox.DialRabbit(u)
 		if err != nil {
 			return err
@@ -88,14 +102,14 @@ func run() error {
 			return err
 		}
 		log.Info("đã khai báo hàng đợi vhost mkg.internal", "event", "startup", "queues", len(internalassembly.Queues()), "outcome", "ok")
-	} else {
+	} else if clusterenv.Has(clusters, migrations.MKG) {
 		log.Warn("thiếu AG_AMQP_INTERNAL_URL — sự kiện nội bộ MKG tồn trên outbox cụm mkg", "event", "startup", "outcome", "degraded")
 	}
 
 	var wg sync.WaitGroup
 	pools := map[string]*pgxpool.Pool{}
-	for _, c := range migrations.Clusters {
-		dsn, err := dbadmin.RoleURL(base, c, "", dbadmin.OutboxPublisher)
+	for _, c := range clusters {
+		dsn, err := dbadmin.RoleURL(clusterenv.BaseURL(c, base), c, "", dbadmin.OutboxPublisher)
 		if err != nil {
 			return err
 		}

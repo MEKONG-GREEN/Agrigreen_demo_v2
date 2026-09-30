@@ -1,0 +1,25 @@
+{{- /* Mỗi vùng một namespace (R-81). Nhãn trust-* chọn nơi trust-manager đặt bó CA. */ -}}
+{{- $root := . }}
+{{- $restricted := list "pf" "mkg" "vault" "pki" }}
+{{- $serviceCA := list "pf" "mkg" "vault" }}
+{{- range $zone, $ns := .Values.namespaces }}
+{{- if include "agrigreen.on" (dict "root" $root "zone" $zone) }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $zone) | nindent 4 }}
+    pod-security.kubernetes.io/enforce: {{ ternary $root.Values.global.podSecurityStandard "baseline" (has $zone $restricted) }}
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+{{- if has $zone $serviceCA }}
+    agrigreen.vn/trust-service-ca: "true"
+{{- end }}
+{{- if eq $zone "mkg" }}
+    agrigreen.vn/trust-device-ca: "true"
+{{- end }}
+  annotations:
+    helm.sh/resource-policy: keep
+{{- end }}
+{{- end }}

@@ -1,0 +1,47 @@
+# Production — trong lãnh thổ (RB-7), dữ liệu thật (mục 21). Một release mỗi vùng:
+#   helm upgrade --install agrigreen-<vùng> deploy/k8s/charts/agrigreen -f values-prod.yaml \
+#     --set-json 'global.installZones=["<vùng>"]'
+# (docs/runbooks/k8s-deploy.md mục 3). Mọi dải/endpoint dưới đây là CHỖ GIỮ (RFC 5737, example.vn)
+# — "chờ chọn nhà cung cấp" (ADR-0007); thay bằng số thật trước khi cài.
+global:
+  env: production
+  domain: agrigreen.example.vn                       # chờ MKG chốt tên miền
+  imageRegistry: registry.example.vn/agrigreen       # kho image trong lãnh thổ — chờ chọn nhà cung cấp
+  imageTag: ""                                       # đặt bằng --set global.imageTag=<git sha> (image đã ký)
+  residencyAllowlist: "svc.cluster.local,single-label,agrigreen.example.vn,s3.example.vn,10.0.0.0/8"
+
+external:
+  objectStorage: ["192.0.2.10/32"]     # kho S3 trong lãnh thổ — chờ chọn nhà cung cấp
+  kms: ["192.0.2.20/32"]               # KMS trong lãnh thổ — chờ chọn nhà cung cấp
+  smtp: ["192.0.2.30/32"]              # SMTP trong lãnh thổ
+  pushNonPII: []                       # FCM data-only: bật khi ADR-0015 được chấp nhận
+  otVpn: ["198.51.100.0/24"]           # dải VPN vùng Biên OT (hub cân)
+  adminVpn: ["198.51.100.128/25"]      # VPN quản trị + MFA
+  kubeAPI: ["203.0.113.1/32"]          # địa chỉ API server của cụm được quản trị
+  hsm: ["192.0.2.40/32"]               # HSM mạng của CA thiết bị — chờ chọn HSM
+  nodes: ["10.20.0.0/16"]
+  gitRepo: ["192.0.2.50/32"]
+
+common:
+  s3:
+    endpoint: s3.example.vn
+
+postgres:
+  storageClass: ""    # lớp lưu trữ mã hóa của nhà cung cấp — chờ chọn
+  backup:
+    s3:
+      endpoint: s3.example.vn
+
+externalSecrets:
+  remotePrefix: agrigreen/prod
+
+apps:
+  api-internal:
+    env:
+      AG_MKG_TENANT_ID: ""           # đặt khi tạo tenant MKG ở production
+      AG_PARTNER_GRANTOR_TENANT: ""
+  ingest:
+    services:
+      - { name: ingest, ports: [health] }
+      # Chú thích LoadBalancer NỘI BỘ của nhà cung cấp — chờ chọn nhà cung cấp.
+      - { name: ingest-ot, ports: [batches], type: LoadBalancer, sourceRangesFrom: otVpn, annotations: { agrigreen.vn/lb: "internal — chờ chọn nhà cung cấp" } }

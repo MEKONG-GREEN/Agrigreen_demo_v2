@@ -1,0 +1,218 @@
+{{- /*
+Job DB theo cụm (mục 20: migration là job riêng, chạy TRƯỚC triển khai ứng dụng):
+  1. bootstrap      migrate bootstrap — vai + database + extension (superuser của cụm, dbadmin.Bootstrap)
+  2. pooler-auth    psql — hàm user_search cho auth_query của CNPG Pooler trong database ứng dụng
+  3. up             migrate up    (AG_CLUSTERS=<cụm>, ag_migrator)
+  4. verify         migrate verify (v_missing_immutability, v_missing_rls rỗng)
+Hook post-install (cụm CNPG chưa có trước lần cài đầu; bootstrap tự thử lại kết nối) và pre-upgrade
+(migration trước khi đổi ứng dụng). Argo CD ánh xạ sang PreSync/PostSync.
+CronJob: maintain (tháng), verify-chains (tuần) theo cụm; anchor + purge-idempotency cho cụm KHÔNG
+thuộc worker nền tảng (worker chạy AG_CLUSTERS=pf).
+*/ -}}
+{{- $root := . }}
+{{- $img := include "agrigreen.image" (dict "root" $root "image" .Values.dbJobs.image) }}
+{{- define "agrigreen.jobPod" -}}
+restartPolicy: Never
+automountServiceAccountToken: false
+enableServiceLinks: false
+securityContext: {{- include "agrigreen.podSecurity" (dict "uid" 65532) | nindent 2 }}
+{{- end -}}
+{{- range $c := .Values.dbJobs.clusters }}
+{{- $cl := index $root.Values.postgres.clusters $c }}
+{{- if include "agrigreen.on" (dict "root" $root "zone" $cl.zone) }}
+{{- $ns := include "agrigreen.ns" (dict "root" $root "zone" $cl.zone) }}
+{{- $direct := include "agrigreen.dbURL" (dict "root" $root "ref" (printf "direct:%s" $c)) }}
+{{- $host := printf "pg-%s-rw.%s.%s" $c $ns (include "agrigreen.svcSuffix" $root) }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migrate-{{ $c }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $cl.zone) | nindent 4 }}
+    app.kubernetes.io/name: db-migrate-{{ $c }}
+  annotations:
+    helm.sh/hook: post-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: {{ $root.Values.dbJobs.backoffLimit }}
+  activeDeadlineSeconds: {{ $root.Values.dbJobs.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: 604800
+  template:
+    metadata:
+      labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $cl.zone) | nindent 8 }}
+        app.kubernetes.io/name: db-migrate-{{ $c }}
+        agrigreen.vn/db-job: "true"
+    spec:
+      {{- include "agrigreen.jobPod" $root | nindent 6 }}
+      initContainers:
+        - name: bootstrap
+          image: {{ $img }}
+          args: [bootstrap]
+          securityContext: {{- include "agrigreen.containerSecurity" . | nindent 12 }}
+          env:
+            - name: PGADMIN_USER
+              valueFrom: { secretKeyRef: { name: pg-{{ $c }}-superuser, key: username } }
+            - name: PGADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: pg-{{ $c }}-superuser, key: password } }
+            - name: AG_PG_ADMIN_URL
+              value: "postgres://$(PGADMIN_USER):$(PGADMIN_PASSWORD)@{{ $host }}:5432/postgres?sslmode=require"
+          envFrom:
+            - secretRef: { name: pg-{{ $c }}-roles }
+            # Vai của vùng khác mà Bootstrap vẫn tạo trên cụm này: mật khẩu ngẫu nhiên không dùng.
+            - secretRef: { name: db-bootstrap-foreign }
+          resources: {{ toJson $root.Values.common.resources.small }}
+        - name: pooler-auth
+          image: {{ tpl $root.Values.postgres.image $root }}
+          # Không dùng shell/heredoc (rootfs chỉ đọc): psql đọc kết nối từ biến PG*.
+          command:
+            - psql
+            - -v
+            - ON_ERROR_STOP=1
+            - -c
+            - "GRANT CONNECT ON DATABASE {{ $cl.database }} TO cnpg_pooler_pgbouncer"
+            - -c
+            - "CREATE OR REPLACE FUNCTION public.user_search(uname TEXT) RETURNS TABLE (usename name, passwd text) LANGUAGE sql SECURITY DEFINER AS 'SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1;'"
+            - -c
+            - "REVOKE ALL ON FUNCTION public.user_search(text) FROM public"
+            - -c
+            - "GRANT EXECUTE ON FUNCTION public.user_search(text) TO cnpg_pooler_pgbouncer"
+          securityContext: {{- include "agrigreen.containerSecurity" . | nindent 12 }}
+          env:
+            - { name: PGHOST, value: {{ $host | quote }} }
+            - { name: PGPORT, value: "5432" }
+            - { name: PGDATABASE, value: {{ $cl.database | quote }} }
+            - { name: PGSSLMODE, value: require }
+            - name: PGUSER
+              valueFrom: { secretKeyRef: { name: pg-{{ $c }}-superuser, key: username } }
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: pg-{{ $c }}-superuser, key: password } }
+          resources: {{ toJson $root.Values.common.resources.small }}
+        - name: up
+          image: {{ $img }}
+          args: [up]
+          securityContext: {{- include "agrigreen.containerSecurity" . | nindent 12 }}
+          env:
+            - { name: AG_CLUSTERS, value: {{ $c | quote }} }
+            - { name: AG_DB_URL, value: {{ $direct | quote }} }
+          envFrom:
+            - secretRef: { name: pg-{{ $c }}-roles }
+          resources: {{ toJson $root.Values.common.resources.small }}
+      containers:
+        - name: verify
+          image: {{ $img }}
+          args: [verify]
+          securityContext: {{- include "agrigreen.containerSecurity" . | nindent 12 }}
+          env:
+            - { name: AG_CLUSTERS, value: {{ $c | quote }} }
+            - { name: AG_DB_URL, value: {{ $direct | quote }} }
+          envFrom:
+            - secretRef: { name: pg-{{ $c }}-roles }
+          resources: {{ toJson $root.Values.common.resources.small }}
+{{- end }}
+{{- end }}
+{{- /* ---------------- CronJob theo cụm: maintain, verify-chains (ag_migrator) */}}
+{{- range $job, $cmd := (dict "maintain" "maintain" "verifyChains" "verify-chains") }}
+{{- $cj := index $root.Values.cronJobs $job }}
+{{- range $c := $cj.clusters }}
+{{- $cl := index $root.Values.postgres.clusters $c }}
+{{- if include "agrigreen.on" (dict "root" $root "zone" $cl.zone) }}
+{{- $ns := include "agrigreen.ns" (dict "root" $root "zone" $cl.zone) }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $cmd }}-{{ $c }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $cl.zone) | nindent 4 }}
+    app.kubernetes.io/name: {{ $cmd }}-{{ $c }}
+spec:
+  schedule: {{ $cj.schedule | quote }}
+  timeZone: {{ $root.Values.global.timeZone }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $cl.zone) | nindent 12 }}
+            app.kubernetes.io/name: {{ $cmd }}-{{ $c }}
+            agrigreen.vn/db-job: "true"
+        spec:
+          {{- include "agrigreen.jobPod" $root | nindent 10 }}
+          containers:
+            - name: {{ $cmd }}
+              image: {{ $img }}
+              args: [{{ $cmd }}]
+              securityContext: {{- include "agrigreen.containerSecurity" . | nindent 16 }}
+              env:
+                - { name: AG_CLUSTERS, value: {{ $c | quote }} }
+                - { name: AG_DB_URL, value: {{ include "agrigreen.dbURL" (dict "root" $root "ref" (printf "direct:%s" $c)) | quote }} }
+              envFrom:
+                - secretRef: { name: pg-{{ $c }}-roles }
+              resources: {{ toJson $root.Values.common.resources.small }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- /* ---------------- CronJob theo vùng: anchor, purge-idempotency (ag_outbox_publisher) */}}
+{{- range $job, $cmd := (dict "anchor" "anchor" "purgeIdempotency" "purge-idempotency") }}
+{{- $cj := index $root.Values.cronJobs $job }}
+{{- range $zone, $clusters := $cj.groups }}
+{{- if include "agrigreen.on" (dict "root" $root "zone" $zone) }}
+{{- $ns := include "agrigreen.ns" (dict "root" $root "zone" $zone) }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $cmd }}-{{ $zone }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $zone) | nindent 4 }}
+    app.kubernetes.io/name: {{ $cmd }}-{{ $zone }}
+spec:
+  schedule: {{ $cj.schedule | quote }}
+  timeZone: {{ $root.Values.global.timeZone }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $zone) | nindent 12 }}
+            app.kubernetes.io/name: {{ $cmd }}-{{ $zone }}
+            agrigreen.vn/db-job: "true"
+        spec:
+          {{- include "agrigreen.jobPod" $root | nindent 10 }}
+          containers:
+            - name: {{ $cmd }}
+              image: {{ $img }}
+              args: [{{ $cmd }}]
+              securityContext: {{- include "agrigreen.containerSecurity" . | nindent 16 }}
+              env:
+                - { name: AG_CLUSTERS, value: {{ join "," $clusters | quote }} }
+                - { name: AG_DB_URL, value: {{ include "agrigreen.dbURL" (dict "root" $root "ref" (printf "direct:%s" (first $clusters))) | quote }} }
+{{- range $c := $clusters }}
+                - { name: {{ printf "AG_%s_DB_URL" (upper $c) }}, value: {{ include "agrigreen.dbURL" (dict "root" $root "ref" (printf "direct:%s" $c)) | quote }} }
+{{- end }}
+{{- if eq $cmd "anchor" }}
+                - { name: AG_ANCHOR_KEY_ID, value: {{ printf "%s-%s-1" $root.Values.global.env $zone | quote }} }
+                - { name: AG_S3_ENDPOINT, value: {{ $root.Values.common.s3.endpoint | quote }} }
+                - { name: AG_S3_BUCKET, value: {{ $root.Values.common.s3.bucket | quote }} }
+                - { name: AG_S3_USE_TLS, value: {{ $root.Values.common.s3.useTLS | quote }} }
+                - name: AG_ANCHOR_SIGNING_KEY
+                  valueFrom: { secretKeyRef: { name: {{ $zone }}-anchor, key: AG_ANCHOR_SIGNING_KEY } }
+                - name: AG_S3_ACCESS_KEY
+                  valueFrom: { secretKeyRef: { name: {{ $zone }}-s3, key: AG_S3_ACCESS_KEY } }
+                - name: AG_S3_SECRET_KEY
+                  valueFrom: { secretKeyRef: { name: {{ $zone }}-s3, key: AG_S3_SECRET_KEY } }
+{{- end }}
+              envFrom:
+                - secretRef: { name: {{ $zone }}-db-outbox }
+              resources: {{ toJson $root.Values.common.resources.small }}
+{{- end }}
+{{- end }}
+{{- end }}

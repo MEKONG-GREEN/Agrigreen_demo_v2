@@ -1,0 +1,88 @@
+{{- /*
+RabbitMQ (ADR-0002, ADR-0018): RabbitMQ Cluster Operator + Messaging Topology Operator (MPL-2.0).
+Hai vhost: "/" (sự kiện nền tảng + van công bố) và "mkg.internal" (sự kiện nội bộ MKG).
+Tài khoản theo dịch vụ; KHÔNG tài khoản nền tảng nào có Permission trên mkg.internal (kiểm ở
+deploy/k8s/tests/check_flows.py). Mật khẩu từ Secret rmq-<user> (External Secrets), không trong repo.
+*/ -}}
+{{- if and .Values.rabbitmq.enabled (include "agrigreen.on" (dict "root" . "zone" "data")) }}
+{{- $root := . }}
+{{- $mq := .Values.rabbitmq }}
+{{- $ns := include "agrigreen.ns" (dict "root" $root "zone" "data") }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
+metadata:
+  name: {{ $mq.name }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" "data") | nindent 4 }}
+spec:
+  replicas: {{ $mq.replicas }}
+  image: {{ $mq.image }}
+  persistence:
+    storage: {{ $mq.storage }}
+{{- with $root.Values.postgres.storageClass }}
+    storageClassName: {{ . }}
+{{- end }}
+  resources:
+    requests: { cpu: "1", memory: 2Gi }
+    limits: { cpu: "2", memory: 2Gi }
+  rabbitmq:
+    additionalPlugins: [rabbitmq_prometheus]
+    additionalConfig: |
+      default_queue_type = quorum
+      # Không cho tài khoản guest; mọi tài khoản dịch vụ do Topology Operator tạo.
+      loopback_users.guest = true
+{{- with (index ($root.Values.scheduling.nodeSelectorByZone | default dict) "data") }}
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+{{- range $k, $v := . }}
+              - { key: {{ $k }}, operator: In, values: [{{ $v }}] }
+{{- end }}
+{{- end }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Vhost
+metadata:
+  name: vhost-mkg-internal
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" "data") | nindent 4 }}
+spec:
+  name: {{ $mq.vhosts.internal.name | quote }}
+  defaultQueueType: quorum
+  rabbitmqClusterReference: { name: {{ $mq.name }} }
+{{- range $u, $spec := $mq.users }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: User
+metadata:
+  name: rmq-{{ $u }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" "data") | nindent 4 }}
+    agrigreen.vn/owner-zone: {{ $spec.zone }}
+spec:
+  tags: {{ toJson ($spec.tags | default list) }}
+  rabbitmqClusterReference: { name: {{ $mq.name }} }
+  importCredentialsSecret: { name: rmq-{{ $u }} }
+{{- range $p := $spec.permissions }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Permission
+metadata:
+  name: rmq-{{ $u }}-{{ $p.vhost }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" "data") | nindent 4 }}
+    agrigreen.vn/owner-zone: {{ $spec.zone }}
+spec:
+  vhost: {{ (index $mq.vhosts $p.vhost).name | quote }}
+  userReference: { name: rmq-{{ $u }} }
+  permissions:
+    configure: {{ $p.configure | quote }}
+    write: {{ $p.write | quote }}
+    read: {{ $p.read | quote }}
+  rabbitmqClusterReference: { name: {{ $mq.name }} }
+{{- end }}
+{{- end }}
+{{- end }}

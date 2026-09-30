@@ -1,0 +1,729 @@
+# Giá trị mặc định = cấu hình kiểu production (an toàn nhất). values-dev/-staging/-prod ghi đè.
+# Chuỗi có "{{ }}" được render bằng tpl (tham chiếu .Values khác).
+# KHÔNG có bí mật trong tệp này: mọi mật khẩu/khóa đến từ Secret do External Secrets Operator
+# đồng bộ từ kho bí mật TRONG LÃNH THỔ (RB-7) — xem externalSecrets và docs/runbooks/k8s-deploy.md mục 4.
+
+global:
+  # AG_ENV của mọi dịch vụ Go. production/prod bật guard RB-7 (internal/shared/residency).
+  env: production
+  # Tên miền công khai — chờ MKG chốt. Các hostname: api., admin., ops., mkg., mkg-api., mkg-admin., auth.
+  domain: agrigreen.example.vn
+  clusterDomain: cluster.local
+  # Kho image trong lãnh thổ (chờ chọn nhà cung cấp). Image ký số, admission từ chối image chưa ký (mục 20).
+  imageRegistry: registry.example.vn/agrigreen
+  imageTag: ""          # rỗng → .Chart.AppVersion
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  # Vùng mà bản phát hành này render. Production: một release mỗi vùng (docs/runbooks/k8s-deploy.md mục 3).
+  installZones: [edge, pf, mkg, vault, data, iam, ops, pki]
+  # AG_RESIDENCY_ALLOWLIST (docs/runbooks/residency.md): DNS nội cụm + tên miền + dải nội bộ.
+  residencyAllowlist: "svc.cluster.local,single-label,agrigreen.example.vn,s3.example.vn,10.0.0.0/8"
+  otlpEndpoint: "otel-collector.{{ .Values.namespaces.ops }}.svc.{{ .Values.global.clusterDomain }}:4317"
+  timeZone: Asia/Ho_Chi_Minh
+  # Nhãn Pod Security Admission cho namespace ứng dụng.
+  podSecurityStandard: restricted
+
+# Mỗi vùng một namespace (R-81, ADR-0008). Đổi tên được nhưng kiểm thử luồng dùng tên mặc định.
+namespaces:
+  edge: agrigreen-edge-ingress   # Biên/DMZ: bộ điều khiển Ingress
+  pf: agrigreen-pf               # Ứng dụng — vùng nền tảng
+  mkg: agrigreen-mkg             # Ứng dụng — vùng nội bộ MKG (+ ingest, Biên OT vào đây)
+  vault: agrigreen-vault         # Định danh: identity-vault + cụm PostgreSQL vault riêng
+  data: agrigreen-data           # Dữ liệu: PostgreSQL pf/mkg/ts/iam, PgBouncer, RabbitMQ
+  iam: agrigreen-iam             # Định danh người dùng: Keycloak (chart riêng), chỉ NetworkPolicy ở đây
+  ops: agrigreen-ops             # Quản trị: Prometheus, Grafana, Argo CD, OTel Collector, sql_exporter
+  pki: agrigreen-pki             # CA thiết bị (step-ca + HSM), chỉ người vận hành qua VPN
+
+# Nhóm node theo vùng (deploy/iac/opentofu tạo node pool gắn nhãn agrigreen.vn/pool). Rỗng → không ràng buộc.
+scheduling:
+  nodeSelectorByZone:
+    edge: { agrigreen.vn/pool: edge }
+    pf: { agrigreen.vn/pool: app-pf }
+    mkg: { agrigreen.vn/pool: app-mkg }
+    vault: { agrigreen.vn/pool: identity }
+    data: { agrigreen.vn/pool: data }
+    ops: { agrigreen.vn/pool: ops }
+    pki: { agrigreen.vn/pool: identity }
+
+# Dải địa chỉ NGOÀI cụm. Tất cả "chờ chọn nhà cung cấp" (ADR-0007) — danh sách rỗng thì luồng
+# tương ứng không được mở (mặc định từ chối). values-prod đặt dải tài liệu RFC 5737 làm chỗ giữ.
+external:
+  internet: ["0.0.0.0/0"]  # chỉ dùng làm NGUỒN vào bộ điều khiển Ingress (Biên → DMZ)
+  objectStorage: []        # kho S3 trong lãnh thổ (tệp, manifest neo, sao lưu pgBackRest)
+  kms: []                  # KMS trong lãnh thổ (Định danh → KMS)
+  smtp: []                 # SMTP trong lãnh thổ (email tóm tắt, báo cáo)
+  pushNonPII: []           # FCM data-only (ngoài lãnh thổ, chỉ dữ liệu không định danh, ADR-0015) — tắt
+  otVpn: []                # vùng Biên OT qua VPN (agent cân → ingest, mục 14/17)
+  adminVpn: []             # VPN quản trị + MFA (Quản trị)
+  kubeAPI: []              # địa chỉ API server (CNPG, RabbitMQ peer discovery)
+  hsm: []                  # HSM mạng của CA thiết bị
+  nodes: []                # dải node (Prometheus thu kubelet/node-exporter)
+  gitRepo: []              # kho mã GitOps trong lãnh thổ (Argo CD)
+ports:
+  ingressController: [8000, 8443]   # cổng container của bộ điều khiển Ingress (Traefik: web/websecure)
+  kubeAPI: [443, 6443]
+  smtp: [587, 465]
+  hsm: [1792]                       # chờ chọn HSM
+
+# Nhãn của Pod không do chart này tạo (operator, chart khác). Kiểm thử luồng dùng đúng các nhãn này.
+systemSelectors:
+  dns: { namespace: kube-system, pods: { k8s-app: kube-dns } }
+  cnpgOperator: { namespace: cnpg-system, pods: { app.kubernetes.io/name: cloudnative-pg } }
+  ingressController: { zone: edge, pods: { app.kubernetes.io/name: traefik } }
+  keycloak: { zone: iam, pods: { app.kubernetes.io/name: keycloak } }
+  prometheus: { zone: ops, pods: { app.kubernetes.io/name: prometheus } }
+  rabbitmq: { zone: data, pods: { app.kubernetes.io/name: rabbitmq } }
+
+# ---------------------------------------------------------------- PostgreSQL (CloudNativePG, Apache-2.0)
+postgres:
+  enabled: true
+  # Ảnh CNPG + PostGIS + pgRouting (deploy/k8s/images/postgres-cnpg/Dockerfile).
+  image: "{{ .Values.global.imageRegistry }}/cnpg-postgis-pgrouting:17-3.5"
+  instances: 3
+  storageClass: ""          # chờ chọn nhà cung cấp (lớp lưu trữ mã hóa, tách logic — R-82)
+  parameters:
+    max_connections: "300"
+    max_locks_per_transaction: "256"   # giữ như Compose/CI (g3-common)
+    wal_level: logical                 # mục 15 (engine đồng bộ, chờ 23.1)
+    pg_stat_statements.max: "10000"
+    timezone: UTC
+  pooler:
+    instances: 2
+    poolMode: transaction   # R-30: ngữ cảnh tenant chỉ SET LOCAL
+    parameters:
+      max_client_conn: "1000"
+      default_pool_size: "20"
+      max_prepared_statements: "0"
+      ignore_startup_parameters: "extra_float_digits,application_name,timezone"
+      server_reset_query: ""
+  backup:
+    # pgBackRest (MIT) qua plugin CNPG-I của Dalibo (Apache-2.0) — mục 22: full tuần, diff ngày, WAL liên tục.
+    enabled: true
+    pluginName: pgbackrest.dalibo.com
+    s3:
+      endpoint: s3.example.vn     # kho sao lưu trong lãnh thổ có khóa đối tượng — chờ chọn nhà cung cấp
+      region: vn-south-1
+      bucket: agrigreen-pg-backup
+      # Kho định danh: bucket RIÊNG, khóa RIÊNG (mục 22).
+      bucketByCluster: { vault: agrigreen-vault-backup }
+      uriStyle: path
+      verifyTLS: true
+    retentionFull: 4
+    fullSchedule: "0 0 1 * * 0"     # CNPG ScheduledBackup: cron 6 trường (giây) — CN 01:00 UTC
+    diffSchedule: "0 0 1 * * 1-6"
+  # Mỗi cụm logic (migrations.Cluster) là MỘT cụm PostgreSQL riêng ở ĐTK 2 (mục 5: "hai sổ,
+  # tách vật lý"; vault "cụm riêng"). storage theo cụm.
+  clusters:
+    pf:    { zone: data,  storage: 200Gi, walStorage: 50Gi, cpu: "2", memory: 8Gi, database: ag_pf }
+    mkg:   { zone: data,  storage: 100Gi, walStorage: 30Gi, cpu: "2", memory: 8Gi, database: ag_mkg }
+    ts:    { zone: data,  storage: 500Gi, walStorage: 50Gi, cpu: "2", memory: 8Gi, database: ag_ts }
+    vault: { zone: vault, storage: 50Gi,  walStorage: 20Gi, cpu: "1", memory: 4Gi, database: ag_vault }
+    # Keycloak (Định danh người dùng) — không có migration của repo, không chạy dbadmin.
+    iam:   { zone: data,  storage: 20Gi,  walStorage: 10Gi, cpu: "1", memory: 2Gi, database: keycloak, keycloak: true }
+
+# Job DB: bootstrap (vai + database, bằng superuser của cụm), migrate up + verify (ag_migrator).
+dbJobs:
+  image: { repository: migrate }
+  # Cụm chạy migration của repo và vùng đặt Job (Job đặt cùng namespace với cụm).
+  clusters: [pf, mkg, ts, vault]
+  backoffLimit: 2
+  activeDeadlineSeconds: 1800
+
+# CronJob vận hành (docs/runbooks/README.md). Vùng pf: lịch trong worker (anchor, idempotency).
+cronJobs:
+  maintain:        { schedule: "0 2 1 * *", clusters: [pf, mkg, ts, vault] }   # migrate maintain — ag_migrator
+  verifyChains:    { schedule: "0 3 * * 0", clusters: [pf, mkg, ts, vault] }   # migrate verify-chains — ag_migrator
+  # Neo + dọn idempotency cho cụm KHÔNG thuộc worker nền tảng (worker chạy AG_CLUSTERS=pf).
+  anchor:          { schedule: "30 0 * * *", groups: { mkg: [mkg, ts], vault: [vault] } }
+  purgeIdempotency: { schedule: "5 * * * *", groups: { mkg: [mkg, ts], vault: [vault] } }
+
+# ---------------------------------------------------------------- RabbitMQ (Cluster + Topology Operator, MPL-2.0)
+rabbitmq:
+  enabled: true
+  name: rabbitmq
+  replicas: 3
+  image: rabbitmq:4.1-management
+  storage: 20Gi
+  # Người dùng theo dịch vụ. Chỉ tài khoản vùng mkg có quyền trên mkg.internal (ADR-0018).
+  # secret: Secret trong namespace data (username/password) do External Secrets tạo.
+  vhosts:
+    platform: { name: "/", description: "Sự kiện nền tảng + van công bố" }
+    internal: { name: "mkg.internal", description: "Sự kiện nội bộ MKG (ADR-0018)" }
+  users:
+    pf-outbox:
+      zone: pf
+      permissions:
+        - { vhost: platform, configure: '^(ag\.events|ag\.dlx|pf\..*)$', write: '^(ag\.events|ag\.dlx|pf\..*)$', read: '^(ag\.events|ag\.dlx)$' }
+    pf-worker:
+      zone: pf
+      permissions:
+        - { vhost: platform, configure: '^(ag\.events|ag\.dlx|pf\..*)$', write: '^(ag\.events|ag\.dlx|pf\..*)$', read: '^(ag\.events|ag\.dlx|pf\..*)$' }
+    pf-optimizer:
+      zone: pf
+      permissions:
+        - { vhost: platform, configure: '^(ag\.events|ag\.dlx|pf\.simulation\..*)$', write: '^(ag\.events|ag\.dlx|pf\.simulation\..*)$', read: '^(ag\.events|ag\.dlx|pf\.simulation\..*)$' }
+    pf-monitor:
+      zone: pf
+      tags: [monitoring]   # management API: độ sâu DLQ (api-platform, worker)
+      permissions:
+        - { vhost: platform, configure: '^$', write: '^$', read: '^$' }
+    mkg-outbox:
+      zone: mkg
+      permissions:
+        - { vhost: internal, configure: '.*', write: '.*', read: '.*' }
+        # Van công bố: chỉ khai báo exchange và phát lên ag.events của vhost nền tảng.
+        - { vhost: platform, configure: '^(ag\.events|ag\.dlx)$', write: '^ag\.events$', read: '^$' }
+    mkg-worker-internal:
+      zone: mkg
+      permissions:
+        - { vhost: internal, configure: '.*', write: '.*', read: '.*' }
+
+# ---------------------------------------------------------------- Ứng dụng
+# probes: dùng đúng endpoint của mã (cmd/*): /healthz (sống), /readyz (mọi pool ping được).
+# worker, outbox-publisher, optimizer CHƯA có endpoint sức khỏe → không probe HTTP (mục mở).
+common:
+  pgbouncerUrl: "postgres://pg-%s-pooler.{{ .Values.namespaces.data }}.svc.{{ .Values.global.clusterDomain }}:5432/?sslmode=require"
+  s3:
+    endpoint: s3.example.vn            # chờ chọn nhà cung cấp (RB-7)
+    bucket: agrigreen-objects
+    useTLS: "true"
+  oidc:
+    issuer: "https://auth.{{ .Values.global.domain }}/realms/agrigreen"
+    audience: agrigreen-api
+    jwksUrl: "http://keycloak.{{ .Values.namespaces.iam }}.svc.{{ .Values.global.clusterDomain }}:8080/realms/agrigreen/protocol/openid-connect/certs"
+    adminUrl: "http://keycloak.{{ .Values.namespaces.iam }}.svc.{{ .Values.global.clusterDomain }}:8080"
+    tokenUrl: "http://keycloak.{{ .Values.namespaces.iam }}.svc.{{ .Values.global.clusterDomain }}:8080/realms/agrigreen/protocol/openid-connect/token"
+  resources:
+    small:  { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: 500m, memory: 256Mi } }
+    medium: { requests: { cpu: 250m, memory: 256Mi }, limits: { cpu: "1", memory: 512Mi } }
+    large:  { requests: { cpu: 500m, memory: 512Mi }, limits: { cpu: "2", memory: 1Gi } }
+
+apps:
+  # ============================ vùng nền tảng (agrigreen-pf)
+  api-platform:
+    zone: pf
+    image: { repository: api-platform }
+    replicas: 3
+    size: large
+    ports: { http: 8080, admin: 8082, internal: 8084 }
+    services:
+      - { name: api-platform, ports: [http, admin] }
+      - { name: api-platform-internal, ports: [internal] }   # Internal API mTLS — chỉ optimizer
+    probes: { readiness: { path: /readyz, port: http }, liveness: { path: /healthz, port: http } }
+    env:
+      AG_HTTP_ADDR: ":8080"
+      AG_ADMIN_HTTP_ADDR: ":8082"
+      AG_INTERNAL_HTTP_ADDR: ":8084"
+      AG_INTERNAL_TLS_CERT: /certs/internal/tls.crt
+      AG_INTERNAL_TLS_KEY: /certs/internal/tls.key
+      AG_INTERNAL_CLIENT_CA: /certs/service-ca/ca.crt   # bó CA dịch vụ (trust-manager) — thay CA không gián đoạn
+      AG_INTERNAL_CLIENT_NAMES: optimizer
+      AG_PF_DB_URL: "pooler:pf"
+      AG_DB_VIA_PGBOUNCER: "1"
+      AG_OIDC_ISSUER: "{{ .Values.common.oidc.issuer }}"
+      AG_OIDC_AUDIENCE: "{{ .Values.common.oidc.audience }}"
+      AG_OIDC_JWKS_URL: "{{ .Values.common.oidc.jwksUrl }}"
+      AG_KC_ADMIN_URL: "{{ .Values.common.oidc.adminUrl }}"
+      AG_KC_REALM: agrigreen
+      AG_KC_CLIENT_ID: agrigreen-accounts
+      AG_KC_ACTIONS_CLIENT_ID: agrigreen-web-ops
+      AG_KC_ACTIONS_REDIRECT_URI: "https://ops.{{ .Values.global.domain }}/"
+      AG_S3_ENDPOINT: "{{ .Values.common.s3.endpoint }}"
+      AG_S3_BUCKET: "{{ .Values.common.s3.bucket }}"
+      AG_S3_USE_TLS: "{{ .Values.common.s3.useTLS }}"
+      AG_VAULT_URL: "https://identity-vault.{{ .Values.namespaces.vault }}.svc.{{ .Values.global.clusterDomain }}:8090"
+      AG_VAULT_CA: /certs/service-ca/ca.crt
+      AG_VAULT_CLIENT_CERT: /certs/vault-client/tls.crt
+      AG_VAULT_CLIENT_KEY: /certs/vault-client/tls.key
+      AG_CORS_ORIGINS: "https://ops.{{ .Values.global.domain }}"
+    envFromSecrets: [pf-db-roles]
+    secretEnv:
+      - { name: AG_SYNC_CURSOR_KEY, secret: pf-app, key: AG_SYNC_CURSOR_KEY }
+      - { name: AG_KC_CLIENT_SECRET, secret: pf-app, key: AG_KC_CLIENT_SECRET }
+      - { name: AG_S3_ACCESS_KEY, secret: pf-s3, key: AG_S3_ACCESS_KEY }
+      - { name: AG_S3_SECRET_KEY, secret: pf-s3, key: AG_S3_SECRET_KEY }
+      - { name: AG_RABBITMQ_MGMT_URL, secret: amqp-pf-monitor, key: url }
+    certs:
+      - { secret: api-platform-internal-tls, mountPath: /certs/internal }
+      - { secret: api-platform-vault-client-tls, mountPath: /certs/vault-client }
+    configMaps:
+      - { configMap: agrigreen-service-ca, mountPath: /certs/service-ca }
+    pdb: { minAvailable: 2 }
+    hpa: { enabled: true, minReplicas: 3, maxReplicas: 12, cpu: 70 }
+
+  worker:
+    zone: pf
+    image: { repository: worker }
+    replicas: 2   # nhiều bản an toàn: lịch chỉ chạy ở leader (khóa 727101)
+    size: medium
+    env:
+      AG_DB_URL: "pooler:pf"
+      AG_DB_VIA_PGBOUNCER: "1"
+      AG_DB_DIRECT_URL: "direct:pf"
+      AG_CLUSTERS: pf   # neo/dọn idempotency chỉ cụm pf; mkg/ts/vault: CronJob của vùng đó
+      AG_ANCHOR_KEY_ID: "{{ .Values.global.env }}-pf-1"   # cùng mẫu với CronJob anchor-<vùng>
+      AG_S3_ENDPOINT: "{{ .Values.common.s3.endpoint }}"
+      AG_S3_BUCKET: "{{ .Values.common.s3.bucket }}"
+      AG_S3_USE_TLS: "{{ .Values.common.s3.useTLS }}"
+      AG_KC_ADMIN_URL: "{{ .Values.common.oidc.adminUrl }}"
+      AG_KC_REALM: agrigreen
+      AG_KC_CLIENT_ID: agrigreen-accounts
+      AG_WEB_OPS_URL: "https://ops.{{ .Values.global.domain }}"
+    envFromSecrets: [pf-db-roles, pf-db-outbox]
+    secretEnv:
+      - { name: AG_AMQP_URL, secret: amqp-pf-worker, key: url }
+      - { name: AG_RABBITMQ_MGMT_URL, secret: amqp-pf-monitor, key: url }
+      - { name: AG_ANCHOR_SIGNING_KEY, secret: pf-anchor, key: AG_ANCHOR_SIGNING_KEY }
+      - { name: AG_KC_CLIENT_SECRET, secret: pf-app, key: AG_KC_CLIENT_SECRET }
+      - { name: AG_S3_ACCESS_KEY, secret: pf-s3, key: AG_S3_ACCESS_KEY }
+      - { name: AG_S3_SECRET_KEY, secret: pf-s3, key: AG_S3_SECRET_KEY }
+    pdb: { minAvailable: 1 }
+
+  outbox-publisher-pf:
+    zone: pf
+    image: { repository: outbox-publisher }
+    replicas: 2   # FOR UPDATE SKIP LOCKED — nhiều bản an toàn
+    size: small
+    env:
+      AG_DB_URL: "direct:pf"
+      AG_CLUSTERS: pf
+    envFromSecrets: [pf-db-outbox]
+    secretEnv:
+      - { name: AG_AMQP_URL, secret: amqp-pf-outbox, key: url }
+    pdb: { minAvailable: 1 }
+
+  optimizer:
+    zone: pf
+    image: { repository: optimizer }
+    args: [consume]
+    replicas: 2
+    size: large
+    runAsUser: 10001
+    goService: false
+    env:
+      AG_OPTIMIZER_QUEUE: pf.simulation.optimizer
+      AG_INTERNAL_API_URL: "https://api-platform-internal.{{ .Values.namespaces.pf }}.svc.{{ .Values.global.clusterDomain }}:8084"
+      AG_OPTIMIZER_CLIENT_CERT: /certs/client/tls.crt
+      AG_OPTIMIZER_CLIENT_KEY: /certs/client/tls.key
+      AG_INTERNAL_CA: /certs/service-ca/ca.crt
+    secretEnv:
+      - { name: AG_AMQP_URL, secret: amqp-pf-optimizer, key: url }
+    certs:
+      - { secret: optimizer-client-tls, mountPath: /certs/client }
+    configMaps:
+      - { configMap: agrigreen-service-ca, mountPath: /certs/service-ca }
+    pdb: { minAvailable: 1 }
+
+  web-ops:
+    zone: pf
+    image: { repository: web-ops }
+    replicas: 2
+    size: medium
+    runAsUser: 1000
+    goService: false
+    ports: { http: 3000 }
+    services: [{ name: web-ops, ports: [http] }]
+    probes: { readiness: { path: /login, port: http }, liveness: { path: /login, port: http } }
+    # NEXT_PUBLIC_* nhúng lúc build image (apps/web-ops/Dockerfile) — build theo môi trường.
+    env:
+      NEXT_PUBLIC_API_BASE_URL: "https://api.{{ .Values.global.domain }}"
+      NEXT_PUBLIC_ADMIN_API_BASE: "https://admin.{{ .Values.global.domain }}"
+      NEXT_PUBLIC_OIDC_ISSUER: "{{ .Values.common.oidc.issuer }}"
+      NEXT_PUBLIC_OIDC_CLIENT_ID: agrigreen-web-ops
+      NEXT_PUBLIC_API_MOCK: "0"
+    tmpDirs: [/tmp, /app/.next/cache]
+    pdb: { minAvailable: 1 }
+
+  # ============================ vùng nội bộ MKG (agrigreen-mkg)
+  api-internal:
+    zone: mkg
+    image: { repository: api-internal }
+    replicas: 2
+    size: medium
+    ports: { http: 8081, admin: 8083 }
+    services: [{ name: api-internal, ports: [http, admin] }]
+    probes: { readiness: { path: /readyz, port: http }, liveness: { path: /healthz, port: http } }
+    env:
+      AG_HTTP_ADDR: ":8081"
+      AG_ADMIN_HTTP_ADDR: ":8083"
+      AG_MKG_DB_URL: "pooler:mkg"
+      AG_MKG_DB_DIRECT_URL: "direct:mkg"   # leader job hub_capacity_daily (khóa mức phiên)
+      AG_DB_VIA_PGBOUNCER: "1"
+      AG_OIDC_ISSUER: "{{ .Values.common.oidc.issuer }}"
+      AG_OIDC_AUDIENCE: "{{ .Values.common.oidc.audience }}"
+      AG_OIDC_JWKS_URL: "{{ .Values.common.oidc.jwksUrl }}"
+      AG_CORS_ORIGINS: "https://mkg.{{ .Values.global.domain }}"
+      # ADR-0020: MKG đọc nền tảng CHỈ qua Application API công khai (/v1/partner/*), đi qua Biên/DMZ.
+      AG_PLATFORM_API_URL: "https://api.{{ .Values.global.domain }}"
+      AG_PLATFORM_TOKEN_URL: "{{ .Values.common.oidc.tokenUrl }}"
+      AG_MKG_SA_CLIENT_ID: agrigreen-mkg-sync
+      AG_MKG_TENANT_ID: ""           # tenant MKG — đặt theo môi trường
+      AG_PARTNER_GRANTOR_TENANT: ""  # tenant chương trình đã duyệt cấp quyền chia sẻ
+    envFromSecrets: [mkg-db-roles, mkg-db-outbox]
+    secretEnv:
+      - { name: AG_MKG_SA_CLIENT_SECRET, secret: mkg-app, key: AG_MKG_SA_CLIENT_SECRET }
+      - { name: AG_FIELDOPS_CURSOR_KEY, secret: mkg-app, key: AG_FIELDOPS_CURSOR_KEY }
+    pdb: { minAvailable: 1 }
+
+  worker-internal:
+    zone: mkg
+    image: { repository: worker-internal }
+    replicas: 2
+    size: medium
+    ports: { health: 8086 }
+    probes: { readiness: { path: /readyz, port: health }, liveness: { path: /healthz, port: health } }
+    env:
+      AG_MKG_DB_URL: "pooler:mkg"
+      AG_DB_VIA_PGBOUNCER: "1"
+      AG_HEALTH_ADDR: ":8086"
+    envFromSecrets: [mkg-db-roles]
+    secretEnv:
+      - { name: AG_AMQP_INTERNAL_URL, secret: amqp-mkg-worker-internal, key: url }
+    pdb: { minAvailable: 1 }
+
+  outbox-publisher-mkg:
+    zone: mkg
+    image: { repository: outbox-publisher }
+    replicas: 2
+    size: small
+    env:
+      AG_DB_URL: "direct:mkg"
+      AG_MKG_DB_URL: "direct:mkg"
+      AG_TS_DB_URL: "direct:ts"
+      AG_CLUSTERS: "mkg,ts"
+    envFromSecrets: [mkg-db-outbox]
+    secretEnv:
+      - { name: AG_AMQP_URL, secret: amqp-mkg-outbox, key: platform-url }        # van → vhost "/"
+      - { name: AG_AMQP_INTERNAL_URL, secret: amqp-mkg-outbox, key: internal-url } # vhost mkg.internal
+    pdb: { minAvailable: 1 }
+
+  ingest:
+    zone: mkg
+    image: { repository: ingest }
+    replicas: 3
+    size: medium
+    ports: { health: 8091, batches: 8443 }
+    services:
+      - { name: ingest, ports: [health] }
+      # Nhận lô mTLS từ vùng Biên OT qua VPN — LoadBalancer nội bộ, nguồn chỉ dải otVpn.
+      - { name: ingest-ot, ports: [batches], type: LoadBalancer, sourceRangesFrom: otVpn }
+    probes: { readiness: { path: /readyz, port: health }, liveness: { path: /healthz, port: health } }
+    env:
+      AG_HTTP_ADDR: ":8091"
+      AG_INGEST_HTTP_ADDR: ":8443"
+      AG_INGEST_TLS_CERT: /certs/server/tls.crt
+      AG_INGEST_TLS_KEY: /certs/server/tls.key
+      AG_INGEST_CLIENT_CA: /certs/device-ca/ca.crt   # CHỈ CA thiết bị (device-pki.md)
+      AG_INGEST_REQUIRE_DEVICE_CA: "1"
+      AG_TS_DB_URL: "pooler:ts"
+      AG_MKG_DB_URL: "pooler:mkg"
+      AG_DB_VIA_PGBOUNCER: "1"
+      AG_INGEST_INTEGRATE_INTERVAL: 15s
+    envFromSecrets: [mkg-db-roles, ts-db-roles]
+    certs:
+      - { secret: ingest-server-tls, mountPath: /certs/server }
+    configMaps:
+      - { configMap: agrigreen-device-ca, mountPath: /certs/device-ca }
+    pdb: { minAvailable: 2 }
+    hpa: { enabled: true, minReplicas: 3, maxReplicas: 10, cpu: 70 }
+
+  web-internal:
+    zone: mkg
+    image: { repository: web-internal }
+    replicas: 2
+    size: medium
+    runAsUser: 1000
+    goService: false
+    ports: { http: 3001 }
+    services: [{ name: web-internal, ports: [http] }]
+    probes: { readiness: { path: /login, port: http }, liveness: { path: /login, port: http } }
+    env:
+      NEXT_PUBLIC_API_BASE_URL: "https://mkg-api.{{ .Values.global.domain }}"
+      NEXT_PUBLIC_ADMIN_API_BASE: "https://mkg-admin.{{ .Values.global.domain }}"
+      NEXT_PUBLIC_OIDC_ISSUER: "{{ .Values.common.oidc.issuer }}"
+      NEXT_PUBLIC_OIDC_CLIENT_ID: agrigreen-web-internal
+      NEXT_PUBLIC_API_MOCK: "0"
+    tmpDirs: [/tmp, /app/.next/cache]
+    pdb: { minAvailable: 1 }
+
+  # ============================ vùng Định danh (agrigreen-vault)
+  identity-vault:
+    zone: vault
+    image: { repository: identity-vault }
+    replicas: 3
+    size: medium
+    ports: { https: 8090 }
+    services: [{ name: identity-vault, ports: [https] }]
+    # mTLS bắt buộc chứng thư client (RequireAndVerifyClientCert) → kubelet không gọi HTTPS được: tcpSocket.
+    probes: { readiness: { tcp: https }, liveness: { tcp: https } }
+    env:
+      AG_HTTP_ADDR: ":8090"
+      AG_TLS_CERT: /certs/tls/tls.crt
+      AG_TLS_KEY: /certs/tls/tls.key
+      AG_TLS_CLIENT_CA: /certs/service-ca/ca.crt
+      AG_VAULT_DB_URL: "pooler:vault"
+      AG_DB_VIA_PGBOUNCER: "1"
+      AG_VAULT_KEK_ID: prod-kek-1
+      AG_OIDC_ISSUER: "{{ .Values.common.oidc.issuer }}"
+      AG_OIDC_AUDIENCE: "{{ .Values.common.oidc.audience }}"
+      AG_OIDC_JWKS_URL: "{{ .Values.common.oidc.jwksUrl }}"
+    envFromSecrets: [vault-db-roles]
+    secretEnv:
+      - { name: AG_VAULT_KEK, secret: vault-keys, key: AG_VAULT_KEK }
+      - { name: AG_VAULT_BLIND_KEY, secret: vault-keys, key: AG_VAULT_BLIND_KEY }
+    certs:
+      - { secret: identity-vault-tls, mountPath: /certs/tls }
+    configMaps:
+      - { configMap: agrigreen-service-ca, mountPath: /certs/service-ca }
+    pdb: { minAvailable: 2 }
+
+  # ============================ Quản trị (agrigreen-ops): chỉ phần của AgriGreen
+  otel-collector:
+    zone: ops
+    image: { repository: otel/opentelemetry-collector-contrib, tag: "0.128.0", external: true }
+    args: ["--config=/etc/otelcol/config.yaml"]
+    replicas: 2
+    size: medium
+    runAsUser: 10001
+    goService: false
+    ports: { otlp: 4317, otlphttp: 4318, metrics: 8889, health: 13133 }
+    services: [{ name: otel-collector, ports: [otlp, otlphttp, metrics] }]
+    probes: { readiness: { path: /, port: health }, liveness: { path: /, port: health } }
+    configMaps:
+      - { configMap: otel-collector-config, mountPath: /etc/otelcol }
+    pdb: { minAvailable: 1 }
+
+  sql-exporter:
+    zone: ops
+    image: { repository: burningalchemist/sql_exporter, tag: "0.17.1", external: true }
+    args: ["-config.file=/etc/sql_exporter/config/sql_exporter.yml"]
+    replicas: 1
+    size: small
+    runAsUser: 65534
+    goService: false
+    ports: { metrics: 9399 }
+    services: [{ name: sql-exporter, ports: [metrics] }]
+    probes: { readiness: { path: /healthz, port: metrics }, liveness: { path: /healthz, port: metrics } }
+    # Cấu hình có DSN (mật khẩu mkg_monitor/ts_monitor) → Secret; collector (không bí mật) → ConfigMap.
+    certs:
+      - { secret: sql-exporter-config, mountPath: /etc/sql_exporter/config }
+    configMaps:
+      - { configMap: sql-exporter-collectors, mountPath: /etc/sql_exporter/collectors }
+
+# ---------------------------------------------------------------- Biên/DMZ: Ingress
+ingress:
+  enabled: true
+  className: traefik
+  annotations: {}
+  # TLS công khai: chứng thư từ CA trong lãnh thổ (chờ chọn), secret do cert-manager/External Secrets tạo.
+  tlsSecret: agrigreen-public-tls
+  hosts:
+    - { host: "api.{{ .Values.global.domain }}", zone: pf, service: api-platform, port: 8080 }
+    - { host: "admin.{{ .Values.global.domain }}", zone: pf, service: api-platform, port: 8082 }
+    - { host: "ops.{{ .Values.global.domain }}", zone: pf, service: web-ops, port: 3000 }
+    - { host: "mkg-api.{{ .Values.global.domain }}", zone: mkg, service: api-internal, port: 8081 }
+    - { host: "mkg-admin.{{ .Values.global.domain }}", zone: mkg, service: api-internal, port: 8083 }
+    - { host: "mkg.{{ .Values.global.domain }}", zone: mkg, service: web-internal, port: 3001 }
+    - { host: "auth.{{ .Values.global.domain }}", zone: iam, service: keycloak, port: 8080 }
+
+# ---------------------------------------------------------------- PKI (ADR-0019 + mTLS dịch vụ)
+pki:
+  enabled: true
+  # CA dịch vụ: CA trung gian (khóa trong Secret agrigreen-service-ca của namespace cert-manager,
+  # đồng bộ từ kho bí mật trong lãnh thổ; CA gốc ngoại tuyến). ClusterIssuer kiểu CA của cert-manager.
+  serviceIssuer: agrigreen-service-ca
+  # true trong lúc xoay vòng CA dịch vụ: bó tin cậy gồm thêm ConfigMap agrigreen-service-ca-extra.
+  serviceCAExtraSource: false
+  certManagerNamespace: cert-manager
+  serviceCertDuration: 2160h    # 90 ngày
+  serviceCertRenewBefore: 720h  # gia hạn trước 30 ngày; Reloader khởi động lại Pod khi Secret đổi
+  serviceCertificates:
+    - { name: api-platform-internal-tls, zone: pf, commonName: api-platform, usages: [server auth], dnsService: api-platform-internal }
+    - { name: api-platform-vault-client-tls, zone: pf, commonName: api-platform, usages: [client auth] }
+    - { name: optimizer-client-tls, zone: pf, commonName: optimizer, usages: [client auth] }
+    - { name: identity-vault-tls, zone: vault, commonName: identity-vault, usages: [server auth], dnsService: identity-vault }
+    - { name: ingest-server-tls, zone: mkg, commonName: ingest, usages: [server auth], dnsService: ingest-ot, extraDNS: ["ingest.ot.{{ .Values.global.domain }}"] }
+  # CA thiết bị: KHÁC CA dịch vụ (device-pki.md). step-ca (Apache-2.0) với khóa trong HSM (PKCS#11),
+  # chỉ người vận hành ký CSR của thiết bị qua VPN quản trị. Chứng thư CA công khai phân phối bằng
+  # trust-manager tới agrigreen-mkg (ingest) dưới tên ConfigMap agrigreen-device-ca.
+  deviceCA:
+    enabled: true
+    image: smallstep/step-ca:0.28.4
+    # PEM công khai của CA trung gian + gốc thiết bị (không phải bí mật) — đặt theo môi trường.
+    bundlePEM: ""
+    hsm:
+      # URI PKCS#11 — chờ chọn HSM. Mã PIN từ Secret step-ca-hsm-pin (External Secrets).
+      kmsUri: "pkcs11:module-path=/usr/lib/pkcs11/libhsm.so;token=agrigreen-device-ca"
+      keyUri: "pkcs11:id=7331;object=agrigreen-device-intermediate"
+    maxCertDuration: 19800h   # 825 ngày (device-pki.md mục 4)
+    defaultCertDuration: 8760h
+
+# ---------------------------------------------------------------- Bí mật (External Secrets Operator, Apache-2.0)
+externalSecrets:
+  enabled: true
+  # ClusterSecretStore trỏ tới kho bí mật TRONG LÃNH THỔ (OpenBao/Vault tự vận hành hoặc dịch vụ
+  # của nhà cung cấp trong nước) — chờ chọn. Chart không tạo store.
+  store: agrigreen-vn-secrets
+  refreshInterval: 1h
+  # Tiền tố khóa ở kho: <prefix>/<tên secret>. Mỗi secret CHỈ tồn tại trong namespace của vùng nó.
+  remotePrefix: agrigreen/prod
+  # vùng → secret: { remote: đường dẫn ở kho (sau remotePrefix), keys: [...], keyRemotes: {KHÓA: đường dẫn khác},
+  # type }. Mỗi secret CHỈ tồn tại trong namespace của vùng nó: Pod vùng mkg không thể gắn secret
+  # của vùng pf và ngược lại (Secret có phạm vi namespace; kiểm thêm ở deploy/k8s/tests/check_flows.py).
+  # Cùng "remote" ở hai vùng (vd db/pf ở pf và data) = cùng mật khẩu vai, một nguồn.
+  secrets:
+    pf:
+      pf-db-roles: { remote: db/pf, keys: [AG_DB_PASSWORD_PLATFORM_API, AG_DB_PASSWORD_WORKER_PLATFORM, AG_DB_PASSWORD_PARTY_APP, AG_DB_PASSWORD_MASTERDATA_APP, AG_DB_PASSWORD_GEO_APP, AG_DB_PASSWORD_EXTENSION_APP, AG_DB_PASSWORD_CONTENT_APP, AG_DB_PASSWORD_MECHANIZATION_APP, AG_DB_PASSWORD_MRV_APP, AG_DB_PASSWORD_SYNC_APP, AG_DB_PASSWORD_ACCOUNTS_APP, AG_DB_PASSWORD_NOTIFY_APP, AG_DB_PASSWORD_REPORTS_APP, AG_DB_PASSWORD_CROPCYCLE_APP, AG_DB_PASSWORD_WATERWAY_APP, AG_DB_PASSWORD_SIMULATION_APP, AG_DB_PASSWORD_METRICS_APP] }
+      pf-db-outbox: { remote: db/pf, keys: [AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER] }
+      pf-app: { remote: app/pf, keys: [AG_SYNC_CURSOR_KEY, AG_KC_CLIENT_SECRET] }
+      pf-s3: { remote: s3/pf, keys: [AG_S3_ACCESS_KEY, AG_S3_SECRET_KEY] }
+      pf-anchor: { remote: anchor/pf, keys: [AG_ANCHOR_SIGNING_KEY] }
+      agrigreen-public-tls: { remote: tls/public, keys: [tls.crt, tls.key], type: kubernetes.io/tls }
+    mkg:
+      mkg-db-roles: { remote: db/mkg, keys: [AG_DB_PASSWORD_MKG_API, AG_DB_PASSWORD_FIELDOPS_APP, AG_DB_PASSWORD_HUB_APP, AG_DB_PASSWORD_MEASUREMENT_APP, AG_DB_PASSWORD_INGEST_MKG, AG_DB_PASSWORD_WORKER_INTERNAL] }
+      ts-db-roles: { remote: db/ts, keys: [AG_DB_PASSWORD_INGEST_TS, AG_DB_PASSWORD_TS_READER] }
+      # ag_outbox_publisher của cụm mkg VÀ ts: cùng biến môi trường → cùng mật khẩu trong vùng mkg.
+      mkg-db-outbox: { remote: db/mkg, keys: [AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER] }
+      mkg-app: { remote: app/mkg, keys: [AG_MKG_SA_CLIENT_SECRET, AG_FIELDOPS_CURSOR_KEY] }
+      mkg-s3: { remote: s3/mkg, keys: [AG_S3_ACCESS_KEY, AG_S3_SECRET_KEY] }
+      mkg-anchor: { remote: anchor/mkg, keys: [AG_ANCHOR_SIGNING_KEY] }
+      agrigreen-public-tls: { remote: tls/public, keys: [tls.crt, tls.key], type: kubernetes.io/tls }
+    vault:
+      vault-db-roles: { remote: db/vault, keys: [AG_DB_PASSWORD_VAULT_APP] }
+      vault-db-outbox: { remote: db/vault, keys: [AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER] }
+      vault-keys: { remote: app/vault, keys: [AG_VAULT_KEK, AG_VAULT_BLIND_KEY] }
+      vault-s3: { remote: s3/vault, keys: [AG_S3_ACCESS_KEY, AG_S3_SECRET_KEY] }
+      vault-anchor: { remote: anchor/vault, keys: [AG_ANCHOR_SIGNING_KEY] }
+      # Mọi vai của cụm vault cho Job bootstrap/migrate.
+      pg-vault-roles: { remote: db/vault, keys: [AG_DB_PASSWORD_AG_MIGRATOR, AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER, AG_DB_PASSWORD_VAULT_APP] }
+      db-bootstrap-foreign: { remote: db/foreign-vault, keys: [AG_DB_APP_PASSWORD] }
+      # Sao lưu vault: bucket và khóa RIÊNG (mục 22).
+      pg-backup-s3: { remote: backup/vault, keys: [ACCESS_KEY_ID, ACCESS_SECRET_KEY] }
+    data:
+      # Vai của từng cụm cho Job bootstrap/migrate — cùng nguồn với secret của vùng ứng dụng.
+      pg-pf-roles: { remote: db/pf, keys: [AG_DB_PASSWORD_AG_MIGRATOR, AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER, AG_DB_PASSWORD_PLATFORM_API, AG_DB_PASSWORD_WORKER_PLATFORM, AG_DB_PASSWORD_PARTY_APP, AG_DB_PASSWORD_MASTERDATA_APP, AG_DB_PASSWORD_GEO_APP, AG_DB_PASSWORD_EXTENSION_APP, AG_DB_PASSWORD_CONTENT_APP, AG_DB_PASSWORD_MECHANIZATION_APP, AG_DB_PASSWORD_MRV_APP, AG_DB_PASSWORD_SYNC_APP, AG_DB_PASSWORD_ACCOUNTS_APP, AG_DB_PASSWORD_NOTIFY_APP, AG_DB_PASSWORD_REPORTS_APP, AG_DB_PASSWORD_CROPCYCLE_APP, AG_DB_PASSWORD_WATERWAY_APP, AG_DB_PASSWORD_SIMULATION_APP, AG_DB_PASSWORD_METRICS_APP] }
+      pg-mkg-roles: { remote: db/mkg, keys: [AG_DB_PASSWORD_AG_MIGRATOR, AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER, AG_DB_PASSWORD_MKG_API, AG_DB_PASSWORD_FIELDOPS_APP, AG_DB_PASSWORD_HUB_APP, AG_DB_PASSWORD_MEASUREMENT_APP, AG_DB_PASSWORD_INGEST_MKG, AG_DB_PASSWORD_WORKER_INTERNAL, AG_DB_PASSWORD_MKG_MONITOR] }
+      pg-ts-roles:
+        remote: db/ts
+        keys: [AG_DB_PASSWORD_AG_MIGRATOR, AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER, AG_DB_PASSWORD_INGEST_TS, AG_DB_PASSWORD_TS_READER, AG_DB_PASSWORD_TS_MONITOR]
+        keyRemotes: { AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER: db/mkg }   # xem mkg-db-outbox
+      # Mật khẩu ngẫu nhiên KHÔNG dùng ở đâu, cho vai của vùng khác mà dbadmin.Bootstrap vẫn tạo
+      # trên mỗi cụm (Bootstrap chưa lọc theo cụm — mục mở cho G4-0).
+      db-bootstrap-foreign: { remote: db/foreign-data, keys: [AG_DB_APP_PASSWORD] }
+      pg-backup-s3: { remote: backup/data, keys: [ACCESS_KEY_ID, ACCESS_SECRET_KEY] }
+    iam:
+      agrigreen-public-tls: { remote: tls/public, keys: [tls.crt, tls.key], type: kubernetes.io/tls }
+    pki:
+      step-ca-hsm-pin: { remote: pki/device-ca, keys: [pin] }
+  # Tài khoản RabbitMQ: một nguồn rabbitmq/<user> {username, password}. Namespace data nhận
+  # rmq-<user> (User CR của Topology Operator); vùng ứng dụng nhận URL dựng sẵn.
+  # url kind: platform = vhost "/", internal = vhost mkg.internal, mgmt = management API.
+  amqp:
+    amqp-pf-outbox:    { zone: pf, user: pf-outbox, urls: { url: platform } }
+    amqp-pf-worker:    { zone: pf, user: pf-worker, urls: { url: platform } }
+    amqp-pf-optimizer: { zone: pf, user: pf-optimizer, urls: { url: platform } }
+    amqp-pf-monitor:   { zone: pf, user: pf-monitor, urls: { url: mgmt } }
+    amqp-mkg-outbox:   { zone: mkg, user: mkg-outbox, urls: { platform-url: platform, internal-url: internal } }
+    amqp-mkg-worker-internal: { zone: mkg, user: mkg-worker-internal, urls: { url: internal } }
+
+# ---------------------------------------------------------------- Quan sát (Prometheus Operator, Apache-2.0)
+observability:
+  enabled: true
+  # Nhãn để Prometheus (kube-prometheus-stack) chọn ServiceMonitor/PrometheusRule.
+  selectorLabels: { release: prometheus }
+  scrapeInterval: 30s
+
+# ---------------------------------------------------------------- NetworkPolicy (ADR-0008, R-81)
+networkPolicy:
+  enabled: true
+  # Bảng luồng — NGUỒN DUY NHẤT sinh NetworkPolicy. Mỗi luồng: from/to là một điểm cuối:
+  #   {zone, app}        Pod của chart (nhãn app.kubernetes.io/name)
+  #   {zone, apps: []}   nhiều Pod của chart
+  #   {zone, pg: X}      Pod PostgreSQL CNPG của cụm pg-X; {zone, pooler: X} Pod PgBouncer của cụm
+  #   {selector: key}    Pod ngoài chart (systemSelectors)
+  #   {zone, all: true}  mọi Pod của namespace
+  #   {external: key}    dải CIDR ngoài cụm (external.*) — rỗng thì luồng không mở
+  # adr: hàng của bảng mục 17 / ADR-0008 mà luồng hiện thực.
+  flows:
+    # ---- Biên → DMZ
+    - { id: F01, adr: "Biên → DMZ", from: { external: internet }, to: { selector: ingressController }, portsFrom: ingressController }
+    # ---- DMZ → Ứng dụng (chỉ cổng API)
+    - { id: F02, adr: "DMZ → Ứng dụng", from: { selector: ingressController }, to: { zone: pf, app: api-platform }, ports: [8080, 8082] }
+    - { id: F03, adr: "DMZ → Ứng dụng", from: { selector: ingressController }, to: { zone: pf, app: web-ops }, ports: [3000] }
+    - { id: F04, adr: "DMZ → Ứng dụng", from: { selector: ingressController }, to: { zone: mkg, app: api-internal }, ports: [8081, 8083] }
+    - { id: F05, adr: "DMZ → Ứng dụng", from: { selector: ingressController }, to: { zone: mkg, app: web-internal }, ports: [3001] }
+    - { id: F06, adr: "DMZ → Định danh người dùng (OIDC)", from: { selector: ingressController }, to: { selector: keycloak }, ports: [8080] }
+    - { id: F07, adr: "DMZ (bộ điều khiển Ingress → API server)", from: { selector: ingressController }, to: { external: kubeAPI }, portsFrom: kubeAPI }
+    # ---- Ứng dụng → Dữ liệu (chỉ cổng DB/MQ)
+    - { id: F10, adr: "Ứng dụng → Dữ liệu", from: { zone: pf, apps: [api-platform, worker] }, to: { zone: data, pooler: pf }, ports: [5432] }
+    - { id: F11, adr: "Ứng dụng → Dữ liệu", from: { zone: pf, apps: [worker, outbox-publisher-pf] }, to: { zone: data, pg: pf }, ports: [5432] }
+    - { id: F12, adr: "Ứng dụng → Dữ liệu", from: { zone: pf, apps: [api-platform, worker, outbox-publisher-pf, optimizer] }, to: { selector: rabbitmq }, ports: [5672] }
+    - { id: F13, adr: "Ứng dụng → Dữ liệu (management API, độ sâu DLQ)", from: { zone: pf, apps: [api-platform, worker] }, to: { selector: rabbitmq }, ports: [15672] }
+    - { id: F14, adr: "Ứng dụng → Dữ liệu", from: { zone: mkg, apps: [api-internal, worker-internal, ingest] }, to: { zone: data, pooler: mkg }, ports: [5432] }
+    - { id: F15, adr: "Ứng dụng → Dữ liệu", from: { zone: mkg, apps: [api-internal, outbox-publisher-mkg, anchor-mkg, purge-idempotency-mkg] }, to: { zone: data, pg: mkg }, ports: [5432] }
+    - { id: F16, adr: "Ứng dụng → Dữ liệu", from: { zone: mkg, app: ingest }, to: { zone: data, pooler: ts }, ports: [5432] }
+    - { id: F17, adr: "Ứng dụng → Dữ liệu", from: { zone: mkg, apps: [outbox-publisher-mkg, anchor-mkg, purge-idempotency-mkg] }, to: { zone: data, pg: ts }, ports: [5432] }
+    - { id: F18, adr: "Ứng dụng → Dữ liệu", from: { zone: mkg, apps: [outbox-publisher-mkg, worker-internal] }, to: { selector: rabbitmq }, ports: [5672] }
+    # ---- Ứng dụng → Định danh (chỉ API vault, mTLS)
+    - { id: F20, adr: "Ứng dụng → Định danh", from: { zone: pf, app: api-platform }, to: { zone: vault, app: identity-vault }, ports: [8090] }
+    # ---- Trong vùng ứng dụng nền tảng: Internal API mTLS (mục 11)
+    - { id: F21, adr: "Ứng dụng (Internal, mTLS)", from: { zone: pf, app: optimizer }, to: { zone: pf, app: api-platform }, ports: [8084] }
+    # ---- Xác minh token (R-54), Keycloak Admin REST, client credentials
+    - { id: F22, adr: "Ứng dụng → Định danh người dùng", from: { zone: pf, apps: [api-platform, worker] }, to: { selector: keycloak }, ports: [8080] }
+    - { id: F23, adr: "Ứng dụng → Định danh người dùng", from: { zone: mkg, app: api-internal }, to: { selector: keycloak }, ports: [8080] }
+    - { id: F24, adr: "Định danh → Định danh người dùng (chỉ JWKS)", from: { zone: vault, app: identity-vault }, to: { selector: keycloak }, ports: [8080] }
+    # ---- Nền tảng → MKG: MKG gọi Application API công khai qua DMZ (mục 5, ADR-0020) — không Pod-tới-Pod
+    - { id: F25, adr: "Tiêu thụ không đặc quyền (mục 5)", from: { zone: mkg, app: api-internal }, to: { selector: ingressController }, portsFrom: ingressController }
+    # ---- Dịch vụ ngoài trong lãnh thổ (RB-7)
+    - { id: F30, adr: "Ứng dụng → kho đối tượng trong lãnh thổ", from: { zone: pf, apps: [api-platform, worker] }, to: { external: objectStorage }, ports: [443] }
+    - { id: F31, adr: "Ứng dụng → SMTP trong lãnh thổ", from: { zone: pf, app: worker }, to: { external: smtp }, portsFrom: smtp }
+    - { id: F32, adr: "Ứng dụng → đẩy không định danh (ADR-0015)", from: { zone: pf, app: worker }, to: { external: pushNonPII }, ports: [443] }
+    - { id: F33, adr: "Định danh → KMS", from: { zone: vault, app: identity-vault }, to: { external: kms }, ports: [443] }
+    - { id: F34, adr: "Ứng dụng → kho đối tượng (manifest neo)", from: { zone: mkg, app: anchor-mkg }, to: { external: objectStorage }, ports: [443] }
+    # ---- Biên OT → ingest (VPN + mTLS)
+    - { id: F40, adr: "Biên OT → ingest", from: { external: otVpn }, to: { zone: mkg, app: ingest }, ports: [8443] }
+    # ---- Quan sát: OTLP từ mọi vùng ứng dụng tới Quản trị (không có dữ liệu cá nhân, R-91)
+    - { id: F50, adr: "Ứng dụng → Quản trị (OTLP)", from: { zone: pf, all: true }, to: { zone: ops, app: otel-collector }, ports: [4317, 4318] }
+    - { id: F51, adr: "Ứng dụng → Quản trị (OTLP)", from: { zone: mkg, all: true }, to: { zone: ops, app: otel-collector }, ports: [4317, 4318] }
+    - { id: F52, adr: "Định danh → Quản trị (OTLP)", from: { zone: vault, app: identity-vault }, to: { zone: ops, app: otel-collector }, ports: [4317, 4318] }
+    # ---- Quản trị → mọi vùng (thu số đo) + người vận hành qua VPN
+    - { id: F53, adr: "Quản trị → Dữ liệu (scrape)", from: { selector: prometheus }, to: { selector: rabbitmq }, ports: [15692] }
+    - { id: F54, adr: "Quản trị → Dữ liệu (scrape)", from: { selector: prometheus }, to: { zone: data, pgAll: true }, ports: [9187] }
+    - { id: F55, adr: "Quản trị → Định danh (scrape)", from: { selector: prometheus }, to: { zone: vault, pgAll: true }, ports: [9187] }
+    - { id: F56, adr: "Quản trị (nội vùng)", from: { selector: prometheus }, to: { zone: ops, apps: [otel-collector, sql-exporter] }, ports: [8889, 9399] }
+    - { id: F57, adr: "Quản trị → Dữ liệu (sql_exporter, vai mkg_monitor/ts_monitor)", from: { zone: ops, app: sql-exporter }, to: { zone: data, poolers: [mkg, ts] }, ports: [5432] }
+    - { id: F58, adr: "Quản trị qua VPN + MFA", from: { external: adminVpn }, to: { zone: ops, all: true }, ports: [3000, 8080, 9090, 9093] }
+    - { id: F59, adr: "Quản trị qua VPN + MFA (CA thiết bị)", from: { external: adminVpn }, to: { zone: pki, app: step-ca }, ports: [9000] }
+    - { id: F96, adr: "Quản trị (nội vùng: Prometheus, Alertmanager, Grafana, Argo CD)", from: { zone: ops, all: true }, to: { zone: ops, all: true }, anyPort: true }
+    - { id: F97, adr: "Quản trị → API server", from: { zone: ops, all: true }, to: { external: kubeAPI }, portsFrom: kubeAPI }
+    - { id: F98, adr: "Quản trị → node (kubelet, node-exporter)", from: { selector: prometheus }, to: { external: nodes }, ports: [9100, 10250] }
+    - { id: F99, adr: "Quản trị → kho GitOps trong lãnh thổ", from: { zone: ops, all: true }, to: { external: gitRepo }, ports: [443, 22] }
+    # ---- Vùng Dữ liệu: nội vùng, operator, sao lưu
+    - { id: F60, adr: "Dữ liệu (PgBouncer → PostgreSQL cùng cụm)", from: { zone: data, pooler: pf }, to: { zone: data, pg: pf }, ports: [5432] }
+    - { id: F61, adr: "Dữ liệu (PgBouncer → PostgreSQL cùng cụm)", from: { zone: data, pooler: mkg }, to: { zone: data, pg: mkg }, ports: [5432] }
+    - { id: F62, adr: "Dữ liệu (PgBouncer → PostgreSQL cùng cụm)", from: { zone: data, pooler: ts }, to: { zone: data, pg: ts }, ports: [5432] }
+    - { id: F63, adr: "Dữ liệu (sao chép trong cụm)", from: { zone: data, pg: pf }, to: { zone: data, pg: pf }, ports: [5432, 8000] }
+    - { id: F64, adr: "Dữ liệu (sao chép trong cụm)", from: { zone: data, pg: mkg }, to: { zone: data, pg: mkg }, ports: [5432, 8000] }
+    - { id: F65, adr: "Dữ liệu (sao chép trong cụm)", from: { zone: data, pg: ts }, to: { zone: data, pg: ts }, ports: [5432, 8000] }
+    - { id: F66, adr: "Dữ liệu (sao chép trong cụm)", from: { zone: data, pg: iam }, to: { zone: data, pg: iam }, ports: [5432, 8000] }
+    - { id: F67, adr: "Quản trị cụm (operator CNPG)", from: { selector: cnpgOperator }, to: { zone: data, pgAll: true }, ports: [8000, 5432] }
+    - { id: F68, adr: "Quản trị cụm (instance manager → API server)", from: { zone: data, cnpgAll: true }, to: { external: kubeAPI }, portsFrom: kubeAPI }
+    - { id: F69, adr: "Quản trị cụm (PgBouncer CNPG → API server)", from: { zone: data, poolersAll: true }, to: { external: kubeAPI }, portsFrom: kubeAPI }
+    - { id: F90, adr: "Dữ liệu → kho sao lưu trong lãnh thổ (mục 22)", from: { zone: data, pgAll: true }, to: { external: objectStorage }, ports: [443] }
+    - { id: F91, adr: "Dữ liệu (cụm RabbitMQ)", from: { selector: rabbitmq }, to: { selector: rabbitmq }, ports: [4369, 25672, 5672, 15672] }
+    - { id: F92, adr: "Quản trị cụm (RabbitMQ peer discovery)", from: { selector: rabbitmq }, to: { external: kubeAPI }, portsFrom: kubeAPI }
+    - { id: F93, adr: "Dữ liệu (Job bootstrap/migrate/bảo trì)", from: { zone: data, dbJobs: true }, to: { zone: data, pgAll: true }, ports: [5432] }
+    - { id: F94, adr: "Định danh người dùng → Dữ liệu (Keycloak DB)", from: { selector: keycloak }, to: { zone: data, pg: iam }, ports: [5432] }
+    - { id: F95, adr: "Định danh người dùng (cụm Keycloak)", from: { selector: keycloak }, to: { selector: keycloak }, ports: [7800, 57800] }
+    # ---- Vùng Định danh: cụm vault riêng
+    - { id: F70, adr: "Định danh (vault → PgBouncer vault)", from: { zone: vault, app: identity-vault }, to: { zone: vault, pooler: vault }, ports: [5432] }
+    - { id: F71, adr: "Định danh (PgBouncer → PostgreSQL)", from: { zone: vault, pooler: vault }, to: { zone: vault, pg: vault }, ports: [5432] }
+    - { id: F72, adr: "Định danh (sao chép trong cụm)", from: { zone: vault, pg: vault }, to: { zone: vault, pg: vault }, ports: [5432, 8000] }
+    - { id: F73, adr: "Quản trị cụm (operator CNPG)", from: { selector: cnpgOperator }, to: { zone: vault, pgAll: true }, ports: [8000, 5432] }
+    - { id: F74, adr: "Quản trị cụm (instance manager → API server)", from: { zone: vault, cnpgAll: true }, to: { external: kubeAPI }, portsFrom: kubeAPI }
+    - { id: F78, adr: "Quản trị cụm (PgBouncer CNPG → API server)", from: { zone: vault, poolersAll: true }, to: { external: kubeAPI }, portsFrom: kubeAPI }
+    - { id: F75, adr: "Định danh → kho sao lưu RIÊNG trong lãnh thổ (mục 22)", from: { zone: vault, pg: vault }, to: { external: objectStorage }, ports: [443] }
+    - { id: F76, adr: "Định danh (Job bootstrap/migrate/bảo trì/neo)", from: { zone: vault, dbJobs: true }, to: { zone: vault, pg: vault }, ports: [5432] }
+    - { id: F77, adr: "Định danh → kho đối tượng (chỉ manifest neo — băm, không định danh)", from: { zone: vault, app: anchor-vault }, to: { external: objectStorage }, ports: [443] }
+    # ---- PKI thiết bị
+    - { id: F85, adr: "CA thiết bị → HSM", from: { zone: pki, app: step-ca }, to: { external: hsm }, portsFrom: hsm }

@@ -1,0 +1,103 @@
+{{- /*
+NetworkPolicy theo ADR-0008 / mục 17 (R-81): mỗi namespace của chart mặc định từ chối CẢ vào lẫn ra,
+chỉ mở DNS và đúng các luồng trong .Values.networkPolicy.flows. Luồng có hai nửa: egress ở namespace
+nguồn, ingress ở namespace đích — chỉ render nửa thuộc vùng mà bản phát hành này cài (installZones).
+Kiểm thử: deploy/k8s/tests/check_flows.py.
+*/ -}}
+{{- if .Values.networkPolicy.enabled }}
+{{- $root := . }}
+{{- range $zone, $ns := .Values.namespaces }}
+{{- if include "agrigreen.on" (dict "root" $root "zone" $zone) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $zone) | nindent 4 }}
+  annotations:
+    agrigreen.vn/adr: "ADR-0008 R-81: mặc định từ chối vào và ra"
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $zone) | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $root.Values.systemSelectors.dns.namespace }}
+          podSelector:
+            matchLabels: {{ $root.Values.systemSelectors.dns.pods | toJson }}
+      ports:
+        - { port: 53, protocol: UDP }
+        - { port: 53, protocol: TCP }
+{{- end }}
+{{- end }}
+{{- range $f := .Values.networkPolicy.flows }}
+{{- $from := include "agrigreen.endpoint" (dict "root" $root "ep" $f.from) | fromYaml }}
+{{- $to := include "agrigreen.endpoint" (dict "root" $root "ep" $f.to) | fromYaml }}
+{{- $ports := $f.ports | default (index $root.Values.ports ($f.portsFrom | default "-") | default list) }}
+{{- $name := printf "flow-%s" (lower $f.id) }}
+{{- $fromOK := or $from.inCluster (gt (len $from.cidrs) 0) }}
+{{- $toOK := or $to.inCluster (gt (len $to.cidrs) 0) }}
+{{- if and $fromOK $toOK (or $f.anyPort (gt (len $ports) 0)) }}
+{{- /* Nửa ingress: ở namespace đích nếu đích là Pod trong vùng của chart. */}}
+{{- if and $to.inCluster $to.zone (include "agrigreen.on" (dict "root" $root "zone" $to.zone)) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-in
+  namespace: {{ $to.namespace }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $to.zone) | nindent 4 }}
+    agrigreen.vn/flow: {{ $f.id }}
+  annotations:
+    agrigreen.vn/adr: {{ $f.adr | quote }}
+spec:
+  podSelector: {{ $to.podSelector | toJson }}
+  policyTypes: [Ingress]
+  ingress:
+    - from: {{- include "agrigreen.peers" $from | nindent 8 }}
+{{- if not $f.anyPort }}
+      ports:
+{{- range $ports }}
+        - { port: {{ . }}, protocol: TCP }
+{{- end }}
+{{- end }}
+{{- end }}
+{{- /* Nửa egress: ở namespace nguồn nếu nguồn là Pod trong vùng của chart. */}}
+{{- if and $from.inCluster $from.zone (include "agrigreen.on" (dict "root" $root "zone" $from.zone)) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-out
+  namespace: {{ $from.namespace }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $from.zone) | nindent 4 }}
+    agrigreen.vn/flow: {{ $f.id }}
+  annotations:
+    agrigreen.vn/adr: {{ $f.adr | quote }}
+spec:
+  podSelector: {{ $from.podSelector | toJson }}
+  policyTypes: [Egress]
+  egress:
+    - to: {{- include "agrigreen.peers" $to | nindent 8 }}
+{{- if not $f.anyPort }}
+      ports:
+{{- range $ports }}
+        - { port: {{ . }}, protocol: TCP }
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

@@ -1,5 +1,5 @@
 # Lệnh thường dùng (Linux/macOS/CI). Trên Windows: xem docs/dev-setup.md.
-.PHONY: all fmt vet lint gates test test-unit build compose-up compose-down verify-db
+.PHONY: all fmt vet lint gates test test-unit build compose-up compose-down verify-db k8s-check
 
 all: fmt vet gates test
 
@@ -36,3 +36,8 @@ compose-down:
 
 verify-db:
 	go run ./cmd/migrate verify
+
+# G4 Kubernetes: helm lint + bảng luồng ADR-0008 (docs/runbooks/k8s-deploy.md mục 8). Windows: deploy/k8s/check.ps1
+k8s-check:
+	for e in dev staging prod; do helm lint --strict deploy/k8s/charts/agrigreen -f deploy/k8s/charts/agrigreen/values-$$e.yaml || exit 1; done
+	python3 deploy/k8s/tests/check_flows.py
