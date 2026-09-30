@@ -1,0 +1,6 @@
+{
+  "device_id": "edge-sim-01",
+  "data_dir": "/var/lib/edge-agent",
+  "adapter": { "type": "simulator" },
+  "buffer": { "max_rate_hz": 2, "hours": 72 }
+}

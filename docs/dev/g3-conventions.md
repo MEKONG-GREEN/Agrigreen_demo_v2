@@ -163,6 +163,7 @@ Gốc lắp ráp (archlint):
   - job `test` đi qua PgBouncer với userlist đã có vai G3;
   - job `images` build thêm `worker-internal`;
   - `compose-smoke` dựng `rabbitmq-init`, kiểm tài khoản nền tảng **không** có quyền trên `mkg.internal`, và kiểm `worker-internal` healthy.
+  - (G3-2 B6) job `images` build thêm `ingest`; job `edge-agent` build nhị phân tĩnh linux/amd64 + arm64 (`CGO_ENABLED=0`, artifact kèm SHA-256); `compose-smoke` dựng `ingest` + agent mô phỏng `edge-sim`, chạy `scripts/dev-edge-bootstrap.sh` (đề xuất + duyệt hai người qua Admin API) và kiểm có lô trong `ts_weigh.reading_batch`, consumer trên `mkg.internal`; job `lint` chạy `promtool check rules` cho `deploy/observability/`. Runbook: [ingest.md](../runbooks/ingest.md).
 
   Máy dev không chạy được các phần này. Ghi trong báo cáo nếu thay đổi của bạn phụ thuộc chúng.
 - **Kiểm thử bắt buộc thêm cho G3:**

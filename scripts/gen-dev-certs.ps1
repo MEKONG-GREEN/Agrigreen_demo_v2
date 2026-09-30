@@ -4,14 +4,21 @@
 #   ca.crt / ca.key            CA dev tự ký (ca.key không gắn vào container nào)
 #   api-platform.crt / .key    máy chủ listener Internal (SAN api-platform, localhost, 127.0.0.1)
 #   optimizer.crt / .key       client của optimizer (CN = SAN = optimizer)
-# Dùng: .\scripts\gen-dev-certs.ps1 [-Force]   (gen-dev-secrets.ps1 tự gọi)
+#   ingest.crt / .key          máy chủ nhận lô mTLS của cmd/ingest (SAN ingest, localhost, 127.0.0.1)
+#   device-<id>.crt / .key     client mTLS của thiết bị biên dev (CN = SAN = device_id, ADR-0019);
+#                              danh sách: -Devices hoặc $env:DEV_EDGE_DEVICES (mặc định edge-sim-01)
+# Dùng: .\scripts\gen-dev-certs.ps1 [-Force] [-Devices edge-sim-01,edge-sim-02]   (gen-dev-secrets.ps1 tự gọi)
 # Cần openssl: trong PATH hoặc đi kèm Git for Windows. CHỈ cho Local/Dev.
-param([switch]$Force)
+param([switch]$Force, [string[]]$Devices)
 $ErrorActionPreference = 'Stop'
+if (-not $Devices) {
+    $Devices = if ($env:DEV_EDGE_DEVICES) { $env:DEV_EDGE_DEVICES -split '\s+' | Where-Object { $_ } } else { @('edge-sim-01') }
+}
+foreach ($d in $Devices) { if ($d -cnotmatch '^[a-z0-9][a-z0-9._-]{2,63}$') { throw "device_id không hợp lệ: $d" } }
 
 $root = Split-Path -Parent $PSScriptRoot
 $dir = Join-Path $root 'deploy\compose\.certs'
-$need = 'ca.crt', 'api-platform.key', 'optimizer.key'
+$need = @('ca.crt', 'api-platform.key', 'optimizer.key', 'ingest.key') + @($Devices | ForEach-Object { "device-$_.key" })
 if (-not $Force -and -not ($need | Where-Object { -not (Test-Path (Join-Path $dir $_)) })) {
     Write-Host "Đã có chứng thư dev trong $dir — giữ nguyên (dùng -Force để sinh lại)."
     exit 0
@@ -43,12 +50,17 @@ try {
     Invoke-OpenSSL req -x509 -new -key ca.key -sha256 -days 3650 -subj '/O=AgriGreen Local-Dev/CN=agrigreen-dev-internal-ca' `
         -addext 'basicConstraints=critical,CA:TRUE,pathlen:0' -addext 'keyUsage=critical,keyCertSign,cRLSign' -out ca.crt
     $t = Split-Path -Leaf $tmp
-    foreach ($leaf in @(
-            @{ Name = 'api-platform'; Usage = 'serverAuth'; San = 'DNS:api-platform,DNS:localhost,IP:127.0.0.1' },
-            @{ Name = 'optimizer'; Usage = 'clientAuth'; San = 'DNS:optimizer' })) {
+    $leaves = @(
+        @{ Name = 'api-platform'; CN = 'api-platform'; Usage = 'serverAuth'; San = 'DNS:api-platform,DNS:localhost,IP:127.0.0.1' },
+        @{ Name = 'optimizer'; CN = 'optimizer'; Usage = 'clientAuth'; San = 'DNS:optimizer' },
+        # cmd/ingest: listener nhận lô mTLS (agent biên gọi https://ingest:8443 trong mạng compose).
+        @{ Name = 'ingest'; CN = 'ingest'; Usage = 'serverAuth'; San = 'DNS:ingest,DNS:localhost,IP:127.0.0.1' })
+    # Thiết bị biên dev: CN = SAN DNS = device_id. Production: CA nội bộ ký CSR của `edge-agent enroll`.
+    foreach ($d in $Devices) { $leaves += @{ Name = "device-$d"; CN = $d; Usage = 'clientAuth'; San = "DNS:$d" } }
+    foreach ($leaf in $leaves) {
         $n = $leaf.Name
         Invoke-OpenSSL genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$n.key"
-        Invoke-OpenSSL req -new -key "$n.key" -subj "/O=AgriGreen Local-Dev/CN=$n" -out "$t/$n.csr"
+        Invoke-OpenSSL req -new -key "$n.key" -subj "/O=AgriGreen Local-Dev/CN=$($leaf.CN)" -out "$t/$n.csr"
         $ext = "basicConstraints=critical,CA:FALSE`nkeyUsage=critical,digitalSignature`nextendedKeyUsage=$($leaf.Usage)`nsubjectAltName=$($leaf.San)`n"
         [System.IO.File]::WriteAllText((Join-Path $tmp "$n.ext"), $ext, (New-Object System.Text.UTF8Encoding $false))
         Invoke-OpenSSL x509 -req -in "$t/$n.csr" -CA ca.crt -CAkey ca.key -CAcreateserial -CAserial "$t/ca.srl" `

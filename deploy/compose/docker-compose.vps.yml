@@ -9,6 +9,8 @@
 #     admin.<domain> → Admin API, chỉ mở cho ADMIN_ALLOW_CIDR (kể cả /admin của Keycloak).
 #   - Keycloak chạy chế độ production (`start`), dữ liệu realm lưu trong PostgreSQL (database keycloak).
 #   - Mọi địa chỉ trình duyệt thấy (issuer, CORS, redirect, NEXT_PUBLIC_*) theo AG_DOMAIN.
+#   - ingest (8443, mTLS) chỉ nghe AG_INGEST_BIND_ADDR (giao diện VPN/OT), không qua Caddy;
+#     edge-sim (mô phỏng) tắt bằng profile dev-sim.
 # Xem docs/runbooks/vps-deploy.md.
 
 x-vps-env: &vps-env
@@ -102,6 +104,22 @@ services:
   worker-internal:
     environment:
       <<: *vps-env
+
+  # Nhận lô mTLS từ agent biên (ADR-0019): CHỈ từ vùng OT/VPN. Caddy KHÔNG định tuyến tới
+  # ingest; 8443 bind vào AG_INGEST_BIND_ADDR (đặt trong .env = địa chỉ giao diện WireGuard/VPN
+  # của VPS, vd 10.88.0.1; mặc định 127.0.0.1) và tường lửa chỉ mở 8443 cho dải VPN của hub.
+  # Chứng thư thiết bị do CA nội bộ ký CSR của `edge-agent enroll` (docs/runbooks/ingest.md).
+  ingest:
+    environment:
+      <<: *vps-env
+
+  # Agent biên mô phỏng chỉ dành cho Local/Dev/CI — không chạy trên VPS (bật lại bằng --profile dev-sim).
+  edge-sim-init:
+    profiles: ["dev-sim"]
+  edge-sim-enroll:
+    profiles: ["dev-sim"]
+  edge-sim:
+    profiles: ["dev-sim"]
 
   worker:
     environment:
