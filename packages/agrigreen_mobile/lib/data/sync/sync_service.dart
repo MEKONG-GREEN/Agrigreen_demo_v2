@@ -124,6 +124,13 @@ class SyncService {
 
   static const _statusKey = 'sync.status';
 
+  /// Mã lỗi "con trỏ pull không hợp lệ" → pull lại từ đầu một lần (nền tảng:
+  /// `sync.cursor_invalid`; đồng bộ vùng mkg: `fieldops.cursor_invalid`).
+  static const cursorInvalidCodes = {
+    'sync.cursor_invalid',
+    'fieldops.cursor_invalid',
+  };
+
   final _statusCtl = StreamController<SyncStatus>.broadcast();
   Stream<SyncStatus> get statusStream => _statusCtl.stream;
 
@@ -326,7 +333,9 @@ class SyncService {
         );
       } on ApiException catch (e) {
         // Con trỏ bị sửa / của thiết bị khác → pull lại từ đầu (một lần).
-        if (e.status == 400 && e.code == 'sync.cursor_invalid' && !restarted) {
+        if (e.status == 400 &&
+            cursorInvalidCodes.contains(e.code) &&
+            !restarted) {
           restarted = true;
           await _db.setMeta(ReferenceRepository.cursorKey, null);
           continue;

@@ -23,6 +23,10 @@ abstract final class PushEntity {
   /// G2 pf/extension: yêu cầu hỗ trợ của nông dân (HTX US-SUPPORT-01).
   static const supportRequest = 'support_request';
 
+  /// G3 mkg/fieldops (App hiện trường MKG): đếm cuộn theo công đoạn —
+  /// `POST /v1/fieldops/sync/push` của vùng mkg, KHÔNG phải pf/sync.
+  static const rollCount = 'roll_count';
+
   static const g1 = {plotBoundary, fieldReport, taskUpdate, consent, evidence};
   static const g2 = {
     seasonOpen,
@@ -31,7 +35,12 @@ abstract final class PushEntity {
     harvest,
     supportRequest,
   };
+
+  /// Thực thể của nền tảng (`/v1/sync/push`) — mặc định của OutboxRepository.
   static const all = {...g1, ...g2};
+
+  /// Thực thể của đồng bộ vùng mkg (`/v1/fieldops/sync/push`).
+  static const mkgFieldops = {rollCount};
 }
 
 enum RecordOp {
