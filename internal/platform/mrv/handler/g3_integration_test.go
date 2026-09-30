@@ -3,6 +3,7 @@ package handler_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
@@ -187,23 +189,23 @@ func TestG3CollectionValveContractAndIdempotency(t *testing.T) {
 
 	bad := collection(s, ref, 1, "2000-5000")
 	bad["mass_kg"] = "3456.7" // khối lượng chính xác KHÔNG được qua van
-	if _, err := f.valve(envelope(f.tenant, port.EventMKGCollectionEvid, bad)); err == nil {
+	if _, err := f.valve(envelope(f.mkg, port.EventMKGCollectionEvid, bad)); err == nil {
 		t.Fatal("payload có khóa ngoài hợp đồng phải bị từ chối")
 	}
 	missing := collection(s, ref, 1, "2000-5000")
 	delete(missing, "revision")
-	if _, err := f.valve(envelope(f.tenant, port.EventMKGCollectionEvid, missing)); err == nil {
+	if _, err := f.valve(envelope(f.mkg, port.EventMKGCollectionEvid, missing)); err == nil {
 		t.Fatal("thiếu trường bắt buộc phải bị từ chối")
 	}
 	wrong := collection(s, ref, 1, "3000")
-	if _, err := f.valve(envelope(f.tenant, port.EventMKGCollectionEvid, wrong)); err == nil {
+	if _, err := f.valve(envelope(f.mkg, port.EventMKGCollectionEvid, wrong)); err == nil {
 		t.Fatal("bậc ngoài enum phải bị từ chối")
 	}
 	if n := f.count(f.tenant, "collection_evidence"); n != 0 {
 		t.Fatalf("payload hỏng không được ghi: %d", n)
 	}
 
-	env := envelope(f.tenant, port.EventMKGCollectionEvid, collection(s, ref, 1, "2000-5000"))
+	env := envelope(f.mkg, port.EventMKGCollectionEvid, collection(s, ref, 1, "2000-5000"))
 	f.must(f.valve(env))
 	f.must(f.valve(env))
 	env.EventID = ids.New()
@@ -211,9 +213,9 @@ func TestG3CollectionValveContractAndIdempotency(t *testing.T) {
 	if n := f.count(f.tenant, "collection_evidence"); n != 1 {
 		t.Fatalf("cùng revision phải là một dòng, có %d", n)
 	}
-	f.must(f.valve(envelope(f.tenant, port.EventMKGCollectionEvid, collection(s, ref, 2, "5000-10000"))))
+	f.must(f.valve(envelope(f.mkg, port.EventMKGCollectionEvid, collection(s, ref, 2, "5000-10000"))))
 	// revision cũ tới muộn: ghi sổ nhưng không thành bản hiện hành.
-	f.must(f.valve(envelope(f.tenant, port.EventMKGCollectionEvid, collection(s, ref, 0, "0-500"))))
+	f.must(f.valve(envelope(f.mkg, port.EventMKGCollectionEvid, collection(s, ref, 0, "0-500"))))
 
 	view := f.as(f.tenant, f.p89, port.RoleViewer)
 	c := view.app(http.MethodGet, "/v1/mrv/seasons/"+s.ref.String()+"/completeness", nil)
@@ -227,6 +229,17 @@ func TestG3CollectionValveContractAndIdempotency(t *testing.T) {
 	if len(inputs) != 1 || inputs[0].(map[string]any)["revision"] != float64(2) {
 		t.Fatalf("ước tính phải dùng revision 2: %v", est)
 	}
+	// ADR-0020: phong bì của tenant MKG ghi vào tenant bên cấp — tenant MKG không có dòng pf_mrv;
+	// tenant phong bì chưa có cấp quyền valve_mrv_evidence → party.valve_share_grant_missing (DLQ).
+	if n := f.count(f.mkg, "collection_evidence"); n != 0 {
+		t.Fatalf("tenant MKG không được có bằng chứng ở pf: %d", n)
+	}
+	if _, err := f.valve(envelope(ids.New(), port.EventMKGCollectionEvid, collection(s, ids.New(), 1, "2000-5000"))); !errors.Is(err, partyport.ErrValveGrantMissing) {
+		t.Fatalf("không có cấp quyền → party.valve_share_grant_missing: %v", err)
+	}
+	if n := f.count(f.tenant, "collection_evidence"); n != 3 {
+		t.Fatalf("phong bì không có cấp quyền không được ghi: %d", n)
+	}
 }
 
 // KN US-MRV-05: chỉ minh chứng đã "Đạt chuẩn" mới được tính vào giảm phát thải;
@@ -235,7 +248,7 @@ func TestG3OnlyApprovedEvidenceCountsKNUSMRV05(t *testing.T) {
 	f := newFixture(t)
 	f.approveSeed(f.tenant)
 	s := f.openSeason(f.tenant, "30001", time.Now().Add(-72*time.Hour))
-	f.must(f.valve(envelope(f.tenant, port.EventMKGCollectionEvid, collection(s, ids.New(), 1, "2000-5000"))))
+	f.must(f.valve(envelope(f.mkg, port.EventMKGCollectionEvid, collection(s, ids.New(), 1, "2000-5000"))))
 	view := f.as(f.tenant, f.p89, port.RoleViewer)
 
 	get := func() map[string]any {
@@ -305,7 +318,7 @@ func TestG3ProvisionalVsOfficialMethodApproval(t *testing.T) {
 	ev := col.app(http.MethodPost, "/v1/mrv/evidence", straw(s, time.Now().Add(-time.Hour)))
 	expect(t, ev, 201, "")
 	expect(t, rev.app(http.MethodPost, "/v1/mrv/evidence/"+ev.str("id")+"/reviews", map[string]any{"decision": "accepted", "reason": "Đạt chuẩn"}), 201, "")
-	f.must(f.valve(envelope(f.tenant, port.EventMKGCollectionEvid, collection(s, ids.New(), 1, "10000+"))))
+	f.must(f.valve(envelope(f.mkg, port.EventMKGCollectionEvid, collection(s, ids.New(), 1, "10000+"))))
 
 	f.params.set(port.ParamCO2OpenBurning, "1460", 3)
 	f.params.set(port.ParamCO2TransportRoad, "0.062", 1)
@@ -366,8 +379,8 @@ func TestG3TenantIsolationAndScope(t *testing.T) {
 	f := newFixture(t)
 	s1 := f.openSeason(f.tenant, "30001", time.Now().Add(-24*time.Hour))
 	s2 := f.openSeason(f.tenant, "30002", time.Now().Add(-24*time.Hour))
-	f.must(f.valve(envelope(f.tenant, port.EventMKGCollectionEvid, collection(s1, ids.New(), 1, "500-1000"))))
-	f.must(f.valve(envelope(f.tenant, port.EventMKGCollectionEvid, collection(s2, ids.New(), 1, "500-1000"))))
+	f.must(f.valve(envelope(f.mkg, port.EventMKGCollectionEvid, collection(s1, ids.New(), 1, "500-1000"))))
+	f.must(f.valve(envelope(f.mkg, port.EventMKGCollectionEvid, collection(s2, ids.New(), 1, "500-1000"))))
 
 	other := f.as(ids.New(), f.national, port.RoleViewer)
 	expect(t, other.app(http.MethodGet, "/v1/mrv/seasons/"+s1.ref.String()+"/completeness", nil), 404, "mrv.season_not_found")
@@ -496,7 +509,7 @@ func TestG3ExportIncludesLinksAndEstimates(t *testing.T) {
 	f.approveSeed(f.tenant)
 	s := f.openSeason(f.tenant, "30001", time.Now().Add(-72*time.Hour))
 	f.must(f.farmLog(envelope(f.tenant, port.EventFarmLogRecorded, logRecorded(s, ids.New(), ids.New(), 1, "thu_hoach", time.Now().Add(-5*time.Hour)))))
-	f.must(f.valve(envelope(f.tenant, port.EventMKGCollectionEvid, collection(s, ids.New(), 1, "1000-2000"))))
+	f.must(f.valve(envelope(f.mkg, port.EventMKGCollectionEvid, collection(s, ids.New(), 1, "1000-2000"))))
 
 	exp := f.as(f.tenant, f.p89, port.RoleExporter)
 	j := exp.app(http.MethodPost, "/v1/mrv/exports", map[string]any{"filters": map[string]any{}})
@@ -537,7 +550,7 @@ func TestG3ExportIncludesLinksAndEstimates(t *testing.T) {
 		t.Fatalf("phiên bản tham số trong gói: %v", p)
 	}
 	// Dữ liệu G3 ghi sau as_of không làm đổi băm dựng lại.
-	f.must(f.valve(envelope(f.tenant, port.EventMKGCollectionEvid, collection(s, ids.New(), 1, "10000+"))))
+	f.must(f.valve(envelope(f.mkg, port.EventMKGCollectionEvid, collection(s, ids.New(), 1, "10000+"))))
 	vr := exp.app(http.MethodGet, "/v1/mrv/exports/"+id+"/verify", nil)
 	if vr.body["match"] != true {
 		t.Fatalf("băm dựng lại: %v", vr.body)

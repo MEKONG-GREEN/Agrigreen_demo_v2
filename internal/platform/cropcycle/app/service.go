@@ -98,6 +98,10 @@ type Service struct {
 	Catalogs mdport.Catalogs         // tùy chọn: giống lúa, vụ, máy (thiếu → chỉ kiểm dạng mã)
 	Farmers  port.FarmerHouseholds   // liên kết tài khoản ↔ nông hộ; thiếu → vai farmer nhận 503
 	GpsLog   geoport.GpsLog          // log GPS của pf/geo (consumer port.GpsLogConsumer); thiếu → consumer lỗi, giao lại
+	// Sharing (ADR-0020): cấp quyền chia sẻ + sổ đọc của bề mặt đối tác (pf/party); thiếu → 403.
+	Sharing partyport.PartnerAccess
+	// ValveGrants (ADR-0020): tenant bên cấp nhận van collection_* của tenant phong bì; thiếu → DLQ.
+	ValveGrants partyport.ValveGrants
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

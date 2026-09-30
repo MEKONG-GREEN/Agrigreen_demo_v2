@@ -8,9 +8,15 @@ package app
 //     phát pf.cropcycle.collection_*.received để pf/notify báo quản lý HTX;
 //   - quản lý HTX (coop_manager) của đúng HTX xác nhận / tranh chấp bảng kê theo revision
 //     hiện hành (409 nếu đã cũ), sổ chỉ ghi thêm, bản sau cùng revision thay bản trước;
-//   - tài khoản dịch vụ MKG (vai mkg_sync) kéo phản hồi theo con trỏ feed_seq — chỉ phản
-//     hồi thuộc bảng kê do chính tenant đó gửi, chỉ các trường MKG cần để ghi
-//     mkg_fieldops.htx_confirmation (không có người phản hồi, không có dữ liệu khác).
+//   - tài khoản dịch vụ MKG (vai mkg_sync, tenant MKG) kéo phản hồi theo con trỏ feed_seq qua
+//     cấp quyền chia sẻ htx_collection_responses (ADR-0020): đọc ở tenant BÊN CẤP, chỉ phản hồi
+//     thuộc bảng kê do chính tenant người gọi gửi qua van, chỉ các trường MKG cần để ghi
+//     mkg_fieldops.htx_confirmation (không có người phản hồi, không có dữ liệu khác), ghi sổ đọc.
+//
+// ADR-0020 (chủ sản phẩm chốt 29–30/09/2026): MKG là tenant riêng. Consumer van ghi sổ nhận,
+// bảng chiếu và sự kiện received vào tenant BÊN CẤP (tenant chương trình của HTX) đã cấp
+// valve_collection cho tenant phong bì — source_tenant_id giữ tenant MKG. Không có cấp quyền →
+// lỗi party.valve_share_grant_missing → giao lại → DLQ.
 
 import (
 	"context"
@@ -27,11 +33,13 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/store"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 // Mã lỗi thu gom (docs/errors.md, mục pf/cropcycle).
@@ -91,19 +99,33 @@ func (s *Service) HandleCollectionValve(ctx context.Context, tx pgx.Tx, env outb
 	if err := c.Validate(env.Payload); err != nil {
 		return fmt.Errorf("%w (%s): %w", errValve, env.EventType, err)
 	}
-	if name == port.ContractCollectionSchedule {
-		return s.receiveSchedule(ctx, tx, env)
+	grantors, err := partyport.ValveTargets(ctx, s.ValveGrants, env.TenantID, partyport.KindValveCollection, s.now())
+	if err != nil {
+		return err
 	}
-	return s.receiveStatement(ctx, tx, env)
+	source := env.TenantID
+	for _, g := range grantors {
+		genv := env
+		genv.TenantID = g // ghi ở tenant bên cấp; nguồn giữ ở source_tenant_id
+		if err := tenant.Within(ctx, tx, g, func() error {
+			if name == port.ContractCollectionSchedule {
+				return s.receiveSchedule(ctx, tx, genv, source)
+			}
+			return s.receiveStatement(ctx, tx, genv, source)
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func (s *Service) receipt(env outbox.Envelope, contract string, ref, coop uuid.UUID, revision int, current bool) store.ValveReceipt {
+func (s *Service) receipt(env outbox.Envelope, source uuid.UUID, contract string, ref, coop uuid.UUID, revision int, current bool) store.ValveReceipt {
 	return store.ValveReceipt{ID: ids.New(), TenantID: env.TenantID, Contract: contract, SubjectRef: ref, Revision: revision,
-		CooperativeRef: coop, SourceEventID: env.EventID, SourceTenantID: env.TenantID, Payload: env.Payload, BecameCurrent: current,
+		CooperativeRef: coop, SourceEventID: env.EventID, SourceTenantID: source, Payload: env.Payload, BecameCurrent: current,
 		EventTime: env.OccurredAt, ActorRef: valveActor, IdemKey: store.ReceiptIdemKey(contract, ref, revision)}
 }
 
-func (s *Service) receiveSchedule(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
+func (s *Service) receiveSchedule(ctx context.Context, tx pgx.Tx, env outbox.Envelope, source uuid.UUID) error {
 	var p collectionScheduleV1
 	if err := json.Unmarshal(env.Payload, &p); err != nil {
 		return fmt.Errorf("%w: %w", errValve, err)
@@ -122,7 +144,7 @@ func (s *Service) receiveSchedule(ctx context.Context, tx pgx.Tx, env outbox.Env
 		return err
 	}
 	current := cur == nil || p.Revision > cur.Revision
-	r := s.receipt(env, port.ContractCollectionSchedule, p.ScheduleRef, p.HTXRef, p.Revision, current)
+	r := s.receipt(env, source, port.ContractCollectionSchedule, p.ScheduleRef, p.HTXRef, p.Revision, current)
 	if err := ledger.Classify(store.InsertReceipt(ctx, tx, &r)); err != nil {
 		return err
 	}
@@ -130,7 +152,7 @@ func (s *Service) receiveSchedule(ctx context.Context, tx pgx.Tx, env outbox.Env
 		return nil // bản cũ đến muộn: chỉ lưu sổ nhận
 	}
 	v := store.ScheduleView{ScheduleRef: p.ScheduleRef, CooperativeRef: p.HTXRef, CommuneCode: p.CommuneCode, WindowFrom: from,
-		WindowTo: to, Status: p.Status, Revision: p.Revision, ReceiptID: r.ID, SourceTenantID: env.TenantID,
+		WindowTo: to, Status: p.Status, Revision: p.Revision, ReceiptID: r.ID, SourceTenantID: source,
 		PublishedAt: env.OccurredAt, ReceivedAt: r.RecordedAt}
 	if err := store.PutSchedule(ctx, tx, env.TenantID, v); err != nil {
 		return err
@@ -141,7 +163,7 @@ func (s *Service) receiveSchedule(ctx context.Context, tx pgx.Tx, env outbox.Env
 	})
 }
 
-func (s *Service) receiveStatement(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
+func (s *Service) receiveStatement(ctx context.Context, tx pgx.Tx, env outbox.Envelope, source uuid.UUID) error {
 	var p htxCollectionStatementV1
 	if err := json.Unmarshal(env.Payload, &p); err != nil {
 		return fmt.Errorf("%w: %w", errValve, err)
@@ -159,7 +181,7 @@ func (s *Service) receiveStatement(ctx context.Context, tx pgx.Tx, env outbox.En
 		return err
 	}
 	current := cur == nil || p.Revision > cur.Revision
-	r := s.receipt(env, port.ContractHTXCollectionStatement, p.StatementRef, p.HTXRef, p.Revision, current)
+	r := s.receipt(env, source, port.ContractHTXCollectionStatement, p.StatementRef, p.HTXRef, p.Revision, current)
 	if err := ledger.Classify(store.InsertReceipt(ctx, tx, &r)); err != nil {
 		return err
 	}
@@ -167,7 +189,7 @@ func (s *Service) receiveStatement(ctx context.Context, tx pgx.Tx, env outbox.En
 		return nil
 	}
 	v := store.StatementView{StatementRef: p.StatementRef, CooperativeRef: p.HTXRef, PlotRef: p.PlotRef, SeasonRef: p.SeasonRef,
-		CollectedOn: on, Rolls: p.Rolls, Revision: p.Revision, ReceiptID: r.ID, SourceTenantID: env.TenantID,
+		CollectedOn: on, Rolls: p.Rolls, Revision: p.Revision, ReceiptID: r.ID, SourceTenantID: source,
 		PublishedAt: env.OccurredAt, ReceivedAt: r.RecordedAt}
 	if err := store.PutStatement(ctx, tx, env.TenantID, v); err != nil {
 		return err
@@ -472,10 +494,23 @@ type ResponseFeedPage struct {
 	Next  int64
 }
 
-// CollectionResponseFeed trả phản hồi của HTX thuộc bảng kê do tenant của người gọi gửi
-// qua van, feed_seq > after. Chỉ vai mkg_sync (RB-2: phạm vi = phản hồi MKG cần).
-func (s *Service) CollectionResponseFeed(ctx context.Context, after int64, limit int) (ResponseFeedPage, error) {
-	p, err := authz.Require(ctx, port.RoleMKGSync)
+// partnerGrant kiểm cấp quyền chia sẻ loại kind cho tenant người gọi (ADR-0020). Chưa nối
+// pf/party → 403 (mặc định từ chối).
+func (s *Service) partnerGrant(ctx context.Context, kind string, grantor uuid.UUID) (partyport.ShareGrant, error) {
+	if s.Sharing == nil {
+		if _, err := authz.Require(ctx, port.RoleMKGSync); err != nil {
+			return partyport.ShareGrant{}, err
+		}
+		return partyport.ShareGrant{}, partyport.ErrShareGrantMissing
+	}
+	return s.Sharing.Authorize(ctx, kind, grantor)
+}
+
+// CollectionResponseFeed trả phản hồi của HTX thuộc bảng kê do tenant của người gọi (bên nhận)
+// gửi qua van, feed_seq > after — đọc ở tenant BÊN CẤP của cấp quyền htx_collection_responses
+// (ADR-0020; RB-2: phạm vi = phản hồi MKG cần). Chỉ vai mkg_sync; mỗi lời gọi một dòng sổ đọc.
+func (s *Service) CollectionResponseFeed(ctx context.Context, grantor uuid.UUID, after int64, limit int, endpoint, query string) (ResponseFeedPage, error) {
+	g, err := s.partnerGrant(ctx, partyport.KindHTXCollectionResponses, grantor)
 	if err != nil {
 		return ResponseFeedPage{}, err
 	}
@@ -486,9 +521,9 @@ func (s *Service) CollectionResponseFeed(ctx context.Context, after int64, limit
 		limit = 200
 	}
 	pg := ResponseFeedPage{Next: after}
-	err = s.inTx(ctx, p.TenantID, func(tx pgx.Tx) error {
+	err = s.inTx(ctx, g.Grantor, func(tx pgx.Tx) error {
 		var e error
-		pg.Items, e = store.ResponseFeed(ctx, tx, p.TenantID, after, limit)
+		pg.Items, e = store.ResponseFeed(ctx, tx, g.Grantee, after, limit)
 		return e
 	})
 	if err != nil {
@@ -496,6 +531,10 @@ func (s *Service) CollectionResponseFeed(ctx context.Context, after int64, limit
 	}
 	if n := len(pg.Items); n > 0 {
 		pg.Next = pg.Items[n-1].FeedSeq
+	}
+	if err := s.Sharing.RecordRead(ctx, g, partyport.PartnerRead{Kind: partyport.KindHTXCollectionResponses, Endpoint: endpoint,
+		Query: query, Items: len(pg.Items)}); err != nil {
+		return ResponseFeedPage{}, err
 	}
 	return pg, nil
 }

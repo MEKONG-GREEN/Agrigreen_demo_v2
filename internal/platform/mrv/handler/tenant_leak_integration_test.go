@@ -17,6 +17,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
@@ -346,7 +347,9 @@ func TestMRVTenantLeakParallel(t *testing.T) {
 			if err := farmLog(ctx, tid, port.EventFarmLogRecorded, logRecorded(s, logRef, ids.New(), 1, "tuoi_nuoc", now.Add(-26*time.Hour))); err != nil {
 				return fmt.Errorf("nhật ký: %w", err)
 			}
-			if _, err := inbox.Process(ctx, f.pool, port.CollectionEvidenceConsumer, envelope(tid, port.EventMKGCollectionEvid,
+			mkgT := ids.New() // ADR-0020: phong bì van của tenant MKG riêng, ghi vào tenant bên cấp tid
+			f.share.Grant(tid, mkgT, partyport.KindValveMRVEvidence)
+			if _, err := inbox.Process(ctx, f.pool, port.CollectionEvidenceConsumer, envelope(mkgT, port.EventMKGCollectionEvid,
 				collection(s, ids.New(), 1, "2000-5000")), f.mod.CollectionEvidenceHandler()); err != nil {
 				return fmt.Errorf("van thu gom: %w", err)
 			}

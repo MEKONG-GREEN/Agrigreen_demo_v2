@@ -20,8 +20,10 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/e2e/harness"
@@ -43,10 +45,14 @@ const (
 type g3 struct {
 	t   *testing.T
 	s   *harness.Stack
-	p   *g1 // nền tảng: dùng lại các bước 01–03, 05 của kịch bản G1
-	tid uuid.UUID
-	m   *mkgStack
-	pm  *pump
+	p   *g1       // nền tảng: dùng lại các bước 01–03, 05 của kịch bản G1
+	tid uuid.UUID // tenant chương trình (bên cấp) — nền tảng
+	// mkg là tenant RIÊNG của MKG (ADR-0020, chủ sản phẩm chốt 29–30/09/2026): API nội bộ, ingest,
+	// tài khoản dịch vụ mkg_sync và tenant phong bì van đều thuộc tenant này.
+	mkg   uuid.UUID
+	grant harness.ShareGrant
+	m     *mkgStack
+	pm    *pump
 
 	op, appr, other mkgUser
 	mgr             *harness.User // quản lý HTX Ninh Kiều trên nền tảng (coop_manager)
@@ -68,15 +74,19 @@ type g3 struct {
 // bằng chứng thu gom → pf/mrv bằng chứng + độ đầy đủ (KN US-MRV-01..05) → phát lại GIS theo ngày
 // (GIS US-REPLAY-01) + giá trị chỉ số ngày (pf/metrics). Cuối: RB-1 (sổ chỉ ghi thêm, số thô
 // không xóa R-71), R-61 (giao lặp), cách ly tenant. R-03 do archlint + TestNoPlatformDependency.
+//
+// RB-2 / Q-MKG-12 (ADR-0020): HAI tenant — tenant chương trình (nền tảng, bên cấp) ≠ tenant MKG.
+// Nền tảng → MKG chỉ qua bề mặt đối tác /v1/partner/* sau cấp quyền chia sẻ (đề xuất ≠ duyệt); MKG →
+// nền tảng chỉ qua van, consumer ghi vào tenant bên cấp; bước 16 thu hồi và kiểm đọc bị chặn.
 func TestG3FieldToCustomer(t *testing.T) {
 	s := harness.New(t)
-	tid := harness.NewTenant()
+	tid, mkg := harness.NewTenant(), harness.NewTenant()
 	p := &g1{t: t, s: s, tid: tid, pubkeys: map[string][]byte{}}
 	p.root = s.User(harness.UserSpec{Tenant: tid, MFA: true,
 		Roles: []string{"platform_admin", "masterdata_admin", "registry_admin", "vault_registrar"}})
-	g := &g3{t: t, s: s, p: p, tid: tid, pm: newPump(t, s, tid), today: clock.BusinessDate(time.Now())}
+	g := &g3{t: t, s: s, p: p, tid: tid, mkg: mkg, pm: newPump(t, s, tid, mkg), today: clock.BusinessDate(time.Now())}
 	g.devIn, g.devOut = newEdgeScale("e2e-g3-scale-in", "HUB_IN"), newEdgeScale("e2e-g3-scale-out", "HUB_OUT")
-	g.m = newMKGStack(t, s, func() string { return g.saToken }, g.devIn.ID, g.devOut.ID)
+	g.m = newMKGStack(t, s, func() string { return g.saToken }, tid, g.devIn.ID, g.devOut.ID)
 
 	steps := []struct {
 		name string
@@ -97,6 +107,7 @@ func TestG3FieldToCustomer(t *testing.T) {
 		{"13_GIS_phat_lai_va_chi_so_ngay", g.stepGISMetrics},
 		{"14_RB1_so_chi_ghi_them_R71", g.stepAppendOnly},
 		{"15_R61_giao_lap_va_cach_ly_tenant", g.stepIdempotencyIsolation},
+		{"16_RB2_thu_hoi_cap_quyen_chia_se", g.stepRevokeShare},
 	}
 	for _, st := range steps {
 		if !t.Run(st.name, func(t *testing.T) { g.t, g.p.t = t, t; st.fn() }) {
@@ -171,18 +182,42 @@ func (g *g3) stepPlatform() {
 	}
 }
 
-// 02 — phía MKG: api-internal (fieldops đọc thửa/HTX qua Application API công khai bằng tài
-// khoản dịch vụ), ingest mTLS với CA thiết bị dev. Người đề xuất và người duyệt là hai người (R-56).
+// 02 — phía MKG: api-internal (fieldops đọc thửa/HTX qua bề mặt đối tác của Application API bằng
+// tài khoản dịch vụ tenant MKG), ingest mTLS với CA thiết bị dev. Người đề xuất và người duyệt là
+// hai người (R-56). RB-2 (ADR-0020): tenant chương trình cấp quyền chia sẻ cho tenant MKG — đề xuất
+// ≠ duyệt; trước khi duyệt, tài khoản dịch vụ MKG không đọc được gì (403).
 func (g *g3) stepMKGStack() {
-	// Tài khoản dịch vụ tenant MKG: đọc HTX/thửa + luồng phản hồi HTX (mkg_sync). RB-2 (cấp quyền
-	// chia sẻ chương trình → MKG) chưa chốt: kịch bản dùng một tenant cho cả hai vùng.
-	sa := g.s.User(harness.UserSpec{Tenant: g.tid, Org: uuid.MustParse(g.p.orgNational), Roles: []string{"kn_national_admin", "plot_viewer", "mkg_sync"}})
+	// Tài khoản dịch vụ tenant MKG: CHỈ vai mkg_sync (không có vai nào trong tenant chương trình).
+	sa := g.s.User(harness.UserSpec{Tenant: g.mkg, Roles: []string{"mkg_sync"}})
 	g.saToken = sa.Token
+	if r := sa.Do(harness.App, http.MethodGet, "/v1/partner/cooperatives/"+g.p.coopNK, "", nil); r.Status != http.StatusForbidden ||
+		r.Code() != "party.share_grant_missing" {
+		g.t.Fatalf("chưa cấp quyền: tài khoản dịch vụ MKG phải nhận 403: %d %s", r.Status, trim(r.Raw))
+	}
+	if r := sa.Do(harness.App, http.MethodGet, "/v1/plots/"+g.p.plots[0], "", nil); r.Status < 400 {
+		g.t.Fatalf("tenant MKG không đọc được thửa qua Application API thường: %d %s", r.Status, trim(r.Raw))
+	}
+	g.grant = g.s.GrantShare(g.tid, g.mkg, "MKG thu gom rơm: danh bạ HTX/thửa, ngày thu hoạch, phản hồi HTX, van (ADR-0020)",
+		"cooperative_directory", "plot_directory", "season_harvest_dates", "htx_collection_responses",
+		"valve_hub", "valve_collection", "valve_mrv_evidence")
+	r := g.want(sa.Do(harness.App, http.MethodGet, "/v1/partner/cooperatives/"+g.p.coopNK, "", nil), 200, "danh bạ HTX sau cấp quyền")
+	for _, k := range []string{"representative_ref", "tax_code", "households"} {
+		if _, ok := r.Body[k]; ok {
+			g.t.Fatalf("danh bạ HTX không được mang %s: %s", k, trim(r.Raw))
+		}
+	}
+	r = g.want(sa.Do(harness.App, http.MethodGet, "/v1/partner/season-harvest-dates?plot_ref="+g.p.plots[0], "", nil), 200, "ngày thu hoạch (FM-01/02)")
+	if it := r.Items(); len(it) != 1 || str(it[0], "season_ref") != g.seasonRef || str(it[0], "expected_harvest_date") == "" {
+		g.t.Fatalf("ngày thu hoạch của vụ thửa 1: %s", trim(r.Raw))
+	}
+	if _, ok := r.Items()[0]["household_ref"]; ok {
+		g.t.Fatalf("ngày thu hoạch không được mang nông hộ: %s", trim(r.Raw))
+	}
 	sign := func(tid uuid.UUID, roles ...string) mkgUser {
 		return mkgUser{g: g, tok: g.s.Issuer.Sign(g.t, mkgToken(tid, roles))}
 	}
-	g.op = sign(g.tid, "field_supervisor", "field_collector", "scale_supervisor", "reconciliation_officer", "dispute_officer", "hub_operator")
-	g.appr = sign(g.tid, "field_supervisor", "device_approver", "hub_approver")
+	g.op = sign(g.mkg, "field_supervisor", "field_collector", "scale_supervisor", "reconciliation_officer", "dispute_officer", "hub_operator")
+	g.appr = sign(g.mkg, "field_supervisor", "device_approver", "hub_approver")
 	g.other = sign(ids.New(), "field_supervisor", "field_collector", "scale_supervisor", "reconciliation_officer", "dispute_officer", "hub_operator")
 	if r := mkgDo(g.t, g.m.App.URL, "", http.MethodGet, "/readyz", nil); r.Status != 200 || r.Str("zone") != "mkg" {
 		g.t.Fatalf("api-internal chưa sẵn sàng: %d %s", r.Status, trim(r.Raw))
@@ -300,11 +335,11 @@ func (g *g3) stepHTXConfirm() {
 	g.want(g.mgr.Do(harness.App, http.MethodPost, "/v1/cropcycle/htx-collection/statements/"+g.statementRef+"/responses", "",
 		map[string]any{"revision": 1, "outcome": "confirmed"}), 201, "HTX xác nhận bảng kê")
 	ctx := context.Background()
-	res, err := g.m.Mods.Fieldops.SyncHTXResponses(ctx, g.tid)
+	res, err := g.m.Mods.Fieldops.SyncHTXResponses(ctx, g.mkg)
 	if err != nil || res.Recorded != 1 {
 		g.t.Fatalf("job kéo phản hồi HTX: %+v %v", res, err)
 	}
-	if res, err := g.m.Mods.Fieldops.SyncHTXResponses(ctx, g.tid); err != nil || res.Recorded != 0 {
+	if res, err := g.m.Mods.Fieldops.SyncHTXResponses(ctx, g.mkg); err != nil || res.Recorded != 0 {
 		g.t.Fatalf("kéo lặp không được ghi trùng: %+v %v", res, err)
 	}
 	rec := g.want(g.op.app(http.MethodGet, "/v1/fieldops/reconciliation?order_id="+g.order, nil), 200, "đối soát chiều mua")
@@ -370,7 +405,7 @@ func (g *g3) stepHubIn() {
 	}
 	// Số thô ở cụm ts (vai ts_reader, RLS theo tenant).
 	var raw int
-	if err := tenant.WithTenantTx(context.Background(), g.s.Env.Pool(g.t, migrations.TS, mport.TSReaderRole), g.tid, func(tx pgx.Tx) error {
+	if err := tenant.WithTenantTx(context.Background(), g.s.Env.Pool(g.t, migrations.TS, mport.TSReaderRole), g.mkg, func(tx pgx.Tx) error {
 		return tx.QueryRow(context.Background(), "SELECT count(*) FROM ts_weigh.raw_reading WHERE device_id = $1", g.devIn.ID).Scan(&raw)
 	}); err != nil {
 		g.t.Fatal(err)
@@ -594,11 +629,17 @@ func (g *g3) stepAppendOnly() {
 		{migrations.PF, mrv.DBRole, "pf_mrv.collection_evidence"},
 		{migrations.PF, metrics.DBRole, "pf_metrics.layer_event"},
 		{migrations.PF, metrics.DBRole, "pf_metrics.daily_value"},
+		{migrations.PF, party.DBRole, "pf_party.share_grant_event"},
+		{migrations.PF, party.DBRole, "pf_party.partner_read_log"},
 	}
 	for _, c := range cases {
 		pool := g.s.Env.Pool(g.t, c.cluster, c.role)
+		tid := g.tid // ADR-0020: dữ liệu nền tảng ở tenant chương trình, dữ liệu MKG (mkg, ts) ở tenant MKG
+		if c.cluster != migrations.PF {
+			tid = g.mkg
+		}
 		var n int
-		if err := tenant.WithTenantTx(ctx, pool, g.tid, func(tx pgx.Tx) error {
+		if err := tenant.WithTenantTx(ctx, pool, tid, func(tx pgx.Tx) error {
 			return tx.QueryRow(ctx, "SELECT count(*) FROM "+c.table).Scan(&n)
 		}); err != nil {
 			g.t.Fatalf("%s: %v", c.table, err)
@@ -613,7 +654,7 @@ func (g *g3) stepAppendOnly() {
 		for _, role := range writers {
 			wp := g.s.Env.Pool(g.t, c.cluster, role)
 			for _, stmt := range []string{"UPDATE " + c.table + " SET tenant_id = tenant_id", "DELETE FROM " + c.table} {
-				err := tenant.WithTenantTx(ctx, wp, g.tid, func(tx pgx.Tx) error { _, e := tx.Exec(ctx, stmt); return e })
+				err := tenant.WithTenantTx(ctx, wp, tid, func(tx pgx.Tx) error { _, e := tx.Exec(ctx, stmt); return e })
 				if err == nil {
 					g.t.Fatalf("RB-1: %s bằng vai %s phải bị chặn", stmt, role)
 				}
@@ -622,7 +663,7 @@ func (g *g3) stepAppendOnly() {
 		// Owner (migrator) cũng bị trigger chặn — chỉ thử trên cụm ts và sổ phiếu cân (R-71, R-70).
 		if c.table == "ts_weigh.raw_reading" || c.table == "mkg_measurement.weigh_ticket" {
 			admin := g.s.Env.AdminPool(g.t, c.cluster)
-			if _, err := admin.Exec(ctx, "DELETE FROM "+c.table+" WHERE tenant_id = $1", g.tid); err == nil {
+			if _, err := admin.Exec(ctx, "DELETE FROM "+c.table+" WHERE tenant_id = $1", tid); err == nil {
 				g.t.Fatalf("R-71/RB-1: owner xóa được %s", c.table)
 			}
 		}
@@ -663,7 +704,7 @@ func (g *g3) stepIdempotencyIsolation() {
 	// Không dữ liệu cá nhân (tên/SĐT nông hộ tổng hợp) trong outbox MKG hay log của mọi server.
 	var payloads string
 	if err := g.s.Env.Pool(g.t, migrations.MKG, "ag_outbox_publisher").QueryRow(context.Background(),
-		"SELECT coalesce(string_agg(payload::text, ' '), '') FROM shared.outbox WHERE tenant_id = $1", g.tid).Scan(&payloads); err != nil {
+		"SELECT coalesce(string_agg(payload::text, ' '), '') FROM shared.outbox WHERE tenant_id = $1", g.mkg).Scan(&payloads); err != nil {
 		g.t.Fatal(err)
 	}
 	logs := g.s.Logs.String()
@@ -672,4 +713,78 @@ func (g *g3) stepIdempotencyIsolation() {
 			g.t.Fatalf("dữ liệu cá nhân %q lọt ra outbox MKG / log", x)
 		}
 	}
+}
+
+// countIn đếm dòng của một bảng pf/mkg dưới tenant tid bằng vai role (RLS áp dụng).
+func (g *g3) countIn(c migrations.Cluster, role string, tid uuid.UUID, q string) int {
+	g.t.Helper()
+	var n int
+	ctx := context.Background()
+	if err := tenant.WithTenantTx(ctx, g.s.Env.Pool(g.t, c, role), tid, func(tx pgx.Tx) error { return tx.QueryRow(ctx, q).Scan(&n) }); err != nil {
+		g.t.Fatalf("%s: %v", q, err)
+	}
+	return n
+}
+
+// 16 — RB-2 / Q-MKG-12 (ADR-0020): van MKG đã được ghi vào tenant chương trình (bên cấp) với nguồn =
+// tenant MKG, tenant MKG không có dòng nào ở pf; mọi lần MKG đọc nền tảng có trong sổ đọc bên cấp;
+// thu hồi cấp quyền → bề mặt đối tác 403 ngay, job kéo phản hồi HTX lỗi (không tiến con trỏ), lệnh
+// gom mới bị từ chối (HTX/thửa "không có"), van mới của MKG bị từ chối (DLQ).
+func (g *g3) stepRevokeShare() {
+	src := "SELECT count(*) FROM pf_cropcycle.collection_valve_receipt WHERE source_tenant_id = '" + g.mkg.String() + "'"
+	if n := g.countIn(migrations.PF, cropcycle.DBRole, g.tid, src); n == 0 {
+		g.t.Fatal("sổ nhận van phải ở tenant chương trình với source_tenant_id = tenant MKG")
+	}
+	for _, c := range []struct{ role, q string }{
+		{cropcycle.DBRole, "SELECT count(*) FROM pf_cropcycle.collection_valve_receipt"},
+		{cropcycle.DBRole, "SELECT count(*) FROM pf_cropcycle.collection_statement_view"},
+		{mrv.DBRole, "SELECT count(*) FROM pf_mrv.collection_evidence"},
+		{"geo_app", "SELECT count(*) FROM pf_geo.hub_view"},
+	} {
+		if n := g.countIn(migrations.PF, c.role, g.mkg, c.q); n != 0 {
+			g.t.Fatalf("tenant MKG không được có dòng pf (%s): %d", c.q, n)
+		}
+	}
+	if n := g.countIn(migrations.PF, "geo_app", g.tid, "SELECT count(*) FROM pf_geo.hub_view"); n == 0 {
+		g.t.Fatal("hub MKG (van hub_facility) phải ở tenant chương trình")
+	}
+	reads := g.want(g.grant.Proposer.Do(harness.Admin, http.MethodGet, "/v1/share-grants/"+g.grant.ID+"/reads?limit=500", "", nil), 200, "sổ đọc")
+	kinds := map[string]bool{}
+	for _, it := range reads.Items() {
+		kinds[str(it, "kind")] = true
+	}
+	for _, k := range []string{"cooperative_directory", "plot_directory", "season_harvest_dates", "htx_collection_responses"} {
+		if !kinds[k] {
+			g.t.Fatalf("sổ đọc phải có lần đọc loại %s: %s", k, trim(reads.Raw))
+		}
+	}
+
+	g.want(g.grant.Approver.Do(harness.Admin, http.MethodPost, "/v1/share-grants/"+g.grant.ID+"/revoke", "",
+		map[string]any{"reason": "Kết thúc thí điểm thu gom (e2e G3)"}), 201, "thu hồi cấp quyền")
+	r := mkgDo(g.t, g.s.App.URL, g.saToken, http.MethodGet, "/v1/partner/plots/"+g.p.plots[0], nil)
+	if r.Status != http.StatusForbidden || r.Code() != "party.share_grant_missing" {
+		g.t.Fatalf("sau thu hồi bề mặt đối tác phải 403: %d %s", r.Status, trim(r.Raw))
+	}
+	if _, err := g.m.Mods.Fieldops.SyncHTXResponses(context.Background(), g.mkg); err == nil {
+		g.t.Fatal("sau thu hồi job kéo phản hồi HTX phải lỗi (không tiến con trỏ)")
+	}
+	day := time.Now().In(clock.Zone())
+	if r := g.op.app(http.MethodPost, "/v1/fieldops/orders", map[string]any{"htx_ref": g.p.coopNK, "window_from": day.Format(time.DateOnly),
+		"window_to": day.AddDate(0, 0, 3).Format(time.DateOnly), "plot_refs": []string{g.p.plots[1]}}); r.Status < 400 {
+		g.t.Fatalf("sau thu hồi không lập được lệnh gom với HTX/thửa của nền tảng: %d %s", r.Status, trim(r.Raw))
+	}
+	// MKG phát lại van hub_facility (event_id mới) → consumer nền tảng từ chối với mã rõ (DLQ), không ghi.
+	for _, d := range g.pm.delivered {
+		if d.consumer != "pf.geo.hub_valve" {
+			continue
+		}
+		env := d.env
+		env.EventID = ids.New()
+		_, err := inbox.Process(context.Background(), g.s.Env.Pool(g.t, d.cluster, d.role), d.consumer, env, d.handler)
+		if err == nil || !strings.Contains(err.Error(), "party.valve_share_grant_missing") {
+			g.t.Fatalf("van sau thu hồi phải bị từ chối party.valve_share_grant_missing: %v", err)
+		}
+		return
+	}
+	g.t.Fatal("kịch bản phải đã giao van hub_facility")
 }

@@ -148,6 +148,44 @@ func TestContextDoesNotOutliveTransaction(t *testing.T) {
 	}
 }
 
+// ADR-0020: Within đổi ngữ cảnh tenant trong CÙNG giao dịch (RLS vẫn áp) rồi trả về tenant cũ.
+func TestWithinSwitchesAndRestores(t *testing.T) {
+	env := pgtest.Get(t)
+	pool := env.Pool(t, migrations.PF, "party_app")
+	ctx := context.Background()
+	a, b := ids.New(), ids.New()
+	err := tenant.WithTenantTx(ctx, pool, a, func(tx pgx.Tx) error {
+		if err := tenant.Within(ctx, tx, b, func() error { return insertConsent(ctx, tx, b, ids.New()) }); err != nil {
+			return err
+		}
+		// Đã về tenant a: dòng của b không thấy.
+		var n int
+		if err := tx.QueryRow(ctx, "SELECT count(*) FROM pf_party.consent").Scan(&n); err != nil {
+			return err
+		}
+		if n != 0 {
+			return fmt.Errorf("sau Within vẫn thấy %d dòng", n)
+		}
+		return insertConsent(ctx, tx, a, ids.New())
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tid := range []uuid.UUID{a, b} {
+		var n int
+		if err := tenant.WithTenantTx(ctx, pool, tid, func(tx pgx.Tx) error {
+			return tx.QueryRow(ctx, "SELECT count(*) FROM pf_party.consent").Scan(&n)
+		}); err != nil || n != 1 {
+			t.Fatalf("tenant %s phải có đúng 1 dòng: %d %v", tid, n, err)
+		}
+	}
+	if err := tenant.WithTenantTx(ctx, pool, a, func(tx pgx.Tx) error {
+		return tenant.Within(ctx, tx, uuid.Nil, func() error { return nil })
+	}); !errors.Is(err, tenant.ErrMissing) {
+		t.Fatalf("Within tenant rỗng phải lỗi ErrMissing: %v", err)
+	}
+}
+
 func TestRejectsNilTenant(t *testing.T) {
 	err := tenant.WithTenantTx(context.Background(), nil, uuid.Nil, func(pgx.Tx) error { return nil })
 	if !errors.Is(err, tenant.ErrMissing) {

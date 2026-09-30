@@ -607,7 +607,7 @@ export const shifts: CrewShift[] = [];
 export const buySide: BuySideReconciliation[] = [];
 export const fieldPublications: Record<string, ValveExport[]> = {};
 
-/** Danh bạ thửa ↔ HTX (thay cho Application API của nền tảng — tài khoản dịch vụ MKG, RB-2 chờ chốt). */
+/** Danh bạ thửa ↔ HTX (thay cho Application API của nền tảng — tài khoản dịch vụ MKG, bề mặt đối tác /v1/partner/*, ADR-0020). */
 export const PLOT_HTX: Record<string, string> = {
   [PLOT.a1]: HTX.vinhBinh,
   [PLOT.a2]: HTX.vinhBinh,

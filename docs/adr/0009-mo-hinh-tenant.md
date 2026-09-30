@@ -13,7 +13,22 @@
 - Phạm vi theo cây phân cấp và theo HTX là **phân quyền tầng ứng dụng** (R-33: RLS chỉ cách ly tenant), gắn vào `authz.Principal`.
 - Dữ liệu dùng chung giữa các ứng dụng (thửa, HTX) thuộc tenant sở hữu. Ứng dụng khác đọc qua `port/` hoặc API, không chồng policy.
 - Mã định danh "duy nhất toàn hệ thống" (MAY-, CSH- của CGH) là nhãn hiển thị, không mang ý nghĩa địa lý bất biến.
-- Liên thông khác tenant — xem ADR-0020. Ví dụ: tài khoản dịch vụ của tenant MKG đọc thửa và HTX thuộc tenant chương trình (RB-2). ADR này không cấp quyền xuyên tenant.
+- Liên thông khác tenant — xem [ADR-0020](0020-lien-thong-platform-mkg-khac-tenant.md). Ví dụ: tài khoản dịch vụ của tenant MKG đọc thửa và HTX thuộc tenant chương trình (RB-2). ADR này không cấp quyền xuyên tenant.
 
 ## Triển khai
 Đối chiếu từng cam kết với mã và kiểm thử: [trien-khai-g1.md](trien-khai-g1.md#adr-0009-mô-hình-tenant-theo-tổ-chức-sở-hữu-dữ-liệu).
+
+## Cập nhật 30/09/2026 — MKG là tenant riêng (ADR-0020)
+
+Chủ sản phẩm chốt (29–30/09/2026): hệ thống nội bộ của MKG (ERP, TMS) **không** dùng chung tenant với nền tảng, chỉ liên thông các dữ liệu cần thiết từ nền tảng qua hệ thống nội bộ. Vì vậy ĐTK 1 có **hai** tenant:
+- tenant chương trình khuyến nông — chủ thửa, HTX, nông hộ, vụ;
+- tenant MKG — chủ dữ liệu vùng mkg.
+
+Nguyên tắc "tenant = tổ chức sở hữu dữ liệu" giữ nguyên. Ứng dụng của tenant khác đọc dữ liệu dùng chung **không** bằng cách chồng policy RLS và **không** bằng vai trong tenant chủ, mà bằng một cấp quyền chia sẻ tường minh:
+- bên cấp → bên nhận;
+- phạm vi = danh sách loại dữ liệu, có hạn;
+- người duyệt ≠ người đề xuất;
+- thu hồi được;
+- mọi lần đọc ghi sổ.
+
+Chi tiết ở [ADR-0020](0020-lien-thong-platform-mkg-khac-tenant.md).

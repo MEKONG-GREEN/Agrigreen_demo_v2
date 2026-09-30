@@ -8,13 +8,15 @@ import "github.com/google/uuid"
 // MKG → nền tảng chỉ qua van công bố (contracts/publication/collection_schedule.json,
 // htx_collection_statement.json — người nhận pf/cropcycle); tên sự kiện và hợp đồng
 // khai lại ở đây vì vùng nền tảng không import mkg (R-03). Nền tảng → MKG chỉ qua
-// Application API công khai: MKG kéo phản hồi của HTX bằng tài khoản dịch vụ vai
-// RoleMKGSync (GET /v1/cropcycle/htx-collection/responses) — không có hàng đợi pf → mkg.
+// Application API công khai: MKG (tenant riêng, ADR-0020) kéo phản hồi của HTX bằng tài khoản
+// dịch vụ vai RoleMKGSync qua bề mặt đối tác GET /v1/partner/htx-collection/responses (bí danh
+// /v1/cropcycle/htx-collection/responses) sau khi kiểm cấp quyền chia sẻ htx_collection_responses
+// — không có hàng đợi pf → mkg.
 // ---------------------------------------------------------------------------
 
 // RoleMKGSync là vai của tài khoản dịch vụ MKG (client agrigreen-mkg-sync, client
-// credentials) kéo phản hồi của HTX về MKG. Chỉ đọc luồng phản hồi thuộc bảng kê do
-// chính tenant của tài khoản gửi qua van; không đọc lịch gom, bảng kê hay dữ liệu khác.
+// credentials) đọc bề mặt đối tác /v1/partner/* (ADR-0020). Luồng phản hồi chỉ gồm phản hồi thuộc
+// bảng kê do chính tenant của tài khoản gửi qua van; không đọc lịch gom, bảng kê hay dữ liệu khác.
 const RoleMKGSync = "mkg_sync"
 
 // Sự kiện van MKG (tên chốt ở contracts/publication/*.json).

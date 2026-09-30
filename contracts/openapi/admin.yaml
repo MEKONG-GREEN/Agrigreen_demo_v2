@@ -3464,6 +3464,154 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
   # --- hết pf/cropcycle ---
+  # --- pf/party: cấp quyền chia sẻ giữa hai tenant (ADR-0020, RB-2 / Q-MKG-12) ---
+  /v1/share-grants:
+    post:
+      summary: Đề xuất cấp quyền chia sẻ tenant này (bên cấp) → tenant khác (bên nhận) — ADR-0020
+      description: |
+        Chỉ `platform_admin` của tenant bên cấp. Một `platform_admin` KHÁC duyệt (R-56). `valid_from` vắng → lúc đề xuất;
+        `valid_to` bắt buộc, ở tương lai, tối đa 5 năm.
+      operationId: proposeShareGrant
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grantee_tenant_id, kinds, purpose, valid_to]
+              properties:
+                grantee_tenant_id: {type: string, format: uuid}
+                kinds:
+                  type: array
+                  minItems: 1
+                  items: {$ref: "#/components/schemas/ShareKind"}
+                purpose: {type: string, minLength: 10, maxLength: 500}
+                valid_from: {type: string, format: date-time}
+                valid_to: {type: string, format: date-time}
+      responses:
+        "201":
+          description: Đã đề xuất (gọi lặp cùng Idempotency-Key → như lần đầu)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ShareGrant"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Cấp quyền chia sẻ của tenant bên cấp — ADR-0020
+      operationId: listShareGrants
+      tags: [party]
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [proposed, active, revoked]}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ShareGrant"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/share-grants/{id}:
+    get:
+      summary: Một cấp quyền chia sẻ — ADR-0020
+      operationId: getShareGrant
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Cấp quyền
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ShareGrant"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/share-grants/{id}/approve:
+    post:
+      summary: Duyệt cấp quyền chia sẻ — người duyệt ≠ người đề xuất (R-56), ADR-0020
+      description: Ghi cùng giao dịch bảng chiếu ở tenant bên nhận. Tự duyệt → 403 `self_approval_forbidden`.
+      operationId: approveShareGrant
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "201":
+          description: Đã duyệt (gọi lặp của chính người duyệt → 200)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ShareGrant"}
+        "200":
+          description: Đã duyệt trước đó bởi chính người gọi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ShareGrant"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/share-grants/{id}/revoke:
+    post:
+      summary: Thu hồi cấp quyền chia sẻ (có hiệu lực ngay) — ADR-0020
+      operationId: revokeShareGrant
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201":
+          description: Đã thu hồi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ShareGrant"}
+        "200":
+          description: Đã thu hồi trước đó bởi chính người gọi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ShareGrant"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/share-grants/{id}/reads:
+    get:
+      summary: Sổ đọc của bên nhận với một cấp quyền (mỗi lời gọi /v1/partner/* một dòng) — ADR-0020
+      operationId: listShareGrantReads
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: after, in: query, schema: {type: integer, minimum: 0, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 100}}
+      responses:
+        "200":
+          description: Một trang sổ đọc
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  next_cursor: {type: integer}
+                  items: {type: array, items: {$ref: "#/components/schemas/ShareGrantRead"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/party cấp quyền chia sẻ ---
 components:
   securitySchemes:
     oidc:
@@ -4695,6 +4843,43 @@ components:
         bound_by: {type: string, format: uuid}
         bound_at: {type: string, format: date-time}
     # --- hết pf/cropcycle ---
+    # --- pf/party: cấp quyền chia sẻ (ADR-0020) ---
+    ShareKind:
+      type: string
+      enum: [cooperative_directory, plot_directory, season_harvest_dates, htx_collection_responses, valve_hub, valve_collection, valve_mrv_evidence]
+    ShareGrant:
+      type: object
+      required: [id, grantor_tenant_id, grantee_tenant_id, kinds, purpose, valid_from, valid_to, status, proposed_by, proposed_at, approved_by, approved_at, revoked_by, revoked_at, revoke_reason]
+      properties:
+        id: {type: string, format: uuid}
+        grantor_tenant_id: {type: string, format: uuid}
+        grantee_tenant_id: {type: string, format: uuid}
+        kinds: {type: array, items: {$ref: "#/components/schemas/ShareKind"}}
+        purpose: {type: string}
+        valid_from: {type: string, format: date-time}
+        valid_to: {type: string, format: date-time}
+        status: {type: string, enum: [proposed, active, revoked]}
+        proposed_by: {type: string, format: uuid}
+        proposed_at: {type: string, format: date-time}
+        approved_by: {type: [string, "null"], format: uuid}
+        approved_at: {type: [string, "null"], format: date-time}
+        revoked_by: {type: [string, "null"], format: uuid}
+        revoked_at: {type: [string, "null"], format: date-time}
+        revoke_reason: {type: [string, "null"]}
+    ShareGrantRead:
+      type: object
+      required: [id, seq, grantee_tenant_id, kind, endpoint, query, item_count, actor_ref, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        grantee_tenant_id: {type: string, format: uuid}
+        kind: {$ref: "#/components/schemas/ShareKind"}
+        endpoint: {type: string}
+        query: {type: [string, "null"]}
+        item_count: {type: integer}
+        actor_ref: {type: string, format: uuid, description: "sub của tài khoản dịch vụ bên nhận"}
+        recorded_at: {type: string, format: date-time}
+    # --- hết pf/party cấp quyền chia sẻ ---
   requestBodies:
     ContentTransition:
       required: true

@@ -53,6 +53,12 @@ func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 		Catalogs: deps.Catalogs, Farmers: deps.Farmers, GpsLog: deps.GpsLog}}
 }
 
+// UseSharing nối cổng cấp quyền chia sẻ của pf/party (ADR-0020): bề mặt đối tác /v1/partner/*
+// (ngày thu hoạch của vụ, luồng phản hồi HTX) và định tuyến van collection_* về tenant bên cấp.
+func (m *Module) UseSharing(pa partyport.PartnerAccess, vg partyport.ValveGrants) {
+	m.svc.Sharing, m.svc.ValveGrants = pa, vg
+}
+
 // UseFarmerHouseholds nối liên kết tài khoản ↔ nông hộ sau khi dựng pf/accounts.
 func (m *Module) UseFarmerHouseholds(f port.FarmerHouseholds) { m.svc.Farmers = f }
 

@@ -64,7 +64,7 @@ func TestCollectionValveScheduleLatestRevision_RB6_BuySide(t *testing.T) {
 		schedulePayload(ref, f.coopA, "in_progress", 3),
 		schedulePayload(ref, f.coopA, "confirmed", 2), // bản cũ đến muộn
 	} {
-		if _, err := f.deliver(f.tenant, port.EventMKGCollectionSchedulePublished, p); err != nil {
+		if _, err := f.deliver(f.mkg, port.EventMKGCollectionSchedulePublished, p); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -97,12 +97,12 @@ func TestCollectionValveDefaultDeny_RB6(t *testing.T) {
 	f := newFixture(t)
 	p := statementPayload(ids.New(), f.coopA, f.p1, 40, 1)
 	p["owner_phone"] = "0912345678"
-	if _, err := f.deliver(f.tenant, port.EventMKGHTXCollectionStatementPublished, p); err == nil {
+	if _, err := f.deliver(f.mkg, port.EventMKGHTXCollectionStatementPublished, p); err == nil {
 		t.Fatal("khóa lạ phải bị từ chối")
 	}
 	q := statementPayload(ids.New(), f.coopA, f.p1, 40, 1)
 	delete(q, "rolls")
-	if _, err := f.deliver(f.tenant, port.EventMKGHTXCollectionStatementPublished, q); err == nil {
+	if _, err := f.deliver(f.mkg, port.EventMKGHTXCollectionStatementPublished, q); err == nil {
 		t.Fatal("thiếu trường phải bị từ chối")
 	}
 	if r := f.managerA().get("/v1/cropcycle/htx-collection/statements"); len(list(r.body, "items")) != 0 {
@@ -116,7 +116,7 @@ func TestCollectionValveDefaultDeny_RB6(t *testing.T) {
 func TestHTXRespondStatement_RB6_BuySide(t *testing.T) {
 	f := newFixture(t)
 	ref := ids.New()
-	if _, err := f.deliver(f.tenant, port.EventMKGHTXCollectionStatementPublished, statementPayload(ref, f.coopA, f.p1, 40, 1)); err != nil {
+	if _, err := f.deliver(f.mkg, port.EventMKGHTXCollectionStatementPublished, statementPayload(ref, f.coopA, f.p1, 40, 1)); err != nil {
 		t.Fatal(err)
 	}
 	mgr := f.managerA()
@@ -156,7 +156,7 @@ func TestHTXRespondStatement_RB6_BuySide(t *testing.T) {
 		t.Fatalf("lịch sử phản hồi: %s", d.raw)
 	}
 	// MKG gửi bản sửa (revision 2, 38 cuộn): phản hồi theo revision 1 → 409.
-	if _, err := f.deliver(f.tenant, port.EventMKGHTXCollectionStatementPublished, statementPayload(ref, f.coopA, f.p1, 38, 2)); err != nil {
+	if _, err := f.deliver(f.mkg, port.EventMKGHTXCollectionStatementPublished, statementPayload(ref, f.coopA, f.p1, 38, 2)); err != nil {
 		t.Fatal(err)
 	}
 	expectCode(t, mgr.post(path, map[string]any{"revision": 1, "outcome": "confirmed"}), http.StatusConflict,
@@ -174,8 +174,9 @@ func TestHTXRespondStatement_RB6_BuySide(t *testing.T) {
 	}
 }
 
-// RB-6 chiều mua + RB-2: luồng phản hồi cho MKG (vai mkg_sync) theo con trỏ tăng dần, chỉ phản hồi
-// thuộc bảng kê của tenant người gọi; vai khác không đọc được luồng, mkg_sync không đọc được bảng kê.
+// RB-6 chiều mua + RB-2 (ADR-0020): luồng phản hồi cho MKG (vai mkg_sync, tenant MKG riêng) theo con
+// trỏ tăng dần, đọc ở tenant bên cấp qua cấp quyền htx_collection_responses, chỉ phản hồi thuộc bảng
+// kê do tenant người gọi gửi; vai khác không đọc được luồng, mkg_sync không đọc được bảng kê.
 func TestMKGSyncResponseFeed_RB6_RB2(t *testing.T) {
 	f := newFixture(t)
 	mgr := f.managerA()
@@ -183,13 +184,13 @@ func TestMKGSyncResponseFeed_RB6_RB2(t *testing.T) {
 	for i := range 3 {
 		ref := ids.New()
 		refs = append(refs, ref)
-		if _, err := f.deliver(f.tenant, port.EventMKGHTXCollectionStatementPublished, statementPayload(ref, f.coopA, f.p1, 10+i, 1)); err != nil {
+		if _, err := f.deliver(f.mkg, port.EventMKGHTXCollectionStatementPublished, statementPayload(ref, f.coopA, f.p1, 10+i, 1)); err != nil {
 			t.Fatal(err)
 		}
 		expect(t, mgr.post("/v1/cropcycle/htx-collection/statements/"+ref.String()+"/responses",
 			map[string]any{"revision": 1, "outcome": "confirmed"}), http.StatusCreated, "xác nhận")
 	}
-	sa := f.as(f.tenant, uuid.Nil, port.RoleMKGSync)
+	sa := f.as(f.mkg, uuid.Nil, port.RoleMKGSync) // tài khoản dịch vụ thuộc tenant MKG (ADR-0020)
 	r := sa.get("/v1/cropcycle/htx-collection/responses?limit=2")
 	expect(t, r, http.StatusOK, "luồng trang 1")
 	items := list(r.body, "items")
@@ -210,8 +211,16 @@ func TestMKGSyncResponseFeed_RB6_RB2(t *testing.T) {
 	}
 	expect(t, mgr.get("/v1/cropcycle/htx-collection/responses"), http.StatusForbidden, "quản lý HTX không đọc luồng MKG")
 	expect(t, sa.get("/v1/cropcycle/htx-collection/statements"), http.StatusForbidden, "mkg_sync không đọc bảng kê")
-	if r := f.as(ids.New(), uuid.Nil, port.RoleMKGSync).get("/v1/cropcycle/htx-collection/responses"); len(list(r.body, "items")) != 0 {
-		t.Fatalf("tenant khác thấy luồng: %s", r.raw)
+	// Tenant khác không có cấp quyền → 403 party.share_grant_missing (không phải "rỗng").
+	expectCode(t, f.as(ids.New(), uuid.Nil, port.RoleMKGSync).get("/v1/cropcycle/htx-collection/responses"), http.StatusForbidden,
+		"party.share_grant_missing", "tenant khác không có cấp quyền")
+	// Đường chuẩn của bề mặt đối tác trả cùng luồng; mỗi lời gọi ghi một dòng sổ đọc.
+	before := f.share.ReadCount()
+	if r := sa.get("/v1/partner/htx-collection/responses"); len(list(r.body, "items")) != 3 {
+		t.Fatalf("đường /v1/partner: %s", r.raw)
+	}
+	if f.share.ReadCount() != before+1 {
+		t.Fatal("mỗi lời gọi bề mặt đối tác phải ghi sổ đọc")
 	}
 }
 
@@ -220,10 +229,10 @@ func TestMKGSyncResponseFeed_RB6_RB2(t *testing.T) {
 func TestCollectionSyncPushPull_RB6(t *testing.T) {
 	f := newFixture(t)
 	ref := ids.New()
-	if _, err := f.deliver(f.tenant, port.EventMKGCollectionSchedulePublished, schedulePayload(ids.New(), f.coopA, "planned", 1)); err != nil {
+	if _, err := f.deliver(f.mkg, port.EventMKGCollectionSchedulePublished, schedulePayload(ids.New(), f.coopA, "planned", 1)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.deliver(f.tenant, port.EventMKGHTXCollectionStatementPublished, statementPayload(ref, f.coopA, f.p1, 20, 1)); err != nil {
+	if _, err := f.deliver(f.mkg, port.EventMKGHTXCollectionStatementPublished, statementPayload(ref, f.coopA, f.p1, 20, 1)); err != nil {
 		t.Fatal(err)
 	}
 	mgr := f.managerA()

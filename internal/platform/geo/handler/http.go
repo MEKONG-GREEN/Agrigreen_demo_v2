@@ -24,6 +24,8 @@ type Handler struct{ Svc *app.Service }
 // RegisterApp gắn route Application API vào nhóm /v1 (OIDC + Idempotency-Key cho POST).
 func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/plots", h.bbox)
+	rg.GET("/partner/plots", h.partnerPlots)
+	rg.GET("/partner/plots/:ref", h.partnerPlot)
 	rg.POST("/plots", h.create)
 	rg.POST("/plots/overlap-check", h.overlapCheck)
 	rg.GET("/plots/:ref", h.get)

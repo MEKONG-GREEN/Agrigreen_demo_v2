@@ -350,6 +350,16 @@ services:
       AG_CORS_ORIGINS: ${AG_MKG_CORS_ORIGINS:-http://localhost:3001,http://127.0.0.1:3001}
       AG_DB_VIA_PGBOUNCER: "1"
       AG_DB_APP_PASSWORD: ${AG_DB_APP_PASSWORD}
+      # Nền tảng → MKG (ADR-0020): mkg/fieldops đọc bề mặt đối tác /v1/partner/* bằng tài khoản dịch vụ
+      # agrigreen-mkg-sync của tenant MKG (tenant RIÊNG). Đọc được khi tenant chương trình
+      # (AG_PARTNER_GRANTOR_TENANT) đã duyệt cấp quyền chia sẻ (POST /v1/share-grants, hai quản trị).
+      # AG_PLATFORM_API_URL trống → nguồn thửa/HTX đóng (lập lệnh gom trả 503 fieldops.directory_unavailable).
+      AG_PLATFORM_API_URL: ${AG_PLATFORM_API_URL:-}
+      AG_PLATFORM_TOKEN_URL: ${AG_PLATFORM_TOKEN_URL:-http://keycloak:8080/realms/agrigreen/protocol/openid-connect/token}
+      AG_MKG_SA_CLIENT_ID: ${AG_MKG_SA_CLIENT_ID:-agrigreen-mkg-sync}
+      AG_MKG_SA_CLIENT_SECRET: ${AG_MKG_SA_CLIENT_SECRET:-}
+      AG_MKG_TENANT_ID: ${AG_MKG_TENANT_ID:-}
+      AG_PARTNER_GRANTOR_TENANT: ${AG_PARTNER_GRANTOR_TENANT:-}
     # Ảnh distroless không có curl: chính binary kiểm /readyz (cmd/api-internal -healthcheck).
     healthcheck:
       test: ["CMD", "/app", "-healthcheck", "http://127.0.0.1:8081/readyz"]

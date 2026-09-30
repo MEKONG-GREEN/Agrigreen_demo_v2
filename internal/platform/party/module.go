@@ -33,8 +33,9 @@ type Deps struct {
 
 // Module là pf/party đã nối.
 type Module struct {
-	svc *app.Service
-	reg *app.Registry
+	svc   *app.Service
+	reg   *app.Registry
+	share *app.Sharing
 }
 
 // New tạo module với pool của vai party_app. deps tùy chọn để giữ tương thích
@@ -46,8 +47,9 @@ func New(db tenant.Beginner, clk clock.Clock, deps ...Deps) *Module {
 		d = deps[0]
 	}
 	return &Module{
-		svc: &app.Service{DB: db, Clock: clk},
-		reg: &app.Registry{DB: db, Clock: clk, Units: d.AdminUnits, Vault: d.Vault},
+		svc:   &app.Service{DB: db, Clock: clk},
+		reg:   &app.Registry{DB: db, Clock: clk, Units: d.AdminUnits, Vault: d.Vault},
+		share: &app.Sharing{DB: db, Clock: clk},
 	}
 }
 
@@ -56,10 +58,21 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.Handler{Svc: m.svc}.Register(rg)
 	handler.Registry{Reg: m.reg}.RegisterApp(rg)
 	handler.Me{Reg: m.reg}.Register(rg)
+	handler.Sharing{Svc: m.share}.RegisterApp(rg)
 }
 
 // RegisterAdmin gắn route Admin API.
-func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Registry{Reg: m.reg}.RegisterAdmin(rg) }
+func (m *Module) RegisterAdmin(rg *gin.RouterGroup) {
+	handler.Registry{Reg: m.reg}.RegisterAdmin(rg)
+	handler.Sharing{Svc: m.share}.RegisterAdmin(rg)
+}
+
+// PartnerAccess cho module chủ dữ liệu kiểm cấp quyền chia sẻ và ghi sổ đọc của bề mặt đối tác
+// /v1/partner/* (ADR-0020, qua port).
+func (m *Module) PartnerAccess() port.PartnerAccess { return m.share }
+
+// ValveGrants cho consumer van của nền tảng tìm tenant bên cấp của phong bì van (ADR-0020, qua port).
+func (m *Module) ValveGrants() port.ValveGrants { return m.share }
 
 // ConsentChecker cho module khác (qua port).
 func (m *Module) ConsentChecker() port.ConsentChecker { return m.svc }

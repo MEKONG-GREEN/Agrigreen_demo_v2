@@ -2421,6 +2421,99 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/share-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cấp quyền chia sẻ của tenant bên cấp — ADR-0020 */
+        get: operations["listShareGrants"];
+        put?: never;
+        /**
+         * Đề xuất cấp quyền chia sẻ tenant này (bên cấp) → tenant khác (bên nhận) — ADR-0020
+         * @description Chỉ `platform_admin` của tenant bên cấp. Một `platform_admin` KHÁC duyệt (R-56). `valid_from` vắng → lúc đề xuất;
+         *     `valid_to` bắt buộc, ở tương lai, tối đa 5 năm.
+         */
+        post: operations["proposeShareGrant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/share-grants/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một cấp quyền chia sẻ — ADR-0020 */
+        get: operations["getShareGrant"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/share-grants/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Duyệt cấp quyền chia sẻ — người duyệt ≠ người đề xuất (R-56), ADR-0020
+         * @description Ghi cùng giao dịch bảng chiếu ở tenant bên nhận. Tự duyệt → 403 `self_approval_forbidden`.
+         */
+        post: operations["approveShareGrant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/share-grants/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thu hồi cấp quyền chia sẻ (có hiệu lực ngay) — ADR-0020 */
+        post: operations["revokeShareGrant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/share-grants/{id}/reads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sổ đọc của bên nhận với một cấp quyền (mỗi lời gọi /v1/partner/* một dòng) — ADR-0020 */
+        get: operations["listShareGrantReads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3680,6 +3773,55 @@ export interface components {
             bound_by: string;
             /** Format: date-time */
             bound_at: string;
+        };
+        /** @enum {string} */
+        ShareKind: "cooperative_directory" | "plot_directory" | "season_harvest_dates" | "htx_collection_responses" | "valve_hub" | "valve_collection" | "valve_mrv_evidence";
+        ShareGrant: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            grantor_tenant_id: string;
+            /** Format: uuid */
+            grantee_tenant_id: string;
+            kinds: components["schemas"]["ShareKind"][];
+            purpose: string;
+            /** Format: date-time */
+            valid_from: string;
+            /** Format: date-time */
+            valid_to: string;
+            /** @enum {string} */
+            status: "proposed" | "active" | "revoked";
+            /** Format: uuid */
+            proposed_by: string;
+            /** Format: date-time */
+            proposed_at: string;
+            /** Format: uuid */
+            approved_by: string | null;
+            /** Format: date-time */
+            approved_at: string | null;
+            /** Format: uuid */
+            revoked_by: string | null;
+            /** Format: date-time */
+            revoked_at: string | null;
+            revoke_reason: string | null;
+        };
+        ShareGrantRead: {
+            /** Format: uuid */
+            id: string;
+            seq: number;
+            /** Format: uuid */
+            grantee_tenant_id: string;
+            kind: components["schemas"]["ShareKind"];
+            endpoint: string;
+            query: string | null;
+            item_count: number;
+            /**
+             * Format: uuid
+             * @description sub của tài khoản dịch vụ bên nhận
+             */
+            actor_ref: string;
+            /** Format: date-time */
+            recorded_at: string;
         };
         ParamValue: {
             key: string;
@@ -8342,6 +8484,205 @@ export interface operations {
                         cooperative_ref: string;
                         open_seasons: number;
                         pending_logs: number;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    listShareGrants: {
+        parameters: {
+            query?: {
+                status?: "proposed" | "active" | "revoked";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ShareGrant"][];
+                        /** Format: uuid */
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    proposeShareGrant: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    grantee_tenant_id: string;
+                    kinds: components["schemas"]["ShareKind"][];
+                    purpose: string;
+                    /** Format: date-time */
+                    valid_from?: string;
+                    /** Format: date-time */
+                    valid_to: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã đề xuất (gọi lặp cùng Idempotency-Key → như lần đầu) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareGrant"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getShareGrant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cấp quyền */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareGrant"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    approveShareGrant: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã duyệt trước đó bởi chính người gọi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareGrant"];
+                };
+            };
+            /** @description Đã duyệt (gọi lặp của chính người duyệt → 200) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareGrant"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    revokeShareGrant: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã thu hồi trước đó bởi chính người gọi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareGrant"];
+                };
+            };
+            /** @description Đã thu hồi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareGrant"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listShareGrantReads: {
+        parameters: {
+            query?: {
+                after?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang sổ đọc */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        next_cursor: number;
+                        items: components["schemas"]["ShareGrantRead"][];
                     };
                 };
             };

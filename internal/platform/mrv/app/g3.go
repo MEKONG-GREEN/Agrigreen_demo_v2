@@ -18,6 +18,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/store"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -275,7 +276,23 @@ func (s *Service) HandleCollectionEvidence(ctx context.Context, tx pgx.Tx, env o
 	if _, ok := domain.BucketLowerKg(p.Bucket); !ok || p.Revision < 0 || p.BucketRule == "" {
 		return fmt.Errorf("%w: bậc/revision/bucket_rule_version", errValve)
 	}
-	ctx = tenant.WithID(ctx, env.TenantID)
+	// ADR-0020: MKG là tenant riêng — ghi vào tenant BÊN CẤP (tenant chương trình có vụ/thửa) đã cấp
+	// valve_mrv_evidence cho tenant phong bì. Không có cấp quyền → lỗi → DLQ.
+	grantors, err := partyport.ValveTargets(ctx, s.ValveGrants, env.TenantID, partyport.KindValveMRVEvidence, s.Clock.Now())
+	if err != nil {
+		return err
+	}
+	for _, g := range grantors {
+		gctx := tenant.WithID(ctx, g)
+		if err := tenant.Within(ctx, tx, g, func() error { return s.receiveEvidence(gctx, tx, env, g, p, on) }); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// receiveEvidence ghi một bằng chứng thu gom vào tenant tid (tx đang ở ngữ cảnh tid).
+func (s *Service) receiveEvidence(ctx context.Context, tx pgx.Tx, env outbox.Envelope, tid uuid.UUID, p collectionEvidenceV1, on time.Time) error {
 	key := store.CollectionIdemKey(p.EvidenceRef, p.Revision)
 	if dup, err := store.IdemExists(ctx, tx, "collection_evidence", key); err != nil || dup {
 		return err
@@ -284,13 +301,13 @@ func (s *Service) HandleCollectionEvidence(ctx context.Context, tx pgx.Tx, env o
 		EvidenceRef: p.EvidenceRef, Revision: p.Revision, PlotRef: p.PlotRef, SeasonRef: p.SeasonRef, CollectedOn: on,
 		Bucket: p.Bucket, BucketRule: p.BucketRule, SourceEventID: env.EventID, EventTime: env.OccurredAt, IdemKey: key,
 	}
-	if err := store.InsertCollection(ctx, tx, env.TenantID, &row); err != nil {
+	if err := store.InsertCollection(ctx, tx, tid, &row); err != nil {
 		return err
 	}
 	if p.SeasonRef == nil {
 		return nil // chưa gắn vụ: lưu làm bằng chứng, không tính (không có thửa/vụ để đối chiếu duyệt)
 	}
-	return s.recompute(ctx, tx, env.TenantID, *p.SeasonRef, store.SystemActor)
+	return s.recompute(ctx, tx, tid, *p.SeasonRef, store.SystemActor)
 }
 
 // ---------------------------------------------------------------------------

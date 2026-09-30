@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/app"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
@@ -17,7 +18,11 @@ func (h Handler) registerCollection(rg *gin.RouterGroup) {
 	rg.GET("/cropcycle/htx-collection/statements", h.listStatements)
 	rg.GET("/cropcycle/htx-collection/statements/:ref", h.getStatement)
 	rg.POST("/cropcycle/htx-collection/statements/:ref/responses", h.respondStatement)
+	// Luồng phản hồi cho MKG (ADR-0020): đường chuẩn ở bề mặt đối tác; đường cũ giữ làm bí danh
+	// (cùng kiểm cấp quyền htx_collection_responses, cùng sổ đọc).
+	rg.GET("/partner/htx-collection/responses", h.responseFeed)
 	rg.GET("/cropcycle/htx-collection/responses", h.responseFeed)
+	rg.GET("/partner/season-harvest-dates", h.partnerHarvestDates)
 }
 
 func collectionList(c *gin.Context) (app.CollectionListInput, bool) {
@@ -130,7 +135,12 @@ func (h Handler) responseFeed(c *gin.Context) {
 		after = n
 	}
 	limit, _ := strconv.Atoi(c.Query("limit"))
-	pg, err := h.Svc.CollectionResponseFeed(c.Request.Context(), after, limit)
+	grantor, err := partyport.ParseGrantor(c.Query("grantor"))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	pg, err := h.Svc.CollectionResponseFeed(c.Request.Context(), grantor, after, limit, "GET "+c.FullPath(), c.Request.URL.RawQuery)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
