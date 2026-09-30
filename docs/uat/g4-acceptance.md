@@ -21,8 +21,8 @@ Bốn trạng thái:
 | Mục | Số yêu cầu | đạt | một phần | chưa làm | ngoài G4 |
 |---|---|---|---|---|---|
 | 3. Phụ lục A (G4) | 5 | 0 | 0 | 5 | 0 |
-| 4. Chuyển từ G3 | 2 | 0 | 0 | 2 | 0 |
-| 5. `mkg/logistics` | 13 | 0 | 0 | 13 | 0 |
+| 4. Chuyển từ G3 | 2 | 0 | 1 | 1 | 0 |
+| 5. `mkg/logistics` | 13 | 10 | 1 | 2 | 0 |
 | 6. `mkg/orders` | 11 | 0 | 0 | 11 | 0 |
 | 7. `mkg/costing` | 16 | 0 | 0 | 16 | 0 |
 | 8. `mkg/acctbridge` | 9 | 0 | 0 | 9 | 0 |
@@ -68,26 +68,26 @@ Như [g3-acceptance.md §1](g3-acceptance.md#1-cách-chạy). Kịch bản E2E G
 
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| T-1 | proto FM-05: mỗi lượt xuống ghe sinh một chuyến vận tải đường thủy (số hiệu ghe, tấn ước theo cuộn; lỗi TMS / không xác định đích → chỉ cảnh báo, đếm cuộn vẫn ghi; thông báo hàng đến mang mã chuyến) | — (phía nền tảng định tuyến: `TestPartnerWaterwayRoute_ADR0020`) | **chưa làm** (`mkg/logistics`) |
+| T-1 | proto FM-05: mỗi lượt xuống ghe sinh một chuyến vận tải đường thủy (số hiệu ghe, tấn ước theo cuộn; lỗi TMS / không xác định đích → chỉ cảnh báo, đếm cuộn vẫn ghi; thông báo hàng đến mang mã chuyến) | `TestLogisticsT1FM05TripFromBoatLoad` (một chuyến planned / lượt xuống ghe, tấn ước = cuộn × kg/cuộn, giao lặp, bản bù đếm cuộn), `TestLogisticsL10OverloadAndUnweighedAlert`, `TestG4LogisticsConsumersRegistered`; phía nền tảng `TestPartnerWaterwayRoute_ADR0020` | **một phần** (mã): lỗi lập chuyến không chặn đếm cuộn (consumer bất đồng bộ `mkg.logistics.roll_count`); sự kiện `roll_count.recorded` chưa có số hiệu ghe → chuyến `planned` cờ `no_vehicle`, điều phối gán sau (cần trường tùy chọn ở fieldops, qua người tích hợp); thiếu đích → chuyến cờ `no_route` thay vì không lập; **chưa có** thông báo hàng đến (`cho_den → da_den`) mang mã chuyến cho hub/kho |
 | T-2 | proto phiếu nhận hàng ↔ đơn mua: lệch > 3 % → cần biên bản chênh lệch + ghi chú kiểm toán, **không chặn** | — | **chưa làm** (`mkg/orders`) |
 
 ## 5. `mkg/logistics` (mkg.md §5.4)
 
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| L-01 | Chuyến, chặng, điểm dừng là sổ (`trip:<id>`) + bảng chiếu `trip_current` cùng giao dịch; dựng lại được | — | **chưa làm** |
-| L-02 | Trạng thái chuyến chỉ tiến `planned → departed → arrived → completed`, hủy có lý do (Go cưỡng chế — prototype không) | — | **chưa làm** |
-| L-03 | Kết quả định tuyến đã dùng lưu nguyên văn + SHA-256 vào chặng; đọc chặng cũ không gọi lại nền tảng; ghim phiên bản mạng (mục 16) | — | **chưa làm** |
-| L-04 | Định tuyến đường thủy chỉ qua bề mặt đối tác + cấp quyền `waterway_routes` (ADR-0020); thiếu cấp quyền / nền tảng lỗi → km tay có lý do hoặc Haversine, không chặn | — | **chưa làm** |
-| L-05 | Đường bộ: Haversine × hệ số #10 (1,3) tới khi có OSRM trong lãnh thổ; nhãn nguồn tính | — | **chưa làm** |
-| L-06 | proto decideMode (GIS FN-08 BR-04): mặc định đường bộ; gợi ý đường thủy khi xa hơn #27 và có kênh tiếp cận; điều phối đổi theo chặng | — | **chưa làm** |
-| L-07 | proto GH-01: danh mục ghe có phiên bản, số hiệu chuẩn hóa duy nhất, loại `ghe`/`sa_lan`, tải > 0, đơn giá > 0 nếu có loại đơn giá | — | **chưa làm** |
-| L-08 | proto GH-02: đăng kiểm hết hạn / sắp hết hạn (≤ 30 ngày) chỉ **cảnh báo**, không chặn xếp hàng; quét định kỳ | — | **chưa làm** |
-| L-09 | proto GH-03 + plant weighing: phiếu cân đóng chuyến với tấn thật; cước = đơn giá thuê ghe (`per_ton`/`per_trip`/`per_ton_km`) nếu có, không thì đơn giá tham số (#22/#23); ghi `cost_source`; lệch > 5 % so với tấn ước → cờ | — | **chưa làm** |
-| L-10 | Cảnh báo tấn ước > 1,1 × tải thực chở của ghe (#51) và ghe chưa cân sau 48 giờ | — | **chưa làm** |
-| L-11 | Chứng từ chuyến ePOD / e-bill có người ký, thời điểm ký (tệp mã hóa ở kho đối tượng) | — | **chưa làm** |
-| L-12 | Sự kiện `mkg.logistics.trip.completed` v1 (bản bù `supersedes_id`); tài xế/chủ ghe là `*_ref`, không dữ liệu cá nhân | — | **chưa làm** |
-| L-13 | (tùy chọn) Telemetry phương tiện `ts_fleet` (ts 000004): chỉ ghi thêm, phân vùng tháng, R-07 | — | **chưa làm** |
+| L-01 | Chuyến, chặng, điểm dừng là sổ (`trip:<id>`) + bảng chiếu `trip_current` cùng giao dịch; dựng lại được | `TestLogisticsL01ProjectionRebuildEqualsLive` (`POST /v1/logistics/projections/rebuild` = bảng chiếu sống, gồm bản bù, hủy, kế hoạch chặng lần 2), `TestLogisticsTenantLeakParallel` | **đạt** |
+| L-02 | Trạng thái chuyến chỉ tiến `planned → departed → arrived → completed`, hủy có lý do (Go cưỡng chế — prototype không) | `TestLogisticsL02ForwardOnlyStatus` (409 + trigger DB `trip_forward_only`), `TestLogisticsL02CanTransitionForwardOnly` | **đạt** |
+| L-03 | Kết quả định tuyến đã dùng lưu nguyên văn + SHA-256 vào chặng; đọc chặng cũ không gọi lại nền tảng; ghim phiên bản mạng (mục 16) | `TestLogisticsL03RouteSnapshotStoredWithHash` (CHECK DB `raw_sha256 = sha256(raw)`), `TestLogisticsWaterwayHTTPPartnerClient` | **đạt** |
+| L-04 | Định tuyến đường thủy chỉ qua bề mặt đối tác + cấp quyền `waterway_routes` (ADR-0020); thiếu cấp quyền / nền tảng lỗi → km tay có lý do hoặc Haversine, không chặn | `TestLogisticsL04FallbackWhenRoutingDown`, `TestLogisticsWaterwayHTTPPartnerClient` (403 → `ErrRouteGrantMissing`) | **đạt** |
+| L-05 | Đường bộ: Haversine × hệ số #10 (1,3) tới khi có OSRM trong lãnh thổ; nhãn nguồn tính | `TestLogisticsL05L06RoadHaversineAndModeSuggestion`, `TestLogisticsL05HaversineDecimal` (không float) | **đạt** |
+| L-06 | proto decideMode (GIS FN-08 BR-04): mặc định đường bộ; gợi ý đường thủy khi xa hơn #27 và có kênh tiếp cận; điều phối đổi theo chặng | `TestLogisticsL05L06RoadHaversineAndModeSuggestion` (cờ `waterway_suggested`; #27 = 120 km tạm, chờ khách) | **đạt** |
+| L-07 | proto GH-01: danh mục ghe có phiên bản, số hiệu chuẩn hóa duy nhất, loại `ghe`/`sa_lan`, tải > 0, đơn giá > 0 nếu có loại đơn giá | `TestLogisticsL07L08VesselRegisterAndExpiry`, `TestLogisticsL07VesselValidation` | **đạt** |
+| L-08 | proto GH-02: đăng kiểm hết hạn / sắp hết hạn (≤ 30 ngày) chỉ **cảnh báo**, không chặn xếp hàng; quét định kỳ | `TestLogisticsL07L08VesselRegisterAndExpiry`, `TestLogisticsL08ExpiryStatus` | **một phần** (mã): cảnh báo khi gán ghe + quét theo yêu cầu `GET /v1/logistics/alerts`; chưa có job định kỳ gửi thông báo (`pf/notify` ở vùng nền tảng — cần kênh thông báo phía MKG) |
+| L-09 | proto GH-03 + plant weighing: phiếu cân đóng chuyến với tấn thật; cước = đơn giá thuê ghe (`per_ton`/`per_trip`/`per_ton_km`) nếu có, không thì đơn giá tham số (#22/#23); ghi `cost_source`; lệch > 5 % so với tấn ước → cờ | `TestLogisticsInternalEventTripCompletedOnWeighTicket`, `TestLogisticsCorrectionByCompensatingRecord` (`param_rate`, `manual` có chứng từ), `TestLogisticsL09Costs` | **đạt** |
+| L-10 | Cảnh báo tấn ước > 1,1 × tải thực chở của ghe (#51) và ghe chưa cân sau 48 giờ | `TestLogisticsL10OverloadAndUnweighedAlert`, `TestLogisticsL10OverloadWarning` | **đạt** |
+| L-11 | Chứng từ chuyến ePOD / e-bill có người ký, thời điểm ký (tệp mã hóa ở kho đối tượng) | — | **chưa làm** (mã: sổ chứng từ + `shared/objstore`; migration 000015 chưa có bảng) |
+| L-12 | Sự kiện `mkg.logistics.trip.completed` v1 (bản bù `supersedes_id`); tài xế/chủ ghe là `*_ref`, không dữ liệu cá nhân | `TestLogisticsInternalEventTripCompletedOnWeighTicket` (outbox `kind = internal`, chặng + ảnh chụp + phiên bản mạng, phiếu bù → `supersedes_id`), `TestLogisticsTripsPortCompletedAsOf` (`port.Trips.Completed` với `asOf`) | **đạt** |
+| L-13 | (tùy chọn) Telemetry phương tiện `ts_fleet` (ts 000004): chỉ ghi thêm, phân vùng tháng, R-07 | — | **chưa làm** (tùy chọn, không làm ở G4 logistics) |
 
 ## 6. `mkg/orders` (mkg.md §5.5)
 

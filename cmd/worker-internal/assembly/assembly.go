@@ -18,6 +18,8 @@ import (
 	fieldport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub"
 	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/logistics"
+	logport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/logistics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement"
 	measport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -68,6 +70,15 @@ func buildMeasurementRollCount(clk clock.Clock, pool PoolFor) (inbox.Handler, er
 	return measurement.NewConsumers(clk, measurement.Deps{Rolls: rolls}).RollCount(), nil
 }
 
+// buildLogisticsRollCount: tấn ước FM-05 = cuộn × kg/cuộn học theo HTX của fieldops (pool vai fieldops_app, chỉ đọc).
+func buildLogisticsRollCount(clk clock.Clock, pool PoolFor) (inbox.Handler, error) {
+	fp, err := pool(fieldops.DBRole)
+	if err != nil {
+		return nil, err
+	}
+	return logistics.NewConsumers(clk, fieldops.New(fp, clk, fieldops.Options{}).KgPerRoll()).RollCount(), nil
+}
+
 // Consumers là sổ đăng ký consumer nội bộ. Kiểm thử của package đòi tên và sự
 // kiện đúng quy ước. Mỗi consumer: quorum queue + DLQ (Name + ".dlq"), giao tối
 // đa inbox.DeliveryLimit lần rồi sang DLQ, idempotent qua shared.inbox (R-61).
@@ -99,6 +110,11 @@ var Consumers = []Consumer{
 	// G3-2 (mkg/measurement, vai measurement_app): số cuộn mới → đối soát lại lô (RB-6).
 	{Name: RollCountReconcileConsumer, Events: []string{fieldport.EventRollCountRecorded}, Role: measurement.DBRole,
 		BuildWith: buildMeasurementRollCount},
+	// G4 (mkg/logistics, vai logistics_app): xuống ghe → chuyến đường thủy planned (FM-05); phiếu cân → đóng chuyến.
+	{Name: logport.RollCountConsumer, Events: []string{fieldport.EventRollCountRecorded}, Role: logistics.DBRole,
+		BuildWith: buildLogisticsRollCount},
+	{Name: logport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Role: logistics.DBRole,
+		Build: func(clk clock.Clock) inbox.Handler { return logistics.NewConsumers(clk, nil).WeighTicket() }},
 }
 
 // RollCountReconcileConsumer: mkg.fieldops.roll_count.recorded → measurement đối soát lại.

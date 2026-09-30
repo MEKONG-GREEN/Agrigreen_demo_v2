@@ -307,4 +307,7 @@ const (
 	ParamPayloadWarnFactor    = "logistics.vessel.payload_warn_factor" // 1.1: tấn ước > 1,1 × tải → cảnh báo
 	ParamExpiryWarnDays       = "logistics.vessel.expiry_warn_days"    // 30 (GH-02): chỉ cảnh báo, không chặn
 	ParamUnweighedAlertHours  = "logistics.trip.unweighed_alert_hours" // 48: xuống ghe quá 48 giờ chưa cân → cảnh báo
+	// ParamRoadHaversineFactor (thêm ở G4 logistics, tương thích ngược): hệ số Haversine đường bộ #10
+	// (1,3) — dùng khi chưa có OSRM trong lãnh thổ và làm dự phòng khi định tuyến đường thủy lỗi.
+	ParamRoadHaversineFactor = "logistics.route.road_haversine_factor"
 )

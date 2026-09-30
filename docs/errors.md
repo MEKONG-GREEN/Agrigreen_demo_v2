@@ -497,6 +497,27 @@ Kết quả theo bản ghi của `POST /v1/fieldops/sync/push` dùng thêm `fiel
 
 Cảnh báo không chặn (mảng `warnings` của kết quả ghi, không phải lỗi): `fieldops.harvest_date_unknown`, `fieldops.harvest_date_unavailable` (FM-01, chưa biết ngày gặt), `fieldops.planned_before_harvest` (ngày bắt đầu dự kiến trước ngày gặt), `fieldops.baling_deadline_at_risk` (ngày kết thúc dự kiến sau hạn cuộn FM-02), `fieldops.crew_over_capacity_override` (giám sát giao vượt năng lực kèm lý do, FM-06).
 
+### mkg/logistics (API nội bộ MKG — `cmd/api-internal`, `contracts/openapi/mkg-internal.yaml`, tag logistics)
+
+| HTTP | code | Khi nào |
+|---|---|---|
+| 403 | `forbidden` | Thiếu vai: lập / hủy chuyến, gán phương tiện, lập chặng, hoàn tất, danh mục ghe, đề xuất tham số cần `dispatcher`; mốc chuyến cần `driver` (hoặc `dispatcher`); duyệt tham số cần `chief_accountant` |
+| 403 | `self_approval_forbidden` | Người duyệt / từ chối phiên bản tham số cước là người đề xuất (R-56); DB chặn lần hai bằng CHECK |
+| 404 | `logistics.trip_not_found` | Không có chuyến trong tenant của token |
+| 404 | `logistics.vessel_not_found` | Không có phương tiện trong danh mục của tenant |
+| 404 | `logistics.param_not_found` | Khóa tham số lạ hoặc không có phiên bản cần quyết định |
+| 404 | `logistics.route_snapshot_not_found` | Chặng không có ảnh chụp định tuyến (km nhập tay) hoặc không thuộc kế hoạch hiệu lực |
+| 409 | `logistics.trip_transition` | Chuyển trạng thái bị cấm — chỉ tiến `planned → departed → arrived → completed`, hủy từ `planned`/`departed`; mốc tài xế đi từng bậc. DB chặn lần hai (trigger `trip_forward_only` trên `trip_current`) |
+| 409 | `logistics.trip_closed` | Thao tác trên chuyến đã hoàn tất / đã hủy (gán phương tiện, lập chặng, mốc) |
+| 409 | `logistics.vessel_code_taken` | Số hiệu (đã chuẩn hóa: bỏ khoảng trắng, chữ hoa) đã có trong danh mục (proto GH-01) |
+| 409 | `logistics.vessel_version_stale` | `expected_version` khác phiên bản hiện hành của phương tiện |
+| 409 | `logistics.param_decided` | Phiên bản tham số đã được duyệt hoặc từ chối |
+| 422 | `validation_failed` | Dữ liệu vào sai (phương thức, tọa độ, kg, lý do < 10 ký tự, `event_time` ở tương lai, loại đơn giá không có đơn giá…), xem `errors[]` |
+| 422 | `logistics.manual_km_reason_required` | `manual_km` không kèm `manual_reason` (10–500 ký tự) |
+| 422 | `logistics.correction_reason_required` | Hoàn tất lại chuyến đã `completed` (bản bù) mà thiếu `correction_reason` |
+
+Định tuyến **không bao giờ** là lỗi của API: nền tảng lỗi, thiếu cấp quyền `waterway_routes` (403 của `/v1/partner/waterway/route`) hoặc mạng không có đường → chặng dự phòng Haversine × #10 (nhãn `haversine`). Cảnh báo không chặn (mảng `warnings` / `flags`): `no_vehicle`, `no_route`, `vessel_unregistered`, `vessel_inactive`, `registration_expired`, `registration_expiring` (GH-02), `payload_exceeded` (FM-05, > 1,1 × tải), `weigh_variance` (lệch cân > 5 %), `routing_unavailable`, `no_waterway_route`, `waterway_suggested` (decideMode), `rolls_corrected`.
+
 ### pf/waterway
 
 Mạng đường thủy có phiên bản (mục 16; GIS FN-09, US-WATER-01/02/03). Vẽ/sửa, dựng, phát hành ở Admin API (MFA); tra lớp và định tuyến ở Application API.

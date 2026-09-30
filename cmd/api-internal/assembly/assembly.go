@@ -25,6 +25,7 @@ import (
 	foport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub"
 	hubport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/logistics"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -41,10 +42,13 @@ type Modules struct {
 	Hub         *hub.Module
 	Measurement *measurement.Module
 	Fieldops    *fieldops.Module
+	Logistics   *logistics.Module
 }
 
 // List trả module theo thứ tự gắn route.
-func (m Modules) List() []httpx.Module { return []httpx.Module{m.Hub, m.Measurement, m.Fieldops} }
+func (m Modules) List() []httpx.Module {
+	return []httpx.Module{m.Hub, m.Measurement, m.Fieldops, m.Logistics}
+}
 
 // OpsRole là vai vận hành của api-internal ở cụm mkg (tương đương platform_api ở
 // cụm pf): chỉ bảng vận hành shared.idempotency_key qua ag_shared_user, không có
@@ -93,6 +97,13 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules,
 	fo.Weighed = mkgwire.Weighed{Links: mods.Measurement.CollectionLinks(), Lots: mods.Measurement.LotMass()}
 	mods.Fieldops = fieldops.New(foPool, clk, fo)
 	rolls.Totals, rolls.KgPerRoll = mods.Fieldops.RollTotals(), mods.Fieldops.KgPerRoll()
+	// G4 mkg/logistics: định tuyến đường thủy qua bề mặt đối tác (cùng tài khoản dịch vụ AG_MKG_SA_*).
+	logPool, err := open(ctx, logistics.DBRole)
+	if err != nil {
+		return mods, ops, pools, err
+	}
+	pools = append(pools, logPool)
+	mods.Logistics = logistics.New(logPool, clk, LogisticsOptionsFromEnv(clk))
 	return mods, ops, pools, nil
 }
 
@@ -161,6 +172,21 @@ func FieldopsOptionsFromEnv(clk clock.Clock) fieldops.Options {
 	}
 	if k := os.Getenv("AG_FIELDOPS_CURSOR_KEY"); k != "" {
 		o.CursorKey = []byte(k)
+	}
+	return o
+}
+
+// LogisticsOptionsFromEnv đọc cấu hình mkg/logistics: cùng AG_PLATFORM_API_URL, AG_PLATFORM_TOKEN_URL,
+// AG_MKG_SA_CLIENT_ID/SECRET, AG_PARTNER_GRANTOR_TENANT với fieldops. Thiếu → mọi chặng thủy dự phòng
+// Haversine × #10 (không chặn lập chuyến).
+func LogisticsOptionsFromEnv(clk clock.Clock) logistics.Options {
+	var o logistics.Options
+	if base := os.Getenv("AG_PLATFORM_API_URL"); base != "" {
+		o.Waterway = logistics.NewPlatformWaterway(logistics.PlatformConfig{
+			BaseURL: base, TokenURL: os.Getenv("AG_PLATFORM_TOKEN_URL"),
+			ClientID: os.Getenv("AG_MKG_SA_CLIENT_ID"), ClientSecret: os.Getenv("AG_MKG_SA_CLIENT_SECRET"),
+			GrantorTenant: strings.TrimSpace(os.Getenv("AG_PARTNER_GRANTOR_TENANT")),
+		}, clk)
 	}
 	return o
 }
