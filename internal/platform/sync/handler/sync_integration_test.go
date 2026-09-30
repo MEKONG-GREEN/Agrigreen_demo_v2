@@ -325,6 +325,36 @@ func TestDeviceRegisterRevoke(t *testing.T) {
 // Pull
 // ---------------------------------------------------------------------------
 
+// TestPullLimitOneNoStarvation: limit=1, entity đầu (plot) luôn còn dữ liệu — entity đứng sau
+// (task) vẫn phải được cấp lượt (vòng chia hạn mức xoay theo trang, KN US-SYNC-01).
+func TestPullLimitOneNoStarvation(t *testing.T) {
+	f := newFixture(t)
+	c := f.officer()
+	c.register()
+	f.source.add("plot", unitA, 40)
+	tasks := f.source.add("task", unitA, 1)
+
+	cursor, seenTask := "", false
+	for page := 1; page <= 12 && !seenTask; page++ {
+		pg, r := c.pull(cursor, 1)
+		if r.status != http.StatusOK {
+			t.Fatalf("pull: %d %s", r.status, r.raw)
+		}
+		if len(pg.Changes) > 1 {
+			t.Fatalf("trang vượt limit=1: %d", len(pg.Changes))
+		}
+		for _, ch := range pg.Changes {
+			if ch.Entity == "task" && ch.ID == tasks[0].String() {
+				seenTask = true
+			}
+		}
+		cursor = pg.NextCursor
+	}
+	if !seenTask {
+		t.Fatal("task bị bỏ đói: 12 trang limit=1 không giao bản ghi task nào")
+	}
+}
+
 func TestPullPaginationRoundRobin(t *testing.T) {
 	f := newFixture(t)
 	c := f.officer(client.RolePubKeySync)

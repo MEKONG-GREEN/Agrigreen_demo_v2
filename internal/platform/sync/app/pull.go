@@ -131,6 +131,13 @@ func (s *Service) collect(ctx context.Context, v view, cur *domain.Cursor, limit
 			active = append(active, pg)
 		}
 	}
+	// Xoay điểm bắt đầu theo con trỏ: phần hạn mức lẻ (remaining % len) luôn rơi vào các
+	// entity đầu vòng, nên nếu không xoay thì với limit nhỏ (vd 1) entity đứng sau không bao
+	// giờ tới lượt khi entity đầu luôn còn dữ liệu. Trang sau bắt đầu từ entity kế tiếp.
+	active = rotateFrom(active, cur.RR)
+	if len(active) > 1 {
+		cur.RR = active[1].entity()
+	}
 	remaining := limit
 	for remaining > 0 && len(active) > 0 {
 		share, extra := remaining/len(active), remaining%len(active)
@@ -157,6 +164,16 @@ func (s *Service) collect(ctx context.Context, v view, cur *domain.Cursor, limit
 		active = next
 	}
 	return out, len(active) > 0, nil
+}
+
+// rotateFrom trả bản sao ps bắt đầu từ pager của entity start (không có → giữ nguyên thứ tự).
+func rotateFrom(ps []pager, start string) []pager {
+	for i, pg := range ps {
+		if pg.entity() == start {
+			return append(append([]pager{}, ps[i:]...), ps[:i]...)
+		}
+	}
+	return ps
 }
 
 // view là phạm vi của một lượt pull: phạm vi cán bộ (scope, theo pf/party) hoặc phạm vi
