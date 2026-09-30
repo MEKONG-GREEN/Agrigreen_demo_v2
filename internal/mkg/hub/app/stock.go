@@ -737,25 +737,30 @@ func (s *Service) LotOrigin(ctx context.Context, tid, id uuid.UUID) (port.LotInf
 	return info, err
 }
 
-// RebuildProjections dựng lại bảng chiếu tồn theo lô của tenant từ sổ (R-22).
-func (s *Service) RebuildProjections(ctx context.Context) (int64, error) {
+// RebuildProjections dựng lại bảng chiếu tồn theo lô và thông báo hàng đến của tenant từ sổ (R-22).
+func (s *Service) RebuildProjections(ctx context.Context) (map[string]int64, error) {
 	p, err := authz.Require(ctx, RoleHubApprover)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	return s.RebuildTenant(ctx, p.TenantID)
 }
 
 // RebuildTenant dựng lại bảng chiếu của tenant tid từ sổ — tenant TƯỜNG MINH, không kiểm vai: chỉ cho công cụ
 // vận hành chạy trên BẢN SAO database (diễn tập R-22, cmd/rebuilddrill). API dùng RebuildProjections (có vai).
-func (s *Service) RebuildTenant(ctx context.Context, tid uuid.UUID) (int64, error) {
-	var n int64
+// Trả số dòng: lot_balance (sổ dịch chuyển tồn), arrival_current (sổ thông báo hàng đến, G4).
+func (s *Service) RebuildTenant(ctx context.Context, tid uuid.UUID) (map[string]int64, error) {
+	out := map[string]int64{}
 	err := s.writeOnly(ctx, tid, func(tx pgx.Tx) error {
-		var e error
-		n, e = store.RebuildBalances(ctx, tx)
+		n, e := store.RebuildBalances(ctx, tx)
+		if e != nil {
+			return e
+		}
+		a, e := store.RebuildArrivals(ctx, tx)
+		out["lot_balance"], out["arrival_current"] = n, a
 		return e
 	})
-	return n, err
+	return out, err
 }
 
 func (s *Service) writeOnly(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) error {

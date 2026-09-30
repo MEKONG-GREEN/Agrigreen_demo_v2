@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { alert, labelled, loginAs, SELF_APPROVAL, sidebar, switchUser } from "./helpers";
+import { alert, labelled, loginAs, pdfFile, SELF_APPROVAL, sidebar, switchUser, textFile } from "./helpers";
 
 // G4 mkg/orders — W-01: hợp đồng mua rơm (CT-01..03, R-56), đơn mua + phiếu nhận lệch > 3 % (cảnh báo, không chặn),
 // một nguồn khoản phải trả, đơn bán vượt ngưỡng giá/chiết khấu, giao nhận theo phiếu CUSTOMER_IN.
@@ -37,8 +37,16 @@ test.describe("Đơn hàng (mkg/orders)", () => {
     await expect(card).toContainText("+7,56 %");
     await expect(card).toContainText("cần lập biên bản chênh lệch");
     await card.getByLabel("Biên bản chênh lệch GRN000001").fill("Ghe chở dư 6,8 t do HTX gom thêm thửa lân cận");
+    // Tải tệp biên bản: SHA-256 tính ở trình duyệt, multipart → file.id làm file_ref.
+    await card.getByLabel("Tệp biên bản GRN000001").setInputFiles(pdfFile("bien-ban-GRN000001.pdf"));
+    await expect(labelled(page, "Tệp đã tải Tệp biên bản GRN000001")).toContainText("bien-ban-GRN000001.pdf");
+    await expect(labelled(page, "Tệp đã tải Tệp biên bản GRN000001")).toContainText("SHA-256");
     await card.getByRole("button", { name: "Ghi biên bản" }).click();
-    await expect(page.getByText("Đã ghi biên bản chênh lệch")).toBeVisible();
+    await expect(page.getByText("Đã ghi biên bản chênh lệch kèm tệp bien-ban-GRN000001.pdf")).toBeVisible();
+    await expect(card).toContainText("Đã có biên bản");
+    const dl = page.waitForEvent("download");
+    await card.getByRole("button", { name: "Tải tệp bien-ban-GRN000001.pdf" }).click();
+    expect((await dl).suggestedFilename()).toBe("bien-ban-GRN000001.pdf");
     await card.getByRole("button", { name: "Duyệt phiếu nhận GRN000001" }).click();
     await expect(alert(page)).toContainText(SELF_APPROVAL);
     await switchUser(page, "truong-kinh-doanh");
@@ -88,14 +96,23 @@ test.describe("Đơn hàng (mkg/orders)", () => {
     await loginAs(page, "kinh-doanh", "/don-hang/don-ban");
     await page.getByRole("button", { name: "Mở đơn bán SO000001" }).click();
     const d1 = labelled(page, "Giao nhận GN000001");
-    await d1.getByLabel("Mã tệp chứng từ GN000001").fill("0192f0ff-0000-7000-8000-000000000001");
+    await expect(d1.getByRole("button", { name: "Chấp nhận giao nhận GN000001" })).toBeDisabled();
+    // Tệp không phải PDF / ảnh → máy chủ nhận diện theo nội dung, từ chối (415).
+    await d1.getByLabel("Tệp chứng từ GN000001").setInputFiles(textFile("khong-phai-pdf.pdf"));
+    await expect(alert(page)).toContainText("orders.file_type");
+    await d1.getByLabel("Tệp chứng từ GN000001").setInputFiles(pdfFile("epod-GN000001.pdf"));
+    await expect(labelled(page, "Tệp đã tải Tệp chứng từ GN000001")).toContainText("epod-GN000001.pdf");
+    await d1.getByLabel("Loại chứng từ GN000001").selectOption("epod");
     await d1.getByRole("button", { name: "Chấp nhận giao nhận GN000001" }).click();
     await expect(page.getByText(/Đã chấp nhận GN000001: 14.800 kg — phát mkg.orders.delivery.accepted/)).toBeVisible();
     await expect(d1).toContainText("26.640.000 ₫");
+    await expect(d1).toContainText("ePOD");
+    await expect(d1.getByRole("button", { name: "Tải tệp epod-GN000001.pdf" })).toBeVisible();
     const d2 = labelled(page, "Giao nhận GN000002");
     await d2.getByRole("button", { name: "Xuất giao GN000002" }).click();
     await expect(page.getByText("Đã xuất giao GN000002")).toBeVisible();
-    await d2.getByLabel("Mã tệp chứng từ GN000002").fill("0192f0ff-0000-7000-8000-000000000002");
+    await d2.getByLabel("Tệp chứng từ GN000002").setInputFiles(pdfFile("bien-ban-GN000002.pdf"));
+    await expect(labelled(page, "Tệp đã tải Tệp chứng từ GN000002")).toContainText("bien-ban-GN000002.pdf");
     await d2.getByRole("button", { name: "Chấp nhận giao nhận GN000002" }).click();
     await expect(alert(page)).toContainText("orders.customer_in_missing");
   });

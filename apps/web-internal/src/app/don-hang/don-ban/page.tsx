@@ -2,9 +2,10 @@
 
 import { useState, type ReactNode } from "react";
 import { idem, unwrap } from "@/api/client";
-import type { OrdersDelivery, OrdersSalesOrder, Product } from "@/api/types";
+import type { MkgFile, OrdersDelivery, OrdersSalesOrder, Product } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { hasRole, ROLES } from "@/auth/principal";
+import { FileRef, FileUploadField } from "@/components/FileUpload";
 import { KV, Money, SoD, When } from "@/components/g4kit";
 import { ActionStatus, Chip, Provisional, Ref, RefPicker, Section, SelectField, SelfHint, TextField, useAction } from "@/components/kit";
 import { ProblemAlert } from "@/components/ProblemAlert";
@@ -24,7 +25,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 function DeliveryRow({ d, onChanged }: { d: OrdersDelivery; onChanged: () => void }) {
   const { api } = useAuth();
   const act = useAction();
-  const [file, setFile] = useState("");
+  const [file, setFile] = useState<MkgFile | null>(null);
   const [kind, setKind] = useState<"epod" | "minutes" | "ebill">("minutes");
   const [dispute, setDispute] = useState("");
   const [trip, setTrip] = useState("");
@@ -48,7 +49,7 @@ function DeliveryRow({ d, onChanged }: { d: OrdersDelivery; onChanged: () => voi
           ["Ngày giao · kg kế hoạch", `${formatDate(d.planned_date)} · ${formatKg(d.planned_kg)}`],
           ["Phiếu CUSTOMER_IN", d.customer_in_ticket_ref ? <span key="t"><Ref id={d.customer_in_ticket_ref} /> · {formatKg(d.ticket_kg)}</span> : <span key="t" className="mute">Chưa có phiếu cân tại khách — chưa chấp nhận được</span>],
           ["Chấp nhận", d.accepted_kg ? <span key="a">{formatKg(d.accepted_kg)} × {formatPrice(d.unit_price, "tấn")} = <Money v={d.amount} strong /> · <When at={d.accepted_at} /></span> : "—"],
-          ...(d.evidence_file_ref ? ([["Chứng từ", <span key="e">{EVIDENCE_KIND_LABEL[d.evidence_kind ?? ""]} <Ref id={d.evidence_file_ref} /> {d.dispute_ref ? <>· tranh chấp <Ref id={d.dispute_ref} /></> : null}</span>]] as [string, ReactNode][]) : []),
+          ...(d.evidence_file_ref ? ([["Chứng từ", <span key="e" className="row" style={{ gap: 6, flexWrap: "wrap" }}>{EVIDENCE_KIND_LABEL[d.evidence_kind ?? ""]} <FileRef module="orders" id={d.evidence_file_ref} /> {d.dispute_ref ? <>· tranh chấp <Ref id={d.dispute_ref} /></> : null}</span>]] as [string, ReactNode][]) : []),
           ...(d.reason ? ([["Lý do", d.reason]] as [string, string][]) : []),
         ]}
       />
@@ -67,7 +68,7 @@ function DeliveryRow({ d, onChanged }: { d: OrdersDelivery; onChanged: () => voi
         <div className="stack">
           <p className="small mute">Khối lượng chấp nhận = phiếu cân CUSTOMER_IN đã gắn (measurement), không nhập tay. Tranh chấp liên kết hồ sơ tranh chấp của bộ phận cân.</p>
           <div className="grid3">
-            <TextField label={`Mã tệp chứng từ ${d.code}`} value={file} onChange={setFile} hint="UUID tệp ePOD / biên bản ở kho đối tượng" />
+            <FileUploadField label={`Tệp chứng từ ${d.code}`} module="orders" purpose="delivery_evidence" value={file} onUploaded={setFile} hint="ePOD / biên bản / e-bill — PDF hoặc ảnh ≤ 15 MB" />
             <SelectField label={`Loại chứng từ ${d.code}`} value={kind} onChange={(k) => setKind(k as "epod")} options={Object.entries(EVIDENCE_KIND_LABEL).map(([value, label]) => ({ value, label }))} />
             <TextField label={`Hồ sơ tranh chấp ${d.code}`} value={dispute} onChange={setDispute} hint="UUID (tuỳ chọn)" />
           </div>
@@ -75,8 +76,8 @@ function DeliveryRow({ d, onChanged }: { d: OrdersDelivery; onChanged: () => voi
             <button
               type="button"
               className="btn btn-p btn-sm"
-              disabled={act.busy || !UUID.test(file.trim()) || (!!dispute && !UUID.test(dispute.trim()))}
-              onClick={() => void act.run(() => unwrap(api.POST("/v1/orders/deliveries/{id}/accept", { params: p(), body: { evidence: { file_ref: file.trim(), kind }, ...(dispute.trim() ? { dispute_ref: dispute.trim() } : {}) } })), (r) => `Đã chấp nhận ${d.code}: ${formatKg(r.delivery?.accepted_kg)} — phát mkg.orders.delivery.accepted`).then(done)}
+              disabled={act.busy || !file || (!!dispute && !UUID.test(dispute.trim()))}
+              onClick={() => void act.run(() => unwrap(api.POST("/v1/orders/deliveries/{id}/accept", { params: p(), body: { evidence: { file_ref: file!.id, kind }, ...(dispute.trim() ? { dispute_ref: dispute.trim() } : {}) } })), (r) => `Đã chấp nhận ${d.code}: ${formatKg(r.delivery?.accepted_kg)} — phát mkg.orders.delivery.accepted`).then(done)}
             >
               Chấp nhận giao nhận {d.code}
             </button>

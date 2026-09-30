@@ -571,3 +571,23 @@ func Attempts(ctx context.Context, tx pgx.Tx, journal uuid.UUID) ([]Attempt, err
 	}
 	return out, rows.Err()
 }
+
+// JobFilter lọc danh sách job (G4 đóng khoảng trống: web liệt kê job dựng / đẩy thay vì nhớ mã vừa xem).
+type JobFilter struct {
+	Kind     string // build | push | rỗng
+	Status   string // queued | done | failed | rỗng
+	PeriodID *uuid.UUID
+	Before   *uuid.UUID // con trỏ = job_id cuối trang (UUIDv7), mới nhất trước
+	Limit    int
+}
+
+// Jobs liệt kê job dựng / đẩy bút toán theo bộ lọc, mới nhất trước.
+func Jobs(ctx context.Context, tx pgx.Tx, f JobFilter) ([]Job, error) {
+	rows, err := tx.Query(ctx, "SELECT "+jobCols+` FROM mkg_acctbridge.job
+	  WHERE ($1 = '' OR kind = $1) AND ($2 = '' OR status = $2) AND ($3::uuid IS NULL OR period_id = $3) AND ($4::uuid IS NULL OR job_id < $4)
+	  ORDER BY job_id DESC LIMIT $5`, f.Kind, f.Status, f.PeriodID, f.Before, f.Limit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Job, error) { return scanJob(r) })
+}

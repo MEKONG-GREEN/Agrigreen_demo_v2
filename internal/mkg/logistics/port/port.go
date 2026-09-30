@@ -173,6 +173,43 @@ type TripVesselRefV1 struct {
 	Kind      string    `json:"kind"` // ghe | sa_lan | truck
 }
 
+// EventTripMilestoneRecorded (G4, proto FM-05 "thông báo hàng đến mang mã chuyến"): mốc của chuyến có đích là
+// cơ sở (chặng cuối to_kind = facility) — mkg/hub ghi thông báo hàng đến cho_den (expected) → da_den (arrived).
+const EventTripMilestoneRecorded = "mkg.logistics.trip.milestone_recorded"
+
+// Mốc của TripMilestoneRecordedV1.
+const (
+	MilestoneDeparted  = "departed"  // xuất phát → hub: hàng sắp đến (cho_den)
+	MilestoneRerouted  = "rerouted"  // lập lại chặng khi đang chạy → đích mới chờ hàng
+	MilestoneArrived   = "arrived"   // đến bến / cổng → da_den
+	MilestoneCompleted = "completed" // phiếu cân đóng chuyến → da_den (nếu chưa ghi mốc đến)
+	MilestoneCancelled = "cancelled" // hủy → hub bỏ thông báo chờ
+)
+
+// TripMilestoneRecordedV1 là payload mốc chuyến cho hub. Chỉ vhost mkg.internal; KHÔNG có cước, tài xế, giá.
+//
+//ag:internal-event mkg.logistics.trip.milestone_recorded v1
+type TripMilestoneRecordedV1 struct {
+	TripID             uuid.UUID            `json:"trip_id"`
+	TripCode           string               `json:"trip_code"`
+	Milestone          string               `json:"milestone"`
+	Status             TripStatus           `json:"status"`
+	FacilityRef        uuid.UUID            `json:"facility_ref"`
+	Mode               Mode                 `json:"mode"`
+	VesselCode         *string              `json:"vessel_code"`
+	CollectionOrderRef *uuid.UUID           `json:"collection_order_ref"`
+	Lots               []TripMilestoneLotV1 `json:"lots"`
+	PlannedKg          *mass.Kg             `json:"planned_kg"`
+	SourceEventRef     uuid.UUID            `json:"source_event_ref"`
+	EventTime          time.Time            `json:"event_time"`
+}
+
+// TripMilestoneLotV1 là một lô trên chuyến với tấn ước (hoặc thật khi đã cân).
+type TripMilestoneLotV1 struct {
+	LotRef uuid.UUID `json:"lot_ref"`
+	MassKg mass.Kg   `json:"mass_kg"`
+}
+
 // ---------------------------------------------------------------------------
 // Cổng cho module mkg khác (cùng tiến trình).
 // ---------------------------------------------------------------------------

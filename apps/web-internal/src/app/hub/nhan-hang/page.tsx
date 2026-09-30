@@ -2,13 +2,17 @@
 
 import { useState } from "react";
 import { idem, unwrap, unwrapAs } from "@/api/client";
-import type { LotTickets, Product, ReceiptResult } from "@/api/types";
+import type { Facility, LotTickets, Product, ReceiptResult } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { ActionStatus, Chip, FacilitySelect, Ref, RefPicker, Section, SelectField, TextField, useAction, useFacilities } from "@/components/kit";
-import { PageHead } from "@/components/ui";
-import { formatKg, isKg, isPct } from "@/lib/kg";
+import { When } from "@/components/g4kit";
+import { Empty, LoadMore, Loading, PageHead } from "@/components/ui";
+import { ProblemAlert } from "@/components/ProblemAlert";
+import { ARRIVAL_STATUS_LABEL, MODE_LABEL } from "@/lib/g4labels";
+import { formatKg, formatTons, isKg, isPct } from "@/lib/kg";
 import { PRODUCT_LABEL, validReason } from "@/lib/rules";
 import { useAsync } from "@/lib/useAsync";
+import { LIST_PAGE_SIZE, usePaged } from "@/lib/usePaged";
 
 type SourceKind = "plot" | "cooperative" | "roll_count" | "supplier" | "lot" | "stocktake";
 interface SourceRow {
@@ -18,6 +22,81 @@ interface SourceRow {
 }
 
 const SOURCE_LABEL: Record<SourceKind, string> = { plot: "Thửa", cooperative: "HTX", roll_count: "Lô gom (số cuộn)", supplier: "Nhà cung cấp", lot: "Lô khác", stocktake: "Kiểm kê" };
+
+/**
+ * Hàng sắp đến (proto FM-05): thông báo mang mã chuyến, ghi khi chuyến có chặng cuối tới cơ sở xuất phát / đổi đích
+ * (Chờ đến), đến / hoàn tất (Đã đến) hoặc bị hủy (Đã hủy). Đọc từ GET /v1/hub/arrivals, mới nhất trước.
+ */
+function Arrivals({ facilities }: { facilities: Facility[] }) {
+  const { api } = useAuth();
+  const [fid, setFid] = useState("");
+  const [status, setStatus] = useState<"" | "expected" | "arrived" | "cancelled">("expected");
+  const list = usePaged(
+    (cursor) => unwrap(api.GET("/v1/hub/arrivals", { params: { query: { limit: LIST_PAGE_SIZE, ...(fid ? { facility_id: fid } : {}), ...(status ? { status } : {}), ...(cursor ? { cursor } : {}) } } })),
+    [api, fid, status],
+  );
+  const fname = (id: string) => facilities.find((f) => f.id === id);
+  return (
+    <Section title="Hàng sắp đến" actions={<button type="button" className="btn btn-o btn-sm" onClick={list.reload}>Làm mới</button>}>
+      <div className="stack">
+        <div className="grid3">
+          <SelectField label="Cơ sở đến" value={fid} onChange={setFid} options={[{ value: "", label: "Mọi cơ sở" }, ...facilities.map((f) => ({ value: f.id ?? "", label: `${f.code} · ${f.name}` }))]} />
+          <SelectField label="Trạng thái hàng đến" value={status} onChange={(v) => setStatus(v as typeof status)} options={[{ value: "", label: "Tất cả" }, ...Object.entries(ARRIVAL_STATUS_LABEL).map(([value, label]) => ({ value, label }))]} />
+        </div>
+        {list.loading ? <Loading /> : null}
+        {list.error ? <ProblemAlert problem={list.error} onRetry={list.reload} /> : null}
+        {list.items && !list.items.length ? <Empty>Không có thông báo hàng đến.</Empty> : null}
+        {list.items?.length ? (
+          <div className="tbl-wrap">
+            <table className="tbl" aria-label="Thông báo hàng đến">
+              <thead>
+                <tr>
+                  <th>Mã chuyến</th>
+                  <th>Cơ sở đến</th>
+                  <th>Trạng thái</th>
+                  <th>Phương tiện</th>
+                  <th className="num">Tấn kế hoạch</th>
+                  <th>Chờ đến từ</th>
+                  <th>Đến lúc</th>
+                  <th>Lô trên chuyến</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.items.map((a) => (
+                  <tr key={a.trip_id}>
+                    <td className="mono">{a.trip_code}</td>
+                    <td>{fname(a.facility_ref)?.code ?? <Ref id={a.facility_ref} />}</td>
+                    <td>
+                      <Chip status={a.status === "expected" ? "in_transit" : a.status === "arrived" ? "received" : "cancelled"} label={ARRIVAL_STATUS_LABEL[a.status]} />
+                    </td>
+                    <td>
+                      <span className="mono">{a.vessel_code ?? "—"}</span> <span className="small mute">{MODE_LABEL[a.mode]}</span>
+                    </td>
+                    <td className="num">{formatTons(a.planned_kg)}</td>
+                    <td>
+                      <When at={a.expected_since} />
+                    </td>
+                    <td>{a.cancelled_at ? <span className="small">hủy <When at={a.cancelled_at} /></span> : <When at={a.arrived_at} />}</td>
+                    <td className="small">
+                      {a.lot_refs.length
+                        ? a.lot_refs.map((l) => (
+                            <span key={l} className="chip c-mute">
+                              <Ref id={l} />
+                            </span>
+                          ))
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+        <LoadMore hasMore={list.hasMore} loading={list.loadingMore} onClick={list.loadMore} />
+      </div>
+    </Section>
+  );
+}
 
 export default function ReceiptPage() {
   const { api } = useAuth();
@@ -66,6 +145,7 @@ export default function ReceiptPage() {
   return (
     <div className="stack">
       <PageHead title="Nhận hàng" subtitle="Nhận một lô có N nguồn (tỷ lệ Σ = 1). Khối lượng lô chuẩn = phiếu cân HUB_IN; nhập tay chỉ khi cân hỏng, có lý do (Q-MKG-04)." />
+      <Arrivals facilities={facilities.data ?? []} />
       <Section title="Lô nhận">
         <div className="stack">
           <div className="grid3">

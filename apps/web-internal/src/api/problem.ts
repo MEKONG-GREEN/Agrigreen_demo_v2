@@ -133,6 +133,12 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "logistics.param_decided": "Phiên bản tham số đã được duyệt hoặc từ chối.",
   "logistics.manual_km_reason_required": "Nhập km tay phải kèm lý do (10–500 ký tự).",
   "logistics.correction_reason_required": "Hoàn tất lại chuyến đã hoàn tất là bản bù — bắt buộc lý do bù.",
+  "logistics.file_too_large": "Tệp chứng từ chuyến vượt 15 MB.",
+  "logistics.file_type": "Tệp chứng từ chỉ nhận PDF, JPEG, PNG hoặc WebP (nhận diện theo nội dung tệp, không theo tên).",
+  "logistics.file_checksum": "SHA-256 khai báo khác nội dung tệp — tệp có thể bị hỏng khi tải lên, hãy chọn lại tệp.",
+  "logistics.file_not_found": "Không có tệp chứng từ này (phải tải tệp lên trước khi ghi chứng từ chuyến).",
+  "logistics.file_store_unavailable": "Kho lưu tệp chứng từ chưa sẵn sàng — tạm thời chưa tải / đọc tệp được.",
+  "logistics.trip_document_not_found": "Chứng từ được thay không thuộc chuyến này.",
   // G4: mkg/orders
   "orders.price_approval_required": "Giá lệch giá bảng hoặc chiết khấu vượt ngưỡng — cần người có vai duyệt giá (sales_approver) khác người lập xác nhận.",
   "orders.contract_not_found": "Không có hợp đồng / phiên bản hợp đồng.",
@@ -191,6 +197,12 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "acctbridge.mapping_pending": "Đang có phiên bản ánh xạ chờ duyệt.",
   "acctbridge.mapping_decided": "Phiên bản ánh xạ đã được duyệt hoặc từ chối.",
   "acctbridge.format_unsupported": "Định dạng tệp xuất chỉ nhận CSV hoặc XML.",
+  "orders.file_too_large": "Tệp chứng từ vượt 15 MB.",
+  "orders.file_type": "Tệp chứng từ chỉ nhận PDF, JPEG, PNG hoặc WebP (nhận diện theo nội dung tệp, không theo tên).",
+  "orders.file_checksum": "SHA-256 khai báo khác nội dung tệp — tệp có thể bị hỏng khi tải lên, hãy chọn lại tệp.",
+  "orders.file_not_found": "Không có tệp chứng từ này.",
+  "orders.file_purpose": "Tệp đã tải cho mục đích khác (biên bản chênh lệch phiếu nhận ↔ chứng từ giao nhận) — tải lại tệp đúng mục đích.",
+  "orders.file_store_unavailable": "Kho lưu tệp chứng từ chưa sẵn sàng — tạm thời chưa tải / đọc tệp được.",
 };
 
 /** Mã 409 của pf/geo mà người dùng được phép "Xác nhận vẫn lưu" (gửi lại với confirm_overlap: true). */

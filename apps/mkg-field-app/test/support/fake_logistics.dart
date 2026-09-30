@@ -2,12 +2,18 @@ import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 
 /// mkg/logistics giả (api-internal) theo `internal/mkg/logistics/handler` +
 /// `app/trip.go`:
-/// - `GET /v1/logistics/trips?status=&cursor=&limit=` mới nhất trước, con trỏ
-///   mờ (`next_cursor` khi trang đầy), con trỏ hỏng → 422 `validation_failed`;
+/// - `GET /v1/logistics/trips?status=&assigned_to_me=&updated_since=&cursor=&limit=`
+///   (`handler/http.go` listTrips + `store/g4int.go`): `assigned_to_me=true`
+///   → chỉ `driver_ref` = [caller]; không `updated_since` → `planned_at` giảm
+///   dần; có → delta `recorded_at > mốc` (mọi trạng thái), `recorded_at` tăng
+///   dần; con trỏ mờ (`next_cursor` khi trang đầy), con trỏ hỏng /
+///   `updated_since` sai → 422 `validation_failed`;
 /// - `GET /v1/logistics/trips/{id}` (kèm chặng) — 404 `logistics.trip_not_found`;
 /// - `POST /v1/logistics/trips/{id}/milestones` — Idempotency-Key (gọi lặp →
 ///   phản hồi lần đầu), chỉ tiến từng bậc (409 `logistics.trip_transition`),
-///   chuyến đóng (409 `logistics.trip_closed`), lat/lng bắt buộc (422).
+///   chuyến đóng (409 `logistics.trip_closed`), lat/lng tùy chọn (cả hai
+///   hoặc không; chỉ một → 422; `accuracy_m` chỉ kèm tọa độ); mỗi thay đổi
+///   chuyến tăng `recorded_at` ([touch]).
 class FakeLogistics {
   /// trip_id → `LogisticsTrip` (kể cả cước — để kiểm máy KHÔNG lưu).
   final Map<String, Map<String, Object?>> trips = {};
@@ -30,13 +36,57 @@ class FakeLogistics {
   /// Trả `next_cursor` hỏng n lần (máy phải đọc lại từ đầu).
   int corruptCursors = 0;
 
+  /// `sub` của token người gọi (lọc `assigned_to_me`); null = không lọc.
+  String? caller;
+
+  /// Trả 422 cho `updated_since` n lần (máy chủ từ chối con trỏ delta).
+  int rejectUpdatedSince = 0;
+
+  /// Đồng hồ ghi sổ của máy chủ giả (`recorded_at` của sự kiện mới).
+  DateTime recordClock = DateTime.utc(2026, 10, 1, 3);
+
   void add(Map<String, Object?> trip) => trips['${trip['trip_id']}'] = trip;
 
-  List<Map<String, Object?>> _sorted(String? status) {
+  /// Ghi một sự kiện cho chuyến [id]: `recorded_at` tăng (như trip_current).
+  void touch(String id) {
+    recordClock = recordClock.add(const Duration(seconds: 1));
+    trips[id]!['recorded_at'] = recordClock.toIso8601String();
+  }
+
+  /// Điều phối đổi chuyến trên web (ghi sự kiện).
+  void update(String id, Map<String, Object?> fields) {
+    trips[id]!.addAll(fields);
+    touch(id);
+  }
+
+  List<Map<String, Object?>> _sorted(Map<String, String>? q) {
+    final status = q?['status'];
+    final mine = q?['assigned_to_me'] == 'true';
+    final since = q?['updated_since'];
+    DateTime? after;
+    if (since != null) {
+      after = DateTime.tryParse(since);
+      if (after == null || rejectUpdatedSince > 0) {
+        if (rejectUpdatedSince > 0) rejectUpdatedSince--;
+        throw ApiException(422, 'validation_failed');
+      }
+    }
     final l = [
       for (final t in trips.values)
-        if (status == null || t['status'] == status) t,
+        if ((status == null || t['status'] == status) &&
+            (!mine || caller == null || t['driver_ref'] == caller) &&
+            (after == null ||
+                DateTime.parse('${t['recorded_at']}').isAfter(after)))
+          t,
     ];
+    if (after != null) {
+      l.sort((a, b) {
+        final c = DateTime.parse('${a['recorded_at']}')
+            .compareTo(DateTime.parse('${b['recorded_at']}'));
+        return c != 0 ? c : '${a['trip_id']}'.compareTo('${b['trip_id']}');
+      });
+      return l;
+    }
     l.sort((a, b) {
       final c = '${b['planned_at']}'.compareTo('${a['planned_at']}');
       return c != 0 ? c : '${b['trip_id']}'.compareTo('${a['trip_id']}');
@@ -61,7 +111,7 @@ class FakeLogistics {
         }
         start = int.parse(m.group(1)!);
       }
-      final all = _sorted(q?['status']);
+      final all = _sorted(q);
       final page = all.skip(start).take(n).toList();
       String? next = page.length == n ? 'c:${start + n}' : null;
       if (next != null && corruptCursors > 0) {
@@ -107,7 +157,11 @@ class FakeLogistics {
     if (kind != 'departed' && kind != 'arrived') {
       throw ApiException(422, 'validation_failed');
     }
-    if (body?['lat'] is! String || body?['lng'] is! String) {
+    final lat = body?['lat'], lng = body?['lng'];
+    if ((lat == null) != (lng == null) ||
+        (lat != null && lat is! String) ||
+        (lng != null && lng is! String) ||
+        (lat == null && body?['accuracy_m'] != null)) {
       throw ApiException(422, 'validation_failed');
     }
     if (DateTime.tryParse('${body?['event_time']}') == null) {
@@ -122,6 +176,7 @@ class FakeLogistics {
     }
     t['status'] = kind;
     t['${kind}_at'] = body!['event_time'];
+    touch(id);
     milestones.add({'trip_id': id, 'key': key, ...body});
     final resp = {
       'trip': t,

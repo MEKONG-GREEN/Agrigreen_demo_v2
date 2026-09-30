@@ -40,9 +40,13 @@ cụ vận hành gọi, API vẫn kiểm vai). Với mỗi tenant và mỗi modu
 2. dựng lại từ sổ trong một giao dịch của module (xóa + phát lại sổ; ghi sổ + chiếu cùng giao dịch nên khóa theo module);
 3. băm lại và so. Mọi bảng phải **khớp** (`rows_before = rows_after`, `sha256_before = sha256_after`).
 
-Module chưa có hàm dựng lại (hiện là `mkg/fieldops` — bảng chiếu ghi cùng giao dịch với sổ, chưa có lệnh dựng lại) vẫn được
-băm, báo cáo ghi **chưa có** — mục mở (R-22 đòi mọi bảng chiếu có lệnh dựng lại). Cụm pf (nền tảng) không thuộc công cụ này
-(R-03: gốc lắp ráp một vùng).
+Mọi module mkg có hàm dựng lại (G4). `mkg/fieldops` (`POST /v1/fieldops/projections/rebuild`, vai `field_supervisor`) dựng
+lại sáu bảng chiếu từ sổ: `collection_order_current` (giữ `sync_seq` cũ để con trỏ pull của app hiện trường không lùi),
+`roll_total_current`, `buyside_reconciliation_current` (bảng kê mới nhất qua van + xác nhận mới nhất của HTX),
+`crew_current`, `crew_assignment_current`, `param_current`. Hai bảng đệm nguồn ngoài — `weighed_loading_current` (khối lượng
+cân đọc qua `measurement/port`) và `order_plot_harvest_current` (ngày gặt từ bề mặt partner) — không có sổ riêng nên **không**
+dựng lại; công cụ vẫn băm và chúng phải khớp. Module nào không có hàm dựng lại sẽ được báo **chưa có**. Cụm pf (nền tảng)
+không thuộc công cụ này (R-03: gốc lắp ráp một vùng).
 
 Chạy (máy vận hành trong vùng mkg, trỏ vào **bản sao**; lệnh GHI bảng chiếu nên bắt buộc `-confirm-copy`):
 

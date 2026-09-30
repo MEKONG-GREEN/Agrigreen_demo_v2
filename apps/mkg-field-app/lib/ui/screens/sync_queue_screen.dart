@@ -15,6 +15,7 @@ class _Queue {
     this.pendingActions,
     this.failedActions,
     this.milestoneConflicts,
+    this.milestones,
     this.tripCodes,
   );
   final List<OutboxRecord> records;
@@ -23,6 +24,9 @@ class _Queue {
 
   /// Mốc chuyến bị máy chủ từ chối (409 `logistics.*`…).
   final List<LocalMilestone> milestoneConflicts;
+
+  /// Mốc chuyến chờ gửi / vừa gửi (kèm ghi chú "không có GPS").
+  final List<LocalMilestone> milestones;
   final Map<String, String> tripCodes;
 }
 
@@ -33,6 +37,7 @@ final _queueProvider = FutureProvider.autoDispose<_Queue>((ref) async {
     await s.actions.pendingCount(),
     await s.field.failedShiftActions(),
     await s.trips.conflicts(),
+    await s.trips.queued(),
     {for (final v in await s.trips.trips()) v.trip.tripId: v.trip.code},
   );
 });
@@ -111,6 +116,24 @@ class SyncQueueScreen extends ConsumerWidget {
                   subtitle: Text(
                     'Lúc ${formatLocal(m.eventTime)} — '
                     '${logisticsMessage(m.errorCode)}',
+                  ),
+                ),
+              ),
+            for (final m in d.milestones)
+              Card(
+                key: ValueKey('ms-queued-${m.actionId}'),
+                child: ListTile(
+                  leading: Icon(
+                    m.hasGps ? Icons.local_shipping : Icons.location_off,
+                    color: m.hasGps ? AgColors.g700 : AgColors.amber,
+                  ),
+                  title: Text(
+                    'Mốc ${m.milestone.label} · chuyến '
+                    '${d.tripCodes[m.tripId] ?? shortRef(m.tripId)}',
+                  ),
+                  subtitle: Text(
+                    'Lúc ${formatLocal(m.eventTime)} · ${m.gpsLabel} · '
+                    '${m.state.label}',
                   ),
                 ),
               ),

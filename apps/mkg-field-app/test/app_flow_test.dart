@@ -87,6 +87,57 @@ void main() {
   });
 
   testWidgets(
+    'FM-05 (G4): ô số hiệu ghe chỉ hiện ở công đoạn xếp ghe; nhập "  ct 12 345 " → gửi vessel_code "CT12345"',
+    (tester) async {
+      final env = TestEnv()..seed();
+      final s = await loginToHome(tester, env);
+      final f = s.field;
+      final o = (await f.order(orderId))!;
+      await f.recordCount(
+        order: o,
+        plotRef: plotA,
+        stage: Stage.bale,
+        rollsText: '20',
+      );
+      await f.recordCount(
+        order: o,
+        plotRef: plotA,
+        stage: Stage.gather,
+        rollsText: '20',
+      );
+      await tapOn(tester, find.byKey(const ValueKey('order-$orderId')));
+      await settle(tester);
+      await tapOn(tester, find.byKey(const ValueKey('record-$plotB-bale')));
+      expect(find.byType(CountFormScreen), findsOneWidget);
+      expect(find.byKey(const ValueKey('vessel-code')), findsNothing);
+      await tester.pageBack();
+      await settle(tester);
+      await tapOn(
+        tester,
+        find.byKey(const ValueKey('record-$plotA-boat_load')),
+      );
+      expect(find.byType(CountFormScreen), findsOneWidget);
+      expect(find.byKey(const ValueKey('vessel-code')), findsOneWidget);
+      expect(find.textContaining('Số hiệu ghe / sà lan'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('vessel-code')),
+        '  ct 12 345 ',
+      );
+      await _enterCount(tester, rolls: '20');
+      await settle(tester, 40);
+      expect(find.byType(CountFormScreen), findsNothing);
+      await s.sync.syncOnce(force: true);
+      final boat = [
+        for (final w in env.server.rollCounts)
+          if ((w['payload']! as Map)['stage'] == 'boat_load')
+            (w['payload']! as Map),
+      ];
+      expect(boat.single['vessel_code'], 'CT12345');
+      await finish(tester);
+    },
+  );
+
+  testWidgets(
     'hàng đợi đồng bộ hiển thị lý do từ chối fieldops.* bằng lời dễ hiểu',
     (tester) async {
       final env = TestEnv()..seed();

@@ -4,12 +4,14 @@
 // Quy ước giả lập định tuyến (thay cho /v1/partner/waterway/route của nền tảng): chặng đường thuỷ tới
 // `customer_site` → không có đường thuỷ (`no_waterway_route`, dự phòng Haversine); còn lại → định tuyến thành công,
 // phản hồi NGUYÊN VĂN + SHA-256 lưu vào ảnh chụp (L-03). Đường bộ = Haversine × 1,3 (#10).
-import type { LogisticsLeg, LogisticsTrip, LogisticsTripEvent, LogisticsVessel } from "../types";
+import type { LogisticsLeg, LogisticsTrip, LogisticsTripDocument, LogisticsTripEvent, LogisticsVessel, LogisticsVesselVersion } from "../types";
 import { grams, kgOf } from "@/lib/kg";
 import { normalizeVesselCode } from "@/lib/g4labels";
 import { cents, divRound, moneyOf, priceUnits } from "@/lib/money";
 import { sha256Text, textToBase64 } from "@/lib/sha256";
+import { syncArrival } from "./arrivals";
 import { F, L, O, newId, sid } from "./db";
+import { fileRoutes, findFile, seedFile, tinyPdf } from "./files";
 import { decimalCheck, paramStore, reasonOf, todayVn } from "./g4common";
 import { created, daysAgo, forbidden, hasRole, json, nowIso, pageSlice, problem, route, str, validation, UUID_RE, type Route } from "./http";
 import { ACTORS } from "./personas";
@@ -57,6 +59,8 @@ const pv = (key: string) => params.effective(key);
 // ---------------------------------------------------------------------------
 interface VesselRec {
   v: LogisticsVessel;
+  /** Sổ vessel_event: mỗi lần tạo / sửa là một phiên bản (proto GH-01). */
+  versions: LogisticsVesselVersion[];
 }
 const vessels: VesselRec[] = [];
 
@@ -69,17 +73,40 @@ function regStatus(expiry: string | null | undefined): Pick<LogisticsVessel, "re
   return { registration_status: "valid", registration_days_left: days, warning: null, warn_param_version: warn.version };
 }
 
+function versionOf(v: LogisticsVessel, kind: "created" | "revised", reason: string | null, actor: string, at: string): LogisticsVesselVersion {
+  return { event_id: newId(0x3b), vessel_id: v.vessel_id, kind, version: v.version, code: v.code, vehicle_kind: v.kind, name: v.name ?? null, owner_ref: v.owner_ref ?? null, registered_tons: v.registered_tons ?? null, straw_payload_tons: v.straw_payload_tons ?? null, registration_expiry: v.registration_expiry ?? null, rate_type: (v.rate_type ?? null) as LogisticsVesselVersion["rate_type"], rate_vnd: v.rate_vnd ?? null, status: v.status, reason, actor_ref: actor, event_time: at, recorded_at: at };
+}
+
 function vessel(id: string, code: string, kind: LogisticsVessel["kind"], name: string, reg: string | null, payload: string | null, expiryDays: number | null, rateType: string | null, rate: string | null, status: "active" | "inactive" = "active") {
   const expiry = expiryDays === null ? null : todayVn(expiryDays);
-  vessels.push({
-    v: { vessel_id: id, version: 1, code, kind, name, owner_ref: sid(0x29, vessels.length + 1), registered_tons: reg, straw_payload_tons: payload, registration_expiry: expiry, rate_type: rateType, rate_vnd: rate, status, ...regStatus(expiry), updated_at: daysAgo(40) },
-  });
+  const v: LogisticsVessel = { vessel_id: id, version: 1, code, kind, name, owner_ref: sid(0x29, vessels.length + 1), registered_tons: reg, straw_payload_tons: payload, registration_expiry: expiry, rate_type: rateType, rate_vnd: rate, status, ...regStatus(expiry), updated_at: daysAgo(40) };
+  vessels.push({ v, versions: [versionOf(v, "created", null, ACTORS.vanTai, daysAgo(40))] });
 }
 vessel(LG.vesselOk, "TG-12345", "ghe", "Ghe Tân Hiệp 1", "120", null, 200, "per_ton", "85000", "active");
 vessel(LG.vesselExpiring, "CT-06789", "sa_lan", "Sà lan Cần Thơ 6", "180", "140", 10, "per_ton_km", "800", "active");
 vessel(LG.vesselExpired, "VL-00111", "ghe", "Ghe Vĩnh Long 11", "80", "60", -5, null, null, "active");
 vessel(LG.truck, "65C-12345", "truck", "Xe tải 15 t", "15", "15", null, null, null, "active");
 vessel(LG.vesselInactive, "KG-09999", "ghe", "Ghe Kiên Giang 99 (ngừng)", "90", null, 90, null, null, "inactive");
+// Sà lan CT-06789: lịch sử 7 phiên bản (gia hạn đăng kiểm, đổi đơn giá, đổi tải) — trang lịch sử có "Tải thêm".
+{
+  const r = vessels.find((x) => x.v.vessel_id === LG.vesselExpiring)!;
+  const final = { ...r.v };
+  const steps: [Partial<LogisticsVessel>, string][] = [
+    [{ rate_type: "per_ton", rate_vnd: "70000" }, "Ký hợp đồng thuê theo tấn mùa vụ Hè Thu"],
+    [{ registration_expiry: todayVn(-200) }, "Cập nhật hạn đăng kiểm theo sổ mới"],
+    [{ straw_payload_tons: "130" }, "Đo lại tải rơm thực chở sau khi gia cố mạn"],
+    [{ rate_type: "per_ton_km", rate_vnd: "750" }, "Đổi sang đơn giá theo tấn·km theo đề nghị chủ sà lan"],
+    [{ straw_payload_tons: "140" }, "Nâng tải rơm thực chở sau khi thay bạt che"],
+    [{ rate_vnd: final.rate_vnd, registration_expiry: final.registration_expiry, status: "active" }, "Gia hạn đăng kiểm và chốt đơn giá 800 đ/t·km"],
+  ];
+  r.v = { ...r.v, rate_type: null, rate_vnd: null, straw_payload_tons: "120", registration_expiry: todayVn(-400) };
+  r.versions = [versionOf(r.v, "created", null, ACTORS.vanTai, daysAgo(420))];
+  steps.forEach(([patch, reason], i) => {
+    r.v = { ...r.v, ...patch, version: r.v.version + 1 };
+    r.versions.push(versionOf(r.v, "revised", reason, ACTORS.vanTai, daysAgo(360 - i * 64)));
+  });
+  r.v = { ...final, version: r.v.version, updated_at: daysAgo(40) };
+}
 
 function currentVessel(id: string | null | undefined): LogisticsVessel | undefined {
   const r = vessels.find((x) => x.v.vessel_id === id);
@@ -134,6 +161,8 @@ interface SnapshotRec {
 interface TripRec {
   trip: LogisticsTrip;
   events: LogisticsTripEvent[];
+  /** Chứng từ chuyến có người ký (L-11). */
+  docs: LogisticsTripDocument[];
 }
 const trips: TripRec[] = [];
 const snapshots: SnapshotRec[] = [];
@@ -289,7 +318,7 @@ function seedTrip(id: string, status: LogisticsTrip["status"], mode: "road" | "w
     legs: [],
     ...extra,
   };
-  trips.push({ trip: t, events: [] });
+  trips.push({ trip: t, events: [], docs: [] });
   ev(t, "planned", extra.source_ref ? ACTORS.system : ACTORS.vanTai, at, { source_ref: extra.source_ref ?? null });
   t.legs = legs.map(([m, a, b, manual], i) => planLeg(t, i + 1, 1, m, a, b, manual, manual ? "Kênh cạn mùa khô, đo theo đồng hồ ghe" : null));
   t.planned_cost = t.legs.length ? addLegCosts(t.legs) : null;
@@ -311,14 +340,23 @@ const P = {
 
 // proto FM-05: lượt xuống ghe 4 400 cuộn → chuyến đường thuỷ planned, tấn ước 88 t, chưa gán ghe, xuống ghe 60 giờ trước.
 seedTrip(LG.tripFm05, "planned", "waterway", "88000.000", 60, { collection_order_ref: O.assigned, source_ref: sid(0x0a, 3), cargo: [{ lot_ref: L.arriving, mass_kg: "88000.000", ticket_ref: null }], flags: ["no_vehicle"] });
-seedTrip(LG.tripDeparted, "departed", "waterway", "90000.000", 30, { vehicle_ref: LG.vesselOk, driver_ref: sid(0x29, 11), departed_at: daysAgo(0, 20), cargo: [{ lot_ref: L.ct, mass_kg: "45000.000", ticket_ref: null }, { lot_ref: L.perBale, mass_kg: "45000.000", ticket_ref: null }] }, [["waterway", P.bai, P.hubCt, null]]);
+seedTrip(LG.tripDeparted, "departed", "waterway", "90000.000", 30, { vehicle_ref: LG.vesselOk, driver_ref: ACTORS.taiXe, departed_at: daysAgo(0, 20), cargo: [{ lot_ref: L.ct, mass_kg: "45000.000", ticket_ref: null }, { lot_ref: L.perBale, mass_kg: "45000.000", ticket_ref: null }] }, [["waterway", P.bai, P.hubCt, null]]);
 seedTrip(LG.tripCompleted, "completed", "road", "15000.000", 200, { vehicle_ref: LG.truck, delivery_ref: sid(0x28, 1), departed_at: daysAgo(8), arrived_at: daysAgo(8), completed_at: daysAgo(8), actual_kg: "14800.000", cost_source: "param_rate", ticket_ref: sid(0x0b, 90), cargo: [{ lot_ref: L.compressed, mass_kg: "15000.000", ticket_ref: sid(0x0b, 90) }] }, [["road", P.hubTb, P.plant, null]]);
 seedTrip(LG.tripCancelled, "cancelled", "road", "12000.000", 120, { cancelled_at: daysAgo(4), cancel_reason: "Khách lùi lịch nhận hàng sang tuần sau" });
 seedTrip(LG.tripArrived, "arrived", "waterway", "130000.000", 34, { vehicle_ref: LG.vesselExpiring, departed_at: daysAgo(0, 30), arrived_at: daysAgo(0, 2), cargo: [{ lot_ref: L.dried, mass_kg: "130000.000", ticket_ref: null }], flags: ["registration_expiring"] }, [["road", P.bai, P.hubTb, "5.200"], ["waterway", P.hubTb, P.hubCt, null]]);
 {
-  const done = trips.find((x) => x.trip.trip_id === LG.tripCompleted)!.trip;
-  done.actual_cost = legCost("14800.000", done.legs![0]!.distance_km, "2200");
+  const done = trips.find((x) => x.trip.trip_id === LG.tripCompleted)!;
+  done.trip.actual_cost = legCost("14800.000", done.trip.legs![0]!.distance_km, "2200");
+  // Chuyến đường bộ đã giao: ePOD khách ký (tệp đã tải lên kho).
+  const f = seedFile("logistics", sid(0x3a, 1), "trip_document", "epod-CH000103.pdf", tinyPdf("ePOD CH000103"), ACTORS.vanTai, daysAgo(8));
+  done.docs.push({ id: sid(0x3c, 1), trip_id: done.trip.trip_id, kind: "epod", file_ref: f.id, file_sha256: f.sha256, signer_role: "consignee", signer_ref: sid(0x29, 20), signed_at: daysAgo(8), note: "Nhà máy ký nhận đủ 15 t", supersedes_id: null, correction_reason: null, actor_ref: ACTORS.vanTai, rule_version: "logistics.trip_document.v1", recorded_at: daysAgo(8) });
 }
+
+function arrive(t: LogisticsTrip, eventId: string, at: string): void {
+  syncArrival(t, eventId, at, currentVessel(t.vehicle_ref)?.code ?? null);
+}
+// Thông báo hàng đến cho chuyến đang tới cơ sở (consumer mkg.hub.trip_milestone).
+for (const r of trips) arrive(r.trip, r.events.at(-1)?.event_id ?? newId(0x22), r.trip.arrived_at ?? r.trip.departed_at ?? r.trip.planned_at);
 
 function tripOr404(id: string): TripRec | Response {
   return trips.find((x) => x.trip.trip_id === id) ?? problem(404, "logistics.trip_not_found", "Trip not found");
@@ -414,7 +452,7 @@ export const logisticsRoutes: Route[] = [
       recorded_at: nowIso(),
       legs: [],
     };
-    trips.push({ trip: t, events: [] });
+    trips.push({ trip: t, events: [], docs: [] });
     const warnings = t.vehicle_ref ? vehicleWarnings(t, t.vehicle_ref) : ["no_vehicle"];
     t.flags = tripFlags({ ...t, flags: warnings });
     return result(t, warnings, ev(t, "planned", persona.actor, at));
@@ -442,7 +480,9 @@ export const logisticsRoutes: Route[] = [
     r.trip.driver_ref = str(body, "driver_ref") || r.trip.driver_ref || null;
     const warnings = vehicleWarnings(r.trip, vehicle);
     r.trip.flags = tripFlags({ ...r.trip, flags: [...(r.trip.flags ?? []).filter((f) => !["no_vehicle", "vessel_unregistered", "vessel_inactive", "registration_expired", "registration_expiring", "payload_exceeded"].includes(f)), ...warnings] });
-    return result(r.trip, warnings, ev(r.trip, "vehicle_assigned", persona.actor, nowIso()));
+    const e = ev(r.trip, "vehicle_assigned", persona.actor, nowIso());
+    arrive(r.trip, e.event_id, e.event_time);
+    return result(r.trip, warnings, e);
   }),
   route("POST", "/v1/logistics/trips/:id/legs", ({ params: p, body, persona }) => {
     if (!hasRole(persona, DISPATCHER)) return forbidden();
@@ -471,7 +511,9 @@ export const logisticsRoutes: Route[] = [
     r.trip.planned_cost = addLegCosts(r.trip.legs);
     r.trip.flags = tripFlags(r.trip);
     const warnings = r.trip.legs.flatMap((l) => l.flags ?? []);
-    return result(r.trip, Array.from(new Set(warnings)), ev(r.trip, "revised", persona.actor, nowIso()));
+    const e = ev(r.trip, "revised", persona.actor, nowIso());
+    arrive(r.trip, e.event_id, e.event_time);
+    return result(r.trip, Array.from(new Set(warnings)), e);
   }),
   route("GET", "/v1/logistics/trips/:id/legs/:leg/route-snapshot", ({ params: p, persona }) => {
     if (!hasRole(persona, DISPATCHER, DRIVER)) return forbidden();
@@ -503,7 +545,9 @@ export const logisticsRoutes: Route[] = [
     r.trip.status = kind;
     if (kind === "departed") r.trip.departed_at = at;
     else r.trip.arrived_at = at;
-    return result(r.trip, [], ev(r.trip, kind, persona.actor, at, { lat, lng }));
+    const e = ev(r.trip, kind, persona.actor, at, { lat, lng });
+    arrive(r.trip, e.event_id, at);
+    return result(r.trip, [], e);
   }),
   route("POST", "/v1/logistics/trips/:id/completion", ({ params: p, body, persona }) => {
     if (!hasRole(persona, DISPATCHER)) return forbidden();
@@ -548,6 +592,7 @@ export const logisticsRoutes: Route[] = [
     t.ticket_ref = str(body, "ticket_ref") || t.ticket_ref || null;
     t.flags = flags;
     const e = ev(t, "completed", persona.actor, at, { actual_kg: kg, actual_cost: cost, cost_source: source, param_version: version, supersedes_id: prev ? prev.event_id : null, correction_reason: prev ? correction : null, reason: manualCost ? str(body, "reason") : null });
+    arrive(t, e.event_id, at);
     return result(t, flags.includes("weigh_variance") ? ["weigh_variance"] : [], e);
   }),
   route("POST", "/v1/logistics/trips/:id/cancel", ({ params: p, body, persona }) => {
@@ -560,7 +605,9 @@ export const logisticsRoutes: Route[] = [
     r.trip.status = "cancelled";
     r.trip.cancelled_at = nowIso();
     r.trip.cancel_reason = reason;
-    return result(r.trip, [], ev(r.trip, "cancelled", persona.actor, nowIso(), { reason }));
+    const e = ev(r.trip, "cancelled", persona.actor, nowIso(), { reason });
+    arrive(r.trip, e.event_id, e.event_time);
+    return result(r.trip, [], e);
   }),
   route("GET", "/v1/logistics/vessels", ({ url, persona }) => {
     if (!hasRole(persona, DISPATCHER, DRIVER)) return forbidden();
@@ -573,7 +620,7 @@ export const logisticsRoutes: Route[] = [
     if (inp instanceof Response) return inp;
     if (vessels.some((x) => x.v.code === inp.code)) return problem(409, "logistics.vessel_code_taken", "Vessel code taken");
     const v = { vessel_id: newId(0x21), version: 1, ...inp, ...regStatus(inp.registration_expiry), updated_at: nowIso() } as LogisticsVessel;
-    vessels.push({ v });
+    vessels.push({ v, versions: [versionOf(v, "created", null, persona.actor, v.updated_at!)] });
     return created({ vessel: v });
   }),
   route("GET", "/v1/logistics/vessels/:id", ({ params: p, persona }) => {
@@ -590,7 +637,20 @@ export const logisticsRoutes: Route[] = [
     if (typeof body.expected_version === "number" && body.expected_version !== r.v.version) return problem(409, "logistics.vessel_version_stale", "Stale version");
     if (vessels.some((x) => x !== r && x.v.code === inp.code)) return problem(409, "logistics.vessel_code_taken", "Vessel code taken");
     r.v = { ...r.v, ...inp, version: r.v.version + 1, ...regStatus(inp.registration_expiry), updated_at: nowIso() } as LogisticsVessel;
+    r.versions.push(versionOf(r.v, "revised", str(body, "reason"), persona.actor, r.v.updated_at!));
     return created({ vessel: r.v });
+  }),
+  route("GET", "/v1/logistics/vessels/:id/versions", ({ params: p, url, persona }) => {
+    if (!hasRole(persona, DISPATCHER)) return forbidden();
+    const r = vessels.find((x) => x.v.vessel_id === p[0]);
+    if (!r) return problem(404, "logistics.vessel_not_found", "Vessel not found");
+    // Con trỏ = version cuối trang (tăng dần).
+    const cursor = url.searchParams.get("cursor");
+    if (cursor && !/^\d+$/.test(cursor)) return validation([{ field: "cursor", reason: "Số phiên bản" }]);
+    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 50) || 50, 1), 200);
+    const rest = r.versions.filter((x) => x.version > Number(cursor ?? 0)).sort((a, b) => a.version - b.version);
+    const items = rest.slice(0, limit);
+    return json({ items, next_cursor: rest.length > limit ? String(items.at(-1)!.version) : null });
   }),
   route("GET", "/v1/logistics/alerts", ({ persona }) => {
     if (!hasRole(persona, DISPATCHER)) return forbidden();
@@ -600,6 +660,47 @@ export const logisticsRoutes: Route[] = [
     const vs = vessels.map((x) => currentVessel(x.v.vessel_id)!).filter((v) => v.status === "active" && (v.registration_status === "expired" || v.registration_status === "expiring"));
     return json({ unweighed_hours: Number(hours.value), unweighed_param_version: hours.version, unweighed_trips: unweighed, vessels: vs });
   }),
+  route("GET", "/v1/logistics/trips/:id/documents", ({ params: p, persona }) => {
+    if (!hasRole(persona, DISPATCHER, DRIVER)) return forbidden();
+    const r = tripOr404(p[0]!);
+    return r instanceof Response ? r : json({ items: [...r.docs].sort((a, b) => b.recorded_at.localeCompare(a.recorded_at)) });
+  }),
+  route("POST", "/v1/logistics/trips/:id/documents", ({ params: p, body, persona }) => {
+    if (!hasRole(persona, DISPATCHER, DRIVER)) return forbidden();
+    const r = tripOr404(p[0]!);
+    if (r instanceof Response) return r;
+    if (!hasRole(persona, DISPATCHER) && r.trip.driver_ref !== persona.actor) return problem(403, "logistics.not_assigned_driver", "Trip not assigned to this driver");
+    if (r.trip.status === "cancelled") return problem(409, "logistics.trip_closed", "Trip cancelled");
+    const kind = str(body, "kind");
+    const role = str(body, "signer_role");
+    const fileRef = str(body, "file_ref");
+    const signedAt = str(body, "signed_at");
+    const signer = str(body, "signer_ref") || null;
+    const sup = str(body, "supersedes_id") || null;
+    const note = str(body, "note");
+    const errs: { field: string; reason: string }[] = [];
+    if (!["epod", "ebill", "minutes"].includes(kind)) errs.push({ field: "kind", reason: "epod | ebill | minutes" });
+    if (!["driver", "consignee", "hub_operator", "dispatcher"].includes(role)) errs.push({ field: "signer_role", reason: "driver | consignee | hub_operator | dispatcher" });
+    if (!UUID_RE.test(fileRef)) errs.push({ field: "file_ref", reason: "UUID tệp đã tải" });
+    if (signer && !UUID_RE.test(signer)) errs.push({ field: "signer_ref", reason: "UUID" });
+    if (!signedAt || !Number.isFinite(Date.parse(signedAt))) errs.push({ field: "signed_at", reason: "Thời điểm ký (RFC 3339)" });
+    else if (Date.parse(signedAt) > Date.now() + 60_000) errs.push({ field: "signed_at", reason: "Không ở tương lai" });
+    if (note.length > 500) errs.push({ field: "note", reason: "≤ 500 ký tự" });
+    let correction: string | null = null;
+    if (sup) {
+      const c = reasonOf(body, "correction_reason");
+      if (c instanceof Response) errs.push({ field: "correction_reason", reason: "Bản bù cần lý do 10–500 ký tự" });
+      else correction = c;
+    }
+    if (errs.length) return validation(errs);
+    if (sup && !r.docs.some((d) => d.id === sup)) return problem(404, "logistics.trip_document_not_found", "Superseded document not on this trip");
+    const f = findFile("logistics", fileRef);
+    if (!f) return problem(404, "logistics.file_not_found", "File not found");
+    const doc: LogisticsTripDocument = { id: newId(0x3c), trip_id: r.trip.trip_id, kind: kind as LogisticsTripDocument["kind"], file_ref: f.id, file_sha256: f.sha256, signer_role: role as LogisticsTripDocument["signer_role"], signer_ref: signer, signed_at: new Date(signedAt).toISOString(), note: note || null, supersedes_id: sup, correction_reason: correction, actor_ref: persona.actor, rule_version: "logistics.trip_document.v1", recorded_at: nowIso() };
+    r.docs.push(doc);
+    return created({ document: doc });
+  }),
+  ...fileRoutes("logistics", [DISPATCHER, DRIVER], ["trip_document"]),
   ...params.routes,
 ];
 

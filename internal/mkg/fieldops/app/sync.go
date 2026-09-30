@@ -67,7 +67,7 @@ type RollCountPayload struct {
 	GPS       json.RawMessage `json:"gps"`
 	GPSStatus string          `json:"gps_status"`
 	// VesselCode (G4, tùy chọn): số hiệu ghe/sà lan khi xếp ghe (boat_load) — proto FM-05. App hiện trường
-	// chưa gửi (thêm ô nhập sau); máy chủ đã nhận.
+	// MKG (apps/mkg-field-app) gửi khi người thu gom nhập ô số hiệu ghe ở công đoạn xếp ghe (G4).
 	VesselCode *string `json:"vessel_code"`
 }
 

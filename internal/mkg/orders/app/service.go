@@ -16,6 +16,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -64,6 +65,9 @@ type Service struct {
 	// Stock (G4, O-05): tồn hub theo dạng hàng (hub/port.Stock, pool vai hub_app, tenant tường minh) để cảnh
 	// báo thiếu tồn khi lập / xác nhận / đọc đơn bán. Nil → kiểm tồn "unavailable" (không cảnh báo, không chặn).
 	Stock hubport.Stock
+	// Files (G4): kho đối tượng trong lãnh thổ cho tệp chứng từ (biên bản chênh lệch, ePOD). Nil → tải tệp trả
+	// 503 orders.file_store_unavailable; phiếu nhận / giao nhận vẫn nhận file_ref.
+	Files objstore.Store
 }
 
 var (

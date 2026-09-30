@@ -54,6 +54,18 @@ export interface Ctx {
   body: Record<string, unknown>;
 }
 export type Handler = (ctx: Ctx) => Response;
+
+/** Phần tệp của thân multipart/form-data (handler giả lập đồng bộ — byte đã đọc sẵn). */
+export interface MultipartFile {
+  name: string;
+  type: string;
+  bytes: Uint8Array;
+}
+
+export function multipartFile(body: Record<string, unknown>, field: string): MultipartFile | null {
+  const v = body[field];
+  return typeof v === "object" && v !== null && (v as MultipartFile).bytes instanceof Uint8Array ? (v as MultipartFile) : null;
+}
 export interface Route {
   method: "GET" | "POST";
   pattern: RegExp;

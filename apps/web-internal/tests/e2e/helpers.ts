@@ -38,6 +38,16 @@ export function monthVn(back = 0): string {
   return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() - back, 1)).toISOString().slice(0, 7);
 }
 
+/** Tệp PDF tối thiểu (chữ ký %PDF-) cho ô tải tệp chứng từ. */
+export function pdfFile(name: string) {
+  return { name, mimeType: "application/pdf", buffer: Buffer.from(`%PDF-1.4\n% ${name}\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n`) };
+}
+
+/** Tệp không phải PDF / ảnh (server nhận diện theo nội dung → 415 *.file_type). */
+export function textFile(name: string) {
+  return { name, mimeType: "application/pdf", buffer: Buffer.from("đây không phải PDF") };
+}
+
 /** Thông báo tự phê duyệt bị chặn (R-56). */
 export const SELF_APPROVAL = /Không được tự phê duyệt/;
 

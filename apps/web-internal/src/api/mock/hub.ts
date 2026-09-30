@@ -3,6 +3,7 @@ import type { Allocation, Movement, Facility, FacilityVersion, Product, RankedLo
 import { addKg, cmpKg, grams, isKg, kgOf, normKg, subKg } from "@/lib/kg";
 import { DEFAULT_RISK_V2, riskScore, validateRisk, type RiskParamsV2 } from "@/lib/rules";
 import { remember } from "@/lib/recent";
+import { arrivalCount } from "./arrivals";
 import {
   DEFAULT_WEIGH_V1,
   facilities,
@@ -568,7 +569,7 @@ export const hubAdminRoutes: Route[] = [
     }
     return created({ version: v, facility: f.current, publications });
   }),
-  route("POST", "/v1/hub/projections/rebuild", () => json({ lot_balances: lots.length })),
+  route("POST", "/v1/hub/projections/rebuild", () => json({ lot_balances: lots.length, arrivals: arrivalCount() })),
   route("GET", "/v1/hub/params/:set", ({ params }) => {
     const set = params[0] as "risk" | "weigh";
     if (set !== "risk" && set !== "weigh") return problem(404, "hub.param_set_not_found", "Param set not found");

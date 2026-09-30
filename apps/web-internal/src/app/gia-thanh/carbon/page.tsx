@@ -4,13 +4,14 @@ import { useState, type ReactNode } from "react";
 import { idem, unwrap } from "@/api/client";
 import type { CarbonRevenueResult } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
-import { KV, Money } from "@/components/g4kit";
-import { ActionStatus, Provisional, Section, TextField, useAction } from "@/components/kit";
+import { KV, Money, When } from "@/components/g4kit";
+import { ActionStatus, Provisional, Ref, Section, SelectField, TextField, useAction } from "@/components/kit";
 import { ProblemAlert } from "@/components/ProblemAlert";
-import { PageHead } from "@/components/ui";
+import { Empty, LoadMore, Loading, PageHead } from "@/components/ui";
 import { COSTING_PARAM_LABEL } from "@/lib/g4labels";
 import { isPositiveMoney, splitCarbon } from "@/lib/money";
 import { useAsync } from "@/lib/useAsync";
+import { LIST_PAGE_SIZE, usePaged } from "@/lib/usePaged";
 
 const KEYS = ["costing.carbon.retained_pct", "costing.carbon.split.farmers_pct", "costing.carbon.split.authority_pct", "costing.carbon.split.verifier_pct"];
 
@@ -21,6 +22,12 @@ export default function CarbonPage() {
   const [amount, setAmount] = useState("");
   const [reference, setReference] = useState("");
   const [result, setResult] = useState<CarbonRevenueResult | null>(null);
+  const [period, setPeriod] = useState("");
+  const periods = useAsync(async () => (await unwrap(api.GET("/v1/costing/periods", { params: { query: { limit: 24 } } }))).items ?? [], [api]);
+  const list = usePaged(
+    (cursor) => unwrap(api.GET("/v1/costing/carbon-revenue", { params: { query: { limit: LIST_PAGE_SIZE, ...(period ? { period_ref: period } : {}), ...(cursor ? { cursor } : {}) } } })),
+    [api, period],
+  );
   const val = (k: string) => params.data?.find((p) => p.key === k)?.active?.value ?? "";
   const preview = isPositiveMoney(amount.trim()) && params.data ? splitCarbon(amount.trim(), val(KEYS[0]!), val(KEYS[1]!), val(KEYS[2]!)) : null;
   return (
@@ -56,7 +63,13 @@ export default function CarbonPage() {
               type="button"
               className="btn btn-p btn-sm"
               disabled={act.busy || !isPositiveMoney(amount.trim())}
-              onClick={() => void act.run(() => unwrap(api.POST("/v1/costing/carbon-revenue", { params: { header: idem() }, body: { amount: amount.trim(), ...(reference.trim() ? { reference: reference.trim() } : {}) } })), (r) => `Đã ghi doanh thu carbon kỳ ${r.period_code} (${r.label})`).then((r) => r && setResult(r))}
+              onClick={() => void act.run(() => unwrap(api.POST("/v1/costing/carbon-revenue", { params: { header: idem() }, body: { amount: amount.trim(), ...(reference.trim() ? { reference: reference.trim() } : {}) } })), (r) => `Đã ghi doanh thu carbon kỳ ${r.period_code} (${r.label})`).then((r) => {
+                  if (r) {
+                    setResult(r);
+                    list.reload();
+                  }
+                })
+              }
             >
               Ghi và chia
             </button>
@@ -105,6 +118,67 @@ export default function CarbonPage() {
               </table>
             </div>
           ) : null}
+        </div>
+      </Section>
+      <Section title="Doanh thu carbon đã ghi">
+        <div className="stack">
+          <SelectField label="Lọc theo kỳ" value={period} onChange={setPeriod} options={[{ value: "", label: "Mọi kỳ" }, ...(periods.data ?? []).map((p) => ({ value: p.id ?? "", label: p.code ?? "" }))]} />
+          {list.loading ? <Loading /> : null}
+          {list.error ? <ProblemAlert problem={list.error} onRetry={list.reload} /> : null}
+          {list.items && !list.items.length ? <Empty>Chưa ghi khoản doanh thu carbon nào.</Empty> : null}
+          {list.items?.length ? (
+            <div className="tbl-wrap">
+              <table className="tbl" aria-label="Doanh thu carbon đã ghi">
+                <thead>
+                  <tr>
+                    <th>Ghi lúc</th>
+                    <th>Kỳ</th>
+                    <th>Tham chiếu</th>
+                    <th className="num">Doanh thu</th>
+                    <th className="num">MKG giữ lại</th>
+                    <th className="num">Nông hộ / HTX</th>
+                    <th className="num">Cơ quan</th>
+                    <th className="num">VVB</th>
+                    <th>Tỷ lệ</th>
+                    <th>Người ghi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.items.map((c) => (
+                    <tr key={c.id}>
+                      <td>
+                        <When at={c.event_time} />
+                      </td>
+                      <td className="mono">{c.period_code}</td>
+                      <td>{c.reference ?? <span className="mute">—</span>}</td>
+                      <td className="num">
+                        <Money v={c.revenue_amount} strong />
+                      </td>
+                      <td className="num">
+                        <Money v={c.retained_amount} />
+                      </td>
+                      <td className="num">
+                        <Money v={c.farmers_amount} />
+                      </td>
+                      <td className="num">
+                        <Money v={c.authority_amount} />
+                      </td>
+                      <td className="num">
+                        <Money v={c.verifier_amount} />
+                      </td>
+                      <td className="small">
+                        {c.retained_pct ?? "?"} % · {c.farmers_pct ?? "?"}/{c.authority_pct ?? "?"}/{c.verifier_pct ?? "?"} <span className="chip c-warn">{c.label}</span>
+                      </td>
+                      <td>
+                        <Ref id={c.actor_ref} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+          <LoadMore hasMore={list.hasMore} loading={list.loadingMore} onClick={list.loadMore} />
         </div>
       </Section>
     </div>

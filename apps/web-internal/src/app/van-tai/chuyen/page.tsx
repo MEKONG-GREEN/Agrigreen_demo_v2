@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import { idem, unwrap } from "@/api/client";
-import type { LogisticsEndpointInput, LogisticsTrip, LogisticsVessel, RouteSnapshot } from "@/api/types";
+import type { LogisticsEndpointInput, LogisticsTrip, LogisticsTripDocument, LogisticsVessel, MkgFile, RouteSnapshot } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { hasRole, ROLES } from "@/auth/principal";
+import { FileRef, FileUploadField } from "@/components/FileUpload";
 import { Flags, KV, Money, When } from "@/components/g4kit";
-import { ActionStatus, Chip, Ref, Section, SelectField, TextField, useAction } from "@/components/kit";
+import { ActionStatus, Chip, localToIso, nowLocalInput, Ref, Section, SelectField, TextField, useAction } from "@/components/kit";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { Empty, KpiTile, Loading, PageHead } from "@/components/ui";
-import { COST_SOURCE_LABEL, ENDPOINT_KIND_LABEL, flagLabel, MODE_LABEL, nextMilestone, ROUTE_SOURCE_LABEL, TRIP_EVENT_LABEL, TRIP_STATUS_LABEL } from "@/lib/g4labels";
+import { COST_SOURCE_LABEL, ENDPOINT_KIND_LABEL, EVIDENCE_KIND_LABEL, flagLabel, SIGNER_ROLE_LABEL, MODE_LABEL, nextMilestone, ROUTE_SOURCE_LABEL, TRIP_EVENT_LABEL, TRIP_STATUS_LABEL } from "@/lib/g4labels";
 import { formatKg, formatTons, isKg } from "@/lib/kg";
 import { formatDecimalString, formatPrice, isMoney, shortHash } from "@/lib/money";
 import { validReason } from "@/lib/rules";
@@ -79,6 +80,139 @@ function SnapshotView({ tripId, legId }: { tripId: string; legId: string }) {
         {new TextDecoder().decode(bytes)}
       </pre>
       <span className="mute">Đọc chặng cũ không gọi lại nền tảng — dùng đúng bản đã lưu (mục 16, L-03).</span>
+    </div>
+  );
+}
+
+type DocKind = LogisticsTripDocument["kind"];
+type SignerRole = LogisticsTripDocument["signer_role"];
+
+/** Chứng từ chuyến có người ký (L-11): tải tệp → ghi ePOD / e-bill / biên bản với vai người ký + thời điểm ký. */
+function TripDocuments({ trip, canWrite }: { trip: LogisticsTrip; canWrite: boolean }) {
+  const { api } = useAuth();
+  const docs = useAsync(async () => (await unwrap(api.GET("/v1/logistics/trips/{id}/documents", { params: { path: { id: trip.trip_id } } }))).items, [api, trip.trip_id]);
+  const act = useAction();
+  const [file, setFile] = useState<MkgFile | null>(null);
+  const [kind, setKind] = useState<DocKind>("epod");
+  const [role, setRole] = useState<SignerRole>("consignee");
+  const [signer, setSigner] = useState("");
+  const [signedAt, setSignedAt] = useState(nowLocalInput());
+  const [note, setNote] = useState("");
+  const [sup, setSup] = useState("");
+  const [correction, setCorrection] = useState("");
+  const items = docs.data ?? [];
+  const superseded = new Set(items.map((d) => d.supersedes_id).filter(Boolean));
+  const err = !file ? "Chọn tệp chứng từ để tải lên trước" : !signedAt ? "Nhập thời điểm ký" : signer && !UUID.test(signer.trim()) ? "Mã người ký: UUID ở vault (không nhập tên)" : sup && !validReason(correction) ? "Bản bù cần lý do ≥ 10 ký tự" : null;
+  return (
+    <div className="stack" aria-label="Chứng từ chuyến">
+      <h3>Chứng từ chuyến (ePOD / e-bill / biên bản)</h3>
+      {docs.error ? <ProblemAlert problem={docs.error} onRetry={docs.reload} /> : null}
+      {docs.data && !items.length ? <Empty>Chưa có chứng từ có người ký.</Empty> : null}
+      {items.length ? (
+        <div className="tbl-wrap">
+          <table className="tbl" aria-label="Chứng từ của chuyến">
+            <thead>
+              <tr>
+                <th>Loại</th>
+                <th>Tệp</th>
+                <th>Người ký</th>
+                <th>Ký lúc</th>
+                <th>Ghi chú</th>
+                <th>Người ghi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((d) => (
+                <tr key={d.id}>
+                  <td>
+                    {EVIDENCE_KIND_LABEL[d.kind] ?? d.kind} {superseded.has(d.id) ? <Chip status="superseded" label="Bị thay" /> : null}
+                  </td>
+                  <td>
+                    <FileRef module="logistics" id={d.file_ref} />
+                  </td>
+                  <td className="small">
+                    {SIGNER_ROLE_LABEL[d.signer_role] ?? d.signer_role} <Ref id={d.signer_ref} />
+                  </td>
+                  <td>
+                    <When at={d.signed_at} />
+                  </td>
+                  <td className="small">
+                    {d.note ?? ""}
+                    {d.supersedes_id ? (
+                      <div>
+                        bù cho <Ref id={d.supersedes_id} /> — {d.correction_reason}
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="small">
+                    <Ref id={d.actor_ref} /> · <When at={d.recorded_at} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+      {canWrite ? (
+        <div className="panel stack">
+          <b>Ghi chứng từ có người ký</b>
+          <div className="grid3">
+            <FileUploadField label="Tệp chứng từ chuyến" module="logistics" value={file} onUploaded={setFile} />
+            <SelectField label="Loại chứng từ" value={kind} onChange={(k) => setKind(k as DocKind)} options={Object.entries(EVIDENCE_KIND_LABEL).map(([value, label]) => ({ value, label }))} />
+            <SelectField label="Vai người ký" value={role} onChange={(r) => setRole(r as SignerRole)} options={Object.entries(SIGNER_ROLE_LABEL).map(([value, label]) => ({ value, label }))} />
+            <TextField label="Mã người ký (vault)" value={signer} onChange={setSigner} hint="UUID (tuỳ chọn) — không nhập tên (RB-3)" />
+            <TextField label="Thời điểm ký" type="datetime-local" value={signedAt} onChange={setSignedAt} />
+            <TextField label="Ghi chú chứng từ" value={note} onChange={setNote} />
+          </div>
+          {items.length ? (
+            <div className="grid2">
+              <SelectField label="Thay chứng từ (bản bù)" value={sup} onChange={setSup} options={[{ value: "", label: "— Chứng từ mới —" }, ...items.filter((d) => !superseded.has(d.id)).map((d) => ({ value: d.id, label: `${EVIDENCE_KIND_LABEL[d.kind] ?? d.kind} ký ${new Date(d.signed_at).toLocaleString("vi-VN")}` }))]} />
+              {sup ? <TextField label="Lý do bù chứng từ" value={correction} onChange={setCorrection} hint="Ít nhất 10 ký tự (RB-1)" /> : null}
+            </div>
+          ) : null}
+          {err ? <p className="small mute">{err}</p> : null}
+          <ActionStatus a={act} />
+          <div className="row">
+            <button
+              type="button"
+              className="btn btn-p btn-sm"
+              disabled={act.busy || !!err}
+              onClick={() =>
+                void act
+                  .run(
+                    () =>
+                      unwrap(
+                        api.POST("/v1/logistics/trips/{id}/documents", {
+                          params: { path: { id: trip.trip_id }, header: idem() },
+                          body: {
+                            kind,
+                            file_ref: file!.id,
+                            signer_role: role,
+                            ...(signer.trim() ? { signer_ref: signer.trim() } : {}),
+                            signed_at: localToIso(signedAt),
+                            ...(note.trim() ? { note: note.trim() } : {}),
+                            ...(sup ? { supersedes_id: sup, correction_reason: correction.trim() } : {}),
+                          },
+                        }),
+                      ),
+                    (r) => `Đã ghi chứng từ ${EVIDENCE_KIND_LABEL[r.document.kind] ?? r.document.kind} — băm tệp ${shortHash(r.document.file_sha256)} chép vào sổ chuyến`,
+                  )
+                  .then((r) => {
+                    if (r) {
+                      setFile(null);
+                      setNote("");
+                      setSup("");
+                      setCorrection("");
+                      docs.reload();
+                    }
+                  })
+              }
+            >
+              Ghi chứng từ
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -371,6 +505,8 @@ function TripPanel({ id, vessels, onChanged }: { id: string; vessels: LogisticsV
           </button>
         </div>
       ) : null}
+
+      <TripDocuments trip={t} canWrite={t.status !== "cancelled" && (disp || (drv && t.driver_ref === principal?.subject))} />
 
       {disp && events.data?.length ? (
         <>

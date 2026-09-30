@@ -55,6 +55,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/logistics/params/:key", h.params)
 	rg.POST("/logistics/params/:key/versions", h.propose)
 	rg.POST("/logistics/params/:key/versions/:version/decision", h.decide)
+	h.registerG4Gaps(rg)
 }
 
 // RegisterAdmin gắn route quản trị (MFA): dựng lại bảng chiếu (R-22).

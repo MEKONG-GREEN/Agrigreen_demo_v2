@@ -6,6 +6,7 @@ import type { OrdersContract, OrdersDelivery, OrdersPayable, OrdersPurchaseOrder
 import { grams, kgOf, pctDiff, absPctGreater } from "@/lib/kg";
 import { amountForCount, amountForKg, isPrice, netPrice, percentHundredths, priceDeltaPct, priceOf, priceUnits } from "@/lib/money";
 import { HTX, L, newId, sid } from "./db";
+import { fileRoutes, findFile } from "./files";
 import { decimalCheck, paramStore, reasonOf, todayVn } from "./g4common";
 import { created, daysAgo, forbidden, hasRole, json, nowIso, pageSlice, problem, route, selfApproval, str, validation, UUID_RE, type Route } from "./http";
 import { ACTORS } from "./personas";
@@ -324,6 +325,8 @@ function deliveryOr404(id: string) {
 const deliveryTransition = () => problem(409, "orders.delivery_transition", "Delivery transition");
 
 export const ordersRoutes: Route[] = [
+  // --- tệp chứng từ (biên bản chênh lệch, ePOD / biên bản / e-bill) ---
+  ...fileRoutes("orders", [OFFICER, APPROVER], ["receipt_variance_report", "delivery_evidence"]),
   // --- hợp đồng ---
   route("GET", "/v1/orders/contracts", ({ url, persona }) => {
     if (!hasRole(persona, OFFICER, APPROVER)) return forbidden();
@@ -499,8 +502,13 @@ export const ordersRoutes: Route[] = [
     if (r.status === "rejected") return problem(409, "orders.receipt_transition", "Receipt rejected");
     const note = str(body, "note");
     if (note.length < 10 || note.length > 2000) return validation([{ field: "note", reason: "10–2000 ký tự" }]);
+    const fileRef = str(body, "file_ref") || null;
+    if (fileRef && !UUID_RE.test(fileRef)) return validation([{ field: "file_ref", reason: "UUID tệp chứng từ" }]);
+    // Tệp đã tải qua POST /v1/orders/files phải đúng mục đích; mã chưa đăng ký vẫn nhận (tương thích ngược).
+    const f = fileRef ? findFile("orders", fileRef) : undefined;
+    if (f && f.purpose !== "receipt_variance_report") return problem(422, "orders.file_purpose", "File uploaded for another purpose");
     r.report_note = note;
-    r.report_file_ref = str(body, "file_ref") || null;
+    r.report_file_ref = fileRef;
     return created({ receipt: r });
   }),
   route("POST", "/v1/orders/receipts/:id/corrections", ({ params: p, body, persona }) => {
@@ -665,6 +673,8 @@ export const ordersRoutes: Route[] = [
     if (!UUID_RE.test(file)) errs.push({ field: "evidence.file_ref", reason: "UUID tệp chứng từ" });
     if (!["epod", "minutes", "ebill"].includes(kind)) errs.push({ field: "evidence.kind", reason: "epod | minutes | ebill" });
     if (errs.length) return validation(errs);
+    const f = findFile("orders", file);
+    if (f && f.purpose !== "delivery_evidence") return problem(422, "orders.file_purpose", "File uploaded for another purpose");
     if (!d.customer_in_ticket_ref || !d.ticket_kg) return problem(409, "orders.customer_in_missing", "CUSTOMER_IN ticket missing");
     d.status = "accepted";
     d.accepted_kg = d.ticket_kg;

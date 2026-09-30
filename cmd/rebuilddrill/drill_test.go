@@ -61,7 +61,7 @@ func deliver(t *testing.T, pool *pgxpool.Pool, tid uuid.UUID, consumer, eventTyp
 
 // R-22 (A-4, G4 tích hợp mục 7): diễn tập dựng lại trên database kiểm thử — dữ liệu sinh qua consumer thật của
 // logistics / orders / costing; lần 1 mọi bảng chiếu khớp (băm trước = sau); bảng chiếu bị sửa tay (giả lập lệch)
-// → diễn tập báo LỆCH và dựng lại từ sổ; lần sau khớp lại. Module chưa có hàm dựng lại (fieldops) được báo.
+// → diễn tập báo LỆCH và dựng lại từ sổ; lần sau khớp lại. Mọi module (kể cả fieldops từ G4) có hàm dựng lại.
 func TestRebuildDrillChecksumsBeforeAfter_R22(t *testing.T) {
 	env := pgtest.Get(t)
 	ctx := context.Background()
@@ -110,14 +110,20 @@ func TestRebuildDrillChecksumsBeforeAfter_R22(t *testing.T) {
 	if _, ok := byTable["mkg_hub.lot_balance"]; !ok {
 		t.Fatal("thiếu mkg_hub.lot_balance")
 	}
-	fo := false
+	// G4: mọi module mkg có hàm dựng lại (fieldops từ G4 — TestFieldopsProjectionRebuildEqualsLive_R22).
 	for _, m := range rep.Modules {
-		if m.Module == "fieldops" && !m.Supported {
-			fo = true
+		if !m.Supported || m.Error != "" {
+			t.Fatalf("module %s phải dựng lại được: %+v", m.Module, m)
 		}
 	}
-	if !fo || !strings.Contains(rep.Markdown(), "**chưa có**") {
-		t.Fatal("báo cáo phải ghi fieldops chưa có dựng lại")
+	if strings.Contains(rep.Markdown(), "**chưa có**") {
+		t.Fatal("báo cáo không còn module chưa có dựng lại")
+	}
+	if tr, ok := byTable["mkg_fieldops.collection_order_current"]; !ok || !tr.Rebuilt || !tr.Equal {
+		t.Fatalf("fieldops collection_order_current: %+v", tr)
+	}
+	if tr := byTable["mkg_fieldops.weighed_loading_current"]; tr.Rebuilt || !tr.Equal {
+		t.Fatalf("bảng đệm fieldops không dựng lại, phải khớp: %+v", tr)
 	}
 
 	// Giả lập bảng chiếu lệch sổ (sửa thẳng bằng quản trị cụm) → diễn tập báo LỆCH, dựng lại sửa về đúng sổ.

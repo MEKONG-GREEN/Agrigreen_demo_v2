@@ -33,6 +33,7 @@ class _CountFormScreenState extends ConsumerState<CountFormScreen> {
   final _kg = TextEditingController();
   final _reason = TextEditingController();
   final _fix = TextEditingController();
+  final _vessel = TextEditingController();
   List<CountRuleError> _errors = const [];
   OrderBoard? _board;
   bool _saving = false;
@@ -58,6 +59,7 @@ class _CountFormScreenState extends ConsumerState<CountFormScreen> {
     _kg.dispose();
     _reason.dispose();
     _fix.dispose();
+    _vessel.dispose();
     super.dispose();
   }
 
@@ -77,6 +79,7 @@ class _CountFormScreenState extends ConsumerState<CountFormScreen> {
               looseKgText: _kg.text,
               discrepancyReason: _reason.text,
               correctionReason: _fix.text,
+              vesselCode: _vessel.text,
             )
           : await f.recordCount(
               order: widget.order,
@@ -85,6 +88,7 @@ class _CountFormScreenState extends ConsumerState<CountFormScreen> {
               rollsText: _rolls.text,
               looseKgText: _kg.text,
               discrepancyReason: _reason.text,
+              vesselCode: _vessel.text,
             );
       if (!mounted) return;
       showMessage(
@@ -155,6 +159,21 @@ class _CountFormScreenState extends ConsumerState<CountFormScreen> {
               labelText: 'Lý do chênh (khi ít hơn công đoạn trước)',
             ),
           ),
+          if (widget.stage.takesVesselCode) ...[
+            const SizedBox(height: 12),
+            TextField(
+              key: const ValueKey('vessel-code'),
+              controller: _vessel,
+              textCapitalization: TextCapitalization.characters,
+              maxLength: 64,
+              decoration: InputDecoration(
+                labelText: 'Số hiệu ghe / sà lan (không bắt buộc)',
+                helperText: widget.correction
+                    ? 'Để trống = giữ số hiệu đã ghi. Ví dụ: CT-12345'
+                    : 'Ví dụ: CT-12345 — bỏ khoảng trắng, tự viết hoa.',
+              ),
+            ),
+          ],
           if (widget.correction) ...[
             const SizedBox(height: 12),
             TextField(

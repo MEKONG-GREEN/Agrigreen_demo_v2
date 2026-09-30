@@ -68,7 +68,9 @@ func newFixture(t *testing.T, cfgKg *decimal.Decimal) *fixture {
 		CursorKey: []byte("khoa-thu-nghiem"), Harvest: f.harvest}
 	f.iss = authztest.New(t)
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)
-	handler.Handler{Svc: f.svc}.RegisterApp(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), idempotency.Middleware(pool)))
+	v1 := eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), idempotency.Middleware(pool))
+	handler.Handler{Svc: f.svc}.RegisterApp(v1)
+	handler.Handler{Svc: f.svc}.RegisterAdmin(v1) // bề mặt quản trị (MFA ở cmd/api-internal) — kiểm thử gộp một máy chủ
 	f.srv = httptest.NewServer(eng)
 	t.Cleanup(f.srv.Close)
 	return f

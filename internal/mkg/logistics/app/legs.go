@@ -275,6 +275,16 @@ func (s *Service) PlanLegs(ctx context.Context, trip uuid.UUID, legs []LegInput,
 		if err := store.UpsertTrip(ctx, tx, next); err != nil {
 			return err
 		}
+		if next.Status == port.TripDeparted {
+			// Đổi đích khi chuyến đang chạy → cơ sở đích mới nhận thông báo hàng sắp đến (FM-05).
+			v, err := tripVessel(ctx, tx, next.VehicleRef)
+			if err != nil {
+				return err
+			}
+			if err := enqueueMilestone(ctx, tx, next, out, v, port.MilestoneRerouted, out[0].ID, now); err != nil {
+				return err
+			}
+		}
 		res = TripResult{Trip: next, Legs: out}
 		return nil
 	}, replay)

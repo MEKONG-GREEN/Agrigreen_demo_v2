@@ -169,3 +169,33 @@ func (s *Service) RebuildTenant(ctx context.Context, tid uuid.UUID) (RebuildResu
 	})
 	return res, err
 }
+
+// Jobs liệt kê job dựng / đẩy bút toán (kind, status, kỳ tùy chọn), mới nhất trước; con trỏ = job_id cuối trang.
+func (s *Service) Jobs(ctx context.Context, f store.JobFilter) ([]store.Job, *uuid.UUID, error) {
+	switch f.Kind {
+	case "", "build", "push":
+	default:
+		return nil, nil, problem.Validation.WithField("kind", "build | push")
+	}
+	switch f.Status {
+	case "", "queued", "done", "failed":
+	default:
+		return nil, nil, problem.Validation.WithField("status", "queued | done | failed")
+	}
+	f.Limit = ClampLimit(f.Limit)
+	lim := f.Limit
+	f.Limit++
+	var items []store.Job
+	err := s.read(ctx, func(tx pgx.Tx) error {
+		var e error
+		items, e = store.Jobs(ctx, tx, f)
+		return e
+	})
+	var next *uuid.UUID
+	if len(items) > lim {
+		items = items[:lim]
+		id := items[lim-1].JobID
+		next = &id
+	}
+	return items, next, err
+}

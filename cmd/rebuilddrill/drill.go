@@ -44,7 +44,10 @@ var Targets = []target{
 	{Module: "measurement", Schema: "mkg_measurement", Role: measurement.DBRole, build: func(p *pgxpool.Pool, c clock.Clock) rebuildFn {
 		return measurement.New(p, c, measurement.Deps{}).RebuildTenant
 	}},
-	{Module: "fieldops", Schema: "mkg_fieldops", Role: fieldops.DBRole}, // G3: chưa có dựng lại (bảng chiếu ghi cùng giao dịch)
+	// fieldops (G4): weighed_loading_current, order_plot_harvest_current là bảng đệm nguồn ngoài — không dựng lại, băm vẫn phải khớp.
+	{Module: "fieldops", Schema: "mkg_fieldops", Role: fieldops.DBRole, build: func(p *pgxpool.Pool, c clock.Clock) rebuildFn {
+		return fieldops.New(p, c, fieldops.Options{}).RebuildTenant
+	}},
 	{Module: "logistics", Schema: "mkg_logistics", Role: logistics.DBRole, build: func(p *pgxpool.Pool, c clock.Clock) rebuildFn {
 		return logistics.New(p, c, logistics.Options{}).RebuildTenant
 	}},

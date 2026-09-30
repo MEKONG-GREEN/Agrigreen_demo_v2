@@ -132,10 +132,11 @@ void main() {
       env.server.offline = true;
       await _confirmMilestone(tester, 'departed');
       // Điều phối đã ghi xuất phát + đến trên web trong lúc mất sóng.
-      env.server.logistics.trips[tripA]!
-        ..['status'] = 'arrived'
-        ..['departed_at'] = '2026-10-01T02:40:00Z'
-        ..['arrived_at'] = '2026-10-01T02:58:00Z';
+      env.server.logistics.update(tripA, {
+        'status': 'arrived',
+        'departed_at': '2026-10-01T02:40:00Z',
+        'arrived_at': '2026-10-01T02:58:00Z',
+      });
       env.server.offline = false;
       await s.sync.syncOnce(force: true);
       await settle(tester);
@@ -158,17 +159,36 @@ void main() {
     },
   );
 
-  testWidgets('W-02 không có GPS → báo lỗi, không ghi mốc', (tester) async {
-    final env = _env();
-    await _loginDriver(tester, env);
-    env.location.result = const LocationResult(GpsStatus.unavailable);
-    await tapOn(tester, find.byKey(const ValueKey('trip-$tripA')));
-    await _confirmMilestone(tester, 'departed');
-    expect(find.textContaining('Chưa lấy được vị trí GPS'), findsOneWidget);
-    expect(_chip(tester), 'Chờ xuất phát');
-    expect(env.server.actionCalls, isEmpty);
-    await finish(tester);
-  });
+  testWidgets(
+    'W-02 không có GPS → vẫn ghi mốc, ghi chú "không có GPS" ở chi tiết chuyến và hàng đợi đồng bộ',
+    (tester) async {
+      final env = _env();
+      await _loginDriver(tester, env);
+      env.server.offline = true;
+      env.location.result = const LocationResult(GpsStatus.unavailable);
+      await tapOn(tester, find.byKey(const ValueKey('trip-$tripA')));
+      await _confirmMilestone(tester, 'departed');
+      expect(_chip(tester), 'Đang chạy');
+      final note = find.byKey(const ValueKey('milestone-note-departed'));
+      expect(note, findsOneWidget);
+      expect(tester.widget<Text>(note).data, contains('không có GPS'));
+      expect(tester.widget<Text>(note).data, contains('Chờ đồng bộ'));
+      expect(find.byIcon(Icons.location_off), findsOneWidget);
+      expect(find.byKey(const ValueKey('record-arrived')), findsOneWidget);
+      await tester.pageBack();
+      await settle(tester);
+      await tapOn(tester, find.byKey(const ValueKey('trip-sync-card')));
+      expect(find.byType(SyncQueueScreen), findsOneWidget);
+      expect(
+        find.textContaining('Mốc Xuất phát · chuyến CH000001'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('không có GPS · Chờ đồng bộ'), findsOneWidget);
+      expect(env.server.actionCalls, isEmpty);
+      env.server.offline = false;
+      await finish(tester);
+    },
+  );
 
   testWidgets(
     'W-02 tổ gom kiêm tài xế: trang chủ có nút "Chuyến của tôi" → danh sách chuyến',

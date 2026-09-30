@@ -126,7 +126,7 @@ class FakeMkgServer extends FakeServer {
   bool offline = false;
 
   /// G4 mkg/logistics giả (chuyến, mốc tài xế).
-  final FakeLogistics logistics = FakeLogistics();
+  final FakeLogistics logistics = FakeLogistics()..caller = meSub;
 
   static final _milestonePath = RegExp(
     r'^/v1/logistics/trips/([^/]+)/milestones$',

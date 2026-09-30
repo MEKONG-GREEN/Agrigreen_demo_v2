@@ -31,6 +31,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.POST("/acctbridge/journals/:id/retry-push", h.retryPush)
 	rg.POST("/acctbridge/periods/:id/journal-builds", h.rebuild)
 	rg.GET("/acctbridge/jobs/:id", h.job)
+	rg.GET("/acctbridge/jobs", h.jobs)
 }
 
 // RegisterAdmin gắn route bề mặt quản trị (MFA).
@@ -327,6 +328,36 @@ func (h Handler) job(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"job": toJob(j)})
+}
+
+// jobs: GET /v1/acctbridge/jobs?kind=build|push&status=&period_id=&cursor=&limit= (G4 đóng khoảng trống).
+func (h Handler) jobs(c *gin.Context) {
+	var f store.JobFilter
+	for _, q := range []struct {
+		name string
+		dst  **uuid.UUID
+	}{{"period_id", &f.PeriodID}, {"cursor", &f.Before}} {
+		if s := c.Query(q.name); s != "" {
+			id, err := uuid.Parse(s)
+			if err != nil {
+				httpx.Fail(c, problem.Validation.WithField(q.name, "phải là UUID"))
+				return
+			}
+			*q.dst = &id
+		}
+	}
+	f.Kind, f.Status = c.Query("kind"), c.Query("status")
+	f.Limit, _ = strconv.Atoi(c.Query("limit"))
+	items, next, err := h.Svc.Jobs(c.Request.Context(), f)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	out := make([]any, 0, len(items))
+	for _, j := range items {
+		out = append(out, toJob(j))
+	}
+	c.JSON(http.StatusOK, gin.H{"items": out, "next_cursor": idPtr(next)})
 }
 
 func (h Handler) rebuildProjections(c *gin.Context) {

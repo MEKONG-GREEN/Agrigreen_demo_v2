@@ -179,6 +179,9 @@ func (s *Service) FileVarianceReport(ctx context.Context, id uuid.UUID, note str
 		if r.Status == "rejected" {
 			return ErrReceiptTransition
 		}
+		if err := checkFileRef(ctx, tx, fileRef, FilePurposeReceiptReport); err != nil {
+			return err
+		}
 		r.Meta = store.Meta{ID: ids.New(), EventTime: s.Clock.Now(), ActorRef: p.ActorRef, IdemKey: idem, RuleVersion: domain.RuleReceipt}
 		r.Kind, r.ReportNote, r.ReportFileRef, r.ReportBy = "report_filed", &note, fileRef, &p.ActorRef
 		if err := store.InsertReceiptEvent(ctx, tx, p.TenantID, r); err != nil {

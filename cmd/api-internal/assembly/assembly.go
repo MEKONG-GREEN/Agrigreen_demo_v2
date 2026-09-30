@@ -34,6 +34,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 )
 
@@ -109,14 +110,18 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules,
 		return mods, ops, pools, err
 	}
 	pools = append(pools, logPool)
-	mods.Logistics = logistics.New(logPool, clk, LogisticsOptionsFromEnv(clk))
+	// G4: tệp chứng từ vùng mkg (biên bản chênh lệch, ePOD / e-bill) ở kho đối tượng trong lãnh thổ (RB-7).
+	docs := DocumentStoreFromEnv(ctx)
+	lo := LogisticsOptionsFromEnv(clk)
+	lo.Files = docs
+	mods.Logistics = logistics.New(logPool, clk, lo)
 	// G4 mkg/orders: hợp đồng mua rơm, đơn mua/phiếu nhận, đơn bán/giao nhận.
 	ordPool, err := open(ctx, orders.DBRole)
 	if err != nil {
 		return mods, ops, pools, err
 	}
 	pools = append(pools, ordPool)
-	mods.Orders = orders.NewWith(ordPool, clk, orders.Options{Stock: mods.Hub.Stock()}) // O-05: cảnh báo thiếu tồn
+	mods.Orders = orders.NewWith(ordPool, clk, orders.Options{Stock: mods.Hub.Stock(), Files: docs}) // O-05: cảnh báo thiếu tồn
 	// G4 costing (costing_app): nguồn gốc lô hub (quy kết hao hụt), hợp đồng mua rơm + giao nhận của
 	// mkg/orders, chuyến của mkg/logistics (ghe chưa cân, đọc lại khi đóng kỳ).
 	costPool, err := open(ctx, costing.DBRole)
@@ -218,6 +223,17 @@ func FieldopsOptionsFromEnv(clk clock.Clock) fieldops.Options {
 		o.CursorKey = []byte(k)
 	}
 	return o
+}
+
+// DocumentStoreFromEnv chọn kho đối tượng trong lãnh thổ cho tệp chứng từ vùng mkg (AG_S3_* | AG_OBJSTORE_DIR,
+// shared/objstore.FromEnv). Chưa cấu hình → nil: POST /v1/orders/files, /v1/logistics/files trả 503
+// (*.file_store_unavailable); phiếu nhận / giao nhận vẫn nhận file_ref.
+func DocumentStoreFromEnv(ctx context.Context) objstore.Store {
+	st, err := objstore.FromEnv(ctx)
+	if err != nil {
+		return nil
+	}
+	return st
 }
 
 // LogisticsOptionsFromEnv đọc cấu hình mkg/logistics: cùng AG_PLATFORM_API_URL, AG_PLATFORM_TOKEN_URL,

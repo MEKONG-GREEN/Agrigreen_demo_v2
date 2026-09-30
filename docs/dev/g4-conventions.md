@@ -98,7 +98,8 @@ Chỉ dùng số đã cấp. golang-migrate **không** áp số nhỏ hơn số 
 | mkg | 000018 | costing (2/2): `period_event`, job đóng kỳ + ảnh chụp đầu vào bất biến, `period_summary` (kết quả đóng kỳ), `settlement_event` + bảng chiếu quyết toán (R-56 CHECK), chia doanh thu carbon | `mkg_costing` | `costing_app` |
 | mkg | 000019 | acctbridge: bảng ánh xạ tài khoản có phiên bản, `summary_journal` (`period:<id>`), duyệt (R-56 CHECK), job, `push_attempt` (bảng vận hành) | `mkg_acctbridge` | `acctbridge_app` |
 | mkg | **000020** | G4 tích hợp (**đã có**, 01/10/2026): sổ `mkg_fieldops.roll_count_vessel` (số hiệu ghe của bản ghi xếp ghe), sổ `mkg_logistics.trip_milestone_fix` (accuracy_m của mốc), bảng vận hành chỉ ghi thêm `mkg_logistics.alert_notice` (L-08), nới CHECK mốc `departed`/`arrived` của `trip_event` (lat/lng NULL khi không GPS, CHECK cặp lat/lng), `ag_outbox_publisher` đọc `(tenant_id, status)` của `trip_current`/`vessel_current` | `mkg_fieldops`, `mkg_logistics` | `fieldops_app`, `logistics_app`, `ag_outbox_publisher` |
-| mkg | 000021 | **dự phòng G4** — xin người tích hợp | | |
+| mkg | **000021** | G4 đóng khoảng trống (**đã có**, 01/10/2026): sổ `mkg_hub.arrival_event` + bảng chiếu `arrival_current` (thông báo hàng đến FM-05), bảng chỉ ghi thêm `mkg_orders.file_object` / `mkg_logistics.file_object` (tệp chứng từ ở kho đối tượng), sổ `mkg_logistics.trip_document` (ePOD / e-bill có người ký, L-11) | `mkg_hub`, `mkg_orders`, `mkg_logistics` | `hub_app`, `orders_app`, `logistics_app` |
+| mkg | 000022 | **dự phòng G4** — xin người tích hợp | | |
 | ts | 000004 | **tùy chọn** — telemetry phương tiện `ts_fleet` (logistics): phân vùng tháng như `ts_weigh`, `apply_append_only`, RLS; `ingest_ts` INSERT + SELECT, `ts_reader` SELECT | `ts_fleet` | `ingest_ts`, `ts_reader` |
 | ts | 000005+ | dự phòng `ts_env` (cảm biến kho, `hub.risk.v2`) — **chuyển** từ ts 000004 của g3-conventions | `ts_env` | xin khi làm |
 | pf | 000044 | **bỏ trống** (không dùng; 000045 đã chạy) | | |
@@ -155,6 +156,7 @@ Tất cả là **sự kiện nội bộ** (`contracts/events-internal/<tên>.v1.
 | `mkg.costing.period_close.requested` v1 | costing | costing (`mkg.costing.period_close`) | job đóng kỳ (mẫu mục 12) |
 | `mkg.acctbridge.journal_build.requested` v1 | acctbridge | acctbridge (`mkg.acctbridge.journal_build`) | job dựng bút toán |
 | `mkg.acctbridge.journal_push.requested` v1 | acctbridge | acctbridge (`mkg.acctbridge.journal_push`) | job đẩy bút toán đã duyệt |
+| `mkg.logistics.trip.milestone_recorded` v1 (**thêm 01/10/2026**, G4 đóng khoảng trống) | logistics | hub (`mkg.hub.trip_milestone`) | mốc chuyến có đích là cơ sở (chặng cuối `to_kind = facility`): `departed`, `rerouted` (lập lại chặng khi đang chạy), `arrived`, `completed`, `cancelled`; mã chuyến, cơ sở đích, số hiệu phương tiện, lô + tấn ước — **không** cước, tài xế. Hub ghi thông báo hàng đến proto FM-05 `cho_den` (`expected`) → `da_den` (`arrived`) |
 
 Sự kiện G3 mà module G4 nhận:
 
@@ -169,7 +171,7 @@ Sự kiện G3 mà module G4 nhận:
 
 - Consumer idempotent qua `shared.inbox` (R-61; kiểm thử giao lặp); DLQ = tên + `.dlq` (R-62).
 - Consumer chỉ ghi sổ đầu vào / đánh dấu cần tính lại; **không** tự đóng kỳ. Ảnh chụp đầu vào của đóng kỳ đọc lại qua `port/` với `asOf`.
-- `roll_count.recorded` v1 có trường **tùy chọn** `vessel_code` (tích hợp 01/10/2026 — thêm trường tùy chọn là tương thích ngược theo `contractcheck -base`, không lên v2): số hiệu ghe/sà lan người thu gom nhập khi xếp ghe (`boat_load`), chuẩn hóa như GH-01. Logistics gán phương tiện của chuyến FM-05 khi số hiệu khớp danh mục; không khớp → cờ `vessel_unregistered` + `no_vehicle`; vắng (app cũ) → `no_vehicle`, điều phối gán sau. API app hiện trường (`POST …/roll-counts`, `sync/push`) đã nhận `vessel_code`; **ô nhập trên app Flutter chưa có** (việc của agent app).
+- `roll_count.recorded` v1 có trường **tùy chọn** `vessel_code` (tích hợp 01/10/2026 — thêm trường tùy chọn là tương thích ngược theo `contractcheck -base`, không lên v2): số hiệu ghe/sà lan người thu gom nhập khi xếp ghe (`boat_load`), chuẩn hóa như GH-01. Logistics gán phương tiện của chuyến FM-05 khi số hiệu khớp danh mục; không khớp → cờ `vessel_unregistered` + `no_vehicle`; vắng (app cũ) → `no_vehicle`, điều phối gán sau. API app hiện trường (`POST …/roll-counts`, `sync/push`) nhận `vessel_code`; app `apps/mkg-field-app` có ô nhập tùy chọn ở công đoạn xếp ghe (G4 đóng khoảng trống, chuẩn hóa như máy chủ).
 - Tên hằng: `logistics/port` (`EventTripCompleted`, `RollCountConsumer`, `WeighTicketConsumer`), `orders/port` (`EventDeliveryAccepted`, `WeighTicketConsumer`), `costing/port` (`EventPeriodClosed`, `EventSettlementApproved`, `EventPeriodCloseRequested`, sáu `*Consumer`, `PeriodCloseConsumer`), `acctbridge/port` (`EventJournalPushed`, `EventJournalBuildRequested`, `EventJournalPushRequested`, `PeriodClosedConsumer`, `JournalBuildConsumer`, `JournalPushConsumer`). `cmd/worker-internal/assembly` `TestG4FrozenInternalContracts` kiểm schema và tên hàng đợi.
 
 ## 5. Vùng và cửa
@@ -222,7 +224,17 @@ Gốc lắp ráp: **chưa** nối module G4 (chưa có module). Chỗ nối ghi 
 | Mốc chuyến không GPS | `lat`/`lng` tùy chọn (NULL, không bao giờ 0,0; app cũ gửi 0,0 → coi như không có); `accuracy_m` tùy chọn ở sổ riêng `trip_milestone_fix`. Delta `updated_since` theo `trip_current.recorded_at` (sự kiện cuối) |
 | Tách cụm | `migrate bootstrap` theo `AG_CLUSTERS` (`dbadmin.BootstrapClusters`, `RolesFor`): chỉ vai + database của cụm chọn, vai nhóm NOLOGIN luôn có; rỗng = mọi cụm |
 | Sức khỏe | `worker` (:8087) và `outbox-publisher` (:8088) có `/healthz`, `/readyz` qua `AG_HEALTH_ADDR` (`cmd/internal/healthsrv`), `-healthcheck <url>`; chart có probe |
-| Diễn tập R-22 | `cmd/rebuilddrill` (gốc lắp ráp vùng mkg): băm → `Module.RebuildTenant` → băm, báo cáo Markdown + JSON ([rebuild-projection.md](../runbooks/rebuild-projection.md#diễn-tập-g4)). `mkg/fieldops` chưa có hàm dựng lại (mục mở) |
+| Diễn tập R-22 | `cmd/rebuilddrill` (gốc lắp ráp vùng mkg): băm → `Module.RebuildTenant` → băm, báo cáo Markdown + JSON ([rebuild-projection.md](../runbooks/rebuild-projection.md#diễn-tập-g4)). `mkg/fieldops` có hàm dựng lại từ G4 đóng khoảng trống (sáu bảng chiếu; `sync_seq` giữ giá trị cũ; hai bảng đệm nguồn ngoài không dựng lại) |
+
+### 8.1 Đóng khoảng trống mã (G4-F, 01/10/2026)
+
+| Chủ đề | Quyết định |
+|---|---|
+| Thông báo hàng đến (FM-05) | Sự kiện nội bộ mới `mkg.logistics.trip.milestone_recorded` v1 (mục 4) phát trong cùng giao dịch với mốc chuyến / lập lại chặng khi đang chạy, chỉ khi chặng cuối của kế hoạch hiện hành tới `facility`. Hub: sổ `arrival_event` (`arrival:<trip_id>`) + `arrival_current`, trạng thái chỉ tiến `expected → arrived`, `cancelled` chỉ từ `expected`, mốc lệch thứ tự / lặp bị bỏ qua; idem theo dòng nguồn logistics. `GET /v1/hub/arrivals?facility_id=&status=&cursor=` (vai hub); `proto_status` = `cho_den`/`da_den`/`huy`. Hub `RebuildTenant` dựng cả `arrival_current` |
+| Tệp chứng từ vùng mkg | Không có module tệp riêng (cần vai DB mới): mỗi module chủ dữ liệu có bảng chỉ ghi thêm `file_object` và route riêng — `POST /v1/orders/files` (mục đích `receipt_variance_report` / `delivery_evidence`), `POST /v1/logistics/files` (`trip_document`). Kiểm tệp dùng chung `internal/shared/docfile` (≤ 15 MB, PDF/JPEG/PNG/WebP theo nội dung, SHA-256 khai báo, tên an toàn — cùng mẫu tệp đính kèm pf/content, không import nền tảng). Nội dung ở `shared/objstore` (`AG_S3_*` / `AG_OBJSTORE_DIR`), khóa `mkg/<module>/<tenant>/<sha256>`, tải về qua API có kiểm vai (không URL có chữ ký). Chưa cấu hình kho → 503 `*.file_store_unavailable`. Phiếu nhận / giao nhận: `file_ref` đã đăng ký phải đúng mục đích (422 `orders.file_purpose`); `file_ref` chưa đăng ký vẫn nhận (tương thích ngược). **Chưa mã hóa phong bì** (cần dịch vụ khóa vùng mkg) — mục mở, chỉ dựa SSE + khóa đối tượng của kho trong lãnh thổ |
+| Chứng từ chuyến (L-11) | Sổ `trip_document`: `kind` epod/ebill/minutes, `file_ref` + `file_sha256` (chép từ `file_object`), `signer_role`, `signer_ref` (*_ref, không tên), `signed_at`; tài xế được giao hoặc điều phối; bản bù `supersedes_id` + lý do |
+| Danh sách cho web | `GET /v1/costing/lots`, `/v1/costing/carbon-revenue`, `/v1/costing/period-close-jobs`, `/v1/acctbridge/jobs`, `/v1/logistics/vessels/{id}/versions` — con trỏ `cursor` = khóa cuối trang (`next_cursor`), mới nhất trước (phiên bản phương tiện: version tăng dần) |
+| fieldops dựng lại | `POST /v1/fieldops/projections/rebuild` (quản trị, `field_supervisor`) + `Module.RebuildTenant` cho `cmd/rebuilddrill` |
 
 ## 9. Giả định tạm (ghi trong báo cáo nếu bám vào)
 

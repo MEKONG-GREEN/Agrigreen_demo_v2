@@ -41,6 +41,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.POST("/hub/facilities/:id/capacity-snapshots", h.capacitySnapshot)
 	rg.GET("/hub/lots/:id", h.getLot)
 	rg.POST("/hub/movements/:id/corrections", h.correct)
+	rg.GET("/hub/arrivals", h.arrivals)
 	h.registerG3App(rg)
 }
 
@@ -294,7 +295,7 @@ func (h Handler) rebuild(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"lot_balances": n})
+	c.JSON(http.StatusOK, gin.H{"lot_balances": n["lot_balance"], "arrivals": n["arrival_current"]})
 }
 
 // ---------------------------------------------------------------------------

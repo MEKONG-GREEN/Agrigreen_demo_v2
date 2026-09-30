@@ -51,6 +51,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.POST(base+"/settlements/:id/cancel", h.cancelSettlement)
 	rg.POST(base+"/settlements/:id/adjust", h.adjustSettlement)
 	rg.POST(base+"/carbon-revenue", h.carbon)
+	h.registerLists(rg)
 	rg.GET(base+"/params", h.params)
 }
 
@@ -146,14 +147,17 @@ func (h Handler) lotCost(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
+	c.JSON(http.StatusOK, lotCostDTO(v))
+}
+
+func lotCostDTO(v app.LotCostView) gin.H {
 	cats := make([]gin.H, 0, len(v.Categories))
 	for _, x := range v.Categories {
 		cats = append(cats, gin.H{"category": x.Category, "amount": x.Amount, "mass_kg": x.MassKg, "entries": x.Entries})
 	}
-	body := gin.H{"lot_ref": v.LotRef, "categories": cats, "total_cost": v.TotalCost, "revenue": v.Revenue, "delivered_kg": v.DeliveredKg,
+	return gin.H{"lot_ref": v.LotRef, "categories": cats, "total_cost": v.TotalCost, "revenue": v.Revenue, "delivered_kg": v.DeliveredKg,
 		"cost_per_tonne": v.CostPerTonne, "cost_per_tonne_undetermined": v.CostPerTonne == nil,
 		"note": "Giá thành không gồm giá mua rơm (quyết toán HTX, tính riêng) và khấu hao (proto buildCostChain)"}
-	c.JSON(http.StatusOK, body)
 }
 
 func entryDTO(e store.Entry) gin.H {
@@ -691,12 +695,7 @@ func (h Handler) carbon(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	created(c, replayed, gin.H{"id": x.ID, "period_ref": x.PeriodRef, "period_code": x.PeriodCode, "revenue_amount": x.Revenue,
-		"retained_amount": x.Split.Retained, "farmers_amount": x.Split.Farmers, "authority_amount": x.Split.Authority,
-		"verifier_amount": x.Split.Verifier, "retained_pct": x.Split.RetainedPct.StringFixed(2), "farmers_pct": x.Split.FarmersPct.StringFixed(2),
-		"authority_pct": x.Split.AuthorityPct.StringFixed(2), "verifier_pct": x.Split.VerifierPct.StringFixed(2), "param_pins": x.Pins,
-		"label": domain.ProvisionalLabel, "rule_version": domain.RuleCarbonSplit, "event_time": x.EventTime,
-		"note": "Chỉ chia doanh thu carbon đã ghi; không tính tCO2e (pf/mrv, chờ C-1)"})
+	created(c, replayed, carbonDTO(x))
 }
 
 func paramVersionDTO(v store.ParamVersion) gin.H {

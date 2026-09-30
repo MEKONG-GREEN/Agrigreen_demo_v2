@@ -2,13 +2,13 @@
 // kỳ tháng open → closing → closed → posted (đóng kỳ 202 + job, mẫu mục 12; không mở lại), bút toán điều chỉnh ở kỳ
 // đang mở (supersedes_id), người đóng kỳ ≠ người lập điều chỉnh của kỳ (R-56), phân bổ + tính lại (kết quả mới
 // supersedes_id), quyết toán HTX proto PM-01..04, chia carbon 45 % / 70-15-15 (VVB nhận phần dư).
-import type { CostEntry, CostingAllocation, CostingCloseJob, CostingParam, CostingParamVersion, CostingPeriod, CostingSettlement } from "../types";
+import type { CostEntry, CostingAllocation, CostingCarbonRevenue, CostingCloseJob, CostingParam, CostingParamVersion, CostingPeriod, CostingSettlement } from "../types";
 import { grams, kgOf } from "@/lib/kg";
 import { amountForCount, amountForKg, cents, divRound, isPrice, moneyOf, percentHundredths, priceOf, priceUnits, splitCarbon } from "@/lib/money";
 import { sha256Text } from "@/lib/sha256";
 import { HTX, L, O, F, newId, sid } from "./db";
 import { monthVn, reasonOf, todayVn } from "./g4common";
-import { created, daysAgo, forbidden, hasRole, json, nowIso, problem, route, selfApproval, str, validation, UUID_RE, type Route } from "./http";
+import { created, daysAgo, forbidden, hasRole, json, nowIso, pageSlice, problem, route, selfApproval, str, validation, UUID_RE, type Route } from "./http";
 import { contractFor } from "./orders";
 import { ACTORS } from "./personas";
 
@@ -79,6 +79,7 @@ const periods: CostingPeriod[] = [];
 const entries: CostEntry[] = [];
 const allocations: CostingAllocation[] = [];
 const jobs: (CostingCloseJob & { polls: number })[] = [];
+const carbon: CostingCarbonRevenue[] = [];
 
 function monthBounds(code: string): { from: string; to: string } {
   const [y, m] = code.split("-").map(Number) as [number, number];
@@ -176,6 +177,11 @@ entry(sid(0x2e, 31), L.abnormal, M2, "hub_processing", "7200000.00", "60000.000"
 entry(sid(0x2e, 32), L.abnormal, M2, "sales_revenue", "81000000.00", "60000.000", "customer", sid(0x29, 20), "delivery", sid(0x2a, 90), ACTORS.keToan, 45);
 closeNow(periods[0]!, ACTORS.keToanTruong, sid(0x31, 1));
 closeNow(periods[1]!, ACTORS.keToanTruong, sid(0x31, 2));
+// Job đóng kỳ đã chạy của M3, M2 (worker-internal) — hiện trong danh sách job.
+for (const [i, per] of [periods[0]!, periods[1]!].entries()) {
+  const list = entries.filter((e) => e.period_code === per.code);
+  jobs.push({ job_id: sid(0x31, 11 + i), kind: "costing.period_close", period_id: per.id, period_code: per.code, status: "completed", requested_by: ACTORS.keToanTruong, requested_at: daysAgo(i === 0 ? 62 : 32), as_of: daysAgo(i === 0 ? 62 : 32), input_snapshot_sha256: sha256Text(JSON.stringify(list.map((e) => [e.id, e.delta_amount]))), snapshot_counts: { entries: list.length, settlements: 0, carbon: 0 }, error_code: null, completed_at: daysAgo(i === 0 ? 62 : 32), polls: 2 });
+}
 
 // Kỳ M1: đang mở, đã hết tháng → đóng được; có bút toán điều chỉnh do Kế toán giá thành L lập (R-56 khi đóng).
 entry(sid(0x2e, 1), L.proto, M1, "collection_labour", "8712000.00", "96800.000", "htx", HTX.tanHiep, "manual", null, ACTORS.keToan, 25);
@@ -188,6 +194,7 @@ entry(sid(0x2e, 7), L.proto, M1, "storage", "1800000.00", null, "facility", F.tb
 entry(sid(0x2e, 8), L.compressed, M1, "transport_road", "1250304.00", "14800.000", "mode", null, "trip", sid(0x20, 3), ACTORS.system, 10);
 entry(sid(0x2e, 9), L.ct, M1, "collection_labour", "4050000.00", "45000.000", "htx", HTX.vinhBinh, "manual", null, ACTORS.keToan, 9);
 entry(sid(0x2e, 10), L.ct, M0, "storage", "600000.00", null, "facility", F.ct, "manual", null, ACTORS.keToan, 2);
+entry(sid(0x2e, 11), L.perBale, M0, "collection_labour", "4500000.00", "50000.000", "htx", HTX.tanHiep, "manual", null, ACTORS.keToan, 1);
 
 allocations.push({
   id: CO.allocationTrip,
@@ -213,6 +220,45 @@ allocations.push({
   correction_reason: null,
   recorded_at: daysAgo(24),
 });
+
+function carbonRecord(per: CostingPeriod, amount: string, reference: string | null, actor: string, at: string): CostingCarbonRevenue {
+  const r = costParam("costing.carbon.retained_pct");
+  const f = costParam("costing.carbon.split.farmers_pct");
+  const a = costParam("costing.carbon.split.authority_pct");
+  const v = costParam("costing.carbon.split.verifier_pct");
+  const sp = splitCarbon(moneyOf(cents(amount)), r.value, f.value, a.value);
+  const rec: CostingCarbonRevenue = {
+    id: newId(0x33),
+    period_ref: per.id!,
+    period_code: per.code!,
+    revenue_amount: moneyOf(cents(amount)),
+    retained_amount: sp.retained,
+    farmers_amount: sp.farmers,
+    authority_amount: sp.authority,
+    verifier_amount: sp.verifier,
+    retained_pct: r.value,
+    farmers_pct: f.value,
+    authority_pct: a.value,
+    verifier_pct: v.value,
+    param_pins: { "costing.carbon.retained_pct": r.seq, "costing.carbon.split.farmers_pct": f.seq, "costing.carbon.split.authority_pct": a.seq, "costing.carbon.split.verifier_pct": v.seq },
+    reference,
+    label: r.seq + f.seq + a.seq + v.seq === 0 ? "tạm, chờ khách" : "đã duyệt",
+    rule_version: "costing.carbon.v1",
+    event_time: at,
+    recorded_at: at,
+    actor_ref: actor,
+    note: "Chỉ chia số tiền đã có — không tính tCO2e (pf/mrv, chờ C-1).",
+  };
+  carbon.push(rec);
+  return rec;
+}
+// Khoản carbon đã ghi (bán tín chỉ theo đợt) — 6 khoản, trang danh sách có "Tải thêm".
+carbonRecord(periods[1]!, "40000000", "HĐ-TC-2026-01", ACTORS.keToan, daysAgo(55));
+carbonRecord(periods[1]!, "12500000", "HĐ-TC-2026-02", ACTORS.keToan, daysAgo(48));
+carbonRecord(periods[2]!, "25000000", "HĐ-TC-2026-03", ACTORS.keToan, daysAgo(27));
+carbonRecord(periods[2]!, "8000000.50", null, ACTORS.keToan, daysAgo(21));
+carbonRecord(periods[3]!, "30000000", "HĐ-TC-2026-05", ACTORS.keToan, daysAgo(3));
+carbonRecord(periods[3]!, "15000000", "HĐ-TC-2026-06", ACTORS.keToan, daysAgo(1));
 
 function lotCost(lot: string) {
   const list = entries.filter((e) => e.lot_ref === lot);
@@ -316,6 +362,14 @@ function openPeriodForNow(): CostingPeriod | Response {
 }
 
 export const costingRoutes: Route[] = [
+  route("GET", "/v1/costing/lots", ({ url, persona }) => {
+    if (!hasRole(persona, ...READ)) return forbidden();
+    // Mới nhất trước theo bút toán gần nhất của lô.
+    const last = new Map<string, string>();
+    for (const e of entries) if (!last.has(e.lot_ref!) || e.recorded_at! > last.get(e.lot_ref!)!) last.set(e.lot_ref!, e.recorded_at!);
+    const lots = [...last.entries()].sort((a, b) => b[1].localeCompare(a[1]) || b[0].localeCompare(a[0])).map(([id]) => lotCost(id)!);
+    return json(pageSlice(lots, url));
+  }),
   route("GET", "/v1/costing/lots/:id/cost", ({ params: p, persona }) => {
     if (!hasRole(persona, ...READ)) return forbidden();
     const c = lotCost(p[0]!);
@@ -431,6 +485,21 @@ export const costingRoutes: Route[] = [
     void _polls;
     return json(out, 202);
   }),
+  route("GET", "/v1/costing/period-close-jobs", ({ url, persona }) => {
+    if (!hasRole(persona, ...READ)) return forbidden();
+    const per = url.searchParams.get("period_id");
+    const st = url.searchParams.get("status");
+    if (per && !UUID_RE.test(per)) return validation([{ field: "period_id", reason: "UUID" }]);
+    if (st && !["queued", "completed", "failed"].includes(st)) return validation([{ field: "status", reason: "queued | completed | failed" }]);
+    const list = jobs
+      .filter((j) => (!per || j.period_id === per) && (!st || j.status === st))
+      .sort((a, b) => b.requested_at!.localeCompare(a.requested_at!) || b.job_id!.localeCompare(a.job_id!))
+      .map(({ polls: _p, ...j }) => {
+        void _p;
+        return j;
+      });
+    return json(pageSlice(list, url));
+  }),
   route("GET", "/v1/costing/period-close-jobs/:id", ({ params: p, persona }) => {
     if (!hasRole(persona, ...READ)) return forbidden();
     const j = jobs.find((x) => x.job_id === p[0]);
@@ -545,9 +614,15 @@ export const costingRoutes: Route[] = [
     if (percentHundredths(f.value) + percentHundredths(a.value) + percentHundredths(v.value) !== 10_000n) return problem(422, "costing.carbon_split_invalid", "Split does not sum to 100");
     const open = openPeriodForNow();
     if (open instanceof Response) return open;
-    const r = costParam("costing.carbon.retained_pct");
-    const s = splitCarbon(moneyOf(cents(amount)), r.value, f.value, a.value);
-    return created({ id: newId(0x33), period_code: open.code, revenue_amount: moneyOf(cents(amount)), retained_amount: s.retained, farmers_amount: s.farmers, authority_amount: s.authority, verifier_amount: s.verifier, param_pins: { "costing.carbon.retained_pct": r.seq, "costing.carbon.split.farmers_pct": f.seq, "costing.carbon.split.authority_pct": a.seq, "costing.carbon.split.verifier_pct": v.seq }, label: r.seq + f.seq + a.seq + v.seq === 0 ? "tạm, chờ khách" : "đã duyệt" });
+    const rec = carbonRecord(open, amount, str(body, "reference") || null, persona.actor, nowIso());
+    return created({ id: rec.id, period_code: rec.period_code, revenue_amount: rec.revenue_amount, retained_amount: rec.retained_amount, farmers_amount: rec.farmers_amount, authority_amount: rec.authority_amount, verifier_amount: rec.verifier_amount, param_pins: rec.param_pins, label: rec.label });
+  }),
+  route("GET", "/v1/costing/carbon-revenue", ({ url, persona }) => {
+    if (!hasRole(persona, ...READ)) return forbidden();
+    const per = url.searchParams.get("period_ref");
+    if (per && !UUID_RE.test(per)) return validation([{ field: "period_ref", reason: "UUID" }]);
+    const list = carbon.filter((c) => !per || c.period_ref === per).sort((a, b) => b.event_time.localeCompare(a.event_time) || b.id.localeCompare(a.id));
+    return json(pageSlice(list, url));
   }),
   route("GET", "/v1/costing/params", ({ persona }) => (hasRole(persona, ...READ) ? json({ items: PARAM_DEFS.map((d) => paramView(d.key)) }) : forbidden())),
 ];

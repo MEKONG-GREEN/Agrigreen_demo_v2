@@ -236,6 +236,24 @@ type LotCostView struct {
 	CostPerTonne *money.Amount // nil = "không xác định" (tấn giao = 0)
 }
 
+// lotCostView tổng hợp các nhóm của một lô (proto buildCostChain): Σ chi phí, doanh thu, tấn giao, đ/t.
+func lotCostView(lot uuid.UUID, cs []store.LotCost) LotCostView {
+	v := LotCostView{LotRef: lot, Categories: cs}
+	for _, c := range cs {
+		switch {
+		case domain.CostCategories[port.CostCategory(c.Category)]:
+			v.TotalCost = v.TotalCost.Add(c.Amount)
+		case c.Category == string(port.CatSalesRevenue):
+			v.Revenue = v.Revenue.Add(c.Amount)
+			if c.MassKg != nil {
+				v.DeliveredKg = v.DeliveredKg.Add(*c.MassKg)
+			}
+		}
+	}
+	v.CostPerTonne = domain.CostPerTonne(v.TotalCost, v.DeliveredKg)
+	return v
+}
+
 // LotCost đọc giá thành lô từ bảng chiếu.
 func (s *Service) LotCost(ctx context.Context, lot uuid.UUID) (v LotCostView, err error) {
 	err = s.read(ctx, func(tx pgx.Tx, _ authz.Principal) error {
@@ -246,19 +264,7 @@ func (s *Service) LotCost(ctx context.Context, lot uuid.UUID) (v LotCostView, er
 		if len(cs) == 0 {
 			return ErrLotNotFound
 		}
-		v = LotCostView{LotRef: lot, Categories: cs}
-		for _, c := range cs {
-			switch {
-			case domain.CostCategories[port.CostCategory(c.Category)]:
-				v.TotalCost = v.TotalCost.Add(c.Amount)
-			case c.Category == string(port.CatSalesRevenue):
-				v.Revenue = v.Revenue.Add(c.Amount)
-				if c.MassKg != nil {
-					v.DeliveredKg = v.DeliveredKg.Add(*c.MassKg)
-				}
-			}
-		}
-		v.CostPerTonne = domain.CostPerTonne(v.TotalCost, v.DeliveredKg)
+		v = lotCostView(lot, cs)
 		return nil
 	})
 	return v, err

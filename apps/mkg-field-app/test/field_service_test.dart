@@ -112,6 +112,121 @@ void main() {
     expect(b.totalRolls(Stage.boatLoad), 18);
   });
 
+  test('FM-05 (G4): số hiệu ghe tùy chọn chỉ ở xếp ghe — chuẩn hóa (bỏ khoảng trắng, chữ hoa), trống → không gửi; công đoạn khác / ký tự sai → chặn trên máy; bản bù trống → giữ số cũ', () async {
+    final (s, o) = await ready();
+    final f = s.field;
+    // Công đoạn khác mang số hiệu → chặn (máy chủ trả 422 như vậy).
+    await expectLater(
+      f.recordCount(
+        order: o,
+        plotRef: plotA,
+        stage: Stage.bale,
+        rollsText: '20',
+        vesselCode: 'CT-1',
+      ),
+      throwsA(
+        isA<FieldError>().having((e) => e.errors.single.rule, 'rule', 'FM-05'),
+      ),
+    );
+    // Trống / toàn khoảng trắng ở công đoạn khác → không sao, không gửi.
+    final bale = await f.recordCount(
+      order: o,
+      plotRef: plotA,
+      stage: Stage.bale,
+      rollsText: '20',
+      vesselCode: '   ',
+    );
+    expect(bale.record.payload.containsKey('vessel_code'), isFalse);
+    final gather = await f.recordCount(
+      order: o,
+      plotRef: plotA,
+      stage: Stage.gather,
+      rollsText: '20',
+    );
+    expect(gather.record.payload.containsKey('vessel_code'), isFalse);
+    await expectLater(
+      f.recordCount(
+        order: o,
+        plotRef: plotA,
+        stage: Stage.boatLoad,
+        rollsText: '20',
+        vesselCode: 'CT_12#',
+      ),
+      throwsA(
+        isA<FieldError>().having((e) => e.errors.single.rule, 'rule', 'FM-05'),
+      ),
+    );
+    await expectLater(
+      f.recordCount(
+        order: o,
+        plotRef: plotA,
+        stage: Stage.boatLoad,
+        rollsText: '20',
+        vesselCode: 'A' * 33,
+      ),
+      throwsA(isA<FieldError>()),
+    );
+    final boat = await f.recordCount(
+      order: o,
+      plotRef: plotA,
+      stage: Stage.boatLoad,
+      rollsText: '20',
+      vesselCode: '  ct 123	45-đ ',
+    );
+    expect(boat.record.payload['vessel_code'], 'CT12345-Đ');
+    // Xếp ghe không có số hiệu → không gửi trường.
+    await f.recordCount(
+      order: o,
+      plotRef: plotB,
+      stage: Stage.bale,
+      rollsText: '5',
+    );
+    await f.recordCount(
+      order: o,
+      plotRef: plotB,
+      stage: Stage.gather,
+      rollsText: '5',
+    );
+    final noVessel = await f.recordCount(
+      order: o,
+      plotRef: plotB,
+      stage: Stage.boatLoad,
+      rollsText: '5',
+      vesselCode: '',
+    );
+    expect(noVessel.record.payload.containsKey('vessel_code'), isFalse);
+
+    // Gửi qua sync/push (đường duy nhất của roll_count): đúng trên dây.
+    await s.sync.syncOnce(force: true);
+    final wires = {
+      for (final w in env.server.rollCounts)
+        '${(w['payload']! as Map)['plot_ref']}|${(w['payload']! as Map)['stage']}':
+            (w['payload']! as Map).cast<String, Object?>(),
+    };
+    expect(wires['$plotA|boat_load']!['vessel_code'], 'CT12345-Đ');
+    expect(wires['$plotB|boat_load']!.containsKey('vessel_code'), isFalse);
+    expect(wires['$plotA|bale']!.containsKey('vessel_code'), isFalse);
+
+    // Bản bù xếp ghe: đổi số hiệu → gửi chuẩn hóa; trống → không gửi (giữ).
+    final fix = await f.correctCount(
+      order: o,
+      plotRef: plotA,
+      stage: Stage.boatLoad,
+      rollsText: '20',
+      correctionReason: 'Ghi nhầm số hiệu ghe',
+      vesselCode: 'kg 999',
+    );
+    expect(fix.record.payload['vessel_code'], 'KG999');
+    final keep = await f.correctCount(
+      order: o,
+      plotRef: plotB,
+      stage: Stage.boatLoad,
+      rollsText: '5',
+      correctionReason: 'Đếm lại trên ghe',
+    );
+    expect(keep.record.payload.containsKey('vessel_code'), isFalse);
+  });
+
   test('FM-09: rơm rời — 0 cuộn kèm kg, không số thực', () async {
     final (s, o) = await ready();
     final r = await s.field.recordCount(
