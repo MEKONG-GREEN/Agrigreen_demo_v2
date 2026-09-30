@@ -247,6 +247,18 @@
       "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"]
     },
     {
+      "clientId": "agrigreen-web-internal",
+      "name": "Web nội bộ Mekong Green (Next.js, vùng mkg) — chỉ gọi api-internal; màn hình quản trị cần MFA",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:3001/*", "http://127.0.0.1:3001/*"],
+      "webOrigins": ["http://localhost:3001", "http://127.0.0.1:3001"],
+      "attributes": { "pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "http://localhost:3001/*##http://127.0.0.1:3001/*" },
+      "defaultClientScopes": ["basic", "roles", "web-origins", "agrigreen-claims"]
+    },
+    {
       "clientId": "agrigreen-field-app",
       "name": "App hiện trường (Flutter)",
       "enabled": true,

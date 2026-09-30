@@ -172,6 +172,7 @@ func TestKeycloakRealmCoversRolesAndClaims(t *testing.T) {
 			t.Errorf("thiếu mapper %s cho %s (có %v)", mapper, claim, claims)
 		}
 	}
+	webInternal := false
 	for _, c := range realm.Clients {
 		for _, s := range c.DefaultClientScopes {
 			if !scopes[s] {
@@ -181,5 +182,15 @@ func TestKeycloakRealmCoversRolesAndClaims(t *testing.T) {
 		if c.ClientID == "agrigreen-web-ops" && (!slices.Contains(c.WebOrigins, "http://localhost:3000") || slices.Contains(c.WebOrigins, "*") || slices.Contains(c.WebOrigins, "+")) {
 			t.Errorf("webOrigins của web-ops: %v", c.WebOrigins)
 		}
+		// G3-2: web nội bộ vùng MKG (apps/web-internal) — client công khai riêng, cổng 3001.
+		if c.ClientID == "agrigreen-web-internal" {
+			webInternal = true
+			if !slices.Contains(c.WebOrigins, "http://localhost:3001") || slices.Contains(c.WebOrigins, "*") || slices.Contains(c.WebOrigins, "+") {
+				t.Errorf("webOrigins của web-internal: %v", c.WebOrigins)
+			}
+		}
+	}
+	if !webInternal {
+		t.Error("realm thiếu client agrigreen-web-internal (apps/web-internal)")
 	}
 }
