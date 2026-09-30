@@ -27,9 +27,9 @@ Bốn trạng thái:
 | 7. `mkg/costing` | 16 | 14 | 2 | 0 | 0 |
 | 8. `mkg/acctbridge` | 9 | 7 | 1 | 1 | 0 |
 | 9. Cổng kiến trúc G4 (RB, R-xx, vùng, hạ tầng) | 14 | 0 | 0 | 14 | 0 |
-| 10. Client và kịch bản đầu–cuối | 4 | 0 | 0 | 4 | 0 |
+| 10. Client và kịch bản đầu–cuối | 4 | 0 | 1 | 3 | 0 |
 | 11. Câu hỏi khách | 7 | 0 | 0 | 7 | 0 |
-| **Tổng** | **81** | **42** | **6** | **33** | **0** |
+| **Tổng** | **81** | **42** | **7** | **32** | **0** |
 
 Đã có ở G4-0 (nền móng, không tính là đạt dòng nào): bề mặt đối tác `/v1/partner/waterway/route` phía nền tảng (`TestPartnerWaterwayRoute_ADR0020`, `TestShareGrantWaterwayRoutesKind_G4`), hợp đồng sự kiện nội bộ (`TestG4FrozenInternalContracts`), vai trong realm (`TestKeycloakRealmCoversRolesAndClaims`), `agnofloat` cho bốn module (`TestNoFloat`).
 
