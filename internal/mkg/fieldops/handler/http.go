@@ -55,6 +55,20 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	h.registerCrews(rg)
 }
 
+// RegisterAdmin gắn route quản trị (MFA): dựng lại bảng chiếu từ sổ (R-22, G4).
+func (h Handler) RegisterAdmin(rg *gin.RouterGroup) {
+	rg.POST("/fieldops/projections/rebuild", h.rebuild)
+}
+
+func (h Handler) rebuild(c *gin.Context) {
+	n, err := h.Svc.RebuildProjections(c.Request.Context())
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, n)
+}
+
 func bind(c *gin.Context, v any) bool {
 	if err := c.ShouldBindJSON(v); err != nil {
 		httpx.Fail(c, problem.BadRequest.WithDetail("Thân request phải là JSON hợp lệ; khối lượng là chuỗi thập phân kg, ví dụ \"1520.500\""))

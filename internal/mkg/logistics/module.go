@@ -25,6 +25,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/logistics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -39,6 +40,8 @@ type Options struct {
 	Waterway port.WaterwayRoutes
 	// Road: định tuyến đường bộ; nil → Haversine × tham số #10 (chưa có OSRM trong lãnh thổ, RB-7).
 	Road port.RoadRoutes
+	// Files (G4, L-11): kho đối tượng trong lãnh thổ (shared/objstore) cho tệp chứng từ chuyến — POST /v1/logistics/files.
+	Files objstore.Store
 }
 
 // Module là mkg/logistics đã nối.
@@ -46,7 +49,7 @@ type Module struct{ svc *app.Service }
 
 // New tạo module với pool của vai logistics_app (cụm mkg).
 func New(db tenant.Beginner, clk clock.Clock, o Options) *Module {
-	return &Module{svc: &app.Service{DB: db, Clock: clk, Waterway: o.Waterway, Road: o.Road, Metrics: app.NewMetrics(telemetry.Meter())}}
+	return &Module{svc: &app.Service{DB: db, Clock: clk, Waterway: o.Waterway, Road: o.Road, Files: o.Files, Metrics: app.NewMetrics(telemetry.Meter())}}
 }
 
 // RebuildTenant dựng lại bảng chiếu của tenant từ sổ, tenant tường minh, không kiểm vai — CHỈ cho công cụ diễn

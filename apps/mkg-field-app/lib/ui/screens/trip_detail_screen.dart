@@ -36,7 +36,8 @@ class _TripDetailState extends ConsumerState<TripDetailScreen> {
         title: Text(m.action),
         content: Text(
           'Ghi mốc "${m.label}" cho chuyến ${v.trip.code} lúc này, kèm vị trí '
-          'GPS? Mốc đã ghi không sửa lùi được.',
+          'GPS nếu có (không có GPS vẫn ghi được)? Mốc đã ghi không sửa lùi '
+          'được.',
         ),
         actions: [
           TextButton(
@@ -58,7 +59,10 @@ class _TripDetailState extends ConsumerState<TripDetailScreen> {
       final l = await ref.services.trips.record(widget.tripId, m);
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Đã ghi "${m.label}" (${l.gpsLabel}) — chờ đồng bộ.'),
+          content: Text(
+            'Đã ghi "${m.label}" (${l.gpsLabel}) — chờ đồng bộ.'
+            '${l.hasGps ? '' : _noGpsHint(l.gpsStatus)}',
+          ),
         ),
       );
       // Có mạng thì gửi ngay; không có thì nằm trong hàng đợi.
@@ -73,6 +77,10 @@ class _TripDetailState extends ConsumerState<TripDetailScreen> {
       ref.invalidate(tripListProvider);
     }
   }
+
+  static String _noGpsHint(String? status) => status == 'denied'
+      ? ' App chưa được cấp quyền vị trí — bật để lần sau có tọa độ.'
+      : ' Chưa lấy được vị trí — bật định vị để lần sau có tọa độ.';
 
   @override
   Widget build(BuildContext context) {
@@ -234,7 +242,11 @@ class _TripDetailState extends ConsumerState<TripDetailScreen> {
         color: done ? AgColors.g700 : AgColors.mute,
       ),
       title: Text(m.label),
+      trailing: local != null && !local.hasGps
+          ? const Icon(Icons.location_off, color: AgColors.amber)
+          : null,
       subtitle: Text(
+        key: ValueKey('milestone-note-${m.code}'),
         !done
             ? 'Chưa ghi'
             : [

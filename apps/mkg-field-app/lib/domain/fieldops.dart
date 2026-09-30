@@ -34,6 +34,40 @@ enum Stage {
     }
     return null;
   }
+
+  /// Chỉ công đoạn xếp ghe mang số hiệu ghe / sà lan (G4, proto FM-05).
+  bool get takesVesselCode => this == Stage.boatLoad;
+}
+
+/// Độ dài tối đa (ký tự) của số hiệu ghe đã chuẩn hóa (`MaxVesselCodeLen`).
+const vesselCodeMaxLength = 32;
+
+/// Chuẩn hóa số hiệu ghe như máy chủ (`NormalizeVesselCode`, proto GH-01):
+/// bỏ mọi khoảng trắng (kể cả đầu/cuối), chữ hoa. Rỗng sau chuẩn hóa → null
+/// (không gửi trường — tùy chọn).
+String? normalizeVesselCode(String? s) {
+  if (s == null) return null;
+  final n = s.replaceAll(RegExp(r'\s+', unicode: true), '').toUpperCase();
+  return n.isEmpty ? null : n;
+}
+
+final _vesselChars = RegExp(r'^[\p{L}\p{Nd}./-]+$', unicode: true);
+
+/// Kiểm số hiệu ghe (như `CheckVesselCode` của máy chủ) — null = hợp lệ
+/// (kể cả để trống). Chỉ công đoạn xếp ghe.
+String? checkVesselCode(String? raw, Stage stage) {
+  final n = normalizeVesselCode(raw);
+  if (n == null) return null;
+  if (!stage.takesVesselCode) {
+    return 'Số hiệu ghe chỉ ghi ở công đoạn "${Stage.boatLoad.label}".';
+  }
+  if (n.runes.length > vesselCodeMaxLength) {
+    return 'Số hiệu ghe tối đa $vesselCodeMaxLength ký tự.';
+  }
+  if (!_vesselChars.hasMatch(n)) {
+    return 'Số hiệu ghe chỉ gồm chữ, số và . - /';
+  }
+  return null;
 }
 
 /// Trạng thái lệnh gom (fieldops domain).

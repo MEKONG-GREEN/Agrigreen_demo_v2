@@ -287,8 +287,9 @@ class FieldService {
     String plotRef,
     Stage stage,
     StageCount c,
-    LocationResult gps,
-  ) => {
+    LocationResult gps, {
+    String? vesselCode,
+  }) => {
     'order_id': order.orderId,
     'plot_ref': plotRef,
     'stage': stage.code,
@@ -298,7 +299,21 @@ class FieldService {
     // Dấu GPS tùy chọn (không bắt buộc, không chặn lưu).
     'gps_status': gps.status.name,
     if (gps.fix != null) 'gps': gps.fix!.toJson(),
+    // G4 (FM-05): số hiệu ghe tùy chọn — chỉ xếp ghe, đã chuẩn hóa (GH-01);
+    // trống → không gửi (bản bù không gửi = giữ số hiệu cũ).
+    if (stage.takesVesselCode) 'vessel_code': ?normalizeVesselCode(vesselCode),
   };
+
+  /// Số hiệu ghe sai (FM-05) → lỗi theo trường, không xếp hàng.
+  static void _checkVessel(String? vesselCode, Stage stage) {
+    final err = checkVesselCode(vesselCode, stage);
+    if (err != null) {
+      throw FieldError(
+        err,
+        errors: [CountRuleError('FM-05', 'vessel_code', err)],
+      );
+    }
+  }
 
   void _requireOpen(CollectionOrder order, String plotRef) {
     if (!order.countable) {
@@ -317,8 +332,10 @@ class FieldService {
     required String rollsText,
     String? looseKgText,
     String? discrepancyReason,
+    String? vesselCode,
   }) async {
     _requireOpen(order, plotRef);
+    _checkVessel(vesselCode, stage);
     final b = await board(order);
     if (b.count(plotRef, stage) != null) {
       throw FieldError(rejectMessage('fieldops.stage_already_counted'));
@@ -333,7 +350,14 @@ class FieldService {
     );
     if (c == null) throw FieldError(errs.first.message, errors: errs);
     final gps = await _gps();
-    final payload = _payload(order, plotRef, stage, c, gps);
+    final payload = _payload(
+      order,
+      plotRef,
+      stage,
+      c,
+      gps,
+      vesselCode: vesselCode,
+    );
     final rej = b.rejectedOf(plotRef, stage);
     // Bản bị từ chối không có trên máy chủ → thay bằng bản ghi MỚI (create).
     final rec = rej != null && rej.op == RecordOp.create
@@ -355,8 +379,10 @@ class FieldService {
     String? looseKgText,
     String? discrepancyReason,
     required String correctionReason,
+    String? vesselCode,
   }) async {
     _requireOpen(order, plotRef);
+    _checkVessel(vesselCode, stage);
     final b = await board(order);
     final cur = b.count(plotRef, stage);
     if (cur == null || cur.id == null) {
@@ -376,7 +402,14 @@ class FieldService {
     );
     if (c == null) throw FieldError(errs.first.message, errors: errs);
     final gps = await _gps();
-    final payload = _payload(order, plotRef, stage, c, gps);
+    final payload = _payload(
+      order,
+      plotRef,
+      stage,
+      c,
+      gps,
+      vesselCode: vesselCode,
+    );
     final OutboxRecord rec;
     if (cur.local && await _outbox.byId(cur.id!) != null) {
       rec = await _outbox.correct(

@@ -188,6 +188,19 @@ void main() {
     expect(parseKgGrams('1.2345'), isNull);
   });
 
+  test('FM-05 normalizeVesselCode / checkVesselCode như máy chủ (GH-01)', () {
+    expect(normalizeVesselCode(' ct 12 345 '), 'CT12345');
+    expect(normalizeVesselCode('   '), isNull);
+    expect(normalizeVesselCode(null), isNull);
+    expect(checkVesselCode('ag-01/2.b', Stage.boatLoad), isNull);
+    expect(checkVesselCode('', Stage.bale), isNull);
+    expect(checkVesselCode('CT1', Stage.gather), contains('Xếp ghe'));
+    expect(checkVesselCode('CT#1', Stage.boatLoad), contains('chỉ gồm'));
+    expect(checkVesselCode('A' * 33, Stage.boatLoad), contains('32'));
+    expect(Stage.boatLoad.takesVesselCode, isTrue);
+    expect(Stage.bale.takesVesselCode, isFalse);
+  });
+
   test('Stage: thứ tự bale → gather → boat_load', () {
     expect(Stage.gather.previous, Stage.bale);
     expect(Stage.boatLoad.next, isNull);

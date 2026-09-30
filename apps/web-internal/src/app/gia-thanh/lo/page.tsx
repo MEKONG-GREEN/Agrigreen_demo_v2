@@ -6,14 +6,16 @@ import type { CostEntry, CostingAllocation } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { hasRole, ROLES } from "@/auth/principal";
 import { KV, Money, When } from "@/components/g4kit";
-import { ActionStatus, Chip, Provisional, Ref, RefPicker, Section, SelectField, TextField, useAction } from "@/components/kit";
+import { ActionStatus, Chip, Provisional, Ref, Section, SelectField, TextField, useAction } from "@/components/kit";
 import { ProblemAlert } from "@/components/ProblemAlert";
-import { Empty, KpiTile, Loading, PageHead } from "@/components/ui";
+import { Empty, KpiTile, LoadMore, Loading, PageHead } from "@/components/ui";
 import { ALLOCATION_KIND_LABEL, COST_CATEGORY_LABEL, DIMENSION_LABEL, MANUAL_CATEGORIES } from "@/lib/g4labels";
 import { formatKg, formatTons, isKg } from "@/lib/kg";
 import { formatVnd, isMoney, shortHash } from "@/lib/money";
-import { validReason } from "@/lib/rules";
+import { labelOf } from "@/lib/recent";
+import { shortRef, validReason } from "@/lib/rules";
 import { useAsync } from "@/lib/useAsync";
+import { LIST_PAGE_SIZE, usePaged } from "@/lib/usePaged";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -175,6 +177,7 @@ export default function LotCostPage() {
   const { api, principal } = useAuth();
   const [lot, setLot] = useState("");
   const [tick, setTick] = useState(0);
+  const lots = usePaged((cursor) => unwrap(api.GET("/v1/costing/lots", { params: { query: { limit: LIST_PAGE_SIZE, ...(cursor ? { cursor } : {}) } } })), [api]);
   const valid = UUID.test(lot);
   const cost = useAsync(async () => (valid ? unwrap(api.GET("/v1/costing/lots/{id}/cost", { params: { path: { id: lot } } })) : null), [api, lot, valid, tick]);
   const entries = useAsync(async () => (valid ? ((await unwrap(api.GET("/v1/costing/lots/{id}/entries", { params: { path: { id: lot }, query: { limit: 500 } } }))).items ?? []) : []), [api, lot, valid, tick]);
@@ -185,6 +188,7 @@ export default function LotCostPage() {
   const refresh = () => {
     setAdjust(null);
     setTick((t) => t + 1);
+    lots.reload();
   };
   const superseded = new Set((entries.data ?? []).map((e) => e.supersedes_id).filter(Boolean));
   const c = cost.data;
@@ -194,8 +198,48 @@ export default function LotCostPage() {
         title="Giá thành lô & phân bổ"
         subtitle="Giá thành = gom + kho + bốc xếp + vận chuyển + sơ chế (proto buildCostChain); đ/t = tổng / tấn giao, tấn giao = 0 → không xác định. Không gồm giá mua rơm (quyết toán HTX, D03), doanh thu, carbon, khấu hao. Sửa = bút toán điều chỉnh, không sửa dòng cũ."
       />
-      <Section title="Chọn lô">
-        <RefPicker label="Mã lô" kind="lot" value={lot} onChange={setLot} />
+      <Section title="Lô có giá thành">
+        <div className="stack">
+          {lots.loading ? <Loading /> : null}
+          {lots.error ? <ProblemAlert problem={lots.error} onRetry={lots.reload} /> : null}
+          {lots.items && !lots.items.length ? <Empty>Chưa có lô nào có bút toán giá thành.</Empty> : null}
+          {lots.items?.length ? (
+            <div className="tbl-wrap">
+              <table className="tbl" aria-label="Lô có giá thành">
+                <thead>
+                  <tr>
+                    <th>Lô</th>
+                    <th className="num">Tổng chi phí</th>
+                    <th className="num">Tấn giao</th>
+                    <th className="num">Giá thành đ/t</th>
+                    <th className="num">Doanh thu</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lots.items.map((x) => (
+                    <tr key={x.lot_ref} aria-selected={x.lot_ref === lot}>
+                      <td>
+                        <button type="button" className="btn btn-o btn-sm" aria-pressed={x.lot_ref === lot} onClick={() => setLot(x.lot_ref!)} title={x.lot_ref}>
+                          {labelOf("lot", x.lot_ref ?? "") ?? shortRef(x.lot_ref)}
+                        </button>
+                      </td>
+                      <td className="num">
+                        <Money v={x.total_cost} />
+                      </td>
+                      <td className="num">{formatTons(x.delivered_kg)}</td>
+                      <td className="num">{x.cost_per_tonne_undetermined ? <span className="mute small">Không xác định</span> : <Money v={x.cost_per_tonne} />}</td>
+                      <td className="num">
+                        <Money v={x.revenue} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+          <LoadMore hasMore={lots.hasMore} loading={lots.loadingMore} onClick={lots.loadMore} />
+          <TextField label="Lô khác (chưa có giá thành)" value={lot} onChange={(v) => setLot(v.trim())} placeholder="0192f…" hint="Dán mã lô (UUID) để ghi bút toán đầu tiên — lô đã có bút toán nằm trong bảng trên" />
+        </div>
       </Section>
       {valid ? (
         <>

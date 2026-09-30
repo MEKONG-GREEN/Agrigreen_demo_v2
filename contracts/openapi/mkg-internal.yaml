@@ -138,7 +138,34 @@ paths:
       servers: [{url: "https://mkg-admin.agrigreen.local"}]
       parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
       responses:
-        "200": {description: Số dòng đã dựng, content: {application/json: {schema: {type: object, properties: {lot_balances: {type: integer}}}}}}
+        "200": {description: Số dòng đã dựng, content: {application/json: {schema: {type: object, properties: {lot_balances: {type: integer}, arrivals: {type: integer, description: "arrival_current (G4, thông báo hàng đến)"}}}}}}
+  /v1/hub/arrivals:
+    get:
+      summary: Thông báo hàng đến mang mã chuyến (proto FM-05 — cho_den = expected → da_den = arrived; cancelled khi chuyến hủy)
+      description: |
+        Vai hub_operator / hub_approver. Ghi bởi consumer mkg.hub.trip_milestone khi mkg/logistics phát
+        mkg.logistics.trip.milestone_recorded v1 cho chuyến có chặng cuối tới cơ sở (xuất phát / đổi đích → expected;
+        đến / hoàn tất bằng phiếu cân → arrived; hủy → cancelled). Mới nhất trước, con trỏ = trip_id cuối trang.
+      operationId: listHubArrivals
+      tags: [hub]
+      parameters:
+        - {name: facility_id, in: query, schema: {type: string, format: uuid}}
+        - {name: status, in: query, schema: {type: string, enum: [expected, arrived, cancelled]}}
+        - {name: cursor, in: query, description: "Con trỏ = next_cursor của trang trước", schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Thông báo hàng đến
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/HubArrival"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   # --- mkg/hub: bề mặt ứng dụng ---
 
   /v1/hub/facilities/{id}:
@@ -1299,6 +1326,20 @@ paths:
           description: Trang thay đổi
           content: {application/json: {schema: {type: object, properties: {changes: {type: array, items: {type: object}}, next_cursor: {type: string}, has_more: {type: boolean}, server_time: {type: string, format: date-time}, reset: {type: boolean}}}}}
         "400": {$ref: "#/components/responses/Problem"}
+  /v1/fieldops/projections/rebuild:
+    post:
+      summary: "[Quản trị] Dựng lại bảng chiếu fieldops từ sổ (R-22, G4)"
+      description: |
+        Vai field_supervisor. Dựng lại collection_order_current (giữ sync_seq cũ — con trỏ pull của app không lùi),
+        roll_total_current, buyside_reconciliation_current, crew_current, crew_assignment_current, param_current.
+        weighed_loading_current và order_plot_harvest_current là bảng đệm nguồn ngoài — không dựng lại.
+      operationId: rebuildFieldopsProjections
+      tags: [fieldops]
+      servers: [{url: "https://mkg-admin.agrigreen.local"}]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses:
+        "200": {description: Số dòng đã dựng theo bảng chiếu, content: {application/json: {schema: {type: object, additionalProperties: {type: integer}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
   /v1/fieldops/crews:
     get:
       summary: Sổ tổ gom (cursor = mã tổ cuối)
@@ -1701,6 +1742,27 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
   /v1/logistics/vessels/{id}/versions:
     parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: Lịch sử phiên bản danh mục của phương tiện (proto GH-01), version tăng dần
+      description: Vai dispatcher. Con trỏ = version cuối trang.
+      operationId: listLogisticsVesselVersions
+      tags: [logistics]
+      parameters:
+        - {name: cursor, in: query, description: "Con trỏ = next_cursor của trang trước", schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Phiên bản
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/LogisticsVesselVersion"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
     post:
       summary: Phiên bản mới của phương tiện (lý do, theo expected_version)
       operationId: reviseLogisticsVessel
@@ -1712,6 +1774,92 @@ paths:
       responses:
         "201": {$ref: "#/components/responses/LogisticsVesselResult"}
         "200": {$ref: "#/components/responses/LogisticsVesselResult"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/files:
+    post:
+      summary: Tải tệp chứng từ chuyến (ePOD / e-bill / biên bản) lên kho đối tượng trong lãnh thổ → file_ref (L-11)
+      description: |
+        Vai dispatcher / driver. multipart: `file` (≤ 15 MB; PDF, JPEG, PNG, WebP nhận diện theo nội dung) và `sha256`
+        (hex của nội dung — không khớp → 422 logistics.file_checksum). Ghi một lần, khóa theo băm nội dung; gọi lặp cùng
+        Idempotency-Key → 200 bản cũ. Chưa cấu hình kho → 503 logistics.file_store_unavailable.
+      operationId: uploadLogisticsFile
+      tags: [logistics]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, sha256]
+              properties:
+                file: {type: string, format: binary}
+                sha256: {type: string, pattern: "^[0-9a-fA-F]{64}$"}
+      responses:
+        "201": {$ref: "#/components/responses/MkgFileResult"}
+        "200": {$ref: "#/components/responses/MkgFileResult"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "415": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/files/{id}:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: Siêu dữ liệu tệp chứng từ chuyến
+      operationId: getLogisticsFile
+      tags: [logistics]
+      responses:
+        "200": {$ref: "#/components/responses/MkgFileResult"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/files/{id}/content:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: Tải nội dung tệp (qua API có kiểm vai; header X-Content-SHA256)
+      operationId: getLogisticsFileContent
+      tags: [logistics]
+      responses:
+        "200": {description: Nội dung tệp, content: {application/octet-stream: {schema: {type: string, format: binary}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/logistics/trips/{id}/documents:
+    parameters: [{$ref: "#/components/parameters/TripID"}]
+    get:
+      summary: Chứng từ chuyến có người ký (ePOD / e-bill / biên bản — L-11)
+      operationId: listLogisticsTripDocuments
+      tags: [logistics]
+      responses:
+        "200": {description: Chứng từ, content: {application/json: {schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/LogisticsTripDocument"}}}}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Ghi chứng từ chuyến có người ký + thời điểm ký (tệp tải trước qua POST /v1/logistics/files)
+      description: |
+        Vai dispatcher hoặc tài xế được giao (403 logistics.not_assigned_driver). Người ký là *_ref (không tên — RB-3),
+        băm tệp chép vào sổ. Sửa sai = bản bù `supersedes_id` + `correction_reason` (RB-1). Chuyến đã hủy → 409.
+      operationId: recordLogisticsTripDocument
+      tags: [logistics]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, file_ref, signer_role, signed_at]
+              properties:
+                kind: {type: string, enum: [epod, ebill, minutes]}
+                file_ref: {type: string, format: uuid}
+                signer_role: {type: string, enum: [driver, consignee, hub_operator, dispatcher]}
+                signer_ref: {type: [string, "null"], format: uuid}
+                signed_at: {type: string, format: date-time}
+                note: {type: string, maxLength: 500}
+                supersedes_id: {type: [string, "null"], format: uuid}
+                correction_reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201": {description: Chứng từ, content: {application/json: {schema: {type: object, required: [document], properties: {document: {$ref: "#/components/schemas/LogisticsTripDocument"}}}}}}
+        "200": {description: Gọi lặp cùng khóa (phát lại), content: {application/json: {schema: {type: object, required: [document], properties: {document: {$ref: "#/components/schemas/LogisticsTripDocument"}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
@@ -1980,6 +2128,54 @@ paths:
       responses:
         "200": {description: Phiếu nhận, content: {application/json: {schema: {type: object, properties: {receipt: {$ref: "#/components/schemas/OrdersReceipt"}}}}}}
         "404": {$ref: "#/components/responses/Problem"}
+  /v1/orders/files:
+    post:
+      summary: Tải tệp chứng từ (biên bản chênh lệch của phiếu nhận, ePOD / biên bản / e-bill của giao nhận) → file_ref
+      description: |
+        Vai sales_officer / sales_approver. multipart: `file` (≤ 15 MB; PDF, JPEG, PNG, WebP nhận diện theo nội dung),
+        `sha256` (hex nội dung, bắt buộc), `purpose` = receipt_variance_report | delivery_evidence. Kho đối tượng trong
+        lãnh thổ, ghi một lần, khóa theo băm; gọi lặp cùng Idempotency-Key → 200 bản cũ. file_ref đã tải phải đúng mục đích
+        khi gắn vào phiếu nhận / giao nhận (422 orders.file_purpose); file_ref chưa đăng ký vẫn được nhận (tương thích ngược).
+      operationId: uploadOrdersFile
+      tags: [orders]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, sha256, purpose]
+              properties:
+                file: {type: string, format: binary}
+                sha256: {type: string, pattern: "^[0-9a-fA-F]{64}$"}
+                purpose: {type: string, enum: [receipt_variance_report, delivery_evidence]}
+      responses:
+        "201": {$ref: "#/components/responses/MkgFileResult"}
+        "200": {$ref: "#/components/responses/MkgFileResult"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "415": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/orders/files/{id}:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: Siêu dữ liệu tệp chứng từ
+      operationId: getOrdersFile
+      tags: [orders]
+      responses:
+        "200": {$ref: "#/components/responses/MkgFileResult"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/orders/files/{id}/content:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: Tải nội dung tệp (qua API có kiểm vai; header X-Content-SHA256)
+      operationId: getOrdersFileContent
+      tags: [orders]
+      responses:
+        "200": {description: Nội dung tệp, content: {application/octet-stream: {schema: {type: string, format: binary}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/orders/receipts/{id}/variance-report:
     parameters: [{$ref: "#/components/parameters/OrderID"}]
     post:
@@ -2241,6 +2437,26 @@ paths:
         "200": {description: Số dòng đã dựng theo bảng chiếu, content: {application/json: {schema: {type: object, additionalProperties: {type: integer}}}}}
         "403": {$ref: "#/components/responses/Problem"}
   # --- mkg/costing: bề mặt ứng dụng (event sourcing mức B — sổ là nguồn; tiền/khối lượng là chuỗi) ---
+  /v1/costing/lots:
+    get:
+      summary: Lô có giá thành (mới nhất trước) — tổng hợp như GET /v1/costing/lots/{id}/cost
+      operationId: listCostingLots
+      tags: [costing]
+      parameters:
+        - {name: cursor, in: query, description: "Con trỏ = next_cursor của trang trước", schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Lô
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CostingLotCost"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/costing/lots/{id}/cost:
     parameters: [{$ref: "#/components/parameters/CostingID"}]
     get:
@@ -2420,6 +2636,28 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
+  /v1/costing/period-close-jobs:
+    get:
+      summary: Job đóng kỳ (mới nhất trước)
+      operationId: listCostingCloseJobs
+      tags: [costing]
+      parameters:
+        - {name: period_id, in: query, schema: {type: string, format: uuid}}
+        - {name: status, in: query, schema: {type: string, enum: [queued, completed, failed]}}
+        - {name: cursor, in: query, description: "Con trỏ = next_cursor của trang trước", schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Job
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CostingCloseJob"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/costing/period-close-jobs/{id}:
     parameters: [{$ref: "#/components/parameters/CostingID"}]
     get:
@@ -2542,6 +2780,26 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
   /v1/costing/carbon-revenue:
+    get:
+      summary: Doanh thu carbon đã ghi và phần chia (mới nhất trước)
+      operationId: listCarbonRevenue
+      tags: [costing]
+      parameters:
+        - {name: period_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, description: "Con trỏ = next_cursor của trang trước", schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Khoản carbon
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CostingCarbonRevenue"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "422": {$ref: "#/components/responses/Problem"}
     post:
       summary: Ghi doanh thu carbon và chia 45 % giữ lại / 70-15-15 (tham số có phiên bản — tạm, chờ khách)
       description: Vai cost_accountant. Chỉ chia số tiền đã có; KHÔNG tính tCO2e (pf/mrv, chờ C-1). VVB nhận phần dư làm tròn.
@@ -2721,6 +2979,29 @@ paths:
         "200": {description: Gọi lặp cùng khóa (phát lại)}
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
+  /v1/acctbridge/jobs:
+    get:
+      summary: Job dựng / đẩy bút toán (mới nhất trước)
+      operationId: listAcctbridgeJobs
+      tags: [acctbridge]
+      parameters:
+        - {name: kind, in: query, schema: {type: string, enum: [build, push]}}
+        - {name: status, in: query, schema: {type: string, enum: [queued, done, failed]}}
+        - {name: period_id, in: query, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, description: "Con trỏ = next_cursor của trang trước", schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Job
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/AcctbridgeJob"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/acctbridge/jobs/{id}:
     parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
     get:
@@ -2824,10 +3105,113 @@ components:
     LogisticsTripResult:
       description: Chuyến sau thao tác (200 = gọi lặp cùng Idempotency-Key); warnings = cờ cảnh báo, không chặn
       content: {application/json: {schema: {type: object, required: [trip, warnings], properties: {trip: {$ref: "#/components/schemas/LogisticsTrip"}, warnings: {type: array, items: {type: string}}, event: {$ref: "#/components/schemas/LogisticsTripEvent"}}}}}
+    MkgFileResult:
+      description: Tệp chứng từ vùng mkg (200 = gọi lặp cùng Idempotency-Key)
+      content: {application/json: {schema: {type: object, required: [file], properties: {file: {$ref: "#/components/schemas/MkgFile"}}}}}
     LogisticsVesselResult:
       description: Phương tiện
       content: {application/json: {schema: {type: object, required: [vessel], properties: {vessel: {$ref: "#/components/schemas/LogisticsVessel"}}}}}
   schemas:
+    MkgFile:
+      type: object
+      description: Siêu dữ liệu tệp chứng từ vùng mkg (nội dung ở kho đối tượng trong lãnh thổ, ghi một lần; không URL có chữ ký)
+      required: [id, purpose, file_name, content_type, size, sha256, uploaded_by, rule_version, recorded_at]
+      properties:
+        id: {type: string, format: uuid, description: file_ref}
+        purpose: {type: string, enum: [receipt_variance_report, delivery_evidence, trip_document]}
+        file_name: {type: string}
+        content_type: {type: string, enum: [application/pdf, image/jpeg, image/png, image/webp]}
+        size: {type: integer}
+        sha256: {type: string, pattern: "^[0-9a-f]{64}$"}
+        uploaded_by: {type: string, format: uuid}
+        rule_version: {type: string}
+        recorded_at: {type: string, format: date-time}
+    HubArrival:
+      type: object
+      description: Thông báo hàng đến của một chuyến (proto FM-05) — status expected = cho_den, arrived = da_den
+      required: [trip_id, trip_code, facility_ref, status, proto_status, mode, lot_refs, last_event_id]
+      properties:
+        trip_id: {type: string, format: uuid}
+        trip_code: {type: string, pattern: "^CH[0-9]{6,}$"}
+        facility_ref: {type: string, format: uuid}
+        status: {type: string, enum: [expected, arrived, cancelled]}
+        proto_status: {type: string, enum: [cho_den, da_den, huy]}
+        mode: {type: string, enum: [road, waterway]}
+        vessel_code: {type: [string, "null"]}
+        collection_order_ref: {type: [string, "null"], format: uuid}
+        lot_refs: {type: array, items: {type: string, format: uuid}}
+        planned_kg: {oneOf: [{$ref: "#/components/schemas/Kg"}, {type: "null"}]}
+        expected_since: {type: [string, "null"], format: date-time}
+        arrived_at: {type: [string, "null"], format: date-time}
+        cancelled_at: {type: [string, "null"], format: date-time}
+        last_event_id: {type: string, format: uuid}
+    LogisticsTripDocument:
+      type: object
+      description: Chứng từ chuyến có người ký (L-11) — người ký là *_ref, không tên
+      required: [id, trip_id, kind, file_ref, file_sha256, signer_role, signed_at, actor_ref, rule_version, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        trip_id: {type: string, format: uuid}
+        kind: {type: string, enum: [epod, ebill, minutes]}
+        file_ref: {type: string, format: uuid}
+        file_sha256: {type: string, pattern: "^[0-9a-f]{64}$"}
+        signer_role: {type: string, enum: [driver, consignee, hub_operator, dispatcher]}
+        signer_ref: {type: [string, "null"], format: uuid}
+        signed_at: {type: string, format: date-time}
+        note: {type: [string, "null"]}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+        rule_version: {type: string}
+        recorded_at: {type: string, format: date-time}
+    LogisticsVesselVersion:
+      type: object
+      description: Một phiên bản danh mục phương tiện (sổ vessel_event)
+      required: [event_id, vessel_id, kind, version, code, vehicle_kind, status, actor_ref, event_time, recorded_at]
+      properties:
+        event_id: {type: string, format: uuid}
+        vessel_id: {type: string, format: uuid}
+        kind: {type: string, enum: [created, revised]}
+        version: {type: integer}
+        code: {type: string}
+        vehicle_kind: {type: string, enum: [ghe, sa_lan, truck]}
+        name: {type: [string, "null"]}
+        owner_ref: {type: [string, "null"], format: uuid}
+        registered_tons: {type: [string, "null"]}
+        straw_payload_tons: {type: [string, "null"]}
+        registration_expiry: {type: [string, "null"], format: date}
+        rate_type: {type: [string, "null"], enum: [per_ton, per_trip, per_ton_km, null]}
+        rate_vnd: {type: [string, "null"]}
+        status: {type: string, enum: [active, inactive]}
+        reason: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+    CostingCarbonRevenue:
+      type: object
+      description: Khoản doanh thu carbon đã ghi + phần chia 45 % / 70-15-15 (tạm, chờ khách)
+      required: [id, period_ref, period_code, revenue_amount, retained_amount, farmers_amount, authority_amount, verifier_amount, param_pins, label, rule_version, event_time]
+      properties:
+        id: {type: string, format: uuid}
+        period_ref: {type: string, format: uuid}
+        period_code: {type: string}
+        revenue_amount: {$ref: "#/components/schemas/Money"}
+        retained_amount: {$ref: "#/components/schemas/Money"}
+        farmers_amount: {$ref: "#/components/schemas/Money"}
+        authority_amount: {$ref: "#/components/schemas/Money"}
+        verifier_amount: {$ref: "#/components/schemas/Money"}
+        retained_pct: {type: string}
+        farmers_pct: {type: string}
+        authority_pct: {type: string}
+        verifier_pct: {type: string}
+        param_pins: {type: object, additionalProperties: {type: integer}}
+        reference: {type: [string, "null"]}
+        label: {type: string, example: "tạm, chờ khách"}
+        rule_version: {type: string}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        note: {type: string}
     Kg: {type: string, pattern: "^-?[0-9]+(\\.[0-9]{1,3})?$", example: "1520.500"}
     Pct: {type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,2})?$", example: "14.50"}
     Product: {type: string, enum: [straw_bale, straw_loose, dried_straw, compressed_bale]}

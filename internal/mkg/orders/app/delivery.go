@@ -191,6 +191,9 @@ func (s *Service) AcceptDelivery(ctx context.Context, id uuid.UUID, in AcceptInp
 		if d.TicketRef == nil {
 			return ErrCustomerInMissing
 		}
+		if err := checkFileRef(ctx, tx, &in.EvidenceFileRef, FilePurposeDeliveryEvidence); err != nil {
+			return err
+		}
 		d.EvidenceFileRef, d.EvidenceKind, d.DisputeRef = &in.EvidenceFileRef, &in.EvidenceKind, in.DisputeRef
 		d.AcceptedAt = &at
 		if err := s.accept(ctx, tx, p.TenantID, d, store.Meta{ID: ids.New(), EventTime: now, ActorRef: p.ActorRef, IdemKey: in.IdemKey}); err != nil {

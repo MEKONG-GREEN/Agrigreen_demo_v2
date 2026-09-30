@@ -18,7 +18,7 @@ import 'support/test_env.dart';
 /// đồng `recordLogisticsMilestone`, problem+json → mã `logistics.*`.
 class _HttpLogistics {
   _HttpLogistics();
-  final FakeLogistics logistics = FakeLogistics();
+  final FakeLogistics logistics = FakeLogistics()..caller = meSub;
   final requests = <http.Request>[];
 
   /// Trả lỗi này cho POST mốc kế tiếp (status, code) rồi xóa.
@@ -120,6 +120,13 @@ void main() {
           r.url.queryParameters['status'],
     ];
     expect(gets, ['planned', 'departed', 'arrived']);
+    // Máy chủ lọc "chuyến của tôi" (assigned_to_me=true), không lọc ở máy.
+    expect(
+      h.requests
+          .where((r) => r.url.path == '/v1/logistics/trips')
+          .every((r) => r.url.queryParameters['assigned_to_me'] == 'true'),
+      isTrue,
+    );
 
     // 1) 503 → lệnh vẫn chờ, lượt đồng bộ lùi thử lại.
     final l = await s.trips.record(tripA, Milestone.departed);
@@ -148,8 +155,15 @@ void main() {
     });
     expect(posts.every((r) => r.headers['X-Device-Id'] == s.deviceId), isTrue);
     final body = jsonDecode(posts.last.body) as Map;
-    expect(body.keys.toSet(), {'kind', 'event_time', 'lat', 'lng'});
+    expect(body.keys.toSet(), {
+      'kind',
+      'event_time',
+      'lat',
+      'lng',
+      'accuracy_m',
+    });
     expect(body['lat'], '10.0451234');
+    expect(body['accuracy_m'], '6');
     // Thân gửi lại giống từng byte (máy chủ băm thân theo Idempotency-Key).
     expect(posts.map((r) => r.body).toSet(), hasLength(1));
     expect(h.logistics.milestones, hasLength(1));
@@ -159,7 +173,7 @@ void main() {
 
     // 4) 409 problem+json logistics.trip_transition → xung đột, không thử lại.
     await s.trips.record(tripB, Milestone.departed);
-    h.logistics.trips[tripB]!['status'] = 'arrived';
+    h.logistics.update(tripB, {'status': 'arrived'});
     await s.sync.syncOnce(force: true);
     final failed = [
       for (final a in await s.actions.ofKind(ApiActionKind.logisticsMilestone))

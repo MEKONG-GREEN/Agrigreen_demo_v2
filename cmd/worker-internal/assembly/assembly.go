@@ -130,6 +130,9 @@ var Consumers = []Consumer{
 		Build: func(clk clock.Clock) inbox.Handler { return hub.NewConsumers(clk).RollCount() }},
 	{Name: hubport.ReconciliationConsumer, Events: []string{measport.EventReconciliationCompleted}, Role: hub.DBRole,
 		Build: func(clk clock.Clock) inbox.Handler { return hub.NewConsumers(clk).Reconciliation() }},
+	// G4 (proto FM-05): mốc chuyến có đích là cơ sở → thông báo hàng đến mang mã chuyến (cho_den → da_den).
+	{Name: hubport.TripMilestoneConsumer, Events: []string{logport.EventTripMilestoneRecorded}, Role: hub.DBRole,
+		Build: func(clk clock.Clock) inbox.Handler { return hub.NewConsumers(clk).TripMilestone() }},
 	// G3-2 (mkg/fieldops, vai fieldops_app): phiếu cân → bảng đệm học kg/cuộn.
 	{Name: fieldport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Role: fieldops.DBRole,
 		Build: func(clk clock.Clock) inbox.Handler { return fieldops.NewConsumers(clk).WeighTicket() }},

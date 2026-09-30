@@ -289,6 +289,7 @@ class LocalMilestone {
     this.lat,
     this.lng,
     this.accuracyM,
+    this.gpsStatus,
     this.errorCode,
   });
   final String actionId;
@@ -299,10 +300,20 @@ class LocalMilestone {
   final String? lat;
   final String? lng;
   final double? accuracyM;
+
+  /// Trạng thái GPS máy báo lúc ghi (`GpsStatus.name`), null = không rõ.
+  final String? gpsStatus;
   final String? errorCode;
 
+  /// Mốc có tọa độ GPS không — không có vẫn ghi được (máy chủ lưu NULL,
+  /// không bao giờ 0,0).
+  bool get hasGps => lat != null && lng != null;
+
+  /// Ghi chú hiển thị khi mốc ghi không có GPS.
+  static const noGpsNote = 'không có GPS';
+
   String get gpsLabel {
-    if (lat == null || lng == null) return 'Không có GPS';
+    if (!hasGps) return noGpsNote;
     final acc = accuracyM == null ? '' : ' (±${accuracyM!.round()} m)';
     return '$lat, $lng$acc';
   }
@@ -347,6 +358,8 @@ String logisticsMessage(String? code) => switch (code) {
   'logistics.trip_not_found' =>
     'Không còn chuyến này (đã bị xóa khỏi phân công hoặc ngoài phạm vi).',
   'validation_failed' => 'Dữ liệu mốc không hợp lệ (thời điểm ở tương lai hoặc tọa độ sai) — kiểm tra giờ máy và GPS.',
+  'logistics.not_assigned_driver' =>
+    'Chuyến không còn giao cho bạn — liên hệ điều phối.',
   'forbidden' => 'Tài khoản không có vai tài xế — liên hệ điều phối.',
   'idempotency_key_reused' =>
     'Mã gửi trùng với thao tác khác — liên hệ quản trị.',

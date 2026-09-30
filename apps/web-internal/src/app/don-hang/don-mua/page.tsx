@@ -2,9 +2,10 @@
 
 import { useState, type ReactNode } from "react";
 import { idem, unwrap } from "@/api/client";
-import type { OrdersPurchaseOrder, OrdersReceipt } from "@/api/types";
+import type { MkgFile, OrdersPurchaseOrder, OrdersReceipt } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { hasRole, ROLES } from "@/auth/principal";
+import { FileRef, FileUploadField } from "@/components/FileUpload";
 import { KV, Money, SoD, When } from "@/components/g4kit";
 import { ActionStatus, Chip, Provisional, Ref, RefPicker, Section, SelectField, SelfHint, TextField, useAction } from "@/components/kit";
 import { ProblemAlert } from "@/components/ProblemAlert";
@@ -24,7 +25,7 @@ function ReceiptCard({ r, po, onChanged }: { r: OrdersReceipt; po: OrdersPurchas
   const { api, principal } = useAuth();
   const act = useAction();
   const [note, setNote] = useState("");
-  const [file, setFile] = useState("");
+  const [file, setFile] = useState<MkgFile | null>(null);
   const [qty, setQty] = useState("");
   const [reason, setReason] = useState("");
   const officer = hasRole(principal, ROLES.salesOfficer);
@@ -35,6 +36,7 @@ function ReceiptCard({ r, po, onChanged }: { r: OrdersReceipt; po: OrdersPurchas
       setNote("");
       setReason("");
       setQty("");
+      setFile(null);
       onChanged();
     }
   };
@@ -52,7 +54,7 @@ function ReceiptCard({ r, po, onChanged }: { r: OrdersReceipt; po: OrdersPurchas
           ["Đặt → nhận", `${qtyText(r.unit, r.ordered_qty)} → ${qtyText(r.unit, r.received_qty)}${r.qty_source ? ` (${QTY_SOURCE_LABEL[r.qty_source]})` : ""}`],
           ["Chênh lệch ↔ đơn mua", r.variance_pct ? <span key="v">{formatPct(r.variance_pct, true)} · ngưỡng {r.threshold_pct} % <span className="mono small">{r.param_version}</span> <Provisional what="Q-5" /></span> : "—"],
           ...(r.audit_note ? ([["Ghi chú kiểm toán", r.audit_note]] as [string, string][]) : []),
-          ...(r.report_note ? ([["Biên bản chênh lệch", <span key="rn">{r.report_note} {r.report_file_ref ? <>· tệp <Ref id={r.report_file_ref} /></> : null}</span>]] as [string, ReactNode][]) : []),
+          ...(r.report_note ? ([["Biên bản chênh lệch", <span key="rn" className="stack" style={{ gap: 4 }}><span>{r.report_note}</span>{r.report_file_ref ? <FileRef module="orders" id={r.report_file_ref} /> : null}</span>]] as [string, ReactNode][]) : []),
           ["Người lập → duyệt", <SoD key="s" maker={r.created_by} checker={r.approved_by} />],
           ...(r.payable ? ([["Khoản phải trả", <span key="p"><Money v={r.payable.amount} strong /> · hạn {formatDate(r.payable.due_date)} ({r.payable.payment_term_days} ngày)</span>]] as [string, ReactNode][]) : []),
           ...(po.category === "straw" && r.status === "approved" ? ([["Phải trả", "Rơm: không ghi ở đây — chỉ từ quyết toán HTX đã duyệt (một nguồn khoản phải trả)"]] as [string, string][]) : []),
@@ -67,13 +69,13 @@ function ReceiptCard({ r, po, onChanged }: { r: OrdersReceipt; po: OrdersPurchas
       {officer && r.status !== "rejected" && r.needs_variance_report ? (
         <div className="grid3">
           <TextField label={`Biên bản chênh lệch ${r.code}`} value={note} onChange={setNote} multiline hint="Ít nhất 10 ký tự" />
-          <TextField label={`Mã tệp biên bản ${r.code}`} value={file} onChange={setFile} hint="UUID tệp ở kho đối tượng (tuỳ chọn)" />
+          <FileUploadField label={`Tệp biên bản ${r.code}`} module="orders" purpose="receipt_variance_report" value={file} onUploaded={setFile} hint="Tuỳ chọn — PDF / ảnh ≤ 15 MB, tải lên kho chứng từ trước khi ghi biên bản" />
           <div className="row">
             <button
               type="button"
               className="btn btn-o btn-sm"
-              disabled={act.busy || !validReason(note) || (!!file && !UUID.test(file.trim()))}
-              onClick={() => void act.run(() => unwrap(api.POST("/v1/orders/receipts/{id}/variance-report", { params: p(), body: { note: note.trim(), ...(file.trim() ? { file_ref: file.trim() } : {}) } })), "Đã ghi biên bản chênh lệch").then(done)}
+              disabled={act.busy || !validReason(note)}
+              onClick={() => void act.run(() => unwrap(api.POST("/v1/orders/receipts/{id}/variance-report", { params: p(), body: { note: note.trim(), ...(file ? { file_ref: file.id } : {}) } })), file ? `Đã ghi biên bản chênh lệch kèm tệp ${file.file_name}` : "Đã ghi biên bản chênh lệch").then(done)}
             >
               Ghi biên bản
             </button>

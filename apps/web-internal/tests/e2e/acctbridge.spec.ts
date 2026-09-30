@@ -70,6 +70,20 @@ test.describe("Cầu nối kế toán (mkg/acctbridge)", () => {
     await expect(page.getByRole("table", { name: "Bút toán tổng hợp" }).getByRole("row", { name: new RegExp(`${M3} v2`) })).toContainText("Đã dựng — chờ duyệt");
   });
 
+  test("danh sách job dựng / đẩy: 5 dòng/trang + Tải thêm; lọc loại job; mở bút toán từ job", async ({ page }) => {
+    await loginAs(page, "ke-toan-truong", "/ke-toan/but-toan");
+    const jobs = page.getByRole("table", { name: "Job cầu nối kế toán đã chạy" });
+    await expect(jobs.getByRole("row")).toHaveCount(6);
+    await page.getByRole("button", { name: "Tải thêm" }).click();
+    await expect(jobs.getByRole("row")).toHaveCount(7);
+    await expect(jobs).toContainText("Phần mềm kế toán từ chối — vào DLQ");
+    await page.getByLabel("Loại job").selectOption("build");
+    await expect(jobs.getByRole("row")).toHaveCount(3);
+    await expect(jobs).not.toContainText("Đẩy lần");
+    await jobs.getByRole("row", { name: new RegExp(M3) }).getByRole("button", { name: /Mở bút toán của job/ }).click();
+    await expect(labelled(page, "Thông tin bút toán")).toContainText(`${M3} · v1`);
+  });
+
   test("phân quyền: tài xế không vào được kế toán; kế toán thấy khối kế toán", async ({ page }) => {
     await loginAs(page, "tai-xe", "/ke-toan/but-toan");
     await expect(page.getByRole("heading", { name: "Không có quyền truy cập" })).toBeVisible();

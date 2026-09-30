@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { alert, labelled, loginAs, navTo, sidebar, status, switchUser } from "./helpers";
+import { alert, labelled, loginAs, navTo, pdfFile, sidebar, status, switchUser } from "./helpers";
 
 // G4 mkg/logistics — W-01: chuyến + chặng (định tuyến lưu nguyên văn + SHA-256), gán ghe (cảnh báo không chặn),
 // huỷ có lý do, mốc tài xế từng bậc, hoàn tất có cờ lệch cân, danh mục ghe có phiên bản, cảnh báo, tham số R-56.
@@ -96,6 +96,55 @@ test.describe("Vận tải (mkg/logistics)", () => {
     await expect(page.getByRole("group", { name: "Chưa cân > 48 giờ" })).toContainText("1");
     await expect(page.getByRole("table", { name: "Phương tiện cần gia hạn" })).toContainText("VL-00111");
     await expect(page.getByRole("table", { name: "Chuyến chưa cân" })).toContainText("CH000101");
+  });
+
+  test("lịch sử phiên bản phương tiện: trang 5 dòng + Tải thêm; sửa → phiên bản mới cuối lịch sử", async ({ page }) => {
+    await loginAs(page, "van-tai", "/van-tai/phuong-tien");
+    await page.getByRole("button", { name: "Lịch sử CT-06789" }).click();
+    const h = page.getByRole("table", { name: "Lịch sử phiên bản CT-06789" });
+    await expect(h.getByRole("row")).toHaveCount(6);
+    await expect(h).toContainText("Tạo mới");
+    await expect(h).toContainText("Ký hợp đồng thuê theo tấn mùa vụ Hè Thu");
+    await page.getByRole("button", { name: "Tải thêm" }).click();
+    await expect(h.getByRole("row")).toHaveCount(8);
+    await expect(h).toContainText("v7");
+    await expect(h).toContainText("Gia hạn đăng kiểm và chốt đơn giá 800 đ/t·km");
+    await expect(page.getByRole("button", { name: "Tải thêm" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Lịch sử TG-12345" }).click();
+    await page.getByRole("button", { name: "Sửa TG-12345" }).click();
+    await page.getByLabel("Tải rơm thực chở (t)").fill("95");
+    await page.getByLabel("Lý do sửa").fill("Đo lại tải thực chở sau khi nâng mạn");
+    await page.getByRole("button", { name: "Lưu phiên bản mới" }).click();
+    await expect(page.getByText("Đã lưu phiên bản 2 của TG-12345")).toBeVisible();
+    const t = page.getByRole("table", { name: "Lịch sử phiên bản TG-12345" });
+    await expect(t.getByRole("row")).toHaveCount(3);
+    await expect(t).toContainText("Đo lại tải thực chở sau khi nâng mạn");
+  });
+
+  test("chứng từ chuyến: tải e-bill (SHA-256 ở trình duyệt) → ghi có vai người ký + thời điểm ký; ePOD đã có tải về được", async ({ page }) => {
+    await loginAs(page, "van-tai", "/van-tai/chuyen");
+    await page.getByRole("button", { name: "Mở chuyến CH000103" }).click();
+    const seeded = page.getByRole("table", { name: "Chứng từ của chuyến" });
+    await expect(seeded).toContainText("ePOD");
+    await expect(seeded).toContainText("Bên nhận hàng");
+    const dl = page.waitForEvent("download");
+    await seeded.getByRole("button", { name: "Tải tệp epod-CH000103.pdf" }).click();
+    expect((await dl).suggestedFilename()).toBe("epod-CH000103.pdf");
+
+    await page.getByRole("button", { name: "Mở chuyến CH000102" }).click();
+    await expect(page.getByText("Chưa có chứng từ có người ký.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Ghi chứng từ" })).toBeDisabled();
+    await page.getByLabel("Tệp chứng từ chuyến").setInputFiles(pdfFile("ebill-CH000102.pdf"));
+    await expect(labelled(page, "Tệp đã tải Tệp chứng từ chuyến")).toContainText("ebill-CH000102.pdf");
+    await page.getByLabel("Loại chứng từ").selectOption("ebill");
+    await page.getByLabel("Vai người ký").selectOption("driver");
+    await page.getByLabel("Ghi chú chứng từ").fill("e-bill xuống ghe tại bãi Tân Hiệp");
+    await page.getByRole("button", { name: "Ghi chứng từ" }).click();
+    await expect(page.getByText(/Đã ghi chứng từ e-bill — băm tệp .* chép vào sổ chuyến/)).toBeVisible();
+    const docs = page.getByRole("table", { name: "Chứng từ của chuyến" });
+    await expect(docs).toContainText("e-bill");
+    await expect(docs).toContainText("Tài xế / chủ ghe");
+    await expect(docs).toContainText("ebill-CH000102.pdf");
   });
 
   test("tham số cước R-56: điều phối đề xuất, không duyệt được; kế toán trưởng khác duyệt → áp dụng v1", async ({ page }) => {

@@ -6,12 +6,14 @@ import type { LogisticsVessel, LogisticsVesselInput } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { ActionStatus, Chip, Ref, Section, SelectField, TextField, useAction } from "@/components/kit";
 import { ProblemAlert } from "@/components/ProblemAlert";
-import { Empty, Loading, PageHead } from "@/components/ui";
+import { When } from "@/components/g4kit";
+import { Empty, LoadMore, Loading, PageHead } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { normalizeVesselCode, RATE_TYPE_LABEL, REGISTRATION_LABEL, VESSEL_KIND_LABEL } from "@/lib/g4labels";
 import { formatDecimalString, formatPrice } from "@/lib/money";
 import { validReason } from "@/lib/rules";
 import { useAsync } from "@/lib/useAsync";
+import { LIST_PAGE_SIZE, usePaged } from "@/lib/usePaged";
 
 interface Form {
   code: string;
@@ -58,10 +60,67 @@ function toBody(f: Form, expected?: number): LogisticsVesselInput {
   };
 }
 
+/** Lịch sử phiên bản danh mục của một phương tiện (sổ vessel_event, proto GH-01) — tăng dần, "Tải thêm". */
+function VesselHistory({ v }: { v: LogisticsVessel }) {
+  const { api } = useAuth();
+  const h = usePaged(
+    (cursor) => unwrap(api.GET("/v1/logistics/vessels/{id}/versions", { params: { path: { id: v.vessel_id }, query: { limit: LIST_PAGE_SIZE, ...(cursor ? { cursor } : {}) } } })),
+    [api, v.vessel_id, v.version],
+  );
+  return (
+    <div className="stack">
+      {h.loading ? <Loading /> : null}
+      {h.error ? <ProblemAlert problem={h.error} onRetry={h.reload} /> : null}
+      {h.items?.length ? (
+        <div className="tbl-wrap">
+          <table className="tbl" aria-label={`Lịch sử phiên bản ${v.code}`}>
+            <thead>
+              <tr>
+                <th className="num">Phiên bản</th>
+                <th>Loại</th>
+                <th>Số hiệu</th>
+                <th className="num">Tải rơm (t)</th>
+                <th>Hạn đăng kiểm</th>
+                <th>Đơn giá thuê</th>
+                <th>Tình trạng</th>
+                <th>Lý do</th>
+                <th>Người ghi · lúc</th>
+              </tr>
+            </thead>
+            <tbody>
+              {h.items.map((x) => (
+                <tr key={x.event_id}>
+                  <td className="num">v{x.version}</td>
+                  <td>{x.kind === "created" ? "Tạo mới" : "Sửa"}</td>
+                  <td className="mono">{x.code}</td>
+                  <td className="num">{x.straw_payload_tons ? formatDecimalString(x.straw_payload_tons) : "—"}</td>
+                  <td>{formatDate(x.registration_expiry)}</td>
+                  <td>{x.rate_type ? formatPrice(x.rate_vnd, PER[x.rate_type]) : <span className="mute small">Đơn giá tham số</span>}</td>
+                  <td>
+                    <Chip status={x.status} label={x.status === "active" ? "Đang dùng" : "Ngừng dùng"} />
+                  </td>
+                  <td className="small">{x.reason ?? "—"}</td>
+                  <td className="small">
+                    <Ref id={x.actor_ref} /> · <When at={x.recorded_at} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+      {h.items && !h.items.length ? <Empty>Chưa có phiên bản.</Empty> : null}
+      <LoadMore hasMore={h.hasMore} loading={h.loadingMore} onClick={h.loadMore} />
+    </div>
+  );
+}
+
 export default function VesselsPage() {
   const { api } = useAuth();
   const list = useAsync(async () => (await unwrap(api.GET("/v1/logistics/vessels"))).items, [api]);
   const [edit, setEdit] = useState<{ v: LogisticsVessel | null; f: Form } | null>(null);
+  const [histId, setHistId] = useState<string | null>(null);
+  const hist = list.data?.find((v) => v.vessel_id === histId) ?? null;
   const act = useAction();
   const revising = !!edit?.v;
   const err = edit ? formError(edit.f, revising) : null;
@@ -154,9 +213,12 @@ export default function VesselsPage() {
                       <Chip status={v.status} label={v.status === "active" ? "Đang dùng" : "Ngừng dùng"} />
                     </td>
                     <td className="num">{v.version}</td>
-                    <td>
+                    <td className="row">
                       <button type="button" className="btn btn-o btn-sm" onClick={() => setEdit({ v, f: formOf(v) })} aria-label={`Sửa ${v.code}`}>
                         Sửa
+                      </button>
+                      <button type="button" className="btn btn-o btn-sm" aria-pressed={v.vessel_id === histId} onClick={() => setHistId(v.vessel_id)} aria-label={`Lịch sử ${v.code}`}>
+                        Lịch sử
                       </button>
                     </td>
                   </tr>
@@ -166,6 +228,11 @@ export default function VesselsPage() {
           </div>
         ) : null}
       </Section>
+      {hist ? (
+        <Section title={`Lịch sử phiên bản ${hist.code} (hiện hành v${hist.version})`}>
+          <VesselHistory key={hist.vessel_id} v={hist} />
+        </Section>
+      ) : null}
     </div>
   );
 }

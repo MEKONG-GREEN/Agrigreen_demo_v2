@@ -109,20 +109,66 @@ func appendEvent(ctx context.Context, tx pgx.Tx, cur *store.Trip, e *store.TripE
 	if err := store.UpsertTrip(ctx, tx, t); err != nil {
 		return store.Trip{}, mapErr(err)
 	}
+	switch e.Kind {
+	case store.KindDeparted, store.KindArrived, store.KindCompleted, store.KindCancelled:
+	default:
+		return t, nil
+	}
+	legs, err := store.LatestPlan(ctx, tx, t.TripID, nil)
+	if err != nil {
+		return t, err
+	}
+	v, err := tripVessel(ctx, tx, t.VehicleRef)
+	if err != nil {
+		return t, err
+	}
 	if e.Kind == store.KindCompleted {
-		legs, err := store.LatestPlan(ctx, tx, t.TripID, nil)
-		if err != nil {
-			return t, err
-		}
-		v, err := tripVessel(ctx, tx, t.VehicleRef)
-		if err != nil {
-			return t, err
-		}
 		if err := enqueueCompleted(ctx, tx, e.TenantID, completedPayload(t, legs, *e, v)); err != nil {
 			return t, err
 		}
 	}
-	return t, nil
+	// proto FM-05: thông báo hàng đến mang mã chuyến cho cơ sở đích (mkg.hub.trip_milestone).
+	return t, enqueueMilestone(ctx, tx, t, legs, v, e.Kind, e.ID, e.EventTime)
+}
+
+// destinationFacility trả cơ sở đích của phiên bản kế hoạch (chặng cuối to_kind = facility); nil nếu đích không
+// phải cơ sở (khách, điểm) hoặc chuyến chưa có chặng (FM-05 lập từ xuống ghe khi chưa xác định đích).
+func destinationFacility(legs []store.Leg) *uuid.UUID {
+	if len(legs) == 0 {
+		return nil
+	}
+	l := legs[len(legs)-1]
+	if l.ToKind != "facility" || l.ToRef == nil {
+		return nil
+	}
+	r := *l.ToRef
+	return &r
+}
+
+// enqueueMilestone phát mkg.logistics.trip.milestone_recorded (nội bộ) khi chuyến có đích là cơ sở: hub ghi thông
+// báo hàng đến (cho_den → da_den) mang mã chuyến. Không cước, không tài xế (R-04, mkg.md §3.1).
+func enqueueMilestone(ctx context.Context, tx pgx.Tx, t store.Trip, legs []store.Leg, v *port.TripVesselRefV1, milestone string,
+	source uuid.UUID, at time.Time) error {
+	fac := destinationFacility(legs)
+	if fac == nil {
+		return nil
+	}
+	lots := make([]port.TripMilestoneLotV1, 0, len(t.Cargo))
+	for _, c := range t.Cargo {
+		lots = append(lots, port.TripMilestoneLotV1{LotRef: c.LotRef, MassKg: c.MassKg})
+	}
+	payload := port.TripMilestoneRecordedV1{
+		TripID: t.TripID, TripCode: t.Code, Milestone: milestone, Status: t.Status, FacilityRef: *fac, Mode: mainMode(t, legs),
+		CollectionOrderRef: t.CollectionOrderRef, Lots: lots, PlannedKg: t.PlannedKg, SourceEventRef: source, EventTime: at.UTC(),
+	}
+	if v != nil {
+		code := v.Code
+		payload.VesselCode = &code
+	}
+	return outbox.Enqueue(ctx, tx, outbox.Event{
+		ID: ids.New(), TenantID: t.TenantID, Type: port.EventTripMilestoneRecorded, SchemaVersion: 1, OccurredAt: payload.EventTime,
+		TraceID: telemetry.TraceID(ctx), Producer: Producer, Payload: payload, Kind: outbox.KindInternal,
+	})
 }
 
 func tripVessel(ctx context.Context, tx pgx.Tx, ref *uuid.UUID) (*port.TripVesselRefV1, error) {

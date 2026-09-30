@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { alert, IDS, loginAs, navTo } from "./helpers";
+import { alert, IDS, loginAs, navTo, switchUser } from "./helpers";
 
 test.describe("Hub & kho", () => {
   test("tồn theo lô xếp theo rủi ro xuống cấp, chi tiết lô và bù sai", async ({ page }) => {
@@ -41,6 +41,32 @@ test.describe("Hub & kho", () => {
     // Phiếu đã dùng → không nhận lần hai.
     await page.getByRole("button", { name: "Ghi nhận lô" }).click();
     await expect(alert(page)).toContainText("hub.weigh_ticket_used");
+  });
+
+  test("hàng sắp đến (FM-05): chuyến xuất phát tới hub → thông báo Chờ đến mang mã chuyến; lọc theo cơ sở / trạng thái", async ({ page }) => {
+    await loginAs(page, "van-tai", "/van-tai/chuyen");
+    await page.getByRole("button", { name: "Mở chuyến CH000101" }).click();
+    await page.getByRole("button", { name: "Lập chặng", exact: true }).click();
+    await page.getByLabel("Điểm đến chặng 1").selectOption("hub-tb");
+    await page.getByRole("button", { name: "Lưu chặng" }).click();
+    await expect(page.getByText("Đã lập chặng — lưu kết quả định tuyến nguyên văn + SHA-256")).toBeVisible();
+    await page.getByRole("button", { name: "Ghi mốc xuất phát" }).click();
+    await expect(page.getByText("Đã ghi mốc xuất phát")).toBeVisible();
+
+    await switchUser(page, "dieu-phoi");
+    await navTo(page, "Nhận hàng");
+    const t = page.getByRole("table", { name: "Thông báo hàng đến" });
+    await expect(t.getByRole("row", { name: /CH000101/ })).toContainText("Chờ đến");
+    await expect(t.getByRole("row", { name: /CH000101/ })).toContainText("HUB-TB");
+    await expect(t.getByRole("row", { name: /CH000101/ })).toContainText("88,0 t");
+    await expect(t).toContainText("CH000102");
+    await page.getByLabel("Cơ sở đến").selectOption({ label: "HUB-TB · Hub Thới Bình" });
+    await expect(t.getByRole("row", { name: /CH000102/ })).toHaveCount(0);
+    await expect(t).toContainText("CH000101");
+    await page.getByLabel("Cơ sở đến").selectOption("");
+    await page.getByLabel("Trạng thái hàng đến").selectOption("arrived");
+    await expect(t.getByRole("row", { name: /CH000105/ })).toContainText("Đã đến");
+    await expect(t.getByRole("row", { name: /CH000101/ })).toHaveCount(0);
   });
 
   test("chuyển kho: nhận ở đích, hao hụt đường = xuất − nhận", async ({ page }) => {

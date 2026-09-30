@@ -43,6 +43,34 @@ test.describe("Giá thành & quyết toán (mkg/costing)", () => {
     await expect(page.getByRole("list", { name: "Lịch sử kết quả phân bổ" })).toContainText("bị thay");
   });
 
+  test("lô có giá thành: danh sách mới nhất trước, 5 dòng/trang + Tải thêm", async ({ page }) => {
+    await loginAs(page, "ke-toan", "/gia-thanh/lo");
+    const t = page.getByRole("table", { name: "Lô có giá thành" });
+    await expect(t.getByRole("row")).toHaveCount(6);
+    await expect(t.getByRole("row").nth(1)).toContainText("LO-CT-0905");
+    await expect(t).not.toContainText("LO-CT-0910");
+    await page.getByRole("button", { name: "Tải thêm" }).click();
+    await expect(t.getByRole("row")).toHaveCount(7);
+    await expect(t).toContainText("LO-CT-0910");
+    await expect(page.getByRole("button", { name: "Tải thêm" })).toHaveCount(0);
+    await t.getByRole("button", { name: "LO-CT-0910" }).click();
+    await expect(page.getByRole("group", { name: "Tổng chi phí" })).toContainText("16.920.000 ₫");
+  });
+
+  test("job đóng kỳ: danh sách job đã chạy; đóng kỳ mới → job xuất hiện đầu danh sách", async ({ page }) => {
+    await loginAs(page, "ke-toan-truong", "/gia-thanh/ky");
+    const jobs = page.getByRole("table", { name: "Job đóng kỳ đã chạy" });
+    await expect(jobs.getByRole("row")).toHaveCount(3);
+    await expect(jobs).toContainText(monthVn(2));
+    await expect(jobs).toContainText(monthVn(3));
+    await page.getByRole("button", { name: `Đóng kỳ ${M1}` }).click();
+    await expect(labelled(page, "Job đóng kỳ")).toContainText("Hoàn tất");
+    await expect(jobs.getByRole("row").nth(1)).toContainText(M1);
+    await expect(jobs.getByRole("row").nth(1)).toContainText("Hoàn tất");
+    await page.getByLabel("Lọc trạng thái job").selectOption("failed");
+    await expect(page.getByText("Chưa có job đóng kỳ.")).toBeVisible();
+  });
+
   test("quyết toán theo cuộn: người lập không tự duyệt; kế toán trưởng khác duyệt → một khoản phải trả; ghi đã trả", async ({ page }) => {
     await loginAs(page, "ke-toan", "/gia-thanh/quyet-toan");
     await page.getByRole("button", { name: "Mở quyết toán …000001" }).click();
@@ -84,6 +112,16 @@ test.describe("Giá thành & quyết toán (mkg/costing)", () => {
     await expect(t).toContainText("45.000.000 ₫");
     await expect(t).toContainText("38.500.000 ₫");
     await expect(t.getByRole("row", { name: /VVB/ })).toContainText("8.250.000 ₫");
+    // Danh sách khoản đã ghi (GET /v1/costing/carbon-revenue): khoản mới đầu danh sách, 5 dòng/trang.
+    const list = page.getByRole("table", { name: "Doanh thu carbon đã ghi" });
+    await expect(list.getByRole("row").nth(1)).toContainText("100.000.000 ₫");
+    await expect(list.getByRole("row")).toHaveCount(6);
+    await page.getByRole("button", { name: "Tải thêm" }).click();
+    await expect(list.getByRole("row")).toHaveCount(8);
+    await expect(list).toContainText("HĐ-TC-2026-01");
+    await page.getByLabel("Lọc theo kỳ").selectOption({ label: monthVn(2) });
+    await expect(list.getByRole("row")).toHaveCount(3);
+    await expect(list).toContainText("HĐ-TC-2026-02");
   });
 
   test("tham số giá thành (bề mặt quản trị): kế toán giá thành đề xuất, tự duyệt bị chặn, kế toán trưởng duyệt", async ({ page }) => {

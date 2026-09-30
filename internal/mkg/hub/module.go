@@ -52,8 +52,7 @@ func (m *Module) LotOrigins() port.LotOrigins { return m.svc }
 // RebuildTenant dựng lại bảng chiếu của tenant từ sổ, tenant tường minh, không kiểm vai — CHỈ cho công cụ diễn
 // tập R-22 trên bản sao database (cmd/rebuilddrill). Trả số dòng theo bảng chiếu.
 func (m *Module) RebuildTenant(ctx context.Context, tid uuid.UUID) (map[string]int64, error) {
-	n, err := m.svc.RebuildTenant(ctx, tid)
-	return map[string]int64{"lot_balance": n}, err
+	return m.svc.RebuildTenant(ctx, tid)
 }
 
 // Stock (G4) cho mkg/orders đọc tồn theo dạng hàng / cơ sở với tenant tường minh (cảnh báo thiếu tồn O-05).
@@ -111,3 +110,6 @@ func (c Consumers) RollCount() inbox.Handler { return c.c.HandleRollCount }
 
 // Reconciliation: mkg.measurement.reconciliation.completed → quy kết hao hụt.
 func (c Consumers) Reconciliation() inbox.Handler { return c.c.HandleReconciliation }
+
+// TripMilestone (G4): mkg.logistics.trip.milestone_recorded → thông báo hàng đến mang mã chuyến (proto FM-05).
+func (c Consumers) TripMilestone() inbox.Handler { return c.c.HandleTripMilestone }

@@ -64,6 +64,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/orders/params/:key", h.params)
 	rg.POST("/orders/params/:key/versions", h.proposeParam)
 	rg.POST("/orders/params/:key/versions/:version/decision", h.decideParam)
+	h.registerFiles(rg)
 }
 
 // RegisterAdmin gắn route quản trị (MFA).

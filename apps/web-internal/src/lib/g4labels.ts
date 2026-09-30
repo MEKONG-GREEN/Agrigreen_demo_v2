@@ -163,6 +163,8 @@ export const DELIVERY_STATUS_LABEL: Record<string, string> = {
   cancelled: "Đã huỷ",
 };
 export const EVIDENCE_KIND_LABEL: Record<string, string> = { epod: "ePOD", minutes: "Biên bản giao nhận", ebill: "e-bill" };
+export const SIGNER_ROLE_LABEL: Record<string, string> = { driver: "Tài xế / chủ ghe", consignee: "Bên nhận hàng", hub_operator: "Nhân viên hub", dispatcher: "Điều phối" };
+export const ARRIVAL_STATUS_LABEL: Record<string, string> = { expected: "Chờ đến", arrived: "Đã đến", cancelled: "Đã hủy" };
 export const PO_CATEGORY_LABEL: Record<string, string> = { straw: "Rơm (HTX)", other: "Hàng khác" };
 export const ORDERS_PARAM_LABEL: Record<string, string> = {
   "orders.receipt.po_variance_warn_pct": "Ngưỡng lệch phiếu nhận ↔ đơn mua (%)",

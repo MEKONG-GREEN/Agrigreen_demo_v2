@@ -369,3 +369,11 @@ export type AcctbridgePushAttempt = S["AcctbridgePushAttempt"];
 export type AcctbridgePushJob = S["AcctbridgePushJob"];
 export type AcctbridgeJournalDetail = Get<"/v1/acctbridge/journals/{id}">;
 export type AcctbridgeMappings = Get<"/v1/acctbridge/mappings">;
+
+// G4 — danh sách có con trỏ, tệp chứng từ, thông báo hàng đến
+export type MkgFile = S["MkgFile"];
+export type MkgFilePurpose = MkgFile["purpose"];
+export type HubArrival = S["HubArrival"];
+export type LogisticsTripDocument = S["LogisticsTripDocument"];
+export type LogisticsVesselVersion = S["LogisticsVesselVersion"];
+export type CostingCarbonRevenue = S["CostingCarbonRevenue"];

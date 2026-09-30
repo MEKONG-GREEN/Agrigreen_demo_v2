@@ -10,6 +10,7 @@ package orders
 
 import (
 	"context"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -35,11 +37,13 @@ func New(db tenant.Beginner, clk clock.Clock) *Module { return NewWith(db, clk, 
 type Options struct {
 	// Stock: tồn hub theo dạng hàng (hub/port.Stock) — cảnh báo thiếu tồn đơn bán (O-05). Nil → không kiểm.
 	Stock hubport.Stock
+	// Files (G4): kho đối tượng trong lãnh thổ (shared/objstore) cho tệp chứng từ — POST /v1/orders/files.
+	Files objstore.Store
 }
 
 // NewWith tạo module với phụ thuộc tùy chọn.
 func NewWith(db tenant.Beginner, clk clock.Clock, o Options) *Module {
-	return &Module{svc: &app.Service{DB: db, Clock: clk, Stock: o.Stock}}
+	return &Module{svc: &app.Service{DB: db, Clock: clk, Stock: o.Stock, Files: o.Files}}
 }
 
 // RegisterApp gắn route (API nội bộ MKG, bề mặt ứng dụng).

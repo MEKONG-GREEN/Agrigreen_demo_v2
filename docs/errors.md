@@ -401,6 +401,8 @@ Nhập hàng loạt: lý do theo dòng dùng nhãn "Thiếu Email", "Sai định
 | 422 | `hub.transfer_wrong_facility` | G3: nhận ở cơ sở không phải đích của phiếu chuyển |
 | 422 | `hub.transfer_ticket_invalid` | G3: phiếu cân không phải phiếu HUB_IN (đến) của một lô nguồn thuộc phiếu chuyển, hoặc lặp |
 
+Thông báo hàng đến (G4, proto FM-05, `GET /v1/hub/arrivals`): `status` khác `expected | arrived | cancelled` hoặc `facility_id` / `cursor` không phải UUID → 422 `validation_failed`. Mốc chuyến tới lệch thứ tự hay lặp (consumer `mkg.hub.trip_milestone`) không phải lỗi: trạng thái chỉ tiến `expected → arrived`, `cancelled` chỉ từ `expected`, mốc cũ bị bỏ qua.
+
 ### mkg/measurement (API nội bộ MKG — `cmd/api-internal`, `contracts/openapi/mkg-internal.yaml`)
 
 | HTTP | code | Khi nào |
@@ -510,6 +512,8 @@ Cảnh báo không chặn (mảng `warnings` của kết quả ghi, không phả
 | 404 | `logistics.vessel_not_found` | Không có phương tiện trong danh mục của tenant |
 | 404 | `logistics.param_not_found` | Khóa tham số lạ hoặc không có phiên bản cần quyết định |
 | 404 | `logistics.route_snapshot_not_found` | Chặng không có ảnh chụp định tuyến (km nhập tay) hoặc không thuộc kế hoạch hiệu lực |
+| 404 | `logistics.file_not_found` | G4 (L-11): `file_ref` không phải tệp đã tải qua `POST /v1/logistics/files` trong tenant; tải nội dung tệp không có ở kho |
+| 404 | `logistics.trip_document_not_found` | Bản bù chứng từ chuyến có `supersedes_id` không phải chứng từ của chuyến này |
 | 409 | `logistics.trip_transition` | Chuyển trạng thái bị cấm — chỉ tiến `planned → departed → arrived → completed`, hủy từ `planned`/`departed`; mốc tài xế đi từng bậc. DB chặn lần hai (trigger `trip_forward_only` trên `trip_current`) |
 | 409 | `logistics.trip_closed` | Thao tác trên chuyến đã hoàn tất / đã hủy (gán phương tiện, lập chặng, mốc) |
 | 409 | `logistics.vessel_code_taken` | Số hiệu (đã chuẩn hóa: bỏ khoảng trắng, chữ hoa) đã có trong danh mục (proto GH-01) |
@@ -518,6 +522,12 @@ Cảnh báo không chặn (mảng `warnings` của kết quả ghi, không phả
 | 422 | `validation_failed` | Dữ liệu vào sai (phương thức, tọa độ, kg, lý do < 10 ký tự, `event_time` ở tương lai, loại đơn giá không có đơn giá, mốc chuyến chỉ có một trong `lat`/`lng`, `accuracy_m` âm hoặc không kèm tọa độ, `assigned_to_me` ≠ true/false, `updated_since` không phải RFC 3339…), xem `errors[]` |
 | 422 | `logistics.manual_km_reason_required` | `manual_km` không kèm `manual_reason` (10–500 ký tự) |
 | 422 | `logistics.correction_reason_required` | Hoàn tất lại chuyến đã `completed` (bản bù) mà thiếu `correction_reason` |
+| 413 | `logistics.file_too_large` | Tệp chứng từ chuyến > 15 MB |
+| 415 | `logistics.file_type` | Tệp không phải PDF / JPEG / PNG / WebP (nhận diện theo nội dung, không theo Content-Type client khai) |
+| 422 | `logistics.file_checksum` | `sha256` khai báo khác SHA-256 nội dung tệp |
+| 503 | `logistics.file_store_unavailable` | Chưa cấu hình kho đối tượng trong lãnh thổ (`AG_S3_*` / `AG_OBJSTORE_DIR`) — tải / đọc tệp chứng từ không được |
+
+Chứng từ chuyến (G4, L-11, `POST /v1/logistics/trips/{id}/documents`): người chỉ có vai `driver` ghi cho chuyến không giao cho mình → 403 `logistics.not_assigned_driver`; chuyến đã hủy → 409 `logistics.trip_closed`; `kind`/`signer_role` lạ, `signed_at` ở tương lai, bản bù thiếu `correction_reason` → 422 `validation_failed`.
 
 Định tuyến **không bao giờ** là lỗi của API: nền tảng lỗi, thiếu cấp quyền `waterway_routes` (403 của `/v1/partner/waterway/route`) hoặc mạng không có đường → chặng dự phòng Haversine × #10 (nhãn `haversine`). Cảnh báo không chặn (mảng `warnings` / `flags`): `no_vehicle`, `no_route`, `vessel_unregistered`, `vessel_inactive`, `registration_expired`, `registration_expiring` (GH-02), `payload_exceeded` (FM-05, > 1,1 × tải), `weigh_variance` (lệch cân > 5 %), `routing_unavailable`, `no_waterway_route`, `waterway_suggested` (decideMode), `rolls_corrected`.
 
@@ -536,6 +546,7 @@ Thông báo cảnh báo L-08 (job `logistics_alerts`, `GET /v1/logistics/alert-n
 | 404 | `orders.sales_order_not_found` | Không có đơn bán |
 | 404 | `orders.delivery_not_found` | Không có giao nhận |
 | 404 | `orders.param_not_found` | Khóa tham số lạ hoặc không có phiên bản cần quyết định |
+| 404 | `orders.file_not_found` | G4: không có tệp chứng từ (`GET /v1/orders/files/{id}`, nội dung không có ở kho) |
 | 409 | `orders.contract_overlap` | proto CT-01: HTX đã có hợp đồng hiệu lực chồng thời gian (khi lập, và kiểm lại khi duyệt) — chấm dứt hợp đồng cũ trước |
 | 409 | `orders.contract_transition` | Sửa hợp đồng không hiệu lực / đang có phiên bản chờ duyệt; duyệt phiên bản không `pending`; chấm dứt hợp đồng không có phiên bản hiệu lực |
 | 409 | `orders.po_transition` | Duyệt đơn mua không ở `draft`; hủy đơn đã hủy / bị từ chối hoặc đã có phiếu nhận hiệu lực |
@@ -550,6 +561,11 @@ Thông báo cảnh báo L-08 (job `logistics_alerts`, `GET /v1/logistics/alert-n
 | 422 | `orders.basis_mismatch` | Đơn vị đơn mua rơm khác cách tính của hợp đồng hiệu lực (per_tonne ↔ kg, per_bale ↔ bale) |
 | 422 | `orders.price_required` | Đơn mua rơm không có hợp đồng hiệu lực tại ngày dự kiến nhận và không nhập đơn giá — hệ thống không đoán giá |
 | 422 | `orders.ticket_unknown` | Bù giao nhận với `customer_in_ticket_ref` chưa nhận từ measurement, hoặc không phải CUSTOMER_IN của cùng lô |
+| 413 | `orders.file_too_large` | G4: tệp chứng từ > 15 MB |
+| 415 | `orders.file_type` | Tệp không phải PDF / JPEG / PNG / WebP (nhận diện theo nội dung) |
+| 422 | `orders.file_checksum` | `sha256` khai báo khác SHA-256 nội dung tệp |
+| 422 | `orders.file_purpose` | `file_ref` đã tải cho mục đích khác (biên bản chênh lệch phiếu nhận ↔ chứng từ giao nhận). `file_ref` chưa đăng ký (tệp ở hệ thống khác, bản ghi trước G4) vẫn được nhận — tương thích ngược |
+| 503 | `orders.file_store_unavailable` | Chưa cấu hình kho đối tượng trong lãnh thổ (`AG_S3_*` / `AG_OBJSTORE_DIR`) cho tệp chứng từ |
 
 Cảnh báo không chặn (trường của phiếu nhận, không phải lỗi): `needs_variance_report = true` + `audit_note` khi |nhận − đặt| / đặt × 100 > `orders.receipt.po_variance_warn_pct` (mặc định 3, tạm chờ khách — proto `RECEIPT_VARIANCE_TOLERANCE_PCT`); duyệt vẫn được, biên bản chênh lệch ghi qua `POST /v1/orders/receipts/{id}/variance-report`. Phiếu cân HUB_IN bị bù SAU KHI phiếu nhận đã duyệt → bản bù phiếu nhận (`corrected`, vẫn `approved`) + bản bù khoản phải trả đơn mua khác (`supersedes_id`, RB-1) — không phải lỗi.
 
@@ -583,6 +599,8 @@ Cảnh báo không chặn của đơn bán (mảng `warnings` + `stock_check`, O
 | 422 | `costing.carbon_split_invalid` | Tỷ lệ chia carbon đang áp dụng (nông hộ + cơ quan + VVB) không bằng 100 |
 | 422 | `validation_failed` | Dữ liệu vào sai (tiền không phải chuỗi ≤ 2 chữ số, khối lượng ≤ 3 chữ số, mã kỳ không phải YYYY-MM, nhóm chi phí không ghi tay được, lý do < 10 ký tự, giá ≤ 0, tham số ngoài miền — vd ẩm độ chỉ `none` tới khi có công thức C-4) |
 | 503 | `costing.contracts_unavailable` | Chưa đọc được hợp đồng mua rơm (`orders/port.Contracts` chưa nối hoặc lỗi) — lập quyết toán không đoán giá |
+Danh sách G4 (`GET /v1/costing/lots`, `/v1/costing/carbon-revenue`, `/v1/costing/period-close-jobs`): `cursor`, `period_ref`, `period_id` không phải UUID hoặc `status` lạ → 422 `validation_failed`.
+
 ### mkg/acctbridge (API nội bộ MKG — `cmd/api-internal`, `contracts/openapi/mkg-internal.yaml`)
 
 | HTTP | code | Khi nào |

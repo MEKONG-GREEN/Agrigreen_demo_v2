@@ -6,16 +6,18 @@
 // 403 mfa_required, route của bề mặt quản trị gọi nhầm bề mặt ứng dụng → 404 (như gin).
 // ============================================================================
 import { acctbridgeAdminRoutes, acctbridgeRoutes } from "./acctbridge";
+import { arrivalRoutes } from "./arrivals";
 import { costingAdminRoutes, costingRoutes } from "./costing";
 import { fieldopsRoutes } from "./fieldops";
 import { hubAdminRoutes, hubAppRoutes } from "./hub";
-import { problem, type Route } from "./http";
+import { sha256Hex } from "@/lib/sha256";
+import { problem, type MultipartFile, type Route } from "./http";
 import { logisticsAdminRoutes, logisticsRoutes } from "./logistics";
 import { measurementAdminRoutes, measurementAppRoutes } from "./measurement";
 import { ordersAdminRoutes, ordersRoutes } from "./orders";
 import { personaFromAuthHeader, type MockPersona } from "./personas";
 
-const appRoutes: Route[] = [...hubAppRoutes, ...measurementAppRoutes, ...fieldopsRoutes, ...logisticsRoutes, ...ordersRoutes, ...costingRoutes, ...acctbridgeRoutes];
+const appRoutes: Route[] = [...hubAppRoutes, ...arrivalRoutes, ...measurementAppRoutes, ...fieldopsRoutes, ...logisticsRoutes, ...ordersRoutes, ...costingRoutes, ...acctbridgeRoutes];
 const adminRoutes: Route[] = [...hubAdminRoutes, ...measurementAdminRoutes, ...logisticsAdminRoutes, ...ordersAdminRoutes, ...costingAdminRoutes, ...acctbridgeAdminRoutes];
 
 function sleep(ms: number) {
@@ -50,12 +52,35 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
 
     const key = request.headers.get("Idempotency-Key");
     if (!key) return problem(400, "idempotency_key_required", "Idempotency-Key required");
-    const text = await request.text();
+    let text: string;
     let body: Record<string, unknown> = {};
-    try {
-      body = text ? (JSON.parse(text) as Record<string, unknown>) : {};
-    } catch {
-      return problem(400, "bad_request", "Invalid JSON");
+    if ((request.headers.get("Content-Type") ?? "").toLowerCase().startsWith("multipart/form-data")) {
+      // Tải tệp: phần tệp → {name, type, bytes}; dấu vân tay idempotency theo băm nội dung thay cho thân thô.
+      let form: FormData;
+      try {
+        form = await request.formData();
+      } catch {
+        return problem(400, "bad_request", "Invalid multipart body");
+      }
+      const parts: string[] = [];
+      for (const [k, v] of form.entries()) {
+        if (typeof v === "string") {
+          body[k] = v;
+          parts.push(`${k}=${v}`);
+        } else {
+          const bytes = new Uint8Array(await v.arrayBuffer());
+          body[k] = { name: v.name, type: v.type, bytes } satisfies MultipartFile;
+          parts.push(`${k}=${v.name}:${bytes.length}:${sha256Hex(bytes)}`);
+        }
+      }
+      text = parts.join("&");
+    } else {
+      text = await request.text();
+      try {
+        body = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+      } catch {
+        return problem(400, "bad_request", "Invalid JSON");
+      }
     }
     const fingerprint = `${opts.surface}|${persona.id}|${url.pathname}${url.search}|${text}`;
     const prev = replay.get(key);

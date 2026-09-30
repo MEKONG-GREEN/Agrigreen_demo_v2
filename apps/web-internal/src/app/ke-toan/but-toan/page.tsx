@@ -9,11 +9,12 @@ import { hasRole, ROLES } from "@/auth/principal";
 import { KV, Money, SoD, useJobPoll, When } from "@/components/g4kit";
 import { ActionStatus, Chip, Ref, Section, SelectField, SelfHint, useAction } from "@/components/kit";
 import { ProblemAlert } from "@/components/ProblemAlert";
-import { Empty, Loading, PageHead } from "@/components/ui";
+import { Empty, LoadMore, Loading, PageHead } from "@/components/ui";
 import { AB_FAILURE_LABEL, AB_JOB_STATUS_LABEL, COST_CATEGORY_LABEL, JOURNAL_STATUS_LABEL, PUSH_OUTCOME_LABEL, SIDE_LABEL } from "@/lib/g4labels";
 import { journalTotals, shortHash } from "@/lib/money";
 import { sha256Text } from "@/lib/sha256";
 import { useAsync } from "@/lib/useAsync";
+import { LIST_PAGE_SIZE, usePaged } from "@/lib/usePaged";
 
 function JobWatch({ job, onDone }: { job: AcctbridgeJob; onDone: () => void }) {
   const { api } = useAuth();
@@ -225,6 +226,21 @@ export default function JournalsPage() {
   const list = useAsync(async () => (await unwrap(api.GET("/v1/acctbridge/journals", { params: { query: { limit: 200, ...(status ? { status: status as "built" } : {}) } } }))).items ?? [], [api, status]);
   const [sel, setSel] = useState("");
   const items: AcctbridgeJournal[] = list.data ?? [];
+  const [jobKind, setJobKind] = useState("");
+  const [jobStatus, setJobStatus] = useState("");
+  const jobs = usePaged(
+    (cursor) =>
+      unwrap(
+        api.GET("/v1/acctbridge/jobs", {
+          params: { query: { limit: LIST_PAGE_SIZE, ...(jobKind ? { kind: jobKind as "build" } : {}), ...(jobStatus ? { status: jobStatus as "queued" } : {}), ...(cursor ? { cursor } : {}) } },
+        }),
+      ),
+    [api, jobKind, jobStatus],
+  );
+  const changed = () => {
+    list.reload();
+    jobs.reload();
+  };
   return (
     <div className="stack">
       <PageHead
@@ -283,9 +299,65 @@ export default function JournalsPage() {
       </Section>
       {sel ? (
         <Section title="Chi tiết bút toán">
-          <JournalPanel key={sel} id={sel} onChanged={list.reload} />
+          <JournalPanel key={sel} id={sel} onChanged={changed} />
         </Section>
       ) : null}
+      <Section title="Danh sách job dựng / đẩy">
+        <div className="stack">
+          <div className="grid2">
+            <SelectField label="Loại job" value={jobKind} onChange={setJobKind} options={[{ value: "", label: "Tất cả" }, { value: "build", label: "Dựng bút toán" }, { value: "push", label: "Đẩy sang kế toán" }]} />
+            <SelectField label="Trạng thái job" value={jobStatus} onChange={setJobStatus} options={[{ value: "", label: "Tất cả" }, ...Object.entries(AB_JOB_STATUS_LABEL).map(([value, label]) => ({ value, label }))]} />
+          </div>
+          {jobs.loading ? <Loading /> : null}
+          {jobs.error ? <ProblemAlert problem={jobs.error} onRetry={jobs.reload} /> : null}
+          {jobs.items && !jobs.items.length ? <Empty>Không có job.</Empty> : null}
+          {jobs.items?.length ? (
+            <div className="tbl-wrap">
+              <table className="tbl" aria-label="Job cầu nối kế toán đã chạy">
+                <thead>
+                  <tr>
+                    <th>Kỳ</th>
+                    <th>Loại</th>
+                    <th>Trạng thái</th>
+                    <th>Lỗi</th>
+                    <th>Ánh xạ</th>
+                    <th>Yêu cầu</th>
+                    <th>Xong lúc</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {jobs.items.map((j) => (
+                    <tr key={j.job_id}>
+                      <td className="mono">{j.period_code}</td>
+                      <td>{j.kind === "push" ? `Đẩy lần ${j.attempt ?? ""}` : "Dựng bút toán"}</td>
+                      <td>
+                        <Chip status={j.status} label={AB_JOB_STATUS_LABEL[j.status ?? ""]} />
+                      </td>
+                      <td className="small">{j.failure_code ? (AB_FAILURE_LABEL[j.failure_code] ?? j.failure_code) : "—"}</td>
+                      <td>{j.mapping_version ? `v${j.mapping_version}` : "—"}</td>
+                      <td className="small">
+                        <Ref id={j.requested_by} /> · <When at={j.requested_at} />
+                      </td>
+                      <td>
+                        <When at={j.completed_at} />
+                      </td>
+                      <td>
+                        {j.journal_id ? (
+                          <button type="button" className="btn btn-o btn-sm" onClick={() => setSel(j.journal_id!)} aria-label={`Mở bút toán của job ${j.job_id}`}>
+                            Bút toán
+                          </button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+          <LoadMore hasMore={jobs.hasMore} loading={jobs.loadingMore} onClick={jobs.loadMore} />
+        </div>
+      </Section>
     </div>
   );
 }

@@ -160,8 +160,14 @@ func WeighedFromMeasurement(l mport.LotMass) port.WeighedMass { return adapter.L
 // RegisterApp gắn route (API nội bộ MKG, bề mặt ứng dụng).
 func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterApp(rg) }
 
-// RegisterAdmin: fieldops không có route quản trị ở G3.
-func (m *Module) RegisterAdmin(*gin.RouterGroup) {}
+// RegisterAdmin gắn route quản trị (MFA): POST /v1/fieldops/projections/rebuild (G4, R-22).
+func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }
+
+// RebuildTenant dựng lại bảng chiếu của tenant từ sổ, tenant tường minh, không kiểm vai — CHỈ cho công cụ diễn
+// tập R-22 chạy trên bản sao database (cmd/rebuilddrill). Trả số dòng mỗi bảng chiếu đã dựng.
+func (m *Module) RebuildTenant(ctx context.Context, tid uuid.UUID) (map[string]int64, error) {
+	return m.svc.RebuildTenant(ctx, tid)
+}
 
 // KgPerRoll cho measurement đọc ước lượng kg/cuộn có mốc thời điểm (G3-2, tenant tường minh).
 func (m *Module) KgPerRoll() port.KgPerRollEstimates { return m.svc }

@@ -6,13 +6,14 @@ import type { CostingCloseJob } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { hasRole, ROLES } from "@/auth/principal";
 import { KV, Money, useJobPoll, When } from "@/components/g4kit";
-import { ActionStatus, Chip, Ref, Section, TextField, useAction } from "@/components/kit";
+import { ActionStatus, Chip, Ref, Section, SelectField, TextField, useAction } from "@/components/kit";
 import { ProblemAlert } from "@/components/ProblemAlert";
-import { Empty, Loading, PageHead } from "@/components/ui";
+import { Empty, LoadMore, Loading, PageHead } from "@/components/ui";
 import { CLOSE_JOB_STATUS_LABEL, COST_CATEGORY_LABEL, DIMENSION_LABEL, PERIOD_STATUS_LABEL } from "@/lib/g4labels";
 import { formatKg } from "@/lib/kg";
 import { addMoney } from "@/lib/money";
 import { useAsync } from "@/lib/useAsync";
+import { LIST_PAGE_SIZE, usePaged } from "@/lib/usePaged";
 
 function JobProgress({ job, onDone }: { job: CostingCloseJob; onDone: () => void }) {
   const { api } = useAuth();
@@ -131,7 +132,15 @@ export default function PeriodsPage() {
   const [job, setJob] = useState<CostingCloseJob | null>(null);
   const act = useAction();
   const closer = hasRole(principal, ROLES.periodCloser);
-  const refresh = () => list.reload();
+  const [jobStatus, setJobStatus] = useState("");
+  const jobs = usePaged(
+    (cursor) => unwrap(api.GET("/v1/costing/period-close-jobs", { params: { query: { limit: LIST_PAGE_SIZE, ...(jobStatus ? { status: jobStatus as "queued" } : {}), ...(cursor ? { cursor } : {}) } } })),
+    [api, jobStatus],
+  );
+  const refresh = () => {
+    list.reload();
+    jobs.reload();
+  };
   return (
     <div className="stack">
       <PageHead
@@ -210,6 +219,65 @@ export default function PeriodsPage() {
               </button>
             </div>
           ) : null}
+        </div>
+      </Section>
+      <Section title="Danh sách job đóng kỳ">
+        <div className="stack">
+          <SelectField label="Lọc trạng thái job" value={jobStatus} onChange={setJobStatus} options={[{ value: "", label: "Tất cả" }, ...Object.entries(CLOSE_JOB_STATUS_LABEL).map(([value, label]) => ({ value, label }))]} />
+          {jobs.loading ? <Loading /> : null}
+          {jobs.error ? <ProblemAlert problem={jobs.error} onRetry={jobs.reload} /> : null}
+          {jobs.items && !jobs.items.length ? <Empty>Chưa có job đóng kỳ.</Empty> : null}
+          {jobs.items?.length ? (
+            <div className="tbl-wrap">
+              <table className="tbl" aria-label="Job đóng kỳ đã chạy">
+                <thead>
+                  <tr>
+                    <th>Kỳ</th>
+                    <th>Trạng thái</th>
+                    <th>Yêu cầu</th>
+                    <th>Xong lúc</th>
+                    <th>Ảnh chụp đầu vào</th>
+                    <th className="num">Bút toán chụp</th>
+                    <th>Lỗi</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {jobs.items.map((j) => (
+                    <tr key={j.job_id}>
+                      <td className="mono">{j.period_code}</td>
+                      <td>
+                        <Chip status={j.status} label={CLOSE_JOB_STATUS_LABEL[j.status ?? ""]} />
+                      </td>
+                      <td className="small">
+                        <Ref id={j.requested_by} /> · <When at={j.requested_at} />
+                      </td>
+                      <td>
+                        <When at={j.completed_at} />
+                      </td>
+                      <td className="mono small" title={j.input_snapshot_sha256}>
+                        {(j.input_snapshot_sha256 ?? "").slice(0, 12)}…
+                      </td>
+                      <td className="num">{j.snapshot_counts?.entries ?? 0}</td>
+                      <td className="small">{j.error_code ?? "—"}</td>
+                      <td>
+                        {j.status === "queued" ? (
+                          <button type="button" className="btn btn-o btn-sm" onClick={() => setJob(j)} aria-label={`Theo dõi job ${j.period_code}`}>
+                            Theo dõi
+                          </button>
+                        ) : j.period_id ? (
+                          <button type="button" className="btn btn-o btn-sm" onClick={() => setSel(j.period_id!)} aria-label={`Xem kỳ của job ${j.period_code}`}>
+                            Xem kỳ
+                          </button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+          <LoadMore hasMore={jobs.hasMore} loading={jobs.loadingMore} onClick={jobs.loadMore} />
         </div>
       </Section>
       {sel ? (

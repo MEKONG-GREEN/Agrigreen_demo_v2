@@ -8,7 +8,7 @@ import { sha256Text } from "@/lib/sha256";
 import { newId, sid } from "./db";
 import { CO, markPosted, onPeriodClosed, periodById } from "./costing";
 import { reasonOf, todayVn } from "./g4common";
-import { created, daysAgo, forbidden, hasRole, json, nowIso, problem, route, selfApproval, str, traceId, validation, type Route } from "./http";
+import { created, daysAgo, forbidden, hasRole, json, nowIso, pageSlice, problem, route, selfApproval, str, traceId, validation, type Route } from "./http";
 import { ACTORS } from "./personas";
 
 const OPERATOR = "accounting_bridge_operator";
@@ -183,11 +183,17 @@ function runPush(job: (typeof jobs)[number]): void {
   attempts[j.journal_id!]!.push(a);
 }
 
+/** Job dựng đã chạy khi kỳ đóng (hạt giống cho danh sách job). */
+function seedBuildJob(j: AcctbridgeJournal, at: string): void {
+  jobs.push({ job_id: newId(0x36), kind: "build", status: "done", period_id: j.period_id!, period_code: j.period_code!, close_run_id: j.close_run_id!, expected_source_hash: j.source_hash!, mapping_version: j.mapping_version ?? null, journal_id: j.journal_id!, attempt: null, failure_code: null, requested_by: j.built_by!, requested_at: at, completed_at: at, polls: 2 });
+}
+
 // Hạt giống: kỳ M2 đã đẩy (posted), kỳ M3 đẩy bị đích từ chối (DLQ, cần đẩy lại).
 {
   const p2 = periodById(CO.periodPrev2)!;
   const j2 = build(p2, ACTORS.keToanTruong, null) as AcctbridgeJournal;
   j2.journal_id = AB.journalPushed;
+  seedBuildJob(j2, daysAgo(32));
   attempts[AB.journalPushed] = [];
   j2.approved_by = ACTORS.keToan;
   j2.approved_at = daysAgo(30);
@@ -195,6 +201,7 @@ function runPush(job: (typeof jobs)[number]): void {
   const p3 = periodById(CO.periodPrev3)!;
   const j3 = build(p3, ACTORS.keToanTruong, null) as AcctbridgeJournal;
   j3.journal_id = AB.journalFailed;
+  seedBuildJob(j3, daysAgo(62));
   attempts[AB.journalFailed] = [];
   j3.approved_by = ACTORS.keToan;
   j3.approved_at = daysAgo(60);
@@ -279,6 +286,21 @@ export const acctbridgeRoutes: Route[] = [
     const job = { job_id: newId(0x36), kind: "build" as const, status: "queued" as const, period_id: per.id!, period_code: per.code!, close_run_id: per.close_run_id, expected_source_hash: per.summary?.result_set_sha256 ?? "", mapping_version: m?.version ?? null, journal_id: null, attempt: null, failure_code: null, requested_by: persona.actor, requested_at: nowIso(), completed_at: null, polls: 0 };
     jobs.push(job);
     return json({ job: stripJob(job) }, 202);
+  }),
+  route("GET", "/v1/acctbridge/jobs", ({ url, persona }) => {
+    if (!hasRole(persona, ...READ)) return forbidden();
+    const kind = url.searchParams.get("kind");
+    const st = url.searchParams.get("status");
+    const per = url.searchParams.get("period_id");
+    if (kind && kind !== "build" && kind !== "push") return validation([{ field: "kind", reason: "build | push" }]);
+    if (st && !["queued", "done", "failed"].includes(st)) return validation([{ field: "status", reason: "queued | done | failed" }]);
+    // Mới nhất trước; cùng thời điểm (hạt giống) → job ghi sau trước.
+    const list = jobs
+      .map((j, i) => ({ j, i }))
+      .filter(({ j }) => (!kind || j.kind === kind) && (!st || j.status === st) && (!per || j.period_id === per))
+      .sort((a, b) => b.j.requested_at!.localeCompare(a.j.requested_at!) || b.i - a.i)
+      .map(({ j }) => stripJob(j));
+    return json(pageSlice(list, url));
   }),
   route("GET", "/v1/acctbridge/jobs/:id", ({ params: p, persona }) => {
     if (!hasRole(persona, ...READ)) return forbidden();

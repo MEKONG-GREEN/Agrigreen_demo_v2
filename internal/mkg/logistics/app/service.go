@@ -22,6 +22,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -61,6 +62,8 @@ type Service struct {
 	Road port.RoadRoutes
 	// Metrics: bộ đo job cảnh báo L-08 (nil → noop).
 	Metrics *Metrics
+	// Files (G4, L-11): kho đối tượng trong lãnh thổ cho tệp chứng từ chuyến. Nil → tải tệp 503.
+	Files objstore.Store
 }
 
 var _ port.Trips = (*Service)(nil)

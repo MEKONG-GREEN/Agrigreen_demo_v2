@@ -89,6 +89,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/hub/arrivals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Thông báo hàng đến mang mã chuyến (proto FM-05 — cho_den = expected → da_den = arrived; cancelled khi chuyến hủy)
+         * @description Vai hub_operator / hub_approver. Ghi bởi consumer mkg.hub.trip_milestone khi mkg/logistics phát
+         *     mkg.logistics.trip.milestone_recorded v1 cho chuyến có chặng cuối tới cơ sở (xuất phát / đổi đích → expected;
+         *     đến / hoàn tất bằng phiếu cân → arrived; hủy → cancelled). Mới nhất trước, con trỏ = trip_id cuối trang.
+         */
+        get: operations["listHubArrivals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/hub/facilities/{id}": {
         parameters: {
             query?: never;
@@ -1374,6 +1396,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/fieldops/projections/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * [Quản trị] Dựng lại bảng chiếu fieldops từ sổ (R-22, G4)
+         * @description Vai field_supervisor. Dựng lại collection_order_current (giữ sync_seq cũ — con trỏ pull của app không lùi),
+         *     roll_total_current, buyside_reconciliation_current, crew_current, crew_assignment_current, param_current.
+         *     weighed_loading_current và order_plot_harvest_current là bảng đệm nguồn ngoài — không dựng lại.
+         */
+        post: operations["rebuildFieldopsProjections"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/fieldops/crews": {
         parameters: {
             query?: never;
@@ -1823,10 +1867,98 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Lịch sử phiên bản danh mục của phương tiện (proto GH-01), version tăng dần
+         * @description Vai dispatcher. Con trỏ = version cuối trang.
+         */
+        get: operations["listLogisticsVesselVersions"];
         put?: never;
         /** Phiên bản mới của phương tiện (lý do, theo expected_version) */
         post: operations["reviseLogisticsVessel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tải tệp chứng từ chuyến (ePOD / e-bill / biên bản) lên kho đối tượng trong lãnh thổ → file_ref (L-11)
+         * @description Vai dispatcher / driver. multipart: `file` (≤ 15 MB; PDF, JPEG, PNG, WebP nhận diện theo nội dung) và `sha256`
+         *     (hex của nội dung — không khớp → 422 logistics.file_checksum). Ghi một lần, khóa theo băm nội dung; gọi lặp cùng
+         *     Idempotency-Key → 200 bản cũ. Chưa cấu hình kho → 503 logistics.file_store_unavailable.
+         */
+        post: operations["uploadLogisticsFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/files/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Siêu dữ liệu tệp chứng từ chuyến */
+        get: operations["getLogisticsFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/files/{id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Tải nội dung tệp (qua API có kiểm vai; header X-Content-SHA256) */
+        get: operations["getLogisticsFileContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/logistics/trips/{id}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["TripID"];
+            };
+            cookie?: never;
+        };
+        /** Chứng từ chuyến có người ký (ePOD / e-bill / biên bản — L-11) */
+        get: operations["listLogisticsTripDocuments"];
+        put?: never;
+        /**
+         * Ghi chứng từ chuyến có người ký + thời điểm ký (tệp tải trước qua POST /v1/logistics/files)
+         * @description Vai dispatcher hoặc tài xế được giao (403 logistics.not_assigned_driver). Người ký là *_ref (không tên — RB-3),
+         *     băm tệp chép vào sổ. Sửa sai = bản bù `supersedes_id` + `correction_reason` (RB-1). Chuyến đã hủy → 409.
+         */
+        post: operations["recordLogisticsTripDocument"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2171,6 +2303,67 @@ export interface paths {
         };
         /** Phiếu nhận hàng (kiểm ↔ đơn mua, khoản phải trả nếu có) */
         get: operations["getOrdersReceipt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tải tệp chứng từ (biên bản chênh lệch của phiếu nhận, ePOD / biên bản / e-bill của giao nhận) → file_ref
+         * @description Vai sales_officer / sales_approver. multipart: `file` (≤ 15 MB; PDF, JPEG, PNG, WebP nhận diện theo nội dung),
+         *     `sha256` (hex nội dung, bắt buộc), `purpose` = receipt_variance_report | delivery_evidence. Kho đối tượng trong
+         *     lãnh thổ, ghi một lần, khóa theo băm; gọi lặp cùng Idempotency-Key → 200 bản cũ. file_ref đã tải phải đúng mục đích
+         *     khi gắn vào phiếu nhận / giao nhận (422 orders.file_purpose); file_ref chưa đăng ký vẫn được nhận (tương thích ngược).
+         */
+        post: operations["uploadOrdersFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/files/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Siêu dữ liệu tệp chứng từ */
+        get: operations["getOrdersFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/orders/files/{id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Tải nội dung tệp (qua API có kiểm vai; header X-Content-SHA256) */
+        get: operations["getOrdersFileContent"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2536,6 +2729,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/costing/lots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lô có giá thành (mới nhất trước) — tổng hợp như GET /v1/costing/lots/{id}/cost */
+        get: operations["listCostingLots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/costing/lots/{id}/cost": {
         parameters: {
             query?: never;
@@ -2763,6 +2973,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/costing/period-close-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Job đóng kỳ (mới nhất trước) */
+        get: operations["listCostingCloseJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/costing/period-close-jobs/{id}": {
         parameters: {
             query?: never;
@@ -2930,7 +3157,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Doanh thu carbon đã ghi và phần chia (mới nhất trước) */
+        get: operations["listCarbonRevenue"];
         put?: never;
         /**
          * Ghi doanh thu carbon và chia 45 % giữ lại / 70-15-15 (tham số có phiên bản — tạm, chờ khách)
@@ -3128,6 +3356,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/acctbridge/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Job dựng / đẩy bút toán (mới nhất trước) */
+        get: operations["listAcctbridgeJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/acctbridge/jobs/{id}": {
         parameters: {
             query?: never;
@@ -3209,6 +3454,143 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description Siêu dữ liệu tệp chứng từ vùng mkg (nội dung ở kho đối tượng trong lãnh thổ, ghi một lần; không URL có chữ ký) */
+        MkgFile: {
+            /**
+             * Format: uuid
+             * @description file_ref
+             */
+            id: string;
+            /** @enum {string} */
+            purpose: "receipt_variance_report" | "delivery_evidence" | "trip_document";
+            file_name: string;
+            /** @enum {string} */
+            content_type: "application/pdf" | "image/jpeg" | "image/png" | "image/webp";
+            size: number;
+            sha256: string;
+            /** Format: uuid */
+            uploaded_by: string;
+            rule_version: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        /** @description Thông báo hàng đến của một chuyến (proto FM-05) — status expected = cho_den, arrived = da_den */
+        HubArrival: {
+            /** Format: uuid */
+            trip_id: string;
+            trip_code: string;
+            /** Format: uuid */
+            facility_ref: string;
+            /** @enum {string} */
+            status: "expected" | "arrived" | "cancelled";
+            /** @enum {string} */
+            proto_status: "cho_den" | "da_den" | "huy";
+            /** @enum {string} */
+            mode: "road" | "waterway";
+            vessel_code?: string | null;
+            /** Format: uuid */
+            collection_order_ref?: string | null;
+            lot_refs: string[];
+            planned_kg?: components["schemas"]["Kg"] | null;
+            /** Format: date-time */
+            expected_since?: string | null;
+            /** Format: date-time */
+            arrived_at?: string | null;
+            /** Format: date-time */
+            cancelled_at?: string | null;
+            /** Format: uuid */
+            last_event_id: string;
+        };
+        /** @description Chứng từ chuyến có người ký (L-11) — người ký là *_ref, không tên */
+        LogisticsTripDocument: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            trip_id: string;
+            /** @enum {string} */
+            kind: "epod" | "ebill" | "minutes";
+            /** Format: uuid */
+            file_ref: string;
+            file_sha256: string;
+            /** @enum {string} */
+            signer_role: "driver" | "consignee" | "hub_operator" | "dispatcher";
+            /** Format: uuid */
+            signer_ref?: string | null;
+            /** Format: date-time */
+            signed_at: string;
+            note?: string | null;
+            /** Format: uuid */
+            supersedes_id?: string | null;
+            correction_reason?: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+            rule_version: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        /** @description Một phiên bản danh mục phương tiện (sổ vessel_event) */
+        LogisticsVesselVersion: {
+            /** Format: uuid */
+            event_id: string;
+            /** Format: uuid */
+            vessel_id: string;
+            /** @enum {string} */
+            kind: "created" | "revised";
+            version: number;
+            code: string;
+            /** @enum {string} */
+            vehicle_kind: "ghe" | "sa_lan" | "truck";
+            name?: string | null;
+            /** Format: uuid */
+            owner_ref?: string | null;
+            registered_tons?: string | null;
+            straw_payload_tons?: string | null;
+            /** Format: date */
+            registration_expiry?: string | null;
+            /** @enum {string|null} */
+            rate_type?: "per_ton" | "per_trip" | "per_ton_km" | null;
+            rate_vnd?: string | null;
+            /** @enum {string} */
+            status: "active" | "inactive";
+            reason?: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        /** @description Khoản doanh thu carbon đã ghi + phần chia 45 % / 70-15-15 (tạm, chờ khách) */
+        CostingCarbonRevenue: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            period_ref: string;
+            period_code: string;
+            revenue_amount: components["schemas"]["Money"];
+            retained_amount: components["schemas"]["Money"];
+            farmers_amount: components["schemas"]["Money"];
+            authority_amount: components["schemas"]["Money"];
+            verifier_amount: components["schemas"]["Money"];
+            retained_pct?: string;
+            farmers_pct?: string;
+            authority_pct?: string;
+            verifier_pct?: string;
+            param_pins: {
+                [key: string]: number;
+            };
+            reference?: string | null;
+            /** @example tạm, chờ khách */
+            label: string;
+            rule_version: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at?: string;
+            /** Format: uuid */
+            actor_ref?: string;
+            note?: string;
+        };
         /** @example 1520.500 */
         Kg: string;
         /** @example 14.50 */
@@ -4911,6 +5293,17 @@ export interface components {
                 };
             };
         };
+        /** @description Tệp chứng từ vùng mkg (200 = gọi lặp cùng Idempotency-Key) */
+        MkgFileResult: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    file: components["schemas"]["MkgFile"];
+                };
+            };
+        };
         /** @description Phương tiện */
         LogisticsVesselResult: {
             headers: {
@@ -5114,9 +5507,42 @@ export interface operations {
                 content: {
                     "application/json": {
                         lot_balances?: number;
+                        /** @description arrival_current (G4, thông báo hàng đến) */
+                        arrivals?: number;
                     };
                 };
             };
+        };
+    };
+    listHubArrivals: {
+        parameters: {
+            query?: {
+                facility_id?: string;
+                status?: "expected" | "arrived" | "cancelled";
+                /** @description Con trỏ = next_cursor của trang trước */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thông báo hàng đến */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HubArrival"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     getHubFacility: {
@@ -7524,6 +7950,31 @@ export interface operations {
             400: components["responses"]["Problem"];
         };
     };
+    rebuildFieldopsProjections: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số dòng đã dựng theo bảng chiếu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
     listCrews: {
         parameters: {
             query?: {
@@ -8243,6 +8694,37 @@ export interface operations {
             404: components["responses"]["Problem"];
         };
     };
+    listLogisticsVesselVersions: {
+        parameters: {
+            query?: {
+                /** @description Con trỏ = next_cursor của trang trước */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["LogisticsVesselVersion"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
     reviseLogisticsVessel: {
         parameters: {
             query?: never;
@@ -8262,6 +8744,157 @@ export interface operations {
         responses: {
             200: components["responses"]["LogisticsVesselResult"];
             201: components["responses"]["LogisticsVesselResult"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    uploadLogisticsFile: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    sha256: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["MkgFileResult"];
+            201: components["responses"]["MkgFileResult"];
+            413: components["responses"]["Problem"];
+            415: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    getLogisticsFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["MkgFileResult"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getLogisticsFileContent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nội dung tệp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    listLogisticsTripDocuments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["TripID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chứng từ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["LogisticsTripDocument"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    recordLogisticsTripDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["TripID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    kind: "epod" | "ebill" | "minutes";
+                    /** Format: uuid */
+                    file_ref: string;
+                    /** @enum {string} */
+                    signer_role: "driver" | "consignee" | "hub_operator" | "dispatcher";
+                    /** Format: uuid */
+                    signer_ref?: string | null;
+                    /** Format: date-time */
+                    signed_at: string;
+                    note?: string;
+                    /** Format: uuid */
+                    supersedes_id?: string | null;
+                    correction_reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng khóa (phát lại) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        document: components["schemas"]["LogisticsTripDocument"];
+                    };
+                };
+            };
+            /** @description Chứng từ */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        document: components["schemas"]["LogisticsTripDocument"];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
@@ -8877,6 +9510,74 @@ export interface operations {
                 };
             };
             404: components["responses"]["Problem"];
+        };
+    };
+    uploadOrdersFile: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    sha256: string;
+                    /** @enum {string} */
+                    purpose: "receipt_variance_report" | "delivery_evidence";
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["MkgFileResult"];
+            201: components["responses"]["MkgFileResult"];
+            413: components["responses"]["Problem"];
+            415: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    getOrdersFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["MkgFileResult"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getOrdersFileContent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nội dung tệp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
         };
     };
     fileOrdersVarianceReport: {
@@ -9540,6 +10241,35 @@ export interface operations {
             403: components["responses"]["Problem"];
         };
     };
+    listCostingLots: {
+        parameters: {
+            query?: {
+                /** @description Con trỏ = next_cursor của trang trước */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lô */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CostingLotCost"][];
+                        /** Format: uuid */
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
     getCostingLotCost: {
         parameters: {
             query?: never;
@@ -9909,6 +10639,37 @@ export interface operations {
             409: components["responses"]["Problem"];
         };
     };
+    listCostingCloseJobs: {
+        parameters: {
+            query?: {
+                period_id?: string;
+                status?: "queued" | "completed" | "failed";
+                /** @description Con trỏ = next_cursor của trang trước */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Job */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CostingCloseJob"][];
+                        /** Format: uuid */
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            422: components["responses"]["Problem"];
+        };
+    };
     getCostingCloseJob: {
         parameters: {
             query?: never;
@@ -10167,6 +10928,36 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+        };
+    };
+    listCarbonRevenue: {
+        parameters: {
+            query?: {
+                period_ref?: string;
+                /** @description Con trỏ = next_cursor của trang trước */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Khoản carbon */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CostingCarbonRevenue"][];
+                        /** Format: uuid */
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            422: components["responses"]["Problem"];
         };
     };
     recordCarbonRevenue: {
@@ -10517,6 +11308,38 @@ export interface operations {
             };
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+        };
+    };
+    listAcctbridgeJobs: {
+        parameters: {
+            query?: {
+                kind?: "build" | "push";
+                status?: "queued" | "done" | "failed";
+                period_id?: string;
+                /** @description Con trỏ = next_cursor của trang trước */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Job */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AcctbridgeJob"][];
+                        /** Format: uuid */
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            422: components["responses"]["Problem"];
         };
     };
     getAcctbridgeJob: {

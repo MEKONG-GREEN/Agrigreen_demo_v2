@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events-internal/mkg.logistics.trip.milestone_recorded/v1",
+  "title": "mkg.logistics.trip.milestone_recorded — payload (sự kiện NỘI BỘ MKG)",
+  "description": "Mốc của một chuyến có đích là cơ sở (hub / kho — chặng cuối to_kind = facility): xuất phát, đổi đích khi đang chạy, đến, hoàn tất (phiếu cân), hủy. Người nhận: mkg/hub (hàng đợi mkg.hub.trip_milestone) ghi thông báo hàng đến mang mã chuyến — proto FM-05 cho_den (expected) → da_den (arrived). Chỉ vhost mkg.internal (ADR-0018); KHÔNG có cước, tài xế, giá — chỉ mã chuyến, phương tiện (số hiệu), lô và tấn ước.",
+  "x-event-type": "mkg.logistics.trip.milestone_recorded",
+  "x-schema-version": 1,
+  "x-producer": "mkg/logistics",
+  "x-kind": "internal",
+  "type": "object",
+  "required": [
+    "trip_id",
+    "trip_code",
+    "milestone",
+    "status",
+    "facility_ref",
+    "mode",
+    "lots",
+    "source_event_ref",
+    "event_time"
+  ],
+  "properties": {
+    "trip_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "trip_code": {
+      "type": "string",
+      "pattern": "^CH[0-9]{6,}$"
+    },
+    "milestone": {
+      "type": "string",
+      "enum": [
+        "departed",
+        "rerouted",
+        "arrived",
+        "completed",
+        "cancelled"
+      ],
+      "description": "rerouted = điều phối lập lại chặng khi chuyến đang chạy (đích mới)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "planned",
+        "departed",
+        "arrived",
+        "completed",
+        "cancelled"
+      ]
+    },
+    "facility_ref": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Cơ sở đích (mkg/hub facility) — chặng cuối của phiên bản kế hoạch hiện hành"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "road",
+        "waterway"
+      ]
+    },
+    "vessel_code": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Số hiệu phương tiện chuẩn hóa (proto GH-01), nếu đã gán"
+    },
+    "collection_order_ref": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "lots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "lot_ref",
+          "mass_kg"
+        ],
+        "properties": {
+          "lot_ref": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mass_kg": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]{3}$"
+          }
+        }
+      }
+    },
+    "planned_kg": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9]+\\.[0-9]{3}$"
+    },
+    "source_event_ref": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Dòng trip_event (xuất phát / đến / hoàn tất / hủy) hoặc leg_event (đổi đích) của logistics — khóa idempotent phía hub"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

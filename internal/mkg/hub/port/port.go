@@ -141,6 +141,16 @@ const (
 	RollCountConsumer = "mkg.hub.roll_count"
 	// ReconciliationConsumer: mkg.measurement.reconciliation.completed → quy kết hao hụt theo cơ sở.
 	ReconciliationConsumer = "mkg.hub.reconciliation"
+	// TripMilestoneConsumer (G4): mkg.logistics.trip.milestone_recorded → thông báo hàng đến mang mã chuyến
+	// (proto FM-05: cho_den = expected → da_den = arrived; cancelled khi chuyến bị hủy).
+	TripMilestoneConsumer = "mkg.hub.trip_milestone"
+)
+
+// Trạng thái thông báo hàng đến (mkg_hub.arrival_current, mkg 000021).
+const (
+	ArrivalExpected  = "expected"  // proto cho_den
+	ArrivalArrived   = "arrived"   // proto da_den
+	ArrivalCancelled = "cancelled" // chuyến bị hủy trước khi đến
 )
 
 // EnvReading là một số đo môi trường kho (độ ẩm %, nhiệt độ °C) của một cơ sở.
