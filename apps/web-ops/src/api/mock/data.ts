@@ -534,6 +534,18 @@ export const CATALOGS: Record<CatalogName, CatalogItem[]> = {
     ["dao_on", "Bệnh đạo ôn", { kind: "benh_hai" }],
     ["oc_buou_vang", "Ốc bươu vàng", { kind: "dong_vat_hai" }],
   ]),
+  vessel_class: cat("vessel_class", []),
+  // KN v7.7 FN-AD-04.05 (gói P2) — dữ liệu nền tạm (Q-01).
+  crop: cat("crop", [
+    ["RAU_MAU", "Rau màu", { is_group: "true" }],
+    ["RAU_MUONG", "Rau muống", { parent_code: "RAU_MAU", is_group: "false", unit: "tấn" }],
+  ]),
+  material: cat("material", [["PHAN_URE", "Phân Urê", { unit: "kg", group: "Phân bón" }]]),
+  production_model: cat("production_model", [["1P5G", "1 phải 5 giảm", {}]]),
+  report_type: cat("report_type", [
+    ["tuan", "Báo cáo tuần", { period: "week", level: "commune" }],
+    ["dot_xuat", "Báo cáo đột xuất", { period: "ad_hoc", level: "both" }],
+  ]),
 };
 
 /** Tên cán bộ quản trị theo actor_ref (danh bạ pf/extension, G-07). Không có → null (web hiện mã). */
@@ -622,7 +634,12 @@ export const CATALOG_META: Record<CatalogName, { name: string; attrs_schema: str
   farm_stage: { name: "Khâu sản xuất", attrs_schema: ["pilot", "description"] },
   machine_type: { name: "Chủng loại máy", attrs_schema: ["farm_stage"] },
   season: { name: "Mùa vụ", attrs_schema: ["start_month", "end_month"] },
-  pest: { name: "Sâu bệnh hại", attrs_schema: ["kind"] },
+  pest: { name: "Sâu bệnh hại", attrs_schema: ["kind", "affected_crops", "severity_thresholds"] },
+  vessel_class: { name: "Lớp phương tiện thủy", attrs_schema: ["capacity_t", "beam_m", "draft_m"] },
+  crop: { name: "Cây trồng", attrs_schema: ["parent_code", "is_group", "unit", "description"] },
+  material: { name: "Vật tư", attrs_schema: ["unit", "group", "description"] },
+  production_model: { name: "Mô hình sản xuất", attrs_schema: ["description"] },
+  report_type: { name: "Loại báo cáo", attrs_schema: ["period", "level", "description"] },
 };
 
 export interface MockParamDef {

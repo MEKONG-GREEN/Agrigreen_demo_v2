@@ -1,6 +1,6 @@
 {
   "format": "agrigreen.catalogs/v1",
-  "source": "BRD Bản đồ CGH v1.3 (FN-02, BR-06), Backlog App HTX v4.0 (US-CAT-01), nguyên mẫu mekong-green (src/seed.ts, src/mdm/varieties.ts)",
+  "source": "BRD Bản đồ CGH v1.3 (FN-02, BR-06), Backlog App HTX v4.0 (US-CAT-01), nguyên mẫu mekong-green (src/seed.ts, src/mdm/varieties.ts); KN v7.7 FN-AD-04.05 (crop, material, production_model, report_type, pest.affected_crops — tạm, chờ khách Q-01)",
   "items": [
     {"catalog": "farm_stage", "code": "lam_dat", "name": "Làm đất", "attrs": {"pilot": "true", "description": "Cày, xới, trục, san phẳng mặt ruộng"}},
     {"catalog": "farm_stage", "code": "gieo_sa", "name": "Gieo sạ / Cấy", "attrs": {"pilot": "true", "description": "Gieo sạ hàng, sạ cụm, cấy máy"}},
@@ -26,9 +26,37 @@
     {"catalog": "rice_variety", "code": "IR50404", "name": "IR50404", "attrs": {"growth_days": "90", "expected_yield_t_per_ha": "7.25"}},
     {"catalog": "rice_variety", "code": "JASMINE85", "name": "Jasmine 85", "attrs": {"growth_days": "100", "expected_yield_t_per_ha": "6"}},
 
-    {"catalog": "pest", "code": "ray_nau", "name": "Rầy nâu", "attrs": {"kind": "sau_hai"}},
+    {"catalog": "crop", "code": "LUA", "name": "Lúa", "attrs": {"is_group": "true", "description": "Nhóm cây lúa (tạm, chờ khách Q-01)"}},
+    {"catalog": "crop", "code": "LUA_CAC_LOAI", "name": "Lúa các loại", "attrs": {"parent_code": "LUA", "is_group": "false", "unit": "tấn"}},
+    {"catalog": "crop", "code": "RAU_MAU", "name": "Rau màu", "attrs": {"is_group": "true", "description": "Nhóm rau màu PL 03 — 54 cây chờ danh sách (Q-01)"}},
+    {"catalog": "crop", "code": "RAU_MUONG", "name": "Rau muống", "attrs": {"parent_code": "RAU_MAU", "is_group": "false", "unit": "tấn"}},
+    {"catalog": "crop", "code": "RAU_CAI", "name": "Rau cải các loại", "attrs": {"parent_code": "RAU_MAU", "is_group": "false", "unit": "tấn"}},
+    {"catalog": "crop", "code": "BAP", "name": "Bắp (ngô)", "attrs": {"parent_code": "RAU_MAU", "is_group": "false", "unit": "tấn"}},
+    {"catalog": "crop", "code": "CAY_AN_QUA", "name": "Cây ăn quả", "attrs": {"is_group": "true", "description": "Nhóm cây ăn trái M01 — 30 cây chờ danh sách (Q-01)"}},
+    {"catalog": "crop", "code": "XOAI", "name": "Xoài", "attrs": {"parent_code": "CAY_AN_QUA", "is_group": "false", "unit": "tấn"}},
+    {"catalog": "crop", "code": "SAU_RIENG", "name": "Sầu riêng", "attrs": {"parent_code": "CAY_AN_QUA", "is_group": "false", "unit": "tấn"}},
+
+    {"catalog": "material", "code": "PHAN_URE", "name": "Phân Urê", "attrs": {"unit": "kg", "group": "Phân bón"}},
+    {"catalog": "material", "code": "PHAN_DAP", "name": "Phân DAP", "attrs": {"unit": "kg", "group": "Phân bón"}},
+    {"catalog": "material", "code": "PHAN_NPK", "name": "Phân NPK", "attrs": {"unit": "kg", "group": "Phân bón"}},
+    {"catalog": "material", "code": "THUOC_BVTV", "name": "Thuốc bảo vệ thực vật", "attrs": {"unit": "lít", "group": "Thuốc BVTV"}},
+    {"catalog": "material", "code": "GIONG_LUA", "name": "Giống lúa", "attrs": {"unit": "kg", "group": "Giống"}},
+
+    {"catalog": "production_model", "code": "1P5G", "name": "1 phải 5 giảm", "attrs": {"description": "PL2 1P5G (tạm, chờ khách Q-01)"}},
+    {"catalog": "production_model", "code": "3G3T", "name": "3 giảm 3 tăng", "attrs": {"description": "PL1 3G3T"}},
+    {"catalog": "production_model", "code": "CANH_DONG_LON", "name": "Cánh đồng lớn", "attrs": {}},
+    {"catalog": "production_model", "code": "LUA_CLC_PTT", "name": "Lúa chất lượng cao, phát thải thấp", "attrs": {"description": "Đề án 1 triệu ha (QĐ 1490/QĐ-TTg)"}},
+
+    {"catalog": "report_type", "code": "tuan", "name": "Báo cáo tuần", "attrs": {"period": "week", "level": "commune"}},
+    {"catalog": "report_type", "code": "thang", "name": "Báo cáo tháng", "attrs": {"period": "month", "level": "commune"}},
+    {"catalog": "report_type", "code": "hang_vu", "name": "Báo cáo hàng vụ", "attrs": {"period": "season", "level": "commune"}},
+    {"catalog": "report_type", "code": "nam", "name": "Báo cáo năm", "attrs": {"period": "year", "level": "province", "description": "Cộng dồn hay mẫu riêng — chờ khách Q-07"}},
+    {"catalog": "report_type", "code": "dot_xuat", "name": "Báo cáo đột xuất", "attrs": {"period": "ad_hoc", "level": "both", "description": "Menu chỉ hiện khi phòng ban có mẫu loại này (FN-AD-04.06)"}},
+    {"catalog": "report_type", "code": "gui_chi_cuc", "name": "Báo cáo gửi Chi cục", "attrs": {"period": "dispatch", "level": "province", "description": "Mẫu riêng CC01 hay T01–T07 — chờ khách Q-08"}},
+
+    {"catalog": "pest", "code": "ray_nau", "name": "Rầy nâu", "attrs": {"kind": "sau_hai", "affected_crops": "LUA_CAC_LOAI"}},
     {"catalog": "pest", "code": "sau_cuon_la", "name": "Sâu cuốn lá nhỏ", "attrs": {"kind": "sau_hai"}},
-    {"catalog": "pest", "code": "dao_on", "name": "Bệnh đạo ôn", "attrs": {"kind": "benh_hai"}},
+    {"catalog": "pest", "code": "dao_on", "name": "Bệnh đạo ôn", "attrs": {"kind": "benh_hai", "affected_crops": "LUA_CAC_LOAI"}},
     {"catalog": "pest", "code": "bac_la", "name": "Bệnh bạc lá", "attrs": {"kind": "benh_hai"}},
     {"catalog": "pest", "code": "lem_lep_hat", "name": "Bệnh lem lép hạt", "attrs": {"kind": "benh_hai"}},
     {"catalog": "pest", "code": "vang_lun", "name": "Bệnh vàng lùn – lùn xoắn lá", "attrs": {"kind": "benh_hai"}},

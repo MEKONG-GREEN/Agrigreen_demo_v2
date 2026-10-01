@@ -88,5 +88,6 @@ func (h Registry) adminListOrgs(c *gin.Context) {
 	for _, o := range page.Items {
 		items = append(items, toOrgDTO(o))
 	}
+	withRegions(c.Request.Context(), h.KN, items, page.Items)
 	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": encodeCursor(page.Next)})
 }

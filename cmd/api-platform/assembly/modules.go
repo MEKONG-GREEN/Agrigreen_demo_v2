@@ -130,6 +130,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	kn := extension.New(extPool, clk, extension.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(),
 		Plots: g.PlotStats(), Coops: pty.CooperativeStats()})
 	md.UseStaffDirectory(kn.StaffNames()) // G-07: tên người đặt/duyệt tham số
+	pty.UseActorNames(kn.StaffNames())    // KN v7.7 P2: tên người thao tác trong Log phòng ban/khu vực
 
 	mechPool, err := pool(mechanization.DBRole)
 	if err != nil {

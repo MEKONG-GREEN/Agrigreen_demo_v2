@@ -1,0 +1,13 @@
+{
+ "format": "agrigreen.departments/v1",
+ "status": "tạm, chờ khách (Q-02)",
+ "source": "BRD KN Phòng Trồng trọt v7.7 FN-AD-04.03 và Hình 3c: TTKN An Giang khai báo 6 phòng ban, Phòng Trồng trọt Đang áp dụng. Tên, mã, thứ tự 2 phòng ban còn lại chưa có — TTKN An Giang xác nhận (Q-02).",
+ "departments": [
+  {"code": "trong_trot", "name": "Phòng Trồng trọt", "description": "Báo cáo tuần/tháng/vụ cây trồng; thu thập HTX, máy móc, thửa ruộng, vật tư", "sort_order": 10, "status": "active", "menu_profile": "trong_trot"},
+  {"code": "chan_nuoi_thuy_san", "name": "Phòng Chăn nuôi - Thủy sản", "description": "Báo cáo Chăn nuôi, Nuôi trồng & Đánh bắt Thủy sản", "sort_order": 20, "status": "not_open", "menu_profile": "generic"},
+  {"code": "ke_hoach_tai_chinh", "name": "Phòng Kế hoạch - Tài chính", "description": "Tổng hợp báo cáo liên phòng; Dự án khuyến nông", "sort_order": 30, "status": "not_open", "menu_profile": "generic"},
+  {"code": "thong_tin_truyen_thong", "name": "Phòng Thông tin - Truyền thông", "description": "Thư viện kỹ thuật & tin tức; Quản trị đào tạo; Giá cả thị trường", "sort_order": 40, "status": "not_open", "menu_profile": "generic"},
+  {"code": "phong_ban_5", "name": "Phòng ban 5 (tạm, chờ khách Q-02)", "description": "Tên chưa có trong BRD v7.7", "sort_order": 50, "status": "not_open", "menu_profile": "generic"},
+  {"code": "phong_ban_6", "name": "Phòng ban 6 (tạm, chờ khách Q-02)", "description": "Tên chưa có trong BRD v7.7", "sort_order": 60, "status": "not_open", "menu_profile": "generic"}
+ ]
+}

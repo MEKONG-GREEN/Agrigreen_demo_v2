@@ -267,6 +267,99 @@ paths:
                   next_cursor: {type: [string, "null"]}
         "401": {$ref: "#/components/responses/Problem"}
         "403": {$ref: "#/components/responses/Problem"}
+  # --- pf/party KN v7.7 gói P2: phòng ban, menu theo cấu hình (UR-KT-02), khu vực, cây 3 cấp ---
+  /v1/orgs/tree:
+    get:
+      summary: "FN-AD-04.02: cây TTKNQG › TTKN tỉnh › Khu vực › Xã trong phạm vi người gọi (xem xuống, không ngang, không lên)"
+      operationId: knOrgTree
+      tags: [party]
+      parameters:
+        - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Rừng cây (gốc = Nút thấy được cao nhất); xã chưa gán khu vực vào nhóm region_unassigned
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/KNOrgTreeNode"}}
+        "401": {$ref: "#/components/responses/Problem"}
+  /v1/departments:
+    get:
+      summary: "Phòng ban của đơn vị (bước 2 đăng nhập, FN-CH-00.01) — chỉ selectable = true chọn được"
+      operationId: knListDepartments
+      tags: [party]
+      parameters:
+        - {name: org_ref, in: query, schema: {type: string, format: uuid}, description: "Đơn vị; vắng = Nút cấp 1/2 gần nhất của Nút người gọi"}
+      responses:
+        "200":
+          description: Danh sách theo thứ tự hiển thị (account_count/record_count luôn null ở Application API)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDepartmentList"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/departments/{code}/modules:
+    get:
+      summary: "UR-KT-02: cây module (menu) của một phòng ban cho vai KN — bật phòng ban không cần phát hành lại web/app"
+      description: |
+        Dựng từ bảng menu tĩnh có phiên bản (kn.menu/v1) và trạng thái phòng ban hiện hành ở MỖI request (Cache-Control: no-store).
+        audience vắng: theo ngữ cảnh phiên (P1) hoặc vai duy nhất của người gọi. platform_admin xem được mọi cấp (FN-AD-04.07).
+        audience = admin: mục con của phòng ban trong nhóm "Phòng ban" (enabled = false khi chưa mở).
+      operationId: knDepartmentModules
+      tags: [party]
+      parameters:
+        - {name: code, in: path, required: true, schema: {type: string}}
+        - {name: audience, in: query, schema: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}}
+        - {name: org_ref, in: query, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Menu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNMenu"}
+        "403": {description: party.menu_audience_forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: party.department_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: party.department_not_open, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/menu:
+    get:
+      summary: "UR-KT-02, BRD §6: sidebar đầy đủ theo vai + phòng ban của phiên (Admin: Điều hành / Phòng ban / Quản trị hệ thống)"
+      operationId: knMenu
+      tags: [party]
+      parameters:
+        - {name: audience, in: query, schema: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}}
+        - {name: department, in: query, schema: {type: string}, description: "Vắng = phòng ban Đang áp dụng duy nhất của đơn vị"}
+        - {name: org_ref, in: query, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Menu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNMenu"}
+        "403": {description: party.menu_audience_forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: party.department_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: party.department_not_open, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/regions:
+    get:
+      summary: "FN-AD-04.02: khu vực của tỉnh kèm số xã được gán (mọi vai chọn/lọc theo Khu vực)"
+      operationId: knListRegions
+      tags: [party]
+      parameters:
+        - {name: province_code, in: query, required: true, schema: {type: string}}
+        - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRegionList"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/party KN v7.7 gói P2 ---
   /v1/cooperatives:
     get:
       summary: HTX/THT trong phạm vi, tìm theo tên, Mã HTX hoặc mã số thuế
@@ -5054,7 +5147,7 @@ components:
       name: catalog
       in: path
       required: true
-      schema: {type: string, enum: [rice_variety, farm_stage, machine_type, season, pest]}
+      schema: {type: string, enum: [rice_variety, farm_stage, machine_type, season, pest, vessel_class, crop, material, production_model, report_type]}
     DeviceID:
       name: X-Device-Id
       in: header
@@ -5355,6 +5448,7 @@ components:
         deactivation_reason: {type: [string, "null"]}
         revision: {type: integer}
         updated_at: {type: string, format: date-time}
+        forms_in_use: {type: integer, description: "KN v7.7 FN-AD-04.05: số mẫu báo cáo đang dùng mục (vắng khi chưa nối P3)"}
     DisplayValue:
       type: object
       required: [key, value, default, version, source]
@@ -5479,6 +5573,117 @@ components:
         parent_ref: {type: [string, "null"], format: uuid}
         representative_ref: {type: [string, "null"], format: uuid, description: "Mã tham chiếu người đại diện trong kho định danh"}
         active: {type: boolean}
+        region: {$ref: "#/components/schemas/KNRegionRef", description: "KN v7.7 FN-AD-04.02: Khu vực của Nút xã (chỉ trong danh sách /v1/orgs, khi đã gán)"}
+    # --- pf/party KN v7.7 gói P2 ---
+    KNDepartment:
+      type: object
+      required: [id, org_ref, code, name, description, sort_order, status, status_label, menu_profile, retired, selectable, account_count, record_count, updated_by, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        org_ref: {type: string, format: uuid, description: "Đơn vị: Nút cấp 1 (ttkn_national) hoặc cấp 2 (ttkn_province)"}
+        code: {type: string, pattern: "^[a-z][a-z0-9_]{1,39}$", description: "Mã phòng ban — department_code của mọi bản ghi KN mới"}
+        name: {type: string}
+        description: {type: [string, "null"]}
+        sort_order: {type: integer}
+        status: {type: string, enum: [active, not_open, suspended], description: "Đang áp dụng / Chưa mở / Ngưng hoạt động"}
+        status_label: {type: string}
+        menu_profile: {type: string, enum: [trong_trot, generic], description: "Bộ menu dựng sẵn trong mã (kn.menu/v1)"}
+        retired: {type: boolean, description: "Đã xóa (sự kiện retired) — mã không tái sử dụng"}
+        selectable: {type: boolean, description: "Chọn được ở bước 2 đăng nhập (Đang áp dụng, chưa xóa)"}
+        account_count: {type: [integer, "null"], description: "null = chưa nối nguồn đếm (P1) hoặc Application API"}
+        record_count: {type: [integer, "null"]}
+        updated_by: {type: string, format: uuid}
+        updated_at: {type: string, format: date-time}
+    KNDepartmentList:
+      type: object
+      required: [org_ref, items]
+      properties:
+        org_ref: {type: string, format: uuid}
+        items: {type: array, items: {$ref: "#/components/schemas/KNDepartment"}}
+    KNRegion:
+      type: object
+      required: [id, province_code, code, name, sort_order, active, deactivation_reason, commune_count, updated_by, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        province_code: {type: string}
+        code: {type: string}
+        name: {type: string}
+        sort_order: {type: integer}
+        active: {type: boolean}
+        deactivation_reason: {type: [string, "null"]}
+        commune_count: {type: integer, description: "Số Nút xã đang hoạt động được gán"}
+        updated_by: {type: string, format: uuid}
+        updated_at: {type: string, format: date-time}
+    KNRegionList:
+      type: object
+      required: [province_code, items, assigned_communes]
+      properties:
+        province_code: {type: string}
+        items: {type: array, items: {$ref: "#/components/schemas/KNRegion"}}
+        assigned_communes: {type: integer, description: "Σ commune_count"}
+    KNRegionRef:
+      type: object
+      required: [code, name]
+      properties:
+        code: {type: string}
+        name: {type: string}
+    KNOrgTreeNode:
+      type: object
+      required: [ref, kind, code, name, admin_unit_code, level, active, region, commune_count, children]
+      properties:
+        ref: {type: [string, "null"], format: uuid, description: "null với nhóm khu vực"}
+        kind: {type: string, enum: [ttkn_national, ttkn_province, extension_team, region, region_unassigned]}
+        code: {type: string}
+        name: {type: string}
+        admin_unit_code: {type: [string, "null"]}
+        level: {type: integer, description: "1 TTKNQG, 2 TTKN tỉnh, 3 Xã; 0 với nhóm khu vực"}
+        active: {type: boolean}
+        region:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/KNRegionRef"
+        commune_count: {type: integer}
+        children: {type: array, items: {$ref: "#/components/schemas/KNOrgTreeNode"}}
+    # --- hết pf/party KN v7.7 gói P2 (chung) ---
+    KNMenuItem:
+      type: object
+      required: [key, label, route, icon, badge_source, enabled, children]
+      properties:
+        key: {type: string, description: "Khóa ổn định của mục (vd xa.nhiem_vu.cong_viec)"}
+        label: {type: string}
+        route: {type: [string, "null"], description: "Đường dẫn web/app; null với mục cha chỉ mở/đóng"}
+        icon: {type: string}
+        badge_source: {type: [string, "null"], description: "Khóa số đếm việc cần xử lý (ẩn khi 0) — client lấy số từ module sở hữu"}
+        enabled: {type: boolean, description: "false: hiện mờ (phòng ban chưa mở trong menu Admin)"}
+        status: {type: string, enum: [active, not_open, suspended], description: "Chỉ mục phòng ban của menu Admin"}
+        status_label: {type: string}
+        children: {type: array, items: {$ref: "#/components/schemas/KNMenuItem"}}
+    KNMenuGroup:
+      type: object
+      required: [key, label, items]
+      properties:
+        key: {type: string, description: "dieu_hanh | bao_cao | du_lieu; Admin: dieu_hanh | phong_ban | quan_tri"}
+        label: {type: string}
+        items: {type: array, items: {$ref: "#/components/schemas/KNMenuItem"}}
+    KNMenu:
+      type: object
+      required: [menu_version, audience, org_ref, department, default_route, groups]
+      properties:
+        menu_version: {type: string, description: "Phiên bản bảng menu tĩnh (kn.menu/v1)"}
+        audience: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}
+        org_ref: {type: [string, "null"], format: uuid}
+        department:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [code, name, status, menu_profile]
+              properties:
+                code: {type: string}
+                name: {type: string}
+                status: {type: string}
+                menu_profile: {type: string}
+        default_route: {type: string}
+        groups: {type: array, items: {$ref: "#/components/schemas/KNMenuGroup"}}
     Me:
       type: object
       required: [actor_ref, tenant_id, roles, mfa, org, scope]
@@ -5630,11 +5835,11 @@ components:
       type: object
       description: |
         data của entity pull catalog_item (pf/masterdata): mục đang dùng của rice_variety, farm_stage, machine_type,
-        season, pest — không lọc theo địa bàn. id = UUIDv5 cố định theo (catalog, code); version = sync_seq
+        season, pest, vessel_class và (KN v7.7) crop, material, production_model, report_type — không lọc theo địa bàn. id = UUIDv5 cố định theo (catalog, code); version = sync_seq
         (luôn tăng). Ngừng dùng → tombstone cùng id; dùng lại → upsert version mới.
       required: [catalog, code, name, attrs, revision, updated_at]
       properties:
-        catalog: {type: string, enum: [rice_variety, farm_stage, machine_type, season, pest]}
+        catalog: {type: string, enum: [rice_variety, farm_stage, machine_type, season, pest, vessel_class, crop, material, production_model, report_type]}
         code: {type: string}
         name: {type: string}
         attrs: {type: object, additionalProperties: {type: string}}

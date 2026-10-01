@@ -420,6 +420,11 @@ func (r *Registry) MoveOrg(ctx context.Context, in MoveOrgInput) (OrgResult, err
 		if cur == nil {
 			return OrgResult{}, ErrOrgNotFound
 		}
+		// KN v7.7 FN-AD-04.02: không di chuyển Nút cấp 1 (TTKNQG), cấp 2 (TTKN tỉnh) sang cha khác.
+		// Đổi mã đơn vị hành chính tại chỗ (sáp nhập ĐVHC, KN US-ADM-07/08) vẫn được phép.
+		if (cur.Kind == port.OrgTTKNNational || cur.Kind == port.OrgTTKNProvince) && cur.ParentRef != in.NewParentRef {
+			return OrgResult{}, ErrInvalidHierarchy.WithDetail("không di chuyển Nút cấp 1 (TTKNQG), cấp 2 (TTKN tỉnh) sang Nút cha khác (FN-AD-04.02)")
+		}
 		var parent *store.OrgState
 		var parentKind *port.OrgKind
 		if in.NewParentRef != uuid.Nil {
@@ -455,6 +460,10 @@ func (r *Registry) MoveOrg(ctx context.Context, in MoveOrgInput) (OrgResult, err
 			return OrgResult{}, err
 		}
 		if err := store.UpdateOrg(ctx, tx, o, cur.StatusReason, ev); err != nil {
+			return OrgResult{}, err
+		}
+		// KN v7.7: Nút xã sang tỉnh khác thì khu vực của tỉnh cũ không còn đúng — bỏ gán (bản ghi bù).
+		if err := clearRegionOnMove(ctx, tx, p, o, in.Reason, now, in.IdemKey); err != nil {
 			return OrgResult{}, err
 		}
 		return OrgResult{Org: o, Event: ev}, nil

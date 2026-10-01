@@ -72,6 +72,8 @@ type itemDTO struct {
 	DeactivationReason *string           `json:"deactivation_reason"`
 	Revision           int               `json:"revision"`
 	UpdatedAt          string            `json:"updated_at"`
+	// FormsInUse: số mẫu báo cáo đang dùng mục (KN v7.7 FN-AD-04.05 "biểu đang dùng"); vắng khi chưa nối P3.
+	FormsInUse *int `json:"forms_in_use,omitempty"`
 }
 
 func toItemDTO(it domain.Item) itemDTO {

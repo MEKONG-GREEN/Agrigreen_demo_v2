@@ -42,6 +42,7 @@ type fixture struct {
 	app    *httptest.Server
 	admin  *httptest.Server
 	vault  *fakeVault
+	units  *fakeUnits
 	mod    *party.Module
 	pool   *pgxpool.Pool
 	tenant uuid.UUID
@@ -53,7 +54,8 @@ func newFixture(t *testing.T) *fixture {
 	pool := env.Pool(t, migrations.PF, party.DBRole)
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	vault := newFakeVault()
-	mod := party.New(pool, clock.System{}, party.Deps{AdminUnits: newFakeUnits(), Vault: vault})
+	units := newFakeUnits()
+	mod := party.New(pool, clock.System{}, party.Deps{AdminUnits: units, Vault: vault})
 	log := telemetry.NewLogger("test", io.Discard)
 
 	appEng := httpx.NewEngine(log, 1<<20)
@@ -63,7 +65,7 @@ func newFixture(t *testing.T) *fixture {
 	appSrv, adminSrv := httptest.NewServer(appEng), httptest.NewServer(adminEng)
 	t.Cleanup(appSrv.Close)
 	t.Cleanup(adminSrv.Close)
-	return &fixture{t: t, env: env, iss: iss, app: appSrv, admin: adminSrv, vault: vault, mod: mod, pool: pool, tenant: ids.New()}
+	return &fixture{t: t, env: env, iss: iss, app: appSrv, admin: adminSrv, vault: vault, units: units, mod: mod, pool: pool, tenant: ids.New()}
 }
 
 type caller struct {

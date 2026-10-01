@@ -50,6 +50,8 @@ Mã lỗi của module có dạng `<module>.<lỗi>`.
 | 409 | `masterdata.catalog_item_exists` | pf/masterdata: mã đã có trong danh mục (kể cả mục đã ngừng dùng) |
 | 409 | `masterdata.catalog_item_state` | pf/masterdata: ngừng dùng mục đã ngừng, hoặc dùng lại mục đang dùng |
 | 422 | `masterdata.farm_stage_invalid` | pf/masterdata: loại máy gắn khâu sản xuất không có hoặc đã ngừng dùng |
+| 409 | `masterdata.catalog_item_name_taken` | pf/masterdata (KN v7.7 FN-AD-04.05): danh mục đã có mục khác cùng tên (không phân biệt hoa/thường tiếng Việt) |
+| 422 | `masterdata.catalog_ref_invalid` | pf/masterdata (KN v7.7 FN-AD-04.05): cây trồng gắn nhóm không phải nhóm cấp 1 đang dùng (hoặc chính nó); sâu bệnh gắn cây trồng bị ảnh hưởng không có/đã ngừng dùng |
 | 404 | `masterdata.param_not_found` | pf/masterdata: không có phiên bản tham số ĐÃ PHÊ DUYỆT có hiệu lực tại thời điểm tra |
 | 404 | `masterdata.param_version_not_found` | pf/masterdata: không có phiên bản tham số |
 | 409 | `masterdata.param_invalid_transition` | pf/masterdata: trạng thái không cho phép (gửi duyệt khi không phải nháp; duyệt/từ chối khi chưa gửi hoặc đã quyết định) |
@@ -65,7 +67,7 @@ Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính m�
 | 404 | `party.org_not_found` | pf/party: không có tổ chức/HTX, hoặc nằm ngoài phạm vi đọc (không lộ sự tồn tại) |
 | 409 | `party.org_code_taken` | pf/party: mã tổ chức đã dùng trong tenant |
 | 409 | `party.tax_code_taken` | pf/party: mã số thuế đã gắn với HTX khác trong tenant; `existing_ref` là HTX đang giữ |
-| 422 | `party.invalid_hierarchy` | pf/party: cấp trên không hợp lệ cho loại tổ chức, tạo vòng khi di chuyển, hoặc đơn vị hành chính không thuộc địa bàn cấp trên |
+| 422 | `party.invalid_hierarchy` | pf/party: cấp trên không hợp lệ cho loại tổ chức, tạo vòng khi di chuyển, hoặc đơn vị hành chính không thuộc địa bàn cấp trên; KN v7.7 FN-AD-04.02: di chuyển Nút cấp 1 (TTKNQG), cấp 2 (TTKN tỉnh) sang cha khác, bảo đảm Nút xã cho Nút không phải TTKN tỉnh |
 | 409 | `party.org_state_conflict` | pf/party: trạng thái không cho phép (đã vô hiệu hóa, đang hoạt động, HTX đã ngừng, không có thay đổi) |
 | 409 | `party.org_has_active_children` | pf/party: vô hiệu hóa tổ chức còn tổ chức con đang hoạt động; `active_children` là số con |
 | 403 | `party.out_of_scope` | pf/party: ghi ngoài phạm vi TW → Tỉnh → Xã của người gọi (ADR-0009) |
@@ -83,6 +85,19 @@ Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính m�
 | 422 | `party.share_grantor_ambiguous` | pf/party (ADR-0020): nhiều tenant bên cấp cùng cấp loại dữ liệu này cho tenant người gọi — truyền tham số `grantor` |
 | 404 | `party.partner_not_found` | pf/party (ADR-0020): `GET /v1/partner/cooperatives/{ref}` — bên cấp không có HTX này (lần đọc vẫn được ghi sổ) |
 | 503 | `party.partner_audit_unavailable` | pf/party (ADR-0020): không ghi được sổ đọc `pf_party.partner_read_log` — bề mặt đối tác không trả dữ liệu chưa ghi sổ |
+| 404 | `party.department_not_found` | pf/party (KN v7.7 FN-AD-04.03): không có phòng ban (hoặc đã xóa khi tra theo mã) |
+| 409 | `party.department_code_taken` | pf/party (FN-AD-04.03): mã phòng ban đã có trong đơn vị — kể cả phòng ban đã xóa (mã không tái sử dụng) |
+| 409 | `party.department_state` | pf/party (FN-AD-04.03): phòng ban đã ở trạng thái yêu cầu, hoặc đã xóa |
+| 409 | `party.department_in_use` | pf/party (FN-AD-04.03): xóa phòng ban còn tài khoản hoặc dữ liệu (`accounts`, `records` trong thân lỗi) — chuyển Ngưng hoạt động |
+| 409 | `party.department_not_open` | pf/party (UR-KT-02): menu/ngữ cảnh của phòng ban chưa "Đang áp dụng" |
+| 422 | `party.department_unit_invalid` | pf/party (FN-AD-04.03): phòng ban chỉ khai báo cho Nút cấp 1 (TTKNQG) hoặc cấp 2 (TTKN tỉnh) đang hoạt động |
+| 404 | `party.region_not_found` | pf/party (KN v7.7 FN-AD-04.02): không có khu vực |
+| 409 | `party.region_code_taken` | pf/party (FN-AD-04.02): mã khu vực đã có trong tỉnh |
+| 409 | `party.region_state` | pf/party (FN-AD-04.02): khu vực đã ở trạng thái yêu cầu; gán lại đúng khu vực hiện tại; bỏ gán xã chưa có khu vực |
+| 409 | `party.region_in_use` | pf/party (FN-AD-04.02): ngừng dùng khu vực còn xã được gán (`communes` trong thân lỗi) |
+| 422 | `party.region_node_invalid` | pf/party (FN-AD-04.02): gán khu vực cho Nút không phải xã (extension_team) đang hoạt động, hoặc khu vực không đang dùng / không thuộc tỉnh của xã |
+| 403 | `party.menu_audience_forbidden` | pf/party (UR-KT-02): người gọi xin menu của vai KN mình không có (Admin xem được mọi cấp — FN-AD-04.07), hoặc khác ngữ cảnh phiên |
+| 404 | `party.seed_unavailable` | pf/party (KN v7.7): không có dữ liệu nền (khu vực) cho tỉnh này — hiện chỉ An Giang (91), tạm chờ Q-04 |
 | — | `party.valve_share_grant_missing` | pf/party (ADR-0020), lỗi consumer (không phải HTTP): phong bì van MKG (`hub_facility`, `hub_capacity`, `collection_schedule`, `htx_collection_statement`, `mrv_collection_evidence`) mang tenant chưa được bên cấp nào cấp loại `valve_*` tương ứng → consumer `pf.geo.hub_valve` / `pf.cropcycle.htx_collection_valve` / `pf.mrv.collection_evidence` trả lỗi, giao lại rồi DLQ (R-62). Duyệt cấp quyền rồi chuyển lại từ DLQ (xử lý idempotent) |
 | 403 | `sync.device_unregistered` | pf/sync: thiếu/sai header `X-Device-Id`, thiết bị chưa đăng ký trong tenant, hoặc đăng ký bởi tài khoản khác |
 | 403 | `sync.device_revoked` | pf/sync: thiết bị đã bị thu hồi — app **xóa dữ liệu cục bộ** và khóa token; đăng ký lại cùng mã cũng trả mã này |
