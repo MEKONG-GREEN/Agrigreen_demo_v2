@@ -51,6 +51,8 @@ Mọi biến `NEXT_PUBLIC_*` được **nhúng lúc build**. Đổi môi trườ
 | `NEXT_PUBLIC_OIDC_ISSUER` | `http://localhost:8081/realms/agrigreen` | Issuer Keycloak |
 | `NEXT_PUBLIC_OIDC_CLIENT_ID` | `agrigreen-web-ops` | Client công khai, PKCE S256 |
 | `NEXT_PUBLIC_MAP_STYLE_URL` | rỗng | Style MapLibre của nhà cung cấp tile trong lãnh thổ (ADR-0007). Rỗng = nền trơn, không gọi tile ngoài |
+| `NEXT_PUBLIC_SURFACE` | `auto` | `auto`: tài khoản có vai trò KN v7.7 (`GET /v1/me/contexts` trả lần gán) dùng menu theo cấu hình; còn lại menu cũ `src/nav/nav.ts`. `legacy`: luôn menu cũ |
+| `NEXT_PUBLIC_KN_LEGACY_MENU` | rỗng | `1` = thêm nhóm "Chức năng khác" (menu cũ theo vai realm) dưới menu KN — cho tính năng đã rút khỏi Trồng trọt |
 
 ## Đăng nhập
 
@@ -61,6 +63,21 @@ Mọi biến `NEXT_PUBLIC_*` được **nhúng lúc build**. Đổi môi trườ
 - `redirect_uri` = `<origin>/login/callback`, `post_logout_redirect_uri` = `<origin>/login`.
 - Vai lấy từ `realm_access.roles`, `tenant_id` và `org_ref` từ claim của access token. Cấp phạm vi (TW / Tỉnh / Xã / Cục) và danh sách đơn vị lấy từ `GET /v1/me`. Tên hiển thị lấy từ claim `name` (Me không chứa tên người). Tổ chức `dcrd` là Cục KTHT, dùng cổng CGH. Nếu `/v1/me` lỗi, web hiện cảnh báo kèm mã tra cứu và menu chỉ lọc theo vai.
 - Menu chỉ **ẩn/hiện** theo vai và phạm vi. Mọi quyền nghiệp vụ do backend kiểm (R-55). Màn hình Admin API hiện hướng dẫn "đăng nhập lại có OTP" khi phiên chưa qua MFA (`MfaNotice`) và khi máy chủ trả `mfa_required`.
+
+## Khung giao diện KN v7.7 (gói P6, đợt 1)
+
+Theo Design Sample (`docs/brd/kn-v7.7-img/`, BRD v7.7 §4.0) cho **mọi** màn hình, cả màn G1–G4 hiện có.
+
+- **Token** (`src/app/globals.css`, đo từ PDF Design Sample, khung 1440 px): sidebar `#123B24 → #1E5C39`, rộng 248 px / thu gọn 72 px; mục ≥ 36 px, mục con 34 px, icon 18 px nét 2; mục active nền `#E6F6EA`, chữ `#123B24`, vạch trái 3 px `#00A82D`; nút chính `#00A82D`; nền trang `#F7FAFB`; viền `#E2E8F0`; chữ `#0F172A / #334155 / #475569 / #64748B`; Khẩn `#C0392B/#FCEAE8`, Cần chú ý `#9A5A00/#FEF3E0`, Thông tin `#00719C/#E5F5FB`; thân chữ 13 px, bảng/nhãn 12 px. Biến cũ (`--g800`, `--red`…) trỏ sang token mới.
+- **Font tự host** (`public/fonts/`, SIL OFL 1.1, giấy phép kèm theo): Noto Serif 600/700 cho h1–h3, tên màn/khối/thẻ; Roboto 400/500/700 cho phần còn lại; chỉ tập latin + vietnamese. Không gọi Google Fonts lúc chạy (RB-7).
+- **Khung** (`src/components/AppShell.tsx`, `src/shell/`): `Sidebar` (nhóm, mục cha mở/đóng, mục cha tự mở khi con active, một mục active, số đếm chỉ cho việc cần xử lý và ẩn khi 0, phòng ban chưa mở hiện mờ "Chưa mở", thu gọn chỉ icon + flyout trắng, footer "Tên sản phẩm · © đơn vị"); thanh trên `Breadcrumb` + chuông + `AccountMenu` (Đang dùng, Đổi vai trò / phòng ban, Đổi mật khẩu, Đăng xuất). ≥ 1280 px: đầy đủ (người dùng tự thu gọn, nhớ trong localStorage); 960–1279 px: tự thu gọn còn icon; < 960 px: ngăn kéo.
+- **Nhận diện tạm** (`src/shell/brand.ts`, Q-19): "Khuyến nông số", "© 2026 TTKN Quốc gia", logo mầm cây và ảnh nền dải màu — thay ở một chỗ khi TTKNQG gửi bộ nhận diện.
+- **Mẫu trang** (`src/components/patterns/`): List (`FilterBar`/`FilterChip`/`SearchBox` + Đặt lại, `DataTable` có STT, `StatusPill`, `RowActions` xem/sửa/xóa, `Pagination` "Hiển thị a–b trên n ‹ 1 2 3 … ›", `PageHeader`); Detail (`BackLink`, `ActionBar`, `LabelValueBlock`, `RelatedTabs`, `LogPanel` theo API Log chuẩn, `DetailLayout`; trang đặt mắt xích breadcrumb cuối bằng `useBreadcrumbTail`); Dashboard (`HotMetric` + sparkline, `ProgressList`, `PeriodCompare`, `AlertList` Khẩn/Cần chú ý/Thông tin).
+- **Đăng nhập** (`/login`, Hình 3a): khối thương hiệu trái, thẻ phải. Bản thật: thẻ nhận email/SĐT rồi chuyển Keycloak (OIDC + PKCE, `login_hint`) — **mật khẩu chỉ nhập ở trang Keycloak** (theme `agrigreen` do P1 làm: banner lỗi, số lần thử, khóa 15 phút); "Ghi nhớ đăng nhập" chỉ nhớ email/SĐT trong localStorage. Chế độ giả lập: thẻ đủ trường (mật khẩu + Hiện, banner "Còn n lần thử", khóa tạm sau 5 lần), vai thử cũ vẫn ở dưới. "Quên mật khẩu?" và "Liên hệ quản trị viên" → `/login/lien-he`.
+- **Chọn vai trò và phòng ban** (`/chon-vai-tro`, Hình 3b): thẻ vai trò → thẻ phòng ban (bấm là vào; chưa mở thì khóa); Admin vào thẳng; 1 vai trò + 1 phòng ban đang áp dụng → không hiện màn này; không có phòng ban nào → "liên hệ quản trị viên". Đổi lại trong menu tài khoản, không đăng nhập lại.
+- **Hợp đồng tạm P1/P2/P4** (`src/kn/contract.ts`, client `src/kn/client.ts`, mock `src/api/mock/kn.ts`): `GET /v1/me/contexts`, `POST /v1/me/context` → `context_id` gửi qua header **`X-AG-Context`** ở mọi lời gọi (cả `api` và `adminApi`); `GET /v1/departments/{code}/modules?role=` (Admin: code `_all`) trả cây menu `MenuTree`; `GET /v1/me/menu-badges` trả số đếm theo `badge_source`. Backend thật chưa có P1 (404) → giữ đăng nhập một vai và menu cũ như trước. Lựa chọn vai trò/phòng ban nhớ trong sessionStorage để tải lại trang chọn lại đúng ngữ cảnh.
+- **Màn**: `/kn/*` hiện chỉ là mẫu trang với dữ liệu minh họa (chỉ ở chế độ giả lập: Dashboard, Công việc cần làm, Tổng quan hệ thống, Danh sách HTX + chi tiết) và trang giữ chỗ cho các mục menu khác — màn đầy đủ ở đợt 3. Màn hiện có (Người dùng, Cơ cấu tổ chức, Danh mục, Mẫu báo cáo, công cụ nền tảng) được nối vào menu Admin.
+- **Tài khoản KN giả lập** (`src/api/mock/kn-accounts.ts`, mật khẩu thử `KhuyenNong@2026`): `an.nv@angiang.gov.vn` (3 vai trò: Xã, Tỉnh, Admin), `binh.tt@angiang.gov.vn` (Tỉnh + Xã), `quan.lm@ttknqg.gov.vn` (Quốc gia), `admin.mekong@mekonggreen.vn` (Admin), `loc.pv@angiang.gov.vn` (không có phòng ban đang áp dụng). Đăng nhập được bằng SĐT `09123456xx` tương ứng.
 
 ## Gọi API
 
@@ -124,6 +141,7 @@ Mức đáp ứng CGH do backend phân loại và lưu theo vụ. Web hiện đ�
 | `notifications.spec.ts` | Chuông → deep link chỉ đạo/tài liệu/nhiệm vụ; xác nhận đã đọc; đọc tất cả |
 | `conflicts.spec.ts` | Xung đột từ thông báo, hai phiên bản + bản đồ, giữ phiên bản; lọc SLA |
 | `accounts.spec.ts` | Lý do khóa < 20 ký tự bị chặn, khóa + nhật ký; ma trận cấp vai tỉnh; lỗi máy chủ `accounts.user_exists`; chưa MFA |
+| `kn-shell.spec.ts` | Khung KN v7.7: đăng nhập (sai mật khẩu → còn n lần, khóa tạm), chọn vai trò & phòng ban, menu theo 4 vai trò (Quốc gia, Tỉnh, Xã, Admin), số đếm, thu gọn sidebar + flyout, đổi vai trò trong menu tài khoản, mẫu List → Detail |
 
 CI chạy job `web-e2e` (`.github/workflows/ci.yml`): `npx playwright install --with-deps chromium` rồi `npm run e2e`; khi lỗi tải lên `playwright-report/` và `test-results/`.
 

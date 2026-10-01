@@ -2,7 +2,8 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MOCK_PERSONAS } from "@/api/mock/personas";
 import { buildPrincipal, type Principal } from "@/auth/principal";
-import { Sidebar } from "@/components/AppShell";
+import { legacyMenu } from "@/shell/menu";
+import { Sidebar } from "@/shell/Sidebar";
 import { canSee, findNavItem, homeFor, visibleNav } from "./nav";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/", useRouter: () => ({ replace: vi.fn() }) }));
@@ -129,20 +130,20 @@ describe("menu App HTX theo vai", () => {
 });
 
 describe("<Sidebar>", () => {
-  it("hiển thị nhóm đánh số và phạm vi của người dùng tỉnh", () => {
+  // Khung P6: phạm vi người dùng chuyển lên menu tài khoản ở thanh trên (src/shell/AccountMenu.tsx).
+  it("menu cũ: hiển thị nhóm đánh số của người dùng tỉnh, mục chi tiết thuộc mục danh sách", () => {
     const p = persona("tinh");
-    render(<Sidebar groups={visibleNav(p)} pathname="/htx/123" principal={p} onLogout={() => undefined} />);
+    render(<Sidebar menu={legacyMenu(visibleNav(p))} pathname="/htx/123" />);
     const nav = screen.getByRole("navigation");
     expect(within(nav).getByText("1. Điều hành")).toBeInTheDocument();
     expect(within(nav).queryByText("6. Quản trị")).toBeNull();
     expect(within(nav).queryByRole("link", { name: /Bản đồ CGH/ })).toBeNull();
     expect(within(nav).getByRole("link", { name: /Quản lý HTX/ })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByText(/Tỉnh · Đồng Tháp/)).toBeInTheDocument();
   });
 
   it("Cục chỉ có cổng CGH và báo cáo", () => {
     const p = persona("cuc");
-    render(<Sidebar groups={visibleNav(p)} pathname="/cgh" principal={p} onLogout={() => undefined} />);
+    render(<Sidebar menu={legacyMenu(visibleNav(p))} pathname="/cgh" />);
     expect(screen.getAllByRole("link")).toHaveLength(2);
     expect(screen.getByRole("link", { name: /Bản đồ CGH/ })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: /Báo cáo/ })).toBeInTheDocument();

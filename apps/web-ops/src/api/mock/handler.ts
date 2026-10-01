@@ -45,6 +45,7 @@ import { syncMonitorRoutes } from "./syncmonitor";
 import { metricsRoutes } from "./metrics";
 import { mrvAdminRoutes, mrvAppRoutes } from "./mrv";
 import { collectionRoutes } from "./collection";
+import { knAppRoutes, personaForContext } from "./kn";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -109,6 +110,8 @@ const appRoutes: Route[] = [
   ...htxGapAppRoutes,
   // --- pf/party: người gọi + phạm vi ---
   { method: "GET", pattern: /^\/v1\/me$/, handler: ({ persona }) => json(persona.me) },
+  // --- KN v7.7 (hợp đồng tạm P1/P2/P4): ngữ cảnh phiên, menu theo cấu hình, số đếm ---
+  ...knAppRoutes,
 
   // --- pf/extension ---
   {
@@ -672,8 +675,10 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
   return async function mockFetch(request: Request): Promise<Response> {
     if (opts.latency !== false) await sleep(120 + Math.random() * 220);
     const url = new URL(request.url);
-    const persona = personaFromAuthHeader(request.headers.get("Authorization"));
-    if (!persona) return problem(401, "unauthenticated", "Unauthenticated");
+    const tokenPersona = personaFromAuthHeader(request.headers.get("Authorization"));
+    if (!tokenPersona) return problem(401, "unauthenticated", "Unauthenticated");
+    // KN v7.7: header X-AG-Context chọn vai trò + phạm vi của lần gán (middleware P1 giả lập).
+    const persona = personaForContext(tokenPersona, request.headers.get("X-AG-Context"));
     // Bề mặt Admin: mọi route bắt buộc token đã qua yếu tố thứ hai (mục 11).
     if (opts.surface === "admin" && !persona.amr.includes("otp")) return problem(403, "mfa_required", "MFA required");
 

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { loginAs, loginViaUi, sidebar } from "./helpers";
+import { accountMenu, loginAs, loginViaUi, sidebar } from "./helpers";
 
 test.describe("đăng nhập giả lập và điều hướng theo vai/phạm vi", () => {
   test("đăng nhập qua /login bằng vai thử TW → bảng điều hành toàn quốc", async ({ page }) => {
@@ -19,14 +19,14 @@ test.describe("đăng nhập giả lập và điều hướng theo vai/phạm vi
 
   test("TTKN tỉnh: phạm vi Đồng Tháp, có Đồng bộ thiết bị, không có quản trị", async ({ page }) => {
     await loginAs(page, "tinh");
-    await expect(sidebar(page).getByText("Tỉnh · Đồng Tháp")).toBeVisible();
+    await expect(accountMenu(page)).toContainText("Tỉnh · Đồng Tháp");
     await expect(sidebar(page).getByRole("link", { name: "Đồng bộ thiết bị" })).toBeVisible();
     await expect(sidebar(page).getByText("6. Quản trị")).toHaveCount(0);
   });
 
   test("KNV xã: không có Đồng bộ thiết bị; vào trang quản trị → không có quyền", async ({ page }) => {
     await loginAs(page, "xa");
-    await expect(sidebar(page).getByText(/^Xã · /)).toBeVisible();
+    await expect(accountMenu(page)).toContainText(/Xã · /);
     await expect(sidebar(page).getByRole("link", { name: "Đồng bộ thiết bị" })).toHaveCount(0);
     await page.goto("/quan-tri/tai-khoan");
     await expect(page.getByRole("heading", { name: "Không có quyền truy cập" })).toBeVisible();

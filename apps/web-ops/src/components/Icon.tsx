@@ -13,7 +13,17 @@ export type IconName =
   | "plot"
   | "download"
   | "bookmark"
-  | "check"
+  | "chevronDown"
+  | "chevronRight"
+  | "chevronLeft"
+  | "eye"
+  | "edit"
+  | "trash"
+  | "arrowLeft"
+  | "external"
+  | "refresh"
+  | "xCircle"
+  | "panelLeft"
   | "lock"
   | "unlock"
   | "mail";
@@ -47,6 +57,28 @@ const PATHS: Record<IconName, string> = {
   download: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3",
   bookmark: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z",
   check: "M20 6L9 17l-5-5",
+  calendar: "M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 10h18M8 2v4M16 2v4",
+  sprout: "M7 20h10M12 20v-9M12 11c0-3-2-6-6-6 0 4 2 6 6 6zM12 11c0-2.5 2-5 6-5 0 3.5-2 5-6 5z",
+  send: "M22 2 11 13M22 2l-7 20-4-9-9-4z",
+  database: "M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
+  building: "M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18zM6 12H4a2 2 0 0 0-2 2v8h4M18 9h2a2 2 0 0 1 2 2v11h-4M10 6h4M10 10h4M10 14h4M10 18h4",
+  package: "M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8",
+  table: "M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 9h18M9 9v12",
+  key: "M15.5 7.5a4.5 4.5 0 1 1-1.7 3.5L3 21.8V18h3v-3h3l1.8-1.8M16 8h.01",
+  users: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8",
+  zap: "M13 2 3 14h9l-1 8 10-12h-9z",
+  file: "M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5",
+  chevronDown: "M6 9l6 6 6-6",
+  chevronRight: "M9 6l6 6-6 6",
+  chevronLeft: "M15 6l-6 6 6 6",
+  eye: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+  edit: "M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z",
+  trash: "M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6",
+  arrowLeft: "M19 12H5M12 19l-7-7 7-7",
+  external: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3",
+  refresh: "M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.2L3 16M3 21v-5h5",
+  xCircle: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM15 9l-6 6M9 9l6 6",
+  panelLeft: "M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM9 3v18",
   lock: "M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4",
   unlock: "M5 11h14v10H5zM8 11V7a4 4 0 0 1 7.5-2",
   mail: "M4 4h16v16H4zM4 6l8 7 8-7",
@@ -74,7 +106,7 @@ export function Icon({ name, size = 18, label }: { name: IconName; size?: number
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.8}
+      strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
       role={label ? "img" : undefined}
