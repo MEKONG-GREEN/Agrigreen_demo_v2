@@ -1,0 +1,47 @@
+# Luật cảnh báo hạ tầng của Public API (G5, ADR-0022, ADR-0025): sẵn sàng của api-public và tỷ lệ lỗi/429
+# ở gateway (Traefik, host partner.<domain>). Luật theo số đo của ứng dụng (ag_public_*, ag_egress_*:
+# bất thường xuất, checkpoint lỗi, metering lỗi) nằm ở tệp luật của pf/metering (agent M) — không lặp ở đây.
+# Ngưỡng là đề xuất (tạm, chờ khách Q5-5). Mọi luật chỉ kêu khi api-public có bản sao mong muốn > 0, nên
+# ở ĐTK 1 / G4 (0 bản sao) không bao giờ kêu.
+groups:
+  - name: agrigreen-public-api
+    rules:
+      - alert: AgPublicAPIDown
+        expr: |
+          kube_deployment_spec_replicas{namespace="agrigreen-pf",deployment="api-public"} > 0
+          and on (namespace, deployment)
+          kube_deployment_status_replicas_available{namespace="agrigreen-pf",deployment="api-public"} < 1
+        for: 5m
+        labels: { severity: critical, priority: P2 }
+        annotations:
+          summary: "Public API (api-public) không còn bản sao sẵn sàng"
+          description: "ADR-0025: Phase K đang bật nhưng không Pod api-public nào sẵn sàng. Kiểm AG_PUBLIC_API_ENABLED, AG_PUBLIC_OPERATOR_TENANT, pepper (pf-apikey-pepper), PgBouncer pf. Runbook: docs/runbooks/phase-k.md."
+      - alert: AgPublicAPIDegraded
+        expr: |
+          kube_deployment_spec_replicas{namespace="agrigreen-pf",deployment="api-public"} > 0
+          and on (namespace, deployment)
+          kube_deployment_status_replicas_available{namespace="agrigreen-pf",deployment="api-public"}
+            < on (namespace, deployment) kube_deployment_spec_replicas{namespace="agrigreen-pf",deployment="api-public"}
+        for: 15m
+        labels: { severity: warning, priority: P3 }
+        annotations:
+          summary: "Public API thiếu bản sao so với mong muốn"
+          description: "ADR-0025: api-public chạy dưới số bản sao cấu hình (HA 2). Kiểm sự kiện Pod và PDB."
+      - alert: AgPublicAPIGateway5xxHigh
+        expr: |
+          sum(rate(traefik_service_requests_total{service=~"agrigreen-pf-api-public-8085.*",code=~"5.."}[5m]))
+            / sum(rate(traefik_service_requests_total{service=~"agrigreen-pf-api-public-8085.*"}[5m])) > 0.05
+        for: 10m
+        labels: { severity: warning, priority: P3 }
+        annotations:
+          summary: "Public API: hơn 5% phản hồi 5xx ở gateway"
+          description: "ADR-0023: 503 metering.unavailable nghĩa là sổ sử dụng không ghi được (đóng khi lỗi). Kiểm PgBouncer pf và luật pf/metering."
+      - alert: AgPublicAPIGatewayRateLimitedHigh
+        expr: |
+          sum(rate(traefik_service_requests_total{service=~"agrigreen-pf-api-public-8085.*",code="429"}[5m]))
+            / sum(rate(traefik_service_requests_total{service=~"agrigreen-pf-api-public-8085.*"}[5m])) > 0.2
+        for: 15m
+        labels: { severity: info, priority: P4 }
+        annotations:
+          summary: "Public API: hơn 20% yêu cầu bị 429"
+          description: "R-55: giới hạn IP ở gateway (Middleware public-api-ratelimit) hoặc hạn mức backend. Đối chiếu sổ sử dụng trước khi nâng hạn mức (gói hạn mức là tham số có phiên bản, người đặt ≠ người duyệt)."

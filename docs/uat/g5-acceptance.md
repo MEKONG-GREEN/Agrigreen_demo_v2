@@ -27,16 +27,16 @@ Bốn trạng thái:
 
 | Mục | Số yêu cầu | đạt | một phần | chưa làm | ngoài G5 |
 |---|---|---|---|---|---|
-| 3. Phụ lục A (G5) | 4 | 0 | 0 | 4 | 0 |
-| 4. Public API (ADR-0022) | 19 | 0 | 0 | 19 | 0 |
+| 3. Phụ lục A (G5) | 4 | 0 | 2 | 2 | 0 |
+| 4. Public API (ADR-0022) | 19 | 0 | 1 | 18 | 0 |
 | 5. Sản phẩm dữ liệu | 5 | 0 | 0 | 5 | 0 |
 | 6. `pf/metering` (ADR-0023) | 10 | 0 | 0 | 10 | 0 |
 | 7. Điểm kiểm soát xuất — DLP (ADR-0024) | 11 | 0 | 0 | 11 | 0 |
-| 8. Phase K và cấp phát bên thứ ba (ADR-0025) | 6 | 0 | 0 | 6 | 0 |
-| 9. Cổng kiến trúc G5 (RB, R-xx, vùng) | 10 | 0 | 0 | 10 | 0 |
+| 8. Phase K và cấp phát bên thứ ba (ADR-0025) | 6 | 0 | 2 | 4 | 0 |
+| 9. Cổng kiến trúc G5 (RB, R-xx, vùng) | 10 | 0 | 2 | 8 | 0 |
 | 10. Client và kịch bản đầu–cuối | 4 | 0 | 0 | 4 | 0 |
 | 11. Câu hỏi khách | 10 | 0 | 0 | 10 | 0 |
-| **Tổng** | **79** | **0** | **0** | **79** | **0** |
+| **Tổng** | **79** | **0** | **7** | **72** | **0** |
 
 Đã có ở G5-0. Đây là nền móng, không tính là đạt dòng nào:
 
@@ -51,6 +51,8 @@ Bốn trạng thái:
 ## 1. Cách chạy
 
 Như [g4-acceptance.md §1](g4-acceptance.md#1-cách-chạy). Kịch bản E2E G5 (mục 2) và diễn tập bật Phase K ghi lệnh chạy ở đây khi có.
+
+Hạ tầng Phase K: `powershell -File deploy/k8s/check.ps1` (online) và `-Offline` — helm lint + kubeconform cho dev/staging/prod và `prod-phasek` (= `values-prod.yaml` + `values-phasek.yaml`), rồi `check_flows.py`. OpenTofu: `tofu plan -var-file=envs/<env>.tfvars [-var phase_k=true]`. Thủ tục bật/tắt: [phase-k.md](../runbooks/phase-k.md).
 
 ## 2. Kịch bản đầu–cuối (chưa có)
 
@@ -73,10 +75,10 @@ Như [g4-acceptance.md §1](g4-acceptance.md#1-cách-chạy). Kịch bản E2E G
 
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| A-1 | Phase K = thay cấu hình và số bản sao, **không sửa mã** (R-01, RB-5): `values-phasek.yaml` chỉ có cấu hình, bật bằng `helm upgrade` không build lại image (ADR-0025 §1) | — | **chưa làm** |
+| A-1 | Phase K = thay cấu hình và số bản sao, **không sửa mã** (R-01, RB-5): `values-phasek.yaml` chỉ có cấu hình, bật bằng `helm upgrade` không build lại image (ADR-0025 §1) | `check_flows.py` `phasek_overlay_checks` (mọi lá của `values-phasek.yaml` thuộc `PHASEK_ALLOWED`: số bản sao, HPA/PDB, `env`, `enabled`, `external.valkey` — không image, không luồng) + `public_api_checks` hồ sơ `prod-phasek`; `deploy/k8s/check.ps1` (online và `-Offline`: helm lint --strict + kubeconform -strict cho dev/staging/prod/prod-phasek, `check_flows.py` 4 921 kiểm đạt, 01/10/2026); [phase-k.md](../runbooks/phase-k.md) | **một phần** — **hạ tầng**: chưa diễn tập `helm upgrade -f values-phasek.yaml` trên staging thật (K-04) |
 | A-2 | `pf/metering` bật: mỗi lời gọi Public API một dòng sổ chứng từ (mục 11, 16) | — | **chưa làm** |
 | A-3 | Public API bật với bên thứ ba đầu tiên: khóa API lưu băm, scope, quota (mục 11) | — | **chưa làm** (chờ khách Q5-1) |
-| A-4 | Public API **tắt ở ĐTK 1**: 0 bản sao, không host ingress, `AG_PUBLIC_API_ENABLED` ≠ `1` → `api-public` thoát lỗi | — | **chưa làm** |
+| A-4 | Public API **tắt ở ĐTK 1**: 0 bản sao, không host ingress, `AG_PUBLIC_API_ENABLED` ≠ `1` → `api-public` thoát lỗi | `check_flows.py` `public_api_checks` hồ sơ dev/staging/prod: Deployment `api-public` có (image build + ký, CI `images`) nhưng 0 bản sao, không HPA, không host `partner`, không Middleware, không pepper, `AG_PUBLIC_API_ENABLED` không đặt; Compose chỉ chạy với `--profile phasek`; OpenTofu `phase_k = false` | **một phần** — **mã**: kiểm thử thoát lỗi của `cmd/api-public` (đợt A) |
 
 ## 4. Public API (ADR-0022)
 
@@ -89,7 +91,7 @@ Như [g4-acceptance.md §1](g4-acceptance.md#1-cách-chạy). Kịch bản E2E G
 | P-05 | Scope cấp qua đăng ký sản phẩm: `api_client_admin` đề xuất ≠ `api_client_approver` duyệt (R-56, `app/` + CHECK DB) | — | **chưa làm** |
 | P-06 | Truy cập cần cấp quyền `dp_<sản phẩm>` đang hiệu lực của bên cấp (ADR-0020, `GrantLookup`); thu hồi → 403 ở lời gọi kế tiếp; `grantor` chỉ chọn bên cấp | — | **chưa làm** |
 | P-07 | Tenant của bên gọi lấy từ bản ghi khóa, không bao giờ từ path/query/body (tương đương R-16) | — | **chưa làm** |
-| P-08 | Gateway: giới hạn thô theo IP + giới hạn thân trên `partner.<domain>`, không thẩm quyền (R-55) | — | **chưa làm** (hạ tầng) |
+| P-08 | Gateway: giới hạn thô theo IP + giới hạn thân trên `partner.<domain>`, không thẩm quyền (R-55) | Chart `ingress.optionalHosts.partner` + `ingress.middlewares`: Traefik `Middleware` `public-api-ratelimit` (20 rps, burst 40 theo IP nguồn — tạm, chờ khách) và `public-api-body-limit` (`buffering.maxRequestBodyBytes` 1 MiB), chỉ `websecure`; `check_flows.py` hồ sơ `prod-phasek` kiểm Ingress tham chiếu đủ hai Middleware; kubeconform online (schema CRD Traefik) | **một phần** — **hạ tầng**: chưa áp trên cụm thật; `ipStrategy.depth` chờ chọn LB nhà cung cấp |
 | P-09 | Backend: giới hạn tần suất theo khách hàng (Valkey nếu có, không thì trong tiến trình) → 429 `apiclient.rate_limited` + `Retry-After` | — | **chưa làm** |
 | P-10 | Hạn mức thẩm quyền ngày/tháng theo đơn vị từ bộ đếm `pf_metering` cùng giao dịch → 429 `metering.quota_exceeded` | — | **chưa làm** |
 | P-11 | Header `RateLimit-Limit`/`-Remaining`/`-Reset`, `AG-Quota-Remaining` ở mọi phản hồi | — | **chưa làm** |
@@ -147,8 +149,8 @@ Như [g4-acceptance.md §1](g4-acceptance.md#1-cách-chạy). Kịch bản E2E G
 
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| K-01 | `values-phasek.yaml`: `api-public` 2 bản sao + PDB, host `partner.<domain>`, F08/F19; luồng cấm (`api-public` → vault/MQ/DB mkg-ts/Internet) bị chặn — `check_flows.py` | — | **chưa làm** (hạ tầng) |
-| K-02 | Pepper khóa API qua ExternalSecret (KMS trong lãnh thổ), xoay theo phiên bản | — | **chưa làm** (hạ tầng) |
+| K-01 | `values-phasek.yaml`: `api-public` 2 bản sao + PDB, host `partner.<domain>`, F08/F19; luồng cấm (`api-public` → vault/MQ/DB mkg-ts/Internet) bị chặn — `check_flows.py` | `check_flows.py` `public_api_checks` (mọi hồ sơ: F08 Ingress → `api-public:8085`, F19 → PgBouncer pf, DNS, OTLP được phép; mọi nguồn khác → `api-public` bị chặn; `api-public` → `identity-vault`, RabbitMQ 5672/15672, PostgreSQL pf trực tiếp, DB mkg/ts/vault/iam, ứng dụng khác, Internet, dải ngoài cụm bị chặn; host `partner` chỉ tới `api-public:8085`; Phase K: 2 bản sao, PDB ≥ 1, TLS `agrigreen-partner-tls`, `AG_EGRESS_MODE=enforce`); luồng tùy chọn F26 (Valkey) / F27 (scrape) / F28 (Keycloak) chỉ mở khi cấu hình; `deploy/k8s/check.ps1` (online và `-Offline`: helm lint --strict + kubeconform -strict cho dev/staging/prod/prod-phasek, `check_flows.py` 4 921 kiểm đạt, 01/10/2026); ADR-0008 mục hiện thực | **một phần** — **hạ tầng**: chưa áp trên cụm thật (CNI thực thi NetworkPolicy) |
+| K-02 | Pepper khóa API qua ExternalSecret (KMS trong lãnh thổ), xoay theo phiên bản | ExternalSecret `pf-apikey-pepper` (`dataFrom.extract` của `<remotePrefix>/apikey/pf`: thêm `AG_APIKEY_PEPPER_V<n+1>` + đổi `CURRENT` chỉ ở kho, không sửa chart), bật ở Phase K, chỉ vùng pf (`api-public` + `api-platform` tùy chọn); vai DB `pf-public-db-roles` đúng tập g5-conventions §3.1, `pg-pf-roles` có `public_api`/`apiclient_app`/`metering_app` — `check_flows.py`; không giá trị bí mật trong repo; Compose `gen-dev-secrets` sinh `AG_APIKEY_PEPPER_V1` | **một phần** — **hạ tầng**: chưa có kho bí mật trong lãnh thổ thật; **mã**: kiểm khóa theo `pepper_version` (đợt A, P-02) |
 | K-03 | Runbook `public-api-onboarding.md`: tenant bên thứ ba → cấp quyền `dp_*` → khách hàng + đăng ký → khóa → thử chấp nhận → bảng kê; ngừng hợp tác | — | **chưa làm** |
 | K-04 | Diễn tập bật Phase K trên staging chỉ bằng `helm upgrade -f values-phasek.yaml` | — | **chưa làm** (hạ tầng) |
 | K-05 | Đơn vị thẩm định: tenant riêng, chỉ xem, mọi truy cập có nhật ký (sổ sử dụng + egress + `partner_read_log`) — KN US-MRV-05 | — | **chưa làm** (chờ khách Q5-7) |
@@ -166,8 +168,8 @@ Như [g4-acceptance.md §1](g4-acceptance.md#1-cách-chạy). Kịch bản E2E G
 | X-06 | R-61: ba consumer G5 idempotent (giao lặp) | — | **chưa làm** |
 | X-07 | R-62: DLQ + cảnh báo cho ba hàng đợi G5 | — | **chưa làm** |
 | X-08 | R-64: ba schema sự kiện G5 tương thích ngược (`contractcheck -base`) | — | **chưa làm** |
-| X-09 | R-80/R-81: `api-public` ở vùng ứng dụng, chỉ PgBouncer pf; NetworkPolicy mặc định từ chối | — | **chưa làm** (hạ tầng) |
-| X-10 | RB-7: Valkey, kho tệp xuất, nhật ký Public API trong lãnh thổ | — | **chưa làm** (hạ tầng) |
+| X-09 | R-80/R-81: `api-public` ở vùng ứng dụng, chỉ PgBouncer pf; NetworkPolicy mặc định từ chối | `api-public` ở `agrigreen-pf` (default-deny), cứng hóa Pod (non-root, rootfs chỉ đọc, seccomp, không token SA) và Secret đúng vùng — `check_flows.py` `structure_checks` + `public_api_checks` (xem K-01) | **một phần** — **hạ tầng**: chưa áp trên cụm thật |
+| X-10 | RB-7: Valkey, kho tệp xuất, nhật ký Public API trong lãnh thổ | Valkey chỉ qua `external.valkey` (dải trong lãnh thổ, F26; rỗng → không mở, `check_flows.py`); `api-public` không ra Internet; log/metric qua OTLP tới `agrigreen-ops` (F50); `global.residencyAllowlist` như mọi dịch vụ Go | **một phần** — **chờ khách** Q5-10 (nhà cung cấp Valkey); **hạ tầng**: kho tệp xuất (nếu `api-public` đọc S3 thì cần luồng tới `external.objectStorage` — chưa mở) |
 
 ## 10. Client và kịch bản đầu–cuối
 

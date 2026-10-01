@@ -32,3 +32,9 @@ output "buckets" {
   description = "Tên bucket đã tạo."
   value       = module.object_storage.bucket_names
 }
+
+
+output "partner_fqdn" {
+  description = "Host Public API (Phase K) → ingress.optionalHosts.partner của Helm; null khi phase_k = false."
+  value       = var.phase_k ? "partner.${var.domain}" : null
+}

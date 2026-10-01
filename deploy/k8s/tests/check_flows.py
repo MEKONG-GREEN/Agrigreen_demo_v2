@@ -10,6 +10,10 @@ Render chart deploy/k8s/charts/agrigreen (helm template) cho dev/staging/prod r�
   2. kiểm cấu trúc: mặc định từ chối ở mọi namespace, cứng hóa Pod, probe, Secret đúng vùng,
      URL DB đúng vùng, quyền RabbitMQ (không tài khoản nền tảng nào trên mkg.internal),
      max_locks_per_transaction = 256, luật Prometheus trùng bản gốc deploy/observability.
+  3. Public API (G5, ADR-0022/0025) trên mọi hồ sơ, kể cả prod-phasek (= values-prod + values-phasek):
+     api-public chỉ nhận từ Ingress (F08), chỉ ra PgBouncer pf (F19) + DNS + OTLP (+ Valkey/Keycloak/
+     scrape khi cấu hình); hồ sơ gốc TẮT (0 bản sao, không host partner), Phase K BẬT; values-phasek.yaml
+     chỉ có cấu hình và số bản sao (R-01, PHASEK_ALLOWED).
 
 Bảng luồng mong đợi ở ĐÂY độc lập với values.yaml (nguồn sinh policy): sửa values mà làm hỏng
 một luồng ADR thì kiểm thử hỏng.
@@ -23,6 +27,7 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -36,7 +41,39 @@ except ImportError:  # pragma: no cover
 
 ROOT = Path(__file__).resolve().parents[3]
 CHART = ROOT / "deploy" / "k8s" / "charts" / "agrigreen"
-ENVS = ("dev", "staging", "prod")
+# Hồ sơ = môi trường + lớp giá trị chồng lên. prod-phasek: Phase K (ADR-0025) chồng lên production.
+PROFILES = {
+    "dev": ["values-dev.yaml"],
+    "staging": ["values-staging.yaml"],
+    "prod": ["values-prod.yaml"],
+    "prod-phasek": ["values-prod.yaml", "values-phasek.yaml"],
+}
+ENVS = tuple(PROFILES)
+
+
+def base_env(env: str) -> str:
+    """Môi trường gốc của hồ sơ (prod-phasek → prod)."""
+    return env.split("-", 1)[0]
+
+
+def is_phasek(env: str) -> bool:
+    return env.endswith("-phasek")
+
+
+# R-01: lớp giá trị Phase K chỉ đổi cấu hình và số bản sao. Mọi lá (đường dẫn) của values-phasek.yaml
+# phải khớp một mẫu dưới đây — không image, không luồng mạng, không tài nguyên mới.
+PHASEK_ALLOWED = (
+    r"apps\.[a-z0-9-]+\.replicas",
+    r"apps\.[a-z0-9-]+\.(hpa|pdb)\.[a-zA-Z]+",
+    r"apps\.[a-z0-9-]+\.env\.AG_[A-Z0-9_]+",
+    r"apps\.api-public\.(metrics|oidc)\.enabled",
+    r"external\.valkey",
+    r"ingress\.optionalHosts\.[a-z0-9-]+\.enabled",
+    r"externalSecrets\.secrets\.[a-z]+\.[a-z0-9-]+\.enabled",
+)
+# Vai DB mà api-public được nhận (g5-conventions §3.1) — không vai nào khác của vùng pf.
+PUBLIC_DB_KEYS = {f"AG_DB_PASSWORD_{r}" for r in (
+    "PUBLIC_API", "APICLIENT_APP", "METERING_APP", "CROPCYCLE_APP", "GEO_APP", "MRV_APP", "MASTERDATA_APP", "PARTY_APP")}
 
 NS = {
     "edge": "agrigreen-edge-ingress",
@@ -328,7 +365,7 @@ def flow_checks(env: str, docs: list[dict], values: dict, r: Report):
     ]
     for desc, src_ext, dst_ext, podkey, port in ext_allowed:
         if (src_ext or dst_ext) not in ipof or podkey not in pods:
-            if env == "prod":
+            if base_env(env) == "prod":
                 r.check(False, f"[{env}] thiếu dải/Pod cho luồng: {desc}")
             continue
         if src_ext:
@@ -391,7 +428,7 @@ def flow_checks(env: str, docs: list[dict], values: dict, r: Report):
             if g(s) is not None:
                 r.check(not m.allowed(g(s), internet, port), f"[{env}] ra Internet phải bị chặn: {s} → 8.8.8.8:{port}")
     # dev tắt CA thiết bị (step-ca); môi trường khác phải có đủ Pod.
-    if env == "dev":
+    if base_env(env) == "dev":
         missing.discard(f"{pki}/step-ca")
     for k in sorted(missing):
         r.check(False, f"[{env}] thiếu Pod {k} trong manifest")
@@ -453,11 +490,17 @@ def structure_checks(env: str, docs: list[dict], values: dict, r: Report):
             res = c.get("resources") or {}
             r.check(bool(res.get("requests")) and bool(res.get("limits")), f"[{env}] {ns}/{name}/{c['name']}: thiếu requests/limits")
             refs = [e["valueFrom"]["secretKeyRef"]["name"] for e in c.get("env") or [] if "valueFrom" in e and "secretKeyRef" in e["valueFrom"]]
-            refs += [e["secretRef"]["name"] for e in c.get("envFrom") or [] if "secretRef" in e]
+            refs += [e["secretRef"]["name"] for e in c.get("envFrom") or [] if "secretRef" in e and not e["secretRef"].get("optional")]
+            optional = [e["secretRef"]["name"] for e in c.get("envFrom") or [] if "secretRef" in e and e["secretRef"].get("optional")]
+            for s in optional:  # Secret chỉ có khi một hồ sơ bật (vd pepper ở Phase K): vẫn phải đúng vùng
+                if ns in forbid_prefix:
+                    r.check(not s.startswith(forbid_prefix[ns]), f"[{env}] {ns}/{name}: Secret của vùng khác: {s}")
+            # Đơn vị tắt bằng cấu hình (replicas 0, vd api-public ở ĐTK 1): Secret của nó chỉ có khi hồ sơ bật.
+            off = d["kind"] == "Deployment" and d["spec"].get("replicas") == 0
             for s in refs:
                 if ns in forbid_prefix:
                     r.check(not s.startswith(forbid_prefix[ns]), f"[{env}] {ns}/{name}: Secret của vùng khác: {s}")
-                if env != "dev":
+                if base_env(env) != "dev" and not off:
                     r.check((ns, s) in es_names or (ns, s) in cnpg_secrets, f"[{env}] {ns}/{name}: Secret {s} không có nguồn ExternalSecret/CNPG trong cùng namespace")
             for e in c.get("env") or []:
                 v = str(e.get("value", ""))
@@ -470,14 +513,14 @@ def structure_checks(env: str, docs: list[dict], values: dict, r: Report):
                 s = v["secret"]["secretName"]
                 if ns in forbid_prefix:
                     r.check(not s.startswith(forbid_prefix[ns]), f"[{env}] {ns}/{name}: gắn Secret vùng khác {s}")
-                if env != "dev":
+                if base_env(env) != "dev":
                     r.check((ns, s) in es_names or (ns, s) in cert_names, f"[{env}] {ns}/{name}: volume Secret {s} không có nguồn")
     # PDB cho mọi Deployment nhiều bản; HPA cho api-platform, ingest (prod).
     pdbs = {(d["metadata"]["namespace"], d["metadata"]["name"]) for d in by_kind.get("PodDisruptionBudget", [])}
     for d in by_kind.get("Deployment", []):
         if (d["spec"].get("replicas") or 2) > 1:
             r.check((d["metadata"]["namespace"], d["metadata"]["name"]) in pdbs, f"[{env}] thiếu PDB: {d['metadata']['name']}")
-    if env != "dev":
+    if base_env(env) != "dev":
         hpas = {d["metadata"]["name"] for d in by_kind.get("HorizontalPodAutoscaler", [])}
         r.check({"api-platform", "ingest"} <= hpas, f"[{env}] HPA cho api-platform/ingest: {hpas}")
     # PostgreSQL: max_locks_per_transaction = 256; cụm vault ở namespace Định danh.
@@ -515,6 +558,166 @@ def structure_checks(env: str, docs: list[dict], values: dict, r: Report):
         r.check(copy.exists() and copy.read_bytes() == f.read_bytes(), f"bản sao collector lệch nguồn: {copy}")
 
 
+# --------------------------------------------------------------------------- Public API (G5)
+def public_api_checks(env: str, docs: list[dict], values: dict, r: Report):
+    """ADR-0022 / ADR-0025: api-public chỉ nhận từ Ingress (F08), chỉ ra PgBouncer pf (F19) + DNS/OTLP
+    (+ Valkey/Keycloak/scrape khi cấu hình); hồ sơ gốc TẮT, hồ sơ Phase K BẬT chỉ bằng cấu hình."""
+    pf, data, vault, mkg, ops = NS["pf"], NS["data"], NS["vault"], NS["mkg"], NS["ops"]
+    phasek = is_phasek(env)
+    m = Model(docs)
+    pods = pods_from(docs)
+    ap = pods.get(f"{pf}/api-public")
+    r.check(ap is not None, f"[{env}] thiếu Deployment api-public (image có ở mọi hồ sơ, chỉ số bản sao đổi)")
+    if ap is None:
+        return
+    app_vals = values["apps"]["api-public"]
+    metrics_on = bool((app_vals.get("metrics") or {}).get("enabled"))
+    oidc_on = bool((app_vals.get("oidc") or {}).get("enabled"))
+    internet = IP("8.8.8.8")
+
+    def p(k):
+        return pods.get(k)
+
+    # ---- luồng phải được phép
+    must = [
+        ("F08 Ingress → api-public:8085", p("edge/traefik"), ap, 8085),
+        ("F19 api-public → PgBouncer pf", ap, p(f"{data}/pg-pf-pooler"), 5432),
+        ("F50 api-public → OTLP", ap, p(f"{ops}/otel-collector"), 4317),
+    ]
+    for desc, s, d, port in must:
+        r.check(s is not None and d is not None and m.allowed(s, d, port), f"[{env}] Public API luồng bị chặn: {desc}")
+    r.check(m.allowed(ap, p("dns"), 53, "UDP"), f"[{env}] Public API: DNS bị chặn")
+
+    # ---- api-public CHỈ nhận từ Ingress, CHỈ cổng 8085
+    srcs = [internet] + [x for x in (
+        p(f"{pf}/api-platform"), p(f"{pf}/worker"), p(f"{pf}/web-ops"), p(f"{pf}/optimizer"), p(f"{pf}/outbox-publisher-pf"),
+        p(f"{mkg}/api-internal"), p(f"{mkg}/ingest"), p(f"{mkg}/worker-internal"), p(f"{vault}/identity-vault"),
+        p(f"{data}/rabbitmq"), p(f"{data}/pg-pf"), p(f"{data}/pg-pf-pooler"), p("iam/keycloak"), p("ops/prometheus"),
+        p(f"{ops}/otel-collector")) if x is not None]
+    for s in srcs:
+        r.check(not m.allowed(s, ap, 8085), f"[{env}] luồng CẤM: {getattr(s, 'name', getattr(s, 'addr', s))} → api-public:8085 (chỉ Ingress, F08)")
+    for port in (8080, 8082, 8084, 9464):
+        if port == 9464 and metrics_on:
+            continue
+        r.check(not m.allowed(p("edge/traefik"), ap, port), f"[{env}] luồng CẤM: Ingress → api-public:{port}")
+    prom_ok = m.allowed(p("ops/prometheus"), ap, 9464)
+    r.check(prom_ok == metrics_on, f"[{env}] Prometheus → api-public:9464 phải {'mở' if metrics_on else 'đóng'} theo apps.api-public.metrics.enabled (F27)")
+
+    # ---- api-public KHÔNG ra: vault, MQ, DB mkg/ts/vault, PostgreSQL pf trực tiếp, ứng dụng khác, Internet
+    banned = [
+        ("identity-vault", p(f"{vault}/identity-vault"), 8090),
+        ("RabbitMQ AMQP", p(f"{data}/rabbitmq"), 5672),
+        ("RabbitMQ management", p(f"{data}/rabbitmq"), 15672),
+        ("PostgreSQL pf trực tiếp (chỉ qua PgBouncer)", p(f"{data}/pg-pf"), 5432),
+        ("api-platform", p(f"{pf}/api-platform"), 8080),
+        ("Admin API", p(f"{pf}/api-platform"), 8082),
+        ("Internal API", p(f"{pf}/api-platform"), 8084),
+        ("api-internal (MKG)", p(f"{mkg}/api-internal"), 8081),
+        ("ingest", p(f"{mkg}/ingest"), 8091),
+    ]
+    for t in ("pg-mkg-pooler", "pg-mkg", "pg-ts-pooler", "pg-ts", "pg-iam"):
+        banned.append((f"DB {t}", p(f"{data}/{t}"), 5432))
+    for t in ("pg-vault-pooler", "pg-vault"):
+        banned.append((f"DB vault {t}", p(f"{vault}/{t}"), 5432))
+    if not oidc_on:
+        banned.append(("Keycloak (chỉ khi apps.api-public.oidc.enabled)", p("iam/keycloak"), 8080))
+    for desc, d, port in banned:
+        if d is not None:
+            r.check(not m.allowed(ap, d, port), f"[{env}] luồng CẤM: api-public → {desc} ({port})")
+    if oidc_on:
+        r.check(m.allowed(ap, p("iam/keycloak"), 8080), f"[{env}] F28 api-public → Keycloak bị chặn dù oidc.enabled")
+    for port in (80, 443, 5432, 6379):
+        r.check(not m.allowed(ap, internet, port), f"[{env}] ra Internet phải bị chặn: api-public → 8.8.8.8:{port}")
+    for key, cidrs in values["external"].items():
+        if not cidrs or key in ("internet", "valkey"):
+            continue
+        tgt = IP(first_host(cidrs))
+        for port in (443, 587, 6443):
+            r.check(not m.allowed(ap, tgt, port), f"[{env}] api-public không được ra dải ngoài {key} ({tgt.addr}:{port})")
+    vk = values["external"].get("valkey") or []
+    if vk:
+        r.check(m.allowed(ap, IP(first_host(vk)), 6379), f"[{env}] F26 api-public → Valkey bị chặn dù external.valkey có dải")
+    r.check(not m.allowed(ap, IP("192.0.2.99"), 6379) or bool(vk), f"[{env}] api-public → :6379 mở khi chưa cấu hình Valkey")
+
+    # ---- cấu trúc: hồ sơ gốc TẮT, Phase K BẬT
+    def find(kind, ns, name):
+        return next((d for d in docs if d.get("kind") == kind and d["metadata"].get("namespace") == ns and d["metadata"]["name"] == name), None)
+
+    dep = find("Deployment", pf, "api-public")
+    c = dep["spec"]["template"]["spec"]["containers"][0]
+    envs = {e["name"]: e.get("value") for e in c.get("env") or []}
+    env_from = [e["secretRef"]["name"] for e in c.get("envFrom") or [] if "secretRef" in e]
+    hpa = find("HorizontalPodAutoscaler", pf, "api-public")
+    pdb = find("PodDisruptionBudget", pf, "api-public")
+    ingresses = [d for d in docs if d.get("kind") == "Ingress"]
+    rules = [(ing, rule) for ing in ingresses for rule in ing["spec"]["rules"]]
+    partner = [(ing, rule) for ing, rule in rules if rule["host"].startswith("partner.")]
+    mws = {d["metadata"]["name"]: d for d in docs if d.get("kind") == "Middleware" and d["metadata"]["namespace"] == pf}
+    es = {(d["metadata"]["namespace"], d["spec"]["target"]["name"]): d for d in docs if d.get("kind") == "ExternalSecret"}
+    # api-public chỉ qua host partner.<domain>; host partner chỉ tới api-public:8085 (không bao giờ api-platform).
+    for ing, rule in rules:
+        for path in rule["http"]["paths"]:
+            svc = path["backend"]["service"]
+            if svc["name"] == "api-public":
+                r.check(rule["host"].startswith("partner."), f"[{env}] api-public lộ qua host khác partner: {rule['host']}")
+            if rule["host"].startswith("partner."):
+                r.check(svc["name"] == "api-public" and svc["port"]["number"] == 8085 and ing["metadata"]["namespace"] == pf,
+                        f"[{env}] host partner.<domain> phải chỉ tới api-public:8085 (ADR-0025): {svc}")
+    for name in ("api-platform", "worker", "api-public"):
+        d = find("Deployment", pf, name)
+        if d is None:
+            continue
+        mode = {e["name"]: e.get("value") for e in d["spec"]["template"]["spec"]["containers"][0].get("env") or []}.get("AG_EGRESS_MODE")
+        want = "enforce" if phasek else "observe"
+        r.check(mode == want, f"[{env}] {name}: AG_EGRESS_MODE={mode}, mong đợi {want} (ADR-0024/0025)")
+    # Pepper chỉ ở vùng pf; vai DB của api-public đúng tập.
+    for (ns, name) in es:
+        if "apikey-pepper" in name:
+            r.check(ns == pf, f"[{env}] pepper khóa API ngoài vùng pf: {ns}/{name}")
+    pub = es.get((pf, "pf-public-db-roles"))
+    if base_env(env) != "dev":
+        r.check(pub is not None, f"[{env}] thiếu ExternalSecret pf-public-db-roles")
+    if pub is not None:
+        keys = {x["secretKey"] for x in pub["spec"].get("data") or []}
+        r.check(keys == PUBLIC_DB_KEYS, f"[{env}] pf-public-db-roles phải đúng vai của api-public: {sorted(keys ^ PUBLIC_DB_KEYS)}")
+    pg_roles = es.get((data, "pg-pf-roles"))
+    if pg_roles is not None:
+        keys = {x["secretKey"] for x in pg_roles["spec"].get("data") or []}
+        need = {"AG_DB_PASSWORD_PUBLIC_API", "AG_DB_PASSWORD_APICLIENT_APP", "AG_DB_PASSWORD_METERING_APP"}
+        r.check(need <= keys, f"[{env}] pg-pf-roles thiếu vai G5 cho bootstrap: {sorted(need - keys)}")
+    r.check(set(env_from) >= {"pf-public-db-roles", "pf-apikey-pepper"}, f"[{env}] api-public thiếu envFrom pf-public-db-roles/pf-apikey-pepper")
+    r.check(not any(s in env_from for s in ("pf-db-roles", "pf-app", "pf-s3", "pf-anchor")), f"[{env}] api-public nhận Secret rộng hơn cần: {env_from}")
+
+    if not phasek:
+        r.check(dep["spec"].get("replicas") == 0, f"[{env}] ĐTK 1/G4: api-public phải 0 bản sao, đang {dep['spec'].get('replicas')}")
+        r.check(hpa is None, f"[{env}] ĐTK 1/G4: không HPA cho api-public (HPA ép ≥ 1 bản sao)")
+        r.check(envs.get("AG_PUBLIC_API_ENABLED") != "1", f"[{env}] ĐTK 1/G4: AG_PUBLIC_API_ENABLED không được là 1")
+        r.check(not partner, f"[{env}] ĐTK 1/G4: không có host partner.<domain>")
+        r.check(not mws, f"[{env}] ĐTK 1/G4: không Middleware Public API")
+        r.check((pf, "pf-apikey-pepper") not in es and (pf, "agrigreen-partner-tls") not in es, f"[{env}] ĐTK 1/G4: pepper/TLS partner chỉ có ở Phase K")
+        return
+    replicas = dep["spec"].get("replicas")
+    r.check(replicas == 2 or (hpa is not None and hpa["spec"]["minReplicas"] >= 2), f"[{env}] Phase K: api-public 2 bản sao (HA), đang {replicas}")
+    r.check(pdb is not None and pdb["spec"].get("minAvailable", 0) >= 1, f"[{env}] Phase K: PDB api-public minAvailable ≥ 1")
+    r.check(envs.get("AG_PUBLIC_API_ENABLED") == "1", f"[{env}] Phase K: AG_PUBLIC_API_ENABLED=1")
+    r.check("AG_PUBLIC_OPERATOR_TENANT" in envs and envs.get("AG_PUBLIC_HTTP_ADDR") == ":8085", f"[{env}] Phase K: thiếu AG_PUBLIC_OPERATOR_TENANT / AG_PUBLIC_HTTP_ADDR")
+    r.check(len(partner) == 1, f"[{env}] Phase K: đúng một host partner.<domain>, có {len(partner)}")
+    if partner:
+        ing, rule = partner[0]
+        r.check(rule["host"] == f"partner.{values['global']['domain']}", f"[{env}] host partner sai: {rule['host']}")
+        tls = ing["spec"].get("tls") or []
+        r.check(any(rule["host"] in t.get("hosts", []) and t.get("secretName") == "agrigreen-partner-tls" for t in tls), f"[{env}] Phase K: partner thiếu TLS agrigreen-partner-tls")
+        r.check(base_env(env) == "dev" or (pf, "agrigreen-partner-tls") in es, f"[{env}] Phase K: TLS partner không có ExternalSecret ở {pf}")
+        ann = ing["metadata"].get("annotations") or {}
+        refs = (ann.get("traefik.ingress.kubernetes.io/router.middlewares") or "").split(",")
+        r.check(ann.get("traefik.ingress.kubernetes.io/router.entrypoints") == "websecure", f"[{env}] Phase K: partner chỉ qua websecure (TLS)")
+        rl = next((mws[n] for n in mws if f"{pf}-{n}@kubernetescrd" in refs and "rateLimit" in mws[n]["spec"]), None)
+        bl = next((mws[n] for n in mws if f"{pf}-{n}@kubernetescrd" in refs and "buffering" in mws[n]["spec"]), None)
+        r.check(rl is not None and rl["spec"]["rateLimit"].get("average", 0) > 0, f"[{env}] Phase K: partner thiếu giới hạn theo IP (R-55)")
+        r.check(bl is not None and 0 < bl["spec"]["buffering"].get("maxRequestBodyBytes", 0) <= 1048576, f"[{env}] Phase K: partner thiếu giới hạn thân 1 MiB")
+    r.check(base_env(env) == "dev" or (pf, "pf-apikey-pepper") in es, f"[{env}] Phase K: thiếu ExternalSecret pepper khóa API")
+
+
 # --------------------------------------------------------------------------- chạy
 def helm_bin() -> str:
     h = os.environ.get("HELM") or shutil.which("helm")
@@ -527,8 +730,10 @@ def helm_bin() -> str:
 
 
 def render(env: str) -> str:
-    out = subprocess.run([helm_bin(), "template", "agrigreen", str(CHART), "-f", str(CHART / f"values-{env}.yaml")],
-                         check=True, capture_output=True, text=True, encoding="utf-8")
+    args = [helm_bin(), "template", "agrigreen", str(CHART)]
+    for f in PROFILES[env]:
+        args += ["-f", str(CHART / f)]
+    out = subprocess.run(args, check=True, capture_output=True, text=True, encoding="utf-8")
     return out.stdout
 
 
@@ -540,9 +745,27 @@ def merged_values(env: str) -> dict:
                 o[k] = merge(a.get(k), v) if k in a else v
             return o
         return b
-    base = yaml.safe_load((CHART / "values.yaml").read_text(encoding="utf-8"))
-    over = yaml.safe_load((CHART / f"values-{env}.yaml").read_text(encoding="utf-8")) or {}
-    return merge(base, over)
+    out = yaml.safe_load((CHART / "values.yaml").read_text(encoding="utf-8"))
+    for f in PROFILES[env]:
+        out = merge(out, yaml.safe_load((CHART / f).read_text(encoding="utf-8")) or {})
+    return out
+
+
+def leaf_paths(d, prefix: str = ""):
+    if isinstance(d, dict) and d:
+        for k, v in d.items():
+            yield from leaf_paths(v, f"{prefix}.{k}" if prefix else str(k))
+    else:
+        yield prefix
+
+
+def phasek_overlay_checks(r: Report):
+    """R-01 / ADR-0025 mục 1: values-phasek.yaml chỉ có cấu hình và số bản sao."""
+    over = yaml.safe_load((CHART / "values-phasek.yaml").read_text(encoding="utf-8")) or {}
+    paths = list(leaf_paths(over))
+    r.check(bool(paths), "values-phasek.yaml rỗng")
+    for p in paths:
+        r.check(any(re.fullmatch(rx, p) for rx in PHASEK_ALLOWED), f"values-phasek.yaml: '{p}' không phải cấu hình/số bản sao (R-01)")
 
 
 def main() -> int:
@@ -561,6 +784,8 @@ def main() -> int:
         values = merged_values(env)
         structure_checks(env, docs, values, r)
         flow_checks(env, docs, values, r)
+        public_api_checks(env, docs, values, r)
+    phasek_overlay_checks(r)
     for f in r.fails:
         print("HỎNG:", f)
     print(f"check_flows: {r.passes} kiểm đạt, {len(r.fails)} hỏng")

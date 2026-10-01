@@ -14,6 +14,7 @@ Các job vận hành dùng chung cho mọi cụm (`ag_pf`, `ag_mkg`, `ag_vault`)
 | Kiểm đích trong lãnh thổ (RB-7) | mỗi lần khởi động ở production | `internal/shared/residency` | — | [residency.md](residency.md) |
 | Deploy một VPS (demo/thử nghiệm) | khi dựng hoặc cập nhật | `docker-compose.vps.yml`, `deploy/vps/prepare.sh` | — | [vps-deploy.md](vps-deploy.md) |
 | Triển khai Kubernetes trong lãnh thổ (G4): cài theo vùng, nâng cấp, lùi lại, bí mật, tách vùng, NetworkPolicy ADR-0008 | khi dựng cụm; mỗi phát hành | chart `deploy/k8s/charts/agrigreen`, `deploy/k8s/check.ps1`, OpenTofu `deploy/iac/opentofu` | theo vùng | [k8s-deploy.md](k8s-deploy.md) |
+| Bật/tắt Phase K (G5): Public API cho bên thứ ba `api-public` (0 → 2 bản sao, host `partner.<domain>`, pepper khóa API, `AG_EGRESS_MODE=enforce`), cấp bên thứ ba, xoay pepper, rollback = 0 bản sao | khi khách chốt bên thứ ba đầu tiên (diễn tập trên staging trước); xoay pepper ≤ 365 ngày | `values-phasek.yaml` chồng lên `values-prod.yaml`, OpenTofu `phase_k`, `docker compose --profile phasek` (dev) | `public_api`, `apiclient_app`, `metering_app` + vai module nguồn | [phase-k.md](phase-k.md) |
 | PKI production: CA dịch vụ (cert-manager, mTLS) + CA thiết bị (step-ca + HSM), xoay vòng CA | dựng một lần; lá dịch vụ tự gia hạn 90 ngày; kiểm hằng quý | `deploy/k8s/charts/agrigreen/templates/pki.yaml` | — | [pki.md](pki.md) |
 | Diễn tập tải ĐTK 2 (sync push/pull, ingest, đọc) + chuyển đổi dự phòng DB giữa lúc đồng bộ | G4, rồi mỗi thay đổi lớn về khối lượng | `tools/loadgen` (staging, dữ liệu tổng hợp) | — | [load-drill.md](load-drill.md) |
 | Khai báo trước hàng đợi consumer RabbitMQ | mỗi lần `outbox-publisher` khởi động | `cmd/outbox-publisher` (`assembly.Queues`) | — | [rabbitmq-queues.md](rabbitmq-queues.md) |
@@ -84,6 +85,7 @@ Có khi đặt `AG_OTLP_ENDPOINT`. Ngưỡng dưới đây là đề xuất, ch�
 | `ag.outbox.oldest_age{cluster}` | outbox-publisher | > 300 giây |
 | `ag.projection.lag{projection}` | module có bảng chiếu, qua `telemetry.RegisterProjectionLag` | > 60 giây (chưa có nguồn ở G1) |
 | `ag.job.runs{job,outcome="error"}` | worker | tăng bất kỳ; job `anchor` lỗi là P1 (mục 23) |
+| `kube_deployment_status_replicas_available{deployment="api-public"}`, `traefik_service_requests_total` (host `partner`) | kube-state-metrics, Traefik | Phase K: `AgPublicAPIDown` (0 bản sao sẵn sàng 5 phút, P2), 5xx > 5 %, 429 > 20 % — `agrigreen-public-api.rules.yml`, [phase-k.md](phase-k.md) |
 | không có `ag.job.runs{job="anchor",outcome="ok"}` trong 26 giờ | worker | P1: mất neo hằng ngày |
 | `http.server.request.duration` | api-* | p95 > 2 giây (R-52) |
 | `ag.sync.conflict.overdue{tenant_id}` | worker khi có lịch (`registerGauges`; tenant qua `ag_outbox_publisher`, migration pf 000043; đếm bằng `sync_app`) | > 0 trong 1 giờ — xung đột đồng bộ quá SLA C-8 (tạm 72 giờ, tham số `sync.conflict_sla_hours`, ADR-0006). Xử lý ở Admin `GET /v1/sync/conflicts?overdue=true` (vai `sync_conflict_resolver`). Luật Prometheus đề xuất: `max by (tenant_id) (ag_sync_conflict_overdue) > 0` for 1h |

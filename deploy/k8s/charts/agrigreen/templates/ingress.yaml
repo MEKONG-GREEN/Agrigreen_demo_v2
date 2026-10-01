@@ -2,27 +2,60 @@
 Biên/DMZ (mục 11, 17): Ingress trong namespace của Service đích; bộ điều khiển (Traefik, MIT) chạy ở
 agrigreen-edge-ingress. Gateway chỉ làm TLS, định tuyến, giới hạn tần suất (R-55); backend tự xác minh
 token (R-54). Không có Ingress cho Internal API (8084), identity-vault, ingest (Biên OT qua VPN).
+
+ingress.hosts: host luôn bật. ingress.optionalHosts: host bật theo hồ sơ cấp phát (map, để lớp giá trị
+chỉ đổi `enabled` — R-01), vd `partner` = Public API cho bên thứ ba (ADR-0022, ADR-0025). Host có thể
+mang middlewares (tên trong ingress.middlewares → CRD Middleware của Traefik cùng namespace), tlsSecret
+riêng và annotations riêng.
 */ -}}
 {{- if .Values.ingress.enabled }}
 {{- $root := . }}
-{{- range $h := .Values.ingress.hosts }}
+{{- $hosts := list }}
+{{- range $h := .Values.ingress.hosts }}{{- $hosts = append $hosts $h }}{{- end }}
+{{- range $key, $h := (.Values.ingress.optionalHosts | default dict) }}
+{{- if $h.enabled }}{{- $hosts = append $hosts $h }}{{- end }}
+{{- end }}
+{{- $mwDone := dict }}
+{{- range $h := $hosts }}
 {{- if include "agrigreen.on" (dict "root" $root "zone" $h.zone) }}
 {{- $host := tpl $h.host $root }}
+{{- $ns := include "agrigreen.ns" (dict "root" $root "zone" $h.zone) }}
+{{- $ann := merge (dict) ($h.annotations | default dict) ($root.Values.ingress.annotations | default dict) }}
+{{- $mwRefs := list }}
+{{- range $m := ($h.middlewares | default list) }}
+{{- $spec := index ($root.Values.ingress.middlewares | default dict) $m }}
+{{- if not $spec }}{{- fail (printf "ingress.middlewares thiếu %s (host %s)" $m $host) }}{{- end }}
+{{- $mwRefs = append $mwRefs (printf "%s-%s@kubernetescrd" $ns $m) }}
+{{- $k := printf "%s/%s" $ns $m }}
+{{- if not (hasKey $mwDone $k) }}
+{{- $_ := set $mwDone $k true }}
+---
+# Traefik Middleware (traefik.io/v1alpha1): giới hạn THÔ ở gateway, không thẩm quyền (R-55, ADR-0022 mục 7).
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $m }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $h.zone) | nindent 4 }}
+spec: {{ toJson $spec }}
+{{- end }}
+{{- end }}
+{{- if $mwRefs }}{{- $_ := set $ann "traefik.ingress.kubernetes.io/router.middlewares" (join "," $mwRefs) }}{{- end }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ $h.service }}-{{ $h.port }}
-  namespace: {{ include "agrigreen.ns" (dict "root" $root "zone" $h.zone) }}
+  namespace: {{ $ns }}
   labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $h.zone) | nindent 4 }}
-{{- with $root.Values.ingress.annotations }}
+{{- with $ann }}
   annotations: {{ toJson . }}
 {{- end }}
 spec:
   ingressClassName: {{ $root.Values.ingress.className }}
   tls:
     - hosts: [{{ $host | quote }}]
-      secretName: {{ $root.Values.ingress.tlsSecret }}
+      secretName: {{ $h.tlsSecret | default $root.Values.ingress.tlsSecret }}
   rules:
     - host: {{ $host | quote }}
       http:

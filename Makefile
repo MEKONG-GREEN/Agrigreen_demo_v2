@@ -40,4 +40,5 @@ verify-db:
 # G4 Kubernetes: helm lint + bảng luồng ADR-0008 (docs/runbooks/k8s-deploy.md mục 8). Windows: deploy/k8s/check.ps1
 k8s-check:
 	for e in dev staging prod; do helm lint --strict deploy/k8s/charts/agrigreen -f deploy/k8s/charts/agrigreen/values-$$e.yaml || exit 1; done
+	helm lint --strict deploy/k8s/charts/agrigreen -f deploy/k8s/charts/agrigreen/values-prod.yaml -f deploy/k8s/charts/agrigreen/values-phasek.yaml
 	python3 deploy/k8s/tests/check_flows.py
