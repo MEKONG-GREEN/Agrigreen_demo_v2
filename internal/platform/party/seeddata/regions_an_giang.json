@@ -1,0 +1,548 @@
+{
+ "format": "agrigreen.regions/v1",
+ "province_code": "91",
+ "status": "tạm, chờ khách (Q-04)",
+ "source": "Suy từ bảng kế thừa ĐVHC (seeddata masterdata admin_units_dbscl.json, QĐ 19/2025/QĐ-TTg): Khu vực = huyện cũ (An Giang + Kiên Giang trước 01/07/2025) mà phần lớn xã cũ hợp thành xã mới thuộc về. TTKN An Giang xác nhận danh sách Khu vực và xã thuộc từng Khu vực (Q-04).",
+ "regions": [
+  {
+   "code": "KV883",
+   "name": "Thành phố Long Xuyên",
+   "sort_order": 10
+  },
+  {
+   "code": "KV884",
+   "name": "Thành phố Châu Đốc",
+   "sort_order": 20
+  },
+  {
+   "code": "KV886",
+   "name": "Huyện An Phú",
+   "sort_order": 30
+  },
+  {
+   "code": "KV887",
+   "name": "Thị xã Tân Châu",
+   "sort_order": 40
+  },
+  {
+   "code": "KV888",
+   "name": "Huyện Phú Tân",
+   "sort_order": 50
+  },
+  {
+   "code": "KV889",
+   "name": "Huyện Châu Phú",
+   "sort_order": 60
+  },
+  {
+   "code": "KV890",
+   "name": "Thị xã Tịnh Biên",
+   "sort_order": 70
+  },
+  {
+   "code": "KV891",
+   "name": "Huyện Tri Tôn",
+   "sort_order": 80
+  },
+  {
+   "code": "KV892",
+   "name": "Huyện Châu Thành (An Giang cũ)",
+   "sort_order": 90
+  },
+  {
+   "code": "KV893",
+   "name": "Huyện Chợ Mới",
+   "sort_order": 100
+  },
+  {
+   "code": "KV894",
+   "name": "Huyện Thoại Sơn",
+   "sort_order": 110
+  },
+  {
+   "code": "KV899",
+   "name": "Thành phố Rạch Giá",
+   "sort_order": 120
+  },
+  {
+   "code": "KV900",
+   "name": "Thành phố Hà Tiên",
+   "sort_order": 130
+  },
+  {
+   "code": "KV902",
+   "name": "Huyện Kiên Lương",
+   "sort_order": 140
+  },
+  {
+   "code": "KV903",
+   "name": "Huyện Hòn Đất",
+   "sort_order": 150
+  },
+  {
+   "code": "KV904",
+   "name": "Huyện Tân Hiệp",
+   "sort_order": 160
+  },
+  {
+   "code": "KV905",
+   "name": "Huyện Châu Thành (Kiên Giang cũ)",
+   "sort_order": 170
+  },
+  {
+   "code": "KV906",
+   "name": "Huyện Giồng Riềng",
+   "sort_order": 180
+  },
+  {
+   "code": "KV907",
+   "name": "Huyện Gò Quao",
+   "sort_order": 190
+  },
+  {
+   "code": "KV908",
+   "name": "Huyện An Biên",
+   "sort_order": 200
+  },
+  {
+   "code": "KV909",
+   "name": "Huyện An Minh",
+   "sort_order": 210
+  },
+  {
+   "code": "KV910",
+   "name": "Huyện Vĩnh Thuận",
+   "sort_order": 220
+  },
+  {
+   "code": "KV911",
+   "name": "Thành phố Phú Quốc",
+   "sort_order": 230
+  },
+  {
+   "code": "KV912",
+   "name": "Huyện Kiên Hải",
+   "sort_order": 240
+  },
+  {
+   "code": "KV913",
+   "name": "Huyện U Minh Thượng",
+   "sort_order": 250
+  },
+  {
+   "code": "KV914",
+   "name": "Huyện Giang Thành",
+   "sort_order": 260
+  }
+ ],
+ "assignments": [
+  {
+   "commune_code": "30292",
+   "region_code": "KV883"
+  },
+  {
+   "commune_code": "30301",
+   "region_code": "KV883"
+  },
+  {
+   "commune_code": "30307",
+   "region_code": "KV883"
+  },
+  {
+   "commune_code": "30313",
+   "region_code": "KV883"
+  },
+  {
+   "commune_code": "30316",
+   "region_code": "KV884"
+  },
+  {
+   "commune_code": "30325",
+   "region_code": "KV884"
+  },
+  {
+   "commune_code": "30337",
+   "region_code": "KV886"
+  },
+  {
+   "commune_code": "30341",
+   "region_code": "KV886"
+  },
+  {
+   "commune_code": "30346",
+   "region_code": "KV886"
+  },
+  {
+   "commune_code": "30352",
+   "region_code": "KV886"
+  },
+  {
+   "commune_code": "30367",
+   "region_code": "KV886"
+  },
+  {
+   "commune_code": "30376",
+   "region_code": "KV887"
+  },
+  {
+   "commune_code": "30377",
+   "region_code": "KV887"
+  },
+  {
+   "commune_code": "30385",
+   "region_code": "KV887"
+  },
+  {
+   "commune_code": "30388",
+   "region_code": "KV887"
+  },
+  {
+   "commune_code": "30403",
+   "region_code": "KV887"
+  },
+  {
+   "commune_code": "30406",
+   "region_code": "KV888"
+  },
+  {
+   "commune_code": "30409",
+   "region_code": "KV888"
+  },
+  {
+   "commune_code": "30421",
+   "region_code": "KV888"
+  },
+  {
+   "commune_code": "30430",
+   "region_code": "KV888"
+  },
+  {
+   "commune_code": "30436",
+   "region_code": "KV888"
+  },
+  {
+   "commune_code": "30445",
+   "region_code": "KV888"
+  },
+  {
+   "commune_code": "30463",
+   "region_code": "KV889"
+  },
+  {
+   "commune_code": "30469",
+   "region_code": "KV889"
+  },
+  {
+   "commune_code": "30478",
+   "region_code": "KV889"
+  },
+  {
+   "commune_code": "30481",
+   "region_code": "KV889"
+  },
+  {
+   "commune_code": "30487",
+   "region_code": "KV889"
+  },
+  {
+   "commune_code": "30502",
+   "region_code": "KV890"
+  },
+  {
+   "commune_code": "30505",
+   "region_code": "KV890"
+  },
+  {
+   "commune_code": "30520",
+   "region_code": "KV890"
+  },
+  {
+   "commune_code": "30526",
+   "region_code": "KV890"
+  },
+  {
+   "commune_code": "30538",
+   "region_code": "KV890"
+  },
+  {
+   "commune_code": "30544",
+   "region_code": "KV891"
+  },
+  {
+   "commune_code": "30547",
+   "region_code": "KV891"
+  },
+  {
+   "commune_code": "30568",
+   "region_code": "KV891"
+  },
+  {
+   "commune_code": "30577",
+   "region_code": "KV891"
+  },
+  {
+   "commune_code": "30580",
+   "region_code": "KV891"
+  },
+  {
+   "commune_code": "30589",
+   "region_code": "KV892"
+  },
+  {
+   "commune_code": "30595",
+   "region_code": "KV892"
+  },
+  {
+   "commune_code": "30604",
+   "region_code": "KV892"
+  },
+  {
+   "commune_code": "30607",
+   "region_code": "KV892"
+  },
+  {
+   "commune_code": "30619",
+   "region_code": "KV892"
+  },
+  {
+   "commune_code": "30628",
+   "region_code": "KV893"
+  },
+  {
+   "commune_code": "30631",
+   "region_code": "KV893"
+  },
+  {
+   "commune_code": "30643",
+   "region_code": "KV893"
+  },
+  {
+   "commune_code": "30658",
+   "region_code": "KV893"
+  },
+  {
+   "commune_code": "30664",
+   "region_code": "KV893"
+  },
+  {
+   "commune_code": "30673",
+   "region_code": "KV893"
+  },
+  {
+   "commune_code": "30682",
+   "region_code": "KV894"
+  },
+  {
+   "commune_code": "30685",
+   "region_code": "KV894"
+  },
+  {
+   "commune_code": "30688",
+   "region_code": "KV894"
+  },
+  {
+   "commune_code": "30691",
+   "region_code": "KV894"
+  },
+  {
+   "commune_code": "30697",
+   "region_code": "KV894"
+  },
+  {
+   "commune_code": "30709",
+   "region_code": "KV894"
+  },
+  {
+   "commune_code": "30742",
+   "region_code": "KV899"
+  },
+  {
+   "commune_code": "30760",
+   "region_code": "KV899"
+  },
+  {
+   "commune_code": "30766",
+   "region_code": "KV900"
+  },
+  {
+   "commune_code": "30769",
+   "region_code": "KV900"
+  },
+  {
+   "commune_code": "30781",
+   "region_code": "KV900"
+  },
+  {
+   "commune_code": "30787",
+   "region_code": "KV902"
+  },
+  {
+   "commune_code": "30790",
+   "region_code": "KV902"
+  },
+  {
+   "commune_code": "30793",
+   "region_code": "KV914"
+  },
+  {
+   "commune_code": "30796",
+   "region_code": "KV914"
+  },
+  {
+   "commune_code": "30811",
+   "region_code": "KV902"
+  },
+  {
+   "commune_code": "30814",
+   "region_code": "KV902"
+  },
+  {
+   "commune_code": "30817",
+   "region_code": "KV903"
+  },
+  {
+   "commune_code": "30823",
+   "region_code": "KV903"
+  },
+  {
+   "commune_code": "30826",
+   "region_code": "KV903"
+  },
+  {
+   "commune_code": "30835",
+   "region_code": "KV903"
+  },
+  {
+   "commune_code": "30838",
+   "region_code": "KV903"
+  },
+  {
+   "commune_code": "30850",
+   "region_code": "KV904"
+  },
+  {
+   "commune_code": "30856",
+   "region_code": "KV904"
+  },
+  {
+   "commune_code": "30874",
+   "region_code": "KV904"
+  },
+  {
+   "commune_code": "30880",
+   "region_code": "KV905"
+  },
+  {
+   "commune_code": "30886",
+   "region_code": "KV905"
+  },
+  {
+   "commune_code": "30898",
+   "region_code": "KV905"
+  },
+  {
+   "commune_code": "30904",
+   "region_code": "KV906"
+  },
+  {
+   "commune_code": "30910",
+   "region_code": "KV906"
+  },
+  {
+   "commune_code": "30928",
+   "region_code": "KV906"
+  },
+  {
+   "commune_code": "30934",
+   "region_code": "KV906"
+  },
+  {
+   "commune_code": "30943",
+   "region_code": "KV906"
+  },
+  {
+   "commune_code": "30949",
+   "region_code": "KV906"
+  },
+  {
+   "commune_code": "30952",
+   "region_code": "KV907"
+  },
+  {
+   "commune_code": "30958",
+   "region_code": "KV907"
+  },
+  {
+   "commune_code": "30970",
+   "region_code": "KV907"
+  },
+  {
+   "commune_code": "30982",
+   "region_code": "KV907"
+  },
+  {
+   "commune_code": "30985",
+   "region_code": "KV908"
+  },
+  {
+   "commune_code": "30988",
+   "region_code": "KV908"
+  },
+  {
+   "commune_code": "31006",
+   "region_code": "KV908"
+  },
+  {
+   "commune_code": "31012",
+   "region_code": "KV913"
+  },
+  {
+   "commune_code": "31018",
+   "region_code": "KV909"
+  },
+  {
+   "commune_code": "31024",
+   "region_code": "KV909"
+  },
+  {
+   "commune_code": "31027",
+   "region_code": "KV913"
+  },
+  {
+   "commune_code": "31031",
+   "region_code": "KV909"
+  },
+  {
+   "commune_code": "31036",
+   "region_code": "KV909"
+  },
+  {
+   "commune_code": "31042",
+   "region_code": "KV909"
+  },
+  {
+   "commune_code": "31051",
+   "region_code": "KV910"
+  },
+  {
+   "commune_code": "31064",
+   "region_code": "KV910"
+  },
+  {
+   "commune_code": "31069",
+   "region_code": "KV910"
+  },
+  {
+   "commune_code": "31078",
+   "region_code": "KV911"
+  },
+  {
+   "commune_code": "31105",
+   "region_code": "KV911"
+  },
+  {
+   "commune_code": "31108",
+   "region_code": "KV912"
+  }
+ ]
+}

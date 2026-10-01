@@ -23,7 +23,10 @@ import (
 )
 
 // Registry gói app.Registry cho HTTP: sổ tổ chức, HTX, nông hộ.
-type Registry struct{ Reg *app.Registry }
+type Registry struct {
+	Reg *app.Registry
+	KN  *app.KN // KN v7.7: khu vực của Nút xã trong /v1/orgs (tùy chọn)
+}
 
 // RegisterApp gắn route Application API.
 func (h Registry) RegisterApp(rg *gin.RouterGroup) {
@@ -71,6 +74,8 @@ type orgDTO struct {
 	ParentRef         *string `json:"parent_ref"`
 	RepresentativeRef *string `json:"representative_ref"`
 	Active            bool    `json:"active"`
+	// Region: khu vực của Nút xã (KN v7.7 FN-AD-04.02) — chỉ có trong danh sách /v1/orgs khi đã gán.
+	Region *regionRefDTO `json:"region,omitempty"`
 }
 
 func refPtr(u uuid.UUID) *string {
@@ -264,6 +269,7 @@ func (h Registry) listOrgs(c *gin.Context) {
 	for _, o := range page.Items {
 		items = append(items, toOrgDTO(o))
 	}
+	withRegions(c.Request.Context(), h.KN, items, page.Items)
 	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": encodeCursor(page.Next)})
 }
 

@@ -3612,6 +3612,483 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
   # --- hết pf/party cấp quyền chia sẻ ---
+  # --- pf/party KN v7.7 gói P2: phòng ban, khu vực, cây 3 cấp, bảng ảnh hưởng (FN-AD-04.02, 04.03) ---
+  /v1/departments:
+    get:
+      summary: "FN-AD-04.03: phòng ban (module) của một đơn vị kèm số tài khoản/bản ghi (null khi chưa nối nguồn đếm)"
+      operationId: knAdminListDepartments
+      tags: [party]
+      parameters:
+        - {name: org_ref, in: query, schema: {type: string, format: uuid}, description: "Đơn vị (Nút cấp 1/2); vắng = đơn vị của Nút người gọi"}
+        - {name: include_retired, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Danh sách theo thứ tự hiển thị
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDepartmentList"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "FN-AD-04.03: khai báo phòng ban cho Nút cấp 1 (TTKNQG) hoặc cấp 2 (TTKN tỉnh); trùng mã trong đơn vị → 409"
+      description: Chỉ Admin (platform_admin, registry_admin). Ghi sổ pf_party.department_event (created, ảnh chụp sau).
+      operationId: knCreateDepartment
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNDepartmentInput"}
+      responses:
+        "201":
+          description: Đã tạo (gọi lặp cùng Idempotency-Key → như lần đầu)
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDepartment"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {description: party.department_code_taken, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed | party.department_unit_invalid, $ref: "#/components/responses/Problem"}
+  /v1/departments/{id}:
+    get:
+      summary: Một phòng ban kèm số tài khoản/bản ghi
+      operationId: knGetDepartment
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Phòng ban
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDepartment"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+    put:
+      summary: Sửa tên, mô tả, thứ tự, bộ menu (không đổi gì → không ghi sổ; đổi → một dòng Log cũ → mới)
+      operationId: knUpdateDepartment
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string, minLength: 1, maxLength: 200}
+                description: {type: string, maxLength: 1000}
+                sort_order: {type: integer, minimum: 0, maximum: 100000}
+                menu_profile: {type: string, enum: [trong_trot, generic]}
+      responses:
+        "200":
+          description: Phòng ban sau khi sửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDepartment"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: party.department_state (đã xóa), $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/departments/{id}/status:
+    post:
+      summary: "Đổi trạng thái Đang áp dụng / Chưa mở / Ngưng hoạt động — hiệu lực ngay ở bước 2 đăng nhập và menu (UR-KT-02)"
+      description: Ngưng (suspended) bắt buộc lý do ≥ 10 ký tự. Ngưng/đóng phòng ban còn tài khoản/dữ liệu → cảnh báo, dữ liệu cũ giữ nguyên.
+      operationId: knDepartmentStatus
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: {type: string, enum: [active, not_open, suspended]}
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201":
+          description: Đã đổi
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [department, warnings]
+                properties:
+                  department: {$ref: "#/components/schemas/KNDepartment"}
+                  warnings: {type: array, items: {type: string}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: party.department_state, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/departments/{id}/retire:
+    post:
+      summary: "Xóa phòng ban (sự kiện retired, không xóa cứng) — chặn khi có tài khoản/dữ liệu (409) hoặc chưa nối nguồn đếm (503)"
+      operationId: knRetireDepartment
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201":
+          description: Đã xóa (mã không tái sử dụng)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNDepartment"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: party.department_in_use | party.department_state, $ref: "#/components/responses/Problem"}
+        "503": {description: party.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/departments/{id}/log:
+    get:
+      summary: Khung Log của phòng ban — người, thời điểm, cũ → mới, lý do (AC-CHUNG)
+      operationId: knDepartmentLog
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: integer, minimum: 0}, description: "seq của dòng cuối trang trước"}
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNLogPage"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/orgs/{ref}/departments/seed:
+    post:
+      summary: "Nạp 6 phòng ban mặc định (TTKN An Giang; Phòng Trồng trọt Đang áp dụng) — TẠM, chờ khách Q-02; chạy lặp an toàn"
+      operationId: knSeedDepartments
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả nạp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created, existing, status]
+                properties:
+                  created: {type: array, items: {$ref: "#/components/schemas/KNDepartment"}}
+                  existing: {type: integer}
+                  status: {type: string}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/regions:
+    get:
+      summary: "FN-AD-04.02: khu vực của tỉnh kèm số xã được gán"
+      operationId: knAdminListRegions
+      tags: [party]
+      parameters:
+        - {name: province_code, in: query, required: true, schema: {type: string}}
+        - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Danh sách theo thứ tự hiển thị
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRegionList"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Thêm khu vực cho tỉnh (mã duy nhất trong tỉnh)
+      operationId: knCreateRegion
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [province_code, code, name]
+              properties:
+                province_code: {type: string}
+                code: {type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$"}
+                name: {type: string, minLength: 1, maxLength: 200}
+                sort_order: {type: integer, minimum: 0, maximum: 100000}
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRegion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {description: party.region_code_taken, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/regions/seed:
+    post:
+      summary: "Nạp Khu vực (huyện cũ) của tỉnh và gán cho Nút xã chưa có khu vực — TẠM, chờ khách Q-04 (chỉ An Giang, mã 91)"
+      operationId: knSeedRegions
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [province_code]
+              properties:
+                province_code: {type: string}
+      responses:
+        "200":
+          description: Kết quả nạp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [province_code, regions_created, assigned, already_assigned, missing_node, status]
+                properties:
+                  province_code: {type: string}
+                  regions_created: {type: integer}
+                  assigned: {type: integer}
+                  already_assigned: {type: integer}
+                  missing_node: {type: array, items: {type: string}, description: "Mã xã chưa có Nút — chạy communes/ensure trước"}
+                  status: {type: string}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: party.seed_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/regions/{id}:
+    get:
+      summary: Một khu vực
+      operationId: knGetRegion
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Khu vực
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRegion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+    put:
+      summary: Sửa tên, thứ tự khu vực
+      operationId: knUpdateRegion
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string, minLength: 1, maxLength: 200}
+                sort_order: {type: integer, minimum: 0, maximum: 100000}
+      responses:
+        "200":
+          description: Khu vực sau khi sửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRegion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/regions/{id}/deactivate:
+    post:
+      summary: Ngừng dùng khu vực (lý do bắt buộc; còn xã được gán → 409 party.region_in_use)
+      operationId: knDeactivateRegion
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201":
+          description: Đã ngừng dùng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRegion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/regions/{id}/reactivate:
+    post:
+      summary: Dùng lại khu vực
+      operationId: knReactivateRegion
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "201":
+          description: Đã dùng lại
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRegion"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/regions/{id}/log:
+    get:
+      summary: Khung Log của khu vực (cũ → mới)
+      operationId: knRegionLog
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: integer, minimum: 0}}
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNLogPage"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/orgs/tree:
+    get:
+      summary: "FN-AD-04.02: cây TTKNQG › TTKN tỉnh › Khu vực › Xã trong phạm vi người gọi (xem xuống, không ngang, không lên)"
+      operationId: knAdminOrgTree
+      tags: [party]
+      parameters:
+        - {name: include_inactive, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Rừng cây (gốc = Nút thấy được cao nhất)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/KNOrgTreeNode"}}
+  /v1/orgs/{ref}/region:
+    post:
+      summary: "Gán / đổi / bỏ (region_code null) Khu vực của Nút xã — đổi, bỏ cần lý do ≥ 10 ký tự (FN-AD-04.02)"
+      operationId: knAssignRegion
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [region_code]
+              properties:
+                region_code: {type: [string, "null"]}
+                reason: {type: string, maxLength: 500}
+      responses:
+        "201":
+          description: Đã ghi sổ org_region_event
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [org_ref, commune_code, province_code, region_code, action]
+                properties:
+                  org_ref: {type: string, format: uuid}
+                  commune_code: {type: string}
+                  province_code: {type: string}
+                  region_code: {type: [string, "null"]}
+                  action: {type: string, enum: [assigned, changed, cleared]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: party.region_state, $ref: "#/components/responses/Problem"}
+        "422": {description: party.region_node_invalid | validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/orgs/{ref}/region-log:
+    get:
+      summary: Lịch sử gán khu vực của Nút xã (cũ → mới, lý do)
+      operationId: knOrgRegionLog
+      tags: [party]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: integer, minimum: 0}}
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNLogPage"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/orgs/{ref}/communes/ensure:
+    post:
+      summary: "Bảo đảm mỗi xã còn hiệu lực của tỉnh có Nút extension_team gắn mã ĐVHC (An Giang: 102), mã = code_prefix-mã xã"
+      operationId: knEnsureCommuneNodes
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}, description: "Nút TTKN tỉnh"}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code_prefix: {type: string, maxLength: 20, default: XA}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [province_code, communes, existing, created]
+                properties:
+                  province_code: {type: string}
+                  communes: {type: integer}
+                  existing: {type: integer}
+                  created: {type: array, items: {$ref: "#/components/schemas/PartyOrg"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/orgs/{ref}/impact:
+    get:
+      summary: "Bảng Ảnh hưởng của Nút: tài khoản, HTX, thửa ruộng, kỳ chưa chốt (FN-AD-04.02)"
+      operationId: knOrgImpact
+      tags: [party]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Bảng ảnh hưởng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNImpact"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/party KN v7.7 gói P2 ---
 components:
   securitySchemes:
     oidc:
@@ -3627,7 +4104,7 @@ components:
       name: catalog
       in: path
       required: true
-      schema: {type: string, enum: [rice_variety, farm_stage, machine_type, season, pest]}
+      schema: {type: string, enum: [rice_variety, farm_stage, machine_type, season, pest, vessel_class, crop, material, production_model, report_type]}
     ItemCode:
       name: code
       in: path
@@ -3883,6 +4360,7 @@ components:
         deactivation_reason: {type: [string, "null"]}
         revision: {type: integer}
         updated_at: {type: string, format: date-time}
+        forms_in_use: {type: integer, description: "KN v7.7 FN-AD-04.05: số mẫu báo cáo đang dùng mục (vắng khi chưa nối P3)"}
     ReasonInput:
       type: object
       properties:
@@ -4038,6 +4516,7 @@ components:
         parent_ref: {type: [string, "null"], format: uuid}
         representative_ref: {type: [string, "null"], format: uuid}
         active: {type: boolean}
+        region: {$ref: "#/components/schemas/KNRegionRef", description: "KN v7.7: Khu vực của Nút xã (chỉ trong danh sách /v1/orgs, khi đã gán)"}
     PartyOrgInput:
       type: object
       required: [kind, name]
@@ -4880,6 +5359,131 @@ components:
         actor_ref: {type: string, format: uuid, description: "sub của tài khoản dịch vụ bên nhận"}
         recorded_at: {type: string, format: date-time}
     # --- hết pf/party cấp quyền chia sẻ ---
+    # --- pf/party KN v7.7 gói P2 ---
+    KNDepartment:
+      type: object
+      required: [id, org_ref, code, name, description, sort_order, status, status_label, menu_profile, retired, selectable, account_count, record_count, updated_by, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        org_ref: {type: string, format: uuid, description: "Đơn vị: Nút cấp 1 (ttkn_national) hoặc cấp 2 (ttkn_province)"}
+        code: {type: string, pattern: "^[a-z][a-z0-9_]{1,39}$", description: "Mã phòng ban — department_code của mọi bản ghi KN mới"}
+        name: {type: string}
+        description: {type: [string, "null"]}
+        sort_order: {type: integer}
+        status: {type: string, enum: [active, not_open, suspended], description: "Đang áp dụng / Chưa mở / Ngưng hoạt động"}
+        status_label: {type: string}
+        menu_profile: {type: string, enum: [trong_trot, generic], description: "Bộ menu dựng sẵn trong mã (kn.menu/v1)"}
+        retired: {type: boolean, description: "Đã xóa (sự kiện retired) — mã không tái sử dụng"}
+        selectable: {type: boolean, description: "Chọn được ở bước 2 đăng nhập (Đang áp dụng, chưa xóa)"}
+        account_count: {type: [integer, "null"], description: "null = chưa nối nguồn đếm (P1) hoặc Application API"}
+        record_count: {type: [integer, "null"]}
+        updated_by: {type: string, format: uuid}
+        updated_at: {type: string, format: date-time}
+    KNDepartmentList:
+      type: object
+      required: [org_ref, items]
+      properties:
+        org_ref: {type: string, format: uuid}
+        items: {type: array, items: {$ref: "#/components/schemas/KNDepartment"}}
+    KNRegion:
+      type: object
+      required: [id, province_code, code, name, sort_order, active, deactivation_reason, commune_count, updated_by, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        province_code: {type: string}
+        code: {type: string}
+        name: {type: string}
+        sort_order: {type: integer}
+        active: {type: boolean}
+        deactivation_reason: {type: [string, "null"]}
+        commune_count: {type: integer, description: "Số Nút xã đang hoạt động được gán"}
+        updated_by: {type: string, format: uuid}
+        updated_at: {type: string, format: date-time}
+    KNRegionList:
+      type: object
+      required: [province_code, items, assigned_communes]
+      properties:
+        province_code: {type: string}
+        items: {type: array, items: {$ref: "#/components/schemas/KNRegion"}}
+        assigned_communes: {type: integer, description: "Σ commune_count"}
+    KNRegionRef:
+      type: object
+      required: [code, name]
+      properties:
+        code: {type: string}
+        name: {type: string}
+    KNOrgTreeNode:
+      type: object
+      required: [ref, kind, code, name, admin_unit_code, level, active, region, commune_count, children]
+      properties:
+        ref: {type: [string, "null"], format: uuid, description: "null với nhóm khu vực"}
+        kind: {type: string, enum: [ttkn_national, ttkn_province, extension_team, region, region_unassigned]}
+        code: {type: string}
+        name: {type: string}
+        admin_unit_code: {type: [string, "null"]}
+        level: {type: integer, description: "1 TTKNQG, 2 TTKN tỉnh, 3 Xã; 0 với nhóm khu vực"}
+        active: {type: boolean}
+        region:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/KNRegionRef"
+        commune_count: {type: integer}
+        children: {type: array, items: {$ref: "#/components/schemas/KNOrgTreeNode"}}
+    # --- hết pf/party KN v7.7 gói P2 (chung) ---
+    KNDepartmentInput:
+      type: object
+      required: [org_ref, code, name]
+      properties:
+        org_ref: {type: string, format: uuid}
+        code: {type: string, pattern: "^[a-z][a-z0-9_]{1,39}$"}
+        name: {type: string, minLength: 1, maxLength: 200}
+        description: {type: string, maxLength: 1000}
+        sort_order: {type: integer, minimum: 0, maximum: 100000}
+        status: {type: string, enum: [active, not_open, suspended], default: not_open}
+        menu_profile: {type: string, enum: [trong_trot, generic], default: generic}
+    KNFieldChange:
+      type: object
+      required: [field, old, new]
+      properties:
+        field: {type: string}
+        old: {type: [string, "null"]}
+        new: {type: [string, "null"]}
+    KNLogEntry:
+      type: object
+      required: [seq, event, actor_ref, actor_display, at, recorded_at, changes, reason]
+      properties:
+        seq: {type: integer}
+        event: {type: string}
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: [string, "null"], description: "Tên tra lúc đọc từ actor_ref (RB-3), null khi chưa nối danh bạ"}
+        at: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        changes: {type: array, items: {$ref: "#/components/schemas/KNFieldChange"}}
+        reason: {type: [string, "null"]}
+    KNLogPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/KNLogEntry"}}
+        next_cursor: {type: [integer, "null"]}
+    KNImpactRow:
+      type: object
+      required: [kind, label, count, available]
+      properties:
+        kind: {type: string, enum: [accounts, cooperatives, plots, open_periods]}
+        label: {type: string}
+        count: {type: [integer, "null"], description: "null khi chưa nối nguồn đếm"}
+        area_ha: {type: string, description: "Thửa ruộng: tổng diện tích (decimal)"}
+        available: {type: boolean}
+    KNImpact:
+      type: object
+      required: [org, communes, rows, warnings, movable]
+      properties:
+        org: {$ref: "#/components/schemas/PartyOrg"}
+        communes: {type: array, items: {type: string}}
+        rows: {type: array, items: {$ref: "#/components/schemas/KNImpactRow"}}
+        warnings: {type: array, items: {type: string}}
+        movable: {type: boolean, description: "false với Nút cấp 1, 2"}
   requestBodies:
     ContentTransition:
       required: true

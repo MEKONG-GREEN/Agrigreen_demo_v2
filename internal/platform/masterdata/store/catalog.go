@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -153,4 +154,26 @@ func scanChanges(rows pgx.Rows, err error) ([]domain.Change, error) {
 func Changes(ctx context.Context, tx pgx.Tx, catalog, code string, afterSeq int64, limit int) ([]domain.Change, error) {
 	return scanChanges(tx.Query(ctx, changeSelect+` WHERE stream_key = $1 AND seq > $2 ORDER BY seq LIMIT $3`,
 		domain.CatalogStreamKey(catalog, domain.CanonicalCode(catalog, code)), afterSeq, limit))
+}
+
+// ItemNameTaken cho biết danh mục đã có mục khác (mã ≠ exceptCode) cùng tên, không phân biệt hoa thường
+// (KN v7.7 FN-AD-04.05: trùng tên → chặn). So khớp chữ hoa/thường tiếng Việt ở Go (lower() của DB phụ
+// thuộc LC_CTYPE, cụm "C" không hạ chữ có dấu); danh mục chỉ vài trăm mục.
+func ItemNameTaken(ctx context.Context, tx pgx.Tx, catalog, name, exceptCode string) (bool, error) {
+	rows, err := tx.Query(ctx, `SELECT name FROM pf_masterdata.catalog_item WHERE catalog = $1 AND code <> $2`, catalog, exceptCode)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	want := strings.ToLower(strings.TrimSpace(name))
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			return false, err
+		}
+		if strings.ToLower(strings.TrimSpace(n)) == want {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }

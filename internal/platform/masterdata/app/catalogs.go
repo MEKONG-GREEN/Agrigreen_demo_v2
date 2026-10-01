@@ -82,9 +82,39 @@ func (s *Service) getItem(ctx context.Context, tid uuid.UUID, catalog, code stri
 	return *it, nil
 }
 
-// checkRefs kiểm tham chiếu trong danh mục: loại máy phải gắn một khâu đang dùng.
+// checkRefs kiểm tham chiếu trong danh mục: loại máy phải gắn một khâu đang dùng; cây trồng gắn nhóm
+// (cây trồng cấp 1 đang dùng, khác chính nó); sâu bệnh gắn cây trồng bị ảnh hưởng đang dùng (KN v7.7).
 func checkRefs(ctx context.Context, tx pgx.Tx, it domain.Item) error {
-	if it.Catalog != port.CatalogMachineType {
+	switch it.Catalog {
+	case port.CatalogCrop:
+		parent := it.Attrs[port.AttrParentCode]
+		if parent == "" {
+			return nil
+		}
+		if parent == it.Code {
+			return ErrCatalogRef.WithField("attrs.parent_code", "không được là chính nó")
+		}
+		g, err := store.Item(ctx, tx, port.CatalogCrop, parent, false)
+		if err != nil {
+			return err
+		}
+		if g == nil || !g.Active || g.Attrs[port.AttrParentCode] != "" {
+			return ErrCatalogRef.WithField("attrs.parent_code", "phải là nhóm cây trồng cấp 1 đang dùng")
+		}
+		return nil
+	case port.CatalogPest:
+		for _, c := range domain.CodeList(it.Attrs[port.AttrAffectedCrops]) {
+			cr, err := store.Item(ctx, tx, port.CatalogCrop, c, false)
+			if err != nil {
+				return err
+			}
+			if cr == nil || !cr.Active {
+				return ErrCatalogRef.WithField("attrs.affected_crops", c)
+			}
+		}
+		return nil
+	case port.CatalogMachineType:
+	default:
 		return nil
 	}
 	st, err := store.Item(ctx, tx, port.CatalogFarmStage, it.Attrs["farm_stage"], false)
@@ -155,6 +185,11 @@ func (s *Service) CreateItem(ctx context.Context, in domain.Item, key string) (d
 		if err := checkRefs(ctx, tx, it); err != nil {
 			return err
 		}
+		if taken, err := store.ItemNameTaken(ctx, tx, it.Catalog, it.Name, it.Code); err != nil {
+			return err
+		} else if taken {
+			return ErrItemNameTaken
+		}
 		c := &domain.Change{ID: ids.New(), Catalog: it.Catalog, Code: it.Code, Action: domain.ActionCreated,
 			After: it.Snapshot(), EventTime: now, ActorRef: p.ActorRef, IdemKey: key}
 		return s.writeChange(ctx, tx, p.TenantID, c, it)
@@ -194,6 +229,13 @@ func (s *Service) UpdateItem(ctx context.Context, in domain.Item) (domain.Item, 
 		}
 		if err := checkRefs(ctx, tx, upd); err != nil {
 			return err
+		}
+		if upd.Name != cur.Name {
+			if taken, err := store.ItemNameTaken(ctx, tx, upd.Catalog, upd.Name, upd.Code); err != nil {
+				return err
+			} else if taken {
+				return ErrItemNameTaken
+			}
 		}
 		next := *cur
 		next.Name, next.Attrs, next.Revision, next.UpdatedBy, next.UpdatedAt = upd.Name, upd.Attrs, cur.Revision+1, p.ActorRef, now
@@ -305,4 +347,19 @@ func (s *Service) History(ctx context.Context, catalog, code string, afterSeq in
 	}
 	pg.Items = cs
 	return pg, nil
+}
+
+// FormsInUse trả số mẫu báo cáo đang dùng mỗi mã (cột "biểu đang dùng"); nil khi chưa nối P3.
+func (s *Service) FormsInUse(ctx context.Context, catalog string, codes []string) map[string]int {
+	if s.Forms == nil || len(codes) == 0 {
+		return nil
+	}
+	m, err := s.Forms.FormsUsing(ctx, catalog, codes)
+	if err != nil {
+		return nil // cột phụ: lỗi nguồn không chặn danh sách
+	}
+	if m == nil {
+		m = map[string]int{}
+	}
+	return m
 }

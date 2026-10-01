@@ -178,7 +178,36 @@ const (
 	// air_draft_m và điều kiện tối thiểu của tuyến đã cộng biên an toàn: min_width_m
 	// (= beam × 1,5), min_depth_m (= draft + 0,4), min_clearance_m (= air_draft + 0,5).
 	CatalogVesselClass = "vessel_class"
+
+	// KN v7.7 FN-AD-04.05 (gói P2, pf 000063) — Danh mục nông nghiệp: Giống lúa (rice_variety), Vật tư,
+	// Cây trồng, Sâu bệnh dịch hại (pest, gắn cây trồng bị ảnh hưởng), Loại máy móc (machine_type, 14 loại
+	// PL3 CGH khi khách gửi danh sách — Q-01), Mô hình sản xuất; và loại báo cáo của phòng ban.
+
+	// CatalogCrop: cây trồng, phân cấp "nhóm › cây". attrs: parent_code (mã nhóm, tùy chọn — mục không có
+	// cha là nhóm cấp 1), is_group ("true"/"false"), unit (ĐVT sản lượng, tùy chọn), description.
+	CatalogCrop = "crop"
+	// CatalogMaterial: vật tư nông nghiệp. attrs: unit (ĐVT, bắt buộc — kg, lít, bao…), group (tùy chọn), description.
+	CatalogMaterial = "material"
+	// CatalogProductionModel: mô hình sản xuất (vd 1 phải 5 giảm, 3 giảm 3 tăng). attrs: description.
+	CatalogProductionModel = "production_model"
+	// CatalogReportType: loại báo cáo của phòng ban (tuần, tháng, hàng vụ, năm, đột xuất, gửi Chi cục).
+	// attrs: period (week|month|season|year|ad_hoc|dispatch), level (province|commune|both), description.
+	CatalogReportType = "report_type"
 )
+
+// Thuộc tính KN v7.7 của danh mục pest: affected_crops — mã cây trồng (danh mục crop) bị ảnh hưởng,
+// ngăn cách dấu phẩy; severity_thresholds — ngưỡng mức độ nhiễm (văn bản tự do, KHÔNG bắt buộc, điền sau).
+const (
+	AttrAffectedCrops      = "affected_crops"
+	AttrSeverityThresholds = "severity_thresholds"
+	AttrParentCode         = "parent_code"
+)
+
+// FormUsage (tùy chọn, P3) đếm số mẫu báo cáo đang dùng mỗi mục danh mục — cột "biểu đang dùng" của
+// màn Danh mục nông nghiệp (FN-AD-04.05). Tenant lấy từ context.
+type FormUsage interface {
+	FormsUsing(ctx context.Context, catalog string, codes []string) (map[string]int, error)
+}
 
 // Vai nghiệp vụ của module (tên vai trong Keycloak).
 const (

@@ -56,6 +56,9 @@ func (m *Module) SyncSource() syncport.Source { return app.Sync{Svc: m.svc} }
 // tham số, G-07). Gốc lắp ráp gọi sau khi dựng pf/extension; không nối → tên null.
 func (m *Module) UseStaffDirectory(d extport.StaffNames) { m.svc.Staff = d }
 
+// UseFormUsage nối P3 (pf/reports) cho cột "biểu đang dùng" của danh mục nông nghiệp (KN v7.7 FN-AD-04.05).
+func (m *Module) UseFormUsage(f port.FormUsage) { m.svc.Forms = f }
+
 // Seed nạp dữ liệu nền nhúng cho một tenant (chạy lặp an toàn) — gọi khi tạo tenant.
 func (m *Module) Seed(ctx context.Context, tenantID uuid.UUID) (app.SeedResult, error) {
 	return m.svc.Seed(ctx, tenantID)

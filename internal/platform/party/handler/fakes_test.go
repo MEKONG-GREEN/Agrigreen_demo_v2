@@ -17,7 +17,17 @@ import (
 )
 
 // fakeUnits là danh mục đơn vị hành chính giả (masterdata đang được làm song song).
-type fakeUnits struct{ units map[string]mdport.AdminUnit }
+type fakeUnits struct {
+	mu    sync.RWMutex
+	units map[string]mdport.AdminUnit
+}
+
+// add thêm đơn vị (KN v7.7: tỉnh An Giang 91 và 102 xã).
+func (f *fakeUnits) add(code, name string, lvl mdport.Level, parent string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.units[code] = mdport.AdminUnit{Code: code, Name: name, Level: lvl, ParentCode: parent}
+}
 
 func newFakeUnits() *fakeUnits {
 	f := &fakeUnits{units: map[string]mdport.AdminUnit{}}
@@ -33,6 +43,8 @@ func newFakeUnits() *fakeUnits {
 }
 
 func (f *fakeUnits) Get(_ context.Context, code string, _ time.Time) (mdport.AdminUnit, error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	u, ok := f.units[code]
 	if !ok {
 		return mdport.AdminUnit{}, mdport.ErrUnitNotFound
@@ -41,6 +53,8 @@ func (f *fakeUnits) Get(_ context.Context, code string, _ time.Time) (mdport.Adm
 }
 
 func (f *fakeUnits) Descendants(_ context.Context, code string, _ time.Time) ([]string, error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	if _, ok := f.units[code]; !ok {
 		return nil, mdport.ErrUnitNotFound
 	}

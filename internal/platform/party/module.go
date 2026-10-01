@@ -36,6 +36,7 @@ type Module struct {
 	svc   *app.Service
 	reg   *app.Registry
 	share *app.Sharing
+	kn    *app.KN
 }
 
 // New tạo module với pool của vai party_app. deps tùy chọn để giữ tương thích
@@ -46,25 +47,29 @@ func New(db tenant.Beginner, clk clock.Clock, deps ...Deps) *Module {
 	if len(deps) > 0 {
 		d = deps[0]
 	}
+	reg := &app.Registry{DB: db, Clock: clk, Units: d.AdminUnits, Vault: d.Vault}
 	return &Module{
 		svc:   &app.Service{DB: db, Clock: clk},
-		reg:   &app.Registry{DB: db, Clock: clk, Units: d.AdminUnits, Vault: d.Vault},
+		reg:   reg,
 		share: &app.Sharing{DB: db, Clock: clk},
+		kn:    &app.KN{DB: db, Clock: clk, Reg: reg},
 	}
 }
 
 // RegisterApp gắn route Application API.
 func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.Handler{Svc: m.svc}.Register(rg)
-	handler.Registry{Reg: m.reg}.RegisterApp(rg)
+	handler.Registry{Reg: m.reg, KN: m.kn}.RegisterApp(rg)
 	handler.Me{Reg: m.reg}.Register(rg)
 	handler.Sharing{Svc: m.share}.RegisterApp(rg)
+	handler.KN{Svc: m.kn}.RegisterApp(rg)
 }
 
 // RegisterAdmin gắn route Admin API.
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) {
-	handler.Registry{Reg: m.reg}.RegisterAdmin(rg)
+	handler.Registry{Reg: m.reg, KN: m.kn}.RegisterAdmin(rg)
 	handler.Sharing{Svc: m.share}.RegisterAdmin(rg)
+	handler.KN{Svc: m.kn}.RegisterAdmin(rg)
 }
 
 // PartnerAccess cho module chủ dữ liệu kiểm cấp quyền chia sẻ và ghi sổ đọc của bề mặt đối tác
@@ -105,3 +110,29 @@ func (m *Module) CooperativeStats() port.CooperativeStats { return m.reg }
 
 // SyncSink nhận bản ghi đồng ý thu ngoại tuyến qua pf/sync (entity consent).
 func (m *Module) SyncSink() syncport.Sink { return app.ConsentSink{Svc: m.svc} }
+
+// ---------------------------------------------------------------------------
+// KN v7.7 gói P2 (phòng ban, khu vực, cây 3 cấp, menu theo cấu hình)
+// ---------------------------------------------------------------------------
+
+// Departments cho module khác đọc phòng ban (P1 ngữ cảnh phiên, P3 mẫu báo cáo — qua port).
+func (m *Module) Departments() port.Departments { return m.kn }
+
+// Regions cho P4 nhóm xã theo Khu vực và dòng tổng Khu vực/Toàn tỉnh (qua port).
+func (m *Module) Regions() port.Regions { return m.kn }
+
+// UseDepartmentUsage nối nguồn đếm tài khoản/bản ghi theo phòng ban (P1, P3/P4/P5/P7) — cột số tài
+// khoản, cảnh báo khi ngưng, chặn "xóa" (FN-AD-04.03). Gọi nhiều lần để cộng nhiều nguồn.
+func (m *Module) UseDepartmentUsage(u port.DepartmentUsage) { m.kn.Usage = append(m.kn.Usage, u) }
+
+// UseOrgImpact nối nguồn đếm của bảng "Ảnh hưởng" (P1 tài khoản, P4 kỳ chưa chốt).
+func (m *Module) UseOrgImpact(s port.OrgImpactSource) { m.kn.Impact = append(m.kn.Impact, s) }
+
+// UseFormAvailability nối P3 cho menu "Báo cáo đột xuất" (FN-AD-04.06).
+func (m *Module) UseFormAvailability(f port.FormAvailability) { m.kn.Forms = f }
+
+// UseSessionContext nối ngữ cảnh phiên của P1 (X-AG-Context) cho menu.
+func (m *Module) UseSessionContext(s port.SessionContext) { m.kn.Session = s }
+
+// UseActorNames nối danh bạ tên người thao tác cho khung Log.
+func (m *Module) UseActorNames(n port.ActorNames) { m.kn.Names = n }

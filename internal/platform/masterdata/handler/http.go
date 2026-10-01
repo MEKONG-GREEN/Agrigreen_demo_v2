@@ -171,8 +171,16 @@ func (h Handler) listItems(admin bool) gin.HandlerFunc {
 			return
 		}
 		items := make([]itemDTO, 0, len(pg.Items))
+		codes := make([]string, 0, len(pg.Items))
 		for _, it := range pg.Items {
 			items = append(items, toItemDTO(it))
+			codes = append(codes, it.Code)
+		}
+		if used := h.Svc.FormsInUse(c.Request.Context(), c.Param("catalog"), codes); used != nil {
+			for i := range items {
+				n := used[items[i].Code]
+				items[i].FormsInUse = &n
+			}
 		}
 		c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": encodeCursor(pg.Next)})
 	}

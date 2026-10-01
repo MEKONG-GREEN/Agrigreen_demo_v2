@@ -15,6 +15,11 @@ var catalogNames = map[string]string{
 	port.CatalogSeason:      "Mùa vụ",
 	port.CatalogPest:        "Sâu bệnh, dịch hại",
 	port.CatalogVesselClass: "Lớp phương tiện thủy",
+	// KN v7.7 FN-AD-04.05.
+	port.CatalogCrop:            "Cây trồng",
+	port.CatalogMaterial:        "Vật tư",
+	port.CatalogProductionModel: "Mô hình sản xuất",
+	port.CatalogReportType:      "Loại báo cáo",
 }
 
 // CatalogName trả tên tiếng Việt của danh mục; không biết → chính mã.

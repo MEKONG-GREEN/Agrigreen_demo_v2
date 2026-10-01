@@ -219,6 +219,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/orgs/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-AD-04.02: cây TTKNQG › TTKN tỉnh › Khu vực › Xã trong phạm vi người gọi (xem xuống, không ngang, không lên) */
+        get: operations["knOrgTree"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/departments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phòng ban của đơn vị (bước 2 đăng nhập, FN-CH-00.01) — chỉ selectable = true chọn được */
+        get: operations["knListDepartments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/departments/{code}/modules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * UR-KT-02: cây module (menu) của một phòng ban cho vai KN — bật phòng ban không cần phát hành lại web/app
+         * @description Dựng từ bảng menu tĩnh có phiên bản (kn.menu/v1) và trạng thái phòng ban hiện hành ở MỖI request (Cache-Control: no-store).
+         *     audience vắng: theo ngữ cảnh phiên (P1) hoặc vai duy nhất của người gọi. platform_admin xem được mọi cấp (FN-AD-04.07).
+         *     audience = admin: mục con của phòng ban trong nhóm "Phòng ban" (enabled = false khi chưa mở).
+         */
+        get: operations["knDepartmentModules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/menu": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** UR-KT-02, BRD §6: sidebar đầy đủ theo vai + phòng ban của phiên (Admin: Điều hành / Phòng ban / Quản trị hệ thống) */
+        get: operations["knMenu"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/regions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-AD-04.02: khu vực của tỉnh kèm số xã được gán (mọi vai chọn/lọc theo Khu vực) */
+        get: operations["knListRegions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cooperatives": {
         parameters: {
             query?: never;
@@ -3771,6 +3861,8 @@ export interface components {
             revision: number;
             /** Format: date-time */
             updated_at: string;
+            /** @description KN v7.7 FN-AD-04.05: số mẫu báo cáo đang dùng mục (vắng khi chưa nối P3) */
+            forms_in_use?: number;
         };
         DisplayValue: {
             /** @example gis.stage_color:chin_ro */
@@ -3909,6 +4001,134 @@ export interface components {
              */
             representative_ref: string | null;
             active: boolean;
+            /** @description KN v7.7 FN-AD-04.02: Khu vực của Nút xã (chỉ trong danh sách /v1/orgs, khi đã gán) */
+            region?: components["schemas"]["KNRegionRef"];
+        };
+        KNDepartment: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Đơn vị: Nút cấp 1 (ttkn_national) hoặc cấp 2 (ttkn_province)
+             */
+            org_ref: string;
+            /** @description Mã phòng ban — department_code của mọi bản ghi KN mới */
+            code: string;
+            name: string;
+            description: string | null;
+            sort_order: number;
+            /**
+             * @description Đang áp dụng / Chưa mở / Ngưng hoạt động
+             * @enum {string}
+             */
+            status: "active" | "not_open" | "suspended";
+            status_label: string;
+            /**
+             * @description Bộ menu dựng sẵn trong mã (kn.menu/v1)
+             * @enum {string}
+             */
+            menu_profile: "trong_trot" | "generic";
+            /** @description Đã xóa (sự kiện retired) — mã không tái sử dụng */
+            retired: boolean;
+            /** @description Chọn được ở bước 2 đăng nhập (Đang áp dụng, chưa xóa) */
+            selectable: boolean;
+            /** @description null = chưa nối nguồn đếm (P1) hoặc Application API */
+            account_count: number | null;
+            record_count: number | null;
+            /** Format: uuid */
+            updated_by: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        KNDepartmentList: {
+            /** Format: uuid */
+            org_ref: string;
+            items: components["schemas"]["KNDepartment"][];
+        };
+        KNRegion: {
+            /** Format: uuid */
+            id: string;
+            province_code: string;
+            code: string;
+            name: string;
+            sort_order: number;
+            active: boolean;
+            deactivation_reason: string | null;
+            /** @description Số Nút xã đang hoạt động được gán */
+            commune_count: number;
+            /** Format: uuid */
+            updated_by: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        KNRegionList: {
+            province_code: string;
+            items: components["schemas"]["KNRegion"][];
+            /** @description Σ commune_count */
+            assigned_communes: number;
+        };
+        KNRegionRef: {
+            code: string;
+            name: string;
+        };
+        KNOrgTreeNode: {
+            /**
+             * Format: uuid
+             * @description null với nhóm khu vực
+             */
+            ref: string | null;
+            /** @enum {string} */
+            kind: "ttkn_national" | "ttkn_province" | "extension_team" | "region" | "region_unassigned";
+            code: string;
+            name: string;
+            admin_unit_code: string | null;
+            /** @description 1 TTKNQG, 2 TTKN tỉnh, 3 Xã; 0 với nhóm khu vực */
+            level: number;
+            active: boolean;
+            region: null | components["schemas"]["KNRegionRef"];
+            commune_count: number;
+            children: components["schemas"]["KNOrgTreeNode"][];
+        };
+        KNMenuItem: {
+            /** @description Khóa ổn định của mục (vd xa.nhiem_vu.cong_viec) */
+            key: string;
+            label: string;
+            /** @description Đường dẫn web/app; null với mục cha chỉ mở/đóng */
+            route: string | null;
+            icon: string;
+            /** @description Khóa số đếm việc cần xử lý (ẩn khi 0) — client lấy số từ module sở hữu */
+            badge_source: string | null;
+            /** @description false: hiện mờ (phòng ban chưa mở trong menu Admin) */
+            enabled: boolean;
+            /**
+             * @description Chỉ mục phòng ban của menu Admin
+             * @enum {string}
+             */
+            status?: "active" | "not_open" | "suspended";
+            status_label?: string;
+            children: components["schemas"]["KNMenuItem"][];
+        };
+        KNMenuGroup: {
+            /** @description dieu_hanh | bao_cao | du_lieu; Admin: dieu_hanh | phong_ban | quan_tri */
+            key: string;
+            label: string;
+            items: components["schemas"]["KNMenuItem"][];
+        };
+        KNMenu: {
+            /** @description Phiên bản bảng menu tĩnh (kn.menu/v1) */
+            menu_version: string;
+            /** @enum {string} */
+            audience: "kn_tw" | "kn_tinh" | "kn_xa" | "admin";
+            /** Format: uuid */
+            org_ref: string | null;
+            department: null | {
+                code: string;
+                name: string;
+                status: string;
+                menu_profile: string;
+            };
+            default_route: string;
+            groups: components["schemas"]["KNMenuGroup"][];
         };
         Me: {
             /**
@@ -4072,12 +4292,12 @@ export interface components {
         };
         /**
          * @description data của entity pull catalog_item (pf/masterdata): mục đang dùng của rice_variety, farm_stage, machine_type,
-         *     season, pest — không lọc theo địa bàn. id = UUIDv5 cố định theo (catalog, code); version = sync_seq
+         *     season, pest, vessel_class và (KN v7.7) crop, material, production_model, report_type — không lọc theo địa bàn. id = UUIDv5 cố định theo (catalog, code); version = sync_seq
          *     (luôn tăng). Ngừng dùng → tombstone cùng id; dùng lại → upsert version mới.
          */
         SyncCatalogItemData: {
             /** @enum {string} */
-            catalog: "rice_variety" | "farm_stage" | "machine_type" | "season" | "pest";
+            catalog: "rice_variety" | "farm_stage" | "machine_type" | "season" | "pest" | "vessel_class" | "crop" | "material" | "production_model" | "report_type";
             code: string;
             name: string;
             attrs: {
@@ -6995,7 +7215,7 @@ export interface components {
         /** @description Thời điểm tra (RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam). Mặc định là hiện tại. */
         At: string;
         UnitCode: string;
-        Catalog: "rice_variety" | "farm_stage" | "machine_type" | "season" | "pest";
+        Catalog: "rice_variety" | "farm_stage" | "machine_type" | "season" | "pest" | "vessel_class" | "crop" | "material" | "production_model" | "report_type";
         /** @description Mã thiết bị đã đăng ký bởi chính người gọi (pf/sync) */
         DeviceID: string;
         /** @description Mục đích xử lý dữ liệu cá nhân (R-42) */
@@ -7375,6 +7595,145 @@ export interface operations {
             };
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
+        };
+    };
+    knOrgTree: {
+        parameters: {
+            query?: {
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rừng cây (gốc = Nút thấy được cao nhất); xã chưa gán khu vực vào nhóm region_unassigned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KNOrgTreeNode"][];
+                    };
+                };
+            };
+            401: components["responses"]["Problem"];
+        };
+    };
+    knListDepartments: {
+        parameters: {
+            query?: {
+                /** @description Đơn vị; vắng = Nút cấp 1/2 gần nhất của Nút người gọi */
+                org_ref?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách theo thứ tự hiển thị (account_count/record_count luôn null ở Application API) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNDepartmentList"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    knDepartmentModules: {
+        parameters: {
+            query?: {
+                audience?: "kn_tw" | "kn_tinh" | "kn_xa" | "admin";
+                org_ref?: string;
+            };
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Menu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNMenu"];
+                };
+            };
+            /** @description party.menu_audience_forbidden */
+            403: components["responses"]["Problem"];
+            /** @description party.department_not_found */
+            404: components["responses"]["Problem"];
+            /** @description party.department_not_open */
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    knMenu: {
+        parameters: {
+            query?: {
+                audience?: "kn_tw" | "kn_tinh" | "kn_xa" | "admin";
+                /** @description Vắng = phòng ban Đang áp dụng duy nhất của đơn vị */
+                department?: string;
+                org_ref?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Menu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNMenu"];
+                };
+            };
+            /** @description party.menu_audience_forbidden */
+            403: components["responses"]["Problem"];
+            /** @description party.department_not_found */
+            404: components["responses"]["Problem"];
+            /** @description party.department_not_open */
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    knListRegions: {
+        parameters: {
+            query: {
+                province_code: string;
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNRegionList"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     listCooperatives: {

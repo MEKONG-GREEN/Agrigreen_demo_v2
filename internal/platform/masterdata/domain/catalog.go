@@ -24,7 +24,8 @@ const CatalogRuleVersion = "pf.masterdata.catalog/v1"
 const CatalogFormat = "agrigreen.catalogs/v1"
 
 // Catalogs là các danh mục module quản lý.
-var Catalogs = []string{port.CatalogRiceVariety, port.CatalogFarmStage, port.CatalogMachineType, port.CatalogSeason, port.CatalogPest, port.CatalogVesselClass}
+var Catalogs = []string{port.CatalogRiceVariety, port.CatalogFarmStage, port.CatalogMachineType, port.CatalogSeason, port.CatalogPest, port.CatalogVesselClass,
+	port.CatalogCrop, port.CatalogMaterial, port.CatalogProductionModel, port.CatalogReportType}
 
 // Hành động ghi vào sổ lịch sử danh mục.
 const (
@@ -41,7 +42,7 @@ var itemCodeRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$`)
 
 // Lỗi kiểm dữ liệu danh mục.
 var (
-	ErrCatalogUnknown = errors.New("danh mục không tồn tại; dùng rice_variety, farm_stage, machine_type, season, pest hoặc vessel_class")
+	ErrCatalogUnknown = errors.New("danh mục không tồn tại; dùng rice_variety, farm_stage, machine_type, season, pest, vessel_class, crop, material, production_model hoặc report_type")
 	ErrItemCode       = errors.New("mã mục 1–40 ký tự [A-Za-z0-9_.-]")
 	ErrItemName       = errors.New("tên bắt buộc, tối đa 200 ký tự")
 	ErrReason         = fmt.Errorf("lý do bắt buộc, %d–500 ký tự", MinReasonLen)
@@ -162,6 +163,56 @@ func positiveDec(max int64) func(string) (string, error) {
 	}
 }
 
+// codeList: danh sách mã mục ngăn cách dấu phẩy, chuẩn hóa (bỏ khoảng trắng, bỏ trùng, sắp xếp); tối đa 200 mã.
+func codeList(s string) (string, error) {
+	var out []string
+	for _, c := range strings.Split(s, ",") {
+		c = strings.TrimSpace(c)
+		if c == "" {
+			continue
+		}
+		if !itemCodeRe.MatchString(c) {
+			return "", fmt.Errorf("mã %q không hợp lệ", c)
+		}
+		if !slices.Contains(out, c) {
+			out = append(out, c)
+		}
+	}
+	if len(out) > 200 {
+		return "", errors.New("tối đa 200 mã")
+	}
+	sort.Strings(out)
+	return strings.Join(out, ","), nil
+}
+
+// nonEmpty: chuỗi bắt buộc, tối đa max ký tự.
+func nonEmpty(max int) func(string) (string, error) {
+	return func(s string) (string, error) {
+		s = strings.TrimSpace(s)
+		if s == "" || utf8.RuneCountInString(s) > max {
+			return "", fmt.Errorf("bắt buộc, tối đa %d ký tự", max)
+		}
+		return s, nil
+	}
+}
+
+func stageRefNamed(what string) func(string) (string, error) {
+	return func(s string) (string, error) {
+		if !itemCodeRe.MatchString(s) {
+			return "", errors.New("phải là " + what)
+		}
+		return s, nil
+	}
+}
+
+// CodeList tách thuộc tính danh sách mã (affected_crops) đã chuẩn hóa.
+func CodeList(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	return strings.Split(s, ",")
+}
+
 func stageRef(s string) (string, error) {
 	if !itemCodeRe.MatchString(s) {
 		return "", errors.New("phải là mã khâu sản xuất")
@@ -189,7 +240,28 @@ var attrSpecs = map[string]map[string]attrSpec{
 		"description": {false, text(500)},
 	},
 	port.CatalogPest: {
-		"kind":        {true, oneOf("sau_hai", "benh_hai", "dong_vat_hai", "co_dai")},
+		"kind":                      {true, oneOf("sau_hai", "benh_hai", "dong_vat_hai", "co_dai")},
+		"description":               {false, text(500)},
+		port.AttrAffectedCrops:      {false, codeList},  // KN v7.7 FN-AD-04.05: cây trồng bị ảnh hưởng
+		port.AttrSeverityThresholds: {false, text(500)}, // không bắt buộc, điền sau
+	},
+	port.CatalogCrop: {
+		port.AttrParentCode: {false, stageRefNamed("mã nhóm cây trồng")},
+		"is_group":          {false, oneOf("true", "false")},
+		"unit":              {false, text(20)},
+		"description":       {false, text(500)},
+	},
+	port.CatalogMaterial: {
+		"unit":        {true, nonEmpty(20)},
+		"group":       {false, text(100)},
+		"description": {false, text(500)},
+	},
+	port.CatalogProductionModel: {
+		"description": {false, text(500)},
+	},
+	port.CatalogReportType: {
+		"period":      {true, oneOf("week", "month", "season", "year", "ad_hoc", "dispatch")},
+		"level":       {false, oneOf("province", "commune", "both")},
 		"description": {false, text(500)},
 	},
 	port.CatalogVesselClass: {
