@@ -70,6 +70,11 @@ type Service struct {
 	Households partyport.Households
 	Vault      client.Client
 	Params     mdport.Params
+	// KN v7.7 gói P1: phòng ban của đơn vị (pf/party P2), tên xã (pf/masterdata), danh bạ tên dự phòng
+	// cho khung Log (pf/extension). Nil Departments → route KN trả 503.
+	Departments partyport.Departments
+	Units       mdport.AdminUnits
+	Names       partyport.ActorNames
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

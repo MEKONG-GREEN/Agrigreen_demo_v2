@@ -45,7 +45,7 @@ import { syncMonitorRoutes } from "./syncmonitor";
 import { metricsRoutes } from "./metrics";
 import { mrvAdminRoutes, mrvAppRoutes } from "./mrv";
 import { collectionRoutes } from "./collection";
-import { knAppRoutes, personaForContext } from "./kn";
+import { contextProblem, knAppRoutes, personaForContext } from "./kn";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -677,7 +677,9 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
     const url = new URL(request.url);
     const tokenPersona = personaFromAuthHeader(request.headers.get("Authorization"));
     if (!tokenPersona) return problem(401, "unauthenticated", "Unauthenticated");
-    // KN v7.7: header X-AG-Context chọn vai trò + phạm vi của lần gán (middleware P1 giả lập).
+    // KN v7.7: header X-AG-Context chọn vai trò + phạm vi của lần gán (middleware P1 giả lập): lạ/của người khác → 403.
+    const badContext = contextProblem(tokenPersona, request.headers.get("X-AG-Context"));
+    if (badContext) return badContext;
     const persona = personaForContext(tokenPersona, request.headers.get("X-AG-Context"));
     // Bề mặt Admin: mọi route bắt buộc token đã qua yếu tố thứ hai (mục 11).
     if (opts.surface === "admin" && !persona.amr.includes("otp")) return problem(403, "mfa_required", "MFA required");

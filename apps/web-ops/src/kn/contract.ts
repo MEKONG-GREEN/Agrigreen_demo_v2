@@ -1,6 +1,7 @@
 // ============================================================================
-// HỢP ĐỒNG TẠM (stub) cho bề mặt KN v7.7 — chưa có trong contracts/openapi.
-//   P1 (danh tính, phiên nhiều vai trò): GET /v1/me/contexts, POST /v1/me/context, header X-AG-Context.
+// HỢP ĐỒNG cho bề mặt KN v7.7.
+//   P1 (danh tính, phiên nhiều vai trò): GET /v1/me/contexts, POST /v1/me/context, header X-AG-Context — ĐÃ CÓ trong
+//     contracts/openapi/application.yaml (KNAssignment, KNSessionContext); kn.test.ts kiểm kiểu sinh gán được vào kiểu dưới đây.
 //   P2 (menu theo cấu hình):            GET /v1/departments/{code}/modules?role=…  (Admin: code "_all").
 //   P4 (số đếm menu):                    GET /v1/me/menu-badges
 // Khi P1/P2 nộp OpenAPI, thay các kiểu dưới đây bằng kiểu sinh (src/api/generated) — giữ tên trường
@@ -38,11 +39,14 @@ export interface CommuneRef {
 export interface RoleAssignment {
   assignment_id: string;
   role: KnRole;
-  org_ref: string;
+  /** Nút của vai trò; null với Admin không gắn Nút ("Toàn hệ thống"). */
+  org_ref: string | null;
   /** Tên Nút tổ chức, vd "TTKN tỉnh An Giang". */
   org_name: string;
-  /** Cấp quản lý (Q-05) — vd "Chuyên viên", "Trưởng phòng". */
+  /** Cấp quản lý (Q-05) — nhãn, vd "Chuyên viên", "Trưởng phòng". */
   mgmt_level: string | null;
+  /** Mã cấp quản lý (danh mục tạm của P1). */
+  mgmt_level_code?: string | null;
   /** Xã/phường phụ trách (chỉ Cấp Xã). */
   communes: CommuneRef[];
   /** Phòng ban của vai trò. Admin: rỗng (không chọn phòng ban). */
@@ -63,20 +67,28 @@ export interface SelectContextRequest {
 /** POST /v1/me/context — phản hồi; `context_id` gửi lại qua header X-AG-Context. */
 export interface SessionContext {
   context_id: string;
-  assignment_id: string;
+  /** null: ngữ cảnh hỗ trợ của Admin không gắn tài khoản (FN-AD-04.07). */
+  assignment_id: string | null;
   role: KnRole;
   department_code: string | null;
   department_name: string | null;
-  org_ref: string;
+  org_ref: string | null;
   org_name: string;
   communes: CommuneRef[];
   /** Trang mặc định theo vai trò (P1 mục 3). */
   default_route: string;
   expires_at: string;
+  /** Khác null: Admin đang hỗ trợ (FN-AD-04.07) — hiện dải cảnh báo vàng; mọi thao tác ghi gửi kèm X-AG-Reason. */
+  support_session_id?: string | null;
+  /** Tài khoản được hỗ trợ. */
+  on_behalf_of?: string | null;
 }
 
 /** Header mang ngữ cảnh phiên (P1 gap §4.5 phương án A). */
 export const CONTEXT_HEADER = "X-AG-Context";
+
+/** Lý do thao tác ghi trong chế độ hỗ trợ (UTF-8, encodeURIComponent; ≥ 10 ký tự). */
+export const REASON_HEADER = "X-AG-Reason";
 
 // ---------------------------------------------------------------------------
 // Menu theo cấu hình (P2 `GET /v1/departments/{code}/modules`)

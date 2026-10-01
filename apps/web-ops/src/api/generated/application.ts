@@ -202,6 +202,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/contexts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-CH-00.01 B3: các lần gán vai trò còn hiệu lực của người gọi (thẻ vai trò + thẻ phòng ban, Hình 3b) — rỗng với tài khoản không có vai trò KN */
+        get: operations["knMyContexts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ngữ cảnh phiên của request (header X-AG-Context) */
+        get: operations["knCurrentContext"];
+        put?: never;
+        /** FN-CH-00.01 B4: chọn vai trò + phòng ban → context_id (Admin: department_code = null, bắt buộc MFA) */
+        post: operations["knSelectContext"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/orgs": {
         parameters: {
             query?: never;
@@ -4210,6 +4245,84 @@ export interface components {
             default_route: string;
             groups: components["schemas"]["KNMenuGroup"][];
         };
+        KNCommune: {
+            code: string;
+            name: string;
+        };
+        KNDepartmentRef: {
+            code: string;
+            name: string;
+            description: string | null;
+            /** @enum {string} */
+            status: "active" | "not_open" | "suspended";
+        };
+        KNAssignment: {
+            /** Format: uuid */
+            assignment_id: string;
+            /** Format: uuid */
+            user_ref: string;
+            /** @enum {string} */
+            role: "kn_tw" | "kn_tinh" | "kn_xa" | "admin";
+            /**
+             * Format: uuid
+             * @description null: Admin không gắn Nút
+             */
+            org_ref: string | null;
+            /** @description Admin không Nút: "Toàn hệ thống" */
+            org_name: string;
+            /** @description Nhãn cấp quản lý (tạm Q-05), vd "Chuyên viên" */
+            mgmt_level: string | null;
+            mgmt_level_code: string | null;
+            /** @description Xã phụ trách (Cấp Xã) */
+            communes: components["schemas"]["KNCommune"][];
+            /** @description Admin: rỗng */
+            departments: components["schemas"]["KNDepartmentRef"][];
+            /** Format: date-time */
+            valid_from: string;
+            /** Format: date-time */
+            valid_to: string | null;
+            active: boolean;
+            /** Format: uuid */
+            created_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        KNSessionContext: {
+            /**
+             * Format: uuid
+             * @description Gửi lại qua header X-AG-Context
+             */
+            context_id: string;
+            /**
+             * Format: uuid
+             * @description null: ngữ cảnh hỗ trợ không gắn tài khoản
+             */
+            assignment_id: string | null;
+            /** @enum {string} */
+            role: "kn_tw" | "kn_tinh" | "kn_xa" | "admin";
+            /** @description null với Admin */
+            department_code: string | null;
+            department_name: string | null;
+            /** Format: uuid */
+            org_ref: string | null;
+            org_name: string;
+            communes: components["schemas"]["KNCommune"][];
+            /** @description Trang mặc định theo vai trò (Dashboard / Công việc cần làm / Tổng quan hệ thống) */
+            default_route: string;
+            /** Format: date-time */
+            expires_at: string;
+            /**
+             * Format: uuid
+             * @description Khác null: Admin đang hỗ trợ (FN-AD-04.07) — dải cảnh báo vàng
+             */
+            support_session_id: string | null;
+            /** Format: uuid */
+            on_behalf_of: string | null;
+        };
         Me: {
             /**
              * Format: uuid
@@ -7965,6 +8078,94 @@ export interface operations {
             401: components["responses"]["Problem"];
             /** @description party.dependency_unavailable — chưa nối danh mục đơn vị hành chính */
             503: components["responses"]["Problem"];
+        };
+    };
+    knMyContexts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lần gán (phòng ban chưa mở có status not_open — hiện mờ, không chọn được) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        assignments: components["schemas"]["KNAssignment"][];
+                    };
+                };
+            };
+            401: components["responses"]["Problem"];
+            /** @description accounts.account_locked */
+            403: components["responses"]["Problem"];
+        };
+    };
+    knCurrentContext: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ngữ cảnh */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNSessionContext"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description accounts.context_required */
+            428: components["responses"]["Problem"];
+        };
+    };
+    knSelectContext: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    assignment_id: string;
+                    department_code: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Ngữ cảnh mới (hết hạn sau 24 giờ hoặc khi lần gán hết hiệu lực) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNSessionContext"];
+                };
+            };
+            /** @description accounts.account_locked, mfa_required (Admin) */
+            403: components["responses"]["Problem"];
+            /** @description accounts.assignment_not_found */
+            404: components["responses"]["Problem"];
+            /** @description accounts.department_not_open */
+            409: components["responses"]["Problem"];
+            /** @description accounts.department_required */
+            422: components["responses"]["Problem"];
         };
     };
     listOrgs: {

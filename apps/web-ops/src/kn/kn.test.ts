@@ -5,7 +5,8 @@ import { KN_ACCOUNTS, MOCK_KN_PASSWORD } from "@/api/mock/kn-accounts";
 import { mockToken } from "@/api/mock/personas";
 import { createApiClient, unwrap } from "@/api/client";
 import { createKnApi } from "./client";
-import { CONTEXT_HEADER } from "./contract";
+import type { components } from "@/api/generated/application";
+import { CONTEXT_HEADER, type RoleAssignment, type SessionContext } from "./contract";
 import { autoSelection, contextLabel, contextShortLabel, enterableOptions, initials, isValidSelection, otherOptions } from "./session";
 
 const acc = (id: string) => KN_ACCOUNTS.find((a) => a.id === id)!;
@@ -87,6 +88,23 @@ describe("client hợp đồng tạm P1/P2 + header X-AG-Context", () => {
     await expect(kn.selectContext({ assignment_id: "asg-an-xa", department_code: "chan_nuoi_thuy_san" })).rejects.toMatchObject({ status: 409 });
     const legacy = createKnApi({ baseUrl: "http://x", getAccessToken: () => mockToken("tinh"), getContextId: () => null, fetch: mockFetchNoDelay });
     expect((await legacy.listContexts()).assignments).toEqual([]);
+  });
+
+  it("header X-AG-Context lạ hoặc của người khác → 403 accounts.context_invalid (như middleware P1)", async () => {
+    const an = createKnApi({ baseUrl: "http://x", getAccessToken: () => mockToken("kn-an"), getContextId: () => null, fetch: mockFetchNoDelay });
+    const ctx = await an.selectContext({ assignment_id: "asg-an-xa", department_code: "trong_trot" });
+    expect(ctx.support_session_id).toBeNull();
+    const binh = createKnApi({ baseUrl: "http://x", getAccessToken: () => mockToken("kn-binh"), getContextId: () => ctx.context_id, fetch: mockFetchNoDelay });
+    await expect(binh.listContexts()).rejects.toMatchObject({ status: 403 });
+    const junk = createKnApi({ baseUrl: "http://x", getAccessToken: () => mockToken("kn-an"), getContextId: () => "khong-phai-uuid", fetch: mockFetchNoDelay });
+    await expect(junk.listContexts()).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("kiểu sinh từ OpenAPI của P1 gán được vào hợp đồng web (KNAssignment, KNSessionContext)", () => {
+    // Kiểm ở thời điểm biên dịch (typecheck): server trả thừa trường được, không thiếu trường web dùng.
+    const asg = (x: components["schemas"]["KNAssignment"]): RoleAssignment => x;
+    const ctx = (x: components["schemas"]["KNSessionContext"]): SessionContext => x;
+    expect([typeof asg, typeof ctx]).toEqual(["function", "function"]);
   });
 
   it("backend thật chưa có P1 → 404 (AuthProvider giữ đăng nhập một vai)", async () => {

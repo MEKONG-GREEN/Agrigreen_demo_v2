@@ -73,12 +73,20 @@ type realmFile struct {
 	BruteForceProtected bool `json:"bruteForceProtected"`
 	FailureFactor       int  `json:"failureFactor"`
 	MaxDeltaTimeSeconds int  `json:"maxDeltaTimeSeconds"`
-	// GIS US-LOG-01 AC-3: khóa tới khi Admin mở (không tự mở sau thời gian chờ).
-	PermanentLockout     bool                         `json:"permanentLockout"`
-	MaxTemporaryLockouts int                          `json:"maxTemporaryLockouts"`
-	LocalizationTexts    map[string]map[string]string `json:"localizationTexts"`
-	PasswordPolicy       string                       `json:"passwordPolicy"`
-	Roles                struct {
+	// KN v7.7 N-10 (thay GIS US-LOG-01 AC-3): khóa TẠM 15 phút, tự mở sau thời gian chờ.
+	PermanentLockout      bool `json:"permanentLockout"`
+	MaxTemporaryLockouts  int  `json:"maxTemporaryLockouts"`
+	WaitIncrementSeconds  int  `json:"waitIncrementSeconds"`
+	MaxFailureWaitSeconds int  `json:"maxFailureWaitSeconds"`
+	LoginWithEmail        bool `json:"loginWithEmailAllowed"`
+	// KN v7.7 N-09: phiên Web 4 giờ không thao tác, Mobile 24 giờ + ngoại tuyến 72 giờ.
+	SSOSessionIdleTimeout     int                          `json:"ssoSessionIdleTimeout"`
+	SSOSessionMaxLifespan     int                          `json:"ssoSessionMaxLifespan"`
+	OfflineSessionMaxLifespan int                          `json:"offlineSessionMaxLifespan"`
+	OfflineMaxLifespanEnabled bool                         `json:"offlineSessionMaxLifespanEnabled"`
+	LocalizationTexts         map[string]map[string]string `json:"localizationTexts"`
+	PasswordPolicy            string                       `json:"passwordPolicy"`
+	Roles                     struct {
 		Realm []struct {
 			Name        string `json:"name"`
 			Description string `json:"description"`
@@ -93,9 +101,10 @@ type realmFile struct {
 		} `json:"protocolMappers"`
 	} `json:"clientScopes"`
 	Clients []struct {
-		ClientID            string   `json:"clientId"`
-		WebOrigins          []string `json:"webOrigins"`
-		DefaultClientScopes []string `json:"defaultClientScopes"`
+		ClientID            string            `json:"clientId"`
+		WebOrigins          []string          `json:"webOrigins"`
+		DefaultClientScopes []string          `json:"defaultClientScopes"`
+		Attributes          map[string]string `json:"attributes"`
 	} `json:"clients"`
 }
 
@@ -118,13 +127,36 @@ func TestKeycloakRealmCoversRolesAndClaims(t *testing.T) {
 		t.Errorf("chính sách đăng nhập: đăng ký=%v chống dò=%v sai tối đa=%d cửa sổ=%ds mật khẩu=%q",
 			realm.RegistrationAllowed, realm.BruteForceProtected, realm.FailureFactor, realm.MaxDeltaTimeSeconds, realm.PasswordPolicy)
 	}
-	// GIS US-LOG-01 AC-3: sai 5 lần/15 phút → khóa VĨNH VIỄN tới khi Admin mở khóa (pf/accounts
-	// unlock xóa trạng thái attack-detection), thông báo đúng văn bản của AC.
+	// KN v7.7 FN-CH-00.01 / N-10 (thay GIS US-LOG-01 AC-3 — BRD v7.7 mới hơn, gap §4.6): sai 5 lần/15
+	// phút → khóa TẠM 15 phút rồi tự mở (Keycloak brute-force: permanentLockout = false, chờ 900 s); Admin
+	// vẫn mở sớm qua pf/accounts unlock. Số lần khóa tạm trước khi khóa hẳn chờ khách (Q-21). Tài khoản bị
+	// Admin khóa (enabled = false) giữ thông báo "liên hệ Admin".
 	const lockedMsg = "Tài khoản đã bị khóa, vui lòng liên hệ Admin để mở khóa."
-	if !realm.PermanentLockout || realm.MaxTemporaryLockouts != 0 || realm.LocalizationTexts["vi"]["accountPermanentlyDisabledMessage"] != lockedMsg ||
+	if realm.PermanentLockout || realm.WaitIncrementSeconds != 900 || realm.MaxFailureWaitSeconds != 900 ||
+		!strings.Contains(realm.LocalizationTexts["vi"]["accountTemporarilyDisabledMessage"], "15 phút") ||
 		realm.LocalizationTexts["vi"]["accountDisabledMessage"] != lockedMsg {
-		t.Errorf("GIS US-LOG-01 AC-3: permanentLockout=%v maxTemporaryLockouts=%d thông báo=%q", realm.PermanentLockout,
-			realm.MaxTemporaryLockouts, realm.LocalizationTexts["vi"]["accountPermanentlyDisabledMessage"])
+		t.Errorf("KN v7.7 N-10: permanentLockout=%v waitIncrement=%d maxFailureWait=%d thông báo khóa tạm=%q", realm.PermanentLockout,
+			realm.WaitIncrementSeconds, realm.MaxFailureWaitSeconds, realm.LocalizationTexts["vi"]["accountTemporarilyDisabledMessage"])
+	}
+	// KN v7.7 FN-CH-00.01: đăng nhập bằng email (loginWithEmailAllowed) hoặc SĐT (username = SĐT chuẩn hóa).
+	if !realm.LoginWithEmail {
+		t.Error("KN v7.7 FN-CH-00.01: phải đăng nhập được bằng email (loginWithEmailAllowed)")
+	}
+	// KN v7.7 N-09: phiên realm đủ dài cho client mobile 24 giờ, ngoại tuyến 72 giờ.
+	if realm.SSOSessionIdleTimeout < 14400 || realm.SSOSessionMaxLifespan < 86400 || !realm.OfflineMaxLifespanEnabled || realm.OfflineSessionMaxLifespan != 259200 {
+		t.Errorf("KN v7.7 N-09: ssoIdle=%d ssoMax=%d offlineMax=%d (bật=%v)", realm.SSOSessionIdleTimeout, realm.SSOSessionMaxLifespan,
+			realm.OfflineSessionMaxLifespan, realm.OfflineMaxLifespanEnabled)
+	}
+	wantClient := map[string]map[string]string{
+		"agrigreen-web-ops":   {"client.session.idle.timeout": "14400"},
+		"agrigreen-field-app": {"client.session.max.lifespan": "86400", "client.offline.session.max.lifespan": "259200"},
+	}
+	for _, c := range realm.Clients {
+		for k, v := range wantClient[c.ClientID] {
+			if c.Attributes[k] != v {
+				t.Errorf("KN v7.7 N-09: client %s %s=%q, cần %q", c.ClientID, k, c.Attributes[k], v)
+			}
+		}
 	}
 	have := map[string]string{}
 	for _, r := range realm.Roles.Realm {

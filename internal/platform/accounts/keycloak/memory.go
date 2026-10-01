@@ -268,6 +268,34 @@ func (m *Memory) SetEnabled(_ context.Context, id uuid.UUID, enabled bool) error
 	return nil
 }
 
+// UpdateProfile thực hiện port.ProfileUpdater: tên đăng nhập/email vẫn duy nhất trong realm.
+func (m *Memory) UpdateProfile(_ context.Context, id uuid.UUID, p port.ProfileUpdate) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.fail("UpdateProfile"); err != nil {
+		return err
+	}
+	u, err := m.get(id)
+	if err != nil {
+		return err
+	}
+	for oid, o := range m.users {
+		if oid != id && (fold(o.u.Username) == fold(p.Username) || (p.Email != "" && fold(o.u.Email) == fold(p.Email))) {
+			return port.ErrUserExists
+		}
+	}
+	if p.Username != "" {
+		u.u.Username = fold(p.Username)
+	}
+	if fold(p.Email) != fold(u.u.Email) {
+		u.u.EmailVerified = false
+	}
+	u.u.Email, u.u.FirstName, u.u.LastName, u.u.Phone = fold(p.Email), p.FirstName, p.LastName, p.Phone
+	return nil
+}
+
+var _ port.ProfileUpdater = (*Memory)(nil)
+
 // SetOrgRef thực hiện port.Directory.
 func (m *Memory) SetOrgRef(_ context.Context, id uuid.UUID, org uuid.UUID) error {
 	m.mu.Lock()

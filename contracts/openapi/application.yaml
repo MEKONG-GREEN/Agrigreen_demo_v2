@@ -245,6 +245,69 @@ paths:
               schema: {$ref: "#/components/schemas/Me"}
         "401": {$ref: "#/components/responses/Problem"}
         "503": {description: party.dependency_unavailable — chưa nối danh mục đơn vị hành chính, $ref: "#/components/responses/Problem"}
+  # --- pf/accounts KN v7.7 gói P1: ngữ cảnh phiên (FN-CH-00.01, gap §4.5 phương án A) ---
+  # Keycloak chỉ xác thực. Client chọn vai trò × phòng ban → context_id, gửi header X-AG-Context ở MỌI request (cả Admin API);
+  # middleware giải vai, phòng ban, phạm vi ở server. Context lạ / của người khác → 403 accounts.context_invalid; hết hạn → 403
+  # accounts.context_expired; vai trò thu hồi, phòng ban không còn Đang áp dụng, tài khoản bị khóa → 403 accounts.context_revoked.
+  # Đổi vai trò/phòng ban = chọn lại, không đăng nhập lại.
+  /v1/me/contexts:
+    get:
+      summary: "FN-CH-00.01 B3: các lần gán vai trò còn hiệu lực của người gọi (thẻ vai trò + thẻ phòng ban, Hình 3b) — rỗng với tài khoản không có vai trò KN"
+      operationId: knMyContexts
+      tags: [accounts]
+      responses:
+        "200":
+          description: Lần gán (phòng ban chưa mở có status not_open — hiện mờ, không chọn được)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [assignments]
+                properties:
+                  assignments: {type: array, items: {$ref: "#/components/schemas/KNAssignment"}}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: accounts.account_locked, $ref: "#/components/responses/Problem"}
+  /v1/me/context:
+    get:
+      summary: "Ngữ cảnh phiên của request (header X-AG-Context)"
+      operationId: knCurrentContext
+      tags: [accounts]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Ngữ cảnh
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNSessionContext"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "428": {description: accounts.context_required, $ref: "#/components/responses/Problem"}
+    post:
+      summary: "FN-CH-00.01 B4: chọn vai trò + phòng ban → context_id (Admin: department_code = null, bắt buộc MFA)"
+      operationId: knSelectContext
+      tags: [accounts]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assignment_id, department_code]
+              properties:
+                assignment_id: {type: string, format: uuid}
+                department_code: {type: [string, "null"]}
+      responses:
+        "201":
+          description: Ngữ cảnh mới (hết hạn sau 24 giờ hoặc khi lần gán hết hiệu lực)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNSessionContext"}
+        "403": {description: "accounts.account_locked, mfa_required (Admin)", $ref: "#/components/responses/Problem"}
+        "404": {description: accounts.assignment_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: accounts.department_not_open, $ref: "#/components/responses/Problem"}
+        "422": {description: accounts.department_required, $ref: "#/components/responses/Problem"}
   /v1/orgs:
     get:
       summary: Tổ chức trong phạm vi của người gọi (phân trang cursor)
@@ -5786,6 +5849,59 @@ components:
                 menu_profile: {type: string}
         default_route: {type: string}
         groups: {type: array, items: {$ref: "#/components/schemas/KNMenuGroup"}}
+    # --- pf/accounts KN v7.7 gói P1 (cùng định nghĩa ở admin.yaml) ---
+    KNCommune:
+      type: object
+      required: [code, name]
+      properties:
+        code: {type: string}
+        name: {type: string}
+    KNDepartmentRef:
+      type: object
+      required: [code, name, description, status]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        description: {type: [string, "null"]}
+        status: {type: string, enum: [active, not_open, suspended]}
+    KNAssignment:
+      type: object
+      required: [assignment_id, user_ref, role, org_ref, org_name, mgmt_level, mgmt_level_code, communes, departments, valid_from, valid_to, active,
+        created_by, created_at, updated_by, updated_at]
+      properties:
+        assignment_id: {type: string, format: uuid}
+        user_ref: {type: string, format: uuid}
+        role: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}
+        org_ref: {type: [string, "null"], format: uuid, description: "null: Admin không gắn Nút"}
+        org_name: {type: string, description: "Admin không Nút: \"Toàn hệ thống\""}
+        mgmt_level: {type: [string, "null"], description: "Nhãn cấp quản lý (tạm Q-05), vd \"Chuyên viên\""}
+        mgmt_level_code: {type: [string, "null"]}
+        communes: {type: array, items: {$ref: "#/components/schemas/KNCommune"}, description: "Xã phụ trách (Cấp Xã)"}
+        departments: {type: array, items: {$ref: "#/components/schemas/KNDepartmentRef"}, description: "Admin: rỗng"}
+        valid_from: {type: string, format: date-time}
+        valid_to: {type: [string, "null"], format: date-time}
+        active: {type: boolean}
+        created_by: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+        updated_by: {type: string, format: uuid}
+        updated_at: {type: string, format: date-time}
+    KNSessionContext:
+      type: object
+      required: [context_id, assignment_id, role, department_code, department_name, org_ref, org_name, communes, default_route, expires_at,
+        support_session_id, on_behalf_of]
+      properties:
+        context_id: {type: string, format: uuid, description: "Gửi lại qua header X-AG-Context"}
+        assignment_id: {type: [string, "null"], format: uuid, description: "null: ngữ cảnh hỗ trợ không gắn tài khoản"}
+        role: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}
+        department_code: {type: [string, "null"], description: "null với Admin"}
+        department_name: {type: [string, "null"]}
+        org_ref: {type: [string, "null"], format: uuid}
+        org_name: {type: string}
+        communes: {type: array, items: {$ref: "#/components/schemas/KNCommune"}}
+        default_route: {type: string, description: "Trang mặc định theo vai trò (Dashboard / Công việc cần làm / Tổng quan hệ thống)"}
+        expires_at: {type: string, format: date-time}
+        support_session_id: {type: [string, "null"], format: uuid, description: "Khác null: Admin đang hỗ trợ (FN-AD-04.07) — dải cảnh báo vàng"}
+        on_behalf_of: {type: [string, "null"], format: uuid}
     Me:
       type: object
       required: [actor_ref, tenant_id, roles, mfa, org, scope]

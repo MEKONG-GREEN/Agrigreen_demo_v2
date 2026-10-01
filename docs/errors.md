@@ -387,6 +387,31 @@ Tài khoản cán bộ quản lý trong Keycloak qua Admin REST (KN US-ADM-01..0
 | 502 | `accounts.email_failed` | pf/accounts: Keycloak không gửi được email liên kết (SMTP lỗi) khi gửi lại; khi tạo tài khoản thì trả 201 với `activation_email_sent = false` |
 | 503 | `accounts.dependency_unavailable` | pf/accounts: chưa cấu hình `AG_KC_*`, Keycloak không phản hồi hoặc từ chối tài khoản dịch vụ, chưa nối pf/party |
 
+KN v7.7 gói P1 — gán vai trò nhiều vai × Nút × phòng ban × xã (FN-AD-04.04), ngữ cảnh phiên `X-AG-Context` (FN-CH-00.01), chế độ hỗ trợ (FN-AD-04.07):
+
+| HTTP | code | Ý nghĩa |
+|---|---|---|
+| 404 | `accounts.assignment_not_found` | lần gán vai trò không có, thuộc tài khoản khác/tenant khác, hoặc đã hết hiệu lực (khi chọn ngữ cảnh) |
+| 409 | `accounts.assignment_duplicate` | tài khoản đã có vai trò này trên cùng Nút (đang hoạt động) |
+| 409 | `accounts.assignment_state` | sửa/thu hồi lần gán đã thu hồi; sửa mà không có thay đổi |
+| 409 | `accounts.prerequisite_missing` | UR-AD-04: Nút không tồn tại, không thuộc đơn vị cấp 1/2, hoặc đơn vị chưa khai báo phòng ban — khai báo cơ cấu tổ chức và phòng ban trước |
+| 422 | `accounts.department_invalid` | phòng ban không thuộc đơn vị của Nút hoặc đã bị xóa (`department_code` trong `errors`) |
+| 422 | `accounts.department_required` | chọn ngữ cảnh / mở hỗ trợ: thiếu phòng ban hoặc phòng ban không thuộc vai trò |
+| 409 | `accounts.department_not_open` | phòng ban chưa ở trạng thái Đang áp dụng (chưa mở / ngưng) — không chọn được |
+| 422 | `accounts.commune_invalid` | xã phụ trách không thuộc Nút tỉnh của vai trò Cấp Xã |
+| 409 | `accounts.duplicate_identity` | SĐT hoặc email đã là tên đăng nhập/email/SĐT của tài khoản khác (đăng nhập bằng email hoặc SĐT) |
+| 403 | `accounts.kn_admin_grant` | vai trò Admin chỉ `platform_admin` gán/thu hồi, cho tài khoản đã có vai realm `platform_admin` (MFA) |
+| 503 | `accounts.profile_update_unavailable` | kho tài khoản (Keycloak) chưa hỗ trợ sửa thông tin |
+| 428 | `accounts.context_required` | route KN v7.7 cần header `X-AG-Context` (chưa chọn vai trò + phòng ban) |
+| 403 | `accounts.context_invalid` | `X-AG-Context` không phải UUID, không tồn tại trong tenant, hoặc thuộc người khác (chống giả header) |
+| 403 | `accounts.context_expired` | ngữ cảnh quá 24 giờ hoặc lần gán hết hiệu lực — chọn lại |
+| 403 | `accounts.context_revoked` | vai trò đã thu hồi/đổi vai, phòng ban không còn trong vai trò hoặc không còn Đang áp dụng, tài khoản bị khóa, phiên hỗ trợ đã kết thúc |
+| 403 | `accounts.account_locked` | tài khoản bị khóa — "Tài khoản đã bị khóa, vui lòng liên hệ Admin để mở khóa." |
+| 403 | `mfa_required` | ngữ cảnh Admin và chế độ hỗ trợ bắt buộc token có yếu tố thứ hai |
+| 422 | `accounts.support_reason_required` | thao tác ghi trong chế độ hỗ trợ thiếu header `X-AG-Reason` (≥ 10 ký tự, UTF-8 mã hóa phần trăm) |
+| 404 | `accounts.support_session_not_found` | phiên hỗ trợ không có hoặc của Admin khác |
+| 409 | `accounts.support_session_ended` | thoát phiên hỗ trợ đã kết thúc |
+
 Nhập hàng loạt: lý do theo dòng dùng nhãn "Thiếu Email", "Sai định dạng Email", "Sai định dạng vai trò", "SĐT đã tồn tại", "Tên đăng nhập hoặc Email đã tồn tại", "Trùng với dòng N trong tệp", "Tổ chức ngoài phạm vi phụ trách", "Vai trò vượt quyền cấp của bạn". Thao tác loạt trả `code` của từng tài khoản trong `items[]`.
 
 ### mkg/hub (API nội bộ MKG — `cmd/api-internal`, `contracts/openapi/mkg-internal.yaml`)

@@ -66,7 +66,7 @@ func TestCORSPreflightAllowed(t *testing.T) {
 	if h.Get("Access-Control-Allow-Origin") != "http://localhost:3000" || h.Get("Access-Control-Allow-Credentials") != "" {
 		t.Fatalf("Allow-Origin phải đúng origin, không credentials: %v", h)
 	}
-	for _, want := range []string{"Authorization", "Content-Type", "Idempotency-Key", "X-Device-Id", "X-Purpose", "traceparent"} {
+	for _, want := range []string{"Authorization", "Content-Type", "Idempotency-Key", "X-Device-Id", "X-AG-Context", "X-AG-Reason", "X-Purpose", "traceparent"} {
 		if !strings.Contains(h.Get("Access-Control-Allow-Headers"), want) {
 			t.Fatalf("Allow-Headers thiếu %s: %q", want, h.Get("Access-Control-Allow-Headers"))
 		}

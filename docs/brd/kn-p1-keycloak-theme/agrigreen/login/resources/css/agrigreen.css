@@ -1,0 +1,26 @@
+/* Theme đăng nhập agrigreen (KN v7.7, Design Sample Hình 3a) — màu theo token web-ops (P6). Font hệ thống
+   (RB-7: không tải Google Fonts lúc chạy). Ảnh nền, logo theo nhận diện TTKNQG — chờ khách (Q-19). */
+.login-pf body {
+  background: linear-gradient(135deg, #123b24 0%, #1d5a38 100%);
+  font-family: Roboto, "Segoe UI", Arial, sans-serif;
+}
+#kc-header-wrapper {
+  color: #ffffff;
+  font-family: "Noto Serif", Georgia, serif;
+  font-weight: 600;
+}
+.card-pf {
+  border-radius: 12px;
+  border-top: 4px solid #00a82d;
+}
+#kc-form-buttons .btn-primary,
+.pf-c-button.pf-m-primary {
+  background-color: #00a82d;
+  border-color: #00a82d;
+}
+.alert-error,
+.pf-c-alert.pf-m-danger {
+  background: #fdecec;
+  border-color: #d93025;
+  color: #8a1c14;
+}

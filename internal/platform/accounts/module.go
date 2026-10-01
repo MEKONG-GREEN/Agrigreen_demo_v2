@@ -42,6 +42,10 @@ type Deps struct {
 	Households partyport.Households
 	Vault      client.Client
 	Params     mdport.Params
+	// KN v7.7 gói P1: phòng ban (pf/party P2), tên xã (pf/masterdata), danh bạ tên dự phòng cho Log.
+	Departments partyport.Departments
+	Units       mdport.AdminUnits
+	Names       partyport.ActorNames
 }
 
 // Module là pf/accounts đã nối.
@@ -50,12 +54,16 @@ type Module struct{ svc *app.Service }
 // New tạo module với pool của vai accounts_app.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs,
-		Households: d.Households, Vault: d.Vault, Params: d.Params}}
+		Households: d.Households, Vault: d.Vault, Params: d.Params, Departments: d.Departments, Units: d.Units, Names: d.Names}}
 }
 
 // RegisterApp gắn route Application API của App HTX: tài khoản nông dân (quản lý
 // HTX, cán bộ KN) và danh bạ cán bộ HTX của nông dân.
-func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterApp(rg) }
+func (m *Module) RegisterApp(rg *gin.RouterGroup) {
+	h := handler.Handler{Svc: m.svc}
+	h.RegisterApp(rg)
+	h.RegisterKNApp(rg) // KN v7.7: /v1/me/contexts, /v1/me/context
+}
 
 // FarmerHouseholds cho module khác: nông hộ liên kết với tài khoản nông dân
 // (cropcycle: phạm vi thửa; extension: yêu cầu hỗ trợ). Tenant lấy từ context.
@@ -65,7 +73,33 @@ func (m *Module) FarmerHouseholds() port.FarmerHouseholds { return m.svc }
 func (m *Module) FarmerAccounts() port.FarmerAccounts { return m.svc }
 
 // RegisterAdmin gắn route Admin API (MFA bắt buộc ở router).
-func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }
+func (m *Module) RegisterAdmin(rg *gin.RouterGroup) {
+	h := handler.Handler{Svc: m.svc}
+	h.RegisterAdmin(rg)
+	h.RegisterKNAdmin(rg) // KN v7.7: gán vai trò, Log, chế độ hỗ trợ
+}
+
+// Middleware thực hiện httpx.RequestMiddleware: ngữ cảnh phiên KN v7.7 (header X-AG-Context) cho MỌI
+// route của hai bề mặt — vai, phòng ban, phạm vi giải ở server (gap §4.5).
+func (m *Module) Middleware() gin.HandlerFunc { return handler.Handler{Svc: m.svc}.Middleware() }
+
+// UseDepartments nối phòng ban của pf/party sau khi dựng (gốc lắp ráp).
+func (m *Module) UseDepartments(d partyport.Departments) { m.svc.Departments = d }
+
+// SessionContext cho pf/party: menu theo ngữ cảnh phiên (P2 UseSessionContext).
+func (m *Module) SessionContext() partyport.SessionContext { return app.SessionContext{} }
+
+// DepartmentUsage cho pf/party: số tài khoản theo phòng ban (P2 UseDepartmentUsage — mở khóa `xóa` phòng ban).
+func (m *Module) DepartmentUsage() partyport.DepartmentUsage { return m.svc }
+
+// OrgImpact cho pf/party: dòng `accounts` của bảng Ảnh hưởng (FN-AD-04.02).
+func (m *Module) OrgImpact() partyport.OrgImpactSource { return app.OrgImpact{S: m.svc} }
+
+// ActorNames cho module khác: tên hiển thị người thao tác trong khung Log (Keycloak, dự phòng danh bạ).
+func (m *Module) ActorNames() partyport.ActorNames { return m.svc }
+
+// Assignments cho P4/P5: lần gán vai trò còn hiệu lực.
+func (m *Module) Assignments() port.Assignments { return m.svc }
 
 // OrgStatusHandler xử lý pf.party.org.deactivated/reactivated (consumer
 // port.OrgStatusConsumer, chạy trong inbox.Process trên pool accounts_app).
