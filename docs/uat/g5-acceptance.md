@@ -27,16 +27,16 @@ Bốn trạng thái:
 
 | Mục | Số yêu cầu | đạt | một phần | chưa làm | ngoài G5 |
 |---|---|---|---|---|---|
-| 3. Phụ lục A (G5) | 4 | 0 | 3 | 1 | 0 |
-| 4. Public API (ADR-0022) | 19 | 0 | 3 | 16 | 0 |
-| 5. Sản phẩm dữ liệu | 5 | 0 | 3 | 2 | 0 |
-| 6. `pf/metering` (ADR-0023) | 10 | 7 | 3 | 0 | 0 |
+| 3. Phụ lục A (G5) | 4 | 0 | 4 | 0 | 0 |
+| 4. Public API (ADR-0022) | 19 | 12 | 7 | 0 | 0 |
+| 5. Sản phẩm dữ liệu | 5 | 0 | 4 | 1 | 0 |
+| 6. `pf/metering` (ADR-0023) | 10 | 8 | 2 | 0 | 0 |
 | 7. Điểm kiểm soát xuất — DLP (ADR-0024) | 11 | 9 | 2 | 0 | 0 |
 | 8. Phase K và cấp phát bên thứ ba (ADR-0025) | 6 | 0 | 3 | 3 | 0 |
-| 9. Cổng kiến trúc G5 (RB, R-xx, vùng) | 10 | 1 | 6 | 3 | 0 |
+| 9. Cổng kiến trúc G5 (RB, R-xx, vùng) | 10 | 3 | 5 | 2 | 0 |
 | 10. Client và kịch bản đầu–cuối | 4 | 0 | 0 | 4 | 0 |
 | 11. Câu hỏi khách | 10 | 0 | 0 | 10 | 0 |
-| **Tổng** | **79** | **17** | **23** | **39** | **0** |
+| **Tổng** | **79** | **32** | **27** | **20** | **0** |
 
 Đã có ở G5-0. Đây là nền móng, không tính là đạt dòng nào:
 
@@ -77,32 +77,32 @@ Hạ tầng Phase K: `powershell -File deploy/k8s/check.ps1` (online) và `-Offl
 |---|---|---|---|
 | A-1 | Phase K = thay cấu hình và số bản sao, **không sửa mã** (R-01, RB-5): `values-phasek.yaml` chỉ có cấu hình, bật bằng `helm upgrade` không build lại image (ADR-0025 §1) | `check_flows.py` `phasek_overlay_checks` (mọi lá của `values-phasek.yaml` thuộc `PHASEK_ALLOWED`: số bản sao, HPA/PDB, `env`, `enabled`, `external.valkey` — không image, không luồng) + `public_api_checks` hồ sơ `prod-phasek`; `deploy/k8s/check.ps1` (online và `-Offline`: helm lint --strict + kubeconform -strict cho dev/staging/prod/prod-phasek, `check_flows.py` 4 921 kiểm đạt, 01/10/2026); [phase-k.md](../runbooks/phase-k.md) | **một phần** — **hạ tầng**: chưa diễn tập `helm upgrade -f values-phasek.yaml` trên staging thật (K-04) |
 | A-2 | `pf/metering` bật: mỗi lời gọi Public API một dòng sổ chứng từ (mục 11, 16) | `TestRecordOneRowPerCall_EgressInDataTenant_ADR0023`, `TestMeteringLedgersAppendOnlySixWays_R20` | **một phần** (mã: `cmd/api-public` gọi `Ledger.Record` mỗi lời gọi — đợt A) |
-| A-3 | Public API bật với bên thứ ba đầu tiên: khóa API lưu băm, scope, quota (mục 11) | — | **chưa làm** (chờ khách Q5-1) |
-| A-4 | Public API **tắt ở ĐTK 1**: 0 bản sao, không host ingress, `AG_PUBLIC_API_ENABLED` ≠ `1` → `api-public` thoát lỗi | `check_flows.py` `public_api_checks` hồ sơ dev/staging/prod: Deployment `api-public` có (image build + ký, CI `images`) nhưng 0 bản sao, không HPA, không host `partner`, không Middleware, không pepper, `AG_PUBLIC_API_ENABLED` không đặt; Compose chỉ chạy với `--profile phasek`; OpenTofu `phase_k = false` | **một phần** — **mã**: kiểm thử thoát lỗi của `cmd/api-public` (đợt A) |
+| A-3 | Public API bật với bên thứ ba đầu tiên: khóa API lưu băm, scope, quota (mục 11) | `TestKeyRotationOverlapRevoke_ADR0022`, `TestScopeAndGrantDenied_ADR0022`, `TestQuotaExhausted429_ADR0022` | **một phần** — cơ chế đạt; chờ khách Q5-1 (bên thứ ba đầu tiên, hợp đồng `approved`) |
+| A-4 | Public API **tắt ở ĐTK 1**: 0 bản sao, không host ingress, `AG_PUBLIC_API_ENABLED` ≠ `1` → `api-public` thoát lỗi | `check_flows.py` `public_api_checks` hồ sơ dev/staging/prod: Deployment `api-public` có (image build + ký, CI `images`) nhưng 0 bản sao, không HPA, không host `partner`, không Middleware, không pepper, `AG_PUBLIC_API_ENABLED` không đặt; Compose chỉ chạy với `--profile phasek`; OpenTofu `phase_k = false`; `TestDisabledFlagExits_ADR0022`, `TestEnabledRequiresOperatorTenant_ADR0022` | **một phần** — mã đạt (thoát lỗi khi tắt, thiếu tenant vận hành → không khởi động; 0 bản sao, không host ở hồ sơ gốc); **hạ tầng**: chưa chạy trên cụm thật |
 
 ## 4. Public API (ADR-0022)
 
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| P-01 | Tiến trình riêng `cmd/api-public` chỉ có route Public; không import `internal/mkg/**` (R-03) và kho định danh, kể cả client (RB-3) | (`TestBoundary` có luật từ G5-0) | **chưa làm** |
-| P-02 | Khóa API: chỉ lưu `key_prefix` + HMAC-SHA-256 với pepper theo phiên bản (≥ 32 byte, từ trình quản lý bí mật); so khớp thời gian hằng; xoay pepper không làm hỏng khóa cũ | — | **chưa làm** |
-| P-03 | Bí mật khóa hiện **một lần** (`Cache-Control: no-store`); không có trong log, lỗi, DB, URL, sự kiện (R-14, R-92) — kiểm thử quét chuỗi | — | **chưa làm** |
-| P-04 | Vòng đời khóa là sổ (`issued`/`rotated`/`revoked`/`expired`, RB-1); tối đa 2 khóa hiệu lực; xoay có hạn chồng lấn; thu hồi có lý do, hiệu lực ngay | — | **chưa làm** |
-| P-05 | Scope cấp qua đăng ký sản phẩm: `api_client_admin` đề xuất ≠ `api_client_approver` duyệt (R-56, `app/` + CHECK DB) | — | **chưa làm** |
-| P-06 | Truy cập cần cấp quyền `dp_<sản phẩm>` đang hiệu lực của bên cấp (ADR-0020, `GrantLookup`); thu hồi → 403 ở lời gọi kế tiếp; `grantor` chỉ chọn bên cấp | `TestGrantLookupActiveGrant_ADR0022` (cổng `GrantLookup`: chỉ `dp_*`, duyệt, hạn, thu hồi, `grantor` chỉ chọn bên cấp); handler `api-public` → 403 `apiclient.forbidden` ở đợt A | **một phần** (mã: handler `api-public` đợt A) |
-| P-07 | Tenant của bên gọi lấy từ bản ghi khóa, không bao giờ từ path/query/body (tương đương R-16) | — | **chưa làm** |
+| P-01 | Tiến trình riêng `cmd/api-public` chỉ có route Public; không import `internal/mkg/**` (R-03) và kho định danh, kể cả client (RB-3) | `TestBoundary`; tiến trình `cmd/api-public` chỉ có route `/v1` Public + `/healthz` `/readyz` | **đạt** |
+| P-02 | Khóa API: chỉ lưu `key_prefix` + HMAC-SHA-256 với pepper theo phiên bản (≥ 32 byte, từ trình quản lý bí mật); so khớp thời gian hằng; xoay pepper không làm hỏng khóa cũ | `TestPepperVersionsAndRotation_ADR0022`, `TestPeppersFromEnv_ADR0022`, `TestKeyHashNeverStoresPlaintext_ADR0022` | **đạt** |
+| P-03 | Bí mật khóa hiện **một lần** (`Cache-Control: no-store`); không có trong log, lỗi, DB, URL, sự kiện (R-14, R-92) — kiểm thử quét chuỗi | `TestKeyHashNeverStoresPlaintext_ADR0022` (quét bảng + log), `TestAdminIssueKeySecretOnce_ADR0022` (no-store, phát lại không bí mật, quét `shared.idempotency_key`), `TestUnauthenticatedNoLedger_ADR0022` | **đạt** |
+| P-04 | Vòng đời khóa là sổ (`issued`/`rotated`/`revoked`/`expired`, RB-1); tối đa 2 khóa hiệu lực; xoay có hạn chồng lấn; thu hồi có lý do, hiệu lực ngay | `TestKeyRotationOverlapRevoke_ADR0022`, `TestKeyUsable_ADR0022` | **đạt** |
+| P-05 | Scope cấp qua đăng ký sản phẩm: `api_client_admin` đề xuất ≠ `api_client_approver` duyệt (R-56, `app/` + CHECK DB) | `TestSelfApprovalBlocked_R56` (app/ + CHECK DB), `TestAdminIssueKeySecretOnce_ADR0022` | **đạt** |
+| P-06 | Truy cập cần cấp quyền `dp_<sản phẩm>` đang hiệu lực của bên cấp (ADR-0020, `GrantLookup`); thu hồi → 403 ở lời gọi kế tiếp; `grantor` chỉ chọn bên cấp | `TestGrantLookupActiveGrant_ADR0022` (cổng `GrantLookup`: chỉ `dp_*`, duyệt, hạn, thu hồi, `grantor` chỉ chọn bên cấp); handler `api-public` → 403 `apiclient.forbidden` ở đợt A; `TestScopeAndGrantDenied_ADR0022`, `TestExportJobFlow_ADR0022` (thu hồi → 403 ở lần tải kế tiếp) — với `GrantLookup` giả | **một phần** — mã: nối `GrantLookup` thật (pf/party) vào `cmd/api-public` `integrationPorts` (đợt tích hợp G5) |
+| P-07 | Tenant của bên gọi lấy từ bản ghi khóa, không bao giờ từ path/query/body (tương đương R-16) | `TestReadCollectionVolumes_ADR0022` | **đạt** |
 | P-08 | Gateway: giới hạn thô theo IP + giới hạn thân trên `partner.<domain>`, không thẩm quyền (R-55) | Chart `ingress.optionalHosts.partner` + `ingress.middlewares`: Traefik `Middleware` `public-api-ratelimit` (20 rps, burst 40 theo IP nguồn — tạm, chờ khách) và `public-api-body-limit` (`buffering.maxRequestBodyBytes` 1 MiB), chỉ `websecure`; `check_flows.py` hồ sơ `prod-phasek` kiểm Ingress tham chiếu đủ hai Middleware; kubeconform online (schema CRD Traefik) | **một phần** — **hạ tầng**: chưa áp trên cụm thật; `ipStrategy.depth` chờ chọn LB nhà cung cấp |
-| P-09 | Backend: giới hạn tần suất theo khách hàng (Valkey nếu có, không thì trong tiến trình) → 429 `apiclient.rate_limited` + `Retry-After` | — | **chưa làm** |
-| P-10 | Hạn mức thẩm quyền ngày/tháng theo đơn vị từ bộ đếm `pf_metering` cùng giao dịch → 429 `metering.quota_exceeded` | `TestQuotaExactUnderConcurrency_ADR0023` (bộ đếm `pf_metering` cùng giao dịch, song song không vượt) | **một phần** (mã: 429 + `Retry-After` ở `api-public` — đợt A) |
-| P-11 | Header `RateLimit-Limit`/`-Remaining`/`-Reset`, `AG-Quota-Remaining` ở mọi phản hồi | — | **chưa làm** |
-| P-12 | R-50: `/v1`, header `AG-Data-Contract: <sản phẩm>.v<N>`; hợp đồng mới chạy song song, `Deprecation`/`Sunset` | — | **chưa làm** |
-| P-13 | R-51: POST thiếu `Idempotency-Key` → 400; gọi lặp → đúng phản hồi đầu, 0 đơn vị | — | **chưa làm** |
-| P-14 | R-52: xuất → 202 + `Location: /v1/jobs/{id}` (mẫu mục 12, ảnh chụp bất biến); tệp phát luồng qua API, **không** URL có chữ ký | — | **chưa làm** |
-| P-15 | R-53: phân trang cursor ở mọi danh sách | — | **chưa làm** |
-| P-16 | Lỗi RFC 9457 + `trace_id` (R-15, R-63), mã ở `docs/errors.md` (`apiclient.*`, `metering.*`) | — | **chưa làm** |
-| P-17 | Lúc chạy: `dataproduct.Get` + `Validate` từng phần tử — trường lạ → không trả, `apiclient.contract_violation` | — | **chưa làm** |
-| P-18 | Hợp đồng `draft` không phục vụ ở production (`residency.Production`) | — | **chưa làm** |
-| P-19 | Lời gọi chưa xác thực không ghi sổ (chỉ log `key_prefix` + `ag_public_unauthenticated_total`); OAuth client credentials tùy chọn (R-54) | — | **chưa làm** |
+| P-09 | Backend: giới hạn tần suất theo khách hàng (Valkey nếu có, không thì trong tiến trình) → 429 `apiclient.rate_limited` + `Retry-After` | `TestRateLimit_ADR0022` (token bucket trong tiến trình, chia theo `AG_PUBLIC_REPLICAS`) | **một phần** — hạ tầng: adapter Valkey chưa có (Q5-10), interface `RateLimiter` sẵn |
+| P-10 | Hạn mức thẩm quyền ngày/tháng theo đơn vị từ bộ đếm `pf_metering` cùng giao dịch → 429 `metering.quota_exceeded` | `TestQuotaExactUnderConcurrency_ADR0023` (bộ đếm `pf_metering` cùng giao dịch, song song không vượt); `TestQuotaExhausted429_ADR0022` (kiểm sớm `Quotas` + thẩm quyền `Ledger.Record`, đơn vị đếm đúng) — với metering giả | **một phần** — mã: nối `Quotas`/`Ledger` thật (pf/metering) vào `cmd/api-public` (đợt tích hợp G5) |
+| P-11 | Header `RateLimit-Limit`/`-Remaining`/`-Reset`, `AG-Quota-Remaining` ở mọi phản hồi | `TestReadCollectionVolumes_ADR0022`, `TestRateLimit_ADR0022` | **đạt** |
+| P-12 | R-50: `/v1`, header `AG-Data-Contract: <sản phẩm>.v<N>`; hợp đồng mới chạy song song, `Deprecation`/`Sunset` | `TestReadCollectionVolumes_ADR0022`, `TestExportJobFlow_ADR0022` (`AG-Data-Contract`) | **một phần** — mã: `Deprecation`/`Sunset` khi có hợp đồng v2 (chưa có) |
+| P-13 | R-51: POST thiếu `Idempotency-Key` → 400; gọi lặp → đúng phản hồi đầu, 0 đơn vị | `TestExportJobFlow_ADR0022` (đúng byte phản hồi đầu, `replayed`, 0 đơn vị; khác thân → 422), `TestExportRequiresIdempotencyKey_ADR0022` | **đạt** |
+| P-14 | R-52: xuất → 202 + `Location: /v1/jobs/{id}` (mẫu mục 12, ảnh chụp bất biến); tệp phát luồng qua API, **không** URL có chữ ký | `TestExportJobFlow_ADR0022` (202 + `Location`, đầu vào bất biến, tệp phát luồng qua API + `Digest`) | **đạt** |
+| P-15 | R-53: phân trang cursor ở mọi danh sách | con trỏ của nguồn chuyển tiếp (`next_cursor`); Admin `GET /v1/api-clients` cursor | **một phần** — mã: con trỏ do nguồn (đợt S/D) hiện thực |
+| P-16 | Lỗi RFC 9457 + `trace_id` (R-15, R-63), mã ở `docs/errors.md` (`apiclient.*`, `metering.*`) | `TestLedgerFailureNoBody_ADR0023`, `TestScopeAndGrantDenied_ADR0022`; mã `apiclient.*` ở `docs/errors.md` | **đạt** |
+| P-17 | Lúc chạy: `dataproduct.Get` + `Validate` từng phần tử — trường lạ → không trả, `apiclient.contract_violation` | `TestDefaultDenyExtraField_ADR0022` | **đạt** |
+| P-18 | Hợp đồng `draft` không phục vụ ở production (`residency.Production`) | `TestDraftNotServedInProduction_ADR0022` | **đạt** |
+| P-19 | Lời gọi chưa xác thực không ghi sổ (chỉ log `key_prefix` + `ag_public_unauthenticated_total`); OAuth client credentials tùy chọn (R-54) | `TestUnauthenticatedNoLedger_ADR0022` (không dòng sổ, log chỉ prefix, metric `ag.public.unauthenticated`) | **một phần** — mã: `TokenAuthenticator` (OAuth client credentials) chưa hiện thực, chờ khách Q5-7 |
 
 ## 5. Sản phẩm dữ liệu (g5-conventions §6)
 
@@ -111,7 +111,7 @@ Hạ tầng Phase K: `powershell -File deploy/k8s/check.ps1` (online) và `-Offl
 | D-01 | `collection_volume`: ô xã × vụ × tháng chỉ khi ≥ k nông hộ phân biệt (`publicdata.k_min`, tạm 10, C-3); ô dưới k **không bao giờ** xuất hiện, kể cả trong tệp xuất; `suppressed_cells` | `TestCollectionVolumeKAnonymity_G5_D01` (nguồn pf/cropcycle: ô ≥ k, ẩn sơ cấp + bổ sung, `Suppressed` trên cả bộ lọc, bộ lọc không lộ ô ẩn, cách ly tenant, chỉ trường hợp đồng), `TestSuppressPrimary_G5_D01`, `TestSuppressComplementaryRow_G5_D01`, `TestSuppressComplementaryFixedPoint_G5_D01`, `TestSuppressNothing_G5_D01` (quy tắc `publicdata.kanon.v1`, g5-conventions §11.3) | **một phần** (mã: đọc `publicdata.k_min`, `meta.suppressed_cells` và tệp xuất ở đợt A; chờ khách C-3) |
 | D-02 | `hub_capacity`: hub đã công bố, bậc sử dụng thay tấn tồn; không lô/giá | `TestHubCapacityProductAndValveEgress_G5` (nguồn pf/geo: bậc thay tấn tồn, không used/lô/giá, khớp hợp đồng, con trỏ, cách ly tenant), `TestUtilizationBand_G5_D02` | **một phần** (mã: handler đợt A; chờ khách Q5-6) |
 | D-03 | `mrv_package_status`: đơn vị thẩm định chỉ xem trạng thái, băm, kiểm lại, số bằng chứng tổng hợp; không ảnh/tọa độ/nông hộ (KN US-MRV-05) | `TestMRVPackageProductAndEgress_G5` (nguồn pf/mrv: trạng thái, băm, số bằng chứng, kiểm lại; không người yêu cầu/khóa đối tượng/tọa độ; 404 tenant khác) | **một phần** (mã: handler + nhật ký truy cập ở đợt A) |
-| D-04 | Xuất `collection_volume` CSV/JSON tất định (SHA-256), cùng ngưỡng k | — | **chưa làm** |
+| D-04 | Xuất `collection_volume` CSV/JSON tất định (SHA-256), cùng ngưỡng k | `TestExportJobFlow_ADR0022`, `TestExportTooLargeAndDeterministic_ADR0022` (CSV/JSON tất định, SHA-256, `max_export_rows`) | **một phần** — mã: ngưỡng k trong nguồn `CollectionVolumeSource` (đợt S) |
 | D-05 | `contractcheck`: struct `//ag:dataproduct` khớp hợp đồng, tag OpenAPI, `personal_data: false`, người đề xuất ≠ người phê duyệt; chuyển `approved` khi khách ký | (`TestDataProductContracts_G5` có từ G5-0) | **chưa làm** (chờ khách Q5-1) |
 
 ## 6. `pf/metering` (ADR-0023, mục 16)
@@ -119,10 +119,10 @@ Hạ tầng Phase K: `powershell -File deploy/k8s/check.ps1` (online) và `-Offl
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
 | M-01 | Sổ `usage_event` theo mẫu §8.1 (chuỗi băm, phân vùng tháng, RLS); một dòng mỗi lời gọi đã xác thực, kể cả 4xx sau xác thực | `TestRecordOneRowPerCall_EgressInDataTenant_ADR0023`, `TestMeteringLedgersAppendOnlySixWays_R20` | **đạt** |
-| M-02 | Ghi sổ **trước** khi gửi byte; ghi lỗi → 503 `metering.unavailable`, không có dữ liệu | `TestRecordFailsClosed_ADR0023` (`Ledger.Record` lỗi → `metering.unavailable`) | **một phần** (mã: `api-public` không gửi byte khi 503 — đợt A) |
+| M-02 | Ghi sổ **trước** khi gửi byte; ghi lỗi → 503 `metering.unavailable`, không có dữ liệu | `TestRecordFailsClosed_ADR0023` (`Ledger.Record` lỗi → `metering.unavailable`); `TestLedgerFailureNoBody_ADR0023`, `TestQuotaExhausted429_ADR0022` | **đạt** |
 | M-03 | Đơn vị `metering.units.v1` ghim `rule_version`; đổi quy tắc → v2, dòng cũ không đổi | `TestUnitsV1_ADR0023`, `TestRecordOneRowPerCall_EgressInDataTenant_ADR0023` | **đạt** |
 | M-04 | Bộ đếm `usage_counter_current` cùng giao dịch, khóa dòng, giờ VN; `RebuildTenant` dựng lại = hiện hành (R-22) | `TestQuotaExactUnderConcurrency_ADR0023`, `TestRebuildProjectionsEqualsLive_R22`, `TestWindowsVietnamTime_ADR0023` | **đạt** |
-| M-05 | `GET /v1/usage`: chỉ của chính khách hàng | `TestRecordOneRowPerCall_EgressInDataTenant_ADR0023` (`port.Usage` chỉ của chính khách hàng) | **một phần** (mã: route `GET /v1/usage` của `api-public` — đợt A) |
+| M-05 | `GET /v1/usage`: chỉ của chính khách hàng | `TestRecordOneRowPerCall_EgressInDataTenant_ADR0023` (`port.Usage` chỉ của chính khách hàng); `TestScopeAndGrantDenied_ADR0022` (`usage:read`, `client_id` từ khóa) | **một phần** — mã: nối `Usage.UsageOf` thật vào route `GET /v1/usage` của `cmd/api-public` (đợt tích hợp G5) |
 | M-06 | Bảng kê kỳ tháng: 202 + job, ảnh chụp bất biến (first/last seq, băm cuối chuỗi, SHA-256); tất định | `TestStatementLifecycle_SoD_Deterministic_ADR0023`, `TestSnapshotCanonicalHash_ADR0023` | **đạt** |
 | M-07 | Duyệt bảng kê `billing_approver` ≠ `billing_officer` yêu cầu (R-56, `app/` + CHECK DB); đã duyệt → 409; sửa = bảng kê bù | `TestStatementLifecycle_SoD_Deterministic_ADR0023` (tự duyệt → 403 ở `app/` và CHECK 23514; đã duyệt → 409; bảng kê bù) | **đạt** |
 | M-08 | Giá tùy chọn, có phiên bản (`shared/money`, `numeric(18,4)`/`(18,2)`, không float — `agnofloat`); chưa có giá → chỉ đơn vị | `TestStatementOptionalPricing_ADR0023`, `TestStatementCSVGolden_ADR0023`, `TestNoFloat` | **đạt** (giá trị chờ khách Q5-4; cơ chế tham số pf/masterdata setter ≠ approver) |
@@ -160,12 +160,12 @@ Hạ tầng Phase K: `powershell -File deploy/k8s/check.ps1` (online) và `-Offl
 
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| X-01 | RB-1: sáu phép thử UPDATE/DELETE/TRUNCATE trên mọi sổ mới; `v_missing_immutability` rỗng | `TestMeteringLedgersAppendOnlySixWays_R20` (pf_metering; `v_missing_immutability` rỗng) | **một phần** (mã: sổ `pf_apiclient` — đợt A) |
-| X-02 | RB-2: cách ly tenant ở mọi bảng mới, kể cả song song qua PgBouncer transaction mode | `TestMeteringTenantIsolationParallel_RB2` (pf_metering) | **một phần** (mã: `pf_apiclient` — đợt A) |
-| X-03 | RB-3: Public API không trả dữ liệu cá nhân (hợp đồng `personal_data: false`, archlint không vault, kiểm thử quét phản hồi) | Nguồn chỉ điền trường DTO, kiểm `Validate` + quét chuỗi: `TestCollectionVolumeKAnonymity_G5_D01`, `TestHubCapacityProductAndValveEgress_G5`, `TestMRVPackageProductAndEgress_G5` | **một phần** (mã: quét phản hồi `api-public` đợt A) |
+| X-01 | RB-1: sáu phép thử UPDATE/DELETE/TRUNCATE trên mọi sổ mới; `v_missing_immutability` rỗng | `TestMeteringLedgersAppendOnlySixWays_R20` (pf_metering; `v_missing_immutability` rỗng); `TestAppendOnlySixWays_G5Apiclient` (sổ `pf_apiclient`, `v_missing_immutability`), `verify_chain` trong `TestKeyRotationOverlapRevoke_ADR0022` | **đạt** |
+| X-02 | RB-2: cách ly tenant ở mọi bảng mới, kể cả song song qua PgBouncer transaction mode | `TestMeteringTenantIsolationParallel_RB2` (pf_metering); `TestTenantIsolation_G5` (`pf_apiclient`) | **một phần** — cả `pf_apiclient` và `pf_metering` đạt trực tiếp PostgreSQL; song song qua PgBouncer chưa chạy (**hạ tầng**) |
+| X-03 | RB-3: Public API không trả dữ liệu cá nhân (hợp đồng `personal_data: false`, archlint không vault, kiểm thử quét phản hồi) | Nguồn chỉ điền trường DTO, kiểm `Validate` + quét chuỗi: `TestCollectionVolumeKAnonymity_G5_D01`, `TestHubCapacityProductAndValveEgress_G5`, `TestMRVPackageProductAndEgress_G5`; `TestBoundary`, `TestDefaultDenyExtraField_ADR0022`, hợp đồng `personal_data: false` | **một phần** — mã: kiểm thử quét phản hồi đầu–cuối qua `cmd/api-public` thật (đợt E) |
 | X-04 | R-10: `agnofloat` phủ `internal/platform/metering/**` | `TestNoFloat`; mọi package `internal/platform/metering/**` (kể cả kiểm thử) không float | **đạt** |
-| X-05 | R-14/R-92: không log khóa, bí mật, URL có chữ ký (`agpiilog` với `IssuedKey.Secret pii:"true"`) | — | **chưa làm** |
-| X-06 | R-61: ba consumer G5 idempotent (giao lặp) | `TestStatementLifecycle_SoD_Deterministic_ADR0023` (giao lặp `pf.metering.statement.requested` → bỏ qua) | **một phần** (mã: consumer xuất apiclient, `pf.notify.egress_anomaly` — đợt A, D) |
+| X-05 | R-14/R-92: không log khóa, bí mật, URL có chữ ký (`agpiilog` với `IssuedKey.Secret pii:"true"`) | `TestKeyHashNeverStoresPlaintext_ADR0022`, `TestUnauthenticatedNoLedger_ADR0022`, `TestAdminIssueKeySecretOnce_ADR0022`; `IssuedKey.Secret pii:"true"` (agpiilog) | **đạt** |
+| X-06 | R-61: ba consumer G5 idempotent (giao lặp) | `TestStatementLifecycle_SoD_Deterministic_ADR0023` (giao lặp `pf.metering.statement.requested` → bỏ qua); `TestExportJobFlow_ADR0022` (giao lặp `pf.apiclient.export` → không làm gì) | **một phần** — `pf.metering.statement`, `pf.apiclient.export` đạt; consumer `pf.notify.egress_anomaly` chưa có |
 | X-07 | R-62: DLQ + cảnh báo cho ba hàng đợi G5 | — | **chưa làm** |
 | X-08 | R-64: ba schema sự kiện G5 tương thích ngược (`contractcheck -base`) | — | **chưa làm** |
 | X-09 | R-80/R-81: `api-public` ở vùng ứng dụng, chỉ PgBouncer pf; NetworkPolicy mặc định từ chối | `api-public` ở `agrigreen-pf` (default-deny), cứng hóa Pod (non-root, rootfs chỉ đọc, seccomp, không token SA) và Secret đúng vùng — `check_flows.py` `structure_checks` + `public_api_checks` (xem K-01) | **một phần** — **hạ tầng**: chưa áp trên cụm thật |

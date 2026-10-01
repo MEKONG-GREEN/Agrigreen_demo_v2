@@ -103,6 +103,7 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
   /v1/data/collection-volumes/exports:
     post:
@@ -128,10 +129,14 @@ paths:
                 to_month: {type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"}
       responses:
         "202": {$ref: "#/components/responses/JobAccepted"}
+        "422":
+          description: "Dữ liệu không hợp lệ, hoặc Idempotency-Key đã dùng cho thân khác (idempotency_key_reused)"
+          content:
+            application/problem+json:
+              schema: {$ref: "#/components/schemas/Problem"}
         "400": {$ref: "#/components/responses/Problem"}
         "401": {$ref: "#/components/responses/Problem"}
         "403": {$ref: "#/components/responses/Problem"}
-        "422": {$ref: "#/components/responses/Problem"}
         "429": {$ref: "#/components/responses/TooManyRequests"}
         "503": {$ref: "#/components/responses/Problem"}
   /v1/data/hub-capacities:
@@ -267,6 +272,8 @@ paths:
       responses:
         "200":
           description: Tổng sử dụng
+          headers:
+            AG-Quota-Remaining: {$ref: "#/components/headers/QuotaRemaining"}
           content:
             application/json:
               schema:
@@ -278,6 +285,7 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "429": {$ref: "#/components/responses/TooManyRequests"}
+        "503": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     apiKey:
@@ -348,9 +356,10 @@ components:
         application/problem+json:
           schema: {$ref: "#/components/schemas/Problem"}
     JobAccepted:
-      description: Đã nhận (R-52). Gọi lặp cùng Idempotency-Key trả lại đúng phản hồi này.
+      description: Đã nhận (R-52). Gọi lặp cùng Idempotency-Key trả lại đúng phản hồi này (0 đơn vị).
       headers:
         Location: {schema: {type: string}, description: "/v1/jobs/{id}"}
+        Idempotent-Replayed: {schema: {type: string, enum: ["true"]}, description: "Có khi là phát lại"}
       content:
         application/json:
           schema: {$ref: "#/components/schemas/Job"}
@@ -458,6 +467,7 @@ components:
         rows: {type: [integer, "null"]}
         sha256: {type: [string, "null"]}
         file_url: {type: [string, "null"], description: "/v1/jobs/{id}/file khi completed"}
+        error_code: {type: string, description: "Khi failed, vd apiclient.export_too_large"}
     UsageDay:
       type: object
       required: [date, product, calls, units]

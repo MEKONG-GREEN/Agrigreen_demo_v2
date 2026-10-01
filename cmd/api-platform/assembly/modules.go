@@ -10,6 +10,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extdata"
@@ -75,13 +76,14 @@ type Modules struct {
 	Simulation    *simulation.Module
 	CropCycle     *cropcycle.Module
 	Metrics       *metrics.Module
-	ExtData       *extdata.Module // proxy khử định danh nguồn ngoài (ADR-0007), không vai DB
-	Metering      *metering.Module
+	ExtData       *extdata.Module   // proxy khử định danh nguồn ngoài (ADR-0007), không vai DB
+	Metering      *metering.Module  // G5 (ADR-0023/0024): sổ sử dụng Public API, điểm kiểm soát xuất, bảng kê
+	APIClient     *apiclient.Module // G5 (ADR-0022): khách hàng Public API, khóa, đăng ký, gói hạn mức — Admin API
 }
 
 // List trả module theo thứ tự gắn route.
 func (m Modules) List() []httpx.Module {
-	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.Waterway, m.Simulation, m.CropCycle, m.Metrics, m.ExtData, m.Metering}
+	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.Waterway, m.Simulation, m.CropCycle, m.Metrics, m.ExtData, m.Metering, m.APIClient}
 }
 
 // Build là gốc lắp ráp DUY NHẤT: mở pool theo vai của từng module (R-05) và nối
@@ -278,6 +280,25 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	}
 	meter := metering.New(meterPool, clk, metering.Deps{Params: md.Params(), Mode: mode})
 
+	// pf/apiclient (G5, ADR-0022): Admin API quản trị khách hàng Public API; pepper khóa từ trình quản lý
+	// bí mật (không đặt → phát hành khóa trả 503). Worker xuất đọc collection_volume qua pf/cropcycle
+	// (cùng luật k-ẩn danh với đọc trực tuyến); pf/metering tra gói hạn mức qua pf/apiclient.
+	apicPool, err := pool(apiclient.DBRole)
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	peppers, err := apiclient.PeppersFromEnv()
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	opTenant, err := apiclient.OperatorTenantFromEnv()
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	apic := apiclient.New(apicPool, clk, apiclient.Deps{Peppers: peppers, OperatorTenant: opTenant, Store: store})
+	apic.UseCollectionSource(cc.CollectionVolumeSource())
+	meter.UsePlans(apic.Plans())
+
 	// G5 (ADR-0022): nguồn sản phẩm collection_volume cần dữ kiện thửa (pf/geo) + đơn vị hành chính.
 	cc.UseCollectionVolume(g.PlotFacts(), md.AdminUnits())
 	// G5 (ADR-0024): mọi đường xuất phía nền tảng qua MỘT điểm kiểm soát — pf/metering (ext.Egress ghi đè cho kiểm thử).
@@ -292,7 +313,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	pty.UseEgress(egress, mode, slog.Default())
 
 	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
-		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Metrics: met, ExtData: ed, Metering: meter}, pools, nil
+		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Metrics: met, ExtData: ed, Metering: meter, APIClient: apic}, pools, nil
 }
 
 // EgressModeFromEnv đọc AG_EGRESS_MODE (ADR-0024 mục 2): rỗng → observe; giá trị lạ → lỗi khởi động.

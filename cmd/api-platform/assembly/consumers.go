@@ -1,6 +1,8 @@
 package assembly
 
 import (
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
+	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
@@ -62,4 +64,7 @@ var Consumers = []Consumer{
 	// G5 (ADR-0023 mục 4): bảng kê kỳ tháng — ảnh chụp bất biến + bảng kê draft (mẫu §12).
 	{Name: meteringport.StatementConsumer, Role: metering.DBRole, Events: []string{meteringport.EventStatementRequested},
 		Handler: func(m Modules) inbox.Handler { return m.Metering.StatementHandler() }},
+	// G5 (ADR-0022 mục 8): việc xuất Public API — dựng tệp tất định qua nguồn của module chủ dữ liệu.
+	{Name: apiclientport.ExportConsumer, Role: apiclient.DBRole, Events: []string{apiclientport.EventExportRequested},
+		Handler: func(m Modules) inbox.Handler { return m.APIClient.ExportHandler() }},
 }
