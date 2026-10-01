@@ -2514,6 +2514,217 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/metering/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tổng sử dụng Public API theo ngày × sản phẩm của một khách hàng — ADR-0023
+         * @description Tenant đơn vị vận hành (token). Đọc bộ đếm (giờ Việt Nam, bao gồm hai đầu, tối đa 366 ngày).
+         */
+        get: operations["getMeteringUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/metering/usage-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sổ sử dụng (chứng từ) của một khách hàng, mới nhất trước — ADR-0023 */
+        get: operations["listMeteringUsageEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/metering/statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bảng kê của tenant đơn vị vận hành — ADR-0023 */
+        get: operations["listMeteringStatements"];
+        put?: never;
+        /**
+         * Yêu cầu lập bảng kê kỳ tháng (202 + job) — ADR-0023 mục 4
+         * @description Vai `billing_officer`. Kỳ phải đã kết thúc (giờ Việt Nam) — không thì 409 `metering.period_not_ended`.
+         *     `client_id` vắng = mọi khách hàng có sử dụng trong kỳ. Bảng kê bù: `supersedes_id` + `correction_reason`
+         *     (cùng khách hàng, cùng kỳ; bảng kê cũ giữ nguyên, ghi `superseded_by`). Worker dựng ảnh chụp bất biến.
+         */
+        post: operations["requestMeteringStatement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/metering/statement-jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái yêu cầu lập bảng kê — ADR-0023 */
+        get: operations["getMeteringStatementJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/metering/statements/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một bảng kê — ADR-0023 */
+        get: operations["getMeteringStatement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/metering/statements/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Duyệt bảng kê — `billing_approver` ≠ người yêu cầu (R-56, app/ + CHECK DB)
+         * @description Đóng băng bảng kê. Tự duyệt → 403 `metering.self_approval`. Đã duyệt bởi người khác hoặc đã bị thay →
+         *     409 `metering.statement_frozen` (sửa = bảng kê bù). Duyệt lặp của chính người duyệt → 200.
+         */
+        post: operations["approveMeteringStatement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/metering/statements/{id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dựng lại ảnh chụp bảng kê từ sổ và so SHA-256 — ADR-0023 */
+        get: operations["verifyMeteringStatement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/metering/statements/{id}/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tải CSV bảng kê (tất định byte-cho-byte) — qua điểm kiểm soát xuất kênh report_export
+         * @description Vai `billing_officer` hoặc `billing_approver`. Lập hóa đơn NGOÀI hệ thống. Header `AG-Snapshot-SHA256`.
+         *     `AG_EGRESS_MODE=enforce` + vượt hạn mức kênh → 429 `metering.egress_quota_exceeded`.
+         */
+        get: operations["exportMeteringStatementCsv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/metering/params": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tham số hiệu lực của pf/metering (hạn mức/ngưỡng kênh DLP, giá tùy chọn) — tạm, chờ khách
+         * @description Đọc từ pf/masterdata (phiên bản đã duyệt) hoặc mặc định g5-conventions §1.2. Đề xuất/duyệt qua
+         *     `/v1/masterdata/params` (param_setter ≠ param_approver, R-56).
+         */
+        get: operations["listMeteringParams"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/metering/egress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sổ xuất dữ liệu (DLP) của tenant chủ dữ liệu — ADR-0024
+         * @description Vai `metering_viewer` hoặc `platform_admin`; chỉ dòng của tenant mình (RLS). Ngày giờ Việt Nam.
+         */
+        get: operations["listMeteringEgress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/metering/egress/anomalies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cảnh báo khối lượng xuất bất thường của tenant chủ dữ liệu — ADR-0024 */
+        get: operations["listMeteringEgressAnomalies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3822,6 +4033,169 @@ export interface components {
             actor_ref: string;
             /** Format: date-time */
             recorded_at: string;
+        };
+        MeteringUsageDay: {
+            /** Format: date */
+            date: string;
+            product: string;
+            calls: number;
+            units: number;
+        };
+        /** @description Một dòng sổ sử dụng (chứng từ). Không bí mật khóa, không giá trị truy vấn. */
+        MeteringUsageEvent: {
+            /** Format: uuid */
+            id: string;
+            seq: number;
+            /** Format: uuid */
+            client_id: string;
+            key_prefix: string;
+            auth_method: string;
+            /** @enum {string} */
+            call_kind: "read" | "export_request" | "job_status" | "file_download" | "meta";
+            product: string;
+            contract_version: number;
+            route_template: string;
+            status: number;
+            problem_code: string | null;
+            /** Format: uuid */
+            data_tenant_id: string | null;
+            units: number;
+            rows_out: number;
+            bytes_out: number;
+            latency_ms: number;
+            replayed: boolean;
+            rule_version: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        MeteringStatementJob: {
+            /** Format: uuid */
+            id: string;
+            period: string;
+            /** Format: uuid */
+            client_id: string | null;
+            /** Format: uuid */
+            supersedes_id: string | null;
+            correction_reason: string | null;
+            /** @enum {string} */
+            status: "queued" | "completed" | "failed";
+            statement_ids: string[];
+            error: string | null;
+            /** Format: uuid */
+            requested_by: string;
+            /** Format: date-time */
+            requested_at: string;
+            /** Format: date-time */
+            completed_at: string | null;
+        };
+        MeteringStatementLine: {
+            product: string;
+            /** @description 2xx | 4xx | 5xx */
+            status_class: string;
+            calls: number;
+            units: number;
+            /** @description numeric(18,4) dạng chuỗi; null khi chưa có giá */
+            unit_price_vnd: string | null;
+            /** @description numeric(18,2) dạng chuỗi */
+            amount_vnd: string | null;
+            price_version: string | null;
+        };
+        /** @description Bảng kê một khách hàng × kỳ tháng (chứng từ lập hóa đơn ngoài hệ thống). Tiền là chuỗi thập phân. */
+        MeteringStatement: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            client_id: string;
+            /** Format: uuid */
+            client_tenant_id: string;
+            period: string;
+            /** @enum {string} */
+            status: "draft" | "approved";
+            lines: components["schemas"]["MeteringStatementLine"][];
+            subscription_vnd: string | null;
+            total_vnd: string | null;
+            price_version: string | null;
+            first_seq: number;
+            last_seq: number;
+            chain_head_hash: string;
+            snapshot_sha256: string;
+            rule_version: string;
+            /** Format: uuid */
+            job_id: string;
+            /** Format: uuid */
+            requested_by: string;
+            /** Format: date-time */
+            requested_at: string;
+            /** Format: uuid */
+            approved_by: string | null;
+            /** Format: date-time */
+            approved_at: string | null;
+            /** Format: uuid */
+            supersedes_id: string | null;
+            correction_reason: string | null;
+            /** Format: uuid */
+            superseded_by: string | null;
+        };
+        /** @enum {string} */
+        EgressChannel: "public_api" | "mrv_package" | "report_export" | "valve" | "partner_share";
+        /** @description Một lần dữ liệu rời đi qua điểm kiểm soát (tenant = chủ dữ liệu). Chỉ mã tham chiếu và số lượng. */
+        EgressEvent: {
+            /** Format: uuid */
+            id: string;
+            seq: number;
+            channel: components["schemas"]["EgressChannel"];
+            /** Format: uuid */
+            source_id: string;
+            /** @enum {string} */
+            counterparty_kind: "api_client" | "tenant" | "actor";
+            /** Format: uuid */
+            counterparty_ref: string;
+            product: string;
+            contract_version: number;
+            records: number;
+            bytes: number;
+            /** Format: date */
+            business_date: string;
+            /** @enum {string} */
+            decision: "allowed" | "denied";
+            /** @enum {string} */
+            reason: "" | "quota_exceeded";
+            /** @enum {string} */
+            mode: "observe" | "enforce";
+            daily_records: number;
+            /** @description 0 = không giới hạn */
+            daily_quota: number;
+            anomaly: boolean;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        EgressAnomaly: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            business_date: string;
+            channel: components["schemas"]["EgressChannel"];
+            /** @enum {string} */
+            counterparty_kind: "api_client" | "tenant" | "actor";
+            /** Format: uuid */
+            counterparty_ref: string;
+            product: string;
+            /** Format: uuid */
+            egress_event_id: string;
+            daily_records: number;
+            threshold: number;
+            /** @enum {string} */
+            basis: "median" | "absolute";
+            /** @enum {string} */
+            mode: "observe" | "enforce";
+            /** Format: date-time */
+            detected_at: string;
         };
         ParamValue: {
             key: string;
@@ -8688,6 +9062,365 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    getMeteringUsage: {
+        parameters: {
+            query: {
+                client_id: string;
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tổng theo ngày */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MeteringUsageDay"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listMeteringUsageEvents: {
+        parameters: {
+            query: {
+                client_id: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MeteringUsageEvent"][];
+                        /** Format: uuid */
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    listMeteringStatements: {
+        parameters: {
+            query?: {
+                period?: string;
+                client_id?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MeteringStatement"][];
+                        /** Format: uuid */
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    requestMeteringStatement: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    period: string;
+                    /** Format: uuid */
+                    client_id?: string | null;
+                    /** Format: uuid */
+                    supersedes_id?: string | null;
+                    correction_reason?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã nhận (gọi lặp cùng Idempotency-Key → cùng job) */
+            202: {
+                headers: {
+                    /** @description /v1/metering/statement-jobs/{id} */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeteringStatementJob"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getMeteringStatementJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Job */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeteringStatementJob"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    getMeteringStatement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bảng kê */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeteringStatement"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    approveMeteringStatement: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã duyệt trước đó bởi chính người gọi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeteringStatement"];
+                };
+            };
+            /** @description Đã duyệt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeteringStatement"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    verifyMeteringStatement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả kiểm lại */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        statement_id: string;
+                        stored_sha256: string;
+                        rebuilt_sha256: string;
+                        match: boolean;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    exportMeteringStatementCsv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV UTF-8, LF */
+            200: {
+                headers: {
+                    "AG-Snapshot-SHA256"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            429: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    listMeteringParams: {
+        parameters: {
+            query?: {
+                at?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tham số */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            key: string;
+                            /** @description decimal dạng chuỗi; null = chưa đặt */
+                            value: string | null;
+                            /** @description default | v<N> | unset */
+                            source: string;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    listMeteringEgress: {
+        parameters: {
+            query?: {
+                channel?: components["schemas"]["EgressChannel"];
+                from?: string;
+                to?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["EgressEvent"][];
+                        /** Format: uuid */
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listMeteringEgressAnomalies: {
+        parameters: {
+            query?: {
+                channel?: components["schemas"]["EgressChannel"];
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["EgressAnomaly"][];
+                        /** Format: uuid */
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
         };
     };
 }

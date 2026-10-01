@@ -17,6 +17,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
@@ -70,11 +72,12 @@ type Modules struct {
 	CropCycle     *cropcycle.Module
 	Metrics       *metrics.Module
 	ExtData       *extdata.Module // proxy khử định danh nguồn ngoài (ADR-0007), không vai DB
+	Metering      *metering.Module
 }
 
 // List trả module theo thứ tự gắn route.
 func (m Modules) List() []httpx.Module {
-	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.Waterway, m.Simulation, m.CropCycle, m.Metrics, m.ExtData}
+	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.Waterway, m.Simulation, m.CropCycle, m.Metrics, m.ExtData, m.Metering}
 }
 
 // Build là gốc lắp ráp DUY NHẤT: mở pool theo vai của từng module (R-05) và nối
@@ -259,8 +262,20 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		return Modules{}, pools, err
 	}
 
+	// pf/metering (G5, ADR-0023/0024): sổ sử dụng Public API, điểm kiểm soát xuất (AG_EGRESS_MODE: observe | enforce),
+	// bảng kê (Admin API; worker dựng ảnh chụp). Tham số kênh/giá đọc pf/masterdata; gói hạn mức nối UsePlans (pf/apiclient).
+	egressMode, err := meteringport.ParseMode(os.Getenv(meteringport.EnvEgressMode))
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	meterPool, err := pool(metering.DBRole)
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	meter := metering.New(meterPool, clk, metering.Deps{Params: md.Params(), Mode: egressMode})
+
 	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
-		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Metrics: met, ExtData: ed}, pools, nil
+		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Metrics: met, ExtData: ed, Metering: meter}, pools, nil
 }
 
 // farmerHouseholds chuyển port pf/accounts (liên kết tài khoản nông dân ↔ nông hộ)

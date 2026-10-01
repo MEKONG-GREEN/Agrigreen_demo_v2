@@ -699,3 +699,7 @@ Khóa API **không bao giờ** xuất hiện trong lỗi, log, URL, sự kiện 
 | 403 | `metering.self_approval` | Người duyệt bảng kê là người yêu cầu lập (R-56) |
 | 409 | `metering.statement_frozen` | Bảng kê đã duyệt — lập bảng kê bù (`supersedes_id`) |
 | 409 | `metering.period_not_ended` | Yêu cầu lập bảng kê cho kỳ chưa kết thúc (giờ Việt Nam) |
+| 429 | `metering.egress_quota_exceeded` (Public API) | Ở `Ledger.Record` checkpoint kênh `public_api` luôn `enforce`: vượt hạn mức kênh của **chủ dữ liệu** → dòng sổ sử dụng `status = 429`, `units = 0`, không phục vụ dữ liệu |
+| 409 | `metering.statement_frozen` (bảng kê bù) | Bảng kê cần thay đã bị thay bởi bảng kê khác (`superseded_by`) — bù cho bảng kê hiện hành; duyệt bảng kê đã bị thay cũng trả mã này |
+| 404 | `metering.not_found` | Admin API: không có bảng kê / yêu cầu lập bảng kê (hoặc thuộc tenant khác — RLS); bảng kê bù trỏ tới bảng kê không cùng khách hàng/kỳ |
+| 503 | `metering.dependency_unavailable` | Module chưa nối pool `metering_app` |

@@ -27,16 +27,16 @@ Bốn trạng thái:
 
 | Mục | Số yêu cầu | đạt | một phần | chưa làm | ngoài G5 |
 |---|---|---|---|---|---|
-| 3. Phụ lục A (G5) | 4 | 0 | 0 | 4 | 0 |
-| 4. Public API (ADR-0022) | 19 | 0 | 0 | 19 | 0 |
+| 3. Phụ lục A (G5) | 4 | 0 | 1 | 3 | 0 |
+| 4. Public API (ADR-0022) | 19 | 0 | 1 | 18 | 0 |
 | 5. Sản phẩm dữ liệu | 5 | 0 | 0 | 5 | 0 |
-| 6. `pf/metering` (ADR-0023) | 10 | 0 | 0 | 10 | 0 |
-| 7. Điểm kiểm soát xuất — DLP (ADR-0024) | 11 | 0 | 0 | 11 | 0 |
+| 6. `pf/metering` (ADR-0023) | 10 | 7 | 3 | 0 | 0 |
+| 7. Điểm kiểm soát xuất — DLP (ADR-0024) | 11 | 5 | 2 | 4 | 0 |
 | 8. Phase K và cấp phát bên thứ ba (ADR-0025) | 6 | 0 | 0 | 6 | 0 |
-| 9. Cổng kiến trúc G5 (RB, R-xx, vùng) | 10 | 0 | 0 | 10 | 0 |
+| 9. Cổng kiến trúc G5 (RB, R-xx, vùng) | 10 | 1 | 3 | 6 | 0 |
 | 10. Client và kịch bản đầu–cuối | 4 | 0 | 0 | 4 | 0 |
 | 11. Câu hỏi khách | 10 | 0 | 0 | 10 | 0 |
-| **Tổng** | **79** | **0** | **0** | **79** | **0** |
+| **Tổng** | **79** | **13** | **10** | **56** | **0** |
 
 Đã có ở G5-0. Đây là nền móng, không tính là đạt dòng nào:
 
@@ -74,7 +74,7 @@ Như [g4-acceptance.md §1](g4-acceptance.md#1-cách-chạy). Kịch bản E2E G
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
 | A-1 | Phase K = thay cấu hình và số bản sao, **không sửa mã** (R-01, RB-5): `values-phasek.yaml` chỉ có cấu hình, bật bằng `helm upgrade` không build lại image (ADR-0025 §1) | — | **chưa làm** |
-| A-2 | `pf/metering` bật: mỗi lời gọi Public API một dòng sổ chứng từ (mục 11, 16) | — | **chưa làm** |
+| A-2 | `pf/metering` bật: mỗi lời gọi Public API một dòng sổ chứng từ (mục 11, 16) | `TestRecordOneRowPerCall_EgressInDataTenant_ADR0023`, `TestMeteringLedgersAppendOnlySixWays_R20` | **một phần** (mã: `cmd/api-public` gọi `Ledger.Record` mỗi lời gọi — đợt A) |
 | A-3 | Public API bật với bên thứ ba đầu tiên: khóa API lưu băm, scope, quota (mục 11) | — | **chưa làm** (chờ khách Q5-1) |
 | A-4 | Public API **tắt ở ĐTK 1**: 0 bản sao, không host ingress, `AG_PUBLIC_API_ENABLED` ≠ `1` → `api-public` thoát lỗi | — | **chưa làm** |
 
@@ -91,7 +91,7 @@ Như [g4-acceptance.md §1](g4-acceptance.md#1-cách-chạy). Kịch bản E2E G
 | P-07 | Tenant của bên gọi lấy từ bản ghi khóa, không bao giờ từ path/query/body (tương đương R-16) | — | **chưa làm** |
 | P-08 | Gateway: giới hạn thô theo IP + giới hạn thân trên `partner.<domain>`, không thẩm quyền (R-55) | — | **chưa làm** (hạ tầng) |
 | P-09 | Backend: giới hạn tần suất theo khách hàng (Valkey nếu có, không thì trong tiến trình) → 429 `apiclient.rate_limited` + `Retry-After` | — | **chưa làm** |
-| P-10 | Hạn mức thẩm quyền ngày/tháng theo đơn vị từ bộ đếm `pf_metering` cùng giao dịch → 429 `metering.quota_exceeded` | — | **chưa làm** |
+| P-10 | Hạn mức thẩm quyền ngày/tháng theo đơn vị từ bộ đếm `pf_metering` cùng giao dịch → 429 `metering.quota_exceeded` | `TestQuotaExactUnderConcurrency_ADR0023` (bộ đếm `pf_metering` cùng giao dịch, song song không vượt) | **một phần** (mã: 429 + `Retry-After` ở `api-public` — đợt A) |
 | P-11 | Header `RateLimit-Limit`/`-Remaining`/`-Reset`, `AG-Quota-Remaining` ở mọi phản hồi | — | **chưa làm** |
 | P-12 | R-50: `/v1`, header `AG-Data-Contract: <sản phẩm>.v<N>`; hợp đồng mới chạy song song, `Deprecation`/`Sunset` | — | **chưa làm** |
 | P-13 | R-51: POST thiếu `Idempotency-Key` → 400; gọi lặp → đúng phản hồi đầu, 0 đơn vị | — | **chưa làm** |
@@ -116,32 +116,32 @@ Như [g4-acceptance.md §1](g4-acceptance.md#1-cách-chạy). Kịch bản E2E G
 
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| M-01 | Sổ `usage_event` theo mẫu §8.1 (chuỗi băm, phân vùng tháng, RLS); một dòng mỗi lời gọi đã xác thực, kể cả 4xx sau xác thực | — | **chưa làm** |
-| M-02 | Ghi sổ **trước** khi gửi byte; ghi lỗi → 503 `metering.unavailable`, không có dữ liệu | — | **chưa làm** |
-| M-03 | Đơn vị `metering.units.v1` ghim `rule_version`; đổi quy tắc → v2, dòng cũ không đổi | — | **chưa làm** |
-| M-04 | Bộ đếm `usage_counter_current` cùng giao dịch, khóa dòng, giờ VN; `RebuildTenant` dựng lại = hiện hành (R-22) | — | **chưa làm** |
-| M-05 | `GET /v1/usage`: chỉ của chính khách hàng | — | **chưa làm** |
-| M-06 | Bảng kê kỳ tháng: 202 + job, ảnh chụp bất biến (first/last seq, băm cuối chuỗi, SHA-256); tất định | — | **chưa làm** |
-| M-07 | Duyệt bảng kê `billing_approver` ≠ `billing_officer` yêu cầu (R-56, `app/` + CHECK DB); đã duyệt → 409; sửa = bảng kê bù | — | **chưa làm** |
-| M-08 | Giá tùy chọn, có phiên bản (`shared/money`, `numeric(18,4)`/`(18,2)`, không float — `agnofloat`); chưa có giá → chỉ đơn vị | — | **chưa làm** (chờ khách Q5-4) |
-| M-09 | CSV bảng kê tất định byte-cho-byte, tải qua checkpoint kênh `report_export` | — | **chưa làm** |
-| M-10 | `verify_chain`, neo hằng ngày (job `anchor`), lưu chứng từ chuyển tầng không xóa | — | **chưa làm** (chờ khách Q5-9) |
+| M-01 | Sổ `usage_event` theo mẫu §8.1 (chuỗi băm, phân vùng tháng, RLS); một dòng mỗi lời gọi đã xác thực, kể cả 4xx sau xác thực | `TestRecordOneRowPerCall_EgressInDataTenant_ADR0023`, `TestMeteringLedgersAppendOnlySixWays_R20` | **đạt** |
+| M-02 | Ghi sổ **trước** khi gửi byte; ghi lỗi → 503 `metering.unavailable`, không có dữ liệu | `TestRecordFailsClosed_ADR0023` (`Ledger.Record` lỗi → `metering.unavailable`) | **một phần** (mã: `api-public` không gửi byte khi 503 — đợt A) |
+| M-03 | Đơn vị `metering.units.v1` ghim `rule_version`; đổi quy tắc → v2, dòng cũ không đổi | `TestUnitsV1_ADR0023`, `TestRecordOneRowPerCall_EgressInDataTenant_ADR0023` | **đạt** |
+| M-04 | Bộ đếm `usage_counter_current` cùng giao dịch, khóa dòng, giờ VN; `RebuildTenant` dựng lại = hiện hành (R-22) | `TestQuotaExactUnderConcurrency_ADR0023`, `TestRebuildProjectionsEqualsLive_R22`, `TestWindowsVietnamTime_ADR0023` | **đạt** |
+| M-05 | `GET /v1/usage`: chỉ của chính khách hàng | `TestRecordOneRowPerCall_EgressInDataTenant_ADR0023` (`port.Usage` chỉ của chính khách hàng) | **một phần** (mã: route `GET /v1/usage` của `api-public` — đợt A) |
+| M-06 | Bảng kê kỳ tháng: 202 + job, ảnh chụp bất biến (first/last seq, băm cuối chuỗi, SHA-256); tất định | `TestStatementLifecycle_SoD_Deterministic_ADR0023`, `TestSnapshotCanonicalHash_ADR0023` | **đạt** |
+| M-07 | Duyệt bảng kê `billing_approver` ≠ `billing_officer` yêu cầu (R-56, `app/` + CHECK DB); đã duyệt → 409; sửa = bảng kê bù | `TestStatementLifecycle_SoD_Deterministic_ADR0023` (tự duyệt → 403 ở `app/` và CHECK 23514; đã duyệt → 409; bảng kê bù) | **đạt** |
+| M-08 | Giá tùy chọn, có phiên bản (`shared/money`, `numeric(18,4)`/`(18,2)`, không float — `agnofloat`); chưa có giá → chỉ đơn vị | `TestStatementOptionalPricing_ADR0023`, `TestStatementCSVGolden_ADR0023`, `TestNoFloat` | **đạt** (giá trị chờ khách Q5-4; cơ chế tham số pf/masterdata setter ≠ approver) |
+| M-09 | CSV bảng kê tất định byte-cho-byte, tải qua checkpoint kênh `report_export` | `TestStatementCSVGolden_ADR0023`, `TestStatementLifecycle_SoD_Deterministic_ADR0023` (CSV byte-cho-byte, tải ghi `egress_event` kênh `report_export`) | **đạt** |
+| M-10 | `verify_chain`, neo hằng ngày (job `anchor`), lưu chứng từ chuyển tầng không xóa | `TestMeteringLedgersAppendOnlySixWays_R20` (`verify_chain` ba sổ; neo hằng ngày qua job `anchor` sẵn có — `shared.chain_head`) | **một phần** (chờ khách Q5-9: thời hạn lưu, chuyển tầng) |
 
 ## 7. Điểm kiểm soát xuất — DLP (ADR-0024, mục 18)
 
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| L-01 | Một điểm kiểm soát `Checkpoint.Pass`: sổ `egress_event` (tenant = chủ dữ liệu, chuỗi băm), idempotent theo (kênh, nguồn, bên nhận) | — | **chưa làm** |
-| L-02 | Public API: dòng egress cùng giao dịch với sổ sử dụng, luôn đóng khi lỗi | — | **chưa làm** |
+| L-01 | Một điểm kiểm soát `Checkpoint.Pass`: sổ `egress_event` (tenant = chủ dữ liệu, chuỗi băm), idempotent theo (kênh, nguồn, bên nhận) | `TestCheckpointObserveEnforce_ADR0024` (mỗi kênh một dòng, giao lặp không thêm), `TestMeteringTenantIsolationParallel_RB2` | **đạt** |
+| L-02 | Public API: dòng egress cùng giao dịch với sổ sử dụng, luôn đóng khi lỗi | `TestRecordOneRowPerCall_EgressInDataTenant_ADR0023`, `TestCheckpointObserveEnforce_ADR0024` (Public API luôn enforce), `TestRecordFailsClosed_ADR0023` | **đạt** |
 | L-03 | `pf/mrv`: yêu cầu xuất gói + `PackageURL` qua `Guard` kênh `mrv_package` | — | **chưa làm** |
 | L-04 | `pf/reports`: ba lối (yêu cầu, lịch, tải) qua `Guard` kênh `report_export`; điểm kiểm soát cục bộ + `pf.reports.export.anomaly` giữ nguyên (kiểm thử G1 không đổi) | — | **chưa làm** |
 | L-05 | Van: ba consumer gọi `Guard` kênh `valve` sau `ValveTargets`, mỗi bên cấp một lần; giao lặp không thêm dòng; `enforce` từ chối → DLQ (R-62) | — | **chưa làm** |
 | L-06 | `/v1/partner/*` (ADR-0020): `RecordRead` qua `Guard` kênh `partner_share` (P2) | — | **chưa làm** |
-| L-07 | Hạn mức kênh `metering.egress.<kênh>.daily_records_quota` (tham số có phiên bản) | — | **chưa làm** (chờ khách Q5-5) |
-| L-08 | Bất thường: × trung vị 28 ngày / ngưỡng tuyệt đối; lần đầu trong ngày → đúng một `pf.metering.egress.anomaly_detected` → `pf.notify.egress_anomaly` | — | **chưa làm** |
-| L-09 | `AG_EGRESS_MODE`: `observe` không bao giờ từ chối (kể cả checkpoint lỗi); `enforce` từ chối đúng mã | (`TestGuardModes_ADR0024` cho `Guard`) | **chưa làm** |
-| L-10 | Metric `ag_egress_*` nhãn cardinality thấp (R-91); luật `agrigreen-egress.rules.yml` | — | **chưa làm** |
-| L-11 | `GET /v1/metering/egress`, `/anomalies` (Admin API): chỉ tenant chủ dữ liệu thấy dòng của mình | — | **chưa làm** |
+| L-07 | Hạn mức kênh `metering.egress.<kênh>.daily_records_quota` (tham số có phiên bản) | `TestCheckpointObserveEnforce_ADR0024` (tham số có phiên bản ở pf/masterdata; mặc định §1.2) | **đạt** (giá trị chờ khách Q5-5) |
+| L-08 | Bất thường: × trung vị 28 ngày / ngưỡng tuyệt đối; lần đầu trong ngày → đúng một `pf.metering.egress.anomaly_detected` → `pf.notify.egress_anomaly` | `TestEgressAnomalyFirstOfDayOnly_ADR0024` (tuyệt đối + 3 × trung vị 28 ngày; đúng một sự kiện/ngày) | **một phần** (mã: consumer `pf.notify.egress_anomaly` — đợt D) |
+| L-09 | `AG_EGRESS_MODE`: `observe` không bao giờ từ chối (kể cả checkpoint lỗi); `enforce` từ chối đúng mã | `TestGuardModes_ADR0024`, `TestCheckpointObserveEnforce_ADR0024` (observe không từ chối kể cả checkpoint lỗi; enforce đúng mã) | **đạt** |
+| L-10 | Metric `ag_egress_*` nhãn cardinality thấp (R-91); luật `agrigreen-egress.rules.yml` | `TestCheckpointObserveEnforce_ADR0024`, `TestEgressAnomalyFirstOfDayOnly_ADR0024` (metric `ag_egress_*`); `deploy/observability/prometheus/agrigreen-egress.rules.yml` + bản sao chart (`check_flows.py`) | **một phần** (hạ tầng: `promtool check rules` chỉ chạy trên CI, chưa chạy cục bộ) |
+| L-11 | `GET /v1/metering/egress`, `/anomalies` (Admin API): chỉ tenant chủ dữ liệu thấy dòng của mình | `TestMeteringTenantIsolationParallel_RB2`, `TestEgressAnomalyFirstOfDayOnly_ADR0024` | **đạt** |
 
 ## 8. Phase K và cấp phát bên thứ ba (ADR-0025)
 
@@ -158,12 +158,12 @@ Như [g4-acceptance.md §1](g4-acceptance.md#1-cách-chạy). Kịch bản E2E G
 
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| X-01 | RB-1: sáu phép thử UPDATE/DELETE/TRUNCATE trên mọi sổ mới; `v_missing_immutability` rỗng | — | **chưa làm** |
-| X-02 | RB-2: cách ly tenant ở mọi bảng mới, kể cả song song qua PgBouncer transaction mode | — | **chưa làm** |
+| X-01 | RB-1: sáu phép thử UPDATE/DELETE/TRUNCATE trên mọi sổ mới; `v_missing_immutability` rỗng | `TestMeteringLedgersAppendOnlySixWays_R20` (pf_metering; `v_missing_immutability` rỗng) | **một phần** (mã: sổ `pf_apiclient` — đợt A) |
+| X-02 | RB-2: cách ly tenant ở mọi bảng mới, kể cả song song qua PgBouncer transaction mode | `TestMeteringTenantIsolationParallel_RB2` (pf_metering) | **một phần** (mã: `pf_apiclient` — đợt A) |
 | X-03 | RB-3: Public API không trả dữ liệu cá nhân (hợp đồng `personal_data: false`, archlint không vault, kiểm thử quét phản hồi) | — | **chưa làm** |
-| X-04 | R-10: `agnofloat` phủ `internal/platform/metering/**` | (`TestNoFloat` có từ G5-0) | **chưa làm** |
+| X-04 | R-10: `agnofloat` phủ `internal/platform/metering/**` | `TestNoFloat`; mọi package `internal/platform/metering/**` (kể cả kiểm thử) không float | **đạt** |
 | X-05 | R-14/R-92: không log khóa, bí mật, URL có chữ ký (`agpiilog` với `IssuedKey.Secret pii:"true"`) | — | **chưa làm** |
-| X-06 | R-61: ba consumer G5 idempotent (giao lặp) | — | **chưa làm** |
+| X-06 | R-61: ba consumer G5 idempotent (giao lặp) | `TestStatementLifecycle_SoD_Deterministic_ADR0023` (giao lặp `pf.metering.statement.requested` → bỏ qua) | **một phần** (mã: consumer xuất apiclient, `pf.notify.egress_anomaly` — đợt A, D) |
 | X-07 | R-62: DLQ + cảnh báo cho ba hàng đợi G5 | — | **chưa làm** |
 | X-08 | R-64: ba schema sự kiện G5 tương thích ngược (`contractcheck -base`) | — | **chưa làm** |
 | X-09 | R-80/R-81: `api-public` ở vùng ứng dụng, chỉ PgBouncer pf; NetworkPolicy mặc định từ chối | — | **chưa làm** (hạ tầng) |
