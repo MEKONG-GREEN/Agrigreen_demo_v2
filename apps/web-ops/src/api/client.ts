@@ -20,16 +20,21 @@ export interface ApiClientOptions {
   onUnauthenticated?: () => void;
   /** Thay fetch (chế độ giả lập, kiểm thử). */
   fetch?: (input: Request) => Promise<Response>;
+  /** Ngữ cảnh phiên KN v7.7 (P1): gửi qua header X-AG-Context khi đã chọn vai trò + phòng ban. */
+  getContextId?: () => string | null;
 }
 
 export function authMiddleware(
   getAccessToken: ApiClientOptions["getAccessToken"],
   onUnauthenticated?: () => void,
+  getContextId?: () => string | null,
 ): Middleware {
   return {
     async onRequest({ request }) {
       const token = await getAccessToken();
       if (token) request.headers.set("Authorization", `Bearer ${token}`);
+      const ctx = getContextId?.();
+      if (ctx) request.headers.set("X-AG-Context", ctx);
       request.headers.set("Accept", "application/json, application/problem+json");
       return request;
     },
@@ -45,7 +50,7 @@ function build<P extends object>(opts: ApiClientOptions): Client<P> {
     baseUrl: opts.baseUrl.replace(/\/+$/, ""),
     ...(opts.fetch ? { fetch: opts.fetch } : {}),
   });
-  client.use(authMiddleware(opts.getAccessToken, opts.onUnauthenticated));
+  client.use(authMiddleware(opts.getAccessToken, opts.onUnauthenticated, opts.getContextId));
   client.use(idempotencyMiddleware());
   return client;
 }

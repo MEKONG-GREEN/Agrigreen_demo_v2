@@ -31,7 +31,20 @@ export type NavIcon =
   | "qr"
   | "support"
   | "sop"
-  | "plot";
+  | "plot"
+  // Bề mặt KN v7.7 (Design Sample): menu theo cấu hình (src/kn/contract.ts).
+  | "calendar"
+  | "sprout"
+  | "send"
+  | "database"
+  | "building"
+  | "package"
+  | "table"
+  | "key"
+  | "users"
+  | "zap"
+  | "file"
+  | "check";
 
 export interface NavItem {
   href: string;

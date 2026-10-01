@@ -18,4 +18,11 @@ export const config = {
   },
   /** URL style MapLibre (tile trong lãnh thổ, ADR-0007). Rỗng → nền trơn, không gọi tile ngoài. */
   mapStyleUrl: process.env.NEXT_PUBLIC_MAP_STYLE_URL ?? "",
+  /**
+   * Bề mặt menu (KN v7.7, kế hoạch P6 mục 3): "auto" = tài khoản có vai trò KN (GET /v1/me/contexts)
+   * dùng menu theo cấu hình, còn lại menu cũ; "legacy" = luôn menu cũ (nav.ts).
+   */
+  surface: process.env.NEXT_PUBLIC_SURFACE === "legacy" ? ("legacy" as const) : ("auto" as const),
+  /** 1 = thêm nhóm "Chức năng khác" (menu cũ theo vai realm) dưới menu KN — tính năng bị rút khỏi Trồng trọt. */
+  knLegacyMenu: process.env.NEXT_PUBLIC_KN_LEGACY_MENU === "1",
 } as const;

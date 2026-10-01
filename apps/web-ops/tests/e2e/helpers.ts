@@ -22,10 +22,16 @@ export async function loginViaUi(page: Page, title: string | RegExp): Promise<vo
   await page.getByRole("button", { name: title }).click();
 }
 
-/** Đăng xuất bằng nút ở thanh bên (điều hướng phía client, không tải lại trang). */
+/** Đăng xuất qua menu tài khoản ở thanh trên (điều hướng phía client, không tải lại trang). */
 export async function logout(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Đăng xuất" }).click();
+  await accountMenu(page).click();
+  await page.getByRole("menuitem", { name: "Đăng xuất" }).click();
   await expect(page.getByRole("heading", { name: "Đăng nhập" })).toBeVisible();
+}
+
+/** Nút menu tài khoản (họ tên, vai trò · phòng ban) ở thanh trên — khung P6. */
+export function accountMenu(page: Page) {
+  return page.getByTestId("account-menu");
 }
 
 export function sidebar(page: Page) {
