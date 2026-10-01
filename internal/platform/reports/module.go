@@ -21,6 +21,7 @@ import (
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/handler"
@@ -70,6 +71,12 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 		Store: d.Store, Extension: d.Extension, Mechanization: d.Mechanization, CropCycle: d.CropCycle, Directory: d.Directory, Recipients: d.Recipients, Mailer: d.Mailer,
 		LinkBase: d.LinkBase,
 	}}
+}
+
+// UseEgress (G5, ADR-0024 mục 3) nối điểm kiểm soát xuất dùng chung (pf/metering, kênh
+// report_export) sau điểm kiểm soát cục bộ ở ba lối (yêu cầu, lịch, tải). cp nil → hành vi cũ.
+func (m *Module) UseEgress(cp meteringport.Checkpoint, mode meteringport.Mode) {
+	m.svc.Egress, m.svc.EgressMode = cp, mode
 }
 
 // RegisterApp gắn route Application API.

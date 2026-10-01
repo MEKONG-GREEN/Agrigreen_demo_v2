@@ -16,7 +16,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
@@ -57,6 +59,15 @@ func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 // UseValveGrants nối cổng cấp quyền chia sẻ của pf/party (ADR-0020): van mrv_collection_evidence
 // của tenant MKG ghi vào tenant bên cấp.
 func (m *Module) UseValveGrants(vg partyport.ValveGrants) { m.svc.ValveGrants = vg }
+
+// UseEgress (G5, ADR-0024) nối điểm kiểm soát xuất (pf/metering): kênh mrv_package (yêu cầu xuất,
+// cấp URL tải gói) và kênh valve (consumer mrv_collection_evidence). cp nil → hành vi cũ.
+func (m *Module) UseEgress(cp meteringport.Checkpoint, mode meteringport.Mode, log *slog.Logger) {
+	m.svc.Egress, m.svc.EgressMode, m.svc.Log = cp, mode, log
+}
+
+// PackageSource (G5, ADR-0022) là nguồn của sản phẩm dữ liệu mrv_package_status cho cmd/api-public.
+func (m *Module) PackageSource() apiclientport.MRVPackageSource { return m.svc }
 
 // RegisterApp gắn route Application API.
 func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterApp(rg) }

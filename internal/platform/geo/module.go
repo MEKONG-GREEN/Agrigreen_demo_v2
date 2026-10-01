@@ -9,12 +9,16 @@
 package geo
 
 import (
+	"log/slog"
+
 	"github.com/gin-gonic/gin"
 
+	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
@@ -76,6 +80,18 @@ func (m *Module) HubSink() port.HubSink { return m.svc }
 
 // UseWaterways nối lớp tuyến đường thủy (pf/waterway) cho bản đồ chuẩn hóa (GIS US-INT-02).
 func (m *Module) UseWaterways(l wwport.Layer) { m.svc.Waterways = l }
+
+// HubCapacitySource (G5, ADR-0022) là nguồn của sản phẩm dữ liệu hub_capacity cho cmd/api-public.
+func (m *Module) HubCapacitySource() apiclientport.HubCapacitySource { return m.svc }
+
+// PlotFacts (G5) tra dữ kiện nhiều thửa cho sản phẩm tổng hợp collection_volume của pf/cropcycle.
+func (m *Module) PlotFacts() port.PlotFacts { return m.svc }
+
+// UseEgress (G5, ADR-0024) nối điểm kiểm soát xuất (pf/metering) cho consumer van hub (kênh valve).
+// cp nil → hành vi cũ.
+func (m *Module) UseEgress(cp meteringport.Checkpoint, mode meteringport.Mode, log *slog.Logger) {
+	m.svc.Egress, m.svc.EgressMode, m.svc.Log = cp, mode, log
+}
 
 // UseSharing nối cổng cấp quyền chia sẻ của pf/party (ADR-0020): bề mặt đối tác /v1/partner/plots
 // và định tuyến van hub_facility / hub_capacity về tenant bên cấp.

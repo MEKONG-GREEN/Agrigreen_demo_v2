@@ -6,6 +6,7 @@ package app
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	wwport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -88,6 +90,11 @@ type Service struct {
 	// ValveGrants (ADR-0020): tenant bên cấp nhận van hub_facility / hub_capacity của tenant phong
 	// bì (pf/party). Thiếu → consumer van từ chối (DLQ, party.valve_share_grant_missing).
 	ValveGrants partyport.ValveGrants
+	// Egress (G5, ADR-0024): điểm kiểm soát xuất (pf/metering) — consumer van gọi Guard kênh valve
+	// sau ValveTargets, mỗi bên cấp một lần. Nil → hành vi cũ.
+	Egress     meteringport.Checkpoint
+	EgressMode meteringport.Mode
+	Log        *slog.Logger
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

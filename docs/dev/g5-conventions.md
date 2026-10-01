@@ -319,3 +319,50 @@ Chưa nối module nào: G5-0 chưa có module. Nhiều agent cùng chạm các 
 Chênh tài liệu: `README.md` của bản rà soát ghi "metering, metrics (G3+)", còn kiến trúc Phụ lục A và `docs/roadmap.md` ghi metering ở G5. **Lấy G5** theo kiến trúc.
 
 Mục rà lại khi đánh giá cấp độ (C-2): sự kiện nội bộ MKG (`mkg.internal`) và bút toán kế toán (`mkg/acctbridge`) **không** đi qua checkpoint nền tảng (ADR-0024 §3).
+
+## 11. Quyết định đợt G5-1 D — nguồn sản phẩm, `GrantLookup`, nối DLP (01/10/2026)
+
+Đợt D gộp phần **S** (nguồn sản phẩm, `GrantLookup`) và **D** (nối DLP) của §8. Không dùng migration (pf 000050 vẫn dự phòng). Không đổi hợp đồng đóng băng; chỉ thêm cổng mới `geoport.PlotFacts`.
+
+### 11.1 `GrantLookup` và sổ đọc (ADR-0020, ADR-0022 §3)
+
+| Chủ đề | Quyết định |
+|---|---|
+| `party.Module.GrantLookup().ActiveGrant` | Cùng truy vấn hai phía như `Authorize` (bảng chiếu bên nhận + bảng hiện hành bên cấp, `active`, `at ∈ [valid_from, valid_to)`). **Chỉ nhận loại `dp_*`** — cổng không vai OIDC không mở rộng sang loại khác (loại khác vẫn qua `Authorize` + vai `mkg_sync`). Thiếu / hết hạn / chưa hiệu lực / thu hồi / loại lạ → `party.share_grant_missing`; nhiều bên cấp + `grantor = Nil` → `party.share_grantor_ambiguous` |
+| Sổ đọc của bên thứ ba | `PartnerAccess.RecordRead` nhận thêm người đọc là `apiclientport.Caller` trong context (không có `authz.Principal`): tenant bên nhận = `Caller.Client.ClientTenantID`, `actor_ref` = mã khách hàng API. Khác tenant → `party.partner_audit_unavailable`. Một dòng `partner_read_log` ở tenant bên cấp cho mỗi lần đọc (K-05) |
+| Kênh `partner_share` | Chỉ cho người gọi OIDC của `/v1/partner/*`. Lần đọc của khách hàng Public API **không** qua `partner_share` — egress `public_api` đã ghi cùng sổ sử dụng (ADR-0023), không đếm hai lần |
+
+### 11.2 Nguồn sản phẩm dữ liệu
+
+| Sản phẩm | Module (gốc lắp ráp) | Quy tắc |
+|---|---|---|
+| `collection_volume` | `cropcycle.Module.CollectionVolumeSource()`; cần `UseCollectionVolume(geo.PlotFacts(), md.AdminUnits())` | Bảng kê hiện hành (`collection_statement_view`) + vụ `season_current` (mã vụ = `<season_year>-<season_code>`, vd `2026-DX`); thửa → xã, nông hộ, diện tích qua `geoport.PlotFacts` (pf/geo là chủ thửa ↔ nông hộ); xã → tỉnh qua `AdminUnits` (tại `AsOf`, không có thì tại ngày gom, đi lên qua cấp huyện lịch sử). Tháng = tháng của `collected_on` (ngày nghiệp vụ giờ VN). Số nông hộ = số `household_ref` khác nhau (thửa chưa gán nông hộ không tính vào k nhưng vẫn góp số cuộn/diện tích); diện tích = tổng diện tích **thửa phân biệt** của ô, 2 chữ số. Bị bỏ khỏi mọi ô (không tính `Suppressed`): bảng kê chưa gắn vụ / vụ không có, thửa không có ở pf/geo, xã không tra được tỉnh. `K < 2` → lỗi kiểm dữ liệu |
+| `hub_capacity` | `geo.Module.HubCapacitySource()` | `pf_geo.hub_view` của tenant bên cấp. Bậc theo lớp màu widget GIS (BR-52, ngưỡng `geo.hub_capacity_warn_pct`/`_full_pct` của bên cấp): `available → normal`, `near_full → warning`, `full → full`, chưa có số → `unknown`. **Không** trả tấn đã dùng, % lấp đầy, nguồn số. `capacity_tons` = sức chứa danh định MKG công bố, chỉ khi đơn vị là tấn. Loại `hub → hub`, `kho → warehouse` (van đã gộp `yard` vào `kho`); bỏ `nha_may` và hub chưa có mã tỉnh. `retired → inactive`. Tọa độ làm tròn 6 chữ số, chuỗi thập phân (`json.Number`) |
+| `mrv_package_status` | `mrv.Module.PackageSource()` | `pf_mrv.export_job` của tenant bên cấp. `catalog_version` = `domain.RuleVersion` của module (job không ghim một phiên bản danh mục; danh mục cụ thể nằm trong gói). `season_code` từ bộ lọc; `province_code` chỉ khi bộ lọc là đúng một mã tỉnh 2 chữ số. `last_verify_match`: `Package` dựng lại ảnh chụp và so băm **mỗi lần đọc** (không lưu); `Packages` → `null`. Không người yêu cầu, khóa đối tượng, URL |
+
+Mọi nguồn đọc bằng pool vai của module chủ dữ liệu với `tenant.WithTenantTx(…, DataTenant, …)`, con trỏ là chuỗi base64url mờ do nguồn tự mã hóa, và chỉ điền trường của DTO `//ag:dataproduct` (kiểm thử `Validate` từng phần tử).
+
+### 11.3 Ngưỡng k: quy tắc `publicdata.kanon.v1` (`cropcycle/domain.Suppress`)
+
+1. Ô = (tỉnh × xã × vụ × tháng). **Ẩn sơ cấp:** ô có < k nông hộ phân biệt.
+2. **Ẩn bổ sung (complementary):** tổng theo hai chiều được coi là có thể biết từ nguồn khác (báo cáo, số liệu công bố của bên cấp):
+   - hàng (tỉnh × vụ × tháng) — mọi xã của một tỉnh trong tháng;
+   - cột (xã × vụ) — mọi tháng của một xã trong vụ.
+
+   Nhóm nào có **đúng một** ô bị ẩn và ít nhất một ô công bố thì ẩn thêm ô công bố nhỏ nhất của nhóm (ít nông hộ nhất, rồi ít cuộn nhất, rồi theo khóa). Lặp tới điểm bất động, duyệt nhóm theo khóa đã sắp nên kết quả tất định.
+3. Ẩn tính trên **toàn bộ** dữ liệu của bên cấp rồi mới áp bộ lọc của lời gọi (vụ, tỉnh, khoảng tháng). Đổi bộ lọc không làm lộ ô bị ẩn.
+4. `Suppressed` = số ô bị ẩn (sơ cấp + bổ sung) khớp bộ lọc, trên cả bộ lọc, không chỉ trang. Ô bị ẩn không bao giờ có trong phản hồi, kể cả tệp xuất (worker xuất của đợt A gọi cùng nguồn).
+
+Rà lại khi khách chốt C-3 (Q5-3): giá trị k, và có áp cho gói MRV / báo cáo không.
+
+### 11.4 Nối DLP (ADR-0024 §3)
+
+Module nhận `UseEgress(cp, mode[, log])`; `cp == nil` → hành vi cũ, kiểm thử hiện có không đổi. Gốc lắp ráp: `assembly.External.Egress` (nil tới khi nối `pf/metering` của đợt M) + `AG_EGRESS_MODE` qua `assembly.EgressModeFromEnv` (giá trị lạ → lỗi khởi động). `cmd/worker`: biến `workerEgress` (nil) cho job lịch gửi báo cáo và `platformLazy`.
+
+| Lối | `Egress` | Khi `enforce` từ chối |
+|---|---|---|
+| `pf/reports` yêu cầu / lịch / tải | kênh `report_export`; tenant = tenant người xuất; bên nhận `actor` = người xuất / người lập lịch; `product` = mã mẫu; `records` = 1; nguồn = id dòng `export_audit`. Gọi **sau** hạn mức người/ngày cục bộ và **trước** khi ghi `export_audit` | 429 / 503, không có dòng `export_audit`; lối lịch bỏ mốc (`skipped`), không lỗi job |
+| `pf/mrv` yêu cầu xuất | kênh `mrv_package`; nguồn = `export_id`; `records` = số bằng chứng ước (ảnh chụp tại lúc yêu cầu — chỉ dựng khi đã nối checkpoint); bên nhận `actor` | 429 / 503, không tạo job |
+| `pf/mrv` cấp URL tải gói | kênh `mrv_package`; nguồn **mới** mỗi lần cấp; `records` = số bằng chứng của gói, `bytes` = `size_bytes` của `export_package` | 429 / 503, không cấp URL |
+| Ba consumer van | kênh `valve`, sau `ValveTargets`, **mỗi bên cấp một lần**, trước khi ghi; tenant dữ liệu = tenant phong bì (MKG), bên nhận `tenant` = bên cấp; nguồn = `event_id`; `product` = tên hợp đồng van; `records` = 1, `bytes` = cỡ payload | lỗi consumer → giao lại → DLQ, không ghi |
+| `/v1/partner/*` (`RecordRead`) | kênh `partner_share`; tenant dữ liệu = bên cấp, bên nhận `tenant` = tenant người gọi; `product` = loại cấp quyền; `records` = số dòng trả; nguồn = id dòng `partner_read_log` | 429 / 503, không ghi sổ đọc, không trả dữ liệu |

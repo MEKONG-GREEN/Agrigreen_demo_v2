@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"slices"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -53,6 +55,11 @@ type Service struct {
 	// ValveGrants (ADR-0020): tenant bên cấp nhận van mrv_collection_evidence của tenant phong bì
 	// (pf/party). Thiếu → consumer van từ chối (DLQ, party.valve_share_grant_missing).
 	ValveGrants partyport.ValveGrants
+	// Egress (G5, ADR-0024): điểm kiểm soát xuất (pf/metering) — kênh mrv_package ở yêu cầu xuất và
+	// cấp URL tải gói; kênh valve ở consumer van mrv_collection_evidence. Nil → hành vi cũ.
+	Egress     meteringport.Checkpoint
+	EgressMode meteringport.Mode
+	Log        *slog.Logger
 }
 
 func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) error {

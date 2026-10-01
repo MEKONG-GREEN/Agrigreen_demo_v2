@@ -17,6 +17,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
@@ -50,6 +51,10 @@ type External struct {
 	// Accounts: Keycloak Admin REST cho pf/accounts. Nil → đọc AG_KC_*; chưa cấu
 	// hình → các route /v1/accounts/* trả 503 accounts.dependency_unavailable.
 	Accounts accport.Directory
+	// Egress (G5, ADR-0024): điểm kiểm soát xuất DUY NHẤT (pf/metering Checkpoint) cho xuất báo cáo,
+	// gói MRV, ba consumer van và /v1/partner/*. Nil → hành vi cũ (chưa nối pf/metering). Chế độ đọc
+	// từ AG_EGRESS_MODE (observe mặc định | enforce).
+	Egress meteringport.Checkpoint
 }
 
 // Modules là các module đã nối — worker và kiểm thử dùng lại port của chúng.
@@ -259,8 +264,26 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		return Modules{}, pools, err
 	}
 
+	// G5 (ADR-0022): nguồn sản phẩm collection_volume cần dữ kiện thửa (pf/geo) + đơn vị hành chính.
+	cc.UseCollectionVolume(g.PlotFacts(), md.AdminUnits())
+	// G5 (ADR-0024): mọi đường xuất phía nền tảng qua MỘT điểm kiểm soát; nil → hành vi cũ.
+	mode, err := EgressModeFromEnv(os.Getenv)
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	rep.UseEgress(ext.Egress, mode)
+	mrvMod.UseEgress(ext.Egress, mode, slog.Default())
+	g.UseEgress(ext.Egress, mode, slog.Default())
+	cc.UseEgress(ext.Egress, mode, slog.Default())
+	pty.UseEgress(ext.Egress, mode, slog.Default())
+
 	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
 		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Metrics: met, ExtData: ed}, pools, nil
+}
+
+// EgressModeFromEnv đọc AG_EGRESS_MODE (ADR-0024 mục 2): rỗng → observe; giá trị lạ → lỗi khởi động.
+func EgressModeFromEnv(getenv func(string) string) (meteringport.Mode, error) {
+	return meteringport.ParseMode(getenv(meteringport.EnvEgressMode))
 }
 
 // farmerHouseholds chuyển port pf/accounts (liên kết tài khoản nông dân ↔ nông hộ)

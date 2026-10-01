@@ -11,6 +11,7 @@ package app
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"slices"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/store"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -102,6 +104,15 @@ type Service struct {
 	Sharing partyport.PartnerAccess
 	// ValveGrants (ADR-0020): tenant bên cấp nhận van collection_* của tenant phong bì; thiếu → DLQ.
 	ValveGrants partyport.ValveGrants
+	// PlotFacts + Units (G5): sản phẩm collection_volume — xã/nông hộ/diện tích thửa (pf/geo), xã →
+	// tỉnh (pf/masterdata). Thiếu → nguồn trả 503 cropcycle.dependency_unavailable.
+	PlotFacts geoport.PlotFacts
+	Units     mdport.AdminUnits
+	// Egress (G5, ADR-0024): điểm kiểm soát xuất (pf/metering) — consumer van collection gọi Guard
+	// kênh valve sau ValveTargets, mỗi bên cấp một lần. Nil → hành vi cũ.
+	Egress     meteringport.Checkpoint
+	EgressMode meteringport.Mode
+	Log        *slog.Logger
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }
