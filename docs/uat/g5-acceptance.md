@@ -34,9 +34,9 @@ Bốn trạng thái:
 | 7. Điểm kiểm soát xuất — DLP (ADR-0024) | 11 | 9 | 2 | 0 | 0 |
 | 8. Phase K và cấp phát bên thứ ba (ADR-0025) | 6 | 0 | 3 | 3 | 0 |
 | 9. Cổng kiến trúc G5 (RB, R-xx, vùng) | 10 | 3 | 5 | 2 | 0 |
-| 10. Client và kịch bản đầu–cuối | 4 | 0 | 0 | 4 | 0 |
+| 10. Client và kịch bản đầu–cuối | 4 | 3 | 0 | 1 | 0 |
 | 11. Câu hỏi khách | 10 | 0 | 0 | 10 | 0 |
-| **Tổng** | **79** | **32** | **27** | **20** | **0** |
+| **Tổng** | **79** | **35** | **27** | **17** | **0** |
 
 Đã có ở G5-0. Đây là nền móng, không tính là đạt dòng nào:
 
@@ -175,9 +175,9 @@ Hạ tầng Phase K: `powershell -File deploy/k8s/check.ps1` (online) và `-Offl
 
 | Mã | Yêu cầu | Kiểm thử | Trạng thái |
 |---|---|---|---|
-| W-01 | `apps/web-ops`: khách hàng API, đăng ký sản phẩm, gói hạn mức, khóa (hiện bí mật một lần, xoay, thu hồi) — R-56 trên UI chỉ phản ánh `app/` | — | **chưa làm** |
-| W-02 | `apps/web-ops`: bảng kê (yêu cầu, duyệt, tải CSV) | — | **chưa làm** |
-| W-03 | `apps/web-ops`: nhật ký xuất và cảnh báo bất thường theo tenant | — | **chưa làm** |
+| W-01 | `apps/web-ops`: khách hàng API, đăng ký sản phẩm, gói hạn mức, khóa (hiện bí mật một lần, xoay, thu hồi) — R-56 trên UI chỉ phản ánh `app/` | Màn `/quan-tri/khach-hang-api` (mock backend `src/api/mock/g5.ts`). WEB-E2E `g5-public-api.spec.ts`: “G5 W-01: vòng đời khách hàng…”, “G5 W-01: phát hành khóa — bí mật hiện MỘT lần, đóng/tải lại là mất…”, “G5 W-01: xoay khóa…”. Vitest `src/apiclient/g5.test.tsx` (`<SecretOnceDialog>`, bảng khóa không lộ bí mật vào DOM/storage/log, phát lại Idempotency-Key không có `api_key`, `apiclient.self_approval`, quy tắc hiển thị) | **đạt** (trên mock; nối API thật cùng hợp đồng `admin.yaml`) |
+| W-02 | `apps/web-ops`: bảng kê (yêu cầu, duyệt, tải CSV) | Màn `/quan-tri/bang-ke` + `/quan-tri/su-dung-api` (tổng theo kỳ, sổ sử dụng cursor, tham số). WEB-E2E “G5 W-02: bảng kê — A yêu cầu (202 + job), không tự duyệt; B duyệt, kiểm băm, tải CSV”. Vitest: tiền VND chuỗi thập phân (BigInt, không float), `metering.self_approval`, `metering.period_not_ended`, CSV cùng định dạng `domain.StatementCSV` | **đạt** (trên mock) |
+| W-03 | `apps/web-ops`: nhật ký xuất và cảnh báo bất thường theo tenant | Màn `/quan-tri/nhat-ky-xuat` (lọc kênh, ngày, bên nhận; tab cảnh báo). WEB-E2E “G5 W-03: nhật ký xuất và cảnh báo bất thường — lọc kênh, bên nhận”, “G5: phân quyền màn hình…”. Vitest sổ xuất (kênh lạ → 422, vai không đọc → 403) | **đạt** (trên mock) |
 | E-01 | Kịch bản `TestG5ThirdPartyToStatement` (mục 2) đạt trên máy dev | — | **chưa làm** |
 
 ## 11. Câu hỏi khách
