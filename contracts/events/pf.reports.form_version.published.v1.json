@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.reports.form_version.published/v1",
+  "title": "pf.reports.form_version.published — payload",
+  "description": "Một phiên bản mẫu báo cáo KN v7.7 vừa phát hành (FN-AD-04.06): người phát hành khác người đề nghị (R-56). Từ effective_from, đợt phát hành mới (P4) dùng phiên bản này; công việc đã ghim phiên bản cũ giữ nguyên. Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.reports.form_version.published",
+  "x-schema-version": 1,
+  "x-producer": "pf/reports",
+  "type": "object",
+  "required": ["template_id", "version_id", "code", "version", "department_code", "entry_level", "effective_from", "effective_label", "proposed_by", "published_by", "published_at"],
+  "properties": {
+    "template_id":     { "type": "string", "format": "uuid" },
+    "version_id":      { "type": "string", "format": "uuid" },
+    "code":            { "type": "string", "description": "Mã mẫu, vd T01" },
+    "version":         { "type": "integer", "minimum": 1 },
+    "department_code": { "type": "string" },
+    "entry_level":     { "type": "string", "enum": ["commune", "province"] },
+    "effective_from":  { "type": "string", "format": "date", "description": "Áp dụng từ kỳ (ngày bắt đầu kỳ)" },
+    "effective_label": { "type": ["string", "null"] },
+    "proposed_by":     { "type": "string", "format": "uuid" },
+    "published_by":    { "type": "string", "format": "uuid" },
+    "published_at":    { "type": "string", "format": "date-time" }
+  }
+}

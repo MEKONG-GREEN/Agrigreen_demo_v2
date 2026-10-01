@@ -2021,6 +2021,316 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reports/forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách mẫu (lọc phòng ban, cấp, trạng thái, loại báo cáo) kèm phiên bản đang soạn và phiên bản phát hành mới nhất */
+        get: operations["adminListForms"];
+        put?: never;
+        /** Tạo mẫu mới (trống, nhân bản từ phiên bản khác, hoặc kèm định nghĩa) → phiên bản nháp v1 */
+        post: operations["adminCreateForm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/forms/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Nạp một sheet Excel (.xlsx) thành mẫu mới hoặc nháp mới của mẫu có sẵn (tiêu đề gộp, chữ cái cột, công thức dòng dữ liệu)
+         * @description Có template_id → nháp mới của mẫu đó (409 nếu đang có nháp); không → tạo mẫu (code, name, department_code, entry_level).
+         *     Bố cục nhận: khung tiêu đề từ header_start; hàng chữ cái A, B, C… và dòng loại cột (tệp do hệ thống xuất) nếu có; dòng dữ
+         *     liệu đầu tự nhận (dòng đầu có công thức, hoặc STT = 1) hoặc data_row. Công thức tham chiếu dòng khác/sheet khác hoặc hàm
+         *     ngoài tập con → cột nhập + cảnh báo (report.warnings). Tệp hỏng → 422 reports.form_import_invalid; mọi lần nạp được ghi.
+         */
+        post: operations["adminImportForm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/forms/seed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Khởi tạo 14 mẫu Phòng Trồng trọt (T01–T07 tuần, M01 tháng, V01–V06 hàng vụ) thành nháp v1 + gán loại báo cáo, cấp Xã
+         * @description Mẫu đã có (cùng mã, phòng ban) giữ nguyên (skipped). Phần chưa biết từ tệp gốc đánh dấu placeholder/pending “chờ khách Q-01”.
+         */
+        post: operations["adminSeedForms"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/forms/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mẫu kèm lịch sử phiên bản (không kèm định nghĩa) và gán loại báo cáo */
+        get: operations["adminGetForm"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/forms/{id}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ngừng dùng cả mẫu (không xóa — RB-1), kèm lý do */
+        post: operations["adminRetireForm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/forms/{id}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhật ký thiết kế mẫu (API Log chuẩn của màn Detail), mới nhất trước, cursor */
+        get: operations["adminFormLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/forms/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tạo nháp mới từ một phiên bản (mặc định mới nhất); restore = khôi phục phiên bản cũ thành nháp */
+        post: operations["adminNewFormVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/forms/{id}/versions/{v}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một phiên bản kèm định nghĩa lưới (mọi trạng thái) */
+        get: operations["adminGetFormVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/forms/{id}/versions/{v}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lưu nháp — thay định nghĩa và/hoặc áp dụng từ kỳ (chỉ phiên bản draft) */
+        post: operations["adminSaveFormDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/forms/{id}/versions/{v}/ops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Thao tác lưới của trình thiết kế (cả lô hoặc không gì) — thêm/xóa/sửa cột, dòng tiêu đề, gộp/tách ô, dòng chỉ tiêu, ràng buộc
+         * @description op ∈ insert_column {at, side before|after, column} · delete_column {letter} · update_column {letter, column} ·
+         *     insert_header_row {row, side} · delete_header_row {row} · set_header_cell {row, letter, text} · merge {range} · unmerge {range} ·
+         *     add_indicator {indicator, after} · delete_indicator {code} · set_rule {rule} · delete_rule {id} · set_meta {meta} ·
+         *     set_groups {groups} · set_totals {totals} · set_period_block {block}. Chèn/xóa cột dời công thức, vùng gộp, nhóm như Excel;
+         *     xóa cột đang được công thức tham chiếu → 422 reports.formula_invalid_ref (lỗi ở ops[i]).
+         */
+        post: operations["adminApplyFormOps"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/forms/{id}/versions/{v}/propose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đề nghị phát hành nháp (khóa nội dung) kèm áp dụng từ kỳ — mẫu phải đã gán loại báo cáo */
+        post: operations["adminProposeFormVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/forms/{id}/versions/{v}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rút đề nghị — phiên bản về nháp */
+        post: operations["adminWithdrawFormVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/forms/{id}/versions/{v}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Phát hành phiên bản đã đề nghị — người phát hành ≠ người đề nghị và ≠ người sửa cuối (R-56); từ đây bất biến
+         * @description Phát sự kiện pf.reports.form_version.published v1.
+         */
+        post: operations["adminPublishFormVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/forms/{id}/versions/{v}/retire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ngừng dùng một phiên bản đã phát hành (kèm lý do); công việc đã ghim phiên bản giữ nguyên */
+        post: operations["adminRetireFormVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/form-versions/{id}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xem trước màn nhập — kiểm và tính thử một lưới theo phiên bản (mọi trạng thái, kể cả nháp) */
+        post: operations["adminEvaluateFormVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/form-assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Gán mẫu vào loại báo cáo của phòng ban × cấp (mặc định chỉ đang hiệu lực) */
+        get: operations["adminListFormAssignments"];
+        put?: never;
+        /** Gán mẫu vào một loại báo cáo (phòng ban, cấp lấy theo mẫu); một loại gồm nhiều mẫu */
+        post: operations["adminAssignForm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/form-assignments/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bỏ gán (kèm lý do); công việc đã phát hành giữ nguyên */
+        post: operations["adminRevokeFormAssignment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/waterway/segments": {
         parameters: {
             query?: never;
@@ -4287,6 +4597,326 @@ export interface components {
             /** Format: uuid */
             supersedes_id: string | null;
             seq: number;
+        };
+        /**
+         * @description Báo cáo tuần / tháng / hàng vụ / năm (Q-07) / đột xuất / gửi Chi cục (Q-08) — tạm, chờ danh mục report_type của P2
+         * @enum {string}
+         */
+        FormReportType: "weekly" | "monthly" | "seasonal" | "annual" | "adhoc" | "dispatch";
+        FormTemplate: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+            /** @example trong_trot */
+            department_code: string;
+            /** @enum {string} */
+            entry_level: "commune" | "province";
+            /** @enum {string} */
+            status: "active" | "retired";
+            retired_reason: string | null;
+            /** Format: uuid */
+            created_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        FormColumn: {
+            letter: string;
+            key?: string;
+            title: string;
+            /**
+             * @description Cố định / Tỉnh giao / Nhập / Cột theo kỳ / Công thức
+             * @enum {string}
+             */
+            kind: "fixed" | "provincial" | "input" | "per_period" | "formula";
+            /** @enum {string} */
+            dtype: "number" | "integer" | "text" | "date" | "catalog";
+            /**
+             * @example ha
+             * @example tấn
+             * @example tấn/ha
+             * @example %
+             */
+            unit?: string;
+            required?: boolean;
+            catalog?: string;
+            /**
+             * @description Tập con Excel: + - * / ^ & % so sánh, SUM MIN MAX AVERAGE COUNT ROUND ROUNDUP ROUNDDOWN ABS IF IFERROR AND OR NOT ISBLANK ISNUMBER; tham chiếu F#, dải F#:L#
+             * @example SUM(F#:L#)
+             * @example IF(G#=0,0,I#/G#)
+             */
+            formula?: string;
+            /** @description row_no | region_name | commune_name | indicator_label | none | xref:<mẫu>:<cột> */
+            fixed_source?: string;
+            period_block?: string;
+            period_slot?: number;
+            /**
+             * @description Dòng tổng: rỗng = sum cho cột số, formula cho cột công thức
+             * @enum {string}
+             */
+            total?: "sum" | "formula" | "none";
+            /** @description decimal */
+            min?: string;
+            /** @description decimal */
+            max?: string;
+            decimals?: number;
+            group?: string;
+            /** @description Chưa biết từ tệp gốc — chờ khách Q-01 */
+            placeholder?: boolean;
+            note?: string;
+            /** @description Chỉ ở layout: khe kỳ vượt số kỳ của đợt */
+            inactive?: boolean;
+        };
+        FormHeaderCell: {
+            row: number;
+            letter: string;
+            text: string;
+            period_block?: string;
+            period_slot?: number;
+        };
+        FormPeriodBlock: {
+            id: string;
+            first_letter: string;
+            /** @description Số cột mỗi kỳ (PL 07: 4) */
+            width: number;
+            /** @description Số kỳ tối đa */
+            slots: number;
+            /** @example Tuần {n} */
+            title_pattern: string;
+        };
+        FormRule: {
+            id: string;
+            /**
+             * @description Biểu thức logic trên dòng; được dùng XREF("T01","M") (liên biểu cùng xã cùng kỳ)
+             * @example J#=XREF("T01","M")
+             */
+            expr: string;
+            when?: string;
+            message: string;
+            /** @enum {string} */
+            severity: "error" | "warning";
+            letters: string[];
+        };
+        /**
+         * @description Định nghĩa lưới của một phiên bản mẫu, đúng bố cục sheet Excel (FN-AD-04.06, FN-XA-03.02). Cột theo chữ cái
+         *     Excel liên tục từ A; tiêu đề nhiều tầng có vùng gộp (dòng tính từ 1 trong khung tiêu đề); công thức chạy trên
+         *     một dòng, tham chiếu "F#" = cột F cùng dòng. Hiển thị: xám = fixed, trắng viền = input, viền xanh đậm = cột theo kỳ
+         *     đang mở, xám nhạt = kỳ khác, xanh lá nhạt = formula; cố định cột tới freeze_through; nhóm cột cho "Đi tới".
+         *     Phần chưa biết từ tệp gốc: cột placeholder = true và mục pending (chờ khách Q-01).
+         */
+        FormDefinition: {
+            /** @constant */
+            schema: "form-template.v1";
+            code: string;
+            /** @description Có thể chứa {season} — thay theo vụ khi dựng layout */
+            title: string;
+            sheet_name: string;
+            /** @description “Yêu cầu biểu mẫu” nguyên văn */
+            requirements: string;
+            columns: components["schemas"]["FormColumn"][];
+            header: {
+                rows: number;
+                cells: components["schemas"]["FormHeaderCell"][];
+                /**
+                 * @example [
+                 *       "F1:L1",
+                 *       "A1:A2"
+                 *     ]
+                 */
+                merges: string[];
+            };
+            period_blocks: components["schemas"]["FormPeriodBlock"][];
+            rows: {
+                /** @enum {string} */
+                kind: "per_commune";
+                /** @description Rỗng: mỗi xã một dòng. Có: mỗi xã × mỗi chỉ tiêu một dòng (vd T05: 20 đối tượng sâu bệnh) */
+                indicators: {
+                    code: string;
+                    label: string;
+                    catalog?: string;
+                    placeholder?: boolean;
+                }[];
+            };
+            totals: {
+                /** @enum {string} */
+                kind: "region" | "province";
+                /** @description “Cộng {region}”, “Toàn tỉnh” */
+                label: string;
+                label_letter: string;
+            }[];
+            groups: {
+                id: string;
+                title: string;
+                from: string;
+                to: string;
+            }[];
+            /** @description Cố định tới cột này (vd J); rỗng = không */
+            freeze_through: string;
+            rules: components["schemas"]["FormRule"][];
+            pending: {
+                part: string;
+                detail: string;
+                /** @example Q-01 */
+                question: string;
+            }[];
+            /** @enum {string} */
+            completeness: "complete" | "partial" | "placeholder";
+            source?: {
+                /** @enum {string} */
+                kind?: "seed" | "import" | "designer";
+                file?: string;
+                sheet?: string;
+                sha256?: string;
+                data_row?: number;
+                seed_note?: string;
+            };
+        };
+        FormVersion: {
+            /**
+             * Format: uuid
+             * @description P4 ghim id này vào công việc khi phát hành biểu
+             */
+            id: string;
+            /** Format: uuid */
+            template_id: string;
+            version: number;
+            /** @enum {string} */
+            status: "draft" | "proposed" | "published" | "retired";
+            /**
+             * Format: date
+             * @description Áp dụng từ kỳ (ngày bắt đầu kỳ)
+             */
+            effective_from: string | null;
+            /** @example Tuần 37/2026 */
+            effective_label: string | null;
+            /** @enum {string} */
+            origin: "blank" | "clone" | "restore" | "import" | "seed";
+            /** Format: uuid */
+            origin_version_id: string | null;
+            /** Format: uuid */
+            import_id: string | null;
+            definition_sha256: string;
+            /** @enum {string} */
+            completeness: "complete" | "partial" | "placeholder";
+            pending_count: number;
+            column_count: number;
+            /** Format: uuid */
+            created_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            proposed_by: string | null;
+            /** Format: date-time */
+            proposed_at: string | null;
+            /**
+             * Format: uuid
+             * @description ≠ proposed_by và ≠ updated_by (R-56)
+             */
+            published_by: string | null;
+            /** Format: date-time */
+            published_at: string | null;
+            /** Format: uuid */
+            retired_by: string | null;
+            /** Format: date-time */
+            retired_at: string | null;
+            retire_reason: string | null;
+            definition?: components["schemas"]["FormDefinition"];
+        };
+        FormAssignment: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            template_id: string;
+            department_code: string;
+            /** @enum {string} */
+            entry_level: "commune" | "province";
+            report_type: components["schemas"]["FormReportType"];
+            /** @enum {string} */
+            status: "active" | "revoked";
+            /** Format: uuid */
+            assigned_by: string;
+            /** Format: date-time */
+            assigned_at: string;
+            /** Format: uuid */
+            revoked_by: string | null;
+            /** Format: date-time */
+            revoked_at: string | null;
+            revoke_reason: string | null;
+        };
+        FormEvalInput: {
+            /**
+             * @description draft bỏ kiểm bắt buộc
+             * @enum {string}
+             */
+            mode: "draft" | "submit";
+            /** @description Khe kỳ đang mở; null = không kiểm (xem trước) */
+            open_slots?: number[] | null;
+            rows: {
+                /** @description Mặc định <mã xã> hoặc <mã xã>/<mã chỉ tiêu> */
+                key?: string;
+                commune: string;
+                region?: string;
+                indicator?: string;
+                /** @description Ô người nhập: chữ cái → giá trị (số dạng chuỗi decimal, ngày YYYY-MM-DD) */
+                input: {
+                    [key: string]: string;
+                };
+                /** @description Ô hệ thống: cố định + Tỉnh giao */
+                system?: {
+                    [key: string]: string;
+                };
+                /** @description Mã mẫu → cột → giá trị (cùng xã cùng kỳ) */
+                xrefs?: {
+                    [key: string]: {
+                        [key: string]: string;
+                    };
+                };
+            }[];
+        };
+        FormEvalResult: {
+            /** @description Không có vấn đề mức error — được gửi */
+            valid: boolean;
+            rows: {
+                key: string;
+                commune: string;
+                region?: string;
+                indicator?: string;
+                cells: {
+                    [key: string]: string;
+                };
+            }[];
+            issues: {
+                row_key: string;
+                letter?: string;
+                /** @enum {string} */
+                code: "reports.row_invalid" | "reports.cell_unknown_column" | "reports.cell_not_editable" | "reports.cell_period_closed" | "reports.cell_invalid_type" | "reports.cell_out_of_range" | "reports.cell_required" | "reports.formula_error" | "reports.rule_failed" | "reports.rule_error" | "reports.form_invalid";
+                message: string;
+                /** @enum {string} */
+                severity: "error" | "warning";
+                rule_id?: string;
+            }[];
+            totals: {
+                /**
+                 * @example region:KV1
+                 * @example province
+                 * @example province/SB01
+                 */
+                key: string;
+                /** @enum {string} */
+                kind: "region" | "province";
+                region?: string;
+                indicator?: string;
+                members: number;
+                cells: {
+                    [key: string]: string;
+                };
+            }[];
         };
     };
     responses: {
@@ -8210,6 +8840,737 @@ export interface operations {
                 };
             };
             404: components["responses"]["Problem"];
+        };
+    };
+    adminListForms: {
+        parameters: {
+            query?: {
+                department?: string;
+                level?: "commune" | "province";
+                status?: "active" | "retired";
+                report_type?: components["schemas"]["FormReportType"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mẫu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            template: components["schemas"]["FormTemplate"];
+                            open_version: components["schemas"]["FormVersion"] | null;
+                            published_version: components["schemas"]["FormVersion"] | null;
+                            report_types: components["schemas"]["FormReportType"][];
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    adminCreateForm: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                    name: string;
+                    /** @example trong_trot */
+                    department_code: string;
+                    /** @enum {string} */
+                    entry_level: "commune" | "province";
+                    definition?: components["schemas"]["FormDefinition"];
+                    /** Format: uuid */
+                    clone_from_version_id?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        template: components["schemas"]["FormTemplate"];
+                        version: components["schemas"]["FormVersion"];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description reports.form_code_taken */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed, reports.form_invalid, reports.formula_invalid, reports.formula_invalid_ref, reports.formula_cycle */
+            422: components["responses"]["Problem"];
+        };
+    };
+    adminImportForm: {
+        parameters: {
+            query?: {
+                template_id?: string;
+                code?: string;
+                name?: string;
+                department_code?: string;
+                entry_level?: "commune" | "province";
+                sheet?: string;
+                header_start?: number;
+                data_row?: number;
+                file_name?: string;
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+            };
+        };
+        responses: {
+            /** @description Đã nạp thành nháp */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        import_id: string;
+                        template: components["schemas"]["FormTemplate"];
+                        version: components["schemas"]["FormVersion"];
+                        report: {
+                            sheet: string;
+                            sheets: string[];
+                            header_rows: number;
+                            data_row: number;
+                            columns: number;
+                            merges: number;
+                            formulas: number;
+                            kind_row: boolean;
+                            warnings: string[] | null;
+                        };
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description reports.form_not_found */
+            404: components["responses"]["Problem"];
+            /** @description reports.form_code_taken, reports.form_draft_exists, reports.form_retired */
+            409: components["responses"]["Problem"];
+            413: components["responses"]["Problem"];
+            /** @description reports.form_import_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    adminSeedForms: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @default trong_trot */
+                    department_code?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        created: string[];
+                        skipped: string[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    adminGetForm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mẫu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        template: components["schemas"]["FormTemplate"];
+                        versions: components["schemas"]["FormVersion"][];
+                        assignments: components["schemas"]["FormAssignment"][];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    adminRetireForm: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ngừng dùng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormTemplate"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            /** @description reports.form_retired */
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    adminFormLog: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nhật ký */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        next_cursor: string | null;
+                        items: {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            event: "template_created" | "template_updated" | "template_retired" | "draft_created" | "draft_saved" | "draft_ops_applied" | "imported" | "seeded" | "proposed" | "proposal_withdrawn" | "published" | "version_retired" | "assigned" | "assignment_revoked";
+                            /** Format: uuid */
+                            actor_ref: string;
+                            /** @description Tên tra từ vault lúc đọc (P1); null ở G1 */
+                            actor_display: string | null;
+                            /** Format: date-time */
+                            at: string;
+                            /** Format: uuid */
+                            version_id: string | null;
+                            version: number | null;
+                            changes: {
+                                field: string;
+                                old: unknown;
+                                new: unknown;
+                            }[];
+                            reason: string | null;
+                            seq: number;
+                        }[];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    adminNewFormVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    from_version?: number;
+                    restore?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Nháp mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormVersion"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            /** @description reports.form_draft_exists, reports.form_retired */
+            409: components["responses"]["Problem"];
+        };
+    };
+    adminGetFormVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                v: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        template: components["schemas"]["FormTemplate"];
+                        version: components["schemas"]["FormVersion"];
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    adminSaveFormDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                v: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    definition?: components["schemas"]["FormDefinition"];
+                    /** Format: date */
+                    effective_from?: string;
+                    effective_label?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Nháp đã lưu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormVersion"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            /** @description reports.form_version_locked, reports.form_retired */
+            409: components["responses"]["Problem"];
+            /** @description reports.form_invalid, reports.formula_invalid, reports.formula_invalid_ref, reports.formula_cycle */
+            422: components["responses"]["Problem"];
+        };
+    };
+    adminApplyFormOps: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                v: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    ops: {
+                        /** @enum {string} */
+                        op: "insert_column" | "delete_column" | "update_column" | "insert_header_row" | "delete_header_row" | "set_header_cell" | "merge" | "unmerge" | "add_indicator" | "delete_indicator" | "set_rule" | "delete_rule" | "set_meta" | "set_groups" | "set_totals" | "set_period_block";
+                        at?: string;
+                        /** @enum {string} */
+                        side?: "before" | "after";
+                        letter?: string;
+                        row?: number;
+                        text?: string;
+                        range?: string;
+                        code?: string;
+                        id?: string;
+                        after?: string;
+                        column?: components["schemas"]["FormColumn"];
+                        indicator?: {
+                            code?: string;
+                            label?: string;
+                            catalog?: string;
+                            placeholder?: boolean;
+                        };
+                        rule?: components["schemas"]["FormRule"];
+                        meta?: {
+                            title?: string;
+                            sheet_name?: string;
+                            requirements?: string;
+                            freeze_through?: string;
+                            /** @enum {string} */
+                            completeness?: "complete" | "partial" | "placeholder";
+                            pending?: {
+                                part?: string;
+                                detail?: string;
+                                question?: string;
+                            }[];
+                        };
+                        groups?: {
+                            id?: string;
+                            title?: string;
+                            from?: string;
+                            to?: string;
+                        }[];
+                        totals?: {
+                            /** @enum {string} */
+                            kind?: "region" | "province";
+                            label?: string;
+                            label_letter?: string;
+                        }[];
+                        block?: components["schemas"]["FormPeriodBlock"];
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Nháp sau thao tác */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormVersion"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            /** @description reports.form_version_locked */
+            409: components["responses"]["Problem"];
+            /** @description reports.form_invalid, reports.formula_invalid_ref… */
+            422: components["responses"]["Problem"];
+        };
+    };
+    adminProposeFormVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                v: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: date
+                     * @description Ngày bắt đầu kỳ áp dụng; không sớm hơn phiên bản đã phát hành
+                     */
+                    effective_from?: string;
+                    /** @example Tuần 37/2026 */
+                    effective_label?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã đề nghị */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormVersion"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            /** @description reports.form_version_locked, reports.form_not_assigned, reports.form_retired */
+            409: components["responses"]["Problem"];
+            /** @description reports.form_effective_invalid, reports.form_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    adminWithdrawFormVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                v: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã về nháp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormVersion"];
+                };
+            };
+            /** @description reports.form_not_proposed */
+            409: components["responses"]["Problem"];
+        };
+    };
+    adminPublishFormVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                v: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Đã phát hành */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormVersion"];
+                };
+            };
+            /** @description self_approval_forbidden */
+            403: components["responses"]["Problem"];
+            /** @description reports.form_not_proposed, reports.form_not_assigned */
+            409: components["responses"]["Problem"];
+        };
+    };
+    adminRetireFormVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                v: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ngừng dùng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormVersion"];
+                };
+            };
+            /** @description reports.form_not_published */
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    adminEvaluateFormVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormEvalInput"];
+            };
+        };
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormEvalResult"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    adminListFormAssignments: {
+        parameters: {
+            query?: {
+                template_id?: string;
+                department?: string;
+                level?: "commune" | "province";
+                report_type?: components["schemas"]["FormReportType"];
+                active?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gán */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["FormAssignment"][];
+                    };
+                };
+            };
+        };
+    };
+    adminAssignForm: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    template_id: string;
+                    report_type: components["schemas"]["FormReportType"];
+                };
+            };
+        };
+        responses: {
+            /** @description Đã gán */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormAssignment"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            /** @description reports.form_already_assigned, reports.form_retired */
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    adminRevokeFormAssignment: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã bỏ gán */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormAssignment"];
+                };
+            };
+            /** @description reports.form_assignment_not_found */
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     listWaterwaySegments: {

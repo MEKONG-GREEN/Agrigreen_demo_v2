@@ -11,6 +11,7 @@ package reports
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"time"
 
@@ -23,6 +24,8 @@ import (
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/app"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/form"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/formimport"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/mail"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
@@ -77,6 +80,29 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.
 
 // RegisterAdmin gắn route Admin API (mẫu biểu, lịch gửi).
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }
+
+// Forms trả cổng mẫu báo cáo KN v7.7 cho P4 (pf/extension: phát hành, bài nộp, tổng hợp):
+// tra phiên bản, kiểm + tính lưới bài nộp, dòng tổng. Nối ở cmd/api-platform/assembly và cmd/worker.
+func (m *Module) Forms() port.FormEngine { return app.Forms{Svc: m.svc} }
+
+// ImportFormXLSX nạp một sheet Excel thành định nghĩa lưới nháp (không DB) — dùng cho
+// cmd/formimport khi khách gửi tệp gốc (Q-01).
+func ImportFormXLSX(r io.Reader, o port.FormImportOptions) (port.FormDefinition, port.FormImportReport, error) {
+	return formimport.Import(r, o)
+}
+
+// ExportFormXLSX dựng tệp mẫu Excel đúng bố cục của một định nghĩa.
+func ExportFormXLSX(def port.FormDefinition) ([]byte, error) { return formimport.Export(def) }
+
+// TrongTrotSeedDefinitions trả 14 định nghĩa mẫu Phòng Trồng trọt khởi tạo (T01–T07, M01, V01–V06).
+func TrongTrotSeedDefinitions() []port.FormDefinition {
+	seeds := form.TrongTrotSeeds()
+	out := make([]port.FormDefinition, 0, len(seeds))
+	for _, s := range seeds {
+		out = append(out, s.Def)
+	}
+	return out
+}
 
 // ExportHandler là inbox.Handler cho pf.reports.export.requested (consumer port.ExportConsumer).
 func (m *Module) ExportHandler() inbox.Handler { return m.svc.HandleExportRequested }

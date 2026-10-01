@@ -37,6 +37,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.POST("/schedules", h.createCoopSchedule)
 	g.POST("/schedules/:id/deactivate", h.coopDeactivate)
 	g.GET("/schedules/:id/runs", h.coopRuns)
+	h.registerFormsApp(g) // KN v7.7: mẫu báo cáo dạng lưới
 }
 
 // RegisterAdmin gắn route Admin API (MFA bắt buộc ở router).
@@ -50,6 +51,7 @@ func (h Handler) RegisterAdmin(rg *gin.RouterGroup) {
 	g.POST("/schedules", h.createSchedule)
 	g.POST("/schedules/:id/deactivate", h.deactivate)
 	g.GET("/schedules/:id/runs", h.runs)
+	h.registerFormsAdmin(g) // KN v7.7: mẫu báo cáo dạng lưới
 }
 
 func bind(c *gin.Context, v any) bool {

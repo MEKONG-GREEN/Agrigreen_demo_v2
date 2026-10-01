@@ -216,6 +216,25 @@ Phản hồi phát lại theo Idempotency-Key có header `Idempotent-Replayed: t
 | 404 | `reports.schedule_not_found` | pf/reports: không có lịch gửi, hoặc ngoài phạm vi xem |
 | 422 | `reports.unit_invalid` | pf/reports: mã đơn vị hành chính không còn hiệu lực hoặc không phải tỉnh/xã |
 | 503 | `reports.dependency_unavailable` | pf/reports: chưa nối pf/party, pf/masterdata, kho đối tượng hoặc cổng dữ liệu của module nguồn |
+| 404 | `reports.form_not_found` | pf/reports KN v7.7: không có mẫu báo cáo dạng lưới với id này trong tenant |
+| 404 | `reports.form_version_not_found` | pf/reports: không có phiên bản; hoặc người không phải Admin đọc/tính phiên bản nháp/chờ phát hành |
+| 409 | `reports.form_code_taken` | pf/reports: mã mẫu (vd T01) đã có trong phòng ban — mẫu thuộc đúng một phòng ban |
+| 409 | `reports.form_draft_exists` | pf/reports: mẫu đang có phiên bản nháp hoặc chờ phát hành — mỗi mẫu một phiên bản đang soạn |
+| 409 | `reports.form_version_locked` | pf/reports: chỉ sửa được phiên bản nháp; đã đề nghị → rút đề nghị để sửa; đã phát hành là bất biến (trigger DB chặn cả SQL trực tiếp) |
+| 409 | `reports.form_not_proposed` | pf/reports: phát hành/rút đề nghị một phiên bản chưa ở trạng thái chờ phát hành |
+| 409 | `reports.form_not_published` | pf/reports: ngừng dùng một phiên bản chưa phát hành |
+| 409 | `reports.form_not_assigned` | pf/reports: mẫu chưa gán loại báo cáo của phòng ban — không đề nghị/phát hành được (FN-AD-04.06) |
+| 422 | `reports.form_effective_invalid` | pf/reports: thiếu “áp dụng từ kỳ” hoặc sớm hơn phiên bản đã phát hành (kỳ đã có số liệu giữ phiên bản cũ) |
+| 409 | `reports.form_retired` | pf/reports: mẫu đã ngừng dùng — không tạo nháp, không gán, không phát hành |
+| 409 | `reports.form_already_assigned` | pf/reports: mẫu đã gán loại báo cáo này |
+| 404 | `reports.form_assignment_not_found` | pf/reports: không có gán đang hiệu lực với id này |
+| 422 | `reports.form_import_invalid` | pf/reports: tệp không phải .xlsx, không có sheet, không nhận ra khung tiêu đề/dòng dữ liệu (lần nạp lỗi vẫn ghi `form_import`) |
+| 422 | `reports.form_invalid` | pf/reports: định nghĩa lưới sai cấu trúc (`errors[].field` = `definition.<đường dẫn>` hoặc `ops[i]`): cột không liên tục từ A, loại/kiểu sai, vùng gộp chồng/ngoài khung, khối kỳ lệch… |
+| 422 | `reports.formula_invalid` | pf/reports: công thức sai cú pháp hoặc ngoài tập con (SUM MIN MAX AVERAGE COUNT ROUND ROUNDUP ROUNDDOWN ABS IF IFERROR AND OR NOT ISBLANK ISNUMBER; XREF chỉ trong ràng buộc) |
+| 422 | `reports.formula_invalid_ref` | pf/reports: công thức tham chiếu ô không tồn tại, hoặc xóa cột đang được công thức tham chiếu — không lưu |
+| 422 | `reports.formula_cycle` | pf/reports: công thức các cột tham chiếu vòng |
+
+Vấn đề tại ô khi tính lưới (`POST /v1/reports/form-versions/{id}/evaluate`, cổng `port.FormEngine.Evaluate` của P4) trả trong `issues[]`, không phải mã lỗi HTTP: `reports.row_invalid`, `reports.cell_unknown_column`, `reports.cell_not_editable` (cột cố định/Tỉnh giao/công thức), `reports.cell_period_closed` (cột của kỳ không mở), `reports.cell_invalid_type`, `reports.cell_out_of_range`, `reports.cell_required` (chỉ khi gửi), `reports.rule_failed` (ràng buộc của mẫu, vd T03 Σ trà = DT xuống giống PL 01), mức `warning`: `reports.formula_error` (#DIV/0!…), `reports.rule_error`. `valid = false` khi có vấn đề mức error → không cho gửi.
 
 Việc xuất hỏng vĩnh viễn ghi `error_code` trên việc xuất (vd `mechanization.run_not_found` khi vụ chưa có kết quả cân đối đã lưu, `reports.object_conflict` khi đã có tệp khác nội dung dưới cùng khóa).
 
