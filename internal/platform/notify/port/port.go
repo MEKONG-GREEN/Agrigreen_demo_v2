@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -52,6 +53,9 @@ const (
 	KindMRVAnomaly = "mrv_anomaly"
 	// KindMRVOverdue: hồ sơ MRV chờ duyệt quá hạn — mức 1 người duyệt, mức 2 quản trị TTKN tỉnh (KN US-MRV-06).
 	KindMRVOverdue = "mrv_overdue"
+	// KindEgressAnomaly: khối lượng xuất dữ liệu bất thường lần đầu trong ngày (pf/metering, DLP — ADR-0024,
+	// G5) → người nhận DLP của tenant CHỦ DỮ LIỆU (EgressAnomalyRoles; migration pf 000050).
+	KindEgressAnomaly = "egress_anomaly"
 	// KindSyncNow là thông điệp dữ liệu "đồng bộ ngay" (US-SYNC-02) — không tạo thông báo.
 	KindSyncNow = "sync_now"
 )
@@ -92,7 +96,15 @@ const (
 	ConsumerIntegration = "pf.notify.integration"
 	// ConsumerMRV: cảnh báo MRV (pf.mrv.alert.raised) — nhãn khẩn, bất thường AWD, leo thang quá hạn (G3).
 	ConsumerMRV = "pf.notify.mrv"
+	// ConsumerEgressAnomaly: cảnh báo DLP pf.metering.egress.anomaly_detected (G5, ADR-0024) — cùng tên
+	// với meteringport.NotifyEgressAnomalyQueue.
+	ConsumerEgressAnomaly = "pf.notify.egress_anomaly"
 )
+
+// EgressAnomalyRoles là người nhận cảnh báo xuất dữ liệu bất thường trong tenant chủ dữ liệu: người
+// xem nhật ký xuất (metering_viewer) và quản trị nền tảng của tenant đó (chủ đề toàn tenant, theo vai).
+// Tạm, chờ khách Q5-5 ("ai nhận cảnh báo DLP"): đổi danh sách ở đây khi khách chốt.
+var EgressAnomalyRoles = []string{meteringport.RoleMeteringViewer, authz.RolePlatformAdmin}
 
 // AreaFarmers tìm tài khoản nông dân nhận cảnh báo khẩn theo địa bàn (HTX
 // US-NEWS-03): tài khoản đang liên kết (pf/accounts farmer_link) với nông hộ có thửa

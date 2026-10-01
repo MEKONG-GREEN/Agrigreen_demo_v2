@@ -11,8 +11,8 @@ Render chart deploy/k8s/charts/agrigreen (helm template) cho dev/staging/prod r�
      URL DB đúng vùng, quyền RabbitMQ (không tài khoản nền tảng nào trên mkg.internal),
      max_locks_per_transaction = 256, luật Prometheus trùng bản gốc deploy/observability.
   3. Public API (G5, ADR-0022/0025) trên mọi hồ sơ, kể cả prod-phasek (= values-prod + values-phasek):
-     api-public chỉ nhận từ Ingress (F08), chỉ ra PgBouncer pf (F19) + DNS + OTLP (+ Valkey/Keycloak/
-     scrape khi cấu hình); hồ sơ gốc TẮT (0 bản sao, không host partner), Phase K BẬT; values-phasek.yaml
+     api-public chỉ nhận từ Ingress (F08), chỉ ra PgBouncer pf (F19) + kho đối tượng 443 (F29, khóa chỉ
+     đọc pf-public-s3) + DNS + OTLP (+ Valkey/Keycloak/scrape khi cấu hình); hồ sơ gốc TẮT (0 bản sao, không host partner), Phase K BẬT; values-phasek.yaml
      chỉ có cấu hình và số bản sao (R-01, PHASEK_ALLOWED).
 
 Bảng luồng mong đợi ở ĐÂY độc lập với values.yaml (nguồn sinh policy): sửa values mà làm hỏng
@@ -359,6 +359,7 @@ def flow_checks(env: str, docs: list[dict], values: dict, r: Report):
         ("Dữ liệu → kho sao lưu trong lãnh thổ", None, "objectStorage", f"{data}/pg-pf", 443),
         ("Định danh → kho sao lưu RIÊNG", None, "objectStorage", f"{vault}/pg-vault", 443),
         ("Neo chuỗi mkg → kho S3", None, "objectStorage", f"{mkg}/anchor-mkg", 443),
+        ("Public API → kho S3 (tệp xuất, F29)", None, "objectStorage", f"{pf}/api-public", 443),
         ("worker → SMTP trong lãnh thổ", None, "smtp", f"{pf}/worker", 587),
         ("CNPG → API server", None, "kubeAPI", f"{data}/pg-mkg", 443),
         ("CA thiết bị → HSM", None, "hsm", f"{pki}/step-ca", 1792),
@@ -560,8 +561,9 @@ def structure_checks(env: str, docs: list[dict], values: dict, r: Report):
 
 # --------------------------------------------------------------------------- Public API (G5)
 def public_api_checks(env: str, docs: list[dict], values: dict, r: Report):
-    """ADR-0022 / ADR-0025: api-public chỉ nhận từ Ingress (F08), chỉ ra PgBouncer pf (F19) + DNS/OTLP
-    (+ Valkey/Keycloak/scrape khi cấu hình); hồ sơ gốc TẮT, hồ sơ Phase K BẬT chỉ bằng cấu hình."""
+    """ADR-0022 / ADR-0025: api-public chỉ nhận từ Ingress (F08), chỉ ra PgBouncer pf (F19) + kho đối tượng
+    443 (F29) + DNS/OTLP (+ Valkey/Keycloak/scrape khi cấu hình); hồ sơ gốc TẮT, hồ sơ Phase K BẬT chỉ bằng
+    cấu hình."""
     pf, data, vault, mkg, ops = NS["pf"], NS["data"], NS["vault"], NS["mkg"], NS["ops"]
     phasek = is_phasek(env)
     m = Model(docs)
@@ -628,11 +630,17 @@ def public_api_checks(env: str, docs: list[dict], values: dict, r: Report):
         r.check(m.allowed(ap, p("iam/keycloak"), 8080), f"[{env}] F28 api-public → Keycloak bị chặn dù oidc.enabled")
     for port in (80, 443, 5432, 6379):
         r.check(not m.allowed(ap, internet, port), f"[{env}] ra Internet phải bị chặn: api-public → 8.8.8.8:{port}")
+    obj_nets = [ipaddress.ip_network(c, strict=False) for c in values["external"].get("objectStorage") or []]
     for key, cidrs in values["external"].items():
         if not cidrs or key in ("internet", "valkey"):
             continue
         tgt = IP(first_host(cidrs))
+        in_obj = any(ipaddress.ip_address(tgt.addr) in n for n in obj_nets)  # dev: dải ngoài chồng nhau (10.0.0.0/8)
         for port in (443, 587, 6443):
+            if port == 443 and in_obj:
+                # F29: phát luồng tệp xuất (ADR-0022 mục 8) — chỉ 443, chỉ kho đối tượng trong lãnh thổ.
+                r.check(m.allowed(ap, tgt, 443), f"[{env}] F29 api-public → kho đối tượng {tgt.addr}:443 bị chặn")
+                continue
             r.check(not m.allowed(ap, tgt, port), f"[{env}] api-public không được ra dải ngoài {key} ({tgt.addr}:{port})")
     vk = values["external"].get("valkey") or []
     if vk:
@@ -687,6 +695,10 @@ def public_api_checks(env: str, docs: list[dict], values: dict, r: Report):
         r.check(need <= keys, f"[{env}] pg-pf-roles thiếu vai G5 cho bootstrap: {sorted(need - keys)}")
     r.check(set(env_from) >= {"pf-public-db-roles", "pf-apikey-pepper"}, f"[{env}] api-public thiếu envFrom pf-public-db-roles/pf-apikey-pepper")
     r.check(not any(s in env_from for s in ("pf-db-roles", "pf-app", "pf-s3", "pf-anchor")), f"[{env}] api-public nhận Secret rộng hơn cần: {env_from}")
+    # Khóa S3: chỉ khóa CHỈ ĐỌC riêng pf-public-s3 (không khóa ghi pf-s3 của api-platform/worker).
+    key_refs = {e["valueFrom"]["secretKeyRef"]["name"] for e in c.get("env") or [] if "secretKeyRef" in (e.get("valueFrom") or {})}
+    r.check(key_refs <= {"pf-public-s3"}, f"[{env}] api-public chỉ nhận khóa S3 chỉ đọc pf-public-s3: {sorted(key_refs)}")
+    r.check(envs.get("AG_S3_ENDPOINT") and envs.get("AG_S3_BUCKET"), f"[{env}] api-public thiếu AG_S3_ENDPOINT/AG_S3_BUCKET (tải tệp xuất, ADR-0022 mục 8)")
 
     if not phasek:
         r.check(dep["spec"].get("replicas") == 0, f"[{env}] ĐTK 1/G4: api-public phải 0 bản sao, đang {dep['spec'].get('replicas')}")
@@ -695,6 +707,7 @@ def public_api_checks(env: str, docs: list[dict], values: dict, r: Report):
         r.check(not partner, f"[{env}] ĐTK 1/G4: không có host partner.<domain>")
         r.check(not mws, f"[{env}] ĐTK 1/G4: không Middleware Public API")
         r.check((pf, "pf-apikey-pepper") not in es and (pf, "agrigreen-partner-tls") not in es, f"[{env}] ĐTK 1/G4: pepper/TLS partner chỉ có ở Phase K")
+        r.check((pf, "pf-public-s3") not in es, f"[{env}] ĐTK 1/G4: khóa S3 của api-public chỉ có ở Phase K")
         return
     replicas = dep["spec"].get("replicas")
     r.check(replicas == 2 or (hpa is not None and hpa["spec"]["minReplicas"] >= 2), f"[{env}] Phase K: api-public 2 bản sao (HA), đang {replicas}")
@@ -716,6 +729,7 @@ def public_api_checks(env: str, docs: list[dict], values: dict, r: Report):
         r.check(rl is not None and rl["spec"]["rateLimit"].get("average", 0) > 0, f"[{env}] Phase K: partner thiếu giới hạn theo IP (R-55)")
         r.check(bl is not None and 0 < bl["spec"]["buffering"].get("maxRequestBodyBytes", 0) <= 1048576, f"[{env}] Phase K: partner thiếu giới hạn thân 1 MiB")
     r.check(base_env(env) == "dev" or (pf, "pf-apikey-pepper") in es, f"[{env}] Phase K: thiếu ExternalSecret pepper khóa API")
+    r.check(base_env(env) == "dev" or (pf, "pf-public-s3") in es, f"[{env}] Phase K: thiếu ExternalSecret pf-public-s3 (khóa S3 chỉ đọc của api-public)")
 
 
 # --------------------------------------------------------------------------- chạy

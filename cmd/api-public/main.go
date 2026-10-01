@@ -13,7 +13,11 @@
 //	AG_APIKEY_PEPPER_V<n>, AG_APIKEY_PEPPER_CURRENT  pepper HMAC (≥ 32 byte, trình quản lý bí mật) — bắt buộc
 //	AG_PUBLIC_REPLICAS         số bản sao (chia giới hạn tần suất trong tiến trình khi không có Valkey), mặc định 1
 //	AG_VALKEY_URL              (tùy chọn) giới hạn tần suất dùng chung — adapter chưa có ở G5-1, dùng bộ đếm trong tiến trình
-//	AG_PF_DB_URL               URL gốc tới PgBouncer cụm pf — vai ghép theo module (public_api, apiclient_app, …)
+//	AG_PF_DB_URL               URL gốc tới PgBouncer cụm pf — vai ghép theo module (public_api, apiclient_app,
+//	                           metering_app, party_app, cropcycle_app, geo_app, mrv_app, masterdata_app)
+//	AG_S3_ENDPOINT, AG_S3_BUCKET, AG_S3_USE_TLS, AG_S3_ACCESS_KEY, AG_S3_SECRET_KEY  kho tệp xuất (chỉ đọc —
+//	                           phát luồng GET /v1/jobs/{id}/file); hoặc AG_OBJSTORE_DIR ở dev
+//	AG_EGRESS_MODE             observe | enforce (pf/metering); Public API luôn đóng khi lỗi
 //	AG_DB_PASSWORD_<VAI> hoặc AG_DB_APP_PASSWORD, AG_DB_VIA_PGBOUNCER, AG_ENV, AG_OTLP_ENDPOINT
 package main
 
@@ -34,6 +38,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
@@ -122,8 +127,12 @@ func run(ctx context.Context, log *slog.Logger, getenv func(string) string) erro
 		log.Warn("AG_VALKEY_URL đã đặt nhưng adapter Valkey chưa có ở G5-1 — dùng giới hạn trong tiến trình chia theo AG_PUBLIC_REPLICAS",
 			"event", "startup", "outcome", "degraded")
 	}
+	mode, err := meteringport.ParseMode(getenv(meteringport.EnvEgressMode))
+	if err != nil {
+		return err
+	}
 	mod, d, err := Build(ctx, open, Config{Operator: operator, Peppers: peppers, Store: store, Replicas: replicas,
-		Production: residency.Production(getenv), Clock: clock.System{}, Log: log})
+		Production: residency.Production(getenv), EgressMode: mode, Clock: clock.System{}, Log: log})
 	if err != nil {
 		return err
 	}

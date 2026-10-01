@@ -121,6 +121,12 @@ const (
 	IdempotencyTTLHours = 48 // R-51
 )
 
+// JobKeyExpiry là job cmd/worker (-jobs, chạy ở leader) ghi sự kiện expired vào sổ api_key_event cho
+// mọi khóa đã quá hạn (hoặc quá hạn chồng lấn khi xoay) của tenant đơn vị vận hành (RB-1: trạng thái
+// khóa đổi bằng bản ghi sổ mới, không UPDATE cột). Xác thực đã từ chối khóa quá hạn theo thời điểm;
+// job chỉ làm sổ và bảng chiếu khớp thực tế (danh sách khóa ở Admin API, tối đa 2 khóa hiệu lực).
+const JobKeyExpiry = "apiclient_key_expiry"
+
 // Khóa tham số (pf/masterdata, có phiên bản, setter ≠ approver).
 const (
 	// ParamKMin: ngưỡng gom nhóm k của sản phẩm tổng hợp (C-3, Q-MKG-11) — tạm 10, chờ khách.

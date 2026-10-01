@@ -9,6 +9,7 @@ import (
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -181,6 +182,29 @@ func AreaFeedStaleTemplate(p mechport.AreaFeedStaleV1, occurred time.Time) Templ
 		Body: fmt.Sprintf("Lần đồng bộ diện tích vụ gần nhất lúc %s, quá %s giờ — Bản đồ CGH đang dùng dữ liệu nhập tay dự phòng.",
 			viTime(ParseTime(p.LastSyncAt, occurred)), p.ThresholdHours),
 		DeepLink: "/mechanization/area-sync-log", CreatedAt: ParseTime(p.DetectedAt, occurred)}
+}
+
+// EgressAnomalyTemplate: khối lượng xuất dữ liệu bất thường lần đầu trong ngày (G5, ADR-0024 — DLP)
+// → người nhận DLP của tenant chủ dữ liệu. Chỉ kênh, sản phẩm, loại bên nhận, số bản ghi, ngưỡng và
+// mã tham chiếu dòng egress_event — không dữ liệu nghiệp vụ, không dữ liệu cá nhân.
+func EgressAnomalyTemplate(p meteringport.EgressAnomalyV1, occurred time.Time) Template {
+	basis := "ngưỡng tuyệt đối"
+	if p.Basis == "median" {
+		basis = "hệ số × trung vị 28 ngày"
+	}
+	mode := "chế độ quan sát (không chặn)"
+	if p.Mode == string(meteringport.ModeEnforce) {
+		mode = "chế độ chặn (enforce)"
+	}
+	t := Template{Kind: port.KindEgressAnomaly, Severity: port.SeverityUrgent,
+		Title: "Cảnh báo xuất dữ liệu bất thường (DLP)",
+		Body: fmt.Sprintf("Ngày %s: kênh %s, sản phẩm %s, bên nhận loại %s đã nhận %d bản ghi, vượt ngưỡng %d (%s; %s). Kiểm tra nhật ký xuất dữ liệu.",
+			p.BusinessDate, p.Channel, p.Product, p.CounterpartyKind, p.DailyRecords, p.Threshold, basis, mode),
+		DeepLink: "/metering/egress/anomalies", CreatedAt: ParseTime(p.DetectedAt, occurred)}
+	if id, err := uuid.Parse(p.EgressEventID); err == nil {
+		t.SubjectRef = &id
+	}
+	return t
 }
 
 // MRVAlertTemplate: cảnh báo MRV (pf.mrv.alert.raised, G3). Chỉ mã tham chiếu và mã xã — không có

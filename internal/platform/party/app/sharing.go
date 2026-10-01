@@ -29,6 +29,7 @@ import (
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port/grantlookup"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -329,43 +330,20 @@ func (s *Sharing) ShareGrantReads(ctx context.Context, id uuid.UUID, after int64
 // Phía bên nhận
 // ---------------------------------------------------------------------------
 
-// verified kiểm lại bảng hiện hành bên cấp (trong cùng tx, ngữ cảnh bên cấp) cho một dòng bên nhận.
-func verified(ctx context.Context, tx pgx.Tx, in store.Inbound, grantee uuid.UUID, kind string, at time.Time) (bool, error) {
-	ok := false
-	err := tenant.Within(ctx, tx, in.Grantor, func() error {
-		g, err := store.GrantByID(ctx, tx, in.GrantID, false)
-		if err != nil || g == nil {
-			return err
-		}
-		ok = g.Status == "active" && g.Grantee == grantee && (kind == "" || slices.Contains(g.Kinds, kind)) &&
-			!at.Before(g.ValidFrom) && at.Before(g.ValidTo)
-		return nil
-	})
-	return ok, err
-}
-
 func toShareGrant(in store.Inbound) port.ShareGrant {
 	return port.ShareGrant{ID: in.GrantID, Grantor: in.Grantor, Grantee: in.TenantID, Kinds: in.Kinds, ValidFrom: in.ValidFrom, ValidTo: in.ValidTo}
 }
 
-// activeFor trả cấp quyền đang hiệu lực (đã kiểm hai phía) của bên nhận grantee cho kind.
+// activeFor trả cấp quyền đang hiệu lực (đã kiểm hai phía — store.VerifiedActive) của bên nhận
+// grantee cho kind.
 func (s *Sharing) activeFor(ctx context.Context, grantee uuid.UUID, kind string, grantor uuid.UUID, at time.Time) ([]port.ShareGrant, error) {
 	var out []port.ShareGrant
 	err := tenant.WithTenantTx(ctx, s.DB, grantee, func(tx pgx.Tx) error {
-		rows, err := store.ActiveInbound(ctx, tx, kind, grantor, at)
-		if err != nil {
-			return err
-		}
+		rows, err := store.VerifiedActive(ctx, tx, grantee, kind, grantor, at)
 		for _, in := range rows {
-			ok, err := verified(ctx, tx, in, grantee, kind, at)
-			if err != nil {
-				return err
-			}
-			if ok {
-				out = append(out, toShareGrant(in))
-			}
+			out = append(out, toShareGrant(in))
 		}
-		return nil
+		return err
 	})
 	return out, err
 }
@@ -408,25 +386,13 @@ func (s *Sharing) Authorize(ctx context.Context, kind string, grantor uuid.UUID)
 // loại khác vẫn phải qua Authorize (vai mkg_sync). Cùng truy vấn hai phía như Authorize: bảng chiếu
 // bên nhận + bảng hiện hành bên cấp, trạng thái active (chưa thu hồi), at ∈ [valid_from, valid_to).
 func (s *Sharing) ActiveGrant(ctx context.Context, grantee, grantor uuid.UUID, kind string, at time.Time) (port.ShareGrant, error) {
-	if grantee == uuid.Nil || !port.ValidKind(kind) || !strings.HasPrefix(kind, port.DataProductKind("")) {
-		return port.ShareGrant{}, port.ErrShareGrantMissing
-	}
-	if at.IsZero() {
-		at = s.Clock.Now()
-	}
-	gs, err := s.activeFor(ctx, grantee, kind, grantor, at)
-	if err != nil {
-		return port.ShareGrant{}, err
-	}
-	if len(gs) == 0 {
-		return port.ShareGrant{}, port.ErrShareGrantMissing
-	}
-	for _, g := range gs[1:] {
-		if g.Grantor != gs[0].Grantor {
-			return port.ShareGrant{}, port.ErrShareGrantorAmbiguous
-		}
-	}
-	return gs[0], nil
+	return grantlookup.New(s.DB, s.Clock).ActiveGrant(ctx, grantee, grantor, kind, at)
+}
+
+// ActiveGrantors (apiclient/public.GrantorLister): mọi bên cấp đang có cấp quyền dp_* loại kind cho
+// grantee — danh mục /v1/data-products.
+func (s *Sharing) ActiveGrantors(ctx context.Context, grantee uuid.UUID, kind string, at time.Time) ([]uuid.UUID, error) {
+	return grantlookup.New(s.DB, s.Clock).ActiveGrantors(ctx, grantee, kind, at)
 }
 
 // readerOf trả (bên nhận, người đọc) của một lần đọc: người dùng OIDC của tenant bên nhận (bề mặt

@@ -18,15 +18,15 @@ Phụ lục A, cổng G5: "Phase K; `pf/metering` và Public API bật với bê
 | `AG_PUBLIC_API_ENABLED` | không đặt → tiến trình thoát lỗi nếu lỡ chạy | `1` |
 | `AG_PUBLIC_OPERATOR_TENANT` | rỗng | tenant đơn vị vận hành — đặt bằng `--set` (chờ khách Q5-2). Rỗng → `api-public` không khởi động |
 | Host `partner.<domain>` | không có (`ingress.optionalHosts.partner.enabled: false`) | có: TLS `agrigreen-partner-tls`, chỉ `websecure`, Middleware `public-api-ratelimit` (20 rps, burst 40 theo IP) + `public-api-body-limit` (1 MiB) |
-| Bí mật | `pf-public-db-roles` (vai của `api-public`) | thêm `pf-apikey-pepper` (pepper khóa API) và `agrigreen-partner-tls` |
+| Bí mật | `pf-public-db-roles` (vai của `api-public`) | thêm `pf-apikey-pepper` (pepper khóa API), `pf-public-s3` (khóa S3 **chỉ đọc** của `api-public` cho tệp xuất) và `agrigreen-partner-tls` |
 | `AG_EGRESS_MODE` (`api-platform`, `worker`, `api-public`) | `observe` | `enforce` |
-| NetworkPolicy | F08 (Ingress → `api-public:8085`), F19 (`api-public` → PgBouncer pf) **có sẵn** — không có Pod nào khi 0 bản sao | không đổi. F26 (Valkey) mở khi `external.valkey` có dải |
+| NetworkPolicy | F08 (Ingress → `api-public:8085`), F19 (`api-public` → PgBouncer pf), F29 (`api-public` → kho đối tượng 443, phát luồng tệp xuất) **có sẵn** — không có Pod nào khi 0 bản sao | không đổi. F26 (Valkey) mở khi `external.valkey` có dải |
 | Valkey | — | tùy chọn (Q5-10): `external.valkey` + `AG_VALKEY_URL` |
 
 `check_flows.py` kiểm cả hai hồ sơ:
 - hồ sơ gốc: `api-public` 0 bản sao, không HPA, không host `partner`, không Middleware, không pepper;
 - Phase K: 2 bản sao + PDB, `AG_PUBLIC_API_ENABLED=1`, host `partner` duy nhất chỉ tới `api-public:8085`, TLS + hai Middleware, pepper chỉ ở vùng pf, `enforce`;
-- mọi hồ sơ: `api-public` chỉ nhận từ Ingress; chỉ ra PgBouncer pf + DNS + OTLP; **không** tới `identity-vault`, RabbitMQ, PostgreSQL pf trực tiếp, DB mkg/ts/vault/iam, ứng dụng khác, Internet, dải ngoài cụm;
+- mọi hồ sơ: `api-public` chỉ nhận từ Ingress; chỉ ra PgBouncer pf + kho đối tượng 443 (F29) + DNS + OTLP; khóa S3 chỉ từ `pf-public-s3`; **không** tới `identity-vault`, RabbitMQ, PostgreSQL pf trực tiếp, DB mkg/ts/vault/iam, ứng dụng khác, Internet, dải ngoài cụm;
 - `values-phasek.yaml` chỉ chứa đường dẫn trong danh sách `PHASEK_ALLOWED` (số bản sao, HPA/PDB, `env`, `enabled`, `external.valkey`) — R-01.
 
 ## 2. Điều kiện trước (ngoài hệ thống, chờ khách)
@@ -44,7 +44,8 @@ Làm ở **staging trước** (diễn tập K-04), rồi production. Không buil
 1. **Bí mật ở kho trong lãnh thổ** (`<remotePrefix>` = `agrigreen/staging` hoặc `agrigreen/prod`):
    - `<remotePrefix>/apikey/pf`: `AG_APIKEY_PEPPER_V1` = 32 byte ngẫu nhiên trở lên (vd `openssl rand -hex 32`, sinh **trong** kho/KMS, không qua máy cá nhân), `AG_APIKEY_PEPPER_CURRENT` = `1`;
    - `<remotePrefix>/db/pf`: có `AG_DB_PASSWORD_PUBLIC_API`, `AG_DB_PASSWORD_APICLIENT_APP`, `AG_DB_PASSWORD_METERING_APP` (vai đã có từ G5-0; Job bootstrap đặt mật khẩu ở `helm upgrade` release `data`);
-   - `<remotePrefix>/tls/partner`: `tls.crt`, `tls.key` cho `partner.<domain>` (bước 2).
+   - `<remotePrefix>/tls/partner`: `tls.crt`, `tls.key` cho `partner.<domain>` (bước 2);
+   - `<remotePrefix>/s3/pf-public`: `AG_S3_ACCESS_KEY`, `AG_S3_SECRET_KEY` — khóa **chỉ đọc** bucket pf, giới hạn ở tiền tố tệp xuất của `pf/apiclient` (`apiclient/`). Không dùng lại khóa ghi `s3/pf` của `api-platform`/`worker`.
 2. **DNS + chứng thư** (`deploy/iac/opentofu`): đặt `phase_k = true` trong `envs/<env>.tfvars`, rồi
    ```powershell
    tofu plan -var-file=envs/<env>.tfvars    # chỉ thêm bản ghi partner + module.partner_certificate[0]
@@ -64,7 +65,7 @@ Làm ở **staging trước** (diễn tập K-04), rồi production. Không buil
 6. **Release `edge`, `ops`**: không cần cài lại. Nửa egress của F08 ở vùng edge và luật `agrigreen-public-api` đã có từ hồ sơ gốc.
 7. **Kiểm sau khi bật:**
    ```powershell
-   kubectl -n agrigreen-pf get externalsecret pf-apikey-pepper agrigreen-partner-tls   # SecretSynced
+   kubectl -n agrigreen-pf get externalsecret pf-apikey-pepper pf-public-s3 agrigreen-partner-tls   # SecretSynced
    kubectl -n agrigreen-pf rollout status deploy/api-public
    kubectl -n agrigreen-pf get pdb api-public                                          # ALLOWED DISRUPTIONS 1
    curl -fsS https://partner.<domain>/healthz                                          # 200
@@ -76,7 +77,7 @@ Ghi vào biên bản diễn tập: revision Helm trước/sau, `global.imageTag`
 
 ## 4. Cấp bên thứ ba (thủ tục, không sửa mã — ADR-0025 mục 2)
 
-Runbook chi tiết của agent vận hành: `docs/runbooks/public-api-onboarding.md`. Tóm tắt thứ tự:
+Runbook chi tiết: [public-api-onboarding.md](public-api-onboarding.md) (kể cả xoay, thu hồi khóa và bảng kê). Tóm tắt thứ tự:
 
 0. **Pháp lý:** hợp đồng dữ liệu / DPA (mục đích, sản phẩm, thời hạn, tái chia sẻ). Ghi số hợp đồng vào mục đích của cấp quyền.
 1. **Tenant bên thứ ba:** tenant UUIDv7 mới, tổ chức gốc ở `pf/party` (như cấp tenant MKG, ADR-0020). Chỉ gọi API thì không cần tài khoản Keycloak.
@@ -133,3 +134,4 @@ Kết quả: `api-public` 0 bản sao; Ingress `partner` và Middleware bị g�
 | 404 ở `partner.<domain>` | `ingress.optionalHosts.partner.enabled`, Middleware `agrigreen-pf-public-api-*@kubernetescrd` tồn tại (Traefik cần provider `kubernetescrd`) |
 | 429 nhiều ở gateway (`AgPublicAPIGatewayRateLimitedHigh`) | nhiều bên thứ ba sau cùng NAT, hoặc LB chèn IP: xem `sourceCriterion.ipStrategy.depth` |
 | 503 `metering.unavailable` | sổ sử dụng không ghi được (đóng khi lỗi, ADR-0023) — DB pf, luật của `pf/metering` |
+| Tải tệp xuất (`GET /v1/jobs/{id}/file`) lỗi 5xx | `pf-public-s3` chưa `SecretSynced`, khóa chỉ đọc thiếu quyền trên tiền tố `apiclient/`, hoặc F29 (dải `external.objectStorage`) |

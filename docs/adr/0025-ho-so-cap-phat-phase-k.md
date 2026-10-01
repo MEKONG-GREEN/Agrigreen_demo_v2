@@ -17,7 +17,7 @@ Agent hạ tầng G5 tạo **một lớp giá trị** `values-phasek.yaml`, ch�
 | `api-public` số bản sao | 0 | 2 (HA, `PodDisruptionBudget` minAvailable 1) |
 | `AG_PUBLIC_API_ENABLED` | không đặt | `1` |
 | Host ingress `partner.<domain>` | không có | có, TLS, middleware giới hạn theo IP (ADR-0022 mục 7), giới hạn thân 1 MiB |
-| NetworkPolicy | — | **F08** Ingress → `api-public` 8085 · **F19** `api-public` → PgBouncer cụm pf 5432 · Prometheus → `api-public` cổng số đo (mở rộng F53) |
+| NetworkPolicy | — | **F08** Ingress → `api-public` 8085 · **F19** `api-public` → PgBouncer cụm pf 5432 · **F29** `api-public` → kho đối tượng trong lãnh thổ 443 (phát luồng tệp xuất, khóa chỉ đọc `pf-public-s3` — thêm ở tích hợp G5) · Prometheus → `api-public` cổng số đo (mở rộng F53) |
 | Luồng **cấm** (`check_flows.py` thêm) | — | `api-public` → `identity-vault`, → RabbitMQ, → DB/PgBouncer mkg/ts, → Internet; Internet → `api-platform` qua host `partner.<domain>` |
 | Bí mật (ExternalSecret, KMS trong lãnh thổ) | — | `AG_APIKEY_PEPPER_V1`, `AG_APIKEY_PEPPER_CURRENT=1`, mật khẩu vai `public_api`, `apiclient_app`, `metering_app`, và vai đọc của module chủ dữ liệu mà `api-public` mở (`cropcycle_app`, `geo_app`, `mrv_app`, `masterdata_app`, `party_app`) |
 | `AG_PUBLIC_OPERATOR_TENANT` | — | tenant đơn vị vận hành (chờ khách) |
@@ -31,7 +31,7 @@ Agent hạ tầng G5 tạo **một lớp giá trị** `values-phasek.yaml`, ch�
 
 ### 2. Cấp tenant và khách hàng API cho bên thứ ba (thủ tục, không sửa mã)
 
-Runbook `docs/runbooks/public-api-onboarding.md` (agent vận hành G5 viết) đi theo thứ tự:
+Runbook [`docs/runbooks/public-api-onboarding.md`](../runbooks/public-api-onboarding.md) (tích hợp G5, 02/10/2026) đi theo thứ tự:
 
 0. **Pháp lý (ngoài hệ thống).** Hợp đồng dữ liệu hoặc DPA giữa chủ dữ liệu, đơn vị vận hành và bên thứ ba: mục đích, sản phẩm, thời hạn, điều khoản tái chia sẻ. Ghi số hợp đồng vào mục đích của cấp quyền.
 1. **Tenant bên thứ ba.** Cấp như đã cấp tenant MKG ở ADR-0020:

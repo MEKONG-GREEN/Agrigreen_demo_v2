@@ -509,3 +509,26 @@ func PutPlan(ctx context.Context, tx pgx.Tx, p PlanRow) error {
 		p.Status, p.ProposedBy, p.ProposedAt.UTC(), p.ApprovedBy, utc(p.ApprovedAt))
 	return err
 }
+
+// ClientsWithDueKeys trả mã khách hàng (không trùng, tăng dần) có khóa active/rotated đã quá hạn
+// (expires_at ≤ now) hoặc khóa rotated đã hết hạn chồng lấn (grace_until ≤ now) — đầu vào job
+// port.JobKeyExpiry. tx ở ngữ cảnh tenant đơn vị vận hành.
+func ClientsWithDueKeys(ctx context.Context, tx pgx.Tx, now time.Time) ([]uuid.UUID, error) {
+	rows, err := tx.Query(ctx, `SELECT DISTINCT client_id FROM pf_apiclient.api_key_current
+	   WHERE (status = 'active' AND expires_at <= $1::timestamptz)
+	      OR (status = 'rotated' AND (expires_at <= $1::timestamptz OR grace_until IS NULL OR grace_until <= $1::timestamptz))
+	   ORDER BY client_id`, now.UTC())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}

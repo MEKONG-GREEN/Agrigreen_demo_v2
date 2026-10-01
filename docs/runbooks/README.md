@@ -28,6 +28,7 @@ Các job vận hành dùng chung cho mọi cụm (`ag_pf`, `ag_mkg`, `ag_vault`)
 | PKI thiết bị: CA thiết bị riêng trong lãnh thổ, cấp/thu hồi chứng thư, thay CA | dựng một lần; mỗi kỳ thiết bị; kiểm hằng quý | CA ngoại tuyến + CA trung gian (HSM), `scripts/gen-dev-certs` (dev) | — | [device-pki.md](device-pki.md) |
 | Giám sát SQL xuyên tenant (sql_exporter) | liên tục (60 s) | `deploy/observability/sql-exporter/*.collector.yml` | `mkg_monitor`, `ts_monitor` (chỉ EXECUTE hàm gộp) | [ingest.md](ingest.md) mục 7 |
 | Leo thang hồ sơ MRV chờ duyệt quá hạn (KN US-MRV-06) | mỗi 15 phút | `cmd/worker` (leader, job `mrv_review_escalation`) | `ag_outbox_publisher` (tìm tenant), `mrv_app` | mục dưới |
+| Ghi `expired` cho khóa Public API quá hạn / quá hạn chồng lấn (ADR-0022 mục 4, G5) | mỗi giờ, chạy khi khởi động | `cmd/worker` (leader, job `apiclient_key_expiry`; chỉ khi có `AG_PUBLIC_OPERATOR_TENANT`) | `apiclient_app` | [public-api-onboarding.md](public-api-onboarding.md) mục 7 |
 
 ## Leo thang hồ sơ MRV quá hạn (pf/mrv)
 

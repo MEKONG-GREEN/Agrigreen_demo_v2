@@ -363,3 +363,77 @@ func TestAppendOnlySixWays_G5Apiclient(t *testing.T) {
 		t.Fatalf("v_missing_immutability pf_apiclient: %d %v", missing, err)
 	}
 }
+
+// ADR-0022 mục 4 (P-04, RB-1): job port.JobKeyExpiry — khóa quá hạn (365 ngày) và khóa cũ quá hạn
+// chồng lấn khi xoay được ghi sự kiện expired ở sổ api_key_event (không UPDATE cột trạng thái ngoài
+// bảng chiếu); chạy lại không ghi thêm (idempotent); khóa còn hạn không đổi; tenant vận hành khác
+// không bị chạm; khóa expired không xác thực được.
+func TestExpireAllDueJob_ADR0022(t *testing.T) {
+	f := newFixture(t)
+	cidA, _ := f.activeClient(t)
+	cidB, _ := f.activeClient(t)
+	a1, err := f.svc.IssueKey(f.admin, cidA, ids.New().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	a2, err := f.svc.RotateKey(f.admin, cidA, a1.KeyID, ids.New().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.clk.Advance(30 * 24 * time.Hour)
+	b1, err := f.svc.IssueKey(f.admin, cidB, ids.New().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+
+	// Chưa tới hạn chồng lấn? Đã qua 30 ngày > 7 ngày → a1 (rotated) tới hạn; a2, b1 còn hạn.
+	n, err := f.svc.ExpireAllDue(ctx, f.op, f.clk.Now())
+	if err != nil || n != 1 {
+		t.Fatalf("muốn 1 khóa expired (a1 quá hạn chồng lấn), nhận %d %v", n, err)
+	}
+	if n, err := f.svc.ExpireAllDue(ctx, f.op, f.clk.Now()); err != nil || n != 0 {
+		t.Fatalf("chạy lại không ghi thêm: %d %v", n, err)
+	}
+	// Qua 365 ngày kể từ a2 → a2 expired; b1 (phát hành sau 30 ngày) còn hạn.
+	f.clk.Advance(port.DefaultKeyLifetime - 30*24*time.Hour + time.Second)
+	if n, err := f.svc.ExpireAllDue(ctx, f.op, f.clk.Now()); err != nil || n != 1 {
+		t.Fatalf("muốn a2 expired: %d %v", n, err)
+	}
+	status := func(cid uuid.UUID) map[uuid.UUID]string {
+		keys, err := f.svc.ListKeys(f.admin, cid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m := map[uuid.UUID]string{}
+		for _, k := range keys {
+			m[k.KeyID] = k.Status
+		}
+		return m
+	}
+	if s := status(cidA); s[a1.KeyID] != "expired" || s[a2.KeyID] != "expired" {
+		t.Fatalf("khóa của A phải expired: %v", s)
+	}
+	if s := status(cidB); s[b1.KeyID] != "active" {
+		t.Fatalf("khóa còn hạn không đổi: %v", s)
+	}
+	var events int
+	if err := tenant.WithTenantTx(ctx, pgtest.Get(t).Pool(t, migrations.PF, port.DBRole), f.op, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT count(*) FROM pf_apiclient.api_key_event WHERE action = 'expired'`).Scan(&events)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if events != 2 {
+		t.Fatalf("sổ phải có đúng 2 sự kiện expired, có %d", events)
+	}
+	if _, err := f.auth(a2.Secret); err == nil {
+		t.Fatal("khóa expired không được xác thực")
+	}
+	// Tenant vận hành khác: không có gì để làm; tenant rỗng → lỗi.
+	if n, err := f.svc.ExpireAllDue(ctx, ids.New(), f.clk.Now()); err != nil || n != 0 {
+		t.Fatalf("tenant khác: %d %v", n, err)
+	}
+	if _, err := f.svc.ExpireAllDue(ctx, uuid.Nil, f.clk.Now()); err == nil {
+		t.Fatal("thiếu tenant vận hành phải lỗi")
+	}
+}

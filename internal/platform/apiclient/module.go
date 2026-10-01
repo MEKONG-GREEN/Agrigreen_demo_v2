@@ -7,8 +7,10 @@
 package apiclient
 
 import (
+	"context"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -21,6 +23,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -108,6 +111,34 @@ func (m *Module) RegisterApp(*gin.RouterGroup) {}
 
 // RegisterAdmin gắn route Admin API (MFA): khách hàng, khóa, đăng ký, gói hạn mức.
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Admin{Svc: m.svc}.Register(rg) }
+
+// ExpireDueKeys ghi sự kiện expired cho mọi khóa quá hạn của tenant đơn vị vận hành tại now — thân job
+// port.JobKeyExpiry; kiểm thử gọi trực tiếp với thời điểm giả. Trả số khóa vừa chuyển expired.
+func (m *Module) ExpireDueKeys(ctx context.Context, now time.Time) (int, error) {
+	return m.svc.ExpireAllDue(ctx, m.svc.OperatorTenant, now)
+}
+
+// Jobs trả job port.JobKeyExpiry (mỗi giờ, chạy ở leader của cmd/worker). Không có tenant đơn vị vận
+// hành (AG_PUBLIC_OPERATOR_TENANT, ĐTK 1) → không job nào.
+func (m *Module) Jobs(log *slog.Logger) []schedule.Job {
+	if m.svc.OperatorTenant == uuid.Nil {
+		return nil
+	}
+	return []schedule.Job{{
+		Name: port.JobKeyExpiry, Spec: schedule.Every{Interval: time.Hour}, RunOnStart: true, Timeout: 5 * time.Minute,
+		Run: func(ctx context.Context) error {
+			n, err := m.ExpireDueKeys(ctx, m.svc.Clock.Now())
+			if log != nil {
+				outcome := "ok"
+				if err != nil {
+					outcome = "error"
+				}
+				log.Info("khóa API quá hạn → expired", "event", "job."+port.JobKeyExpiry, "expired", n, "outcome", outcome)
+			}
+			return err
+		},
+	}}
+}
 
 // ExportHandler là inbox.Handler của consumer port.ExportConsumer (pool vai apiclient_app).
 func (m *Module) ExportHandler() inbox.Handler { return m.svc.HandleExportRequested }
