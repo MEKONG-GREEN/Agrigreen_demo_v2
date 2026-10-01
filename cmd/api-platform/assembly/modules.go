@@ -10,6 +10,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extdata"
@@ -69,12 +70,13 @@ type Modules struct {
 	Simulation    *simulation.Module
 	CropCycle     *cropcycle.Module
 	Metrics       *metrics.Module
-	ExtData       *extdata.Module // proxy khử định danh nguồn ngoài (ADR-0007), không vai DB
+	ExtData       *extdata.Module   // proxy khử định danh nguồn ngoài (ADR-0007), không vai DB
+	APIClient     *apiclient.Module // G5 (ADR-0022): khách hàng Public API, khóa, đăng ký, gói hạn mức — Admin API
 }
 
 // List trả module theo thứ tự gắn route.
 func (m Modules) List() []httpx.Module {
-	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.Waterway, m.Simulation, m.CropCycle, m.Metrics, m.ExtData}
+	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.Waterway, m.Simulation, m.CropCycle, m.Metrics, m.ExtData, m.APIClient}
 }
 
 // Build là gốc lắp ráp DUY NHẤT: mở pool theo vai của từng module (R-05) và nối
@@ -259,8 +261,25 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		return Modules{}, pools, err
 	}
 
+	// pf/apiclient (G5, ADR-0022): Admin API quản trị khách hàng Public API; pepper khóa từ trình quản lý
+	// bí mật (không đặt → phát hành khóa trả 503). Nguồn collection_volume cho worker xuất: đợt G5-1 S nối
+	// apic.UseCollectionSource(...) ở đây.
+	apicPool, err := pool(apiclient.DBRole)
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	peppers, err := apiclient.PeppersFromEnv()
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	opTenant, err := apiclient.OperatorTenantFromEnv()
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	apic := apiclient.New(apicPool, clk, apiclient.Deps{Peppers: peppers, OperatorTenant: opTenant, Store: store})
+
 	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
-		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Metrics: met, ExtData: ed}, pools, nil
+		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Metrics: met, ExtData: ed, APIClient: apic}, pools, nil
 }
 
 // farmerHouseholds chuyển port pf/accounts (liên kết tài khoản nông dân ↔ nông hộ)

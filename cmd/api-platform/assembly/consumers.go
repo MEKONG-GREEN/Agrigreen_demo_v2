@@ -1,6 +1,8 @@
 package assembly
 
 import (
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
+	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
@@ -56,4 +58,7 @@ var Consumers = []Consumer{
 		Handler: func(m Modules) inbox.Handler { return m.MRV.CollectionEvidenceHandler() }},
 	{Name: metricsport.LayerLogConsumer, Role: metrics.DBRole, Events: metrics.LayerEvents,
 		Handler: func(m Modules) inbox.Handler { return m.Metrics.LayerLogHandler() }},
+	// G5 (ADR-0022 mục 8): việc xuất Public API — dựng tệp tất định qua nguồn của module chủ dữ liệu.
+	{Name: apiclientport.ExportConsumer, Role: apiclient.DBRole, Events: []string{apiclientport.EventExportRequested},
+		Handler: func(m Modules) inbox.Handler { return m.APIClient.ExportHandler() }},
 }

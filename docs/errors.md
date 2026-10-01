@@ -684,7 +684,20 @@ Tọa độ sai dạng, thiếu `lat`/`lon`, `z/x/y` không phải số trả `v
 | 500 | `apiclient.contract_violation` | Phần tử sắp trả có trường ngoài hợp đồng `contracts/dataproduct` — không trả gì, cảnh báo vận hành |
 | 403 | `apiclient.self_approval` | Admin API: người duyệt khách hàng / đăng ký sản phẩm / gói hạn mức là người đề xuất (R-56) |
 | 409 | `apiclient.too_many_keys` | Admin API: khách hàng đã có tối đa 2 khóa hiệu lực |
-| 422 | `apiclient.export_too_large` | Yêu cầu xuất vượt `max_export_rows` của gói |
+| 422 | `apiclient.export_too_large` | Yêu cầu xuất vượt `max_export_rows` của gói. Phát hiện ở worker (số ô chỉ biết khi dựng tệp) → job `failed` với `error_code = apiclient.export_too_large` ở `GET /v1/jobs/{id}` |
+| 404 | `apiclient.client_not_found` | Admin API: không có khách hàng API (hoặc thuộc đơn vị vận hành khác — RLS) |
+| 404 | `apiclient.key_not_found` | Admin API: không có khóa API của khách hàng này |
+| 404 | `apiclient.subscription_not_found` | Admin API: không có đăng ký sản phẩm của khách hàng này |
+| 404 | `apiclient.plan_not_found` | Admin API: không có phiên bản gói hạn mức |
+| 409 | `apiclient.state` | Admin API: bản ghi không ở trạng thái cho phép (duyệt bản không phải `proposed`, phát hành khóa cho khách hàng chưa `active`, xoay khóa không `active`, đăng ký trùng sản phẩm chưa thu hồi, thao tác trên khách hàng đã thu hồi) |
+| 403 | `apiclient.not_operator_tenant` | Admin API: người gọi không thuộc tenant đơn vị vận hành `AG_PUBLIC_OPERATOR_TENANT` (khi biến được đặt) |
+| 503 | `apiclient.dependency_unavailable` | Phụ thuộc chưa sẵn sàng: pepper khóa (`AG_APIKEY_PEPPER_V<n>`) khi phát hành/xoay/xác thực, nguồn sản phẩm của module chủ dữ liệu, kho đối tượng của tệp xuất — không trả dữ liệu |
+| 404 | `apiclient.job_not_found` | Public API: không có việc xuất, hoặc việc xuất của khách hàng khác |
+| 409 | `apiclient.job_not_ready` | Public API: `GET /v1/jobs/{id}/file` khi job chưa `completed` (hoặc `failed`) |
+
+Mã `error_code` của job `failed` (không phải phản hồi HTTP): `apiclient.export_too_large`, `apiclient.contract_violation` (một ô sai hợp đồng — không dựng tệp), `apiclient.export_not_supported` (sản phẩm không có xuất), `apiclient.unknown_product` (hợp đồng đổi phiên bản sau khi yêu cầu), `apiclient.export_conflict` (đã có tệp khác nội dung dưới cùng khóa đối tượng).
+
+Public API dùng thêm mã dùng chung: `idempotency_key_required` (400, POST thiếu `Idempotency-Key`), `idempotency_key_reused` (422, cùng khóa khác thân hoặc khác bên cấp), `validation_failed` (422, tham số lọc / `grantor` sai dạng). Mọi lời gọi đã xác thực — kể cả 4xx/5xx sau xác thực — có đúng một dòng sổ `pf_metering.usage_event`; ghi sổ lỗi → `503 metering.unavailable` và không có byte dữ liệu.
 
 Khóa API **không bao giờ** xuất hiện trong lỗi, log, URL, sự kiện (R-14, R-92); chỉ `key_prefix`.
 

@@ -2514,10 +2514,346 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/api-clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách khách hàng API (api_client_admin, api_client_approver) */
+        get: operations["listApiClients"];
+        put?: never;
+        /** Đề xuất khách hàng API (api_client_admin) — tenant bên thứ ba, tên tổ chức, mục đích, mã đầu mối (không PII) */
+        post: operations["proposeApiClient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-clients/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một khách hàng API */
+        get: operations["getApiClient"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-clients/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt khách hàng (api_client_approver ≠ người đề xuất — R-56) */
+        post: operations["approveApiClient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-clients/{id}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tạm ngưng khách hàng (api_client_admin, lý do bắt buộc) — mọi khóa 401 ngay */
+        post: operations["suspendApiClient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-clients/{id}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bật lại khách hàng đã tạm ngưng (api_client_approver) */
+        post: operations["reactivateApiClient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-clients/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thu hồi khách hàng (cuối, api_client_admin, lý do bắt buộc) */
+        post: operations["revokeApiClient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-clients/{id}/keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Khóa API của khách hàng — chỉ prefix, trạng thái, hạn (không bí mật, không HMAC) */
+        get: operations["listApiKeys"];
+        put?: never;
+        /** Phát hành khóa (api_client_admin; khách hàng active; tối đa 2 khóa hiệu lực) — bí mật hiện MỘT lần */
+        post: operations["issueApiKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-clients/{id}/keys/{key_id}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xoay khóa — khóa mới + khóa cũ còn hiệu lực tới previous_key_grace_until (7 ngày) */
+        post: operations["rotateApiKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-clients/{id}/keys/{key_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thu hồi khóa (lý do bắt buộc) — hiệu lực ngay ở lời gọi kế tiếp */
+        post: operations["revokeApiKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-clients/{id}/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Đăng ký sản phẩm dữ liệu (scope) của khách hàng */
+        get: operations["listApiSubscriptions"];
+        put?: never;
+        /** Đề xuất đăng ký sản phẩm + scope (api_client_admin) — scope của hợp đồng contracts/dataproduct hoặc usage:read */
+        post: operations["proposeApiSubscription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-clients/{id}/subscriptions/{sub_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt đăng ký (api_client_approver ≠ người đề xuất — R-56) */
+        post: operations["approveApiSubscription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-clients/{id}/subscriptions/{sub_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thu hồi đăng ký (api_client_admin, lý do) — scope mất ngay ở lời gọi kế tiếp */
+        post: operations["revokeApiSubscription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-clients/{id}/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiên bản gói hạn mức của khách hàng + mặc định (tạm, chờ khách) */
+        get: operations["listApiQuotaPlans"];
+        put?: never;
+        /** Đề xuất phiên bản gói hạn mức mới (api_client_admin) */
+        post: operations["proposeApiQuotaPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-clients/{id}/plans/{version}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt phiên bản gói (api_client_approver ≠ người đề xuất — R-56) */
+        post: operations["approveApiQuotaPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ApiClient: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            client_tenant_id: string;
+            display_name: string;
+            purpose: string;
+            /** Format: uuid */
+            contact_ref: string;
+            auth_methods: string[];
+            oauth_client_id?: string | null;
+            /** @enum {string} */
+            status: "proposed" | "active" | "suspended" | "revoked";
+            status_reason?: string | null;
+            /** Format: uuid */
+            proposed_by: string;
+            /** Format: date-time */
+            proposed_at: string;
+            /** Format: uuid */
+            approved_by?: string | null;
+            /** Format: date-time */
+            approved_at?: string | null;
+        };
+        /** @description Không có bí mật, không có HMAC — chỉ prefix (an toàn để hiển thị và ghi log) */
+        ApiKey: {
+            /** Format: uuid */
+            id: string;
+            key_prefix: string;
+            /** @enum {string} */
+            status: "active" | "rotated" | "revoked" | "expired";
+            /** Format: date-time */
+            issued_at: string;
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: date-time */
+            grace_until?: string | null;
+            /** Format: date-time */
+            revoked_at?: string | null;
+            revoke_reason?: string | null;
+        };
+        ApiKeyIssued: {
+            /** Format: uuid */
+            key_id: string;
+            /** Format: uuid */
+            client_id: string;
+            key_prefix: string;
+            /** @description agk_<prefix>_<bí mật> — CHỈ có ở phản hồi đầu; không bao giờ lưu, log hay phát lại */
+            api_key?: string;
+            /** Format: date-time */
+            expires_at: string;
+            /**
+             * Format: date-time
+             * @description Khi xoay: hạn chồng lấn của khóa cũ
+             */
+            previous_key_grace_until?: string;
+        };
+        ApiSubscription: {
+            /** Format: uuid */
+            id: string;
+            product: string;
+            scopes: string[];
+            /** @enum {string} */
+            status: "proposed" | "active" | "revoked";
+            /** Format: uuid */
+            proposed_by: string;
+            /** Format: date-time */
+            proposed_at: string;
+            /** Format: uuid */
+            approved_by?: string | null;
+            /** Format: date-time */
+            approved_at?: string | null;
+            /** Format: date-time */
+            revoked_at?: string | null;
+            revoke_reason?: string | null;
+        };
+        ApiQuotaPlan: {
+            version: number;
+            requests_per_minute: number;
+            daily_units: number;
+            monthly_units: number;
+            max_export_rows: number;
+            /** Format: date-time */
+            effective_from: string;
+            /** @enum {string} */
+            status: "proposed" | "approved";
+            /** Format: uuid */
+            proposed_by: string;
+            /** Format: date-time */
+            proposed_at: string;
+            /** Format: uuid */
+            approved_by?: string | null;
+            /** Format: date-time */
+            approved_at?: string | null;
+        };
         ReportDefinition: {
             title: string;
             /** @enum {string} */
@@ -3993,6 +4329,14 @@ export interface components {
         Limit: number;
     };
     requestBodies: {
+        ApiClientReason: {
+            content: {
+                "application/json": {
+                    /** @description Lý do (không ghi dữ liệu cá nhân) */
+                    reason: string;
+                };
+            };
+        };
         ContentTransition: {
             content: {
                 "application/json": {
@@ -8684,6 +9028,538 @@ export interface operations {
                         next_cursor: number;
                         items: components["schemas"]["ShareGrantRead"][];
                     };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    listApiClients: {
+        parameters: {
+            query?: {
+                status?: "proposed" | "active" | "suspended" | "revoked";
+                cursor?: components["parameters"]["Cursor"];
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ApiClient"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    proposeApiClient: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: uuid
+                     * @description Tenant bên thứ ba (bên nhận cấp quyền dp_*)
+                     */
+                    client_tenant_id: string;
+                    /** @description Tên TỔ CHỨC, không phải người */
+                    display_name: string;
+                    purpose: string;
+                    /**
+                     * Format: uuid
+                     * @description Mã tham chiếu đầu mối (tên/điện thoại ở kho định danh hoặc pf/accounts)
+                     */
+                    contact_ref: string;
+                    auth_methods?: ("api_key" | "oauth_client_credentials")[];
+                    oauth_client_id?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã đề xuất */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiClient"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getApiClient: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Khách hàng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiClient"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    approveApiClient: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã duyệt (active) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiClient"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    suspendApiClient: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ApiClientReason"];
+        responses: {
+            /** @description Đã tạm ngưng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiClient"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    reactivateApiClient: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã bật lại */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiClient"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    revokeApiClient: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ApiClientReason"];
+        responses: {
+            /** @description Đã thu hồi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiClient"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listApiKeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách khóa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ApiKey"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    issueApiKey: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Khóa mới (Cache-Control: no-store). Gọi lặp cùng Idempotency-Key trả bản KHÔNG có api_key. */
+            201: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyIssued"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    rotateApiKey: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Khóa mới (Cache-Control: no-store) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyIssued"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    revokeApiKey: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ApiClientReason"];
+        responses: {
+            /** @description Đã thu hồi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKey"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listApiSubscriptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ApiSubscription"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    proposeApiSubscription: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    product: "collection_volume" | "hub_capacity" | "mrv_package_status";
+                    scopes: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Đã đề xuất */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiSubscription"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    approveApiSubscription: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                sub_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã duyệt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiSubscription"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    revokeApiSubscription: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                sub_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ApiClientReason"];
+        responses: {
+            /** @description Đã thu hồi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiSubscription"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listApiQuotaPlans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ApiQuotaPlan"][];
+                        defaults: {
+                            requests_per_minute?: number;
+                            daily_units?: number;
+                            monthly_units?: number;
+                            max_export_rows?: number;
+                        };
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    proposeApiQuotaPlan: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    requests_per_minute: number;
+                    daily_units: number;
+                    monthly_units: number;
+                    max_export_rows: number;
+                    /** Format: date-time */
+                    effective_from?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã đề xuất */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiQuotaPlan"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    approveApiQuotaPlan: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã duyệt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiQuotaPlan"];
                 };
             };
             403: components["responses"]["Problem"];
