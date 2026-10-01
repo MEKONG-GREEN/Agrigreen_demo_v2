@@ -180,6 +180,10 @@ Còn lại:
 - **chờ khách**: nhà cung cấp phần mềm kế toán + chế độ kế toán + hệ thống tài khoản (Q-1, B-09); khóa phân bổ chi phí (Q-2); công thức giá quyết toán, hạn thanh toán (Q-3); tỷ lệ chia doanh thu carbon (Q-4); ngưỡng duyệt giá / chiết khấu (Q-5); quy đổi ẩm (Q-6, C-4); đơn giá cước, ngưỡng đường thủy, tải ghe (Q-7); khối lượng ĐTK 2 cho diễn tập tải.
 - **hạ tầng**: cụm Kubernetes được quản trị trong lãnh thổ (chưa chọn nhà cung cấp), áp NetworkPolicy / PKI / mTLS / admission ký image trên cụm, CA thiết bị production + VPN biên, sao lưu pgBackRest + diễn tập phục hồi, diễn tập tải ĐTK 2 và R-22 trên bản sao dữ liệu thật ở staging, PgBouncer thật, `promtool`, CI (GitHub Actions bị chặn do thanh toán), kiểm thử máy ảo app.
 
+## KN Phòng Trồng trọt v7.7
+
+**Trạng thái (01/10/2026, nhánh `sub/kn-v77`):** BRD v7.7 đã tóm tắt, có ma trận khoảng cách và kế hoạch gói P1–P8 ([docs/brd/kn-v7.7-plan.md](brd/kn-v7.7-plan.md), migration pf 000060–000089, ADR từ 0026). Khung nghiệm thu [docs/uat/kn-v7.7-acceptance.md](uat/kn-v7.7-acceptance.md): **130 yêu cầu — 4 đạt, 3 một phần, 110 chưa làm, 13 ngoài module** (40 UR, 25 FN, 14 NFR, 15 xung đột kiến trúc, 13 tính năng chuyển khỏi module, 23 câu hỏi khách Q-01…Q-23). Đợt 1 (P2, P6-khung, P3-engine, P8-khung UAT) đang làm; chặn lớn nhất là tệp Excel gốc của 14 mẫu (Q-01).
+
 ## G5–G6
 Theo Phụ lục A của tài liệu kiến trúc:
 - **G5 (Q4/2028):** Public API và metering.
