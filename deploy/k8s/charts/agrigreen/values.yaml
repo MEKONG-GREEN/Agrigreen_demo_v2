@@ -349,7 +349,8 @@ apps:
   # Public API cho bên thứ ba (ADR-0022): tiến trình riêng cmd/api-public, bề mặt partner.<domain>.
   # ĐTK 1 / G4: TẮT — 0 bản sao, không host ingress (ingress.optionalHosts.partner), AG_PUBLIC_API_ENABLED
   # không đặt (tiến trình thoát lỗi nếu lỡ chạy). Image vẫn build và ký. Bật = values-phasek.yaml (ADR-0025).
-  # Chỉ ra: PgBouncer cụm pf (F19), DNS, OTLP (F50); Valkey (F26) / Keycloak (F28) / số đo (F27) khi cấu hình.
+  # Chỉ ra: PgBouncer cụm pf (F19), kho đối tượng trong lãnh thổ 443 (F29 — phát luồng tệp xuất, khóa CHỈ ĐỌC),
+  # DNS, OTLP (F50); Valkey (F26) / Keycloak (F28) / số đo (F27) khi cấu hình.
   # KHÔNG RabbitMQ, identity-vault, DB mkg/ts/vault, Internet (check_flows.py).
   api-public:
     zone: pf
@@ -367,9 +368,17 @@ apps:
       AG_PUBLIC_OPERATOR_TENANT: ""
       # Public API luôn đóng khi lỗi; biến này cho các đường xuất khác trong cùng tiến trình (ADR-0024).
       AG_EGRESS_MODE: observe
+      # Kho tệp xuất (GET /v1/jobs/{id}/file phát luồng qua api-public, ADR-0022 mục 8 — không URL có chữ ký).
+      AG_S3_ENDPOINT: "{{ .Values.common.s3.endpoint }}"
+      AG_S3_BUCKET: "{{ .Values.common.s3.bucket }}"
+      AG_S3_USE_TLS: "{{ .Values.common.s3.useTLS }}"
     # Pool: public_api (bảng vận hành shared) + vai module mà api-public mở qua port/ (g5-conventions §3.1).
     # Pepper (AG_APIKEY_PEPPER_V<n>, AG_APIKEY_PEPPER_CURRENT) chỉ ở api-public và Admin API.
     envFromSecrets: [pf-public-db-roles, pf-apikey-pepper]
+    # Khóa S3 CHỈ ĐỌC riêng của api-public (pf-public-s3, bật ở Phase K) — không dùng pf-s3 (ghi) của api-platform/worker.
+    secretEnv:
+      - { name: AG_S3_ACCESS_KEY, secret: pf-public-s3, key: AG_S3_ACCESS_KEY }
+      - { name: AG_S3_SECRET_KEY, secret: pf-public-s3, key: AG_S3_SECRET_KEY }
     pdb: { minAvailable: 1 }
     # HPA tùy chọn (số bản sao — R-01). minReplicas ≥ 2 khi bật.
     hpa: { enabled: false, minReplicas: 2, maxReplicas: 6, cpu: 70 }
@@ -660,6 +669,8 @@ externalSecrets:
       # extract: lấy mọi thuộc tính của apikey/pf → xoay pepper chỉ là thêm V<n+1> + đổi CURRENT ở kho bí mật.
       # Chỉ tồn tại ở vùng pf; bật ở Phase K (values-phasek.yaml).
       pf-apikey-pepper: { enabled: false, remote: apikey/pf, extract: true }
+      # Khóa S3 CHỈ ĐỌC cho api-public (tiền tố tệp xuất apiclient/ của bucket pf) — bật ở Phase K (values-phasek.yaml).
+      pf-public-s3: { enabled: false, remote: s3/pf-public, keys: [AG_S3_ACCESS_KEY, AG_S3_SECRET_KEY] }
       # TLS của partner.<domain> (Phase K).
       agrigreen-partner-tls: { enabled: false, remote: tls/partner, keys: [tls.crt, tls.key], type: kubernetes.io/tls }
       pf-app: { remote: app/pf, keys: [AG_SYNC_CURSOR_KEY, AG_KC_CLIENT_SECRET] }
@@ -769,6 +780,9 @@ networkPolicy:
     - { id: F26, adr: "Ứng dụng → Valkey trong lãnh thổ (giới hạn tần suất dùng chung, không phải nguồn sự thật)", from: { zone: pf, app: api-public }, to: { external: valkey }, ports: [6379] }
     - { id: F27, adr: "Quản trị → Ứng dụng (scrape api-public, mở rộng F53)", when: '{{ (index .Values.apps "api-public").metrics.enabled }}', from: { selector: prometheus }, to: { zone: pf, app: api-public }, ports: [9464] }
     - { id: F28, adr: "Ứng dụng → Định danh người dùng (JWKS, client credentials đơn vị thẩm định, R-54)", when: '{{ (index .Values.apps "api-public").oidc.enabled }}', from: { zone: pf, app: api-public }, to: { selector: keycloak }, ports: [8080] }
+    # Public API → kho đối tượng: chỉ đọc tệp xuất để phát luồng (ADR-0022 mục 8). Mở sẵn ở mọi hồ sơ như F08/F19
+    # (không Pod nào khi api-public 0 bản sao); khóa S3 chỉ có ở Phase K.
+    - { id: F29, adr: "Ứng dụng → kho đối tượng trong lãnh thổ (Public API phát luồng tệp xuất, khóa chỉ đọc)", from: { zone: pf, app: api-public }, to: { external: objectStorage }, ports: [443] }
     # ---- Dịch vụ ngoài trong lãnh thổ (RB-7)
     - { id: F30, adr: "Ứng dụng → kho đối tượng trong lãnh thổ", from: { zone: pf, apps: [api-platform, worker] }, to: { external: objectStorage }, ports: [443] }
     - { id: F31, adr: "Ứng dụng → SMTP trong lãnh thổ", from: { zone: pf, app: worker }, to: { external: smtp }, portsFrom: smtp }

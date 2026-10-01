@@ -569,7 +569,9 @@ services:
       pgbouncer: { condition: service_healthy }
       valkey: { condition: service_healthy }
     environment:
-      <<: [*otel-env]
+      # s3-env: tải tệp xuất qua api-public (GET /v1/jobs/{id}/file, ADR-0022 mục 8). Dev dùng chung khóa
+      # agrigreen-app; Helm Phase K dùng khóa CHỈ ĐỌC riêng pf-public-s3 (F29).
+      <<: [*otel-env, *s3-env]
       AG_PUBLIC_API_ENABLED: "1"
       AG_PUBLIC_HTTP_ADDR: ":8085"
       AG_PF_DB_URL: postgres://pgbouncer:6432/?sslmode=disable

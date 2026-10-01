@@ -37,4 +37,5 @@ externalSecrets:
   secrets:
     pf:
       pf-apikey-pepper: { enabled: true }        # <remotePrefix>/apikey/pf: AG_APIKEY_PEPPER_V1, AG_APIKEY_PEPPER_CURRENT
+      pf-public-s3: { enabled: true }            # <remotePrefix>/s3/pf-public: khóa S3 CHỈ ĐỌC của api-public (tệp xuất, F29)
       agrigreen-partner-tls: { enabled: true }   # <remotePrefix>/tls/partner: tls.crt, tls.key

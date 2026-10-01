@@ -326,6 +326,8 @@ Nhãn vị trí (HTX US-GPS-01/02): `location_status` = `match` (≤ `cropcycle.
 | 429 | `notify.nudge_rate_limited` | pf/notify: đích đã được yêu cầu đồng bộ trong 5 phút qua, hoặc người gọi vượt 30 lần/giờ; có `retry_after_s` và header `Retry-After` |
 | 422 | `notify.nudge_entity_unknown` | pf/notify: `entities[]` của `POST /v1/sync/nudge` có tên không phải entity chiều xuống của pf/sync (KN US-SYNC-02) |
 | 503 | `notify.dependency_unavailable` | pf/notify: chưa nối sổ thiết bị của pf/sync |
+
+Consumer `pf.notify.egress_anomaly` (G5, ADR-0024) không trả mã HTTP: payload `pf.metering.egress.anomaly_detected` hỏng → lỗi consumer, giao lại rồi vào `pf.notify.egress_anomaly.dlq` (R-62); giao lặp → inbox bỏ qua (R-61).
 ### pf/accounts
 
 Tài khoản cán bộ quản lý trong Keycloak qua Admin REST (KN US-ADM-01..03, HTX US-ACC-01/02, US-HTXSTATUS-01..03, CGH FN-01). Lỗi không bao giờ chứa họ tên, email, SĐT hay thân phản hồi của Keycloak (R-14).
@@ -691,7 +693,7 @@ Tọa độ sai dạng, thiếu `lat`/`lon`, `z/x/y` không phải số trả `v
 | 404 | `apiclient.plan_not_found` | Admin API: không có phiên bản gói hạn mức |
 | 409 | `apiclient.state` | Admin API: bản ghi không ở trạng thái cho phép (duyệt bản không phải `proposed`, phát hành khóa cho khách hàng chưa `active`, xoay khóa không `active`, đăng ký trùng sản phẩm chưa thu hồi, thao tác trên khách hàng đã thu hồi) |
 | 403 | `apiclient.not_operator_tenant` | Admin API: người gọi không thuộc tenant đơn vị vận hành `AG_PUBLIC_OPERATOR_TENANT` (khi biến được đặt) |
-| 503 | `apiclient.dependency_unavailable` | Phụ thuộc chưa sẵn sàng: pepper khóa (`AG_APIKEY_PEPPER_V<n>`) khi phát hành/xoay/xác thực, nguồn sản phẩm của module chủ dữ liệu, kho đối tượng của tệp xuất — không trả dữ liệu |
+| 503 | `apiclient.dependency_unavailable` | Phụ thuộc chưa sẵn sàng: pepper khóa (`AG_APIKEY_PEPPER_V<n>`) khi phát hành/xoay/xác thực, nguồn sản phẩm của module chủ dữ liệu, kho đối tượng của tệp xuất (tích hợp G5: `api-public` cần `AG_S3_*` + khóa chỉ đọc `pf-public-s3` / luồng F29 để phát luồng `GET /v1/jobs/{id}/file`) — không trả dữ liệu |
 | 404 | `apiclient.job_not_found` | Public API: không có việc xuất, hoặc việc xuất của khách hàng khác |
 | 409 | `apiclient.job_not_ready` | Public API: `GET /v1/jobs/{id}/file` khi job chưa `completed` (hoặc `failed`) |
 

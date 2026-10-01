@@ -295,6 +295,46 @@ func (s *Service) ExpireDue(ctx context.Context, operatorTenant, clientID uuid.U
 	})
 }
 
+// ExpireAllDue (job port.JobKeyExpiry) ghi sự kiện expired cho mọi khóa đã quá hạn của MỌI khách hàng
+// của tenant đơn vị vận hành tại now, một giao dịch. Idempotent: khóa đã expired không ghi lại (lọc
+// trạng thái + idem_key key:expire:<key_id>). Trả số khóa vừa chuyển expired.
+func (s *Service) ExpireAllDue(ctx context.Context, operatorTenant uuid.UUID, now time.Time) (int, error) {
+	if operatorTenant == uuid.Nil {
+		return 0, tenant.ErrMissing
+	}
+	n := 0
+	err := tenant.WithTenantTx(ctx, s.DB, operatorTenant, func(tx pgx.Tx) error {
+		clients, err := store.ClientsWithDueKeys(ctx, tx, now)
+		if err != nil {
+			return err
+		}
+		for _, cid := range clients {
+			keys, err := store.KeysOf(ctx, tx, cid)
+			if err != nil {
+				return err
+			}
+			before := map[uuid.UUID]string{}
+			for _, k := range keys {
+				before[k.KeyID] = k.Status
+			}
+			after, err := s.expireDue(ctx, tx, operatorTenant, keys, now)
+			if err != nil {
+				return err
+			}
+			for _, k := range after {
+				if k.Status == domain.KeyStatusExpired && before[k.KeyID] != domain.KeyStatusExpired {
+					n++
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
 // ---------------------------------------------------------------------------
 // Xác thực (port.Authenticator)
 // ---------------------------------------------------------------------------

@@ -56,11 +56,12 @@ Chart `deploy/k8s/charts/agrigreen` (vận hành: [k8s-deploy.md](../runbooks/k8
   |---|---|---|---|
   | F08 | DMZ → Ứng dụng | Ingress → `api-public` 8085 (host `partner.<domain>`, TLS, giới hạn IP + thân 1 MiB ở gateway, R-55) | luôn có policy; có Pod khi Phase K |
   | F19 | Ứng dụng → Dữ liệu | `api-public` → PgBouncer cụm pf 5432 | như F08 |
+  | F29 | Ứng dụng → dịch vụ trong lãnh thổ | `api-public` → kho đối tượng 443 (đọc tệp xuất để phát luồng `GET /v1/jobs/{id}/file`, khóa chỉ đọc `pf-public-s3` — tích hợp G5) | như F08; khóa S3 chỉ có ở Phase K |
   | F26 | Ứng dụng → dịch vụ trong lãnh thổ | `api-public` → Valkey 6379 (giới hạn tần suất dùng chung, không phải nguồn sự thật) | khi `external.valkey` có dải (Q5-10) |
   | F27 | Quản trị → Ứng dụng (mở rộng F53) | Prometheus → `api-public` 9464 | khi `apps.api-public.metrics.enabled` (mặc định số đo đi OTLP qua F50) |
   | F28 | Ứng dụng → Định danh người dùng (R-54) | `api-public` → Keycloak 8080 (JWKS, client credentials đơn vị thẩm định) | khi `apps.api-public.oidc.enabled` (Q5-7) |
 
-  Luồng **cấm** (`check_flows.py`, `public_api_checks`, mọi hồ sơ kể cả `prod-phasek`): mọi nguồn khác Ingress → `api-public`; `api-public` → `identity-vault`, RabbitMQ (outbox ghi DB, `outbox-publisher-pf` phát), PostgreSQL pf trực tiếp, DB/PgBouncer mkg/ts/vault/iam, ứng dụng khác, Internet, dải ngoài cụm; host `partner.<domain>` → bất cứ gì ngoài `api-public:8085` (Internet không tới `api-platform` qua host này). Pepper khóa API chỉ có Secret ở `agrigreen-pf`.- **Còn phụ thuộc hạ tầng:**
+  Luồng **cấm** (`check_flows.py`, `public_api_checks`, mọi hồ sơ kể cả `prod-phasek`): mọi nguồn khác Ingress → `api-public`; `api-public` → `identity-vault`, RabbitMQ (outbox ghi DB, `outbox-publisher-pf` phát), PostgreSQL pf trực tiếp, DB/PgBouncer mkg/ts/vault/iam, ứng dụng khác, Internet, dải ngoài cụm (trừ kho đối tượng 443, F29); host `partner.<domain>` → bất cứ gì ngoài `api-public:8085` (Internet không tới `api-platform` qua host này). Pepper khóa API chỉ có Secret ở `agrigreen-pf`.- **Còn phụ thuộc hạ tầng:**
   - CNI phải thực thi NetworkPolicy, kể cả sau DNAT cho luồng hairpin F25 (Calico/Cilium);
   - nhà cung cấp phải có bằng chứng tách logic theo R-82;
   - dải thật thay chỗ giữ RFC 5737 trong `values-prod.yaml` — chờ chọn nhà cung cấp.
