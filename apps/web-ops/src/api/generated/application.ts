@@ -2276,6 +2276,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reports/forms/available": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mẫu đã gán cho (phòng ban, cấp, loại báo cáo) kèm phiên bản ĐÃ PHÁT HÀNH áp dụng tại ngày at — Cấp Tỉnh chọn khi phát hành biểu
+         * @description Vai KN (kn_officer, kn_province_admin, kn_national_admin), reports_admin, platform_admin. Mẫu chưa có phiên bản phát hành áp dụng tại at không có trong danh sách.
+         */
+        get: operations["listAvailableForms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/forms/{id}/versions/{v}/layout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lưới JSON của một phiên bản mẫu để dựng màn nhập/xem (web, app) — hợp đồng form-template.v1
+         * @description Tiêu đề cột theo kỳ đặt theo nhãn kỳ của đợt (period_label lặp lại theo thứ tự khe); khe vượt số kỳ → inactive = true
+         *     (giữ chữ cái cột như tệp Excel). {season} trong tiêu đề thay bằng season. Người không phải Admin chỉ đọc được phiên
+         *     bản published/retired (nháp → 404 reports.form_version_not_found).
+         */
+        get: operations["getFormLayout"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/forms/{id}/versions/{v}/template.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tải mẫu Excel đúng bố cục (tiêu đề gộp, hàng chữ cái, dòng loại cột, công thức) — không có số liệu */
+        get: operations["downloadFormTemplateXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/form-versions/{id}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Kiểm và tính thử một lưới theo phiên bản mẫu (ô nhập, kỳ đang mở, công thức, ràng buộc của mẫu, dòng tổng) — server là nguồn đúng
+         * @description Không lưu gì (bài nộp do P4). Vấn đề báo tại ô (row_key + letter); valid = false khi có vấn đề mức error (không cho gửi).
+         *     Số dạng chuỗi decimal (không float). Người không phải Admin chỉ tính được trên phiên bản published/retired.
+         */
+        post: operations["evaluateFormVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/waterway/segments": {
         parameters: {
             query?: never;
@@ -5829,6 +5909,326 @@ export interface components {
             summary: string | null;
             /** Format: date-time */
             published_at: string | null;
+        };
+        /**
+         * @description Định nghĩa lưới của một phiên bản mẫu, đúng bố cục sheet Excel (FN-AD-04.06, FN-XA-03.02). Cột theo chữ cái
+         *     Excel liên tục từ A; tiêu đề nhiều tầng có vùng gộp (dòng tính từ 1 trong khung tiêu đề); công thức chạy trên
+         *     một dòng, tham chiếu "F#" = cột F cùng dòng. Hiển thị: xám = fixed, trắng viền = input, viền xanh đậm = cột theo kỳ
+         *     đang mở, xám nhạt = kỳ khác, xanh lá nhạt = formula; cố định cột tới freeze_through; nhóm cột cho "Đi tới".
+         *     Phần chưa biết từ tệp gốc: cột placeholder = true và mục pending (chờ khách Q-01).
+         */
+        FormDefinition: {
+            /** @constant */
+            schema: "form-template.v1";
+            code: string;
+            /** @description Có thể chứa {season} — thay theo vụ khi dựng layout */
+            title: string;
+            sheet_name: string;
+            /** @description “Yêu cầu biểu mẫu” nguyên văn */
+            requirements: string;
+            columns: components["schemas"]["FormColumn"][];
+            header: {
+                rows: number;
+                cells: components["schemas"]["FormHeaderCell"][];
+                /**
+                 * @example [
+                 *       "F1:L1",
+                 *       "A1:A2"
+                 *     ]
+                 */
+                merges: string[];
+            };
+            period_blocks: components["schemas"]["FormPeriodBlock"][];
+            rows: {
+                /** @enum {string} */
+                kind: "per_commune";
+                /** @description Rỗng: mỗi xã một dòng. Có: mỗi xã × mỗi chỉ tiêu một dòng (vd T05: 20 đối tượng sâu bệnh) */
+                indicators: {
+                    code: string;
+                    label: string;
+                    catalog?: string;
+                    placeholder?: boolean;
+                }[];
+            };
+            totals: {
+                /** @enum {string} */
+                kind: "region" | "province";
+                /** @description “Cộng {region}”, “Toàn tỉnh” */
+                label: string;
+                label_letter: string;
+            }[];
+            groups: {
+                id: string;
+                title: string;
+                from: string;
+                to: string;
+            }[];
+            /** @description Cố định tới cột này (vd J); rỗng = không */
+            freeze_through: string;
+            rules: components["schemas"]["FormRule"][];
+            pending: {
+                part: string;
+                detail: string;
+                /** @example Q-01 */
+                question: string;
+            }[];
+            /** @enum {string} */
+            completeness: "complete" | "partial" | "placeholder";
+            source?: {
+                /** @enum {string} */
+                kind?: "seed" | "import" | "designer";
+                file?: string;
+                sheet?: string;
+                sha256?: string;
+                data_row?: number;
+                seed_note?: string;
+            };
+        };
+        FormColumn: {
+            letter: string;
+            key?: string;
+            title: string;
+            /**
+             * @description Cố định / Tỉnh giao / Nhập / Cột theo kỳ / Công thức
+             * @enum {string}
+             */
+            kind: "fixed" | "provincial" | "input" | "per_period" | "formula";
+            /** @enum {string} */
+            dtype: "number" | "integer" | "text" | "date" | "catalog";
+            /**
+             * @example ha
+             * @example tấn
+             * @example tấn/ha
+             * @example %
+             */
+            unit?: string;
+            required?: boolean;
+            catalog?: string;
+            /**
+             * @description Tập con Excel: + - * / ^ & % so sánh, SUM MIN MAX AVERAGE COUNT ROUND ROUNDUP ROUNDDOWN ABS IF IFERROR AND OR NOT ISBLANK ISNUMBER; tham chiếu F#, dải F#:L#
+             * @example SUM(F#:L#)
+             * @example IF(G#=0,0,I#/G#)
+             */
+            formula?: string;
+            /** @description row_no | region_name | commune_name | indicator_label | none | xref:<mẫu>:<cột> */
+            fixed_source?: string;
+            period_block?: string;
+            period_slot?: number;
+            /**
+             * @description Dòng tổng: rỗng = sum cho cột số, formula cho cột công thức
+             * @enum {string}
+             */
+            total?: "sum" | "formula" | "none";
+            /** @description decimal */
+            min?: string;
+            /** @description decimal */
+            max?: string;
+            decimals?: number;
+            group?: string;
+            /** @description Chưa biết từ tệp gốc — chờ khách Q-01 */
+            placeholder?: boolean;
+            note?: string;
+            /** @description Chỉ ở layout: khe kỳ vượt số kỳ của đợt */
+            inactive?: boolean;
+        };
+        FormHeaderCell: {
+            row: number;
+            letter: string;
+            text: string;
+            period_block?: string;
+            period_slot?: number;
+        };
+        FormPeriodBlock: {
+            id: string;
+            first_letter: string;
+            /** @description Số cột mỗi kỳ (PL 07: 4) */
+            width: number;
+            /** @description Số kỳ tối đa */
+            slots: number;
+            /** @example Tuần {n} */
+            title_pattern: string;
+        };
+        FormRule: {
+            id: string;
+            /**
+             * @description Biểu thức logic trên dòng; được dùng XREF("T01","M") (liên biểu cùng xã cùng kỳ)
+             * @example J#=XREF("T01","M")
+             */
+            expr: string;
+            when?: string;
+            message: string;
+            /** @enum {string} */
+            severity: "error" | "warning";
+            letters: string[];
+        };
+        FormTemplate: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name: string;
+            /** @example trong_trot */
+            department_code: string;
+            /** @enum {string} */
+            entry_level: "commune" | "province";
+            /** @enum {string} */
+            status: "active" | "retired";
+            retired_reason: string | null;
+            /** Format: uuid */
+            created_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        FormVersion: {
+            /**
+             * Format: uuid
+             * @description P4 ghim id này vào công việc khi phát hành biểu
+             */
+            id: string;
+            /** Format: uuid */
+            template_id: string;
+            version: number;
+            /** @enum {string} */
+            status: "draft" | "proposed" | "published" | "retired";
+            /**
+             * Format: date
+             * @description Áp dụng từ kỳ (ngày bắt đầu kỳ)
+             */
+            effective_from: string | null;
+            /** @example Tuần 37/2026 */
+            effective_label: string | null;
+            /** @enum {string} */
+            origin: "blank" | "clone" | "restore" | "import" | "seed";
+            /** Format: uuid */
+            origin_version_id: string | null;
+            /** Format: uuid */
+            import_id: string | null;
+            definition_sha256: string;
+            /** @enum {string} */
+            completeness: "complete" | "partial" | "placeholder";
+            pending_count: number;
+            column_count: number;
+            /** Format: uuid */
+            created_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            proposed_by: string | null;
+            /** Format: date-time */
+            proposed_at: string | null;
+            /**
+             * Format: uuid
+             * @description ≠ proposed_by và ≠ updated_by (R-56)
+             */
+            published_by: string | null;
+            /** Format: date-time */
+            published_at: string | null;
+            /** Format: uuid */
+            retired_by: string | null;
+            /** Format: date-time */
+            retired_at: string | null;
+            retire_reason: string | null;
+            definition?: components["schemas"]["FormDefinition"];
+        };
+        FormAssignment: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            template_id: string;
+            department_code: string;
+            /** @enum {string} */
+            entry_level: "commune" | "province";
+            report_type: components["schemas"]["FormReportType"];
+            /** @enum {string} */
+            status: "active" | "revoked";
+            /** Format: uuid */
+            assigned_by: string;
+            /** Format: date-time */
+            assigned_at: string;
+            /** Format: uuid */
+            revoked_by: string | null;
+            /** Format: date-time */
+            revoked_at: string | null;
+            revoke_reason: string | null;
+        };
+        /**
+         * @description Báo cáo tuần / tháng / hàng vụ / năm (Q-07) / đột xuất / gửi Chi cục (Q-08) — tạm, chờ danh mục report_type của P2
+         * @enum {string}
+         */
+        FormReportType: "weekly" | "monthly" | "seasonal" | "annual" | "adhoc" | "dispatch";
+        FormEvalInput: {
+            /**
+             * @description draft bỏ kiểm bắt buộc
+             * @enum {string}
+             */
+            mode: "draft" | "submit";
+            /** @description Khe kỳ đang mở; null = không kiểm (xem trước) */
+            open_slots?: number[] | null;
+            rows: {
+                /** @description Mặc định <mã xã> hoặc <mã xã>/<mã chỉ tiêu> */
+                key?: string;
+                commune: string;
+                region?: string;
+                indicator?: string;
+                /** @description Ô người nhập: chữ cái → giá trị (số dạng chuỗi decimal, ngày YYYY-MM-DD) */
+                input: {
+                    [key: string]: string;
+                };
+                /** @description Ô hệ thống: cố định + Tỉnh giao */
+                system?: {
+                    [key: string]: string;
+                };
+                /** @description Mã mẫu → cột → giá trị (cùng xã cùng kỳ) */
+                xrefs?: {
+                    [key: string]: {
+                        [key: string]: string;
+                    };
+                };
+            }[];
+        };
+        FormEvalResult: {
+            /** @description Không có vấn đề mức error — được gửi */
+            valid: boolean;
+            rows: {
+                key: string;
+                commune: string;
+                region?: string;
+                indicator?: string;
+                cells: {
+                    [key: string]: string;
+                };
+            }[];
+            issues: {
+                row_key: string;
+                letter?: string;
+                /** @enum {string} */
+                code: "reports.row_invalid" | "reports.cell_unknown_column" | "reports.cell_not_editable" | "reports.cell_period_closed" | "reports.cell_invalid_type" | "reports.cell_out_of_range" | "reports.cell_required" | "reports.formula_error" | "reports.rule_failed" | "reports.rule_error" | "reports.form_invalid";
+                message: string;
+                /** @enum {string} */
+                severity: "error" | "warning";
+                rule_id?: string;
+            }[];
+            totals: {
+                /**
+                 * @example region:KV1
+                 * @example province
+                 * @example province/SB01
+                 */
+                key: string;
+                /** @enum {string} */
+                kind: "region" | "province";
+                region?: string;
+                indicator?: string;
+                members: number;
+                cells: {
+                    [key: string]: string;
+                };
+            }[];
         };
         ReportColumn: {
             /** @description Khóa cột của nguồn dữ liệu */
@@ -11433,6 +11833,130 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    listAvailableForms: {
+        parameters: {
+            query: {
+                department: string;
+                level?: "commune" | "province";
+                report_type?: components["schemas"]["FormReportType"];
+                /** @description Ngày bắt đầu kỳ (mặc định hôm nay giờ Việt Nam) */
+                at?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mẫu khả dụng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            template: components["schemas"]["FormTemplate"];
+                            report_type: components["schemas"]["FormReportType"];
+                            version: components["schemas"]["FormVersion"];
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    getFormLayout: {
+        parameters: {
+            query?: {
+                period_label?: string[];
+                season?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+                v: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lưới */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        template: components["schemas"]["FormTemplate"];
+                        version: components["schemas"]["FormVersion"];
+                        definition: components["schemas"]["FormDefinition"];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    downloadFormTemplateXlsx: {
+        parameters: {
+            query?: {
+                season?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+                v: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    evaluateFormVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormEvalInput"];
+            };
+        };
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormEvalResult"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     listWaterwayLayer: {
