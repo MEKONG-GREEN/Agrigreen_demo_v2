@@ -1,0 +1,3253 @@
+[
+ {
+  "name": "chèn cột trước F: dải SUM nở, vùng gộp dời",
+  "code": "T01",
+  "ops": [
+   {
+    "op": "insert_column",
+    "at": "F",
+    "side": "before",
+    "column": {
+     "letter": "",
+     "title": "Ghi chú",
+     "kind": "input",
+     "dtype": "text"
+    }
+   }
+  ],
+  "result": {
+   "schema": "form-template.v1",
+   "code": "T01",
+   "title": "TIẾN ĐỘ XUỐNG GIỐNG LÚA {season}",
+   "sheet_name": "PL 01_Tđộ XG TĐ 2026",
+   "requirements": "Số xuống giống được nhập là số tăng thêm trong tuần, không nhập số lũy kế",
+   "columns": [
+    {
+     "letter": "A",
+     "key": "stt",
+     "title": "STT",
+     "kind": "fixed",
+     "dtype": "integer",
+     "fixed_source": "row_no"
+    },
+    {
+     "letter": "B",
+     "key": "khu_vuc",
+     "title": "Khu vực",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "region_name"
+    },
+    {
+     "letter": "C",
+     "key": "xa",
+     "title": "Xã, phường",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "commune_name"
+    },
+    {
+     "letter": "D",
+     "key": "kh_tinh_giao",
+     "title": "KH tỉnh giao",
+     "kind": "provincial",
+     "dtype": "number",
+     "unit": "ha"
+    },
+    {
+     "letter": "E",
+     "key": "khxg_dia_phuong",
+     "title": "KHXG (dự kiến của địa phương)",
+     "kind": "input",
+     "dtype": "number",
+     "unit": "ha"
+    },
+    {
+     "letter": "F",
+     "title": "Ghi chú",
+     "kind": "input",
+     "dtype": "text"
+    },
+    {
+     "letter": "G",
+     "key": "xg_tuan_1",
+     "title": "Tuần 1",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 1
+    },
+    {
+     "letter": "H",
+     "key": "xg_tuan_2",
+     "title": "Tuần 2",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 2
+    },
+    {
+     "letter": "I",
+     "key": "xg_tuan_3",
+     "title": "Tuần 3",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 3
+    },
+    {
+     "letter": "J",
+     "key": "xg_tuan_4",
+     "title": "Tuần 4",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 4
+    },
+    {
+     "letter": "K",
+     "key": "xg_tuan_5",
+     "title": "Tuần 5",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 5
+    },
+    {
+     "letter": "L",
+     "key": "xg_tuan_6",
+     "title": "Tuần 6",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 6
+    },
+    {
+     "letter": "M",
+     "key": "xg_tuan_7",
+     "title": "Tuần 7",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 7
+    },
+    {
+     "letter": "N",
+     "key": "luy_ke",
+     "title": "LŨY KẾ",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "ha",
+     "formula": "SUM(G#:M#)"
+    },
+    {
+     "letter": "O",
+     "key": "ngay_ket_thuc_xg",
+     "title": "NGÀY KẾT THÚC XG",
+     "kind": "input",
+     "dtype": "date"
+    },
+    {
+     "letter": "P",
+     "key": "du_kien_thu_hoach",
+     "title": "DỰ KIẾN NGÀY THU HOẠCH",
+     "kind": "input",
+     "dtype": "date"
+    }
+   ],
+   "header": {
+    "rows": 2,
+    "cells": [
+     {
+      "row": 1,
+      "letter": "A",
+      "text": "STT"
+     },
+     {
+      "row": 1,
+      "letter": "B",
+      "text": "Khu vực"
+     },
+     {
+      "row": 1,
+      "letter": "C",
+      "text": "Xã, phường"
+     },
+     {
+      "row": 1,
+      "letter": "D",
+      "text": "KH tỉnh giao"
+     },
+     {
+      "row": 1,
+      "letter": "E",
+      "text": "KHXG (dự kiến của địa phương)"
+     },
+     {
+      "row": 2,
+      "letter": "G",
+      "text": "Tuần 1",
+      "period_block": "xg",
+      "period_slot": 1
+     },
+     {
+      "row": 2,
+      "letter": "H",
+      "text": "Tuần 2",
+      "period_block": "xg",
+      "period_slot": 2
+     },
+     {
+      "row": 2,
+      "letter": "I",
+      "text": "Tuần 3",
+      "period_block": "xg",
+      "period_slot": 3
+     },
+     {
+      "row": 2,
+      "letter": "J",
+      "text": "Tuần 4",
+      "period_block": "xg",
+      "period_slot": 4
+     },
+     {
+      "row": 2,
+      "letter": "K",
+      "text": "Tuần 5",
+      "period_block": "xg",
+      "period_slot": 5
+     },
+     {
+      "row": 2,
+      "letter": "L",
+      "text": "Tuần 6",
+      "period_block": "xg",
+      "period_slot": 6
+     },
+     {
+      "row": 2,
+      "letter": "M",
+      "text": "Tuần 7",
+      "period_block": "xg",
+      "period_slot": 7
+     },
+     {
+      "row": 1,
+      "letter": "G",
+      "text": "DIỆN TÍCH XUỐNG GIỐNG LÚA {season} THEO TUẦN (ha)"
+     },
+     {
+      "row": 1,
+      "letter": "N",
+      "text": "LŨY KẾ"
+     },
+     {
+      "row": 1,
+      "letter": "O",
+      "text": "NGÀY KẾT THÚC XG"
+     },
+     {
+      "row": 1,
+      "letter": "P",
+      "text": "DỰ KIẾN NGÀY THU HOẠCH"
+     }
+    ],
+    "merges": [
+     "A1:A2",
+     "B1:B2",
+     "C1:C2",
+     "D1:D2",
+     "E1:E2",
+     "G1:M1",
+     "N1:N2",
+     "O1:O2",
+     "P1:P2"
+    ]
+   },
+   "period_blocks": [
+    {
+     "id": "xg",
+     "first_letter": "G",
+     "width": 1,
+     "slots": 7,
+     "title_pattern": "Tuần {n}"
+    }
+   ],
+   "rows": {
+    "kind": "per_commune",
+    "indicators": []
+   },
+   "totals": [
+    {
+     "kind": "region",
+     "label": "Cộng {region}",
+     "label_letter": "B"
+    },
+    {
+     "kind": "province",
+     "label": "Toàn tỉnh",
+     "label_letter": "B"
+    }
+   ],
+   "groups": null,
+   "freeze_through": "C",
+   "rules": [],
+   "pending": [
+    {
+     "part": "Cột F–L",
+     "detail": "Số cột tuần tối đa (tạm 7 khe Tuần 1–7 như wireframe); tiêu đề tuần đặt theo kỳ khi phát hành",
+     "question": "Q-01"
+    },
+    {
+     "part": "Cột N, O",
+     "detail": "Kiểu dữ liệu (tạm: ngày YYYY-MM-DD)",
+     "question": "Q-01"
+    },
+    {
+     "part": "Cột M",
+     "detail": "Công thức Lũy kế chính xác của tệp gốc (tạm SUM các tuần)",
+     "question": "Q-01"
+    },
+    {
+     "part": "Tên sheet",
+     "detail": "Tên sheet theo vụ (tạm “PL 01_Tđộ XG TĐ 2026”); đối chiếu tệp gốc",
+     "question": "Q-01"
+    }
+   ],
+   "completeness": "complete",
+   "source": {
+    "kind": "seed",
+    "seed_note": "kn-v7.7-seed-2026-10-01"
+   }
+  }
+ },
+ {
+  "name": "chèn cột sau O + công thức tham chiếu",
+  "code": "T01",
+  "ops": [
+   {
+    "op": "insert_column",
+    "at": "O",
+    "side": "after",
+    "column": {
+     "letter": "",
+     "title": "Tỷ lệ",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "%",
+     "formula": "IF(D#=0,0,M#/D#*100)"
+    }
+   },
+   {
+    "op": "set_header_cell",
+    "letter": "P",
+    "row": 1,
+    "text": "TỶ LỆ"
+   },
+   {
+    "op": "merge",
+    "range": "P1:P2"
+   }
+  ],
+  "result": {
+   "schema": "form-template.v1",
+   "code": "T01",
+   "title": "TIẾN ĐỘ XUỐNG GIỐNG LÚA {season}",
+   "sheet_name": "PL 01_Tđộ XG TĐ 2026",
+   "requirements": "Số xuống giống được nhập là số tăng thêm trong tuần, không nhập số lũy kế",
+   "columns": [
+    {
+     "letter": "A",
+     "key": "stt",
+     "title": "STT",
+     "kind": "fixed",
+     "dtype": "integer",
+     "fixed_source": "row_no"
+    },
+    {
+     "letter": "B",
+     "key": "khu_vuc",
+     "title": "Khu vực",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "region_name"
+    },
+    {
+     "letter": "C",
+     "key": "xa",
+     "title": "Xã, phường",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "commune_name"
+    },
+    {
+     "letter": "D",
+     "key": "kh_tinh_giao",
+     "title": "KH tỉnh giao",
+     "kind": "provincial",
+     "dtype": "number",
+     "unit": "ha"
+    },
+    {
+     "letter": "E",
+     "key": "khxg_dia_phuong",
+     "title": "KHXG (dự kiến của địa phương)",
+     "kind": "input",
+     "dtype": "number",
+     "unit": "ha"
+    },
+    {
+     "letter": "F",
+     "key": "xg_tuan_1",
+     "title": "Tuần 1",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 1
+    },
+    {
+     "letter": "G",
+     "key": "xg_tuan_2",
+     "title": "Tuần 2",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 2
+    },
+    {
+     "letter": "H",
+     "key": "xg_tuan_3",
+     "title": "Tuần 3",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 3
+    },
+    {
+     "letter": "I",
+     "key": "xg_tuan_4",
+     "title": "Tuần 4",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 4
+    },
+    {
+     "letter": "J",
+     "key": "xg_tuan_5",
+     "title": "Tuần 5",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 5
+    },
+    {
+     "letter": "K",
+     "key": "xg_tuan_6",
+     "title": "Tuần 6",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 6
+    },
+    {
+     "letter": "L",
+     "key": "xg_tuan_7",
+     "title": "Tuần 7",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 7
+    },
+    {
+     "letter": "M",
+     "key": "luy_ke",
+     "title": "LŨY KẾ",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "ha",
+     "formula": "SUM(F#:L#)"
+    },
+    {
+     "letter": "N",
+     "key": "ngay_ket_thuc_xg",
+     "title": "NGÀY KẾT THÚC XG",
+     "kind": "input",
+     "dtype": "date"
+    },
+    {
+     "letter": "O",
+     "key": "du_kien_thu_hoach",
+     "title": "DỰ KIẾN NGÀY THU HOẠCH",
+     "kind": "input",
+     "dtype": "date"
+    },
+    {
+     "letter": "P",
+     "title": "Tỷ lệ",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "%",
+     "formula": "IF(D#=0,0,M#/D#*100)"
+    }
+   ],
+   "header": {
+    "rows": 2,
+    "cells": [
+     {
+      "row": 1,
+      "letter": "A",
+      "text": "STT"
+     },
+     {
+      "row": 1,
+      "letter": "B",
+      "text": "Khu vực"
+     },
+     {
+      "row": 1,
+      "letter": "C",
+      "text": "Xã, phường"
+     },
+     {
+      "row": 1,
+      "letter": "D",
+      "text": "KH tỉnh giao"
+     },
+     {
+      "row": 1,
+      "letter": "E",
+      "text": "KHXG (dự kiến của địa phương)"
+     },
+     {
+      "row": 2,
+      "letter": "F",
+      "text": "Tuần 1",
+      "period_block": "xg",
+      "period_slot": 1
+     },
+     {
+      "row": 2,
+      "letter": "G",
+      "text": "Tuần 2",
+      "period_block": "xg",
+      "period_slot": 2
+     },
+     {
+      "row": 2,
+      "letter": "H",
+      "text": "Tuần 3",
+      "period_block": "xg",
+      "period_slot": 3
+     },
+     {
+      "row": 2,
+      "letter": "I",
+      "text": "Tuần 4",
+      "period_block": "xg",
+      "period_slot": 4
+     },
+     {
+      "row": 2,
+      "letter": "J",
+      "text": "Tuần 5",
+      "period_block": "xg",
+      "period_slot": 5
+     },
+     {
+      "row": 2,
+      "letter": "K",
+      "text": "Tuần 6",
+      "period_block": "xg",
+      "period_slot": 6
+     },
+     {
+      "row": 2,
+      "letter": "L",
+      "text": "Tuần 7",
+      "period_block": "xg",
+      "period_slot": 7
+     },
+     {
+      "row": 1,
+      "letter": "F",
+      "text": "DIỆN TÍCH XUỐNG GIỐNG LÚA {season} THEO TUẦN (ha)"
+     },
+     {
+      "row": 1,
+      "letter": "M",
+      "text": "LŨY KẾ"
+     },
+     {
+      "row": 1,
+      "letter": "N",
+      "text": "NGÀY KẾT THÚC XG"
+     },
+     {
+      "row": 1,
+      "letter": "O",
+      "text": "DỰ KIẾN NGÀY THU HOẠCH"
+     },
+     {
+      "row": 1,
+      "letter": "P",
+      "text": "TỶ LỆ"
+     }
+    ],
+    "merges": [
+     "A1:A2",
+     "B1:B2",
+     "C1:C2",
+     "D1:D2",
+     "E1:E2",
+     "F1:L1",
+     "M1:M2",
+     "N1:N2",
+     "O1:O2",
+     "P1:P2"
+    ]
+   },
+   "period_blocks": [
+    {
+     "id": "xg",
+     "first_letter": "F",
+     "width": 1,
+     "slots": 7,
+     "title_pattern": "Tuần {n}"
+    }
+   ],
+   "rows": {
+    "kind": "per_commune",
+    "indicators": []
+   },
+   "totals": [
+    {
+     "kind": "region",
+     "label": "Cộng {region}",
+     "label_letter": "B"
+    },
+    {
+     "kind": "province",
+     "label": "Toàn tỉnh",
+     "label_letter": "B"
+    }
+   ],
+   "groups": null,
+   "freeze_through": "C",
+   "rules": [],
+   "pending": [
+    {
+     "part": "Cột F–L",
+     "detail": "Số cột tuần tối đa (tạm 7 khe Tuần 1–7 như wireframe); tiêu đề tuần đặt theo kỳ khi phát hành",
+     "question": "Q-01"
+    },
+    {
+     "part": "Cột N, O",
+     "detail": "Kiểu dữ liệu (tạm: ngày YYYY-MM-DD)",
+     "question": "Q-01"
+    },
+    {
+     "part": "Cột M",
+     "detail": "Công thức Lũy kế chính xác của tệp gốc (tạm SUM các tuần)",
+     "question": "Q-01"
+    },
+    {
+     "part": "Tên sheet",
+     "detail": "Tên sheet theo vụ (tạm “PL 01_Tđộ XG TĐ 2026”); đối chiếu tệp gốc",
+     "question": "Q-01"
+    }
+   ],
+   "completeness": "complete",
+   "source": {
+    "kind": "seed",
+    "seed_note": "kn-v7.7-seed-2026-10-01"
+   }
+  }
+ },
+ {
+  "name": "xóa cột E (không ai tham chiếu)",
+  "code": "T01",
+  "ops": [
+   {
+    "op": "delete_column",
+    "letter": "E"
+   }
+  ],
+  "result": {
+   "schema": "form-template.v1",
+   "code": "T01",
+   "title": "TIẾN ĐỘ XUỐNG GIỐNG LÚA {season}",
+   "sheet_name": "PL 01_Tđộ XG TĐ 2026",
+   "requirements": "Số xuống giống được nhập là số tăng thêm trong tuần, không nhập số lũy kế",
+   "columns": [
+    {
+     "letter": "A",
+     "key": "stt",
+     "title": "STT",
+     "kind": "fixed",
+     "dtype": "integer",
+     "fixed_source": "row_no"
+    },
+    {
+     "letter": "B",
+     "key": "khu_vuc",
+     "title": "Khu vực",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "region_name"
+    },
+    {
+     "letter": "C",
+     "key": "xa",
+     "title": "Xã, phường",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "commune_name"
+    },
+    {
+     "letter": "D",
+     "key": "kh_tinh_giao",
+     "title": "KH tỉnh giao",
+     "kind": "provincial",
+     "dtype": "number",
+     "unit": "ha"
+    },
+    {
+     "letter": "E",
+     "key": "xg_tuan_1",
+     "title": "Tuần 1",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 1
+    },
+    {
+     "letter": "F",
+     "key": "xg_tuan_2",
+     "title": "Tuần 2",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 2
+    },
+    {
+     "letter": "G",
+     "key": "xg_tuan_3",
+     "title": "Tuần 3",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 3
+    },
+    {
+     "letter": "H",
+     "key": "xg_tuan_4",
+     "title": "Tuần 4",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 4
+    },
+    {
+     "letter": "I",
+     "key": "xg_tuan_5",
+     "title": "Tuần 5",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 5
+    },
+    {
+     "letter": "J",
+     "key": "xg_tuan_6",
+     "title": "Tuần 6",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 6
+    },
+    {
+     "letter": "K",
+     "key": "xg_tuan_7",
+     "title": "Tuần 7",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 7
+    },
+    {
+     "letter": "L",
+     "key": "luy_ke",
+     "title": "LŨY KẾ",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "ha",
+     "formula": "SUM(E#:K#)"
+    },
+    {
+     "letter": "M",
+     "key": "ngay_ket_thuc_xg",
+     "title": "NGÀY KẾT THÚC XG",
+     "kind": "input",
+     "dtype": "date"
+    },
+    {
+     "letter": "N",
+     "key": "du_kien_thu_hoach",
+     "title": "DỰ KIẾN NGÀY THU HOẠCH",
+     "kind": "input",
+     "dtype": "date"
+    }
+   ],
+   "header": {
+    "rows": 2,
+    "cells": [
+     {
+      "row": 1,
+      "letter": "A",
+      "text": "STT"
+     },
+     {
+      "row": 1,
+      "letter": "B",
+      "text": "Khu vực"
+     },
+     {
+      "row": 1,
+      "letter": "C",
+      "text": "Xã, phường"
+     },
+     {
+      "row": 1,
+      "letter": "D",
+      "text": "KH tỉnh giao"
+     },
+     {
+      "row": 2,
+      "letter": "E",
+      "text": "Tuần 1",
+      "period_block": "xg",
+      "period_slot": 1
+     },
+     {
+      "row": 2,
+      "letter": "F",
+      "text": "Tuần 2",
+      "period_block": "xg",
+      "period_slot": 2
+     },
+     {
+      "row": 2,
+      "letter": "G",
+      "text": "Tuần 3",
+      "period_block": "xg",
+      "period_slot": 3
+     },
+     {
+      "row": 2,
+      "letter": "H",
+      "text": "Tuần 4",
+      "period_block": "xg",
+      "period_slot": 4
+     },
+     {
+      "row": 2,
+      "letter": "I",
+      "text": "Tuần 5",
+      "period_block": "xg",
+      "period_slot": 5
+     },
+     {
+      "row": 2,
+      "letter": "J",
+      "text": "Tuần 6",
+      "period_block": "xg",
+      "period_slot": 6
+     },
+     {
+      "row": 2,
+      "letter": "K",
+      "text": "Tuần 7",
+      "period_block": "xg",
+      "period_slot": 7
+     },
+     {
+      "row": 1,
+      "letter": "E",
+      "text": "DIỆN TÍCH XUỐNG GIỐNG LÚA {season} THEO TUẦN (ha)"
+     },
+     {
+      "row": 1,
+      "letter": "L",
+      "text": "LŨY KẾ"
+     },
+     {
+      "row": 1,
+      "letter": "M",
+      "text": "NGÀY KẾT THÚC XG"
+     },
+     {
+      "row": 1,
+      "letter": "N",
+      "text": "DỰ KIẾN NGÀY THU HOẠCH"
+     }
+    ],
+    "merges": [
+     "A1:A2",
+     "B1:B2",
+     "C1:C2",
+     "D1:D2",
+     "E1:K1",
+     "L1:L2",
+     "M1:M2",
+     "N1:N2"
+    ]
+   },
+   "period_blocks": [
+    {
+     "id": "xg",
+     "first_letter": "E",
+     "width": 1,
+     "slots": 7,
+     "title_pattern": "Tuần {n}"
+    }
+   ],
+   "rows": {
+    "kind": "per_commune",
+    "indicators": []
+   },
+   "totals": [
+    {
+     "kind": "region",
+     "label": "Cộng {region}",
+     "label_letter": "B"
+    },
+    {
+     "kind": "province",
+     "label": "Toàn tỉnh",
+     "label_letter": "B"
+    }
+   ],
+   "groups": null,
+   "freeze_through": "C",
+   "rules": [],
+   "pending": [
+    {
+     "part": "Cột F–L",
+     "detail": "Số cột tuần tối đa (tạm 7 khe Tuần 1–7 như wireframe); tiêu đề tuần đặt theo kỳ khi phát hành",
+     "question": "Q-01"
+    },
+    {
+     "part": "Cột N, O",
+     "detail": "Kiểu dữ liệu (tạm: ngày YYYY-MM-DD)",
+     "question": "Q-01"
+    },
+    {
+     "part": "Cột M",
+     "detail": "Công thức Lũy kế chính xác của tệp gốc (tạm SUM các tuần)",
+     "question": "Q-01"
+    },
+    {
+     "part": "Tên sheet",
+     "detail": "Tên sheet theo vụ (tạm “PL 01_Tđộ XG TĐ 2026”); đối chiếu tệp gốc",
+     "question": "Q-01"
+    }
+   ],
+   "completeness": "complete",
+   "source": {
+    "kind": "seed",
+    "seed_note": "kn-v7.7-seed-2026-10-01"
+   }
+  }
+ },
+ {
+  "name": "xóa cột D đang được công thức tham chiếu → lỗi",
+  "code": "T04",
+  "ops": [
+   {
+    "op": "delete_column",
+    "letter": "D"
+   }
+  ],
+  "error_code": "reports.formula_invalid_ref",
+  "error_at": 0
+ },
+ {
+  "name": "xóa cột theo kỳ lẻ → lỗi",
+  "code": "T01",
+  "ops": [
+   {
+    "op": "delete_column",
+    "letter": "H"
+   }
+  ],
+  "error_code": "reports.form_invalid",
+  "error_at": 0
+ },
+ {
+  "name": "đổi cột thành công thức sai cú pháp → lỗi",
+  "code": "T01",
+  "ops": [
+   {
+    "op": "update_column",
+    "letter": "E",
+    "column": {
+     "letter": "",
+     "title": "X",
+     "kind": "formula",
+     "dtype": "number",
+     "formula": "SUM(D#:"
+    }
+   }
+  ],
+  "error_code": "reports.formula_invalid"
+ },
+ {
+  "name": "công thức tham chiếu cột không tồn tại → lỗi",
+  "code": "T01",
+  "ops": [
+   {
+    "op": "update_column",
+    "letter": "E",
+    "column": {
+     "letter": "",
+     "title": "X",
+     "kind": "formula",
+     "dtype": "number",
+     "formula": "ZZ#*2"
+    }
+   }
+  ],
+  "error_code": "reports.formula_invalid_ref"
+ },
+ {
+  "name": "công thức vòng → lỗi",
+  "code": "T01",
+  "ops": [
+   {
+    "op": "update_column",
+    "letter": "E",
+    "column": {
+     "letter": "",
+     "title": "X",
+     "kind": "formula",
+     "dtype": "number",
+     "formula": "M#+1"
+    }
+   },
+   {
+    "op": "update_column",
+    "letter": "M",
+    "column": {
+     "letter": "",
+     "title": "LŨY KẾ",
+     "kind": "formula",
+     "dtype": "number",
+     "formula": "SUM(F#:L#)+E#"
+    }
+   }
+  ],
+  "error_code": "reports.formula_cycle"
+ },
+ {
+  "name": "thêm dòng tiêu đề trên cùng, tách, gộp lại",
+  "code": "T01",
+  "ops": [
+   {
+    "op": "insert_header_row",
+    "side": "before",
+    "row": 1
+   },
+   {
+    "op": "set_header_cell",
+    "letter": "A",
+    "row": 1,
+    "text": "PHỤ LỤC 01"
+   },
+   {
+    "op": "merge",
+    "range": "A1:O1"
+   },
+   {
+    "op": "unmerge",
+    "range": "F2:L2"
+   }
+  ],
+  "result": {
+   "schema": "form-template.v1",
+   "code": "T01",
+   "title": "TIẾN ĐỘ XUỐNG GIỐNG LÚA {season}",
+   "sheet_name": "PL 01_Tđộ XG TĐ 2026",
+   "requirements": "Số xuống giống được nhập là số tăng thêm trong tuần, không nhập số lũy kế",
+   "columns": [
+    {
+     "letter": "A",
+     "key": "stt",
+     "title": "STT",
+     "kind": "fixed",
+     "dtype": "integer",
+     "fixed_source": "row_no"
+    },
+    {
+     "letter": "B",
+     "key": "khu_vuc",
+     "title": "Khu vực",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "region_name"
+    },
+    {
+     "letter": "C",
+     "key": "xa",
+     "title": "Xã, phường",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "commune_name"
+    },
+    {
+     "letter": "D",
+     "key": "kh_tinh_giao",
+     "title": "KH tỉnh giao",
+     "kind": "provincial",
+     "dtype": "number",
+     "unit": "ha"
+    },
+    {
+     "letter": "E",
+     "key": "khxg_dia_phuong",
+     "title": "KHXG (dự kiến của địa phương)",
+     "kind": "input",
+     "dtype": "number",
+     "unit": "ha"
+    },
+    {
+     "letter": "F",
+     "key": "xg_tuan_1",
+     "title": "Tuần 1",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 1
+    },
+    {
+     "letter": "G",
+     "key": "xg_tuan_2",
+     "title": "Tuần 2",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 2
+    },
+    {
+     "letter": "H",
+     "key": "xg_tuan_3",
+     "title": "Tuần 3",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 3
+    },
+    {
+     "letter": "I",
+     "key": "xg_tuan_4",
+     "title": "Tuần 4",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 4
+    },
+    {
+     "letter": "J",
+     "key": "xg_tuan_5",
+     "title": "Tuần 5",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 5
+    },
+    {
+     "letter": "K",
+     "key": "xg_tuan_6",
+     "title": "Tuần 6",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 6
+    },
+    {
+     "letter": "L",
+     "key": "xg_tuan_7",
+     "title": "Tuần 7",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 7
+    },
+    {
+     "letter": "M",
+     "key": "luy_ke",
+     "title": "LŨY KẾ",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "ha",
+     "formula": "SUM(F#:L#)"
+    },
+    {
+     "letter": "N",
+     "key": "ngay_ket_thuc_xg",
+     "title": "NGÀY KẾT THÚC XG",
+     "kind": "input",
+     "dtype": "date"
+    },
+    {
+     "letter": "O",
+     "key": "du_kien_thu_hoach",
+     "title": "DỰ KIẾN NGÀY THU HOẠCH",
+     "kind": "input",
+     "dtype": "date"
+    }
+   ],
+   "header": {
+    "rows": 3,
+    "cells": [
+     {
+      "row": 2,
+      "letter": "A",
+      "text": "STT"
+     },
+     {
+      "row": 2,
+      "letter": "B",
+      "text": "Khu vực"
+     },
+     {
+      "row": 2,
+      "letter": "C",
+      "text": "Xã, phường"
+     },
+     {
+      "row": 2,
+      "letter": "D",
+      "text": "KH tỉnh giao"
+     },
+     {
+      "row": 2,
+      "letter": "E",
+      "text": "KHXG (dự kiến của địa phương)"
+     },
+     {
+      "row": 3,
+      "letter": "F",
+      "text": "Tuần 1",
+      "period_block": "xg",
+      "period_slot": 1
+     },
+     {
+      "row": 3,
+      "letter": "G",
+      "text": "Tuần 2",
+      "period_block": "xg",
+      "period_slot": 2
+     },
+     {
+      "row": 3,
+      "letter": "H",
+      "text": "Tuần 3",
+      "period_block": "xg",
+      "period_slot": 3
+     },
+     {
+      "row": 3,
+      "letter": "I",
+      "text": "Tuần 4",
+      "period_block": "xg",
+      "period_slot": 4
+     },
+     {
+      "row": 3,
+      "letter": "J",
+      "text": "Tuần 5",
+      "period_block": "xg",
+      "period_slot": 5
+     },
+     {
+      "row": 3,
+      "letter": "K",
+      "text": "Tuần 6",
+      "period_block": "xg",
+      "period_slot": 6
+     },
+     {
+      "row": 3,
+      "letter": "L",
+      "text": "Tuần 7",
+      "period_block": "xg",
+      "period_slot": 7
+     },
+     {
+      "row": 2,
+      "letter": "F",
+      "text": "DIỆN TÍCH XUỐNG GIỐNG LÚA {season} THEO TUẦN (ha)"
+     },
+     {
+      "row": 2,
+      "letter": "M",
+      "text": "LŨY KẾ"
+     },
+     {
+      "row": 2,
+      "letter": "N",
+      "text": "NGÀY KẾT THÚC XG"
+     },
+     {
+      "row": 2,
+      "letter": "O",
+      "text": "DỰ KIẾN NGÀY THU HOẠCH"
+     },
+     {
+      "row": 1,
+      "letter": "A",
+      "text": "PHỤ LỤC 01"
+     }
+    ],
+    "merges": [
+     "A2:A3",
+     "B2:B3",
+     "C2:C3",
+     "D2:D3",
+     "E2:E3",
+     "M2:M3",
+     "N2:N3",
+     "O2:O3",
+     "A1:O1"
+    ]
+   },
+   "period_blocks": [
+    {
+     "id": "xg",
+     "first_letter": "F",
+     "width": 1,
+     "slots": 7,
+     "title_pattern": "Tuần {n}"
+    }
+   ],
+   "rows": {
+    "kind": "per_commune",
+    "indicators": []
+   },
+   "totals": [
+    {
+     "kind": "region",
+     "label": "Cộng {region}",
+     "label_letter": "B"
+    },
+    {
+     "kind": "province",
+     "label": "Toàn tỉnh",
+     "label_letter": "B"
+    }
+   ],
+   "groups": [],
+   "freeze_through": "C",
+   "rules": [],
+   "pending": [
+    {
+     "part": "Cột F–L",
+     "detail": "Số cột tuần tối đa (tạm 7 khe Tuần 1–7 như wireframe); tiêu đề tuần đặt theo kỳ khi phát hành",
+     "question": "Q-01"
+    },
+    {
+     "part": "Cột N, O",
+     "detail": "Kiểu dữ liệu (tạm: ngày YYYY-MM-DD)",
+     "question": "Q-01"
+    },
+    {
+     "part": "Cột M",
+     "detail": "Công thức Lũy kế chính xác của tệp gốc (tạm SUM các tuần)",
+     "question": "Q-01"
+    },
+    {
+     "part": "Tên sheet",
+     "detail": "Tên sheet theo vụ (tạm “PL 01_Tđộ XG TĐ 2026”); đối chiếu tệp gốc",
+     "question": "Q-01"
+    }
+   ],
+   "completeness": "complete",
+   "source": {
+    "kind": "seed",
+    "seed_note": "kn-v7.7-seed-2026-10-01"
+   }
+  }
+ },
+ {
+  "name": "xóa dòng tiêu đề 2",
+  "code": "T07",
+  "ops": [
+   {
+    "op": "delete_header_row",
+    "row": 2
+   }
+  ],
+  "result": {
+   "schema": "form-template.v1",
+   "code": "T07",
+   "title": "TIẾN ĐỘ THU HOẠCH LÚA {season}",
+   "sheet_name": "PL 07",
+   "requirements": "",
+   "columns": [
+    {
+     "letter": "A",
+     "key": "stt",
+     "title": "STT",
+     "kind": "fixed",
+     "dtype": "integer",
+     "fixed_source": "row_no"
+    },
+    {
+     "letter": "B",
+     "key": "khu_vuc",
+     "title": "Khu vực",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "region_name"
+    },
+    {
+     "letter": "C",
+     "key": "xa",
+     "title": "Xã, phường",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "commune_name"
+    },
+    {
+     "letter": "D",
+     "key": "dt_xg_pl01",
+     "title": "DT xuống giống (PL 01) (chờ khách Q-01)",
+     "kind": "fixed",
+     "dtype": "number",
+     "unit": "ha",
+     "fixed_source": "xref:T01:M",
+     "placeholder": true
+    },
+    {
+     "letter": "E",
+     "title": "DT thu hoạch (chờ khách Q-01)",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "th",
+     "period_slot": 1,
+     "placeholder": true
+    },
+    {
+     "letter": "F",
+     "title": "Năng suất (chờ khách Q-01)",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "tấn/ha",
+     "period_block": "th",
+     "period_slot": 1,
+     "placeholder": true
+    },
+    {
+     "letter": "G",
+     "title": "Sản lượng (chờ khách Q-01)",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "tấn",
+     "formula": "E#*F#",
+     "period_block": "th",
+     "period_slot": 1,
+     "total": "sum",
+     "placeholder": true
+    },
+    {
+     "letter": "H",
+     "title": "% so DT xuống giống (chờ khách Q-01)",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "%",
+     "formula": "IF(D#=0,0,E#/D#*100)",
+     "period_block": "th",
+     "period_slot": 1,
+     "placeholder": true
+    },
+    {
+     "letter": "I",
+     "title": "DT thu hoạch (chờ khách Q-01)",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "th",
+     "period_slot": 2,
+     "placeholder": true
+    },
+    {
+     "letter": "J",
+     "title": "Năng suất (chờ khách Q-01)",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "tấn/ha",
+     "period_block": "th",
+     "period_slot": 2,
+     "placeholder": true
+    },
+    {
+     "letter": "K",
+     "title": "Sản lượng (chờ khách Q-01)",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "tấn",
+     "formula": "I#*J#",
+     "period_block": "th",
+     "period_slot": 2,
+     "total": "sum",
+     "placeholder": true
+    },
+    {
+     "letter": "L",
+     "title": "% so DT xuống giống (chờ khách Q-01)",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "%",
+     "formula": "IF(D#=0,0,I#/D#*100)",
+     "period_block": "th",
+     "period_slot": 2,
+     "placeholder": true
+    },
+    {
+     "letter": "M",
+     "title": "DT thu hoạch (chờ khách Q-01)",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "th",
+     "period_slot": 3,
+     "placeholder": true
+    },
+    {
+     "letter": "N",
+     "title": "Năng suất (chờ khách Q-01)",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "tấn/ha",
+     "period_block": "th",
+     "period_slot": 3,
+     "placeholder": true
+    },
+    {
+     "letter": "O",
+     "title": "Sản lượng (chờ khách Q-01)",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "tấn",
+     "formula": "M#*N#",
+     "period_block": "th",
+     "period_slot": 3,
+     "total": "sum",
+     "placeholder": true
+    },
+    {
+     "letter": "P",
+     "title": "% so DT xuống giống (chờ khách Q-01)",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "%",
+     "formula": "IF(D#=0,0,M#/D#*100)",
+     "period_block": "th",
+     "period_slot": 3,
+     "placeholder": true
+    },
+    {
+     "letter": "Q",
+     "title": "DT thu hoạch (chờ khách Q-01)",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "th",
+     "period_slot": 4,
+     "placeholder": true
+    },
+    {
+     "letter": "R",
+     "title": "Năng suất (chờ khách Q-01)",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "tấn/ha",
+     "period_block": "th",
+     "period_slot": 4,
+     "placeholder": true
+    },
+    {
+     "letter": "S",
+     "title": "Sản lượng (chờ khách Q-01)",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "tấn",
+     "formula": "Q#*R#",
+     "period_block": "th",
+     "period_slot": 4,
+     "total": "sum",
+     "placeholder": true
+    },
+    {
+     "letter": "T",
+     "title": "% so DT xuống giống (chờ khách Q-01)",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "%",
+     "formula": "IF(D#=0,0,Q#/D#*100)",
+     "period_block": "th",
+     "period_slot": 4,
+     "placeholder": true
+    },
+    {
+     "letter": "U",
+     "title": "DT thu hoạch lũy kế",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "ha",
+     "formula": "E#+I#+M#+Q#"
+    },
+    {
+     "letter": "V",
+     "title": "Sản lượng lũy kế",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "tấn",
+     "formula": "G#+K#+O#+S#"
+    },
+    {
+     "letter": "W",
+     "title": "Năng suất bình quân",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "tấn/ha",
+     "formula": "IF(U#=0,0,V#/U#)"
+    },
+    {
+     "letter": "X",
+     "title": "% thu hoạch lũy kế",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "%",
+     "formula": "IF(D#=0,0,U#/D#*100)"
+    }
+   ],
+   "header": {
+    "rows": 2,
+    "cells": [
+     {
+      "row": 1,
+      "letter": "A",
+      "text": "STT"
+     },
+     {
+      "row": 1,
+      "letter": "B",
+      "text": "Khu vực"
+     },
+     {
+      "row": 1,
+      "letter": "C",
+      "text": "Xã, phường"
+     },
+     {
+      "row": 1,
+      "letter": "D",
+      "text": "DT xuống giống (PL 01) (chờ khách Q-01)"
+     },
+     {
+      "row": 2,
+      "letter": "E",
+      "text": "DT thu hoạch (ha)"
+     },
+     {
+      "row": 2,
+      "letter": "F",
+      "text": "Năng suất (tấn/ha)"
+     },
+     {
+      "row": 2,
+      "letter": "G",
+      "text": "Sản lượng (tấn)"
+     },
+     {
+      "row": 2,
+      "letter": "H",
+      "text": "% so DT XG"
+     },
+     {
+      "row": 2,
+      "letter": "I",
+      "text": "DT thu hoạch (ha)"
+     },
+     {
+      "row": 2,
+      "letter": "J",
+      "text": "Năng suất (tấn/ha)"
+     },
+     {
+      "row": 2,
+      "letter": "K",
+      "text": "Sản lượng (tấn)"
+     },
+     {
+      "row": 2,
+      "letter": "L",
+      "text": "% so DT XG"
+     },
+     {
+      "row": 2,
+      "letter": "M",
+      "text": "DT thu hoạch (ha)"
+     },
+     {
+      "row": 2,
+      "letter": "N",
+      "text": "Năng suất (tấn/ha)"
+     },
+     {
+      "row": 2,
+      "letter": "O",
+      "text": "Sản lượng (tấn)"
+     },
+     {
+      "row": 2,
+      "letter": "P",
+      "text": "% so DT XG"
+     },
+     {
+      "row": 2,
+      "letter": "Q",
+      "text": "DT thu hoạch (ha)"
+     },
+     {
+      "row": 2,
+      "letter": "R",
+      "text": "Năng suất (tấn/ha)"
+     },
+     {
+      "row": 2,
+      "letter": "S",
+      "text": "Sản lượng (tấn)"
+     },
+     {
+      "row": 2,
+      "letter": "T",
+      "text": "% so DT XG"
+     },
+     {
+      "row": 1,
+      "letter": "E",
+      "text": "THU HOẠCH LÚA {season} THEO TUẦN – số tăng thêm"
+     },
+     {
+      "row": 1,
+      "letter": "U",
+      "text": "LŨY KẾ THU HOẠCH"
+     },
+     {
+      "row": 2,
+      "letter": "U",
+      "text": "DT thu hoạch lũy kế (ha)"
+     },
+     {
+      "row": 2,
+      "letter": "V",
+      "text": "Sản lượng lũy kế (tấn)"
+     },
+     {
+      "row": 2,
+      "letter": "W",
+      "text": "Năng suất bình quân (tấn/ha)"
+     },
+     {
+      "row": 2,
+      "letter": "X",
+      "text": "% thu hoạch lũy kế (%)"
+     }
+    ],
+    "merges": [
+     "A1:A2",
+     "B1:B2",
+     "C1:C2",
+     "D1:D2",
+     "E1:T1",
+     "U1:X1"
+    ]
+   },
+   "period_blocks": [
+    {
+     "id": "th",
+     "first_letter": "E",
+     "width": 4,
+     "slots": 4,
+     "title_pattern": "Tuần {n}"
+    }
+   ],
+   "rows": {
+    "kind": "per_commune",
+    "indicators": []
+   },
+   "totals": [
+    {
+     "kind": "region",
+     "label": "Cộng {region}",
+     "label_letter": "B"
+    },
+    {
+     "kind": "province",
+     "label": "Toàn tỉnh",
+     "label_letter": "B"
+    }
+   ],
+   "groups": [],
+   "freeze_through": "D",
+   "rules": [],
+   "pending": [
+    {
+     "part": "Khối tuần",
+     "detail": "4 cột của khối mỗi tuần (tạm: DT thu hoạch, năng suất, sản lượng = DT × NS, % so DT XG) và số tuần tối đa (tạm 4)",
+     "question": "Q-01"
+    },
+    {
+     "part": "Khối Lũy kế thu hoạch",
+     "detail": "Công thức khối lũy kế (BRD: “thêm công thức khối Lũy kế thu hoạch”) — tạm tổng các tuần",
+     "question": "Q-01"
+    },
+    {
+     "part": "Cột cố định đầu",
+     "detail": "Cột D (tạm: DT xuống giống lấy từ PL 01 cột M)",
+     "question": "Q-01"
+    }
+   ],
+   "completeness": "placeholder",
+   "source": {
+    "kind": "seed",
+    "seed_note": "kn-v7.7-seed-2026-10-01"
+   }
+  }
+ },
+ {
+  "name": "gộp chồng vùng có sẵn → lỗi",
+  "code": "T01",
+  "ops": [
+   {
+    "op": "merge",
+    "range": "E1:G1"
+   }
+  ],
+  "error_code": "reports.form_invalid",
+  "error_at": 0
+ },
+ {
+  "name": "dòng chỉ tiêu, ràng buộc, meta, nhóm, dòng tổng, khối kỳ",
+  "code": "T05",
+  "ops": [
+   {
+    "op": "add_indicator",
+    "after": "SB01",
+    "indicator": {
+     "code": "SB00",
+     "label": "Rầy nâu"
+    }
+   },
+   {
+    "op": "delete_indicator",
+    "code": "SB20"
+   },
+   {
+    "op": "set_rule",
+    "rule": {
+     "id": "T05.nang",
+     "expr": "G#<=H#",
+     "message": "Mức nặng không vượt tổng",
+     "severity": "warning",
+     "letters": [
+      "G"
+     ]
+    }
+   },
+   {
+    "op": "set_meta",
+    "meta": {
+     "title": "SÂU BỆNH HẠI LÚA",
+     "requirements": "Nhập diện tích nhiễm theo mức",
+     "freeze_through": "c"
+    }
+   },
+   {
+    "op": "set_groups",
+    "groups": [
+     {
+      "id": "muc",
+      "title": "Theo mức",
+      "from": "E",
+      "to": "G"
+     }
+    ]
+   },
+   {
+    "op": "set_totals",
+    "totals": [
+     {
+      "kind": "province",
+      "label": "Toàn tỉnh",
+      "label_letter": "C"
+     }
+    ]
+   }
+  ],
+  "result": {
+   "schema": "form-template.v1",
+   "code": "T05",
+   "title": "SÂU BỆNH HẠI LÚA",
+   "sheet_name": "PL 04",
+   "requirements": "Nhập diện tích nhiễm theo mức",
+   "columns": [
+    {
+     "letter": "A",
+     "key": "stt",
+     "title": "STT",
+     "kind": "fixed",
+     "dtype": "integer",
+     "fixed_source": "row_no"
+    },
+    {
+     "letter": "B",
+     "key": "khu_vuc",
+     "title": "Khu vực",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "region_name"
+    },
+    {
+     "letter": "C",
+     "key": "xa",
+     "title": "Xã, phường",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "commune_name"
+    },
+    {
+     "letter": "D",
+     "key": "doi_tuong",
+     "title": "Đối tượng sâu bệnh",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "indicator_label"
+    },
+    {
+     "letter": "E",
+     "title": "Mức Nhẹ (chờ khách Q-01)",
+     "kind": "input",
+     "dtype": "number",
+     "unit": "ha",
+     "placeholder": true
+    },
+    {
+     "letter": "F",
+     "title": "Mức Trung bình (chờ khách Q-01)",
+     "kind": "input",
+     "dtype": "number",
+     "unit": "ha",
+     "placeholder": true
+    },
+    {
+     "letter": "G",
+     "title": "Mức Nặng (chờ khách Q-01)",
+     "kind": "input",
+     "dtype": "number",
+     "unit": "ha",
+     "placeholder": true
+    },
+    {
+     "letter": "H",
+     "title": "Tổng diện tích nhiễm (chờ khách Q-01)",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "ha",
+     "formula": "SUM(E#:G#)",
+     "placeholder": true
+    }
+   ],
+   "header": {
+    "rows": 2,
+    "cells": [
+     {
+      "row": 1,
+      "letter": "A",
+      "text": "STT"
+     },
+     {
+      "row": 1,
+      "letter": "B",
+      "text": "Khu vực"
+     },
+     {
+      "row": 1,
+      "letter": "C",
+      "text": "Xã, phường"
+     },
+     {
+      "row": 1,
+      "letter": "D",
+      "text": "Đối tượng sâu bệnh"
+     },
+     {
+      "row": 2,
+      "letter": "E",
+      "text": "Mức Nhẹ (chờ khách Q-01)"
+     },
+     {
+      "row": 2,
+      "letter": "F",
+      "text": "Mức Trung bình (chờ khách Q-01)"
+     },
+     {
+      "row": 2,
+      "letter": "G",
+      "text": "Mức Nặng (chờ khách Q-01)"
+     },
+     {
+      "row": 1,
+      "letter": "E",
+      "text": "DIỆN TÍCH NHIỄM THEO MỨC (ha)"
+     },
+     {
+      "row": 1,
+      "letter": "H",
+      "text": "Tổng diện tích nhiễm (chờ khách Q-01)"
+     }
+    ],
+    "merges": [
+     "A1:A2",
+     "B1:B2",
+     "C1:C2",
+     "D1:D2",
+     "E1:G1",
+     "H1:H2"
+    ]
+   },
+   "period_blocks": [],
+   "rows": {
+    "kind": "per_commune",
+    "indicators": [
+     {
+      "code": "SB01",
+      "label": "Đối tượng sâu bệnh 1 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB00",
+      "label": "Rầy nâu"
+     },
+     {
+      "code": "SB02",
+      "label": "Đối tượng sâu bệnh 2 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB03",
+      "label": "Đối tượng sâu bệnh 3 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB04",
+      "label": "Đối tượng sâu bệnh 4 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB05",
+      "label": "Đối tượng sâu bệnh 5 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB06",
+      "label": "Đối tượng sâu bệnh 6 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB07",
+      "label": "Đối tượng sâu bệnh 7 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB08",
+      "label": "Đối tượng sâu bệnh 8 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB09",
+      "label": "Đối tượng sâu bệnh 9 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB10",
+      "label": "Đối tượng sâu bệnh 10 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB11",
+      "label": "Đối tượng sâu bệnh 11 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB12",
+      "label": "Đối tượng sâu bệnh 12 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB13",
+      "label": "Đối tượng sâu bệnh 13 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB14",
+      "label": "Đối tượng sâu bệnh 14 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB15",
+      "label": "Đối tượng sâu bệnh 15 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB16",
+      "label": "Đối tượng sâu bệnh 16 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB17",
+      "label": "Đối tượng sâu bệnh 17 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB18",
+      "label": "Đối tượng sâu bệnh 18 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     },
+     {
+      "code": "SB19",
+      "label": "Đối tượng sâu bệnh 19 (chờ khách Q-01)",
+      "catalog": "pest",
+      "placeholder": true
+     }
+    ]
+   },
+   "totals": [
+    {
+     "kind": "province",
+     "label": "Toàn tỉnh",
+     "label_letter": "C"
+    }
+   ],
+   "groups": [
+    {
+     "id": "muc",
+     "title": "Theo mức",
+     "from": "E",
+     "to": "G"
+    }
+   ],
+   "freeze_through": "C",
+   "rules": [
+    {
+     "id": "T05.nang",
+     "expr": "G#<=H#",
+     "message": "Mức nặng không vượt tổng",
+     "severity": "warning",
+     "letters": [
+      "G"
+     ]
+    }
+   ],
+   "pending": [
+    {
+     "part": "Dòng chỉ tiêu",
+     "detail": "Danh sách 20 đối tượng sâu bệnh (danh mục sâu bệnh)",
+     "question": "Q-01"
+    },
+    {
+     "part": "3 mức",
+     "detail": "Tên 3 mức (tạm nhẹ/trung bình/nặng, ha); có cột tổng, “trong đó nặng”, diện tích phòng trị?",
+     "question": "Q-01"
+    },
+    {
+     "part": "Bố cục",
+     "detail": "Đối tượng là dòng hay khối cột trên dòng của xã (tạm: dòng chỉ tiêu trong mỗi xã)",
+     "question": "Q-01"
+    }
+   ],
+   "completeness": "placeholder",
+   "source": {
+    "kind": "seed",
+    "seed_note": "kn-v7.7-seed-2026-10-01"
+   }
+  }
+ },
+ {
+  "name": "đổi tiêu đề mẫu của khối kỳ",
+  "code": "T01",
+  "ops": [
+   {
+    "op": "set_period_block",
+    "block": {
+     "id": "xg",
+     "first_letter": "F",
+     "width": 1,
+     "slots": 7,
+     "title_pattern": "Tuần thứ {n}"
+    }
+   }
+  ],
+  "result": {
+   "schema": "form-template.v1",
+   "code": "T01",
+   "title": "TIẾN ĐỘ XUỐNG GIỐNG LÚA {season}",
+   "sheet_name": "PL 01_Tđộ XG TĐ 2026",
+   "requirements": "Số xuống giống được nhập là số tăng thêm trong tuần, không nhập số lũy kế",
+   "columns": [
+    {
+     "letter": "A",
+     "key": "stt",
+     "title": "STT",
+     "kind": "fixed",
+     "dtype": "integer",
+     "fixed_source": "row_no"
+    },
+    {
+     "letter": "B",
+     "key": "khu_vuc",
+     "title": "Khu vực",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "region_name"
+    },
+    {
+     "letter": "C",
+     "key": "xa",
+     "title": "Xã, phường",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "commune_name"
+    },
+    {
+     "letter": "D",
+     "key": "kh_tinh_giao",
+     "title": "KH tỉnh giao",
+     "kind": "provincial",
+     "dtype": "number",
+     "unit": "ha"
+    },
+    {
+     "letter": "E",
+     "key": "khxg_dia_phuong",
+     "title": "KHXG (dự kiến của địa phương)",
+     "kind": "input",
+     "dtype": "number",
+     "unit": "ha"
+    },
+    {
+     "letter": "F",
+     "key": "xg_tuan_1",
+     "title": "Tuần 1",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 1
+    },
+    {
+     "letter": "G",
+     "key": "xg_tuan_2",
+     "title": "Tuần 2",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 2
+    },
+    {
+     "letter": "H",
+     "key": "xg_tuan_3",
+     "title": "Tuần 3",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 3
+    },
+    {
+     "letter": "I",
+     "key": "xg_tuan_4",
+     "title": "Tuần 4",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 4
+    },
+    {
+     "letter": "J",
+     "key": "xg_tuan_5",
+     "title": "Tuần 5",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 5
+    },
+    {
+     "letter": "K",
+     "key": "xg_tuan_6",
+     "title": "Tuần 6",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 6
+    },
+    {
+     "letter": "L",
+     "key": "xg_tuan_7",
+     "title": "Tuần 7",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 7
+    },
+    {
+     "letter": "M",
+     "key": "luy_ke",
+     "title": "LŨY KẾ",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "ha",
+     "formula": "SUM(F#:L#)"
+    },
+    {
+     "letter": "N",
+     "key": "ngay_ket_thuc_xg",
+     "title": "NGÀY KẾT THÚC XG",
+     "kind": "input",
+     "dtype": "date"
+    },
+    {
+     "letter": "O",
+     "key": "du_kien_thu_hoach",
+     "title": "DỰ KIẾN NGÀY THU HOẠCH",
+     "kind": "input",
+     "dtype": "date"
+    }
+   ],
+   "header": {
+    "rows": 2,
+    "cells": [
+     {
+      "row": 1,
+      "letter": "A",
+      "text": "STT"
+     },
+     {
+      "row": 1,
+      "letter": "B",
+      "text": "Khu vực"
+     },
+     {
+      "row": 1,
+      "letter": "C",
+      "text": "Xã, phường"
+     },
+     {
+      "row": 1,
+      "letter": "D",
+      "text": "KH tỉnh giao"
+     },
+     {
+      "row": 1,
+      "letter": "E",
+      "text": "KHXG (dự kiến của địa phương)"
+     },
+     {
+      "row": 2,
+      "letter": "F",
+      "text": "Tuần 1",
+      "period_block": "xg",
+      "period_slot": 1
+     },
+     {
+      "row": 2,
+      "letter": "G",
+      "text": "Tuần 2",
+      "period_block": "xg",
+      "period_slot": 2
+     },
+     {
+      "row": 2,
+      "letter": "H",
+      "text": "Tuần 3",
+      "period_block": "xg",
+      "period_slot": 3
+     },
+     {
+      "row": 2,
+      "letter": "I",
+      "text": "Tuần 4",
+      "period_block": "xg",
+      "period_slot": 4
+     },
+     {
+      "row": 2,
+      "letter": "J",
+      "text": "Tuần 5",
+      "period_block": "xg",
+      "period_slot": 5
+     },
+     {
+      "row": 2,
+      "letter": "K",
+      "text": "Tuần 6",
+      "period_block": "xg",
+      "period_slot": 6
+     },
+     {
+      "row": 2,
+      "letter": "L",
+      "text": "Tuần 7",
+      "period_block": "xg",
+      "period_slot": 7
+     },
+     {
+      "row": 1,
+      "letter": "F",
+      "text": "DIỆN TÍCH XUỐNG GIỐNG LÚA {season} THEO TUẦN (ha)"
+     },
+     {
+      "row": 1,
+      "letter": "M",
+      "text": "LŨY KẾ"
+     },
+     {
+      "row": 1,
+      "letter": "N",
+      "text": "NGÀY KẾT THÚC XG"
+     },
+     {
+      "row": 1,
+      "letter": "O",
+      "text": "DỰ KIẾN NGÀY THU HOẠCH"
+     }
+    ],
+    "merges": [
+     "A1:A2",
+     "B1:B2",
+     "C1:C2",
+     "D1:D2",
+     "E1:E2",
+     "F1:L1",
+     "M1:M2",
+     "N1:N2",
+     "O1:O2"
+    ]
+   },
+   "period_blocks": [
+    {
+     "id": "xg",
+     "first_letter": "F",
+     "width": 1,
+     "slots": 7,
+     "title_pattern": "Tuần thứ {n}"
+    }
+   ],
+   "rows": {
+    "kind": "per_commune",
+    "indicators": []
+   },
+   "totals": [
+    {
+     "kind": "region",
+     "label": "Cộng {region}",
+     "label_letter": "B"
+    },
+    {
+     "kind": "province",
+     "label": "Toàn tỉnh",
+     "label_letter": "B"
+    }
+   ],
+   "groups": [],
+   "freeze_through": "C",
+   "rules": [],
+   "pending": [
+    {
+     "part": "Cột F–L",
+     "detail": "Số cột tuần tối đa (tạm 7 khe Tuần 1–7 như wireframe); tiêu đề tuần đặt theo kỳ khi phát hành",
+     "question": "Q-01"
+    },
+    {
+     "part": "Cột N, O",
+     "detail": "Kiểu dữ liệu (tạm: ngày YYYY-MM-DD)",
+     "question": "Q-01"
+    },
+    {
+     "part": "Cột M",
+     "detail": "Công thức Lũy kế chính xác của tệp gốc (tạm SUM các tuần)",
+     "question": "Q-01"
+    },
+    {
+     "part": "Tên sheet",
+     "detail": "Tên sheet theo vụ (tạm “PL 01_Tđộ XG TĐ 2026”); đối chiếu tệp gốc",
+     "question": "Q-01"
+    }
+   ],
+   "completeness": "complete",
+   "source": {
+    "kind": "seed",
+    "seed_note": "kn-v7.7-seed-2026-10-01"
+   }
+  }
+ },
+ {
+  "name": "tăng số kỳ 7 → 8 (chèn trước khe cuối)",
+  "code": "T01",
+  "ops": [
+   {
+    "op": "set_period_block",
+    "block": {
+     "id": "xg",
+     "first_letter": "F",
+     "width": 1,
+     "slots": 8,
+     "title_pattern": "Tuần {n}"
+    }
+   },
+   {
+    "op": "insert_column",
+    "at": "L",
+    "side": "before",
+    "column": {
+     "letter": "",
+     "key": "xg_tuan_7",
+     "title": "Tuần 7",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 7
+    }
+   },
+   {
+    "op": "update_column",
+    "letter": "M",
+    "column": {
+     "letter": "",
+     "key": "xg_tuan_8",
+     "title": "Tuần 8",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 8
+    }
+   }
+  ],
+  "result": {
+   "schema": "form-template.v1",
+   "code": "T01",
+   "title": "TIẾN ĐỘ XUỐNG GIỐNG LÚA {season}",
+   "sheet_name": "PL 01_Tđộ XG TĐ 2026",
+   "requirements": "Số xuống giống được nhập là số tăng thêm trong tuần, không nhập số lũy kế",
+   "columns": [
+    {
+     "letter": "A",
+     "key": "stt",
+     "title": "STT",
+     "kind": "fixed",
+     "dtype": "integer",
+     "fixed_source": "row_no"
+    },
+    {
+     "letter": "B",
+     "key": "khu_vuc",
+     "title": "Khu vực",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "region_name"
+    },
+    {
+     "letter": "C",
+     "key": "xa",
+     "title": "Xã, phường",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "commune_name"
+    },
+    {
+     "letter": "D",
+     "key": "kh_tinh_giao",
+     "title": "KH tỉnh giao",
+     "kind": "provincial",
+     "dtype": "number",
+     "unit": "ha"
+    },
+    {
+     "letter": "E",
+     "key": "khxg_dia_phuong",
+     "title": "KHXG (dự kiến của địa phương)",
+     "kind": "input",
+     "dtype": "number",
+     "unit": "ha"
+    },
+    {
+     "letter": "F",
+     "key": "xg_tuan_1",
+     "title": "Tuần 1",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 1
+    },
+    {
+     "letter": "G",
+     "key": "xg_tuan_2",
+     "title": "Tuần 2",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 2
+    },
+    {
+     "letter": "H",
+     "key": "xg_tuan_3",
+     "title": "Tuần 3",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 3
+    },
+    {
+     "letter": "I",
+     "key": "xg_tuan_4",
+     "title": "Tuần 4",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 4
+    },
+    {
+     "letter": "J",
+     "key": "xg_tuan_5",
+     "title": "Tuần 5",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 5
+    },
+    {
+     "letter": "K",
+     "key": "xg_tuan_6",
+     "title": "Tuần 6",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 6
+    },
+    {
+     "letter": "L",
+     "key": "xg_tuan_7",
+     "title": "Tuần 7",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 7
+    },
+    {
+     "letter": "M",
+     "key": "xg_tuan_8",
+     "title": "Tuần 8",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 8
+    },
+    {
+     "letter": "N",
+     "key": "luy_ke",
+     "title": "LŨY KẾ",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "ha",
+     "formula": "SUM(F#:M#)"
+    },
+    {
+     "letter": "O",
+     "key": "ngay_ket_thuc_xg",
+     "title": "NGÀY KẾT THÚC XG",
+     "kind": "input",
+     "dtype": "date"
+    },
+    {
+     "letter": "P",
+     "key": "du_kien_thu_hoach",
+     "title": "DỰ KIẾN NGÀY THU HOẠCH",
+     "kind": "input",
+     "dtype": "date"
+    }
+   ],
+   "header": {
+    "rows": 2,
+    "cells": [
+     {
+      "row": 1,
+      "letter": "A",
+      "text": "STT"
+     },
+     {
+      "row": 1,
+      "letter": "B",
+      "text": "Khu vực"
+     },
+     {
+      "row": 1,
+      "letter": "C",
+      "text": "Xã, phường"
+     },
+     {
+      "row": 1,
+      "letter": "D",
+      "text": "KH tỉnh giao"
+     },
+     {
+      "row": 1,
+      "letter": "E",
+      "text": "KHXG (dự kiến của địa phương)"
+     },
+     {
+      "row": 2,
+      "letter": "F",
+      "text": "Tuần 1",
+      "period_block": "xg",
+      "period_slot": 1
+     },
+     {
+      "row": 2,
+      "letter": "G",
+      "text": "Tuần 2",
+      "period_block": "xg",
+      "period_slot": 2
+     },
+     {
+      "row": 2,
+      "letter": "H",
+      "text": "Tuần 3",
+      "period_block": "xg",
+      "period_slot": 3
+     },
+     {
+      "row": 2,
+      "letter": "I",
+      "text": "Tuần 4",
+      "period_block": "xg",
+      "period_slot": 4
+     },
+     {
+      "row": 2,
+      "letter": "J",
+      "text": "Tuần 5",
+      "period_block": "xg",
+      "period_slot": 5
+     },
+     {
+      "row": 2,
+      "letter": "K",
+      "text": "Tuần 6",
+      "period_block": "xg",
+      "period_slot": 6
+     },
+     {
+      "row": 2,
+      "letter": "M",
+      "text": "Tuần 7",
+      "period_block": "xg",
+      "period_slot": 7
+     },
+     {
+      "row": 1,
+      "letter": "F",
+      "text": "DIỆN TÍCH XUỐNG GIỐNG LÚA {season} THEO TUẦN (ha)"
+     },
+     {
+      "row": 1,
+      "letter": "N",
+      "text": "LŨY KẾ"
+     },
+     {
+      "row": 1,
+      "letter": "O",
+      "text": "NGÀY KẾT THÚC XG"
+     },
+     {
+      "row": 1,
+      "letter": "P",
+      "text": "DỰ KIẾN NGÀY THU HOẠCH"
+     }
+    ],
+    "merges": [
+     "A1:A2",
+     "B1:B2",
+     "C1:C2",
+     "D1:D2",
+     "E1:E2",
+     "F1:M1",
+     "N1:N2",
+     "O1:O2",
+     "P1:P2"
+    ]
+   },
+   "period_blocks": [
+    {
+     "id": "xg",
+     "first_letter": "F",
+     "width": 1,
+     "slots": 8,
+     "title_pattern": "Tuần {n}"
+    }
+   ],
+   "rows": {
+    "kind": "per_commune",
+    "indicators": []
+   },
+   "totals": [
+    {
+     "kind": "region",
+     "label": "Cộng {region}",
+     "label_letter": "B"
+    },
+    {
+     "kind": "province",
+     "label": "Toàn tỉnh",
+     "label_letter": "B"
+    }
+   ],
+   "groups": null,
+   "freeze_through": "C",
+   "rules": [],
+   "pending": [
+    {
+     "part": "Cột F–L",
+     "detail": "Số cột tuần tối đa (tạm 7 khe Tuần 1–7 như wireframe); tiêu đề tuần đặt theo kỳ khi phát hành",
+     "question": "Q-01"
+    },
+    {
+     "part": "Cột N, O",
+     "detail": "Kiểu dữ liệu (tạm: ngày YYYY-MM-DD)",
+     "question": "Q-01"
+    },
+    {
+     "part": "Cột M",
+     "detail": "Công thức Lũy kế chính xác của tệp gốc (tạm SUM các tuần)",
+     "question": "Q-01"
+    },
+    {
+     "part": "Tên sheet",
+     "detail": "Tên sheet theo vụ (tạm “PL 01_Tđộ XG TĐ 2026”); đối chiếu tệp gốc",
+     "question": "Q-01"
+    }
+   ],
+   "completeness": "complete",
+   "source": {
+    "kind": "seed",
+    "seed_note": "kn-v7.7-seed-2026-10-01"
+   }
+  }
+ },
+ {
+  "name": "giảm số kỳ 7 → 6",
+  "code": "T01",
+  "ops": [
+   {
+    "op": "set_period_block",
+    "block": {
+     "id": "xg",
+     "first_letter": "F",
+     "width": 1,
+     "slots": 6,
+     "title_pattern": "Tuần {n}"
+    }
+   },
+   {
+    "op": "update_column",
+    "letter": "L",
+    "column": {
+     "letter": "",
+     "title": "Tuần 7",
+     "kind": "input",
+     "dtype": "number"
+    }
+   },
+   {
+    "op": "delete_column",
+    "letter": "L"
+   }
+  ],
+  "result": {
+   "schema": "form-template.v1",
+   "code": "T01",
+   "title": "TIẾN ĐỘ XUỐNG GIỐNG LÚA {season}",
+   "sheet_name": "PL 01_Tđộ XG TĐ 2026",
+   "requirements": "Số xuống giống được nhập là số tăng thêm trong tuần, không nhập số lũy kế",
+   "columns": [
+    {
+     "letter": "A",
+     "key": "stt",
+     "title": "STT",
+     "kind": "fixed",
+     "dtype": "integer",
+     "fixed_source": "row_no"
+    },
+    {
+     "letter": "B",
+     "key": "khu_vuc",
+     "title": "Khu vực",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "region_name"
+    },
+    {
+     "letter": "C",
+     "key": "xa",
+     "title": "Xã, phường",
+     "kind": "fixed",
+     "dtype": "text",
+     "fixed_source": "commune_name"
+    },
+    {
+     "letter": "D",
+     "key": "kh_tinh_giao",
+     "title": "KH tỉnh giao",
+     "kind": "provincial",
+     "dtype": "number",
+     "unit": "ha"
+    },
+    {
+     "letter": "E",
+     "key": "khxg_dia_phuong",
+     "title": "KHXG (dự kiến của địa phương)",
+     "kind": "input",
+     "dtype": "number",
+     "unit": "ha"
+    },
+    {
+     "letter": "F",
+     "key": "xg_tuan_1",
+     "title": "Tuần 1",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 1
+    },
+    {
+     "letter": "G",
+     "key": "xg_tuan_2",
+     "title": "Tuần 2",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 2
+    },
+    {
+     "letter": "H",
+     "key": "xg_tuan_3",
+     "title": "Tuần 3",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 3
+    },
+    {
+     "letter": "I",
+     "key": "xg_tuan_4",
+     "title": "Tuần 4",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 4
+    },
+    {
+     "letter": "J",
+     "key": "xg_tuan_5",
+     "title": "Tuần 5",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 5
+    },
+    {
+     "letter": "K",
+     "key": "xg_tuan_6",
+     "title": "Tuần 6",
+     "kind": "per_period",
+     "dtype": "number",
+     "unit": "ha",
+     "period_block": "xg",
+     "period_slot": 6
+    },
+    {
+     "letter": "L",
+     "key": "luy_ke",
+     "title": "LŨY KẾ",
+     "kind": "formula",
+     "dtype": "number",
+     "unit": "ha",
+     "formula": "SUM(F#:K#)"
+    },
+    {
+     "letter": "M",
+     "key": "ngay_ket_thuc_xg",
+     "title": "NGÀY KẾT THÚC XG",
+     "kind": "input",
+     "dtype": "date"
+    },
+    {
+     "letter": "N",
+     "key": "du_kien_thu_hoach",
+     "title": "DỰ KIẾN NGÀY THU HOẠCH",
+     "kind": "input",
+     "dtype": "date"
+    }
+   ],
+   "header": {
+    "rows": 2,
+    "cells": [
+     {
+      "row": 1,
+      "letter": "A",
+      "text": "STT"
+     },
+     {
+      "row": 1,
+      "letter": "B",
+      "text": "Khu vực"
+     },
+     {
+      "row": 1,
+      "letter": "C",
+      "text": "Xã, phường"
+     },
+     {
+      "row": 1,
+      "letter": "D",
+      "text": "KH tỉnh giao"
+     },
+     {
+      "row": 1,
+      "letter": "E",
+      "text": "KHXG (dự kiến của địa phương)"
+     },
+     {
+      "row": 2,
+      "letter": "F",
+      "text": "Tuần 1",
+      "period_block": "xg",
+      "period_slot": 1
+     },
+     {
+      "row": 2,
+      "letter": "G",
+      "text": "Tuần 2",
+      "period_block": "xg",
+      "period_slot": 2
+     },
+     {
+      "row": 2,
+      "letter": "H",
+      "text": "Tuần 3",
+      "period_block": "xg",
+      "period_slot": 3
+     },
+     {
+      "row": 2,
+      "letter": "I",
+      "text": "Tuần 4",
+      "period_block": "xg",
+      "period_slot": 4
+     },
+     {
+      "row": 2,
+      "letter": "J",
+      "text": "Tuần 5",
+      "period_block": "xg",
+      "period_slot": 5
+     },
+     {
+      "row": 2,
+      "letter": "K",
+      "text": "Tuần 6",
+      "period_block": "xg",
+      "period_slot": 6
+     },
+     {
+      "row": 1,
+      "letter": "F",
+      "text": "DIỆN TÍCH XUỐNG GIỐNG LÚA {season} THEO TUẦN (ha)"
+     },
+     {
+      "row": 1,
+      "letter": "L",
+      "text": "LŨY KẾ"
+     },
+     {
+      "row": 1,
+      "letter": "M",
+      "text": "NGÀY KẾT THÚC XG"
+     },
+     {
+      "row": 1,
+      "letter": "N",
+      "text": "DỰ KIẾN NGÀY THU HOẠCH"
+     }
+    ],
+    "merges": [
+     "A1:A2",
+     "B1:B2",
+     "C1:C2",
+     "D1:D2",
+     "E1:E2",
+     "F1:K1",
+     "L1:L2",
+     "M1:M2",
+     "N1:N2"
+    ]
+   },
+   "period_blocks": [
+    {
+     "id": "xg",
+     "first_letter": "F",
+     "width": 1,
+     "slots": 6,
+     "title_pattern": "Tuần {n}"
+    }
+   ],
+   "rows": {
+    "kind": "per_commune",
+    "indicators": []
+   },
+   "totals": [
+    {
+     "kind": "region",
+     "label": "Cộng {region}",
+     "label_letter": "B"
+    },
+    {
+     "kind": "province",
+     "label": "Toàn tỉnh",
+     "label_letter": "B"
+    }
+   ],
+   "groups": null,
+   "freeze_through": "C",
+   "rules": [],
+   "pending": [
+    {
+     "part": "Cột F–L",
+     "detail": "Số cột tuần tối đa (tạm 7 khe Tuần 1–7 như wireframe); tiêu đề tuần đặt theo kỳ khi phát hành",
+     "question": "Q-01"
+    },
+    {
+     "part": "Cột N, O",
+     "detail": "Kiểu dữ liệu (tạm: ngày YYYY-MM-DD)",
+     "question": "Q-01"
+    },
+    {
+     "part": "Cột M",
+     "detail": "Công thức Lũy kế chính xác của tệp gốc (tạm SUM các tuần)",
+     "question": "Q-01"
+    },
+    {
+     "part": "Tên sheet",
+     "detail": "Tên sheet theo vụ (tạm “PL 01_Tđộ XG TĐ 2026”); đối chiếu tệp gốc",
+     "question": "Q-01"
+    }
+   ],
+   "completeness": "complete",
+   "source": {
+    "kind": "seed",
+    "seed_note": "kn-v7.7-seed-2026-10-01"
+   }
+  }
+ },
+ {
+  "name": "thao tác không hỗ trợ → lỗi",
+  "code": "T01",
+  "ops": [
+   {
+    "op": "explode"
+   }
+  ],
+  "error_code": "reports.form_invalid",
+  "error_at": 0
+ }
+]

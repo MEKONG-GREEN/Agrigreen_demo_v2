@@ -137,9 +137,10 @@ function adminGroups(departments: readonly DepartmentRef[]): MenuGroup[] {
           { key: `${d.code}-tong-hop`, label: "Báo cáo tổng hợp các xã", icon: "layers", href: `${base}/tong-hop` },
           { key: `${d.code}-du-lieu`, label: "Dữ liệu báo cáo các xã", icon: "file", href: `${base}/du-lieu-bao-cao` },
           { key: `${d.code}-thu-thap`, label: "Thu thập dữ liệu", icon: "database", href: `${base}/thu-thap` },
-          // Màn hiện có (G1): danh mục dùng chung, mẫu & lịch báo cáo — giữ tới khi P3/P6 dựng màn mới.
+          // Màn hiện có (G1): danh mục dùng chung — giữ tới khi P2/P6 dựng màn mới.
           { key: `${d.code}-danh-muc`, label: "Danh mục nông nghiệp", icon: "package", href: "/quan-tri/danh-muc" },
-          { key: `${d.code}-mau`, label: "Mẫu báo cáo", icon: "table", href: "/quan-tri/mau-bao-cao" },
+          // P3b: trình thiết kế mẫu báo cáo dạng lưới Excel (FN-AD-04.06, Hình 27).
+          { key: `${d.code}-mau`, label: "Mẫu báo cáo", icon: "table", href: `${base}/mau-bao-cao` },
         ],
       });
     } else closed.push(d);
@@ -169,6 +170,8 @@ function adminGroups(departments: readonly DepartmentRef[]): MenuGroup[] {
           icon: "param",
           children: [
             { key: "tham-so", label: "Tham số & phê duyệt", icon: "param", href: "/quan-tri/tham-so" },
+            // Màn G1 (mẫu xuất có phiên bản + lịch gửi email) — giữ nguyên, không xóa tính năng.
+            { key: "mau-xuat", label: "Mẫu xuất & lịch gửi", icon: "report", href: "/quan-tri/mau-bao-cao" },
             { key: "xung-dot", label: "Xung đột đồng bộ", icon: "conflict", href: "/quan-tri/xung-dot" },
             { key: "giam-sat", label: "Giám sát đồng bộ", icon: "sync", href: "/quan-tri/giam-sat-dong-bo" },
             { key: "thiet-bi", label: "Đồng bộ thiết bị", icon: "sync", href: "/dong-bo" },

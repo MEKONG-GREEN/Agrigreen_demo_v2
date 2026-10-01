@@ -46,6 +46,7 @@ import { metricsRoutes } from "./metrics";
 import { mrvAdminRoutes, mrvAppRoutes } from "./mrv";
 import { collectionRoutes } from "./collection";
 import { knAppRoutes, personaForContext } from "./kn";
+import { formsAdminRoutes, formsAppRoutes } from "./forms/routes";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -112,6 +113,8 @@ const appRoutes: Route[] = [
   { method: "GET", pattern: /^\/v1\/me$/, handler: ({ persona }) => json(persona.me) },
   // --- KN v7.7 (hợp đồng tạm P1/P2/P4): ngữ cảnh phiên, menu theo cấu hình, số đếm ---
   ...knAppRoutes,
+  // --- KN v7.7 P3: mẫu báo cáo dạng lưới (chọn mẫu, layout, mẫu Excel, tính thử) ---
+  ...formsAppRoutes,
 
   // --- pf/extension ---
   {
@@ -401,6 +404,8 @@ const importedPhones = new Set<string>();
 
 const adminRoutes: Route[] = [
   ...htxGapAdminRoutes,
+  // --- KN v7.7 P3: trình thiết kế mẫu báo cáo (FN-AD-04.06) ---
+  ...formsAdminRoutes,
   {
     method: "GET",
     pattern: /^\/v1\/masterdata\/catalogs\/([a-z_]+)\/items$/,

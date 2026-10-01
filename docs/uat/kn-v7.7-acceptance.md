@@ -20,13 +20,13 @@ Bốn trạng thái:
 | 3. UR chung, Cấp Quốc gia, kỹ thuật | 5 | 0 | 0 | 5 | 0 |
 | 4. UR Cấp Tỉnh | 7 | 0 | 0 | 7 | 0 |
 | 5. UR Cấp Xã | 21 | 0 | 0 | 21 | 0 |
-| 6. UR Admin | 7 | 1 | 0 | 6 | 0 |
-| 7. Tiêu chí chấp nhận FN | 25 | 1 | 0 | 24 | 0 |
+| 6. UR Admin | 7 | 2 | 0 | 5 | 0 |
+| 7. Tiêu chí chấp nhận FN | 25 | 1 | 1 | 23 | 0 |
 | 8. Phi chức năng | 14 | 2 | 3 | 9 | 0 |
 | 9. Xung đột kiến trúc và cách xử lý | 15 | 0 | 0 | 15 | 0 |
 | 10. Tính năng chuyển khỏi module | 13 | 0 | 0 | 0 | 13 |
 | 11. Câu hỏi khách | 23 | 0 | 0 | 23 | 0 |
-| **Tổng** | **130** | **4** | **3** | **110** | **13** |
+| **Tổng** | **130** | **5** | **4** | **108** | **13** |
 
 Còn lại theo loại: **mã** — mọi dòng **chưa làm** của mục 3–9 (gói P1–P7 theo cột "Gói"); **chờ khách** — Q-01…Q-23 (mục 11), đặc biệt Q-01 (tệp Excel gốc của 14 mẫu) chặn 12/14 mẫu; **hạ tầng** — N-01 (sẵn sàng ≥ 99,5 %), N-02..N-04 (sao lưu, RPO, RTO trên cụm thật), N-05 (kiểm tải 500 người dùng trên staging).
 
@@ -107,7 +107,7 @@ Chưa có (P8 đợt 4). Khi có, bảng bước `TestKN77AnGiangTuan36` đặt 
 | UR-AD-03 | Admin khai báo danh mục phòng ban và trạng thái áp dụng | FN-AD-04.03 | P2 | — | **chưa làm** |
 | UR-AD-04 | Admin tạo tài khoản, phân quyền; một tài khoản nhiều vai trò và phòng ban, mỗi vai trò có Nút, phòng ban, xã phụ trách riêng; chỉ thực hiện sau UR-AD-02, 03 | FN-AD-04.04 | P1 | — (nền có sẵn: `TestCreateUserUSADM01`, `TestLockUnlockNeedsReason`, `TestImportXLSXMixedRows`, `TestBulkActions`) | **chưa làm** |
 | UR-AD-05 | Admin quản lý danh mục nông nghiệp (giống lúa, vật tư, cây trồng, sâu bệnh, loại máy, mô hình) | FN-AD-04.05 | P2, P3 | — (nền có sẵn: `TestCatalogDeactivateKeepsHistory`, `TestCatalogImportPerRowErrors`) | **chưa làm** |
-| UR-AD-06 | Admin chỉnh sửa mẫu báo cáo của các phòng ban cấp tỉnh, cấp xã, tạo mẫu mới, gán vào loại báo cáo của phòng ban | FN-AD-04.06 | P3 | — (nền có sẵn: `TestTemplateVersionsAdmin` — chỉ bố cục xuất) | **chưa làm** |
+| UR-AD-06 | Admin chỉnh sửa mẫu báo cáo của các phòng ban cấp tỉnh, cấp xã, tạo mẫu mới, gán vào loại báo cáo của phòng ban | FN-AD-04.06 | P3 | Go `TestFN_AD_04_06_FormLifecycleSoD`, `TestFN_AD_04_06_UnassignedCannotPublish`, `TestFN_AD_04_06_FormTenantIsolation`, `TestFN_AD_04_06_ImportEndpoint`, `TestFN_AD_04_06_DesignerOps`, `TestFN_AD_04_06_SeedsValid`, `TestFN_AD_04_06_ImporterRoundTrip`, `TestFN_AD_04_06_FormulaGolden`, `TestWebFixtures` (bản giả lập web = engine Go); Vitest `src/kn/grid/grid.test.tsx` (gộp tiêu đề, khe kỳ mở, dán khối, bàn phím, dòng tổng, vấn đề tại ô, soạn lô đổi số kỳ), `src/api/mock/forms/engine.test.ts` (ca vàng tính/thao tác); Playwright `tests/e2e/kn-forms.spec.ts` ("vòng đời: tạo mẫu, sửa cấu trúc, lỗi công thức từ máy chủ, gán, đề nghị, tự phát hành bị chặn (R-56), người khác phát hành, ngừng dùng", "tải mẫu Excel → nạp lại thành mẫu mới…; khởi tạo 14 mẫu…") — màn Admin › Phòng ban › Phòng Trồng trọt › Mẫu báo cáo (`/kn/phong-ban/{phòng ban}/mau-bao-cao`) | **đạt** (cơ chế; nội dung 12/14 mẫu chờ khách Q-01 — nạp lại bằng "Nạp từ Excel") |
 | UR-AD-07 | Admin vào menu mọi cấp, nhập liệu thay khi hỗ trợ; mọi thao tác ghi nhật ký | FN-AD-04.07 | P1, P6 | — | **chưa làm** |
 
 ## 7. Tiêu chí chấp nhận FN
@@ -139,7 +139,7 @@ Mỗi dòng gồm tiêu chí của FN **và** AC-CHUNG (lưu cơ sở dữ liệ
 | FN-AD-04.03 | Chuyển "Đang áp dụng" hiện ngay ở bước 2 đăng nhập; không xóa phòng ban đã có tài khoản/dữ liệu; AC-CHUNG | P2, P1 | — | **chưa làm** |
 | FN-AD-04.04 | Tài khoản mới đúng phạm vi; vai trò khác Admin không thấy menu "Người dùng"; hai Cán bộ xã khác Phòng ban trên cùng xã chỉ thấy dữ liệu Phòng ban mình; mọi lần lưu, khóa, gửi lại mật khẩu, thêm/xóa vai trò hiện trong Log (người, thời điểm, cũ → mới); khóa thu hồi ngay mọi phiên; AC-CHUNG | P1 | — | **chưa làm** |
 | FN-AD-04.05 | Mục danh mục mới hiện ngay trong biểu và màn nhập; không xóa cứng mục đã dùng; AC-CHUNG | P2, P3 | — | **chưa làm** |
-| FN-AD-04.06 | Thêm/bớt cột, dòng hiện đúng trên màn nhập và bảng tổng hợp từ kỳ áp dụng; mẫu mới gán cho phòng ban hiện trong danh sách phát hành của Cấp Tỉnh phòng ban đó; kỳ đã có số giữ phiên bản cũ; AC-CHUNG | P3 | — | **chưa làm** |
+| FN-AD-04.06 | Thêm/bớt cột, dòng hiện đúng trên màn nhập và bảng tổng hợp từ kỳ áp dụng; mẫu mới gán cho phòng ban hiện trong danh sách phát hành của Cấp Tỉnh phòng ban đó; kỳ đã có số giữ phiên bản cũ; AC-CHUNG | P3 | Go `TestFN_AD_04_06_DesignerOps`, `TestFN_XA_03_02_FormEnginePortForP4` (ApplicableVersion/AssignedForms: kỳ đã có số giữ phiên bản cũ), `TestFN_AD_04_06_FormLifecycleSoD` (Log cũ → mới, R-56); Vitest `src/kn/grid/grid.test.tsx`; Playwright `tests/e2e/kn-forms.spec.ts` (cột thêm/đổi công thức hiện ngay trên "Xem trước màn hình nhập liệu" — bộ vẽ lưới dùng chung cho màn nhập P4 — kèm dòng Cộng khu vực/Toàn tỉnh; "T04 vẽ đủ tới cột HR, cố định A–J khi cuộn ngang…"); khung Log `GET /v1/reports/forms/{id}/log` | **một phần** — **mã**: màn nhập Cấp Xã, bảng tổng hợp và danh sách phát hành của Cấp Tỉnh (`GET /v1/reports/forms/available`) dựng ở P4 trên `src/kn/grid` |
 | FN-AD-04.07 | Mọi thao tác hỗ trợ có trong nhật ký (thời điểm, Admin, thay cho ai, chức năng, nội dung, lý do; không xóa); yêu cầu MFA; AC-CHUNG | P1, P6 | — | **chưa làm** |
 
 ## 8. Phi chức năng

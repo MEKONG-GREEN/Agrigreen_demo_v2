@@ -1,0 +1,1570 @@
+[
+ {
+  "name": "T01 tuần 3 mở, lũy kế, dòng tổng",
+  "code": "T01",
+  "input": {
+   "mode": "draft",
+   "open_slots": [
+    3
+   ],
+   "rows": [
+    {
+     "key": "",
+     "commune": "91301",
+     "region": "KV883",
+     "input": {
+      "E": "126",
+      "F": "28",
+      "G": "38",
+      "H": "38.5"
+     },
+     "system": {
+      "B": "Long Xuyên",
+      "C": "Mỹ Hòa Hưng",
+      "D": "126"
+     }
+    },
+    {
+     "key": "",
+     "commune": "91302",
+     "region": "KV883",
+     "input": {
+      "E": "80,25",
+      "H": "12.125",
+      "I": "5",
+      "N": "2026-09-01"
+     },
+     "system": {
+      "D": "90"
+     }
+    },
+    {
+     "key": "",
+     "commune": "91310",
+     "region": "KV884",
+     "input": {
+      "H": "abc",
+      "O": "16/11/2026"
+     }
+    }
+   ]
+  },
+  "result": {
+   "valid": false,
+   "rows": [
+    {
+     "key": "91301",
+     "commune": "91301",
+     "region": "KV883",
+     "cells": {
+      "A": "1",
+      "B": "Long Xuyên",
+      "C": "Mỹ Hòa Hưng",
+      "D": "126",
+      "E": "126",
+      "H": "38.5",
+      "M": "38.5"
+     }
+    },
+    {
+     "key": "91302",
+     "commune": "91302",
+     "region": "KV883",
+     "cells": {
+      "A": "2",
+      "B": "KV883",
+      "C": "91302",
+      "D": "90",
+      "E": "80.25",
+      "H": "12.125",
+      "M": "12.125",
+      "N": "2026-09-01"
+     }
+    },
+    {
+     "key": "91310",
+     "commune": "91310",
+     "region": "KV884",
+     "cells": {
+      "A": "3",
+      "B": "KV884",
+      "C": "91310",
+      "M": "0"
+     }
+    }
+   ],
+   "issues": [
+    {
+     "row_key": "91301",
+     "letter": "F",
+     "code": "reports.cell_period_closed",
+     "message": "chỉ cột của kỳ đang mở được nhập",
+     "severity": "error"
+    },
+    {
+     "row_key": "91301",
+     "letter": "G",
+     "code": "reports.cell_period_closed",
+     "message": "chỉ cột của kỳ đang mở được nhập",
+     "severity": "error"
+    },
+    {
+     "row_key": "91302",
+     "letter": "I",
+     "code": "reports.cell_period_closed",
+     "message": "chỉ cột của kỳ đang mở được nhập",
+     "severity": "error"
+    },
+    {
+     "row_key": "91310",
+     "letter": "H",
+     "code": "reports.cell_invalid_type",
+     "message": "phải là số (dùng dấu chấm thập phân)",
+     "severity": "error"
+    },
+    {
+     "row_key": "91310",
+     "letter": "O",
+     "code": "reports.cell_invalid_type",
+     "message": "ngày dạng YYYY-MM-DD",
+     "severity": "error"
+    }
+   ]
+  },
+  "totals": [
+   {
+    "key": "region:KV883",
+    "kind": "region",
+    "region": "KV883",
+    "members": 2,
+    "cells": {
+     "B": "Cộng KV883",
+     "D": "216",
+     "E": "206.25",
+     "H": "50.625",
+     "M": "50.625"
+    }
+   },
+   {
+    "key": "region:KV884",
+    "kind": "region",
+    "region": "KV884",
+    "members": 1,
+    "cells": {
+     "B": "Cộng KV884",
+     "M": "0"
+    }
+   },
+   {
+    "key": "province",
+    "kind": "province",
+    "members": 3,
+    "cells": {
+     "B": "Toàn tỉnh",
+     "D": "216",
+     "E": "206.25",
+     "H": "50.625",
+     "M": "50.625"
+    }
+   }
+  ]
+ },
+ {
+  "name": "T01 gửi: bắt buộc bỏ qua, kỳ đóng",
+  "code": "T01",
+  "input": {
+   "mode": "submit",
+   "open_slots": [
+    1,
+    2
+   ],
+   "rows": [
+    {
+     "key": "",
+     "commune": "91301",
+     "region": "KV883",
+     "input": {
+      "F": "1",
+      "G": "2.5",
+      "M": "9"
+     }
+    }
+   ]
+  },
+  "result": {
+   "valid": false,
+   "rows": [
+    {
+     "key": "91301",
+     "commune": "91301",
+     "region": "KV883",
+     "cells": {
+      "A": "1",
+      "B": "KV883",
+      "C": "91301",
+      "F": "1",
+      "G": "2.5",
+      "M": "3.5"
+     }
+    }
+   ],
+   "issues": [
+    {
+     "row_key": "91301",
+     "letter": "M",
+     "code": "reports.cell_not_editable",
+     "message": "cột cố định, Tỉnh giao hoặc công thức không nhập tay",
+     "severity": "error"
+    }
+   ]
+  },
+  "totals": [
+   {
+    "key": "region:KV883",
+    "kind": "region",
+    "region": "KV883",
+    "members": 1,
+    "cells": {
+     "B": "Cộng KV883",
+     "F": "1",
+     "G": "2.5",
+     "M": "3.5"
+    }
+   },
+   {
+    "key": "province",
+    "kind": "province",
+    "members": 1,
+    "cells": {
+     "B": "Toàn tỉnh",
+     "F": "1",
+     "G": "2.5",
+     "M": "3.5"
+    }
+   }
+  ]
+ },
+ {
+  "name": "T04 hai cây, năng suất, tỷ lệ",
+  "code": "T04",
+  "input": {
+   "mode": "draft",
+   "open_slots": null,
+   "rows": [
+    {
+     "key": "",
+     "commune": "91301",
+     "region": "KV883",
+     "input": {
+      "HO": "3",
+      "HP": "1",
+      "HR": "7",
+      "K": "0.5",
+      "L": "0.5",
+      "N": "4",
+      "O": "6.5",
+      "P": "9",
+      "R": "162"
+     },
+     "system": {
+      "D": "60"
+     }
+    },
+    {
+     "key": "",
+     "commune": "91302",
+     "region": "KV883",
+     "input": {
+      "K": "10",
+      "L": "0",
+      "N": "0"
+     },
+     "system": {
+      "D": "0"
+     }
+    }
+   ]
+  },
+  "result": {
+   "valid": true,
+   "rows": [
+    {
+     "key": "91301",
+     "commune": "91301",
+     "region": "KV883",
+     "cells": {
+      "A": "1",
+      "AC": "0",
+      "AG": "0",
+      "AK": "0",
+      "AO": "0",
+      "AS": "0",
+      "AW": "0",
+      "B": "KV883",
+      "BA": "0",
+      "BE": "0",
+      "BI": "0",
+      "BM": "0",
+      "BQ": "0",
+      "BU": "0",
+      "BY": "0",
+      "C": "91301",
+      "CC": "0",
+      "CG": "0",
+      "CK": "0",
+      "CO": "0",
+      "CS": "0",
+      "CW": "0",
+      "D": "60",
+      "DA": "0",
+      "DE": "0",
+      "DI": "0",
+      "DM": "0",
+      "DQ": "0",
+      "DU": "0",
+      "DY": "0",
+      "E": "10",
+      "EC": "0",
+      "EG": "0",
+      "EK": "0",
+      "EO": "0",
+      "ES": "0",
+      "EW": "0",
+      "F": "16.6666666667",
+      "FA": "0",
+      "FE": "0",
+      "FI": "0",
+      "FM": "0",
+      "FQ": "0",
+      "FU": "0",
+      "FY": "0",
+      "G": "10.5",
+      "GC": "0",
+      "GG": "0",
+      "GK": "0",
+      "GO": "0",
+      "GS": "0",
+      "GW": "0",
+      "H": "16.4761904762",
+      "HA": "0",
+      "HE": "0",
+      "HI": "0",
+      "HM": "0",
+      "HO": "3",
+      "HP": "1",
+      "HQ": "7",
+      "HR": "7",
+      "I": "173",
+      "J": "105",
+      "K": "0.5",
+      "L": "0.5",
+      "M": "8",
+      "N": "4",
+      "O": "6.5",
+      "P": "9",
+      "Q": "18",
+      "R": "162",
+      "U": "0",
+      "Y": "0"
+     }
+    },
+    {
+     "key": "91302",
+     "commune": "91302",
+     "region": "KV883",
+     "cells": {
+      "A": "2",
+      "AC": "0",
+      "AG": "0",
+      "AK": "0",
+      "AO": "0",
+      "AS": "0",
+      "AW": "0",
+      "B": "KV883",
+      "BA": "0",
+      "BE": "0",
+      "BI": "0",
+      "BM": "0",
+      "BQ": "0",
+      "BU": "0",
+      "BY": "0",
+      "C": "91302",
+      "CC": "0",
+      "CG": "0",
+      "CK": "0",
+      "CO": "0",
+      "CS": "0",
+      "CW": "0",
+      "D": "0",
+      "DA": "0",
+      "DE": "0",
+      "DI": "0",
+      "DM": "0",
+      "DQ": "0",
+      "DU": "0",
+      "DY": "0",
+      "E": "10",
+      "EC": "0",
+      "EG": "0",
+      "EK": "0",
+      "EO": "0",
+      "ES": "0",
+      "EW": "0",
+      "F": "0",
+      "FA": "0",
+      "FE": "0",
+      "FI": "0",
+      "FM": "0",
+      "FQ": "0",
+      "FU": "0",
+      "FY": "0",
+      "G": "0",
+      "GC": "0",
+      "GG": "0",
+      "GK": "0",
+      "GO": "0",
+      "GS": "0",
+      "GW": "0",
+      "H": "0",
+      "HA": "0",
+      "HE": "0",
+      "HI": "0",
+      "HM": "0",
+      "HQ": "0",
+      "I": "0",
+      "J": "0",
+      "K": "10",
+      "L": "0",
+      "M": "0",
+      "N": "0",
+      "Q": "0",
+      "U": "0",
+      "Y": "0"
+     }
+    }
+   ],
+   "issues": []
+  },
+  "totals": [
+   {
+    "key": "region:KV883",
+    "kind": "region",
+    "region": "KV883",
+    "members": 2,
+    "cells": {
+     "AC": "0",
+     "AG": "0",
+     "AK": "0",
+     "AO": "0",
+     "AS": "0",
+     "AW": "0",
+     "B": "Cộng KV883",
+     "BA": "0",
+     "BE": "0",
+     "BI": "0",
+     "BM": "0",
+     "BQ": "0",
+     "BU": "0",
+     "BY": "0",
+     "CC": "0",
+     "CG": "0",
+     "CK": "0",
+     "CO": "0",
+     "CS": "0",
+     "CW": "0",
+     "D": "60",
+     "DA": "0",
+     "DE": "0",
+     "DI": "0",
+     "DM": "0",
+     "DQ": "0",
+     "DU": "0",
+     "DY": "0",
+     "E": "20",
+     "EC": "0",
+     "EG": "0",
+     "EK": "0",
+     "EO": "0",
+     "ES": "0",
+     "EW": "0",
+     "F": "33.3333333333",
+     "FA": "0",
+     "FE": "0",
+     "FI": "0",
+     "FM": "0",
+     "FQ": "0",
+     "FU": "0",
+     "FY": "0",
+     "G": "10.5",
+     "GC": "0",
+     "GG": "0",
+     "GK": "0",
+     "GO": "0",
+     "GS": "0",
+     "GW": "0",
+     "H": "16.4761904762",
+     "HA": "0",
+     "HE": "0",
+     "HI": "0",
+     "HM": "0",
+     "HO": "3",
+     "HP": "1",
+     "HQ": "7",
+     "HR": "7",
+     "I": "173",
+     "J": "52.5",
+     "K": "10.5",
+     "L": "0.5",
+     "M": "8",
+     "N": "4",
+     "O": "6.5",
+     "P": "9",
+     "Q": "18",
+     "R": "162",
+     "U": "0",
+     "Y": "0"
+    }
+   },
+   {
+    "key": "province",
+    "kind": "province",
+    "members": 2,
+    "cells": {
+     "AC": "0",
+     "AG": "0",
+     "AK": "0",
+     "AO": "0",
+     "AS": "0",
+     "AW": "0",
+     "B": "Toàn tỉnh",
+     "BA": "0",
+     "BE": "0",
+     "BI": "0",
+     "BM": "0",
+     "BQ": "0",
+     "BU": "0",
+     "BY": "0",
+     "CC": "0",
+     "CG": "0",
+     "CK": "0",
+     "CO": "0",
+     "CS": "0",
+     "CW": "0",
+     "D": "60",
+     "DA": "0",
+     "DE": "0",
+     "DI": "0",
+     "DM": "0",
+     "DQ": "0",
+     "DU": "0",
+     "DY": "0",
+     "E": "20",
+     "EC": "0",
+     "EG": "0",
+     "EK": "0",
+     "EO": "0",
+     "ES": "0",
+     "EW": "0",
+     "F": "33.3333333333",
+     "FA": "0",
+     "FE": "0",
+     "FI": "0",
+     "FM": "0",
+     "FQ": "0",
+     "FU": "0",
+     "FY": "0",
+     "G": "10.5",
+     "GC": "0",
+     "GG": "0",
+     "GK": "0",
+     "GO": "0",
+     "GS": "0",
+     "GW": "0",
+     "H": "16.4761904762",
+     "HA": "0",
+     "HE": "0",
+     "HI": "0",
+     "HM": "0",
+     "HO": "3",
+     "HP": "1",
+     "HQ": "7",
+     "HR": "7",
+     "I": "173",
+     "J": "52.5",
+     "K": "10.5",
+     "L": "0.5",
+     "M": "8",
+     "N": "4",
+     "O": "6.5",
+     "P": "9",
+     "Q": "18",
+     "R": "162",
+     "U": "0",
+     "Y": "0"
+    }
+   }
+  ]
+ },
+ {
+  "name": "T07 khối 4 cột, % so PL 01",
+  "code": "T07",
+  "input": {
+   "mode": "draft",
+   "open_slots": [
+    2
+   ],
+   "rows": [
+    {
+     "key": "",
+     "commune": "91301",
+     "region": "KV883",
+     "input": {
+      "I": "12.5",
+      "J": "6.2"
+     },
+     "xrefs": {
+      "T01": {
+       "M": "104.5"
+      }
+     }
+    }
+   ]
+  },
+  "result": {
+   "valid": true,
+   "rows": [
+    {
+     "key": "91301",
+     "commune": "91301",
+     "region": "KV883",
+     "cells": {
+      "A": "1",
+      "B": "KV883",
+      "C": "91301",
+      "D": "104.5",
+      "G": "0",
+      "H": "0",
+      "I": "12.5",
+      "J": "6.2",
+      "K": "77.5",
+      "L": "11.961722488",
+      "O": "0",
+      "P": "0",
+      "S": "0",
+      "T": "0",
+      "U": "12.5",
+      "V": "77.5",
+      "W": "6.2",
+      "X": "11.961722488"
+     }
+    }
+   ],
+   "issues": []
+  },
+  "totals": [
+   {
+    "key": "region:KV883",
+    "kind": "region",
+    "region": "KV883",
+    "members": 1,
+    "cells": {
+     "B": "Cộng KV883",
+     "G": "0",
+     "H": "0",
+     "I": "12.5",
+     "J": "6.2",
+     "K": "77.5",
+     "L": "0",
+     "O": "0",
+     "P": "0",
+     "S": "0",
+     "T": "0",
+     "U": "12.5",
+     "V": "77.5",
+     "W": "6.2",
+     "X": "0"
+    }
+   },
+   {
+    "key": "province",
+    "kind": "province",
+    "members": 1,
+    "cells": {
+     "B": "Toàn tỉnh",
+     "G": "0",
+     "H": "0",
+     "I": "12.5",
+     "J": "6.2",
+     "K": "77.5",
+     "L": "0",
+     "O": "0",
+     "P": "0",
+     "S": "0",
+     "T": "0",
+     "U": "12.5",
+     "V": "77.5",
+     "W": "6.2",
+     "X": "0"
+    }
+   }
+  ]
+ },
+ {
+  "name": "T03 ràng buộc liên biểu",
+  "code": "T03",
+  "input": {
+   "mode": "draft",
+   "open_slots": null,
+   "rows": [
+    {
+     "key": "",
+     "commune": "91301",
+     "region": "KV883",
+     "input": {
+      "E": "10",
+      "F": "20.5"
+     },
+     "xrefs": {
+      "T01": {
+       "M": "40"
+      }
+     }
+    },
+    {
+     "key": "",
+     "commune": "91302",
+     "region": "KV883",
+     "input": {
+      "E": "40"
+     },
+     "xrefs": {
+      "T01": {
+       "M": "40"
+      }
+     }
+    }
+   ]
+  },
+  "result": {
+   "valid": false,
+   "rows": [
+    {
+     "key": "91301",
+     "commune": "91301",
+     "region": "KV883",
+     "cells": {
+      "A": "1",
+      "B": "KV883",
+      "C": "91301",
+      "D": "40",
+      "E": "10",
+      "F": "20.5",
+      "J": "30.5"
+     }
+    },
+    {
+     "key": "91302",
+     "commune": "91302",
+     "region": "KV883",
+     "cells": {
+      "A": "2",
+      "B": "KV883",
+      "C": "91302",
+      "D": "40",
+      "E": "40",
+      "J": "40"
+     }
+    }
+   ],
+   "issues": [
+    {
+     "row_key": "91301",
+     "letter": "J",
+     "code": "reports.rule_failed",
+     "message": "Tổng các trà phải bằng diện tích đã xuống giống ở PL 01",
+     "severity": "error",
+     "rule_id": "T03.tong_tra_bang_xg"
+    }
+   ]
+  },
+  "totals": [
+   {
+    "key": "region:KV883",
+    "kind": "region",
+    "region": "KV883",
+    "members": 2,
+    "cells": {
+     "B": "Cộng KV883",
+     "E": "50",
+     "F": "20.5",
+     "J": "70.5"
+    }
+   },
+   {
+    "key": "province",
+    "kind": "province",
+    "members": 2,
+    "cells": {
+     "B": "Toàn tỉnh",
+     "E": "50",
+     "F": "20.5",
+     "J": "70.5"
+    }
+   }
+  ]
+ },
+ {
+  "name": "T05 dòng chỉ tiêu",
+  "code": "T05",
+  "input": {
+   "mode": "draft",
+   "open_slots": null,
+   "rows": [
+    {
+     "key": "",
+     "commune": "91301",
+     "region": "KV883",
+     "indicator": "SB01",
+     "input": {
+      "E": "1.5",
+      "F": "2",
+      "G": "0.25"
+     }
+    },
+    {
+     "key": "",
+     "commune": "91301",
+     "region": "KV883",
+     "indicator": "SB02",
+     "input": {
+      "E": "3"
+     }
+    },
+    {
+     "key": "",
+     "commune": "91302",
+     "region": "KV884",
+     "indicator": "SB01",
+     "input": {
+      "E": "1"
+     }
+    },
+    {
+     "key": "",
+     "commune": "91302",
+     "region": "KV884",
+     "indicator": "XX99",
+     "input": {}
+    }
+   ]
+  },
+  "result": {
+   "valid": false,
+   "rows": [
+    {
+     "key": "91301/SB01",
+     "commune": "91301",
+     "region": "KV883",
+     "indicator": "SB01",
+     "cells": {
+      "A": "1",
+      "B": "KV883",
+      "C": "91301",
+      "D": "Đối tượng sâu bệnh 1 (chờ khách Q-01)",
+      "E": "1.5",
+      "F": "2",
+      "G": "0.25",
+      "H": "3.75"
+     }
+    },
+    {
+     "key": "91301/SB02",
+     "commune": "91301",
+     "region": "KV883",
+     "indicator": "SB02",
+     "cells": {
+      "A": "1",
+      "B": "KV883",
+      "C": "91301",
+      "D": "Đối tượng sâu bệnh 2 (chờ khách Q-01)",
+      "E": "3",
+      "H": "3"
+     }
+    },
+    {
+     "key": "91302/SB01",
+     "commune": "91302",
+     "region": "KV884",
+     "indicator": "SB01",
+     "cells": {
+      "A": "2",
+      "B": "KV884",
+      "C": "91302",
+      "D": "Đối tượng sâu bệnh 1 (chờ khách Q-01)",
+      "E": "1",
+      "H": "1"
+     }
+    }
+   ],
+   "issues": [
+    {
+     "row_key": "91302/XX99",
+     "code": "reports.row_invalid",
+     "message": "chỉ tiêu không có trong mẫu",
+     "severity": "error"
+    }
+   ]
+  },
+  "totals": [
+   {
+    "key": "region:KV883/SB01",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB01",
+    "members": 1,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 1 (chờ khách Q-01)",
+     "E": "1.5",
+     "F": "2",
+     "G": "0.25",
+     "H": "3.75"
+    }
+   },
+   {
+    "key": "region:KV883/SB02",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB02",
+    "members": 1,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 2 (chờ khách Q-01)",
+     "E": "3",
+     "H": "3"
+    }
+   },
+   {
+    "key": "region:KV883/SB03",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB03",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 3 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV883/SB04",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB04",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 4 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV883/SB05",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB05",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 5 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV883/SB06",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB06",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 6 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV883/SB07",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB07",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 7 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV883/SB08",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB08",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 8 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV883/SB09",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB09",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 9 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV883/SB10",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB10",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 10 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV883/SB11",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB11",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 11 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV883/SB12",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB12",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 12 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV883/SB13",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB13",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 13 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV883/SB14",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB14",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 14 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV883/SB15",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB15",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 15 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV883/SB16",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB16",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 16 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV883/SB17",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB17",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 17 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV883/SB18",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB18",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 18 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV883/SB19",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB19",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 19 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV883/SB20",
+    "kind": "region",
+    "region": "KV883",
+    "indicator": "SB20",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV883 – Đối tượng sâu bệnh 20 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB01",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB01",
+    "members": 1,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 1 (chờ khách Q-01)",
+     "E": "1",
+     "H": "1"
+    }
+   },
+   {
+    "key": "region:KV884/SB02",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB02",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 2 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB03",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB03",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 3 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB04",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB04",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 4 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB05",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB05",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 5 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB06",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB06",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 6 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB07",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB07",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 7 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB08",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB08",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 8 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB09",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB09",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 9 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB10",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB10",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 10 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB11",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB11",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 11 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB12",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB12",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 12 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB13",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB13",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 13 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB14",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB14",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 14 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB15",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB15",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 15 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB16",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB16",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 16 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB17",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB17",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 17 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB18",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB18",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 18 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB19",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB19",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 19 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "region:KV884/SB20",
+    "kind": "region",
+    "region": "KV884",
+    "indicator": "SB20",
+    "members": 0,
+    "cells": {
+     "B": "Cộng KV884 – Đối tượng sâu bệnh 20 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB01",
+    "kind": "province",
+    "indicator": "SB01",
+    "members": 2,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 1 (chờ khách Q-01)",
+     "E": "2.5",
+     "F": "2",
+     "G": "0.25",
+     "H": "4.75"
+    }
+   },
+   {
+    "key": "province/SB02",
+    "kind": "province",
+    "indicator": "SB02",
+    "members": 1,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 2 (chờ khách Q-01)",
+     "E": "3",
+     "H": "3"
+    }
+   },
+   {
+    "key": "province/SB03",
+    "kind": "province",
+    "indicator": "SB03",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 3 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB04",
+    "kind": "province",
+    "indicator": "SB04",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 4 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB05",
+    "kind": "province",
+    "indicator": "SB05",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 5 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB06",
+    "kind": "province",
+    "indicator": "SB06",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 6 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB07",
+    "kind": "province",
+    "indicator": "SB07",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 7 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB08",
+    "kind": "province",
+    "indicator": "SB08",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 8 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB09",
+    "kind": "province",
+    "indicator": "SB09",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 9 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB10",
+    "kind": "province",
+    "indicator": "SB10",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 10 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB11",
+    "kind": "province",
+    "indicator": "SB11",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 11 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB12",
+    "kind": "province",
+    "indicator": "SB12",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 12 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB13",
+    "kind": "province",
+    "indicator": "SB13",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 13 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB14",
+    "kind": "province",
+    "indicator": "SB14",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 14 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB15",
+    "kind": "province",
+    "indicator": "SB15",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 15 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB16",
+    "kind": "province",
+    "indicator": "SB16",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 16 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB17",
+    "kind": "province",
+    "indicator": "SB17",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 17 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB18",
+    "kind": "province",
+    "indicator": "SB18",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 18 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB19",
+    "kind": "province",
+    "indicator": "SB19",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 19 (chờ khách Q-01)",
+     "H": "0"
+    }
+   },
+   {
+    "key": "province/SB20",
+    "kind": "province",
+    "indicator": "SB20",
+    "members": 0,
+    "cells": {
+     "B": "Toàn tỉnh – Đối tượng sâu bệnh 20 (chờ khách Q-01)",
+     "H": "0"
+    }
+   }
+  ]
+ }
+]

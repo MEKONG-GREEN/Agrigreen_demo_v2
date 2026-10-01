@@ -573,3 +573,87 @@ fieldset.plain legend { font-size: 12.5px; font-weight: 600; color: var(--ink2);
   .alert-row { grid-template-columns: 36px minmax(0, 1fr); }
   .alert-row time, .alert-row .btn { grid-column: 2; justify-self: start; }
 }
+
+/* ---------- Lưới mẫu báo cáo KN v7.7 (src/kn/grid — Hình 14, 15, 27) ---------- */
+.fgrid-tools { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.fgrid-tools .fchip select { position: static; opacity: 1; border: none; background: transparent; font-weight: 500; color: var(--slate-900); cursor: pointer; }
+.fgrid-wrap { overflow: auto; border: 1px solid var(--slate-200); border-radius: 8px; background: #fff; position: relative; outline: none; }
+.fgrid-wrap:focus-visible { box-shadow: var(--focus); }
+.fgrid-t { border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: 12px; }
+.fgrid-t th, .fgrid-t td { border-right: 1px solid var(--slate-200); border-bottom: 1px solid var(--slate-200); padding: 4px 6px; overflow: hidden; text-overflow: ellipsis; }
+.fgrid-t thead { position: sticky; top: 0; z-index: 3; }
+.fgrid-t thead th { background: var(--slate-50); color: var(--slate-700); font-weight: 600; text-align: center; vertical-align: middle; white-space: normal; line-height: 1.3; }
+.fgrid-t .g-letters th { background: var(--slate-100); color: var(--slate-500); font-weight: 500; font-size: 11px; padding: 2px 4px; height: 22px; }
+.fgrid-t .g-letters th.is-activecol { background: var(--primary-50); color: var(--brand-900); }
+.fgrid-t .g-letters th.is-colsel, .fgrid-t td.is-colsel { box-shadow: inset 0 0 0 2px var(--primary); }
+.fgrid-t .g-letters th.is-colsel { background: var(--primary); color: #fff; }
+.g-letter-btn { width: 100%; font: inherit; color: inherit; }
+.fgrid-t th.is-hsel { background: #fff7d6; box-shadow: inset 0 0 0 2px #f0b429; }
+.fgrid-t .g-frz { position: sticky; z-index: 2; }
+.fgrid-t thead .g-frz { z-index: 4; }
+.fgrid-t .g-frz-last { box-shadow: 2px 0 0 var(--slate-300); }
+.fgrid-t td { height: 32px; white-space: nowrap; background: #fff; color: var(--slate-900); cursor: default; }
+.fgrid-t td.g-num { text-align: right; font-variant-numeric: tabular-nums; }
+.fgrid-t td.g-fixed { background: var(--slate-50); color: var(--slate-700); }
+.fgrid-t td.g-prov { background: #f3f6ff; color: #23408e; }
+.fgrid-t td.g-input { background: #fff; box-shadow: inset 0 0 0 1px var(--slate-400); }
+.fgrid-t td.g-open { background: #fff; box-shadow: inset 0 0 0 2px var(--primary); }
+.fgrid-t td.g-closed { background: var(--slate-100); color: var(--slate-500); }
+.fgrid-t td.g-formula { background: #f1faf3; color: var(--primary-ink); font-weight: 600; }
+.fgrid-t .g-inactive { background: repeating-linear-gradient(45deg, var(--slate-50), var(--slate-50) 4px, var(--slate-100) 4px, var(--slate-100) 8px); color: var(--slate-400); }
+.fgrid-t tr.g-total td { background: #f6f9f2; font-weight: 700; color: var(--slate-900); border-top: 1px solid var(--slate-300); }
+.fgrid-t tr.g-total-province td { background: #e9f5ec; }
+.fgrid-t tr.g-row-issue td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
+.fgrid-t td.is-err { background: var(--danger-bg) !important; box-shadow: inset 0 0 0 2px var(--danger) !important; color: #7a1a12; }
+.fgrid-t td.is-warn { background: var(--warning-bg) !important; box-shadow: inset 0 0 0 2px #e0a23a !important; }
+.fgrid-t td.is-active { outline: 2px solid #1d4ed8; outline-offset: -2px; z-index: 1; }
+.fgrid-t td.is-active.g-frz { z-index: 3; }
+.g-edit { width: 100%; height: 100%; border: none; outline: none; background: #fff; font: inherit; text-align: inherit; padding: 0; }
+.fgrid-t tr.g-kinds td { background: var(--slate-50); color: var(--slate-500); font-size: 11px; text-align: center; height: 26px; cursor: pointer; }
+.fgrid-t tr.g-kinds td.g-kind-formula { color: var(--primary-ink); font-weight: 700; }
+.fgrid-t tr.g-kinds td.g-kind-per_period { box-shadow: inset 0 0 0 2px var(--primary); color: var(--brand-900); }
+.fgrid-t tr.g-kinds td.g-kind-input { background: #fff; box-shadow: inset 0 0 0 1px var(--slate-400); }
+.g-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; list-style: none; font-size: 12px; color: var(--slate-600); }
+.g-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.g-sw { display: inline-block; width: 16px; height: 12px; border-radius: 3px; border: 1px solid var(--slate-300); }
+.g-sw.g-fixed { background: var(--slate-50); }
+.g-sw.g-input { background: #fff; border-color: var(--slate-500); }
+.g-sw.g-open { background: #fff; border: 2px solid var(--primary); }
+.g-sw.g-closed { background: var(--slate-100); }
+.g-sw.g-formula { background: #f1faf3; border-color: var(--primary-line); }
+.g-sw.g-prov { background: #f3f6ff; border-color: #c5d1f5; }
+.ftabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.ftab { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid var(--slate-200); border-bottom: none; border-radius: 10px 10px 0 0; background: var(--slate-50); color: var(--slate-600); }
+.ftab[aria-selected="true"] { background: #fff; color: var(--slate-900); box-shadow: inset 0 3px 0 var(--primary); }
+.ftab-st { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; background: var(--info-bg); color: var(--info); }
+.fentry-body { padding: 16px; border-top-left-radius: 0; display: flex; flex-direction: column; gap: 12px; }
+.freq { font-size: 12.5px; }
+.fentry-foot { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--slate-200); padding-top: 10px; }
+.fissues h3 { font-size: 14px; display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+.fissues ul { list-style: none; display: flex; flex-direction: column; gap: 2px; max-height: 200px; overflow: auto; }
+.fissues button { text-align: left; width: 100%; padding: 4px 8px; border-radius: 6px; font-size: 12.5px; }
+.fissues li.is-err button { color: #7a1a12; }
+.fissues li.is-warn button { color: var(--warning); }
+.fissues button:hover { background: var(--slate-100); }
+
+/* Trình thiết kế mẫu (FN-AD-04.06, Hình 27) */
+.fd-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; align-items: start; }
+.fd-main { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.fd-main h2, .fd-side h2 { font-size: 16px; }
+.fd-toolbar { display: flex; flex-wrap: wrap; gap: 6px; }
+.fd-toolbar .btn { border: 1px solid var(--slate-200); background: #fff; }
+.fd-toolbar .btn:hover:not(:disabled) { background: var(--slate-50); }
+.fd-side { display: flex; flex-direction: column; gap: 14px; }
+.fd-side .card { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.fd-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.fd-side .input, .fd-side .select, .fd-side .textarea, .dlg .input, .dlg .select, .dlg .textarea { width: 100%; }
+.fgrid-ro td.g-input, .fgrid-ro td.g-open { box-shadow: none; }
+.fd-hint { font-size: 12px; color: var(--slate-600); }
+.fd-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.fd-formula { font-family: ui-monospace, Consolas, monospace; }
+.fd-sod { font-size: 12px; color: var(--slate-600); background: var(--slate-50); border: 1px dashed var(--slate-300); border-radius: 8px; padding: 8px 10px; }
+.fd-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.fd-list li { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: 12.5px; border-bottom: 1px solid var(--slate-100); padding-bottom: 4px; }
+.fd-pend { font-size: 12px; }
+.fd-pend li { margin-left: 16px; }
+@media (max-width: 1280px) { .fd-grid { grid-template-columns: 1fr; } }
