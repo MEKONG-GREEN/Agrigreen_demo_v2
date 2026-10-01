@@ -17,6 +17,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering"
 	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
@@ -75,11 +76,12 @@ type Modules struct {
 	CropCycle     *cropcycle.Module
 	Metrics       *metrics.Module
 	ExtData       *extdata.Module // proxy khử định danh nguồn ngoài (ADR-0007), không vai DB
+	Metering      *metering.Module
 }
 
 // List trả module theo thứ tự gắn route.
 func (m Modules) List() []httpx.Module {
-	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.Waterway, m.Simulation, m.CropCycle, m.Metrics, m.ExtData}
+	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.Waterway, m.Simulation, m.CropCycle, m.Metrics, m.ExtData, m.Metering}
 }
 
 // Build là gốc lắp ráp DUY NHẤT: mở pool theo vai của từng module (R-05) và nối
@@ -264,21 +266,33 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		return Modules{}, pools, err
 	}
 
-	// G5 (ADR-0022): nguồn sản phẩm collection_volume cần dữ kiện thửa (pf/geo) + đơn vị hành chính.
-	cc.UseCollectionVolume(g.PlotFacts(), md.AdminUnits())
-	// G5 (ADR-0024): mọi đường xuất phía nền tảng qua MỘT điểm kiểm soát; nil → hành vi cũ.
+	// pf/metering (G5, ADR-0023/0024): sổ sử dụng Public API, điểm kiểm soát xuất (AG_EGRESS_MODE: observe | enforce),
+	// bảng kê (Admin API; worker dựng ảnh chụp). Tham số kênh/giá đọc pf/masterdata; gói hạn mức nối UsePlans (pf/apiclient).
 	mode, err := EgressModeFromEnv(os.Getenv)
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	rep.UseEgress(ext.Egress, mode)
-	mrvMod.UseEgress(ext.Egress, mode, slog.Default())
-	g.UseEgress(ext.Egress, mode, slog.Default())
-	cc.UseEgress(ext.Egress, mode, slog.Default())
-	pty.UseEgress(ext.Egress, mode, slog.Default())
+	meterPool, err := pool(metering.DBRole)
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	meter := metering.New(meterPool, clk, metering.Deps{Params: md.Params(), Mode: mode})
+
+	// G5 (ADR-0022): nguồn sản phẩm collection_volume cần dữ kiện thửa (pf/geo) + đơn vị hành chính.
+	cc.UseCollectionVolume(g.PlotFacts(), md.AdminUnits())
+	// G5 (ADR-0024): mọi đường xuất phía nền tảng qua MỘT điểm kiểm soát — pf/metering (ext.Egress ghi đè cho kiểm thử).
+	egress := ext.Egress
+	if egress == nil {
+		egress = meter.Checkpoint()
+	}
+	rep.UseEgress(egress, mode)
+	mrvMod.UseEgress(egress, mode, slog.Default())
+	g.UseEgress(egress, mode, slog.Default())
+	cc.UseEgress(egress, mode, slog.Default())
+	pty.UseEgress(egress, mode, slog.Default())
 
 	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
-		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Metrics: met, ExtData: ed}, pools, nil
+		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Metrics: met, ExtData: ed, Metering: meter}, pools, nil
 }
 
 // EgressModeFromEnv đọc AG_EGRESS_MODE (ADR-0024 mục 2): rỗng → observe; giá trị lạ → lỗi khởi động.
