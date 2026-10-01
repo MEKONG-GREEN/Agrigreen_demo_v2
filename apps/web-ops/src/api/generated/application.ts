@@ -6762,7 +6762,7 @@ export interface components {
             id: string;
             /** Format: uuid */
             grantor_tenant_id: string;
-            kinds: ("cooperative_directory" | "plot_directory" | "season_harvest_dates" | "htx_collection_responses" | "waterway_routes" | "valve_hub" | "valve_collection" | "valve_mrv_evidence")[];
+            kinds: ("cooperative_directory" | "plot_directory" | "season_harvest_dates" | "htx_collection_responses" | "waterway_routes" | "valve_hub" | "valve_collection" | "valve_mrv_evidence" | "dp_collection_volume" | "dp_hub_capacity" | "dp_mrv_package_status")[];
             /** Format: date-time */
             valid_from: string;
             /** Format: date-time */

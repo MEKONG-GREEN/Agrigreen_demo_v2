@@ -14,6 +14,10 @@
 //     trong internal/mkg/**, schema ở contracts/events-internal/, chỉ phát với
 //     outbox.KindInternal (vhost mkg.internal) — không bao giờ lên exchange nền
 //     tảng (xem internal.go).
+//   - Sản phẩm dữ liệu Public API (G5, ADR-0022): contracts/dataproduct/<tên>.json
+//     đủ siêu dữ liệu, không dữ liệu cá nhân; struct //ag:dataproduct <tên> chỉ có
+//     trường của hợp đồng, đúng kiểu; mỗi sản phẩm có tag trong
+//     contracts/openapi/public.yaml (xem dataproduct.go).
 //
 // Chạy: go run ./tools/contractcheck [-base origin/main]
 package main
@@ -87,6 +91,7 @@ type annotated struct {
 	event       string // "<type> v<N>"
 	publication string
 	internal    string // //ag:internal-event "<type> v<N>" (ADR-0018)
+	dataproduct string // //ag:dataproduct <tên> (G5, ADR-0022 — xem dataproduct.go)
 }
 
 // loadSchemas đọc mọi schema sự kiện trong contracts/<sub>/, khóa "<type> v<N>".
@@ -201,7 +206,10 @@ func Check(root, base string) ([]string, error) {
 			if m := internalTagRe.FindStringSubmatch(d.doc); m != nil {
 				a.internal = m[1] + " v" + m[2]
 			}
-			if a.event != "" || a.publication != "" || a.internal != "" {
+			if m := dpTagRe.FindStringSubmatch(d.doc); m != nil {
+				a.dataproduct = m[1]
+			}
+			if a.event != "" || a.publication != "" || a.internal != "" || a.dataproduct != "" {
 				ann[annKey(pkg, name)] = a
 			}
 		}
@@ -243,6 +251,17 @@ func Check(root, base string) ([]string, error) {
 		}
 	}
 	problems = append(problems, ix.mkgRules(ann)...)
+	// Sản phẩm dữ liệu Public API (G5, ADR-0022 mục 9).
+	prods, dpp, err := loadDataProducts(root)
+	if err != nil {
+		return nil, err
+	}
+	problems = append(problems, dpp...)
+	dpr, err := ix.dataProductRules(root, ann, prods)
+	if err != nil {
+		return nil, err
+	}
+	problems = append(problems, dpr...)
 	sort.Strings(problems)
 	return problems, nil
 }

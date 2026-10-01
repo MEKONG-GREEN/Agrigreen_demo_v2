@@ -7795,7 +7795,7 @@ components:
         grantor_tenant_id: {type: string, format: uuid}
         kinds:
           type: array
-          items: {type: string, enum: [cooperative_directory, plot_directory, season_harvest_dates, htx_collection_responses, waterway_routes, valve_hub, valve_collection, valve_mrv_evidence]}
+          items: {type: string, enum: [cooperative_directory, plot_directory, season_harvest_dates, htx_collection_responses, waterway_routes, valve_hub, valve_collection, valve_mrv_evidence, dp_collection_volume, dp_hub_capacity, dp_mrv_package_status]}
         valid_from: {type: string, format: date-time}
         valid_to: {type: string, format: date-time}
     PartnerWaterwayPoint:

@@ -672,3 +672,30 @@ Proxy khử định danh cho nguồn dữ liệu ngoài — thời tiết, độ
 | 502 | `extdata.provider_unavailable` | pf/extdata: nhà cung cấp không phản hồi, trả mã khác 200, thân không phải JSON, quá lớn hoặc loại tile không cho phép. Lỗi không nêu URL (có thể chứa khóa API) |
 
 Tọa độ sai dạng, thiếu `lat`/`lon`, `z/x/y` không phải số trả `validation_failed`.
+
+### pf/apiclient (Public API — `cmd/api-public`, `contracts/openapi/public.yaml`; G5-0 đóng băng, ADR-0022)
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 401 | `apiclient.unauthenticated` | Khóa API thiếu, sai dạng, sai, đã thu hồi, hết hạn, hoặc khách hàng không `active` — không nói lý do; không ghi sổ sử dụng (chỉ log `key_prefix` + metric) |
+| 403 | `apiclient.forbidden` | Thiếu scope, thiếu cấp quyền `dp_<sản phẩm>` đang hiệu lực của bên cấp, hoặc sản phẩm không phục vụ ở môi trường này (dự thảo ở production) — không nói thiếu điều kiện nào |
+| 404 | `apiclient.unknown_product` | Không có sản phẩm dữ liệu với tên này |
+| 429 | `apiclient.rate_limited` | Vượt giới hạn tần suất mỗi phút của gói (`Retry-After`) |
+| 500 | `apiclient.contract_violation` | Phần tử sắp trả có trường ngoài hợp đồng `contracts/dataproduct` — không trả gì, cảnh báo vận hành |
+| 403 | `apiclient.self_approval` | Admin API: người duyệt khách hàng / đăng ký sản phẩm / gói hạn mức là người đề xuất (R-56) |
+| 409 | `apiclient.too_many_keys` | Admin API: khách hàng đã có tối đa 2 khóa hiệu lực |
+| 422 | `apiclient.export_too_large` | Yêu cầu xuất vượt `max_export_rows` của gói |
+
+Khóa API **không bao giờ** xuất hiện trong lỗi, log, URL, sự kiện (R-14, R-92); chỉ `key_prefix`.
+
+### pf/metering (sổ đo lường sử dụng, điểm kiểm soát xuất dữ liệu, bảng kê — G5-0 đóng băng, ADR-0023, ADR-0024)
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 503 | `metering.unavailable` | Public API: không ghi được sổ sử dụng — **không trả dữ liệu** (đóng khi lỗi) |
+| 429 | `metering.quota_exceeded` | Vượt hạn mức đơn vị ngày/tháng của gói (`Retry-After` tới đầu cửa sổ kế tiếp); dòng sổ vẫn ghi với `units = 0` |
+| 429 | `metering.egress_quota_exceeded` | Điểm kiểm soát xuất (`AG_EGRESS_MODE=enforce`) từ chối: vượt hạn mức kênh `metering.egress.<kênh>.daily_records_quota`. Kênh `valve`: consumer giao lại → DLQ |
+| 503 | `metering.egress_unavailable` | Điểm kiểm soát xuất lỗi ở chế độ `enforce` — không xuất (ở `observe` chỉ log + metric, thao tác tiếp tục) |
+| 403 | `metering.self_approval` | Người duyệt bảng kê là người yêu cầu lập (R-56) |
+| 409 | `metering.statement_frozen` | Bảng kê đã duyệt — lập bảng kê bù (`supersedes_id`) |
+| 409 | `metering.period_not_ended` | Yêu cầu lập bảng kê cho kỳ chưa kết thúc (giờ Việt Nam) |

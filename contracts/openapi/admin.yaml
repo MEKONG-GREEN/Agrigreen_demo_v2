@@ -4846,7 +4846,7 @@ components:
     # --- pf/party: cấp quyền chia sẻ (ADR-0020) ---
     ShareKind:
       type: string
-      enum: [cooperative_directory, plot_directory, season_harvest_dates, htx_collection_responses, waterway_routes, valve_hub, valve_collection, valve_mrv_evidence]
+      enum: [cooperative_directory, plot_directory, season_harvest_dates, htx_collection_responses, waterway_routes, valve_hub, valve_collection, valve_mrv_evidence, dp_collection_volume, dp_hub_capacity, dp_mrv_package_status]
     ShareGrant:
       type: object
       required: [id, grantor_tenant_id, grantee_tenant_id, kinds, purpose, valid_from, valid_to, status, proposed_by, proposed_at, approved_by, approved_at, revoked_by, revoked_at, revoke_reason]

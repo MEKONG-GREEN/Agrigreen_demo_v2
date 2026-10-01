@@ -39,12 +39,32 @@ const (
 	KindValveHub         = "valve_hub"          // hub_facility, hub_capacity → pf/geo hub_view
 	KindValveCollection  = "valve_collection"   // collection_schedule, htx_collection_statement → pf/cropcycle
 	KindValveMRVEvidence = "valve_mrv_evidence" // mrv_collection_evidence → pf/mrv
+	// Sản phẩm dữ liệu Public API (G5-0, pf 000047; ADR-0022 mục 3): bên cấp (chủ dữ liệu) → tenant
+	// BÊN THỨ BA. Loại = "dp_" + tên hợp đồng contracts/dataproduct/<tên>.json (DataProductKind).
+	KindDPCollectionVolume = "dp_collection_volume"  // số cuộn + diện tích đã gom theo xã × vụ × tháng, ngưỡng k
+	KindDPHubCapacity      = "dp_hub_capacity"       // hub MKG đã công bố, sức chứa danh định, bậc sử dụng
+	KindDPMRVPackageStatus = "dp_mrv_package_status" // trạng thái gói xuất MRV cho đơn vị thẩm định
 )
 
-// ShareKinds là mọi loại hợp lệ (khớp CHECK của migration pf 000042, mở rộng ở pf 000046).
+// ShareKinds là mọi loại hợp lệ (khớp CHECK của migration pf 000042, mở rộng ở pf 000046, pf 000047).
 var ShareKinds = []string{KindCooperativeDirectory, KindPlotDirectory, KindSeasonHarvestDates, KindHTXCollectionResponses,
 	KindWaterwayRoutes,
-	KindValveHub, KindValveCollection, KindValveMRVEvidence}
+	KindValveHub, KindValveCollection, KindValveMRVEvidence,
+	KindDPCollectionVolume, KindDPHubCapacity, KindDPMRVPackageStatus}
+
+// DataProductKind trả loại cấp quyền của một sản phẩm dữ liệu Public API: "dp_<product>".
+func DataProductKind(product string) string { return "dp_" + product }
+
+// GrantLookup (G5-0, ADR-0022 mục 3) cho cmd/api-public kiểm cấp quyền của bên thứ ba MÀ KHÔNG cần
+// vai OIDC (bên gọi là khách hàng API đã xác thực bằng khóa, không phải người dùng Keycloak):
+// trả cấp quyền active, trong hạn tại at, bên cấp grantor → bên nhận grantee (tenant bên thứ ba lấy
+// từ bản ghi khóa — không bao giờ từ request), có loại kind, ở CẢ bảng chiếu bên nhận lẫn bảng hiện
+// hành bên cấp. grantor = uuid.Nil → chỉ nhận khi đúng một bên cấp. Lỗi như PartnerAccess.Authorize
+// (ErrShareGrantMissing, ErrShareGrantorAmbiguous). Chỉ đọc; ghi sổ đọc vẫn bằng
+// PartnerAccess.RecordRead trước khi trả dữ liệu.
+type GrantLookup interface {
+	ActiveGrant(ctx context.Context, grantee, grantor uuid.UUID, kind string, at time.Time) (ShareGrant, error)
+}
 
 // ValidKind cho biết k có là loại dữ liệu của cấp quyền.
 func ValidKind(k string) bool { return slices.Contains(ShareKinds, k) }

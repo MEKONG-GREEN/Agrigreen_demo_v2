@@ -180,7 +180,50 @@ Còn lại:
 - **chờ khách**: nhà cung cấp phần mềm kế toán + chế độ kế toán + hệ thống tài khoản (Q-1, B-09); khóa phân bổ chi phí (Q-2); công thức giá quyết toán, hạn thanh toán (Q-3); tỷ lệ chia doanh thu carbon (Q-4); ngưỡng duyệt giá / chiết khấu (Q-5); quy đổi ẩm (Q-6, C-4); đơn giá cước, ngưỡng đường thủy, tải ghe (Q-7); khối lượng ĐTK 2 cho diễn tập tải.
 - **hạ tầng**: cụm Kubernetes được quản trị trong lãnh thổ (chưa chọn nhà cung cấp), áp NetworkPolicy / PKI / mTLS / admission ký image trên cụm, CA thiết bị production + VPN biên, sao lưu pgBackRest + diễn tập phục hồi, diễn tập tải ĐTK 2 và R-22 trên bản sao dữ liệu thật ở staging, PgBouncer thật, `promtool`, CI (GitHub Actions bị chặn do thanh toán), kiểm thử máy ảo app.
 
-## G5–G6
+## G5 — Phase K, `pf/metering`, Public API cho bên thứ ba (nhánh `sub/g5`)
+
+Phụ lục A: "Phase K; `pf/metering` và Public API bật với bên thứ ba đầu tiên" (Q4/2028), cộng mục 18 (một điểm kiểm soát cho mọi đường xuất). Quy ước, số migration, vai, sự kiện, sản phẩm dữ liệu, tham số tạm: [docs/dev/g5-conventions.md](dev/g5-conventions.md). Quyết định: ADR-0022..0025. Nghiệm thu: [docs/uat/g5-acceptance.md](uat/g5-acceptance.md) (79 yêu cầu, đều chưa làm).
+
+### G5-0: nền móng và hợp đồng đóng băng (01/10/2026, xong)
+
+- [x] ADR-0022 Public API:
+  - tiến trình riêng `cmd/api-public`, tắt ở ĐTK 1 bằng cấu hình;
+  - khóa API lưu HMAC + pepper, scope, cấp quyền `dp_*`;
+  - giới hạn ở gateway + hạn mức thẩm quyền ở backend;
+  - R-50..R-53.
+- [x] ADR-0023 `pf/metering`: sổ sử dụng là chứng từ, đơn vị `metering.units.v1`, bảng kê tháng, R-56, giá tùy chọn.
+- [x] ADR-0024 DLP: `Checkpoint` duy nhất ở `pf/metering`, `observe`/`enforce`, van kiểm ở phía nhận.
+- [x] ADR-0025 hồ sơ Phase K: lớp giá trị, cấp tenant bên thứ ba, đơn vị thẩm định.
+- [x] Số migration:
+  - pf 000047: schema `pf_apiclient`, `pf_metering`, loại cấp quyền `dp_*` (**đã có**);
+  - pf 000048 apiclient;
+  - pf 000049 metering;
+  - pf 000050–000051 dự phòng;
+  - mkg 000022 không dùng.
+- [x] Vai DB `apiclient_app`, `metering_app`, `public_api` (dbadmin + PgBouncer CI/Compose). Vai nghiệp vụ `api_client_admin`, `api_client_approver`, `metering_viewer`, `billing_officer`, `billing_approver` (hằng `port/` + realm).
+- [x] Port đóng băng:
+  - `apiclient/port`: `Authenticator`, `TokenAuthenticator`, `Plans`, ba nguồn sản phẩm, DTO `//ag:dataproduct`;
+  - `metering/port`: `Ledger`, `Quotas`, `Usage`, `Checkpoint`, `Guard`, `UnitsV1`;
+  - `party/port`: `GrantLookup`, `DataProductKind`.
+  
+  Ba sự kiện: `pf.apiclient.export.requested`, `pf.metering.statement.requested`, `pf.metering.egress.anomaly_detected`.
+- [x] Hợp đồng sản phẩm dữ liệu `contracts/dataproduct/*` (dự thảo, chờ khách): `collection_volume` (k nông hộ), `hub_capacity`, `mrv_package_status`. `contractcheck` kiểm struct `//ag:dataproduct` và tag của `contracts/openapi/public.yaml` (khung).
+- [x] archlint: `cmd/api-public` không import `mkg/**` (R-03), không import vault kể cả client (RB-3); `agnofloat` cho `metering` có testdata.
+
+### G5-1: module, hạ tầng, client (song song, theo hợp đồng G5-0)
+
+Theo [g5-conventions §8](dev/g5-conventions.md#8-đợt-g5-1-song-song-theo-hợp-đồng-g5-0):
+
+| Đợt | Phạm vi |
+|---|---|
+| **A** | `pf/apiclient` + `cmd/api-public` |
+| **M** | `pf/metering` |
+| **S** | nguồn sản phẩm ở `pf/cropcycle`, `pf/geo`, `pf/mrv`, `pf/party` |
+| **D** | tích hợp DLP vào báo cáo / MRV / van |
+| **H** | hạ tầng Phase K |
+| **W** | `apps/web-ops` |
+| **E** | E2E + diễn tập bật Phase K |
+
+## G6
 Theo Phụ lục A của tài liệu kiến trúc:
-- **G5 (Q4/2028):** Public API và metering.
-- **G6 (Q1/2029):** cấu hình Phase 1, không sửa mã.
+- **G6 (Q1/2029):** cấu hình Phase 1, không sửa mã. Cơ chế giống Phase K: một lớp giá trị mới (ADR-0025).
