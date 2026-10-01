@@ -18,6 +18,7 @@ import (
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
@@ -107,6 +108,11 @@ type Service struct {
 	Recipients port.RecipientDirectory // nil → màn lập lịch của quản lý HTX trả 503
 	Mailer     port.Mailer             // nil → bỏ gửi email kèm cảnh báo
 	LinkBase   string                  // URL gốc web-ops: <LinkBase>/reports/exports/<id>
+
+	// Egress (G5, ADR-0024 mục 3): điểm kiểm soát xuất DÙNG CHUNG (pf/metering, kênh report_export),
+	// gọi NGAY SAU điểm kiểm soát cục bộ egress ở cả ba lối. Nil → hành vi cũ.
+	Egress     meteringport.Checkpoint
+	EgressMode meteringport.Mode
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

@@ -17,6 +17,7 @@ package app
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"slices"
 	"strings"
@@ -25,6 +26,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -32,6 +35,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -50,11 +54,17 @@ const maxShareValidity = 5 * 366 * 24 * time.Hour
 type Sharing struct {
 	DB    tenant.Beginner // pool vai party_app
 	Clock clock.Clock
+	// Egress (G5, ADR-0024): điểm kiểm soát xuất dùng chung (pf/metering) cho kênh partner_share
+	// ở RecordRead. Nil → hành vi cũ (chỉ sổ partner_read_log).
+	Egress     meteringport.Checkpoint
+	EgressMode meteringport.Mode
+	Log        *slog.Logger
 }
 
 var (
 	_ port.PartnerAccess = (*Sharing)(nil)
 	_ port.ValveGrants   = (*Sharing)(nil)
+	_ port.GrantLookup   = (*Sharing)(nil)
 )
 
 // ProposeShareInput là dữ liệu đề xuất cấp quyền.
@@ -393,10 +403,53 @@ func (s *Sharing) Authorize(ctx context.Context, kind string, grantor uuid.UUID)
 	return gs[0], nil
 }
 
-// RecordRead cài đặt port.PartnerAccess: một dòng partner_read_log ở tenant bên cấp.
+// ActiveGrant cài đặt port.GrantLookup (G5, ADR-0022 mục 3) cho cmd/api-public: không kiểm vai OIDC
+// (bên gọi là khách hàng API đã xác thực bằng khóa) nên CHỈ nhận loại sản phẩm dữ liệu dp_* — các
+// loại khác vẫn phải qua Authorize (vai mkg_sync). Cùng truy vấn hai phía như Authorize: bảng chiếu
+// bên nhận + bảng hiện hành bên cấp, trạng thái active (chưa thu hồi), at ∈ [valid_from, valid_to).
+func (s *Sharing) ActiveGrant(ctx context.Context, grantee, grantor uuid.UUID, kind string, at time.Time) (port.ShareGrant, error) {
+	if grantee == uuid.Nil || !port.ValidKind(kind) || !strings.HasPrefix(kind, port.DataProductKind("")) {
+		return port.ShareGrant{}, port.ErrShareGrantMissing
+	}
+	if at.IsZero() {
+		at = s.Clock.Now()
+	}
+	gs, err := s.activeFor(ctx, grantee, kind, grantor, at)
+	if err != nil {
+		return port.ShareGrant{}, err
+	}
+	if len(gs) == 0 {
+		return port.ShareGrant{}, port.ErrShareGrantMissing
+	}
+	for _, g := range gs[1:] {
+		if g.Grantor != gs[0].Grantor {
+			return port.ShareGrant{}, port.ErrShareGrantorAmbiguous
+		}
+	}
+	return gs[0], nil
+}
+
+// readerOf trả (bên nhận, người đọc) của một lần đọc: người dùng OIDC của tenant bên nhận (bề mặt
+// /v1/partner/*) hoặc khách hàng Public API (apiclientport.Caller — tenant bên thứ ba lấy từ bản ghi
+// khóa, người đọc = mã khách hàng API). viaAPI = true với khách hàng Public API.
+func readerOf(ctx context.Context) (tid, actor uuid.UUID, viaAPI, ok bool) {
+	if p, ok := authz.FromContext(ctx); ok {
+		return p.TenantID, p.ActorRef, false, true
+	}
+	if c, ok := apiclientport.CallerFrom(ctx); ok && c.Client.ID != uuid.Nil {
+		return c.Client.ClientTenantID, c.Client.ID, true, true
+	}
+	return uuid.Nil, uuid.Nil, false, false
+}
+
+// RecordRead cài đặt port.PartnerAccess: một dòng partner_read_log ở tenant bên cấp. Với bề mặt
+// /v1/partner/* (người gọi OIDC), lần đọc cũng đi qua điểm kiểm soát xuất kênh partner_share
+// (ADR-0024 mục 3, P2) TRƯỚC khi ghi sổ đọc; enforce + từ chối → không ghi, không trả dữ liệu. Lần
+// đọc của khách hàng Public API không qua kênh partner_share: api-public đã ghi egress public_api
+// cùng giao dịch với sổ sử dụng (ADR-0023) — không đếm hai lần.
 func (s *Sharing) RecordRead(ctx context.Context, g port.ShareGrant, r port.PartnerRead) error {
-	p, ok := authz.FromContext(ctx)
-	if !ok || p.TenantID != g.Grantee || g.Grantor == uuid.Nil {
+	tid, actor, viaAPI, ok := readerOf(ctx)
+	if !ok || tid != g.Grantee || g.Grantor == uuid.Nil {
 		return port.ErrPartnerAuditUnavailable
 	}
 	var q *string
@@ -408,7 +461,16 @@ func (s *Sharing) RecordRead(ctx context.Context, g port.ShareGrant, r port.Part
 		q = &v
 	}
 	row := store.ReadLog{ID: ids.New(), TenantID: g.Grantor, GrantID: g.ID, Grantee: g.Grantee, Kind: r.Kind, Endpoint: r.Endpoint, Query: q,
-		Items: r.Items, EventTime: s.Clock.Now(), ActorRef: p.ActorRef, IdemKey: "read:" + ids.New().String()}
+		Items: r.Items, EventTime: s.Clock.Now(), ActorRef: actor, IdemKey: "read:" + ids.New().String()}
+	if !viaAPI {
+		if err := meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
+			SourceID: row.ID, Channel: meteringport.ChannelPartnerShare, DataTenantID: g.Grantor,
+			CounterpartyKind: meteringport.CounterpartyTenant, CounterpartyRef: g.Grantee, Product: r.Kind,
+			Records: int64(r.Items), OccurredAt: row.EventTime, ActorRef: actor, TraceID: telemetry.TraceID(ctx),
+		}, s.Log); err != nil {
+			return err
+		}
+	}
 	if err := tenant.WithTenantTx(ctx, s.DB, g.Grantor, func(tx pgx.Tx) error { return store.InsertReadLog(ctx, tx, &row) }); err != nil {
 		return port.ErrPartnerAuditUnavailable.WithCause(err)
 	}

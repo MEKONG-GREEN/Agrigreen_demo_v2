@@ -478,6 +478,14 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		}
 		md := masterdata.New(mdPool, clk)
 		rep := reports.New(repPool, clk, reports.Deps{Params: md.Params(), Log: log})
+		// G5 (ADR-0024): lối "lịch" của xuất báo cáo qua điểm kiểm soát chung (kênh report_export).
+		// AG_EGRESS_MODE sai → lỗi khởi động. Checkpoint pf/metering: nil tới khi nối đợt M (hành vi cũ).
+		mode, err := assembly.EgressModeFromEnv(os.Getenv)
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		rep.UseEgress(workerEgress, mode)
 		js = append(js, rep.Jobs(reports.ScheduleTenants(out.pools[migrations.PF]), log)...)
 	}
 	if selected(jobs, mechport.JobAreaFeedCheck) {

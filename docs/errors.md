@@ -79,7 +79,7 @@ Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính m�
 | 422 | `party.membership_reason_required` | pf/party: đổi thành viên HTX phải nêu lý do 10–500 ký tự |
 | 404 | `party.share_grant_not_found` | pf/party (ADR-0020): không có cấp quyền chia sẻ trong tenant bên cấp của người gọi (bên nhận không xem được sổ của bên cấp) |
 | 409 | `party.share_grant_state` | pf/party (ADR-0020): chỉ duyệt được bản `proposed` còn hạn; bản đã thu hồi không thao tác được nữa |
-| 403 | `party.share_grant_missing` | pf/party (ADR-0020): bề mặt đối tác `/v1/partner/*` — tenant người gọi không có cấp quyền chia sẻ ĐANG HIỆU LỰC (đã duyệt, trong hạn, chưa thu hồi) có loại dữ liệu này, hoặc `grantor` không cấp cho tenant người gọi. Cũng trả cho `GET /v1/cropcycle/htx-collection/responses` (bí danh) |
+| 403 | `party.share_grant_missing` | pf/party (ADR-0020): bề mặt đối tác `/v1/partner/*` — tenant người gọi không có cấp quyền chia sẻ ĐANG HIỆU LỰC (đã duyệt, trong hạn, chưa thu hồi) có loại dữ liệu này, hoặc `grantor` không cấp cho tenant người gọi. Cũng trả cho `GET /v1/cropcycle/htx-collection/responses` (bí danh). G5 (ADR-0022): `GrantLookup.ActiveGrant` của Public API trả mã này khi bên thứ ba không có cấp quyền `dp_*` đang hiệu lực tại thời điểm gọi, hoặc khi loại không phải `dp_*` (cổng không vai OIDC chỉ mở cho sản phẩm dữ liệu) — `cmd/api-public` đổi thành 403 `apiclient.forbidden` |
 | 422 | `party.share_grantor_ambiguous` | pf/party (ADR-0020): nhiều tenant bên cấp cùng cấp loại dữ liệu này cho tenant người gọi — truyền tham số `grantor` |
 | 404 | `party.partner_not_found` | pf/party (ADR-0020): `GET /v1/partner/cooperatives/{ref}` — bên cấp không có HTX này (lần đọc vẫn được ghi sổ) |
 | 503 | `party.partner_audit_unavailable` | pf/party (ADR-0020): không ghi được sổ đọc `pf_party.partner_read_log` — bề mặt đối tác không trả dữ liệu chưa ghi sổ |
@@ -310,7 +310,7 @@ Cổng `geo.GpsLog.RecordFix` (module khác gọi, không qua HTTP) trả lỗi 
 | 404 | `cropcycle.collection_statement_not_found` | pf/cropcycle (G3-2): không có bảng kê thu gom MKG trong phạm vi (quản lý HTX chỉ thấy bảng kê của HTX mình) |
 | 409 | `cropcycle.collection_statement_stale` | pf/cropcycle (G3-2): phản hồi theo `revision` cũ — MKG đã gửi bản sửa; `current_revision` là bản hiện hành |
 | 403 | `cropcycle.collection_manager_only` | pf/cropcycle (G3-2): chỉ `coop_manager` của đúng HTX (`org_ref`) được xác nhận/tranh chấp bảng kê |
-| 503 | `cropcycle.dependency_unavailable` | pf/cropcycle: chưa nối hoặc không gọi được pf/geo, pf/party, pf/masterdata, liên kết tài khoản ↔ nông hộ (vai `farmer`); consumer `pf.cropcycle.gps_log` chưa nối log GPS pf/geo (sự kiện được giao lại) |
+| 503 | `cropcycle.dependency_unavailable` | pf/cropcycle: chưa nối hoặc không gọi được pf/geo, pf/party, pf/masterdata, liên kết tài khoản ↔ nông hộ (vai `farmer`); consumer `pf.cropcycle.gps_log` chưa nối log GPS pf/geo (sự kiện được giao lại). G5: nguồn sản phẩm `collection_volume` chưa nối `geoport.PlotFacts` / `AdminUnits` hoặc không đọc được |
 
 Nhãn vị trí (HTX US-GPS-01/02): `location_status` = `match` (≤ `cropcycle.gps_match_tolerance_m`, mặc định 50 m) | `mismatch` | `missing`; nguồn `gps_source` luôn có. Thiếu GPS hoặc không đo được **không** chặn lưu.
 
@@ -694,8 +694,8 @@ Khóa API **không bao giờ** xuất hiện trong lỗi, log, URL, sự kiện 
 |---|---|---|
 | 503 | `metering.unavailable` | Public API: không ghi được sổ sử dụng — **không trả dữ liệu** (đóng khi lỗi) |
 | 429 | `metering.quota_exceeded` | Vượt hạn mức đơn vị ngày/tháng của gói (`Retry-After` tới đầu cửa sổ kế tiếp); dòng sổ vẫn ghi với `units = 0` |
-| 429 | `metering.egress_quota_exceeded` | Điểm kiểm soát xuất (`AG_EGRESS_MODE=enforce`) từ chối: vượt hạn mức kênh `metering.egress.<kênh>.daily_records_quota`. Kênh `valve`: consumer giao lại → DLQ |
-| 503 | `metering.egress_unavailable` | Điểm kiểm soát xuất lỗi ở chế độ `enforce` — không xuất (ở `observe` chỉ log + metric, thao tác tiếp tục) |
+| 429 | `metering.egress_quota_exceeded` | Điểm kiểm soát xuất (`AG_EGRESS_MODE=enforce`) từ chối: vượt hạn mức kênh `metering.egress.<kênh>.daily_records_quota`. Trả ở: `POST /v1/reports/exports`, `GET /v1/reports/exports/{id}/download` (kênh `report_export`, SAU hạn mức người/ngày `reports.export_quota_exceeded`; lối lịch bỏ mốc, không lỗi job); `POST /v1/mrv/exports`, `GET /v1/mrv/exports/{id}/package` (kênh `mrv_package`, không tạo job / không cấp URL); `/v1/partner/*` (kênh `partner_share`, không ghi sổ đọc, không trả dữ liệu). Kênh `valve` (consumer `pf.geo.hub_valve`, `pf.cropcycle.htx_collection_valve`, `pf.mrv.collection_evidence`): lỗi consumer, không ghi, giao lại → DLQ |
+| 503 | `metering.egress_unavailable` | Điểm kiểm soát xuất lỗi ở chế độ `enforce` — không xuất (ở `observe` chỉ log `event=egress outcome=checkpoint_error` + metric, thao tác tiếp tục). Cùng các lối như `metering.egress_quota_exceeded` |
 | 403 | `metering.self_approval` | Người duyệt bảng kê là người yêu cầu lập (R-56) |
 | 409 | `metering.statement_frozen` | Bảng kê đã duyệt — lập bảng kê bù (`supersedes_id`) |
 | 409 | `metering.period_not_ended` | Yêu cầu lập bảng kê cho kỳ chưa kết thúc (giờ Việt Nam) |

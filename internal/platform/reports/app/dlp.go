@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -44,6 +45,12 @@ type Egress struct {
 //     đánh dấu; lần đầu vượt trong ngày phát pf.reports.export.anomaly v1.
 //
 // Đếm được tuần tự hóa bằng khóa tư vấn theo (tenant, người, ngày).
+//
+// G5 (ADR-0024 mục 3): sau khi điểm kiểm soát cục bộ cho qua (hạn mức người/ngày), lần xuất đi tiếp
+// qua điểm kiểm soát DÙNG CHUNG của pf/metering (kênh report_export: hạn mức theo tenant/kênh/bên
+// nhận, nhật ký thống nhất) TRƯỚC khi ghi export_audit — enforce + từ chối → không có dòng nhật ký
+// cục bộ, thao tác không xảy ra. Mã reports.export_quota_exceeded và sự kiện pf.reports.export.anomaly
+// giữ nguyên; checkpoint nil → hành vi cũ.
 func (s *Service) egress(ctx context.Context, tx pgx.Tx, e Egress) error {
 	now := s.now()
 	day := clock.BusinessDate(now).String()
@@ -72,6 +79,14 @@ func (s *Service) egress(ctx context.Context, tx pgx.Tx, e Egress) error {
 		}
 		row.DailyCount = count + 1
 		row.Anomaly = row.DailyCount > threshold
+	}
+	if err := meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
+		SourceID: row.ID, Channel: meteringport.ChannelReportExport, DataTenantID: e.TenantID,
+		CounterpartyKind: meteringport.CounterpartyActor, CounterpartyRef: e.ActorRef, Product: e.TemplateKey,
+		Records: 1, OccurredAt: now, ActorRef: e.ActorRef, TraceID: telemetry.TraceID(ctx),
+	}, s.log()); err != nil {
+		lg.Warn("điểm kiểm soát xuất dùng chung từ chối", "outcome", "egress_denied")
+		return err
 	}
 	if err := store.InsertAudit(ctx, tx, e.TenantID, row); err != nil {
 		return err
