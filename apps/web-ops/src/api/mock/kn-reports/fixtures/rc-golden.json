@@ -1,0 +1,1505 @@
+{
+ "_note": "SINH TỰ ĐỘNG bởi TestWebReportCycleFixture (internal/platform/extension/reportcycle/domain) — không sửa tay.",
+ "status_labels": {
+  "adjustment_requested": "Yêu cầu điều chỉnh",
+  "closed": "Đã chốt",
+  "confirmed": "Đã xác nhận",
+  "draft": "Lưu nháp",
+  "not_started": "Chưa nhập",
+  "overdue": "Trễ hạn",
+  "submitted": "Đã nộp"
+ },
+ "default_deadlines": {
+  "adhoc": {
+   "offset_days": 7,
+   "time": "17:00"
+  },
+  "month": {
+   "offset_days": 10,
+   "time": "17:00"
+  },
+  "season": {
+   "offset_days": 7,
+   "time": "17:00"
+  },
+  "week": {
+   "offset_days": 2,
+   "time": "17:00"
+  },
+  "year": {
+   "offset_days": 7,
+   "time": "17:00"
+  }
+ },
+ "default_close_after_days": 3,
+ "max_periods": 60,
+ "split": [
+  {
+   "name": "tuần từ thứ Tư, 3 kỳ",
+   "period_type": "week",
+   "from_date": "2026-09-02",
+   "to_date": "2026-09-20",
+   "season_label": "Thu Đông 2026",
+   "week_numbering": "season",
+   "deadline": {
+    "offset_days": 2,
+    "time": "17:00"
+   },
+   "close_after_days": 3,
+   "periods": [
+    {
+     "slot": 1,
+     "label": "Tuần 1",
+     "range_label": "02/09–06/09/2026",
+     "iso_week": 36,
+     "from_date": "2026-09-02",
+     "to_date": "2026-09-06",
+     "due_at": "2026-09-08T10:00:00Z",
+     "auto_close_at": "2026-09-11T10:00:00Z"
+    },
+    {
+     "slot": 2,
+     "label": "Tuần 2",
+     "range_label": "07/09–13/09/2026",
+     "iso_week": 37,
+     "from_date": "2026-09-07",
+     "to_date": "2026-09-13",
+     "due_at": "2026-09-15T10:00:00Z",
+     "auto_close_at": "2026-09-18T10:00:00Z"
+    },
+    {
+     "slot": 3,
+     "label": "Tuần 3",
+     "range_label": "14/09–20/09/2026",
+     "iso_week": 38,
+     "from_date": "2026-09-14",
+     "to_date": "2026-09-20",
+     "due_at": "2026-09-22T10:00:00Z",
+     "auto_close_at": "2026-09-25T10:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v1-tam;week=season"
+  },
+  {
+   "name": "tuần ISO",
+   "period_type": "week",
+   "from_date": "2026-09-07",
+   "to_date": "2026-09-27",
+   "season_label": "",
+   "week_numbering": "iso",
+   "deadline": {
+    "offset_days": 2,
+    "time": "17:00"
+   },
+   "close_after_days": 1,
+   "periods": [
+    {
+     "slot": 1,
+     "label": "Tuần 37",
+     "range_label": "07/09–13/09/2026",
+     "iso_week": 37,
+     "from_date": "2026-09-07",
+     "to_date": "2026-09-13",
+     "due_at": "2026-09-15T10:00:00Z",
+     "auto_close_at": "2026-09-16T10:00:00Z"
+    },
+    {
+     "slot": 2,
+     "label": "Tuần 38",
+     "range_label": "14/09–20/09/2026",
+     "iso_week": 38,
+     "from_date": "2026-09-14",
+     "to_date": "2026-09-20",
+     "due_at": "2026-09-22T10:00:00Z",
+     "auto_close_at": "2026-09-23T10:00:00Z"
+    },
+    {
+     "slot": 3,
+     "label": "Tuần 39",
+     "range_label": "21/09–27/09/2026",
+     "iso_week": 39,
+     "from_date": "2026-09-21",
+     "to_date": "2026-09-27",
+     "due_at": "2026-09-29T10:00:00Z",
+     "auto_close_at": "2026-09-30T10:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v1-tam;week=iso"
+  },
+  {
+   "name": "tuần qua năm",
+   "period_type": "week",
+   "from_date": "2026-12-21",
+   "to_date": "2027-01-10",
+   "season_label": "Đông Xuân 2026-2027",
+   "week_numbering": "season",
+   "deadline": {
+    "offset_days": 1,
+    "time": "08:30"
+   },
+   "close_after_days": 0,
+   "periods": [
+    {
+     "slot": 1,
+     "label": "Tuần 1",
+     "range_label": "21/12–27/12/2026",
+     "iso_week": 52,
+     "from_date": "2026-12-21",
+     "to_date": "2026-12-27",
+     "due_at": "2026-12-28T01:30:00Z",
+     "auto_close_at": "2026-12-28T01:30:00Z"
+    },
+    {
+     "slot": 2,
+     "label": "Tuần 2",
+     "range_label": "28/12/2026–03/01/2027",
+     "iso_week": 53,
+     "from_date": "2026-12-28",
+     "to_date": "2027-01-03",
+     "due_at": "2027-01-04T01:30:00Z",
+     "auto_close_at": "2027-01-04T01:30:00Z"
+    },
+    {
+     "slot": 3,
+     "label": "Tuần 3",
+     "range_label": "04/01–10/01/2027",
+     "iso_week": 1,
+     "from_date": "2027-01-04",
+     "to_date": "2027-01-10",
+     "due_at": "2027-01-11T01:30:00Z",
+     "auto_close_at": "2027-01-11T01:30:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v1-tam;week=season"
+  },
+  {
+   "name": "tháng",
+   "period_type": "month",
+   "from_date": "2026-07-15",
+   "to_date": "2026-09-30",
+   "season_label": "",
+   "week_numbering": "season",
+   "deadline": {
+    "offset_days": 10,
+    "time": "17:00"
+   },
+   "close_after_days": 3,
+   "periods": [
+    {
+     "slot": 1,
+     "label": "Tháng 7/2026",
+     "range_label": "15/07–31/07/2026",
+     "iso_week": 0,
+     "from_date": "2026-07-15",
+     "to_date": "2026-07-31",
+     "due_at": "2026-08-10T10:00:00Z",
+     "auto_close_at": "2026-08-13T10:00:00Z"
+    },
+    {
+     "slot": 2,
+     "label": "Tháng 8/2026",
+     "range_label": "01/08–31/08/2026",
+     "iso_week": 0,
+     "from_date": "2026-08-01",
+     "to_date": "2026-08-31",
+     "due_at": "2026-09-10T10:00:00Z",
+     "auto_close_at": "2026-09-13T10:00:00Z"
+    },
+    {
+     "slot": 3,
+     "label": "Tháng 9/2026",
+     "range_label": "01/09–30/09/2026",
+     "iso_week": 0,
+     "from_date": "2026-09-01",
+     "to_date": "2026-09-30",
+     "due_at": "2026-10-10T10:00:00Z",
+     "auto_close_at": "2026-10-13T10:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v1-tam;week=season"
+  },
+  {
+   "name": "vụ",
+   "period_type": "season",
+   "from_date": "2026-09-01",
+   "to_date": "2026-12-31",
+   "season_label": "Thu Đông 2026",
+   "week_numbering": "season",
+   "deadline": {
+    "offset_days": 7,
+    "time": "17:00"
+   },
+   "close_after_days": 3,
+   "periods": [
+    {
+     "slot": 1,
+     "label": "Thu Đông 2026",
+     "range_label": "01/09–31/12/2026",
+     "iso_week": 0,
+     "from_date": "2026-09-01",
+     "to_date": "2026-12-31",
+     "due_at": "2027-01-07T10:00:00Z",
+     "auto_close_at": "2027-01-10T10:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v1-tam;week=season"
+  },
+  {
+   "name": "năm không tên",
+   "period_type": "year",
+   "from_date": "2026-01-01",
+   "to_date": "2026-12-31",
+   "season_label": "",
+   "week_numbering": "season",
+   "deadline": {
+    "offset_days": 7,
+    "time": "17:00"
+   },
+   "close_after_days": 5,
+   "periods": [
+    {
+     "slot": 1,
+     "label": "Năm 2026",
+     "range_label": "01/01–31/12/2026",
+     "iso_week": 0,
+     "from_date": "2026-01-01",
+     "to_date": "2026-12-31",
+     "due_at": "2027-01-07T10:00:00Z",
+     "auto_close_at": "2027-01-12T10:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v1-tam;week=season"
+  },
+  {
+   "name": "đột xuất",
+   "period_type": "adhoc",
+   "from_date": "2026-10-01",
+   "to_date": "2026-10-03",
+   "season_label": "Rà soát sau lũ",
+   "week_numbering": "season",
+   "deadline": {
+    "offset_days": 7,
+    "time": "17:00"
+   },
+   "close_after_days": 2,
+   "periods": [
+    {
+     "slot": 1,
+     "label": "Rà soát sau lũ",
+     "range_label": "01/10–03/10/2026",
+     "iso_week": 0,
+     "from_date": "2026-10-01",
+     "to_date": "2026-10-03",
+     "due_at": "2026-10-10T10:00:00Z",
+     "auto_close_at": "2026-10-12T10:00:00Z"
+    }
+   ],
+   "error": null,
+   "rule_tag": "kn.period_rule/v1-tam;week=season"
+  },
+  {
+   "name": "đến ngày trước từ ngày",
+   "period_type": "week",
+   "from_date": "2026-09-07",
+   "to_date": "2026-09-01",
+   "season_label": "",
+   "week_numbering": "season",
+   "deadline": {
+    "offset_days": 2,
+    "time": "17:00"
+   },
+   "close_after_days": 3,
+   "periods": [],
+   "error": {
+    "Field": "to_date",
+    "Msg": "phải không trước from_date"
+   },
+   "rule_tag": "kn.period_rule/v1-tam;week=season"
+  },
+  {
+   "name": "quá số kỳ",
+   "period_type": "week",
+   "from_date": "2025-01-01",
+   "to_date": "2026-12-31",
+   "season_label": "",
+   "week_numbering": "season",
+   "deadline": {
+    "offset_days": 2,
+    "time": "17:00"
+   },
+   "close_after_days": 3,
+   "periods": [],
+   "error": {
+    "Field": "to_date",
+    "Msg": "tối đa 60 kỳ mỗi đợt"
+   },
+   "rule_tag": "kn.period_rule/v1-tam;week=season"
+  },
+  {
+   "name": "giờ sai",
+   "period_type": "week",
+   "from_date": "2026-09-07",
+   "to_date": "2026-09-13",
+   "season_label": "",
+   "week_numbering": "season",
+   "deadline": {
+    "offset_days": 2,
+    "time": "25:00"
+   },
+   "close_after_days": 3,
+   "periods": [],
+   "error": {
+    "Field": "deadline.time",
+    "Msg": "giờ phải dạng HH:MM"
+   },
+   "rule_tag": "kn.period_rule/v1-tam;week=season"
+  },
+  {
+   "name": "chốt sau hạn quá 60",
+   "period_type": "week",
+   "from_date": "2026-09-07",
+   "to_date": "2026-09-13",
+   "season_label": "",
+   "week_numbering": "season",
+   "deadline": {
+    "offset_days": 2,
+    "time": "17:00"
+   },
+   "close_after_days": 61,
+   "periods": [],
+   "error": {
+    "Field": "close_after_days",
+    "Msg": "0–60 ngày"
+   },
+   "rule_tag": "kn.period_rule/v1-tam;week=season"
+  },
+  {
+   "name": "loại kỳ lạ",
+   "period_type": "quarter",
+   "from_date": "2026-09-07",
+   "to_date": "2026-09-13",
+   "season_label": "",
+   "week_numbering": "season",
+   "deadline": {
+    "offset_days": 2,
+    "time": "17:00"
+   },
+   "close_after_days": 3,
+   "periods": [],
+   "error": {
+    "Field": "period_type",
+    "Msg": "week | month | season | year | adhoc"
+   },
+   "rule_tag": "kn.period_rule/v1-tam;week=season"
+  }
+ ],
+ "status": [
+  {
+   "status": "not_started",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": null,
+   "now": "2026-09-15T09:59:00Z",
+   "display": "not_started",
+   "label": "Chưa nhập",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "not_started",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": null,
+   "now": "2026-09-15T10:00:00Z",
+   "display": "overdue",
+   "label": "Trễ hạn",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "not_started",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": null,
+   "now": "2026-09-17T10:00:00Z",
+   "display": "overdue",
+   "label": "Trễ hạn",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "not_started",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T09:59:00Z",
+   "display": "not_started",
+   "label": "Chưa nhập",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "not_started",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T10:00:00Z",
+   "display": "overdue",
+   "label": "Trễ hạn",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "not_started",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-17T10:00:00Z",
+   "display": "overdue",
+   "label": "Trễ hạn",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "not_started",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": null,
+   "now": "2026-09-15T09:59:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": true
+  },
+  {
+   "status": "not_started",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": null,
+   "now": "2026-09-15T10:00:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": true
+  },
+  {
+   "status": "not_started",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": null,
+   "now": "2026-09-17T10:00:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": true
+  },
+  {
+   "status": "not_started",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T09:59:00Z",
+   "display": "not_started",
+   "label": "Chưa nhập",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "not_started",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T10:00:00Z",
+   "display": "overdue",
+   "label": "Trễ hạn",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "not_started",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-17T10:00:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": true
+  },
+  {
+   "status": "draft",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": null,
+   "now": "2026-09-15T09:59:00Z",
+   "display": "draft",
+   "label": "Lưu nháp",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "draft",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": null,
+   "now": "2026-09-15T10:00:00Z",
+   "display": "overdue",
+   "label": "Trễ hạn",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "draft",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": null,
+   "now": "2026-09-17T10:00:00Z",
+   "display": "overdue",
+   "label": "Trễ hạn",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "draft",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T09:59:00Z",
+   "display": "draft",
+   "label": "Lưu nháp",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "draft",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T10:00:00Z",
+   "display": "overdue",
+   "label": "Trễ hạn",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "draft",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-17T10:00:00Z",
+   "display": "overdue",
+   "label": "Trễ hạn",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "draft",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": null,
+   "now": "2026-09-15T09:59:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": true
+  },
+  {
+   "status": "draft",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": null,
+   "now": "2026-09-15T10:00:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": true
+  },
+  {
+   "status": "draft",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": null,
+   "now": "2026-09-17T10:00:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": true
+  },
+  {
+   "status": "draft",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T09:59:00Z",
+   "display": "draft",
+   "label": "Lưu nháp",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "draft",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T10:00:00Z",
+   "display": "overdue",
+   "label": "Trễ hạn",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "draft",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-17T10:00:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": true
+  },
+  {
+   "status": "submitted",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": null,
+   "now": "2026-09-15T09:59:00Z",
+   "display": "submitted",
+   "label": "Đã nộp",
+   "open": true,
+   "pending": false
+  },
+  {
+   "status": "submitted",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": null,
+   "now": "2026-09-15T10:00:00Z",
+   "display": "submitted",
+   "label": "Đã nộp",
+   "open": true,
+   "pending": false
+  },
+  {
+   "status": "submitted",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": null,
+   "now": "2026-09-17T10:00:00Z",
+   "display": "submitted",
+   "label": "Đã nộp",
+   "open": true,
+   "pending": false
+  },
+  {
+   "status": "submitted",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T09:59:00Z",
+   "display": "submitted",
+   "label": "Đã nộp",
+   "open": true,
+   "pending": false
+  },
+  {
+   "status": "submitted",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T10:00:00Z",
+   "display": "submitted",
+   "label": "Đã nộp",
+   "open": true,
+   "pending": false
+  },
+  {
+   "status": "submitted",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-17T10:00:00Z",
+   "display": "submitted",
+   "label": "Đã nộp",
+   "open": true,
+   "pending": false
+  },
+  {
+   "status": "submitted",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": null,
+   "now": "2026-09-15T09:59:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": false
+  },
+  {
+   "status": "submitted",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": null,
+   "now": "2026-09-15T10:00:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": false
+  },
+  {
+   "status": "submitted",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": null,
+   "now": "2026-09-17T10:00:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": false
+  },
+  {
+   "status": "submitted",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T09:59:00Z",
+   "display": "submitted",
+   "label": "Đã nộp",
+   "open": true,
+   "pending": false
+  },
+  {
+   "status": "submitted",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T10:00:00Z",
+   "display": "submitted",
+   "label": "Đã nộp",
+   "open": true,
+   "pending": false
+  },
+  {
+   "status": "submitted",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-17T10:00:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": false
+  },
+  {
+   "status": "adjustment_requested",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": null,
+   "now": "2026-09-15T09:59:00Z",
+   "display": "adjustment_requested",
+   "label": "Yêu cầu điều chỉnh",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "adjustment_requested",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": null,
+   "now": "2026-09-15T10:00:00Z",
+   "display": "adjustment_requested",
+   "label": "Yêu cầu điều chỉnh",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "adjustment_requested",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": null,
+   "now": "2026-09-17T10:00:00Z",
+   "display": "adjustment_requested",
+   "label": "Yêu cầu điều chỉnh",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "adjustment_requested",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T09:59:00Z",
+   "display": "adjustment_requested",
+   "label": "Yêu cầu điều chỉnh",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "adjustment_requested",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T10:00:00Z",
+   "display": "adjustment_requested",
+   "label": "Yêu cầu điều chỉnh",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "adjustment_requested",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-17T10:00:00Z",
+   "display": "adjustment_requested",
+   "label": "Yêu cầu điều chỉnh",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "adjustment_requested",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": null,
+   "now": "2026-09-15T09:59:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": true
+  },
+  {
+   "status": "adjustment_requested",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": null,
+   "now": "2026-09-15T10:00:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": true
+  },
+  {
+   "status": "adjustment_requested",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": null,
+   "now": "2026-09-17T10:00:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": true
+  },
+  {
+   "status": "adjustment_requested",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T09:59:00Z",
+   "display": "adjustment_requested",
+   "label": "Yêu cầu điều chỉnh",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "adjustment_requested",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T10:00:00Z",
+   "display": "adjustment_requested",
+   "label": "Yêu cầu điều chỉnh",
+   "open": true,
+   "pending": true
+  },
+  {
+   "status": "adjustment_requested",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-17T10:00:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": true
+  },
+  {
+   "status": "confirmed",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": null,
+   "now": "2026-09-15T09:59:00Z",
+   "display": "confirmed",
+   "label": "Đã xác nhận",
+   "open": true,
+   "pending": false
+  },
+  {
+   "status": "confirmed",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": null,
+   "now": "2026-09-15T10:00:00Z",
+   "display": "confirmed",
+   "label": "Đã xác nhận",
+   "open": true,
+   "pending": false
+  },
+  {
+   "status": "confirmed",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": null,
+   "now": "2026-09-17T10:00:00Z",
+   "display": "confirmed",
+   "label": "Đã xác nhận",
+   "open": true,
+   "pending": false
+  },
+  {
+   "status": "confirmed",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T09:59:00Z",
+   "display": "confirmed",
+   "label": "Đã xác nhận",
+   "open": true,
+   "pending": false
+  },
+  {
+   "status": "confirmed",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T10:00:00Z",
+   "display": "confirmed",
+   "label": "Đã xác nhận",
+   "open": true,
+   "pending": false
+  },
+  {
+   "status": "confirmed",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": false,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-17T10:00:00Z",
+   "display": "confirmed",
+   "label": "Đã xác nhận",
+   "open": true,
+   "pending": false
+  },
+  {
+   "status": "confirmed",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": null,
+   "now": "2026-09-15T09:59:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": false
+  },
+  {
+   "status": "confirmed",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": null,
+   "now": "2026-09-15T10:00:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": false
+  },
+  {
+   "status": "confirmed",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": null,
+   "now": "2026-09-17T10:00:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": false
+  },
+  {
+   "status": "confirmed",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T09:59:00Z",
+   "display": "confirmed",
+   "label": "Đã xác nhận",
+   "open": true,
+   "pending": false
+  },
+  {
+   "status": "confirmed",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-15T10:00:00Z",
+   "display": "confirmed",
+   "label": "Đã xác nhận",
+   "open": true,
+   "pending": false
+  },
+  {
+   "status": "confirmed",
+   "due_at": "2026-09-15T10:00:00Z",
+   "period_closed": true,
+   "reopened_until": "2026-09-17T10:00:00Z",
+   "now": "2026-09-17T10:00:00Z",
+   "display": "closed",
+   "label": "Đã chốt",
+   "open": false,
+   "pending": false
+  }
+ ],
+ "diff": [
+  {
+   "name": "lần đầu: mọi ô là Gửi mới, cột công thức Tự tính",
+   "prev": [],
+   "next": [
+    {
+     "key": "91301",
+     "commune": "91301",
+     "region": "LX",
+     "cells": {
+      "D": "126",
+      "F": "28",
+      "M": "28"
+     }
+    },
+    {
+     "key": "91302",
+     "commune": "91302",
+     "region": "LX",
+     "cells": {
+      "F": "30",
+      "M": "30"
+     }
+    }
+   ],
+   "prev_src": {},
+   "next_src": {
+    "91301": {
+     "submission_id": "s1",
+     "version_no": 1,
+     "submitted_at": "2026-09-08T01:40:00Z",
+     "actor_ref": "a1",
+     "adjustment_response": false
+    },
+    "91302": {
+     "submission_id": "s2",
+     "version_no": 1,
+     "submitted_at": "2026-09-08T01:40:00Z",
+     "actor_ref": "a1",
+     "adjustment_response": false
+    }
+   },
+   "formula": [
+    "M"
+   ],
+   "changes": [
+    {
+     "commune": "91301",
+     "row_key": "91301",
+     "letter": "D",
+     "old": null,
+     "new": "126",
+     "kind": "new"
+    },
+    {
+     "commune": "91301",
+     "row_key": "91301",
+     "letter": "F",
+     "old": null,
+     "new": "28",
+     "kind": "new"
+    },
+    {
+     "commune": "91301",
+     "row_key": "91301",
+     "letter": "M",
+     "old": null,
+     "new": "28",
+     "kind": "computed"
+    },
+    {
+     "commune": "91302",
+     "row_key": "91302",
+     "letter": "F",
+     "old": null,
+     "new": "30",
+     "kind": "new"
+    },
+    {
+     "commune": "91302",
+     "row_key": "91302",
+     "letter": "M",
+     "old": null,
+     "new": "30",
+     "kind": "computed"
+    }
+   ],
+   "communes": 2
+  },
+  {
+   "name": "gửi lại, điều chỉnh theo yêu cầu, số bằng nhau theo decimal, xóa ô",
+   "prev": [
+    {
+     "key": "91301",
+     "commune": "91301",
+     "region": "LX",
+     "cells": {
+      "F": "28",
+      "G": "38",
+      "M": "66.0"
+     }
+    },
+    {
+     "key": "91302",
+     "commune": "91302",
+     "region": "LX",
+     "cells": {
+      "F": "30",
+      "G": "20",
+      "M": "50"
+     }
+    },
+    {
+     "key": "91303",
+     "commune": "91303",
+     "region": "LX",
+     "cells": {
+      "F": "1.50",
+      "N": "2026-09-01"
+     }
+    }
+   ],
+   "next": [
+    {
+     "key": "91301",
+     "commune": "91301",
+     "region": "LX",
+     "cells": {
+      "F": "28",
+      "G": "38",
+      "H": "38.5",
+      "M": "104.5"
+     }
+    },
+    {
+     "key": "91302",
+     "commune": "91302",
+     "region": "LX",
+     "cells": {
+      "F": "30",
+      "G": "15",
+      "M": "45"
+     }
+    },
+    {
+     "key": "91303",
+     "commune": "91303",
+     "region": "LX",
+     "cells": {
+      "F": "1.5"
+     }
+    }
+   ],
+   "prev_src": {
+    "91301": {
+     "submission_id": "s1",
+     "version_no": 1,
+     "submitted_at": "2026-09-08T01:40:00Z",
+     "actor_ref": "a1",
+     "adjustment_response": false
+    },
+    "91302": {
+     "submission_id": "s2",
+     "version_no": 1,
+     "submitted_at": "2026-09-08T01:40:00Z",
+     "actor_ref": "a1",
+     "adjustment_response": false
+    },
+    "91303": {
+     "submission_id": "s3",
+     "version_no": 1,
+     "submitted_at": "2026-09-08T01:40:00Z",
+     "actor_ref": "a1",
+     "adjustment_response": false
+    }
+   },
+   "next_src": {
+    "91301": {
+     "submission_id": "s4",
+     "version_no": 1,
+     "submitted_at": "2026-09-08T01:40:00Z",
+     "actor_ref": "a1",
+     "adjustment_response": false
+    },
+    "91302": {
+     "submission_id": "s5",
+     "version_no": 1,
+     "submitted_at": "2026-09-08T01:40:00Z",
+     "actor_ref": "a1",
+     "adjustment_response": true
+    },
+    "91303": {
+     "submission_id": "s6",
+     "version_no": 1,
+     "submitted_at": "2026-09-08T01:40:00Z",
+     "actor_ref": "a1",
+     "adjustment_response": false
+    }
+   },
+   "formula": [
+    "M"
+   ],
+   "changes": [
+    {
+     "commune": "91301",
+     "row_key": "91301",
+     "letter": "H",
+     "old": null,
+     "new": "38.5",
+     "kind": "resubmit"
+    },
+    {
+     "commune": "91301",
+     "row_key": "91301",
+     "letter": "M",
+     "old": "66.0",
+     "new": "104.5",
+     "kind": "computed"
+    },
+    {
+     "commune": "91302",
+     "row_key": "91302",
+     "letter": "G",
+     "old": "20",
+     "new": "15",
+     "kind": "adjusted"
+    },
+    {
+     "commune": "91302",
+     "row_key": "91302",
+     "letter": "M",
+     "old": "50",
+     "new": "45",
+     "kind": "computed"
+    },
+    {
+     "commune": "91303",
+     "row_key": "91303",
+     "letter": "N",
+     "old": "2026-09-01",
+     "new": null,
+     "kind": "resubmit"
+    }
+   ],
+   "communes": 3
+  },
+  {
+   "name": "dòng chỉ tiêu, xã mới, sắp Z trước AA",
+   "prev": [
+    {
+     "key": "91301/SB01",
+     "commune": "91301",
+     "region": "",
+     "indicator": "SB01",
+     "cells": {
+      "Z": "1"
+     }
+    }
+   ],
+   "next": [
+    {
+     "key": "91301/SB01",
+     "commune": "91301",
+     "region": "",
+     "indicator": "SB01",
+     "cells": {
+      "AA": "3",
+      "Z": "2"
+     }
+    },
+    {
+     "key": "91304/SB01",
+     "commune": "91304",
+     "region": "",
+     "indicator": "SB01",
+     "cells": {
+      "E": "4"
+     }
+    }
+   ],
+   "prev_src": {
+    "91301": {
+     "submission_id": "s1",
+     "version_no": 1,
+     "submitted_at": "2026-09-08T01:40:00Z",
+     "actor_ref": "a1",
+     "adjustment_response": false
+    }
+   },
+   "next_src": {
+    "91301": {
+     "submission_id": "s2",
+     "version_no": 1,
+     "submitted_at": "2026-09-08T01:40:00Z",
+     "actor_ref": "a1",
+     "adjustment_response": false
+    },
+    "91304": {
+     "submission_id": "s3",
+     "version_no": 1,
+     "submitted_at": "2026-09-08T01:40:00Z",
+     "actor_ref": "a1",
+     "adjustment_response": false
+    }
+   },
+   "formula": [],
+   "changes": [
+    {
+     "commune": "91301",
+     "row_key": "91301/SB01",
+     "letter": "Z",
+     "old": "1",
+     "new": "2",
+     "kind": "resubmit"
+    },
+    {
+     "commune": "91301",
+     "row_key": "91301/SB01",
+     "letter": "AA",
+     "old": null,
+     "new": "3",
+     "kind": "resubmit"
+    },
+    {
+     "commune": "91304",
+     "row_key": "91304/SB01",
+     "letter": "E",
+     "old": null,
+     "new": "4",
+     "kind": "new"
+    }
+   ],
+   "communes": 2
+  }
+ ],
+ "ratio": [
+  {
+   "a": "104.5",
+   "b": "126",
+   "result": "82.9"
+  },
+  {
+   "a": "0",
+   "b": "0",
+   "result": "0"
+  },
+  {
+   "a": "5",
+   "b": "0",
+   "result": "0"
+  },
+  {
+   "a": "1",
+   "b": "3",
+   "result": "33.3"
+  },
+  {
+   "a": "2",
+   "b": "3",
+   "result": "66.7"
+  },
+  {
+   "a": "88600",
+   "b": "86950",
+   "result": "101.9"
+  },
+  {
+   "a": "0.05",
+   "b": "1",
+   "result": "5"
+  }
+ ],
+ "yield": [
+  {
+   "a": "104.5",
+   "b": "126",
+   "result": "0.83"
+  },
+  {
+   "a": "0",
+   "b": "0",
+   "result": "0"
+  },
+  {
+   "a": "5",
+   "b": "0",
+   "result": "0"
+  },
+  {
+   "a": "1",
+   "b": "3",
+   "result": "0.33"
+  },
+  {
+   "a": "2",
+   "b": "3",
+   "result": "0.67"
+  },
+  {
+   "a": "88600",
+   "b": "86950",
+   "result": "1.02"
+  },
+  {
+   "a": "0.05",
+   "b": "1",
+   "result": "0.05"
+  }
+ ],
+ "reason": [
+  {
+   "input": "  ngắn  ",
+   "max": 500,
+   "out": "ngắn",
+   "ok": false
+  },
+  {
+   "input": "Kiểm tra lại tuần 3",
+   "max": 500,
+   "out": "Kiểm tra lại tuần 3",
+   "ok": true
+  },
+  {
+   "input": "  Đủ mười ký tự  ",
+   "max": 10,
+   "out": "Đủ mười ký tự",
+   "ok": false
+  },
+  {
+   "input": "ááááááááááá",
+   "max": 10,
+   "out": "ááááááááááá",
+   "ok": false
+  },
+  {
+   "input": "",
+   "max": 2000,
+   "out": "",
+   "ok": false
+  }
+ ]
+}

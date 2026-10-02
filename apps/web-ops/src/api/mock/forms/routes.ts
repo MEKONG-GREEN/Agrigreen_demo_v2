@@ -221,6 +221,42 @@ function versionsOf(id: string): StoredVersion[] {
   return S.versions.get(id) ?? [];
 }
 
+/** Cho backend giả lập vòng đời báo cáo (P4, kn-reports): một mẫu đã gán kèm phiên bản áp dụng (port FormEngine). */
+export interface MockAssignedForm {
+  template: FormTemplate;
+  reportTypes: FormReportType[];
+  version: FormVersion;
+  definition: FormDefinition;
+}
+
+/** Mẫu đã gán (phòng ban × cấp × loại báo cáo) có phiên bản đã phát hành áp dụng tại ngày `at` (như reports AssignedForms). */
+export function mockAssignedForms(dept: string, level: "commune" | "province", reportType: FormReportType, at: string): MockAssignedForm[] {
+  const out: MockAssignedForm[] = [];
+  for (const a of S.assignments) {
+    if (a.status !== "active" || a.department_code !== dept || a.entry_level !== level || a.report_type !== reportType) continue;
+    const tpl = tplOf(a.template_id);
+    if (!tpl || tpl.status !== "active" || out.some((x) => x.template.id === tpl.id)) continue;
+    const v = versionsOf(tpl.id)
+      .filter((x) => x.status === "published" && x.effective_from && x.effective_from <= at)
+      .sort((x, y) => (x.effective_from! < y.effective_from! ? -1 : 1))
+      .at(-1);
+    if (!v) continue;
+    const reportTypes = S.assignments.filter((x) => x.template_id === tpl.id && x.status === "active").map((x) => x.report_type);
+    out.push({ template: tpl, reportTypes, version: strip(v, false), definition: cloneDef(v.definition) });
+  }
+  return out.sort((x, y) => x.template.code.localeCompare(y.template.code));
+}
+
+/** Phiên bản mẫu theo id (kèm định nghĩa) — null khi không có. */
+export function mockFormVersion(versionId: string): { template: FormTemplate; version: FormVersion; definition: FormDefinition } | null {
+  for (const [tid, vs] of S.versions) {
+    const v = vs.find((x) => x.id === versionId);
+    const tpl = tplOf(tid);
+    if (v && tpl) return { template: tpl, version: strip(v, false), definition: v.definition };
+  }
+  return null;
+}
+
 function openVersion(id: string): StoredVersion | undefined {
   return versionsOf(id).find((v) => v.status === "draft" || v.status === "proposed");
 }

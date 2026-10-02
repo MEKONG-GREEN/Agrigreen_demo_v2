@@ -63,7 +63,8 @@ function a(id: string, role: KnRole, extra: Partial<RoleAssignment> = {}): RoleA
   };
 }
 
-export const KN_ACCOUNTS: readonly MockKnAccount[] = [
+/** Danh sách sống: Admin tạo tài khoản ở FN-AD-04.04 (kn-admin.ts) thêm vào đây — đăng nhập được ngay. */
+export const KN_ACCOUNTS: MockKnAccount[] = [
   {
     // Hình 3b: 3 vai trò — Cấp Xã (2 xã, 3 phòng ban), Cấp Tỉnh, Admin.
     id: "kn-an",
@@ -191,3 +192,20 @@ export function knPersona(account: MockKnAccount, assignment?: RoleAssignment): 
 }
 
 export const KN_PERSONAS: readonly MockPersona[] = KN_ACCOUNTS.map((x) => knPersona(x));
+
+/** Persona của tài khoản KN theo id (kể cả tài khoản Admin vừa tạo — không có trong KN_PERSONAS lúc nạp). */
+export function knPersonaById(id: string | null | undefined): MockPersona | undefined {
+  const a = findKnAccount(id);
+  return a ? knPersona(a) : undefined;
+}
+
+const KN_SEED_COUNT = KN_ACCOUNTS.length;
+
+/** Cho kiểm thử: bỏ tài khoản tạo thêm, khôi phục lần gán đã sửa của tài khoản gốc. */
+export function resetKnAccounts(original: readonly MockKnAccount[]): void {
+  KN_ACCOUNTS.splice(KN_SEED_COUNT);
+  for (const o of original) {
+    const a = KN_ACCOUNTS.find((x) => x.id === o.id);
+    if (a) a.assignments = o.assignments.map((x) => ({ ...x }));
+  }
+}

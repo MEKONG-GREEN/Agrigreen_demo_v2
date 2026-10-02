@@ -3,7 +3,7 @@
 // Tổ chức của persona trùng tổ chức trong cây giả lập (ORGS) để màn hình tài khoản/tổ chức khớp nhau.
 import type { Me } from "../types";
 import { COMMUNES, communeOrgRef, DCRD_REF, htxCoop, MKG_REF, NATIONAL_REF, PROVINCES, provinceOrgRef } from "./data";
-import { KN_PERSONAS } from "./kn-accounts";
+import { KN_PERSONAS, knPersonaById } from "./kn-accounts";
 
 export interface MockPersona {
   id: string;
@@ -178,7 +178,7 @@ export const MOCK_PERSONAS: readonly MockPersona[] = [
 
 /** Persona theo mã — gồm vai thử cũ và tài khoản KN v7.7 (kn-accounts.ts). */
 export function findPersona(id: string | null | undefined): MockPersona | undefined {
-  return MOCK_PERSONAS.find((p) => p.id === id) ?? KN_PERSONAS.find((p) => p.id === id);
+  return MOCK_PERSONAS.find((p) => p.id === id) ?? KN_PERSONAS.find((p) => p.id === id) ?? knPersonaById(id);
 }
 
 /** Token giả lập: "mock.<persona>" — chỉ chế độ mock hiểu. */

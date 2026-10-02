@@ -57,6 +57,26 @@ var (
 	formReaders = append(append([]string{}, knRoles...), port.RoleReportsAdmin)
 )
 
+// formReader cho đọc mẫu (layout, mẫu Excel, tính thử, mẫu đã gán) khi người gọi có vai realm đọc mẫu HOẶC
+// một ngữ cảnh phiên KN hợp lệ (header X-AG-Context đã được middleware P1 giải): tài khoản KN v7.7 chỉ có vai
+// cổng kn_user, vai nghiệp vụ nằm trong ngữ cảnh — màn nhập báo cáo của Cấp Xã cần đọc layout (FN-XA-03.02).
+// Trả kn = true khi được nhận nhờ ngữ cảnh KN (để lọc theo phòng ban của ngữ cảnh).
+func formReader(ctx context.Context, extra ...string) (authz.Principal, bool, error) {
+	p, err := authz.Require(ctx, append(append([]string{}, formReaders...), extra...)...)
+	if err == nil {
+		return p, false, nil
+	}
+	if q, ok := authz.FromContext(ctx); ok && q.KN != nil {
+		return q, true, nil
+	}
+	return p, false, err
+}
+
+// knDeptAllows: người đọc nhờ ngữ cảnh KN chỉ thấy mẫu của phòng ban ngữ cảnh (Admin: mọi phòng ban).
+func knDeptAllows(p authz.Principal, viaKN bool, dept string) bool {
+	return !viaKN || p.KN.AllowsDepartment(dept)
+}
+
 // FormSummary là một mẫu kèm phiên bản đang soạn và phiên bản phát hành mới nhất.
 type FormSummary struct {
 	Template    store.FormTemplate
@@ -1102,12 +1122,15 @@ type AvailableForm struct {
 // AvailableForms trả mẫu đã gán cho (phòng ban, cấp, loại báo cáo) có phiên bản đã phát hành
 // áp dụng tại ngày at (Cấp Tỉnh chọn khi phát hành biểu — FN-TI-02.02).
 func (s *Service) AvailableForms(ctx context.Context, dept, level, reportType string, at time.Time) ([]AvailableForm, error) {
-	p, err := authz.Require(ctx, formReaders...)
+	p, viaKN, err := formReader(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if !deptRe(dept) {
 		return nil, problem.Validation.WithField("department", "bắt buộc")
+	}
+	if !knDeptAllows(p, viaKN, dept) {
+		return []AvailableForm{}, nil
 	}
 	var out []AvailableForm
 	err = s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
@@ -1148,7 +1171,7 @@ func availableForms(ctx context.Context, tx pgx.Tx, dept, level, reportType stri
 // FormLayout trả phiên bản kèm định nghĩa đã đặt nhãn kỳ/vụ cho màn nhập/xem. Người đọc
 // (không phải Admin) chỉ thấy phiên bản đã phát hành hoặc đã ngừng dùng.
 func (s *Service) FormLayout(ctx context.Context, templateID uuid.UUID, n int, o form.LayoutOptions) (store.FormTemplate, store.FormVersion, error) {
-	p, err := authz.Require(ctx, append(append([]string{}, formReaders...), authz.RolePlatformAdmin)...)
+	p, viaKN, err := formReader(ctx, authz.RolePlatformAdmin)
 	if err != nil {
 		return store.FormTemplate{}, store.FormVersion{}, err
 	}
@@ -1168,6 +1191,9 @@ func (s *Service) FormLayout(ctx context.Context, templateID uuid.UUID, n int, o
 	if !hasAny(p, formAdmins) && v.Status != port.FormPublished && v.Status != port.FormRetired {
 		return store.FormTemplate{}, store.FormVersion{}, ErrFormVersionNotFound
 	}
+	if !knDeptAllows(p, viaKN, t.DepartmentCode) {
+		return store.FormTemplate{}, store.FormVersion{}, ErrFormNotFound
+	}
 	v.Def = form.Layout(v.Def, o)
 	return *t, *v, nil
 }
@@ -1175,7 +1201,7 @@ func (s *Service) FormLayout(ctx context.Context, templateID uuid.UUID, n int, o
 // EvaluateFormVersion kiểm và tính thử một lưới theo phiên bản (xem trước của trình thiết kế,
 // tính tạm trên web/app — server là nguồn đúng).
 func (s *Service) EvaluateFormVersion(ctx context.Context, versionID uuid.UUID, in port.EvalInput) (port.EvalResult, []port.TotalRowResult, error) {
-	p, err := authz.Require(ctx, append(append([]string{}, formReaders...), authz.RolePlatformAdmin)...)
+	p, _, err := formReader(ctx, authz.RolePlatformAdmin)
 	if err != nil {
 		return port.EvalResult{}, nil, err
 	}
