@@ -32,7 +32,7 @@ type DispatchRecipient struct {
 	UpdatedAt  time.Time
 }
 
-const recCols = `id, department_code, province_code, label, address, contact_ref, kind, is_default, active, last_used_at, created_by, created_at, updated_at`
+const recCols = `id, department_code, province_code, label, mailbox, contact_ref, kind, is_default, active, last_used_at, created_by, created_at, updated_at`
 
 func scanRec(r pgx.Row) (DispatchRecipient, error) {
 	var x DispatchRecipient
@@ -43,7 +43,7 @@ func scanRec(r pgx.Row) (DispatchRecipient, error) {
 
 // InsertRecipient ghi người nhận mới.
 func InsertRecipient(ctx context.Context, tx pgx.Tx, tid uuid.UUID, r DispatchRecipient) error {
-	_, err := tx.Exec(ctx, `INSERT INTO pf_reports.dispatch_recipient (tenant_id, id, department_code, province_code, label, address, contact_ref, kind,
+	_, err := tx.Exec(ctx, `INSERT INTO pf_reports.dispatch_recipient (tenant_id, id, department_code, province_code, label, mailbox, contact_ref, kind,
 	    is_default, active, created_by, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11, $11)`,
 		tid, r.ID, r.Department, r.Province, r.Label, r.Address, r.ContactRef, r.Kind, r.IsDefault, r.CreatedBy, r.CreatedAt.UTC())
 	return err

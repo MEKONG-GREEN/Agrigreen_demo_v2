@@ -4,7 +4,7 @@
 --   1. dispatch_recipient_event  SỔ danh bạ người nhận Chi cục (thêm, đổi, ngừng dùng) — mặc định lần trước
 --      dispatch_recipient        bảng chiếu. Địa chỉ là HỘP THƯ ĐƠN VỊ (dữ liệu tổ chức, Q-09 tạm); nếu khách
 --                                xác nhận là địa chỉ cá nhân → chuyển sang chủ thể vault (contact_ref), cột
---                                address để NULL (đã có CHECK cho phép)
+--                                mailbox để NULL (đã có CHECK cho phép)
 --   2. dispatch_event            SỔ lần xuất/gửi: exported, send_requested, sent, failed (gửi lỗi → gửi lại)
 --      dispatch                  bảng chiếu lần gửi
 --   3. dispatch_file             tệp đã dựng (Excel theo mẫu, PDF) trong kho đối tượng trong lãnh thổ — bất biến
@@ -47,7 +47,7 @@ CREATE TABLE pf_reports.dispatch_recipient (
   department_code text        NOT NULL,
   province_code   text        NOT NULL,
   label           text        NOT NULL CHECK (char_length(label) BETWEEN 1 AND 200),  -- "Chi cục Trồng trọt và BVTV"
-  address         text        NULL CHECK (address IS NULL OR (char_length(address) <= 254 AND address ~ '^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$')),
+  mailbox         text        NULL CHECK (mailbox IS NULL OR (char_length(mailbox) <= 254 AND mailbox ~ '^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$')),
   contact_ref     uuid        NULL,                       -- chủ thể vault nếu là địa chỉ cá nhân (Q-09)
   kind            text        NOT NULL CHECK (kind IN ('to', 'cc')),
   is_default      boolean     NOT NULL DEFAULT true,
@@ -57,10 +57,10 @@ CREATE TABLE pf_reports.dispatch_recipient (
   created_at      timestamptz NOT NULL,
   updated_at      timestamptz NOT NULL,
   PRIMARY KEY (tenant_id, id),
-  CHECK ((address IS NULL) <> (contact_ref IS NULL))
+  CHECK ((mailbox IS NULL) <> (contact_ref IS NULL))
 );
-CREATE UNIQUE INDEX dispatch_recipient_address ON pf_reports.dispatch_recipient (tenant_id, province_code, department_code, lower(address))
-  WHERE active AND address IS NOT NULL;
+CREATE UNIQUE INDEX dispatch_recipient_mailbox ON pf_reports.dispatch_recipient (tenant_id, province_code, department_code, lower(mailbox))
+  WHERE active AND mailbox IS NOT NULL;
 SELECT shared.apply_tenant_rls('pf_reports.dispatch_recipient');
 
 CREATE TABLE pf_reports.dispatch_event (
