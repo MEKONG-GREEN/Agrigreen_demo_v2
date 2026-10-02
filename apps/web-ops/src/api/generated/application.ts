@@ -1723,6 +1723,224 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/work-schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách lịch tuần trong phạm vi (tab Chờ duyệt / Đã duyệt / Yêu cầu chỉnh sửa của Cấp Tỉnh) */
+        get: operations["extListWorkSchedules"];
+        put?: never;
+        /**
+         * Lưu nháp hoặc gửi duyệt lịch tuần của chính mình (FN-XA-03.08; Cấp Tỉnh "Lịch của tôi" FN-TI-02.07)
+         * @description Mỗi lần gọi tạo một phiên bản mới của lịch (người gọi × phòng ban × tuần) — sổ chỉ ghi thêm (RB-1).
+         *     action=draft: Nháp (khi lịch chưa gửi hoặc bị Yêu cầu chỉnh sửa). action=submit: Chờ duyệt; nếu lịch đã duyệt thì
+         *     là "điều chỉnh" — phần điều chỉnh chờ duyệt lại, bản đã duyệt vẫn hiệu lực tới khi duyệt bản mới.
+         *     Gửi sau hạn đăng ký → nhãn "Đăng ký muộn". Tuần đã kết thúc → 409 extension.week_locked.
+         *     base_version (phiên bản client đã sửa) khác phiên bản hiện hành → 409 extension.schedule_version_conflict
+         *     (máy ngoại tuyến phải tải lại). Gọi lặp cùng Idempotency-Key → 200 với đúng kết quả lần đầu.
+         *     Trùng thời gian giữa các mục chỉ là cảnh báo (warnings), không chặn.
+         */
+        post: operations["extSaveWorkSchedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/work-schedules/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch tuần của tôi (mặc định tuần kế tiếp) kèm hạn đăng ký, hạn duyệt, trạng thái khóa */
+        get: operations["extMyWorkSchedule"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/work-schedules/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Số đếm theo tab của tuần và số lịch chờ duyệt của mọi tuần chưa khóa (số đếm menu extension.work_schedules.pending) */
+        get: operations["extWorkScheduleCounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/work-schedules/unregistered": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tab "Chưa đăng ký" — cán bộ trong phạm vi chưa gửi lịch tuần (chưa có hoặc mới lưu nháp) */
+        get: operations["extWorkScheduleUnregistered"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/work-schedules/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cấu hình lịch công tác hiệu lực của tỉnh (hạn đăng ký, hạn duyệt, nhắc, cấp quản lý duyệt) — tạm, chờ khách Q-05/Q-16
+         * @description Đọc từ tham số pf/masterdata (đặt qua Admin API, có phê duyệt R-56), khóa có chiều tỉnh
+         *     "<khóa>:<mã tỉnh>" ưu tiên hơn khóa chung; chưa có → mặc định (provisional = true).
+         */
+        get: operations["extWorkScheduleSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/work-schedules/copy-previous": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sao chép tuần trước thành nháp của tuần đã chọn (ngày dời +7) */
+        post: operations["extCopyPreviousWorkSchedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/work-schedules/bulk-approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt hàng loạt các lịch đang Chờ duyệt (bỏ qua lịch của chính mình, ngoài phạm vi, đã đổi trạng thái) */
+        post: operations["extBulkApproveWorkSchedules"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/work-schedules/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất lịch tuần trong phạm vi ra Excel (.xlsx) hoặc PDF khổ ngang */
+        get: operations["extExportWorkSchedules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/work-schedules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết lịch tuần (phiên bản hiện hành, bản đã duyệt nếu đang điều chỉnh, cảnh báo, các phiên bản) */
+        get: operations["extGetWorkSchedule"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/work-schedules/{id}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Khung Log của màn Detail — mọi sự việc của lịch (lưu nháp, gửi, duyệt, yêu cầu chỉnh sửa, điều chỉnh, khóa) kèm cũ → mới */
+        get: operations["extWorkScheduleLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/work-schedules/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duyệt phiên bản đang Chờ duyệt — người duyệt khác người đăng ký (R-56), cùng phòng ban, cùng tỉnh, cấp quản lý được duyệt (Q-05) */
+        post: operations["extApproveWorkSchedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/work-schedules/{id}/request-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Yêu cầu chỉnh sửa — bắt buộc lý do (≥ 10 ký tự); cán bộ nhận thông báo kèm lý do */
+        post: operations["extRequestWorkScheduleChanges"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/mechanization/owners": {
         parameters: {
             query?: never;
@@ -5734,6 +5952,241 @@ export interface components {
             /** @description Phản ánh khẩn (FR-02) */
             urgent?: boolean;
             note?: string;
+        };
+        /**
+         * @description draft = Nháp, pending = Chờ duyệt, approved = Đã duyệt, changes_requested = Yêu cầu chỉnh sửa
+         * @enum {string}
+         */
+        ExtWorkScheduleStatus: "draft" | "pending" | "approved" | "changes_requested";
+        ExtWorkScheduleItemInput: {
+            /**
+             * Format: uuid
+             * @description Mã mục (giữ qua các phiên bản để so cũ → mới); vắng → server sinh
+             */
+            id?: string;
+            /**
+             * Format: date
+             * @description Một ngày trong tuần (Thứ Hai…Chủ Nhật)
+             */
+            day: string;
+            /**
+             * @description Buổi: Sáng / Chiều
+             * @enum {string}
+             */
+            session: "morning" | "afternoon";
+            start_time?: string | null;
+            end_time?: string | null;
+            /** @description Nội dung công tác */
+            content: string;
+            /** @description Địa điểm: xã (Cán bộ xã: một trong các xã phụ trách) */
+            commune_code?: string | null;
+            /**
+             * Format: uuid
+             * @description Địa điểm: HTX
+             */
+            cooperative_ref?: string | null;
+            /** @description Địa điểm cụ thể (ấp, cánh đồng…) */
+            location?: string | null;
+            /** @description Thành phần phối hợp — không ghi SĐT/CCCD (RB-3) */
+            participants?: string | null;
+            note?: string | null;
+        };
+        ExtWorkScheduleItem: components["schemas"]["ExtWorkScheduleItemInput"] & {
+            /**
+             * Format: uuid
+             * @description Mã mục, giữ qua các phiên bản
+             */
+            id: string;
+            /** @description Khác bản đã duyệt (phần điều chỉnh chờ duyệt lại) */
+            changed: boolean;
+            /** @description Trùng thời gian với mục khác (tô vàng) */
+            conflict: boolean;
+        };
+        ExtWorkScheduleSave: {
+            /**
+             * Format: uuid
+             * @description UUIDv7 máy sinh cho lịch mới (ngoại tuyến); lịch đã có thì bỏ qua
+             */
+            id?: string;
+            /**
+             * Format: date
+             * @description Thứ Hai đầu tuần
+             */
+            week_start: string;
+            /** @enum {string} */
+            action: "draft" | "submit";
+            /** @description Phiên bản client đã sửa; null = tạo mới */
+            base_version?: number | null;
+            items: components["schemas"]["ExtWorkScheduleItemInput"][];
+            device_id?: string | null;
+        };
+        ExtWorkSchedule: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            owner_ref: string;
+            /** @description Tên tra lúc đọc từ actor_ref (RB-3) */
+            owner_display: string | null;
+            /** @enum {string} */
+            owner_level: "commune" | "province";
+            department_code: string;
+            province_code: string;
+            /** @description Xã phụ trách của người đăng ký (lúc gửi) */
+            commune_codes: string[];
+            /** Format: date */
+            week_start: string;
+            /** Format: date */
+            week_end: string;
+            status: components["schemas"]["ExtWorkScheduleStatus"];
+            version: number;
+            approved_version: number | null;
+            /** @description Đang chờ duyệt phần điều chỉnh của lịch đã duyệt */
+            amendment: boolean;
+            /** @description Đăng ký muộn (gửi lần đầu sau hạn đăng ký) */
+            late: boolean;
+            /** @description Tuần đã kết thúc — chỉ xem */
+            locked: boolean;
+            /** Format: date-time */
+            submit_due_at: string;
+            /** Format: date-time */
+            review_due_at: string;
+            review_overdue: boolean;
+            /** Format: date-time */
+            submitted_at: string | null;
+            /** Format: date-time */
+            reviewed_at: string | null;
+            /** Format: uuid */
+            reviewer_ref: string | null;
+            reviewer_display: string | null;
+            /** @description Lý do yêu cầu chỉnh sửa gần nhất */
+            last_reason: string | null;
+            item_count: number;
+            conflict_count: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+        };
+        ExtWorkScheduleListItem: components["schemas"]["ExtWorkSchedule"] & {
+            /** @description Mục của phiên bản hiện hành (lưới tuần) */
+            items: components["schemas"]["ExtWorkScheduleItem"][];
+        };
+        ExtWorkScheduleWarning: {
+            /** @enum {string} */
+            code: "time_overlap" | "late_registration" | "outside_week";
+            message: string;
+            item_ids: string[];
+        };
+        ExtWorkScheduleVersion: {
+            version: number;
+            /** @enum {string} */
+            action: "draft_saved" | "submitted" | "amended";
+            /** Format: date-time */
+            at: string;
+            /** Format: uuid */
+            actor_ref: string;
+            actor_display: string | null;
+            item_count: number;
+        };
+        ExtWorkScheduleDetail: {
+            schedule: components["schemas"]["ExtWorkSchedule"];
+            viewing_version?: number;
+            items: components["schemas"]["ExtWorkScheduleItem"][];
+            /** @description Bản đã duyệt khi đang điều chỉnh (rỗng nếu không) */
+            approved_items: components["schemas"]["ExtWorkScheduleItem"][];
+            warnings: components["schemas"]["ExtWorkScheduleWarning"][];
+            versions: components["schemas"]["ExtWorkScheduleVersion"][];
+            can: {
+                edit: boolean;
+                submit: boolean;
+                approve: boolean;
+                request_changes: boolean;
+            };
+        };
+        ExtMyWorkSchedule: {
+            /** Format: date */
+            week_start: string;
+            /** Format: date */
+            week_end: string;
+            /** Format: date-time */
+            submit_due_at: string;
+            /** Format: date-time */
+            review_due_at: string;
+            locked: boolean;
+            /** @description Gửi lúc này sẽ mang nhãn Đăng ký muộn */
+            late_now: boolean;
+            schedule: components["schemas"]["ExtWorkScheduleDetail"] | null;
+            /** Format: date */
+            previous_week_start: string;
+            /** @description Tuần trước có lịch để sao chép */
+            previous_available: boolean;
+        };
+        ExtWorkScheduleCounts: {
+            /** Format: date */
+            week_start: string;
+            draft: number;
+            pending: number;
+            approved: number;
+            changes_requested: number;
+            unregistered: number;
+            /** @description Lịch chờ duyệt của mọi tuần chưa kết thúc mà người gọi duyệt được (số đếm menu) */
+            pending_open_weeks: number;
+        };
+        ExtWorkScheduleUnregistered: {
+            /** Format: uuid */
+            actor_ref: string;
+            actor_display: string | null;
+            /** @enum {string} */
+            owner_level: "commune" | "province";
+            province_code: string;
+            commune_codes: string[];
+            /** @enum {string} */
+            status: "none" | "draft";
+            /** Format: uuid */
+            schedule_id?: string | null;
+        };
+        ExtWorkScheduleSettings: {
+            province_code: string;
+            /** @description Hạn đăng ký = 00:00 Thứ Hai của tuần + số giờ (âm = trước tuần). Mặc định −55 (17:00 Thứ Sáu tuần trước) */
+            submit_due_offset_hours: number;
+            /** @description Hạn duyệt = 00:00 Thứ Hai + số giờ. Mặc định 0 */
+            review_due_offset_hours: number;
+            /** @description Nhắc cán bộ chưa gửi trước hạn đăng ký bao nhiêu giờ. Mặc định 24 */
+            remind_before_hours: number;
+            /** @description Cấp quản lý được duyệt (Q-05). Mặc định [truong_phong] */
+            approver_levels: string[];
+            /**
+             * @description Lịch cán bộ Cấp Tỉnh: peer = người duyệt cấp quản lý khác người đăng ký; auto = tự duyệt khi gửi (Q-16). Mặc định peer
+             * @enum {string}
+             */
+            province_approval: "peer" | "auto";
+            /** @description Đang dùng giá trị mặc định tạm, chờ khách */
+            provisional: boolean;
+        };
+        KNFieldChange: {
+            field: string;
+            old: string | null;
+            new: string | null;
+        };
+        KNLogEntry: {
+            seq: number;
+            event: string;
+            /** Format: uuid */
+            actor_ref: string;
+            /** @description Tên tra lúc đọc từ actor_ref (RB-3), null khi chưa nối danh bạ */
+            actor_display: string | null;
+            /** Format: date-time */
+            at: string;
+            /** Format: date-time */
+            recorded_at: string;
+            changes: components["schemas"]["KNFieldChange"][];
+            reason: string | null;
+        };
+        KNLogPage: {
+            items: components["schemas"]["KNLogEntry"][];
+            next_cursor: number | null;
         };
         ExtFieldReport: components["schemas"]["ExtFieldReportInput"] & {
             /** Format: uuid */
@@ -10979,6 +11432,405 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extListWorkSchedules: {
+        parameters: {
+            query?: {
+                /** @description Thứ Hai đầu tuần (giờ Việt Nam). Mặc định tuần kế tiếp */
+                week_start?: string;
+                status?: components["schemas"]["ExtWorkScheduleStatus"];
+                commune_code?: string;
+                owner_level?: "commune" | "province";
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        week_start: string;
+                        items: components["schemas"]["ExtWorkScheduleListItem"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extSaveWorkSchedule: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtWorkScheduleSave"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp — kết quả lần đầu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtWorkScheduleDetail"];
+                };
+            };
+            /** @description Đã ghi phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtWorkScheduleDetail"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extMyWorkSchedule: {
+        parameters: {
+            query?: {
+                week_start?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch của tôi (schedule = null khi chưa đăng ký) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtMyWorkSchedule"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extWorkScheduleCounts: {
+        parameters: {
+            query?: {
+                week_start?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số đếm */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtWorkScheduleCounts"];
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    extWorkScheduleUnregistered: {
+        parameters: {
+            query?: {
+                week_start?: string;
+                commune_code?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        week_start: string;
+                        items: components["schemas"]["ExtWorkScheduleUnregistered"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    extWorkScheduleSettings: {
+        parameters: {
+            query?: {
+                province_code?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cấu hình */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtWorkScheduleSettings"];
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    extCopyPreviousWorkSchedule: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date */
+                    week_start: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtWorkScheduleDetail"];
+                };
+            };
+            /** @description Đã tạo nháp */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtWorkScheduleDetail"];
+                };
+            };
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    extBulkApproveWorkSchedules: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    ids: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Kết quả từng lịch */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        approved: string[];
+                        skipped: {
+                            /** Format: uuid */
+                            id: string;
+                            /** @description Mã lỗi problem (vd self_approval_forbidden, extension.schedule_state_conflict) */
+                            code: string;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    extExportWorkSchedules: {
+        parameters: {
+            query?: {
+                week_start?: string;
+                status?: components["schemas"]["ExtWorkScheduleStatus"];
+                commune_code?: string;
+                format?: "xlsx" | "pdf";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/pdf": string;
+                };
+            };
+            403: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extGetWorkSchedule: {
+        parameters: {
+            query?: {
+                /** @description Xem một phiên bản cũ */
+                version?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chi tiết */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtWorkScheduleDetail"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    extWorkScheduleLog: {
+        parameters: {
+            query?: {
+                /** @description seq của dòng cuối trang trước (mới → cũ) */
+                cursor?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang, mới nhất trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNLogPage"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    extApproveWorkSchedule: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Phiên bản người duyệt đã xem; khác phiên bản chờ duyệt → 409 */
+                    version: number;
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã duyệt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtWorkScheduleDetail"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    extRequestWorkScheduleChanges: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    version: number;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtWorkScheduleDetail"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
         };
     };

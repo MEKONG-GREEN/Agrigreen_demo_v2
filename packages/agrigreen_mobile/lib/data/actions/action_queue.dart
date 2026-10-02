@@ -36,7 +36,12 @@ enum ApiActionKind {
   /// G4 (App hiện trường MKG — tài xế, api-internal): `POST
   /// /v1/logistics/trips/{id}/milestones {kind, event_time, lat, lng}` — mốc
   /// xuất phát / đến của chuyến (chỉ tiến, L-02).
-  logisticsMilestone('logistics_milestone');
+  logisticsMilestone('logistics_milestone'),
+
+  /// KN v7.7 P5 (App hiện trường): `POST /v1/extension/work-schedules
+  /// {id, week_start, action, base_version, items}` — lưu nháp / gửi duyệt
+  /// lịch công tác tuần. Thân giữ nguyên giữa các lần phát lại.
+  workScheduleSave('work_schedule_save');
 
   const ApiActionKind(this.code);
   final String code;
@@ -54,6 +59,7 @@ enum ApiActionKind {
       '/v1/fieldops/orders/$target/crew-shifts',
     ApiActionKind.logisticsMilestone =>
       '/v1/logistics/trips/$target/milestones',
+    ApiActionKind.workScheduleSave => '/v1/extension/work-schedules',
   };
 }
 
@@ -213,6 +219,31 @@ class ActionQueue {
     'last_error = ? WHERE id = ?',
     [code, id],
   );
+
+  /// Bỏ một lệnh **còn chờ** vì đã có lệnh mới thay thế (ví dụ lưu lịch tuần
+  /// lần sau thay lần trước khi cả hai chưa gửi). Trả false nếu lệnh đã gửi
+  /// xong hoặc đã thất bại (không đổi gì). Lệnh bị bỏ mang `last_error =
+  /// 'superseded'`.
+  Future<bool> cancelPending(String id) async {
+    final n = await _sql.rawUpdate(
+      "UPDATE api_action SET status = 'failed', last_error = ?, done_at = ? "
+      "WHERE id = ? AND status = 'pending'",
+      [supersededCode, _clock.now().millisecondsSinceEpoch, id],
+    );
+    return n > 0;
+  }
+
+  static const supersededCode = 'superseded';
+
+  /// Một lệnh theo id (null nếu đã dọn).
+  Future<ApiAction?> byId(String id) async {
+    final rows = await _sql.query(
+      'api_action',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    return rows.isEmpty ? null : ApiAction.fromRow(rows.first);
+  }
 
   Future<void> recordAttempt(String id, String code) => _sql.rawUpdate(
     'UPDATE api_action SET attempts = attempts + 1, last_error = ? WHERE id = ?',

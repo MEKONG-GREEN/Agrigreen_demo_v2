@@ -136,6 +136,14 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
     "Tệp nhập sai mẫu (thiếu cột email, org_ref, roles, full_name; không phải CSV/XLSX; không có dòng hoặc quá 200 dòng). Cả tệp bị từ chối.",
   "accounts.email_failed": "Máy chủ không gửi được email liên kết kích hoạt. Vui lòng thử lại sau.",
   "accounts.dependency_unavailable": "Dịch vụ tài khoản (Keycloak) tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+  // KN v7.7 P5: lịch công tác tuần
+  "extension.week_locked": "Tuần này đã kết thúc — lịch đã bị khóa, chỉ xem được.",
+  "extension.schedule_version_conflict": "Lịch đã được cập nhật ở nơi khác (máy khác hoặc người duyệt). Vui lòng tải lại lịch rồi thao tác lại.",
+  "extension.schedule_state_conflict": "Trạng thái lịch đã thay đổi (đã gửi, đã duyệt hoặc chưa gửi) — thao tác không còn phù hợp. Vui lòng tải lại.",
+  "extension.schedule_not_found": "Không tìm thấy lịch công tác (hoặc lịch nằm ngoài phạm vi của bạn).",
+  "extension.not_schedule_approver": "Chỉ cán bộ có cấp quản lý được duyệt (Trưởng phòng) mới duyệt được lịch công tác.",
+  "extension.schedule_context_required": "Tài khoản chưa được gán phòng ban và xã phụ trách — liên hệ Admin.",
+  "extension.schedule_no_previous": "Tuần trước chưa có lịch để sao chép.",
   // pf/reports
   "reports.template_not_found": "Không có mẫu báo cáo này.",
   "reports.template_retired": "Mẫu đã ngừng dùng — không xuất và không lập lịch được.",

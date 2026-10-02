@@ -46,6 +46,7 @@ import { metricsRoutes } from "./metrics";
 import { mrvAdminRoutes, mrvAppRoutes } from "./mrv";
 import { collectionRoutes } from "./collection";
 import { knAppRoutes, personaForContext } from "./kn";
+import { workScheduleAppRoutes } from "./kn-schedules";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -112,6 +113,8 @@ const appRoutes: Route[] = [
   { method: "GET", pattern: /^\/v1\/me$/, handler: ({ persona }) => json(persona.me) },
   // --- KN v7.7 (hợp đồng tạm P1/P2/P4): ngữ cảnh phiên, menu theo cấu hình, số đếm ---
   ...knAppRoutes,
+  // --- KN v7.7 P5: lịch công tác tuần (/v1/extension/work-schedules*) ---
+  ...workScheduleAppRoutes,
 
   // --- pf/extension ---
   {
@@ -724,7 +727,7 @@ function dispatch(routes: Route[], request: Request, url: URL, persona: MockPers
   for (const r of routes) {
     if (r.method !== request.method) continue;
     const m = r.pattern.exec(url.pathname);
-    if (!m) continue;
+    if (!m || (r.match && !r.match(url))) continue;
     try {
       return r.handler({ url, persona, params: m.slice(1), body, request });
     } catch (e) {

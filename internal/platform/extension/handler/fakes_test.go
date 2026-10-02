@@ -54,8 +54,23 @@ func (f *fakeUnits) Current(_ context.Context, code string, _ time.Time) ([]stri
 
 // fakeParams: tham số đã duyệt, đổi được trong kiểm thử.
 type fakeParams struct {
-	mu sync.Mutex
-	v  map[string]decimal.Decimal
+	mu   sync.Mutex
+	v    map[string]decimal.Decimal
+	text map[string]string // tham số chuỗi (vd extension.work_schedule_approver_levels)
+}
+
+// setText đặt tham số chuỗi; "" → xóa.
+func (f *fakeParams) setText(key, val string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.text == nil {
+		f.text = map[string]string{}
+	}
+	if val == "" {
+		delete(f.text, key)
+		return
+	}
+	f.text[key] = val
 }
 
 func (f *fakeParams) set(key, val string) {
@@ -71,6 +86,9 @@ func (f *fakeParams) set(key, val string) {
 func (f *fakeParams) At(_ context.Context, key string, at time.Time) (mdport.ParamValue, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if t, ok := f.text[key]; ok {
+		return mdport.ParamValue{Key: key, Text: t, Version: 1, EffectiveFrom: at}, nil
+	}
 	v, ok := f.v[key]
 	if !ok {
 		return mdport.ParamValue{}, mdport.ErrParamNotFound

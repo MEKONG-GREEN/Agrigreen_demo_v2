@@ -18,17 +18,17 @@ Bốn trạng thái:
 | Mục | Số yêu cầu | đạt | một phần | chưa làm | ngoài module |
 |---|---|---|---|---|---|
 | 3. UR chung, Cấp Quốc gia, kỹ thuật | 5 | 0 | 0 | 5 | 0 |
-| 4. UR Cấp Tỉnh | 7 | 0 | 0 | 7 | 0 |
-| 5. UR Cấp Xã | 21 | 0 | 0 | 21 | 0 |
+| 4. UR Cấp Tỉnh | 7 | 1 | 0 | 6 | 0 |
+| 5. UR Cấp Xã | 21 | 1 | 0 | 20 | 0 |
 | 6. UR Admin | 7 | 1 | 0 | 6 | 0 |
-| 7. Tiêu chí chấp nhận FN | 25 | 1 | 0 | 24 | 0 |
+| 7. Tiêu chí chấp nhận FN | 25 | 2 | 1 | 22 | 0 |
 | 8. Phi chức năng | 14 | 2 | 3 | 9 | 0 |
 | 9. Xung đột kiến trúc và cách xử lý | 15 | 0 | 0 | 15 | 0 |
 | 10. Tính năng chuyển khỏi module | 13 | 0 | 0 | 0 | 13 |
 | 11. Câu hỏi khách | 23 | 0 | 0 | 23 | 0 |
-| **Tổng** | **130** | **4** | **3** | **110** | **13** |
+| **Tổng** | **130** | **7** | **4** | **106** | **13** |
 
-Còn lại theo loại: **mã** — mọi dòng **chưa làm** của mục 3–9 (gói P1–P7 theo cột "Gói"); **chờ khách** — Q-01…Q-23 (mục 11), đặc biệt Q-01 (tệp Excel gốc của 14 mẫu) chặn 12/14 mẫu; **hạ tầng** — N-01 (sẵn sàng ≥ 99,5 %), N-02..N-04 (sao lưu, RPO, RTO trên cụm thật), N-05 (kiểm tải 500 người dùng trên staging).
+Còn lại theo loại: **mã** — mọi dòng **chưa làm** của mục 3–9 (gói P1–P7 theo cột "Gói") và FN-XA-03.08 (kiểu thông báo lịch công tác chờ migration pf_notify 000073 của P4); **chờ khách** — Q-01…Q-23 (mục 11), đặc biệt Q-01 (tệp Excel gốc của 14 mẫu) chặn 12/14 mẫu; **hạ tầng** — N-01 (sẵn sàng ≥ 99,5 %), N-02..N-04 (sao lưu, RPO, RTO trên cụm thật), N-05 (kiểm tải 500 người dùng trên staging).
 
 Phát hiện khi đối chiếu dòng "Đáp ứng (xác nhận)" của ma trận khoảng cách với runbook: `repo1-retention-full=4` với bản full hằng tuần ([backup.md](../runbooks/backup.md)) chỉ giữ chắc khoảng 4 tuần (≈ 28 ngày), **chưa chắc ≥ 30 ngày** như BRD §7 → N-02 ghi **một phần**; cần tăng lên ≥ 5 bản full (hoặc giữ theo thời gian) — việc của người tích hợp hạ tầng (`deploy/**`).
 
@@ -70,7 +70,7 @@ Chưa có (P8 đợt 4). Khi có, bảng bước `TestKN77AnGiangTuan36` đặt 
 | UR-TI-04 | Cấp Tỉnh rà soát, yêu cầu điều chỉnh kèm lý do, chốt kỳ và mở lại kỳ | FN-TI-02.04 | P4 | — (nền có sẵn: `TestClosedPeriodNeedsCorrectionReason` — kỳ `YYYY-MM` cũ, không mở lại) | **chưa làm** |
 | UR-TI-05 | Cấp Tỉnh xem tổng hợp các xã đúng mẫu, bấm "Cập nhật", xem nhật ký thay đổi | FN-TI-02.05 | P4 | — | **chưa làm** |
 | UR-TI-06 | Cấp Tỉnh xuất file và gửi email cho Chi cục từ hệ thống (file hoặc link Google Sheet) | FN-TI-02.06 | P4 | — (nền có sẵn: `TestXLSXContent`, `TestPDFVietnamese`, `TestSMTPDeliversOverSTARTTLS`, `TestComposeUTF8NoAttachment` — hiện **không** đính kèm) | **chưa làm** |
-| UR-TI-07 | Cấp Tỉnh xem, duyệt lịch làm việc hằng tuần Cán bộ xã và đăng ký lịch của mình | FN-TI-02.07 | P5 | — | **chưa làm** |
+| UR-TI-07 | Cấp Tỉnh xem, duyệt lịch làm việc hằng tuần Cán bộ xã và đăng ký lịch của mình | FN-TI-02.07 | P5 | `TestFN_TI_02_07_SelfApprovalBlockedAndProvinceOwnSchedule`, `TestFN_TI_02_07_ScopeAndTenantIsolation`, `TestFN_TI_02_07_UnregisteredBulkRemindersExport`, `TestFN_TI_02_07_ApproverMgmtLevelViaP1Context`, `TestFN_TI_02_07_EndedWeekLocked`; Vitest `src/kn/schedule/schedule.test.tsx`, `src/api/mock/kn-schedules.test.ts`; Playwright `tests/e2e/kn-lich-cong-tac.spec.ts` | **đạt** (người duyệt = cấp quản lý `truong_phong`, lịch cán bộ tỉnh duyệt chéo `peer` — tham số tạm, chờ khách Q-05, Q-16; ngữ cảnh KN suy từ vai realm tới khi P1 nối `UseKNContext`) |
 
 ## 5. UR Cấp Xã
 
@@ -96,7 +96,7 @@ Chưa có (P8 đợt 4). Khi có, bảng bước `TestKN77AnGiangTuan36` đặt 
 | UR-XA-18 | Vẽ ranh giới thửa ruộng trên bản đồ, kể cả offline | FN-XA-03.05 | P7 | — (nền có sẵn: `TestBoundaryValidationRules`, `TestOverlapRules`, `TestGeodesicAreaNearCanTho`, Flutter `boundary_test.dart`; thiếu hình tròn/vuông, tên nông dân, HTX, web vẽ thửa) | **chưa làm** |
 | UR-XA-19 | Ghi nhận thông tin vật tư trên địa bàn | FN-XA-03.06 | P2, P7 | — | **chưa làm** |
 | UR-XA-20 | Xem lại báo cáo đã gửi và thống kê của xã | FN-XA-03.07 | P4, P6 | — | **chưa làm** |
-| UR-XA-21 | Đăng ký lịch làm việc hằng tuần, gửi Cấp Tỉnh duyệt | FN-XA-03.08 | P5, P7 | — | **chưa làm** |
+| UR-XA-21 | Đăng ký lịch làm việc hằng tuần, gửi Cấp Tỉnh duyệt | FN-XA-03.08 | P5, P7 | `TestFN_XA_03_08_RegisterSubmitReviewFlow`, `TestFN_XA_03_08_AmendmentVersioning`, `TestFN_XA_03_08_CopyPreviousAndValidation`, `TestFN_XA_03_08_WeekRules`, `TestFN_XA_03_08_ItemRules`; Vitest `src/kn/schedule/schedule.test.tsx`, `src/api/mock/kn-schedules.test.ts`; Playwright `tests/e2e/kn-lich-cong-tac.spec.ts`; Flutter `apps/field-app/test/work_schedule_test.dart`, `work_schedule_screen_test.dart`, `packages/agrigreen_mobile/test/action_queue_test.dart` (ngoại tuyến: hàng đợi lệnh idempotent `work_schedule_save`, xung đột phiên bản → tải lại) | **đạt** |
 
 ## 6. UR Admin
 
@@ -125,7 +125,7 @@ Mỗi dòng gồm tiêu chí của FN **và** AC-CHUNG (lưu cơ sở dữ liệ
 | FN-TI-02.04 | Cán bộ xã nhận yêu cầu điều chỉnh kèm lý do (bắt buộc); số liệu sau chốt không sửa được nếu chưa mở lại kỳ; Cấp Tỉnh không sửa số gốc; AC-CHUNG | P4 | — | **chưa làm** |
 | FN-TI-02.05 | Sau "Cập nhật" bảng đúng số liệu mới nhất; mọi ô thay đổi được đánh dấu và có trong nhật ký (không xóa); toàn tỉnh = tổng xã; Excel xuất đúng bố cục mẫu; AC-CHUNG | P3, P4 | — | **chưa làm** |
 | FN-TI-02.06 | Số trong file = số tổng hợp của kỳ; Chi cục nhận email kèm file hoặc link mở được; mọi lần gửi có trong log; AC-CHUNG | P4 | — | **chưa làm** (Google Sheet phụ thuộc ADR-0026, Q-14) |
-| FN-TI-02.07 | Lịch Cán bộ xã gửi hiện ngay ở "Chờ duyệt"; không xem được lịch Phòng ban/tỉnh khác; AC-CHUNG | P5 | — | **chưa làm** |
+| FN-TI-02.07 | Lịch Cán bộ xã gửi hiện ngay ở "Chờ duyệt"; không xem được lịch Phòng ban/tỉnh khác; AC-CHUNG | P5 | `TestFN_XA_03_08_RegisterSubmitReviewFlow` (hiện ngay ở Chờ duyệt, Log cũ → mới), `TestFN_TI_02_07_SelfApprovalBlockedAndProvinceOwnSchedule`, `TestFN_TI_02_07_ScopeAndTenantIsolation`, `TestFN_TI_02_07_UnregisteredBulkRemindersExport`, `TestFN_TI_02_07_ApproverMgmtLevelViaP1Context`, `TestFN_TI_02_07_EndedWeekLocked`; Vitest `src/kn/schedule/schedule.test.tsx`, `src/api/mock/kn-schedules.test.ts`; Playwright `tests/e2e/kn-lich-cong-tac.spec.ts` | **đạt** (lịch sử duyệt: sổ `work_schedule_event`, phiên bản `work_schedule_item` — RB-1) |
 | FN-XA-03.01 | Công việc mới hiện ngay sau phát hành; trạng thái chuyển "Đã nộp" ngay sau khi gửi; AC-CHUNG | P4, P6, P7 | — | **chưa làm** |
 | FN-XA-03.02 | Bố cục bảng trùng sheet mẫu (đối chiếu theo chữ cái cột); Cán bộ xã không thấy dòng xã khác; số liệu gửi hiện ngay ở tổng hợp Cấp Tỉnh ("Thay đổi chờ cập nhật"); vi phạm yêu cầu mẫu → không cho gửi; gửi sau chốt → từ chối; AC-CHUNG | P3, P4, P6, P7 | — | **chưa làm** |
 | FN-XA-03.03 | Không thao tác ngoài phạm vi xã phụ trách; không xóa được HTX đã có dữ liệu liên kết (vô hiệu hóa thay xóa); SĐT che một phần; AC-CHUNG | P7, P6 | — (nền có sẵn: vô hiệu hóa HTX `deactivation-preview`, mặt nạ SĐT ở UAT G1) | **chưa làm** |
@@ -133,7 +133,7 @@ Mỗi dòng gồm tiêu chí của FN **và** AC-CHUNG (lưu cơ sở dữ liệ
 | FN-XA-03.05 | Không lưu được ranh giới không khép kín hoặc chồng lấn; vẽ offline đồng bộ đủ 100 %; AC-CHUNG | P7 | — (nền có sẵn: `TestOverlapRules`, `TestClassifyOverlaps`, Flutter `boundary_test.dart` "chồng lấn thửa của HTX khác → chặn lưu kể cả khi xác nhận"; v7.7 chặn mọi chồng lấn — hiện cùng HTX chỉ cần xác nhận) | **chưa làm** |
 | FN-XA-03.06 | Cấp Tỉnh xem được tổng hợp vật tư theo xã; AC-CHUNG | P2, P7 | — | **chưa làm** |
 | FN-XA-03.07 | Thống kê của xã khớp báo cáo đã gửi; AC-CHUNG | P4, P6 | — | **chưa làm** |
-| FN-XA-03.08 | Cán bộ xã nhận thông báo kết quả duyệt kèm lý do; lịch tuần đã kết thúc bị khóa; AC-CHUNG | P5, P7 | — | **chưa làm** |
+| FN-XA-03.08 | Cán bộ xã nhận thông báo kết quả duyệt kèm lý do; lịch tuần đã kết thúc bị khóa; AC-CHUNG | P5, P7 | `TestFN_XA_03_08_RegisterSubmitReviewFlow`, `TestFN_XA_03_08_AmendmentVersioning`, `TestFN_XA_03_08_CopyPreviousAndValidation`, `TestFN_XA_03_08_WeekRules`, `TestFN_XA_03_08_ItemRules`, `TestFN_TI_02_07_EndedWeekLocked`, `TestFN_XA_03_08_WorkScheduleNotifications` (pf/notify); Vitest `src/kn/schedule/schedule.test.tsx`, `src/api/mock/kn-schedules.test.ts`; Playwright `tests/e2e/kn-lich-cong-tac.spec.ts`; Flutter `apps/field-app/test/work_schedule_test.dart`, `work_schedule_screen_test.dart`, `packages/agrigreen_mobile/test/action_queue_test.dart` | **một phần** — **mã**: sự kiện `pf.extension.work_schedule.reviewed` kèm lý do và mẫu thông báo đã có, nhưng ràng buộc `pf_notify.notification.kind` chưa có `work_schedule_submitted`, `work_schedule_reviewed`, `work_schedule_due` (migration pf_notify 000073 của P4) nên consumer `pf.notify.work_schedule` chưa ghi được hộp thư |
 | FN-AD-04.01 | Đúng tỉnh An Giang và các xã/phường (sắp xếp 2025); không chọn được ĐVHC ngoài danh mục; mã duy nhất, không xóa, chỉ "Hết hiệu lực"; AC-CHUNG | P6 (giao diện) | `TestSeedCountsMatchDoc`, `TestSeedCodesAndValidity`, `TestDescendantsCoverWholeProvince`, `TestUnitValidate`, `TestResolveCurrentMergerSplitAndReuse`, `TestSuccessorResolutionAfterMerger` (mã lạ → 404 `masterdata.admin_unit_not_found`, tham chiếu sai → 422 `masterdata.admin_unit_invalid_reference`), `TestCatalogDeactivateKeepsHistory` | **đạt** (dữ liệu, API; màn Design Sample ở P6) |
 | FN-AD-04.02 | Cây trực quan; di chuyển Nút cập nhật ngay phạm vi tài khoản; báo cáo nhóm đúng theo Khu vực; không di chuyển Nút cấp 1, 2; AC-CHUNG | P2 | — | **chưa làm** |
 | FN-AD-04.03 | Chuyển "Đang áp dụng" hiện ngay ở bước 2 đăng nhập; không xóa phòng ban đã có tài khoản/dữ liệu; AC-CHUNG | P2, P1 | — | **chưa làm** |

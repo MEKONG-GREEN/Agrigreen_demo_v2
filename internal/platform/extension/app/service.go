@@ -80,6 +80,12 @@ type Service struct {
 	Farmers accport.FarmerHouseholds
 	// GpsLog (tùy chọn): log GPS của pf/geo cho consumer port.GpsLogConsumer (HTX US-GPS-03).
 	GpsLog geoport.GpsLog
+	// KNContext, KNDirectory (tùy chọn, P1): ngữ cảnh phiên KN và danh bạ gán vai trò cho lịch công tác (P5).
+	// Thiếu → suy từ vai realm + phạm vi đơn vị, danh bạ trực pf_extension.staff.
+	KNContext   port.KNContextResolver
+	KNDirectory port.KNDirectory
+	// TablePDF (tùy chọn, pf/reports): "Xuất PDF" lịch công tác. Thiếu → 503.
+	TablePDF port.TablePDF
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

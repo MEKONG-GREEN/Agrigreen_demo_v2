@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.work_schedule.submitted/v1",
+  "title": "pf.extension.work_schedule.submitted — payload",
+  "description": "Lịch công tác tuần vừa gửi duyệt (KN v7.7 FN-XA-03.08, FN-TI-02.07): gửi lần đầu, gửi lại sau Yêu cầu chỉnh sửa, hoặc điều chỉnh lịch đã duyệt (amendment). Ghi trong sổ pf_extension.work_schedule_event. Consumer pf/notify báo người duyệt (approver_refs; rỗng → chủ đề Cấp Tỉnh của tỉnh). Không chứa dữ liệu cá nhân, không có nội dung lịch.",
+  "x-event-type": "pf.extension.work_schedule.submitted",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": [
+    "schedule_id",
+    "owner_ref",
+    "owner_level",
+    "department_code",
+    "province_code",
+    "commune_codes",
+    "week_start",
+    "version",
+    "amendment",
+    "late",
+    "approver_refs",
+    "event_time"
+  ],
+  "properties": {
+    "schedule_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "owner_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "owner_level": {
+      "type": "string",
+      "enum": [
+        "commune",
+        "province"
+      ]
+    },
+    "department_code": {
+      "type": "string"
+    },
+    "province_code": {
+      "type": "string"
+    },
+    "commune_codes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "week_start": {
+      "type": "string",
+      "format": "date",
+      "description": "Thứ Hai đầu tuần (giờ Việt Nam)"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "amendment": {
+      "type": "boolean",
+      "description": "Điều chỉnh lịch đã duyệt — phần điều chỉnh chờ duyệt lại"
+    },
+    "late": {
+      "type": "boolean",
+      "description": "Đăng ký muộn"
+    },
+    "approver_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

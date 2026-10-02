@@ -36,6 +36,7 @@ import 'field_report_service.dart';
 import 'library_service.dart';
 import 'roster_service.dart';
 import 'task_service.dart';
+import 'work_schedule_service.dart';
 
 /// Phụ thuộc nền tảng, thay được trong kiểm thử.
 class AppPlatform {
@@ -103,6 +104,7 @@ class AppServices {
     required this.catalogs,
     required this.mrv,
     required this.roster,
+    required this.schedules,
   });
 
   final AppPlatform platform;
@@ -129,6 +131,10 @@ class AppServices {
 
   /// Danh bạ trực (trực tuyến; số điện thoại đọc lúc bấm, không lưu máy).
   final RosterService roster;
+
+  /// Lịch công tác tuần (KN v7.7 P5): bản đệm + nháp trên máy, lưu/gửi qua
+  /// hàng đợi lệnh.
+  final WorkScheduleService schedules;
 
   late final PushHost pushHost = _ServicesPushHost(this);
 
@@ -164,6 +170,7 @@ class AppServices {
       onWiped: onWiped,
     );
     final api = pf.apiFactory(accessToken, deviceId);
+    late final WorkScheduleService schedules;
     final sync = SyncService(
       db: db,
       api: api,
@@ -183,7 +190,22 @@ class AppServices {
         await pushTokens.flush(api, deviceId);
       },
       // Danh mục không có entity đồng bộ: tải qua API sau mỗi lượt pull.
-      afterPull: () => catalogs.refresh(api),
+      afterPull: () async {
+        await catalogs.refresh(api);
+        // Lệnh lưu lịch tuần vừa phát lại → tải bản mới, bỏ nháp đã lên máy chủ.
+        await schedules.refreshAfterSync();
+      },
+    );
+    schedules = WorkScheduleService(
+      db: db,
+      api: api,
+      actions: actions,
+      clock: pf.clock,
+      ids: pf.ids,
+      deviceId: deviceId,
+      syncNow: () async {
+        await sync.syncOnce(force: true);
+      },
     );
     final photos = PhotoPipeline(
       camera: pf.camera,
@@ -242,6 +264,7 @@ class AppServices {
         ids: pf.ids,
       ),
       roster: RosterService(api: api, dialer: pf.dialer, ids: pf.ids),
+      schedules: schedules,
     );
   }
 
