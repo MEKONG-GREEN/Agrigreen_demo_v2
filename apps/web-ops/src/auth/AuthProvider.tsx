@@ -10,6 +10,7 @@ import { ApiProblem } from "@/api/problem";
 import type { Me } from "@/api/types";
 import { config } from "@/config";
 import { createKnApi } from "@/kn/client";
+import { createCycleApi, createKnAdminApi, supportReasonStore, type CycleApi, type KnAdminApi } from "@/kn/cycle/api";
 import type { KnApi, MenuBadges, MenuTree, RoleAssignment, SelectContextRequest, SessionContext } from "@/kn/contract";
 import { contextStore, readSelection, writeSelection } from "@/kn/contextStore";
 import { autoSelection, isValidSelection } from "@/kn/session";
@@ -32,6 +33,8 @@ export interface KnSessionState {
   context: SessionContext | null;
   menu: MenuTree | null;
   badges: MenuBadges | null;
+  /** Chế độ hỗ trợ (FN-AD-04.07): đang thay cho ai — nhãn hiển thị trên dải vàng, lý do gửi kèm thao tác ghi. */
+  support?: { target: string; reason: string } | null;
 }
 
 const KN_LEGACY: KnSessionState = { status: "legacy", assignments: [], context: null, menu: null, badges: null };
@@ -47,7 +50,17 @@ export interface AuthContextValue {
   adminApi: AdminApiClient;
   /** Hợp đồng tạm KN v7.7 (ngữ cảnh phiên, menu theo cấu hình). */
   knApi: KnApi;
+  /** Vòng đời báo cáo KN v7.7 (P4) — Application API. */
+  cycleApi: CycleApi;
+  /** Quản trị KN v7.7 (P1/P2) — Admin API. */
+  knAdminApi: KnAdminApi;
   kn: KnSessionState;
+  /** FN-AD-04.07: vào menu vai trò khác với ngữ cảnh hỗ trợ (POST /v1/accounts/support-sessions). */
+  enterSupport: (ctx: SessionContext, target: string, reason: string) => Promise<void>;
+  /** Thoát chế độ hỗ trợ → về ngữ cảnh Admin. */
+  exitSupport: () => Promise<void>;
+  /** Sửa lý do của các thao tác ghi tiếp theo trong chế độ hỗ trợ. */
+  setSupportReason: (reason: string) => void;
   /** Chọn/đổi vai trò + phòng ban (không cần đăng nhập lại). Trả ngữ cảnh mới (default_route). */
   selectContext: (sel: SelectContextRequest) => Promise<SessionContext>;
   /** Chuyển hướng tới Keycloak; `loginHint` = email/SĐT người dùng gõ ở thẻ Đăng nhập. */
@@ -110,6 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fetch: config.mock ? mockAdminFetch : undefined,
       }),
       knApi: createKnApi({ baseUrl: config.apiBaseUrl, getAccessToken, getContextId, fetch: config.mock ? mockFetch : undefined }),
+      cycleApi: createCycleApi({ baseUrl: config.apiBaseUrl, getAccessToken, getContextId, fetch: config.mock ? mockFetch : undefined }),
+      knAdminApi: createKnAdminApi({ baseUrl: config.adminApiBaseUrl, getAccessToken, getContextId, fetch: config.mock ? mockAdminFetch : undefined }),
     };
   }, [onUnauthenticated]);
 
@@ -261,7 +276,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [loginAsPersona],
   );
 
-  const selectContext = useCallback((sel: SelectContextRequest) => activate(sel, kn.assignments), [activate, kn.assignments]);
+  const selectContext = useCallback(
+    (sel: SelectContextRequest) => {
+      supportReasonStore.set(null);
+      return activate(sel, kn.assignments);
+    },
+    [activate, kn.assignments],
+  );
+
+  const enterSupport = useCallback(
+    async (ctx: SessionContext, target: string, reason: string) => {
+      contextStore.set(ctx.context_id);
+      supportReasonStore.set(reason);
+      const [menu, badges] = await Promise.all([clients.knApi.menu(), clients.knApi.badges().catch((): MenuBadges => ({ counts: {} }))]);
+      await loadPrincipal();
+      setKn((k) => ({ status: "active", assignments: k.assignments, context: ctx, menu, badges, support: { target, reason } }));
+    },
+    [clients, loadPrincipal],
+  );
+
+  const exitSupport = useCallback(async () => {
+    const id = kn.context?.support_session_id;
+    if (id) await clients.knAdminApi.endSupport(id).catch(() => undefined);
+    supportReasonStore.set(null);
+    const sel = readSelection() ?? autoSelection(kn.assignments);
+    if (sel) await activate(sel, kn.assignments);
+  }, [clients, kn.context, kn.assignments, activate]);
+
+  const setSupportReason = useCallback((reason: string) => {
+    supportReasonStore.set(reason);
+    setKn((k) => (k.support ? { ...k, support: { ...k.support, reason } } : k));
+  }, []);
 
   const changePassword = useCallback(async () => {
     if (config.mock) return;
@@ -269,6 +314,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    supportReasonStore.set(null);
     tokenStore.set(null);
     contextStore.set(null);
     writeSelection(null);
@@ -293,7 +339,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       api: clients.api,
       adminApi: clients.adminApi,
       knApi: clients.knApi,
+      cycleApi: clients.cycleApi,
+      knAdminApi: clients.knAdminApi,
       kn,
+      enterSupport,
+      exitSupport,
+      setSupportReason,
       selectContext,
       login,
       loginWithPassword,
@@ -301,7 +352,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       changePassword,
       logout,
     }),
-    [status, principal, scopeWarning, clients, kn, selectContext, login, loginWithPassword, loginAsPersona, changePassword, logout],
+    [status, principal, scopeWarning, clients, kn, enterSupport, exitSupport, setSupportReason, selectContext, login, loginWithPassword, loginAsPersona, changePassword, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

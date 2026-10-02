@@ -180,8 +180,8 @@ var adminDeptItems = map[string][]MenuItem{
 		{Key: "admin.pb.thu_thap", Label: "Thu thập dữ liệu", Route: adminDeptRoute("/thu-thap"), Icon: "database"},
 		// FN-TI-02.07 (P5): Admin xem lịch công tác (chỉ đọc) — cùng màn của Cấp Tỉnh, chưa tách theo phòng ban.
 		{Key: "admin.pb.lich_cong_tac", Label: "Lịch công tác", Route: "/kn/nhiem-vu/lich-cong-tac", Icon: "calendar"},
-		// Tạm: màn danh mục dùng chung hiện có (G1) tới khi P6 dựng màn danh mục theo phòng ban.
-		{Key: "admin.pb.danh_muc", Label: "Danh mục nông nghiệp", Route: "/quan-tri/danh-muc", Icon: "package"},
+		// P6s: màn danh mục nông nghiệp theo phòng ban (FN-AD-04.05); màn danh mục G1 giữ ở /quan-tri/danh-muc.
+		{Key: "admin.pb.danh_muc", Label: "Danh mục nông nghiệp", Route: adminDeptRoute("/danh-muc"), Icon: "package"},
 		// P3b: trình thiết kế mẫu báo cáo dạng lưới Excel (FN-AD-04.06, Hình 27).
 		{Key: "admin.pb.mau_bao_cao", Label: "Mẫu báo cáo", Route: adminDeptRoute("/mau-bao-cao"), Icon: "table"},
 	},
@@ -189,7 +189,7 @@ var adminDeptItems = map[string][]MenuItem{
 		{Key: "admin.pb.theo_doi_nop", Label: "Theo dõi nộp báo cáo", Route: adminDeptRoute("/theo-doi-nop"), Icon: "bell"},
 		{Key: "admin.pb.tong_hop", Label: "Báo cáo tổng hợp các xã", Route: adminDeptRoute("/tong-hop"), Icon: "layers"},
 		{Key: "admin.pb.du_lieu_bao_cao", Label: "Dữ liệu báo cáo các xã", Route: adminDeptRoute("/du-lieu-bao-cao"), Icon: "file"},
-		{Key: "admin.pb.danh_muc", Label: "Danh mục nông nghiệp", Route: "/quan-tri/danh-muc", Icon: "package"},
+		{Key: "admin.pb.danh_muc", Label: "Danh mục nông nghiệp", Route: adminDeptRoute("/danh-muc"), Icon: "package"},
 		{Key: "admin.pb.mau_bao_cao", Label: "Mẫu báo cáo", Route: adminDeptRoute("/mau-bao-cao"), Icon: "table"},
 	},
 }
@@ -209,14 +209,16 @@ var (
 	}}
 	AdminSystem = MenuGroup{Key: "quan_tri", Label: "Quản trị hệ thống", Items: []MenuItem{
 		{Key: "admin.qt.dvhc", Label: "Đơn vị hành chính", Route: "/kn/quan-tri/don-vi-hanh-chinh", Icon: "map"},
-		// Màn hiện có (G1) giữ đường dẫn cũ — không xóa tính năng.
-		{Key: "admin.qt.co_cau", Label: "Cơ cấu tổ chức 3 cấp", Route: "/quan-tri/to-chuc", Icon: "org"},
+		// P6s: màn KN v7.7 (FN-AD-04.02); màn G1 giữ ở Công cụ nền tảng — không xóa tính năng.
+		{Key: "admin.qt.co_cau", Label: "Cơ cấu tổ chức 3 cấp", Route: "/kn/quan-tri/co-cau-to-chuc", Icon: "org"},
 		{Key: "admin.qt.phong_ban", Label: "Phòng ban", Route: "/kn/quan-tri/phong-ban", Icon: "building"},
-		{Key: "admin.qt.nguoi_dung", Label: "Người dùng", Route: "/quan-tri/tai-khoan", Icon: "users"},
+		{Key: "admin.qt.nguoi_dung", Label: "Người dùng", Route: "/kn/quan-tri/nguoi-dung", Icon: "users"},
 		{Key: "admin.qt.menu_cac_cap", Label: "Menu các cấp", Route: "/kn/quan-tri/menu-cac-cap", Icon: "key"},
 		// Q-13 (tạm, chờ khách): công cụ quản trị nền tảng đã có (G1–G5) đặt trong nhóm Quản trị hệ thống.
 		{Key: "admin.qt.cong_cu", Label: "Công cụ nền tảng (tạm)", Icon: "param", Children: []MenuItem{
 			{Key: "admin.qt.cong_cu.tham_so", Label: "Tham số & phê duyệt", Route: "/quan-tri/tham-so", Icon: "param"},
+			{Key: "admin.qt.cong_cu.tai_khoan", Label: "Tài khoản cán bộ (G1)", Route: "/quan-tri/tai-khoan", Icon: "user"},
+			{Key: "admin.qt.cong_cu.to_chuc", Label: "Cây tổ chức (G1)", Route: "/quan-tri/to-chuc", Icon: "org"},
 			{Key: "admin.qt.cong_cu.mau_xuat", Label: "Mẫu xuất & lịch gửi", Route: "/quan-tri/mau-bao-cao", Icon: "report"},
 			{Key: "admin.qt.cong_cu.xung_dot", Label: "Xung đột đồng bộ", Route: "/quan-tri/xung-dot", Icon: "conflict"},
 			{Key: "admin.qt.cong_cu.giam_sat", Label: "Giám sát đồng bộ", Route: "/quan-tri/giam-sat-dong-bo", Icon: "sync"},

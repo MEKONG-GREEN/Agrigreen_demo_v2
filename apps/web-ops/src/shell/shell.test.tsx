@@ -53,7 +53,7 @@ describe("menu theo vai trò (BRD v7.7 §6, Hình 3c–3f)", () => {
       ["3 phòng khác", "not_open"],
     ]);
     const hrefs = menuLinks(admin).map((l) => l.node.href);
-    expect(hrefs).toEqual(expect.arrayContaining(["/kn/tong-quan", "/quan-tri/to-chuc", "/quan-tri/tai-khoan", "/quan-tri/danh-muc", "/quan-tri/mau-bao-cao"]));
+    expect(hrefs).toEqual(expect.arrayContaining(["/kn/tong-quan", "/kn/quan-tri/co-cau-to-chuc", "/kn/quan-tri/nguoi-dung", "/quan-tri/to-chuc", "/quan-tri/tai-khoan", "/kn/phong-ban/trong_trot/danh-muc", "/quan-tri/mau-bao-cao"]));
   });
 
   it("khớp tiền tố dài nhất, breadcrumb mục cha / mục, kiểm đường dẫn theo menu", () => {

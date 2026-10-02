@@ -689,7 +689,7 @@
          {
           "key": "admin.pb.danh_muc",
           "label": "Danh mục nông nghiệp",
-          "route": "/quan-tri/danh-muc",
+          "route": "/kn/phong-ban/trong_trot/danh-muc",
           "icon": "package",
           "badge_source": null,
           "enabled": true,
@@ -746,7 +746,7 @@
          {
           "key": "admin.pb.danh_muc",
           "label": "Danh mục nông nghiệp",
-          "route": "/quan-tri/danh-muc",
+          "route": "/kn/phong-ban/chan_nuoi_thuy_san/danh-muc",
           "icon": "package",
           "badge_source": null,
           "enabled": false,
@@ -803,7 +803,7 @@
          {
           "key": "admin.pb.danh_muc",
           "label": "Danh mục nông nghiệp",
-          "route": "/quan-tri/danh-muc",
+          "route": "/kn/phong-ban/ke_hoach_tai_chinh/danh-muc",
           "icon": "package",
           "badge_source": null,
           "enabled": false,
@@ -860,7 +860,7 @@
          {
           "key": "admin.pb.danh_muc",
           "label": "Danh mục nông nghiệp",
-          "route": "/quan-tri/danh-muc",
+          "route": "/kn/phong-ban/thong_tin_truyen_thong/danh-muc",
           "icon": "package",
           "badge_source": null,
           "enabled": false,
@@ -917,7 +917,7 @@
          {
           "key": "admin.pb.danh_muc",
           "label": "Danh mục nông nghiệp",
-          "route": "/quan-tri/danh-muc",
+          "route": "/kn/phong-ban/phong_ban_5/danh-muc",
           "icon": "package",
           "badge_source": null,
           "enabled": false,
@@ -974,7 +974,7 @@
          {
           "key": "admin.pb.danh_muc",
           "label": "Danh mục nông nghiệp",
-          "route": "/quan-tri/danh-muc",
+          "route": "/kn/phong-ban/phong_ban_6/danh-muc",
           "icon": "package",
           "badge_source": null,
           "enabled": false,
@@ -1009,7 +1009,7 @@
        {
         "key": "admin.qt.co_cau",
         "label": "Cơ cấu tổ chức 3 cấp",
-        "route": "/quan-tri/to-chuc",
+        "route": "/kn/quan-tri/co-cau-to-chuc",
         "icon": "org",
         "badge_source": null,
         "enabled": true,
@@ -1027,7 +1027,7 @@
        {
         "key": "admin.qt.nguoi_dung",
         "label": "Người dùng",
-        "route": "/quan-tri/tai-khoan",
+        "route": "/kn/quan-tri/nguoi-dung",
         "icon": "users",
         "badge_source": null,
         "enabled": true,
@@ -1055,6 +1055,24 @@
           "label": "Tham số \u0026 phê duyệt",
           "route": "/quan-tri/tham-so",
           "icon": "param",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
+         },
+         {
+          "key": "admin.qt.cong_cu.tai_khoan",
+          "label": "Tài khoản cán bộ (G1)",
+          "route": "/quan-tri/tai-khoan",
+          "icon": "user",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
+         },
+         {
+          "key": "admin.qt.cong_cu.to_chuc",
+          "label": "Cây tổ chức (G1)",
+          "route": "/quan-tri/to-chuc",
+          "icon": "org",
           "badge_source": null,
           "enabled": true,
           "children": []

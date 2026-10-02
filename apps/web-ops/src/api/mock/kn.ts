@@ -164,8 +164,7 @@ function adminDeptItems(code: string, profile: "trong_trot" | "generic"): Item[]
           { key: "admin.pb.lich_cong_tac", label: "Lịch công tác", route: WORK_SCHEDULE_ROUTE, icon: "calendar" },
         ]
       : []),
-    // Tạm: màn danh mục dùng chung hiện có (G1).
-    { key: "admin.pb.danh_muc", label: "Danh mục nông nghiệp", route: "/quan-tri/danh-muc", icon: "package" },
+    { key: "admin.pb.danh_muc", label: "Danh mục nông nghiệp", route: `${base}/danh-muc`, icon: "package" },
     // P3b: trình thiết kế mẫu báo cáo dạng lưới Excel (FN-AD-04.06, Hình 27).
     { key: "admin.pb.mau_bao_cao", label: "Mẫu báo cáo", route: `${base}/mau-bao-cao`, icon: "table" },
   ];
@@ -181,9 +180,9 @@ const ADMIN_SYSTEM: Group = {
   label: "Quản trị hệ thống",
   items: [
     { key: "admin.qt.dvhc", label: "Đơn vị hành chính", route: "/kn/quan-tri/don-vi-hanh-chinh", icon: "map" },
-    { key: "admin.qt.co_cau", label: "Cơ cấu tổ chức 3 cấp", route: "/quan-tri/to-chuc", icon: "org" },
+    { key: "admin.qt.co_cau", label: "Cơ cấu tổ chức 3 cấp", route: "/kn/quan-tri/co-cau-to-chuc", icon: "org" },
     { key: "admin.qt.phong_ban", label: "Phòng ban", route: "/kn/quan-tri/phong-ban", icon: "building" },
-    { key: "admin.qt.nguoi_dung", label: "Người dùng", route: "/quan-tri/tai-khoan", icon: "users" },
+    { key: "admin.qt.nguoi_dung", label: "Người dùng", route: "/kn/quan-tri/nguoi-dung", icon: "users" },
     { key: "admin.qt.menu_cac_cap", label: "Menu các cấp", route: "/kn/quan-tri/menu-cac-cap", icon: "key" },
     {
       // Q-13 (tạm, chờ khách): công cụ quản trị nền tảng đã có đặt trong nhóm Quản trị hệ thống.
@@ -192,6 +191,8 @@ const ADMIN_SYSTEM: Group = {
       icon: "param",
       children: [
         { key: "admin.qt.cong_cu.tham_so", label: "Tham số & phê duyệt", route: "/quan-tri/tham-so", icon: "param" },
+        { key: "admin.qt.cong_cu.tai_khoan", label: "Tài khoản cán bộ (G1)", route: "/quan-tri/tai-khoan", icon: "user" },
+        { key: "admin.qt.cong_cu.to_chuc", label: "Cây tổ chức (G1)", route: "/quan-tri/to-chuc", icon: "org" },
         // Màn G1 (mẫu xuất có phiên bản + lịch gửi email) — giữ nguyên, không xóa tính năng.
         { key: "admin.qt.cong_cu.mau_xuat", label: "Mẫu xuất & lịch gửi", route: "/quan-tri/mau-bao-cao", icon: "report" },
         { key: "admin.qt.cong_cu.xung_dot", label: "Xung đột đồng bộ", route: "/quan-tri/xung-dot", icon: "conflict" },

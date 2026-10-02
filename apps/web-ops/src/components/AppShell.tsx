@@ -17,6 +17,7 @@ import { useStoredValue, writeStoredValue } from "@/lib/useStoredValue";
 import { Icon } from "./Icon";
 import { NotificationBell } from "./NotificationBell";
 import { Loading } from "./ui";
+import { SupportBanner } from "@/kn/SupportBanner";
 
 /** Trang không có khung (đăng nhập, chọn vai trò & phòng ban). */
 export function isBareRoute(pathname: string): boolean {
@@ -166,6 +167,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             />
           </header>
           <main className="body" id="main" tabIndex={-1}>
+            {ctx?.support_session_id ? <SupportBanner /> : null}
             {scopeWarning ? (
               <div className="alert alert-warn" role="status" style={{ marginBottom: 16 }}>
                 <Icon name="info" />
