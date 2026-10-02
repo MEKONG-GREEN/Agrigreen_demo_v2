@@ -299,6 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const id = kn.context?.support_session_id;
     if (id) await clients.knAdminApi.endSupport(id).catch(() => undefined);
     supportReasonStore.set(null);
+    contextStore.set(null); // ngữ cảnh hỗ trợ đã hết hiệu lực — không gửi kèm khi chọn lại ngữ cảnh Admin
     const sel = readSelection() ?? autoSelection(kn.assignments);
     if (sel) await activate(sel, kn.assignments);
   }, [clients, kn.context, kn.assignments, activate]);

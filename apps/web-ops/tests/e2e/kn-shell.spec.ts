@@ -50,7 +50,7 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     const active = menuNav(page).locator('[aria-current="page"]');
     await expect(active).toHaveCount(1);
     await expect(active).toContainText("Công việc cần làm");
-    await expect(active).toContainText("6");
+    await expect(active).toContainText(/\d/); // số đếm từ sổ giả lập vòng đời báo cáo (P4)
     await expect(menuNav(page).getByRole("link", { name: "Dashboard" })).toHaveCount(0);
     await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toHaveText(/Nhiệm vụ\s*\/?\s*Công việc cần làm/);
     await expect(accountMenu(page)).toContainText("Nguyễn Văn An");
@@ -73,7 +73,7 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await expect(page.getByRole("menu")).toContainText("Cấp Quốc gia · Phòng Trồng trọt");
     await expect(page.getByRole("menu")).toContainText("Tài khoản chỉ có 1 vai trò, 1 phòng ban");
     await page.keyboard.press("Escape");
-    // Màn chưa dựng (đợt sau) mở trang giữ chỗ mang tên mục menu.
+    // Báo cáo năm: chưa có mẫu năm (Q-07) → "Chưa có dữ liệu", chỉ xem.
     await menuNav(page).getByRole("link", { name: "Báo cáo năm" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Báo cáo năm" })).toBeVisible();
     await expect(menuNav(page).getByRole("link", { name: "Báo cáo năm" })).toHaveAttribute("aria-current", "page");
@@ -88,8 +88,8 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     const nav = menuNav(page);
     await expect(nav.getByRole("button", { name: /Nhiệm vụ/ })).toHaveAttribute("aria-expanded", "false");
     await nav.getByRole("button", { name: /Nhiệm vụ/ }).click();
-    await expect(nav.getByRole("link", { name: /Trạng thái nộp/ })).toContainText("15");
-    await expect(nav.getByRole("link", { name: /Rà soát & chốt kỳ/ })).toContainText("3");
+    await expect(nav.getByRole("link", { name: /Trạng thái nộp/ })).toContainText(/\d/);
+    await expect(nav.getByRole("link", { name: /Rà soát & chốt kỳ/ })).toContainText(/\d/);
     await expect(nav.getByRole("link", { name: /Lịch công tác/ })).toContainText("2");
     await expect(nav.getByRole("link", { name: "Phát hành biểu mẫu" })).not.toContainText(/\d/);
     await nav.getByRole("link", { name: "Phát hành biểu mẫu" }).click();
@@ -109,7 +109,7 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await expect(accountMenu(page)).toContainText("Cấp Xã · Trồng trọt");
   });
 
-  test("Admin: vào thẳng Tổng quan hệ thống; nhóm Phòng ban (chưa mở hiện mờ) và Quản trị hệ thống mở màn hiện có", async ({ page }) => {
+  test("Admin: vào thẳng Tổng quan hệ thống; nhóm Phòng ban (chưa mở hiện mờ) và Quản trị hệ thống mở màn KN", async ({ page }) => {
     await loginKn(page, "admin.mekong@mekonggreen.vn");
     await expect(page).toHaveURL(/\/kn\/tong-quan$/);
     await expect(page.getByRole("heading", { level: 1, name: /Xin chào, admin\.mekong/ })).toBeVisible();
@@ -120,8 +120,8 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await menuNav(page).getByRole("button", { name: /Phòng Trồng trọt/ }).click();
     await expect(menuNav(page).getByRole("link", { name: "Mẫu báo cáo" })).toBeVisible();
     await menuNav(page).getByRole("link", { name: "Người dùng" }).click();
-    await expect(page).toHaveURL(/\/quan-tri\/tai-khoan$/);
-    await expect(page.getByRole("heading", { level: 1, name: "Tài khoản cán bộ" })).toBeVisible();
+    await expect(page).toHaveURL(/\/kn\/quan-tri\/nguoi-dung$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Người dùng" })).toBeVisible();
     await expect(menuNav(page).getByRole("link", { name: "Người dùng" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByText("Hệ thống gặp lỗi")).toHaveCount(0);
   });
@@ -156,13 +156,12 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await expect(page).toHaveURL(/\/kn\/nhiem-vu\/cong-viec$/);
     await menuNav(page).getByRole("button", { name: /Thu thập dữ liệu/ }).click();
     await menuNav(page).getByRole("link", { name: "Danh sách HTX" }).click();
-    await expect(page.getByText("Hiển thị 1–10 trên 23")).toBeVisible();
-    await page.getByRole("button", { name: "Trang 3" }).click();
-    await expect(page.getByText("Hiển thị 21–23 trên 23")).toBeVisible();
+    // P6s: danh sách đọc API thật (GET /v1/cooperatives theo xã phụ trách).
+    await expect(page.getByText("Hiển thị 1–3 trên 3")).toBeVisible();
     await page.getByRole("button", { name: "Đặt lại" }).click();
     await page.getByRole("link", { name: /^Xem HTX/ }).first().click();
-    await expect(page).toHaveURL(/\/kn\/du-lieu\/htx\/htx-/);
-    await expect(page.getByRole("complementary", { name: "Log" })).toContainText("Cập nhật diện tích");
+    await expect(page).toHaveURL(/\/kn\/du-lieu\/htx\/[0-9a-f-]{36}$/);
+    await expect(page.getByRole("complementary", { name: "Log" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("Danh sách HTX");
     await page.getByRole("link", { name: "Danh sách HTX" }).first().click();
     await expect(page).toHaveURL(/\/kn\/du-lieu\/htx$/);

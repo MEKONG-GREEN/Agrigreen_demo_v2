@@ -1667,6 +1667,7 @@ export function badgesFor(c: Caller, now = nowMs()): Record<string, number> {
 export function cycleBadges(contextId: string): Record<string, number> {
   const st = knStoredContext(contextId);
   if (!st || st.ctx.role === "kn_tw" || st.ctx.role === "admin") return {};
+  ensureSeeded();
   tick();
   return badgesFor(callerFromStored(st));
 }
