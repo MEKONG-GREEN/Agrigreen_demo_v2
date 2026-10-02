@@ -3,6 +3,7 @@ package domain
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -123,7 +124,7 @@ func TestWebReportCycleFixture(t *testing.T) {
 	}
 	for _, pt := range []string{PeriodWeek, PeriodMonth, PeriodSeason, PeriodYear, PeriodAdhoc} {
 		d := DefaultDeadline(pt)
-		fx.Defaults[pt] = fxDeadline{d.OffsetDays, d.Time}
+		fx.Defaults[pt] = fxDeadline(d)
 	}
 	type sc struct {
 		name, pt, from, to, season, numbering string
@@ -152,8 +153,8 @@ func TestWebReportCycleFixture(t *testing.T) {
 		out := fxSplit{Name: c.name, PeriodType: c.pt, From: c.from, To: c.to, Season: c.season, WeekNumbering: c.numbering,
 			Deadline: fxDeadline{c.d.OffsetDays, c.d.Time}, CloseAfterDays: c.closeAfter, Periods: []fxPeriod{}, RuleTag: rule.Tag()}
 		if err != nil {
-			e, ok := err.(ErrPeriod)
-			if !ok {
+			var e ErrPeriod
+			if !errors.As(err, &e) {
 				t.Fatalf("%s: lỗi không phải ErrPeriod: %v", c.name, err)
 			}
 			out.Error = &e
