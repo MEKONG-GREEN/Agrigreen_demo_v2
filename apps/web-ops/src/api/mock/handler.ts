@@ -49,6 +49,7 @@ import { contextProblem, knAppRoutes, personaForContext } from "./kn";
 import { formsAdminRoutes, formsAppRoutes } from "./forms/routes";
 import { workScheduleAppRoutes } from "./kn-schedules";
 import { reportCycleAppRoutes } from "./kn-reports/routes";
+import { knAdminRoutes, supportGuard, supportRecord } from "./kn-admin";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -409,6 +410,9 @@ function findVersion(id: string | undefined): ParamVersion | undefined {
 const importedPhones = new Set<string>();
 
 const adminRoutes: Route[] = [
+  // KN v7.7 (P1/P2): tài khoản nhiều vai trò, Menu các cấp (hỗ trợ), phòng ban, khu vực, cây tổ chức — đặt trước
+  // để GET /v1/accounts/users trong ngữ cảnh Admin KN trả tài khoản KN.
+  ...knAdminRoutes,
   ...htxGapAdminRoutes,
   // --- KN v7.7 P3: trình thiết kế mẫu báo cáo (FN-AD-04.06) ---
   ...formsAdminRoutes,
@@ -723,7 +727,12 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
         if (prev.fingerprint !== fingerprint) return problem(422, "idempotency_key_reused", "Idempotency key reused");
         return new Response(prev.body, { status: prev.status, headers: { ...prev.headers, "Idempotent-Replayed": "true" } });
       }
+      // FN-AD-04.07: chế độ hỗ trợ — lý do bắt buộc, nhật ký attempted + completed.
+      const guard = supportGuard(request, url);
+      if (guard) return guard;
+      supportRecord(request, url, null, "attempted", key);
       const res = dispatch(routes, request, url, persona, body);
+      supportRecord(request, url, res.status, "completed", key);
       if (res.ok) {
         replay.set(key, { status: res.status, body: await res.clone().text(), headers: { "Content-Type": res.headers.get("Content-Type") ?? "application/json" }, fingerprint });
       }
@@ -737,7 +746,7 @@ function dispatch(routes: Route[], request: Request, url: URL, persona: MockPers
   for (const r of routes) {
     if (r.method !== request.method) continue;
     const m = r.pattern.exec(url.pathname);
-    if (!m || (r.match && !r.match(url))) continue;
+    if (!m || (r.match && !r.match(url, request))) continue;
     try {
       return r.handler({ url, persona, params: m.slice(1), body, request });
     } catch (e) {
