@@ -55,6 +55,8 @@ export interface FormGridProps {
   focusCell?: { rowKey: string; letter: string; nonce: number } | null;
   /** Ẩn ô "Đi tới nhóm cột" (khi trang tự đặt). */
   hideGroupJump?: boolean;
+  /** Tổng hợp các xã (FN-TI-02.05): ô thay đổi viền vàng ● + chú thích cũ/người/thời điểm. Khóa "dòng|cột". */
+  changed?: ReadonlyMap<string, string>;
 }
 
 interface Active {
@@ -115,6 +117,8 @@ interface RowViewProps {
   editing: Editing | null;
   readOnly: boolean;
   issues: Map<string, FormCellIssue[]>;
+  /** Ô thay đổi trong lần tổng hợp gần nhất: khóa "dòng|cột" → chú thích (giá trị cũ, người sửa, thời điểm). */
+  changed?: ReadonlyMap<string, string>;
   idBase: string;
   selectedColumn: number;
   onCellMouseDown: (r: number, c: number, e: MouseEvent) => void;
@@ -142,6 +146,7 @@ const RowView = memo(function RowView(p: RowViewProps) {
         const shown = raw === undefined || raw === "" ? fallbackCell(def, row, col, p.communes) : displayCell(col, raw, isTotal || role === "formula");
         const iss = p.issues.get(`${row.key}|${col.letter}`);
         const sev = iss?.some((i) => i.severity === "error") ? "err" : iss?.length ? "warn" : "";
+        const chg = p.changed?.get(`${row.key}|${col.letter}`);
         const active = p.activeC === c;
         const isEditing = active && p.editing !== null;
         const numeric = col.dtype === "number" || col.dtype === "integer";
@@ -154,6 +159,7 @@ const RowView = memo(function RowView(p: RowViewProps) {
           active ? "is-active" : "",
           sev ? `is-${sev}` : "",
           p.selectedColumn === c + 1 ? "is-colsel" : "",
+          chg ? "g-changed" : "",
         ]
           .filter(Boolean)
           .join(" ");
@@ -166,7 +172,8 @@ const RowView = memo(function RowView(p: RowViewProps) {
             aria-readonly={!editable || undefined}
             aria-selected={active || undefined}
             aria-invalid={sev === "err" || undefined}
-            title={iss?.map((i) => i.message).join("\n") || undefined}
+            title={iss?.map((i) => i.message).join("\n") || chg || undefined}
+            data-changed={chg ? "true" : undefined}
             className={cls}
             style={frozen ? { left: p.lefts[c] } : undefined}
             data-letter={col.letter}
@@ -184,6 +191,10 @@ const RowView = memo(function RowView(p: RowViewProps) {
                 onKeyDown={p.onEditorKeyDown}
                 onBlur={p.commitEdit}
               />
+            ) : chg ? (
+              <>
+                {shown} <span className="g-chg-dot" aria-label={chg}>●</span>
+              </>
             ) : (
               shown
             )}
@@ -215,6 +226,7 @@ export function FormGrid({
   maxHeight = 520,
   focusCell,
   hideGroupJump = false,
+  changed,
 }: FormGridProps) {
   const idBase = useId().replace(/:/g, "");
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -575,6 +587,7 @@ export function FormGrid({
                 editing={editing?.r === r ? editing : null}
                 readOnly={readOnly || !onChange}
                 issues={issueMap}
+                changed={changed}
                 idBase={idBase}
                 selectedColumn={selCol}
                 onCellMouseDown={onCellMouseDown}

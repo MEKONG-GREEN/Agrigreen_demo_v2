@@ -76,6 +76,8 @@ export const KN_COMMUNES: readonly { code: string; name: string }[] = [
   { code: "91304", name: "Vĩnh Tế" },
   { code: "91305", name: "An Cư" },
   { code: "91306", name: "Núi Sam" },
+  // P6s: xã chưa có cán bộ phụ trách Phòng Trồng trọt (cảnh báo khi phát hành biểu).
+  { code: "91307", name: "Châu Phong" },
 ];
 
 const communeName = (code: string | null | undefined) => KN_COMMUNES.find((c) => c.code === code)?.name ?? code ?? "";
