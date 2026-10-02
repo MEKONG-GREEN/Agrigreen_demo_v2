@@ -158,8 +158,8 @@ export const reportCycleAppRoutes: Route[] = [
       const pid = q(ctx, "period_id");
       const p = pid ? st.periodsOf(b.id).find((x) => x.id === pid) : st.defaultPeriod(b.id);
       if (!p) return notFoundPeriod();
-      const { batch: _b, ...board } = st.statusBoard(b, p, { template_id: q(ctx, "template_id"), status: q(ctx, "status") });
-      return json(board);
+      const board = st.statusBoard(b, p, { template_id: q(ctx, "template_id"), status: q(ctx, "status") });
+      return json({ period: board.period, counts: board.counts, items: board.items });
     }),
   },
   {

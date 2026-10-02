@@ -112,7 +112,9 @@ export function useLoad<T>(load: (() => Promise<T>) | null, deps: unknown[]): Lo
   const seq = useRef(0);
   const [nonce, setNonce] = useState(0);
   const fn = useRef(load);
-  fn.current = load;
+  useEffect(() => {
+    fn.current = load;
+  });
   useEffect(() => {
     const f = fn.current;
     if (!f) return;

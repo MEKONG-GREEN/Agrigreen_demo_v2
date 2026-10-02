@@ -349,7 +349,7 @@ export function useBatchPeriod(initialBatch?: string | null, reportType?: string
   const active = batchId ?? batches.data?.items.find((b) => b.status === "issued")?.id ?? null;
   const detail = useLoad(active ? () => cycleApi.batch(active) : null, [active]);
   const [periodId, setPeriodId] = useState<string | null>(null);
-  const now = Date.now();
+  const [now] = useState(() => Date.now());
   const periods = detail.data?.periods ?? [];
   const defPeriod = [...periods].reverse().find((p) => Date.parse(p.from_date) <= now) ?? periods[0];
   const period = periods.find((p) => p.id === periodId) ?? defPeriod ?? null;

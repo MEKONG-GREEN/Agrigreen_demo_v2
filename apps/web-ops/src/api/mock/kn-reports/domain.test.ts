@@ -82,7 +82,7 @@ describe("KN v7.7 P4 — bản port giả lập khớp ca vàng Go (reportcycle/
 
   it.each(g.diff.map((c) => [c.name, c] as const))("FN-TI-02.05 so khác lần tổng hợp: %s", (_n, c) => {
     const [changes, communes] = diff(c.prev, c.next, c.prev_src, c.next_src, new Set(c.formula));
-    expect(changes.map(({ source: _s, ...x }) => x)).toEqual(c.changes);
+    expect(changes.map((x) => ({ commune: x.commune, row_key: x.row_key, letter: x.letter, old: x.old, new: x.new, kind: x.kind }))).toEqual(c.changes);
     expect(communes).toBe(c.communes);
   });
 

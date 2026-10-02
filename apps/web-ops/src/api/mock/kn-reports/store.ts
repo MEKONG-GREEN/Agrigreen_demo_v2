@@ -538,13 +538,13 @@ export function taskVisible(c: Caller, t: Task): boolean {
   return !!b && !t.withdrawn && batchVisible(c, b) && (c.role !== "kn_xa" || c.communes.includes(t.commune_code));
 }
 
-function taskState(t: Task, now: number) {
+function taskState(t: Task) {
   const p = periodOf(t.period_id)!;
   return { status: t.stored, dueAt: Date.parse(p.due_at), periodClosed: p.status === "closed", reopenedUntil: t.reopened_until ? Date.parse(t.reopened_until) : null };
 }
 
-export const displayOf = (t: Task, now = nowMs()): DisplayStatus => taskDisplay(taskState(t, now), now);
-export const openOf = (t: Task, now = nowMs()): boolean => taskOpen(taskState(t, now), now);
+export const displayOf = (t: Task, now = nowMs()): DisplayStatus => taskDisplay(taskState(t), now);
+export const openOf = (t: Task, now = nowMs()): boolean => taskOpen(taskState(t), now);
 
 export function taskWire(t: Task, now = nowMs()) {
   const p = periodOf(t.period_id)!;
@@ -1832,7 +1832,9 @@ export const dispatchesOf = (c: Caller, q: { period_id?: string | null; province
   S.dispatches.filter((d) => (c.province === null || d.province_code === c.province) && (c.role === "admin" || d.department_code === c.dept) && (!q.period_id || d.period_id === q.period_id) && (!q.province || d.province_code === q.province)).reverse();
 
 export function dispatchWire(d: Dispatch) {
-  const { files, log, deliver_at: _d, ...dispatch } = d;
+  const { files, log, ...rest } = d;
+  const dispatch: Partial<Dispatch> = { ...rest };
+  delete dispatch.deliver_at;
   return { dispatch, files, log };
 }
 

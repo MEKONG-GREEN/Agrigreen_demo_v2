@@ -1122,6 +1122,13 @@ export const workScheduleAppRoutes: Route[] = [
     },
   },
   {
+    // P6s (FN-XA-03.03): hồ sơ HTX của các xã KN giả lập.
+    method: "GET",
+    pattern: /^\/v1\/cooperatives\/([0-9a-f-]{36})$/,
+    match: (url) => KN_COOPS.some((c) => url.pathname.endsWith(c.ref)),
+    handler: ({ params }) => json(KN_COOPS.find((c) => c.ref === params[0])!),
+  },
+  {
     method: "GET",
     pattern: /^\/v1\/cooperatives$/,
     match: (url) => /^913\d\d$/.test(url.searchParams.get("admin_unit") ?? ""),
