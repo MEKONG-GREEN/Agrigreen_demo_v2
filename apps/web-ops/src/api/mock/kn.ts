@@ -11,8 +11,14 @@ import type { DepartmentRef, KnRole, MenuGroup, MenuNode, MenuTree, RoleAssignme
 import { json, problem, type Route } from "./http";
 import { findKnAccount, findKnAccountByIdentifier, KN_DEPARTMENTS, knPersona, MOCK_KN_PASSWORD, SHORT_DEPT_NAME, type MockKnAccount } from "./kn-accounts";
 import type { MockPersona } from "./personas";
+import { workSchedulePendingBadge } from "./kn-schedules";
 
 export const MENU_VERSION = "kn-menu.v7.7-2026-10-01";
+
+/** Màn Lịch công tác (P5): một đường dẫn cho Cấp Xã (đăng ký) và Cấp Tỉnh/Admin (duyệt) — trang tự chọn theo vai trò. */
+export const WORK_SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
+/** Nguồn số đếm menu theo hợp đồng P5 (ExtWorkScheduleCounts.pending_open_weeks) và menu P2. */
+export const WORK_SCHEDULE_BADGE = "extension.work_schedules.pending";
 
 /** Trang mặc định theo vai trò (FN-CH-00.01). */
 export const DEFAULT_ROUTE: Record<KnRole, string> = {
@@ -63,7 +69,7 @@ function deptGroups(role: Exclude<KnRole, "admin">, dept: string): MenuGroup[] {
                 { key: "phat-hanh", label: "Phát hành biểu mẫu", icon: "send", href: "/kn/nhiem-vu/phat-hanh" },
                 { key: "trang-thai-nop", label: "Trạng thái nộp", icon: "bell", href: "/kn/nhiem-vu/trang-thai-nop", badge_source: "submissions.missing" },
                 { key: "ra-soat", label: "Rà soát & chốt kỳ", icon: "check", href: "/kn/nhiem-vu/ra-soat", badge_source: "reviews.pending" },
-                { key: "lich-cong-tac", label: "Lịch công tác", icon: "calendar", href: "/kn/nhiem-vu/lich-cong-tac", badge_source: "schedules.pending" },
+                { key: "lich-cong-tac", label: "Lịch công tác", icon: "calendar", href: WORK_SCHEDULE_ROUTE, badge_source: WORK_SCHEDULE_BADGE },
               ],
             },
           ],
@@ -90,7 +96,7 @@ function deptGroups(role: Exclude<KnRole, "admin">, dept: string): MenuGroup[] {
               icon: "task",
               children: [
                 { key: "cong-viec", label: "Công việc cần làm", icon: "bell", href: "/kn/nhiem-vu/cong-viec", badge_source: "report_tasks.todo" },
-                { key: "lich-cong-tac", label: "Lịch công tác", icon: "calendar", href: "/kn/nhiem-vu/lich-cong-tac" },
+                { key: "lich-cong-tac", label: "Lịch công tác", icon: "calendar", href: WORK_SCHEDULE_ROUTE },
               ],
             },
           ],
@@ -137,6 +143,8 @@ function adminGroups(departments: readonly DepartmentRef[]): MenuGroup[] {
           { key: `${d.code}-tong-hop`, label: "Báo cáo tổng hợp các xã", icon: "layers", href: `${base}/tong-hop` },
           { key: `${d.code}-du-lieu`, label: "Dữ liệu báo cáo các xã", icon: "file", href: `${base}/du-lieu-bao-cao` },
           { key: `${d.code}-thu-thap`, label: "Thu thập dữ liệu", icon: "database", href: `${base}/thu-thap` },
+          // FN-TI-02.07: Admin xem lịch công tác (chỉ đọc) — cùng màn của Cấp Tỉnh, chưa tách theo phòng ban.
+          ...(d.code === "trong_trot" ? [{ key: `${d.code}-lich`, label: "Lịch công tác", icon: "calendar" as const, href: WORK_SCHEDULE_ROUTE }] : []),
           // Màn hiện có (G1): danh mục dùng chung — giữ tới khi P2/P6 dựng màn mới.
           { key: `${d.code}-danh-muc`, label: "Danh mục nông nghiệp", icon: "package", href: "/quan-tri/danh-muc" },
           // P3b: trình thiết kế mẫu báo cáo dạng lưới Excel (FN-AD-04.06, Hình 27).
@@ -194,7 +202,7 @@ export function knMenuFor(role: KnRole, departmentCode: string | null): MenuTree
 /** Số đếm giả lập theo vai trò (Hình 3e: 15 / 3 / 2; Hình 3f: 6). 0 → menu ẩn số đếm. */
 const BADGES: Record<KnRole, Record<string, number>> = {
   kn_tw: {},
-  kn_tinh: { "submissions.missing": 15, "reviews.pending": 3, "schedules.pending": 2, "adhoc_reports.todo": 0 },
+  kn_tinh: { "submissions.missing": 15, "reviews.pending": 3, "adhoc_reports.todo": 0 },
   kn_xa: { "report_tasks.todo": 6, "adhoc_reports.todo": 1 },
   admin: {},
 };
@@ -301,9 +309,14 @@ export const knAppRoutes: Route[] = [
   {
     method: "GET",
     pattern: /^\/v1\/me\/menu-badges$/,
-    handler: ({ request }) => {
-      const stored = CONTEXTS.get(request.headers.get("X-AG-Context") ?? "");
-      return json({ counts: stored ? BADGES[stored.assignment.role] : {} });
+    handler: ({ request, persona }) => {
+      const contextId = request.headers.get("X-AG-Context") ?? "";
+      const stored = CONTEXTS.get(contextId);
+      if (!stored) return json({ counts: {} });
+      const counts: Record<string, number> = { ...BADGES[stored.assignment.role] };
+      // Lịch chờ duyệt: tính từ sổ lịch giả lập (P5), không cố định.
+      if (stored.assignment.role === "kn_tinh") counts[WORK_SCHEDULE_BADGE] = workSchedulePendingBadge(persona, contextId);
+      return json({ counts });
     },
   },
 ];

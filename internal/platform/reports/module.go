@@ -29,6 +29,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/mail"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/render"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
@@ -84,6 +85,18 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc
 // Forms trả cổng mẫu báo cáo KN v7.7 cho P4 (pf/extension: phát hành, bài nộp, tổng hợp):
 // tra phiên bản, kiểm + tính lưới bài nộp, dòng tổng. Nối ở cmd/api-platform/assembly và cmd/worker.
 func (m *Module) Forms() port.FormEngine { return app.Forms{Svc: m.svc} }
+
+// TablePDF là bộ dựng PDF bảng chữ cho module khác (pf/extension: "Xuất PDF" lịch công tác, KN v7.7 P5) —
+// gốc lắp ráp nối qua extension.Module.UseTablePDF. Không đụng DB.
+func (m *Module) TablePDF() TablePDFRenderer { return TablePDFRenderer{} }
+
+// TablePDFRenderer hiện thực interface TablePDF của module gọi (chữ ký chỉ dùng kiểu cơ bản).
+type TablePDFRenderer struct{}
+
+// RenderTablePDF dựng PDF A4 ngang từ tiêu đề, các dòng "nhãn: giá trị", tiêu đề cột và các dòng.
+func (TablePDFRenderer) RenderTablePDF(title string, meta [][2]string, header []string, rows [][]string, at time.Time) ([]byte, error) {
+	return render.TablePDF(title, meta, header, rows, at)
+}
 
 // ImportFormXLSX nạp một sheet Excel thành định nghĩa lưới nháp (không DB) — dùng cho
 // cmd/formimport khi khách gửi tệp gốc (Q-01).

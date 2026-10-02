@@ -50,6 +50,8 @@ class InboxItem {
     'farm_log_reviewed' => 'Kết quả duyệt nhật ký',
     'season_opened' => 'Mở vụ',
     'task_assigned' => 'Nhiệm vụ mới',
+    'work_schedule_reviewed' => 'Kết quả duyệt lịch công tác',
+    'work_schedule_due' => 'Nhắc đăng ký lịch công tác',
     _ => 'Thông báo',
   };
 }
