@@ -50,6 +50,7 @@ import { formsAdminRoutes, formsAppRoutes } from "./forms/routes";
 import { workScheduleAppRoutes } from "./kn-schedules";
 import { reportCycleAppRoutes } from "./kn-reports/routes";
 import { knAdminRoutes, supportGuard, supportRecord } from "./kn-admin";
+import { knCollectRoutes } from "./kn-collect";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -122,6 +123,8 @@ const appRoutes: Route[] = [
   ...workScheduleAppRoutes,
   // --- KN v7.7 P4: vòng đời báo cáo (phát hành, công việc, nộp, rà soát, kỳ, tổng hợp, dashboard, Chi cục) ---
   ...reportCycleAppRoutes,
+  // --- KN v7.7 P7: thu thập dữ liệu Cấp Xã (/v1/kn/cooperatives*, machine-counts*, plots, materials*) ---
+  ...knCollectRoutes,
 
   // --- pf/extension ---
   {
@@ -700,8 +703,9 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
     if (opts.surface === "admin" && !persona.amr.includes("otp")) return problem(403, "mfa_required", "MFA required");
 
     let body: unknown = undefined;
-    if (request.method === "POST") {
-      const key = request.headers.get("Idempotency-Key");
+    // POST bắt buộc Idempotency-Key; PUT/PATCH (KN v7.7 P1/P7) đọc thân như POST, khóa tùy chọn.
+    if (request.method === "POST" || ((request.method === "PUT" || request.method === "PATCH") && request.headers.get("Content-Type")?.includes("json"))) {
+      const key = request.headers.get("Idempotency-Key") ?? (request.method === "POST" ? null : uuidv7());
       if (!key) return problem(400, "idempotency_key_required", "Idempotency-Key required");
       const type = request.headers.get("Content-Type") ?? "application/json";
       let fingerprintBody: string;

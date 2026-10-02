@@ -10,7 +10,7 @@ import { ApiProblem } from "@/api/problem";
 import type { Me } from "@/api/types";
 import { config } from "@/config";
 import { createKnApi } from "@/kn/client";
-import { createCycleApi, createKnAdminApi, supportReasonStore, type CycleApi, type KnAdminApi } from "@/kn/cycle/api";
+import { createCollectApi, createCycleApi, createKnAdminApi, supportReasonStore, type CollectApi, type CycleApi, type KnAdminApi } from "@/kn/cycle/api";
 import type { KnApi, MenuBadges, MenuTree, RoleAssignment, SelectContextRequest, SessionContext } from "@/kn/contract";
 import { contextStore, readSelection, writeSelection } from "@/kn/contextStore";
 import { autoSelection, isValidSelection } from "@/kn/session";
@@ -54,6 +54,8 @@ export interface AuthContextValue {
   cycleApi: CycleApi;
   /** Quản trị KN v7.7 (P1/P2) — Admin API. */
   knAdminApi: KnAdminApi;
+  /** Thu thập dữ liệu Cấp Xã KN v7.7 (P7 /v1/kn/*). */
+  collectApi: CollectApi;
   kn: KnSessionState;
   /** FN-AD-04.07: vào menu vai trò khác với ngữ cảnh hỗ trợ (POST /v1/accounts/support-sessions). */
   enterSupport: (ctx: SessionContext, target: string, reason: string) => Promise<void>;
@@ -124,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }),
       knApi: createKnApi({ baseUrl: config.apiBaseUrl, getAccessToken, getContextId, fetch: config.mock ? mockFetch : undefined }),
       cycleApi: createCycleApi({ baseUrl: config.apiBaseUrl, getAccessToken, getContextId, fetch: config.mock ? mockFetch : undefined }),
+      collectApi: createCollectApi({ baseUrl: config.apiBaseUrl, getAccessToken, getContextId, fetch: config.mock ? mockFetch : undefined }),
       knAdminApi: createKnAdminApi({ baseUrl: config.adminApiBaseUrl, getAccessToken, getContextId, fetch: config.mock ? mockAdminFetch : undefined }),
     };
   }, [onUnauthenticated]);
@@ -342,6 +345,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       knApi: clients.knApi,
       cycleApi: clients.cycleApi,
       knAdminApi: clients.knAdminApi,
+      collectApi: clients.collectApi,
       kn,
       enterSupport,
       exitSupport,

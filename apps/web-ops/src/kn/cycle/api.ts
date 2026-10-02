@@ -286,3 +286,35 @@ export function createKnAdminApi(opts: KnHttpOptions) {
     impact: (ref: string) => call<{ org: { name: string }; communes: string[]; rows: { key?: string; label?: string; count?: number }[]; warnings: string[]; movable: boolean }>("GET", `/v1/orgs/${ref}/impact`),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Thu thập dữ liệu Cấp Xã (P7 — application.yaml /v1/kn/*)
+// ---------------------------------------------------------------------------
+export type KnCooperative = A["KNCooperative"];
+export type KnHousehold = A["KNHousehold"];
+export type KnCoopMachines = A["KNCoopMachines"];
+export type KnMachineOverview = A["KNMachineOverview"];
+export type KnPlot = A["KNPlot"];
+export type MaterialRecord = A["MaterialRecord"];
+
+export type CollectApi = ReturnType<typeof createCollectApi>;
+
+export function createCollectApi(opts: KnHttpOptions) {
+  const call = knHttp(opts);
+  return {
+    cooperatives: (q: { commune?: string; status?: "active" | "inactive" | "all"; q?: string } = {}) => call<A["KNCooperativeList"]>("GET", "/v1/kn/cooperatives", undefined, { ...q, limit: 200 }),
+    createCooperative: (b: A["KNCooperativeCreate"]) => call<KnCooperative>("POST", "/v1/kn/cooperatives", b),
+    cooperative: (ref: string) => call<KnCooperative>("GET", `/v1/kn/cooperatives/${ref}`),
+    deactivate: (ref: string, reason: string) => call<A["KNCooperativeDeactivated"]>("POST", `/v1/kn/cooperatives/${ref}/deactivate`, { reason }),
+    households: (ref: string) => call<A["KNHouseholdList"]>("GET", `/v1/kn/cooperatives/${ref}/households`),
+    addHousehold: (ref: string, b: { holder: { full_name: string; phone: string }; cultivated_area_ha?: string }) => call<KnHousehold>("POST", `/v1/kn/cooperatives/${ref}/households`, b),
+    machines: (commune?: string) => call<KnMachineOverview>("GET", "/v1/kn/machine-counts", undefined, { commune }),
+    coopMachines: (ref: string) => call<KnCoopMachines>("GET", `/v1/kn/machine-counts/${ref}`),
+    putMachines: (ref: string, lines: { machine_type: string; quantity: number; note?: string | null }[]) => call<KnCoopMachines>("PUT", `/v1/kn/machine-counts/${ref}`, { lines }),
+    plots: (q: { commune?: string; cooperative_ref?: string } = {}) => call<{ items: KnPlot[]; next_cursor: string | null }>("GET", "/v1/kn/plots", undefined, q),
+    materials: (commune?: string) => call<{ items: MaterialRecord[]; next_cursor: string | null }>("GET", "/v1/kn/materials", undefined, { commune }),
+    recordMaterials: (b: { commune_code: string; recorded_on: string; lines: { material_code: string; quantity: string; note?: string }[] }) => call<{ items: MaterialRecord[] }>("POST", "/v1/kn/materials", b),
+    materialSummary: (commune?: string) =>
+      call<{ items: { commune_code: string; material_code: string; material_name: string; unit: string; quantity: string; records: number }[] }>("GET", "/v1/kn/materials/summary", undefined, { commune }),
+  };
+}
