@@ -141,6 +141,8 @@ func (m *Module) Consumers() []Consumer {
 			extport.EventSubmissionAdjustmentRequested, extport.EventPeriodReopened}, Handler: ev},
 		{Name: port.ConsumerIntegration, Events: []string{syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale}, Handler: ev},
 		{Name: port.ConsumerMRV, Events: []string{mrvport.EventAlertRaised}, Handler: ev},
+		{Name: port.ConsumerWorkSchedule, Events: []string{extport.EventWorkScheduleSubmitted, extport.EventWorkScheduleReviewed,
+			extport.EventWorkScheduleReminded}, Handler: ev},
 		{Name: port.ConsumerPush, Events: []string{port.EventPushRequested}, Handler: m.svc.HandlePush},
 	}
 }

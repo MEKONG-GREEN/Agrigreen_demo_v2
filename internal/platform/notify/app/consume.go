@@ -43,6 +43,7 @@ var HandledEvents = []string{
 	extport.EventReportBatchIssued, extport.EventReportTaskReminded, extport.EventSubmissionAdjustmentRequested, extport.EventPeriodReopened,
 	ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived,
 	syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale, mrvport.EventAlertRaised,
+	extport.EventWorkScheduleSubmitted, extport.EventWorkScheduleReviewed, extport.EventWorkScheduleReminded,
 }
 
 // HandleEvent là inbox.Handler cho các sự kiện nguồn: dựng thông báo, xếp lần gửi
@@ -50,6 +51,15 @@ var HandledEvents = []string{
 // kể cả gọi thẳng hai lần, chỉ mục duy nhất (sự kiện, người nhận) chặn trùng.
 func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
 	switch env.EventType {
+	case extport.EventWorkScheduleSubmitted, extport.EventWorkScheduleReviewed, extport.EventWorkScheduleReminded:
+		ns, err := domain.WorkScheduleNotifications(env.EventType, env.Payload, env.OccurredAt)
+		if err != nil {
+			return err
+		}
+		if len(ns) == 0 {
+			return nil
+		}
+		return s.deliver(ctx, tx, env, ns)
 	case extport.EventDirectiveIssued:
 		var p extport.DirectiveIssuedV1
 		if err := decode(env, &p); err != nil {

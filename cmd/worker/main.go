@@ -406,7 +406,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			},
 		})
 	}
-	if selected(jobs, extension.JobEscalation) {
+	if selected(jobs, extension.JobEscalation) || selected(jobs, extension.JobWorkSchedule) {
 		// Leo thang SLA nhiệm vụ khuyến nông: tìm tenant bằng pool ag_outbox_publisher
 		// (chỉ đọc 4 cột), ghi bằng vai extension_app của module (R-05).
 		openRole := func(role string) (*pgxpool.Pool, error) {
@@ -444,7 +444,13 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		kn := extension.New(extPool, clk, extension.Deps{
 			Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(),
 		})
-		js = append(js, kn.Jobs(extension.OverdueTenants(out.pools[migrations.PF]), log)...)
+		if selected(jobs, extension.JobEscalation) {
+			js = append(js, kn.Jobs(extension.OverdueTenants(out.pools[migrations.PF]), log)...)
+		}
+		if selected(jobs, extension.JobWorkSchedule) {
+			// KN v7.7 P5: khóa tuần đã kết thúc, nhắc hạn đăng ký / hạn duyệt lịch công tác.
+			js = append(js, kn.ScheduleJobs(extension.ScheduleTenants(out.pools[migrations.PF]), log)...)
+		}
 	}
 	if selected(jobs, notifyport.JobEmailDigest) && os.Getenv("AG_SMTP_HOST") != "" {
 		// Email tóm tắt chỉ chạy khi đã cấu hình SMTP; tìm tenant bằng ag_outbox_publisher (2 cột).
@@ -531,7 +537,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 	}
 	if len(js) == 0 {
 		closeFn()
-		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + extension.JobEscalation + ", " +
+		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + extension.JobEscalation + ", " + extension.JobWorkSchedule + ", " +
 			notifyport.JobEmailDigest + ", " + reports.JobSchedules + ", " + mechport.JobAreaFeedCheck + ", " + metricsport.JobMetricsSnapshot +
 			", " + mrvport.JobReviewEscalator + ")")
 	}

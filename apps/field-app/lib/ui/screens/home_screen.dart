@@ -15,6 +15,7 @@ import 'plots_screen.dart';
 import 'roster_screen.dart';
 import 'sync_queue_screen.dart';
 import 'tasks_screen.dart';
+import 'work_schedule_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -106,6 +107,11 @@ class HomeScreen extends ConsumerWidget {
                       ? '${summary.value!.openTasks}'
                       : null,
                   onTap: () => open(const TasksScreen()),
+                ),
+                BigTile(
+                  icon: Icons.calendar_month_outlined,
+                  label: 'Lịch công tác',
+                  onTap: () => open(const WorkScheduleScreen()),
                 ),
                 BigTile(
                   icon: Icons.edit_note,

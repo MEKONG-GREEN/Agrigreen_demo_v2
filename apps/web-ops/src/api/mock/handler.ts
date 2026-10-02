@@ -47,6 +47,7 @@ import { mrvAdminRoutes, mrvAppRoutes } from "./mrv";
 import { collectionRoutes } from "./collection";
 import { contextProblem, knAppRoutes, personaForContext } from "./kn";
 import { formsAdminRoutes, formsAppRoutes } from "./forms/routes";
+import { workScheduleAppRoutes } from "./kn-schedules";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -115,6 +116,8 @@ const appRoutes: Route[] = [
   ...knAppRoutes,
   // --- KN v7.7 P3: mẫu báo cáo dạng lưới (chọn mẫu, layout, mẫu Excel, tính thử) ---
   ...formsAppRoutes,
+  // --- KN v7.7 P5: lịch công tác tuần (/v1/extension/work-schedules*) ---
+  ...workScheduleAppRoutes,
 
   // --- pf/extension ---
   {
@@ -731,7 +734,7 @@ function dispatch(routes: Route[], request: Request, url: URL, persona: MockPers
   for (const r of routes) {
     if (r.method !== request.method) continue;
     const m = r.pattern.exec(url.pathname);
-    if (!m) continue;
+    if (!m || (r.match && !r.match(url))) continue;
     try {
       return r.handler({ url, persona, params: m.slice(1), body, request });
     } catch (e) {

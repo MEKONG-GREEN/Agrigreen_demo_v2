@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
@@ -36,6 +37,9 @@ const DBRole = "extension_app"
 
 // JobEscalation là tên job leo thang SLA trong cmd/worker (-jobs).
 const JobEscalation = "extension_escalation"
+
+// JobWorkSchedule là tên job lịch công tác (khóa tuần đã kết thúc, nhắc hạn đăng ký / hạn duyệt — KN v7.7 P5).
+const JobWorkSchedule = "extension_work_schedule"
 
 // Deps là port của module khác mà extension cần. Thiếu port nào thì thao tác cần
 // nó trả 503 extension.dependency_unavailable (mặc định chặn), riêng Params thiếu
@@ -74,6 +78,15 @@ func (m *Module) UseFarmers(f accport.FarmerHouseholds) { m.svc.Farmers = f }
 
 // UseGpsLog nối log GPS của pf/geo (consumer port.GpsLogConsumer, HTX US-GPS-03).
 func (m *Module) UseGpsLog(g geoport.GpsLog) { m.svc.GpsLog = g }
+
+// UseKNContext nối ngữ cảnh phiên KN và danh bạ gán vai trò của P1 (pf/accounts) cho lịch công tác (KN v7.7 P5).
+// Chưa nối → suy từ vai realm + phạm vi đơn vị, danh bạ trực pf_extension.staff.
+func (m *Module) UseKNContext(c port.KNContextResolver, d port.KNDirectory) {
+	m.svc.KNContext, m.svc.KNDirectory = c, d
+}
+
+// UseTablePDF nối bộ dựng PDF bảng (pf/reports) cho "Xuất PDF" lịch công tác.
+func (m *Module) UseTablePDF(p port.TablePDF) { m.svc.TablePDF = p }
 
 // GpsLogHandler là inbox.Handler của consumer port.GpsLogConsumer (vai extension_app).
 func (m *Module) GpsLogHandler() inbox.Handler { return m.svc.HandleGpsLog }
@@ -123,6 +136,35 @@ func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job
 			return err
 		},
 	}}
+}
+
+// ScheduleTenants dựng bộ tìm tenant cho job lịch công tác từ pool vai ag_outbox_publisher (worker, nối thẳng).
+func ScheduleTenants(pool *pgxpool.Pool) app.TenantLister { return app.ScheduleTenants(pool) }
+
+// ScheduleJobs trả job lịch công tác (KN v7.7 P5) cho bộ lập lịch của worker (chỉ chạy ở leader): mỗi 15 phút
+// ghi sự việc khóa cho tuần đã kết thúc, nhắc cán bộ chưa gửi lịch trước hạn đăng ký, nhắc người duyệt khi quá hạn
+// duyệt. Job idempotent.
+func (m *Module) ScheduleJobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job {
+	return []schedule.Job{{
+		Name: JobWorkSchedule, Spec: schedule.Every{Interval: 15 * time.Minute}, RunOnStart: true, Timeout: 10 * time.Minute,
+		Run: func(ctx context.Context) error {
+			r, err := m.svc.RunScheduleJob(ctx, tenants)
+			if log != nil {
+				outcome := "ok"
+				if err != nil {
+					outcome = "error"
+				}
+				log.Info("lịch công tác: khóa tuần, nhắc hạn", "event", "job.extension_work_schedule", "locked", r.Locked,
+					"reminders", r.Reminders, "outcome", outcome)
+			}
+			return err
+		},
+	}}
+}
+
+// ScheduleJobRun chạy job lịch công tác cho một tenant ngay lúc này (kiểm thử, chạy tay).
+func (m *Module) ScheduleJobRun(ctx context.Context, tid uuid.UUID) (app.ScheduleJobResult, error) {
+	return m.svc.ScheduleJobTenant(ctx, tid, m.svc.Clock.Now().UTC())
 }
 
 // MetricsSource cho pf/metrics (qua gốc lắp ráp): 4 KPI KN US-DASH-01 như hệ biết

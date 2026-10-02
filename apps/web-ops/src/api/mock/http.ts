@@ -82,6 +82,8 @@ export type Handler = (ctx: Ctx) => Response;
 export interface Route {
   method: string;
   pattern: RegExp;
+  /** Điều kiện thêm ngoài đường dẫn (vd tham số truy vấn); false → xét route kế tiếp. */
+  match?: (url: URL) => boolean;
   handler: Handler;
 }
 

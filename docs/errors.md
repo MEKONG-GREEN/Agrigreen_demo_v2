@@ -182,6 +182,14 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 503 | `extension.dependency_unavailable` | pf/extension: chưa nối pf/party (phạm vi) hoặc pf/masterdata (đơn vị, danh mục); consumer `pf.extension.gps_log` chưa nối log GPS pf/geo (sự kiện được giao lại) |
 | 404 | `extension.program_report_not_found` | pf/extension: không có báo cáo tiến độ Đề án (FR-03), hoặc ngoài phạm vi đọc |
 | 409 | `extension.program_report_approved` | pf/extension: phiên bản tiến độ Đề án đã được duyệt |
+| 404 | `extension.schedule_not_found` | pf/extension (KN v7.7 P5): không có lịch công tác, hoặc ngoài phạm vi (Cấp Xã: không phải lịch của mình; Cấp Tỉnh: khác phòng ban/tỉnh) — không lộ sự tồn tại |
+| 409 | `extension.schedule_state_conflict` | pf/extension: trạng thái lịch không cho phép thao tác (vd lưu nháp khi đang Chờ duyệt/Đã duyệt — điều chỉnh bằng Gửi duyệt; duyệt lịch không ở Chờ duyệt); kèm `status` |
+| 409 | `extension.schedule_version_conflict` | pf/extension: `base_version`/`version` khác phiên bản hiện hành (máy ngoại tuyến hoặc người duyệt xem bản cũ) — tải lại; kèm `current_version` |
+| 409 | `extension.week_locked` | pf/extension: tuần đã kết thúc — lịch bị khóa, chỉ xem (FN-TI-02.07, FN-XA-03.08) |
+| 403 | `extension.not_schedule_approver` | pf/extension: người duyệt không phải Cấp Tỉnh cùng phòng ban, cùng tỉnh, có cấp quản lý được duyệt (Q-05), hoặc lịch cán bộ tỉnh khi cấu hình tự duyệt (Q-16) |
+| 403 | `extension.schedule_context_required` | pf/extension: tài khoản chưa có phòng ban/tỉnh, hoặc Cấp Xã chưa có xã phụ trách (tiên quyết FN-XA-03.08) |
+| 404 | `extension.schedule_no_previous` | pf/extension: "Sao chép tuần trước" khi tuần trước chưa có lịch có mục |
+| 403 | `self_approval_forbidden` | pf/extension: duyệt / yêu cầu chỉnh sửa lịch công tác của chính mình (R-56; DB cũng chặn bằng CHECK) |
 
 Đồng bộ ngoại tuyến (`task_update`, `field_report`): lỗi nghiệp vụ trả trong `results[].code` với `status = rejected` theo cùng các mã trên; bản ghi gửi lặp (`idem_key` đã ghi) trả `duplicate`.
 

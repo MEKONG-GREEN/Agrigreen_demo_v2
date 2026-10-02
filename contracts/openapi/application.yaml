@@ -2507,6 +2507,294 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  # --- KN v7.7 P5: Lịch công tác tuần (FN-XA-03.08 đăng ký, FN-TI-02.07 duyệt) ---
+  # Ngữ cảnh KN (vai kn_xa | kn_tinh | admin, phòng ban, tỉnh, xã phụ trách) lấy từ ngữ cảnh phiên của P1 (X-AG-Context)
+  # khi có; chưa có P1 thì suy từ vai realm (kn_officer → kn_xa, kn_province_admin → kn_tinh, platform_admin → admin,
+  # chỉ đọc) + phạm vi đơn vị (org_ref), phòng ban mặc định "trong_trot". Cấp Quốc gia (kn_tw) không có quyền (ma trận §5).
+  # Cán bộ xã chỉ thấy lịch của mình; Cấp Tỉnh thấy lịch cùng phòng ban, cùng tỉnh; Admin xem mọi lịch.
+  # Sửa lịch = phiên bản mới (sổ work_schedule_item, supersedes_id), không ghi đè (RB-1).
+  /v1/extension/work-schedules:
+    post:
+      summary: Lưu nháp hoặc gửi duyệt lịch tuần của chính mình (FN-XA-03.08; Cấp Tỉnh "Lịch của tôi" FN-TI-02.07)
+      description: |
+        Mỗi lần gọi tạo một phiên bản mới của lịch (người gọi × phòng ban × tuần) — sổ chỉ ghi thêm (RB-1).
+        action=draft: Nháp (khi lịch chưa gửi hoặc bị Yêu cầu chỉnh sửa). action=submit: Chờ duyệt; nếu lịch đã duyệt thì
+        là "điều chỉnh" — phần điều chỉnh chờ duyệt lại, bản đã duyệt vẫn hiệu lực tới khi duyệt bản mới.
+        Gửi sau hạn đăng ký → nhãn "Đăng ký muộn". Tuần đã kết thúc → 409 extension.week_locked.
+        base_version (phiên bản client đã sửa) khác phiên bản hiện hành → 409 extension.schedule_version_conflict
+        (máy ngoại tuyến phải tải lại). Gọi lặp cùng Idempotency-Key → 200 với đúng kết quả lần đầu.
+        Trùng thời gian giữa các mục chỉ là cảnh báo (warnings), không chặn.
+      operationId: extSaveWorkSchedule
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ExtWorkScheduleSave"}
+      responses:
+        "201":
+          description: Đã ghi phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleDetail"}
+        "200":
+          description: Gọi lặp — kết quả lần đầu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleDetail"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Danh sách lịch tuần trong phạm vi (tab Chờ duyệt / Đã duyệt / Yêu cầu chỉnh sửa của Cấp Tỉnh)
+      operationId: extListWorkSchedules
+      parameters:
+        - {name: week_start, in: query, description: "Thứ Hai đầu tuần (giờ Việt Nam). Mặc định tuần kế tiếp", schema: {type: string, format: date}}
+        - {name: status, in: query, schema: {$ref: "#/components/schemas/ExtWorkScheduleStatus"}}
+        - {name: commune_code, in: query, schema: {type: string}}
+        - {name: owner_level, in: query, schema: {type: string, enum: [commune, province]}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [week_start, items, next_cursor]
+                properties:
+                  week_start: {type: string, format: date}
+                  items: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleListItem"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/mine:
+    get:
+      summary: Lịch tuần của tôi (mặc định tuần kế tiếp) kèm hạn đăng ký, hạn duyệt, trạng thái khóa
+      operationId: extMyWorkSchedule
+      parameters:
+        - {name: week_start, in: query, schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Lịch của tôi (schedule = null khi chưa đăng ký)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtMyWorkSchedule"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/counts:
+    get:
+      summary: Số đếm theo tab của tuần và số lịch chờ duyệt của mọi tuần chưa khóa (số đếm menu extension.work_schedules.pending)
+      operationId: extWorkScheduleCounts
+      parameters:
+        - {name: week_start, in: query, schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Số đếm
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleCounts"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/unregistered:
+    get:
+      summary: Tab "Chưa đăng ký" — cán bộ trong phạm vi chưa gửi lịch tuần (chưa có hoặc mới lưu nháp)
+      operationId: extWorkScheduleUnregistered
+      parameters:
+        - {name: week_start, in: query, schema: {type: string, format: date}}
+        - {name: commune_code, in: query, schema: {type: string}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [week_start, items]
+                properties:
+                  week_start: {type: string, format: date}
+                  items: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleUnregistered"}}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/settings:
+    get:
+      summary: Cấu hình lịch công tác hiệu lực của tỉnh (hạn đăng ký, hạn duyệt, nhắc, cấp quản lý duyệt) — tạm, chờ khách Q-05/Q-16
+      description: |
+        Đọc từ tham số pf/masterdata (đặt qua Admin API, có phê duyệt R-56), khóa có chiều tỉnh
+        "<khóa>:<mã tỉnh>" ưu tiên hơn khóa chung; chưa có → mặc định (provisional = true).
+      operationId: extWorkScheduleSettings
+      parameters:
+        - {name: province_code, in: query, schema: {type: string}}
+      responses:
+        "200":
+          description: Cấu hình
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleSettings"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/copy-previous:
+    post:
+      summary: Sao chép tuần trước thành nháp của tuần đã chọn (ngày dời +7)
+      operationId: extCopyPreviousWorkSchedule
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [week_start]
+              properties:
+                week_start: {type: string, format: date}
+      responses:
+        "201":
+          description: Đã tạo nháp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleDetail"}
+        "200":
+          description: Gọi lặp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleDetail"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/bulk-approve:
+    post:
+      summary: Duyệt hàng loạt các lịch đang Chờ duyệt (bỏ qua lịch của chính mình, ngoài phạm vi, đã đổi trạng thái)
+      operationId: extBulkApproveWorkSchedules
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: {type: array, minItems: 1, maxItems: 200, items: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả từng lịch
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [approved, skipped]
+                properties:
+                  approved: {type: array, items: {type: string, format: uuid}}
+                  skipped:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, code]
+                      properties:
+                        id: {type: string, format: uuid}
+                        code: {type: string, description: "Mã lỗi problem (vd self_approval_forbidden, extension.schedule_state_conflict)"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/export:
+    get:
+      summary: Xuất lịch tuần trong phạm vi ra Excel (.xlsx) hoặc PDF khổ ngang
+      operationId: extExportWorkSchedules
+      parameters:
+        - {name: week_start, in: query, schema: {type: string, format: date}}
+        - {name: status, in: query, schema: {$ref: "#/components/schemas/ExtWorkScheduleStatus"}}
+        - {name: commune_code, in: query, schema: {type: string}}
+        - {name: format, in: query, schema: {type: string, enum: [xlsx, pdf], default: xlsx}}
+      responses:
+        "200":
+          description: Tệp
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+            application/pdf:
+              schema: {type: string, format: binary}
+        "403": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/{id}:
+    get:
+      summary: Chi tiết lịch tuần (phiên bản hiện hành, bản đã duyệt nếu đang điều chỉnh, cảnh báo, các phiên bản)
+      operationId: extGetWorkSchedule
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: version, in: query, description: "Xem một phiên bản cũ", schema: {type: integer, minimum: 1}}
+      responses:
+        "200":
+          description: Chi tiết
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleDetail"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/{id}/log:
+    get:
+      summary: Khung Log của màn Detail — mọi sự việc của lịch (lưu nháp, gửi, duyệt, yêu cầu chỉnh sửa, điều chỉnh, khóa) kèm cũ → mới
+      operationId: extWorkScheduleLog
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, description: "seq của dòng cuối trang trước (mới → cũ)", schema: {type: integer}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang, mới nhất trước
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNLogPage"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/{id}/approve:
+    post:
+      summary: Duyệt phiên bản đang Chờ duyệt — người duyệt khác người đăng ký (R-56), cùng phòng ban, cùng tỉnh, cấp quản lý được duyệt (Q-05)
+      operationId: extApproveWorkSchedule
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version: {type: integer, minimum: 1, description: "Phiên bản người duyệt đã xem; khác phiên bản chờ duyệt → 409"}
+                note: {type: string, maxLength: 1000}
+      responses:
+        "200":
+          description: Đã duyệt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleDetail"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/{id}/request-changes:
+    post:
+      summary: Yêu cầu chỉnh sửa — bắt buộc lý do (≥ 10 ký tự); cán bộ nhận thông báo kèm lý do
+      operationId: extRequestWorkScheduleChanges
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version, reason]
+              properties:
+                version: {type: integer, minimum: 1}
+                reason: {type: string, minLength: 10, maxLength: 1000}
+      responses:
+        "200":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleDetail"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   # Số liệu cân đối/báo cáo/dashboard đọc KẾT QUẢ ĐÃ LƯU theo vụ (FN-10 BR-04), không tính lại.
 
   # Phạm vi không phải toàn vùng: danh sách máy/chủ sở hữu/diện tích phải lọc theo cooperative_ref trong phạm vi.
@@ -7091,6 +7379,192 @@ components:
         affected_area_ha: {$ref: "#/components/schemas/Decimal"}
         urgent: {type: boolean, description: "Phản ánh khẩn (FR-02)"}
         note: {type: string, maxLength: 2000}
+    # --- KN v7.7 P5: lịch công tác tuần ---
+    ExtWorkScheduleStatus:
+      type: string
+      description: "draft = Nháp, pending = Chờ duyệt, approved = Đã duyệt, changes_requested = Yêu cầu chỉnh sửa"
+      enum: [draft, pending, approved, changes_requested]
+    ExtWorkScheduleItemInput:
+      type: object
+      required: [day, session, content]
+      properties:
+        id: {type: string, format: uuid, description: "Mã mục (giữ qua các phiên bản để so cũ → mới); vắng → server sinh"}
+        day: {type: string, format: date, description: "Một ngày trong tuần (Thứ Hai…Chủ Nhật)"}
+        session: {type: string, enum: [morning, afternoon], description: "Buổi: Sáng / Chiều"}
+        start_time: {type: [string, "null"], pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"}
+        end_time: {type: [string, "null"], pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$"}
+        content: {type: string, minLength: 3, maxLength: 500, description: "Nội dung công tác"}
+        commune_code: {type: [string, "null"], description: "Địa điểm: xã (Cán bộ xã: một trong các xã phụ trách)"}
+        cooperative_ref: {type: [string, "null"], format: uuid, description: "Địa điểm: HTX"}
+        location: {type: [string, "null"], maxLength: 200, description: "Địa điểm cụ thể (ấp, cánh đồng…)"}
+        participants: {type: [string, "null"], maxLength: 500, description: "Thành phần phối hợp — không ghi SĐT/CCCD (RB-3)"}
+        note: {type: [string, "null"], maxLength: 1000}
+    ExtWorkScheduleItem:
+      allOf:
+        - $ref: "#/components/schemas/ExtWorkScheduleItemInput"
+        - type: object
+          required: [id, changed, conflict]
+          properties:
+            id: {type: string, format: uuid, description: "Mã mục, giữ qua các phiên bản"}
+            changed: {type: boolean, description: "Khác bản đã duyệt (phần điều chỉnh chờ duyệt lại)"}
+            conflict: {type: boolean, description: "Trùng thời gian với mục khác (tô vàng)"}
+    ExtWorkScheduleSave:
+      type: object
+      required: [week_start, action, items]
+      properties:
+        id: {type: string, format: uuid, description: "UUIDv7 máy sinh cho lịch mới (ngoại tuyến); lịch đã có thì bỏ qua"}
+        week_start: {type: string, format: date, description: "Thứ Hai đầu tuần"}
+        action: {type: string, enum: [draft, submit]}
+        base_version: {type: [integer, "null"], description: "Phiên bản client đã sửa; null = tạo mới"}
+        items: {type: array, maxItems: 100, items: {$ref: "#/components/schemas/ExtWorkScheduleItemInput"}}
+        device_id: {type: [string, "null"]}
+    ExtWorkSchedule:
+      type: object
+      required: [id, owner_ref, owner_display, owner_level, department_code, province_code, commune_codes, week_start, week_end,
+        status, version, approved_version, amendment, late, locked, submit_due_at, review_due_at, review_overdue, submitted_at,
+        reviewed_at, reviewer_ref, reviewer_display, last_reason, item_count, conflict_count, created_at, updated_at, updated_by]
+      properties:
+        id: {type: string, format: uuid}
+        owner_ref: {type: string, format: uuid}
+        owner_display: {type: [string, "null"], description: "Tên tra lúc đọc từ actor_ref (RB-3)"}
+        owner_level: {type: string, enum: [commune, province]}
+        department_code: {type: string}
+        province_code: {type: string}
+        commune_codes: {type: array, items: {type: string}, description: "Xã phụ trách của người đăng ký (lúc gửi)"}
+        week_start: {type: string, format: date}
+        week_end: {type: string, format: date}
+        status: {$ref: "#/components/schemas/ExtWorkScheduleStatus"}
+        version: {type: integer}
+        approved_version: {type: [integer, "null"]}
+        amendment: {type: boolean, description: "Đang chờ duyệt phần điều chỉnh của lịch đã duyệt"}
+        late: {type: boolean, description: "Đăng ký muộn (gửi lần đầu sau hạn đăng ký)"}
+        locked: {type: boolean, description: "Tuần đã kết thúc — chỉ xem"}
+        submit_due_at: {type: string, format: date-time}
+        review_due_at: {type: string, format: date-time}
+        review_overdue: {type: boolean}
+        submitted_at: {type: [string, "null"], format: date-time}
+        reviewed_at: {type: [string, "null"], format: date-time}
+        reviewer_ref: {type: [string, "null"], format: uuid}
+        reviewer_display: {type: [string, "null"]}
+        last_reason: {type: [string, "null"], description: "Lý do yêu cầu chỉnh sửa gần nhất"}
+        item_count: {type: integer}
+        conflict_count: {type: integer}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+        updated_by: {type: string, format: uuid}
+    ExtWorkScheduleListItem:
+      allOf:
+        - $ref: "#/components/schemas/ExtWorkSchedule"
+        - type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleItem"}, description: "Mục của phiên bản hiện hành (lưới tuần)"}
+    ExtWorkScheduleWarning:
+      type: object
+      required: [code, message, item_ids]
+      properties:
+        code: {type: string, enum: [time_overlap, late_registration, outside_week]}
+        message: {type: string}
+        item_ids: {type: array, items: {type: string, format: uuid}}
+    ExtWorkScheduleVersion:
+      type: object
+      required: [version, action, at, actor_ref, actor_display, item_count]
+      properties:
+        version: {type: integer}
+        action: {type: string, enum: [draft_saved, submitted, amended]}
+        at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: [string, "null"]}
+        item_count: {type: integer}
+    ExtWorkScheduleDetail:
+      type: object
+      required: [schedule, items, approved_items, warnings, versions, can]
+      properties:
+        schedule: {$ref: "#/components/schemas/ExtWorkSchedule"}
+        viewing_version: {type: integer}
+        items: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleItem"}}
+        approved_items: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleItem"}, description: "Bản đã duyệt khi đang điều chỉnh (rỗng nếu không)"}
+        warnings: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleWarning"}}
+        versions: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleVersion"}}
+        can:
+          type: object
+          required: [edit, submit, approve, request_changes]
+          properties:
+            edit: {type: boolean}
+            submit: {type: boolean}
+            approve: {type: boolean}
+            request_changes: {type: boolean}
+    ExtMyWorkSchedule:
+      type: object
+      required: [week_start, week_end, submit_due_at, review_due_at, locked, late_now, schedule, previous_week_start, previous_available]
+      properties:
+        week_start: {type: string, format: date}
+        week_end: {type: string, format: date}
+        submit_due_at: {type: string, format: date-time}
+        review_due_at: {type: string, format: date-time}
+        locked: {type: boolean}
+        late_now: {type: boolean, description: "Gửi lúc này sẽ mang nhãn Đăng ký muộn"}
+        schedule: {oneOf: [{$ref: "#/components/schemas/ExtWorkScheduleDetail"}, {type: "null"}]}
+        previous_week_start: {type: string, format: date}
+        previous_available: {type: boolean, description: "Tuần trước có lịch để sao chép"}
+    ExtWorkScheduleCounts:
+      type: object
+      required: [week_start, draft, pending, approved, changes_requested, unregistered, pending_open_weeks]
+      properties:
+        week_start: {type: string, format: date}
+        draft: {type: integer}
+        pending: {type: integer}
+        approved: {type: integer}
+        changes_requested: {type: integer}
+        unregistered: {type: integer}
+        pending_open_weeks: {type: integer, description: "Lịch chờ duyệt của mọi tuần chưa kết thúc mà người gọi duyệt được (số đếm menu)"}
+    ExtWorkScheduleUnregistered:
+      type: object
+      required: [actor_ref, actor_display, owner_level, province_code, commune_codes, status]
+      properties:
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: [string, "null"]}
+        owner_level: {type: string, enum: [commune, province]}
+        province_code: {type: string}
+        commune_codes: {type: array, items: {type: string}}
+        status: {type: string, enum: [none, draft]}
+        schedule_id: {type: [string, "null"], format: uuid}
+    ExtWorkScheduleSettings:
+      type: object
+      required: [province_code, submit_due_offset_hours, review_due_offset_hours, remind_before_hours, approver_levels, province_approval, provisional]
+      properties:
+        province_code: {type: string}
+        submit_due_offset_hours: {type: integer, description: "Hạn đăng ký = 00:00 Thứ Hai của tuần + số giờ (âm = trước tuần). Mặc định −55 (17:00 Thứ Sáu tuần trước)"}
+        review_due_offset_hours: {type: integer, description: "Hạn duyệt = 00:00 Thứ Hai + số giờ. Mặc định 0"}
+        remind_before_hours: {type: integer, description: "Nhắc cán bộ chưa gửi trước hạn đăng ký bao nhiêu giờ. Mặc định 24"}
+        approver_levels: {type: array, items: {type: string}, description: "Cấp quản lý được duyệt (Q-05). Mặc định [truong_phong]"}
+        province_approval: {type: string, enum: [peer, auto], description: "Lịch cán bộ Cấp Tỉnh: peer = người duyệt cấp quản lý khác người đăng ký; auto = tự duyệt khi gửi (Q-16). Mặc định peer"}
+        provisional: {type: boolean, description: "Đang dùng giá trị mặc định tạm, chờ khách"}
+    KNFieldChange:
+      type: object
+      required: [field, old, new]
+      properties:
+        field: {type: string}
+        old: {type: [string, "null"]}
+        new: {type: [string, "null"]}
+    KNLogEntry:
+      type: object
+      required: [seq, event, actor_ref, actor_display, at, recorded_at, changes, reason]
+      properties:
+        seq: {type: integer}
+        event: {type: string}
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: [string, "null"], description: "Tên tra lúc đọc từ actor_ref (RB-3), null khi chưa nối danh bạ"}
+        at: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        changes: {type: array, items: {$ref: "#/components/schemas/KNFieldChange"}}
+        reason: {type: [string, "null"]}
+    KNLogPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/KNLogEntry"}}
+        next_cursor: {type: [integer, "null"]}
     ExtFieldReport:
       allOf:
         - $ref: "#/components/schemas/ExtFieldReportInput"

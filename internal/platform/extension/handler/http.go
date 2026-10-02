@@ -57,6 +57,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.POST("/roster/shifts", h.addShift)
 	h.registerUnified(rg)
 	h.registerSupport(rg)
+	h.registerSchedule(rg)
 }
 
 func bind(c *gin.Context, v any) bool {
