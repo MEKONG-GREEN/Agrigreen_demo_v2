@@ -323,6 +323,11 @@ func SetPeriodDue(ctx context.Context, tx pgx.Tx, id uuid.UUID, due, autoClose, 
 func ClosePeriod(ctx context.Context, tx pgx.Tx, id, actor uuid.UUID, mode string, at time.Time) error {
 	_, err := tx.Exec(ctx, `UPDATE pf_extension.report_period SET status = 'closed', closed_at = $2, closed_by = $3, close_mode = $4, updated_at = $2
 	  WHERE id = $1`, id, at.UTC(), actor, mode)
+	if err != nil {
+		return err
+	}
+	// KN v7.7 P7: công việc của kỳ lấy sync_seq mới (trigger 000077) để máy ngoại tuyến nhận "Đã chốt" qua pull.
+	_, err = tx.Exec(ctx, `UPDATE pf_extension.report_task SET updated_at = $2 WHERE period_id = $1`, id, at.UTC())
 	return err
 }
 

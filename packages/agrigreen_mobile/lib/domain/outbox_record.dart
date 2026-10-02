@@ -31,7 +31,12 @@ abstract final class PushEntity {
   /// thu gom MKG (RB-6 chiều mua).
   static const htxCollectionResponse = 'htx_collection_response';
 
+  /// KN v7.7 P7 (pf/extension reportcycle): lưu nháp / gửi báo cáo theo biểu
+  /// mẫu khi ngoại tuyến (FN-XA-03.02). Chỉ `op: create`; `id` = id bài nộp.
+  static const reportSubmission = 'report_submission';
+
   static const g1 = {plotBoundary, fieldReport, taskUpdate, consent, evidence};
+  static const kn = {reportSubmission};
   static const g3 = {htxCollectionResponse};
   static const g2 = {
     seasonOpen,
@@ -42,7 +47,7 @@ abstract final class PushEntity {
   };
 
   /// Thực thể của nền tảng (`/v1/sync/push`) — mặc định của OutboxRepository.
-  static const all = {...g1, ...g2, ...g3};
+  static const all = {...g1, ...g2, ...g3, ...kn};
 
   /// Thực thể của đồng bộ vùng mkg (`/v1/fieldops/sync/push`).
   static const mkgFieldops = {rollCount};

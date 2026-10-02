@@ -76,7 +76,9 @@ Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính m�
 | 409 | `party.cooperative_name_taken` | pf/party: "Tên HTX này đã tồn tại, vui lòng chọn tên khác." — sao chép hồ sơ HTX (`POST /v1/cooperatives/{ref}/copy`, HTX US-HTX-03 AC-3) hoặc dòng nhập HTX (`POST /v1/cooperatives/import`, lý do theo dòng) trùng tên HTX đã có (không phân biệt hoa thường); `existing_ref` là HTX đang giữ tên |
 | 409 | `party.household_phone_taken` | pf/party: sao chép nông hộ với SĐT/CCCD đã có trong kho định danh — trong `POST /v1/households/copy` thành lý do dòng "SĐT đã tồn tại" (HTX US-HH-02 AC-4) |
 | 404 | `party.household_contact_unavailable` | pf/party: `GET /v1/households/{ref}/contact` — chủ hộ chưa có SĐT hợp lệ hoặc đã xóa định danh (HTX US-HH-03) |
-| 404 | `party.household_not_found` | pf/party: `POST /v1/households/{ref}/membership` — nông hộ không có hoặc ngoài phạm vi (không lộ sự tồn tại) |
+| 404 | `party.household_not_found` | pf/party: `POST /v1/households/{ref}/membership` — nông hộ không có hoặc ngoài phạm vi (không lộ sự tồn tại); KN v7.7: cả `PUT /v1/kn/households/{ref}`, `GET …/log` ngoài phạm vi ngữ cảnh phiên |
+| 403 | `party.read_only` | pf/party (KN v7.7 FN-XA-03.03): ngữ cảnh phiên Cấp Tỉnh (`kn_tinh`) hoặc Cấp Quốc gia (`kn_tw`) ghi vào `/v1/kn/cooperatives*`, `/v1/kn/households*` — chỉ xem (BRD §5.1) |
+| 422 | `party.support_reason_required` | pf/party (KN v7.7): chế độ hỗ trợ Admin ghi HTX/nông hộ thiếu lý do (header `X-AG-Reason` ≥ 10 ký tự, FN-AD-04.07). KN v7.7 (P7) cũng dùng lại `party.out_of_scope` (thêm HTX / lọc `commune` ngoài xã phụ trách), `party.org_not_found` (HTX ngoài phạm vi ngữ cảnh phiên), `party.org_state_conflict` (sửa HTX đã vô hiệu hóa qua `PUT /v1/kn/cooperatives/{ref}`) |
 | 409 | `party.membership_unchanged` | pf/party: nông hộ đã ở đúng trạng thái thành viên HTX yêu cầu |
 | 422 | `party.membership_reason_required` | pf/party: đổi thành viên HTX phải nêu lý do 10–500 ký tự |
 | 404 | `party.share_grant_not_found` | pf/party (ADR-0020): không có cấp quyền chia sẻ trong tenant bên cấp của người gọi (bên nhận không xem được sổ của bên cấp) |
@@ -210,9 +212,15 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 403 | `extension.read_only` | pf/extension: Cấp Quốc gia chỉ xem (BRD §4.2) |
 | 403 | `extension.out_of_scope` | pf/extension: xã/tỉnh ngoài phạm vi của ngữ cảnh phiên, hoặc ngữ cảnh không gắn tỉnh/phòng ban |
 | 422 | `extension.support_reason_required` | pf/extension: chế độ hỗ trợ Admin ghi thiếu lý do (FN-AD-04.07) |
+| 404 | `extension.material_record_not_found` | pf/extension KN v7.7 (FN-XA-03.06): bản ghi vật tư không có, của tenant khác, ngoài phạm vi xã hoặc của phòng ban khác |
+| 422 | `extension.material_unknown` | pf/extension KN v7.7: vật tư không có / đã ngừng dùng trong danh mục masterdata `material`, hoặc mục danh mục thiếu `attrs.unit` (lỗi theo trường `lines.<i>.material_code`) |
+| 422 | `extension.material_quantity_invalid` | pf/extension KN v7.7: số lượng sai theo ĐVT — âm, > 1 000 000 000, ĐVT đếm được (`bao, cái, chai, gói, con, chiếc, cây, hộp`) mà không nguyên, hoặc > 4 chữ số lẻ (tạm, chờ khách); lỗi theo trường `lines.<i>.quantity` / `quantity` |
+| 409 | `extension.material_superseded` | pf/extension KN v7.7: sửa (`POST /v1/kn/materials/{id}/correct`) một bản ghi đã bị bản bù khác thay — hãy sửa bản hiện hành |
 | 403 | `self_approval_forbidden` | pf/extension (P4): người đã nhập thay bản nộp (on_behalf_of) tự rà soát/xác nhận/chốt kỳ có bản đó (gap §4.6) |
 
-Đồng bộ ngoại tuyến (`task_update`, `field_report`): lỗi nghiệp vụ trả trong `results[].code` với `status = rejected` theo cùng các mã trên; bản ghi gửi lặp (`idem_key` đã ghi) trả `duplicate`.
+Vật tư KN v7.7 dùng lại `extension.read_only` (Cấp Quốc gia ghi vật tư), `extension.out_of_scope`, `extension.support_reason_required`, `extension.dependency_unavailable` (chưa nối danh mục vật tư / đơn vị hành chính).
+
+Đồng bộ ngoại tuyến (`task_update`, `field_report`, KN v7.7 `report_submission`): lỗi nghiệp vụ trả trong `results[].code` với `status = rejected` theo cùng các mã trên; bản ghi gửi lặp (`idem_key` đã ghi) trả `duplicate`.
 
 | 404 | `mechanization.owner_not_found` | pf/mechanization: không có chủ sở hữu máy, hoặc ngoài phạm vi đọc |
 | 404 | `mechanization.machine_not_found` | pf/mechanization: không có máy, hoặc HTX của máy ngoài phạm vi đọc |
@@ -228,6 +236,15 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 403 | `mechanization.out_of_scope` | pf/mechanization: ghi dữ liệu của HTX ngoài phạm vi TW → Tỉnh → Xã của người gọi (ADR-0009) |
 | 503 | `mechanization.dependency_unavailable` | pf/mechanization: chưa nối hoặc không gọi được pf/party, pf/masterdata hoặc kho định danh (kể cả consumer `pf.mechanization.area_sync`, CGH FN-07 — sự kiện được giao lại rồi vào DLQ) |
 | 422 | `mechanization.import_invalid` | pf/mechanization: tệp nhập máy sai mẫu (thiếu cột bắt buộc, có cột "Mã máy"/"Khâu", sai CSV/.xlsx, ô công thức, quá 500 dòng) — từ chối cả tệp |
+| 403 | `mechanization.read_only` | pf/mechanization (KN v7.7 FN-XA-03.04): ngữ cảnh phiên Cấp Tỉnh hoặc Cấp Quốc gia ghi `PUT /v1/kn/machine-counts/{cooperative_ref}` — chỉ xem |
+| 422 | `mechanization.support_reason_required` | pf/mechanization (KN v7.7): chế độ hỗ trợ Admin ghi khai báo máy thiếu lý do (header `X-AG-Reason` ≥ 10 ký tự) |
+| 404 | `mechanization.cooperative_not_found` | pf/mechanization (KN v7.7 FN-XA-03.04): HTX không có, không phải HTX, hoặc ngoài phạm vi ngữ cảnh phiên (không lộ sự tồn tại) |
+| 422 | `mechanization.machine_type_unknown` | pf/mechanization (KN v7.7 FN-XA-03.04): loại máy không thuộc danh mục masterdata `machine_type` hoặc đã ngừng dùng; `machine_type` là mã gửi |
+| 422 | `mechanization.machine_type_duplicate` | pf/mechanization (KN v7.7 FN-XA-03.04): cùng loại máy xuất hiện hai lần trong một lần lưu — "cập nhật dòng đã có"; `machine_type` là mã trùng |
+| 422 | `mechanization.machine_quantity_invalid` | pf/mechanization (KN v7.7 FN-XA-03.04): số lượng âm, không nguyên, không phải số JSON hoặc > 1.000.000; `errors[].field` = `lines[i].quantity` |
+
+KN v7.7 (P7) dùng lại `mechanization.out_of_scope` (lọc `commune` ngoài phạm vi ngữ cảnh phiên) và `mechanization.cooperative_invalid` (khai báo máy cho HTX đã ngừng hoạt động).
+
 Phản hồi phát lại theo Idempotency-Key có header `Idempotent-Replayed: true`.
 
 ### pf/reports
@@ -311,6 +328,9 @@ Việc mô phỏng hỏng ghi `error_code` trên việc: mã `simulation.*` (l�
 | 409 | `geo.version_conflict` | pf/geo: `supersedes_id` không phải phiên bản ranh giới hiện hành; problem có `current_boundary_id`, `current_version` |
 | 409 | `geo.plot_state_conflict` | pf/geo: thửa đã ngừng dùng, hoặc gán trùng trạng thái hiện tại |
 | 409 | `geo.plot_exists` | pf/geo: `plot_ref` do máy sinh đã được dùng |
+| 409 | `geo.plot_overlap` | pf/geo KN v7.7 (FN-XA-03.05, `/v1/kn/plots…`): ranh giới mới/sửa chồng lấn thửa đã có (vượt `geo.overlap_tolerance_pct`) — trực tuyến CHẶN mọi chồng lấn, không có xác nhận giữ nguyên; problem có `overlaps: [{plot_ref, code, area_ha, overlap_pct, geometry}]` (`geometry` = phần chồng lấn, GeoJSON). Đồng bộ ngoại tuyến không dùng mã này (→ `conflict`) |
+| 403 | `geo.read_only` | pf/geo KN v7.7: Cấp Quốc gia (`kn_tw`) chỉ xem — ghi thửa qua `/v1/kn/plots…` hoặc đẩy `plot_boundary` bị từ chối |
+| 422 | `geo.support_reason_required` | pf/geo KN v7.7: chế độ hỗ trợ Admin ghi thửa thiếu lý do (≥ 10 ký tự, FN-AD-04.07). KN v7.7 cũng dùng lại `geo.out_of_scope` (xã ngoài phạm vi ngữ cảnh khi vẽ/lọc/xuất), `geo.plot_not_found` (thửa ngoài phạm vi xã hoặc của phòng ban khác), `geo.dependency_unavailable` (có `farmer_name` mà chưa nối kho định danh) |
 | 409 | `geo.conflict_state` | pf/geo: xung đột đã được xử lý |
 | 403 | `geo.out_of_scope` | pf/geo: ghi ngoài phạm vi xã của người gọi, hoặc quản lý HTX thao tác trên thửa/HTX khác (HTX US-PLOT-01 AC-4) |
 | 422 | `geo.too_few_points` | pf/geo: dưới 4 điểm phân biệt, hoặc các điểm thẳng hàng (KN US-PLOT-01 AC-1, HTX US-PLOT-02 AC-2) |

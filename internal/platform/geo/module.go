@@ -22,6 +22,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
 // DBRole là vai DB riêng của module (R-05).
@@ -45,6 +46,8 @@ type Deps struct {
 	// Farmers (tùy chọn): nông hộ của tài khoản nông dân (pf/accounts) — vai farmer đọc log
 	// GPS của mình (HTX US-GPS-03). Gốc lắp ráp nối sau khi dựng pf/accounts (UseFarmers).
 	Farmers port.FarmerHouseholds
+	// Vault (tùy chọn, KN v7.7 FN-XA-03.05): tên nông dân của thửa vào kho định danh. Có thể nối sau bằng UseKN.
+	Vault client.Client
 }
 
 // Module là pf/geo đã nối.
@@ -53,7 +56,7 @@ type Module struct{ svc *app.Service }
 // New tạo module với pool của vai geo_app.
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Scope: deps.Scope, Params: deps.Params, Units: deps.AdminUnits, Orgs: deps.Orgs, Households: deps.Households,
-		Markers: deps.CoopMarkers, Farmers: deps.Farmers}}
+		Markers: deps.CoopMarkers, Farmers: deps.Farmers, Vault: deps.Vault}}
 }
 
 // RegisterApp gắn route Application API.
@@ -81,6 +84,12 @@ func (m *Module) UseWaterways(l wwport.Layer) { m.svc.Waterways = l }
 // và định tuyến van hub_facility / hub_capacity về tenant bên cấp.
 func (m *Module) UseSharing(pa partyport.PartnerAccess, vg partyport.ValveGrants) {
 	m.svc.Sharing, m.svc.ValveGrants = pa, vg
+}
+
+// UseKN nối kho định danh (tên nông dân của thửa) và danh bạ tên người thao tác (Log) cho route /v1/kn/plots
+// (KN v7.7 FN-XA-03.05). names có thể nil.
+func (m *Module) UseKN(v client.Client, names partyport.ActorNames) {
+	m.svc.Vault, m.svc.Names = v, names
 }
 
 // UseFarmers nối liên kết tài khoản nông dân ↔ nông hộ (pf/accounts) sau khi module đó được dựng.

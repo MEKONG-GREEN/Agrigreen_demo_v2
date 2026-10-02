@@ -45,6 +45,10 @@ class FakeServer implements SyncApi {
   bool Function(Map<String, Object?> wire)? rejectIf;
   bool Function(Map<String, Object?> wire)? conflictIf;
 
+  /// Kết quả tùy biến cho một bản ghi (null = hành vi mặc định) — ví dụ
+  /// `rejected` kèm lỗi tại ô của báo cáo KN.
+  PushResult? Function(Map<String, Object?> wire)? resultFor;
+
   /// cursor (null = đầu) → trang pull.
   final Map<String?, PullPage> pages = {};
   final List<String?> pullCursors = [];
@@ -96,7 +100,11 @@ class FakeServer implements SyncApi {
       for (final w in decoded.cast<Map<String, Object?>>()) {
         final id = w['id']! as String;
         final key = w['idem_key']! as String;
-        if (ledger.containsKey(key)) {
+        final custom = ledger.containsKey(key) ? null : resultFor?.call(w);
+        if (custom != null) {
+          if (custom.status != 'rejected') ledger[key] = w;
+          results.add(custom);
+        } else if (ledger.containsKey(key)) {
           results.add(PushResult(id: id, status: 'duplicate'));
         } else if (rejectIf?.call(w) ?? false) {
           results.add(
@@ -263,6 +271,46 @@ class FakeServer implements SyncApi {
       idempotencyKey,
       () => {'path': path, 'body': body},
     );
+  }
+
+  /// Lệnh `sendJson` đã nhận (phương thức, path, khóa, thân).
+  final List<(String, String, String?, Map<String, Object?>?)> sendCalls = [];
+
+  /// Bộ xử lý `sendJson` tùy biến (PUT/POST của API KN). Trả null → mặc định
+  /// (POST chuyển cho [postAction]; phương thức khác trả `{path, body}`).
+  Future<Map<String, Object?>?> Function(
+    String method,
+    String path,
+    Map<String, Object?>? body,
+  )?
+  onSend;
+
+  @override
+  Future<Map<String, Object?>> sendJson({
+    required String method,
+    required String path,
+    String? idempotencyKey,
+    Map<String, Object?>? body,
+  }) async {
+    _guard();
+    sendCalls.add((method, path, idempotencyKey, body));
+    final key = idempotencyKey;
+    final prev = key == null ? null : _actionResponses[key];
+    if (prev != null) return prev;
+    final h = onSend;
+    if (h != null) {
+      final r = await h(method, path, body);
+      if (r != null) {
+        if (key != null) _actionResponses[key] = r;
+        return r;
+      }
+    }
+    if (method == 'POST' && key != null) {
+      return postAction(path: path, idempotencyKey: key, body: body);
+    }
+    final r = {'path': path, 'body': body};
+    if (key != null) _actionResponses[key] = r;
+    return r;
   }
 
   /// Số lần máy chủ thực hiện mỗi path (khóa trùng chỉ tính một).

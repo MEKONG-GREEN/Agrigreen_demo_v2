@@ -33,6 +33,7 @@ dev_dependencies:
     sdk: flutter
   # Chỉ kiểm thử import trực tiếp (bản chạy nhận qua agrigreen_mobile).
   crypto: ^3.0.7
+  http: ^1.6.0
   image: ^4.10.1
   pinenacl: ^0.6.0
 

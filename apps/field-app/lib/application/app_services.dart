@@ -36,6 +36,10 @@ import 'field_report_service.dart';
 import 'library_service.dart';
 import 'roster_service.dart';
 import 'task_service.dart';
+import 'kn_collection_service.dart';
+import 'kn_context_service.dart';
+import 'kn_menu_service.dart';
+import 'kn_report_service.dart';
 import 'work_schedule_service.dart';
 
 /// Phụ thuộc nền tảng, thay được trong kiểm thử.
@@ -105,6 +109,10 @@ class AppServices {
     required this.mrv,
     required this.roster,
     required this.schedules,
+    required this.knContext,
+    required this.knMenu,
+    required this.knReports,
+    required this.knData,
   });
 
   final AppPlatform platform;
@@ -135,6 +143,18 @@ class AppServices {
   /// Lịch công tác tuần (KN v7.7 P5): bản đệm + nháp trên máy, lưu/gửi qua
   /// hàng đợi lệnh.
   final WorkScheduleService schedules;
+
+  /// KN v7.7 P1: ngữ cảnh phiên (vai trò, phòng ban, xã phụ trách).
+  final KnContextService knContext;
+
+  /// KN v7.7 P2: menu Cấp Xã (đệm ngoại tuyến) + số đếm.
+  final KnMenuService knMenu;
+
+  /// KN v7.7 P7: công việc cần làm + nhập báo cáo ngoại tuyến.
+  final KnReportService knReports;
+
+  /// KN v7.7 P7: thu thập dữ liệu (HTX, máy móc, thửa, vật tư).
+  final KnCollectionService knData;
 
   late final PushHost pushHost = _ServicesPushHost(this);
 
@@ -207,6 +227,34 @@ class AppServices {
         await sync.syncOnce(force: true);
       },
     );
+    // KN v7.7 P1: mọi lời gọi mang X-AG-Context; ngữ cảnh bị từ chối → chọn
+    // lại cùng phân công rồi gọi lại (HttpSyncApi; bản giả bỏ qua).
+    final knContext = KnContextService(
+      db: db,
+      api: api,
+      clock: pf.clock,
+      ids: pf.ids,
+    );
+    if (api is HttpSyncApi) {
+      api.contextId = knContext.contextId;
+      api.onContextRejected = knContext.recover;
+    }
+    final knReports = KnReportService(
+      db: db,
+      refs: refs,
+      outbox: outbox,
+      api: api,
+      clock: pf.clock,
+      syncNow: (entities) async {
+        await sync.syncOnce(force: true, entities: entities);
+      },
+    );
+    final knMenu = KnMenuService(
+      db: db,
+      api: api,
+      clock: pf.clock,
+      localTodoCount: knReports.todoCount,
+    );
     final photos = PhotoPipeline(
       camera: pf.camera,
       location: pf.location,
@@ -265,11 +313,22 @@ class AppServices {
       ),
       roster: RosterService(api: api, dialer: pf.dialer, ids: pf.ids),
       schedules: schedules,
+      knContext: knContext,
+      knMenu: knMenu,
+      knReports: knReports,
+      knData: KnCollectionService(
+        db: db,
+        api: api,
+        actions: actions,
+        catalogs: catalogs,
+        clock: pf.clock,
+      ),
     );
   }
 
   Future<void> close() async {
     await sync.dispose();
+    await knContext.dispose();
     if (!wipe.wiped) await db.close();
   }
 }

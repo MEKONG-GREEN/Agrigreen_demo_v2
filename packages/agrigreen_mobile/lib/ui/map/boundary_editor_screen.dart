@@ -45,7 +45,22 @@ class BoundaryEditorScreen extends StatefulWidget {
     this.onDownloadView,
     this.modeToggle = false,
     this.initialMode = BoundaryMethod.gps,
+    this.shapeTools = false,
+    this.plotAttributes = false,
+    this.cooperatives = const [],
   });
+
+  /// KN v7.7 (FN-XA-03.05): công cụ vẽ chấm điểm / hình tròn (chạm tâm rồi
+  /// chạm mép) / hình vuông (chạm tâm rồi chạm một góc). Hình tròn/vuông đổi
+  /// thành đa giác trước khi lưu, `shape` ghi cách vẽ.
+  final bool shapeTools;
+
+  /// KN v7.7: trường HTX, tên nông dân, tên lô (bắt buộc với thửa mới), ghi
+  /// chú — gửi kèm payload `plot_boundary`.
+  final bool plotAttributes;
+
+  /// HTX chọn được (mã tham chiếu, tên) khi [plotAttributes].
+  final List<(String, String)> cooperatives;
 
   final BoundaryService boundaries;
   final LocationSource location;
@@ -82,6 +97,13 @@ class _BoundaryEditorScreenState extends State<BoundaryEditorScreen> {
 
   /// Lý do sửa ranh giới — sống cùng màn (hộp thoại còn dùng khi đang đóng).
   final _reason = TextEditingController();
+  final _lot = TextEditingController();
+  final _farmer = TextEditingController();
+  final _note = TextEditingController();
+  PlotShape _shape = PlotShape.polygon;
+
+  /// Tâm hình tròn/vuông đã chạm, chờ chạm điểm thứ hai.
+  GeoPoint? _shapeCenter;
   BoundaryCheck? _check;
   bool _busy = false;
   List<List<GeoPoint>> _others = const [];
@@ -117,6 +139,13 @@ class _BoundaryEditorScreenState extends State<BoundaryEditorScreen> {
       _points.addAll(ring);
       _acc.addAll(List.filled(ring.length, null));
     }
+    final d = widget.plot?.data;
+    if (d != null) {
+      _lot.text = '${d['lot_name'] ?? ''}';
+      _note.text = '${d['note'] ?? ''}';
+      final declared = d['declared_area_ha'];
+      if (declared != null) _declared.text = '$declared';
+    }
     _tiles =
         widget.tileProvider ??
         OfflineFirstTileProvider(
@@ -131,6 +160,9 @@ class _BoundaryEditorScreenState extends State<BoundaryEditorScreen> {
   void dispose() {
     _declared.dispose();
     _reason.dispose();
+    _lot.dispose();
+    _farmer.dispose();
+    _note.dispose();
     _map.dispose();
     super.dispose();
   }
@@ -204,7 +236,40 @@ class _BoundaryEditorScreenState extends State<BoundaryEditorScreen> {
   void _onMapTap(LatLng ll) {
     if (!_allowed) return;
     if (widget.modeToggle && _mode != BoundaryMethod.map) return;
-    _add(GeoPoint(ll.latitude, ll.longitude));
+    final p = GeoPoint(ll.latitude, ll.longitude);
+    if (widget.shapeTools && _shape != PlotShape.polygon) {
+      _shapeTap(p);
+      return;
+    }
+    _add(p);
+  }
+
+  /// Hình tròn/vuông: chạm 1 = tâm, chạm 2 = mép (tròn) hoặc góc (vuông).
+  void _shapeTap(GeoPoint p) {
+    final c = _shapeCenter;
+    if (c == null) {
+      setState(() {
+        _points.clear();
+        _acc.clear();
+        _shapeCenter = p;
+        _restored = null;
+      });
+      unawaited(_recheck());
+      return;
+    }
+    final ring = _shape == PlotShape.circle
+        ? circlePolygon(c, distanceM(c, p))
+        : squarePolygon(c, p);
+    setState(() {
+      _shapeCenter = null;
+      _points
+        ..clear()
+        ..addAll(ring);
+      _acc
+        ..clear()
+        ..addAll(List.filled(ring.length, null));
+    });
+    unawaited(_recheck());
   }
 
   Future<void> _addGps() async {
@@ -324,6 +389,13 @@ class _BoundaryEditorScreenState extends State<BoundaryEditorScreen> {
         ack = true;
       }
     }
+    if (!mounted) return;
+    if (widget.plotAttributes &&
+        widget.plot == null &&
+        _lot.text.trim().isEmpty) {
+      showMessage(context, 'Nhập tên lô trước khi lưu.', error: true);
+      return;
+    }
     String? reason;
     if (widget.plot?.data['boundary_id'] != null) {
       reason = await _askReason();
@@ -342,6 +414,10 @@ class _BoundaryEditorScreenState extends State<BoundaryEditorScreen> {
         correctionReason: reason,
         acknowledgeOverlap: ack,
         worstAccuracyM: _worstAccuracy,
+        lotName: widget.plotAttributes ? _lot.text : null,
+        farmerName: widget.plotAttributes ? _farmer.text : null,
+        note: widget.plotAttributes ? _note.text : null,
+        shape: widget.shapeTools || widget.plotAttributes ? _shape.name : null,
       );
       if (!mounted) return;
       showMessage(context, 'Đã lưu ranh giới. Sẽ tự đồng bộ khi có mạng.');
@@ -380,6 +456,57 @@ class _BoundaryEditorScreenState extends State<BoundaryEditorScreen> {
     });
     unawaited(_recheck());
   }
+
+  /// Khung điều khiển dưới bản đồ; cuộn được khi có thêm trường thửa v7.7.
+  Widget _panel(Widget child) {
+    final box = Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(12),
+      child: child,
+    );
+    if (!widget.plotAttributes) return box;
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.55,
+      ),
+      child: SingleChildScrollView(child: box),
+    );
+  }
+
+  List<Widget> _attributeFields() => [
+    if (widget.cooperatives.isNotEmpty)
+      DropdownButtonFormField<String>(
+        key: const ValueKey('be-coop'),
+        initialValue: widget.cooperatives.any((c) => c.$1 == _coop)
+            ? _coop
+            : null,
+        isExpanded: true,
+        decoration: const InputDecoration(labelText: 'HTX'),
+        items: [
+          for (final c in widget.cooperatives)
+            DropdownMenuItem(value: c.$1, child: Text(c.$2)),
+        ],
+        onChanged: (v) => setState(() => _coop = v),
+      ),
+    TextField(
+      key: const ValueKey('be-farmer'),
+      controller: _farmer,
+      decoration: const InputDecoration(labelText: 'Tên nông dân'),
+    ),
+    TextField(
+      key: const ValueKey('be-lot'),
+      controller: _lot,
+      decoration: InputDecoration(
+        labelText: widget.plot == null ? 'Tên lô (bắt buộc)' : 'Tên lô',
+      ),
+    ),
+    TextField(
+      key: const ValueKey('be-note'),
+      controller: _note,
+      decoration: const InputDecoration(labelText: 'Ghi chú'),
+    ),
+    const SizedBox(height: 8),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -427,6 +554,30 @@ class _BoundaryEditorScreenState extends State<BoundaryEditorScreen> {
                 onSelectionChanged: (s) => setState(() => _mode = s.first),
               ),
             ),
+          if (widget.shapeTools)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+              child: SegmentedButton<PlotShape>(
+                key: const ValueKey('be-shape'),
+                segments: [
+                  for (final s in PlotShape.values)
+                    ButtonSegment(
+                      value: s,
+                      icon: Icon(switch (s) {
+                        PlotShape.polygon => Icons.polyline,
+                        PlotShape.circle => Icons.circle_outlined,
+                        PlotShape.square => Icons.crop_square,
+                      }),
+                      label: Text(s.label),
+                    ),
+                ],
+                selected: {_shape},
+                onSelectionChanged: (s) => setState(() {
+                  _shape = s.first;
+                  _shapeCenter = null;
+                }),
+              ),
+            ),
           Expanded(
             child: FlutterMap(
               mapController: _map,
@@ -465,6 +616,17 @@ class _BoundaryEditorScreenState extends State<BoundaryEditorScreen> {
                 ),
                 MarkerLayer(
                   markers: [
+                    if (_shapeCenter != null)
+                      Marker(
+                        point: LatLng(_shapeCenter!.lat, _shapeCenter!.lon),
+                        width: 24,
+                        height: 24,
+                        child: const Icon(
+                          Icons.add_circle,
+                          color: AgColors.red,
+                          size: 24,
+                        ),
+                      ),
                     for (var i = 0; i < pts.length; i++)
                       Marker(
                         point: pts[i],
@@ -489,12 +651,18 @@ class _BoundaryEditorScreenState extends State<BoundaryEditorScreen> {
               ],
             ),
           ),
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(12),
-            child: Column(
+          _panel(
+            Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (_shapeCenter != null)
+                  Text(
+                    _shape == PlotShape.circle
+                        ? 'Chạm điểm trên mép để đặt bán kính hình tròn.'
+                        : 'Chạm một góc để đặt hình vuông.',
+                    style: const TextStyle(color: AgColors.g700, fontSize: 15),
+                  ),
+                if (widget.plotAttributes) ..._attributeFields(),
                 if (!_allowed)
                   const Text(
                     msgPlotNotOwned,

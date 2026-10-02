@@ -41,10 +41,41 @@ enum ApiActionKind {
   /// KN v7.7 P5 (App hiện trường): `POST /v1/extension/work-schedules
   /// {id, week_start, action, base_version, items}` — lưu nháp / gửi duyệt
   /// lịch công tác tuần. Thân giữ nguyên giữa các lần phát lại.
-  workScheduleSave('work_schedule_save');
+  workScheduleSave('work_schedule_save'),
 
-  const ApiActionKind(this.code);
+  /// KN v7.7 P7 (FN-XA-03.03): `POST /v1/kn/cooperatives` — thêm HTX.
+  knCooperativeCreate('kn_cooperative_create'),
+
+  /// `PUT /v1/kn/cooperatives/{ref}` — sửa HTX (sự kiện bù trên sổ).
+  knCooperativeUpdate('kn_cooperative_update', method: 'PUT'),
+
+  /// `POST /v1/kn/cooperatives/{ref}/deactivate {reason}`.
+  knCooperativeDeactivate('kn_cooperative_deactivate'),
+
+  /// `POST /v1/kn/cooperatives/{ref}/households` — thêm nông hộ.
+  knHouseholdCreate('kn_household_create'),
+
+  /// `PUT /v1/kn/households/{ref}` — sửa diện tích canh tác.
+  knHouseholdUpdate('kn_household_update', method: 'PUT'),
+
+  /// FN-XA-03.04: `PUT /v1/kn/machine-counts/{cooperative_ref}` — thay toàn
+  /// bộ khai báo số lượng máy của HTX.
+  knMachineCountsSave('kn_machine_counts_save', method: 'PUT'),
+
+  /// FN-XA-03.06: `POST /v1/kn/materials` — ghi nhận vật tư.
+  knMaterialsCreate('kn_materials_create'),
+
+  /// `POST /v1/kn/materials/{id}/correct` — bản ghi bù có lý do.
+  knMaterialCorrect('kn_material_correct'),
+
+  /// FN-XA-03.05: `PUT /v1/kn/plots/{ref}` — sửa thuộc tính thửa.
+  knPlotUpdate('kn_plot_update', method: 'PUT');
+
+  const ApiActionKind(this.code, {this.method = 'POST'});
   final String code;
+
+  /// Phương thức HTTP khi phát lại (mặc định POST).
+  final String method;
 
   static ApiActionKind parse(String c) => values.firstWhere((k) => k.code == c);
 
@@ -60,6 +91,16 @@ enum ApiActionKind {
     ApiActionKind.logisticsMilestone =>
       '/v1/logistics/trips/$target/milestones',
     ApiActionKind.workScheduleSave => '/v1/extension/work-schedules',
+    ApiActionKind.knCooperativeCreate => '/v1/kn/cooperatives',
+    ApiActionKind.knCooperativeUpdate => '/v1/kn/cooperatives/$target',
+    ApiActionKind.knCooperativeDeactivate =>
+      '/v1/kn/cooperatives/$target/deactivate',
+    ApiActionKind.knHouseholdCreate => '/v1/kn/cooperatives/$target/households',
+    ApiActionKind.knHouseholdUpdate => '/v1/kn/households/$target',
+    ApiActionKind.knMachineCountsSave => '/v1/kn/machine-counts/$target',
+    ApiActionKind.knMaterialsCreate => '/v1/kn/materials',
+    ApiActionKind.knMaterialCorrect => '/v1/kn/materials/$target/correct',
+    ApiActionKind.knPlotUpdate => '/v1/kn/plots/$target',
   };
 }
 
@@ -91,6 +132,7 @@ class ApiAction {
   /// Idempotency-Key ổn định cho mọi lần phát lại (khớp regex của máy chủ).
   String get idempotencyKey => 'act:$id';
   String get path => kind.pathFor(target);
+  String get method => kind.method;
 
   factory ApiAction.fromRow(Map<String, Object?> r) => ApiAction(
     id: r['id']! as String,

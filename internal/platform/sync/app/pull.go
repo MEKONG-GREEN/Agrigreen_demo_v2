@@ -85,6 +85,10 @@ func (s *Service) PullEntitiesOnly(ctx context.Context, deviceHeader, cursor str
 	}
 	v := view{scope: scope}
 	fp := domain.ScopeFingerprint(scope.All, scope.Units)
+	if p.KN != nil {
+		// Đổi vai trò/phòng ban/xã phụ trách của ngữ cảnh → con trỏ cũ reset (dữ liệu KN theo phòng ban).
+		fp = "kn:" + p.KN.Role + ":" + p.KN.Department + ":" + fp
+	}
 	if scope.Empty() && p.Has(accport.RoleFarmer) {
 		// Nông dân: token không có org_ref → phạm vi pf/party rỗng. Đi đường riêng theo
 		// nông hộ liên kết (chỉ entity của FarmerSource), không suy phạm vi xã.

@@ -6422,6 +6422,624 @@ paths:
         "404": {description: "extdata.unknown_source", $ref: "#/components/responses/Problem"}
         "422": {description: "validation_failed | extdata.zoom_too_high | extdata.outside_territory", $ref: "#/components/responses/Problem"}
         "502": {description: "extdata.provider_unavailable", $ref: "#/components/responses/Problem"}
+  # ---- KN v7.7 P7 (FN-XA-03.03/03.04: HTX, nông hộ, máy móc HTX) ----
+  # Mọi route cần X-AG-Context. Cấp Xã (kn_xa) ghi trong xã phụ trách; Cấp Tỉnh xem trong tỉnh; Cấp Quốc gia xem;
+  # Admin mọi thứ (chế độ hỗ trợ: header X-AG-Reason ≥ 10 ký tự). Cấp Tỉnh/Quốc gia ghi → 403 party.read_only.
+  /v1/kn/cooperatives:
+    get:
+      tags: [party]
+      summary: "Danh sách HTX trên các xã phụ trách (FN-XA-03.03)"
+      operationId: knListCooperatives
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: commune, in: query, schema: {type: string}, description: "Mã xã; vắng = mọi xã trong phạm vi; ngoài phạm vi → 403 party.out_of_scope"}
+        - {name: status, in: query, schema: {type: string, enum: [active, inactive, all], default: active}}
+        - {name: q, in: query, schema: {type: string}, description: "Tìm theo tên, Mã HTX, mã số thuế"}
+        - {name: area_min, in: query, schema: {type: string}, description: "Diện tích tối thiểu (ha, decimal)"}
+        - {name: area_max, in: query, schema: {type: string}, description: "Diện tích tối đa (ha, decimal)"}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang HTX
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNCooperativeList"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "428": {$ref: "#/components/responses/Problem"}
+    post:
+      tags: [party]
+      summary: "Thêm HTX trong xã phụ trách (Cấp Xã, Admin)"
+      description: "Mã HTX tự sinh. Trùng tên (không phân biệt hoa thường) → 409 party.cooperative_name_taken. Người đại diện chỉ vào kho định danh."
+      operationId: knCreateCooperative
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNCooperativeCreate"}
+      responses:
+        "201":
+          description: HTX đã tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNCooperative"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/kn/cooperatives/{ref}:
+    get:
+      tags: [party]
+      summary: "Chi tiết HTX (ngoài phạm vi → 404)"
+      operationId: knGetCooperative
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: HTX
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNCooperative"}
+        "404": {$ref: "#/components/responses/Problem"}
+    put:
+      tags: [party]
+      summary: "Sửa hồ sơ HTX — sự kiện bù (Log cũ → mới, không PII)"
+      description: >-
+        Trường vắng = giữ nguyên; area_ha/tax_code/head_office rỗng hoặc null = xóa giá trị. Đổi người đại diện: chủ thể mới
+        trong kho định danh, Log ghi representative_ref cũ → mới. Gửi lại cùng Idempotency-Key → kết quả hiện tại, không ghi thêm.
+        HTX đã vô hiệu hóa → 409 party.org_state_conflict.
+      operationId: knUpdateCooperative
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNCooperativeUpdate"}
+      responses:
+        "200":
+          description: HTX sau khi sửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNCooperative"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/kn/cooperatives/{ref}/deactivate:
+    post:
+      tags: [party]
+      summary: "Vô hiệu hóa HTX (thay xóa cứng) kèm cảnh báo dữ liệu liên kết"
+      description: "Lý do ≥ 20 ký tự (ràng buộc sổ org_event, US-HTXSTATUS-01 AC-3). Phát pf.party.org.deactivated."
+      operationId: knDeactivateCooperative
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNReason"}
+      responses:
+        "200":
+          description: HTX đã vô hiệu hóa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNCooperativeDeactivated"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/kn/cooperatives/{ref}/reactivate:
+    post:
+      tags: [party]
+      summary: "Kích hoạt lại HTX (lý do ≥ 10 ký tự)"
+      operationId: knReactivateCooperative
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNReason"}
+      responses:
+        "200":
+          description: HTX đã kích hoạt lại
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNCooperative"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/kn/cooperatives/{ref}/households:
+    get:
+      tags: [party]
+      summary: "Nông hộ thành viên của HTX (tab Nông hộ)"
+      operationId: knListHouseholds
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang nông hộ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNHouseholdList"}
+        "404": {$ref: "#/components/responses/Problem"}
+    post:
+      tags: [party]
+      summary: "Thêm nông hộ vào HTX (chủ hộ vào kho định danh)"
+      description: "SĐT đã có trong kho → 409 party.household_phone_taken; HTX đã vô hiệu hóa → 409 party.org_state_conflict."
+      operationId: knCreateHousehold
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNHouseholdCreate"}
+      responses:
+        "201":
+          description: Nông hộ đã thêm
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNHousehold"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/kn/cooperatives/{ref}/log:
+    get:
+      tags: [party]
+      summary: "Log HTX: tạo, vô hiệu hóa/kích hoạt lại, sửa hồ sơ (cũ → mới, không PII)"
+      operationId: knCooperativeLog
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: integer, minimum: 0}, description: "Vị trí trong Log đã gộp (next_cursor)"}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Log
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNLogPage"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/kn/households/{ref}:
+    put:
+      tags: [party]
+      summary: "Sửa diện tích canh tác của nông hộ — sự kiện bù"
+      operationId: knUpdateHousehold
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNHouseholdUpdate"}
+      responses:
+        "200":
+          description: Nông hộ sau khi sửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNHousehold"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/kn/households/{ref}/log:
+    get:
+      tags: [party]
+      summary: "Log nông hộ: tạo và các lần sửa diện tích"
+      operationId: knHouseholdLog
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: integer, minimum: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Log
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNLogPage"}
+        "404": {$ref: "#/components/responses/Problem"}
+
+  # FN-XA-03.04 — Máy móc HTX (khai báo số lượng theo loại máy). Cấp Tỉnh/Quốc gia ghi → 403 mechanization.read_only.
+  /v1/kn/machine-counts:
+    get:
+      tags: [mechanization]
+      summary: "Khai báo máy của các HTX trong phạm vi + tổng xã theo loại máy (= Σ HTX)"
+      operationId: knMachineCountsOverview
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: commune, in: query, schema: {type: string}, description: "Mã xã; ngoài phạm vi → 403 mechanization.out_of_scope"}
+      responses:
+        "200":
+          description: Tổng quan
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNMachineOverview"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/kn/machine-counts/{cooperative_ref}:
+    get:
+      tags: [mechanization]
+      summary: "Khai báo máy hiện hành của một HTX"
+      operationId: knCoopMachineCounts
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: cooperative_ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Khai báo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNCoopMachines"}
+        "404": {$ref: "#/components/responses/Problem"}
+    put:
+      tags: [mechanization]
+      summary: "Thay toàn bộ khai báo máy của HTX (mỗi loại đổi = một sự kiện set/removed)"
+      description: >-
+        Loại máy thuộc danh mục masterdata machine_type đang dùng (mechanization.machine_type_unknown); số lượng phải là
+        số JSON nguyên 0–1.000.000 (mechanization.machine_quantity_invalid); trùng loại trong request →
+        mechanization.machine_type_duplicate (gợi ý cập nhật dòng đã có); HTX ngừng hoạt động → mechanization.cooperative_invalid.
+        Gửi lại cùng Idempotency-Key → khai báo hiện tại, không ghi thêm. Admin: tham số department (mặc định trong_trot).
+      operationId: knPutMachineCounts
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: cooperative_ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: department, in: query, schema: {type: string}, description: "Chỉ Admin: phòng ban của bản ghi"}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNMachineCountsPut"}
+      responses:
+        "200":
+          description: Khai báo sau khi lưu
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNCoopMachines"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/kn/machine-counts/{cooperative_ref}/log:
+    get:
+      tags: [mechanization]
+      summary: "Lịch sử thay đổi số lượng máy của HTX"
+      operationId: knMachineCountLog
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: cooperative_ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: integer, minimum: 0}, description: "seq của dòng cuối trang trước"}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Lịch sử
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNMachineLogPage"}
+        "404": {$ref: "#/components/responses/Problem"}
+  # ---- KN v7.7 P7 (FN-XA-03.05/03.06: thửa, vật tư) ----
+  /v1/kn/plots:
+    get:
+      summary: "FN-XA-03.05: danh sách thửa trong phạm vi ngữ cảnh (không hình học)"
+      operationId: knListPlots
+      tags: [geo]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: commune, in: query, schema: {type: string}, description: "Vắng = mọi xã trong phạm vi; ngoài phạm vi → 403 geo.out_of_scope"}
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 100}}
+      responses:
+        "200":
+          description: Trang thửa
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/KNPlot"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {description: geo.out_of_scope, $ref: "#/components/responses/Problem"}
+        "428": {description: accounts.context_required, $ref: "#/components/responses/Problem"}
+    post:
+      summary: "FN-XA-03.05: vẽ lô mới (Cấp Xã, Admin) — chặn mọi chồng lấn, diện tích tự tính"
+      operationId: knCreatePlot
+      tags: [geo]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: department, in: query, schema: {type: string}, description: "Chỉ Admin: phòng ban ghi (mặc định trong_trot)"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNPlotCreate"}
+      responses:
+        "201":
+          description: Thửa đã tạo (POST lặp cùng khóa → cùng kết quả)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNPlotWrite"}
+        "403": {description: "geo.read_only | forbidden | geo.out_of_scope", $ref: "#/components/responses/Problem"}
+        "409": {description: "geo.plot_overlap (kèm overlaps) | geo.plot_exists", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | geo.too_few_points | geo.invalid_geometry | geo.area_out_of_range | geo.outside_commune | geo.cooperative_invalid | geo.support_reason_required", $ref: "#/components/responses/Problem"}
+        "503": {description: geo.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/kn/plots/export:
+    get:
+      summary: "FN-XA-03.05: tải thửa của một xã (GeoJSON | KML)"
+      operationId: knExportPlots
+      tags: [geo]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: commune, in: query, required: true, schema: {type: string}}
+        - {name: format, in: query, schema: {type: string, enum: [geojson, kml], default: geojson}}
+      responses:
+        "200":
+          description: "Tệp tải về (Content-Disposition: attachment); properties: ref, code, lot_name, commune_code, cooperative_ref, farmer_label, note, area_ha, declared_area_ha, shape, status"
+          content:
+            application/geo+json:
+              schema: {type: object}
+            application/vnd.google-earth.kml+xml:
+              schema: {type: string}
+        "403": {description: geo.out_of_scope, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/kn/plots/{ref}:
+    parameters:
+      - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: "FN-XA-03.05: chi tiết thửa kèm hình (ngoài phạm vi/phòng ban → 404)"
+      operationId: knGetPlot
+      tags: [geo]
+      responses:
+        "200":
+          description: Thửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNPlotDetail"}
+        "404": {description: geo.plot_not_found, $ref: "#/components/responses/Problem"}
+    put:
+      summary: "FN-XA-03.05: sửa thuộc tính (sự kiện bù attributes_changed, Log). Trường vắng = giữ nguyên; null = xóa"
+      operationId: knUpdatePlot
+      tags: [geo]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: false, schema: {type: string}, description: "Tùy chọn: PUT lặp cùng khóa → cùng kết quả"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lot_name: {type: string, maxLength: 200}
+                note: {type: [string, "null"], maxLength: 1000}
+                farmer_name: {type: [string, "null"], maxLength: 200, description: "→ kho định danh; null/'' = bỏ"}
+                cooperative_ref: {type: [string, "null"], format: uuid}
+                declared_area_ha: {type: [string, "null"], description: "decimal > 0"}
+                reason: {type: string, maxLength: 500}
+      responses:
+        "200":
+          description: Thửa sau sửa (không đổi gì → hiện trạng, không ghi sổ)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNPlotDetail"}
+        "403": {description: "geo.read_only | forbidden | geo.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: geo.plot_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: geo.plot_state_conflict, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/kn/plots/{ref}/boundary:
+    post:
+      summary: "FN-XA-03.05: sửa ranh giới — phiên bản mới thay supersedes_boundary_id (chặn mọi chồng lấn)"
+      operationId: knCorrectPlotBoundary
+      tags: [geo]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [supersedes_boundary_id, geometry, reason]
+              properties:
+                supersedes_boundary_id: {type: string, format: uuid}
+                geometry: {$ref: "#/components/schemas/GeoJSONPolygonal"}
+                shape: {type: string, enum: [polygon, circle, square]}
+                reason: {type: string, minLength: 10}
+      responses:
+        "201":
+          description: Phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNPlotWrite"}
+        "404": {description: geo.plot_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "geo.plot_overlap | geo.version_conflict | geo.plot_state_conflict", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/kn/plots/{ref}/log:
+    get:
+      summary: "FN-XA-03.05: lịch sử thửa (thuộc tính + phiên bản ranh giới), mới nhất trước"
+      operationId: knPlotLog
+      tags: [geo]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: "Log; event ∈ created|assigned|retired|restored|attributes_changed|boundary_recorded|boundary_corrected"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRecordLogPage"}
+        "404": {description: geo.plot_not_found, $ref: "#/components/responses/Problem"}
+
+  /v1/kn/materials:
+    get:
+      summary: "FN-XA-03.06: bản ghi vật tư hiện hành (không bị bản bù thay)"
+      operationId: knListMaterials
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: commune, in: query, schema: {type: string}}
+        - {name: from, in: query, schema: {type: string, format: date}}
+        - {name: to, in: query, schema: {type: string, format: date}}
+        - {name: material_code, in: query, schema: {type: string}}
+        - {name: department, in: query, schema: {type: string}, description: "Chỉ Admin (vắng = mọi phòng ban)"}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 100}}
+      responses:
+        "200":
+          description: Trang bản ghi
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MaterialRecord"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {description: extension.out_of_scope, $ref: "#/components/responses/Problem"}
+    post:
+      summary: "FN-XA-03.06: ghi nhận vật tư của xã (Cấp Xã, Admin), 1–200 dòng"
+      operationId: knRecordMaterials
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: department, in: query, schema: {type: string}, description: "Chỉ Admin: phòng ban ghi (mặc định trong_trot)"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [commune_code, recorded_on, lines]
+              properties:
+                commune_code: {type: string}
+                recorded_on: {type: string, format: date, description: "Không ở tương lai (giờ VN)"}
+                lines:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items:
+                    type: object
+                    required: [material_code, quantity]
+                    properties:
+                      material_code: {type: string, description: "Danh mục masterdata material (đang dùng); ĐVT = attrs.unit"}
+                      quantity: {type: string, description: "decimal ≥ 0, ≤ 1e9; ĐVT đếm được → số nguyên; còn lại ≤ 4 chữ số lẻ"}
+                      note: {type: string, maxLength: 1000}
+      responses:
+        "201":
+          description: Bản ghi đã tạo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MaterialRecord"}}
+        "403": {description: "extension.read_only | forbidden | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.material_unknown | extension.material_quantity_invalid | extension.support_reason_required", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/kn/materials/summary:
+    get:
+      summary: "FN-XA-03.06 AC: tổng hợp vật tư hiện hành theo xã × vật tư (Cấp Tỉnh: các xã trong tỉnh)"
+      operationId: knMaterialSummary
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: commune, in: query, schema: {type: string}}
+        - {name: from, in: query, schema: {type: string, format: date}}
+        - {name: to, in: query, schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Tổng hợp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [commune_code, material_code, material_name, unit, quantity, records]
+                      properties:
+                        commune_code: {type: string}
+                        material_code: {type: string}
+                        material_name: {type: string}
+                        unit: {type: string}
+                        quantity: {type: string}
+                        records: {type: integer}
+        "403": {description: extension.out_of_scope, $ref: "#/components/responses/Problem"}
+  /v1/kn/materials/{id}/correct:
+    post:
+      summary: "FN-XA-03.06: sửa = bản ghi bù (bản cũ hết hiện hành)"
+      operationId: knCorrectMaterial
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity, reason]
+              properties:
+                quantity: {type: string}
+                note: {type: [string, "null"], maxLength: 1000}
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201":
+          description: Bản ghi bù
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MaterialRecord"}
+        "403": {description: "extension.read_only | forbidden", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.material_record_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: extension.material_superseded, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.material_quantity_invalid", $ref: "#/components/responses/Problem"}
+  /v1/kn/materials/{id}/log:
+    get:
+      summary: "FN-XA-03.06: lịch sử chuỗi sửa của bản ghi (recorded → corrected…), mới nhất trước"
+      operationId: knMaterialLog
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Log
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNRecordLogPage"}
+        "404": {description: extension.material_record_not_found, $ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -7242,6 +7860,28 @@ components:
         supersedes_id: {type: [string, "null"], format: uuid, description: "Bắt buộc khi op = correct"}
         correction_reason: {type: [string, "null"], minLength: 10, maxLength: 500, description: "Bắt buộc khi op = correct"}
         payload: {type: object, description: "Tối đa 256 KiB; máy chủ pf/sync chỉ lưu SHA-256"}
+    SyncReportSubmissionPayload:
+      type: object
+      description: |
+        KN v7.7 P7 (N-07): payload của bản ghi push entity = report_submission (Sink của pf/extension, ngữ cảnh Cấp Xã
+        qua X-AG-Context). Chỉ op = create; id của bản ghi = id bài nộp (UUIDv7 máy sinh, gửi lại → duplicate).
+        conflict khi phiên bản liền trước do người/máy khác ghi và mới hơn base_version (bản vẫn được lưu).
+        Chiều xuống: report_task, form_layout, report_submission — docs/dev/sync-contract.md "Báo cáo KN v7.7".
+      required: [task_id, kind, rows]
+      properties:
+        task_id: {type: string, format: uuid}
+        kind: {type: string, enum: [draft, submitted]}
+        base_version: {type: integer, minimum: 0, description: "latest_version máy đã thấy qua pull"}
+        rows:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            required: [input]
+            properties:
+              indicator: {type: string}
+              input: {type: object, additionalProperties: {type: string}, description: "chữ cái cột → giá trị"}
     SyncConsentPayload:
       type: object
       description: |
@@ -10502,3 +11142,276 @@ components:
         url: {type: string}
         expires_in_seconds: {type: integer}
     # --- hết bề mặt đối tác ---
+    # ---- KN v7.7 P7 ----
+    KNMaskedPerson:
+      type: object
+      description: "Nhãn đã che từ kho định danh (RB-3) — không bao giờ có SĐT đầy đủ"
+      required: [label, masked_phone]
+      properties:
+        label: {type: string, description: "vd 'Nguyễn V. A.'; 'Không hiển thị được' khi kho không trả nhãn"}
+        masked_phone: {type: [string, "null"], description: "vd '0912•••123'"}
+    KNCooperative:
+      type: object
+      required: [ref, code, name, commune_code, area_ha, representative, household_count, active, status_reason, tax_code, head_office, updated_at]
+      properties:
+        ref: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        commune_code: {type: string}
+        area_ha: {type: [string, "null"], description: "decimal (ha)"}
+        representative: {oneOf: [{$ref: "#/components/schemas/KNMaskedPerson"}, {type: "null"}]}
+        household_count: {type: integer}
+        active: {type: boolean}
+        status_reason: {type: [string, "null"]}
+        tax_code: {type: [string, "null"]}
+        head_office: {type: [string, "null"]}
+        updated_at: {type: string, format: date-time}
+    KNCooperativeList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/KNCooperative"}}
+        next_cursor: {type: [string, "null"]}
+    KNRepresentativeInput:
+      type: object
+      required: [full_name, phone]
+      properties:
+        full_name: {type: string}
+        phone: {type: string}
+    KNCooperativeCreate:
+      type: object
+      required: [name, commune_code]
+      properties:
+        name: {type: string, maxLength: 200}
+        commune_code: {type: string}
+        area_ha: {type: [string, number, "null"], description: "decimal ≥ 0, tối đa 4 chữ số lẻ"}
+        tax_code: {type: string}
+        head_office: {type: string, maxLength: 500}
+        representative: {$ref: "#/components/schemas/KNRepresentativeInput"}
+    KNCooperativeUpdate:
+      type: object
+      properties:
+        name: {type: string, maxLength: 200}
+        area_ha: {type: [string, number, "null"]}
+        tax_code: {type: [string, "null"]}
+        head_office: {type: [string, "null"]}
+        representative: {$ref: "#/components/schemas/KNRepresentativeInput"}
+        reason: {type: string, maxLength: 500}
+    KNReason:
+      type: object
+      required: [reason]
+      properties:
+        reason: {type: string}
+    KNCooperativeDeactivated:
+      type: object
+      required: [cooperative, warnings]
+      properties:
+        cooperative: {$ref: "#/components/schemas/KNCooperative"}
+        warnings:
+          type: object
+          required: [households, plots, machines]
+          properties:
+            households: {type: integer, description: "Nông hộ đang là thành viên"}
+            plots: {type: [integer, "null"], description: "Thửa đã số hóa (null khi chưa nối pf/geo)"}
+            machines: {type: [integer, "null"], description: "Tổng số máy khai báo (null khi chưa nối pf/mechanization)"}
+    KNHousehold:
+      type: object
+      required: [ref, holder, cultivated_area_ha, active, since_date]
+      properties:
+        ref: {type: string, format: uuid}
+        holder: {$ref: "#/components/schemas/KNMaskedPerson"}
+        cultivated_area_ha: {type: [string, "null"]}
+        active: {type: boolean}
+        since_date: {type: [string, "null"], format: date}
+    KNHouseholdList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/KNHousehold"}}
+        next_cursor: {type: [string, "null"]}
+    KNHouseholdCreate:
+      type: object
+      required: [full_name, phone]
+      properties:
+        full_name: {type: string}
+        phone: {type: string}
+        cultivated_area_ha: {type: [string, number, "null"]}
+    KNHouseholdUpdate:
+      type: object
+      required: [cultivated_area_ha]
+      properties:
+        cultivated_area_ha: {type: [string, number, "null"], description: "null = xóa giá trị"}
+        reason: {type: string, maxLength: 500}
+    KNMachineLine:
+      type: object
+      required: [machine_type, machine_type_name, quantity, note, updated_at, updated_by]
+      properties:
+        machine_type: {type: string}
+        machine_type_name: {type: string}
+        quantity: {type: integer, minimum: 0}
+        note: {type: [string, "null"]}
+        updated_at: {type: string, format: date-time}
+        updated_by: {type: string, format: uuid}
+    KNCoopMachines:
+      type: object
+      required: [cooperative_ref, name, commune_code, lines, total]
+      properties:
+        cooperative_ref: {type: string, format: uuid}
+        name: {type: string}
+        commune_code: {type: string}
+        lines: {type: array, items: {$ref: "#/components/schemas/KNMachineLine"}}
+        total: {type: integer}
+    KNMachineOverview:
+      type: object
+      required: [cooperatives, commune_totals]
+      properties:
+        cooperatives: {type: array, items: {$ref: "#/components/schemas/KNCoopMachines"}, description: "HTX có ít nhất một dòng khai báo"}
+        commune_totals:
+          type: array
+          items:
+            type: object
+            required: [commune_code, machine_type, machine_type_name, quantity]
+            properties:
+              commune_code: {type: string}
+              machine_type: {type: string}
+              machine_type_name: {type: string}
+              quantity: {type: integer}
+    KNMachineCountsPut:
+      type: object
+      required: [lines]
+      properties:
+        lines:
+          type: array
+          maxItems: 100
+          description: "Thay toàn bộ; mảng rỗng = bỏ mọi dòng"
+          items:
+            type: object
+            required: [machine_type, quantity]
+            properties:
+              machine_type: {type: string}
+              quantity: {type: integer, minimum: 0, maximum: 1000000}
+              note: {type: [string, "null"], maxLength: 500}
+        reason: {type: string, maxLength: 500}
+    KNMachineLogEntry:
+      type: object
+      required: [seq, event, machine_type, machine_type_name, actor_ref, actor_display, at, recorded_at, changes, reason, department_code]
+      properties:
+        seq: {type: integer}
+        event: {type: string, enum: [set, removed]}
+        machine_type: {type: string}
+        machine_type_name: {type: string}
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: [string, "null"]}
+        at: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        changes: {type: array, items: {$ref: "#/components/schemas/KNFieldChange"}, description: "quantity cũ → mới (removed: mới = null), note"}
+        reason: {type: [string, "null"]}
+        department_code: {type: string}
+    KNMachineLogPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/KNMachineLogEntry"}}
+        next_cursor: {type: [integer, "null"]}
+    GeoJSONPolygonal:
+      type: object
+      description: "GeoJSON Polygon/MultiPolygon WGS84; ≥ 4 đỉnh phân biệt không thẳng hàng; vòng chưa khép được tự khép"
+      required: [type, coordinates]
+      properties:
+        type: {type: string, enum: [Polygon, MultiPolygon]}
+        coordinates: {type: array}
+    KNPlotCreate:
+      type: object
+      required: [commune_code, lot_name, geometry]
+      properties:
+        plot_ref: {type: string, format: uuid, description: UUIDv7 (tùy chọn)}
+        commune_code: {type: string}
+        cooperative_ref: {type: [string, "null"], format: uuid}
+        farmer_name: {type: string, maxLength: 200, description: "→ kho định danh (farmer_ref); API chỉ trả nhãn đã che"}
+        lot_name: {type: string, maxLength: 200}
+        note: {type: string, maxLength: 1000}
+        declared_area_ha: {type: string, description: decimal > 0}
+        shape: {type: string, enum: [polygon, circle, square], default: polygon}
+        geometry: {$ref: "#/components/schemas/GeoJSONPolygonal"}
+    KNPlot:
+      type: object
+      required: [ref, code, lot_name, commune_code, cooperative_ref, farmer, note, area_ha, declared_area_ha, area_deviation_pct, status, boundary_id, updated_at]
+      properties:
+        ref: {type: string, format: uuid}
+        code: {type: string}
+        lot_name: {type: [string, "null"]}
+        commune_code: {type: string}
+        cooperative_ref: {type: [string, "null"], format: uuid}
+        farmer:
+          type: [object, "null"]
+          properties:
+            label: {type: [string, "null"]}
+        note: {type: [string, "null"]}
+        area_ha: {type: string, description: "Diện tích trắc địa tự tính"}
+        declared_area_ha: {type: [string, "null"]}
+        area_deviation_pct: {type: [string, "null"]}
+        shape: {type: [string, "null"], enum: [polygon, circle, square, null]}
+        department_code: {type: [string, "null"]}
+        status: {type: string, enum: [draft, active, retired]}
+        needs_review: {type: boolean}
+        version: {type: integer}
+        boundary_id: {type: string, format: uuid}
+        updated_at: {type: string, format: date-time}
+    KNPlotDetail:
+      allOf:
+        - $ref: "#/components/schemas/KNPlot"
+        - type: object
+          required: [geometry]
+          properties:
+            geometry: {type: object, description: GeoJSON MultiPolygon}
+    KNPlotWrite:
+      allOf:
+        - $ref: "#/components/schemas/KNPlotDetail"
+        - type: object
+          required: [boundary]
+          properties:
+            boundary: {type: object, description: "Phiên bản ranh giới vừa ghi (như PlotBoundary của /v1/plots)"}
+    KNRecordLogPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [id, event, actor_ref, actor_display, at, changes, reason]
+            properties:
+              id: {type: string, format: uuid}
+              event: {type: string}
+              actor_ref: {type: string, format: uuid}
+              actor_display: {type: [string, "null"]}
+              at: {type: string, format: date-time}
+              changes:
+                type: array
+                items:
+                  type: object
+                  required: [field, old, new]
+                  properties:
+                    field: {type: string}
+                    old: {}
+                    new: {}
+              reason: {type: [string, "null"]}
+        next_cursor: {type: [string, "null"]}
+    MaterialRecord:
+      type: object
+      required: [id, commune_code, recorded_on, material_code, material_name, quantity, unit, note, actor_ref, actor_display, recorded_at, supersedes_id]
+      properties:
+        id: {type: string, format: uuid}
+        commune_code: {type: string}
+        recorded_on: {type: string, format: date}
+        material_code: {type: string}
+        material_name: {type: string}
+        quantity: {type: string}
+        unit: {type: string}
+        note: {type: [string, "null"]}
+        department_code: {type: string}
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: [string, "null"]}
+        recorded_at: {type: string, format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}

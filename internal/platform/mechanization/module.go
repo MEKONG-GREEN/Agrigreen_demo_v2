@@ -25,6 +25,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/store"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
@@ -47,10 +48,17 @@ func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 }
 
 // RegisterApp gắn route Application API (đọc — Cục KTHT và Admin).
-func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterApp(rg) }
+func (m *Module) RegisterApp(rg *gin.RouterGroup) {
+	handler.Handler{Svc: m.svc}.RegisterApp(rg)
+	handler.Handler{Svc: m.svc}.RegisterKNMachineCounts(rg) // KN v7.7 FN-XA-03.04: /v1/kn/machine-counts*
+}
 
 // RegisterAdmin gắn route Admin API (ghi dữ liệu chủ, vụ mùa, chạy cân đối; MFA bắt buộc ở router).
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }
+
+// MachineCounts cho pf/party (qua gốc lắp ráp): tổng số máy khai báo của HTX cho cảnh báo vô hiệu hóa HTX
+// (KN v7.7 FN-XA-03.03/03.04).
+func (m *Module) MachineCounts() partyport.CoopMachineCounts { return app.MachineCounts{Svc: m.svc} }
 
 // ReportData cho pf/reports: 3 tab FN-10 đọc từ kết quả cân đối đã lưu.
 func (m *Module) ReportData() port.ReportData { return app.ReportData{Svc: m.svc} }

@@ -126,6 +126,11 @@ func (s *Service) PullEntities() []string {
 }
 
 func (s *Service) scope(ctx context.Context) (authz.Scope, error) {
+	// KN v7.7 (P7): request mang X-AG-Context → phạm vi = phạm vi của ngữ cảnh phiên do pf/accounts giải ở server
+	// (Cấp Xã: các xã phụ trách), không suy từ org_ref của token.
+	if p, ok := authz.FromContext(ctx); ok && p.KN != nil {
+		return p.KN.Scope, nil
+	}
 	if s.Scope == nil {
 		return authz.Scope{}, nil // chưa nối party → mặc định chặn
 	}
@@ -179,6 +184,11 @@ func fieldErr(field, reason string) problem.FieldError {
 }
 
 func orgPtr(p authz.Principal) *uuid.UUID {
+	if p.KN != nil && p.KN.OrgRef != uuid.Nil {
+		// KN v7.7: đơn vị phụ trách xung đột = Nút của ngữ cảnh phiên (Cấp Xã gắn Nút tỉnh).
+		o := p.KN.OrgRef
+		return &o
+	}
 	if p.OrgRef == uuid.Nil {
 		return nil
 	}
