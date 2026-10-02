@@ -5,6 +5,7 @@
   "registrationAllowed": false,
   "resetPasswordAllowed": false,
   "loginWithEmailAllowed": true,
+  "loginTheme": "agrigreen",
   "duplicateEmailsAllowed": false,
   "editUsernameAllowed": false,
   "bruteForceProtected": true,
@@ -51,7 +52,7 @@
   },
   "attributes": {
     "lockout_note": "KN v7.7 FN-CH-00.01 / N-10 (thay GIS US-LOG-01 AC-3): sai mật khẩu 5 lần trong 15 phút → khóa TẠM 15 phút (permanentLockout = false, waitIncrementSeconds = maxFailureWaitSeconds = 900), tự mở sau thời gian chờ; Admin vẫn mở sớm được qua pf/accounts (POST /v1/accounts/users/{id}/unlock → attack-detection). Số lần khóa tạm trước khi khóa hẳn chờ khách (Q-21): khi có, đặt permanentLockout = true + maxTemporaryLockouts = N. Tài khoản bị Admin khóa (enabled = false) vẫn khóa tới khi mở. Đăng nhập bằng email hoặc SĐT: username = SĐT chuẩn hóa 0xxxxxxxxx (pf/accounts tạo), email qua loginWithEmailAllowed.",
-    "session_note": "KN v7.7: web-ops hết phiên sau 4 giờ không thao tác (client.session.idle.timeout 14400), app hiện trường phiên 24 giờ (86400) + ngoại tuyến 72 giờ (offline 259200, PIN 6 số giữ trong app); các client khác giữ 1 giờ không thao tác như trước. Lần đầu đăng nhập bắt buộc đặt mật khẩu qua liên kết kích hoạt (required action UPDATE_PASSWORD), không gửi mật khẩu tạm. Theme đăng nhập agrigreen: xem docs/brd/kn-p1-realm-patch.md.",
+    "session_note": "KN v7.7: web-ops hết phiên sau 4 giờ không thao tác (client.session.idle.timeout 14400), app hiện trường phiên 24 giờ (86400) + ngoại tuyến 72 giờ (offline 259200, PIN 6 số giữ trong app); các client khác giữ 1 giờ không thao tác như trước. Lần đầu đăng nhập bắt buộc đặt mật khẩu qua liên kết kích hoạt (required action UPDATE_PASSWORD), không gửi mật khẩu tạm. Theme đăng nhập agrigreen (loginTheme) gắn từ deploy/compose/keycloak-themes/agrigreen vào /opt/keycloak/themes/agrigreen: xem docs/brd/kn-p1-realm-patch.md.",
     "note": "Vai đánh dấu [MFA] chỉ dùng trên Admin API — backend chặn token không có yếu tố thứ hai (httpx.RequireMFA, mục 11). Người giữ vai này phải cấu hình TOTP (required action CONFIGURE_TOTP) khi tạo tài khoản."
   },
   "roles": {

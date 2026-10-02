@@ -1,6 +1,6 @@
 # Bản vá Keycloak KN v7.7 — gói P1
 
-Đã áp vào `deploy/compose/keycloak/agrigreen-realm.json` (kiểm bởi `cmd/api-platform/realm_test.go`). Người tích hợp chỉ còn hai việc ở `deploy/**` (ngoài quyền của gói P1): gắn theme và cập nhật realm production (`deploy/vps/prepare.sh` sinh từ cùng tệp).
+Đã áp vào `deploy/compose/keycloak/agrigreen-realm.json` (kiểm bởi `cmd/api-platform/realm_test.go`). Theme đăng nhập đã gắn (gói KN-fix); còn lại: SPI "còn n lần thử" và cập nhật realm production đã nhập (`deploy/vps/prepare.sh` sinh từ cùng tệp).
 
 ## Đã đổi trong realm
 
@@ -15,10 +15,14 @@
 
 GIS US-LOG-01 AC-3 (khóa vĩnh viễn) bị thay bởi BRD v7.7 (mới hơn, gap §4.6) — chủ sản phẩm xác nhận cùng Q-21.
 
-## Việc của người tích hợp
+## Theme đăng nhập `agrigreen` (đã gắn — gói KN-fix)
 
-1. **Theme `agrigreen`** (bản tối thiểu ở `docs/brd/kn-p1-keycloak-theme/agrigreen/login/`): gắn vào container Keycloak, vd trong `deploy/compose/docker-compose.yml` dịch vụ `keycloak`:
-   `volumes: ["./keycloak:/opt/keycloak/data/import:ro", "../../docs/brd/kn-p1-keycloak-theme/agrigreen:/opt/keycloak/themes/agrigreen:ro"]`
-   rồi thêm `"loginTheme": "agrigreen"` vào realm. Chưa đặt `loginTheme` trong realm để Keycloak không cảnh báo khi chưa gắn theme.
-2. **"Còn n lần thử"**: template FreeMarker của Keycloak không có số lần sai còn lại; cần SPI authenticator (đọc `BruteForceProtector`) — chưa làm, banner ghi quy tắc "sau 5 lần sai khóa tạm 15 phút" (phương án dự phòng của gap §4.6).
-3. **Production**: `deploy/vps/prepare.sh` sinh realm từ tệp này — realm đã nhập (`--import-realm` chỉ nhập khi chưa có) cần áp các thuộc tính trên bằng Admin Console/REST.
+- Thư mục theme: `deploy/compose/keycloak-themes/agrigreen/login/` (chuyển từ `docs/brd/kn-p1-keycloak-theme/`): `theme.properties` (kế thừa `keycloak`, PKCE giữ nguyên, form mật khẩu vẫn ở Keycloak), `messages/messages_vi.properties`, `resources/css/agrigreen.css`.
+- Compose: dịch vụ `keycloak` trong `deploy/compose/docker-compose.yml` gắn `./keycloak-themes/agrigreen:/opt/keycloak/themes/agrigreen:ro`. `docker-compose.vps.yml` chỉ ghi đè mount `/opt/keycloak/data/import` (realm sinh bởi `prepare.sh`) nên kế thừa mount theme.
+- Realm: `"loginTheme": "agrigreen"` trong `deploy/compose/keycloak/agrigreen-realm.json` (VPS sinh từ cùng tệp). `cmd/api-platform/realm_test.go` kiểm `loginTheme`, sự có mặt của `theme.properties` và dòng mount trong compose.
+- K8s: Keycloak chạy bằng chart riêng (namespace `agrigreen-iam`, `deploy/k8s/charts/agrigreen` chỉ có NetworkPolicy/Ingress tới nó) — khi dựng chart Keycloak, đóng theme vào image (`COPY deploy/compose/keycloak-themes/agrigreen /opt/keycloak/themes/agrigreen` rồi `kc.sh build`) hoặc gắn ConfigMap/volume cùng đường dẫn.
+
+## Việc còn lại
+
+1. **"Còn n lần thử"**: template FreeMarker của Keycloak không có số lần sai còn lại; cần SPI authenticator (đọc `BruteForceProtector`) — chưa làm, banner ghi quy tắc "sau 5 lần sai khóa tạm 15 phút" (phương án dự phòng của gap §4.6).
+2. **Production đã chạy**: `--import-realm` chỉ nhập khi realm chưa có — realm đã nhập cần áp các thuộc tính trên (kể cả `loginTheme`) bằng Admin Console/REST (Realm settings › Themes › Login theme = `agrigreen`).

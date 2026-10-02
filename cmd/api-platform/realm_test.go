@@ -74,11 +74,12 @@ type realmFile struct {
 	FailureFactor       int  `json:"failureFactor"`
 	MaxDeltaTimeSeconds int  `json:"maxDeltaTimeSeconds"`
 	// KN v7.7 N-10 (thay GIS US-LOG-01 AC-3): khóa TẠM 15 phút, tự mở sau thời gian chờ.
-	PermanentLockout      bool `json:"permanentLockout"`
-	MaxTemporaryLockouts  int  `json:"maxTemporaryLockouts"`
-	WaitIncrementSeconds  int  `json:"waitIncrementSeconds"`
-	MaxFailureWaitSeconds int  `json:"maxFailureWaitSeconds"`
-	LoginWithEmail        bool `json:"loginWithEmailAllowed"`
+	PermanentLockout      bool   `json:"permanentLockout"`
+	MaxTemporaryLockouts  int    `json:"maxTemporaryLockouts"`
+	WaitIncrementSeconds  int    `json:"waitIncrementSeconds"`
+	MaxFailureWaitSeconds int    `json:"maxFailureWaitSeconds"`
+	LoginWithEmail        bool   `json:"loginWithEmailAllowed"`
+	LoginTheme            string `json:"loginTheme"`
 	// KN v7.7 N-09: phiên Web 4 giờ không thao tác, Mobile 24 giờ + ngoại tuyến 72 giờ.
 	SSOSessionIdleTimeout     int                          `json:"ssoSessionIdleTimeout"`
 	SSOSessionMaxLifespan     int                          `json:"ssoSessionMaxLifespan"`
@@ -141,6 +142,18 @@ func TestKeycloakRealmCoversRolesAndClaims(t *testing.T) {
 	// KN v7.7 FN-CH-00.01: đăng nhập bằng email (loginWithEmailAllowed) hoặc SĐT (username = SĐT chuẩn hóa).
 	if !realm.LoginWithEmail {
 		t.Error("KN v7.7 FN-CH-00.01: phải đăng nhập được bằng email (loginWithEmailAllowed)")
+	}
+	// KN v7.7 FN-CH-00.01 / X-08 (Hình 3a): theme đăng nhập agrigreen — realm đặt loginTheme và compose gắn
+	// thư mục theme vào /opt/keycloak/themes/agrigreen (thiếu theme thì Keycloak rơi về theme mặc định).
+	if realm.LoginTheme != "agrigreen" {
+		t.Errorf("KN v7.7 X-08: loginTheme=%q, cần \"agrigreen\"", realm.LoginTheme)
+	}
+	if _, err := os.Stat(filepath.Join(repoRoot, "deploy", "compose", "keycloak-themes", "agrigreen", "login", "theme.properties")); err != nil {
+		t.Errorf("KN v7.7 X-08: thiếu theme agrigreen: %v", err)
+	}
+	if compose, err := os.ReadFile(filepath.Join(repoRoot, "deploy", "compose", "docker-compose.yml")); err != nil ||
+		!strings.Contains(string(compose), "./keycloak-themes/agrigreen:/opt/keycloak/themes/agrigreen:ro") {
+		t.Errorf("KN v7.7 X-08: docker-compose.yml chưa gắn theme agrigreen vào Keycloak (%v)", err)
 	}
 	// KN v7.7 N-09: phiên realm đủ dài cho client mobile 24 giờ, ngoại tuyến 72 giờ.
 	if realm.SSOSessionIdleTimeout < 14400 || realm.SSOSessionMaxLifespan < 86400 || !realm.OfflineMaxLifespanEnabled || realm.OfflineSessionMaxLifespan != 259200 {
