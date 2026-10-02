@@ -233,3 +233,66 @@ List<GeoPoint>? ringFromGeoJson(Object? g) {
   }
   return normalizeRing(pts);
 }
+
+// ---- KN v7.7 P7 (FN-XA-03.05): vẽ bằng hình tròn / hình vuông ----
+
+/// Cách vẽ thửa (`shape` của pf/geo). Hình tròn / vuông được đổi thành đa
+/// giác trên máy trước khi gửi (máy chủ chỉ nhận Polygon).
+enum PlotShape {
+  polygon('Chấm điểm'),
+  circle('Hình tròn'),
+  square('Hình vuông');
+
+  const PlotShape(this.label);
+  final String label;
+}
+
+/// Khoảng cách (m) giữa hai điểm (haversine trên cầu bán kính WGS84).
+double distanceM(GeoPoint a, GeoPoint b) {
+  final dLat = _rad(b.lat - a.lat);
+  final dLon = _rad(b.lon - a.lon);
+  final h =
+      pow(sin(dLat / 2), 2) +
+      cos(_rad(a.lat)) * cos(_rad(b.lat)) * pow(sin(dLon / 2), 2);
+  return 2 * _earthRadiusM * asin(min(1.0, sqrt(h)));
+}
+
+/// Điểm cách [c] một đoạn ([northM], [eastM]) mét (xấp xỉ mặt phẳng cục bộ —
+/// đủ chính xác ở quy mô thửa ruộng).
+GeoPoint offsetM(GeoPoint c, double northM, double eastM) {
+  final dLat = northM / _earthRadiusM * 180 / pi;
+  final dLon = eastM / (_earthRadiusM * cos(_rad(c.lat))) * 180 / pi;
+  return GeoPoint(c.lat + dLat, c.lon + dLon);
+}
+
+/// Đa giác xấp xỉ hình tròn tâm [center], bán kính [radiusM] ([segments] đỉnh).
+List<GeoPoint> circlePolygon(
+  GeoPoint center,
+  double radiusM, {
+  int segments = 32,
+}) => [
+  for (var i = 0; i < segments; i++)
+    offsetM(
+      center,
+      radiusM * cos(2 * pi * i / segments),
+      radiusM * sin(2 * pi * i / segments),
+    ),
+];
+
+/// Hình vuông tâm [center], một đỉnh tại [corner] (xoay theo hướng đỉnh đó).
+List<GeoPoint> squarePolygon(GeoPoint center, GeoPoint corner) {
+  // Véc-tơ tâm → đỉnh theo mét (bắc, đông), xoay 90° ba lần.
+  final n = (corner.lat - center.lat) * pi / 180 * _earthRadiusM;
+  final e =
+      (corner.lon - center.lon) *
+      pi /
+      180 *
+      _earthRadiusM *
+      cos(_rad(center.lat));
+  return [
+    offsetM(center, n, e),
+    offsetM(center, -e, n),
+    offsetM(center, -n, -e),
+    offsetM(center, e, -n),
+  ];
+}

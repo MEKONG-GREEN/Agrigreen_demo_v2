@@ -169,6 +169,22 @@ Kết quả (máy ngoại tuyến không thấy nhau nên máy chủ **không ch
 
 Chiều xuống entity `plot`: `data = {ref, code, name, commune_code, cooperative_ref, household_ref, status, version, boundary_id, area_ha, source, needs_review, geometry, updated_at}`; `version` của thay đổi là `revision` của thửa. Tombstone khi thửa ngừng dùng, hoặc (quản lý HTX) thửa chuyển sang HTX khác.
 
+#### KN v7.7 (FN-XA-03.05) — người gửi có ngữ cảnh phiên KN (`X-AG-Context`)
+
+- Người gọi có `X-AG-Context` (Principal.KN ≠ nil): KHÔNG cần vai realm `plot_editor`. Được đẩy khi vai ngữ cảnh là `kn_xa` hoặc `admin`; `kn_tw` → `rejected geo.read_only`; `kn_tinh` → `rejected forbidden`; Admin chế độ hỗ trợ thiếu lý do → `rejected geo.support_reason_required`. Phạm vi = đối số scope do pf/sync truyền (= `KN.Scope`: Cấp Xã chỉ các xã phụ trách) — xã ngoài phạm vi → `rejected geo.out_of_scope`; sửa thửa ngoài phạm vi hoặc của phòng ban khác → `rejected geo.plot_not_found`.
+- Payload `plot_boundary` thêm (đều tùy chọn):
+
+| Trường | Ghi chú |
+|---|---|
+| `lot_name` | Tên lô (≤ 200 ký tự, không SĐT/CCCD). Vắng → dùng `name`; KN cần một trong hai (`rejected validation_failed` trường `lot_name`) |
+| `note` | Ghi chú (≤ 1000 ký tự, không SĐT/CCCD) |
+| `farmer_name` | Tên nông dân — máy chủ tạo chủ thể "người" trong kho định danh → `farmer_ref`; KHÔNG lưu tên ở pf_geo, không ghi log |
+| `shape` | `polygon` (mặc định) \| `circle` \| `square` — máy đổi hình tròn/vuông thành đa giác trước khi gửi; `geometry` luôn là Polygon/MultiPolygon |
+
+- Với `op: correct` chỉ `shape` được dùng (thuộc tính khác sửa qua `PUT /v1/kn/plots/{ref}`). Thửa mới của KN mang `department_code` = phòng ban của ngữ cảnh (Admin: `trong_trot`).
+- Chồng lấn khi đồng bộ: GIỮ ngữ nghĩa hiện có (máy ngoại tuyến không thấy nhau) — chồng lấn → `conflict` (bản ghi được giữ, xung đột `same_coop_overlap` / `cross_coop_overlap` mở để cán bộ xử lý), sửa trên phiên bản cũ → `conflict` (`concurrent_edit`). Chỉ API trực tuyến `/v1/kn/plots` mới chặn (409 `geo.plot_overlap`).
+- Chiều xuống `plot` thêm vào `data` (chỉ khi có giá trị, khóa vắng = null): `lot_name`, `note`, `declared_area_ha` (chuỗi decimal), `shape`, `department_code`, và `farmer_label` (nhãn đã che, vd "Trần T. B." — chỉ với người gọi có ngữ cảnh KN; không bao giờ có tên đầy đủ). Với người gọi KN, thửa mang `department_code` của phòng ban khác → tombstone; thửa không mang phòng ban (có trước v7.7) đi xuống mọi phòng ban.
+
 ### Payload `field_report` (pf/extension, `app.ReportPayload`)
 
 Nguồn: `internal/platform/extension/app/payload.go` (`ReportPayload.ToReport`), `domain/report.go` (`Report.Validate`), `app/reports.go` (`SubmitReport`). `id` của bản ghi là mã báo cáo; `event_time` lấy từ phong bì. Trường lạ bị bỏ qua (app **không** gửi GPS).
@@ -267,6 +283,31 @@ Mọi entity chỉ `create` / `correct`; `event_time` là lúc xảy ra tại ru
 | `farm_log_batch` | `create` | `{plot_refs[], activity_code, sop_step_seq?, machine_codes[], inputs[], note, gps?}` | Một đầu lô + một dòng mỗi thửa (HTX US-LOG-03). Thửa chưa mở vụ / ngoài phạm vi bị loại, ghi lý do trong đầu lô; không còn thửa nào → `rejected cropcycle.batch_empty` |
 | `harvest` | `create` | `{season_ref? \| plot_ref?, harvest_date?, mass_kg, moisture_pct?, confirm_anomaly?, gps?}` | `mass_kg` chuỗi decimal ≤ 3 chữ số lẻ. Trước `harvest_open_date` → `cropcycle.harvest_too_early`; 0 / vượt ngưỡng chưa xác nhận → `cropcycle.yield_anomaly` (máy hỏi lại người dùng rồi gửi bản ghi **mới** với `confirm_anomaly: true`). Đóng vụ cùng giao dịch |
 | `harvest` | `correct` | `{mass_kg, harvest_date?, moisture_pct?, confirm_anomaly?}` | `supersedes_id` = khai báo hiện hành của vụ (`harvest_id`) |
+
+## Báo cáo KN v7.7 (P7, field-app Cán bộ xã — FN-XA-03.01/03.02, N-07)
+
+Nguồn: `internal/platform/extension/reportcycle/app/sync.go` (`ReportSync`, `ReportSink`), `store/sync.go`; migration pf 000077 (`report_task.sync_seq` tăng ở mọi UPDATE qua trigger, `report_task.created_seq` cấp một lần). Kiểm thử: `tests/kn77/p7_sync_integration_test.go` (`TestFN_XA_03_02_OfflineReportSync`).
+
+**Ngữ cảnh phiên.** Request mang `X-AG-Context` (P1) → pf/sync lấy phạm vi pull/push = `Principal.KN.Scope` (Cấp Xã: các xã phụ trách), KHÔNG theo `org_ref` của token; dấu vân tay con trỏ có thêm `kn:<vai>:<phòng ban>:` → đổi vai trò/phòng ban/xã phụ trách = `reset: true`. Đơn vị phụ trách xung đột = Nút của ngữ cảnh. Không có header → đường cũ (`ScopeResolver`), entity báo cáo bị bỏ qua (Source trả 403), các entity khác vẫn đồng bộ. Chỉ vai `kn_xa` nhận/gửi entity báo cáo; dữ liệu lọc theo phòng ban của ngữ cảnh.
+
+### Chiều xuống
+
+- `report_task`: `id` = id công việc, `version` = `sync_seq`. `data = {id, batch_id, period_id, template_id, version_id, form_code, form_name, commune_code, commune_name, department_code, report_type, period_type, slot, period_block, period_label, period_range_label, period_labels[], season_label, period_from, period_to, due_at, auto_close_at, period_closed, reopened_until, status, display_status, open, open_slots[], adjustment_reason, latest_version, latest_submission_id, submitted_submission_id, submitted_at, provincial{chữ cái: giá trị}, updated_at}`. `display_status`/`open` tính lúc máy chủ trả — máy tự tính lại "Trễ hạn" theo `due_at`. Chốt kỳ, mở lại, nhắc, yêu cầu điều chỉnh, sửa hạn đều làm công việc lấy `sync_seq` mới. Thu hồi đợt → tombstone. Giá trị khe kỳ khác (chỉ xem) máy tự ghép từ `report_submission` của các công việc cùng đợt × mẫu × xã.
+- `form_layout`: `id` = `version_id`, `version` = `created_seq` lớn nhất của công việc dùng phiên bản. `data = {version_id, template_id, code, name, version, definition}` — định nghĩa lưới CHƯA thay nhãn kỳ; máy áp nhãn kỳ và vụ như `reports/form.Layout` (cột theo kỳ rộng 1 → tiêu đề = nhãn kỳ; ô tiêu đề có `period_slot` → nhãn kỳ; khe vượt số kỳ của đợt → `inactive`; `{season}` → `season_label`). Phiên bản bất biến nên chỉ đi xuống khi có công việc mới dùng nó.
+- `report_submission`: bài nộp mới nhất của công việc. `id` = id công việc, `version` = `sync_seq` của công việc. `data = {task_id, submission_id, version_no, kind, rows[{key, indicator, input{}, cells{}}], issues[CellIssue], event_time, recorded_at}`. `cells` gồm ô công thức do MÁY CHỦ tính (nguồn đúng); ngoại tuyến máy hiện "chưa tính".
+
+### Chiều lên `report_submission`
+
+Chỉ `op: create`; `id` = UUIDv7 máy sinh = id bài nộp (P4 nhận gửi lại cùng id → `duplicate`). `payload = {task_id, kind: draft|submitted, rows[{indicator?, input{chữ cái: chuỗi}}], base_version}` (`base_version` = `latest_version` máy đã thấy qua pull). Đi qua đúng use case `Submit` của REST (kiểm ô, khe kỳ đang mở, ràng buộc mẫu, chốt kỳ, chế độ hỗ trợ).
+
+| Tình huống | Kết quả |
+|---|---|
+| Hợp lệ | `accepted` |
+| Gửi lại cùng `idem_key` hoặc cùng `id` | `duplicate` (không thêm phiên bản) |
+| Phiên bản liền trước do người/máy KHÁC ghi và mới hơn `base_version` | `conflict` — bản vẫn được lưu thành phiên bản mới (RB-1, giữ cả hai), pf/sync mở xung đột |
+| Vi phạm yêu cầu mẫu khi Gửi | `rejected` `extension.submission_invalid`, `errors[{field: "rows.<row_key>.<chữ cái>", reason}]` |
+| Kỳ đã chốt | `rejected` `extension.period_closed` |
+| Công việc ngoài phạm vi / không có | `rejected` `extension.report_task_not_found` |
 
 ## Tệp minh chứng
 

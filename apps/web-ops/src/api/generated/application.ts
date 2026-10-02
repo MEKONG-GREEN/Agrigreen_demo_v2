@@ -4608,6 +4608,372 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/kn/cooperatives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách HTX trên các xã phụ trách (FN-XA-03.03) */
+        get: operations["knListCooperatives"];
+        put?: never;
+        /**
+         * Thêm HTX trong xã phụ trách (Cấp Xã, Admin)
+         * @description Mã HTX tự sinh. Trùng tên (không phân biệt hoa thường) → 409 party.cooperative_name_taken. Người đại diện chỉ vào kho định danh.
+         */
+        post: operations["knCreateCooperative"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/cooperatives/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết HTX (ngoài phạm vi → 404) */
+        get: operations["knGetCooperative"];
+        /**
+         * Sửa hồ sơ HTX — sự kiện bù (Log cũ → mới, không PII)
+         * @description Trường vắng = giữ nguyên; area_ha/tax_code/head_office rỗng hoặc null = xóa giá trị. Đổi người đại diện: chủ thể mới trong kho định danh, Log ghi representative_ref cũ → mới. Gửi lại cùng Idempotency-Key → kết quả hiện tại, không ghi thêm. HTX đã vô hiệu hóa → 409 party.org_state_conflict.
+         */
+        put: operations["knUpdateCooperative"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/cooperatives/{ref}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Vô hiệu hóa HTX (thay xóa cứng) kèm cảnh báo dữ liệu liên kết
+         * @description Lý do ≥ 20 ký tự (ràng buộc sổ org_event, US-HTXSTATUS-01 AC-3). Phát pf.party.org.deactivated.
+         */
+        post: operations["knDeactivateCooperative"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/cooperatives/{ref}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Kích hoạt lại HTX (lý do ≥ 10 ký tự) */
+        post: operations["knReactivateCooperative"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/cooperatives/{ref}/households": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nông hộ thành viên của HTX (tab Nông hộ) */
+        get: operations["knListHouseholds"];
+        put?: never;
+        /**
+         * Thêm nông hộ vào HTX (chủ hộ vào kho định danh)
+         * @description SĐT đã có trong kho → 409 party.household_phone_taken; HTX đã vô hiệu hóa → 409 party.org_state_conflict.
+         */
+        post: operations["knCreateHousehold"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/cooperatives/{ref}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Log HTX: tạo, vô hiệu hóa/kích hoạt lại, sửa hồ sơ (cũ → mới, không PII) */
+        get: operations["knCooperativeLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/households/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Sửa diện tích canh tác của nông hộ — sự kiện bù */
+        put: operations["knUpdateHousehold"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/households/{ref}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Log nông hộ: tạo và các lần sửa diện tích */
+        get: operations["knHouseholdLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/machine-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Khai báo máy của các HTX trong phạm vi + tổng xã theo loại máy (= Σ HTX) */
+        get: operations["knMachineCountsOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/machine-counts/{cooperative_ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Khai báo máy hiện hành của một HTX */
+        get: operations["knCoopMachineCounts"];
+        /**
+         * Thay toàn bộ khai báo máy của HTX (mỗi loại đổi = một sự kiện set/removed)
+         * @description Loại máy thuộc danh mục masterdata machine_type đang dùng (mechanization.machine_type_unknown); số lượng phải là số JSON nguyên 0–1.000.000 (mechanization.machine_quantity_invalid); trùng loại trong request → mechanization.machine_type_duplicate (gợi ý cập nhật dòng đã có); HTX ngừng hoạt động → mechanization.cooperative_invalid. Gửi lại cùng Idempotency-Key → khai báo hiện tại, không ghi thêm. Admin: tham số department (mặc định trong_trot).
+         */
+        put: operations["knPutMachineCounts"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/machine-counts/{cooperative_ref}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử thay đổi số lượng máy của HTX */
+        get: operations["knMachineCountLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/plots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-XA-03.05: danh sách thửa trong phạm vi ngữ cảnh (không hình học) */
+        get: operations["knListPlots"];
+        put?: never;
+        /** FN-XA-03.05: vẽ lô mới (Cấp Xã, Admin) — chặn mọi chồng lấn, diện tích tự tính */
+        post: operations["knCreatePlot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/plots/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-XA-03.05: tải thửa của một xã (GeoJSON | KML) */
+        get: operations["knExportPlots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/plots/{ref}": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        /** FN-XA-03.05: chi tiết thửa kèm hình (ngoài phạm vi/phòng ban → 404) */
+        get: operations["knGetPlot"];
+        /** FN-XA-03.05: sửa thuộc tính (sự kiện bù attributes_changed, Log). Trường vắng = giữ nguyên; null = xóa */
+        put: operations["knUpdatePlot"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/plots/{ref}/boundary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** FN-XA-03.05: sửa ranh giới — phiên bản mới thay supersedes_boundary_id (chặn mọi chồng lấn) */
+        post: operations["knCorrectPlotBoundary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/plots/{ref}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-XA-03.05: lịch sử thửa (thuộc tính + phiên bản ranh giới), mới nhất trước */
+        get: operations["knPlotLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-XA-03.06: bản ghi vật tư hiện hành (không bị bản bù thay) */
+        get: operations["knListMaterials"];
+        put?: never;
+        /** FN-XA-03.06: ghi nhận vật tư của xã (Cấp Xã, Admin), 1–200 dòng */
+        post: operations["knRecordMaterials"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/materials/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-XA-03.06 AC: tổng hợp vật tư hiện hành theo xã × vật tư (Cấp Tỉnh: các xã trong tỉnh) */
+        get: operations["knMaterialSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/materials/{id}/correct": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** FN-XA-03.06: sửa = bản ghi bù (bản cũ hết hiện hành) */
+        post: operations["knCorrectMaterial"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/materials/{id}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-XA-03.06: lịch sử chuỗi sửa của bản ghi (recorded → corrected…), mới nhất trước */
+        get: operations["knMaterialLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5442,6 +5808,27 @@ export interface components {
             correction_reason?: string | null;
             /** @description Tối đa 256 KiB; máy chủ pf/sync chỉ lưu SHA-256 */
             payload: Record<string, never>;
+        };
+        /**
+         * @description KN v7.7 P7 (N-07): payload của bản ghi push entity = report_submission (Sink của pf/extension, ngữ cảnh Cấp Xã
+         *     qua X-AG-Context). Chỉ op = create; id của bản ghi = id bài nộp (UUIDv7 máy sinh, gửi lại → duplicate).
+         *     conflict khi phiên bản liền trước do người/máy khác ghi và mới hơn base_version (bản vẫn được lưu).
+         *     Chiều xuống: report_task, form_layout, report_submission — docs/dev/sync-contract.md "Báo cáo KN v7.7".
+         */
+        SyncReportSubmissionPayload: {
+            /** Format: uuid */
+            task_id: string;
+            /** @enum {string} */
+            kind: "draft" | "submitted";
+            /** @description latest_version máy đã thấy qua pull */
+            base_version?: number;
+            rows: {
+                indicator?: string;
+                /** @description chữ cái cột → giá trị */
+                input: {
+                    [key: string]: string;
+                };
+            }[];
         };
         /**
          * @description payload của bản ghi push entity = consent (Sink của pf/party). Chỉ op = create; rút lại đồng ý là
@@ -9445,6 +9832,255 @@ export interface components {
         DispDownload: {
             url: string;
             expires_in_seconds: number;
+        };
+        /** @description Nhãn đã che từ kho định danh (RB-3) — không bao giờ có SĐT đầy đủ */
+        KNMaskedPerson: {
+            /** @description vd 'Nguyễn V. A.'; 'Không hiển thị được' khi kho không trả nhãn */
+            label: string;
+            /** @description vd '0912•••123' */
+            masked_phone: string | null;
+        };
+        KNCooperative: {
+            /** Format: uuid */
+            ref: string;
+            code: string;
+            name: string;
+            commune_code: string;
+            /** @description decimal (ha) */
+            area_ha: string | null;
+            representative: components["schemas"]["KNMaskedPerson"] | null;
+            household_count: number;
+            active: boolean;
+            status_reason: string | null;
+            tax_code: string | null;
+            head_office: string | null;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        KNCooperativeList: {
+            items: components["schemas"]["KNCooperative"][];
+            next_cursor: string | null;
+        };
+        KNRepresentativeInput: {
+            full_name: string;
+            phone: string;
+        };
+        KNCooperativeCreate: {
+            name: string;
+            commune_code: string;
+            /** @description decimal ≥ 0, tối đa 4 chữ số lẻ */
+            area_ha?: string | number | null;
+            tax_code?: string;
+            head_office?: string;
+            representative?: components["schemas"]["KNRepresentativeInput"];
+        };
+        KNCooperativeUpdate: {
+            name?: string;
+            area_ha?: string | number | null;
+            tax_code?: string | null;
+            head_office?: string | null;
+            representative?: components["schemas"]["KNRepresentativeInput"];
+            reason?: string;
+        };
+        KNReason: {
+            reason: string;
+        };
+        KNCooperativeDeactivated: {
+            cooperative: components["schemas"]["KNCooperative"];
+            warnings: {
+                /** @description Nông hộ đang là thành viên */
+                households: number;
+                /** @description Thửa đã số hóa (null khi chưa nối pf/geo) */
+                plots: number | null;
+                /** @description Tổng số máy khai báo (null khi chưa nối pf/mechanization) */
+                machines: number | null;
+            };
+        };
+        KNHousehold: {
+            /** Format: uuid */
+            ref: string;
+            holder: components["schemas"]["KNMaskedPerson"];
+            cultivated_area_ha: string | null;
+            active: boolean;
+            /** Format: date */
+            since_date: string | null;
+        };
+        KNHouseholdList: {
+            items: components["schemas"]["KNHousehold"][];
+            next_cursor: string | null;
+        };
+        KNHouseholdCreate: {
+            full_name: string;
+            phone: string;
+            cultivated_area_ha?: string | number | null;
+        };
+        KNHouseholdUpdate: {
+            /** @description null = xóa giá trị */
+            cultivated_area_ha: string | number | null;
+            reason?: string;
+        };
+        KNMachineLine: {
+            machine_type: string;
+            machine_type_name: string;
+            quantity: number;
+            note: string | null;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+        };
+        KNCoopMachines: {
+            /** Format: uuid */
+            cooperative_ref: string;
+            name: string;
+            commune_code: string;
+            lines: components["schemas"]["KNMachineLine"][];
+            total: number;
+        };
+        KNMachineOverview: {
+            /** @description HTX có ít nhất một dòng khai báo */
+            cooperatives: components["schemas"]["KNCoopMachines"][];
+            commune_totals: {
+                commune_code: string;
+                machine_type: string;
+                machine_type_name: string;
+                quantity: number;
+            }[];
+        };
+        KNMachineCountsPut: {
+            /** @description Thay toàn bộ; mảng rỗng = bỏ mọi dòng */
+            lines: {
+                machine_type: string;
+                quantity: number;
+                note?: string | null;
+            }[];
+            reason?: string;
+        };
+        KNMachineLogEntry: {
+            seq: number;
+            /** @enum {string} */
+            event: "set" | "removed";
+            machine_type: string;
+            machine_type_name: string;
+            /** Format: uuid */
+            actor_ref: string;
+            actor_display: string | null;
+            /** Format: date-time */
+            at: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** @description quantity cũ → mới (removed: mới = null), note */
+            changes: components["schemas"]["KNFieldChange"][];
+            reason: string | null;
+            department_code: string;
+        };
+        KNMachineLogPage: {
+            items: components["schemas"]["KNMachineLogEntry"][];
+            next_cursor: number | null;
+        };
+        /** @description GeoJSON Polygon/MultiPolygon WGS84; ≥ 4 đỉnh phân biệt không thẳng hàng; vòng chưa khép được tự khép */
+        GeoJSONPolygonal: {
+            /** @enum {string} */
+            type: "Polygon" | "MultiPolygon";
+            coordinates: unknown[];
+        };
+        KNPlotCreate: {
+            /**
+             * Format: uuid
+             * @description UUIDv7 (tùy chọn)
+             */
+            plot_ref?: string;
+            commune_code: string;
+            /** Format: uuid */
+            cooperative_ref?: string | null;
+            /** @description → kho định danh (farmer_ref); API chỉ trả nhãn đã che */
+            farmer_name?: string;
+            lot_name: string;
+            note?: string;
+            /** @description decimal > 0 */
+            declared_area_ha?: string;
+            /**
+             * @default polygon
+             * @enum {string}
+             */
+            shape: "polygon" | "circle" | "square";
+            geometry: components["schemas"]["GeoJSONPolygonal"];
+        };
+        KNPlot: {
+            /** Format: uuid */
+            ref: string;
+            code: string;
+            lot_name: string | null;
+            commune_code: string;
+            /** Format: uuid */
+            cooperative_ref: string | null;
+            farmer: {
+                label?: string | null;
+            } | null;
+            note: string | null;
+            /** @description Diện tích trắc địa tự tính */
+            area_ha: string;
+            declared_area_ha: string | null;
+            area_deviation_pct: string | null;
+            /** @enum {string|null} */
+            shape?: "polygon" | "circle" | "square" | null;
+            department_code?: string | null;
+            /** @enum {string} */
+            status: "draft" | "active" | "retired";
+            needs_review?: boolean;
+            version?: number;
+            /** Format: uuid */
+            boundary_id: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        KNPlotDetail: components["schemas"]["KNPlot"] & {
+            /** @description GeoJSON MultiPolygon */
+            geometry: Record<string, never>;
+        };
+        KNPlotWrite: components["schemas"]["KNPlotDetail"] & {
+            /** @description Phiên bản ranh giới vừa ghi (như PlotBoundary của /v1/plots) */
+            boundary: Record<string, never>;
+        };
+        KNRecordLogPage: {
+            items: {
+                /** Format: uuid */
+                id: string;
+                event: string;
+                /** Format: uuid */
+                actor_ref: string;
+                actor_display: string | null;
+                /** Format: date-time */
+                at: string;
+                changes: {
+                    field: string;
+                    old: unknown;
+                    new: unknown;
+                }[];
+                reason: string | null;
+            }[];
+            next_cursor: string | null;
+        };
+        MaterialRecord: {
+            /** Format: uuid */
+            id: string;
+            commune_code: string;
+            /** Format: date */
+            recorded_on: string;
+            material_code: string;
+            material_name: string;
+            quantity: string;
+            unit: string;
+            note: string | null;
+            department_code?: string;
+            /** Format: uuid */
+            actor_ref: string;
+            actor_display: string | null;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            supersedes_id: string | null;
+            correction_reason?: string | null;
         };
     };
     responses: {
@@ -18535,6 +19171,914 @@ export interface operations {
             422: components["responses"]["Problem"];
             /** @description extdata.provider_unavailable */
             502: components["responses"]["Problem"];
+        };
+    };
+    knListCooperatives: {
+        parameters: {
+            query?: {
+                /** @description Mã xã; vắng = mọi xã trong phạm vi; ngoài phạm vi → 403 party.out_of_scope */
+                commune?: string;
+                status?: "active" | "inactive" | "all";
+                /** @description Tìm theo tên, Mã HTX, mã số thuế */
+                q?: string;
+                /** @description Diện tích tối thiểu (ha, decimal) */
+                area_min?: string;
+                /** @description Diện tích tối đa (ha, decimal) */
+                area_max?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang HTX */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNCooperativeList"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            428: components["responses"]["Problem"];
+        };
+    };
+    knCreateCooperative: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KNCooperativeCreate"];
+            };
+        };
+        responses: {
+            /** @description HTX đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNCooperative"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    knGetCooperative: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description HTX */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNCooperative"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    knUpdateCooperative: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KNCooperativeUpdate"];
+            };
+        };
+        responses: {
+            /** @description HTX sau khi sửa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNCooperative"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    knDeactivateCooperative: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KNReason"];
+            };
+        };
+        responses: {
+            /** @description HTX đã vô hiệu hóa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNCooperativeDeactivated"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    knReactivateCooperative: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KNReason"];
+            };
+        };
+        responses: {
+            /** @description HTX đã kích hoạt lại */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNCooperative"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    knListHouseholds: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang nông hộ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNHouseholdList"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    knCreateHousehold: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KNHouseholdCreate"];
+            };
+        };
+        responses: {
+            /** @description Nông hộ đã thêm */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNHousehold"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    knCooperativeLog: {
+        parameters: {
+            query?: {
+                /** @description Vị trí trong Log đã gộp (next_cursor) */
+                cursor?: number;
+                limit?: number;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Log */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNLogPage"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    knUpdateHousehold: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KNHouseholdUpdate"];
+            };
+        };
+        responses: {
+            /** @description Nông hộ sau khi sửa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNHousehold"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    knHouseholdLog: {
+        parameters: {
+            query?: {
+                cursor?: number;
+                limit?: number;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Log */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNLogPage"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    knMachineCountsOverview: {
+        parameters: {
+            query?: {
+                /** @description Mã xã; ngoài phạm vi → 403 mechanization.out_of_scope */
+                commune?: string;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tổng quan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNMachineOverview"];
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    knCoopMachineCounts: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                cooperative_ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Khai báo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNCoopMachines"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    knPutMachineCounts: {
+        parameters: {
+            query?: {
+                /** @description Chỉ Admin: phòng ban của bản ghi */
+                department?: string;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                cooperative_ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KNMachineCountsPut"];
+            };
+        };
+        responses: {
+            /** @description Khai báo sau khi lưu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNCoopMachines"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    knMachineCountLog: {
+        parameters: {
+            query?: {
+                /** @description seq của dòng cuối trang trước */
+                cursor?: number;
+                limit?: number;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                cooperative_ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNMachineLogPage"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    knListPlots: {
+        parameters: {
+            query?: {
+                /** @description Vắng = mọi xã trong phạm vi; ngoài phạm vi → 403 geo.out_of_scope */
+                commune?: string;
+                cooperative_ref?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header: {
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trang thửa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KNPlot"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            /** @description geo.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description accounts.context_required */
+            428: components["responses"]["Problem"];
+        };
+    };
+    knCreatePlot: {
+        parameters: {
+            query?: {
+                /** @description Chỉ Admin: phòng ban ghi (mặc định trong_trot) */
+                department?: string;
+            };
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KNPlotCreate"];
+            };
+        };
+        responses: {
+            /** @description Thửa đã tạo (POST lặp cùng khóa → cùng kết quả) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNPlotWrite"];
+                };
+            };
+            /** @description geo.read_only | forbidden | geo.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description geo.plot_overlap (kèm overlaps) | geo.plot_exists */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | geo.too_few_points | geo.invalid_geometry | geo.area_out_of_range | geo.outside_commune | geo.cooperative_invalid | geo.support_reason_required */
+            422: components["responses"]["Problem"];
+            /** @description geo.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    knExportPlots: {
+        parameters: {
+            query: {
+                commune: string;
+                format?: "geojson" | "kml";
+            };
+            header: {
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp tải về (Content-Disposition: attachment); properties: ref, code, lot_name, commune_code, cooperative_ref, farmer_label, note, area_ha, declared_area_ha, shape, status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/geo+json": Record<string, never>;
+                    "application/vnd.google-earth.kml+xml": string;
+                };
+            };
+            /** @description geo.out_of_scope */
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    knGetPlot: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thửa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNPlotDetail"];
+                };
+            };
+            /** @description geo.plot_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    knUpdatePlot: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                /** @description Tùy chọn: PUT lặp cùng khóa → cùng kết quả */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    lot_name?: string;
+                    note?: string | null;
+                    /** @description → kho định danh; null/'' = bỏ */
+                    farmer_name?: string | null;
+                    /** Format: uuid */
+                    cooperative_ref?: string | null;
+                    /** @description decimal > 0 */
+                    declared_area_ha?: string | null;
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Thửa sau sửa (không đổi gì → hiện trạng, không ghi sổ) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNPlotDetail"];
+                };
+            };
+            /** @description geo.read_only | forbidden | geo.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description geo.plot_not_found */
+            404: components["responses"]["Problem"];
+            /** @description geo.plot_state_conflict */
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    knCorrectPlotBoundary: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    supersedes_boundary_id: string;
+                    geometry: components["schemas"]["GeoJSONPolygonal"];
+                    /** @enum {string} */
+                    shape?: "polygon" | "circle" | "square";
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNPlotWrite"];
+                };
+            };
+            /** @description geo.plot_not_found */
+            404: components["responses"]["Problem"];
+            /** @description geo.plot_overlap | geo.version_conflict | geo.plot_state_conflict */
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    knPlotLog: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header: {
+                "X-AG-Context": string;
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Log; event ∈ created|assigned|retired|restored|attributes_changed|boundary_recorded|boundary_corrected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNRecordLogPage"];
+                };
+            };
+            /** @description geo.plot_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    knListMaterials: {
+        parameters: {
+            query?: {
+                commune?: string;
+                from?: string;
+                to?: string;
+                material_code?: string;
+                /** @description Chỉ Admin (vắng = mọi phòng ban) */
+                department?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header: {
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trang bản ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MaterialRecord"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            /** @description extension.out_of_scope */
+            403: components["responses"]["Problem"];
+        };
+    };
+    knRecordMaterials: {
+        parameters: {
+            query?: {
+                /** @description Chỉ Admin: phòng ban ghi (mặc định trong_trot) */
+                department?: string;
+            };
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    commune_code: string;
+                    /**
+                     * Format: date
+                     * @description Không ở tương lai (giờ VN)
+                     */
+                    recorded_on: string;
+                    lines: {
+                        /** @description Danh mục masterdata material (đang dùng); ĐVT = attrs.unit */
+                        material_code: string;
+                        /** @description decimal ≥ 0, ≤ 1e9; ĐVT đếm được → số nguyên; còn lại ≤ 4 chữ số lẻ */
+                        quantity: string;
+                        note?: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Bản ghi đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MaterialRecord"][];
+                    };
+                };
+            };
+            /** @description extension.read_only | forbidden | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed | extension.material_unknown | extension.material_quantity_invalid | extension.support_reason_required */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    knMaterialSummary: {
+        parameters: {
+            query?: {
+                commune?: string;
+                from?: string;
+                to?: string;
+            };
+            header: {
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tổng hợp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            commune_code: string;
+                            material_code: string;
+                            material_name: string;
+                            unit: string;
+                            quantity: string;
+                            records: number;
+                        }[];
+                    };
+                };
+            };
+            /** @description extension.out_of_scope */
+            403: components["responses"]["Problem"];
+        };
+    };
+    knCorrectMaterial: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    quantity: string;
+                    note?: string | null;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Bản ghi bù */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialRecord"];
+                };
+            };
+            /** @description extension.read_only | forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.material_record_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.material_superseded */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | extension.material_quantity_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    knMaterialLog: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Log */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNRecordLogPage"];
+                };
+            };
+            /** @description extension.material_record_not_found */
+            404: components["responses"]["Problem"];
         };
     };
 }

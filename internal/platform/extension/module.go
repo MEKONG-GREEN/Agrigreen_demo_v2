@@ -18,6 +18,8 @@ import (
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/handler"
+	matapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/material/app"
+	mathandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/material/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	rcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/app"
 	rchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/handler"
@@ -58,15 +60,19 @@ type Deps struct {
 // Module là pf/extension đã nối.
 type Module struct {
 	svc *app.Service
-	rc  *rcapp.Service // KN v7.7 P4: vòng đời báo cáo (extension/reportcycle, module_reportcycle.go)
+	rc  *rcapp.Service  // KN v7.7 P4: vòng đời báo cáo (extension/reportcycle, module_reportcycle.go)
+	mat *matapp.Service // KN v7.7 P7 FN-XA-03.06: sổ vật tư (extension/material)
 }
 
 // New tạo module với pool của vai extension_app.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
-	return &Module{svc: &app.Service{
+	m := &Module{svc: &app.Service{
 		DB: db, Clock: clk, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
 		Plots: d.Plots, Coops: d.Coops,
 	}, rc: &rcapp.Service{DB: db, Clock: clk, Orgs: d.Orgs, Units: d.Units, Params: d.Params}}
+	// Tên người thao tác của sổ vật tư dùng chung danh bạ của vòng đời báo cáo (UseReportCycle nối sau).
+	m.mat = &matapp.Service{DB: db, Clock: clk, Catalogs: d.Catalogs, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
+	return m
 }
 
 // UseContacts nối cổng số điện thoại cán bộ (pf/accounts) sau khi module đó được dựng.
@@ -98,6 +104,7 @@ func (m *Module) StaffNames() port.StaffNames { return m.svc }
 func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.Handler{Svc: m.svc}.RegisterApp(rg)
 	rchandler.Handler{Svc: m.rc}.RegisterApp(rg)
+	mathandler.Handler{Svc: m.mat}.RegisterApp(rg)
 }
 
 // RegisterAdmin: module chưa có route quản trị (tham số SLA đặt qua pf/masterdata).

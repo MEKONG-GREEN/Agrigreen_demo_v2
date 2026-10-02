@@ -26,6 +26,13 @@ const (
 	EventConsolidationCompleted        = "pf.extension.consolidation.completed"
 )
 
+// Entity đồng bộ ngoại tuyến của vòng đời báo cáo (KN v7.7 P7, docs/dev/sync-contract.md mục "Báo cáo KN v7.7").
+const (
+	EntityReportTask       = "report_task"       // chiều xuống: công việc của các xã phụ trách (Cấp Xã)
+	EntityFormLayout       = "form_layout"       // chiều xuống: phiên bản mẫu của công việc (bất biến)
+	EntityReportSubmission = "report_submission" // chiều xuống: bài nộp mới nhất của công việc; chiều lên: lưu nháp/gửi
+)
+
 // Chế độ nhắc.
 const (
 	ReminderManual      = "manual"       // Cấp Tỉnh "Gửi nhắc nhở"

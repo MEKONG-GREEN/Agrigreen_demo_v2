@@ -202,6 +202,12 @@ func (r *Registry) CreateOrg(ctx context.Context, in CreateOrgInput) (OrgResult,
 	if err != nil {
 		return OrgResult{}, err
 	}
+	return r.createOrg(ctx, p, in, func(unit string) error { return r.requireWriteScope(ctx, p, unit) })
+}
+
+// createOrg là lõi của CreateOrg sau bước kiểm vai: allow kiểm phạm vi ghi của đơn vị hành chính
+// (G1: cây ScopeResolver; KN v7.7 FN-XA-03.03: xã phụ trách của ngữ cảnh phiên).
+func (r *Registry) createOrg(ctx context.Context, p authz.Principal, in CreateOrgInput, allow func(unit string) error) (OrgResult, error) {
 	if in.IdemKey == "" {
 		return OrgResult{}, problem.IdempotencyRequired
 	}
@@ -239,7 +245,7 @@ func (r *Registry) CreateOrg(ctx context.Context, in CreateOrgInput) (OrgResult,
 	if err != nil {
 		return OrgResult{}, err
 	}
-	if err := r.requireWriteScope(ctx, p, in.AdminUnitCode); err != nil {
+	if err := allow(in.AdminUnitCode); err != nil {
 		return OrgResult{}, err
 	}
 
@@ -519,11 +525,21 @@ func (r *Registry) changeStatus(ctx context.Context, in StatusInput, action doma
 	if in.IdemKey == "" {
 		return OrgResult{}, problem.IdempotencyRequired
 	}
-	now := r.now()
 	sc, err := r.scopeFor(ctx, p)
 	if err != nil {
 		return OrgResult{}, err
 	}
+	return r.changeStatusIn(ctx, p, sc, in, action, check)
+}
+
+// changeStatusIn là lõi của changeStatus sau bước kiểm vai và tính phạm vi (G1: ScopeResolver; KN v7.7
+// FN-XA-03.03: phạm vi của ngữ cảnh phiên).
+func (r *Registry) changeStatusIn(ctx context.Context, p authz.Principal, sc authz.Scope, in StatusInput, action domain.OrgAction,
+	check func(*store.OrgState) error) (OrgResult, error) {
+	if in.IdemKey == "" {
+		return OrgResult{}, problem.IdempotencyRequired
+	}
+	now := r.now()
 	return r.write(ctx, p.TenantID, in.IdemKey, func(tx pgx.Tx) (OrgResult, error) {
 		cur, err := store.OrgByRef(ctx, tx, in.Ref, true)
 		if err != nil {

@@ -184,8 +184,9 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	snc := syncmod.New(syncPool, clk, syncmod.Deps{
 		Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Params: md.Params(), Vault: ext.Vault,
 		Store: store, CursorKey: cursorKey(ext),
-		Sources: []syncport.Source{md.SyncSource(), g.SyncSource(), cnt.SyncSource(), kn.SyncSource(), nt.SyncSource(), mrvMod.SyncSource(), cc.SyncSource()},
-		Sinks:   []syncport.Sink{g.SyncSink(), kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink(), cc.SyncSink()},
+		Sources: []syncport.Source{md.SyncSource(), g.SyncSource(), cnt.SyncSource(), kn.SyncSource(), nt.SyncSource(), mrvMod.SyncSource(), cc.SyncSource(),
+			kn.ReportSyncSource()}, // KN v7.7 P7: report_task, form_layout, report_submission (Cấp Xã ngoại tuyến)
+		Sinks: []syncport.Sink{g.SyncSink(), kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink(), cc.SyncSink(), kn.ReportSyncSink()},
 	})
 	nt.UseSyncEntities(snc.PullEntities())               // KN US-SYNC-02: kiểm entities[] của nudge
 	snc.UseIntegrations(queueNames(), dlqDepthFromEnv()) // GIS US-SYNC-01: màn giám sát đồng bộ
@@ -209,6 +210,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	pty.UseDepartmentUsage(acc.DepartmentUsage())
 	pty.UseOrgImpact(acc.OrgImpact())
 	pty.UseActorNames(acc.ActorNames())
+	pty.UseMachineCounts(mech.MachineCounts()) // KN v7.7 FN-XA-03.03/03.04: cảnh báo số máy khi vô hiệu hóa HTX
+	g.UseKN(ext.Vault, acc.ActorNames())       // KN v7.7 FN-XA-03.05: tên nông dân (kho định danh) + tên người thao tác của Log thửa
 	if c := acc.StaffContacts(); c != nil {
 		kn.UseContacts(c) // US-DIR-02: số điện thoại cán bộ đọc từ Keycloak lúc bấm liên hệ
 	}

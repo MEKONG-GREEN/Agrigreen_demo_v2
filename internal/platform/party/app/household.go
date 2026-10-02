@@ -43,6 +43,9 @@ type CreateHouseholdInput struct {
 	// RejectDuplicate: chủ hộ đã có trong kho định danh (trùng SĐT/CCCD) → lỗi
 	// party.household_phone_taken thay vì dùng lại mã cũ (sao chép hàng loạt, HTX US-HH-02).
 	RejectDuplicate bool
+	// KNScoped: người gọi đã được kiểm bằng ngữ cảnh phiên KN v7.7 (authz.RequireKN) — bỏ kiểm
+	// "quản lý HTX chỉ HTX mình" theo vai realm (FN-XA-03.03).
+	KNScoped bool
 }
 
 // HouseholdResult là kết quả tạo một nông hộ.
@@ -117,7 +120,8 @@ func (r *Registry) createHousehold(ctx context.Context, p authz.Principal, sc au
 		return HouseholdResult{}, ErrOrgState.WithDetail("HTX đã bị vô hiệu hóa")
 	}
 	// Quản lý HTX chỉ thao tác nông hộ của chính HTX mình (HTX US-HH-01 AC-3).
-	if !p.Has(port.RoleRegistryAdmin) && !p.Has(port.RoleKNProvinceAdmin) && !p.Has(port.RoleKNOfficer) && coop.Ref != p.OrgRef {
+	// KN v7.7 (FN-XA-03.03): vai nằm trong ngữ cảnh phiên, phạm vi sc đã là xã phụ trách.
+	if !in.KNScoped && !p.Has(port.RoleRegistryAdmin) && !p.Has(port.RoleKNProvinceAdmin) && !p.Has(port.RoleKNOfficer) && coop.Ref != p.OrgRef {
 		return HouseholdResult{}, ErrOutOfScope.WithDetail("Bạn không có quyền truy cập nông hộ này.")
 	}
 	commune := strings.TrimSpace(in.CommuneCode)

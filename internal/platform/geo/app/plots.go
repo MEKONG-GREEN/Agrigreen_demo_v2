@@ -61,6 +61,8 @@ type CreateInput struct {
 	HouseholdRef   uuid.UUID
 	Boundary       BoundaryInput
 	IdemKey        string
+	// KN (KN v7.7 FN-XA-03.05): thuộc tính v7.7 + chế độ hỗ trợ; khác nil → trực tuyến chặn MỌI chồng lấn.
+	KN *KNInput
 }
 
 // CorrectInput ghi phiên bản ranh giới mới thay phiên bản SupersedesID.
@@ -70,6 +72,7 @@ type CorrectInput struct {
 	Reason       string
 	Boundary     BoundaryInput
 	IdemKey      string
+	KN           *KNInput // KN v7.7: cách vẽ, chế độ hỗ trợ; trực tuyến chặn mọi chồng lấn
 }
 
 // WriteResult là kết quả ghi ranh giới.
@@ -366,10 +369,8 @@ func (s *Service) create(ctx context.Context, a access, in CreateInput, m mode, 
 			return WriteResult{}, err
 		}
 		c.deviation(in.Boundary.DeclaredAreaHa)
-		if m == modeOnline {
-			if err := onlineGate(c.same, c.cross, c.devPct, maxDev, in.Boundary.Confirm); err != nil {
-				return WriteResult{}, err
-			}
+		if err := gate(ctx, tx, m, in.KN, c, maxDev, in.Boundary.Confirm); err != nil {
+			return WriteResult{}, err
 		}
 		code, err := store.NextPlotCode(ctx, tx)
 		if err != nil {
@@ -381,6 +382,7 @@ func (s *Service) create(ctx context.Context, a access, in CreateInput, m mode, 
 			CooperativeRef: in.CooperativeRef, BecameCurrent: true, EventTime: in.Boundary.EventTime, ActorRef: a.p.ActorRef,
 			DeviceID: in.Boundary.DeviceID, IdemKey: in.IdemKey,
 		}
+		in.KN.boundary(&b, in.Boundary.DeclaredAreaHa)
 		if err := store.InsertBoundary(ctx, tx, &b, c.geojson); err != nil {
 			return WriteResult{}, err
 		}
@@ -390,11 +392,17 @@ func (s *Service) create(ctx context.Context, a access, in CreateInput, m mode, 
 			HouseholdRef: in.HouseholdRef, Status: domain.StatusFor(in.CooperativeRef), CurrentVersion: b.Version,
 			CurrentBoundaryID: b.ID, AreaHa: b.AreaHa, Source: b.Source, NeedsReview: len(flagged) > 0, CreatedBy: a.p.ActorRef,
 		}
+		if in.KN != nil {
+			plot.KNAttrs = in.KN.Attrs
+			plot.DeclaredAreaHa = in.Boundary.DeclaredAreaHa
+		}
 		ev := store.PlotEvent{
 			ID: ids.New(), TenantID: a.p.TenantID, PlotRef: ref, Action: domain.ActionCreated, Code: code, Name: in.Name,
 			CommuneCode: in.CommuneCode, CooperativeRef: in.CooperativeRef, HouseholdRef: in.HouseholdRef, Status: plot.Status,
 			EventTime: in.Boundary.EventTime, ActorRef: a.p.ActorRef, DeviceID: in.Boundary.DeviceID, IdemKey: in.IdemKey,
+			KNAttrs: plot.KNAttrs,
 		}
+		in.KN.event(&ev)
 		if err := store.InsertPlotEvent(ctx, tx, &ev); err != nil {
 			return WriteResult{}, err
 		}
@@ -484,10 +492,8 @@ func (s *Service) correct(ctx context.Context, a access, in CorrectInput, m mode
 			return WriteResult{}, err
 		}
 		c.deviation(in.Boundary.DeclaredAreaHa)
-		if m == modeOnline {
-			if err := onlineGate(c.same, c.cross, c.devPct, maxDev, in.Boundary.Confirm); err != nil {
-				return WriteResult{}, err
-			}
+		if err := gate(ctx, tx, m, in.KN, c, maxDev, in.Boundary.Confirm); err != nil {
+			return WriteResult{}, err
 		}
 		sup, reason := in.SupersedesID, in.Reason
 		b := store.Boundary{
@@ -496,6 +502,7 @@ func (s *Service) correct(ctx context.Context, a access, in CorrectInput, m mode
 			CooperativeRef: plot.CooperativeRef, BecameCurrent: !stale, EventTime: in.Boundary.EventTime,
 			SupersedesID: &sup, CorrectionReason: &reason, ActorRef: a.p.ActorRef, DeviceID: in.Boundary.DeviceID, IdemKey: in.IdemKey,
 		}
+		in.KN.boundary(&b, in.Boundary.DeclaredAreaHa)
 		if err := store.InsertBoundary(ctx, tx, &b, c.geojson); err != nil {
 			return WriteResult{}, err
 		}
@@ -508,6 +515,11 @@ func (s *Service) correct(ctx context.Context, a access, in CorrectInput, m mode
 			conflicts = conflictsFor(*plot, b.ID, c.same, c.cross, now)
 			if err := store.SetCurrentBoundary(ctx, tx, plot.Ref, b, c.geojson, len(conflicts) > 0); err != nil {
 				return WriteResult{}, err
+			}
+			if in.KN != nil {
+				if err := store.SetShape(ctx, tx, plot.Ref, b.Shape, b.DeclaredAreaHa); err != nil {
+					return WriteResult{}, err
+				}
 			}
 		}
 		for _, cf := range conflicts {
@@ -651,7 +663,7 @@ func (s *Service) Assign(ctx context.Context, in AssignInput) (AttrResult, error
 		ev := store.PlotEvent{
 			ID: ids.New(), TenantID: a.p.TenantID, PlotRef: p.Ref, Action: domain.ActionAssigned, Code: p.Code, Name: p.Name,
 			CommuneCode: p.CommuneCode, CooperativeRef: p.CooperativeRef, HouseholdRef: p.HouseholdRef, Status: p.Status,
-			Reason: strings.TrimSpace(in.Reason), EventTime: now, ActorRef: a.p.ActorRef, IdemKey: in.IdemKey,
+			Reason: strings.TrimSpace(in.Reason), EventTime: now, ActorRef: a.p.ActorRef, IdemKey: in.IdemKey, KNAttrs: p.KNAttrs,
 		}
 		if err := store.InsertPlotEvent(ctx, tx, &ev); err != nil {
 			return AttrResult{}, err
@@ -716,7 +728,7 @@ func (s *Service) Retire(ctx context.Context, in RetireInput) (AttrResult, error
 		ev := store.PlotEvent{
 			ID: ids.New(), TenantID: a.p.TenantID, PlotRef: p.Ref, Action: domain.ActionRetired, Code: p.Code, Name: p.Name,
 			CommuneCode: p.CommuneCode, CooperativeRef: p.CooperativeRef, HouseholdRef: p.HouseholdRef, Status: p.Status,
-			Reason: p.StatusReason, EventTime: now, ActorRef: a.p.ActorRef, IdemKey: in.IdemKey,
+			Reason: p.StatusReason, EventTime: now, ActorRef: a.p.ActorRef, IdemKey: in.IdemKey, KNAttrs: p.KNAttrs,
 		}
 		if err := store.InsertPlotEvent(ctx, tx, &ev); err != nil {
 			return AttrResult{}, err
@@ -795,7 +807,7 @@ func (s *Service) Restore(ctx context.Context, in RestoreInput) (AttrResult, err
 		ev := store.PlotEvent{
 			ID: ids.New(), TenantID: a.p.TenantID, PlotRef: p.Ref, Action: domain.ActionRestored, Code: p.Code, Name: p.Name,
 			CommuneCode: p.CommuneCode, CooperativeRef: p.CooperativeRef, HouseholdRef: p.HouseholdRef, Status: p.Status,
-			Reason: strings.TrimSpace(in.Reason), EventTime: now, ActorRef: a.p.ActorRef, IdemKey: in.IdemKey,
+			Reason: strings.TrimSpace(in.Reason), EventTime: now, ActorRef: a.p.ActorRef, IdemKey: in.IdemKey, KNAttrs: p.KNAttrs,
 		}
 		if err := store.InsertPlotEvent(ctx, tx, &ev); err != nil {
 			return AttrResult{}, err

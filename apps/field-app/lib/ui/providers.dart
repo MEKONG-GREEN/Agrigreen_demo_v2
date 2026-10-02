@@ -13,6 +13,8 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/app_services.dart';
+import '../application/kn_context_service.dart';
+import '../domain/kn_context.dart';
 
 /// Ghi đè trong `main.dart` (thiết bị) hoặc trong kiểm thử widget.
 final platformProvider = Provider<AppPlatform>(
@@ -80,17 +82,25 @@ final authFlowProvider = Provider<AuthFlow>(
 );
 
 class AppState {
-  const AppState(this.view, {this.services, this.busy = false});
+  const AppState(this.view, {this.services, this.busy = false, this.kn});
   final AuthView view;
   final AppServices? services;
   final bool busy;
 
-  AppState copyWith({AuthView? view, AppServices? services, bool? busy}) =>
-      AppState(
-        view ?? this.view,
-        services: services ?? this.services,
-        busy: busy ?? this.busy,
-      );
+  /// Ngữ cảnh phiên KN v7.7 (null = chưa xác định / không phải tài khoản KN).
+  final KnContextState? kn;
+
+  AppState copyWith({
+    AuthView? view,
+    AppServices? services,
+    bool? busy,
+    KnContextState? kn,
+  }) => AppState(
+    view ?? this.view,
+    services: services ?? this.services,
+    busy: busy ?? this.busy,
+    kn: kn ?? this.kn,
+  );
 }
 
 class AppController extends Notifier<AppState> {
@@ -101,6 +111,7 @@ class AppController extends Notifier<AppState> {
   @override
   AppState build() {
     ref.onDispose(_stopAutoSync);
+    ref.onDispose(() => unawaited(_knSub?.cancel()));
     ref.onDispose(() => unawaited(_taps?.cancel()));
     Future.microtask(_init);
     return const AppState(AuthView(AuthStage.loading));
@@ -138,10 +149,18 @@ class AppController extends Notifier<AppState> {
             accessToken: ref.read(sessionServiceProvider).accessToken,
             onWiped: _onWiped,
           );
-      state = AppState(v, services: services);
+      // KN v7.7 P1: ngữ cảnh phiên trước lượt đồng bộ đầu (pull theo phạm vi
+      // ngữ cảnh). Ngoại tuyến → ngữ cảnh lưu trên máy.
+      final kn = existing != null && state.kn != null
+          ? state.kn!
+          : await _resolveKn(services);
+      state = AppState(v, services: services, kn: kn);
+      _watchKn(services);
       _startAutoSync(services);
       await _push.attach(services.pushHost);
-      unawaited(services.sync.syncOnce(force: true));
+      if (kn.stage != KnContextStage.picker) {
+        unawaited(services.sync.syncOnce(force: true));
+      }
     } else {
       // Ngoài trạng thái mở khóa không giữ CSDL mở.
       _stopAutoSync();
@@ -158,6 +177,62 @@ class AppController extends Notifier<AppState> {
       await _apply(await f());
     } finally {
       state = state.copyWith(busy: false);
+    }
+  }
+
+  Future<KnContextState> _resolveKn(AppServices s) async {
+    try {
+      return await s.knContext.resolve();
+    } on Object {
+      final cur = await s.knContext.stored();
+      return cur == null
+          ? const KnContextState(KnContextStage.none)
+          : KnContextState(KnContextStage.ready, context: cur, offline: true);
+    }
+  }
+
+  StreamSubscription<KnContextState>? _knSub;
+
+  void _watchKn(AppServices s) {
+    unawaited(_knSub?.cancel());
+    _knSub = s.knContext.changes.listen((k) {
+      if (state.services == s) state = state.copyWith(kn: k);
+    });
+  }
+
+  /// Chọn (vai trò, phòng ban) ở màn chọn hoặc "Đổi vai trò/phòng ban" —
+  /// không đăng nhập lại. Phạm vi đổi → dữ liệu KN đã pull bị thay (máy chủ
+  /// trả `reset: true`), nên đồng bộ đầy đủ ngay.
+  Future<void> chooseContext(KnContextChoice c) async {
+    final s = state.services;
+    if (s == null) return;
+    state = state.copyWith(busy: true);
+    try {
+      final ctx = await s.knContext.switchTo(c);
+      state = AppState(
+        state.view,
+        services: s,
+        kn: KnContextState(
+          KnContextStage.ready,
+          context: ctx,
+          choices: state.kn?.choices ?? const [],
+        ),
+      );
+      unawaited(s.sync.syncOnce(force: true));
+    } finally {
+      state = state.copyWith(busy: false);
+    }
+  }
+
+  /// Mở màn chọn để đổi vai trò/phòng ban (cần mạng để lấy danh sách mới;
+  /// ngoại tuyến dùng danh sách đã lưu).
+  Future<List<KnContextChoice>> contextChoices() async {
+    final s = state.services;
+    if (s == null) return const [];
+    try {
+      return await s.knContext.fetchChoices();
+    } on Object {
+      return s.knContext.storedChoices();
     }
   }
 

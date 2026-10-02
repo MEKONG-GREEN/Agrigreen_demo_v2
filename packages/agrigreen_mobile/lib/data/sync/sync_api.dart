@@ -22,6 +22,18 @@ class ApiException implements Exception {
       status == 408 ||
       (status == 409 && code == 'idempotency_in_progress');
 
+  /// Ngữ cảnh phiên KN (header `X-AG-Context`, KN v7.7 P1) hết hạn / bị thu
+  /// hồi / không hợp lệ (403) hoặc thiếu (428) → chọn lại ngữ cảnh, thử lại.
+  bool get isContextError =>
+      (status == 403 && contextErrorCodes.contains(code)) || status == 428;
+
+  static const contextErrorCodes = {
+    'accounts.context_expired',
+    'accounts.context_revoked',
+    'accounts.context_invalid',
+    'accounts.context_required',
+  };
+
   @override
   String toString() => 'ApiException($status, $code)';
 }
@@ -149,9 +161,26 @@ abstract class SyncApi {
     required String idempotencyKey,
     Map<String, Object?>? body,
   });
+
+  /// Lệnh JSON với phương thức bất kỳ (KN v7.7 P7: `PUT /v1/kn/...` sửa HTX,
+  /// nông hộ, khai báo máy móc). [idempotencyKey] cố định cho mọi lần phát lại.
+  Future<Map<String, Object?>> sendJson({
+    required String method,
+    required String path,
+    String? idempotencyKey,
+    Map<String, Object?>? body,
+  });
 }
 
 typedef AccessTokenProvider = Future<String?> Function();
+
+/// Mã ngữ cảnh phiên KN hiện hành (null = không gửi header `X-AG-Context`).
+typedef ContextIdProvider = Future<String?> Function();
+
+/// Máy chủ từ chối ngữ cảnh ([ApiException.isContextError]): chọn lại ngữ
+/// cảnh (cùng phân công) và trả mã mới để thử lại một lần; null = không chọn
+/// lại được (người dùng phải chọn ở màn "Chọn vai trò và phòng ban").
+typedef ContextRecovery = Future<String?> Function(ApiException rejected);
 
 class HttpSyncApi implements SyncApi {
   HttpSyncApi({
@@ -162,10 +191,20 @@ class HttpSyncApi implements SyncApi {
     this.timeout = const Duration(seconds: 30),
     this.pushPath = defaultPushPath,
     this.pullPath = defaultPullPath,
+    this.contextId,
+    this.onContextRejected,
   }) : _client = client ?? http.Client();
 
   static const defaultPushPath = '/v1/sync/push';
   static const defaultPullPath = '/v1/sync/pull';
+
+  /// Header ngữ cảnh phiên KN v7.7 (P1) — gửi ở MỌI lời gọi khi [contextId]
+  /// trả mã (trừ chính các lời gọi chọn ngữ cảnh [contextFreePaths]).
+  static const contextHeader = 'X-AG-Context';
+
+  /// `GET /v1/me/contexts`, `POST /v1/me/context`: không mang ngữ cảnh cũ và
+  /// không tự chọn lại khi bị từ chối (tránh vòng lặp).
+  static const contextFreePaths = {'/v1/me/contexts', '/v1/me/context'};
 
   /// Đường dẫn đồng bộ (cùng hình dạng hợp đồng sync-contract). Mặc định của
   /// nền tảng; App hiện trường MKG dùng `/v1/fieldops/sync/push|pull` của
@@ -181,20 +220,64 @@ class HttpSyncApi implements SyncApi {
   final http.Client _client;
   final Duration timeout;
 
+  /// Nguồn mã ngữ cảnh KN (tùy chọn; App HTX / App MKG không dùng). Gán được
+  /// sau khi tạo (app hiện trường nối sau khi mở CSDL).
+  ContextIdProvider? contextId;
+
+  /// Tự chọn lại ngữ cảnh khi máy chủ báo hết hạn/thu hồi rồi thử lại một lần.
+  ContextRecovery? onContextRejected;
+
   Uri _u(String path, [Map<String, String>? q]) {
     final b = Uri.parse(baseUrl);
     return b.replace(path: '${b.path}$path', queryParameters: q);
   }
 
-  Future<Map<String, String>> _headers({String? idem, bool json = true}) async {
+  Future<Map<String, String>> _headers(
+    String path, {
+    String? idem,
+    bool json = true,
+  }) async {
     final token = await accessToken();
+    final ctx = contextFreePaths.contains(path)
+        ? null
+        : await contextId?.call();
     return {
       if (token != null) 'Authorization': 'Bearer $token',
       'Idempotency-Key': ?idem,
       'X-Device-Id': ?deviceId,
+      if (ctx != null && ctx.isNotEmpty) contextHeader: ctx,
       if (json) 'Content-Type': 'application/json',
       'Accept': 'application/json, application/problem+json',
     };
+  }
+
+  /// Một lời gọi: dựng header (kèm `X-AG-Context`), đổi lỗi mạng thành
+  /// [NetworkException], lỗi HTTP thành [ApiException]. Ngữ cảnh bị từ chối →
+  /// [onContextRejected] chọn lại, dựng lại header và thử lại đúng một lần.
+  Future<http.Response> _call(
+    String path,
+    Future<http.Response> Function(Map<String, String> headers) f, {
+    String? idem,
+    bool json = true,
+  }) async {
+    var retried = false;
+    while (true) {
+      final h = await _headers(path, idem: idem, json: json);
+      try {
+        return await _send(() => f(h));
+      } on ApiException catch (e) {
+        final recover = onContextRejected;
+        if (retried ||
+            recover == null ||
+            !e.isContextError ||
+            contextFreePaths.contains(path)) {
+          rethrow;
+        }
+        retried = true;
+        final next = await recover(e);
+        if (next == null || next.isEmpty) rethrow;
+      }
+    }
   }
 
   Future<http.Response> _send(Future<http.Response> Function() f) async {
@@ -243,9 +326,10 @@ class HttpSyncApi implements SyncApi {
     required String platform,
     required String appVersion,
   }) async {
-    final h = await _headers(idem: 'devreg:$deviceId');
-    await _send(
-      () => _client.post(
+    await _call(
+      '/v1/devices',
+      idem: 'devreg:$deviceId',
+      (h) => _client.post(
         _u('/v1/devices'),
         headers: h,
         body: jsonEncode({
@@ -271,9 +355,10 @@ class HttpSyncApi implements SyncApi {
     required String deviceId,
     required List<OutboxRecord> records,
   }) async {
-    final h = await _headers(idem: batchKey);
-    final res = await _send(
-      () => _client.post(
+    final res = await _call(
+      pushPath,
+      idem: batchKey,
+      (h) => _client.post(
         _u(pushPath),
         headers: h,
         body: encodePushBody(deviceId, records),
@@ -291,9 +376,10 @@ class HttpSyncApi implements SyncApi {
     required int limit,
     List<String>? entities,
   }) async {
-    final h = await _headers(json: false);
-    final res = await _send(
-      () => _client.get(
+    final res = await _call(
+      pullPath,
+      json: false,
+      (h) => _client.get(
         _u(pullPath, {
           'cursor': ?cursor,
           'limit': '$limit',
@@ -313,8 +399,9 @@ class HttpSyncApi implements SyncApi {
     required Uint8List ciphertext,
     String? fileRef,
   }) async {
-    final h = await _headers(idem: idempotencyKey, json: false);
-    final res = await _send(() async {
+    final res = await _call('/v1/files', idem: idempotencyKey, json: false, (
+      h,
+    ) async {
       final req = http.MultipartRequest('POST', _u('/v1/files'))
         ..headers.addAll(h)
         // `meta` là trường văn bản (không filename), `blob` là phần tệp.
@@ -342,8 +429,11 @@ class HttpSyncApi implements SyncApi {
     String path, {
     Map<String, String>? query,
   }) async {
-    final h = await _headers(json: false);
-    final res = await _send(() => _client.get(_u(path, query), headers: h));
+    final res = await _call(
+      path,
+      json: false,
+      (h) => _client.get(_u(path, query), headers: h),
+    );
     return _json(res);
   }
 
@@ -353,10 +443,12 @@ class HttpSyncApi implements SyncApi {
     required String token,
     required String idempotencyKey,
   }) async {
-    final h = await _headers(idem: idempotencyKey);
-    await _send(
-      () => _client.post(
-        _u('/v1/devices/$deviceId/push-token'),
+    final path = '/v1/devices/$deviceId/push-token';
+    await _call(
+      path,
+      idem: idempotencyKey,
+      (h) => _client.post(
+        _u(path),
         headers: h,
         body: jsonEncode({'provider': 'fcm', 'token': token}),
       ),
@@ -368,15 +460,25 @@ class HttpSyncApi implements SyncApi {
     required String path,
     required String idempotencyKey,
     Map<String, Object?>? body,
+  }) => sendJson(
+    method: 'POST',
+    path: path,
+    idempotencyKey: idempotencyKey,
+    body: body,
+  );
+
+  @override
+  Future<Map<String, Object?>> sendJson({
+    required String method,
+    required String path,
+    String? idempotencyKey,
+    Map<String, Object?>? body,
   }) async {
-    final h = await _headers(idem: idempotencyKey);
-    final res = await _send(
-      () => _client.post(
-        _u(path),
-        headers: h,
-        body: body == null ? null : jsonEncode(body),
-      ),
-    );
+    final res = await _call(path, idem: idempotencyKey, (h) async {
+      final req = http.Request(method, _u(path))..headers.addAll(h);
+      if (body != null) req.body = jsonEncode(body);
+      return http.Response.fromStream(await _client.send(req));
+    });
     if (res.bodyBytes.isEmpty) return const {};
     try {
       return _json(res);

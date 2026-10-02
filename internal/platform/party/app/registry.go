@@ -68,6 +68,9 @@ type Registry struct {
 	// Activity (tùy chọn): vụ chưa xong / nhật ký chờ duyệt (pf/cropcycle) cho màn cảnh báo
 	// trước khi vô hiệu hóa HTX (HTX US-HTXSTATUS-01 AC-1).
 	Activity port.SeasonActivity
+	// Machines (tùy chọn): tổng số máy khai báo của HTX (pf/mechanization, KN v7.7 FN-XA-03.04) cho
+	// cảnh báo vô hiệu hóa HTX (FN-XA-03.03).
+	Machines port.CoopMachineCounts
 }
 
 var (

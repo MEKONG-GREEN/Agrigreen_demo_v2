@@ -297,6 +297,10 @@ class BoundaryService {
     String? correctionReason,
     bool acknowledgeOverlap = false,
     double? worstAccuracyM,
+    String? lotName,
+    String? note,
+    String? farmerName,
+    String? shape,
   }) async {
     final existing = plotId == null
         ? null
@@ -348,6 +352,14 @@ class BoundaryService {
       'geometry': toGeoJsonPolygon(c.validation.ring),
       'gps_accuracy_m': ?worstAccuracyM?.toStringAsFixed(1),
       'declared_area_ha': ?declaredAreaHa?.toStringAsFixed(4),
+      // KN v7.7 P7 (FN-XA-03.05): thuộc tính thửa; tên nông dân máy chủ đưa
+      // vào kho định danh (vault), không lưu tên.
+      if (lotName != null && lotName.trim().isNotEmpty)
+        'lot_name': lotName.trim(),
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      if (farmerName != null && farmerName.trim().isNotEmpty)
+        'farmer_name': farmerName.trim(),
+      'shape': ?shape,
       'source': source,
       'confirm_overlap': acknowledgeOverlap,
       // Thông tin phụ cho màn hình trên máy (máy chủ bỏ qua trường lạ).

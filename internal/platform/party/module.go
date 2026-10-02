@@ -63,6 +63,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.Me{Reg: m.reg}.Register(rg)
 	handler.Sharing{Svc: m.share}.RegisterApp(rg)
 	handler.KN{Svc: m.kn}.RegisterApp(rg)
+	handler.KN{Svc: m.kn}.RegisterKNCollect(rg) // KN v7.7 FN-XA-03.03: /v1/kn/cooperatives*, /v1/kn/households*
 }
 
 // RegisterAdmin gắn route Admin API.
@@ -133,6 +134,10 @@ func (m *Module) UseFormAvailability(f port.FormAvailability) { m.kn.Forms = f }
 
 // UseSessionContext nối ngữ cảnh phiên của P1 (X-AG-Context) cho menu.
 func (m *Module) UseSessionContext(s port.SessionContext) { m.kn.Session = s }
+
+// UseMachineCounts nối tổng số máy khai báo của HTX (pf/mechanization, KN v7.7 FN-XA-03.04) cho cảnh báo
+// vô hiệu hóa HTX ở POST /v1/kn/cooperatives/{ref}/deactivate (FN-XA-03.03).
+func (m *Module) UseMachineCounts(c port.CoopMachineCounts) { m.reg.Machines = c }
 
 // UseActorNames nối danh bạ tên người thao tác cho khung Log.
 func (m *Module) UseActorNames(n port.ActorNames) { m.kn.Names = n }

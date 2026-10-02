@@ -300,11 +300,20 @@ class SyncService {
     if (q == null) return;
     for (final a in await q.pending()) {
       try {
-        await _api.postAction(
-          path: a.path,
-          idempotencyKey: a.idempotencyKey,
-          body: a.body,
-        );
+        if (a.method == 'POST') {
+          await _api.postAction(
+            path: a.path,
+            idempotencyKey: a.idempotencyKey,
+            body: a.body,
+          );
+        } else {
+          await _api.sendJson(
+            method: a.method,
+            path: a.path,
+            idempotencyKey: a.idempotencyKey,
+            body: a.body,
+          );
+        }
         await q.markDone(a.id);
         report.actions++;
       } on ApiException catch (e) {

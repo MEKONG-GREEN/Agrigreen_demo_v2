@@ -177,6 +177,11 @@ type Boundary struct {
 	DeviceID         *string
 	IdemKey          string
 	GeoJSON          string // chỉ có khi đọc kèm hình
+	// KN v7.7 (FN-XA-03.05, 000079): cách vẽ, diện tích khai báo, chế độ hỗ trợ Admin.
+	Shape          string
+	DeclaredAreaHa *decimal.Decimal
+	OnBehalfOf     *uuid.UUID
+	SupportReason  *string
 }
 
 // InsertBoundary ghi một phiên bản; DB tính seq, băm và diện tích trắc địa.
@@ -184,15 +189,17 @@ func InsertBoundary(ctx context.Context, tx pgx.Tx, b *Boundary, geojson string)
 	var area string
 	err := tx.QueryRow(ctx, `INSERT INTO pf_geo.plot_boundary
 	    (id, tenant_id, stream_key, plot_ref, geom, area_ha, point_count, gps_accuracy_m, source, commune_code,
-	     cooperative_ref, became_current, event_time, supersedes_id, correction_reason, actor_ref, device_id, idem_key, rule_version)
+	     cooperative_ref, became_current, event_time, supersedes_id, correction_reason, actor_ref, device_id, idem_key, rule_version,
+	     shape, declared_area_ha, on_behalf_of, support_reason)
 	  SELECT $1::uuid, $2::uuid, $3::text, $4::uuid, s.g, (ST_Area(s.g::geography) / 10000)::numeric(14,4), $6::int,
 	         $7::numeric, $8::text, $9::text, $10::uuid, $11::boolean, $12::timestamptz, $13::uuid, $14::text, $15::uuid,
-	         $16::text, $17::text, $18::text
+	         $16::text, $17::text, $18::text, $19::text, $20::numeric, $21::uuid, $22::text
 	  FROM (SELECT `+geomSQL("$5")+` AS g) s
 	  RETURNING seq, recorded_at, area_ha::text`,
 		b.ID, b.TenantID, domain.StreamKey(b.PlotRef), b.PlotRef, geojson, b.PointCount, decPtr(b.GPSAccuracyM), b.Source,
 		b.CommuneCode, nilIfZero(b.CooperativeRef), b.BecameCurrent, b.EventTime.UTC(), b.SupersedesID, b.CorrectionReason,
-		b.ActorRef, b.DeviceID, b.IdemKey, domain.RuleVersion).Scan(&b.Version, &b.RecordedAt, &area)
+		b.ActorRef, b.DeviceID, b.IdemKey, domain.RuleVersion, nilIfEmpty(b.Shape), decPtr(b.DeclaredAreaHa), b.OnBehalfOf,
+		b.SupportReason).Scan(&b.Version, &b.RecordedAt, &area)
 	if err != nil {
 		return err
 	}
@@ -201,16 +208,18 @@ func InsertBoundary(ctx context.Context, tx pgx.Tx, b *Boundary, geojson string)
 }
 
 const boundaryCols = `id, tenant_id, plot_ref, seq, area_ha::text, point_count, gps_accuracy_m::text, source, commune_code,
-  cooperative_ref, became_current, event_time, recorded_at, supersedes_id, correction_reason, actor_ref, device_id, idem_key`
+  cooperative_ref, became_current, event_time, recorded_at, supersedes_id, correction_reason, actor_ref, device_id, idem_key,
+  coalesce(shape, ''), declared_area_ha::text, on_behalf_of, support_reason`
 
 func scanBoundary(row pgx.Row, withGeom bool) (Boundary, error) {
 	var b Boundary
 	var area string
 	var acc *string
 	var coop *uuid.UUID
+	var declared *string
 	dest := []any{&b.ID, &b.TenantID, &b.PlotRef, &b.Version, &area, &b.PointCount, &acc, &b.Source, &b.CommuneCode,
 		&coop, &b.BecameCurrent, &b.EventTime, &b.RecordedAt, &b.SupersedesID, &b.CorrectionReason, &b.ActorRef,
-		&b.DeviceID, &b.IdemKey}
+		&b.DeviceID, &b.IdemKey, &b.Shape, &declared, &b.OnBehalfOf, &b.SupportReason}
 	if withGeom {
 		dest = append(dest, &b.GeoJSON)
 	}
@@ -222,7 +231,10 @@ func scanBoundary(row pgx.Row, withGeom bool) (Boundary, error) {
 	if b.AreaHa, err = decimal.NewFromString(area); err != nil {
 		return b, err
 	}
-	b.GPSAccuracyM, err = parseDec(acc)
+	if b.GPSAccuracyM, err = parseDec(acc); err != nil {
+		return b, err
+	}
+	b.DeclaredAreaHa, err = parseDec(declared)
 	return b, err
 }
 
@@ -289,43 +301,48 @@ type PlotEvent struct {
 	IdemKey        string
 	Seq            int64
 	RecordedAt     time.Time
+	// KNAttrs: ảnh chụp thuộc tính v7.7 sau sự việc (000079) — Log là hiệu giữa hai ảnh chụp liên tiếp.
+	KNAttrs
+	OnBehalfOf    *uuid.UUID
+	SupportReason *string
+}
+
+// KNAttrs là thuộc tính thửa KN v7.7 (FN-XA-03.05): không có PII — tên nông dân nằm trong kho định danh (FarmerRef).
+type KNAttrs struct {
+	FarmerRef      uuid.UUID
+	LotName        string
+	Note           string
+	DeclaredAreaHa *decimal.Decimal
+	Shape          string
+	Department     string
 }
 
 // InsertPlotEvent ghi sổ biến động; DB tính seq và băm.
 func InsertPlotEvent(ctx context.Context, tx pgx.Tx, e *PlotEvent) error {
 	return tx.QueryRow(ctx, `INSERT INTO pf_geo.plot_event
 	    (id, tenant_id, stream_key, plot_ref, action, code, name, commune_code, cooperative_ref, household_ref, status,
-	     reason, event_time, actor_ref, device_id, idem_key, rule_version)
+	     reason, event_time, actor_ref, device_id, idem_key, rule_version,
+	     farmer_ref, lot_name, note, declared_area_ha, shape, department_code, on_behalf_of, support_reason)
 	  VALUES ($1::uuid, $2::uuid, $3::text, $4::uuid, $5::text, $6::text, $7::text, $8::text, $9::uuid, $10::uuid, $11::text,
-	     $12::text, $13::timestamptz, $14::uuid, $15::text, $16::text, $17::text)
+	     $12::text, $13::timestamptz, $14::uuid, $15::text, $16::text, $17::text,
+	     $18::uuid, $19::text, $20::text, $21::numeric, $22::text, $23::text, $24::uuid, $25::text)
 	  RETURNING seq, recorded_at`,
 		e.ID, e.TenantID, domain.StreamKey(e.PlotRef), e.PlotRef, e.Action, e.Code, nilIfEmpty(e.Name), e.CommuneCode,
 		nilIfZero(e.CooperativeRef), nilIfZero(e.HouseholdRef), e.Status, nilIfEmpty(e.Reason), e.EventTime.UTC(), e.ActorRef,
-		e.DeviceID, e.IdemKey, domain.RuleVersion).Scan(&e.Seq, &e.RecordedAt)
+		e.DeviceID, e.IdemKey, domain.RuleVersion,
+		nilIfZero(e.FarmerRef), nilIfEmpty(e.LotName), nilIfEmpty(e.Note), decPtr(e.DeclaredAreaHa), nilIfEmpty(e.Shape),
+		nilIfEmpty(e.Department), e.OnBehalfOf, e.SupportReason).Scan(&e.Seq, &e.RecordedAt)
 }
 
 // PlotEventByIdemKey tìm biến động đã ghi với idem_key.
 func PlotEventByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*PlotEvent, error) {
-	var e PlotEvent
-	var name, reason *string
-	var coop, hh *uuid.UUID
-	err := tx.QueryRow(ctx, `SELECT id, tenant_id, plot_ref, action, code, name, commune_code, cooperative_ref, household_ref,
-	    status, reason, event_time, actor_ref, idem_key, seq, recorded_at
-	  FROM pf_geo.plot_event WHERE idem_key = $1::text`, key).Scan(&e.ID, &e.TenantID, &e.PlotRef, &e.Action, &e.Code, &name,
-		&e.CommuneCode, &coop, &hh, &e.Status, &reason, &e.EventTime, &e.ActorRef, &e.IdemKey, &e.Seq, &e.RecordedAt)
+	e, err := scanPlotEvent(tx.QueryRow(ctx, "SELECT "+plotEventCols+" FROM pf_geo.plot_event WHERE idem_key = $1::text", key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	if name != nil {
-		e.Name = *name
-	}
-	if reason != nil {
-		e.Reason = *reason
-	}
-	e.CooperativeRef, e.HouseholdRef = deref(coop), deref(hh)
 	return &e, nil
 }
 
@@ -354,27 +371,35 @@ type Plot struct {
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 	GeoJSON           string // có khi đọc kèm hình
+	KNAttrs                  // KN v7.7 (000079)
 }
 
 const plotCols = `p.ref, p.code, coalesce(p.name, ''), p.commune_code, p.cooperative_ref, p.household_ref, p.status,
   coalesce(p.status_reason, ''), p.current_version, p.current_boundary_id, p.area_ha::text, p.source, p.needs_review,
-  p.revision, p.sync_seq, p.created_by, p.created_at, p.updated_at`
+  p.revision, p.sync_seq, p.created_by, p.created_at, p.updated_at,
+  p.farmer_ref, coalesce(p.lot_name, ''), coalesce(p.note, ''), p.declared_area_ha::text, coalesce(p.shape, ''),
+  coalesce(p.department_code, '')`
 
 func scanPlot(row pgx.Row, withGeom bool) (Plot, error) {
 	var p Plot
 	var area string
-	var coop, hh *uuid.UUID
+	var declared *string
+	var coop, hh, farmer *uuid.UUID
 	dest := []any{&p.Ref, &p.Code, &p.Name, &p.CommuneCode, &coop, &hh, &p.Status, &p.StatusReason, &p.CurrentVersion,
-		&p.CurrentBoundaryID, &area, &p.Source, &p.NeedsReview, &p.Revision, &p.SyncSeq, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt}
+		&p.CurrentBoundaryID, &area, &p.Source, &p.NeedsReview, &p.Revision, &p.SyncSeq, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt,
+		&farmer, &p.LotName, &p.Note, &declared, &p.Shape, &p.Department}
 	if withGeom {
 		dest = append(dest, &p.GeoJSON)
 	}
 	if err := row.Scan(dest...); err != nil {
 		return p, err
 	}
-	p.CooperativeRef, p.HouseholdRef = deref(coop), deref(hh)
+	p.CooperativeRef, p.HouseholdRef, p.FarmerRef = deref(coop), deref(hh), deref(farmer)
 	var err error
-	p.AreaHa, err = decimal.NewFromString(area)
+	if p.AreaHa, err = decimal.NewFromString(area); err != nil {
+		return p, err
+	}
+	p.DeclaredAreaHa, err = parseDec(declared)
 	return p, err
 }
 
@@ -409,11 +434,15 @@ func InsertPlot(ctx context.Context, tx pgx.Tx, tenantID uuid.UUID, p Plot, geoj
 	}
 	_, err := tx.Exec(ctx, `INSERT INTO pf_geo.plot
 	    (tenant_id, ref, code, name, commune_code, cooperative_ref, household_ref, status, current_version,
-	     current_boundary_id, geom, area_ha, source, needs_review, created_by)
+	     current_boundary_id, geom, area_ha, source, needs_review, created_by,
+	     farmer_ref, lot_name, note, declared_area_ha, shape, department_code)
 	  VALUES ($1::uuid, $2::uuid, $3::text, $4::text, $5::text, $6::uuid, $7::uuid, $8::text, $9::bigint, $10::uuid,
-	     `+geomSQL("$11")+`, $12::numeric, $13::text, $14::boolean, $15::uuid)`,
+	     `+geomSQL("$11")+`, $12::numeric, $13::text, $14::boolean, $15::uuid,
+	     $16::uuid, $17::text, $18::text, $19::numeric, $20::text, $21::text)`,
 		tenantID, p.Ref, p.Code, nilIfEmpty(p.Name), p.CommuneCode, nilIfZero(p.CooperativeRef), nilIfZero(p.HouseholdRef),
-		p.Status, p.CurrentVersion, p.CurrentBoundaryID, geojson, p.AreaHa.String(), p.Source, p.NeedsReview, p.CreatedBy)
+		p.Status, p.CurrentVersion, p.CurrentBoundaryID, geojson, p.AreaHa.String(), p.Source, p.NeedsReview, p.CreatedBy,
+		nilIfZero(p.FarmerRef), nilIfEmpty(p.LotName), nilIfEmpty(p.Note), decPtr(p.DeclaredAreaHa), nilIfEmpty(p.Shape),
+		nilIfEmpty(p.Department))
 	return err
 }
 

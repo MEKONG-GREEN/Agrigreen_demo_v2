@@ -54,6 +54,13 @@ type PlotSyncData struct {
 	NeedsReview    bool            `json:"needs_review"`
 	Geometry       json.RawMessage `json:"geometry"`
 	UpdatedAt      string          `json:"updated_at"`
+	// KN v7.7 (FN-XA-03.05): có khi thửa mang thuộc tính v7.7. farmer_label là nhãn đã che (chỉ người gọi có ngữ cảnh KN).
+	LotName        *string `json:"lot_name,omitempty"`
+	Note           *string `json:"note,omitempty"`
+	FarmerLabel    *string `json:"farmer_label,omitempty"`
+	DeclaredAreaHa *string `json:"declared_area_ha,omitempty"`
+	Shape          *string `json:"shape,omitempty"`
+	DepartmentCode *string `json:"department_code,omitempty"`
 }
 
 func strPtr(s string) *string {
@@ -100,7 +107,7 @@ func (src SyncSource) FarmerChanges(ctx context.Context, fs syncport.FarmerScope
 	if err != nil {
 		return nil, after, err
 	}
-	return plotChanges(rows, after, func(r store.Plot) bool { return slices.Contains(fs.Households, r.HouseholdRef) })
+	return plotChanges(rows, after, func(r store.Plot) bool { return slices.Contains(fs.Households, r.HouseholdRef) }, nil)
 }
 
 // Changes thực hiện syncport.Source. Con trỏ là pf_geo.plot.sync_seq. Thửa ngừng
@@ -130,11 +137,27 @@ func (src SyncSource) Changes(ctx context.Context, scope authz.Scope, entity str
 	if err != nil {
 		return nil, after, err
 	}
-	return plotChanges(rows, after, func(r store.Plot) bool { return a.sees(r.CommuneCode, r.CooperativeRef) })
+	sees := func(r store.Plot) bool { return a.sees(r.CommuneCode, r.CooperativeRef) }
+	var labels map[uuid.UUID]string
+	if p.KN != nil {
+		// KN v7.7: phạm vi = k.Scope (pf/sync truyền KN.Scope); thửa của phòng ban khác → tombstone.
+		k := *p.KN
+		sees = func(r store.Plot) bool {
+			return a.sees(r.CommuneCode, r.CooperativeRef) && (r.Department == "" || k.AllowsDepartment(r.Department))
+		}
+		visible := make([]store.Plot, 0, len(rows))
+		for _, r := range rows {
+			if r.Status != port.StatusRetired && sees(r) {
+				visible = append(visible, r)
+			}
+		}
+		labels = src.Svc.FarmerLabels(ctx, visible...)
+	}
+	return plotChanges(rows, after, sees, labels)
 }
 
 // plotChanges dựng thay đổi chiều xuống; thửa ngừng dùng hoặc người gọi không còn thấy → tombstone.
-func plotChanges(rows []store.Plot, after int64, sees func(store.Plot) bool) ([]syncport.Change, int64, error) {
+func plotChanges(rows []store.Plot, after int64, sees func(store.Plot) bool, labels map[uuid.UUID]string) ([]syncport.Change, int64, error) {
 	out := make([]syncport.Change, 0, len(rows))
 	last := after
 	for _, r := range rows {
@@ -145,13 +168,19 @@ func plotChanges(rows []store.Plot, after int64, sees func(store.Plot) bool) ([]
 			out = append(out, ch)
 			continue
 		}
-		data, err := json.Marshal(PlotSyncData{
+		d := PlotSyncData{
 			Ref: r.Ref.String(), Code: r.Code, Name: strPtr(r.Name), CommuneCode: r.CommuneCode,
 			CooperativeRef: refPtr(r.CooperativeRef), HouseholdRef: refPtr(r.HouseholdRef), Status: r.Status,
 			Version: r.CurrentVersion, BoundaryID: r.CurrentBoundaryID.String(), AreaHa: r.AreaHa.StringFixed(4),
 			Source: r.Source, NeedsReview: r.NeedsReview, Geometry: json.RawMessage(r.GeoJSON),
 			UpdatedAt: r.UpdatedAt.UTC().Format(time.RFC3339Nano),
-		})
+			LotName:   strPtr(r.LotName), Note: strPtr(r.Note), DeclaredAreaHa: decStr(r.DeclaredAreaHa), Shape: strPtr(r.Shape),
+			DepartmentCode: strPtr(r.Department),
+		}
+		if l, ok := labels[r.FarmerRef]; ok && r.FarmerRef != uuid.Nil && l != "" {
+			d.FarmerLabel = &l
+		}
+		data, err := json.Marshal(d)
 		if err != nil {
 			return nil, after, err
 		}
@@ -180,6 +209,12 @@ type BoundaryPayload struct {
 	Source         string          `json:"source"`
 	// ConfirmOverlap: người vẽ đã xác nhận giữ nguyên chồng lấn cùng HTX/thửa nháp trên máy.
 	ConfirmOverlap bool `json:"confirm_overlap"`
+	// KN v7.7 (FN-XA-03.05, người gửi có ngữ cảnh KN): tên lô, ghi chú, tên nông dân (máy chủ ghi vào kho định danh →
+	// farmer_ref, không lưu tên), cách vẽ.
+	LotName    string `json:"lot_name"`
+	Note       string `json:"note"`
+	FarmerName string `json:"farmer_name" pii:"true"`
+	Shape      string `json:"shape"`
 }
 
 func rejected(id uuid.UUID, err error) syncport.Result {
@@ -220,8 +255,15 @@ func optRef(field, s string) (uuid.UUID, error) {
 // Lệch diện tích khai báo không chặn — ghi vào sự kiện pf.geo.plot_boundary.recorded.
 func (snk SyncSink) Accept(ctx context.Context, scope authz.Scope, rec syncport.Record) syncport.Result {
 	s := snk.Svc
-	p, err := authz.Require(ctx, syncWriteRoles...)
-	if err != nil {
+	var p authz.Principal
+	var err error
+	if pk, ok := authz.FromContext(ctx); ok && pk.KN != nil {
+		// KN v7.7: vai nằm trong ngữ cảnh phiên (kn_xa/admin), không cần vai realm plot_editor.
+		if err := knWriter(*pk.KN); err != nil {
+			return rejected(rec.ID, err)
+		}
+		p = pk
+	} else if p, err = authz.Require(ctx, syncWriteRoles...); err != nil {
 		return rejected(rec.ID, err)
 	}
 	if rec.Entity != port.EntityPlotBoundary {
@@ -278,6 +320,11 @@ func (snk SyncSink) Accept(ctx context.Context, scope authz.Scope, rec syncport.
 		return rejected(rec.ID, problem.Validation.WithField("event_time", "bắt buộc (R-13)"))
 	}
 	a := accessFor(p, scope)
+	var kc *knCaller
+	if p.KN != nil {
+		kc = &knCaller{a: access{p: p, sc: scope}, k: *p.KN}
+		a = kc.a
+	}
 	var res WriteResult
 	switch rec.Op {
 	case syncport.OpCreate:
@@ -293,10 +340,23 @@ func (snk SyncSink) Accept(ctx context.Context, scope authz.Scope, rec syncport.
 		if err != nil {
 			return rejected(rec.ID, err)
 		}
-		res, err = s.create(ctx, a, CreateInput{
+		in := CreateInput{
 			PlotRef: ref, Name: pl.Name, CommuneCode: pl.CommuneCode, CooperativeRef: coop, HouseholdRef: hh,
 			Boundary: b, IdemKey: rec.IdemKey,
-		}, modeOffline, domain.SourceKNFieldApp)
+		}
+		if kc != nil {
+			lot := pl.LotName
+			if strings.TrimSpace(lot) == "" {
+				lot = pl.Name
+			}
+			kin, err := s.knCreateAttrs(ctx, *kc, KNCreateInput{CommuneCode: pl.CommuneCode, FarmerName: pl.FarmerName, LotName: lot,
+				Note: pl.Note, DeclaredAreaHa: b.DeclaredAreaHa, Shape: pl.Shape, IdemKey: rec.IdemKey})
+			if err != nil {
+				return rejected(rec.ID, err)
+			}
+			in.KN, in.Name = kin, kin.Attrs.LotName
+		}
+		res, err = s.create(ctx, a, in, modeOffline, domain.SourceKNFieldApp)
 		if err != nil {
 			return rejected(rec.ID, err)
 		}
@@ -315,9 +375,22 @@ func (snk SyncSink) Accept(ctx context.Context, scope authz.Scope, rec syncport.
 		if old == nil {
 			return rejected(rec.ID, problem.Validation.WithField("supersedes_id", "không có phiên bản ranh giới này"))
 		}
-		res, err = s.correct(ctx, a, CorrectInput{
+		cin := CorrectInput{
 			PlotRef: old.PlotRef, SupersedesID: old.ID, Reason: *rec.CorrectionReason, Boundary: b, IdemKey: rec.IdemKey,
-		}, modeOffline, domain.SourceKNFieldApp)
+		}
+		if kc != nil {
+			cur, err := s.knPlot(ctx, *kc, old.PlotRef)
+			if err != nil {
+				return rejected(rec.ID, err)
+			}
+			shape, err := knShape(pl.Shape)
+			if err != nil {
+				return rejected(rec.ID, err)
+			}
+			cin.KN = kc.input(cur.KNAttrs)
+			cin.KN.Attrs.Shape = shape
+		}
+		res, err = s.correct(ctx, a, cin, modeOffline, domain.SourceKNFieldApp)
 		if err != nil {
 			return rejected(rec.ID, err)
 		}
