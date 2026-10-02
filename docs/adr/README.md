@@ -23,6 +23,7 @@
 | 0019 | [Định danh thiết bị cân, ký tại nguồn và đồng hồ](0019-dinh-danh-thiet-bi-va-dong-ho.md) | Đề xuất — hợp đồng dây đóng băng ở G3-0 |
 | 0020 | [Liên thông nền tảng ↔ MKG khác tenant bằng cấp quyền chia sẻ (RB-2, Q-MKG-12)](0020-lien-thong-platform-mkg-khac-tenant.md) | Chấp nhận — chủ sản phẩm chốt 29–30/09/2026; hiện thực ở pf 000042 |
 | 0021 | [Hạ tầng Kubernetes G4 — operator, PKI, bí mật và tách vùng bằng cấu hình](0021-ha-tang-kubernetes-g4.md) | Đề xuất — hiện thực ở G4 (`deploy/k8s`, `deploy/iac`) |
+| 0026 | [Xuất bản báo cáo tổng hợp sang Google Sheets (Báo cáo Chi cục KN v7.7, RB-7)](0026-xuat-google-sheets.md) | Đề xuất — bộ chuyển tắt mặc định, chờ khách Q-14 (0022–0025 dùng ở nhánh G5) |
 
 ADR 0006, 0007, 0009, 0010, 0011 được chủ sản phẩm chấp nhận ngày 30/09/2026 trong phiên làm việc. Bảng đối chiếu cam kết → mã → kiểm thử ở [trien-khai-g1.md](trien-khai-g1.md).
 

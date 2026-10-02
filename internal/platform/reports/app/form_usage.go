@@ -43,7 +43,7 @@ func (f FormAvailability) HasForms(ctx context.Context, department, level, repor
 	if !ok {
 		return false, nil
 	}
-	fs, err := Forms{Svc: f.Svc}.AssignedForms(ctx, p.TenantID, department, level, reportTypeOf(reportType), f.Svc.now())
+	fs, err := Forms(f).AssignedForms(ctx, p.TenantID, department, level, reportTypeOf(reportType), f.Svc.now())
 	return len(fs) > 0, err
 }
 

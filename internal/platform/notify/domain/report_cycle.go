@@ -59,7 +59,7 @@ func ReportCycleNotifications(eventType string, payload json.RawMessage, occurre
 				delete(seen, r)
 				t := Template{Kind: port.KindReportTaskAssigned, Severity: port.SeverityNormal, Title: "Có công việc nộp báo cáo mới",
 					Body:     fmt.Sprintf("%s — %d công việc (%d kỳ), hạn kỳ đầu %s.", p.SeasonLabel, n, p.PeriodCount, due),
-					DeepLink: "/kn/cong-viec/dot/" + p.BatchID, SubjectRef: parseRef(p.BatchID), CreatedAt: at}
+					DeepLink: "/kn/nhiem-vu/cong-viec", SubjectRef: parseRef(p.BatchID), CreatedAt: at}
 				out = append(out, t.For(r))
 			}
 		}
@@ -74,7 +74,7 @@ func ReportCycleNotifications(eventType string, payload json.RawMessage, occurre
 			kind, title = port.KindReportTaskDue, "Nhắc hạn nộp báo cáo"
 		}
 		tpl = Template{Kind: kind, Severity: port.SeverityNormal, Title: title, Body: p.PeriodLabel + ": " + truncate(p.Message, 400),
-			DeepLink: "/kn/cong-viec/ky/" + p.PeriodID, SubjectRef: parseRef(p.PeriodID), CreatedAt: ParseTime(p.EventTime, occurred)}
+			DeepLink: "/kn/nhiem-vu/cong-viec", SubjectRef: parseRef(p.PeriodID), CreatedAt: ParseTime(p.EventTime, occurred)}
 		recips = refsOf(p.RecipientRefs)
 	case extport.EventSubmissionAdjustmentRequested:
 		var p extport.SubmissionAdjustmentRequestedV1
@@ -82,7 +82,7 @@ func ReportCycleNotifications(eventType string, payload json.RawMessage, occurre
 			return bad(err)
 		}
 		tpl = Template{Kind: port.KindReportAdjustmentRequested, Severity: port.SeverityNormal, Title: "Yêu cầu điều chỉnh báo cáo",
-			Body: p.FormCode + " · " + p.PeriodLabel + " · xã " + p.CommuneCode + ": " + truncate(p.Reason, 400), DeepLink: "/kn/cong-viec/" + p.TaskID,
+			Body: p.FormCode + " · " + p.PeriodLabel + " · xã " + p.CommuneCode + ": " + truncate(p.Reason, 400), DeepLink: "/kn/nhiem-vu/cong-viec/" + p.TaskID,
 			SubjectRef: parseRef(p.TaskID), CreatedAt: ParseTime(p.EventTime, occurred)}
 		recips = refsOf(p.RecipientRefs)
 	case extport.EventPeriodReopened:
@@ -92,7 +92,7 @@ func ReportCycleNotifications(eventType string, payload json.RawMessage, occurre
 		}
 		tpl = Template{Kind: port.KindReportPeriodReopened, Severity: port.SeverityNormal, Title: "Kỳ báo cáo được mở lại",
 			Body:     fmt.Sprintf("%s mở lại đến %s: %s", p.Label, viTime(ParseTime(p.ReopenUntil, occurred)), truncate(p.Reason, 300)),
-			DeepLink: "/kn/cong-viec/ky/" + p.PeriodID, SubjectRef: parseRef(p.PeriodID), CreatedAt: ParseTime(p.EventTime, occurred)}
+			DeepLink: "/kn/nhiem-vu/cong-viec", SubjectRef: parseRef(p.PeriodID), CreatedAt: ParseTime(p.EventTime, occurred)}
 		recips = refsOf(p.RecipientRefs)
 	default:
 		return nil, nil

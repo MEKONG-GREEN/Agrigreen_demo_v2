@@ -190,6 +190,27 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 403 | `extension.schedule_context_required` | pf/extension: tài khoản chưa có phòng ban/tỉnh, hoặc Cấp Xã chưa có xã phụ trách (tiên quyết FN-XA-03.08) |
 | 404 | `extension.schedule_no_previous` | pf/extension: "Sao chép tuần trước" khi tuần trước chưa có lịch có mục |
 | 403 | `self_approval_forbidden` | pf/extension: duyệt / yêu cầu chỉnh sửa lịch công tác của chính mình (R-56; DB cũng chặn bằng CHECK) |
+| 404 | `extension.report_batch_not_found` | pf/extension (KN v7.7 P4): không có đợt phát hành, hoặc ngoài tỉnh/phòng ban của ngữ cảnh — không lộ sự tồn tại |
+| 404 | `extension.report_task_not_found` | pf/extension: không có công việc nộp biểu, đợt đã thu hồi, hoặc ngoài xã phụ trách/tỉnh/phòng ban |
+| 404 | `extension.report_period_not_found` | pf/extension: không có kỳ báo cáo, hoặc ngoài phạm vi |
+| 404 | `extension.submission_not_found` | pf/extension: không có bài nộp |
+| 404 | `extension.consolidation_not_found` | pf/extension: kỳ × biểu chưa có lần tổng hợp ("Cập nhật") hoặc `run_id` không thuộc kỳ/biểu |
+| 422 | `extension.form_not_assigned` | pf/extension: mẫu chưa gán cho loại báo cáo của phòng ban (FN-AD-04.06) hoặc chưa có phiên bản phát hành áp dụng tại kỳ đầu |
+| 422 | `extension.form_no_structure` | pf/extension: mẫu chưa có cột nhập liệu — chặn phát hành (FN-TI-02.02) |
+| 422 | `extension.period_slots_exceeded` | pf/extension: số kỳ của đợt vượt số khe kỳ trên một dòng của mẫu nhiều kỳ (PL 01, 01B, 02, 07; tạm theo seed, chờ khách Q-01) |
+| 422 | `extension.no_communes` | pf/extension: chưa chọn xã nhận, hoặc mã xã không phải Nút xã đang hoạt động của tỉnh |
+| 409 | `extension.batch_has_submissions` | pf/extension: thu hồi đợt khi đã có xã gửi báo cáo |
+| 409 | `extension.batch_withdrawn` | pf/extension: đợt đã thu hồi |
+| 409 | `extension.deadline_no_future_period` | pf/extension: sửa hạn nộp khi mọi kỳ đã đến hạn/đã chốt (chỉ áp cho kỳ chưa đến hạn) |
+| 409 | `extension.period_closed` | pf/extension: kỳ đã chốt — gửi/sửa bị từ chối nếu chưa mở lại cho xã/biểu (FN-XA-03.02, FN-TI-02.04 AC) |
+| 409 | `extension.period_not_closed` | pf/extension: mở lại kỳ chưa chốt |
+| 422 | `extension.submission_invalid` | pf/extension: "Gửi báo cáo" vi phạm yêu cầu của mẫu; `issues` là vấn đề tại ô (mã `reports.cell_*`, `reports.rule_failed`) — không ghi |
+| 409 | `extension.task_not_submitted` | pf/extension: rà soát/xác nhận khi xã chưa gửi (hoặc đang Yêu cầu điều chỉnh) |
+| 409 | `extension.adjustment_after_close` | pf/extension: yêu cầu điều chỉnh sau chốt kỳ — phải mở lại kỳ trước (FN-TI-02.04 phụ) |
+| 403 | `extension.read_only` | pf/extension: Cấp Quốc gia chỉ xem (BRD §4.2) |
+| 403 | `extension.out_of_scope` | pf/extension: xã/tỉnh ngoài phạm vi của ngữ cảnh phiên, hoặc ngữ cảnh không gắn tỉnh/phòng ban |
+| 422 | `extension.support_reason_required` | pf/extension: chế độ hỗ trợ Admin ghi thiếu lý do (FN-AD-04.07) |
+| 403 | `self_approval_forbidden` | pf/extension (P4): người đã nhập thay bản nộp (on_behalf_of) tự rà soát/xác nhận/chốt kỳ có bản đó (gap §4.6) |
 
 Đồng bộ ngoại tuyến (`task_update`, `field_report`): lỗi nghiệp vụ trả trong `results[].code` với `status = rejected` theo cùng các mã trên; bản ghi gửi lặp (`idem_key` đã ghi) trả `duplicate`.
 
@@ -215,6 +236,14 @@ Phản hồi phát lại theo Idempotency-Key có header `Idempotent-Replayed: t
 |---|---|---|
 | 404 | `reports.template_not_found` | pf/reports: không có mẫu báo cáo với mã này (cả mẫu hệ thống lẫn phiên bản của tenant) |
 | 409 | `reports.template_retired` | pf/reports: mẫu đã ngừng dùng — không xuất, không lập lịch, không ngừng lại lần nữa |
+| 404 | `reports.dispatch_not_found` | pf/reports (KN v7.7 P4): không có lần xuất/gửi báo cáo Chi cục (hoặc tệp), hoặc ngoài tỉnh/phòng ban |
+| 404 | `reports.dispatch_recipient_not_found` | pf/reports: người nhận Chi cục không có/đã ngừng dùng/khác tỉnh |
+| 409 | `reports.dispatch_recipient_duplicate` | pf/reports: địa chỉ hộp thư đã có trong danh bạ đang dùng |
+| 409 | `reports.dispatch_no_data` | pf/reports: kỳ chưa có lần tổng hợp — bấm "Cập nhật" ở Báo cáo tổng hợp các xã trước |
+| 409 | `reports.gsheet_disabled` | pf/reports: tạo link Google Sheet khi bộ chuyển đang TẮT (mặc định; ADR-0026 "Đề xuất", RB-7) |
+| 409 | `reports.dispatch_sending` | pf/reports: đang gửi — chờ kết quả rồi mới gửi lại |
+| 422 | `reports.dispatch_no_recipients` | pf/reports: chưa chọn người nhận và chưa có người nhận mặc định |
+| 422 | `reports.gsheet_valve_blocked` | pf/reports: van mặc định chặn — mẫu có cột không phải số/nhãn tổ chức, không được đưa ra ngoài lãnh thổ |
 | 422 | `reports.format_unsupported` | pf/reports: mẫu không hỗ trợ định dạng đã chọn (`xlsx`/`pdf`) |
 | 404 | `reports.export_not_found` | pf/reports: không có việc xuất, hoặc người gọi không phải người yêu cầu và phạm vi không bao trọn |
 | 409 | `reports.export_not_ready` | pf/reports: việc xuất chưa xong hoặc đã hỏng — chưa có tệp để tải |

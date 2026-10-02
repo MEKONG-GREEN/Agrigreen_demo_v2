@@ -60,6 +60,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.GET("/consolidations/:id/changes", h.changes)
 
 	g.GET("/kn-dashboard", h.dashboard)
+	g.GET("/report-badges", h.badges)
 	g.GET("/commune-reports", h.communeReports)
 	g.GET("/commune-reports/stats", h.communeStats)
 }
@@ -1089,4 +1090,13 @@ func (h Handler) communeStats(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"commune_code": st.Commune, "batch": batch, "sown_area": metricDTO(st.SownArea), "sown_plan": metricDTO(st.SownPlan),
 		"sown_pct": metricDTO(st.SownPct), "pest_area": metricDTO(st.PestArea), "tasks_total": st.TotalTasks, "tasks_submitted": st.Submitted,
 		"tasks_due": st.DueTasks, "tasks_on_time": st.OnTime})
+}
+
+func (h Handler) badges(c *gin.Context) {
+	m, err := h.Svc.Badges(c.Request.Context())
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"counts": m})
 }

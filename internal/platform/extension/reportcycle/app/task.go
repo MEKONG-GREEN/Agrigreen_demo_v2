@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"slices"
 	"strings"
 	"time"
@@ -380,7 +381,7 @@ func (s *Service) Submit(ctx context.Context, taskID uuid.UUID, in SubmissionInp
 		out = SubmissionResult{Submission: sub, Task: viewOf(*t, *p, nil, now), Issues: issues}
 		return nil
 	})
-	if err == errStop {
+	if errors.Is(err, errStop) {
 		return out, ErrSubmissionInvalid.With("issues", out.Issues)
 	}
 	return out, err

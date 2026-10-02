@@ -111,7 +111,7 @@ type Dashboard struct {
 }
 
 // KNDashboard dựng dashboard từ bảng chỉ số dựng sẵn khi "Cập nhật" (consolidation_metric) + trạng thái nộp —
-// 6–8 truy vấn theo chỉ mục, không quét bài nộp (mục tiêu < 5 s, xem docs/runbooks/kn-dashboard-load.md).
+// 6–8 truy vấn theo chỉ mục, không quét bài nộp (mục tiêu < 5 s, xem docs/runbooks/kn-report-cycle-load.md).
 func (s *Service) KNDashboard(ctx context.Context, q DashboardQuery) (Dashboard, error) {
 	a, err := s.knActor(ctx, authz.KNTinh, authz.KNTW, authz.KNAdmin)
 	if err != nil {

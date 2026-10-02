@@ -69,8 +69,12 @@ func (u units) Get(_ context.Context, code string, _ time.Time) (mdport.AdminUni
 	}
 	return mdport.AdminUnit{Code: code, Name: n, Level: mdport.LevelCommune}, nil
 }
-func (u units) Descendants(_ context.Context, code string, _ time.Time) ([]string, error) { return []string{code}, nil }
-func (u units) Current(_ context.Context, code string, _ time.Time) ([]string, error)     { return []string{code}, nil }
+func (u units) Descendants(_ context.Context, code string, _ time.Time) ([]string, error) {
+	return []string{code}, nil
+}
+func (u units) Current(_ context.Context, code string, _ time.Time) ([]string, error) {
+	return []string{code}, nil
+}
 
 type regions struct {
 	byProvince map[string][]partyport.Region
@@ -335,8 +339,10 @@ func (c caller) do(srv *httptest.Server, method, path, idem string, body any) re
 
 func key() string { return "k-" + ids.New().String() }
 
-func (c caller) post(path string, body any) resp { return c.do(c.f.app, http.MethodPost, path, key(), body) }
-func (c caller) get(path string) resp            { return c.do(c.f.app, http.MethodGet, path, "", nil) }
+func (c caller) post(path string, body any) resp {
+	return c.do(c.f.app, http.MethodPost, path, key(), body)
+}
+func (c caller) get(path string) resp { return c.do(c.f.app, http.MethodGet, path, "", nil) }
 func (c caller) adminPost(path string, body any) resp {
 	return c.do(c.f.admin, http.MethodPost, path, key(), body)
 }

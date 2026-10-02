@@ -86,15 +86,6 @@ func submit(who caller, taskID, kind string, input map[string]string) resp {
 	return who.post("/v1/extension/report-tasks/"+taskID+"/submissions", map[string]any{"kind": kind, "rows": []any{map[string]any{"input": input}}})
 }
 
-func cell(rows []map[string]any, commune, letter string) string {
-	for _, r := range rows {
-		if str(r, "commune") == commune {
-			return str(obj(r, "cells"), letter)
-		}
-	}
-	return ""
-}
-
 func totalCell(totals []map[string]any, kind, region, letter string) string {
 	for _, r := range totals {
 		if str(r, "kind") == kind && str(r, "region") == region && str(r, "indicator") == "" {
@@ -165,6 +156,11 @@ func TestFN_TI_02_KN77FullCycle(t *testing.T) {
 		t.Fatalf("Cán bộ xã khác phòng ban không nhận: %d", len(arr(l.body, "items")))
 	}
 	c.xa1.fail(c.xa1.get("/v1/extension/report-tasks?commune="+c3), http.StatusForbidden, "extension.out_of_scope", "xã ngoài phạm vi")
+	// Số đếm menu (P2 badge_source): công việc còn phải gửi của kỳ đã bắt đầu.
+	bg := c.xa1.must(c.xa1.get("/v1/extension/report-badges"), http.StatusOK, "số đếm menu")
+	if num(obj(bg.body, "counts"), "extension.report_tasks.todo") != 4 {
+		t.Fatalf("badge công việc cần làm: %v", bg.body)
+	}
 
 	// FN-XA-03.02: lưu nháp rồi gửi (T01 Tuần 1, số tăng thêm tuần ở cột F).
 	t1c1 := c.task(t, c.xa1, "T01", c1, c.p1)
@@ -379,6 +375,15 @@ func TestFN_TI_02_KN77FullCycle(t *testing.T) {
 	s2 := c.xa1.must(submit(c.xa1, t2c1, "submitted", map[string]string{"E": "90", "F": "26", "G": "5"}), http.StatusCreated, "gửi kỳ 2")
 	if str(obj(arr(obj(s2.body, "submission"), "rows")[0], "cells"), "M") != "31" {
 		t.Fatalf("Lũy kế kỳ 2 = 26 + 5: %v", arr(obj(s2.body, "submission"), "rows"))
+	}
+
+	// N-07: máy ngoại tuyến gửi lại cùng id (UUIDv7) với Idempotency-Key khác → 200 trả bản đã có, không thêm phiên bản.
+	cid := ids.New().String()
+	off := map[string]any{"id": cid, "kind": "draft", "rows": []any{map[string]any{"input": map[string]string{"E": "90", "F": "26", "G": "5"}}}}
+	c.xa1.must(c.xa1.post("/v1/extension/report-tasks/"+t2c1+"/submissions", off), http.StatusCreated, "ngoại tuyến lần 1")
+	rp := c.xa1.must(c.xa1.post("/v1/extension/report-tasks/"+t2c1+"/submissions", off), http.StatusOK, "ngoại tuyến gửi lại")
+	if str(obj(rp.body, "submission"), "id") != cid || len(arr(c.xa1.get("/v1/extension/report-tasks/"+t2c1+"/history").body, "items")) != 2 {
+		t.Fatalf("gửi lại cùng id: %s", string(rp.raw))
 	}
 
 	// FN-XA-03.07: thống kê của xã khớp bản đã gửi.

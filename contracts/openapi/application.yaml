@@ -4100,6 +4100,23 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-badges:
+    get:
+      summary: "Số đếm menu việc cần xử lý của ngữ cảnh (badge_source của menu kn.menu/v2)"
+      operationId: rcBadges
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: "counts: extension.report_tasks.todo, extension.report_status.not_submitted, extension.submissions.pending_review, extension.report_tasks.ad_hoc_todo, extension.report_status.ad_hoc_pending"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [counts]
+                properties:
+                  counts: {type: object, additionalProperties: {type: integer}}
+        "403": {$ref: "#/components/responses/Problem"}
   /v1/extension/commune-reports:
     get:
       summary: "Báo cáo của xã: danh sách báo cáo theo xã phụ trách (FN-XA-03.07)"

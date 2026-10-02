@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -58,7 +59,7 @@ func TestFN_TI_02_06_SMTPAttachmentAndCC(t *testing.T) {
 	var datas [][]byte
 	for i := 0; ; i++ {
 		p, err := mr.NextPart()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

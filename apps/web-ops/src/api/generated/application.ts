@@ -2470,6 +2470,660 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/report-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mẫu đã gán cho loại báo cáo của phòng ban (Bước 1 phát hành, FN-TI-02.02) */
+        get: operations["rcReportForms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-batches/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Xem trước đợt phát hành: kỳ đã chia, số công việc = biểu × xã × kỳ, xã chưa có cán bộ
+         * @description Không ghi gì. Quy tắc chia kỳ Q-17 TẠM (tuần thứ Hai–Chủ nhật, nhãn "Tuần n của đợt" hoặc ISO theo tham số
+         *     extension.report_period_week_numbering); hạn mặc định tuần = Thứ Ba tuần sau 17:00, tháng = ngày 10 tháng sau.
+         */
+        post: operations["rcPreviewBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Các đợt đã phát hành (cursor) */
+        get: operations["rcListBatches"];
+        put?: never;
+        /**
+         * Phát hành biểu: sinh công việc xã × biểu × kỳ, giá trị Tỉnh giao, thông báo (FN-TI-02.02)
+         * @description Chỉ mẫu đã gán cho phòng ban của ngữ cảnh; chỉ cán bộ xã phụ trách CÙNG phòng ban nhận công việc. 8.670 công việc
+         *     sinh bằng một câu lệnh (≪ 2 s — docs/runbooks/kn-report-cycle-load.md). Số kỳ > số khe kỳ của mẫu → 422 extension.period_slots_exceeded.
+         */
+        post: operations["rcIssueBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-batches/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết đợt kèm kỳ */
+        get: operations["rcGetBatch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-batches/{id}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhật ký đợt (khung Log) */
+        get: operations["rcBatchLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-batches/{id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thu hồi đợt chưa có xã nào nộp (sự kiện bù, lý do bắt buộc) */
+        post: operations["rcWithdrawBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-batches/{id}/deadline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sửa hạn nộp — chỉ áp cho kỳ chưa đến hạn */
+        post: operations["rcChangeDeadline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-batches/{id}/provincial-values": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Giá trị cột Tỉnh giao (Cấp Xã chỉ xem xã mình) */
+        get: operations["rcProvincialValues"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-batches/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trạng thái nộp thời gian thực theo xã (FN-TI-02.03) */
+        get: operations["rcBatchStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-batches/{id}/reminders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử nhắc */
+        get: operations["rcReminders"];
+        put?: never;
+        /** Gửi nhắc nhở xã đã chọn / tất cả xã chưa nộp (tới tay < 1 phút) */
+        post: operations["rcRemind"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Công việc cần làm (FN-XA-03.01) — sắp theo hạn gần nhất; Cấp Tỉnh: công việc của tỉnh */
+        get: operations["rcListTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-tasks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Chi tiết công việc để mở màn nhập (layout: phiên bản mẫu, nhãn kỳ, khe kỳ đang mở)
+         * @description Lưới vẽ bằng GET /v1/reports/forms/{template_id}/versions/{v}/layout?period_label=… với layout.period_labels.
+         *     carried = giá trị các khe kỳ khác (chỉ xem).
+         */
+        get: operations["rcGetTask"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-tasks/{id}/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lưu nháp / Gửi báo cáo — mỗi lần là một phiên bản bất biến (RB-1)
+         * @description kind=submitted chỉ ghi khi đạt yêu cầu của mẫu (422 extension.submission_invalid kèm issues tại ô); chỉ khe kỳ của công việc
+         *     được nhập; sau chốt kỳ → 409 extension.period_closed (trừ khi mở lại). Client ngoại tuyến gửi id (UUIDv7): gửi lại cùng id → 200 bản đã có.
+         */
+        post: operations["rcSubmit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-tasks/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử sửa (mọi phiên bản) */
+        get: operations["rcHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-tasks/{id}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Khung Log của công việc */
+        get: operations["rcTaskLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-tasks/{id}/adjustment-request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Yêu cầu điều chỉnh (lý do bắt buộc, FN-TI-02.04)
+         * @description Kỳ đã chốt → 409 extension.adjustment_after_close. Người đã nhập thay bản này → 403 self_approval_forbidden.
+         */
+        post: operations["rcRequestAdjustment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-tasks/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xác nhận (tùy chọn) bản đã gửi */
+        post: operations["rcConfirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/kn-periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kỳ của đợt đã phát hành trong phạm vi (bộ lọc dashboard/báo cáo) */
+        get: operations["rcListPeriods"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-periods/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kỳ (khung Chốt kỳ: chốt tự động lúc, đã nộp n/N, các lần tổng hợp) */
+        get: operations["rcGetPeriod"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-periods/{id}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhật ký kỳ (chốt, tự chốt, mở lại, chốt lại) */
+        get: operations["rcPeriodLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-periods/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chốt kỳ ngay (kỳ đã chốt có xã/biểu mở lại → chốt lại); hệ thống tổng hợp một lần lúc chốt */
+        post: operations["rcClosePeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-periods/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mở lại kỳ đã chốt cho xã/biểu (lý do + thời hạn mở; hết hạn → tự chốt lại) */
+        post: operations["rcReopenPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/consolidations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Báo cáo tổng hợp các xã đúng bố cục mẫu (lần gần nhất hoặc run_id) — FN-TI-02.05, FN-TW-01.02
+         * @description Dòng xã + dòng Cộng khu vực/Toàn tỉnh (FormEngine.Totals; năng suất = sản lượng/diện tích). changed_cells = ô thay đổi so lần
+         *     trước (tooltip cũ/người/thời điểm). pending = "Có n thay đổi mới từ m xã". compare=previous_year: dòng Toàn tỉnh cùng kỳ năm trước.
+         */
+        get: operations["rcGetConsolidation"];
+        put?: never;
+        /**
+         * Cập nhật: lấy bản Đã gửi mới nhất từng xã, tổng hợp lại, ghi lần tổng hợp bất biến + nhật ký ô
+         * @description 201 khi có lần mới; 200 "Dữ liệu đã mới nhất" khi không có thay đổi.
+         */
+        post: operations["rcConsolidate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/consolidations/pending-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thay đổi chờ cập nhật */
+        get: operations["rcPendingChanges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/consolidations/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhật ký cập nhật (mọi lần, không xóa) */
+        get: operations["rcRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/consolidations/{id}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết ô thay đổi của một lần (xã, cột Excel, cũ → mới, người sửa, loại) */
+        get: operations["rcRunChanges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/kn-dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dashboard trồng trọt Tỉnh/TW (chỉ đọc) từ lần tổng hợp gần nhất (FN-TI-02.01, FN-TW-01.01)
+         * @description Đọc bảng chỉ số dựng sẵn khi Cập nhật (consolidation_metric) — số trùng Báo cáo tổng hợp cùng kỳ; mục tiêu < 5 s.
+         *     Cấp Quốc gia/Admin bắt buộc province.
+         */
+        get: operations["rcDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/report-badges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Số đếm menu việc cần xử lý của ngữ cảnh (badge_source của menu kn.menu/v2) */
+        get: operations["rcBadges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/commune-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Báo cáo của xã: danh sách báo cáo theo xã phụ trách (FN-XA-03.07) */
+        get: operations["rcCommuneReports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/commune-reports/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thống kê của xã theo vụ/đợt (từ chính bản đã gửi) */
+        get: operations["rcCommuneStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/dispatch-recipients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh bạ người nhận Chi cục (hộp thư đơn vị, Q-09 tạm; TW thấy địa chỉ đã che) */
+        get: operations["dispRecipients"];
+        put?: never;
+        /** Thêm người nhận / CC */
+        post: operations["dispAddRecipient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/dispatch-recipients/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ngừng dùng người nhận (lý do bắt buộc) */
+        post: operations["dispDeactivateRecipient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/dispatches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử xuất/gửi */
+        get: operations["dispList"];
+        put?: never;
+        /**
+         * Xuất file toàn tỉnh của kỳ từ lần tổng hợp gần nhất (Excel theo mẫu, PDF; Google Sheet tắt mặc định — ADR-0026)
+         * @description Mỗi tệp đi qua điểm kiểm soát DLP (export_audit kind dispatch). Kỳ chưa tổng hợp → 409 reports.dispatch_no_data; gsheet khi
+         *     cờ tắt → 409 reports.gsheet_disabled. Kỳ chưa chốt/còn xã chưa nộp → tệp ghi "Tạm tính" + danh sách xã chưa nộp.
+         */
+        post: operations["dispCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/dispatches/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lần xuất/gửi kèm tệp và log */
+        get: operations["dispGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/dispatches/{id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Gửi email (worker SMTP, đính kèm; vượt giới hạn → chỉ liên kết); gửi lại khi Gửi lỗi
+         * @description Không chọn người nhận → người nhận mặc định (lần trước). 202; kết quả sent/failed xem ở GET /dispatches/{id}.
+         */
+        post: operations["dispSend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/dispatches/{id}/files/{file}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** URL tải tệp (chỉ tải, không gửi) — qua điểm kiểm soát */
+        get: operations["dispDownload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/reports/templates": {
         parameters: {
             query?: never;
@@ -8080,6 +8734,718 @@ export interface components {
                 supersedes_response_id: string | null;
             }[];
         };
+        RcFormList: {
+            items: {
+                [key: string]: unknown;
+            }[];
+        };
+        RcBatchInput: {
+            /** @enum {string} */
+            report_type: "weekly" | "monthly" | "seasonal" | "annual" | "adhoc";
+            template_ids: string[];
+            scope: {
+                /** @enum {string} */
+                mode: "province" | "regions" | "communes";
+                regions?: string[];
+                communes?: string[];
+            };
+            /** @enum {string} */
+            period_type?: "week" | "month" | "season" | "year" | "adhoc";
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+            season_label: string;
+            deadline?: {
+                offset_days?: number;
+                time?: string;
+            };
+            close_after_days?: number;
+            note?: string;
+            /** @description template_id → mã xã → chữ cái cột Tỉnh giao → giá trị */
+            provincial_values?: {
+                [key: string]: {
+                    [key: string]: {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @enum {string} */
+            provincial_source?: "manual" | "excel";
+            copy_provincial_from_previous?: string[];
+        };
+        RcPreview: {
+            report_type: string;
+            period_type: string;
+            period_rule: string;
+            deadline: {
+                [key: string]: unknown;
+            };
+            close_after_days: number;
+            forms: {
+                [key: string]: unknown;
+            }[];
+            periods: {
+                [key: string]: unknown;
+            }[];
+            communes: {
+                [key: string]: unknown;
+            }[];
+            communes_without_officer: string[];
+            provincial_columns: {
+                [key: string]: unknown;
+            }[];
+            form_count: number;
+            commune_count: number;
+            period_count: number;
+            task_count: number;
+            warnings: string[];
+        };
+        RcBatchForm: {
+            /** Format: uuid */
+            template_id: string;
+            /** Format: uuid */
+            version_id: string;
+            code: string;
+            name: string;
+            version: number;
+            period_block: boolean;
+        };
+        RcBatch: {
+            /** Format: uuid */
+            id: string;
+            department_code: string;
+            province_code: string;
+            report_type: string;
+            period_type: string;
+            season_label: string;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+            period_rule: string;
+            deadline_offset_days: number;
+            deadline_time: string;
+            close_after_days: number;
+            note: string | null;
+            forms: components["schemas"]["RcBatchForm"][];
+            communes: string[];
+            /** @enum {string} */
+            status: "issued" | "withdrawn";
+            period_count: number;
+            task_count: number;
+            /** Format: uuid */
+            issued_by: string;
+            /** Format: date-time */
+            issued_at: string;
+            /** Format: uuid */
+            withdrawn_by: string | null;
+            /** Format: date-time */
+            withdrawn_at: string | null;
+            withdraw_reason: string | null;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        RcPeriod: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            batch_id: string;
+            slot: number;
+            label: string;
+            range_label: string;
+            iso_week: number | null;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+            /** Format: date-time */
+            due_at: string;
+            /** Format: date-time */
+            auto_close_at: string;
+            /** @enum {string} */
+            status: "open" | "closed";
+            /** Format: date-time */
+            closed_at: string | null;
+            /** Format: uuid */
+            closed_by: string | null;
+            /** @enum {string|null} */
+            close_mode: "manual" | "auto" | null;
+        };
+        RcIssueResult: {
+            batch: components["schemas"]["RcBatch"];
+            periods: components["schemas"]["RcPeriod"][];
+            warnings: string[];
+            communes_without_officer: string[];
+        };
+        RcBatchPage: {
+            items: components["schemas"]["RcBatch"][];
+            next_cursor: string | null;
+        };
+        RcBatchDetail: {
+            batch: components["schemas"]["RcBatch"];
+            periods: components["schemas"]["RcPeriod"][];
+        };
+        RcLogEntry: {
+            event: string;
+            /** Format: uuid */
+            actor_ref: string;
+            actor_display: string;
+            /** Format: date-time */
+            at: string;
+            changes: {
+                [key: string]: unknown;
+            }[];
+            reason: string | null;
+            /** Format: uuid */
+            on_behalf_of: string | null;
+            /** @description chi tiết sự kiện (tùy loại) */
+            detail?: unknown;
+        };
+        RcLogPage: {
+            items: components["schemas"]["RcLogEntry"][];
+            next_cursor: string | null;
+        };
+        RcReason: {
+            reason?: string;
+            note?: string;
+        };
+        RcDeadlineChange: {
+            period_ids?: string[];
+            /** Format: date-time */
+            due_at?: string;
+            deadline?: {
+                offset_days?: number;
+                time?: string;
+            };
+            close_after_days?: number;
+            reason: string;
+        };
+        RcDeadlineChanges: {
+            changes: {
+                [key: string]: unknown;
+            }[];
+        };
+        RcProvincialValues: {
+            items: {
+                /** Format: uuid */
+                template_id: string;
+                commune_code: string;
+                cells: {
+                    [key: string]: string;
+                };
+            }[];
+        };
+        RcTask: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            batch_id: string;
+            /** Format: uuid */
+            period_id: string;
+            /** Format: uuid */
+            template_id: string;
+            /** Format: uuid */
+            version_id: string;
+            form_code: string;
+            department_code: string;
+            province_code: string;
+            commune_code: string;
+            region_code: string;
+            slot: number;
+            period_block: boolean;
+            period_label: string;
+            period_range: string;
+            /** Format: date-time */
+            due_at: string;
+            /** @enum {string} */
+            status: "not_started" | "draft" | "submitted" | "overdue" | "adjustment_requested" | "confirmed" | "closed";
+            status_label: string;
+            /** @enum {string} */
+            stored_status: "not_started" | "draft" | "submitted" | "adjustment_requested" | "confirmed";
+            open: boolean;
+            assignees: string[];
+            latest_version: number;
+            /** Format: date-time */
+            submitted_at: string | null;
+            /** Format: uuid */
+            submitted_by: string | null;
+            /** Format: uuid */
+            on_behalf_of: string | null;
+            adjustment_reason: string | null;
+            /** Format: date-time */
+            confirmed_at: string | null;
+            /** Format: date-time */
+            last_reminded_at: string | null;
+            /** Format: date-time */
+            reopened_until: string | null;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        RcReminder: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            batch_id: string;
+            /** Format: uuid */
+            period_id: string;
+            /** Format: uuid */
+            template_id: string | null;
+            /** @enum {string} */
+            mode: "manual" | "auto_before" | "auto_overdue";
+            message: string;
+            communes: string[];
+            task_ids: string[];
+            recipient_count: number;
+            /** Format: uuid */
+            actor_ref: string;
+            actor_display: string;
+            /** Format: date-time */
+            at: string;
+        };
+        RcTaskList: {
+            items: components["schemas"]["RcTask"][];
+            counts: {
+                todo: number;
+                overdue: number;
+                adjustment_requested: number;
+            };
+            last_reminder: components["schemas"]["RcReminder"] | null;
+        };
+        RcCellIssue: {
+            row_key: string;
+            letter?: string;
+            code: string;
+            message: string;
+            /** @enum {string} */
+            severity: "error" | "warning";
+            rule_id?: string;
+        };
+        RcSubRow: {
+            key: string;
+            indicator?: string;
+            input: {
+                [key: string]: string;
+            };
+            cells: {
+                [key: string]: string;
+            };
+        };
+        RcSubmission: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            task_id: string;
+            version_no: number;
+            /** Format: uuid */
+            form_version_id: string;
+            /** @enum {string} */
+            kind: "draft" | "submitted";
+            rows: components["schemas"]["RcSubRow"][];
+            issues: components["schemas"]["RcCellIssue"][];
+            adjustment_response: boolean;
+            /** Format: uuid */
+            previous_id: string | null;
+            /** Format: uuid */
+            on_behalf_of: string | null;
+            /** Format: uuid */
+            support_session_id?: string | null;
+            support_reason?: string | null;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            actor_ref: string;
+            actor_display?: string;
+        };
+        RcTaskDetail: {
+            task: components["schemas"]["RcTask"];
+            batch: components["schemas"]["RcBatch"];
+            period: components["schemas"]["RcPeriod"];
+            form_name: string;
+            layout: {
+                /** Format: uuid */
+                template_id: string;
+                /** Format: uuid */
+                version_id: string;
+                period_labels: string[];
+                season: string;
+                open_slots: number[];
+            };
+            provincial_values: {
+                [key: string]: string;
+            };
+            /** @description khóa dòng → chữ cái → giá trị của khe kỳ khác */
+            carried: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+            latest: components["schemas"]["RcSubmission"] | null;
+            latest_submitted: components["schemas"]["RcSubmission"] | null;
+        };
+        RcSubmissionInput: {
+            /**
+             * Format: uuid
+             * @description UUIDv7 do client ngoại tuyến sinh
+             */
+            id?: string;
+            /** @enum {string} */
+            kind: "draft" | "submitted";
+            rows: {
+                indicator?: string;
+                input: {
+                    [key: string]: string;
+                };
+            }[];
+            /** Format: date-time */
+            event_time?: string;
+            device_id?: string;
+        };
+        RcSubmissionResult: {
+            submission: components["schemas"]["RcSubmission"];
+            task: components["schemas"]["RcTask"];
+            issues: components["schemas"]["RcCellIssue"][];
+        };
+        RcSubmissionList: {
+            items: components["schemas"]["RcSubmission"][];
+        };
+        RcTaskEnvelope: {
+            task: components["schemas"]["RcTask"];
+        };
+        RcStatusBoard: {
+            period: components["schemas"]["RcPeriod"];
+            counts: {
+                [key: string]: number;
+            };
+            items: {
+                [key: string]: unknown;
+            }[];
+        };
+        RcRemindInput: {
+            /** Format: uuid */
+            period_id: string;
+            /** Format: uuid */
+            template_id?: string | null;
+            communes?: string[];
+            all_pending?: boolean;
+            message: string;
+        };
+        RcRemindResult: {
+            reminder: components["schemas"]["RcReminder"];
+            skipped_no_officer: string[];
+            skipped_done: string[];
+        };
+        RcReminderList: {
+            items: components["schemas"]["RcReminder"][];
+        };
+        RcPeriodList: {
+            items: components["schemas"]["RcPeriod"][];
+        };
+        RcRun: {
+            /** Format: uuid */
+            id: string;
+            run_no: number;
+            /** Format: uuid */
+            period_id: string;
+            /** Format: uuid */
+            template_id: string;
+            /** Format: uuid */
+            version_id: string;
+            form_code: string;
+            /** @enum {string} */
+            trigger: "manual" | "system";
+            /** Format: uuid */
+            actor_ref: string;
+            actor_display: string;
+            /** Format: uuid */
+            on_behalf_of: string | null;
+            /** Format: date-time */
+            at: string;
+            communes_total: number;
+            communes_with_data: number;
+            communes_changed: number;
+            cells_changed: number;
+            provisional: boolean;
+            missing_communes: string[];
+            regions: {
+                [key: string]: unknown;
+            }[];
+            /** Format: uuid */
+            previous_run_id: string | null;
+        };
+        RcPeriodView: {
+            period: components["schemas"]["RcPeriod"];
+            batch: components["schemas"]["RcBatch"];
+            submitted: number;
+            total: number;
+            reopened: number;
+            runs: components["schemas"]["RcRun"][];
+        };
+        RcReopenInput: {
+            communes?: string[];
+            template_ids?: string[];
+            reason: string;
+            /** Format: date-time */
+            until: string;
+        };
+        RcReopenResult: {
+            period: components["schemas"]["RcPeriod"];
+            batch: components["schemas"]["RcBatch"];
+            submitted: number;
+            total: number;
+            reopened: number;
+            runs: components["schemas"]["RcRun"][];
+            task_ids: string[];
+            /** @description kỳ đã gửi Chi cục → cảnh báo số liệu đã thay đổi */
+            dispatch_changed: boolean;
+        };
+        RcGridRow: {
+            key: string;
+            commune: string;
+            commune_name?: string;
+            region?: string;
+            region_name?: string;
+            indicator?: string;
+            cells: {
+                [key: string]: string;
+            };
+        };
+        RcGridTotal: {
+            key: string;
+            /** @enum {string} */
+            kind: "region" | "province";
+            region?: string;
+            region_name?: string;
+            indicator?: string;
+            members: number;
+            cells: {
+                [key: string]: string;
+            };
+        };
+        RcPending: {
+            changes: number;
+            communes: number;
+            items: {
+                [key: string]: unknown;
+            }[];
+        };
+        RcConsolidationView: {
+            period: components["schemas"]["RcPeriod"];
+            batch: components["schemas"]["RcBatch"];
+            form_name: string;
+            run: components["schemas"]["RcRun"];
+            /** @enum {string} */
+            status_label: "Tạm tính" | "Đã chốt";
+            read_only: boolean;
+            rows: components["schemas"]["RcGridRow"][];
+            totals: components["schemas"]["RcGridTotal"][];
+            missing: {
+                [key: string]: unknown;
+            }[];
+            changed_cells: {
+                [key: string]: unknown;
+            }[];
+            pending: components["schemas"]["RcPending"];
+            compare: {
+                [key: string]: unknown;
+            } | null;
+        };
+        RcConsolidateInput: {
+            /** Format: uuid */
+            period_id: string;
+            template_ids?: string[];
+        };
+        RcConsolidateResult: {
+            runs: components["schemas"]["RcRun"][];
+            up_to_date: string[];
+            message: string;
+        };
+        RcRunList: {
+            items: components["schemas"]["RcRun"][];
+        };
+        RcChange: {
+            /** Format: uuid */
+            id: string;
+            commune_code: string;
+            row_key: string;
+            letter: string;
+            old: string | null;
+            new: string | null;
+            /** @enum {string} */
+            kind: "new" | "resubmit" | "adjusted" | "computed";
+            /** Format: uuid */
+            submission_id: string | null;
+            /** Format: uuid */
+            changed_by: string | null;
+            changed_by_display: string;
+            /** Format: uuid */
+            on_behalf_of: string | null;
+            /** Format: date-time */
+            submitted_at: string | null;
+        };
+        RcChangePage: {
+            run: components["schemas"]["RcRun"];
+            items: components["schemas"]["RcChange"][];
+            next_cursor: string | null;
+        };
+        RcMetric: {
+            /** @description decimal dạng chuỗi */
+            value: string | null;
+            /** Format: date-time */
+            as_of: string | null;
+        };
+        RcDashboard: {
+            province: string;
+            region: string;
+            period: components["schemas"]["RcPeriod"] | null;
+            batch: components["schemas"]["RcBatch"] | null;
+            periods: components["schemas"]["RcPeriod"][];
+            /** Format: date-time */
+            updated_at: string | null;
+            empty: boolean;
+            /** @description sown_area, sown_plan, sown_pct, harvest_area, harvest_output, harvest_yield, veg_*, pest_area, pest_severe, fruit_area: RcMetric; submitted: {communes_submitted, communes_total} */
+            cards: {
+                [key: string]: unknown;
+            };
+            sown_by_week: {
+                [key: string]: unknown;
+            }[];
+            tra: {
+                [key: string]: unknown;
+            }[];
+            sown_by_region: {
+                [key: string]: unknown;
+            }[];
+            pests_top: {
+                [key: string]: unknown;
+            }[];
+            unsubmitted: {
+                [key: string]: unknown;
+            }[];
+            by_commune: {
+                [key: string]: unknown;
+            }[];
+            alerts: {
+                /** @enum {string} */
+                level: "urgent" | "warning" | "info";
+                code: string;
+                message: string;
+            }[];
+            region_names: {
+                [key: string]: string;
+            };
+            versions: {
+                [key: string]: string;
+            };
+            read_only: boolean;
+        };
+        RcCommuneStats: {
+            commune_code: string;
+            batch: components["schemas"]["RcBatch"] | null;
+            sown_area: components["schemas"]["RcMetric"];
+            sown_plan: components["schemas"]["RcMetric"];
+            sown_pct: components["schemas"]["RcMetric"];
+            pest_area: components["schemas"]["RcMetric"];
+            tasks_total: number;
+            tasks_submitted: number;
+            tasks_due: number;
+            tasks_on_time: number;
+        };
+        DispRecipient: {
+            /** Format: uuid */
+            id: string;
+            label: string;
+            address: string | null;
+            masked: boolean;
+            /** @enum {string} */
+            kind: "to" | "cc";
+            is_default: boolean;
+            active: boolean;
+            /** Format: date-time */
+            last_used_at: string | null;
+        };
+        DispRecipientList: {
+            items: components["schemas"]["DispRecipient"][];
+        };
+        DispRecipientInput: {
+            label: string;
+            /** Format: email */
+            address: string;
+            /** @enum {string} */
+            kind: "to" | "cc";
+            is_default?: boolean;
+        };
+        DispCreateInput: {
+            /** Format: uuid */
+            period_id: string;
+            form_codes?: string[];
+            formats?: ("xlsx" | "pdf" | "gsheet")[];
+        };
+        DispSendInput: {
+            recipient_ids?: string[];
+            cc_ids?: string[];
+            subject?: string;
+            body?: string;
+        };
+        Dispatch: {
+            /** Format: uuid */
+            id: string;
+            department_code: string;
+            province_code: string;
+            /** Format: uuid */
+            period_id: string;
+            period_label: string;
+            run_ids: string[];
+            forms: string[];
+            formats: string[];
+            provisional: boolean;
+            missing_communes: string[];
+            /** @enum {string} */
+            status: "exported" | "sending" | "sent" | "failed";
+            recipient_ids: string[];
+            cc_ids: string[];
+            subject: string | null;
+            body: string | null;
+            link_only: boolean;
+            attempts: number;
+            last_error: string | null;
+            /** Format: date-time */
+            sent_at: string | null;
+            /** Format: uuid */
+            created_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        DispView: {
+            dispatch: components["schemas"]["Dispatch"];
+            files: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                format: "xlsx" | "pdf";
+                form_code: string;
+                file_name: string;
+                sha256: string;
+                size_bytes: number;
+                /** Format: date-time */
+                created_at: string;
+            }[];
+            log: {
+                [key: string]: unknown;
+            }[];
+        };
+        DispPage: {
+            items: components["schemas"]["Dispatch"][];
+            next_cursor: string | null;
+        };
+        DispDownload: {
+            url: string;
+            expires_in_seconds: number;
+        };
     };
     responses: {
         /** @description RFC 9457 */
@@ -12960,6 +14326,1341 @@ export interface operations {
             };
             /** @description content.library_item_not_found */
             404: components["responses"]["Problem"];
+        };
+    };
+    rcReportForms: {
+        parameters: {
+            query?: {
+                report_type?: "weekly" | "monthly" | "seasonal" | "annual" | "adhoc";
+                from_date?: string;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcFormList"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcPreviewBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                /** @description Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07) */
+                "X-AG-Reason"?: string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RcBatchInput"];
+            };
+        };
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcPreview"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcListBatches: {
+        parameters: {
+            query?: {
+                province?: string;
+                report_type?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcBatchPage"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcIssueBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                /** @description Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07) */
+                "X-AG-Reason"?: string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RcBatchInput"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key hoặc không có thay đổi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcIssueResult"];
+                };
+            };
+            /** @description Đã phát hành */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcIssueResult"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcGetBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcBatchDetail"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcBatchLog: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcLogPage"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcWithdrawBatch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                /** @description Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07) */
+                "X-AG-Reason"?: string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RcReason"];
+            };
+        };
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcBatch"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcChangeDeadline: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                /** @description Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07) */
+                "X-AG-Reason"?: string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RcDeadlineChange"];
+            };
+        };
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcDeadlineChanges"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcProvincialValues: {
+        parameters: {
+            query?: {
+                template_id?: string;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcProvincialValues"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcBatchStatus: {
+        parameters: {
+            query?: {
+                period_id?: string;
+                template_id?: string;
+                status?: "not_started" | "draft" | "submitted" | "overdue" | "adjustment_requested" | "confirmed" | "closed" | "no_officer";
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcStatusBoard"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcReminders: {
+        parameters: {
+            query?: {
+                period_id?: string;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcReminderList"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcRemind: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                /** @description Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07) */
+                "X-AG-Reason"?: string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RcRemindInput"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key hoặc không có thay đổi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcRemindResult"];
+                };
+            };
+            /** @description Đã nhắc */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcRemindResult"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcListTasks: {
+        parameters: {
+            query?: {
+                commune?: string;
+                period_type?: "week" | "month" | "season" | "year" | "adhoc";
+                status?: "not_started" | "draft" | "submitted" | "overdue" | "adjustment_requested" | "confirmed" | "closed";
+                form_code?: string;
+                batch_id?: string;
+                period_id?: string;
+                limit?: number;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcTaskList"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcGetTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcTaskDetail"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcSubmit: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                /** @description Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07) */
+                "X-AG-Reason"?: string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RcSubmissionInput"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key hoặc không có thay đổi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcSubmissionResult"];
+                };
+            };
+            /** @description Đã ghi phiên bản */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcSubmissionResult"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcHistory: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcSubmissionList"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcTaskLog: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcLogPage"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcRequestAdjustment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                /** @description Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07) */
+                "X-AG-Reason"?: string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RcReason"];
+            };
+        };
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcTaskEnvelope"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcConfirm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                /** @description Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07) */
+                "X-AG-Reason"?: string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RcReason"];
+            };
+        };
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcTaskEnvelope"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcListPeriods: {
+        parameters: {
+            query?: {
+                province?: string;
+                report_type?: string;
+                batch_id?: string;
+                limit?: number;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcPeriodList"];
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    rcGetPeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcPeriodView"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcPeriodLog: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcLogPage"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcClosePeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                /** @description Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07) */
+                "X-AG-Reason"?: string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcPeriodView"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    rcReopenPeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                /** @description Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07) */
+                "X-AG-Reason"?: string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RcReopenInput"];
+            };
+        };
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcReopenResult"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcGetConsolidation: {
+        parameters: {
+            query?: {
+                period_id?: string;
+                template_id?: string;
+                form_code?: string;
+                run_id?: string;
+                region?: string;
+                compare?: "previous_year";
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcConsolidationView"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcConsolidate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                /** @description Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07) */
+                "X-AG-Reason"?: string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RcConsolidateInput"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key hoặc không có thay đổi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcConsolidateResult"];
+                };
+            };
+            /** @description Đã tạo lần tổng hợp */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcConsolidateResult"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcPendingChanges: {
+        parameters: {
+            query?: {
+                period_id?: string;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcPending"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcRuns: {
+        parameters: {
+            query?: {
+                period_id?: string;
+                template_id?: string;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcRunList"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcRunChanges: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcChangePage"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcDashboard: {
+        parameters: {
+            query?: {
+                province?: string;
+                region?: string;
+                period_id?: string;
+                batch_id?: string;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcDashboard"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcBadges: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description counts: extension.report_tasks.todo, extension.report_status.not_submitted, extension.submissions.pending_review, extension.report_tasks.ad_hoc_todo, extension.report_status.ad_hoc_pending */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        counts: {
+                            [key: string]: number;
+                        };
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    rcCommuneReports: {
+        parameters: {
+            query?: {
+                commune?: string;
+                period_type?: string;
+                status?: string;
+                form_code?: string;
+                batch_id?: string;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcTaskList"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcCommuneStats: {
+        parameters: {
+            query?: {
+                commune?: string;
+                batch_id?: string;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RcCommuneStats"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    dispRecipients: {
+        parameters: {
+            query?: {
+                province?: string;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DispRecipientList"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    dispAddRecipient: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                /** @description Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07) */
+                "X-AG-Reason"?: string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DispRecipientInput"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key hoặc không có thay đổi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DispRecipient"];
+                };
+            };
+            /** @description Đã thêm */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DispRecipient"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    dispDeactivateRecipient: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                /** @description Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07) */
+                "X-AG-Reason"?: string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RcReason"];
+            };
+        };
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DispRecipient"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    dispList: {
+        parameters: {
+            query?: {
+                province?: string;
+                period_id?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DispPage"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    dispCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                /** @description Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07) */
+                "X-AG-Reason"?: string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DispCreateInput"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key hoặc không có thay đổi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DispView"];
+                };
+            };
+            /** @description Đã xuất */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DispView"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    dispGet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DispView"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    dispSend: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+                /** @description Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07) */
+                "X-AG-Reason"?: string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DispSendInput"];
+            };
+        };
+        responses: {
+            /** @description Đã xếp gửi */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DispView"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    dispDownload: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Ngữ cảnh phiên KN (P1) */
+                "X-AG-Context": string;
+            };
+            path: {
+                id: string;
+                file: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DispDownload"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     listReportTemplates: {

@@ -2109,6 +2109,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reports/dispatch-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cấu hình báo cáo Chi cục (KN v7.7 FN-TI-02.06) — cờ Google Sheet (TẮT mặc định, ADR-0026), SMTP công vụ đã cấu hình */
+        get: operations["adminDispatchSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/reports/templates": {
         parameters: {
             query?: never;
@@ -9289,6 +9306,34 @@ export interface operations {
                     "application/json": {
                         items: components["schemas"]["KNSupportLogEntry"][];
                         next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    adminDispatchSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cấu hình hiện hành (chỉ đọc; bật qua biến môi trường AG_REPORTS_GSHEET + AG_EXTDATA_GSHEET_ADR + AG_NONPII_ALLOWLIST) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        gsheet_enabled: boolean;
+                        gsheet_adr: string;
+                        /** @enum {string} */
+                        gsheet_share_mode: "recipients" | "anyone_with_link";
+                        gsheet_connected: boolean;
+                        smtp_configured: boolean;
                     };
                 };
             };

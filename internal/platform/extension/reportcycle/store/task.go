@@ -106,6 +106,37 @@ func InsertTasks(ctx context.Context, tx pgx.Tx, tid, batchID uuid.UUID, dept, p
 	return nil
 }
 
+// TaskCount là số công việc theo nhóm (số đếm menu).
+type TaskCount struct {
+	Adhoc   bool
+	Status  string
+	Closed  bool
+	Overdue bool
+	Started bool
+	N       int
+}
+
+// CountTasks đếm công việc theo (đột xuất, trạng thái, đã chốt, trễ hạn, kỳ đã bắt đầu) — số đếm menu P2.
+func CountTasks(ctx context.Context, tx pgx.Tx, dept, province string, communes []string, now time.Time) ([]TaskCount, error) {
+	rows, err := tx.Query(ctx, `SELECT b.report_type = 'adhoc', t.status,
+	    (p.status = 'closed' AND (t.reopened_until IS NULL OR t.reopened_until <= $4)), t.due_at <= $4, p.from_date <= ($4 AT TIME ZONE 'Asia/Ho_Chi_Minh')::date,
+	    count(*)
+	  FROM pf_extension.report_task t
+	  JOIN pf_extension.report_batch b ON b.id = t.batch_id AND b.status = 'issued'
+	  JOIN pf_extension.report_period p ON p.id = t.period_id
+	  WHERE NOT t.withdrawn AND ($1 = '' OR t.department_code = $1) AND ($2 = '' OR t.province_code = $2)
+	    AND ($3::text[] IS NULL OR t.commune_code = ANY($3::text[]))
+	  GROUP BY 1, 2, 3, 4, 5`, dept, province, nilIfEmpty(communes), now.UTC())
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (TaskCount, error) {
+		var c TaskCount
+		err := r.Scan(&c.Adhoc, &c.Status, &c.Closed, &c.Overdue, &c.Started, &c.N)
+		return c, err
+	})
+}
+
 // TaskByID đọc (khóa nếu lock) một công việc; không có → nil.
 func TaskByID(ctx context.Context, tx pgx.Tx, id uuid.UUID, lock bool) (*Task, error) {
 	q := "SELECT " + taskCols + " FROM pf_extension.report_task WHERE id = $1::uuid"

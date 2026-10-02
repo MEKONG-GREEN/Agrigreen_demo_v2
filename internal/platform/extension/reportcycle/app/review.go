@@ -503,7 +503,7 @@ func (s *Service) Status(ctx context.Context, batchID uuid.UUID, periodID, templ
 			if row.NoOfficer {
 				board.Counts["no_officer"]++
 			}
-			if status != "" && status != v.Display && !(status == "no_officer" && row.NoOfficer) {
+			if status != "" && status != v.Display && (status != "no_officer" || !row.NoOfficer) {
 				continue
 			}
 			board.Rows = append(board.Rows, row)
