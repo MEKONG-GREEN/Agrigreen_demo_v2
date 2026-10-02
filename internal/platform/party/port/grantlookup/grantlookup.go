@@ -19,9 +19,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -31,7 +33,10 @@ type Lookup struct {
 	Clock clock.Clock
 }
 
-var _ port.GrantLookup = (*Lookup)(nil)
+var (
+	_ port.GrantLookup = (*Lookup)(nil)
+	_ port.APIReadLog  = (*Lookup)(nil)
+)
 
 // New tạo bộ điều hợp trên pool vai party_app.
 func New(db tenant.Beginner, clk clock.Clock) *Lookup {
@@ -103,4 +108,43 @@ func (l *Lookup) ActiveGrantors(ctx context.Context, grantee uuid.UUID, kind str
 		}
 	}
 	return out, nil
+}
+
+// maxQuery giới hạn tham số lọc lưu ở sổ đọc (như app.Sharing.RecordRead).
+const maxQuery = 500
+
+// RecordRead cài đặt port.APIReadLog (K-05, KN US-MRV-05): MỘT dòng partner_read_log ở tenant BÊN CẤP
+// cho một lần đọc của khách hàng Public API. Người đọc lấy từ apiclient/port.Caller trong context (không
+// bao giờ từ request): tenant bên nhận phải = g.Grantee, actor_ref = mã khách hàng API. Chỉ loại dp_*
+// mà cấp quyền có. idem_key theo mã yêu cầu (AG-Request-Id) nên ghi lại trong cùng yêu cầu không thêm
+// dòng. Không qua kênh partner_share: egress public_api đã ghi cùng sổ sử dụng (ADR-0023). Lỗi →
+// port.ErrPartnerAuditUnavailable (module gọi không trả dữ liệu).
+func (l *Lookup) RecordRead(ctx context.Context, g port.ShareGrant, r port.PartnerRead) error {
+	c, ok := apiclientport.CallerFrom(ctx)
+	if !ok || c.Client.ID == uuid.Nil || c.Client.ClientTenantID == uuid.Nil || c.Client.ClientTenantID != g.Grantee ||
+		g.Grantor == uuid.Nil || g.ID == uuid.Nil || !dataProductKind(r.Kind) || !g.Covers(r.Kind) {
+		return port.ErrPartnerAuditUnavailable
+	}
+	var q *string
+	if r.Query != "" {
+		v := r.Query
+		if len(v) > maxQuery {
+			v = v[:maxQuery]
+		}
+		q = &v
+	}
+	req := c.RequestID
+	if req == uuid.Nil {
+		req = ids.New()
+	}
+	at := c.ReceivedAt
+	if at.IsZero() {
+		at = l.Clock.Now()
+	}
+	row := store.ReadLog{ID: ids.New(), TenantID: g.Grantor, GrantID: g.ID, Grantee: g.Grantee, Kind: r.Kind, Endpoint: r.Endpoint, Query: q,
+		Items: r.Items, EventTime: at, ActorRef: c.Client.ID, IdemKey: "read:api:" + req.String()}
+	if err := tenant.WithTenantTx(ctx, l.DB, g.Grantor, func(tx pgx.Tx) error { return store.InsertReadLog(ctx, tx, &row) }); err != nil {
+		return port.ErrPartnerAuditUnavailable.WithCause(err)
+	}
+	return nil
 }

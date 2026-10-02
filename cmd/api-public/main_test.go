@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-public/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 )
 
@@ -43,7 +44,7 @@ func TestEnabledRequiresOperatorTenant_ADR0022(t *testing.T) {
 
 // Đóng khi lỗi: thiếu sổ đo lường / hạn mức / cấp quyền → không khởi động.
 func TestAssembleRequiresMeteringAndGrants_ADR0022(t *testing.T) {
-	if _, err := Assemble(Config{Replicas: 1}, Ports{}, nil); !errors.Is(err, ErrNotWired) {
+	if _, err := assembly.Assemble(assembly.Config{Replicas: 1}, assembly.Ports{}, nil); !errors.Is(err, assembly.ErrNotWired) {
 		t.Fatalf("muốn ErrNotWired, nhận %v", err)
 	}
 }

@@ -1,4 +1,8 @@
-package main
+// Package assembly là gốc lắp ráp của cmd/api-public (Public API cho bên thứ ba, ADR-0022): nối pool
+// vai của từng module chủ dữ liệu (g5-conventions §3.1) thành apiclient.PublicDeps. Tách khỏi package
+// main để kịch bản đầu–cuối (tests/e2e) chạy ĐÚNG gốc lắp ráp và router của tiến trình thật. archlint
+// (zoneRoots, noVaultRoots) áp cho cả cây cmd/api-public, kể cả gói này.
+package assembly
 
 import (
 	"context"
@@ -22,6 +26,9 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 )
+
+// PoolOpener mở pool cho một vai DB của cụm pf.
+type PoolOpener func(ctx context.Context, role string) (*pgxpool.Pool, error)
 
 // partyDBRole là vai DB của pf/party (party.DBRole). Không import gốc module pf/party: gốc đó kéo
 // client kho định danh và handler Application/Admin (RB-3, ADR-0022 mục 1) — api-public chỉ dùng bộ
@@ -49,6 +56,8 @@ type Ports struct {
 	Quotas meteringport.Quotas
 	Usage  meteringport.Usage
 	Grants partyport.GrantLookup
+	// Reads: sổ đọc partner_read_log ở tenant bên cấp cho lần đọc của khách hàng API (K-05).
+	Reads  partyport.APIReadLog
 	Params mdport.Params
 
 	Collection apiclientport.CollectionVolumeSource
@@ -66,7 +75,8 @@ var ErrNotWired = errors.New("api-public: chưa nối metering/port.Ledger, Quot
 // của module chủ (g5-conventions §3.1):
 //   - pf/metering (metering_app): Ledger, Quotas, Usage; gói hạn mức qua plans (pf/apiclient, pool
 //     apiclient_app); tham số kênh qua pf/masterdata;
-//   - pf/party (party_app): GrantLookup — bộ điều hợp chỉ đọc party/port/grantlookup (không vault);
+//   - pf/party (party_app): GrantLookup + sổ đọc partner_read_log của bên cấp (APIReadLog, K-05) — bộ
+//     điều hợp party/port/grantlookup (không vault);
 //   - pf/cropcycle (cropcycle_app): CollectionVolumeSource, dữ kiện thửa qua pf/geo (geo_app) + đơn
 //     vị hành chính pf/masterdata (masterdata_app);
 //   - pf/geo (geo_app): HubCapacitySource;
@@ -91,7 +101,8 @@ var integrationPorts = func(ctx context.Context, open PoolOpener, cfg Config, pl
 	cc := cropcycle.New(ccPool, clk, cropcycle.Deps{Params: md.Params()})
 	cc.UseCollectionVolume(g.PlotFacts(), md.AdminUnits())
 	m := mrv.New(mrvPool, clk, mrv.Deps{Params: md.Params()})
-	return Ports{Ledger: meter.Ledger(), Quotas: meter.Quotas(), Usage: meter.Usage(), Grants: grantlookup.New(partyPool, clk), Params: md.Params(),
+	grants := grantlookup.New(partyPool, clk)
+	return Ports{Ledger: meter.Ledger(), Quotas: meter.Quotas(), Usage: meter.Usage(), Grants: grants, Reads: grants, Params: md.Params(),
 		Collection: cc.CollectionVolumeSource(), Hubs: g.HubCapacitySource(), MRV: m.PackageSource(),
 		Ready: []*pgxpool.Pool{meterPool, partyPool}}, nil
 }
@@ -127,7 +138,7 @@ func Assemble(cfg Config, ports Ports, pools []*pgxpool.Pool) (apiclient.PublicD
 		ready = append(ready, p.Ping)
 	}
 	return apiclient.PublicDeps{Limiter: apiclient.NewRateLimiter(cfg.Replicas),
-		Ledger: ports.Ledger, Quotas: ports.Quotas, Usage: ports.Usage, Grants: ports.Grants, Params: ports.Params,
+		Ledger: ports.Ledger, Quotas: ports.Quotas, Usage: ports.Usage, Grants: ports.Grants, Reads: ports.Reads, Params: ports.Params,
 		Collection: ports.Collection, Hubs: ports.Hubs, MRV: ports.MRV, OperatorTenant: cfg.Operator, Production: cfg.Production,
 		Clock: cfg.Clock, Log: cfg.Log, Ready: ready}, nil
 }

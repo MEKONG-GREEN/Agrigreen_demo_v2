@@ -110,6 +110,16 @@ type PartnerAccess interface {
 	RecordRead(ctx context.Context, g ShareGrant, r PartnerRead) error
 }
 
+// APIReadLog (G5, K-05 — ADR-0022 mục 3, KN US-MRV-05) ghi sổ đọc partner_read_log ở tenant bên cấp
+// cho MỘT lần đọc của khách hàng Public API (apiclient/port.Caller trong context, không có
+// authz.Principal): tenant bên nhận = Caller.Client.ClientTenantID (phải = g.Grantee), actor_ref = mã
+// khách hàng API; chỉ loại dp_* mà g có. Không qua kênh partner_share (egress public_api đã ghi cùng sổ
+// sử dụng — ADR-0023). Lỗi → ErrPartnerAuditUnavailable: module gọi KHÔNG trả dữ liệu. Hiện thực không
+// kéo kho định danh: party/port/grantlookup (cmd/api-public, RB-3).
+type APIReadLog interface {
+	RecordRead(ctx context.Context, g ShareGrant, r PartnerRead) error
+}
+
 // ValveGrants cho consumer van của nền tảng tìm tenant bên cấp của một phong bì van: mọi bên cấp
 // có cấp quyền đang hiệu lực loại kind cho bên nhận grantee (= tenant phong bì) tại thời điểm at =
 // lúc consumer NHẬN (đồng hồ của module) — không phải occurred_at: sự kiện hiện trường ghi lùi giờ.

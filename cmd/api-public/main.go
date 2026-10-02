@@ -36,6 +36,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-public/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
@@ -60,9 +61,6 @@ func main() {
 
 // ErrDisabled: Public API tắt (ĐTK 1) — tiến trình thoát lỗi.
 var ErrDisabled = errors.New("api-public: " + port.EnvEnabled + " ≠ 1 — Public API tắt ở ĐTK 1 (ADR-0022), thoát")
-
-// PoolOpener mở pool cho một vai DB của cụm pf.
-type PoolOpener func(ctx context.Context, role string) (*pgxpool.Pool, error)
 
 func run(ctx context.Context, log *slog.Logger, getenv func(string) string) error {
 	if getenv(port.EnvEnabled) != "1" {
@@ -131,7 +129,7 @@ func run(ctx context.Context, log *slog.Logger, getenv func(string) string) erro
 	if err != nil {
 		return err
 	}
-	mod, d, err := Build(ctx, open, Config{Operator: operator, Peppers: peppers, Store: store, Replicas: replicas,
+	mod, d, err := assembly.Build(ctx, open, assembly.Config{Operator: operator, Peppers: peppers, Store: store, Replicas: replicas,
 		Production: residency.Production(getenv), EgressMode: mode, Clock: clock.System{}, Log: log})
 	if err != nil {
 		return err

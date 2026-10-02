@@ -182,7 +182,7 @@ Còn lại:
 
 ## G5 — Phase K, `pf/metering`, Public API cho bên thứ ba (nhánh `sub/g5`)
 
-Phụ lục A: "Phase K; `pf/metering` và Public API bật với bên thứ ba đầu tiên" (Q4/2028), cộng mục 18 (một điểm kiểm soát cho mọi đường xuất). Quy ước, số migration, vai, sự kiện, sản phẩm dữ liệu, tham số tạm: [docs/dev/g5-conventions.md](dev/g5-conventions.md). Quyết định: ADR-0022..0025. Nghiệm thu: [docs/uat/g5-acceptance.md](uat/g5-acceptance.md) (79 yêu cầu, đều chưa làm).
+Phụ lục A: "Phase K; `pf/metering` và Public API bật với bên thứ ba đầu tiên" (Q4/2028), cộng mục 18 (một điểm kiểm soát cho mọi đường xuất). Quy ước, số migration, vai, sự kiện, sản phẩm dữ liệu, tham số tạm: [docs/dev/g5-conventions.md](dev/g5-conventions.md). Quyết định: ADR-0022..0025. Nghiệm thu: [docs/uat/g5-acceptance.md](uat/g5-acceptance.md) — rà E2E 02/10/2026: **82 yêu cầu, 51 đạt, 19 một phần, 12 chưa làm** (10 trong số đó là câu hỏi khách Q5-1..Q5-10).
 
 ### G5-0: nền móng và hợp đồng đóng băng (01/10/2026, xong)
 
@@ -223,6 +223,25 @@ Theo [g5-conventions §8](dev/g5-conventions.md#8-đợt-g5-1-song-song-theo-h�
 | **H** | hạ tầng Phase K |
 | **W** | `apps/web-ops` |
 | **E** | E2E + diễn tập bật Phase K |
+
+Trạng thái (02/10/2026): A, M, S + D, H, W đã hợp nhất vào `sub/g5` (tích hợp `g5-int`: nối cổng thật cho `api-public`, kho tệp xuất F29, cảnh báo DLP, job khóa hết hạn, runbook cấp bên thứ ba).
+
+### G5 E2E (02/10/2026, nhánh `g5-e`)
+
+- [x] `TestG5ThirdPartyToStatement` (`tests/e2e/g5_scenario_test.go`) đạt: 14 bước, 5 tenant (chương trình, MKG, đơn vị vận hành, nhà máy, đơn vị thẩm định), gốc lắp ráp thật của `api-platform` và `api-public`, consumer thật của worker qua bơm outbox, `AG_EGRESS_MODE=enforce`. Phủ:
+  - runbook cấp bên thứ ba bước 1–8;
+  - ba sản phẩm qua `api-public` thật, `publicdata.k_min` = 5 đặt qua pf/masterdata (người đặt ≠ người duyệt);
+  - xuất 202 → tệp `Digest`; sổ sử dụng, egress, sổ đọc khớp số lời gọi;
+  - 429 hạn mức, gói v2; DLP enforce (báo cáo, gói MRV) → bất thường → thông báo;
+  - xoay / thu hồi khóa, thu hồi cấp quyền;
+  - bảng kê cuối kỳ R-56 + CSV golden + kiểm băm + bảng kê bù;
+  - giao lặp mọi sự kiện, cách ly tenant, quét RB-3, `verify_chain` chín sổ.
+- [x] Đóng K-05: `api-public` ghi `partner_read_log` ở tenant bên cấp cho mỗi lần đọc / tải dữ liệu 2xx, qua bộ điều hợp không vault `party/port/grantlookup` (`port.APIReadLog`, ghi trước sổ đo lường, lỗi → 503 không dữ liệu). `TestAPIReadLogAdapter_K05`.
+- [x] Gốc lắp ráp `api-public` tách sang `cmd/api-public/assembly` để E2E dùng đúng mã của tiến trình (archlint vẫn phủ cả cây).
+- [ ] Còn lại:
+  - **mã:** `Deprecation`/`Sunset` (P-12), OAuth client credentials (P-19), con trỏ (P-15);
+  - **chờ khách:** Q5-1..Q5-10 (bên thứ ba đầu tiên, giá trị k, Q5-6 hub, giá, thời hạn lưu, Valkey, VVB);
+  - **hạ tầng:** diễn tập `helm upgrade -f values-phasek.yaml` trên staging (K-04), NetworkPolicy / Ingress / ExternalSecret trên cụm thật, PgBouncer song song, luật cảnh báo DLQ vùng nền tảng (X-07), `promtool`, cổng giấy phép CI.
 
 ## G6
 Theo Phụ lục A của tài liệu kiến trúc:

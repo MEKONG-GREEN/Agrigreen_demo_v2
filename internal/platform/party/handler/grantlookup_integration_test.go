@@ -13,8 +13,11 @@ import (
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port/grantlookup"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
 // fakeCheckpoint là điểm kiểm soát xuất giả (pf/metering chưa nối ở kiểm thử module).
@@ -214,5 +217,65 @@ func TestPartnerShareEgress_ADR0024(t *testing.T) {
 	wantStatus(t, sa.appDo(http.MethodGet, "/v1/partner/cooperatives", nil), http.StatusOK, "chưa nối checkpoint")
 	if len(cp.calls()) != n || reads() != 4 {
 		t.Fatalf("nil → hành vi cũ: %d %d", len(cp.calls()), reads())
+	}
+}
+
+// G5 K-05 (KN US-MRV-05 — đơn vị thẩm định chỉ xem, mọi lần truy cập có nhật ký; ADR-0022 mục 3):
+// bộ điều hợp KHÔNG kéo kho định danh party/port/grantlookup (cmd/api-public, RB-3) hiện thực
+// port.APIReadLog — một dòng partner_read_log ở tenant BÊN CẤP cho mỗi lần đọc của khách hàng Public
+// API (người đọc = mã khách hàng, tenant bên nhận từ bản ghi khóa); ghi lại cùng mã yêu cầu không thêm
+// dòng; không có Caller / Caller tenant khác / loại không có trong cấp quyền / loại không phải dp_* →
+// party.partner_audit_unavailable (module gọi không trả dữ liệu); không qua kênh partner_share.
+func TestAPIReadLogAdapter_K05(t *testing.T) {
+	f := newFixture(t)
+	verifier := ids.New()
+	f.grant(verifier, port.KindDPMRVPackageStatus)
+	gl := grantlookup.New(f.pool, clock.System{})
+	ctx := context.Background()
+	g, err := gl.ActiveGrant(ctx, verifier, uuid.Nil, port.KindDPMRVPackageStatus, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := apiclientport.Client{ID: ids.New(), ClientTenantID: verifier, Status: apiclientport.ClientActive}
+	req := ids.New()
+	call := apiclientport.WithCaller(ctx, apiclientport.Caller{Client: client, KeyPrefix: "abcdefgh2345", RequestID: req, ReceivedAt: time.Now()})
+	read := port.PartnerRead{Kind: port.KindDPMRVPackageStatus, Endpoint: "GET /v1/data/mrv-packages", Query: "status=completed", Items: 2}
+	var _ port.APIReadLog = gl
+	if err := gl.RecordRead(call, g, read); err != nil {
+		t.Fatalf("ghi sổ đọc của đơn vị thẩm định: %v", err)
+	}
+	where := "pf_party.partner_read_log WHERE actor_ref = '" + client.ID.String() + "' AND grantee_tenant_id = '" + verifier.String() +
+		"' AND grant_id = '" + g.ID.String() + "' AND kind = 'dp_mrv_package_status' AND endpoint = 'GET /v1/data/mrv-packages' AND item_count = 2" +
+		" AND query = 'status=completed' AND idem_key = 'read:api:" + req.String() + "'"
+	if n := f.countIn(f.tenant, where); n != 1 {
+		t.Fatalf("một dòng sổ đọc ở tenant bên cấp: %d", n)
+	}
+	if n := f.countIn(verifier, "pf_party.partner_read_log"); n != 0 {
+		t.Fatalf("sổ đọc không ở tenant bên thứ ba: %d", n)
+	}
+	// Ghi lại trong CÙNG yêu cầu (cùng AG-Request-Id) → trùng idem_key → lỗi, không thêm dòng.
+	var pe *problem.Problem
+	if err := gl.RecordRead(call, g, read); !errors.As(err, &pe) || pe.Code != port.ErrPartnerAuditUnavailable.Code {
+		t.Fatalf("cùng mã yêu cầu ghi hai lần: %v", err)
+	}
+	if n := f.countIn(f.tenant, "pf_party.partner_read_log"); n != 1 {
+		t.Fatalf("không thêm dòng: %d", n)
+	}
+	for name, bad := range map[string]struct {
+		ctx  context.Context
+		read port.PartnerRead
+	}{
+		"không có Caller":          {ctx, read},
+		"Caller của tenant khác":   {apiclientport.WithCaller(ctx, apiclientport.Caller{Client: apiclientport.Client{ID: ids.New(), ClientTenantID: ids.New()}}), read},
+		"loại không có trong cấp":  {call, port.PartnerRead{Kind: port.KindDPHubCapacity, Endpoint: "GET /v1/data/hub-capacities"}},
+		"loại không phải dp_*":     {call, port.PartnerRead{Kind: port.KindCooperativeDirectory, Endpoint: "GET /v1/partner/cooperatives"}},
+		"người dùng OIDC không có": {authz.WithPrincipal(ctx, authz.Principal{TenantID: verifier, ActorRef: ids.New()}), read},
+	} {
+		if err := gl.RecordRead(bad.ctx, g, bad.read); !errors.Is(err, port.ErrPartnerAuditUnavailable) {
+			t.Fatalf("%s → party.partner_audit_unavailable: %v", name, err)
+		}
+	}
+	if n := f.countIn(f.tenant, "pf_party.partner_read_log"); n != 1 {
+		t.Fatalf("lần ghi bị từ chối không thêm dòng: %d", n)
 	}
 }

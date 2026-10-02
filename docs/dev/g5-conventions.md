@@ -379,4 +379,20 @@ Module nhận `UseEgress(cp, mode[, log])`; `cp == nil` → hành vi cũ, kiểm
 | Valkey | **Không làm** adapter: máy dev không có Valkey để kiểm thử tích hợp, nhà cung cấp chờ Q5-10. Ứng viên client `valkey-go` (Apache-2.0) hoặc `go-redis` (BSD-2-Clause), đều trong allowlist. `AG_VALKEY_URL` vẫn chỉ log cảnh báo |
 | Runbook | [public-api-onboarding.md](../runbooks/public-api-onboarding.md) (ADR-0025 §2–3) |
 
-Mục mở sau tích hợp: `partner_read_log` cho lần đọc của khách hàng Public API (K-05) chưa được `api-public` gọi (`PartnerAccess.RecordRead` cần gốc `pf/party`); kiểm thử đặt `publicdata.k_min` khác mặc định qua `api-public`; `Deprecation`/`Sunset` (P-12); OAuth client credentials (P-19).
+## 13. Quyết định đợt E2E G5 (02/10/2026, nhánh `g5-e`)
+
+| Chủ đề | Quyết định |
+|---|---|
+| Gốc lắp ráp `api-public` | `Config`, `Ports`, `Build`, `Assemble`, `PoolOpener`, `ErrNotWired` chuyển sang gói **`cmd/api-public/assembly`** để `tests/e2e` chạy đúng mã của tiến trình (như `cmd/api-platform/assembly`). `main.go` chỉ đọc môi trường. archlint `zoneRoots`/`noVaultRoots` dùng tiền tố nên phủ cả gói mới; `TestNoVaultTransitiveDeps_RB3` không đổi |
+| Sổ đọc K-05 | Cổng mới **`partyport.APIReadLog`** (`RecordRead(ctx, ShareGrant, PartnerRead)`, thêm — không đổi `PartnerAccess`). Hiện thực ở `party/port/grantlookup` (không vault): người đọc từ `apiclientport.Caller`, chỉ loại `dp_*` mà cấp quyền có, `idem_key = read:api:<AG-Request-Id>`, `event_time = ReceivedAt`. `app.Sharing.RecordRead` chuyển lời gọi của khách hàng API sang cùng bộ điều hợp (một ngữ nghĩa) |
+| Thứ tự trong đường ống Public API | Với phản hồi 2xx có dữ liệu (đọc sản phẩm, tải tệp): sổ đọc ở bên cấp **trước** `Ledger.Record`. Sổ đọc lỗi → phản hồi thay bằng 503 `party.partner_audit_unavailable`, sổ đo lường vẫn ghi lời gọi (status 503, 0 đơn vị), không có byte dữ liệu. `PublicDeps.Reads` nil → không ghi sổ đọc (kiểm thử module cũ không đổi) |
+| Kịch bản E2E | `TestG5ThirdPartyToStatement` (g5-acceptance mục 2). Bơm outbox G5 giao tới `assembly.Consumers` + `pf.mrv.export` + `pf.notify.egress_anomaly`. Bảng kê dùng Admin API pf/metering thứ hai với đồng hồ "đầu tháng sau" trên cùng database. Golden `tests/e2e/testdata/g5_statement.golden.csv` (mã, tenant, kỳ, băm chuẩn hóa; `-g5-update` để ghi lại) |
+| Ngữ nghĩa duyệt bảng kê | Người đã duyệt gọi duyệt lại → 200 (idempotent); người duyệt **khác** → 409 `metering.statement_frozen` (đúng như `TestStatementLifecycle_SoD_Deterministic_ADR0023`) |
+| Runbook | `verify` bảng kê là `GET /v1/metering/statements/{id}/verify` (sửa từ `POST`) |
+
+Mục mở sau E2E G5:
+- **mã:** `Deprecation`/`Sunset` (P-12, khi có hợp đồng v2); OAuth client credentials (P-19, chờ Q5-7); kịch bản E2E chưa chạy job dựng tệp báo cáo (`pf.reports.export.requested`) — chỉ lối yêu cầu qua checkpoint;
+- **chờ khách:** Q5-1..Q5-10;
+- **hạ tầng:** luật Prometheus cảnh báo DLQ cho vhost nền tảng (X-07); diễn tập Phase K trên staging (K-04); PgBouncer song song (X-02); cổng giấy phép CI (X-11).
+
+K-05 và kiểm thử `publicdata.k_min` khác mặc định qua `api-public` đã đóng ở E2E G5.

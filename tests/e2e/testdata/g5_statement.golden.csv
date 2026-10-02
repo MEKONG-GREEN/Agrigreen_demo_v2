@@ -1,0 +1,8 @@
+statement_id,client_id,client_tenant_id,period,status,product,status_class,calls,units,unit_price_vnd,amount_vnd,price_version,snapshot_sha256,chain_head_hash,first_seq,last_seq,rule_version,supersedes_id
+<statement_id>,<client_id>,<client_tenant_id>,<period>,approved,,2xx,4,0,,,,<snapshot_sha256>,<chain_head_hash>,1,20,metering.statement.v1,
+<statement_id>,<client_id>,<client_tenant_id>,<period>,approved,collection_volume,2xx,9,6,,,,<snapshot_sha256>,<chain_head_hash>,1,20,metering.statement.v1,
+<statement_id>,<client_id>,<client_tenant_id>,<period>,approved,collection_volume,4xx,3,0,,,,<snapshot_sha256>,<chain_head_hash>,1,20,metering.statement.v1,
+<statement_id>,<client_id>,<client_tenant_id>,<period>,approved,hub_capacity,2xx,2,2,,,,<snapshot_sha256>,<chain_head_hash>,1,20,metering.statement.v1,
+<statement_id>,<client_id>,<client_tenant_id>,<period>,approved,hub_capacity,4xx,1,0,,,,<snapshot_sha256>,<chain_head_hash>,1,20,metering.statement.v1,
+<statement_id>,<client_id>,<client_tenant_id>,<period>,approved,mrv_package_status,4xx,1,0,,,,<snapshot_sha256>,<chain_head_hash>,1,20,metering.statement.v1,
+<statement_id>,<client_id>,<client_tenant_id>,<period>,approved,_total,,20,8,,,,<snapshot_sha256>,<chain_head_hash>,1,20,metering.statement.v1,

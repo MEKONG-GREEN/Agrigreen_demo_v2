@@ -4,7 +4,7 @@ Thủ tục đưa một bên thứ ba (nhà máy sinh khối, bên mua tín ch�
 
 Quyết định: [ADR-0022](../adr/0022-public-api-ben-thu-ba.md) (Public API, khóa, scope, hạn mức), [ADR-0023](../adr/0023-so-do-luong-su-dung-metering.md) (sổ đo lường, bảng kê), [ADR-0024](../adr/0024-diem-kiem-soat-xuat-du-lieu-dlp.md) (điểm kiểm soát xuất), [ADR-0025](../adr/0025-ho-so-cap-phat-phase-k.md) mục 2–3 (thủ tục này), [ADR-0020](../adr/0020-lien-thong-platform-mkg-khac-tenant.md) (cấp quyền chia sẻ). Quy ước: [g5-conventions.md](../dev/g5-conventions.md).
 
-Kiểm thử chạy lại đúng các bước 2–5 trên gốc lắp ráp thật: `TestPublicAPIRealWiring_G5Integration` (`cmd/api-public`).
+Kiểm thử chạy lại đúng các bước 2–5 trên gốc lắp ráp thật: `TestPublicAPIRealWiring_G5Integration` (`cmd/api-public`). Toàn bộ thủ tục 1–8 (tenant bên thứ ba, cấp quyền, khách hàng, khóa, thử chấp nhận, bảng kê, xoay, thu hồi) chạy đầu–cuối trong `TestG5ThirdPartyToStatement` (`tests/e2e`).
 
 ## Ai làm gì
 
@@ -120,7 +120,7 @@ Ghi kết quả vào biên bản chấp nhận. Lỗi thường gặp:
 ## 6. Vận hành hằng tháng: bảng kê
 
 1. Sau khi kỳ tháng kết thúc (giờ Việt Nam), `billing_officer`: `POST /v1/metering/statements` `{ "period": "2028-11", "client_id": "<id>" }` → 202 + job.
-2. `billing_approver` (người khác) kiểm `GET /v1/metering/statements/{id}`, `POST /v1/metering/statements/{id}/verify`, rồi duyệt `POST /v1/metering/statements/{id}/approve`. Bảng kê đã duyệt bị đóng băng (409 `metering.statement_frozen`).
+2. `billing_approver` (người khác) kiểm `GET /v1/metering/statements/{id}`, `GET /v1/metering/statements/{id}/verify`, rồi duyệt `POST /v1/metering/statements/{id}/approve`. Bảng kê đã duyệt bị đóng băng (409 `metering.statement_frozen`).
 3. Tải CSV `GET /v1/metering/statements/{id}/export.csv` để lập hóa đơn **ngoài hệ thống**. Chưa có đơn giá thì bảng kê chỉ có đơn vị (Q5-4).
 4. Sai sót → bảng kê **bù** (`supersedes_id` + `correction_reason`). Bảng kê cũ giữ nguyên (RB-1).
 

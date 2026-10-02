@@ -13,7 +13,9 @@ info:
       ∧ scope ∧ cấp quyền chia sẻ `dp_<sản phẩm>` đang hiệu lực của chủ dữ liệu (tham số `grantor`) ∧ sản
       phẩm phục vụ được. Tenant của bên gọi lấy từ bản ghi khóa, không bao giờ từ path/query/body.
     - Mỗi lời gọi đã xác thực ghi một dòng sổ đo lường (`pf/metering`, ADR-0023) TRƯỚC khi trả dữ liệu;
-      không ghi được → 503 `metering.unavailable`.
+      không ghi được → 503 `metering.unavailable`. Mỗi lần đọc / tải dữ liệu thành công còn ghi một dòng
+      sổ đọc `partner_read_log` ở tenant chủ dữ liệu (K-05); không ghi được → 503
+      `party.partner_audit_unavailable`, không có dữ liệu.
     - Mỗi phần tử trả về qua hợp đồng dữ liệu `contracts/dataproduct/<sản phẩm>.json` (mặc định từ chối);
       header `AG-Data-Contract: <sản phẩm>.v<N>`. Không có dữ liệu cá nhân (RB-3).
     - Giới hạn: `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset` (giây), `AG-Quota-Remaining`;

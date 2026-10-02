@@ -365,6 +365,7 @@ func (s *Server) mrvPackage(c *gin.Context, caller port.Caller, _ port.Plan) (*r
 	r.header.Set("Content-Type", "application/json; charset=utf-8")
 	r.header.Set(port.HeaderDataContract, a.product.ContractHeader())
 	r.rows, r.dataTenant, r.product, r.contractVersion = 1, a.grant.Grantor, a.product.Name, a.product.Version
+	r.grant = &a.grant
 	return r, nil
 }
 
@@ -431,6 +432,7 @@ func (s *Server) jobFile(c *gin.Context, caller port.Caller, _ port.Plan) (*resu
 	r.header.Set("Digest", digestHeader(f.SHA256))
 	r.header.Set(port.HeaderDataContract, a.product.ContractHeader())
 	r.rows, r.dataTenant, r.product, r.contractVersion, r.jobID = f.Rows, a.grant.Grantor, a.product.Name, a.product.Version, j.ID
+	r.grant = &a.grant
 	return r, nil
 }
 

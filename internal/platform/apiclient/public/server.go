@@ -67,6 +67,10 @@ type Deps struct {
 	Quotas meteringport.Quotas
 	Usage  meteringport.Usage
 	Grants partyport.GrantLookup
+	// Reads (K-05, KN US-MRV-05): sổ đọc partner_read_log ở tenant bên cấp cho mỗi lần đọc / tải dữ
+	// liệu 2xx — ghi TRƯỚC sổ đo lường; lỗi → 503 party.partner_audit_unavailable, không có dữ liệu.
+	// Nil → không ghi sổ đọc (hành vi trước tích hợp E2E G5).
+	Reads  partyport.APIReadLog
 	Params mdport.Params // publicdata.k_min (nil → k_default của hợp đồng)
 
 	Collection port.CollectionVolumeSource
@@ -191,7 +195,8 @@ type result struct {
 	stream          io.ReadCloser // tệp xuất (thay body); size đã biết trước
 	size            int64
 	rows            int64
-	dataTenant      uuid.UUID // bên cấp có dữ liệu được phục vụ (2xx)
+	dataTenant      uuid.UUID             // bên cấp có dữ liệu được phục vụ (2xx)
+	grant           *partyport.ShareGrant // cấp quyền dp_* đã kiểm cho dữ liệu được phục vụ (sổ đọc K-05)
 	product         string
 	contractVersion int
 	replayed        bool
@@ -299,6 +304,20 @@ func (s *Server) handle(sp spec, fn handlerFn) gin.HandlerFunc {
 		}
 		if res.product == "" {
 			res.product = sp.product
+		}
+		// Sổ đọc của bên cấp (K-05) TRƯỚC sổ đo lường: lỗi → 503, không có dữ liệu; sổ đo lường ghi
+		// lời gọi với status 503, 0 đơn vị.
+		if res.grant != nil && res.status >= 200 && res.status <= 299 && s.d.Reads != nil {
+			q := c.Request.URL.RawQuery
+			if rerr := s.d.Reads.RecordRead(ctx, *res.grant, partyport.PartnerRead{Kind: partyport.DataProductKind(res.product),
+				Endpoint: routeTemplate(c), Query: q, Items: int(res.rows)}); rerr != nil {
+				if res.stream != nil {
+					_ = res.stream.Close()
+				}
+				prod := res.product
+				res = s.failResult(c, partyport.ErrPartnerAuditUnavailable.WithCause(rerr))
+				res.product = prod
+			}
 		}
 		scope := sp.scope
 		if scope == "" && res.product != "" && sp.action != "" {
@@ -469,6 +488,7 @@ func dataResult(a access, items []json.RawMessage, next string, meta any) (*resu
 	}
 	r.header.Set(port.HeaderDataContract, a.product.ContractHeader())
 	r.rows, r.dataTenant, r.product, r.contractVersion = int64(len(items)), a.grant.Grantor, a.product.Name, a.product.Version
+	r.grant = &a.grant
 	return r, nil
 }
 

@@ -418,6 +418,10 @@ func (s *Sharing) RecordRead(ctx context.Context, g port.ShareGrant, r port.Part
 	if !ok || tid != g.Grantee || g.Grantor == uuid.Nil {
 		return port.ErrPartnerAuditUnavailable
 	}
+	if viaAPI {
+		// Khách hàng Public API (K-05): cùng một ngữ nghĩa với cmd/api-public (bộ điều hợp không vault).
+		return grantlookup.New(s.DB, s.Clock).RecordRead(ctx, g, r)
+	}
 	var q *string
 	if r.Query != "" {
 		v := r.Query
@@ -428,14 +432,12 @@ func (s *Sharing) RecordRead(ctx context.Context, g port.ShareGrant, r port.Part
 	}
 	row := store.ReadLog{ID: ids.New(), TenantID: g.Grantor, GrantID: g.ID, Grantee: g.Grantee, Kind: r.Kind, Endpoint: r.Endpoint, Query: q,
 		Items: r.Items, EventTime: s.Clock.Now(), ActorRef: actor, IdemKey: "read:" + ids.New().String()}
-	if !viaAPI {
-		if err := meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
-			SourceID: row.ID, Channel: meteringport.ChannelPartnerShare, DataTenantID: g.Grantor,
-			CounterpartyKind: meteringport.CounterpartyTenant, CounterpartyRef: g.Grantee, Product: r.Kind,
-			Records: int64(r.Items), OccurredAt: row.EventTime, ActorRef: actor, TraceID: telemetry.TraceID(ctx),
-		}, s.Log); err != nil {
-			return err
-		}
+	if err := meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
+		SourceID: row.ID, Channel: meteringport.ChannelPartnerShare, DataTenantID: g.Grantor,
+		CounterpartyKind: meteringport.CounterpartyTenant, CounterpartyRef: g.Grantee, Product: r.Kind,
+		Records: int64(r.Items), OccurredAt: row.EventTime, ActorRef: actor, TraceID: telemetry.TraceID(ctx),
+	}, s.Log); err != nil {
+		return err
 	}
 	if err := tenant.WithTenantTx(ctx, s.DB, g.Grantor, func(tx pgx.Tx) error { return store.InsertReadLog(ctx, tx, &row) }); err != nil {
 		return port.ErrPartnerAuditUnavailable.WithCause(err)
