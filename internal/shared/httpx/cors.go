@@ -20,7 +20,7 @@ const CORSEnv = "AG_CORS_ORIGINS"
 // trả "*".
 var (
 	corsAllowMethods  = "GET, POST, PUT, PATCH, DELETE"
-	corsAllowHeaders  = "Authorization, Content-Type, Idempotency-Key, X-Device-Id, X-Purpose, traceparent"
+	corsAllowHeaders  = "Authorization, Content-Type, Idempotency-Key, X-Device-Id, X-Purpose, X-AG-Context, X-AG-Reason, traceparent"
 	corsExposeHeaders = "X-Trace-Id, Idempotent-Replayed, Location"
 	corsMaxAge        = "600"
 )

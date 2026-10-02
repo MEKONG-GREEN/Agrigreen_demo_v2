@@ -35,6 +35,7 @@ var ManagedRoles = []string{
 	"param_setter", "param_approver", "masterdata_admin", "registry_admin", "reports_admin",
 	"consent_writer", "consent_reader",
 	"kn_national_admin", "kn_province_admin", "kn_officer", "coop_manager",
+	RoleKNUser, // KN v7.7: cổng vào bề mặt KN; vai nghiệp vụ ở sổ gán vai trò (kn.go)
 	"cgh_viewer", "cgh_admin",
 	"plot_editor", "plot_viewer", "geo_admin",
 	"content_editor_national", "content_editor_province", "content_reviewer",

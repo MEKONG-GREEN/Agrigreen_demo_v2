@@ -201,7 +201,14 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		}
 	}
 	acc := accounts.New(accPool, clk, accounts.Deps{Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs(),
-		Households: pty.Households(), Vault: ext.Vault, Params: md.Params()})
+		Households: pty.Households(), Vault: ext.Vault, Params: md.Params(),
+		Departments: pty.Departments(), Units: md.AdminUnits(), Names: kn.StaffNames()}) // KN v7.7 P1
+	// KN v7.7 P1 ↔ P2: menu theo ngữ cảnh phiên, số tài khoản theo phòng ban (mở khóa "xóa" phòng ban),
+	// dòng tài khoản của bảng Ảnh hưởng, tên người thao tác trong Log (Keycloak, dự phòng danh bạ cán bộ).
+	pty.UseSessionContext(acc.SessionContext())
+	pty.UseDepartmentUsage(acc.DepartmentUsage())
+	pty.UseOrgImpact(acc.OrgImpact())
+	pty.UseActorNames(acc.ActorNames())
 	if c := acc.StaffContacts(); c != nil {
 		kn.UseContacts(c) // US-DIR-02: số điện thoại cán bộ đọc từ Keycloak lúc bấm liên hệ
 	}

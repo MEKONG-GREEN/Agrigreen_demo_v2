@@ -62,6 +62,22 @@ var (
 	ErrUnavailable  = errors.New("accounts: Keycloak không phản hồi")
 )
 
+// ProfileUpdate là thông tin tài khoản sau khi sửa (KN v7.7 FN-AD-04.04). Mọi trường ghi đè; Phone rỗng
+// = bỏ SĐT. Username đổi theo SĐT/email khi tài khoản đăng nhập bằng chúng.
+type ProfileUpdate struct {
+	Username  string `pii:"true"`
+	Email     string `pii:"true"`
+	FirstName string `pii:"true"`
+	LastName  string `pii:"true"`
+	Phone     string `pii:"true"`
+}
+
+// ProfileUpdater (tùy chọn, kiểm bằng type assertion) sửa thông tin tài khoản trong Keycloak. Tách khỏi
+// Directory để không buộc mọi bản cài phải có.
+type ProfileUpdater interface {
+	UpdateProfile(ctx context.Context, id uuid.UUID, p ProfileUpdate) error
+}
+
 // Directory là cổng Keycloak Admin REST (realm agrigreen) bằng tài khoản dịch vụ
 // agrigreen-accounts (manage-users, view-users, query-users). Bản HTTP ở
 // accounts.DirectoryFromEnv; bản trong bộ nhớ cho kiểm thử ở accounts.NewMemoryDirectory.

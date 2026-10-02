@@ -33,6 +33,9 @@ type Principal struct {
 	Roles    []string
 	MFA      bool      // token có amr chứa yếu tố thứ hai
 	AuthTime time.Time // thời điểm đăng nhập
+	// KN là ngữ cảnh phiên KN v7.7 (header X-AG-Context) do pf/accounts giải ở server; nil khi
+	// request không mang header (kn.go).
+	KN *KNContext
 }
 
 // Has cho biết người gọi có vai r.

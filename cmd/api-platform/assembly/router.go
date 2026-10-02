@@ -57,11 +57,18 @@ func NewRouter(d Deps) *gin.Engine {
 	r := httpx.NewEngine(d.Log, maxBody)
 	r.Use(httpx.CORS(d.CORSOrigins)) // trước mọi route: preflight đi qua cả nhánh 404/405
 	health(d)(r)
-	v1 := r.Group("/v1", httpx.Authenticate(d.Verifier), idempotency.Middleware(d.Ops))
+	v1 := r.Group("/v1", chain(d, httpx.Authenticate(d.Verifier))...)
 	for _, m := range d.Modules {
 		m.RegisterApp(v1)
 	}
 	return r
+}
+
+// chain: xác thực (+ MFA) → middleware của module (KN v7.7: ngữ cảnh phiên X-AG-Context của
+// pf/accounts) → Idempotency-Key.
+func chain(d Deps, auth ...gin.HandlerFunc) []gin.HandlerFunc {
+	out := append(auth, httpx.Middlewares(d.Modules)...)
+	return append(out, idempotency.Middleware(d.Ops))
 }
 
 // NewAdminRouter dựng Admin API (admin.<domain>): MFA bắt buộc cho mọi route (mục 11).
@@ -69,7 +76,7 @@ func NewAdminRouter(d Deps) *gin.Engine {
 	r := httpx.NewEngine(d.Log, maxBody)
 	r.Use(httpx.CORS(d.CORSOrigins)) // trước mọi route: preflight đi qua cả nhánh 404/405
 	health(d)(r)
-	v1 := r.Group("/v1", httpx.Authenticate(d.Verifier), httpx.RequireMFA(), idempotency.Middleware(d.Ops))
+	v1 := r.Group("/v1", chain(d, httpx.Authenticate(d.Verifier), httpx.RequireMFA())...)
 	for _, m := range d.Modules {
 		m.RegisterAdmin(v1)
 	}

@@ -215,7 +215,7 @@ function accountOf(p: MockPersona): MockKnAccount | undefined {
 
 /**
  * Persona theo header X-AG-Context (mô phỏng middleware P1): chỉ nhận context của chính tài khoản
- * trong token. Context lạ/của người khác → giữ persona gốc (backend thật trả 403).
+ * trong token. Context lạ/của người khác → giữ persona gốc; handler trả 403 trước đó (contextProblem).
  */
 export function personaForContext(base: MockPersona, contextId: string | null): MockPersona {
   if (!contextId) return base;
@@ -223,6 +223,19 @@ export function personaForContext(base: MockPersona, contextId: string | null): 
   const account = accountOf(base);
   if (!stored || !account || stored.accountId !== account.id) return base;
   return knPersona(account, stored.assignment);
+}
+
+/**
+ * Như middleware P1 thật: header X-AG-Context lạ, không phải UUID hoặc của người khác → 403
+ * accounts.context_invalid (không bao giờ âm thầm bỏ qua header). null = hợp lệ hoặc không có header.
+ */
+export function contextProblem(base: MockPersona, contextId: string | null): Response | null {
+  if (!contextId) return null;
+  const stored = CONTEXTS.get(contextId);
+  if (!stored || stored.accountId !== accountOf(base)?.id) {
+    return problem(403, "accounts.context_invalid", "Ngữ cảnh phiên không hợp lệ hoặc không thuộc người gọi");
+  }
+  return null;
 }
 
 /** Context đã lưu (cho kiểm thử và khôi phục sau tải lại trong cùng tab). */
@@ -261,7 +274,10 @@ export const knAppRoutes: Route[] = [
         org_name: asg.org_name,
         communes: asg.communes,
         default_route: DEFAULT_ROUTE[asg.role],
-        expires_at: new Date(Date.now() + 4 * 3_600_000).toISOString(),
+        // Server: 24 giờ hoặc tới khi lần gán hết hiệu lực (P1 domain.ContextTTL).
+        expires_at: new Date(Date.now() + 24 * 3_600_000).toISOString(),
+        support_session_id: null,
+        on_behalf_of: null,
       };
       CONTEXTS.set(ctx.context_id, { accountId: account.id, assignment: asg, ctx });
       return json(ctx, 201);

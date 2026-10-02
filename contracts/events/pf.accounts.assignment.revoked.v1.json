@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.accounts.assignment.revoked/v1",
+  "title": "pf.accounts.assignment.revoked — payload",
+  "description": "KN v7.7 FN-AD-04.04: Admin thu hồi (xóa) một lần gán vai trò. Ngữ cảnh phiên dựng từ lần gán này hết hiệu lực ở request kế tiếp; dữ liệu đã nhập bằng vai trò đó giữ nguyên. Không chứa dữ liệu cá nhân, không chứa lý do tự do.",
+  "x-event-type": "pf.accounts.assignment.revoked",
+  "x-schema-version": 1,
+  "x-producer": "pf/accounts",
+  "type": "object",
+  "required": ["assignment_id", "user_ref", "role", "org_ref", "department_codes", "commune_codes", "active", "actor_ref", "event_time", "seq"],
+  "properties": {
+    "assignment_id": {"type": "string", "format": "uuid"},
+    "user_ref": {"type": "string", "format": "uuid", "description": "id người dùng trong Keycloak"},
+    "role": {"type": "string", "enum": ["kn_tw", "kn_tinh", "kn_xa", "admin"]},
+    "org_ref": {"type": ["string", "null"], "format": "uuid"},
+    "department_codes": {"type": "array", "items": {"type": "string"}},
+    "commune_codes": {"type": "array", "items": {"type": "string"}},
+    "active": {"type": "boolean", "const": false},
+    "actor_ref": {"type": "string", "format": "uuid"},
+    "event_time": {"type": "string", "format": "date-time"},
+    "seq": {"type": "integer", "minimum": 1}
+  }
+}

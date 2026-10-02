@@ -398,6 +398,32 @@ func (c *Client) SetOrgRef(ctx context.Context, id uuid.UUID, org uuid.UUID) err
 	})
 }
 
+// UpdateProfile thực hiện port.ProfileUpdater (KN v7.7 FN-AD-04.04): họ tên, email, SĐT và tên đăng
+// nhập (đi theo SĐT/email). Đổi email → emailVerified = false (Keycloak gửi lại VERIFY_EMAIL khi cần).
+func (c *Client) UpdateProfile(ctx context.Context, id uuid.UUID, p port.ProfileUpdate) error {
+	return c.update(ctx, id, "sửa thông tin", func(m map[string]any) {
+		if old, _ := m["email"].(string); !strings.EqualFold(old, p.Email) {
+			m["emailVerified"] = false
+		}
+		if p.Username != "" {
+			m["username"] = p.Username
+		}
+		m["email"], m["firstName"], m["lastName"] = p.Email, p.FirstName, p.LastName
+		attrs, _ := m["attributes"].(map[string]any)
+		if attrs == nil {
+			attrs = map[string]any{}
+		}
+		if p.Phone == "" {
+			delete(attrs, port.AttrPhone)
+		} else {
+			attrs[port.AttrPhone] = []string{p.Phone}
+		}
+		m["attributes"] = attrs
+	})
+}
+
+var _ port.ProfileUpdater = (*Client)(nil)
+
 // AddRequiredActions thêm required action (không trùng).
 func (c *Client) AddRequiredActions(ctx context.Context, id uuid.UUID, actions []string) error {
 	return c.update(ctx, id, "thêm required action", func(m map[string]any) {

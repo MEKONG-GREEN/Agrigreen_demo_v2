@@ -1914,6 +1914,201 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/accounts/mgmt-levels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh mục cấp quản lý (tạm, chờ khách Q-05) */
+        get: operations["accountsMgmtLevels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/kn-users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * FN-AD-04.04 Tạo tài khoản KN: tên đăng nhập = SĐT chuẩn hóa (vắng → email), vai realm kn_user, liên kết kích hoạt (lần đầu bắt buộc đặt mật khẩu, không mật khẩu tạm) + các vai trò
+         * @description Tiên quyết (UR-AD-04): Nút tồn tại, đúng cấp của vai (Cấp Quốc gia → ttkn_national; Cấp Tỉnh, Cấp Xã → ttkn_province), đơn vị đã
+         *     khai phòng ban → ngược lại 409 accounts.prerequisite_missing. Trùng SĐT/email → 409 accounts.duplicate_identity. Cấp Xã chưa gán xã →
+         *     lưu được, cảnh báo commune_unassigned. Vai Admin không tạo kèm được (gán sau cho tài khoản platform_admin).
+         */
+        post: operations["accountsCreateKNUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/users/{id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Khối Vai trò và phạm vi của màn Detail tài khoản */
+        get: operations["accountsListAssignments"];
+        put?: never;
+        /** Thêm vai trò (sổ role_assignment_event, phát pf.accounts.assignment.granted); vai Admin chỉ platform_admin gán cho tài khoản platform_admin */
+        post: operations["accountsGrantAssignment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/users/{id}/assignments/{aid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                aid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Sửa vai trò (Nút, phòng ban, cấp quản lý, xã phụ trách, hiệu lực) — có hiệu lực ở request kế tiếp của mọi ngữ cảnh; không đổi vai */
+        put: operations["accountsChangeAssignment"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/users/{id}/assignments/{aid}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                aid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xóa (thu hồi) vai trò — lý do ≥ 10 ký tự; dữ liệu đã nhập bằng vai trò giữ nguyên; ngữ cảnh của vai trò hết hiệu lực ngay */
+        post: operations["accountsRevokeAssignment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/users/{id}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Sửa Thông tin tài khoản (họ tên, email, SĐT) ở Keycloak; tài khoản đăng nhập bằng SĐT/email đổi tên đăng nhập theo; sổ chỉ ghi tên trường (RB-3) */
+        patch: operations["accountsUpdateProfile"];
+        trace?: never;
+    };
+    "/v1/accounts/users/{id}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Khung Log của màn Detail (định dạng Log chung P2): tạo, khóa/mở, gửi lại liên kết, thêm/sửa/xóa vai trò (cũ → mới), sửa thông tin */
+        get: operations["accountsUserLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/support-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * FN-AD-04.07 Menu các cấp: Admin (platform_admin, MFA) vào menu Cấp Quốc gia/Tỉnh/Xã để hỗ trợ — trả ngữ cảnh phiên (gửi qua X-AG-Context, dải cảnh báo vàng theo support_session_id)
+         * @description target_assignment_id: hỗ trợ một tài khoản (vai, Nút, xã của lần gán; on_behalf_of = tài khoản đó). Vắng: chọn role + org_ref (+ commune_codes
+         *     với Cấp Xã). Mọi thao tác ghi trong ngữ cảnh này bắt buộc header X-AG-Reason (≥ 10 ký tự, mã hóa phần trăm) → nếu thiếu 422
+         *     accounts.support_reason_required; mỗi thao tác ghi hai dòng nhật ký (attempted, completed). Hết hạn sau 4 giờ (tạm).
+         */
+        post: operations["accountsStartSupport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/support-sessions/{id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thoát chế độ hỗ trợ — ngữ cảnh hỗ trợ hết hiệu lực ngay */
+        post: operations["accountsEndSupport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/accounts/support-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nhật ký hỗ trợ (không xóa): thời điểm, Admin, thay cho ai, chức năng, nội dung, lý do — mới nhất trước */
+        get: operations["accountsSupportLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/reports/templates": {
         parameters: {
             query?: never;
@@ -4094,6 +4289,156 @@ export interface components {
             /** @description vd required actions, prev_org_ref, source_event_id — không PII */
             details?: Record<string, never>;
         };
+        KNAssignmentInput: {
+            /** @enum {string} */
+            role: "kn_tw" | "kn_tinh" | "kn_xa" | "admin";
+            /**
+             * Format: uuid
+             * @description Bắt buộc trừ admin. kn_tw → ttkn_national; kn_tinh, kn_xa → ttkn_province
+             */
+            org_ref?: string | null;
+            /** @description ≥ 1 (trừ admin: rỗng); phòng ban của đơn vị chứa Nút */
+            department_codes?: string[];
+            /** @description Mã danh mục cấp quản lý (GET /v1/accounts/mgmt-levels, tạm Q-05) */
+            mgmt_level?: string | null;
+            /** @description Chỉ kn_xa; ⊂ xã của Nút tỉnh; rỗng → cảnh báo */
+            commune_codes?: string[];
+            /** Format: date-time */
+            valid_from?: string | null;
+            /** Format: date-time */
+            valid_to?: string | null;
+            reason?: string;
+        };
+        KNCommune: {
+            code: string;
+            name: string;
+        };
+        KNDepartmentRef: {
+            code: string;
+            name: string;
+            description: string | null;
+            /** @enum {string} */
+            status: "active" | "not_open" | "suspended";
+        };
+        KNAssignment: {
+            /** Format: uuid */
+            assignment_id: string;
+            /** Format: uuid */
+            user_ref: string;
+            /** @enum {string} */
+            role: "kn_tw" | "kn_tinh" | "kn_xa" | "admin";
+            /** Format: uuid */
+            org_ref: string | null;
+            /** @description Admin không Nút: "Toàn hệ thống" */
+            org_name: string;
+            /** @description Nhãn cấp quản lý */
+            mgmt_level: string | null;
+            mgmt_level_code: string | null;
+            communes: components["schemas"]["KNCommune"][];
+            departments: components["schemas"]["KNDepartmentRef"][];
+            /** Format: date-time */
+            valid_from: string;
+            /** Format: date-time */
+            valid_to: string | null;
+            active: boolean;
+            /** Format: uuid */
+            created_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        KNWarning: {
+            /** @enum {string} */
+            code: "commune_unassigned";
+            message: string;
+        };
+        KNSessionContext: {
+            /**
+             * Format: uuid
+             * @description Gửi lại qua header X-AG-Context
+             */
+            context_id: string;
+            /**
+             * Format: uuid
+             * @description null: ngữ cảnh hỗ trợ không gắn tài khoản
+             */
+            assignment_id: string | null;
+            /** @enum {string} */
+            role: "kn_tw" | "kn_tinh" | "kn_xa" | "admin";
+            department_code: string | null;
+            department_name: string | null;
+            /** Format: uuid */
+            org_ref: string | null;
+            org_name: string;
+            communes: components["schemas"]["KNCommune"][];
+            default_route: string;
+            /** Format: date-time */
+            expires_at: string;
+            /**
+             * Format: uuid
+             * @description Khác null: chế độ hỗ trợ — hiện dải cảnh báo vàng
+             */
+            support_session_id: string | null;
+            /** Format: uuid */
+            on_behalf_of: string | null;
+        };
+        KNAccountLogEntry: {
+            /** @description Thứ tự trong Log hợp nhất của tài khoản */
+            seq: number;
+            /** @enum {string} */
+            event: "account.created" | "account.locked" | "account.unlocked" | "account.activation_sent" | "account.assignment_changed" | "account.profile_updated" | "assignment.granted" | "assignment.changed" | "assignment.revoked";
+            /**
+             * Format: uuid
+             * @description assignment_id với sự kiện assignment.*
+             */
+            entity_ref: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+            actor_display: string | null;
+            /** Format: date-time */
+            at: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** @description profile_updated: chỉ tên trường, old/new = null (RB-3) */
+            changes: components["schemas"]["KNFieldChange"][];
+            reason: string | null;
+        };
+        KNSupportLogEntry: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            support_session_id: string;
+            /** Format: uuid */
+            context_id: string;
+            /** Format: uuid */
+            request_id: string;
+            /** @enum {string} */
+            phase: "attempted" | "completed";
+            /**
+             * Format: uuid
+             * @description Admin thật
+             */
+            actor_ref: string;
+            actor_display: string | null;
+            /** Format: uuid */
+            on_behalf_of: string | null;
+            on_behalf_of_display: string | null;
+            /** @enum {string} */
+            acted_role: "kn_tw" | "kn_tinh" | "kn_xa";
+            department_code: string;
+            /** @description Phương thức + route, vd "POST /v1/extension/report-tasks/:id/submissions" */
+            function: string;
+            /** @description path_params — không có thân request */
+            content: Record<string, never>;
+            status_code: number | null;
+            reason: string;
+            trace_id: string | null;
+            /** Format: date-time */
+            at: string;
+        };
         /** @description GeoJSON LineString WGS84 [kinh độ, vĩ độ], ≥ 2 đỉnh phân biệt */
         WaterwayLineString: {
             /** @enum {string} */
@@ -5057,6 +5402,20 @@ export interface components {
                     account: components["schemas"]["AccountsAccount"];
                     seq: number;
                     replayed: boolean;
+                };
+            };
+        };
+        /** @description Lần gán vai trò sau thao tác, seq dòng sổ, cảnh báo (vd commune_unassigned) */
+        KNAssignmentChanged: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    assignment: components["schemas"]["KNAssignment"];
+                    seq: number;
+                    replayed: boolean;
+                    warnings: components["schemas"]["KNWarning"][];
                 };
             };
         };
@@ -8586,6 +8945,354 @@ export interface operations {
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+        };
+    };
+    accountsMgmtLevels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh mục */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            code: string;
+                            label: string;
+                        }[];
+                        provisional: boolean;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    accountsCreateKNUser: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    full_name: string;
+                    /** Format: email */
+                    email: string;
+                    /** @description 0xxxxxxxxx hoặc +84…; chuẩn hóa thành tên đăng nhập */
+                    phone?: string;
+                    assignments: components["schemas"]["KNAssignmentInput"][];
+                };
+            };
+        };
+        responses: {
+            /** @description Đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        user: components["schemas"]["AccountsUser"];
+                        assignments: components["schemas"]["KNAssignment"][];
+                        activation_email_sent: boolean;
+                        warnings: components["schemas"]["KNWarning"][];
+                    };
+                };
+            };
+            /** @description accounts.kn_admin_grant, không phải Admin */
+            403: components["responses"]["Problem"];
+            /** @description accounts.prerequisite_missing, accounts.duplicate_identity, accounts.assignment_duplicate */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed, accounts.department_invalid, accounts.commune_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    accountsListAssignments: {
+        parameters: {
+            query?: {
+                include_revoked?: boolean;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Theo thời điểm gán */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KNAssignment"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    accountsGrantAssignment: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KNAssignmentInput"];
+            };
+        };
+        responses: {
+            201: components["responses"]["KNAssignmentChanged"];
+            /** @description accounts.self_action, accounts.kn_admin_grant */
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    accountsChangeAssignment: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KNAssignmentInput"];
+            };
+        };
+        responses: {
+            200: components["responses"]["KNAssignmentChanged"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            /** @description accounts.assignment_state (đã thu hồi / không có thay đổi), accounts.assignment_duplicate */
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    accountsRevokeAssignment: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["AccountsReason"];
+        responses: {
+            200: components["responses"]["KNAssignmentChanged"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    accountsUpdateProfile: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    full_name?: string;
+                    /** Format: email */
+                    email?: string;
+                    phone?: string;
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã sửa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        user: components["schemas"]["AccountsUser"];
+                        changed_fields: ("full_name" | "email" | "phone" | "username")[];
+                        seq: number;
+                        replayed: boolean;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            /** @description accounts.duplicate_identity, accounts.state_conflict (không có thay đổi) */
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            /** @description accounts.profile_update_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    accountsUserLog: {
+        parameters: {
+            query?: {
+                /** @description seq của dòng cuối trang trước */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Theo thời điểm ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KNAccountLogEntry"][];
+                        next_cursor: number | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    accountsStartSupport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    target_assignment_id?: string;
+                    /** @enum {string} */
+                    role?: "kn_tw" | "kn_tinh" | "kn_xa";
+                    /** Format: uuid */
+                    org_ref?: string;
+                    commune_codes?: string[];
+                    department_code: string;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Ngữ cảnh hỗ trợ */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNSessionContext"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    accountsEndSupport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã kết thúc */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        support_session_id: string;
+                        /** Format: date-time */
+                        ended_at: string | null;
+                    };
+                };
+            };
+            404: components["responses"]["Problem"];
+            /** @description accounts.support_session_ended */
+            409: components["responses"]["Problem"];
+        };
+    };
+    accountsSupportLog: {
+        parameters: {
+            query?: {
+                support_session_id?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KNSupportLogEntry"][];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
         };
     };
     adminListReportTemplates: {
