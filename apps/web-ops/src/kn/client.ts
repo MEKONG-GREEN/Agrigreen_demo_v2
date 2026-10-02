@@ -1,9 +1,10 @@
 // Client hợp đồng tạm KN v7.7 (contract.ts). Dùng fetch(Request) thuần để chạy được với backend giả lập
 // (mockFetch nhận Request) và backend thật như nhau; Bearer, Idempotency-Key và X-AG-Context đặt ở đây.
-// Khi P1/P2 có OpenAPI: chuyển sang `api.GET("/v1/me/contexts")` của client sinh, giữ interface KnApi.
+// Kiểu trên dây là kiểu sinh từ OpenAPI (KNAssignment, KNSessionContext, KNMenu); menu dựng sang cây của khung ở đây.
 import { uuidv7 } from "@/api/idempotency";
 import { ApiProblem, networkProblem, toProblem } from "@/api/problem";
-import { CONTEXT_HEADER, type KnApi, type MenuBadges, type MenuTree, type MeContexts, type SessionContext } from "./contract";
+import { CONTEXT_HEADER, type KnApi, type KnMenu, type MenuBadges, type MeContexts, type SessionContext } from "./contract";
+import { fromKnMenu } from "./menuAdapter";
 
 export interface KnApiOptions {
   baseUrl: string;
@@ -11,9 +12,6 @@ export interface KnApiOptions {
   getContextId: () => string | null;
   fetch?: (input: Request) => Promise<Response>;
 }
-
-/** Admin không chọn phòng ban: menu lấy qua mã phòng ban đặc biệt "_all" (giả định cho P2). */
-export const ADMIN_MENU_CODE = "_all";
 
 export function createKnApi(opts: KnApiOptions): KnApi {
   const base = opts.baseUrl.replace(/\/+$/, "");
@@ -50,11 +48,8 @@ export function createKnApi(opts: KnApiOptions): KnApi {
   return {
     listContexts: () => call<MeContexts>("GET", "/v1/me/contexts"),
     selectContext: (req) => call<SessionContext>("POST", "/v1/me/context", req),
-    menu: (ctx) =>
-      call<MenuTree>(
-        "GET",
-        `/v1/departments/${encodeURIComponent(ctx.role === "admin" ? ADMIN_MENU_CODE : (ctx.department_code ?? ""))}/modules?role=${encodeURIComponent(ctx.role)}`,
-      ),
+    // Vai + phòng ban lấy từ ngữ cảnh phiên (X-AG-Context) ở server — không gửi tham số (P2 resolveAudience).
+    menu: async () => fromKnMenu(await call<KnMenu>("GET", "/v1/menu")),
     badges: () => call<MenuBadges>("GET", "/v1/me/menu-badges"),
   };
 }

@@ -501,6 +501,12 @@ def structure_checks(env: str, docs: list[dict], values: dict, r: Report):
     pf_users = [n for n, d in users.items() if d["metadata"]["labels"].get("agrigreen.vn/owner-zone") == "pf"]
     r.check(len(pf_users) >= 3, f"[{env}] thiếu tài khoản RabbitMQ nền tảng: {pf_users}")
     r.check(any(d["spec"]["name"] == "mkg.internal" for d in by_kind.get("Vhost", [])), f"[{env}] thiếu vhost mkg.internal")
+    # Sao lưu (KN v7.7 NFR): mọi Stanza giữ >= 30 ngày phục hồi — theo ngày (fullType time), không theo số bản.
+    for st in by_kind.get("Stanza", []):
+        for repo in st["spec"]["stanzaConfiguration"].get("s3Repositories", []):
+            rp = repo.get("retentionPolicy", {})
+            r.check(rp.get("fullType") == "time" and int(rp.get("full", 0)) >= 30,
+                    f"[{env}] Stanza {st['metadata']['name']}: retention {rp} chưa bảo đảm >= 30 ngày (cần fullType time, full >= 30)")
     # Luật Prometheus: bản trong chart trùng bản gốc; PrometheusRule mang đúng nhóm luật.
     src = ROOT / "deploy" / "observability" / "prometheus"
     rules = {d["metadata"]["name"]: d for d in by_kind.get("PrometheusRule", [])}

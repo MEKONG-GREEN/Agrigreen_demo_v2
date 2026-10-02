@@ -108,7 +108,10 @@ postgres:
       bucketByCluster: { vault: agrigreen-vault-backup }
       uriStyle: path
       verifyTLS: true
-    retentionFull: 4
+    # >= 30 ngày phục hồi (KN v7.7 NFR): retentionPolicy theo NGÀY (fullType time) — full tuần với
+    # "4 bản" (count) chỉ còn ~28 ngày. deploy/k8s/tests/check_flows.py kiểm.
+    retentionFullType: time
+    retentionFull: 30
     fullSchedule: "0 0 1 * * 0"     # CNPG ScheduledBackup: cron 6 trường (giây) — CN 01:00 UTC
     diffSchedule: "0 0 1 * * 1-6"
   # Mỗi cụm logic (migrations.Cluster) là MỘT cụm PostgreSQL riêng ở ĐTK 2 (mục 5: "hai sổ,

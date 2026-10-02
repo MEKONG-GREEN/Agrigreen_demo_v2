@@ -238,7 +238,9 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	pty.UseDepartmentUsage(kn.ReportUsage())
 	pty.UseFormAvailability(rep.FormAvailability())
 	md.UseFormUsage(rep.FormUsage())
-	kn.UseTablePDF(rep.TablePDF()) // KN v7.7 P5: "Xuất PDF" lịch công tác (ngữ cảnh KN của P1 nối qua kn.UseKNContext)
+	kn.UseTablePDF(rep.TablePDF()) // KN v7.7 P5: "Xuất PDF" lịch công tác
+	// KN v7.7 P1 → P5: vai, phòng ban, tỉnh, xã, cấp quản lý từ ngữ cảnh phiên + sổ gán vai trò (thay suy từ vai realm).
+	kn.UseKNContext(acc.ExtensionKNContext(), acc.ExtensionKNDirectory())
 
 	// pf/waterway (G2): API ghi sổ đoạn/công trình, tạo job dựng và phát hành; worker dựng đồ thị (cmd/worker).
 	wwPool, err := pool(waterway.DBRole)

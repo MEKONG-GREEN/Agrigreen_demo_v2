@@ -137,6 +137,17 @@ func (m *Module) StaffContacts() extport.StaffContacts {
 	return app.StaffContacts{Dir: m.svc.Dir}
 }
 
+// ExtensionKNContext cho pf/extension (KN v7.7 P5): ngữ cảnh KN của request (X-AG-Context) kèm tỉnh và cấp
+// quản lý của lần gán — extension.UseKNContext(acc.ExtensionKNContext(), acc.ExtensionKNDirectory()).
+func (m *Module) ExtensionKNContext() extport.KNContextResolver {
+	return app.ExtensionKN{Assignments: m.svc, Orgs: m.svc.Orgs}
+}
+
+// ExtensionKNDirectory cho pf/extension (KN v7.7 P5): cán bộ KN của phòng ban × tỉnh từ sổ gán vai trò.
+func (m *Module) ExtensionKNDirectory() extport.KNDirectory {
+	return app.ExtensionKN{Assignments: m.svc, Orgs: m.svc.Orgs}
+}
+
 // OrgStatusEvents là các sự kiện consumer đăng ký.
 var OrgStatusEvents = []string{partyport.EventOrgDeactivated, partyport.EventOrgReactivated}
 

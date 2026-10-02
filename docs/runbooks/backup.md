@@ -59,7 +59,15 @@ Kết quả là JSON: `copied`, `skipped` (đã có cùng băm — gia tăng), `
 | `objsync backup` | hằng ngày 01:30 (sau neo 00:30, để manifest neo có trong bản sao) |
 | `pgbackrest check`, `info` | sau mỗi lần sao lưu; cảnh báo P1 nếu thất bại |
 
-Repo production là S3 trong lãnh thổ (TLS) có object lock; `repo1-retention-full=4`, `repo1-retention-diff=7`.
+Repo production là S3 trong lãnh thổ (TLS) có object lock; `repo1-retention-full-type=time`, `repo1-retention-full=30`, `repo1-retention-diff=7`.
+
+### Thời gian giữ: tối thiểu 30 ngày (KN v7.7 NFR)
+
+- **Theo ngày, không theo số bản.** Trước đây `repo1-retention-full=4` (đếm bản) với full hằng tuần chỉ giữ ~28 ngày — dưới yêu cầu ≥ 30 ngày. Nay `repo1-retention-full-type=time` + `repo1-retention-full=30`: pgBackRest chỉ cho một full hết hạn khi đã có full khác cũ hơn 30 ngày, nên luôn phục hồi (PITR) được về bất kỳ thời điểm nào trong 30 ngày gần nhất; thực tế giữ 5–6 full tuần (tới ~37 ngày). WAL hết hạn theo full (mặc định `repo1-retention-archive-type=full`), diff giữ 7 bản gần nhất (không ảnh hưởng PITR vì WAL còn).
+- Compose/Local: [deploy/compose/backup/pgbackrest.conf](../../deploy/compose/backup/pgbackrest.conf). K8s (CloudNativePG + plugin pgBackRest): `postgres.backup.retentionFullType: time`, `retentionFull: 30` trong [values.yaml](../../deploy/k8s/charts/agrigreen/values.yaml) → `Stanza.spec…retentionPolicy {full: 30, fullType: time}`; `deploy/k8s/tests/check_flows.py` (chạy bởi `deploy/k8s/check.ps1`) từ chối mọi Stanza dưới 30 ngày hoặc đếm theo bản.
+- Object lock của bucket sao lưu (COMPLIANCE) đặt **≥ 38 ngày** (30 ngày + một chu kỳ full tuần + biên) để `expire` không vướng khóa với bản còn trong cửa sổ, và không cho xóa sớm hơn cửa sổ phục hồi.
+- Dung lượng: kho cần ~6 full + diff + WAL của 37 ngày — kiểm `pgbackrest info` sau đợt chuyển; kho cũ (đếm 4 bản) không mất bản nào khi đổi, chỉ ngừng hết hạn tới khi đủ 30 ngày.
+- Kiểm hằng tháng: `pgbackrest info` phải có full cũ nhất ≥ 30 ngày (sau 5 tuần vận hành); diễn tập phục hồi về mốc 29 ngày trước ít nhất mỗi quý ([restore-drill.md](restore-drill.md)).
 
 ## Khi lỗi
 

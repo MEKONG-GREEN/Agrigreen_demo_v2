@@ -297,7 +297,7 @@ export interface paths {
         };
         /**
          * UR-KT-02: cây module (menu) của một phòng ban cho vai KN — bật phòng ban không cần phát hành lại web/app
-         * @description Dựng từ bảng menu tĩnh có phiên bản (kn.menu/v1) và trạng thái phòng ban hiện hành ở MỖI request (Cache-Control: no-store).
+         * @description Dựng từ bảng menu tĩnh có phiên bản (kn.menu/v2) và trạng thái phòng ban hiện hành ở MỖI request (Cache-Control: no-store).
          *     audience vắng: theo ngữ cảnh phiên (P1) hoặc vai duy nhất của người gọi. platform_admin xem được mọi cấp (FN-AD-04.07).
          *     audience = admin: mục con của phòng ban trong nhóm "Phòng ban" (enabled = false khi chưa mở).
          */
@@ -317,7 +317,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** UR-KT-02, BRD §6: sidebar đầy đủ theo vai + phòng ban của phiên (Admin: Điều hành / Phòng ban / Quản trị hệ thống) */
+        /**
+         * UR-KT-02, BRD §6: sidebar đầy đủ theo vai + phòng ban của phiên (Admin: Điều hành / Phòng ban / Quản trị hệ thống)
+         * @description web-ops/app gọi KHÔNG tham số kèm header X-AG-Context: server lấy vai + phòng ban từ ngữ cảnh phiên (P1).
+         *     Đường dẫn (route) là trang web-ops: "/kn/<màn>" (vai + phòng ban ở ngữ cảnh, không ở URL); màn Admin theo
+         *     phòng ban "/kn/phong-ban/{mã phòng ban}/<màn>"; màn hiện có ngoài /kn giữ đường dẫn cũ. Bản giả lập web
+         *     khớp bảng Go qua ca vàng apps/web-ops/src/api/mock/fixtures/kn-menu.json.
+         */
         get: operations["knMenu"];
         put?: never;
         post?: never;
@@ -4357,7 +4363,7 @@ export interface components {
             status: "active" | "not_open" | "suspended";
             status_label: string;
             /**
-             * @description Bộ menu dựng sẵn trong mã (kn.menu/v1)
+             * @description Bộ menu dựng sẵn trong mã (kn.menu/v2)
              * @enum {string}
              */
             menu_profile: "trong_trot" | "generic";
@@ -4426,8 +4432,9 @@ export interface components {
             /** @description Khóa ổn định của mục (vd xa.nhiem_vu.cong_viec) */
             key: string;
             label: string;
-            /** @description Đường dẫn web/app; null với mục cha chỉ mở/đóng */
+            /** @description Trang web-ops (/kn/<màn>; Admin theo phòng ban /kn/phong-ban/{mã}/<màn>); null với mục cha chỉ mở/đóng */
             route: string | null;
+            /** @description Tên icon NavIcon của web-ops (app tự ánh xạ) */
             icon: string;
             /** @description Khóa số đếm việc cần xử lý (ẩn khi 0) — client lấy số từ module sở hữu */
             badge_source: string | null;
@@ -4448,7 +4455,7 @@ export interface components {
             items: components["schemas"]["KNMenuItem"][];
         };
         KNMenu: {
-            /** @description Phiên bản bảng menu tĩnh (kn.menu/v1) */
+            /** @description Phiên bản bảng menu tĩnh (kn.menu/v2) */
             menu_version: string;
             /** @enum {string} */
             audience: "kn_tw" | "kn_tinh" | "kn_xa" | "admin";
@@ -8705,6 +8712,11 @@ export interface operations {
         parameters: {
             query?: {
                 audience?: "kn_tw" | "kn_tinh" | "kn_xa" | "admin";
+                /**
+                 * @deprecated
+                 * @description Tên cũ của audience (hợp đồng tạm P6) — nhận một đợt; audience thắng
+                 */
+                role?: "kn_tw" | "kn_tinh" | "kn_xa" | "admin";
                 org_ref?: string;
             };
             header?: never;
@@ -8736,8 +8748,14 @@ export interface operations {
     knMenu: {
         parameters: {
             query?: {
+                /** @description Vắng = theo ngữ cảnh phiên (X-AG-Context) hoặc vai duy nhất */
                 audience?: "kn_tw" | "kn_tinh" | "kn_xa" | "admin";
-                /** @description Vắng = phòng ban Đang áp dụng duy nhất của đơn vị */
+                /**
+                 * @deprecated
+                 * @description Tên cũ của audience (hợp đồng tạm P6) — nhận một đợt; audience thắng
+                 */
+                role?: "kn_tw" | "kn_tinh" | "kn_xa" | "admin";
+                /** @description Vắng = phòng ban của ngữ cảnh phiên, hoặc phòng ban Đang áp dụng duy nhất của đơn vị */
                 department?: string;
                 org_ref?: string;
             };

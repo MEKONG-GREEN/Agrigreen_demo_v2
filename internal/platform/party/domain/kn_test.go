@@ -30,7 +30,8 @@ func TestUR_KT_02_MenuTableConsistent(t *testing.T) {
 					if it.Route == "" && len(it.Children) == 0 {
 						t.Fatalf("%s/%s: mục %s không có đường dẫn lẫn mục con", profile, aud, it.Key)
 					}
-					if it.Route != "" && (!strings.HasPrefix(it.Route, "/kn/chan_nuoi/") || strings.Contains(it.Route, "{")) {
+					// Hợp đồng đường dẫn KN-fix: vai + phòng ban ở ngữ cảnh phiên, không ở URL.
+					if it.Route != "" && (!strings.HasPrefix(it.Route, "/kn/") || strings.Contains(it.Route, "{") || strings.Contains(it.Route, "chan_nuoi")) {
 						t.Fatalf("%s/%s: đường dẫn %s", profile, aud, it.Route)
 					}
 					if aud == port.AudienceXa && strings.Contains(it.Key, "dashboard") {
@@ -45,12 +46,18 @@ func TestUR_KT_02_MenuTableConsistent(t *testing.T) {
 			for _, g := range groups {
 				walk(g.Items)
 			}
-			if r := domain.DefaultRoute(aud, "chan_nuoi"); !strings.HasPrefix(r, "/kn/chan_nuoi/") {
+			if r := domain.DefaultRoute(aud); !strings.HasPrefix(r, "/kn/") {
 				t.Fatalf("trang mặc định %s: %s", aud, r)
 			}
 		}
-		if items := domain.AdminDepartmentItems(profile, "tt"); len(items) < 5 {
+		items := domain.AdminDepartmentItems(profile, "tt")
+		if len(items) < 5 {
 			t.Fatalf("mục Admin của phòng ban (%s): %d", profile, len(items))
+		}
+		for _, it := range items {
+			if strings.Contains(it.Route, "{") || (strings.HasPrefix(it.Route, "/kn/phong-ban/") && !strings.HasPrefix(it.Route, "/kn/phong-ban/tt/")) {
+				t.Fatalf("mục Admin của phòng ban (%s): đường dẫn %s", profile, it.Route)
+			}
 		}
 	}
 	// Bản sao sâu: sửa kết quả không đổi bảng tĩnh.

@@ -6338,7 +6338,7 @@ components:
         sort_order: {type: integer}
         status: {type: string, enum: [active, not_open, suspended], description: "Đang áp dụng / Chưa mở / Ngưng hoạt động"}
         status_label: {type: string}
-        menu_profile: {type: string, enum: [trong_trot, generic], description: "Bộ menu dựng sẵn trong mã (kn.menu/v1)"}
+        menu_profile: {type: string, enum: [trong_trot, generic], description: "Bộ menu dựng sẵn trong mã (kn.menu/v2)"}
         retired: {type: boolean, description: "Đã xóa (sự kiện retired) — mã không tái sử dụng"}
         selectable: {type: boolean, description: "Chọn được ở bước 2 đăng nhập (Đang áp dụng, chưa xóa)"}
         account_count: {type: [integer, "null"], description: "null = chưa nối nguồn đếm (P1) hoặc Application API"}

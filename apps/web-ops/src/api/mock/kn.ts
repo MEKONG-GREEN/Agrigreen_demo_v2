@@ -1,26 +1,32 @@
 // ============================================================================
-// BACKEND GIẢ LẬP cho hợp đồng tạm KN v7.7 (src/kn/contract.ts):
+// BACKEND GIẢ LẬP cho bề mặt KN v7.7 (kiểu trên dây = kiểu sinh từ OpenAPI, src/kn/contract.ts):
 //   GET  /v1/me/contexts                 (P1) — các lần gán vai trò của người gọi
 //   POST /v1/me/context                  (P1) — chọn vai trò + phòng ban → context_id
-//   GET  /v1/departments/{code}/modules  (P2) — cây menu theo vai trò (Admin: code "_all")
+//   GET  /v1/menu                        (P2) — KNMenu theo ngữ cảnh phiên (X-AG-Context) hoặc ?audience=&department=
+//   GET  /v1/departments/{code}/modules  (P2) — cây module của một phòng ban (?audience=; Admin: nhóm của phòng ban)
 //   GET  /v1/me/menu-badges              (P4) — số đếm việc cần xử lý
-// Bảng menu Trồng trọt dựng theo BRD v7.7 §6 (Hình 3c–3f). Đăng nhập mật khẩu giả lập ở `mockKnLogin`.
+// Bảng menu = bảng Go internal/platform/party/domain/menu.go (BRD v7.7 §6, Hình 3c–3f): Vitest
+// src/api/mock/kn-menu.contract.test.ts so từng ca với ca vàng fixtures/kn-menu.json do Go sinh
+// (AG_UPDATE_WEB_FIXTURES=1 go test ./internal/platform/party/handler -run TestWebMenuFixture).
+// Đăng nhập mật khẩu giả lập ở `mockKnLogin`.
 // ============================================================================
 import { uuidv7 } from "../idempotency";
-import type { DepartmentRef, KnRole, MenuGroup, MenuNode, MenuTree, RoleAssignment, SessionContext } from "@/kn/contract";
+import type { DepartmentRef, KnMenu, KnMenuGroup, KnMenuItem, KnRole, MenuTree, RoleAssignment, SessionContext } from "@/kn/contract";
+import { fromKnMenu } from "@/kn/menuAdapter";
 import { json, problem, type Route } from "./http";
-import { findKnAccount, findKnAccountByIdentifier, KN_DEPARTMENTS, knPersona, MOCK_KN_PASSWORD, SHORT_DEPT_NAME, type MockKnAccount } from "./kn-accounts";
+import { findKnAccount, findKnAccountByIdentifier, KN_DEPARTMENTS, KN_MENU_PROFILE, knPersona, MOCK_KN_PASSWORD, type MockKnAccount } from "./kn-accounts";
 import type { MockPersona } from "./personas";
 import { workSchedulePendingBadge } from "./kn-schedules";
 
-export const MENU_VERSION = "kn-menu.v7.7-2026-10-01";
+/** domain.MenuVersion. */
+export const MENU_VERSION = "kn.menu/v2";
 
 /** Màn Lịch công tác (P5): một đường dẫn cho Cấp Xã (đăng ký) và Cấp Tỉnh/Admin (duyệt) — trang tự chọn theo vai trò. */
 export const WORK_SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
-/** Nguồn số đếm menu theo hợp đồng P5 (ExtWorkScheduleCounts.pending_open_weeks) và menu P2. */
+/** Nguồn số đếm menu theo hợp đồng P5 (ExtWorkScheduleCounts.pending_open_weeks) và menu P2 (domain.BadgeScheduleApprovals). */
 export const WORK_SCHEDULE_BADGE = "extension.work_schedules.pending";
 
-/** Trang mặc định theo vai trò (FN-CH-00.01). */
+/** Trang mặc định theo vai trò (FN-CH-00.01) — domain.DefaultRoute (P2) = accounts DefaultRoute (P1). */
 export const DEFAULT_ROUTE: Record<KnRole, string> = {
   kn_tw: "/kn/dashboard",
   kn_tinh: "/kn/dashboard",
@@ -31,179 +37,233 @@ export const DEFAULT_ROUTE: Record<KnRole, string> = {
 /** Cờ "Báo cáo đột xuất": chỉ hiện khi phòng ban đã có mẫu loại này (FN-AD-04.06). Mặc định tắt như Hình 3e/3f. */
 const ADHOC_FORMS: Record<string, boolean> = { trong_trot: false };
 
-const BAO_CAO_KY: MenuNode[] = [
-  { key: "bc-tuan", label: "Báo cáo tuần", icon: "file", href: "/kn/bao-cao/tuan" },
-  { key: "bc-thang", label: "Báo cáo tháng", icon: "calendar", href: "/kn/bao-cao/thang" },
-  { key: "bc-vu", label: "Báo cáo hàng vụ", icon: "sprout", href: "/kn/bao-cao/vu" },
+// Khóa số đếm (domain.Badge*).
+const B = {
+  tasksTodo: "extension.report_tasks.todo",
+  notSubmitted: "extension.report_status.not_submitted",
+  reviewPending: "extension.submissions.pending_review",
+  schedules: WORK_SCHEDULE_BADGE,
+  adHocTodo: "extension.report_tasks.ad_hoc_todo",
+  adHocStatus: "extension.report_status.ad_hoc_pending",
+} as const;
+
+interface Item {
+  key: string;
+  label: string;
+  route?: string;
+  icon: string;
+  badge?: string;
+  /** Chỉ hiện khi có mẫu "đột xuất" (MenuRequirement). */
+  adHoc?: boolean;
+  children?: Item[];
+}
+interface Group {
+  key: string;
+  label: string;
+  items: Item[];
+}
+
+const BC_KY = (p: "tw" | "xa"): Item[] => [
+  { key: `${p}.bao_cao.tuan`, label: "Báo cáo tuần", route: "/kn/bao-cao/tuan", icon: "file" },
+  { key: `${p}.bao_cao.thang`, label: "Báo cáo tháng", route: "/kn/bao-cao/thang", icon: "calendar" },
+  { key: `${p}.bao_cao.hang_vu`, label: "Báo cáo hàng vụ", route: "/kn/bao-cao/vu", icon: "sprout" },
 ];
 
-function adhoc(dept: string): MenuNode[] {
-  return ADHOC_FORMS[dept]
-    ? [{ key: "bc-dot-xuat", label: "Báo cáo đột xuất", icon: "zap", href: "/kn/bao-cao/dot-xuat", badge_source: "adhoc_reports.todo" }]
-    : [];
-}
-
-function deptGroups(role: Exclude<KnRole, "admin">, dept: string): MenuGroup[] {
-  switch (role) {
-    case "kn_tw":
-      return [
-        { key: "dieu-hanh", label: "Điều hành", items: [{ key: "dashboard", label: "Dashboard", icon: "dashboard", href: "/kn/dashboard" }] },
-        {
-          key: "bao-cao",
-          label: "Báo cáo",
-          items: [...BAO_CAO_KY, { key: "bc-nam", label: "Báo cáo năm", icon: "chart", href: "/kn/bao-cao/nam" }],
-        },
-      ];
-    case "kn_tinh":
-      return [
-        {
-          key: "dieu-hanh",
-          label: "Điều hành",
-          items: [
-            { key: "dashboard", label: "Dashboard", icon: "dashboard", href: "/kn/dashboard" },
-            {
-              key: "nhiem-vu",
-              label: "Nhiệm vụ",
-              icon: "task",
-              children: [
-                { key: "phat-hanh", label: "Phát hành biểu mẫu", icon: "send", href: "/kn/nhiem-vu/phat-hanh" },
-                { key: "trang-thai-nop", label: "Trạng thái nộp", icon: "bell", href: "/kn/nhiem-vu/trang-thai-nop", badge_source: "submissions.missing" },
-                { key: "ra-soat", label: "Rà soát & chốt kỳ", icon: "check", href: "/kn/nhiem-vu/ra-soat", badge_source: "reviews.pending" },
-                { key: "lich-cong-tac", label: "Lịch công tác", icon: "calendar", href: WORK_SCHEDULE_ROUTE, badge_source: WORK_SCHEDULE_BADGE },
-              ],
-            },
-          ],
-        },
-        {
-          key: "bao-cao",
-          label: "Báo cáo",
-          items: [
-            { key: "tong-hop", label: "Báo cáo tổng hợp các xã", icon: "layers", href: "/kn/bao-cao/tong-hop" },
-            { key: "chi-cuc", label: "Báo cáo Chi cục", icon: "file", href: "/kn/bao-cao/chi-cuc" },
-            ...adhoc(dept),
-          ],
-        },
-      ];
-    case "kn_xa":
-      return [
-        {
-          key: "dieu-hanh",
-          label: "Điều hành",
-          items: [
-            {
-              key: "nhiem-vu",
-              label: "Nhiệm vụ",
-              icon: "task",
-              children: [
-                { key: "cong-viec", label: "Công việc cần làm", icon: "bell", href: "/kn/nhiem-vu/cong-viec", badge_source: "report_tasks.todo" },
-                { key: "lich-cong-tac", label: "Lịch công tác", icon: "calendar", href: WORK_SCHEDULE_ROUTE },
-              ],
-            },
-          ],
-        },
-        {
-          key: "bao-cao",
-          label: "Báo cáo",
-          items: [...BAO_CAO_KY, ...adhoc(dept), { key: "bc-cua-xa", label: "Báo cáo của xã", icon: "chart", href: "/kn/bao-cao/cua-xa" }],
-        },
-        {
-          key: "du-lieu",
-          label: "Dữ liệu",
-          items: [
-            {
-              key: "thu-thap",
-              label: "Thu thập dữ liệu",
-              icon: "database",
-              children: [
-                { key: "htx", label: "Danh sách HTX", icon: "coop", href: "/kn/du-lieu/htx" },
-                { key: "may-moc", label: "Máy móc HTX", icon: "tractor", href: "/kn/du-lieu/may-moc" },
-                { key: "ve-thua", label: "Vẽ thửa ruộng", icon: "map", href: "/kn/du-lieu/ve-thua" },
-                { key: "vat-tu", label: "Vật tư", icon: "package", href: "/kn/du-lieu/vat-tu" },
-              ],
-            },
-          ],
-        },
-      ];
-  }
-}
-
-/** Menu Admin: nhóm Phòng ban (từng phòng ban) + Quản trị hệ thống (FN-CH-00.01 quy tắc, Hình 3c). */
-function adminGroups(departments: readonly DepartmentRef[]): MenuGroup[] {
-  const deptNodes: MenuNode[] = [];
-  const closed: DepartmentRef[] = [];
-  for (const d of departments) {
-    if (d.status === "active") {
-      const base = `/kn/phong-ban/${d.code}`;
-      deptNodes.push({
-        key: `pb-${d.code}`,
-        label: d.name,
-        icon: "sprout",
-        children: [
-          { key: `${d.code}-theo-doi`, label: "Theo dõi nộp báo cáo", icon: "bell", href: `${base}/theo-doi-nop` },
-          { key: `${d.code}-tong-hop`, label: "Báo cáo tổng hợp các xã", icon: "layers", href: `${base}/tong-hop` },
-          { key: `${d.code}-du-lieu`, label: "Dữ liệu báo cáo các xã", icon: "file", href: `${base}/du-lieu-bao-cao` },
-          { key: `${d.code}-thu-thap`, label: "Thu thập dữ liệu", icon: "database", href: `${base}/thu-thap` },
-          // FN-TI-02.07: Admin xem lịch công tác (chỉ đọc) — cùng màn của Cấp Tỉnh, chưa tách theo phòng ban.
-          ...(d.code === "trong_trot" ? [{ key: `${d.code}-lich`, label: "Lịch công tác", icon: "calendar" as const, href: WORK_SCHEDULE_ROUTE }] : []),
-          // Màn hiện có (G1): danh mục dùng chung — giữ tới khi P2/P6 dựng màn mới.
-          { key: `${d.code}-danh-muc`, label: "Danh mục nông nghiệp", icon: "package", href: "/quan-tri/danh-muc" },
-          // P3b: trình thiết kế mẫu báo cáo dạng lưới Excel (FN-AD-04.06, Hình 27).
-          { key: `${d.code}-mau`, label: "Mẫu báo cáo", icon: "table", href: `${base}/mau-bao-cao` },
-        ],
-      });
-    } else closed.push(d);
-  }
-  // Hình 3c: hai phòng chưa mở đầu tiên hiện riêng, phần còn lại gộp "n phòng khác".
-  for (const d of closed.slice(0, 2)) {
-    deptNodes.push({ key: `pb-${d.code}`, label: SHORT_DEPT_NAME[d.code] ?? d.name, icon: "building", status: "not_open" });
-  }
-  if (closed.length > 2) deptNodes.push({ key: "pb-khac", label: `${closed.length - 2} phòng khác`, icon: "building", status: "not_open" });
-
-  return [
-    { key: "dieu-hanh", label: "Điều hành", items: [{ key: "tong-quan", label: "Tổng quan hệ thống", icon: "dashboard", href: "/kn/tong-quan" }] },
-    { key: "phong-ban", label: "Phòng ban", items: deptNodes },
+/** Bộ menu Phòng Trồng trọt (domain.trongTrotMenus). */
+const TRONG_TROT: Record<Exclude<KnRole, "admin">, Group[]> = {
+  kn_tw: [
+    { key: "dieu_hanh", label: "Điều hành", items: [{ key: "tw.dashboard", label: "Dashboard", route: "/kn/dashboard", icon: "dashboard" }] },
+    { key: "bao_cao", label: "Báo cáo", items: [...BC_KY("tw"), { key: "tw.bao_cao.nam", label: "Báo cáo năm", route: "/kn/bao-cao/nam", icon: "chart" }] },
+  ],
+  kn_tinh: [
     {
-      key: "quan-tri",
-      label: "Quản trị hệ thống",
+      key: "dieu_hanh",
+      label: "Điều hành",
       items: [
-        { key: "dvhc", label: "Đơn vị hành chính", icon: "map", href: "/kn/quan-tri/don-vi-hanh-chinh" },
-        { key: "co-cau", label: "Cơ cấu tổ chức 3 cấp", icon: "org", href: "/quan-tri/to-chuc" },
-        { key: "phong-ban-dm", label: "Phòng ban", icon: "building", href: "/kn/quan-tri/phong-ban" },
-        { key: "nguoi-dung", label: "Người dùng", icon: "users", href: "/quan-tri/tai-khoan" },
-        { key: "menu-cac-cap", label: "Menu các cấp", icon: "key", href: "/kn/quan-tri/menu-cac-cap" },
+        { key: "tinh.dashboard", label: "Dashboard", route: "/kn/dashboard", icon: "dashboard" },
         {
-          // Q-13 (tạm, chờ khách): công cụ quản trị nền tảng đã có đặt trong nhóm Quản trị hệ thống.
-          key: "cong-cu",
-          label: "Công cụ nền tảng (tạm)",
-          icon: "param",
+          key: "tinh.nhiem_vu",
+          label: "Nhiệm vụ",
+          icon: "task",
           children: [
-            { key: "tham-so", label: "Tham số & phê duyệt", icon: "param", href: "/quan-tri/tham-so" },
-            // Màn G1 (mẫu xuất có phiên bản + lịch gửi email) — giữ nguyên, không xóa tính năng.
-            { key: "mau-xuat", label: "Mẫu xuất & lịch gửi", icon: "report", href: "/quan-tri/mau-bao-cao" },
-            { key: "xung-dot", label: "Xung đột đồng bộ", icon: "conflict", href: "/quan-tri/xung-dot" },
-            { key: "giam-sat", label: "Giám sát đồng bộ", icon: "sync", href: "/quan-tri/giam-sat-dong-bo" },
-            { key: "thiet-bi", label: "Đồng bộ thiết bị", icon: "sync", href: "/dong-bo" },
+            { key: "tinh.nhiem_vu.phat_hanh", label: "Phát hành biểu mẫu", route: "/kn/nhiem-vu/phat-hanh", icon: "send" },
+            { key: "tinh.nhiem_vu.trang_thai_nop", label: "Trạng thái nộp", route: "/kn/nhiem-vu/trang-thai-nop", icon: "bell", badge: B.notSubmitted },
+            { key: "tinh.nhiem_vu.ra_soat", label: "Rà soát & chốt kỳ", route: "/kn/nhiem-vu/ra-soat", icon: "check", badge: B.reviewPending },
+            { key: "tinh.nhiem_vu.lich_cong_tac", label: "Lịch công tác", route: WORK_SCHEDULE_ROUTE, icon: "calendar", badge: B.schedules },
           ],
         },
       ],
     },
+    {
+      key: "bao_cao",
+      label: "Báo cáo",
+      items: [
+        { key: "tinh.bao_cao.tong_hop", label: "Báo cáo tổng hợp các xã", route: "/kn/bao-cao/tong-hop", icon: "layers" },
+        { key: "tinh.bao_cao.chi_cuc", label: "Báo cáo Chi cục", route: "/kn/bao-cao/chi-cuc", icon: "file" },
+        { key: "tinh.bao_cao.dot_xuat", label: "Báo cáo đột xuất", route: "/kn/bao-cao/dot-xuat", icon: "zap", badge: B.adHocStatus, adHoc: true },
+      ],
+    },
+  ],
+  kn_xa: [
+    {
+      key: "dieu_hanh",
+      label: "Điều hành",
+      items: [
+        {
+          key: "xa.nhiem_vu",
+          label: "Nhiệm vụ",
+          icon: "task",
+          children: [
+            { key: "xa.nhiem_vu.cong_viec", label: "Công việc cần làm", route: "/kn/nhiem-vu/cong-viec", icon: "bell", badge: B.tasksTodo },
+            { key: "xa.nhiem_vu.lich_cong_tac", label: "Lịch công tác", route: WORK_SCHEDULE_ROUTE, icon: "calendar" },
+          ],
+        },
+      ],
+    },
+    {
+      key: "bao_cao",
+      label: "Báo cáo",
+      items: [
+        ...BC_KY("xa"),
+        { key: "xa.bao_cao.cua_xa", label: "Báo cáo của xã", route: "/kn/bao-cao/cua-xa", icon: "chart" },
+        { key: "xa.bao_cao.dot_xuat", label: "Báo cáo đột xuất", route: "/kn/bao-cao/dot-xuat", icon: "zap", badge: B.adHocTodo, adHoc: true },
+      ],
+    },
+    {
+      key: "du_lieu",
+      label: "Dữ liệu",
+      items: [
+        {
+          key: "xa.thu_thap",
+          label: "Thu thập dữ liệu",
+          icon: "database",
+          children: [
+            { key: "xa.thu_thap.htx", label: "Danh sách HTX", route: "/kn/du-lieu/htx", icon: "coop" },
+            { key: "xa.thu_thap.may_moc", label: "Máy móc HTX", route: "/kn/du-lieu/may-moc", icon: "tractor" },
+            { key: "xa.thu_thap.thua", label: "Vẽ thửa ruộng", route: "/kn/du-lieu/ve-thua", icon: "map" },
+            { key: "xa.thu_thap.vat_tu", label: "Vật tư", route: "/kn/du-lieu/vat-tu", icon: "package" },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+/** Mục con của phòng ban trong nhóm "Phòng ban" của Admin (domain.adminDeptItems). */
+function adminDeptItems(code: string, profile: "trong_trot" | "generic"): Item[] {
+  const base = `/kn/phong-ban/${code}`;
+  return [
+    { key: "admin.pb.theo_doi_nop", label: "Theo dõi nộp báo cáo", route: `${base}/theo-doi-nop`, icon: "bell" },
+    { key: "admin.pb.tong_hop", label: "Báo cáo tổng hợp các xã", route: `${base}/tong-hop`, icon: "layers" },
+    { key: "admin.pb.du_lieu_bao_cao", label: "Dữ liệu báo cáo các xã", route: `${base}/du-lieu-bao-cao`, icon: "file" },
+    ...(profile === "trong_trot"
+      ? [
+          { key: "admin.pb.thu_thap", label: "Thu thập dữ liệu", route: `${base}/thu-thap`, icon: "database" },
+          // FN-TI-02.07 (P5): Admin xem lịch công tác (chỉ đọc) — cùng màn của Cấp Tỉnh, chưa tách theo phòng ban.
+          { key: "admin.pb.lich_cong_tac", label: "Lịch công tác", route: WORK_SCHEDULE_ROUTE, icon: "calendar" },
+        ]
+      : []),
+    // Tạm: màn danh mục dùng chung hiện có (G1).
+    { key: "admin.pb.danh_muc", label: "Danh mục nông nghiệp", route: "/quan-tri/danh-muc", icon: "package" },
+    // P3b: trình thiết kế mẫu báo cáo dạng lưới Excel (FN-AD-04.06, Hình 27).
+    { key: "admin.pb.mau_bao_cao", label: "Mẫu báo cáo", route: `${base}/mau-bao-cao`, icon: "table" },
   ];
 }
 
-export function knMenuFor(role: KnRole, departmentCode: string | null): MenuTree {
+const ADMIN_OVERVIEW: Group = {
+  key: "dieu_hanh",
+  label: "Điều hành",
+  items: [{ key: "admin.tong_quan", label: "Tổng quan hệ thống", route: "/kn/tong-quan", icon: "dashboard" }],
+};
+const ADMIN_SYSTEM: Group = {
+  key: "quan_tri",
+  label: "Quản trị hệ thống",
+  items: [
+    { key: "admin.qt.dvhc", label: "Đơn vị hành chính", route: "/kn/quan-tri/don-vi-hanh-chinh", icon: "map" },
+    { key: "admin.qt.co_cau", label: "Cơ cấu tổ chức 3 cấp", route: "/quan-tri/to-chuc", icon: "org" },
+    { key: "admin.qt.phong_ban", label: "Phòng ban", route: "/kn/quan-tri/phong-ban", icon: "building" },
+    { key: "admin.qt.nguoi_dung", label: "Người dùng", route: "/quan-tri/tai-khoan", icon: "users" },
+    { key: "admin.qt.menu_cac_cap", label: "Menu các cấp", route: "/kn/quan-tri/menu-cac-cap", icon: "key" },
+    {
+      // Q-13 (tạm, chờ khách): công cụ quản trị nền tảng đã có đặt trong nhóm Quản trị hệ thống.
+      key: "admin.qt.cong_cu",
+      label: "Công cụ nền tảng (tạm)",
+      icon: "param",
+      children: [
+        { key: "admin.qt.cong_cu.tham_so", label: "Tham số & phê duyệt", route: "/quan-tri/tham-so", icon: "param" },
+        // Màn G1 (mẫu xuất có phiên bản + lịch gửi email) — giữ nguyên, không xóa tính năng.
+        { key: "admin.qt.cong_cu.mau_xuat", label: "Mẫu xuất & lịch gửi", route: "/quan-tri/mau-bao-cao", icon: "report" },
+        { key: "admin.qt.cong_cu.xung_dot", label: "Xung đột đồng bộ", route: "/quan-tri/xung-dot", icon: "conflict" },
+        { key: "admin.qt.cong_cu.giam_sat", label: "Giám sát đồng bộ", route: "/quan-tri/giam-sat-dong-bo", icon: "sync" },
+        { key: "admin.qt.cong_cu.thiet_bi", label: "Đồng bộ thiết bị", route: "/dong-bo", icon: "sync" },
+      ],
+    },
+  ],
+};
+
+const STATUS_LABEL: Record<DepartmentRef["status"], string> = { active: "Đang áp dụng", not_open: "Chưa mở", suspended: "Ngưng hoạt động" };
+
+function wire(items: readonly Item[], enabled: boolean, adHoc: boolean): KnMenuItem[] {
+  const out: KnMenuItem[] = [];
+  for (const it of items) {
+    if (it.adHoc && !adHoc) continue;
+    const children = wire(it.children ?? [], enabled, adHoc);
+    if (it.children?.length && !children.length) continue;
+    out.push({ key: it.key, label: it.label, route: it.route ?? null, icon: it.icon, badge_source: it.badge ?? null, enabled, children });
+  }
+  return out;
+}
+
+const profileOf = (code: string) => KN_MENU_PROFILE[code] ?? "generic";
+const deptWire = (d: DepartmentRef): NonNullable<KnMenu["department"]> => ({ code: d.code, name: d.name, status: d.status, menu_profile: profileOf(d.code) });
+
+function adminDeptItem(d: DepartmentRef): KnMenuItem {
+  const enabled = d.status === "active";
   return {
-    version: MENU_VERSION,
-    role,
-    department_code: role === "admin" ? null : departmentCode,
-    groups: role === "admin" ? adminGroups(KN_DEPARTMENTS) : deptGroups(role, departmentCode ?? "trong_trot"),
+    key: `phong_ban.${d.code}`,
+    label: d.name,
+    route: null,
+    icon: profileOf(d.code) === "trong_trot" ? "sprout" : "building",
+    badge_source: null,
+    enabled,
+    status: d.status,
+    status_label: STATUS_LABEL[d.status],
+    children: wire(adminDeptItems(d.code, profileOf(d.code)), enabled, false),
   };
+}
+
+/**
+ * KNMenu trên dây (= Go app.DepartmentMenu / app.AdminMenu). Admin: Điều hành / Phòng ban (mọi phòng ban, chưa mở
+ * enabled = false) / Quản trị hệ thống. Chỉ bộ Trồng trọt có ở giả lập (phòng ban khác chưa mở → 409 ở handler).
+ */
+export function knMenu(audience: KnRole, departmentCode: string | null, opts: { adHoc?: boolean; orgRef?: string | null } = {}): KnMenu {
+  if (audience === "admin") {
+    const groups: KnMenuGroup[] = [
+      { key: ADMIN_OVERVIEW.key, label: ADMIN_OVERVIEW.label, items: wire(ADMIN_OVERVIEW.items, true, false) },
+      { key: "phong_ban", label: "Phòng ban", items: KN_DEPARTMENTS.map(adminDeptItem) },
+      { key: ADMIN_SYSTEM.key, label: ADMIN_SYSTEM.label, items: wire(ADMIN_SYSTEM.items, true, false) },
+    ];
+    return { menu_version: MENU_VERSION, audience, org_ref: opts.orgRef ?? null, department: null, default_route: DEFAULT_ROUTE.admin, groups };
+  }
+  const d = KN_DEPARTMENTS.find((x) => x.code === (departmentCode ?? "trong_trot")) ?? KN_DEPARTMENTS[0]!;
+  const adHoc = opts.adHoc ?? ADHOC_FORMS[d.code] ?? false;
+  const groups = TRONG_TROT[audience]
+    .map((g) => ({ key: g.key, label: g.label, items: wire(g.items, true, adHoc) }))
+    .filter((g) => g.items.length > 0);
+  return { menu_version: MENU_VERSION, audience, org_ref: opts.orgRef ?? null, department: deptWire(d), default_route: DEFAULT_ROUTE[audience], groups };
+}
+
+/** Cây menu của khung (cho kiểm thử khung/Sidebar). */
+export function knMenuFor(role: KnRole, departmentCode: string | null): MenuTree {
+  return fromKnMenu(knMenu(role, departmentCode));
 }
 
 /** Số đếm giả lập theo vai trò (Hình 3e: 15 / 3 / 2; Hình 3f: 6). 0 → menu ẩn số đếm. */
 const BADGES: Record<KnRole, Record<string, number>> = {
   kn_tw: {},
-  kn_tinh: { "submissions.missing": 15, "reviews.pending": 3, "adhoc_reports.todo": 0 },
-  kn_xa: { "report_tasks.todo": 6, "adhoc_reports.todo": 1 },
+  // Lịch chờ duyệt (B.schedules) tính từ sổ lịch giả lập P5 ở handler menu-badges.
+  kn_tinh: { [B.notSubmitted]: 15, [B.reviewPending]: 3, [B.adHocStatus]: 0 },
+  kn_xa: { [B.tasksTodo]: 6, [B.adHocTodo]: 1 },
   admin: {},
 };
 
@@ -251,6 +311,35 @@ export function knContext(contextId: string): SessionContext | undefined {
   return CONTEXTS.get(contextId)?.ctx;
 }
 
+const NO_STORE = { "Cache-Control": "no-store" };
+
+/**
+ * Đối tượng + phòng ban của lời gọi menu như app.resolveAudience (P2): ngữ cảnh phiên (X-AG-Context) thắng;
+ * ?audience= (tên cũ ?role=) khác ngữ cảnh → 403 party.menu_audience_forbidden (trừ Admin hỗ trợ mọi cấp).
+ * Không có ngữ cảnh: bắt buộc ?audience=.
+ */
+function menuQuery(
+  request: Request,
+  url: URL,
+  pathDepartment?: string,
+): Response | { audience: KnRole; department: string | null; orgRef: string | null } {
+  const asked = (url.searchParams.get("audience") ?? url.searchParams.get("role")) as KnRole | null;
+  if (asked && !(asked in DEFAULT_ROUTE)) return problem(422, "validation_failed", "audience: kn_tw | kn_tinh | kn_xa | admin");
+  let department = pathDepartment ?? url.searchParams.get("department");
+  const stored = CONTEXTS.get(request.headers.get("X-AG-Context") ?? "");
+  if (stored) {
+    const role = stored.ctx.role;
+    if (role !== "admin" && ((asked && asked !== role) || (department && department !== stored.ctx.department_code))) {
+      return problem(403, "party.menu_audience_forbidden", "chỉ trả menu của ngữ cảnh phiên đang dùng");
+    }
+    const audience = asked ?? role;
+    if (!department && audience === role) department = stored.ctx.department_code;
+    return { audience, department, orgRef: stored.ctx.org_ref };
+  }
+  if (!asked) return problem(422, "validation_failed", "audience: bắt buộc khi không có ngữ cảnh phiên");
+  return { audience: asked, department, orgRef: null };
+}
+
 export const knAppRoutes: Route[] = [
   {
     method: "GET",
@@ -293,17 +382,38 @@ export const knAppRoutes: Route[] = [
   },
   {
     method: "GET",
+    pattern: /^\/v1\/menu$/,
+    handler: ({ request, url }) => {
+      const q = menuQuery(request, url);
+      if (q instanceof Response) return q;
+      if (q.audience === "admin") return json(knMenu("admin", null, { orgRef: q.orgRef }), 200, NO_STORE);
+      const d = q.department ? KN_DEPARTMENTS.find((x) => x.code === q.department) : KN_DEPARTMENTS.find((x) => x.status === "active");
+      if (!d) return problem(404, "party.department_not_found", "Department not found");
+      if (d.status !== "active") return problem(409, "party.department_not_open", "Department not open");
+      return json(knMenu(q.audience, d.code, { orgRef: q.orgRef }), 200, NO_STORE);
+    },
+  },
+  {
+    method: "GET",
     pattern: /^\/v1\/departments\/([\w-]+)\/modules$/,
-    handler: ({ params, url }) => {
-      const role = url.searchParams.get("role") as KnRole | null;
-      if (!role || !(role in DEFAULT_ROUTE)) return problem(422, "validation_failed", "role required");
+    handler: ({ params, request, url }) => {
+      const q = menuQuery(request, url, params[0] ?? "");
+      if (q instanceof Response) return q;
       const code = params[0] ?? "";
-      if (role !== "admin") {
-        const d = KN_DEPARTMENTS.find((x) => x.code === code);
-        if (!d) return problem(404, "party.department_not_found", "Department not found");
-        if (d.status !== "active") return problem(409, "party.department_not_open", "Department not open");
+      const d = KN_DEPARTMENTS.find((x) => x.code === code);
+      if (!d) return problem(404, "party.department_not_found", "Department not found");
+      if (q.audience === "admin") {
+        // Admin: nhóm của MỘT phòng ban (kể cả chưa mở — mục con enabled = false), như app.DepartmentModules.
+        const item = knMenu("admin", null).groups.find((g) => g.key === "phong_ban")!.items.find((i) => i.key === `phong_ban.${code}`)!;
+        return json(
+          { menu_version: MENU_VERSION, audience: "admin", org_ref: q.orgRef, department: { code: d.code, name: d.name, status: d.status, menu_profile: KN_MENU_PROFILE[d.code] ?? "generic" },
+            default_route: DEFAULT_ROUTE.admin, groups: [{ key: item.key, label: d.name, items: item.children }] } satisfies KnMenu,
+          200,
+          NO_STORE,
+        );
       }
-      return json(knMenuFor(role, role === "admin" ? null : code));
+      if (d.status !== "active") return problem(409, "party.department_not_open", "Department not open");
+      return json(knMenu(q.audience, d.code, { orgRef: q.orgRef }), 200, NO_STORE);
     },
   },
   {

@@ -45,7 +45,7 @@ describe("menu theo vai trò (BRD v7.7 §6, Hình 3c–3f)", () => {
   });
 
   it("Admin: phòng ban chưa mở hiện mờ, gộp 'n phòng khác'; màn hiện có giữ đường dẫn cũ", () => {
-    const pb = admin.groups.find((g) => g.key === "phong-ban")!;
+    const pb = admin.groups.find((g) => g.key === "phong_ban")!;
     expect(pb.items.map((i) => [i.label, i.status ?? "active"])).toEqual([
       ["Phòng Trồng trọt", "active"],
       ["Chăn nuôi - TS", "not_open"],
@@ -66,8 +66,8 @@ describe("menu theo vai trò (BRD v7.7 §6, Hình 3c–3f)", () => {
 
   it("số đếm chỉ cho việc cần xử lý, ẩn khi bằng 0", () => {
     const node = menuLinks(tinh).find((l) => l.node.label === "Trạng thái nộp")!.node;
-    expect(badgeOf(node, { counts: { "submissions.missing": 15 } })).toBe(15);
-    expect(badgeOf(node, { counts: { "submissions.missing": 0 } })).toBe(0);
+    expect(badgeOf(node, { counts: { "extension.report_status.not_submitted": 15 } })).toBe(15);
+    expect(badgeOf(node, { counts: { "extension.report_status.not_submitted": 0 } })).toBe(0);
     const dash = menuLinks(tinh).find((l) => l.node.label === "Dashboard")!.node;
     expect(badgeOf(dash, { counts: { anything: 5 } })).toBe(0);
   });
@@ -75,7 +75,7 @@ describe("menu theo vai trò (BRD v7.7 §6, Hình 3c–3f)", () => {
 
 describe("<Sidebar> (Design Sample)", () => {
   it("mục cha tự mở khi con active, một mục active, số đếm hiện/ẩn, footer sản phẩm", () => {
-    render(<Sidebar menu={xa} pathname="/kn/nhiem-vu/cong-viec" badges={{ counts: { "report_tasks.todo": 6 } }} />);
+    render(<Sidebar menu={xa} pathname="/kn/nhiem-vu/cong-viec" badges={{ counts: { "extension.report_tasks.todo": 6 } }} />);
     const nav = screen.getByRole("navigation", { name: "Menu chức năng" });
     expect(within(nav).getByRole("button", { name: /Nhiệm vụ/ })).toHaveAttribute("aria-expanded", "true");
     expect(within(nav).getByRole("button", { name: /Thu thập dữ liệu/ })).toHaveAttribute("aria-expanded", "false");

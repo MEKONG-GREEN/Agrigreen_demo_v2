@@ -109,7 +109,7 @@ spec:
         verifyTLS: {{ $pg.backup.s3.verifyTLS }}
         retentionPolicy:
           full: {{ $pg.backup.retentionFull }}
-          fullType: count
+          fullType: {{ $pg.backup.retentionFullType | default "time" }}
         secretRef:
           accessKeyId: { name: pg-backup-s3, key: ACCESS_KEY_ID }
           secretAccessKey: { name: pg-backup-s3, key: ACCESS_SECRET_KEY }
