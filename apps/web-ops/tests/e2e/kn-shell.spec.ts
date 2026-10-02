@@ -68,7 +68,7 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     }
     await expect(page.getByText("Chỉ số nóng")).toBeVisible();
     await expect(page.getByText("Chỉ số so sánh")).toBeVisible();
-    await expect(page.getByRole("region", { name: "Cảnh báo" })).toContainText("Khẩn");
+    await expect(page.getByRole("region", { name: "Cảnh báo" })).toContainText("Thông tin");
     await accountMenu(page).click();
     await expect(page.getByRole("menu")).toContainText("Cấp Quốc gia · Phòng Trồng trọt");
     await expect(page.getByRole("menu")).toContainText("Tài khoản chỉ có 1 vai trò, 1 phòng ban");

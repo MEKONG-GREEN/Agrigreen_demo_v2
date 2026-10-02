@@ -38,8 +38,14 @@ export function authMiddleware(
       request.headers.set("Accept", "application/json, application/problem+json");
       return request;
     },
-    onResponse({ response }) {
-      if (response.status === 401) onUnauthenticated?.();
+    async onResponse({ request, response }) {
+      // Chỉ coi là hết phiên khi 401 là của token ĐANG dùng: lời gọi cũ (gửi trước khi đăng xuất/đăng nhập lại) về muộn
+      // không được đá phiên mới ra (P6s: đổi người dùng trong cùng tab).
+      if (response.status === 401) {
+        const token = await getAccessToken();
+        const sent = request.headers.get("Authorization");
+        if (sent === (token ? `Bearer ${token}` : null)) onUnauthenticated?.();
+      }
       return response;
     },
   };
