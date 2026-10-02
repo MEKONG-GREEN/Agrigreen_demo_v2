@@ -99,6 +99,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/clusterenv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/healthsrv"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
@@ -448,6 +449,15 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			js = append(js, kn.Jobs(extension.OverdueTenants(out.pools[migrations.PF]), log)...)
 		}
 		if selected(jobs, extension.JobWorkSchedule) {
+			// KN v7.7 P1 → P5: người nhận nhắc / người duyệt lấy từ sổ gán vai trò (phòng ban × tỉnh × cấp quản
+			// lý) bằng vai accounts_app; thiếu → danh bạ trực pf_extension.staff như trước.
+			accPool, err := openRole(accounts.DBRole)
+			if err != nil {
+				closeFn()
+				return nil, func() {}, err
+			}
+			acc := accounts.New(accPool, clk, accounts.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Departments: pty.Departments(), Units: md.AdminUnits()})
+			kn.UseKNContext(acc.ExtensionKNContext(), acc.ExtensionKNDirectory())
 			// KN v7.7 P5: khóa tuần đã kết thúc, nhắc hạn đăng ký / hạn duyệt lịch công tác.
 			js = append(js, kn.ScheduleJobs(extension.ScheduleTenants(out.pools[migrations.PF]), log)...)
 		}

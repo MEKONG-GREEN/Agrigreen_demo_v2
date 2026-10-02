@@ -137,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       contextStore.set(ctx.context_id);
       writeSelection(sel);
       const [menu, badges] = await Promise.all([
-        clients.knApi.menu(ctx),
+        clients.knApi.menu(),
         clients.knApi.badges().catch((): MenuBadges => ({ counts: {} })), // số đếm lỗi: ẩn số, không chặn menu
       ]);
       await loadPrincipal();

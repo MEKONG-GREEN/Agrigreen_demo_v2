@@ -150,20 +150,27 @@ func (k *KN) Menu(ctx context.Context, q MenuQuery) (MenuView, error) {
 	if err != nil {
 		return MenuView{}, err
 	}
-	view := MenuView{Version: domain.MenuVersion, Audience: q.Audience, UnitRef: q.UnitRef}
 	if q.Audience == port.AudienceAdmin {
-		return k.adminMenu(view, depts), nil
+		return AdminMenu(q.UnitRef, depts), nil
 	}
 	d, err := pickDepartment(depts, q.Department)
 	if err != nil {
 		return MenuView{}, err
 	}
-	groups, err := k.departmentGroups(ctx, d, q.Audience)
+	view, err := DepartmentMenu(ctx, k.Forms, d, q.Audience)
+	view.UnitRef = q.UnitRef
+	return view, err
+}
+
+// DepartmentMenu dựng menu của đối tượng (kn_tw/kn_tinh/kn_xa) cho phòng ban d — hàm thuần trên bảng tĩnh
+// + trạng thái truyền vào (forms nil = chưa có mẫu nào). Dùng bởi Menu và ca vàng web (TestWebMenuFixture).
+func DepartmentMenu(ctx context.Context, forms port.FormAvailability, d port.Department, audience string) (MenuView, error) {
+	groups, err := departmentGroups(ctx, forms, d, audience)
 	if err != nil {
 		return MenuView{}, err
 	}
-	view.Department, view.Groups, view.DefaultRoute = &d, groups, domain.DefaultRoute(q.Audience, d.Code)
-	return view, nil
+	return MenuView{Version: domain.MenuVersion, Audience: audience, UnitRef: d.OrgRef, Department: &d, Groups: groups,
+		DefaultRoute: domain.DefaultRoute(audience)}, nil
 }
 
 // DepartmentModules trả cây module (menu) của MỘT phòng ban cho đối tượng — GET /v1/departments/{code}/modules.
@@ -201,7 +208,7 @@ func (k *KN) DepartmentModules(ctx context.Context, code string, q MenuQuery) (M
 	}
 	item := adminDeptItem(*d)
 	return MenuView{Version: domain.MenuVersion, Audience: q.Audience, UnitRef: q.UnitRef, Department: d,
-		DefaultRoute: domain.DefaultRoute(port.AudienceAdmin, ""),
+		DefaultRoute: domain.DefaultRoute(port.AudienceAdmin),
 		Groups:       []MenuGroupView{{Key: domain.AdminDepartmentGroupKey + "." + d.Code, Label: d.Name, Items: item.Children}}}, nil
 }
 
@@ -230,7 +237,7 @@ func pickDepartment(depts []port.Department, code string) (port.Department, erro
 }
 
 // departmentGroups giải điều kiện mục (FormAvailability) và bỏ mục cha không còn mục con.
-func (k *KN) departmentGroups(ctx context.Context, d port.Department, audience string) ([]MenuGroupView, error) {
+func departmentGroups(ctx context.Context, forms port.FormAvailability, d port.Department, audience string) ([]MenuGroupView, error) {
 	level := domain.LevelProvince
 	if audience == port.AudienceXa {
 		level = domain.LevelCommune
@@ -240,7 +247,7 @@ func (k *KN) departmentGroups(ctx context.Context, d port.Department, audience s
 		if req == nil {
 			return true, nil
 		}
-		if k.Forms == nil {
+		if forms == nil {
 			return false, nil
 		}
 		lv := req.Level
@@ -251,7 +258,7 @@ func (k *KN) departmentGroups(ctx context.Context, d port.Department, audience s
 		if v, ok := cache[key]; ok {
 			return v, nil
 		}
-		v, err := k.Forms.HasForms(ctx, d.Code, lv, req.ReportType)
+		v, err := forms.HasForms(ctx, d.Code, lv, req.ReportType)
 		cache[key] = v
 		return v, err
 	}
@@ -301,20 +308,20 @@ func plainItems(items []domain.MenuItem, enabled bool) []MenuItemView {
 }
 
 func adminDeptItem(d port.Department) MenuItemView {
-	item := MenuItemView{Key: domain.AdminDepartmentGroupKey + "." + d.Code, Label: d.Name, Icon: "building", Enabled: d.Selectable(),
+	item := MenuItemView{Key: domain.AdminDepartmentGroupKey + "." + d.Code, Label: d.Name, Icon: domain.AdminDepartmentIcon(d.MenuProfile), Enabled: d.Selectable(),
 		Status: d.Status, StatusLabel: domain.StatusLabel(d.Status)}
 	item.Children = plainItems(domain.AdminDepartmentItems(d.MenuProfile, d.Code), d.Selectable())
 	return item
 }
 
-// adminMenu: Điều hành › Tổng quan hệ thống; Phòng ban › mỗi phòng ban (chưa mở: mờ, không mục con
-// dùng được); Quản trị hệ thống (Hình 3c).
-func (k *KN) adminMenu(view MenuView, depts []port.Department) MenuView {
+// AdminMenu: Điều hành › Tổng quan hệ thống; Phòng ban › mỗi phòng ban (chưa mở: mờ, không mục con
+// dùng được); Quản trị hệ thống (Hình 3c). Hàm thuần (ca vàng web dùng chung).
+func AdminMenu(unit uuid.UUID, depts []port.Department) MenuView {
 	deptItems := make([]MenuItemView, 0, len(depts))
 	for _, d := range depts {
 		deptItems = append(deptItems, adminDeptItem(d))
 	}
-	view.DefaultRoute = domain.DefaultRoute(port.AudienceAdmin, "")
+	view := MenuView{Version: domain.MenuVersion, Audience: port.AudienceAdmin, UnitRef: unit, DefaultRoute: domain.DefaultRoute(port.AudienceAdmin)}
 	view.Groups = []MenuGroupView{
 		{Key: domain.AdminOverview.Key, Label: domain.AdminOverview.Label, Items: plainItems(domain.AdminOverview.Items, true)},
 		{Key: domain.AdminDepartmentGroupKey, Label: domain.AdminDepartmentGroupLabel, Items: deptItems},

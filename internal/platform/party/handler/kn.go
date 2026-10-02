@@ -682,6 +682,13 @@ func writeMenu(c *gin.Context, v app.MenuView, err error) {
 		httpx.Fail(c, err)
 		return
 	}
+	// Menu đổi ngay khi Admin đổi trạng thái phòng ban — không lưu đệm phía trung gian.
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, menuBody(v))
+}
+
+// menuBody là thân JSON của KNMenu (contracts/openapi/application.yaml) — dùng chung với ca vàng web.
+func menuBody(v app.MenuView) gin.H {
 	groups := make([]menuGroupDTO, 0, len(v.Groups))
 	for _, g := range v.Groups {
 		groups = append(groups, menuGroupDTO{Key: g.Key, Label: g.Label, Items: toMenuItems(g.Items)})
@@ -690,10 +697,8 @@ func writeMenu(c *gin.Context, v app.MenuView, err error) {
 	if v.Department != nil {
 		dept = &menuDeptDTO{Code: v.Department.Code, Name: v.Department.Name, Status: v.Department.Status, MenuProfile: v.Department.MenuProfile}
 	}
-	// Menu đổi ngay khi Admin đổi trạng thái phòng ban — không lưu đệm phía trung gian.
-	c.Header("Cache-Control", "no-store")
-	c.JSON(http.StatusOK, gin.H{"menu_version": v.Version, "audience": v.Audience, "org_ref": refPtr(v.UnitRef), "department": dept,
-		"default_route": v.DefaultRoute, "groups": groups})
+	return gin.H{"menu_version": v.Version, "audience": v.Audience, "org_ref": refPtr(v.UnitRef), "department": dept,
+		"default_route": v.DefaultRoute, "groups": groups}
 }
 
 func menuQuery(c *gin.Context) (app.MenuQuery, bool) {
@@ -701,7 +706,12 @@ func menuQuery(c *gin.Context) (app.MenuQuery, bool) {
 	if !ok {
 		return app.MenuQuery{}, false
 	}
-	return app.MenuQuery{Audience: c.Query("audience"), Department: c.Query("department"), UnitRef: unit}, true
+	// "role" là tên cũ của "audience" (hợp đồng tạm P6 trước KN-fix) — nhận thêm một đợt, "audience" thắng.
+	aud := c.Query("audience")
+	if aud == "" {
+		aud = c.Query("role")
+	}
+	return app.MenuQuery{Audience: aud, Department: c.Query("department"), UnitRef: unit}, true
 }
 
 func (h KN) menu(c *gin.Context) {

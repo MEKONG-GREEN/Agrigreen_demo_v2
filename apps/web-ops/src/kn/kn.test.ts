@@ -55,7 +55,7 @@ describe("đăng nhập mật khẩu giả lập", () => {
   });
 });
 
-describe("client hợp đồng tạm P1/P2 + header X-AG-Context", () => {
+describe("client P1/P2 (GET /v1/menu theo ngữ cảnh) + header X-AG-Context", () => {
   it("chọn ngữ cảnh → menu theo vai trò; mọi lời gọi sau mang X-AG-Context; /v1/me theo ngữ cảnh", async () => {
     let ctxId: string | null = null;
     const seen: (string | null)[] = [];
@@ -74,9 +74,9 @@ describe("client hợp đồng tạm P1/P2 + header X-AG-Context", () => {
     const ctx = await kn.selectContext({ assignment_id: "asg-an-xa", department_code: "trong_trot" });
     expect(ctx.default_route).toBe("/kn/nhiem-vu/cong-viec");
     ctxId = ctx.context_id;
-    const menu = await kn.menu(ctx);
+    const menu = await kn.menu();
     expect(menu.groups.map((g) => g.label)).toEqual(["Điều hành", "Báo cáo", "Dữ liệu"]);
-    expect((await kn.badges()).counts["report_tasks.todo"]).toBe(6);
+    expect((await kn.badges()).counts["extension.report_tasks.todo"]).toBe(6);
     const me = await unwrap(api.GET("/v1/me"));
     expect(me.roles).toContain("kn_officer");
     expect(me.scope.units).toEqual(["91301", "91302"]);

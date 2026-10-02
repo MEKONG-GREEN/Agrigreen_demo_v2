@@ -332,7 +332,7 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	r = xa.appDo(http.MethodGet, "/v1/menu", nil)
 	wantStatus(t, r, http.StatusOK, "menu Cấp Xã")
 	if str(r.body, "audience") != port.AudienceXa || str(r.body, "department", "code") != "trong_trot" ||
-		str(r.body, "default_route") != "/kn/trong_trot/xa/cong-viec" || str(r.body, "menu_version") != "kn.menu/v1" ||
+		str(r.body, "default_route") != "/kn/nhiem-vu/cong-viec" || str(r.body, "menu_version") != "kn.menu/v2" ||
 		!slices.Equal(groupKeys(r), []string{"dieu_hanh", "bao_cao", "du_lieu"}) || r.hdr.Get("Cache-Control") != "no-store" {
 		t.Fatalf("menu Cấp Xã: %v %v", r.body, r.hdr)
 	}
@@ -352,13 +352,22 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	// Không lấy được menu của vai khác.
 	wantCode(t, xa.appDo(http.MethodGet, "/v1/menu?audience=kn_tinh", nil), http.StatusForbidden, "party.menu_audience_forbidden", "Cấp Xã xin menu Tỉnh")
 	wantCode(t, xa.appDo(http.MethodGet, "/v1/menu?audience=admin", nil), http.StatusForbidden, "party.menu_audience_forbidden", "Cấp Xã xin menu Admin")
+	// Tên tham số cũ ?role= (hợp đồng tạm P6) vẫn nhận một đợt.
+	wantCode(t, xa.appDo(http.MethodGet, "/v1/menu?role=kn_tinh", nil), http.StatusForbidden, "party.menu_audience_forbidden", "Cấp Xã xin menu Tỉnh (?role=)")
+	if r := xa.appDo(http.MethodGet, "/v1/departments/trong_trot/modules?role=kn_xa", nil); r.status != http.StatusOK || str(r.body, "audience") != port.AudienceXa {
+		t.Fatalf("?role= (tên cũ): %d %v", r.status, r.body)
+	}
+	// Hợp đồng đường dẫn KN-fix: trang web-ops, không chứa mã phòng ban (phòng ban ở ngữ cảnh phiên).
+	if !strings.Contains(string(raw), `"route":"/kn/nhiem-vu/lich-cong-tac"`) || strings.Contains(string(raw), "/kn/trong_trot/") {
+		t.Fatalf("đường dẫn menu Cấp Xã: %s", raw)
+	}
 	// Phòng ban chưa mở → không vào được.
 	wantCode(t, xa.appDo(http.MethodGet, "/v1/menu?department=chan_nuoi_thuy_san", nil), http.StatusConflict, "party.department_not_open", "chưa mở")
 
 	// Cấp Tỉnh, Cấp Quốc gia (chỉ xem: không có Nhiệm vụ).
 	r = tinh.appDo(http.MethodGet, "/v1/menu", nil)
 	if keys := menuKeys(r); r.status != http.StatusOK || !slices.Contains(keys, "tinh.nhiem_vu.lich_cong_tac") || !slices.Contains(keys, "tinh.bao_cao.chi_cuc") ||
-		slices.Contains(keys, "tinh.bao_cao.dot_xuat") || str(r.body, "default_route") != "/kn/trong_trot/tinh/dashboard" {
+		slices.Contains(keys, "tinh.bao_cao.dot_xuat") || str(r.body, "default_route") != "/kn/dashboard" {
 		t.Fatalf("menu Cấp Tỉnh: %v", r.body)
 	}
 	r = tw.appDo(http.MethodGet, "/v1/menu?org_ref="+tr.p89.String(), nil)
@@ -368,10 +377,11 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 
 	// Admin: Tổng quan hệ thống; Phòng ban (Trồng trọt mở, 5 phòng khác "Chưa mở" mờ); Quản trị hệ thống.
 	r = root.appDo(http.MethodGet, "/v1/menu?org_ref="+tr.p89.String(), nil)
-	if r.status != http.StatusOK || !slices.Equal(groupKeys(r), []string{"dieu_hanh", "phong_ban", "quan_tri"}) || str(r.body, "default_route") != "/quan-tri/tong-quan" {
+	if r.status != http.StatusOK || !slices.Equal(groupKeys(r), []string{"dieu_hanh", "phong_ban", "quan_tri"}) || str(r.body, "default_route") != "/kn/tong-quan" {
 		t.Fatalf("menu Admin: %v", r.body)
 	}
-	if it := adminDeptItem(t, r, "trong_trot"); it["enabled"] != true || len(it["children"].([]any)) != 6 {
+	if it := adminDeptItem(t, r, "trong_trot"); it["enabled"] != true || len(it["children"].([]any)) != 7 ||
+		it["children"].([]any)[6].(map[string]any)["route"] != "/kn/phong-ban/trong_trot/mau-bao-cao" {
 		t.Fatalf("Admin › Phòng Trồng trọt: %v", it)
 	}
 	if it := adminDeptItem(t, r, "chan_nuoi_thuy_san"); it["enabled"] != false || it["status_label"] != "Chưa mở" {
@@ -383,7 +393,7 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	wantStatus(t, root.adminDo(http.MethodPost, "/v1/departments/"+cn+"/status", map[string]any{"status": "active"}), http.StatusCreated, "bật phòng ban")
 	r = xa.appDo(http.MethodGet, "/v1/menu?department=chan_nuoi_thuy_san", nil)
 	if r.status != http.StatusOK || str(r.body, "department", "menu_profile") != port.MenuProfileGeneric ||
-		str(r.body, "default_route") != "/kn/chan_nuoi_thuy_san/xa/cong-viec" || slices.Contains(groupKeys(r), "du_lieu") {
+		str(r.body, "default_route") != "/kn/nhiem-vu/cong-viec" || slices.Contains(groupKeys(r), "du_lieu") {
 		t.Fatalf("menu phòng ban vừa bật (bộ generic): %d %v", r.status, r.body)
 	}
 	wantStatus(t, xa.appDo(http.MethodGet, "/v1/menu", nil), http.StatusUnprocessableEntity, "hai phòng ban đang áp dụng → phải chọn")

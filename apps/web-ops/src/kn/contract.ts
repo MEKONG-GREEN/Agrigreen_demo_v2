@@ -2,12 +2,21 @@
 // HỢP ĐỒNG cho bề mặt KN v7.7.
 //   P1 (danh tính, phiên nhiều vai trò): GET /v1/me/contexts, POST /v1/me/context, header X-AG-Context — ĐÃ CÓ trong
 //     contracts/openapi/application.yaml (KNAssignment, KNSessionContext); kn.test.ts kiểm kiểu sinh gán được vào kiểu dưới đây.
-//   P2 (menu theo cấu hình):            GET /v1/departments/{code}/modules?role=…  (Admin: code "_all").
-//   P4 (số đếm menu):                    GET /v1/me/menu-badges
-// Khi P1/P2 nộp OpenAPI, thay các kiểu dưới đây bằng kiểu sinh (src/api/generated) — giữ tên trường
-// snake_case như hợp đồng để việc thay là đổi import. Xem docs/brd/kn-v7.7-plan.md §3 P1, P2, P6.
+//   P2 (menu theo cấu hình):            GET /v1/menu (KHÔNG tham số; vai + phòng ban lấy từ X-AG-Context) → KNMenu
+//     (kiểu sinh). Hợp đồng đường dẫn (KN-fix): route = trang web-ops "/kn/<màn>" (vai + phòng ban ở ngữ cảnh,
+//     không ở URL); màn Admin theo phòng ban "/kn/phong-ban/{mã}/<màn>"; màn cũ ngoài /kn giữ đường dẫn.
+//     Bản giả lập (src/api/mock/kn.ts) = bảng Go qua ca vàng src/api/mock/fixtures/kn-menu.json.
+//     `GET /v1/departments/{code}/modules?audience=` (cây một phòng ban) giữ cho Admin/màn "Menu các cấp".
+//   P4 (số đếm menu):                    GET /v1/me/menu-badges (khóa = badge_source của KNMenu)
+// Xem docs/brd/kn-v7.7-plan.md §3 P1, P2, P6.
 // ============================================================================
+import type { components } from "@/api/generated/application";
 import type { NavIcon } from "@/nav/nav";
+
+/** Menu trên dây (P2, kiểu sinh từ OpenAPI). Khung vẽ MenuTree dựng bằng fromKnMenu (src/kn/menuAdapter.ts). */
+export type KnMenu = components["schemas"]["KNMenu"];
+export type KnMenuGroup = components["schemas"]["KNMenuGroup"];
+export type KnMenuItem = components["schemas"]["KNMenuItem"];
 
 /** Vai nghiệp vụ KN v7.7 (BRD §1.3) — nằm trong role_assignment của P1, KHÔNG phải vai realm. */
 export type KnRole = "kn_tw" | "kn_tinh" | "kn_xa" | "admin";
@@ -91,7 +100,7 @@ export const CONTEXT_HEADER = "X-AG-Context";
 export const REASON_HEADER = "X-AG-Reason";
 
 // ---------------------------------------------------------------------------
-// Menu theo cấu hình (P2 `GET /v1/departments/{code}/modules`)
+// Cây menu của khung (dựng từ KnMenu bằng fromKnMenu; menu cũ nav.ts cũng đổi sang dạng này)
 // ---------------------------------------------------------------------------
 
 /** Một mục menu. Có `children` → mục cha mở/đóng; không có → liên kết `href`. */
@@ -101,7 +110,7 @@ export interface MenuNode {
   icon: NavIcon;
   href?: string;
   children?: MenuNode[];
-  /** Khóa nguồn số đếm (vd "report_tasks.todo"); chỉ đặt cho việc cần xử lý. */
+  /** Khóa nguồn số đếm (vd "extension.report_tasks.todo"); chỉ đặt cho việc cần xử lý. */
   badge_source?: string;
   /** "not_open": phòng ban chưa mở — hiện mờ, nhãn "Chưa mở", không bấm được. */
   status?: "active" | "not_open";
@@ -118,6 +127,8 @@ export interface MenuTree {
   version: string;
   role: KnRole | null;
   department_code: string | null;
+  /** Trang mặc định của đối tượng (KNMenu.default_route). */
+  default_route?: string;
   groups: MenuGroup[];
 }
 
@@ -130,6 +141,7 @@ export interface MenuBadges {
 export interface KnApi {
   listContexts(): Promise<MeContexts>;
   selectContext(req: SelectContextRequest): Promise<SessionContext>;
-  menu(ctx: Pick<SessionContext, "role" | "department_code">): Promise<MenuTree>;
+  /** GET /v1/menu theo ngữ cảnh phiên (header X-AG-Context), đã dựng thành cây của khung. */
+  menu(): Promise<MenuTree>;
   badges(): Promise<MenuBadges>;
 }

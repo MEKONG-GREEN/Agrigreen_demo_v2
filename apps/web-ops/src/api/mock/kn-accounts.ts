@@ -13,24 +13,24 @@ export const MOCK_KN_PASSWORD = "KhuyenNong@2026";
 const TENANT = "01927b3e-0000-7000-8000-00000000a001";
 
 /**
- * 6 phòng ban của TTKN An Giang (FN-AD-04.03). Q-02: mới biết 4 tên trên wireframe — 2 phòng còn lại
- * là tên TẠM, chờ khách. Chỉ Phòng Trồng trọt "Đang áp dụng".
+ * 6 phòng ban của TTKN An Giang (FN-AD-04.03) = dữ liệu nền Go internal/platform/party/seeddata/departments_an_giang.json
+ * (kiểm bởi src/api/mock/kn-menu.contract.test.ts qua ca vàng kn-menu.json). Q-02: mới biết 4 tên trên wireframe —
+ * 2 phòng còn lại là tên TẠM, chờ khách. Chỉ Phòng Trồng trọt "Đang áp dụng".
  */
 export const KN_DEPARTMENTS: readonly DepartmentRef[] = [
-  { code: "trong_trot", name: "Phòng Trồng trọt", description: "Trồng trọt, bảo vệ thực vật", status: "active" },
-  { code: "chan_nuoi_thuy_san", name: "Phòng Chăn nuôi - Thủy sản", description: "Chăn nuôi, nuôi trồng thủy sản", status: "not_open" },
-  { code: "ke_hoach_tai_chinh", name: "Phòng Kế hoạch - Tài chính", description: "Kế hoạch, tài chính", status: "not_open" },
-  { code: "thong_tin_truyen_thong", name: "Phòng Thông tin - Truyền thông", description: "Thư viện, tin tức", status: "not_open" },
-  { code: "phong_5", name: "Phòng ban 5 (tạm, chờ khách)", description: null, status: "not_open" },
-  { code: "phong_6", name: "Phòng ban 6 (tạm, chờ khách)", description: null, status: "not_open" },
+  { code: "trong_trot", name: "Phòng Trồng trọt", description: "Báo cáo tuần/tháng/vụ cây trồng; thu thập HTX, máy móc, thửa ruộng, vật tư", status: "active" },
+  { code: "chan_nuoi_thuy_san", name: "Phòng Chăn nuôi - Thủy sản", description: "Báo cáo Chăn nuôi, Nuôi trồng & Đánh bắt Thủy sản", status: "not_open" },
+  { code: "ke_hoach_tai_chinh", name: "Phòng Kế hoạch - Tài chính", description: "Tổng hợp báo cáo liên phòng; Dự án khuyến nông", status: "not_open" },
+  { code: "thong_tin_truyen_thong", name: "Phòng Thông tin - Truyền thông", description: "Thư viện kỹ thuật & tin tức; Quản trị đào tạo; Giá cả thị trường", status: "not_open" },
+  { code: "phong_ban_5", name: "Phòng ban 5 (tạm, chờ khách Q-02)", description: "Tên chưa có trong BRD v7.7", status: "not_open" },
+  { code: "phong_ban_6", name: "Phòng ban 6 (tạm, chờ khách Q-02)", description: "Tên chưa có trong BRD v7.7", status: "not_open" },
 ];
 
-export const SHORT_DEPT_NAME: Readonly<Record<string, string>> = {
-  trong_trot: "Trồng trọt",
-  chan_nuoi_thuy_san: "Chăn nuôi - TS",
-  ke_hoach_tai_chinh: "Kế hoạch - TC",
-  thong_tin_truyen_thong: "Thông tin - TT",
-};
+/** Bộ menu của phòng ban (P2 menu_profile): chỉ Trồng trọt có bộ riêng. */
+export const KN_MENU_PROFILE: Readonly<Record<string, "trong_trot" | "generic">> = { trong_trot: "trong_trot" };
+
+/** Tên ngắn (Hình 3c) — định nghĩa ở src/kn/menuAdapter.ts, giữ tên xuất cũ. */
+export { SHORT_DEPT_NAME } from "@/kn/menuAdapter";
 
 const dept = (...codes: string[]) => KN_DEPARTMENTS.filter((d) => codes.includes(d.code));
 

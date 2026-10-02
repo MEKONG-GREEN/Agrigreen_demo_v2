@@ -4801,7 +4801,7 @@ export interface components {
             status: "active" | "not_open" | "suspended";
             status_label: string;
             /**
-             * @description Bộ menu dựng sẵn trong mã (kn.menu/v1)
+             * @description Bộ menu dựng sẵn trong mã (kn.menu/v2)
              * @enum {string}
              */
             menu_profile: "trong_trot" | "generic";
