@@ -35,7 +35,9 @@ func Process(ctx context.Context, db tenant.Beginner, consumer string, env outbo
 			return nil // đã xử lý
 		}
 		processed = true
-		return h(ctx, tx, env)
+		// Handler chạy trong giao dịch của tenant env.TenantID: ngữ cảnh mang cùng tenant để cổng của module khác
+		// (tham số masterdata, tổng hợp KN…) đọc được (KN P8: consumer gửi Chi cục lỗi "tenant: thiếu tenant_id").
+		return h(tenant.WithID(ctx, env.TenantID), tx, env)
 	})
 	if err != nil {
 		processed = false

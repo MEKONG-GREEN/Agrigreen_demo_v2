@@ -153,25 +153,27 @@ void main() {
     expect(await h.actions.pendingCount(), 0);
   });
 
-  test(
-    'FN-XA-03.03 vô hiệu hóa: lý do ≥ 10 ký tự, trả cảnh báo dữ liệu liên kết',
-    () async {
-      expect(
-        () => svc.deactivateCooperative('c1', 'ngắn'),
-        throwsA(isA<KnCommandError>()),
-      );
-      h.fake.onPost = (path, body) async => {
-        'cooperative': {'ref': 'c1', 'active': false},
-        'warnings': {'households': 3, 'plots': 2, 'machines': 0},
-      };
-      final r = await svc.deactivateCooperative(
+  test('FN-XA-03.03 vô hiệu hóa: lý do ≥ 20 ký tự (= CHECK sổ org_event), trả cảnh báo dữ liệu liên kết', () async {
+    expect(
+      () => svc.deactivateCooperative('c1', 'ngắn'),
+      throwsA(isA<KnCommandError>()),
+    );
+    // 19 ký tự (có dấu): máy chủ từ chối → chặn ngay trên máy, không xếp hàng.
+    expect(
+      () => svc.deactivateCooperative(
         'c1',
-        'HTX giải thể theo QĐ 12',
-      );
-      expect((r.response!['warnings'] as Map)['plots'], 2);
-      expect(h.fake.actionCalls.single.$1, '/v1/kn/cooperatives/c1/deactivate');
-    },
-  );
+        'HTX giải thể QĐ 12'.padRight(19, '.'),
+      ),
+      throwsA(isA<KnCommandError>()),
+    );
+    h.fake.onPost = (path, body) async => {
+      'cooperative': {'ref': 'c1', 'active': false},
+      'warnings': {'households': 3, 'plots': 2, 'machines': 0},
+    };
+    final r = await svc.deactivateCooperative('c1', 'HTX giải thể theo QĐ 12');
+    expect((r.response!['warnings'] as Map)['plots'], 2);
+    expect(h.fake.actionCalls.single.$1, '/v1/kn/cooperatives/c1/deactivate');
+  });
 
   test('FN-XA-03.04 máy móc: số nguyên ≥ 0, trùng loại gợi ý cập nhật dòng có sẵn, PUT thay toàn bộ', () async {
     final errs = validateMachineLines(const [

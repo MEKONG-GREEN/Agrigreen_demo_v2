@@ -1,8 +1,8 @@
 package handler
 
 // HTTP của KN v7.7 FN-XA-03.04 — Máy móc HTX (hợp đồng P7 §2). Application API, bắt buộc header X-AG-Context:
-//   GET /v1/kn/machine-counts?commune=, GET|PUT /v1/kn/machine-counts/{cooperative_ref},
-//   GET /v1/kn/machine-counts/{cooperative_ref}/log.
+//   GET /v1/kn/machine-counts?commune=, GET|PUT /v1/kn/machine-counts/{ref},
+//   GET /v1/kn/machine-counts/{ref}/log.
 
 import (
 	"bytes"

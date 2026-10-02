@@ -4776,7 +4776,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/kn/machine-counts/{cooperative_ref}": {
+    "/v1/kn/machine-counts/{ref}": {
         parameters: {
             query?: never;
             header?: never;
@@ -4797,7 +4797,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/kn/machine-counts/{cooperative_ref}/log": {
+    "/v1/kn/machine-counts/{ref}/log": {
         parameters: {
             query?: never;
             header?: never;
@@ -19560,7 +19560,8 @@ export interface operations {
                 "X-AG-Context": string;
             };
             path: {
-                cooperative_ref: string;
+                /** @description cooperative_ref của HTX */
+                ref: string;
             };
             cookie?: never;
         };
@@ -19590,7 +19591,8 @@ export interface operations {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
             };
             path: {
-                cooperative_ref: string;
+                /** @description cooperative_ref của HTX */
+                ref: string;
             };
             cookie?: never;
         };
@@ -19626,7 +19628,8 @@ export interface operations {
                 "X-AG-Context": string;
             };
             path: {
-                cooperative_ref: string;
+                /** @description cooperative_ref của HTX */
+                ref: string;
             };
             cookie?: never;
         };

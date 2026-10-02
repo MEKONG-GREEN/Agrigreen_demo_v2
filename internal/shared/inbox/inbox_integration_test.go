@@ -128,6 +128,24 @@ func TestHandlerFailureAllowsRetry(t *testing.T) {
 	}
 }
 
+// KN P8: handler nhận ngữ cảnh mang tenant của sự kiện (cổng module khác đọc tenant từ ngữ cảnh — consumer gửi Chi cục
+// đọc tham số masterdata từng lỗi "tenant: thiếu tenant_id" trong worker).
+func TestHandlerContextCarriesEventTenant(t *testing.T) {
+	env := pgtest.Get(t)
+	app := env.Pool(t, migrations.PF, "worker_platform")
+	e := outbox.Envelope{EventID: ids.New(), TenantID: ids.New(), EventType: "pf.party.consent.recorded", Payload: json.RawMessage(`{}`)}
+	processed, err := inbox.Process(context.Background(), app, "tenant.ctx.consumer", e, func(ctx context.Context, _ pgx.Tx, ev outbox.Envelope) error {
+		got, err := tenant.FromContext(ctx)
+		if err != nil || got != ev.TenantID {
+			t.Fatalf("ngữ cảnh handler phải mang tenant %s, nhận %s %v", ev.TenantID, got, err)
+		}
+		return nil
+	})
+	if err != nil || !processed {
+		t.Fatalf("processed=%v err=%v", processed, err)
+	}
+}
+
 func TestEventTypeConvention(t *testing.T) {
 	for _, bad := range []string{"consent.recorded", "pf.party.consent", "PF.party.consent.recorded", "x.party.consent.recorded"} {
 		if outbox.ValidateType(bad) == nil {

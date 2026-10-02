@@ -6,6 +6,10 @@ import 'package:agrigreen_mobile/data/catalog/catalog_cache.dart';
 import 'package:agrigreen_mobile/data/db/local_db.dart';
 import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 
+/// Số ký tự tối thiểu của lý do vô hiệu hóa HTX (FN-XA-03.03) — bằng ràng buộc
+/// CHECK của sổ `pf_party.org_event` và `party/domain.MinDeactivateReason`.
+const kDeactivateReasonMin = 20;
+
 /// Một trang danh sách REST (cursor) — có thể lấy từ bản đệm khi ngoại tuyến.
 class KnPage {
   const KnPage(this.items, {this.nextCursor, this.fromCache = false});
@@ -335,11 +339,16 @@ class KnCollectionService {
     },
   );
 
-  /// Vô hiệu hóa (không xóa cứng). Lý do ≥ 10 ký tự. Trả cảnh báo dữ liệu
-  /// liên kết (`warnings: {households, plots, machines}`).
+  /// Vô hiệu hóa (không xóa cứng). Lý do ≥ 20 ký tự — cùng ràng buộc sổ
+  /// `pf_party.org_event` và máy chủ (US-HTXSTATUS-01 AC-3; BRD v7.7 không
+  /// nêu số). Trả cảnh báo dữ liệu liên kết (`warnings: {households, plots,
+  /// machines}`).
   Future<KnCommandResult> deactivateCooperative(String ref, String reason) {
-    if (reason.trim().length < 10) {
-      throw KnCommandError('validation_failed', 'Lý do cần ít nhất 10 ký tự.');
+    if (reason.trim().runes.length < kDeactivateReasonMin) {
+      throw KnCommandError(
+        'validation_failed',
+        'Lý do cần ít nhất $kDeactivateReasonMin ký tự.',
+      );
     }
     return run(
       ApiActionKind.knCooperativeDeactivate,

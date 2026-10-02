@@ -86,6 +86,12 @@ type Stack struct {
 // New dựng Stack trên database của pgtest (bỏ qua kiểm thử khi không có PostgreSQL).
 func New(t testing.TB) *Stack {
 	t.Helper()
+	return NewAt(t, clock.System{})
+}
+
+// NewAt như New nhưng mọi module dùng đồng hồ clk (KN v7.7 P8: đồng hồ giả cho hạn nộp, chốt tự động, hạn mở lại).
+func NewAt(t testing.TB, clk clock.Clock) *Stack {
+	t.Helper()
 	env := pgtest.Get(t)
 	iss := authztest.New(t)
 	logs := &LogBuffer{}
@@ -98,7 +104,7 @@ func New(t testing.TB) *Stack {
 		t.Fatal(err)
 	}
 	kc := accounts.NewMemoryDirectory()
-	mods := build(func(role string) *pgxpool.Pool { return env.Pool(t, migrations.PF, role) }, clock.System{}, vc, store, kc)
+	mods := build(func(role string) *pgxpool.Pool { return env.Pool(t, migrations.PF, role) }, clk, vc, store, kc)
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	verifier := iss.Verifier()
 	app := httptest.NewServer(newRouter(log, verifier, ops, mods.List(), false))

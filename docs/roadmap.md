@@ -182,7 +182,7 @@ Còn lại:
 
 ## KN Phòng Trồng trọt v7.7
 
-**Trạng thái (01/10/2026, nhánh `sub/kn-v77`):** BRD v7.7 đã tóm tắt, có ma trận khoảng cách và kế hoạch gói P1–P8 ([docs/brd/kn-v7.7-plan.md](brd/kn-v7.7-plan.md), migration pf 000060–000089, ADR từ 0026). Khung nghiệm thu [docs/uat/kn-v7.7-acceptance.md](uat/kn-v7.7-acceptance.md): **130 yêu cầu — 4 đạt, 3 một phần, 110 chưa làm, 13 ngoài module** (40 UR, 25 FN, 14 NFR, 15 xung đột kiến trúc, 13 tính năng chuyển khỏi module, 23 câu hỏi khách Q-01…Q-23). Đợt 1 (P2, P6-khung, P3-engine, P8-khung UAT) đang làm; chặn lớn nhất là tệp Excel gốc của 14 mẫu (Q-01).
+**Trạng thái (02/10/2026, nhánh `sub/kn-v77` + P8 đợt 4 `kn-p8e`):** gói P1–P7 đã có mã (P1 tài khoản nhiều vai trò + ngữ cảnh phiên X-AG-Context, P2 phòng ban/khu vực/cây 3 cấp/menu theo cấu hình, P3 engine 14 mẫu, P4 vòng đời báo cáo + Chi cục, P5 lịch công tác, P6 khung + mọi màn web, P7 app Cán bộ xã ngoại tuyến + HTX/máy/thửa/vật tư); kịch bản đầu–cuối `TestKN77AnGiangTuan36` (`tests/kn77`, 13 bước trên module thật) đạt. Nghiệm thu [docs/uat/kn-v7.7-acceptance.md](uat/kn-v7.7-acceptance.md): **130 yêu cầu — 42 đạt, 48 một phần, 27 chưa làm, 13 ngoài module** (trước đợt 4: 38/36/43/13). Còn lại: **chờ khách** Q-01…Q-23 (chặn lớn nhất Q-01 — tệp Excel gốc của 14 mẫu, 13 biểu Cấp Xã đang là mẫu tạm); **mã** — menu/ngữ cảnh trên mobile, vài màn Admin (di chuyển Nút, nạp Excel nhiều vai trò, đếm theo phòng ban), vai kho định danh mặc định cho Cán bộ xã, cảnh báo PII ô tự do, SPI "còn n lần thử"; **hạ tầng** — sẵn sàng, sao lưu/RPO/RTO trên cụm thật, tải 500 người dùng, Android 3G, FCM thật.
 
 ## G5–G6
 Theo Phụ lục A của tài liệu kiến trúc:

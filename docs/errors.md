@@ -236,7 +236,7 @@ Vật tư KN v7.7 dùng lại `extension.read_only` (Cấp Quốc gia ghi vật 
 | 403 | `mechanization.out_of_scope` | pf/mechanization: ghi dữ liệu của HTX ngoài phạm vi TW → Tỉnh → Xã của người gọi (ADR-0009) |
 | 503 | `mechanization.dependency_unavailable` | pf/mechanization: chưa nối hoặc không gọi được pf/party, pf/masterdata hoặc kho định danh (kể cả consumer `pf.mechanization.area_sync`, CGH FN-07 — sự kiện được giao lại rồi vào DLQ) |
 | 422 | `mechanization.import_invalid` | pf/mechanization: tệp nhập máy sai mẫu (thiếu cột bắt buộc, có cột "Mã máy"/"Khâu", sai CSV/.xlsx, ô công thức, quá 500 dòng) — từ chối cả tệp |
-| 403 | `mechanization.read_only` | pf/mechanization (KN v7.7 FN-XA-03.04): ngữ cảnh phiên Cấp Tỉnh hoặc Cấp Quốc gia ghi `PUT /v1/kn/machine-counts/{cooperative_ref}` — chỉ xem |
+| 403 | `mechanization.read_only` | pf/mechanization (KN v7.7 FN-XA-03.04): ngữ cảnh phiên Cấp Tỉnh hoặc Cấp Quốc gia ghi `PUT /v1/kn/machine-counts/{ref}` — chỉ xem |
 | 422 | `mechanization.support_reason_required` | pf/mechanization (KN v7.7): chế độ hỗ trợ Admin ghi khai báo máy thiếu lý do (header `X-AG-Reason` ≥ 10 ký tự) |
 | 404 | `mechanization.cooperative_not_found` | pf/mechanization (KN v7.7 FN-XA-03.04): HTX không có, không phải HTX, hoặc ngoài phạm vi ngữ cảnh phiên (không lộ sự tồn tại) |
 | 422 | `mechanization.machine_type_unknown` | pf/mechanization (KN v7.7 FN-XA-03.04): loại máy không thuộc danh mục masterdata `machine_type` hoặc đã ngừng dùng; `machine_type` là mã gửi |

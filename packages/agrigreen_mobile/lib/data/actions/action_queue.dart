@@ -58,7 +58,7 @@ enum ApiActionKind {
   /// `PUT /v1/kn/households/{ref}` — sửa diện tích canh tác.
   knHouseholdUpdate('kn_household_update', method: 'PUT'),
 
-  /// FN-XA-03.04: `PUT /v1/kn/machine-counts/{cooperative_ref}` — thay toàn
+  /// FN-XA-03.04: `PUT /v1/kn/machine-counts/{ref}` — thay toàn
   /// bộ khai báo số lượng máy của HTX.
   knMachineCountsSave('kn_machine_counts_save', method: 'PUT'),
 

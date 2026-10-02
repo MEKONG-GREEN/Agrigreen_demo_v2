@@ -6676,14 +6676,14 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/KNMachineOverview"}
         "403": {$ref: "#/components/responses/Problem"}
-  /v1/kn/machine-counts/{cooperative_ref}:
+  /v1/kn/machine-counts/{ref}:
     get:
       tags: [mechanization]
       summary: "Khai báo máy hiện hành của một HTX"
       operationId: knCoopMachineCounts
       parameters:
         - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: cooperative_ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, description: "cooperative_ref của HTX", schema: {type: string, format: uuid}}
       responses:
         "200":
           description: Khai báo
@@ -6702,7 +6702,7 @@ paths:
       operationId: knPutMachineCounts
       parameters:
         - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: cooperative_ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, description: "cooperative_ref của HTX", schema: {type: string, format: uuid}}
         - {name: department, in: query, schema: {type: string}, description: "Chỉ Admin: phòng ban của bản ghi"}
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -6719,14 +6719,14 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
-  /v1/kn/machine-counts/{cooperative_ref}/log:
+  /v1/kn/machine-counts/{ref}/log:
     get:
       tags: [mechanization]
       summary: "Lịch sử thay đổi số lượng máy của HTX"
       operationId: knMachineCountLog
       parameters:
         - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: cooperative_ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, description: "cooperative_ref của HTX", schema: {type: string, format: uuid}}
         - {name: cursor, in: query, schema: {type: integer, minimum: 0}, description: "seq của dòng cuối trang trước"}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
       responses:

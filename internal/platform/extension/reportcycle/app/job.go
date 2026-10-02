@@ -15,6 +15,7 @@ import (
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 // TenantLister trả tenant có kỳ báo cáo (job vòng đời báo cáo).
@@ -62,6 +63,9 @@ func (s *Service) RunJob(ctx context.Context, tenants TenantLister) (JobResult, 
 // JobTenant: tự chốt kỳ quá giờ chốt (kèm tổng hợp "Hệ thống"), tự chốt lại xã/biểu hết hạn mở, tự nhắc trước hạn
 // và khi trễ hạn theo tham số (Q-15, tạm).
 func (s *Service) JobTenant(ctx context.Context, tid uuid.UUID, now time.Time) (JobResult, error) {
+	// Cổng của module khác (khu vực P2, engine mẫu P3, cán bộ phụ trách P1) đọc tenant từ ngữ cảnh: job không có request nên
+	// phải gắn tenant trước khi chốt/chốt lại/tổng hợp (lỗi P8: "tenant: thiếu tenant_id" khi chốt lại tự động trên gốc lắp ráp thật).
+	ctx = tenant.WithID(ctx, tid)
 	var out JobResult
 	var due []store.Period
 	if err := s.tx(ctx, tid, func(tx pgx.Tx) error {
