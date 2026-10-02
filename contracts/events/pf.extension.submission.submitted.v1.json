@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.submission.submitted/v1",
+  "title": "pf.extension.submission.submitted — payload",
+  "description": "KN v7.7 FN-XA-03.02: một bài nộp 'Đã gửi' (gửi mới, gửi lại, gửi theo yêu cầu điều chỉnh) — phiên bản bất biến. Bảng tổng hợp chỉ đổi sau 'Cập nhật' (FN-TI-02.05). Không có giá trị ô; on_behalf_of khi Admin nhập thay.",
+  "x-event-type": "pf.extension.submission.submitted",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": [
+    "submission_id",
+    "task_id",
+    "period_id",
+    "template_id",
+    "form_code",
+    "commune_code",
+    "department_code",
+    "province_code",
+    "version_no",
+    "adjustment_response",
+    "on_behalf_of",
+    "actor_ref",
+    "event_time"
+  ],
+  "properties": {
+    "submission_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "task_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "period_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "template_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "form_code": {
+      "type": "string"
+    },
+    "commune_code": {
+      "type": "string"
+    },
+    "department_code": {
+      "type": "string"
+    },
+    "province_code": {
+      "type": "string"
+    },
+    "version_no": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "adjustment_response": {
+      "type": "boolean"
+    },
+    "on_behalf_of": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "actor_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

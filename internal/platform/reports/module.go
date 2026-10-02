@@ -24,6 +24,7 @@ import (
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/app"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/dispatch"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/form"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/formimport"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/handler"
@@ -61,6 +62,10 @@ type Deps struct {
 	Mailer     port.Mailer
 	LinkBase   string // AG_WEB_OPS_URL: liên kết trang việc xuất trong email
 	Log        *slog.Logger
+	// KN v7.7 P4 — báo cáo Chi cục: lần tổng hợp của pf/extension (nối sau bằng UseConsolidations nếu cần) và biến môi
+	// trường của cờ Google Sheet (nil → TẮT; ADR-0026 "Đề xuất").
+	Consolidations extport.Consolidations
+	Getenv         func(string) string
 }
 
 // Module là pf/reports đã nối.
@@ -69,12 +74,36 @@ type Module struct{ svc *app.Service }
 // New tạo module với pool của vai reports_app. Ở worker, db là pool reports_app
 // (job lịch); handler inbox dùng giao dịch do inbox.Process mở.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
-	return &Module{svc: &app.Service{
+	svc := &app.Service{
 		DB: db, Clock: clk, Log: d.Log, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
 		Store: d.Store, Extension: d.Extension, Mechanization: d.Mechanization, CropCycle: d.CropCycle, Directory: d.Directory, Recipients: d.Recipients, Mailer: d.Mailer,
-		LinkBase: d.LinkBase,
-	}}
+		LinkBase: d.LinkBase, Consolidations: d.Consolidations,
+	}
+	if d.Getenv != nil {
+		svc.GSheet = dispatch.GSheetConfigFromEnv(d.Getenv)
+	}
+	return &Module{svc: svc}
 }
+
+// UseConsolidations nối cổng lần tổng hợp của pf/extension (báo cáo Chi cục, KN v7.7 P4).
+func (m *Module) UseConsolidations(c extport.Consolidations) { m.svc.Consolidations = c }
+
+// UseMailer nối bộ gửi SMTP (worker: consumer báo cáo Chi cục).
+func (m *Module) UseMailer(ml port.Mailer) { m.svc.Mailer = ml }
+
+// DispatchHandler là inbox.Handler cho pf.reports.dispatch.requested (consumer port.DispatchConsumer).
+func (m *Module) DispatchHandler() inbox.Handler { return m.svc.HandleDispatchRequested }
+
+// DispatchHistory cho pf/extension biết kỳ đã gửi Chi cục (cảnh báo khi mở lại kỳ).
+func (m *Module) DispatchHistory() extport.DispatchHistory { return app.DispatchHistory{Svc: m.svc} }
+
+// FormAvailability cho pf/party (P2): menu "Báo cáo đột xuất" chỉ hiện khi phòng ban có mẫu loại đó.
+func (m *Module) FormAvailability() partyport.FormAvailability {
+	return app.FormAvailability{Svc: m.svc}
+}
+
+// FormUsage cho pf/masterdata (P2): cột "biểu đang dùng" của danh mục nông nghiệp.
+func (m *Module) FormUsage() mdport.FormUsage { return app.FormUsage{Svc: m.svc} }
 
 // RegisterApp gắn route Application API.
 func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterApp(rg) }

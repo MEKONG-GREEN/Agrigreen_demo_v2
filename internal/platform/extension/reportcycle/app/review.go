@@ -543,7 +543,7 @@ type RemindInput struct {
 
 // RemindResult là kết quả nhắc.
 type RemindResult struct {
-	Reminder        store.Reminder
+	Reminder         store.Reminder
 	SkippedNoOfficer []string
 	SkippedDone      []string
 }

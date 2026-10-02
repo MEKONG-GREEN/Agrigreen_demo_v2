@@ -58,14 +58,14 @@ type Service struct {
 	Clock clock.Clock
 	Log   *slog.Logger
 
-	Forms       repport.FormEngine      // P3: mẫu, phiên bản, Evaluate, Totals
-	Regions     partyport.Regions       // P2: khu vực của Nút xã
-	Orgs        partyport.Orgs          // tỉnh của Nút trong ngữ cảnh
-	Units       mdport.AdminUnits       // tên xã/tỉnh
-	Params      mdport.Params           // tham số nhắc, đánh số tuần (tạm, Q-15, Q-17)
-	Assignments accport.Assignments     // P1: cán bộ xã phụ trách cùng phòng ban
-	Names       partyport.ActorNames    // tên người thao tác trong Log (tùy chọn)
-	Dispatches  port.DispatchHistory    // pf/reports: kỳ đã gửi Chi cục (tùy chọn)
+	Forms       repport.FormEngine   // P3: mẫu, phiên bản, Evaluate, Totals
+	Regions     partyport.Regions    // P2: khu vực của Nút xã
+	Orgs        partyport.Orgs       // tỉnh của Nút trong ngữ cảnh
+	Units       mdport.AdminUnits    // tên xã/tỉnh
+	Params      mdport.Params        // tham số nhắc, đánh số tuần (tạm, Q-15, Q-17)
+	Assignments accport.Assignments  // P1: cán bộ xã phụ trách cùng phòng ban
+	Names       partyport.ActorNames // tên người thao tác trong Log (tùy chọn)
+	Dispatches  port.DispatchHistory // pf/reports: kỳ đã gửi Chi cục (tùy chọn)
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

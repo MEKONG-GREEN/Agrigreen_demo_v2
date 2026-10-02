@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.period.closed/v1",
+  "title": "pf.extension.period.closed — payload",
+  "description": "KN v7.7 FN-TI-02.04: kỳ báo cáo đã chốt (manual = Cấp Tỉnh 'Chốt kỳ ngay'; auto = hệ thống chốt theo lịch). Hệ thống đã tổng hợp một lần lúc chốt.",
+  "x-event-type": "pf.extension.period.closed",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": [
+    "period_id",
+    "batch_id",
+    "label",
+    "mode",
+    "department_code",
+    "province_code",
+    "actor_ref",
+    "event_time"
+  ],
+  "properties": {
+    "period_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "batch_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "label": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "auto"
+      ]
+    },
+    "department_code": {
+      "type": "string"
+    },
+    "province_code": {
+      "type": "string"
+    },
+    "actor_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

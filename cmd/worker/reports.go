@@ -123,5 +123,8 @@ func reportsConsumers(log *slog.Logger) []consumer {
 			handler: wrap(func(m *reports.Module) inbox.Handler { return m.ExportHandler() })},
 		{name: repport.DeliveryConsumer, cluster: migrations.PF, role: reports.DBRole, events: []string{repport.EventExportCompleted},
 			handler: wrap(func(m *reports.Module) inbox.Handler { return m.DeliveryHandler() })},
+		// KN v7.7 P4: gửi email báo cáo Chi cục kèm tệp (SMTP công vụ AG_SMTP_*; thiếu → "Gửi lỗi", gửi lại được).
+		{name: repport.DispatchConsumer, cluster: migrations.PF, role: reports.DBRole, events: []string{repport.EventDispatchRequested},
+			handler: wrap(func(m *reports.Module) inbox.Handler { return m.DispatchHandler() })},
 	}
 }

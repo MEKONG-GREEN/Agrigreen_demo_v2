@@ -194,6 +194,28 @@ func BatchEvents(ctx context.Context, tx pgx.Tx, batchID uuid.UUID) ([]BatchEven
 	})
 }
 
+// strs đổi mảng UUID sang mảng chuỗi: pool vai ứng dụng chạy chế độ QueryExecModeExec (PgBouncer) nên pgx không biết
+// kiểu của tham số mảng — truyền text[] rồi ép ::uuid[] trong SQL.
+func strs(ids []uuid.UUID) []string {
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = id.String()
+	}
+	return out
+}
+
+// pstrs đổi mảng con trỏ UUID (có NULL) sang mảng chuỗi có NULL.
+func pstrs(ids []*uuid.UUID) []*string {
+	out := make([]*string, len(ids))
+	for i, id := range ids {
+		if id != nil {
+			s := id.String()
+			out[i] = &s
+		}
+	}
+	return out
+}
+
 func rawOr(b []byte, def string) string {
 	if len(b) == 0 {
 		return def
@@ -271,7 +293,7 @@ func PeriodsOfBatch(ctx context.Context, tx pgx.Tx, batchID uuid.UUID) ([]Period
 
 // PeriodsByIDs trả các kỳ theo id.
 func PeriodsByIDs(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) (map[uuid.UUID]Period, error) {
-	rows, err := tx.Query(ctx, "SELECT "+periodCols+" FROM pf_extension.report_period WHERE id = ANY($1::uuid[])", ids)
+	rows, err := tx.Query(ctx, "SELECT "+periodCols+" FROM pf_extension.report_period WHERE id = ANY($1::uuid[])", strs(ids))
 	if err != nil {
 		return nil, err
 	}

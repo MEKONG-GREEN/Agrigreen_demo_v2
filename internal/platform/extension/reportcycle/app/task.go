@@ -47,10 +47,10 @@ type TaskQuery struct {
 
 // TaskList là danh sách kèm số đếm và nhắc mới nhất.
 type TaskList struct {
-	Items       []TaskView
-	Todo        int // cần làm (còn phải gửi, kỳ mở)
-	Overdue     int
-	Adjustment  int
+	Items        []TaskView
+	Todo         int // cần làm (còn phải gửi, kỳ mở)
+	Overdue      int
+	Adjustment   int
 	LastReminder *store.Reminder
 }
 
@@ -127,13 +127,13 @@ func (s *Service) ListTasks(ctx context.Context, q TaskQuery) (TaskList, error) 
 // TaskDetail là công việc để mở màn nhập (FN-XA-03.02).
 type TaskDetail struct {
 	TaskView
-	FormName      string
-	PeriodLabels  []string // nhãn kỳ theo khe (tiêu đề cột theo kỳ của mẫu — FN-TI-02.02)
-	OpenSlots     []int
-	Provincial    map[string]string
-	Carried       map[string]map[string]string // giá trị khe kỳ khác (chỉ xem)
-	Latest        *store.Submission
-	LatestSubmit  *store.Submission
+	FormName     string
+	PeriodLabels []string // nhãn kỳ theo khe (tiêu đề cột theo kỳ của mẫu — FN-TI-02.02)
+	OpenSlots    []int
+	Provincial   map[string]string
+	Carried      map[string]map[string]string // giá trị khe kỳ khác (chỉ xem)
+	Latest       *store.Submission
+	LatestSubmit *store.Submission
 }
 
 func (s *Service) taskInScope(ctx context.Context, tx pgx.Tx, a actor, id uuid.UUID, lock bool) (*store.Task, error) {

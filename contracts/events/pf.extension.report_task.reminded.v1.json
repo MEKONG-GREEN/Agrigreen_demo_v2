@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.report_task.reminded/v1",
+  "title": "pf.extension.report_task.reminded — payload",
+  "description": "KN v7.7 FN-TI-02.03: nhắc xã chưa nộp/trễ hạn — thủ công (Cấp Tỉnh, nội dung tự soạn) hoặc tự động trước hạn/khi trễ. Consumer pf/notify gửi tới cán bộ phụ trách (đẩy chỉ dữ liệu, < 1 phút).",
+  "x-event-type": "pf.extension.report_task.reminded",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": [
+    "reminder_id",
+    "batch_id",
+    "period_id",
+    "period_label",
+    "mode",
+    "message",
+    "due_at",
+    "communes",
+    "task_ids",
+    "recipient_refs",
+    "actor_ref",
+    "event_time"
+  ],
+  "properties": {
+    "reminder_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "batch_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "period_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "period_label": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "auto_before",
+        "auto_overdue"
+      ]
+    },
+    "message": {
+      "type": "string"
+    },
+    "due_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "communes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "task_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "recipient_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "actor_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

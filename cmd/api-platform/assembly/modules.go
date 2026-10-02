@@ -226,8 +226,18 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	rep := reports.New(repPool, clk, reports.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(), Store: store,
 		Extension: kn.ReportData(), Mechanization: mech.ReportData(), CropCycle: cc.ReportData(), Directory: acc.MailDirectory(),
-		Recipients: acc.ReportRecipients(), // HTX US-DASH-03: người nhận = tài khoản của HTX
+		Recipients:     acc.ReportRecipients(),                 // HTX US-DASH-03: người nhận = tài khoản của HTX
+		Consolidations: kn.Consolidations(), Getenv: os.Getenv, // KN v7.7 P4: báo cáo Chi cục; cờ Google Sheet (tắt mặc định)
 	})
+	// KN v7.7 P4: vòng đời báo cáo — engine mẫu (P3), khu vực (P2), cán bộ phụ trách (P1), lịch sử gửi Chi cục; nối ngược
+	// cho P2: bảng Ảnh hưởng (kỳ chưa chốt), dữ liệu theo phòng ban, menu "Báo cáo đột xuất", cột "biểu đang dùng".
+	kn.UseReportCycle(extension.ReportCycleDeps{Forms: rep.Forms(), Regions: pty.Regions(), Assignments: acc.Assignments(), Names: acc.ActorNames(),
+		Log: slog.Default()})
+	kn.UseDispatchHistory(rep.DispatchHistory())
+	pty.UseOrgImpact(kn.OpenPeriodsImpact())
+	pty.UseDepartmentUsage(kn.ReportUsage())
+	pty.UseFormAvailability(rep.FormAvailability())
+	md.UseFormUsage(rep.FormUsage())
 	kn.UseTablePDF(rep.TablePDF()) // KN v7.7 P5: "Xuất PDF" lịch công tác (ngữ cảnh KN của P1 nối qua kn.UseKNContext)
 
 	// pf/waterway (G2): API ghi sổ đoạn/công trình, tạo job dựng và phát hành; worker dựng đồ thị (cmd/worker).

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.consolidation.completed/v1",
+  "title": "pf.extension.consolidation.completed — payload",
+  "description": "KN v7.7 FN-TI-02.05: một lần 'Cập nhật' (người hoặc Hệ thống lúc chốt kỳ) đã ghi lần tổng hợp bất biến — nguồn của dashboard Tỉnh/TW, báo cáo TW và Chi cục.",
+  "x-event-type": "pf.extension.consolidation.completed",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": [
+    "run_ids",
+    "period_id",
+    "batch_id",
+    "form_codes",
+    "trigger",
+    "department_code",
+    "province_code",
+    "cells_changed",
+    "event_time"
+  ],
+  "properties": {
+    "run_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "period_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "batch_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "form_codes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "trigger": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "system"
+      ]
+    },
+    "department_code": {
+      "type": "string"
+    },
+    "province_code": {
+      "type": "string"
+    },
+    "cells_changed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

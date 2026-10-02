@@ -486,16 +486,16 @@ func sortedKeys(m map[int]decimal.Decimal) []int {
 
 // CommuneStats là khung "Thống kê của xã" theo vụ (đợt).
 type CommuneStats struct {
-	Commune     string
-	Batch       *store.Batch
-	SownArea    Metric
-	SownPlan    Metric
-	SownPct     Metric
-	PestArea    Metric
-	DueTasks    int // công việc đã đến hạn
-	OnTime      int // nộp đúng hạn (lần gửi đầu ≤ hạn)
-	Submitted   int
-	TotalTasks  int
+	Commune    string
+	Batch      *store.Batch
+	SownArea   Metric
+	SownPlan   Metric
+	SownPct    Metric
+	PestArea   Metric
+	DueTasks   int // công việc đã đến hạn
+	OnTime     int // nộp đúng hạn (lần gửi đầu ≤ hạn)
+	Submitted  int
+	TotalTasks int
 }
 
 // CommuneStatsOf tính thống kê của xã từ CHÍNH các bản đã gửi của xã (AC: khớp báo cáo đã gửi).

@@ -169,9 +169,9 @@ type deadlineReq struct {
 }
 
 type batchReq struct {
-	ReportType       string                                  `json:"report_type"`
-	TemplateIDs      []string                                `json:"template_ids"`
-	Scope            struct {
+	ReportType  string   `json:"report_type"`
+	TemplateIDs []string `json:"template_ids"`
+	Scope       struct {
 		Mode     string   `json:"mode"`
 		Regions  []string `json:"regions"`
 		Communes []string `json:"communes"`

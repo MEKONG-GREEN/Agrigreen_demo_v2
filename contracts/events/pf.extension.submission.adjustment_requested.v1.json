@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.submission.adjustment_requested/v1",
+  "title": "pf.extension.submission.adjustment_requested — payload",
+  "description": "KN v7.7 FN-TI-02.04: Cấp Tỉnh yêu cầu xã điều chỉnh kèm lý do bắt buộc. Consumer pf/notify báo cán bộ phụ trách.",
+  "x-event-type": "pf.extension.submission.adjustment_requested",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": [
+    "task_id",
+    "submission_id",
+    "form_code",
+    "commune_code",
+    "period_label",
+    "reason",
+    "recipient_refs",
+    "actor_ref",
+    "event_time"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "submission_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "form_code": {
+      "type": "string"
+    },
+    "commune_code": {
+      "type": "string"
+    },
+    "period_label": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "recipient_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "actor_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

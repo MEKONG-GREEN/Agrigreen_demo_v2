@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -84,12 +85,13 @@ func InsertTasks(ctx context.Context, tx pgx.Tx, tid, batchID uuid.UUID, dept, p
 	for start := 0; start < len(ts); start += chunk {
 		end := min(start+chunk, len(ts))
 		n := end - start
-		ids, periods, tpls, vers, codes, communes, regions, assignees := make([]uuid.UUID, n), make([]uuid.UUID, n), make([]uuid.UUID, n),
-			make([]uuid.UUID, n), make([]string, n), make([]string, n), make([]string, n), make([]string, n)
-		slots, blocks, dues := make([]int32, n), make([]bool, n), make([]time.Time, n)
+		ids, periods, tpls, vers, codes, communes, regions, assignees := make([]string, n), make([]string, n), make([]string, n),
+			make([]string, n), make([]string, n), make([]string, n), make([]string, n), make([]string, n)
+		slots, blocks, dues := make([]string, n), make([]string, n), make([]string, n)
 		for i, t := range ts[start:end] {
-			ids[i], periods[i], tpls[i], vers[i], codes[i] = t.ID, t.PeriodID, t.Form.TemplateID, t.Form.VersionID, t.Form.Code
-			communes[i], regions[i], assignees[i], slots[i], blocks[i], dues[i] = t.Commune, t.Region, t.AssigneeCSV, int32(t.Slot), t.Form.PeriodBlock, t.DueAt.UTC()
+			ids[i], periods[i], tpls[i], vers[i], codes[i] = t.ID.String(), t.PeriodID.String(), t.Form.TemplateID.String(), t.Form.VersionID.String(), t.Form.Code
+			communes[i], regions[i], assignees[i] = t.Commune, t.Region, t.AssigneeCSV
+			slots[i], blocks[i], dues[i] = strconv.Itoa(t.Slot), strconv.FormatBool(t.Form.PeriodBlock), t.DueAt.UTC().Format(time.RFC3339Nano)
 		}
 		_, err := tx.Exec(ctx, `INSERT INTO pf_extension.report_task (tenant_id, id, batch_id, period_id, template_id, version_id, form_code,
 		    department_code, province_code, commune_code, region_code, slot, period_block, due_at, status, assignees, created_at, updated_at)
@@ -223,13 +225,13 @@ func SaveSubmissionState(ctx context.Context, tx pgx.Tx, t Task, at time.Time) e
 
 // SetReopened đặt/xóa hạn mở lại của công việc.
 func SetReopened(ctx context.Context, tx pgx.Tx, ids []uuid.UUID, until *time.Time, at time.Time) error {
-	_, err := tx.Exec(ctx, `UPDATE pf_extension.report_task SET reopened_until = $2, updated_at = $3 WHERE id = ANY($1::uuid[])`, ids, until, at.UTC())
+	_, err := tx.Exec(ctx, `UPDATE pf_extension.report_task SET reopened_until = $2, updated_at = $3 WHERE id = ANY($1::uuid[])`, strs(ids), until, at.UTC())
 	return err
 }
 
 // MarkReminded ghi lần nhắc gần nhất.
 func MarkReminded(ctx context.Context, tx pgx.Tx, ids []uuid.UUID, at time.Time) error {
-	_, err := tx.Exec(ctx, `UPDATE pf_extension.report_task SET last_reminded_at = $2, updated_at = $2 WHERE id = ANY($1::uuid[])`, ids, at.UTC())
+	_, err := tx.Exec(ctx, `UPDATE pf_extension.report_task SET last_reminded_at = $2, updated_at = $2 WHERE id = ANY($1::uuid[])`, strs(ids), at.UTC())
 	return err
 }
 

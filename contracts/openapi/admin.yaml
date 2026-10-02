@@ -3068,6 +3068,25 @@ paths:
   # --- hết pf/accounts ---
 
   # --- pf/reports: mẫu biểu (reports_admin, masterdata_admin hoặc platform_admin — CGH FN-10 BR-03) và lịch gửi định kỳ (US-DASH-03) ---
+  /v1/reports/dispatch-settings:
+    get:
+      summary: Cấu hình báo cáo Chi cục (KN v7.7 FN-TI-02.06) — cờ Google Sheet (TẮT mặc định, ADR-0026), SMTP công vụ đã cấu hình
+      operationId: adminDispatchSettings
+      responses:
+        "200":
+          description: Cấu hình hiện hành (chỉ đọc; bật qua biến môi trường AG_REPORTS_GSHEET + AG_EXTDATA_GSHEET_ADR + AG_NONPII_ALLOWLIST)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [gsheet_enabled, gsheet_adr, gsheet_share_mode, gsheet_connected, smtp_configured]
+                properties:
+                  gsheet_enabled: {type: boolean}
+                  gsheet_adr: {type: string}
+                  gsheet_share_mode: {type: string, enum: [recipients, anyone_with_link]}
+                  gsheet_connected: {type: boolean}
+                  smtp_configured: {type: boolean}
+        "403": {$ref: "#/components/responses/Problem"}
   /v1/reports/templates:
     get:
       summary: Mọi mẫu (mẫu hệ thống + phiên bản mới nhất của tenant, kể cả đã ngừng dùng)

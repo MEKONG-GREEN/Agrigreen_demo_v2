@@ -167,21 +167,25 @@ func InsertCellChanges(ctx context.Context, tx pgx.Tx, tid uuid.UUID, cs []CellC
 	for start := 0; start < len(cs); start += chunk {
 		part := cs[start:min(start+chunk, len(cs))]
 		n := len(part)
-		ids, runs, periods, tpls := make([]uuid.UUID, n), make([]uuid.UUID, n), make([]uuid.UUID, n), make([]uuid.UUID, n)
+		ids, runs, periods, tpls := make([]string, n), make([]string, n), make([]string, n), make([]string, n)
 		codes, communes, keys, letters, kinds := make([]string, n), make([]string, n), make([]string, n), make([]string, n), make([]string, n)
 		olds, news := make([]*string, n), make([]*string, n)
 		subs, bys, obos := make([]*uuid.UUID, n), make([]*uuid.UUID, n), make([]*uuid.UUID, n)
-		ats, created := make([]*time.Time, n), make([]time.Time, n)
+		ats, created := make([]*string, n), make([]string, n)
 		for i, c := range part {
-			ids[i], runs[i], periods[i], tpls[i], codes[i], communes[i], keys[i], letters[i], kinds[i] = c.ID, c.RunID, c.PeriodID, c.TemplateID, c.FormCode,
+			ids[i], runs[i], periods[i], tpls[i], codes[i], communes[i], keys[i], letters[i], kinds[i] = c.ID.String(), c.RunID.String(), c.PeriodID.String(), c.TemplateID.String(), c.FormCode,
 				c.Commune, c.RowKey, c.Letter, c.Kind
-			olds[i], news[i], subs[i], bys[i], obos[i], ats[i], created[i] = c.Old, c.New, c.Submission, c.ChangedBy, c.OnBehalfOf, c.SubmittedAt, c.CreatedAt.UTC()
+			olds[i], news[i], subs[i], bys[i], obos[i], created[i] = c.Old, c.New, c.Submission, c.ChangedBy, c.OnBehalfOf, c.CreatedAt.UTC().Format(time.RFC3339Nano)
+			if c.SubmittedAt != nil {
+				s := c.SubmittedAt.UTC().Format(time.RFC3339Nano)
+				ats[i] = &s
+			}
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO pf_extension.consolidation_cell_change (tenant_id, id, run_id, period_id, template_id, form_code,
 		    commune_code, row_key, letter, old_value, new_value, change_kind, submission_id, changed_by, on_behalf_of, submitted_at, created_at)
 		  SELECT $1, u.* FROM unnest($2::uuid[], $3::uuid[], $4::uuid[], $5::uuid[], $6::text[], $7::text[], $8::text[], $9::text[], $10::text[],
-		    $11::text[], $12::text[], $13::uuid[], $14::uuid[], $15::uuid[], $16::timestamptz[], $17::timestamptz[])`,
-			tid, ids, runs, periods, tpls, codes, communes, keys, letters, olds, news, kinds, subs, bys, obos, ats, created); err != nil {
+		    $11::text[], $12::text[], $13::uuid[], $14::uuid[], $15::uuid[], $16::timestamptz[], $17::timestamptz[]) AS u`,
+			tid, ids, runs, periods, tpls, codes, communes, keys, letters, olds, news, kinds, pstrs(subs), pstrs(bys), pstrs(obos), ats, created); err != nil {
 			return err
 		}
 	}
@@ -251,7 +255,7 @@ func LatestOfPeriod(ctx context.Context, tx pgx.Tx, periodID uuid.UUID) (map[uui
 // LatestForForm trả con trỏ mới nhất của mỗi kỳ cho mã mẫu ở phạm vi (dashboard: tiến độ theo kỳ, sâu bệnh so kỳ trước).
 func LatestForForm(ctx context.Context, tx pgx.Tx, province, dept, formCode string, periodIDs []uuid.UUID) ([]Latest, error) {
 	rows, err := tx.Query(ctx, `SELECT period_id, template_id, run_id, run_no, batch_id, form_code, run_at FROM pf_extension.consolidation_latest
-	  WHERE province_code = $1 AND department_code = $2 AND form_code = $3 AND period_id = ANY($4::uuid[])`, province, dept, formCode, periodIDs)
+	  WHERE province_code = $1 AND department_code = $2 AND form_code = $3 AND period_id = ANY($4::uuid[])`, province, dept, formCode, strs(periodIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +297,7 @@ func InsertMetrics(ctx context.Context, tx pgx.Tx, tid, runID, periodID, batchID
 // MetricsOfRuns đọc chỉ số của các lần chạy (chỉ số theo tiền tố metric nếu có).
 func MetricsOfRuns(ctx context.Context, tx pgx.Tx, runIDs []uuid.UUID, scopes []string) ([]Metric, error) {
 	rows, err := tx.Query(ctx, `SELECT run_id, period_id, form_code, metric, scope, unit_code, value::text FROM pf_extension.consolidation_metric
-	  WHERE run_id = ANY($1::uuid[]) AND scope = ANY($2::text[])`, runIDs, scopes)
+	  WHERE run_id = ANY($1::uuid[]) AND scope = ANY($2::text[])`, strs(runIDs), scopes)
 	if err != nil {
 		return nil, err
 	}

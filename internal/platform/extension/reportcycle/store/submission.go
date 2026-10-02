@@ -91,7 +91,7 @@ func SubmissionsByIDs(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) (map[uuid
 	if len(ids) == 0 {
 		return out, nil
 	}
-	rows, err := tx.Query(ctx, "SELECT "+subCols+" FROM pf_extension.submission_version WHERE id = ANY($1::uuid[])", ids)
+	rows, err := tx.Query(ctx, "SELECT "+subCols+" FROM pf_extension.submission_version WHERE id = ANY($1::uuid[])", strs(ids))
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func SubmissionHistory(ctx context.Context, tx pgx.Tx, taskID uuid.UUID) ([]Subm
 func ActAsSubmissionsBy(ctx context.Context, tx pgx.Tx, actor uuid.UUID, taskIDs []uuid.UUID) (int, error) {
 	var n int
 	err := tx.QueryRow(ctx, `SELECT count(*) FROM pf_extension.submission_version
-	  WHERE actor_ref = $1 AND on_behalf_of IS NOT NULL AND kind = 'submitted' AND task_id = ANY($2::uuid[])`, actor, taskIDs).Scan(&n)
+	  WHERE actor_ref = $1 AND on_behalf_of IS NOT NULL AND kind = 'submitted' AND task_id = ANY($2::uuid[])`, actor, strs(taskIDs)).Scan(&n)
 	return n, err
 }
 
@@ -176,7 +176,7 @@ func InsertReminder(ctx context.Context, tx pgx.Tx, tid uuid.UUID, r *Reminder) 
 	return tx.QueryRow(ctx, `INSERT INTO pf_extension.reminder_event (id, tenant_id, stream_key, batch_id, period_id, template_id, mode, message, task_ids,
 	    communes, recipient_refs, department_code, on_behalf_of, event_time, actor_ref, idem_key, rule_version)
 	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::uuid[], $10::text[], $11::uuid[], $12, $13, $14, $15, $16, $17) RETURNING seq, recorded_at`,
-		r.ID, tid, "reminder:"+r.BatchID.String(), r.BatchID, r.PeriodID, r.TemplateID, r.Mode, r.Message, r.TaskIDs, r.Communes, r.Recipients,
+		r.ID, tid, "reminder:"+r.BatchID.String(), r.BatchID, r.PeriodID, r.TemplateID, r.Mode, r.Message, strs(r.TaskIDs), r.Communes, strs(r.Recipients),
 		r.Department, r.OnBehalfOf, r.EventTime.UTC(), r.ActorRef, r.IdemKey, RuleVersion).Scan(&seq, &r.RecordedAt)
 }
 
@@ -267,7 +267,7 @@ func InsertPeriodEvent(ctx context.Context, tx pgx.Tx, tid uuid.UUID, e *PeriodE
 	return tx.QueryRow(ctx, `INSERT INTO pf_extension.period_event (id, tenant_id, stream_key, period_id, batch_id, action, communes, template_ids,
 	    task_ids, reason, reopen_until, department_code, on_behalf_of, event_time, actor_ref, idem_key, rule_version)
 	  VALUES ($1, $2, $3, $4, $5, $6, $7::text[], $8::uuid[], $9::uuid[], $10, $11, $12, $13, $14, $15, $16, $17) RETURNING seq, recorded_at`,
-		e.ID, tid, "period:"+e.PeriodID.String(), e.PeriodID, e.BatchID, e.Action, e.Communes, e.TemplateIDs, e.TaskIDs, e.Reason, e.ReopenUntil,
+		e.ID, tid, "period:"+e.PeriodID.String(), e.PeriodID, e.BatchID, e.Action, e.Communes, strs(e.TemplateIDs), strs(e.TaskIDs), e.Reason, e.ReopenUntil,
 		e.Department, e.OnBehalfOf, e.EventTime.UTC(), e.ActorRef, e.IdemKey, RuleVersion).Scan(&e.Seq, &e.RecordedAt)
 }
 

@@ -40,6 +40,7 @@ func Queues() []Queue {
 		{Name: wwport.BuildConsumer, Events: []string{wwport.EventBuildRequested}},
 		{Name: repport.ExportConsumer, Events: []string{repport.EventExportRequested}},
 		{Name: repport.DeliveryConsumer, Events: []string{repport.EventExportCompleted}},
+		{Name: repport.DispatchConsumer, Events: []string{repport.EventDispatchRequested}}, // KN v7.7 P4: báo cáo Chi cục
 		{Name: simport.OptimizerConsumer, Events: []string{simport.EventJobRequested}},
 	}
 	for _, c := range notify.New(nil, clock.System{}, notify.Deps{}).Consumers() {

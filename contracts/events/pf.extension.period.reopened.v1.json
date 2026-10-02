@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.period.reopened/v1",
+  "title": "pf.extension.period.reopened — payload",
+  "description": "KN v7.7 FN-TI-02.04: mở lại kỳ đã chốt cho xã/biểu (sự kiện bù) kèm lý do và hạn mở; dispatch_changed = báo cáo Chi cục của kỳ đã gửi → cảnh báo 'số liệu đã thay đổi'.",
+  "x-event-type": "pf.extension.period.reopened",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": [
+    "period_id",
+    "batch_id",
+    "label",
+    "communes",
+    "form_codes",
+    "reason",
+    "reopen_until",
+    "recipient_refs",
+    "dispatch_changed",
+    "actor_ref",
+    "event_time"
+  ],
+  "properties": {
+    "period_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "batch_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "label": {
+      "type": "string"
+    },
+    "communes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "form_codes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reason": {
+      "type": "string"
+    },
+    "reopen_until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "recipient_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "dispatch_changed": {
+      "type": "boolean"
+    },
+    "actor_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

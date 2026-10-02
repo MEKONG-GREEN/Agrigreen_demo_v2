@@ -535,11 +535,29 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		mrvMod := mrv.New(mrvPool, clk, mrv.Deps{Params: masterdata.New(mdPool, clk).Params()})
 		js = append(js, mrvMod.Jobs(mrv.PendingTenants(out.pools[migrations.PF]), log)...)
 	}
+	if selected(jobs, extension.JobReportCycle) {
+		// KN v7.7 P4 — vòng đời báo cáo (tự chốt kỳ + tổng hợp "Hệ thống", chốt lại sau hạn mở, tự nhắc): cần engine mẫu
+		// (pf/reports), khu vực (pf/party), gán vai trò (pf/accounts) → dựng module pf qua assembly.Build (mỗi module một
+		// vai DB, R-05); tìm tenant bằng ag_outbox_publisher (hai cột của report_period).
+		mods, mpools, err := buildPlatform(ctx, direct)
+		prevClose := closeFn
+		closeFn = func() {
+			for _, p := range mpools {
+				p.Close()
+			}
+			prevClose()
+		}
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		js = append(js, mods.Extension.ReportCycleJobs(extension.ReportCycleTenants(out.pools[migrations.PF]), log)...)
+	}
 	if len(js) == 0 {
 		closeFn()
 		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + extension.JobEscalation + ", " + extension.JobWorkSchedule + ", " +
 			notifyport.JobEmailDigest + ", " + reports.JobSchedules + ", " + mechport.JobAreaFeedCheck + ", " + metricsport.JobMetricsSnapshot +
-			", " + mrvport.JobReviewEscalator + ")")
+			", " + mrvport.JobReviewEscalator + ", " + extension.JobReportCycle + ")")
 	}
 	out.s = &schedule.Scheduler{Clock: clk, Log: log, Jobs: js}
 	return out, closeFn, nil

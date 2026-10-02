@@ -19,6 +19,7 @@ import (
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/dispatch"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -107,6 +108,11 @@ type Service struct {
 	Recipients port.RecipientDirectory // nil → màn lập lịch của quản lý HTX trả 503
 	Mailer     port.Mailer             // nil → bỏ gửi email kèm cảnh báo
 	LinkBase   string                  // URL gốc web-ops: <LinkBase>/reports/exports/<id>
+
+	// KN v7.7 P4 — báo cáo Chi cục (dispatch.go): lần tổng hợp của pf/extension, cờ + bộ chuyển Google Sheet (TẮT mặc định).
+	Consolidations extport.Consolidations
+	GSheet         dispatch.GSheetConfig
+	GSheetPub      dispatch.GSheetPublisher
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

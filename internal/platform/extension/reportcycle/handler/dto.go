@@ -77,20 +77,20 @@ func toBatch(b store.Batch) batchDTO {
 }
 
 type periodDTO struct {
-	ID          uuid.UUID `json:"id"`
-	BatchID     uuid.UUID `json:"batch_id"`
-	Slot        int       `json:"slot"`
-	Label       string    `json:"label"`
-	RangeLabel  string    `json:"range_label"`
-	ISOWeek     *int      `json:"iso_week"`
-	FromDate    string    `json:"from_date"`
-	ToDate      string    `json:"to_date"`
-	DueAt       string    `json:"due_at"`
-	AutoCloseAt string    `json:"auto_close_at"`
-	Status      string    `json:"status"`
-	ClosedAt    *string   `json:"closed_at"`
+	ID          uuid.UUID  `json:"id"`
+	BatchID     uuid.UUID  `json:"batch_id"`
+	Slot        int        `json:"slot"`
+	Label       string     `json:"label"`
+	RangeLabel  string     `json:"range_label"`
+	ISOWeek     *int       `json:"iso_week"`
+	FromDate    string     `json:"from_date"`
+	ToDate      string     `json:"to_date"`
+	DueAt       string     `json:"due_at"`
+	AutoCloseAt string     `json:"auto_close_at"`
+	Status      string     `json:"status"`
+	ClosedAt    *string    `json:"closed_at"`
 	ClosedBy    *uuid.UUID `json:"closed_by"`
-	CloseMode   *string   `json:"close_mode"`
+	CloseMode   *string    `json:"close_mode"`
 }
 
 func toPeriod(p store.Period) periodDTO {
@@ -283,18 +283,18 @@ func toRun(r store.Run, names map[uuid.UUID]string) runDTO {
 }
 
 type changeDTO struct {
-	ID           uuid.UUID  `json:"id"`
-	CommuneCode  string     `json:"commune_code"`
-	RowKey       string     `json:"row_key"`
-	Letter       string     `json:"letter"`
-	Old          *string    `json:"old"`
-	New          *string    `json:"new"`
-	Kind         string     `json:"kind"`
-	SubmissionID *uuid.UUID `json:"submission_id"`
-	ChangedBy    *uuid.UUID `json:"changed_by"`
-	ChangedByDisplay string `json:"changed_by_display"`
-	OnBehalfOf   *uuid.UUID `json:"on_behalf_of"`
-	SubmittedAt  *string    `json:"submitted_at"`
+	ID               uuid.UUID  `json:"id"`
+	CommuneCode      string     `json:"commune_code"`
+	RowKey           string     `json:"row_key"`
+	Letter           string     `json:"letter"`
+	Old              *string    `json:"old"`
+	New              *string    `json:"new"`
+	Kind             string     `json:"kind"`
+	SubmissionID     *uuid.UUID `json:"submission_id"`
+	ChangedBy        *uuid.UUID `json:"changed_by"`
+	ChangedByDisplay string     `json:"changed_by_display"`
+	OnBehalfOf       *uuid.UUID `json:"on_behalf_of"`
+	SubmittedAt      *string    `json:"submitted_at"`
 }
 
 func dec(m app.Metric) any {

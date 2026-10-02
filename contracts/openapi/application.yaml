@@ -3470,6 +3470,836 @@ paths:
   # nhật ký (không PII), hạn mức ngày reports.daily_export_quota (mặc định 50) → 429, vượt reports.export_anomaly_threshold
 
   # → sự kiện pf.reports.export.anomaly. Số liệu CGH lấy từ kết quả cân đối ĐÃ LƯU (FN-10 BR-04), không tính lại.
+  # --- pf/extension: vòng đời báo cáo KN v7.7 (gói P4) ---
+  # Mọi route cần X-AG-Context; vai trong ngữ cảnh: Cấp Tỉnh phát hành/rà soát/chốt/tổng hợp, Cấp Xã nhập, Cấp Quốc gia chỉ xem
+  # (ghi → 403 extension.read_only). Sửa/mở lại/thu hồi là sự kiện bù (RB-1). Admin nhập thay mang on_behalf_of.
+  /v1/extension/report-forms:
+    get:
+      summary: "Mẫu đã gán cho loại báo cáo của phòng ban (Bước 1 phát hành, FN-TI-02.02)"
+      operationId: rcReportForms
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: report_type, in: query, schema: {type: string, enum: [weekly, monthly, seasonal, annual, adhoc]}}
+        - {name: from_date, in: query, schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcFormList"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-batches/preview:
+    post:
+      summary: "Xem trước đợt phát hành: kỳ đã chia, số công việc = biểu × xã × kỳ, xã chưa có cán bộ"
+      description: |
+        Không ghi gì. Quy tắc chia kỳ Q-17 TẠM (tuần thứ Hai–Chủ nhật, nhãn "Tuần n của đợt" hoặc ISO theo tham số
+        extension.report_period_week_numbering); hạn mặc định tuần = Thứ Ba tuần sau 17:00, tháng = ngày 10 tháng sau.
+      operationId: rcPreviewBatch
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: X-AG-Reason, in: header, required: false, description: "Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07)", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RcBatchInput"}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcPreview"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-batches:
+    post:
+      summary: "Phát hành biểu: sinh công việc xã × biểu × kỳ, giá trị Tỉnh giao, thông báo (FN-TI-02.02)"
+      description: |
+        Chỉ mẫu đã gán cho phòng ban của ngữ cảnh; chỉ cán bộ xã phụ trách CÙNG phòng ban nhận công việc. 8.670 công việc
+        sinh bằng một câu lệnh (≪ 2 s — docs/runbooks/kn-report-cycle-load.md). Số kỳ > số khe kỳ của mẫu → 422 extension.period_slots_exceeded.
+      operationId: rcIssueBatch
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: X-AG-Reason, in: header, required: false, description: "Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07)", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RcBatchInput"}
+      responses:
+        "201":
+          description: Đã phát hành
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcIssueResult"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key hoặc không có thay đổi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcIssueResult"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: "Các đợt đã phát hành (cursor)"
+      operationId: rcListBatches
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: province, in: query, schema: {type: string}}
+        - {name: report_type, in: query, schema: {type: string}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcBatchPage"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-batches/{id}:
+    get:
+      summary: "Chi tiết đợt kèm kỳ"
+      operationId: rcGetBatch
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcBatchDetail"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-batches/{id}/log:
+    get:
+      summary: "Nhật ký đợt (khung Log)"
+      operationId: rcBatchLog
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcLogPage"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-batches/{id}/withdraw:
+    post:
+      summary: "Thu hồi đợt chưa có xã nào nộp (sự kiện bù, lý do bắt buộc)"
+      operationId: rcWithdrawBatch
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: X-AG-Reason, in: header, required: false, description: "Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07)", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RcReason"}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcBatch"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-batches/{id}/deadline:
+    post:
+      summary: "Sửa hạn nộp — chỉ áp cho kỳ chưa đến hạn"
+      operationId: rcChangeDeadline
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: X-AG-Reason, in: header, required: false, description: "Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07)", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RcDeadlineChange"}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcDeadlineChanges"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-batches/{id}/provincial-values:
+    get:
+      summary: "Giá trị cột Tỉnh giao (Cấp Xã chỉ xem xã mình)"
+      operationId: rcProvincialValues
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: template_id, in: query, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcProvincialValues"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-batches/{id}/status:
+    get:
+      summary: "Trạng thái nộp thời gian thực theo xã (FN-TI-02.03)"
+      operationId: rcBatchStatus
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: period_id, in: query, schema: {type: string, format: uuid}}
+        - {name: template_id, in: query, schema: {type: string, format: uuid}}
+        - {name: status, in: query, schema: {type: string, enum: [not_started, draft, submitted, overdue, adjustment_requested, confirmed, closed, no_officer]}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcStatusBoard"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-batches/{id}/reminders:
+    post:
+      summary: "Gửi nhắc nhở xã đã chọn / tất cả xã chưa nộp (tới tay < 1 phút)"
+      operationId: rcRemind
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: X-AG-Reason, in: header, required: false, description: "Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07)", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RcRemindInput"}
+      responses:
+        "201":
+          description: Đã nhắc
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcRemindResult"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key hoặc không có thay đổi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcRemindResult"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: "Lịch sử nhắc"
+      operationId: rcReminders
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: period_id, in: query, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcReminderList"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-tasks:
+    get:
+      summary: "Công việc cần làm (FN-XA-03.01) — sắp theo hạn gần nhất; Cấp Tỉnh: công việc của tỉnh"
+      operationId: rcListTasks
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: commune, in: query, schema: {type: string}}
+        - {name: period_type, in: query, schema: {type: string, enum: [week, month, season, year, adhoc]}}
+        - {name: status, in: query, schema: {type: string, enum: [not_started, draft, submitted, overdue, adjustment_requested, confirmed, closed]}}
+        - {name: form_code, in: query, schema: {type: string}}
+        - {name: batch_id, in: query, schema: {type: string, format: uuid}}
+        - {name: period_id, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcTaskList"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-tasks/{id}:
+    get:
+      summary: "Chi tiết công việc để mở màn nhập (layout: phiên bản mẫu, nhãn kỳ, khe kỳ đang mở)"
+      description: |
+        Lưới vẽ bằng GET /v1/reports/forms/{template_id}/versions/{v}/layout?period_label=… với layout.period_labels.
+        carried = giá trị các khe kỳ khác (chỉ xem).
+      operationId: rcGetTask
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcTaskDetail"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-tasks/{id}/submissions:
+    post:
+      summary: "Lưu nháp / Gửi báo cáo — mỗi lần là một phiên bản bất biến (RB-1)"
+      description: |
+        kind=submitted chỉ ghi khi đạt yêu cầu của mẫu (422 extension.submission_invalid kèm issues tại ô); chỉ khe kỳ của công việc
+        được nhập; sau chốt kỳ → 409 extension.period_closed (trừ khi mở lại). Client ngoại tuyến gửi id (UUIDv7): gửi lại cùng id → 200 bản đã có.
+      operationId: rcSubmit
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: X-AG-Reason, in: header, required: false, description: "Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07)", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RcSubmissionInput"}
+      responses:
+        "201":
+          description: Đã ghi phiên bản
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcSubmissionResult"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key hoặc không có thay đổi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcSubmissionResult"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-tasks/{id}/history:
+    get:
+      summary: "Lịch sử sửa (mọi phiên bản)"
+      operationId: rcHistory
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcSubmissionList"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-tasks/{id}/log:
+    get:
+      summary: "Khung Log của công việc"
+      operationId: rcTaskLog
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcLogPage"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-tasks/{id}/adjustment-request:
+    post:
+      summary: "Yêu cầu điều chỉnh (lý do bắt buộc, FN-TI-02.04)"
+      description: |
+        Kỳ đã chốt → 409 extension.adjustment_after_close. Người đã nhập thay bản này → 403 self_approval_forbidden.
+      operationId: rcRequestAdjustment
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: X-AG-Reason, in: header, required: false, description: "Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07)", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RcReason"}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcTaskEnvelope"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-tasks/{id}/confirm:
+    post:
+      summary: "Xác nhận (tùy chọn) bản đã gửi"
+      operationId: rcConfirm
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: X-AG-Reason, in: header, required: false, description: "Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07)", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RcReason"}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcTaskEnvelope"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/kn-periods:
+    get:
+      summary: "Kỳ của đợt đã phát hành trong phạm vi (bộ lọc dashboard/báo cáo)"
+      operationId: rcListPeriods
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: province, in: query, schema: {type: string}}
+        - {name: report_type, in: query, schema: {type: string}}
+        - {name: batch_id, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcPeriodList"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-periods/{id}:
+    get:
+      summary: "Kỳ (khung Chốt kỳ: chốt tự động lúc, đã nộp n/N, các lần tổng hợp)"
+      operationId: rcGetPeriod
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcPeriodView"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-periods/{id}/log:
+    get:
+      summary: "Nhật ký kỳ (chốt, tự chốt, mở lại, chốt lại)"
+      operationId: rcPeriodLog
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcLogPage"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-periods/{id}/close:
+    post:
+      summary: "Chốt kỳ ngay (kỳ đã chốt có xã/biểu mở lại → chốt lại); hệ thống tổng hợp một lần lúc chốt"
+      operationId: rcClosePeriod
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: X-AG-Reason, in: header, required: false, description: "Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07)", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcPeriodView"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-periods/{id}/reopen:
+    post:
+      summary: "Mở lại kỳ đã chốt cho xã/biểu (lý do + thời hạn mở; hết hạn → tự chốt lại)"
+      operationId: rcReopenPeriod
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: X-AG-Reason, in: header, required: false, description: "Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07)", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RcReopenInput"}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcReopenResult"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/consolidations:
+    get:
+      summary: "Báo cáo tổng hợp các xã đúng bố cục mẫu (lần gần nhất hoặc run_id) — FN-TI-02.05, FN-TW-01.02"
+      description: |
+        Dòng xã + dòng Cộng khu vực/Toàn tỉnh (FormEngine.Totals; năng suất = sản lượng/diện tích). changed_cells = ô thay đổi so lần
+        trước (tooltip cũ/người/thời điểm). pending = "Có n thay đổi mới từ m xã". compare=previous_year: dòng Toàn tỉnh cùng kỳ năm trước.
+      operationId: rcGetConsolidation
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: period_id, in: query, schema: {type: string, format: uuid}}
+        - {name: template_id, in: query, schema: {type: string, format: uuid}}
+        - {name: form_code, in: query, schema: {type: string}}
+        - {name: run_id, in: query, schema: {type: string, format: uuid}}
+        - {name: region, in: query, schema: {type: string}}
+        - {name: compare, in: query, schema: {type: string, enum: [previous_year]}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcConsolidationView"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Cập nhật: lấy bản Đã gửi mới nhất từng xã, tổng hợp lại, ghi lần tổng hợp bất biến + nhật ký ô"
+      description: |
+        201 khi có lần mới; 200 "Dữ liệu đã mới nhất" khi không có thay đổi.
+      operationId: rcConsolidate
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: X-AG-Reason, in: header, required: false, description: "Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07)", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RcConsolidateInput"}
+      responses:
+        "201":
+          description: Đã tạo lần tổng hợp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcConsolidateResult"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key hoặc không có thay đổi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcConsolidateResult"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/consolidations/pending-changes:
+    get:
+      summary: "Thay đổi chờ cập nhật"
+      operationId: rcPendingChanges
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: period_id, in: query, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcPending"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/consolidations/runs:
+    get:
+      summary: "Nhật ký cập nhật (mọi lần, không xóa)"
+      operationId: rcRuns
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: period_id, in: query, schema: {type: string, format: uuid}}
+        - {name: template_id, in: query, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcRunList"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/consolidations/{id}/changes:
+    get:
+      summary: "Chi tiết ô thay đổi của một lần (xã, cột Excel, cũ → mới, người sửa, loại)"
+      operationId: rcRunChanges
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 1000}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcChangePage"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/kn-dashboard:
+    get:
+      summary: "Dashboard trồng trọt Tỉnh/TW (chỉ đọc) từ lần tổng hợp gần nhất (FN-TI-02.01, FN-TW-01.01)"
+      description: |
+        Đọc bảng chỉ số dựng sẵn khi Cập nhật (consolidation_metric) — số trùng Báo cáo tổng hợp cùng kỳ; mục tiêu < 5 s.
+        Cấp Quốc gia/Admin bắt buộc province.
+      operationId: rcDashboard
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: province, in: query, schema: {type: string}}
+        - {name: region, in: query, schema: {type: string}}
+        - {name: period_id, in: query, schema: {type: string, format: uuid}}
+        - {name: batch_id, in: query, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcDashboard"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/commune-reports:
+    get:
+      summary: "Báo cáo của xã: danh sách báo cáo theo xã phụ trách (FN-XA-03.07)"
+      operationId: rcCommuneReports
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: commune, in: query, schema: {type: string}}
+        - {name: period_type, in: query, schema: {type: string}}
+        - {name: status, in: query, schema: {type: string}}
+        - {name: form_code, in: query, schema: {type: string}}
+        - {name: batch_id, in: query, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcTaskList"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/commune-reports/stats:
+    get:
+      summary: "Thống kê của xã theo vụ/đợt (từ chính bản đã gửi)"
+      operationId: rcCommuneStats
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: commune, in: query, schema: {type: string}}
+        - {name: batch_id, in: query, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RcCommuneStats"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  # --- pf/reports: báo cáo Chi cục KN v7.7 (FN-TI-02.06) ---
+  /v1/reports/dispatch-recipients:
+    get:
+      summary: "Danh bạ người nhận Chi cục (hộp thư đơn vị, Q-09 tạm; TW thấy địa chỉ đã che)"
+      operationId: dispRecipients
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: province, in: query, schema: {type: string}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/DispRecipientList"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Thêm người nhận / CC"
+      operationId: dispAddRecipient
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: X-AG-Reason, in: header, required: false, description: "Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07)", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/DispRecipientInput"}
+      responses:
+        "201":
+          description: Đã thêm
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/DispRecipient"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key hoặc không có thay đổi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/DispRecipient"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/reports/dispatch-recipients/{id}/deactivate:
+    post:
+      summary: "Ngừng dùng người nhận (lý do bắt buộc)"
+      operationId: dispDeactivateRecipient
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: X-AG-Reason, in: header, required: false, description: "Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07)", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RcReason"}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/DispRecipient"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/reports/dispatches:
+    post:
+      summary: "Xuất file toàn tỉnh của kỳ từ lần tổng hợp gần nhất (Excel theo mẫu, PDF; Google Sheet tắt mặc định — ADR-0026)"
+      description: |
+        Mỗi tệp đi qua điểm kiểm soát DLP (export_audit kind dispatch). Kỳ chưa tổng hợp → 409 reports.dispatch_no_data; gsheet khi
+        cờ tắt → 409 reports.gsheet_disabled. Kỳ chưa chốt/còn xã chưa nộp → tệp ghi "Tạm tính" + danh sách xã chưa nộp.
+      operationId: dispCreate
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: X-AG-Reason, in: header, required: false, description: "Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07)", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/DispCreateInput"}
+      responses:
+        "201":
+          description: Đã xuất
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/DispView"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key hoặc không có thay đổi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/DispView"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: "Lịch sử xuất/gửi"
+      operationId: dispList
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: province, in: query, schema: {type: string}}
+        - {name: period_id, in: query, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/DispPage"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/reports/dispatches/{id}:
+    get:
+      summary: "Lần xuất/gửi kèm tệp và log"
+      operationId: dispGet
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/DispView"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/reports/dispatches/{id}/send:
+    post:
+      summary: "Gửi email (worker SMTP, đính kèm; vượt giới hạn → chỉ liên kết); gửi lại khi Gửi lỗi"
+      description: |
+        Không chọn người nhận → người nhận mặc định (lần trước). 202; kết quả sent/failed xem ở GET /dispatches/{id}.
+      operationId: dispSend
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: X-AG-Reason, in: header, required: false, description: "Lý do (bắt buộc ở chế độ hỗ trợ Admin, FN-AD-04.07)", schema: {type: string}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/DispSendInput"}
+      responses:
+        "202":
+          description: Đã xếp gửi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/DispView"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/reports/dispatches/{id}/files/{file}/download:
+    get:
+      summary: "URL tải tệp (chỉ tải, không gửi) — qua điểm kiểm soát"
+      operationId: dispDownload
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: file, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/DispDownload"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/reports/templates:
     get:
       summary: Mẫu báo cáo đang dùng mà vai của người gọi được xuất (mẫu hệ thống = phiên bản 0)
@@ -9055,4 +9885,596 @@ components:
               reason: {type: [string, "null"]}
               responded_at: {type: string, format: date-time}
               supersedes_response_id: {type: [string, "null"], format: uuid}
+    # --- pf/extension: vòng đời báo cáo KN v7.7 (P4) ---
+    RcFormList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {type: object, additionalProperties: true}}
+    RcBatchInput:
+      type: object
+      required: [report_type, template_ids, scope, from_date, to_date, season_label]
+      properties:
+        report_type: {type: string, enum: [weekly, monthly, seasonal, annual, adhoc]}
+        template_ids: {type: array, items: {type: string, format: uuid}}
+        scope: {type: object, required: [mode], properties: {mode: {type: string, enum: [province, regions, communes]}, regions: {type: array, items: {type: string}}, communes: {type: array, items: {type: string}}}}
+        period_type: {type: string, enum: [week, month, season, year, adhoc]}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+        season_label: {type: string}
+        deadline: {type: object, properties: {offset_days: {type: integer, minimum: 0, maximum: 60}, time: {type: string, pattern: "^\\d{2}:\\d{2}$"}}}
+        close_after_days: {type: integer, minimum: 0, maximum: 60}
+        note: {type: string}
+        provincial_values: {type: object, description: "template_id → mã xã → chữ cái cột Tỉnh giao → giá trị", additionalProperties: {type: object, additionalProperties: {type: object, additionalProperties: {type: string}}}}
+        provincial_source: {type: string, enum: [manual, excel]}
+        copy_provincial_from_previous: {type: array, items: {type: string, format: uuid}}
+    RcPreview:
+      type: object
+      required: [report_type, period_type, period_rule, deadline, close_after_days, forms, periods, communes, communes_without_officer, provincial_columns, form_count, commune_count, period_count, task_count, warnings]
+      properties:
+        report_type: {type: string}
+        period_type: {type: string}
+        period_rule: {type: string}
+        deadline: {type: object, additionalProperties: true}
+        close_after_days: {type: integer}
+        forms: {type: array, items: {type: object, additionalProperties: true}}
+        periods: {type: array, items: {type: object, additionalProperties: true}}
+        communes: {type: array, items: {type: object, additionalProperties: true}}
+        communes_without_officer: {type: array, items: {type: string}}
+        provincial_columns: {type: array, items: {type: object, additionalProperties: true}}
+        form_count: {type: integer}
+        commune_count: {type: integer}
+        period_count: {type: integer}
+        task_count: {type: integer}
+        warnings: {type: array, items: {type: string}}
+    RcBatchForm:
+      type: object
+      required: [template_id, version_id, code, name, version, period_block]
+      properties:
+        template_id: {type: string, format: uuid}
+        version_id: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        version: {type: integer}
+        period_block: {type: boolean}
+    RcBatch:
+      type: object
+      required: [id, department_code, province_code, report_type, period_type, season_label, from_date, to_date, period_rule, deadline_offset_days, deadline_time, close_after_days, note, forms, communes, status, period_count, task_count, issued_by, issued_at, withdrawn_by, withdrawn_at, withdraw_reason, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        department_code: {type: string}
+        province_code: {type: string}
+        report_type: {type: string}
+        period_type: {type: string}
+        season_label: {type: string}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+        period_rule: {type: string}
+        deadline_offset_days: {type: integer}
+        deadline_time: {type: string}
+        close_after_days: {type: integer}
+        note: {type: [string, "null"]}
+        forms: {type: array, items: {$ref: "#/components/schemas/RcBatchForm"}}
+        communes: {type: array, items: {type: string}}
+        status: {type: string, enum: [issued, withdrawn]}
+        period_count: {type: integer}
+        task_count: {type: integer}
+        issued_by: {type: string, format: uuid}
+        issued_at: {type: string, format: date-time}
+        withdrawn_by: {type: [string, "null"], format: uuid}
+        withdrawn_at: {type: [string, "null"], format: date-time}
+        withdraw_reason: {type: [string, "null"]}
+        updated_at: {type: string, format: date-time}
+    RcPeriod:
+      type: object
+      required: [id, batch_id, slot, label, range_label, iso_week, from_date, to_date, due_at, auto_close_at, status, closed_at, closed_by, close_mode]
+      properties:
+        id: {type: string, format: uuid}
+        batch_id: {type: string, format: uuid}
+        slot: {type: integer}
+        label: {type: string}
+        range_label: {type: string}
+        iso_week: {type: [integer, "null"]}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+        due_at: {type: string, format: date-time}
+        auto_close_at: {type: string, format: date-time}
+        status: {type: string, enum: [open, closed]}
+        closed_at: {type: [string, "null"], format: date-time}
+        closed_by: {type: [string, "null"], format: uuid}
+        close_mode: {type: [string, "null"], enum: [manual, auto, null]}
+    RcIssueResult:
+      type: object
+      required: [batch, periods, warnings, communes_without_officer]
+      properties:
+        batch: {$ref: "#/components/schemas/RcBatch"}
+        periods: {type: array, items: {$ref: "#/components/schemas/RcPeriod"}}
+        warnings: {type: array, items: {type: string}}
+        communes_without_officer: {type: array, items: {type: string}}
+    RcBatchPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/RcBatch"}}
+        next_cursor: {type: [string, "null"]}
+    RcBatchDetail:
+      type: object
+      required: [batch, periods]
+      properties:
+        batch: {$ref: "#/components/schemas/RcBatch"}
+        periods: {type: array, items: {$ref: "#/components/schemas/RcPeriod"}}
+    RcLogEntry:
+      type: object
+      required: [event, actor_ref, actor_display, at, changes, reason, on_behalf_of]
+      properties:
+        event: {type: string}
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: string}
+        at: {type: string, format: date-time}
+        changes: {type: array, items: {type: object, additionalProperties: true}}
+        reason: {type: [string, "null"]}
+        on_behalf_of: {type: [string, "null"], format: uuid}
+        detail: {description: "chi tiết sự kiện (tùy loại)"}
+    RcLogPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/RcLogEntry"}}
+        next_cursor: {type: [string, "null"]}
+    RcReason:
+      type: object
+      properties:
+        reason: {type: string}
+        note: {type: string}
+    RcDeadlineChange:
+      type: object
+      required: [reason]
+      properties:
+        period_ids: {type: array, items: {type: string, format: uuid}}
+        due_at: {type: string, format: date-time}
+        deadline: {type: object, properties: {offset_days: {type: integer}, time: {type: string}}}
+        close_after_days: {type: integer}
+        reason: {type: string}
+    RcDeadlineChanges:
+      type: object
+      required: [changes]
+      properties:
+        changes: {type: array, items: {type: object, additionalProperties: true}}
+    RcProvincialValues:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {type: object, required: [template_id, commune_code, cells], properties: {template_id: {type: string, format: uuid}, commune_code: {type: string}, cells: {type: object, additionalProperties: {type: string}}}}}
+    RcTask:
+      type: object
+      required: [id, batch_id, period_id, template_id, version_id, form_code, department_code, province_code, commune_code, region_code, slot, period_block, period_label, period_range, due_at, status, status_label, stored_status, open, assignees, latest_version, submitted_at, submitted_by, on_behalf_of, adjustment_reason, confirmed_at, last_reminded_at, reopened_until, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        batch_id: {type: string, format: uuid}
+        period_id: {type: string, format: uuid}
+        template_id: {type: string, format: uuid}
+        version_id: {type: string, format: uuid}
+        form_code: {type: string}
+        department_code: {type: string}
+        province_code: {type: string}
+        commune_code: {type: string}
+        region_code: {type: string}
+        slot: {type: integer}
+        period_block: {type: boolean}
+        period_label: {type: string}
+        period_range: {type: string}
+        due_at: {type: string, format: date-time}
+        status: {type: string, enum: [not_started, draft, submitted, overdue, adjustment_requested, confirmed, closed]}
+        status_label: {type: string}
+        stored_status: {type: string, enum: [not_started, draft, submitted, adjustment_requested, confirmed]}
+        open: {type: boolean}
+        assignees: {type: array, items: {type: string, format: uuid}}
+        latest_version: {type: integer}
+        submitted_at: {type: [string, "null"], format: date-time}
+        submitted_by: {type: [string, "null"], format: uuid}
+        on_behalf_of: {type: [string, "null"], format: uuid}
+        adjustment_reason: {type: [string, "null"]}
+        confirmed_at: {type: [string, "null"], format: date-time}
+        last_reminded_at: {type: [string, "null"], format: date-time}
+        reopened_until: {type: [string, "null"], format: date-time}
+        updated_at: {type: string, format: date-time}
+    RcReminder:
+      type: object
+      required: [id, batch_id, period_id, template_id, mode, message, communes, task_ids, recipient_count, actor_ref, actor_display, at]
+      properties:
+        id: {type: string, format: uuid}
+        batch_id: {type: string, format: uuid}
+        period_id: {type: string, format: uuid}
+        template_id: {type: [string, "null"], format: uuid}
+        mode: {type: string, enum: [manual, auto_before, auto_overdue]}
+        message: {type: string}
+        communes: {type: array, items: {type: string}}
+        task_ids: {type: array, items: {type: string, format: uuid}}
+        recipient_count: {type: integer}
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: string}
+        at: {type: string, format: date-time}
+    RcTaskList:
+      type: object
+      required: [items, counts, last_reminder]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/RcTask"}}
+        counts: {type: object, required: [todo, overdue, adjustment_requested], properties: {todo: {type: integer}, overdue: {type: integer}, adjustment_requested: {type: integer}}}
+        last_reminder: {oneOf: [{$ref: "#/components/schemas/RcReminder"}, {type: "null"}]}
+    RcCellIssue:
+      type: object
+      required: [row_key, code, message, severity]
+      properties:
+        row_key: {type: string}
+        letter: {type: string}
+        code: {type: string}
+        message: {type: string}
+        severity: {type: string, enum: [error, warning]}
+        rule_id: {type: string}
+    RcSubRow:
+      type: object
+      required: [key, input, cells]
+      properties:
+        key: {type: string}
+        indicator: {type: string}
+        input: {type: object, additionalProperties: {type: string}}
+        cells: {type: object, additionalProperties: {type: string}}
+    RcSubmission:
+      type: object
+      required: [id, task_id, version_no, form_version_id, kind, rows, issues, adjustment_response, previous_id, on_behalf_of, event_time, recorded_at, actor_ref]
+      properties:
+        id: {type: string, format: uuid}
+        task_id: {type: string, format: uuid}
+        version_no: {type: integer}
+        form_version_id: {type: string, format: uuid}
+        kind: {type: string, enum: [draft, submitted]}
+        rows: {type: array, items: {$ref: "#/components/schemas/RcSubRow"}}
+        issues: {type: array, items: {$ref: "#/components/schemas/RcCellIssue"}}
+        adjustment_response: {type: boolean}
+        previous_id: {type: [string, "null"], format: uuid}
+        on_behalf_of: {type: [string, "null"], format: uuid}
+        support_session_id: {type: [string, "null"], format: uuid}
+        support_reason: {type: [string, "null"]}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: string}
+    RcTaskDetail:
+      type: object
+      required: [task, batch, period, form_name, layout, provincial_values, carried, latest, latest_submitted]
+      properties:
+        task: {$ref: "#/components/schemas/RcTask"}
+        batch: {$ref: "#/components/schemas/RcBatch"}
+        period: {$ref: "#/components/schemas/RcPeriod"}
+        form_name: {type: string}
+        layout: {type: object, required: [template_id, version_id, period_labels, season, open_slots], properties: {template_id: {type: string, format: uuid}, version_id: {type: string, format: uuid}, period_labels: {type: array, items: {type: string}}, season: {type: string}, open_slots: {type: array, items: {type: integer}}}}
+        provincial_values: {type: object, additionalProperties: {type: string}}
+        carried: {type: object, description: "khóa dòng → chữ cái → giá trị của khe kỳ khác", additionalProperties: {type: object, additionalProperties: {type: string}}}
+        latest: {oneOf: [{$ref: "#/components/schemas/RcSubmission"}, {type: "null"}]}
+        latest_submitted: {oneOf: [{$ref: "#/components/schemas/RcSubmission"}, {type: "null"}]}
+    RcSubmissionInput:
+      type: object
+      required: [kind, rows]
+      properties:
+        id: {type: string, format: uuid, description: "UUIDv7 do client ngoại tuyến sinh"}
+        kind: {type: string, enum: [draft, submitted]}
+        rows: {type: array, minItems: 1, maxItems: 500, items: {type: object, required: [input], properties: {indicator: {type: string}, input: {type: object, additionalProperties: {type: string}}}}}
+        event_time: {type: string, format: date-time}
+        device_id: {type: string}
+    RcSubmissionResult:
+      type: object
+      required: [submission, task, issues]
+      properties:
+        submission: {$ref: "#/components/schemas/RcSubmission"}
+        task: {$ref: "#/components/schemas/RcTask"}
+        issues: {type: array, items: {$ref: "#/components/schemas/RcCellIssue"}}
+    RcSubmissionList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/RcSubmission"}}
+    RcTaskEnvelope:
+      type: object
+      required: [task]
+      properties:
+        task: {$ref: "#/components/schemas/RcTask"}
+    RcStatusBoard:
+      type: object
+      required: [period, counts, items]
+      properties:
+        period: {$ref: "#/components/schemas/RcPeriod"}
+        counts: {type: object, additionalProperties: {type: integer}}
+        items: {type: array, items: {type: object, additionalProperties: true}}
+    RcRemindInput:
+      type: object
+      required: [period_id, message]
+      properties:
+        period_id: {type: string, format: uuid}
+        template_id: {type: [string, "null"], format: uuid}
+        communes: {type: array, items: {type: string}}
+        all_pending: {type: boolean}
+        message: {type: string}
+    RcRemindResult:
+      type: object
+      required: [reminder, skipped_no_officer, skipped_done]
+      properties:
+        reminder: {$ref: "#/components/schemas/RcReminder"}
+        skipped_no_officer: {type: array, items: {type: string}}
+        skipped_done: {type: array, items: {type: string}}
+    RcReminderList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/RcReminder"}}
+    RcPeriodList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/RcPeriod"}}
+    RcRun:
+      type: object
+      required: [id, run_no, period_id, template_id, version_id, form_code, trigger, actor_ref, actor_display, on_behalf_of, at, communes_total, communes_with_data, communes_changed, cells_changed, provisional, missing_communes, regions, previous_run_id]
+      properties:
+        id: {type: string, format: uuid}
+        run_no: {type: integer}
+        period_id: {type: string, format: uuid}
+        template_id: {type: string, format: uuid}
+        version_id: {type: string, format: uuid}
+        form_code: {type: string}
+        trigger: {type: string, enum: [manual, system]}
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: string}
+        on_behalf_of: {type: [string, "null"], format: uuid}
+        at: {type: string, format: date-time}
+        communes_total: {type: integer}
+        communes_with_data: {type: integer}
+        communes_changed: {type: integer}
+        cells_changed: {type: integer}
+        provisional: {type: boolean}
+        missing_communes: {type: array, items: {type: string}}
+        regions: {type: array, items: {type: object, additionalProperties: true}}
+        previous_run_id: {type: [string, "null"], format: uuid}
+    RcPeriodView:
+      type: object
+      required: [period, batch, submitted, total, reopened, runs]
+      properties:
+        period: {$ref: "#/components/schemas/RcPeriod"}
+        batch: {$ref: "#/components/schemas/RcBatch"}
+        submitted: {type: integer}
+        total: {type: integer}
+        reopened: {type: integer}
+        runs: {type: array, items: {$ref: "#/components/schemas/RcRun"}}
+    RcReopenInput:
+      type: object
+      required: [reason, until]
+      properties:
+        communes: {type: array, items: {type: string}}
+        template_ids: {type: array, items: {type: string, format: uuid}}
+        reason: {type: string}
+        until: {type: string, format: date-time}
+    RcReopenResult:
+      type: object
+      required: [period, batch, submitted, total, reopened, runs, task_ids, dispatch_changed]
+      properties:
+        period: {$ref: "#/components/schemas/RcPeriod"}
+        batch: {$ref: "#/components/schemas/RcBatch"}
+        submitted: {type: integer}
+        total: {type: integer}
+        reopened: {type: integer}
+        runs: {type: array, items: {$ref: "#/components/schemas/RcRun"}}
+        task_ids: {type: array, items: {type: string, format: uuid}}
+        dispatch_changed: {type: boolean, description: "kỳ đã gửi Chi cục → cảnh báo số liệu đã thay đổi"}
+    RcGridRow:
+      type: object
+      required: [key, commune, cells]
+      properties:
+        key: {type: string}
+        commune: {type: string}
+        commune_name: {type: string}
+        region: {type: string}
+        region_name: {type: string}
+        indicator: {type: string}
+        cells: {type: object, additionalProperties: {type: string}}
+    RcGridTotal:
+      type: object
+      required: [key, kind, members, cells]
+      properties:
+        key: {type: string}
+        kind: {type: string, enum: [region, province]}
+        region: {type: string}
+        region_name: {type: string}
+        indicator: {type: string}
+        members: {type: integer}
+        cells: {type: object, additionalProperties: {type: string}}
+    RcPending:
+      type: object
+      required: [changes, communes, items]
+      properties:
+        changes: {type: integer}
+        communes: {type: integer}
+        items: {type: array, items: {type: object, additionalProperties: true}}
+    RcConsolidationView:
+      type: object
+      required: [period, batch, form_name, run, status_label, read_only, rows, totals, missing, changed_cells, pending, compare]
+      properties:
+        period: {$ref: "#/components/schemas/RcPeriod"}
+        batch: {$ref: "#/components/schemas/RcBatch"}
+        form_name: {type: string}
+        run: {$ref: "#/components/schemas/RcRun"}
+        status_label: {type: string, enum: [Tạm tính, Đã chốt]}
+        read_only: {type: boolean}
+        rows: {type: array, items: {$ref: "#/components/schemas/RcGridRow"}}
+        totals: {type: array, items: {$ref: "#/components/schemas/RcGridTotal"}}
+        missing: {type: array, items: {type: object, additionalProperties: true}}
+        changed_cells: {type: array, items: {type: object, additionalProperties: true}}
+        pending: {$ref: "#/components/schemas/RcPending"}
+        compare: {type: [object, "null"], additionalProperties: true}
+    RcConsolidateInput:
+      type: object
+      required: [period_id]
+      properties:
+        period_id: {type: string, format: uuid}
+        template_ids: {type: array, items: {type: string, format: uuid}}
+    RcConsolidateResult:
+      type: object
+      required: [runs, up_to_date, message]
+      properties:
+        runs: {type: array, items: {$ref: "#/components/schemas/RcRun"}}
+        up_to_date: {type: array, items: {type: string}}
+        message: {type: string}
+    RcRunList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/RcRun"}}
+    RcChange:
+      type: object
+      required: [id, commune_code, row_key, letter, old, new, kind, submission_id, changed_by, changed_by_display, on_behalf_of, submitted_at]
+      properties:
+        id: {type: string, format: uuid}
+        commune_code: {type: string}
+        row_key: {type: string}
+        letter: {type: string}
+        old: {type: [string, "null"]}
+        new: {type: [string, "null"]}
+        kind: {type: string, enum: [new, resubmit, adjusted, computed]}
+        submission_id: {type: [string, "null"], format: uuid}
+        changed_by: {type: [string, "null"], format: uuid}
+        changed_by_display: {type: string}
+        on_behalf_of: {type: [string, "null"], format: uuid}
+        submitted_at: {type: [string, "null"], format: date-time}
+    RcChangePage:
+      type: object
+      required: [run, items, next_cursor]
+      properties:
+        run: {$ref: "#/components/schemas/RcRun"}
+        items: {type: array, items: {$ref: "#/components/schemas/RcChange"}}
+        next_cursor: {type: [string, "null"]}
+    RcMetric:
+      type: object
+      required: [value, as_of]
+      properties:
+        value: {type: [string, "null"], description: "decimal dạng chuỗi"}
+        as_of: {type: [string, "null"], format: date-time}
+    RcDashboard:
+      type: object
+      required: [province, region, period, batch, periods, updated_at, empty, cards, sown_by_week, tra, sown_by_region, pests_top, unsubmitted, by_commune, alerts, region_names, versions, read_only]
+      properties:
+        province: {type: string}
+        region: {type: string}
+        period: {oneOf: [{$ref: "#/components/schemas/RcPeriod"}, {type: "null"}]}
+        batch: {oneOf: [{$ref: "#/components/schemas/RcBatch"}, {type: "null"}]}
+        periods: {type: array, items: {$ref: "#/components/schemas/RcPeriod"}}
+        updated_at: {type: [string, "null"], format: date-time}
+        empty: {type: boolean}
+        cards: {type: object, description: "sown_area, sown_plan, sown_pct, harvest_area, harvest_output, harvest_yield, veg_*, pest_area, pest_severe, fruit_area: RcMetric; submitted: {communes_submitted, communes_total}", additionalProperties: true}
+        sown_by_week: {type: array, items: {type: object, additionalProperties: true}}
+        tra: {type: array, items: {type: object, additionalProperties: true}}
+        sown_by_region: {type: array, items: {type: object, additionalProperties: true}}
+        pests_top: {type: array, items: {type: object, additionalProperties: true}}
+        unsubmitted: {type: array, items: {type: object, additionalProperties: true}}
+        by_commune: {type: array, items: {type: object, additionalProperties: true}}
+        alerts: {type: array, items: {type: object, required: [level, code, message], properties: {level: {type: string, enum: [urgent, warning, info]}, code: {type: string}, message: {type: string}}}}
+        region_names: {type: object, additionalProperties: {type: string}}
+        versions: {type: object, additionalProperties: {type: string}}
+        read_only: {type: boolean}
+    RcCommuneStats:
+      type: object
+      required: [commune_code, batch, sown_area, sown_plan, sown_pct, pest_area, tasks_total, tasks_submitted, tasks_due, tasks_on_time]
+      properties:
+        commune_code: {type: string}
+        batch: {oneOf: [{$ref: "#/components/schemas/RcBatch"}, {type: "null"}]}
+        sown_area: {$ref: "#/components/schemas/RcMetric"}
+        sown_plan: {$ref: "#/components/schemas/RcMetric"}
+        sown_pct: {$ref: "#/components/schemas/RcMetric"}
+        pest_area: {$ref: "#/components/schemas/RcMetric"}
+        tasks_total: {type: integer}
+        tasks_submitted: {type: integer}
+        tasks_due: {type: integer}
+        tasks_on_time: {type: integer}
+    # --- pf/reports: báo cáo Chi cục (P4) ---
+    DispRecipient:
+      type: object
+      required: [id, label, address, masked, kind, is_default, active, last_used_at]
+      properties:
+        id: {type: string, format: uuid}
+        label: {type: string}
+        address: {type: [string, "null"]}
+        masked: {type: boolean}
+        kind: {type: string, enum: [to, cc]}
+        is_default: {type: boolean}
+        active: {type: boolean}
+        last_used_at: {type: [string, "null"], format: date-time}
+    DispRecipientList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/DispRecipient"}}
+    DispRecipientInput:
+      type: object
+      required: [label, address, kind]
+      properties:
+        label: {type: string}
+        address: {type: string, format: email}
+        kind: {type: string, enum: [to, cc]}
+        is_default: {type: boolean}
+    DispCreateInput:
+      type: object
+      required: [period_id]
+      properties:
+        period_id: {type: string, format: uuid}
+        form_codes: {type: array, items: {type: string}}
+        formats: {type: array, items: {type: string, enum: [xlsx, pdf, gsheet]}}
+    DispSendInput:
+      type: object
+      properties:
+        recipient_ids: {type: array, items: {type: string, format: uuid}}
+        cc_ids: {type: array, items: {type: string, format: uuid}}
+        subject: {type: string}
+        body: {type: string}
+    Dispatch:
+      type: object
+      required: [id, department_code, province_code, period_id, period_label, run_ids, forms, formats, provisional, missing_communes, status, recipient_ids, cc_ids, subject, body, link_only, attempts, last_error, sent_at, created_by, created_at, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        department_code: {type: string}
+        province_code: {type: string}
+        period_id: {type: string, format: uuid}
+        period_label: {type: string}
+        run_ids: {type: array, items: {type: string, format: uuid}}
+        forms: {type: array, items: {type: string}}
+        formats: {type: array, items: {type: string}}
+        provisional: {type: boolean}
+        missing_communes: {type: array, items: {type: string}}
+        status: {type: string, enum: [exported, sending, sent, failed]}
+        recipient_ids: {type: array, items: {type: string, format: uuid}}
+        cc_ids: {type: array, items: {type: string, format: uuid}}
+        subject: {type: [string, "null"]}
+        body: {type: [string, "null"]}
+        link_only: {type: boolean}
+        attempts: {type: integer}
+        last_error: {type: [string, "null"]}
+        sent_at: {type: [string, "null"], format: date-time}
+        created_by: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    DispView:
+      type: object
+      required: [dispatch, files, log]
+      properties:
+        dispatch: {$ref: "#/components/schemas/Dispatch"}
+        files: {type: array, items: {type: object, required: [id, format, form_code, file_name, sha256, size_bytes, created_at], properties: {id: {type: string, format: uuid}, format: {type: string, enum: [xlsx, pdf]}, form_code: {type: string}, file_name: {type: string}, sha256: {type: string}, size_bytes: {type: integer}, created_at: {type: string, format: date-time}}}}
+        log: {type: array, items: {type: object, additionalProperties: true}}
+    DispPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/Dispatch"}}
+        next_cursor: {type: [string, "null"]}
+    DispDownload:
+      type: object
+      required: [url, expires_in_seconds]
+      properties:
+        url: {type: string}
+        expires_in_seconds: {type: integer}
     # --- hết bề mặt đối tác ---

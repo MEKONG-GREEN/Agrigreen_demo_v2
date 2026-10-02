@@ -412,18 +412,18 @@ type CellMark struct {
 
 // ConsolidationView là bảng "Báo cáo tổng hợp các xã" của một lần chạy.
 type ConsolidationView struct {
-	Period          store.Period
-	Batch           store.Batch
-	Run             store.Run
-	Rows            []SnapRow
-	Totals          []SnapTotal
-	Missing         []store.RegionRef
-	Marks           []CellMark
-	Pending         PendingSummary
-	Names           map[uuid.UUID]string
-	FormName        string
-	Compare         *SnapTotal // "So sánh cùng kỳ năm trước" (dòng Toàn tỉnh)
-	CompareLabel    string
+	Period       store.Period
+	Batch        store.Batch
+	Run          store.Run
+	Rows         []SnapRow
+	Totals       []SnapTotal
+	Missing      []store.RegionRef
+	Marks        []CellMark
+	Pending      PendingSummary
+	Names        map[uuid.UUID]string
+	FormName     string
+	Compare      *SnapTotal // "So sánh cùng kỳ năm trước" (dòng Toàn tỉnh)
+	CompareLabel string
 }
 
 // GetConsolidation trả bảng tổng hợp theo mẫu (Cấp Tỉnh; Cấp Quốc gia chỉ xem — FN-TW-01.02).

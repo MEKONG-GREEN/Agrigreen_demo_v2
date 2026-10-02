@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.report_batch.issued/v1",
+  "title": "pf.extension.report_batch.issued — payload",
+  "description": "KN v7.7 FN-TI-02.02: đợt phát hành đã sinh công việc xã × biểu × kỳ cho cán bộ xã phụ trách cùng phòng ban. Consumer pf/notify báo 'có công việc mới' (một thông báo mỗi cán bộ). Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.extension.report_batch.issued",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": [
+    "batch_id",
+    "department_code",
+    "province_code",
+    "report_type",
+    "season_label",
+    "form_codes",
+    "period_count",
+    "task_count",
+    "first_due_at",
+    "assignees",
+    "issued_by",
+    "event_time"
+  ],
+  "properties": {
+    "batch_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "department_code": {
+      "type": "string"
+    },
+    "province_code": {
+      "type": "string"
+    },
+    "report_type": {
+      "type": "string",
+      "enum": [
+        "weekly",
+        "monthly",
+        "seasonal",
+        "annual",
+        "adhoc"
+      ]
+    },
+    "season_label": {
+      "type": "string"
+    },
+    "form_codes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "period_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "task_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "first_due_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "assignees": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "commune_code",
+          "officer_refs",
+          "task_count"
+        ],
+        "properties": {
+          "commune_code": {
+            "type": "string"
+          },
+          "officer_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "task_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "issued_by": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
