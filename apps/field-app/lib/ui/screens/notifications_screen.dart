@@ -113,7 +113,9 @@ class _InboxTile extends ConsumerWidget {
         ref.invalidate(inboxProvider);
         ref.invalidate(homeSummaryProvider);
         unawaitedSync(ref);
-        if (context.mounted) await openDeepLink(context, item.deepLink);
+        if (context.mounted) {
+          await openDeepLink(context, item.deepLink, kind: item.kind);
+        }
       },
     );
   }

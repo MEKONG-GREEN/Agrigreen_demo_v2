@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.work_schedule.reminded/v1",
+  "title": "pf.extension.work_schedule.reminded — payload",
+  "description": "Nhắc lịch công tác tuần do job extension_work_schedule phát (KN v7.7 FN-XA-03.08, FN-TI-02.07): submit_due = nhắc cán bộ chưa gửi lịch trước hạn đăng ký; review_overdue = nhắc người duyệt khi còn lịch chờ duyệt quá hạn duyệt. Một lần mỗi (loại, tuần, phòng ban, tỉnh). Không chứa dữ liệu cá nhân.",
+  "x-event-type": "pf.extension.work_schedule.reminded",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": [
+    "kind",
+    "department_code",
+    "province_code",
+    "week_start",
+    "due_at",
+    "recipient_refs",
+    "pending"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "submit_due",
+        "review_overdue"
+      ]
+    },
+    "department_code": {
+      "type": "string"
+    },
+    "province_code": {
+      "type": "string"
+    },
+    "week_start": {
+      "type": "string",
+      "format": "date"
+    },
+    "due_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "recipient_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "pending": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Số lịch chờ duyệt (review_overdue) hoặc số cán bộ chưa gửi (submit_due)"
+    }
+  }
+}

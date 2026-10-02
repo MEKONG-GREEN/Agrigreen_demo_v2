@@ -1,0 +1,69 @@
+/* Lịch công tác tuần (P5, Hình 12 + Hình 21) — tiền tố ws- để không đụng globals.css. */
+.ws-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; margin-bottom: 14px; }
+.ws-week { display: inline-flex; align-items: center; gap: 4px; }
+.ws-week .fchip { background: var(--primary-50); border-color: var(--primary-line); }
+.ws-week .fchip b { color: var(--slate-900); font-weight: 600; }
+.ws-week-nav { width: 30px; height: 34px; border-radius: 8px; border: 1px solid var(--slate-200); background: #fff; color: var(--slate-600); display: inline-grid; place-items: center; }
+.ws-week-nav:hover:not(:disabled) { background: var(--slate-100); }
+.ws-due { color: var(--slate-600); font-size: 13px; }
+.ws-dirty { color: var(--warning); font-size: 12.5px; font-weight: 600; }
+
+.ws-layout { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 14px; align-items: start; }
+.ws-side { display: flex; flex-direction: column; gap: 14px; }
+@media (max-width: 1100px) { .ws-layout { grid-template-columns: minmax(0, 1fr); } }
+
+.ws-grid-wrap { overflow-x: auto; }
+table.ws-grid { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 760px; }
+.ws-grid th, .ws-grid td { border: 1px solid var(--slate-200); vertical-align: top; padding: 6px; }
+.ws-grid thead th { font-size: 12px; font-weight: 600; color: var(--slate-600); background: var(--slate-50); text-align: center; padding: 8px 6px; }
+.ws-grid tbody th { text-align: left; font-size: 13px; font-weight: 600; width: 80px; background: #fff; }
+.ws-grid.ws-officers tbody th { width: 170px; }
+.ws-grid td { height: 86px; background: #fff; }
+.ws-grid td.ws-cell-add { cursor: pointer; }
+.ws-grid td.ws-cell-add:hover { background: var(--slate-50); }
+.ws-grid tr.ws-row-click { cursor: pointer; }
+.ws-grid tr.ws-row-click:hover td, .ws-grid tr.ws-row-click:hover th { background: var(--slate-50); }
+.ws-grid tr.is-selected th, .ws-grid tr.is-selected td { background: var(--primary-50); }
+.ws-off b { display: block; font-size: 13px; }
+.ws-off a { color: var(--slate-900); text-decoration: none; }
+.ws-off a:hover { text-decoration: underline; }
+.ws-off .ws-communes { display: block; font-size: 11.5px; color: var(--slate-500); font-weight: 400; margin: 1px 0 4px; }
+.ws-off .ws-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.ws-off label { display: inline-flex; gap: 6px; align-items: flex-start; }
+.ws-off input[type="checkbox"] { margin-top: 3px; }
+
+.ws-card { display: block; width: 100%; text-align: left; border: 1px solid var(--primary-line); border-left: 3px solid var(--primary); background: var(--primary-50); border-radius: 6px; padding: 6px 8px; font-size: 12px; line-height: 1.35; color: var(--slate-900); margin-bottom: 6px; }
+.ws-card:last-child { margin-bottom: 0; }
+button.ws-card:hover { filter: brightness(.97); }
+.ws-card.is-conflict { background: var(--warning-bg); border-color: #f5d9a0; border-left-color: var(--chart-orange); color: #6b4000; }
+.ws-card.is-changed { box-shadow: inset 0 0 0 1px var(--info); }
+.ws-card .ws-time { display: block; font-size: 11px; color: var(--slate-600); }
+.ws-card.is-conflict .ws-time { color: #8a5a00; }
+.ws-card .ws-place { display: block; font-size: 11px; color: var(--slate-500); }
+.ws-card .ws-flag { display: inline-block; font-size: 10.5px; font-weight: 600; border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+.ws-flag.f-conflict { background: #fde6bf; color: #7a4a00; }
+.ws-flag.f-changed { background: var(--info-bg); color: var(--info); }
+.ws-card.is-removed { text-decoration: line-through; opacity: .7; background: var(--slate-100); border-left-color: var(--slate-400); border-color: var(--slate-200); }
+.ws-add { display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 24px; color: var(--slate-400); font-size: 16px; border-radius: 6px; }
+.ws-add:hover { color: var(--primary-ink); background: var(--primary-50); }
+.ws-note { font-size: 12.5px; color: var(--slate-500); margin-top: 8px; }
+
+.ws-form { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.ws-form h2 { font-size: 16px; }
+.ws-form .ws-two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ws-form .req::after { content: " *"; color: var(--danger); }
+.ws-form .hint { font-size: 11.5px; color: var(--warning); }
+.ws-form .err { color: var(--red); font-size: 12px; font-weight: 600; }
+.ws-form .ws-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.ws-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 12px; flex-wrap: wrap; }
+.ws-tabs [role="tab"] { padding: 10px 14px; font-weight: 600; color: var(--primary-ink); border-bottom: 3px solid transparent; margin-bottom: -1px; border-radius: 8px 8px 0 0; }
+.ws-tabs [role="tab"][aria-selected="true"] { color: var(--slate-900); background: #fff; border: 1px solid var(--line); border-bottom: 3px solid var(--primary); }
+
+.ws-diff { list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.ws-diff li { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--slate-200); }
+.ws-diff li.d-add { border-color: var(--primary-line); background: var(--primary-50); }
+.ws-diff li.d-mod { border-color: #b3e0f2; background: var(--info-bg); }
+.ws-diff li.d-del { border-color: #f5c2bc; background: var(--danger-bg); }
+.ws-diff .chg { font-size: 12px; color: var(--slate-600); }
+.ws-reason { white-space: pre-wrap; }
