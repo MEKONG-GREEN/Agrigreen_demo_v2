@@ -17,6 +17,7 @@ import { json, problem, type Route } from "./http";
 import { findKnAccount, findKnAccountByIdentifier, KN_DEPARTMENTS, KN_MENU_PROFILE, knPersona, MOCK_KN_PASSWORD, type MockKnAccount } from "./kn-accounts";
 import type { MockPersona } from "./personas";
 import { workSchedulePendingBadge } from "./kn-schedules";
+import { cycleBadges } from "./kn-reports/store";
 
 /** domain.MenuVersion. */
 export const MENU_VERSION = "kn.menu/v2";
@@ -262,20 +263,47 @@ export function knMenuFor(role: KnRole, departmentCode: string | null): MenuTree
 const BADGES: Record<KnRole, Record<string, number>> = {
   kn_tw: {},
   // Lịch chờ duyệt (B.schedules) tính từ sổ lịch giả lập P5 ở handler menu-badges.
-  kn_tinh: { [B.notSubmitted]: 15, [B.reviewPending]: 3, [B.adHocStatus]: 0 },
-  kn_xa: { [B.tasksTodo]: 6, [B.adHocTodo]: 1 },
+  // Số đếm vòng đời báo cáo tính từ sổ giả lập P4 (kn-reports/store.ts cycleBadges).
+  kn_tinh: {},
+  kn_xa: {},
   admin: {},
 };
 
 // --------------------------------------------------------------------------
 // Ngữ cảnh phiên (giữ trong bộ nhớ tab, như mọi trạng thái giả lập khác)
 // --------------------------------------------------------------------------
-interface StoredContext {
+/** Phiên hỗ trợ của Admin (FN-AD-04.07): thay cho ai, vai trò, lý do mở phiên. */
+export interface KnSupportInfo {
+  sessionId: string;
+  /** Tài khoản được hỗ trợ (id tài khoản giả lập) — null: hỗ trợ theo vai trò/xã, không gắn tài khoản. */
+  onBehalfOf: string | null;
+  onBehalfOfName: string | null;
+  reason: string;
+  startedAt: string;
+  endedAt: string | null;
+}
+export interface StoredContext {
   accountId: string;
   assignment: RoleAssignment;
   ctx: SessionContext;
+  support?: KnSupportInfo;
 }
 const CONTEXTS = new Map<string, StoredContext>();
+
+/** Ngữ cảnh đã lưu (backend giả lập P4/FN-AD-04.07 đọc vai trò, phòng ban, xã, phiên hỗ trợ). */
+export function knStoredContext(contextId: string | null | undefined): StoredContext | undefined {
+  return contextId ? CONTEXTS.get(contextId) : undefined;
+}
+
+/** Lưu ngữ cảnh hỗ trợ do POST /v1/accounts/support-sessions tạo (kn-admin.ts). */
+export function registerKnContext(stored: StoredContext): void {
+  CONTEXTS.set(stored.ctx.context_id, stored);
+}
+
+/** Thoát hỗ trợ: ngữ cảnh của phiên hết hiệu lực ngay. */
+export function dropSupportContexts(sessionId: string): void {
+  for (const [id, st] of CONTEXTS) if (st.support?.sessionId === sessionId) CONTEXTS.delete(id);
+}
 
 function accountOf(p: MockPersona): MockKnAccount | undefined {
   return findKnAccount(p.id);
@@ -423,7 +451,7 @@ export const knAppRoutes: Route[] = [
       const contextId = request.headers.get("X-AG-Context") ?? "";
       const stored = CONTEXTS.get(contextId);
       if (!stored) return json({ counts: {} });
-      const counts: Record<string, number> = { ...BADGES[stored.assignment.role] };
+      const counts: Record<string, number> = { ...BADGES[stored.assignment.role], ...cycleBadges(contextId) };
       // Lịch chờ duyệt: tính từ sổ lịch giả lập (P5), không cố định.
       if (stored.assignment.role === "kn_tinh") counts[WORK_SCHEDULE_BADGE] = workSchedulePendingBadge(persona, contextId);
       return json({ counts });
