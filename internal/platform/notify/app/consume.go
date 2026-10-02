@@ -40,6 +40,7 @@ var HandledEvents = []string{
 	contentport.EventDocumentPublished, syncport.EventConflictOpened, syncport.EventDeviceRevoked,
 	partyport.EventOrgDeactivated, partyport.EventHouseholdRegistered, partyport.EventHouseholdMembershipChanged,
 	extport.EventTaskCreated, ccport.EventFarmLogRecorded, ccport.EventFarmLogReviewed, ccport.EventSeasonOpened,
+	extport.EventReportBatchIssued, extport.EventReportTaskReminded, extport.EventSubmissionAdjustmentRequested, extport.EventPeriodReopened,
 	ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived,
 	syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale, mrvport.EventAlertRaised,
 }
@@ -185,6 +186,16 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 		}
 		a := domain.Audience{National: true, Roles: []string{mechport.RoleCGHAdmin}}
 		return s.deliver(ctx, tx, env, []domain.Notification{domain.AreaFeedStaleTemplate(p, env.OccurredAt).ForAudience(a)})
+	case extport.EventReportBatchIssued, extport.EventReportTaskReminded, extport.EventSubmissionAdjustmentRequested, extport.EventPeriodReopened:
+		// KN v7.7 P4: công việc mới, nhắc, yêu cầu điều chỉnh, mở lại kỳ → cán bộ phụ trách (đẩy chỉ dữ liệu, < 1 phút).
+		ns, err := domain.ReportCycleNotifications(env.EventType, env.Payload, env.OccurredAt)
+		if err != nil {
+			return err
+		}
+		if len(ns) == 0 {
+			return nil
+		}
+		return s.deliver(ctx, tx, env, ns)
 	case mrvport.EventAlertRaised:
 		var p mrvport.AlertRaisedV1
 		if err := decode(env, &p); err != nil {

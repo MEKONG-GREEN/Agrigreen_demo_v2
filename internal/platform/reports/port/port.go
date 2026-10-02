@@ -129,12 +129,22 @@ type RecipientDirectory interface {
 	OrgRecipients(ctx context.Context, tenantID, orgRef uuid.UUID) ([]Recipient, error)
 }
 
-// Message là một email gửi đi: không đính kèm (tệp có thể chứa dữ liệu nhạy
-// cảm) — chỉ liên kết tải ngắn hạn.
+// Message là một email gửi đi. Lịch gửi báo cáo (US-DASH-03) KHÔNG đính kèm (tệp có thể chứa dữ liệu nhạy
+// cảm) — chỉ liên kết tải ngắn hạn. Báo cáo Chi cục (KN v7.7 FN-TI-02.06) đính kèm tệp số tổng hợp theo xã (không
+// PII) tới hộp thư đơn vị ngoài hệ thống, có CC.
 type Message struct {
-	To      string `pii:"true"`
-	Subject string
-	Text    string
+	To          string   `pii:"true"`
+	CC          []string `pii:"true"` // đồng gửi (cùng một thư; địa chỉ hiện trong tiêu đề Cc)
+	Subject     string
+	Text        string
+	Attachments []Attachment
+}
+
+// Attachment là một tệp đính kèm.
+type Attachment struct {
+	Name        string // tên tệp (UTF-8, mã hóa RFC 2231 khi gửi)
+	ContentType string
+	Data        []byte
 }
 
 // Mailer gửi email (hiện thực SMTP có TLS: reports.SMTPFromEnv).

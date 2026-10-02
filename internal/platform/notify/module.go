@@ -137,6 +137,8 @@ func (m *Module) Consumers() []Consumer {
 			partyport.EventHouseholdMembershipChanged}, Handler: ev},
 		{Name: port.ConsumerCropCycle, Events: []string{ccport.EventFarmLogRecorded, ccport.EventFarmLogReviewed, ccport.EventSeasonOpened,
 			ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived}, Handler: ev},
+		{Name: port.ConsumerReportCycle, Events: []string{extport.EventReportBatchIssued, extport.EventReportTaskReminded,
+			extport.EventSubmissionAdjustmentRequested, extport.EventPeriodReopened}, Handler: ev},
 		{Name: port.ConsumerIntegration, Events: []string{syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale}, Handler: ev},
 		{Name: port.ConsumerMRV, Events: []string{mrvport.EventAlertRaised}, Handler: ev},
 		{Name: port.ConsumerPush, Events: []string{port.EventPushRequested}, Handler: m.svc.HandlePush},

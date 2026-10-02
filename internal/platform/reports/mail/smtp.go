@@ -1,6 +1,7 @@
 // Package mail là bộ gửi email qua SMTP có TLS bắt buộc cho lịch gửi báo cáo
-// (US-DASH-03). Không gửi đính kèm; mỗi người nhận một email riêng (không lộ
-// địa chỉ của nhau). Không ghi địa chỉ email vào log (R-14).
+// (US-DASH-03: không đính kèm, mỗi người nhận một email riêng — không lộ địa chỉ
+// của nhau) và báo cáo Chi cục KN v7.7 (FN-TI-02.06: đính kèm Excel/PDF số tổng
+// hợp, người nhận + CC là hộp thư đơn vị). Không ghi địa chỉ email vào log (R-14).
 package mail
 
 import (
@@ -94,6 +95,11 @@ func (s *SMTP) Send(ctx context.Context, m port.Message) error {
 	if _, err := mail.ParseAddress(m.To); err != nil {
 		return errors.New("mail: địa chỉ người nhận không hợp lệ")
 	}
+	for _, cc := range m.CC {
+		if _, err := mail.ParseAddress(cc); err != nil {
+			return errors.New("mail: địa chỉ CC không hợp lệ")
+		}
+	}
 	body, err := Compose(s.Cfg.From, m, s.Clock.Now())
 	if err != nil {
 		return err
@@ -142,6 +148,12 @@ func (s *SMTP) Send(ctx context.Context, m port.Message) error {
 	if err := c.Rcpt(to.Address); err != nil {
 		return errors.New("mail: máy chủ từ chối người nhận")
 	}
+	for _, cc := range m.CC {
+		a, _ := mail.ParseAddress(cc)
+		if err := c.Rcpt(a.Address); err != nil {
+			return errors.New("mail: máy chủ từ chối người nhận CC")
+		}
+	}
 	w, err := c.Data()
 	if err != nil {
 		return fmt.Errorf("mail: DATA: %w", err)
@@ -155,10 +167,19 @@ func (s *SMTP) Send(ctx context.Context, m port.Message) error {
 	return c.Quit()
 }
 
-// Compose dựng thông điệp RFC 5322 UTF-8 (tiêu đề mã hóa Q, thân base64), không đính kèm.
+// Compose dựng thông điệp RFC 5322 UTF-8 (tiêu đề mã hóa Q, thân base64). Không đính kèm → một phần text/plain
+// (lịch gửi US-DASH-03); có đính kèm (báo cáo Chi cục FN-TI-02.06) → multipart/mixed, tên tệp mã hóa RFC 2231.
 func Compose(from string, m port.Message, now time.Time) ([]byte, error) {
 	if strings.ContainsAny(m.Subject, "\r\n") || strings.ContainsAny(m.To, "\r\n") {
 		return nil, errors.New("mail: tiêu đề hoặc người nhận chứa ký tự xuống dòng")
+	}
+	for _, cc := range m.CC {
+		if strings.ContainsAny(cc, "\r\n,;") {
+			return nil, errors.New("mail: địa chỉ CC không hợp lệ")
+		}
+	}
+	if len(m.Attachments) > 0 {
+		return composeMixed(from, m, now)
 	}
 	id := make([]byte, 12)
 	if _, err := rand.Read(id); err != nil {
@@ -172,21 +193,69 @@ func Compose(from string, m port.Message, now time.Time) ([]byte, error) {
 	}
 	var b bytes.Buffer
 	hdr := func(k, v string) { b.WriteString(k + ": " + v + "\r\n") }
-	hdr("From", from)
-	hdr("To", m.To)
-	hdr("Subject", mime.QEncoding.Encode("utf-8", m.Subject))
-	hdr("Date", now.In(clock.Zone()).Format(time.RFC1123Z))
-	hdr("Message-ID", "<"+hex.EncodeToString(id)+"@"+domainPart+">")
-	hdr("MIME-Version", "1.0")
+	writeHeaders(&b, from, m, now, hex.EncodeToString(id)+"@"+domainPart)
 	hdr("Content-Type", "text/plain; charset=utf-8")
 	hdr("Content-Transfer-Encoding", "base64")
-	hdr("Auto-Submitted", "auto-generated")
 	b.WriteString("\r\n")
-	enc := base64.StdEncoding.EncodeToString([]byte(m.Text))
+	writeBase64(&b, []byte(m.Text))
+	return b.Bytes(), nil
+}
+
+func writeHeaders(b *bytes.Buffer, from string, m port.Message, now time.Time, msgID string) {
+	hdr := func(k, v string) { b.WriteString(k + ": " + v + "\r\n") }
+	hdr("From", from)
+	hdr("To", m.To)
+	if len(m.CC) > 0 {
+		hdr("Cc", strings.Join(m.CC, ", "))
+	}
+	hdr("Subject", mime.QEncoding.Encode("utf-8", m.Subject))
+	hdr("Date", now.In(clock.Zone()).Format(time.RFC1123Z))
+	hdr("Message-ID", "<"+msgID+">")
+	hdr("MIME-Version", "1.0")
+	hdr("Auto-Submitted", "auto-generated")
+}
+
+func writeBase64(b *bytes.Buffer, data []byte) {
+	enc := base64.StdEncoding.EncodeToString(data)
 	for len(enc) > 76 {
 		b.WriteString(enc[:76] + "\r\n")
 		enc = enc[76:]
 	}
 	b.WriteString(enc + "\r\n")
+}
+
+// composeMixed dựng multipart/mixed: phần thân text/plain + mỗi tệp một phần base64 (Content-Disposition attachment).
+func composeMixed(from string, m port.Message, now time.Time) ([]byte, error) {
+	rnd := make([]byte, 24)
+	if _, err := rand.Read(rnd); err != nil {
+		return nil, err
+	}
+	boundary := "agrigreen-" + hex.EncodeToString(rnd[:12])
+	domainPart := "agrigreen.local"
+	if a, err := mail.ParseAddress(from); err == nil {
+		if i := strings.LastIndex(a.Address, "@"); i >= 0 {
+			domainPart = a.Address[i+1:]
+		}
+	}
+	var b bytes.Buffer
+	writeHeaders(&b, from, m, now, hex.EncodeToString(rnd[12:])+"@"+domainPart)
+	b.WriteString("Content-Type: multipart/mixed; boundary=\"" + boundary + "\"\r\n\r\n")
+	b.WriteString("--" + boundary + "\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n")
+	writeBase64(&b, []byte(m.Text))
+	for _, a := range m.Attachments {
+		if strings.ContainsAny(a.Name, "\r\n\"") || strings.ContainsAny(a.ContentType, "\r\n") || a.Name == "" {
+			return nil, errors.New("mail: tên hoặc kiểu tệp đính kèm không hợp lệ")
+		}
+		ct := a.ContentType
+		if ct == "" {
+			ct = "application/octet-stream"
+		}
+		b.WriteString("--" + boundary + "\r\n")
+		b.WriteString("Content-Type: " + mime.FormatMediaType(ct, map[string]string{"name": a.Name}) + "\r\n")
+		b.WriteString("Content-Transfer-Encoding: base64\r\n")
+		b.WriteString("Content-Disposition: " + mime.FormatMediaType("attachment", map[string]string{"filename": a.Name}) + "\r\n\r\n")
+		writeBase64(&b, a.Data)
+	}
+	b.WriteString("--" + boundary + "--\r\n")
 	return b.Bytes(), nil
 }

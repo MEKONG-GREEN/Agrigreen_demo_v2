@@ -18,6 +18,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
+	rcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/app"
+	rchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/handler"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
@@ -52,6 +54,7 @@ type Deps struct {
 // Module là pf/extension đã nối.
 type Module struct {
 	svc *app.Service
+	rc  *rcapp.Service // KN v7.7 P4: vòng đời báo cáo (extension/reportcycle, module_reportcycle.go)
 }
 
 // New tạo module với pool của vai extension_app.
@@ -59,7 +62,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	return &Module{svc: &app.Service{
 		DB: db, Clock: clk, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
 		Plots: d.Plots, Coops: d.Coops,
-	}}
+	}, rc: &rcapp.Service{DB: db, Clock: clk, Orgs: d.Orgs, Units: d.Units, Params: d.Params}}
 }
 
 // UseContacts nối cổng số điện thoại cán bộ (pf/accounts) sau khi module đó được dựng.
@@ -78,8 +81,11 @@ func (m *Module) GpsLogHandler() inbox.Handler { return m.svc.HandleGpsLog }
 // StaffNames cho module khác tra tên cán bộ trong danh bạ (qua port, G-07/G-09).
 func (m *Module) StaffNames() port.StaffNames { return m.svc }
 
-// RegisterApp gắn route Application API.
-func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterApp(rg) }
+// RegisterApp gắn route Application API (gồm vòng đời báo cáo KN v7.7 — cần header X-AG-Context).
+func (m *Module) RegisterApp(rg *gin.RouterGroup) {
+	handler.Handler{Svc: m.svc}.RegisterApp(rg)
+	rchandler.Handler{Svc: m.rc}.RegisterApp(rg)
+}
 
 // RegisterAdmin: module chưa có route quản trị (tham số SLA đặt qua pf/masterdata).
 func (m *Module) RegisterAdmin(*gin.RouterGroup) {}

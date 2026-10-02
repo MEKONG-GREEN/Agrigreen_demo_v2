@@ -41,6 +41,7 @@ type seen struct {
 	tlsBefore bool // mọi lệnh AUTH/MAIL đều sau khi đã TLS
 	auth      string
 	from, rcp string
+	rcpts     []string // mọi RCPT (người nhận + CC)
 	data      string
 	delivered int
 }
@@ -146,6 +147,7 @@ func (f *fakeSMTP) serve(conn net.Conn, secure bool) {
 			}
 			f.mu.Lock()
 			f.rcp = arg
+			f.rcpts = append(f.rcpts, arg)
 			f.mu.Unlock()
 			reply("250 ok")
 		case "DATA":
