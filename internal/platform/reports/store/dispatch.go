@@ -161,11 +161,13 @@ func InsertDispatch(ctx context.Context, tx pgx.Tx, tid uuid.UUID, d Dispatch) e
 	return err
 }
 
-// DispatchByID đọc (khóa nếu lock) một lần gửi; không có → nil.
+// DispatchByID đọc (khóa nếu lock) một lần gửi; không có → nil. Khóa FOR NO KEY UPDATE: vẫn tuần tự hóa người cập
+// nhật lần gửi, nhưng không chặn giao dịch khác chèn dòng có khóa ngoại tới nó (KEY SHARE) — HandleDispatchRequested
+// giữ khóa này trong giao dịch inbox trong khi ghi liên kết tải ở giao dịch riêng.
 func DispatchByID(ctx context.Context, tx pgx.Tx, id uuid.UUID, lock bool) (*Dispatch, error) {
 	q := "SELECT " + dispCols + " FROM pf_reports.dispatch WHERE id = $1::uuid"
 	if lock {
-		q += " FOR UPDATE"
+		q += " FOR NO KEY UPDATE"
 	}
 	d, err := scanDisp(tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) {

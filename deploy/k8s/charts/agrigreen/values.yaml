@@ -187,6 +187,10 @@ rabbitmq:
 # worker (:8087), outbox-publisher (:8088), worker-internal (:8086): AG_HEALTH_ADDR (cmd/internal/healthsrv, G4).
 # optimizer (Python) CHƯA có endpoint sức khỏe → không probe HTTP (mục mở).
 common:
+  # CIDR pod của bộ điều khiển Ingress (Traefik), cách nhau dấu phẩy → AG_TRUSTED_PROXIES: chỉ khi
+  # kết nối tới từ dải này api-platform mới tin X-Forwarded-For (IP trong sổ truy cập, giới hạn theo IP).
+  # Rỗng = không tin (IP = pod Traefik, không giả mạo được) — điền khi biết dải pod của cụm.
+  trustedProxies: ""
   pgbouncerUrl: "postgres://pg-%s-pooler.{{ .Values.namespaces.data }}.svc.{{ .Values.global.clusterDomain }}:5432/?sslmode=require"
   s3:
     endpoint: s3.example.vn            # chờ chọn nhà cung cấp (RB-7)
@@ -241,6 +245,7 @@ apps:
       AG_VAULT_CLIENT_CERT: /certs/vault-client/tls.crt
       AG_VAULT_CLIENT_KEY: /certs/vault-client/tls.key
       AG_CORS_ORIGINS: "https://ops.{{ .Values.global.domain }}"
+      AG_TRUSTED_PROXIES: "{{ .Values.common.trustedProxies }}"
       # Điểm kiểm soát xuất (ADR-0024): observe ở ĐTK 1/G4, enforce ở Phase K (values-phasek.yaml).
       AG_EGRESS_MODE: observe
     # pf-apikey-pepper: Admin API cấp khóa API cần pepper (ADR-0022 mục 4). Chỉ có Secret khi Phase K bật.

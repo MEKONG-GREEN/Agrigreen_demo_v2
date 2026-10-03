@@ -26,6 +26,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"os"
 	"os/signal"
 	"sync"
@@ -33,6 +34,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/clusterenv"
@@ -88,6 +90,7 @@ func run() error {
 		return err
 	}
 	defer func() { _ = broker.Close() }()
+	broker.OnReturn = logReturn(log, "platform")
 	// Hàng đợi consumer của cụm pf chỉ do bản publisher phụ trách cụm pf khai báo: bản của
 	// vùng mkg (AG_CLUSTERS=mkg,ts) chỉ có quyền phát lên ag.events của vhost nền tảng (van).
 	if clusterenv.Has(clusters, migrations.PF) {
@@ -105,6 +108,7 @@ func run() error {
 			return err
 		}
 		defer func() { _ = internalBroker.Close() }()
+		internalBroker.OnReturn = logReturn(log, "internal")
 		if err := declareInternalQueues(internalBroker); err != nil {
 			return err
 		}
@@ -145,7 +149,8 @@ func run() error {
 	if _, err := outbox.RegisterBacklogMetrics(pools); err != nil {
 		log.Warn("không đăng ký được metric outbox", "event", "startup", "outcome", "error", "error", err.Error())
 	}
-	// G4 (k8s probe): /healthz sống; /readyz khi mọi pool cụm ping được.
+	// G4 (k8s probe): /healthz sống; /readyz khi mọi pool cụm ping được và broker còn kết
+	// nối (Check quay số lại khi đứt — publisher tự hồi phục, không cần khởi động lại pod).
 	hs := healthsrv.New("platform")
 	if !clusterenv.Has(clusters, migrations.PF) {
 		hs = healthsrv.New("mkg")
@@ -157,6 +162,10 @@ func run() error {
 		}
 		return out
 	}))
+	hs.Add("amqp", broker.Check)
+	if internalBroker != nil {
+		hs.Add("amqp_internal", internalBroker.Check)
+	}
 	hs.Info("clusters", len(clusters))
 	errc := make(chan error, 1)
 	stopHealth := hs.Start("", ":8088", log, errc)
@@ -171,6 +180,15 @@ func run() error {
 		stop()
 		wg.Wait()
 		return err
+	}
+}
+
+// logReturn ghi cảnh báo khi broker trả thông điệp không route được (chưa hàng đợi nào
+// bind routing key): sự kiện vẫn được đánh dấu đã phát — log để phát hiện thiếu binding.
+func logReturn(log *slog.Logger, vhost string) func(amqp.Return) {
+	return func(ret amqp.Return) {
+		log.Warn("sự kiện không route được", "event", "outbox.unroutable", "vhost", vhost,
+			"routing_key", ret.RoutingKey, "message_id", ret.MessageId, "outcome", "returned")
 	}
 }
 

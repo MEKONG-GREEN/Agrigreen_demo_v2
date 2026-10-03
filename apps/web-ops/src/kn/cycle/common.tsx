@@ -85,6 +85,7 @@ export const LOG_LABEL: Record<string, string> = {
   "period.reclosed": "Chốt lại kỳ",
   "dispatch.exported": "Xuất file",
   "dispatch.send_requested": "Gửi email",
+  "dispatch.recipient_mailed": "Đã gửi tới một người nhận",
   "dispatch.sent": "Gửi email thành công",
   "dispatch.failed": "Gửi lỗi",
 };

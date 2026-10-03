@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 )
@@ -34,6 +35,12 @@ type Deps struct {
 
 // maxBody giới hạn thân request (tải tệp đi qua đường riêng có giới hạn riêng).
 const maxBody = 1 << 20
+
+// Giới hạn route công khai /v1/public theo IP (mỗi bản sao): người nhận Chi cục mở vài liên kết.
+const (
+	publicPerMinute = 30
+	publicBurst     = 20
+)
 
 func health(d Deps) func(r *gin.Engine) {
 	return func(r *gin.Engine) {
@@ -59,7 +66,8 @@ func NewRouter(d Deps) *gin.Engine {
 	health(d)(r)
 	// Route công khai (không đăng nhập, không middleware phiên): mã thông báo trong đường dẫn là quyền truy cập —
 	// liên kết tải tệp Chi cục của pf/reports (quyết định A4). Đăng ký trước nhóm /v1 có xác thực.
-	pub := r.Group("/v1/public")
+	// Giới hạn thô theo IP: mỗi mã (kể cả mã đoán bừa) tốn một giao dịch DB.
+	pub := r.Group("/v1/public", httpx.RateLimitByIP(clock.System{}, publicPerMinute, publicBurst))
 	for _, m := range d.Modules {
 		if p, ok := m.(publicRoutes); ok {
 			p.RegisterPublic(pub)

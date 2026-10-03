@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"slices"
@@ -728,27 +729,59 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 	if d.Subject != nil {
 		subj = *d.Subject
 	}
+	// Email là tác dụng phụ không hoàn tác được: liên kết tải và dấu "đã gửi" của từng người nhận ghi ở GIAO DỊCH RIÊNG,
+	// commit quanh mỗi lần gửi. Giao dịch inbox này hủy (lỗi DB/commit) rồi giao lại → người đã nhận được bỏ qua (không
+	// gửi trùng) và liên kết trong email đã gửi vẫn mở được.
+	events, err := store.DispatchEvents(ctx, tx, d.ID)
+	if err != nil {
+		return err
+	}
+	mailed := map[string]bool{}
+	for _, e := range events {
+		if e.Action == ActionRecipientMailed {
+			mailed[e.IdemKey] = true
+		}
+	}
 	sent := 0
 	for _, x := range d.Recipients {
 		to, ok := addr[x]
 		if !ok {
 			continue
 		}
+		key := mailedKey(d.ID, d.Attempts, x)
+		if mailed[key] {
+			sent++
+			continue
+		}
 		var links []string
-		for _, f := range files {
-			if !linkOnly {
-				break
-			}
-			l, err := s.issueLink(ctx, tx, tid, *d, f, x, ttl, now)
-			if err != nil {
+		if linkOnly {
+			if err := s.tx(ctx, tid, func(ltx pgx.Tx) error {
+				links = links[:0]
+				for _, f := range files {
+					l, err := s.issueLink(ctx, ltx, tid, *d, f, x, ttl, now)
+					if err != nil {
+						return err
+					}
+					links = append(links, l)
+				}
+				return nil
+			}); err != nil {
 				return err
 			}
-			links = append(links, l)
 		}
 		if err := s.Mailer.Send(ctx, port.Message{To: to, CC: cc, Subject: subj, Text: bodyFor(links), Attachments: atts}); err != nil {
 			return fail("máy chủ thư từ chối hoặc không kết nối được")
 		}
 		sent++
+		payload, _ := json.Marshal(map[string]any{"attempt": d.Attempts, "recipient_id": x, "links": len(links)})
+		ev := store.DispatchEvent{ID: ids.New(), DispatchID: d.ID, Action: ActionRecipientMailed, Payload: payload, Department: d.Department,
+			Province: d.Province, EventTime: now, ActorRef: d.CreatedBy, IdemKey: key}
+		if err := s.tx(ctx, tid, func(mtx pgx.Tx) error { return store.InsertDispatchEvent(ctx, mtx, tid, &ev) }); err != nil {
+			// Email đã đi nhưng chưa ghi được dấu: lần giao lại có thể gửi trùng người nhận này.
+			s.log().Error("đã gửi email Chi cục nhưng không ghi được dấu người nhận", "event", "reports.dispatch.mark_failed",
+				"dispatch_id", d.ID, "recipient_ref", x, "outcome", "error", "error", err.Error())
+			return err
+		}
 	}
 	if sent == 0 {
 		return fail("không còn người nhận đang dùng")
@@ -762,6 +795,14 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 		EventTime: now, ActorRef: d.CreatedBy, IdemKey: "dispatch-sent:" + env.EventID.String()}
 	s.log().Info("đã gửi báo cáo Chi cục", "event", "reports.dispatch.sent", "dispatch_id", d.ID, "recipients", sent, "link_only", linkOnly, "outcome", "ok")
 	return store.InsertDispatchEvent(ctx, tx, tid, &ev)
+}
+
+// ActionRecipientMailed là dòng sổ dispatch_event "đã gửi email tới một người nhận" của một lượt gửi (migration 000086).
+const ActionRecipientMailed = "recipient_mailed"
+
+// mailedKey là idem_key của dấu đã gửi: theo (lần gửi, lượt gửi, người nhận) — "Gửi lại" (lượt mới) gửi lại cho mọi người.
+func mailedKey(dispatchID uuid.UUID, attempt int, recipient uuid.UUID) string {
+	return fmt.Sprintf("dispatch-mailed:%s:%d:%s", dispatchID, attempt, recipient)
 }
 
 // DispatchHistory hiện thực extension/port.DispatchHistory (kỳ đã gửi Chi cục → cảnh báo khi mở lại kỳ).

@@ -27,6 +27,7 @@ const TraceHeader = "X-Trace-Id"
 func NewEngine(log *slog.Logger, maxBody int64) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
+	configureProxies(r, log)
 	r.HandleMethodNotAllowed = true
 	r.Use(Trace(), AccessLog(log), Recover(log), BodyLimit(maxBody))
 	r.NoRoute(func(c *gin.Context) { Fail(c, problem.NotFound) })

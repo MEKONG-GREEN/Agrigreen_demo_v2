@@ -91,7 +91,10 @@ func (s *Service) OpenDispatchLink(ctx context.Context, token, ip string) (LinkF
 	now := s.now()
 	var l *store.DispatchLink
 	var file store.DispatchFile
+	var rc io.ReadCloser
+	var size int64
 	outcome := ""
+	egressDenied := false
 	err := s.tx(ctx, tid, func(tx pgx.Tx) error {
 		var err error
 		if l, err = store.DispatchLinkByID(ctx, tx, linkID); err != nil || l == nil {
@@ -124,17 +127,28 @@ func (s *Service) OpenDispatchLink(ctx context.Context, token, ip string) (LinkF
 		// Điểm kiểm soát xuất: bên nhận = người nhận Chi cục (mã danh bạ), nguồn = lần gửi.
 		if err := s.egress(ctx, tx, Egress{Kind: EgressDownload, TenantID: tid, ActorRef: l.RecipientRef, TemplateKey: "kn." + strings.ToLower(file.FormCode),
 			Format: file.Format, JobID: l.DispatchID}); err != nil {
+			egressDenied = true
 			return err
 		}
+		// Mở tệp TRƯỚC khi ghi "served": kho đối tượng lỗi → giao dịch hủy, không có dòng sổ/export_audit cho lần tải
+		// không thành.
+		body, info, err := s.Store.Get(ctx, file.ObjectKey)
+		if err != nil {
+			return err
+		}
+		rc, size = body, info.Size
 		outcome = store.LinkServed
 		return s.logLinkAccess(ctx, tx, tid, *l, outcome, got, ip, now)
 	})
+	if err != nil && rc != nil {
+		_ = rc.Close()
+	}
 	if l == nil && err == nil {
 		return LinkFile{}, ErrLinkNotFound
 	}
 	if err != nil {
 		var p *problem.Problem
-		if l != nil && outcome == "" && errors.As(err, &p) && p.Status != http.StatusNotFound {
+		if l != nil && egressDenied && errors.As(err, &p) && p.Status != http.StatusNotFound {
 			// Điểm kiểm soát từ chối (enforce): giao dịch trên đã hủy — ghi sổ ở giao dịch riêng.
 			_ = s.tx(ctx, tid, func(tx pgx.Tx) error { return s.logLinkAccess(ctx, tx, tid, *l, store.LinkEgressDenied, got, ip, now) })
 		}
@@ -154,13 +168,9 @@ func (s *Service) OpenDispatchLink(ctx context.Context, token, ip string) (LinkF
 		}
 		return LinkFile{}, ErrLinkNotFound
 	}
-	rc, info, err := s.Store.Get(ctx, file.ObjectKey)
-	if err != nil {
-		return LinkFile{}, err
-	}
 	s.log().Info("tải tệp Chi cục qua liên kết", "event", "reports.dispatch_link", "tenant_id", tid, "link_id", l.ID, "dispatch_id", l.DispatchID,
 		"outcome", "served")
-	return LinkFile{Body: rc, Name: file.FileName, ContentType: contentTypeOf(file.Format), Size: info.Size}, nil
+	return LinkFile{Body: rc, Name: file.FileName, ContentType: contentTypeOf(file.Format), Size: size}, nil
 }
 
 // logLinkAccess ghi một dòng sổ truy cập (IP chỉ ở dạng HMAC theo liên kết).

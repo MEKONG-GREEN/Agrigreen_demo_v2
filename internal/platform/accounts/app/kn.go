@@ -365,10 +365,13 @@ func (s *Service) GrantAssignment(ctx context.Context, user uuid.UUID, in domain
 	if err := s.ensureKNUser(ctx, t, c.in.Role); err != nil {
 		return AssignmentResult{}, err
 	}
+	vaultGranted := false
 	if c.in.Role == port.KNXa { // A1: Cán bộ xã mặc định có vai kho định danh
+		had := slices.Contains(t.realm, KNXaVaultRole)
 		if t.realm, err = s.grantKNXaVault(ctx, a.p.TenantID, a.p.ActorRef, t.state(), t.realm, key+":vault"); err != nil {
 			return AssignmentResult{}, err
 		}
+		vaultGranted = !had
 	}
 	res, err := s.writeAsg(ctx, a.p.TenantID, a.p.ActorRef, key, domain.AsgGranted, optStr(reason), uuid.Nil,
 		func(tx pgx.Tx, _ *port.Assignment) (port.Assignment, error) {
@@ -377,8 +380,21 @@ func (s *Service) GrantAssignment(ctx context.Context, user uuid.UUID, in domain
 			}
 			return assignmentFrom(ids.New(), user, c), nil
 		})
+	if err != nil && vaultGranted {
+		err = s.undoKNXaVault(ctx, a, user, key, err)
+	}
 	res.Warnings = c.warnings
 	return res, err
+}
+
+// undoKNXaVault bù khi lần gán kn_xa không ghi được sau khi đã tự cấp vai kho định danh (A1): thu lại vai — không để
+// tài khoản giữ quyền ghi PII mà không có lần gán kn_xa nào (releaseKNXaVault giữ nguyên nếu còn kn_xa khác hoặc vai do
+// Admin cấp tay). Trả lỗi gốc, cộng lỗi bù nếu có.
+func (s *Service) undoKNXaVault(ctx context.Context, a *actor, user uuid.UUID, key string, cause error) error {
+	if rerr := s.releaseKNXaVault(context.WithoutCancel(ctx), a, user, key+":vault-undo"); rerr != nil {
+		return errors.Join(cause, rerr)
+	}
+	return cause
 }
 
 func optStr(s string) *string {
@@ -649,6 +665,7 @@ func (s *Service) CreateKNUser(ctx context.Context, in KNCreateInput) (KNCreateR
 		_, _ = compensate(nil)
 		return s.knReplayed(ctx, a, ev)
 	}
+	vaultGranted := false
 	if slices.ContainsFunc(checked, func(c checkedAssignment) bool { return c.in.Role == port.KNXa }) {
 		// A1: Cán bộ xã mặc định có vai kho định danh. Lỗi ở đây: tài khoản đã ghi sổ, không bù (như lần gán dưới).
 		realm, err := s.grantKNXaVault(ctx, a.p.TenantID, a.p.ActorRef, acc, []string{port.RoleKNUser}, in.IdemKey+":vault")
@@ -656,13 +673,19 @@ func (s *Service) CreateKNUser(ctx context.Context, in KNCreateInput) (KNCreateR
 			return KNCreateResult{}, err
 		}
 		acc.Roles = domain.ManagedOf(realm)
+		vaultGranted = true
 	}
 	res := KNCreateResult{Warnings: warnings}
 	for i, c := range checked {
 		r, err := s.writeAsg(ctx, a.p.TenantID, a.p.ActorRef, in.IdemKey+":asg:"+strconv.Itoa(i), domain.AsgGranted, nil, uuid.Nil,
 			func(pgx.Tx, *port.Assignment) (port.Assignment, error) { return assignmentFrom(ids.New(), id, c), nil })
 		if err != nil {
-			return KNCreateResult{}, err // tài khoản đã ghi sổ: không bù, Admin thêm vai trò còn thiếu ở màn Detail
+			// Tài khoản đã ghi sổ: không xóa, Admin thêm vai trò còn thiếu ở màn Detail. Nhưng vai kho định danh vừa tự
+			// cấp thì thu lại nếu chưa có lần gán kn_xa nào ghi được.
+			if vaultGranted {
+				err = s.undoKNXaVault(ctx, a, id, in.IdemKey, err)
+			}
+			return KNCreateResult{}, err
 		}
 		res.Assignments = append(res.Assignments, r.Assignment)
 	}

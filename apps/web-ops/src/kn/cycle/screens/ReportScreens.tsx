@@ -578,7 +578,7 @@ export function DispatchScreen() {
               entries={toLog(
                 (view.data?.log ?? []).map((l) => {
                   const x = l as { event: string; actor_ref: string; at: string; on_behalf_of: string | null };
-                  return { event: x.event, actor_ref: x.actor_ref, actor_display: x.event === "dispatch.sent" ? "Hệ thống" : "", at: x.at, changes: [], reason: null, on_behalf_of: x.on_behalf_of };
+                  return { event: x.event, actor_ref: x.actor_ref, actor_display: x.event === "dispatch.sent" || x.event === "dispatch.recipient_mailed" ? "Hệ thống" : "", at: x.at, changes: [], reason: null, on_behalf_of: x.on_behalf_of };
                 }).reverse(),
               )}
             />

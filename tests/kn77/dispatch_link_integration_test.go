@@ -2,6 +2,7 @@ package kn77_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"regexp"
@@ -58,10 +59,25 @@ func TestA4_ChiCucDownloadLink7Days(t *testing.T) {
 	f.rep.UseEgress(cp, meteringport.ModeEnforce)
 	c.tinh.must(c.tinh.post("/v1/reports/dispatches/"+did+"/send", map[string]any{}), http.StatusAccepted, "gửi email")
 	ev := f.events(repport.EventDispatchRequested)
+	// Review M2: email đã gửi rồi giao dịch inbox hủy (commit lỗi) → giao lại KHÔNG gửi trùng người nhận, liên kết trong
+	// email đã gửi vẫn mở được (liên kết + dấu recipient_mailed ghi ở giao dịch riêng).
+	errCommit := errors.New("giả lập commit inbox lỗi")
+	if err := tenant.WithTenantTx(context.Background(), f.repPool, f.tenant, func(tx pgx.Tx) error {
+		if err := f.rep.DispatchHandler()(context.Background(), tx, ev[len(ev)-1]); err != nil {
+			return err
+		}
+		return errCommit
+	}); !errors.Is(err, errCommit) {
+		t.Fatal(err)
+	}
 	if err := tenant.WithTenantTx(context.Background(), f.repPool, f.tenant, func(tx pgx.Tx) error {
 		return f.rep.DispatchHandler()(context.Background(), tx, ev[len(ev)-1])
 	}); err != nil {
 		t.Fatal(err)
+	}
+	if n := f.count(`SELECT count(*) FROM pf_reports.dispatch_event WHERE tenant_id = $1 AND action = 'recipient_mailed'
+	    AND dispatch_id::text = $2`, f.tenant, did); n != 1 {
+		t.Fatalf("dấu đã gửi người nhận: %d", n)
 	}
 	ms := f.mail.all()
 	if len(ms) != 1 || len(ms[0].Attachments) != 0 || !strings.Contains(ms[0].Text, "hết hạn") || strings.Contains(ms[0].Text, "files.test") {
