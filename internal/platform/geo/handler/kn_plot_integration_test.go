@@ -20,6 +20,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port/farmerid"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -52,7 +53,7 @@ func newKNFix(t *testing.T) *knFix {
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	tol := decimal.NewFromInt(1)
 	f.mod = geo.New(pool, clock.System{}, geo.Deps{Scope: newFakeScope(), Params: fakeParams{tolerance: &tol}, AdminUnits: newFakeUnits()})
-	f.mod.UseKN(clienttest.New(), nil)
+	f.mod.UseKN(farmerid.New(clienttest.New()), nil)
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 4<<20)
 	f.mod.RegisterApp(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), f.knMiddleware(), idempotency.Middleware(ops)))
 	f.srv = httptest.NewServer(eng)

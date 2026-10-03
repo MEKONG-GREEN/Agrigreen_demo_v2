@@ -25,7 +25,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
 // Mã lỗi của pf/geo (docs/errors.md).
@@ -93,7 +92,7 @@ type Service struct {
 	ValveGrants partyport.ValveGrants
 	// Vault (tùy chọn, KN v7.7 FN-XA-03.05): tên nông dân của thửa → chủ thể "người" (farmer_ref); nhãn che khi đọc.
 	// Thiếu → ghi có farmer_name trả 503 geo.dependency_unavailable; đọc trả farmer = null.
-	Vault client.Client
+	Vault port.FarmerIdentity
 	// Names (tùy chọn): tên người thao tác trong khung Log của thửa KN.
 	Names partyport.ActorNames
 	// Egress (G5, ADR-0024): điểm kiểm soát xuất (pf/metering) — consumer van gọi Guard kênh valve

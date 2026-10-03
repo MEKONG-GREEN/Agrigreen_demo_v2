@@ -29,7 +29,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
 // Mã lỗi KN v7.7 của pf/geo (docs/errors.md).
@@ -196,18 +195,15 @@ func (s *Service) farmerRef(ctx context.Context, name, commune string) (uuid.UUI
 	if s.Vault == nil {
 		return uuid.Nil, ErrDependency.WithDetail("chưa nối kho định danh")
 	}
-	cr, err := s.Vault.Create(ctx, client.PurposeContact, client.Identity{Kind: client.SubjectPerson, FullName: name, AreaCode: commune})
+	ref, err := s.Vault.RegisterFarmer(ctx, name, commune)
 	if err != nil {
-		if errors.Is(err, client.ErrDuplicate) && cr.Ref != uuid.Nil {
-			return cr.Ref, nil
-		}
 		var pr *problem.Problem
 		if errors.As(err, &pr) && pr.Status == http.StatusUnprocessableEntity {
 			return uuid.Nil, problem.Validation.WithField("farmer_name", "không hợp lệ")
 		}
 		return uuid.Nil, ErrDependency.WithDetail("không ghi được tên nông dân vào kho định danh").WithCause(err)
 	}
-	return cr.Ref, nil
+	return ref, nil
 }
 
 // FarmerLabels tra nhãn đã che của nông dân (mục đích extension.contact); lỗi tra nhãn không chặn màn hình.
@@ -223,9 +219,9 @@ func (s *Service) FarmerLabels(ctx context.Context, plots ...store.Plot) map[uui
 		if _, ok := out[p.FarmerRef]; ok {
 			continue
 		}
-		d, err := s.Vault.Display(ctx, client.PurposeContact, p.FarmerRef)
-		if err == nil || d.Label != "" {
-			out[p.FarmerRef] = d.Label
+		label, err := s.Vault.FarmerLabel(ctx, p.FarmerRef)
+		if err == nil || label != "" {
+			out[p.FarmerRef] = label
 		}
 	}
 	return out

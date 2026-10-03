@@ -26,7 +26,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
 // DBRole là vai DB riêng của module (R-05).
@@ -51,7 +50,7 @@ type Deps struct {
 	// GPS của mình (HTX US-GPS-03). Gốc lắp ráp nối sau khi dựng pf/accounts (UseFarmers).
 	Farmers port.FarmerHouseholds
 	// Vault (tùy chọn, KN v7.7 FN-XA-03.05): tên nông dân của thửa vào kho định danh. Có thể nối sau bằng UseKN.
-	Vault client.Client
+	Vault port.FarmerIdentity
 }
 
 // Module là pf/geo đã nối.
@@ -104,7 +103,7 @@ func (m *Module) UseSharing(pa partyport.PartnerAccess, vg partyport.ValveGrants
 
 // UseKN nối kho định danh (tên nông dân của thửa) và danh bạ tên người thao tác (Log) cho route /v1/kn/plots
 // (KN v7.7 FN-XA-03.05). names có thể nil.
-func (m *Module) UseKN(v client.Client, names partyport.ActorNames) {
+func (m *Module) UseKN(v port.FarmerIdentity, names partyport.ActorNames) {
 	m.svc.Vault, m.svc.Names = v, names
 }
 
