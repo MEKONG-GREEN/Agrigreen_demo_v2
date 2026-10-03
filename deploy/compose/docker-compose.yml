@@ -15,6 +15,7 @@
 #   Keycloak            http://localhost:8180   (realm agrigreen; issuer = http://localhost:8180/realms/agrigreen)
 #   S3 (SeaweedFS)      http://localhost:9000
 #   RabbitMQ            http://localhost:15672
+#   Public API (G5)     http://localhost:8085   — chỉ với --profile phasek (bên thứ ba, khóa API X-API-Key)
 #
 # Bí mật chỉ nằm trong deploy/compose/.env (không commit). Mỗi dịch vụ chỉ nhận
 # đúng biến nó cần (không dùng env_file chung): api-platform KHÔNG có mật khẩu
@@ -329,6 +330,11 @@ services:
       AG_INTERNAL_TLS_KEY: /certs/api-platform.key
       AG_INTERNAL_CLIENT_CA: /certs/ca.crt
       AG_INTERNAL_CLIENT_NAMES: optimizer
+      # Điểm kiểm soát xuất (ADR-0024): observe (ĐTK 1) | enforce (Phase K) — đặt AG_EGRESS_MODE trong .env.
+      AG_EGRESS_MODE: ${AG_EGRESS_MODE:-observe}
+      # Admin API cấp khóa API cần pepper (ADR-0022 mục 4); rỗng khi chưa chạy hồ sơ phasek.
+      AG_APIKEY_PEPPER_V1: ${AG_APIKEY_PEPPER_V1:-}
+      AG_APIKEY_PEPPER_CURRENT: "1"
     volumes: *internal-server-certs
     ports: ["127.0.0.1:8080:8080", "127.0.0.1:8082:8082"]
     # 8084 (Internal, mTLS) chỉ trong mạng compose — KHÔNG publish ra máy chủ.
@@ -551,6 +557,40 @@ services:
       AG_AMQP_URL: amqp://agrigreen:${AMQP_PASSWORD}@rabbitmq:5672/
       AG_ANCHOR_SIGNING_KEY: ${AG_ANCHOR_SIGNING_KEY:?chạy scripts/gen-dev-secrets}
       AG_ANCHOR_KEY_ID: local-dev-1
+      AG_EGRESS_MODE: ${AG_EGRESS_MODE:-observe}   # ADR-0024
+
+  # Public API cho bên thứ ba (G5, ADR-0022) — TẮT mặc định, chỉ chạy với hồ sơ Phase K:
+  #   docker compose -f deploy/compose/docker-compose.yml --profile phasek up -d --build --wait
+  # (docs/runbooks/phase-k.md mục 6). Không RabbitMQ (outbox ghi DB), không identity-vault, không DB mkg/ts.
+  # AG_PUBLIC_OPERATOR_TENANT: tenant đơn vị vận hành — đặt trong .env sau khi tạo tenant; rỗng → thoát lỗi.
+  api-public:
+    <<: *go-app
+    profiles: [phasek]
+    image: agrigreen/api-public:dev
+    build: { context: ../.., dockerfile: Dockerfile, args: { CMD: api-public } }
+    depends_on:
+      migrate-up: { condition: service_completed_successfully }
+      pgbouncer: { condition: service_healthy }
+      valkey: { condition: service_healthy }
+    environment:
+      # s3-env: tải tệp xuất qua api-public (GET /v1/jobs/{id}/file, ADR-0022 mục 8). Dev dùng chung khóa
+      # agrigreen-app; Helm Phase K dùng khóa CHỈ ĐỌC riêng pf-public-s3 (F29).
+      <<: [*otel-env, *s3-env]
+      AG_PUBLIC_API_ENABLED: "1"
+      AG_PUBLIC_HTTP_ADDR: ":8085"
+      AG_PF_DB_URL: postgres://pgbouncer:6432/?sslmode=disable
+      AG_DB_VIA_PGBOUNCER: "1"
+      AG_DB_APP_PASSWORD: ${AG_DB_APP_PASSWORD}
+      AG_PUBLIC_OPERATOR_TENANT: ${AG_PUBLIC_OPERATOR_TENANT:-}
+      AG_APIKEY_PEPPER_V1: ${AG_APIKEY_PEPPER_V1:-}
+      AG_APIKEY_PEPPER_CURRENT: "1"
+      # Giới hạn tần suất dùng chung (ADR-0022 mục 7). Rỗng → bộ đếm trong tiến trình.
+      AG_VALKEY_URL: ${AG_VALKEY_URL:-redis://valkey:6379/0}
+      AG_EGRESS_MODE: ${AG_EGRESS_MODE:-enforce}
+      # Tùy chọn (ADR-0022 mục 5): client credentials cho đơn vị thẩm định.
+      AG_PUBLIC_OIDC_ISSUER: ${AG_PUBLIC_OIDC_ISSUER:-}
+      AG_PUBLIC_OIDC_AUDIENCE: ${AG_PUBLIC_OIDC_AUDIENCE:-}
+    ports: ["127.0.0.1:8085:8085"]
 
   web-ops:
     <<: *hardened

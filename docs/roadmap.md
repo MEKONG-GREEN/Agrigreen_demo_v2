@@ -184,7 +184,69 @@ Còn lại:
 
 **Trạng thái (02/10/2026, nhánh `sub/kn-v77` + P8 đợt 4 `kn-p8e`):** gói P1–P7 đã có mã (P1 tài khoản nhiều vai trò + ngữ cảnh phiên X-AG-Context, P2 phòng ban/khu vực/cây 3 cấp/menu theo cấu hình, P3 engine 14 mẫu, P4 vòng đời báo cáo + Chi cục, P5 lịch công tác, P6 khung + mọi màn web, P7 app Cán bộ xã ngoại tuyến + HTX/máy/thửa/vật tư); kịch bản đầu–cuối `TestKN77AnGiangTuan36` (`tests/kn77`, 13 bước trên module thật) đạt. Nghiệm thu [docs/uat/kn-v7.7-acceptance.md](uat/kn-v7.7-acceptance.md): **130 yêu cầu — 42 đạt, 48 một phần, 27 chưa làm, 13 ngoài module** (trước đợt 4: 38/36/43/13). Còn lại: **chờ khách** Q-01…Q-23 (chặn lớn nhất Q-01 — tệp Excel gốc của 14 mẫu, 13 biểu Cấp Xã đang là mẫu tạm); **mã** — menu/ngữ cảnh trên mobile, vài màn Admin (di chuyển Nút, nạp Excel nhiều vai trò, đếm theo phòng ban), vai kho định danh mặc định cho Cán bộ xã, cảnh báo PII ô tự do, SPI "còn n lần thử"; **hạ tầng** — sẵn sàng, sao lưu/RPO/RTO trên cụm thật, tải 500 người dùng, Android 3G, FCM thật.
 
-## G5–G6
+## G5 — Phase K, `pf/metering`, Public API cho bên thứ ba (nhánh `sub/g5`)
+
+Phụ lục A: "Phase K; `pf/metering` và Public API bật với bên thứ ba đầu tiên" (Q4/2028), cộng mục 18 (một điểm kiểm soát cho mọi đường xuất). Quy ước, số migration, vai, sự kiện, sản phẩm dữ liệu, tham số tạm: [docs/dev/g5-conventions.md](dev/g5-conventions.md). Quyết định: ADR-0022..0025. Nghiệm thu: [docs/uat/g5-acceptance.md](uat/g5-acceptance.md) — rà E2E 02/10/2026: **82 yêu cầu, 51 đạt, 19 một phần, 12 chưa làm** (10 trong số đó là câu hỏi khách Q5-1..Q5-10).
+
+### G5-0: nền móng và hợp đồng đóng băng (01/10/2026, xong)
+
+- [x] ADR-0022 Public API:
+  - tiến trình riêng `cmd/api-public`, tắt ở ĐTK 1 bằng cấu hình;
+  - khóa API lưu HMAC + pepper, scope, cấp quyền `dp_*`;
+  - giới hạn ở gateway + hạn mức thẩm quyền ở backend;
+  - R-50..R-53.
+- [x] ADR-0023 `pf/metering`: sổ sử dụng là chứng từ, đơn vị `metering.units.v1`, bảng kê tháng, R-56, giá tùy chọn.
+- [x] ADR-0024 DLP: `Checkpoint` duy nhất ở `pf/metering`, `observe`/`enforce`, van kiểm ở phía nhận.
+- [x] ADR-0025 hồ sơ Phase K: lớp giá trị, cấp tenant bên thứ ba, đơn vị thẩm định.
+- [x] Số migration:
+  - pf 000047: schema `pf_apiclient`, `pf_metering`, loại cấp quyền `dp_*` (**đã có**);
+  - pf 000048 apiclient;
+  - pf 000049 metering;
+  - pf 000050–000051 dự phòng;
+  - mkg 000022 không dùng.
+- [x] Vai DB `apiclient_app`, `metering_app`, `public_api` (dbadmin + PgBouncer CI/Compose). Vai nghiệp vụ `api_client_admin`, `api_client_approver`, `metering_viewer`, `billing_officer`, `billing_approver` (hằng `port/` + realm).
+- [x] Port đóng băng:
+  - `apiclient/port`: `Authenticator`, `TokenAuthenticator`, `Plans`, ba nguồn sản phẩm, DTO `//ag:dataproduct`;
+  - `metering/port`: `Ledger`, `Quotas`, `Usage`, `Checkpoint`, `Guard`, `UnitsV1`;
+  - `party/port`: `GrantLookup`, `DataProductKind`.
+  
+  Ba sự kiện: `pf.apiclient.export.requested`, `pf.metering.statement.requested`, `pf.metering.egress.anomaly_detected`.
+- [x] Hợp đồng sản phẩm dữ liệu `contracts/dataproduct/*` (dự thảo, chờ khách): `collection_volume` (k nông hộ), `hub_capacity`, `mrv_package_status`. `contractcheck` kiểm struct `//ag:dataproduct` và tag của `contracts/openapi/public.yaml` (khung).
+- [x] archlint: `cmd/api-public` không import `mkg/**` (R-03), không import vault kể cả client (RB-3); `agnofloat` cho `metering` có testdata.
+
+### G5-1: module, hạ tầng, client (song song, theo hợp đồng G5-0)
+
+Theo [g5-conventions §8](dev/g5-conventions.md#8-đợt-g5-1-song-song-theo-hợp-đồng-g5-0):
+
+| Đợt | Phạm vi |
+|---|---|
+| **A** | `pf/apiclient` + `cmd/api-public` |
+| **M** | `pf/metering` |
+| **S** | nguồn sản phẩm ở `pf/cropcycle`, `pf/geo`, `pf/mrv`, `pf/party` |
+| **D** | tích hợp DLP vào báo cáo / MRV / van |
+| **H** | hạ tầng Phase K |
+| **W** | `apps/web-ops` |
+| **E** | E2E + diễn tập bật Phase K |
+
+Trạng thái (02/10/2026): A, M, S + D, H, W đã hợp nhất vào `sub/g5` (tích hợp `g5-int`: nối cổng thật cho `api-public`, kho tệp xuất F29, cảnh báo DLP, job khóa hết hạn, runbook cấp bên thứ ba).
+
+### G5 E2E (02/10/2026, nhánh `g5-e`)
+
+- [x] `TestG5ThirdPartyToStatement` (`tests/e2e/g5_scenario_test.go`) đạt: 14 bước, 5 tenant (chương trình, MKG, đơn vị vận hành, nhà máy, đơn vị thẩm định), gốc lắp ráp thật của `api-platform` và `api-public`, consumer thật của worker qua bơm outbox, `AG_EGRESS_MODE=enforce`. Phủ:
+  - runbook cấp bên thứ ba bước 1–8;
+  - ba sản phẩm qua `api-public` thật, `publicdata.k_min` = 5 đặt qua pf/masterdata (người đặt ≠ người duyệt);
+  - xuất 202 → tệp `Digest`; sổ sử dụng, egress, sổ đọc khớp số lời gọi;
+  - 429 hạn mức, gói v2; DLP enforce (báo cáo, gói MRV) → bất thường → thông báo;
+  - xoay / thu hồi khóa, thu hồi cấp quyền;
+  - bảng kê cuối kỳ R-56 + CSV golden + kiểm băm + bảng kê bù;
+  - giao lặp mọi sự kiện, cách ly tenant, quét RB-3, `verify_chain` chín sổ.
+- [x] Đóng K-05: `api-public` ghi `partner_read_log` ở tenant bên cấp cho mỗi lần đọc / tải dữ liệu 2xx, qua bộ điều hợp không vault `party/port/grantlookup` (`port.APIReadLog`, ghi trước sổ đo lường, lỗi → 503 không dữ liệu). `TestAPIReadLogAdapter_K05`.
+- [x] Gốc lắp ráp `api-public` tách sang `cmd/api-public/assembly` để E2E dùng đúng mã của tiến trình (archlint vẫn phủ cả cây).
+- [ ] Còn lại:
+  - **mã:** `Deprecation`/`Sunset` (P-12), OAuth client credentials (P-19), con trỏ (P-15);
+  - **chờ khách:** Q5-1..Q5-10 (bên thứ ba đầu tiên, giá trị k, Q5-6 hub, giá, thời hạn lưu, Valkey, VVB);
+  - **hạ tầng:** diễn tập `helm upgrade -f values-phasek.yaml` trên staging (K-04), NetworkPolicy / Ingress / ExternalSecret trên cụm thật, PgBouncer song song, luật cảnh báo DLQ vùng nền tảng (X-07), `promtool`, cổng giấy phép CI.
+
+## G6
 Theo Phụ lục A của tài liệu kiến trúc:
-- **G5 (Q4/2028):** Public API và metering.
-- **G6 (Q1/2029):** cấu hình Phase 1, không sửa mã.
+- **G6 (Q1/2029):** cấu hình Phase 1, không sửa mã. Cơ chế giống Phase K: một lớp giá trị mới (ADR-0025).

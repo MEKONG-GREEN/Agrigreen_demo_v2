@@ -48,6 +48,8 @@ tmp="$target.tmp.$$"
   echo "AG_VAULT_BLIND_KEY='$(b64 32)'"
   echo "AG_ANCHOR_SIGNING_KEY='$(b64 32)'"
   echo "AG_KC_CLIENT_SECRET=$(hex 32)"
+  # Public API (G5, docker compose --profile phasek): pepper HMAC khóa API phiên bản 1 (ADR-0022 mục 4, ≥ 32 byte).
+  echo "AG_APIKEY_PEPPER_V1=$(hex 32)"
   # Sao lưu (docker-compose.backup.yml): mã hóa kho pgBackRest, kho S3 thứ hai với danh tính ghi/đọc tách biệt.
   echo "PGBACKREST_CIPHER_PASS=$(hex 32)"
   echo "BACKUP_S3_ROOT_SECRET=$(hex 24)"

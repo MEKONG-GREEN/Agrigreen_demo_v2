@@ -100,6 +100,12 @@ variable "dns_records" {
   }
 }
 
+variable "phase_k" {
+  description = "Phase K (G5, ADR-0025): true → bản ghi DNS partner.<domain> + chứng thư TLS cho Public API. Tắt ở ĐTK 1/G4."
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Nhãn chung gắn vào tài nguyên."
   type        = map(string)

@@ -100,10 +100,12 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/clusterenv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/healthsrv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
+	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
@@ -494,6 +496,24 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		}
 		md := masterdata.New(mdPool, clk)
 		rep := reports.New(repPool, clk, reports.Deps{Params: md.Params(), Log: log})
+		// G5 (ADR-0024): lối "lịch" của xuất báo cáo qua điểm kiểm soát chung (kênh report_export) —
+		// Checkpoint của pf/metering (vai metering_app); workerEgress ghi đè cho kiểm thử.
+		// AG_EGRESS_MODE sai → lỗi khởi động.
+		mode, err := assembly.EgressModeFromEnv(os.Getenv)
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		egress := workerEgress
+		if egress == nil {
+			meterPool, err := openPF(ctx, direct, metering.DBRole, &closeFn)
+			if err != nil {
+				closeFn()
+				return nil, func() {}, err
+			}
+			egress = metering.New(meterPool, clk, metering.Deps{Params: md.Params(), Mode: mode}).Checkpoint()
+		}
+		rep.UseEgress(egress, mode)
 		js = append(js, rep.Jobs(reports.ScheduleTenants(out.pools[migrations.PF]), log)...)
 	}
 	if selected(jobs, mechport.JobAreaFeedCheck) {
@@ -563,11 +583,22 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		}
 		js = append(js, mods.Extension.ReportCycleJobs(extension.ReportCycleTenants(out.pools[migrations.PF]), log)...)
 	}
+	if selected(jobs, apiclientport.JobKeyExpiry) && os.Getenv(apiclientport.EnvOperatorTenant) != "" {
+		// G5 (ADR-0022 mục 4, RB-1): khóa API quá hạn → sự kiện expired ở sổ api_key_event của tenant đơn vị
+		// vận hành (AG_PUBLIC_OPERATOR_TENANT; không đặt — ĐTK 1 — thì không có job), vai apiclient_app.
+		mod, err := apiclientKeyJobs(ctx, direct, &closeFn)
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		js = append(js, mod.Jobs(log)...)
+	}
 	if len(js) == 0 {
 		closeFn()
 		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + extension.JobEscalation + ", " + extension.JobWorkSchedule + ", " +
 			notifyport.JobEmailDigest + ", " + reports.JobSchedules + ", " + mechport.JobAreaFeedCheck + ", " + metricsport.JobMetricsSnapshot +
-			", " + mrvport.JobReviewEscalator + ", " + extension.JobReportCycle + ")")
+			", " + mrvport.JobReviewEscalator + ", " + extension.JobReportCycle +
+			", " + apiclientport.JobKeyExpiry + ")")
 	}
 	out.s = &schedule.Scheduler{Clock: clk, Log: log, Jobs: js}
 	return out, closeFn, nil

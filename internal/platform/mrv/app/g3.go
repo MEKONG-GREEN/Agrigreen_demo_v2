@@ -15,6 +15,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/publication"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/store"
@@ -281,6 +282,17 @@ func (s *Service) HandleCollectionEvidence(ctx context.Context, tx pgx.Tx, env o
 	grantors, err := partyport.ValveTargets(ctx, s.ValveGrants, env.TenantID, partyport.KindValveMRVEvidence, s.Clock.Now())
 	if err != nil {
 		return err
+	}
+	// ADR-0024 mục 3: điểm kiểm soát xuất kênh valve ở phía nhận, mỗi bên cấp một lần, TRƯỚC khi ghi
+	// vào tenant bên cấp. enforce + từ chối → giao lại → DLQ (R-62).
+	for _, g := range grantors {
+		if err := meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
+			SourceID: env.EventID, Channel: meteringport.ChannelValve, DataTenantID: env.TenantID,
+			CounterpartyKind: meteringport.CounterpartyTenant, CounterpartyRef: g, Product: port.ContractCollectionEvidence,
+			ContractVersion: env.SchemaVersion, Records: 1, Bytes: int64(len(env.Payload)), OccurredAt: env.OccurredAt, TraceID: env.TraceID,
+		}, s.Log); err != nil {
+			return err
+		}
 	}
 	for _, g := range grantors {
 		gctx := tenant.WithID(ctx, g)

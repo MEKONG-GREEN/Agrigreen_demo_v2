@@ -6,6 +6,9 @@ locals {
   zones   = ["edge", "app-pf", "app-mkg", "identity", "data", "ops"]
   subnets = { for i, z in local.zones : z => cidrsubnet(var.network_cidr, 4, i) }
   tags    = merge(var.tags, { environment = var.environment, provider = var.provider_name })
+  # Phase K (G5, ADR-0025): host partner.<domain> của Public API chỉ có khi phase_k = true (R-01: cấu hình).
+  phase_k_records = var.phase_k ? { "partner" = "ingress" } : {}
+  dns_records     = merge(var.dns_records, local.phase_k_records)
 }
 
 module "network" {
@@ -68,9 +71,20 @@ module "object_storage" {
 module "dns" {
   source     = "./modules/dns"
   domain     = var.domain
-  records    = var.dns_records
+  records    = local.dns_records
   ingress_ip = module.network.ingress_ip
   # ingest.ot.<domain> chỉ ở DNS nội bộ của VPN OT (không công bố Internet).
   private_records = { "ingest.ot" = module.network.ot_ingest_ip }
   tags            = local.tags
+}
+
+# Chứng thư riêng cho partner.<domain> (Public API, ADR-0022). Secret đích: values.yaml
+# externalSecrets.secrets.pf.agrigreen-partner-tls (remote tls/partner), bật bằng values-phasek.yaml.
+module "partner_certificate" {
+  source      = "./modules/certificate"
+  count       = var.phase_k ? 1 : 0
+  name        = "${local.name}-partner"
+  hostnames   = ["partner.${var.domain}"]
+  secret_path = "agrigreen/${var.environment == "production" ? "prod" : var.environment}/tls/partner"
+  tags        = local.tags
 }

@@ -198,6 +198,11 @@ const ADMIN_SYSTEM: Group = {
         { key: "admin.qt.cong_cu.xung_dot", label: "Xung đột đồng bộ", route: "/quan-tri/xung-dot", icon: "conflict" },
         { key: "admin.qt.cong_cu.giam_sat", label: "Giám sát đồng bộ", route: "/quan-tri/giam-sat-dong-bo", icon: "sync" },
         { key: "admin.qt.cong_cu.thiet_bi", label: "Đồng bộ thiết bị", route: "/dong-bo", icon: "sync" },
+        // G5: màn Public API / đo lường / nhật ký xuất (tự kiểm vai).
+        { key: "admin.qt.cong_cu.khach_hang_api", label: "Khách hàng Public API", route: "/quan-tri/khach-hang-api", icon: "key" },
+        { key: "admin.qt.cong_cu.su_dung_api", label: "Sử dụng Public API", route: "/quan-tri/su-dung-api", icon: "chart" },
+        { key: "admin.qt.cong_cu.bang_ke", label: "Bảng kê sử dụng", route: "/quan-tri/bang-ke", icon: "report" },
+        { key: "admin.qt.cong_cu.nhat_ky_xuat", label: "Nhật ký xuất dữ liệu", route: "/quan-tri/nhat-ky-xuat", icon: "shield" },
       ],
     },
   ],

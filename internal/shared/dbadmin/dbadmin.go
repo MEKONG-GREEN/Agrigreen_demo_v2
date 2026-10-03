@@ -100,6 +100,13 @@ var Roles = []Role{
 	{Name: "orders_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
 	{Name: "costing_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
 	{Name: "acctbridge_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
+	// G5 (docs/dev/g5-conventions.md §3; ADR-0022..0024): Public API cho bên thứ ba. Mỗi module một vai, chỉ
+	// CONNECT ag_pf; schema + USAGE do pf 000047, bảng và GRANT do migration của từng module (000048, 000049).
+	{Name: "apiclient_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
+	{Name: "metering_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
+	// public_api: tiến trình cmd/api-public — như platform_api, chỉ bảng vận hành schema shared (idempotency,
+	// outbox), không quyền nghiệp vụ.
+	{Name: "public_api", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
 	// sql_exporter (mục 19): chỉ EXECUTE hàm gộp trong schema mkg_monitor / ts_monitor — không SELECT bảng
 	// gốc, không thuộc ag_shared_user, NOBYPASSRLS (deploy/observability/sql-exporter).
 	{Name: MKGMonitor, Login: true, Clusters: []migrations.Cluster{migrations.MKG}},

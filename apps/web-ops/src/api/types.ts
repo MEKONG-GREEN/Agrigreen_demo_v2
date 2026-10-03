@@ -266,3 +266,27 @@ export type MrvOfficerRecord = S["MrvOfficerRecord"];
 export type MrvComparisonInput = NonNullable<AppPaths["/v1/mrv/comparisons"]["post"]["requestBody"]>["content"]["application/json"];
 export type MrvMethodVersion = AS["MrvMethodVersion"];
 export type MrvParamPin = AS["MrvParamPin"];
+
+// G5 — pf/apiclient (khách hàng Public API, ADR-0022) và pf/metering (sổ sử dụng, bảng kê, DLP — ADR-0023/0024)
+export type ApiClientRecord = AS["ApiClient"];
+export type ApiClientStatus = ApiClientRecord["status"];
+export type ApiKeyRecord = AS["ApiKey"];
+export type ApiKeyIssued = AS["ApiKeyIssued"];
+export type ApiSubscription = AS["ApiSubscription"];
+export type ApiQuotaPlan = AS["ApiQuotaPlan"];
+export type ApiQuotaPlans = AdminGet<"/v1/api-clients/{id}/plans">;
+export type ApiClientProposal = NonNullable<AdminPaths["/v1/api-clients"]["post"]["requestBody"]>["content"]["application/json"];
+export type ApiSubscriptionProposal = NonNullable<AdminPaths["/v1/api-clients/{id}/subscriptions"]["post"]["requestBody"]>["content"]["application/json"];
+export type ApiDataProduct = ApiSubscriptionProposal["product"];
+export type ApiQuotaPlanProposal = NonNullable<AdminPaths["/v1/api-clients/{id}/plans"]["post"]["requestBody"]>["content"]["application/json"];
+export type MeteringUsageDay = AS["MeteringUsageDay"];
+export type MeteringUsageEvent = AS["MeteringUsageEvent"];
+export type MeteringStatementJob = AS["MeteringStatementJob"];
+export type MeteringStatement = AS["MeteringStatement"];
+export type MeteringStatementLine = AS["MeteringStatementLine"];
+export type MeteringStatementRequest = NonNullable<AdminPaths["/v1/metering/statements"]["post"]["requestBody"]>["content"]["application/json"];
+export type MeteringVerify = AdminGet<"/v1/metering/statements/{id}/verify">;
+export type MeteringParam = AdminGet<"/v1/metering/params">["items"][number];
+export type EgressChannel = AS["EgressChannel"];
+export type EgressEvent = AS["EgressEvent"];
+export type EgressAnomaly = AS["EgressAnomaly"];

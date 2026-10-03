@@ -16,7 +16,16 @@ export interface MockPersona {
   me: Me;
 }
 
-const TENANT = "01927b3e-0000-7000-8000-00000000a001";
+export const TENANT = "01927b3e-0000-7000-8000-00000000a001";
+
+/** Mã người dùng (actor_ref) của persona G5 — UUID như hợp đồng Admin API (proposed_by, requested_by…). */
+export const G5_ACTORS = {
+  admin: "0192a5a0-0000-7000-8000-00000000a501",
+  approver: "0192a5a0-0000-7000-8000-00000000a502",
+  viewer: "0192a5a0-0000-7000-8000-00000000a503",
+  /** Người đề xuất khác (không phải persona) — để B duyệt được bản ghi chờ duyệt có sẵn. */
+  other: "0192a5a0-0000-7000-8000-00000000a504",
+} as const;
 const MKG_ORG = { ref: MKG_REF, kind: "mkg", name: "Mekong Green", admin_unit_code: null, active: true } as const;
 
 const dtCommunes = COMMUNES.filter((c) => c.province_code === "82");
@@ -161,6 +170,41 @@ export const MOCK_PERSONAS: readonly MockPersona[] = [
     roles: ["account_admin_province"],
     org: DT_ORG,
     scope: { ...DT_SCOPE, units: [...DT_SCOPE.units] },
+  }),
+  // G5 — đơn vị vận hành Public API (ADR-0022/0023). Người A đề xuất/phát hành khóa/yêu cầu bảng kê và có cả vai
+  // duyệt để thấy quy tắc không tự duyệt (R-56); người B duyệt; người xem chỉ đọc đo lường + nhật ký xuất.
+  persona({
+    id: "api-admin",
+    title: "Quản trị khách hàng Public API (A)",
+    description: "api_client_admin + api_client_approver + billing_officer + billing_approver + metering_viewer (đã qua MFA) — đề xuất, phát hành khóa, yêu cầu bảng kê; thử quy tắc không tự duyệt",
+    displayName: "Quản trị khách hàng API A (giả lập)",
+    amr: ["pwd", "otp"],
+    actor: G5_ACTORS.admin,
+    roles: ["api_client_admin", "api_client_approver", "billing_officer", "billing_approver", "metering_viewer"],
+    org: MKG_ORG,
+    scope: { all: true, level: "national", units: [] },
+  }),
+  persona({
+    id: "api-approver",
+    title: "Người duyệt khách hàng API & bảng kê (B)",
+    description: "api_client_approver + billing_approver + metering_viewer (đã qua MFA) — duyệt khách hàng, đăng ký, gói hạn mức, bảng kê",
+    displayName: "Người duyệt API B (giả lập)",
+    amr: ["pwd", "otp"],
+    actor: G5_ACTORS.approver,
+    roles: ["api_client_approver", "billing_approver", "metering_viewer"],
+    org: MKG_ORG,
+    scope: { all: true, level: "national", units: [] },
+  }),
+  persona({
+    id: "metering-viewer",
+    title: "Xem đo lường & nhật ký xuất",
+    description: "metering_viewer (đã qua MFA) — chỉ xem sổ sử dụng, bảng kê, nhật ký xuất và cảnh báo; không quản trị khách hàng",
+    displayName: "Người xem đo lường (giả lập)",
+    amr: ["pwd", "otp"],
+    actor: G5_ACTORS.viewer,
+    roles: ["metering_viewer"],
+    org: MKG_ORG,
+    scope: { all: true, level: "national", units: [] },
   }),
   // Quản trị CHƯA qua MFA: mọi lời gọi Admin API trả 403 mfa_required (thử thông báo).
   persona({

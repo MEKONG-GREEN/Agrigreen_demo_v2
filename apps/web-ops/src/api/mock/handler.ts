@@ -51,6 +51,7 @@ import { workScheduleAppRoutes } from "./kn-schedules";
 import { reportCycleAppRoutes } from "./kn-reports/routes";
 import { knAdminRoutes, supportGuard, supportRecord } from "./kn-admin";
 import { knCollectRoutes } from "./kn-collect";
+import { apiClientAdminRoutes, meteringAdminRoutes } from "./g5";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -675,6 +676,9 @@ const adminRoutes: Route[] = [
   ...cropcycleAdminRoutes,
   ...htxAdminRoutes,
   ...mrvAdminRoutes,
+  // G5: pf/apiclient (khách hàng Public API) + pf/metering (sổ sử dụng, bảng kê, DLP).
+  ...apiClientAdminRoutes,
+  ...meteringAdminRoutes,
 ];
 
 // --------------------------------------------------------------------------
@@ -687,6 +691,21 @@ function binaryFingerprint(bytes: Uint8Array): string {
   let h = 2166136261;
   for (let i = 0; i < bytes.length; i++) h = Math.imul(h ^ (bytes[i] ?? 0), 16777619) >>> 0;
   return `bin:${bytes.length}:${h.toString(16)}`;
+}
+
+/**
+ * Thân lưu cho phát lại Idempotency-Key. Phản hồi `Cache-Control: no-store` (phát hành/xoay khóa API, ADR-0022 §4)
+ * KHÔNG được giữ bí mật: bỏ `api_key` — gọi lặp trả bản không có khóa, như backend.
+ */
+function replayBody(res: Response, text: string): string {
+  if (res.headers.get("Cache-Control") !== "no-store") return text;
+  try {
+    const parsed = JSON.parse(text) as Record<string, unknown>;
+    delete parsed.api_key;
+    return JSON.stringify(parsed);
+  } catch {
+    return "{}";
+  }
 }
 
 function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; latency?: boolean }) {
@@ -738,7 +757,7 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
       const res = dispatch(routes, request, url, persona, body);
       supportRecord(request, url, res.status, "completed", key);
       if (res.ok) {
-        replay.set(key, { status: res.status, body: await res.clone().text(), headers: { "Content-Type": res.headers.get("Content-Type") ?? "application/json" }, fingerprint });
+        replay.set(key, { status: res.status, body: replayBody(res, await res.clone().text()), headers: { "Content-Type": res.headers.get("Content-Type") ?? "application/json" }, fingerprint });
       }
       return res;
     }

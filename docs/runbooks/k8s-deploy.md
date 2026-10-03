@@ -4,7 +4,7 @@ Phụ lục A, cổng G4: Kubernetes được quản trị trong lãnh thổ, t�
 
 | Thành phần | Đường dẫn |
 |---|---|
-| Chart Helm | `deploy/k8s/charts/agrigreen` (`values.yaml` + `values-dev/-staging/-prod.yaml`) |
+| Chart Helm | `deploy/k8s/charts/agrigreen` (`values.yaml` + `values-dev/-staging/-prod.yaml`; lớp Phase K `values-phasek.yaml` — [phase-k.md](phase-k.md)) |
 | Kiểm chart + bảng luồng | `deploy/k8s/check.ps1`, `make k8s-check`, `deploy/k8s/tests/check_flows.py` |
 | Ảnh PostgreSQL CNPG | `deploy/k8s/images/postgres-cnpg/Dockerfile` |
 | Bí mật dev | `deploy/k8s/scripts/dev-secrets.ps1` |
@@ -48,7 +48,7 @@ Compose (`deploy/compose`, `docker-compose.vps.yml`) vẫn là Local/Dev/demo. C
 
    Nhãn Pod của các thành phần ngoài chart phải khớp `systemSelectors` trong `values.yaml`. Kiểm thử luồng dựa vào giả định này: đổi nhãn thì đổi cả hai nơi.
 3. **Ảnh.** Build và ký mọi image vào kho image trong lãnh thổ (`global.imageRegistry`):
-   - dịch vụ Go: `Dockerfile` gốc với `--build-arg CMD=<lệnh>` cho `api-platform`, `api-internal`, `worker`, `worker-internal`, `outbox-publisher`, `ingest`, `identity-vault`, `migrate`;
+   - dịch vụ Go: `Dockerfile` gốc với `--build-arg CMD=<lệnh>` cho `api-platform`, `api-internal`, `api-public` (G5 — build và ký dù 0 bản sao), `worker`, `worker-internal`, `outbox-publisher`, `ingest`, `identity-vault`, `migrate`;
    - `optimizer`, `web-ops`, `web-internal`;
    - `cnpg-postgis-pgrouting:17-3.5` (`deploy/k8s/images/postgres-cnpg`).
 
@@ -106,6 +106,9 @@ kubectl -n agrigreen-data logs job/db-migrate-pf            # "cổng catalog: s
   | `pki/service-ca` | `tls.crt`/`tls.key` CA trung gian dịch vụ | `cert-manager` |
   | `pki/device-ca` | PIN HSM của step-ca | `agrigreen-pki` |
   | `tls/public` | chứng thư TLS công khai (CA trong lãnh thổ) | `agrigreen-pf`, `-mkg`, `-iam` |
+  | `db/pf` → `pf-public-db-roles` (G5) | chỉ vai của `api-public`: `public_api`, `apiclient_app`, `metering_app`, `cropcycle_app`, `geo_app`, `mrv_app`, `masterdata_app`, `party_app` | `agrigreen-pf` |
+  | `apikey/pf` (G5, Phase K) | `AG_APIKEY_PEPPER_V<n>` (≥ 32 byte), `AG_APIKEY_PEPPER_CURRENT`. `dataFrom.extract`: thêm phiên bản pepper chỉ ở kho | chỉ `agrigreen-pf` (`api-public`, `api-platform`) |
+  | `tls/partner` (G5, Phase K) | chứng thư `partner.<domain>` (OpenTofu `module.partner_certificate`) | `agrigreen-pf` |
 
 - **Tách vùng.** Secret có phạm vi namespace. Pod vùng mkg vì vậy không thể nhận mật khẩu vai pf và ngược lại. `check_flows.py` kiểm thêm không Pod nào tham chiếu Secret có tiền tố của vùng khác.
 - **Đổi mật khẩu vai DB:**
@@ -178,7 +181,7 @@ Dev: 1 bản mỗi thứ, không sao lưu, không HSM, `AG_ENV=dev`. NetworkPoli
 ## 9. Kiểm chart (bắt buộc trước mỗi thay đổi `deploy/k8s`)
 
 ```powershell
-powershell -File deploy/k8s/check.ps1            # helm lint --strict ×3, helm template ×3, kubeconform -strict, check_flows.py
+powershell -File deploy/k8s/check.ps1            # helm lint --strict, helm template, kubeconform -strict cho dev/staging/prod/prod-phasek; check_flows.py
 powershell -File deploy/k8s/check.ps1 -Offline   # không tải schema CRD từ mạng
 make k8s-check                                   # Linux/CI: helm lint + check_flows.py
 ```
@@ -191,14 +194,16 @@ make k8s-check                                   # Linux/CI: helm lint + check_f
 - Pod dùng Secret hoặc URL DB của vùng khác;
 - tài khoản nền tảng có quyền trên `mkg.internal`;
 - `max_locks_per_transaction` ≠ 256;
-- luật Prometheus trong chart lệch bản gốc `deploy/observability/prometheus`. Sửa luật ở bản gốc rồi chép vào `deploy/k8s/charts/agrigreen/files/`.
+- luật Prometheus trong chart lệch bản gốc `deploy/observability/prometheus`. Sửa luật ở bản gốc rồi chép vào `deploy/k8s/charts/agrigreen/files/`;
+- Public API (G5, hồ sơ `prod-phasek` = `values-prod.yaml` + `values-phasek.yaml`): `api-public` nhận từ nơi khác ngoài Ingress, ra nơi khác ngoài PgBouncer pf/DNS/OTLP (vault, RabbitMQ, DB mkg/ts/vault, Internet…); hồ sơ gốc không ở trạng thái tắt (0 bản sao, không host `partner`, không pepper); Phase K thiếu 2 bản sao/PDB/TLS/Middleware/`enforce`; `values-phasek.yaml` chứa thứ khác ngoài cấu hình và số bản sao (R-01).
 
 ## 10. OpenTofu (chờ chọn nhà cung cấp)
 
 `deploy/iac/opentofu`:
 - module trung lập nhà cung cấp: `network`, `cluster`, `node-pool`, `kms`, `object-storage`, `dns`;
 - `envs/<env>.tfvars`;
-- `provider_country` chỉ nhận `VN` (RB-7).
+- `provider_country` chỉ nhận `VN` (RB-7);
+- `phase_k` (G5, mặc định `false`): bản ghi DNS `partner.<domain>` + module `certificate` (chứng thư ghi vào `<remotePrefix>/tls/partner`) — [phase-k.md](phase-k.md) mục 3.
 
 Các module hiện chỉ ghi ý định (`terraform_data`). Khi đã chọn nhà cung cấp (VNPT, Viettel, FPT Cloud hoặc khác đạt R-82):
 1. thêm `required_providers`, `backend "s3"` trỏ kho S3 trong lãnh thổ;
@@ -209,6 +214,7 @@ Các module hiện chỉ ghi ý định (`terraform_data`). Khi đã chọn nhà
 cd deploy/iac/opentofu
 tofu init -backend=false; tofu validate
 tofu plan -var-file=envs/staging.tfvars
+tofu plan -var-file=envs/staging.tfvars -var phase_k=true   # Phase K: thêm partner + chứng thư
 ```
 
 ## 11. Tách đơn vị triển khai bằng cấu hình (RB-5) — tóm tắt
@@ -216,6 +222,7 @@ tofu plan -var-file=envs/staging.tfvars
 | Đơn vị | Namespace | Cấu hình chọn vùng |
 |---|---|---|
 | `api-platform`, `worker` | `agrigreen-pf` | `AG_PF_DB_URL`/`AG_DB_URL` → `pg-pf-pooler`; worker `AG_CLUSTERS=pf`, `AG_DB_DIRECT_URL` → `pg-pf-rw` |
+| `api-public` (G5) | `agrigreen-pf` | `AG_PF_DB_URL` → `pg-pf-pooler`; 0 bản sao ở hồ sơ gốc, 2 ở Phase K (`values-phasek.yaml`, [phase-k.md](phase-k.md)) |
 | `outbox-publisher-pf` | `agrigreen-pf` | `AG_CLUSTERS=pf`, `AG_DB_URL` → `pg-pf-rw`, vhost `/` |
 | `outbox-publisher-mkg` | `agrigreen-mkg` | `AG_CLUSTERS=mkg,ts`, `AG_MKG_DB_URL`/`AG_TS_DB_URL` → `pg-mkg-rw`/`pg-ts-rw`, van → `/`, nội bộ → `mkg.internal` |
 | `api-internal`, `worker-internal`, `ingest` | `agrigreen-mkg` | `AG_MKG_DB_URL` → `pg-mkg-pooler`, ingest `AG_TS_DB_URL` → `pg-ts-pooler` |
@@ -239,3 +246,4 @@ Tên biến `_URL` nên guard RB-7 kiểm đích ([residency.md](residency.md)).
 | ingest từ chối khởi động (CA) | `agrigreen-device-ca` phải chỉ chứa CA thiết bị ([pki.md](pki.md)) |
 | probe của kubelet thất bại ngay sau khi bật NetworkPolicy | CNI phải cho phép lưu lượng từ node tới Pod trên cùng node (mặc định của Calico/Cilium); không mở bằng NetworkPolicy |
 | `api-internal` không gọi được `api.<miền>` | luồng F25 qua DMZ; CNI phải thực thi policy sau DNAT, DNS của cụm phân giải được tên công khai |
+| `api-public` thoát lỗi khi khởi động | `AG_PUBLIC_API_ENABLED`, `AG_PUBLIC_OPERATOR_TENANT`, pepper — [phase-k.md](phase-k.md) mục 8 |

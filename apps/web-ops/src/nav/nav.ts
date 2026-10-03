@@ -1,5 +1,5 @@
 import type { ScopeLevel } from "@/auth/principal";
-import { hasRole, KN_ROLES, MRV_ROLES, ROLES, type Principal } from "@/auth/principal";
+import { API_CLIENT_ROLES, hasRole, KN_ROLES, METERING_READ_ROLES, MRV_ROLES, ROLES, type Principal } from "@/auth/principal";
 
 export type NavIcon =
   | "dashboard"
@@ -44,7 +44,8 @@ export type NavIcon =
   | "users"
   | "zap"
   | "file"
-  | "check";
+  | "check"
+  | "shield";
 
 export interface NavItem {
   href: string;
@@ -174,6 +175,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       // GIS US-SYNC-01/02: tình trạng luồng đồng bộ tích hợp, hàng chờ lỗi (DLQ).
       { href: "/quan-tri/giam-sat-dong-bo", label: "Giám sát đồng bộ", icon: "sync", roles: [ROLES.platformAdmin, ROLES.deviceAdmin] },
       { href: "/quan-tri/mau-bao-cao", label: "Mẫu & lịch báo cáo", icon: "report", roles: [ROLES.platformAdmin, ROLES.reportsAdmin, ROLES.masterdataAdmin] },
+      // G5 (ADR-0022/0023/0024): Public API cho bên thứ ba — tài khoản tenant đơn vị vận hành, Admin API (MFA).
+      { href: "/quan-tri/khach-hang-api", label: "Khách hàng Public API", icon: "key", roles: API_CLIENT_ROLES },
+      { href: "/quan-tri/su-dung-api", label: "Sử dụng Public API", icon: "chart", roles: METERING_READ_ROLES },
+      { href: "/quan-tri/bang-ke", label: "Bảng kê sử dụng", icon: "report", roles: METERING_READ_ROLES },
+      // metering_viewer của mọi tenant chủ dữ liệu (chỉ thấy tenant mình) và platform_admin.
+      { href: "/quan-tri/nhat-ky-xuat", label: "Nhật ký xuất dữ liệu", icon: "shield", roles: [ROLES.meteringViewer, ROLES.platformAdmin] },
     ],
   },
 ];

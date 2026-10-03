@@ -23,8 +23,12 @@
 | 0019 | [Định danh thiết bị cân, ký tại nguồn và đồng hồ](0019-dinh-danh-thiet-bi-va-dong-ho.md) | Đề xuất — hợp đồng dây đóng băng ở G3-0 |
 | 0020 | [Liên thông nền tảng ↔ MKG khác tenant bằng cấp quyền chia sẻ (RB-2, Q-MKG-12)](0020-lien-thong-platform-mkg-khac-tenant.md) | Chấp nhận — chủ sản phẩm chốt 29–30/09/2026; hiện thực ở pf 000042 |
 | 0021 | [Hạ tầng Kubernetes G4 — operator, PKI, bí mật và tách vùng bằng cấu hình](0021-ha-tang-kubernetes-g4.md) | Đề xuất — hiện thực ở G4 (`deploy/k8s`, `deploy/iac`) |
-| 0026 | [Xuất bản báo cáo tổng hợp sang Google Sheets (Báo cáo Chi cục KN v7.7, RB-7)](0026-xuat-google-sheets.md) | Đề xuất — bộ chuyển tắt mặc định, chờ khách Q-14 (0022–0025 dùng ở nhánh G5) |
+| 0022 | [Public API cho bên thứ ba — đơn vị triển khai riêng, khóa API lưu băm, scope, quota](0022-public-api-ben-thu-ba.md) | Đề xuất — nền móng G5-0 |
+| 0023 | [`pf/metering` — sổ đo lường sử dụng là chứng từ, bộ đếm hạn mức, bảng kê theo kỳ](0023-so-do-luong-su-dung-metering.md) | Đề xuất — nền móng G5-0 |
+| 0024 | [Một điểm kiểm soát xuất dữ liệu (DLP) cho van, Public API, gói MRV, báo cáo](0024-diem-kiem-soat-xuat-du-lieu-dlp.md) | Đề xuất — nền móng G5-0 |
+| 0025 | [Hồ sơ cấp phát Phase K — cấu hình, số bản sao, tenant bên thứ ba, đơn vị thẩm định](0025-ho-so-cap-phat-phase-k.md) | Đề xuất — nền móng G5-0 |
+| 0026 | [Xuất bản báo cáo tổng hợp sang Google Sheets (Báo cáo Chi cục KN v7.7, RB-7)](0026-xuat-google-sheets.md) | Đề xuất — bộ chuyển tắt mặc định, chờ khách Q-14 |
 
 ADR 0006, 0007, 0009, 0010, 0011 được chủ sản phẩm chấp nhận ngày 30/09/2026 trong phiên làm việc. Bảng đối chiếu cam kết → mã → kiểm thử ở [trien-khai-g1.md](trien-khai-g1.md).
 
-ADR 0001–0008 là danh sách bắt buộc ở Phụ lục B của tài liệu kiến trúc. ADR 0009–0016 phát sinh khi tổng hợp BRD và khi dựng G0. ADR 0017–0019 là nền của cổng G3 ([g3-conventions](../dev/g3-conventions.md)). ADR-0020 đóng câu hỏi RB-2 (MKG là tenant riêng). ADR-0021 ghi các lựa chọn hạ tầng của cổng G4.
+ADR 0001–0008 là danh sách bắt buộc ở Phụ lục B của tài liệu kiến trúc. ADR 0009–0016 phát sinh khi tổng hợp BRD và khi dựng G0. ADR 0017–0019 là nền của cổng G3 ([g3-conventions](../dev/g3-conventions.md)). ADR-0020 đóng câu hỏi RB-2 (MKG là tenant riêng). ADR-0021 ghi các lựa chọn hạ tầng của cổng G4. ADR 0022–0025 là nền của cổng G5 ([g5-conventions](../dev/g5-conventions.md)): Public API, `pf/metering`, điểm kiểm soát xuất dữ liệu, hồ sơ Phase K.

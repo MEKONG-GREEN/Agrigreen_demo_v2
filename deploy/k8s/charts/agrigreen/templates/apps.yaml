@@ -2,6 +2,9 @@
 Đơn vị triển khai (mục 5): mỗi app một Deployment trong namespace của vùng. Bí mật CHỈ từ Secret
 cùng namespace (secretEnv, envFromSecrets) — Pod vùng mkg không thể nhận bí mật của vùng pf.
 Cứng hóa (mục 18): non-root, rootfs chỉ đọc, bỏ capability, seccomp, không gắn token ServiceAccount.
+replicas: 0 là hợp lệ (đơn vị có mã nhưng tắt theo cấu hình, R-01 — vd api-public ở ĐTK 1/G4).
+envFromSecrets: tên Secret, hoặc {secret, optional: true} cho Secret chỉ có khi một hồ sơ bật (Phase K).
+metrics: {enabled, port, path, service?} → cổng số đo + ServiceMonitor (chỉ khi tiến trình phục vụ /metrics).
 */ -}}
 {{- $root := . }}
 {{- range $name, $app := .Values.apps }}
@@ -9,7 +12,9 @@ Cứng hóa (mục 18): non-root, rootfs chỉ đọc, bỏ capability, seccomp,
 {{- $ns := include "agrigreen.ns" (dict "root" $root "zone" $app.zone) }}
 {{- $uid := $app.runAsUser | default 65532 }}
 {{- $res := index $root.Values.common.resources ($app.size | default "medium") }}
-{{- $ports := $app.ports | default dict }}
+{{- $ports := deepCopy ($app.ports | default dict) }}
+{{- $metricsOn := and $app.metrics $app.metrics.enabled }}
+{{- if $metricsOn }}{{- $_ := set $ports "metrics" $app.metrics.port }}{{- end }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -32,7 +37,7 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
 {{- if not (and $app.hpa $app.hpa.enabled) }}
-  replicas: {{ $app.replicas | default 1 }}
+  replicas: {{ ternary $app.replicas 1 (hasKey $app "replicas") }}
 {{- end }}
   revisionHistoryLimit: 5
   strategy:
@@ -93,7 +98,11 @@ spec:
 {{- with $app.envFromSecrets }}
           envFrom:
 {{- range . }}
+{{- if kindIs "map" . }}
+            - secretRef: { name: {{ .secret }}{{ if .optional }}, optional: true{{ end }} }
+{{- else }}
             - secretRef: { name: {{ . }} }
+{{- end }}
 {{- end }}
 {{- end }}
           resources: {{ toJson $res }}
@@ -167,9 +176,29 @@ spec:
   selector:
     app.kubernetes.io/name: {{ $name }}
   ports:
-{{- range $svc.ports }}
+{{- $svcPorts := $svc.ports }}
+{{- if and $metricsOn (eq $svc.name ($app.metrics.service | default $name)) }}{{- $svcPorts = append $svcPorts "metrics" }}{{- end }}
+{{- range $svcPorts }}
     - { name: {{ . }}, port: {{ index $ports . }}, targetPort: {{ . }}, protocol: TCP }
 {{- end }}
+{{- end }}
+{{- if and $metricsOn $root.Values.observability.enabled }}
+---
+# Thu số đo trực tiếp (chỉ khi tiến trình phục vụ /metrics). Mặc định dịch vụ Go đẩy OTLP → otel-collector
+# (ServiceMonitor otel-collector ở agrigreen-ops), nên metrics.enabled để false.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $name }}
+  namespace: {{ $ns }}
+  labels: {{- include "agrigreen.labels" (dict "root" $root "zone" $app.zone) | nindent 4 }}
+    app.kubernetes.io/name: {{ $name }}
+{{- toYaml $root.Values.observability.selectorLabels | nindent 4 }}
+spec:
+  selector:
+    matchLabels: { app.kubernetes.io/name: {{ $name }} }
+  endpoints:
+    - { port: metrics, path: {{ $app.metrics.path | default "/metrics" }}, interval: {{ $root.Values.observability.scrapeInterval }} }
 {{- end }}
 {{- with $app.pdb }}
 ---

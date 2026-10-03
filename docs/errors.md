@@ -83,10 +83,10 @@ Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính m�
 | 422 | `party.membership_reason_required` | pf/party: đổi thành viên HTX phải nêu lý do 10–500 ký tự |
 | 404 | `party.share_grant_not_found` | pf/party (ADR-0020): không có cấp quyền chia sẻ trong tenant bên cấp của người gọi (bên nhận không xem được sổ của bên cấp) |
 | 409 | `party.share_grant_state` | pf/party (ADR-0020): chỉ duyệt được bản `proposed` còn hạn; bản đã thu hồi không thao tác được nữa |
-| 403 | `party.share_grant_missing` | pf/party (ADR-0020): bề mặt đối tác `/v1/partner/*` — tenant người gọi không có cấp quyền chia sẻ ĐANG HIỆU LỰC (đã duyệt, trong hạn, chưa thu hồi) có loại dữ liệu này, hoặc `grantor` không cấp cho tenant người gọi. Cũng trả cho `GET /v1/cropcycle/htx-collection/responses` (bí danh) |
+| 403 | `party.share_grant_missing` | pf/party (ADR-0020): bề mặt đối tác `/v1/partner/*` — tenant người gọi không có cấp quyền chia sẻ ĐANG HIỆU LỰC (đã duyệt, trong hạn, chưa thu hồi) có loại dữ liệu này, hoặc `grantor` không cấp cho tenant người gọi. Cũng trả cho `GET /v1/cropcycle/htx-collection/responses` (bí danh). G5 (ADR-0022): `GrantLookup.ActiveGrant` của Public API trả mã này khi bên thứ ba không có cấp quyền `dp_*` đang hiệu lực tại thời điểm gọi, hoặc khi loại không phải `dp_*` (cổng không vai OIDC chỉ mở cho sản phẩm dữ liệu) — `cmd/api-public` đổi thành 403 `apiclient.forbidden` |
 | 422 | `party.share_grantor_ambiguous` | pf/party (ADR-0020): nhiều tenant bên cấp cùng cấp loại dữ liệu này cho tenant người gọi — truyền tham số `grantor` |
 | 404 | `party.partner_not_found` | pf/party (ADR-0020): `GET /v1/partner/cooperatives/{ref}` — bên cấp không có HTX này (lần đọc vẫn được ghi sổ) |
-| 503 | `party.partner_audit_unavailable` | pf/party (ADR-0020): không ghi được sổ đọc `pf_party.partner_read_log` — bề mặt đối tác không trả dữ liệu chưa ghi sổ |
+| 503 | `party.partner_audit_unavailable` | pf/party (ADR-0020): không ghi được sổ đọc `pf_party.partner_read_log` — bề mặt đối tác (`/v1/partner/*`) và Public API (`api-public`, K-05) không trả dữ liệu chưa ghi sổ |
 | 404 | `party.department_not_found` | pf/party (KN v7.7 FN-AD-04.03): không có phòng ban (hoặc đã xóa khi tra theo mã) |
 | 409 | `party.department_code_taken` | pf/party (FN-AD-04.03): mã phòng ban đã có trong đơn vị — kể cả phòng ban đã xóa (mã không tái sử dụng) |
 | 409 | `party.department_state` | pf/party (FN-AD-04.03): phòng ban đã ở trạng thái yêu cầu, hoặc đã xóa |
@@ -401,7 +401,7 @@ Cổng `geo.GpsLog.RecordFix` (module khác gọi, không qua HTTP) trả lỗi 
 | 404 | `cropcycle.collection_statement_not_found` | pf/cropcycle (G3-2): không có bảng kê thu gom MKG trong phạm vi (quản lý HTX chỉ thấy bảng kê của HTX mình) |
 | 409 | `cropcycle.collection_statement_stale` | pf/cropcycle (G3-2): phản hồi theo `revision` cũ — MKG đã gửi bản sửa; `current_revision` là bản hiện hành |
 | 403 | `cropcycle.collection_manager_only` | pf/cropcycle (G3-2): chỉ `coop_manager` của đúng HTX (`org_ref`) được xác nhận/tranh chấp bảng kê |
-| 503 | `cropcycle.dependency_unavailable` | pf/cropcycle: chưa nối hoặc không gọi được pf/geo, pf/party, pf/masterdata, liên kết tài khoản ↔ nông hộ (vai `farmer`); consumer `pf.cropcycle.gps_log` chưa nối log GPS pf/geo (sự kiện được giao lại) |
+| 503 | `cropcycle.dependency_unavailable` | pf/cropcycle: chưa nối hoặc không gọi được pf/geo, pf/party, pf/masterdata, liên kết tài khoản ↔ nông hộ (vai `farmer`); consumer `pf.cropcycle.gps_log` chưa nối log GPS pf/geo (sự kiện được giao lại). G5: nguồn sản phẩm `collection_volume` chưa nối `geoport.PlotFacts` / `AdminUnits` hoặc không đọc được |
 
 Nhãn vị trí (HTX US-GPS-01/02): `location_status` = `match` (≤ `cropcycle.gps_match_tolerance_m`, mặc định 50 m) | `mismatch` | `missing`; nguồn `gps_source` luôn có. Thiếu GPS hoặc không đo được **không** chặn lưu.
 
@@ -417,6 +417,8 @@ Nhãn vị trí (HTX US-GPS-01/02): `location_status` = `match` (≤ `cropcycle.
 | 429 | `notify.nudge_rate_limited` | pf/notify: đích đã được yêu cầu đồng bộ trong 5 phút qua, hoặc người gọi vượt 30 lần/giờ; có `retry_after_s` và header `Retry-After` |
 | 422 | `notify.nudge_entity_unknown` | pf/notify: `entities[]` của `POST /v1/sync/nudge` có tên không phải entity chiều xuống của pf/sync (KN US-SYNC-02) |
 | 503 | `notify.dependency_unavailable` | pf/notify: chưa nối sổ thiết bị của pf/sync |
+
+Consumer `pf.notify.egress_anomaly` (G5, ADR-0024) không trả mã HTTP: payload `pf.metering.egress.anomaly_detected` hỏng → lỗi consumer, giao lại rồi vào `pf.notify.egress_anomaly.dlq` (R-62); giao lặp → inbox bỏ qua (R-61).
 ### pf/accounts
 
 Tài khoản cán bộ quản lý trong Keycloak qua Admin REST (KN US-ADM-01..03, HTX US-ACC-01/02, US-HTXSTATUS-01..03, CGH FN-01). Lỗi không bao giờ chứa họ tên, email, SĐT hay thân phản hồi của Keycloak (R-14).
@@ -788,3 +790,47 @@ Proxy khử định danh cho nguồn dữ liệu ngoài — thời tiết, độ
 | 502 | `extdata.provider_unavailable` | pf/extdata: nhà cung cấp không phản hồi, trả mã khác 200, thân không phải JSON, quá lớn hoặc loại tile không cho phép. Lỗi không nêu URL (có thể chứa khóa API) |
 
 Tọa độ sai dạng, thiếu `lat`/`lon`, `z/x/y` không phải số trả `validation_failed`.
+
+### pf/apiclient (Public API — `cmd/api-public`, `contracts/openapi/public.yaml`; G5-0 đóng băng, ADR-0022)
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 401 | `apiclient.unauthenticated` | Khóa API thiếu, sai dạng, sai, đã thu hồi, hết hạn, hoặc khách hàng không `active` — không nói lý do; không ghi sổ sử dụng (chỉ log `key_prefix` + metric) |
+| 403 | `apiclient.forbidden` | Thiếu scope, thiếu cấp quyền `dp_<sản phẩm>` đang hiệu lực của bên cấp, hoặc sản phẩm không phục vụ ở môi trường này (dự thảo ở production) — không nói thiếu điều kiện nào |
+| 404 | `apiclient.unknown_product` | Không có sản phẩm dữ liệu với tên này |
+| 429 | `apiclient.rate_limited` | Vượt giới hạn tần suất mỗi phút của gói (`Retry-After`) |
+| 500 | `apiclient.contract_violation` | Phần tử sắp trả có trường ngoài hợp đồng `contracts/dataproduct` — không trả gì, cảnh báo vận hành |
+| 403 | `apiclient.self_approval` | Admin API: người duyệt khách hàng / đăng ký sản phẩm / gói hạn mức là người đề xuất (R-56) |
+| 409 | `apiclient.too_many_keys` | Admin API: khách hàng đã có tối đa 2 khóa hiệu lực |
+| 422 | `apiclient.export_too_large` | Yêu cầu xuất vượt `max_export_rows` của gói. Phát hiện ở worker (số ô chỉ biết khi dựng tệp) → job `failed` với `error_code = apiclient.export_too_large` ở `GET /v1/jobs/{id}` |
+| 404 | `apiclient.client_not_found` | Admin API: không có khách hàng API (hoặc thuộc đơn vị vận hành khác — RLS) |
+| 404 | `apiclient.key_not_found` | Admin API: không có khóa API của khách hàng này |
+| 404 | `apiclient.subscription_not_found` | Admin API: không có đăng ký sản phẩm của khách hàng này |
+| 404 | `apiclient.plan_not_found` | Admin API: không có phiên bản gói hạn mức |
+| 409 | `apiclient.state` | Admin API: bản ghi không ở trạng thái cho phép (duyệt bản không phải `proposed`, phát hành khóa cho khách hàng chưa `active`, xoay khóa không `active`, đăng ký trùng sản phẩm chưa thu hồi, thao tác trên khách hàng đã thu hồi) |
+| 403 | `apiclient.not_operator_tenant` | Admin API: người gọi không thuộc tenant đơn vị vận hành `AG_PUBLIC_OPERATOR_TENANT` (khi biến được đặt) |
+| 503 | `apiclient.dependency_unavailable` | Phụ thuộc chưa sẵn sàng: pepper khóa (`AG_APIKEY_PEPPER_V<n>`) khi phát hành/xoay/xác thực, nguồn sản phẩm của module chủ dữ liệu, kho đối tượng của tệp xuất (tích hợp G5: `api-public` cần `AG_S3_*` + khóa chỉ đọc `pf-public-s3` / luồng F29 để phát luồng `GET /v1/jobs/{id}/file`) — không trả dữ liệu |
+| 404 | `apiclient.job_not_found` | Public API: không có việc xuất, hoặc việc xuất của khách hàng khác |
+| 409 | `apiclient.job_not_ready` | Public API: `GET /v1/jobs/{id}/file` khi job chưa `completed` (hoặc `failed`) |
+
+Mã `error_code` của job `failed` (không phải phản hồi HTTP): `apiclient.export_too_large`, `apiclient.contract_violation` (một ô sai hợp đồng — không dựng tệp), `apiclient.export_not_supported` (sản phẩm không có xuất), `apiclient.unknown_product` (hợp đồng đổi phiên bản sau khi yêu cầu), `apiclient.export_conflict` (đã có tệp khác nội dung dưới cùng khóa đối tượng).
+
+Public API dùng thêm mã dùng chung: `idempotency_key_required` (400, POST thiếu `Idempotency-Key`), `idempotency_key_reused` (422, cùng khóa khác thân hoặc khác bên cấp), `validation_failed` (422, tham số lọc / `grantor` sai dạng). Mọi lời gọi đã xác thực — kể cả 4xx/5xx sau xác thực — có đúng một dòng sổ `pf_metering.usage_event`; ghi sổ lỗi → `503 metering.unavailable` và không có byte dữ liệu.
+
+Khóa API **không bao giờ** xuất hiện trong lỗi, log, URL, sự kiện (R-14, R-92); chỉ `key_prefix`.
+
+### pf/metering (sổ đo lường sử dụng, điểm kiểm soát xuất dữ liệu, bảng kê — G5-0 đóng băng, ADR-0023, ADR-0024)
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 503 | `metering.unavailable` | Public API: không ghi được sổ sử dụng — **không trả dữ liệu** (đóng khi lỗi) |
+| 429 | `metering.quota_exceeded` | Vượt hạn mức đơn vị ngày/tháng của gói (`Retry-After` tới đầu cửa sổ kế tiếp); dòng sổ vẫn ghi với `units = 0` |
+| 429 | `metering.egress_quota_exceeded` | Điểm kiểm soát xuất (`AG_EGRESS_MODE=enforce`) từ chối: vượt hạn mức kênh `metering.egress.<kênh>.daily_records_quota`. Trả ở: `POST /v1/reports/exports`, `GET /v1/reports/exports/{id}/download` (kênh `report_export`, SAU hạn mức người/ngày `reports.export_quota_exceeded`; lối lịch bỏ mốc, không lỗi job); `POST /v1/mrv/exports`, `GET /v1/mrv/exports/{id}/package` (kênh `mrv_package`, không tạo job / không cấp URL); `/v1/partner/*` (kênh `partner_share`, không ghi sổ đọc, không trả dữ liệu). Kênh `valve` (consumer `pf.geo.hub_valve`, `pf.cropcycle.htx_collection_valve`, `pf.mrv.collection_evidence`): lỗi consumer, không ghi, giao lại → DLQ |
+| 503 | `metering.egress_unavailable` | Điểm kiểm soát xuất lỗi ở chế độ `enforce` — không xuất (ở `observe` chỉ log `event=egress outcome=checkpoint_error` + metric, thao tác tiếp tục). Cùng các lối như `metering.egress_quota_exceeded` |
+| 403 | `metering.self_approval` | Người duyệt bảng kê là người yêu cầu lập (R-56) |
+| 409 | `metering.statement_frozen` | Bảng kê đã duyệt — lập bảng kê bù (`supersedes_id`) |
+| 409 | `metering.period_not_ended` | Yêu cầu lập bảng kê cho kỳ chưa kết thúc (giờ Việt Nam) |
+| 429 | `metering.egress_quota_exceeded` (Public API) | Ở `Ledger.Record` checkpoint kênh `public_api` luôn `enforce`: vượt hạn mức kênh của **chủ dữ liệu** → dòng sổ sử dụng `status = 429`, `units = 0`, không phục vụ dữ liệu |
+| 409 | `metering.statement_frozen` (bảng kê bù) | Bảng kê cần thay đã bị thay bởi bảng kê khác (`superseded_by`) — bù cho bảng kê hiện hành; duyệt bảng kê đã bị thay cũng trả mã này |
+| 404 | `metering.not_found` | Admin API: không có bảng kê / yêu cầu lập bảng kê (hoặc thuộc tenant khác — RLS); bảng kê bù trỏ tới bảng kê không cùng khách hàng/kỳ |
+| 503 | `metering.dependency_unavailable` | Module chưa nối pool `metering_app` |

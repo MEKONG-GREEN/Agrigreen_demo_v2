@@ -25,3 +25,6 @@ buckets = {
   "vault-backup" = { purpose = "pgBackRest vault (staging)", versioning = true, object_lock = true, retention_days = 14, replicate = false }
   "tofu-state"   = { purpose = "trạng thái OpenTofu", versioning = true, object_lock = false, retention_days = 0, replicate = false }
 }
+
+# Phase K (G5, ADR-0025): partner.<domain> + chứng thư. Bật bằng cấu hình (R-01) khi khách chốt bên thứ ba đầu tiên.
+phase_k = false

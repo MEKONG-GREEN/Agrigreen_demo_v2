@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.metering.egress.anomaly_detected/v1",
+  "title": "pf.metering.egress.anomaly_detected — payload",
+  "description": "G5 (ADR-0024, mục 18 DLP): lần ĐẦU trong ngày (giờ Việt Nam) khối lượng xuất của (tenant chủ dữ liệu × kênh × bên nhận) vượt ngưỡng bất thường (anomaly_factor × trung vị 28 ngày, hoặc ngưỡng tuyệt đối khi chưa đủ 7 ngày mẫu). Tenant phong bì = chủ dữ liệu. Consumer pf.notify.egress_anomaly báo quản trị nền tảng của tenant đó. Chỉ mã tham chiếu, không dữ liệu cá nhân.",
+  "x-event-type": "pf.metering.egress.anomaly_detected",
+  "x-schema-version": 1,
+  "x-producer": "pf/metering",
+  "type": "object",
+  "required": ["egress_event_id", "channel", "product", "counterparty_kind", "counterparty_ref", "business_date", "daily_records", "threshold", "basis", "mode", "detected_at"],
+  "properties": {
+    "egress_event_id":   { "type": "string", "format": "uuid", "description": "Dòng egress_event làm vượt ngưỡng" },
+    "channel":           { "type": "string", "enum": ["public_api", "mrv_package", "report_export", "valve", "partner_share"] },
+    "product":           { "type": "string", "description": "Sản phẩm dữ liệu / hợp đồng van / mẫu báo cáo / mrv_package" },
+    "counterparty_kind": { "type": "string", "enum": ["api_client", "tenant", "actor"] },
+    "counterparty_ref":  { "type": "string", "format": "uuid" },
+    "business_date":     { "type": "string", "format": "date" },
+    "daily_records":     { "type": "integer", "minimum": 1 },
+    "threshold":         { "type": "integer" },
+    "basis":             { "type": "string", "enum": ["median", "absolute"] },
+    "mode":              { "type": "string", "enum": ["observe", "enforce"] },
+    "detected_at":       { "type": "string", "format": "date-time" }
+  }
+}

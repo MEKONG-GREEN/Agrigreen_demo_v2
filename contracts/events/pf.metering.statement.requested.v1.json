@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.metering.statement.requested/v1",
+  "title": "pf.metering.statement.requested — payload",
+  "description": "G5 (ADR-0023 mục 4): yêu cầu lập bảng kê sử dụng Public API của kỳ tháng đã ghi job ở pf_metering (tenant đơn vị vận hành, mẫu mục 12). Worker (consumer pf.metering.statement) chụp tổng sổ usage_event của kỳ (first/last seq, băm cuối chuỗi, SHA-256 ảnh chụp) và ghi bảng kê draft. client_id null = mọi khách hàng.",
+  "x-event-type": "pf.metering.statement.requested",
+  "x-schema-version": 1,
+  "x-producer": "pf/metering",
+  "type": "object",
+  "required": ["job_id", "period", "client_id", "requested_by", "requested_at"],
+  "properties": {
+    "job_id":       { "type": "string", "format": "uuid" },
+    "period":       { "type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$", "description": "Kỳ tháng YYYY-MM giờ Việt Nam" },
+    "client_id":    { "type": ["string", "null"], "format": "uuid" },
+    "requested_by": { "type": "string", "format": "uuid", "description": "actor_ref billing_officer" },
+    "requested_at": { "type": "string", "format": "date-time" }
+  }
+}

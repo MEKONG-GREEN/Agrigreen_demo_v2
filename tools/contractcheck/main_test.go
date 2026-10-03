@@ -162,6 +162,52 @@ func TestTestdataBad(t *testing.T) {
 	}
 }
 
+// G5 (ADR-0022 mục 9): sản phẩm dữ liệu Public API — mặc định từ chối, đúng kiểu, chỉ vùng nền tảng,
+// tag OpenAPI, không dữ liệu cá nhân.
+func TestDataProductContracts_G5(t *testing.T) {
+	const prod = `{"name":"x_prod","version":1,"owner":"pf/apiclient","sources":["pf/geo"],"data_owner":"bên cấp",
+	"grant_kind":"dp_x_prod","scopes":["dp:x_prod:read"],"route":"GET /v1/data/x","status":"draft",
+	"proposed_by":"a","approved_by":"b","approved_at":"2026-10-01","purpose":"p","personal_data":false,
+	"type":"object","required":["code"],"properties":{"code":{"type":"string"},"rolls":{"type":"integer"}}}`
+	root := t.TempDir()
+	write(t, root, "internal/platform/apiclient/port/p.go", "package port\n\n//ag:dataproduct x_prod\ntype X struct {\n\tCode string `json:\"code\"`\n\tRolls int64 `json:\"rolls\"`\n}\n")
+	p, _ := Check(root, "")
+	if len(p) != 1 || !strings.Contains(p[0], "mặc định từ chối") {
+		t.Fatalf("không có hợp đồng phải bị từ chối: %v", p)
+	}
+	write(t, root, "contracts/dataproduct/x_prod.json", prod)
+	p, _ = Check(root, "")
+	if len(p) != 1 || !strings.Contains(p[0], "thiếu contracts/openapi/public.yaml") {
+		t.Fatalf("thiếu public.yaml phải bị bắt: %v", p)
+	}
+	write(t, root, "contracts/openapi/public.yaml", "openapi: 3.1.0\ntags:\n  - name: other\n")
+	if p, _ = Check(root, ""); len(p) != 1 || !strings.Contains(p[0], `không có tag "x_prod"`) {
+		t.Fatalf("thiếu tag phải bị bắt: %v", p)
+	}
+	write(t, root, "contracts/openapi/public.yaml", "openapi: 3.1.0\ntags:\n  - name: x_prod\n")
+	if p, _ = Check(root, ""); len(p) != 0 {
+		t.Fatalf("hợp đồng khớp phải qua: %v", p)
+	}
+	// Trường ngoài hợp đồng + sai kiểu.
+	write(t, root, "internal/platform/apiclient/port/p.go", "package port\n\n//ag:dataproduct x_prod\ntype X struct {\n\tCode string `json:\"code\"`\n\tRolls string `json:\"rolls\"`\n\tHousehold string `json:\"household_ref\"`\n}\n")
+	joined := func() string { p, _ := Check(root, ""); return strings.Join(p, "\n") }
+	if j := joined(); !strings.Contains(j, "X.household_ref không có trong hợp đồng sản phẩm dữ liệu x_prod") || !strings.Contains(j, "X.rolls kiểu Go ra JSON string") {
+		t.Fatalf("trường lạ / sai kiểu phải bị bắt:\n%s", j)
+	}
+	// Chỉ vùng nền tảng.
+	write(t, root, "internal/platform/apiclient/port/p.go", "package port\n")
+	write(t, root, "internal/mkg/hub/port/p.go", "package port\n\n//ag:dataproduct x_prod\ntype X struct {\n\tCode string `json:\"code\"`\n}\n")
+	if j := joined(); !strings.Contains(j, "//ag:dataproduct chỉ dùng trong internal/platform") {
+		t.Fatalf("chú thích ở vùng mkg phải bị bắt:\n%s", j)
+	}
+	write(t, root, "internal/mkg/hub/port/p.go", "package port\n")
+	// Dữ liệu cá nhân / tự phê duyệt → hợp đồng coi như không có.
+	write(t, root, "contracts/dataproduct/x_prod.json", strings.Replace(strings.Replace(prod, `"personal_data":false`, `"personal_data":true`, 1), `"approved_by":"b"`, `"approved_by":"a"`, 1))
+	if j := joined(); !strings.Contains(j, "personal_data phải khai và bằng false") || !strings.Contains(j, "approved_by phải khác proposed_by") {
+		t.Fatalf("siêu dữ liệu sai phải bị bắt:\n%s", j)
+	}
+}
+
 func TestFileNameMustMatch(t *testing.T) {
 	root := t.TempDir()
 	write(t, root, "contracts/events/pf.party.consent.recorded.v2.json", schema)

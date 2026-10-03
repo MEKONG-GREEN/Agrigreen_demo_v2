@@ -90,6 +90,8 @@ const PATHS: Record<IconName, string> = {
   journal: "M5 3h11a3 3 0 0 1 3 3v15H8a3 3 0 0 1-3-3zM5 18a3 3 0 0 1 3-3h11M9 7h6M9 11h4",
   approve: "M9 11l3 3 8-8M4 4h9M4 9h4M4 14h4M4 19h14",
   harvest: "M4 20h16M6 20V10l6-6 6 6v10M10 20v-5h4v5",
+  key: "M15 7a4 4 0 1 1-3.9 4.9L3 20v-3h3v-3h3l1.1-1.1A4 4 0 0 1 15 7zM16.5 9.5h.01",
+  shield: "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4",
   chart: "M3 3v18h18M7 15l4-4 3 3 6-7",
   qr: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3",
   support: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01",

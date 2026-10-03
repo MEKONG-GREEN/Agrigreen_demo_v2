@@ -6,10 +6,13 @@
 package party
 
 import (
+	"log/slog"
+
 	"github.com/gin-gonic/gin"
 
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -79,6 +82,15 @@ func (m *Module) PartnerAccess() port.PartnerAccess { return m.share }
 
 // ValveGrants cho consumer van của nền tảng tìm tenant bên cấp của phong bì van (ADR-0020, qua port).
 func (m *Module) ValveGrants() port.ValveGrants { return m.share }
+
+// GrantLookup (G5, ADR-0022 mục 3) cho cmd/api-public kiểm cấp quyền dp_* của bên thứ ba (không vai OIDC).
+func (m *Module) GrantLookup() port.GrantLookup { return m.share }
+
+// UseEgress (G5, ADR-0024) nối điểm kiểm soát xuất (pf/metering) cho kênh partner_share của
+// RecordRead (bề mặt /v1/partner/*). cp nil → hành vi cũ.
+func (m *Module) UseEgress(cp meteringport.Checkpoint, mode meteringport.Mode, log *slog.Logger) {
+	m.share.Egress, m.share.EgressMode, m.share.Log = cp, mode, log
+}
 
 // ConsentChecker cho module khác (qua port).
 func (m *Module) ConsentChecker() port.ConsentChecker { return m.svc }

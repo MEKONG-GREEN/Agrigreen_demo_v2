@@ -223,6 +223,12 @@ var (
 			{Key: "admin.qt.cong_cu.xung_dot", Label: "Xung đột đồng bộ", Route: "/quan-tri/xung-dot", Icon: "conflict"},
 			{Key: "admin.qt.cong_cu.giam_sat", Label: "Giám sát đồng bộ", Route: "/quan-tri/giam-sat-dong-bo", Icon: "sync"},
 			{Key: "admin.qt.cong_cu.thiet_bi", Label: "Đồng bộ thiết bị", Route: "/dong-bo", Icon: "sync"},
+			// G5 (ADR-0022/0023/0024): Public API cho bên thứ ba — màn tự kiểm vai (api_client_*, metering_viewer,
+			// billing_*, platform_admin); menu Admin chỉ để tới được màn.
+			{Key: "admin.qt.cong_cu.khach_hang_api", Label: "Khách hàng Public API", Route: "/quan-tri/khach-hang-api", Icon: "key"},
+			{Key: "admin.qt.cong_cu.su_dung_api", Label: "Sử dụng Public API", Route: "/quan-tri/su-dung-api", Icon: "chart"},
+			{Key: "admin.qt.cong_cu.bang_ke", Label: "Bảng kê sử dụng", Route: "/quan-tri/bang-ke", Icon: "report"},
+			{Key: "admin.qt.cong_cu.nhat_ky_xuat", Label: "Nhật ký xuất dữ liệu", Route: "/quan-tri/nhat-ky-xuat", Icon: "shield"},
 		}},
 	}}
 )

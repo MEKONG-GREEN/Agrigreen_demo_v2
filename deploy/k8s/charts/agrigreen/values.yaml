@@ -59,6 +59,7 @@ external:
   hsm: []                  # HSM mạng của CA thiết bị
   nodes: []                # dải node (Prometheus thu kubelet/node-exporter)
   gitRepo: []              # kho mã GitOps trong lãnh thổ (Argo CD)
+  valkey: []               # Valkey trong lãnh thổ cho giới hạn tần suất dùng chung của api-public (ADR-0022 mục 7, Q5-10) — tùy chọn
 ports:
   ingressController: [8000, 8443]   # cổng container của bộ điều khiển Ingress (Traefik: web/websecure)
   kubeAPI: [443, 6443]
@@ -240,7 +241,10 @@ apps:
       AG_VAULT_CLIENT_CERT: /certs/vault-client/tls.crt
       AG_VAULT_CLIENT_KEY: /certs/vault-client/tls.key
       AG_CORS_ORIGINS: "https://ops.{{ .Values.global.domain }}"
-    envFromSecrets: [pf-db-roles]
+      # Điểm kiểm soát xuất (ADR-0024): observe ở ĐTK 1/G4, enforce ở Phase K (values-phasek.yaml).
+      AG_EGRESS_MODE: observe
+    # pf-apikey-pepper: Admin API cấp khóa API cần pepper (ADR-0022 mục 4). Chỉ có Secret khi Phase K bật.
+    envFromSecrets: [pf-db-roles, { secret: pf-apikey-pepper, optional: true }]
     secretEnv:
       - { name: AG_SYNC_CURSOR_KEY, secret: pf-app, key: AG_SYNC_CURSOR_KEY }
       - { name: AG_KC_CLIENT_SECRET, secret: pf-app, key: AG_KC_CLIENT_SECRET }
@@ -276,6 +280,7 @@ apps:
       AG_KC_REALM: agrigreen
       AG_KC_CLIENT_ID: agrigreen-accounts
       AG_WEB_OPS_URL: "https://ops.{{ .Values.global.domain }}"
+      AG_EGRESS_MODE: observe   # ADR-0024; Phase K: enforce
     envFromSecrets: [pf-db-roles, pf-db-outbox]
     secretEnv:
       - { name: AG_AMQP_URL, secret: amqp-pf-worker, key: url }
@@ -343,6 +348,47 @@ apps:
       NEXT_PUBLIC_API_MOCK: "0"
     tmpDirs: [/tmp, /app/.next/cache]
     pdb: { minAvailable: 1 }
+
+  # Public API cho bên thứ ba (ADR-0022): tiến trình riêng cmd/api-public, bề mặt partner.<domain>.
+  # ĐTK 1 / G4: TẮT — 0 bản sao, không host ingress (ingress.optionalHosts.partner), AG_PUBLIC_API_ENABLED
+  # không đặt (tiến trình thoát lỗi nếu lỡ chạy). Image vẫn build và ký. Bật = values-phasek.yaml (ADR-0025).
+  # Chỉ ra: PgBouncer cụm pf (F19), kho đối tượng trong lãnh thổ 443 (F29 — phát luồng tệp xuất, khóa CHỈ ĐỌC),
+  # DNS, OTLP (F50); Valkey (F26) / Keycloak (F28) / số đo (F27) khi cấu hình.
+  # KHÔNG RabbitMQ, identity-vault, DB mkg/ts/vault, Internet (check_flows.py).
+  api-public:
+    zone: pf
+    image: { repository: api-public }
+    replicas: 0
+    size: medium
+    ports: { http: 8085 }
+    services: [{ name: api-public, ports: [http] }]
+    probes: { readiness: { path: /readyz, port: http }, liveness: { path: /healthz, port: http } }
+    env:
+      AG_PUBLIC_HTTP_ADDR: ":8085"
+      AG_PF_DB_URL: "pooler:pf"
+      AG_DB_VIA_PGBOUNCER: "1"
+      # Tenant đơn vị vận hành (chủ sổ khách hàng API + sổ đo lường) — chờ khách Q5-2; bắt buộc khi bật.
+      AG_PUBLIC_OPERATOR_TENANT: ""
+      # Public API luôn đóng khi lỗi; biến này cho các đường xuất khác trong cùng tiến trình (ADR-0024).
+      AG_EGRESS_MODE: observe
+      # Kho tệp xuất (GET /v1/jobs/{id}/file phát luồng qua api-public, ADR-0022 mục 8 — không URL có chữ ký).
+      AG_S3_ENDPOINT: "{{ .Values.common.s3.endpoint }}"
+      AG_S3_BUCKET: "{{ .Values.common.s3.bucket }}"
+      AG_S3_USE_TLS: "{{ .Values.common.s3.useTLS }}"
+    # Pool: public_api (bảng vận hành shared) + vai module mà api-public mở qua port/ (g5-conventions §3.1).
+    # Pepper (AG_APIKEY_PEPPER_V<n>, AG_APIKEY_PEPPER_CURRENT) chỉ ở api-public và Admin API.
+    envFromSecrets: [pf-public-db-roles, pf-apikey-pepper]
+    # Khóa S3 CHỈ ĐỌC riêng của api-public (pf-public-s3, bật ở Phase K) — không dùng pf-s3 (ghi) của api-platform/worker.
+    secretEnv:
+      - { name: AG_S3_ACCESS_KEY, secret: pf-public-s3, key: AG_S3_ACCESS_KEY }
+      - { name: AG_S3_SECRET_KEY, secret: pf-public-s3, key: AG_S3_SECRET_KEY }
+    pdb: { minAvailable: 1 }
+    # HPA tùy chọn (số bản sao — R-01). minReplicas ≥ 2 khi bật.
+    hpa: { enabled: false, minReplicas: 2, maxReplicas: 6, cpu: 70 }
+    # Dịch vụ Go đẩy OTLP (ag_public_*, ag_egress_* tới otel-collector). Bật khi cmd/api-public phục vụ /metrics.
+    metrics: { enabled: false, port: 9464, path: /metrics }
+    # OAuth client credentials cho đơn vị thẩm định (ADR-0022 mục 5) — chỉ khi khách chọn (Q5-7); mở F28.
+    oidc: { enabled: false }
 
   # ============================ vùng nội bộ MKG (agrigreen-mkg)
   api-internal:
@@ -538,6 +584,38 @@ ingress:
     - { host: "mkg-admin.{{ .Values.global.domain }}", zone: mkg, service: api-internal, port: 8083 }
     - { host: "mkg.{{ .Values.global.domain }}", zone: mkg, service: web-internal, port: 3001 }
     - { host: "auth.{{ .Values.global.domain }}", zone: iam, service: keycloak, port: 8080 }
+  # Host bật theo hồ sơ cấp phát: lớp giá trị chỉ đổi `enabled` (R-01).
+  optionalHosts:
+    # Public API cho bên thứ ba (ADR-0022, ADR-0025). TẮT ở ĐTK 1 / G4. Chỉ tới api-public:8085 (F08) —
+    # host này KHÔNG BAO GIỜ trỏ tới api-platform (check_flows.py).
+    partner:
+      enabled: false
+      host: "partner.{{ .Values.global.domain }}"
+      zone: pf
+      service: api-public
+      port: 8085
+      # Chứng thư riêng cho partner.<domain> (deploy/iac/opentofu module certificate, phase_k).
+      tlsSecret: agrigreen-partner-tls
+      middlewares: [public-api-ratelimit, public-api-body-limit]
+      annotations:
+        traefik.ingress.kubernetes.io/router.entrypoints: websecure
+        traefik.ingress.kubernetes.io/router.tls: "true"
+  # CRD Middleware của Traefik (traefik.io/v1alpha1), spec nguyên văn. Chỉ render khi một host bật dùng nó.
+  middlewares:
+    # Giới hạn THÔ theo IP nguồn (R-55, ADR-0022 mục 7: đề xuất 20 rps, burst 40 — tạm, chờ khách).
+    # depth 0 = địa chỉ kết nối; nếu LB của nhà cung cấp đứng trước và chèn X-Forwarded-For, đặt depth 1
+    # (chỉ khi LB là bước tin cậy duy nhất) — chờ chọn nhà cung cấp.
+    public-api-ratelimit:
+      rateLimit:
+        average: 20
+        burst: 40
+        period: 1s
+        sourceCriterion: { ipStrategy: { depth: 0 } }
+    # Giới hạn thân yêu cầu 1 MiB (ADR-0025 mục 1).
+    public-api-body-limit:
+      buffering:
+        maxRequestBodyBytes: 1048576
+        memRequestBodyBytes: 1048576
 
 # ---------------------------------------------------------------- PKI (ADR-0019 + mTLS dịch vụ)
 pki:
@@ -586,8 +664,18 @@ externalSecrets:
   # Cùng "remote" ở hai vùng (vd db/pf ở pf và data) = cùng mật khẩu vai, một nguồn.
   secrets:
     pf:
-      pf-db-roles: { remote: db/pf, keys: [AG_DB_PASSWORD_PLATFORM_API, AG_DB_PASSWORD_WORKER_PLATFORM, AG_DB_PASSWORD_PARTY_APP, AG_DB_PASSWORD_MASTERDATA_APP, AG_DB_PASSWORD_GEO_APP, AG_DB_PASSWORD_EXTENSION_APP, AG_DB_PASSWORD_CONTENT_APP, AG_DB_PASSWORD_MECHANIZATION_APP, AG_DB_PASSWORD_MRV_APP, AG_DB_PASSWORD_SYNC_APP, AG_DB_PASSWORD_ACCOUNTS_APP, AG_DB_PASSWORD_NOTIFY_APP, AG_DB_PASSWORD_REPORTS_APP, AG_DB_PASSWORD_CROPCYCLE_APP, AG_DB_PASSWORD_WATERWAY_APP, AG_DB_PASSWORD_SIMULATION_APP, AG_DB_PASSWORD_METRICS_APP] }
+      pf-db-roles: { remote: db/pf, keys: [AG_DB_PASSWORD_PLATFORM_API, AG_DB_PASSWORD_WORKER_PLATFORM, AG_DB_PASSWORD_PARTY_APP, AG_DB_PASSWORD_MASTERDATA_APP, AG_DB_PASSWORD_GEO_APP, AG_DB_PASSWORD_EXTENSION_APP, AG_DB_PASSWORD_CONTENT_APP, AG_DB_PASSWORD_MECHANIZATION_APP, AG_DB_PASSWORD_MRV_APP, AG_DB_PASSWORD_SYNC_APP, AG_DB_PASSWORD_ACCOUNTS_APP, AG_DB_PASSWORD_NOTIFY_APP, AG_DB_PASSWORD_REPORTS_APP, AG_DB_PASSWORD_CROPCYCLE_APP, AG_DB_PASSWORD_WATERWAY_APP, AG_DB_PASSWORD_SIMULATION_APP, AG_DB_PASSWORD_METRICS_APP, AG_DB_PASSWORD_APICLIENT_APP, AG_DB_PASSWORD_METERING_APP] }
       pf-db-outbox: { remote: db/pf, keys: [AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER] }
+      # api-public (G5): CHỈ các vai nó mở (g5-conventions §3.1) — không vai nào khác của vùng pf.
+      pf-public-db-roles: { remote: db/pf, keys: [AG_DB_PASSWORD_PUBLIC_API, AG_DB_PASSWORD_APICLIENT_APP, AG_DB_PASSWORD_METERING_APP, AG_DB_PASSWORD_CROPCYCLE_APP, AG_DB_PASSWORD_GEO_APP, AG_DB_PASSWORD_MRV_APP, AG_DB_PASSWORD_MASTERDATA_APP, AG_DB_PASSWORD_PARTY_APP] }
+      # Pepper HMAC khóa API theo phiên bản (ADR-0022 mục 4): AG_APIKEY_PEPPER_V<n> (≥ 32 byte), AG_APIKEY_PEPPER_CURRENT.
+      # extract: lấy mọi thuộc tính của apikey/pf → xoay pepper chỉ là thêm V<n+1> + đổi CURRENT ở kho bí mật.
+      # Chỉ tồn tại ở vùng pf; bật ở Phase K (values-phasek.yaml).
+      pf-apikey-pepper: { enabled: false, remote: apikey/pf, extract: true }
+      # Khóa S3 CHỈ ĐỌC cho api-public (tiền tố tệp xuất apiclient/ của bucket pf) — bật ở Phase K (values-phasek.yaml).
+      pf-public-s3: { enabled: false, remote: s3/pf-public, keys: [AG_S3_ACCESS_KEY, AG_S3_SECRET_KEY] }
+      # TLS của partner.<domain> (Phase K).
+      agrigreen-partner-tls: { enabled: false, remote: tls/partner, keys: [tls.crt, tls.key], type: kubernetes.io/tls }
       pf-app: { remote: app/pf, keys: [AG_SYNC_CURSOR_KEY, AG_KC_CLIENT_SECRET] }
       pf-s3: { remote: s3/pf, keys: [AG_S3_ACCESS_KEY, AG_S3_SECRET_KEY] }
       pf-anchor: { remote: anchor/pf, keys: [AG_ANCHOR_SIGNING_KEY] }
@@ -614,7 +702,7 @@ externalSecrets:
       pg-backup-s3: { remote: backup/vault, keys: [ACCESS_KEY_ID, ACCESS_SECRET_KEY] }
     data:
       # Vai của từng cụm cho Job bootstrap/migrate — cùng nguồn với secret của vùng ứng dụng.
-      pg-pf-roles: { remote: db/pf, keys: [AG_DB_PASSWORD_AG_MIGRATOR, AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER, AG_DB_PASSWORD_PLATFORM_API, AG_DB_PASSWORD_WORKER_PLATFORM, AG_DB_PASSWORD_PARTY_APP, AG_DB_PASSWORD_MASTERDATA_APP, AG_DB_PASSWORD_GEO_APP, AG_DB_PASSWORD_EXTENSION_APP, AG_DB_PASSWORD_CONTENT_APP, AG_DB_PASSWORD_MECHANIZATION_APP, AG_DB_PASSWORD_MRV_APP, AG_DB_PASSWORD_SYNC_APP, AG_DB_PASSWORD_ACCOUNTS_APP, AG_DB_PASSWORD_NOTIFY_APP, AG_DB_PASSWORD_REPORTS_APP, AG_DB_PASSWORD_CROPCYCLE_APP, AG_DB_PASSWORD_WATERWAY_APP, AG_DB_PASSWORD_SIMULATION_APP, AG_DB_PASSWORD_METRICS_APP] }
+      pg-pf-roles: { remote: db/pf, keys: [AG_DB_PASSWORD_AG_MIGRATOR, AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER, AG_DB_PASSWORD_PLATFORM_API, AG_DB_PASSWORD_WORKER_PLATFORM, AG_DB_PASSWORD_PARTY_APP, AG_DB_PASSWORD_MASTERDATA_APP, AG_DB_PASSWORD_GEO_APP, AG_DB_PASSWORD_EXTENSION_APP, AG_DB_PASSWORD_CONTENT_APP, AG_DB_PASSWORD_MECHANIZATION_APP, AG_DB_PASSWORD_MRV_APP, AG_DB_PASSWORD_SYNC_APP, AG_DB_PASSWORD_ACCOUNTS_APP, AG_DB_PASSWORD_NOTIFY_APP, AG_DB_PASSWORD_REPORTS_APP, AG_DB_PASSWORD_CROPCYCLE_APP, AG_DB_PASSWORD_WATERWAY_APP, AG_DB_PASSWORD_SIMULATION_APP, AG_DB_PASSWORD_METRICS_APP, AG_DB_PASSWORD_APICLIENT_APP, AG_DB_PASSWORD_METERING_APP, AG_DB_PASSWORD_PUBLIC_API] }
       pg-mkg-roles: { remote: db/mkg, keys: [AG_DB_PASSWORD_AG_MIGRATOR, AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER, AG_DB_PASSWORD_MKG_API, AG_DB_PASSWORD_FIELDOPS_APP, AG_DB_PASSWORD_HUB_APP, AG_DB_PASSWORD_MEASUREMENT_APP, AG_DB_PASSWORD_INGEST_MKG, AG_DB_PASSWORD_WORKER_INTERNAL, AG_DB_PASSWORD_MKG_MONITOR] }
       pg-ts-roles:
         remote: db/ts
@@ -667,6 +755,8 @@ networkPolicy:
     - { id: F05, adr: "DMZ → Ứng dụng", from: { selector: ingressController }, to: { zone: mkg, app: web-internal }, ports: [3001] }
     - { id: F06, adr: "DMZ → Định danh người dùng (OIDC)", from: { selector: ingressController }, to: { selector: keycloak }, ports: [8080] }
     - { id: F07, adr: "DMZ (bộ điều khiển Ingress → API server)", from: { selector: ingressController }, to: { external: kubeAPI }, portsFrom: kubeAPI }
+    # Public API (G5, ADR-0025): mở sẵn ở mọi hồ sơ nhưng không có Pod nào khi api-public 0 bản sao.
+    - { id: F08, adr: "DMZ → Ứng dụng (Public API partner.<domain>, ADR-0022)", from: { selector: ingressController }, to: { zone: pf, app: api-public }, ports: [8085] }
     # ---- Ứng dụng → Dữ liệu (chỉ cổng DB/MQ)
     - { id: F10, adr: "Ứng dụng → Dữ liệu", from: { zone: pf, apps: [api-platform, worker] }, to: { zone: data, pooler: pf }, ports: [5432] }
     - { id: F11, adr: "Ứng dụng → Dữ liệu", from: { zone: pf, apps: [worker, outbox-publisher-pf] }, to: { zone: data, pg: pf }, ports: [5432] }
@@ -677,6 +767,8 @@ networkPolicy:
     - { id: F16, adr: "Ứng dụng → Dữ liệu", from: { zone: mkg, app: ingest }, to: { zone: data, pooler: ts }, ports: [5432] }
     - { id: F17, adr: "Ứng dụng → Dữ liệu", from: { zone: mkg, apps: [outbox-publisher-mkg, anchor-mkg, purge-idempotency-mkg] }, to: { zone: data, pg: ts }, ports: [5432] }
     - { id: F18, adr: "Ứng dụng → Dữ liệu", from: { zone: mkg, apps: [outbox-publisher-mkg, worker-internal] }, to: { selector: rabbitmq }, ports: [5672] }
+    # api-public CHỈ tới PgBouncer cụm pf (outbox ghi DB, outbox-publisher-pf phát) — ADR-0025 mục 1.
+    - { id: F19, adr: "Ứng dụng → Dữ liệu (Public API → PgBouncer pf, ADR-0025)", from: { zone: pf, app: api-public }, to: { zone: data, pooler: pf }, ports: [5432] }
     # ---- Ứng dụng → Định danh (chỉ API vault, mTLS)
     - { id: F20, adr: "Ứng dụng → Định danh", from: { zone: pf, app: api-platform }, to: { zone: vault, app: identity-vault }, ports: [8090] }
     # ---- Trong vùng ứng dụng nền tảng: Internal API mTLS (mục 11)
@@ -687,6 +779,13 @@ networkPolicy:
     - { id: F24, adr: "Định danh → Định danh người dùng (chỉ JWKS)", from: { zone: vault, app: identity-vault }, to: { selector: keycloak }, ports: [8080] }
     # ---- Nền tảng → MKG: MKG gọi Application API công khai qua DMZ (mục 5, ADR-0020) — không Pod-tới-Pod
     - { id: F25, adr: "Tiêu thụ không đặc quyền (mục 5)", from: { zone: mkg, app: api-internal }, to: { selector: ingressController }, portsFrom: ingressController }
+    # ---- Public API: luồng tùy chọn (ADR-0022 mục 5, 7) — chỉ mở khi cấu hình
+    - { id: F26, adr: "Ứng dụng → Valkey trong lãnh thổ (giới hạn tần suất dùng chung, không phải nguồn sự thật)", from: { zone: pf, app: api-public }, to: { external: valkey }, ports: [6379] }
+    - { id: F27, adr: "Quản trị → Ứng dụng (scrape api-public, mở rộng F53)", when: '{{ (index .Values.apps "api-public").metrics.enabled }}', from: { selector: prometheus }, to: { zone: pf, app: api-public }, ports: [9464] }
+    - { id: F28, adr: "Ứng dụng → Định danh người dùng (JWKS, client credentials đơn vị thẩm định, R-54)", when: '{{ (index .Values.apps "api-public").oidc.enabled }}', from: { zone: pf, app: api-public }, to: { selector: keycloak }, ports: [8080] }
+    # Public API → kho đối tượng: chỉ đọc tệp xuất để phát luồng (ADR-0022 mục 8). Mở sẵn ở mọi hồ sơ như F08/F19
+    # (không Pod nào khi api-public 0 bản sao); khóa S3 chỉ có ở Phase K.
+    - { id: F29, adr: "Ứng dụng → kho đối tượng trong lãnh thổ (Public API phát luồng tệp xuất, khóa chỉ đọc)", from: { zone: pf, app: api-public }, to: { external: objectStorage }, ports: [443] }
     # ---- Dịch vụ ngoài trong lãnh thổ (RB-7)
     - { id: F30, adr: "Ứng dụng → kho đối tượng trong lãnh thổ", from: { zone: pf, apps: [api-platform, worker] }, to: { external: objectStorage }, ports: [443] }
     - { id: F31, adr: "Ứng dụng → SMTP trong lãnh thổ", from: { zone: pf, app: worker }, to: { external: smtp }, portsFrom: smtp }

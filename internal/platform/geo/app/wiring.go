@@ -16,6 +16,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -131,6 +132,11 @@ func (s *Service) HandleHubPublication(ctx context.Context, _ pgx.Tx, env outbox
 	if err != nil {
 		return err
 	}
+	// ADR-0024 mục 3: điểm kiểm soát xuất kênh valve ở phía nhận, mỗi bên cấp một lần, TRƯỚC khi ghi
+	// vào tenant bên cấp. enforce + từ chối → lỗi → giao lại → DLQ (R-62).
+	if err := s.valveEgress(ctx, env, name, grantors); err != nil {
+		return err
+	}
 	if name == port.ContractHubCapacity {
 		h, err := capacityFromValve(env.Payload)
 		if err != nil {
@@ -207,4 +213,19 @@ func capacityFromValve(raw []byte) (port.HubCapacity, error) {
 		return port.HubCapacity{}, fmt.Errorf("%w: capacity_tons/used_tons", errValve)
 	}
 	return port.HubCapacity{HubRef: p.HubRef, AsOf: at.UTC(), CapacityTons: capacity, UsedTons: used}, nil
+}
+
+// valveEgress gọi điểm kiểm soát xuất (ADR-0024) cho một phong bì van: tenant dữ liệu = tenant phong
+// bì (MKG), bên nhận = từng tenant bên cấp, nguồn = event_id (giao lặp → cùng dòng egress_event).
+func (s *Service) valveEgress(ctx context.Context, env outbox.Envelope, contract string, grantors []uuid.UUID) error {
+	for _, g := range grantors {
+		if err := meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
+			SourceID: env.EventID, Channel: meteringport.ChannelValve, DataTenantID: env.TenantID,
+			CounterpartyKind: meteringport.CounterpartyTenant, CounterpartyRef: g, Product: contract, ContractVersion: env.SchemaVersion,
+			Records: 1, Bytes: int64(len(env.Payload)), OccurredAt: env.OccurredAt, TraceID: env.TraceID,
+		}, s.Log); err != nil {
+			return err
+		}
+	}
+	return nil
 }

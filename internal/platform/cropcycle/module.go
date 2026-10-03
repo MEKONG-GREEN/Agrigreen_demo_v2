@@ -8,13 +8,17 @@
 package cropcycle
 
 import (
+	"log/slog"
+
 	"github.com/gin-gonic/gin"
 
+	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
@@ -57,6 +61,22 @@ func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 // (ngày thu hoạch của vụ, luồng phản hồi HTX) và định tuyến van collection_* về tenant bên cấp.
 func (m *Module) UseSharing(pa partyport.PartnerAccess, vg partyport.ValveGrants) {
 	m.svc.Sharing, m.svc.ValveGrants = pa, vg
+}
+
+// UseCollectionVolume (G5) nối nguồn của sản phẩm dữ liệu collection_volume: dữ kiện thửa (pf/geo)
+// và đơn vị hành chính (pf/masterdata).
+func (m *Module) UseCollectionVolume(pf geoport.PlotFacts, units mdport.AdminUnits) {
+	m.svc.PlotFacts, m.svc.Units = pf, units
+}
+
+// CollectionVolumeSource (G5, ADR-0022) là nguồn của sản phẩm dữ liệu collection_volume cho
+// cmd/api-public (ô xã × vụ × tháng, ngưỡng k — domain.KAnonRule).
+func (m *Module) CollectionVolumeSource() apiclientport.CollectionVolumeSource { return m.svc }
+
+// UseEgress (G5, ADR-0024) nối điểm kiểm soát xuất (pf/metering) cho consumer van collection_*
+// (kênh valve). cp nil → hành vi cũ.
+func (m *Module) UseEgress(cp meteringport.Checkpoint, mode meteringport.Mode, log *slog.Logger) {
+	m.svc.Egress, m.svc.EgressMode, m.svc.Log = cp, mode, log
 }
 
 // UseFarmerHouseholds nối liên kết tài khoản ↔ nông hộ sau khi dựng pf/accounts.

@@ -15,6 +15,7 @@ import (
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
@@ -44,6 +45,7 @@ var HandledEvents = []string{
 	ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived,
 	syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale, mrvport.EventAlertRaised,
 	extport.EventWorkScheduleSubmitted, extport.EventWorkScheduleReviewed, extport.EventWorkScheduleReminded,
+	meteringport.EventEgressAnomaly,
 }
 
 // HandleEvent là inbox.Handler cho các sự kiện nguồn: dựng thông báo, xếp lần gửi
@@ -206,6 +208,15 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 			return nil
 		}
 		return s.deliver(ctx, tx, env, ns)
+	case meteringport.EventEgressAnomaly:
+		// G5 (ADR-0024, mục 18 DLP): tenant phong bì = CHỦ DỮ LIỆU → chủ đề toàn tenant theo vai người
+		// nhận DLP (port.EgressAnomalyRoles — tạm, chờ khách Q5-5). Idempotent: inbox + (sự kiện, người nhận).
+		var p meteringport.EgressAnomalyV1
+		if err := decode(env, &p); err != nil {
+			return err
+		}
+		a := domain.Audience{National: true, Roles: port.EgressAnomalyRoles}
+		return s.deliver(ctx, tx, env, []domain.Notification{domain.EgressAnomalyTemplate(p, env.OccurredAt).ForAudience(a)})
 	case mrvport.EventAlertRaised:
 		var p mrvport.AlertRaisedV1
 		if err := decode(env, &p); err != nil {

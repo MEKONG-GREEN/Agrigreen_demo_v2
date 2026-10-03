@@ -1,7 +1,19 @@
 import { expect, type Page } from "@playwright/test";
 
 /** Mã persona giả lập (src/api/mock/personas.ts). */
-export type Persona = "tw" | "tinh" | "xa" | "htx" | "cuc" | "setter" | "approver" | "account-tinh" | "admin-no-mfa";
+export type Persona =
+  | "tw"
+  | "tinh"
+  | "xa"
+  | "htx"
+  | "cuc"
+  | "setter"
+  | "approver"
+  | "account-tinh"
+  | "admin-no-mfa"
+  | "api-admin"
+  | "api-approver"
+  | "metering-viewer";
 
 const MOCK_KEY = "ag.mock.persona";
 

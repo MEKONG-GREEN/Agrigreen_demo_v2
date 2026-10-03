@@ -43,9 +43,10 @@ jobs:
           go run ./tools/contractcheck -base "$BASE"
       - name: promtool — luật cảnh báo (deploy/observability)
         run: |
+          # Mọi tệp *.rules.yml (tệp mới, vd luật pf/metering G5, được kiểm mà không phải sửa bước này).
+          files=$(cd deploy/observability && ls prometheus/*.rules.yml | sed 's#^#/obs/#')
           docker run --rm --entrypoint /bin/promtool -v "$PWD/deploy/observability:/obs:ro" prom/prometheus:v3.5.0 \
-            check rules /obs/prometheus/agrigreen-mkg-ingest.rules.yml /obs/prometheus/agrigreen-platform.rules.yml \
-            /obs/prometheus/agrigreen-mkg-acctbridge.rules.yml /obs/prometheus/agrigreen-mkg-logistics.rules.yml
+            check rules $files
 
   test:
     name: Kiểm thử (sổ, RLS qua PgBouncer, idempotency)
@@ -75,7 +76,7 @@ jobs:
           sudo systemctl stop pgbouncer || true
           sudo mkdir -p /etc/pgbouncer-ci
           : | sudo tee /etc/pgbouncer-ci/userlist.txt > /dev/null
-          for r in platform_api worker_platform party_app masterdata_app geo_app extension_app content_app mechanization_app mrv_app sync_app accounts_app notify_app reports_app cropcycle_app waterway_app simulation_app fieldops_app hub_app mkg_api measurement_app ingest_mkg worker_internal ingest_ts ts_reader metrics_app logistics_app orders_app costing_app acctbridge_app mkg_monitor ts_monitor vault_app ag_outbox_publisher ag_migrator; do
+          for r in platform_api worker_platform party_app masterdata_app geo_app extension_app content_app mechanization_app mrv_app sync_app accounts_app notify_app reports_app cropcycle_app waterway_app simulation_app fieldops_app hub_app mkg_api measurement_app ingest_mkg worker_internal ingest_ts ts_reader metrics_app logistics_app orders_app costing_app acctbridge_app apiclient_app metering_app public_api mkg_monitor ts_monitor vault_app ag_outbox_publisher ag_migrator; do
             printf '"%s" "%s"\n' "$r" "$AG_DB_APP_PASSWORD" | sudo tee -a /etc/pgbouncer-ci/userlist.txt > /dev/null
           done
           sudo tee /etc/pgbouncer-ci/pgbouncer.ini > /dev/null <<'INI'
@@ -395,7 +396,8 @@ jobs:
     strategy:
       matrix:
         # optimizer (Python) có Dockerfile và ngữ cảnh riêng (optimizer/); còn lại build từ Dockerfile gốc với CMD.
-        cmd: [api-platform, api-internal, ingest, identity-vault, worker, worker-internal, outbox-publisher, migrate, optimizer]
+        # api-public (G5, ADR-0022): build và ký ở mọi giai đoạn dù 0 bản sao ở ĐTK 1 (ADR-0025).
+        cmd: [api-platform, api-internal, api-public, ingest, identity-vault, worker, worker-internal, outbox-publisher, migrate, optimizer]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3

@@ -1,0 +1,63 @@
+# Luật cảnh báo Prometheus — điểm kiểm soát xuất dữ liệu (DLP, mục 18; ADR-0024) và sổ đo lường Public API
+# (ADR-0023) của pf/metering. Kiểm: promtool check rules (CI job lint). Chi tiết từng lần: Admin API
+# GET /v1/metering/egress, GET /v1/metering/egress/anomalies (tenant chủ dữ liệu), GET /v1/metering/usage-events.
+#
+# Nguồn metric (OTLP → OpenTelemetry Collector, exporter prometheus: dấu chấm → gạch dưới, counter thêm _total).
+# Nhãn cardinality thấp (R-91): không tenant, không khách hàng.
+#   ag_egress_records_total{channel,decision}      phần tử qua checkpoint: allowed | denied
+#   ag_egress_bytes_total{channel}                 byte qua checkpoint
+#   ag_egress_denied_total{channel,reason}         lần bị từ chối (AG_EGRESS_MODE=enforce, hoặc Public API)
+#   ag_egress_checkpoint_errors_total{channel}     checkpoint lỗi hạ tầng (observe: thao tác vẫn tiếp tục)
+#   ag_egress_anomalies_total{channel}             lần ĐẦU trong ngày khối lượng (chủ dữ liệu × kênh × bên nhận)
+#                                                  vượt anomaly_factor × trung vị 28 ngày / ngưỡng tuyệt đối
+#   ag_public_calls_total{status_class}            dòng sổ sử dụng đã ghi
+#   ag_public_units_total                          đơn vị tính phí (metering.units.v1)
+#   ag_public_quota_exceeded_total                 lời gọi vượt hạn mức gói (429 metering.quota_exceeded)
+#   ag_public_ledger_errors_total                  ghi sổ sử dụng lỗi → 503 metering.unavailable, không trả dữ liệu
+#
+# Ngưỡng nghiệp vụ là tham số có phiên bản ở pf/masterdata (metering.egress.<kênh>.daily_records_quota /
+# anomaly_factor / anomaly_records — tạm, chờ khách Q5-5), KHÔNG lặp ở đây: luật chỉ báo khi checkpoint đã thấy.
+#
+# Mức (mục 23): severity=page (P1/P2 — gọi trực), ticket (P3 — xử lý trong giờ làm việc).
+groups:
+  - name: agrigreen-egress
+    rules:
+      # Mục 18: khối lượng xuất bất thường — có thể là thất thoát dữ liệu. Sự kiện pf.metering.egress.anomaly_detected
+      # đã báo quản trị tenant chủ dữ liệu (pf.notify.egress_anomaly); luật này báo trực vận hành/an ninh.
+      - alert: AgrigreenEgressAnomaly
+        expr: sum by (channel) (increase(ag_egress_anomalies_total[15m])) > 0
+        labels: { severity: page, priority: P2, area: dlp }
+        annotations:
+          summary: "Khối lượng xuất dữ liệu bất thường ở kênh {{ $labels.channel }}"
+          description: "GET /v1/metering/egress/anomalies (tenant chủ dữ liệu) để xem bên nhận, khối lượng ngày, ngưỡng và cơ sở (median/absolute). Kiểm bên nhận có hợp lệ không; nếu nghi thất thoát: thu hồi cấp quyền / khóa API, chuyển AG_EGRESS_MODE=enforce."
+      # Checkpoint lỗi: ở observe thao tác vẫn chạy nhưng KHÔNG có nhật ký xuất — mất dấu vết DLP.
+      - alert: AgrigreenEgressCheckpointErrors
+        expr: sum by (channel) (increase(ag_egress_checkpoint_errors_total[10m])) > 0
+        for: 5m
+        labels: { severity: page, priority: P2, area: dlp }
+        annotations:
+          summary: "Điểm kiểm soát xuất lỗi ở kênh {{ $labels.channel }} ({{ $value }} lần / 10 phút)"
+          description: "Log event=egress outcome=checkpoint_error. Kiểm vai metering_app, PgBouncer cụm pf, tham số pf/masterdata. Ở enforce các thao tác xuất đang trả 503 metering.egress_unavailable; van vào DLQ."
+      # Bị từ chối do vượt hạn mức kênh (enforce): người dùng/bên nhận bị chặn — xác nhận hạn mức hợp lý.
+      - alert: AgrigreenEgressDenied
+        expr: sum by (channel, reason) (increase(ag_egress_denied_total[30m])) > 0
+        labels: { severity: ticket, priority: P3, area: dlp }
+        annotations:
+          summary: "Điểm kiểm soát xuất từ chối {{ $value }} lần ở kênh {{ $labels.channel }} ({{ $labels.reason }})"
+          description: "GET /v1/metering/egress?channel={{ $labels.channel }}; nếu hợp lệ thì đề xuất tăng metering.egress.<kênh>.daily_records_quota (param_setter ≠ param_approver). Kênh valve: chuyển lại thông điệp từ DLQ sau khi sửa."
+      # ADR-0023 mục 1: không ghi được sổ sử dụng → Public API trả 503, bên thứ ba không nhận dữ liệu.
+      - alert: AgrigreenPublicLedgerErrors
+        expr: sum(increase(ag_public_ledger_errors_total[5m])) > 0
+        for: 5m
+        labels: { severity: page, priority: P2, area: public-api }
+        annotations:
+          summary: "Ghi sổ đo lường Public API lỗi {{ $value }} lần / 5 phút — lời gọi trả 503"
+          description: "Log event=metering.record outcome=error ở api-public. Kiểm vai metering_app, PgBouncer cụm pf, phân vùng pf_metering.usage_event (migrate maintain)."
+      # Khách hàng chạm hạn mức gói liên tục — có thể cần đổi gói (pf/apiclient quota_plan, admin ≠ approver).
+      - alert: AgrigreenPublicQuotaExhausted
+        expr: sum(increase(ag_public_quota_exceeded_total[1h])) > 100
+        for: 15m
+        labels: { severity: ticket, priority: P3, area: public-api }
+        annotations:
+          summary: "{{ $value }} lời gọi Public API vượt hạn mức gói trong 1 giờ"
+          description: "GET /v1/metering/usage-events?client_id=… để xác định khách hàng; liên hệ đầu mối, cân nhắc gói hạn mức mới (api_client_admin đề xuất, api_client_approver duyệt)."

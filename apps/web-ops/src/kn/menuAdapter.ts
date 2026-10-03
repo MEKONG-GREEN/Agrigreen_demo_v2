@@ -9,7 +9,7 @@ const NAV_ICONS: ReadonlySet<string> = new Set<NavIcon>([
   "dashboard", "map", "coop", "task", "library", "catalog", "param", "org", "tractor", "megaphone", "report", "bell", "sync",
   "user", "conflict", "upload", "phone", "layers", "water", "warehouse", "sim", "season", "journal", "approve", "harvest",
   "chart", "qr", "support", "sop", "plot", "calendar", "sprout", "send", "database", "building", "package", "table", "key",
-  "users", "zap", "file", "check",
+  "users", "zap", "file", "check", "shield",
 ]);
 
 /** Icon của backend (tên NavIcon); tên lạ (bảng menu mới hơn web) → "file". */

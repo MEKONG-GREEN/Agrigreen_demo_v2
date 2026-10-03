@@ -1,5 +1,5 @@
 ﻿# Kiểm chart Kubernetes G4 (docs/runbooks/k8s-deploy.md mục 8):
-#   1. helm lint --strict cho dev/staging/prod
+#   1. helm lint --strict cho dev/staging/prod và prod + values-phasek.yaml (Phase K, G5)
 #   2. helm template → kubeconform -strict (nếu có; schema CRD từ catalog datreeio + schema Stanza cục bộ)
 #   3. deploy/k8s/tests/check_flows.py — bảng luồng ADR-0008, luồng cấm, cứng hóa, bí mật theo vùng
 # Dùng: powershell -File deploy/k8s/check.ps1 [-Offline]
@@ -19,12 +19,18 @@ if (-not $kc) { $kc = Join-Path $env:LOCALAPPDATA "Programs\kubeconform\kubeconf
 $out = Join-Path ([System.IO.Path]::GetTempPath()) "agrigreen-k8s-check"
 New-Item -ItemType Directory -Force $out | Out-Null
 $rendered = @()
-foreach ($e in "dev", "staging", "prod") {
-  $vf = Join-Path $chart "values-$e.yaml"
-  & $helm lint $chart -f $vf --strict
+# Hồ sơ = môi trường + lớp chồng. prod-phasek: Phase K (ADR-0025) chồng lên production.
+$profiles = [ordered]@{
+  "dev" = @("values-dev.yaml"); "staging" = @("values-staging.yaml"); "prod" = @("values-prod.yaml")
+  "prod-phasek" = @("values-prod.yaml", "values-phasek.yaml")
+}
+foreach ($e in $profiles.Keys) {
+  $vargs = @()
+  foreach ($v in $profiles[$e]) { $vargs += @("-f", (Join-Path $chart $v)) }
+  & $helm lint $chart @vargs --strict
   if ($LASTEXITCODE -ne 0) { throw "helm lint hỏng ($e)" }
   $f = Join-Path $out "$e.yaml"
-  & $helm template agrigreen $chart -f $vf | Out-File -Encoding utf8 $f
+  & $helm template agrigreen $chart @vargs | Out-File -Encoding utf8 $f
   if ($LASTEXITCODE -ne 0) { throw "helm template hỏng ($e)" }
   $rendered += "$e=$f"
 }

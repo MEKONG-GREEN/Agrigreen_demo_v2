@@ -7,10 +7,13 @@ package store
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 // ShareRuleVersion là rule_version của sổ cấp quyền và sổ đọc.
@@ -286,4 +289,36 @@ func CooperativeEntryByRef(ctx context.Context, tx pgx.Tx, ref uuid.UUID) (*Coop
 		return nil, err
 	}
 	return &e, nil
+}
+
+// VerifiedActive trả cấp quyền đang hiệu lực tại at của bên nhận grantee (tx PHẢI đang ở ngữ cảnh
+// tenant bên nhận) đã kiểm HAI phía: bảng chiếu share_grant_inbound của bên nhận + bảng hiện hành
+// share_grant của bên cấp (đổi ngữ cảnh bằng tenant.Within — RLS vẫn áp, không BYPASSRLS): active,
+// đúng bên nhận, có loại kind (rỗng = mọi loại), at ∈ [valid_from, valid_to). Dùng chung cho
+// Authorize/ActiveGrant của app/ và bộ điều hợp chỉ đọc party/port/grantlookup (cmd/api-public).
+func VerifiedActive(ctx context.Context, tx pgx.Tx, grantee uuid.UUID, kind string, grantor uuid.UUID, at time.Time) ([]Inbound, error) {
+	rows, err := ActiveInbound(ctx, tx, kind, grantor, at)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Inbound, 0, len(rows))
+	for _, in := range rows {
+		ok := false
+		err := tenant.Within(ctx, tx, in.Grantor, func() error {
+			g, err := GrantByID(ctx, tx, in.GrantID, false)
+			if err != nil || g == nil {
+				return err
+			}
+			ok = g.Status == "active" && g.Grantee == grantee && (kind == "" || slices.Contains(g.Kinds, kind)) &&
+				!at.Before(g.ValidFrom) && at.Before(g.ValidTo)
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			out = append(out, in)
+		}
+	}
+	return out, nil
 }

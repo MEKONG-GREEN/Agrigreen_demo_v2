@@ -91,6 +91,14 @@ func violation(from, to loc, imp string) string {
 	if to.zone == "shared" {
 		return ""
 	}
+	// G5 (ADR-0022 mục 1, RB-3): Public API cho bên thứ ba không bao giờ chạm kho định danh — kể cả client.
+	if to.zone == "vault" && !from.internal {
+		for _, r := range noVaultRoots {
+			if under(from.path, r) {
+				return "RB-3: " + r + " (Public API cho bên thứ ba) không được import kho định danh (" + imp + ") — bên thứ ba không bao giờ thấy dữ liệu cá nhân"
+			}
+		}
+	}
 	// R-04: vault chỉ qua client — trừ gốc lắp ráp của vault (theo quy tắc gốc lắp ráp bên dưới).
 	isVaultRoot := from.path == modulePath+"/"+vaultRoot || strings.HasPrefix(from.path, modulePath+"/"+vaultRoot+"/")
 	if to.zone == "vault" && (!from.internal || from.zone != "vault") {
@@ -137,7 +145,12 @@ var zoneRoots = []struct{ root, forbidden string }{
 	{"cmd/worker-internal", "platform"},
 	// G4: công cụ diễn tập dựng lại bảng chiếu cụm mkg (R-22) — chỉ nối module mkg.
 	{"cmd/rebuilddrill", "platform"},
+	// G5: đơn vị triển khai Public API (ADR-0022) — gốc lắp ráp vùng nền tảng, chỉ nối platform/*.
+	{"cmd/api-public", "mkg"},
 }
+
+// noVaultRoots là gốc lắp ráp không được import BẤT KỲ package nào của vault, kể cả client (RB-3).
+var noVaultRoots = []string{"cmd/api-public"}
 
 // edgeAgentRoot là nhị phân tĩnh ở vùng biên OT (mục 14, 17): không DB, không
 // mã nghiệp vụ, chỉ đi ra tới ingest qua mTLS.

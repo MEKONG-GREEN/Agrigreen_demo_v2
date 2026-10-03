@@ -43,6 +43,8 @@ spec:
 {{- end }}
 {{- end }}
 {{- range $f := .Values.networkPolicy.flows }}
+{{- /* when: chuỗi tpl; luồng chỉ mở khi render ra "true" (luồng tùy chọn theo cấu hình, vd số đo trực tiếp). */}}
+{{- if or (not $f.when) (eq (tpl (toString $f.when) $root | trim) "true") }}
 {{- $from := include "agrigreen.endpoint" (dict "root" $root "ep" $f.from) | fromYaml }}
 {{- $to := include "agrigreen.endpoint" (dict "root" $root "ep" $f.to) | fromYaml }}
 {{- $ports := $f.ports | default (index $root.Values.ports ($f.portsFrom | default "-") | default list) }}
@@ -95,6 +97,7 @@ spec:
       ports:
 {{- range $ports }}
         - { port: {{ . }}, protocol: TCP }
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

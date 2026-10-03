@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.apiclient.export.requested/v1",
+  "title": "pf.apiclient.export.requested — payload",
+  "description": "G5 (ADR-0022 mục 8, R-52): yêu cầu xuất sản phẩm dữ liệu của khách hàng Public API đã ghi job + ảnh chụp đầu vào bất biến ở pf_apiclient (tenant đơn vị vận hành, mẫu mục 12). Worker (consumer pf.apiclient.export) nạp bộ lọc + bên cấp từ bảng job, dựng tệp tất định (CSV/JSON, SHA-256) ở kho đối tượng trong lãnh thổ. Chỉ mã tham chiếu, không dữ liệu cá nhân, không khóa API.",
+  "x-event-type": "pf.apiclient.export.requested",
+  "x-schema-version": 1,
+  "x-producer": "pf/apiclient",
+  "type": "object",
+  "required": ["job_id", "client_id", "product", "contract_version", "data_tenant_id", "requested_at"],
+  "properties": {
+    "job_id":           { "type": "string", "format": "uuid" },
+    "client_id":        { "type": "string", "format": "uuid", "description": "Khách hàng API (tenant đơn vị vận hành)" },
+    "product":          { "type": "string", "description": "Tên hợp đồng contracts/dataproduct" },
+    "contract_version": { "type": "integer" },
+    "data_tenant_id":   { "type": "string", "format": "uuid", "description": "Tenant chủ dữ liệu (bên cấp) đã kiểm cấp quyền dp_<product>" },
+    "requested_at":     { "type": "string", "format": "date-time", "description": "Mốc ảnh chụp dữ liệu (as_of)" }
+  }
+}

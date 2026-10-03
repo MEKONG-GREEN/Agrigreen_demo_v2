@@ -4933,6 +4933,637 @@ paths:
               schema: {$ref: "#/components/schemas/KNImpact"}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/party cấp quyền chia sẻ ---
+  # --- pf/metering (G5, ADR-0023 sổ đo lường + bảng kê, ADR-0024 điểm kiểm soát xuất) ---
+  /v1/metering/usage:
+    get:
+      summary: Tổng sử dụng Public API theo ngày × sản phẩm của một khách hàng — ADR-0023
+      description: Tenant đơn vị vận hành (token). Đọc bộ đếm (giờ Việt Nam, bao gồm hai đầu, tối đa 366 ngày).
+      operationId: getMeteringUsage
+      tags: [metering]
+      parameters:
+        - {name: client_id, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: from, in: query, required: true, schema: {type: string, format: date}}
+        - {name: to, in: query, required: true, schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Tổng theo ngày
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MeteringUsageDay"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/metering/usage-events:
+    get:
+      summary: Sổ sử dụng (chứng từ) của một khách hàng, mới nhất trước — ADR-0023
+      operationId: listMeteringUsageEvents
+      tags: [metering]
+      parameters:
+        - {name: client_id, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MeteringUsageEvent"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/metering/statements:
+    post:
+      summary: Yêu cầu lập bảng kê kỳ tháng (202 + job) — ADR-0023 mục 4
+      description: |
+        Vai `billing_officer`. Kỳ phải đã kết thúc (giờ Việt Nam) — không thì 409 `metering.period_not_ended`.
+        `client_id` vắng = mọi khách hàng có sử dụng trong kỳ. Bảng kê bù: `supersedes_id` + `correction_reason`
+        (cùng khách hàng, cùng kỳ; bảng kê cũ giữ nguyên, ghi `superseded_by`). Worker dựng ảnh chụp bất biến.
+      operationId: requestMeteringStatement
+      tags: [metering]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [period]
+              properties:
+                period: {type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"}
+                client_id: {type: [string, "null"], format: uuid}
+                supersedes_id: {type: [string, "null"], format: uuid}
+                correction_reason: {type: [string, "null"], minLength: 10, maxLength: 500}
+      responses:
+        "202":
+          description: Đã nhận (gọi lặp cùng Idempotency-Key → cùng job)
+          headers:
+            Location: {schema: {type: string}, description: "/v1/metering/statement-jobs/{id}"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MeteringStatementJob"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Bảng kê của tenant đơn vị vận hành — ADR-0023
+      operationId: listMeteringStatements
+      tags: [metering]
+      parameters:
+        - {name: period, in: query, schema: {type: string}}
+        - {name: client_id, in: query, schema: {type: string, format: uuid}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/MeteringStatement"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/metering/statement-jobs/{id}:
+    get:
+      summary: Trạng thái yêu cầu lập bảng kê — ADR-0023
+      operationId: getMeteringStatementJob
+      tags: [metering]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Job
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MeteringStatementJob"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/metering/statements/{id}:
+    get:
+      summary: Một bảng kê — ADR-0023
+      operationId: getMeteringStatement
+      tags: [metering]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Bảng kê
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MeteringStatement"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/metering/statements/{id}/approve:
+    post:
+      summary: Duyệt bảng kê — `billing_approver` ≠ người yêu cầu (R-56, app/ + CHECK DB)
+      description: |
+        Đóng băng bảng kê. Tự duyệt → 403 `metering.self_approval`. Đã duyệt bởi người khác hoặc đã bị thay →
+        409 `metering.statement_frozen` (sửa = bảng kê bù). Duyệt lặp của chính người duyệt → 200.
+      operationId: approveMeteringStatement
+      tags: [metering]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "201":
+          description: Đã duyệt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MeteringStatement"}
+        "200":
+          description: Đã duyệt trước đó bởi chính người gọi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MeteringStatement"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/metering/statements/{id}/verify:
+    get:
+      summary: Dựng lại ảnh chụp bảng kê từ sổ và so SHA-256 — ADR-0023
+      operationId: verifyMeteringStatement
+      tags: [metering]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Kết quả kiểm lại
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [statement_id, stored_sha256, rebuilt_sha256, match]
+                properties:
+                  statement_id: {type: string, format: uuid}
+                  stored_sha256: {type: string}
+                  rebuilt_sha256: {type: string}
+                  match: {type: boolean}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/metering/statements/{id}/export.csv:
+    get:
+      summary: Tải CSV bảng kê (tất định byte-cho-byte) — qua điểm kiểm soát xuất kênh report_export
+      description: |
+        Vai `billing_officer` hoặc `billing_approver`. Lập hóa đơn NGOÀI hệ thống. Header `AG-Snapshot-SHA256`.
+        `AG_EGRESS_MODE=enforce` + vượt hạn mức kênh → 429 `metering.egress_quota_exceeded`.
+      operationId: exportMeteringStatementCsv
+      tags: [metering]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: CSV UTF-8, LF
+          headers:
+            AG-Snapshot-SHA256: {schema: {type: string}}
+          content:
+            text/csv:
+              schema: {type: string}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "429": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/metering/params:
+    get:
+      summary: Tham số hiệu lực của pf/metering (hạn mức/ngưỡng kênh DLP, giá tùy chọn) — tạm, chờ khách
+      description: |
+        Đọc từ pf/masterdata (phiên bản đã duyệt) hoặc mặc định g5-conventions §1.2. Đề xuất/duyệt qua
+        `/v1/masterdata/params` (param_setter ≠ param_approver, R-56).
+      operationId: listMeteringParams
+      tags: [metering]
+      parameters:
+        - {name: at, in: query, schema: {type: string, format: date-time}}
+      responses:
+        "200":
+          description: Tham số
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [key, value, source]
+                      properties:
+                        key: {type: string}
+                        value: {type: [string, "null"], description: "decimal dạng chuỗi; null = chưa đặt"}
+                        source: {type: string, description: "default | v<N> | unset"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/metering/egress:
+    get:
+      summary: Sổ xuất dữ liệu (DLP) của tenant chủ dữ liệu — ADR-0024
+      description: Vai `metering_viewer` hoặc `platform_admin`; chỉ dòng của tenant mình (RLS). Ngày giờ Việt Nam.
+      operationId: listMeteringEgress
+      tags: [metering]
+      parameters:
+        - {name: channel, in: query, schema: {$ref: "#/components/schemas/EgressChannel"}}
+        - {name: from, in: query, schema: {type: string, format: date}}
+        - {name: to, in: query, schema: {type: string, format: date}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/EgressEvent"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/metering/egress/anomalies:
+    get:
+      summary: Cảnh báo khối lượng xuất bất thường của tenant chủ dữ liệu — ADR-0024
+      operationId: listMeteringEgressAnomalies
+      tags: [metering]
+      parameters:
+        - {name: channel, in: query, schema: {$ref: "#/components/schemas/EgressChannel"}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/EgressAnomaly"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "403": {$ref: "#/components/responses/Problem"}
+  # --- hết pf/party cấp quyền chia sẻ ---
+  # --- pf/apiclient ---
+  # Quản trị khách hàng Public API (ADR-0022): tài khoản tenant đơn vị vận hành, MFA. api_client_admin
+  # đề xuất / phát hành khóa; api_client_approver KHÁC người đề xuất duyệt (R-56, app/ + CHECK DB).
+  /v1/api-clients:
+    post:
+      summary: Đề xuất khách hàng API (api_client_admin) — tenant bên thứ ba, tên tổ chức, mục đích, mã đầu mối (không PII)
+      operationId: proposeApiClient
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [client_tenant_id, display_name, purpose, contact_ref]
+              properties:
+                client_tenant_id: {type: string, format: uuid, description: "Tenant bên thứ ba (bên nhận cấp quyền dp_*)"}
+                display_name: {type: string, minLength: 2, maxLength: 200, description: "Tên TỔ CHỨC, không phải người"}
+                purpose: {type: string, minLength: 10, maxLength: 500}
+                contact_ref: {type: string, format: uuid, description: "Mã tham chiếu đầu mối (tên/điện thoại ở kho định danh hoặc pf/accounts)"}
+                auth_methods: {type: array, items: {type: string, enum: [api_key, oauth_client_credentials]}}
+                oauth_client_id: {type: string, pattern: "^[A-Za-z0-9._-]{3,100}$"}
+      responses:
+        "201":
+          description: Đã đề xuất
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiClient"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    get:
+      summary: Danh sách khách hàng API (api_client_admin, api_client_approver)
+      operationId: listApiClients
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [proposed, active, suspended, revoked]}}
+        - $ref: "#/components/parameters/Cursor"
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 100}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ApiClient"}}
+                  next_cursor: {type: [string, "null"]}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/api-clients/{id}:
+    get:
+      summary: Một khách hàng API
+      operationId: getApiClient
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Khách hàng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiClient"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/api-clients/{id}/approve:
+    post:
+      summary: Duyệt khách hàng (api_client_approver ≠ người đề xuất — R-56)
+      operationId: approveApiClient
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Đã duyệt (active)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiClient"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/api-clients/{id}/suspend:
+    post:
+      summary: Tạm ngưng khách hàng (api_client_admin, lý do bắt buộc) — mọi khóa 401 ngay
+      operationId: suspendApiClient
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody: {$ref: "#/components/requestBodies/ApiClientReason"}
+      responses:
+        "200":
+          description: Đã tạm ngưng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiClient"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/api-clients/{id}/reactivate:
+    post:
+      summary: Bật lại khách hàng đã tạm ngưng (api_client_approver)
+      operationId: reactivateApiClient
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Đã bật lại
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiClient"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/api-clients/{id}/revoke:
+    post:
+      summary: Thu hồi khách hàng (cuối, api_client_admin, lý do bắt buộc)
+      operationId: revokeApiClient
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody: {$ref: "#/components/requestBodies/ApiClientReason"}
+      responses:
+        "200":
+          description: Đã thu hồi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiClient"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/api-clients/{id}/keys:
+    get:
+      summary: Khóa API của khách hàng — chỉ prefix, trạng thái, hạn (không bí mật, không HMAC)
+      operationId: listApiKeys
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Danh sách khóa
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ApiKey"}}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Phát hành khóa (api_client_admin; khách hàng active; tối đa 2 khóa hiệu lực) — bí mật hiện MỘT lần
+      operationId: issueApiKey
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "201":
+          description: "Khóa mới (Cache-Control: no-store). Gọi lặp cùng Idempotency-Key trả bản KHÔNG có api_key."
+          headers:
+            Cache-Control: {schema: {type: string, enum: [no-store]}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiKeyIssued"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/api-clients/{id}/keys/{key_id}/rotate:
+    post:
+      summary: Xoay khóa — khóa mới + khóa cũ còn hiệu lực tới previous_key_grace_until (7 ngày)
+      operationId: rotateApiKey
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: key_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "201":
+          description: "Khóa mới (Cache-Control: no-store)"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiKeyIssued"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/api-clients/{id}/keys/{key_id}/revoke:
+    post:
+      summary: Thu hồi khóa (lý do bắt buộc) — hiệu lực ngay ở lời gọi kế tiếp
+      operationId: revokeApiKey
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: key_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody: {$ref: "#/components/requestBodies/ApiClientReason"}
+      responses:
+        "200":
+          description: Đã thu hồi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiKey"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/api-clients/{id}/subscriptions:
+    get:
+      summary: Đăng ký sản phẩm dữ liệu (scope) của khách hàng
+      operationId: listApiSubscriptions
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ApiSubscription"}}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Đề xuất đăng ký sản phẩm + scope (api_client_admin) — scope của hợp đồng contracts/dataproduct hoặc usage:read
+      operationId: proposeApiSubscription
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [product, scopes]
+              properties:
+                product: {type: string, enum: [collection_volume, hub_capacity, mrv_package_status]}
+                scopes: {type: array, minItems: 1, maxItems: 3, items: {type: string, pattern: "^(dp:[a-z_]+:(read|export)|usage:read)$"}}
+      responses:
+        "201":
+          description: Đã đề xuất
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiSubscription"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/api-clients/{id}/subscriptions/{sub_id}/approve:
+    post:
+      summary: Duyệt đăng ký (api_client_approver ≠ người đề xuất — R-56)
+      operationId: approveApiSubscription
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: sub_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Đã duyệt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiSubscription"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/api-clients/{id}/subscriptions/{sub_id}/revoke:
+    post:
+      summary: Thu hồi đăng ký (api_client_admin, lý do) — scope mất ngay ở lời gọi kế tiếp
+      operationId: revokeApiSubscription
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: sub_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody: {$ref: "#/components/requestBodies/ApiClientReason"}
+      responses:
+        "200":
+          description: Đã thu hồi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiSubscription"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/api-clients/{id}/plans:
+    get:
+      summary: Phiên bản gói hạn mức của khách hàng + mặc định (tạm, chờ khách)
+      operationId: listApiQuotaPlans
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, defaults]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ApiQuotaPlan"}}
+                  defaults:
+                    type: object
+                    properties:
+                      requests_per_minute: {type: integer}
+                      daily_units: {type: integer}
+                      monthly_units: {type: integer}
+                      max_export_rows: {type: integer}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Đề xuất phiên bản gói hạn mức mới (api_client_admin)
+      operationId: proposeApiQuotaPlan
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [requests_per_minute, daily_units, monthly_units, max_export_rows]
+              properties:
+                requests_per_minute: {type: integer, minimum: 1, maximum: 100000}
+                daily_units: {type: integer, minimum: 1}
+                monthly_units: {type: integer, minimum: 1}
+                max_export_rows: {type: integer, minimum: 1, maximum: 100000000}
+                effective_from: {type: string, format: date-time}
+      responses:
+        "201":
+          description: Đã đề xuất
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiQuotaPlan"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/api-clients/{id}/plans/{version}/approve:
+    post:
+      summary: Duyệt phiên bản gói (api_client_approver ≠ người đề xuất — R-56)
+      operationId: approveApiQuotaPlan
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: version, in: path, required: true, schema: {type: integer, minimum: 1}}
+      responses:
+        "200":
+          description: Đã duyệt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiQuotaPlan"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
   # --- hết pf/party KN v7.7 gói P2 ---
 components:
   securitySchemes:
@@ -6291,7 +6922,7 @@ components:
     # --- pf/party: cấp quyền chia sẻ (ADR-0020) ---
     ShareKind:
       type: string
-      enum: [cooperative_directory, plot_directory, season_harvest_dates, htx_collection_responses, waterway_routes, valve_hub, valve_collection, valve_mrv_evidence]
+      enum: [cooperative_directory, plot_directory, season_harvest_dates, htx_collection_responses, waterway_routes, valve_hub, valve_collection, valve_mrv_evidence, dp_collection_volume, dp_hub_capacity, dp_mrv_package_status]
     ShareGrant:
       type: object
       required: [id, grantor_tenant_id, grantee_tenant_id, kinds, purpose, valid_from, valid_to, status, proposed_by, proposed_at, approved_by, approved_at, revoked_by, revoked_at, revoke_reason]
@@ -6450,6 +7081,212 @@ components:
         rows: {type: array, items: {$ref: "#/components/schemas/KNImpactRow"}}
         warnings: {type: array, items: {type: string}}
         movable: {type: boolean, description: "false với Nút cấp 1, 2"}
+    # --- hết pf/party cấp quyền chia sẻ ---
+    # --- pf/metering ---
+    MeteringUsageDay:
+      type: object
+      required: [date, product, calls, units]
+      properties:
+        date: {type: string, format: date}
+        product: {type: string}
+        calls: {type: integer}
+        units: {type: integer}
+    MeteringUsageEvent:
+      type: object
+      description: Một dòng sổ sử dụng (chứng từ). Không bí mật khóa, không giá trị truy vấn.
+      required: [id, seq, client_id, key_prefix, auth_method, call_kind, product, contract_version, route_template, status,
+        problem_code, data_tenant_id, units, rows_out, bytes_out, latency_ms, replayed, rule_version, event_time, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        client_id: {type: string, format: uuid}
+        key_prefix: {type: string}
+        auth_method: {type: string}
+        call_kind: {type: string, enum: [read, export_request, job_status, file_download, meta]}
+        product: {type: string}
+        contract_version: {type: integer}
+        route_template: {type: string}
+        status: {type: integer}
+        problem_code: {type: [string, "null"]}
+        data_tenant_id: {type: [string, "null"], format: uuid}
+        units: {type: integer}
+        rows_out: {type: integer}
+        bytes_out: {type: integer}
+        latency_ms: {type: integer}
+        replayed: {type: boolean}
+        rule_version: {type: string}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+    MeteringStatementJob:
+      type: object
+      required: [id, period, client_id, supersedes_id, correction_reason, status, statement_ids, error, requested_by, requested_at, completed_at]
+      properties:
+        id: {type: string, format: uuid}
+        period: {type: string}
+        client_id: {type: [string, "null"], format: uuid}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        status: {type: string, enum: [queued, completed, failed]}
+        statement_ids: {type: array, items: {type: string, format: uuid}}
+        error: {type: [string, "null"]}
+        requested_by: {type: string, format: uuid}
+        requested_at: {type: string, format: date-time}
+        completed_at: {type: [string, "null"], format: date-time}
+    MeteringStatementLine:
+      type: object
+      required: [product, status_class, calls, units, unit_price_vnd, amount_vnd, price_version]
+      properties:
+        product: {type: string}
+        status_class: {type: string, description: "2xx | 4xx | 5xx"}
+        calls: {type: integer}
+        units: {type: integer}
+        unit_price_vnd: {type: [string, "null"], description: "numeric(18,4) dạng chuỗi; null khi chưa có giá"}
+        amount_vnd: {type: [string, "null"], description: "numeric(18,2) dạng chuỗi"}
+        price_version: {type: [string, "null"]}
+    MeteringStatement:
+      type: object
+      description: Bảng kê một khách hàng × kỳ tháng (chứng từ lập hóa đơn ngoài hệ thống). Tiền là chuỗi thập phân.
+      required: [id, client_id, client_tenant_id, period, status, lines, subscription_vnd, total_vnd, price_version, first_seq, last_seq,
+        chain_head_hash, snapshot_sha256, rule_version, job_id, requested_by, requested_at, approved_by, approved_at, supersedes_id,
+        correction_reason, superseded_by]
+      properties:
+        id: {type: string, format: uuid}
+        client_id: {type: string, format: uuid}
+        client_tenant_id: {type: string, format: uuid}
+        period: {type: string}
+        status: {type: string, enum: [draft, approved]}
+        lines: {type: array, items: {$ref: "#/components/schemas/MeteringStatementLine"}}
+        subscription_vnd: {type: [string, "null"]}
+        total_vnd: {type: [string, "null"]}
+        price_version: {type: [string, "null"]}
+        first_seq: {type: integer}
+        last_seq: {type: integer}
+        chain_head_hash: {type: string}
+        snapshot_sha256: {type: string}
+        rule_version: {type: string}
+        job_id: {type: string, format: uuid}
+        requested_by: {type: string, format: uuid}
+        requested_at: {type: string, format: date-time}
+        approved_by: {type: [string, "null"], format: uuid}
+        approved_at: {type: [string, "null"], format: date-time}
+        supersedes_id: {type: [string, "null"], format: uuid}
+        correction_reason: {type: [string, "null"]}
+        superseded_by: {type: [string, "null"], format: uuid}
+    EgressChannel:
+      type: string
+      enum: [public_api, mrv_package, report_export, valve, partner_share]
+    EgressEvent:
+      type: object
+      description: Một lần dữ liệu rời đi qua điểm kiểm soát (tenant = chủ dữ liệu). Chỉ mã tham chiếu và số lượng.
+      required: [id, seq, channel, source_id, counterparty_kind, counterparty_ref, product, contract_version, records, bytes, business_date,
+        decision, reason, mode, daily_records, daily_quota, anomaly, actor_ref, event_time, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        channel: {$ref: "#/components/schemas/EgressChannel"}
+        source_id: {type: string, format: uuid}
+        counterparty_kind: {type: string, enum: [api_client, tenant, actor]}
+        counterparty_ref: {type: string, format: uuid}
+        product: {type: string}
+        contract_version: {type: integer}
+        records: {type: integer}
+        bytes: {type: integer}
+        business_date: {type: string, format: date}
+        decision: {type: string, enum: [allowed, denied]}
+        reason: {type: string, enum: ["", quota_exceeded]}
+        mode: {type: string, enum: [observe, enforce]}
+        daily_records: {type: integer}
+        daily_quota: {type: integer, description: "0 = không giới hạn"}
+        anomaly: {type: boolean}
+        actor_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+    EgressAnomaly:
+      type: object
+      required: [id, business_date, channel, counterparty_kind, counterparty_ref, product, egress_event_id, daily_records, threshold, basis, mode, detected_at]
+      properties:
+        id: {type: string, format: uuid}
+        business_date: {type: string, format: date}
+        channel: {$ref: "#/components/schemas/EgressChannel"}
+        counterparty_kind: {type: string, enum: [api_client, tenant, actor]}
+        counterparty_ref: {type: string, format: uuid}
+        product: {type: string}
+        egress_event_id: {type: string, format: uuid}
+        daily_records: {type: integer}
+        threshold: {type: integer}
+        basis: {type: string, enum: [median, absolute]}
+        mode: {type: string, enum: [observe, enforce]}
+        detected_at: {type: string, format: date-time}
+    # --- pf/apiclient ---
+    ApiClient:
+      type: object
+      required: [id, client_tenant_id, display_name, purpose, contact_ref, auth_methods, status, proposed_by, proposed_at]
+      properties:
+        id: {type: string, format: uuid}
+        client_tenant_id: {type: string, format: uuid}
+        display_name: {type: string}
+        purpose: {type: string}
+        contact_ref: {type: string, format: uuid}
+        auth_methods: {type: array, items: {type: string}}
+        oauth_client_id: {type: [string, "null"]}
+        status: {type: string, enum: [proposed, active, suspended, revoked]}
+        status_reason: {type: [string, "null"]}
+        proposed_by: {type: string, format: uuid}
+        proposed_at: {type: string, format: date-time}
+        approved_by: {type: [string, "null"], format: uuid}
+        approved_at: {type: [string, "null"], format: date-time}
+    ApiKey:
+      type: object
+      description: Không có bí mật, không có HMAC — chỉ prefix (an toàn để hiển thị và ghi log)
+      required: [id, key_prefix, status, issued_at, expires_at]
+      properties:
+        id: {type: string, format: uuid}
+        key_prefix: {type: string, pattern: "^[a-z2-7]{12}$"}
+        status: {type: string, enum: [active, rotated, revoked, expired]}
+        issued_at: {type: string, format: date-time}
+        expires_at: {type: string, format: date-time}
+        grace_until: {type: [string, "null"], format: date-time}
+        revoked_at: {type: [string, "null"], format: date-time}
+        revoke_reason: {type: [string, "null"]}
+    ApiKeyIssued:
+      type: object
+      required: [key_id, client_id, key_prefix, expires_at]
+      properties:
+        key_id: {type: string, format: uuid}
+        client_id: {type: string, format: uuid}
+        key_prefix: {type: string}
+        api_key: {type: string, description: "agk_<prefix>_<bí mật> — CHỈ có ở phản hồi đầu; không bao giờ lưu, log hay phát lại"}
+        expires_at: {type: string, format: date-time}
+        previous_key_grace_until: {type: string, format: date-time, description: "Khi xoay: hạn chồng lấn của khóa cũ"}
+    ApiSubscription:
+      type: object
+      required: [id, product, scopes, status, proposed_by, proposed_at]
+      properties:
+        id: {type: string, format: uuid}
+        product: {type: string}
+        scopes: {type: array, items: {type: string}}
+        status: {type: string, enum: [proposed, active, revoked]}
+        proposed_by: {type: string, format: uuid}
+        proposed_at: {type: string, format: date-time}
+        approved_by: {type: [string, "null"], format: uuid}
+        approved_at: {type: [string, "null"], format: date-time}
+        revoked_at: {type: [string, "null"], format: date-time}
+        revoke_reason: {type: [string, "null"]}
+    ApiQuotaPlan:
+      type: object
+      required: [version, requests_per_minute, daily_units, monthly_units, max_export_rows, effective_from, status, proposed_by, proposed_at]
+      properties:
+        version: {type: integer}
+        requests_per_minute: {type: integer}
+        daily_units: {type: integer}
+        monthly_units: {type: integer}
+        max_export_rows: {type: integer}
+        effective_from: {type: string, format: date-time}
+        status: {type: string, enum: [proposed, approved]}
+        proposed_by: {type: string, format: uuid}
+        proposed_at: {type: string, format: date-time}
+        approved_by: {type: [string, "null"], format: uuid}
+        approved_at: {type: [string, "null"], format: date-time}
   requestBodies:
     ContentTransition:
       required: true
@@ -6469,3 +7306,13 @@ components:
             required: [reason]
             properties:
               reason: {type: string, minLength: 20, description: "Lý do ≥ 20 ký tự (HTX US-HTXSTATUS-01 AC-3); không ghi dữ liệu cá nhân"}
+    ApiClientReason:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [reason]
+            properties:
+              reason: {type: string, minLength: 10, maxLength: 500, description: "Lý do (không ghi dữ liệu cá nhân)"}

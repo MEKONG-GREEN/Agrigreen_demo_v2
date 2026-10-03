@@ -39,7 +39,18 @@ export const ROLES = {
   mrvExporter: "mrv_exporter",
   metricsViewer: "metrics_viewer",
   plotViewer: "plot_viewer",
+  // G5 (apiclientport / meteringport): tài khoản của tenant đơn vị vận hành Public API.
+  apiClientAdmin: "api_client_admin",
+  apiClientApprover: "api_client_approver",
+  meteringViewer: "metering_viewer",
+  billingOfficer: "billing_officer",
+  billingApprover: "billing_approver",
 } as const;
+
+/** Vai quản trị khách hàng Public API (ADR-0022): đề xuất ≠ duyệt (R-56). */
+export const API_CLIENT_ROLES: readonly string[] = [ROLES.apiClientAdmin, ROLES.apiClientApprover];
+/** Vai đọc sổ sử dụng và bảng kê (pf/metering statementReaders). */
+export const METERING_READ_ROLES: readonly string[] = [ROLES.meteringViewer, ROLES.billingOfficer, ROLES.billingApprover];
 
 /** Vai đọc màn hình MRV (pf/mrv): thu, duyệt, xem, xuất. */
 export const MRV_ROLES: readonly string[] = [ROLES.mrvCollector, ROLES.mrvReviewer, ROLES.mrvViewer, ROLES.mrvExporter];
@@ -93,6 +104,11 @@ export const ROLE_LABEL: Readonly<Record<string, string>> = {
   vault_eraser: "Xoá định danh (RB-3)",
   consent_writer: "Ghi đồng ý",
   consent_reader: "Xem đồng ý",
+  api_client_admin: "Quản trị khách hàng Public API",
+  api_client_approver: "Duyệt khách hàng Public API",
+  metering_viewer: "Xem đo lường & nhật ký xuất",
+  billing_officer: "Lập bảng kê sử dụng",
+  billing_approver: "Duyệt bảng kê sử dụng",
 };
 
 export function roleLabel(role: string): string {

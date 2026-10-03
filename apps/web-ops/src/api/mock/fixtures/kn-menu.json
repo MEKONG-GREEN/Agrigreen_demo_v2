@@ -1112,6 +1112,42 @@
           "badge_source": null,
           "enabled": true,
           "children": []
+         },
+         {
+          "key": "admin.qt.cong_cu.khach_hang_api",
+          "label": "Khách hàng Public API",
+          "route": "/quan-tri/khach-hang-api",
+          "icon": "key",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
+         },
+         {
+          "key": "admin.qt.cong_cu.su_dung_api",
+          "label": "Sử dụng Public API",
+          "route": "/quan-tri/su-dung-api",
+          "icon": "chart",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
+         },
+         {
+          "key": "admin.qt.cong_cu.bang_ke",
+          "label": "Bảng kê sử dụng",
+          "route": "/quan-tri/bang-ke",
+          "icon": "report",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
+         },
+         {
+          "key": "admin.qt.cong_cu.nhat_ky_xuat",
+          "label": "Nhật ký xuất dữ liệu",
+          "route": "/quan-tri/nhat-ky-xuat",
+          "icon": "shield",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
          }
         ]
        }

@@ -268,3 +268,25 @@ func TestShareGrantWaterwayRoutesKind_G4(t *testing.T) {
 		t.Fatal("CHECK DB phải chặn loại dữ liệu lạ")
 	}
 }
+
+// G5-0 (pf 000047, ADR-0022 mục 3): ba loại sản phẩm dữ liệu dp_* đề xuất + duyệt được qua sổ thật
+// (CHECK DB mở rộng) cho tenant BÊN THỨ BA; bên nhận thấy đủ ba loại.
+func TestShareGrantDataProductKinds_G5(t *testing.T) {
+	f := newFixture(t)
+	third := ids.New()
+	a, b := f.as(f.tenant, uuid.Nil, authz.RolePlatformAdmin), f.as(f.tenant, uuid.Nil, authz.RolePlatformAdmin)
+	r := a.adminDo(http.MethodPost, "/v1/share-grants", proposal(third, port.KindDPCollectionVolume, port.KindDPHubCapacity, port.KindDPMRVPackageStatus))
+	wantStatus(t, r, http.StatusCreated, "đề xuất dp_*")
+	wantStatus(t, b.adminDo(http.MethodPost, "/v1/share-grants/"+str(r.body, "id")+"/approve", nil), http.StatusCreated, "duyệt")
+	g := f.as(third, uuid.Nil, port.RolePartnerSync).appDo(http.MethodGet, "/v1/partner/grants", nil)
+	it := items(g)
+	if len(it) != 1 {
+		t.Fatalf("cấp quyền bên nhận: %v", g.body)
+	}
+	if k, _ := it[0]["kinds"].([]any); len(k) != 3 {
+		t.Fatalf("loại: %v", it[0])
+	}
+	if port.DataProductKind("hub_capacity") != port.KindDPHubCapacity {
+		t.Fatal("DataProductKind phải là dp_<sản phẩm>")
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
@@ -42,7 +43,7 @@ func (p *platformLazy) get(ctx context.Context) (assembly.Modules, error) {
 			}
 			return db.Open(ctx, dsn, db.Options{AppName: "worker-platform", MaxConns: 2})
 		}
-		p.mods, _, p.err = assembly.Build(context.WithoutCancel(ctx), open, clock.System{}, assembly.External{})
+		p.mods, _, p.err = assembly.Build(context.WithoutCancel(ctx), open, clock.System{}, assembly.External{Egress: workerEgress})
 	})
 	return p.mods, p.err
 }
@@ -70,3 +71,7 @@ func wiredConsumers(log *slog.Logger) []consumer {
 	}
 	return out
 }
+
+// workerEgress là điểm kiểm soát xuất (pf/metering Checkpoint, ADR-0024) cho job của worker dựng
+// module riêng (lịch gửi báo cáo). Nil → hành vi cũ; người tích hợp nối khi có pf/metering.
+var workerEgress meteringport.Checkpoint

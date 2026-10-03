@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/store"
@@ -72,6 +73,9 @@ func (s *Service) RequestExport(ctx context.Context, f domain.ExportFilters, ide
 		} else if prev != nil {
 			j, replayed = *prev, true
 			return nil
+		}
+		if err := s.packageEgress(ctx, tx, j, p.ActorRef); err != nil {
+			return err
 		}
 		if err := store.InsertJob(ctx, tx, &j); err != nil {
 			return err
@@ -160,6 +164,9 @@ func (s *Service) PackageURL(ctx context.Context, id uuid.UUID) (PackageLink, er
 	}
 	if s.Store == nil {
 		return PackageLink{}, ErrDependencyUnavailable
+	}
+	if err := s.downloadEgress(ctx, j); err != nil {
+		return PackageLink{}, err
 	}
 	u, err := s.Store.PresignGet(ctx, *j.ObjectKey, PackageURLTTL)
 	if err != nil {
@@ -371,4 +378,53 @@ func snapshotCatalog(c domain.CatalogVersion) domain.SnapshotCatalog {
 		out.Fields = append(out.Fields, sf)
 	}
 	return out
+}
+
+// ProductMRVPackage là tên sản phẩm của kênh mrv_package ở điểm kiểm soát xuất (ADR-0024).
+const ProductMRVPackage = "mrv_package"
+
+// packageEgress: yêu cầu xuất gói đi qua điểm kiểm soát xuất kênh mrv_package (ADR-0024 mục 3) —
+// phần tử = số bằng chứng ước (ảnh chụp tại lúc yêu cầu), nguồn = export_id, bên nhận = người yêu
+// cầu. Chưa nối checkpoint → không đọc thêm gì (hành vi cũ). enforce + từ chối → không tạo job.
+func (s *Service) packageEgress(ctx context.Context, tx pgx.Tx, j domain.ExportJob, actor uuid.UUID) error {
+	if s.Egress == nil {
+		return nil
+	}
+	rows, err := store.SnapshotAt(ctx, tx, j.Filters, s.Clock.Now())
+	if err != nil {
+		return err
+	}
+	return meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
+		SourceID: j.ID, Channel: meteringport.ChannelMRVPackage, DataTenantID: j.TenantID, CounterpartyKind: meteringport.CounterpartyActor,
+		CounterpartyRef: actor, Product: ProductMRVPackage, Records: int64(len(rows)), OccurredAt: s.Clock.Now(), ActorRef: actor,
+		TraceID: telemetry.TraceID(ctx),
+	}, s.Log)
+}
+
+// downloadEgress: mỗi lần cấp URL tải gói là một lần xuất (nguồn mới) — phần tử = số bằng chứng của
+// gói, byte = cỡ gói (sổ export_package).
+func (s *Service) downloadEgress(ctx context.Context, j domain.ExportJob) error {
+	if s.Egress == nil {
+		return nil
+	}
+	p, _ := authz.FromContext(ctx)
+	var size int64
+	if err := s.tx(ctx, j.TenantID, func(tx pgx.Tx) error {
+		pk, err := store.PackagesOf(ctx, tx, j.ID)
+		if len(pk) > 0 {
+			size = pk[len(pk)-1].SizeBytes
+		}
+		return err
+	}); err != nil {
+		return err
+	}
+	var n int64
+	if j.EvidenceCount != nil {
+		n = int64(*j.EvidenceCount)
+	}
+	return meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
+		SourceID: ids.New(), Channel: meteringport.ChannelMRVPackage, DataTenantID: j.TenantID, CounterpartyKind: meteringport.CounterpartyActor,
+		CounterpartyRef: p.ActorRef, Product: ProductMRVPackage, Records: n, Bytes: size, OccurredAt: s.Clock.Now(), ActorRef: p.ActorRef,
+		TraceID: telemetry.TraceID(ctx),
+	}, s.Log)
 }

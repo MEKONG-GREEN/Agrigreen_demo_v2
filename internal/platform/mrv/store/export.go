@@ -201,3 +201,23 @@ func SnapshotAt(ctx context.Context, tx pgx.Tx, f domain.ExportFilters, asOf tim
 
 // HexHash đổi row_hash sang hex.
 func HexHash(b []byte) string { return hex.EncodeToString(b) }
+
+// ProductJobs trả job xuất của tenant (sản phẩm dữ liệu mrv_package_status, G5) theo id (UUIDv7 —
+// thứ tự thời gian) sau after, lọc trạng thái (rỗng = mọi trạng thái), tối đa limit.
+func ProductJobs(ctx context.Context, tx pgx.Tx, status string, after uuid.UUID, limit int) ([]domain.ExportJob, error) {
+	rows, err := tx.Query(ctx, "SELECT "+jobCols+` FROM pf_mrv.export_job
+	  WHERE ($1::text = '' OR status = $1::text) AND id > $2::uuid ORDER BY id LIMIT $3::int`, status, after, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.ExportJob
+	for rows.Next() {
+		j, err := scanJob(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, j)
+	}
+	return out, rows.Err()
+}

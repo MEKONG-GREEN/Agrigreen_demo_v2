@@ -22,6 +22,8 @@ func TestBoundary(t *testing.T) {
 		"example.com/ag/cmd/worker-internal",
 		"example.com/ag/cmd/ingest",
 		"example.com/ag/internal/mkg/measurement/port/edgewire",
+		// G5-0: Public API — gốc lắp ráp vùng nền tảng, không import vault kể cả client (RB-3).
+		"example.com/ag/cmd/api-public",
 	)
 }
 
@@ -34,6 +36,8 @@ func TestNoFloat(t *testing.T) {
 		"example.com/ag/internal/mkg/orders/domain",
 		"example.com/ag/internal/mkg/acctbridge/adapter",
 		"example.com/ag/internal/platform/beta/free",
+		// G5-0: pf/metering (giá, thành tiền) — theo tên đoạn, kể cả package con.
+		"example.com/ag/internal/platform/metering/app",
 	)
 }
 

@@ -1,0 +1,41 @@
+# Hồ sơ cấp phát Phase K (ADR-0025, G5): Public API cho bên thứ ba + điểm kiểm soát xuất ở chế độ enforce.
+# Chồng LÊN values-prod.yaml (hoặc values-staging.yaml khi diễn tập):
+#   helm upgrade --install agrigreen-pf deploy/k8s/charts/agrigreen -f values-prod.yaml -f values-phasek.yaml \
+#     --set-json 'global.installZones=["pf"]' --set apps.api-public.env.AG_PUBLIC_OPERATOR_TENANT=<uuid>
+# (docs/runbooks/phase-k.md). Edge/data/ops không cần cài lại: F08/F19 đã có từ hồ sơ gốc.
+#
+# R-01: tệp này CHỈ được chứa cấu hình và số bản sao — không image, không luồng mạng, không tài nguyên mới.
+# check_flows.py kiểm danh sách đường dẫn được phép (PHASEK_ALLOWED). Thêm thứ khác ở đây = ranh giới sai.
+# Tắt lại (rollback): bỏ tệp này khỏi lệnh helm upgrade → api-public về 0 bản sao, host partner biến mất.
+
+apps:
+  api-public:
+    replicas: 2                       # HA; PDB minAvailable 1 có sẵn ở values.yaml
+    env:
+      AG_PUBLIC_API_ENABLED: "1"      # khác "1" → tiến trình thoát lỗi (ADR-0022 mục 1)
+      AG_PUBLIC_OPERATOR_TENANT: ""   # chờ khách Q5-2 — đặt bằng --set; rỗng → api-public không khởi động (đóng khi lỗi)
+      AG_EGRESS_MODE: enforce
+      # Tùy chọn (Q5-10): Valkey trong lãnh thổ cho giới hạn tần suất dùng chung giữa các bản sao.
+      # Khi có: đặt AG_VALKEY_URL ở đây (qua Secret nếu có mật khẩu) và external.valkey bên dưới.
+  api-platform:
+    env:
+      AG_EGRESS_MODE: enforce         # ADR-0024: van/báo cáo/gói MRV/partner_share bị từ chối khi vượt hạn mức
+  worker:
+    env:
+      AG_EGRESS_MODE: enforce
+
+# Dải Valkey trong lãnh thổ (mở F26). Rỗng = dùng bộ đếm trong tiến trình (ADR-0022 mục 7).
+external:
+  valkey: []
+
+ingress:
+  optionalHosts:
+    partner:
+      enabled: true                   # partner.<domain> → api-public:8085, TLS + giới hạn IP + thân 1 MiB
+
+externalSecrets:
+  secrets:
+    pf:
+      pf-apikey-pepper: { enabled: true }        # <remotePrefix>/apikey/pf: AG_APIKEY_PEPPER_V1, AG_APIKEY_PEPPER_CURRENT
+      pf-public-s3: { enabled: true }            # <remotePrefix>/s3/pf-public: khóa S3 CHỈ ĐỌC của api-public (tệp xuất, F29)
+      agrigreen-partner-tls: { enabled: true }   # <remotePrefix>/tls/partner: tls.crt, tls.key
