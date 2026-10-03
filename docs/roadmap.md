@@ -184,7 +184,7 @@ Còn lại:
 
 **Trạng thái (02/10/2026, nhánh `sub/kn-v77` + P8 đợt 4 `kn-p8e`):** gói P1–P7 đã có mã (P1 tài khoản nhiều vai trò + ngữ cảnh phiên X-AG-Context, P2 phòng ban/khu vực/cây 3 cấp/menu theo cấu hình, P3 engine 14 mẫu, P4 vòng đời báo cáo + Chi cục, P5 lịch công tác, P6 khung + mọi màn web, P7 app Cán bộ xã ngoại tuyến + HTX/máy/thửa/vật tư); kịch bản đầu–cuối `TestKN77AnGiangTuan36` (`tests/kn77`, 13 bước trên module thật) đạt. Nghiệm thu [docs/uat/kn-v7.7-acceptance.md](uat/kn-v7.7-acceptance.md): **130 yêu cầu — 42 đạt, 48 một phần, 27 chưa làm, 13 ngoài module** (trước đợt 4: 38/36/43/13). Còn lại: **chờ khách** Q-01…Q-23 (chặn lớn nhất Q-01 — tệp Excel gốc của 14 mẫu, 13 biểu Cấp Xã đang là mẫu tạm); **mã** — menu/ngữ cảnh trên mobile, vài màn Admin (di chuyển Nút, nạp Excel nhiều vai trò, đếm theo phòng ban), vai kho định danh mặc định cho Cán bộ xã, cảnh báo PII ô tự do, SPI "còn n lần thử"; **hạ tầng** — sẵn sàng, sao lưu/RPO/RTO trên cụm thật, tải 500 người dùng, Android 3G, FCM thật.
 
-## G5 — Phase K, `pf/metering`, Public API cho bên thứ ba (nhánh `sub/g5`)
+## G5 — Phase K, `pf/metering`, Public API cho bên thứ ba (nhánh `sub/g5`, hợp nhất vào `main` 03/10/2026)
 
 Phụ lục A: "Phase K; `pf/metering` và Public API bật với bên thứ ba đầu tiên" (Q4/2028), cộng mục 18 (một điểm kiểm soát cho mọi đường xuất). Quy ước, số migration, vai, sự kiện, sản phẩm dữ liệu, tham số tạm: [docs/dev/g5-conventions.md](dev/g5-conventions.md). Quyết định: ADR-0022..0025. Nghiệm thu: [docs/uat/g5-acceptance.md](uat/g5-acceptance.md) — rà E2E 02/10/2026: **82 yêu cầu, 51 đạt, 19 một phần, 12 chưa làm** (10 trong số đó là câu hỏi khách Q5-1..Q5-10).
 
