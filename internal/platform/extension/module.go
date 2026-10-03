@@ -25,6 +25,7 @@ import (
 	rchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/handler"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
@@ -89,6 +90,12 @@ func (m *Module) UseGpsLog(g geoport.GpsLog) { m.svc.GpsLog = g }
 // Chưa nối → suy từ vai realm + phạm vi đơn vị, danh bạ trực pf_extension.staff.
 func (m *Module) UseKNContext(c port.KNContextResolver, d port.KNDirectory) {
 	m.svc.KNContext, m.svc.KNDirectory = c, d
+}
+
+// UseEgress (quyết định A5, ADR-0024) nối điểm kiểm soát xuất (pf/metering) cho "Xuất Excel/PDF" lịch công tác —
+// xuất nội bộ: ghi egress_event, không bao giờ bị chặn kể cả AG_EGRESS_MODE=enforce.
+func (m *Module) UseEgress(cp meteringport.Checkpoint, mode meteringport.Mode, log *slog.Logger) {
+	m.svc.Egress, m.svc.EgressMode, m.svc.Log = cp, mode, log
 }
 
 // UseTablePDF nối bộ dựng PDF bảng (pf/reports) cho "Xuất PDF" lịch công tác.

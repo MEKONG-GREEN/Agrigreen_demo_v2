@@ -4324,6 +4324,32 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /v1/public/report-links/{token}:
+    get:
+      summary: "Tải tệp báo cáo Chi cục qua liên kết trong email (A4) — KHÔNG đăng nhập; mã thông báo là quyền truy cập"
+      description: >-
+        Quyết định A4 (03/10/2026, FN-TI-02.06): email Chi cục vượt giới hạn đính kèm mang liên kết do api-platform phục vụ
+        (trong lãnh thổ), hạn theo tham số reports.dispatch_link_ttl_hours (mặc định 168 giờ = 7 ngày). Mỗi lần mở ghi
+        một dòng sổ pf_reports.dispatch_link_access (mã người nhận, thời điểm, IP đã băm HMAC, kết quả) và đi qua điểm
+        kiểm soát xuất (export_audit kind download + pf/metering kênh report_export, ADR-0024). Mã sai/bị sửa → 404;
+        hết hạn → 410 reports.link_expired; Admin thu hồi → 410 reports.link_revoked; điểm kiểm soát (enforce) từ chối
+        → 429 metering.egress_quota_exceeded. Phản hồi Cache-Control no-store, Referrer-Policy no-referrer.
+      operationId: openReportLink
+      tags: [reports]
+      security: []
+      parameters:
+        - {name: token, in: path, required: true, description: "Mã thông báo base64url 86 ký tự (tenant + liên kết + bí mật 32 byte; DB chỉ giữ SHA-256)", schema: {type: string, pattern: "^[A-Za-z0-9_-]{86}$"}}
+      responses:
+        "200":
+          description: Tệp (Excel hoặc PDF), Content-Disposition attachment
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+            application/pdf:
+              schema: {type: string, format: binary}
+        "404": {description: "reports.link_not_found", $ref: "#/components/responses/Problem"}
+        "410": {description: "reports.link_expired | reports.link_revoked", $ref: "#/components/responses/Problem"}
+        "429": {description: "metering.egress_quota_exceeded (AG_EGRESS_MODE=enforce)", $ref: "#/components/responses/Problem"}
   /v1/reports/templates:
     get:
       summary: Mẫu báo cáo đang dùng mà vai của người gọi được xuất (mẫu hệ thống = phiên bản 0)
@@ -8367,7 +8393,7 @@ components:
 
     PolygonGeometry:
       type: object
-      description: GeoJSON (RFC 7946) Polygon hoặc MultiPolygon, WGS84 kinh/vĩ độ (EPSG:4326). Vòng chưa khép được tự khép. Tối thiểu 4 đỉnh phân biệt không thẳng hàng mỗi mảnh.
+      description: GeoJSON (RFC 7946) Polygon hoặc MultiPolygon, WGS84 kinh/vĩ độ (EPSG:4326). Vòng chưa khép được tự khép. Tối thiểu 3 đỉnh phân biệt không thẳng hàng mỗi mảnh.
       required: [type, coordinates]
       properties:
         type: {type: string, enum: [Polygon, MultiPolygon]}
@@ -11315,7 +11341,7 @@ components:
         next_cursor: {type: [integer, "null"]}
     GeoJSONPolygonal:
       type: object
-      description: "GeoJSON Polygon/MultiPolygon WGS84; ≥ 4 đỉnh phân biệt không thẳng hàng; vòng chưa khép được tự khép"
+      description: "GeoJSON Polygon/MultiPolygon WGS84; ≥ 3 đỉnh phân biệt không thẳng hàng; vòng chưa khép được tự khép"
       required: [type, coordinates]
       properties:
         type: {type: string, enum: [Polygon, MultiPolygon]}

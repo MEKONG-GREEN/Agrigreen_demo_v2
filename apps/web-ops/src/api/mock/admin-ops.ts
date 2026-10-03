@@ -753,7 +753,7 @@ export const adminOpsRoutes: Route[] = [
         return problem(422, "geo.format_unsupported", "Unsupported format");
       }
       const features = names.map((name, index) => {
-        if (bad.has(index)) return { index, name, status: "rejected" as const, code: "geo.too_few_points", reason: "Dưới 4 điểm phân biệt", plot_ref: null, plot_code: null, area_ha: null, flagged_overlaps: [] };
+        if (bad.has(index)) return { index, name, status: "rejected" as const, code: "geo.too_few_points", reason: "Dưới 3 điểm phân biệt hoặc thẳng hàng", plot_ref: null, plot_code: null, area_ha: null, flagged_overlaps: [] };
         const overlap = index === 1;
         if (overlap && !confirm) return { index, name, status: "rejected" as const, code: "geo.overlap_needs_confirm", reason: "Chồng lấn thửa nháp cùng xã — nhập lại với “Nhận cả đối tượng chồng lấn”", plot_ref: null, plot_code: null, area_ha: null, flagged_overlaps: [] };
         const ref = uuidv7();

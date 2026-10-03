@@ -27,6 +27,9 @@ const (
 	ParamDailyExportQuota = "reports.daily_export_quota"
 	// ParamAnomalyThreshold: vượt số lần xuất trong ngày này → sự kiện pf.reports.export.anomaly. Mặc định 30.
 	ParamAnomalyThreshold = "reports.export_anomaly_threshold"
+	// ParamDispatchLinkTTLHours: hạn liên kết tải tệp Chi cục (giờ) do api-platform phục vụ — quyết định A4
+	// 03/10/2026. Mặc định 168 (7 ngày), trần 2160.
+	ParamDispatchLinkTTLHours = "reports.dispatch_link_ttl_hours"
 )
 
 // Nguồn dữ liệu của mẫu biểu.

@@ -50,7 +50,7 @@ func validateEgress(e port.Egress) error {
 // bao giờ từ chối; ở enforce vượt hạn mức → Allowed = false. Lỗi trả về là lỗi hạ tầng (Guard áp ngữ
 // nghĩa observe/enforce). Idempotent theo (kênh, nguồn, bên nhận).
 func (s *Service) Pass(ctx context.Context, e port.Egress) (port.Decision, error) {
-	d, err := s.pass(ctx, e, s.mode())
+	d, err := s.pass(ctx, e, e.EffectiveMode(s.mode())) // A5: xuất nội bộ luôn observe
 	if err != nil {
 		s.metrics().checkpointError(ctx, string(e.Channel))
 	}

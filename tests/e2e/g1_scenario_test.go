@@ -316,8 +316,8 @@ func (g *g1) stepPlots() {
 		"commune_code": communeNK, "geometry": harness.Rect(nkLat, nkLon, 0, 600, 50, 50),
 	}), 403, "geo.out_of_scope", "tỉnh khác vẽ thửa Cần Thơ")
 	g.wantProblem(g.officer.Do(harness.App, http.MethodPost, "/v1/plots", "", map[string]any{
-		"commune_code": communeNK, "geometry": map[string]any{"type": "Polygon", "coordinates": [][][]float64{{{105.77, 10.03}, {105.771, 10.03}, {105.77, 10.031}, {105.77, 10.03}}}},
-	}), 422, "geo.too_few_points", "tam giác")
+		"commune_code": communeNK, "geometry": map[string]any{"type": "Polygon", "coordinates": [][][]float64{{{105.77, 10.03}, {105.771, 10.03}, {105.772, 10.03}, {105.77, 10.03}}}},
+	}), 422, "geo.too_few_points", "3 điểm thẳng hàng (A2: tam giác thật hợp lệ)")
 }
 
 func (g *g1) publish(reviewer *harness.User, ref string) harness.Resp {
@@ -728,7 +728,7 @@ func (g *g1) stepSync() {
 		rec("evidence", evidence(g.households[0])),
 		rec("evidence", evidence(g.households[1])), // hộ 2 chưa đồng ý mrv.evidence
 		rec("plot_boundary", map[string]any{"plot_ref": uuid.Must(uuid.NewV7()).String(), "commune_code": communeNK,
-			"geometry": map[string]any{"type": "Polygon", "coordinates": [][][]float64{{{105.77, 10.04}, {105.771, 10.04}, {105.77, 10.041}, {105.77, 10.04}}}}}),
+			"geometry": map[string]any{"type": "Polygon", "coordinates": [][][]float64{{{105.77, 10.04}, {105.771, 10.04}, {105.772, 10.04}, {105.77, 10.04}}}}}), // 3 điểm thẳng hàng
 		rec("invoice", map[string]any{"x": 1}),
 	}
 	want := []struct{ status, code string }{

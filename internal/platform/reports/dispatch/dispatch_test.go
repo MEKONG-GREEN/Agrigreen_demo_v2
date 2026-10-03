@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 )
 
@@ -58,5 +60,46 @@ func TestFN_TI_02_06_MessageHelpers(t *testing.T) {
 	}
 	if FileName("T01", "Tuần 1/2", "xlsx") != "T01_Tuần 1_2.xlsx" {
 		t.Fatal(FileName("T01", "Tuần 1/2", "xlsx"))
+	}
+}
+
+// A4 (03/10/2026, FN-TI-02.06): mã thông báo liên kết tải — khứ hồi đúng tenant/liên kết, sửa một ký tự → không khớp
+// băm hoặc không giải mã được; IP chỉ lưu dạng HMAC theo liên kết.
+func TestA4_LinkTokenRoundTripAndTamper(t *testing.T) {
+	tid, lid := uuid.New(), uuid.New()
+	tok, hash, err := NewLinkToken(tid, lid)
+	if err != nil || len(hash) != 32 {
+		t.Fatal(err)
+	}
+	gt, gl, gh, ok := ParseLinkToken(tok)
+	if !ok || gt != tid || gl != lid || !TokenMatches(hash, gh) {
+		t.Fatalf("khứ hồi: %v %v %v", ok, gt, gl)
+	}
+	// Sửa ký tự cuối (thuộc phần bí mật) → giải mã được nhưng băm khác.
+	last := tok[len(tok)-1]
+	repl := byte('A')
+	if last == 'A' {
+		repl = 'B'
+	}
+	_, _, th, ok := ParseLinkToken(tok[:len(tok)-1] + string(repl))
+	if ok && TokenMatches(hash, th) {
+		t.Fatal("mã bị sửa vẫn khớp")
+	}
+	mid := []byte(tok)
+	mid[60] ^= 1 // đổi một ký tự giữa phần bí mật (vẫn là ký tự base64url hợp lệ)
+	for _, bad := range []string{"", "abc", tok + "x", strings.Repeat("A", len(tok)), string(mid)} {
+		if _, _, h, ok := ParseLinkToken(bad); ok && TokenMatches(hash, h) {
+			t.Fatalf("mã sai vẫn nhận: %q", bad)
+		}
+	}
+	tok2, hash2, _ := NewLinkToken(tid, lid)
+	if tok2 == tok || TokenMatches(hash, hash2) {
+		t.Fatal("bí mật phải ngẫu nhiên")
+	}
+	if h := IPHash(hash, "203.0.113.7"); len(h) != 64 || h == IPHash(hash2, "203.0.113.7") || strings.Contains(h, "203") || IPHash(hash, "") != "" {
+		t.Fatalf("băm IP: %q", h)
+	}
+	if u := LinkURL("https://api.vi-du.vn/", tok); u != "https://api.vi-du.vn/v1/public/report-links/"+tok {
+		t.Fatal(u)
 	}
 }

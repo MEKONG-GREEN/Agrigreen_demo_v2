@@ -215,7 +215,7 @@ void main() {
   );
 
   testWidgets(
-    'HTX US-PLOT-02: đi GPS — < 4 điểm hoặc thẳng hàng bị chặn; GPS yếu → '
+    'HTX US-PLOT-02: đi GPS — < 3 điểm hoặc thẳng hàng bị chặn; GPS yếu → '
     'cảnh báo, đánh dấu lại hoặc chuyển sang chọn trên bản đồ; lệch diện tích '
     '> geo.area_deviation_max_pct phải xác nhận; khép vùng → lô mới của HTX',
     (tester) async {
@@ -227,12 +227,12 @@ void main() {
       expect(find.text('Vẽ thửa mới'), findsOneWidget);
       final sq = squareAt(10.0451, 105.7701, 100);
 
-      // AC-2: 3 điểm → chặn, thông báo đúng AC.
-      for (final p in sq.take(3)) {
+      // AC-2 (A2 03/10/2026: tối thiểu 3 điểm): 2 điểm → chặn, thông báo đúng AC.
+      for (final p in sq.take(2)) {
         await _gpsPoint(tester, env, p);
       }
       const msg4 =
-          'Cần tối thiểu 4 điểm ranh giới không thẳng hàng để khép vùng.';
+          'Cần tối thiểu 3 điểm ranh giới không thẳng hàng để khép vùng.';
       expect(find.text(msg4), findsOneWidget);
       expect(
         tester
@@ -312,7 +312,7 @@ void main() {
 
   testWidgets(
     'HTX US-PLOT-03: chọn góc trên bản đồ (nền theo AG_TILE_URL, vệ tinh chờ '
-    'RB-7) — cùng ràng buộc ≥ 4 điểm không thẳng hàng; chạm bản đồ ở chế độ '
+    'RB-7) — cùng ràng buộc ≥ 3 điểm không thẳng hàng; chạm bản đồ ở chế độ '
     'đi GPS không thêm điểm',
     (tester) async {
       await _tall(tester);
@@ -333,7 +333,7 @@ void main() {
       }
       expect(
         find.text(
-          'Cần tối thiểu 4 điểm ranh giới không thẳng hàng để khép vùng.',
+          'Cần tối thiểu 3 điểm ranh giới không thẳng hàng để khép vùng.',
         ),
         findsOneWidget,
       );

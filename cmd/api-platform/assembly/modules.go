@@ -241,6 +241,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		Extension: kn.ReportData(), Mechanization: mech.ReportData(), CropCycle: cc.ReportData(), Directory: acc.MailDirectory(),
 		Recipients:     acc.ReportRecipients(),                 // HTX US-DASH-03: người nhận = tài khoản của HTX
 		Consolidations: kn.Consolidations(), Getenv: os.Getenv, // KN v7.7 P4: báo cáo Chi cục; cờ Google Sheet (tắt mặc định)
+		LinkDownloadBase: os.Getenv("AG_REPORT_LINK_BASE"), // A4: liên kết tải Chi cục (route công khai /v1/public/report-links)
 	})
 	// KN v7.7 P4: vòng đời báo cáo — engine mẫu (P3), khu vực (P2), cán bộ phụ trách (P1), lịch sử gửi Chi cục; nối ngược
 	// cho P2: bảng Ảnh hưởng (kỳ chưa chốt), dữ liệu theo phòng ban, menu "Báo cáo đột xuất", cột "biểu đang dùng".
@@ -336,6 +337,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	g.UseEgress(egress, mode, slog.Default())
 	cc.UseEgress(egress, mode, slog.Default())
 	pty.UseEgress(egress, mode, slog.Default())
+	kn.UseEgress(egress, mode, slog.Default()) // A5: xuất lịch công tác — nội bộ, observe
 
 	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
 		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Metrics: met, ExtData: ed, Metering: meter, APIClient: apic}, pools, nil

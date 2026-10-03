@@ -151,7 +151,7 @@ Kiểm thử chính (`test/` của app; tệp đánh dấu *lõi* nằm ở `pac
 | *lõi* `auth_test.dart` | phiên 72 giờ; làm mới gia hạn; phát hiện lùi đồng hồ; PIN 6 số; khóa 15 phút sau 5 lần sai; bộ đếm bền; hủy PIN sau 10 lần; luồng đăng nhập |
 | *lõi* `wipe_test.dart` | 403 `sync.device_revoked` → xóa CSDL, ciphertext, toàn bộ kho bí mật; 401 không xóa |
 | *lõi* `envelope_test.dart`, `envelope_vectors_test.dart` | round-trip, sửa tag, sai khóa; vector Go `nacl/box.SealAnonymous` (`packages/agrigreen_mobile/test/fixtures/go_nacl_vectors.json`); bộ chung `internal/shared/envelope/testdata/vectors.json` (bỏ qua nếu chưa có) |
-| `boundary_test.dart` | ≥4 điểm, thẳng hàng, tự cắt, lõm, diện tích ha (sai lệch <1 %), chồng lấn, GeoJSON, chặn/xác nhận chồng lấn |
+| `boundary_test.dart` | ≥3 điểm (A2, tam giác hợp lệ), thẳng hàng, tự cắt, lõm, diện tích ha (sai lệch <1 %), chồng lấn, GeoJSON, chặn/xác nhận chồng lấn |
 | *lõi* `photo_pipeline_test.dart` | không có bản rõ trên đĩa; tải tệp mất phản hồi + crash → một bản ghi evidence |
 | `task_service_test.dart` | nhiệm vụ hỗ trợ: đóng cần kết quả, chuyển tiếp cần ghi chú |
 | *lõi* `big_tile_small_screen_test.dart` | BigTile không tràn trên màn hình nhỏ |

@@ -73,6 +73,8 @@ type realmFile struct {
 	BruteForceProtected bool `json:"bruteForceProtected"`
 	FailureFactor       int  `json:"failureFactor"`
 	MaxDeltaTimeSeconds int  `json:"maxDeltaTimeSeconds"`
+	// A3 / Q-21: MULTIPLE = khóa ở mỗi bội số failureFactor (5, 10, 15…), không khóa lại ở từng lần sai lẻ.
+	BruteForceStrategy string `json:"bruteForceStrategy"`
 	// KN v7.7 N-10 (thay GIS US-LOG-01 AC-3): khóa TẠM 15 phút, tự mở sau thời gian chờ.
 	PermanentLockout      bool   `json:"permanentLockout"`
 	MaxTemporaryLockouts  int    `json:"maxTemporaryLockouts"`
@@ -121,23 +123,27 @@ func TestKeycloakRealmCoversRolesAndClaims(t *testing.T) {
 	if err := dec.Decode(&realm); err != nil {
 		t.Fatalf("realm JSON: %v", err)
 	}
-	// CGH FN-01 BR-01/luồng ngoại lệ: không đăng ký công khai; sai 5 lần trong 15 phút → khóa tạm thời;
-	// mật khẩu có tiêu chí độ mạnh (BR-02).
-	if realm.RegistrationAllowed || !realm.BruteForceProtected || realm.FailureFactor != 5 || realm.MaxDeltaTimeSeconds != 900 ||
+	// CGH FN-01 BR-01/luồng ngoại lệ: không đăng ký công khai; sai 5 lần → khóa tạm thời; mật khẩu có tiêu chí độ
+	// mạnh (BR-02). Cửa sổ đếm lần sai 24 giờ (A3 03/10/2026, thay 15 phút — cần để đếm được 3 lần khóa tạm/24 h).
+	if realm.RegistrationAllowed || !realm.BruteForceProtected || realm.FailureFactor != 5 || realm.MaxDeltaTimeSeconds != 86400 ||
 		!strings.Contains(realm.PasswordPolicy, "length(") {
 		t.Errorf("chính sách đăng nhập: đăng ký=%v chống dò=%v sai tối đa=%d cửa sổ=%ds mật khẩu=%q",
 			realm.RegistrationAllowed, realm.BruteForceProtected, realm.FailureFactor, realm.MaxDeltaTimeSeconds, realm.PasswordPolicy)
 	}
-	// KN v7.7 FN-CH-00.01 / N-10 (thay GIS US-LOG-01 AC-3 — BRD v7.7 mới hơn, gap §4.6): sai 5 lần/15
-	// phút → khóa TẠM 15 phút rồi tự mở (Keycloak brute-force: permanentLockout = false, chờ 900 s); Admin
-	// vẫn mở sớm qua pf/accounts unlock. Số lần khóa tạm trước khi khóa hẳn chờ khách (Q-21). Tài khoản bị
-	// Admin khóa (enabled = false) giữ thông báo "liên hệ Admin".
+	// KN v7.7 FN-CH-00.01 / N-10 (thay GIS US-LOG-01 AC-3 — BRD v7.7 mới hơn, gap §4.6) + A3/Q-21 (chốt
+	// 03/10/2026): mỗi 5 lần sai → khóa TẠM 15 phút rồi tự mở (chờ 900 s); sau 3 lần khóa tạm trong cửa sổ 24 giờ
+	// → khóa HẲN (permanentLockout = true, maxTemporaryLockouts = 3; Keycloak 26 đặt enabled = false), Admin mở
+	// qua pf/accounts unlock. Tài khoản bị khóa giữ thông báo "liên hệ Admin".
 	const lockedMsg = "Tài khoản đã bị khóa, vui lòng liên hệ Admin để mở khóa."
-	if realm.PermanentLockout || realm.WaitIncrementSeconds != 900 || realm.MaxFailureWaitSeconds != 900 ||
+	if !realm.PermanentLockout || realm.MaxTemporaryLockouts != 3 || realm.BruteForceStrategy != "MULTIPLE" ||
+		realm.WaitIncrementSeconds != 900 || realm.MaxFailureWaitSeconds != 900 ||
+		realm.LocalizationTexts["vi"]["accountPermanentlyDisabledMessage"] != lockedMsg ||
+		!strings.Contains(realm.LocalizationTexts["vi"]["invalidUserMessage"], "3 lần trong 24 giờ") ||
 		!strings.Contains(realm.LocalizationTexts["vi"]["accountTemporarilyDisabledMessage"], "15 phút") ||
 		realm.LocalizationTexts["vi"]["accountDisabledMessage"] != lockedMsg {
-		t.Errorf("KN v7.7 N-10: permanentLockout=%v waitIncrement=%d maxFailureWait=%d thông báo khóa tạm=%q", realm.PermanentLockout,
-			realm.WaitIncrementSeconds, realm.MaxFailureWaitSeconds, realm.LocalizationTexts["vi"]["accountTemporarilyDisabledMessage"])
+		t.Errorf("KN v7.7 N-10 / A3: permanentLockout=%v maxTemporaryLockouts=%d strategy=%q waitIncrement=%d maxFailureWait=%d thông báo khóa tạm=%q",
+			realm.PermanentLockout, realm.MaxTemporaryLockouts, realm.BruteForceStrategy, realm.WaitIncrementSeconds, realm.MaxFailureWaitSeconds,
+			realm.LocalizationTexts["vi"]["accountTemporarilyDisabledMessage"])
 	}
 	// KN v7.7 FN-CH-00.01: đăng nhập bằng email (loginWithEmailAllowed) hoặc SĐT (username = SĐT chuẩn hóa).
 	if !realm.LoginWithEmail {

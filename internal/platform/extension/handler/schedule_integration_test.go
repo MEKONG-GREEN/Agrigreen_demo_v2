@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -493,9 +495,21 @@ func TestFN_TI_02_07_UnregisteredBulkRemindersExport(t *testing.T) {
 	}
 	pdf := &fakePDF{}
 	f.mod.UseTablePDF(pdf)
+	// A5 (03/10/2026): xuất lịch là xuất NỘI BỘ — qua điểm kiểm soát dùng chung (ghi egress_event) nhưng không bị chặn
+	// kể cả enforce + checkpoint báo vượt hạn mức hoặc lỗi.
+	cp := &denyCP{}
+	f.mod.UseEgress(cp, meteringport.ModeEnforce, nil)
 	if r := p.admin89.call(http.MethodGet, "/v1/extension/work-schedules/export?week_start="+nextWeek+"&format=pdf", "", nil); r.status != http.StatusOK || pdf.rows != 3 {
 		t.Fatalf("xuất PDF 3 dòng: %d %d", r.status, pdf.rows)
 	}
+	if x := p.admin89.call(http.MethodGet, "/v1/extension/work-schedules/export?week_start="+nextWeek, "", nil); x.status != http.StatusOK {
+		t.Fatalf("A5: xuất Excel ở enforce bị chặn: %d", x.status)
+	}
+	if len(cp.got) != 2 || !cp.got[0].Internal || cp.got[0].Channel != meteringport.ChannelReportExport || cp.got[0].Product != "kn_work_schedule" ||
+		cp.got[0].Records != 3 || cp.got[0].CounterpartyRef == uuid.Nil {
+		t.Fatalf("A5: lần xuất phải qua checkpoint với Internal: %+v", cp.got)
+	}
+	f.mod.UseEgress(nil, "", nil)
 
 	bulk := p.admin89.must(p.admin89.post("/v1/extension/work-schedules/bulk-approve", map[string]any{"ids": []string{schedID(a), schedID(own), ids.New().String()}}),
 		http.StatusOK, "duyệt hàng loạt")
@@ -638,4 +652,17 @@ func TestFN_XA_03_08_CopyPreviousAndValidation(t *testing.T) {
 	if r := off.post("/v1/extension/work-schedules", map[string]any{"id": cid, "week_start": "2026-10-12", "action": "draft", "items": []any{}}); r.status != http.StatusConflict || code(r) != "extension.id_reused" {
 		t.Fatalf("id dùng lại → 409: %d %v", r.status, r.body)
 	}
+}
+
+// denyCP là điểm kiểm soát xuất giả luôn báo vượt hạn mức (A5: xuất nội bộ vẫn phải đi qua và không bị chặn).
+type denyCP struct {
+	mu  sync.Mutex
+	got []meteringport.Egress
+}
+
+func (d *denyCP) Pass(_ context.Context, e meteringport.Egress) (meteringport.Decision, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.got = append(d.got, e)
+	return meteringport.Decision{Allowed: false, Reason: "quota_exceeded", Mode: meteringport.ModeEnforce}, nil
 }

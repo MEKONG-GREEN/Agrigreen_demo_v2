@@ -254,6 +254,9 @@ Phản hồi phát lại theo Idempotency-Key có header `Idempotent-Replayed: t
 | 404 | `reports.template_not_found` | pf/reports: không có mẫu báo cáo với mã này (cả mẫu hệ thống lẫn phiên bản của tenant) |
 | 409 | `reports.template_retired` | pf/reports: mẫu đã ngừng dùng — không xuất, không lập lịch, không ngừng lại lần nữa |
 | 404 | `reports.dispatch_not_found` | pf/reports (KN v7.7 P4): không có lần xuất/gửi báo cáo Chi cục (hoặc tệp), hoặc ngoài tỉnh/phòng ban |
+| 404 | `reports.link_not_found` | pf/reports (A4, 03/10/2026): `GET /v1/public/report-links/{token}` — mã thông báo sai định dạng, không có, hoặc bị sửa (băm không khớp; ghi sổ `dispatch_link_access` outcome `invalid`) |
+| 410 | `reports.link_expired` | pf/reports (A4): liên kết tải Chi cục quá hạn `reports.dispatch_link_ttl_hours` (mặc định 168 giờ = 7 ngày); đề nghị đơn vị gửi lại |
+| 410 | `reports.link_revoked` | pf/reports (A4): Admin đã thu hồi liên kết tải của lần gửi (`POST /v1/reports/dispatches/{id}/revoke-links`, Admin API) |
 | 404 | `reports.dispatch_recipient_not_found` | pf/reports: người nhận Chi cục không có/đã ngừng dùng/khác tỉnh |
 | 409 | `reports.dispatch_recipient_duplicate` | pf/reports: địa chỉ hộp thư đã có trong danh bạ đang dùng |
 | 409 | `reports.dispatch_no_data` | pf/reports: kỳ chưa có lần tổng hợp — bấm "Cập nhật" ở Báo cáo tổng hợp các xã trước |
@@ -333,7 +336,7 @@ Việc mô phỏng hỏng ghi `error_code` trên việc: mã `simulation.*` (l�
 | 422 | `geo.support_reason_required` | pf/geo KN v7.7: chế độ hỗ trợ Admin ghi thửa thiếu lý do (≥ 10 ký tự, FN-AD-04.07). KN v7.7 cũng dùng lại `geo.out_of_scope` (xã ngoài phạm vi ngữ cảnh khi vẽ/lọc/xuất), `geo.plot_not_found` (thửa ngoài phạm vi xã hoặc của phòng ban khác), `geo.dependency_unavailable` (có `farmer_name` mà chưa nối kho định danh) |
 | 409 | `geo.conflict_state` | pf/geo: xung đột đã được xử lý |
 | 403 | `geo.out_of_scope` | pf/geo: ghi ngoài phạm vi xã của người gọi, hoặc quản lý HTX thao tác trên thửa/HTX khác (HTX US-PLOT-01 AC-4) |
-| 422 | `geo.too_few_points` | pf/geo: dưới 4 điểm phân biệt, hoặc các điểm thẳng hàng (KN US-PLOT-01 AC-1, HTX US-PLOT-02 AC-2) |
+| 422 | `geo.too_few_points` | pf/geo: dưới 3 điểm phân biệt, hoặc các điểm thẳng hàng (BRD v7.7 FN-XA-03.05, quyết định A2 03/10/2026; trước đó 4 điểm) |
 | 422 | `geo.invalid_geometry` | pf/geo: hình không hợp lệ theo PostGIS (tự cắt — hình nơ bướm, vòng sai), không phải vùng khép kín, quá 5.000 đỉnh |
 | 422 | `geo.crs_unsupported` | pf/geo: hệ toạ độ khác WGS84 (EPSG:4326) — thành phần `crs` khác; `.prj` của Shapefile là VN-2000, hệ chiếu phẳng, hệ khác hoặc thiếu `.prj`; hoặc toạ độ ngoài miền kinh/vĩ độ. Hệ thống không tự chuyển VN-2000 — chuyển sang EPSG:4326 trước khi tải lên |
 | 422 | `geo.area_out_of_range` | pf/geo: diện tích trắc địa ngoài 0,001–1.000 ha |

@@ -1,5 +1,5 @@
 // Package domain: quy tắc nghiệp vụ của pf/geo — đọc và kiểm hình ranh giới thửa
-// (GeoJSON, KML, Shapefile), quy tắc tối thiểu 4 điểm, hệ toạ độ WGS84, nguồn và trạng thái
+// (GeoJSON, KML, Shapefile), quy tắc tối thiểu 3 điểm, hệ toạ độ WGS84, nguồn và trạng thái
 // thửa. Không phụ thuộc hạ tầng; kiểm hình học chính xác (ST_IsValid, diện tích
 // trắc địa, chồng lấn) chạy trong PostGIS ở tầng store.
 package domain
@@ -29,8 +29,9 @@ type MultiPolygon []Polygon
 
 // Giới hạn hình học.
 const (
-	// MinPoints: KN US-PLOT-01 AC-1, HTX US-PLOT-02 AC-2 — tối thiểu 4 điểm không thẳng hàng.
-	MinPoints = 4
+	// MinPoints: tối thiểu 3 điểm phân biệt không thẳng hàng (tam giác hợp lệ) — BRD v7.7 FN-XA-03.05, quyết định A2
+	// chốt 03/10/2026 (trước đó 4 theo KN US-PLOT-01 AC-1, HTX US-PLOT-02 AC-2). DB: CHECK point_count >= 3 (pf 000084).
+	MinPoints = 3
 	// MaxPoints mỗi thửa — chặn dữ liệu bất thường, giữ truy vấn dưới 2 giây (R-52).
 	MaxPoints = 5000
 )
@@ -54,7 +55,7 @@ const (
 func violation(code, msg string) *Violation { return &Violation{Code: code, Msg: msg} }
 
 // ErrTooFewPoints là thông báo của HTX US-PLOT-02 AC-2.
-var ErrTooFewPoints = violation(CodeTooFewPoints, "Cần tối thiểu 4 điểm ranh giới không thẳng hàng để khép vùng.")
+var ErrTooFewPoints = violation(CodeTooFewPoints, "Cần tối thiểu 3 điểm ranh giới không thẳng hàng để khép vùng.")
 
 // ErrNotWGS84: toạ độ nằm ngoài miền kinh/vĩ độ — gần như chắc chắn là hệ chiếu (VN-2000, UTM).
 var ErrNotWGS84 = violation(CodeCRSUnsupported, "Chỉ nhận toạ độ WGS84 (EPSG:4326) dạng kinh độ, vĩ độ; tệp có vẻ dùng hệ toạ độ phẳng (VN-2000/UTM) — hãy chuyển sang EPSG:4326 trước khi tải lên")
@@ -183,7 +184,7 @@ func polygonFrom(c [][][]float64) (Polygon, error) {
 	return p, nil
 }
 
-// Normalize kiểm toạ độ, khép vòng và áp quy tắc tối thiểu 4 đỉnh phân biệt,
+// Normalize kiểm toạ độ, khép vòng và áp quy tắc tối thiểu 3 đỉnh phân biệt,
 // không thẳng hàng cho vòng ngoài của mỗi mảnh. Trả tổng số đỉnh phân biệt.
 func (mp MultiPolygon) Normalize() (int, error) {
 	if len(mp) == 0 {

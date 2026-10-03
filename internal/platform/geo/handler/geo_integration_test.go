@@ -267,12 +267,15 @@ func TestGeodesicAreaNearCanTho(t *testing.T) {
 	}
 }
 
-// KN US-PLOT-01 AC-1 / HTX US-PLOT-02 AC-2: < 4 điểm, tự cắt, hệ toạ độ phẳng, diện tích vô lý → chặn lưu.
+// FN-XA-03.05 / HTX US-PLOT-02 AC-2: < 3 điểm phân biệt hoặc thẳng hàng, tự cắt, hệ toạ độ phẳng, diện tích vô lý → chặn
+// lưu; tam giác (3 điểm) hợp lệ — quyết định A2 03/10/2026 (CHECK point_count >= 3, pf 000084).
 func TestBoundaryValidationRules(t *testing.T) {
 	f := newFixture(t)
 	c := f.national()
 	dLat, dLon := degPerMetre(baseLat)
 	tri := map[string]any{"type": "Polygon", "coordinates": [][][]float64{{{baseLon, baseLat}, {baseLon + 100*dLon, baseLat}, {baseLon, baseLat + 100*dLat}}}}
+	dup := map[string]any{"type": "Polygon", "coordinates": [][][]float64{{{baseLon, baseLat}, {baseLon + 100*dLon, baseLat}, {baseLon + 100*dLon, baseLat}}}}
+	col := map[string]any{"type": "Polygon", "coordinates": [][][]float64{{{baseLon, baseLat}, {baseLon + 50*dLon, baseLat}, {baseLon + 100*dLon, baseLat}}}}
 	bow := map[string]any{"type": "Polygon", "coordinates": [][][]float64{{
 		{baseLon, baseLat}, {baseLon + 100*dLon, baseLat + 100*dLat}, {baseLon + 100*dLon, baseLat}, {baseLon, baseLat + 100*dLat}}}}
 	vn2000 := map[string]any{"type": "Polygon", "coordinates": [][][]float64{{{585000, 1108000}, {585100, 1108000}, {585100, 1108100}, {585000, 1108100}}}}
@@ -281,7 +284,8 @@ func TestBoundaryValidationRules(t *testing.T) {
 		geom map[string]any
 		want string
 	}{
-		{"3 điểm", tri, "geo.too_few_points"},
+		{"2 điểm phân biệt", dup, "geo.too_few_points"},
+		{"3 điểm thẳng hàng", col, "geo.too_few_points"},
 		{"hình nơ bướm tự cắt", bow, "geo.invalid_geometry"},
 		{"toạ độ VN-2000", vn2000, "geo.crs_unsupported"},
 		{"quá nhỏ (1 m²)", rect(0, 0, 1, 1), "geo.area_out_of_range"},
@@ -294,6 +298,9 @@ func TestBoundaryValidationRules(t *testing.T) {
 	}
 	r := c.appDo(http.MethodPost, "/v1/plots", map[string]any{"commune_code": "99999", "geometry": rect(0, 0, 50, 50)})
 	expect(t, r, http.StatusUnprocessableEntity, "mã xã không tồn tại")
+	// A2: tam giác lưu được, point_count = 3 qua CHECK của DB.
+	r = c.appDo(http.MethodPost, "/v1/plots", map[string]any{"commune_code": "31117", "geometry": tri})
+	expect(t, r, http.StatusCreated, "tam giác 3 điểm")
 }
 
 // KN US-PLOT-03, HTX US-PLOT-04 AC-1/AC-2, nguyên mẫu mdm/lifecycle.ts: chồng lấn thửa của HTX KHÁC
@@ -772,9 +779,9 @@ func TestSyncSinkIdempotentAndConflict(t *testing.T) {
 	}
 
 	// Dữ liệu sai → rejected kèm mã.
-	bad := mk("create", ids.New(), map[string]any{"type": "Polygon", "coordinates": [][][]float64{{{105.6, 10.05}, {105.601, 10.05}, {105.6, 10.051}}}}, nil)
+	bad := mk("create", ids.New(), map[string]any{"type": "Polygon", "coordinates": [][][]float64{{{105.6, 10.05}, {105.601, 10.05}, {105.602, 10.05}}}}, nil)
 	if st, _, c := send(bad, dev1, "dev:"+dev1.String()+":3", ""); st != "rejected" || c != "geo.too_few_points" {
-		t.Fatalf("3 điểm: %s %s", st, c)
+		t.Fatalf("3 điểm thẳng hàng: %s %s", st, c)
 	}
 	// Ngoài phạm vi → rejected.
 	out, p, _, _ := boundaryRecord("create", ids.New(), "31120", uuid.Nil, rect(0, 900, 50, 50), nil)
@@ -794,7 +801,7 @@ func TestImportGeoJSONAndKML(t *testing.T) {
 	}
 	fc, _ := json.Marshal(map[string]any{"type": "FeatureCollection", "features": []any{
 		feat("Thửa 1", rect(0, 0, 100, 100)),
-		feat("Thửa 3 điểm", map[string]any{"type": "Polygon", "coordinates": [][][]float64{{{baseLon, baseLat}, {baseLon + 50*dLon, baseLat}, {baseLon, baseLat + 50*dLat}}}}),
+		feat("Thửa 3 điểm thẳng hàng", map[string]any{"type": "Polygon", "coordinates": [][][]float64{{{baseLon, baseLat}, {baseLon + 50*dLon, baseLat}, {baseLon + 100*dLon, baseLat}}}}),
 		feat("Thửa đè thửa 1", rect(30, 30, 100, 100)),
 		map[string]any{"type": "Feature", "properties": map[string]any{"name": "Cọc"}, "geometry": map[string]any{"type": "Point", "coordinates": []float64{baseLon, baseLat}}},
 	}})

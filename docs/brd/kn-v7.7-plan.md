@@ -201,7 +201,7 @@ Tệp Excel gốc (3 Google Sheet: “Báo cáo cây lúa, rau màu hằng tuầ
 | Q-18 | Danh mục vụ (Đông Xuân, Hè Thu, Thu Đông, lúa mùa) và khoảng ngày mặc định ở An Giang | P2, P4 |
 | Q-19 | Bộ nhận diện TTKNQG: tên sản phẩm, logo, ảnh nền đăng nhập, dòng footer | P6 |
 | Q-20 | Có cần nạp số liệu lịch sử từ Google Sheet (các kỳ trước) để so sánh cùng kỳ năm trước? | P4 |
-| Q-21 | Khóa tạm 15 phút: sau bao nhiêu lần khóa tạm thì khóa hẳn (ATTT cấp 3)? | P1 |
+| Q-21 | Khóa tạm 15 phút: sau bao nhiêu lần khóa tạm thì khóa hẳn (ATTT cấp 3)? — **Đã trả lời 03/10/2026 (A3):** khóa hẳn sau 3 lần khóa tạm trong 24 giờ (`permanentLockout: true`, `maxTemporaryLockouts: 3`, `maxDeltaTimeSeconds: 86400`) | P1 |
 | Q-22 | MFA cho Admin: TOTP (đã có) có đủ? Admin Mekong Green có cần tài khoản riêng cho từng người? | P1 |
 | Q-23 | Bản đồ nền vệ tinh cho vẽ thửa offline: nguồn tile nào (trong lãnh thổ hoặc qua proxy ADR-0007)? | P7 |
 

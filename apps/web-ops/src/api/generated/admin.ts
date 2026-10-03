@@ -2109,6 +2109,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reports/dispatches/{id}/revoke-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thu hồi mọi liên kết tải còn hiệu lực của một lần gửi Chi cục (A4) — mở liên kết sau đó trả 410 reports.link_revoked */
+        post: operations["adminRevokeDispatchLinks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/dispatches/{id}/link-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sổ truy cập liên kết tải Chi cục (A4) — mã người nhận, thời điểm, IP đã băm, kết quả; không dữ liệu cá nhân */
+        get: operations["adminDispatchLinkAccess"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/reports/dispatch-settings": {
         parameters: {
             query?: never;
@@ -10028,6 +10062,88 @@ export interface operations {
                 };
             };
             403: components["responses"]["Problem"];
+        };
+    };
+    adminRevokeDispatchLinks: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Số liên kết bị thu hồi (0 khi không còn liên kết hiệu lực); ghi dispatch_event links_revoked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        dispatch_id: string;
+                        /** Format: int64 */
+                        revoked: number;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description reports.dispatch_not_found */
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    adminDispatchLinkAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tối đa 500 dòng, mới nhất trước */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            link_id: string;
+                            /** Format: uuid */
+                            file_id: string;
+                            /** Format: uuid */
+                            recipient_ref: string;
+                            /** @enum {string} */
+                            outcome: "served" | "expired" | "revoked" | "invalid" | "egress_denied";
+                            /** @description HMAC-SHA256(khóa = băm mã thông báo, IP) — không lưu IP thô */
+                            ip_hash: string | null;
+                            /** Format: date-time */
+                            at: string;
+                            /** Format: int64 */
+                            seq: number;
+                        }[];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
         };
     };
     adminDispatchSettings: {

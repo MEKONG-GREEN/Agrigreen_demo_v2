@@ -253,3 +253,39 @@ func TestRebuildProjectionsEqualsLive_R22(t *testing.T) {
 		t.Fatalf("dựng lại ≠ sống:\nsống   %v\ndựng lại %v", live, rebuilt)
 	}
 }
+
+// A5 (03/10/2026, ADR-0024 ghi chú triển khai): xuất NỘI BỘ (Egress.Internal) qua checkpoint thật ở enforce — vượt
+// hạn mức vẫn ghi egress_event (mode = observe, decision = allowed, có lý do quota_exceeded), được đếm (cộng vào
+// phát hiện bất thường), KHÔNG bị từ chối; cùng lúc kênh ngoài vẫn bị từ chối.
+func TestCheckpointInternalObserveUnderEnforce_A5(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t, port.ModeEnforce)
+	dt, actor := ids.New(), ids.New()
+	f.params.set(dt, port.EgressParam(port.ParamEgressDailyQuotaFmt, port.ChannelReportExport), "3")
+	enf := metering.New(f.pool, f.clk, metering.Deps{Params: f.params, Mode: port.ModeEnforce})
+	internal := func(records int64) port.Egress {
+		return port.Egress{SourceID: ids.New(), Channel: port.ChannelReportExport, DataTenantID: dt, CounterpartyKind: port.CounterpartyActor,
+			CounterpartyRef: actor, Product: "kn_plot_file", Records: records, OccurredAt: oct, ActorRef: actor, Internal: true}
+	}
+	for i := 0; i < 3; i++ {
+		if err := port.Guard(ctx, enf.Checkpoint(), enf.Mode(), internal(2), nil); err != nil {
+			t.Fatalf("lần %d: xuất nội bộ không được từ chối ở enforce: %v", i+1, err)
+		}
+	}
+	d, err := enf.Checkpoint().Pass(ctx, internal(1))
+	if err != nil || !d.Allowed || d.Mode != port.ModeObserve || d.Reason != "quota_exceeded" || d.DailyRecords != 7 {
+		t.Fatalf("Pass nội bộ: %+v %v", d, err)
+	}
+	if n := f.count(dt, `SELECT count(*) FROM pf_metering.egress_event WHERE product = 'kn_plot_file' AND mode = 'observe' AND decision = 'allowed'`); n != 4 {
+		t.Fatalf("dòng egress_event nội bộ: %d", n)
+	}
+	if n := f.count(dt, `SELECT records FROM pf_metering.egress_counter_current WHERE channel = 'report_export'`); n != 7 {
+		t.Fatalf("xuất nội bộ phải được đếm: %d", n)
+	}
+	// Kênh ngoài cùng bên nhận/ngày: vẫn bị chặn ở enforce.
+	ext := internal(1)
+	ext.Internal = false
+	if err := port.Guard(ctx, enf.Checkpoint(), enf.Mode(), ext, nil); codeOf(err) != "metering.egress_quota_exceeded" {
+		t.Fatalf("kênh ngoài phải bị từ chối: %v", err)
+	}
+}

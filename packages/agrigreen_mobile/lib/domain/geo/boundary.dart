@@ -23,7 +23,7 @@ enum BoundaryError {
 
   String get message => switch (this) {
     BoundaryError.tooFewPoints || BoundaryError.collinear =>
-      'Cần tối thiểu 4 điểm ranh giới không thẳng hàng để khép vùng.',
+      'Cần tối thiểu 3 điểm ranh giới không thẳng hàng để khép vùng.',
     BoundaryError.selfIntersecting =>
       'Ranh giới tự cắt nhau. Vui lòng sắp lại thứ tự các điểm.',
     BoundaryError.outOfRange => 'Tọa độ không hợp lệ.',
@@ -140,15 +140,19 @@ bool isCollinear(List<GeoPoint> ring) {
   return true;
 }
 
-/// Kiểm tra ranh giới thửa: ≥ 4 điểm không thẳng hàng (US-PLOT-01, HTX
-/// US-PLOT-02 AC-2), không tự cắt; tính diện tích ha.
+/// Số điểm phân biệt tối thiểu của ranh giới: 3 (tam giác hợp lệ) — BRD v7.7
+/// FN-XA-03.05, quyết định A2 chốt 03/10/2026 (khớp geo/domain.MinPoints).
+const int kMinBoundaryPoints = 3;
+
+/// Kiểm tra ranh giới thửa: ≥ [kMinBoundaryPoints] điểm không thẳng hàng
+/// (FN-XA-03.05, HTX US-PLOT-02 AC-2), không tự cắt; tính diện tích ha.
 BoundaryValidation validateBoundary(List<GeoPoint> points) {
   final ring = normalizeRing(points);
   final errors = <BoundaryError>[];
   if (ring.any((p) => p.lat.abs() > 90 || p.lon.abs() > 180)) {
     errors.add(BoundaryError.outOfRange);
   }
-  if (ring.toSet().length < 4) {
+  if (ring.toSet().length < kMinBoundaryPoints) {
     errors.add(BoundaryError.tooFewPoints);
   } else if (isCollinear(ring)) {
     errors.add(BoundaryError.collinear);

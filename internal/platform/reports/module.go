@@ -62,7 +62,9 @@ type Deps struct {
 	Recipients port.RecipientDirectory
 	Mailer     port.Mailer
 	LinkBase   string // AG_WEB_OPS_URL: liên kết trang việc xuất trong email
-	Log        *slog.Logger
+	// LinkDownloadBase (A4): URL gốc công khai api-platform cho liên kết tải Chi cục (AG_REPORT_LINK_BASE).
+	LinkDownloadBase string
+	Log              *slog.Logger
 	// KN v7.7 P4 — báo cáo Chi cục: lần tổng hợp của pf/extension (nối sau bằng UseConsolidations nếu cần) và biến môi
 	// trường của cờ Google Sheet (nil → TẮT; ADR-0026 "Đề xuất").
 	Consolidations extport.Consolidations
@@ -78,7 +80,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	svc := &app.Service{
 		DB: db, Clock: clk, Log: d.Log, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
 		Store: d.Store, Extension: d.Extension, Mechanization: d.Mechanization, CropCycle: d.CropCycle, Directory: d.Directory, Recipients: d.Recipients, Mailer: d.Mailer,
-		LinkBase: d.LinkBase, Consolidations: d.Consolidations,
+		LinkBase: d.LinkBase, LinkDownloadBase: d.LinkDownloadBase, Consolidations: d.Consolidations,
 	}
 	if d.Getenv != nil {
 		svc.GSheet = dispatch.GSheetConfigFromEnv(d.Getenv)
@@ -88,6 +90,12 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 
 // UseConsolidations nối cổng lần tổng hợp của pf/extension (báo cáo Chi cục, KN v7.7 P4).
 func (m *Module) UseConsolidations(c extport.Consolidations) { m.svc.Consolidations = c }
+
+// UseLinkDownloadBase đặt URL gốc công khai của api-platform cho liên kết tải Chi cục (A4; worker: AG_REPORT_LINK_BASE).
+func (m *Module) UseLinkDownloadBase(base string) { m.svc.LinkDownloadBase = base }
+
+// RegisterPublic gắn route công khai (không đăng nhập) của Application API: liên kết tải tệp Chi cục (A4).
+func (m *Module) RegisterPublic(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterPublic(rg) }
 
 // UseMailer nối bộ gửi SMTP (worker: consumer báo cáo Chi cục).
 func (m *Module) UseMailer(ml port.Mailer) { m.svc.Mailer = ml }

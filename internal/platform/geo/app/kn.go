@@ -26,9 +26,11 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 )
 
 // Mã lỗi KN v7.7 của pf/geo (docs/errors.md).
@@ -355,7 +357,7 @@ func knShape(s string) (string, error) {
 	return s, nil
 }
 
-// KNCreatePlot tạo thửa với ranh giới đầu tiên; chặn mọi chồng lấn (409 geo.plot_overlap), < 4 đỉnh/không khép → 422.
+// KNCreatePlot tạo thửa với ranh giới đầu tiên; chặn mọi chồng lấn (409 geo.plot_overlap), < 3 đỉnh/không khép → 422.
 func (s *Service) KNCreatePlot(ctx context.Context, in KNCreateInput) (WriteResult, error) {
 	c, err := s.kn(ctx, true)
 	if err != nil {
@@ -784,6 +786,13 @@ func (s *Service) KNExport(ctx context.Context, commune, format string) (ExportF
 	}
 	labels := s.FarmerLabels(ctx, plots...)
 	base := "thua-ruong-" + commune
+	// A5 (ADR-0024): tải tệp thửa KN là xuất NỘI BỘ — qua điểm kiểm soát dùng chung (ghi egress_event, đếm, cảnh báo
+	// bất thường) nhưng không bao giờ bị chặn, kể cả AG_EGRESS_MODE=enforce (Internal → observe; lỗi chỉ ghi log).
+	_ = meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
+		SourceID: ids.New(), Channel: meteringport.ChannelReportExport, DataTenantID: c.a.p.TenantID,
+		CounterpartyKind: meteringport.CounterpartyActor, CounterpartyRef: c.a.p.ActorRef, Product: ProductKNPlotFile,
+		Records: int64(len(rows)), OccurredAt: s.now(), ActorRef: c.a.p.ActorRef, TraceID: telemetry.TraceID(ctx), Internal: true,
+	}, s.Log)
 	if format == "kml" {
 		return ExportFile{Name: base + ".kml", ContentType: "application/vnd.google-earth.kml+xml", Body: kmlDoc(commune, rows, labels)}, nil
 	}
@@ -798,6 +807,9 @@ func (s *Service) KNExport(ctx context.Context, commune, format string) (ExportF
 	}
 	return ExportFile{Name: base + ".geojson", ContentType: "application/geo+json", Body: body}, nil
 }
+
+// ProductKNPlotFile là tên sản phẩm của lần tải tệp thửa KN trong sổ egress_event (pf/metering).
+const ProductKNPlotFile = "kn_plot_file"
 
 func exportProps(p store.Plot, labels map[uuid.UUID]string) map[string]any {
 	m := map[string]any{"ref": p.Ref.String(), "code": p.Code, "lot_name": strOrNilAny(p.LotName), "commune_code": p.CommuneCode,

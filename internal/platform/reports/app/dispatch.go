@@ -681,14 +681,19 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 	}
 	linkOnly := total > int64(limitMB)*1024*1024
 	var atts []port.Attachment
-	var links []string
+	ttl := 0
+	if linkOnly {
+		// A4: liên kết do api-platform phục vụ (hạn reports.dispatch_link_ttl_hours, ghi sổ truy cập) thay URL ký
+		// sẵn 15 phút của kho đối tượng; mỗi người nhận To một bộ liên kết (cấp trong vòng gửi bên dưới).
+		if strings.TrimSpace(s.LinkDownloadBase) == "" {
+			return fail("chưa cấu hình URL tải liên kết (AG_REPORT_LINK_BASE)")
+		}
+		if ttl, err = s.linkTTL(ctx, now); err != nil {
+			return err
+		}
+	}
 	for _, f := range files {
 		if linkOnly {
-			u, err := s.Store.PresignGet(ctx, f.ObjectKey, DownloadTTL)
-			if err != nil {
-				return fail("không cấp được liên kết tải")
-			}
-			links = append(links, f.FileName+": "+u)
 			continue
 		}
 		rc, _, err := s.Store.Get(ctx, f.ObjectKey)
@@ -706,14 +711,18 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 		}
 		atts = append(atts, port.Attachment{Name: f.FileName, ContentType: ct, Data: data})
 	}
-	body := ""
-	if d.Body != nil {
-		body = *d.Body
-	}
-	if body == "" {
-		body = dispatch.Body(d.PeriodLabel, "", d.Forms, d.Provisional, d.Missing, links)
-	} else if len(links) > 0 {
-		body += "\n\n" + dispatch.Body(d.PeriodLabel, "", d.Forms, false, nil, links)
+	bodyFor := func(links []string) string {
+		body := ""
+		if d.Body != nil {
+			body = *d.Body
+		}
+		if body == "" {
+			return dispatch.Body(d.PeriodLabel, "", d.Forms, d.Provisional, d.Missing, links)
+		}
+		if len(links) > 0 {
+			body += "\n\n" + dispatch.Body(d.PeriodLabel, "", d.Forms, false, nil, links)
+		}
+		return body
 	}
 	subj := ""
 	if d.Subject != nil {
@@ -725,7 +734,18 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 		if !ok {
 			continue
 		}
-		if err := s.Mailer.Send(ctx, port.Message{To: to, CC: cc, Subject: subj, Text: body, Attachments: atts}); err != nil {
+		var links []string
+		for _, f := range files {
+			if !linkOnly {
+				break
+			}
+			l, err := s.issueLink(ctx, tx, tid, *d, f, x, ttl, now)
+			if err != nil {
+				return err
+			}
+			links = append(links, l)
+		}
+		if err := s.Mailer.Send(ctx, port.Message{To: to, CC: cc, Subject: subj, Text: bodyFor(links), Attachments: atts}); err != nil {
 			return fail("máy chủ thư từ chối hoặc không kết nối được")
 		}
 		sent++

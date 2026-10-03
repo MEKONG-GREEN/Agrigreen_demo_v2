@@ -20,6 +20,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
@@ -152,6 +153,9 @@ type fixture struct {
 	admin   *httptest.Server
 	mail    *mailer
 	asg     *assignments
+	// repParams: tham số của pf/reports trong kiểm thử (A4: reports.dispatch_attachment_limit_mb,
+	// reports.dispatch_link_ttl_hours); rỗng → mặc định.
+	repParams *repParams
 
 	mu   sync.Mutex
 	ctxs map[uuid.UUID]*authz.KNContext
@@ -201,7 +205,9 @@ func newFixture(t *testing.T, o fixtureOpts) *fixture {
 	repPool := env.Pool(t, migrations.PF, reports.DBRole)
 	f.repPool = repPool
 	f.ext = extension.New(extPool, f.clk, extension.Deps{Orgs: og, Units: units{names: names}})
-	f.rep = reports.New(repPool, f.clk, reports.Deps{Orgs: og, Units: units{names: names}, Store: st, Mailer: f.mail, Getenv: func(string) string { return "" }})
+	f.repParams = &repParams{v: map[string]decimal.Decimal{}}
+	f.rep = reports.New(repPool, f.clk, reports.Deps{Orgs: og, Units: units{names: names}, Store: st, Mailer: f.mail, Getenv: func(string) string { return "" },
+		Params: f.repParams})
 	f.ext.UseReportCycle(extension.ReportCycleDeps{Forms: f.rep.Forms(), Regions: rg, Assignments: f.asg})
 	f.ext.UseDispatchHistory(f.rep.DispatchHistory())
 	f.rep.UseConsolidations(f.ext.Consolidations())
@@ -216,10 +222,34 @@ func newFixture(t *testing.T, o fixtureOpts) *fixture {
 	adminEng := httpx.NewEngine(log, 8<<20)
 	adminEng.Use(logErrors(t))
 	f.rep.RegisterAdmin(adminEng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), httpx.RequireMFA(), idempotency.Middleware(ops)))
+	f.rep.RegisterPublic(appEng.Group("/v1/public")) // A4: liên kết tải Chi cục (không đăng nhập)
 	f.app, f.admin = httptest.NewServer(appEng), httptest.NewServer(adminEng)
+	f.rep.UseLinkDownloadBase(f.app.URL)
 	t.Cleanup(f.app.Close)
 	t.Cleanup(f.admin.Close)
 	return f
+}
+
+// repParams là tham số pf/masterdata giả cho pf/reports (khóa chưa đặt → ErrParamNotFound → mặc định).
+type repParams struct {
+	mu sync.Mutex
+	v  map[string]decimal.Decimal
+}
+
+func (p *repParams) set(key, v string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.v[key] = decimal.RequireFromString(v)
+}
+
+func (p *repParams) At(_ context.Context, key string, _ time.Time) (mdport.ParamValue, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	v, ok := p.v[key]
+	if !ok {
+		return mdport.ParamValue{}, mdport.ErrParamNotFound
+	}
+	return mdport.ParamValue{Key: key, Value: v, Version: 1}, nil
 }
 
 func logErrors(t *testing.T) gin.HandlerFunc {

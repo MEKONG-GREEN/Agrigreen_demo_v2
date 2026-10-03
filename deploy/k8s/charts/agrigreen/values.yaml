@@ -280,6 +280,7 @@ apps:
       AG_KC_REALM: agrigreen
       AG_KC_CLIENT_ID: agrigreen-accounts
       AG_WEB_OPS_URL: "https://ops.{{ .Values.global.domain }}"
+      AG_REPORT_LINK_BASE: "https://api.{{ .Values.global.domain }}"   # A4: liên kết tải báo cáo Chi cục 7 ngày (api-platform phục vụ)
       AG_EGRESS_MODE: observe   # ADR-0024; Phase K: enforce
     envFromSecrets: [pf-db-roles, pf-db-outbox]
     secretEnv:

@@ -85,7 +85,7 @@ type WriteResult struct {
 	Replayed bool
 }
 
-// prepare đọc và kiểm hình phía Go (≥ 4 đỉnh, WGS84), chuẩn hóa nguồn và thời điểm.
+// prepare đọc và kiểm hình phía Go (≥ 3 đỉnh, WGS84), chuẩn hóa nguồn và thời điểm.
 func (s *Service) prepare(b *BoundaryInput, defaultSource string) error {
 	if b.Parsed == nil {
 		mp, n, err := domain.ParseGeometry(b.Geometry)

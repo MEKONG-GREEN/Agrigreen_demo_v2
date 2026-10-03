@@ -25,7 +25,8 @@ func polygon(pts ...[]float64) map[string]any {
 // Nguồn: mekong-green/tests/brd-2026.test.ts — "Thửa cần tối thiểu 4 điểm; hệ thống tự tính diện tích"
 // và "UAT DEF-KN-PLOT-01: … tam giác có điểm đóng vòng vẫn là 3 điểm";
 // htx-operations.test.ts — "Đường bao dưới 3 đỉnh bị từ chối".
-// Khác prototype (htx-operations): mốc tối thiểu là 4 điểm theo BRD (KN US-PLOT-01), không phải 3.
+// Quyết định A2 (03/10/2026, BRD v7.7 FN-XA-03.05): mốc tối thiểu là 3 điểm phân biệt không thẳng hàng — tam giác
+// hợp lệ (khớp htx-operations "dưới 3 đỉnh bị từ chối"); trước đó 4 điểm theo KN US-PLOT-01.
 func TestPrototypeThuaToiThieuBonDiem(t *testing.T) {
 	nguon(t, "brd-2026.test.ts", "Thửa cần tối thiểu 4 điểm; hệ thống tự tính diện tích")
 	nguon(t, "htx-operations.test.ts", "Đường bao dưới 3 đỉnh bị từ chối")
@@ -33,8 +34,13 @@ func TestPrototypeThuaToiThieuBonDiem(t *testing.T) {
 	post := func(geom map[string]any) harness.Resp {
 		return w.officer.Do(harness.App, http.MethodPost, "/v1/plots", "", map[string]any{"commune_code": communeNK, "geometry": geom})
 	}
-	triClosed := polygon([]float64{105.77, 10.03}, []float64{105.771, 10.03}, []float64{105.77, 10.031}, []float64{105.77, 10.03})
-	wantProblem(t, post(triClosed), 422, "geo.too_few_points", "tam giác có điểm đóng vòng")
+	sq := harness.Rect(nkLat, nkLon, 300, 0, 50, 50)["coordinates"].([][][]float64)[0] // xa thửa vuông bên dưới
+	triClosed := polygon(sq[0], sq[1], sq[2], sq[0])
+	if r := post(triClosed); r.Status != 201 {
+		t.Fatalf("A2: tam giác có điểm đóng vòng (3 điểm) phải lưu được: %d %s", r.Status, trim(r.Raw))
+	}
+	colClosed := polygon([]float64{105.775, 10.035}, []float64{105.776, 10.035}, []float64{105.777, 10.035}, []float64{105.775, 10.035})
+	wantProblem(t, post(colClosed), 422, "geo.too_few_points", "3 điểm thẳng hàng")
 	two := polygon([]float64{105.77, 10.03}, []float64{105.771, 10.03})
 	if r := post(two); r.Status != 422 || (r.Code() != "geo.too_few_points" && r.Code() != "geo.invalid_geometry") {
 		t.Fatalf("đường bao 2 đỉnh phải bị từ chối 422: %d %s", r.Status, trim(r.Raw))
@@ -270,7 +276,7 @@ func TestPrototypeNapThuaTuTep(t *testing.T) {
 		}
 		return b
 	}
-	tri := polygon([]float64{nkLon, nkLat + 0.01}, []float64{nkLon + 0.001, nkLat + 0.01}, []float64{nkLon, nkLat + 0.011}, []float64{nkLon, nkLat + 0.01})
+	tri := polygon([]float64{nkLon, nkLat + 0.01}, []float64{nkLon + 0.001, nkLat + 0.01}, []float64{nkLon + 0.002, nkLat + 0.01}, []float64{nkLon, nkLat + 0.01}) // 3 điểm thẳng hàng (A2: tam giác thật thì hợp lệ)
 	q := "file_name=thua.geojson&cooperative_ref=" + w.coopNK
 	r := w.want(upload(q, "application/geo+json", fc(
 		feat("Vuông 1", harness.Rect(nkLat, nkLon, 0, 0, 100, 100)),

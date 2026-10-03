@@ -21,6 +21,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port/farmerid"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -234,8 +235,16 @@ func TestFN_XA_03_05_CreateListGetUpdateCorrectLog(t *testing.T) {
 	if strings.Contains(string(lg.raw), "Nguyễn Văn An") {
 		t.Fatal("log không được chứa tên nông dân")
 	}
-	// Xuất tệp của xã.
+	// Xuất tệp của xã. A5 (03/10/2026): tải tệp thửa là xuất NỘI BỘ — qua điểm kiểm soát dùng chung (ghi egress_event)
+	// nhưng không bị chặn kể cả enforce + checkpoint báo vượt hạn mức.
+	cp := &denyCP{}
+	f.mod.UseEgress(cp, meteringport.ModeEnforce, nil)
+	defer f.mod.UseEgress(nil, "", nil)
 	ex := xa.get("/v1/kn/plots/export?commune=31117&format=geojson")
+	if len(cp.got) != 1 || !cp.got[0].Internal || cp.got[0].Channel != meteringport.ChannelReportExport || cp.got[0].Product != "kn_plot_file" ||
+		cp.got[0].Records < 1 || cp.got[0].DataTenantID == uuid.Nil {
+		t.Fatalf("A5: tải tệp thửa phải qua checkpoint với Internal: %+v", cp.got)
+	}
 	if ex.status != http.StatusOK || !strings.Contains(string(ex.raw), ref) || !strings.Contains(ex.hdr.Get("Content-Disposition"), ".geojson") {
 		t.Fatalf("xuất GeoJSON: %d %s", ex.status, ex.raw)
 	}
@@ -259,6 +268,12 @@ func TestFN_XA_03_05_OverlapBlockedAndInvalidShape(t *testing.T) {
 	// < 3 điểm / không khép được → 422.
 	two := map[string]any{"type": "Polygon", "coordinates": [][][]float64{{{105.6, 10.05}, {105.601, 10.05}, {105.6, 10.05}}}}
 	wantCode(t, xa.post("/v1/kn/plots", knPlotBody("31117", two)), http.StatusUnprocessableEntity, "geo.too_few_points", "2 điểm")
+	// A2 (BRD v7.7, chốt 03/10/2026): tam giác 3 điểm hợp lệ; 3 điểm thẳng hàng vẫn chặn.
+	tri := rect(600, 0, 50, 50) // 3 góc đầu của hình vuông
+	tri["coordinates"] = [][][]float64{tri["coordinates"].([][][]float64)[0][:3]}
+	wantCode(t, xa.post("/v1/kn/plots", knPlotBody("31117", tri)), http.StatusCreated, "", "tam giác 3 điểm")
+	col := map[string]any{"type": "Polygon", "coordinates": [][][]float64{{{105.6, 10.05}, {105.601, 10.05}, {105.602, 10.05}}}}
+	wantCode(t, xa.post("/v1/kn/plots", knPlotBody("31117", col)), http.StatusUnprocessableEntity, "geo.too_few_points", "3 điểm thẳng hàng")
 	line := map[string]any{"type": "LineString", "coordinates": [][]float64{{105.6, 10.05}, {105.601, 10.05}}}
 	wantCode(t, xa.post("/v1/kn/plots", knPlotBody("31117", line)), http.StatusUnprocessableEntity, "geo.invalid_geometry", "không phải vùng khép kín")
 	b := knPlotBody("31117", rect(400, 0, 50, 50))

@@ -92,7 +92,7 @@ func rejectReason(err error) (string, string) {
 }
 
 // ImportPlots nhập tệp GeoJSON/KML/Shapefile (.zip): mỗi đối tượng vùng thành một thửa, cùng quy
-// tắc như vẽ tay (≥ 4 điểm, hợp lệ, trong xã, chồng lấn). Đối tượng lỗi bị loại
+// tắc như vẽ tay (≥ 3 điểm, hợp lệ, trong xã, chồng lấn). Đối tượng lỗi bị loại
 // kèm lý do; đối tượng hợp lệ vẫn được nạp. Lỗi hệ thống dừng cả lượt (client
 // thử lại được nhờ idem_key theo từng đối tượng).
 func (s *Service) ImportPlots(ctx context.Context, in ImportInput) (ImportResult, error) {

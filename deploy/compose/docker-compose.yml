@@ -558,6 +558,7 @@ services:
       AG_ANCHOR_SIGNING_KEY: ${AG_ANCHOR_SIGNING_KEY:?chạy scripts/gen-dev-secrets}
       AG_ANCHOR_KEY_ID: local-dev-1
       AG_EGRESS_MODE: ${AG_EGRESS_MODE:-observe}   # ADR-0024
+      AG_REPORT_LINK_BASE: ${AG_REPORT_LINK_BASE:-http://localhost:8080}   # A4: liên kết tải báo cáo Chi cục (api-platform)
 
   # Public API cho bên thứ ba (G5, ADR-0022) — TẮT mặc định, chỉ chạy với hồ sơ Phase K:
   #   docker compose -f deploy/compose/docker-compose.yml --profile phasek up -d --build --wait

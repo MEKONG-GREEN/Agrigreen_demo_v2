@@ -139,7 +139,7 @@ function coopLayer(p: MockPersona, bb: [number, number, number, number], limit: 
   return { type: "FeatureCollection" as const, features: all.slice(0, limit).map((s) => coopFeature(s, true)), truncated: all.length > limit, limit };
 }
 
-/** Kiểm vùng GeoJSON từ client: ≥ 4 đỉnh (3 phân biệt), vòng khép. */
+/** Kiểm vùng GeoJSON từ client: ≥ 3 đỉnh phân biệt (tam giác hợp lệ — A2, khớp geo/domain.MinPoints), diện tích > 0. */
 function polygonInput(g: unknown): LngLat[] | null {
   const geom = g as { type?: string; coordinates?: unknown } | undefined;
   if (!geom || geom.type !== "Polygon" || !Array.isArray(geom.coordinates)) return null;

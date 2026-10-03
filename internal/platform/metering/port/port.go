@@ -199,6 +199,19 @@ type Egress struct {
 	OccurredAt      time.Time
 	ActorRef        uuid.UUID // người/khách hàng gây ra (Nil với van)
 	TraceID         string
+	// Internal (quyết định A5, 03/10/2026): xuất NỘI BỘ của cán bộ trong phạm vi được giao (xuất lịch công tác,
+	// tải tệp thửa KN). Điểm kiểm soát vẫn ghi egress_event, đếm và phát hiện bất thường như mọi lần xuất,
+	// nhưng LUÔN xử lý ở chế độ observe — không bao giờ từ chối, kể cả AG_EGRESS_MODE=enforce (Guard và
+	// Checkpoint.Pass đều tôn trọng). Mặc định false: hành vi cũ, kênh ra ngoài vẫn bị chặn ở enforce.
+	Internal bool
+}
+
+// EffectiveMode là chế độ áp cho một lần xuất: Internal → luôn ModeObserve.
+func (e Egress) EffectiveMode(mode Mode) Mode {
+	if e.Internal {
+		return ModeObserve
+	}
+	return mode
 }
 
 // Decision là quyết định của điểm kiểm soát.
@@ -250,10 +263,13 @@ func ParseMode(s string) (Mode, error) {
 //   - !Allowed: enforce → ErrEgressQuotaExceeded; observe → nil.
 //
 // Van: lỗi trả về làm consumer giao lại → DLQ (R-62).
+//
+// e.Internal (A5): xuất nội bộ → áp như observe (ghi, đếm, cảnh báo, không bao giờ từ chối).
 func Guard(ctx context.Context, cp Checkpoint, mode Mode, e Egress, log *slog.Logger) error {
 	if cp == nil {
 		return nil
 	}
+	mode = e.EffectiveMode(mode)
 	d, err := cp.Pass(ctx, e)
 	if err != nil {
 		if mode == ModeEnforce {

@@ -71,6 +71,8 @@
 //	AG_S3_* hoặc AG_OBJSTORE_DIR       kho manifest, tệp báo cáo (shared/objstore)
 //	AG_SMTP_HOST/PORT/USERNAME/PASSWORD/FROM/TLS  (tùy chọn) email lịch gửi báo cáo; thiếu → bỏ gửi kèm cảnh báo
 //	AG_WEB_OPS_URL                     (tùy chọn) URL web-ops cho liên kết tải lại trong email
+//	AG_REPORT_LINK_BASE                URL gốc công khai api-platform (vd https://api.<domain>) cho liên kết tải
+//	                                   báo cáo Chi cục 7 ngày (A4); thiếu → email vượt giới hạn đính kèm ghi "Gửi lỗi"
 //	AG_RABBITMQ_MGMT_URL               (tùy chọn) management API cho metric độ sâu DLQ
 //	AG_KC_ADMIN_URL, AG_KC_REALM,      Keycloak Admin REST (tài khoản dịch vụ agrigreen-accounts) cho consumer
 //	AG_KC_CLIENT_ID, AG_KC_CLIENT_SECRET  pf.accounts.org_status (khóa/mở tài khoản theo trạng thái tổ chức)

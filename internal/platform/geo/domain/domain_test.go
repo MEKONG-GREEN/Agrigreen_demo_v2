@@ -18,14 +18,18 @@ func code(err error) string {
 	return ""
 }
 
-// KN US-PLOT-01 AC-1, HTX US-PLOT-02 AC-2: tối thiểu 4 điểm không thẳng hàng.
+// FN-XA-03.05 (BRD v7.7, quyết định A2 03/10/2026): tối thiểu 3 điểm phân biệt không thẳng hàng — tam giác hợp lệ;
+// điểm trùng/thẳng hàng vẫn bị chặn.
 func TestParseGeometryMinPoints(t *testing.T) {
 	cases := []struct {
 		name, geom, want string
 		points           int
 	}{
-		{"tam giác 3 điểm", `{"type":"Polygon","coordinates":[[[105.7,10.0],[105.71,10.0],[105.71,10.01],[105.7,10.0]]]}`, CodeTooFewPoints, 0},
-		{"4 điểm nhưng 1 trùng", `{"type":"Polygon","coordinates":[[[105.7,10.0],[105.71,10.0],[105.71,10.0],[105.71,10.01]]]}`, CodeTooFewPoints, 0},
+		{"tam giác 3 điểm (A2)", `{"type":"Polygon","coordinates":[[[105.7,10.0],[105.71,10.0],[105.71,10.01],[105.7,10.0]]]}`, "", 3},
+		{"tam giác chưa khép", `{"type":"Polygon","coordinates":[[[105.7,10.0],[105.71,10.0],[105.71,10.01]]]}`, "", 3},
+		{"3 điểm nhưng 1 trùng", `{"type":"Polygon","coordinates":[[[105.7,10.0],[105.71,10.0],[105.71,10.0]]]}`, CodeTooFewPoints, 0},
+		{"3 điểm thẳng hàng", `{"type":"Polygon","coordinates":[[[105.7,10.0],[105.71,10.01],[105.72,10.02]]]}`, CodeTooFewPoints, 0},
+		{"4 điểm nhưng 2 trùng", `{"type":"Polygon","coordinates":[[[105.7,10.0],[105.71,10.0],[105.71,10.0],[105.7,10.0]]]}`, CodeTooFewPoints, 0},
 		{"4 điểm thẳng hàng", `{"type":"Polygon","coordinates":[[[105.7,10.0],[105.71,10.01],[105.72,10.02],[105.73,10.03]]]}`, CodeTooFewPoints, 0},
 		{"4 điểm hợp lệ, chưa khép", `{"type":"Polygon","coordinates":[[[105.7,10.0],[105.71,10.0],[105.71,10.01],[105.7,10.01]]]}`, "", 4},
 		{"MultiPolygon hợp lệ", `{"type":"MultiPolygon","coordinates":[[[[105.7,10.0],[105.71,10.0],[105.71,10.01],[105.7,10.01],[105.7,10.0]]]]}`, "", 4},

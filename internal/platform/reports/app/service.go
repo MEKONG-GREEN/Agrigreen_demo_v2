@@ -109,6 +109,9 @@ type Service struct {
 	Recipients port.RecipientDirectory // nil → màn lập lịch của quản lý HTX trả 503
 	Mailer     port.Mailer             // nil → bỏ gửi email kèm cảnh báo
 	LinkBase   string                  // URL gốc web-ops: <LinkBase>/reports/exports/<id>
+	// LinkDownloadBase (A4): URL gốc công khai của api-platform cho liên kết tải Chi cục
+	// <LinkDownloadBase>/v1/public/report-links/<token> (AG_REPORT_LINK_BASE). Rỗng → gửi kiểu liên kết thất bại.
+	LinkDownloadBase string
 
 	// KN v7.7 P4 — báo cáo Chi cục (dispatch.go): lần tổng hợp của pf/extension, cờ + bộ chuyển Google Sheet (TẮT mặc định).
 	Consolidations extport.Consolidations

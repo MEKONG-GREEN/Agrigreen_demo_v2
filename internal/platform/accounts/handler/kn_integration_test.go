@@ -572,13 +572,13 @@ func TestFN_AD_04_04_AssignmentLog(t *testing.T) {
 	for _, x := range items {
 		events = append(events, x.(map[string]any)["event"].(string))
 	}
-	want := []string{"account.created", "assignment.granted", "account.activation_sent", "assignment.changed", "assignment.granted",
+	want := []string{"account.created", "account.assignment_changed", "assignment.granted", "account.activation_sent", "assignment.changed", "assignment.granted",
 		"account.profile_updated", "assignment.revoked"}
 	if lg.status != http.StatusOK || !slices.Equal(events, want) {
 		t.Fatalf("Log: %d %v", lg.status, events)
 	}
-	changed := items[3].(map[string]any)
-	if changed["actor_display"] != "Quản trị Mekong" || changed["entity_ref"] != aid || changed["seq"] != float64(4) {
+	changed := items[4].(map[string]any)
+	if changed["actor_display"] != "Quản trị Mekong" || changed["entity_ref"] != aid || changed["seq"] != float64(5) {
 		t.Fatalf("dòng sửa: %v", changed)
 	}
 	got := map[string][2]any{}
@@ -589,13 +589,13 @@ func TestFN_AD_04_04_AssignmentLog(t *testing.T) {
 	if got["commune_codes"] != [2]any{"30292", "30292,30301"} || got["mgmt_level"] != [2]any{"chuyen_vien", "truong_phong"} || len(got) != 2 {
 		t.Fatalf("cũ → mới: %v", got)
 	}
-	prof := items[5].(map[string]any)
+	prof := items[6].(map[string]any)
 	raw, _ := json.Marshal(prof)
 	if strings.Contains(string(raw), newPhone) || strings.Contains(string(raw), "Ân") {
 		t.Fatalf("Log chỉnh sửa không được chứa PII: %s", raw)
 	}
-	if items[6].(map[string]any)["reason"] != "Gán nhầm vai trò Cấp Tỉnh" {
-		t.Fatalf("lý do thu hồi: %v", items[6])
+	if items[7].(map[string]any)["reason"] != "Gán nhầm vai trò Cấp Tỉnh" {
+		t.Fatalf("lý do thu hồi: %v", items[7])
 	}
 	// Phân trang cursor.
 	p1 := f.adminDo(f.root, http.MethodGet, base+"/log?limit=3", nil)
@@ -650,7 +650,7 @@ func TestFN_AD_04_04_CreateAccountRules(t *testing.T) {
 	u, _ := f.dir.GetUser(context.Background(), id)
 	roles, _ := f.dir.RealmRoles(context.Background(), id)
 	if u.Username != "0912000111" || u.Phone != "0912000111" || !slices.Equal(u.RequiredActions, []string{port.ActionVerifyEmail, port.ActionUpdatePassword}) ||
-		!slices.Equal(roles, []string{port.RoleKNUser}) || u.OrgRef != uuid.Nil {
+		!slices.Equal(roles, []string{port.RoleKNUser, "vault_registrar"}) || u.OrgRef != uuid.Nil { // A1: Cán bộ xã có vai kho định danh
 		t.Fatalf("Keycloak: user=%s phone=%s actions=%v roles=%v org=%s", u.Username, u.Phone, u.RequiredActions, roles, u.OrgRef)
 	}
 	// Gọi lặp cùng Idempotency-Key → cùng tài khoản, không tạo thêm.
@@ -686,4 +686,73 @@ func TestFN_AD_04_04_TenantIsolation(t *testing.T) {
 		t.Fatalf("contexts tenant khác: %d %v", r.status, r.body)
 	}
 	wantCode(t, f.selectCtx(same, asgIDs(cr)[port.KNTinh], deptTT), http.StatusNotFound, "accounts.assignment_not_found", "chọn lần gán của tenant khác")
+}
+
+// A1 (chốt 03/10/2026, FN-XA-03.03/03.05): gán vai trò Cán bộ xã → module tự cấp vai realm vault_registrar (ghi sổ dấu tự
+// cấp); thu lần gán kn_xa cuối cùng → thu lại vai; tài khoản giữ vai vì lý do khác (Admin cấp) không bị thu.
+func TestA1_KNXaDefaultVaultRegistrar(t *testing.T) {
+	f := newKNFixture(t)
+	ctx := context.Background()
+	has := func(id uuid.UUID) bool {
+		t.Helper()
+		roles, err := f.dir.RealmRoles(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return slices.Contains(roles, "vault_registrar")
+	}
+	// Tạo tài khoản có kn_xa → có vai kho định danh; dòng sổ ghi dấu tự cấp.
+	anID, _, cr := f.createKN("Nguyễn Văn An", asg(port.KNXa, f.p91, []string{deptTT}, "30292"), asg(port.KNTinh, f.p91, []string{deptTT}))
+	if !has(anID) {
+		t.Fatal("Cán bộ xã phải có vault_registrar ngay khi tạo")
+	}
+	ev := f.adminDo(f.root, http.MethodGet, "/v1/accounts/users/"+anID.String()+"/events", nil)
+	if !strings.Contains(func() string { b, _ := json.Marshal(ev.body); return string(b) }(), "kn_xa_default") {
+		t.Fatalf("sổ account_event thiếu dấu tự cấp: %v", ev.body)
+	}
+	// Chỉ vai Tỉnh → không cấp.
+	binhID, _, _ := f.createKN("Trần Thị Bình", asg(port.KNTinh, f.p91, []string{deptTT}))
+	if has(binhID) {
+		t.Fatal("Cấp Tỉnh không được cấp mặc định vai kho định danh")
+	}
+	// Thêm vai trò kn_xa sau → cấp; thu hồi → thu lại (vai Tỉnh còn, kn_user còn).
+	g := f.adminDo(f.root, http.MethodPost, "/v1/accounts/users/"+binhID.String()+"/assignments", asg(port.KNXa, f.p91, []string{deptTT}, "30292"))
+	if g.status != http.StatusCreated || !has(binhID) {
+		t.Fatalf("thêm vai trò Cán bộ xã: %d %v", g.status, g.body)
+	}
+	aid := str(g.body, "assignment", "assignment_id")
+	if r := f.adminDo(f.root, http.MethodPost, "/v1/accounts/users/"+binhID.String()+"/assignments/"+aid+"/revoke",
+		map[string]any{"reason": "Hết nhiệm vụ phụ trách xã"}); r.status != http.StatusOK {
+		t.Fatalf("thu hồi: %d %v", r.status, r.body)
+	}
+	if roles, _ := f.dir.RealmRoles(ctx, binhID); slices.Contains(roles, "vault_registrar") || !slices.Contains(roles, port.RoleKNUser) {
+		t.Fatalf("sau thu hồi kn_xa cuối: %v", roles)
+	}
+	// Giữ vì lý do khác: Admin cấp vault_registrar trước khi gán kn_xa → thu kn_xa không thu vai.
+	cuongID, _, _ := f.createKN("Lê Văn Cường", asg(port.KNTinh, f.p91, []string{deptTT}))
+	if r := f.adminDo(f.root, http.MethodPost, "/v1/accounts/users/"+cuongID.String()+"/assignment",
+		map[string]any{"org_ref": f.p91, "roles": []string{port.RoleKNUser, "vault_registrar"}}); r.status != http.StatusOK {
+		t.Fatalf("Admin cấp vai kho: %d %v", r.status, r.body)
+	}
+	g = f.adminDo(f.root, http.MethodPost, "/v1/accounts/users/"+cuongID.String()+"/assignments", asg(port.KNXa, f.p91, []string{deptTT}, "30292"))
+	if g.status != http.StatusCreated {
+		t.Fatalf("thêm kn_xa: %d %v", g.status, g.body)
+	}
+	if r := f.adminDo(f.root, http.MethodPost, "/v1/accounts/users/"+cuongID.String()+"/assignments/"+str(g.body, "assignment", "assignment_id")+"/revoke",
+		map[string]any{"reason": "Hết nhiệm vụ phụ trách xã"}); r.status != http.StatusOK {
+		t.Fatalf("thu hồi: %d %v", r.status, r.body)
+	}
+	if !has(cuongID) {
+		t.Fatal("vai do Admin cấp không được thu theo kn_xa")
+	}
+	// An: thu vai Tỉnh không đụng vai kho; thu kn_xa → thu vai kho.
+	a := asgIDs(cr)
+	if r := f.adminDo(f.root, http.MethodPost, "/v1/accounts/users/"+anID.String()+"/assignments/"+a[port.KNTinh]+"/revoke",
+		map[string]any{"reason": "Hết nhiệm vụ cấp tỉnh"}); r.status != http.StatusOK || !has(anID) {
+		t.Fatalf("thu vai Tỉnh: %d %v", r.status, r.body)
+	}
+	if r := f.adminDo(f.root, http.MethodPost, "/v1/accounts/users/"+anID.String()+"/assignments/"+a[port.KNXa]+"/revoke",
+		map[string]any{"reason": "Cán bộ chuyển công tác"}); r.status != http.StatusOK || has(anID) {
+		t.Fatalf("thu kn_xa cuối: %d %v", r.status, r.body)
+	}
 }

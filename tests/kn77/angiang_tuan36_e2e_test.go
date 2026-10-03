@@ -181,13 +181,23 @@ func (s *agScenario) createKN(name, email, phone string, asgs ...map[string]any)
 	for _, a := range arr(r.body, "assignments") {
 		out[str(a, "role")] = str(a, "assignment_id")
 	}
-	tok := s.s.Issuer.Sign(s.t, authztest.Token{Subject: id, TenantID: s.tid, Roles: []string{accport.RoleKNUser}, TTL: 3 * time.Hour})
+	// Token mang đúng vai realm mà Keycloak (giả) ghi cho tài khoản — A1: Cán bộ xã có sẵn vault_registrar.
+	tok := s.s.Issuer.Sign(s.t, authztest.Token{Subject: id, TenantID: s.tid, Roles: s.realm(id), TTL: 3 * time.Hour})
 	s.pii = append(s.pii, email, phone)
 	s.staff = append(s.staff, name)
 	return &agUser{s: s, id: id, tid: s.tid, token: tok}, out
 }
 
 // as chọn ngữ cảnh (POST /v1/me/context) — trả bản sao người dùng mang X-AG-Context.
+func (s *agScenario) realm(id uuid.UUID) []string {
+	s.t.Helper()
+	roles, err := s.s.Directory.RealmRoles(context.Background(), id)
+	if err != nil {
+		s.t.Fatal(err)
+	}
+	return roles
+}
+
 func (u *agUser) as(assignment, dept string) *agUser {
 	u.s.t.Helper()
 	c := *u
@@ -642,12 +652,11 @@ func TestKN77AnGiangTuan36(t *testing.T) {
 
 	// ---- 12. Dữ liệu Cấp Xã (P7): HTX, máy móc, thửa, vật tư — phạm vi ----
 	s.step("Cán bộ xã khai HTX, máy móc, thửa, vật tư trong xã phụ trách; ngoài phạm vi bị chặn; vô hiệu hóa HTX ≥ 20 ký tự")
-	// Ghi người đại diện/nông dân vào kho định danh cần vai realm vault_registrar: vai kn_user KHÔNG kèm vai kho định danh
-	// (quyết định chờ: cấp mặc định cho Cán bộ xã khi tạo tài khoản KN). Ở đây Admin cấp thêm qua API vai realm hiện có và
-	// người dùng nhận token mới (Keycloak ghi vai vào token lúc đăng nhập/làm mới).
-	s.want(s.rootA.adm(http.MethodPost, "/v1/accounts/users/"+an.id.String()+"/assignment", map[string]any{"org_ref": s.p91, "roles": []string{accport.RoleKNUser, "vault_registrar",
-		"vault_display"}}), http.StatusOK, "cấp vai kho định danh cho Cán bộ xã")
-	xa1.token = s.s.Issuer.Sign(t, authztest.Token{Subject: an.id, TenantID: s.tid, Roles: []string{accport.RoleKNUser, "vault_registrar", "vault_display"}, TTL: 3 * time.Hour})
+	// Ghi người đại diện/nông dân vào kho định danh cần vai realm vault_registrar — A1 (chốt 03/10/2026): pf/accounts cấp
+	// mặc định khi gán vai trò Cán bộ xã (không còn bước Admin cấp tay); kho ghi sổ truy cập theo mục đích.
+	if !slices.Contains(s.realm(an.id), "vault_registrar") {
+		t.Fatal("A1: Cán bộ xã phải có sẵn vai vault_registrar")
+	}
 	repName, repPhone := "Phạm Thị Duyên", agPhone
 	s.pii = append(s.pii, repName, repPhone)
 	coop := s.want(xa1.post("/v1/kn/cooperatives", map[string]any{"name": "HTX Nông nghiệp Mỹ Hòa Hưng", "commune_code": agC1, "area_ha": "85.5",

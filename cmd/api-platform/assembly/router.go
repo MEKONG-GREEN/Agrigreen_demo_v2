@@ -57,11 +57,24 @@ func NewRouter(d Deps) *gin.Engine {
 	r := httpx.NewEngine(d.Log, maxBody)
 	r.Use(httpx.CORS(d.CORSOrigins)) // trước mọi route: preflight đi qua cả nhánh 404/405
 	health(d)(r)
+	// Route công khai (không đăng nhập, không middleware phiên): mã thông báo trong đường dẫn là quyền truy cập —
+	// liên kết tải tệp Chi cục của pf/reports (quyết định A4). Đăng ký trước nhóm /v1 có xác thực.
+	pub := r.Group("/v1/public")
+	for _, m := range d.Modules {
+		if p, ok := m.(publicRoutes); ok {
+			p.RegisterPublic(pub)
+		}
+	}
 	v1 := r.Group("/v1", chain(d, httpx.Authenticate(d.Verifier))...)
 	for _, m := range d.Modules {
 		m.RegisterApp(v1)
 	}
 	return r
+}
+
+// publicRoutes (tùy chọn) là module có route công khai trên Application API.
+type publicRoutes interface {
+	RegisterPublic(rg *gin.RouterGroup)
 }
 
 // chain: xác thực (+ MFA) → middleware của module (KN v7.7: ngữ cảnh phiên X-AG-Context của

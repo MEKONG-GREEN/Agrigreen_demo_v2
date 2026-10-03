@@ -31,12 +31,12 @@ Bốn trạng thái:
 | 4. Public API (ADR-0022) | 19 | 14 | 5 | 0 | 0 |
 | 5. Sản phẩm dữ liệu | 5 | 2 | 3 | 0 | 0 |
 | 6. `pf/metering` (ADR-0023) | 10 | 9 | 1 | 0 | 0 |
-| 7. Điểm kiểm soát xuất — DLP (ADR-0024) | 11 | 10 | 1 | 0 | 0 |
+| 7. Điểm kiểm soát xuất — DLP (ADR-0024) | 12 | 11 | 1 | 0 | 0 |
 | 8. Phase K và cấp phát bên thứ ba (ADR-0025) | 6 | 2 | 2 | 2 | 0 |
 | 9. Cổng kiến trúc G5 (RB, R-xx, vùng) | 13 | 8 | 5 | 0 | 0 |
 | 10. Client và kịch bản đầu–cuối | 4 | 4 | 0 | 0 | 0 |
 | 11. Câu hỏi khách | 10 | 0 | 0 | 10 | 0 |
-| **Tổng** | **82** | **51** | **19** | **12** | **0** |
+| **Tổng** | **83** | **52** | **19** | **12** | **0** |
 
 Rà E2E G5 (02/10/2026, nhánh `g5-e`): trước rà 79 yêu cầu — 44 đạt, 19 một phần, 16 chưa làm. Sau rà 82 yêu cầu (thêm X-11..X-13 cho RB-4, RB-5, RB-6) — 51 đạt, 19 một phần, 12 chưa làm. Mọi tên kiểm thử trong bảng đã tra được trong mã (`func Test…`, WEB-E2E `g5-public-api.spec.ts`, Vitest `src/apiclient/g5.test.tsx`). Phần còn lại theo loại:
 - **mã:** P-12 `Deprecation`/`Sunset` (khi có hợp đồng v2), P-15 con trỏ, P-19 OAuth client credentials (cũng chờ Q5-7);
@@ -163,6 +163,7 @@ Không có trong kịch bản: job dựng tệp báo cáo (`pf.reports.export.re
 | L-09 | `AG_EGRESS_MODE`: `observe` không bao giờ từ chối (kể cả checkpoint lỗi); `enforce` từ chối đúng mã | `TestGuardModes_ADR0024`, `TestParseMode_ADR0024`, `TestEgressModeFromEnv_ADR0024` (gốc lắp ráp), `TestCheckpointObserveEnforce_ADR0024` (checkpoint pf/metering thật); từng lối: `TestReportExportEgress_ADR0024`, `TestMRVPackageProductAndEgress_G5`, `TestHubCapacityProductAndValveEgress_G5`, `TestPartnerShareEgress_ADR0024` | **đạt** |
 | L-10 | Metric `ag_egress_*` nhãn cardinality thấp (R-91); luật `agrigreen-egress.rules.yml` | `TestCheckpointObserveEnforce_ADR0024`, `TestEgressAnomalyFirstOfDayOnly_ADR0024` (metric `ag_egress_*`); `deploy/observability/prometheus/agrigreen-egress.rules.yml` + bản sao chart (`check_flows.py`) | **một phần** (hạ tầng: `promtool check rules` chỉ chạy trên CI, chưa chạy cục bộ) |
 | L-11 | `GET /v1/metering/egress`, `/anomalies` (Admin API): chỉ tenant chủ dữ liệu thấy dòng của mình | `TestMeteringTenantIsolationParallel_RB2`, `TestEgressAnomalyFirstOfDayOnly_ADR0024` | **đạt** |
+| L-12 | Xuất nội bộ KN (quyết định A5, 03/10/2026): xuất lịch công tác và tải tệp thửa KN qua `Guard` kênh `report_export` với `Egress.Internal` → luôn `observe` (ghi `egress_event`, đếm, bất thường), không bao giờ bị chặn kể cả `AG_EGRESS_MODE=enforce`; kênh ngoài vẫn bị chặn | `TestGuardInternalNeverDenied_A5`, `TestCheckpointInternalObserveUnderEnforce_A5` (checkpoint thật, enforce + vượt hạn mức), `TestFN_TI_02_07_UnregisteredBulkRemindersExport`, `TestFN_XA_03_05_CreateListGetUpdateCorrectLog` (handler: checkpoint giả từ chối vẫn 200, nhận `Internal`) | **đạt** |
 
 ## 8. Phase K và cấp phát bên thứ ba (ADR-0025)
 

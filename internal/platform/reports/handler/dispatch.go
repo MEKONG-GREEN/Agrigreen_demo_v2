@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -32,6 +33,79 @@ func (h Handler) registerDispatchApp(g *gin.RouterGroup) {
 
 func (h Handler) registerDispatchAdmin(g *gin.RouterGroup) {
 	g.GET("/dispatch-settings", h.dispatchSettings)
+	// A4: Admin thu hồi liên kết tải Chi cục, xem sổ truy cập liên kết.
+	g.POST("/dispatches/:id/revoke-links", h.revokeDispatchLinks)
+	g.GET("/dispatches/:id/link-access", h.dispatchLinkAccess)
+}
+
+// RegisterPublic gắn route CÔNG KHAI (không đăng nhập — mã thông báo trong đường dẫn là quyền truy cập): liên kết tải
+// tệp Chi cục do api-platform phục vụ (quyết định A4, 03/10/2026).
+func (h Handler) RegisterPublic(rg *gin.RouterGroup) {
+	rg.GET("/report-links/:token", h.openDispatchLink)
+}
+
+func (h Handler) openDispatchLink(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	c.Header("Referrer-Policy", "no-referrer")
+	f, err := h.Svc.OpenDispatchLink(c.Request.Context(), c.Param("token"), c.ClientIP())
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	defer func() { _ = f.Body.Close() }()
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.DataFromReader(http.StatusOK, f.Size, f.ContentType, f.Body,
+		map[string]string{"Content-Disposition": "attachment; filename*=UTF-8''" + url.PathEscape(f.Name)})
+}
+
+type revokeLinksReq struct {
+	Reason string `json:"reason"`
+}
+
+func (h Handler) revokeDispatchLinks(c *gin.Context) {
+	id, ok := pathID(c, app.ErrDispatchNotFound)
+	if !ok {
+		return
+	}
+	var req revokeLinksReq
+	if !bind(c, &req) {
+		return
+	}
+	n, err := h.Svc.RevokeDispatchLinks(c.Request.Context(), id, req.Reason, c.GetHeader("Idempotency-Key"))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"dispatch_id": id, "revoked": n})
+}
+
+type linkAccessDTO struct {
+	ID           uuid.UUID `json:"id"`
+	LinkID       uuid.UUID `json:"link_id"`
+	FileID       uuid.UUID `json:"file_id"`
+	RecipientRef uuid.UUID `json:"recipient_ref"`
+	Outcome      string    `json:"outcome"`
+	IPHash       *string   `json:"ip_hash"`
+	At           string    `json:"at"`
+	Seq          int64     `json:"seq"`
+}
+
+func (h Handler) dispatchLinkAccess(c *gin.Context) {
+	id, ok := pathID(c, app.ErrDispatchNotFound)
+	if !ok {
+		return
+	}
+	rows, err := h.Svc.DispatchLinkLog(c.Request.Context(), id)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	items := make([]linkAccessDTO, 0, len(rows))
+	for _, r := range rows {
+		items = append(items, linkAccessDTO{ID: r.ID, LinkID: r.LinkID, FileID: r.FileID, RecipientRef: r.RecipientRef, Outcome: r.Outcome,
+			IPHash: r.IPHash, At: ts(r.EventTime), Seq: r.Seq})
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 
 type dispatchRecipientDTO struct {

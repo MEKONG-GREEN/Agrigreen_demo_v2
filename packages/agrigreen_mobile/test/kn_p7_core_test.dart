@@ -217,6 +217,23 @@ void main() {
       expect(vs.areaHa, closeTo(0.36, 0.005));
     });
 
+    test('FN-XA-03.05 (A2 03/10/2026): tam giác 3 điểm hợp lệ; trùng/thẳng hàng chặn', () {
+      expect(kMinBoundaryPoints, 3);
+      const a = GeoPoint(10.04, 105.77);
+      final tri = validateBoundary([a, offsetM(a, 60, 0), offsetM(a, 0, 60)]);
+      expect(tri.ok, isTrue);
+      // Tam giác vuông cạnh 60 m → 1800 m².
+      expect(tri.areaHa, closeTo(0.18, 0.005));
+      expect(
+        validateBoundary([a, offsetM(a, 60, 0), offsetM(a, 60, 0)]).errors,
+        [BoundaryError.tooFewPoints],
+      );
+      expect(
+        validateBoundary([a, offsetM(a, 30, 0), offsetM(a, 60, 0)]).errors,
+        [BoundaryError.collinear],
+      );
+    });
+
     test('FN-XA-03.05 payload plot_boundary mang lot_name, note, farmer_name, shape', () async {
       final svc = BoundaryService(outbox: h.outbox, refs: h.refs, ids: h.ids);
       final rec = await svc.save(

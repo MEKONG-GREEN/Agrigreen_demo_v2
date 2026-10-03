@@ -3068,6 +3068,67 @@ paths:
   # --- hết pf/accounts ---
 
   # --- pf/reports: mẫu biểu (reports_admin, masterdata_admin hoặc platform_admin — CGH FN-10 BR-03) và lịch gửi định kỳ (US-DASH-03) ---
+  /v1/reports/dispatches/{id}/revoke-links:
+    post:
+      summary: "Thu hồi mọi liên kết tải còn hiệu lực của một lần gửi Chi cục (A4) — mở liên kết sau đó trả 410 reports.link_revoked"
+      operationId: adminRevokeDispatchLinks
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "200":
+          description: "Số liên kết bị thu hồi (0 khi không còn liên kết hiệu lực); ghi dispatch_event links_revoked"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [dispatch_id, revoked]
+                properties:
+                  dispatch_id: {type: string, format: uuid}
+                  revoked: {type: integer, format: int64}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: reports.dispatch_not_found, $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/reports/dispatches/{id}/link-access:
+    get:
+      summary: "Sổ truy cập liên kết tải Chi cục (A4) — mã người nhận, thời điểm, IP đã băm, kết quả; không dữ liệu cá nhân"
+      operationId: adminDispatchLinkAccess
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: "Tối đa 500 dòng, mới nhất trước"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, link_id, file_id, recipient_ref, outcome, ip_hash, at, seq]
+                      properties:
+                        id: {type: string, format: uuid}
+                        link_id: {type: string, format: uuid}
+                        file_id: {type: string, format: uuid}
+                        recipient_ref: {type: string, format: uuid}
+                        outcome: {type: string, enum: [served, expired, revoked, invalid, egress_denied]}
+                        ip_hash: {type: [string, "null"], description: "HMAC-SHA256(khóa = băm mã thông báo, IP) — không lưu IP thô"}
+                        at: {type: string, format: date-time}
+                        seq: {type: integer, format: int64}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
   /v1/reports/dispatch-settings:
     get:
       summary: Cấu hình báo cáo Chi cục (KN v7.7 FN-TI-02.06) — cờ Google Sheet (TẮT mặc định, ADR-0026), SMTP công vụ đã cấu hình

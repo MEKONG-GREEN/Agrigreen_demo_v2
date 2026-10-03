@@ -89,3 +89,11 @@ Ba lựa chọn đi kèm bảng trên:
   - hạn mức và ngưỡng theo kênh;
   - người nhận cảnh báo (bộ phận an ninh của MKG hay quản trị của từng tenant);
   - có chặn `valve` khi vượt hạn mức hay chỉ cảnh báo.
+
+## Ghi chú triển khai (03/10/2026 — quyết định A4, A5 của chủ sản phẩm)
+
+- **A5 — xuất nội bộ KN đi qua điểm kiểm soát ở chế độ quan sát, không bao giờ bị chặn.** `meteringport.Egress` có thêm cờ `Internal bool` (bổ sung, tương thích ngược — mặc định `false` giữ hành vi cũ). `Internal = true` → `Egress.EffectiveMode` luôn trả `observe`: `Guard` không bao giờ từ chối (kể cả checkpoint lỗi) và `Checkpoint.Pass` (pf/metering) đánh giá ở `observe` — dòng `egress_event` ghi `mode = observe`, `decision = allowed` (lý do `quota_exceeded` nếu vượt), vẫn được đếm vào bộ đếm ngày và phát hiện bất thường, kể cả khi `AG_EGRESS_MODE=enforce`. Hai đường dùng cờ này, kênh `report_export`, bên nhận = cán bộ xuất (`actor`):
+  - "Xuất Excel/PDF" lịch công tác (`pf/extension`, `app/schedule_export.go`, sản phẩm `kn_work_schedule`, phần tử = số dòng) — `extension.Module.UseEgress` nối ở `cmd/api-platform/assembly`;
+  - tải tệp thửa KN `GET /v1/kn/plots/export` (`pf/geo`, `app/kn.go` `KNExport`, sản phẩm `kn_plot_file`, phần tử = số thửa).
+  Kênh ra ngoài (`Internal = false`: xuất báo cáo, gói MRV, van, Public API, liên kết Chi cục) vẫn bị từ chối ở `enforce`. Kiểm thử: `TestGuardInternalNeverDenied_A5` (port), `TestCheckpointInternalObserveUnderEnforce_A5` (checkpoint thật, enforce + vượt hạn mức), `TestFN_TI_02_07_UnregisteredBulkRemindersExport` và `TestFN_XA_03_05_CreateListGetUpdateCorrectLog` (handler, enforce + checkpoint giả luôn từ chối: vẫn 200, lần xuất mang `Internal`).
+- **A4 — liên kết tải báo cáo Chi cục 7 ngày.** Lần mở liên kết công khai `GET /v1/public/report-links/{token}` đi qua `app.egress` cục bộ (export_audit kind `download`) rồi checkpoint dùng chung kênh `report_export` với bên nhận = người nhận Chi cục (mã danh bạ) — đây là đường ra ngoài nên **không** dùng `Internal`; `enforce` vượt hạn mức → 429 và sổ `dispatch_link_access` outcome `egress_denied` (`TestA4_ChiCucDownloadLink7Days`).

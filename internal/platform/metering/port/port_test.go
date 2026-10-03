@@ -90,3 +90,25 @@ func TestParseMode_ADR0024(t *testing.T) {
 		t.Fatal("khóa tham số kênh sai")
 	}
 }
+
+// A5 (03/10/2026): xuất nội bộ (Internal) luôn observe — enforce + vượt hạn mức hoặc checkpoint lỗi vẫn cho qua,
+// checkpoint vẫn được gọi (ghi egress_event); kênh ngoài (Internal = false) vẫn bị chặn.
+func TestGuardInternalNeverDenied_A5(t *testing.T) {
+	ctx := context.Background()
+	in := port.Egress{Channel: port.ChannelReportExport, Internal: true}
+	deny := &fakeCP{d: port.Decision{Allowed: false, Reason: "quota_exceeded"}}
+	if err := port.Guard(ctx, deny, port.ModeEnforce, in, nil); err != nil || deny.n != 1 {
+		t.Fatalf("nội bộ ở enforce không được từ chối: %v (gọi %d lần)", err, deny.n)
+	}
+	if err := port.Guard(ctx, &fakeCP{err: errors.New("db down")}, port.ModeEnforce, in, nil); err != nil {
+		t.Fatalf("nội bộ: checkpoint lỗi vẫn tiếp tục: %v", err)
+	}
+	out := in
+	out.Internal = false
+	if err := port.Guard(ctx, deny, port.ModeEnforce, out, nil); code(err) != "metering.egress_quota_exceeded" {
+		t.Fatalf("kênh ngoài vẫn phải bị chặn ở enforce: %v", err)
+	}
+	if in.EffectiveMode(port.ModeEnforce) != port.ModeObserve || out.EffectiveMode(port.ModeEnforce) != port.ModeEnforce {
+		t.Fatal("EffectiveMode")
+	}
+}

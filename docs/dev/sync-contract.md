@@ -148,7 +148,7 @@ Vai được đẩy: `plot_editor`, `coop_manager`, `platform_admin` (vai khác 
 | `plot_ref` | `create` | UUIDv7 máy sinh cho thửa mới. Với `correct` bỏ qua — thửa suy ra từ `supersedes_id` |
 | `commune_code` | `create` | Mã xã hiện hành, phải trong phạm vi người gửi |
 | `name`, `cooperative_ref`, `household_ref` | không | Quản lý HTX bỏ trống `cooperative_ref` → HTX của mình. `household_ref` cần `cooperative_ref` |
-| `geometry` | có | GeoJSON Polygon/MultiPolygon WGS84 (EPSG:4326); ≥ 4 đỉnh phân biệt không thẳng hàng; vòng chưa khép được tự khép |
+| `geometry` | có | GeoJSON Polygon/MultiPolygon WGS84 (EPSG:4326); ≥ 3 đỉnh phân biệt không thẳng hàng; vòng chưa khép được tự khép |
 | `gps_accuracy_m`, `declared_area_ha` | không | Số thập phân **dạng chuỗi** |
 | `source` | không | `kn_field_app` (mặc định) hoặc `htx_app` |
 | `confirm_overlap` | không | Người vẽ đã xác nhận giữ nguyên chồng lấn cùng HTX / thửa nháp trên máy (HTX US-PLOT-04 AC-2) |

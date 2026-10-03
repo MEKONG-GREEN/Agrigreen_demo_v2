@@ -3124,6 +3124,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/public/report-links/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tải tệp báo cáo Chi cục qua liên kết trong email (A4) — KHÔNG đăng nhập; mã thông báo là quyền truy cập
+         * @description Quyết định A4 (03/10/2026, FN-TI-02.06): email Chi cục vượt giới hạn đính kèm mang liên kết do api-platform phục vụ (trong lãnh thổ), hạn theo tham số reports.dispatch_link_ttl_hours (mặc định 168 giờ = 7 ngày). Mỗi lần mở ghi một dòng sổ pf_reports.dispatch_link_access (mã người nhận, thời điểm, IP đã băm HMAC, kết quả) và đi qua điểm kiểm soát xuất (export_audit kind download + pf/metering kênh report_export, ADR-0024). Mã sai/bị sửa → 404; hết hạn → 410 reports.link_expired; Admin thu hồi → 410 reports.link_revoked; điểm kiểm soát (enforce) từ chối → 429 metering.egress_quota_exceeded. Phản hồi Cache-Control no-store, Referrer-Policy no-referrer.
+         */
+        get: operations["openReportLink"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/reports/templates": {
         parameters: {
             query?: never;
@@ -6435,7 +6455,7 @@ export interface components {
             publisher_ref?: string | null;
             return_reason?: string | null;
         };
-        /** @description GeoJSON (RFC 7946) Polygon hoặc MultiPolygon, WGS84 kinh/vĩ độ (EPSG:4326). Vòng chưa khép được tự khép. Tối thiểu 4 đỉnh phân biệt không thẳng hàng mỗi mảnh. */
+        /** @description GeoJSON (RFC 7946) Polygon hoặc MultiPolygon, WGS84 kinh/vĩ độ (EPSG:4326). Vòng chưa khép được tự khép. Tối thiểu 3 đỉnh phân biệt không thẳng hàng mỗi mảnh. */
         PolygonGeometry: {
             /** @enum {string} */
             type: "Polygon" | "MultiPolygon";
@@ -9978,7 +9998,7 @@ export interface components {
             items: components["schemas"]["KNMachineLogEntry"][];
             next_cursor: number | null;
         };
-        /** @description GeoJSON Polygon/MultiPolygon WGS84; ≥ 4 đỉnh phân biệt không thẳng hàng; vòng chưa khép được tự khép */
+        /** @description GeoJSON Polygon/MultiPolygon WGS84; ≥ 3 đỉnh phân biệt không thẳng hàng; vòng chưa khép được tự khép */
         GeoJSONPolygonal: {
             /** @enum {string} */
             type: "Polygon" | "MultiPolygon";
@@ -16297,6 +16317,36 @@ export interface operations {
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+        };
+    };
+    openReportLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Mã thông báo base64url 86 ký tự (tenant + liên kết + bí mật 32 byte; DB chỉ giữ SHA-256) */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp (Excel hoặc PDF), Content-Disposition attachment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/pdf": string;
+                };
+            };
+            /** @description reports.link_not_found */
+            404: components["responses"]["Problem"];
+            /** @description reports.link_expired | reports.link_revoked */
+            410: components["responses"]["Problem"];
+            /** @description metering.egress_quota_exceeded (AG_EGRESS_MODE=enforce) */
+            429: components["responses"]["Problem"];
         };
     };
     listReportTemplates: {

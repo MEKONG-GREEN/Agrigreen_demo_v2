@@ -168,6 +168,14 @@ func (s *Service) checkAssignment(ctx context.Context, a *actor, in domain.Assig
 type knTarget struct {
 	user  port.User
 	realm []string
+	tg    *target
+}
+
+// state là trạng thái tài khoản ở pf với vai do module quản lý theo realm hiện hành.
+func (t *knTarget) state() domain.Account {
+	acc := t.tg.state()
+	acc.Roles = domain.ManagedOf(t.realm)
+	return acc
 }
 
 func (s *Service) knTarget(ctx context.Context, a *actor, id uuid.UUID) (*knTarget, error) {
@@ -185,7 +193,7 @@ func (s *Service) knTarget(ctx context.Context, a *actor, id uuid.UUID) (*knTarg
 	if t.acc != nil && !t.acc.Enabled {
 		return nil, ErrState.WithDetail("Tài khoản đang bị khóa.")
 	}
-	return &knTarget{user: t.user, realm: realm}, nil
+	return &knTarget{user: t.user, realm: realm, tg: t}, nil
 }
 
 // AssignmentResult là kết quả một thao tác gán vai trò.
@@ -357,6 +365,11 @@ func (s *Service) GrantAssignment(ctx context.Context, user uuid.UUID, in domain
 	if err := s.ensureKNUser(ctx, t, c.in.Role); err != nil {
 		return AssignmentResult{}, err
 	}
+	if c.in.Role == port.KNXa { // A1: Cán bộ xã mặc định có vai kho định danh
+		if t.realm, err = s.grantKNXaVault(ctx, a.p.TenantID, a.p.ActorRef, t.state(), t.realm, key+":vault"); err != nil {
+			return AssignmentResult{}, err
+		}
+	}
 	res, err := s.writeAsg(ctx, a.p.TenantID, a.p.ActorRef, key, domain.AsgGranted, optStr(reason), uuid.Nil,
 		func(tx pgx.Tx, _ *port.Assignment) (port.Assignment, error) {
 			if err := noDuplicate(ctx, tx, user, c.in, uuid.Nil); err != nil {
@@ -464,12 +477,15 @@ func (s *Service) RevokeAssignment(ctx context.Context, user, id uuid.UUID, reas
 	}
 	key := "asg:revoke:" + idem
 	if prev, err := s.asgReplay(ctx, a.p.TenantID, key); err != nil || prev != nil {
+		if err == nil && prev.Assignment.Role == port.KNXa {
+			err = s.releaseKNXaVault(ctx, a, user, key+":vault") // lần trước lỗi giữa chừng → làm tiếp
+		}
 		return derefAsg(prev), err
 	}
 	if _, err := s.knTarget(ctx, a, user); err != nil {
 		return AssignmentResult{}, err
 	}
-	return s.writeAsg(ctx, a.p.TenantID, a.p.ActorRef, key, domain.AsgRevoked, optStr(reason), id,
+	res, err := s.writeAsg(ctx, a.p.TenantID, a.p.ActorRef, key, domain.AsgRevoked, optStr(reason), id,
 		func(_ pgx.Tx, cur *port.Assignment) (port.Assignment, error) {
 			if cur.UserRef != user {
 				return port.Assignment{}, ErrAssignmentNotFound
@@ -484,6 +500,10 @@ func (s *Service) RevokeAssignment(ctx context.Context, user, id uuid.UUID, reas
 			next.Active = false
 			return next, nil
 		})
+	if err == nil && res.Assignment.Role == port.KNXa {
+		err = s.releaseKNXaVault(ctx, a, user, key+":vault")
+	}
+	return res, err
 }
 
 // ListAssignments liệt kê vai trò của tài khoản (Admin, màn Detail khối "Vai trò và phạm vi").
@@ -628,6 +648,14 @@ func (s *Service) CreateKNUser(ctx context.Context, in KNCreateInput) (KNCreateR
 	} else if replayed {
 		_, _ = compensate(nil)
 		return s.knReplayed(ctx, a, ev)
+	}
+	if slices.ContainsFunc(checked, func(c checkedAssignment) bool { return c.in.Role == port.KNXa }) {
+		// A1: Cán bộ xã mặc định có vai kho định danh. Lỗi ở đây: tài khoản đã ghi sổ, không bù (như lần gán dưới).
+		realm, err := s.grantKNXaVault(ctx, a.p.TenantID, a.p.ActorRef, acc, []string{port.RoleKNUser}, in.IdemKey+":vault")
+		if err != nil {
+			return KNCreateResult{}, err
+		}
+		acc.Roles = domain.ManagedOf(realm)
 	}
 	res := KNCreateResult{Warnings: warnings}
 	for i, c := range checked {

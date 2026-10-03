@@ -26,26 +26,43 @@ List<GeoPoint> square(double lat, double lon, double sideM) {
 
 void main() {
   group('kiểm tra ranh giới (US-PLOT-01, HTX US-PLOT-02 AC-2)', () {
-    test('ít hơn 4 điểm bị chặn', () {
-      final v = validateBoundary(const [
+    test('A2: tam giác 3 điểm hợp lệ; ít hơn 3 điểm bị chặn', () {
+      expect(kMinBoundaryPoints, 3);
+      final tri = validateBoundary(const [
         GeoPoint(10, 105),
         GeoPoint(10, 105.001),
         GeoPoint(10.001, 105.001),
+      ]);
+      expect(tri.ok, isTrue);
+      expect(tri.areaHa, greaterThan(0));
+      final v = validateBoundary(const [
+        GeoPoint(10, 105),
+        GeoPoint(10, 105.001),
       ]);
       expect(v.ok, isFalse);
       expect(v.errors, [BoundaryError.tooFewPoints]);
       expect(
         v.errors.first.message,
-        'Cần tối thiểu 4 điểm ranh giới không thẳng hàng để khép vùng.',
+        'Cần tối thiểu 3 điểm ranh giới không thẳng hàng để khép vùng.',
       );
     });
 
     test('điểm khép (cuối = đầu) và điểm trùng không được tính', () {
       final s = square(10.03, 105.78, 100);
-      final v = validateBoundary([...s.take(3), s[2], s.first]);
+      final v = validateBoundary([...s.take(2), s[1], s.first]);
       expect(v.errors, [BoundaryError.tooFewPoints]);
+      expect(validateBoundary([...s.take(3), s[2], s.first]).ok, isTrue);
       expect(validateBoundary([...s, s.first]).ok, isTrue);
       expect(validateBoundary([...s, s.first]).ring, hasLength(4));
+    });
+
+    test('3 điểm thẳng hàng bị chặn', () {
+      final v = validateBoundary(const [
+        GeoPoint(10.0, 105.0),
+        GeoPoint(10.001, 105.001),
+        GeoPoint(10.002, 105.002),
+      ]);
+      expect(v.errors, [BoundaryError.collinear]);
     });
 
     test('4 điểm thẳng hàng bị chặn', () {

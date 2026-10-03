@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
@@ -143,4 +144,17 @@ func rect(east, north, w, h float64) map[string]any {
 	x0, y0 := baseLon+east*dLon, baseLat+north*dLat
 	x1, y1 := x0+w*dLon, y0+h*dLat
 	return map[string]any{"type": "Polygon", "coordinates": [][][]float64{{{x0, y0}, {x1, y0}, {x1, y1}, {x0, y1}, {x0, y0}}}}
+}
+
+// denyCP là điểm kiểm soát xuất giả luôn báo vượt hạn mức (A5: xuất nội bộ vẫn phải đi qua và không bị chặn).
+type denyCP struct {
+	mu  sync.Mutex
+	got []meteringport.Egress
+}
+
+func (d *denyCP) Pass(_ context.Context, e meteringport.Egress) (meteringport.Decision, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.got = append(d.got, e)
+	return meteringport.Decision{Allowed: false, Reason: "quota_exceeded", Mode: meteringport.ModeEnforce}, nil
 }

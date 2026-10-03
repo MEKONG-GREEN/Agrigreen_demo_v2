@@ -11,10 +11,34 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tabular"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 )
+
+// ProductScheduleExport là tên sản phẩm của lần xuất lịch công tác trong sổ egress_event (pf/metering).
+const ProductScheduleExport = "kn_work_schedule"
+
+// scheduleEgress đưa lần xuất lịch công tác qua điểm kiểm soát dùng chung (ADR-0024, quyết định A5): kênh
+// report_export, bên nhận = chính cán bộ xuất, Internal → luôn observe (ghi, đếm, cảnh báo bất thường; không bao giờ
+// từ chối kể cả AG_EGRESS_MODE=enforce). Chưa nối checkpoint → hành vi cũ.
+func (s *Service) scheduleEgress(ctx context.Context, records, bytes int) {
+	p, ok := authz.FromContext(ctx)
+	if !ok || s.Egress == nil {
+		return
+	}
+	// Guard với Internal không bao giờ trả lỗi (observe): lỗi hạ tầng chỉ được ghi log.
+	_ = meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
+		SourceID: ids.New(), Channel: meteringport.ChannelReportExport, DataTenantID: p.TenantID,
+		CounterpartyKind: meteringport.CounterpartyActor, CounterpartyRef: p.ActorRef, Product: ProductScheduleExport,
+		Records: int64(records), Bytes: int64(bytes), OccurredAt: s.now(), ActorRef: p.ActorRef, TraceID: telemetry.TraceID(ctx),
+		Internal: true,
+	}, s.Log)
+}
 
 // ScheduleExport là tệp xuất lịch công tác.
 type ScheduleExport struct {
@@ -114,12 +138,14 @@ func (s *Service) ExportSchedules(ctx context.Context, q ScheduleQuery, format s
 		if err != nil {
 			return ScheduleExport{}, err
 		}
+		s.scheduleEgress(ctx, len(rows), len(b))
 		return ScheduleExport{Body: b, ContentType: "application/pdf", FileName: fname + ".pdf"}, nil
 	}
 	var buf bytes.Buffer
 	if err := tabular.WriteXLSX(&buf, "Lịch công tác", scheduleExportHeader, rows); err != nil {
 		return ScheduleExport{}, err
 	}
+	s.scheduleEgress(ctx, len(rows), buf.Len())
 	return ScheduleExport{Body: buf.Bytes(), ContentType: tabular.ContentTypeXLSX, FileName: fname + ".xlsx"}, nil
 }
 

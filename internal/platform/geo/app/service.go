@@ -40,7 +40,7 @@ var (
 	ErrConflictState         = problem.New(http.StatusConflict, "geo.conflict_state", "Xung đột đã được xử lý")
 	ErrPlotExists            = problem.New(http.StatusConflict, "geo.plot_exists", "Mã tham chiếu thửa đã được dùng")
 	ErrOutOfScope            = problem.New(http.StatusForbidden, "geo.out_of_scope", "Bạn không có quyền truy cập lô ruộng này.")
-	ErrTooFewPoints          = problem.New(http.StatusUnprocessableEntity, domain.CodeTooFewPoints, "Cần tối thiểu 4 điểm ranh giới không thẳng hàng để khép vùng.")
+	ErrTooFewPoints          = problem.New(http.StatusUnprocessableEntity, domain.CodeTooFewPoints, "Cần tối thiểu 3 điểm ranh giới không thẳng hàng để khép vùng.")
 	ErrInvalidGeometry       = problem.New(http.StatusUnprocessableEntity, domain.CodeInvalidGeometry, "Ranh giới không hợp lệ")
 	ErrCRSUnsupported        = problem.New(http.StatusUnprocessableEntity, domain.CodeCRSUnsupported, "Hệ toạ độ không được hỗ trợ — chỉ nhận WGS84 (EPSG:4326)")
 	ErrFormatInvalid         = problem.New(http.StatusUnprocessableEntity, domain.CodeFormat, "Tệp không đúng định dạng")

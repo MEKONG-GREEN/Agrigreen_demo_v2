@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"slices"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -86,6 +88,11 @@ type Service struct {
 	KNDirectory port.KNDirectory
 	// TablePDF (tùy chọn, pf/reports): "Xuất PDF" lịch công tác. Thiếu → 503.
 	TablePDF port.TablePDF
+	// Egress (tùy chọn, G5 ADR-0024 + quyết định A5): điểm kiểm soát xuất dùng chung (pf/metering) cho "Xuất
+	// Excel/PDF" lịch công tác — xuất NỘI BỘ (Internal): ghi egress_event, đếm, cảnh báo, không bao giờ chặn.
+	Egress     meteringport.Checkpoint
+	EgressMode meteringport.Mode
+	Log        *slog.Logger
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }
