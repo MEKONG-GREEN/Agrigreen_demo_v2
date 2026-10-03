@@ -145,8 +145,13 @@ type Publisher struct {
 	Kind   Kind
 }
 
+// ParkAfterRejections: số lần broker từ chối (ErrRejected) một sự kiện trước khi publisher gác nó (parked_at,
+// shared 000005) để sự kiện sau không bị chặn mãi. Lỗi kết nối không bao giờ dẫn tới gác.
+const ParkAfterRejections = 5
+
 // PublishBatch phát tối đa Batch sự kiện chưa phát, theo thứ tự id (UUIDv7 ~
-// thứ tự ghi). Dừng ở lỗi đầu tiên để giữ thứ tự; trả số sự kiện đã phát.
+// thứ tự ghi). Dừng ở lỗi đầu tiên để giữ thứ tự — trừ sự kiện bị broker từ chối
+// đủ ParkAfterRejections lần: gác rồi đi tiếp. Trả số sự kiện đã phát.
 func (p *Publisher) PublishBatch(ctx context.Context) (int, error) {
 	batch := p.Batch
 	if batch <= 0 {
@@ -159,21 +164,24 @@ func (p *Publisher) PublishBatch(ctx context.Context) (int, error) {
 	defer tx.Rollback(ctx) //nolint:errcheck
 
 	rows, err := tx.Query(ctx, `SELECT id, tenant_id, event_type, schema_version, occurred_at, recorded_at,
-	    coalesce(trace_id, ''), producer, payload, coalesce(trace_parent, '')
-	  FROM shared.outbox WHERE published_at IS NULL AND kind = $2
+	    coalesce(trace_id, ''), producer, payload, coalesce(trace_parent, ''), attempts
+	  FROM shared.outbox WHERE published_at IS NULL AND parked_at IS NULL AND kind = $2
 	  ORDER BY id FOR UPDATE SKIP LOCKED LIMIT $1`, batch, string(p.Kind.orDefault()))
 	if err != nil {
 		return 0, err
 	}
 	var envs []Envelope
+	var attempts []int
 	for rows.Next() {
 		var e Envelope
+		var n int
 		if err := rows.Scan(&e.EventID, &e.TenantID, &e.EventType, &e.SchemaVersion, &e.OccurredAt, &e.RecordedAt,
-			&e.TraceID, &e.Producer, &e.Payload, &e.TraceParent); err != nil {
+			&e.TraceID, &e.Producer, &e.Payload, &e.TraceParent, &n); err != nil {
 			rows.Close()
 			return 0, err
 		}
 		envs = append(envs, e)
+		attempts = append(attempts, n)
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
@@ -182,12 +190,22 @@ func (p *Publisher) PublishBatch(ctx context.Context) (int, error) {
 
 	sent := 0
 	var pubErr error
-	for _, e := range envs {
+	for i, e := range envs {
 		if err := p.publishOne(ctx, e); err != nil {
 			pubErr = err
 			msg := err.Error()
 			if len(msg) > 500 {
 				msg = msg[:500]
+			}
+			if errors.Is(err, ErrRejected) && attempts[i]+1 >= ParkAfterRejections {
+				// Sự kiện độc: gác để không chặn sự kiện sau (mất thứ tự với riêng sự kiện này — chấp nhận, nó không
+				// bao giờ phát được). Metric ag.outbox.parked báo để người vận hành xử lý.
+				if _, uerr := tx.Exec(ctx, "UPDATE shared.outbox SET attempts = attempts + 1, last_error = $2, parked_at = now() WHERE id = $1",
+					e.EventID, msg); uerr != nil {
+					return sent, uerr
+				}
+				pubErr = fmt.Errorf("outbox: gác sự kiện %s (%s) sau %d lần broker từ chối: %w", e.EventID, e.EventType, attempts[i]+1, err)
+				continue
 			}
 			if _, uerr := tx.Exec(ctx, "UPDATE shared.outbox SET attempts = attempts + 1, last_error = $2 WHERE id = $1", e.EventID, msg); uerr != nil {
 				return sent, uerr

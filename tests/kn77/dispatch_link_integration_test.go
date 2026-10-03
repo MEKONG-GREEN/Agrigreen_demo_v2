@@ -180,6 +180,14 @@ func TestA4_ChiCucDownloadLink7Days(t *testing.T) {
 	if n := f.count(`SELECT count(*) FROM pf_reports.dispatch_event WHERE tenant_id = $1 AND action = 'links_revoked'`, f.tenant); n != 1 {
 		t.Fatalf("sổ lần gửi: %d", n)
 	}
+	// Review M7 (pf 000087): thu hồi một chiều — vai reports_app không mở lại được liên kết đã thu hồi.
+	if err := tenant.WithTenantTx(context.Background(), f.repPool, f.tenant, func(tx pgx.Tx) error {
+		_, err := tx.Exec(context.Background(), `UPDATE pf_reports.dispatch_link SET revoked_at = NULL, revoked_by = NULL, revoke_reason = NULL
+		  WHERE dispatch_id = $1::uuid`, did)
+		return err
+	}); err == nil {
+		t.Fatal("mở lại liên kết đã thu hồi phải bị từ chối")
+	}
 	lg := adm.must(adm.adminGet("/v1/reports/dispatches/"+did+"/link-access"), http.StatusOK, "sổ truy cập")
 	if len(arr(lg.body, "items")) != 5 || strings.Contains(string(lg.raw), addr) || strings.Contains(string(lg.raw), "127.0.0.1") {
 		t.Fatalf("sổ truy cập (5 dòng, không PII/IP thô): %s", lg.raw)

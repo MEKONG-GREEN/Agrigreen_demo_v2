@@ -79,9 +79,13 @@ services:
     # Realm sinh bởi prepare.sh (redirect/origin theo AG_DOMAIN). Chỉ nhập khi realm CHƯA có.
     volumes: ["./.vps/keycloak:/opt/keycloak/data/import:ro"]
 
+  # Ngoại lệ tường minh (cmd/identity-vault/prodguard.go, có hiệu lực khi AG_ENV=production): VPS một máy — kho chỉ
+  # trong mạng compose (cổng chỉ bind 127.0.0.1), không mTLS; KEK phần mềm từ .env cho tới khi có KMS/HSM.
   identity-vault:
     environment:
       <<: [*vps-env, *vps-oidc]
+      AG_VAULT_ALLOW_PLAINTEXT: "1"
+      AG_VAULT_ALLOW_LOCAL_KMS: "1"
 
   # Listener Internal :8084 (mTLS, optimizer) vẫn chỉ trong mạng compose — Caddy không định
   # tuyến tới, không publish. Chứng thư dev do prepare.sh → gen-dev-secrets → gen-dev-certs sinh.

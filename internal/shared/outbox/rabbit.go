@@ -18,6 +18,10 @@ const Exchange = "ag.events"
 // DeadLetterExchange nhận thông điệp vượt giới hạn giao (R-62).
 const DeadLetterExchange = "ag.dlx"
 
+// ErrRejected: broker nhận kết nối nhưng từ chối (nack) chính thông điệp này — khác lỗi kết nối, là lỗi của
+// sự kiện, có thể bị gác sau ParkAfterRejections lần (Publisher.PublishBatch).
+var ErrRejected = errors.New("outbox: broker từ chối (nack)")
+
 // Rabbit là Broker RabbitMQ có publisher confirm. Kết nối/kênh đứt (broker khởi động lại,
 // mạng chập chờn) được quay số lại ở lần Publish/Check kế tiếp — publisher không bị kẹt
 // mãi với kết nối chết.
@@ -157,7 +161,7 @@ func (r *Rabbit) Publish(ctx context.Context, env Envelope) error {
 		return err
 	}
 	if !ok {
-		return errors.New("outbox: broker từ chối (nack)")
+		return ErrRejected
 	}
 	return nil
 }

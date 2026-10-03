@@ -274,8 +274,8 @@ func ListCurrent(ctx context.Context, tx pgx.Tx, f ListFilter, after uuid.UUID, 
 	return out, rows.Err()
 }
 
-// RebuildCurrent dựng lại bảng chiếu từ sổ cho tenant hiện tại (R-22).
-func RebuildCurrent(ctx context.Context, tx pgx.Tx) (int64, error) {
+// RebuildCurrent dựng lại bảng chiếu từ sổ cho tenant hiện tại (R-22); at là updated_at (đồng hồ chung của app).
+func RebuildCurrent(ctx context.Context, tx pgx.Tx, at time.Time) (int64, error) {
 	if _, err := tx.Exec(ctx, "DELETE FROM pf_mrv.evidence_current"); err != nil {
 		return 0, err
 	}
@@ -286,6 +286,6 @@ func RebuildCurrent(ctx context.Context, tx pgx.Tx) (int64, error) {
 	         h.season_code, h.event_time, h.actor_ref, coalesce(r.decision, 'pending'), r.id, $1::timestamptz
 	  FROM (SELECT DISTINCT ON (root_id) * FROM pf_mrv.evidence ORDER BY root_id, chain_version DESC) h
 	  LEFT JOIN LATERAL (SELECT id, decision FROM pf_mrv.evidence_review x WHERE x.evidence_id = h.id
-	                     ORDER BY x.recorded_at DESC, x.seq DESC LIMIT 1) r ON true`, time.Now().UTC())
+	                     ORDER BY x.recorded_at DESC, x.seq DESC LIMIT 1) r ON true`, at.UTC())
 	return tag.RowsAffected(), err
 }

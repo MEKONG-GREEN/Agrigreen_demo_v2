@@ -30,6 +30,13 @@ Kiểm thử `cmd/worker` `TestWorkerConsumersDeclaredByPublisher` đòi mọi c
 - Thiếu `AG_AMQP_INTERNAL_URL` thì sự kiện nội bộ **tồn trên outbox** (`ag.outbox.backlog` cụm mkg tăng), không bao giờ rơi sang vhost nền tảng. Đặt biến rồi khởi động lại publisher; sự kiện được phát theo thứ tự `id`.
 - Kiểm tra: `rabbitmqctl -q list_permissions -p mkg.internal` chỉ có `mkg_internal`; `rabbitmqctl -q list_queues -p mkg.internal name messages consumers`.
 
+## Sự kiện bị gác (outbox `parked_at`)
+
+- Publisher phát theo thứ tự `id` và dừng ở lỗi đầu tiên. Khi broker **từ chối (nack)** cùng một sự kiện `outbox.ParkAfterRejections` (= 5) lần, publisher gác sự kiện đó (`shared.outbox.parked_at`, migration shared 000005) và đi tiếp. Lỗi kết nối broker không bao giờ dẫn tới gác: publisher giữ thứ tự và thử lại mãi.
+- Dấu hiệu: `ag.outbox.parked{cluster}` > 0, và log `outbox.publish` có "gác sự kiện".
+- Tìm: `SELECT id, event_type, tenant_id, attempts, last_error, parked_at FROM shared.outbox WHERE parked_at IS NOT NULL AND published_at IS NULL ORDER BY id;` (vai `ag_outbox_publisher` hoặc quản trị).
+- Sửa nguyên nhân (giới hạn kích thước thông điệp, policy của hàng đợi…) rồi mở lại: `UPDATE shared.outbox SET parked_at = NULL, attempts = 0 WHERE id = '<id>';`. Sự kiện được phát ở lượt quét kế tiếp, **sau** các sự kiện đã phát trong lúc nó bị gác, nên consumer phải chịu được thứ tự lệch (inbox khử trùng theo `event_id`).
+
 ## Vận hành
 
 - **Thứ tự triển khai** không còn quan trọng với việc mất sự kiện, nhưng bản `outbox-publisher` phải **cùng hoặc mới hơn** bản API: publisher cũ không biết hàng đợi của consumer mới. Khi phát hành có consumer mới: cập nhật publisher trước (hoặc cùng lúc) API.

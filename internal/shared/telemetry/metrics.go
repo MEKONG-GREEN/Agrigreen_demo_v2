@@ -16,6 +16,7 @@ const (
 	MetricHTTPDuration  = "http.server.request.duration" // giây, theo semconv HTTP
 	MetricOutboxBacklog = "ag.outbox.backlog"            // số sự kiện chưa phát, theo cluster
 	MetricOutboxAge     = "ag.outbox.oldest_age"         // giây, tuổi sự kiện chưa phát lâu nhất
+	MetricOutboxParked  = "ag.outbox.parked"             // số sự kiện bị gác (broker từ chối lặp lại), > 0 → cảnh báo
 	MetricDLQDepth      = "ag.rabbitmq.dlq.depth"        // số thông điệp trong DLQ, theo queue (R-62)
 	MetricProjectionLag = "ag.projection.lag"            // giây, độ trễ bảng chiếu so với sổ (R-21)
 	MetricJobRuns       = "ag.job.runs"                  // số lần chạy job vận hành, theo job + outcome

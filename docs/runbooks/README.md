@@ -84,6 +84,7 @@ Có khi đặt `AG_OTLP_ENDPOINT`. Ngưỡng dưới đây là đề xuất, ch�
 | `ag.rabbitmq.dlq.depth{queue}` | worker (cần `AG_RABBITMQ_MGMT_URL`) | > 0 trong 5 phút (R-62) — luật Prometheus cụ thể và cách xử lý: [integration-alerts.md](integration-alerts.md) |
 | `ag.outbox.backlog{cluster}` | outbox-publisher | > 1000 trong 10 phút |
 | `ag.outbox.oldest_age{cluster}` | outbox-publisher | > 300 giây |
+| `ag.outbox.parked{cluster}` | outbox-publisher | > 0 — sự kiện bị broker từ chối 5 lần đã bị gác (không phát, không chặn sự kiện sau). Xử lý: [rabbitmq-queues.md](rabbitmq-queues.md) "Sự kiện bị gác" |
 | `ag.projection.lag{projection}` | module có bảng chiếu, qua `telemetry.RegisterProjectionLag` | > 60 giây (chưa có nguồn ở G1) |
 | `ag.job.runs{job,outcome="error"}` | worker | tăng bất kỳ; job `anchor` lỗi là P1 (mục 23) |
 | `kube_deployment_status_replicas_available{deployment="api-public"}`, `traefik_service_requests_total` (host `partner`) | kube-state-metrics, Traefik | Phase K: `AgPublicAPIDown` (0 bản sao sẵn sàng 5 phút, P2), 5xx > 5 %, 429 > 20 % — `agrigreen-public-api.rules.yml`, [phase-k.md](phase-k.md) |

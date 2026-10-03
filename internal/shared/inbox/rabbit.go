@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 	"go.opentelemetry.io/otel/attribute"
@@ -143,7 +144,7 @@ func ConsumeWith(ctx context.Context, ch *amqp.Channel, db tenant.Beginner, cons
 			var env outbox.Envelope
 			if err := json.Unmarshal(d.Body, &env); err != nil {
 				log.Error("phong bì hỏng, chuyển DLQ", "consumer", consumer, "message_id", d.MessageId)
-				_ = d.Nack(false, false)
+				logAckErr(log, consumer, "nack", d.Nack(false, false))
 				continue
 			}
 			mctx, span := StartConsume(ctx, consumer, d.Headers, env)
@@ -152,6 +153,12 @@ func ConsumeWith(ctx context.Context, ch *amqp.Channel, db tenant.Beginner, cons
 				span.SetStatus(codes.Error, "handler failed")
 			}
 			span.End()
+			if err != nil && ctx.Err() != nil {
+				// Đang dừng (ctx hủy giữa chừng): không phải lỗi của thông điệp — không ghi thất bại, không NACK (NACK
+				// requeue tăng x-delivery-count, khởi động lại cuốn chiếu có thể đẩy thông điệp lành vào DLQ). Thông điệp
+				// chưa ACK được broker trả lại hàng đợi khi kênh đóng.
+				return ctx.Err()
+			}
 			if err != nil {
 				n := DeliveryCount(d.Headers)
 				outcome := "retry"
@@ -165,7 +172,16 @@ func ConsumeWith(ctx context.Context, ch *amqp.Channel, db tenant.Beginner, cons
 						log.Error("không ghi được lần thất bại", "consumer", consumer, "event_id", env.EventID, "outcome", "error")
 					}
 				}
-				_ = d.Nack(false, true)
+				// Lùi trước khi trả lại: lỗi tạm (DB/broker chập chờn) có thời gian hồi phục thay vì 5 lần giao dồn trong
+				// vài mili giây rồi vào DLQ. Chờ chặn consumer này (xử lý tuần tự) — trần RetryBackoffMax giữ độ trễ có hạn.
+				if !FinalAttempt(n) {
+					select {
+					case <-ctx.Done():
+						return ctx.Err() // chưa NACK: broker trả lại khi kênh đóng
+					case <-time.After(RetryBackoff(n)):
+					}
+				}
+				logAckErr(log, consumer, "nack", d.Nack(false, true))
 				continue
 			}
 			outcome := "processed"
@@ -174,7 +190,31 @@ func ConsumeWith(ctx context.Context, ch *amqp.Channel, db tenant.Beginner, cons
 			}
 			log.Info("sự kiện", "consumer", consumer, "event", env.EventType, "event_id", env.EventID,
 				"trace_id", env.TraceID, "tenant_id", env.TenantID, "outcome", outcome)
-			_ = d.Ack(false)
+			// ACK lỗi (kênh đứt): thông điệp được giao lại, inbox khử trùng theo event_id — chỉ cần ghi log.
+			logAckErr(log, consumer, "ack", d.Ack(false))
 		}
+	}
+}
+
+// RetryBackoffBase, RetryBackoffMax: độ lùi trước khi NACK requeue — Base·2^n, trần Max.
+const (
+	RetryBackoffBase = 500 * time.Millisecond
+	RetryBackoffMax  = 10 * time.Second
+)
+
+// RetryBackoff trả độ lùi cho lần giao đã thất bại deliveryCount lần trước đó.
+func RetryBackoff(deliveryCount int64) time.Duration {
+	if deliveryCount < 0 {
+		deliveryCount = 0
+	}
+	if deliveryCount >= 5 { // 500ms·2^5 = 16s > trần
+		return RetryBackoffMax
+	}
+	return min(RetryBackoffBase<<deliveryCount, RetryBackoffMax)
+}
+
+func logAckErr(log *slog.Logger, consumer, op string, err error) {
+	if err != nil {
+		log.Error("không gửi được "+op+" tới broker", "consumer", consumer, "event", "inbox."+op, "outcome", "error", "error", err.Error())
 	}
 }

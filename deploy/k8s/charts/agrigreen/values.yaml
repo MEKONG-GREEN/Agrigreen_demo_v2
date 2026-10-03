@@ -529,6 +529,9 @@ apps:
       AG_VAULT_DB_URL: "pooler:vault"
       AG_DB_VIA_PGBOUNCER: "1"
       AG_VAULT_KEK_ID: prod-kek-1
+      # Ngoại lệ tường minh (cmd/identity-vault/prodguard.go): KEK phần mềm từ Secret vault-keys cho tới khi chọn được
+      # KMS/HSM trong lãnh thổ — production từ chối khởi động nếu bỏ dòng này mà chưa có KMS. Gỡ khi có KMS.
+      AG_VAULT_ALLOW_LOCAL_KMS: "1"
       AG_OIDC_ISSUER: "{{ .Values.common.oidc.issuer }}"
       AG_OIDC_AUDIENCE: "{{ .Values.common.oidc.audience }}"
       AG_OIDC_JWKS_URL: "{{ .Values.common.oidc.jwksUrl }}"

@@ -85,7 +85,8 @@ func WithTenantTxOptions(ctx context.Context, db Beginner, tid uuid.UUID, opts p
 // tenant khác sau khi app/ đã kiểm một cấp quyền chia sẻ tường minh (ADR-0020) — vd
 // consumer van ghi vào tenant bên cấp, hoặc ghi bảng chiếu cấp quyền ở tenant bên nhận.
 // RLS vẫn áp dụng đầy đủ (không có vai BYPASSRLS): fn chỉ thấy và ghi được dòng của tid.
-// fn trả lỗi → không khôi phục (giao dịch sẽ bị rollback).
+// fn trả lỗi → vẫn thử khôi phục: người gọi nuốt lỗi rồi dùng tiếp tx thì không chạy dưới tenant lạ. Giao dịch đã
+// hỏng (lỗi SQL) thì khôi phục cũng lỗi — bỏ qua, mọi lệnh sau đều bị từ chối tới rollback; trả lỗi gốc của fn.
 func Within(ctx context.Context, tx pgx.Tx, tid uuid.UUID, fn func() error) error {
 	if tid == uuid.Nil {
 		return ErrMissing
@@ -98,6 +99,7 @@ func Within(ctx context.Context, tx pgx.Tx, tid uuid.UUID, fn func() error) erro
 		return fmt.Errorf("tenant: đặt ngữ cảnh: %w", err)
 	}
 	if err := fn(); err != nil {
+		_, _ = tx.Exec(ctx, "SELECT set_config('app.tenant_id', $1, true)", prev)
 		return err
 	}
 	if _, err := tx.Exec(ctx, "SELECT set_config('app.tenant_id', $1, true)", prev); err != nil {

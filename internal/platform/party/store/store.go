@@ -116,8 +116,8 @@ func HasConsent(ctx context.Context, tx pgx.Tx, subject uuid.UUID, purpose strin
 	return ok, err
 }
 
-// RebuildCurrent dựng lại bảng chiếu từ sổ cho tenant hiện tại (R-22).
-func RebuildCurrent(ctx context.Context, tx pgx.Tx) (int64, error) {
+// RebuildCurrent dựng lại bảng chiếu từ sổ cho tenant hiện tại (R-22); at là updated_at (đồng hồ chung của app).
+func RebuildCurrent(ctx context.Context, tx pgx.Tx, at time.Time) (int64, error) {
 	if _, err := tx.Exec(ctx, "DELETE FROM pf_party.consent_current"); err != nil {
 		return 0, err
 	}
@@ -126,6 +126,6 @@ func RebuildCurrent(ctx context.Context, tx pgx.Tx) (int64, error) {
 	  SELECT DISTINCT ON (tenant_id, subject_ref, purpose)
 	    tenant_id, subject_ref, purpose, status, text_version, id, seq, event_time, $1::timestamptz
 	  FROM pf_party.consent
-	  ORDER BY tenant_id, subject_ref, purpose, event_time DESC, seq DESC`, time.Now().UTC())
+	  ORDER BY tenant_id, subject_ref, purpose, event_time DESC, seq DESC`, at.UTC())
 	return tag.RowsAffected(), err
 }

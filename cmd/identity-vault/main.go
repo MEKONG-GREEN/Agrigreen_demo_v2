@@ -15,6 +15,8 @@
 //	AG_VAULT_BLIND_KEY   khóa HMAC của chỉ mục mù: base64 chuẩn, ≥ 32 byte, KHÁC KEK
 //	AG_TLS_CERT, AG_TLS_KEY  bật TLS
 //	AG_TLS_CLIENT_CA     bật mTLS: bắt buộc chứng thư client do CA này cấp
+//	AG_VAULT_ALLOW_PLAINTEXT=1  production: chấp nhận chạy không mTLS (mặc định từ chối khởi động)
+//	AG_VAULT_ALLOW_LOCAL_KMS=1  production: chấp nhận KEK phần mềm AG_VAULT_KEK (mặc định từ chối khởi động)
 package main
 
 import (
@@ -72,6 +74,10 @@ func run(log *slog.Logger) error {
 	}
 	tlsCfg, err := TLSConfigFromEnv()
 	if err != nil {
+		return err
+	}
+	// Production: bắt buộc mTLS và KMS không phải phần mềm, trừ ngoại lệ tường minh (prodguard.go).
+	if err := productionGuard(os.Getenv, tlsCfg, true, log); err != nil {
 		return err
 	}
 	dsn, err := dbadmin.RoleURL(base, migrations.Vault, "", identity.DBRole)

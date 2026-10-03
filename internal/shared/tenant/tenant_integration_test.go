@@ -186,6 +186,31 @@ func TestWithinSwitchesAndRestores(t *testing.T) {
 	}
 }
 
+// Review M7: fn trả lỗi (không phải lỗi SQL) mà người gọi nuốt lỗi rồi dùng tiếp tx → vẫn chạy dưới tenant cũ.
+func TestWithinRestoresOnError(t *testing.T) {
+	env := pgtest.Get(t)
+	pool := env.Pool(t, migrations.PF, "party_app")
+	ctx := context.Background()
+	a, b := ids.New(), ids.New()
+	boom := errors.New("lỗi nghiệp vụ")
+	err := tenant.WithTenantTx(ctx, pool, a, func(tx pgx.Tx) error {
+		if err := tenant.Within(ctx, tx, b, func() error { return boom }); !errors.Is(err, boom) {
+			return fmt.Errorf("mong lỗi gốc của fn: %w", err)
+		}
+		var cur string
+		if err := tx.QueryRow(ctx, "SELECT current_setting('app.tenant_id', true)").Scan(&cur); err != nil {
+			return err
+		}
+		if cur != a.String() {
+			return fmt.Errorf("sau lỗi của fn ngữ cảnh phải về tenant %s, đang là %s", a, cur)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRejectsNilTenant(t *testing.T) {
 	err := tenant.WithTenantTx(context.Background(), nil, uuid.Nil, func(pgx.Tx) error { return nil })
 	if !errors.Is(err, tenant.ErrMissing) {
