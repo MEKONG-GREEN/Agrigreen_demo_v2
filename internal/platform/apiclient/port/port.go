@@ -28,11 +28,11 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
-// DBRole là vai DB của module ở cụm pf (schema pf_apiclient, pf 000047/000048).
+// DBRole là vai DB của module ở cụm pf (schema pf_apiclient, pf 000080/000081).
 const DBRole = "apiclient_app"
 
 // PublicDBRole là vai vận hành của tiến trình cmd/api-public: chỉ bảng vận hành schema shared
-// (idempotency, outbox) như platform_api — không quyền nghiệp vụ (pf 000047).
+// (idempotency, outbox) như platform_api — không quyền nghiệp vụ (pf 000080).
 const PublicDBRole = "public_api"
 
 // Producer là giá trị producer của phong bì sự kiện.

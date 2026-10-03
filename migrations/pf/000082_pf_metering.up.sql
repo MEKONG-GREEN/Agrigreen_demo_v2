@@ -1,6 +1,6 @@
 -- pf_metering (G5, ADR-0023 + ADR-0024; g5-conventions §2): sổ đo lường sử dụng Public API, bộ đếm
 -- hạn mức thẩm quyền, điểm kiểm soát xuất dữ liệu (DLP) và bảng kê theo kỳ tháng. Vai metering_app
--- (R-05); schema + USAGE đã có ở pf 000047. Không tham chiếu schema khác (R-07), không dữ liệu cá nhân.
+-- (R-05); schema + USAGE đã có ở pf 000080. Không tham chiếu schema khác (R-07), không dữ liệu cá nhân.
 --
 --   usage_event              SỔ (mẫu §8.1): một dòng mỗi lời gọi Public API ĐÃ XÁC THỰC, tenant = đơn vị
 --                            vận hành, stream 'client:<client_id>:<YYYY-MM>' (tháng giờ VN của event_time),

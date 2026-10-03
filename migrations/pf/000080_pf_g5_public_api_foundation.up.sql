@@ -5,9 +5,9 @@
 --    migration của từng module tạo:
 --
 --      pf_apiclient   khách hàng API, sổ khóa API (chỉ prefix + HMAC), đăng ký sản phẩm, gói hạn mức,
---                     việc xuất bất đồng bộ                                         (pf 000048, apiclient_app)
+--                     việc xuất bất đồng bộ                                         (pf 000081, apiclient_app)
 --      pf_metering    sổ sử dụng usage_event (chứng từ), bộ đếm hạn mức, sổ xuất egress_event (DLP),
---                     bảng kê theo kỳ                                               (pf 000049, metering_app)
+--                     bảng kê theo kỳ                                               (pf 000082, metering_app)
 --
 --    Vai apiclient_app, metering_app và public_api (tiến trình cmd/api-public — chỉ bảng vận hành
 --    schema shared qua ag_shared_user, như platform_api) khai ở internal/shared/dbadmin (G5-0).

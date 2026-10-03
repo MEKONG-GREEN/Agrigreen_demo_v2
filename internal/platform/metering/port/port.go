@@ -28,7 +28,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
-// DBRole là vai DB của module ở cụm pf (schema pf_metering, pf 000047/000049).
+// DBRole là vai DB của module ở cụm pf (schema pf_metering, pf 000080/000082).
 const DBRole = "metering_app"
 
 // Producer là giá trị producer của phong bì sự kiện.

@@ -39,14 +39,14 @@ const (
 	KindValveHub         = "valve_hub"          // hub_facility, hub_capacity → pf/geo hub_view
 	KindValveCollection  = "valve_collection"   // collection_schedule, htx_collection_statement → pf/cropcycle
 	KindValveMRVEvidence = "valve_mrv_evidence" // mrv_collection_evidence → pf/mrv
-	// Sản phẩm dữ liệu Public API (G5-0, pf 000047; ADR-0022 mục 3): bên cấp (chủ dữ liệu) → tenant
+	// Sản phẩm dữ liệu Public API (G5-0, pf 000080; ADR-0022 mục 3): bên cấp (chủ dữ liệu) → tenant
 	// BÊN THỨ BA. Loại = "dp_" + tên hợp đồng contracts/dataproduct/<tên>.json (DataProductKind).
 	KindDPCollectionVolume = "dp_collection_volume"  // số cuộn + diện tích đã gom theo xã × vụ × tháng, ngưỡng k
 	KindDPHubCapacity      = "dp_hub_capacity"       // hub MKG đã công bố, sức chứa danh định, bậc sử dụng
 	KindDPMRVPackageStatus = "dp_mrv_package_status" // trạng thái gói xuất MRV cho đơn vị thẩm định
 )
 
-// ShareKinds là mọi loại hợp lệ (khớp CHECK của migration pf 000042, mở rộng ở pf 000046, pf 000047).
+// ShareKinds là mọi loại hợp lệ (khớp CHECK của migration pf 000042, mở rộng ở pf 000046, pf 000080).
 var ShareKinds = []string{KindCooperativeDirectory, KindPlotDirectory, KindSeasonHarvestDates, KindHTXCollectionResponses,
 	KindWaterwayRoutes,
 	KindValveHub, KindValveCollection, KindValveMRVEvidence,

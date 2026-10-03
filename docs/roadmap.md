@@ -199,10 +199,11 @@ Phụ lục A: "Phase K; `pf/metering` và Public API bật với bên thứ ba 
 - [x] ADR-0024 DLP: `Checkpoint` duy nhất ở `pf/metering`, `observe`/`enforce`, van kiểm ở phía nhận.
 - [x] ADR-0025 hồ sơ Phase K: lớp giá trị, cấp tenant bên thứ ba, đơn vị thẩm định.
 - [x] Số migration:
-  - pf 000047: schema `pf_apiclient`, `pf_metering`, loại cấp quyền `dp_*` (**đã có**);
-  - pf 000048 apiclient;
-  - pf 000049 metering;
-  - pf 000050–000051 dự phòng;
+  - pf 000080: schema `pf_apiclient`, `pf_metering`, loại cấp quyền `dp_*` (**đã có**);
+  - pf 000081 apiclient;
+  - pf 000082 metering;
+  - pf 000083 kind thông báo `egress_anomaly`;
+  - (trên `sub/g5` là 000047–000050; đánh số lại khi hợp nhất vào `main` 03/10/2026, sau KN 000060–000079);
   - mkg 000022 không dùng.
 - [x] Vai DB `apiclient_app`, `metering_app`, `public_api` (dbadmin + PgBouncer CI/Compose). Vai nghiệp vụ `api_client_admin`, `api_client_approver`, `metering_viewer`, `billing_officer`, `billing_approver` (hằng `port/` + realm).
 - [x] Port đóng băng:

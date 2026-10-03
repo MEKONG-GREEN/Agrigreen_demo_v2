@@ -64,7 +64,7 @@ const (
 	// (KN v7.7 FN-TI-02.07 luồng phụ; kế hoạch 000073).
 	KindWorkScheduleDue = "work_schedule_due"
 	// KindEgressAnomaly: khối lượng xuất dữ liệu bất thường lần đầu trong ngày (pf/metering, DLP — ADR-0024,
-	// G5) → người nhận DLP của tenant CHỦ DỮ LIỆU (EgressAnomalyRoles; migration pf 000050).
+	// G5) → người nhận DLP của tenant CHỦ DỮ LIỆU (EgressAnomalyRoles; migration pf 000083).
 	KindEgressAnomaly = "egress_anomaly"
 	// KindSyncNow là thông điệp dữ liệu "đồng bộ ngay" (US-SYNC-02) — không tạo thông báo.
 	KindSyncNow = "sync_now"

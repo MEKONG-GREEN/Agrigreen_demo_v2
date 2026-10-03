@@ -1,6 +1,6 @@
 # ADR-0023: `pf/metering` — sổ đo lường sử dụng là chứng từ, bộ đếm hạn mức, bảng kê theo kỳ
 
-**Trạng thái:** Đề xuất · **Ngày:** 01/10/2026 (G5-0) · **Thành phần:** `pf/metering` (schema `pf_metering`, vai `metering_app`, migration pf 000049), `cmd/api-public`, `cmd/worker` · **Liên quan:** [ADR-0022](0022-public-api-ben-thu-ba.md), [ADR-0024](0024-diem-kiem-soat-xuat-du-lieu-dlp.md), mục 8 và 16 của kiến trúc
+**Trạng thái:** Đề xuất · **Ngày:** 01/10/2026 (G5-0) · **Thành phần:** `pf/metering` (schema `pf_metering`, vai `metering_app`, migration pf 000082), `cmd/api-public`, `cmd/worker` · **Liên quan:** [ADR-0022](0022-public-api-ben-thu-ba.md), [ADR-0024](0024-diem-kiem-soat-xuat-du-lieu-dlp.md), mục 8 và 16 của kiến trúc
 
 ## Bối cảnh
 

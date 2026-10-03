@@ -21,7 +21,7 @@
 
 ## 2. Cấp số migration (`migrations/pf`)
 
-Trên main số cao nhất là 000046; 000047 đã dành (roadmap); `sub/g5` dùng 000047–000051. **KN v7.7 dùng dải 000060–000089.**
+Trên main số cao nhất là 000046; 000047 đã dành (roadmap); `sub/g5` dùng 000047–000050 — khi hợp nhất vào `main` (03/10/2026) đánh số lại thành **000080–000083**. **KN v7.7 dùng dải 000060–000079**; số tự do tiếp theo 000084.
 
 | Số | Gói | Schema | Nội dung |
 |---|---|---|---|
@@ -45,7 +45,8 @@ Trên main số cao nhất là 000046; 000047 đã dành (roadmap); `sub/g5` dù
 | 000077 | P7 | `pf_extension` | `material_record` (sổ: xã, thời điểm ghi nhận, vật tư, số lượng numeric(14,4), ĐVT, ghi chú, `department_code`) |
 | 000078 | P7 | `pf_mechanization` | nếu cần: `coop_machine_count_event` (HTX × loại máy × số lượng, lịch sử) khi bảng `machine` hiện có không đủ |
 | 000079 | P7 | `pf_geo` | thuộc tính thửa v7.7: `farmer_ref` (vault), tên lô, ghi chú, diện tích khai báo, HTX, `department_code` |
-| 000080–000089 | — | — | dự phòng KN (sửa sai, chỉ mục hiệu năng P8) |
+| 000080–000083 | — | — | **đã dùng bởi G5** (đánh số lại khi hợp nhất: apiclient/metering foundation, apiclient, metering, notify egress_anomaly) |
+| 000084–000089 | — | — | dự phòng KN (sửa sai, chỉ mục hiệu năng P8) — lấy số tự do tiếp theo khi cần |
 
 `migratecheck` đã chấp nhận khoảng trống (000030, 000031, 000033, 000039, 000044 hiện trống).
 

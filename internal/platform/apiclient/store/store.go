@@ -1,4 +1,4 @@
-// Package store: SQL của pf/apiclient (migration pf 000048). Mọi hàm nhận pgx.Tx đã ở ngữ cảnh
+// Package store: SQL của pf/apiclient (migration pf 000081). Mọi hàm nhận pgx.Tx đã ở ngữ cảnh
 // tenant đơn vị vận hành (tenant.WithTenantTx). Sổ: DB tính seq, chuỗi băm, chống trùng idem_key và
 // kiểm R-56 bằng CHECK. Tham số luôn ép kiểu tường minh (PgBouncer — QueryExecModeExec).
 package store

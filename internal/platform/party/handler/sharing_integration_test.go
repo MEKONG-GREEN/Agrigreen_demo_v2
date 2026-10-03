@@ -269,7 +269,7 @@ func TestShareGrantWaterwayRoutesKind_G4(t *testing.T) {
 	}
 }
 
-// G5-0 (pf 000047, ADR-0022 mục 3): ba loại sản phẩm dữ liệu dp_* đề xuất + duyệt được qua sổ thật
+// G5-0 (pf 000080, ADR-0022 mục 3): ba loại sản phẩm dữ liệu dp_* đề xuất + duyệt được qua sổ thật
 // (CHECK DB mở rộng) cho tenant BÊN THỨ BA; bên nhận thấy đủ ba loại.
 func TestShareGrantDataProductKinds_G5(t *testing.T) {
 	f := newFixture(t)

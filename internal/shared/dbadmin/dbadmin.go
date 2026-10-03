@@ -101,7 +101,7 @@ var Roles = []Role{
 	{Name: "costing_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
 	{Name: "acctbridge_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.MKG}},
 	// G5 (docs/dev/g5-conventions.md §3; ADR-0022..0024): Public API cho bên thứ ba. Mỗi module một vai, chỉ
-	// CONNECT ag_pf; schema + USAGE do pf 000047, bảng và GRANT do migration của từng module (000048, 000049).
+	// CONNECT ag_pf; schema + USAGE do pf 000080, bảng và GRANT do migration của từng module (000081, 000082).
 	{Name: "apiclient_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
 	{Name: "metering_app", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
 	// public_api: tiến trình cmd/api-public — như platform_api, chỉ bảng vận hành schema shared (idempotency,

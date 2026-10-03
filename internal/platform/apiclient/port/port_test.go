@@ -25,7 +25,7 @@ func TestParseKey_ADR0022(t *testing.T) {
 }
 
 // G5-0 hợp đồng đóng băng: mọi sản phẩm dữ liệu có hằng tên ở port, loại cấp quyền dp_* hợp lệ ở
-// pf/party (khớp CHECK pf 000047) và scope theo ProductScope.
+// pf/party (khớp CHECK pf 000080) và scope theo ProductScope.
 func TestG5FrozenDataProducts(t *testing.T) {
 	all, err := dataproduct.All()
 	if err != nil {

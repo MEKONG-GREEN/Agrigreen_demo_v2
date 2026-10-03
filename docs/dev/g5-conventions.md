@@ -97,13 +97,15 @@ Tham số vùng nền tảng nằm ở `pf/masterdata` (có phiên bản, setter
 
 Chỉ dùng số đã cấp. golang-migrate **không** áp số nhỏ hơn số đã chạy. Database dev/Compose đã chạy số cao hơn phải dựng lại. Người tích hợp merge theo thứ tự số.
 
+**Đánh số lại khi hợp nhất vào `main` (03/10/2026):** trên `sub/g5` bốn migration là pf 000047–000050; khi vào `main` (đã có KN v7.7 pf 000060–000079) chúng được đổi thành **000080–000083** (giữ thứ tự, giữ hậu tố tên tệp) để database đã chạy tới 000079 áp tiếp đúng thứ tự. Bảng dưới dùng số mới. Số tự do tiếp theo ở cụm pf: **000084** (000047–000059 bỏ trống, không dùng lại — golang-migrate không áp số nhỏ hơn số đã chạy).
+
 | Cụm | Số | Nội dung | Schema | Vai DB |
 |---|---|---|---|---|
-| pf | **000047** | G5-0 (**đã có**). `CREATE SCHEMA pf_apiclient`, `pf_metering` + `USAGE` cho đúng vai, không bảng. Loại cấp quyền `dp_collection_volume`, `dp_hub_capacity`, `dp_mrv_package_status` (CHECK `share_grant_event_kinds_check`). Số dự phòng G4 (`road_routes`) không dùng: nếu sau này có OSRM thì xin số mới | `pf_apiclient`, `pf_metering`, `pf_party` | `apiclient_app`, `metering_app`, `party_app` |
-| pf | 000048 | **apiclient**. Sổ `client_event` (`client:<id>`) + bảng chiếu `client_current`. Sổ `api_key_event` (`key_prefix` UNIQUE, `key_hmac` bytea, `pepper_version`, không bí mật) + bảng chiếu `api_key_current`. Sổ `subscription_event` (sản phẩm, scope, R-56 CHECK) + bảng chiếu. Sổ `quota_plan` có phiên bản (R-56 CHECK). `export_job` + ảnh chụp đầu vào bất biến (mẫu mục 12) + `export_file` (SHA-256, khóa đối tượng) | `pf_apiclient` | `apiclient_app` |
-| pf | 000049 | **metering**. Sổ `usage_event` (mẫu §8.1, phân vùng tháng, `UNIQUE (tenant_id, idem_key)`, chuỗi `client:<id>:<YYYY-MM>`) + `usage_counter_current`. Sổ `egress_event` (tenant = chủ dữ liệu, `UNIQUE (tenant_id, idem_key)` với `idem_key = <kênh>:<source_id>:<counterparty_ref>`, CHECK kênh ∈ `port.Channels`) + `egress_counter_current` + `egress_anomaly` (một dòng/ngày/khóa). `statement_job`, `statement_snapshot` (bất biến, băm), sổ `statement` (R-56 CHECK, `supersedes_id`), `numeric(18,4)` / `numeric(18,2)` cho tiền | `pf_metering` | `metering_app` |
-| pf | 000050 | **dự phòng tích hợp DLP** (nếu `pf/reports`, `pf/mrv`, consumer van cần cột/bảng phụ). Xin người tích hợp | | |
-| pf | 000051 | dự phòng G5 (E2E / sửa sai) | | |
+| pf | **000080** | G5-0 (**đã có**). `CREATE SCHEMA pf_apiclient`, `pf_metering` + `USAGE` cho đúng vai, không bảng. Loại cấp quyền `dp_collection_volume`, `dp_hub_capacity`, `dp_mrv_package_status` (CHECK `share_grant_event_kinds_check`). Số dự phòng G4 (`road_routes`) không dùng: nếu sau này có OSRM thì xin số mới | `pf_apiclient`, `pf_metering`, `pf_party` | `apiclient_app`, `metering_app`, `party_app` |
+| pf | 000081 | **apiclient**. Sổ `client_event` (`client:<id>`) + bảng chiếu `client_current`. Sổ `api_key_event` (`key_prefix` UNIQUE, `key_hmac` bytea, `pepper_version`, không bí mật) + bảng chiếu `api_key_current`. Sổ `subscription_event` (sản phẩm, scope, R-56 CHECK) + bảng chiếu. Sổ `quota_plan` có phiên bản (R-56 CHECK). `export_job` + ảnh chụp đầu vào bất biến (mẫu mục 12) + `export_file` (SHA-256, khóa đối tượng) | `pf_apiclient` | `apiclient_app` |
+| pf | 000082 | **metering**. Sổ `usage_event` (mẫu §8.1, phân vùng tháng, `UNIQUE (tenant_id, idem_key)`, chuỗi `client:<id>:<YYYY-MM>`) + `usage_counter_current`. Sổ `egress_event` (tenant = chủ dữ liệu, `UNIQUE (tenant_id, idem_key)` với `idem_key = <kênh>:<source_id>:<counterparty_ref>`, CHECK kênh ∈ `port.Channels`) + `egress_counter_current` + `egress_anomaly` (một dòng/ngày/khóa). `statement_job`, `statement_snapshot` (bất biến, băm), sổ `statement` (R-56 CHECK, `supersedes_id`), `numeric(18,4)` / `numeric(18,2)` cho tiền | `pf_metering` | `metering_app` |
+| pf | 000083 | **tích hợp DLP** (đã dùng): `pf_notify.notification.kind` thêm `egress_anomaly` (đọc CHECK hiện hành rồi cộng thêm — chạy sau KN 000073 vẫn giữ mọi loại) | `pf_notify` | `notify_app` |
+| pf | 000084 | số tự do tiếp theo (không còn dự phòng riêng của G5) | | |
 | mkg | 000022 | **không dùng ở G5-0**. G5 không có migration vùng mkg (van kiểm ở phía nhận, ADR-0024). Vẫn là số dự phòng G4 | | |
 
 Migration cụm `pf` **không** tham chiếu `mkg_*`, `ts_*`, `vault` (R-07).
@@ -116,8 +118,8 @@ Migration cụm `pf` **không** tham chiếu `mkg_*`, `ts_*`, `vault` (R-07).
 
 | Vai DB | Cụm | Của | Quyền |
 |---|---|---|---|
-| `apiclient_app` | pf | `pf/apiclient` | `USAGE pf_apiclient` (000047); bảng do 000048 |
-| `metering_app` | pf | `pf/metering` | `USAGE pf_metering` (000047); bảng do 000049 |
+| `apiclient_app` | pf | `pf/apiclient` | `USAGE pf_apiclient` (000080); bảng do 000081 |
+| `metering_app` | pf | `pf/metering` | `USAGE pf_metering` (000080); bảng do 000082 |
 | `public_api` | pf | tiến trình `cmd/api-public` | chỉ bảng vận hành schema `shared` qua `ag_shared_user` (idempotency, outbox), như `platform_api`; không quyền nghiệp vụ |
 
 Cả ba là `LOGIN`, thành viên `ag_shared_user`, chỉ `CONNECT ag_pf`. **Không** có quyền xuyên schema. `api-public` đọc module chủ dữ liệu qua `port/`, bằng pool vai của module đó: `cropcycle_app`, `geo_app`, `mrv_app`, `masterdata_app` (tham số k), `party_app` (`GrantLookup`, `RecordRead`). `metering_app` đọc gói hạn mức qua `apiclientport.Plans`, bằng pool `apiclient_app`.
@@ -223,7 +225,7 @@ type Channel: public_api | mrv_package | report_export | valve | partner_share; 
 ### 7.3 `internal/platform/party/port` (thêm, tương thích ngược)
 
 ```go
-const KindDPCollectionVolume, KindDPHubCapacity, KindDPMRVPackageStatus   // ShareKinds mở rộng (pf 000047)
+const KindDPCollectionVolume, KindDPHubCapacity, KindDPMRVPackageStatus   // ShareKinds mở rộng (pf 000080)
 func DataProductKind(product string) string                                  // "dp_" + product
 type GrantLookup interface{ ActiveGrant(ctx, grantee, grantor uuid.UUID, kind string, at time.Time) (ShareGrant, error) }
 ```
@@ -262,13 +264,13 @@ Chưa nối module nào: G5-0 chưa có module. Nhiều agent cùng chạm các 
 
 | Đợt | Nội dung | Migration |
 |---|---|---|
-| **A** `pf/apiclient` + `cmd/api-public` | Sổ khách hàng/khóa/đăng ký/gói hạn mức, Admin API (MFA, R-56); xác thực khóa HMAC + pepper theo phiên bản; giới hạn tần suất; handler ba sản phẩm (kiểm `GrantLookup`, `Validate`, `AG-Data-Contract`); xuất 202 + job + worker; `cmd/api-public` (thoát lỗi khi chưa bật); OpenAPI `admin.yaml` cho route quản trị + `gen:api` | pf 000048 |
-| **M** `pf/metering` | `Ledger.Record` (đóng khi lỗi), bộ đếm, `Quotas`, `Usage`, `Checkpoint.Pass` + bất thường + sự kiện, bảng kê 202 + job + duyệt R-56 + CSV tất định, `RebuildTenant`, metric `ag_egress_*`, `ag_public_*` | pf 000049 |
+| **A** `pf/apiclient` + `cmd/api-public` | Sổ khách hàng/khóa/đăng ký/gói hạn mức, Admin API (MFA, R-56); xác thực khóa HMAC + pepper theo phiên bản; giới hạn tần suất; handler ba sản phẩm (kiểm `GrantLookup`, `Validate`, `AG-Data-Contract`); xuất 202 + job + worker; `cmd/api-public` (thoát lỗi khi chưa bật); OpenAPI `admin.yaml` cho route quản trị + `gen:api` | pf 000081 |
+| **M** `pf/metering` | `Ledger.Record` (đóng khi lỗi), bộ đếm, `Quotas`, `Usage`, `Checkpoint.Pass` + bất thường + sự kiện, bảng kê 202 + job + duyệt R-56 + CSV tất định, `RebuildTenant`, metric `ag_egress_*`, `ag_public_*` | pf 000082 |
 | **S** nguồn sản phẩm | `pf/cropcycle` `CollectionVolumeSource` (k nông hộ qua `pf/geo`), `pf/geo` `HubCapacitySource`, `pf/mrv` `MRVPackageSource`, `pf/party` `GrantLookup` | — |
-| **D** tích hợp DLP | `Guard` ở `pf/reports` (ba lối), `pf/mrv` (yêu cầu + `PackageURL`), ba consumer van, `pf/party` `RecordRead` (P2); consumer `pf.notify.egress_anomaly` | pf 000050 (nếu cần) |
+| **D** tích hợp DLP | `Guard` ở `pf/reports` (ba lối), `pf/mrv` (yêu cầu + `PackageURL`), ba consumer van, `pf/party` `RecordRead` (P2); consumer `pf.notify.egress_anomaly` | pf 000083 (nếu cần) |
 | **H** hạ tầng Phase K | `values-phasek.yaml`, F08/F19 + luồng cấm trong `check_flows.py`, ExternalSecret pepper, middleware ingress, luật `agrigreen-egress.rules.yml`, Valkey (tùy chọn) | — |
 | **W** web | `apps/web-ops`: màn khách hàng API, khóa (hiện bí mật một lần), đăng ký, gói hạn mức, bảng kê, nhật ký xuất / cảnh báo | — |
-| **E** E2E | `TestG5ThirdPartyToStatement` (mục 2 của g5-acceptance), diễn tập bật Phase K bằng cấu hình | pf 000051 (nếu cần) |
+| **E** E2E | `TestG5ThirdPartyToStatement` (mục 2 của g5-acceptance), diễn tập bật Phase K bằng cấu hình | pf 000084 (nếu cần) |
 
 ## 9. Kiểm thử bắt buộc (thêm vào g1-conventions §5)
 
@@ -322,7 +324,7 @@ Mục rà lại khi đánh giá cấp độ (C-2): sự kiện nội bộ MKG (`
 
 ## 11. Quyết định đợt G5-1 D — nguồn sản phẩm, `GrantLookup`, nối DLP (01/10/2026)
 
-Đợt D gộp phần **S** (nguồn sản phẩm, `GrantLookup`) và **D** (nối DLP) của §8. Không dùng migration (pf 000050 vẫn dự phòng). Không đổi hợp đồng đóng băng; chỉ thêm cổng mới `geoport.PlotFacts`.
+Đợt D gộp phần **S** (nguồn sản phẩm, `GrantLookup`) và **D** (nối DLP) của §8. Không dùng migration (số dự phòng DLP về sau dùng cho kind `egress_anomaly` — nay pf 000083). Không đổi hợp đồng đóng băng; chỉ thêm cổng mới `geoport.PlotFacts`.
 
 ### 11.1 `GrantLookup` và sổ đọc (ADR-0020, ADR-0022 §3)
 
@@ -374,7 +376,7 @@ Module nhận `UseEgress(cp, mode[, log])`; `cp == nil` → hành vi cũ, kiểm
 | `cmd/api-public` `integrationPorts` | Nối cổng **thật**, mỗi cổng một pool vai của module chủ (§3.1): `pf/metering` (`metering_app`: `Ledger`, `Quotas`, `Usage`; gói hạn mức qua `apiclient.Plans()`), `GrantLookup` (`party_app`), `CollectionVolumeSource` (`cropcycle_app` + `geo.PlotFacts` + `masterdata.AdminUnits`), `HubCapacitySource` (`geo_app`), `MRVPackageSource` (`mrv_app`), tham số (`masterdata_app`). Đúng 8 vai, kiểm ở `TestPublicAPIRealWiring_G5Integration`. `/readyz` ping thêm pool metering + party. `AG_EGRESS_MODE` đọc ở `api-public` (giá trị lạ → không khởi động) |
 | `GrantLookup` không kéo vault | Gốc module `pf/party` và `party/app` import client kho định danh + handler. Gốc lắp ráp chỉ import gốc module hoặc `port/` (R-02), nên bộ điều hợp chỉ đọc nằm ở **`party/port/grantlookup`** (`grantlookup.New(pool, clk)`: `ActiveGrant` + `ActiveGrantors` cho danh mục). Truy vấn hai phía dùng chung `party/store.VerifiedActive`; `app.Sharing.ActiveGrant` gọi lại gói này (một ngữ nghĩa). Không nới archlint; `TestNoVaultTransitiveDeps_RB3` cấm vault / mkg / `party`, `party/app`, `party/handler` trong `go list -deps` của `cmd/api-public` |
 | Kho tệp xuất | `api-public` đọc tệp xuất từ kho đối tượng để phát luồng: luồng **F29** `api-public` → `external.objectStorage` 443 (mọi hồ sơ, như F08/F19), `AG_S3_*` ở values gốc, khóa **chỉ đọc** riêng `pf-public-s3` (`<remotePrefix>/s3/pf-public`, bật ở `values-phasek.yaml`). `check_flows.py`: F29 phải mở, chỉ 443; khóa S3 chỉ từ `pf-public-s3` (không `pf-s3` ghi) |
-| Consumer `pf.notify.egress_anomaly` | pf/notify, chủ đề toàn tenant **chủ dữ liệu** (tenant phong bì) theo vai `notifyport.EgressAnomalyRoles` = `metering_viewer`, `platform_admin` (**tạm, chờ khách Q5-5**). Loại thông báo `egress_anomaly` — migration **pf 000050** (dùng số dự phòng tích hợp DLP). Hàng đợi tự có trong `assembly.Queues` vì liệt kê từ `notify.Consumers()` |
+| Consumer `pf.notify.egress_anomaly` | pf/notify, chủ đề toàn tenant **chủ dữ liệu** (tenant phong bì) theo vai `notifyport.EgressAnomalyRoles` = `metering_viewer`, `platform_admin` (**tạm, chờ khách Q5-5**). Loại thông báo `egress_anomaly` — migration **pf 000083** (dùng số dự phòng tích hợp DLP). Hàng đợi tự có trong `assembly.Queues` vì liệt kê từ `notify.Consumers()` |
 | Job `apiclient_key_expiry` | `apiclientport.JobKeyExpiry`, `cmd/worker` (leader, mỗi giờ, chạy khi khởi động) chỉ khi đặt `AG_PUBLIC_OPERATOR_TENANT`. `Service.ExpireAllDue` ghi sự kiện `expired` (RB-1) cho khóa quá hạn và khóa `rotated` quá hạn chồng lấn của mọi khách hàng, idempotent |
 | Valkey | **Không làm** adapter: máy dev không có Valkey để kiểm thử tích hợp, nhà cung cấp chờ Q5-10. Ứng viên client `valkey-go` (Apache-2.0) hoặc `go-redis` (BSD-2-Clause), đều trong allowlist. `AG_VALKEY_URL` vẫn chỉ log cảnh báo |
 | Runbook | [public-api-onboarding.md](../runbooks/public-api-onboarding.md) (ADR-0025 §2–3) |
