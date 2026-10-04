@@ -184,6 +184,90 @@ func TestPurgeIdempotency(t *testing.T) {
 	}
 }
 
+// W2.1 (DB-11): dọn shared.ledger_idem ở MỌI cụm (shared/000006 áp cho mọi database),
+// bằng vai job ag_outbox_publisher (chỉ có EXECUTE), chỉ xóa dòng quá hạn.
+func TestPurgeLedgerIdemEveryCluster(t *testing.T) {
+	ctx := context.Background()
+	env := pgtest.Get(t)
+	for _, c := range migrations.Clusters {
+		t.Run(string(c), func(t *testing.T) {
+			owner := env.Pool(t, c, dbadmin.Migrator)
+			pub := env.Pool(t, c, dbadmin.OutboxPublisher)
+			ledgerName := "test.purge_" + ids.New().String()
+			tid := ids.New()
+			for i, exp := range []string{"now() - interval '1 day'", "now() - interval '1 second'", "now() + interval '1 hour'", "DEFAULT"} {
+				if _, err := owner.Exec(ctx, `INSERT INTO shared.ledger_idem (ledger, tenant_id, idem_key, row_id, expires_at)
+				  VALUES ($1, $2, $3, $4, `+exp+`)`, ledgerName, tid, "k"+string(rune('a'+i)), ids.New()); err != nil {
+					t.Fatal(err)
+				}
+			}
+			// Vai job không xóa thẳng được bảng (chỉ qua hàm SECURITY DEFINER).
+			if _, err := pub.Exec(ctx, "DELETE FROM shared.ledger_idem WHERE ledger = $1", ledgerName); err == nil {
+				t.Fatal("ag_outbox_publisher không được có DELETE trực tiếp trên shared.ledger_idem")
+			}
+			r, err := opsjobs.PurgeAllIdempotency(ctx, pub, 1)
+			if err != nil || r.LedgerIdem < 2 {
+				t.Fatalf("phải xóa ít nhất 2 dòng quá hạn: %+v %v", r, err)
+			}
+			var keys []string
+			rows, err := owner.Query(ctx, "SELECT idem_key FROM shared.ledger_idem WHERE ledger = $1 ORDER BY 1", ledgerName)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for rows.Next() {
+				var k string
+				if err := rows.Scan(&k); err != nil {
+					t.Fatal(err)
+				}
+				keys = append(keys, k)
+			}
+			rows.Close()
+			if strings.Join(keys, ",") != "kc,kd" {
+				t.Fatalf("chỉ được xóa dòng quá hạn, còn %v", keys)
+			}
+		})
+	}
+}
+
+// W2.1: sau khi dòng đăng ký quá hạn bị dọn, ghi lại cùng idem_key được nhận như mới.
+func TestLedgerReplayAcceptedAfterPurge(t *testing.T) {
+	ctx := context.Background()
+	env := pgtest.Get(t)
+	owner := env.Pool(t, migrations.MKG, dbadmin.Migrator)
+	pub := env.Pool(t, migrations.MKG, dbadmin.OutboxPublisher)
+	app := env.Pool(t, migrations.MKG, "fieldops_app")
+	tid := ids.New()
+	idem := ids.New().String()
+	write := func() error {
+		return tenant.WithTenantTx(ctx, app, tid, func(tx pgx.Tx) error {
+			_, err := tx.Exec(ctx, `INSERT INTO mkg_fieldops.roll_count
+			  (id, tenant_id, stream_key, plot_ref, htx_ref, rolls, event_time, actor_ref, idem_key, rule_version)
+			  VALUES ($1, $2, 'lot:replay', $3, $4, 1, $5, $6, $7, 'roll_count/v1')`,
+				ids.New(), tid, ids.New(), ids.New(), time.Now().UTC().Add(-time.Hour), ids.New(), idem)
+			return err
+		})
+	}
+	if err := write(); err != nil {
+		t.Fatal(err)
+	}
+	if err := write(); err == nil {
+		t.Fatal("trong hạn phải bị chặn trùng")
+	}
+	if _, err := owner.Exec(ctx, "UPDATE shared.ledger_idem SET expires_at = now() - interval '1 second' WHERE tenant_id = $1 AND idem_key = $2", tid, idem); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := opsjobs.PurgeLedgerIdem(ctx, pub, 5000); err != nil || n < 1 {
+		t.Fatalf("phải dọn dòng quá hạn: %d %v", n, err)
+	}
+	var left int
+	if err := owner.QueryRow(ctx, "SELECT count(*) FROM shared.ledger_idem WHERE tenant_id = $1 AND idem_key = $2", tid, idem).Scan(&left); err != nil || left != 0 {
+		t.Fatalf("dòng đăng ký phải bị xóa: %d %v", left, err)
+	}
+	if err := write(); err != nil {
+		t.Fatalf("sau khi dọn, cùng idem_key phải được nhận như mới: %v", err)
+	}
+}
+
 // migrate maintain chạy lặp an toàn và tạo đúng phần thiếu.
 func TestEnsurePartitionsIdempotent(t *testing.T) {
 	ctx := context.Background()

@@ -75,6 +75,8 @@ DLQ `pf.geo.hub_valve`, `pf.cropcycle.htx_collection_valve`, `pf.mrv.collection_
 
 Hàm `shared.purge_expired_idempotency(batch)` (migration `shared/000002`) xóa theo lô các khóa quá `expires_at` (48 giờ, R-51). Job gọi lặp tới khi lô trả ít hơn `batch`. Log: `event=job.idempotency`, `deleted=<số>`. Bảng phình to thì kiểm log `job.run outcome=error`.
 
+Cùng job (và `migrate purge-idempotency`) dọn luôn `shared.ledger_idem` — sổ đăng ký `idem_key` của bảng sổ, hạn 30 ngày (W2.1, DB-11, ADR-0012) — bằng `shared.purge_expired_ledger_idem(batch)` (migration `shared/000006`). Log: `ledger_idem_deleted=<số>` (worker) hoặc dòng `xóa … idem_key sổ quá 30 ngày` (CronJob). Bản ghi sổ không bị đụng tới. Sau 30 ngày, ghi lại cùng `idem_key` được nhận như bản ghi mới (kể cả khi job chưa chạy) — job trễ chỉ làm bảng phình, không đổi hành vi chống trùng.
+
 ## Chỉ số và cảnh báo (mục 19)
 
 Có khi đặt `AG_OTLP_ENDPOINT`. Ngưỡng dưới đây là đề xuất, chốt khi dựng Alertmanager.

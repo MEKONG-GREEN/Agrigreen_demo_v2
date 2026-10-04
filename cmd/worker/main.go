@@ -9,7 +9,7 @@
 // pg_try_advisory_lock trên kết nối riêng (shared/leader):
 //
 //	anchor       00:30 hằng ngày: neo chuỗi mọi cụm + manifest ký số (mục 8.2)
-//	idempotency  mỗi giờ: xóa Idempotency-Key hết hạn ở mọi cụm (R-51)
+//	idempotency  mỗi giờ: xóa Idempotency-Key hết hạn (R-51) và idem_key sổ quá 30 ngày (W2.1) ở mọi cụm
 //	extension_escalation  mỗi 15 phút: leo thang nhiệm vụ khuyến nông quá SLA lên TTKN tỉnh (KN US-TASK-02)
 //	reports_schedules     mỗi 15 phút: lịch gửi báo cáo định kỳ — mỗi mốc tạo đúng một việc xuất (KN US-DASH-03)
 //	notify_email_digest   mỗi giờ: email tóm tắt chỉ đạo khẩn tới hộp thư công vụ (pf/notify, ADR-0015)
@@ -400,12 +400,14 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			Run: func(ctx context.Context) error {
 				var errs []error
 				for _, c := range clusters {
-					n, err := opsjobs.PurgeIdempotency(ctx, out.pools[c], 5000)
+					// Cả Idempotency-Key HTTP (48 giờ) và idem_key sổ quá 30 ngày (W2.1).
+					r, err := opsjobs.PurgeAllIdempotency(ctx, out.pools[c], 5000)
 					if err != nil {
 						errs = append(errs, err)
 						continue
 					}
-					log.Info("dọn idempotency", "event", "job.idempotency", "cluster", string(c), "deleted", n, "outcome", "ok")
+					log.Info("dọn idempotency", "event", "job.idempotency", "cluster", string(c),
+						"deleted", r.HTTPKeys, "ledger_idem_deleted", r.LedgerIdem, "outcome", "ok")
 				}
 				return errors.Join(errs...)
 			},

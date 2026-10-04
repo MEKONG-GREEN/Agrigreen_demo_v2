@@ -249,6 +249,102 @@ func TestDuplicateIdemKey(t *testing.T) {
 	}
 }
 
+// W2.1 (DB-11, ADR-0012): dòng đăng ký idem_key có hạn mặc định recorded_at + 30 ngày.
+func TestLedgerIdemExpiryDefault(t *testing.T) {
+	ctx := context.Background()
+	owner := pgtest.Get(t).Pool(t, migrations.MKG, dbadmin.Migrator)
+	tid := ids.New()
+	idem := ids.New().String()
+	if err := tenant.WithTenantTx(ctx, appPool(t), tid, func(tx pgx.Tx) error {
+		_, err := insertRoll(ctx, tx, tid, "lot:"+ids.New().String(), idem, 3)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var ttlSec int64
+	if err := owner.QueryRow(ctx, `SELECT extract(epoch FROM expires_at - recorded_at)::bigint
+	    FROM shared.ledger_idem WHERE ledger = $1 AND tenant_id = $2 AND idem_key = $3`, rollCount, tid, idem).Scan(&ttlSec); err != nil {
+		t.Fatal(err)
+	}
+	if ttl := time.Duration(ttlSec) * time.Second; ttl != 30*24*time.Hour {
+		t.Fatalf("hạn chống trùng phải là 30 ngày, nhận %v", ttl)
+	}
+}
+
+// W2.1: trong hạn → ErrDuplicate; hết hạn (dù job dọn chưa chạy) → ghi như bản ghi mới,
+// dòng đăng ký trỏ sang bản ghi mới và có hạn mới; khóa vẫn tra được ở cột idem_key của sổ.
+func TestDuplicateIdemKeyExpiresAfter30Days(t *testing.T) {
+	ctx := context.Background()
+	app := appPool(t)
+	owner := pgtest.Get(t).Pool(t, migrations.MKG, dbadmin.Migrator)
+	tid := ids.New()
+	idem := ids.New().String()
+	stream := "lot:" + ids.New().String()
+	write := func() (uuid.UUID, error) {
+		var id uuid.UUID
+		err := tenant.WithTenantTx(ctx, app, tid, func(tx pgx.Tx) error {
+			var err error
+			id, err = insertRoll(ctx, tx, tid, stream, idem, 5)
+			return err
+		})
+		return id, err
+	}
+	first, err := write()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Gần hết hạn (còn 1 phút) vẫn là trùng.
+	setExpiry := func(expr string) {
+		t.Helper()
+		if _, err := owner.Exec(ctx, `UPDATE shared.ledger_idem SET expires_at = `+expr+`
+		    WHERE ledger = $1 AND tenant_id = $2 AND idem_key = $3`, rollCount, tid, idem); err != nil {
+			t.Fatal(err)
+		}
+	}
+	setExpiry("now() + interval '1 minute'")
+	if _, err := write(); !errors.Is(err, ledger.ErrDuplicate) {
+		t.Fatalf("trong hạn phải là ErrDuplicate, nhận %v", err)
+	}
+	// Quá 30 ngày: nhận như mới.
+	setExpiry("now() - interval '1 second'")
+	second, err := write()
+	if err != nil {
+		t.Fatalf("sau hạn 30 ngày, cùng idem_key phải được nhận như bản ghi mới: %v", err)
+	}
+	var rowID uuid.UUID
+	var leftSec int64
+	if err := owner.QueryRow(ctx, `SELECT row_id, extract(epoch FROM expires_at - now())::bigint
+	    FROM shared.ledger_idem WHERE ledger = $1 AND tenant_id = $2 AND idem_key = $3`, rollCount, tid, idem).Scan(&rowID, &leftSec); err != nil {
+		t.Fatal(err)
+	}
+	if rowID != second || rowID == first || time.Duration(leftSec)*time.Second < 29*24*time.Hour {
+		t.Fatalf("dòng đăng ký phải trỏ bản ghi mới với hạn mới: row=%s first=%s second=%s còn=%ds", rowID, first, second, leftSec)
+	}
+	// Lần ghi mới lại được chống trùng trong 30 ngày tiếp theo.
+	if _, err := write(); !errors.Is(err, ledger.ErrDuplicate) {
+		t.Fatalf("bản ghi mới phải được chống trùng, nhận %v", err)
+	}
+	if err := tenant.WithTenantTx(ctx, app, tid, func(tx pgx.Tx) error {
+		var n int
+		if err := tx.QueryRow(ctx, "SELECT count(*) FROM mkg_fieldops.roll_count WHERE idem_key = $1", idem).Scan(&n); err != nil {
+			return err
+		}
+		if n != 2 {
+			return fmt.Errorf("sổ phải giữ cả hai bản ghi cùng idem_key, có %d", n)
+		}
+		r, err := ledger.Verify(ctx, tx, rollCount, tid, stream)
+		if err != nil {
+			return err
+		}
+		if !r.OK || r.RowsChecked != 2 {
+			return fmt.Errorf("chuỗi: %+v", r)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRecordedAtIsSystemOwned(t *testing.T) {
 	ctx := context.Background()
 	app := appPool(t)

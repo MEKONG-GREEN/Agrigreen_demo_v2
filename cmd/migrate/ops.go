@@ -121,7 +121,8 @@ func verifyChains(ctx context.Context) error {
 
 // purgeIdempotency: như job idempotency của worker (R-51) nhưng chạy một lần, cho vùng
 // không có lịch worker (vd CronJob vùng mkg/vault ở Kubernetes). Vai ag_outbox_publisher,
-// nối thẳng.
+// nối thẳng. Dọn cả shared.idempotency_key (48 giờ) và shared.ledger_idem (30 ngày, W2.1)
+// của từng cụm trong AG_CLUSTERS.
 func purgeIdempotency(ctx context.Context) error {
 	base, err := need("AG_DB_URL")
 	if err != nil {
@@ -141,13 +142,12 @@ func purgeIdempotency(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		total, err := opsjobs.PurgeIdempotency(ctx, pool, batch)
+		r, err := opsjobs.PurgeAllIdempotency(ctx, pool, batch)
+		pool.Close()
+		fmt.Printf("%s: xóa %d Idempotency-Key hết hạn, %d idem_key sổ quá 30 ngày\n", c, r.HTTPKeys, r.LedgerIdem)
 		if err != nil {
-			pool.Close()
 			return fmt.Errorf("%s: %w", c, err)
 		}
-		pool.Close()
-		fmt.Printf("%s: xóa %d Idempotency-Key hết hạn\n", c, total)
 	}
 	return nil
 }

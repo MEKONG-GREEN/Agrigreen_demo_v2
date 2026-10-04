@@ -2,6 +2,7 @@ package opsjobs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -10,14 +11,43 @@ import (
 // PurgeIdempotency xóa khóa Idempotency-Key đã hết hạn theo lô tới khi hết.
 // pool là vai ag_outbox_publisher (BYPASSRLS — xem migration shared/000002).
 func PurgeIdempotency(ctx context.Context, pool *pgxpool.Pool, batch int) (int64, error) {
+	return purgeLoop(ctx, pool, "purge_expired_idempotency", batch)
+}
+
+// PurgeLedgerIdem xóa dòng đăng ký idem_key của sổ (shared.ledger_idem) đã quá hạn
+// 30 ngày theo lô tới khi hết (W2.1, DB-11, ADR-0012). Bản ghi sổ không bị đụng tới;
+// sau hạn, ghi lại cùng idem_key được nhận như bản ghi mới. pool: ag_outbox_publisher
+// (chỉ có EXECUTE trên hàm SECURITY DEFINER — migration shared/000006).
+func PurgeLedgerIdem(ctx context.Context, pool *pgxpool.Pool, batch int) (int64, error) {
+	return purgeLoop(ctx, pool, "purge_expired_ledger_idem", batch)
+}
+
+// PurgeResult là số dòng đã xóa của một lần dọn idempotency trên một cụm.
+type PurgeResult struct {
+	HTTPKeys   int64 // shared.idempotency_key (48 giờ, R-51)
+	LedgerIdem int64 // shared.ledger_idem (30 ngày, W2.1)
+}
+
+// PurgeAllIdempotency dọn cả hai bảng idempotency của một cụm. Lỗi ở bảng đầu
+// không chặn bảng sau; trả số đã xóa từng phần kèm lỗi gộp.
+func PurgeAllIdempotency(ctx context.Context, pool *pgxpool.Pool, batch int) (PurgeResult, error) {
+	var r PurgeResult
+	var err1, err2 error
+	r.HTTPKeys, err1 = PurgeIdempotency(ctx, pool, batch)
+	r.LedgerIdem, err2 = PurgeLedgerIdem(ctx, pool, batch)
+	return r, errors.Join(err1, err2)
+}
+
+// purgeLoop gọi shared.<fn>(batch) lặp tới khi một lô trả ít hơn batch.
+func purgeLoop(ctx context.Context, pool *pgxpool.Pool, fn string, batch int) (int64, error) {
 	if batch <= 0 {
 		batch = 5000
 	}
 	var total int64
 	for {
 		var n int64
-		if err := pool.QueryRow(ctx, "SELECT shared.purge_expired_idempotency($1)", batch).Scan(&n); err != nil {
-			return total, fmt.Errorf("opsjobs: purge_expired_idempotency: %w", err)
+		if err := pool.QueryRow(ctx, "SELECT shared."+fn+"($1)", batch).Scan(&n); err != nil {
+			return total, fmt.Errorf("opsjobs: %s: %w", fn, err)
 		}
 		total += n
 		if n < int64(batch) || ctx.Err() != nil {
