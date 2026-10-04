@@ -1,5 +1,5 @@
 # Lệnh thường dùng (Linux/macOS/CI). Trên Windows: xem docs/dev-setup.md.
-.PHONY: all fmt vet lint gates test test-unit build compose-up compose-down verify-db k8s-check
+.PHONY: all fmt vet lint gates test test-unit build compose-up compose-down verify-db k8s-check docsql
 
 all: fmt vet gates test
 
@@ -37,6 +37,10 @@ compose-down:
 
 verify-db:
 	go run ./cmd/migrate verify
+
+# R-OPS-04: DDL trong tài liệu kiến trúc chạy trên PostgreSQL thật. Cần AG_TEST_PG_ADMIN_URL. Xem docs/dev/docsql.md.
+docsql:
+	go run ./tools/docsql docs/kien-truc/AgriGreen-Thiet-ke-kien-truc-he-thong-v4_1.md
 
 # G4 Kubernetes: helm lint + bảng luồng ADR-0008 (docs/runbooks/k8s-deploy.md mục 8). Windows: deploy/k8s/check.ps1
 k8s-check:

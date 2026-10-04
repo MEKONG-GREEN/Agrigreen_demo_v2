@@ -102,6 +102,9 @@ jobs:
           sleep 1 && pg_isready -h 127.0.0.1 -p 6432
       - name: go test -race
         run: go test -race -count=1 -timeout 40m ./...
+      # R-OPS-04: mọi khối ```sql của tài liệu kiến trúc chạy trên PostgreSQL thật (docs/dev/docsql.md).
+      - name: "Tài liệu kiến trúc: DDL chạy được (docsql)"
+        run: go run ./tools/docsql docs/kien-truc/AgriGreen-Thiet-ke-kien-truc-he-thong-v4_1.md
 
   web-ops:
     name: Web vận hành (Next.js)

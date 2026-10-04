@@ -274,6 +274,7 @@ Nhận xét:
 - G0 v4.1 cần MKG cập nhật trạng thái (H-7). Đề xuất của repo: mốc mới là khi W1.x và W2.1–W2.5 xong.
 
 ## Chuyển đổi kiến trúc v4.1 ([kế hoạch](kien-truc-v4.1-ke-hoach.md))
+- [x] W0.4 (04/10/2026): R-OPS-04 — bản v4.1 trong `docs/kien-truc/`, `go run ./tools/docsql` chạy 9 khối ```sql trên PostgreSQL trong CI (9/9 PASS) ([docs/dev/docsql.md](dev/docsql.md)).
 - [x] W0.3 (04/10/2026): ghi lệch ADR-0006 (C-1 không chặn), ADR-0012 (`chain_head` chung, idempotency 30 ngày qua W2.1), ADR-0017 (không TimescaleDB); ADR-0037 (tách xác thực và phân quyền, không mạo danh — Đề xuất, chờ MKG ký); `docs/design/mkg.md` bốn cửa và bảng kê song phương; dẫn chiếu v3.0 → v4.1 trong `docs/dev/g*-conventions.md`; bảng cổng v4.1 ↔ cổng repo ở trên.
 - [x] W0.2 (04/10/2026): ADR-0032…0036 — đơn vị hành chính có hiệu lực + kế thừa, cổng tích hợp `integration-gateway` (MKG như mọi đối tác), luồng song phương, cấp phép tổng hợp theo xã có k, engine ba chế độ + `lib/optcore` ([docs/adr](adr/README.md)); Đề xuất, chờ MKG ký (A7), ADR-0034 chờ thêm C-12.
 - [x] W1.1 (04/10/2026): `module.yaml` cho 26 module, `internal/shared/modreg`, `go run ./tools/modgen -check` ([docs/dev/modules.md](dev/modules.md)).
