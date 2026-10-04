@@ -1,0 +1,19 @@
+# Tệp khai báo ứng dụng — ADR-0027 mục 3, kiến trúc v4.1 §7.2, docs/dev/modules.md#ứng-dụng-appyaml-w13.
+# Viết tay; kiểm bằng go run ./tools/modgen -check.
+app: NH
+description: Nông hộ — nông dân xem hộ, thửa, vụ, nhật ký, tài liệu và gửi yêu cầu hỗ trợ (chế độ nông dân của app HTX; Zalo Mini App sau)
+modules:
+  pf/accounts: ">=1.0 <2"      # /v1/farmer/* (hộ của tôi, cán bộ HTX)
+  pf/content: ">=1.0 <2"
+  pf/cropcycle: ">=1.0 <2"
+  pf/extension: ">=1.0 <2"     # yêu cầu hỗ trợ
+  pf/geo: ">=1.0 <2"
+  pf/masterdata: ">=1.0 <2"
+  pf/notify: ">=1.0 <2"
+  pf/party: ">=1.0 <2"
+  pf/sync: ">=1.0 <2"
+  vault/identity: ">=1.0 <2"   # định danh nông hộ (vai farmer khai ở vault/identity), cụm riêng
+roles: [farmer]
+deployment_units: [api-platform, worker, identity-vault]
+frontends: [apps/htx-app]
+clients: [agrigreen-htx-app]

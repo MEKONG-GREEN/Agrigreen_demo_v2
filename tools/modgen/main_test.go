@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 // TestRepoUpToDate là cổng W1.1: module.yaml trong repo khớp mã nguồn và migration.
 func TestRepoUpToDate(t *testing.T) {
@@ -10,6 +13,40 @@ func TestRepoUpToDate(t *testing.T) {
 	}
 	if len(stale) > 0 {
 		t.Fatalf("module.yaml lỗi thời, chạy go run ./tools/modgen: %v", stale)
+	}
+}
+
+// TestWiredModules: ghép trong tiến trình tính từ import của cmd/<đơn vị> (không tính port/,
+// client/; theo cả cmd/internal/*).
+func TestWiredModules(t *testing.T) {
+	wired, err := wiredModules("../..", []string{"api-platform", "api-public", "identity-vault", "ingest", "migrate"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	has := func(u, m string) bool { return slices.Contains(wired[u], m) }
+	if !has("api-platform", "pf/party") || !has("api-platform", "pf/sync") || has("api-platform", "vault/identity") {
+		t.Errorf("api-platform: %v (vault/identity chỉ qua client/, không ghép)", wired["api-platform"])
+	}
+	if !has("api-public", "pf/apiclient") || has("api-public", "pf/party") {
+		t.Errorf("api-public: %v (pf/party chỉ qua port/)", wired["api-public"])
+	}
+	if !has("identity-vault", "vault/identity") || !has("ingest", "mkg/measurement") || len(wired["migrate"]) != 0 {
+		t.Errorf("wired = %v", wired)
+	}
+}
+
+func TestInProcess(t *testing.T) {
+	cases := map[string]bool{
+		"internal/platform/party":                 true,
+		"internal/mkg/measurement/ingest":         true,
+		"internal/platform/geo/port/farmerid":     false,
+		"internal/vault/identity/client":          false,
+		"internal/vault/identity/client/clientmt": false,
+	}
+	for in, want := range cases {
+		if got := inProcess(in); got != want {
+			t.Errorf("inProcess(%q) = %v", in, got)
+		}
 	}
 }
 

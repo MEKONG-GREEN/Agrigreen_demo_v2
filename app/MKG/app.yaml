@@ -1,0 +1,34 @@
+# Tệp khai báo ứng dụng — ADR-0027 mục 3, kiến trúc v4.1 §7.2, docs/dev/modules.md#ứng-dụng-appyaml-w13.
+# Viết tay; kiểm bằng go run ./tools/modgen -check.
+app: MKG
+description: Vận hành nội bộ Mekong Green (vùng mkg) — hub/kho, cân và đối soát, gom, điều vận, bán hàng, giá thành, cầu nối kế toán
+modules:
+  mkg/acctbridge: ">=1.0 <2"
+  mkg/costing: ">=1.0 <2"
+  mkg/fieldops: ">=1.0 <2"
+  mkg/hub: ">=1.0 <2"
+  mkg/logistics: ">=1.0 <2"
+  mkg/measurement: ">=1.0 <2"
+  mkg/orders: ">=1.0 <2"
+roles:
+  - hub_operator
+  - hub_approver
+  - scale_supervisor
+  - device_approver
+  - reconciliation_officer
+  - dispute_officer
+  - tolerance_approver
+  - field_collector
+  - field_supervisor
+  - dispatcher
+  - driver
+  - sales_officer
+  - sales_approver
+  - cost_accountant
+  - period_closer
+  - chief_accountant
+  - accounting_bridge_operator
+  - mkg_sync # tài khoản dịch vụ agrigreen-mkg-sync đọc /v1/partner/* của nền tảng
+deployment_units: [api-internal, worker-internal, ingest, edge-agent, rebuilddrill]
+frontends: [apps/web-internal, apps/mkg-field-app]
+clients: [agrigreen-web-internal, agrigreen-mkg-field-app, agrigreen-mkg-sync]

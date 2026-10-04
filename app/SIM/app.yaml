@@ -1,0 +1,19 @@
+# Tệp khai báo ứng dụng — ADR-0027 mục 3, kiến trúc v4.1 §7.2, docs/dev/modules.md#ứng-dụng-appyaml-w13.
+# Viết tay; kiểm bằng go run ./tools/modgen -check.
+app: SIM
+description: Mô phỏng chọn hub (dom/hubsim) và mạng đường thủy (dom/waterway)
+modules:
+  pf/accounts: ">=1.0 <2"
+  pf/cropcycle: ">=1.0 <2"     # mô hình cung từ vụ
+  pf/geo: ">=1.0 <2"           # kho/hub và dung lượng
+  pf/masterdata: ">=1.0 <2"
+  pf/simulation: ">=1.0 <2"    # /v1/simulations, /v1/candidate-hubs, /v1/scenarios
+  pf/waterway: ">=1.0 <2"
+roles: [simulation_analyst, waterway_editor, waterway_publisher]
+landing:
+  simulation_analyst: /mo-phong
+  waterway_editor: /quan-tri/thuy-he
+  waterway_publisher: /quan-tri/thuy-he
+deployment_units: [api-platform, worker]
+frontends: [apps/web-ops]
+clients: [agrigreen-web-ops]

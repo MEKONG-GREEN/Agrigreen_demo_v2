@@ -1,0 +1,38 @@
+# Tệp khai báo ứng dụng — ADR-0027 mục 3, kiến trúc v4.1 §7.2, docs/dev/modules.md#ứng-dụng-appyaml-w13.
+# Viết tay; kiểm bằng go run ./tools/modgen -check.
+app: KN
+description: Khuyến nông TW/Tỉnh/Xã (bề mặt KN v7.7 của web-ops, gồm phòng ban Trồng trọt; app hiện trường)
+modules:
+  pf/accounts: ">=1.0 <2"      # ngữ cảnh phiên KN (P1, /v1/me), tài khoản cán bộ
+  pf/content: ">=1.0 <2"       # thư viện số, tài liệu (/v1/documents, /v1/library)
+  pf/cropcycle: ">=1.0 <2"     # xem mùa vụ HTX trong phạm vi (dom/cooperative shared-read)
+  pf/extdata: ">=1.0 <2"       # lớp dữ liệu ngoài của bản đồ GIS
+  pf/extension: ">=1.0 <2"     # nhiệm vụ, chỉ đạo, phòng ban (dom/extension)
+  pf/geo: ">=1.0 <2"           # bản đồ khuyến nông, /v1/kn/* của geo
+  pf/masterdata: ">=1.0 <2"
+  pf/mrv: ">=1.0 <2"           # đối chiếu HTX ↔ KN (KN US-MRV-02), thu thập MRV ở app hiện trường
+  pf/notify: ">=1.0 <2"
+  pf/party: ">=1.0 <2"         # menu KN (/v1/menu), cây tổ chức, phòng ban, HTX/hộ trong phạm vi
+  pf/reports: ">=1.0 <2"       # biểu mẫu, kỳ báo cáo (cap/forms, cap/export)
+  pf/sync: ">=1.0 <2"          # đồng bộ ngoại tuyến của app hiện trường
+roles:
+  - kn_national_admin
+  - kn_province_admin
+  - kn_officer
+  - kn_user
+  - content_editor_national
+  - content_editor_province
+  - content_reviewer
+  - mrv_collector
+  - mrv_reviewer
+  - mrv_viewer
+  - mrv_exporter
+context_roles: [kn_tw, kn_tinh, kn_xa, admin] # vai gán KN (internal/shared/authz/kn.go), không phải vai realm
+landing: # FN-CH-00.01: accounts/domain.DefaultRoute, party/domain.defaultRoutes
+  kn_tw: /kn/dashboard
+  kn_tinh: /kn/dashboard
+  kn_xa: /kn/nhiem-vu/cong-viec
+  admin: /kn/tong-quan
+deployment_units: [api-platform, worker, formimport]
+frontends: [apps/web-ops, apps/field-app]
+clients: [agrigreen-web-ops, agrigreen-field-app]

@@ -83,3 +83,40 @@ Tình trạng lúc W1.2 (04/10/2026), 118 mục:
 | `schema` | 17 — migration tích hợp G3/G4/G5 nhiều schema (mkg 000010, 000014, 000020, 000021; pf 000080); pf 000034 (`pf/sync`) và 000045 (`pf/mrv`) sửa CHECK `pf_notify.notification`; pf 000078 (`pf/mechanization`) đụng `pf_party` | W7.1 (migration theo schema; tệp đã áp không sửa được, R-23) |
 
 Gợi ý tầng (chưa áp, cần sửa ADR-0027): `pf/metering` (`dom/metering`) là điểm kiểm soát xuất dữ liệu duy nhất, được `party`, `apiclient`, `geo`, `notify`, `reports` gọi, còn nó chỉ phụ thuộc `apiclient` (kernel) và `masterdata` (capability). Chuyển sang `kind: capability` (`cap/metering`) gỡ 3 cạnh `tier` (`geo`, `notify`, `reports` → `metering`) mà không thêm cạnh đi lên nào; `kernel` gỡ cả 5 nhưng sinh cạnh đi lên mới `metering` → `masterdata`.
+
+## Ứng dụng: `app.yaml` (W1.3)
+
+Ứng dụng (ADR-0027 mục 3, v4.1 §7.2) là tổ hợp module người dùng thấy, khai ở `app/<APP>/app.yaml`, viết tay. Đủ bảy ứng dụng: `KN`, `HTX`, `CGH`, `SIM`, `MKG`, `NH`, `PF`. Đơn vị triển khai là nhị phân `cmd/<đơn vị>`; một đơn vị phục vụ nhiều ứng dụng. Thư mục `app/` (khai báo) khác `apps/` (mã giao diện).
+
+| Trường | Bắt buộc | Kiểm |
+|---|---|---|
+| `app` | có | thuộc bảy tên, trùng tên thư mục |
+| `description` | có | không rỗng |
+| `modules` | có | tên module repo → ràng buộc phiên bản; module có `module.yaml`, ràng buộc thỏa `version`. Không dùng ký tự đại diện (`k/*` của v4.1) |
+| `roles` | có | vai realm (seed vai, R-MOD-07); phải có trong `deploy/compose/keycloak/agrigreen-realm.json` |
+| `context_roles` | không | vai ngữ cảnh phiên không phải vai realm (KN P1: `kn_tw`, `kn_tinh`, `kn_xa`, `admin`) |
+| `landing` | không | vai (thuộc `roles` hoặc `context_roles`) → trang đích, bắt đầu bằng `/` |
+| `deployment_units` | có | có `cmd/<đơn vị>/main.go` |
+| `frontends` | không | thư mục `apps/<x>` có thật |
+| `clients` | không | client OIDC có trong realm |
+
+`go run ./tools/modgen -check` (và `go test ./tools/modgen`, `./internal/shared/modreg`) kiểm thêm, không có ngoại lệ:
+
+- mỗi `cmd/<đơn vị>` chỉ **ghép** module thuộc hợp `modules` của các ứng dụng liệt kê nó trong `deployment_units`. "Ghép" là mã không phải kiểm thử của `cmd/<đơn vị>` (kể cả `cmd/internal/*` nó import) import gói của module **trừ** `port/` và vault `client/`: port là hợp đồng, client của vault là gọi mạng sang cụm khác;
+- mọi `cmd/<đơn vị>` có `main.go` phải được ít nhất một ứng dụng liệt kê (cả job vận hành: `migrate`, `objsync`, `drill`, …);
+- mọi module có `module.yaml` thuộc ít nhất một ứng dụng;
+- mỗi module của một ứng dụng được ít nhất một đơn vị của ứng dụng đó ghép.
+
+Lúc W1.3 (04/10/2026):
+
+| App | Module | Đơn vị | Giao diện |
+|---|---|---|---|
+| KN | 12 | `api-platform`, `worker`, `formimport` | `web-ops` (KN v7.7, gồm phòng ban Trồng trọt), `field-app` |
+| HTX | 11 | `api-platform`, `worker` | `htx-app`, `web-ops` `/htx` |
+| NH | 10 (gồm `vault/identity`) | `api-platform`, `worker`, `identity-vault` | `htx-app` (chế độ nông dân) |
+| CGH | 6 | `api-platform`, `worker`, `drill` | `web-ops` `/cgh` |
+| SIM | 6 | `api-platform`, `worker` | `web-ops` `/mo-phong`, `/quan-tri/thuy-he` |
+| MKG | 7 (`mkg/*`) | `api-internal`, `worker-internal`, `ingest`, `edge-agent`, `rebuilddrill` | `web-internal`, `mkg-field-app` |
+| PF | 15 | `api-platform`, `api-public`, `worker`, `identity-vault`, `outbox-publisher`, `migrate`, `objsync`, `drill`, `seed-synthetic` | `web-ops` `/quan-tri` |
+
+Danh sách module lấy từ menu `web-ops` (`src/nav/nav.ts`), tiền tố API mà `web-ops`, `field-app`, `htx-app`, `mkg-field-app`, `web-internal` gọi, và import của `cmd/*`. `landing` KN lấy từ `accounts/domain.DefaultRoute` (trùng `party/domain` menu); các vai khác theo `homeFor` của `web-ops`. Phòng ban KN là cấu hình của `pf/extension`, không phải module (ADR-0027 mục 6). Bật module theo đơn vị là W1.4.

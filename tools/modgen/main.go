@@ -14,6 +14,10 @@
 // Trường TAY (name, aka, kind, zones, version, shares, enable) giữ nguyên. Tệp chưa
 // có được tạo khung; kind/zones/enable phải điền tay rồi chạy lại.
 //
+// Sau đó kiểm app/*/app.yaml (W1.3, viết tay, không sinh): đủ bảy ứng dụng, tham chiếu
+// đúng (module, phiên bản, vai/client realm, cmd/*, apps/*) và mỗi cmd/<đơn vị> chỉ ghép
+// module thuộc hợp `modules` của các ứng dụng liệt kê nó trong deployment_units.
+//
 // Chạy: go run ./tools/modgen [-check] [-root .]
 package main
 
@@ -149,10 +153,120 @@ func run(root string, check bool) ([]string, error) {
 	if !check {
 		stale = nil
 	}
-	if _, err := modreg.New(all); err != nil {
+	reg, err := modreg.New(all)
+	if err != nil {
 		return stale, fmt.Errorf("module.yaml không hợp lệ:\n%w", err)
 	}
+	if err := checkApps(root, reg); err != nil {
+		return stale, err
+	}
 	return stale, nil
+}
+
+// checkApps là cổng W1.3: app/*/app.yaml hợp lệ, đủ bảy ứng dụng, và mỗi cmd/<đơn vị>
+// chỉ ghép module thuộc hợp các app.yaml liệt kê nó (modreg.Apps.CheckAssembly).
+func checkApps(root string, reg *modreg.Registry) error {
+	fsys := os.DirFS(root)
+	apps, env, err := modreg.LoadApps(fsys, reg)
+	if err != nil {
+		return fmt.Errorf("app.yaml không hợp lệ:\n%w", err)
+	}
+	var errs []error
+	for _, n := range modreg.AppNames {
+		if _, ok := apps.Get(n); !ok {
+			errs = append(errs, fmt.Errorf("thiếu app/%s/%s", n, modreg.AppFileName))
+		}
+	}
+	units := make([]string, 0, len(env.Units))
+	for u := range env.Units {
+		units = append(units, u)
+	}
+	wired, err := wiredModules(root, units)
+	if err != nil {
+		return err
+	}
+	errs = append(errs, apps.CheckAssembly(reg, wired)...)
+	if err := errors.Join(errs...); err != nil {
+		return fmt.Errorf("app.yaml không khớp cmd/*:\n%w", err)
+	}
+	return nil
+}
+
+// wiredModules trả đơn vị → module được ghép TRONG TIẾN TRÌNH: mã không phải kiểm thử của
+// cmd/<đơn vị> (kể cả gói cmd/internal/* nó import, bắc cầu) import gói của module mà không
+// phải port/ hay client/ (port là hợp đồng; client của vault là gọi qua mạng sang cụm khác).
+func wiredModules(root string, units []string) (map[string][]string, error) {
+	out := map[string][]string{}
+	for _, u := range units {
+		mods := map[string]bool{}
+		seen := map[string]bool{}
+		queue := []string{"cmd/" + u}
+		for len(queue) > 0 {
+			dir := queue[0]
+			queue = queue[1:]
+			if seen[dir] {
+				continue
+			}
+			seen[dir] = true
+			imps, err := dirImports(root, dir, dir == "cmd/"+u)
+			if err != nil {
+				return nil, err
+			}
+			for _, ip := range imps {
+				rel, ok := strings.CutPrefix(ip, modulePath+"/")
+				if !ok {
+					continue
+				}
+				if strings.HasPrefix(rel, "cmd/internal/") {
+					queue = append(queue, rel)
+					continue
+				}
+				if m := moduleOf(ip); m != "" && inProcess(rel) {
+					mods[m] = true
+				}
+			}
+		}
+		out[u] = keys(mods)
+	}
+	return out, nil
+}
+
+// inProcess: đường dẫn internal/<vùng>/<module>[/gói] không thuộc port/ hay client/.
+func inProcess(rel string) bool {
+	parts := strings.Split(rel, "/")
+	return len(parts) < 4 || (parts[3] != "port" && parts[3] != "client")
+}
+
+// dirImports trả import của các tệp .go không phải kiểm thử trong dir (đệ quy nếu recursive,
+// bỏ testdata).
+func dirImports(root, dir string, recursive bool) ([]string, error) {
+	var out []string
+	fset := token.NewFileSet()
+	base := filepath.Join(root, filepath.FromSlash(dir))
+	err := filepath.WalkDir(base, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if p != base && (!recursive || d.Name() == "testdata") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
+			return nil
+		}
+		f, err := parser.ParseFile(fset, p, nil, parser.ImportsOnly)
+		if err != nil {
+			return err
+		}
+		for _, imp := range f.Imports {
+			ip, _ := strconv.Unquote(imp.Path.Value)
+			out = append(out, ip)
+		}
+		return nil
+	})
+	return out, err
 }
 
 func normalizeEOL(b []byte) []byte { return bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n")) }

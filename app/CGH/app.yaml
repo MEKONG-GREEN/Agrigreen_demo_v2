@@ -1,0 +1,17 @@
+# Tệp khai báo ứng dụng — ADR-0027 mục 3, kiến trúc v4.1 §7.2, docs/dev/modules.md#ứng-dụng-appyaml-w13.
+# Viết tay; kiểm bằng go run ./tools/modgen -check.
+app: CGH
+description: Cơ giới hóa — Bản đồ CGH cho Cục KTHT, cân đối máy theo vùng, xuất báo cáo CGH
+modules:
+  pf/accounts: ">=1.0 <2"
+  pf/geo: ">=1.0 <2"
+  pf/masterdata: ">=1.0 <2"
+  pf/mechanization: ">=1.0 <2" # dom/mechanization
+  pf/party: ">=1.0 <2"         # số máy theo HTX (CoopMachineCounts)
+  pf/reports: ">=1.0 <2"       # xuất báo cáo CGH (FN-11)
+roles: [cgh_viewer, cgh_admin, cgh_sync]
+landing:
+  cgh_viewer: /cgh # web-ops homeFor: cấp Cục → /cgh
+deployment_units: [api-platform, worker, drill] # drill tính lại kỳ cân đối CGH khi diễn tập phục hồi
+frontends: [apps/web-ops]
+clients: [agrigreen-web-ops]

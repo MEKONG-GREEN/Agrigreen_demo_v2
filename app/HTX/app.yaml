@@ -1,0 +1,27 @@
+# Tệp khai báo ứng dụng — ADR-0027 mục 3, kiến trúc v4.1 §7.2, docs/dev/modules.md#ứng-dụng-appyaml-w13.
+# Viết tay; kiểm bằng go run ./tools/modgen -check.
+app: HTX
+description: Hợp tác xã — quản lý HTX, nông hộ, lô ruộng, mùa vụ, nhật ký, sản lượng (app HTX và nhóm /htx của web-ops)
+modules:
+  pf/accounts: ">=1.0 <2"      # tài khoản nông dân do HTX cấp (/v1/farmer-accounts)
+  pf/content: ">=1.0 <2"       # tài liệu, SOP
+  pf/cropcycle: ">=1.0 <2"     # mùa vụ, nhật ký, sản lượng, phê duyệt
+  pf/extension: ">=1.0 <2"     # yêu cầu hỗ trợ gửi khuyến nông
+  pf/geo: ">=1.0 <2"           # lô ruộng, ranh giới
+  pf/masterdata: ">=1.0 <2"
+  pf/mrv: ">=1.0 <2"           # hồ sơ MRV phía HTX
+  pf/notify: ">=1.0 <2"
+  pf/party: ">=1.0 <2"         # HTX, nông hộ, đồng ý (/v1/cooperatives, /v1/households, /v1/consents)
+  pf/reports: ">=1.0 <2"       # lịch gửi báo cáo của quản lý HTX
+  pf/sync: ">=1.0 <2"          # đồng bộ ngoại tuyến của app HTX
+roles:
+  - coop_manager
+  - plot_editor
+  - plot_viewer
+  - consent_writer
+  - consent_reader
+landing:
+  coop_manager: /htx/dashboard # web-ops homeFor: mục đầu tiên coop_manager thấy
+deployment_units: [api-platform, worker]
+frontends: [apps/htx-app, apps/web-ops]
+clients: [agrigreen-htx-app, agrigreen-web-ops]

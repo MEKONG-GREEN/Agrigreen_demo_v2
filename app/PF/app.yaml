@@ -1,0 +1,66 @@
+# Tệp khai báo ứng dụng — ADR-0027 mục 3, kiến trúc v4.1 §7.2, docs/dev/modules.md#ứng-dụng-appyaml-w13.
+# Viết tay; kiểm bằng go run ./tools/modgen -check.
+app: PF
+description: Quản trị và vận hành nền tảng — tài khoản, danh mục, tham số, tổ chức, bản đồ, chỉ số, đồng bộ, Public API và đo đếm, kho định danh, job vận hành
+modules:
+  pf/accounts: ">=1.0 <2"      # tài khoản cán bộ
+  pf/apiclient: ">=1.0 <2"     # khách hàng Public API (Admin API, api-public)
+  pf/content: ">=1.0 <2"
+  pf/cropcycle: ">=1.0 <2"     # quy trình SOP; dữ liệu vụ của Public API
+  pf/extdata: ">=1.0 <2"
+  pf/geo: ">=1.0 <2"           # nhập thửa, biên tập bản đồ, quy chuẩn hiển thị; map_consumer
+  pf/masterdata: ">=1.0 <2"    # danh mục, tham số có phê duyệt
+  pf/metering: ">=1.0 <2"      # sử dụng Public API, bảng kê, nhật ký xuất
+  pf/metrics: ">=1.0 <2"       # định nghĩa chỉ số
+  pf/mrv: ">=1.0 <2"           # phương pháp ước tính MRV; dữ liệu MRV của Public API
+  pf/notify: ">=1.0 <2"
+  pf/party: ">=1.0 <2"         # cơ cấu tổ chức, nhập nông hộ, cấp quyền chia sẻ
+  pf/reports: ">=1.0 <2"       # mẫu và lịch báo cáo
+  pf/sync: ">=1.0 <2"          # giám sát đồng bộ, xung đột, thiết bị
+  vault/identity: ">=1.0 <2"   # kho định danh
+roles:
+  - platform_admin
+  - param_setter
+  - param_approver
+  - masterdata_admin
+  - reports_admin
+  - registry_admin
+  - account_admin
+  - account_admin_province
+  - sop_admin
+  - geo_admin
+  - metrics_viewer
+  - device_admin
+  - sync_conflict_resolver
+  - api_client_admin
+  - api_client_approver
+  - metering_viewer
+  - billing_officer
+  - billing_approver
+  - map_consumer
+  - vault_registrar
+  - vault_display
+  - vault_evidence_viewer
+  - vault_eraser
+  - vault_pubkey_sync
+landing: # web-ops homeFor: mục đầu tiên vai thấy
+  platform_admin: /
+  account_admin: /quan-tri/tai-khoan
+  account_admin_province: /quan-tri/tai-khoan
+  masterdata_admin: /quan-tri/danh-muc
+  registry_admin: /quan-tri/to-chuc
+  geo_admin: /quan-tri/nhap-thua
+  api_client_admin: /quan-tri/khach-hang-api
+  metering_viewer: /quan-tri/su-dung-api
+deployment_units:
+  - api-platform
+  - api-public
+  - worker
+  - identity-vault
+  - outbox-publisher
+  - migrate
+  - objsync
+  - drill
+  - seed-synthetic
+frontends: [apps/web-ops]
+clients: [agrigreen-web-ops, agrigreen-accounts, agrigreen-api, agrigreen-seed, agrigreen-tms]
