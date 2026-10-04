@@ -1,6 +1,6 @@
 # ADR-0016: Giấy phép phụ thuộc Python của optimizer
 
-**Trạng thái:** Đề xuất · **Ngày:** 29/09/2026 · **Thành phần:** `optimizer/` (Python 3.12, pf/simulation), `deploy/policies/allowed-licenses.txt`
+**Trạng thái:** Đề xuất · Bổ sung bởi [ADR-0036](0036-engine-ba-che-do-vung-noi-bo-optcore.md) (đề xuất: áp cho `lib/optcore` và engine nội bộ) · **Ngày:** 29/09/2026 · **Thành phần:** `optimizer/` (Python 3.12, pf/simulation), `deploy/policies/allowed-licenses.txt`
 
 ## Bối cảnh
 

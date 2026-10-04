@@ -17,23 +17,28 @@
 | 0013 | [Quan sát: trace_id từ G0, OTLP từ G1](0013-quan-sat-otlp.md) | Chấp nhận — đã hiện thực OTLP ở G1 |
 | 0014 | [Thư viện xuất Excel/PDF và giấy phép phông chữ nhúng](0014-thu-vien-xuat-bao-cao-va-phong-chu.md) | Đề xuất |
 | 0015 | [Kênh đẩy thông báo và RB-7](0015-kenh-day-thong-bao-rb7.md) | Đề xuất — đã hiện thực ở pf/notify |
-| 0016 | [Giấy phép phụ thuộc Python của optimizer](0016-giay-phep-python.md) | Đề xuất |
+| 0016 | [Giấy phép phụ thuộc Python của optimizer](0016-giay-phep-python.md) | Đề xuất — bổ sung bởi ADR-0036 (đề xuất) |
 | 0017 | [Kho chuỗi thời gian — PostgreSQL phân vùng tháng ở cụm `ts`](0017-kho-chuoi-thoi-gian.md) | Đề xuất — hiện thực ở G3-0 |
 | 0018 | [Sự kiện nội bộ MKG — vhost RabbitMQ `mkg.internal` (Q-MKG-01)](0018-su-kien-noi-bo-mkg.md) | Đề xuất — hiện thực ở G3-0 |
 | 0019 | [Định danh thiết bị cân, ký tại nguồn và đồng hồ](0019-dinh-danh-thiet-bi-va-dong-ho.md) | Đề xuất — hợp đồng dây đóng băng ở G3-0 |
-| 0020 | [Liên thông nền tảng ↔ MKG khác tenant bằng cấp quyền chia sẻ (RB-2, Q-MKG-12)](0020-lien-thong-platform-mkg-khac-tenant.md) | Chấp nhận — chủ sản phẩm chốt 29–30/09/2026; hiện thực ở pf 000042; sửa đổi bởi ADR-0030 (đề xuất) |
+| 0020 | [Liên thông nền tảng ↔ MKG khác tenant bằng cấp quyền chia sẻ (RB-2, Q-MKG-12)](0020-lien-thong-platform-mkg-khac-tenant.md) | Chấp nhận — chủ sản phẩm chốt 29–30/09/2026; hiện thực ở pf 000042; sửa đổi bởi ADR-0030, ADR-0033, ADR-0034 (đề xuất) |
 | 0021 | [Hạ tầng Kubernetes G4 — operator, PKI, bí mật và tách vùng bằng cấu hình](0021-ha-tang-kubernetes-g4.md) | Đề xuất — hiện thực ở G4 (`deploy/k8s`, `deploy/iac`) |
-| 0022 | [Public API cho bên thứ ba — đơn vị triển khai riêng, khóa API lưu băm, scope, quota](0022-public-api-ben-thu-ba.md) | Đề xuất — nền móng G5-0 |
+| 0022 | [Public API cho bên thứ ba — đơn vị triển khai riêng, khóa API lưu băm, scope, quota](0022-public-api-ben-thu-ba.md) | Đề xuất — nền móng G5-0; sửa đổi bởi ADR-0033, ADR-0035 (đề xuất) |
 | 0023 | [`pf/metering` — sổ đo lường sử dụng là chứng từ, bộ đếm hạn mức, bảng kê theo kỳ](0023-so-do-luong-su-dung-metering.md) | Đề xuất — nền móng G5-0 |
 | 0024 | [Một điểm kiểm soát xuất dữ liệu (DLP) cho van, Public API, gói MRV, báo cáo](0024-diem-kiem-soat-xuat-du-lieu-dlp.md) | Đề xuất — nền móng G5-0 |
-| 0025 | [Hồ sơ cấp phát Phase K — cấu hình, số bản sao, tenant bên thứ ba, đơn vị thẩm định](0025-ho-so-cap-phat-phase-k.md) | Đề xuất — nền móng G5-0 |
+| 0025 | [Hồ sơ cấp phát Phase K — cấu hình, số bản sao, tenant bên thứ ba, đơn vị thẩm định](0025-ho-so-cap-phat-phase-k.md) | Đề xuất — nền móng G5-0; sửa đổi bởi ADR-0033 (đề xuất) |
 | 0026 | [Xuất bản báo cáo tổng hợp sang Google Sheets (Báo cáo Chi cục KN v7.7, RB-7)](0026-xuat-google-sheets.md) | Đề xuất — bộ chuyển tắt mặc định, chờ khách Q-14 |
 | 0027 | [Bốn tầng module khai trong tệp khai báo, ứng dụng là tổ hợp, gọi trong tiến trình](0027-bon-tang-module-tep-khai-bao.md) | Đề xuất — chờ MKG ký (A7); hiện thực W1.x |
 | 0028 | [Một vai đăng nhập mỗi đơn vị triển khai, `SET LOCAL ROLE r_<module>`](0028-vai-dang-nhap-theo-don-vi-trien-khai.md) | Đề xuất — chờ MKG ký (A7); hiện thực W2.3, W2.6 |
 | 0029 | [`k_ref` — bản chiếu chỉ đọc của dữ liệu lõi trong mỗi cụm, trễ ≤ 5 s](0029-k-ref-ban-chieu-loi-moi-cum.md) | Đề xuất — chờ MKG ký (A7); hiện thực W2.4, W2.5 |
 | 0030 | [Chia sẻ trong vùng nền tảng là đọc tại chỗ có cấp phép, qua RLS `share_scope`](0030-doc-tai-cho-co-cap-phep.md) | Đề xuất — chờ MKG ký (A7), H-1 còn mở; sửa ADR-0005, 0009, 0020; hiện thực W3.4, W4.1, W4.2 |
 | 0031 | [Vai tổng hợp `r_agg` và view công bố, ngưỡng k](0031-vai-tong-hop-r-agg.md) | Đề xuất — chờ MKG ký (A7), k `[KÝ]`; hiện thực W6.3, W6.4 |
+| 0032 | [Đơn vị hành chính có hiệu lực, ràng buộc loại trừ và bảng kế thừa](0032-don-vi-hanh-chinh-co-hieu-luc-va-ke-thua.md) | Đề xuất — chờ MKG ký (A7), nạp production chờ C-9 (H-16); hiện thực W2.2 |
+| 0033 | [Cổng tích hợp `cmd/integration-gateway` — MKG như mọi đối tác, feed cursor, nạp theo lô, webhook mỏng](0033-cong-tich-hop-mkg-nhu-moi-doi-tac.md) | Đề xuất — chờ MKG ký (A7, H-3); sửa ADR-0020, 0022, 0025; hiện thực W5.1–W5.10 |
+| 0034 | [Luồng song phương — chỉ hai bên của giao dịch thấy](0034-luong-song-phuong.md) | Đề xuất — chờ MKG ký (A7) và chờ C-12 (H-2); sửa ADR-0020; hiện thực W5.6 |
+| 0035 | [Cấp phép tổng hợp theo xã có ngưỡng k — tập dữ liệu dựng sẵn](0035-cap-phep-tong-hop-theo-xa-nguong-k.md) | Đề xuất — chờ MKG ký (A7), k `[KÝ]`; sửa ADR-0022; hiện thực W4.1, W5.3, W6.4 |
+| 0036 | [Engine ba chế độ ở vùng nội bộ MKG, `lib/optcore` dùng chung](0036-engine-ba-che-do-vung-noi-bo-optcore.md) | Đề xuất — chờ MKG ký (A7); bổ sung ADR-0016; W8.1 ngay, W8.3 chờ MKG v1.3 |
 
 ADR 0006, 0007, 0009, 0010, 0011 được chủ sản phẩm chấp nhận ngày 30/09/2026 trong phiên làm việc. Bảng đối chiếu cam kết → mã → kiểm thử ở [trien-khai-g1.md](trien-khai-g1.md).
 
-ADR 0001–0008 là danh sách bắt buộc ở Phụ lục B của tài liệu kiến trúc. ADR 0009–0016 phát sinh khi tổng hợp BRD và khi dựng G0. ADR 0017–0019 là nền của cổng G3 ([g3-conventions](../dev/g3-conventions.md)). ADR-0020 đóng câu hỏi RB-2 (MKG là tenant riêng). ADR-0021 ghi các lựa chọn hạ tầng của cổng G4. ADR 0022–0025 là nền của cổng G5 ([g5-conventions](../dev/g5-conventions.md)): Public API, `pf/metering`, điểm kiểm soát xuất dữ liệu, hồ sơ Phase K. ADR 0027–0031 là năm ADR lõi của kiến trúc v4.1 (gói W0.1, [kế hoạch](../kien-truc-v4.1-ke-hoach.md)), ứng với mục 1–2, 7–10 Phụ lục B; ADR-0030 sửa ADR-0005, 0009, 0020.
+ADR 0001–0008 là danh sách bắt buộc ở Phụ lục B của tài liệu kiến trúc. ADR 0009–0016 phát sinh khi tổng hợp BRD và khi dựng G0. ADR 0017–0019 là nền của cổng G3 ([g3-conventions](../dev/g3-conventions.md)). ADR-0020 đóng câu hỏi RB-2 (MKG là tenant riêng). ADR-0021 ghi các lựa chọn hạ tầng của cổng G4. ADR 0022–0025 là nền của cổng G5 ([g5-conventions](../dev/g5-conventions.md)): Public API, `pf/metering`, điểm kiểm soát xuất dữ liệu, hồ sơ Phase K. ADR 0027–0031 là năm ADR lõi của kiến trúc v4.1 (gói W0.1, [kế hoạch](../kien-truc-v4.1-ke-hoach.md)), ứng với mục 1–2, 7–10 Phụ lục B; ADR-0030 sửa ADR-0005, 0009, 0020. ADR 0032–0036 là năm ADR tích hợp và engine (gói W0.2), ứng với mục 11, 15–19 Phụ lục B; ADR-0033 sửa ADR-0020, 0022, 0025; ADR-0034 sửa ADR-0020; ADR-0035 sửa ADR-0022; ADR-0036 bổ sung ADR-0016.

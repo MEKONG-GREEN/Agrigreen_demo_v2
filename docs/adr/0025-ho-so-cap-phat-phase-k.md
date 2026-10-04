@@ -1,6 +1,6 @@
 # ADR-0025: Hồ sơ cấp phát Phase K — cấu hình, số bản sao, cấp tenant bên thứ ba, quyền của đơn vị thẩm định
 
-**Trạng thái:** Đề xuất · **Ngày:** 01/10/2026 (G5-0) · **Thành phần:** chart `deploy/k8s/charts/agrigreen` (lớp giá trị Phase K — việc của agent hạ tầng G5), `cmd/api-public`, `pf/apiclient`, `pf/metering`, `pf/party`, realm Keycloak · **Liên quan:** R-01, RB-5, mục 2 và Phụ lục A của kiến trúc, [ADR-0008](0008-phan-vung-mang.md), [ADR-0021](0021-ha-tang-kubernetes-g4.md), [ADR-0022](0022-public-api-ben-thu-ba.md)…[ADR-0024](0024-diem-kiem-soat-xuat-du-lieu-dlp.md)
+**Trạng thái:** Đề xuất · Sửa đổi bởi [ADR-0033](0033-cong-tich-hop-mkg-nhu-moi-doi-tac.md) (đề xuất: cổng chạy từ ĐTK 1 cho MKG, Phase K chỉ bật đối tác thứ ba) · **Ngày:** 01/10/2026 (G5-0) · **Thành phần:** chart `deploy/k8s/charts/agrigreen` (lớp giá trị Phase K — việc của agent hạ tầng G5), `cmd/api-public`, `pf/apiclient`, `pf/metering`, `pf/party`, realm Keycloak · **Liên quan:** R-01, RB-5, mục 2 và Phụ lục A của kiến trúc, [ADR-0008](0008-phan-vung-mang.md), [ADR-0021](0021-ha-tang-kubernetes-g4.md), [ADR-0022](0022-public-api-ben-thu-ba.md)…[ADR-0024](0024-diem-kiem-soat-xuat-du-lieu-dlp.md)
 
 ## Bối cảnh
 

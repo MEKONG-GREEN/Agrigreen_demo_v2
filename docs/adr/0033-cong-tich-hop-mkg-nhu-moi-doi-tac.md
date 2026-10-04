@@ -1,0 +1,141 @@
+# ADR-0033: Cổng tích hợp `cmd/integration-gateway` — MKG như mọi đối tác, feed theo cursor, nạp theo lô, webhook mỏng
+
+**Trạng thái:** Đề xuất — chờ MKG ký (A7, H-3) · **Ngày:** 04/10/2026 (gói W0.2) · **Phụ lục B v4.1:** mục 15 và 18 · **Xung đột:** X-02 (phần MKG), X-03, X-15, X-16 · **Sửa đổi:** [ADR-0020](0020-lien-thong-platform-mkg-khac-tenant.md) §3–§5, [ADR-0022](0022-public-api-ben-thu-ba.md) §1 và §8, [ADR-0025](0025-ho-so-cap-phat-phase-k.md) (tên đơn vị, thời điểm bật) · **Thành phần:** `cmd/api-public` → `cmd/integration-gateway`, `pf/apiclient`, `pf/metering`, điểm kiểm soát xuất ([ADR-0024](0024-diem-kiem-soat-xuat-du-lieu-dlp.md)), `pf/party` (cấp phép), `contracts/integration/` (mới), `mkg/fieldops`, `mkg/hub`, `mkg/measurement` (bộ điều hợp), consumer van `pf.geo.hub_valve`, `pf.cropcycle.htx_collection_valve`, `pf.mrv.collection_evidence` · **Liên quan:** [ADR-0018](0018-su-kien-noi-bo-mkg.md), [ADR-0028](0028-vai-dang-nhap-theo-don-vi-trien-khai.md), [ADR-0030](0030-doc-tai-cho-co-cap-phep.md), [ADR-0034](0034-luong-song-phuong.md), [ADR-0035](0035-cap-phep-tong-hop-theo-xa-nguong-k.md), kiến trúc v4.1 Phần VI (§37–§44)
+
+## Bối cảnh
+
+MKG hiện có **hai lối riêng** vào nền tảng, cộng một bề mặt thứ ba cho bên thứ ba (bản đối chiếu, dòng R-INT-01):
+
+| # | Lối | Hiện thực | ADR |
+|---|---|---|---|
+| 1 | MKG → nền tảng | Van công bố: `valve_export` + outbox cụm mkg → RabbitMQ vhost `/` → consumer `pf.geo.hub_valve`, `pf.cropcycle.htx_collection_valve`, `pf.mrv.collection_evidence`; ghi vào tenant bên cấp bằng `tenant.Within` | ADR-0018 (vhost), ADR-0020 §4 |
+| 2 | Nền tảng → MKG | `/v1/partner/*` trên **Application API** của `api-platform`, OIDC client credentials `agrigreen-mkg-sync`, vai `mkg_sync`; `mkg/fieldops` gọi qua `adapter.PlatformHTTP` | ADR-0020 §3, §5 |
+| 3 | Bên thứ ba | `cmd/api-public` (`partner.<domain>`): khóa API HMAC có pepper theo phiên bản, scope, hạn mức + `429` (Valkey tùy chọn), mỗi lời gọi ghi `pf_metering`, điểm kiểm soát xuất `egress_event`, hợp đồng `contracts/dataproduct` mặc định từ chối, `202` + job cho việc dài; tắt ở ĐTK 1 | ADR-0022…0025 |
+
+v4.1 R-INT-01: MKG đi **đúng cổng, đúng hợp đồng, đúng hạn mức, đúng xác thực** như mọi đối tác tương lai; không DB, không hàng đợi chung, không endpoint riêng. R-INT-02…11 thêm feed theo cursor giữ 30 ngày, nạp theo lô `202` + mã lô, vách ngăn theo đối tác, tập dữ liệu dựng sẵn, webhook mỏng, ngắt mạch, đối soát tổng kiểm, kênh tệp cùng lược đồ. R-API-07: không đường riêng theo ứng dụng.
+
+Lối (3) là mầm của cổng: đã có xác thực máy, hạn mức theo khách, đo lường, kiểm soát xuất. Lối (1) và (2) là lối riêng. Lối (1) đúng chữ R-EVT-05 ("không vượt vùng qua broker trừ van") nhưng trái §38.1 và R-INT-01.
+
+## Quyết định
+
+### 1. Một cổng, mở rộng từ `cmd/api-public`
+
+`cmd/api-public` đổi tên thành **`cmd/integration-gateway`** (X-15). Giữ mọi lý do tách tiến trình của ADR-0022 §1 (bề mặt tấn công, luồng mạng riêng, pepper chỉ ở đây, co giãn độc lập). Không dựng tiến trình thứ hai.
+
+| Giữ nguyên từ G5-0 | Thêm |
+|---|---|
+| Khóa API lưu HMAC + pepper theo phiên bản (`pf/apiclient`) | **mTLS bắt buộc** với đối tác ghi khối lượng lớn, gồm MKG (§41.2); chứng chỉ gắn với khách hàng API, kiểm cả khóa lẫn chứng chỉ |
+| Scope, hạn mức tần suất/khối lượng, `429` + `Retry-After` | Hạn mức **và** hàng đợi xử lý + DLQ riêng từng đối tác (R-INT-04); Valkey thành bắt buộc khi > 1 bản sao |
+| Mỗi lời gọi ghi `pf_metering` trước khi trả byte (ADR-0023) | Đo cả lời gọi nạp và lần cấp URL ảnh chụp |
+| Điểm kiểm soát xuất, đóng khi lỗi (ADR-0024) | Áp cho từng trang feed và mỗi lần cấp URL ảnh chụp |
+| Hợp đồng mặc định từ chối, `contractcheck` | `contracts/integration/` cho feed và hợp đồng nạp (R-INT-08); `contracts/publication` dùng lại nguyên làm lược đồ nạp |
+| RFC 9457, `Idempotency-Key`, `202` + `/v1/jobs/{id}` | `POST /v1/batches/{contract}` → `202` + mã lô; `GET /v1/feeds/{feed}?cursor=`; `GET /v1/snapshots/{dataset}/{version}`; đăng ký webhook |
+| Tenant bên gọi lấy từ bản ghi khóa, không từ request | Như cũ; MKG là một khách hàng API với `client_tenant_id` = tenant MKG |
+
+Định danh máy: v4.1 đặt ở `k/access`. Đến W7.2, khóa và chứng chỉ vẫn ở `pf/apiclient`; cổng gọi qua port `MachineIdentity` để W7.2 chuyển chủ mà không sửa cổng. Vai đăng nhập DB của cổng là `app_public` (ADR-0028).
+
+Bề mặt quản trị (cấp khóa, chứng chỉ, đăng ký feed, webhook, hạn mức) vẫn ở Admin API của `api-platform`, MFA, bốn mắt như ADR-0022.
+
+### 2. Feed theo cursor (R-INT-05, R-INT-06)
+
+- **Kho feed** chỉ ghi thêm, chủ là `pf/apiclient` (schema `pf_apiclient`, không thêm module): `(feed, seq bigint, entity_key, event_id, dataset_version, payload, recorded_at)`. `seq` tăng đơn điệu trong mỗi feed; cursor = `seq` mã hóa mờ.
+- Module chủ dữ liệu **không** ghi thẳng: job dựng tập dữ liệu của module chủ (hoặc job `r_agg`, ADR-0031) gọi port của `pf/apiclient` để nối thêm một phiên bản. Tính một lần, phát cho mọi đối tác có quyền; không lọc từng hàng theo đối tác, trừ feed song phương (ADR-0034).
+- Giao ít nhất một lần, có thứ tự theo `entity_key`; bên nhận idempotent theo `event_id`.
+- Giữ **30 ngày**. Cursor quá hạn → `410` `integration.cursor_expired` kèm liên kết ảnh chụp mới nhất; đối tác đồng bộ lại từ ảnh chụp rồi đọc tiếp.
+- **Ảnh chụp lớn** (vd. `waterway_routes`, `admin_units`) ở kho đối tượng trong lãnh thổ, phục vụ bằng **URL ký có hạn** (≤ 15 phút, một khách hàng). Đây là **sửa ADR-0022 §8** (cấm URL ký cho bên thứ ba): URL chỉ được cấp qua cổng, **sau** khi ghi `pf_metering` theo kích thước ảnh chụp và qua điểm kiểm soát xuất, nên không vòng qua sổ đo lường. Việc xuất theo job của ADR-0022 giữ cách phát luồng qua cổng.
+
+Feed đầu tiên (chi tiết hợp đồng ở W5.1):
+
+| Feed | Loại (§38.1) | Thay cho |
+|---|---|---|
+| `harvest_progress_by_commune` | cấp phép, tổng hợp theo xã, ngưỡng k (ADR-0035) | — (mới) |
+| `season_harvest_dates` | cấp phép | `GET /v1/partner/season-harvest-dates` |
+| `cooperative_directory`, `plot_directory` | cấp phép (tập dữ liệu theo bên cấp) | `GET /v1/partner/cooperatives`, `/plots` |
+| `waterway_routes` | tham chiếu, theo phiên bản | — (mới) |
+| `admin_units` | tham chiếu dùng chung (ADR-0032) | — (mới) |
+| feed của cặp | song phương (ADR-0034) | `GET /v1/partner/htx-collection/responses` |
+
+### 3. Nạp theo lô (R-INT-03, §41.3)
+
+Nhận lô → kiểm lược đồ đồng bộ → `202` + mã lô → hàng đợi riêng đối tác → **inbox** → kiểm hợp đồng (mặc định từ chối) → port của module chủ → kết quả từng bản ghi vào lô. Bản ghi lỗi không làm hỏng cả lô. Idempotent theo `Idempotency-Key` và khóa nghiệp vụ.
+
+Hợp đồng nạp dùng lại `contracts/publication/<tên>.json` (`hub_facility`, `hub_capacity`, `mrv_collection_evidence`): trường, phiên bản, người đề xuất ≠ người duyệt giữ nguyên. Phía MKG, sổ `valve_export` vẫn là bằng chứng (RB-1); chỉ đổi đường gửi.
+
+Ghi vào tenant bên cấp theo cấp phép như ADR-0020 §4 (`ValveTargets`, `tenant.Within` sau kiểm cấp phép) — logic chuyển từ consumer van sang bộ xử lý inbox của cổng, không viết lại.
+
+### 4. Webhook mỏng, ngắt mạch, đối soát (R-INT-07, R-INT-09, R-INT-10)
+
+- Thân webhook chỉ có `{feed, cursor, occurred_at}`; chữ ký HMAC-SHA256 kèm dấu thời gian trong header; không bao giờ có dữ liệu nghiệp vụ.
+- N lần lỗi liên tiếp (mặc định 5, tham số theo đối tác) → ngắt, báo đối tác qua kênh quản trị; không mất dữ liệu vì đối tác đọc tiếp từ cursor.
+- Mỗi phiên bản tập dữ liệu và mỗi ngày của luồng song phương có tổng kiểm (số bản ghi + băm) đọc qua `GET /v1/feeds/{feed}/checksums`.
+
+### 5. Chuyển MKG sang cổng
+
+| Hiện tại | Sau | Gói |
+|---|---|---|
+| Client OIDC `agrigreen-mkg-sync`, vai `mkg_sync` | Khách hàng API tenant MKG, khóa + mTLS, scope = loại cấp phép + hợp đồng nạp | W5.2 |
+| `adapter.PlatformHTTP` gọi `/v1/partner/*` trên `api-platform` | Bộ điều hợp feed trong `mkg/fieldops` kéo `/v1/feeds/*` trên cổng; lưu `as_of`, `max_age`; bản sao cục bộ như hiện nay (R-INT-02) | W5.5 |
+| Van `hub_facility`, `hub_capacity` qua RabbitMQ → `pf.geo.hub_valve` | `mkg/hub` gửi lô từ `valve_export` tới `POST /v1/batches/hub_facility` … | Sau W5.4, khi hợp đồng nạp tương ứng có |
+| Van `collection_schedule`, `htx_collection_statement` → `pf.cropcycle.htx_collection_valve` | Luồng song phương (ADR-0034) | W5.6 |
+| Van `mrv_collection_evidence` → `pf.mrv.collection_evidence` | Hợp đồng nạp `mrv_collection_evidence` | Sau W5.4 |
+| NetworkPolicy: vùng mkg → `api-platform` | Vùng mkg → **chỉ** cổng; gỡ luồng tới `api-platform` (ADR-0008, `check_flows.py`) | W5.10 |
+
+Sổ cấp phép của ADR-0020 (`share_grant_event`, bốn mắt, thu hồi, `partner_read_log`) **giữ nguyên** và là nguồn quyền của cổng: `grant_class = partner` (ADR-0030), `kinds` ánh xạ sang feed và hợp đồng nạp. Thêm loại mới vẫn theo ADR-0020 §2 (sửa ADR, `ShareKinds`, migration CHECK).
+
+### 6. Ghi lệch có hạn: van RabbitMQ (X-03)
+
+- Van RabbitMQ vhost `/` **giữ cho ĐTK 1** đến **cổng G2 của v4.1** (tên cổng chờ H-7). Không thêm hợp đồng van mới qua RabbitMQ: hợp đồng mới đi thẳng hợp đồng nạp.
+- `contractcheck` giữ các kiểm hiện có (`//ag:publication`, payload kind `platform`) cho tới khi consumer cuối cùng bị gỡ.
+- vhost `mkg.internal` (ADR-0018) không bị ảnh hưởng: đó là sự kiện nội bộ vùng mkg.
+
+### 7. Cửa sổ ngừng dùng (R-API-01, X-16)
+
+1. W5.2: cổng chạy song song; `/v1/partner/*` không đổi.
+2. W5.5: MKG đọc feed. Mọi phản hồi `/v1/partner/*` thêm `Deprecation` và `Sunset` (ngày gỡ dự kiến); metric `partner_legacy_calls_total` theo route.
+3. Điều kiện gỡ (W5.10): đã qua **ít nhất một kỳ phát hành** từ W5.5 **và** metric bằng 0 trong 14 ngày liên tiếp **và** đối soát tổng kiểm hai đường khớp.
+4. W5.10 gỡ `/v1/partner/*`, client `mkg_sync`, consumer `pf.cropcycle.htx_collection_valve`. `hub_valve`, `mrv` gỡ khi hợp đồng nạp tương ứng chạy; muộn nhất G2 v4.1.
+5. `cmd/api-public` giữ làm bí danh (cùng nhị phân, tên Deployment cũ) **một kỳ** để chart, DNS `partner.<domain>` và tài liệu đối tác chuyển.
+
+## Phương án đã cân nhắc
+
+| Phương án | Lý do không chọn |
+|---|---|
+| Giữ hai lối riêng cho MKG, cổng chỉ cho bên thứ ba (hiện trạng) | Trái R-INT-01; mỗi đối tác sau phải xây lại; MKG là đối tác tải lớn nhất nên là phép thử tốt nhất của cổng |
+| Dựng cổng mới, để `api-public` song song | Hai nơi giữ khóa API, hai pepper, hai luồng mạng; nhân đôi metering và DLP |
+| Mở rộng `/v1/partner/*` trên `api-platform` cho mọi đối tác | Application API là bề mặt người dùng (OIDC); mọi handler nằm trong tiến trình nghe đối tác — lý do ADR-0022 §1 tách `api-public` |
+| Đẩy dữ liệu qua webhook | Bão giao hàng, mất thứ tự, dữ liệu nằm trong nhật ký lỗi của bên nhận (R-INT-07) |
+| Gỡ van RabbitMQ ngay | Van đang chạy cho ĐTK 1 và có kiểm thử đầu–cuối; nạp theo lô chưa có. Chuyển cùng lúc với mốc 15/12/2026 làm tăng rủi ro đường găng |
+| Không cấp URL ký (giữ ADR-0022 §8) | Ảnh chụp chục MB × 200 đối tác qua API là sóng tải §39 rủi ro 4; URL cấp qua cổng sau đo lường giữ được lý do của §8 |
+
+## Hệ quả
+
+- **Cổng chạy từ ĐTK 1** (không chờ Phase K) vì MKG dùng nó: `AG_PUBLIC_API_ENABLED` (đổi tên `AG_GATEWAY_ENABLED`, giữ tên cũ một kỳ) bật, số bản sao ≥ 2, host ingress riêng. Sửa ADR-0025: Phase K chỉ còn bật **đối tác thứ ba**, không bật cổng.
+- MKG mất đặc quyền đọc theo vai `mkg_sync`; mọi lần đọc của MKG có metering và sổ xuất như bên thứ ba.
+- Chi phí: mỗi trang feed một giao dịch ghi `pf_metering`. §39 ước 3,3 yêu cầu/giây cho 200 đối tác — đo ở W5.9.
+- Thu hồi cấp phép có hiệu lực ngay ở lời gọi kế tiếp (kiểm tại cổng, như `/v1/partner/*`).
+- Vùng mkg không còn gọi `api-platform`; một luồng mạng ít hơn.
+- Cổng nhận ở vùng nội bộ cho VFT (§38.3) dùng chung mã, triển khai và dữ liệu riêng (R-MOD-10) — ngoài phạm vi ADR này.
+- ADR-0020 giữ thân bài; §3–§5 thay bằng ADR này khi ký. ADR-0022 §1 (tên), §8 (URL ký) sửa. ADR-0024 không đổi nguyên tắc; danh sách điểm kiểm soát thêm feed và ảnh chụp.
+
+## Hiện thực
+
+| Gói | Việc | Migration |
+|---|---|---|
+| W5.1 | `contracts/integration/` (feed, hợp đồng nạp, song phương), `contractcheck` mở rộng | — |
+| W5.2 | `cmd/integration-gateway` từ `cmd/api-public`, mTLS, port `MachineIdentity`, bí danh, NetworkPolicy, chart | — |
+| W5.3 | Kho feed, job dựng tập dữ liệu, ảnh chụp + URL ký, `GET /v1/feeds/*` | pf 000100–000101 |
+| W5.4 | Nạp theo lô, hàng đợi + DLQ từng đối tác, inbox | pf 000102 |
+| W5.5 | Bộ điều hợp feed `mkg/fieldops`, `as_of`/`max_age`, header `Deprecation`/`Sunset` | mkg 000024 |
+| W5.6 | Luồng song phương (ADR-0034) | pf 000103, mkg 000025 |
+| W5.7 | Webhook mỏng, ngắt mạch, tổng kiểm | pf 000104 |
+| W5.8 | Kênh tệp cùng lược đồ, môi trường thử đối tác | — |
+| W5.9 | Kiểm thử tải §42 | — |
+| W5.10 | Gỡ `/v1/partner/*`, `mkg_sync`, consumer `htx_collection_valve` | — |
+| W0.3 | `docs/design/mkg.md` §1.1 "bốn cửa" theo ADR này | — |
+
+## Liên quan
+
+- Kiến trúc v4.1: §6, §37 (R-INT-01), §38, §39, §40 (R-INT-02…11), §41, §42, §43, §44, Phụ lục B mục 15 và 18, R-API-01, R-API-07, R-EVT-05, R-MOD-10.
+- Bản đối chiếu: §2.3, X-02, X-03, X-15, X-16, các dòng R-INT.
+- Câu hỏi: [cau-hoi-ton-dong.md](../cau-hoi-ton-dong.md) H-3, H-7, H-12.
+- [ADR-0008](0008-phan-vung-mang.md), [ADR-0018](0018-su-kien-noi-bo-mkg.md), [ADR-0020](0020-lien-thong-platform-mkg-khac-tenant.md), [ADR-0022](0022-public-api-ben-thu-ba.md)…[ADR-0025](0025-ho-so-cap-phat-phase-k.md), [ADR-0028](0028-vai-dang-nhap-theo-don-vi-trien-khai.md), [ADR-0030](0030-doc-tai-cho-co-cap-phep.md), [ADR-0031](0031-vai-tong-hop-r-agg.md), [ADR-0032](0032-don-vi-hanh-chinh-co-hieu-luc-va-ke-thua.md), [ADR-0034](0034-luong-song-phuong.md), [ADR-0035](0035-cap-phep-tong-hop-theo-xa-nguong-k.md); [docs/design/mkg.md](../design/mkg.md) §1.1, §3.

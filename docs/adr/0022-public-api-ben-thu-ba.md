@@ -1,6 +1,6 @@
 # ADR-0022: Public API cho bên thứ ba — đơn vị triển khai riêng, khóa API lưu băm, scope, quota
 
-**Trạng thái:** Đề xuất · **Ngày:** 01/10/2026 (G5-0) · **Thành phần:** `cmd/api-public` (mới), `pf/apiclient` (mới), `pf/metering` ([ADR-0023](0023-so-do-luong-su-dung-metering.md)), điểm kiểm soát xuất ([ADR-0024](0024-diem-kiem-soat-xuat-du-lieu-dlp.md)), `pf/party` (loại cấp quyền `dp_*`, [ADR-0020](0020-lien-thong-platform-mkg-khac-tenant.md)), `contracts/openapi/public.yaml`, `contracts/dataproduct/*` · **Quy ước:** [g5-conventions.md](../dev/g5-conventions.md)
+**Trạng thái:** Đề xuất · Sửa đổi bởi [ADR-0033](0033-cong-tich-hop-mkg-nhu-moi-doi-tac.md) (§1 thành `cmd/integration-gateway`, §8 URL ký cho ảnh chụp), [ADR-0035](0035-cap-phep-tong-hop-theo-xa-nguong-k.md) (§9 k theo phiên bản tập dữ liệu) (đề xuất) · **Ngày:** 01/10/2026 (G5-0) · **Thành phần:** `cmd/api-public` (mới), `pf/apiclient` (mới), `pf/metering` ([ADR-0023](0023-so-do-luong-su-dung-metering.md)), điểm kiểm soát xuất ([ADR-0024](0024-diem-kiem-soat-xuat-du-lieu-dlp.md)), `pf/party` (loại cấp quyền `dp_*`, [ADR-0020](0020-lien-thong-platform-mkg-khac-tenant.md)), `contracts/openapi/public.yaml`, `contracts/dataproduct/*` · **Quy ước:** [g5-conventions.md](../dev/g5-conventions.md)
 
 ## Bối cảnh
 

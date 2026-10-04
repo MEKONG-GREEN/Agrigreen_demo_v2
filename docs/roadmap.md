@@ -249,6 +249,7 @@ Trạng thái (02/10/2026): A, M, S + D, H, W đã hợp nhất vào `sub/g5` (t
   - **hạ tầng:** diễn tập `helm upgrade -f values-phasek.yaml` trên staging (K-04), NetworkPolicy / Ingress / ExternalSecret trên cụm thật, PgBouncer song song, luật cảnh báo DLQ vùng nền tảng (X-07), `promtool`, cổng giấy phép CI.
 
 ## Chuyển đổi kiến trúc v4.1 ([kế hoạch](kien-truc-v4.1-ke-hoach.md))
+- [x] W0.2 (04/10/2026): ADR-0032…0036 — đơn vị hành chính có hiệu lực + kế thừa, cổng tích hợp `integration-gateway` (MKG như mọi đối tác), luồng song phương, cấp phép tổng hợp theo xã có k, engine ba chế độ + `lib/optcore` ([docs/adr](adr/README.md)); Đề xuất, chờ MKG ký (A7), ADR-0034 chờ thêm C-12.
 - [x] W1.1 (04/10/2026): `module.yaml` cho 26 module, `internal/shared/modreg`, `go run ./tools/modgen -check` ([docs/dev/modules.md](dev/modules.md)).
 - [x] W1.2 (04/10/2026): analyzer `agmodgraph` trong `tools/archlint` (chu trình, tầng, `depends`, phiên bản, `owns_schema` ↔ migration) + 118 ngoại lệ có chủ trong `tools/archlint/modgraph_exceptions.yaml` (chỉ co lại); `modgen -check` và `agmodgraph` vào job lint CI ([docs/dev/modules.md](dev/modules.md#đồ-thị-module-agmodgraph-w12)).
 
