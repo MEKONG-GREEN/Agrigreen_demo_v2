@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { unwrap, type ApiClient } from "@/api/client";
 import { useAuth, type KnSessionState } from "@/auth/AuthProvider";
 import { LEVEL_LABEL, roleLabel, type Principal } from "@/auth/principal";
 import { config } from "@/config";
 import type { MenuTree } from "@/kn/contract";
 import { contextLabel, contextShortLabel, optionLabel, otherOptions } from "@/kn/session";
-import { canSee, findNavItem, homeFor, visibleNav } from "@/nav/nav";
+import { canSee, disabledModules, findNavItem, homeFor, visibleNav, type DisabledModules } from "@/nav/nav";
 import { AccountMenu } from "@/shell/AccountMenu";
 import { Breadcrumb, BreadcrumbTailProvider, useBreadcrumbTailValue, type Crumb } from "@/shell/Breadcrumb";
 import { crumbsFor, legacyMenu, menuAllows, withExtraGroups } from "@/shell/menu";
@@ -25,8 +26,8 @@ export function isBareRoute(pathname: string): boolean {
 }
 
 /** Menu đang dùng: menu cấu hình KN (P2) khi có ngữ cảnh, ngược lại menu cũ theo vai realm (nav.ts). */
-export function activeMenu(kn: KnSessionState, principal: Principal | null): MenuTree {
-  const legacy = legacyMenu(visibleNav(principal));
+export function activeMenu(kn: KnSessionState, principal: Principal | null, disabled: DisabledModules = NO_MODULES): MenuTree {
+  const legacy = legacyMenu(visibleNav(principal, disabled));
   if (kn.status === "active" && kn.menu) {
     if (!config.knLegacyMenu) return kn.menu;
     const extra = legacy.groups.map((g) => ({ ...g, key: `extra-${g.key}`, label: `Chức năng khác · ${g.label.replace(/^\d+\.\s*/, "")}` }));
@@ -39,10 +40,10 @@ export function activeMenu(kn: KnSessionState, principal: Principal | null): Men
  * Hiện màn hình được không (chỉ ẩn/hiện — backend vẫn kiểm từng lời gọi, R-55).
  * Bề mặt KN: đường /kn/* phải nằm trong menu của ngữ cảnh; màn hiện có ngoài /kn vẫn theo vai (canSee).
  */
-export function isAllowed(pathname: string, kn: KnSessionState, menu: MenuTree, principal: Principal | null): boolean {
+export function isAllowed(pathname: string, kn: KnSessionState, menu: MenuTree, principal: Principal | null, disabled: DisabledModules = NO_MODULES): boolean {
   if (kn.status === "active" && pathname.startsWith("/kn")) return menuAllows(menu, pathname);
   const item = findNavItem(pathname);
-  return !item || canSee(item, principal);
+  return !item || canSee(item, principal, disabled);
 }
 
 function legacyScopeText(p: Principal): string {
@@ -65,13 +66,36 @@ function useMediaQuery(query: string): boolean {
 
 const COLLAPSE_KEY = "ag.shell.collapsed";
 
+const NO_MODULES: DisabledModules = new Set<string>();
+
+/**
+ * W1.4 (R-MOD-08): module Ä‘Ã£ táº¯t cho Ä‘Æ¡n vá»‹ (GET /v1/me/modules) Ä‘á»ƒ áº©n mÃ n cá»§a chÃºng á»Ÿ menu cÅ© (nav.ts).
+ * Menu KN (GET /v1/menu) Ä‘Ã£ lá»c á»Ÿ server. KhÃ´ng Ä‘á»c Ä‘Æ°á»£c â†’ khÃ´ng lá»c (backend váº«n tráº£ 403 module_not_enabled).
+ */
+function useDisabledModules(api: ApiClient, enabled: boolean): DisabledModules {
+  const [disabled, setDisabled] = useState<DisabledModules>(NO_MODULES);
+  useEffect(() => {
+    if (!enabled) return;
+    let alive = true;
+    unwrap(api.GET("/v1/me/modules"))
+      .then((r) => {
+        if (alive) setDisabled(disabledModules(r.items));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [api, enabled]);
+  return disabled;
+}
+
 function TopCrumbs({ base }: { base: Crumb[] }) {
   const tail = useBreadcrumbTailValue();
   return <Breadcrumb items={[...base, ...tail]} />;
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { status, principal, logout, scopeWarning, kn, selectContext, changePassword } = useAuth();
+  const { status, principal, logout, scopeWarning, kn, selectContext, changePassword, api } = useAuth();
   const pathname = usePathname() ?? "/";
   const router = useRouter();
   const [navOpen, setNavOpen] = useState(false);
@@ -84,8 +108,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const toggleCollapse = useCallback(() => writeStoredValue(COLLAPSE_KEY, prefCollapsed ? "0" : "1"), [prefCollapsed]);
 
-  const menu = useMemo(() => activeMenu(kn, principal), [kn, principal]);
-  const allowed = isAllowed(pathname, kn, menu, principal);
+  const disabled = useDisabledModules(api, status === "authenticated");
+  const menu = useMemo(() => activeMenu(kn, principal, disabled), [kn, principal, disabled]);
+  const allowed = isAllowed(pathname, kn, menu, principal, disabled);
 
   useEffect(() => {
     if (bare) return;
@@ -95,9 +120,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       if (kn.status === "choose") router.replace(`/chon-vai-tro?returnTo=${encodeURIComponent(pathname)}`);
       else if (kn.status === "active" && kn.context && pathname === "/") router.replace(kn.context.default_route);
       // Cục KTHT vào "/" → cổng CGH (BRD CGH FN-11 B1).
-      else if (kn.status === "legacy" && pathname === "/" && !allowed) router.replace(homeFor(principal));
+      else if (kn.status === "legacy" && pathname === "/" && !allowed) router.replace(homeFor(principal, disabled));
     }
-  }, [status, bare, pathname, router, allowed, principal, kn.status, kn.context]);
+  }, [status, bare, pathname, router, allowed, principal, kn.status, kn.context, disabled]);
 
   const note = noteState?.path === pathname ? noteState.text : null;
 
@@ -115,7 +140,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const crumbs = crumbsFor(menu, pathname);
   // Nhãn nhóm menu cũ có số thứ tự ("1. Điều hành") — breadcrumb bỏ số.
   const baseCrumbs: Crumb[] = crumbs.length ? crumbs.map((label) => ({ label: label.replace(/^\d+\.\s*/, "") })) : [{ label: findNavItem(pathname)?.label ?? "Trang" }];
-  const home = ctx?.default_route ?? homeFor(principal);
+  const home = ctx?.default_route ?? homeFor(principal, disabled);
   const collapsed = !navOpen && (tablet || prefCollapsed);
 
   return (

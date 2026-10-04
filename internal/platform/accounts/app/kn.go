@@ -116,6 +116,9 @@ func (s *Service) checkAssignment(ctx context.Context, a *actor, in domain.Assig
 		}
 		return out, nil
 	}
+	if err := s.checkKNModule(ctx, a, in.Role); err != nil { // W1.4: pf/extension đã tắt → không gán vai trò KN
+		return checkedAssignment{}, err
+	}
 	o, err := s.checkOrg(ctx, a, in.OrgRef)
 	if err != nil {
 		if errors.Is(err, ErrOrgInvalid) {

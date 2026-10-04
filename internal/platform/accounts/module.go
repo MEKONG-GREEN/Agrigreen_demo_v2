@@ -46,6 +46,8 @@ type Deps struct {
 	Departments partyport.Departments
 	Units       mdport.AdminUnits
 	Names       partyport.ActorNames
+	// W1.4 (R-MOD-08): trạng thái bật module theo đơn vị — vai của module đã tắt không cấp được.
+	Modules partyport.ModuleEnablement
 }
 
 // Module là pf/accounts đã nối.
@@ -54,7 +56,8 @@ type Module struct{ svc *app.Service }
 // New tạo module với pool của vai accounts_app.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs,
-		Households: d.Households, Vault: d.Vault, Params: d.Params, Departments: d.Departments, Units: d.Units, Names: d.Names}}
+		Households: d.Households, Vault: d.Vault, Params: d.Params, Departments: d.Departments, Units: d.Units, Names: d.Names,
+		Modules: d.Modules}}
 }
 
 // RegisterApp gắn route Application API của App HTX: tài khoản nông dân (quản lý

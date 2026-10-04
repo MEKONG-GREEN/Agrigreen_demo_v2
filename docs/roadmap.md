@@ -259,7 +259,7 @@ Cho đến khi MKG chọn tên mới (H-7, đề xuất "M0…M6" hoặc "G0′�
 
 | Cổng v4.1 | Mốc | Giao theo v4.1 (Phụ lục A) | Cổng repo cùng mốc và trạng thái | Gói chuyển đổi ([kế hoạch](kien-truc-v4.1-ke-hoach.md)) |
 |---|---|---|---|---|
-| **G0 v4.1** | 30/09/2026 ("cần cập nhật trạng thái") | Khung module, registry, kiểm đồ thị; `k/ledger` mẫu DDL đã sửa; `k/access` tối thiểu; `k_ref`; vai đăng nhập theo đơn vị triển khai; CI chạy DDL tài liệu | G0 repo: nền móng, xong. Phần v4.1 **đang làm**: W1.1, W1.2, W1.3 xong; W2.x chưa | Giai đoạn 1–2 (W1.x, W2.x) |
+| **G0 v4.1** | 30/09/2026 ("cần cập nhật trạng thái") | Khung module, registry, kiểm đồ thị; `k/ledger` mẫu DDL đã sửa; `k/access` tối thiểu; `k_ref`; vai đăng nhập theo đơn vị triển khai; CI chạy DDL tài liệu | G0 repo: nền móng, xong. Phần v4.1 **đang làm**: W1.1, W1.2, W1.3, W1.4 xong; W2.x chưa | Giai đoạn 1–2 (W1.x, W2.x) |
 | **G1 v4.1** | 15/12/2026 | App KN chạy trên module dùng chung; `dom/cooperative` làm chủ duy nhất (hợp nhất ba hệ UAT); lớp định danh theo SAD v1.1 | G1 repo (ĐTK 1): **mã xong** 29/09/2026. KN v7.7: P1–P7 có mã. Chủ duy nhất HTX **chưa** | Giai đoạn 3 (W3.x, trước 15/12/2026). Lớp định danh: KN P1 là hiện thực ĐTK 1 (ADR-0037); W7.2–W7.3 chờ SAD v1.1 |
 | **G1+ v4.1** | Song song G1 | Cổng tích hợp tối thiểu: feed cursor, nạp theo lô, xác thực máy, hạn mức theo đối tác; ADR luồng song phương và cấp phép tổng hợp theo xã | Không có cổng repo tương ứng. Mầm là `cmd/api-public` (G5 repo) | Giai đoạn 5 (W5.x); ADR-0033…0035 |
 | **G2 v4.1** | 31/03/2027 | App HTX, CGH, SIM lên module dùng chung; `share_grant` chạy thật; tổng quát `cap/forms`, `cap/task`; ký Danh mục Ràng buộc Nền tảng | G2 repo (`mkg/*`, `pf/waterway`, `pf/simulation`): **mã xong**. Hạn gỡ van RabbitMQ (ADR-0033 §6) | Giai đoạn 4, 6 (W4.x, W6.x) |
@@ -280,6 +280,7 @@ Nhận xét:
 - [x] W1.1 (04/10/2026): `module.yaml` cho 26 module, `internal/shared/modreg`, `go run ./tools/modgen -check` ([docs/dev/modules.md](dev/modules.md)).
 - [x] W1.2 (04/10/2026): analyzer `agmodgraph` trong `tools/archlint` (chu trình, tầng, `depends`, phiên bản, `owns_schema` ↔ migration) + 118 ngoại lệ có chủ trong `tools/archlint/modgraph_exceptions.yaml` (chỉ co lại); `modgen -check` và `agmodgraph` vào job lint CI ([docs/dev/modules.md](dev/modules.md#đồ-thị-module-agmodgraph-w12)).
 - [x] W1.3 (04/10/2026): `app/{KN,HTX,CGH,SIM,MKG,NH,PF}/app.yaml` (module có phiên bản, vai realm, trang đích, đơn vị triển khai); `modgen -check` kiểm ghép `cmd/*` ⊆ hợp `app.yaml` ([docs/dev/modules.md](dev/modules.md#ứng-dụng-appyaml-w13)).
+- [x] W1.4 (04/10/2026): bật module theo đơn vị (R-MOD-08, pf 000088) — sổ + chiếu `pf_party.module_enablement_event`/`_current`, mặc định bật; route của module tắt trả 403 `module_not_enabled`, vai của module tắt không cấp được, menu Go và web-ops lọc ([docs/dev/modules.md](dev/modules.md#bật-module-theo-đơn-vị-w14)).
 
 ## G6
 Theo Phụ lục A của tài liệu kiến trúc:

@@ -26,6 +26,7 @@ provides:
     - FormAvailability
     - GrantLookup
     - Households
+    - ModuleEnablement
     - OrgCodes
     - OrgImpactSource
     - Orgs

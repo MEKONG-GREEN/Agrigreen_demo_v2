@@ -151,7 +151,7 @@ func (k *KN) Menu(ctx context.Context, q MenuQuery) (MenuView, error) {
 		return MenuView{}, err
 	}
 	if q.Audience == port.AudienceAdmin {
-		return AdminMenu(q.UnitRef, depts), nil
+		return k.withModules(ctx, p.TenantID, AdminMenu(q.UnitRef, depts))
 	}
 	d, err := pickDepartment(depts, q.Department)
 	if err != nil {
@@ -159,7 +159,57 @@ func (k *KN) Menu(ctx context.Context, q MenuQuery) (MenuView, error) {
 	}
 	view, err := DepartmentMenu(ctx, k.Forms, d, q.Audience)
 	view.UnitRef = q.UnitRef
-	return view, err
+	if err != nil {
+		return view, err
+	}
+	return k.withModules(ctx, p.TenantID, view)
+}
+
+// withModules bỏ mục menu của module đã tắt cho tenant (W1.4, R-MOD-08: menu không hiện).
+func (k *KN) withModules(ctx context.Context, tid uuid.UUID, view MenuView) (MenuView, error) {
+	if k.Modules == nil {
+		return view, nil
+	}
+	disabled, err := k.Modules.DisabledModules(ctx, tid)
+	if err != nil {
+		return MenuView{}, err
+	}
+	view.Groups = FilterMenuGroups(view.Groups, disabled)
+	return view, nil
+}
+
+// FilterMenuGroups bỏ mục lá có màn thuộc module đã tắt (domain.MenuModule), mục cha không còn mục con
+// và nhóm trở nên rỗng vì lọc. disabled rỗng → giữ nguyên.
+func FilterMenuGroups(groups []MenuGroupView, disabled map[string]bool) []MenuGroupView {
+	if len(disabled) == 0 {
+		return groups
+	}
+	out := make([]MenuGroupView, 0, len(groups))
+	for _, g := range groups {
+		n := len(g.Items)
+		g.Items = filterMenuItems(g.Items, disabled)
+		if n > 0 && len(g.Items) == 0 {
+			continue
+		}
+		out = append(out, g)
+	}
+	return out
+}
+
+func filterMenuItems(items []MenuItemView, disabled map[string]bool) []MenuItemView {
+	out := make([]MenuItemView, 0, len(items))
+	for _, it := range items {
+		if len(it.Children) > 0 {
+			it.Children = filterMenuItems(it.Children, disabled)
+			if len(it.Children) == 0 {
+				continue
+			}
+		} else if it.Route != "" && disabled[domain.MenuModule(it.Route)] {
+			continue
+		}
+		out = append(out, it)
+	}
+	return out
 }
 
 // DepartmentMenu dựng menu của đối tượng (kn_tw/kn_tinh/kn_xa) cho phòng ban d — hàm thuần trên bảng tĩnh
@@ -207,9 +257,9 @@ func (k *KN) DepartmentModules(ctx context.Context, code string, q MenuQuery) (M
 		return MenuView{}, ErrDepartmentNotFound
 	}
 	item := adminDeptItem(*d)
-	return MenuView{Version: domain.MenuVersion, Audience: q.Audience, UnitRef: q.UnitRef, Department: d,
+	return k.withModules(ctx, p.TenantID, MenuView{Version: domain.MenuVersion, Audience: q.Audience, UnitRef: q.UnitRef, Department: d,
 		DefaultRoute: domain.DefaultRoute(port.AudienceAdmin),
-		Groups:       []MenuGroupView{{Key: domain.AdminDepartmentGroupKey + "." + d.Code, Label: d.Name, Items: item.Children}}}, nil
+		Groups:       []MenuGroupView{{Key: domain.AdminDepartmentGroupKey + "." + d.Code, Label: d.Name, Items: item.Children}}})
 }
 
 func pickDepartment(depts []port.Department, code string) (port.Department, error) {

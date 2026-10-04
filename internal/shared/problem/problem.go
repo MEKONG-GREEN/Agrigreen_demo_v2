@@ -94,6 +94,7 @@ var (
 	Forbidden           = New(http.StatusForbidden, "forbidden", "Không có quyền")
 	MFARequired         = New(http.StatusForbidden, "mfa_required", "Vai trò này bắt buộc xác thực đa yếu tố")
 	SelfApproval        = New(http.StatusForbidden, "self_approval_forbidden", "Không được phê duyệt thay đổi do chính mình đặt")
+	ModuleNotEnabled    = New(http.StatusForbidden, "module_not_enabled", "Module chưa được bật cho đơn vị") // R-MOD-08 (W1.4)
 	NotFound            = New(http.StatusNotFound, "not_found", "Không tìm thấy")
 	Conflict            = New(http.StatusConflict, "conflict", "Xung đột dữ liệu")
 	PayloadTooLarge     = New(http.StatusRequestEntityTooLarge, "payload_too_large", "Dữ liệu gửi lên quá lớn")

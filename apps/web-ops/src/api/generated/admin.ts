@@ -3163,6 +3163,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/modules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bật module theo đơn vị (W1.4, R-MOD-08): mọi module của danh mục với trạng thái bật của tenant người gọi
+         * @description Module `enable: always` (lõi, mkg/*, pf/extdata) luôn bật. Module `per_tenant` bật mặc định (chưa có dòng sổ) — chỉ tắt khi quản trị ghi sự kiện. Tắt module: route của module trả 403 `module_not_enabled`, vai của module không cấp được (`accounts.role_module_not_enabled`), menu không hiện màn của module.
+         */
+        get: operations["listModuleEnablement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/modules/{zone}/{name}/enablement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bật/tắt một module per_tenant cho tenant người gọi — hiệu lực ngay ở bản sao xử lý, các bản sao khác ≤ 10 giây
+         * @description Tắt bắt buộc lý do 10–500 ký tự. Module là `<zone>/<name>` (vd `pf/geo`).
+         */
+        post: operations["setModuleEnablement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/modules/{zone}/{name}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Khung Log bật/tắt module — người, thời điểm, trạng thái cũ → mới, lý do */
+        get: operations["moduleEnablementLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/orgs/{ref}/departments/seed": {
         parameters: {
             query?: never;
@@ -5406,6 +5463,21 @@ export interface components {
             recorded_at: string;
             changes: components["schemas"]["KNFieldChange"][];
             reason: string | null;
+        };
+        /** @description Trạng thái bật một module cho tenant (W1.4, R-MOD-08) */
+        ModuleEnablement: {
+            /** @description Tên repo, vd pf/geo */
+            module: string;
+            /** @enum {string} */
+            kind: "kernel" | "capability" | "domain";
+            /** @enum {string} */
+            enable: "always" | "per_tenant";
+            enabled: boolean;
+            reason: string | null;
+            /** Format: uuid */
+            updated_by: string | null;
+            /** Format: date-time */
+            updated_at: string | null;
         };
         KNLogPage: {
             items: components["schemas"]["KNLogEntry"][];
@@ -12289,6 +12361,105 @@ export interface operations {
             header?: never;
             path: {
                 id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNLogPage"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    listModuleEnablement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ModuleEnablement"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    setModuleEnablement: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                zone: "pf" | "mkg" | "vault";
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled: boolean;
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleEnablement"];
+                };
+            };
+            /** @description Đã ghi (200 khi gọi lặp cùng Idempotency-Key) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleEnablement"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description party.module_not_found */
+            404: components["responses"]["Problem"];
+            /** @description party.module_always_on | party.module_enablement_state */
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    moduleEnablementLog: {
+        parameters: {
+            query?: {
+                /** @description seq của dòng cuối trang trước */
+                cursor?: number;
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                zone: "pf" | "mkg" | "vault";
+                name: string;
             };
             cookie?: never;
         };

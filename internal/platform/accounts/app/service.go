@@ -26,6 +26,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/modreg"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
@@ -35,19 +36,21 @@ import (
 
 // Mã lỗi của module (docs/errors.md).
 var (
-	ErrDependency     = problem.New(http.StatusServiceUnavailable, "accounts.dependency_unavailable", "Keycloak hoặc pf/party chưa sẵn sàng")
-	ErrUserNotFound   = problem.New(http.StatusNotFound, "accounts.user_not_found", "Không tìm thấy tài khoản")
-	ErrOutOfScope     = problem.New(http.StatusForbidden, "accounts.out_of_scope", "Đơn vị ngoài phạm vi phụ trách")
-	ErrNotGrantable   = problem.New(http.StatusForbidden, "accounts.role_not_grantable", "Không được cấp hoặc thao tác trên vai này")
-	ErrSelfAction     = problem.New(http.StatusForbidden, "accounts.self_action", "Không được tự khóa, mở khóa hoặc đổi vai của chính mình")
-	ErrUserExists     = problem.New(http.StatusConflict, "accounts.user_exists", "Tên đăng nhập hoặc email đã được dùng")
-	ErrPhoneTaken     = problem.New(http.StatusConflict, "accounts.phone_taken", "Số điện thoại này đã được đăng ký cho một tài khoản khác.")
-	ErrState          = problem.New(http.StatusConflict, "accounts.state_conflict", "Trạng thái tài khoản không cho phép thao tác này")
-	ErrOrgInactive    = problem.New(http.StatusConflict, "accounts.org_inactive", "Tổ chức đang bị vô hiệu hóa")
-	ErrOrgInvalid     = problem.New(http.StatusUnprocessableEntity, "accounts.org_invalid", "Không có tổ chức với org_ref này")
-	ErrEmailFailed    = problem.New(http.StatusBadGateway, "accounts.email_failed", "Keycloak không gửi được email kích hoạt")
-	ErrImportInvalid  = problem.New(http.StatusUnprocessableEntity, "accounts.import_invalid", "Tệp nhập không đúng mẫu quy định")
-	errNoDirectoryYet = errors.New("accounts: chưa cấu hình Keycloak Admin (AG_KC_*)")
+	ErrDependency    = problem.New(http.StatusServiceUnavailable, "accounts.dependency_unavailable", "Keycloak hoặc pf/party chưa sẵn sàng")
+	ErrUserNotFound  = problem.New(http.StatusNotFound, "accounts.user_not_found", "Không tìm thấy tài khoản")
+	ErrOutOfScope    = problem.New(http.StatusForbidden, "accounts.out_of_scope", "Đơn vị ngoài phạm vi phụ trách")
+	ErrNotGrantable  = problem.New(http.StatusForbidden, "accounts.role_not_grantable", "Không được cấp hoặc thao tác trên vai này")
+	ErrSelfAction    = problem.New(http.StatusForbidden, "accounts.self_action", "Không được tự khóa, mở khóa hoặc đổi vai của chính mình")
+	ErrUserExists    = problem.New(http.StatusConflict, "accounts.user_exists", "Tên đăng nhập hoặc email đã được dùng")
+	ErrPhoneTaken    = problem.New(http.StatusConflict, "accounts.phone_taken", "Số điện thoại này đã được đăng ký cho một tài khoản khác.")
+	ErrState         = problem.New(http.StatusConflict, "accounts.state_conflict", "Trạng thái tài khoản không cho phép thao tác này")
+	ErrOrgInactive   = problem.New(http.StatusConflict, "accounts.org_inactive", "Tổ chức đang bị vô hiệu hóa")
+	ErrOrgInvalid    = problem.New(http.StatusUnprocessableEntity, "accounts.org_invalid", "Không có tổ chức với org_ref này")
+	ErrEmailFailed   = problem.New(http.StatusBadGateway, "accounts.email_failed", "Keycloak không gửi được email kích hoạt")
+	ErrImportInvalid = problem.New(http.StatusUnprocessableEntity, "accounts.import_invalid", "Tệp nhập không đúng mẫu quy định")
+	// W1.4 (R-MOD-08): quyền của module chưa bật cho đơn vị không cấp được.
+	ErrRoleModuleDisabled = problem.New(http.StatusConflict, "accounts.role_module_not_enabled", "Vai thuộc module chưa bật cho đơn vị")
+	errNoDirectoryYet     = errors.New("accounts: chưa cấu hình Keycloak Admin (AG_KC_*)")
 )
 
 // Producer ghi vào phong bì sự kiện.
@@ -75,7 +78,12 @@ type Service struct {
 	Departments partyport.Departments
 	Units       mdport.AdminUnits
 	Names       partyport.ActorNames
+	// W1.4 (R-MOD-08): trạng thái bật module theo đơn vị (pf/party) — chặn cấp vai của module đã tắt.
+	Modules partyport.ModuleEnablement
 }
+
+// KNModule là module sở hữu nghiệp vụ của vai trò KN (kn_tw, kn_tinh, kn_xa).
+const KNModule = "pf/extension"
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }
 
@@ -185,6 +193,38 @@ func (s *Service) checkOrg(ctx context.Context, a *actor, ref uuid.UUID) (*party
 		return nil, ErrOrgInactive.WithDetail("Không gán tài khoản vào tổ chức đã bị vô hiệu hóa.")
 	}
 	return o, nil
+}
+
+// checkModules (W1.4, R-MOD-08): vai mà mọi module khai nó (module.yaml permissions) đều đã tắt cho
+// tenant người gọi thì không cấp được. Modules nil → không kiểm (gốc lắp ráp cũ, kiểm thử).
+func (s *Service) checkModules(ctx context.Context, a *actor, roles []string) error {
+	if s.Modules == nil || len(roles) == 0 {
+		return nil
+	}
+	disabled, err := s.Modules.DisabledModules(ctx, a.p.TenantID)
+	if err != nil || len(disabled) == 0 {
+		return err
+	}
+	for _, r := range roles {
+		if blocked, mods := modreg.RoleBlocked(r, func(m string) bool { return disabled[m] }); blocked {
+			return ErrRoleModuleDisabled.WithDetail("Vai "+r+" thuộc module chưa bật cho đơn vị.").With("role", r).With("modules", mods)
+		}
+	}
+	return nil
+}
+
+// checkKNModule (W1.4): vai trò KN (kn_tw/kn_tinh/kn_xa) là chức năng của pf/extension — không gán khi
+// module đã tắt cho tenant.
+func (s *Service) checkKNModule(ctx context.Context, a *actor, role string) error {
+	if s.Modules == nil {
+		return nil
+	}
+	on, err := s.Modules.ModuleEnabled(ctx, a.p.TenantID, KNModule)
+	if err != nil || on {
+		return err
+	}
+	return ErrRoleModuleDisabled.WithDetail("Vai trò "+role+" thuộc module "+KNModule+" chưa bật cho đơn vị.").
+		With("role", role).With("modules", []string{KNModule})
 }
 
 // checkGrant: mọi vai trong roles phải nằm trong tập người gọi được cấp.

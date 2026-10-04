@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -82,9 +83,30 @@ type Modules struct {
 	APIClient     *apiclient.Module // G5 (ADR-0022): khách hàng Public API, khóa, đăng ký, gói hạn mức — Admin API
 }
 
-// List trả module theo thứ tự gắn route.
+// Named trả module kèm tên repo (module.yaml) theo thứ tự gắn route.
+func (m Modules) Named() []NamedModule {
+	return []NamedModule{
+		{"pf/masterdata", m.MasterData}, {"pf/party", m.Party}, {"pf/geo", m.Geo}, {"pf/content", m.Content},
+		{"pf/extension", m.Extension}, {"pf/mechanization", m.Mechanization}, {"pf/mrv", m.MRV}, {"pf/sync", m.Sync},
+		{"pf/notify", m.Notify}, {"pf/accounts", m.Accounts}, {"pf/reports", m.Reports}, {"pf/waterway", m.Waterway},
+		{"pf/simulation", m.Simulation}, {"pf/cropcycle", m.CropCycle}, {"pf/metrics", m.Metrics}, {"pf/extdata", m.ExtData},
+		{"pf/metering", m.Metering}, {"pf/apiclient", m.APIClient},
+	}
+}
+
+// List trả module theo thứ tự gắn route. W1.4 (R-MOD-08): route App/Admin của module per_tenant đi qua
+// cổng bật module của pf/party (403 module_not_enabled khi đã tắt cho tenant người gọi).
 func (m Modules) List() []httpx.Module {
-	return []httpx.Module{m.MasterData, m.Party, m.Geo, m.Content, m.Extension, m.Mechanization, m.MRV, m.Sync, m.Notify, m.Accounts, m.Reports, m.Waterway, m.Simulation, m.CropCycle, m.Metrics, m.ExtData, m.Metering, m.APIClient}
+	named := m.Named()
+	out := make([]httpx.Module, 0, len(named))
+	for _, n := range named {
+		var gate gin.HandlerFunc
+		if m.Party != nil {
+			gate = m.Party.ModuleGate(n.Name)
+		}
+		out = append(out, Gated(n.Module, gate))
+	}
+	return out
 }
 
 // Build là gốc lắp ráp DUY NHẤT: mở pool theo vai của từng module (R-05) và nối
@@ -213,7 +235,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	}
 	acc := accounts.New(accPool, clk, accounts.Deps{Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs(),
 		Households: pty.Households(), Vault: ext.Vault, Params: md.Params(),
-		Departments: pty.Departments(), Units: md.AdminUnits(), Names: kn.StaffNames()}) // KN v7.7 P1
+		Departments: pty.Departments(), Units: md.AdminUnits(), Names: kn.StaffNames(), // KN v7.7 P1
+		Modules: pty.ModuleEnablement()}) // W1.4: vai của module đã tắt không cấp được
 	// KN v7.7 P1 ↔ P2: menu theo ngữ cảnh phiên, số tài khoản theo phòng ban (mở khóa "xóa" phòng ban),
 	// dòng tài khoản của bảng Ảnh hưởng, tên người thao tác trong Log (Keycloak, dự phòng danh bạ cán bộ).
 	pty.UseSessionContext(acc.SessionContext())

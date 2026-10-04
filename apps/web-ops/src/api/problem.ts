@@ -28,6 +28,7 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   mfa_required:
     "Chức năng quản trị (Admin API) bắt buộc xác thực hai yếu tố. Phiên hiện tại mới đăng nhập bằng mật khẩu — vui lòng đăng xuất rồi đăng nhập lại kèm mã OTP.",
   self_approval_forbidden: "Không được tự phê duyệt thay đổi do chính mình đề xuất. Cần một người phê duyệt khác.",
+  module_not_enabled: "Chức năng này chưa được bật cho đơn vị của bạn. Liên hệ quản trị nếu cần sử dụng.",
   not_found: "Không tìm thấy dữ liệu yêu cầu.",
   method_not_allowed: "Thao tác không được hỗ trợ.",
   idempotency_in_progress: "Yêu cầu trước đó đang được xử lý. Vui lòng đợi giây lát rồi tải lại.",
@@ -185,6 +186,10 @@ export const PROBLEM_MESSAGES: Readonly<Record<string, string>> = {
   "party.department_not_found": "Không tìm thấy phòng ban.",
   "party.department_code_taken": "Mã phòng ban đã có trong đơn vị (mã không tái sử dụng).",
   "party.department_state": "Phòng ban đã ở trạng thái yêu cầu hoặc đã xóa.",
+  "party.module_not_found": "Không có module này.",
+  "party.module_always_on": "Module lõi luôn bật, không tắt theo đơn vị.",
+  "party.module_enablement_state": "Module đã ở trạng thái yêu cầu.",
+  "accounts.role_module_not_enabled": "Vai trò thuộc chức năng chưa được bật cho đơn vị — bật module trước khi cấp vai.",
   "party.department_in_use": "Phòng ban còn tài khoản hoặc dữ liệu — chuyển “Ngưng hoạt động” thay vì xóa.",
   "party.department_not_open": "Phòng ban chưa “Đang áp dụng”.",
   "party.department_unit_invalid": "Phòng ban chỉ khai báo cho Nút cấp 1 (TTKNQG) hoặc cấp 2 (TTKN tỉnh) đang hoạt động.",

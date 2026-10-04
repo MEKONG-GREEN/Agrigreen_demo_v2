@@ -11,6 +11,9 @@
 //   - owns_schema: schema do migration tạo (CREATE SCHEMA) có tên <cụm>_<module>,
 //     hoặc được duy nhất module này nhắc trong chuỗi SQL của mã không phải kiểm thử.
 //
+// Rồi sinh internal/shared/modreg/catalog_gen.go (W1.4): tên, kind, enable, permissions
+// của mọi module cho bật module theo đơn vị lúc chạy (nhị phân không mang module.yaml).
+//
 // Trường TAY (name, aka, kind, zones, version, shares, enable) giữ nguyên. Tệp chưa
 // có được tạo khung; kind/zones/enable phải điền tay rồi chạy lại.
 //
@@ -156,6 +159,19 @@ func run(root string, check bool) ([]string, error) {
 	reg, err := modreg.New(all)
 	if err != nil {
 		return stale, fmt.Errorf("module.yaml không hợp lệ:\n%w", err)
+	}
+	// W1.4: danh mục lúc chạy (tên, tầng, enable, vai) cho bật module theo đơn vị.
+	cat, err := modreg.FormatCatalog(all)
+	if err != nil {
+		return stale, err
+	}
+	cp := filepath.Join(root, filepath.FromSlash(modreg.CatalogFile))
+	if got, err := os.ReadFile(cp); err != nil || !bytes.Equal(normalizeEOL(got), cat) {
+		if check {
+			stale = append(stale, modreg.CatalogFile)
+		} else if err := os.WriteFile(cp, cat, 0o644); err != nil { //nolint:gosec // tệp nguồn trong repo
+			return stale, err
+		}
 	}
 	if err := checkApps(root, reg); err != nil {
 		return stale, err

@@ -40,6 +40,7 @@ type Module struct {
 	reg   *app.Registry
 	share *app.Sharing
 	kn    *app.KN
+	mods  *app.Modules
 }
 
 // New tạo module với pool của vai party_app. deps tùy chọn để giữ tương thích
@@ -51,11 +52,15 @@ func New(db tenant.Beginner, clk clock.Clock, deps ...Deps) *Module {
 		d = deps[0]
 	}
 	reg := &app.Registry{DB: db, Clock: clk, Units: d.AdminUnits, Vault: d.Vault}
+	kn := &app.KN{DB: db, Clock: clk, Reg: reg}
+	mods := &app.Modules{DB: db, Clock: clk, Names: func() port.ActorNames { return kn.Names }}
+	kn.Modules = mods
 	return &Module{
 		svc:   &app.Service{DB: db, Clock: clk},
 		reg:   reg,
 		share: &app.Sharing{DB: db, Clock: clk},
-		kn:    &app.KN{DB: db, Clock: clk, Reg: reg},
+		kn:    kn,
+		mods:  mods,
 	}
 }
 
@@ -66,7 +71,8 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.Me{Reg: m.reg}.Register(rg)
 	handler.Sharing{Svc: m.share}.RegisterApp(rg)
 	handler.KN{Svc: m.kn}.RegisterApp(rg)
-	handler.KN{Svc: m.kn}.RegisterKNCollect(rg) // KN v7.7 FN-XA-03.03: /v1/kn/cooperatives*, /v1/kn/households*
+	handler.KN{Svc: m.kn}.RegisterKNCollect(rg)  // KN v7.7 FN-XA-03.03: /v1/kn/cooperatives*, /v1/kn/households*
+	handler.Modules{Svc: m.mods}.RegisterApp(rg) // W1.4: GET /v1/me/modules
 }
 
 // RegisterAdmin gắn route Admin API.
@@ -74,7 +80,15 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) {
 	handler.Registry{Reg: m.reg, KN: m.kn}.RegisterAdmin(rg)
 	handler.Sharing{Svc: m.share}.RegisterAdmin(rg)
 	handler.KN{Svc: m.kn}.RegisterAdmin(rg)
+	handler.Modules{Svc: m.mods}.RegisterAdmin(rg) // W1.4: /v1/modules*
 }
+
+// ModuleEnablement (W1.4, R-MOD-08) cho gốc lắp ráp và pf/accounts: trạng thái bật module theo đơn vị.
+func (m *Module) ModuleEnablement() port.ModuleEnablement { return m.mods }
+
+// ModuleGate trả middleware chặn route của module (tên repo, vd "pf/geo") khi đã tắt cho tenant người
+// gọi (403 module_not_enabled); nil với module luôn bật. Gốc lắp ráp gắn vào nhóm route của module.
+func (m *Module) ModuleGate(module string) gin.HandlerFunc { return handler.ModuleGate(m.mods, module) }
 
 // PartnerAccess cho module chủ dữ liệu kiểm cấp quyền chia sẻ và ghi sổ đọc của bề mặt đối tác
 // /v1/partner/* (ADR-0020, qua port).

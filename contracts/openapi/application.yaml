@@ -245,6 +245,25 @@ paths:
               schema: {$ref: "#/components/schemas/Me"}
         "401": {$ref: "#/components/responses/Problem"}
         "503": {description: party.dependency_unavailable — chưa nối danh mục đơn vị hành chính, $ref: "#/components/responses/Problem"}
+  /v1/me/modules:
+    get:
+      summary: "Module đã bật cho đơn vị (tenant) của người gọi — W1.4, R-MOD-08: client ẩn màn của module đã tắt"
+      description: >-
+        Mọi người đã xác thực. Route của module đã tắt trả 403 `module_not_enabled` (problem có `module`); menu
+        `GET /v1/menu` đã lọc sẵn ở server. Module `enable: always` luôn `enabled: true`.
+      operationId: myModules
+      tags: [party]
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ModuleEnablement"}}
+        "401": {$ref: "#/components/responses/Problem"}
   # --- pf/accounts KN v7.7 gói P1: ngữ cảnh phiên (FN-CH-00.01, gap §4.5 phương án A) ---
   # Keycloak chỉ xác thực. Client chọn vai trò × phòng ban → context_id, gửi header X-AG-Context ở MỌI request (cả Admin API);
   # middleware giải vai, phòng ban, phạm vi ở server. Context lạ / của người khác → 403 accounts.context_invalid; hết hạn → 403
@@ -7616,6 +7635,18 @@ components:
         key: {type: string, description: "dieu_hanh | bao_cao | du_lieu; Admin: dieu_hanh | phong_ban | quan_tri"}
         label: {type: string}
         items: {type: array, items: {$ref: "#/components/schemas/KNMenuItem"}}
+    ModuleEnablement:
+      type: object
+      description: Trạng thái bật một module cho tenant (W1.4, R-MOD-08)
+      required: [module, kind, enable, enabled, reason, updated_by, updated_at]
+      properties:
+        module: {type: string, description: "Tên repo, vd pf/geo"}
+        kind: {type: string, enum: [kernel, capability, domain]}
+        enable: {type: string, enum: [always, per_tenant]}
+        enabled: {type: boolean}
+        reason: {type: [string, "null"]}
+        updated_by: {type: [string, "null"], format: uuid}
+        updated_at: {type: [string, "null"], format: date-time}
     KNMenu:
       type: object
       required: [menu_version, audience, org_ref, department, default_route, groups]

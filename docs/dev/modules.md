@@ -120,3 +120,35 @@ Lúc W1.3 (04/10/2026):
 | PF | 15 | `api-platform`, `api-public`, `worker`, `identity-vault`, `outbox-publisher`, `migrate`, `objsync`, `drill`, `seed-synthetic` | `web-ops` `/quan-tri` |
 
 Danh sách module lấy từ menu `web-ops` (`src/nav/nav.ts`), tiền tố API mà `web-ops`, `field-app`, `htx-app`, `mkg-field-app`, `web-internal` gọi, và import của `cmd/*`. `landing` KN lấy từ `accounts/domain.DefaultRoute` (trùng `party/domain` menu); các vai khác theo `homeFor` của `web-ops`. Phòng ban KN là cấu hình của `pf/extension`, không phải module (ADR-0027 mục 6). Bật module theo đơn vị là W1.4.
+
+## Bật module theo đơn vị (W1.4)
+
+R-MOD-08 (kiến trúc v4.1 §7.3): module chưa bật cho đơn vị thì route trả `module_not_enabled`, quyền liên quan không cấp được, menu không hiện. Migration **pf 000088**.
+
+**Đơn vị = tenant.** "Đơn vị tham gia" của v4.1 là tenant (RB-2: cách ly theo đơn vị tham gia bằng `tenant_id`), khớp tên chính sách `enable: per_tenant`. Phòng ban KN (`pf_party.department`, ADR-0027 mục 6) là cấu hình riêng, lọc menu thêm sau bước này.
+
+| `enable` | Hành vi |
+|---|---|
+| `always` | Luôn bật. Không ghi sổ được (`party.module_always_on`), không có middleware. Mọi `kernel`, `mkg/*`, `pf/extdata` |
+| `per_tenant` | **Mặc định bật**: không có dòng chiếu = bật. Chỉ tắt khi Admin ghi sự kiện `disabled` |
+
+**Lựa chọn nạp mặc định:** không nạp dữ liệu. Mọi tenant hiện có và tenant mới giữ nguyên hành vi trước W1.4; sổ chỉ có dòng khi quản trị tắt (hoặc bật lại) một module. Muốn tenant mới mặc định tắt một module thì cần gói sau (ghi sự kiện khi tạo tenant), không đổi nghĩa "không có dòng".
+
+**Dữ liệu.** `pf_party.module_enablement_event` (sổ chỉ ghi thêm, seq, chuỗi băm, RLS; `status`, `prev_status`, lý do bắt buộc ≥ 10 ký tự khi tắt) và `pf_party.module_enablement_current` (chiếu, cùng giao dịch, R-21). Không phê duyệt hai người, cùng mức với trạng thái phòng ban: Admin API có MFA, vai `platform_admin` hoặc `registry_admin`.
+
+**Danh mục lúc chạy.** Nhị phân không mang `module.yaml`, nên `modgen` sinh `internal/shared/modreg/catalog_gen.go` (tên, `kind`, `enable`, `permissions`). `modgen -check` hỏng khi tệp này lệch. `modreg.PerTenant`, `modreg.RoleBlocked` dùng nó.
+
+**API.**
+
+| Bề mặt | Route | Ghi chú |
+|---|---|---|
+| Admin (MFA) | `GET /v1/modules` | Mọi module của danh mục, trạng thái của tenant người gọi |
+| Admin (MFA) | `POST /v1/modules/{zone}/{name}/enablement` | `{enabled, reason}`, Idempotency-Key; 201, gọi lặp 200 |
+| Admin (MFA) | `GET /v1/modules/{zone}/{name}/log` | Khung Log: người, thời điểm, cũ → mới, lý do |
+| App | `GET /v1/me/modules` | Mọi người đã xác thực; web-ops dùng để ẩn màn |
+
+**Cổng route.** `cmd/api-platform/assembly` biết route nào thuộc module nào vì chính nó gọi `RegisterApp`/`RegisterAdmin` của từng module (`Modules.Named()`, kiểm thử khớp tên với gói và danh mục). Module `per_tenant` đăng ký route trong nhóm con mang `party.Module.ModuleGate(name)`: tenant đã tắt → 403 `module_not_enabled` (thân có `module`). Route công khai `/v1/public` và middleware phiên của module không qua cổng. Đọc trạng thái có đệm theo tenant 10 giây; ghi trong cùng tiến trình xóa đệm ngay, bản sao khác thấy sau tối đa 10 giây. Chỉ chặn HTTP; port trong tiến trình (lõi gọi masterdata, geo…) không bị chặn.
+
+**Quyền.** `pf/accounts` từ chối vai **thêm mới** khi mọi module khai vai đó trong `permissions` đều `per_tenant` và đã tắt (`accounts.role_module_not_enabled`, 409). Vai có module lõi cùng khai (vd `coop_manager` của `pf/party`) không bị chặn. Gán vai trò KN (`kn_tw`/`kn_tinh`/`kn_xa`) bị chặn khi `pf/extension` tắt.
+
+**Menu.** `GET /v1/menu` bỏ mục có màn thuộc module tắt (`party/domain.MenuModule`: tiền tố đường dẫn → module), mục cha không còn con và nhóm trở nên rỗng. `web-ops` `nav.ts` gắn `module` cho mục menu cũ và lọc theo `GET /v1/me/modules`; không đọc được thì không lọc (backend vẫn chặn).

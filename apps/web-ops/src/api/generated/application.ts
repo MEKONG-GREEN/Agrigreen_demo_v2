@@ -202,6 +202,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/modules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Module đã bật cho đơn vị (tenant) của người gọi — W1.4, R-MOD-08: client ẩn màn của module đã tắt
+         * @description Mọi người đã xác thực. Route của module đã tắt trả 403 `module_not_enabled` (problem có `module`); menu `GET /v1/menu` đã lọc sẵn ở server. Module `enable: always` luôn `enabled: true`.
+         */
+        get: operations["myModules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/contexts": {
         parameters: {
             query?: never;
@@ -5494,6 +5514,21 @@ export interface components {
             label: string;
             items: components["schemas"]["KNMenuItem"][];
         };
+        /** @description Trạng thái bật một module cho tenant (W1.4, R-MOD-08) */
+        ModuleEnablement: {
+            /** @description Tên repo, vd pf/geo */
+            module: string;
+            /** @enum {string} */
+            kind: "kernel" | "capability" | "domain";
+            /** @enum {string} */
+            enable: "always" | "per_tenant";
+            enabled: boolean;
+            reason: string | null;
+            /** Format: uuid */
+            updated_by: string | null;
+            /** Format: date-time */
+            updated_at: string | null;
+        };
         KNMenu: {
             /** @description Phiên bản bảng menu tĩnh (kn.menu/v2) */
             menu_version: string;
@@ -10560,6 +10595,29 @@ export interface operations {
             401: components["responses"]["Problem"];
             /** @description party.dependency_unavailable — chưa nối danh mục đơn vị hành chính */
             503: components["responses"]["Problem"];
+        };
+    };
+    myModules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ModuleEnablement"][];
+                    };
+                };
+            };
+            401: components["responses"]["Problem"];
         };
     };
     knMyContexts: {

@@ -16,6 +16,7 @@ Mọi lỗi trả về `application/problem+json` theo RFC 9457. Mỗi lỗi có
 | 403 | `forbidden` | Thiếu vai |
 | 403 | `mfa_required` | Bề mặt Admin khi token chưa qua yếu tố thứ hai |
 | 403 | `self_approval_forbidden` | Tự phê duyệt thay đổi do chính mình đặt (R-56) |
+| 403 | `module_not_enabled` | Route của một module `enable: per_tenant` đã tắt cho đơn vị (tenant) người gọi (R-MOD-08, W1.4). Thân có `module` (vd `pf/geo`). Module lõi/`always` không bao giờ trả mã này |
 | 404 | `not_found` | Đường dẫn không tồn tại |
 | 405 | `method_not_allowed` | Phương thức HTTP không được hỗ trợ |
 | 409 | `idempotency_in_progress` | Yêu cầu cùng khóa đang chạy |
@@ -98,6 +99,9 @@ Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính m�
 | 409 | `party.region_state` | pf/party (FN-AD-04.02): khu vực đã ở trạng thái yêu cầu; gán lại đúng khu vực hiện tại; bỏ gán xã chưa có khu vực |
 | 409 | `party.region_in_use` | pf/party (FN-AD-04.02): ngừng dùng khu vực còn xã được gán (`communes` trong thân lỗi) |
 | 422 | `party.region_node_invalid` | pf/party (FN-AD-04.02): gán khu vực cho Nút không phải xã (extension_team) đang hoạt động, hoặc khu vực không đang dùng / không thuộc tỉnh của xã |
+| 404 | `party.module_not_found` | pf/party (W1.4, R-MOD-08): `POST /v1/modules/{zone}/{name}/enablement`, `GET …/log` — tên module không có trong danh mục (module.yaml) |
+| 409 | `party.module_always_on` | pf/party (W1.4): bật/tắt module `enable: always` (lõi, `mkg/*`, `pf/extdata`) — chỉ module `per_tenant` bật/tắt theo đơn vị |
+| 409 | `party.module_enablement_state` | pf/party (W1.4): module đã ở trạng thái yêu cầu (bật module đang bật — kể cả mặc định chưa có dòng sổ — hoặc tắt module đang tắt) |
 | 403 | `party.menu_audience_forbidden` | pf/party (UR-KT-02): người gọi xin menu của vai KN mình không có (Admin xem được mọi cấp — FN-AD-04.07), hoặc khác ngữ cảnh phiên |
 | 404 | `party.seed_unavailable` | pf/party (KN v7.7): không có dữ liệu nền (khu vực) cho tỉnh này — hiện chỉ An Giang (91), tạm chờ Q-04 |
 | — | `party.valve_share_grant_missing` | pf/party (ADR-0020), lỗi consumer (không phải HTTP): phong bì van MKG (`hub_facility`, `hub_capacity`, `collection_schedule`, `htx_collection_statement`, `mrv_collection_evidence`) mang tenant chưa được bên cấp nào cấp loại `valve_*` tương ứng → consumer `pf.geo.hub_valve` / `pf.cropcycle.htx_collection_valve` / `pf.mrv.collection_evidence` trả lỗi, giao lại rồi DLQ (R-62). Duyệt cấp quyền rồi chuyển lại từ DLQ (xử lý idempotent) |
@@ -430,6 +434,7 @@ Tài khoản cán bộ quản lý trong Keycloak qua Admin REST (KN US-ADM-01..0
 |---|---|---|
 | 403 | `accounts.out_of_scope` | pf/accounts: tổ chức (`org_ref`) hoặc tài khoản đích ngoài phạm vi TW → Tỉnh → Xã của người gọi; tổ chức cấp quốc gia chỉ người có phạm vi toàn quốc thao tác |
 | 403 | `accounts.role_not_grantable` | pf/accounts: vai cần cấp, hoặc một vai tài khoản đích đang có, nằm ngoài ma trận cấp vai của người gọi (quản trị tỉnh chỉ `kn_officer`, `coop_manager`); tài khoản `platform_admin` chỉ `platform_admin` thao tác; vai không có trong realm |
+| 409 | `accounts.role_module_not_enabled` | pf/accounts (W1.4, R-MOD-08): vai THÊM MỚI (tạo tài khoản, `POST …/assignment`) mà mọi module khai nó trong `permissions` (module.yaml) đều là `per_tenant` và đã tắt cho tenant người gọi; hoặc gán vai trò KN (`kn_tw`/`kn_tinh`/`kn_xa`) khi `pf/extension` đã tắt. Thân có `role`, `modules`. Gỡ hoặc giữ vai đang có vẫn được |
 | 403 | `accounts.self_action` | pf/accounts: tự khóa, mở khóa hoặc đổi đơn vị/vai của chính mình |
 | 404 | `accounts.user_not_found` | pf/accounts: không có người dùng Keycloak, hoặc người dùng thuộc tenant khác (không lộ sự tồn tại) |
 | 409 | `accounts.user_exists` | pf/accounts: tên đăng nhập hoặc email đã có trong realm |

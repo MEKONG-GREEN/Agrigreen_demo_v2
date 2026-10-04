@@ -148,3 +148,51 @@ func TestMeAndConsentSyncWired(t *testing.T) {
 		t.Fatalf("đọc lại đồng ý đã đồng bộ: %d %v", resp.StatusCode, b)
 	}
 }
+
+// W1.4 (R-MOD-08): gốc lắp ráp gắn cổng bật module vào route của module per_tenant — tắt pf/sync cho
+// tenant thì route của pf/sync trả 403 module_not_enabled, route lõi (/v1/me) vẫn chạy, tenant khác không ảnh hưởng.
+func TestModuleGateWired(t *testing.T) {
+	app, admin, iss := glueFixture(t)
+	tid, other := ids.New(), ids.New()
+	adm := iss.Sign(t, authztest.Token{Subject: ids.New(), TenantID: tid, Roles: []string{"platform_admin"}, MFA: true})
+	hdr := func(tok, key string) map[string]string {
+		h := map[string]string{"Authorization": "Bearer " + tok, "Content-Type": "application/json"}
+		if key != "" {
+			h["Idempotency-Key"] = key
+		}
+		return h
+	}
+	device := func(tok string) int {
+		d := ids.New().String()
+		h := hdr(tok, "devreg:"+d)
+		h["X-Device-Id"] = d
+		resp, _ := send(t, http.MethodPost, app.URL+"/v1/devices", h, map[string]any{"device_id": d, "platform": "android", "app_version": "1.0.0"})
+		return resp.StatusCode
+	}
+	if s := device(adm); s != http.StatusCreated {
+		t.Fatalf("pf/sync bật mặc định: %d", s)
+	}
+	if resp, b := send(t, http.MethodPost, admin.URL+"/v1/modules/pf/sync/enablement", hdr(adm, "mod-"+ids.New().String()),
+		map[string]any{"enabled": false, "reason": "Đơn vị chưa dùng đồng bộ"}); resp.StatusCode != http.StatusCreated {
+		t.Fatalf("tắt pf/sync: %d %v", resp.StatusCode, b)
+	}
+	d := ids.New().String()
+	h := hdr(adm, "devreg:"+d)
+	h["X-Device-Id"] = d
+	if resp, b := send(t, http.MethodPost, app.URL+"/v1/devices", h, map[string]any{"device_id": d, "platform": "android", "app_version": "1.0.0"}); resp.StatusCode != http.StatusForbidden || b["code"] != "module_not_enabled" || b["module"] != "pf/sync" {
+		t.Fatalf("route pf/sync đã tắt: %d %v", resp.StatusCode, b)
+	}
+	if resp, b := send(t, http.MethodGet, app.URL+"/v1/me", hdr(adm, ""), nil); resp.StatusCode != http.StatusOK {
+		t.Fatalf("route lõi không bị chặn: %d %v", resp.StatusCode, b)
+	}
+	if s := device(iss.Sign(t, authztest.Token{Subject: ids.New(), TenantID: other, Roles: []string{"platform_admin"}, MFA: true})); s != http.StatusCreated {
+		t.Fatalf("tenant khác: %d", s)
+	}
+	if resp, b := send(t, http.MethodPost, admin.URL+"/v1/modules/pf/sync/enablement", hdr(adm, "mod-"+ids.New().String()),
+		map[string]any{"enabled": true}); resp.StatusCode != http.StatusCreated {
+		t.Fatalf("bật lại pf/sync: %d %v", resp.StatusCode, b)
+	}
+	if s := device(adm); s != http.StatusCreated {
+		t.Fatalf("sau khi bật lại: %d", s)
+	}
+}

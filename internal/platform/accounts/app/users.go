@@ -54,6 +54,9 @@ func (s *Service) prepare(ctx context.Context, a *actor, in CreateInput) (prepar
 	if err := a.checkGrant(roles); err != nil {
 		return prepared{}, err
 	}
+	if err := s.checkModules(ctx, a, roles); err != nil {
+		return prepared{}, err
+	}
 	o, err := s.checkOrg(ctx, a, in.OrgRef)
 	if err != nil {
 		return prepared{}, err
@@ -389,6 +392,16 @@ func (s *Service) Assign(ctx context.Context, in AssignInput) (Result, error) {
 			return Result{}, fieldProblem(err)
 		}
 		if err := a.checkGrant(newRoles); err != nil {
+			return Result{}, err
+		}
+		// W1.4: chỉ vai THÊM MỚI bị chặn khi module đã tắt — gỡ hoặc giữ vai cũ vẫn được.
+		var added []string
+		for _, r := range newRoles {
+			if !slices.Contains(t.roles, r) {
+				added = append(added, r)
+			}
+		}
+		if err := s.checkModules(ctx, a, added); err != nil {
 			return Result{}, err
 		}
 	}

@@ -4,7 +4,7 @@ import { MOCK_PERSONAS } from "@/api/mock/personas";
 import { buildPrincipal, type Principal } from "@/auth/principal";
 import { legacyMenu } from "@/shell/menu";
 import { Sidebar } from "@/shell/Sidebar";
-import { canSee, findNavItem, homeFor, visibleNav } from "./nav";
+import { canSee, disabledModules, findNavItem, homeFor, NAV_GROUPS, visibleNav } from "./nav";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/", useRouter: () => ({ replace: vi.fn() }) }));
 
@@ -147,5 +147,32 @@ describe("<Sidebar>", () => {
     expect(screen.getAllByRole("link")).toHaveLength(2);
     expect(screen.getByRole("link", { name: /Bản đồ CGH/ })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: /Báo cáo/ })).toBeInTheDocument();
+  });
+});
+
+describe("W1.4 (R-MOD-08): áº©n mÃ n cá»§a module chÆ°a báº­t cho Ä‘Æ¡n vá»‹", () => {
+  const off = (...m: string[]) => disabledModules(m.map((module) => ({ module, enabled: false })));
+
+  it("khÃ´ng táº¯t gÃ¬ â†’ menu nhÆ° cÅ©; táº¯t pf/geo â†’ áº©n báº£n Ä‘á»“, giá»¯ mÃ n lÃµi", () => {
+    const tw = persona("tw");
+    expect(visibleNav(tw, off())).toEqual(visibleNav(tw));
+    const h = visibleNav(tw, off("pf/geo")).flatMap((g) => g.items.map((i) => i.href));
+    expect(h).not.toContain("/ban-do");
+    expect(h).not.toContain("/ban-do-gis");
+    expect(h).toEqual(expect.arrayContaining(["/", "/htx", "/nhiem-vu"]));
+  });
+
+  it("canSee cháº·n mÃ n cá»§a module táº¯t (Ä‘Æ°á»ng dáº«n gÃµ tay); Cá»¥c khÃ´ng bá»‹ Ä‘Æ°a tá»›i /cgh khi pf/mechanization táº¯t", () => {
+    const cuc = persona("cuc");
+    const cgh = findNavItem("/cgh");
+    expect(cgh && canSee(cgh, cuc)).toBe(true);
+    expect(cgh && canSee(cgh, cuc, off("pf/mechanization"))).toBe(false);
+    expect(homeFor(cuc, off("pf/mechanization"))).not.toBe("/cgh");
+  });
+
+  it("disabledModules chá»‰ láº¥y module enabled = false; module gáº¯n á»Ÿ nav lÃ  tÃªn repo pf/*", () => {
+    expect([...disabledModules([{ module: "pf/geo", enabled: false }, { module: "pf/party", enabled: true }])]).toEqual(["pf/geo"]);
+    expect([...disabledModules(undefined)]).toEqual([]);
+    for (const g of NAV_GROUPS) for (const i of g.items) if (i.module) expect(i.module).toMatch(/^pf\/[a-z][a-z0-9_]*$/);
   });
 });
