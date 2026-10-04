@@ -1,0 +1,28 @@
+# Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
+name: pf/notify
+aka: [cap/notify]
+kind: capability
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/content: ">=1.0 <2"
+  pf/cropcycle: ">=1.0 <2"
+  pf/extension: ">=1.0 <2"
+  pf/masterdata: ">=1.0 <2"
+  pf/mechanization: ">=1.0 <2"
+  pf/metering: ">=1.0 <2"
+  pf/mrv: ">=1.0 <2"
+  pf/party: ">=1.0 <2"
+  pf/sync: ">=1.0 <2"
+provides:
+  ports: [AreaFarmers]
+  events: [pf.notify.notification.created/v1, pf.notify.push.requested/v1]
+  internal_events: []
+  publications: []
+  data_products: []
+permissions: []
+shares: []
+owns_schema: [pf_notify]
+enable: per_tenant

@@ -1,0 +1,21 @@
+# Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
+name: pf/masterdata
+aka: [cap/masterdata]
+kind: capability
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/extension: ">=1.0 <2"
+  pf/sync: ">=1.0 <2"
+provides:
+  ports: [AdminUnitTree, AdminUnits, Catalogs, FormUsage, Params]
+  events: [pf.masterdata.admin_unit.changed/v1, pf.masterdata.param.approved/v1]
+  internal_events: []
+  publications: []
+  data_products: []
+permissions: [masterdata_admin]
+shares: []
+owns_schema: [pf_masterdata]
+enable: per_tenant

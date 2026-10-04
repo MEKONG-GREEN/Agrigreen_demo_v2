@@ -1,0 +1,27 @@
+# Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
+name: pf/mrv
+aka: [dom/mrv]
+kind: domain
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/apiclient: ">=1.0 <2"
+  pf/masterdata: ">=1.0 <2"
+  pf/metering: ">=1.0 <2"
+  pf/party: ">=1.0 <2"
+  pf/sync: ">=1.0 <2"
+provides:
+  ports: []
+  events:
+    - pf.mrv.alert.raised/v1
+    - pf.mrv.export.completed/v1
+    - pf.mrv.export.requested/v1
+  internal_events: []
+  publications: []
+  data_products: []
+permissions: [mrv_collector, mrv_exporter, mrv_reviewer, mrv_viewer]
+shares: []
+owns_schema: [pf_mrv]
+enable: per_tenant

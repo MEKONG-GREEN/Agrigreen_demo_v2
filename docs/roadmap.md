@@ -248,6 +248,9 @@ Trạng thái (02/10/2026): A, M, S + D, H, W đã hợp nhất vào `sub/g5` (t
   - **chờ khách:** Q5-1..Q5-10 (bên thứ ba đầu tiên, giá trị k, Q5-6 hub, giá, thời hạn lưu, Valkey, VVB);
   - **hạ tầng:** diễn tập `helm upgrade -f values-phasek.yaml` trên staging (K-04), NetworkPolicy / Ingress / ExternalSecret trên cụm thật, PgBouncer song song, luật cảnh báo DLQ vùng nền tảng (X-07), `promtool`, cổng giấy phép CI.
 
+## Chuyển đổi kiến trúc v4.1 ([kế hoạch](kien-truc-v4.1-ke-hoach.md))
+- [x] W1.1 (04/10/2026): `module.yaml` cho 26 module, `internal/shared/modreg`, `go run ./tools/modgen -check` ([docs/dev/modules.md](dev/modules.md)).
+
 ## G6
 Theo Phụ lục A của tài liệu kiến trúc:
 - **G6 (Q1/2029):** cấu hình Phase 1, không sửa mã. Cơ chế giống Phase K: một lớp giá trị mới (ADR-0025).

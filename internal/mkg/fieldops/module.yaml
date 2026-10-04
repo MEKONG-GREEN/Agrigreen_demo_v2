@@ -1,0 +1,29 @@
+# Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
+name: mkg/fieldops
+aka: [mkg/fieldops]
+kind: domain
+zones: [mkg]
+version: 1.0.0
+depends:
+  mkg/measurement: ">=1.0 <2"
+provides:
+  ports:
+    - HTXResponseFeed
+    - HarvestCalendar
+    - KgPerRollEstimates
+    - PlatformDirectory
+    - Publication
+    - RollTotals
+    - WeighedMass
+  events:
+    - mkg.fieldops.collection_schedule.published/v1
+    - mkg.fieldops.htx_collection_statement.published/v1
+  internal_events: [mkg.fieldops.roll_count.recorded/v1]
+  publications: [collection_schedule, htx_collection_statement]
+  data_products: []
+permissions: [field_collector, field_supervisor]
+shares: []
+owns_schema: [mkg_fieldops]
+enable: always

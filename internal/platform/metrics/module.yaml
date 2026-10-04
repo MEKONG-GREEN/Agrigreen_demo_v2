@@ -1,0 +1,24 @@
+# Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
+name: pf/metrics
+aka: [cap/analytics]
+kind: capability
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/cropcycle: ">=1.0 <2"
+  pf/geo: ">=1.0 <2"
+  pf/mechanization: ">=1.0 <2"
+  pf/party: ">=1.0 <2"
+  pf/waterway: ">=1.0 <2"
+provides:
+  ports: [GeometryResolver, LayerLog, ScopeLister, Source]
+  events: []
+  internal_events: []
+  publications: []
+  data_products: []
+permissions: [metrics_viewer]
+shares: []
+owns_schema: [pf_metrics]
+enable: per_tenant

@@ -1,0 +1,27 @@
+# Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
+name: pf/sync
+aka: [cap/sync, cap/evidence]
+kind: capability
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/accounts: ">=1.0 <2"
+  pf/masterdata: ">=1.0 <2"
+  pf/party: ">=1.0 <2"
+  vault/identity: ">=1.0 <2"
+provides:
+  ports: [ConflictViewer, Devices, FarmerSource, Sink, Source]
+  events:
+    - pf.sync.conflict.opened/v1
+    - pf.sync.conflict.resolved/v1
+    - pf.sync.device.revoked/v1
+    - pf.sync.integration.dead_lettered/v1
+  internal_events: []
+  publications: []
+  data_products: []
+permissions: [device_admin, sync_conflict_resolver]
+shares: []
+owns_schema: [pf_files, pf_sync]
+enable: per_tenant

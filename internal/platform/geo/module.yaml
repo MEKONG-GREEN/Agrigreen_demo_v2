@@ -1,0 +1,43 @@
+# Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
+name: pf/geo
+aka: [cap/geo]
+kind: capability
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/apiclient: ">=1.0 <2"
+  pf/masterdata: ">=1.0 <2"
+  pf/metering: ">=1.0 <2"
+  pf/metrics: ">=1.0 <2"
+  pf/party: ">=1.0 <2"
+  pf/sync: ">=1.0 <2"
+  pf/waterway: ">=1.0 <2"
+  vault/identity: ">=1.0 <2"
+provides:
+  ports:
+    - CoopCentroids
+    - CoopMarkers
+    - FarmerHouseholds
+    - FarmerIdentity
+    - GpsLog
+    - HubSink
+    - PlotFacts
+    - PlotHouseholds
+    - PlotStats
+    - Plots
+  events:
+    - pf.geo.cooperative_boundary.recorded/v1
+    - pf.geo.facility.recorded/v1
+    - pf.geo.plot.created/v1
+    - pf.geo.plot.restored/v1
+    - pf.geo.plot.retired/v1
+    - pf.geo.plot_boundary.recorded/v1
+  internal_events: []
+  publications: []
+  data_products: []
+permissions: [coop_manager, farmer, geo_admin, map_consumer, plot_editor, plot_viewer]
+shares: []
+owns_schema: [pf_geo]
+enable: per_tenant

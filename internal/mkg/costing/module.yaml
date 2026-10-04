@@ -1,0 +1,28 @@
+# Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
+name: mkg/costing
+aka: [mkg/costing]
+kind: domain
+zones: [mkg]
+version: 1.0.0
+depends:
+  mkg/acctbridge: ">=1.0 <2"
+  mkg/fieldops: ">=1.0 <2"
+  mkg/hub: ">=1.0 <2"
+  mkg/logistics: ">=1.0 <2"
+  mkg/measurement: ">=1.0 <2"
+  mkg/orders: ">=1.0 <2"
+provides:
+  ports: [ClosedPeriods]
+  events: []
+  internal_events:
+    - mkg.costing.period.closed/v1
+    - mkg.costing.period_close.requested/v1
+    - mkg.costing.settlement.approved/v1
+  publications: []
+  data_products: []
+permissions: [chief_accountant, cost_accountant, period_closer]
+shares: []
+owns_schema: [mkg_costing]
+enable: always

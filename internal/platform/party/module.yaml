@@ -1,0 +1,59 @@
+# Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
+name: pf/party
+aka: [k/orgtree, k/access]
+kind: kernel
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/apiclient: ">=1.0 <2"
+  pf/geo: ">=1.0 <2"
+  pf/masterdata: ">=1.0 <2"
+  pf/metering: ">=1.0 <2"
+  pf/sync: ">=1.0 <2"
+  vault/identity: ">=1.0 <2"
+provides:
+  ports:
+    - APIReadLog
+    - ActorNames
+    - ConsentChecker
+    - CoopMachineCounts
+    - CooperativeSites
+    - CooperativeStats
+    - DepartmentUsage
+    - Departments
+    - FormAvailability
+    - GrantLookup
+    - Households
+    - OrgCodes
+    - OrgImpactSource
+    - Orgs
+    - PartnerAccess
+    - Regions
+    - ScopeResolver
+    - SeasonActivity
+    - SessionContext
+    - ValveGrants
+  events:
+    - pf.party.consent.recorded/v1
+    - pf.party.household.membership_changed/v1
+    - pf.party.household.registered/v1
+    - pf.party.org.deactivated/v1
+    - pf.party.org.reactivated/v1
+  internal_events: []
+  publications: []
+  data_products: []
+permissions:
+    - cgh_viewer
+    - consent_reader
+    - consent_writer
+    - coop_manager
+    - kn_national_admin
+    - kn_officer
+    - kn_province_admin
+    - mkg_sync
+    - registry_admin
+shares: []
+owns_schema: [pf_party]
+enable: always

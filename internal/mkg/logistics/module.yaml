@@ -1,0 +1,23 @@
+# Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
+name: mkg/logistics
+aka: [mkg/logistics]
+kind: domain
+zones: [mkg]
+version: 1.0.0
+depends:
+  mkg/costing: ">=1.0 <2"
+  mkg/fieldops: ">=1.0 <2"
+  mkg/hub: ">=1.0 <2"
+  mkg/measurement: ">=1.0 <2"
+provides:
+  ports: [RoadRoutes, Trips, WaterwayRoutes]
+  events: []
+  internal_events: [mkg.logistics.trip.completed/v1, mkg.logistics.trip.milestone_recorded/v1]
+  publications: []
+  data_products: []
+permissions: [dispatcher, driver]
+shares: []
+owns_schema: [mkg_logistics]
+enable: always

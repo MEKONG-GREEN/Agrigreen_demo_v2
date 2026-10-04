@@ -1,0 +1,25 @@
+# Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
+name: vault/identity
+aka: []
+kind: kernel
+zones: [vault]
+version: 1.0.0
+depends: {}
+provides:
+  ports: [Client]
+  events: []
+  internal_events: []
+  publications: []
+  data_products: []
+permissions:
+    - farmer
+    - vault_display
+    - vault_eraser
+    - vault_evidence_viewer
+    - vault_pubkey_sync
+    - vault_registrar
+shares: []
+owns_schema: [vault]
+enable: always

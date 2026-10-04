@@ -1,0 +1,22 @@
+# Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
+name: mkg/hub
+aka: [mkg/hub]
+kind: domain
+zones: [mkg]
+version: 1.0.0
+depends:
+  mkg/fieldops: ">=1.0 <2"
+  mkg/logistics: ">=1.0 <2"
+  mkg/measurement: ">=1.0 <2"
+provides:
+  ports: [EnvReadings, LotOrigins, Lots, Publication, Stock]
+  events: [mkg.hub.capacity.published/v1, mkg.hub.facility.published/v1]
+  internal_events: []
+  publications: [hub_capacity, hub_facility]
+  data_products: []
+permissions: [hub_approver, hub_operator]
+shares: []
+owns_schema: [mkg_hub]
+enable: always

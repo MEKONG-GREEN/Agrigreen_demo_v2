@@ -1,0 +1,22 @@
+# Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
+name: pf/content
+aka: [cap/content]
+kind: capability
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/masterdata: ">=1.0 <2"
+  pf/party: ">=1.0 <2"
+  pf/sync: ">=1.0 <2"
+provides:
+  ports: []
+  events: [pf.content.alert.published/v1, pf.content.document.published/v1]
+  internal_events: []
+  publications: []
+  data_products: []
+permissions: [content_editor_national, content_editor_province, content_reviewer]
+shares: []
+owns_schema: [pf_content]
+enable: per_tenant

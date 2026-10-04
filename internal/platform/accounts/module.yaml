@@ -1,0 +1,36 @@
+# Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
+name: pf/accounts
+aka: [k/access]
+kind: kernel
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/extension: ">=1.0 <2"
+  pf/masterdata: ">=1.0 <2"
+  pf/party: ">=1.0 <2"
+  pf/reports: ">=1.0 <2"
+  vault/identity: ">=1.0 <2"
+provides:
+  ports:
+    - ActionLinks
+    - Assignments
+    - Directory
+    - FarmerAccounts
+    - FarmerHouseholds
+    - ProfileUpdater
+  events:
+    - pf.accounts.assignment.changed/v1
+    - pf.accounts.assignment.granted/v1
+    - pf.accounts.assignment.revoked/v1
+    - pf.accounts.user.created/v1
+    - pf.accounts.user.locked/v1
+    - pf.accounts.user.unlocked/v1
+  internal_events: []
+  publications: []
+  data_products: []
+permissions: [account_admin, account_admin_province, farmer, kn_user]
+shares: []
+owns_schema: [pf_accounts]
+enable: always

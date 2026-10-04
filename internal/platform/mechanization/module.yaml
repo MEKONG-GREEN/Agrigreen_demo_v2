@@ -1,0 +1,24 @@
+# Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
+name: pf/mechanization
+aka: [dom/mechanization]
+kind: domain
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/cropcycle: ">=1.0 <2"
+  pf/masterdata: ">=1.0 <2"
+  pf/metrics: ">=1.0 <2"
+  pf/party: ">=1.0 <2"
+  vault/identity: ">=1.0 <2"
+provides:
+  ports: [AreaFeed, ReportData]
+  events: [pf.mechanization.area_feed.stale/v1, pf.mechanization.balance.computed/v1]
+  internal_events: []
+  publications: []
+  data_products: []
+permissions: [cgh_admin, cgh_sync, cgh_viewer]
+shares: []
+owns_schema: [pf_mechanization]
+enable: per_tenant
