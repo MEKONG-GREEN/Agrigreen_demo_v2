@@ -111,6 +111,49 @@ Cách trả lời: ghi ngay dưới mỗi câu (`→ ...`), hoặc trả lời t
 | G-5 | Máy Android giá rẻ + 3G để đo thực tế app hiện trường | N-06, UR-KT-01 |
 | G-6 | Nhật ký truy cập 1 năm (N-13), tầng lạnh trong lãnh thổ | ATTT cấp 3 |
 
+## H. Kiến trúc v4.1
+
+Phát sinh khi đối chiếu repo với *Thiết kế kiến trúc hệ thống v4.1* (03/10/2026). Chi tiết ở [kien-truc-v4.1-doi-chieu.md](kien-truc-v4.1-doi-chieu.md) (xung đột X-xx). Kế hoạch ở [kien-truc-v4.1-ke-hoach.md](kien-truc-v4.1-ke-hoach.md).
+
+**Lưu ý mã câu hỏi:** Phụ lục C của v4.1 cũng đánh mã `C-1 … C-13`, nhưng trùng số với mục E ở trên mà khác nghĩa. Trong hai tài liệu v4.1 của repo, "C-x" theo **v4.1**. Bảng ánh xạ ở cuối mục này.
+
+| # | Câu hỏi | Người quyết | Chặn |
+|---|---|---|---|
+| H-1 | **Ai là đơn vị chủ dữ liệu HTX, nông hộ, thửa?** Hiện tại (ADR-0009) là tenant chương trình khuyến nông. v4.1 (ma trận 5.1, C-10) ngụ ý HTX là chủ, Khuyến nông đọc qua cấp phép. Chọn một: (a) giữ chương trình là chủ; (b) mỗi HTX/đơn vị vận hành App HTX là một đơn vị chủ, kèm thỏa thuận chia sẻ mẫu | MKG + pháp chế | `share_grant` G2, W3.1, W4.1 (X-01) |
+| H-2 | **Luồng song phương có được chấp nhận?** (v4.1 C-12). Bảng kê số cuộn theo thửa, lịch gom, xác nhận HTX hiện đi qua van công bố vào tenant chương trình, trái chính `mkg.md` §3.1. Nếu không chấp nhận, Kênh nông hộ phải bỏ "khoản thanh toán của hộ" (BRD SSO IV.C.6) | Product owner + pháp chế | ADR-0034, W5.6 (X-04) |
+| H-3 | **Đồng ý thay hai lối riêng của MKG** (van qua RabbitMQ, `/v1/partner/*` bằng tài khoản `mkg_sync`) bằng **cổng tích hợp chung** (R-INT-01) theo lịch: song song từ G1+, gỡ lối cũ ở G2? `cmd/api-public` sẽ thành `cmd/integration-gateway` | MKG + kiến trúc sư | ADR-0033, W5.x (X-02, X-03, X-15) |
+| H-4 | **TimescaleDB:** v4.1 đặt TimescaleDB ở `mkg-ts`, có nén tầng lạnh. ADR-0017 đã chọn PostgreSQL thuần vì nén là tính năng TSL, không qua RB-4. Giữ ADR-0017? | Kiến trúc sư + pháp chế | Ghi lệch (X-05) |
+| H-5 | **Grafana / Loki / Tempo (AGPL)** v4.1 ghi trong stack. Trùng A10: dùng hay không? | Pháp chế | Quan sát (X-08) |
+| H-6 | v4.1 §24 ghi hình học thửa "tối thiểu **4 đỉnh**", trong khi A2 (03/10) đã chốt **3 điểm** theo BRD v7.7. Xác nhận 4 đỉnh là vòng khép kín (3 điểm + điểm đóng) | Kiến trúc sư | — (X-12) |
+| H-7 | **Mốc G0–G6 của v4.1** trùng tên với G1–G5 của repo (đã có mã). Đổi tên cổng v4.1 trong roadmap (vd. "M0…M6") và cập nhật trạng thái G0 v4.1 (30/09, "cần cập nhật") | MKG | Roadmap (X-19) |
+| H-8 | **Tài liệu đi kèm chưa có trong repo:** SAD Định danh & Phân quyền v1.1, Thiết kế chi tiết vùng nội bộ MKG v1.3, BRD Lớp SSO và Vai trò v1.1. Xin bản để đưa vào `docs/` | Kiến trúc sư | W7.2–W7.3 (`k/access`), W8.3–W8.5 (engine, `mkg/workforce`) |
+| H-9 | **Engine ba chế độ ở vùng nội bộ** (mô phỏng, kế hoạch cuộn 7–14 ngày, điều phối): mục tiêu thời gian giải, năm điều kiện tự duyệt, dữ liệu VFT vào hệ vận hành theo kênh nào | MKG vận hành | W8.3 |
+| H-10 | **`mkg/workforce`:** dữ liệu cá nhân của 1.500+ nhân sự hiện trường. Phạm vi trường, cơ sở pháp lý, thời hạn lưu, kho định danh nhân sự riêng trong cụm `mkg` | MKG + pháp chế | W8.4 |
+| H-11 | **Người sở hữu từng module** (v4.1 C-11). Đề xuất của v4.1: một PO cho `dom/extension` + `cap/forms`; một PO cho `dom/cooperative` + `dom/mechanization`; một PO cho các năng lực còn lại | MKG | Duyệt `module.yaml`, phát hành module dùng chung |
+| H-12 | **Danh sách đối tác dự kiến 2027–2029** và kênh của từng bên (v4.1 C-13) | Thương mại | Kiểm thử tải cổng W5.9 |
+| H-13 | **RPO:** repo đang ghi RPO 24 h / RTO 4 h (G-2). v4.1 §34 yêu cầu RPO ≤ 1 h (`pf`, `mkg`, `vault`), ≤ 1 h / ≤ 2 h cho `idp` | Vận hành | Chính sách sao lưu (X-18) |
+| H-14 | **Ký các mục `[KÝ]` của v4.1:** RB-1…RB-7; ngưỡng k (= Q5-3); cửa sổ kiểm toán số đo thô (= C-7 mục E); hai thời hạn báo cáo sự cố — an toàn thông tin theo cấp độ và dữ liệu cá nhân (pháp chế). Danh sách ở [kế hoạch §4](kien-truc-v4.1-ke-hoach.md#4-các-mục-ký-của-v41-mà-mkg-phải-ký) | MKG + pháp chế | ADR W0.1–W0.2, runbook sự cố |
+| H-15 | **Thỏa thuận chia sẻ dữ liệu mẫu** giữa HTX và cơ quan khuyến nông — căn cứ của `share_grant` (v4.1 C-10) | MKG + pháp chế | W4.1 production |
+| H-16 | **Nguồn chính thức** danh mục đơn vị hành chính sau sắp xếp 2025 và bảng kế thừa (v4.1 C-9) | MKG + TTKNQG | W2.2, W3.5 |
+
+**Ánh xạ Phụ lục C của v4.1 sang mã trong tài liệu này:**
+
+| v4.1 | Nội dung | Mã ở đây |
+|---|---|---|
+| C-1 | Slot `failover = true` của engine đồng bộ | Không còn chặn: ADR-0006 dùng Application API |
+| C-2 | Danh mục trường MRV | F-1 |
+| C-3 | Cấp độ an toàn thông tin | G-6 (một phần); **mới** — cần khởi động hồ sơ cấp độ |
+| C-4 | Ngưỡng k | Q5-3 |
+| C-5 | Dung sai cân, độ ẩm | C-4, Q-6 |
+| C-6 | Đường nhận số cân của khách | C-5 |
+| C-7 | Mẫu cân và giao thức | C-6 |
+| C-8 | Hai người giữ tài khoản khẩn cấp, hai Quản trị nền tảng/an ninh | **mới** — cần trả lời trước khi khởi tạo lớp định danh production |
+| C-9 | Nguồn danh mục hành chính | H-16 |
+| C-10 | Thỏa thuận chia sẻ mẫu | H-15 |
+| C-11 | Người sở hữu module | H-11 |
+| C-12 | Luồng song phương | H-2 |
+| C-13 | Danh sách đối tác | H-12 |
+
 ---
 
-**Ưu tiên trả lời:** ~~A1–A5~~ (đã chốt và đã làm 03/10/2026) → **Q-01** (tệp Excel 14 mẫu) → A8 (CI) → G-1/G-2 (staging) → Q5-1/Q5-2 (bật Public API) → Q-1 (kế toán).
+**Ưu tiên trả lời:** ~~A1–A5~~ (đã chốt và đã làm 03/10/2026) → **Q-01** (tệp Excel 14 mẫu) → A8 (CI) → G-1/G-2 (staging) → Q5-1/Q5-2 (bật Public API) → Q-1 (kế toán). Với kiến trúc v4.1: **H-1** (chủ dữ liệu HTX/hộ/thửa, trước 15/12/2026) → H-2 (luồng song phương) → H-3 (cổng tích hợp) → H-8 (tài liệu đi kèm).
