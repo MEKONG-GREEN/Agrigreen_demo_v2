@@ -6,11 +6,11 @@
 | 0002 | [RabbitMQ thay vì hàng đợi trong PostgreSQL](0002-rabbitmq.md) | Chấp nhận |
 | 0003 | [Event sourcing mức B](0003-event-sourcing-muc-b.md) | Chấp nhận |
 | 0004 | [Mã hóa phong bì X25519 theo hộ](0004-ma-hoa-phong-bi-theo-ho.md) | Chấp nhận — hiện thực ở G1 |
-| 0005 | [Row-level security, một policy mỗi bảng](0005-rls-mot-policy-moi-bang.md) | Chấp nhận |
+| 0005 | [Row-level security, một policy mỗi bảng](0005-rls-mot-policy-moi-bang.md) | Chấp nhận — sửa đổi bởi ADR-0030 (đề xuất) |
 | 0006 | [Engine đồng bộ ngoại tuyến và phương án xử lý slot](0006-engine-dong-bo-ngoai-tuyen.md) | Chấp nhận — 30/09/2026 ([triển khai](trien-khai-g1.md)) |
 | 0007 | [Danh mục nhà cung cấp trong lãnh thổ](0007-nha-cung-cap-trong-lanh-tho.md) | Chấp nhận — 30/09/2026 ([triển khai](trien-khai-g1.md)) |
 | 0008 | [Phân vùng mạng và bảng luồng](0008-phan-vung-mang.md) | Chấp nhận — hiện thực ở G4 (chart `deploy/k8s`, kiểm `check_flows.py`) |
-| 0009 | [Mô hình tenant theo tổ chức sở hữu dữ liệu](0009-mo-hinh-tenant.md) | Chấp nhận — 30/09/2026 ([triển khai](trien-khai-g1.md)) |
+| 0009 | [Mô hình tenant theo tổ chức sở hữu dữ liệu](0009-mo-hinh-tenant.md) | Chấp nhận — 30/09/2026 ([triển khai](trien-khai-g1.md)); sửa đổi bởi ADR-0030 (đề xuất) |
 | 0010 | [Kênh nông hộ: Flutter cho hiện trường, Zalo Mini App chỉ online](0010-kenh-nong-ho.md) | Chấp nhận — 30/09/2026 ([triển khai](trien-khai-g1.md)) |
 | 0011 | [Bổ sung module nghiệp vụ cho các app](0011-module-nghiep-vu-cac-app.md) | Chấp nhận — 30/09/2026 ([triển khai](trien-khai-g1.md)) |
 | 0012 | [Tính duy nhất trên bảng sổ phân vùng](0012-duy-nhat-tren-bang-so-phan-vung.md) | Chấp nhận |
@@ -21,14 +21,19 @@
 | 0017 | [Kho chuỗi thời gian — PostgreSQL phân vùng tháng ở cụm `ts`](0017-kho-chuoi-thoi-gian.md) | Đề xuất — hiện thực ở G3-0 |
 | 0018 | [Sự kiện nội bộ MKG — vhost RabbitMQ `mkg.internal` (Q-MKG-01)](0018-su-kien-noi-bo-mkg.md) | Đề xuất — hiện thực ở G3-0 |
 | 0019 | [Định danh thiết bị cân, ký tại nguồn và đồng hồ](0019-dinh-danh-thiet-bi-va-dong-ho.md) | Đề xuất — hợp đồng dây đóng băng ở G3-0 |
-| 0020 | [Liên thông nền tảng ↔ MKG khác tenant bằng cấp quyền chia sẻ (RB-2, Q-MKG-12)](0020-lien-thong-platform-mkg-khac-tenant.md) | Chấp nhận — chủ sản phẩm chốt 29–30/09/2026; hiện thực ở pf 000042 |
+| 0020 | [Liên thông nền tảng ↔ MKG khác tenant bằng cấp quyền chia sẻ (RB-2, Q-MKG-12)](0020-lien-thong-platform-mkg-khac-tenant.md) | Chấp nhận — chủ sản phẩm chốt 29–30/09/2026; hiện thực ở pf 000042; sửa đổi bởi ADR-0030 (đề xuất) |
 | 0021 | [Hạ tầng Kubernetes G4 — operator, PKI, bí mật và tách vùng bằng cấu hình](0021-ha-tang-kubernetes-g4.md) | Đề xuất — hiện thực ở G4 (`deploy/k8s`, `deploy/iac`) |
 | 0022 | [Public API cho bên thứ ba — đơn vị triển khai riêng, khóa API lưu băm, scope, quota](0022-public-api-ben-thu-ba.md) | Đề xuất — nền móng G5-0 |
 | 0023 | [`pf/metering` — sổ đo lường sử dụng là chứng từ, bộ đếm hạn mức, bảng kê theo kỳ](0023-so-do-luong-su-dung-metering.md) | Đề xuất — nền móng G5-0 |
 | 0024 | [Một điểm kiểm soát xuất dữ liệu (DLP) cho van, Public API, gói MRV, báo cáo](0024-diem-kiem-soat-xuat-du-lieu-dlp.md) | Đề xuất — nền móng G5-0 |
 | 0025 | [Hồ sơ cấp phát Phase K — cấu hình, số bản sao, tenant bên thứ ba, đơn vị thẩm định](0025-ho-so-cap-phat-phase-k.md) | Đề xuất — nền móng G5-0 |
 | 0026 | [Xuất bản báo cáo tổng hợp sang Google Sheets (Báo cáo Chi cục KN v7.7, RB-7)](0026-xuat-google-sheets.md) | Đề xuất — bộ chuyển tắt mặc định, chờ khách Q-14 |
+| 0027 | [Bốn tầng module khai trong tệp khai báo, ứng dụng là tổ hợp, gọi trong tiến trình](0027-bon-tang-module-tep-khai-bao.md) | Đề xuất — chờ MKG ký (A7); hiện thực W1.x |
+| 0028 | [Một vai đăng nhập mỗi đơn vị triển khai, `SET LOCAL ROLE r_<module>`](0028-vai-dang-nhap-theo-don-vi-trien-khai.md) | Đề xuất — chờ MKG ký (A7); hiện thực W2.3, W2.6 |
+| 0029 | [`k_ref` — bản chiếu chỉ đọc của dữ liệu lõi trong mỗi cụm, trễ ≤ 5 s](0029-k-ref-ban-chieu-loi-moi-cum.md) | Đề xuất — chờ MKG ký (A7); hiện thực W2.4, W2.5 |
+| 0030 | [Chia sẻ trong vùng nền tảng là đọc tại chỗ có cấp phép, qua RLS `share_scope`](0030-doc-tai-cho-co-cap-phep.md) | Đề xuất — chờ MKG ký (A7), H-1 còn mở; sửa ADR-0005, 0009, 0020; hiện thực W3.4, W4.1, W4.2 |
+| 0031 | [Vai tổng hợp `r_agg` và view công bố, ngưỡng k](0031-vai-tong-hop-r-agg.md) | Đề xuất — chờ MKG ký (A7), k `[KÝ]`; hiện thực W6.3, W6.4 |
 
 ADR 0006, 0007, 0009, 0010, 0011 được chủ sản phẩm chấp nhận ngày 30/09/2026 trong phiên làm việc. Bảng đối chiếu cam kết → mã → kiểm thử ở [trien-khai-g1.md](trien-khai-g1.md).
 
-ADR 0001–0008 là danh sách bắt buộc ở Phụ lục B của tài liệu kiến trúc. ADR 0009–0016 phát sinh khi tổng hợp BRD và khi dựng G0. ADR 0017–0019 là nền của cổng G3 ([g3-conventions](../dev/g3-conventions.md)). ADR-0020 đóng câu hỏi RB-2 (MKG là tenant riêng). ADR-0021 ghi các lựa chọn hạ tầng của cổng G4. ADR 0022–0025 là nền của cổng G5 ([g5-conventions](../dev/g5-conventions.md)): Public API, `pf/metering`, điểm kiểm soát xuất dữ liệu, hồ sơ Phase K.
+ADR 0001–0008 là danh sách bắt buộc ở Phụ lục B của tài liệu kiến trúc. ADR 0009–0016 phát sinh khi tổng hợp BRD và khi dựng G0. ADR 0017–0019 là nền của cổng G3 ([g3-conventions](../dev/g3-conventions.md)). ADR-0020 đóng câu hỏi RB-2 (MKG là tenant riêng). ADR-0021 ghi các lựa chọn hạ tầng của cổng G4. ADR 0022–0025 là nền của cổng G5 ([g5-conventions](../dev/g5-conventions.md)): Public API, `pf/metering`, điểm kiểm soát xuất dữ liệu, hồ sơ Phase K. ADR 0027–0031 là năm ADR lõi của kiến trúc v4.1 (gói W0.1, [kế hoạch](../kien-truc-v4.1-ke-hoach.md)), ứng với mục 1–2, 7–10 Phụ lục B; ADR-0030 sửa ADR-0005, 0009, 0020.

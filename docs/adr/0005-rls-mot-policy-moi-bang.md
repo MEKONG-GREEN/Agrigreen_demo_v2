@@ -1,6 +1,6 @@
 # ADR-0005: Row-level security, một policy mỗi bảng
 
-**Trạng thái:** Chấp nhận · **Ngày:** 27/09/2026
+**Trạng thái:** Chấp nhận · Sửa đổi bởi [ADR-0030](0030-doc-tai-cho-co-cap-phep.md) (đề xuất) · **Ngày:** 27/09/2026
 
 ## Quyết định
 - Mọi bảng nghiệp vụ có `tenant_id`, ENABLE + FORCE RLS và đúng một policy `p_tenant` (R-33).

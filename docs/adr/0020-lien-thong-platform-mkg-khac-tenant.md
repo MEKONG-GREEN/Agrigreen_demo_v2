@@ -1,6 +1,6 @@
 # ADR-0020: Liên thông nền tảng ↔ MKG khác tenant bằng cấp quyền chia sẻ
 
-**Trạng thái:** Chấp nhận · **Ngày:** 30/09/2026 · **Quyết định của:** chủ sản phẩm, 29–30/09/2026 (trong trao đổi) · **Đóng:** RB-2, Q-MKG-12, Q3-08 · **Thành phần:** `pf/party` (sổ cấp quyền, migration pf 000042), bề mặt đối tác `/v1/partner/*` (`pf/party`, `pf/geo`, `pf/cropcycle`), consumer van `pf.geo.hub_valve`, `pf.cropcycle.htx_collection_valve`, `pf.mrv.collection_evidence`, `mkg/fieldops` (adapter nền tảng)
+**Trạng thái:** Chấp nhận · Sửa đổi bởi [ADR-0030](0030-doc-tai-cho-co-cap-phep.md) (đề xuất) · **Ngày:** 30/09/2026 · **Quyết định của:** chủ sản phẩm, 29–30/09/2026 (trong trao đổi) · **Đóng:** RB-2, Q-MKG-12, Q3-08 · **Thành phần:** `pf/party` (sổ cấp quyền, migration pf 000042), bề mặt đối tác `/v1/partner/*` (`pf/party`, `pf/geo`, `pf/cropcycle`), consumer van `pf.geo.hub_valve`, `pf.cropcycle.htx_collection_valve`, `pf.mrv.collection_evidence`, `mkg/fieldops` (adapter nền tảng)
 
 ## Quyết định của chủ sản phẩm
 

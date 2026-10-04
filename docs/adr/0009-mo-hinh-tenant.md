@@ -1,6 +1,6 @@
 # ADR-0009: Mô hình tenant theo tổ chức sở hữu dữ liệu
 
-**Trạng thái:** Chấp nhận — 30/09/2026, theo quyết định của chủ sản phẩm trong phiên làm việc · **Ngày:** 27/09/2026
+**Trạng thái:** Chấp nhận — 30/09/2026, theo quyết định của chủ sản phẩm trong phiên làm việc · Sửa đổi bởi [ADR-0030](0030-doc-tai-cho-co-cap-phep.md) (đề xuất) · **Ngày:** 27/09/2026
 
 ## Bối cảnh (xung đột X4 trong bản tổng hợp yêu cầu)
 - App Khuyến nông phân phạm vi theo cây TW → Tỉnh → Xã.
