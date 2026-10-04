@@ -18,13 +18,31 @@
 | Mã nguồn | `internal/mkg/<module>/{port,domain,app,store,handler}` + `module.go` (mẫu `internal/platform/party`) |
 | Gốc lắp ráp | **Chỉ** `cmd/api-internal/assembly` và `cmd/worker-internal/assembly` (cùng `cmd/ingest`, `cmd/edge-agent`). `tools/archlint` hỏng build nếu `cmd/api-platform` import `internal/mkg/*` hoặc `cmd/api-internal`, `cmd/ingest`, `cmd/edge-agent`, `cmd/worker-internal` import `internal/platform/*` (R-03 ở gốc lắp ráp); `cmd/edge-agent` chỉ thư viện chuẩn + `shared/{clock,ids,mass}` + `edgewire` |
 
-### 1.1 Ba cửa giữa hai vùng (mục 5) — cách hiện thực
+### 1.1 Bốn cửa giữa hai vùng (mục 5 v3.0; v4.1 §38) — cách hiện thực
+
+> **Đối chiếu v4.1 (04/10/2026, gói W0.3).** Bản 29/09/2026 có **ba cửa** theo mục 5 v3.0. v4.1 §38 có **bốn loại luồng**: tham chiếu, cấp phép, tổng hợp và song phương. Thay đổi so với bản cũ:
+> - Thêm cửa thứ tư, **luồng song phương** ([ADR-0034](../adr/0034-luong-song-phuong.md), dòng cuối bảng).
+> - Theo [ADR-0033](../adr/0033-cong-tich-hop-mkg-nhu-moi-doi-tac.md), MKG kết nối qua **cổng tích hợp** `cmd/integration-gateway` như mọi đối tác. Van công bố thành *nạp theo lô*. Tiêu thụ không đặc quyền thành *feed theo cursor*. Van lọc dữ liệu công thành *cấp phép tổng hợp theo xã có ngưỡng k* ([ADR-0035](../adr/0035-cap-phep-tong-hop-theo-xa-nguong-k.md)).
+> - Van RabbitMQ **giữ cho ĐTK 1 đến cổng G2 của v4.1** (ADR-0033 §6; tên cổng xem [roadmap](../roadmap.md#cổng-v41--cổng-repo)). Không thêm hợp đồng van mới qua RabbitMQ.
+>
+> Bảng đầu mô tả mã hiện có. Bảng "Sau v4.1" ngay dưới ghi đích và gói chuyển. Hai thay đổi này chỉ có hiệu lực khi ADR-0033…0035 được ký (A7).
 
 | Cửa | Chiều | Hiện thực | Trạng thái |
 |---|---|---|---|
 | **Van công bố** | MKG → nền tảng | Hợp đồng `contracts/publication/<tên>.json` (có người đề xuất ≠ người phê duyệt) → struct `//ag:publication` trong `mkg/<module>/port` → `Contract.Validate` lúc chạy → sổ `mkg_<module>.valve_export` + `shared.outbox` cụm mkg **cùng giao dịch** → `outbox-publisher` (đã quét mọi cụm, vai `ag_outbox_publisher`) → RabbitMQ → consumer pf (đợt 2: `pf/geo` `HubSink`) | `hub_facility`, `hub_capacity` v1 — G2 đợt 1 |
 | **Tiêu thụ không đặc quyền** | nền tảng → MKG | mkg gọi **bề mặt đối tác `/v1/partner/*`** của Application API công khai bằng tài khoản dịch vụ thuộc tenant MKG (OIDC client credentials, vai `mkg_sync`), chỉ khi tenant chương trình đã duyệt cấp quyền chia sẻ có loại dữ liệu đó; mọi lần đọc ghi sổ (ADR-0020). Không kết nối DB mkg → pf | G3 (fieldops: HTX, thửa, ngày thu hoạch, phản hồi HTX) |
 | **Van lọc dữ liệu công** | nền tảng → MKG (dữ liệu công) | Chỉ tổng hợp qua ngưỡng gom nhóm k ≥ `[KÝ]` (C-3) | Chờ C-3 |
+| **Luồng song phương** (thêm 04/10/2026) | MKG ↔ một HTX, chỉ hai bên thấy | Bản ghi của một giao dịch giữa MKG và một HTX: lịch gom, bảng kê số cuộn theo thửa, xác nhận/từ chối của HTX. Sổ chỉ ghi thêm, RLS `p_pair`, không vào tổng hợp hay sản phẩm dữ liệu (ADR-0034). **Hiện tại** đi tạm qua van `htx_collection_statement` và `/v1/partner/htx-collection/responses`, có hạn chế đọc ở tầng ứng dụng (§3.2) | Đề xuất. Mã ở W5.6; bật production chờ C-12 (H-2) |
+
+**Sau v4.1** (ADR-0033 §5, ADR-0034 §4):
+
+| Cửa | Sau v4.1 | Gói |
+|---|---|---|
+| Van công bố | `mkg/hub`, `mkg/measurement` gửi lô từ `valve_export` tới `POST /v1/batches/<hợp đồng>` của cổng tích hợp. Sổ `valve_export` vẫn là bằng chứng (RB-1). Consumer RabbitMQ gỡ muộn nhất ở cổng G2 v4.1 | Sau W5.4 |
+| Tiêu thụ không đặc quyền | `mkg/fieldops` kéo `GET /v1/feeds/*` của cổng bằng khóa API + mTLS của tenant MKG. Gỡ `/v1/partner/*` và vai `mkg_sync` | W5.2, W5.5, W5.10 |
+| Van lọc dữ liệu công | Feed `harvest_progress_by_commune`: cấp phép tổng hợp theo xã có ngưỡng k (ADR-0035) | W5.3, W6.4 |
+| Luồng song phương | `POST /v1/batches/roll_count_statement` (MKG → HTX). Feed cặp `GET /v1/feeds/bilateral?pair=…` (HTX → MKG). Tổng kiểm hằng ngày theo cặp | W5.6 (chờ C-12) |
+| Luồng mạng | Vùng mkg chỉ ra **cổng tích hợp**, không gọi `api-platform` (ADR-0008, `check_flows.py`) | W5.10 |
 
 **Không có** import mã xuyên vùng (R-03, `agboundary`), **không có** kết nối DB xuyên cụm (R-05: vai `hub_app` chỉ CONNECT `ag_mkg`), **không có** join xuyên schema (R-06).
 
@@ -49,6 +67,7 @@
 2. **Mọi sự kiện của vùng mkg lên vhost nền tảng là công bố.** Exchange `ag.events` của vhost nền tảng dùng chung; consumer pf bind được mọi routing key. Vì vậy `contractcheck` bắt: struct `//ag:event` trong `internal/mkg/**` phải kèm `//ag:publication`, và mọi `outbox.Event.Payload` (kind `platform`) trong `internal/mkg/**` phải chứng minh được là hợp đồng van. Sự kiện **nội bộ** giữa các module mkg (G3, Q-MKG-01 đã chốt — ADR-0018) mang `//ag:internal-event`, schema ở `contracts/events-internal/`, chỉ phát với `outbox.KindInternal` lên vhost riêng `mkg.internal` mà tài khoản nền tảng không có quyền; `contractcheck` bắt payload nội bộ không bao giờ đi kind `platform`. Mặc định vẫn là `port/` đồng bộ trong cùng tiến trình.
 3. **Sổ xuất là bằng chứng** (RB-1): `mkg_<module>.valve_export` lưu đúng byte đã kiểm, `payload_sha256`, `contract`, `contract_version`, `event_type`, `schema_version`, `subject_ref`, `actor_ref`; `id` = `event_id` trên outbox. Outbox **không** phải sổ (R-60).
 4. **Không bao giờ qua van:** dữ liệu cá nhân (RB-3, R-14), giá mua/bán, giá thành, biên lợi nhuận, `yield_kg_per_roll` (chỉ số biên lợi nhuận, mục 13.3), danh tính và điều khoản khách hàng, hồ sơ tranh chấp, số đo cân thô, tồn **theo lô** và nguồn gốc lô tới thửa/HTX (kết hợp với khối lượng lộ thông tin thương mại), bút toán.
+5. **Dữ liệu song phương không phải dữ liệu van** (thêm 04/10/2026, ADR-0034, v4.1 §38.2). Có những bản ghi chỉ thuộc **một giao dịch giữa MKG và một HTX**: bảng kê số cuộn theo thửa, xác nhận của HTX, và sau C-12 là khoản thanh toán của hộ. Các bản ghi này không đi qua van công bố, vì van phát cho mọi người dùng có quyền của tenant nhận và như thế trái nguyên tắc 4 (nguồn gốc lô tới thửa). Chúng đi qua **luồng song phương** (§1.1): chỉ hai bên thấy, không vào tổng hợp. Nguyên tắc 4 giữ nguyên với van.
 
 ### 3.2 Hợp đồng hiện có và ứng viên
 
@@ -57,10 +76,20 @@
 | `hub_facility` v1 | mkg/hub | `hub_ref, code, name, kind, location{lat,lng}, boundary?, province_code, status, capacity_tons, unit, effective_from` | Nền tảng (GIS, mô phỏng chọn hub, điều phối gom) cần vị trí, loại, trạng thái, sức chứa danh định của cơ sở **đã phê duyệt**. Là dữ liệu hạ tầng, không cá nhân, không giá | pf/geo (mô hình đọc hub, đợt 2) | **Đã có** — phát khi duyệt phiên bản dữ liệu chủ |
 | `hub_capacity` v1 | mkg/hub | `hub_ref, as_of, capacity_tons, used_tons, available_tons, unit` | Điều phối gom rơm cần sức chứa còn trống. Chỉ con số tổng của cơ sở — không lô, không nguồn gốc | pf/geo | **Đã có** — phát khi duyệt và khi chụp (`POST …/capacity-snapshots`) |
 | `collection_schedule` v1 (**dự thảo G3-0**) | mkg/fieldops | `schedule_ref, htx_ref, commune_code, window_from, window_to, status, revision` | HTX/cán bộ KN cần biết lịch gom để không đốt rơm (mục tiêu chương trình) | pf/cropcycle, notify | Tệp hợp đồng + schema sự kiện + struct `fieldops/port` đã có; người phê duyệt là vai giữ chỗ — cần MKG phê duyệt |
-| `htx_collection_statement` v1 (**dự thảo G3-0**) | mkg/fieldops | `statement_ref, htx_ref, plot_ref, season_ref?, collected_on, rolls, revision` | Đối soát chéo chiều mua (mục 13.3, `htx_confirmation_ref`): HTX xác nhận số cuộn trên app HTX. Không có giá, không khối lượng cân | pf/cropcycle (HTX xác nhận) → quay về MKG qua API công khai | Dự thảo đã có — cần chốt với khách (C-4: trả theo cuộn hay theo tấn) |
+| `htx_collection_statement` v1 (**dự thảo G3-0**; **là song phương** theo ADR-0034, sẽ thay bằng `roll_count_statement` — xem ghi chú dưới bảng) | mkg/fieldops | `statement_ref, htx_ref, plot_ref, season_ref?, collected_on, rolls, revision` | Đối soát chéo chiều mua (mục 13.3, `htx_confirmation_ref`): HTX xác nhận số cuộn trên app HTX. Không có giá, không khối lượng cân | pf/cropcycle (HTX xác nhận) → quay về MKG qua API công khai | Dự thảo đã có — cần chốt với khách (C-4: trả theo cuộn hay theo tấn) |
 | `mrv_collection_evidence` v1 (**dự thảo G3-0**) | mkg/measurement | `evidence_ref, plot_ref, season_ref?, collected_on, collected_kg_bucket, bucket_rule_version, revision` | MRV cần lượng rơm được thu (tránh đốt) theo thửa; khối lượng làm tròn theo bậc để không lộ sản lượng thương mại | pf/mrv | Dự thảo đã có — chờ C-1 (danh mục trường MRV, phương pháp tCO2e) |
 
 Hợp đồng mới: PR riêng, `proposed_by` ≠ `approved_by` (R-56), đi kèm schema sự kiện `mkg.<module>.<thực thể>.published v<N>`.
+
+**Đối chiếu v4.1 (04/10/2026, gói W0.3) — bảng kê số cuộn theo thửa là song phương.** Bảng trên giữ nguyên để lưu lịch sử thiết kế G3-0. Theo [ADR-0034](../adr/0034-luong-song-phuong.md) (Đề xuất, chờ MKG ký và chờ C-12):
+
+- `htx_collection_statement` (`htx_ref, plot_ref, collected_on, rolls`) **không phải** dữ liệu mạng lưới. Lý do: nó gắn lô gom với thửa và HTX của một giao dịch (X-04, trái §3.1(4) nếu đi qua van). Đích là các hợp đồng song phương `roll_count_statement` (MKG → HTX) và `htx_roll_confirmation` (HTX → MKG) trong `contracts/integration/`, với `flow: bilateral`, gửi qua cổng tích hợp (W5.1, W5.6). `collection_schedule` cũng chuyển sang song phương.
+- **Trong lúc chờ C-12 (ĐTK 1):**
+  - Giữ đường hiện tại: van, consumer `pf.cropcycle.htx_collection_valve`, `/v1/partner/htx-collection/responses`.
+  - **Không bật** hợp đồng `htx_collection_statement` ở production.
+  - Đọc `pf_cropcycle.collection_*` **phải** hạn chế ở tầng ứng dụng (quy định của ADR-0034 §6): chỉ vai HTX có `org_ref` khớp `htx_ref`, và MKG qua bề mặt đối tác. Cán bộ KN của tenant chương trình **không** đọc bảng kê.
+- **Nếu C-12 không chấp nhận** (ADR-0034 §7): số cuộn đối soát ở mức **HTX × ngày**, không có `plot_ref`, đi qua van như dữ liệu mạng lưới. Đối soát theo thửa làm ngoài nền tảng.
+- `hub_facility`, `hub_capacity`, `mrv_collection_evidence` vẫn là dữ liệu mạng lưới. Sau v4.1 chúng thành hợp đồng **nạp theo lô** của cổng tích hợp (ADR-0033 §3, §5), dùng lại nguyên tệp `contracts/publication/<tên>.json`. Van RabbitMQ giữ đến cổng G2 v4.1.
 
 ### 3.3 Luồng van (hiện thực ở `mkg/hub`)
 

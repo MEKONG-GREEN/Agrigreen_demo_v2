@@ -248,7 +248,33 @@ Trạng thái (02/10/2026): A, M, S + D, H, W đã hợp nhất vào `sub/g5` (t
   - **chờ khách:** Q5-1..Q5-10 (bên thứ ba đầu tiên, giá trị k, Q5-6 hub, giá, thời hạn lưu, Valkey, VVB);
   - **hạ tầng:** diễn tập `helm upgrade -f values-phasek.yaml` trên staging (K-04), NetworkPolicy / Ingress / ExternalSecret trên cụm thật, PgBouncer song song, luật cảnh báo DLQ vùng nền tảng (X-07), `promtool`, cổng giấy phép CI.
 
+## Cổng v4.1 ↔ cổng repo
+
+Thêm ngày 04/10/2026 (gói W0.3, X-19). **Có hai bộ tên cổng trùng nhau.**
+- Các mục G0–G6 ở trên là cổng **của repo**. Chúng theo Phụ lục A v3.0 và đã có mã đến G5.
+- Phụ lục A **v4.1** dùng lại đúng tên G0–G6, với cùng mốc ngày, nhưng giao **việc khác**: chuyển repo sang module bốn tầng, cổng tích hợp, `k/access`…
+- Vì vậy "G2" trong một ADR v4.1 (ví dụ "van RabbitMQ giữ đến G2", ADR-0033 §6) **không** phải G2 của repo, vốn đã xong mã.
+
+Cho đến khi MKG chọn tên mới (H-7, đề xuất "M0…M6" hoặc "G0′…G6′"), tài liệu repo viết **"G<n> v4.1"** cho cổng v4.1. Chữ "G<n>" không kèm hậu tố luôn là cổng repo.
+
+| Cổng v4.1 | Mốc | Giao theo v4.1 (Phụ lục A) | Cổng repo cùng mốc và trạng thái | Gói chuyển đổi ([kế hoạch](kien-truc-v4.1-ke-hoach.md)) |
+|---|---|---|---|---|
+| **G0 v4.1** | 30/09/2026 ("cần cập nhật trạng thái") | Khung module, registry, kiểm đồ thị; `k/ledger` mẫu DDL đã sửa; `k/access` tối thiểu; `k_ref`; vai đăng nhập theo đơn vị triển khai; CI chạy DDL tài liệu | G0 repo: nền móng, xong. Phần v4.1 **đang làm**: W1.1, W1.2 xong; W2.x chưa | Giai đoạn 1–2 (W1.x, W2.x) |
+| **G1 v4.1** | 15/12/2026 | App KN chạy trên module dùng chung; `dom/cooperative` làm chủ duy nhất (hợp nhất ba hệ UAT); lớp định danh theo SAD v1.1 | G1 repo (ĐTK 1): **mã xong** 29/09/2026. KN v7.7: P1–P7 có mã. Chủ duy nhất HTX **chưa** | Giai đoạn 3 (W3.x, trước 15/12/2026). Lớp định danh: KN P1 là hiện thực ĐTK 1 (ADR-0037); W7.2–W7.3 chờ SAD v1.1 |
+| **G1+ v4.1** | Song song G1 | Cổng tích hợp tối thiểu: feed cursor, nạp theo lô, xác thực máy, hạn mức theo đối tác; ADR luồng song phương và cấp phép tổng hợp theo xã | Không có cổng repo tương ứng. Mầm là `cmd/api-public` (G5 repo) | Giai đoạn 5 (W5.x); ADR-0033…0035 |
+| **G2 v4.1** | 31/03/2027 | App HTX, CGH, SIM lên module dùng chung; `share_grant` chạy thật; tổng quát `cap/forms`, `cap/task`; ký Danh mục Ràng buộc Nền tảng | G2 repo (`mkg/*`, `pf/waterway`, `pf/simulation`): **mã xong**. Hạn gỡ van RabbitMQ (ADR-0033 §6) | Giai đoạn 4, 6 (W4.x, W6.x) |
+| **G3 v4.1** | Q3/2027 | Vùng nội bộ MKG `mkg/*`, cụm `mkg`, `mkg-ts`; App NH; chỉ số qua `r_agg` | G3 repo (measurement, edge-agent, cụm `ts`): **mã xong**. `mkg-ts` = cụm `ts` (ADR-0017, ghi lệch) | Giai đoạn 8 (W8.x, chờ MKG v1.3); W6.3–W6.4 (`r_agg`) |
+| **G4 v4.1** | Q2/2028 | Kubernetes được quản trị; diễn tập tải ĐTK 2; tách đơn vị triển khai bằng cấu hình; dựng lại bảng chiếu; phục hồi đủ thứ tự | G4 repo: **mã xong** (chart, diễn tập trên máy dev); còn hạ tầng thật | W7.4 (cụm `idp` riêng; bản đối chiếu §2.4: tách ở G4) |
+| **G5 v4.1** | Q4/2028 | Phase K; Public API và khóa API với bên thứ ba đầu tiên; bật module theo đơn vị | G5 repo: **mã xong**, hợp nhất 03/10/2026. Sau ADR-0033, Public API thành cổng tích hợp, bật từ ĐTK 1 | W5.2 (đổi tên cổng) |
+| **G6 v4.1** | Q1/2029 | Cấu hình Phase 1 không sửa mã; build bản lite | G6 repo: như v4.1 | — |
+
+Nhận xét:
+- Hai bộ cổng **cùng mốc ngày**. Khác nhau ở chỗ cổng repo là "tính năng nào chạy" (đã làm trước lịch), còn cổng v4.1 là "kiến trúc đã chuyển tới đâu".
+- Thứ tự gói chuyển đổi **không** theo số cổng: G1+ v4.1 (giai đoạn 5) chạy song song G1 v4.1, trước G2 v4.1 (giai đoạn 4).
+- G0 v4.1 cần MKG cập nhật trạng thái (H-7). Đề xuất của repo: mốc mới là khi W1.x và W2.1–W2.5 xong.
+
 ## Chuyển đổi kiến trúc v4.1 ([kế hoạch](kien-truc-v4.1-ke-hoach.md))
+- [x] W0.3 (04/10/2026): ghi lệch ADR-0006 (C-1 không chặn), ADR-0012 (`chain_head` chung, idempotency 30 ngày qua W2.1), ADR-0017 (không TimescaleDB); ADR-0037 (tách xác thực và phân quyền, không mạo danh — Đề xuất, chờ MKG ký); `docs/design/mkg.md` bốn cửa và bảng kê song phương; dẫn chiếu v3.0 → v4.1 trong `docs/dev/g*-conventions.md`; bảng cổng v4.1 ↔ cổng repo ở trên.
 - [x] W0.2 (04/10/2026): ADR-0032…0036 — đơn vị hành chính có hiệu lực + kế thừa, cổng tích hợp `integration-gateway` (MKG như mọi đối tác), luồng song phương, cấp phép tổng hợp theo xã có k, engine ba chế độ + `lib/optcore` ([docs/adr](adr/README.md)); Đề xuất, chờ MKG ký (A7), ADR-0034 chờ thêm C-12.
 - [x] W1.1 (04/10/2026): `module.yaml` cho 26 module, `internal/shared/modreg`, `go run ./tools/modgen -check` ([docs/dev/modules.md](dev/modules.md)).
 - [x] W1.2 (04/10/2026): analyzer `agmodgraph` trong `tools/archlint` (chu trình, tầng, `depends`, phiên bản, `owns_schema` ↔ migration) + 118 ngoại lệ có chủ trong `tools/archlint/modgraph_exceptions.yaml` (chỉ co lại); `modgen -check` và `agmodgraph` vào job lint CI ([docs/dev/modules.md](dev/modules.md#đồ-thị-module-agmodgraph-w12)).

@@ -1,6 +1,19 @@
 # Quy ước phát triển G1
 
-Tài liệu này dành cho mọi người và agent phát triển module G1. Đọc cùng tài liệu kiến trúc v3.0 (`G:\My Drive\Development\AgriGreen-Thiet-ke-kien-truc-he-thong-v3_0.md`) và các ADR trong `docs/adr/`.
+Tài liệu này dành cho mọi người và agent phát triển module G1. Đọc cùng tài liệu kiến trúc v4.1 (`G:\Shared drives\Development\AgriGreen-Thiet-ke-kien-truc-he-thong-v4_1.md`) và các ADR trong `docs/adr/`. Bản v3.0 (`G:\My Drive\Development\AgriGreen-Thiet-ke-kien-truc-he-thong-v3_0.md`) là căn cứ lúc viết G1.
+
+> **Đối chiếu v4.1 (04/10/2026, gói W0.3).** Dẫn chiếu "mục x" của bản v3.0 trong các tệp `g*-conventions.md` đã đổi sang mục v4.1, dạng "§y v4.1 (mục x v3.0)". Mã quy tắc R-xx của v3.0 giữ nguyên trong văn bản vì kiểm thử và linter dùng các mã này; mã v4.1 tương ứng tra ở Phụ lục D của v4.1. Bảng đổi mục:
+>
+> | v3.0 | v4.1 | | v3.0 | v4.1 |
+> |---|---|---|---|---|
+> | mục 2 Hai điểm thiết kế | §2 | | mục 16 Các module còn lại | §27 Nghiệp vụ (§25–§26 cho lõi, năng lực) |
+> | mục 4 Stack | §6 | | mục 17 Phân vùng mạng | §29 |
+> | mục 5 Bốn vùng | §4 | | mục 18 Kiểm soát an ninh | §30 |
+> | mục 8 / 8.1 Mẫu bảng sổ | §15 (mẫu đã sửa, DB-01, DB-03) | | mục 19 Quan sát | §31 |
+> | mục 11 Bốn bề mặt API | §10 Giao diện (bề mặt đối tác: Phần VI §41) | | mục 20 CI/CD | §32 |
+> | mục 12 Luồng bất đồng bộ | §11 | | mục 21 Môi trường và dữ liệu | §33 (**khác** §21 v4.1 là chuỗi thời gian) |
+> | mục 13 `mkg/measurement` | §27.2 | | mục 22 Sao lưu | §34 |
+> | Phụ lục A | Phụ lục A v4.1: cùng tên G0–G6, khác nội dung, xem [roadmap](../roadmap.md#cổng-v41--cổng-repo) | | | |
 
 ## 1. Cấu trúc một module
 
@@ -46,7 +59,7 @@ Không đổi số đã cấp. Mỗi module chỉ tạo tệp migration mang s�
 - Các vai đã khai trong `internal/shared/dbadmin/dbadmin.go`. **Không sửa tệp đó.** Cần vai mới thì ghi vào báo cáo.
 - Migration **chỉ tiến**, không có tệp `.down.sql`. Không được có `UPDATE`, `DELETE`, `TRUNCATE` ở mức câu lệnh (R-25).
 - Mọi bảng trong schema nghiệp vụ phải có `tenant_id` và gọi `SELECT shared.apply_tenant_rls('<schema.bảng>')`.
-- Bảng sổ (chỉ ghi thêm) theo mẫu mục 8.1, rồi gọi `SELECT shared.apply_ledger('<schema.bảng>', '<schema.bảng>')`. Xem `migrations/pf/000001_pf_party_consent.up.sql`.
+- Bảng sổ (chỉ ghi thêm) theo mẫu §15 v4.1 (mục 8.1 v3.0), rồi gọi `SELECT shared.apply_ledger('<schema.bảng>', '<schema.bảng>')`. Xem `migrations/pf/000001_pf_party_consent.up.sql`.
 - Khóa duy nhất trên bảng sổ không làm được vì bảng phân vùng (ADR-0012). `fn_chain` đã chống trùng `idem_key`.
 - Không dùng khóa ngoại xuyên schema, không join xuyên schema. Tham chiếu sang module khác là UUID thuần (R-06).
 - Cuối migration: `GRANT` cho vai của module. Với bảng sổ, **không** GRANT UPDATE/DELETE.

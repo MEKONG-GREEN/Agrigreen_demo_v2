@@ -8,14 +8,14 @@ Tài liệu này chỉ ghi phần **thêm** cho G5. Đọc cùng các tài liệ
 
 Mọi quy ước của các cổng trước vẫn áp dụng: cấu trúc module, RLS, sổ chỉ ghi thêm, PII chỉ ở vault, kiểm thử bắt buộc, tiền tố mã story, lệnh kiểm tra trước khi báo xong.
 
-Cổng G5 (kiến trúc Phụ lục A, Q4/2028): "**Phase K; `pf/metering` và Public API bật với bên thứ ba đầu tiên**". Các điều khoản kiến trúc liên quan:
+Cổng G5 (kiến trúc v3.0 Phụ lục A, Q4/2028): "**Phase K; `pf/metering` và Public API bật với bên thứ ba đầu tiên**". G5 v4.1 cùng mốc, viết "Phase K; Public API và khóa API với bên thứ ba đầu tiên; bật module theo đơn vị" ([roadmap](../roadmap.md#cổng-v41--cổng-repo)). Các điều khoản kiến trúc liên quan (cột đầu là mục v4.1, trong ngoặc là mục v3.0 lúc viết; bảng đổi mục ở [g1-conventions](g1-conventions.md)):
 
 | Mục kiến trúc | Nội dung cho G5 |
 |---|---|
-| §2 | Người dùng ĐTK 2 có "bên thứ ba, đơn vị thẩm định"; Phase K là trạng thái cấp phát, không phải điểm thiết kế |
-| §11 | Bề mặt Public `partner.<domain>`: khóa API lưu băm, scope, quota, **tắt ở ĐTK 1**, mọi lời gọi ghi sổ đo lường |
-| §16 | `pf/metering` là chứng từ theo mẫu sổ mục 8, mỗi lời gọi Public API một dòng |
-| §18 | Mọi đường xuất (van, Public API, gói, báo cáo) đi qua **một** điểm kiểm soát có nhật ký, hạn mức, cảnh báo |
+| §2 v4.1 (§2 v3.0) | Người dùng ĐTK 2 có "bên thứ ba, đơn vị thẩm định"; Phase K là trạng thái cấp phát, không phải điểm thiết kế |
+| §10 v4.1 (§11 v3.0) | Bề mặt Public `partner.<domain>`: khóa API lưu băm, scope, quota, **tắt ở ĐTK 1**, mọi lời gọi ghi sổ đo lường. **v4.1 Phần VI §41 và ADR-0033 (đề xuất):** Public API thành cổng tích hợp `cmd/integration-gateway`, bật từ ĐTK 1 vì MKG dùng nó |
+| §27 v4.1 (§16 v3.0) | `pf/metering` là chứng từ theo mẫu sổ §15 v4.1 (mục 8 v3.0), mỗi lời gọi Public API một dòng |
+| §30 v4.1 (§18 v3.0) | Mọi đường xuất (van, Public API, gói, báo cáo) đi qua **một** điểm kiểm soát có nhật ký, hạn mức, cảnh báo |
 | R-01 | Chuyển giai đoạn chỉ là đổi cấu hình và số bản sao |
 
 **Không nhầm** Public API với `/v1/partner/*` của [ADR-0020](../adr/0020-lien-thong-platform-mkg-khac-tenant.md). Bề mặt ADR-0020 nằm trên Application API (vai `mkg_sync`), là cửa nền tảng → MKG. Public API là cửa nền tảng → bên thứ ba.
@@ -39,13 +39,13 @@ Cả bốn ở trạng thái **Đề xuất**.
 |---|---|---|
 | Đơn vị triển khai | Public API là **tiến trình riêng `cmd/api-public`** (`:8085`, Deployment `api-public`, namespace `agrigreen-pf`), không phải listener thứ ba của `api-platform`. Nhị phân chỉ có route Public. `AG_PUBLIC_API_ENABLED` ≠ `1` → thoát lỗi khi khởi động. ĐTK 1: 0 bản sao, không có host ingress | ADR-0022 §1, R-01 |
 | Ranh giới mã | archlint: `cmd/api-public` không import `internal/mkg/**` (R-03) và **không import kho định danh, kể cả client** (RB-3). Đã cưỡng chế ở G5-0 | ADR-0022 §1 |
-| Bề mặt quản trị | Đăng ký khách hàng, khóa, đăng ký sản phẩm, gói hạn mức, bảng kê, nhật ký xuất: **Admin API** của `api-platform` (MFA). Không có cổng tự phục vụ cho bên thứ ba ở G5 | mục 11 |
+| Bề mặt quản trị | Đăng ký khách hàng, khóa, đăng ký sản phẩm, gói hạn mức, bảng kê, nhật ký xuất: **Admin API** của `api-platform` (MFA). Không có cổng tự phục vụ cho bên thứ ba ở G5 | §10 v4.1 (mục 11 v3.0) |
 | Module | `pf/apiclient` (khách hàng, khóa, scope, đăng ký, gói hạn mức, việc xuất, handler sản phẩm) · `pf/metering` (sổ sử dụng, bộ đếm, điểm kiểm soát xuất, bảng kê) | ADR-0022 §2 |
 | Tenant | Bên thứ ba = **tenant riêng**. Khách hàng API, khóa, sổ sử dụng, bảng kê thuộc tenant **đơn vị vận hành** (`AG_PUBLIC_OPERATOR_TENANT`). Dữ liệu phục vụ thuộc tenant chủ dữ liệu, và chỉ đọc được khi có cấp quyền ADR-0020 loại `dp_<sản phẩm>` (bên cấp → tenant bên thứ ba). Tenant bên gọi lấy từ bản ghi khóa | ADR-0009, ADR-0020, ADR-0022 §3 |
 | Khóa API | Dạng `agk_<prefix 12 base32>_<32 byte base64url>`, header `X-API-Key`. Lưu `key_prefix` + HMAC-SHA-256(pepper theo phiên bản, khóa), không argon2id. Bí mật hiện một lần, tag `pii:"true"`. Vòng đời là sổ (`issued`/`rotated`/`revoked`/`expired`). Tối đa 2 khóa hiệu lực, hạn 365 ngày, chồng lấn khi xoay 7 ngày | ADR-0022 §4, RB-1, R-92 |
 | Xác thực mạnh hơn | `oauth_client_credentials` (Keycloak, R-54) tùy chọn cho đơn vị thẩm định. `mtls` để sau | ADR-0022 §5 |
 | Truy cập hiệu lực | khóa hiệu lực ∧ scope (đăng ký sản phẩm được duyệt, R-56) ∧ cấp quyền `dp_*` đang hiệu lực ∧ sản phẩm phục vụ được (production chỉ `approved`). Thiếu một điều kiện → 403 `apiclient.forbidden` | ADR-0022 §6 |
-| Giới hạn | Gateway: giới hạn thô theo IP, không thẩm quyền (R-55). Backend: token bucket theo khách hàng (Valkey nếu có, không thì trong tiến trình). **Hạn mức thẩm quyền** = bộ đếm `pf_metering` cập nhật cùng giao dịch với sổ | ADR-0022 §7, mục 4 |
+| Giới hạn | Gateway: giới hạn thô theo IP, không thẩm quyền (R-55). Backend: token bucket theo khách hàng (Valkey nếu có, không thì trong tiến trình). **Hạn mức thẩm quyền** = bộ đếm `pf_metering` cập nhật cùng giao dịch với sổ | ADR-0022 §7, §6 v4.1 (mục 4 v3.0, Stack) |
 | R-50/51/52/53 | `/v1`, header `AG-Data-Contract`; `Idempotency-Key` bắt buộc với POST, gọi lặp → 0 đơn vị; xuất → 202 + `/v1/jobs/{id}`, tệp phát luồng qua API (**không** URL có chữ ký); cursor | ADR-0022 §8 |
 | Hợp đồng dữ liệu | `contracts/dataproduct/<tên>.json` (gói Go `contracts/dataproduct`, dùng lại `publication.Node` / `Validate`), mặc định từ chối, `personal_data: false`. `contractcheck` kiểm struct `//ag:dataproduct` và tag OpenAPI. Lúc chạy `Validate` từng phần tử. **Đã cưỡng chế ở G5-0** | ADR-0022 §9 |
 | Sổ sử dụng | Một dòng mỗi lời gọi **đã xác thực**, kể cả lỗi sau xác thực. `stream_key = client:<id>:<YYYY-MM>`. Ghi **trước** khi gửi byte, lỗi → 503, không trả dữ liệu | ADR-0023 §1 |
@@ -62,7 +62,7 @@ BRD và backlog **không có** yêu cầu nào về Public API, khóa API, đo l
 - backlog KN, GIS, CGH, HTX;
 - `docs/requirements/tong-hop.md`.
 
-Mọi yêu cầu G5 đến từ ba nguồn: kiến trúc v3.0, một vài dòng gần nhất (bảng dưới), và prototype `mekong-green` dùng làm đặc tả chạy được (đọc quy tắc, không chép mã).
+Mọi yêu cầu G5 đến từ ba nguồn: kiến trúc v3.0 (từ 04/10/2026 đối chiếu với v4.1, xem [ADR-0033](../adr/0033-cong-tich-hop-mkg-nhu-moi-doi-tac.md)), một vài dòng gần nhất (bảng dưới), và prototype `mekong-green` dùng làm đặc tả chạy được (đọc quy tắc, không chép mã).
 
 | Nguồn | Nội dung | Dùng cho |
 |---|---|---|
@@ -102,8 +102,8 @@ Chỉ dùng số đã cấp. golang-migrate **không** áp số nhỏ hơn số 
 | Cụm | Số | Nội dung | Schema | Vai DB |
 |---|---|---|---|---|
 | pf | **000080** | G5-0 (**đã có**). `CREATE SCHEMA pf_apiclient`, `pf_metering` + `USAGE` cho đúng vai, không bảng. Loại cấp quyền `dp_collection_volume`, `dp_hub_capacity`, `dp_mrv_package_status` (CHECK `share_grant_event_kinds_check`). Số dự phòng G4 (`road_routes`) không dùng: nếu sau này có OSRM thì xin số mới | `pf_apiclient`, `pf_metering`, `pf_party` | `apiclient_app`, `metering_app`, `party_app` |
-| pf | 000081 | **apiclient**. Sổ `client_event` (`client:<id>`) + bảng chiếu `client_current`. Sổ `api_key_event` (`key_prefix` UNIQUE, `key_hmac` bytea, `pepper_version`, không bí mật) + bảng chiếu `api_key_current`. Sổ `subscription_event` (sản phẩm, scope, R-56 CHECK) + bảng chiếu. Sổ `quota_plan` có phiên bản (R-56 CHECK). `export_job` + ảnh chụp đầu vào bất biến (mẫu mục 12) + `export_file` (SHA-256, khóa đối tượng) | `pf_apiclient` | `apiclient_app` |
-| pf | 000082 | **metering**. Sổ `usage_event` (mẫu §8.1, phân vùng tháng, `UNIQUE (tenant_id, idem_key)`, chuỗi `client:<id>:<YYYY-MM>`) + `usage_counter_current`. Sổ `egress_event` (tenant = chủ dữ liệu, `UNIQUE (tenant_id, idem_key)` với `idem_key = <kênh>:<source_id>:<counterparty_ref>`, CHECK kênh ∈ `port.Channels`) + `egress_counter_current` + `egress_anomaly` (một dòng/ngày/khóa). `statement_job`, `statement_snapshot` (bất biến, băm), sổ `statement` (R-56 CHECK, `supersedes_id`), `numeric(18,4)` / `numeric(18,2)` cho tiền | `pf_metering` | `metering_app` |
+| pf | 000081 | **apiclient**. Sổ `client_event` (`client:<id>`) + bảng chiếu `client_current`. Sổ `api_key_event` (`key_prefix` UNIQUE, `key_hmac` bytea, `pepper_version`, không bí mật) + bảng chiếu `api_key_current`. Sổ `subscription_event` (sản phẩm, scope, R-56 CHECK) + bảng chiếu. Sổ `quota_plan` có phiên bản (R-56 CHECK). `export_job` + ảnh chụp đầu vào bất biến (mẫu §11 v4.1, mục 12 v3.0) + `export_file` (SHA-256, khóa đối tượng) | `pf_apiclient` | `apiclient_app` |
+| pf | 000082 | **metering**. Sổ `usage_event` (mẫu §15 v4.1, mục 8.1 v3.0, phân vùng tháng, `UNIQUE (tenant_id, idem_key)`, chuỗi `client:<id>:<YYYY-MM>`) + `usage_counter_current`. Sổ `egress_event` (tenant = chủ dữ liệu, `UNIQUE (tenant_id, idem_key)` với `idem_key = <kênh>:<source_id>:<counterparty_ref>`, CHECK kênh ∈ `port.Channels`) + `egress_counter_current` + `egress_anomaly` (một dòng/ngày/khóa). `statement_job`, `statement_snapshot` (bất biến, băm), sổ `statement` (R-56 CHECK, `supersedes_id`), `numeric(18,4)` / `numeric(18,2)` cho tiền | `pf_metering` | `metering_app` |
 | pf | 000083 | **tích hợp DLP** (đã dùng): `pf_notify.notification.kind` thêm `egress_anomaly` (đọc CHECK hiện hành rồi cộng thêm — chạy sau KN 000073 vẫn giữ mọi loại) | `pf_notify` | `notify_app` |
 | pf | 000084 | số tự do tiếp theo (không còn dự phòng riêng của G5) | | |
 | mkg | 000022 | **không dùng ở G5-0**. G5 không có migration vùng mkg (van kiểm ở phía nhận, ADR-0024). Vẫn là số dự phòng G4 | | |

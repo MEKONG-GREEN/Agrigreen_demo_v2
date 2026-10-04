@@ -3,7 +3,7 @@
 **Khung** lập ngày 30/09/2026 ở G4-0 (nhánh `sub/g4`); rà toàn bảng ngày 01/10/2026 sau khi có bốn module, web/app, hạ tầng và kịch bản E2E `TestG4TripToLedger` (mọi tên kiểm thử trong bảng đã tra được trong mã; mọi dòng **đạt** có kiểm thử). Agent module, web/app, hạ tầng và E2E điền cột kiểm thử và trạng thái khi làm; người tích hợp rà lại toàn bảng trước khi đóng cổng (như [g3-acceptance.md](g3-acceptance.md)). Mỗi yêu cầu có đúng một dòng. Tên kiểm thử ghi vào bảng phải tra được trong mã.
 
 Yêu cầu lấy từ:
-- kiến trúc v3.0: Phụ lục A dòng G4, mục 12 (luồng bất đồng bộ), 16 (`mkg/costing`, `mkg/acctbridge`, `pf/waterway`), 17 (phân vùng mạng), 18, 19, 20 (kiểm thử định kỳ), 21, 22 (sao lưu, phục hồi);
+- kiến trúc v3.0: Phụ lục A dòng G4, mục 12 (luồng bất đồng bộ), 16 (`mkg/costing`, `mkg/acctbridge`, `pf/waterway`), 17 (phân vùng mạng), 18, 19, 20 (kiểm thử định kỳ), 21, 22 (sao lưu, phục hồi). Mục tương ứng ở v4.1 (W0.3, 04/10/2026): §11, §27, §29, §30, §31, §32, §33, §34. Các dòng dưới giữ số mục v3.0 vì là bằng chứng nghiệm thu đã lập; bảng đổi mục ở [g1-conventions](../dev/g1-conventions.md);
 - [docs/design/mkg.md](../design/mkg.md) §5.4–5.8, §6, §7 và [g4-conventions.md](../dev/g4-conventions.md);
 - hai dòng **"ngoài G3 → G4"** của [g3-acceptance.md](g3-acceptance.md): proto FM-05, phiếu nhận hàng ↔ đơn mua > 3 %;
 - quy tắc của prototype `mekong-green` (`src/erp/tms`, `sales`, `procurement`, `warehouse`, `straw`, `finance`, `field` FM-05/09/10, `params/actuals`) — prototype là đặc tả chạy được, không chép mã. Prototype **không có kiểm thử** cho đơn bán, đơn mua, three-way match, dung sai 3 %, chia carbon, định tuyến TMS, chênh cước;

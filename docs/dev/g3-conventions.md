@@ -2,7 +2,7 @@
 
 Đọc cùng [g1-conventions.md](g1-conventions.md) và [g2-conventions.md](g2-conventions.md). Mọi quy ước G1, G2 vẫn áp dụng: cấu trúc module, RLS, sổ chỉ ghi thêm, PII chỉ ở vault, kiểm thử bắt buộc, tiền tố mã story, lệnh kiểm tra trước khi báo xong. Tài liệu này chỉ ghi phần **thêm** cho G3.
 
-Cổng G3 (tài liệu kiến trúc Phụ lục A, Q3/2027) gồm ba phần:
+Cổng G3 (tài liệu kiến trúc v3.0 Phụ lục A, Q3/2027; G3 v4.1 cùng mốc nhưng khác nội dung — [roadmap](../roadmap.md#cổng-v41--cổng-repo); bảng đổi mục v3.0 → v4.1 ở [g1-conventions](g1-conventions.md)) gồm ba phần:
 - `pf/metrics` có lịch sử;
 - `mkg/measurement` có đường nhận số liệu cân của khách;
 - agent biên theo mẫu cân đã chốt.
@@ -67,7 +67,7 @@ Chỉ dùng số đã cấp. Số trống có thể còn lại giữa các kho�
 | mkg | 000010 | G3-2 tích hợp: `mkg_measurement.lot_collection(_current)` (lô cân ↔ lệnh gom), cột `ticket_ref`/`supersedes_ticket_ref` của `mkg_fieldops.weighed_loading_current`, sổ `mkg_fieldops.roll_count_location` (GPS app hiện trường) | `mkg_measurement`, `mkg_fieldops` | `measurement_app` (+ `ingest_mkg` SELECT bảng chiếu), `fieldops_app` |
 | mkg | 000011 | **dự phòng** G3 — xin người tích hợp | | |
 | mkg | 000012 | Nghiệm thu G3 (proto FM-01/02/06/07/08): sổ tổ gom `crew_event`/`crew_current`, phân công có năng lực `crew_assignment(_current)`, kiểm ngày gặt `roll_count_harvest`, bảng đệm ngày gặt `order_plot_harvest_current`, tham số có phiên bản `param_version`/`param_current` (`baling_deadline_days`, mặc định 3 — tạm, chờ khách) | `mkg_fieldops` | `fieldops_app` |
-| mkg | 000013 | giám sát vận hành: schema `mkg_monitor`, hàm gộp SECURITY DEFINER cho sql_exporter (mục 19) | `mkg_monitor` | `mkg_monitor` (EXECUTE), chủ hàm `mkg_monitor_owner` |
+| mkg | 000013 | giám sát vận hành: schema `mkg_monitor`, hàm gộp SECURITY DEFINER cho sql_exporter (§31 v4.1, mục 19 v3.0) | `mkg_monitor` | `mkg_monitor` (EXECUTE), chủ hàm `mkg_monitor_owner` |
 | ts | 000004 | **cấp cho G4** (`ts_fleet`, telemetry phương tiện — [g4-conventions §2](g4-conventions.md#2-số-migration)); `ts_env` (cảm biến kho) chuyển sang ts 000005+ | `ts_fleet` | `ingest_ts`, `ts_reader` |
 | ts | 000003 | giám sát vận hành: schema `ts_monitor`, hàm gộp SECURITY DEFINER (`ts_env` chuyển sang ts 000005 trở đi — G4-0) | `ts_monitor` | `ts_monitor` (EXECUTE), chủ hàm `ts_monitor_owner` |
 | pf | 000045 | mrv cảnh báo: sổ `pf_mrv.alert` (KN US-MRV-04, US-MRV-06, FR-08), loại thông báo `mrv_*` của `pf_notify` | `pf_mrv`, `pf_notify` | `mrv_app` (+ `ag_outbox_publisher` hai cột `evidence_current`) |
@@ -88,8 +88,8 @@ Vai DB đã khai trong `internal/shared/dbadmin/dbadmin.go` và trong userlist P
 | `ingest_mkg` | mkg | `cmd/ingest` | đọc sổ thiết bị đã duyệt, ghi phiếu cân + outbox (mkg 000007–000008 cấp) |
 | `worker_internal` | mkg | `cmd/worker-internal` | `shared.inbox` qua `ag_shared_user`; consumer ghi nghiệp vụ bằng vai module |
 | `metrics_app` | pf | `pf/metrics` | schema `pf_metrics` (pf 000036–000037 cấp) |
-| `mkg_monitor` | mkg | sql_exporter (mục 19) | NOBYPASSRLS; chỉ `EXECUTE` hàm `mkg_monitor.*` (số đếm/tuổi gộp xuyên tenant); **không** SELECT bảng gốc |
-| `ts_monitor` | ts | sql_exporter (mục 19) | như trên với `ts_monitor.*` |
+| `mkg_monitor` | mkg | sql_exporter (§31 v4.1, mục 19 v3.0) | NOBYPASSRLS; chỉ `EXECUTE` hàm `mkg_monitor.*` (số đếm/tuổi gộp xuyên tenant); **không** SELECT bảng gốc |
+| `ts_monitor` | ts | sql_exporter (§31 v4.1, mục 19 v3.0) | như trên với `ts_monitor.*` |
 | `mkg_monitor_owner`, `ts_monitor_owner` | mkg, ts | chủ hàm SECURITY DEFINER | NOLOGIN, BYPASSRLS, chỉ SELECT theo cột vận hành; `ag_migrator` là thành viên để chuyển chủ hàm |
 
 Vai nghiệp vụ đã có hằng trong `port/` và có trong realm Keycloak:

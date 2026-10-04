@@ -19,3 +19,12 @@
 
 ## Triển khai
 Đối chiếu từng cam kết với mã và kiểm thử: [trien-khai-g1.md](trien-khai-g1.md#adr-0006-engine-đồng-bộ-ngoại-tuyến).
+
+## Đối chiếu v4.1 (04/10/2026)
+
+Ghi lệch theo gói W0.3 ([kế hoạch](../kien-truc-v4.1-ke-hoach.md)), mục X-06 của [bản đối chiếu](../kien-truc-v4.1-doi-chieu.md). Quyết định 30/09/2026 ở trên **giữ nguyên**.
+
+- Kiến trúc v4.1 (§6, §36 và Phụ lục C) vẫn giả định engine đồng bộ tự vận hành bằng logical replication: slot `failover = true`, sáu điều kiện. Phụ lục C ghi C-1 "chặn `cap/sync`".
+- Repo không theo giả định đó. Engine là **Application API**: pull/push qua cursor mờ ký HMAC, kèm Idempotency-Key. Không có slot nào, nên **C-1 không chặn** `cap/sync` (repo: `pf/sync`) và không chặn kiểm chứng đồng bộ ở ĐTK 1.
+- C-1 chỉ thành câu hỏi trở lại khi có ADR mới đề xuất chuyển sang logical replication. ADR đó phải thỏa đủ sáu điều kiện (mục 15 v3.0, §36 v4.1).
+- Đây là ghi lệch, không sửa v4.1. MKG ký cùng các ADR v4.1 ở mục A7 của [cau-hoi-ton-dong.md](../cau-hoi-ton-dong.md).

@@ -50,3 +50,20 @@
   - `migrate maintain` trên cụm ts;
   - kiểm thử ngược của view cổng.
 - Nếu tải thật (G4, diễn tập ĐTK 2) vượt khả năng phân vùng tháng thuần, cân nhắc phân vùng tuần hoặc extension lõi Apache-2.0 qua ADR mới. Mô hình dữ liệu không đổi.
+
+## Đối chiếu v4.1 (04/10/2026)
+
+Ghi lệch theo gói W0.3 ([kế hoạch](../kien-truc-v4.1-ke-hoach.md)), mục X-05 của [bản đối chiếu](../kien-truc-v4.1-doi-chieu.md). Quyết định ở trên **giữ nguyên**.
+
+| Điểm | Kiến trúc v4.1 (§6, §21, Phụ lục B mục 13) | Repo (ADR này) |
+|---|---|---|
+| Công nghệ | TimescaleDB ở cụm `mkg-ts` | PostgreSQL 17 thuần, phân vùng tháng, cụm `ts` |
+| Tầng lạnh | Nén (tính năng TSL) | Không nén trong DB. Xuất tầng lạnh có ký ra kho đối tượng trong lãnh thổ (runbook `ingest.md` §8) |
+| RLS | Không RLS trên chuỗi thời gian | Có RLS tenant (`shared.apply_append_only`) |
+| Chỉ ghi thêm, không join với bảng nghiệp vụ | Có | Có (`migratecheck`, R-07) |
+
+- **Lý do giữ:** nén, continuous aggregate và chính sách lưu giữ của TimescaleDB đều thuộc giấy phép **TSL**. TSL không qua RB-4 (giấy phép phải cho dùng trong nền tảng thu phí và có đường thoát). Nếu chỉ dùng phần lõi Apache-2.0 thì không có nén, tức là mất đúng lý do v4.1 chọn TimescaleDB.
+- **Tên cụm:** `ts` của repo tương ứng `mkg-ts` của v4.1. Cụm này chỉ chứa dữ liệu vùng nội bộ MKG, đúng tinh thần Phụ lục B mục 13 ("chỉ ở vùng nội bộ một đơn vị"). Không đổi tên.
+- **RLS:** giữ. RLS trên bảng chỉ ghi thêm tốn ít và chặn được lỗi cấu hình tenant. Nếu diễn tập tải G4 cho thấy RLS là nút cổ chai thì xử lý qua ADR mới.
+- **Đường chuyển:** bố cục đã tương thích hypertable (quyết định 3). Chỉ cần hỏi lại MKG và pháp chế khi thật sự cần nén ([cau-hoi-ton-dong.md](../cau-hoi-ton-dong.md) H-4).
+- Đây là ghi lệch, không sửa v4.1. MKG ký cùng các ADR v4.1 ở mục A7.
