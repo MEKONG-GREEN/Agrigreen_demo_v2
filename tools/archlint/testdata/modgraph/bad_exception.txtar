@@ -1,0 +1,16 @@
+# Ngoại lệ thiếu gói kế hoạch sở hữu, hoặc cho quy tắc depends, bị từ chối.
+error owner phải là gói kế hoạch
+-- exceptions.yaml --
+exceptions:
+  - rule: depends
+    from: pf/k
+    to: pf/d
+    owner: sau này
+    until: chưa rõ
+    reason: lười
+-- internal/platform/k/module.yaml --
+name: pf/k
+kind: kernel
+zones: [pf]
+version: 1.0.0
+enable: always

@@ -1,0 +1,35 @@
+# Ngoại lệ: vi phạm đã khai (tier pf/k → pf/d) không bị báo; ngoại lệ không còn xảy ra
+# (cycle pf/k → pf/d) và ops_schemas không còn được tạo đều là lỗi thời.
+stale cycle pf/k pf/d
+staleops pf_gone
+-- exceptions.yaml --
+ops_schemas:
+  - schema: pf_gone
+    reason: đã bỏ
+exceptions:
+  - rule: tier
+    from: pf/k
+    to: pf/d
+    owner: W3.3
+    until: khi đóng W3.3
+    reason: thử
+  - rule: cycle
+    from: pf/k
+    to: pf/d
+    owner: W3.3
+    until: khi đóng W3.3
+    reason: đã gỡ chu trình nhưng quên xóa mục
+-- internal/platform/k/module.yaml --
+name: pf/k
+kind: kernel
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/d: ">=1.0 <2"
+enable: always
+-- internal/platform/d/module.yaml --
+name: pf/d
+kind: domain
+zones: [pf]
+version: 1.0.0
+enable: per_tenant

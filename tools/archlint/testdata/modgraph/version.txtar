@@ -1,0 +1,18 @@
+# Ràng buộc phiên bản không thỏa (pf/b là 1.4.0) và depends tới module không có.
+violation version pf/a pf/b
+violation version pf/a pf/zzz
+-- internal/platform/a/module.yaml --
+name: pf/a
+kind: domain
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/b: ">=2.0 <3"
+  pf/zzz: ">=1.0 <2"
+enable: per_tenant
+-- internal/platform/b/module.yaml --
+name: pf/b
+kind: capability
+zones: [pf]
+version: 1.4.0
+enable: per_tenant

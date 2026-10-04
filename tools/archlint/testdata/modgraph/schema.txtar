@@ -1,0 +1,52 @@
+# Sở hữu schema:
+#  - owns_schema khai pf_ghost mà không migration nào tạo;
+#  - migration của pf/b sửa bảng trong pf_a;
+#  - migration không gắn module tạo schema không ai sở hữu;
+#  - migration tích hợp không gắn module đụng schema của hai module (trigger, policy);
+#  - migration không gắn module chỉ đụng schema của MỘT module được gắn module đó (không lỗi);
+#  - schema vận hành khai trong ops_schemas và schema của cụm shared không cần chủ.
+violation schema pf/b pf_ghost
+violation schema migrations/pf/000003_pf_b_hack.up.sql pf_a
+violation schema migrations/pf/000004_pf_orphan.up.sql pf_orphan
+violation schema migrations/pf/000005_pf_g9_integration.up.sql pf_a
+violation schema migrations/pf/000005_pf_g9_integration.up.sql pf_b
+-- exceptions.yaml --
+ops_schemas:
+  - schema: pf_monitor
+    reason: vai giám sát sql_exporter
+exceptions: []
+-- internal/platform/a/module.yaml --
+name: pf/a
+kind: capability
+zones: [pf]
+version: 1.0.0
+owns_schema: [pf_a]
+enable: per_tenant
+-- internal/platform/b/module.yaml --
+name: pf/b
+kind: domain
+zones: [pf]
+version: 1.0.0
+owns_schema: [pf_b, pf_files, pf_ghost]
+enable: per_tenant
+-- migrations/pf/000001_pf_a.up.sql --
+CREATE SCHEMA pf_a;
+CREATE TABLE pf_a.t (id int);
+-- migrations/pf/000002_pf_b.up.sql --
+CREATE SCHEMA pf_b;
+CREATE TABLE pf_b.u (id int);
+-- migrations/pf/000003_pf_b_hack.up.sql --
+ALTER TABLE pf_a.t ADD COLUMN x int;
+-- migrations/pf/000004_pf_orphan.up.sql --
+CREATE SCHEMA pf_orphan;
+-- migrations/pf/000005_pf_g9_integration.up.sql --
+CREATE TRIGGER t_audit AFTER INSERT OR UPDATE ON pf_a.t FOR EACH ROW EXECUTE FUNCTION shared.f();
+CREATE POLICY p_tenant ON pf_b.u USING (true);
+-- migrations/pf/000006_pf_files.up.sql --
+CREATE SCHEMA pf_files;
+CREATE TABLE pf_files.blob (id int);
+-- migrations/pf/000007_pf_ops.up.sql --
+CREATE SCHEMA pf_monitor;
+CREATE FUNCTION pf_monitor.count_t() RETURNS int LANGUAGE sql AS 'SELECT 1';
+-- migrations/shared/000001_baseline.up.sql --
+CREATE SCHEMA shared;

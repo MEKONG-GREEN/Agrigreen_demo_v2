@@ -42,3 +42,44 @@ go run ./tools/modgen -check   # CI: lỗi nếu tệp nào lỗi thời hoặc 
 - `vault/identity` → `kernel`, `enable: always`: kho định danh nằm dưới mọi module chạm tới người (party, accounts, sync, geo, mechanization), cụm riêng (ADR-0021).
 - Module `mkg/*` → `enable: always`: vùng nội bộ chỉ phục vụ MKG.
 - Phụ thuộc chỉ tính từ mã không phải kiểm thử; import chéo trong `_test.go` không vào `depends`.
+
+## Đồ thị module: `agmodgraph` (W1.2)
+
+Analyzer `agmodgraph` trong `tools/archlint` ([modgraph.go](../../tools/archlint/modgraph.go)) đọc mọi `module.yaml`, mã Go không phải kiểm thử và `migrations/*/*.up.sql`. Chạy cùng các analyzer khác:
+
+```powershell
+go run ./tools/modgen -check     # module.yaml khớp mã (chạy trước)
+go run ./tools/archlint ./...    # gồm agmodgraph
+go test ./tools/archlint -run ModGraph
+```
+
+| Quy tắc | Kiểm | Có ngoại lệ |
+|---|---|---|
+| `cycle` | Đồ thị `depends` không chu trình. Mọi cạnh nằm trong một thành phần liên thông mạnh đều bị báo | có |
+| `tier` | Chỉ đi xuống theo `kind`: kernel ← capability ← domain (R-MOD-05). Cùng tầng được phép nếu không chu trình | có |
+| `depends` | Mã không phải kiểm thử import package của module khác (`port/`, vault `client/`) thì module đó phải có trong `depends` | **không** — chạy `modgen` |
+| `version` | `depends` trỏ tới module có thật, ràng buộc thỏa `version` hiện có | có |
+| `schema` | Schema trong `owns_schema` phải được migration `CREATE SCHEMA`; schema migration tạo phải có chủ (trừ cụm `shared` và `ops_schemas`); migration của module A không tạo/sửa/xóa đối tượng (bảng, view, chỉ mục, hàm, trigger, policy, chú thích) trong schema của module B | có |
+
+Migration được gắn module theo tên tệp `<số>_<cụm>_<module>[_…].up.sql` (khớp dài nhất). Tệp không khớp tên mà chỉ đụng schema của **một** module thì gắn module đó (vd `pf 000010_pf_files` → `pf/sync`, `ts 000001_ts_weigh` → `mkg/measurement`). Tệp đụng schema của nhiều module là vi phạm `schema`: migration mới phải tách theo module.
+
+Lỗi được báo ở `module.go` của module liên quan (với `depends`: ở dòng import). Vi phạm không gắn được module nào làm `archlint` dừng với lỗi chung.
+
+### Ngoại lệ
+
+Vi phạm có từ trước W1.2 được liệt kê trong [`tools/archlint/modgraph_exceptions.yaml`](../../tools/archlint/modgraph_exceptions.yaml), khóa `(rule, from, to)`, mỗi mục bắt buộc `reason`, `owner` (gói kế hoạch sẽ gỡ, dạng `W<n>.<m>`) và `until`. Mục `ops_schemas` liệt kê schema vận hành/dbadmin không thuộc module nào (`mkg_monitor`, `ts_monitor`).
+
+- Vi phạm **mới** (không có trong tệp) làm hỏng cổng. Sửa mã; không thêm ngoại lệ để qua cổng.
+- Ngoại lệ **lỗi thời** (vi phạm không còn xảy ra) cũng làm hỏng cổng: xóa mục trong cùng PR đã gỡ nó. Vì vậy danh sách chỉ co lại.
+- Thêm mục mới chỉ khi có lý do kiến trúc, review như thay đổi hợp đồng (ADR-0027), ghi gói sẽ gỡ. Đổi `kind` của module để gỡ cạnh `tier` cần sửa ADR-0027 mục 2.
+- Khi đóng một gói `W<n>.<m>`, mọi mục `owner: W<n>.<m>` phải đã biến mất. Nếu chưa, gói đó gỡ nốt hoặc ghi lại `owner` sang gói khác kèm lý do trong PR.
+
+Tình trạng lúc W1.2 (04/10/2026), 118 mục:
+
+| Quy tắc | Số mục | Gói gỡ |
+|---|---|---|
+| `cycle` | 77 — hai chu trình: cả 7 module `mkg/*`; 13 module pf (`accounts`, `apiclient`, `cropcycle`, `extension`, `geo`, `masterdata`, `mechanization`, `metering`, `metrics`, `party`, `reports`, `sync`, `waterway`) | W8.5 (mkg, 19), W3.2 (14), W5.2 (13), W3.3 (9), W6.3 (9), W6.2 (7), W7.2 (6) |
+| `tier` | 24 cạnh đi lên | W5.2 (5), W9.1 (5, `pf/notify` → nghiệp vụ), W6.2 (4), W3.3 (3), W6.3 (3), W7.2 (3), W3.2 (1) |
+| `schema` | 17 — migration tích hợp G3/G4/G5 nhiều schema (mkg 000010, 000014, 000020, 000021; pf 000080); pf 000034 (`pf/sync`) và 000045 (`pf/mrv`) sửa CHECK `pf_notify.notification`; pf 000078 (`pf/mechanization`) đụng `pf_party` | W7.1 (migration theo schema; tệp đã áp không sửa được, R-23) |
+
+Gợi ý tầng (chưa áp, cần sửa ADR-0027): `pf/metering` (`dom/metering`) là điểm kiểm soát xuất dữ liệu duy nhất, được `party`, `apiclient`, `geo`, `notify`, `reports` gọi, còn nó chỉ phụ thuộc `apiclient` (kernel) và `masterdata` (capability). Chuyển sang `kind: capability` (`cap/metering`) gỡ 3 cạnh `tier` (`geo`, `notify`, `reports` → `metering`) mà không thêm cạnh đi lên nào; `kernel` gỡ cả 5 nhưng sinh cạnh đi lên mới `metering` → `masterdata`.

@@ -10,6 +10,9 @@
 //	agpiilog    R-14 — cấm log trường pii:"true"
 //	agnoharddelete RB-1, ADR-0011 — cấm DELETE FROM / TRUNCATE trong internal/platform, internal/mkg
 //	            (trừ hàm Rebuild*/Clear* dựng lại bảng chiếu từ sổ, R-22)
+//	agmodgraph  W1.2, ADR-0027, R-MOD-05 — đồ thị module.yaml: không chu trình, chỉ đi xuống theo kind,
+//	            import có trong depends, phiên bản thỏa, owns_schema khớp migration; ngoại lệ có tên
+//	            trong modgraph_exceptions.yaml (chỉ được co lại)
 //
 // Chạy: go run ./tools/archlint ./...
 package main
@@ -17,5 +20,5 @@ package main
 import "golang.org/x/tools/go/analysis/multichecker"
 
 func main() {
-	multichecker.Main(Boundary, NoFloat, NoTimeNow, PIILog, NoHardDelete)
+	multichecker.Main(Boundary, NoFloat, NoTimeNow, PIILog, NoHardDelete, ModGraph)
 }

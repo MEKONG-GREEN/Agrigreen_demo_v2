@@ -32,7 +32,9 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with: { version: v2.14.0 }
-      - name: archlint — R-02/R-03/R-04, R-10, R-12, R-14
+      - name: modgen -check — module.yaml khớp mã và migration (W1.1, ADR-0027)
+        run: go run ./tools/modgen -check
+      - name: archlint — R-02/R-03/R-04, R-10, R-12, R-14, agmodgraph (W1.2, R-MOD-05)
         run: go run ./tools/archlint ./...
       - name: migratecheck — R-23/R-25
         run: go run ./tools/migratecheck migrations

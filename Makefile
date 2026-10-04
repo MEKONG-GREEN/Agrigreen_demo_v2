@@ -12,8 +12,9 @@ vet:
 lint:
 	golangci-lint run ./...
 
-# Cổng kiến trúc (mục 20)
+# Cổng kiến trúc (mục 20). agmodgraph (đồ thị module.yaml, W1.2) chạy trong archlint.
 gates:
+	go run ./tools/modgen -check
 	go run ./tools/archlint ./...
 	go run ./tools/migratecheck migrations
 	go run ./tools/contractcheck

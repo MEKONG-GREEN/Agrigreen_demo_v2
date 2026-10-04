@@ -43,7 +43,7 @@ CI GitHub (`.github/workflows/ci.yml`, 14 job): cổng tĩnh (gofmt, vet, golang
 | UUIDv7 (R-11), giờ nghiệp vụ Việt Nam (R-12) | [ids](internal/shared/ids), [clock](internal/shared/clock) | kiểm thử đơn vị + `agnotimenow` |
 | Mỗi module một vai DB (R-05), vault tách database (R-04) | [dbadmin](internal/shared/dbadmin/dbadmin.go) | CONNECT theo database |
 | Module mẫu đủ 5 lớp | [internal/platform/party](internal/platform/party): đồng ý theo mục đích (mục 10.5) | API end-to-end: [router_test.go](cmd/api-platform/router_test.go) |
-| Ranh giới module R-02/03/04, PII R-14 | [tools/archlint](tools/archlint) | `analysistest` |
+| Ranh giới module R-02/03/04, PII R-14, đồ thị module R-MOD-05 (`agmodgraph`) | [tools/archlint](tools/archlint), [module.yaml](docs/dev/modules.md) | `analysistest`, ca `testdata/modgraph` |
 | Migration R-23/R-25, hợp đồng R-64, van công bố | [tools/migratecheck](tools/migratecheck), [tools/contractcheck](tools/contractcheck) | kiểm thử của từng công cụ |
 
 ## Lệch so với tài liệu kiến trúc
@@ -82,7 +82,7 @@ Cài môi trường xem [docs/dev-setup.md](docs/dev-setup.md): Go 1.26, Postgre
 
 ```bash
 go test -count=1 ./...
-go run ./tools/archlint ./... && go run ./tools/migratecheck migrations && go run ./tools/contractcheck
+go run ./tools/modgen -check && go run ./tools/archlint ./... && go run ./tools/migratecheck migrations && go run ./tools/contractcheck
 ```
 
 Kiểm thử tích hợp cần `AG_TEST_PG_ADMIN_URL` và `AG_DB_APP_PASSWORD`. Nếu thiếu, trên máy dev các kiểm thử này được bỏ qua; khi `CI=true` thì build hỏng.

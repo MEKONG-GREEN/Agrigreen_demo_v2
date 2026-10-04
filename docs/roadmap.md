@@ -250,6 +250,7 @@ Trạng thái (02/10/2026): A, M, S + D, H, W đã hợp nhất vào `sub/g5` (t
 
 ## Chuyển đổi kiến trúc v4.1 ([kế hoạch](kien-truc-v4.1-ke-hoach.md))
 - [x] W1.1 (04/10/2026): `module.yaml` cho 26 module, `internal/shared/modreg`, `go run ./tools/modgen -check` ([docs/dev/modules.md](dev/modules.md)).
+- [x] W1.2 (04/10/2026): analyzer `agmodgraph` trong `tools/archlint` (chu trình, tầng, `depends`, phiên bản, `owns_schema` ↔ migration) + 118 ngoại lệ có chủ trong `tools/archlint/modgraph_exceptions.yaml` (chỉ co lại); `modgen -check` và `agmodgraph` vào job lint CI ([docs/dev/modules.md](dev/modules.md#đồ-thị-module-agmodgraph-w12)).
 
 ## G6
 Theo Phụ lục A của tài liệu kiến trúc:

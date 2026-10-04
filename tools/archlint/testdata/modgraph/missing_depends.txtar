@@ -1,0 +1,28 @@
+# Mã không phải kiểm thử import port/ (và vault client/) của module khác mà không khai depends.
+violation depends pf/a pf/b
+violation depends pf/a vault/identity
+-- internal/platform/a/module.yaml --
+name: pf/a
+kind: domain
+zones: [pf]
+version: 1.0.0
+enable: per_tenant
+-- internal/platform/a/app/svc.go --
+package app
+
+import (
+	_ "example.com/ag/internal/platform/b/port"
+	_ "example.com/ag/internal/vault/identity/client"
+)
+-- internal/platform/b/module.yaml --
+name: pf/b
+kind: capability
+zones: [pf]
+version: 1.0.0
+enable: per_tenant
+-- internal/vault/identity/module.yaml --
+name: vault/identity
+kind: kernel
+zones: [vault]
+version: 1.0.0
+enable: always

@@ -1,0 +1,58 @@
+# Đồ thị hợp lệ: kernel ← capability ← domain, import có trong depends, ràng buộc thỏa,
+# migration của module chỉ đụng schema của mình; import trong _test.go không cần depends;
+# chú thích SQL bị bỏ qua; schema của thư viện (cụm shared) không cần chủ.
+# Không có vi phạm nào.
+-- internal/platform/core/module.yaml --
+name: pf/core
+kind: kernel
+zones: [pf]
+version: 1.0.0
+owns_schema: [pf_core]
+enable: always
+-- internal/platform/core/module.go --
+package core
+-- internal/platform/forms/module.yaml --
+name: pf/forms
+kind: capability
+zones: [pf]
+version: 1.2.0
+depends:
+  pf/core: ">=1.0 <2"
+owns_schema: [pf_forms]
+enable: per_tenant
+-- internal/platform/forms/app/a.go --
+package app
+
+import _ "example.com/ag/internal/platform/core/port"
+-- internal/platform/farm/module.yaml --
+name: pf/farm
+kind: domain
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/core: ">=1.0 <2"
+  pf/forms: ">=1.2 <2"
+enable: per_tenant
+-- internal/platform/farm/module.go --
+package farm
+
+import (
+	_ "example.com/ag/internal/platform/core/port"
+	_ "example.com/ag/internal/platform/farm/port"
+	_ "example.com/ag/internal/platform/forms/port"
+	_ "example.com/ag/internal/shared/ledger"
+)
+-- internal/platform/farm/x_test.go --
+package farm
+
+import _ "example.com/ag/internal/platform/mrv/port"
+-- migrations/pf/000001_pf_core.up.sql --
+CREATE SCHEMA pf_core;
+CREATE TABLE pf_core.t (id int);
+-- migrations/pf/000002_pf_forms.up.sql --
+CREATE SCHEMA IF NOT EXISTS pf_forms;
+CREATE UNIQUE INDEX forms_x ON pf_forms.x (id);
+/* ALTER TABLE pf_core.t ADD COLUMN c int; */
+-- chú thích: ALTER TABLE pf_core.t ADD COLUMN d int;
+-- migrations/shared/000001_baseline.up.sql --
+CREATE SCHEMA shared;

@@ -1,0 +1,28 @@
+# Chu trình pf/a ↔ pf/b (cùng tầng domain): mọi cạnh trong thành phần liên thông mạnh bị báo;
+# cạnh pf/c → pf/a đi vào chu trình nhưng không nằm trong nó nên không bị báo.
+violation cycle pf/a pf/b
+violation cycle pf/b pf/a
+-- internal/platform/a/module.yaml --
+name: pf/a
+kind: domain
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/b: ">=1.0 <2"
+enable: per_tenant
+-- internal/platform/b/module.yaml --
+name: pf/b
+kind: domain
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/a: ">=1.0 <2"
+enable: per_tenant
+-- internal/platform/c/module.yaml --
+name: pf/c
+kind: domain
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/a: ">=1.0 <2"
+enable: per_tenant

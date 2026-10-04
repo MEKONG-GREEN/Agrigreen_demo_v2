@@ -1,0 +1,728 @@
+# Ngoại lệ của agmodgraph (W1.2, ADR-0027 mục 5) — vi phạm ĐANG CÓ được chấp nhận tạm, đã rà soát.
+#
+# Quy tắc: tools/archlint/modgraph.go; quy trình: docs/dev/modules.md mục "Đồ thị module".
+#   - Vi phạm mới (không có trong tệp này) làm hỏng `go run ./tools/archlint ./...`.
+#   - Mục lỗi thời (vi phạm không còn xảy ra) cũng làm hỏng cổng: xóa mục trong cùng PR đã gỡ nó.
+#   - Danh sách chỉ được co lại. Thêm mục mới cần review như thay đổi hợp đồng (ADR-0027) và
+#     phải có rule, from, to, reason, owner (gói kế hoạch W<n>.<m> sẽ gỡ), until.
+#   - Quy tắc `depends` không có ngoại lệ: chạy `go run ./tools/modgen`.
+#
+# Khóa: (rule, from, to). cycle/tier/version: from, to là module. schema: from là migration (hoặc
+# module với owns_schema thừa), to là schema.
+
+# Schema vận hành/dbadmin, không thuộc module nào (được phép lâu dài; phải còn được migration tạo).
+ops_schemas:
+  - schema: mkg_monitor
+    reason: "vai giám sát sql_exporter cụm mkg (mkg 000013, docs/runbooks/ingest.md mục 7) — hàm SECURITY DEFINER chỉ trả số đếm, chủ là dbadmin"
+  - schema: ts_monitor
+    reason: "vai giám sát sql_exporter cụm ts (ts 000003) — cùng mẫu mkg_monitor, chủ là dbadmin"
+
+exceptions:
+  - rule: cycle
+    from: pf/cropcycle
+    to: pf/geo
+    owner: W3.2
+    until: khi đóng W3.2
+    reason: "thửa/vụ HTX của pf/geo, pf/cropcycle chuyển sang pf/cooperative; bên tiêu thụ đổi sang cooperativeport (W3.2)"
+  - rule: cycle
+    from: pf/cropcycle
+    to: pf/masterdata
+    owner: W3.2
+    until: khi đóng W3.2
+    reason: "thửa/vụ HTX của pf/geo, pf/cropcycle chuyển sang pf/cooperative; bên tiêu thụ đổi sang cooperativeport (W3.2)"
+  - rule: cycle
+    from: pf/cropcycle
+    to: pf/sync
+    owner: W3.2
+    until: khi đóng W3.2
+    reason: "thửa/vụ HTX của pf/geo, pf/cropcycle chuyển sang pf/cooperative; bên tiêu thụ đổi sang cooperativeport (W3.2)"
+  - rule: cycle
+    from: pf/extension
+    to: pf/geo
+    owner: W3.2
+    until: khi đóng W3.2
+    reason: "thửa/vụ HTX của pf/geo, pf/cropcycle chuyển sang pf/cooperative; bên tiêu thụ đổi sang cooperativeport (W3.2)"
+  - rule: cycle
+    from: pf/extension
+    to: pf/masterdata
+    owner: W3.2
+    until: khi đóng W3.2
+    reason: "cạnh đúng chiều nhưng nằm trong chu trình pf (đăng ký hai chiều); hết chu trình khi gỡ các cạnh đi lên; nếu còn sau W3.2 thì đảo chiều đăng ký (port do module dưới khai)"
+  - rule: cycle
+    from: pf/extension
+    to: pf/sync
+    owner: W3.2
+    until: khi đóng W3.2
+    reason: "cạnh đúng chiều nhưng nằm trong chu trình pf (đăng ký hai chiều); hết chu trình khi gỡ các cạnh đi lên; nếu còn sau W3.2 thì đảo chiều đăng ký (port do module dưới khai)"
+  - rule: cycle
+    from: pf/geo
+    to: pf/masterdata
+    owner: W3.2
+    until: khi đóng W3.2
+    reason: "thửa/vụ HTX của pf/geo, pf/cropcycle chuyển sang pf/cooperative; bên tiêu thụ đổi sang cooperativeport (W3.2)"
+  - rule: cycle
+    from: pf/geo
+    to: pf/sync
+    owner: W3.2
+    until: khi đóng W3.2
+    reason: "thửa/vụ HTX của pf/geo, pf/cropcycle chuyển sang pf/cooperative; bên tiêu thụ đổi sang cooperativeport (W3.2)"
+  - rule: cycle
+    from: pf/geo
+    to: pf/waterway
+    owner: W3.2
+    until: khi đóng W3.2
+    reason: "thửa/vụ HTX của pf/geo, pf/cropcycle chuyển sang pf/cooperative; bên tiêu thụ đổi sang cooperativeport (W3.2)"
+  - rule: cycle
+    from: pf/masterdata
+    to: pf/sync
+    owner: W3.2
+    until: khi đóng W3.2
+    reason: "cạnh đúng chiều nhưng nằm trong chu trình pf (đăng ký hai chiều); hết chu trình khi gỡ các cạnh đi lên; nếu còn sau W3.2 thì đảo chiều đăng ký (port do module dưới khai)"
+  - rule: cycle
+    from: pf/mechanization
+    to: pf/cropcycle
+    owner: W3.2
+    until: khi đóng W3.2
+    reason: "thửa/vụ HTX của pf/geo, pf/cropcycle chuyển sang pf/cooperative; bên tiêu thụ đổi sang cooperativeport (W3.2)"
+  - rule: cycle
+    from: pf/mechanization
+    to: pf/masterdata
+    owner: W3.2
+    until: khi đóng W3.2
+    reason: "cạnh đúng chiều nhưng nằm trong chu trình pf (đăng ký hai chiều); hết chu trình khi gỡ các cạnh đi lên; nếu còn sau W3.2 thì đảo chiều đăng ký (port do module dưới khai)"
+  - rule: cycle
+    from: pf/sync
+    to: pf/masterdata
+    owner: W3.2
+    until: khi đóng W3.2
+    reason: "cạnh đúng chiều nhưng nằm trong chu trình pf (đăng ký hai chiều); hết chu trình khi gỡ các cạnh đi lên; nếu còn sau W3.2 thì đảo chiều đăng ký (port do module dưới khai)"
+  - rule: cycle
+    from: pf/waterway
+    to: pf/masterdata
+    owner: W3.2
+    until: khi đóng W3.2
+    reason: "cạnh đúng chiều nhưng nằm trong chu trình pf (đăng ký hai chiều); hết chu trình khi gỡ các cạnh đi lên; nếu còn sau W3.2 thì đảo chiều đăng ký (port do module dưới khai)"
+  - rule: cycle
+    from: pf/cropcycle
+    to: pf/party
+    owner: W3.3
+    until: khi đóng W3.3
+    reason: "pf/party còn giữ HTX/hộ (ngoại lệ có tên của ADR-0027, hết hạn ở W3.3 khi chuyển sang pf_coop/pf/cooperative)"
+  - rule: cycle
+    from: pf/extension
+    to: pf/party
+    owner: W3.3
+    until: khi đóng W3.3
+    reason: "pf/party còn giữ HTX/hộ (ngoại lệ có tên của ADR-0027, hết hạn ở W3.3 khi chuyển sang pf_coop/pf/cooperative)"
+  - rule: cycle
+    from: pf/geo
+    to: pf/party
+    owner: W3.3
+    until: khi đóng W3.3
+    reason: "pf/party còn giữ HTX/hộ (ngoại lệ có tên của ADR-0027, hết hạn ở W3.3 khi chuyển sang pf_coop/pf/cooperative)"
+  - rule: cycle
+    from: pf/mechanization
+    to: pf/party
+    owner: W3.3
+    until: khi đóng W3.3
+    reason: "pf/party còn giữ HTX/hộ (ngoại lệ có tên của ADR-0027, hết hạn ở W3.3 khi chuyển sang pf_coop/pf/cooperative)"
+  - rule: cycle
+    from: pf/party
+    to: pf/geo
+    owner: W3.3
+    until: khi đóng W3.3
+    reason: "pf/party còn giữ HTX/hộ (ngoại lệ có tên của ADR-0027, hết hạn ở W3.3 khi chuyển sang pf_coop/pf/cooperative)"
+  - rule: cycle
+    from: pf/party
+    to: pf/masterdata
+    owner: W3.3
+    until: khi đóng W3.3
+    reason: "pf/party còn giữ HTX/hộ (ngoại lệ có tên của ADR-0027, hết hạn ở W3.3 khi chuyển sang pf_coop/pf/cooperative)"
+  - rule: cycle
+    from: pf/party
+    to: pf/sync
+    owner: W3.3
+    until: khi đóng W3.3
+    reason: "pf/party còn giữ HTX/hộ (ngoại lệ có tên của ADR-0027, hết hạn ở W3.3 khi chuyển sang pf_coop/pf/cooperative)"
+  - rule: cycle
+    from: pf/sync
+    to: pf/party
+    owner: W3.3
+    until: khi đóng W3.3
+    reason: "pf/party còn giữ HTX/hộ (ngoại lệ có tên của ADR-0027, hết hạn ở W3.3 khi chuyển sang pf_coop/pf/cooperative)"
+  - rule: cycle
+    from: pf/waterway
+    to: pf/party
+    owner: W3.3
+    until: khi đóng W3.3
+    reason: "pf/party còn giữ HTX/hộ (ngoại lệ có tên của ADR-0027, hết hạn ở W3.3 khi chuyển sang pf_coop/pf/cooperative)"
+  - rule: cycle
+    from: pf/apiclient
+    to: pf/masterdata
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: cycle
+    from: pf/apiclient
+    to: pf/metering
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: cycle
+    from: pf/apiclient
+    to: pf/party
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: cycle
+    from: pf/cropcycle
+    to: pf/apiclient
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: cycle
+    from: pf/cropcycle
+    to: pf/metering
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: cycle
+    from: pf/extension
+    to: pf/metering
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: cycle
+    from: pf/geo
+    to: pf/apiclient
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: cycle
+    from: pf/geo
+    to: pf/metering
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: cycle
+    from: pf/metering
+    to: pf/apiclient
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: cycle
+    from: pf/metering
+    to: pf/masterdata
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: cycle
+    from: pf/party
+    to: pf/apiclient
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: cycle
+    from: pf/party
+    to: pf/metering
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: cycle
+    from: pf/reports
+    to: pf/metering
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: cycle
+    from: pf/extension
+    to: pf/reports
+    owner: W6.2
+    until: khi đóng W6.2
+    reason: "pf/reports + extension/reportcycle và danh mục KN đan nhau; W6.2 tách cap/forms, KN dùng qua cấu hình"
+  - rule: cycle
+    from: pf/masterdata
+    to: pf/extension
+    owner: W6.2
+    until: khi đóng W6.2
+    reason: "pf/reports + extension/reportcycle và danh mục KN đan nhau; W6.2 tách cap/forms, KN dùng qua cấu hình"
+  - rule: cycle
+    from: pf/reports
+    to: pf/cropcycle
+    owner: W6.2
+    until: khi đóng W6.2
+    reason: "pf/reports + extension/reportcycle và danh mục KN đan nhau; W6.2 tách cap/forms, KN dùng qua cấu hình"
+  - rule: cycle
+    from: pf/reports
+    to: pf/extension
+    owner: W6.2
+    until: khi đóng W6.2
+    reason: "pf/reports + extension/reportcycle và danh mục KN đan nhau; W6.2 tách cap/forms, KN dùng qua cấu hình"
+  - rule: cycle
+    from: pf/reports
+    to: pf/masterdata
+    owner: W6.2
+    until: khi đóng W6.2
+    reason: "pf/reports + extension/reportcycle và danh mục KN đan nhau; W6.2 tách cap/forms, KN dùng qua cấu hình"
+  - rule: cycle
+    from: pf/reports
+    to: pf/mechanization
+    owner: W6.2
+    until: khi đóng W6.2
+    reason: "pf/reports + extension/reportcycle và danh mục KN đan nhau; W6.2 tách cap/forms, KN dùng qua cấu hình"
+  - rule: cycle
+    from: pf/reports
+    to: pf/party
+    owner: W6.2
+    until: khi đóng W6.2
+    reason: "pf/reports + extension/reportcycle và danh mục KN đan nhau; W6.2 tách cap/forms, KN dùng qua cấu hình"
+  - rule: cycle
+    from: pf/cropcycle
+    to: pf/metrics
+    owner: W6.3
+    until: khi đóng W6.3
+    reason: "pf/metrics (cap/analytics) và module nghiệp vụ gọi port của nhau; W6.3: metrics chỉ đọc view _pub, không import port nghiệp vụ"
+  - rule: cycle
+    from: pf/extension
+    to: pf/metrics
+    owner: W6.3
+    until: khi đóng W6.3
+    reason: "pf/metrics (cap/analytics) và module nghiệp vụ gọi port của nhau; W6.3: metrics chỉ đọc view _pub, không import port nghiệp vụ"
+  - rule: cycle
+    from: pf/geo
+    to: pf/metrics
+    owner: W6.3
+    until: khi đóng W6.3
+    reason: "pf/metrics (cap/analytics) và module nghiệp vụ gọi port của nhau; W6.3: metrics chỉ đọc view _pub, không import port nghiệp vụ"
+  - rule: cycle
+    from: pf/mechanization
+    to: pf/metrics
+    owner: W6.3
+    until: khi đóng W6.3
+    reason: "pf/metrics (cap/analytics) và module nghiệp vụ gọi port của nhau; W6.3: metrics chỉ đọc view _pub, không import port nghiệp vụ"
+  - rule: cycle
+    from: pf/metrics
+    to: pf/cropcycle
+    owner: W6.3
+    until: khi đóng W6.3
+    reason: "pf/metrics (cap/analytics) và module nghiệp vụ gọi port của nhau; W6.3: metrics chỉ đọc view _pub, không import port nghiệp vụ"
+  - rule: cycle
+    from: pf/metrics
+    to: pf/geo
+    owner: W6.3
+    until: khi đóng W6.3
+    reason: "pf/metrics (cap/analytics) và module nghiệp vụ gọi port của nhau; W6.3: metrics chỉ đọc view _pub, không import port nghiệp vụ"
+  - rule: cycle
+    from: pf/metrics
+    to: pf/mechanization
+    owner: W6.3
+    until: khi đóng W6.3
+    reason: "pf/metrics (cap/analytics) và module nghiệp vụ gọi port của nhau; W6.3: metrics chỉ đọc view _pub, không import port nghiệp vụ"
+  - rule: cycle
+    from: pf/metrics
+    to: pf/party
+    owner: W6.3
+    until: khi đóng W6.3
+    reason: "pf/metrics (cap/analytics) và module nghiệp vụ gọi port của nhau; W6.3: metrics chỉ đọc view _pub, không import port nghiệp vụ"
+  - rule: cycle
+    from: pf/metrics
+    to: pf/waterway
+    owner: W6.3
+    until: khi đóng W6.3
+    reason: "pf/metrics (cap/analytics) và module nghiệp vụ gọi port của nhau; W6.3: metrics chỉ đọc view _pub, không import port nghiệp vụ"
+  - rule: cycle
+    from: pf/accounts
+    to: pf/extension
+    owner: W7.2
+    until: khi đóng W7.2
+    reason: "pf/accounts gọi port nghiệp vụ để dựng ngữ cảnh; W7.2 hợp nhất k/access (thay ScopeResolver + ngữ cảnh KN)"
+  - rule: cycle
+    from: pf/accounts
+    to: pf/masterdata
+    owner: W7.2
+    until: khi đóng W7.2
+    reason: "pf/accounts gọi port nghiệp vụ để dựng ngữ cảnh; W7.2 hợp nhất k/access (thay ScopeResolver + ngữ cảnh KN)"
+  - rule: cycle
+    from: pf/accounts
+    to: pf/party
+    owner: W7.2
+    until: khi đóng W7.2
+    reason: "pf/accounts gọi port nghiệp vụ để dựng ngữ cảnh; W7.2 hợp nhất k/access (thay ScopeResolver + ngữ cảnh KN)"
+  - rule: cycle
+    from: pf/accounts
+    to: pf/reports
+    owner: W7.2
+    until: khi đóng W7.2
+    reason: "pf/accounts gọi port nghiệp vụ để dựng ngữ cảnh; W7.2 hợp nhất k/access (thay ScopeResolver + ngữ cảnh KN)"
+  - rule: cycle
+    from: pf/extension
+    to: pf/accounts
+    owner: W7.2
+    until: khi đóng W7.2
+    reason: "pf/accounts gọi port nghiệp vụ để dựng ngữ cảnh; W7.2 hợp nhất k/access (thay ScopeResolver + ngữ cảnh KN)"
+  - rule: cycle
+    from: pf/sync
+    to: pf/accounts
+    owner: W7.2
+    until: khi đóng W7.2
+    reason: "pf/accounts gọi port nghiệp vụ để dựng ngữ cảnh; W7.2 hợp nhất k/access (thay ScopeResolver + ngữ cảnh KN)"
+  - rule: cycle
+    from: mkg/acctbridge
+    to: mkg/costing
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/costing
+    to: mkg/acctbridge
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/costing
+    to: mkg/fieldops
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/costing
+    to: mkg/hub
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/costing
+    to: mkg/logistics
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/costing
+    to: mkg/measurement
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/costing
+    to: mkg/orders
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/fieldops
+    to: mkg/measurement
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/hub
+    to: mkg/fieldops
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/hub
+    to: mkg/logistics
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/hub
+    to: mkg/measurement
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/logistics
+    to: mkg/costing
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/logistics
+    to: mkg/fieldops
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/logistics
+    to: mkg/hub
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/logistics
+    to: mkg/measurement
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/measurement
+    to: mkg/fieldops
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/measurement
+    to: mkg/hub
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/orders
+    to: mkg/hub
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: cycle
+    from: mkg/orders
+    to: mkg/measurement
+    owner: W8.5
+    until: khi đóng W8.5
+    reason: "bảy module mkg/* gọi port của nhau hai chiều (G3/G4); W8.5 đảo chiều bằng sự kiện nội bộ hoặc port do module dưới khai"
+  - rule: schema
+    from: migrations/mkg/000010_mkg_g3_integration.up.sql
+    to: mkg_fieldops
+    owner: W7.1
+    until: khi đóng W7.1
+    reason: "migration tích hợp G3/G4/G5 viết cho nhiều schema module (đã áp, bất biến theo R-23); W7.1 chuyển sang migration theo schema/thư mục module"
+  - rule: schema
+    from: migrations/mkg/000010_mkg_g3_integration.up.sql
+    to: mkg_measurement
+    owner: W7.1
+    until: khi đóng W7.1
+    reason: "migration tích hợp G3/G4/G5 viết cho nhiều schema module (đã áp, bất biến theo R-23); W7.1 chuyển sang migration theo schema/thư mục module"
+  - rule: schema
+    from: migrations/mkg/000014_mkg_g4_schemas.up.sql
+    to: mkg_acctbridge
+    owner: W7.1
+    until: khi đóng W7.1
+    reason: "migration tích hợp G3/G4/G5 viết cho nhiều schema module (đã áp, bất biến theo R-23); W7.1 chuyển sang migration theo schema/thư mục module"
+  - rule: schema
+    from: migrations/mkg/000014_mkg_g4_schemas.up.sql
+    to: mkg_costing
+    owner: W7.1
+    until: khi đóng W7.1
+    reason: "migration tích hợp G3/G4/G5 viết cho nhiều schema module (đã áp, bất biến theo R-23); W7.1 chuyển sang migration theo schema/thư mục module"
+  - rule: schema
+    from: migrations/mkg/000014_mkg_g4_schemas.up.sql
+    to: mkg_logistics
+    owner: W7.1
+    until: khi đóng W7.1
+    reason: "migration tích hợp G3/G4/G5 viết cho nhiều schema module (đã áp, bất biến theo R-23); W7.1 chuyển sang migration theo schema/thư mục module"
+  - rule: schema
+    from: migrations/mkg/000014_mkg_g4_schemas.up.sql
+    to: mkg_orders
+    owner: W7.1
+    until: khi đóng W7.1
+    reason: "migration tích hợp G3/G4/G5 viết cho nhiều schema module (đã áp, bất biến theo R-23); W7.1 chuyển sang migration theo schema/thư mục module"
+  - rule: schema
+    from: migrations/mkg/000020_mkg_g4_integration.up.sql
+    to: mkg_fieldops
+    owner: W7.1
+    until: khi đóng W7.1
+    reason: "migration tích hợp G3/G4/G5 viết cho nhiều schema module (đã áp, bất biến theo R-23); W7.1 chuyển sang migration theo schema/thư mục module"
+  - rule: schema
+    from: migrations/mkg/000020_mkg_g4_integration.up.sql
+    to: mkg_logistics
+    owner: W7.1
+    until: khi đóng W7.1
+    reason: "migration tích hợp G3/G4/G5 viết cho nhiều schema module (đã áp, bất biến theo R-23); W7.1 chuyển sang migration theo schema/thư mục module"
+  - rule: schema
+    from: migrations/mkg/000021_mkg_g4_gaps.up.sql
+    to: mkg_hub
+    owner: W7.1
+    until: khi đóng W7.1
+    reason: "migration tích hợp G3/G4/G5 viết cho nhiều schema module (đã áp, bất biến theo R-23); W7.1 chuyển sang migration theo schema/thư mục module"
+  - rule: schema
+    from: migrations/mkg/000021_mkg_g4_gaps.up.sql
+    to: mkg_logistics
+    owner: W7.1
+    until: khi đóng W7.1
+    reason: "migration tích hợp G3/G4/G5 viết cho nhiều schema module (đã áp, bất biến theo R-23); W7.1 chuyển sang migration theo schema/thư mục module"
+  - rule: schema
+    from: migrations/mkg/000021_mkg_g4_gaps.up.sql
+    to: mkg_orders
+    owner: W7.1
+    until: khi đóng W7.1
+    reason: "migration tích hợp G3/G4/G5 viết cho nhiều schema module (đã áp, bất biến theo R-23); W7.1 chuyển sang migration theo schema/thư mục module"
+  - rule: schema
+    from: migrations/pf/000034_pf_sync_integration_monitor.up.sql
+    to: pf_notify
+    owner: W7.1
+    until: khi đóng W7.1
+    reason: "migration của module khác mở rộng CHECK pf_notify.notification.kind (đã áp, bất biến theo R-23); W7.1 chuyển sang migration theo schema. Loại thông báo mới từ nay thêm trong migration pf_notify"
+  - rule: schema
+    from: migrations/pf/000045_pf_mrv_alerts.up.sql
+    to: pf_notify
+    owner: W7.1
+    until: khi đóng W7.1
+    reason: "migration của module khác mở rộng CHECK pf_notify.notification.kind (đã áp, bất biến theo R-23); W7.1 chuyển sang migration theo schema. Loại thông báo mới từ nay thêm trong migration pf_notify"
+  - rule: schema
+    from: migrations/pf/000078_pf_mechanization_party_kn_collection.up.sql
+    to: pf_party
+    owner: W7.1
+    until: khi đóng W7.1
+    reason: "migration KN P7 của pf/mechanization thêm đối tượng vào pf_party (đã áp, bất biến theo R-23); W7.1 chuyển sang migration theo schema"
+  - rule: schema
+    from: migrations/pf/000080_pf_g5_public_api_foundation.up.sql
+    to: pf_apiclient
+    owner: W7.1
+    until: khi đóng W7.1
+    reason: "migration tích hợp G3/G4/G5 viết cho nhiều schema module (đã áp, bất biến theo R-23); W7.1 chuyển sang migration theo schema/thư mục module"
+  - rule: schema
+    from: migrations/pf/000080_pf_g5_public_api_foundation.up.sql
+    to: pf_metering
+    owner: W7.1
+    until: khi đóng W7.1
+    reason: "migration tích hợp G3/G4/G5 viết cho nhiều schema module (đã áp, bất biến theo R-23); W7.1 chuyển sang migration theo schema/thư mục module"
+  - rule: schema
+    from: migrations/pf/000080_pf_g5_public_api_foundation.up.sql
+    to: pf_party
+    owner: W7.1
+    until: khi đóng W7.1
+    reason: "migration tích hợp G3/G4/G5 viết cho nhiều schema module (đã áp, bất biến theo R-23); W7.1 chuyển sang migration theo schema/thư mục module"
+  - rule: tier
+    from: pf/geo
+    to: pf/waterway
+    owner: W3.2
+    until: khi đóng W3.2
+    reason: "thửa/vụ HTX của pf/geo, pf/cropcycle chuyển sang pf/cooperative; bên tiêu thụ đổi sang cooperativeport (W3.2)"
+  - rule: tier
+    from: pf/party
+    to: pf/geo
+    owner: W3.3
+    until: khi đóng W3.3
+    reason: "pf/party còn giữ HTX/hộ (ngoại lệ có tên của ADR-0027, hết hạn ở W3.3 khi chuyển sang pf_coop/pf/cooperative)"
+  - rule: tier
+    from: pf/party
+    to: pf/masterdata
+    owner: W3.3
+    until: khi đóng W3.3
+    reason: "pf/party còn giữ HTX/hộ (ngoại lệ có tên của ADR-0027, hết hạn ở W3.3 khi chuyển sang pf_coop/pf/cooperative)"
+  - rule: tier
+    from: pf/party
+    to: pf/sync
+    owner: W3.3
+    until: khi đóng W3.3
+    reason: "pf/party còn giữ HTX/hộ (ngoại lệ có tên của ADR-0027, hết hạn ở W3.3 khi chuyển sang pf_coop/pf/cooperative)"
+  - rule: tier
+    from: pf/apiclient
+    to: pf/masterdata
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: tier
+    from: pf/apiclient
+    to: pf/metering
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: tier
+    from: pf/geo
+    to: pf/metering
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: tier
+    from: pf/party
+    to: pf/metering
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: tier
+    from: pf/reports
+    to: pf/metering
+    owner: W5.2
+    until: khi đóng W5.2
+    reason: "khóa API (pf/apiclient) và đo lường (pf/metering) đan với party/geo/masterdata/reports; W5.2 chuyển định danh máy về pf/accounts qua port, metering là điểm kiểm soát xuất của integration-gateway"
+  - rule: tier
+    from: pf/masterdata
+    to: pf/extension
+    owner: W6.2
+    until: khi đóng W6.2
+    reason: "pf/reports + extension/reportcycle và danh mục KN đan nhau; W6.2 tách cap/forms, KN dùng qua cấu hình"
+  - rule: tier
+    from: pf/reports
+    to: pf/cropcycle
+    owner: W6.2
+    until: khi đóng W6.2
+    reason: "pf/reports + extension/reportcycle và danh mục KN đan nhau; W6.2 tách cap/forms, KN dùng qua cấu hình"
+  - rule: tier
+    from: pf/reports
+    to: pf/extension
+    owner: W6.2
+    until: khi đóng W6.2
+    reason: "pf/reports + extension/reportcycle và danh mục KN đan nhau; W6.2 tách cap/forms, KN dùng qua cấu hình"
+  - rule: tier
+    from: pf/reports
+    to: pf/mechanization
+    owner: W6.2
+    until: khi đóng W6.2
+    reason: "pf/reports + extension/reportcycle và danh mục KN đan nhau; W6.2 tách cap/forms, KN dùng qua cấu hình"
+  - rule: tier
+    from: pf/metrics
+    to: pf/cropcycle
+    owner: W6.3
+    until: khi đóng W6.3
+    reason: "pf/metrics (cap/analytics) và module nghiệp vụ gọi port của nhau; W6.3: metrics chỉ đọc view _pub, không import port nghiệp vụ"
+  - rule: tier
+    from: pf/metrics
+    to: pf/mechanization
+    owner: W6.3
+    until: khi đóng W6.3
+    reason: "pf/metrics (cap/analytics) và module nghiệp vụ gọi port của nhau; W6.3: metrics chỉ đọc view _pub, không import port nghiệp vụ"
+  - rule: tier
+    from: pf/metrics
+    to: pf/waterway
+    owner: W6.3
+    until: khi đóng W6.3
+    reason: "pf/metrics (cap/analytics) và module nghiệp vụ gọi port của nhau; W6.3: metrics chỉ đọc view _pub, không import port nghiệp vụ"
+  - rule: tier
+    from: pf/accounts
+    to: pf/extension
+    owner: W7.2
+    until: khi đóng W7.2
+    reason: "pf/accounts gọi port nghiệp vụ để dựng ngữ cảnh; W7.2 hợp nhất k/access (thay ScopeResolver + ngữ cảnh KN)"
+  - rule: tier
+    from: pf/accounts
+    to: pf/masterdata
+    owner: W7.2
+    until: khi đóng W7.2
+    reason: "pf/accounts gọi port nghiệp vụ để dựng ngữ cảnh; W7.2 hợp nhất k/access (thay ScopeResolver + ngữ cảnh KN)"
+  - rule: tier
+    from: pf/accounts
+    to: pf/reports
+    owner: W7.2
+    until: khi đóng W7.2
+    reason: "pf/accounts gọi port nghiệp vụ để dựng ngữ cảnh; W7.2 hợp nhất k/access (thay ScopeResolver + ngữ cảnh KN)"
+  - rule: tier
+    from: pf/notify
+    to: pf/cropcycle
+    owner: W9.1
+    until: khi đóng W9.1
+    reason: "cap/notify gọi port module nghiệp vụ để dựng nội dung; đảo chiều: module nghiệp vụ gửi qua port notify hoặc sự kiện (W9.1 vệ sinh tầng capability)"
+  - rule: tier
+    from: pf/notify
+    to: pf/extension
+    owner: W9.1
+    until: khi đóng W9.1
+    reason: "cap/notify gọi port module nghiệp vụ để dựng nội dung; đảo chiều: module nghiệp vụ gửi qua port notify hoặc sự kiện (W9.1 vệ sinh tầng capability)"
+  - rule: tier
+    from: pf/notify
+    to: pf/mechanization
+    owner: W9.1
+    until: khi đóng W9.1
+    reason: "cap/notify gọi port module nghiệp vụ để dựng nội dung; đảo chiều: module nghiệp vụ gửi qua port notify hoặc sự kiện (W9.1 vệ sinh tầng capability)"
+  - rule: tier
+    from: pf/notify
+    to: pf/metering
+    owner: W9.1
+    until: khi đóng W9.1
+    reason: "cap/notify gọi port module nghiệp vụ để dựng nội dung; đảo chiều: module nghiệp vụ gửi qua port notify hoặc sự kiện (W9.1 vệ sinh tầng capability)"
+  - rule: tier
+    from: pf/notify
+    to: pf/mrv
+    owner: W9.1
+    until: khi đóng W9.1
+    reason: "cap/notify gọi port module nghiệp vụ để dựng nội dung; đảo chiều: module nghiệp vụ gửi qua port notify hoặc sự kiện (W9.1 vệ sinh tầng capability)"

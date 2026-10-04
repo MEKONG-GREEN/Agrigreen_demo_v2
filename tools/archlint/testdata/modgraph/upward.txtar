@@ -1,0 +1,41 @@
+# Phụ thuộc đi lên: kernel → domain và capability → domain bị báo; capability → capability
+# (cùng tầng, không chu trình) và domain → kernel được phép.
+violation tier pf/k pf/d
+violation tier pf/c1 pf/d
+-- internal/platform/k/module.yaml --
+name: pf/k
+kind: kernel
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/d: ">=1.0 <2"
+enable: always
+-- internal/platform/c1/module.yaml --
+name: pf/c1
+kind: capability
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/c2: ">=1.0 <2"
+  pf/d: ">=1.0 <2"
+enable: per_tenant
+-- internal/platform/c2/module.yaml --
+name: pf/c2
+kind: capability
+zones: [pf]
+version: 1.0.0
+enable: per_tenant
+-- internal/platform/d/module.yaml --
+name: pf/d
+kind: domain
+zones: [pf]
+version: 1.0.0
+enable: per_tenant
+-- internal/platform/e/module.yaml --
+name: pf/e
+kind: domain
+zones: [pf]
+version: 1.0.0
+depends:
+  pf/k: ">=1.0 <2"
+enable: per_tenant
