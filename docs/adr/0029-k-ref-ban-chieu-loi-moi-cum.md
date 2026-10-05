@@ -78,6 +78,13 @@ Có ở cụm `pf` và `mkg`. Không cần ở `ts`, `vault` cho đến khi có 
 | W3.4 | Chính sách `p_scope` đọc `k_ref.node_closure` trên `pf_coop` | pf 000097 |
 | W4.2 | Worker dựng `share_scope` | pf 000099 |
 
+**W2.4 (05/10/2026, pf 000091):** `CREATE SCHEMA IF NOT EXISTS k_ref` cùng `k_ref.ctx_text(k)` và `k_ref.ctx_uuid(k)`. Hai hàm `LANGUAGE sql STABLE PARALLEL SAFE`, thân là một biểu thức, nên được inline (`EXPLAIN VERBOSE` chỉ còn `current_setting`). Khác bản §17.2:
+
+- `ctx_uuid` trả NULL, không ném lỗi, khi giá trị không phải UUID dạng chuẩn;
+- tên ngoài `app.[a-z][a-z0-9_]*` bị từ chối, lỗi 22023 qua `k_ref.ctx_reject`.
+
+`REVOKE … FROM PUBLIC`. USAGE schema và EXECUTE cấp cho 17 `r_*`, danh sách khớp `dbadmin.ModuleGroups` (`TestMigration91MatchesModuleGroups`). Kiểm thử: `TestCtxFunctions_W24`, `TestCtxFunctionGrants_W24` (`internal/shared/db`). `shared.current_tenant()` giữ nguyên. Tệp pf 000091 đã thuộc W2.4, nên các quan hệ `k_ref` của W2.5 phải vào số kế tiếp (pf 000092).
+
 ## Liên quan
 
 - Kiến trúc v4.1: §13 (cụm và schema), §17.1 (R-DB-05), §17.2 (`ctx_uuid`), §34 (dựng lại `k_ref` khi phục hồi), §36, Phụ lục B mục 8, Phụ lục D (SAD 6.2 → `k_ref`).

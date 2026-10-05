@@ -127,6 +127,30 @@ Mỗi bước có đường lui: vai cũ còn quyền cho đến khi bước k�
 
 **Còn cho W2.6:** 15 module pf còn lại (accounts, apiclient, cropcycle, extension, geo, masterdata, mechanization, metering, metrics, mrv, party, reports, simulation, sync, waterway) bọc pool bằng `db.ForModule`/`WithContextTx`; mkg (7 module), ts, vault; `cmd/*` mở pool `app_*` thay `<module>_app` (compose, chart K8s, PgBouncer `userlist`); vai không theo module (`platform_api`, `worker_platform`, `public_api`, `mkg_api`, `worker_internal`, `ingest_*`, `ts_reader`) chọn `r_*` riêng hoặc gộp; bỏ quyền bảng trực tiếp của `<module>_app`; cổng CI "truy vấn ngoài `WithContextTx` thất bại".
 
+### W2.4 (05/10/2026): biến ngữ cảnh `app.*` (§2 bước 2)
+
+`internal/shared/db/ctxvars.go`. Giao dịch mở qua `db.ForModule` chạy **một** câu lệnh sau BEGIN: `SELECT set_config('role', $1, true), set_config('app.node_id', $2, true), …`. `set_config('role', …, true)` tương đương `SET LOCAL ROLE`: cùng kiểm membership, cùng lỗi 42501. Đổi từ `SET LOCAL ROLE` (lệnh tiện ích, không nhận tham số) sang dạng này để vai và sáu biến đi chung một lượt khứ hồi. `db.SetLocalRole` giữ cho ai cần riêng vai.
+
+Nguồn các biến:
+
+- `app.node_id` = `Principal.KN.OrgRef`; không có ngữ cảnh KN thì `Principal.OrgRef`;
+- `app.dept` = `KN.Department`;
+- `app.xa_ids` = `KN.Communes`, viết thành literal mảng `{"…"}`;
+- `app.purpose` = `authz.PurposeFrom(ctx)` (mới: `authz.WithPurpose`);
+- `app.actor_ref` = `Principal.ActorRef`;
+- `app.on_behalf_of_ref` = `KN.Support.OnBehalfOf`.
+
+Giá trị vắng được đặt rỗng, không giữ giá trị cũ, kể cả trong savepoint lồng. `app.tenant_id` vẫn do `tenant.WithTenantTx` đặt.
+
+**pf 000091** tạo `k_ref.ctx_uuid`, `k_ref.ctx_text` (ADR-0029), EXECUTE cho 17 `r_*`. Bảng biến và cách đọc: [hướng dẫn](../dev/modules.md#biến-ngữ-cảnh-trong-db-w24).
+
+Kiểm thử:
+
+- `ctxvars_test.go`: ánh xạ Principal/KN → biến;
+- `ctxvars_integration_test.go`: `pf/content` trên `app_platform`, pool một kết nối, cả hai chế độ thực thi. Biến thấy được qua `k_ref.ctx_*`; sau COMMIT và sau ROLLBACK, giao dịch kế tiếp thấy NULL.
+
+Chưa đổi chính sách RLS nào.
+
 ## Liên quan
 
 - Kiến trúc v4.1: §6 (PgBouncer một pool mỗi đơn vị), §14 (R-DB-02, R-DB-03), Phụ lục B mục 7, Phụ lục D (`WithTenantTx` → `WithContextTx`).

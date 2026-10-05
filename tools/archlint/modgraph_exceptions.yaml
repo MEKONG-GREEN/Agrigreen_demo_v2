@@ -16,6 +16,8 @@ ops_schemas:
     reason: "vai giám sát sql_exporter cụm mkg (mkg 000013, docs/runbooks/ingest.md mục 7) — hàm SECURITY DEFINER chỉ trả số đếm, chủ là dbadmin"
   - schema: ts_monitor
     reason: "vai giám sát sql_exporter cụm ts (ts 000003) — cùng mẫu mkg_monitor, chủ là dbadmin"
+  - schema: k_ref
+    reason: "TẠM (W2.4, pf 000091): chỉ có hàm k_ref.ctx_uuid/ctx_text của lõi; W2.5 dựng module sở hữu k_ref (owns_schema) và XÓA mục này (cổng báo lỗi khi schema đã có chủ)"
 
 exceptions:
   - rule: cycle

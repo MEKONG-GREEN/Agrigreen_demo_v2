@@ -62,7 +62,8 @@ type moduleDB struct {
 }
 
 // ForModule bọc pool (vai đăng nhập của đơn vị triển khai, hoặc vai <module>_app cũ trong kỳ chuyển — là
-// thành viên r_<module>) để MỌI giao dịch mở qua nó chạy `SET LOCAL ROLE r_<module>` ngay sau BEGIN.
+// thành viên r_<module>) để MỌI giao dịch mở qua nó chạy `SET LOCAL ROLE r_<module>` ngay sau BEGIN
+// (dạng set_config('role', …, true), cùng câu lệnh với các biến ngữ cảnh app.* — W2.4).
 // Kết quả dùng được ở mọi chỗ nhận tenant.Beginner (tenant.WithTenantTx, inbox.Process, …), nên module
 // chuyển sang r_* chỉ cần bọc pool một lần ở gốc module.
 func ForModule(b tenant.Beginner, m ModuleID) tenant.Beginner {
@@ -80,16 +81,30 @@ func (d moduleDB) BeginTx(ctx context.Context, opts pgx.TxOptions) (pgx.Tx, erro
 	if err != nil {
 		return nil, err
 	}
-	if err := SetLocalRole(ctx, tx, d.m); err != nil {
+	if err := setLocalContext(ctx, tx, d.m); err != nil {
 		_ = tx.Rollback(ctx)
 		return nil, err
 	}
 	return tx, nil
 }
 
+// setLocalContext đặt vai của module và biến ngữ cảnh app.* (ctxvars.go) trong một câu lệnh — nơi duy
+// nhất mọi giao dịch của module (ForModule, WithContextTx, WithModuleTenantTx) đi qua.
+func setLocalContext(ctx context.Context, tx pgx.Tx, m ModuleID) error {
+	if !m.Valid() {
+		return fmt.Errorf("db: ModuleID rỗng — dùng db.Module(\"<vùng>/<module>\")")
+	}
+	args := append([]any{m.role}, ContextVarsFrom(ctx).args()...)
+	if _, err := tx.Exec(ctx, setConfigSQL, args...); err != nil {
+		return fmt.Errorf("db: SET LOCAL ROLE %s + biến ngữ cảnh: %w", m.role, err)
+	}
+	return nil
+}
+
 // WithContextTx là cửa giao dịch của module theo ADR-0028 §2: BEGIN → SET LOCAL ROLE r_<module> →
 // set_config('app.tenant_id', tenant của ctx, true) → fn → COMMIT (lỗi → ROLLBACK). Tenant lấy từ
-// context đã xác thực (tenant.WithID), không từ tham số. W2.4 thêm các biến app.* khác ở đây.
+// context đã xác thực (tenant.WithID), không từ tham số. Cùng câu lệnh với vai, ForModule đặt các biến
+// app.node_id, app.dept, app.xa_ids, app.purpose, app.actor_ref, app.on_behalf_of_ref từ ctx (W2.4, ctxvars.go).
 func WithContextTx(ctx context.Context, b tenant.Beginner, m ModuleID, fn func(pgx.Tx) error) error {
 	tid, err := tenant.FromContext(ctx)
 	if err != nil {

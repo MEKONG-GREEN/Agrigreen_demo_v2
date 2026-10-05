@@ -67,7 +67,7 @@ Lỗi được báo ở `module.go` của module liên quan (với `depends`: �
 
 ### Ngoại lệ
 
-Vi phạm có từ trước W1.2 được liệt kê trong [`tools/archlint/modgraph_exceptions.yaml`](../../tools/archlint/modgraph_exceptions.yaml), khóa `(rule, from, to)`, mỗi mục bắt buộc `reason`, `owner` (gói kế hoạch sẽ gỡ, dạng `W<n>.<m>`) và `until`. Mục `ops_schemas` liệt kê schema vận hành/dbadmin không thuộc module nào (`mkg_monitor`, `ts_monitor`).
+Vi phạm có từ trước W1.2 được liệt kê trong [`tools/archlint/modgraph_exceptions.yaml`](../../tools/archlint/modgraph_exceptions.yaml), khóa `(rule, from, to)`, mỗi mục bắt buộc `reason`, `owner` (gói kế hoạch sẽ gỡ, dạng `W<n>.<m>`) và `until`. Mục `ops_schemas` liệt kê schema vận hành/dbadmin không thuộc module nào (`mkg_monitor`, `ts_monitor`; `k_ref` tạm từ W2.4 tới khi W2.5 gán chủ).
 
 - Vi phạm **mới** (không có trong tệp) làm hỏng cổng. Sửa mã; không thêm ngoại lệ để qua cổng.
 - Ngoại lệ **lỗi thời** (vi phạm không còn xảy ra) cũng làm hỏng cổng: xóa mục trong cùng PR đã gỡ nó. Vì vậy danh sách chỉ co lại.
@@ -186,3 +186,29 @@ ADR-0028, R-DB-02, R-DB-03. Mỗi module pf có vai nhóm `r_<module>` (NOLOGIN,
 - `cmd/*` đổi pool sang `app_*`;
 - compose, chart, PgBouncer `userlist`;
 - bỏ quyền bảng của `<module>_app`.
+
+## Biến ngữ cảnh trong DB (W2.4)
+
+ADR-0028 §2, ADR-0029, kiến trúc v4.1 §14 và §17.2 (DB-13). Mọi giao dịch mở qua `db.ForModule` (nên cả `db.WithContextTx`, `db.WithModuleTenantTx`) đặt, **trong cùng một câu lệnh** với vai của module, các biến dưới đây bằng `set_config(…, true)`. Biến chỉ sống trong giao dịch, an toàn với PgBouncer transaction mode. Biến không có giá trị trong ctx được đặt rỗng, không bao giờ giữ giá trị của giao dịch trước (`internal/shared/db/ctxvars.go`).
+
+| Biến | Nguồn | Dạng |
+|---|---|---|
+| `app.tenant_id` | `tenant.WithID` / tham số `WithModuleTenantTx` (đặt bởi `tenant.WithTenantTx`) | uuid |
+| `app.node_id` | `Principal.KN.OrgRef` (Nút của ngữ cảnh phiên); không có KN → `Principal.OrgRef` (claim `org_ref`). Có KN mà không gắn Nút (Admin) → rỗng | uuid |
+| `app.dept` | `Principal.KN.Department` | mã phòng ban |
+| `app.xa_ids` | `Principal.KN.Communes` | literal mảng `{"30280","30283"}`; danh sách rỗng → rỗng |
+| `app.purpose` | `authz.WithPurpose(ctx, mã)` — module đã kiểm mục đích (X-Purpose, thân request) thì gắn | mã mục đích |
+| `app.actor_ref` | `Principal.ActorRef` (sub của token) | uuid |
+| `app.on_behalf_of_ref` | `Principal.KN.Support.OnBehalfOf` (chế độ hỗ trợ, ADR-0037) | uuid |
+
+Mã tham chiếu chỉ nhận `uuid.UUID`, nên không có đường nào đưa tên, SĐT hay email vào biến DB. Consumer và job không có Principal: mọi biến trừ tenant đều rỗng.
+
+**Đọc trong SQL** chỉ qua `k_ref.ctx_uuid('app.…')` và `k_ref.ctx_text('app.…')` (pf 000091, R-DB-08). Cấm `current_setting(…)::uuid`. Hai hàm:
+
+- trả NULL khi biến rỗng hoặc chưa đặt;
+- `ctx_uuid` trả NULL, không ném lỗi, khi giá trị không phải UUID dạng chuẩn;
+- chỉ nhận tên `app.<chữ thường|số|_>`, tên khác → lỗi 22023;
+- được planner inline thành `current_setting(…)`;
+- EXECUTE chỉ cấp cho `r_*` (vai cũ `<module>_app` có qua membership).
+
+Mảng xã: `k_ref.ctx_text('app.xa_ids')::text[]`. Chưa chính sách RLS nào đọc các biến mới (W3.4, W4.x).

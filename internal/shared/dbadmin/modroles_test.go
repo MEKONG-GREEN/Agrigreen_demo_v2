@@ -109,3 +109,22 @@ func TestMigration90MatchesModuleGroups(t *testing.T) {
 		}
 	}
 }
+
+// pf 000091 (W2.4) cấp EXECUTE k_ref.ctx_* cho danh sách r_* ghi tay — phải khớp ModuleGroups.
+func TestMigration91MatchesModuleGroups(t *testing.T) {
+	src, err := fs.ReadFile(migrations.FS, "pf/000091_pf_k_ref_ctx_functions.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, m := range regexp.MustCompile(`'(r_[a-z_]+)'`).FindAllStringSubmatch(string(src), -1) {
+		got = append(got, m[1])
+	}
+	var want []string
+	for _, g := range ModuleGroups() {
+		want = append(want, g.Role)
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("000091 cấp cho %v, ModuleGroups %v", got, want)
+	}
+}
