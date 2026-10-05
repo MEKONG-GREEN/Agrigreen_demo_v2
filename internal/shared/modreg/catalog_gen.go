@@ -17,6 +17,7 @@ var catalog = []CatalogEntry{
 	{Name: "pf/extdata", Kind: "capability", Enable: "always", Permissions: []string{}},
 	{Name: "pf/extension", Kind: "domain", Enable: "per_tenant", Permissions: []string{}},
 	{Name: "pf/geo", Kind: "capability", Enable: "per_tenant", Permissions: []string{"coop_manager", "farmer", "geo_admin", "map_consumer", "plot_editor", "plot_viewer"}},
+	{Name: "pf/kref", Kind: "kernel", Enable: "always", Permissions: []string{}},
 	{Name: "pf/masterdata", Kind: "capability", Enable: "per_tenant", Permissions: []string{"masterdata_admin"}},
 	{Name: "pf/mechanization", Kind: "domain", Enable: "per_tenant", Permissions: []string{"cgh_admin", "cgh_sync", "cgh_viewer"}},
 	{Name: "pf/metering", Kind: "domain", Enable: "per_tenant", Permissions: []string{"billing_approver", "billing_officer", "metering_viewer"}},

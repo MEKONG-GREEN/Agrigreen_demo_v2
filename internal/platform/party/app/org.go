@@ -333,6 +333,10 @@ func (r *Registry) createOrg(ctx context.Context, p authz.Principal, in CreateOr
 				return OrgResult{}, err
 			}
 		}
+		// W2.5: pf.party.org.created → worker pf.kref (k_ref.org, k_ref.node_closure).
+		if err := enqueueStatusEvent(ctx, tx, ev, 0); err != nil {
+			return OrgResult{}, err
+		}
 		return OrgResult{Org: o, Event: ev, RepresentativeDuplicate: repDup}, nil
 	})
 }
@@ -466,6 +470,10 @@ func (r *Registry) MoveOrg(ctx context.Context, in MoveOrgInput) (OrgResult, err
 			return OrgResult{}, err
 		}
 		if err := store.UpdateOrg(ctx, tx, o, cur.StatusReason, ev); err != nil {
+			return OrgResult{}, err
+		}
+		// W2.5: pf.party.org.moved → worker pf.kref dựng lại bao đóng của cả nhánh (ADR-0029).
+		if err := enqueueStatusEvent(ctx, tx, ev, 0); err != nil {
 			return OrgResult{}, err
 		}
 		// KN v7.7: Nút xã sang tỉnh khác thì khu vực của tỉnh cũ không còn đúng — bỏ gán (bản ghi bù).
@@ -605,6 +613,20 @@ func enqueueStatusEvent(ctx context.Context, tx pgx.Tx, ev domain.OrgEvent, hous
 		TraceID: telemetry.TraceID(ctx), Producer: "pf/party",
 	}
 	switch ev.Action {
+	case domain.ActionCreated:
+		base.Type = port.EventOrgCreated
+		base.Payload = port.OrgCreatedV1{
+			OrgRef: ev.Org.Ref, Kind: string(ev.Org.Kind), Code: ev.Org.Code, AdminUnitCode: ev.Org.AdminUnitCode,
+			ParentRef: refPtr(ev.Org.ParentRef), Active: ev.Org.Active, ActorRef: ev.ActorRef,
+			EventTime: ev.EventTime.Format(time.RFC3339), Seq: ev.Seq,
+		}
+	case domain.ActionMoved:
+		base.Type = port.EventOrgMoved
+		base.Payload = port.OrgMovedV1{
+			OrgRef: ev.Org.Ref, Kind: string(ev.Org.Kind), Code: ev.Org.Code, AdminUnitCode: ev.Org.AdminUnitCode,
+			ParentRef: refPtr(ev.Org.ParentRef), PrevParentRef: refPtr(ev.PrevParentRef), PrevAdminUnitCode: ev.PrevAdminUnit,
+			Active: ev.Org.Active, Reason: ev.Reason, ActorRef: ev.ActorRef, EventTime: ev.EventTime.Format(time.RFC3339), Seq: ev.Seq,
+		}
 	case domain.ActionDeactivated:
 		base.Type = port.EventOrgDeactivated
 		base.Payload = port.OrgDeactivatedV1{
@@ -622,6 +644,14 @@ func enqueueStatusEvent(ctx context.Context, tx pgx.Tx, ev domain.OrgEvent, hous
 		return nil
 	}
 	return outbox.Enqueue(ctx, tx, base)
+}
+
+// refPtr đổi uuid.Nil (gốc cây) thành null của payload.
+func refPtr(u uuid.UUID) *uuid.UUID {
+	if u == uuid.Nil {
+		return nil
+	}
+	return &u
 }
 
 // visible cho biết tổ chức gắn đơn vị unit nằm trong phạm vi đọc.

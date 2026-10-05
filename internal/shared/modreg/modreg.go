@@ -207,6 +207,14 @@ func (m *Manifest) Validate() error {
 	listCheck("shares", m.Shares, reSnake)
 	listCheck("owns_schema", m.OwnsSchema, reSchema)
 	for _, s := range m.OwnsSchema {
+		// Schema lõi k_<x> (v4.1 §13: k_ref, k_ledger, k_jobs) có ở MỌI cụm dữ liệu module chạy — chỉ module
+		// kernel được sở hữu (W2.5: k_ref → pf/kref, ADR-0029).
+		if strings.HasPrefix(s, "k_") {
+			if m.Kind != KindKernel {
+				bad("owns_schema %q: schema lõi k_* chỉ thuộc module kernel", s)
+			}
+			continue
+		}
 		if z := schemaZone(s); z == "" {
 			bad("owns_schema %q: tiền tố phải là pf_, mkg_, ts_ hoặc vault", s)
 		} else if !slices.Contains(m.Zones, z) {

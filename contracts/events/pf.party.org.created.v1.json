@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.party.org.created/v1",
+  "title": "pf.party.org.created — payload",
+  "description": "Một tổ chức (Nút của cây tổ chức) vừa được tạo, ghi trong sổ pf_party.org_event. Ảnh chụp sau sự việc: mã, loại, đơn vị hành chính, Nút cha, trạng thái — worker pf.kref dựng k_ref.org và k_ref.node_closure (W2.5, ADR-0029). Không chứa tên hay dữ liệu cá nhân.",
+  "x-event-type": "pf.party.org.created",
+  "x-schema-version": 1,
+  "x-producer": "pf/party",
+  "type": "object",
+  "required": ["org_ref", "kind", "code", "admin_unit_code", "parent_ref", "active", "actor_ref", "event_time", "seq"],
+  "properties": {
+    "org_ref":         { "type": "string", "format": "uuid" },
+    "kind":            { "type": "string", "enum": ["ttkn_national", "ttkn_province", "extension_team", "dcrd", "cooperative", "mkg", "partner"] },
+    "code":            { "type": "string", "maxLength": 40 },
+    "admin_unit_code": { "type": "string", "description": "Mã đơn vị hành chính của tổ chức; rỗng với cấp quốc gia" },
+    "parent_ref":      { "type": ["string", "null"], "format": "uuid", "description": "Nút cha; null với gốc cây" },
+    "active":          { "type": "boolean" },
+    "actor_ref":       { "type": "string", "format": "uuid" },
+    "event_time":      { "type": "string", "format": "date-time" },
+    "seq":             { "type": "integer", "minimum": 1, "description": "Thứ tự trong chuỗi băm của tổ chức" }
+  }
+}

@@ -20,9 +20,46 @@ const (
 
 // Sự kiện của sổ tổ chức (schema trong contracts/events/).
 const (
+	EventOrgCreated     = "pf.party.org.created"
+	EventOrgMoved       = "pf.party.org.moved"
 	EventOrgDeactivated = "pf.party.org.deactivated"
 	EventOrgReactivated = "pf.party.org.reactivated"
 )
+
+// OrgCreatedV1 là payload của pf.party.org.created: ảnh chụp Nút mới (W2.5, ADR-0029 — worker pf.kref
+// dựng k_ref.org + k_ref.node_closure). Chỉ mã, loại, đơn vị hành chính, cha, trạng thái — không tên, không PII.
+//
+//ag:event pf.party.org.created v1
+type OrgCreatedV1 struct {
+	OrgRef        uuid.UUID  `json:"org_ref"`
+	Kind          string     `json:"kind"`
+	Code          string     `json:"code"`
+	AdminUnitCode string     `json:"admin_unit_code"`
+	ParentRef     *uuid.UUID `json:"parent_ref"`
+	Active        bool       `json:"active"`
+	ActorRef      uuid.UUID  `json:"actor_ref"`
+	EventTime     string     `json:"event_time"`
+	Seq           int64      `json:"seq"`
+}
+
+// OrgMovedV1 là payload của pf.party.org.moved: Nút đổi cha (kèm cả nhánh con) và/hoặc đổi mã đơn vị hành
+// chính tại chỗ (sáp nhập ĐVHC) — ảnh chụp SAU sự việc và vị trí trước (W2.5, ADR-0029).
+//
+//ag:event pf.party.org.moved v1
+type OrgMovedV1 struct {
+	OrgRef            uuid.UUID  `json:"org_ref"`
+	Kind              string     `json:"kind"`
+	Code              string     `json:"code"`
+	AdminUnitCode     string     `json:"admin_unit_code"`
+	ParentRef         *uuid.UUID `json:"parent_ref"`
+	PrevParentRef     *uuid.UUID `json:"prev_parent_ref"`
+	PrevAdminUnitCode string     `json:"prev_admin_unit_code"`
+	Active            bool       `json:"active"`
+	Reason            string     `json:"reason"`
+	ActorRef          uuid.UUID  `json:"actor_ref"`
+	EventTime         string     `json:"event_time"`
+	Seq               int64      `json:"seq"`
+}
 
 // OrgDeactivatedV1 là payload của pf.party.org.deactivated. Consumer (quản trị
 // tài khoản) khóa mọi tài khoản thuộc tổ chức (HTX US-HTXSTATUS-01 AC-2) và ghi

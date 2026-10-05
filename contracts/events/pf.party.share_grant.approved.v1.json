@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.party.share_grant.approved/v1",
+  "title": "pf.party.share_grant.approved — payload",
+  "description": "Một cấp quyền chia sẻ dữ liệu giữa hai tenant vừa được duyệt (người duyệt khác người đề xuất, R-56) và có hiệu lực. Ghi trong sổ pf_party.share_grant_event; tenant của phong bì là BÊN CẤP. Worker pf.kref dựng k_ref.share_grant_active (W2.5, ADR-0029). Không có mục đích dạng văn bản tự do, không dữ liệu cá nhân.",
+  "x-event-type": "pf.party.share_grant.approved",
+  "x-schema-version": 1,
+  "x-producer": "pf/party",
+  "type": "object",
+  "required": ["grant_id", "grantee_tenant_id", "kinds", "valid_from", "valid_to", "actor_ref", "event_time", "seq"],
+  "properties": {
+    "grant_id":          { "type": "string", "format": "uuid" },
+    "grantee_tenant_id": { "type": "string", "format": "uuid", "description": "Tenant bên nhận" },
+    "kinds":             { "type": "array", "items": { "type": "string" }, "description": "Loại dữ liệu (ADR-0020), đã sắp" },
+    "valid_from":        { "type": "string", "format": "date-time" },
+    "valid_to":          { "type": "string", "format": "date-time" },
+    "actor_ref":         { "type": "string", "format": "uuid" },
+    "event_time":        { "type": "string", "format": "date-time" },
+    "seq":               { "type": "integer", "minimum": 1, "description": "Thứ tự trong chuỗi băm của cấp quyền" }
+  }
+}

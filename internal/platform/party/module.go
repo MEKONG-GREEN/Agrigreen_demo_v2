@@ -36,6 +36,7 @@ type Deps struct {
 
 // Module là pf/party đã nối.
 type Module struct {
+	db    tenant.Beginner // nguồn k_ref (kref.go)
 	svc   *app.Service
 	reg   *app.Registry
 	share *app.Sharing
@@ -56,6 +57,7 @@ func New(db tenant.Beginner, clk clock.Clock, deps ...Deps) *Module {
 	mods := &app.Modules{DB: db, Clock: clk, Names: func() port.ActorNames { return kn.Names }}
 	kn.Modules = mods
 	return &Module{
+		db:    db,
 		svc:   &app.Service{DB: db, Clock: clk},
 		reg:   reg,
 		share: &app.Sharing{DB: db, Clock: clk},

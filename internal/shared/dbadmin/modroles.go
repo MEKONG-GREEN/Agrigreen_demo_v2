@@ -51,8 +51,16 @@ var LoginUnits = []LoginUnit{
 	{Role: AppSync, Unit: "objsync", Extra: []string{"pf/sync"}},
 }
 
-// ModuleGroups trả vai nhóm của mọi module pf có vai đăng nhập cũ <module>_app (đã sắp theo tên module).
-// Suy từ registry (modreg.Catalog) + baseRoles: thêm module pf mới có vai <module>_app thì r_* tự có.
+// groupOnlyModules: module pf sinh sau ADR-0028, KHÔNG có vai đăng nhập cũ <module>_app — chỉ có r_<module>,
+// chạy trên vai đăng nhập của đơn vị (app_worker…). Cụm của vai nhóm (lọc theo AG_CLUSTERS).
+var groupOnlyModules = map[string][]migrations.Cluster{
+	// pf/kref (W2.5, ADR-0029): ghi k_ref ở cụm pf (worker) và — khi có kênh nguồn — ở cụm mkg (mkg 000022).
+	"pf/kref": {migrations.PF, migrations.MKG},
+}
+
+// ModuleGroups trả vai nhóm của mọi module pf có vai đăng nhập cũ <module>_app, cùng module trong
+// groupOnlyModules (Legacy rỗng), đã sắp theo tên module. Suy từ registry (modreg.Catalog) + baseRoles: thêm
+// module pf mới có vai <module>_app thì r_* tự có.
 func ModuleGroups() []ModuleGroup {
 	var out []ModuleGroup
 	for _, e := range modreg.Catalog() {
@@ -61,12 +69,21 @@ func ModuleGroups() []ModuleGroup {
 			continue
 		}
 		legacy := seg + "_app"
-		if !slices.ContainsFunc(baseRoles, func(r Role) bool { return r.Name == legacy }) {
+		if _, only := groupOnlyModules[e.Name]; only {
+			legacy = ""
+		} else if !slices.ContainsFunc(baseRoles, func(r Role) bool { return r.Name == legacy }) {
 			continue
 		}
 		out = append(out, ModuleGroup{Module: e.Name, Role: modreg.DBRole(e.Name), Legacy: legacy})
 	}
 	return out
+}
+
+func groupClusters(g ModuleGroup) []migrations.Cluster {
+	if cs, ok := groupOnlyModules[g.Module]; ok {
+		return cs
+	}
+	return []migrations.Cluster{migrations.PF}
 }
 
 // UnitGroupRoles trả các r_* mà vai đăng nhập của đơn vị là thành viên (đã sắp).
@@ -89,7 +106,7 @@ func buildRoles() []Role {
 	for _, g := range groups {
 		// r_* thuộc ag_shared_user (outbox, inbox, idempotency như vai cũ); NOLOGIN nên Clusters chỉ để lọc
 		// theo AG_CLUSTERS, không GRANT CONNECT.
-		out = append(out, Role{Name: g.Role, MemberOf: []string{SharedUser}, Clusters: pf})
+		out = append(out, Role{Name: g.Role, MemberOf: []string{SharedUser}, Clusters: groupClusters(g)})
 	}
 	for _, r := range baseRoles[1:] {
 		for _, g := range groups {

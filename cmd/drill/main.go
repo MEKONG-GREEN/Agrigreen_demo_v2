@@ -7,6 +7,10 @@
 //	    Trên môi trường ĐÃ PHỤC HỒI (sạch): số dòng, băm bộ tham số, verify_chain
 //	    mọi sổ, tính lại mẫu cân đối CGH (FN-09) so với kết quả đã lưu, checksum kho
 //	    đối tượng theo manifest kiểm kê, neo mới nhất khớp manifest ký Ed25519.
+//	drill kref -confirm-copy [-tenants uuid,uuid] [-report báo-cáo.json] [-out báo-cáo.md]
+//	    Bước "k_ref dựng lại khớp nguồn" (W2.5, ADR-0029 §5) trên BẢN SAO cụm pf đã phục hồi: xóa + dựng lại
+//	    k_ref từ nguồn rồi so số dòng + băm theo quan hệ với một lần dựng độc lập (kref.go). GHI k_ref — chỉ
+//	    chạy trên bản sao, bắt buộc -confirm-copy; nối bằng AG_DB_URL + vai module (không dùng AG_PG_ADMIN_URL).
 //	drill pubkey
 //	    In khóa công khai (base64) suy từ AG_ANCHOR_SIGNING_KEY — chỉ cho Local/CI;
 //	    production lấy khóa công khai qua kênh riêng, không đọc khóa ký.
@@ -74,11 +78,18 @@ func run(ctx context.Context, cmd string, args []string) (int, error) {
 	ignore := fs.String("ignore-tables", "", "check: bảng được phép lệch số dòng, phân tách bằng dấu phẩy (schema.bảng)")
 	sample := fs.Int("sample-runs", 20, "check: số lần cân đối mới nhất được tính lại")
 	suffix := fs.String("suffix", os.Getenv("AG_DB_SUFFIX"), "hậu tố database (pgtest)")
+	if cmd == "kref" {
+		fs.Bool("confirm-copy", false, "kref: xác nhận database đích là BẢN SAO")
+		fs.String("tenants", "", "kref: danh sách tenant (UUID, dấu phẩy)")
+	}
 	if err := fs.Parse(args); err != nil {
 		return 2, fmt.Errorf("%w: %w", errConfig, err)
 	}
 	if err := residency.CheckEnv(); err != nil {
 		return 2, fmt.Errorf("%w: %w", errConfig, err)
+	}
+	if cmd == "kref" {
+		return runKRefCmd(ctx, args, *suffix)
 	}
 	if cmd == "pubkey" {
 		s, err := opsjobs.SignerFromEnv()

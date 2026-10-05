@@ -21,7 +21,7 @@ Mỗi module `internal/{platform,mkg,vault}/<module>` có `module.yaml` cạnh `
 | `provides.data_products` | **sinh** | `//ag:dataproduct` | Sản phẩm dữ liệu Public API (`contracts/dataproduct`) |
 | `permissions` | **sinh** | hằng `Role*` trong `port/` | Vai realm module khai và kiểm. Mã quyền × lớp (R-MOD-07) đến ở W7.2 |
 | `shares` | tay | — | Bảng chấp nhận đọc chéo đơn vị (ADR-0030). Rỗng đến W4.1 |
-| `owns_schema` | **sinh** | migration | Schema `CREATE SCHEMA` tên `<cụm>_<module>` (vault: `vault`), hoặc schema chỉ module này nhắc trong chuỗi SQL (vd `ts_weigh` → `mkg/measurement`, `pf_files` → `pf/sync`) |
+| `owns_schema` | **sinh** | migration | Schema `CREATE SCHEMA` tên `<cụm>_<module>` (vault: `vault`; schema lõi `k_ref` → `pf/kref`), hoặc schema chỉ module này nhắc trong chuỗi SQL (vd `ts_weigh` → `mkg/measurement`, `pf_files` → `pf/sync`). Schema lõi `k_*` có ở mọi cụm của `zones`, chỉ module `kernel` được sở hữu |
 | `enable` | tay | — | `always` (lõi, mkg, `pf/extdata`) \| `per_tenant` (bật theo đơn vị, W1.4). `kernel` bắt buộc `always` |
 
 Kiểm của `modreg`: trường lạ là lỗi, giá trị enum, semver, tên duy nhất, `depends` trỏ tới module có thật và ràng buộc thỏa phiên bản hiện có, mỗi schema một chủ, schema khớp `zones`. **Không** kiểm hướng tầng và chu trình (W1.2 `agmodgraph`).
@@ -67,7 +67,7 @@ Lỗi được báo ở `module.go` của module liên quan (với `depends`: �
 
 ### Ngoại lệ
 
-Vi phạm có từ trước W1.2 được liệt kê trong [`tools/archlint/modgraph_exceptions.yaml`](../../tools/archlint/modgraph_exceptions.yaml), khóa `(rule, from, to)`, mỗi mục bắt buộc `reason`, `owner` (gói kế hoạch sẽ gỡ, dạng `W<n>.<m>`) và `until`. Mục `ops_schemas` liệt kê schema vận hành/dbadmin không thuộc module nào (`mkg_monitor`, `ts_monitor`; `k_ref` tạm từ W2.4 tới khi W2.5 gán chủ).
+Vi phạm có từ trước W1.2 được liệt kê trong [`tools/archlint/modgraph_exceptions.yaml`](../../tools/archlint/modgraph_exceptions.yaml), khóa `(rule, from, to)`, mỗi mục bắt buộc `reason`, `owner` (gói kế hoạch sẽ gỡ, dạng `W<n>.<m>`) và `until`. Mục `ops_schemas` liệt kê schema vận hành/dbadmin không thuộc module nào (`mkg_monitor`, `ts_monitor`). `k_ref` thuộc `pf/kref` từ W2.5.
 
 - Vi phạm **mới** (không có trong tệp) làm hỏng cổng. Sửa mã; không thêm ngoại lệ để qua cổng.
 - Ngoại lệ **lỗi thời** (vi phạm không còn xảy ra) cũng làm hỏng cổng: xóa mục trong cùng PR đã gỡ nó. Vì vậy danh sách chỉ co lại.
@@ -164,9 +164,10 @@ ADR-0028, R-DB-02, R-DB-03. Mỗi module pf có vai nhóm `r_<module>` (NOLOGIN,
 1. Gốc module (`module.go`): `var DBModule = db.Module("pf/<module>")`. Tên phải có trong registry, không thì panic lúc khởi tạo.
 2. Trong `New`, bọc pool một lần: `app.Service{DB: db.ForModule(b, DBModule), …}`. Mọi `tenant.WithTenantTx`/`FromCtxTx` của module từ đó chạy dưới `r_<module>`. Mã mới dùng `db.WithContextTx(ctx, pool, DBModule, fn)` (tenant lấy từ ctx), hoặc `db.WithModuleTenantTx` khi đã có tenant (consumer, job).
 3. Consumer của worker: đặt `module: <pkg>.DBModule` trong `consumer` (`cmd/worker`), để giao dịch inbox cũng chạy dưới `r_<module>`. Ở chỗ khác, đưa `db.ForModule(pool, DBModule)` cho `inbox.Process`/`ConsumeWith`.
-4. Grant: migration mới `GRANT … TO r_<module>`, không grant cho `<module>_app`; vai cũ thừa hưởng qua membership. Module chưa từng có vai cũ thì thêm vai vào `ModuleGroups` (W2.6 đổi nguồn danh sách) và grant cho `r_<module>`.
-5. Kiểm thử tích hợp: dựng module trên `env.Pool(t, migrations.PF, dbadmin.AppPlatform)`. Toàn bộ bộ kiểm thử phải xanh: vai đăng nhập NOINHERIT chỉ chạm bảng qua `r_*`. Kiểm trực tiếp DB vẫn dùng pool vai cũ.
-6. Truy vấn ngoài giao dịch, như `pool.Query(…)` thẳng trên pool, sẽ bị `permission denied` khi pool là `app_*`. Chuyển chúng vào `db.WithContextTx`.
+4. Grant: migration mới `GRANT … TO r_<module>`, không grant cho `<module>_app`; vai cũ thừa hưởng qua membership. Module chưa từng có vai cũ thì thêm vào `dbadmin.groupOnlyModules` (W2.5: `pf/kref`; W2.6 đổi nguồn danh sách) và grant cho `r_<module>`. Pool là vai đăng nhập của đơn vị (`app_worker`…), mật khẩu `AG_DB_PASSWORD_APP_*`.
+5. Module pf mới (có `r_*`) phải được migration của nó `GRANT USAGE ON SCHEMA k_ref` + `SELECT` các quan hệ `k_ref` + `EXECUTE k_ref.ctx_*` (R-DB-05) — pf 000091/000092 chỉ cấp cho các `r_*` lúc đó.
+6. Kiểm thử tích hợp: dựng module trên `env.Pool(t, migrations.PF, dbadmin.AppPlatform)`. Toàn bộ bộ kiểm thử phải xanh: vai đăng nhập NOINHERIT chỉ chạm bảng qua `r_*`. Kiểm trực tiếp DB vẫn dùng pool vai cũ.
+7. Truy vấn ngoài giao dịch, như `pool.Query(…)` thẳng trên pool, sẽ bị `permission denied` khi pool là `app_*`. Chuyển chúng vào `db.WithContextTx`.
 
 **Lint.** `agnosessionset` (archlint) cấm, trong chuỗi SQL của mã `internal/*` và `cmd/*` (trừ `*_test.go`):
 
@@ -212,3 +213,47 @@ Mã tham chiếu chỉ nhận `uuid.UUID`, nên không có đường nào đưa 
 - EXECUTE chỉ cấp cho `r_*` (vai cũ `<module>_app` có qua membership).
 
 Mảng xã: `k_ref.ctx_text('app.xa_ids')::text[]`. Chưa chính sách RLS nào đọc các biến mới (W3.4, W4.x).
+## Bản chiếu `k_ref` (W2.5)
+
+[ADR-0029](../adr/0029-k-ref-ban-chieu-loi-moi-cum.md#hiện-thực), kiến trúc v4.1 §17.1–17.3, R-DB-05. Module lõi `pf/kref` (`internal/platform/kref`, `k/ref`) sở hữu schema `k_ref` ở cụm pf (pf 000092) và mkg (mkg 000022, rỗng). `k_ref` là dữ liệu **dẫn xuất**: nguồn là sổ của `pf/party`, `pf/masterdata`.
+
+| Quan hệ | Khóa | Nguồn | RLS |
+|---|---|---|---|
+| `org` | (tenant_id, ref) | `pf_party.org`: mã, loại, ĐVHC, cha, trạng thái, `source_seq` | theo tenant |
+| `node_closure` | (tenant_id, ancestor, descendant) + `depth` | cây `org`; `(x, x, 0)` cho chính Nút | theo tenant |
+| `admin_unit` | (tenant_id, code, valid_from) | `pf_masterdata.admin_unit` + `successor_codes` | theo tenant |
+| `share_grant_active` | (tenant_id = bên cấp, grant_id) | `pf_party.share_grant` status `active` | bên cấp **hoặc** bên nhận |
+| `share_scope` | (viewer_tenant, purpose, module_table, owner_tenant, node_id) | — (W4.2) | theo đơn vị xem |
+
+**Đọc.** Mọi `r_*` có `SELECT` (đọc thẳng bảng, không qua hàm `SECURITY DEFINER` — DB-14). Chính sách RLS của module viết thẳng `EXISTS (SELECT 1 FROM k_ref.node_closure c WHERE c.ancestor = k_ref.ctx_uuid('app.node_id') AND c.descendant = <bảng>.node_id)` (W3.4). Port Go cho module khác đọc `k_ref` chưa có; đọc bằng SQL trong giao dịch của module.
+
+**Ghi.** Chỉ `r_kref` (worker `pf.kref` trong `cmd/worker`, vai đăng nhập `app_worker`). Không module nào khác ghi.
+
+**Sự kiện → `k_ref`.**
+
+| Sự kiện | Chủ | Áp |
+|---|---|---|
+| `pf.party.org.created` | pf/party (tạo tổ chức) | thêm Nút + bao đóng |
+| `pf.party.org.moved` | pf/party (`MoveOrg`) | cập nhật Nút; đổi cha → dựng lại bao đóng cả nhánh |
+| `pf.party.org.deactivated`, `reactivated` | pf/party | trạng thái |
+| `pf.masterdata.admin_unit.changed` | pf/masterdata (nhập danh mục, seed) | thêm phiên bản / đóng hiệu lực |
+| `pf.party.share_grant.approved`, `revoked` | pf/party | thêm / bỏ cấp quyền |
+
+Mọi ảnh chụp mang `seq` của sổ nguồn: bản cũ hơn bản đã áp thì bỏ qua (giao lại, sai thứ tự). Nút hoặc cha chưa có trong `k_ref` → `kref.ErrNotYetProjected`: giao lại, vẫn thiếu thì vào DLQ `pf.kref.dlq` — chạy dựng lại.
+
+**Dựng lại.** `worker -kref-rebuild` dựng lại mọi tenant từ nguồn (vai `party_app`, `masterdata_app`, `app_worker`, `ag_outbox_publisher` để tìm tenant). Chạy:
+
+- **một lần sau khi triển khai W2.5** — tổ chức có trước W2.5 chưa từng phát `created`;
+- sau mỗi lần phục hồi (thứ tự §34: nguồn trước, `k_ref` sau);
+- khi `pf.kref.dlq` có sự kiện.
+
+Diễn tập: `drill kref -confirm-copy` (chỉ trên bản sao, xem [restore-drill](../runbooks/restore-drill.md)).
+
+**Chỉ số.** `ag.k_ref.lag` (histogram giây, nhãn `relation`), từ `recorded_at` của outbox tới lúc áp. Cảnh báo `AgKRefLagHigh`: p99 > 5 giây trong 5 phút (P2).
+
+**Thêm quan hệ hoặc nguồn mới:**
+
+1. Migration của `pf/kref` (tên `<số>_pf_kref_…`): tạo bảng, RLS, `SELECT` cho mọi `r_*`, ghi cho `r_kref`.
+2. Thêm `Rel*`, phần chiếu trong `kref.Project`/`Digests`, `snapshotTx`, `rebuildTenantTx`.
+3. Thêm interface nguồn trong `kref/port`; module nguồn cài bằng vai của nó.
+4. Thêm sự kiện vào `kref.Events`.

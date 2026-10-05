@@ -506,6 +506,7 @@ func schemaOwners(scans map[string]*scan, created map[string]string) map[string]
 		byName[zone+"_"+mod] = name
 	}
 	byName["vault"] = "vault/identity"
+	byName["k_ref"] = "pf/kref" // schema lõi có ở mọi cụm dữ liệu (ADR-0029), không theo mẫu <cụm>_<module>
 	for schema := range created {
 		if owner, ok := byName[schema]; ok && scans[owner] != nil {
 			out[owner] = append(out[owner], schema)

@@ -82,6 +82,11 @@ func UnitLatestFrom(ctx context.Context, tx pgx.Tx, code string, d time.Time) (*
 	    WHERE code = $1 AND valid_from <= $2::date ORDER BY valid_from DESC LIMIT 1`, code, day(d)))
 }
 
+// AllUnits liệt kê mọi phiên bản đơn vị hành chính của tenant (bản chiếu k_ref.admin_unit, W2.5).
+func AllUnits(ctx context.Context, tx pgx.Tx) ([]domain.Unit, error) {
+	return manyUnits(tx.Query(ctx, "SELECT "+unitCols+" FROM pf_masterdata.admin_unit ORDER BY code, valid_from"))
+}
+
 // UnitVersion đọc đúng phiên bản (code, valid_from) và khóa dòng.
 func UnitVersion(ctx context.Context, tx pgx.Tx, code string, from time.Time) (*domain.Unit, error) {
 	return oneUnit(tx.QueryRow(ctx, "SELECT "+unitCols+` FROM pf_masterdata.admin_unit

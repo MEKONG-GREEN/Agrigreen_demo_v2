@@ -25,8 +25,8 @@ func roleByName(t *testing.T, name string) (Role, int) {
 // NOINHERIT là thành viên đúng các r_* của module đơn vị ghép (modreg.UnitModules); thứ tự tạo nhóm trước.
 func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	groups := ModuleGroups()
-	if len(groups) != 17 {
-		t.Errorf("số module pf có vai cũ: %d (muốn 17): %v", len(groups), groups)
+	if len(groups) != 18 || len(legacyGroups()) != 17 {
+		t.Errorf("số module pf có vai nhóm: %d (muốn 18, 17 có vai cũ): %v", len(groups), groups)
 	}
 	seen := map[string]bool{}
 	for _, g := range groups {
@@ -37,6 +37,15 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 		r, ri := roleByName(t, g.Role)
 		if r.Login || r.BypassRLS || r.NoInherit || !slices.Equal(r.MemberOf, []string{SharedUser}) {
 			t.Errorf("%s: %+v", g.Role, r)
+		}
+		if g.Legacy == "" {
+			// Module không có vai cũ (W2.5: pf/kref) — không vai đăng nhập nào ngoài app_* là thành viên.
+			for _, o := range Roles {
+				if slices.Contains(o.MemberOf, g.Role) && !slices.ContainsFunc(LoginUnits, func(u LoginUnit) bool { return u.Role == o.Name }) {
+					t.Errorf("%s không được là thành viên %s", o.Name, g.Role)
+				}
+			}
+			continue
 		}
 		l, li := roleByName(t, g.Legacy)
 		if !slices.Contains(l.MemberOf, g.Role) || li < ri {
@@ -75,6 +84,13 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	if syn, _ := roleByName(t, AppSync); !slices.Equal(syn.MemberOf, []string{"r_sync"}) {
 		t.Errorf("app_sync: %v", syn.MemberOf)
 	}
+	// W2.5: chỉ app_worker (worker pf.kref) ghi k_ref — là thành viên r_kref; r_kref có ở cụm pf và mkg.
+	if w, _ := roleByName(t, AppWorker); !slices.Contains(w.MemberOf, "r_kref") || slices.Contains(plat.MemberOf, "r_kref") {
+		t.Errorf("r_kref: app_worker %v, app_platform %v", w.MemberOf, plat.MemberOf)
+	}
+	if k, _ := roleByName(t, "r_kref"); !slices.Equal(k.Clusters, []migrations.Cluster{migrations.PF, migrations.MKG}) {
+		t.Errorf("r_kref: %+v", k)
+	}
 	// Không vai đặc quyền nào cấp cho app_* (ADR-0028 §1).
 	for _, u := range LoginUnits {
 		r, _ := roleByName(t, u.Role)
@@ -88,7 +104,18 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 
 var pairRe = regexp.MustCompile(`\['([a-z_]+)', '([a-z_]+)'\]`)
 
-// pf 000090 chép quyền theo danh sách cặp ghi tay — phải khớp ModuleGroups (thêm module pf có vai cũ thì
+// legacyGroups: vai nhóm của module có vai cũ <module>_app — đúng tập của W2.3/W2.4 (pf 000090, 000091).
+func legacyGroups() []ModuleGroup {
+	var out []ModuleGroup
+	for _, g := range ModuleGroups() {
+		if g.Legacy != "" {
+			out = append(out, g)
+		}
+	}
+	return out
+}
+
+// pf 000090 chép quyền theo danh sách cặp ghi tay — phải khớp ModuleGroups có vai cũ (thêm module pf thì
 // migration mới GRANT cho r_<module>, không sửa 000090).
 func TestMigration90MatchesModuleGroups(t *testing.T) {
 	src, err := fs.ReadFile(migrations.FS, "pf/000090_pf_module_group_roles.up.sql")
@@ -99,7 +126,7 @@ func TestMigration90MatchesModuleGroups(t *testing.T) {
 	for _, m := range pairRe.FindAllStringSubmatch(string(src), -1) {
 		got = append(got, ModuleGroup{Legacy: m[1], Role: m[2]})
 	}
-	groups := ModuleGroups()
+	groups := legacyGroups()
 	if len(got) != len(groups) {
 		t.Fatalf("000090 có %d cặp, ModuleGroups %d", len(got), len(groups))
 	}
@@ -110,9 +137,9 @@ func TestMigration90MatchesModuleGroups(t *testing.T) {
 	}
 }
 
-// pf 000091 (W2.4) cấp EXECUTE k_ref.ctx_* cho danh sách r_* ghi tay — phải khớp ModuleGroups.
-func TestMigration91MatchesModuleGroups(t *testing.T) {
-	src, err := fs.ReadFile(migrations.FS, "pf/000091_pf_k_ref_ctx_functions.up.sql")
+func migrationRoles(t *testing.T, file string) []string {
+	t.Helper()
+	src, err := fs.ReadFile(migrations.FS, file)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,11 +147,27 @@ func TestMigration91MatchesModuleGroups(t *testing.T) {
 	for _, m := range regexp.MustCompile(`'(r_[a-z_]+)'`).FindAllStringSubmatch(string(src), -1) {
 		got = append(got, m[1])
 	}
-	var want []string
-	for _, g := range ModuleGroups() {
-		want = append(want, g.Role)
+	return got
+}
+
+func roles(gs []ModuleGroup) []string {
+	var out []string
+	for _, g := range gs {
+		out = append(out, g.Role)
 	}
-	if !slices.Equal(got, want) {
+	return out
+}
+
+// pf 000091 (W2.4) cấp EXECUTE k_ref.ctx_* cho danh sách r_* ghi tay — khớp các vai nhóm lúc W2.4 (có vai cũ).
+func TestMigration91MatchesModuleGroups(t *testing.T) {
+	if got, want := migrationRoles(t, "pf/000091_pf_k_ref_ctx_functions.up.sql"), roles(legacyGroups()); !slices.Equal(got, want) {
 		t.Fatalf("000091 cấp cho %v, ModuleGroups %v", got, want)
+	}
+}
+
+// pf 000092 (W2.5) cấp SELECT k_ref.* cho MỌI r_* (R-DB-05) — danh sách ghi tay khớp ModuleGroups.
+func TestMigration92MatchesModuleGroups(t *testing.T) {
+	if got, want := migrationRoles(t, "pf/000092_pf_kref_relations.up.sql"), roles(ModuleGroups()); !slices.Equal(got, want) {
+		t.Fatalf("000092 cấp cho %v, ModuleGroups %v", got, want)
 	}
 }

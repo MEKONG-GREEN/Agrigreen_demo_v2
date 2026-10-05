@@ -9,6 +9,7 @@ modules:
   pf/cropcycle: ">=1.0 <2"     # quy trình SOP; dữ liệu vụ của Public API
   pf/extdata: ">=1.0 <2"
   pf/geo: ">=1.0 <2"           # nhập thửa, biên tập bản đồ, quy chuẩn hiển thị; map_consumer
+  pf/kref: ">=1.0 <2"          # bản chiếu k_ref (worker pf.kref, diễn tập dựng lại — W2.5)
   pf/masterdata: ">=1.0 <2"    # danh mục, tham số có phê duyệt
   pf/metering: ">=1.0 <2"      # sử dụng Public API, bảng kê, nhật ký xuất
   pf/metrics: ">=1.0 <2"       # định nghĩa chỉ số

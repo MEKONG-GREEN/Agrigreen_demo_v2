@@ -9,6 +9,7 @@ version: 1.0.0
 depends:
   pf/apiclient: ">=1.0 <2"
   pf/geo: ">=1.0 <2"
+  pf/kref: ">=1.0 <2"
   pf/masterdata: ">=1.0 <2"
   pf/metering: ">=1.0 <2"
   pf/sync: ">=1.0 <2"
@@ -40,8 +41,12 @@ provides:
     - pf.party.consent.recorded/v1
     - pf.party.household.membership_changed/v1
     - pf.party.household.registered/v1
+    - pf.party.org.created/v1
     - pf.party.org.deactivated/v1
+    - pf.party.org.moved/v1
     - pf.party.org.reactivated/v1
+    - pf.party.share_grant.approved/v1
+    - pf.party.share_grant.revoked/v1
   internal_events: []
   publications: []
   data_products: []

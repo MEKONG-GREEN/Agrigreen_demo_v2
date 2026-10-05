@@ -23,6 +23,10 @@ const (
 	// MetricStandbyLag: giây, độ trễ áp WAL của bản sao chờ theo cluster (ADR-0006:
 	// standby_replication_lag_seconds có cảnh báo) — db.RegisterStandbyLag.
 	MetricStandbyLag = "ag.db.standby_replication_lag"
+	// MetricKRefLag: giây (histogram, theo relation), độ trễ bản chiếu k_ref từ lúc sự kiện nguồn được ghi tới
+	// lúc worker pf.kref áp xong (ADR-0029 §4: k_ref_lag_seconds, mục tiêu p99 ≤ 5 giây) — Prometheus
+	// ag_k_ref_lag_seconds_bucket.
+	MetricKRefLag = "ag.k_ref.lag"
 )
 
 type httpInstruments struct {

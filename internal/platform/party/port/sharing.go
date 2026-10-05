@@ -24,6 +24,43 @@ import (
 // van của nền tảng ghi vào tenant bên cấp đã cấp loại valve_* cho tenant phong bì.
 // ---------------------------------------------------------------------------
 
+// Sự kiện vòng đời cấp quyền (W2.5, ADR-0029 §3): worker pf.kref dựng k_ref.share_grant_active. Tenant của
+// phong bì là bên cấp.
+const (
+	EventShareGrantApproved = "pf.party.share_grant.approved"
+	EventShareGrantRevoked  = "pf.party.share_grant.revoked"
+)
+
+// ShareGrantApprovedV1 là payload của pf.party.share_grant.approved: cấp quyền vừa có hiệu lực (không có
+// mục đích dạng văn bản tự do — chỉ mã tenant, loại dữ liệu, hạn, seq của sổ share_grant_event).
+//
+//ag:event pf.party.share_grant.approved v1
+type ShareGrantApprovedV1 struct {
+	GrantID         uuid.UUID `json:"grant_id"`
+	GranteeTenantID uuid.UUID `json:"grantee_tenant_id"`
+	Kinds           []string  `json:"kinds"`
+	ValidFrom       string    `json:"valid_from"`
+	ValidTo         string    `json:"valid_to"`
+	ActorRef        uuid.UUID `json:"actor_ref"`
+	EventTime       string    `json:"event_time"`
+	Seq             int64     `json:"seq"`
+}
+
+// ShareGrantRevokedV1 là payload của pf.party.share_grant.revoked (đề xuất hoặc cấp quyền đang hiệu lực bị
+// thu hồi) — cùng trường với approved.
+//
+//ag:event pf.party.share_grant.revoked v1
+type ShareGrantRevokedV1 struct {
+	GrantID         uuid.UUID `json:"grant_id"`
+	GranteeTenantID uuid.UUID `json:"grantee_tenant_id"`
+	Kinds           []string  `json:"kinds"`
+	ValidFrom       string    `json:"valid_from"`
+	ValidTo         string    `json:"valid_to"`
+	ActorRef        uuid.UUID `json:"actor_ref"`
+	EventTime       string    `json:"event_time"`
+	Seq             int64     `json:"seq"`
+}
+
 // Loại dữ liệu của một cấp quyền (cột kinds của pf_party.share_grant_event).
 const (
 	// Nền tảng → bên nhận (đọc qua /v1/partner/*).

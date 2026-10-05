@@ -17,3 +17,13 @@ groups:
         annotations:
           summary: "Có xung đột đồng bộ quá hạn xử lý (C-8)"
           description: "ADR-0006: xung đột offline chờ đối soát quá SLA. Mở màn Xung đột đồng bộ (sync_conflict_resolver)."
+  # W2.5 (ADR-0029 §4): độ trễ bản chiếu k_ref — mục tiêu p99 ≤ 5 giây (k_ref_lag_seconds, kiến trúc v4.1 §17.1, §36).
+  - name: agrigreen-platform-kref
+    rules:
+      - alert: AgKRefLagHigh
+        expr: histogram_quantile(0.99, sum by (le, relation) (rate(ag_k_ref_lag_seconds_bucket[5m]))) > 5
+        for: 5m
+        labels: { severity: warning, priority: P2 }
+        annotations:
+          summary: "k_ref trễ quá 5 giây ở p99 (quan hệ {{ $labels.relation }})"
+          description: "ADR-0029 §4: cấp phép vừa thu hồi còn hiệu lực, Nút vừa di chuyển chưa áp trong khoảng trễ. Kiểm consumer pf.kref (worker), hàng đợi và DLQ pf.kref.dlq; runbook docs/runbooks/README.md mục k_ref."

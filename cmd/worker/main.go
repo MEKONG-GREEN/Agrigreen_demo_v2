@@ -25,6 +25,11 @@
 // giám sát đồng bộ, GIS US-SYNC-01); lần giao cuối trước DLQ phát pf.sync.integration.dead_lettered
 // → pf/notify báo Admin nền tảng (GIS US-SYNC-02).
 //
+// Consumer pf.kref (W2.5, ADR-0029; vai đăng nhập app_worker → SET LOCAL ROLE r_kref): dựng bản chiếu k_ref từ
+// pf.party.org.created/moved/deactivated/reactivated, pf.masterdata.admin_unit.changed, pf.party.share_grant.*;
+// chỉ số ag.k_ref.lag. Lệnh một lần -kref-rebuild dựng lại k_ref mọi tenant từ nguồn (vai party_app,
+// masterdata_app, ag_outbox_publisher, app_worker — AG_DB_PASSWORD_APP_WORKER hoặc AG_DB_APP_PASSWORD).
+//
 // Lệnh một lần (không chạy consumer/job): -metrics-backfill=YYYY-MM-DD:YYYY-MM-DD ghi sổ chỉ
 // số + ảnh chụp lớp cho từng ngày đã kết thúc (-metrics-tenant chọn một tenant, mặc định mọi
 // tenant có sự kiện; -metrics-keys chọn chỉ số). Dòng không đổi được giữ; khác → bản ghi bù.
@@ -151,7 +156,7 @@ func consumers(log *slog.Logger) []consumer {
 			log.Info("đồng ý đã ghi", "event", env.EventType, "event_id", env.EventID, "tenant_id", env.TenantID, "trace_id", env.TraceID, "outcome", "ok")
 			return nil
 		},
-	}, mrvExportConsumer(log), accountsOrgStatusConsumer(log), waterwayBuildConsumer()}, append(reportsConsumers(log), wiredConsumers(log)...)...)
+	}, mrvExportConsumer(log), accountsOrgStatusConsumer(log), waterwayBuildConsumer(), krefConsumer()}, append(reportsConsumers(log), wiredConsumers(log)...)...)
 }
 
 func allConsumers(log *slog.Logger) []consumer {
@@ -172,7 +177,15 @@ func main() {
 	backfill := flag.String("metrics-backfill", "", "ghi sổ chỉ số + ảnh chụp lớp cho khoảng YYYY-MM-DD:YYYY-MM-DD rồi thoát")
 	bfTenant := flag.String("metrics-tenant", "", "(với -metrics-backfill) chỉ một tenant")
 	bfKeys := flag.String("metrics-keys", "", "(với -metrics-backfill) danh sách chỉ số, phân tách dấu phẩy")
+	krefRebuild := flag.Bool("kref-rebuild", false, "dựng lại k_ref của mọi tenant từ nguồn rồi thoát (W2.5)")
 	flag.Parse()
+	if *krefRebuild {
+		if err := runKRefRebuild(log); err != nil {
+			log.Error("dựng lại k_ref lỗi", "event", "kref.rebuild", "outcome", "error", "error", err.Error())
+			os.Exit(1)
+		}
+		return
+	}
 	if *backfill != "" {
 		if err := runMetricsBackfill(log, *backfill, *bfTenant, *bfKeys); err != nil {
 			log.Error("backfill chỉ số lỗi", "event", "metrics.backfill", "outcome", "error", "error", err.Error())

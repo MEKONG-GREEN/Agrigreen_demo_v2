@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.party.org.moved/v1",
+  "title": "pf.party.org.moved — payload",
+  "description": "Một Nút của cây tổ chức đổi Nút cha (kèm cả nhánh con) và/hoặc đổi mã đơn vị hành chính tại chỗ (sáp nhập ĐVHC), ghi trong sổ pf_party.org_event (action moved). Ảnh chụp SAU sự việc và vị trí trước. Worker pf.kref dựng lại bao đóng của cả nhánh trong một giao dịch (W2.5, ADR-0029). Không chứa tên hay dữ liệu cá nhân.",
+  "x-event-type": "pf.party.org.moved",
+  "x-schema-version": 1,
+  "x-producer": "pf/party",
+  "type": "object",
+  "required": ["org_ref", "kind", "code", "admin_unit_code", "parent_ref", "prev_parent_ref", "prev_admin_unit_code", "active", "reason", "actor_ref", "event_time", "seq"],
+  "properties": {
+    "org_ref":              { "type": "string", "format": "uuid" },
+    "kind":                 { "type": "string", "enum": ["ttkn_national", "ttkn_province", "extension_team", "dcrd", "cooperative", "mkg", "partner"] },
+    "code":                 { "type": "string", "maxLength": 40 },
+    "admin_unit_code":      { "type": "string", "description": "Mã đơn vị hành chính sau di chuyển; rỗng với cấp quốc gia" },
+    "parent_ref":           { "type": ["string", "null"], "format": "uuid", "description": "Nút cha mới; null = thành gốc" },
+    "prev_parent_ref":      { "type": ["string", "null"], "format": "uuid", "description": "Nút cha trước khi di chuyển" },
+    "prev_admin_unit_code": { "type": "string", "description": "Mã đơn vị hành chính trước khi di chuyển" },
+    "active":               { "type": "boolean" },
+    "reason":               { "type": "string", "minLength": 10, "description": "Lý do di chuyển (ràng buộc sổ org_event). Không chứa dữ liệu cá nhân." },
+    "actor_ref":            { "type": "string", "format": "uuid" },
+    "event_time":           { "type": "string", "format": "date-time" },
+    "seq":                  { "type": "integer", "minimum": 1, "description": "Thứ tự trong chuỗi băm của tổ chức" }
+  }
+}

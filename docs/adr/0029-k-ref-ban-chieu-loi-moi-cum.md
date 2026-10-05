@@ -74,7 +74,7 @@ Có ở cụm `pf` và `mkg`. Không cần ở `ts`, `vault` cho đến khi có 
 | Gói | Việc | Migration |
 |---|---|---|
 | W2.4 | Hàm `k_ref.ctx_uuid`, `k_ref.ctx_text`; biến ngữ cảnh trong `WithContextTx` | trong pf 000091 |
-| W2.5 | Schema `k_ref`, worker `pf.kref`, sự kiện `pf.party.org.moved`, `SELECT` cho mọi `r_*`, `k_ref_lag_seconds` + cảnh báo, bước dựng lại trong `restore-drill` | pf 000091–000092, mkg 000022 |
+| W2.5 | Quan hệ `k_ref`, module `pf/kref`, worker `pf.kref`, sự kiện `pf.party.org.created`/`moved`, `pf.party.share_grant.approved`/`revoked`, `SELECT` cho mọi `r_*`, `k_ref_lag_seconds` + cảnh báo, bước dựng lại trong `restore-drill` | pf 000092, mkg 000022 |
 | W3.4 | Chính sách `p_scope` đọc `k_ref.node_closure` trên `pf_coop` | pf 000097 |
 | W4.2 | Worker dựng `share_scope` | pf 000099 |
 
@@ -84,6 +84,36 @@ Có ở cụm `pf` và `mkg`. Không cần ở `ts`, `vault` cho đến khi có 
 - tên ngoài `app.[a-z][a-z0-9_]*` bị từ chối, lỗi 22023 qua `k_ref.ctx_reject`.
 
 `REVOKE … FROM PUBLIC`. USAGE schema và EXECUTE cấp cho 17 `r_*`, danh sách khớp `dbadmin.ModuleGroups` (`TestMigration91MatchesModuleGroups`). Kiểm thử: `TestCtxFunctions_W24`, `TestCtxFunctionGrants_W24` (`internal/shared/db`). `shared.current_tenant()` giữ nguyên. Tệp pf 000091 đã thuộc W2.4, nên các quan hệ `k_ref` của W2.5 phải vào số kế tiếp (pf 000092).
+
+**W2.5 (05/10/2026, pf 000092, mkg 000022):**
+
+- **Module.** `internal/platform/kref` (`pf/kref`, `aka: [k/ref]`, `kind: kernel`, `zones: [pf, mkg]`, `enable: always`) sở hữu `k_ref` (`owns_schema`; `modreg` cho phép schema lõi `k_*` với module kernel; mục tạm `k_ref` trong `ops_schemas` đã gỡ). Module không import module nào. Port `kref/port`: `OrgSource`, `ShareGrantSource` (pf/party cài), `AdminUnitSource` (pf/masterdata cài), cùng bằng vai DB của module nguồn.
+- **"Nút" = mọi dòng `pf_party.org`.** Khu vực là thuộc tính của Nút xã, phòng ban là cấu hình của đơn vị (KN v7.7 FN-AD-04.02/04.03), không phải Nút.
+- **Quan hệ (pf 000092).** `org` (mã, loại, đơn vị hành chính, cha, trạng thái, `source_seq`), `node_closure` (tổ tiên, hậu duệ, độ sâu; `(x, x, 0)` cho chính Nút), `admin_unit` (phiên bản hiệu lực + `successor_codes`), `share_grant_active` (cấp quyền status `active`, tenant = bên cấp), `share_scope` (khóa đúng §17.3, **rỗng** tới W4.2).
+- **Lệch §2 — có RLS theo tenant.** Nguồn ở repo là bảng theo tenant (tenant = đơn vị tham gia, RB-2), nên `org`, `node_closure`, `admin_unit` dùng `shared.apply_tenant_rls`. Chính sách `p_scope` của W3.4 (`EXISTS node_closure` cùng tenant) không đổi. `share_grant_active` thấy được ở bên cấp **và** bên nhận. `share_scope` theo `viewer_tenant`. Hai chính sách viết tay đọc biến qua `k_ref.ctx_uuid` (R-DB-08). `WITH CHECK` chỉ cho tenant hiện hành.
+- **Quyền.** 18 `r_*` có `SELECT` + `EXECUTE k_ref.ctx_*`; danh sách khớp `dbadmin.ModuleGroups` (`TestMigration92MatchesModuleGroups`). Chỉ `r_kref` có `INSERT/UPDATE/DELETE`, không ai có `TRUNCATE`. `r_kref` là vai nhóm mới, không có vai cũ (`dbadmin.groupOnlyModules`, cụm pf + mkg); thành viên duy nhất là `app_worker` vì `cmd/worker` ghép `pf/kref`. `ag_outbox_publisher` chỉ đọc cột `tenant_id` của `k_ref.*` và bảng nguồn, để tìm tenant khi dựng lại.
+- **Sự kiện.** pf/party phát `pf.party.org.created` (tạo tổ chức) và `pf.party.org.moved` (`MoveOrg`: đổi cha và/hoặc mã ĐVHC tại chỗ). Cả hai mang ảnh chụp sau sự việc + `seq`. pf/party cũng phát `pf.party.share_grant.approved`/`revoked`, không mang mục đích dạng văn bản tự do. `pf.masterdata.admin_unit.changed` đã phát từ lần nhập danh mục (kể cả seed). Đổi tên không phát: tên không có trong `k_ref`.
+- **Worker `pf.kref`** (`cmd/worker`, vai đăng nhập `app_worker` → `SET LOCAL ROLE r_kref`) xử lý idempotent qua `shared.inbox`. Mỗi sự kiện áp trong một giao dịch, có khóa tư vấn theo tenant.
+  - Ảnh chụp có `seq` ≤ bản đã áp thì bỏ qua.
+  - Nút mới: thêm bao đóng từ tổ tiên của cha.
+  - Di chuyển: bỏ cặp (tổ tiên ngoài nhánh, hậu duệ trong nhánh), thêm (tổ tiên của cha mới × nhánh). Từ chối tạo vòng.
+  - Cha hoặc Nút chưa có trong `k_ref` → `kref.ErrNotYetProjected`: sự kiện được giao lại, vẫn thiếu thì vào DLQ.
+  - ĐVHC: bản đóng hiệu lực thắng bản mở.
+  - Cấp quyền thu hồi: xóa dòng.
+- **Dựng lại toàn bộ.** `kref.Module.Rebuild` / `RebuildTenant`, mỗi tenant một giao dịch:
+  - đọc nguồn bằng vai của module nguồn, rồi kiểm cây (`kref.Project` bắt vòng và cha thiếu);
+  - xóa và chèn lại theo tenant; bao đóng tính bằng CTE đệ quy trong DB;
+  - `share_scope` không đụng.
+
+  Chạy bằng `worker -kref-rebuild`: **bắt buộc một lần sau triển khai W2.5**, vì Nút có trước W2.5 chưa từng phát `created`. Chạy lại sau mỗi lần phục hồi.
+- **Diễn tập.** `drill kref -confirm-copy` (bước mới của `restore-drill.yml`, chạy sau `drill check`). Lệnh chụp `k_ref`, dựng lại, chụp lại, rồi so số dòng + SHA-256 theo quan hệ với lần dựng độc lập trong Go (`kref.Expected`). "Sau ≠ mong đợi" là hỏng. "Trước ≠ mong đợi" chỉ được báo, vì `k_ref` trống sau phục hồi là bình thường. Băm không tính `seq` và thời điểm đồng bộ.
+- **Chỉ số.** `ag.k_ref.lag` là histogram giây theo `relation`, tính từ `recorded_at` của outbox tới lúc áp xong; Prometheus `ag_k_ref_lag_seconds`. Cảnh báo `AgKRefLagHigh`: p99 > 5 giây trong 5 phút, P2 (`agrigreen-platform.rules.yml`).
+- **Cụm mkg (mkg 000022).** Schema, hàm `ctx_*` và năm quan hệ cùng hình với pf. 7 vai module `mkg/*` có `SELECT`, `r_kref` ghi. **Kênh nguồn chốt:** không nối DB chéo cụm, không import chéo vùng. Nguồn là cụm pf, đi qua bề mặt đối tác có cấp quyền (ADR-0020), về sau là cổng tích hợp (ADR-0033). Bên ghi là pf/kref chạy trong `cmd/worker-internal`. Bảng để rỗng cho tới gói nối kênh (W7.4): chưa có chính sách nào của mkg đọc `k_ref`.
+- **Kiểm thử.**
+  - Đơn vị: `internal/platform/kref` (closure, vòng, băm).
+  - Tích hợp `kref`: sự kiện → dòng, di chuyển nhánh, sai thứ tự, idempotent, dựng lại khớp nguồn, RLS, `r_*` chỉ đọc, `r_kref` ghi, `app_platform` không `SET ROLE r_kref` được, cụm mkg.
+  - Chấp nhận `TestKRefIncrementalEqualsRebuild_W25`: Admin API thật → outbox → worker = dựng lại = nguồn.
+  - Diễn tập: `TestDrillKRefRebuildMatchesSource_W25`.
 
 ## Liên quan
 

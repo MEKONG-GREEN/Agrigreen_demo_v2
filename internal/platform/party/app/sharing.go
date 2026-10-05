@@ -35,6 +35,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -206,10 +207,37 @@ func (s *Sharing) Approve(ctx context.Context, id uuid.UUID) (store.Grant, bool,
 		}); err != nil {
 			return err
 		}
+		if err := enqueueGrantEvent(ctx, tx, e); err != nil {
+			return err
+		}
 		out = *g
 		return nil
 	})
 	return out, replayed, err
+}
+
+// enqueueGrantEvent phát pf.party.share_grant.approved / revoked (W2.5: worker pf.kref dựng
+// k_ref.share_grant_active) cùng giao dịch với sổ.
+func enqueueGrantEvent(ctx context.Context, tx pgx.Tx, e store.GrantEvent) error {
+	ev := outbox.Event{
+		ID: ids.New(), TenantID: e.TenantID, SchemaVersion: 1, OccurredAt: e.EventTime,
+		TraceID: telemetry.TraceID(ctx), Producer: "pf/party",
+	}
+	switch e.Action {
+	case "approved":
+		ev.Type = port.EventShareGrantApproved
+		ev.Payload = port.ShareGrantApprovedV1{GrantID: e.GrantID, GranteeTenantID: e.Grantee, Kinds: e.Kinds,
+			ValidFrom: e.ValidFrom.UTC().Format(time.RFC3339Nano), ValidTo: e.ValidTo.UTC().Format(time.RFC3339Nano),
+			ActorRef: e.ActorRef, EventTime: e.EventTime.UTC().Format(time.RFC3339), Seq: e.Seq}
+	case "revoked":
+		ev.Type = port.EventShareGrantRevoked
+		ev.Payload = port.ShareGrantRevokedV1{GrantID: e.GrantID, GranteeTenantID: e.Grantee, Kinds: e.Kinds,
+			ValidFrom: e.ValidFrom.UTC().Format(time.RFC3339Nano), ValidTo: e.ValidTo.UTC().Format(time.RFC3339Nano),
+			ActorRef: e.ActorRef, EventTime: e.EventTime.UTC().Format(time.RFC3339), Seq: e.Seq}
+	default:
+		return nil
+	}
+	return outbox.Enqueue(ctx, tx, ev)
 }
 
 // Revoke thu hồi (đề xuất hoặc cấp quyền đang hiệu lực). Có lý do; đọc sau thu hồi → 403.
@@ -259,6 +287,9 @@ func (s *Sharing) Revoke(ctx context.Context, id uuid.UUID, reason string) (stor
 			}); err != nil {
 				return err
 			}
+		}
+		if err := enqueueGrantEvent(ctx, tx, e); err != nil {
+			return err
 		}
 		out = *g
 		return nil

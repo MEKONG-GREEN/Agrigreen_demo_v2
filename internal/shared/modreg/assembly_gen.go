@@ -6,7 +6,7 @@ var assembly = map[string][]string{
 	"api-internal":     {"mkg/acctbridge", "mkg/costing", "mkg/fieldops", "mkg/hub", "mkg/logistics", "mkg/measurement", "mkg/orders"},
 	"api-platform":     {"pf/accounts", "pf/apiclient", "pf/content", "pf/cropcycle", "pf/extdata", "pf/extension", "pf/geo", "pf/masterdata", "pf/mechanization", "pf/metering", "pf/metrics", "pf/mrv", "pf/notify", "pf/party", "pf/reports", "pf/simulation", "pf/sync", "pf/waterway"},
 	"api-public":       {"pf/apiclient", "pf/cropcycle", "pf/geo", "pf/masterdata", "pf/metering", "pf/mrv"},
-	"drill":            {"pf/mechanization"},
+	"drill":            {"pf/kref", "pf/masterdata", "pf/mechanization", "pf/party"},
 	"edge-agent":       {},
 	"formimport":       {"pf/reports"},
 	"identity-vault":   {"vault/identity"},
@@ -16,6 +16,6 @@ var assembly = map[string][]string{
 	"outbox-publisher": {},
 	"rebuilddrill":     {"mkg/acctbridge", "mkg/costing", "mkg/fieldops", "mkg/hub", "mkg/logistics", "mkg/measurement", "mkg/orders"},
 	"seed-synthetic":   {},
-	"worker":           {"pf/accounts", "pf/apiclient", "pf/cropcycle", "pf/extension", "pf/geo", "pf/masterdata", "pf/mechanization", "pf/metering", "pf/metrics", "pf/mrv", "pf/notify", "pf/party", "pf/reports", "pf/sync", "pf/waterway"},
+	"worker":           {"pf/accounts", "pf/apiclient", "pf/cropcycle", "pf/extension", "pf/geo", "pf/kref", "pf/masterdata", "pf/mechanization", "pf/metering", "pf/metrics", "pf/mrv", "pf/notify", "pf/party", "pf/reports", "pf/sync", "pf/waterway"},
 	"worker-internal":  {"mkg/acctbridge", "mkg/costing", "mkg/fieldops", "mkg/hub", "mkg/logistics", "mkg/measurement", "mkg/orders"},
 }
