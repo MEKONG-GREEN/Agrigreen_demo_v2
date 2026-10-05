@@ -133,6 +133,23 @@ Port của `pf/masterdata` có ba hàm, thay mọi truy vấn trực tiếp ở 
 | W5.1, W5.3 | Hợp đồng và feed tham chiếu `admin_units` | pf 000100–000101 |
 | W7.4 | Chuyển về lõi (hoặc sớm hơn khi có đơn vị thứ hai) | cụm `access` |
 
+### W2.2 (05/10/2026) — xong phần mã, nạp production chờ C-9
+
+- **Migration pf 000089** (`migrations/pf/000089_pf_masterdata_admin_unit_succession.up.sql`): `btree_gist` (trusted extension; thêm vào `dbadmin.Extensions` của cụm pf), `admin_unit_no_overlap` như mục 2, bảng `admin_unit_succession` như mục 3, điền như mục 4. Trigger `fn_admin_unit_guard` giữ nguyên.
+- **Khác mục 3 (ghi lệch):**
+  - Khóa chính là `(tenant_id, predecessor_code, predecessor_valid_from, successor_code, basis_status)` thay vì `…, effective_on`. Lý do: trigger buộc `effective_on = valid_to` của tiền thân, nên khóa theo `effective_on` không cho có dòng `official` bù cùng cặp. Hệ quả: mỗi cặp có tối đa một dòng mỗi trạng thái; sửa một dòng `official` sai chưa có đường (cần khi nào thì thêm cột phiên bản).
+  - Kiểm kế thừa chặt hơn `successor_valid_from ≤ effective_on`: kế thừa phải **có hiệu lực** ngày `effective_on`.
+  - Bảng không vào `shared.v_missing_immutability` (view chỉ xét bảng `ts_*` hoặc có `row_hash`; đổi view là migration shared, ngoài số được cấp). Bất biến bằng `shared.apply_append_only` (trigger `fn_immutable` UPDATE/DELETE/TRUNCATE, áp cả owner) và quyền chỉ `SELECT, INSERT`. Thay cho cổng, `migrations/admin_unit_succession_integration_test.go` kiểm UPDATE/DELETE bị chặn với cả vai ứng dụng và owner.
+  - Điền dữ liệu chạy bằng `ag_migrator` (chủ bảng, FORCE RLS, không BYPASSRLS): một policy chỉ đọc `p_migrate_000089 … TO CURRENT_USER` mở `admin_unit` trong lúc `INSERT … SELECT`, bỏ ngay trong cùng tệp; `p_tenant` không đổi, `v_missing_rls` sạch.
+- **Đường ghi:** `ImportUnits` (Admin API và seed) ghi `successor_codes` và bảng kế thừa trong cùng giao dịch khi đóng hoặc tạo phiên bản đã đóng; dòng ghi là `pending_c9`, `legal_basis` = `source` của tệp, `area_share` NULL. Chưa có đường ghi `official` và `area_share`: thuộc W3.5 (nạp nguồn chính thức), lúc đó thêm kiểm tổng `area_share ≤ 1` ở `app/`.
+- **Port `AdminUnitHistory`** (`masterdata/port/history.go`, adapter `UnitsPort`, `Module.AdminUnitHistory()`; module gọi cũng lấy được bằng type assertion trên `AdminUnits`):
+  - `AdminUnitAt(code, at)`: như `AdminUnits.Get`. Không có → `masterdata.admin_unit_not_found` (bọc `port.ErrUnitNotFound`); không thêm mã `admin_unit_not_effective` vì cùng nghĩa.
+  - `SuccessorsAt(code, from, to)`: chuỗi quan hệ từ phiên bản tại `from`, `effective_on ≤ to`.
+  - `RollForward(code, at, target)`: mã tại `target` kèm `Share` (tích `area_share`; sáp nhập trọn = 1; tách chưa có tỉ lệ = chưa biết), `Estimated` (có bước tách một phần), `Pending` (có bước `pending_c9`). `target < at` → `validation_failed`.
+  - Dòng `official` thay dòng `pending_c9` cùng cặp. Phiên bản đóng chưa có dòng nào trong bảng (ghi thẳng bằng SQL trước 000089) dùng `successor_codes` như quan hệ `pending_c9` tỉ lệ chưa biết.
+- **Chưa làm trong W2.2:** sửa các truy vấn nhóm theo địa bàn — danh sách ở bản đối chiếu, dòng R-DB-09. `k_ref.admin_unit` và sự kiện có trường kế thừa thuộc W2.5.
+- **C-9:** production chỉ nạp danh mục và kế thừa `official` khi có trả lời. Trước đó mọi dòng (seed, UAT, điền từ `successor_codes`) là `pending_c9`, và `RollForward` gắn `Pending`.
+
 ## Liên quan
 
 - Kiến trúc v4.1: §19 (R-DB-09), §25 (`k/orgtree`, `AdminUnitAt`), §33 (dữ liệu tổng hợp có bảng kế thừa), §38.1 (tham chiếu dùng chung), Phụ lục B mục 11, Phụ lục C C-9.

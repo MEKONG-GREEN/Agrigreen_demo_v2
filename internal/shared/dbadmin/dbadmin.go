@@ -223,7 +223,9 @@ func BootstrapClusters(ctx context.Context, adminURL, dbSuffix string, clusters 
 // tạo ở Bootstrap vì ag_migrator không phải superuser. Migration chỉ giả định
 // chúng đã có (CREATE EXTENSION IF NOT EXISTS trong migration là no-op).
 var Extensions = map[migrations.Cluster][]string{
-	migrations.PF:  {"postgis", "pgrouting"}, // pgrouting: pf/waterway (G2)
+	// pgrouting: pf/waterway (G2). btree_gist: EXCLUDE trên pf_masterdata.admin_unit (pf 000089,
+	// ADR-0032) — trusted extension nên migration tự tạo được, liệt kê ở đây cho đủ danh sách cụm.
+	migrations.PF:  {"postgis", "pgrouting", "btree_gist"},
 	migrations.MKG: {"postgis"},
 	// migrations.TS: không cần extension — PostgreSQL 17 phân vùng khai báo thuần,
 	// TimescaleDB TSL không dùng (ADR-0017, RB-4).

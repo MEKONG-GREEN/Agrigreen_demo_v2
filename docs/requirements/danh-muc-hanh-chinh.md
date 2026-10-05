@@ -104,7 +104,10 @@ Lưu ý:
 - **`valid_from = 2004-01-01` là mốc dữ liệu** (QĐ 124/2004/QĐ-TTg), không phải ngày thành lập. Danh mục cũ là ảnh chụp ngày 30/06/2025.
   - Các lần điều chỉnh cấp xã 2004–2025 không được dựng lại, ví dụ đợt 2023–2025 theo NQ 1203/NQ-UBTVQH15 của Vĩnh Long.
   - Tra một ngày trước 30/06/2025 sẽ ra danh mục ngày 30/06/2025.
-- **Không lưu tỷ lệ "nhập một phần".** Mô hình chỉ có danh sách kế thừa. Ghi chú nằm trong tệp CSV.
+- **Không lưu tỷ lệ "nhập một phần".** Danh mục nhúng chỉ có danh sách kế thừa. Ghi chú nằm trong tệp CSV.
+  - Từ W2.2 (pf 000089, [ADR-0032](../adr/0032-don-vi-hanh-chinh-co-hieu-luc-va-ke-thua.md#hiện-thực)) có bảng `pf_masterdata.admin_unit_succession` với cột `area_share`, `legal_basis`, `basis_status`. Mọi quan hệ của danh mục này ghi `basis_status = 'pending_c9'`, `area_share` NULL.
+  - `RollForward` của port `AdminUnitHistory` vì vậy trả `Share` chưa biết và cờ `Estimated` cho đơn vị tách hoặc nhập một phần, và cờ `Pending` cho mọi kết quả.
+  - Tỷ lệ và căn cứ chính thức chỉ nạp khi có nguồn chính thức (C-9 / H-16, gói W3.5).
 - **Không có thôn/ấp.** N1 có trang thôn ấp, nhưng mô hình không có cấp này.
 
 ## 4. Khác biệt giữa các nguồn và cách xử lý

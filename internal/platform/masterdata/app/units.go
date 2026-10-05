@@ -108,6 +108,16 @@ func (s *Service) importUnits(ctx context.Context, tx pgx.Tx, tid, actor uuid.UU
 			if next == nil {
 				return res, ErrUnitRef.WithField(fmt.Sprintf("units[%d].successors", i), u.Code+" → "+sc)
 			}
+			// ADR-0032 mục 4: successor_codes giữ một kỳ phát hành, bảng kế thừa ghi cùng
+			// giao dịch. Tệp nhập chưa mang căn cứ pháp lý chính thức → 'pending_c9' (C-9);
+			// dòng 'official' nạp ở W3.5 khi có nguồn chính thức.
+			if err := store.InsertSuccession(ctx, tx, tid, port.Succession{
+				PredecessorCode: u.Code, PredecessorValidFrom: u.ValidFrom,
+				SuccessorCode: next.Code, SuccessorValidFrom: next.ValidFrom, EffectiveOn: *u.ValidTo,
+				LegalBasis: source, BasisStatus: port.BasisPendingC9,
+			}, actor); err != nil {
+				return res, err
+			}
 		}
 	}
 	for _, c := range changes {

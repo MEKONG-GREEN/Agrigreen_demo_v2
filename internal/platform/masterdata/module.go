@@ -43,6 +43,10 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc
 // AdminUnits cho module khác (qua port), vd party.ScopeResolver dùng Descendants.
 func (m *Module) AdminUnits() port.AdminUnits { return app.UnitsPort{Svc: m.svc} }
 
+// AdminUnitHistory cho module khác: tra theo thời điểm, chuỗi kế thừa và ánh xạ mã
+// qua các lần sắp xếp (R-DB-09, ADR-0032) — cho báo cáo nhóm theo đơn vị tại kỳ.
+func (m *Module) AdminUnitHistory() port.AdminUnitHistory { return app.UnitsPort{Svc: m.svc} }
+
 // Params cho module khác: tham số đã duyệt theo thời điểm của sự việc.
 func (m *Module) Params() port.Params { return app.ParamsPort{Svc: m.svc} }
 
