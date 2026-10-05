@@ -1,4 +1,5 @@
-// Package db mở pool kết nối cho từng vai DB của module (R-05).
+// Package db mở pool kết nối theo vai DB (R-05) và chuyển giao dịch sang vai của module bằng SET LOCAL ROLE
+// (ADR-0028, module.go).
 package db
 
 import (

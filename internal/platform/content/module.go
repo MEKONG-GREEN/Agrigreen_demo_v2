@@ -15,12 +15,16 @@ import (
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
-// DBRole là vai DB riêng của module (R-05).
+// DBRole là vai đăng nhập cũ của module (R-05) — kỳ chuyển ADR-0028: thành viên r_content.
 const DBRole = "content_app"
+
+// DBModule: mọi giao dịch của module chạy SET LOCAL ROLE r_content (ADR-0028, W2.3).
+var DBModule = db.Module("pf/content")
 
 // Deps là port của module khác và hạ tầng mà content cần.
 type Deps struct {
@@ -38,9 +42,10 @@ type Deps struct {
 // Module là pf/content đã nối.
 type Module struct{ svc *app.Service }
 
-// New tạo module với pool của vai content_app.
-func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
-	return &Module{svc: &app.Service{DB: db, Clock: clk, Scope: d.Scope, Catalogs: d.Catalogs, Units: d.AdminUnits, Store: d.Store}}
+// New tạo module trên pool b: vai đăng nhập của đơn vị triển khai (app_platform) hoặc vai cũ content_app.
+// Mọi giao dịch mở qua pool chạy dưới vai r_content (db.ForModule).
+func New(b tenant.Beginner, clk clock.Clock, d Deps) *Module {
+	return &Module{svc: &app.Service{DB: db.ForModule(b, DBModule), Clock: clk, Scope: d.Scope, Catalogs: d.Catalogs, Units: d.AdminUnits, Store: d.Store}}
 }
 
 // RegisterApp gắn route Application API.

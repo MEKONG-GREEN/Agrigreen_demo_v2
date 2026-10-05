@@ -35,13 +35,18 @@ import (
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
-// DBRole là vai DB riêng của module (R-05).
+// DBRole là vai đăng nhập cũ của module (R-05) — kỳ chuyển ADR-0028: thành viên r_notify.
 const DBRole = "notify_app"
+
+// DBModule: mọi giao dịch của module chạy SET LOCAL ROLE r_notify (ADR-0028, W2.3). Consumer: pool đưa cho
+// inbox phải bọc bằng db.ForModule(pool, DBModule) (cmd/worker) để giao dịch inbox cũng chạy dưới r_notify.
+var DBModule = db.Module("pf/notify")
 
 // Deps là port của module khác và kênh gửi. Thiếu Devices → gắn token trả 503;
 // thiếu Staff → dùng thông báo chủ đề; thiếu Units → không mở rộng tỉnh ra xã;
@@ -92,9 +97,10 @@ func ChannelsFromEnv(log *slog.Logger) (Channels, error) {
 // Module là pf/notify đã nối.
 type Module struct{ svc *app.Service }
 
-// New tạo module với pool của vai notify_app.
-func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
-	return &Module{svc: app.NewService(db, clk, app.Deps{
+// New tạo module trên pool b: vai đăng nhập của đơn vị triển khai (app_platform, app_worker) hoặc vai cũ
+// notify_app. Mọi giao dịch module tự mở chạy dưới vai r_notify (db.ForModule).
+func New(b tenant.Beginner, clk clock.Clock, d Deps) *Module {
+	return &Module{svc: app.NewService(db.ForModule(b, DBModule), clk, app.Deps{
 		Scope: d.Scope, Devices: d.Devices, Staff: d.Staff, Units: d.Units, Farmers: d.Farmers, Pusher: d.Pusher, Mailer: d.Mailer,
 		DigestTo: d.DigestTo, Log: d.Log, NudgeCooldown: d.NudgeCooldown, NudgeHourly: d.NudgeHourly,
 		SyncEntities: d.SyncEntities,

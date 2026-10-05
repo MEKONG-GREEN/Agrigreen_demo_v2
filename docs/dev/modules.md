@@ -152,3 +152,37 @@ R-MOD-08 (kiến trúc v4.1 §7.3): module chưa bật cho đơn vị thì route
 **Quyền.** `pf/accounts` từ chối vai **thêm mới** khi mọi module khai vai đó trong `permissions` đều `per_tenant` và đã tắt (`accounts.role_module_not_enabled`, 409). Vai có module lõi cùng khai (vd `coop_manager` của `pf/party`) không bị chặn. Gán vai trò KN (`kn_tw`/`kn_tinh`/`kn_xa`) bị chặn khi `pf/extension` tắt.
 
 **Menu.** `GET /v1/menu` bỏ mục có màn thuộc module tắt (`party/domain.MenuModule`: tiền tố đường dẫn → module), mục cha không còn con và nhóm trở nên rỗng. `web-ops` `nav.ts` gắn `module` cho mục menu cũ và lọc theo `GET /v1/me/modules`; không đọc được thì không lọc (backend vẫn chặn).
+
+## Vai DB theo module (W2.3)
+
+ADR-0028, R-DB-02, R-DB-03. Mỗi module pf có vai nhóm `r_<module>` (NOLOGIN, tên = `modreg.DBRole`, vd `pf/content` → `r_content`). Mỗi đơn vị triển khai có một vai đăng nhập NOINHERIT (`app_platform`, `app_worker`, `app_public`, `app_sync`), là thành viên các `r_*` của module đơn vị ghép (`modreg/assembly_gen.go`, `modgen` sinh). Tự vai đăng nhập không có quyền bảng nào; giao dịch của module chạy `SET LOCAL ROLE r_<module>`, nên SQL của module chỉ có quyền của chính nó. `SET LOCAL` hết khi COMMIT/ROLLBACK, an toàn với PgBouncer transaction mode.
+
+**Kỳ chuyển (tới W2.6):** vai cũ `<module>_app` vẫn chạy, giữ quyền và là thành viên `r_<module>`. Module đã chuyển chạy được trên cả pool cũ lẫn pool `app_*`. Đã chuyển: `pf/content`, `pf/notify`.
+
+**Chuyển một module sang `r_*`:**
+
+1. Gốc module (`module.go`): `var DBModule = db.Module("pf/<module>")`. Tên phải có trong registry, không thì panic lúc khởi tạo.
+2. Trong `New`, bọc pool một lần: `app.Service{DB: db.ForModule(b, DBModule), …}`. Mọi `tenant.WithTenantTx`/`FromCtxTx` của module từ đó chạy dưới `r_<module>`. Mã mới dùng `db.WithContextTx(ctx, pool, DBModule, fn)` (tenant lấy từ ctx), hoặc `db.WithModuleTenantTx` khi đã có tenant (consumer, job).
+3. Consumer của worker: đặt `module: <pkg>.DBModule` trong `consumer` (`cmd/worker`), để giao dịch inbox cũng chạy dưới `r_<module>`. Ở chỗ khác, đưa `db.ForModule(pool, DBModule)` cho `inbox.Process`/`ConsumeWith`.
+4. Grant: migration mới `GRANT … TO r_<module>`, không grant cho `<module>_app`; vai cũ thừa hưởng qua membership. Module chưa từng có vai cũ thì thêm vai vào `ModuleGroups` (W2.6 đổi nguồn danh sách) và grant cho `r_<module>`.
+5. Kiểm thử tích hợp: dựng module trên `env.Pool(t, migrations.PF, dbadmin.AppPlatform)`. Toàn bộ bộ kiểm thử phải xanh: vai đăng nhập NOINHERIT chỉ chạm bảng qua `r_*`. Kiểm trực tiếp DB vẫn dùng pool vai cũ.
+6. Truy vấn ngoài giao dịch, như `pool.Query(…)` thẳng trên pool, sẽ bị `permission denied` khi pool là `app_*`. Chuyển chúng vào `db.WithContextTx`.
+
+**Lint.** `agnosessionset` (archlint) cấm, trong chuỗi SQL của mã `internal/*` và `cmd/*` (trừ `*_test.go`):
+
+- `SET ROLE`, `SET SESSION …`, `SET <biến> = …` và `SET TIME ZONE …` ở đầu câu lệnh;
+- `RESET …`;
+- `set_config(…, false)`;
+- `SET LOCAL ROLE` ngoài `internal/shared/db`.
+
+`migratecheck` cấm tương tự trong migration. Biến cục bộ dùng `SET LOCAL` hoặc `set_config(…, true)`.
+
+**Triển khai:** chạy `migrate bootstrap` (tạo `r_*`, `app_*`, membership) trước `migrate up` (pf 000090 chép quyền và lỗi nếu thiếu vai). Mật khẩu `app_*` lấy từ `AG_DB_PASSWORD_APP_PLATFORM`, … hoặc `AG_DB_APP_PASSWORD`.
+
+**Còn lại (W2.6):**
+
+- 15 module pf: accounts, apiclient, cropcycle, extension, geo, masterdata, mechanization, metering, metrics, mrv, party, reports, simulation, sync, waterway;
+- 7 module mkg, ts, vault;
+- `cmd/*` đổi pool sang `app_*`;
+- compose, chart, PgBouncer `userlist`;
+- bỏ quyền bảng của `<module>_app`.

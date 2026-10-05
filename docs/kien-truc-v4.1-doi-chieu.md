@@ -372,8 +372,8 @@ Cột: **Yêu cầu v4.1** · **Ở đâu trong repo** · **TT** (trạng thái)
 | R-DB-01 Tên schema `<tầng>_<module>`, `_pub` | `pf_<module>`, `mkg_<module>` (Phụ lục D chấp nhận). Không có `_pub` | LN | Giữ tên; thêm `_pub` | S | Thấp |
 | §13 `vault` instance riêng từ ĐTK 1 | K8s `pg-vault` riêng (ADR-0021). Compose ĐTK 1 dùng chung một instance (chỉ local/dev, ADR-0008) | LN | Bảo đảm ĐTK 1 production dùng instance riêng (G-1) | S | Thấp |
 | §14 Ba vai mỗi module (`own_`, `r_`, `r_…_pub`) | Một vai `<module>_app` LOGIN; `ag_migrator` sở hữu mọi schema | LL | W2.2, W9.1 | L | Cao |
-| R-DB-02 Vai đăng nhập NOINHERIT; quyền chỉ sau `SET LOCAL ROLE` | Không | CC | W2.2 | L | Cao |
-| R-DB-03 Vai do registry gán; lint cấm `SET ROLE` | Không áp dụng (chưa có `SET ROLE`) | CC | W2.2 + lint | S | Thấp |
+| R-DB-02 Vai đăng nhập NOINHERIT; quyền chỉ sau `SET LOCAL ROLE` | Một phần (W2.3: khung `r_*`/`app_*`, `db.WithContextTx`; 2 module mẫu; còn lại W2.6) | CC | W2.2 | L | Cao |
+| R-DB-03 Vai do registry gán; lint cấm `SET ROLE` | Có (W2.3: `db.Module` từ registry, archlint `agnosessionset`, `migratecheck`) | CC | W2.2 + lint | S | Thấp |
 | §14 Tối đa 80 kết nối máy chủ cụm `pf` | Theo vai module × đơn vị | LL | W2.2 | — | — |
 | §15.1 DDL sổ: PK có `recorded_at`, phân vùng tháng | ADR-0012, `apply_ledger` | Đ | — | — | — |
 | §15.2 `chain_head` | `shared.chain_head` (một bảng, cột `ledger`), `fn_chain` SECURITY DEFINER | Đ | Ghi lệch (bảng chung thay vì mỗi schema) | — | — |

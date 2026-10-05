@@ -27,6 +27,9 @@ type Role struct {
 	Name      string
 	Login     bool
 	BypassRLS bool
+	// NoInherit: vai không thừa hưởng quyền của vai nó là thành viên (ADR-0028: vai đăng nhập app_<đơn vị>
+	// chỉ có quyền sau SET LOCAL ROLE r_<module>). Membership được cấp WITH INHERIT FALSE, SET TRUE.
+	NoInherit bool
 	MemberOf  []string
 	// Clusters là các database vai được CONNECT.
 	Clusters []migrations.Cluster
@@ -44,9 +47,14 @@ const (
 	TSMonitorOwner  = "ts_monitor_owner"
 )
 
-// Roles là danh mục vai. Mỗi module một vai riêng chỉ có quyền trên schema của
-// nó (R-05) — thêm module mới thì thêm vai ở đây và GRANT trong migration.
-var Roles = []Role{
+// Roles là danh mục vai đầy đủ theo thứ tự tạo (vai nhóm trước thành viên): baseRoles + vai nhóm r_<module>
+// + vai đăng nhập app_<đơn vị> (ADR-0028, modroles.go).
+var Roles = buildRoles()
+
+// baseRoles là danh mục vai g1–g5. Mỗi module một vai đăng nhập <module>_app chỉ có quyền trên schema của
+// nó (R-05) — kỳ chuyển ADR-0028: vai này là thành viên r_<module> (thêm tự động ở buildRoles); module mới
+// GRANT cho r_<module> trong migration (docs/dev/modules.md).
+var baseRoles = []Role{
 	{Name: SharedUser, Login: false},
 	// Chủ các hàm giám sát SECURITY DEFINER (mkg 000013, ts 000003): NOLOGIN, BYPASSRLS để đếm xuyên
 	// tenant, chỉ được SELECT theo CỘT vận hành do migration cấp. Tạo trước ag_migrator vì ag_migrator
@@ -268,6 +276,11 @@ func ensureRole(ctx context.Context, conn *pgx.Conn, r Role) error {
 	} else {
 		attrs = append(attrs, "NOBYPASSRLS")
 	}
+	if r.NoInherit {
+		attrs = append(attrs, "NOINHERIT")
+	} else {
+		attrs = append(attrs, "INHERIT")
+	}
 	attrs = append(attrs, "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE")
 
 	var exists bool
@@ -281,9 +294,15 @@ func ensureRole(ctx context.Context, conn *pgx.Conn, r Role) error {
 	if _, err := conn.Exec(ctx, fmt.Sprintf("%s ROLE %s %s", verb, ident(r.Name), strings.Join(attrs, " "))); err != nil {
 		return fmt.Errorf("dbadmin: %s ROLE %s: %w", verb, r.Name, err)
 	}
+	// PostgreSQL 16+: tùy chọn INHERIT/SET của từng membership; ghi rõ để chạy lặp cập nhật được grant cũ
+	// (NOINHERIT của vai chỉ là mặc định cho grant MỚI).
+	inherit := "TRUE"
+	if r.NoInherit {
+		inherit = "FALSE"
+	}
 	for _, m := range r.MemberOf {
-		if _, err := conn.Exec(ctx, fmt.Sprintf("GRANT %s TO %s", ident(m), ident(r.Name))); err != nil {
-			return err
+		if _, err := conn.Exec(ctx, fmt.Sprintf("GRANT %s TO %s WITH INHERIT %s, SET TRUE", ident(m), ident(r.Name), inherit)); err != nil {
+			return fmt.Errorf("dbadmin: GRANT %s TO %s: %w", m, r.Name, err)
 		}
 	}
 	return nil

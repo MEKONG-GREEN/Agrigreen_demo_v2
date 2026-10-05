@@ -101,7 +101,7 @@ func notifyConsumers(log *slog.Logger) []consumer {
 	for i := range specs {
 		sp := specs[i]
 		out = append(out, consumer{
-			name: sp.Name, cluster: migrations.PF, role: notify.DBRole, events: sp.Events,
+			name: sp.Name, cluster: migrations.PF, role: notify.DBRole, module: notify.DBModule, events: sp.Events,
 			handler: func(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
 				m, err := lazy.get(ctx)
 				if err != nil {

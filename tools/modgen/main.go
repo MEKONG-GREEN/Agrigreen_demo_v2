@@ -21,6 +21,9 @@
 // đúng (module, phiên bản, vai/client realm, cmd/*, apps/*) và mỗi cmd/<đơn vị> chỉ ghép
 // module thuộc hợp `modules` của các ứng dụng liệt kê nó trong deployment_units.
 //
+// Cuối cùng sinh internal/shared/modreg/assembly_gen.go (W2.3, ADR-0028): đơn vị → module ghép trong tiến
+// trình, cho vai đăng nhập app_<đơn vị> của dbadmin là thành viên đúng các r_<module>.
+//
 // Chạy: go run ./tools/modgen [-check] [-root .]
 package main
 
@@ -173,19 +176,33 @@ func run(root string, check bool) ([]string, error) {
 			return stale, err
 		}
 	}
-	if err := checkApps(root, reg); err != nil {
+	wired, err := checkApps(root, reg)
+	if err != nil {
 		return stale, err
+	}
+	// W2.3 (ADR-0028): đơn vị → module ghép, cho vai đăng nhập app_<đơn vị> của dbadmin.
+	asm, err := modreg.FormatAssembly(wired)
+	if err != nil {
+		return stale, err
+	}
+	ap := filepath.Join(root, filepath.FromSlash(modreg.AssemblyFile))
+	if got, err := os.ReadFile(ap); err != nil || !bytes.Equal(normalizeEOL(got), asm) {
+		if check {
+			stale = append(stale, modreg.AssemblyFile)
+		} else if err := os.WriteFile(ap, asm, 0o644); err != nil { //nolint:gosec // tệp nguồn trong repo
+			return stale, err
+		}
 	}
 	return stale, nil
 }
 
 // checkApps là cổng W1.3: app/*/app.yaml hợp lệ, đủ bảy ứng dụng, và mỗi cmd/<đơn vị>
 // chỉ ghép module thuộc hợp các app.yaml liệt kê nó (modreg.Apps.CheckAssembly).
-func checkApps(root string, reg *modreg.Registry) error {
+func checkApps(root string, reg *modreg.Registry) (map[string][]string, error) {
 	fsys := os.DirFS(root)
 	apps, env, err := modreg.LoadApps(fsys, reg)
 	if err != nil {
-		return fmt.Errorf("app.yaml không hợp lệ:\n%w", err)
+		return nil, fmt.Errorf("app.yaml không hợp lệ:\n%w", err)
 	}
 	var errs []error
 	for _, n := range modreg.AppNames {
@@ -199,13 +216,13 @@ func checkApps(root string, reg *modreg.Registry) error {
 	}
 	wired, err := wiredModules(root, units)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	errs = append(errs, apps.CheckAssembly(reg, wired)...)
 	if err := errors.Join(errs...); err != nil {
-		return fmt.Errorf("app.yaml không khớp cmd/*:\n%w", err)
+		return nil, fmt.Errorf("app.yaml không khớp cmd/*:\n%w", err)
 	}
-	return nil
+	return wired, nil
 }
 
 // wiredModules trả đơn vị → module được ghép TRONG TIẾN TRÌNH: mã không phải kiểm thử của

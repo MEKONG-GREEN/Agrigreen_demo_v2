@@ -27,6 +27,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -72,7 +73,9 @@ func newFixture(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mod := content.New(pool, clock.System{}, content.Deps{Scope: sc, Catalogs: newFakeCatalogs(), AdminUnits: newFakeUnits(), Store: st})
+	// ADR-0028 (W2.3): module chạy trên vai đăng nhập app_platform (NOINHERIT, không quyền bảng) — mọi giao dịch
+	// phải SET LOCAL ROLE r_content mới chạm được pf_content. pool (content_app) chỉ dùng để kiểm trực tiếp.
+	mod := content.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, content.Deps{Scope: sc, Catalogs: newFakeCatalogs(), AdminUnits: newFakeUnits(), Store: st})
 	log := telemetry.NewLogger("test", io.Discard)
 
 	// Giới hạn thân chung 1 MB như api-platform; đường tải tệp có giới hạn riêng (httpx.AllowBody).

@@ -129,6 +129,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
@@ -136,6 +137,8 @@ type consumer struct {
 	name    string
 	cluster migrations.Cluster
 	role    string
+	// module (tùy chọn, ADR-0028): giao dịch inbox của consumer chạy SET LOCAL ROLE r_<module> (db.ForModule).
+	module  db.ModuleID
 	events  []string
 	handler inbox.Handler
 }
@@ -314,7 +317,11 @@ func startConsumers(ctx context.Context, log *slog.Logger, base, mods string, er
 			return 0, func() {}, err
 		}
 		started++
-		go func(c consumer) { errc <- inbox.ConsumeWith(ctx, ch, pool, c.name, c.handler, log, rec) }(c)
+		var b tenant.Beginner = pool
+		if c.module.Valid() {
+			b = db.ForModule(pool, c.module)
+		}
+		go func(c consumer) { errc <- inbox.ConsumeWith(ctx, ch, b, c.name, c.handler, log, rec) }(c)
 	}
 	return started, closeFn, nil
 }

@@ -140,6 +140,11 @@ var forbidden = []struct {
 	{regexp.MustCompile(`(?is)\bDISABLE\s+ROW\s+LEVEL\s+SECURITY\b`), "RB-2: không được tắt RLS"},
 	{regexp.MustCompile(`(?is)^\s*DROP\s+POLICY\b.*\bp_tenant\b`), "RB-2: không được xóa policy p_tenant"},
 	{regexp.MustCompile(`(?is)\bsession_replication_role\b`), "RB-1: không được đổi session_replication_role"},
+	// ADR-0028 §3 (R-DB-02): migration chạy bằng ag_migrator, không đổi vai, không để lại trạng thái mức phiên.
+	// Mệnh đề SET … của CREATE FUNCTION nằm giữa câu lệnh nên không khớp.
+	{regexp.MustCompile(`(?is)^\s*SET\s+(LOCAL\s+)?ROLE\b`), "ADR-0028: migration không được SET ROLE"},
+	{regexp.MustCompile(`(?is)^\s*(RESET\b|SET\s+(SESSION\b|TIME\s+ZONE\b|[a-z_."]+\s*(=|\bTO\b)))`), "ADR-0028: migration không được đặt biến mức phiên (SET/RESET)"},
+	{regexp.MustCompile(`(?is)\bset_config\s*\([^)]*,\s*false\s*\)`), "ADR-0028: migration không được set_config(…, false) mức phiên"},
 }
 
 // CheckSQL trả danh sách vi phạm trong một tệp migration.

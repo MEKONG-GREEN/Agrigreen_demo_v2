@@ -25,6 +25,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
@@ -45,7 +46,8 @@ type fixture struct {
 	app     *httptest.Server
 	admin   *httptest.Server
 	mod     *notify.Module
-	pool    *pgxpool.Pool
+	pool    *pgxpool.Pool   // notify_app (vai cũ): chỉ kiểm trực tiếp
+	appDB   tenant.Beginner // app_platform bọc db.ForModule(…, notify.DBModule): giao dịch inbox như cmd/worker
 	clk     *clock.Fixed
 	scope   *fakeScope
 	devices *fakeDevices
@@ -61,7 +63,10 @@ func newFixture(t *testing.T) *fixture {
 		scope: &fakeScope{scopes: map[uuid.UUID]authz.Scope{}}, devices: &fakeDevices{m: map[[2]uuid.UUID]syncport.DeviceInfo{}},
 		staff: &fakeStaff{staff: map[uuid.UUID][]extport.StaffRef{}}, pusher: &fakePusher{invalid: map[string]bool{}, flaky: map[string]int{}},
 		tenant: ids.New()}
-	f.mod = notify.New(f.pool, f.clk, notify.Deps{Scope: f.scope, Devices: f.devices, Staff: f.staff, Units: fakeUnits{}, Pusher: f.pusher})
+	// ADR-0028 (W2.3): module chạy trên vai đăng nhập app_platform (NOINHERIT) — chỉ chạm pf_notify sau SET LOCAL ROLE r_notify.
+	appPool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
+	f.appDB = db.ForModule(appPool, notify.DBModule)
+	f.mod = notify.New(appPool, f.clk, notify.Deps{Scope: f.scope, Devices: f.devices, Staff: f.staff, Units: fakeUnits{}, Pusher: f.pusher})
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	log := telemetry.NewLogger("test", io.Discard)
 	appEng := httpx.NewEngine(log, 1<<20)
@@ -180,7 +185,7 @@ func (f *fixture) event(tid uuid.UUID, typ string, payload any) outbox.Envelope 
 
 func (f *fixture) process(consumer string, env outbox.Envelope) bool {
 	f.t.Helper()
-	ok, err := inbox.Process(context.Background(), f.pool, consumer, env, f.mod.EventHandler())
+	ok, err := inbox.Process(context.Background(), f.appDB, consumer, env, f.mod.EventHandler())
 	if err != nil {
 		f.t.Fatalf("xử lý %s: %v", env.EventType, err)
 	}
@@ -205,7 +210,7 @@ func (f *fixture) flushPush(tid uuid.UUID) error {
 	var last error
 	for _, b := range batches {
 		env := f.event(tid, port.EventPushRequested, port.PushRequestedV1{BatchID: b, Kind: "x", Deliveries: 1})
-		if _, err := inbox.Process(context.Background(), f.pool, port.ConsumerPush, env, f.mod.PushHandler()); err != nil {
+		if _, err := inbox.Process(context.Background(), f.appDB, port.ConsumerPush, env, f.mod.PushHandler()); err != nil {
 			last = err
 		}
 	}

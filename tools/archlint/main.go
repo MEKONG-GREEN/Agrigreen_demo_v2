@@ -20,5 +20,5 @@ package main
 import "golang.org/x/tools/go/analysis/multichecker"
 
 func main() {
-	multichecker.Main(Boundary, NoFloat, NoTimeNow, PIILog, NoHardDelete, ModGraph)
+	multichecker.Main(Boundary, NoFloat, NoTimeNow, PIILog, NoHardDelete, ModGraph, NoSessionSet)
 }

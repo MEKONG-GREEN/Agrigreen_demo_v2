@@ -11,4 +11,8 @@
 # Khối đổi nội dung → hash đổi → mục thành "thừa" và docsql hỏng: xem lại mục đó.
 #
 # Lần chạy đầu (W0.4, 04/10/2026): 9/9 khối của v4.1 chạy được — không cần bỏ qua.
-skips: []
+# W2.3 (05/10/2026): khối #1 §14 tạo vai app_platform — từ W2.3 dbadmin.Bootstrap tạo vai này (vai là đối tượng
+# mức cụm PostgreSQL, docsql chạy trên cùng cụm với kiểm thử) nên CREATE ROLE trùng. Hiện thực được kiểm ở
+# internal/shared/db (T4/T5) và internal/shared/dbadmin.
+skips:
+  - {doc: AgriGreen-Thiet-ke-kien-truc-he-thong-v4_1.md, block: 1, hash: bb79616ac032, reason: "minh họa: CREATE ROLE app_platform — vai do dbadmin.Bootstrap tạo từ W2.3 (ADR-0028), trùng trên cụm dùng chung; hiện thực kiểm ở internal/shared/db và dbadmin"}

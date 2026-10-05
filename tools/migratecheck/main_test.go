@@ -37,6 +37,13 @@ func TestRejectsDataChangesAndProtectionBypass(t *testing.T) {
 		"ALTER TABLE pf_party.consent DISABLE ROW LEVEL SECURITY":    "tắt RLS",
 		"DROP POLICY p_tenant ON pf_party.consent":                   "p_tenant",
 		"SET session_replication_role = replica":                     "session_replication_role",
+		// ADR-0028 §3: không đổi vai, không trạng thái mức phiên.
+		"SET ROLE content_app":                           "SET ROLE",
+		"SET LOCAL ROLE r_content":                       "SET ROLE",
+		"RESET ROLE":                                     "mức phiên",
+		"SET search_path = pf_content":                   "mức phiên",
+		"SET SESSION AUTHORIZATION content_app":          "mức phiên",
+		"SELECT set_config('app.tenant_id', 'x', false)": "set_config",
 	}
 	for sql, want := range cases {
 		p := CheckSQL(sql + ";")

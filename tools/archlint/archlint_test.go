@@ -53,3 +53,11 @@ func TestPIILog(t *testing.T) {
 func TestNoHardDelete_ADR0011(t *testing.T) {
 	analysistest.Run(t, analysistest.TestData(), NoHardDelete, "example.com/ag/internal/platform/beta/store")
 }
+
+// ADR-0028, R-DB-02/03: không trạng thái mức phiên trong chuỗi SQL; SET LOCAL ROLE chỉ trong shared/db.
+func TestNoSessionSet_ADR0028(t *testing.T) {
+	analysistest.Run(t, analysistest.TestData(), NoSessionSet,
+		"example.com/ag/internal/platform/beta/sqlsess",
+		"example.com/ag/internal/shared/db",
+	)
+}
