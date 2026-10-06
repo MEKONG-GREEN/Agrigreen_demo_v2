@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 
 	"github.com/google/uuid"
@@ -17,21 +18,25 @@ var (
 	thousand = decimal.NewFromInt(1000)
 )
 
-// amountOf dựng money.Amount từ decimal đã làm tròn 2 số.
-func amountOf(d decimal.Decimal) money.Amount {
+// ErrOutOfRange: số tiền / khối lượng tính ra vượt độ rộng cột lưu (numeric(18,2) cho tiền, cột kg cho
+// khối lượng) — vd đơn giá thỏa thuận quá lớn × số cuộn. Đầu vào từ request ánh xạ 422 (app.mapErr).
+var ErrOutOfRange = errors.New("costing: số tiền / khối lượng tính ra vượt giới hạn lưu trữ")
+
+// amountOf dựng money.Amount từ decimal đã làm tròn 2 số; vượt numeric(18,2) → ErrOutOfRange.
+func amountOf(d decimal.Decimal) (money.Amount, error) {
 	a, err := money.ParseAmount(d.Round(money.AmountScale).StringFixed(money.AmountScale))
 	if err != nil {
-		panic(err) // chỉ khi vượt numeric(18,2) — không xảy ra với số tiền hợp lệ đầu vào
+		return money.Amount{}, fmt.Errorf("%w: %w", ErrOutOfRange, err)
 	}
-	return a
+	return a, nil
 }
 
-func kgOf(d decimal.Decimal) mass.Kg {
+func kgOf(d decimal.Decimal) (mass.Kg, error) {
 	k, err := mass.ParseKg(d.Round(mass.Scale).StringFixed(mass.Scale))
 	if err != nil {
-		panic(err)
+		return mass.Kg{}, fmt.Errorf("%w: %w", ErrOutOfRange, err)
 	}
-	return k
+	return k, nil
 }
 
 // Weight là trọng số của một lô trong phép phân bổ.
@@ -101,8 +106,8 @@ func SplitAmount(total money.Amount, ws []Weight, basis string) ([]AllocLine, st
 	return out, used, nil
 }
 
-// HubProcessingCost = kg / 1000 × đơn giá (đ/t, #55), làm tròn nửa lên 2 số.
-func HubProcessingCost(kg mass.Kg, ratePerTonne decimal.Decimal) money.Amount {
+// HubProcessingCost = kg / 1000 × đơn giá (đ/t, #55), làm tròn nửa lên 2 số. Vượt numeric(18,2) → ErrOutOfRange.
+func HubProcessingCost(kg mass.Kg, ratePerTonne decimal.Decimal) (money.Amount, error) {
 	return amountOf(kg.Decimal().Mul(ratePerTonne).DivRound(thousand, money.AmountScale))
 }
 
@@ -168,7 +173,8 @@ func AttributeLoss(abnormal, expected, norm mass.Kg, sources []Source) ([]LossLi
 }
 
 // ExpectedLossKg = kg × (định mức #19 + #56) / 100 — chỉ báo tham chiếu định mức của costing.
-func ExpectedLossKg(kg mass.Kg, pcts ...decimal.Decimal) mass.Kg {
+// Vượt độ rộng cột kg → ErrOutOfRange.
+func ExpectedLossKg(kg mass.Kg, pcts ...decimal.Decimal) (mass.Kg, error) {
 	p := decimal.Zero
 	for _, x := range pcts {
 		p = p.Add(x)
@@ -217,33 +223,40 @@ type SettlementFigures struct {
 }
 
 // ComputeSettlement tính quyết toán (proto PM-02/03): theo cuộn → số cuộn × giá ngay; theo tấn →
-// chờ cân đủ mọi ghe; không có giá → không có số tiền (không đoán giá).
-func ComputeSettlement(in SettlementInput) SettlementFigures {
+// chờ cân đủ mọi ghe; không có giá → không có số tiền (không đoán giá). Số tiền vượt numeric(18,2)
+// (đơn giá thỏa thuận quá lớn) → ErrOutOfRange.
+func ComputeSettlement(in SettlementInput) (SettlementFigures, error) {
 	out := SettlementFigures{Status: port.SettlementPendingConfirmation}
 	if in.PriceBasis == "" || in.UnitPrice == nil {
 		// PM-03: không có hợp đồng → không có số tiền; người lập nhập giá thỏa thuận, không đoán.
 		out.Blocked = "no_contract"
-		return out
+		return out, nil
 	}
 	var gross decimal.Decimal
 	switch in.PriceBasis {
 	case "per_bale":
 		if in.Rolls == nil || *in.Rolls <= 0 {
 			out.Blocked = "no_rolls"
-			return out
+			return out, nil
 		}
 		gross = decimal.NewFromInt(int64(*in.Rolls)).Mul(in.UnitPrice.Decimal())
 	default: // per_tonne
 		if in.WeighedKg == nil || in.PendingLoads {
 			out.Status, out.Blocked = port.SettlementAwaitingWeighing, "awaiting_weighing"
-			return out
+			return out, nil
 		}
 		gross = in.WeighedKg.Decimal().Mul(in.UnitPrice.Decimal()).DivRound(thousand, money.AmountScale)
 	}
-	g := amountOf(gross)
-	a := g.Sub(in.Deductions)
+	g, err := amountOf(gross)
+	if err != nil {
+		return SettlementFigures{}, err
+	}
+	a, err := amountOf(g.Decimal().Sub(in.Deductions.Decimal()))
+	if err != nil {
+		return SettlementFigures{}, err
+	}
 	out.Gross, out.Amount = &g, &a
-	return out
+	return out, nil
 }
 
 // CarbonSplit là phần chia doanh thu carbon.
@@ -268,8 +281,18 @@ func SplitCarbon(revenue money.Amount, retained, farmers, authority, verifier de
 	f := pool.Mul(farmers).DivRound(hundred, money.AmountScale)
 	a := pool.Mul(authority).DivRound(hundred, money.AmountScale)
 	v := pool.Sub(f).Sub(a)
-	return CarbonSplit{Retained: amountOf(r), Farmers: amountOf(f), Authority: amountOf(a), Verifier: amountOf(v),
-		RetainedPct: retained, FarmersPct: farmers, AuthorityPct: authority, VerifierPct: verifier}, nil
+	out := CarbonSplit{RetainedPct: retained, FarmersPct: farmers, AuthorityPct: authority, VerifierPct: verifier}
+	for _, x := range []struct {
+		dst *money.Amount
+		v   decimal.Decimal
+	}{{&out.Retained, r}, {&out.Farmers, f}, {&out.Authority, a}, {&out.Verifier, v}} {
+		amt, err := amountOf(x.v)
+		if err != nil {
+			return CarbonSplit{}, err
+		}
+		*x.dst = amt
+	}
+	return out, nil
 }
 
 // CostCategories là các nhóm CHI PHÍ của giá thành lô (proto buildCostChain): không gồm doanh
@@ -292,10 +315,14 @@ func ValidCategory(c port.CostCategory) bool {
 }
 
 // CostPerTonne = tổng chi phí / tấn giao (proto buildCostChain). Tấn giao = 0 → nil ("không xác định").
-func CostPerTonne(total money.Amount, deliveredKg mass.Kg) *money.Amount {
+// Tấn giao quá nhỏ so với chi phí (đ/t vượt numeric(18,2)) → ErrOutOfRange.
+func CostPerTonne(total money.Amount, deliveredKg mass.Kg) (*money.Amount, error) {
 	if deliveredKg.Decimal().Sign() <= 0 {
-		return nil
+		return nil, nil
 	}
-	a := amountOf(total.Decimal().Mul(thousand).DivRound(deliveredKg.Decimal(), money.AmountScale))
-	return &a
+	a, err := amountOf(total.Decimal().Mul(thousand).DivRound(deliveredKg.Decimal(), money.AmountScale))
+	if err != nil {
+		return nil, err
+	}
+	return &a, nil
 }

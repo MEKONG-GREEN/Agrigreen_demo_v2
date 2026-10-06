@@ -117,7 +117,10 @@ func run(ctx context.Context, cmd string, args []string) (int, error) {
 		if err != nil {
 			return 1, err
 		}
-		b, _ := json.MarshalIndent(m, "", "  ")
+		b, err := json.MarshalIndent(m, "", "  ")
+		if err != nil {
+			return 1, fmt.Errorf("mã hóa manifest: %w", err)
+		}
 		if err := os.WriteFile(*out, b, 0o600); err != nil { //nolint:gosec // đường dẫn do người vận hành truyền vào
 			return 1, err
 		}
@@ -182,7 +185,10 @@ func check(ctx context.Context, cfg Config, manifestPath, objectsRef, reportPath
 	if err != nil {
 		return 1, err
 	}
-	out, _ := json.MarshalIndent(rep, "", "  ")
+	out, err := json.MarshalIndent(rep, "", "  ")
+	if err != nil {
+		return 1, fmt.Errorf("mã hóa báo cáo: %w", err)
+	}
 	_, _ = fmt.Fprintln(os.Stdout, string(out))
 	if reportPath != "" {
 		if err := os.WriteFile(reportPath, out, 0o600); err != nil { //nolint:gosec // đường dẫn do người vận hành truyền vào

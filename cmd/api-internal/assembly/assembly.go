@@ -9,6 +9,7 @@ package assembly
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -149,34 +150,88 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules,
 // Jobs trả job định kỳ của vùng mkg được chọn (danh sách phân tách bằng dấu phẩy hoặc "all"):
 // hub_capacity_daily — công bố sức chứa theo ngày qua van hub_capacity (GIS US-WH-01 AC-2).
 // tenantPool là pool vai ag_outbox_publisher của cụm mkg (tìm tenant xuyên RLS, chỉ đọc cột).
-func Jobs(mods Modules, tenantPool *pgxpool.Pool, selected string, log *slog.Logger) []schedule.Job {
+// Biến môi trường của job ĐÃ ĐẶT nhưng sai cú pháp (UUID, Go duration) → lỗi khởi động thay vì lặng lẽ tắt
+// job hoặc rơi về mặc định; chưa đặt → giữ mặc định (job fieldops không chạy khi thiếu AG_MKG_TENANT_ID).
+func Jobs(mods Modules, tenantPool *pgxpool.Pool, selected string, log *slog.Logger) ([]schedule.Job, error) {
 	var out []schedule.Job
-	if selected == "all" || strings.Contains(","+selected+",", ","+hubport.JobDailyCapacity+",") {
+	picked := func(name string) bool {
+		return selected == "all" || strings.Contains(","+selected+",", ","+name+",")
+	}
+	if picked(hubport.JobDailyCapacity) {
 		out = append(out, mods.Hub.Jobs(hub.ActiveHubTenants(tenantPool), log)...)
 	}
-	if selected == "all" || strings.Contains(","+selected+",", ","+foport.JobHTXResponses+",") {
+	if picked(foport.JobHTXResponses) {
 		// Nền tảng → MKG chỉ qua Application API công khai: kéo phản hồi của HTX cho tenant MKG
 		// AG_MKG_TENANT_ID (tenant của tài khoản dịch vụ agrigreen-mkg-sync). Thiếu → không có job.
-		tid, _ := uuid.Parse(os.Getenv("AG_MKG_TENANT_ID"))
-		interval, _ := time.ParseDuration(os.Getenv("AG_FIELDOPS_HTX_POLL_INTERVAL"))
+		tid, err := EnvUUID("AG_MKG_TENANT_ID")
+		if err != nil {
+			return nil, err
+		}
+		interval, err := EnvDuration("AG_FIELDOPS_HTX_POLL_INTERVAL")
+		if err != nil {
+			return nil, err
+		}
 		out = append(out, mods.Fieldops.Jobs(tid, interval, log)...)
 	}
-	if selected == "all" || strings.Contains(","+selected+",", ","+foport.JobHarvestDates+",") {
+	if picked(foport.JobHarvestDates) {
 		// FM-01/02: bảng đệm ngày gặt của lệnh gom đang mở, đọc bề mặt partner của nền tảng.
-		tid, _ := uuid.Parse(os.Getenv("AG_MKG_TENANT_ID"))
-		interval, _ := time.ParseDuration(os.Getenv("AG_FIELDOPS_HARVEST_POLL_INTERVAL"))
+		tid, err := EnvUUID("AG_MKG_TENANT_ID")
+		if err != nil {
+			return nil, err
+		}
+		interval, err := EnvDuration("AG_FIELDOPS_HARVEST_POLL_INTERVAL")
+		if err != nil {
+			return nil, err
+		}
 		out = append(out, mods.Fieldops.HarvestJobs(tid, interval, log)...)
 	}
-	if selected == "all" || strings.Contains(","+selected+",", ","+logistics.JobAlerts+",") {
+	if picked(logistics.JobAlerts) {
 		// L-08: cảnh báo ghe chưa cân > N giờ, đăng kiểm hết / sắp hết hạn (AG_LOGISTICS_ALERT_INTERVAL, mặc định 15m).
-		interval, _ := time.ParseDuration(os.Getenv("AG_LOGISTICS_ALERT_INTERVAL"))
+		interval, err := EnvDuration("AG_LOGISTICS_ALERT_INTERVAL")
+		if err != nil {
+			return nil, err
+		}
 		out = append(out, mods.Logistics.Jobs(logistics.ActiveTenants(tenantPool), interval, log)...)
 	}
-	if selected == "all" || strings.Contains(","+selected+",", ","+acctbridge.JobPushRetry+",") {
+	if picked(acctbridge.JobPushRetry) {
 		// R-62: đẩy lại bút toán tổng hợp có hạn thử lại (giãn cách mũ) — tenant tìm qua vai ag_outbox_publisher.
 		out = append(out, mods.Acctbridge.Jobs(acctbridge.PendingRetryTenants(tenantPool), log)...)
 	}
-	return out
+	return out, nil
+}
+
+// EnvUUID đọc biến môi trường name dạng UUID: chưa đặt (hoặc chỉ khoảng trắng) → uuid.Nil, nil;
+// đặt nhưng sai cú pháp hoặc là UUID rỗng → lỗi nêu tên biến (gõ nhầm không được lặng lẽ tắt job).
+func EnvUUID(name string) (uuid.UUID, error) {
+	v := strings.TrimSpace(os.Getenv(name))
+	if v == "" {
+		return uuid.Nil, nil
+	}
+	id, err := uuid.Parse(v)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("%s không phải UUID hợp lệ: %w", name, err)
+	}
+	if id == uuid.Nil {
+		return uuid.Nil, fmt.Errorf("%s không được là UUID rỗng", name)
+	}
+	return id, nil
+}
+
+// EnvDuration đọc biến môi trường name dạng Go duration: chưa đặt → 0, nil (module dùng mặc định);
+// đặt nhưng sai cú pháp hoặc ≤ 0 → lỗi nêu tên biến (gõ nhầm không được lặng lẽ rơi về mặc định).
+func EnvDuration(name string) (time.Duration, error) {
+	v := strings.TrimSpace(os.Getenv(name))
+	if v == "" {
+		return 0, nil
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return 0, fmt.Errorf("%s không phải Go duration hợp lệ (vd 5m, 1h): %w", name, err)
+	}
+	if d <= 0 {
+		return 0, fmt.Errorf("%s phải > 0, nhận %q", name, v)
+	}
+	return d, nil
 }
 
 // JobNames liệt kê tên job hợp lệ của api-internal.

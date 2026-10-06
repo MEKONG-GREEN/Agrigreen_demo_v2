@@ -21,6 +21,10 @@ import (
 // MaxImportRows: số dòng tối đa xử lý đồng bộ trong một request.
 const MaxImportRows = 200
 
+// MaxImportBytes giới hạn tệp nhập tài khoản (CSV/XLSX) — handler giới hạn thân request bằng cùng hằng;
+// readTable tự giới hạn lần nữa để người gọi khác (job, kiểm thử) không đọc nguồn không giới hạn vào bộ nhớ.
+const MaxImportBytes = 4 << 20
+
 // Định dạng tệp nhập.
 const (
 	FormatCSV  = "csv"
@@ -64,9 +68,19 @@ var errBadTemplate = ErrImportInvalid.WithDetail("Tệp không đúng mẫu quy 
 
 // readTable đọc bảng (dòng đầu là tiêu đề) từ CSV UTF-8 hoặc XLSX (trang tính đầu tiên).
 func readTable(format string, src io.Reader) ([][]string, error) {
+	if format != FormatCSV && format != FormatXLSX {
+		return nil, ErrImportInvalid.WithDetail("chỉ hỗ trợ CSV (text/csv) hoặc Excel .xlsx")
+	}
+	raw, err := io.ReadAll(io.LimitReader(src, MaxImportBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) > MaxImportBytes {
+		return nil, ErrImportInvalid.WithDetail("Tệp vượt " + strconv.Itoa(MaxImportBytes>>20) + " MB")
+	}
 	switch format {
 	case FormatCSV:
-		rd := csv.NewReader(src)
+		rd := csv.NewReader(bytes.NewReader(raw))
 		rd.FieldsPerRecord = -1
 		rd.TrimLeadingSpace = true
 		rows, err := rd.ReadAll()
@@ -75,10 +89,6 @@ func readTable(format string, src io.Reader) ([][]string, error) {
 		}
 		return rows, nil
 	case FormatXLSX:
-		raw, err := io.ReadAll(src)
-		if err != nil {
-			return nil, err
-		}
 		// Giới hạn giải nén chống zip bomb.
 		f, err := excelize.OpenReader(bytes.NewReader(raw), excelize.Options{UnzipSizeLimit: 32 << 20, UnzipXMLSizeLimit: 16 << 20})
 		if err != nil {

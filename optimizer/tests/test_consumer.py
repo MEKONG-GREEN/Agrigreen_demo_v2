@@ -208,12 +208,23 @@ def test_snapshot_404_is_permanent_500_is_transient(api: InternalAPI) -> None:
     assert ch.nacked == [(t404, False), (t500, True)]
 
 
-def test_unexpected_exception_requeues() -> None:
+class _Props:
+    def __init__(self, headers: dict[str, Any]) -> None:
+        self.headers = headers
+
+
+def test_unexpected_exception_requeues_with_backoff() -> None:
     def boom(*_a: Any) -> dict[str, Any]:
         raise RuntimeError("lỗi lập trình")
 
-    c = Consumer(InternalAPI("http://x"), handler=boom)
+    sleeps: list[float] = []
+    c = Consumer(InternalAPI("http://x"), handler=boom, retry_base_s=2.0, sleep=sleeps.append)
     assert c.decide(envelope()) == REQUEUE
+    # Lỗi bất ngờ cũng lùi như WorkerError tạm thời (không dồn 5 lần giao trong vài mili giây rồi vào DLQ).
+    assert c.decide(envelope(), _Props({"x-delivery-count": 2})) == REQUEUE
+    assert c.decide(envelope(), _Props({"x-delivery-count": 10})) == REQUEUE
+    assert c.decide(envelope(), _Props({"x-delivery-count": "hỏng"})) == REQUEUE
+    assert sleeps == [2.0, 8.0, 60.0, 2.0]
 
 
 def test_threaded_callback_settles_on_connection_thread(api: InternalAPI) -> None:

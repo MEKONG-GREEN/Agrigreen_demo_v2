@@ -3,6 +3,7 @@ package inbox
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -117,15 +118,46 @@ func DeliveryCount(h amqp.Table) int64 {
 // là lần cuối — thất bại thêm lần nữa thì RabbitMQ chuyển sang DLQ.
 func FinalAttempt(deliveryCount int64) bool { return deliveryCount >= DeliveryLimit }
 
+// DefaultHandlerTimeout: hạn xử lý MỘT thông điệp (giao dịch inbox + handler). Handler treo (đích ngoài
+// không trả lời, khóa DB chờ mãi) không được chặn consumer vô hạn: hết hạn → ctx của handler hủy, giao
+// dịch rollback, thông điệp NACK requeue với độ lùi như mọi lỗi khác (quorum queue đếm lần giao → DLQ).
+const DefaultHandlerTimeout = 2 * time.Minute
+
+// ConsumeOption chỉnh cấu hình của Consume / ConsumeWith.
+type ConsumeOption func(*consumeConfig)
+
+type consumeConfig struct {
+	handlerTimeout time.Duration
+}
+
+// WithHandlerTimeout đặt hạn xử lý mỗi thông điệp cho consumer (mặc định DefaultHandlerTimeout);
+// d ≤ 0 → không đặt hạn (chỉ dùng khi handler tự giới hạn thời gian của mình).
+func WithHandlerTimeout(d time.Duration) ConsumeOption {
+	return func(c *consumeConfig) { c.handlerTimeout = d }
+}
+
+// handlerContext gắn hạn xử lý một thông điệp vào ctx (d ≤ 0 → không hạn).
+func handlerContext(ctx context.Context, d time.Duration) (context.Context, context.CancelFunc) {
+	if d <= 0 {
+		return context.WithCancel(ctx)
+	}
+	return context.WithTimeout(ctx, d)
+}
+
 // Consume nhận thông điệp tới khi ctx hủy. ACK chỉ sau commit; lỗi → NACK
 // requeue, quorum queue tự đếm lần giao và đẩy sang DLQ khi vượt giới hạn.
-func Consume(ctx context.Context, ch *amqp.Channel, db tenant.Beginner, consumer string, h Handler, log *slog.Logger) error {
-	return ConsumeWith(ctx, ch, db, consumer, h, log, nil)
+func Consume(ctx context.Context, ch *amqp.Channel, db tenant.Beginner, consumer string, h Handler, log *slog.Logger, opts ...ConsumeOption) error {
+	return ConsumeWith(ctx, ch, db, consumer, h, log, nil, opts...)
 }
 
 // ConsumeWith như Consume, thêm rec (có thể nil) ghi nhận từng lần thất bại cho màn giám sát
 // đồng bộ và cảnh báo Admin khi sự kiện vào DLQ (GIS US-SYNC-01/02).
-func ConsumeWith(ctx context.Context, ch *amqp.Channel, db tenant.Beginner, consumer string, h Handler, log *slog.Logger, rec FailureRecorder) error {
+func ConsumeWith(ctx context.Context, ch *amqp.Channel, db tenant.Beginner, consumer string, h Handler, log *slog.Logger, rec FailureRecorder,
+	opts ...ConsumeOption) error {
+	cfg := consumeConfig{handlerTimeout: DefaultHandlerTimeout}
+	for _, o := range opts {
+		o(&cfg)
+	}
 	if err := ch.Qos(16, 0, false); err != nil {
 		return err
 	}
@@ -148,7 +180,10 @@ func ConsumeWith(ctx context.Context, ch *amqp.Channel, db tenant.Beginner, cons
 				continue
 			}
 			mctx, span := StartConsume(ctx, consumer, d.Headers, env)
-			processed, err := Process(mctx, db, consumer, env, h)
+			hctx, cancel := handlerContext(mctx, cfg.handlerTimeout)
+			processed, err := Process(hctx, db, consumer, env, h)
+			timedOut := err != nil && errors.Is(hctx.Err(), context.DeadlineExceeded) && ctx.Err() == nil
+			cancel()
 			if err != nil {
 				span.SetStatus(codes.Error, "handler failed")
 			}
@@ -166,7 +201,8 @@ func ConsumeWith(ctx context.Context, ch *amqp.Channel, db tenant.Beginner, cons
 					outcome = "dead_letter"
 				}
 				log.Warn("xử lý sự kiện thất bại", "consumer", consumer, "event", env.EventType,
-					"event_id", env.EventID, "trace_id", env.TraceID, "tenant_id", env.TenantID, "delivery_count", n, "outcome", outcome)
+					"event_id", env.EventID, "trace_id", env.TraceID, "tenant_id", env.TenantID, "delivery_count", n, "outcome", outcome,
+					"timed_out", timedOut)
 				if rec != nil {
 					if rerr := rec(mctx, Failure{Consumer: consumer, Envelope: env, Err: err, DeliveryCount: n, DeadLettered: FinalAttempt(n)}); rerr != nil {
 						log.Error("không ghi được lần thất bại", "consumer", consumer, "event_id", env.EventID, "outcome", "error")

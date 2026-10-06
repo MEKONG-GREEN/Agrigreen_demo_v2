@@ -105,21 +105,73 @@ func TestComputeSettlement_PM02_PM03(t *testing.T) {
 	price, _ := money.ParsePrice("150000")
 	rolls := 4400
 	kg := mass.MustKg("96800")
-	bale := ComputeSettlement(SettlementInput{PriceBasis: "per_bale", UnitPrice: &price, Rolls: &rolls, Deductions: money.MustAmount("0")})
+	bale, err := ComputeSettlement(SettlementInput{PriceBasis: "per_bale", UnitPrice: &price, Rolls: &rolls, Deductions: money.MustAmount("0")})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if bale.Status != port.SettlementPendingConfirmation || bale.Amount.String() != "660000000.00" {
 		t.Errorf("theo cuộn: %+v", bale)
 	}
-	wait := ComputeSettlement(SettlementInput{PriceBasis: "per_tonne", UnitPrice: &price, Rolls: &rolls, WeighedKg: &kg, PendingLoads: true})
+	wait, err := ComputeSettlement(SettlementInput{PriceBasis: "per_tonne", UnitPrice: &price, Rolls: &rolls, WeighedKg: &kg, PendingLoads: true})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if wait.Status != port.SettlementAwaitingWeighing || wait.Amount != nil {
 		t.Errorf("theo tấn còn ghe chưa cân: %+v", wait)
 	}
-	ton := ComputeSettlement(SettlementInput{PriceBasis: "per_tonne", UnitPrice: &price, WeighedKg: &kg, Deductions: money.MustAmount("20000.00")})
+	ton, err := ComputeSettlement(SettlementInput{PriceBasis: "per_tonne", UnitPrice: &price, WeighedKg: &kg, Deductions: money.MustAmount("20000.00")})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if ton.Gross.String() != "14520000.00" || ton.Amount.String() != "14500000.00" {
 		t.Errorf("theo tấn: %+v", ton)
 	}
-	none := ComputeSettlement(SettlementInput{Rolls: &rolls, WeighedKg: &kg})
+	none, err := ComputeSettlement(SettlementInput{Rolls: &rolls, WeighedKg: &kg})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if none.Amount != nil || none.Blocked != "no_contract" {
 		t.Errorf("PM-03 không đoán giá: %+v", none)
+	}
+}
+
+// Đơn giá thỏa thuận quá lớn × số cuộn vượt numeric(18,2): lỗi ErrOutOfRange (422), không panic.
+func TestComputeSettlementOutOfRange(t *testing.T) {
+	price, err := money.ParsePrice("99999999999999.9999") // tối đa numeric(18,4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rolls := 1000
+	kg := mass.MustKg("100000000")
+	for _, in := range []SettlementInput{
+		{PriceBasis: "per_bale", UnitPrice: &price, Rolls: &rolls},
+		{PriceBasis: "per_tonne", UnitPrice: &price, WeighedKg: &kg},
+	} {
+		if _, err := ComputeSettlement(in); !errors.Is(err, ErrOutOfRange) {
+			t.Errorf("%s: lỗi = %v, muốn ErrOutOfRange", in.PriceBasis, err)
+		}
+	}
+	// Gross hợp lệ nhưng gross − khấu trừ vượt độ rộng (khấu trừ âm sát trần) cũng là ErrOutOfRange.
+	small, _ := money.ParsePrice("1")
+	one := 1
+	if _, err := ComputeSettlement(SettlementInput{PriceBasis: "per_bale", UnitPrice: &small, Rolls: &one,
+		Deductions: money.MustAmount("-9999999999999999.99")}); !errors.Is(err, ErrOutOfRange) {
+		t.Errorf("khấu trừ: lỗi = %v", err)
+	}
+}
+
+func TestOutOfRangeNoPanic(t *testing.T) {
+	if _, err := HubProcessingCost(mass.MustKg("100000000"), dec("1e15")); !errors.Is(err, ErrOutOfRange) {
+		t.Errorf("HubProcessingCost: %v", err)
+	}
+	if v, err := HubProcessingCost(mass.MustKg("1000"), dec("55000")); err != nil || v.String() != "55000.00" {
+		t.Errorf("HubProcessingCost hợp lệ: %v, %v", v, err)
+	}
+	if _, err := CostPerTonne(money.MustAmount("9999999999999999.99"), mass.MustKg("0.001")); !errors.Is(err, ErrOutOfRange) {
+		t.Errorf("CostPerTonne: %v", err)
+	}
+	if _, err := ExpectedLossKg(mass.MustKg("1000"), dec("1e30")); !errors.Is(err, ErrOutOfRange) {
+		t.Errorf("ExpectedLossKg: %v", err)
 	}
 }
 
@@ -145,11 +197,11 @@ func TestSplitCarbon_C14(t *testing.T) {
 
 // C-08 (proto buildCostChain): đ/t = tổng / tấn giao; tấn giao 0 → không xác định.
 func TestCostPerTonne_C08(t *testing.T) {
-	if v := CostPerTonne(money.MustAmount("12000000.00"), mass.MustKg("80000")); v == nil || v.String() != "150000.00" {
-		t.Errorf("%v", v)
+	if v, err := CostPerTonne(money.MustAmount("12000000.00"), mass.MustKg("80000")); err != nil || v == nil || v.String() != "150000.00" {
+		t.Errorf("%v, %v", v, err)
 	}
-	if CostPerTonne(money.MustAmount("1"), mass.MustKg("0")) != nil {
-		t.Error("tấn giao 0 → nil")
+	if v, err := CostPerTonne(money.MustAmount("1"), mass.MustKg("0")); v != nil || err != nil {
+		t.Errorf("tấn giao 0 → nil, nhận %v, %v", v, err)
 	}
 }
 

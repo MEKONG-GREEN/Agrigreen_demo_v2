@@ -138,7 +138,11 @@ func run(log *slog.Logger) error {
 			return err
 		}
 		defer jobPool.Close()
-		sched := &schedule.Scheduler{Clock: clock.System{}, Log: log, Jobs: assembly.Jobs(mods, jobPool, jobs, log)}
+		mkgJobs, err := assembly.Jobs(mods, jobPool, jobs, log)
+		if err != nil {
+			return err
+		}
+		sched := &schedule.Scheduler{Clock: clock.System{}, Log: log, Jobs: mkgJobs}
 		if len(sched.Jobs) == 0 {
 			return errors.New("AG_MKG_JOBS không chọn job hợp lệ nào (all, none, " + assembly.JobNames() + ")")
 		}

@@ -118,7 +118,7 @@ func (s *Server) Start(addr, def string, log *slog.Logger, errc chan<- error) fu
 		addr = def
 	}
 	srv := &http.Server{Addr: addr, Handler: s.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second,
-		WriteTimeout: 10 * time.Second}
+		WriteTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errc <- err

@@ -105,7 +105,10 @@ func compute(ctx context.Context, tx pgx.Tx, kind string, raw json.RawMessage, e
 		if err != nil {
 			return computed{}, err
 		}
-		amt := domain.HubProcessingCost(in.MassKg, rate.Decimal())
+		amt, err := domain.HubProcessingCost(in.MassKg, rate.Decimal())
+		if err != nil {
+			return computed{}, err
+		}
 		kg := in.MassKg
 		lines := []domain.AllocLine{{LotRef: in.LotRef, MassKg: kg.String(), Ratio: "1.000000", Amount: amt.String()}}
 		return computed{Basis: "self", Total: &amt, TotalKg: &kg, Lines: lines, Alloc: lines, Pins: domain.Pins{}.Add(rate),
@@ -170,7 +173,9 @@ func compute(ctx context.Context, tx pgx.Tx, kind string, raw json.RawMessage, e
 		}
 		var norm mass.Kg
 		if in.HubInKg != nil {
-			norm = domain.ExpectedLossKg(*in.HubInKg, p19.Decimal(), p56.Decimal())
+			if norm, err = domain.ExpectedLossKg(*in.HubInKg, p19.Decimal(), p56.Decimal()); err != nil {
+				return computed{}, err
+			}
 		}
 		srcs := make([]domain.Source, 0, len(in.Sources))
 		for _, s := range in.Sources {

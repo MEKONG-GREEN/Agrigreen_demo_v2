@@ -25,10 +25,11 @@ import (
 )
 
 // refigure tính lại số liệu quyết toán gốc từ bảng chiếu lệnh gom (PM-01/02/03). Giá, cách tính,
-// khấu trừ giữ nguyên; số cuộn, khối lượng cân, số tiền, trạng thái làm mới.
-func refigure(st store.Settlement, c *store.Collection, pending bool) store.Settlement {
+// khấu trừ giữ nguyên; số cuộn, khối lượng cân, số tiền, trạng thái làm mới. Số tiền vượt numeric(18,2)
+// → domain.ErrOutOfRange (mapErr → 422 costing.amount_out_of_range).
+func refigure(st store.Settlement, c *store.Collection, pending bool) (store.Settlement, error) {
 	if st.Kind != "original" {
-		return st
+		return st, nil
 	}
 	next := st
 	next.Rolls, next.MassKg = nil, nil
@@ -39,10 +40,13 @@ func refigure(st store.Settlement, c *store.Collection, pending bool) store.Sett
 	if st.Basis != nil {
 		basis = *st.Basis
 	}
-	f := domain.ComputeSettlement(domain.SettlementInput{PriceBasis: basis, UnitPrice: st.UnitPrice, Rolls: next.Rolls,
+	f, err := domain.ComputeSettlement(domain.SettlementInput{PriceBasis: basis, UnitPrice: st.UnitPrice, Rolls: next.Rolls,
 		WeighedKg: next.MassKg, PendingLoads: pending, Deductions: st.Deductions})
+	if err != nil {
+		return st, err
+	}
 	next.Status, next.BlockedReason, next.GrossAmount, next.Amount = f.Status, strPtr(f.Blocked), f.Gross, f.Amount
-	return next
+	return next, nil
 }
 
 func eqStr(a, b *string) bool {
@@ -165,7 +169,9 @@ func (s *Service) CreateSettlement(ctx context.Context, in CreateSettlementInput
 			cid := terms.ContractID
 			draft.ContractRef, draft.ContractVersion, draft.Basis, draft.PriceSource, draft.UnitPrice = &cid, &ver, &basis, &src, &price
 		}
-		st = refigure(draft, c, pending)
+		if st, err = refigure(draft, c, pending); err != nil {
+			return err
+		}
 		e := store.SettlementEvent{ID: ids.New(), Action: "drafted", State: st, Reason: strPtr(reason), Pins: domain.Pins{},
 			EventTime: s.now(), ActorRef: p.ActorRef, IdemKey: in.IdemKey}
 		if err := store.InsertSettlementEvent(ctx, tx, p.TenantID, &e); err != nil {
@@ -231,7 +237,9 @@ func (s *Service) PriceSettlement(ctx context.Context, in PriceSettlementInput) 
 		next := cur
 		basis, src, price := in.Basis, "manual", in.UnitPrice
 		next.Basis, next.PriceSource, next.UnitPrice, next.PreparedBy = &basis, &src, &price, p.ActorRef
-		next = refigure(next, c, pending)
+		if next, err = refigure(next, c, pending); err != nil {
+			return err
+		}
 		e := store.SettlementEvent{ID: ids.New(), Action: "priced", State: next, Reason: &reason, Pins: domain.Pins{}, EventTime: s.now(),
 			ActorRef: p.ActorRef, IdemKey: in.IdemKey}
 		if err := store.InsertSettlementEvent(ctx, tx, p.TenantID, &e); err != nil {

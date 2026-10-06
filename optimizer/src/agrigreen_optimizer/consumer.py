@@ -135,6 +135,14 @@ class Consumer:
         self.api, self.queue, self.handler = api, queue, handler
         self.retry_base_s, self.sleep = retry_base_s, sleep
 
+    def _retry_delay(self, props: Any) -> float:
+        """Độ lùi trước khi NACK requeue: retry_base_s·2^x-delivery-count, trần 60 s."""
+        try:
+            count = max(int(_header(props, "x-delivery-count") or 0), 0)
+        except (TypeError, ValueError):
+            count = 0
+        return min(self.retry_base_s * (2 ** min(count, 16)), 60.0)
+
     def decide(self, body: bytes, props: Any = None) -> str:
         try:
             env = json.loads(body)
@@ -151,13 +159,15 @@ class Consumer:
             if exc.permanent:
                 _log(logging.ERROR, f"lỗi vĩnh viễn, chuyển DLQ: {exc}", outcome="dead", **fields)
                 return DEAD
-            count = int(_header(props, "x-delivery-count") or 0)
-            delay = min(self.retry_base_s * (2**count), 60.0)
+            delay = self._retry_delay(props)
             _log(logging.WARNING, f"xử lý thất bại, thử lại sau {delay:g}s: {exc}", outcome="retry", **fields)
             self.sleep(delay)
             return REQUEUE
         except Exception as exc:  # noqa: BLE001 - lỗi bất ngờ: thử lại, quorum queue giới hạn số lần
-            _log(logging.ERROR, f"lỗi bất ngờ: {type(exc).__name__}: {exc}", outcome="retry", **fields)
+            # Cùng độ lùi với WorkerError tạm thời: không lùi thì 5 lần giao dồn trong vài mili giây rồi vào DLQ.
+            delay = self._retry_delay(props)
+            _log(logging.ERROR, f"lỗi bất ngờ, thử lại sau {delay:g}s: {type(exc).__name__}: {exc}", outcome="retry", **fields)
+            self.sleep(delay)
             return REQUEUE
         outcome = "duplicate" if out.get("replayed") else "processed"
         _log(logging.INFO, "sự kiện", outcome=outcome, status=out.get("status"), **fields)

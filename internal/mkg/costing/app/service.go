@@ -55,6 +55,8 @@ var (
 	ErrParamPending         = problem.New(409, "costing.param_pending_exists", "Khóa tham số đang có phiên bản chờ duyệt")
 	ErrParamNotPending      = problem.New(409, "costing.param_not_pending", "Phiên bản tham số không còn chờ duyệt")
 	ErrCarbonSplit          = problem.New(422, "costing.carbon_split_invalid", "Tỷ lệ chia carbon (nông hộ + cơ quan + VVB) đang áp dụng không bằng 100")
+	ErrAmountOutOfRange     = problem.New(422, "costing.amount_out_of_range",
+		"Số tiền / khối lượng tính ra vượt giới hạn lưu trữ (numeric(18,2)) — kiểm tra đơn giá, số cuộn, khối lượng, khấu trừ")
 )
 
 // Deps là cổng đọc module mkg khác (cùng tiến trình, pool vai của module chủ dữ liệu). Nil = chưa nối.
@@ -97,6 +99,8 @@ func mapErr(err error) error {
 		return problem.Validation.WithField("code", "YYYY-MM")
 	case errors.Is(err, domain.ErrCarbonSplit):
 		return ErrCarbonSplit
+	case errors.Is(err, domain.ErrOutOfRange):
+		return ErrAmountOutOfRange.WithCause(err)
 	case errors.Is(err, authz.ErrSelfApproval):
 		return problem.SelfApproval.WithCause(err)
 	}

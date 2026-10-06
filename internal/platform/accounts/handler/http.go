@@ -25,7 +25,7 @@ import (
 )
 
 // MaxImportBytes giới hạn tệp nhập tài khoản (CSV/XLSX).
-const MaxImportBytes = 4 << 20
+const MaxImportBytes = app.MaxImportBytes
 
 // Handler gói app.Service cho HTTP.
 type Handler struct{ Svc *app.Service }

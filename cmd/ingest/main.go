@@ -258,13 +258,15 @@ func healthcheck(url string) int {
 func serve(ctx context.Context, log *slog.Logger, plain []*http.Server, tlsSrv *http.Server) error {
 	errc := make(chan error, len(plain)+1)
 	for _, s := range plain {
-		s.ReadHeaderTimeout, s.ReadTimeout, s.WriteTimeout = 5*time.Second, 10*time.Second, 10*time.Second
+		// Cùng bộ hạn với cmd/internal/healthsrv; IdleTimeout ghi rõ (0 = lấy ReadTimeout) cho keep-alive.
+		s.ReadHeaderTimeout, s.ReadTimeout, s.WriteTimeout, s.IdleTimeout = 5*time.Second, 10*time.Second, 10*time.Second, 60*time.Second
 		go func(s *http.Server) { errc <- s.ListenAndServe() }(s)
 		log.Info("lắng nghe", "event", "startup", "addr", s.Addr, "surface", "ops", "outcome", "ok")
 	}
 	all := plain
 	if tlsSrv != nil {
-		tlsSrv.ReadHeaderTimeout, tlsSrv.ReadTimeout, tlsSrv.WriteTimeout = 5*time.Second, 30*time.Second, 30*time.Second
+		tlsSrv.ReadHeaderTimeout, tlsSrv.ReadTimeout, tlsSrv.WriteTimeout, tlsSrv.IdleTimeout = 5*time.Second, 30*time.Second, 30*time.Second,
+			120*time.Second
 		go func() { errc <- tlsSrv.ListenAndServeTLS("", "") }()
 		log.Info("lắng nghe", "event", "startup", "addr", tlsSrv.Addr, "surface", "ingest_mtls", "outcome", "ok")
 		all = append(all, tlsSrv)

@@ -626,7 +626,11 @@ func checkAnchors(ctx context.Context, cluster string, pool *pgxpool.Pool, cfg C
 		r.Status, r.Detail = StatusSkip, "thiếu kho đối tượng hoặc khóa công khai neo (AG_ANCHOR_PUBLIC_KEY)"
 		return r
 	}
-	d, _ := time.Parse(time.DateOnly, date)
+	d, err := time.Parse(time.DateOnly, date)
+	if err != nil {
+		r.Status, r.Detail = StatusFail, fmt.Sprintf("ngày neo %q không hợp lệ: %v", date, err)
+		return r
+	}
 	key := opsjobs.ManifestKey(cluster, clock.Date{Year: d.Year(), Month: d.Month(), Day: d.Day()})
 	rc, _, err := cfg.Store.Get(ctx, key)
 	if err != nil {

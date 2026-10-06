@@ -693,6 +693,9 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 			return err
 		}
 	}
+	// Đính kèm chỉ khi Σ kích thước (siêu dữ liệu) ≤ giới hạn; đọc kho cũng giới hạn cùng mức — đối tượng lớn hơn
+	// siêu dữ liệu ghi (thay ngoài luồng, hỏng) không được nạp không giới hạn vào bộ nhớ worker.
+	attachMax := int64(limitMB) * 1024 * 1024
 	for _, f := range files {
 		if linkOnly {
 			continue
@@ -701,10 +704,13 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 		if err != nil {
 			return fail("không đọc được tệp đã xuất")
 		}
-		data, err := io.ReadAll(rc)
+		data, err := io.ReadAll(io.LimitReader(rc, attachMax+1))
 		_ = rc.Close()
 		if err != nil {
 			return fail("không đọc được tệp đã xuất")
+		}
+		if int64(len(data)) > attachMax {
+			return fail("tệp đã xuất lớn hơn kích thước đã ghi (vượt giới hạn đính kèm)")
 		}
 		ct := "application/pdf"
 		if f.Format == dispatch.FormatXLSX {

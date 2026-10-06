@@ -331,7 +331,10 @@ func (s *Service) refreshSettlements(ctx context.Context, tx pgx.Tx, tid, order 
 		return err
 	}
 	for _, st := range open {
-		next := refigure(st, c, pending)
+		next, err := refigure(st, c, pending)
+		if err != nil {
+			return err
+		}
 		if sameFigures(st, next) {
 			continue
 		}

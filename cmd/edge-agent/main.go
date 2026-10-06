@@ -201,6 +201,9 @@ func Enroll(cfg *Config, epoch int, rotate, abandon bool, now time.Time, log *sl
 		return res, err
 	}
 	blk, _ := pem.Decode(csr)
+	if blk == nil || blk.Type != "CERTIFICATE REQUEST" {
+		return res, errors.New("CSR vừa sinh không phải PEM \"CERTIFICATE REQUEST\"")
+	}
 	h := sha256.Sum256(blk.Bytes)
 	parsed, _ := x509.ParseCertificateRequest(blk.Bytes)
 	subj := ""
@@ -259,7 +262,10 @@ func cmdEnroll(args []string, stdout io.Writer, log *slog.Logger) error {
 			return err
 		}
 		if ok {
-			b, _ := json.MarshalIndent(cur, "", "  ")
+			b, err := json.MarshalIndent(cur, "", "  ")
+			if err != nil {
+				return fmt.Errorf("mã hóa kết quả đăng ký: %w", err)
+			}
 			_, _ = fmt.Fprintf(stdout, "%s\n\nĐã đăng ký kỳ %d — giữ nguyên (không sinh khóa mới).\n", b, cur.Epoch)
 			return nil
 		}
@@ -268,7 +274,10 @@ func cmdEnroll(args []string, stdout io.Writer, log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	b, _ := json.MarshalIndent(res, "", "  ")
+	b, err := json.MarshalIndent(res, "", "  ")
+	if err != nil {
+		return fmt.Errorf("mã hóa kết quả đăng ký: %w", err)
+	}
 	_, _ = fmt.Fprintf(stdout, "%s\n\nGửi device_id, epoch, public_key_hex, key_id và CSR cho scale_supervisor để đề xuất vào sổ thiết bị;\n"+
 		"device_approver (khác người đề xuất, R-56) duyệt. Sau khi CA nội bộ ký CSR, đặt chứng thư vào ingest.cert_file,\n"+
 		"chạy `edge-agent info` để lấy cert_sha256 bổ sung vào sổ, rồi khởi động dịch vụ.\n", b)
@@ -298,7 +307,10 @@ func cmdInfo(args []string, stdout io.Writer) error {
 			out["cert_error"] = err.Error()
 		}
 	}
-	b, _ := json.MarshalIndent(out, "", "  ")
+	b, err := json.MarshalIndent(out, "", "  ")
+	if err != nil {
+		return fmt.Errorf("mã hóa thông tin: %w", err)
+	}
 	_, _ = fmt.Fprintln(stdout, string(b))
 	return nil
 }
@@ -368,7 +380,10 @@ func cmdUpdate(args []string, stdout io.Writer, log *slog.Logger) error {
 		if err := SignManifest(priv, &m); err != nil {
 			return err
 		}
-		out, _ := json.MarshalIndent(m, "", "  ")
+		out, err := json.MarshalIndent(m, "", "  ")
+		if err != nil {
+			return fmt.Errorf("mã hóa manifest: %w", err)
+		}
 		_, _ = fmt.Fprintln(stdout, string(out))
 		return nil
 	}
@@ -436,7 +451,10 @@ func cmdUpdate(args []string, stdout io.Writer, log *slog.Logger) error {
 	default:
 		return fmt.Errorf("update %s không hỗ trợ", sub)
 	}
-	out, _ := json.MarshalIndent(s, "", "  ")
+	out, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		return fmt.Errorf("mã hóa trạng thái khe: %w", err)
+	}
 	_, _ = fmt.Fprintln(stdout, string(out))
 	return nil
 }

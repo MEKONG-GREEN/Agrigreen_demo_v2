@@ -250,7 +250,11 @@ func lotCostView(lot uuid.UUID, cs []store.LotCost) LotCostView {
 			}
 		}
 	}
-	v.CostPerTonne = domain.CostPerTonne(v.TotalCost, v.DeliveredKg)
+	// đ/t vượt numeric(18,2) (tấn giao quá nhỏ so với chi phí) → "không xác định" như tấn giao = 0: chỉ là
+	// số chỉ báo của màn xem, không chặn cả danh sách giá thành vì một lô.
+	if cpt, err := domain.CostPerTonne(v.TotalCost, v.DeliveredKg); err == nil {
+		v.CostPerTonne = cpt
+	}
 	return v
 }
 
