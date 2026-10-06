@@ -13,7 +13,7 @@ import pytest
 from agrigreen_optimizer.cli import main
 from agrigreen_optimizer.worker import InternalAPI, WorkerError, handle_event
 
-GOLDEN = Path(__file__).parent / "golden"
+from .paths import GOLDEN  # noqa: E402
 RAW = (GOLDEN / "case1_two_hubs_unapproved" / "snapshot.json").read_bytes()
 
 

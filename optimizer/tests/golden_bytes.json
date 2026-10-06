@@ -1,0 +1,82 @@
+{
+ "case1_two_hubs_unapproved/as_is": {
+  "bytes": 40442,
+  "sha256": "6fa4e3605e04d92ef1eeaf9764854c6f050b28bbf140eff8966dd5d142956c24"
+ },
+ "case1_two_hubs_unapproved/select_hubs_2": {
+  "bytes": 30318,
+  "sha256": "90ae160e5065241f7da31bba5452f291576be644aac22ea58a92b375ced6945d"
+ },
+ "case1_two_hubs_unapproved/sensitivity_default": {
+  "bytes": 41980,
+  "sha256": "145bdcf596b61ac619b38316e9c7fc1de797749fca8abfc32a1667434d7f2cc5"
+ },
+ "case2_three_hubs_approved_discounted/as_is": {
+  "bytes": 51176,
+  "sha256": "a069b73e6a67a70c90905df7057739aa4fcb6f5dff8d19eeb195bf8260be8bb7"
+ },
+ "case2_three_hubs_approved_discounted/select_hubs_2": {
+  "bytes": 25290,
+  "sha256": "dd6465d09fad0825432d226a67ba31e799462058ab1a034f07af8f5556b04901"
+ },
+ "case2_three_hubs_approved_discounted/sensitivity_default": {
+  "bytes": 48176,
+  "sha256": "80da87667db73cc33bdc856b704d277637aa53f4ad1204105331475831a8d16f"
+ },
+ "case3_five_hubs_lease_manual_baseline/as_is": {
+  "bytes": 63241,
+  "sha256": "3f197938d5ec74040098a89a07258e57b4efa665c4ba500a5568163a3436fc69"
+ },
+ "case3_five_hubs_lease_manual_baseline/select_hubs_2": {
+  "bytes": 23325,
+  "sha256": "de692e12b02b8b6326469ea951a1761691af4f20b2b55df4fc7e4fafdc662f00"
+ },
+ "case3_five_hubs_lease_manual_baseline/sensitivity_default": {
+  "bytes": 64755,
+  "sha256": "ea0cf7cf1c3f9e41ffa1dd18e7703cd5b5ebe93e3528ffb056eae898c74353ac"
+ },
+ "case4_small_capacity_overflow/as_is": {
+  "bytes": 26207,
+  "sha256": "3723082677c6245884e50a7781016f6a3416b1670a9c64733c59445658d49e45"
+ },
+ "case4_small_capacity_overflow/select_hubs_2": {
+  "bytes": 27330,
+  "sha256": "b066e0a5625dcb79fd96b7a1230e3335525a01d53d640b5218e9b0eee628d057"
+ },
+ "case4_small_capacity_overflow/sensitivity_default": {
+  "bytes": 27720,
+  "sha256": "98820324b94809a1ba94d184e1f307ed5c271ea569ea650bd8393dd9ffdc1399"
+ },
+ "case5_observed_harvest_calendar/as_is": {
+  "bytes": 38602,
+  "sha256": "c585426396ae2cc341c7585386da1be18951e1ca7bb1be7e2dbbaea6553d2d6e"
+ },
+ "case5_observed_harvest_calendar/select_hubs_2": {
+  "bytes": 26565,
+  "sha256": "2eb9155f38417720f8b6268a9a6d7fa0882c5e3711d55e27ddf5c5d4c55a2a91"
+ },
+ "case5_observed_harvest_calendar/sensitivity_default": {
+  "bytes": 40152,
+  "sha256": "de32c8beaf4f927861933200164bc3d86e8d4beed3610c924b760b425a0a6e46"
+ },
+ "contract_example/as_is": {
+  "bytes": 30926,
+  "sha256": "eb64dbf11dd8ce1801fc3d1d209f46c048d723cf3c30a55ed09735f877983854"
+ },
+ "contract_example/select_hubs_2": {
+  "bytes": 22613,
+  "sha256": "8646a0347f200537734f326f83f1c31532e824ac4576bf08ac7e79740d20443f"
+ },
+ "contract_example/sensitivity_default": {
+  "bytes": 31291,
+  "sha256": "5499b7a648b18fff0f39d75407cf984933b9391b3c2b748bd7ffd908f745bb37"
+ },
+ "invalid/json": {
+  "bytes": 466,
+  "sha256": "8d627321398eac0f8905f178348872913f1a24dfe05e1cdff4442d62271984a0"
+ },
+ "invalid/schema": {
+  "bytes": 405,
+  "sha256": "a7e981a7454a2f48946def42824bfd4980fa4086112c1960badb6e3c8d70b71c"
+ }
+}

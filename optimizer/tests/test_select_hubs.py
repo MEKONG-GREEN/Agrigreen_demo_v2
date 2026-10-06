@@ -12,7 +12,9 @@ pytest.importorskip("highspy")
 from agrigreen_optimizer.run import process  # noqa: E402
 from agrigreen_optimizer.select_hubs import select_hubs  # noqa: E402
 
-SNAP = json.loads((Path(__file__).parent / "golden" / "case3_five_hubs_lease_manual_baseline" / "snapshot.json").read_text(encoding="utf-8"))
+from .paths import GOLDEN  # noqa: E402
+
+SNAP = json.loads((GOLDEN / "case3_five_hubs_lease_manual_baseline" / "snapshot.json").read_text(encoding="utf-8"))
 
 
 def test_select_hubs_respects_max_hubs_and_reevaluates() -> None:

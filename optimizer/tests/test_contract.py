@@ -14,7 +14,7 @@ jsonschema = pytest.importorskip("jsonschema")
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACTS = ROOT / "contracts" / "optimizer"
-GOLDEN = Path(__file__).parent / "golden"
+from .paths import GOLDEN  # noqa: E402
 CASES = sorted(p.name for p in GOLDEN.iterdir() if (p / "snapshot.json").exists())
 
 
