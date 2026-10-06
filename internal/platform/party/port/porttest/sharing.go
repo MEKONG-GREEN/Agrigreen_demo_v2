@@ -1,6 +1,7 @@
 // Package porttest là bản giả trong bộ nhớ của cổng cấp quyền chia sẻ pf/party (ADR-0020) cho
 // kiểm thử của module khác (geo, cropcycle, mrv). Hành vi thật (sổ, R-56, bảng chiếu hai phía,
-// sổ đọc) kiểm ở kiểm thử tích hợp của pf/party và kịch bản e2e G3.
+// sổ đọc) kiểm ở kiểm thử tích hợp của pf/party và kịch bản e2e G3. Gói đúc tenant.Grant (H4) nên
+// archlint agtenantgate chỉ cho import nó từ tệp _test.go.
 package porttest
 
 import (
@@ -13,6 +14,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 // Sharing cài đặt port.PartnerAccess và port.ValveGrants trong bộ nhớ.
@@ -38,7 +40,7 @@ func (s *Sharing) Grant(grantor, grantee uuid.UUID, kinds ...string) port.ShareG
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	g := port.ShareGrant{ID: uuid.Must(uuid.NewV7()), Grantor: grantor, Grantee: grantee, Kinds: kinds,
-		ValidFrom: time.Unix(0, 0).UTC(), ValidTo: time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC)}
+		ValidFrom: time.Unix(0, 0).UTC(), ValidTo: time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC), Access: tenant.MintGrant(grantee, grantor)}
 	s.grants = append(s.grants, g)
 	return g
 }
@@ -99,13 +101,13 @@ func (s *Sharing) RecordRead(_ context.Context, _ port.ShareGrant, r port.Partne
 }
 
 // ValveGrantors cài đặt port.ValveGrants.
-func (s *Sharing) ValveGrantors(_ context.Context, grantee uuid.UUID, kind string, _ time.Time) ([]uuid.UUID, error) {
+func (s *Sharing) ValveGrantors(_ context.Context, grantee uuid.UUID, kind string, _ time.Time) ([]tenant.Grant, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var out []uuid.UUID
+	var out []tenant.Grant
 	for _, g := range s.matching(grantee, uuid.Nil, kind) {
-		if !slices.Contains(out, g.Grantor) {
-			out = append(out, g.Grantor)
+		if !slices.ContainsFunc(out, func(x tenant.Grant) bool { return x.Tenant() == g.Grantor }) {
+			out = append(out, g.Access)
 		}
 	}
 	return out, nil

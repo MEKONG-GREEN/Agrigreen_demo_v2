@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 // ---------------------------------------------------------------------------
@@ -118,6 +119,10 @@ type ShareGrant struct {
 	Kinds     []string
 	ValidFrom time.Time
 	ValidTo   time.Time
+	// Access là bằng chứng (H4) đi từ tenant bên nhận sang tenant bên cấp — CHỈ app/ của pf/party đúc
+	// sau khi kiểm hai phía. Module gọi đổi tenant bằng tenant.WithGrant / tenant.Within với Access,
+	// không bằng tenant.WithID(ctx, Grantor). Zero (vd ShareGrant tự dựng) → đổi tenant bị từ chối.
+	Access tenant.Grant
 }
 
 // Covers cho biết cấp quyền có loại k.
@@ -160,8 +165,10 @@ type APIReadLog interface {
 // ValveGrants cho consumer van của nền tảng tìm tenant bên cấp của một phong bì van: mọi bên cấp
 // có cấp quyền đang hiệu lực loại kind cho bên nhận grantee (= tenant phong bì) tại thời điểm at =
 // lúc consumer NHẬN (đồng hồ của module) — không phải occurred_at: sự kiện hiện trường ghi lùi giờ.
+// Mỗi phần tử là bằng chứng (H4) đi từ grantee sang một bên cấp (Tenant() = bên cấp, không trùng):
+// consumer ghi vào tenant bên cấp bằng tenant.Within / tenant.WithGrant với chính bằng chứng đó.
 type ValveGrants interface {
-	ValveGrantors(ctx context.Context, grantee uuid.UUID, kind string, at time.Time) ([]uuid.UUID, error)
+	ValveGrantors(ctx context.Context, grantee uuid.UUID, kind string, at time.Time) ([]tenant.Grant, error)
 }
 
 // Lỗi của cấp quyền chia sẻ (docs/errors.md, mục pf/party).
@@ -193,9 +200,9 @@ func ParseGrantor(s string) (uuid.UUID, error) {
 	return u, nil
 }
 
-// ValveTargets trả tenant bên cấp cho phong bì van của grantee: lỗi ErrValveGrantMissing khi
-// không có (hoặc chưa nối cổng ValveGrants — mặc định từ chối).
-func ValveTargets(ctx context.Context, g ValveGrants, grantee uuid.UUID, kind string, at time.Time) ([]uuid.UUID, error) {
+// ValveTargets trả bằng chứng đổi sang tenant bên cấp cho phong bì van của grantee: lỗi
+// ErrValveGrantMissing khi không có (hoặc chưa nối cổng ValveGrants — mặc định từ chối).
+func ValveTargets(ctx context.Context, g ValveGrants, grantee uuid.UUID, kind string, at time.Time) ([]tenant.Grant, error) {
 	if g == nil {
 		return nil, ErrValveGrantMissing
 	}

@@ -44,7 +44,11 @@ func (s *Service) PartnerRoute(ctx context.Context, grantor uuid.UUID, points []
 	if version < 0 {
 		return PartnerRoute{}, problem.Validation.WithField("version", "phải là số nguyên dương")
 	}
-	r, err := s.RouteBetween(tenant.WithID(ctx, g.Grantor), points, minLoad, version)
+	gctx, err := tenant.WithGrant(ctx, g.Access) // H4: chỉ bằng chứng do pf/party đúc mới đổi được sang bên cấp
+	if err != nil {
+		return PartnerRoute{}, err
+	}
+	r, err := s.RouteBetween(gctx, points, minLoad, version)
 	if err != nil {
 		return PartnerRoute{}, err
 	}

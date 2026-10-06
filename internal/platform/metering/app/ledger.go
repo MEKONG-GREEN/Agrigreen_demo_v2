@@ -198,7 +198,10 @@ func (s *Service) recordTx(ctx context.Context, tx pgx.Tx, op uuid.UUID, c port.
 			CounterpartyKind: port.CounterpartyAPIClient, CounterpartyRef: c.ClientID, Product: c.Product, ContractVersion: c.ContractVersion,
 			Records: c.Rows, Bytes: c.Bytes, OccurredAt: c.ReceivedAt, ActorRef: c.ClientID, TraceID: c.TraceID}
 		var p passed
-		if err := tenant.Within(ctx, tx, c.DataTenantID, func() error {
+		// H4: DataTenantID là bên cấp đã kiểm cấp quyền dp_* ở apiclient/public (party/port.GrantLookup) trước khi
+		// gọi sổ. GrantLookup (grantlookup) chưa trả bằng chứng — chờ chuyển ra adapter (review M9) — nên đúc ở
+		// đây, nơi duy nhất ngoài pf/party có tên trong danh sách đúc của archlint agtenantgate.
+		if err := tenant.Within(ctx, tx, tenant.MintGrant(op, c.DataTenantID), func() error {
 			var e2 error
 			p, e2 = s.passTx(ctx, tx, e, ep, port.ModeEnforce)
 			return e2

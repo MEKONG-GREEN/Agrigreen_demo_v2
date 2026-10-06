@@ -155,7 +155,7 @@ func TestWithinSwitchesAndRestores(t *testing.T) {
 	ctx := context.Background()
 	a, b := ids.New(), ids.New()
 	err := tenant.WithTenantTx(ctx, pool, a, func(tx pgx.Tx) error {
-		if err := tenant.Within(ctx, tx, b, func() error { return insertConsent(ctx, tx, b, ids.New()) }); err != nil {
+		if err := tenant.Within(ctx, tx, tenant.MintGrant(a, b), func() error { return insertConsent(ctx, tx, b, ids.New()) }); err != nil {
 			return err
 		}
 		// Đã về tenant a: dòng của b không thấy.
@@ -179,10 +179,48 @@ func TestWithinSwitchesAndRestores(t *testing.T) {
 			t.Fatalf("tenant %s phải có đúng 1 dòng: %d %v", tid, n, err)
 		}
 	}
-	if err := tenant.WithTenantTx(ctx, pool, a, func(tx pgx.Tx) error {
-		return tenant.Within(ctx, tx, uuid.Nil, func() error { return nil })
-	}); !errors.Is(err, tenant.ErrMissing) {
-		t.Fatalf("Within tenant rỗng phải lỗi ErrMissing: %v", err)
+}
+
+// H4: Within không đổi tenant khi thiếu bằng chứng cấp quyền (Grant zero / thiếu một phía) hoặc
+// bằng chứng cấp cho tenant nguồn khác ngữ cảnh hiện hành; fn không chạy, ngữ cảnh giữ nguyên.
+func TestWithinRejectsMissingOrForeignGrant(t *testing.T) {
+	env := pgtest.Get(t)
+	pool := env.Pool(t, migrations.PF, "party_app")
+	ctx := context.Background()
+	a, b, c := ids.New(), ids.New(), ids.New()
+	cases := []struct {
+		name string
+		g    tenant.Grant
+		want error
+	}{
+		{"zero", tenant.Grant{}, tenant.ErrGrantMissing},
+		{"thiếu đích", tenant.MintGrant(a, uuid.Nil), tenant.ErrGrantMissing},
+		{"thiếu nguồn", tenant.MintGrant(uuid.Nil, b), tenant.ErrGrantMissing},
+		{"nguồn khác ngữ cảnh", tenant.MintGrant(c, b), tenant.ErrGrantMismatch},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ran := false
+			err := tenant.WithTenantTx(ctx, pool, a, func(tx pgx.Tx) error {
+				if err := tenant.Within(ctx, tx, tc.g, func() error { ran = true; return nil }); !errors.Is(err, tc.want) {
+					return fmt.Errorf("muốn %w, nhận %w", tc.want, err)
+				}
+				var cur string
+				if err := tx.QueryRow(ctx, "SELECT current_setting('app.tenant_id', true)").Scan(&cur); err != nil {
+					return err
+				}
+				if cur != a.String() {
+					return fmt.Errorf("ngữ cảnh phải giữ tenant %s, đang là %s", a, cur)
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ran {
+				t.Fatal("fn không được chạy khi bằng chứng không hợp lệ")
+			}
+		})
 	}
 }
 
@@ -194,7 +232,7 @@ func TestWithinRestoresOnError(t *testing.T) {
 	a, b := ids.New(), ids.New()
 	boom := errors.New("lỗi nghiệp vụ")
 	err := tenant.WithTenantTx(ctx, pool, a, func(tx pgx.Tx) error {
-		if err := tenant.Within(ctx, tx, b, func() error { return boom }); !errors.Is(err, boom) {
+		if err := tenant.Within(ctx, tx, tenant.MintGrant(a, b), func() error { return boom }); !errors.Is(err, boom) {
 			return fmt.Errorf("mong lỗi gốc của fn: %w", err)
 		}
 		var cur string

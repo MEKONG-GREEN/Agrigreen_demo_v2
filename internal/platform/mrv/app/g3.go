@@ -288,15 +288,18 @@ func (s *Service) HandleCollectionEvidence(ctx context.Context, tx pgx.Tx, env o
 	for _, g := range grantors {
 		if err := meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
 			SourceID: env.EventID, Channel: meteringport.ChannelValve, DataTenantID: env.TenantID,
-			CounterpartyKind: meteringport.CounterpartyTenant, CounterpartyRef: g, Product: port.ContractCollectionEvidence,
+			CounterpartyKind: meteringport.CounterpartyTenant, CounterpartyRef: g.Tenant(), Product: port.ContractCollectionEvidence,
 			ContractVersion: env.SchemaVersion, Records: 1, Bytes: int64(len(env.Payload)), OccurredAt: env.OccurredAt, TraceID: env.TraceID,
 		}, s.Log); err != nil {
 			return err
 		}
 	}
 	for _, g := range grantors {
-		gctx := tenant.WithID(ctx, g)
-		if err := tenant.Within(ctx, tx, g, func() error { return s.receiveEvidence(gctx, tx, env, g, p, on) }); err != nil {
+		gctx, err := tenant.WithGrant(ctx, g) // H4: bằng chứng của pf/party, không WithID tenant bên cấp
+		if err != nil {
+			return err
+		}
+		if err := tenant.Within(ctx, tx, g, func() error { return s.receiveEvidence(gctx, tx, env, g.Tenant(), p, on) }); err != nil {
 			return err
 		}
 	}

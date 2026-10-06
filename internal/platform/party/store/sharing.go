@@ -293,7 +293,8 @@ func CooperativeEntryByRef(ctx context.Context, tx pgx.Tx, ref uuid.UUID) (*Coop
 
 // VerifiedActive trả cấp quyền đang hiệu lực tại at của bên nhận grantee (tx PHẢI đang ở ngữ cảnh
 // tenant bên nhận) đã kiểm HAI phía: bảng chiếu share_grant_inbound của bên nhận + bảng hiện hành
-// share_grant của bên cấp (đổi ngữ cảnh bằng tenant.Within — RLS vẫn áp, không BYPASSRLS): active,
+// share_grant của bên cấp (đổi ngữ cảnh bằng tenant.Within với bằng chứng grantee → bên cấp của dòng
+// chiếu — chỉ để đọc dòng hiện hành kiểm phía bên cấp; RLS vẫn áp, không BYPASSRLS): active,
 // đúng bên nhận, có loại kind (rỗng = mọi loại), at ∈ [valid_from, valid_to). Dùng chung cho
 // Authorize/ActiveGrant của app/ và bộ điều hợp chỉ đọc party/port/grantlookup (cmd/api-public).
 func VerifiedActive(ctx context.Context, tx pgx.Tx, grantee uuid.UUID, kind string, grantor uuid.UUID, at time.Time) ([]Inbound, error) {
@@ -304,7 +305,7 @@ func VerifiedActive(ctx context.Context, tx pgx.Tx, grantee uuid.UUID, kind stri
 	out := make([]Inbound, 0, len(rows))
 	for _, in := range rows {
 		ok := false
-		err := tenant.Within(ctx, tx, in.Grantor, func() error {
+		err := tenant.Within(ctx, tx, tenant.MintGrant(grantee, in.Grantor), func() error {
 			g, err := GrantByID(ctx, tx, in.GrantID, false)
 			if err != nil || g == nil {
 				return err

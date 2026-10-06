@@ -146,7 +146,11 @@ func (s *Service) HandleHubPublication(ctx context.Context, _ pgx.Tx, env outbox
 			return nil // cơ sở chưa khai sức chứa danh định: không có % lấp đầy để hiển thị
 		}
 		for _, g := range grantors {
-			if _, err := s.AppendHubCapacity(tenant.WithID(ctx, g), h); err != nil {
+			gctx, err := tenant.WithGrant(ctx, g) // H4: đổi sang tenant bên cấp bằng bằng chứng của pf/party
+			if err != nil {
+				return err
+			}
+			if _, err := s.AppendHubCapacity(gctx, h); err != nil {
 				return err
 			}
 		}
@@ -157,7 +161,11 @@ func (s *Service) HandleHubPublication(ctx context.Context, _ pgx.Tx, env outbox
 		return err
 	}
 	for _, g := range grantors {
-		if _, err := s.UpsertHubFacility(tenant.WithID(ctx, g), h); err != nil {
+		gctx, err := tenant.WithGrant(ctx, g)
+		if err != nil {
+			return err
+		}
+		if _, err := s.UpsertHubFacility(gctx, h); err != nil {
 			return err
 		}
 	}
@@ -217,8 +225,9 @@ func capacityFromValve(raw []byte) (port.HubCapacity, error) {
 
 // valveEgress gọi điểm kiểm soát xuất (ADR-0024) cho một phong bì van: tenant dữ liệu = tenant phong
 // bì (MKG), bên nhận = từng tenant bên cấp, nguồn = event_id (giao lặp → cùng dòng egress_event).
-func (s *Service) valveEgress(ctx context.Context, env outbox.Envelope, contract string, grantors []uuid.UUID) error {
-	for _, g := range grantors {
+func (s *Service) valveEgress(ctx context.Context, env outbox.Envelope, contract string, grantors []tenant.Grant) error {
+	for _, gr := range grantors {
+		g := gr.Tenant()
 		if err := meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
 			SourceID: env.EventID, Channel: meteringport.ChannelValve, DataTenantID: env.TenantID,
 			CounterpartyKind: meteringport.CounterpartyTenant, CounterpartyRef: g, Product: contract, ContractVersion: env.SchemaVersion,

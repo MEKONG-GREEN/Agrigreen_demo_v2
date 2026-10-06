@@ -21,8 +21,9 @@ const vaultRoot = "cmd/identity-vault"
 // Boundary cưỡng chế R-02, R-03, R-04 và "shared không chứa logic nghiệp vụ".
 var Boundary = &analysis.Analyzer{
 	Name: "agboundary",
-	Doc:  "ranh giới module: chỉ import port/ của module khác (R-02); platform và mkg không import nhau (R-03); vault chỉ qua client (R-04)",
-	Run:  runBoundary,
+	Doc: "ranh giới module: chỉ import port/ của module khác (R-02); platform và mkg không import nhau (R-03); vault chỉ qua client (R-04); " +
+		"vault không import platform/mkg (mục 4); port/ chỉ interface + DTO (mục 8)",
+	Run: runBoundary,
 }
 
 func init() {
@@ -68,6 +69,10 @@ func runBoundary(pass *analysis.Pass) (any, error) {
 				continue
 			}
 			if msg := edgeViolation(from.path, imp); msg != "" {
+				pass.Reportf(spec.Pos(), "%s", msg)
+				continue
+			}
+			if msg := contractDriverViolation(from, imp); msg != "" {
 				pass.Reportf(spec.Pos(), "%s", msg)
 				continue
 			}
@@ -123,6 +128,15 @@ func violation(from, to loc, imp string) string {
 		}
 		return ""
 	}
+	// Mục 4, RB-3: kho định danh hộ là vùng chủ quyền riêng (cụm vault, đơn vị identity-vault) — không phụ
+	// thuộc mã nghiệp vụ của vùng nền tảng hay nội bộ MKG.
+	if from.zone == "vault" && (to.zone == "platform" || to.zone == "mkg") {
+		return "RB-3: vault/ là vùng chủ quyền riêng (mục 4) — không được import " + to.zone + "/ (" + imp + ")"
+	}
+	// Mục 8: port/ (và client/ của vault) chỉ có interface + DTO — không kéo lớp trong của chính module.
+	if isContract(from) && !contractExempt(from.path) && from.zone == to.zone && from.module == to.module && innerLayer(to.rest) {
+		return "mục 8: " + from.module + "/" + from.rest + " chỉ chứa interface + DTO — không import " + imp + " (đặt bộ điều hợp ở adapter/ hoặc app/)"
+	}
 	// R-03: platform ↔ mkg.
 	if (from.zone == "platform" && to.zone == "mkg") || (from.zone == "mkg" && to.zone == "platform") {
 		return "R-03: " + from.zone + "/ không được import " + to.zone + "/ (" + imp + ") — chỉ qua API công khai hoặc van công bố"
@@ -147,6 +161,67 @@ var zoneRoots = []struct{ root, forbidden string }{
 	{"cmd/rebuilddrill", "platform"},
 	// G5: đơn vị triển khai Public API (ADR-0022) — gốc lắp ráp vùng nền tảng, chỉ nối platform/*.
 	{"cmd/api-public", "mkg"},
+	// worker-platform (mục 4: consumer + job của vùng nền tảng), diễn tập phục hồi cụm pf và bộ nạp mẫu
+	// báo cáo Excel — chỉ nối platform/*.
+	{"cmd/worker", "mkg"},
+	{"cmd/drill", "mkg"},
+	{"cmd/formimport", "mkg"},
+	// Kho định danh hộ (mục 4, RB-3): đơn vị riêng ở vùng định danh — không nối platform/* lẫn mkg/*.
+	{"cmd/identity-vault", "platform"},
+	{"cmd/identity-vault", "mkg"},
+}
+
+// pgxPrefix là driver DB: port/ và client/ của vault không được dùng (hợp đồng không kéo hạ tầng, mục 8).
+var pgxPrefix = "github.com/jackc/pgx"
+
+// innerLayers là lớp trong của một module mà port/ không được import (domain/ thuần, được phép).
+var innerLayers = []string{"store", "app", "handler", "adapter"}
+
+// contractExemptPaths: ngoại lệ có tên của luật port/ — chỉ được co lại.
+var contractExemptPaths = []string{
+	// đang chuyển ra adapter (review M9)
+	"internal/platform/party/port/grantlookup",
+}
+
+func innerLayer(rest string) bool {
+	first, _, _ := strings.Cut(rest, "/")
+	for _, l := range innerLayers {
+		if first == l {
+			return true
+		}
+	}
+	return false
+}
+
+// isContract: package hợp đồng của module — port/** của mọi module, client/** của vault.
+func isContract(l loc) bool {
+	if !l.internal || l.module == "" {
+		return false
+	}
+	if isPort(l.rest) {
+		return true
+	}
+	return l.zone == "vault" && (l.rest == "client" || strings.HasPrefix(l.rest, "client/"))
+}
+
+func contractExempt(pkg string) bool {
+	for _, e := range contractExemptPaths {
+		if under(pkg, e) {
+			return true
+		}
+	}
+	return false
+}
+
+// contractDriverViolation: port/ (client/ của vault) không import driver DB pgx (mục 8).
+func contractDriverViolation(from loc, imp string) string {
+	if imp != pgxPrefix && !strings.HasPrefix(imp, pgxPrefix+"/") {
+		return ""
+	}
+	if !isContract(from) || contractExempt(from.path) {
+		return ""
+	}
+	return "mục 8: " + from.module + "/" + from.rest + " chỉ chứa interface + DTO — không import driver DB " + imp
 }
 
 // noVaultRoots là gốc lắp ráp không được import BẤT KỲ package nào của vault, kể cả client (RB-3).

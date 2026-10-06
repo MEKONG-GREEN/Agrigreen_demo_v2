@@ -14,7 +14,7 @@ var floatFreeSegments = []string{"costing", "measurement", "orders", "acctbridge
 // NoFloat cấm float32/float64 trong package tiền và khối lượng (R-10).
 var NoFloat = &analysis.Analyzer{
 	Name: "agnofloat",
-	Doc:  "cấm float32/float64 trong costing, measurement, orders, acctbridge, metering, mkg/hub, mkg/logistics, reports/{formula,form,formimport,dispatch}, extension/reportcycle, shared/money, shared/mass (R-10)",
+	Doc:  "cấm float32/float64 trong costing, measurement, orders, acctbridge, metering, mkg/hub, mkg/logistics, mkg/fieldops, mechanization, reports/{formula,form,formimport,dispatch}, extension/reportcycle, shared/money, shared/mass (R-10)",
 	Run:  runNoFloat,
 }
 
@@ -29,11 +29,24 @@ var floatFreeZones = []string{"/internal/mkg/hub", "/internal/mkg/logistics",
 	"/internal/platform/reports/formula", "/internal/platform/reports/form", "/internal/platform/reports/formimport",
 	"/internal/platform/extension/reportcycle", "/internal/platform/reports/dispatch"}
 
-func floatFree(pkg string) bool {
-	for _, z := range floatFreeZones {
+// floatFreeProdZones là module cấm float trong mã không phải kiểm thử: mkg/fieldops (số cuộn, diện tích
+// hiện trường, ngày công) và pf/mechanization (diện tích, giờ máy, số máy). Kiểm thử HTTP của hai module
+// giải mã JSON bằng encoding/json (số → float64) và cố ý gửi số lẻ để kiểm từ chối, nên tệp _test.go miễn.
+var floatFreeProdZones = []string{"/internal/mkg/fieldops", "/internal/platform/mechanization"}
+
+func inZone(pkg string, zones []string) bool {
+	for _, z := range zones {
 		if strings.Contains(pkg, z+"/") || strings.HasSuffix(strings.TrimSuffix(pkg, "_test"), z) {
 			return true
 		}
+	}
+	return false
+}
+
+// floatFree: cấm float cả trong tệp kiểm thử (vùng floatFreeZones hoặc tên đoạn floatFreeSegments).
+func floatFree(pkg string) bool {
+	if inZone(pkg, floatFreeZones) {
+		return true
 	}
 	for _, seg := range strings.Split(strings.TrimSuffix(pkg, "_test"), "/") {
 		for _, s := range floatFreeSegments {
@@ -54,11 +67,16 @@ func isFloat(t types.Type) bool {
 }
 
 func runNoFloat(pass *analysis.Pass) (any, error) {
-	if !floatFree(pass.Pkg.Path()) {
+	strict := floatFree(pass.Pkg.Path())
+	prodOnly := !strict && inZone(pass.Pkg.Path(), floatFreeProdZones)
+	if !strict && !prodOnly {
 		return nil, nil
 	}
 	seen := map[int]bool{}
 	for _, f := range pass.Files {
+		if prodOnly && strings.HasSuffix(pass.Fset.Position(f.Pos()).Filename, "_test.go") {
+			continue
+		}
 		ast.Inspect(f, func(n ast.Node) bool {
 			e, ok := n.(ast.Expr)
 			if !ok {

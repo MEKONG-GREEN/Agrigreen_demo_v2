@@ -147,7 +147,7 @@ func Day(t time.Time) time.Time {
 func AddDays(d time.Time, n int) time.Time { return d.AddDate(0, 0, n) }
 
 // DaysBetween = to − from (ngày).
-func DaysBetween(from, to time.Time) int { return int(to.Sub(from).Hours() / 24) }
+func DaysBetween(from, to time.Time) int { return int(to.Sub(from) / (24 * time.Hour)) }
 
 // ---------------------------------------------------------------------------
 // FM-01: ngày gặt

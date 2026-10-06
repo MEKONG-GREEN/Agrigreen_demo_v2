@@ -11,7 +11,10 @@ package app
 //   - Quản trị nền tảng của tenant BÊN CẤP (platform_admin) đề xuất; một quản trị KHÁC duyệt (R-56,
 //     kiểm ở đây và bằng CHECK DB); bên cấp thu hồi được bất kỳ lúc nào.
 //   - Khi duyệt / thu hồi, cùng giao dịch ghi bảng chiếu share_grant_inbound ở tenant BÊN NHẬN
-//     (tenant.Within — RLS vẫn áp, không có vai BYPASSRLS) để bên nhận tra cấp quyền của mình.
+//     (tenant.Within với bằng chứng tenant.MintGrant bên cấp → bên nhận — RLS vẫn áp, không có vai
+//     BYPASSRLS) để bên nhận tra cấp quyền của mình.
+//   - H4: gói này (cùng party/store) là nơi duy nhất đúc tenant.Grant (archlint agtenantgate): mọi
+//     ShareGrant trả ra mang Access; ValveGrantors trả bằng chứng đi từ tenant phong bì sang bên cấp.
 //   - Authorize kiểm cả bảng chiếu bên nhận lẫn bảng hiện hành bên cấp; RecordRead ghi sổ đọc ở
 //     tenant bên cấp cho MỖI lời gọi bề mặt đối tác.
 
@@ -201,7 +204,7 @@ func (s *Sharing) Approve(ctx context.Context, id uuid.UUID) (store.Grant, bool,
 		if err := store.PutGrant(ctx, tx, *g); err != nil {
 			return err
 		}
-		if err := tenant.Within(ctx, tx, g.Grantee, func() error {
+		if err := tenant.Within(ctx, tx, tenant.MintGrant(p.TenantID, g.Grantee), func() error {
 			return store.PutInbound(ctx, tx, store.Inbound{TenantID: g.Grantee, GrantID: id, Grantor: p.TenantID, Kinds: g.Kinds,
 				ValidFrom: g.ValidFrom, ValidTo: g.ValidTo, Status: "active"})
 		}); err != nil {
@@ -281,7 +284,7 @@ func (s *Sharing) Revoke(ctx context.Context, id uuid.UUID, reason string) (stor
 			return err
 		}
 		if wasActive {
-			if err := tenant.Within(ctx, tx, g.Grantee, func() error {
+			if err := tenant.Within(ctx, tx, tenant.MintGrant(p.TenantID, g.Grantee), func() error {
 				return store.PutInbound(ctx, tx, store.Inbound{TenantID: g.Grantee, GrantID: id, Grantor: p.TenantID, Kinds: g.Kinds,
 					ValidFrom: g.ValidFrom, ValidTo: g.ValidTo, Status: "revoked"})
 			}); err != nil {
@@ -361,8 +364,10 @@ func (s *Sharing) ShareGrantReads(ctx context.Context, id uuid.UUID, after int64
 // Phía bên nhận
 // ---------------------------------------------------------------------------
 
+// toShareGrant chỉ gọi với dòng đã kiểm hai phía (store.VerifiedActive): đúc bằng chứng H4 bên nhận → bên cấp.
 func toShareGrant(in store.Inbound) port.ShareGrant {
-	return port.ShareGrant{ID: in.GrantID, Grantor: in.Grantor, Grantee: in.TenantID, Kinds: in.Kinds, ValidFrom: in.ValidFrom, ValidTo: in.ValidTo}
+	return port.ShareGrant{ID: in.GrantID, Grantor: in.Grantor, Grantee: in.TenantID, Kinds: in.Kinds, ValidFrom: in.ValidFrom, ValidTo: in.ValidTo,
+		Access: tenant.MintGrant(in.TenantID, in.Grantor)}
 }
 
 // activeFor trả cấp quyền đang hiệu lực (đã kiểm hai phía — store.VerifiedActive) của bên nhận
@@ -416,8 +421,14 @@ func (s *Sharing) Authorize(ctx context.Context, kind string, grantor uuid.UUID)
 // (bên gọi là khách hàng API đã xác thực bằng khóa) nên CHỈ nhận loại sản phẩm dữ liệu dp_* — các
 // loại khác vẫn phải qua Authorize (vai mkg_sync). Cùng truy vấn hai phía như Authorize: bảng chiếu
 // bên nhận + bảng hiện hành bên cấp, trạng thái active (chưa thu hồi), at ∈ [valid_from, valid_to).
+// grantlookup đã kiểm hai phía nhưng không đúc bằng chứng H4 (chờ chuyển ra adapter — review M9): đúc ở đây.
 func (s *Sharing) ActiveGrant(ctx context.Context, grantee, grantor uuid.UUID, kind string, at time.Time) (port.ShareGrant, error) {
-	return grantlookup.New(s.DB, s.Clock).ActiveGrant(ctx, grantee, grantor, kind, at)
+	g, err := grantlookup.New(s.DB, s.Clock).ActiveGrant(ctx, grantee, grantor, kind, at)
+	if err != nil {
+		return g, err
+	}
+	g.Access = tenant.MintGrant(g.Grantee, g.Grantor)
+	return g, nil
 }
 
 // ActiveGrantors (apiclient/public.GrantorLister): mọi bên cấp đang có cấp quyền dp_* loại kind cho
@@ -476,16 +487,17 @@ func (s *Sharing) RecordRead(ctx context.Context, g port.ShareGrant, r port.Part
 	return nil
 }
 
-// ValveGrantors cài đặt port.ValveGrants (consumer van — không có người gọi).
-func (s *Sharing) ValveGrantors(ctx context.Context, grantee uuid.UUID, kind string, at time.Time) ([]uuid.UUID, error) {
+// ValveGrantors cài đặt port.ValveGrants (consumer van — không có người gọi): mỗi bên cấp một bằng
+// chứng đi từ grantee (tenant phong bì) sang bên cấp.
+func (s *Sharing) ValveGrantors(ctx context.Context, grantee uuid.UUID, kind string, at time.Time) ([]tenant.Grant, error) {
 	gs, err := s.activeFor(ctx, grantee, kind, uuid.Nil, at)
 	if err != nil {
 		return nil, err
 	}
-	var out []uuid.UUID
+	var out []tenant.Grant
 	for _, g := range gs {
-		if !slices.Contains(out, g.Grantor) {
-			out = append(out, g.Grantor)
+		if !slices.ContainsFunc(out, func(x tenant.Grant) bool { return x.Tenant() == g.Grantor }) {
+			out = append(out, g.Access)
 		}
 	}
 	return out, nil

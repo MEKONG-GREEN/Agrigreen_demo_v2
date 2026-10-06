@@ -154,7 +154,7 @@ func TestShareGrantLifecycle_SoD_Audit_ADR0020(t *testing.T) {
 	if gs, err := vg.ValveGrantors(context.Background(), mkg, port.KindValveCollection, time.Now()); err != nil || len(gs) != 0 {
 		t.Fatalf("valve_collection chưa cấp: %v %v", gs, err)
 	}
-	if gs, err := vg.ValveGrantors(context.Background(), mkg, port.KindHTXCollectionResponses, time.Now()); err != nil || len(gs) != 1 || gs[0] != f.tenant {
+	if gs, err := vg.ValveGrantors(context.Background(), mkg, port.KindHTXCollectionResponses, time.Now()); err != nil || len(gs) != 1 || gs[0].Tenant() != f.tenant || gs[0].From() != mkg {
 		t.Fatalf("bên cấp của loại đã cấp: %v %v", gs, err)
 	}
 	// Hết hạn (đồng hồ sau valid_to) → 403.

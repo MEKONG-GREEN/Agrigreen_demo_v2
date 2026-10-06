@@ -109,7 +109,7 @@ func (s *Service) HandleCollectionValve(ctx context.Context, tx pgx.Tx, env outb
 	for _, g := range grantors {
 		if err := meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
 			SourceID: env.EventID, Channel: meteringport.ChannelValve, DataTenantID: env.TenantID,
-			CounterpartyKind: meteringport.CounterpartyTenant, CounterpartyRef: g, Product: name, ContractVersion: env.SchemaVersion,
+			CounterpartyKind: meteringport.CounterpartyTenant, CounterpartyRef: g.Tenant(), Product: name, ContractVersion: env.SchemaVersion,
 			Records: 1, Bytes: int64(len(env.Payload)), OccurredAt: env.OccurredAt, TraceID: env.TraceID,
 		}, s.Log); err != nil {
 			return err
@@ -118,7 +118,7 @@ func (s *Service) HandleCollectionValve(ctx context.Context, tx pgx.Tx, env outb
 	source := env.TenantID
 	for _, g := range grantors {
 		genv := env
-		genv.TenantID = g // ghi ở tenant bên cấp; nguồn giữ ở source_tenant_id
+		genv.TenantID = g.Tenant() // ghi ở tenant bên cấp; nguồn giữ ở source_tenant_id
 		if err := tenant.Within(ctx, tx, g, func() error {
 			if name == port.ContractCollectionSchedule {
 				return s.receiveSchedule(ctx, tx, genv, source)
