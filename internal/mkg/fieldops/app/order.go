@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"errors"
 	"regexp"
 	"strings"
 	"time"
@@ -11,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/domain"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -39,6 +37,10 @@ type OrderResult struct {
 	Order   store.Order
 	Event   store.OrderEvent
 	Exports []store.ValveExport
+	// Warnings: cảnh báo không chặn của đối chiếu danh mục (WarnDirectoryStale, WarnDirectoryUnverified).
+	Warnings []string
+	// DirectoryAsOf: as_of cũ nhất của bản sao HTX/thửa đã dùng để đối chiếu (nil = không dùng bản sao).
+	DirectoryAsOf *time.Time
 }
 
 type plan struct {
@@ -46,10 +48,13 @@ type plan struct {
 	commune  string
 	from, to time.Time
 	plots    []uuid.UUID
+	warnings []string   // cảnh báo đối chiếu danh mục
+	asOf     *time.Time // as_of cũ nhất của bản sao đã dùng
 }
 
-// validatePlan kiểm dữ liệu và đối chiếu thửa/HTX với nền tảng (ngoài giao dịch DB).
-func (s *Service) validatePlan(ctx context.Context, in PlanInput) (plan, error) {
+// validatePlan kiểm dữ liệu và đối chiếu thửa/HTX với BẢN SAO danh mục trong cụm mkg (ngoài giao dịch DB;
+// R-INT-02 — chỉ mục chưa có mới tra nền tảng, có chặn thời gian: app/directory.go).
+func (s *Service) validatePlan(ctx context.Context, tid uuid.UUID, in PlanInput) (plan, error) {
 	v := problem.Validation
 	bad := false
 	add := func(f, m string) { v, bad = v.WithField(f, m), true }
@@ -85,33 +90,15 @@ func (s *Service) validatePlan(ctx context.Context, in PlanInput) (plan, error) 
 	if bad {
 		return pl, v
 	}
-	h, err := s.Directory.Cooperative(ctx, in.HTXRef)
-	switch {
-	case errors.Is(err, port.ErrDirectoryNotFound):
-		return pl, ErrHTXNotFound
-	case err != nil:
+	if s.DirectoryUnconfigured || s.Directory == nil {
+		return pl, ErrDirectory // chưa cấu hình nguồn thửa/HTX: đóng
+	}
+	snap, err := s.dirReplica().load(ctx, tid, in.HTXRef, pl.plots)
+	if err != nil {
 		return pl, mapErr(err)
-	case !h.Active:
-		return pl, ErrHTXNotFound.WithDetail("HTX đã vô hiệu hóa")
 	}
-	if pl.commune == "" {
-		pl.commune = h.CommuneCode
-	}
-	if !communeRe.MatchString(pl.commune) {
-		return pl, problem.Validation.WithField("commune_code", "nền tảng không có mã xã của HTX — ghi commune_code")
-	}
-	for _, ref := range pl.plots {
-		p, err := s.Directory.Plot(ctx, ref)
-		switch {
-		case errors.Is(err, port.ErrDirectoryNotFound):
-			return pl, ErrPlotNotFound.WithDetail(ref.String())
-		case err != nil:
-			return pl, mapErr(err)
-		case p.CooperativeRef == nil || *p.CooperativeRef != in.HTXRef || p.Status == "retired":
-			return pl, ErrPlotOtherHTX.WithDetail(ref.String())
-		}
-	}
-	return pl, nil
+	snap = s.lookupMissing(ctx, tid, in.HTXRef, pl.plots, snap)
+	return checkDirectory(pl, snap, s.Clock.Now(), s.dirMaxAge())
 }
 
 // CreateOrder lập lệnh gom (planned, revision 1). Vai field_supervisor.
@@ -137,7 +124,7 @@ func (s *Service) CreateOrder(ctx context.Context, in PlanInput) (OrderResult, b
 	var harvests []store.PlotHarvest
 	orderID := ids.New()
 	if prev == nil {
-		if pl, err = s.validatePlan(ctx, in); err != nil {
+		if pl, err = s.validatePlan(ctx, p.TenantID, in); err != nil {
 			return res, false, err
 		}
 		// FM-01/02: ngày gặt của các thửa vào bảng đệm (ngoài giao dịch; chưa biết → gắn cờ, không chặn).
@@ -155,6 +142,9 @@ func (s *Service) CreateOrder(ctx context.Context, in PlanInput) (OrderResult, b
 		}
 		return putHarvests(ctx, tx, p.TenantID, orderID, harvests)
 	}, s.replayOrder(ctx, in.IdemKey, &res))
+	if err == nil && !replayed {
+		res.Warnings, res.DirectoryAsOf = pl.warnings, pl.asOf
+	}
 	return res, replayed, err
 }
 
@@ -167,7 +157,7 @@ func (s *Service) ReviseOrder(ctx context.Context, orderID uuid.UUID, in PlanInp
 	if err := requireIdem(in.IdemKey); err != nil {
 		return OrderResult{}, false, err
 	}
-	pl, err := s.validatePlan(ctx, in)
+	pl, err := s.validatePlan(ctx, p.TenantID, in)
 	if err != nil {
 		return OrderResult{}, false, err
 	}
@@ -179,6 +169,7 @@ func (s *Service) ReviseOrder(ctx context.Context, orderID uuid.UUID, in PlanInp
 		return nil
 	})
 	if err == nil && !replayed {
+		res.Warnings, res.DirectoryAsOf = pl.warnings, pl.asOf
 		// Bảng đệm, dựng lại được: ghi sau sự kiện (lỗi ở đây không làm hỏng lệnh gom).
 		_ = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error { return putHarvests(ctx, tx, p.TenantID, orderID, harvests) })
 	}

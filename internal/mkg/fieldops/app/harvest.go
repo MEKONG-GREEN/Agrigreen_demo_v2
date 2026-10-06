@@ -54,10 +54,35 @@ func (s *Service) fetchHarvest(ctx context.Context, orderID, plot uuid.UUID, anc
 	return h
 }
 
+// Chặn trên của việc đọc ngày gặt từ nền tảng (R-INT-02: không để thao tác người dùng chờ nền tảng vô hạn).
+const (
+	harvestBudget    = 3 * time.Second // tổng thời gian chờ trong một thao tác người dùng (lập/sửa/giao lệnh, ghi cuộn)
+	harvestJobBudget = 2 * time.Minute // mỗi lệnh gom trong job fieldops_harvest_dates
+	harvestParallel  = 8               // lời gọi song song tối đa
+)
+
+// fetchPlots đọc ngày gặt của các thửa của lệnh gom (ngoài giao dịch) trong ngân sách harvestBudget.
 func (s *Service) fetchPlots(ctx context.Context, o store.Order) []store.PlotHarvest {
+	return s.fetchPlotsWithin(ctx, o, harvestBudget)
+}
+
+// fetchPlotsWithin đọc song song (tối đa harvestParallel) với tổng thời gian ≤ budget; thửa chưa có kết
+// quả khi hết hạn → unavailable (gắn cờ, dùng bảng đệm nếu có) — không bao giờ chặn thao tác.
+func (s *Service) fetchPlotsWithin(ctx context.Context, o store.Order, budget time.Duration) []store.PlotHarvest {
+	bctx, cancel := context.WithTimeout(ctx, budget)
+	defer cancel()
+	got := newSlots[store.PlotHarvest](len(o.PlotRefs))
+	runBounded(bctx, len(o.PlotRefs), harvestParallel, func(c context.Context, i int) {
+		got.set(i, s.fetchHarvest(c, o.OrderID, o.PlotRefs[i], o.WindowFrom))
+	})
 	out := make([]store.PlotHarvest, 0, len(o.PlotRefs))
-	for _, p := range o.PlotRefs {
-		out = append(out, s.fetchHarvest(ctx, o.OrderID, p, o.WindowFrom))
+	for i, h := range got.close() {
+		if h == nil {
+			out = append(out, store.PlotHarvest{OrderID: o.OrderID, PlotRef: o.PlotRefs[i], Check: domain.HarvestUnavailable,
+				FetchedAt: s.Clock.Now()})
+			continue
+		}
+		out = append(out, *h)
 	}
 	return out
 }
@@ -123,7 +148,7 @@ func (s *Service) RefreshHarvestDates(ctx context.Context, tid uuid.UUID) (Harve
 	}
 	var r HarvestRefresh
 	for _, o := range orders {
-		hs := s.fetchPlots(ctx, o)
+		hs := s.fetchPlotsWithin(ctx, o, harvestJobBudget)
 		for _, h := range hs {
 			r.Plots++
 			switch h.Check {

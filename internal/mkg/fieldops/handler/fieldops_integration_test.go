@@ -100,7 +100,8 @@ func TestOrderApprovalSeparationOfDuties(t *testing.T) {
 	}
 }
 
-// Nguồn thửa/HTX qua PlatformDirectory: thửa HTX khác bị chặn, nền tảng không gọi được → 503.
+// Nguồn thửa/HTX qua PlatformDirectory: thửa HTX khác bị chặn, HTX lạ bị chặn; nền tảng ngừng thì
+// đối chiếu theo bản sao (directory_integration_test.go), chưa cấu hình nguồn → 503.
 func TestOrderValidatesPlatformDirectory(t *testing.T) {
 	f := newFixture(t, nil)
 	sup := f.supervisor()
@@ -113,8 +114,9 @@ func TestOrderValidatesPlatformDirectory(t *testing.T) {
 	mustCode(t, sup.post("/v1/fieldops/orders", b), http.StatusUnprocessableEntity, "fieldops.plot_other_htx", "thửa HTX khác")
 	b["htx_ref"] = ids.New().String()
 	mustCode(t, sup.post("/v1/fieldops/orders", b), http.StatusUnprocessableEntity, "fieldops.htx_not_found", "HTX lạ (RB-2)")
-	f.dir.Down = true
-	mustCode(t, sup.post("/v1/fieldops/orders", f.planBody()), http.StatusServiceUnavailable, "fieldops.directory_unavailable", "nền tảng lỗi")
+	f.svc.DirectoryUnconfigured = true
+	mustCode(t, sup.post("/v1/fieldops/orders", f.planBody()), http.StatusServiceUnavailable, "fieldops.directory_unavailable",
+		"chưa cấu hình nguồn thửa/HTX")
 }
 
 // proto FM-03/FM-04/FM-09: mỗi công đoạn bằng công đoạn trước hoặc ít hơn kèm lý do.

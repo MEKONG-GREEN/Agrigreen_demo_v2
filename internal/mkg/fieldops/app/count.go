@@ -107,7 +107,7 @@ func (s *Service) count(ctx context.Context, p authz.Principal, in CountInput) (
 			return CountResult{}, false, mapErr(err)
 		}
 		if o != nil && o.HasPlot(in.PlotRef) {
-			h := s.fetchHarvest(ctx, o.OrderID, in.PlotRef, o.WindowFrom)
+			h := s.fetchPlots(ctx, store.Order{OrderID: o.OrderID, WindowFrom: o.WindowFrom, PlotRefs: []uuid.UUID{in.PlotRef}})[0]
 			live = &h
 		}
 	}

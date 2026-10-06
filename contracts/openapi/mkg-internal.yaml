@@ -993,7 +993,7 @@ paths:
           content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: "#/components/schemas/CollectionOrder"}}, next_cursor: {type: [string, "null"]}}}}}
     post:
       summary: Lập lệnh gom (planned) — vai field_supervisor
-      description: Thửa/HTX đối chiếu với nền tảng qua Application API (tài khoản dịch vụ MKG); thửa phải thuộc HTX. Chưa công bố tới khi người KHÁC duyệt (R-56).
+      description: Thửa/HTX đối chiếu với bản sao danh mục của nền tảng trong cụm mkg (job fieldops_directory làm mới qua Application API, R-INT-02); chỉ mục chưa có mới tra trực tiếp, có chặn thời gian; thửa phải thuộc HTX. 503 chỉ khi chưa cấu hình nguồn thửa/HTX. Chưa công bố tới khi người KHÁC duyệt (R-56).
       operationId: createCollectionOrder
       tags: [fieldops]
       parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
@@ -3482,6 +3482,11 @@ components:
         order: {$ref: "#/components/schemas/CollectionOrder"}
         event: {type: object}
         publications: {type: array, items: {$ref: "#/components/schemas/ValveExport"}}
+        warnings:
+          type: array
+          description: "R-INT-02: HTX/thửa đối chiếu theo bản sao danh mục trong cụm mkg — directory_stale = bản sao cũ hơn max_age; directory_unverified = chưa có trong bản sao và không tra được nền tảng (vẫn lập, gắn cờ)"
+          items: {type: string, enum: [fieldops.directory_stale, fieldops.directory_unverified]}
+        directory_as_of: {type: [string, "null"], format: date-time, description: "as_of cũ nhất của bản sao HTX/thửa đã dùng để đối chiếu"}
     RollCountInput:
       type: object
       required: [rolls, event_time]

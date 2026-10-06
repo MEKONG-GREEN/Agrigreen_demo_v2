@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -59,6 +60,13 @@ type Service struct {
 	DB        tenant.Beginner // pool vai fieldops_app (cụm mkg)
 	Clock     clock.Clock
 	Directory port.PlatformDirectory
+	// DirectoryUnconfigured: chưa cấu hình nguồn thửa/HTX → lập/sửa lệnh gom đóng (503), không có job bản sao.
+	DirectoryUnconfigured bool
+	// DirectoryMaxAge: tuổi tối đa của bản sao HTX/thửa trước khi gắn cờ dữ liệu cũ (0 = 6 giờ; app/directory.go).
+	DirectoryMaxAge time.Duration
+	// DirectoryLookupBudget: tổng thời gian tra trực tiếp mục chưa có trong bản sao khi lập/sửa lệnh gom
+	// (0 = 2 giây; < 0 = không tra, chỉ bản sao).
+	DirectoryLookupBudget time.Duration
 	// Weighed: khối lượng cân của lô gom (mkg/measurement). nil = chưa nối → không học kg/cuộn.
 	Weighed port.WeighedMass
 	// ConfiguredKgPerRoll: kg/cuộn cấu hình (bậc 3 của chuỗi dự phòng); nil = không có. Tạm, chờ khách.
@@ -71,7 +79,9 @@ type Service struct {
 	// nối → mọi kiểm ngày gặt gắn cờ unavailable (vẫn cho ghi, không bao giờ im lặng).
 	Harvest port.HarvestCalendar
 
-	feed feedState
+	feed    feedState
+	replica directoryReplica // nil = bảng bản sao của cụm mkg (kiểm thử đơn vị thay bản giả)
+	metrics feedMetrics
 }
 
 var _ port.RollTotals = (*Service)(nil)

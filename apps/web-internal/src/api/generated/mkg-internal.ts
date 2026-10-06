@@ -1022,7 +1022,7 @@ export interface paths {
         put?: never;
         /**
          * Lập lệnh gom (planned) — vai field_supervisor
-         * @description Thửa/HTX đối chiếu với nền tảng qua Application API (tài khoản dịch vụ MKG); thửa phải thuộc HTX. Chưa công bố tới khi người KHÁC duyệt (R-56).
+         * @description Thửa/HTX đối chiếu với bản sao danh mục của nền tảng trong cụm mkg (job fieldops_directory làm mới qua Application API, R-INT-02); chỉ mục chưa có mới tra trực tiếp, có chặn thời gian; thửa phải thuộc HTX. 503 chỉ khi chưa cấu hình nguồn thửa/HTX. Chưa công bố tới khi người KHÁC duyệt (R-56).
          */
         post: operations["createCollectionOrder"];
         delete?: never;
@@ -3985,6 +3985,13 @@ export interface components {
             order?: components["schemas"]["CollectionOrder"];
             event?: Record<string, never>;
             publications?: components["schemas"]["ValveExport"][];
+            /** @description R-INT-02: HTX/thửa đối chiếu theo bản sao danh mục trong cụm mkg — directory_stale = bản sao cũ hơn max_age; directory_unverified = chưa có trong bản sao và không tra được nền tảng (vẫn lập, gắn cờ) */
+            warnings?: ("fieldops.directory_stale" | "fieldops.directory_unverified")[];
+            /**
+             * Format: date-time
+             * @description as_of cũ nhất của bản sao HTX/thửa đã dùng để đối chiếu
+             */
+            directory_as_of?: string | null;
         };
         RollCountInput: {
             /**

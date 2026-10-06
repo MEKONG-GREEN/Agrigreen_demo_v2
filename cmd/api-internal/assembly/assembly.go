@@ -185,6 +185,18 @@ func Jobs(mods Modules, tenantPool *pgxpool.Pool, selected string, log *slog.Log
 		}
 		out = append(out, mods.Fieldops.HarvestJobs(tid, interval, log)...)
 	}
+	if picked(foport.JobDirectory) {
+		// R-INT-02: bản sao danh mục HTX/thửa trong cụm mkg — lập lệnh gom không gọi nền tảng cho mục đã có.
+		tid, err := EnvUUID("AG_MKG_TENANT_ID")
+		if err != nil {
+			return nil, err
+		}
+		interval, err := EnvDuration("AG_FIELDOPS_DIRECTORY_POLL_INTERVAL")
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, mods.Fieldops.DirectoryJobs(tid, interval, log)...)
+	}
 	if picked(logistics.JobAlerts) {
 		// L-08: cảnh báo ghe chưa cân > N giờ, đăng kiểm hết / sắp hết hạn (AG_LOGISTICS_ALERT_INTERVAL, mặc định 15m).
 		interval, err := EnvDuration("AG_LOGISTICS_ALERT_INTERVAL")
@@ -236,8 +248,8 @@ func EnvDuration(name string) (time.Duration, error) {
 
 // JobNames liệt kê tên job hợp lệ của api-internal.
 func JobNames() string {
-	return hubport.JobDailyCapacity + ", " + foport.JobHTXResponses + ", " + foport.JobHarvestDates + ", " + logistics.JobAlerts + ", " +
-		acctbridge.JobPushRetry
+	return hubport.JobDailyCapacity + ", " + foport.JobHTXResponses + ", " + foport.JobHarvestDates + ", " + foport.JobDirectory + ", " +
+		logistics.JobAlerts + ", " + acctbridge.JobPushRetry
 }
 
 // FieldopsOptionsFromEnv đọc cấu hình mkg/fieldops:
@@ -255,6 +267,10 @@ func JobNames() string {
 //	AG_FIELDOPS_HARVEST_POLL_INTERVAL chu kỳ làm mới ngày gặt (job fieldops_harvest_dates, mặc định 1h)
 //	    Ngày gặt đọc qua GET /v1/partner/season-harvest-dates (cùng tài khoản dịch vụ); thiếu cấu
 //	    hình → kiểm ngày gặt gắn cờ unavailable (vẫn cho ghi, FM-01).
+//	AG_FIELDOPS_DIRECTORY_POLL_INTERVAL chu kỳ làm mới bản sao danh mục HTX/thửa (job fieldops_directory, mặc định 15m)
+//	AG_FIELDOPS_DIRECTORY_MAX_AGE tuổi tối đa của bản sao trước khi lệnh gom gắn cờ fieldops.directory_stale (mặc định 6h)
+//	AG_FIELDOPS_DIRECTORY_LOOKUP_BUDGET tổng thời gian tra trực tiếp HTX/thửa CHƯA có trong bản sao khi lập/sửa lệnh gom
+//	    (mặc định 2s; "off" = chỉ bản sao, không gọi nền tảng trong thao tác người dùng — R-INT-02)
 //
 // WeighedMass (mkg/measurement) nối trong Build.
 func FieldopsOptionsFromEnv(clk clock.Clock) fieldops.Options {
@@ -276,6 +292,18 @@ func FieldopsOptionsFromEnv(clk clock.Clock) fieldops.Options {
 	}
 	if k := os.Getenv("AG_FIELDOPS_CURSOR_KEY"); k != "" {
 		o.CursorKey = []byte(k)
+	}
+	if d, err := time.ParseDuration(os.Getenv("AG_FIELDOPS_DIRECTORY_MAX_AGE")); err == nil && d > 0 {
+		o.DirectoryMaxAge = d
+	}
+	switch b := strings.TrimSpace(os.Getenv("AG_FIELDOPS_DIRECTORY_LOOKUP_BUDGET")); b {
+	case "":
+	case "off":
+		o.DirectoryLookupBudget = -1
+	default:
+		if d, err := time.ParseDuration(b); err == nil && d > 0 {
+			o.DirectoryLookupBudget = d
+		}
 	}
 	return o
 }

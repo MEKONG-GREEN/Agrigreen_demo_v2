@@ -2,18 +2,24 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"sync"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -33,7 +39,10 @@ type FeedResult struct {
 	Recorded  int   // ghi thành htx_confirmation mới
 	Duplicate int   // đã có (phát lại / lượt trước)
 	Skipped   int   // bảng kê không có ở MKG, revision / số cuộn đã cũ, sai HTX/thửa hoặc sai quy tắc
+	Parked    int   // lỗi vĩnh viễn khi ghi: gác vào htx_feed_parked, con trỏ vẫn tiến (cảnh báo vận hành)
 	Cursor    int64 // con trỏ sau lượt
+	// LastParked: mã lỗi của mục bị gác cuối cùng trong lượt (rỗng = không có) — cho dòng log của job.
+	LastParked string
 }
 
 // feedState giữ con trỏ luồng trong tiến trình (dựng lại từ sổ khi khởi động).
@@ -80,13 +89,26 @@ func (s *Service) SyncHTXResponses(ctx context.Context, tid uuid.UUID) (FeedResu
 		for _, it := range pg.Items {
 			outcome, err := s.applyHTXResponse(ctx, tid, it)
 			if err != nil {
-				return res, err
+				// Lỗi vĩnh viễn (dữ liệu / ràng buộc): gác mục kèm lỗi rồi đi tiếp — không để một mục hỏng chặn
+				// luồng mãi (job 5 phút lặp lại cùng mục). Lỗi tạm thời (DB, mạng): dừng lượt, con trỏ giữ nguyên.
+				code, permanent := classifyFeedErr(err)
+				if !permanent {
+					return res, err
+				}
+				if perr := s.parkHTXResponse(ctx, tid, it, code, err); perr != nil {
+					return res, perr
+				}
+				s.metrics.parked(ctx, code)
+				res.LastParked = code
+				outcome = feedParked
 			}
 			switch outcome {
 			case feedRecorded:
 				res.Recorded++
 			case feedDuplicate:
 				res.Duplicate++
+			case feedParked:
+				res.Parked++
 			default:
 				res.Skipped++
 			}
@@ -108,7 +130,89 @@ const (
 	feedRecorded feedOutcome = iota + 1
 	feedDuplicate
 	feedSkipped
+	feedParked
 )
+
+// classifyFeedErr phân loại lỗi khi ghi một phản hồi: permanent = ghi lại bao nhiêu lần cũng hỏng như nhau
+// (lỗi dữ liệu / ràng buộc của PostgreSQL lớp 22, 23 trừ 23505; lỗi nghiệp vụ 4xx; lỗi trường của domain). Còn
+// lại (mất kết nối, hết thời gian, khóa chết, trùng khóa do ghi song song, thiếu quyền do cấu hình…) là tạm
+// thời — job thử lại lượt sau (trùng idem_key thật đã là Duplicate ở applyHTXResponse).
+func classifyFeedErr(err error) (code string, permanent bool) {
+	var pe *pgconn.PgError
+	var pr *problem.Problem
+	var fe domain.FieldError
+	switch {
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+		return "", false
+	case errors.As(err, &pe):
+		return "sqlstate." + pe.Code, strings.HasPrefix(pe.Code, "22") || (strings.HasPrefix(pe.Code, "23") && pe.Code != "23505")
+	case errors.As(err, &pr):
+		return pr.Code, pr.Status >= 400 && pr.Status < 500
+	case errors.As(err, &fe):
+		return "validation." + fe.Field, true
+	}
+	return "", false
+}
+
+// parkHTXResponse gác phản hồi lỗi vĩnh viễn vào htx_feed_parked (giao dịch riêng — giao dịch ghi đã hủy).
+func (s *Service) parkHTXResponse(ctx context.Context, tid uuid.UUID, it port.HTXResponse, code string, cause error) error {
+	clean := it
+	if it.Reason != nil {
+		r := sanitizeText(*it.Reason, 2000)
+		clean.Reason = &r
+	}
+	clean.Outcome = sanitizeText(it.Outcome, 100)
+	payload, err := json.Marshal(clean)
+	if err != nil {
+		return err
+	}
+	p := store.ParkedResponse{Cursor: it.Cursor, ResponseID: it.ResponseID, StatementRef: it.StatementRef,
+		Code: sanitizeText(code, 100), Detail: sanitizeText(cause.Error(), 1000), Payload: payload, ParkedAt: s.Clock.Now()}
+	return tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error { return store.ParkResponse(ctx, tx, tid, p) })
+}
+
+// sanitizeText bỏ ký tự NUL / UTF-8 hỏng (PostgreSQL text và jsonb từ chối) và cắt còn tối đa n ký tự.
+func sanitizeText(v string, n int) string {
+	v = strings.ReplaceAll(strings.ToValidUTF8(v, "\uFFFD"), "\x00", "")
+	if r := []rune(v); len(r) > n {
+		v = string(r[:n])
+	}
+	return v
+}
+
+// MetricFeedParked: phản hồi HTX bị gác vì lỗi vĩnh viễn, theo code (> 0 → cảnh báo vận hành xử lý tay).
+const MetricFeedParked = "ag.fieldops.htx_feed.parked"
+
+// feedMetrics đếm mục bị gác (OTLP khi telemetry bật; bản sao trong tiến trình cho kiểm thử).
+type feedMetrics struct {
+	once    sync.Once
+	counter metric.Int64Counter
+	mu      sync.Mutex
+	total   int64
+}
+
+func (m *feedMetrics) parked(ctx context.Context, code string) {
+	m.mu.Lock()
+	m.total++
+	m.mu.Unlock()
+	if !telemetry.Enabled() {
+		return
+	}
+	m.once.Do(func() {
+		m.counter, _ = telemetry.Meter().Int64Counter(MetricFeedParked,
+			metric.WithDescription("Phản hồi HTX bị gác vì lỗi vĩnh viễn — cần vận hành xử lý"))
+	})
+	if m.counter != nil {
+		m.counter.Add(ctx, 1, metric.WithAttributes(attribute.String("code", code)))
+	}
+}
+
+// FeedParkedTotal trả số phản hồi HTX đã gác trong tiến trình (kiểm thử, chẩn đoán).
+func (s *Service) FeedParkedTotal() int64 {
+	s.metrics.mu.Lock()
+	defer s.metrics.mu.Unlock()
+	return s.metrics.total
+}
 
 func (s *Service) applyHTXResponse(ctx context.Context, tid uuid.UUID, it port.HTXResponse) (feedOutcome, error) {
 	key := store.PlatformIdemKey(it.Cursor, it.ResponseID)

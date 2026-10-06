@@ -34,8 +34,13 @@ const DBRole = port.DBRole
 
 // Options là phụ thuộc tùy chọn của module.
 type Options struct {
-	// Directory: nguồn thửa/HTX; nil → Unconfigured (đóng: lập lệnh gom trả 503).
+	// Directory: nguồn thửa/HTX; nil → Unconfigured (đóng: lập lệnh gom trả 503). Lập/sửa lệnh gom đối chiếu
+	// với bản sao trong cụm mkg do job fieldops_directory làm mới (R-INT-02, app/directory.go).
 	Directory port.PlatformDirectory
+	// DirectoryMaxAge: tuổi tối đa của bản sao HTX/thửa trước khi gắn cờ fieldops.directory_stale (0 = 6 giờ).
+	DirectoryMaxAge time.Duration
+	// DirectoryLookupBudget: tổng thời gian tra trực tiếp mục chưa có trong bản sao (0 = 2 giây; < 0 = tắt).
+	DirectoryLookupBudget time.Duration
 	// Weighed: khối lượng cân của lô gom; nil → chưa học kg/cuộn (dùng cấu hình / 20).
 	Weighed port.WeighedMass
 	// KgPerRoll: kg/cuộn cấu hình (tạm, chờ khách); nil = không có.
@@ -54,14 +59,16 @@ type Module struct{ svc *app.Service }
 
 // New tạo module với pool của vai fieldops_app (cụm mkg).
 func New(db tenant.Beginner, clk clock.Clock, o Options) *Module {
-	if o.Directory == nil {
+	unconfigured := o.Directory == nil
+	if unconfigured {
 		o.Directory = adapter.Unconfigured{}
 	}
 	if len(o.CursorKey) == 0 {
 		o.CursorKey = make([]byte, 32)
 		_, _ = rand.Read(o.CursorKey)
 	}
-	return &Module{svc: &app.Service{DB: db, Clock: clk, Directory: o.Directory, Weighed: o.Weighed,
+	return &Module{svc: &app.Service{DB: db, Clock: clk, Directory: o.Directory, DirectoryUnconfigured: unconfigured,
+		DirectoryMaxAge: o.DirectoryMaxAge, DirectoryLookupBudget: o.DirectoryLookupBudget, Weighed: o.Weighed,
 		ConfiguredKgPerRoll: o.KgPerRoll, CursorKey: o.CursorKey, Feed: o.Feed, Harvest: o.Harvest}}
 }
 
@@ -114,6 +121,37 @@ func (m *Module) HarvestJobs(tid uuid.UUID, interval time.Duration, log *slog.Lo
 	}}
 }
 
+// DirectoryJobs trả job làm mới bản sao danh mục HTX/thửa (R-INT-02) mỗi interval (mặc định 15 phút) cho
+// tenant MKG tid. Chưa cấu hình nguồn thửa/HTX → không có job.
+func (m *Module) DirectoryJobs(tid uuid.UUID, interval time.Duration, log *slog.Logger) []schedule.Job {
+	if m.svc.DirectoryUnconfigured || tid == uuid.Nil {
+		return nil
+	}
+	if interval <= 0 {
+		interval = 15 * time.Minute
+	}
+	return []schedule.Job{{
+		Name: port.JobDirectory, Spec: schedule.Every{Interval: interval}, RunOnStart: true, Timeout: 30 * time.Minute,
+		Run: func(ctx context.Context) error {
+			r, err := m.svc.RefreshDirectory(ctx, tid)
+			if log != nil {
+				outcome := "ok"
+				if err != nil {
+					outcome = "error"
+				}
+				log.Info("làm mới bản sao danh mục HTX/thửa", "event", "job."+port.JobDirectory, "htx", r.HTX, "plots", r.Plots,
+					"present", r.Present, "absent", r.Absent, "unavailable", r.Unavailable, "outcome", outcome)
+			}
+			return err
+		},
+	}}
+}
+
+// RefreshDirectory chạy một lượt làm mới bản sao danh mục HTX/thửa cho tenant tid (job, kiểm thử).
+func (m *Module) RefreshDirectory(ctx context.Context, tid uuid.UUID) (app.DirectoryRefresh, error) {
+	return m.svc.RefreshDirectory(ctx, tid)
+}
+
 // RefreshHarvestDates chạy một lượt làm mới bảng đệm ngày gặt cho tenant tid (job, kiểm thử).
 func (m *Module) RefreshHarvestDates(ctx context.Context, tid uuid.UUID) (app.HarvestRefresh, error) {
 	return m.svc.RefreshHarvestDates(ctx, tid)
@@ -133,7 +171,12 @@ func (m *Module) htxJobs(tid uuid.UUID, interval time.Duration, log *slog.Logger
 					outcome = "error"
 				}
 				log.Info("kéo phản hồi của HTX", "event", "job."+port.JobHTXResponses, "recorded", r.Recorded,
-					"duplicate", r.Duplicate, "skipped", r.Skipped, "cursor", r.Cursor, "outcome", outcome)
+					"duplicate", r.Duplicate, "skipped", r.Skipped, "parked", r.Parked, "cursor", r.Cursor, "outcome", outcome)
+				if r.Parked > 0 {
+					// Mục lỗi vĩnh viễn đã gác (htx_feed_parked) — vận hành xử lý tay; metric ag.fieldops.htx_feed.parked.
+					log.Warn("gác phản hồi HTX lỗi vĩnh viễn", "event", "job."+port.JobHTXResponses+".parked",
+						"parked", r.Parked, "code", r.LastParked, "outcome", "parked")
+				}
 			}
 			return err
 		},

@@ -80,7 +80,9 @@ func toExports(xs []store.ValveExport) []exportDTO {
 }
 
 func toOrderResult(r app.OrderResult) map[string]any {
-	return map[string]any{"order": toOrder(r.Order), "event": toOrderEvent(r.Event), "publications": toExports(r.Exports)}
+	// warnings / directory_as_of: đối chiếu HTX/thửa theo bản sao danh mục (R-INT-02) — cũ hoặc chưa đối chiếu thì gắn cờ.
+	return map[string]any{"order": toOrder(r.Order), "event": toOrderEvent(r.Event), "publications": toExports(r.Exports),
+		"warnings": nonNil(r.Warnings), "directory_as_of": r.DirectoryAsOf}
 }
 
 type rollDTO struct {
