@@ -21,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/shopspring/decimal"
 
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/store"
@@ -96,7 +97,7 @@ type Service struct {
 	Clock    clock.Clock
 	Scope    partyport.ScopeResolver // phạm vi cán bộ KN; thiếu → vai KN nhận 503
 	Orgs     partyport.Orgs          // tùy chọn: kiểm HTX đang hoạt động
-	Plots    geoport.Plots           // bắt buộc cho ghi: thửa, diện tích, khoảng cách GPS
+	Plots    coopport.Plots          // bắt buộc cho ghi: thửa, diện tích, khoảng cách GPS (pf/cooperative, W3.2)
 	Params   params.Params           // tùy chọn: ngưỡng GPS, ngưỡng năng suất bất thường
 	Catalogs mdport.Catalogs         // tùy chọn: giống lúa, vụ, máy (thiếu → chỉ kiểm dạng mã)
 	Farmers  port.FarmerHouseholds   // liên kết tài khoản ↔ nông hộ; thiếu → vai farmer nhận 503
@@ -105,9 +106,9 @@ type Service struct {
 	Sharing partyport.PartnerAccess
 	// ValveGrants (ADR-0020): tenant bên cấp nhận van collection_* của tenant phong bì; thiếu → DLQ.
 	ValveGrants partyport.ValveGrants
-	// PlotFacts + Units (G5): sản phẩm collection_volume — xã/nông hộ/diện tích thửa (pf/geo), xã →
-	// tỉnh (pf/masterdata). Thiếu → nguồn trả 503 cropcycle.dependency_unavailable.
-	PlotFacts geoport.PlotFacts
+	// PlotFacts + Units (G5): sản phẩm collection_volume — xã/nông hộ/diện tích thửa (pf/cooperative
+	// Plots.Facts), xã → tỉnh (pf/masterdata). Thiếu → nguồn trả 503 cropcycle.dependency_unavailable.
+	PlotFacts coopport.Plots
 	Units     partyport.AdminUnits
 	// Egress (G5, ADR-0024): điểm kiểm soát xuất (pf/metering) — consumer van collection gọi Guard
 	// kênh valve sau ValveTargets, mỗi bên cấp một lần. Nil → hành vi cũ.
@@ -271,19 +272,19 @@ func (a access) sopVisibility() (all bool, coop uuid.UUID) {
 // Phụ thuộc
 // ---------------------------------------------------------------------------
 
-// plot đọc thửa qua pf/geo và kiểm thửa đã gán HTX, chưa ngừng dùng.
-func (s *Service) plot(ctx context.Context, ref uuid.UUID) (geoport.Plot, error) {
+// plot đọc thửa qua pf/cooperative và kiểm thửa đã gán HTX, chưa ngừng dùng.
+func (s *Service) plot(ctx context.Context, ref uuid.UUID) (coopport.Plot, error) {
 	if s.Plots == nil {
-		return geoport.Plot{}, ErrDependency.WithDetail("chưa nối pf/geo (thửa)")
+		return coopport.Plot{}, ErrDependency.WithDetail("chưa nối pf/cooperative (thửa)")
 	}
 	pl, err := s.Plots.Get(ctx, ref)
-	if errors.Is(err, geoport.ErrPlotNotFound) {
+	if errors.Is(err, coopport.ErrPlotNotFound) {
 		return pl, ErrPlotNotFound
 	}
 	if err != nil {
 		return pl, ErrDependency.WithDetail("không tra được thửa").WithCause(err)
 	}
-	if pl.Status != geoport.StatusActive || pl.CooperativeRef == uuid.Nil {
+	if pl.Status != coopport.PlotActive || pl.CooperativeRef == uuid.Nil {
 		return pl, ErrPlotInvalid
 	}
 	if !pl.AreaHa.IsPositive() {

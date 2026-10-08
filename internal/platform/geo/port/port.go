@@ -68,6 +68,10 @@ var ErrPlotNotFound = errors.New("geo: không có thửa")
 
 // Plots tra cứu thửa cho module khác. Tenant lấy từ context. Không kiểm phạm vi
 // người gọi — module gọi tự kiểm.
+//
+// Thay thế (W3.2): bên tiêu thụ tầng domain dùng cooperativeport.Plots; cổng này còn cho bên tiêu thụ
+// tầng dưới và bộ chuyển cmd/internal/coopwire, xóa ở W3.3 (docs/design/cooperative.md mục 4). Không ghi
+// "Deprecated:" để staticcheck không chặn các chỗ dùng hợp lệ còn lại.
 type Plots interface {
 	Get(ctx context.Context, ref uuid.UUID) (Plot, error)
 	// DistanceM trả khoảng cách trắc địa (mét, làm tròn) từ điểm WGS84 tới ranh

@@ -4,6 +4,7 @@ app: SIM
 description: Mô phỏng chọn hub (dom/hubsim) và mạng đường thủy (dom/waterway)
 modules:
   pf/accounts: ">=1.0 <2"
+  pf/cooperative: ">=1.0 <2"   # nguồn cung HTX × vụ, toạ độ HTX
   pf/cropcycle: ">=1.0 <2"     # mô hình cung từ vụ
   pf/geo: ">=1.0 <2"           # kho/hub và dung lượng
   pf/masterdata: ">=1.0 <2"

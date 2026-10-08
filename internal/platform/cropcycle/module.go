@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
@@ -38,8 +39,8 @@ type Deps struct {
 	Scope partyport.ScopeResolver
 	// Orgs (tùy chọn): kiểm HTX đang hoạt động khi mở vụ, tạo SOP riêng của HTX.
 	Orgs partyport.Orgs
-	// Plots: thửa, diện tích, khoảng cách GPS (pf/geo). Bắt buộc cho ghi.
-	Plots geoport.Plots
+	// Plots: thửa, diện tích, khoảng cách GPS (pf/cooperative, W3.2). Bắt buộc cho ghi.
+	Plots coopport.Plots
 	// Params (tùy chọn): cropcycle.gps_match_tolerance_m, cropcycle.yield_anomaly_max_t_per_ha[:giống].
 	Params params.Params
 	// Catalogs (tùy chọn): rice_variety, season, machine_type.
@@ -65,9 +66,9 @@ func (m *Module) UseSharing(pa partyport.PartnerAccess, vg partyport.ValveGrants
 	m.svc.Sharing, m.svc.ValveGrants = pa, vg
 }
 
-// UseCollectionVolume (G5) nối nguồn của sản phẩm dữ liệu collection_volume: dữ kiện thửa (pf/geo)
-// và đơn vị hành chính (pf/masterdata).
-func (m *Module) UseCollectionVolume(pf geoport.PlotFacts, units partyport.AdminUnits) {
+// UseCollectionVolume (G5) nối nguồn của sản phẩm dữ liệu collection_volume: dữ kiện thửa
+// (pf/cooperative Plots.Facts) và đơn vị hành chính (pf/masterdata).
+func (m *Module) UseCollectionVolume(pf coopport.Plots, units partyport.AdminUnits) {
 	m.svc.PlotFacts, m.svc.Units = pf, units
 }
 

@@ -11,10 +11,8 @@ import (
 	"github.com/shopspring/decimal"
 
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
-	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	simport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation/port"
 	wwport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -29,13 +27,17 @@ func TestMain(m *testing.M) { os.Exit(pgtest.Run(m)) }
 
 // ---- giả lập port ----
 
-type fakeSupply struct{ rows []ccport.CoopSeasonSupply }
+// fakeSupply cài coopport.Seasons.Supply (cổng khác không dùng: nil nhúng).
+type fakeSupply struct {
+	coopport.Seasons
+	rows []coopport.CoopSeasonSupply
+}
 
-func (f fakeSupply) SeasonSupply(ctx context.Context, year int) ([]ccport.CoopSeasonSupply, error) {
+func (f fakeSupply) Supply(ctx context.Context, year int) ([]coopport.CoopSeasonSupply, error) {
 	if _, err := tenant.FromContext(ctx); err != nil {
 		return nil, err
 	}
-	var out []ccport.CoopSeasonSupply
+	var out []coopport.CoopSeasonSupply
 	for _, r := range f.rows {
 		if r.SeasonYear == year {
 			out = append(out, r)
@@ -44,16 +46,20 @@ func (f fakeSupply) SeasonSupply(ctx context.Context, year int) ([]ccport.CoopSe
 	return out, nil
 }
 
-type fakeSites []partyport.CooperativeSite
-
-func (f fakeSites) ActiveCooperatives(context.Context) ([]partyport.CooperativeSite, error) {
-	return f, nil
+// fakeCoops cài coopport.Cooperatives.Active + Centroids (ByUnit không dùng: nil nhúng).
+type fakeCoops struct {
+	coopport.Cooperatives
+	sites     []coopport.CooperativeSite
+	centroids map[uuid.UUID]coopport.CoopCentroid
 }
 
-type fakeCentroids map[uuid.UUID]geoport.CoopCentroid
+func (f fakeCoops) Active(context.Context) ([]coopport.CooperativeSite, error) { return f.sites, nil }
 
-func (f fakeCentroids) CoopCentroids(context.Context, []uuid.UUID) (map[uuid.UUID]geoport.CoopCentroid, error) {
-	return f, nil
+func (f fakeCoops) Centroids(context.Context, []uuid.UUID) (map[uuid.UUID]coopport.CoopCentroid, error) {
+	if f.centroids == nil {
+		return nil, coopport.ErrUnavailable
+	}
+	return f.centroids, nil
 }
 
 type fakeCatalogs []mdport.CatalogItem
@@ -90,18 +96,17 @@ func dec(s string) *decimal.Decimal { d := decimal.RequireFromString(s); return 
 func TestSupplySourceFromCropcyclePartyGeo(t *testing.T) {
 	c1, c2, c3 := ids.New(), ids.New(), ids.New()
 	src := SupplySource{
-		Seasons: fakeSupply{rows: []ccport.CoopSeasonSupply{
+		Seasons: fakeSupply{rows: []coopport.CoopSeasonSupply{
 			{CooperativeRef: c1, SeasonCode: "DX", SeasonYear: 2025, AreaHa: decimal.RequireFromString("120.5"), PaddyKg: decimal.RequireFromString("813375")},
 			{CooperativeRef: c1, SeasonCode: "XX", SeasonYear: 2025, AreaHa: decimal.NewFromInt(1), PaddyKg: decimal.NewFromInt(1)},
 			{CooperativeRef: c2, SeasonCode: "ht", SeasonYear: 2025, AreaHa: decimal.NewFromInt(10), PaddyKg: decimal.NewFromInt(60000)},
 			{CooperativeRef: c3, SeasonCode: "DX", SeasonYear: 2024, AreaHa: decimal.NewFromInt(5), PaddyKg: decimal.NewFromInt(30000)},
 		}},
-		Coops: fakeSites{
+		Coops: fakeCoops{sites: []coopport.CooperativeSite{
 			{Ref: c1, Members: 42, Lon: dec("105.1"), Lat: dec("10.1")},
 			{Ref: c2, Members: 7, Lon: dec("105.9"), Lat: dec("10.9")},
 			{Ref: c3, Members: 3},
-		},
-		Centroids: fakeCentroids{c1: {CooperativeRef: c1, Lon: decimal.RequireFromString("105.5"), Lat: decimal.RequireFromString("10.5")}},
+		}, centroids: map[uuid.UUID]coopport.CoopCentroid{c1: {CooperativeRef: c1, Lon: decimal.RequireFromString("105.5"), Lat: decimal.RequireFromString("10.5")}}},
 		Catalogs: fakeCatalogs{
 			{Catalog: "season", Code: "DX", Active: true, Attrs: map[string]string{"end_month": "3"}},
 			{Catalog: "season", Code: "HT", Active: true, Attrs: map[string]string{"end_month": "8"}},
@@ -179,9 +184,13 @@ func TestWaterwayRouterPinsVersionAndLabels(t *testing.T) {
 	}
 }
 
-type fakePlotHH struct{ m map[string][]uuid.UUID }
+// fakePlotHH cài coopport.Households.InCommunes (Membership không dùng: nil nhúng).
+type fakePlotHH struct {
+	coopport.Households
+	m map[string][]uuid.UUID
+}
 
-func (f fakePlotHH) HouseholdsInCommunes(ctx context.Context, communes []string) ([]uuid.UUID, error) {
+func (f fakePlotHH) InCommunes(ctx context.Context, communes []string) ([]uuid.UUID, error) {
 	if _, err := tenant.FromContext(ctx); err != nil {
 		return nil, err
 	}
@@ -208,12 +217,14 @@ func (f fakeFarmerAcc) SubjectsForHouseholds(_ context.Context, hh []uuid.UUID) 
 
 var _ accport.FarmerAccounts = fakeFarmerAcc{}
 
+// fakeStats cài coopport.Seasons.ActivityByCooperative (cổng khác không dùng: nil nhúng).
 type fakeStats struct {
-	m map[uuid.UUID]ccport.CoopActivity
+	coopport.Seasons
+	m map[uuid.UUID]coopport.CoopActivity
 }
 
-func (f fakeStats) ActivityByCooperative(_ context.Context, coops []uuid.UUID) (map[uuid.UUID]ccport.CoopActivity, error) {
-	out := map[uuid.UUID]ccport.CoopActivity{}
+func (f fakeStats) ActivityByCooperative(_ context.Context, coops []uuid.UUID) (map[uuid.UUID]coopport.CoopActivity, error) {
+	out := map[uuid.UUID]coopport.CoopActivity{}
 	for _, c := range coops {
 		if a, ok := f.m[c]; ok {
 			out[c] = a
@@ -221,15 +232,12 @@ func (f fakeStats) ActivityByCooperative(_ context.Context, coops []uuid.UUID) (
 	}
 	return out, nil
 }
-func (fakeStats) SeasonAreas(context.Context, uuid.UUID, string, int) ([]ccport.CoopSeasonArea, error) {
-	return nil, nil
-}
 
-// HTX US-NEWS-03 (thửa pf/geo → tài khoản pf/accounts) và HTX US-HTXSTATUS-01 AC-1
-// (vụ mở / nhật ký chờ duyệt của pf/cropcycle cho pf/party).
+// HTX US-NEWS-03 (nông hộ có thửa của pf/cooperative → tài khoản pf/accounts) và HTX US-HTXSTATUS-01 AC-1
+// (vụ mở / nhật ký chờ duyệt của pf/cooperative cho pf/party).
 func TestAreaFarmersAndSeasonActivityAdapters(t *testing.T) {
 	h1, h2, h3, u1, u2 := ids.New(), ids.New(), ids.New(), ids.New(), ids.New()
-	a := AreaFarmers{Plots: fakePlotHH{m: map[string][]uuid.UUID{"31117": {h1, h2}, "31120": {h3}}}, Accounts: fakeFarmerAcc{h1: u1, h3: u2}}
+	a := AreaFarmers{Households: fakePlotHH{m: map[string][]uuid.UUID{"31117": {h1, h2}, "31120": {h3}}}, Accounts: fakeFarmerAcc{h1: u1, h3: u2}}
 	got, err := a.FarmersInCommunes(context.Background(), ids.New(), []string{"31117"})
 	if err != nil || !slices.Equal(got, []uuid.UUID{u1}) {
 		t.Fatalf("nông dân xã 31117 (h2 chưa có tài khoản): %v %v", got, err)
@@ -238,7 +246,7 @@ func TestAreaFarmersAndSeasonActivityAdapters(t *testing.T) {
 		t.Fatalf("xã không có thửa: %v", got)
 	}
 	coop := ids.New()
-	sa := SeasonActivity{Stats: fakeStats{m: map[uuid.UUID]ccport.CoopActivity{coop: {CooperativeRef: coop, OpenSeasons: 4, PendingLogs: 9}}}}
+	sa := SeasonActivity{Seasons: fakeStats{m: map[uuid.UUID]coopport.CoopActivity{coop: {CooperativeRef: coop, OpenSeasons: 4, PendingLogs: 9}}}}
 	if o, p, err := sa.CoopActivity(context.Background(), coop); err != nil || o != 4 || p != 9 {
 		t.Fatalf("hoạt động HTX: %d %d %v", o, p, err)
 	}
@@ -265,7 +273,7 @@ func TestBuildWiresG2Consumers(t *testing.T) {
 		names[c.Name] = true
 	}
 	tid := ids.New()
-	src := SupplySource{Seasons: mods.CropCycle.SupplyStats(), Coops: mods.Party.CooperativeSites(), Centroids: mods.Geo.CoopCentroids(), Catalogs: mods.MasterData.Catalogs()}
+	src := SupplySource{Seasons: mods.Cooperative.Seasons(), Coops: mods.Cooperative.Cooperatives(), Catalogs: mods.MasterData.Catalogs()}
 	sup, err := src.Supply(context.Background(), tid, simport.SupplyQuery{ReferenceYear: 2026})
 	if err != nil || len(sup.Cooperatives) != 0 || len(sup.Seasons) == 0 {
 		t.Fatalf("nguồn cung tenant rỗng: %+v %v", sup, err)
@@ -273,7 +281,7 @@ func TestBuildWiresG2Consumers(t *testing.T) {
 	if v, err := (WaterwayRouter{WW: mods.Waterway.Router()}).NetworkVersion(context.Background(), tid); err != nil || v != "" {
 		t.Fatalf("chưa có mạng: %q %v", v, err)
 	}
-	af := AreaFarmers{Plots: mods.Geo.PlotHouseholds(), Accounts: mods.Accounts.FarmerAccounts()}
+	af := AreaFarmers{Households: mods.Cooperative.Households(), Accounts: mods.Accounts.FarmerAccounts()}
 	if got, err := af.FarmersInCommunes(context.Background(), tid, nil); err != nil || len(got) != 0 {
 		t.Fatalf("nông dân tenant rỗng: %v %v", got, err)
 	}

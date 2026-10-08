@@ -121,7 +121,7 @@ Giữ cả hai cơ chế, tách nghĩa:
 | W1.3 | `app/*/app.yaml`, kiểm `cmd/*/assembly` ⊆ hợp `app.yaml` |
 | W1.4 | Bật module theo đơn vị (`module_enablement`, pf 000088), menu lọc |
 | W3.1 | Thiết kế ranh giới `pf/cooperative`: kiểm kê bảng, port, `module.yaml`, kế hoạch W3.3–W3.4 — [docs/design/cooperative.md](../design/cooperative.md) |
-| W3.2 | Module `pf/cooperative` |
+| W3.2 | Module `pf/cooperative` (`kind: domain`) — xong 08/10/2026: mặt tiền không DB, đỉnh lá của đồ thị (nguồn cũ nối ở gốc lắp ráp, `cmd/internal/coopwire`); chỉ module domain import `cooperativeport` (R-MOD-05), tầng dưới dùng interface tự khai ([ghi chú](../design/cooperative.md#16-ghi-chú-hiện-thực-w32)) |
 | W6.1 | `pf/workflow` (`cap/workflow`, capability, pf 000118). `pf/masterdata` (capability) import `workflow/port` trực tiếp; `pf/party` (kernel) KHÔNG được import tầng trên (mục 5) nên khai interface của mình (`party/port.FourEyes`) và gốc lắp ráp `cmd/api-platform/assembly` nối cài đặt của workflow — mẫu đảo phụ thuộc cho module lõi cần năng lực `cap/*`, không thêm ngoại lệ `agmodgraph` |
 | W6.x | Tách `cap/forms`, `cap/export`, `cap/import`, `cap/task` |
 | W9.1 | Lint cấm so sánh tên ứng dụng trong module `capability` |

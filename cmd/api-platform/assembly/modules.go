@@ -9,10 +9,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/coopwire"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
@@ -77,6 +79,7 @@ type Modules struct {
 	Waterway      *waterway.Module
 	Simulation    *simulation.Module
 	CropCycle     *cropcycle.Module
+	Cooperative   *cooperative.Module // W3.2: mặt tiền dom/cooperative (không route, không vai DB đến W3.3)
 	Metrics       *metrics.Module
 	ExtData       *extdata.Module   // proxy khử định danh nguồn ngoài (ADR-0007), không vai DB
 	Metering      *metering.Module  // G5 (ADR-0023/0024): sổ sử dụng Public API, điểm kiểm soát xuất, bảng kê
@@ -151,6 +154,12 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	g := geo.New(geoPool, clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits(), Orgs: pty.Orgs(), Households: pty.Households(),
 		CoopMarkers: pty.CoopMarkers()}) // GIS US-BND-02: điểm vị trí HTX của pf/party
 	pty.UsePlotStats(g.PlotStats()) // G-03: số thửa đã số hoá trong danh sách HTX
+	// pf/cooperative (W3.2, docs/design/cooperative.md): mặt tiền không DB trên port cũ của pf/party, pf/geo
+	// (bộ chuyển cmd/internal/coopwire); nguồn vụ nối sau khi dựng pf/cropcycle. W3.3: store pf_coop, vai r_coop.
+	coop := cooperative.New(coopwire.Sources(coopwire.Legacy{
+		CoopStats: pty.CooperativeStats(), CoopSites: pty.CooperativeSites(), Centroids: g.CoopCentroids(),
+		Households: pty.Households(), PlotHH: g.PlotHouseholds(), Plots: g.Plots(), PlotFacts: g.PlotFacts(), PlotStats: g.PlotStats(),
+	}))
 
 	contentPool, err := pool(content.DBRole)
 	if err != nil {
@@ -163,7 +172,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		return Modules{}, pools, err
 	}
 	kn := extension.New(extPool, clk, extension.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(),
-		Plots: g.PlotStats(), Coops: pty.CooperativeStats()})
+		Plots: coop.Plots(), Coops: coop.Cooperatives()})
 	md.UseStaffDirectory(kn.StaffNames()) // G-07: tên người đặt/duyệt tham số
 	pty.UseActorNames(kn.StaffNames())    // KN v7.7 P2: tên người thao tác trong Log phòng ban/khu vực
 
@@ -187,9 +196,10 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	cc := cropcycle.New(ccPool, clk, cropcycle.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Plots: g.Plots(), Params: md.Params(), Catalogs: md.Catalogs(),
+	cc := cropcycle.New(ccPool, clk, cropcycle.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Plots: coop.Plots(), Params: md.Params(), Catalogs: md.Catalogs(),
 		GpsLog: g.GpsLog()}) // HTX US-GPS-03: log GPS qua consumer outbox pf.cropcycle.gps_log
-	pty.UseSeasonActivity(SeasonActivity{Stats: cc.Stats()}) // HTX US-HTXSTATUS-01 AC-1: vụ chưa xong / nhật ký chờ duyệt
+	coop.UseSeasons(coopwire.Seasons{Stats: cc.Stats(), SupplyStats: cc.SupplyStats(), Reports: cc.ReportData()})
+	pty.UseSeasonActivity(SeasonActivity{Seasons: coop.Seasons()}) // HTX US-HTXSTATUS-01 AC-1: vụ chưa xong / nhật ký chờ duyệt
 	// ADR-0020 (RB-2, Q-MKG-12): MKG là tenant riêng — bề mặt đối tác /v1/partner/* kiểm cấp quyền
 	// chia sẻ của pf/party; consumer van MKG ghi vào tenant bên cấp đã cấp valve_* cho tenant phong bì.
 	g.UseSharing(pty.PartnerAccess(), pty.ValveGrants())
@@ -251,11 +261,11 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if c := acc.StaffContacts(); c != nil {
 		kn.UseContacts(c) // US-DIR-02: số điện thoại cán bộ đọc từ Keycloak lúc bấm liên hệ
 	}
-	kn.UseFarmers(acc.FarmerHouseholds())                                                     // HTX US-SUPPORT-01: nông hộ của tài khoản nông dân
-	snc.UseFarmers(acc.FarmerHouseholds())                                                    // App HTX: pull của nông dân theo nông hộ liên kết
-	cc.UseFarmerHouseholds(farmerHouseholds{acc.FarmerHouseholds()})                          // HTX US-SEASON-01: thửa của nông hộ mình
-	g.UseFarmers(farmerHouseholds{acc.FarmerHouseholds()})                                    // HTX US-GPS-03: nông dân đọc log GPS của mình
-	nt.UseAreaFarmers(AreaFarmers{Plots: g.PlotHouseholds(), Accounts: acc.FarmerAccounts()}) // HTX US-NEWS-03
+	kn.UseFarmers(acc.FarmerHouseholds())                                                         // HTX US-SUPPORT-01: nông hộ của tài khoản nông dân
+	snc.UseFarmers(acc.FarmerHouseholds())                                                        // App HTX: pull của nông dân theo nông hộ liên kết
+	cc.UseFarmerHouseholds(farmerHouseholds{acc.FarmerHouseholds()})                              // HTX US-SEASON-01: thửa của nông hộ mình
+	g.UseFarmers(farmerHouseholds{acc.FarmerHouseholds()})                                        // HTX US-GPS-03: nông dân đọc log GPS của mình
+	nt.UseAreaFarmers(AreaFarmers{Households: coop.Households(), Accounts: acc.FarmerAccounts()}) // HTX US-NEWS-03
 
 	// pf/reports: API tạo việc xuất và cấp URL tải; worker dựng tệp (cmd/worker). Địa chỉ email tra qua pf/accounts (MailDirectory).
 	repPool, err := pool(reports.DBRole)
@@ -292,14 +302,14 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	// G4-0 (ADR-0020): bề mặt đối tác /v1/partner/waterway/route cho mkg/logistics (loại waterway_routes).
 	ww.UseSharing(pty.PartnerAccess())
 
-	// pf/simulation: API ghi kịch bản/yêu cầu; worker dựng ảnh chụp qua SupplySource (pf/cropcycle
-	// + pf/party + pf/geo + pf/masterdata) và WaterwayRouter (pf/waterway); optimizer tính và nộp qua RegisterInternal.
+	// pf/simulation: API ghi kịch bản/yêu cầu; worker dựng ảnh chụp qua SupplySource (pf/cooperative
+	// + pf/masterdata) và WaterwayRouter (pf/waterway); optimizer tính và nộp qua RegisterInternal.
 	simPool, err := pool(simulation.DBRole)
 	if err != nil {
 		return Modules{}, pools, err
 	}
 	sim := simulation.New(simPool, clk, simulation.Deps{Params: simulation.MasterdataParams(md.Params()),
-		Supply: SupplySource{Seasons: cc.SupplyStats(), Coops: pty.CooperativeSites(), Centroids: g.CoopCentroids(), Catalogs: md.Catalogs()},
+		Supply: SupplySource{Seasons: coop.Seasons(), Coops: coop.Cooperatives(), Catalogs: md.Catalogs()},
 		Router: WaterwayRouter{WW: ww.Router()}})
 
 	// pf/metrics (G3): chỉ số có lịch sử qua port.Source của module chủ dữ liệu (mỗi nguồn đọc
@@ -351,8 +361,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	apic.UseCollectionSource(cc.CollectionVolumeSource())
 	meter.UsePlans(apic.Plans())
 
-	// G5 (ADR-0022): nguồn sản phẩm collection_volume cần dữ kiện thửa (pf/geo) + đơn vị hành chính.
-	cc.UseCollectionVolume(g.PlotFacts(), md.AdminUnits())
+	// G5 (ADR-0022): nguồn sản phẩm collection_volume cần dữ kiện thửa (pf/cooperative) + đơn vị hành chính.
+	cc.UseCollectionVolume(coop.Plots(), md.AdminUnits())
 	// G5 (ADR-0024): mọi đường xuất phía nền tảng qua MỘT điểm kiểm soát — pf/metering (ext.Egress ghi đè cho kiểm thử).
 	egress := ext.Egress
 	if egress == nil {
@@ -366,7 +376,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	kn.UseEgress(egress, mode, slog.Default()) // A5: xuất lịch công tác — nội bộ, observe
 
 	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
-		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Metrics: met, ExtData: ed, Metering: meter, APIClient: apic}, pools, nil
+		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Cooperative: coop, Metrics: met, ExtData: ed, Metering: meter, APIClient: apic}, pools, nil
 }
 
 // EgressModeFromEnv đọc AG_EGRESS_MODE (ADR-0024 mục 2): rỗng → observe; giá trị lạ → lỗi khởi động.

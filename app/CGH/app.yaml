@@ -4,6 +4,7 @@ app: CGH
 description: Cơ giới hóa — Bản đồ CGH cho Cục KTHT, cân đối máy theo vùng, xuất báo cáo CGH
 modules:
   pf/accounts: ">=1.0 <2"
+  pf/cooperative: ">=1.0 <2"   # diện tích vụ HTX (FN-07), số máy theo HTX (MachineCounts)
   pf/geo: ">=1.0 <2"
   pf/masterdata: ">=1.0 <2"
   pf/mechanization: ">=1.0 <2" # dom/mechanization

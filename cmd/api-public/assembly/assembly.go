@@ -12,8 +12,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/coopwire"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
@@ -77,8 +79,8 @@ var ErrNotWired = errors.New("api-public: chưa nối metering/port.Ledger, Quot
 //     apiclient_app); tham số kênh qua pf/masterdata;
 //   - pf/party (party_app): GrantLookup + sổ đọc partner_read_log của bên cấp (APIReadLog, K-05) — bộ
 //     điều hợp party/port/grantlookup (không vault);
-//   - pf/cropcycle (cropcycle_app): CollectionVolumeSource, dữ kiện thửa qua pf/geo (geo_app) + đơn
-//     vị hành chính pf/masterdata (masterdata_app);
+//   - pf/cropcycle (cropcycle_app): CollectionVolumeSource, dữ kiện thửa qua pf/cooperative (mặt tiền
+//     W3.2 trên pf/geo, geo_app) + đơn vị hành chính pf/masterdata (masterdata_app);
 //   - pf/geo (geo_app): HubCapacitySource;
 //   - pf/mrv (mrv_app): MRVPackageSource (chỉ đọc export_job — không kho đối tượng).
 //
@@ -99,7 +101,9 @@ var integrationPorts = func(ctx context.Context, open PoolOpener, cfg Config, pl
 	meter := metering.New(meterPool, clk, metering.Deps{Plans: plans, Params: md.Params(), Mode: cfg.EgressMode, Log: cfg.Log})
 	g := geo.New(geoPool, clk, geo.Deps{Params: md.Params(), AdminUnits: md.AdminUnits()})
 	cc := cropcycle.New(ccPool, clk, cropcycle.Deps{Params: md.Params()})
-	cc.UseCollectionVolume(g.PlotFacts(), md.AdminUnits())
+	// pf/cooperative (W3.2): dữ kiện thửa qua mặt tiền (nguồn cũ pf/geo, cmd/internal/coopwire).
+	coop := cooperative.New(coopwire.Sources(coopwire.Legacy{PlotFacts: g.PlotFacts()}))
+	cc.UseCollectionVolume(coop.Plots(), md.AdminUnits())
 	m := mrv.New(mrvPool, clk, mrv.Deps{Params: md.Params()})
 	grants := grantlookup.New(partyPool, clk)
 	return Ports{Ledger: meter.Ledger(), Quotas: meter.Quotas(), Usage: meter.Usage(), Grants: grants, Reads: grants, Params: md.Params(),

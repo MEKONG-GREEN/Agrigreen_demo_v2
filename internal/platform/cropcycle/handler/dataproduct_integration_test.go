@@ -14,8 +14,8 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/dataproduct"
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
-	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
@@ -23,14 +23,14 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
-// PlotFacts cài geoport.PlotFacts trên thửa giả (tenant phải có trong context như pf/geo thật).
-func (f *fakePlots) PlotFacts(ctx context.Context, refs []uuid.UUID) (map[uuid.UUID]geoport.Plot, error) {
+// Facts cài cooperativeport.Plots.Facts trên thửa giả (tenant phải có trong context như pf/geo thật).
+func (f *fakePlots) Facts(ctx context.Context, refs []uuid.UUID) (map[uuid.UUID]coopport.Plot, error) {
 	if _, err := tenant.FromContext(ctx); err != nil {
 		return nil, err
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	out := map[uuid.UUID]geoport.Plot{}
+	out := map[uuid.UUID]coopport.Plot{}
 	for _, r := range refs {
 		if p, ok := f.plots[r]; ok {
 			out[r] = p
@@ -91,8 +91,8 @@ func TestCollectionVolumeKAnonymity_G5_D01(t *testing.T) {
 	area := decimal.RequireFromString("1.5000")
 	plot := func(commune string, coop uuid.UUID) uuid.UUID {
 		ref := ids.New()
-		f.plots.put(geoport.Plot{Ref: ref, Code: "G5" + ref.String()[28:], CommuneCode: commune, CooperativeRef: coop, HouseholdRef: ids.New(),
-			Status: geoport.StatusActive, Version: 1, AreaHa: area}, 0)
+		f.plots.put(coopport.Plot{Ref: ref, Code: "G5" + ref.String()[28:], CommuneCode: commune, CooperativeRef: coop, HouseholdRef: ids.New(),
+			Status: coopport.PlotActive, Version: 1, AreaHa: area}, 0)
 		return ref
 	}
 	// 31117: 4 nông hộ (≥ k = 3) · 31121: 3 nông hộ (= k, nhưng nhỏ nhất của hàng → ẩn bổ sung) ·

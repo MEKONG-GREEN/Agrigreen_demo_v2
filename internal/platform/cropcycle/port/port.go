@@ -87,6 +87,10 @@ type CoopSeasonArea struct {
 
 // Stats là cổng đọc cho module khác. Tenant lấy từ context. Không kiểm phạm vi
 // người gọi — module gọi tự giới hạn danh sách HTX theo phạm vi của mình.
+//
+// Thay thế (W3.2): bên tiêu thụ tầng domain dùng cooperativeport.Seasons (ActivityByCooperative, Areas); cổng này còn cho bên tiêu thụ
+// tầng dưới và bộ chuyển cmd/internal/coopwire, xóa ở W3.3 (docs/design/cooperative.md mục 4). Không ghi
+// "Deprecated:" để staticcheck không chặn các chỗ dùng hợp lệ còn lại.
 type Stats interface {
 	// ActivityByCooperative trả số vụ mở/nhật ký chờ duyệt; coops nil = mọi HTX có
 	// hoạt động. HTX không có vụ mở lẫn nhật ký chờ duyệt không có trong kết quả.
@@ -110,6 +114,10 @@ type CoopSeasonSupply struct {
 
 // SupplyStats là cổng đọc nguồn cung cho mô phỏng chọn Hub (pf/simulation qua gốc lắp
 // ráp, tham số #4, #5). Tenant lấy từ context; không kiểm phạm vi.
+//
+// Thay thế (W3.2): bên tiêu thụ tầng domain dùng cooperativeport.Seasons (Supply); cổng này còn cho bên tiêu thụ
+// tầng dưới và bộ chuyển cmd/internal/coopwire, xóa ở W3.3 (docs/design/cooperative.md mục 4). Không ghi
+// "Deprecated:" để staticcheck không chặn các chỗ dùng hợp lệ còn lại.
 type SupplyStats interface {
 	SeasonSupply(ctx context.Context, year int) ([]CoopSeasonSupply, error)
 }

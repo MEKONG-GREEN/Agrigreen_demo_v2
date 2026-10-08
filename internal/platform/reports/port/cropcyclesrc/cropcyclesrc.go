@@ -70,6 +70,9 @@ type ProductionData struct {
 
 // ReportData là cổng đọc số liệu báo cáo của pf/cropcycle cho pf/reports (qua gốc
 // lắp ráp). Không kiểm vai người gọi — pf/reports đã kiểm vai và giải phạm vi.
+//
+// W3.2: cổng do bên tiêu thụ tầng dưới khai (R-MOD-05) — giữ lâu dài. Nguồn hiện là module cũ; W3.3
+// pf/cooperative hiện thực (cùng dữ liệu với cooperativeport.Seasons (Production), gốc lắp ráp nối).
 type ReportData interface {
 	Production(ctx context.Context, q ProductionQuery) (ProductionData, error)
 }

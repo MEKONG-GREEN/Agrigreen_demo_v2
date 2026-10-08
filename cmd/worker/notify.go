@@ -11,7 +11,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/coopwire"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
@@ -85,7 +87,9 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	md := masterdata.New(mdPool, clk)
 	kn := extension.New(extPool, clk, extension.Deps{Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs()})
 	log.Info("kênh thông báo", "event", "startup", "push", ch.Pusher.Name(), "email", ch.Mailer != nil, "outcome", "ok")
-	farmers := assembly.AreaFarmers{Plots: geo.New(geoPool, clk, geo.Deps{}).PlotHouseholds(),
+	// pf/cooperative (W3.2): nông hộ có thửa theo xã qua mặt tiền (nguồn cũ pf/geo, cmd/internal/coopwire).
+	coop := cooperative.New(coopwire.Sources(coopwire.Legacy{PlotHH: geo.New(geoPool, clk, geo.Deps{}).PlotHouseholds()}))
+	farmers := assembly.AreaFarmers{Households: coop.Households(),
 		Accounts: accounts.New(accPool, clk, accounts.Deps{}).FarmerAccounts()}
 	return notify.New(nPool, clk, notify.Deps{Staff: kn.Staff(), Units: md.AdminUnits(), Farmers: farmers, Pusher: ch.Pusher, Mailer: ch.Mailer,
 		DigestTo: ch.DigestTo, Log: log}), nil

@@ -18,6 +18,10 @@ type UnitCooperatives struct {
 // CooperativeStats là cổng đọc thống kê HTX cho module khác (web-backend-gaps
 // G-02: bảng điều hành gộp). Tenant lấy từ context. Không kiểm phạm vi — module
 // gọi tự giới hạn danh sách đơn vị theo phạm vi của mình.
+//
+// Thay thế (W3.2): bên tiêu thụ tầng domain dùng cooperativeport.Cooperatives (ByUnit); cổng này còn cho bên tiêu thụ
+// tầng dưới và bộ chuyển cmd/internal/coopwire, xóa ở W3.3 (docs/design/cooperative.md mục 4). Không ghi
+// "Deprecated:" để staticcheck không chặn các chỗ dùng hợp lệ còn lại.
 type CooperativeStats interface {
 	// CooperativesByUnit trả thống kê theo mã đơn vị; units nil = mọi đơn vị.
 	// Đơn vị không có HTX không có trong kết quả.
@@ -37,6 +41,10 @@ type CooperativeSite struct {
 
 // CooperativeSites liệt kê HTX đang hoạt động của tenant (tenant lấy từ context,
 // không kiểm phạm vi — module gọi tự giới hạn).
+//
+// Thay thế (W3.2): bên tiêu thụ tầng domain dùng cooperativeport.Cooperatives (Active); cổng này còn cho bên tiêu thụ
+// tầng dưới và bộ chuyển cmd/internal/coopwire, xóa ở W3.3 (docs/design/cooperative.md mục 4). Không ghi
+// "Deprecated:" để staticcheck không chặn các chỗ dùng hợp lệ còn lại.
 type CooperativeSites interface {
 	ActiveCooperatives(ctx context.Context) ([]CooperativeSite, error)
 }

@@ -5,6 +5,7 @@ description: Nông hộ — nông dân xem hộ, thửa, vụ, nhật ký, tài 
 modules:
   pf/accounts: ">=1.0 <2"      # /v1/farmer/* (hộ của tôi, cán bộ HTX)
   pf/content: ">=1.0 <2"
+  pf/cooperative: ">=1.0 <2"
   pf/cropcycle: ">=1.0 <2"
   pf/extension: ">=1.0 <2"     # yêu cầu hỗ trợ
   pf/geo: ">=1.0 <2"

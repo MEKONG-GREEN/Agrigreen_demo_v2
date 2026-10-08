@@ -20,6 +20,10 @@ type HouseholdMembership struct {
 }
 
 // Households cho module khác tra thành viên HTX của nông hộ. Tenant lấy từ context.
+//
+// Thay thế (W3.2): bên tiêu thụ tầng domain dùng cooperativeport.Households; cổng này còn cho bên tiêu thụ
+// tầng dưới và bộ chuyển cmd/internal/coopwire, xóa ở W3.3 (docs/design/cooperative.md mục 4). Không ghi
+// "Deprecated:" để staticcheck không chặn các chỗ dùng hợp lệ còn lại.
 type Households interface {
 	Membership(ctx context.Context, ref uuid.UUID) (HouseholdMembership, error) // không có → ErrHouseholdNotFound
 }

@@ -282,3 +282,26 @@ Kiến trúc v4.1 §26, R-56. Module năng lực `pf/workflow` (`internal/platfo
 | `pf/party` | `party.share_grant` | đề xuất cấp quyền | duyệt → `approved`; thu hồi đề xuất chưa duyệt → `cancelled` (thu hồi cấp quyền đã duyệt không thêm quyết định) |
 
 Chưa có route HTTP, sự kiện `pf.workflow.request.decided` (§26) chờ bên tiêu thụ (W6.2, W6.4). Vai DB: `r_workflow` là vai nhóm không có vai cũ (`dbadmin.groupOnlyModules`); `cmd/api-platform` mở pool `app_platform` cho giao dịch riêng của module.
+
+## Module `pf/cooperative` — mặt tiền (W3.2)
+
+[Thiết kế](../design/cooperative.md) (W3.1), ADR-0027, ADR-0030. `internal/platform/cooperative` (`dom/cooperative`, `kind: domain`, `enable: per_tenant`, `shares: [household, plot, season, diary_entry]`). W3.2 **không đổi DB**: module chưa có schema, vai hay route; `owns_schema` rỗng đến W3.3 (`pf_coop`, pf 000094).
+
+**Cổng** (`cooperativeport`): `Cooperatives`, `Households`, `Plots`, `Seasons`, `Diary`, `Resolve` và hai interface module khác hiện thực `MachineCounts` (pf/mechanization), `FarmerHouseholds`. DTO giữ nguyên trường của DTO cũ (partyport, geoport, ccport). Nguồn chưa nối → `cooperativeport.ErrUnavailable` (bên gọi coi như phụ thuộc lỗi, 503). Bộ kiểm hợp đồng `cooperative/port/porttest.RunContract(t, tenant.WithID, mk)` + bản giả `porttest.Memory` cho kiểm thử của module khác.
+
+**Đỉnh lá của đồ thị.** `pf/cooperative` không import port cũ. Gốc lắp ráp dựng nguồn (`cooperative.Sources`, store tạm) từ port của `pf/party`, `pf/geo`, `pf/cropcycle` bằng bộ chuyển [`cmd/internal/coopwire`](../../cmd/internal/coopwire/coopwire.go). Lý do: `pf/cropcycle` đọc thửa qua `cooperativeport`, còn mặt tiền đọc vụ từ cropcycle — import trực tiếp sẽ thành chu trình `cropcycle ↔ cooperative`. W3.3 (vụ vào `pf/cooperative`) gộp bộ chuyển vào `cooperative/store`.
+
+**Ai dùng `cooperativeport`.** Chỉ module **domain** được import (R-MOD-05):
+
+| Bên tiêu thụ | Dùng |
+|---|---|
+| `pf/mechanization` | hiện thực `MachineCounts` (sự kiện diện tích vụ vẫn đọc `ccport` — chỉ là `consumes.events`) |
+| `pf/extension` | `Cooperatives.ByUnit`, `Plots.DigitizedByCommune` (bảng điều hành gộp G-02) |
+| `pf/cropcycle` (vụ + van collection) | `Plots.Get`, `DistanceM`, `Facts` |
+| Gốc lắp ráp | `SupplySource` (simulation), `AreaFarmers` (notify), `SeasonActivity` (party) đọc qua `coop.*` |
+
+Bên tiêu thụ tầng dưới (`pf/accounts` kernel; `pf/party`; `pf/reports`, `pf/notify`, `pf/metrics` capability) không import `cooperativeport`: chúng khai interface của mình (`partyport.PlotStats`, `reports/port/cropcyclesrc`…), gốc lắp ráp nối. Port cũ do module chủ khai có ghi chú "Thay thế (W3.2)" (không ghi `Deprecated:` để staticcheck không chặn chỗ dùng hợp lệ). Sự kiện vẫn khai `//ag:event` ở port cũ đến W3.3.
+
+**Thêm bên tiêu thụ:** chỉ từ module domain; module tầng dưới khai interface của mình (port của nó) và gốc lắp ráp nối `coop.*` vào.
+
+**W3.3** thay `store.Legacy` bằng store SQL `pf_coop`, ghi đè `modreg.DBRole` → `r_coop`, thêm `dbadmin.groupOnlyModules`, chuyển handler/consumer/sync và xóa `cmd/internal/coopwire` cùng port cũ.

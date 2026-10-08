@@ -20,12 +20,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/store"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
-	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/mechanizationsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
@@ -57,9 +57,9 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 // RegisterAdmin gắn route Admin API (ghi dữ liệu chủ, vụ mùa, chạy cân đối; MFA bắt buộc ở router).
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }
 
-// MachineCounts cho pf/party (qua gốc lắp ráp): tổng số máy khai báo của HTX cho cảnh báo vô hiệu hóa HTX
-// (KN v7.7 FN-XA-03.03/03.04).
-func (m *Module) MachineCounts() partyport.CoopMachineCounts { return app.MachineCounts{Svc: m.svc} }
+// MachineCounts (cooperativeport, W3.2) cho cảnh báo vô hiệu hóa HTX qua gốc lắp ráp — hôm nay pf/party
+// nhận (partyport.CoopMachineCounts cùng chữ ký), W3.3 pf/cooperative (KN v7.7 FN-XA-03.03/03.04).
+func (m *Module) MachineCounts() coopport.MachineCounts { return app.MachineCounts{Svc: m.svc} }
 
 // ReportData cho pf/reports: 3 tab FN-10 đọc từ kết quả cân đối đã lưu.
 func (m *Module) ReportData() mechanizationsrc.ReportData { return app.ReportData{Svc: m.svc} }

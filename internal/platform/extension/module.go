@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/handler"
 	matapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/material/app"
@@ -56,9 +57,10 @@ type Deps struct {
 	Units    partyport.AdminUnits    // tỉnh của xã
 	Params   params.Params           // extension.task_sla_hours, extension.duty_status_ttl_hours
 	Catalogs mdport.Catalogs         // giống lúa, vụ, sâu bệnh (FR-01 BR-01)
-	// Plots, Coops (tùy chọn): thống kê thửa (pf/geo) và HTX (pf/party) cho GET /v1/dashboard (G-02).
-	Plots partyport.PlotStats
-	Coops partyport.CooperativeStats
+	// Plots, Coops (tùy chọn): thống kê thửa và HTX của pf/cooperative (W3.2; dữ liệu còn ở pf/geo,
+	// pf/party đến W3.3) cho GET /v1/dashboard (G-02).
+	Plots coopport.Plots
+	Coops coopport.Cooperatives
 }
 
 // Module là pf/extension đã nối.

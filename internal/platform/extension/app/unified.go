@@ -124,7 +124,7 @@ func (s *Service) GetUnifiedDashboard(ctx context.Context, unit, period string) 
 	}
 	if s.Coops != nil {
 		out.Sources = append(out.Sources, "pf/party")
-		stats, err := s.Coops.CooperativesByUnit(ctx, communes)
+		stats, err := s.Coops.ByUnit(ctx, communes)
 		if err != nil {
 			return Unified{}, ErrDependency.WithDetail("không đọc được thống kê HTX").WithCause(err)
 		}

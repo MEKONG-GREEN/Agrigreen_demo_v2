@@ -37,6 +37,9 @@ type PlotStat struct {
 // PlotStats là cổng đọc thống kê thửa cho module khác (web-backend-gaps G-02,
 // G-03). Tenant lấy từ context. Không kiểm phạm vi người gọi — module gọi tự
 // giới hạn danh sách xã/HTX theo phạm vi của mình.
+//
+// W3.2: cổng do bên tiêu thụ tầng dưới khai (R-MOD-05) — giữ lâu dài. Nguồn hiện là module cũ; W3.3
+// pf/cooperative hiện thực (cùng dữ liệu với cooperativeport.Plots (DigitizedBy*), gốc lắp ráp nối).
 type PlotStats interface {
 	// DigitizedByCommune trả thống kê theo xã; communes nil = mọi xã của tenant.
 	// Xã không có thửa không có trong kết quả.

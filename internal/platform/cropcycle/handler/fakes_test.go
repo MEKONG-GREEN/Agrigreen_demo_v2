@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
-	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -35,26 +35,26 @@ func (f *fakeScope) Scope(ctx context.Context) (authz.Scope, error) {
 	return f.scopes[p.OrgRef], nil
 }
 
-// fakePlots thay geo/port.Plots: thửa theo ref, khoảng cách GPS cấu hình được.
+// fakePlots thay cooperative/port.Plots (W3.2): thửa theo ref, khoảng cách GPS cấu hình được.
 type fakePlots struct {
 	mu    sync.Mutex
-	plots map[uuid.UUID]geoport.Plot
+	plots map[uuid.UUID]coopport.Plot
 	dist  map[uuid.UUID]decimal.Decimal
 }
 
-func (f *fakePlots) put(p geoport.Plot, distM int64) {
+func (f *fakePlots) put(p coopport.Plot, distM int64) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.plots[p.Ref] = p
 	f.dist[p.Ref] = decimal.NewFromInt(distM)
 }
 
-func (f *fakePlots) Get(_ context.Context, ref uuid.UUID) (geoport.Plot, error) {
+func (f *fakePlots) Get(_ context.Context, ref uuid.UUID) (coopport.Plot, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	p, ok := f.plots[ref]
 	if !ok {
-		return geoport.Plot{}, geoport.ErrPlotNotFound
+		return coopport.Plot{}, coopport.ErrPlotNotFound
 	}
 	return p, nil
 }
@@ -64,9 +64,18 @@ func (f *fakePlots) DistanceM(_ context.Context, ref uuid.UUID, _, _ decimal.Dec
 	defer f.mu.Unlock()
 	d, ok := f.dist[ref]
 	if !ok {
-		return decimal.Zero, geoport.ErrPlotNotFound
+		return decimal.Zero, coopport.ErrPlotNotFound
 	}
 	return d, nil
+}
+
+// DigitizedByCommune, DigitizedByCooperative: không dùng ở cropcycle.
+func (f *fakePlots) DigitizedByCommune(context.Context, []string) ([]coopport.PlotStat, error) {
+	return nil, nil
+}
+
+func (f *fakePlots) DigitizedByCooperative(context.Context, []uuid.UUID) (map[uuid.UUID]coopport.PlotStat, error) {
+	return nil, nil
 }
 
 // fakeOrgs thay party/port.Orgs.

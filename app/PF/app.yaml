@@ -6,6 +6,7 @@ modules:
   pf/accounts: ">=1.0 <2"      # tài khoản cán bộ
   pf/apiclient: ">=1.0 <2"     # khách hàng Public API (Admin API, api-public)
   pf/content: ">=1.0 <2"
+  pf/cooperative: ">=1.0 <2"   # dữ kiện thửa/vụ của sản phẩm dữ liệu Public API
   pf/cropcycle: ">=1.0 <2"     # quy trình SOP; dữ liệu vụ của Public API
   pf/extdata: ">=1.0 <2"
   pf/geo: ">=1.0 <2"           # nhập thửa, biên tập bản đồ, quy chuẩn hiển thị; map_consumer

@@ -2,6 +2,7 @@ package assembly
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -11,10 +12,8 @@ import (
 	"github.com/shopspring/decimal"
 
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
-	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	simport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation/port"
 	wwport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -24,20 +23,20 @@ import (
 // ghép). Không có logic nghiệp vụ ngoài việc đổi dạng dữ liệu.
 
 // ---------------------------------------------------------------------------
-// Cảnh báo khẩn tới nông dân theo địa bàn (HTX US-NEWS-03): pf/geo + pf/accounts → pf/notify
+// Cảnh báo khẩn tới nông dân theo địa bàn (HTX US-NEWS-03): pf/cooperative + pf/accounts → pf/notify
 // ---------------------------------------------------------------------------
 
-// AreaFarmers ghép nông hộ có thửa trong xã (pf/geo) với tài khoản nông dân liên kết
+// AreaFarmers ghép nông hộ có thửa trong xã (pf/cooperative) với tài khoản nông dân liên kết
 // (pf/accounts) thành notify/port.AreaFarmers.
 type AreaFarmers struct {
-	Plots    geoport.PlotHouseholds
-	Accounts accport.FarmerAccounts
+	Households coopport.Households
+	Accounts   accport.FarmerAccounts
 }
 
 // FarmersInCommunes thực hiện notify/port.AreaFarmers.
 func (a AreaFarmers) FarmersInCommunes(ctx context.Context, tid uuid.UUID, communes []string) ([]uuid.UUID, error) {
 	ctx = tenant.WithID(ctx, tid)
-	hh, err := a.Plots.HouseholdsInCommunes(ctx, communes)
+	hh, err := a.Households.InCommunes(ctx, communes)
 	if err != nil || len(hh) == 0 {
 		return nil, err
 	}
@@ -45,15 +44,16 @@ func (a AreaFarmers) FarmersInCommunes(ctx context.Context, tid uuid.UUID, commu
 }
 
 // ---------------------------------------------------------------------------
-// Cảnh báo trước khi vô hiệu hóa HTX (HTX US-HTXSTATUS-01 AC-1): pf/cropcycle → pf/party
+// Cảnh báo trước khi vô hiệu hóa HTX (HTX US-HTXSTATUS-01 AC-1): pf/cooperative → pf/party
 // ---------------------------------------------------------------------------
 
-// SeasonActivity chuyển cropcycle/port.Stats sang party/port.SeasonActivity.
-type SeasonActivity struct{ Stats ccport.Stats }
+// SeasonActivity chuyển cooperative/port.Seasons sang party/port.SeasonActivity (party là kernel,
+// không import cooperativeport; W3.3 thay bằng OrgImpactSource do pf/cooperative hiện thực).
+type SeasonActivity struct{ Seasons coopport.Seasons }
 
 // CoopActivity thực hiện party/port.SeasonActivity.
 func (s SeasonActivity) CoopActivity(ctx context.Context, coop uuid.UUID) (int64, int64, error) {
-	m, err := s.Stats.ActivityByCooperative(ctx, []uuid.UUID{coop})
+	m, err := s.Seasons.ActivityByCooperative(ctx, []uuid.UUID{coop})
 	if err != nil {
 		return 0, 0, err
 	}
@@ -62,21 +62,20 @@ func (s SeasonActivity) CoopActivity(ctx context.Context, coop uuid.UUID) (int64
 }
 
 // ---------------------------------------------------------------------------
-// Nguồn cung của mô phỏng chọn Hub: pf/cropcycle + pf/party + pf/geo + pf/masterdata
+// Nguồn cung của mô phỏng chọn Hub: pf/cooperative + pf/masterdata
 // ---------------------------------------------------------------------------
 
 // SupplySource thực hiện simulation/port.SupplySource:
-//   - #4 diện tích, #5 sản lượng lúa theo HTX × vụ của năm tham chiếu: pf/cropcycle
+//   - #4 diện tích, #5 sản lượng lúa theo HTX × vụ của năm tham chiếu: Seasons.Supply
 //     (vụ đã khai sản lượng → thực tế; chưa khai → dự kiến theo năng suất kỳ vọng của giống);
-//   - #3 toạ độ: tâm ranh giới HTX (pf/geo), không có → vị trí hồ sơ HTX (pf/party), không
-//     có nữa → nil (simulation loại trước khi định tuyến);
-//   - #6 số hộ: hộ thành viên đang mở (pf/party);
+//   - #3 toạ độ: tâm vùng HTX (Cooperatives.Centroids), không có → vị trí hồ sơ HTX
+//     (Cooperatives.Active), không có nữa → nil (simulation loại trước khi định tuyến);
+//   - #6 số hộ: hộ thành viên đang mở (Cooperatives.Active);
 //   - #7 lịch mùa vụ: danh mục season (pf/masterdata, attrs end_month), thứ tự theo danh mục.
 type SupplySource struct {
-	Seasons   ccport.SupplyStats
-	Coops     partyport.CooperativeSites
-	Centroids geoport.CoopCentroids
-	Catalogs  mdport.Catalogs
+	Seasons  coopport.Seasons
+	Coops    coopport.Cooperatives
+	Catalogs mdport.Catalogs
 }
 
 var kgPerTon = decimal.NewFromInt(1000)
@@ -84,7 +83,7 @@ var kgPerTon = decimal.NewFromInt(1000)
 // Supply thực hiện simulation/port.SupplySource.
 func (s SupplySource) Supply(ctx context.Context, tid uuid.UUID, q simport.SupplyQuery) (simport.SupplyData, error) {
 	if s.Seasons == nil || s.Coops == nil {
-		return simport.SupplyData{}, fmt.Errorf("assembly: nguồn cung chưa nối pf/cropcycle hoặc pf/party")
+		return simport.SupplyData{}, fmt.Errorf("assembly: nguồn cung chưa nối pf/cooperative")
 	}
 	ctx = tenant.WithID(ctx, tid)
 	defs, err := s.seasonDefs(ctx)
@@ -95,7 +94,7 @@ func (s SupplySource) Supply(ctx context.Context, tid uuid.UUID, q simport.Suppl
 	for _, d := range defs {
 		known[d.Key] = true
 	}
-	rows, err := s.Seasons.SeasonSupply(ctx, q.ReferenceYear)
+	rows, err := s.Seasons.Supply(ctx, q.ReferenceYear)
 	if err != nil {
 		return simport.SupplyData{}, err
 	}
@@ -108,15 +107,13 @@ func (s SupplySource) Supply(ctx context.Context, tid uuid.UUID, q simport.Suppl
 		byCoop[r.CooperativeRef] = append(byCoop[r.CooperativeRef], simport.CoopSeason{
 			SeasonKey: key, PaddyTons: r.PaddyKg.Div(kgPerTon).Round(6), PlantedAreaHa: r.AreaHa})
 	}
-	sites, err := s.Coops.ActiveCooperatives(ctx)
+	sites, err := s.Coops.Active(ctx)
 	if err != nil {
 		return simport.SupplyData{}, err
 	}
-	var centroids map[uuid.UUID]geoport.CoopCentroid
-	if s.Centroids != nil {
-		if centroids, err = s.Centroids.CoopCentroids(ctx, nil); err != nil {
-			return simport.SupplyData{}, err
-		}
+	centroids, err := s.Coops.Centroids(ctx, nil)
+	if err != nil && !errors.Is(err, coopport.ErrUnavailable) { // chưa nối vùng HTX: dùng vị trí hồ sơ
+		return simport.SupplyData{}, err
 	}
 	out := simport.SupplyData{Seasons: defs}
 	for _, site := range sites {

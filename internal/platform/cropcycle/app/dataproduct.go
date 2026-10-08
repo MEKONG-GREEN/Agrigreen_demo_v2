@@ -8,7 +8,7 @@ package app
 // tenant.WithTenantTx — R-05, không BYPASSRLS):
 //   - nguồn: bảng kê thu gom HTX nhận qua van htx_collection_statement (bảng chiếu = revision cao
 //     nhất) + vụ (season_current) của chính module;
-//   - thửa → xã, nông hộ, diện tích: pf/geo (geoport.PlotFacts — chủ quan hệ thửa ↔ nông hộ);
+//   - thửa → xã, nông hộ, diện tích: pf/cooperative (cooperativeport.Plots.Facts — chủ quan hệ thửa ↔ nông hộ; W3.2 đọc qua pf/geo);
 //     xã → tỉnh: pf/masterdata (AdminUnits);
 //   - ô (tỉnh × xã × vụ × tháng giờ VN), ẩn theo domain.KAnonRule (ẩn sơ cấp < k + ẩn bổ sung, tính
 //     trên TOÀN BỘ dữ liệu bên cấp rồi mới lọc) — ô bị ẩn không bao giờ trả, chỉ đếm Suppressed;
@@ -87,7 +87,7 @@ func (s *Service) CollectionCells(ctx context.Context, q apiclientport.Collectio
 		return apiclientport.CollectionPage{}, err
 	}
 	if s.PlotFacts == nil || s.Units == nil {
-		return apiclientport.CollectionPage{}, ErrDependency.WithDetail("chưa nối pf/geo PlotFacts hoặc pf/masterdata AdminUnits")
+		return apiclientport.CollectionPage{}, ErrDependency.WithDetail("chưa nối pf/cooperative Plots hoặc pf/masterdata AdminUnits")
 	}
 	after := ""
 	if q.After != "" {
@@ -118,9 +118,9 @@ func (s *Service) CollectionCells(ctx context.Context, q apiclientport.Collectio
 	}
 	slices.SortFunc(refs, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
 	refs = slices.Compact(refs)
-	plots, err := s.PlotFacts.PlotFacts(tctx, refs)
+	plots, err := s.PlotFacts.Facts(tctx, refs)
 	if err != nil {
-		return apiclientport.CollectionPage{}, ErrDependency.WithDetail("không đọc được thửa (pf/geo)").WithCause(err)
+		return apiclientport.CollectionPage{}, ErrDependency.WithDetail("không đọc được thửa (pf/cooperative)").WithCause(err)
 	}
 	at := q.AsOf
 	if at.IsZero() {

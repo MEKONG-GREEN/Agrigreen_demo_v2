@@ -13,6 +13,7 @@ var catalog = []CatalogEntry{
 	{Name: "pf/accounts", Kind: "kernel", Enable: "always", Permissions: []string{"account_admin", "account_admin_province", "farmer", "kn_user"}},
 	{Name: "pf/apiclient", Kind: "kernel", Enable: "always", Permissions: []string{"api_client_admin", "api_client_approver"}},
 	{Name: "pf/content", Kind: "capability", Enable: "per_tenant", Permissions: []string{"content_editor_national", "content_editor_province", "content_reviewer"}},
+	{Name: "pf/cooperative", Kind: "domain", Enable: "per_tenant", Permissions: []string{}},
 	{Name: "pf/cropcycle", Kind: "domain", Enable: "per_tenant", Permissions: []string{"coop_manager", "farmer", "mkg_sync", "sop_admin"}},
 	{Name: "pf/extdata", Kind: "capability", Enable: "always", Permissions: []string{}},
 	{Name: "pf/extension", Kind: "domain", Enable: "per_tenant", Permissions: []string{}},

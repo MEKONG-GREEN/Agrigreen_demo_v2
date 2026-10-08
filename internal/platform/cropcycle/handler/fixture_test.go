@@ -16,9 +16,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
-	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port/porttest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -76,7 +76,7 @@ func newFixture(t *testing.T) *fixture {
 		coopA: ids.New(), coopB: ids.New(), knA: ids.New(), h1: ids.New(), h2: ids.New(), h3: ids.New(), h4: ids.New(),
 		p1: ids.New(), p2: ids.New(), p3: ids.New(), p4: ids.New(), p5: ids.New()}
 	sc := &fakeScope{scopes: map[uuid.UUID]authz.Scope{f.knA: {Units: []string{"31117"}}}}
-	f.plots = &fakePlots{plots: map[uuid.UUID]geoport.Plot{}, dist: map[uuid.UUID]decimal.Decimal{}}
+	f.plots = &fakePlots{plots: map[uuid.UUID]coopport.Plot{}, dist: map[uuid.UUID]decimal.Decimal{}}
 	area := decimal.RequireFromString("1.5000")
 	for i, p := range []struct {
 		ref, coop, hh uuid.UUID
@@ -84,8 +84,8 @@ func newFixture(t *testing.T) *fixture {
 		dist          int64
 	}{{f.p1, f.coopA, f.h1, "31117", 10}, {f.p2, f.coopA, f.h2, "31117", 120}, {f.p3, f.coopA, f.h3, "31117", 0},
 		{f.p4, f.coopB, f.h4, "31120", 5}, {f.p5, f.coopA, f.h1, "31117", 30}} {
-		f.plots.put(geoport.Plot{Ref: p.ref, Code: "TH000000" + string(rune('1'+i)), CommuneCode: p.commune, CooperativeRef: p.coop,
-			HouseholdRef: p.hh, Status: geoport.StatusActive, Version: 1, AreaHa: area}, p.dist)
+		f.plots.put(coopport.Plot{Ref: p.ref, Code: "TH000000" + string(rune('1'+i)), CommuneCode: p.commune, CooperativeRef: p.coop,
+			HouseholdRef: p.hh, Status: coopport.PlotActive, Version: 1, AreaHa: area}, p.dist)
 	}
 	f.orgs = &fakeOrgs{orgs: map[uuid.UUID]partyport.Org{
 		f.coopA: {Ref: f.coopA, Kind: partyport.OrgCooperative, Code: "HTXA", AdminUnitCode: "31117", Active: true},

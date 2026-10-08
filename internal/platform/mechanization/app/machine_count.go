@@ -19,6 +19,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/store"
@@ -402,10 +403,14 @@ func (s *Service) MachineCountLog(ctx context.Context, ref uuid.UUID, after int6
 	return out, nil
 }
 
-// MachineCounts thực hiện partyport.CoopMachineCounts cho cảnh báo vô hiệu hóa HTX (FN-XA-03.03).
+// MachineCounts thực hiện cooperativeport.MachineCounts (W3.2; cùng chữ ký partyport.CoopMachineCounts
+// mà pf/party còn dùng đến W3.3) cho cảnh báo vô hiệu hóa HTX (FN-XA-03.03).
 type MachineCounts struct{ Svc *Service }
 
-var _ partyport.CoopMachineCounts = MachineCounts{}
+var (
+	_ coopport.MachineCounts      = MachineCounts{}
+	_ partyport.CoopMachineCounts = MachineCounts{}
+)
 
 // CoopMachineTotal trả tổng số máy đang khai báo của HTX. Tenant lấy từ context.
 func (m MachineCounts) CoopMachineTotal(ctx context.Context, coop uuid.UUID) (int, error) {

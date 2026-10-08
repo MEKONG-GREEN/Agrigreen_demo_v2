@@ -646,3 +646,53 @@ Mốc: W3.3 + W3.4 xong **trước 15/12/2026**. H-1 phải được trả lời
 - **Nội bộ, quyết khi giao W3.3** (không cần MKG):
   - cột `name` trong `k_ref.org` (8.6, cần số migration của `pf/kref`);
   - giữ hay bỏ nhánh `node_id IS NULL` cho người dùng (mục 9).
+
+---
+
+## 16. Ghi chú hiện thực W3.2
+
+**Ngày:** 08/10/2026, dựng lại trên `origin/main` aabe11c (sau rà soát đảo phụ thuộc R-MOD-05: port nguồn của bên tiêu thụ tầng dưới chuyển về port của bên tiêu thụ — `partyport.PlotStats`, `reports/port/cropcyclesrc`…; `agmodgraph` bỏ qua import chỉ dùng hợp đồng dữ liệu; ngoại lệ còn 22). Phần dưới ghi chỗ hiện thực **lệch** bản thiết kế và lý do. W3.3 đọc mục này trước mục 8.
+
+### 16.1 `pf/cooperative` là đỉnh lá trong W3.2
+
+Mục 4 và 7.1 cho `pf/cooperative` gọi port cũ trong module (`depends: pf/party, pf/geo, …`). W3.2 không làm vậy:
+- `pf/cropcycle` (vụ và van collection) đổi sang `cooperativeport.Plots` (mục 5). Nếu mặt tiền import `cropcycle/port` để đọc vụ (`Stats`, `SupplyStats`, `cropcyclesrc.ReportData`) thì `cropcycle ↔ cooperative` thành chu trình — cạnh `cycle` mới, tệp ngoại lệ chỉ được co lại;
+- vì vậy `cooperativeport` có DTO riêng (cùng trường DTO cũ), `module.yaml` có `depends: {}`, và `store.Legacy` (store tạm) giữ nguồn kiểu `cooperativeport`. Gốc lắp ráp dựng nguồn từ port cũ bằng bộ chuyển `cmd/internal/coopwire` (đổi DTO, đổi `ErrPlotNotFound`/`ErrHouseholdNotFound` sang lỗi của `cooperativeport`);
+- `api-platform`: `coop` dựng sau `party`, `geo`; `coop.UseSeasons(…)` sau `cropcycle`. `worker` (notify) và `api-public` dựng `coop` với đúng nguồn cần.
+
+**Đồ thị sau rà soát.** Thành phần liên thông mạnh pf chỉ còn `{accounts, party, sync}` (4 cạnh `cycle`, chủ W3.3/W7.2). Không module nào trong đó phụ thuộc `pf/cooperative` hay bên tiêu thụ của nó. Hệ quả cho **W3.3**: khi vụ chuyển vào `pf/cooperative` (store `pf_coop`), module được import `partyport`, `geoport`, `masterdata`, `sync`, `metrics`… mà không sinh chu trình (miễn `party`/`sync`/`accounts` không quay lại import `cooperativeport` — chúng dùng interface tự khai, gốc lắp ráp nối). Lúc đó gộp `cmd/internal/coopwire` vào `cooperative/store` rồi xóa.
+
+### 16.2 Bên tiêu thụ đã đổi và chưa đổi
+
+| Bên tiêu thụ | W3.2 |
+|---|---|
+| `pf/mechanization` | Đổi: `MachineCounts()` trả `cooperativeport.MachineCounts` (party nhận qua `partyport.CoopMachineCounts`, cùng chữ ký). Sự kiện `pf.cropcycle.coop_season_area.changed` **giữ** `ccport` — từ aabe11c import chỉ dùng kiểu/hằng sự kiện là `consumes.events`, không tạo `depends`, nên không cần khai lại tên ở `cooperativeport` (đã bỏ; lệch mục 5) |
+| `pf/extension` | Đổi: `Deps.Coops cooperativeport.Cooperatives`, `Deps.Plots cooperativeport.Plots` (thay `partyport.CooperativeStats`, `partyport.PlotStats`). `GpsLog` giữ `geoport` |
+| `pf/cropcycle` | Đổi: `Deps.Plots`, `UseCollectionVolume` nhận `cooperativeport.Plots` (vụ và van collection). `GpsLog`, `FarmerHouseholds` giữ |
+| Gốc lắp ráp `api-platform` | `SupplySource{Seasons, Coops}` (simulation), `AreaFarmers{Households}` (notify), `SeasonActivity{Seasons}` (party) đọc `coop.*` |
+| `cmd/worker` (notify), `cmd/api-public` | `coop.Households()`, `coop.Plots()` |
+| `pf/accounts` (kernel), `pf/reports`, `pf/notify`, `pf/metrics`, `pf/party` (tầng dưới) | **Không import `cooperativeport`** (cạnh `tier` mới, R-MOD-05). Mẫu đúng — đã áp ở aabe11c — là interface do bên tiêu thụ khai (`partyport.PlotStats`, `reports/port/cropcyclesrc.ReportData`…); gốc lắp ráp nối nguồn. W3.3 nối các interface đó vào `pf/cooperative` thay vì geo/cropcycle |
+| `pf/geo` (nội bộ) | Chưa đổi (W3.3: mã thửa, `CoopMarkers` chuyển vào cooperative) |
+| `pf/mrv` | Không đổi (D-8) |
+| `/v1/partner/{cooperatives,plots,season-harvest-dates}` | **Chưa chuyển handler** — cần store; chuyển cùng store ở W3.3. Đường dẫn không đổi (D-9) |
+| `pf/sync` | Chưa đổi: thực thể đồng bộ vẫn do geo/cropcycle/party đăng ký đến W3.3 |
+
+### 16.3 Cổng
+
+- `Seasons.HarvestDates`, `Diary`: port cũ không có nguồn (ngày thu hoạch chỉ có ở bề mặt đối tác có cấp quyền; nhật ký chưa có cổng đọc) → `ErrUnavailable` đến W3.3.
+- `Resolve`: phân giải `cooperative` (HTX đang hoạt động), `household`, `plot`, `diary_entry`; `season`, `harvest` → `ErrSubjectTypeUnsupported` đến W3.3. Thêm `ErrSubjectTypeUnsupported`, `ErrUnavailable`, `ErrDiaryEntryNotFound`, `SubjectModule = "pf/cooperative"`.
+- `Diary.BySeason`: `limit ≤ 0 → 100`, `> 500 → 500`.
+- Danh sách lọc: `nil` = tất cả, rỗng = không gì (mặt tiền trả rỗng, không gọi nguồn) — như port cũ.
+- Sự kiện: `cooperativeport` chưa khai tên sự kiện; `//ag:event` ở lại port cũ đến W3.3 (D-8).
+- Port cũ do module chủ khai (`partyport.Households`, `CooperativeStats`, `CooperativeSites`, `geoport.Plots`, `PlotFacts`, `PlotHouseholds`, `CoopCentroids`, `ccport.Stats`, `SupplyStats`) có ghi chú "Thay thế (W3.2)", **không** ghi `// Deprecated:` (staticcheck sẽ chặn chỗ dùng hợp lệ còn lại). `partyport.PlotStats`, `cropcyclesrc.ReportData` là interface của bên tiêu thụ, giữ lâu dài.
+- `porttest.RunContract(t, withTenant, mk)`: kiểm thử truyền `tenant.WithID` (gói `porttest` không phải `_test.go`, archlint `agtenantgate`).
+
+### 16.4 Vai, `module.yaml`, ứng dụng
+
+- `modreg.DBRole` ghi đè `r_coop` và `dbadmin.groupOnlyModules` (mục 7.2) **chưa làm**: module chưa có pool. `dbadmin.ModuleGroups` bỏ qua module không có vai cũ `<module>_app` nên không sinh `r_cooperative`. TODO W3.3 (cùng `migrate bootstrap` trước pf 000094).
+- `module.yaml`: `depends: {}`, `owns_schema: []`, `provides.events: []`, `consumes.events: []`, `permissions: []` — **chưa khai hằng `Role*`** trong `cooperativeport`: module chưa kiểm vai, và `modreg.RoleBlocked` coi một module per_tenant đang bật cùng khai vai là "không chặn" (tắt `pf/geo` sẽ không còn chặn `plot_editor`, `TestPerTenantAndRoleBlocked`). W3.3 thêm khi chuyển handler.
+- `app/{KN,HTX,CGH,PF,SIM,NH}/app.yaml` thêm `pf/cooperative` (các ứng dụng có đơn vị ghép module: `api-platform`, `worker`, `api-public`).
+
+### 16.5 Ngoại lệ `agmodgraph`
+
+Rà soát aabe11c đã gỡ mọi mục chủ W3.2 (kể cả `geo → waterway`: `geoport.Layer` do geo khai). W3.2 không thêm, không bớt mục nào; tệp còn 22 mục (4 `cycle`, 1 `tier` trong `{accounts, party, sync}`, 17 `schema`). Mục 3 ("W3.2 gỡ 15 mục") đã do rà soát làm.
