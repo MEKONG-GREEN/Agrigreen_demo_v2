@@ -52,6 +52,9 @@ type Service struct {
 	Peppers *domain.Peppers
 	// Rand: nguồn ngẫu nhiên sinh khóa (nil → crypto/rand).
 	Rand io.Reader
+	// Sandbox: môi trường thử của đối tác (W5.8, port.EnvSandbox) — phát hành khóa agks_ và chỉ xác thực khóa agks_;
+	// false → chỉ khóa agk_.
+	Sandbox bool
 	// OperatorTenant: tenant đơn vị vận hành (AG_PUBLIC_OPERATOR_TENANT). Nil ở Admin API → nhận
 	// tenant của người gọi; đặt → người gọi phải thuộc đúng tenant này.
 	OperatorTenant uuid.UUID

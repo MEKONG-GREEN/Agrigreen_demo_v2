@@ -18,4 +18,8 @@ const (
 	EnvIngestMaxQueued = "AG_GATEWAY_INGEST_MAX_QUEUED"
 	// EnvIngestRetryAfter: Retry-After (giây) khi hàng đợi đối tác đầy (mặc định 30).
 	EnvIngestRetryAfter = "AG_GATEWAY_INGEST_RETRY_AFTER"
+	// EnvIngestMaxFileBytes: kích thước tối đa một tệp của kênh tệp W5.8 (byte, mặc định 8 MiB, trần 100 MiB).
+	EnvIngestMaxFileBytes = "AG_GATEWAY_INGEST_MAX_FILE_BYTES"
+	// EnvIngestMaxFileRecords: số bản ghi tối đa một tệp (mặc định 10 000, trần 100 000).
+	EnvIngestMaxFileRecords = "AG_GATEWAY_INGEST_MAX_FILE_RECORDS"
 )

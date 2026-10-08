@@ -321,7 +321,12 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	apic := apiclient.New(unit, clk, apiclient.Deps{Peppers: peppers, OperatorTenant: opTenant, Store: store})
+	// W5.8 (R-INT-08): AG_PARTNER_SANDBOX=1 → phát hành khóa thử agks_ (môi trường thử của đối tác); production từ chối.
+	sandbox, err := apiclient.SandboxFromEnv(os.Getenv)
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	apic := apiclient.New(unit, clk, apiclient.Deps{Peppers: peppers, OperatorTenant: opTenant, Store: store, Sandbox: sandbox})
 	apic.UseCollectionSource(cc.CollectionVolumeSource())
 	meter.UsePlans(apic.Plans())
 

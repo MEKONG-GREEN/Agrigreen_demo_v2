@@ -56,6 +56,13 @@ tags:
     description: |
       Nạp theo lô của cổng tích hợp (W5.4, ADR-0033 §3): hợp đồng `contracts/integration/ingest/`, scope
       `ingest:<hợp đồng>:write`, 202 + mã lô, hàng đợi + DLQ riêng từng đối tác, kết quả từng bản ghi.
+  - name: files
+    description: |
+      Kênh tệp cùng lược đồ (W5.8, R-INT-11): đối tác không có đội IT tải một tệp NDJSON/CSV theo lược đồ bản ghi của
+      hợp đồng nạp; cổng đổi thành các lô `ingest_batch.v1` qua CHÍNH đường ống `batches` (cùng scope
+      `ingest:<hợp đồng>:write`, cùng kiểm hợp đồng, cùng kết quả từng bản ghi), idempotent theo SHA-256 của tệp; tải tệp
+      kết quả cùng định dạng. Chỉ hợp đồng có `ingest.channels` chứa `file`. Môi trường thử của đối tác (R-INT-08):
+      khóa `agks_…`, mọi phản hồi có `AG-Environment: sandbox`; khóa thử không dùng được ở production và ngược lại.
 paths:
   /v1/data-products:
     get:
@@ -421,13 +428,108 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
         "429": {$ref: "#/components/responses/TooManyRequests"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/files/{contract}:
+    post:
+      tags: [files]
+      summary: Tải một tệp NDJSON/CSV theo hợp đồng nạp (202 + mã tệp; tệp → lô ingest_batch.v1)
+      description: |
+        W5.8 (R-INT-11, ADR-0033 §3). Thân = TỆP (không phải JSON phong bì): `application/x-ndjson` (mỗi dòng một bản ghi
+        JSON object) hoặc `text/csv` (UTF-8, có thể có BOM; dòng tiêu đề = tên trường của lược đồ bản ghi; dấu `,` hoặc `;`;
+        ô rỗng = null nếu trường cho phép null, ngược lại bỏ trường). Cổng chỉ TÁCH tệp thành bản ghi rồi chia theo
+        `ingest.max_batch` thành các lô gửi qua đường ống `POST /v1/batches/{contract}` — mọi kiểm nội dung bản ghi (khóa lạ,
+        kiểu, bắt buộc, entity_key) là của đường ống lô, kết quả từng bản ghi ở tệp kết quả. Tệp không tách được (dòng
+        không phải JSON object, CSV lệch cột/tiêu đề trùng, không UTF-8) → 400 `integration.file_invalid` cả tệp.
+        **Idempotent theo SHA-256 của tệp** (thay `Idempotency-Key`, R-51 thỏa bằng khóa tự nhiên): tải lại cùng tệp trả
+        cùng mã tệp (`Idempotent-Replayed: true`) và gửi tiếp lô còn thiếu (vd sau 429 `integration.queue_saturated`).
+        Kênh không mở cho hợp đồng → 403 `integration.file_channel_not_allowed`; vượt kích thước/số bản ghi → 413
+        `integration.file_too_large`.
+      operationId: submitFile
+      parameters:
+        - {name: contract, in: path, required: true, schema: {type: string, pattern: "^[a-z][a-z0-9_]{2,47}$"}}
+        - {name: contract_version, in: query, required: true, schema: {type: integer, minimum: 1}}
+      requestBody:
+        required: true
+        content:
+          application/x-ndjson:
+            schema: {type: string, description: "Mỗi dòng một bản ghi JSON object theo lược đồ hợp đồng nạp"}
+          text/csv:
+            schema: {type: string, description: "Dòng tiêu đề = tên trường; mỗi dòng sau một bản ghi"}
+      responses:
+        "202":
+          description: Đã nhận tệp và gửi đủ các lô. Tải lại cùng tệp trả cùng mã tệp (0 đơn vị).
+          headers:
+            Location: {schema: {type: string}, description: "/v1/files/{id}"}
+            AG-Data-Contract: {$ref: "#/components/headers/DataContract"}
+            Idempotent-Replayed: {schema: {type: string, enum: ["true"]}, description: "Có khi cùng tệp đã nhận trước đó"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/IngestFile"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "415": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/files/{id}:
+    get:
+      tags: [files]
+      summary: Trạng thái tệp của chính khách hàng (gộp từ các lô của tệp)
+      operationId: getFile
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Tệp nạp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/IngestFile"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/files/{id}/results:
+    get:
+      tags: [files]
+      summary: Tải tệp kết quả từng bản ghi (CSV/NDJSON) khi tệp đã xử lý xong
+      description: |
+        Mỗi dòng: `record` (thứ tự bản ghi trong tệp, từ 1 — CSV không tính dòng tiêu đề), `entity_key`, `outcome`
+        (accepted | rejected), `problem_code`, `detail`. Không có giá trị bản ghi. Lô `dead_lettered` → mọi bản ghi của lô
+        rejected với mã của kết cục lô. Ô CSV bắt đầu bằng = + - @ được thêm dấu nháy đơn (chặn chèn công thức).
+        Chưa xong → 409 `integration.file_results_pending` + `Retry-After`.
+      operationId: downloadFileResults
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: format, in: query, description: "Mặc định = định dạng tệp tải lên", schema: {type: string, enum: [csv, ndjson]}}
+      responses:
+        "200":
+          description: Tệp kết quả (Content-Disposition attachment)
+          headers:
+            AG-Data-Contract: {$ref: "#/components/headers/DataContract"}
+          content:
+            text/csv: {schema: {type: string}}
+            application/x-ndjson: {schema: {type: string}}
+        "401": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409":
+          description: Tệp chưa xử lý xong (integration.file_results_pending)
+          headers:
+            Retry-After: {$ref: "#/components/headers/RetryAfter"}
+          content:
+            application/problem+json:
+              schema: {$ref: "#/components/schemas/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "503": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     apiKey:
       type: apiKey
       in: header
       name: X-API-Key
-      description: "agk_<prefix 12 ký tự base32>_<bí mật 43 ký tự base64url>. Chỉ hiện một lần lúc phát hành."
+      description: "agk_<prefix 12 ký tự base32>_<bí mật 43 ký tự base64url> (môi trường thử của đối tác: agks_…, W5.8). Chỉ hiện một lần lúc phát hành."
     verifierClientCredentials:
       type: oauth2
       description: Tùy chọn cho đơn vị thẩm định (auth_methods có oauth_client_credentials). JWT kiểm issuer, audience, chữ ký (R-54).
@@ -539,6 +641,40 @@ components:
           type: array
           description: Chỉ ở GET khi completed — theo thứ tự phần tử của lô
           items: {$ref: "#/components/schemas/IngestRecordResult"}
+    IngestFile:
+      type: object
+      required: [id, contract, contract_version, format, sha256, bytes, records, status, accepted, rejected, received_at, results_url, batches]
+      properties:
+        id: {type: string, format: uuid}
+        contract: {type: string}
+        contract_version: {type: integer}
+        format: {type: string, enum: [ndjson, csv]}
+        sha256: {type: string, pattern: "^[0-9a-f]{64}$", description: "Tổng kiểm tệp — khóa idempotent"}
+        bytes: {type: integer}
+        records: {type: integer}
+        status:
+          type: string
+          enum: [incomplete, queued, completed, dead_lettered]
+          description: "incomplete = còn lô chưa gửi (tải lại cùng tệp); dead_lettered = có lô vào DLQ"
+        accepted: {type: integer}
+        rejected: {type: integer}
+        received_at: {type: string, format: date-time}
+        results_url: {type: string, description: "/v1/files/{id}/results"}
+        batches:
+          type: array
+          items: {$ref: "#/components/schemas/IngestFileBatch"}
+    IngestFileBatch:
+      type: object
+      required: [index, batch_ref, id, status, items, accepted, rejected]
+      properties:
+        index: {type: integer}
+        batch_ref: {type: string, format: uuid, description: "UUIDv5 tất định từ (mã tệp, index)"}
+        id: {type: [string, "null"], format: uuid, description: "Mã lô (GET /v1/batches/{id}); null khi chưa gửi"}
+        status: {type: string, enum: [incomplete, queued, completed, dead_lettered]}
+        items: {type: integer}
+        accepted: {type: integer}
+        rejected: {type: integer}
+        problem_code: {type: [string, "null"]}
     IngestRecordResult:
       type: object
       required: [index, entity_key, outcome]

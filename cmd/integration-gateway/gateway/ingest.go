@@ -21,6 +21,9 @@ type IngestConfig struct {
 	AllowProposed bool
 	MaxQueued     int
 	RetryAfter    time.Duration
+	// Kênh tệp (W5.8).
+	MaxFileBytes   int64
+	MaxFileRecords int
 }
 
 // ErrProposedInProduction: cờ dev/test cho hợp đồng proposed đặt ở production — không khởi động (đóng khi lỗi).
@@ -45,6 +48,20 @@ func IngestFromEnv(getenv func(string) string, production bool, log *slog.Logger
 			return IngestConfig{}, fmt.Errorf("integration-gateway: %s phải là số giây 1–3600", port.EnvIngestRetryAfter)
 		}
 		cfg.RetryAfter = time.Duration(n) * time.Second
+	}
+	if v := getenv(port.EnvIngestMaxFileBytes); v != "" {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n < 1024 || n > apiclient.IngestMaxFileBytesLimit {
+			return IngestConfig{}, fmt.Errorf("integration-gateway: %s phải là số byte 1024–%d", port.EnvIngestMaxFileBytes, apiclient.IngestMaxFileBytesLimit)
+		}
+		cfg.MaxFileBytes = n
+	}
+	if v := getenv(port.EnvIngestMaxFileRecords); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > apiclient.IngestMaxFileRecordsLimit {
+			return IngestConfig{}, fmt.Errorf("integration-gateway: %s phải là số nguyên 1–%d", port.EnvIngestMaxFileRecords, apiclient.IngestMaxFileRecordsLimit)
+		}
+		cfg.MaxFileRecords = n
 	}
 	switch url := getenv(EnvAMQPURL); {
 	case url != "":

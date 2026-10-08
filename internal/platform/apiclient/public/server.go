@@ -83,8 +83,11 @@ type Deps struct {
 
 	OperatorTenant uuid.UUID
 	Production     bool // residency.Production: hợp đồng draft không phục vụ
-	Clock          clock.Clock
-	Log            *slog.Logger
+	// Sandbox: môi trường thử của đối tác (W5.8, R-INT-08) — mọi phản hồi mang AG-Environment: sandbox. Chỉ khóa
+	// thử (agks_) xác thực được ở đây (app.Authenticator); production từ chối khởi động với cờ này.
+	Sandbox bool
+	Clock   clock.Clock
+	Log     *slog.Logger
 	// Ready là các kiểm tra sẵn sàng của /readyz (ping pool).
 	Ready []func(context.Context) error
 
@@ -125,6 +128,9 @@ func NewRouter(d Deps) *gin.Engine {
 	s.rated, _ = telemetry.Meter().Int64Counter(MetricRateLimited, metric.WithDescription("Lời gọi Public API vượt giới hạn tần suất"))
 
 	r := httpx.NewEngine(d.Log, maxBody)
+	if d.Sandbox {
+		r.Use(func(c *gin.Context) { c.Header(port.HeaderEnvironment, port.EnvironmentSandbox); c.Next() })
+	}
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
 	r.GET("/readyz", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
@@ -149,6 +155,7 @@ func NewRouter(d Deps) *gin.Engine {
 	v1.GET("/usage", s.handle(spec{kind: meter.CallMeta, scope: port.ScopeUsageRead}, s.usage))
 	registerBatches(s, v1) // W5.4
 	s.registerFeeds(v1)    // W5.3
+	registerFiles(s, v1)   // W5.8
 	return r
 }
 

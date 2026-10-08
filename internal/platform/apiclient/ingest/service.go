@@ -42,6 +42,9 @@ type Service struct {
 	// MaxQueued: số lô chờ tối đa mỗi đối tác (≤ 0 → DefaultMaxQueued). RetryAfter của 429 (≤ 0 → DefaultRetryAfter).
 	MaxQueued  int
 	RetryAfter time.Duration
+	// MaxFileBytes, MaxFileRecords: giới hạn kênh tệp W5.8 (≤ 0 → DefaultMaxFileBytes / DefaultMaxFileRecords).
+	MaxFileBytes   int64
+	MaxFileRecords int
 	// OperatorTenant: tenant đơn vị vận hành — liệt kê đối tác khi mở consumer (Rabbit).
 	OperatorTenant uuid.UUID
 	Clock          clock.Clock

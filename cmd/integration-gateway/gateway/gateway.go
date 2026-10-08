@@ -140,6 +140,14 @@ func Run(ctx context.Context, log *slog.Logger, getenv func(string) string, unit
 	if !Enabled(getenv) {
 		return ErrDisabled
 	}
+	// Môi trường thử của đối tác (W5.8, R-INT-08): production + AG_PARTNER_SANDBOX → không khởi động (trước mọi kết nối).
+	sandbox, err := port.SandboxFromEnv(getenv, residency.Production(getenv))
+	if err != nil {
+		return err
+	}
+	if sandbox {
+		log.Warn("CHẾ ĐỘ THỬ CỦA ĐỐI TÁC — chỉ nhận khóa agks_, DB phải là DB thử dữ liệu tổng hợp", "event", "startup", "sandbox", true, "outcome", "ok")
+	}
 	// RB-7: production chỉ nối đích trong lãnh thổ.
 	if err := residency.CheckEnv(); err != nil {
 		return err
@@ -230,7 +238,8 @@ func Run(ctx context.Context, log *slog.Logger, getenv func(string) string, unit
 	}
 	mod, d, err := assembly.Build(ctx, open, assembly.Config{Operator: operator, Peppers: peppers, Store: store, Replicas: replicas,
 		Production: production, AllowUnapproved: allowUnapproved, EgressMode: mode, Clock: clock.System{}, Log: log,
-		IngestQueue: ing.Queue, IngestAllowProposed: ing.AllowProposed, IngestMaxQueued: ing.MaxQueued, IngestRetryAfter: ing.RetryAfter})
+		IngestQueue: ing.Queue, IngestAllowProposed: ing.AllowProposed, IngestMaxQueued: ing.MaxQueued, IngestRetryAfter: ing.RetryAfter,
+		IngestMaxFileBytes: ing.MaxFileBytes, IngestMaxFileRecords: ing.MaxFileRecords, Sandbox: sandbox})
 	if err != nil {
 		return err
 	}

@@ -32,8 +32,11 @@ type GeneratedKey struct {
 	Full   string // "agk_<prefix>_<secret>"
 }
 
-// GenerateKey sinh khóa mới từ nguồn ngẫu nhiên r (crypto/rand.Reader ở production).
-func GenerateKey(r io.Reader) (GeneratedKey, error) {
+// GenerateKey sinh khóa thật mới từ nguồn ngẫu nhiên r (crypto/rand.Reader ở production).
+func GenerateKey(r io.Reader) (GeneratedKey, error) { return GenerateKeyFor(r, false) }
+
+// GenerateKeyFor sinh khóa mới; sandbox → tiền tố khóa thử port.SandboxKeyTokenPrefix (W5.8, R-INT-08).
+func GenerateKeyFor(r io.Reader, sandbox bool) (GeneratedKey, error) {
 	if r == nil {
 		r = rand.Reader
 	}
@@ -49,7 +52,11 @@ func GenerateKey(r io.Reader) (GeneratedKey, error) {
 	if _, err := io.ReadFull(r, secret[:]); err != nil {
 		return GeneratedKey{}, fmt.Errorf("apiclient: sinh bí mật khóa: %w", err)
 	}
-	full := port.KeyTokenPrefix + string(prefix) + "_" + base64.RawURLEncoding.EncodeToString(secret[:])
+	token := port.KeyTokenPrefix
+	if sandbox {
+		token = port.SandboxKeyTokenPrefix
+	}
+	full := token + string(prefix) + "_" + base64.RawURLEncoding.EncodeToString(secret[:])
 	if p, ok := port.ParseKey(full); !ok || p != string(prefix) {
 		return GeneratedKey{}, errors.New("apiclient: khóa sinh ra sai dạng")
 	}

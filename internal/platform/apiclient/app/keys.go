@@ -55,7 +55,7 @@ func (s *Service) newKey(tid, clientID, actor uuid.UUID, now time.Time, rotatedF
 	if s.Peppers == nil {
 		return store.KeyEvent{}, domain.GeneratedKey{}, ErrDependencyUnavailable.WithDetail("Chưa cấu hình pepper khóa API (AG_APIKEY_PEPPER_V<n>)")
 	}
-	g, err := domain.GenerateKey(s.Rand)
+	g, err := domain.GenerateKeyFor(s.Rand, s.Sandbox)
 	if err != nil {
 		return store.KeyEvent{}, domain.GeneratedKey{}, err
 	}
@@ -350,6 +350,12 @@ func (a Authenticator) Authenticate(ctx context.Context, presented string, recei
 	s := a.Svc
 	prefix, ok := port.ParseKey(presented)
 	if !ok {
+		return port.Caller{}, port.ErrUnauthenticated
+	}
+	// Môi trường thử (W5.8, R-INT-08): khóa thử chỉ ở tiến trình thử, khóa thật không bao giờ ở tiến trình thử.
+	if port.IsSandboxKey(presented) != s.Sandbox {
+		s.log().WarnContext(ctx, "từ chối khóa API sai môi trường (thử ↔ thật)", "event", "apiclient.sandbox_key_refused",
+			"key_prefix", prefix, "sandbox", s.Sandbox, "outcome", "rejected")
 		return port.Caller{}, port.ErrUnauthenticated
 	}
 	if s.Peppers == nil || s.OperatorTenant == uuid.Nil {

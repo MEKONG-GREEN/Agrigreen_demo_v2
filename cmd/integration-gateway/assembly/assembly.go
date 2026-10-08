@@ -58,6 +58,12 @@ type Config struct {
 	IngestRetryAfter    time.Duration
 	// IngestOwners: hợp đồng → port module chủ; nil → ba hợp đồng song phương vào sổ đệm (W5.6 nối port thật).
 	IngestOwners map[string]apiclient.IngestOwner
+	// Kênh tệp (W5.8): giới hạn byte / bản ghi mỗi tệp (≤ 0 → mặc định).
+	IngestMaxFileBytes   int64
+	IngestMaxFileRecords int
+	// Sandbox: môi trường thử của đối tác (W5.8, AG_PARTNER_SANDBOX) — chỉ khóa agks_; Production + Sandbox bị
+	// gateway từ chối khởi động.
+	Sandbox bool
 }
 
 // Ports là cổng của module khác mà Public API dùng — mỗi cổng đọc bằng pool vai của module chủ
@@ -122,7 +128,8 @@ func Build(ctx context.Context, open PoolOpener, cfg Config) (*apiclient.Module,
 	if err != nil {
 		return nil, apiclient.PublicDeps{}, err
 	}
-	mod := apiclient.New(apPool, cfg.Clock, apiclient.Deps{Peppers: cfg.Peppers, OperatorTenant: cfg.Operator, Store: cfg.Store, Log: cfg.Log})
+	mod := apiclient.New(apPool, cfg.Clock, apiclient.Deps{Peppers: cfg.Peppers, OperatorTenant: cfg.Operator, Store: cfg.Store, Sandbox: cfg.Sandbox,
+		Log: cfg.Log})
 	ports, err := integrationPorts(ctx, open, cfg, mod.Plans())
 	if err != nil {
 		return nil, apiclient.PublicDeps{}, err
@@ -132,7 +139,7 @@ func Build(ctx context.Context, open PoolOpener, cfg Config) (*apiclient.Module,
 	if err == nil && cfg.IngestQueue != nil {
 		d.Ingest = apiclient.NewIngest(apPool, apiclient.IngestDeps{Queue: cfg.IngestQueue, Production: cfg.Production,
 			AllowProposed: cfg.IngestAllowProposed, Owners: cfg.IngestOwners, MaxQueued: cfg.IngestMaxQueued, RetryAfter: cfg.IngestRetryAfter,
-			OperatorTenant: cfg.Operator, Clock: cfg.Clock, Log: cfg.Log})
+			MaxFileBytes: cfg.IngestMaxFileBytes, MaxFileRecords: cfg.IngestMaxFileRecords, OperatorTenant: cfg.Operator, Clock: cfg.Clock, Log: cfg.Log})
 	}
 	return mod, d, err
 }
@@ -149,5 +156,5 @@ func Assemble(cfg Config, ports Ports, pools []*pgxpool.Pool) (apiclient.PublicD
 	return apiclient.PublicDeps{Limiter: apiclient.NewRateLimiter(cfg.Replicas),
 		Ledger: ports.Ledger, Quotas: ports.Quotas, Usage: ports.Usage, Grants: ports.Grants, Reads: ports.Reads, Params: ports.Params,
 		Collection: ports.Collection, Hubs: ports.Hubs, MRV: ports.MRV, OperatorTenant: cfg.Operator, Production: cfg.Production,
-		AllowUnapproved: cfg.AllowUnapproved && !cfg.Production, Clock: cfg.Clock, Log: cfg.Log, Ready: ready}, nil
+		AllowUnapproved: cfg.AllowUnapproved && !cfg.Production, Sandbox: cfg.Sandbox, Clock: cfg.Clock, Log: cfg.Log, Ready: ready}, nil
 }

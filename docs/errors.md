@@ -869,6 +869,22 @@ Mã `problem_code` trong kết quả từng bản ghi (`results[].problem_code`,
 
 Kết cục lô `dead_lettered` (`problem_code` của lô): `integration.owner_unavailable` — port của module chủ lỗi tạm quá `inbox.DeliveryLimit` lần giao; thông điệp ở DLQ riêng của đối tác `pf.apiclient.ingest.<client_id>.dlq` ([runbook](runbooks/integration-batches.md)). Đối tác gửi lại bằng `batch_ref` mới.
 
+### Cổng tích hợp — kênh tệp và môi trường thử (W5.8, `POST /v1/files/{contract}`, `GET /v1/files/{id}[/results]`; R-INT-11, R-INT-08)
+
+Tệp được tách thành lô `ingest_batch.v1` và đi qua CHÍNH đường ống nạp theo lô ở trên: mọi mã của mục "nạp theo lô" (`integration.contract_unknown`, `integration.contract_not_servable`, `integration.no_owner_port`, `integration.queue_saturated`, `integration.queue_unavailable`, kết quả từng bản ghi) áp nguyên cho tệp. Mã riêng của kênh tệp:
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 403 | `integration.file_channel_not_allowed` | Hợp đồng nạp không có `file` trong `ingest.channels` — mặc định từ chối |
+| 415 | `integration.file_format_unsupported` | `Content-Type` không phải `application/x-ndjson` (hoặc `application/ndjson`, `application/jsonl`) / `text/csv`, hoặc `charset` khác UTF-8 |
+| 400 | `integration.file_invalid` | Tệp không tách được thành bản ghi (cả tệp bị từ chối, không ghi sổ): không UTF-8, dòng NDJSON trống giữa tệp hoặc không phải JSON object, CSV thiếu/trùng tiêu đề, lệch số cột, ngoặc kép không đóng, tệp không có bản ghi. `detail` có số dòng, không có giá trị |
+| 413 | `integration.file_too_large` | Tệp vượt `AG_GATEWAY_INGEST_MAX_FILE_BYTES` (mặc định 8 MiB) hoặc `AG_GATEWAY_INGEST_MAX_FILE_RECORDS` bản ghi (mặc định 10 000) |
+| 422 | `validation_failed` | Thiếu/sai `contract_version` (query) hoặc `format` của tệp kết quả không phải `csv`/`ndjson` |
+| 404 | `integration.file_not_found` | Không có tệp, hoặc tệp của khách hàng/đối tác khác |
+| 409 | `integration.file_results_pending` | `GET /v1/files/{id}/results` khi còn lô `queued` hoặc chưa gửi (`incomplete` — tải lại cùng tệp) — kèm `Retry-After` |
+
+Môi trường thử của đối tác (`AG_PARTNER_SANDBOX=1`): khóa thử `agks_…` trình cho cổng thật, hoặc khóa thật `agk_…` trình cho cổng thử → `401 apiclient.unauthenticated` (log `apiclient.sandbox_key_refused`). Đặt cờ ở production → `api-platform` / `integration-gateway` không khởi động.
+
 ### pf/metering (sổ đo lường sử dụng, điểm kiểm soát xuất dữ liệu, bảng kê — G5-0 đóng băng, ADR-0023, ADR-0024)
 
 | HTTP | Mã | Khi nào |

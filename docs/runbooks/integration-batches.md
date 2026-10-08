@@ -55,3 +55,45 @@ SELECT b.id, b.contract, b.item_count, o.outcome, o.accepted, o.rejected, o.prob
 | Lô `dead_lettered` | Port module chủ lỗi tạm ≥ 6 lần giao | Sửa nguyên nhân (log `ingest.batch_failed`, `ingest.dead_lettered`); đối tác gửi lại bằng `batch_ref` mới (khóa nghiệp vụ idempotent ở port chủ nên an toàn). **Không** xóa DLQ bằng tay (R-62); xả DLQ theo quy trình thay đổi sau khi đối tác đã gửi lại |
 | 403 `integration.contract_not_servable` ở staging | Thiếu `AG_GATEWAY_INGEST_ALLOW_PROPOSED=1` cho hợp đồng `proposed` | Đặt cờ (không bao giờ ở production) |
 | 503 `apiclient.dependency_unavailable` ở `/v1/batches` | Production thiếu `AG_AMQP_URL` | Đặt `AG_AMQP_URL` + tài khoản RabbitMQ (mục 2) |
+
+## 6. Kênh tệp cùng lược đồ (W5.8, R-INT-11)
+
+Cho đối tác không có đội IT (HTX nhỏ, cơ quan chỉ có Excel): cùng hợp đồng, cùng scope `ingest:<hợp đồng>:write`, khác kênh.
+
+```
+POST /v1/files/{contract}?contract_version=N   (thân = tệp; Content-Type application/x-ndjson | text/csv)
+  → kiểm hợp đồng (mặc định từ chối) + ingest.channels có "file" + giới hạn byte/bản ghi
+  → tách bản ghi (NDJSON: mỗi dòng một object; CSV: tiêu đề = tên trường, ',' hoặc ';', BOM được)
+  → sổ pf_apiclient.ingest_file (pf 000128; idem theo SHA-256 tệp)
+  → chia theo ingest.max_batch → mỗi phần là phong bì ingest_batch.v1 (batch_ref = UUIDv5(mã tệp, k))
+  → ingest.Service.Submit của W5.4 (cùng hàng đợi đối tác, inbox, ValidateRecord, port chủ, kết quả từng bản ghi)
+GET /v1/files/{id}            trạng thái gộp: incomplete | queued | completed | dead_lettered
+GET /v1/files/{id}/results    tệp kết quả (?format=csv|ndjson): record, entity_key, outcome, problem_code, detail
+```
+
+- **Một đường kiểm:** cổng chỉ tách tệp; ô CSV được đổi sang kiểu JSON của trường (số, boolean, null cho trường nullable rỗng) chỉ khi đúng dạng — ô sai dạng giữ chuỗi để hợp đồng từ chối BẢN GHI (`integration.record_invalid` trong tệp kết quả), không phải cả tệp. Cả tệp bị từ chối (400 `integration.file_invalid`) chỉ khi không tách được bản ghi.
+- **Idempotent theo tổng kiểm:** tải lại đúng tệp → cùng mã tệp (`Idempotent-Replayed: true`), lô đã gửi là gọi lặp, lô còn thiếu được gửi tiếp. Đây là cách xử lý 429 `integration.queue_saturated` giữa tệp (tệp ở `incomplete`): chờ `Retry-After` rồi tải lại cùng tệp. Sửa một byte = tệp mới.
+- **Giới hạn:** `AG_GATEWAY_INGEST_MAX_FILE_BYTES` (mặc định 8 MiB, trần 100 MiB — route có giới hạn thân riêng, Ingress/Traefik phải cho qua tối thiểu cùng cỡ), `AG_GATEWAY_INGEST_MAX_FILE_RECORDS` (mặc định 10 000). Số lô của một tệp tính vào hạn hàng đợi của đối tác (`AG_GATEWAY_INGEST_MAX_QUEUED`) — tệp 10 000 bản ghi × `max_batch` 500 = 20 lô.
+- **Điểm kiểm soát:** cả ba route đi qua đường ống `/v1` (khóa [+ mTLS], hạn tần suất, sổ đo lường trước byte — đóng khi lỗi): POST = `export_request` 0 đơn vị (`job_id` = mã tệp), GET = `job_status`. Tệp kết quả chỉ có khóa thực thể + mã problem của CHÍNH đối tác, không giá trị bản ghi; ô CSV bắt đầu bằng `= + - @` được thêm `'`. Không lưu nội dung tệp (bản ghi đã ở `ingest_batch.items`).
+- **Kiểm tra:** `SELECT id, contract, contract_version, format, record_count, batch_count, event_time FROM pf_apiclient.ingest_file` (dưới tenant đối tác); lô của tệp tra theo `batch_ref` ở `ingest_batch`.
+- **Không làm:** URL tải lên ký sẵn vào kho đối tượng (sẽ vòng qua sổ đo lường và kiểm hợp đồng đồng bộ — ADR-0033 §2 chỉ cho URL ký ở chiều xuất), SFTP. Tải XUỐNG feed theo tệp = ảnh chụp `GET /v1/snapshots/…` (W5.3).
+
+## 7. Môi trường thử của đối tác (W5.8, R-INT-08)
+
+Một **triển khai riêng** (namespace/compose riêng, DB riêng, pepper riêng) chạy `api-platform` + `integration-gateway` với `AG_PARTNER_SANDBOX=1`, dữ liệu do `cmd/seed-synthetic` sinh — không có dữ liệu thật.
+
+| Bảo đảm | Cơ chế |
+|---|---|
+| Khóa thử khác khóa thật | `api-platform` ở chế độ thử phát hành khóa `agks_<prefix>_<bí mật>`; khóa thật là `agk_…` |
+| Khóa thử không dùng được ở production | Cổng thật từ chối mọi khóa `agks_` (401, log `apiclient.sandbox_key_refused`) trước khi tra DB; cổng thử từ chối khóa `agk_` |
+| Production không có chế độ thử | `AG_ENV=production` + `AG_PARTNER_SANDBOX=1` → `api-platform` và `integration-gateway` không khởi động (`ErrSandboxInProduction`, kiểm trước mọi kết nối) |
+| Đối tác biết đang ở môi trường thử | Mọi phản hồi của cổng thử có header `AG-Environment: sandbox` |
+| Cùng hợp đồng, cùng đường ống | Không có nhánh mã riêng cho thử: feed, lô, kênh tệp, sổ đo lường chạy y như thật; hợp đồng `proposed` mở bằng `AG_GATEWAY_INGEST_ALLOW_PROPOSED=1` / `AG_GATEWAY_FEED_ALLOW_PROPOSED=1` (chỉ ngoài production) |
+
+**Cấp môi trường thử:**
+
+1. Dựng stack riêng với `AG_ENV=staging` (hoặc `test`), DB riêng (`cmd/migrate bootstrap` + `up`), pepper riêng (`AG_APIKEY_PEPPER_V1` khác production), `AG_PARTNER_SANDBOX=1` cho **cả** `api-platform` và `integration-gateway`, `AG_GATEWAY_ENABLED=1`, `AG_GATEWAY_INGEST_ALLOW_PROPOSED=1`, `AG_GATEWAY_FEED_ALLOW_PROPOSED=1`; host riêng (vd `sandbox.partner.<domain>`), không chung Ingress với production.
+2. Sinh dữ liệu tổng hợp: `go run ./cmd/seed-synthetic -app-url … -admin-url … -seed <n>` (kế hoạch `platform`; `-plan mkg` nếu cần luồng MKG). Bộ sinh từ chối `AG_ENV=production`. Chạy job dựng feed (`cmd/worker -jobs apiclient_feed_build`) để feed có phiên bản.
+3. Cấp đối tác như mục 3 trên Admin API của stack thử (đề xuất ≠ duyệt): khách hàng API với `client_tenant_id` là tenant tổng hợp của đối tác, đăng ký `product = <hợp đồng nạp/feed>`, gói hạn mức, phát hành khóa — khóa trả về bắt đầu bằng `agks_`. Gửi khóa cho đối tác qua kênh bảo mật như khóa thật.
+4. Đối tác thử: `POST /v1/batches/{contract}`, `POST /v1/files/{contract}?contract_version=1` (mẫu bản ghi ở `contracts/integration/examples/`), `GET /v1/feeds/{feed}`. Kiểm tra header `AG-Environment: sandbox`.
+5. Khi chuyển sang thật: cấp khách hàng + khóa MỚI ở production (khóa thử không bao giờ chuyển được).

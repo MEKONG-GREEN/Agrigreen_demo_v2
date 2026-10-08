@@ -128,7 +128,7 @@ Sổ cấp phép của ADR-0020 (`share_grant_event`, bốn mắt, thu hồi, `p
 | W5.5 | Bộ điều hợp feed `mkg/fieldops`, `as_of`/`max_age`, header `Deprecation`/`Sunset` | mkg 000024 |
 | W5.6 | Luồng song phương (ADR-0034) | pf 000103, mkg 000025 |
 | W5.7 | Webhook mỏng, ngắt mạch, tổng kiểm | pf 000104 |
-| W5.8 | Kênh tệp cùng lược đồ, môi trường thử đối tác | — |
+| W5.8 | Kênh tệp cùng lược đồ, môi trường thử đối tác | pf 000128 |
 | W5.9 | Kiểm thử tải §42 | — |
 | W5.10 | Gỡ `/v1/partner/*`, `mkg_sync`, consumer `htx_collection_valve` | — |
 | W0.3 | `docs/design/mkg.md` §1.1 "bốn cửa" theo ADR này | — |
@@ -166,6 +166,14 @@ Sổ cấp phép của ADR-0020 (`share_grant_event`, bốn mắt, thu hồi, `p
 - **Xử lý (§41.3):** inbox (`shared.inbox`, một lần về hiệu quả) → kiểm lại hợp đồng → `ValidateRecord` → `entity_key` → khóa nghiệp vụ → port module chủ (`ingest.RecordSink`, do bên tiêu thụ khai, nối ở `assembly.Config.IngestOwners`) → kết quả từng bản ghi; problem 4xx của port = từ chối bản ghi; lỗi khác = lỗi tạm → giao lại → DLQ + kết cục `dead_lettered`.
 - **Song phương (ADR-0034, C-12):** port chủ chưa có → `ingest.Staging` ghi `pf_apiclient.ingest_staging`, idempotent theo `(hợp đồng, phiên bản, khóa nghiệp vụ)` (khác nội dung → `integration.business_key_conflict`). **W5.6** nối port thật (pf_coop/pf_cropcycle) và chuyển dữ liệu đệm; van `valve_collection` của MKG không đổi (W5.10).
 - **Ghi lệch:** sổ đo lường dùng `call_kind` có sẵn (`export_request` cho POST — 0 đơn vị, `job_status` cho GET; `product` = hợp đồng, `job_id` = mã lô) vì thêm loại `ingest` cần migration `pf_metering`; đơn vị tính cho lô nạp chờ W5.9 đo tải. Bộ chuyển RabbitMQ chưa có kiểm thử với broker thật (repo không có broker trong kiểm thử — như `inbox`); hàng đợi trong tiến trình được kiểm đầu–cuối. Tài khoản RabbitMQ của cổng (`rabbitmq.users`) chưa thêm vào chart.
+
+### W5.8 (09/10/2026) — kênh tệp và môi trường thử
+
+- **Kênh tệp (R-INT-11):** `POST /v1/files/{contract}?contract_version=N` trong router Public (`public/files.go`) — kế thừa khóa [+ mTLS], hạn tần suất, sổ đo lường trước byte; cùng scope `ingest:<hợp đồng>:write` với lô. Chỉ hợp đồng có `file` trong `ingest.channels` (mặc định từ chối → 403 `integration.file_channel_not_allowed`). Thân là tệp NDJSON (`application/x-ndjson`) hoặc CSV (`text/csv`, tiêu đề = tên trường, `,`/`;`, BOM). Gói `ingest` CHỈ tách tệp (`ParseFile`; ô CSV đổi sang kiểu JSON của trường khi đúng dạng, sai dạng giữ chuỗi) và chia theo `max_batch` thành phong bì `ingest_batch.v1` (`FileEnvelopes`, `batch_ref` = UUIDv5(mã tệp, k), `sent_at` = lúc nhận tệp) rồi gọi `Service.Submit` của W5.4 — **không có đường kiểm thứ hai**; tệp chỉ bị từ chối cả tệp khi không tách được bản ghi (400 `integration.file_invalid`).
+- **Idempotent theo tổng kiểm:** sổ chỉ ghi thêm `pf_apiclient.ingest_file` (pf 000128, idem `file:<client>:<hợp đồng>.v<N>:<sha256>`, RLS tenant đối tác, chỉ `r_apiclient`) ghi TRƯỚC khi gửi lô; thân lô tất định nên tải lại cùng tệp là gọi lặp ở W5.4 và gửi tiếp lô còn thiếu (429 giữa tệp → `incomplete`). Không lưu nội dung tệp (bản ghi ở `ingest_batch.items`). Giới hạn `AG_GATEWAY_INGEST_MAX_FILE_BYTES` (8 MiB, giới hạn thân riêng của route qua `httpx.AllowBody`) và `_MAX_FILE_RECORDS` (10 000).
+- **Kết quả:** `GET /v1/files/{id}` gộp trạng thái lô; `GET /v1/files/{id}/results?format=csv|ndjson` (409 khi chưa xong) — số thứ tự bản ghi, `entity_key`, kết cục, mã problem; lô `dead_lettered` → mọi bản ghi rejected với mã của lô. Sổ đo lường: POST `export_request` 0 đơn vị, GET `job_status` (`job_id` = mã tệp) — như lô, chờ W5.9 định đơn vị.
+- **Môi trường thử (R-INT-08):** triển khai riêng, DB riêng, dữ liệu `cmd/seed-synthetic`, cờ `AG_PARTNER_SANDBOX=1` ở `api-platform` + `integration-gateway`: phát hành khóa `agks_…` (`domain.GenerateKeyFor`); `app.Authenticator` từ chối khóa sai môi trường (401, log `apiclient.sandbox_key_refused`) nên khóa thử không dùng được ở cổng thật dù lộ; production + cờ → không khởi động (`port.ErrSandboxInProduction`); mọi phản hồi cổng thử có `AG-Environment: sandbox`. Không có nhánh mã riêng — feed, lô, tệp chạy y như thật.
+- **Ghi lệch:** không làm URL tải lên ký sẵn (vòng qua sổ đo lường và kiểm đồng bộ — mục 2 chỉ cho URL ký ở chiều xuất) và SFTP; tải xuống feed theo tệp là ảnh chụp của W5.3. Kênh tệp không đòi `Idempotency-Key` (R-51 thỏa bằng khóa tự nhiên SHA-256). Cấp đối tác ở môi trường thử vẫn qua Admin API bốn mắt (chưa tự động trong `cmd/seed-synthetic`). Ingress/Traefik của cổng phải cho thân ≥ giới hạn tệp khi bật.
 
 ## Liên quan
 

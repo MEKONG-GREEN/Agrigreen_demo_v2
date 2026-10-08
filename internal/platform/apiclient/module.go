@@ -26,6 +26,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -56,7 +57,9 @@ type Deps struct {
 	Store objstore.Store
 	// Collection: nguồn collection_volume (pf/cropcycle — đợt G5-1 S/D nối).
 	Collection port.CollectionVolumeSource
-	Log        *slog.Logger
+	// Sandbox: môi trường thử của đối tác (W5.8, SandboxFromEnv) — khóa agks_.
+	Sandbox bool
+	Log     *slog.Logger
 }
 
 // Module là pf/apiclient đã nối.
@@ -67,12 +70,17 @@ type Module struct{ svc *app.Service }
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 	db = forModule(db)
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Peppers: deps.Peppers, OperatorTenant: deps.OperatorTenant, Store: deps.Store,
-		Collection: deps.Collection, Log: deps.Log}}
+		Collection: deps.Collection, Sandbox: deps.Sandbox, Log: deps.Log}}
 }
 
 // PeppersFromEnv đọc AG_APIKEY_PEPPER_V<n> / AG_APIKEY_PEPPER_CURRENT của tiến trình. Không đặt →
 // (nil, nil).
 func PeppersFromEnv() (*Peppers, error) { return domain.PeppersFromEnv(os.Getenv, os.Environ()) }
+
+// SandboxFromEnv đọc AG_PARTNER_SANDBOX (môi trường thử của đối tác, W5.8); production → lỗi khởi động.
+func SandboxFromEnv(getenv func(string) string) (bool, error) {
+	return port.SandboxFromEnv(getenv, residency.Production(getenv))
+}
 
 // OperatorTenantFromEnv đọc AG_PUBLIC_OPERATOR_TENANT (rỗng → Nil).
 func OperatorTenantFromEnv() (uuid.UUID, error) {

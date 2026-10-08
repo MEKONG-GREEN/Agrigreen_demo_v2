@@ -28,6 +28,12 @@ type (
 	IngestMemoryQueue = ingest.Memory
 )
 
+// Trần cứng của kênh tệp (W5.8) cho cấu hình AG_GATEWAY_INGEST_MAX_FILE_BYTES / _RECORDS.
+const (
+	IngestMaxFileBytesLimit   = ingest.MaxFileBytesLimit
+	IngestMaxFileRecordsLimit = ingest.MaxFileRecordsLimit
+)
+
 // NewIngestMemoryQueue tạo hàng đợi trong tiến trình (dev/test, một bản sao).
 func NewIngestMemoryQueue(maxLen int) *ingest.Memory { return ingest.NewMemory(maxLen) }
 
@@ -44,9 +50,12 @@ type IngestDeps struct {
 	// AllowProposed: cờ dev/test AG_GATEWAY_INGEST_ALLOW_PROPOSED (bị bỏ qua ở production).
 	AllowProposed bool
 	// Owners: hợp đồng → port module chủ. Nil → chỉ ba hợp đồng song phương vào sổ đệm (StagingOwners).
-	Owners         map[string]ingest.Owner
-	MaxQueued      int
-	RetryAfter     time.Duration
+	Owners     map[string]ingest.Owner
+	MaxQueued  int
+	RetryAfter time.Duration
+	// MaxFileBytes, MaxFileRecords: giới hạn kênh tệp (W5.8); ≤ 0 → mặc định.
+	MaxFileBytes   int64
+	MaxFileRecords int
 	OperatorTenant uuid.UUID
 	Clock          clock.Clock
 	Log            *slog.Logger
@@ -60,7 +69,8 @@ func NewIngest(db tenant.Beginner, d IngestDeps) *ingest.Service {
 		owners = StagingOwners(db, d.Clock)
 	}
 	return &ingest.Service{DB: db, Queue: d.Queue, Gate: ingest.Gate{Production: d.Production, AllowProposed: d.AllowProposed && !d.Production},
-		Owners: owners, MaxQueued: d.MaxQueued, RetryAfter: d.RetryAfter, OperatorTenant: d.OperatorTenant, Clock: d.Clock, Log: d.Log}
+		Owners: owners, MaxQueued: d.MaxQueued, RetryAfter: d.RetryAfter, MaxFileBytes: d.MaxFileBytes, MaxFileRecords: d.MaxFileRecords,
+		OperatorTenant: d.OperatorTenant, Clock: d.Clock, Log: d.Log}
 }
 
 // StagingOwners nối ba hợp đồng song phương (collection_schedule, roll_count_statement, htx_roll_confirmation) vào

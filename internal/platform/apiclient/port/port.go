@@ -62,7 +62,9 @@ const (
 	MaxActiveKeys = 2
 )
 
-var keyRe = regexp.MustCompile(`^agk_([a-z2-7]{12})_([A-Za-z0-9_-]{43})$`)
+// keyRe nhận khóa thật agk_ và khóa thử agks_ (W5.8, sandbox.go); loại khóa phải khớp chế độ của tiến trình
+// (app.Authenticator).
+var keyRe = regexp.MustCompile(`^agks?_([a-z2-7]{12})_([A-Za-z0-9_-]{43})$`)
 
 // ParseKey tách prefix của khóa trình ra (header X-API-Key). ok = false khi sai dạng — trả 401
 // apiclient.unauthenticated, không nói lý do. Prefix dùng để tra cứu và ghi log; KHÔNG BAO GIỜ log
