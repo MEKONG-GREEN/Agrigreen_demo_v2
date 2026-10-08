@@ -84,10 +84,19 @@ Ngưỡng k là mục `[KÝ]` của v4.1 (K-8, Phụ lục C C-4, câu hỏi Q5-
 |---|---|---|
 | W6.1 | `pf/workflow` (bốn mắt cho thêm job) | pf 000118 |
 | W6.3 | Schema `_pub`, view có phiên bản, vai `r_<module>_pub` (thành viên: `r_metrics`), `pf/metrics` chỉ đọc `_pub`, bản sao chỉ đọc `AG_DB_REPLICA_URL` — xong 09/10/2026 ([modules.md](../dev/modules.md#view-công-bố-_pub-w63)) | pf 000124 |
-| W6.4 | `r_agg`, `app_agg`, danh mục job, nhật ký chạy, cổng CI danh mục BYPASSRLS | pf 000109 |
+| W6.4 | `r_agg`, danh mục job, nhật ký chạy, cổng CI danh mục BYPASSRLS — mã xong 09/10/2026, bật production chờ C-4 (ghi chú dưới) | pf 000129 (000109 cũ bỏ) |
 | W5.3 | Tập dữ liệu dựng sẵn cho cổng tích hợp qua ngưỡng k | pf 000100–000101 |
 
 Bản đối chiếu ghi gói `r_agg` là "W6.5" ở vài chỗ; số đúng theo kế hoạch là **W6.4**.
+
+**W6.4 (09/10/2026)** — [modules.md](../dev/modules.md#vai-tổng-hợp-r_agg-w64), [runbook](../runbooks/agg-jobs.md):
+
+- **Module chủ:** `pf/metrics` (`cap/analytics`): sổ `pf_metrics.agg_job` (danh mục có phiên bản: job, phiên bản, view `_pub`, SQL, mục đích, k, băm định nghĩa; `proposed` → đúng một `approved`/`rejected`) và `pf_metrics.agg_run` (nhật ký mỗi lần chạy, §5) ở **tenant quản trị**; `pf/workflow` giữ yêu cầu/quyết định (kind `agg.job`) — `r_metrics` gọi `pf_workflow.submit/decide` trong giao dịch của mình (§4 bốn mắt; CHECK `agg_job_four_eyes` ở cả sổ danh mục).
+- **§3 vai:** `r_agg` NOLOGIN BYPASSRLS (bootstrap), thành viên `r_<module>_pub`, thêm SELECT cột `k_ref.org.tenant_id`. **Lệch:** chưa có `app_agg` — `app_worker` (NOINHERIT) là thành viên; bù bằng đường vào duy nhất `db.WithAggTx` (giao dịch chỉ đọc, `statement_timeout` cục bộ, kiểm job đã duyệt trước khi đổi vai) và lint `agnosessionset`. Tách `app_agg` + `pg_hba` trước khi bật production. Chưa chạy trên bản sao chỉ đọc (pool truyền vào có thể là pool bản sao).
+- **§2 lệch đã có từ W6.3:** view `_pub` **không** `security_invoker` — chủ `ag_migrator` (NOBYPASSRLS, bảng gốc FORCE RLS), nên BYPASSRLS của `r_agg` không xuyên qua view. Bộ chạy liệt kê tenant bằng `k_ref.org` (đọc thẳng, vượt RLS) và đọc từng lát tenant (`app.tenant_id` cục bộ) trong cùng giao dịch; k áp trên nhóm sau khi gộp mọi tenant như §4. Chuyển sang view `security_invoker` đòi `r_agg` có quyền bảng gốc — không làm.
+- **§4:** job khai trong mã (`domain.AggJob`, `app/aggjobs.go`); bộ chạy so băm định nghĩa với phiên bản đã duyệt **mới nhất** — phiên bản cũ, chưa duyệt, bị từ chối, sửa tại chỗ → `refused` (không đổi vai). Ô bù chưa cần (đầu ra chỉ có nhóm, không có tổng).
+- **§6:** cổng `TestAggRole_W64` (danh mục `dbadmin`) + `TestSchemaIsolationAggRole_W64` (`pg_roles` mọi cụm, quyền hiệu lực của `r_agg`).
+- **§7:** k sàn đọc qua `KFloorSource` (`publicdata.k_min` của tenant quản trị, chưa đặt → 10); job/k xin dưới sàn bị từ chối. Bộ chạy chưa nối `cmd/worker` — bật sau C-4.
 
 ## Liên quan
 

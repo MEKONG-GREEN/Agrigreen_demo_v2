@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/app"
@@ -22,6 +23,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	wfport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/workflow/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
@@ -120,6 +122,24 @@ func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job
 		},
 	}}
 }
+
+// AggDeps là phụ thuộc của bộ chạy job tổng hợp (W6.4, ADR-0031): pool vai đăng nhập của đơn vị chạy job
+// (app_worker — thành viên r_metrics và vai tổng hợp), cap/workflow cho bốn mắt, tenant quản trị (danh mục, quyết
+// định, nhật ký chạy), nguồn k sàn publicdata.k_min (nil → 10 tạm, ADR-0031 §7).
+type AggDeps struct {
+	DB         tenant.Beginner
+	Approvals  wfport.Approvals
+	Governance uuid.UUID
+	KFloor     app.KFloorSource
+}
+
+// Agg dựng bộ quản lý danh mục + bộ chạy job tổng hợp. Chưa nối vào cmd/worker: bật production chờ C-4.
+func Agg(clk clock.Clock, d AggDeps) *app.Agg {
+	return &app.Agg{DB: forModule(d.DB), Clock: clk, Approvals: d.Approvals, Governance: d.Governance, KFloor: d.KFloor}
+}
+
+// AggJobs là mọi job tổng hợp đã khai (đăng ký lúc biên dịch).
+var AggJobs = app.AggJobs
 
 // ParseDate, Before, AddDays, Closed: tiện ích ngày nghiệp vụ cho lệnh worker.
 var (

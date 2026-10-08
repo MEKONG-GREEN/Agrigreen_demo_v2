@@ -786,6 +786,18 @@ Chỉ số có lịch sử và nhật ký lớp GIS (G3-A5; `GET /v1/metrics/*`,
 | 409 | `metrics.definition_edited` | pf/metrics (job/backfill): tệp `defs/<key>.v<n>.yaml` của phiên bản đã dùng bị sửa tại chỗ (băm khác `definition_pin`) — thêm phiên bản mới thay vì sửa |
 | 503 | `metrics.dependency_unavailable` | pf/metrics: chưa nối CSDL, nguồn chỉ số của module chủ dữ liệu, pf/party (phạm vi) hoặc pf/geo (hình học) |
 
+Job tổng hợp `r_agg` (W6.4, ADR-0031; chưa có route — mã đi ra qua bộ chạy/gốc lắp ráp, ghi ở `pf_metrics.agg_run.error_code`):
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 422 | `metrics.agg_job_invalid` | Định nghĩa job sai: id/phiên bản/view không dạng `pf_<module>_pub.v<N>_<tên>`, SQL tham chiếu đối tượng ngoài view đã khai hoặc tự đặt tenant, thiếu chiều/số đo, mục đích ngoài 10–500 ký tự |
+| 422 | `metrics.agg_k_below_floor` | k của job hoặc k xin khi chạy nhỏ hơn k sàn (`publicdata.k_min`, tạm 10) |
+| 409 | `metrics.agg_version_not_newer` | Đề xuất phiên bản không lớn hơn mọi phiên bản đã đề xuất của job |
+| 404 | `metrics.agg_proposal_not_found` | Quyết định cho đề xuất không có trong tenant quản trị |
+| 409 | `metrics.agg_already_decided` | Đề xuất đã có quyết định khác (khác người hoặc khác kết quả) |
+| 403 | `metrics.agg_job_not_approved` | Chạy job chưa khai, chưa duyệt, bị từ chối, không phải phiên bản duyệt mới nhất, hoặc định nghĩa trong mã khác băm đã duyệt — không đổi sang `r_agg` |
+| 403 | `self_approval_forbidden` | Người quyết định trùng người đề xuất job (CHECK `agg_job_four_eyes`, `decision_four_eyes`) |
+
 Nguồn không có dữ liệu cho một phạm vi/ngày (vd vụ chưa có lần cân đối trước cutoff) **không** là lỗi API: job không ghi dòng (`port.ErrNoData`), API trả danh sách rỗng.
 
 ### pf/extdata

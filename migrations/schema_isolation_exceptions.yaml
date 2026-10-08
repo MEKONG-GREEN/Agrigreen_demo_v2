@@ -37,3 +37,10 @@ exceptions:
       băng qua pf_forms.mirror (SECURITY DEFINER, port forms/port.Freezer) TRONG giao dịch của pf/extension — USAGE
       schema + EXECUTE, không quyền bảng. Điểm vào ghi lâu dài; bỏ khi KN chuyển sang kỳ native.
     owner: ADR-0028-write-port
+  - role: r_metrics
+    schema: pf_workflow
+    reason: >-
+      W6.4 (pf 000129): thêm/sửa job tổng hợp r_agg là thay đổi đặc quyền — cap/analytics ghi yêu cầu/quyết định
+      bốn mắt (kind agg.job) qua pf_workflow.submit/decide (SECURITY DEFINER) TRONG giao dịch của pf/metrics cùng
+      dòng danh mục pf_metrics.agg_job — USAGE schema + EXECUTE, không quyền bảng. Điểm vào ghi lâu dài.
+    owner: ADR-0028-write-port

@@ -88,6 +88,8 @@ func TestNoHardDelete_ADR0011(t *testing.T) {
 func TestNoSessionSet_ADR0028(t *testing.T) {
 	analysistest.Run(t, analysistest.TestData(), NoSessionSet,
 		"example.com/ag/internal/platform/beta/sqlsess",
+		"example.com/ag/internal/platform/beta/aggcall",
+		"example.com/ag/internal/platform/metrics/app",
 		"example.com/ag/internal/shared/db",
 	)
 }

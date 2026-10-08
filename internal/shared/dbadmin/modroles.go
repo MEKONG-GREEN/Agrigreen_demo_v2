@@ -49,8 +49,16 @@ type ModuleGroup struct {
 }
 
 // AnalyticsModule là module phân tích (cap/analytics, aka của pf/metrics — ADR-0027): vai nhóm của nó là thành
-// viên mọi r_<module>_pub (R-DB-10, W6.3). r_agg (W6.4) sẽ là bên đọc thứ hai.
+// viên mọi r_<module>_pub (R-DB-10, W6.3). r_agg (W6.4) là bên đọc thứ hai.
 const AnalyticsModule = "pf/metrics"
+
+// AggRole là vai tổng hợp vượt đơn vị (W6.4, ADR-0031 §3, R-DB-11): NOLOGIN, BYPASSRLS, INHERIT, thành viên mọi
+// r_<module>_pub (chỉ SELECT view công bố); không thuộc ag_shared_user; migration pf 000129 cấp thêm đúng
+// SELECT (tenant_id) trên k_ref.org (liệt kê tenant). Vai đăng nhập của đơn vị chạy job (LoginUnit.Agg — app_worker)
+// là thành viên NOINHERIT, SET TRUE: chỉ có quyền r_agg sau SET LOCAL ROLE trong db.WithAggTx (shared/db), sau khi
+// job đã khai được kiểm là đã duyệt bốn mắt. Lệch ADR-0031 §3 (vai đăng nhập riêng app_agg): chưa tách — bí mật
+// thêm và pg_hba riêng chờ bật production (C-4); xem docs/runbooks/agg-jobs.md.
+const AggRole = "r_agg"
 
 // LoginUnit là vai đăng nhập của một đơn vị triển khai.
 type LoginUnit struct {
@@ -66,7 +74,9 @@ type LoginUnit struct {
 	// hoặc đơn vị chưa ghép module trong tiến trình nhưng ADR-0028 gán (engine đồng bộ).
 	Extra []string
 	// Ops: đơn vị cần r_ops (idempotency HTTP, consumer không thuộc module).
-	Ops      bool
+	Ops bool
+	// Agg: đơn vị chạy job tổng hợp đã khai (W6.4) — thành viên r_agg.
+	Agg      bool
 	Clusters []migrations.Cluster
 }
 
@@ -80,7 +90,7 @@ var (
 // (job vận hành, không theo module) và vai giám sát (mkg_monitor/ts_monitor): bí mật pf 7, mkg 7, ts 5, vault 4.
 var LoginUnits = []LoginUnit{
 	{Role: AppPlatform, Unit: "api-platform", Ops: true, Clusters: pfOnly},
-	{Role: AppWorker, Unit: "worker", Tools: []string{"drill", "formimport"}, Ops: true, Clusters: pfOnly},
+	{Role: AppWorker, Unit: "worker", Tools: []string{"drill", "formimport"}, Ops: true, Agg: true, Clusters: pfOnly},
 	// Cổng tích hợp (W5.2, ADR-0033 §1: vai app_public, không thêm vai) mở pool party theo tên
 	// (cmd/integration-gateway/assembly: không import gốc pf/party). api-public là bí danh một kỳ.
 	{Role: AppPublic, Unit: "integration-gateway", Aliases: []string{"api-public"}, Extra: []string{"pf/party"}, Ops: true, Clusters: pfOnly},
@@ -172,6 +182,9 @@ func UnitGroupRoles(u LoginUnit) []string {
 	if u.Ops {
 		out = append(out, OpsGroup)
 	}
+	if u.Agg {
+		out = append(out, AggRole)
+	}
 	slices.Sort(out)
 	return out
 }
@@ -195,6 +208,10 @@ func buildRoles() []Role {
 			pubs = append(pubs, g.Pub)
 			out = append(out, Role{Name: g.Pub, Clusters: g.Clusters})
 		}
+	}
+	// r_agg sau r_<module>_pub (đích MemberOf của nó), trước vai đăng nhập (W6.4).
+	if len(pubs) > 0 {
+		out = append(out, Role{Name: AggRole, BypassRLS: true, MemberOf: slices.Clone(pubs), Clusters: pfOnly})
 	}
 	for _, g := range groups {
 		// r_* thuộc ag_shared_user (outbox, inbox, idempotency như vai cũ); NOLOGIN nên Clusters chỉ để lọc

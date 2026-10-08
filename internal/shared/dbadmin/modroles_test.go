@@ -35,10 +35,46 @@ func TestPubRoles_W63(t *testing.T) {
 			t.Errorf("%s: %+v (vị trí %d, r_metrics %d)", name, r, ri, ai)
 		}
 		for _, o := range Roles {
-			if slices.Contains(o.MemberOf, name) && o.Name != modreg.DBRole(AnalyticsModule) {
+			if slices.Contains(o.MemberOf, name) && o.Name != modreg.DBRole(AnalyticsModule) && o.Name != AggRole {
 				t.Errorf("%s không được là thành viên %s", o.Name, name)
 			}
 		}
+	}
+}
+
+// W6.4 (ADR-0031 §3, R-DB-11): r_agg NOLOGIN BYPASSRLS INHERIT, thành viên đúng mọi r_<module>_pub (không
+// ag_shared_user, không vai module nào), tạo sau vai _pub và trước vai đăng nhập; chỉ app_worker (đơn vị chạy job,
+// LoginUnit.Agg) là thành viên — NOINHERIT. Không vai BYPASSRLS mới nào khác.
+func TestAggRole_W64(t *testing.T) {
+	r, ri := roleByName(t, AggRole)
+	if r.Login || !r.BypassRLS || r.NoInherit || !slices.Equal(r.MemberOf, pubRoles()) ||
+		!slices.Equal(r.Clusters, []migrations.Cluster{migrations.PF}) {
+		t.Errorf("r_agg: %+v", r)
+	}
+	for _, p := range pubRoles() {
+		if _, pi := roleByName(t, p); pi > ri {
+			t.Errorf("%s tạo sau r_agg", p)
+		}
+	}
+	var members, bypass []string
+	for i, o := range Roles {
+		if slices.Contains(o.MemberOf, AggRole) {
+			members = append(members, o.Name)
+			if !o.Login || !o.NoInherit || i < ri {
+				t.Errorf("%s: thành viên r_agg phải là vai đăng nhập NOINHERIT tạo sau r_agg: %+v", o.Name, o)
+			}
+		}
+		if o.BypassRLS {
+			bypass = append(bypass, o.Name)
+		}
+	}
+	if !slices.Equal(members, []string{AppWorker}) {
+		t.Errorf("thành viên r_agg: %v, muốn [app_worker]", members)
+	}
+	slices.Sort(bypass)
+	// ADR-0031 §6: danh mục vai BYPASSRLS.
+	if want := []string{OpsJobs, OutboxPublisher, MKGMonitorOwner, AggRole, TSMonitorOwner}; !slices.Equal(bypass, want) {
+		t.Errorf("vai BYPASSRLS: %v, muốn %v", bypass, want)
 	}
 }
 
@@ -65,7 +101,7 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	if slices.ContainsFunc(groups, func(g ModuleGroup) bool { return g.Module == "pf/extdata" }) {
 		t.Error("pf/extdata không có schema — không có vai nhóm")
 	}
-	seen := map[string]bool{OpsGroup: true}
+	seen := map[string]bool{OpsGroup: true, AggRole: true} // r_agg: W6.4, TestAggRole_W64
 	for _, g := range groups {
 		if seen[g.Role] {
 			t.Errorf("trùng vai nhóm %s", g.Role)
