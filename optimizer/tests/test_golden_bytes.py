@@ -74,5 +74,5 @@ def test_manifest_covers_every_input() -> None:
 
 if __name__ == "__main__" and "--write" in sys.argv:  # pragma: no cover - công cụ sinh lại
     manifest = {n: _entry(raw) for n, raw in inputs()}
-    MANIFEST.write_text(json.dumps(manifest, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    MANIFEST.write_text(json.dumps(manifest, indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     print(f"{len(manifest)} phong bì → {MANIFEST}")

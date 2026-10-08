@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=69"]  # MIT
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agrigreen-optcore"
+dynamic = ["version"]
+description = "AgriGreen optcore: lõi tối ưu thuần (mạng lưới, mô hình cung, hàm chi phí, bộ giải) dùng chung cho optimizer nền tảng và engine nội bộ (ADR-0036)"
+requires-python = ">=3.12,<3.13"
+readme = "README.md"
+# Không phụ thuộc runtime bắt buộc (thư viện thuần). Giấy phép phụ thuộc thuộc
+# deploy/policies/allowed-licenses.txt (RB-4, ADR-0016).
+dependencies = []
+
+[project.optional-dependencies]
+# Bộ giải MILP cho select_hubs (THỬ NGHIỆM).
+milp = [
+  "highspy>=1.7,<2",        # MIT
+]
+dev = [
+  "pytest>=8",              # MIT
+  "mypy>=1.10",             # MIT — kiểm kiểu (gói có py.typed)
+]
+
+[tool.setuptools.dynamic]
+version = { attr = "optcore.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+optcore = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src/optcore"]
+check_untyped_defs = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["highspy"]
+ignore_missing_imports = true

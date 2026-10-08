@@ -3,7 +3,7 @@
 `golden_bytes.json` được chụp từ `agrigreen_optimizer` TRƯỚC khi tách (cab0280) và chỉ
 được sinh lại khi công thức đổi có chủ đích (kèm đổi ENGINE_VERSION):
 
-    python tests/test_golden_bytes.py --write     # từ lib/optcore
+    python -m tests.test_golden_bytes --write     # từ lib/optcore
 
 Mỗi đầu ra được tuần tự hóa như phong bì kết quả (khóa sắp xếp, UTF-8, không khoảng
 trắng) rồi so sha256 + độ dài — tương đương so byte. `--dump DIR` ghi đầu ra đầy đủ để diff.
@@ -93,7 +93,7 @@ def test_manifest_covers_every_output() -> None:
 def main(argv: list[str]) -> int:  # pragma: no cover - công cụ sinh lại
     if "--write" in argv:
         manifest = {f"{c}/{n}": _entry(fn) for c in CASES for n, fn in outputs(c)}
-        MANIFEST.write_text(json.dumps(manifest, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        MANIFEST.write_text(json.dumps(manifest, indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
         print(f"{len(manifest)} đầu ra → {MANIFEST}")
     if "--dump" in argv:
         out = Path(argv[argv.index("--dump") + 1])

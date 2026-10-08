@@ -1,11 +1,18 @@
 # optimizer (Python 3.12) — ảnh slim, chạy không phải root. Chỉ nhận dữ liệu không định danh (RB-7).
-# Build từ gốc repo: docker build -f optimizer/Dockerfile -t agrigreen/optimizer optimizer
+# Ngữ cảnh chính là optimizer/; lõi dùng chung lib/optcore (ADR-0036, W8.1) đến qua ngữ cảnh
+# đặt tên `optcore` (BuildKit). Từ gốc repo:
+#   docker build --build-context optcore=lib/optcore -t agrigreen/optimizer optimizer
+# Compose: additional_contexts trong deploy/compose/docker-compose.yml.
 FROM python:3.12-slim AS build
 WORKDIR /src
+COPY --from=optcore pyproject.toml README.md /optcore/
+COPY --from=optcore src /optcore/src
 COPY pyproject.toml README.md ./
 COPY src ./src
+# Wheel lõi trước, rồi wheel optimizer phân giải agrigreen-optcore==<ghim> từ chính thư mục đó.
 RUN pip install --no-cache-dir --upgrade pip \
- && pip wheel --no-cache-dir --wheel-dir /wheels ".[milp]"
+ && pip wheel --no-cache-dir --no-deps --wheel-dir /wheels /optcore \
+ && pip wheel --no-cache-dir --find-links /wheels --wheel-dir /wheels ".[milp]"
 
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1

@@ -384,7 +384,8 @@ services:
   optimizer:
     <<: *hardened
     image: agrigreen/optimizer:dev
-    build: { context: ../../optimizer, dockerfile: Dockerfile }
+    # Lõi lib/optcore (ADR-0036) là ngữ cảnh đặt tên `optcore` của optimizer/Dockerfile.
+    build: { context: ../../optimizer, dockerfile: Dockerfile, additional_contexts: { optcore: ../../lib/optcore } }
     command: ["consume"]
     depends_on:
       rabbitmq: { condition: service_healthy }

@@ -10,7 +10,7 @@ import pytest
 pytest.importorskip("highspy")
 
 from agrigreen_optimizer.run import process  # noqa: E402
-from agrigreen_optimizer.select_hubs import select_hubs  # noqa: E402
+from optcore.select_hubs import select_hubs  # noqa: E402
 
 from .paths import GOLDEN  # noqa: E402
 

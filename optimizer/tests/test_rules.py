@@ -8,11 +8,11 @@ from pathlib import Path
 
 import pytest
 
-from agrigreen_optimizer.engine import evaluate
-from agrigreen_optimizer.jsmath import fmt_vi, js_round, jsum
 from agrigreen_optimizer.run import dumps, process
+from optcore.engine import evaluate
+from optcore.jsmath import fmt_vi, js_round, jsum
 
-from .paths import GOLDEN  # noqa: E402
+from .paths import GOLDEN
 
 
 def snap(case: str = "case1_two_hubs_unapproved") -> dict:

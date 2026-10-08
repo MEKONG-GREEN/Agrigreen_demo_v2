@@ -42,7 +42,7 @@ def num(value: float) -> float | int:
 
 
 def _group(int_part: str) -> str:
-    out = []
+    out: list[str] = []
     while len(int_part) > 3:
         out.insert(0, int_part[-3:])
         int_part = int_part[:-3]

@@ -168,7 +168,7 @@ def simulate_flow(
     daily = plant_annual_demand_tons / op_count if op_count > 0 else 0.0
     reorder_point = daily * PLANT_REORDER_DAYS
 
-    months = [
+    months: list[dict[str, Any]] = [
         {
             "month": i + 1,
             "label": f"Tháng {i + 1}",

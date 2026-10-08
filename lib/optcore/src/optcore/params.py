@@ -9,6 +9,7 @@ giá trị, min/max và cờ phê duyệt, nên optimizer không giữ bản sao
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -212,7 +213,7 @@ class UnsupportedOverride(ValueError):
 
 def with_override(p: SimulationParams, code: str, value: float) -> SimulationParams:
     """Áp một giá trị ghi đè (FN-18) — cùng bảng ánh xạ với `withOverride` của prototype."""
-    m = {
+    m: dict[str, Callable[[], dict[str, Any]]] = {
         "straw_to_paddy_ratio": lambda: {"straw_to_paddy_ratio": value},
         "collectable_ratio": lambda: {"collectable_ratio": value / 100},
         "loss_ratio": lambda: {"loss_ratio": value / 100},

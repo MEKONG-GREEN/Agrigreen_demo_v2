@@ -71,10 +71,18 @@ ADR-0016 áp cho `lib/optcore` và engine nội bộ. Thêm bộ giải mới (O
 
 | Gói | Việc | Migration |
 |---|---|---|
-| W8.1 | Tách `lib/optcore`, golden test giữ nguyên byte | — |
+| W8.1 | Tách `lib/optcore`, golden test giữ nguyên byte — **xong** (08/10/2026), xem ghi chú dưới | — |
 | W5.5 | Bộ điều hợp feed `mkg/fieldops` (nguồn của kho quan sát) | mkg 000024 |
 | W8.2 | Kho quan sát | mkg 000026 |
 | W8.3 | Engine nội bộ ba chế độ, T1/T2a/T2b/T3, vùng đóng băng, tự duyệt (chờ v1.3) | — |
+
+**W8.1 (xong).**
+
+- Gói `lib/optcore/` (`agrigreen-optcore` 1.0.0, src layout, `py.typed`, mypy `disallow_untyped_defs`) giữ các mô-đun `engine` (mô hình mạng lưới `Routes`/`Distance`, hàm chi phí, đối chứng không Hub), `calendar`, `flow` (mô hình cung), `params`, `jsmath`, `select_hubs` (bọc HiGHS, `[milp]`) và `sensitivity`. Các mô-đun được chuyển nguyên trạng bằng `git mv`, chỉ thêm chú thích kiểu. Lõi không có phụ thuộc runtime bắt buộc.
+- `agrigreen_optimizer` thành lớp vỏ (`snapshot`, `run`, `worker`, `consumer`, `cli`) và ghim `agrigreen-optcore==1.0.0`.
+- Không đổi hành vi. Golden byte được chụp ở commit riêng **trước** khi tách: 35 đầu ra lõi trên 5 ca (evaluate, bỏ đối chứng, độ nhạy, lịch thu hoạch, select_hubs) và 20 phong bì kết quả. Sau khi tách, sha256 và độ dài trùng hết. Bản dump đầy đủ trước và sau cũng trùng từng byte (diff -r).
+- Phiên bản: mỗi kết quả vẫn ghi `engine_version` (= `optcore.ENGINE_VERSION`). Chưa thêm trường `optcore_version` vào phong bì, vì làm vậy đổi hợp đồng `result.v1` và đổi byte. Việc này để cho W8.3, khi có triển khai thứ hai. Tới lúc đó, phiên bản gói được ghim ở pyproject của optimizer.
+- Build: `optimizer/Dockerfile` nhận lõi qua ngữ cảnh đặt tên `optcore` (`docker build --build-context optcore=lib/optcore … optimizer`; compose `additional_contexts`). CI thêm job `optcore` (pytest, mypy, giấy phép highspy). Job `optimizer` cài lõi từ đường dẫn.
 
 ## Liên quan
 

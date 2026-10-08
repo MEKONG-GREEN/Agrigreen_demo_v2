@@ -28,7 +28,7 @@ from agrigreen_optimizer.consumer import (
 )
 from agrigreen_optimizer.worker import EVENT_TYPE, InternalAPI, WorkerError
 
-from .paths import GOLDEN  # noqa: E402
+from .paths import GOLDEN
 
 RAW = (GOLDEN / "case1_two_hubs_unapproved" / "snapshot.json").read_bytes()
 SHA = hashlib.sha256(RAW).hexdigest()

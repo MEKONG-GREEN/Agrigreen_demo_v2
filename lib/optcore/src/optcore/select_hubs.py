@@ -38,7 +38,7 @@ def _leg_cost_per_ton(frm: str, to: str, road_km: float, override: str, routes: 
 
 def select_hubs(snapshot: dict[str, Any], max_hubs: int | None = None) -> dict[str, Any]:
     try:
-        import highspy  # type: ignore[import-untyped]
+        import highspy
     except ImportError as exc:  # pragma: no cover - phụ thuộc tùy chọn
         raise SolverUnavailable("chế độ select_hubs cần gói tùy chọn highspy (pip install .[milp])") from exc
 

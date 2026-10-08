@@ -10,6 +10,9 @@ requires-python = ">=3.12,<3.13"
 readme = "README.md"
 # Giấy phép phụ thuộc phải thuộc deploy/policies/allowed-licenses.txt (RB-4).
 dependencies = [
+  # Lõi tối ưu dùng chung (ADR-0036, W8.1) — gói trong repo `lib/optcore`, ghim đúng phiên bản.
+  # Cài trước từ đường dẫn: `pip install ../lib/optcore ".[dev,milp]"` (CI, Dockerfile làm như vậy).
+  "agrigreen-optcore==1.0.0",
   "pydantic>=2.7,<3",       # MIT — kiểm hợp đồng ảnh chụp, mặc định từ chối trường lạ
   "pika>=1.3,<2",           # BSD-3-Clause — client AMQP 0-9-1 (vòng nhận RabbitMQ, consumer.py), thuần Python
 ]
@@ -17,7 +20,7 @@ dependencies = [
 [project.optional-dependencies]
 # Chế độ THỬ NGHIỆM select_hubs (MILP vị trí cơ sở).
 milp = [
-  "highspy>=1.7,<2",        # MIT
+  "agrigreen-optcore[milp]==1.0.0",  # kéo highspy (MIT) qua lõi
 ]
 dev = [
   "pytest>=8",              # MIT
@@ -33,5 +36,5 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "../lib/optcore/src"]
 addopts = "-q"

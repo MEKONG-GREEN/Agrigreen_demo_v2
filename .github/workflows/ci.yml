@@ -149,6 +149,24 @@ jobs:
             apps/web-ops/test-results/
           retention-days: 7
 
+  optcore:
+    name: lib/optcore (Python 3.12 — pytest golden, mypy, giấy phép)
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: lib/optcore }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: lib/optcore/pyproject.toml }
+      - name: Cài đặt
+        run: python -m pip install --upgrade pip && pip install ".[dev,milp]" pip-licenses
+      - name: pytest (golden prototype + golden byte, ADR-0036)
+        run: python -m pytest -q
+      - name: mypy
+        run: python -m mypy
+      - name: Giấy phép phụ thuộc runtime (RB-4, ADR-0016)
+        run: pip-licenses --packages highspy --allow-only="MIT;MIT License"
+
   optimizer:
     name: Optimizer (Python 3.12 — pytest, giấy phép)
     runs-on: ubuntu-latest
@@ -157,10 +175,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.12", cache: pip, cache-dependency-path: optimizer/pyproject.toml }
-      - name: Cài đặt
-        run: python -m pip install --upgrade pip && pip install ".[dev,milp]"
-      - name: pytest (golden prototype, hợp đồng contracts/optimizer, RB-7)
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            optimizer/pyproject.toml
+            lib/optcore/pyproject.toml
+      - name: Cài đặt (lõi lib/optcore từ đường dẫn, rồi optimizer)
+        run: python -m pip install --upgrade pip && pip install "../lib/optcore[milp]" ".[dev,milp]"
+      - name: pytest (golden byte phong bì, hợp đồng contracts/optimizer, RB-7)
         run: python -m pytest -q
       - name: Giấy phép phụ thuộc runtime (RB-4)
         run: |
@@ -172,8 +195,8 @@ jobs:
           # Thư viện nhị phân gói kèm trong wheel numpy (OpenBLAS, LAPACK, runtime GCC…) — dữ liệu cho ADR-0016.
           lic=$(python -c 'import glob, os, numpy; g = glob.glob(os.path.join(os.path.dirname(os.path.dirname(numpy.__file__)), "numpy-*.dist-info", "licenses", "LICENSE.txt")); print(g[0] if g else "/dev/null")')
           grep -E '^(Name|License):' "$lic" || true
-      - name: Docker build (non-root)
-        run: docker build -t agrigreen/optimizer:ci .
+      - name: Docker build (non-root, lõi qua ngữ cảnh đặt tên optcore)
+        run: docker build --build-context optcore=../lib/optcore -t agrigreen/optimizer:ci .
 
   agrigreen-mobile:
     name: Lõi di động (packages/agrigreen_mobile)
@@ -400,7 +423,8 @@ jobs:
       id-token: write   # ký keyless bằng cosign
     strategy:
       matrix:
-        # optimizer (Python) có Dockerfile và ngữ cảnh riêng (optimizer/); còn lại build từ Dockerfile gốc với CMD.
+        # optimizer (Python) có Dockerfile và ngữ cảnh riêng (optimizer/ + ngữ cảnh đặt tên optcore=lib/optcore);
+        # còn lại build từ Dockerfile gốc với CMD.
         # api-public (G5, ADR-0022): build và ký ở mọi giai đoạn dù 0 bản sao ở ĐTK 1 (ADR-0025).
         cmd: [api-platform, api-internal, api-public, ingest, identity-vault, worker, worker-internal, outbox-publisher, migrate, optimizer]
     steps:
@@ -411,7 +435,7 @@ jobs:
       - name: Build
         run: |
           if [ "${{ matrix.cmd }}" = optimizer ]; then
-            docker build --load -t "$IMAGE" optimizer
+            docker build --load --build-context optcore=lib/optcore -t "$IMAGE" optimizer
           else
             docker build --load --build-arg CMD=${{ matrix.cmd }} -t "$IMAGE" .
           fi

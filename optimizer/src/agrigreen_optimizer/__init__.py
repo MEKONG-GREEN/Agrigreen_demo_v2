@@ -4,7 +4,7 @@ Ngoại lệ ngôn ngữ bắt buộc (Python 3.12, mục 4). Chỉ nhận ảnh
 chứa định danh (RB-7): mã tham chiếu UUID, không tên, không toạ độ.
 """
 
-from .engine import ENGINE_VERSION
+from optcore import ENGINE_VERSION
 
 # Phiên bản thuật toán của optimizer: đổi khi công thức đổi (Go ghim vào ảnh chụp).
 ALGORITHM_VERSION = f"agrigreen-optimizer/{ENGINE_VERSION}+py.1"

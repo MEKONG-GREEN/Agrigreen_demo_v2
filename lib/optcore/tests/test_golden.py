@@ -12,17 +12,17 @@ from pathlib import Path
 
 import pytest
 
-from agrigreen_optimizer import calendar as cal
-from agrigreen_optimizer.engine import evaluate, normalize_numbers
-from agrigreen_optimizer.params import resolve
-from agrigreen_optimizer.sensitivity import run_sensitivity
+from optcore import calendar as cal
+from optcore.engine import evaluate, normalize_numbers
+from optcore.params import resolve
+from optcore.sensitivity import run_sensitivity
 
 from .golden_compare import compare, to_snake
 
 GOLDEN = Path(__file__).parent / "golden"
 CASES = sorted(p.name for p in GOLDEN.iterdir() if (p / "snapshot.json").exists())
 
-# Lệch có chủ đích so với prototype (README "Golden — lệch đã biết"):
+# Lệch có chủ đích so với prototype (optimizer/README.md, "Lệch đã biết"):
 KNOWN = {
     # Prototype đọc flow.boatTripsToHub trên kết quả MỘT Hub (trường không tồn tại) → trips vắng
     # mặt, vehiclesRequired = null. Optimizer tính số chuyến ghe thật của chặng này.

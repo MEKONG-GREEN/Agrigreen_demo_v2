@@ -2,6 +2,14 @@
 
 Dịch vụ tính mô phỏng chọn Hub cho `pf/simulation`. Đây là ngoại lệ bắt buộc về ngôn ngữ (mục 4): Go không có engine, chỉ giữ kịch bản, ảnh chụp và kết quả.
 
+Từ W8.1 ([ADR-0036](../docs/adr/0036-engine-ba-che-do-vung-noi-bo-optcore.md)), công thức nằm ở lõi dùng chung [`lib/optcore`](../lib/optcore/README.md): mô hình mạng lưới, mô hình cung, hàm chi phí và bộ giải. `agrigreen_optimizer` chỉ còn là lớp vỏ:
+
+- `snapshot` kiểm hợp đồng;
+- `run` dựng phong bì kết quả và `ALGORITHM_VERSION`;
+- `worker`, `consumer`, `cli` lo Internal API, RabbitMQ và dòng lệnh.
+
+`pyproject.toml` ghim `agrigreen-optcore==<phiên bản>`.
+
 ## Quy ước
 
 - Nhận việc qua mẫu bất đồng bộ ở mục 12. Đầu vào là **ảnh chụp bất biến** gồm tham số đã giải, phiên bản mạng, **kết quả định tuyến đã dùng** và `algorithm_version`.
@@ -59,12 +67,12 @@ Phía api-platform bật listener bằng `AG_INTERNAL_HTTP_ADDR` (`:8084`) cùng
 
 ```powershell
 cd optimizer
-python -m pip install -e ".[dev,milp]"   # Python 3.12 (py -3.12)
-python -m pytest                        # 56 kiểm thử (gồm vòng nhận với broker giả); test_select_hubs tự bỏ qua nếu thiếu highspy
+python -m pip install -e "..\lib\optcore[milp]" -e ".[dev,milp]"   # Python 3.12 (py -3.12); lõi cài từ đường dẫn
+python -m pytest                        # 66 kiểm thử (gồm golden byte phong bì, vòng nhận với broker giả); test_select_hubs tự bỏ qua nếu thiếu highspy
 agrigreen-optimizer evaluate --snapshot ..\contracts\optimizer\examples\snapshot.example.json --out result.json
 ```
 
-Không cài gói thì chạy `set PYTHONPATH=src` rồi `python -m pytest` (pytest đọc `pythonpath = src` từ pyproject).
+Không cài gói thì chạy thẳng `python -m pytest`: pytest đọc `pythonpath = ["src", "../lib/optcore/src"]` từ pyproject.
 
 Kiểm giấy phép (RB-4, danh sách `deploy/policies/allowed-licenses.txt`):
 
@@ -85,11 +93,15 @@ Phụ thuộc runtime (bản đã kiểm 29/09/2026):
 
 Hai dòng cuối chờ [ADR-0016](../docs/adr/0016-giay-phep-python.md) (trạng thái "Đề xuất"). Tới khi ADR được chấp nhận, CI chỉ in giấy phép của hai gói này ra, không chặn.
 
-Docker (non-root, slim): `docker build -t agrigreen/optimizer optimizer`.
+Docker (non-root, slim), từ gốc repo: `docker build --build-context optcore=lib/optcore -t agrigreen/optimizer optimizer`. Lõi đến qua ngữ cảnh đặt tên `optcore` (BuildKit). Compose khai báo ngữ cảnh này bằng `additional_contexts`.
 
-## Golden: tái lập prototype
+## Golden
 
-`tests/golden/case*/` chứa 5 ca:
+**Golden byte (W8.1).** `tests/golden_bytes.json` ghi sha256 và độ dài của 20 phong bì kết quả, đúng byte mà worker POST về: 5 ca golden và ảnh chụp ví dụ của hợp đồng, mỗi ca chạy nguyên trạng, kèm độ nhạy và `select_hubs`; thêm 2 ảnh chụp hỏng. Bản này được chụp trước khi tách `lib/optcore`, ở cab0280. Chỉ sinh lại khi công thức hoặc hợp đồng đổi có chủ đích: `python -m tests.test_golden_bytes --write`. Lõi có golden byte riêng ở `lib/optcore/tests/golden_bytes.json`.
+
+### Tái lập prototype
+
+`lib/optcore/tests/golden/case*/` chứa 5 ca. Từ W8.1 các ca này thuộc lõi; `tests/paths.py` trỏ tới đó. Mỗi ca gồm:
 
 - `snapshot.json` là đầu vào đúng định dạng hợp đồng;
 - `expected.json` là `ScenarioResult` của prototype, đã bỏ tên và toạ độ.
@@ -98,6 +110,7 @@ Các ca được sinh bằng cách **chạy chính prototype** trên seed tất 
 
 ```powershell
 $env:MEKONG_GREEN_DIR = "C:\Users\manht\Downloads\claude-skills-main\mekong-green"
+cd lib\optcore
 node tests\golden\generate\dump_prototype.ts .\out      # Node ≥ 22.6
 python tests\golden\generate\prepare.py .\out tests\golden
 ```
