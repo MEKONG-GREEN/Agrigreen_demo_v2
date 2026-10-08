@@ -41,6 +41,9 @@ func TestModuleGroupRolesMirrorLegacy_ADR0028(t *testing.T) {
 		   AND has_function_privilege($1, f.oid, 'EXECUTE') <> has_function_privilege($2, f.oid, 'EXECUTE')
 		LIMIT 10`
 	for _, g := range dbadmin.ModuleGroups() {
+		if g.Legacy == "" {
+			continue // vai nhóm không có vai cũ (pf/kref, W2.5): không có gì để so
+		}
 		rows, err := admin.Query(ctx, diff, g.Legacy, g.Role)
 		if err != nil {
 			t.Fatal(err)
