@@ -26,25 +26,23 @@ import (
 // nhập cũ <module>_app: pool là vai đăng nhập của đơn vị (app_worker), là thành viên r_kref.
 var DBModule = db.Module("pf/kref")
 
-// Consumer là tên consumer (hàng đợi + khóa inbox) của worker.
-const Consumer = "pf.kref"
+// Consumer là tên consumer (hàng đợi + khóa inbox) của worker (khai ở port để outbox-publisher khai hàng đợi
+// mà không ghép module).
+const Consumer = port.Consumer
 
 // Sự kiện worker tiêu thụ (schema ở contracts/events/, chủ là module nguồn).
 const (
-	EventOrgCreated        = "pf.party.org.created"
-	EventOrgMoved          = "pf.party.org.moved"
-	EventOrgDeactivated    = "pf.party.org.deactivated"
-	EventOrgReactivated    = "pf.party.org.reactivated"
-	EventAdminUnitChanged  = "pf.masterdata.admin_unit.changed"
-	EventShareGrantApprove = "pf.party.share_grant.approved"
-	EventShareGrantRevoke  = "pf.party.share_grant.revoked"
+	EventOrgCreated        = port.EventOrgCreated
+	EventOrgMoved          = port.EventOrgMoved
+	EventOrgDeactivated    = port.EventOrgDeactivated
+	EventOrgReactivated    = port.EventOrgReactivated
+	EventAdminUnitChanged  = port.EventAdminUnitChanged
+	EventShareGrantApprove = port.EventShareGrantApprove
+	EventShareGrantRevoke  = port.EventShareGrantRevoke
 )
 
 // Events là danh sách sự kiện của consumer pf.kref.
-var Events = []string{
-	EventOrgCreated, EventOrgMoved, EventOrgDeactivated, EventOrgReactivated,
-	EventAdminUnitChanged, EventShareGrantApprove, EventShareGrantRevoke,
-}
+var Events = port.Events
 
 // ErrNotYetProjected: sự kiện tham chiếu Nút chưa có trong k_ref (sự kiện tới sai thứ tự, hoặc Nút có trước
 // W2.5 khi chưa chạy Rebuild). Handler trả lỗi → sự kiện được giao lại; vẫn thiếu → DLQ (chạy Rebuild).

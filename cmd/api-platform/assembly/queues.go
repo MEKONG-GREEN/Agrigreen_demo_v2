@@ -5,6 +5,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
+	krefport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/kref/port"
 	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -42,6 +43,7 @@ func Queues() []Queue {
 		{Name: repport.DeliveryConsumer, Events: []string{repport.EventExportCompleted}},
 		{Name: repport.DispatchConsumer, Events: []string{repport.EventDispatchRequested}}, // KN v7.7 P4: báo cáo Chi cục
 		{Name: simport.OptimizerConsumer, Events: []string{simport.EventJobRequested}},
+		{Name: krefport.Consumer, Events: krefport.Events}, // W2.5: bản chiếu k_ref
 	}
 	for _, c := range notify.New(nil, clock.System{}, notify.Deps{}).Consumers() {
 		out = append(out, Queue{Name: c.Name, Events: c.Events})

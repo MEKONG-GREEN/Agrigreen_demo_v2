@@ -13,6 +13,27 @@ import (
 	"github.com/google/uuid"
 )
 
+// Consumer là tên consumer pf.kref của worker (hàng đợi + khóa inbox); outbox-publisher khai hàng đợi
+// này qua assembly.Queues() mà không ghép module pf/kref.
+const Consumer = "pf.kref"
+
+// Sự kiện consumer pf.kref tiêu thụ (schema ở contracts/events/, chủ là module nguồn).
+const (
+	EventOrgCreated        = "pf.party.org.created"
+	EventOrgMoved          = "pf.party.org.moved"
+	EventOrgDeactivated    = "pf.party.org.deactivated"
+	EventOrgReactivated    = "pf.party.org.reactivated"
+	EventAdminUnitChanged  = "pf.masterdata.admin_unit.changed"
+	EventShareGrantApprove = "pf.party.share_grant.approved"
+	EventShareGrantRevoke  = "pf.party.share_grant.revoked"
+)
+
+// Events là danh sách sự kiện của consumer pf.kref.
+var Events = []string{
+	EventOrgCreated, EventOrgMoved, EventOrgDeactivated, EventOrgReactivated,
+	EventAdminUnitChanged, EventShareGrantApprove, EventShareGrantRevoke,
+}
+
 // Tên quan hệ của schema k_ref (nhãn `relation` của chỉ số ag.k_ref.lag, khóa báo cáo diễn tập).
 const (
 	RelOrg              = "org"
