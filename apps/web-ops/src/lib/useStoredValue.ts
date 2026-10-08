@@ -1,8 +1,13 @@
 "use client";
 
-// Giá trị localStorage nhỏ, không bí mật (sidebar thu gọn, email/SĐT ghi nhớ) đọc qua useSyncExternalStore:
-// an toàn khi hydrate (máy chủ trả undefined), cập nhật mọi nơi dùng khi ghi.
+// Giá trị lưu trữ trình duyệt nhỏ, không bí mật, đọc qua useSyncExternalStore: an toàn khi hydrate
+// (máy chủ trả undefined), cập nhật mọi nơi dùng khi ghi.
+// - "local" (mặc định): tùy chọn giao diện không phải dữ liệu cá nhân (sidebar thu gọn).
+// - "session": dữ liệu cá nhân (email ghi nhớ ở màn đăng nhập, M19) — mất khi đóng tab, không để lại
+//   trên máy dùng chung. KHÔNG đặt dữ liệu cá nhân vào "local".
 import { useSyncExternalStore } from "react";
+
+export type StorageArea = "local" | "session";
 
 const listeners = new Set<() => void>();
 
@@ -15,18 +20,22 @@ function subscribe(cb: () => void): () => void {
   };
 }
 
-function read(key: string): string | null {
+function storageOf(area: StorageArea): Storage {
+  return area === "session" ? window.sessionStorage : window.localStorage;
+}
+
+function read(key: string, area: StorageArea): string | null {
   try {
-    return window.localStorage.getItem(key);
+    return storageOf(area).getItem(key);
   } catch {
     return null;
   }
 }
 
-export function writeStoredValue(key: string, value: string | null): void {
+export function writeStoredValue(key: string, value: string | null, area: StorageArea = "local"): void {
   try {
-    if (value === null) window.localStorage.removeItem(key);
-    else window.localStorage.setItem(key, value);
+    if (value === null) storageOf(area).removeItem(key);
+    else storageOf(area).setItem(key, value);
   } catch {
     // bỏ qua: trình duyệt chặn lưu trữ
   }
@@ -34,10 +43,10 @@ export function writeStoredValue(key: string, value: string | null): void {
 }
 
 /** undefined khi render phía máy chủ / trước hydrate; null khi chưa có giá trị. */
-export function useStoredValue(key: string): string | null | undefined {
+export function useStoredValue(key: string, area: StorageArea = "local"): string | null | undefined {
   return useSyncExternalStore(
     subscribe,
-    () => read(key),
+    () => read(key, area),
     () => undefined,
   );
 }

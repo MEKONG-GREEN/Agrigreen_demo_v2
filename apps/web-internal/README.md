@@ -19,6 +19,11 @@ npm run build:mock && npx playwright test   # E2E trên bản build production g
 npm run gen:api         # sinh lại src/api/generated/mkg-internal.ts khi hợp đồng đổi (CI: check:api)
 ```
 
+Bản build production (`NEXT_PUBLIC_DEPLOY_ENV` mặc định `production`/`staging`): `next build` **dừng** nếu thiếu
+`NEXT_PUBLIC_API_BASE_URL` / `NEXT_PUBLIC_ADMIN_API_BASE` / `NEXT_PUBLIC_OIDC_ISSUER`, nếu URL không phải https,
+hoặc nếu bật `NEXT_PUBLIC_API_MOCK=1` (bỏ qua đăng nhập). `build:mock` tự đặt `NEXT_PUBLIC_DEPLOY_ENV=demo`;
+máy cục bộ/Compose với `http://localhost` đặt `NEXT_PUBLIC_DEPLOY_ENV=dev` (`src/deployEnv.ts`, `next.config.ts`).
+
 ## Đăng nhập và hai bề mặt
 
 - OIDC Authorization Code + PKCE, client công khai **`agrigreen-web-internal`** (realm `agrigreen`, redirect

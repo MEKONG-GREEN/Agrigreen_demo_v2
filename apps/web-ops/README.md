@@ -42,13 +42,18 @@ npm run dev
 ## Biến môi trường
 
 Mọi biến `NEXT_PUBLIC_*` được **nhúng lúc build**. Đổi môi trường thì build lại image.
+Mặc định `http://localhost:*` dưới đây chỉ áp dụng khi `next dev` hoặc `NEXT_PUBLIC_DEPLOY_ENV=dev`.
+Bản build production thật: `next build` **dừng** nếu thiếu `NEXT_PUBLIC_API_BASE_URL` /
+`NEXT_PUBLIC_ADMIN_API_BASE` / `NEXT_PUBLIC_OIDC_ISSUER`, nếu URL không phải https, hoặc nếu bật
+`NEXT_PUBLIC_API_MOCK=1` (`src/deployEnv.ts`, kiểm trong `next.config.ts`).
 
 | Biến | Mặc định | Ý nghĩa |
 |---|---|---|
-| `NEXT_PUBLIC_API_MOCK` | `0` | `1` = backend giả lập trong trình duyệt (dữ liệu tổng hợp, không phải dữ liệu thật) |
-| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:8080` | Application API |
-| `NEXT_PUBLIC_ADMIN_API_BASE` | `http://localhost:8082` | Admin API: host riêng (admin.<domain>), bắt buộc MFA. Dùng cho danh mục, tham số, cây tổ chức, nhập tệp, tài khoản, mẫu/lịch báo cáo, xung đột đồng bộ, thiết bị, chạy dự báo CGH |
-| `NEXT_PUBLIC_OIDC_ISSUER` | `http://localhost:8081/realms/agrigreen` | Issuer Keycloak |
+| `NEXT_PUBLIC_DEPLOY_ENV` | `production` | `production`/`staging`: bản thật (URL https bắt buộc, cấm giả lập). `demo`: bản giả lập (Render, E2E — `build:mock` tự đặt). `dev`: máy cục bộ/Compose (cho phép http, localhost) |
+| `NEXT_PUBLIC_API_MOCK` | `0` | `1` = backend giả lập trong trình duyệt, bỏ qua đăng nhập (dữ liệu tổng hợp). Chỉ hiệu lực khi `next dev` hoặc `NEXT_PUBLIC_DEPLOY_ENV=demo`/`dev` |
+| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:8080` (chỉ dev) | Application API |
+| `NEXT_PUBLIC_ADMIN_API_BASE` | `http://localhost:8082` (chỉ dev) | Admin API: host riêng (admin.<domain>), bắt buộc MFA. Dùng cho danh mục, tham số, cây tổ chức, nhập tệp, tài khoản, mẫu/lịch báo cáo, xung đột đồng bộ, thiết bị, chạy dự báo CGH |
+| `NEXT_PUBLIC_OIDC_ISSUER` | `http://localhost:8081/realms/agrigreen` (chỉ dev) | Issuer Keycloak |
 | `NEXT_PUBLIC_OIDC_CLIENT_ID` | `agrigreen-web-ops` | Client công khai, PKCE S256 |
 | `NEXT_PUBLIC_MAP_STYLE_URL` | rỗng | Style MapLibre của nhà cung cấp tile trong lãnh thổ (ADR-0007). Rỗng = nền trơn, không gọi tile ngoài |
 | `NEXT_PUBLIC_SURFACE` | `auto` | `auto`: tài khoản có vai trò KN v7.7 (`GET /v1/me/contexts` trả lần gán) dùng menu theo cấu hình; còn lại menu cũ `src/nav/nav.ts`. `legacy`: luôn menu cũ |
@@ -151,8 +156,10 @@ CI chạy job `web-e2e` (`.github/workflows/ci.yml`): `npx playwright install --
 ```powershell
 docker build -t agrigreen/web-ops `
   --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.agrigreen.vn `
+  --build-arg NEXT_PUBLIC_ADMIN_API_BASE=https://admin.agrigreen.vn `
   --build-arg NEXT_PUBLIC_OIDC_ISSUER=https://auth.agrigreen.vn/realms/agrigreen `
   apps/web-ops
+# Compose cục bộ (http://localhost): thêm --build-arg NEXT_PUBLIC_DEPLOY_ENV=dev
 docker run --rm -p 3000:3000 agrigreen/web-ops
 ```
 

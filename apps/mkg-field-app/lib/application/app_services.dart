@@ -20,6 +20,7 @@ import 'package:path/path.dart' as p;
 
 import '../domain/roles.dart';
 import 'field_service.dart';
+import 'mkg_action_kind.dart';
 import 'trip_service.dart';
 
 /// Client OIDC công khai của App hiện trường MKG
@@ -151,7 +152,13 @@ class MkgServices {
       entities: PushEntity.mkgFieldops,
     );
     final refs = ReferenceRepository(db, pf.clock);
-    final actions = ActionQueue(db: db, clock: pf.clock, ids: pf.ids);
+    // Lệnh api-internal (vùng mkg) do app này đăng ký — lõi không chứa chúng.
+    final actions = ActionQueue(
+      db: db,
+      clock: pf.clock,
+      ids: pf.ids,
+      extraKinds: MkgActionKind.values,
+    );
     final wipe = WipeService(
       db: db,
       blobs: blobs,

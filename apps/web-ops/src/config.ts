@@ -1,19 +1,33 @@
 // Cấu hình phía trình duyệt. Biến NEXT_PUBLIC_* được Next.js nhúng lúc build,
 // nên image Docker phải build lại cho từng môi trường (xem README).
 // Không đặt bí mật ở đây: client agrigreen-web-ops là public client + PKCE.
+// Bản build production: next.config.ts chặn thiếu biến / URL không https / giả lập ngoài
+// NEXT_PUBLIC_DEPLOY_ENV=demo|dev (src/deployEnv.ts). Mặc định localhost chỉ dùng khi dev.
+import { allowsDevDefaults, isMockEnabled, type PublicEnv } from "./deployEnv";
+
+/** Next.js chỉ nhúng tham chiếu process.env.NEXT_PUBLIC_* viết tường minh — giữ nguyên dạng này. */
+const env: PublicEnv = {
+  NODE_ENV: process.env.NODE_ENV,
+  NEXT_PUBLIC_DEPLOY_ENV: process.env.NEXT_PUBLIC_DEPLOY_ENV,
+  NEXT_PUBLIC_API_MOCK: process.env.NEXT_PUBLIC_API_MOCK,
+};
+
+function orDevDefault(value: string | undefined, devDefault: string): string {
+  return value || (allowsDevDefaults(env) ? devDefault : "");
+}
 
 export const config = {
-  /** Bật chế độ dữ liệu giả lập (không gọi backend, không cần Keycloak). */
-  mock: process.env.NEXT_PUBLIC_API_MOCK === "1",
+  /** Bật chế độ dữ liệu giả lập (không gọi backend, không cần Keycloak) — tắt cứng ở bản production thật. */
+  mock: isMockEnabled(env),
   /** Gốc Application API, vd https://api.agrigreen.vn */
-  apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080",
+  apiBaseUrl: orDevDefault(process.env.NEXT_PUBLIC_API_BASE_URL, "http://localhost:8080"),
   /**
    * Gốc Admin API — host RIÊNG (admin.<domain>), MFA bắt buộc cho mọi route.
    * api-platform mở Admin API ở AG_ADMIN_HTTP_ADDR, mặc định :8082.
    */
-  adminApiBaseUrl: process.env.NEXT_PUBLIC_ADMIN_API_BASE || "http://localhost:8082",
+  adminApiBaseUrl: orDevDefault(process.env.NEXT_PUBLIC_ADMIN_API_BASE, "http://localhost:8082"),
   oidc: {
-    issuer: process.env.NEXT_PUBLIC_OIDC_ISSUER || "http://localhost:8081/realms/agrigreen",
+    issuer: orDevDefault(process.env.NEXT_PUBLIC_OIDC_ISSUER, "http://localhost:8081/realms/agrigreen"),
     clientId: process.env.NEXT_PUBLIC_OIDC_CLIENT_ID || "agrigreen-web-ops",
   },
   /** URL style MapLibre (tile trong lãnh thổ, ADR-0007). Rỗng → nền trơn, không gọi tile ngoài. */

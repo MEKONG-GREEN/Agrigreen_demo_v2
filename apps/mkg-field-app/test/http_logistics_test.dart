@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:agrigreen_mkg_field/application/app_services.dart';
+import 'package:agrigreen_mkg_field/application/mkg_action_kind.dart';
 import 'package:agrigreen_mkg_field/domain/trips.dart';
 import 'package:agrigreen_mobile/data/actions/action_queue.dart';
 import 'package:agrigreen_mobile/data/secure/secure_store.dart';
@@ -176,7 +177,7 @@ void main() {
     h.logistics.update(tripB, {'status': 'arrived'});
     await s.sync.syncOnce(force: true);
     final failed = [
-      for (final a in await s.actions.ofKind(ApiActionKind.logisticsMilestone))
+      for (final a in await s.actions.ofKind(MkgActionKind.logisticsMilestone))
         if (a.status == ApiActionStatus.failed) a,
     ];
     expect(failed.single.lastError, 'logistics.trip_transition');

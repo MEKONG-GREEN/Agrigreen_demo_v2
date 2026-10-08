@@ -10,6 +10,7 @@ import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 
 import '../domain/roles.dart';
 import '../domain/trips.dart';
+import 'mkg_action_kind.dart';
 
 /// Lỗi nghiệp vụ chuyến hiển thị cho tài xế.
 class TripError implements Exception {
@@ -337,7 +338,7 @@ class TripService {
     final meta = await _gpsMeta();
     if (meta.isEmpty) return;
     final live = {
-      for (final a in await _actions.ofKind(ApiActionKind.logisticsMilestone))
+      for (final a in await _actions.ofKind(MkgActionKind.logisticsMilestone))
         a.id,
     };
     meta.removeWhere((k, _) => !live.contains(k));
@@ -347,7 +348,7 @@ class TripService {
   Future<List<LocalMilestone>> _local() async {
     final gps = await _gpsMeta();
     final out = <LocalMilestone>[];
-    for (final a in await _actions.ofKind(ApiActionKind.logisticsMilestone)) {
+    for (final a in await _actions.ofKind(MkgActionKind.logisticsMilestone)) {
       final m = Milestone.tryParse(a.body?['kind'] as String?);
       final t = DateTime.tryParse('${a.body?['event_time']}');
       if (m == null || t == null || a.target == null) continue;
@@ -472,7 +473,7 @@ class TripService {
     final fix = raw != null && _usable(raw) ? raw : null;
     final now = _clock.now();
     final a = await _actions.enqueue(
-      ApiActionKind.logisticsMilestone,
+      MkgActionKind.logisticsMilestone,
       target: tripId,
       body: {
         'kind': m.code,

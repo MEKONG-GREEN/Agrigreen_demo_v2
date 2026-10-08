@@ -9,10 +9,10 @@
   },
   "scripts": {
     "dev": "next dev -p 3001",
-    "dev:mock": "cross-env NEXT_PUBLIC_API_MOCK=1 next dev -p 3001",
+    "dev:mock": "cross-env NEXT_PUBLIC_API_MOCK=1 NEXT_PUBLIC_DEPLOY_ENV=demo next dev -p 3001",
     "build": "next build",
     "start": "next start -p 3001",
-    "build:mock": "cross-env NEXT_PUBLIC_API_MOCK=1 next build",
+    "build:mock": "cross-env NEXT_PUBLIC_API_MOCK=1 NEXT_PUBLIC_DEPLOY_ENV=demo next build",
     "start:e2e": "next start -p 3101",
     "e2e": "playwright test",
     "e2e:install": "playwright install chromium",

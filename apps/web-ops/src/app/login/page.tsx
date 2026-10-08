@@ -13,14 +13,7 @@ import { BrandMark } from "@/shell/BrandMark";
 import { BRAND } from "@/shell/brand";
 import { LoginCard, type LoginError } from "@/shell/LoginCard";
 import { menuAllows } from "@/shell/menu";
-import { useStoredValue, writeStoredValue } from "@/lib/useStoredValue";
-
-const REMEMBER_KEY = "ag.login.identifier";
-
-/** Chỉ nhớ email/SĐT (không phải bí mật) khi người dùng chọn "Ghi nhớ đăng nhập". Phiên do Keycloak giữ. */
-function remember(identifier: string, on: boolean): void {
-  writeStoredValue(REMEMBER_KEY, on ? identifier : null);
-}
+import { purgeLegacyIdentifier, rememberIdentifier, useRememberedIdentifier } from "@/lib/rememberLogin";
 
 function LoginInner() {
   const { status, principal, kn, login, loginWithPassword, loginAsPersona } = useAuth();
@@ -32,7 +25,9 @@ function LoginInner() {
     params.get("error") ? { kind: "message", text: "Không hoàn tất được đăng nhập. Vui lòng thử lại hoặc liên hệ quản trị viên." } : null,
   );
   // undefined trước hydrate → chờ để thẻ nhận đúng giá trị ban đầu.
-  const remembered = useStoredValue(REMEMBER_KEY);
+  // Chỉ email, chỉ khi đã tích "Ghi nhớ đăng nhập", ở sessionStorage (src/lib/rememberLogin.ts).
+  const remembered = useRememberedIdentifier();
+  useEffect(purgeLegacyIdentifier, []);
 
   useEffect(() => {
     if (status !== "authenticated" || !principal) return;
@@ -52,7 +47,7 @@ function LoginInner() {
   const submit = async (v: { identifier: string; password: string; remember: boolean }) => {
     setBusy(true);
     setError(null);
-    remember(v.identifier, v.remember);
+    rememberIdentifier(v.identifier, v.remember);
     try {
       if (config.mock) {
         const r = await loginWithPassword(v.identifier, v.password);

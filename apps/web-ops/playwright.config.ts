@@ -31,6 +31,6 @@ export default defineConfig({
     reuseExistingServer: !CI,
     stdout: "ignore",
     stderr: "pipe",
-    env: { NEXT_PUBLIC_API_MOCK: "1", NEXT_TELEMETRY_DISABLED: "1" },
+    env: { NEXT_PUBLIC_API_MOCK: "1", NEXT_PUBLIC_DEPLOY_ENV: "demo", NEXT_TELEMETRY_DISABLED: "1" },
   },
 });

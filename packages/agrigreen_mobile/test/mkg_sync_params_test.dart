@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:agrigreen_mobile/data/actions/action_queue.dart';
 import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
 import 'package:agrigreen_mobile/data/reference/reference_repository.dart';
 import 'package:agrigreen_mobile/data/sync/sync_api.dart';
@@ -164,16 +163,5 @@ void main() {
     expect(rep, isNotNull);
     expect(server.pullCursors, ['tampered', null]);
     expect(await h.refs.cursor(), 'fresh');
-  });
-
-  test('G3 mkg: lệnh mở/đóng ca tổ gom xếp hàng tới đúng đường dẫn', () {
-    expect(
-      ApiActionKind.fieldopsCrewShift.pathFor('o1'),
-      '/v1/fieldops/orders/o1/crew-shifts',
-    );
-    expect(
-      ApiActionKind.parse('fieldops_crew_shift'),
-      ApiActionKind.fieldopsCrewShift,
-    );
   });
 }

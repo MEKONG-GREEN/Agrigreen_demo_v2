@@ -1,3 +1,4 @@
+import 'package:agrigreen_mkg_field/application/mkg_action_kind.dart';
 import 'package:agrigreen_mkg_field/application/trip_service.dart';
 import 'package:agrigreen_mkg_field/domain/trips.dart';
 import 'package:agrigreen_mobile/data/actions/action_queue.dart';
@@ -341,7 +342,7 @@ void main() {
     await s.sync.syncOnce(force: true);
     expect(env.server.logistics.trips[tripA]!['status'], 'arrived');
     expect(
-      (await s.actions.ofKind(ApiActionKind.logisticsMilestone))
+      (await s.actions.ofKind(MkgActionKind.logisticsMilestone))
           .where((a) => a.status == ApiActionStatus.failed),
       hasLength(1),
     );

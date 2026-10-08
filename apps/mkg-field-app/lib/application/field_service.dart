@@ -11,6 +11,7 @@ import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 import 'package:agrigreen_mobile/domain/outbox_record.dart';
 
 import '../domain/fieldops.dart';
+import 'mkg_action_kind.dart';
 
 /// Lỗi nghiệp vụ hiển thị cho người dùng.
 class FieldError implements Exception {
@@ -453,7 +454,7 @@ class FieldService {
       );
     }
     for (final a in await _actions.active(
-      kind: ApiActionKind.fieldopsCrewShift,
+      kind: MkgActionKind.fieldopsCrewShift,
       target: orderId,
     )) {
       final t = DateTime.tryParse('${a.body?['event_time']}');
@@ -483,7 +484,7 @@ class FieldService {
       throw FieldError('Ca đang mở — đóng ca trước khi mở ca mới.');
     }
     await _actions.enqueue(
-      ApiActionKind.fieldopsCrewShift,
+      MkgActionKind.fieldopsCrewShift,
       target: order.orderId,
       body: {
         'crew_ref': crew,
@@ -501,7 +502,7 @@ class FieldService {
       throw FieldError('Chưa có ca đang mở.');
     }
     await _actions.enqueue(
-      ApiActionKind.fieldopsCrewShift,
+      MkgActionKind.fieldopsCrewShift,
       target: order.orderId,
       body: {
         'crew_ref': crew,
@@ -525,7 +526,7 @@ class FieldService {
 
   /// Lệnh mở/đóng ca bị máy chủ từ chối (hiển thị ở hàng đợi).
   Future<List<ApiAction>> failedShiftActions() async => [
-    for (final a in await _actions.ofKind(ApiActionKind.fieldopsCrewShift))
+    for (final a in await _actions.ofKind(MkgActionKind.fieldopsCrewShift))
       if (a.status == ApiActionStatus.failed) a,
   ];
 

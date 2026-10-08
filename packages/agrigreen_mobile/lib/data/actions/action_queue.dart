@@ -6,9 +6,28 @@ import '../../core/clock.dart';
 import '../../core/ids.dart';
 import '../db/local_db.dart';
 
+/// Loại lệnh API xếp hàng: mã lưu trong bảng `api_action` + đường dẫn phát lại.
+///
+/// Lõi chỉ khai báo lệnh của Application API nền tảng ([ApiActionKind]).
+/// Lệnh của vùng khác (vd api-internal vùng mkg: `/v1/fieldops`,
+/// `/v1/logistics`) do CHÍNH app đó khai báo và đăng ký qua
+/// `ActionQueue(kinds: ...)` — bản build của app khác (App hiện trường KN)
+/// không chứa và không xếp hàng được các lệnh này (phân vùng mạng §29,
+/// R-SEC-01).
+abstract interface class ActionKind {
+  /// Mã ổn định lưu trong cột `api_action.kind` (duy nhất trong một app).
+  String get code;
+
+  /// Phương thức HTTP khi phát lại.
+  String get method;
+
+  /// Đường dẫn phát lại cho [target].
+  String pathFor(String? target);
+}
+
 /// Lệnh API xếp hàng khi ngoại tuyến. Mọi lệnh là POST idempotent của
 /// Application API (gọi lặp giữ kết quả lần đầu), nên phát lại an toàn.
-enum ApiActionKind {
+enum ApiActionKind implements ActionKind {
   /// `POST /v1/notifications/{id}/read`
   notificationRead('notification_read'),
 
@@ -28,15 +47,8 @@ enum ApiActionKind {
   /// — quản lý HTX duyệt / yêu cầu bổ sung nhật ký (HTX US-LOG-05).
   farmLogReview('farm_log_review'),
 
-  /// G3 (App hiện trường MKG, api-internal): `POST
-  /// /v1/fieldops/orders/{id}/crew-shifts {crew_ref, kind, headcount,
-  /// event_time, device_id}` — mở / đóng ca tổ gom.
-  fieldopsCrewShift('fieldops_crew_shift'),
-
-  /// G4 (App hiện trường MKG — tài xế, api-internal): `POST
-  /// /v1/logistics/trips/{id}/milestones {kind, event_time, lat, lng}` — mốc
-  /// xuất phát / đến của chuyến (chỉ tiến, L-02).
-  logisticsMilestone('logistics_milestone'),
+  // G3/G4 (mở/đóng ca tổ gom, mốc chuyến — api-internal vùng mkg) KHÔNG ở
+  // đây: App hiện trường MKG tự khai báo (MkgActionKind) và đăng ký.
 
   /// KN v7.7 P5 (App hiện trường): `POST /v1/extension/work-schedules
   /// {id, week_start, action, base_version, items}` — lưu nháp / gửi duyệt
@@ -72,13 +84,16 @@ enum ApiActionKind {
   knPlotUpdate('kn_plot_update', method: 'PUT');
 
   const ApiActionKind(this.code, {this.method = 'POST'});
+  @override
   final String code;
 
   /// Phương thức HTTP khi phát lại (mặc định POST).
+  @override
   final String method;
 
   static ApiActionKind parse(String c) => values.firstWhere((k) => k.code == c);
 
+  @override
   String pathFor(String? target) => switch (this) {
     ApiActionKind.notificationRead => '/v1/notifications/$target/read',
     ApiActionKind.notificationReadAll => '/v1/notifications/read-all',
@@ -86,10 +101,6 @@ enum ApiActionKind {
     ApiActionKind.librarySave => '/v1/documents/$target/save',
     ApiActionKind.libraryUnsave => '/v1/documents/$target/unsave',
     ApiActionKind.farmLogReview => '/v1/cropcycle/farm-logs/$target/reviews',
-    ApiActionKind.fieldopsCrewShift =>
-      '/v1/fieldops/orders/$target/crew-shifts',
-    ApiActionKind.logisticsMilestone =>
-      '/v1/logistics/trips/$target/milestones',
     ApiActionKind.workScheduleSave => '/v1/extension/work-schedules',
     ApiActionKind.knCooperativeCreate => '/v1/kn/cooperatives',
     ApiActionKind.knCooperativeUpdate => '/v1/kn/cooperatives/$target',
@@ -121,7 +132,7 @@ class ApiAction {
 
   final String id;
   final int seq;
-  final ApiActionKind kind;
+  final ActionKind kind;
   final String? target;
   final Map<String, Object?>? body;
   final ApiActionStatus status;
@@ -134,10 +145,14 @@ class ApiAction {
   String get path => kind.pathFor(target);
   String get method => kind.method;
 
-  factory ApiAction.fromRow(Map<String, Object?> r) => ApiAction(
+  /// [parseKind] tra mã `kind` → loại lệnh (mặc định chỉ lệnh của lõi).
+  factory ApiAction.fromRow(
+    Map<String, Object?> r, {
+    ActionKind Function(String code) parseKind = ApiActionKind.parse,
+  }) => ApiAction(
     id: r['id']! as String,
     seq: r['seq']! as int,
-    kind: ApiActionKind.parse(r['kind']! as String),
+    kind: parseKind(r['kind']! as String),
     target: r['target'] as String?,
     body: r['body'] == null
         ? null
@@ -150,18 +165,47 @@ class ApiAction {
 }
 
 /// Hàng đợi lệnh API (bảng `api_action`). Thứ tự phát lại theo `seq`.
+///
+/// Chỉ xếp hàng / đọc được các loại lệnh đã đăng ký: [ApiActionKind] của lõi
+/// cộng [extraKinds] do app truyền vào (vd App hiện trường MKG đăng ký lệnh
+/// api-internal của mình). Lệnh chưa đăng ký bị từ chối khi `enqueue`.
 class ActionQueue {
   ActionQueue({
     required LocalDb db,
     required Clock clock,
     required IdGenerator ids,
+    Iterable<ActionKind> extraKinds = const [],
   }) : _db = db,
        _clock = clock,
-       _ids = ids;
+       _ids = ids,
+       _kinds = _registry(extraKinds);
 
   final LocalDb _db;
   final Clock _clock;
   final IdGenerator _ids;
+  final Map<String, ActionKind> _kinds;
+
+  static Map<String, ActionKind> _registry(Iterable<ActionKind> extra) {
+    final m = <String, ActionKind>{};
+    for (final k in [...ApiActionKind.values, ...extra]) {
+      final prev = m[k.code];
+      if (prev != null && !identical(prev, k)) {
+        throw ArgumentError.value(k.code, 'extraKinds', 'trùng mã loại lệnh');
+      }
+      m[k.code] = k;
+    }
+    return Map.unmodifiable(m);
+  }
+
+  /// Các loại lệnh hàng đợi này chấp nhận.
+  Iterable<ActionKind> get kinds => _kinds.values;
+
+  ActionKind _parseKind(String code) =>
+      _kinds[code] ??
+      (throw StateError('api_action: loại lệnh chưa đăng ký "$code"'));
+
+  ApiAction _fromRow(Map<String, Object?> r) =>
+      ApiAction.fromRow(r, parseKind: _parseKind);
 
   static const _seqKey = 'api_action.seq';
 
@@ -172,10 +216,19 @@ class ActionQueue {
   static const doneRetention = Duration(hours: 48);
 
   Future<ApiAction> enqueue(
-    ApiActionKind kind, {
+    ActionKind kind, {
     String? target,
     Map<String, Object?>? body,
   }) {
+    if (!identical(_kinds[kind.code], kind)) {
+      return Future.error(
+        ArgumentError.value(
+          kind.code,
+          'kind',
+          'loại lệnh chưa đăng ký với ActionQueue',
+        ),
+      );
+    }
     return _sql.transaction((tx) async {
       final cur = int.tryParse(await _db.getMeta(_seqKey, tx: tx) ?? '') ?? 0;
       final seq = cur + 1;
@@ -209,11 +262,11 @@ class ActionQueue {
       where: "status = 'pending'",
       orderBy: 'seq',
     );
-    return rows.map(ApiAction.fromRow).toList();
+    return rows.map(_fromRow).toList();
   }
 
   /// Lệnh chưa thất bại (chờ hoặc đã xong) — dùng làm lớp phủ trạng thái cục bộ.
-  Future<List<ApiAction>> active({ApiActionKind? kind, String? target}) async {
+  Future<List<ApiAction>> active({ActionKind? kind, String? target}) async {
     final where = ["status != 'failed'"];
     final args = <Object?>[];
     if (kind != null) {
@@ -230,18 +283,18 @@ class ActionQueue {
       whereArgs: args,
       orderBy: 'seq',
     );
-    return rows.map(ApiAction.fromRow).toList();
+    return rows.map(_fromRow).toList();
   }
 
   /// Mọi lệnh của [kind] (kể cả đã thất bại, để hiển thị lỗi), theo `seq`.
-  Future<List<ApiAction>> ofKind(ApiActionKind kind) async {
+  Future<List<ApiAction>> ofKind(ActionKind kind) async {
     final rows = await _sql.query(
       'api_action',
       where: 'kind = ?',
       whereArgs: [kind.code],
       orderBy: 'seq',
     );
-    return rows.map(ApiAction.fromRow).toList();
+    return rows.map(_fromRow).toList();
   }
 
   Future<void> markDone(String id) => _sql.update(
@@ -284,7 +337,7 @@ class ActionQueue {
       where: 'id = ?',
       whereArgs: [id],
     );
-    return rows.isEmpty ? null : ApiAction.fromRow(rows.first);
+    return rows.isEmpty ? null : _fromRow(rows.first);
   }
 
   Future<void> recordAttempt(String id, String code) => _sql.rawUpdate(

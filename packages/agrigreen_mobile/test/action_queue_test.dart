@@ -5,6 +5,25 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'support/harness.dart';
 
+/// Loại lệnh do app khai báo (thử cơ chế đăng ký `extraKinds`).
+enum _AppKind implements ActionKind {
+  ping('app_ping'),
+
+  /// Trùng mã với lệnh của lõi → ActionQueue phải từ chối.
+  dup('notification_read');
+
+  const _AppKind(this.code);
+
+  @override
+  final String code;
+
+  @override
+  String get method => 'POST';
+
+  @override
+  String pathFor(String? target) => '/v1/app/$target/ping';
+}
+
 void main() {
   test('KN P5: lệnh lưu lịch công tác tới đúng đường dẫn', () {
     expect(
@@ -14,6 +33,51 @@ void main() {
     expect(
       ApiActionKind.parse('work_schedule_save'),
       ApiActionKind.workScheduleSave,
+    );
+  });
+
+  test('phân vùng mạng (§29, R-SEC-01): lõi không chứa lệnh vùng mkg', () {
+    for (final k in ApiActionKind.values) {
+      final path = k.pathFor('x');
+      expect(path, isNot(startsWith('/v1/fieldops')), reason: k.code);
+      expect(path, isNot(startsWith('/v1/logistics')), reason: k.code);
+    }
+    expect(() => ApiActionKind.parse('fieldops_crew_shift'), throwsStateError);
+    expect(() => ApiActionKind.parse('logistics_milestone'), throwsStateError);
+  });
+
+  test('lệnh riêng của app: phải đăng ký mới xếp hàng / đọc được', () async {
+    final h = await Harness.create();
+    addTearDown(h.dispose);
+    // Hàng đợi mặc định (như App hiện trường KN) từ chối lệnh chưa đăng ký.
+    await expectLater(
+      h.actions.enqueue(_AppKind.ping, target: 't1'),
+      throwsArgumentError,
+    );
+    expect(await h.actions.pendingCount(), 0);
+
+    final q = ActionQueue(
+      db: h.db,
+      clock: h.clock,
+      ids: h.ids,
+      extraKinds: [_AppKind.ping],
+    );
+    final a = await q.enqueue(_AppKind.ping, target: 't1');
+    expect(a.path, '/v1/app/t1/ping');
+    final back = await q.byId(a.id);
+    expect(back!.kind, _AppKind.ping);
+    expect(q.kinds, containsAll([...ApiActionKind.values, _AppKind.ping]));
+    // Hàng đợi không đăng ký gặp bản ghi lạ → lỗi rõ ràng, không phát nhầm.
+    await expectLater(h.actions.byId(a.id), throwsStateError);
+
+    expect(
+      () => ActionQueue(
+        db: h.db,
+        clock: h.clock,
+        ids: h.ids,
+        extraKinds: [_AppKind.dup],
+      ),
+      throwsArgumentError,
     );
   });
 

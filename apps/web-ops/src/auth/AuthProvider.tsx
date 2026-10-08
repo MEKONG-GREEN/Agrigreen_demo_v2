@@ -14,6 +14,7 @@ import { createCollectApi, createCycleApi, createKnAdminApi, supportReasonStore,
 import type { KnApi, MenuBadges, MenuTree, RoleAssignment, SelectContextRequest, SessionContext } from "@/kn/contract";
 import { contextStore, readSelection, writeSelection } from "@/kn/contextStore";
 import { autoSelection, isValidSelection } from "@/kn/session";
+import { forgetIdentifier } from "@/lib/rememberLogin";
 import { buildPrincipal, decodeAccessToken, type AccessTokenClaims, type Principal } from "./principal";
 import { getUserManager, safeReturnTo } from "./oidc";
 import { tokenStore } from "./tokenStore";
@@ -322,6 +323,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokenStore.set(null);
     contextStore.set(null);
     writeSelection(null);
+    forgetIdentifier(); // M19: email "Ghi nhớ đăng nhập" không ở lại sau khi đăng xuất
     setPrincipal(null);
     setKn(KN_LEGACY);
     setStatus("anonymous");
