@@ -1,4 +1,7 @@
-package port
+// Package mechanizationsrc là điểm mở rộng của pf/reports (cap/export): nguồn số liệu báo cáo CGH FN-10.
+// pf/mechanization hiện thực ReportData; gốc lắp ráp nối vào pf/reports. Khai ở tầng năng lực để phụ thuộc
+// chỉ đi xuống (R-MOD-05): module nghiệp vụ biết pf/reports, pf/reports không biết module nghiệp vụ.
+package mechanizationsrc
 
 import (
 	"context"

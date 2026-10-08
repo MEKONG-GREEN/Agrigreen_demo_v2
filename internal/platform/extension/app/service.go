@@ -19,10 +19,11 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -69,14 +70,14 @@ type Service struct {
 	Clock    clock.Clock
 	Scope    partyport.ScopeResolver
 	Orgs     partyport.Orgs
-	Units    mdport.AdminUnits
-	Params   mdport.Params
+	Units    partyport.AdminUnits
+	Params   params.Params
 	Catalogs mdport.Catalogs
 	// Plots, Coops (tùy chọn): thống kê của pf/geo và pf/party cho bảng điều hành gộp (G-02).
-	Plots geoport.PlotStats
+	Plots partyport.PlotStats
 	Coops partyport.CooperativeStats
 	// Contacts (tùy chọn): số điện thoại cán bộ ở pf/accounts cho "gọi/nhắn 1 chạm" (US-DIR-02).
-	Contacts port.StaffContacts
+	Contacts accport.StaffContacts
 	// Farmers: liên kết tài khoản nông dân ↔ nông hộ (pf/accounts) cho yêu cầu hỗ trợ
 	// từ App HTX (HTX US-SUPPORT-01). Nil → route yêu cầu hỗ trợ trả 503.
 	Farmers accport.FarmerHouseholds
@@ -84,14 +85,14 @@ type Service struct {
 	GpsLog geoport.GpsLog
 	// KNContext, KNDirectory (tùy chọn, P1): ngữ cảnh phiên KN và danh bạ gán vai trò cho lịch công tác (P5).
 	// Thiếu → suy từ vai realm + phạm vi đơn vị, danh bạ trực pf_extension.staff.
-	KNContext   port.KNContextResolver
-	KNDirectory port.KNDirectory
+	KNContext   accport.KNContextResolver
+	KNDirectory accport.KNDirectory
 	// TablePDF (tùy chọn, pf/reports): "Xuất PDF" lịch công tác. Thiếu → 503.
 	TablePDF port.TablePDF
 	// Egress (tùy chọn, G5 ADR-0024 + quyết định A5): điểm kiểm soát xuất dùng chung (pf/metering) cho "Xuất
 	// Excel/PDF" lịch công tác — xuất NỘI BỘ (Internal): ghi egress_event, đếm, cảnh báo, không bao giờ chặn.
-	Egress     meteringport.Checkpoint
-	EgressMode meteringport.Mode
+	Egress     meter.Checkpoint
+	EgressMode meter.Mode
 	Log        *slog.Logger
 }
 
@@ -119,21 +120,21 @@ func withScope(ctx context.Context, sc authz.Scope) context.Context {
 }
 
 // provinceOf trả mã tỉnh của một đơn vị (xã → tỉnh cha; tỉnh → chính nó).
-func (s *Service) provinceOf(ctx context.Context, unit, field string) (string, mdport.Level, error) {
+func (s *Service) provinceOf(ctx context.Context, unit, field string) (string, partyport.Level, error) {
 	if s.Units == nil {
 		return "", "", ErrDependency.WithDetail("chưa nối danh mục đơn vị hành chính")
 	}
 	u, err := s.Units.Get(ctx, unit, s.now())
-	if errors.Is(err, mdport.ErrUnitNotFound) {
+	if errors.Is(err, partyport.ErrUnitNotFound) {
 		return "", "", ErrUnitInvalid.WithField(field, "không có đơn vị hành chính còn hiệu lực với mã này")
 	}
 	if err != nil {
 		return "", "", err
 	}
 	switch u.Level {
-	case mdport.LevelProvince:
+	case partyport.LevelProvince:
 		return u.Code, u.Level, nil
-	case mdport.LevelCommune:
+	case partyport.LevelCommune:
 		return u.ParentCode, u.Level, nil
 	}
 	return "", "", ErrUnitInvalid.WithField(field, "chỉ nhận đơn vị cấp tỉnh hoặc xã hiện hành")
@@ -145,7 +146,7 @@ func (s *Service) paramDecimal(ctx context.Context, key string, at time.Time, de
 		return def, nil
 	}
 	v, err := s.Params.At(ctx, key, at)
-	if errors.Is(err, mdport.ErrParamNotFound) {
+	if errors.Is(err, params.ErrParamNotFound) {
 		return def, nil
 	}
 	if err != nil {

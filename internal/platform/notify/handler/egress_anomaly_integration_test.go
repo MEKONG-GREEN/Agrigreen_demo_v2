@@ -12,6 +12,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 )
 
 // ADR-0024 (L-08, X-06; mục 18 DLP): pf.metering.egress.anomaly_detected → consumer
@@ -27,9 +28,9 @@ func TestEgressAnomalyNotifiesDLPRecipients_ADR0024(t *testing.T) {
 	other := f.userIn(ids.New(), ids.New(), authz.Scope{All: true}, meteringport.RoleMeteringViewer, authz.RolePlatformAdmin)
 	egressID, client := ids.New(), ids.New()
 	ev := f.event(f.tenant, meteringport.EventEgressAnomaly, meteringport.EgressAnomalyV1{
-		EgressEventID: egressID.String(), Channel: string(meteringport.ChannelPublicAPI), Product: "collection_volume",
-		CounterpartyKind: string(meteringport.CounterpartyAPIClient), CounterpartyRef: client.String(), BusinessDate: "2026-10-02",
-		DailyRecords: 60000, Threshold: 50000, Basis: "absolute", Mode: string(meteringport.ModeEnforce), DetectedAt: f.clk.Now().Format(time.RFC3339)})
+		EgressEventID: egressID.String(), Channel: string(meter.ChannelPublicAPI), Product: "collection_volume",
+		CounterpartyKind: string(meter.CounterpartyAPIClient), CounterpartyRef: client.String(), BusinessDate: "2026-10-02",
+		DailyRecords: 60000, Threshold: 50000, Basis: "absolute", Mode: string(meter.ModeEnforce), DetectedAt: f.clk.Now().Format(time.RFC3339)})
 	if !f.process(port.ConsumerEgressAnomaly, ev) {
 		t.Fatal("lần giao đầu phải được xử lý")
 	}

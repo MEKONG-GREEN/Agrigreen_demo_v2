@@ -10,10 +10,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -42,11 +42,11 @@ func (f *fakeScope) Scope(ctx context.Context) (authz.Scope, error) {
 // fakeParams trả sync.conflict_sla_hours nếu đã đặt.
 type fakeParams struct{ hours *decimal.Decimal }
 
-func (f fakeParams) At(_ context.Context, key string, at time.Time) (mdport.ParamValue, error) {
+func (f fakeParams) At(_ context.Context, key string, at time.Time) (params.ParamValue, error) {
 	if key != port.ParamConflictSLAHours || f.hours == nil {
-		return mdport.ParamValue{}, mdport.ErrParamNotFound
+		return params.ParamValue{}, params.ErrParamNotFound
 	}
-	return mdport.ParamValue{Key: key, Value: *f.hours, Unit: "h", Version: 1, EffectiveFrom: at}, nil
+	return params.ParamValue{Key: key, Value: *f.hours, Unit: "h", Version: 1, EffectiveFrom: at}, nil
 }
 
 // fakeConsent từ chối các chủ thể trong denied.

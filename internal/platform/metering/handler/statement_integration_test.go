@@ -14,6 +14,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -77,7 +78,7 @@ func (f *fixture) draftAndApprove(client uuid.UUID, period string) string {
 // metering.self_approval (app/) và CHECK DB; người khác duyệt → approved; duyệt lại → 409 statement_frozen;
 // CSV tất định byte-cho-byte, tải qua checkpoint report_export; kiểm lại băm khớp sổ; sửa = bảng kê bù.
 func TestStatementLifecycle_SoD_Deterministic_ADR0023(t *testing.T) {
-	f := newFixture(t, port.ModeObserve)
+	f := newFixture(t, meter.ModeObserve)
 	ctx := context.Background()
 	client, ct, dt := ids.New(), ids.New(), ids.New()
 	for i := 0; i < 5; i++ {
@@ -235,7 +236,7 @@ func tenantInsertSelfApproval(f *fixture, sid, actor uuid.UUID) error {
 // ADR-0023 mục 4 + Q5-4 (M-08): giá TÙY CHỌN, có phiên bản (pf/masterdata), shared/money — đơn giá
 // numeric(18,4), thành tiền numeric(18,2), thuê bao; price_version ghi phiên bản đã dùng.
 func TestStatementOptionalPricing_ADR0023(t *testing.T) {
-	f := newFixture(t, port.ModeObserve)
+	f := newFixture(t, meter.ModeObserve)
 	ctx := context.Background()
 	client, ct, dt := ids.New(), ids.New(), ids.New()
 	for i := 0; i < 3; i++ {

@@ -17,11 +17,11 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port/porttest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -32,23 +32,23 @@ type fakeCheckpoint struct {
 	mu    sync.Mutex
 	allow bool
 	err   error
-	seen  []meteringport.Egress
+	seen  []meter.Egress
 }
 
-func (c *fakeCheckpoint) Pass(_ context.Context, e meteringport.Egress) (meteringport.Decision, error) {
+func (c *fakeCheckpoint) Pass(_ context.Context, e meter.Egress) (meter.Decision, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.seen = append(c.seen, e)
 	if c.err != nil {
-		return meteringport.Decision{}, c.err
+		return meter.Decision{}, c.err
 	}
-	return meteringport.Decision{Allowed: c.allow}, nil
+	return meter.Decision{Allowed: c.allow}, nil
 }
 
-func (c *fakeCheckpoint) calls() []meteringport.Egress {
+func (c *fakeCheckpoint) calls() []meter.Egress {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return append([]meteringport.Egress(nil), c.seen...)
+	return append([]meter.Egress(nil), c.seen...)
 }
 
 func problemCode(err error) string {
@@ -91,7 +91,7 @@ func TestHubCapacityProductAndValveEgress_G5(t *testing.T) {
 	share.Grant(second, mkg, partyport.KindValveHub)
 	g.mod.UseSharing(share, share)
 	cp := &fakeCheckpoint{allow: false}
-	g.mod.UseEgress(cp, meteringport.ModeObserve, nil)
+	g.mod.UseEgress(cp, meter.ModeObserve, nil)
 	h := g.mod.HubValveHandler()
 	ctx := context.Background()
 	run := func(env outbox.Envelope) (bool, error) {
@@ -113,8 +113,8 @@ func TestHubCapacityProductAndValveEgress_G5(t *testing.T) {
 		t.Fatalf("mỗi bên cấp một Egress: %+v", calls)
 	}
 	for _, e := range calls {
-		if e.Channel != meteringport.ChannelValve || e.SourceID != envA.EventID || e.DataTenantID != mkg ||
-			e.CounterpartyKind != meteringport.CounterpartyTenant || e.Product != port.ContractHubFacility || e.Records != 1 || e.Bytes <= 0 {
+		if e.Channel != meter.ChannelValve || e.SourceID != envA.EventID || e.DataTenantID != mkg ||
+			e.CounterpartyKind != meter.CounterpartyTenant || e.Product != port.ContractHubFacility || e.Records != 1 || e.Bytes <= 0 {
 			t.Fatalf("Egress van: %+v", e)
 		}
 	}
@@ -138,7 +138,7 @@ func TestHubCapacityProductAndValveEgress_G5(t *testing.T) {
 	}
 
 	// enforce + từ chối → lỗi đúng mã, không ghi hub mới; checkpoint lỗi → metering.egress_unavailable.
-	g.mod.UseEgress(cp, meteringport.ModeEnforce, nil)
+	g.mod.UseEgress(cp, meter.ModeEnforce, nil)
 	hubC := ids.New()
 	if _, err := run(valveEnv(t, mkg, port.EventMKGHubFacilityPublished, facility(hubC, "MKG-KHO-C", "92", "warehouse"))); problemCode(err) != "metering.egress_quota_exceeded" {
 		t.Fatalf("enforce + từ chối → metering.egress_quota_exceeded: %v", err)
@@ -148,7 +148,7 @@ func TestHubCapacityProductAndValveEgress_G5(t *testing.T) {
 		t.Fatalf("enforce + checkpoint lỗi → metering.egress_unavailable: %v", err)
 	}
 	cp.err = nil
-	g.mod.UseEgress(nil, meteringport.ModeEnforce, nil)
+	g.mod.UseEgress(nil, meter.ModeEnforce, nil)
 
 	src := g.mod.HubCapacitySource()
 	items, next, err := src.HubCapacities(ctx, g.tenant, "", "", 0)

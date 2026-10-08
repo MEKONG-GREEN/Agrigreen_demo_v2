@@ -7,11 +7,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 )
@@ -80,9 +80,9 @@ func (s *Service) egress(ctx context.Context, tx pgx.Tx, e Egress) error {
 		row.DailyCount = count + 1
 		row.Anomaly = row.DailyCount > threshold
 	}
-	if err := meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
-		SourceID: row.ID, Channel: meteringport.ChannelReportExport, DataTenantID: e.TenantID,
-		CounterpartyKind: meteringport.CounterpartyActor, CounterpartyRef: e.ActorRef, Product: e.TemplateKey,
+	if err := meter.Guard(ctx, s.Egress, s.EgressMode, meter.Egress{
+		SourceID: row.ID, Channel: meter.ChannelReportExport, DataTenantID: e.TenantID,
+		CounterpartyKind: meter.CounterpartyActor, CounterpartyRef: e.ActorRef, Product: e.TemplateKey,
 		Records: 1, OccurredAt: now, ActorRef: e.ActorRef, TraceID: telemetry.TraceID(ctx),
 	}, s.log()); err != nil {
 		lg.Warn("điểm kiểm soát xuất dùng chung từ chối", "outcome", "egress_denied")

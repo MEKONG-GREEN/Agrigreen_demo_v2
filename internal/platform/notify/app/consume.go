@@ -13,7 +13,7 @@ import (
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
@@ -414,7 +414,7 @@ func (s *Service) expandUnits(ctx context.Context, units []string, at time.Time)
 	out := append([]string(nil), units...)
 	for _, u := range units {
 		desc, err := s.Units.Descendants(ctx, u, at)
-		if errors.Is(err, mdport.ErrUnitNotFound) {
+		if errors.Is(err, partyport.ErrUnitNotFound) {
 			continue
 		}
 		if err != nil {

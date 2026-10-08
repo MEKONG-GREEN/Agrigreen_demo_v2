@@ -26,6 +26,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/store"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/mechanizationsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
@@ -61,7 +62,7 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc
 func (m *Module) MachineCounts() partyport.CoopMachineCounts { return app.MachineCounts{Svc: m.svc} }
 
 // ReportData cho pf/reports: 3 tab FN-10 đọc từ kết quả cân đối đã lưu.
-func (m *Module) ReportData() port.ReportData { return app.ReportData{Svc: m.svc} }
+func (m *Module) ReportData() mechanizationsrc.ReportData { return app.ReportData{Svc: m.svc} }
 
 // AreaFeed cho bộ đồng bộ App HTX (FN-07, G2) áp diện tích vụ theo QT-03.
 func (m *Module) AreaFeed() port.AreaFeed { return m.svc }

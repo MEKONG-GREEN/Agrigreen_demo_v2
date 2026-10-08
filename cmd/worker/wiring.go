@@ -11,10 +11,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
@@ -74,4 +74,4 @@ func wiredConsumers(log *slog.Logger) []consumer {
 
 // workerEgress là điểm kiểm soát xuất (pf/metering Checkpoint, ADR-0024) cho job của worker dựng
 // module riêng (lịch gửi báo cáo). Nil → hành vi cũ; người tích hợp nối khi có pf/metering.
-var workerEgress meteringport.Checkpoint
+var workerEgress meter.Checkpoint

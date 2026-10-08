@@ -9,12 +9,12 @@ import (
 
 	"github.com/google/uuid"
 
+	accountsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/domain"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tabular"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
@@ -32,9 +32,9 @@ func (s *Service) scheduleEgress(ctx context.Context, records, bytes int) {
 		return
 	}
 	// Guard với Internal không bao giờ trả lỗi (observe): lỗi hạ tầng chỉ được ghi log.
-	_ = meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
-		SourceID: ids.New(), Channel: meteringport.ChannelReportExport, DataTenantID: p.TenantID,
-		CounterpartyKind: meteringport.CounterpartyActor, CounterpartyRef: p.ActorRef, Product: ProductScheduleExport,
+	_ = meter.Guard(ctx, s.Egress, s.EgressMode, meter.Egress{
+		SourceID: ids.New(), Channel: meter.ChannelReportExport, DataTenantID: p.TenantID,
+		CounterpartyKind: meter.CounterpartyActor, CounterpartyRef: p.ActorRef, Product: ProductScheduleExport,
 		Records: int64(records), Bytes: int64(bytes), OccurredAt: s.now(), ActorRef: p.ActorRef, TraceID: telemetry.TraceID(ctx),
 		Internal: true,
 	}, s.Log)
@@ -90,7 +90,7 @@ func (s *Service) ExportSchedules(ctx context.Context, q ScheduleQuery, format s
 			owner = sc.OwnerRef.String()
 		}
 		level := "Cấp Xã"
-		if sc.OwnerLevel == port.ScheduleLevelProvince {
+		if sc.OwnerLevel == accountsport.ScheduleLevelProvince {
 			level = "Cấp Tỉnh"
 		}
 		status := domain.StatusVI(sc.Status)

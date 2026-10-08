@@ -16,10 +16,10 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/keycloak"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
-	reportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
+
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
@@ -41,10 +41,10 @@ type Deps struct {
 	// nông hộ, tra nông hộ theo SĐT qua chỉ mục mù, tham số activation.grant_lifespan_hours.
 	Households partyport.Households
 	Vault      client.Client
-	Params     mdport.Params
+	Params     params.Params
 	// KN v7.7 gói P1: phòng ban (pf/party P2), tên xã (pf/masterdata), danh bạ tên dự phòng cho Log.
 	Departments partyport.Departments
-	Units       mdport.AdminUnits
+	Units       partyport.AdminUnits
 	Names       partyport.ActorNames
 	// W1.4 (R-MOD-08): trạng thái bật module theo đơn vị — vai của module đã tắt không cấp được.
 	Modules partyport.ModuleEnablement
@@ -115,7 +115,7 @@ func (m *Module) OrgStatusHandler() inbox.Handler {
 
 // MailDirectory cho pf/reports: email đã xác minh của tài khoản lúc gửi lịch báo
 // cáo. Chưa cấu hình Keycloak → nil (pf/reports bỏ gửi kèm cảnh báo).
-func (m *Module) MailDirectory() reportsport.MailDirectory {
+func (m *Module) MailDirectory() port.MailDirectory {
 	if m.svc.Dir == nil {
 		return nil
 	}
@@ -124,7 +124,7 @@ func (m *Module) MailDirectory() reportsport.MailDirectory {
 
 // ReportRecipients cho pf/reports: tài khoản đã đăng ký của một HTX (email đã xác minh)
 // để quản lý HTX chọn người nhận lịch báo cáo (HTX US-DASH-03). Chưa cấu hình Keycloak → nil.
-func (m *Module) ReportRecipients() reportsport.RecipientDirectory {
+func (m *Module) ReportRecipients() port.RecipientDirectory {
 	if m.svc.Dir == nil {
 		return nil
 	}
@@ -133,7 +133,7 @@ func (m *Module) ReportRecipients() reportsport.RecipientDirectory {
 
 // StaffContacts cho pf/extension: số điện thoại của cán bộ lúc bấm "gọi/nhắn" trong
 // danh bạ trực (KN US-DIR-02). Chưa cấu hình Keycloak → nil (route liên hệ trả 503).
-func (m *Module) StaffContacts() extport.StaffContacts {
+func (m *Module) StaffContacts() port.StaffContacts {
 	if m.svc.Dir == nil {
 		return nil
 	}
@@ -142,12 +142,12 @@ func (m *Module) StaffContacts() extport.StaffContacts {
 
 // ExtensionKNContext cho pf/extension (KN v7.7 P5): ngữ cảnh KN của request (X-AG-Context) kèm tỉnh và cấp
 // quản lý của lần gán — extension.UseKNContext(acc.ExtensionKNContext(), acc.ExtensionKNDirectory()).
-func (m *Module) ExtensionKNContext() extport.KNContextResolver {
+func (m *Module) ExtensionKNContext() port.KNContextResolver {
 	return app.ExtensionKN{Assignments: m.svc, Orgs: m.svc.Orgs}
 }
 
 // ExtensionKNDirectory cho pf/extension (KN v7.7 P5): cán bộ KN của phòng ban × tỉnh từ sổ gán vai trò.
-func (m *Module) ExtensionKNDirectory() extport.KNDirectory {
+func (m *Module) ExtensionKNDirectory() port.KNDirectory {
 	return app.ExtensionKN{Assignments: m.svc, Orgs: m.svc.Orgs}
 }
 

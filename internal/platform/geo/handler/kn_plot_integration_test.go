@@ -21,13 +21,13 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port/farmerid"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -238,10 +238,10 @@ func TestFN_XA_03_05_CreateListGetUpdateCorrectLog(t *testing.T) {
 	// Xuất tệp của xã. A5 (03/10/2026): tải tệp thửa là xuất NỘI BỘ — qua điểm kiểm soát dùng chung (ghi egress_event)
 	// nhưng không bị chặn kể cả enforce + checkpoint báo vượt hạn mức.
 	cp := &denyCP{}
-	f.mod.UseEgress(cp, meteringport.ModeEnforce, nil)
+	f.mod.UseEgress(cp, meter.ModeEnforce, nil)
 	defer f.mod.UseEgress(nil, "", nil)
 	ex := xa.get("/v1/kn/plots/export?commune=31117&format=geojson")
-	if len(cp.got) != 1 || !cp.got[0].Internal || cp.got[0].Channel != meteringport.ChannelReportExport || cp.got[0].Product != "kn_plot_file" ||
+	if len(cp.got) != 1 || !cp.got[0].Internal || cp.got[0].Channel != meter.ChannelReportExport || cp.got[0].Product != "kn_plot_file" ||
 		cp.got[0].Records < 1 || cp.got[0].DataTenantID == uuid.Nil {
 		t.Fatalf("A5: tải tệp thửa phải qua checkpoint với Internal: %+v", cp.got)
 	}

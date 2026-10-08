@@ -45,7 +45,7 @@ func parseParts(s string) (Version, int, error) {
 	}
 	var out [3]int
 	for i, p := range parts {
-		if p == "" || (len(p) > 1 && p[0] == '0') {
+		if p == "" || (len(p) > 1 && p[0] == '0') || strings.TrimLeft(p, "0123456789") != "" {
 			return Version{}, 0, fmt.Errorf("phiên bản %q không hợp lệ", s)
 		}
 		n, err := strconv.Atoi(p)

@@ -39,11 +39,11 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/dataproduct"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -63,15 +63,15 @@ type Deps struct {
 	Plans   port.Plans
 	Limiter RateLimiter
 
-	Ledger meteringport.Ledger
-	Quotas meteringport.Quotas
-	Usage  meteringport.Usage
+	Ledger meter.Ledger
+	Quotas meter.Quotas
+	Usage  meter.Usage
 	Grants partyport.GrantLookup
 	// Reads (K-05, KN US-MRV-05): sổ đọc partner_read_log ở tenant bên cấp cho mỗi lần đọc / tải dữ
 	// liệu 2xx — ghi TRƯỚC sổ đo lường; lỗi → 503 party.partner_audit_unavailable, không có dữ liệu.
 	// Nil → không ghi sổ đọc (hành vi trước tích hợp E2E G5).
 	Reads  partyport.APIReadLog
-	Params mdport.Params // publicdata.k_min (nil → k_default của hợp đồng)
+	Params params.Params // publicdata.k_min (nil → k_default của hợp đồng)
 
 	Collection port.CollectionVolumeSource
 	Hubs       port.HubCapacitySource
@@ -130,15 +130,15 @@ func NewRouter(d Deps) *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{"status": "ready"})
 	})
 	v1 := r.Group("/v1", s.authenticate)
-	v1.GET("/data-products", s.handle(spec{kind: meteringport.CallMeta}, s.catalog))
-	v1.GET("/data/collection-volumes", s.handle(spec{kind: meteringport.CallRead, product: port.ProductCollectionVolume, action: port.ActionRead}, s.collection))
-	v1.POST("/data/collection-volumes/exports", s.handle(spec{kind: meteringport.CallExportRequest, product: port.ProductCollectionVolume, action: port.ActionExport}, s.exportCollection))
-	v1.GET("/data/hub-capacities", s.handle(spec{kind: meteringport.CallRead, product: port.ProductHubCapacity, action: port.ActionRead}, s.hubs))
-	v1.GET("/data/mrv-packages", s.handle(spec{kind: meteringport.CallRead, product: port.ProductMRVPackageStatus, action: port.ActionRead}, s.mrvPackages))
-	v1.GET("/data/mrv-packages/:export_id", s.handle(spec{kind: meteringport.CallRead, product: port.ProductMRVPackageStatus, action: port.ActionRead}, s.mrvPackage))
-	v1.GET("/jobs/:id", s.handle(spec{kind: meteringport.CallJobStatus}, s.job))
-	v1.GET("/jobs/:id/file", s.handle(spec{kind: meteringport.CallFileDownload, action: port.ActionExport}, s.jobFile))
-	v1.GET("/usage", s.handle(spec{kind: meteringport.CallMeta, scope: port.ScopeUsageRead}, s.usage))
+	v1.GET("/data-products", s.handle(spec{kind: meter.CallMeta}, s.catalog))
+	v1.GET("/data/collection-volumes", s.handle(spec{kind: meter.CallRead, product: port.ProductCollectionVolume, action: port.ActionRead}, s.collection))
+	v1.POST("/data/collection-volumes/exports", s.handle(spec{kind: meter.CallExportRequest, product: port.ProductCollectionVolume, action: port.ActionExport}, s.exportCollection))
+	v1.GET("/data/hub-capacities", s.handle(spec{kind: meter.CallRead, product: port.ProductHubCapacity, action: port.ActionRead}, s.hubs))
+	v1.GET("/data/mrv-packages", s.handle(spec{kind: meter.CallRead, product: port.ProductMRVPackageStatus, action: port.ActionRead}, s.mrvPackages))
+	v1.GET("/data/mrv-packages/:export_id", s.handle(spec{kind: meter.CallRead, product: port.ProductMRVPackageStatus, action: port.ActionRead}, s.mrvPackage))
+	v1.GET("/jobs/:id", s.handle(spec{kind: meter.CallJobStatus}, s.job))
+	v1.GET("/jobs/:id/file", s.handle(spec{kind: meter.CallFileDownload, action: port.ActionExport}, s.jobFile))
+	v1.GET("/usage", s.handle(spec{kind: meter.CallMeta, scope: port.ScopeUsageRead}, s.usage))
 	return r
 }
 
@@ -182,7 +182,7 @@ func (s *Server) authenticate(c *gin.Context) {
 // ---------------------------------------------------------------------------
 
 type spec struct {
-	kind    meteringport.CallKind
+	kind    meter.CallKind
 	product string
 	action  string
 	scope   string
@@ -299,7 +299,7 @@ func (s *Server) handle(sp spec, fn handlerFn) gin.HandlerFunc {
 				res = s.failResult(c, err)
 			}
 		}
-		if res.problemCode == meteringport.ErrQuotaExceeded.Code && res.header.Get("Retry-After") == "" {
+		if res.problemCode == meter.ErrQuotaExceeded.Code && res.header.Get("Retry-After") == "" {
 			res.header.Set("Retry-After", seconds(nextBusinessDay(caller.ReceivedAt).Sub(caller.ReceivedAt)))
 		}
 		if res.product == "" {
@@ -323,7 +323,7 @@ func (s *Server) handle(sp spec, fn handlerFn) gin.HandlerFunc {
 		if scope == "" && res.product != "" && sp.action != "" {
 			scope = port.ProductScope(res.product, sp.action)
 		}
-		call := meteringport.Call{RequestID: caller.RequestID, ReceivedAt: caller.ReceivedAt, ClientID: caller.Client.ID,
+		call := meter.Call{RequestID: caller.RequestID, ReceivedAt: caller.ReceivedAt, ClientID: caller.Client.ID,
 			ClientTenantID: caller.Client.ClientTenantID, KeyPrefix: caller.KeyPrefix, AuthMethod: string(caller.AuthMethod), Kind: sp.kind,
 			Product: res.product, ContractVersion: res.contractVersion, Scope: scope, RouteTemplate: routeTemplate(c), Status: res.status,
 			ProblemCode: res.problemCode, Replayed: res.replayed, JobID: res.jobID, TraceID: telemetry.TraceID(ctx)}
@@ -337,7 +337,7 @@ func (s *Server) handle(sp spec, fn handlerFn) gin.HandlerFunc {
 		call.Latency = s.d.Clock.Now().Sub(caller.ReceivedAt)
 
 		// Sổ đo lường TRƯỚC khi gửi byte nào (ADR-0023 mục 1) — đóng khi lỗi.
-		var rec meteringport.Recorded
+		var rec meter.Recorded
 		if s.d.Ledger == nil {
 			err = errors.New("apiclient: chưa nối metering/port.Ledger")
 		} else {
@@ -347,14 +347,14 @@ func (s *Server) handle(sp spec, fn handlerFn) gin.HandlerFunc {
 			if res.stream != nil {
 				_ = res.stream.Close()
 			}
-			if !isCode(err, meteringport.ErrQuotaExceeded.Code) {
+			if !isCode(err, meter.ErrQuotaExceeded.Code) {
 				s.d.Log.ErrorContext(ctx, "Public API: không ghi được sổ đo lường — không trả dữ liệu", "event", "public.metering_unavailable",
 					"request_id", caller.RequestID, "trace_id", telemetry.TraceID(ctx), "outcome", "error", "error", err.Error())
-				httpx.Fail(c, meteringport.ErrUnavailable)
+				httpx.Fail(c, meter.ErrUnavailable)
 				return
 			}
 			// Dòng sổ đã ghi với status 429, units 0 (metering/port.Ledger).
-			res = s.failResult(c, meteringport.ErrQuotaExceeded)
+			res = s.failResult(c, meter.ErrQuotaExceeded)
 			reset := rec.WindowReset
 			if reset.IsZero() {
 				reset = nextBusinessDay(caller.ReceivedAt)
@@ -435,17 +435,17 @@ func grantorParam(c *gin.Context) (uuid.UUID, error) {
 // precheck kiểm hạn mức sớm (đọc bộ đếm đã commit). Thẩm quyền cuối là Ledger.Record.
 func (s *Server) precheck(ctx context.Context, caller port.Caller, product string) error {
 	if s.d.Quotas == nil {
-		return meteringport.ErrUnavailable
+		return meter.ErrUnavailable
 	}
 	rem, err := s.d.Quotas.Remaining(ctx, s.d.OperatorTenant, caller.Client.ID, product, caller.ReceivedAt)
 	if err != nil {
-		if isCode(err, meteringport.ErrQuotaExceeded.Code) {
+		if isCode(err, meter.ErrQuotaExceeded.Code) {
 			return err
 		}
-		return meteringport.ErrUnavailable.WithCause(err)
+		return meter.ErrUnavailable.WithCause(err)
 	}
 	if rem.DailyUnits <= 0 || rem.MonthlyUnits <= 0 {
-		return meteringport.ErrQuotaExceeded
+		return meter.ErrQuotaExceeded
 	}
 	return nil
 }
@@ -461,7 +461,7 @@ func (s *Server) kFor(ctx context.Context, p *dataproduct.Product, grantor uuid.
 	}
 	v, err := s.d.Params.At(tenant.WithID(ctx, grantor), p.Aggregation.KParam, at)
 	if err != nil {
-		if !errors.Is(err, mdport.ErrParamNotFound) {
+		if !errors.Is(err, params.ErrParamNotFound) {
 			s.d.Log.WarnContext(ctx, "Public API: không đọc được tham số k — dùng k mặc định của hợp đồng", "event", "public.k_param", "outcome", "error")
 		}
 		return k

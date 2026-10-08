@@ -18,9 +18,9 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/public"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
@@ -68,7 +68,7 @@ func TestExportJobFlow_ADR0022(t *testing.T) {
 		t.Fatalf("cùng khóa khác thân → 422: %d %s", r3.status, r3.raw)
 	}
 	calls, units := e.meter.snapshot()
-	if len(calls) != 3 || units != 0 || !calls[1].Replayed || calls[0].Replayed || calls[0].Kind != meteringport.CallExportRequest {
+	if len(calls) != 3 || units != 0 || !calls[1].Replayed || calls[0].Replayed || calls[0].Kind != meter.CallExportRequest {
 		t.Fatalf("sổ yêu cầu xuất: %+v", calls)
 	}
 
@@ -123,7 +123,7 @@ func TestExportJobFlow_ADR0022(t *testing.T) {
 	}
 	calls, units = e.meter.snapshot()
 	last := calls[len(calls)-1]
-	if last.Kind != meteringport.CallFileDownload || last.Rows != 2 || last.DataTenantID != e.grantor || meteringport.UnitsV1(last) != 1 || last.Bytes != int64(len(fr.raw)) {
+	if last.Kind != meter.CallFileDownload || last.Rows != 2 || last.DataTenantID != e.grantor || meter.UnitsV1(last) != 1 || last.Bytes != int64(len(fr.raw)) {
 		t.Fatalf("dòng sổ tải tệp: %+v", last)
 	}
 	if units != 1 { // yêu cầu xuất, gọi lặp, trạng thái job = 0; tải tệp = ceil(2/1000) = 1 (metering.units.v1)

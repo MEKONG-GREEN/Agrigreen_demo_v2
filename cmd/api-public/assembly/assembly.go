@@ -17,14 +17,14 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port/grantlookup"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 )
 
 // PoolOpener mở pool cho một vai DB của cụm pf.
@@ -44,7 +44,7 @@ type Config struct {
 	Production bool
 	// EgressMode: AG_EGRESS_MODE cho pf/metering. Public API luôn đóng khi lỗi qua Ledger.Record,
 	// không phụ thuộc chế độ (ADR-0022 mục 1, ADR-0024).
-	EgressMode meteringport.Mode
+	EgressMode meter.Mode
 	Clock      clock.Clock
 	Log        *slog.Logger
 }
@@ -52,13 +52,13 @@ type Config struct {
 // Ports là cổng của module khác mà Public API dùng — mỗi cổng đọc bằng pool vai của module chủ
 // (R-05), api-public chỉ mở pool của g5-conventions §3.1.
 type Ports struct {
-	Ledger meteringport.Ledger
-	Quotas meteringport.Quotas
-	Usage  meteringport.Usage
+	Ledger meter.Ledger
+	Quotas meter.Quotas
+	Usage  meter.Usage
 	Grants partyport.GrantLookup
 	// Reads: sổ đọc partner_read_log ở tenant bên cấp cho lần đọc của khách hàng API (K-05).
 	Reads  partyport.APIReadLog
-	Params mdport.Params
+	Params params.Params
 
 	Collection apiclientport.CollectionVolumeSource
 	Hubs       apiclientport.HubCapacitySource

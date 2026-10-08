@@ -61,7 +61,7 @@ func newFixture(t *testing.T) *fixture {
 	env := pgtest.Get(t)
 	f := &fixture{t: t, iss: authztest.New(t), pool: env.Pool(t, migrations.PF, notify.DBRole), clk: clock.NewFixed(time.Now()),
 		scope: &fakeScope{scopes: map[uuid.UUID]authz.Scope{}}, devices: &fakeDevices{m: map[[2]uuid.UUID]syncport.DeviceInfo{}},
-		staff: &fakeStaff{staff: map[uuid.UUID][]extport.StaffRef{}}, pusher: &fakePusher{invalid: map[string]bool{}, flaky: map[string]int{}},
+		staff: &fakeStaff{staff: map[uuid.UUID][]port.StaffRef{}}, pusher: &fakePusher{invalid: map[string]bool{}, flaky: map[string]int{}},
 		tenant: ids.New()}
 	// ADR-0028 (W2.3): module chạy trên vai đăng nhập app_platform (NOINHERIT) — chỉ chạm pf_notify sau SET LOCAL ROLE r_notify.
 	appPool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
@@ -244,7 +244,7 @@ func TestDirectiveNotifiesTargetOfficersOnly(t *testing.T) {
 	}
 
 	// Không có target_refs → tra danh bạ hiện tại của vùng (cán bộ xã 30292 là b).
-	f.staff.add(f.tenant, extport.StaffRef{ActorRef: b.actor, UnitCode: ward1, ProvinceCode: prov91})
+	f.staff.add(f.tenant, port.StaffRef{ActorRef: b.actor, UnitCode: ward1, ProvinceCode: prov91})
 	env2, _ := f.directive(f.tenant, port.SeverityNormal, []string{ward1})
 	f.process(port.ConsumerDirective, env2)
 	if len(b.inbox()) != 1 || len(other.inbox()) != 0 {
@@ -635,8 +635,8 @@ func TestTaskEscalatedRecipients(t *testing.T) {
 	assignee := f.user(authz.Scope{Units: []string{ward1}}, partyport.RoleKNOfficer)
 	commune := f.user(authz.Scope{Units: []string{ward2}}, partyport.RoleKNOfficer)
 	admin := f.user(authz.Scope{Units: []string{prov91, ward1, ward2}}, partyport.RoleKNProvinceAdmin)
-	f.staff.add(f.tenant, extport.StaffRef{ActorRef: admin.actor, UnitCode: prov91, ProvinceCode: prov91})
-	f.staff.add(f.tenant, extport.StaffRef{ActorRef: commune.actor, UnitCode: ward2, ProvinceCode: prov91})
+	f.staff.add(f.tenant, port.StaffRef{ActorRef: admin.actor, UnitCode: prov91, ProvinceCode: prov91})
+	f.staff.add(f.tenant, port.StaffRef{ActorRef: commune.actor, UnitCode: ward2, ProvinceCode: prov91})
 	task := func(province string, assigneeRef *uuid.UUID) outbox.Envelope {
 		return f.event(f.tenant, extport.EventTaskEscalated, extport.TaskEscalatedV1{TaskID: ids.New(), CommuneCode: ward1,
 			ProvinceCode: province, Reason: extport.EscalationReasonSLA, Status: "assigned", Priority: "high", Category: "sau_benh",

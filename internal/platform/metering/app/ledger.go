@@ -13,20 +13,20 @@ import (
 
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/domain"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 var (
-	_ port.Ledger = (*Service)(nil)
-	_ port.Quotas = (*Service)(nil)
-	_ port.Usage  = (*Service)(nil)
+	_ meter.Ledger = (*Service)(nil)
+	_ meter.Quotas = (*Service)(nil)
+	_ meter.Usage  = (*Service)(nil)
 )
 
-func validateCall(op uuid.UUID, c port.Call) error {
+func validateCall(op uuid.UUID, c meter.Call) error {
 	switch {
 	case op == uuid.Nil:
 		return errors.New("metering: thiếu tenant đơn vị vận hành")
@@ -42,7 +42,7 @@ func validateCall(op uuid.UUID, c port.Call) error {
 		return errors.New("metering: số dòng/byte/độ trễ âm")
 	}
 	switch c.Kind {
-	case port.CallRead, port.CallExportRequest, port.CallJobStatus, port.CallFileDownload, port.CallMeta:
+	case meter.CallRead, meter.CallExportRequest, meter.CallJobStatus, meter.CallFileDownload, meter.CallMeta:
 	default:
 		return fmt.Errorf("metering: loại lời gọi %q không hợp lệ", c.Kind)
 	}
@@ -51,7 +51,7 @@ func validateCall(op uuid.UUID, c port.Call) error {
 
 // recordOut là kết quả nội bộ của một lần ghi sổ.
 type recordOut struct {
-	rec      port.Recorded
+	rec      meter.Recorded
 	status   int
 	units    int64
 	quotaErr error
@@ -79,32 +79,32 @@ func optID(id uuid.UUID) *uuid.UUID {
 // liệu (tenant.Within, ADR-0024 — luôn enforce). Vượt hạn mức gói → dòng vẫn ghi với status 429,
 // units 0, trả ErrQuotaExceeded; checkpoint từ chối → 429 ErrEgressQuotaExceeded. Lỗi hạ tầng →
 // ErrUnavailable (Public API không gửi byte nào). Idempotent theo RequestID.
-func (s *Service) Record(ctx context.Context, op uuid.UUID, c port.Call) (port.Recorded, error) {
+func (s *Service) Record(ctx context.Context, op uuid.UUID, c meter.Call) (meter.Recorded, error) {
 	if err := validateCall(op, c); err != nil {
 		s.metrics().ledgerError(ctx)
-		return port.Recorded{}, port.ErrUnavailable.WithCause(err)
+		return meter.Recorded{}, meter.ErrUnavailable.WithCause(err)
 	}
 	out, err := s.record(ctx, op, c)
 	if err != nil {
 		s.metrics().ledgerError(ctx)
 		if c.DataTenantID != uuid.Nil {
-			s.metrics().checkpointError(ctx, string(port.ChannelPublicAPI))
+			s.metrics().checkpointError(ctx, string(meter.ChannelPublicAPI))
 		}
 		s.log().ErrorContext(ctx, "ghi sổ sử dụng lỗi — không trả dữ liệu", "event", "metering.record", "request_id", c.RequestID,
 			"client_id", c.ClientID, "outcome", "error", "error", err.Error())
-		return port.Recorded{}, port.ErrUnavailable.WithCause(err)
+		return meter.Recorded{}, meter.ErrUnavailable.WithCause(err)
 	}
 	if !out.replay {
-		s.metrics().call(ctx, domain.StatusClass(out.status), out.units, errors.Is(out.quotaErr, port.ErrQuotaExceeded))
+		s.metrics().call(ctx, domain.StatusClass(out.status), out.units, errors.Is(out.quotaErr, meter.ErrQuotaExceeded))
 		if out.egress != nil && !out.egress.replay {
-			s.metrics().egress(ctx, string(port.ChannelPublicAPI), out.egress.decision.Allowed, out.egress.decision.Reason, c.Rows, c.Bytes,
+			s.metrics().egress(ctx, string(meter.ChannelPublicAPI), out.egress.decision.Allowed, out.egress.decision.Reason, c.Rows, c.Bytes,
 				out.egress.firstAnomaly)
 		}
 	}
 	return out.rec, out.quotaErr
 }
 
-func (s *Service) record(ctx context.Context, op uuid.UUID, c port.Call) (recordOut, error) {
+func (s *Service) record(ctx context.Context, op uuid.UUID, c meter.Call) (recordOut, error) {
 	plan, err := s.plan(ctx, op, c.ClientID, c.ReceivedAt)
 	if err != nil {
 		return recordOut{}, fmt.Errorf("metering: gói hạn mức: %w", err)
@@ -112,7 +112,7 @@ func (s *Service) record(ctx context.Context, op uuid.UUID, c port.Call) (record
 	serves := c.DataTenantID != uuid.Nil && c.Status >= 200 && c.Status <= 299
 	var eparams domain.EgressParams
 	if serves {
-		if eparams, err = s.EgressParams(ctx, c.DataTenantID, port.ChannelPublicAPI, c.ReceivedAt); err != nil {
+		if eparams, err = s.EgressParams(ctx, c.DataTenantID, meter.ChannelPublicAPI, c.ReceivedAt); err != nil {
 			return recordOut{}, err
 		}
 	}
@@ -138,7 +138,7 @@ func remaining(limit, used int64) int64 {
 	return 0
 }
 
-func (s *Service) recordTx(ctx context.Context, tx pgx.Tx, op uuid.UUID, c port.Call, plan apiclientport.Plan, serves bool, ep domain.EgressParams) (recordOut, error) {
+func (s *Service) recordTx(ctx context.Context, tx pgx.Tx, op uuid.UUID, c meter.Call, plan apiclientport.Plan, serves bool, ep domain.EgressParams) (recordOut, error) {
 	day, month := domain.Day(c.ReceivedAt), domain.Month(c.ReceivedAt)
 	reset := domain.NextDayStart(c.ReceivedAt)
 	if prev, err := store.UsageByIdem(ctx, tx, c.RequestID.String()); err != nil {
@@ -152,13 +152,13 @@ func (s *Service) recordTx(ctx context.Context, tx pgx.Tx, op uuid.UUID, c port.
 		if err != nil {
 			return recordOut{}, err
 		}
-		out := recordOut{replay: true, status: prev.Status, units: prev.Units, rec: port.Recorded{EventID: prev.ID, Units: prev.Units,
+		out := recordOut{replay: true, status: prev.Status, units: prev.Units, rec: meter.Recorded{EventID: prev.ID, Units: prev.Units,
 			RuleVersion: prev.RuleVersion, DailyRemaining: remaining(plan.DailyUnits, dc.Units), MonthlyRemaining: remaining(plan.MonthlyUnits, mc.Units),
 			WindowReset: reset}}
-		if prev.ProblemCode != nil && *prev.ProblemCode == port.ErrQuotaExceeded.Code {
-			out.quotaErr = port.ErrQuotaExceeded
-		} else if prev.ProblemCode != nil && *prev.ProblemCode == port.ErrEgressQuotaExceeded.Code {
-			out.quotaErr = port.ErrEgressQuotaExceeded
+		if prev.ProblemCode != nil && *prev.ProblemCode == meter.ErrQuotaExceeded.Code {
+			out.quotaErr = meter.ErrQuotaExceeded
+		} else if prev.ProblemCode != nil && *prev.ProblemCode == meter.ErrEgressQuotaExceeded.Code {
+			out.quotaErr = meter.ErrEgressQuotaExceeded
 		}
 		return out, nil
 	}
@@ -177,25 +177,25 @@ func (s *Service) recordTx(ctx context.Context, tx pgx.Tx, op uuid.UUID, c port.
 	if _, err := store.LockCounter(ctx, tx, op, c.ClientID, c.Product, "month", month); err != nil {
 		return recordOut{}, err
 	}
-	units := port.UnitsV1(c)
+	units := meter.UnitsV1(c)
 	status, problemCode := c.Status, c.ProblemCode
 	var quotaErr error
 	if units > 0 {
 		switch {
 		case dayAll.Units+units > plan.DailyUnits:
-			quotaErr = port.ErrQuotaExceeded
+			quotaErr = meter.ErrQuotaExceeded
 		case monthAll.Units+units > plan.MonthlyUnits:
-			quotaErr = port.ErrQuotaExceeded
+			quotaErr = meter.ErrQuotaExceeded
 			reset = domain.NextMonthStart(c.ReceivedAt)
 		}
 	}
 	if quotaErr != nil {
-		status, problemCode, units, serves = http.StatusTooManyRequests, port.ErrQuotaExceeded.Code, 0, false
+		status, problemCode, units, serves = http.StatusTooManyRequests, meter.ErrQuotaExceeded.Code, 0, false
 	}
 	var eg *passed
 	if serves {
-		e := port.Egress{SourceID: c.RequestID, Channel: port.ChannelPublicAPI, DataTenantID: c.DataTenantID,
-			CounterpartyKind: port.CounterpartyAPIClient, CounterpartyRef: c.ClientID, Product: c.Product, ContractVersion: c.ContractVersion,
+		e := meter.Egress{SourceID: c.RequestID, Channel: meter.ChannelPublicAPI, DataTenantID: c.DataTenantID,
+			CounterpartyKind: meter.CounterpartyAPIClient, CounterpartyRef: c.ClientID, Product: c.Product, ContractVersion: c.ContractVersion,
 			Records: c.Rows, Bytes: c.Bytes, OccurredAt: c.ReceivedAt, ActorRef: c.ClientID, TraceID: c.TraceID}
 		var p passed
 		// H4: DataTenantID là bên cấp đã kiểm cấp quyền dp_* ở apiclient/public (party/port.GrantLookup) trước khi
@@ -203,15 +203,15 @@ func (s *Service) recordTx(ctx context.Context, tx pgx.Tx, op uuid.UUID, c port.
 		// đây, nơi duy nhất ngoài pf/party có tên trong danh sách đúc của archlint agtenantgate.
 		if err := tenant.Within(ctx, tx, tenant.MintGrant(op, c.DataTenantID), func() error {
 			var e2 error
-			p, e2 = s.passTx(ctx, tx, e, ep, port.ModeEnforce)
+			p, e2 = s.passTx(ctx, tx, e, ep, meter.ModeEnforce)
 			return e2
 		}); err != nil {
 			return recordOut{}, err
 		}
 		eg = &p
 		if !p.decision.Allowed {
-			quotaErr = port.ErrEgressQuotaExceeded
-			status, problemCode, units = http.StatusTooManyRequests, port.ErrEgressQuotaExceeded.Code, 0
+			quotaErr = meter.ErrEgressQuotaExceeded
+			status, problemCode, units = http.StatusTooManyRequests, meter.ErrEgressQuotaExceeded.Code, 0
 		}
 	}
 	dataTenant := optID(c.DataTenantID)
@@ -223,7 +223,7 @@ func (s *Service) recordTx(ctx context.Context, tx pgx.Tx, op uuid.UUID, c port.
 		KeyPrefix: c.KeyPrefix, AuthMethod: c.AuthMethod, CallKind: string(c.Kind), Product: c.Product, ContractVer: c.ContractVersion,
 		Scope: c.Scope, RouteTemplate: c.RouteTemplate, Status: status, ProblemCode: optStr(problemCode), DataTenantID: dataTenant, Units: units,
 		RowsOut: c.Rows, BytesOut: c.Bytes, LatencyMS: c.Latency.Milliseconds(), Replayed: c.Replayed, JobID: optID(c.JobID),
-		TraceID: traceRef(ctx, c.TraceID), EventTime: c.ReceivedAt.UTC(), IdemKey: c.RequestID.String(), RuleVersion: port.RuleUnitsV1,
+		TraceID: traceRef(ctx, c.TraceID), EventTime: c.ReceivedAt.UTC(), IdemKey: c.RequestID.String(), RuleVersion: meter.RuleUnitsV1,
 	}
 	if quotaErr != nil {
 		row.RowsOut, row.BytesOut = 0, 0
@@ -239,8 +239,8 @@ func (s *Service) recordTx(ctx context.Context, tx pgx.Tx, op uuid.UUID, c port.
 			return recordOut{}, err
 		}
 	}
-	return recordOut{status: status, units: units, quotaErr: quotaErr, egress: eg, rec: port.Recorded{
-		EventID: row.ID, Units: units, RuleVersion: port.RuleUnitsV1,
+	return recordOut{status: status, units: units, quotaErr: quotaErr, egress: eg, rec: meter.Recorded{
+		EventID: row.ID, Units: units, RuleVersion: meter.RuleUnitsV1,
 		DailyRemaining: remaining(plan.DailyUnits, dayAll.Units+units), MonthlyRemaining: remaining(plan.MonthlyUnits, monthAll.Units+units),
 		WindowReset: reset,
 	}}, nil
@@ -248,10 +248,10 @@ func (s *Service) recordTx(ctx context.Context, tx pgx.Tx, op uuid.UUID, c port.
 
 // Remaining thực hiện port.Quotas: hạn mức còn lại từ bộ đếm ĐÃ COMMIT (không giữ chỗ). Hạn mức gói
 // tính trên tổng mọi sản phẩm của khách hàng (dòng '*'); product chỉ để tương thích chữ ký.
-func (s *Service) Remaining(ctx context.Context, op, client uuid.UUID, _ string, at time.Time) (port.Remaining, error) {
+func (s *Service) Remaining(ctx context.Context, op, client uuid.UUID, _ string, at time.Time) (meter.Remaining, error) {
 	plan, err := s.plan(ctx, op, client, at)
 	if err != nil {
-		return port.Remaining{}, port.ErrUnavailable.WithCause(err)
+		return meter.Remaining{}, meter.ErrUnavailable.WithCause(err)
 	}
 	var dc, mc store.Counter
 	err = s.tx(ctx, op, func(tx pgx.Tx) error {
@@ -263,9 +263,9 @@ func (s *Service) Remaining(ctx context.Context, op, client uuid.UUID, _ string,
 		return e
 	})
 	if err != nil {
-		return port.Remaining{}, port.ErrUnavailable.WithCause(err)
+		return meter.Remaining{}, meter.ErrUnavailable.WithCause(err)
 	}
-	r := port.Remaining{DailyUnits: remaining(plan.DailyUnits, dc.Units), MonthlyUnits: remaining(plan.MonthlyUnits, mc.Units),
+	r := meter.Remaining{DailyUnits: remaining(plan.DailyUnits, dc.Units), MonthlyUnits: remaining(plan.MonthlyUnits, mc.Units),
 		WindowReset: domain.NextDayStart(at)}
 	if r.MonthlyUnits == 0 {
 		r.WindowReset = domain.NextMonthStart(at)
@@ -275,7 +275,7 @@ func (s *Service) Remaining(ctx context.Context, op, client uuid.UUID, _ string,
 
 // UsageOf thực hiện port.Usage: tổng theo ngày × sản phẩm (giờ VN, bao gồm hai đầu) của CHÍNH khách
 // hàng client (client_id lấy từ khóa ở api-public), từ bộ đếm.
-func (s *Service) UsageOf(ctx context.Context, op, client uuid.UUID, from, to time.Time) ([]port.UsageDay, error) {
+func (s *Service) UsageOf(ctx context.Context, op, client uuid.UUID, from, to time.Time) ([]meter.UsageDay, error) {
 	if to.Before(from) {
 		return nil, problem.Validation.WithField("to", "phải ≥ from")
 	}
@@ -288,9 +288,9 @@ func (s *Service) UsageOf(ctx context.Context, op, client uuid.UUID, from, to ti
 	if err != nil {
 		return nil, err
 	}
-	out := make([]port.UsageDay, 0, len(rows))
+	out := make([]meter.UsageDay, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, port.UsageDay{Date: r.Date.Format(time.DateOnly), Product: r.Product, Calls: r.Calls, Units: r.Units})
+		out = append(out, meter.UsageDay{Date: r.Date.Format(time.DateOnly), Product: r.Product, Calls: r.Calls, Units: r.Units})
 	}
 	return out, nil
 }

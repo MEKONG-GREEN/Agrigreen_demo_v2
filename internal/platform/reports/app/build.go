@@ -8,11 +8,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/mechanizationsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -211,8 +212,8 @@ func (s *Service) buildDataset(ctx context.Context, j domain.Job) (domain.Datase
 	return ds, nil
 }
 
-func (s *Service) extQuery(ctx context.Context, j domain.Job, sc authz.Scope) (extport.ReportQuery, string, error) {
-	q := extport.ReportQuery{TenantID: j.TenantID, Scope: sc, Unit: j.Params.UnitCode, SeasonCode: j.Params.SeasonCode,
+func (s *Service) extQuery(ctx context.Context, j domain.Job, sc authz.Scope) (extensionsrc.ReportQuery, string, error) {
+	q := extensionsrc.ReportQuery{TenantID: j.TenantID, Scope: sc, Unit: j.Params.UnitCode, SeasonCode: j.Params.SeasonCode,
 		SeasonYear: j.Params.SeasonYear, At: j.RequestedAt}
 	label := ""
 	if j.Params.Period != "" {
@@ -225,7 +226,7 @@ func (s *Service) extQuery(ctx context.Context, j domain.Job, sc authz.Scope) (e
 	return q, label, nil
 }
 
-func completenessNotes(c extport.Completeness) []string {
+func completenessNotes(c extensionsrc.Completeness) []string {
 	var out []string
 	if len(c.MissingCommunes) > 0 {
 		out = append(out, "Còn "+strconv.Itoa(len(c.MissingCommunes))+"/"+strconv.Itoa(c.ExpectedCommunes)+" xã chưa gửi báo cáo của kỳ: "+
@@ -258,7 +259,7 @@ func (s *Service) buildExtension(ctx context.Context, j domain.Job, sc authz.Sco
 	}
 	lv := j.Params.Level
 	g := newGrouper()
-	var comp extport.Completeness
+	var comp extensionsrc.Completeness
 	switch j.Def.Source {
 	case port.SourceSowing:
 		d, err := s.Extension.Sowing(ctx, q)
@@ -337,7 +338,7 @@ func dims(def domain.Definition, kv ...string) string {
 
 // buildProgram: FR-03 — tỷ lệ đăng ký/mục tiêu tính trên tổng của nhóm (tỉnh; toàn
 // quốc = tổng mục tiêu các tỉnh, chỉ khi mọi tỉnh đã đặt mục tiêu).
-func (s *Service) buildProgram(ctx context.Context, j domain.Job, q extport.ReportQuery, n *names) (built, error) {
+func (s *Service) buildProgram(ctx context.Context, j domain.Job, q extensionsrc.ReportQuery, n *names) (built, error) {
 	d, err := s.Extension.ProgramProgress(ctx, q)
 	if err != nil {
 		return built{}, err
@@ -437,8 +438,8 @@ func seasonLabel(name string, year int) string {
 // chỉ ánh xạ sang cột, không cộng, không chia, không làm tròn (BR-04).
 // ---------------------------------------------------------------------------
 
-func (s *Service) mechQuery(ctx context.Context, j domain.Job, sc authz.Scope) (mechport.ReportQuery, error) {
-	q := mechport.ReportQuery{TenantID: j.TenantID, Scope: sc, SeasonCode: j.Params.SeasonCode, SeasonYear: j.Params.SeasonYear,
+func (s *Service) mechQuery(ctx context.Context, j domain.Job, sc authz.Scope) (mechanizationsrc.ReportQuery, error) {
+	q := mechanizationsrc.ReportQuery{TenantID: j.TenantID, Scope: sc, SeasonCode: j.Params.SeasonCode, SeasonYear: j.Params.SeasonYear,
 		MachineType: j.Params.MachineType, Level: j.Params.Level}
 	if q.Level == domain.LevelCooperative {
 		q.Level = domain.LevelProvince
@@ -455,7 +456,7 @@ func (s *Service) mechQuery(ctx context.Context, j domain.Job, sc authz.Scope) (
 		if err != nil {
 			return q, err
 		}
-		if u.Level == mdport.LevelProvince {
+		if u.Level == partyport.LevelProvince {
 			q.ProvinceCode = u.Code
 		} else {
 			q.CommuneCode = u.Code
@@ -464,12 +465,12 @@ func (s *Service) mechQuery(ctx context.Context, j domain.Job, sc authz.Scope) (
 	return q, nil
 }
 
-func runMeta(label string, r mechport.RunInfo) domain.Meta {
+func runMeta(label string, r mechanizationsrc.RunInfo) domain.Meta {
 	return domain.Meta{Label: label, Value: r.SeasonCode + "-" + strconv.Itoa(r.SeasonYear) + " (kết quả cân đối lưu lúc " +
 		domain.FormatDateTimeVN(r.ComputedAt) + ", quy tắc " + r.RuleVersion + ")"}
 }
 
-func runNotes(r mechport.RunInfo) (bool, []string) {
+func runNotes(r mechanizationsrc.RunInfo) (bool, []string) {
 	var notes []string
 	if len(r.MissingNorms) > 0 {
 		notes = append(notes, "Chưa cấu hình định mức cho: "+strings.Join(limit(r.MissingNorms, 10), ", "))
@@ -482,7 +483,7 @@ func runNotes(r mechport.RunInfo) (bool, []string) {
 
 const savedNote = "Toàn bộ số liệu lấy từ kết quả cân đối đã lưu theo vụ (FN-09), không tính lại tại thời điểm xuất (FN-10 BR-04)."
 
-func figs(prefix string, f *mechport.Figures, row domain.Row) {
+func figs(prefix string, f *mechanizationsrc.Figures, row domain.Row) {
 	if f == nil {
 		return
 	}
@@ -533,7 +534,7 @@ func (s *Service) buildMechanization(ctx context.Context, j domain.Job, sc authz
 			})
 		}
 	case port.SourceCGHCompare:
-		d, err := s.Mechanization.SeasonCompare(ctx, mechport.CompareQuery{ReportQuery: q, SeasonCodeB: j.Params.SeasonCodeB, SeasonYearB: j.Params.SeasonYearB})
+		d, err := s.Mechanization.SeasonCompare(ctx, mechanizationsrc.CompareQuery{ReportQuery: q, SeasonCodeB: j.Params.SeasonCodeB, SeasonYearB: j.Params.SeasonYearB})
 		if err != nil {
 			return b, err
 		}

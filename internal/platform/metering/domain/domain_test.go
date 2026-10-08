@@ -13,6 +13,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/money"
 )
 
@@ -44,7 +45,7 @@ func TestWindowsVietnamTime_ADR0023(t *testing.T) {
 
 // ADR-0024 mục 1.3: × trung vị 28 ngày khi đủ 7 ngày mẫu; không đủ → ngưỡng tuyệt đối.
 func TestThresholdMedianOrAbsolute_ADR0024(t *testing.T) {
-	p := domain.DefaultEgressParams(port.ChannelValve)
+	p := domain.DefaultEgressParams(meter.ChannelValve)
 	if p.AnomalyRecords != 20_000 || !p.AnomalyFactor.Equal(decimal.NewFromInt(3)) || p.DailyQuota != 0 {
 		t.Fatalf("mặc định van: %+v", p)
 	}
@@ -62,7 +63,7 @@ func TestThresholdMedianOrAbsolute_ADR0024(t *testing.T) {
 	if domain.IsAnomaly(30, 30) || !domain.IsAnomaly(31, 30) || domain.IsAnomaly(1_000_000, 0) {
 		t.Fatal("so ngưỡng sai")
 	}
-	if domain.DefaultEgressParams(port.ChannelMRVPackage).DailyQuota != 50_000 {
+	if domain.DefaultEgressParams(meter.ChannelMRVPackage).DailyQuota != 50_000 {
 		t.Fatal("hạn mức mặc định mrv_package = 50 000")
 	}
 }
@@ -128,7 +129,7 @@ func TestStatementCSVGolden_ADR0023(t *testing.T) {
 
 // ADR-0023 mục 4: cùng ảnh chụp → cùng băm (không phụ thuộc thứ tự dòng); đổi một số → băm khác.
 func TestSnapshotCanonicalHash_ADR0023(t *testing.T) {
-	s := domain.Snapshot{RuleVersion: domain.RuleStatementV1, UnitsRules: []string{port.RuleUnitsV1}, ClientID: "c", Period: "2026-10",
+	s := domain.Snapshot{RuleVersion: domain.RuleStatementV1, UnitsRules: []string{meter.RuleUnitsV1}, ClientID: "c", Period: "2026-10",
 		StreamKey: "client:c:2026-10", FirstSeq: 1, LastSeq: 3, ChainHeadHash: "00",
 		Lines: []domain.SnapshotLine{{Product: "b", StatusClass: "2xx", Calls: 1, Units: 1}, {Product: "a", StatusClass: "4xx", Calls: 2}}}
 	b1, h1, err := s.Canonical()

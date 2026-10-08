@@ -401,8 +401,8 @@ type CoopLayer struct {
 	Items []store.CoopArea
 	// Markers: điểm HTX từ pf/party — cho HTX có ranh giới (marker ưu tiên) và HTX
 	// chưa có ranh giới (chỉ marker, GIS US-BND-02 "gắn Marker").
-	Markers   map[uuid.UUID]port.CoopMarker
-	Unbounded []port.CoopMarker
+	Markers   map[uuid.UUID]partyport.CoopMarker
+	Unbounded []partyport.CoopMarker
 	Truncated bool
 }
 
@@ -417,7 +417,7 @@ func (s *Service) CoopBoundariesInBBox(ctx context.Context, in BBoxInput) (CoopL
 }
 
 func (s *Service) coopLayer(ctx context.Context, a access, in BBoxInput) (CoopLayer, error) {
-	out := CoopLayer{Items: []store.CoopArea{}, Markers: map[uuid.UUID]port.CoopMarker{}, Unbounded: []port.CoopMarker{}}
+	out := CoopLayer{Items: []store.CoopArea{}, Markers: map[uuid.UUID]partyport.CoopMarker{}, Unbounded: []partyport.CoopMarker{}}
 	limit, err := viewportLimit(in.Limit)
 	if err != nil {
 		return out, err

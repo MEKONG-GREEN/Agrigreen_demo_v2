@@ -9,9 +9,9 @@ import (
 
 	"github.com/google/uuid"
 
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -73,32 +73,32 @@ var _ partyport.ConsentChecker = (*fakeConsent)(nil)
 // fakeParams giả masterdata Params: tham số "đã duyệt" theo khóa kèm phiên bản.
 type fakeParams struct {
 	mu   sync.Mutex
-	vals map[string]mdport.ParamValue
+	vals map[string]params.ParamValue
 }
 
-func newFakeParams() *fakeParams { return &fakeParams{vals: map[string]mdport.ParamValue{}} }
+func newFakeParams() *fakeParams { return &fakeParams{vals: map[string]params.ParamValue{}} }
 
 func (f *fakeParams) set(key, v string, version int) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.vals[key] = mdport.ParamValue{Key: key, Value: decimal.RequireFromString(v), Version: version}
+	f.vals[key] = params.ParamValue{Key: key, Value: decimal.RequireFromString(v), Version: version}
 }
 
 // setText đặt tham số CHUỖI (vd danh sách mã) "đã duyệt".
 func (f *fakeParams) setText(key, text string, version int) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.vals[key] = mdport.ParamValue{Key: key, Text: text, Version: version}
+	f.vals[key] = params.ParamValue{Key: key, Text: text, Version: version}
 }
 
-func (f *fakeParams) At(_ context.Context, key string, _ time.Time) (mdport.ParamValue, error) {
+func (f *fakeParams) At(_ context.Context, key string, _ time.Time) (params.ParamValue, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	v, ok := f.vals[key]
 	if !ok {
-		return mdport.ParamValue{}, mdport.ErrParamNotFound
+		return params.ParamValue{}, params.ErrParamNotFound
 	}
 	return v, nil
 }
 
-var _ mdport.Params = (*fakeParams)(nil)
+var _ params.Params = (*fakeParams)(nil)

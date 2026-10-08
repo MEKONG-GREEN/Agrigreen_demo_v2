@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
-	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/cropcyclesrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/mass"
 )
 
@@ -15,25 +15,25 @@ import (
 type ccRow struct {
 	commune string
 	hh      []string
-	row     ccport.ProductionRow
+	row     cropcyclesrc.ProductionRow
 }
 
 // fakeCC là cổng báo cáo sản lượng giả của pf/cropcycle (HTX US-DASH-02): lọc theo phạm vi
 // như hiện thực thật, ghi lại truy vấn; tổng tính lại trên tập đã lọc (số hộ phân biệt).
 type fakeCC struct {
 	mu   sync.Mutex
-	last ccport.ProductionQuery
+	last cropcyclesrc.ProductionQuery
 	rows []ccRow
 }
 
-func fig(seasons, open, completed int64, area, harvested, expKg, actKg string, steps, done int64) ccport.ProductionFigures {
-	f := ccport.ProductionFigures{Seasons: seasons, OpenSeasons: open, CompletedSeasons: completed, AreaHa: d(area), HarvestedAreaHa: d(harvested),
+func fig(seasons, open, completed int64, area, harvested, expKg, actKg string, steps, done int64) cropcyclesrc.ProductionFigures {
+	f := cropcyclesrc.ProductionFigures{Seasons: seasons, OpenSeasons: open, CompletedSeasons: completed, AreaHa: d(area), HarvestedAreaHa: d(harvested),
 		ExpectedKg: mass.MustKg(expKg), ActualKg: mass.MustKg(actKg), SOPSteps: steps, SOPStepsDone: done}
 	derive(&f)
 	return f
 }
 
-func derive(f *ccport.ProductionFigures) {
+func derive(f *cropcyclesrc.ProductionFigures) {
 	if f.HarvestedAreaHa.IsPositive() {
 		y := f.ActualKg.Decimal().Div(decimal.NewFromInt(1000)).Div(f.HarvestedAreaHa).Round(4)
 		f.ActualYieldTPerHa = &y
@@ -45,9 +45,9 @@ func derive(f *ccport.ProductionFigures) {
 }
 
 func newFakeCC(coop, coop2 uuid.UUID) *fakeCC {
-	row := func(ref uuid.UUID, variety string, f ccport.ProductionFigures, hh int64) ccport.ProductionRow {
+	row := func(ref uuid.UUID, variety string, f cropcyclesrc.ProductionFigures, hh int64) cropcyclesrc.ProductionRow {
 		f.Households = hh
-		return ccport.ProductionRow{CooperativeRef: ref, SeasonCode: "HT", SeasonYear: 2026, VarietyCode: variety, ProductionFigures: f}
+		return cropcyclesrc.ProductionRow{CooperativeRef: ref, SeasonCode: "HT", SeasonYear: 2026, VarietyCode: variety, ProductionFigures: f}
 	}
 	return &fakeCC{rows: []ccRow{
 		{commune: cBinhDuc, hh: []string{"h1", "h2"}, row: row(coop, "OM5451", fig(2, 1, 1, "3.0000", "1.5000", "20250.000", "9750.125", 10, 4), 2)},
@@ -56,18 +56,18 @@ func newFakeCC(coop, coop2 uuid.UUID) *fakeCC {
 	}}
 }
 
-func (f *fakeCC) lastQuery() ccport.ProductionQuery {
+func (f *fakeCC) lastQuery() cropcyclesrc.ProductionQuery {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.last
 }
 
-func (f *fakeCC) Production(_ context.Context, q ccport.ProductionQuery) (ccport.ProductionData, error) {
+func (f *fakeCC) Production(_ context.Context, q cropcyclesrc.ProductionQuery) (cropcyclesrc.ProductionData, error) {
 	f.mu.Lock()
 	f.last = q
 	f.mu.Unlock()
-	out := ccport.ProductionData{Rows: []ccport.ProductionRow{}}
-	var tot ccport.ProductionFigures
+	out := cropcyclesrc.ProductionData{Rows: []cropcyclesrc.ProductionRow{}}
+	var tot cropcyclesrc.ProductionFigures
 	tot.ExpectedKg, tot.ActualKg = mass.MustKg("0"), mass.MustKg("0")
 	hh := map[string]bool{}
 	for _, r := range f.rows {

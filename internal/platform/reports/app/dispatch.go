@@ -28,6 +28,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/dispatch"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/form"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/render"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -238,9 +239,9 @@ type DispatchView struct {
 }
 
 // gridRows sắp dòng xã theo khu vực, sau mỗi khu vực là dòng "Cộng khu vực", cuối là "Toàn tỉnh" (đúng mẫu).
-func gridRows(v extport.ConsolidationView) []render.GridRow {
+func gridRows(v extensionsrc.ConsolidationView) []render.GridRow {
 	var regions []string
-	byRegion := map[string][]extport.ConsolidationRow{}
+	byRegion := map[string][]extensionsrc.ConsolidationRow{}
 	for _, r := range v.Rows {
 		if _, ok := byRegion[r.Region]; !ok {
 			regions = append(regions, r.Region)
@@ -302,7 +303,7 @@ func (s *Service) CreateDispatch(ctx context.Context, in DispatchInput, idem str
 	}
 	tid := a.p.TenantID
 	info, err := s.Consolidations.Period(ctx, tid, in.PeriodID)
-	if errors.Is(err, extport.ErrConsolidationNotFound) {
+	if errors.Is(err, extensionsrc.ErrConsolidationNotFound) {
 		return DispatchView{}, ErrDispatchNoData
 	}
 	if err != nil {
@@ -825,6 +826,6 @@ func (h DispatchHistory) SentForPeriod(ctx context.Context, tid, periodID uuid.U
 	return ok, err
 }
 
-var _ extport.DispatchHistory = DispatchHistory{}
+var _ extensionsrc.DispatchHistory = DispatchHistory{}
 
 func decimalInt(n int64) decimal.Decimal { return decimal.NewFromInt(n) }

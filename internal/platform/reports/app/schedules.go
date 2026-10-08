@@ -12,11 +12,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -306,7 +306,7 @@ func (s *Service) fire(ctx context.Context, id, tid uuid.UUID, slotAt time.Time,
 		if errors.Is(err, ErrQuotaExceeded) {
 			return skip("vượt hạn mức xuất trong ngày của người lập lịch")
 		}
-		if errors.Is(err, meteringport.ErrEgressQuotaExceeded) {
+		if errors.Is(err, meter.ErrEgressQuotaExceeded) {
 			return skip("vượt hạn mức xuất dữ liệu của kênh report_export (điểm kiểm soát chung)")
 		}
 		if err != nil {

@@ -8,8 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
@@ -61,10 +59,10 @@ var adminRoles = []string{port.RoleRegistryAdmin, port.RoleKNProvinceAdmin, auth
 type Registry struct {
 	DB    tenant.Beginner // pool vai party_app
 	Clock clock.Clock
-	Units mdport.AdminUnits // có thể nil khi chưa nối — thao tác cần nó trả ErrDependency
-	Vault client.Client     // có thể nil khi chưa nối
+	Units port.AdminUnits // có thể nil khi chưa nối — thao tác cần nó trả ErrDependency
+	Vault client.Client   // có thể nil khi chưa nối
 	// Plots (tùy chọn): thống kê thửa đã số hoá của pf/geo cho danh sách HTX (G-03).
-	Plots geoport.PlotStats
+	Plots port.PlotStats
 	// Activity (tùy chọn): vụ chưa xong / nhật ký chờ duyệt (pf/cropcycle) cho màn cảnh báo
 	// trước khi vô hiệu hóa HTX (HTX US-HTXSTATUS-01 AC-1).
 	Activity port.SeasonActivity
@@ -162,7 +160,7 @@ func (r *Registry) scopeFor(ctx context.Context, p authz.Principal) (authz.Scope
 			return authz.Scope{}, ErrDependency.WithDetail("chưa nối danh mục đơn vị hành chính")
 		}
 		codes, err := r.Units.Descendants(ctx, s.AdminUnitCode, r.Clock.Now())
-		if errors.Is(err, mdport.ErrUnitNotFound) {
+		if errors.Is(err, port.ErrUnitNotFound) {
 			return authz.Scope{}, nil
 		}
 		if err != nil {

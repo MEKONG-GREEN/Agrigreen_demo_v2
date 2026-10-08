@@ -10,14 +10,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
@@ -29,7 +27,7 @@ const DBRole = "party_app"
 type Deps struct {
 	// AdminUnits: đơn vị hành chính có hiệu lực theo thời gian (pf/masterdata) —
 	// kiểm mã đơn vị khi tạo/di chuyển tổ chức và tính phạm vi TTKN tỉnh.
-	AdminUnits mdport.AdminUnits
+	AdminUnits port.AdminUnits
 	// Vault: kho định danh — tạo chủ hộ/người đại diện, nhãn hiển thị.
 	Vault client.Client
 }
@@ -104,7 +102,7 @@ func (m *Module) GrantLookup() port.GrantLookup { return m.share }
 
 // UseEgress (G5, ADR-0024) nối điểm kiểm soát xuất (pf/metering) cho kênh partner_share của
 // RecordRead (bề mặt /v1/partner/*). cp nil → hành vi cũ.
-func (m *Module) UseEgress(cp meteringport.Checkpoint, mode meteringport.Mode, log *slog.Logger) {
+func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logger) {
 	m.share.Egress, m.share.EgressMode, m.share.Log = cp, mode, log
 }
 
@@ -122,14 +120,14 @@ func (m *Module) ScopeResolver() port.ScopeResolver { return m.reg }
 
 // UsePlotStats nối thống kê thửa của pf/geo cho danh sách HTX (G-03). Gốc lắp ráp
 // gọi sau khi dựng pf/geo (pf/geo cần phạm vi của pf/party nên dựng sau).
-func (m *Module) UsePlotStats(ps geoport.PlotStats) { m.reg.Plots = ps }
+func (m *Module) UsePlotStats(ps port.PlotStats) { m.reg.Plots = ps }
 
 // UseSeasonActivity nối số vụ chưa xong / nhật ký chờ duyệt của pf/cropcycle (qua gốc
 // lắp ráp) cho cảnh báo trước khi vô hiệu hóa HTX (HTX US-HTXSTATUS-01 AC-1).
 func (m *Module) UseSeasonActivity(a port.SeasonActivity) { m.reg.Activity = a }
 
 // CoopMarkers cho pf/geo: điểm vị trí HTX làm marker lớp ranh giới HTX (GIS US-BND-02).
-func (m *Module) CoopMarkers() geoport.CoopMarkers { return m.reg }
+func (m *Module) CoopMarkers() port.CoopMarkers { return m.reg }
 
 // CooperativeSites cho gốc lắp ráp: HTX đang hoạt động, vị trí, số hộ (nguồn cung mô phỏng).
 func (m *Module) CooperativeSites() port.CooperativeSites { return m.reg }

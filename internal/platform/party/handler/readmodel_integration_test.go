@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
-	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -18,14 +17,14 @@ import (
 // fakePlots là thống kê thửa giả của pf/geo.
 type fakePlots struct{ byCoop map[uuid.UUID]int64 }
 
-func (f fakePlots) DigitizedByCommune(context.Context, []string) ([]geoport.PlotStat, error) {
+func (f fakePlots) DigitizedByCommune(context.Context, []string) ([]port.PlotStat, error) {
 	return nil, nil
 }
-func (f fakePlots) DigitizedByCooperative(_ context.Context, coops []uuid.UUID) (map[uuid.UUID]geoport.PlotStat, error) {
-	out := map[uuid.UUID]geoport.PlotStat{}
+func (f fakePlots) DigitizedByCooperative(_ context.Context, coops []uuid.UUID) (map[uuid.UUID]port.PlotStat, error) {
+	out := map[uuid.UUID]port.PlotStat{}
 	for _, c := range coops {
 		if n, ok := f.byCoop[c]; ok {
-			out[c] = geoport.PlotStat{CooperativeRef: c, Plots: n, AreaHa: decimal.NewFromInt(n)}
+			out[c] = port.PlotStat{CooperativeRef: c, Plots: n, AreaHa: decimal.NewFromInt(n)}
 		}
 	}
 	return out, nil

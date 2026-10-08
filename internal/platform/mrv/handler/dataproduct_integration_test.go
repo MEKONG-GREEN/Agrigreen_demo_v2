@@ -14,10 +14,10 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/dataproduct"
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -25,23 +25,23 @@ type fakeCheckpoint struct {
 	mu    sync.Mutex
 	allow bool
 	err   error
-	seen  []meteringport.Egress
+	seen  []meter.Egress
 }
 
-func (c *fakeCheckpoint) Pass(_ context.Context, e meteringport.Egress) (meteringport.Decision, error) {
+func (c *fakeCheckpoint) Pass(_ context.Context, e meter.Egress) (meter.Decision, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.seen = append(c.seen, e)
 	if c.err != nil {
-		return meteringport.Decision{}, c.err
+		return meter.Decision{}, c.err
 	}
-	return meteringport.Decision{Allowed: c.allow}, nil
+	return meter.Decision{Allowed: c.allow}, nil
 }
 
-func (c *fakeCheckpoint) calls() []meteringport.Egress {
+func (c *fakeCheckpoint) calls() []meter.Egress {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return append([]meteringport.Egress(nil), c.seen...)
+	return append([]meter.Egress(nil), c.seen...)
 }
 
 func pcode(err error) string {
@@ -66,7 +66,7 @@ func TestMRVPackageProductAndEgress_G5(t *testing.T) {
 	expect(t, col.app(http.MethodPost, "/v1/mrv/evidence", awd("30001")), 201, "")
 	expect(t, col.app(http.MethodPost, "/v1/mrv/evidence", awd("30002")), 201, "")
 	cp := &fakeCheckpoint{allow: false}
-	f.mod.UseEgress(cp, meteringport.ModeObserve, nil)
+	f.mod.UseEgress(cp, meter.ModeObserve, nil)
 	exp := f.as(f.tenant, f.p89, port.RoleExporter)
 
 	body := map[string]any{"filters": map[string]any{"evidence_type": "awd_log", "season_code": "2026-DX"}}
@@ -77,8 +77,8 @@ func TestMRVPackageProductAndEgress_G5(t *testing.T) {
 	if len(calls) != 1 {
 		t.Fatalf("yêu cầu xuất: một Egress: %+v", calls)
 	}
-	if e := calls[0]; e.Channel != meteringport.ChannelMRVPackage || e.SourceID.String() != id || e.DataTenantID != f.tenant ||
-		e.CounterpartyKind != meteringport.CounterpartyActor || e.CounterpartyRef != exp.actor || e.Records != 2 {
+	if e := calls[0]; e.Channel != meter.ChannelMRVPackage || e.SourceID.String() != id || e.DataTenantID != f.tenant ||
+		e.CounterpartyKind != meter.CounterpartyActor || e.CounterpartyRef != exp.actor || e.Records != 2 {
 		t.Fatalf("Egress yêu cầu xuất (số bằng chứng ước = 2): %+v", e)
 	}
 	if _, err := inbox.Process(ctx, f.pool, port.ExportConsumer, f.requestedEvent(f.tenant, id), f.mod.ExportHandler()); err != nil {
@@ -86,7 +86,7 @@ func TestMRVPackageProductAndEgress_G5(t *testing.T) {
 	}
 	expect(t, exp.app(http.MethodGet, "/v1/mrv/exports/"+id+"/package", nil), 200, "")
 	calls = cp.calls()
-	if len(calls) != 2 || calls[1].Channel != meteringport.ChannelMRVPackage || calls[1].Records != 2 || calls[1].Bytes <= 0 ||
+	if len(calls) != 2 || calls[1].Channel != meter.ChannelMRVPackage || calls[1].Records != 2 || calls[1].Bytes <= 0 ||
 		calls[1].SourceID.String() == id {
 		t.Fatalf("cấp URL tải gói: Egress mới, byte = cỡ gói: %+v", calls)
 	}
@@ -152,7 +152,7 @@ func TestMRVPackageProductAndEgress_G5(t *testing.T) {
 	check(p2[0])
 
 	// enforce + từ chối → 429, không tạo job, không cấp URL.
-	f.mod.UseEgress(cp, meteringport.ModeEnforce, nil)
+	f.mod.UseEgress(cp, meter.ModeEnforce, nil)
 	jobs := f.count(f.tenant, "export_job")
 	expect(t, exp.app(http.MethodPost, "/v1/mrv/exports", map[string]any{"filters": map[string]any{}}), 429, "metering.egress_quota_exceeded")
 	if f.count(f.tenant, "export_job") != jobs {
@@ -173,17 +173,17 @@ func TestMRVPackageProductAndEgress_G5(t *testing.T) {
 	if f.count(f.tenant, "collection_evidence") != before {
 		t.Fatal("van bị chặn không được ghi")
 	}
-	f.mod.UseEgress(cp, meteringport.ModeObserve, nil)
+	f.mod.UseEgress(cp, meter.ModeObserve, nil)
 	if _, err := f.valve(env); err != nil {
 		t.Fatalf("van observe: %v", err)
 	}
 	last := cp.calls()[len(cp.calls())-1]
-	if last.Channel != meteringport.ChannelValve || last.SourceID != env.EventID || last.DataTenantID != f.mkg || last.CounterpartyRef != f.tenant ||
+	if last.Channel != meter.ChannelValve || last.SourceID != env.EventID || last.DataTenantID != f.mkg || last.CounterpartyRef != f.tenant ||
 		last.Product != port.ContractCollectionEvidence || f.count(f.tenant, "collection_evidence") != before+1 {
 		t.Fatalf("Egress van MRV: %+v", last)
 	}
 	// nil → hành vi cũ.
-	f.mod.UseEgress(nil, meteringport.ModeEnforce, nil)
+	f.mod.UseEgress(nil, meter.ModeEnforce, nil)
 	n := len(cp.calls())
 	expect(t, exp.app(http.MethodPost, "/v1/mrv/exports", map[string]any{"filters": map[string]any{}}), 202, "")
 	if len(cp.calls()) != n {

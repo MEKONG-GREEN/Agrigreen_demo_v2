@@ -15,6 +15,7 @@ import (
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 )
 
 // Template là nội dung chung của một thông báo; người nhận gắn sau (For/ForAudience).
@@ -193,7 +194,7 @@ func EgressAnomalyTemplate(p meteringport.EgressAnomalyV1, occurred time.Time) T
 		basis = "hệ số × trung vị 28 ngày"
 	}
 	mode := "chế độ quan sát (không chặn)"
-	if p.Mode == string(meteringport.ModeEnforce) {
+	if p.Mode == string(meter.ModeEnforce) {
 		mode = "chế độ chặn (enforce)"
 	}
 	t := Template{Kind: port.KindEgressAnomaly, Severity: port.SeverityUrgent,

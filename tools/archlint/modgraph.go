@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"io"
@@ -345,7 +346,97 @@ func sccs(ms []*modreg.Manifest, byName map[string]*modreg.Manifest) map[string]
 	return comp
 }
 
-// dependsViolations: import (mã không phải kiểm thử) tới module khác phải có trong depends.
+// dataContractOnly: tệp f chỉ dùng hợp đồng dữ liệu của gói ip — hằng (tên sự kiện, tên vai, khóa tham
+// số, giá trị liệt kê) và kiểu payload //ag:event / //ag:internal-event. Import như vậy không tạo
+// depends (§7.1 tách consumes khỏi depends; modgen phân loại cùng quy tắc và ghi consumes.events).
+// Import trống/chấm, hoặc dùng định danh khác (interface, hàm, biến, kiểu thường) → false.
+func dataContractOnly(root, modPath string, f *ast.File, imp *ast.ImportSpec, ip string) (bool, error) {
+	name := ip[strings.LastIndex(ip, "/")+1:]
+	if imp.Name != nil {
+		name = imp.Name.Name
+	}
+	if name == "_" || name == "." {
+		return false, nil
+	}
+	data, err := portDataSymbols(root, modPath, ip)
+	if err != nil {
+		return false, err
+	}
+	only := true
+	ast.Inspect(f, func(n ast.Node) bool {
+		if sel, ok := n.(*ast.SelectorExpr); ok {
+			if x, ok := sel.X.(*ast.Ident); ok && x.Name == name && x.Obj == nil && !data[sel.Sel.Name] {
+				only = false
+			}
+		}
+		return only
+	})
+	return only, nil
+}
+
+var (
+	portDataMu       sync.Mutex
+	portDataCache    = map[string]map[string]bool{}
+	reEventDirective = regexp.MustCompile(`^//ag:(event|internal-event)\s`)
+)
+
+// portDataSymbols trả các định danh hợp đồng dữ liệu (hằng, kiểu payload sự kiện) của gói ip.
+func portDataSymbols(root, modPath, ip string) (map[string]bool, error) {
+	portDataMu.Lock()
+	defer portDataMu.Unlock()
+	if d, ok := portDataCache[ip]; ok {
+		return d, nil
+	}
+	dir := filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(strings.TrimPrefix(ip, modPath), "/")))
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	var files []*ast.File
+	fset := token.NewFileSet()
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, filepath.Join(dir, e.Name()), nil, parser.ParseComments)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, f)
+	}
+	out := map[string]bool{}
+	for _, file := range files {
+		for _, decl := range file.Decls {
+			gd, ok := decl.(*ast.GenDecl)
+			if !ok {
+				continue
+			}
+			for _, spec := range gd.Specs {
+				switch sp := spec.(type) {
+				case *ast.ValueSpec:
+					if gd.Tok == token.CONST {
+						for _, n := range sp.Names {
+							out[n.Name] = true
+						}
+					}
+				case *ast.TypeSpec:
+					doc := sp.Doc
+					if doc == nil && len(gd.Specs) == 1 {
+						doc = gd.Doc
+					}
+					if doc != nil && slices.ContainsFunc(doc.List, func(c *ast.Comment) bool { return reEventDirective.MatchString(c.Text) }) {
+						out[sp.Name.Name] = true
+					}
+				}
+			}
+		}
+	}
+	portDataCache[ip] = out
+	return out, nil
+}
+
+// dependsViolations: import (mã không phải kiểm thử) tới module khác phải có trong depends, trừ import chỉ
+// dùng hợp đồng dữ liệu (dataContractOnly).
 func dependsViolations(root, modPath string, ms []*modreg.Manifest) ([]mgViolation, error) {
 	var out []mgViolation
 	fset := token.NewFileSet()
@@ -364,7 +455,7 @@ func dependsViolations(root, modPath string, ms []*modreg.Manifest) ([]mgViolati
 			if !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
 				return nil
 			}
-			f, err := parser.ParseFile(fset, p, nil, parser.ImportsOnly)
+			f, err := parser.ParseFile(fset, p, nil, 0)
 			if err != nil {
 				return err
 			}
@@ -376,7 +467,14 @@ func dependsViolations(root, modPath string, ms []*modreg.Manifest) ([]mgViolati
 				if dep == "" || dep == m.Name {
 					continue
 				}
-				if _, ok := m.Depends[dep]; !ok {
+				if _, ok := m.Depends[dep]; ok {
+					continue
+				}
+				dataOnly, err := dataContractOnly(root, modPath, f, imp, ip)
+				if err != nil {
+					return err
+				}
+				if !dataOnly {
 					out = append(out, mgViolation{Rule: ruleDepends, From: m.Name, To: dep, File: rel, Import: ip, Anchor: m.Name,
 						Msg: fmt.Sprintf("%s import %s nhưng module.yaml không khai depends %s (chạy go run ./tools/modgen)", rel, ip, dep)})
 				}

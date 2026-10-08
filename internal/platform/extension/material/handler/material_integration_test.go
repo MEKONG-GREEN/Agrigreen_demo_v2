@@ -20,6 +20,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -60,12 +61,12 @@ func (c catalogs) List(_ context.Context, catalog string) ([]mdport.CatalogItem,
 
 type units struct{}
 
-func (units) Get(_ context.Context, code string, _ time.Time) (mdport.AdminUnit, error) {
+func (units) Get(_ context.Context, code string, _ time.Time) (partyport.AdminUnit, error) {
 	parent := "89"
 	if strings.HasPrefix(code, "31") {
 		parent = "92"
 	}
-	return mdport.AdminUnit{Code: code, Name: "Xã " + code, Level: mdport.LevelCommune, ParentCode: parent}, nil
+	return partyport.AdminUnit{Code: code, Name: "Xã " + code, Level: partyport.LevelCommune, ParentCode: parent}, nil
 }
 func (units) Descendants(_ context.Context, code string, _ time.Time) ([]string, error) {
 	return []string{code}, nil

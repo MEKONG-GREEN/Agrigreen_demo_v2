@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
+
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 )
 
 // Trạng thái căn cứ của một quan hệ kế thừa (ADR-0032 mục 3).
@@ -46,10 +48,12 @@ type RolledUnit struct {
 // AdminUnitHistory tra đơn vị hành chính theo thời điểm và chuỗi kế thừa (R-DB-09,
 // ADR-0032 mục 5). Thực hiện bởi adapter AdminUnits của pf/masterdata; module gọi
 // lấy qua Module.AdminUnitHistory() hoặc type assertion trên AdminUnits (giữ tương
-// thích với bản giả AdminUnits trong kiểm thử). Không có → lỗi bọc ErrUnitNotFound.
+// thích với bản giả AdminUnits trong kiểm thử). Không có → lỗi bọc partyport.ErrUnitNotFound.
+// Kiểu AdminUnit ở pf/party/port (k/orgtree, review R-MOD-05); lịch sử kế thừa còn ở đây cho tới khi
+// dữ liệu đơn vị hành chính chuyển về k/orgtree.
 type AdminUnitHistory interface {
 	// AdminUnitAt: phiên bản của code có hiệu lực ngày at.
-	AdminUnitAt(ctx context.Context, code string, at time.Time) (AdminUnit, error)
+	AdminUnitAt(ctx context.Context, code string, at time.Time) (partyport.AdminUnit, error)
 	// SuccessorsAt: chuỗi kế thừa từ phiên bản của code có hiệu lực ngày from, gồm mọi
 	// quan hệ có EffectiveOn ≤ to (theo EffectiveOn rồi mã), kèm AreaShare.
 	SuccessorsAt(ctx context.Context, code string, from, to time.Time) ([]Succession, error)

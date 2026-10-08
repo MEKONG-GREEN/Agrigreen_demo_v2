@@ -1,5 +1,5 @@
 # Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
-# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, consumes, permissions, owns_schema.
 # Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
 name: pf/extension
 aka: [dom/extension]
@@ -10,22 +10,13 @@ depends:
   pf/accounts: ">=1.0 <2"
   pf/geo: ">=1.0 <2"
   pf/masterdata: ">=1.0 <2"
-  pf/metering: ">=1.0 <2"
   pf/metrics: ">=1.0 <2"
+  pf/notify: ">=1.0 <2"
   pf/party: ">=1.0 <2"
   pf/reports: ">=1.0 <2"
   pf/sync: ">=1.0 <2"
 provides:
-  ports:
-    - Consolidations
-    - DispatchHistory
-    - KNContextResolver
-    - KNDirectory
-    - ReportData
-    - StaffContacts
-    - StaffDirectory
-    - StaffNames
-    - TablePDF
+  ports: [TablePDF]
   events:
     - pf.extension.consolidation.completed/v1
     - pf.extension.directive.issued/v1
@@ -44,6 +35,8 @@ provides:
   internal_events: []
   publications: []
   data_products: []
+consumes:
+  events: []
 permissions: []
 shares: []
 owns_schema: [pf_extension]

@@ -15,6 +15,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/store"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -739,24 +740,24 @@ func (s *Service) RunChanges(ctx context.Context, runID uuid.UUID, after *uuid.U
 // Consolidations hiện thực port.Consolidations (tenant tường minh — worker/pf/reports).
 type Consolidations struct{ Svc *Service }
 
-var _ port.Consolidations = Consolidations{}
+var _ extensionsrc.Consolidations = Consolidations{}
 
 // Period trả kỳ.
-func (c Consolidations) Period(ctx context.Context, tid, periodID uuid.UUID) (port.PeriodInfo, error) {
-	var out port.PeriodInfo
+func (c Consolidations) Period(ctx context.Context, tid, periodID uuid.UUID) (extensionsrc.PeriodInfo, error) {
+	var out extensionsrc.PeriodInfo
 	err := c.Svc.tx(ctx, tid, func(tx pgx.Tx) error {
 		p, err := store.PeriodByID(ctx, tx, periodID, false)
 		if err != nil {
 			return err
 		}
 		if p == nil {
-			return port.ErrConsolidationNotFound
+			return extensionsrc.ErrConsolidationNotFound
 		}
 		b, err := store.BatchByID(ctx, tx, p.BatchID, false)
 		if err != nil {
 			return err
 		}
-		out = port.PeriodInfo{ID: p.ID, BatchID: p.BatchID, Label: p.Label, RangeLabel: p.RangeLabel, SeasonLabel: b.SeasonLabel, From: p.From, To: p.To,
+		out = extensionsrc.PeriodInfo{ID: p.ID, BatchID: p.BatchID, Label: p.Label, RangeLabel: p.RangeLabel, SeasonLabel: b.SeasonLabel, From: p.From, To: p.To,
 			Closed: p.Status == "closed", ProvinceCode: p.ProvinceCode, DepartmentCode: p.DepartmentCode, ReportType: b.ReportType, Slot: p.Slot}
 		ps, err := store.PeriodsOfBatch(ctx, tx, p.BatchID)
 		for _, x := range ps {
@@ -768,8 +769,8 @@ func (c Consolidations) Period(ctx context.Context, tid, periodID uuid.UUID) (po
 }
 
 // LatestRuns trả lần tổng hợp gần nhất của các biểu trong kỳ.
-func (c Consolidations) LatestRuns(ctx context.Context, tid, periodID uuid.UUID, formCodes []string) ([]port.ConsolidationView, error) {
-	var out []port.ConsolidationView
+func (c Consolidations) LatestRuns(ctx context.Context, tid, periodID uuid.UUID, formCodes []string) ([]extensionsrc.ConsolidationView, error) {
+	var out []extensionsrc.ConsolidationView
 	err := c.Svc.tx(ctx, tid, func(tx pgx.Tx) error {
 		latest, err := store.LatestOfPeriod(ctx, tx, periodID)
 		if err != nil {
@@ -799,7 +800,7 @@ func (c Consolidations) LatestRuns(ctx context.Context, tid, periodID uuid.UUID,
 			if err := json.Unmarshal(snap.Totals, &totals); err != nil {
 				return err
 			}
-			v := port.ConsolidationView{RunID: run.ID, RunNo: run.RunNo, TemplateID: run.TemplateID, VersionID: run.VersionID, FormCode: run.FormCode,
+			v := extensionsrc.ConsolidationView{RunID: run.ID, RunNo: run.RunNo, TemplateID: run.TemplateID, VersionID: run.VersionID, FormCode: run.FormCode,
 				At: run.EventTime, Trigger: run.Trigger, ActorRef: run.ActorRef, Provisional: run.Provisional, MissingCommunes: run.MissingCommunes}
 			for _, m := range run.MissingCommunes {
 				name := m
@@ -811,11 +812,11 @@ func (c Consolidations) LatestRuns(ctx context.Context, tid, periodID uuid.UUID,
 				v.MissingNames = append(v.MissingNames, name)
 			}
 			for _, r := range rows {
-				v.Rows = append(v.Rows, port.ConsolidationRow{Key: r.Key, Commune: r.Commune, CommuneName: r.CommuneName, Region: r.Region,
+				v.Rows = append(v.Rows, extensionsrc.ConsolidationRow{Key: r.Key, Commune: r.Commune, CommuneName: r.CommuneName, Region: r.Region,
 					RegionName: r.RegionName, Indicator: r.Indicator, Cells: r.Cells})
 			}
 			for _, t := range totals {
-				v.Totals = append(v.Totals, port.ConsolidationTotal{Key: t.Key, Kind: t.Kind, Region: t.Region, RegionName: t.RegionName,
+				v.Totals = append(v.Totals, extensionsrc.ConsolidationTotal{Key: t.Key, Kind: t.Kind, Region: t.Region, RegionName: t.RegionName,
 					Indicator: t.Indicator, Members: t.Members, Cells: t.Cells})
 			}
 			out = append(out, v)

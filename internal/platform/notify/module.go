@@ -23,7 +23,7 @@ import (
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
@@ -54,8 +54,8 @@ var DBModule = db.Module("pf/notify")
 type Deps struct {
 	Scope   partyport.ScopeResolver
 	Devices syncport.Devices
-	Staff   extport.StaffDirectory
-	Units   mdport.AdminUnits
+	Staff   port.StaffDirectory
+	Units   partyport.AdminUnits
 	// Farmers (tùy chọn): nông dân có thửa trong địa bàn cảnh báo khẩn (HTX US-NEWS-03).
 	Farmers  port.AreaFarmers
 	Pusher   channel.Pusher

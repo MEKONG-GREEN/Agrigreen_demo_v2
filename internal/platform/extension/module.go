@@ -25,12 +25,15 @@ import (
 	rchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/handler"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
+	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -50,11 +53,11 @@ const JobWorkSchedule = "extension_work_schedule"
 type Deps struct {
 	Scope    partyport.ScopeResolver // phạm vi TW → Tỉnh → Xã (ADR-0009)
 	Orgs     partyport.Orgs          // kiểm HTX, tìm TTKN tỉnh nhận leo thang
-	Units    mdport.AdminUnits       // tỉnh của xã
-	Params   mdport.Params           // extension.task_sla_hours, extension.duty_status_ttl_hours
+	Units    partyport.AdminUnits    // tỉnh của xã
+	Params   params.Params           // extension.task_sla_hours, extension.duty_status_ttl_hours
 	Catalogs mdport.Catalogs         // giống lúa, vụ, sâu bệnh (FR-01 BR-01)
 	// Plots, Coops (tùy chọn): thống kê thửa (pf/geo) và HTX (pf/party) cho GET /v1/dashboard (G-02).
-	Plots geoport.PlotStats
+	Plots partyport.PlotStats
 	Coops partyport.CooperativeStats
 }
 
@@ -77,7 +80,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 }
 
 // UseContacts nối cổng số điện thoại cán bộ (pf/accounts) sau khi module đó được dựng.
-func (m *Module) UseContacts(c port.StaffContacts) { m.svc.Contacts = c }
+func (m *Module) UseContacts(c accport.StaffContacts) { m.svc.Contacts = c }
 
 // UseFarmers nối cổng liên kết tài khoản nông dân ↔ nông hộ (pf/accounts) — yêu cầu
 // hỗ trợ từ App HTX (HTX US-SUPPORT-01 → KN US-TASK-01). Gốc lắp ráp gọi sau khi dựng pf/accounts.
@@ -88,13 +91,13 @@ func (m *Module) UseGpsLog(g geoport.GpsLog) { m.svc.GpsLog = g }
 
 // UseKNContext nối ngữ cảnh phiên KN và danh bạ gán vai trò của P1 (pf/accounts) cho lịch công tác (KN v7.7 P5).
 // Chưa nối → suy từ vai realm + phạm vi đơn vị, danh bạ trực pf_extension.staff.
-func (m *Module) UseKNContext(c port.KNContextResolver, d port.KNDirectory) {
+func (m *Module) UseKNContext(c accport.KNContextResolver, d accport.KNDirectory) {
 	m.svc.KNContext, m.svc.KNDirectory = c, d
 }
 
 // UseEgress (quyết định A5, ADR-0024) nối điểm kiểm soát xuất (pf/metering) cho "Xuất Excel/PDF" lịch công tác —
 // xuất nội bộ: ghi egress_event, không bao giờ bị chặn kể cả AG_EGRESS_MODE=enforce.
-func (m *Module) UseEgress(cp meteringport.Checkpoint, mode meteringport.Mode, log *slog.Logger) {
+func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logger) {
 	m.svc.Egress, m.svc.EgressMode, m.svc.Log = cp, mode, log
 }
 
@@ -105,7 +108,7 @@ func (m *Module) UseTablePDF(p port.TablePDF) { m.svc.TablePDF = p }
 func (m *Module) GpsLogHandler() inbox.Handler { return m.svc.HandleGpsLog }
 
 // StaffNames cho module khác tra tên cán bộ trong danh bạ (qua port, G-07/G-09).
-func (m *Module) StaffNames() port.StaffNames { return m.svc }
+func (m *Module) StaffNames() mdport.StaffNames { return m.svc }
 
 // RegisterApp gắn route Application API (gồm vòng đời báo cáo KN v7.7 — cần header X-AG-Context).
 func (m *Module) RegisterApp(rg *gin.RouterGroup) {
@@ -121,13 +124,13 @@ func (m *Module) RegisterAdmin(*gin.RouterGroup) {}
 func (m *Module) SyncSource() syncport.Source { return app.SyncSource{Svc: m.svc} }
 
 // Staff là cổng đọc danh bạ cán bộ (chỉ mã tham chiếu + đơn vị) cho pf/notify.
-func (m *Module) Staff() port.StaffDirectory { return app.StaffDirectory{Svc: m.svc} }
+func (m *Module) Staff() notifyport.StaffDirectory { return app.StaffDirectory{Svc: m.svc} }
 
 // SyncSink cho pf/sync: chiều lên "task_update", "field_report".
 func (m *Module) SyncSink() syncport.Sink { return app.SyncSink{Svc: m.svc} }
 
 // ReportData cho pf/reports: đọc dữ liệu báo cáo FR-01..FR-05 theo phạm vi đã giải.
-func (m *Module) ReportData() port.ReportData { return app.ReportData{Svc: m.svc} }
+func (m *Module) ReportData() extensionsrc.ReportData { return app.ReportData{Svc: m.svc} }
 
 // OverdueTenants dựng bộ tìm tenant có nhiệm vụ quá hạn từ pool vai
 // ag_ops_jobs (worker, nối thẳng).

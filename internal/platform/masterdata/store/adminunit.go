@@ -16,7 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/domain"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 )
 
 func day(t time.Time) string { return t.Format(time.DateOnly) }
@@ -40,7 +40,7 @@ func scanUnit(row pgx.Row) (domain.Unit, error) {
 	var u domain.Unit
 	var level string
 	err := row.Scan(&u.Code, &u.ValidFrom, &u.ValidTo, &u.Name, &level, &u.ParentCode, &u.Successors)
-	u.Level = port.Level(level)
+	u.Level = partyport.Level(level)
 	return u, err
 }
 
@@ -131,9 +131,9 @@ func CloseUnit(ctx context.Context, tx pgx.Tx, u domain.Unit, actor uuid.UUID, n
 
 // ParentCovers kiểm đơn vị cha của u tồn tại, đúng cấp và bao trọn khoảng hiệu lực của u.
 func ParentCovers(ctx context.Context, tx pgx.Tx, u domain.Unit) (bool, error) {
-	levels := []string{string(port.LevelProvince)}
-	if u.Level == port.LevelCommune {
-		levels = append(levels, string(port.LevelDistrict))
+	levels := []string{string(partyport.LevelProvince)}
+	if u.Level == partyport.LevelCommune {
+		levels = append(levels, string(partyport.LevelDistrict))
 	}
 	var ok bool
 	err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pf_masterdata.admin_unit p

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
@@ -37,25 +38,27 @@ func (f *fakeScope) Scope(ctx context.Context) (authz.Scope, error) {
 }
 
 // fakeUnits: tỉnh 89 (xã 30001, 30002), tỉnh 92 (xã 31001).
-type fakeUnits struct{ units map[string]mdport.AdminUnit }
+type fakeUnits struct {
+	units map[string]partyport.AdminUnit
+}
 
 func newFakeUnits() *fakeUnits {
-	f := &fakeUnits{units: map[string]mdport.AdminUnit{}}
-	add := func(code string, lvl mdport.Level, parent string) {
-		f.units[code] = mdport.AdminUnit{Code: code, Name: code, Level: lvl, ParentCode: parent}
+	f := &fakeUnits{units: map[string]partyport.AdminUnit{}}
+	add := func(code string, lvl partyport.Level, parent string) {
+		f.units[code] = partyport.AdminUnit{Code: code, Name: code, Level: lvl, ParentCode: parent}
 	}
-	add("89", mdport.LevelProvince, "")
-	add("30001", mdport.LevelCommune, "89")
-	add("30002", mdport.LevelCommune, "89")
-	add("92", mdport.LevelProvince, "")
-	add("31001", mdport.LevelCommune, "92")
+	add("89", partyport.LevelProvince, "")
+	add("30001", partyport.LevelCommune, "89")
+	add("30002", partyport.LevelCommune, "89")
+	add("92", partyport.LevelProvince, "")
+	add("31001", partyport.LevelCommune, "92")
 	return f
 }
 
-func (f *fakeUnits) Get(_ context.Context, code string, _ time.Time) (mdport.AdminUnit, error) {
+func (f *fakeUnits) Get(_ context.Context, code string, _ time.Time) (partyport.AdminUnit, error) {
 	u, ok := f.units[code]
 	if !ok {
-		return mdport.AdminUnit{}, mdport.ErrUnitNotFound
+		return partyport.AdminUnit{}, partyport.ErrUnitNotFound
 	}
 	return u, nil
 }

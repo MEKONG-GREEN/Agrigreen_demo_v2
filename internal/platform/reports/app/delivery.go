@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	accountsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/store"
@@ -76,7 +77,7 @@ func (s *Service) HandleExportCompleted(ctx context.Context, tx pgx.Tx, env outb
 	sent, missing := 0, 0
 	for _, r := range sch.Recipients {
 		addr, err := s.Directory.EmailOf(ctx, j.TenantID, r)
-		if errors.Is(err, port.ErrNoEmail) || (err == nil && strings.TrimSpace(addr) == "") {
+		if errors.Is(err, accountsport.ErrNoEmail) || (err == nil && strings.TrimSpace(addr) == "") {
 			missing++
 			continue
 		}

@@ -21,7 +21,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
@@ -35,6 +34,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
@@ -58,7 +58,7 @@ type External struct {
 	// Egress (G5, ADR-0024): điểm kiểm soát xuất DUY NHẤT (pf/metering Checkpoint) cho xuất báo cáo,
 	// gói MRV, ba consumer van và /v1/partner/*. Nil → hành vi cũ (chưa nối pf/metering). Chế độ đọc
 	// từ AG_EGRESS_MODE (observe mặc định | enforce).
-	Egress meteringport.Checkpoint
+	Egress meter.Checkpoint
 }
 
 // Modules là các module đã nối — worker và kiểm thử dùng lại port của chúng.
@@ -367,8 +367,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 }
 
 // EgressModeFromEnv đọc AG_EGRESS_MODE (ADR-0024 mục 2): rỗng → observe; giá trị lạ → lỗi khởi động.
-func EgressModeFromEnv(getenv func(string) string) (meteringport.Mode, error) {
-	return meteringport.ParseMode(getenv(meteringport.EnvEgressMode))
+func EgressModeFromEnv(getenv func(string) string) (meter.Mode, error) {
+	return meter.ParseMode(getenv(meter.EnvEgressMode))
 }
 
 // farmerHouseholds chuyển port pf/accounts (liên kết tài khoản nông dân ↔ nông hộ)

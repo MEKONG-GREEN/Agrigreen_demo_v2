@@ -10,6 +10,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/store"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -27,14 +29,14 @@ type ParamsPort struct{ Svc *Service }
 type CatalogsPort struct{ Svc *Service }
 
 var (
-	_ port.AdminUnits = UnitsPort{}
-	_ port.Params     = ParamsPort{}
-	_ port.Catalogs   = CatalogsPort{}
+	_ partyport.AdminUnits = UnitsPort{}
+	_ params.Params        = ParamsPort{}
+	_ port.Catalogs        = CatalogsPort{}
 )
 
 // ToPortUnit chuyển phiên bản đơn vị sang DTO công khai (ngày → 00:00 giờ Việt Nam).
-func ToPortUnit(u domain.Unit) port.AdminUnit {
-	out := port.AdminUnit{
+func ToPortUnit(u domain.Unit) partyport.AdminUnit {
+	out := partyport.AdminUnit{
 		Code: u.Code, Name: u.Name, Level: u.Level, ParentCode: u.ParentCode,
 		ValidFrom: domain.DayStart(u.ValidFrom), SuccessorCodes: append([]string{}, u.Successors...),
 	}
@@ -46,14 +48,14 @@ func ToPortUnit(u domain.Unit) port.AdminUnit {
 }
 
 // Get thực hiện port.AdminUnits.
-func (p UnitsPort) Get(ctx context.Context, code string, at time.Time) (port.AdminUnit, error) {
+func (p UnitsPort) Get(ctx context.Context, code string, at time.Time) (partyport.AdminUnit, error) {
 	tid, err := tenant.FromContext(ctx)
 	if err != nil {
-		return port.AdminUnit{}, err
+		return partyport.AdminUnit{}, err
 	}
 	u, err := p.Svc.getUnit(ctx, tid, code, at)
 	if err != nil {
-		return port.AdminUnit{}, err
+		return partyport.AdminUnit{}, err
 	}
 	return ToPortUnit(u), nil
 }
@@ -85,8 +87,8 @@ func (p UnitsPort) Current(ctx context.Context, code string, at time.Time) ([]st
 }
 
 // ToPortParam chuyển dòng sổ đã duyệt sang DTO công khai.
-func ToPortParam(a domain.Approved) port.ParamValue {
-	pv := port.ParamValue{Key: a.Key, Unit: a.Unit, Version: a.Version, EffectiveFrom: a.EffectiveFrom, SourceDoc: a.SourceDoc}
+func ToPortParam(a domain.Approved) params.ParamValue {
+	pv := params.ParamValue{Key: a.Key, Unit: a.Unit, Version: a.Version, EffectiveFrom: a.EffectiveFrom, SourceDoc: a.SourceDoc}
 	if a.Value != nil {
 		pv.Value = *a.Value
 	}
@@ -97,14 +99,14 @@ func ToPortParam(a domain.Approved) port.ParamValue {
 }
 
 // At thực hiện port.Params: phiên bản đã duyệt có hiệu lực tại thời điểm của sự việc.
-func (p ParamsPort) At(ctx context.Context, key string, at time.Time) (port.ParamValue, error) {
+func (p ParamsPort) At(ctx context.Context, key string, at time.Time) (params.ParamValue, error) {
 	tid, err := tenant.FromContext(ctx)
 	if err != nil {
-		return port.ParamValue{}, err
+		return params.ParamValue{}, err
 	}
 	a, err := p.Svc.paramAt(ctx, tid, key, at)
 	if err != nil {
-		return port.ParamValue{}, err
+		return params.ParamValue{}, err
 	}
 	return ToPortParam(a), nil
 }

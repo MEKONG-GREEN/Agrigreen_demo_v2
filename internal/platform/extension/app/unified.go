@@ -9,7 +9,8 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/store"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 )
 
 // ParamTargetSownAreaPrefix là khóa tham số mục tiêu diện tích gieo sạ theo đơn vị:
@@ -198,7 +199,7 @@ func (s *Service) targetArea(ctx context.Context, unit string, at time.Time) (*d
 		return nil, nil
 	}
 	v, err := s.Params.At(ctx, ParamTargetSownAreaPrefix+":"+unit, at)
-	if errors.Is(err, mdport.ErrParamNotFound) {
+	if errors.Is(err, params.ErrParamNotFound) {
 		return nil, nil
 	}
 	if err != nil {
@@ -223,7 +224,7 @@ func (s *Service) communesOf(ctx context.Context, level, unit string) ([]string,
 	}
 	cache := map[string]string{}
 	now := s.now()
-	if tree, ok := s.Units.(mdport.AdminUnitTree); ok && s.Units != nil {
+	if tree, ok := s.Units.(partyport.AdminUnitTree); ok && s.Units != nil {
 		provs, err := tree.Children(ctx, "", now)
 		if err == nil {
 			for _, p := range provs {
@@ -246,7 +247,7 @@ func (s *Service) communesOf(ctx context.Context, level, unit string) ([]string,
 		if s.Units != nil {
 			if u, err := s.Units.Get(ctx, commune, now); err == nil {
 				p = u.ParentCode
-				if u.Level == mdport.LevelProvince {
+				if u.Level == partyport.LevelProvince {
 					p = u.Code
 				}
 			}

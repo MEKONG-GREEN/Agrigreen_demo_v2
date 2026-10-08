@@ -9,8 +9,8 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/domain"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/store"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/mechanizationsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -19,23 +19,23 @@ import (
 // định mức hiện tại — số trên tệp xuất đúng bằng số đã lưu (BR-04).
 type ReportData struct{ Svc *Service }
 
-var _ port.ReportData = ReportData{}
+var _ mechanizationsrc.ReportData = ReportData{}
 
 var errNoTenant = errors.New("mechanization: truy vấn báo cáo thiếu tenant")
 
 // ErrSameSeason: tab đối chiếu chọn hai vụ trùng nhau (FN-10 luồng ngoại lệ).
 var ErrSameSeason = problem.Validation.WithField("season_b", "Vui lòng chọn hai vụ khác nhau để đối chiếu")
 
-func runInfo(r domain.BalanceRun) port.RunInfo {
+func runInfo(r domain.BalanceRun) mechanizationsrc.RunInfo {
 	mn := append([]string{}, r.MissingNorms...)
-	return port.RunInfo{
+	return mechanizationsrc.RunInfo{
 		RunID: r.ID, SeasonCode: r.Season.Code, SeasonYear: r.Season.Year, ReferenceDate: r.ReferenceDate,
 		ComputedAt: r.EventTime, RuleVersion: r.RuleVersion, MissingNorms: mn, ThresholdsComplete: r.Thresholds.Complete(),
 	}
 }
 
 // saved đọc lần cân đối và các dòng đã lưu trong phạm vi.
-func (d ReportData) saved(ctx context.Context, q port.ReportQuery) (*domain.BalanceRun, []domain.BalanceResult, error) {
+func (d ReportData) saved(ctx context.Context, q mechanizationsrc.ReportQuery) (*domain.BalanceRun, []domain.BalanceResult, error) {
 	if q.TenantID == uuid.Nil {
 		return nil, nil, errNoTenant
 	}
@@ -59,8 +59,8 @@ func (d ReportData) saved(ctx context.Context, q port.ReportQuery) (*domain.Bala
 	return run, res, err
 }
 
-func figuresOf(g domain.Group) port.Figures {
-	f := port.Figures{Capacity: g.Capacity, CoveragePct: g.CoveragePct, Status: string(g.Status), StatusLabel: domain.CoverageLabels[g.Status]}
+func figuresOf(g domain.Group) mechanizationsrc.Figures {
+	f := mechanizationsrc.Figures{Capacity: g.Capacity, CoveragePct: g.CoveragePct, Status: string(g.Status), StatusLabel: domain.CoverageLabels[g.Status]}
 	if g.Status != domain.CoverageNoData && g.Status != domain.CoverageNoNorm {
 		req, whole := g.Required, g.RequiredWhole
 		f.Required, f.RequiredWhole = &req, &whole
@@ -84,7 +84,7 @@ func less(a, b groupKey) bool {
 
 // groups gom các dòng đã lưu theo đơn vị × khâu × chủng loại; số liệu nhóm dùng
 // đúng quy tắc tổng hợp của bản đồ (domain.Summarize) với ngưỡng ĐÃ LƯU của lần cân đối.
-func groups(run domain.BalanceRun, res []domain.BalanceResult, level string) (map[groupKey]port.Figures, map[groupKey]int, []groupKey) {
+func groups(run domain.BalanceRun, res []domain.BalanceResult, level string) (map[groupKey]mechanizationsrc.Figures, map[groupKey]int, []groupKey) {
 	rows := map[groupKey][]domain.ResultRow{}
 	coops := map[groupKey]map[uuid.UUID]bool{}
 	for _, r := range res {
@@ -98,7 +98,7 @@ func groups(run domain.BalanceRun, res []domain.BalanceResult, level string) (ma
 		}
 		coops[k][r.CooperativeRef] = true
 	}
-	figs := map[groupKey]port.Figures{}
+	figs := map[groupKey]mechanizationsrc.Figures{}
 	counts := map[groupKey]int{}
 	keys := make([]groupKey, 0, len(rows))
 	for k, rs := range rows {
@@ -121,19 +121,19 @@ func level(l string) (string, error) {
 }
 
 // Coverage: tab "Tổng hợp theo khu vực".
-func (d ReportData) Coverage(ctx context.Context, q port.ReportQuery) (port.CoverageData, error) {
+func (d ReportData) Coverage(ctx context.Context, q mechanizationsrc.ReportQuery) (mechanizationsrc.CoverageData, error) {
 	lv, err := level(q.Level)
 	if err != nil {
-		return port.CoverageData{}, err
+		return mechanizationsrc.CoverageData{}, err
 	}
 	run, res, err := d.saved(ctx, q)
 	if err != nil {
-		return port.CoverageData{}, err
+		return mechanizationsrc.CoverageData{}, err
 	}
-	out := port.CoverageData{Run: runInfo(*run), Rows: []port.CoverageRow{}}
+	out := mechanizationsrc.CoverageData{Run: runInfo(*run), Rows: []mechanizationsrc.CoverageRow{}}
 	figs, counts, keys := groups(*run, res, lv)
 	for _, k := range keys {
-		out.Rows = append(out.Rows, port.CoverageRow{
+		out.Rows = append(out.Rows, mechanizationsrc.CoverageRow{
 			ProvinceCode: k.Province, CommuneCode: k.Commune, FarmStage: k.Stage, MachineType: k.Type, Cooperatives: counts[k], Figures: figs[k],
 		})
 	}
@@ -141,12 +141,12 @@ func (d ReportData) Coverage(ctx context.Context, q port.ReportQuery) (port.Cove
 }
 
 // Shortage: tab "Thiếu hụt theo HTX" — đúng các dòng đã lưu có gap < 0.
-func (d ReportData) Shortage(ctx context.Context, q port.ReportQuery) (port.ShortageData, error) {
+func (d ReportData) Shortage(ctx context.Context, q mechanizationsrc.ReportQuery) (mechanizationsrc.ShortageData, error) {
 	run, res, err := d.saved(ctx, q)
 	if err != nil {
-		return port.ShortageData{}, err
+		return mechanizationsrc.ShortageData{}, err
 	}
-	out := port.ShortageData{Run: runInfo(*run), Rows: []port.ShortageRow{}}
+	out := mechanizationsrc.ShortageData{Run: runInfo(*run), Rows: []mechanizationsrc.ShortageRow{}}
 	orgs := map[uuid.UUID][2]string{}
 	for _, r := range res {
 		if r.Figures.Gap == nil || *r.Figures.Gap >= 0 {
@@ -159,7 +159,7 @@ func (d ReportData) Shortage(ctx context.Context, q port.ReportQuery) (port.Shor
 			}
 			orgs[r.CooperativeRef] = info
 		}
-		out.Rows = append(out.Rows, port.ShortageRow{
+		out.Rows = append(out.Rows, mechanizationsrc.ShortageRow{
 			ResultID: r.ID, CooperativeRef: r.CooperativeRef, CooperativeCode: info[0], CooperativeName: info[1],
 			ProvinceCode: r.ProvinceCode, CommuneCode: r.CommuneCode, FarmStage: r.FarmStage, MachineType: r.MachineType,
 			Capacity: r.Capacity, Required: r.Figures.Required, RequiredWhole: r.Figures.RequiredWhole, Shortage: -*r.Figures.Gap,
@@ -184,28 +184,28 @@ func (d ReportData) Shortage(ctx context.Context, q port.ReportQuery) (port.Shor
 
 // SeasonCompare: tab "Đối chiếu giữa các vụ" — hai lần cân đối đã lưu (mới nhất
 // của Vụ A và Vụ B); chênh lệch = B − A.
-func (d ReportData) SeasonCompare(ctx context.Context, q port.CompareQuery) (port.CompareData, error) {
+func (d ReportData) SeasonCompare(ctx context.Context, q mechanizationsrc.CompareQuery) (mechanizationsrc.CompareData, error) {
 	lv, err := level(q.Level)
 	if err != nil {
-		return port.CompareData{}, err
+		return mechanizationsrc.CompareData{}, err
 	}
 	if q.SeasonCode == "" || q.SeasonCodeB == "" {
-		return port.CompareData{}, problem.Validation.WithField("season", "chọn Vụ A và Vụ B")
+		return mechanizationsrc.CompareData{}, problem.Validation.WithField("season", "chọn Vụ A và Vụ B")
 	}
 	if q.SeasonCode == q.SeasonCodeB && q.SeasonYear == q.SeasonYearB {
-		return port.CompareData{}, ErrSameSeason
+		return mechanizationsrc.CompareData{}, ErrSameSeason
 	}
 	qa := q.ReportQuery
 	qa.RunID = uuid.Nil
 	runA, resA, err := d.saved(ctx, qa)
 	if err != nil {
-		return port.CompareData{}, err
+		return mechanizationsrc.CompareData{}, err
 	}
 	qb := qa
 	qb.SeasonCode, qb.SeasonYear = q.SeasonCodeB, q.SeasonYearB
 	runB, resB, err := d.saved(ctx, qb)
 	if err != nil {
-		return port.CompareData{}, err
+		return mechanizationsrc.CompareData{}, err
 	}
 	fa, _, ka := groups(*runA, resA, lv)
 	fb, _, kb := groups(*runB, resB, lv)
@@ -218,9 +218,9 @@ func (d ReportData) SeasonCompare(ctx context.Context, q port.CompareQuery) (por
 		}
 	}
 	sort.Slice(keys, func(i, j int) bool { return less(keys[i], keys[j]) })
-	out := port.CompareData{RunA: runInfo(*runA), RunB: runInfo(*runB), Rows: []port.CompareRow{}}
+	out := mechanizationsrc.CompareData{RunA: runInfo(*runA), RunB: runInfo(*runB), Rows: []mechanizationsrc.CompareRow{}}
 	for _, k := range keys {
-		row := port.CompareRow{ProvinceCode: k.Province, CommuneCode: k.Commune, FarmStage: k.Stage, MachineType: k.Type}
+		row := mechanizationsrc.CompareRow{ProvinceCode: k.Province, CommuneCode: k.Commune, FarmStage: k.Stage, MachineType: k.Type}
 		if a, ok := fa[k]; ok {
 			row.A = &a
 		}

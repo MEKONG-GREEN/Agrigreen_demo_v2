@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -43,7 +42,7 @@ func TestMRVAlertNotificationsKNUSMRV04_06_FR08(t *testing.T) {
 	}
 
 	// FR-08: danh bạ có cán bộ xã phụ trách → thông báo cá nhân.
-	f.staff.add(f.tenant, extport.StaffRef{ActorRef: officer.actor, UnitCode: ward1, ProvinceCode: prov91})
+	f.staff.add(f.tenant, port.StaffRef{ActorRef: officer.actor, UnitCode: ward1, ProvinceCode: prov91})
 	awd := mrvAlert(mrvport.AlertAWDNoInfrastructure, 0, "normal", ward1)
 	awd.SubjectType = "farm_log"
 	f.process(port.ConsumerMRV, f.event(f.tenant, mrvport.EventAlertRaised, awd))

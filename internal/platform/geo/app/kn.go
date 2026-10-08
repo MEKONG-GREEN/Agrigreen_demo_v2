@@ -26,9 +26,9 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 )
@@ -788,9 +788,9 @@ func (s *Service) KNExport(ctx context.Context, commune, format string) (ExportF
 	base := "thua-ruong-" + commune
 	// A5 (ADR-0024): tải tệp thửa KN là xuất NỘI BỘ — qua điểm kiểm soát dùng chung (ghi egress_event, đếm, cảnh báo
 	// bất thường) nhưng không bao giờ bị chặn, kể cả AG_EGRESS_MODE=enforce (Internal → observe; lỗi chỉ ghi log).
-	_ = meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
-		SourceID: ids.New(), Channel: meteringport.ChannelReportExport, DataTenantID: c.a.p.TenantID,
-		CounterpartyKind: meteringport.CounterpartyActor, CounterpartyRef: c.a.p.ActorRef, Product: ProductKNPlotFile,
+	_ = meter.Guard(ctx, s.Egress, s.EgressMode, meter.Egress{
+		SourceID: ids.New(), Channel: meter.ChannelReportExport, DataTenantID: c.a.p.TenantID,
+		CounterpartyKind: meter.CounterpartyActor, CounterpartyRef: c.a.p.ActorRef, Product: ProductKNPlotFile,
 		Records: int64(len(rows)), OccurredAt: s.now(), ActorRef: c.a.p.ActorRef, TraceID: telemetry.TraceID(ctx), Internal: true,
 	}, s.Log)
 	if format == "kml" {

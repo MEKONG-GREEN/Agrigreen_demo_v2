@@ -13,6 +13,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/store"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
@@ -255,7 +256,7 @@ func (s *Service) current(ctx context.Context, tid uuid.UUID, code string, at ti
 			func(c string, d time.Time) (*domain.Unit, error) { return store.UnitLatestFrom(ctx, tx, c, d) })
 		return e
 	})
-	if errors.Is(err, port.ErrUnitNotFound) {
+	if errors.Is(err, partyport.ErrUnitNotFound) {
 		return nil, ErrUnitNotFound
 	}
 	return codes, err

@@ -7,47 +7,46 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
-
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
+	"github.com/google/uuid"
 )
 
 // fakeUnits là danh mục đơn vị hành chính giả (masterdata đang được làm song song).
 type fakeUnits struct {
 	mu    sync.RWMutex
-	units map[string]mdport.AdminUnit
+	units map[string]partyport.AdminUnit
 }
 
 // add thêm đơn vị (KN v7.7: tỉnh An Giang 91 và 102 xã).
-func (f *fakeUnits) add(code, name string, lvl mdport.Level, parent string) {
+func (f *fakeUnits) add(code, name string, lvl partyport.Level, parent string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.units[code] = mdport.AdminUnit{Code: code, Name: name, Level: lvl, ParentCode: parent}
+	f.units[code] = partyport.AdminUnit{Code: code, Name: name, Level: lvl, ParentCode: parent}
 }
 
 func newFakeUnits() *fakeUnits {
-	f := &fakeUnits{units: map[string]mdport.AdminUnit{}}
-	add := func(code, name string, lvl mdport.Level, parent string) {
-		f.units[code] = mdport.AdminUnit{Code: code, Name: name, Level: lvl, ParentCode: parent}
+	f := &fakeUnits{units: map[string]partyport.AdminUnit{}}
+	add := func(code, name string, lvl partyport.Level, parent string) {
+		f.units[code] = partyport.AdminUnit{Code: code, Name: name, Level: lvl, ParentCode: parent}
 	}
-	add("89", "An Giang", mdport.LevelProvince, "")
-	add("30001", "Xã A", mdport.LevelCommune, "89")
-	add("30002", "Xã B", mdport.LevelCommune, "89")
-	add("92", "Cần Thơ", mdport.LevelProvince, "")
-	add("31001", "Xã C", mdport.LevelCommune, "92")
+	add("89", "An Giang", partyport.LevelProvince, "")
+	add("30001", "Xã A", partyport.LevelCommune, "89")
+	add("30002", "Xã B", partyport.LevelCommune, "89")
+	add("92", "Cần Thơ", partyport.LevelProvince, "")
+	add("31001", "Xã C", partyport.LevelCommune, "92")
 	return f
 }
 
-func (f *fakeUnits) Get(_ context.Context, code string, _ time.Time) (mdport.AdminUnit, error) {
+func (f *fakeUnits) Get(_ context.Context, code string, _ time.Time) (partyport.AdminUnit, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	u, ok := f.units[code]
 	if !ok {
-		return mdport.AdminUnit{}, mdport.ErrUnitNotFound
+		return partyport.AdminUnit{}, partyport.ErrUnitNotFound
 	}
 	return u, nil
 }
@@ -56,7 +55,7 @@ func (f *fakeUnits) Descendants(_ context.Context, code string, _ time.Time) ([]
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	if _, ok := f.units[code]; !ok {
-		return nil, mdport.ErrUnitNotFound
+		return nil, partyport.ErrUnitNotFound
 	}
 	out := []string{code}
 	for c, u := range f.units {

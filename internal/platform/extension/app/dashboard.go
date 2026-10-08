@@ -11,7 +11,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/store"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -127,7 +127,7 @@ func (s *Service) GetDashboard(ctx context.Context, unit, period string) (Dashbo
 			return Dashboard{}, err
 		}
 		level = store.LevelCommune
-		if lv == mdport.LevelProvince {
+		if lv == partyport.LevelProvince {
 			level = store.LevelProvince
 		}
 	}
@@ -204,7 +204,7 @@ func (s *Service) defaultUnit(ctx context.Context, sc authz.Scope) (string, erro
 		if err != nil {
 			return "", err
 		}
-		if lv == mdport.LevelProvince && prov == u {
+		if lv == partyport.LevelProvince && prov == u {
 			return u, nil
 		}
 	}

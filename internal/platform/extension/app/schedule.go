@@ -19,16 +19,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	accountsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/store"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -61,7 +62,7 @@ var defaultApproverLevels = []string{port.MgmtLevelHead}
 // knActor là người gọi kèm ngữ cảnh KN.
 type knActor struct {
 	authz.Principal
-	port.KNContext
+	accountsport.KNContext
 }
 
 // knActor dựng ngữ cảnh KN: P1 (X-AG-Context) nếu có; ngược lại suy từ vai realm + phạm vi đơn vị:
@@ -96,7 +97,7 @@ func (s *Service) knActor(ctx context.Context) (knActor, error) {
 		}
 		for _, u := range sc.Units {
 			prov, level, err := s.provinceOf(ctx, u, "org_ref")
-			if err == nil && level == mdport.LevelProvince {
+			if err == nil && level == partyport.LevelProvince {
 				a.ProvinceCode = prov
 				break
 			}
@@ -110,7 +111,7 @@ func (s *Service) knActor(ctx context.Context) (knActor, error) {
 		}
 		for _, u := range sc.Units {
 			prov, level, err := s.provinceOf(ctx, u, "org_ref")
-			if err != nil || level != mdport.LevelCommune {
+			if err != nil || level != partyport.LevelCommune {
 				continue
 			}
 			if a.ProvinceCode == "" {
@@ -148,9 +149,9 @@ func (a knActor) registrant() error {
 
 func (a knActor) level() string {
 	if a.Role == port.KNRoleTinh {
-		return port.ScheduleLevelProvince
+		return accountsport.ScheduleLevelProvince
 	}
-	return port.ScheduleLevelCommune
+	return accountsport.ScheduleLevelCommune
 }
 
 // canView: Cấp Xã chỉ lịch của mình; Cấp Tỉnh lịch cùng phòng ban, cùng tỉnh; Admin mọi lịch; Cấp Quốc gia không.
@@ -192,9 +193,9 @@ type ScheduleSettings struct {
 }
 
 // param tra khóa có chiều tỉnh trước, rồi khóa chung; không có → ok = false.
-func (s *Service) param(ctx context.Context, key, province string, at time.Time) (mdport.ParamValue, bool, error) {
+func (s *Service) param(ctx context.Context, key, province string, at time.Time) (params.ParamValue, bool, error) {
 	if s.Params == nil {
-		return mdport.ParamValue{}, false, nil
+		return params.ParamValue{}, false, nil
 	}
 	keys := []string{key}
 	if province != "" {
@@ -202,15 +203,15 @@ func (s *Service) param(ctx context.Context, key, province string, at time.Time)
 	}
 	for _, k := range keys {
 		v, err := s.Params.At(ctx, k, at)
-		if errors.Is(err, mdport.ErrParamNotFound) {
+		if errors.Is(err, params.ErrParamNotFound) {
 			continue
 		}
 		if err != nil {
-			return mdport.ParamValue{}, false, err
+			return params.ParamValue{}, false, err
 		}
 		return v, true, nil
 	}
-	return mdport.ParamValue{}, false, nil
+	return params.ParamValue{}, false, nil
 }
 
 func (s *Service) scheduleSettings(ctx context.Context, province string, at time.Time) (ScheduleSettings, error) {
@@ -286,7 +287,7 @@ func (a knActor) canReview(sc domain.Schedule, st ScheduleSettings) error {
 	if !domain.ApproverLevelAllowed(a.MgmtLevel, st.ApproverLevels) {
 		return ErrNotScheduleApprover.With("mgmt_level", a.MgmtLevel)
 	}
-	if sc.OwnerLevel == port.ScheduleLevelProvince && st.ProvinceApproval != port.ProvinceApprovalPeer {
+	if sc.OwnerLevel == accountsport.ScheduleLevelProvince && st.ProvinceApproval != port.ProvinceApprovalPeer {
 		return ErrNotScheduleApprover
 	}
 	return nil
@@ -296,25 +297,25 @@ func (a knActor) canReview(sc domain.Schedule, st ScheduleSettings) error {
 // Danh bạ cán bộ KN (P1 hoặc dự phòng pf_extension.staff)
 // ---------------------------------------------------------------------------
 
-func (s *Service) knOfficers(ctx context.Context, tid uuid.UUID, dept, province string) ([]port.KNOfficer, error) {
+func (s *Service) knOfficers(ctx context.Context, tid uuid.UUID, dept, province string) ([]accountsport.KNOfficer, error) {
 	if s.KNDirectory != nil {
 		return s.KNDirectory.Officers(ctx, tid, dept, province)
 	}
 	if dept != partyport.DeptTrongTrot || province == "" {
 		return nil, nil // danh bạ trực chưa có phòng ban: coi mọi cán bộ là Phòng Trồng trọt
 	}
-	var out []port.KNOfficer
+	var out []accountsport.KNOfficer
 	err := tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
 		units, refs, err := store.ProvinceStaff(ctx, tx, province)
 		if err != nil {
 			return err
 		}
 		for i, ref := range refs {
-			o := port.KNOfficer{ActorRef: ref, ProvinceCode: units[i][1]}
+			o := accountsport.KNOfficer{ActorRef: ref, ProvinceCode: units[i][1]}
 			if units[i][0] == units[i][1] {
-				o.Level = port.ScheduleLevelProvince
+				o.Level = accountsport.ScheduleLevelProvince
 			} else {
-				o.Level, o.Communes = port.ScheduleLevelCommune, []string{units[i][0]}
+				o.Level, o.Communes = accountsport.ScheduleLevelCommune, []string{units[i][0]}
 			}
 			out = append(out, o)
 		}
@@ -331,7 +332,7 @@ func (s *Service) approvers(ctx context.Context, tid uuid.UUID, dept, province s
 	}
 	out := []uuid.UUID{}
 	for _, o := range offs {
-		if o.Level == port.ScheduleLevelProvince && o.ActorRef != owner && domain.ApproverLevelAllowed(o.MgmtLevel, st.ApproverLevels) {
+		if o.Level == accountsport.ScheduleLevelProvince && o.ActorRef != owner && domain.ApproverLevelAllowed(o.MgmtLevel, st.ApproverLevels) {
 			out = append(out, o.ActorRef)
 		}
 	}
@@ -438,7 +439,7 @@ func (s *Service) SaveSchedule(ctx context.Context, in ScheduleSaveInput) (Sched
 	if err != nil {
 		return ScheduleDetail{}, err
 	}
-	auto := a.level() == port.ScheduleLevelProvince && st.ProvinceApproval == port.ProvinceApprovalAuto
+	auto := a.level() == accountsport.ScheduleLevelProvince && st.ProvinceApproval == port.ProvinceApprovalAuto
 	var approvers []uuid.UUID
 	if in.Action == domain.SaveSubmit && !auto {
 		if approvers, err = s.approvers(ctx, a.TenantID, a.Department, a.ProvinceCode, a.ActorRef, st); err != nil {
@@ -556,7 +557,7 @@ func (s *Service) checkScheduleItems(ctx context.Context, a knActor, items []dom
 			if err != nil {
 				return err
 			}
-			if level != mdport.LevelCommune || prov != a.ProvinceCode {
+			if level != partyport.LevelCommune || prov != a.ProvinceCode {
 				return ErrOutOfScope.WithField("items.commune_code", "xã không thuộc tỉnh của bạn")
 			}
 		}
@@ -979,7 +980,7 @@ func (s *Service) ListSchedules(ctx context.Context, q ScheduleQuery) (ScheduleP
 	default:
 		return SchedulePage{}, problem.Validation.WithField("status", "draft, pending, approved hoặc changes_requested")
 	}
-	if q.OwnerLevel != "" && q.OwnerLevel != port.ScheduleLevelCommune && q.OwnerLevel != port.ScheduleLevelProvince {
+	if q.OwnerLevel != "" && q.OwnerLevel != accountsport.ScheduleLevelCommune && q.OwnerLevel != accountsport.ScheduleLevelProvince {
 		return SchedulePage{}, problem.Validation.WithField("owner_level", "commune hoặc province")
 	}
 	if q.Limit <= 0 || q.Limit > 200 {
@@ -1227,7 +1228,7 @@ func (s *Service) CountSchedules(ctx context.Context, weekRaw string) (ScheduleC
 
 // Unregistered là một cán bộ chưa gửi lịch tuần.
 type Unregistered struct {
-	Officer    port.KNOfficer
+	Officer    accountsport.KNOfficer
 	Status     string // none | draft
 	ScheduleID uuid.UUID
 }
@@ -1293,7 +1294,7 @@ func (s *Service) unregistered(ctx context.Context, a knActor, week time.Time, c
 	sort.SliceStable(out, func(i, j int) bool {
 		ci, cj := strings.Join(out[i].Officer.Communes, ","), strings.Join(out[j].Officer.Communes, ",")
 		if out[i].Officer.Level != out[j].Officer.Level {
-			return out[i].Officer.Level == port.ScheduleLevelCommune
+			return out[i].Officer.Level == accountsport.ScheduleLevelCommune
 		}
 		return ci < cj
 	})

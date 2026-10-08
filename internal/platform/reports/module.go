@@ -18,11 +18,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
+	accountsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/dispatch"
@@ -31,10 +28,15 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/mail"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/cropcyclesrc"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/mechanizationsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/render"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -50,16 +52,16 @@ const JobSchedules = "reports_schedules"
 type Deps struct {
 	Scope         partyport.ScopeResolver
 	Orgs          partyport.Orgs
-	Units         mdport.AdminUnits
-	Params        mdport.Params // reports.daily_export_quota, reports.export_anomaly_threshold
+	Units         partyport.AdminUnits
+	Params        params.Params // reports.daily_export_quota, reports.export_anomaly_threshold
 	Catalogs      mdport.Catalogs
 	Store         objstore.Store // reports/<tenant>/<job>.<định dạng>
-	Extension     extport.ReportData
-	Mechanization mechport.ReportData
-	CropCycle     ccport.ReportData  // pf/cropcycle: báo cáo sản lượng HTX (HTX US-DASH-02, US-DASH-03)
-	Directory     port.MailDirectory // pf/accounts hiện thực; nil → bỏ gửi email
+	Extension     extensionsrc.ReportData
+	Mechanization mechanizationsrc.ReportData
+	CropCycle     cropcyclesrc.ReportData    // pf/cropcycle: báo cáo sản lượng HTX (HTX US-DASH-02, US-DASH-03)
+	Directory     accountsport.MailDirectory // pf/accounts hiện thực; nil → bỏ gửi email
 	// Recipients: tài khoản của HTX để quản lý HTX chọn người nhận lịch (HTX US-DASH-03); nil → 503.
-	Recipients port.RecipientDirectory
+	Recipients accountsport.RecipientDirectory
 	Mailer     port.Mailer
 	LinkBase   string // AG_WEB_OPS_URL: liên kết trang việc xuất trong email
 	// LinkDownloadBase (A4): URL gốc công khai api-platform cho liên kết tải Chi cục (AG_REPORT_LINK_BASE).
@@ -67,7 +69,7 @@ type Deps struct {
 	Log              *slog.Logger
 	// KN v7.7 P4 — báo cáo Chi cục: lần tổng hợp của pf/extension (nối sau bằng UseConsolidations nếu cần) và biến môi
 	// trường của cờ Google Sheet (nil → TẮT; ADR-0026 "Đề xuất").
-	Consolidations extport.Consolidations
+	Consolidations extensionsrc.Consolidations
 	Getenv         func(string) string
 }
 
@@ -89,7 +91,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 }
 
 // UseConsolidations nối cổng lần tổng hợp của pf/extension (báo cáo Chi cục, KN v7.7 P4).
-func (m *Module) UseConsolidations(c extport.Consolidations) { m.svc.Consolidations = c }
+func (m *Module) UseConsolidations(c extensionsrc.Consolidations) { m.svc.Consolidations = c }
 
 // UseLinkDownloadBase đặt URL gốc công khai của api-platform cho liên kết tải Chi cục (A4; worker: AG_REPORT_LINK_BASE).
 func (m *Module) UseLinkDownloadBase(base string) { m.svc.LinkDownloadBase = base }
@@ -104,7 +106,9 @@ func (m *Module) UseMailer(ml port.Mailer) { m.svc.Mailer = ml }
 func (m *Module) DispatchHandler() inbox.Handler { return m.svc.HandleDispatchRequested }
 
 // DispatchHistory cho pf/extension biết kỳ đã gửi Chi cục (cảnh báo khi mở lại kỳ).
-func (m *Module) DispatchHistory() extport.DispatchHistory { return app.DispatchHistory{Svc: m.svc} }
+func (m *Module) DispatchHistory() extensionsrc.DispatchHistory {
+	return app.DispatchHistory{Svc: m.svc}
+}
 
 // FormAvailability cho pf/party (P2): menu "Báo cáo đột xuất" chỉ hiện khi phòng ban có mẫu loại đó.
 func (m *Module) FormAvailability() partyport.FormAvailability {
@@ -116,7 +120,7 @@ func (m *Module) FormUsage() mdport.FormUsage { return app.FormUsage{Svc: m.svc}
 
 // UseEgress (G5, ADR-0024 mục 3) nối điểm kiểm soát xuất dùng chung (pf/metering, kênh
 // report_export) sau điểm kiểm soát cục bộ ở ba lối (yêu cầu, lịch, tải). cp nil → hành vi cũ.
-func (m *Module) UseEgress(cp meteringport.Checkpoint, mode meteringport.Mode) {
+func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode) {
 	m.svc.Egress, m.svc.EgressMode = cp, mode
 }
 

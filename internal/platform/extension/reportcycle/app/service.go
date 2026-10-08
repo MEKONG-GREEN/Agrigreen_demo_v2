@@ -17,12 +17,13 @@ import (
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/store"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -58,14 +59,14 @@ type Service struct {
 	Clock clock.Clock
 	Log   *slog.Logger
 
-	Forms       repport.FormEngine   // P3: mẫu, phiên bản, Evaluate, Totals
-	Regions     partyport.Regions    // P2: khu vực của Nút xã
-	Orgs        partyport.Orgs       // tỉnh của Nút trong ngữ cảnh
-	Units       mdport.AdminUnits    // tên xã/tỉnh
-	Params      mdport.Params        // tham số nhắc, đánh số tuần (tạm, Q-15, Q-17)
-	Assignments accport.Assignments  // P1: cán bộ xã phụ trách cùng phòng ban
-	Names       partyport.ActorNames // tên người thao tác trong Log (tùy chọn)
-	Dispatches  port.DispatchHistory // pf/reports: kỳ đã gửi Chi cục (tùy chọn)
+	Forms       repport.FormEngine           // P3: mẫu, phiên bản, Evaluate, Totals
+	Regions     partyport.Regions            // P2: khu vực của Nút xã
+	Orgs        partyport.Orgs               // tỉnh của Nút trong ngữ cảnh
+	Units       partyport.AdminUnits         // tên xã/tỉnh
+	Params      params.Params                // tham số nhắc, đánh số tuần (tạm, Q-15, Q-17)
+	Assignments accport.Assignments          // P1: cán bộ xã phụ trách cùng phòng ban
+	Names       partyport.ActorNames         // tên người thao tác trong Log (tùy chọn)
+	Dispatches  extensionsrc.DispatchHistory // pf/reports: kỳ đã gửi Chi cục (tùy chọn)
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

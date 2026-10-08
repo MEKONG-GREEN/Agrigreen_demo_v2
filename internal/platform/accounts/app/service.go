@@ -20,7 +20,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/store"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -28,6 +27,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/modreg"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -72,11 +72,11 @@ type Service struct {
 	// (pf/party), tra nông hộ theo SĐT (kho định danh), hạn lượt kích hoạt (pf/masterdata).
 	Households partyport.Households
 	Vault      client.Client
-	Params     mdport.Params
+	Params     params.Params
 	// KN v7.7 gói P1: phòng ban của đơn vị (pf/party P2), tên xã (pf/masterdata), danh bạ tên dự phòng
 	// cho khung Log (pf/extension). Nil Departments → route KN trả 503.
 	Departments partyport.Departments
-	Units       mdport.AdminUnits
+	Units       partyport.AdminUnits
 	Names       partyport.ActorNames
 	// W1.4 (R-MOD-08): trạng thái bật module theo đơn vị (pf/party) — chặn cấp vai của module đã tắt.
 	Modules partyport.ModuleEnablement

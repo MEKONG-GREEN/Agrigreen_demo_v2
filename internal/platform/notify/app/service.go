@@ -10,8 +10,6 @@ import (
 
 	"github.com/google/uuid"
 
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/channel"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
@@ -53,8 +51,8 @@ const (
 type Deps struct {
 	Scope   partyport.ScopeResolver // phạm vi người xem; nil → phạm vi rỗng
 	Devices syncport.Devices        // kiểm thiết bị khi gắn token đẩy
-	Staff   extport.StaffDirectory  // danh bạ cán bộ (người nhận chính xác)
-	Units   mdport.AdminUnits       // mở rộng tỉnh → xã cho thông báo chủ đề
+	Staff   port.StaffDirectory     // danh bạ cán bộ (người nhận chính xác)
+	Units   partyport.AdminUnits    // mở rộng tỉnh → xã cho thông báo chủ đề
 	// Farmers: tài khoản nông dân có thửa trong địa bàn (cảnh báo khẩn HTX US-NEWS-03); nil → chỉ chủ đề.
 	Farmers port.AreaFarmers
 	Pusher  channel.Pusher // chỉ worker cần

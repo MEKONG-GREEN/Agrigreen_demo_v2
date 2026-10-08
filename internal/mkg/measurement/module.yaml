@@ -1,5 +1,5 @@
 # Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
-# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, consumes, permissions, owns_schema.
 # Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
 name: mkg/measurement
 aka: [mkg/measurement]
@@ -7,7 +7,6 @@ kind: domain
 zones: [mkg, ts]
 version: 1.0.0
 depends:
-  mkg/fieldops: ">=1.0 <2"
   mkg/hub: ">=1.0 <2"
 provides:
   ports:
@@ -28,6 +27,8 @@ provides:
     - mkg.measurement.weigh_ticket.recorded/v1
   publications: [mrv_collection_evidence]
   data_products: []
+consumes:
+  events: [mkg.fieldops.roll_count.recorded/v1]
 permissions:
     - device_approver
     - dispute_officer

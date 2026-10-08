@@ -39,10 +39,10 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-public/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
@@ -125,7 +125,7 @@ func run(ctx context.Context, log *slog.Logger, getenv func(string) string) erro
 		log.Warn("AG_VALKEY_URL đã đặt nhưng adapter Valkey chưa có ở G5-1 — dùng giới hạn trong tiến trình chia theo AG_PUBLIC_REPLICAS",
 			"event", "startup", "outcome", "degraded")
 	}
-	mode, err := meteringport.ParseMode(getenv(meteringport.EnvEgressMode))
+	mode, err := meter.ParseMode(getenv(meter.EnvEgressMode))
 	if err != nil {
 		return err
 	}

@@ -1,9 +1,15 @@
 // Lệnh modgen tính lại các trường SINH của module.yaml (ADR-0027, gói W1.1) từ mã
 // nguồn và migration, rồi ghi lại (mặc định) hoặc chỉ kiểm (-check, dùng trong CI):
 //
-//   - depends: module khác mà mã KHÔNG phải kiểm thử import (port/, vault client/).
+//   - depends: module khác mà mã KHÔNG phải kiểm thử import (port/, vault client/) và dùng ít nhất một
+//     định danh tạo phụ thuộc gọi (interface, hàm, biến, lỗi, kiểu không phải sự kiện).
 //     Phụ thuộc mới nhận ràng buộc mặc định ">=MAJOR.MINOR <MAJOR+1" theo phiên bản
 //     hiện có của module được phụ thuộc; ràng buộc đã sửa tay được giữ.
+//   - consumes.events: sự kiện của module khác mà mã nhắc tới (kiểu payload //ag:event,
+//     //ag:internal-event, hoặc hằng Event* mang tên sự kiện). Import chỉ dùng hợp đồng dữ liệu
+//     — kiểu sự kiện và hằng (tên sự kiện, giá trị liệt kê của payload, tên vai) — không tạo
+//     depends: không có lời gọi nào đi qua nó, nên không thuộc đồ thị R-MOD-05 (§7.1 tách
+//     consumes khỏi depends).
 //   - provides.ports: interface xuất trong port/ (vault: client/), gói con có tiền tố.
 //   - provides.events / internal_events / publications / data_products: chỉ thị
 //     //ag:event, //ag:internal-event, //ag:publication, //ag:dataproduct.
@@ -37,6 +43,7 @@ import (
 	"go/token"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -77,12 +84,17 @@ func run(root string, check bool) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	idx, err := indexPorts(root, dirs)
+	if err != nil {
+		return nil, err
+	}
 	scans := map[string]*scan{}
 	for _, d := range dirs {
 		s, err := scanModule(root, d)
 		if err != nil {
 			return nil, err
 		}
+		s.classify(idx)
 		scans[s.name] = s
 	}
 	owners := schemaOwners(scans, created)
@@ -109,7 +121,13 @@ func run(root string, check bool) ([]string, error) {
 		return nil, err
 	}
 
+	type write struct {
+		path  string
+		data  []byte
+		isNew bool
+	}
 	var stale []string
+	var writes []write
 	var all []*modreg.Manifest
 	for _, d := range dirs {
 		name := modreg.NameForDir(d)
@@ -123,12 +141,14 @@ func run(root string, check bool) ([]string, error) {
 		for _, dep := range s.deps {
 			c, ok := m.Depends[dep]
 			if !ok {
-				c = "*"
+				// Module chưa có manifest được tạo khung ở 1.0.0 ngay trong lượt này.
+				v := modreg.Version{Major: 1}
 				if dm := existing[dep]; dm != nil {
-					if v, err := modreg.ParseVersion(dm.Version); err == nil {
-						c = modreg.DefaultConstraint(v)
+					if dv, err := modreg.ParseVersion(dm.Version); err == nil {
+						v = dv
 					}
 				}
+				c = modreg.DefaultConstraint(v)
 			}
 			next.Depends[dep] = c
 		}
@@ -139,6 +159,7 @@ func run(root string, check bool) ([]string, error) {
 			Publications:   s.directives["publication"],
 			DataProducts:   s.directives["dataproduct"],
 		}
+		next.Consumes = modreg.Consumes{Events: s.consumes}
 		next.Permissions = s.roles
 		next.OwnsSchema = owners[name]
 		all = append(all, &next)
@@ -150,18 +171,31 @@ func run(root string, check bool) ([]string, error) {
 			continue
 		}
 		stale = append(stale, d+"/"+modreg.FileName)
-		if !check {
-			if err := os.WriteFile(p, want, 0o644); err != nil { //nolint:gosec // tệp nguồn trong repo
-				return stale, err
+		writes = append(writes, write{path: p, data: want, isNew: existing[name] == nil})
+	}
+	reg, verr := modreg.New(all)
+	if verr != nil {
+		if check {
+			return stale, fmt.Errorf("module.yaml không hợp lệ:\n%w", verr)
+		}
+		// Kiểm trước khi ghi: khi bộ manifest không hợp lệ, KHÔNG ghi đè tệp đã có; chỉ
+		// tạo khung cho tệp chưa có để điền tay (kind/zones/enable) rồi chạy lại.
+		for _, w := range writes {
+			if w.isNew {
+				if err := os.WriteFile(w.path, w.data, 0o644); err != nil { //nolint:gosec // tệp nguồn trong repo
+					return nil, err
+				}
 			}
 		}
+		return nil, fmt.Errorf("module.yaml không hợp lệ (chưa ghi đè tệp đã có):\n%w", verr)
 	}
 	if !check {
+		for _, w := range writes {
+			if err := os.WriteFile(w.path, w.data, 0o644); err != nil { //nolint:gosec // tệp nguồn trong repo
+				return nil, err
+			}
+		}
 		stale = nil
-	}
-	reg, err := modreg.New(all)
-	if err != nil {
-		return stale, fmt.Errorf("module.yaml không hợp lệ:\n%w", err)
 	}
 	// W1.4: danh mục lúc chạy (tên, tầng, enable, vai) cho bật module theo đơn vị.
 	cat, err := modreg.FormatCatalog(all)
@@ -356,22 +390,182 @@ func createdSchemas(dir string) (map[string]string, error) {
 type scan struct {
 	name       string
 	deps       []string
+	consumes   []string // sự kiện <tên>/v<N> của module khác
 	ports      []string
 	roles      []string
 	directives map[string][]string
 	literals   map[string]bool // các chuỗi trong mã không phải kiểm thử (để tìm schema)
+	// uses: module khác → gói import → định danh dùng qua gói đó; opaque: module import kiểu _ hoặc .
+	uses   map[string]map[string]map[string]bool
+	opaque map[string]bool
+}
+
+// symClass là lớp của một định danh cấp gói trong port của module.
+type symClass int
+
+const (
+	symOther symClass = iota // interface, hàm, biến, kiểu thường: tạo phụ thuộc gọi
+	symConst                 // hằng: hợp đồng dữ liệu
+	symEvent                 // kiểu payload //ag:event, //ag:internal-event
+)
+
+// portPkg là chỉ mục định danh của một gói port: lớp, và sự kiện mà định danh đó đại diện.
+type portPkg struct {
+	class  map[string]symClass
+	events map[string][]string
+}
+
+// indexPorts lập chỉ mục mọi gói port/ (vault: client/) của các module, theo đường dẫn import.
+func indexPorts(root string, dirs []string) (map[string]*portPkg, error) {
+	out := map[string]*portPkg{}
+	for _, d := range dirs {
+		pd := d + "/port"
+		if strings.HasPrefix(d, "internal/vault/") {
+			pd = d + "/client"
+		}
+		base := filepath.Join(root, filepath.FromSlash(pd))
+		if _, err := os.Stat(base); errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		consts := map[string]map[string]string{} // gói → hằng → giá trị chuỗi
+		err := filepath.WalkDir(base, func(p string, de fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if de.IsDir() || !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
+				return nil
+			}
+			rel, err := filepath.Rel(root, filepath.Dir(p))
+			if err != nil {
+				return err
+			}
+			ip := modulePath + "/" + filepath.ToSlash(rel)
+			f, err := parser.ParseFile(token.NewFileSet(), p, nil, parser.ParseComments)
+			if err != nil {
+				return err
+			}
+			pk := out[ip]
+			if pk == nil {
+				pk = &portPkg{class: map[string]symClass{}, events: map[string][]string{}}
+				out[ip] = pk
+				consts[ip] = map[string]string{}
+			}
+			indexFile(f, pk, consts[ip])
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		// Hằng Event* mang tên sự kiện (không phiên bản) đại diện mọi phiên bản sự kiện đó của gói.
+		for ip, cs := range consts {
+			var evs []string
+			for _, es := range out[ip].events {
+				evs = append(evs, es...)
+			}
+			for name, v := range cs {
+				for _, e := range evs {
+					if n, _, _ := strings.Cut(e, "/v"); n == v {
+						out[ip].events[name] = append(out[ip].events[name], e)
+					}
+				}
+			}
+		}
+	}
+	return out, nil
+}
+
+func indexFile(f *ast.File, pk *portPkg, consts map[string]string) {
+	for _, decl := range f.Decls {
+		switch dd := decl.(type) {
+		case *ast.FuncDecl:
+			if dd.Recv == nil {
+				pk.class[dd.Name.Name] = symOther
+			}
+		case *ast.GenDecl:
+			for _, spec := range dd.Specs {
+				switch sp := spec.(type) {
+				case *ast.ValueSpec:
+					for i, n := range sp.Names {
+						if dd.Tok != token.CONST {
+							pk.class[n.Name] = symOther
+							continue
+						}
+						pk.class[n.Name] = symConst
+						if i < len(sp.Values) {
+							if lit, ok := sp.Values[i].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+								consts[n.Name], _ = strconv.Unquote(lit.Value)
+							}
+						}
+					}
+				case *ast.TypeSpec:
+					doc := sp.Doc
+					if doc == nil && len(dd.Specs) == 1 {
+						doc = dd.Doc
+					}
+					pk.class[sp.Name.Name] = symOther
+					if doc == nil {
+						continue
+					}
+					for _, c := range doc.List {
+						mm := reDirective.FindStringSubmatch(c.Text)
+						if mm == nil || (mm[1] != "event" && mm[1] != "internal-event") {
+							continue
+						}
+						e := mm[2]
+						if mm[3] != "" {
+							e += "/" + mm[3]
+						}
+						pk.class[sp.Name.Name] = symEvent
+						pk.events[sp.Name.Name] = append(pk.events[sp.Name.Name], e)
+					}
+				}
+			}
+		}
+	}
+}
+
+// classify tách các module được import thành depends (có định danh tạo phụ thuộc gọi) và consumes.events.
+func (s *scan) classify(idx map[string]*portPkg) {
+	deps := map[string]bool{}
+	events := map[string]bool{}
+	for dep, pkgs := range s.uses {
+		if s.opaque[dep] {
+			deps[dep] = true
+		}
+		for ip, syms := range pkgs {
+			pk := idx[ip]
+			if pk == nil { // không phải gói port: archlint cấm, coi như phụ thuộc
+				deps[dep] = true
+				continue
+			}
+			for sym := range syms {
+				c, known := pk.class[sym]
+				if !known || c == symOther {
+					deps[dep] = true
+				}
+				for _, e := range pk.events[sym] {
+					events[e] = true
+				}
+			}
+		}
+	}
+	for dep := range s.opaque {
+		deps[dep] = true
+	}
+	s.deps = keys(deps)
+	s.consumes = keys(events)
 }
 
 var reDirective = regexp.MustCompile(`^//ag:(event|internal-event|publication|dataproduct)\s+(\S+)(?:\s+(v[0-9]+))?`)
 
 func scanModule(root, dir string) (*scan, error) {
-	s := &scan{name: modreg.NameForDir(dir), directives: map[string][]string{}, literals: map[string]bool{}}
+	s := &scan{name: modreg.NameForDir(dir), directives: map[string][]string{}, literals: map[string]bool{},
+		uses: map[string]map[string]map[string]bool{}, opaque: map[string]bool{}}
 	portDir := dir + "/port"
 	if strings.HasPrefix(dir, "internal/vault/") {
 		portDir = dir + "/client"
 	}
 	selfPrefix := modulePath + "/" + dir + "/"
-	deps := map[string]bool{}
 	ports := map[string]bool{}
 	roles := map[string]bool{}
 	dirs := map[string]map[string]bool{}
@@ -400,9 +594,34 @@ func scanModule(root, dir string) (*scan, error) {
 		}
 		for _, imp := range f.Imports {
 			ip, _ := strconv.Unquote(imp.Path.Value)
-			if dep := moduleOf(ip); dep != "" && !strings.HasPrefix(ip+"/", selfPrefix) {
-				deps[dep] = true
+			dep := moduleOf(ip)
+			if dep == "" || strings.HasPrefix(ip+"/", selfPrefix) {
+				continue
 			}
+			alias := path.Base(ip)
+			if imp.Name != nil {
+				alias = imp.Name.Name
+			}
+			if alias == "_" || alias == "." {
+				s.opaque[dep] = true
+				continue
+			}
+			if s.uses[dep] == nil {
+				s.uses[dep] = map[string]map[string]bool{}
+			}
+			syms := s.uses[dep][ip]
+			if syms == nil {
+				syms = map[string]bool{}
+				s.uses[dep][ip] = syms
+			}
+			ast.Inspect(f, func(n ast.Node) bool {
+				if se, ok := n.(*ast.SelectorExpr); ok {
+					if id, ok := se.X.(*ast.Ident); ok && id.Name == alias && id.Obj == nil {
+						syms[se.Sel.Name] = true
+					}
+				}
+				return true
+			})
 		}
 		for _, cg := range f.Comments {
 			for _, c := range cg.List {
@@ -438,7 +657,6 @@ func scanModule(root, dir string) (*scan, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.deps = keys(deps)
 	s.ports = keys(ports)
 	s.roles = keys(roles)
 	for k, v := range dirs {

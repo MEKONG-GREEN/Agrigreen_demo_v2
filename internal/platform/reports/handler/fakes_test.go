@@ -8,14 +8,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
-	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
+	accountsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/cropcyclesrc"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/mechanizationsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 )
 
 // Mã đơn vị theo danh mục chính thức sau sắp xếp 2025 (docs/requirements/danh-muc-hanh-chinh.md):
@@ -25,25 +27,27 @@ const (
 	pCT, cCaiKhe           = "92", "31120"
 )
 
-type fakeUnits struct{ units map[string]mdport.AdminUnit }
+type fakeUnits struct {
+	units map[string]partyport.AdminUnit
+}
 
 func newFakeUnits() *fakeUnits {
-	f := &fakeUnits{units: map[string]mdport.AdminUnit{}}
-	add := func(code, name string, lvl mdport.Level, parent string) {
-		f.units[code] = mdport.AdminUnit{Code: code, Name: name, Level: lvl, ParentCode: parent}
+	f := &fakeUnits{units: map[string]partyport.AdminUnit{}}
+	add := func(code, name string, lvl partyport.Level, parent string) {
+		f.units[code] = partyport.AdminUnit{Code: code, Name: name, Level: lvl, ParentCode: parent}
 	}
-	add(pAG, "An Giang", mdport.LevelProvince, "")
-	add(cBinhDuc, "Phường Bình Đức", mdport.LevelCommune, pAG)
-	add(cMyThoi, "Phường Mỹ Thới", mdport.LevelCommune, pAG)
-	add(pCT, "Cần Thơ", mdport.LevelProvince, "")
-	add(cCaiKhe, "Phường Cái Khế", mdport.LevelCommune, pCT)
+	add(pAG, "An Giang", partyport.LevelProvince, "")
+	add(cBinhDuc, "Phường Bình Đức", partyport.LevelCommune, pAG)
+	add(cMyThoi, "Phường Mỹ Thới", partyport.LevelCommune, pAG)
+	add(pCT, "Cần Thơ", partyport.LevelProvince, "")
+	add(cCaiKhe, "Phường Cái Khế", partyport.LevelCommune, pCT)
 	return f
 }
 
-func (f *fakeUnits) Get(_ context.Context, code string, _ time.Time) (mdport.AdminUnit, error) {
+func (f *fakeUnits) Get(_ context.Context, code string, _ time.Time) (partyport.AdminUnit, error) {
 	u, ok := f.units[code]
 	if !ok {
-		return mdport.AdminUnit{}, mdport.ErrUnitNotFound
+		return partyport.AdminUnit{}, partyport.ErrUnitNotFound
 	}
 	return u, nil
 }
@@ -73,14 +77,14 @@ func (f *fakeParams) set(key, val string) {
 	f.v[key] = decimal.RequireFromString(val)
 }
 
-func (f *fakeParams) At(_ context.Context, key string, at time.Time) (mdport.ParamValue, error) {
+func (f *fakeParams) At(_ context.Context, key string, at time.Time) (params.ParamValue, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	v, ok := f.v[key]
 	if !ok {
-		return mdport.ParamValue{}, mdport.ErrParamNotFound
+		return params.ParamValue{}, params.ErrParamNotFound
 	}
-	return mdport.ParamValue{Key: key, Value: v, Version: 1, EffectiveFrom: at}, nil
+	return params.ParamValue{Key: key, Value: v, Version: 1, EffectiveFrom: at}, nil
 }
 
 type fakeCatalogs struct{}
@@ -152,16 +156,16 @@ func dp(s string) *decimal.Decimal {
 // fakeExt là cổng dữ liệu pf/extension giả: số liệu cố định, ghi lại truy vấn.
 type fakeExt struct {
 	mu   sync.Mutex
-	last extport.ReportQuery
+	last extensionsrc.ReportQuery
 }
 
-func (f *fakeExt) record(q extport.ReportQuery) {
+func (f *fakeExt) record(q extensionsrc.ReportQuery) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.last = q
 }
 
-func (f *fakeExt) lastQuery() extport.ReportQuery {
+func (f *fakeExt) lastQuery() extensionsrc.ReportQuery {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.last
@@ -171,58 +175,58 @@ func inScope(sc authz.Scope, commune, province string) bool {
 	return sc.All || sc.Allows(commune) || sc.Allows(province)
 }
 
-func (f *fakeExt) Sowing(_ context.Context, q extport.ReportQuery) (extport.SowingData, error) {
+func (f *fakeExt) Sowing(_ context.Context, q extensionsrc.ReportQuery) (extensionsrc.SowingData, error) {
 	f.record(q)
-	all := []extport.SowingRow{
+	all := []extensionsrc.SowingRow{
 		{ProvinceCode: pAG, CommuneCode: cBinhDuc, SeasonCode: "HT", VarietyCode: "ST25", SownAreaHa: d("1234.5678"), Cooperatives: 2, Reports: 3},
 		{ProvinceCode: pAG, CommuneCode: cBinhDuc, SeasonCode: "HT", VarietyCode: "OM5451", SownAreaHa: d("0.1"), Cooperatives: 1, Reports: 1},
 		{ProvinceCode: pCT, CommuneCode: cCaiKhe, SeasonCode: "HT", VarietyCode: "ST25", SownAreaHa: d("10"), Cooperatives: 1, Reports: 1},
 	}
-	var out extport.SowingData
+	var out extensionsrc.SowingData
 	for _, r := range all {
 		if inScope(q.Scope, r.CommuneCode, r.ProvinceCode) {
 			out.Rows = append(out.Rows, r)
 		}
 	}
-	out.Completeness = extport.Completeness{ExpectedCommunes: 2, ReportedCommunes: 1, MissingCommunes: []string{cMyThoi}, Provisional: true}
+	out.Completeness = extensionsrc.Completeness{ExpectedCommunes: 2, ReportedCommunes: 1, MissingCommunes: []string{cMyThoi}, Provisional: true}
 	return out, nil
 }
 
-func (f *fakeExt) GrowthPest(_ context.Context, q extport.ReportQuery) (extport.PestData, error) {
+func (f *fakeExt) GrowthPest(_ context.Context, q extensionsrc.ReportQuery) (extensionsrc.PestData, error) {
 	f.record(q)
-	return extport.PestData{}, nil
+	return extensionsrc.PestData{}, nil
 }
 
-func (f *fakeExt) ProgramProgress(_ context.Context, q extport.ReportQuery) (extport.ProgramData, error) {
+func (f *fakeExt) ProgramProgress(_ context.Context, q extensionsrc.ReportQuery) (extensionsrc.ProgramData, error) {
 	f.record(q)
-	return extport.ProgramData{Targets: map[string]*decimal.Decimal{}}, nil
+	return extensionsrc.ProgramData{Targets: map[string]*decimal.Decimal{}}, nil
 }
 
-func (f *fakeExt) TasksSLA(_ context.Context, q extport.ReportQuery) (extport.TaskData, error) {
+func (f *fakeExt) TasksSLA(_ context.Context, q extensionsrc.ReportQuery) (extensionsrc.TaskData, error) {
 	f.record(q)
-	return extport.TaskData{}, nil
+	return extensionsrc.TaskData{}, nil
 }
 
-func (f *fakeExt) PeriodSummary(_ context.Context, q extport.ReportQuery) (extport.SummaryData, error) {
+func (f *fakeExt) PeriodSummary(_ context.Context, q extensionsrc.ReportQuery) (extensionsrc.SummaryData, error) {
 	f.record(q)
-	return extport.SummaryData{}, nil
+	return extensionsrc.SummaryData{}, nil
 }
 
 // fakeMech trả "kết quả cân đối đã lưu" cố định — số có 4 chữ số thập phân để
 // kiểm tệp xuất giữ nguyên, không làm tròn hay tính lại.
 type fakeMech struct {
-	run       mechport.RunInfo
+	run       mechanizationsrc.RunInfo
 	coop      uuid.UUID
-	shortages []mechport.ShortageRow
+	shortages []mechanizationsrc.ShortageRow
 }
 
 func newFakeMech(coop uuid.UUID) *fakeMech {
 	w := 5
 	return &fakeMech{
 		coop: coop,
-		run: mechport.RunInfo{RunID: ids.New(), SeasonCode: "DX", SeasonYear: 2025, ComputedAt: time.Date(2026, 9, 20, 2, 0, 0, 0, time.UTC),
+		run: mechanizationsrc.RunInfo{RunID: ids.New(), SeasonCode: "DX", SeasonYear: 2025, ComputedAt: time.Date(2026, 9, 20, 2, 0, 0, 0, time.UTC),
 			RuleVersion: "cgh.balance/v1", ThresholdsComplete: true},
-		shortages: []mechport.ShortageRow{{
+		shortages: []mechanizationsrc.ShortageRow{{
 			ResultID: ids.New(), CooperativeRef: coop, CooperativeCode: "HTX000001", CooperativeName: "HTX Lúa Xanh Bình Đức",
 			ProvinceCode: pAG, CommuneCode: cBinhDuc, FarmStage: "lam_dat", MachineType: "MLD", Capacity: 3,
 			Required: dp("4.9999"), RequiredWhole: &w, Shortage: 2, CoveragePct: dp("60.0012"), Status: "attention", AreaSource: "manual",
@@ -230,20 +234,20 @@ func newFakeMech(coop uuid.UUID) *fakeMech {
 	}
 }
 
-func (f *fakeMech) Coverage(_ context.Context, q mechport.ReportQuery) (mechport.CoverageData, error) {
+func (f *fakeMech) Coverage(_ context.Context, q mechanizationsrc.ReportQuery) (mechanizationsrc.CoverageData, error) {
 	w := 12
-	return mechport.CoverageData{Run: f.run, Rows: []mechport.CoverageRow{{
+	return mechanizationsrc.CoverageData{Run: f.run, Rows: []mechanizationsrc.CoverageRow{{
 		ProvinceCode: pAG, FarmStage: "lam_dat", MachineType: "MLD", Cooperatives: 2,
-		Figures: mechport.Figures{Required: dp("11.2345"), RequiredWhole: &w, Capacity: 9, CoveragePct: dp("80.1103"), Status: "attention", StatusLabel: "Cần chú ý"},
+		Figures: mechanizationsrc.Figures{Required: dp("11.2345"), RequiredWhole: &w, Capacity: 9, CoveragePct: dp("80.1103"), Status: "attention", StatusLabel: "Cần chú ý"},
 	}}}, nil
 }
 
-func (f *fakeMech) Shortage(_ context.Context, q mechport.ReportQuery) (mechport.ShortageData, error) {
-	return mechport.ShortageData{Run: f.run, Rows: f.shortages}, nil
+func (f *fakeMech) Shortage(_ context.Context, q mechanizationsrc.ReportQuery) (mechanizationsrc.ShortageData, error) {
+	return mechanizationsrc.ShortageData{Run: f.run, Rows: f.shortages}, nil
 }
 
-func (f *fakeMech) SeasonCompare(_ context.Context, q mechport.CompareQuery) (mechport.CompareData, error) {
-	return mechport.CompareData{RunA: f.run, RunB: f.run}, nil
+func (f *fakeMech) SeasonCompare(_ context.Context, q mechanizationsrc.CompareQuery) (mechanizationsrc.CompareData, error) {
+	return mechanizationsrc.CompareData{RunA: f.run, RunB: f.run}, nil
 }
 
 // fakeDirectory: email của tài khoản (pf/accounts giả).
@@ -253,11 +257,11 @@ type fakeDirectory struct {
 }
 
 // OrgRecipients: tài khoản của tổ chức có email (HTX US-DASH-03).
-func (f fakeDirectory) OrgRecipients(_ context.Context, _ uuid.UUID, org uuid.UUID) ([]port.Recipient, error) {
-	out := []port.Recipient{}
+func (f fakeDirectory) OrgRecipients(_ context.Context, _ uuid.UUID, org uuid.UUID) ([]accountsport.Recipient, error) {
+	out := []accountsport.Recipient{}
 	for actor, o := range f.members {
 		if e, ok := f.emails[actor]; ok && o == org {
-			out = append(out, port.Recipient{ActorRef: actor, DisplayName: "Cán bộ HTX", MaskedEmail: e[:2] + "•••"})
+			out = append(out, accountsport.Recipient{ActorRef: actor, DisplayName: "Cán bộ HTX", MaskedEmail: e[:2] + "•••"})
 		}
 	}
 	return out, nil
@@ -266,7 +270,7 @@ func (f fakeDirectory) OrgRecipients(_ context.Context, _ uuid.UUID, org uuid.UU
 func (f fakeDirectory) EmailOf(_ context.Context, _ uuid.UUID, actor uuid.UUID) (string, error) {
 	e, ok := f.emails[actor]
 	if !ok {
-		return "", port.ErrNoEmail
+		return "", accountsport.ErrNoEmail
 	}
 	return e, nil
 }
@@ -290,15 +294,15 @@ func (f *fakeMailer) messages() []port.Message {
 }
 
 var (
-	_ partyport.Orgs          = (*orgTree)(nil)
-	_ partyport.ScopeResolver = (*orgTree)(nil)
-	_ mdport.AdminUnits       = (*fakeUnits)(nil)
-	_ mdport.Params           = (*fakeParams)(nil)
-	_ mdport.Catalogs         = fakeCatalogs{}
-	_ extport.ReportData      = (*fakeExt)(nil)
-	_ mechport.ReportData     = (*fakeMech)(nil)
-	_ ccport.ReportData       = (*fakeCC)(nil)
-	_ port.MailDirectory      = fakeDirectory{}
-	_ port.RecipientDirectory = fakeDirectory{}
-	_ port.Mailer             = (*fakeMailer)(nil)
+	_ partyport.Orgs                  = (*orgTree)(nil)
+	_ partyport.ScopeResolver         = (*orgTree)(nil)
+	_ partyport.AdminUnits            = (*fakeUnits)(nil)
+	_ params.Params                   = (*fakeParams)(nil)
+	_ mdport.Catalogs                 = fakeCatalogs{}
+	_ extensionsrc.ReportData         = (*fakeExt)(nil)
+	_ mechanizationsrc.ReportData     = (*fakeMech)(nil)
+	_ cropcyclesrc.ReportData         = (*fakeCC)(nil)
+	_ accountsport.MailDirectory      = fakeDirectory{}
+	_ accountsport.RecipientDirectory = fakeDirectory{}
+	_ port.Mailer                     = (*fakeMailer)(nil)
 )

@@ -7,9 +7,9 @@ import (
 
 	"github.com/google/uuid"
 
+	accountsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -35,7 +35,7 @@ func coopManager(ctx context.Context) (authz.Principal, error) {
 
 // CoopRecipients liệt kê người nhận chọn được cho lịch của quản lý HTX: tài khoản đang
 // bật, email đã xác minh, thuộc HTX của người gọi (HTX US-DASH-03).
-func (s *Service) CoopRecipients(ctx context.Context) ([]port.Recipient, error) {
+func (s *Service) CoopRecipients(ctx context.Context) ([]accountsport.Recipient, error) {
 	p, err := coopManager(ctx)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (s *Service) CreateCoopSchedule(ctx context.Context, in ScheduleInput) (dom
 			return domain.Schedule{}, false, err
 		}
 		for _, r := range in.Schedule.Recipients {
-			if !slices.ContainsFunc(list, func(x port.Recipient) bool { return x.ActorRef == r }) {
+			if !slices.ContainsFunc(list, func(x accountsport.Recipient) bool { return x.ActorRef == r }) {
 				return domain.Schedule{}, false, ErrRecipientNotInCoop.WithField("recipients", "chỉ chọn tài khoản đã đăng ký, có email đã xác minh của HTX")
 			}
 		}

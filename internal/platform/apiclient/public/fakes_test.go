@@ -19,10 +19,10 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/public"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 )
 
 // fakeAuth: khóa → bên gọi (tenant bên gọi chỉ đến từ bản ghi khóa).
@@ -49,49 +49,49 @@ func (f fakePlans) PlanFor(_ context.Context, _, clientID uuid.UUID, _ time.Time
 // status 429 units 0 + ErrQuotaExceeded; Remaining đọc cùng bộ đếm.
 type fakeMetering struct {
 	mu      sync.Mutex
-	calls   []meteringport.Call
+	calls   []meter.Call
 	units   []int64
 	monthly int64
 	used    int64
 	err     error
 }
 
-func (f *fakeMetering) Record(_ context.Context, _ uuid.UUID, c meteringport.Call) (meteringport.Recorded, error) {
+func (f *fakeMetering) Record(_ context.Context, _ uuid.UUID, c meter.Call) (meter.Recorded, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.err != nil {
-		return meteringport.Recorded{}, f.err
+		return meter.Recorded{}, f.err
 	}
-	u := meteringport.UnitsV1(c)
+	u := meter.UnitsV1(c)
 	if u > 0 && f.used+u > f.monthly {
-		c.Status, c.ProblemCode = http.StatusTooManyRequests, meteringport.ErrQuotaExceeded.Code
+		c.Status, c.ProblemCode = http.StatusTooManyRequests, meter.ErrQuotaExceeded.Code
 		f.calls, f.units = append(f.calls, c), append(f.units, 0)
-		return meteringport.Recorded{}, meteringport.ErrQuotaExceeded
+		return meter.Recorded{}, meter.ErrQuotaExceeded
 	}
 	f.used += u
 	f.calls, f.units = append(f.calls, c), append(f.units, u)
-	return meteringport.Recorded{EventID: ids.New(), Units: u, RuleVersion: meteringport.RuleUnitsV1, MonthlyRemaining: f.monthly - f.used,
+	return meter.Recorded{EventID: ids.New(), Units: u, RuleVersion: meter.RuleUnitsV1, MonthlyRemaining: f.monthly - f.used,
 		DailyRemaining: f.monthly - f.used}, nil
 }
 
-func (f *fakeMetering) Remaining(context.Context, uuid.UUID, uuid.UUID, string, time.Time) (meteringport.Remaining, error) {
+func (f *fakeMetering) Remaining(context.Context, uuid.UUID, uuid.UUID, string, time.Time) (meter.Remaining, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return meteringport.Remaining{DailyUnits: f.monthly - f.used, MonthlyUnits: f.monthly - f.used}, nil
+	return meter.Remaining{DailyUnits: f.monthly - f.used, MonthlyUnits: f.monthly - f.used}, nil
 }
 
-func (f *fakeMetering) UsageOf(context.Context, uuid.UUID, uuid.UUID, time.Time, time.Time) ([]meteringport.UsageDay, error) {
-	return []meteringport.UsageDay{{Date: "2026-10-01", Product: port.ProductCollectionVolume, Calls: 2, Units: 2}}, nil
+func (f *fakeMetering) UsageOf(context.Context, uuid.UUID, uuid.UUID, time.Time, time.Time) ([]meter.UsageDay, error) {
+	return []meter.UsageDay{{Date: "2026-10-01", Product: port.ProductCollectionVolume, Calls: 2, Units: 2}}, nil
 }
 
-func (f *fakeMetering) snapshot() ([]meteringport.Call, int64) {
+func (f *fakeMetering) snapshot() ([]meter.Call, int64) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	var sum int64
 	for _, u := range f.units {
 		sum += u
 	}
-	return append([]meteringport.Call(nil), f.calls...), sum
+	return append([]meter.Call(nil), f.calls...), sum
 }
 
 // fakeGrants: cấp quyền (bên cấp → bên nhận, loại). Ghi lại grantee đã tra.

@@ -8,7 +8,7 @@ import (
 
 // header đứng đầu mọi module.yaml do tools/modgen ghi.
 const header = `# Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
-# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, consumes, permissions, owns_schema.
 # Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
 `
 
@@ -36,6 +36,8 @@ func Format(m *Manifest) []byte {
 	b.WriteString("  internal_events:" + flow(m.Provides.InternalEvents, true) + "\n")
 	b.WriteString("  publications:" + flow(m.Provides.Publications, true) + "\n")
 	b.WriteString("  data_products:" + flow(m.Provides.DataProducts, true) + "\n")
+	b.WriteString("consumes:\n")
+	b.WriteString("  events:" + flow(m.Consumes.Events, true) + "\n")
 	b.WriteString("permissions:" + flow(m.Permissions, true) + "\n")
 	b.WriteString("shares:" + flow(m.Shares, true) + "\n")
 	b.WriteString("owns_schema:" + flow(m.OwnsSchema, true) + "\n")

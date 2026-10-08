@@ -15,10 +15,11 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 )
 
-func egress(ch port.Channel, dataTenant, counterparty uuid.UUID, records int64, at time.Time) port.Egress {
-	return port.Egress{SourceID: ids.New(), Channel: ch, DataTenantID: dataTenant, CounterpartyKind: port.CounterpartyTenant,
+func egress(ch meter.Channel, dataTenant, counterparty uuid.UUID, records int64, at time.Time) meter.Egress {
+	return meter.Egress{SourceID: ids.New(), Channel: ch, DataTenantID: dataTenant, CounterpartyKind: meter.CounterpartyTenant,
 		CounterpartyRef: counterparty, Product: "valve_collection", ContractVersion: 1, Records: records, Bytes: records * 100, OccurredAt: at}
 }
 
@@ -28,15 +29,15 @@ func egress(ch port.Channel, dataTenant, counterparty uuid.UUID, records int64, 
 // từ chối.
 func TestCheckpointObserveEnforce_ADR0024(t *testing.T) {
 	ctx := context.Background()
-	f := newFixture(t, port.ModeObserve)
+	f := newFixture(t, meter.ModeObserve)
 	dt, recv := ids.New(), ids.New()
 	at := oct
 
 	// Mỗi kênh một dòng; giao lặp cùng nguồn → không thêm.
-	for _, ch := range port.Channels {
+	for _, ch := range meter.Channels {
 		e := egress(ch, dt, recv, 10, at)
 		for i := 0; i < 2; i++ {
-			if err := port.Guard(ctx, f.mod.Checkpoint(), f.mod.Mode(), e, nil); err != nil {
+			if err := meter.Guard(ctx, f.mod.Checkpoint(), f.mod.Mode(), e, nil); err != nil {
 				t.Fatalf("%s: %v", ch, err)
 			}
 		}
@@ -49,22 +50,22 @@ func TestCheckpointObserveEnforce_ADR0024(t *testing.T) {
 	}
 
 	// Hạn mức kênh valve = 25 (tham số đã duyệt). observe: vượt vẫn cho qua, ghi lý do.
-	f.params.set(dt, port.EgressParam(port.ParamEgressDailyQuotaFmt, port.ChannelValve), "25")
-	d, err := f.mod.Checkpoint().Pass(ctx, egress(port.ChannelValve, dt, recv, 20, at))
-	if err != nil || !d.Allowed || d.Reason != "quota_exceeded" || d.DailyRecords != 30 || d.DailyQuota != 25 || d.Mode != port.ModeObserve {
+	f.params.set(dt, port.EgressParam(port.ParamEgressDailyQuotaFmt, meter.ChannelValve), "25")
+	d, err := f.mod.Checkpoint().Pass(ctx, egress(meter.ChannelValve, dt, recv, 20, at))
+	if err != nil || !d.Allowed || d.Reason != "quota_exceeded" || d.DailyRecords != 30 || d.DailyQuota != 25 || d.Mode != meter.ModeObserve {
 		t.Fatalf("observe vượt hạn mức phải cho qua: %+v %v", d, err)
 	}
-	if err := port.Guard(ctx, f.mod.Checkpoint(), port.ModeObserve, egress(port.ChannelValve, dt, recv, 5, at), nil); err != nil {
+	if err := meter.Guard(ctx, f.mod.Checkpoint(), meter.ModeObserve, egress(meter.ChannelValve, dt, recv, 5, at), nil); err != nil {
 		t.Fatalf("Guard observe: %v", err)
 	}
 
 	// enforce (Phase K): cùng tenant, cùng hạn mức → từ chối, không đếm.
-	enf := metering.New(f.pool, f.clk, metering.Deps{Params: f.params, Mode: port.ModeEnforce})
-	d, err = enf.Checkpoint().Pass(ctx, egress(port.ChannelValve, dt, recv, 1, at))
+	enf := metering.New(f.pool, f.clk, metering.Deps{Params: f.params, Mode: meter.ModeEnforce})
+	d, err = enf.Checkpoint().Pass(ctx, egress(meter.ChannelValve, dt, recv, 1, at))
 	if err != nil || d.Allowed || d.Reason != "quota_exceeded" || d.DailyRecords != 35 {
 		t.Fatalf("enforce phải từ chối: %+v %v", d, err)
 	}
-	if err := port.Guard(ctx, enf.Checkpoint(), enf.Mode(), egress(port.ChannelValve, dt, recv, 1, at), nil); codeOf(err) != "metering.egress_quota_exceeded" {
+	if err := meter.Guard(ctx, enf.Checkpoint(), enf.Mode(), egress(meter.ChannelValve, dt, recv, 1, at), nil); codeOf(err) != "metering.egress_quota_exceeded" {
 		t.Fatalf("Guard enforce: %v", err)
 	}
 	if n := f.count(dt, `SELECT count(*) FROM pf_metering.egress_event WHERE decision = 'denied' AND mode = 'enforce'`); n != 2 {
@@ -74,16 +75,16 @@ func TestCheckpointObserveEnforce_ADR0024(t *testing.T) {
 		t.Fatalf("phần bị từ chối không đếm: %d", n)
 	}
 	// Kênh khác / ngày khác không bị ảnh hưởng.
-	if err := port.Guard(ctx, enf.Checkpoint(), enf.Mode(), egress(port.ChannelValve, dt, recv, 20, at.Add(24*time.Hour)), nil); err != nil {
+	if err := meter.Guard(ctx, enf.Checkpoint(), enf.Mode(), egress(meter.ChannelValve, dt, recv, 20, at.Add(24*time.Hour)), nil); err != nil {
 		t.Fatalf("ngày mới: %v", err)
 	}
 
 	// Checkpoint lỗi hạ tầng: observe → tiếp tục; enforce → metering.egress_unavailable.
 	broken := metering.New(brokenDB{}, clock.NewFixed(at), metering.Deps{})
-	if err := port.Guard(ctx, broken.Checkpoint(), port.ModeObserve, egress(port.ChannelMRVPackage, dt, recv, 1, at), nil); err != nil {
+	if err := meter.Guard(ctx, broken.Checkpoint(), meter.ModeObserve, egress(meter.ChannelMRVPackage, dt, recv, 1, at), nil); err != nil {
 		t.Fatalf("observe + checkpoint lỗi phải tiếp tục: %v", err)
 	}
-	if err := port.Guard(ctx, broken.Checkpoint(), port.ModeEnforce, egress(port.ChannelMRVPackage, dt, recv, 1, at), nil); codeOf(err) != "metering.egress_unavailable" {
+	if err := meter.Guard(ctx, broken.Checkpoint(), meter.ModeEnforce, egress(meter.ChannelMRVPackage, dt, recv, 1, at), nil); codeOf(err) != "metering.egress_unavailable" {
 		t.Fatalf("enforce + checkpoint lỗi: %v", err)
 	}
 	if broken.Metrics().Count("egress_checkpoint_errors:mrv_package") != 2 {
@@ -93,7 +94,7 @@ func TestCheckpointObserveEnforce_ADR0024(t *testing.T) {
 		t.Fatal("thiếu metric ag_egress_records / ag_egress_denied")
 	}
 	// Public API qua Ledger.Record luôn enforce: hạn mức kênh public_api của chủ dữ liệu → 429.
-	f.params.set(dt, port.EgressParam(port.ParamEgressDailyQuotaFmt, port.ChannelPublicAPI), "15")
+	f.params.set(dt, port.EgressParam(port.ParamEgressDailyQuotaFmt, meter.ChannelPublicAPI), "15")
 	client := ids.New()
 	if _, err := f.mod.Ledger().Record(ctx, f.op, call(client, ids.New(), dt, at)); err != nil {
 		t.Fatal(err)
@@ -111,10 +112,10 @@ func TestCheckpointObserveEnforce_ADR0024(t *testing.T) {
 // cảnh báo + MỘT sự kiện pf.metering.egress.anomaly_detected trong ngày; đủ 7 ngày mẫu → so 3 × trung vị.
 func TestEgressAnomalyFirstOfDayOnly_ADR0024(t *testing.T) {
 	ctx := context.Background()
-	f := newFixture(t, port.ModeObserve)
+	f := newFixture(t, meter.ModeObserve)
 	dt, recv := ids.New(), ids.New()
-	f.params.set(dt, port.EgressParam(port.ParamEgressAnomalyRecordsFmt, port.ChannelReportExport), "100")
-	ch := port.ChannelReportExport
+	f.params.set(dt, port.EgressParam(port.ParamEgressAnomalyRecordsFmt, meter.ChannelReportExport), "100")
+	ch := meter.ChannelReportExport
 	for i, n := range []int64{60, 50, 70, 5} {
 		d, err := f.mod.Checkpoint().Pass(ctx, egress(ch, dt, recv, n, oct.Add(time.Duration(i)*time.Minute)))
 		if err != nil || !d.Allowed {
@@ -217,24 +218,24 @@ func (f *fixture) dumpProjections(tid uuid.UUID) map[string][]projRow {
 // thái sống, kể cả lời gọi 429, dòng bị checkpoint từ chối và bảng kê bù.
 func TestRebuildProjectionsEqualsLive_R22(t *testing.T) {
 	ctx := context.Background()
-	f := newFixture(t, port.ModeObserve)
+	f := newFixture(t, meter.ModeObserve)
 	client, ct := ids.New(), ids.New()
 	for i := 0; i < 4; i++ {
 		c := call(client, ct, f.op, oct.Add(time.Duration(i)*20*time.Hour))
 		if i == 3 {
-			c.Product, c.Kind, c.Status, c.DataTenantID = "", port.CallMeta, 200, uuid.Nil
+			c.Product, c.Kind, c.Status, c.DataTenantID = "", meter.CallMeta, 200, uuid.Nil
 		}
 		if _, err := f.mod.Ledger().Record(ctx, f.op, c); err != nil {
 			t.Fatal(err)
 		}
 	}
-	f.params.set(f.op, port.EgressParam(port.ParamEgressDailyQuotaFmt, port.ChannelPublicAPI), "5")
+	f.params.set(f.op, port.EgressParam(port.ParamEgressDailyQuotaFmt, meter.ChannelPublicAPI), "5")
 	if _, err := f.mod.Ledger().Record(ctx, f.op, call(client, ct, f.op, oct.Add(100*time.Hour))); codeOf(err) != "metering.egress_quota_exceeded" {
 		t.Fatalf("muốn bị checkpoint từ chối: %v", err)
 	}
-	enf := metering.New(f.pool, f.clk, metering.Deps{Params: f.params, Mode: port.ModeEnforce})
-	f.params.set(f.op, port.EgressParam(port.ParamEgressDailyQuotaFmt, port.ChannelMRVPackage), "3")
-	_, _ = enf.Checkpoint().Pass(ctx, egress(port.ChannelMRVPackage, f.op, ids.New(), 9, oct))
+	enf := metering.New(f.pool, f.clk, metering.Deps{Params: f.params, Mode: meter.ModeEnforce})
+	f.params.set(f.op, port.EgressParam(port.ParamEgressDailyQuotaFmt, meter.ChannelMRVPackage), "3")
+	_, _ = enf.Checkpoint().Pass(ctx, egress(meter.ChannelMRVPackage, f.op, ids.New(), 9, oct))
 	sid := f.draftAndApprove(client, "2026-10")
 	corr := f.as(f.op, port.RoleBillingOfficer).do("POST", "/v1/metering/statements", map[string]any{"period": "2026-10", "client_id": client.String(),
 		"supersedes_id": sid, "correction_reason": "Kiểm thử dựng lại bảng chiếu"}, "")
@@ -259,21 +260,21 @@ func TestRebuildProjectionsEqualsLive_R22(t *testing.T) {
 // phát hiện bất thường), KHÔNG bị từ chối; cùng lúc kênh ngoài vẫn bị từ chối.
 func TestCheckpointInternalObserveUnderEnforce_A5(t *testing.T) {
 	ctx := context.Background()
-	f := newFixture(t, port.ModeEnforce)
+	f := newFixture(t, meter.ModeEnforce)
 	dt, actor := ids.New(), ids.New()
-	f.params.set(dt, port.EgressParam(port.ParamEgressDailyQuotaFmt, port.ChannelReportExport), "3")
-	enf := metering.New(f.pool, f.clk, metering.Deps{Params: f.params, Mode: port.ModeEnforce})
-	internal := func(records int64) port.Egress {
-		return port.Egress{SourceID: ids.New(), Channel: port.ChannelReportExport, DataTenantID: dt, CounterpartyKind: port.CounterpartyActor,
+	f.params.set(dt, port.EgressParam(port.ParamEgressDailyQuotaFmt, meter.ChannelReportExport), "3")
+	enf := metering.New(f.pool, f.clk, metering.Deps{Params: f.params, Mode: meter.ModeEnforce})
+	internal := func(records int64) meter.Egress {
+		return meter.Egress{SourceID: ids.New(), Channel: meter.ChannelReportExport, DataTenantID: dt, CounterpartyKind: meter.CounterpartyActor,
 			CounterpartyRef: actor, Product: "kn_plot_file", Records: records, OccurredAt: oct, ActorRef: actor, Internal: true}
 	}
 	for i := 0; i < 3; i++ {
-		if err := port.Guard(ctx, enf.Checkpoint(), enf.Mode(), internal(2), nil); err != nil {
+		if err := meter.Guard(ctx, enf.Checkpoint(), enf.Mode(), internal(2), nil); err != nil {
 			t.Fatalf("lần %d: xuất nội bộ không được từ chối ở enforce: %v", i+1, err)
 		}
 	}
 	d, err := enf.Checkpoint().Pass(ctx, internal(1))
-	if err != nil || !d.Allowed || d.Mode != port.ModeObserve || d.Reason != "quota_exceeded" || d.DailyRecords != 7 {
+	if err != nil || !d.Allowed || d.Mode != meter.ModeObserve || d.Reason != "quota_exceeded" || d.DailyRecords != 7 {
 		t.Fatalf("Pass nội bộ: %+v %v", d, err)
 	}
 	if n := f.count(dt, `SELECT count(*) FROM pf_metering.egress_event WHERE product = 'kn_plot_file' AND mode = 'observe' AND decision = 'allowed'`); n != 4 {
@@ -285,7 +286,7 @@ func TestCheckpointInternalObserveUnderEnforce_A5(t *testing.T) {
 	// Kênh ngoài cùng bên nhận/ngày: vẫn bị chặn ở enforce.
 	ext := internal(1)
 	ext.Internal = false
-	if err := port.Guard(ctx, enf.Checkpoint(), enf.Mode(), ext, nil); codeOf(err) != "metering.egress_quota_exceeded" {
+	if err := meter.Guard(ctx, enf.Checkpoint(), enf.Mode(), ext, nil); codeOf(err) != "metering.egress_quota_exceeded" {
 		t.Fatalf("kênh ngoài phải bị từ chối: %v", err)
 	}
 }

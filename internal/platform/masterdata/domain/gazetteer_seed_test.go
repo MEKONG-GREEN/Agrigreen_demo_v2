@@ -1,14 +1,13 @@
 package domain
 
 import (
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/seeddata"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"regexp"
 	"slices"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/seeddata"
 )
 
 // Số liệu đối chiếu của bộ seed — phải khớp bảng ở docs/requirements/danh-muc-hanh-chinh.md
@@ -83,7 +82,7 @@ func TestSeedCountsMatchDoc(t *testing.T) {
 	oldDistricts, oldCommunes := map[string]int{}, map[string]int{}
 	for _, u := range s.units {
 		switch {
-		case u.Level == port.LevelCommune && u.ValidAt(afterReorg):
+		case u.Level == partyport.LevelCommune && u.ValidAt(afterReorg):
 			c := newCounts[u.ParentCode]
 			c[0]++
 			switch communeKind(u.Name) {
@@ -97,11 +96,11 @@ func TestSeedCountsMatchDoc(t *testing.T) {
 				t.Errorf("%s %q: loại hình lạ sau sắp xếp", u.Code, u.Name)
 			}
 			newCounts[u.ParentCode] = c
-		case u.Level == port.LevelDistrict:
+		case u.Level == partyport.LevelDistrict:
 			oldDistricts[u.ParentCode]++
-		case u.Level == port.LevelCommune:
+		case u.Level == partyport.LevelCommune:
 			d := s.at(u.ParentCode, beforeReorg)
-			if d == nil || d.Level != port.LevelDistrict {
+			if d == nil || d.Level != partyport.LevelDistrict {
 				t.Fatalf("%s: huyện cha %s không có hiệu lực ngày 30/06/2025", u.Code, u.ParentCode)
 			}
 			if communeKind(u.Name) == "" || communeKind(u.Name) == "Đặc khu" {
@@ -130,7 +129,7 @@ func TestSeedCountsMatchDoc(t *testing.T) {
 func TestSeedCodesAndValidity(t *testing.T) {
 	s := loadSeed(t)
 	for _, u := range s.units {
-		re := map[port.Level]*regexp.Regexp{port.LevelProvince: provinceCodeRe, port.LevelDistrict: districtCodeRe, port.LevelCommune: communeCodeRe}[u.Level]
+		re := map[partyport.Level]*regexp.Regexp{partyport.LevelProvince: provinceCodeRe, partyport.LevelDistrict: districtCodeRe, partyport.LevelCommune: communeCodeRe}[u.Level]
 		if !re.MatchString(u.Code) {
 			t.Errorf("%s (%s): sai khuôn mã TCTK", u.Code, u.Level)
 		}
@@ -159,9 +158,9 @@ func TestSeedSuccessorsExistAndAreCurrent(t *testing.T) {
 			continue
 		}
 		oldProv := u.Code
-		if u.Level != port.LevelProvince {
+		if u.Level != partyport.LevelProvince {
 			oldProv = u.ParentCode
-			if u.Level == port.LevelCommune {
+			if u.Level == partyport.LevelCommune {
 				oldProv = s.at(u.ParentCode, beforeReorg).ParentCode
 			}
 		}
@@ -172,21 +171,21 @@ func TestSeedSuccessorsExistAndAreCurrent(t *testing.T) {
 				t.Errorf("%s → %s: kế thừa không tồn tại hoặc không còn hiệu lực", u.Code, sc)
 				continue
 			}
-			wantLevel := port.LevelCommune
-			if u.Level == port.LevelProvince {
-				wantLevel = port.LevelProvince
+			wantLevel := partyport.LevelCommune
+			if u.Level == partyport.LevelProvince {
+				wantLevel = partyport.LevelProvince
 			}
 			if n.Level != wantLevel {
 				t.Errorf("%s → %s: kế thừa sai cấp %s", u.Code, sc, n.Level)
 			}
 			got := n.Code
-			if n.Level == port.LevelCommune {
+			if n.Level == partyport.LevelCommune {
 				got = n.ParentCode
 			}
 			if got != wantProv {
 				t.Errorf("%s (tỉnh cũ %s) → %s thuộc tỉnh %s, muốn %s", u.Code, oldProv, sc, got, wantProv)
 			}
-			if u.Level == port.LevelCommune {
+			if u.Level == partyport.LevelCommune {
 				predecessors[sc]++
 			}
 		}
@@ -204,7 +203,7 @@ func TestSeedSuccessorsExistAndAreCurrent(t *testing.T) {
 	}
 	// Chiều ngược: mọi xã mới đều có ≥ 1 xã cũ tiền thân.
 	for _, u := range s.units {
-		if u.Level == port.LevelCommune && u.ValidTo == nil && predecessors[u.Code] == 0 {
+		if u.Level == partyport.LevelCommune && u.ValidTo == nil && predecessors[u.Code] == 0 {
 			t.Errorf("%s %q: xã mới không có tiền thân", u.Code, u.Name)
 		}
 	}
@@ -220,7 +219,7 @@ func TestSeedSampleMatchesResolution(t *testing.T) {
 	}
 	var preds []string
 	for _, u := range s.units {
-		if u.Level == port.LevelCommune && u.ValidTo != nil && slices.Contains(u.Successors, "31135") {
+		if u.Level == partyport.LevelCommune && u.ValidTo != nil && slices.Contains(u.Successors, "31135") {
 			if u.ParentCode != "916" {
 				t.Errorf("%s %q: không thuộc quận Ninh Kiều (916)", u.Code, u.Name)
 			}

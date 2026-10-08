@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/cropcyclesrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 )
@@ -40,7 +40,7 @@ func TestReportData_Production_HTX_US_DASH_02(t *testing.T) {
 	f := reportSeed(t)
 	rd := f.mod.ReportData()
 	ctx := context.Background()
-	d, err := rd.Production(ctx, port.ProductionQuery{TenantID: f.tenant, CoopOnly: true, CooperativeRef: f.coopA,
+	d, err := rd.Production(ctx, cropcyclesrc.ProductionQuery{TenantID: f.tenant, CoopOnly: true, CooperativeRef: f.coopA,
 		SeasonCode: "DX", SeasonYear: 2026, ByCooperative: true, BySeason: true, ByVariety: true})
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +78,7 @@ func TestReportData_Production_HTX_US_DASH_02(t *testing.T) {
 		}
 	}
 	// Chỉ theo HTX (gộp vụ, giống): một dòng HTX A, hộ phân biệt = 2 (không phải 3 lô).
-	byCoop, err := rd.Production(ctx, port.ProductionQuery{TenantID: f.tenant, Scope: authz.Scope{All: true}, ByCooperative: true})
+	byCoop, err := rd.Production(ctx, cropcyclesrc.ProductionQuery{TenantID: f.tenant, Scope: authz.Scope{All: true}, ByCooperative: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestReportData_Production_HTX_US_DASH_02(t *testing.T) {
 		}
 	}
 	// Bộ lọc giống không có dữ liệu → không dòng, tổng bằng 0.
-	none, err := rd.Production(ctx, port.ProductionQuery{TenantID: f.tenant, Scope: authz.Scope{All: true}, VarietyCode: "ST25", ByCooperative: true})
+	none, err := rd.Production(ctx, cropcyclesrc.ProductionQuery{TenantID: f.tenant, Scope: authz.Scope{All: true}, VarietyCode: "ST25", ByCooperative: true})
 	if err != nil || len(none.Rows) != 0 || none.Totals.Seasons != 0 || none.Totals.ActualYieldTPerHa != nil {
 		t.Fatalf("lọc giống không có vụ: %+v %v", none, err)
 	}
@@ -106,7 +106,7 @@ func TestReportData_Scope_HTX_US_DASH_03(t *testing.T) {
 	f := reportSeed(t)
 	rd := f.mod.ReportData()
 	ctx := context.Background()
-	seasons := func(q port.ProductionQuery) int64 {
+	seasons := func(q cropcyclesrc.ProductionQuery) int64 {
 		t.Helper()
 		d, err := rd.Production(ctx, q)
 		if err != nil {
@@ -114,25 +114,25 @@ func TestReportData_Scope_HTX_US_DASH_03(t *testing.T) {
 		}
 		return d.Totals.Seasons
 	}
-	if n := seasons(port.ProductionQuery{TenantID: ids.New(), Scope: authz.Scope{All: true}}); n != 0 {
+	if n := seasons(cropcyclesrc.ProductionQuery{TenantID: ids.New(), Scope: authz.Scope{All: true}}); n != 0 {
 		t.Fatalf("tenant khác (RLS): %d", n)
 	}
-	if n := seasons(port.ProductionQuery{TenantID: f.tenant, CoopOnly: true, CooperativeRef: f.coopB}); n != 1 {
+	if n := seasons(cropcyclesrc.ProductionQuery{TenantID: f.tenant, CoopOnly: true, CooperativeRef: f.coopB}); n != 1 {
 		t.Fatalf("HTX B chỉ lô của mình: %d", n)
 	}
-	if n := seasons(port.ProductionQuery{TenantID: f.tenant, Scope: authz.Scope{Units: []string{"31117"}}}); n != 3 {
+	if n := seasons(cropcyclesrc.ProductionQuery{TenantID: f.tenant, Scope: authz.Scope{Units: []string{"31117"}}}); n != 3 {
 		t.Fatalf("cán bộ KN xã 31117: %d", n)
 	}
-	if n := seasons(port.ProductionQuery{TenantID: f.tenant, Scope: authz.Scope{Units: []string{"31117"}}, CooperativeRef: f.coopB}); n != 0 {
+	if n := seasons(cropcyclesrc.ProductionQuery{TenantID: f.tenant, Scope: authz.Scope{Units: []string{"31117"}}, CooperativeRef: f.coopB}); n != 0 {
 		t.Fatalf("lọc HTX ngoài xã không mở rộng phạm vi: %d", n)
 	}
-	if n := seasons(port.ProductionQuery{TenantID: f.tenant, Scope: authz.Scope{All: true}, CooperativeRef: f.coopB}); n != 1 {
+	if n := seasons(cropcyclesrc.ProductionQuery{TenantID: f.tenant, Scope: authz.Scope{All: true}, CooperativeRef: f.coopB}); n != 1 {
 		t.Fatalf("toàn bộ lọc HTX B: %d", n)
 	}
-	if n := seasons(port.ProductionQuery{TenantID: f.tenant}); n != 0 {
+	if n := seasons(cropcyclesrc.ProductionQuery{TenantID: f.tenant}); n != 0 {
 		t.Fatalf("phạm vi rỗng: %d", n)
 	}
-	for _, q := range []port.ProductionQuery{
+	for _, q := range []cropcyclesrc.ProductionQuery{
 		{TenantID: uuid.Nil, Scope: authz.Scope{All: true}},
 		{TenantID: f.tenant, CoopOnly: true},
 		{TenantID: f.tenant, Scope: authz.Scope{All: true}, SeasonCode: "DX'; --"},

@@ -93,10 +93,10 @@ func TestFN_TI_02_07_ExtensionKNContextFromP1(t *testing.T) {
 	if err != nil || len(offs) != 2 {
 		t.Fatalf("danh bạ: %+v err=%v", offs, err)
 	}
-	if offs[0].ActorRef != head || offs[0].Level != extport.ScheduleLevelProvince || offs[0].MgmtLevel != "truong_phong" {
+	if offs[0].ActorRef != head || offs[0].Level != port.ScheduleLevelProvince || offs[0].MgmtLevel != "truong_phong" {
 		t.Fatalf("người duyệt: %+v", offs[0])
 	}
-	if offs[1].ActorRef != xa1 || offs[1].Level != extport.ScheduleLevelCommune || len(offs[1].Communes) != 2 || offs[1].ProvinceCode != "91" {
+	if offs[1].ActorRef != xa1 || offs[1].Level != port.ScheduleLevelCommune || len(offs[1].Communes) != 2 || offs[1].ProvinceCode != "91" {
 		t.Fatalf("cán bộ xã (gộp xã): %+v", offs[1])
 	}
 	if len(fa.tenants) == 0 || fa.tenants[len(fa.tenants)-1] != tid {

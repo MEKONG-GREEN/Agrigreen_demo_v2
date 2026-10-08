@@ -11,8 +11,9 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	wwport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
+
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
@@ -65,7 +66,7 @@ type StandardMap struct {
 	Cooperatives    *CoopLayer
 	Facilities      *FacilityPage
 	Roads           *RoadPage
-	Waterways       *wwport.LayerPage
+	Waterways       *port.LayerPage
 	Basemaps        []Basemap
 }
 
@@ -108,11 +109,11 @@ func (s *Service) StandardMap(ctx context.Context, in StandardMapInput) (Standar
 	level := in.AdminLevel
 	switch level {
 	case "":
-		level = string(mdport.LevelCommune)
+		level = string(partyport.LevelCommune)
 		if in.Zoom < 10 {
-			level = string(mdport.LevelProvince)
+			level = string(partyport.LevelProvince)
 		}
-	case string(mdport.LevelProvince), string(mdport.LevelCommune):
+	case string(partyport.LevelProvince), string(partyport.LevelCommune):
 	default:
 		return StandardMap{}, problem.Validation.WithField("admin_level", "phải là province hoặc commune")
 	}
@@ -172,7 +173,7 @@ func (s *Service) StandardMap(ctx context.Context, in StandardMapInput) (Standar
 		for _, k := range BasemapKinds {
 			v, err := s.Params.At(ctx, ParamBasemapPrefix+":"+k, out.GeneratedAt)
 			switch {
-			case errors.Is(err, mdport.ErrParamNotFound):
+			case errors.Is(err, params.ErrParamNotFound):
 			case err != nil:
 				return StandardMap{}, ErrDependency.WithDetail("không tra được tham số bản đồ nền").WithCause(err)
 			case strings.TrimSpace(v.Text) != "":

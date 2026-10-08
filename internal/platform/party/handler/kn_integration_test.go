@@ -17,7 +17,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -572,9 +571,9 @@ func TestFN_AD_04_02_AnGiangCommunesRegionSums(t *testing.T) {
 	if len(seed.Assignments) != 102 || len(seed.Regions) != 26 {
 		t.Fatalf("dữ liệu nền An Giang: %d xã, %d khu vực", len(seed.Assignments), len(seed.Regions))
 	}
-	f.units.add("91", "An Giang", mdport.LevelProvince, "")
+	f.units.add("91", "An Giang", port.LevelProvince, "")
 	for _, a := range seed.Assignments {
-		f.units.add(a.CommuneCode, "Xã "+a.CommuneCode, mdport.LevelCommune, "91")
+		f.units.add(a.CommuneCode, "Xã "+a.CommuneCode, port.LevelCommune, "91")
 	}
 	root := f.root()
 	national := root.createOrg(map[string]any{"kind": "ttkn_national", "code": "TTKNQG", "name": "Trung tâm Khuyến nông Quốc gia"})

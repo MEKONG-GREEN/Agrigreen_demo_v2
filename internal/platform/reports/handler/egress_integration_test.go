@@ -11,9 +11,9 @@ import (
 	"github.com/google/uuid"
 
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
@@ -21,23 +21,23 @@ type fakeCheckpoint struct {
 	mu    sync.Mutex
 	allow bool
 	err   error
-	seen  []meteringport.Egress
+	seen  []meter.Egress
 }
 
-func (c *fakeCheckpoint) Pass(_ context.Context, e meteringport.Egress) (meteringport.Decision, error) {
+func (c *fakeCheckpoint) Pass(_ context.Context, e meter.Egress) (meter.Decision, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.seen = append(c.seen, e)
 	if c.err != nil {
-		return meteringport.Decision{}, c.err
+		return meter.Decision{}, c.err
 	}
-	return meteringport.Decision{Allowed: c.allow}, nil
+	return meter.Decision{Allowed: c.allow}, nil
 }
 
-func (c *fakeCheckpoint) calls() []meteringport.Egress {
+func (c *fakeCheckpoint) calls() []meter.Egress {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return append([]meteringport.Egress(nil), c.seen...)
+	return append([]meter.Egress(nil), c.seen...)
 }
 
 func (f *fixture) audits(kind string) int {
@@ -60,7 +60,7 @@ func (f *fixture) audits(kind string) int {
 func TestReportExportEgress_ADR0024(t *testing.T) {
 	f := newFixture(t, false)
 	cp := &fakeCheckpoint{allow: false}
-	f.mod.UseEgress(cp, meteringport.ModeObserve)
+	f.mod.UseEgress(cp, meter.ModeObserve)
 	u := f.as(f.org.pAG, extport.RoleKNProvinceAdmin)
 	body := map[string]any{"template_key": "kn.sowing_progress", "format": "xlsx"}
 	id := str(u.must(u.post("/v1/reports/exports", body), http.StatusAccepted, "observe + vượt hạn mức kênh vẫn xuất").body, "id")
@@ -68,7 +68,7 @@ func TestReportExportEgress_ADR0024(t *testing.T) {
 	if len(calls) != 1 {
 		t.Fatalf("một Egress: %+v", calls)
 	}
-	if e := calls[0]; e.Channel != meteringport.ChannelReportExport || e.DataTenantID != f.tenant || e.CounterpartyKind != meteringport.CounterpartyActor ||
+	if e := calls[0]; e.Channel != meter.ChannelReportExport || e.DataTenantID != f.tenant || e.CounterpartyKind != meter.CounterpartyActor ||
 		e.CounterpartyRef != u.actor || e.ActorRef != u.actor || e.Product != "kn.sowing_progress" || e.Records != 1 || e.SourceID == uuid.Nil {
 		t.Fatalf("Egress yêu cầu xuất: %+v", e)
 	}
@@ -80,7 +80,7 @@ func TestReportExportEgress_ADR0024(t *testing.T) {
 		t.Fatalf("lối tải qua checkpoint chung: %d, nhật ký tải %d", len(cp.calls()), f.audits("download"))
 	}
 
-	f.mod.UseEgress(cp, meteringport.ModeEnforce)
+	f.mod.UseEgress(cp, meter.ModeEnforce)
 	exports := f.audits("export")
 	if r := u.post("/v1/reports/exports", body); r.status != http.StatusTooManyRequests || code(r) != "metering.egress_quota_exceeded" {
 		t.Fatalf("enforce + từ chối: %d %v", r.status, r.body)
@@ -110,7 +110,7 @@ func TestReportExportEgress_ADR0024(t *testing.T) {
 	o := f.as(f.org.pAG, extport.RoleKNProvinceAdmin)
 	o.must(o.post("/v1/reports/exports", body), http.StatusAccepted, "enforce + trong hạn mức")
 
-	f.mod.UseEgress(nil, meteringport.ModeEnforce)
+	f.mod.UseEgress(nil, meter.ModeEnforce)
 	f.params.set(port.ParamDailyExportQuota, "50")
 	n = len(cp.calls())
 	o.must(o.post("/v1/reports/exports", body), http.StatusAccepted, "chưa nối checkpoint")
@@ -124,7 +124,7 @@ func TestReportExportEgress_ADR0024(t *testing.T) {
 func TestScheduledExportEgress_ADR0024(t *testing.T) {
 	f := newFixture(t, true)
 	cp := &fakeCheckpoint{allow: false}
-	f.mod.UseEgress(cp, meteringport.ModeEnforce)
+	f.mod.UseEgress(cp, meter.ModeEnforce)
 	mgr := f.as(f.org.pAG, extport.RoleKNProvinceAdmin)
 	r1 := ids.New()
 	f.dir.emails[r1] = "can.bo@ttkn-angiang.test"
@@ -140,7 +140,7 @@ func TestScheduledExportEgress_ADR0024(t *testing.T) {
 		t.Fatalf("mốc bị từ chối không tạo việc xuất: %d", n)
 	}
 	calls := cp.calls()
-	if len(calls) != 1 || calls[0].Channel != meteringport.ChannelReportExport || calls[0].CounterpartyRef != mgr.actor {
+	if len(calls) != 1 || calls[0].Channel != meter.ChannelReportExport || calls[0].CounterpartyRef != mgr.actor {
 		t.Fatalf("Egress lối lịch: %+v", calls)
 	}
 	// Mốc tuần sau, trong hạn mức → tạo việc xuất.

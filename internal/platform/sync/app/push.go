@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/store"
@@ -18,6 +17,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -174,7 +174,7 @@ func (s *Service) conflictSLA(ctx context.Context, now time.Time) time.Duration 
 	}
 	v, err := s.Params.At(ctx, port.ParamConflictSLAHours, now)
 	if err != nil {
-		if !errors.Is(err, mdport.ErrParamNotFound) {
+		if !errors.Is(err, params.ErrParamNotFound) {
 			s.Log.Warn("không đọc được tham số SLA xung đột, dùng mặc định", "event", "sync.param_unavailable",
 				"param", port.ParamConflictSLAHours, "trace_id", telemetry.TraceID(ctx))
 		}

@@ -15,10 +15,11 @@ import (
 	"github.com/shopspring/decimal"
 
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -36,9 +37,9 @@ type Service struct {
 	// Plans: gói hạn mức có phiên bản của pf/apiclient (pool apiclient_app). nil → mặc định "tạm, chờ khách".
 	Plans apiclientport.Plans
 	// Params: tham số đã duyệt của pf/masterdata (hạn mức/ngưỡng kênh DLP, giá). nil → mặc định.
-	Params mdport.Params
+	Params params.Params
 	// Mode: AG_EGRESS_MODE của Checkpoint.Pass (Public API qua Ledger.Record luôn enforce).
-	Mode    port.Mode
+	Mode    meter.Mode
 	Metrics *Metrics
 	Log     *slog.Logger
 }
@@ -64,24 +65,24 @@ func (s *Service) log() *slog.Logger {
 	return s.Log
 }
 
-func (s *Service) mode() port.Mode {
+func (s *Service) mode() meter.Mode {
 	if s.Mode == "" {
-		return port.ModeObserve
+		return meter.ModeObserve
 	}
 	return s.Mode
 }
 
 // param đọc tham số đã duyệt của tenant tid tại at; chưa có → ok = false (dùng mặc định).
-func (s *Service) param(ctx context.Context, tid uuid.UUID, key string, at time.Time) (mdport.ParamValue, bool, error) {
+func (s *Service) param(ctx context.Context, tid uuid.UUID, key string, at time.Time) (params.ParamValue, bool, error) {
 	if s.Params == nil {
-		return mdport.ParamValue{}, false, nil
+		return params.ParamValue{}, false, nil
 	}
 	v, err := s.Params.At(tenant.WithID(ctx, tid), key, at)
-	if errors.Is(err, mdport.ErrParamNotFound) {
-		return mdport.ParamValue{}, false, nil
+	if errors.Is(err, params.ErrParamNotFound) {
+		return params.ParamValue{}, false, nil
 	}
 	if err != nil {
-		return mdport.ParamValue{}, false, fmt.Errorf("metering: đọc tham số %s: %w", key, err)
+		return params.ParamValue{}, false, fmt.Errorf("metering: đọc tham số %s: %w", key, err)
 	}
 	return v, true, nil
 }
@@ -89,7 +90,7 @@ func (s *Service) param(ctx context.Context, tid uuid.UUID, key string, at time.
 // EgressParams trả tham số DLP hiệu lực của kênh ch ở tenant chủ dữ liệu tại at: hạn mức ngày, hệ số
 // và ngưỡng tuyệt đối bất thường. Tham số có phiên bản, setter ≠ approver ở pf/masterdata; chưa duyệt
 // → mặc định g5-conventions §1.2 ("tạm, chờ khách").
-func (s *Service) EgressParams(ctx context.Context, dataTenant uuid.UUID, ch port.Channel, at time.Time) (domain.EgressParams, error) {
+func (s *Service) EgressParams(ctx context.Context, dataTenant uuid.UUID, ch meter.Channel, at time.Time) (domain.EgressParams, error) {
 	p := domain.DefaultEgressParams(ch)
 	for _, it := range []struct {
 		format string

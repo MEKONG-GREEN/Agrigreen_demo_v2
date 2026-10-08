@@ -14,6 +14,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -21,7 +22,7 @@ import (
 var egressReaders = []string{port.RoleMeteringViewer, authz.RolePlatformAdmin}
 
 // AdminUsage (Admin API, tenant đơn vị vận hành) trả tổng theo ngày × sản phẩm của một khách hàng.
-func (s *Service) AdminUsage(ctx context.Context, client uuid.UUID, from, to time.Time) ([]port.UsageDay, error) {
+func (s *Service) AdminUsage(ctx context.Context, client uuid.UUID, from, to time.Time) ([]meter.UsageDay, error) {
 	p, err := authz.Require(ctx, statementReaders...)
 	if err != nil {
 		return nil, err
@@ -54,7 +55,7 @@ func (s *Service) EgressEvents(ctx context.Context, f store.EgressFilter) (Page[
 	if err != nil {
 		return Page[store.EgressRow]{}, err
 	}
-	if f.Channel != "" && !domain.ValidChannel(port.Channel(f.Channel)) {
+	if f.Channel != "" && !domain.ValidChannel(meter.Channel(f.Channel)) {
 		return Page[store.EgressRow]{}, problem.Validation.WithField("channel", "kênh không hợp lệ")
 	}
 	limit := clampLimit(f.Limit)
@@ -74,7 +75,7 @@ func (s *Service) Anomalies(ctx context.Context, channel string, after uuid.UUID
 	if err != nil {
 		return Page[store.AnomalyRow]{}, err
 	}
-	if channel != "" && !domain.ValidChannel(port.Channel(channel)) {
+	if channel != "" && !domain.ValidChannel(meter.Channel(channel)) {
 		return Page[store.AnomalyRow]{}, problem.Validation.WithField("channel", "kênh không hợp lệ")
 	}
 	limit = clampLimit(limit)
@@ -102,7 +103,7 @@ func (s *Service) EffectiveParams(ctx context.Context, at time.Time) ([]ParamVie
 		return nil, err
 	}
 	var out []ParamView
-	for _, ch := range port.Channels {
+	for _, ch := range meter.Channels {
 		ep, err := s.EgressParams(ctx, p.TenantID, ch, at)
 		if err != nil {
 			return nil, err

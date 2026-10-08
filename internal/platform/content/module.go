@@ -34,7 +34,7 @@ type Deps struct {
 	Catalogs mdport.Catalogs
 	// AdminUnits (tùy chọn): kiểm mã đơn vị của phạm vi áp dụng và tìm tỉnh cha
 	// của xã, để cán bộ xã/HTX thấy tài liệu cấp tỉnh.
-	AdminUnits mdport.AdminUnits
+	AdminUnits partyport.AdminUnits
 	// Store: kho đối tượng cho tệp đính kèm. nil → tải tệp trả 503.
 	Store objstore.Store
 }

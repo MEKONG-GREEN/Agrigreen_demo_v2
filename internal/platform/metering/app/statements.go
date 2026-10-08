@@ -20,6 +20,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/money"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -581,8 +582,8 @@ func (s *Service) StatementCSV(ctx context.Context, id uuid.UUID) ([]byte, port.
 	if err != nil {
 		return nil, st, err
 	}
-	if err := port.Guard(ctx, s, s.mode(), port.Egress{SourceID: ids.New(), Channel: port.ChannelReportExport, DataTenantID: p.TenantID,
-		CounterpartyKind: port.CounterpartyActor, CounterpartyRef: p.ActorRef, Product: "metering_statement", ContractVersion: 1,
+	if err := meter.Guard(ctx, s, s.mode(), meter.Egress{SourceID: ids.New(), Channel: meter.ChannelReportExport, DataTenantID: p.TenantID,
+		CounterpartyKind: meter.CounterpartyActor, CounterpartyRef: p.ActorRef, Product: "metering_statement", ContractVersion: 1,
 		Records: int64(len(st.Lines)), Bytes: int64(len(body)), OccurredAt: s.Clock.Now(), ActorRef: p.ActorRef,
 		TraceID: telemetry.TraceID(ctx)}, s.log()); err != nil {
 		return nil, st, err

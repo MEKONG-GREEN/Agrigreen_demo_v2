@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
+
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -27,8 +27,8 @@ type ExtensionKN struct {
 }
 
 var (
-	_ extport.KNContextResolver = ExtensionKN{}
-	_ extport.KNDirectory       = ExtensionKN{}
+	_ port.KNContextResolver = ExtensionKN{}
+	_ port.KNDirectory       = ExtensionKN{}
 )
 
 // maxOrgHops giới hạn số bước đi lên cây tổ chức khi tìm TTKN tỉnh.
@@ -67,26 +67,26 @@ func unitOf(a port.Assignment) uuid.UUID {
 }
 
 // KNContext trả ngữ cảnh KN của request (ok = false khi request không mang X-AG-Context).
-func (e ExtensionKN) KNContext(ctx context.Context) (extport.KNContext, bool, error) {
+func (e ExtensionKN) KNContext(ctx context.Context) (port.KNContext, bool, error) {
 	p, found := authz.FromContext(ctx)
 	if !found || p.KN == nil {
-		return extport.KNContext{}, false, nil
+		return port.KNContext{}, false, nil
 	}
 	k := p.KN
-	c := extport.KNContext{Role: k.Role, Department: k.Department, Communes: slices.Clone(k.Communes)}
+	c := port.KNContext{Role: k.Role, Department: k.Department, Communes: slices.Clone(k.Communes)}
 	unit := k.UnitRef
 	if unit == uuid.Nil {
 		unit = k.OrgRef
 	}
 	var err error
 	if c.ProvinceCode, err = e.provinceOf(ctx, unit); err != nil {
-		return extport.KNContext{}, false, err
+		return port.KNContext{}, false, err
 	}
 	// Cấp quản lý của lần gán (Q-05). Ngữ cảnh hỗ trợ không gắn tài khoản (AssignmentID Nil) → không biết.
 	if k.AssignmentID != uuid.Nil && e.Assignments != nil {
 		list, err := e.Assignments.ActiveAssignments(ctx, k.Role, k.Department)
 		if err != nil {
-			return extport.KNContext{}, false, err
+			return port.KNContext{}, false, err
 		}
 		for _, a := range list {
 			if a.ID == k.AssignmentID {
@@ -101,7 +101,7 @@ func (e ExtensionKN) KNContext(ctx context.Context) (extport.KNContext, bool, er
 // Officers liệt kê cán bộ Cấp Xã/Cấp Tỉnh còn hiệu lực của phòng ban × tỉnh (tab "Chưa đăng ký", người nhận
 // nhắc, người duyệt). Tenant truyền tường minh (job của worker không có Principal). Một người có nhiều lần gán
 // cùng cấp → gộp xã phụ trách; cấp quản lý lấy của lần gán Cấp Tỉnh (người duyệt).
-func (e ExtensionKN) Officers(ctx context.Context, tenantID uuid.UUID, department, provinceCode string) ([]extport.KNOfficer, error) {
+func (e ExtensionKN) Officers(ctx context.Context, tenantID uuid.UUID, department, provinceCode string) ([]port.KNOfficer, error) {
 	if e.Assignments == nil {
 		return nil, nil
 	}
@@ -116,14 +116,14 @@ func (e ExtensionKN) Officers(ctx context.Context, tenantID uuid.UUID, departmen
 		level string
 	}
 	idx := map[key]int{}
-	var out []extport.KNOfficer
+	var out []port.KNOfficer
 	for _, a := range list {
 		var level string
 		switch a.Role {
 		case port.KNXa:
-			level = extport.ScheduleLevelCommune
+			level = port.ScheduleLevelCommune
 		case port.KNTinh:
-			level = extport.ScheduleLevelProvince
+			level = port.ScheduleLevelProvince
 		default:
 			continue
 		}
@@ -151,7 +151,7 @@ func (e ExtensionKN) Officers(ctx context.Context, tenantID uuid.UUID, departmen
 			continue
 		}
 		idx[k] = len(out)
-		out = append(out, extport.KNOfficer{ActorRef: a.UserRef, Level: level, ProvinceCode: prov, Communes: slices.Clone(a.Communes), MgmtLevel: a.MgmtLevel})
+		out = append(out, port.KNOfficer{ActorRef: a.UserRef, Level: level, ProvinceCode: prov, Communes: slices.Clone(a.Communes), MgmtLevel: a.MgmtLevel})
 	}
 	return out, nil
 }

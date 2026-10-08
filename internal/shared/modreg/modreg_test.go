@@ -70,6 +70,53 @@ func TestParseRejectsUnknownFieldAndBOM(t *testing.T) {
 	if _, err := Parse(append([]byte("\xef\xbb\xbf"), validYAML...), "x"); err != nil {
 		t.Fatalf("BOM phải được bỏ qua: %v", err)
 	}
+	for _, empty := range []string{"", "# chỉ có chú thích\n"} {
+		if _, err := Parse([]byte(empty), "x"); err == nil || !strings.Contains(err.Error(), "tệp rỗng") {
+			t.Fatalf("tệp rỗng %q: cần lỗi \"tệp rỗng\", có %v", empty, err)
+		}
+	}
+	if _, err := Parse([]byte(validYAML+"---\nname: pf/geo\n"), "x"); err == nil || !strings.Contains(err.Error(), "một tài liệu") {
+		t.Fatalf("tài liệu thứ hai phải bị bác, có %v", err)
+	}
+}
+
+// TestConsumes: consumes không thuộc đồ thị depends (R-MOD-05 kiểm ở archlint agmodgraph) nhưng phải
+// trỏ tới sự kiện module phát có khai.
+func TestConsumes(t *testing.T) {
+	mk := func(name, kind, deps, consumes, events string) *Manifest {
+		dir := map[string]string{"pf": "platform", "mkg": "mkg"}[strings.Split(name, "/")[0]]
+		zone := strings.Split(name, "/")[0]
+		y := "name: " + name + "\nkind: " + kind + "\nzones: [" + zone + "]\nversion: 1.0.0\nenable: always\n" +
+			"depends: {" + deps + "}\nprovides:\n  events: [" + events + "]\nconsumes:\n  events: [" + consumes + "]\n"
+		if kind != "kernel" {
+			y = strings.Replace(y, "enable: always", "enable: per_tenant", 1)
+		}
+		return mustParse(t, y, "internal/"+dir+"/"+strings.Split(name, "/")[1]+"/module.yaml")
+	}
+	geo2 := mk("pf/geo", "capability", `pf/party: ">=1.0 <2"`, "", "pf.geo.plot.created/v1")
+	if _, err := New([]*Manifest{mk("pf/party", "kernel", "", "pf.geo.plot.created/v1", ""), geo2}); err != nil {
+		t.Fatalf("consumes hợp lệ: %v", err)
+	}
+	// Sự kiện tiêu thụ phải được khai bởi module phát.
+	bad := mk("pf/party", "kernel", "", "pf.geo.plot.retired/v1", "")
+	if _, err := New([]*Manifest{bad, geo2}); err == nil || !strings.Contains(err.Error(), "không khai sự kiện") {
+		t.Fatalf("cần lỗi sự kiện không khai, có %v", err)
+	}
+	if _, err := New([]*Manifest{mk("pf/party", "kernel", "", "pf.nope.x.y/v1", "")}); err == nil || !strings.Contains(err.Error(), "không có module phát") {
+		t.Fatalf("cần lỗi module phát không có, có %v", err)
+	}
+	if EventProducer("mkg.fieldops.roll_count.recorded/v1") != "mkg/fieldops" || EventProducer("x") != "" {
+		t.Fatal("EventProducer sai")
+	}
+}
+
+// TestValidateErrorPathWithPercent: đường dẫn chứa % không làm méo thông báo lỗi.
+func TestValidateErrorPathWithPercent(t *testing.T) {
+	m := mustParse(t, strings.Replace(validYAML, "kind: kernel", "kind: app", 1), "a%d/module.yaml")
+	err := m.Validate()
+	if err == nil || strings.Contains(err.Error(), "%!") || !strings.Contains(err.Error(), "a%d/module.yaml: ") {
+		t.Fatalf("thông báo lỗi bị méo: %v", err)
+	}
 }
 
 func TestInvalidManifests(t *testing.T) {
@@ -81,6 +128,7 @@ func TestInvalidManifests(t *testing.T) {
 		{"zone lạ", "zones: [pf]", "zones: [pf, cloud]", "zone \"cloud\""},
 		{"semver sai", "version: 1.2.0", "version: 1.2", "MAJOR.MINOR.PATCH"},
 		{"semver số 0 đầu", "version: 1.2.0", "version: 01.2.0", "không hợp lệ"},
+		{"semver dấu +", "version: 1.2.0", "version: \"+1.2.0\"", "không hợp lệ"},
 		{"tên sai", "name: pf/party", "name: party", "name"},
 		{"tên không khớp thư mục", "name: pf/party", "name: pf/geo", "không khớp thư mục"},
 		{"aka sai", "aka: [k/orgtree]", "aka: [orgtree]", "aka"},
@@ -209,7 +257,7 @@ func TestConstraint(t *testing.T) {
 			t.Errorf("%q.Allows(%s) != %v", tc.c, tc.v, tc.ok)
 		}
 	}
-	for _, bad := range []string{"", ">=", ">=1.2.3.4", "~1.2", ">=a"} {
+	for _, bad := range []string{"", ">=", ">=1.2.3.4", "~1.2", ">=a", ">=+1", ">=1.-0"} {
 		if _, err := ParseConstraint(bad); err == nil {
 			t.Errorf("%q phải lỗi", bad)
 		}

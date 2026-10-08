@@ -7,6 +7,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 )
 
 func dec(s string) *decimal.Decimal { d := decimal.RequireFromString(s); return &d }
@@ -102,7 +103,7 @@ func TestRollForward(t *testing.T) {
 func TestRollForwardAbolished(t *testing.T) {
 	g := fakeGazetteer{{Code: "X", ValidFrom: Day(2020, 1, 1), ValidTo: dp(ReorgDate)}}
 	edges := func(u Unit) ([]port.Succession, error) { return LegacyEdges(u, g.at) }
-	if _, err := RollForward(g[0], Day(2026, 1, 1), g.at, edges); !errors.Is(err, port.ErrUnitNotFound) {
+	if _, err := RollForward(g[0], Day(2026, 1, 1), g.at, edges); !errors.Is(err, partyport.ErrUnitNotFound) {
 		t.Fatalf("bãi bỏ không kế thừa: %v", err)
 	}
 }

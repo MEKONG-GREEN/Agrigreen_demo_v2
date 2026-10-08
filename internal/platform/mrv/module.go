@@ -17,8 +17,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
@@ -26,7 +24,9 @@ import (
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -43,7 +43,7 @@ type Deps struct {
 	// Store: kho đối tượng cho gói xuất (packages/<tenant>/<export_id>.json).
 	Store objstore.Store
 	// Params: tham số đã duyệt của pf/masterdata (G3: hệ số CO2, FR-08, cửa sổ đối chiếu).
-	Params mdport.Params
+	Params params.Params
 }
 
 // Module là pf/mrv đã nối.
@@ -62,7 +62,7 @@ func (m *Module) UseValveGrants(vg partyport.ValveGrants) { m.svc.ValveGrants = 
 
 // UseEgress (G5, ADR-0024) nối điểm kiểm soát xuất (pf/metering): kênh mrv_package (yêu cầu xuất,
 // cấp URL tải gói) và kênh valve (consumer mrv_collection_evidence). cp nil → hành vi cũ.
-func (m *Module) UseEgress(cp meteringport.Checkpoint, mode meteringport.Mode, log *slog.Logger) {
+func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logger) {
 	m.svc.Egress, m.svc.EgressMode, m.svc.Log = cp, mode, log
 }
 

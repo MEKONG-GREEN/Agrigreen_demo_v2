@@ -7,9 +7,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
-	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/cropcyclesrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
@@ -58,7 +58,7 @@ func (s *Service) htxUnits(ctx context.Context, sc authz.Scope, unit string, j d
 	return out, nil
 }
 
-func htxFigures(f ccport.ProductionFigures, row domain.Row) {
+func htxFigures(f cropcyclesrc.ProductionFigures, row domain.Row) {
 	row["seasons"] = domain.Int(f.Seasons)
 	row["open_seasons"] = domain.Int(f.OpenSeasons)
 	row["completed_seasons"] = domain.Int(f.CompletedSeasons)
@@ -73,7 +73,7 @@ func htxFigures(f ccport.ProductionFigures, row domain.Row) {
 
 func (s *Service) buildHTX(ctx context.Context, j domain.Job, sc authz.Scope, n *names) (built, error) {
 	def := j.Def
-	q := ccport.ProductionQuery{TenantID: j.TenantID, SeasonCode: j.Params.SeasonCode, SeasonYear: j.Params.SeasonYear,
+	q := cropcyclesrc.ProductionQuery{TenantID: j.TenantID, SeasonCode: j.Params.SeasonCode, SeasonYear: j.Params.SeasonYear,
 		VarietyCode:   j.Params.VarietyCode,
 		ByCooperative: def.HasColumn("cooperative_name") || def.HasColumn("cooperative_code"),
 		BySeason:      def.HasColumn("season"), ByVariety: def.HasColumn("variety_name")}

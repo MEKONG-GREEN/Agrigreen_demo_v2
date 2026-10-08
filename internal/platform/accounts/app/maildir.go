@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	reportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 )
 
 // MailDirectory hiện thực reports/port.MailDirectory: tra email của tài khoản
@@ -20,8 +19,8 @@ import (
 type MailDirectory struct{ Dir port.Directory }
 
 var (
-	_ reportsport.MailDirectory      = MailDirectory{}
-	_ reportsport.RecipientDirectory = MailDirectory{}
+	_ port.MailDirectory      = MailDirectory{}
+	_ port.RecipientDirectory = MailDirectory{}
 )
 
 // ErrNoDirectory: chưa cấu hình Keycloak Admin REST (AG_KC_*).
@@ -34,13 +33,13 @@ func (m MailDirectory) EmailOf(ctx context.Context, tenantID, actorRef uuid.UUID
 	}
 	u, err := m.Dir.GetUser(ctx, actorRef)
 	if errors.Is(err, port.ErrUserNotFound) {
-		return "", reportsport.ErrNoEmail
+		return "", port.ErrNoEmail
 	}
 	if err != nil {
 		return "", err
 	}
 	if u.TenantID != tenantID || !u.Enabled || !u.EmailVerified || strings.TrimSpace(u.Email) == "" {
-		return "", reportsport.ErrNoEmail
+		return "", port.ErrNoEmail
 	}
 	return u.Email, nil
 }

@@ -98,6 +98,10 @@ func run() error {
 			return err
 		}
 		log.Info("đã khai báo hàng đợi consumer", "event", "startup", "queues", len(assembly.Queues()), "outcome", "ok")
+	} else {
+		// Bản vùng mkg không khai báo hàng đợi pf: van phát khi hàng đợi chưa có thì giữ lại trên outbox
+		// và phát lại, không đánh dấu đã phát rồi mất.
+		broker.FailOnReturn = true
 	}
 
 	// Vhost mkg.internal: kết nối và tài khoản riêng (ADR-0018).
@@ -184,7 +188,8 @@ func run() error {
 }
 
 // logReturn ghi cảnh báo khi broker trả thông điệp không route được (chưa hàng đợi nào
-// bind routing key): sự kiện vẫn được đánh dấu đã phát — log để phát hiện thiếu binding.
+// bind routing key) — log để phát hiện thiếu binding. Sự kiện được đánh dấu đã phát, trừ
+// khi broker bật FailOnReturn (khi đó publisher phát lại lượt sau).
 func logReturn(log *slog.Logger, vhost string) func(amqp.Return) {
 	return func(ret amqp.Return) {
 		log.Warn("sự kiện không route được", "event", "outbox.unroutable", "vhost", vhost,

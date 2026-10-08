@@ -14,18 +14,23 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
+	accountsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/dispatch"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/cropcyclesrc"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/mechanizationsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -96,31 +101,31 @@ type Service struct {
 
 	Scope    partyport.ScopeResolver
 	Orgs     partyport.Orgs
-	Units    mdport.AdminUnits
-	Params   mdport.Params
+	Units    partyport.AdminUnits
+	Params   params.Params
 	Catalogs mdport.Catalogs
 	Store    objstore.Store
 
-	Extension     extport.ReportData
-	Mechanization mechport.ReportData
-	CropCycle     ccport.ReportData // HTX US-DASH-02: sản lượng HTX
+	Extension     extensionsrc.ReportData
+	Mechanization mechanizationsrc.ReportData
+	CropCycle     cropcyclesrc.ReportData // HTX US-DASH-02: sản lượng HTX
 
-	Directory  port.MailDirectory      // nil → bỏ gửi email kèm cảnh báo
-	Recipients port.RecipientDirectory // nil → màn lập lịch của quản lý HTX trả 503
-	Mailer     port.Mailer             // nil → bỏ gửi email kèm cảnh báo
-	LinkBase   string                  // URL gốc web-ops: <LinkBase>/reports/exports/<id>
+	Directory  accountsport.MailDirectory      // nil → bỏ gửi email kèm cảnh báo
+	Recipients accountsport.RecipientDirectory // nil → màn lập lịch của quản lý HTX trả 503
+	Mailer     port.Mailer                     // nil → bỏ gửi email kèm cảnh báo
+	LinkBase   string                          // URL gốc web-ops: <LinkBase>/reports/exports/<id>
 	// LinkDownloadBase (A4): URL gốc công khai của api-platform cho liên kết tải Chi cục
 	// <LinkDownloadBase>/v1/public/report-links/<token> (AG_REPORT_LINK_BASE). Rỗng → gửi kiểu liên kết thất bại.
 	LinkDownloadBase string
 
 	// KN v7.7 P4 — báo cáo Chi cục (dispatch.go): lần tổng hợp của pf/extension, cờ + bộ chuyển Google Sheet (TẮT mặc định).
-	Consolidations extport.Consolidations
+	Consolidations extensionsrc.Consolidations
 	GSheet         dispatch.GSheetConfig
 	GSheetPub      dispatch.GSheetPublisher
 	// Egress (G5, ADR-0024 mục 3): điểm kiểm soát xuất DÙNG CHUNG (pf/metering, kênh report_export),
 	// gọi NGAY SAU điểm kiểm soát cục bộ egress ở cả ba lối. Nil → hành vi cũ.
-	Egress     meteringport.Checkpoint
-	EgressMode meteringport.Mode
+	Egress     meter.Checkpoint
+	EgressMode meter.Mode
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }
@@ -153,7 +158,7 @@ func (s *Service) paramInt(ctx context.Context, key string, at time.Time, def de
 	if s.Params != nil {
 		pv, err := s.Params.At(ctx, key, at)
 		switch {
-		case errors.Is(err, mdport.ErrParamNotFound):
+		case errors.Is(err, params.ErrParamNotFound):
 		case err != nil:
 			return 0, err
 		default:
@@ -164,12 +169,12 @@ func (s *Service) paramInt(ctx context.Context, key string, at time.Time, def de
 }
 
 // unitLevel trả cấp của đơn vị (tỉnh/xã) hiện hành.
-func (s *Service) unitLevel(ctx context.Context, code string) (mdport.AdminUnit, error) {
+func (s *Service) unitLevel(ctx context.Context, code string) (partyport.AdminUnit, error) {
 	if s.Units == nil {
-		return mdport.AdminUnit{}, ErrDependency.WithDetail("chưa nối danh mục đơn vị hành chính")
+		return partyport.AdminUnit{}, ErrDependency.WithDetail("chưa nối danh mục đơn vị hành chính")
 	}
 	u, err := s.Units.Get(ctx, code, s.now())
-	if errors.Is(err, mdport.ErrUnitNotFound) {
+	if errors.Is(err, partyport.ErrUnitNotFound) {
 		return u, ErrUnitInvalid.WithField("unit_code", "không có đơn vị hành chính còn hiệu lực với mã này")
 	}
 	return u, err

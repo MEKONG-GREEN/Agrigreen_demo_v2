@@ -14,13 +14,13 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/publication"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/store"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -60,7 +60,7 @@ func (s *Service) param(ctx context.Context, key string, at time.Time) (domain.P
 		return out, nil
 	}
 	v, err := s.Params.At(ctx, key, at)
-	if errors.Is(err, mdport.ErrParamNotFound) {
+	if errors.Is(err, params.ErrParamNotFound) {
 		return out, nil
 	}
 	if err != nil {
@@ -286,9 +286,9 @@ func (s *Service) HandleCollectionEvidence(ctx context.Context, tx pgx.Tx, env o
 	// ADR-0024 mục 3: điểm kiểm soát xuất kênh valve ở phía nhận, mỗi bên cấp một lần, TRƯỚC khi ghi
 	// vào tenant bên cấp. enforce + từ chối → giao lại → DLQ (R-62).
 	for _, g := range grantors {
-		if err := meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
-			SourceID: env.EventID, Channel: meteringport.ChannelValve, DataTenantID: env.TenantID,
-			CounterpartyKind: meteringport.CounterpartyTenant, CounterpartyRef: g.Tenant(), Product: port.ContractCollectionEvidence,
+		if err := meter.Guard(ctx, s.Egress, s.EgressMode, meter.Egress{
+			SourceID: env.EventID, Channel: meter.ChannelValve, DataTenantID: env.TenantID,
+			CounterpartyKind: meter.CounterpartyTenant, CounterpartyRef: g.Tenant(), Product: port.ContractCollectionEvidence,
 			ContractVersion: env.SchemaVersion, Records: 1, Bytes: int64(len(env.Payload)), OccurredAt: env.OccurredAt, TraceID: env.TraceID,
 		}, s.Log); err != nil {
 			return err

@@ -23,7 +23,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-public/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -33,6 +32,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
@@ -143,7 +143,7 @@ func newIntEnv(t *testing.T) *intEnv {
 	}
 	// Gốc lắp ráp THẬT: Build → integrationPorts thật (metering, party GrantLookup, ba nguồn).
 	mod, d, err := assembly.Build(context.Background(), open, assembly.Config{Operator: e.operator, Peppers: peppers, Store: store, Replicas: 1,
-		EgressMode: meteringport.ModeEnforce, Clock: clk, Log: log})
+		EgressMode: meter.ModeEnforce, Clock: clk, Log: log})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
@@ -408,7 +408,7 @@ func TestPublicAPIRealWiring_G5Integration(t *testing.T) {
 	// Đọc thứ ba → đủ 3 đơn vị; đọc thứ tư → 429 + Retry-After (hạn mức thẩm quyền pf_metering).
 	want(t, e.call(http.MethodGet, "/v1/data/collection-volumes", key, nil), http.StatusOK, "đọc lần 2")
 	r = e.call(http.MethodGet, "/v1/data/collection-volumes", key, nil)
-	if r.status != http.StatusTooManyRequests || r.code() != meteringport.ErrQuotaExceeded.Code || r.header.Get("Retry-After") == "" {
+	if r.status != http.StatusTooManyRequests || r.code() != meter.ErrQuotaExceeded.Code || r.header.Get("Retry-After") == "" {
 		t.Fatalf("hết hạn mức ngày → 429 metering.quota_exceeded + Retry-After: %d %v %s", r.status, r.header, r.raw)
 	}
 	if strings.Contains(string(r.raw), "31117") {
@@ -423,7 +423,7 @@ func TestPublicAPIRealWiring_G5Integration(t *testing.T) {
 	restore = e.failInserts("pf_metering.usage_event")
 	r = e.call(http.MethodGet, "/v1/data-products", key, nil)
 	restore()
-	if r.status != http.StatusServiceUnavailable || r.code() != meteringport.ErrUnavailable.Code || strings.Contains(string(r.raw), "collection_volume") {
+	if r.status != http.StatusServiceUnavailable || r.code() != meter.ErrUnavailable.Code || strings.Contains(string(r.raw), "collection_volume") {
 		t.Fatalf("sổ lỗi → 503 metering.unavailable, không dữ liệu: %d %s", r.status, r.raw)
 	}
 

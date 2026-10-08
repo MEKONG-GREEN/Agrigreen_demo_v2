@@ -15,12 +15,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -53,7 +53,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 }
 
 // MasterdataParams bọc pf/masterdata thành port.ParamSet.
-func MasterdataParams(p mdport.Params) port.ParamSet { return app.MasterdataParams{P: p} }
+func MasterdataParams(p params.Params) port.ParamSet { return app.MasterdataParams{P: p} }
 
 // RegisterApp gắn route Application API.
 func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterApp(rg) }

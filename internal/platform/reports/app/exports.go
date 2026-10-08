@@ -8,11 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/store"
@@ -21,6 +17,9 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func ts(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
@@ -85,7 +84,7 @@ func (s *Service) normalizeParams(ctx context.Context, def domain.Definition, in
 		if err != nil {
 			return p, err
 		}
-		if u.Level != mdport.LevelProvince && u.Level != mdport.LevelCommune {
+		if u.Level != partyport.LevelProvince && u.Level != partyport.LevelCommune {
 			return p, ErrUnitInvalid.WithField("unit_code", "chỉ nhận tỉnh hoặc xã hiện hành")
 		}
 	}

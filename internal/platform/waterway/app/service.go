@@ -19,6 +19,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -46,7 +47,7 @@ type Service struct {
 	// Read là pool bản sao đọc cho truy vấn đồ thị (mục 16); nil → DB.
 	Read     tenant.Beginner
 	Clock    clock.Clock
-	Params   mdport.Params
+	Params   params.Params
 	Catalogs mdport.Catalogs
 	// Sharing (G4-0): cổng cấp quyền chia sẻ của pf/party cho bề mặt đối tác
 	// /v1/partner/waterway/route (loại waterway_routes, ADR-0020). Nil → 403 party.share_grant_missing.
@@ -112,7 +113,7 @@ func (s *Service) decParam(ctx context.Context, key string, def decimal.Decimal,
 		return def, nil
 	}
 	v, err := s.Params.At(ctx, key, at)
-	if errors.Is(err, mdport.ErrParamNotFound) {
+	if errors.Is(err, params.ErrParamNotFound) {
 		return def, nil
 	}
 	if err != nil {

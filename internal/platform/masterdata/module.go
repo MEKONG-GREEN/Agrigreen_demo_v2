@@ -12,12 +12,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -41,14 +42,14 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }
 
 // AdminUnits cho module khác (qua port), vd party.ScopeResolver dùng Descendants.
-func (m *Module) AdminUnits() port.AdminUnits { return app.UnitsPort{Svc: m.svc} }
+func (m *Module) AdminUnits() partyport.AdminUnits { return app.UnitsPort{Svc: m.svc} }
 
 // AdminUnitHistory cho module khác: tra theo thời điểm, chuỗi kế thừa và ánh xạ mã
 // qua các lần sắp xếp (R-DB-09, ADR-0032) — cho báo cáo nhóm theo đơn vị tại kỳ.
 func (m *Module) AdminUnitHistory() port.AdminUnitHistory { return app.UnitsPort{Svc: m.svc} }
 
 // Params cho module khác: tham số đã duyệt theo thời điểm của sự việc.
-func (m *Module) Params() port.Params { return app.ParamsPort{Svc: m.svc} }
+func (m *Module) Params() params.Params { return app.ParamsPort{Svc: m.svc} }
 
 // Catalogs cho module khác: danh mục dùng chung.
 func (m *Module) Catalogs() port.Catalogs { return app.CatalogsPort{Svc: m.svc} }
@@ -58,7 +59,7 @@ func (m *Module) SyncSource() syncport.Source { return app.Sync{Svc: m.svc} }
 
 // UseStaffDirectory nối danh bạ cán bộ của pf/extension (tên người đặt/duyệt
 // tham số, G-07). Gốc lắp ráp gọi sau khi dựng pf/extension; không nối → tên null.
-func (m *Module) UseStaffDirectory(d extport.StaffNames) { m.svc.Staff = d }
+func (m *Module) UseStaffDirectory(d port.StaffNames) { m.svc.Staff = d }
 
 // UseFormUsage nối P3 (pf/reports) cho cột "biểu đang dùng" của danh mục nông nghiệp (KN v7.7 FN-AD-04.05).
 func (m *Module) UseFormUsage(f port.FormUsage) { m.svc.Forms = f }

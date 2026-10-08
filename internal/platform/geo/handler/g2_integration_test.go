@@ -65,13 +65,13 @@ func (f *coopRegistry) ByCode(_ context.Context, code string) (partyport.Org, er
 
 type fakeMarkers struct {
 	mu sync.Mutex
-	ms []port.CoopMarker
+	ms []partyport.CoopMarker
 }
 
-func (f *fakeMarkers) MarkersInBBox(_ context.Context, minLon, minLat, maxLon, maxLat float64, _ int) ([]port.CoopMarker, error) {
+func (f *fakeMarkers) MarkersInBBox(_ context.Context, minLon, minLat, maxLon, maxLat float64, _ int) ([]partyport.CoopMarker, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	var out []port.CoopMarker
+	var out []partyport.CoopMarker
 	for _, m := range f.ms {
 		lon, lat := m.Lon.InexactFloat64(), m.Lat.InexactFloat64()
 		if lon >= minLon && lon <= maxLon && lat >= minLat && lat <= maxLat {
@@ -475,7 +475,7 @@ func TestCoopMarkersFallback_GIS_US_BND_02(t *testing.T) {
 	lonA, latA := at(250, 250)
 	lonB, latB := at(3000, 0)
 	g.markers.mu.Lock()
-	g.markers.ms = []port.CoopMarker{
+	g.markers.ms = []partyport.CoopMarker{
 		{Ref: g.coopA, Code: "HTXA", Name: "HTX A", CommuneCode: "31117", Lon: lonA, Lat: latA},
 		{Ref: g.coopB, Code: "HTXB", Name: "HTX B", CommuneCode: "31117", Lon: lonB, Lat: latB},
 		{Ref: g.coopC, Code: "HTXC", Name: "HTX C", CommuneCode: "31120", Lon: lonB, Lat: latB},

@@ -6,7 +6,10 @@ import (
 	"github.com/google/uuid"
 )
 
-// StaffNames là cổng đọc tên hiển thị trong danh bạ cán bộ của pf/extension: tên của
+// StaffNames: pf/masterdata khai cổng tên cán bộ nó cần (hiện người đặt/duyệt tham số); pf/extension (chủ
+// danh bạ trực) hiện thực qua gốc lắp ráp — phụ thuộc chỉ đi xuống (R-MOD-05).
+//
+// Tên hiển thị trong danh bạ cán bộ của pf/extension: tên của
 // cán bộ (không phải nông hộ) theo actor_ref, để module khác hiện tên người
 // đặt/duyệt tham số, người được giao (web-backend-gaps G-07, G-09). Tenant lấy
 // từ context. Không kiểm vai — module gọi đã kiểm vai của nghiệp vụ của nó.

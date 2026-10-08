@@ -12,6 +12,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/store"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -94,7 +95,7 @@ func (s *Service) SubmitReport(ctx context.Context, in ReportInput) (ReportResul
 	if err != nil {
 		return ReportResult{}, err
 	}
-	if level != mdport.LevelCommune {
+	if level != partyport.LevelCommune {
 		return ReportResult{}, ErrUnitInvalid.WithField("commune_code", "báo cáo gắn với một xã")
 	}
 	r.ProvinceCode = province
@@ -334,7 +335,7 @@ func (s *Service) ClosePeriod(ctx context.Context, in ClosePeriodInput) (bool, e
 	if err != nil {
 		return false, err
 	}
-	if level != mdport.LevelProvince || prov != in.ProvinceCode {
+	if level != partyport.LevelProvince || prov != in.ProvinceCode {
 		return false, ErrUnitInvalid.WithField("province_code", "phải là mã tỉnh")
 	}
 	var closed bool

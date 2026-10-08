@@ -9,20 +9,20 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/store"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
-var _ port.AdminUnitTree = UnitsPort{}
+var _ partyport.AdminUnitTree = UnitsPort{}
 
 // Children thực hiện port.AdminUnitTree: đơn vị con trực tiếp có hiệu lực tại at
 // (parent rỗng → các tỉnh), đọc hết mọi trang.
-func (p UnitsPort) Children(ctx context.Context, parent string, at time.Time) ([]port.AdminUnit, error) {
-	var out []port.AdminUnit
+func (p UnitsPort) Children(ctx context.Context, parent string, at time.Time) ([]partyport.AdminUnit, error) {
+	var out []partyport.AdminUnit
 	err := tenant.FromCtxTx(ctx, p.Svc.DB, func(tx pgx.Tx) error {
 		after := ""
 		for {
@@ -190,4 +190,4 @@ func (s *Service) ActorNames(ctx context.Context, refs []uuid.UUID) map[uuid.UUI
 }
 
 // staffDirectory là port danh bạ cán bộ (pf/extension) dùng cho tên người đặt/duyệt.
-type staffDirectory = extport.StaffNames
+type staffDirectory = port.StaffNames

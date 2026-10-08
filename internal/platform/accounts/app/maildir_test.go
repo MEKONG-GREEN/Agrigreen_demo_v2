@@ -9,7 +9,6 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/keycloak"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	reportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 )
 
 // US-DASH-03: email người nhận lịch báo cáo tra từ Keycloak lúc gửi — chỉ tài khoản
@@ -30,7 +29,7 @@ func TestMailDirectoryEmailOf(t *testing.T) {
 		t.Fatalf("email đã xác minh: %v", err)
 	}
 	for name, id := range map[string]uuid.UUID{"chưa xác minh": unverified, "đã khóa": locked, "tenant khác": other, "không có": uuid.New()} {
-		if _, err := md.EmailOf(ctx, tid, id); !errors.Is(err, reportsport.ErrNoEmail) {
+		if _, err := md.EmailOf(ctx, tid, id); !errors.Is(err, port.ErrNoEmail) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}

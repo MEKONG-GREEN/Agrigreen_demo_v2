@@ -16,8 +16,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -228,9 +228,9 @@ func capacityFromValve(raw []byte) (port.HubCapacity, error) {
 func (s *Service) valveEgress(ctx context.Context, env outbox.Envelope, contract string, grantors []tenant.Grant) error {
 	for _, gr := range grantors {
 		g := gr.Tenant()
-		if err := meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
-			SourceID: env.EventID, Channel: meteringport.ChannelValve, DataTenantID: env.TenantID,
-			CounterpartyKind: meteringport.CounterpartyTenant, CounterpartyRef: g, Product: contract, ContractVersion: env.SchemaVersion,
+		if err := meter.Guard(ctx, s.Egress, s.EgressMode, meter.Egress{
+			SourceID: env.EventID, Channel: meter.ChannelValve, DataTenantID: env.TenantID,
+			CounterpartyKind: meter.CounterpartyTenant, CounterpartyRef: g, Product: contract, ContractVersion: env.SchemaVersion,
 			Records: 1, Bytes: int64(len(env.Payload)), OccurredAt: env.OccurredAt, TraceID: env.TraceID,
 		}, s.Log); err != nil {
 			return err

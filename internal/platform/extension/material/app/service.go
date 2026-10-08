@@ -51,8 +51,8 @@ var deptRe = regexp.MustCompile(`^[a-z][a-z0-9_]{1,39}$`)
 type Service struct {
 	DB       tenant.Beginner // pool vai extension_app
 	Clock    clock.Clock
-	Catalogs mdport.Catalogs   // danh mục "material" (attrs.unit = ĐVT)
-	Units    mdport.AdminUnits // tỉnh của xã (province_code)
+	Catalogs mdport.Catalogs      // danh mục "material" (attrs.unit = ĐVT)
+	Units    partyport.AdminUnits // tỉnh của xã (province_code)
 	// Names (tùy chọn): tên người thao tác (actor_display); hàm để gốc lắp ráp nối sau.
 	Names func() partyport.ActorNames
 }
@@ -201,7 +201,7 @@ func (s *Service) province(ctx context.Context, commune string) (string, error) 
 		return "", ErrDependency.WithDetail("chưa nối danh mục đơn vị hành chính")
 	}
 	u, err := s.Units.Get(ctx, commune, s.now())
-	if errors.Is(err, mdport.ErrUnitNotFound) {
+	if errors.Is(err, partyport.ErrUnitNotFound) {
 		return "", problem.Validation.WithField("commune_code", "không có đơn vị hành chính còn hiệu lực với mã này")
 	}
 	if err != nil {

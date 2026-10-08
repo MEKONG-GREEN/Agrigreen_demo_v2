@@ -16,9 +16,9 @@ import (
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -42,17 +42,17 @@ func (f *fakePlots) PlotFacts(ctx context.Context, refs []uuid.UUID) (map[uuid.U
 // fakeUnits: mọi xã 311xx thuộc tỉnh 92 (Cần Thơ, sau sắp xếp 2025 chỉ tỉnh → xã).
 type fakeUnits struct{}
 
-func (fakeUnits) Get(ctx context.Context, code string, _ time.Time) (mdport.AdminUnit, error) {
+func (fakeUnits) Get(ctx context.Context, code string, _ time.Time) (partyport.AdminUnit, error) {
 	if _, err := tenant.FromContext(ctx); err != nil {
-		return mdport.AdminUnit{}, err
+		return partyport.AdminUnit{}, err
 	}
 	switch {
 	case code == "92":
-		return mdport.AdminUnit{Code: "92", Level: mdport.LevelProvince}, nil
+		return partyport.AdminUnit{Code: "92", Level: partyport.LevelProvince}, nil
 	case strings.HasPrefix(code, "311"):
-		return mdport.AdminUnit{Code: code, Level: mdport.LevelCommune, ParentCode: "92"}, nil
+		return partyport.AdminUnit{Code: code, Level: partyport.LevelCommune, ParentCode: "92"}, nil
 	}
-	return mdport.AdminUnit{}, mdport.ErrUnitNotFound
+	return partyport.AdminUnit{}, partyport.ErrUnitNotFound
 }
 func (fakeUnits) Descendants(context.Context, string, time.Time) ([]string, error) { return nil, nil }
 func (fakeUnits) Current(context.Context, string, time.Time) ([]string, error)     { return nil, nil }
@@ -60,14 +60,14 @@ func (fakeUnits) Current(context.Context, string, time.Time) ([]string, error)  
 type fakeCheckpoint struct {
 	mu    sync.Mutex
 	allow bool
-	seen  []meteringport.Egress
+	seen  []meter.Egress
 }
 
-func (c *fakeCheckpoint) Pass(_ context.Context, e meteringport.Egress) (meteringport.Decision, error) {
+func (c *fakeCheckpoint) Pass(_ context.Context, e meter.Egress) (meter.Decision, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.seen = append(c.seen, e)
-	return meteringport.Decision{Allowed: c.allow}, nil
+	return meter.Decision{Allowed: c.allow}, nil
 }
 
 func (c *fakeCheckpoint) n() int {
@@ -85,7 +85,7 @@ func TestCollectionVolumeKAnonymity_G5_D01(t *testing.T) {
 	f := newFixture(t)
 	f.mod.UseCollectionVolume(f.plots, fakeUnits{})
 	cp := &fakeCheckpoint{allow: false}
-	f.mod.UseEgress(cp, meteringport.ModeObserve, nil)
+	f.mod.UseEgress(cp, meter.ModeObserve, nil)
 	f.publishedSOP("SOP OM5451", "OM5451")
 	adm := f.platformAdmin()
 	area := decimal.RequireFromString("1.5000")
@@ -130,7 +130,7 @@ func TestCollectionVolumeKAnonymity_G5_D01(t *testing.T) {
 	cp.mu.Lock()
 	e := cp.seen[0]
 	cp.mu.Unlock()
-	if e.Channel != meteringport.ChannelValve || e.DataTenantID != f.mkg || e.CounterpartyRef != f.tenant || e.Product != port.ContractHTXCollectionStatement {
+	if e.Channel != meter.ChannelValve || e.DataTenantID != f.mkg || e.CounterpartyRef != f.tenant || e.Product != port.ContractHTXCollectionStatement {
 		t.Fatalf("Egress van collection: %+v", e)
 	}
 
@@ -205,7 +205,7 @@ func TestCollectionVolumeKAnonymity_G5_D01(t *testing.T) {
 	}
 
 	// enforce + từ chối → lỗi metering.egress_quota_exceeded, bảng kê không ghi.
-	f.mod.UseEgress(cp, meteringport.ModeEnforce, nil)
+	f.mod.UseEgress(cp, meter.ModeEnforce, nil)
 	extra := plot("31117", f.coopA)
 	pay := statementPayload(ids.New(), f.coopA, extra, 50, 1)
 	pay["season_ref"] = adm.mustOpen(extra)

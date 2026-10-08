@@ -9,7 +9,6 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/keycloak"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 )
 
 // KN US-DIR-02: số điện thoại cho "gọi/nhắn 1 chạm" tra từ Keycloak lúc bấm — chỉ tài
@@ -27,7 +26,7 @@ func TestStaffContactsPhoneOf(t *testing.T) {
 		t.Fatalf("có số: %q %v", p, err)
 	}
 	for name, id := range map[string]uuid.UUID{"chưa khai số": noPhone, "đã khóa": locked, "tenant khác": other, "không có": uuid.New()} {
-		if _, err := sc.PhoneOf(ctx, tid, id); !errors.Is(err, extport.ErrNoPhone) {
+		if _, err := sc.PhoneOf(ctx, tid, id); !errors.Is(err, port.ErrNoPhone) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}

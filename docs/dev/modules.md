@@ -13,7 +13,8 @@ Mỗi module `internal/{platform,mkg,vault}/<module>` có `module.yaml` cạnh `
 | `kind` | tay | ADR-0027 | `kernel` \| `capability` \| `domain`. Đổi `kind` cần sửa ADR-0027 |
 | `zones` | tay | — | Cụm dữ liệu module chạy: `pf`, `mkg`, `vault`, `ts`. Phải chứa cụm của mọi `owns_schema` |
 | `version` | tay | — | Semver `MAJOR.MINOR.PATCH`, bắt đầu `1.0.0`. Tăng MAJOR khi port phá vỡ (R-MOD-06) |
-| `depends` | khóa **sinh**, ràng buộc tay | import | Module khác mà mã không phải kiểm thử import (`port/`, vault `client/`). Ràng buộc mặc định `">=MAJOR.MINOR <MAJOR+1"`; sửa tay được giữ |
+| `depends` | khóa **sinh**, ràng buộc tay | import | Module khác mà mã không phải kiểm thử import (`port/`, vault `client/`) **và dùng ít nhất một định danh tạo phụ thuộc gọi** (interface, hàm, biến, kiểu thường). Import chỉ dùng hợp đồng dữ liệu — hằng (tên sự kiện, tên vai, khóa tham số, giá trị liệt kê) và kiểu payload `//ag:event`/`//ag:internal-event` — không tạo `depends`. Ràng buộc mặc định `">=MAJOR.MINOR <MAJOR+1"`; sửa tay được giữ |
+| `consumes.events` | sinh | kiểu payload sự kiện, hằng `Event*` | Sự kiện của module khác mà mã nhắc tới (§7.1 tách `consumes` khỏi `depends`). Không thuộc đồ thị R-MOD-05; `modreg` kiểm mỗi sự kiện do module phát khai trong `provides`, sự kiện nội bộ MKG chỉ cho module vùng `mkg` |
 | `provides.ports` | **sinh** | `port/` (vault: `client/`) | Interface xuất; gói con có tiền tố `sub.Name` |
 | `provides.events` | **sinh** | `//ag:event <tên> v<N>` | Sự kiện công bố (`contracts/events`), dạng `<tên>/v<N>` |
 | `provides.internal_events` | **sinh** | `//ag:internal-event` | Sự kiện nội bộ (`contracts/events-internal`) |
@@ -57,7 +58,7 @@ go test ./tools/archlint -run ModGraph
 |---|---|---|
 | `cycle` | Đồ thị `depends` không chu trình. Mọi cạnh nằm trong một thành phần liên thông mạnh đều bị báo | có |
 | `tier` | Chỉ đi xuống theo `kind`: kernel ← capability ← domain (R-MOD-05). Cùng tầng được phép nếu không chu trình | có |
-| `depends` | Mã không phải kiểm thử import package của module khác (`port/`, vault `client/`) thì module đó phải có trong `depends` | **không** — chạy `modgen` |
+| `depends` | Mã không phải kiểm thử import package của module khác (`port/`, vault `client/`) thì module đó phải có trong `depends`, trừ import chỉ dùng hợp đồng dữ liệu (hằng, kiểu payload sự kiện — cùng quy tắc với `modgen`) | **không** — chạy `modgen` |
 | `version` | `depends` trỏ tới module có thật, ràng buộc thỏa `version` hiện có | có |
 | `schema` | Schema trong `owns_schema` phải được migration `CREATE SCHEMA`; schema migration tạo phải có chủ (trừ cụm `shared` và `ops_schemas`); migration của module A không tạo/sửa/xóa đối tượng (bảng, view, chỉ mục, hàm, trigger, policy, chú thích) trong schema của module B | có |
 

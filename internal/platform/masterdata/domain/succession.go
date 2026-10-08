@@ -9,6 +9,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 )
 
 // LegacyBasis là căn cứ ghi cho quan hệ kế thừa suy từ successor_codes (pf 000002) —
@@ -200,7 +201,7 @@ func RollForward(start Unit, target time.Time, at FindFunc, edges EdgesFunc) ([]
 		return nil, err
 	}
 	if len(out) == 0 {
-		return nil, port.ErrUnitNotFound
+		return nil, partyport.ErrUnitNotFound
 	}
 	codes := make([]string, 0, len(out))
 	for c := range out {

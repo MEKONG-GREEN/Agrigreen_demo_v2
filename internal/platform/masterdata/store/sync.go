@@ -7,7 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/domain"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 )
 
 // SyncItem là một mục danh mục kèm sync_seq (con trỏ chiều xuống của pf/sync).
@@ -72,7 +72,7 @@ func SyncUnits(ctx context.Context, tx pgx.Tx, all bool, units []string, after i
 		if err := rows.Scan(&u.Code, &u.ValidFrom, &u.ValidTo, &u.Name, &level, &u.ParentCode, &u.Successors, &r.Seq); err != nil {
 			return nil, err
 		}
-		u.Level = port.Level(level)
+		u.Level = partyport.Level(level)
 		out = append(out, r)
 	}
 	return out, rows.Err()

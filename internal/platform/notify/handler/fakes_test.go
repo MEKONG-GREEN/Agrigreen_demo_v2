@@ -2,18 +2,16 @@ package handler_test
 
 import (
 	"context"
-	"sync"
-	"time"
-
-	"github.com/google/uuid"
-
-	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/channel"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/domain"
+	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/google/uuid"
+	"sync"
+	"time"
 )
 
 // Mã đơn vị hành chính chính thức (seed masterdata, sau sắp xếp 2025):
@@ -74,19 +72,19 @@ func (f *fakeDevices) Device(_ context.Context, tid, id uuid.UUID) (syncport.Dev
 // fakeStaff là danh bạ cán bộ giả (theo tenant).
 type fakeStaff struct {
 	mu    sync.Mutex
-	staff map[uuid.UUID][]extport.StaffRef
+	staff map[uuid.UUID][]notifyport.StaffRef
 }
 
-func (f *fakeStaff) add(tid uuid.UUID, s extport.StaffRef) {
+func (f *fakeStaff) add(tid uuid.UUID, s notifyport.StaffRef) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.staff[tid] = append(f.staff[tid], s)
 }
 
-func (f *fakeStaff) ActiveStaff(_ context.Context, tid uuid.UUID, units []string) ([]extport.StaffRef, error) {
+func (f *fakeStaff) ActiveStaff(_ context.Context, tid uuid.UUID, units []string) ([]notifyport.StaffRef, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	var out []extport.StaffRef
+	var out []notifyport.StaffRef
 	for _, s := range f.staff[tid] {
 		for _, u := range units {
 			if s.UnitCode == u || s.ProvinceCode == u {
@@ -103,8 +101,8 @@ type fakeUnits struct{}
 
 var tree = map[string][]string{prov91: {prov91, ward1, ward2}, prov92: {prov92, ward92}}
 
-func (fakeUnits) Get(_ context.Context, code string, _ time.Time) (mdport.AdminUnit, error) {
-	return mdport.AdminUnit{Code: code}, nil
+func (fakeUnits) Get(_ context.Context, code string, _ time.Time) (partyport.AdminUnit, error) {
+	return partyport.AdminUnit{Code: code}, nil
 }
 
 func (fakeUnits) Descendants(_ context.Context, code string, _ time.Time) ([]string, error) {
@@ -118,7 +116,7 @@ func (fakeUnits) Descendants(_ context.Context, code string, _ time.Time) ([]str
 			}
 		}
 	}
-	return nil, mdport.ErrUnitNotFound
+	return nil, partyport.ErrUnitNotFound
 }
 
 func (fakeUnits) Current(_ context.Context, code string, _ time.Time) ([]string, error) {

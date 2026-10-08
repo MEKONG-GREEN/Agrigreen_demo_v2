@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -73,6 +74,13 @@ type Provides struct {
 	DataProducts   []string `yaml:"data_products"`   // //ag:dataproduct (contracts/dataproduct)
 }
 
+// Consumes là những gì module dùng của module khác mà KHÔNG tạo phụ thuộc gọi (§7.1 `consumes`): sự kiện
+// nhận qua hàng đợi. Không thuộc đồ thị depends nên không chịu R-MOD-05 (chỉ đi xuống); mỗi sự kiện phải do
+// module phát khai trong provides.events / provides.internal_events.
+type Consumes struct {
+	Events []string `yaml:"events"` // <tên>/v<N>, cùng dạng provides.events
+}
+
 // Manifest là nội dung một module.yaml.
 type Manifest struct {
 	Name        string            `yaml:"name"` // tên repo, vd pf/party
@@ -82,6 +90,7 @@ type Manifest struct {
 	Version     string            `yaml:"version"`
 	Depends     map[string]string `yaml:"depends"` // tên module → ràng buộc phiên bản
 	Provides    Provides          `yaml:"provides"`
+	Consumes    Consumes          `yaml:"consumes"`
 	Permissions []string          `yaml:"permissions"` // vai realm do module khai trong port/
 	Shares      []string          `yaml:"shares"`
 	OwnsSchema  []string          `yaml:"owns_schema"`
@@ -123,14 +132,22 @@ func NameForDir(dir string) string {
 	return prefix + "/" + parts[2]
 }
 
-// Parse đọc một module.yaml; trường lạ là lỗi (bắt lỗi gõ). p là đường dẫn để báo lỗi.
+// Parse đọc một module.yaml; trường lạ là lỗi (bắt lỗi gõ). Tệp phải có đúng một
+// tài liệu YAML. p là đường dẫn để báo lỗi.
 func Parse(data []byte, p string) (*Manifest, error) {
 	data = bytes.TrimPrefix(data, []byte("\xef\xbb\xbf")) // BOM của trình soạn thảo Windows
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	var m Manifest
 	if err := dec.Decode(&m); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, fmt.Errorf("%s: tệp rỗng", p)
+		}
 		return nil, fmt.Errorf("%s: %w", p, err)
+	}
+	var extra yaml.Node
+	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
+		return nil, fmt.Errorf("%s: chỉ được có một tài liệu YAML (thừa sau ---)", p)
 	}
 	m.Path = p
 	return &m, nil
@@ -149,7 +166,9 @@ var (
 // Validate kiểm lược đồ một tệp (không cần biết module khác).
 func (m *Manifest) Validate() error {
 	var errs []error
-	bad := func(format string, a ...any) { errs = append(errs, fmt.Errorf(m.Path+": "+format, a...)) }
+	bad := func(format string, a ...any) {
+		errs = append(errs, fmt.Errorf("%s: %s", m.Path, fmt.Sprintf(format, a...)))
+	}
 
 	if !reName.MatchString(m.Name) {
 		bad("name %q phải có dạng pf|mkg|vault/<module>", m.Name)
@@ -203,6 +222,12 @@ func (m *Manifest) Validate() error {
 	listCheck("provides.internal_events", m.Provides.InternalEvents, reEvent)
 	listCheck("provides.publications", m.Provides.Publications, reSnake)
 	listCheck("provides.data_products", m.Provides.DataProducts, reSnake)
+	listCheck("consumes.events", m.Consumes.Events, reEvent)
+	for _, e := range m.Consumes.Events {
+		if EventProducer(e) == m.Name {
+			bad("consumes.events %q: module không nhận sự kiện của chính nó qua consumes", e)
+		}
+	}
 	listCheck("permissions", m.Permissions, reSnake)
 	listCheck("shares", m.Shares, reSnake)
 	listCheck("owns_schema", m.OwnsSchema, reSchema)
@@ -293,6 +318,20 @@ func New(ms []*Manifest) (*Registry, error) {
 				errs = append(errs, fmt.Errorf("%s: owns_schema %q đã thuộc %s", m.Path, s, o))
 			}
 			schemaOwner[s] = m.Name
+		}
+		for _, e := range m.Consumes.Events {
+			p, ok := r.byName[EventProducer(e)]
+			switch {
+			case !ok:
+				errs = append(errs, fmt.Errorf("%s: consumes.events %q: không có module phát %q", m.Path, e, EventProducer(e)))
+			case slices.Contains(p.Provides.InternalEvents, e):
+				// Sự kiện nội bộ MKG (ADR-0018) chỉ lên vhost mkg.internal: module vùng khác không nhận được.
+				if !slices.Contains(m.Zones, "mkg") {
+					errs = append(errs, fmt.Errorf("%s: consumes.events %q là sự kiện nội bộ MKG, module không chạy ở vùng mkg", m.Path, e))
+				}
+			case !slices.Contains(p.Provides.Events, e):
+				errs = append(errs, fmt.Errorf("%s: consumes.events %q: %s không khai sự kiện này trong provides", m.Path, e, p.Name))
+			}
 		}
 	}
 	if err := errors.Join(errs...); err != nil {
@@ -387,6 +426,16 @@ func (r *Registry) ByKind(k Kind) []string {
 		}
 	}
 	return out
+}
+
+// EventProducer trả tên module phát sự kiện theo quy ước tên R-64 (<vùng>.<module>.<thực thể>.<động từ>),
+// vd "mkg.fieldops.roll_count.recorded/v1" → "mkg/fieldops"; "" khi tên không đúng dạng.
+func EventProducer(event string) string {
+	parts := strings.SplitN(event, ".", 3)
+	if len(parts) < 3 || !slices.Contains([]string{"pf", "mkg", "vault"}, parts[0]) {
+		return ""
+	}
+	return parts[0] + "/" + parts[1]
 }
 
 // SchemaOwner trả module sở hữu schema (theo owns_schema).

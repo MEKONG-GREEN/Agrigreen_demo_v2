@@ -129,25 +129,6 @@ type HubSink interface {
 }
 
 // ---------------------------------------------------------------------------
-// Marker HTX từ pf/party (điểm pf_party.cooperative.location) — module party cài
-// ---------------------------------------------------------------------------
-
-// CoopMarker là điểm vị trí HTX (không có dữ liệu cá nhân).
-type CoopMarker struct {
-	Ref         uuid.UUID
-	Code        string
-	Name        string
-	CommuneCode string
-	Lon, Lat    decimal.Decimal
-}
-
-// CoopMarkers cho geo đọc điểm HTX làm marker/dự phòng khi HTX chưa có ranh giới
-// (GIS US-BND-02 "gắn Marker"). Tenant lấy từ context; không kiểm phạm vi.
-type CoopMarkers interface {
-	MarkersInBBox(ctx context.Context, minLon, minLat, maxLon, maxLat float64, limit int) ([]CoopMarker, error)
-}
-
-// ---------------------------------------------------------------------------
 // Sự kiện G2
 // ---------------------------------------------------------------------------
 const (

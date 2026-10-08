@@ -14,13 +14,14 @@ import (
 	"github.com/google/uuid"
 
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -33,9 +34,9 @@ type Deps struct {
 	// Plans: gói hạn mức của pf/apiclient (pool apiclient_app). nil → mặc định "tạm, chờ khách".
 	Plans apiclientport.Plans
 	// Params: tham số đã duyệt của pf/masterdata (hạn mức/ngưỡng kênh, giá). nil → mặc định.
-	Params mdport.Params
+	Params params.Params
 	// Mode: AG_EGRESS_MODE (rỗng = observe). Public API luôn enforce qua Ledger.Record.
-	Mode port.Mode
+	Mode meter.Mode
 	// Metrics: nil → bộ đo trên telemetry.Meter().
 	Metrics *app.Metrics
 	Log     *slog.Logger
@@ -63,21 +64,21 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterAdmin(rg) }
 
 // Ledger là sổ sử dụng cho cmd/api-public (ghi TRƯỚC khi gửi byte; lỗi → 503, không dữ liệu).
-func (m *Module) Ledger() port.Ledger { return m.svc }
+func (m *Module) Ledger() meter.Ledger { return m.svc }
 
 // Quotas là kiểm hạn mức sớm cho cmd/api-public.
-func (m *Module) Quotas() port.Quotas { return m.svc }
+func (m *Module) Quotas() meter.Quotas { return m.svc }
 
 // Usage là tổng sử dụng của chính khách hàng (GET /v1/usage của Public API).
-func (m *Module) Usage() port.Usage { return m.svc }
+func (m *Module) Usage() meter.Usage { return m.svc }
 
 // Checkpoint là ĐIỂM KIỂM SOÁT XUẤT DUY NHẤT cho reports, mrv, van, party (gọi qua port.Guard).
-func (m *Module) Checkpoint() port.Checkpoint { return m.svc }
+func (m *Module) Checkpoint() meter.Checkpoint { return m.svc }
 
 // Mode là chế độ điểm kiểm soát đã cấu hình.
-func (m *Module) Mode() port.Mode {
+func (m *Module) Mode() meter.Mode {
 	if m.svc.Mode == "" {
-		return port.ModeObserve
+		return meter.ModeObserve
 	}
 	return m.svc.Mode
 }

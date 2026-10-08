@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
+	accountsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/store"
@@ -267,7 +268,7 @@ func (s *Service) StaffPhone(ctx context.Context, actor uuid.UUID) (string, erro
 		return "", ErrDependency.WithDetail("chưa nối pf/accounts (Keycloak Admin REST)")
 	}
 	phone, err := s.Contacts.PhoneOf(ctx, p.TenantID, actor)
-	if errors.Is(err, port.ErrNoPhone) {
+	if errors.Is(err, accountsport.ErrNoPhone) {
 		return "", ErrNoContact
 	}
 	if err != nil {

@@ -6,26 +6,25 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // ---------------------------------------------------------------------------
 // port.PlotStats (G-02, G-03)
 // ---------------------------------------------------------------------------
 
-var _ port.PlotStats = (*Service)(nil)
+var _ partyport.PlotStats = (*Service)(nil)
 
 // DigitizedByCommune thực hiện port.PlotStats.
-func (s *Service) DigitizedByCommune(ctx context.Context, communes []string) ([]port.PlotStat, error) {
+func (s *Service) DigitizedByCommune(ctx context.Context, communes []string) ([]partyport.PlotStat, error) {
 	var rows []store.StatRow
 	err := tenant.FromCtxTx(ctx, s.DB, func(tx pgx.Tx) error {
 		var e error
@@ -35,16 +34,16 @@ func (s *Service) DigitizedByCommune(ctx context.Context, communes []string) ([]
 	if err != nil {
 		return nil, err
 	}
-	out := make([]port.PlotStat, 0, len(rows))
+	out := make([]partyport.PlotStat, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, port.PlotStat{CommuneCode: r.Key, Plots: r.Plots, AreaHa: r.AreaHa})
+		out = append(out, partyport.PlotStat{CommuneCode: r.Key, Plots: r.Plots, AreaHa: r.AreaHa})
 	}
 	return out, nil
 }
 
 // DigitizedByCooperative thực hiện port.PlotStats.
-func (s *Service) DigitizedByCooperative(ctx context.Context, coops []uuid.UUID) (map[uuid.UUID]port.PlotStat, error) {
-	out := map[uuid.UUID]port.PlotStat{}
+func (s *Service) DigitizedByCooperative(ctx context.Context, coops []uuid.UUID) (map[uuid.UUID]partyport.PlotStat, error) {
+	out := map[uuid.UUID]partyport.PlotStat{}
 	if len(coops) == 0 {
 		return out, nil
 	}
@@ -62,7 +61,7 @@ func (s *Service) DigitizedByCooperative(ctx context.Context, coops []uuid.UUID)
 		if err != nil {
 			return nil, err
 		}
-		out[ref] = port.PlotStat{CooperativeRef: ref, Plots: r.Plots, AreaHa: r.AreaHa}
+		out[ref] = partyport.PlotStat{CooperativeRef: ref, Plots: r.Plots, AreaHa: r.AreaHa}
 	}
 	return out, nil
 }
@@ -96,11 +95,11 @@ func (s *Service) ListAdminBoundaries(ctx context.Context, level, parent string,
 		return AdminBoundaryList{}, err
 	}
 	switch level {
-	case string(mdport.LevelProvince), string(mdport.LevelCommune):
+	case string(partyport.LevelProvince), string(partyport.LevelCommune):
 	default:
 		return AdminBoundaryList{}, problem.Validation.WithField("level", "phải là province hoặc commune")
 	}
-	if level == string(mdport.LevelCommune) && parent == "" {
+	if level == string(partyport.LevelCommune) && parent == "" {
 		return AdminBoundaryList{}, problem.Validation.WithField("parent", "bắt buộc với level=commune (mã tỉnh)")
 	}
 	units, err := s.unitsOf(ctx, level, parent)
@@ -143,28 +142,28 @@ func (s *Service) ListAdminBoundaries(ctx context.Context, level, parent string,
 }
 
 // unitsOf trả đơn vị cấp level thuộc parent, hiệu lực hiện tại, sắp theo mã.
-func (s *Service) unitsOf(ctx context.Context, level, parent string) ([]mdport.AdminUnit, error) {
+func (s *Service) unitsOf(ctx context.Context, level, parent string) ([]partyport.AdminUnit, error) {
 	if s.Units == nil {
 		return nil, ErrDependency.WithDetail("chưa nối danh mục đơn vị hành chính")
 	}
 	now := s.now()
 	if parent != "" {
 		pu, err := s.Units.Get(ctx, parent, now)
-		if errors.Is(err, mdport.ErrUnitNotFound) {
+		if errors.Is(err, partyport.ErrUnitNotFound) {
 			return nil, problem.Validation.WithField("parent", "không có đơn vị hành chính còn hiệu lực với mã này")
 		}
 		if err != nil {
 			return nil, ErrDependency.WithDetail("không tra được đơn vị hành chính").WithCause(err)
 		}
-		if level == string(mdport.LevelProvince) {
-			if pu.Level != mdport.LevelProvince {
+		if level == string(partyport.LevelProvince) {
+			if pu.Level != partyport.LevelProvince {
 				return nil, problem.Validation.WithField("parent", "với level=province, parent phải là mã tỉnh")
 			}
-			return []mdport.AdminUnit{pu}, nil
+			return []partyport.AdminUnit{pu}, nil
 		}
 	}
-	var out []mdport.AdminUnit
-	if tree, ok := s.Units.(mdport.AdminUnitTree); ok {
+	var out []partyport.AdminUnit
+	if tree, ok := s.Units.(partyport.AdminUnitTree); ok {
 		us, err := tree.Children(ctx, parent, now)
 		if err != nil {
 			return nil, ErrDependency.WithDetail("không liệt kê được đơn vị hành chính").WithCause(err)

@@ -14,7 +14,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
@@ -22,6 +21,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
@@ -53,7 +53,7 @@ type Deps struct {
 	// thiết bị của nông dân không nhận gì (mặc định chặn), như trước G2 đợt 3.
 	Farmers   accport.FarmerHouseholds
 	Consent   partyport.ConsentChecker // tùy chọn: kiểm đồng ý trước khi cấp tệp minh chứng
-	Params    mdport.Params            // tùy chọn: sync.conflict_sla_hours
+	Params    params.Params            // tùy chọn: sync.conflict_sla_hours
 	Vault     client.Client            // khóa công khai (pubkey) và mở DEK xem tệp
 	Store     objstore.Store           // kho đối tượng chỉ chứa bản mã (R-40)
 	CursorKey []byte                   // khóa HMAC của con trỏ pull (AG_SYNC_CURSOR_KEY)

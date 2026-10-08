@@ -18,12 +18,14 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/cropcyclesrc"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -39,7 +41,7 @@ type Deps struct {
 	// Plots: thửa, diện tích, khoảng cách GPS (pf/geo). Bắt buộc cho ghi.
 	Plots geoport.Plots
 	// Params (tùy chọn): cropcycle.gps_match_tolerance_m, cropcycle.yield_anomaly_max_t_per_ha[:giống].
-	Params mdport.Params
+	Params params.Params
 	// Catalogs (tùy chọn): rice_variety, season, machine_type.
 	Catalogs mdport.Catalogs
 	// Farmers: liên kết tài khoản nông dân ↔ nông hộ (pf/accounts, G2). Thiếu → vai farmer nhận 503.
@@ -65,7 +67,7 @@ func (m *Module) UseSharing(pa partyport.PartnerAccess, vg partyport.ValveGrants
 
 // UseCollectionVolume (G5) nối nguồn của sản phẩm dữ liệu collection_volume: dữ kiện thửa (pf/geo)
 // và đơn vị hành chính (pf/masterdata).
-func (m *Module) UseCollectionVolume(pf geoport.PlotFacts, units mdport.AdminUnits) {
+func (m *Module) UseCollectionVolume(pf geoport.PlotFacts, units partyport.AdminUnits) {
 	m.svc.PlotFacts, m.svc.Units = pf, units
 }
 
@@ -75,7 +77,7 @@ func (m *Module) CollectionVolumeSource() apiclientport.CollectionVolumeSource {
 
 // UseEgress (G5, ADR-0024) nối điểm kiểm soát xuất (pf/metering) cho consumer van collection_*
 // (kênh valve). cp nil → hành vi cũ.
-func (m *Module) UseEgress(cp meteringport.Checkpoint, mode meteringport.Mode, log *slog.Logger) {
+func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logger) {
 	m.svc.Egress, m.svc.EgressMode, m.svc.Log = cp, mode, log
 }
 
@@ -92,7 +94,7 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc
 func (m *Module) Stats() port.Stats { return m.svc }
 
 // ReportData cho pf/reports (qua gốc lắp ráp): báo cáo sản lượng HTX (HTX US-DASH-02, US-DASH-03).
-func (m *Module) ReportData() port.ReportData { return app.ReportData{Svc: m.svc} }
+func (m *Module) ReportData() cropcyclesrc.ReportData { return app.ReportData{Svc: m.svc} }
 
 // UseGpsLog nối log GPS của pf/geo (consumer port.GpsLogConsumer).
 func (m *Module) UseGpsLog(g geoport.GpsLog) { m.svc.GpsLog = g }

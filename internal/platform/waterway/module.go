@@ -11,6 +11,7 @@ package waterway
 import (
 	"github.com/gin-gonic/gin"
 
+	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/app"
@@ -18,6 +19,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -28,7 +30,7 @@ const DBRole = "waterway_app"
 type Deps struct {
 	// Params: ngưỡng dựng, biên an toàn, bán kính tiếp cận, hệ số Haversine (#10) (pf/masterdata).
 	// Thiếu tham số → giá trị mặc định trong mã (domain.DefaultParams).
-	Params mdport.Params
+	Params params.Params
 	// Catalogs: danh mục lớp phương tiện vessel_class (tùy chọn; thiếu → ba lớp mặc định).
 	Catalogs mdport.Catalogs
 	// Read: pool bản sao đọc (vai waterway_app) cho truy vấn đồ thị (mục 16); nil → pool chính.
@@ -58,7 +60,7 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc
 func (m *Module) Router() port.Router { return m.svc }
 
 // Layer cho pf/geo: lớp tuyến đường thủy theo khung nhìn của bản đồ chuẩn hóa (GIS US-INT-02).
-func (m *Module) Layer() port.Layer { return m.svc }
+func (m *Module) Layer() geoport.Layer { return m.svc }
 
 // BuildHandler là inbox.Handler của worker cho pf.waterway.network_build.requested
 // (consumer port.BuildConsumer, pool vai waterway_app).

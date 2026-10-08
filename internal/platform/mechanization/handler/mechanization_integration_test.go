@@ -30,6 +30,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -63,7 +64,7 @@ func newFixture(t *testing.T, now time.Time) *fixture {
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	f := &fixture{
 		t: t, iss: iss, pool: pool, clk: clock.NewFixed(now), tenant: ids.New(),
-		orgs: &fakeOrgs{orgs: map[uuid.UUID]partyport.Org{}}, params: &fakeParams{vals: map[string][]mdport.ParamValue{}},
+		orgs: &fakeOrgs{orgs: map[uuid.UUID]partyport.Org{}}, params: &fakeParams{vals: map[string][]params.ParamValue{}},
 		dcrd: ids.New(), adminOrg: ids.New(), provOrg: ids.New(), c1: ids.New(), c2: ids.New(),
 	}
 	f.scope = &fakeScope{byOrg: map[uuid.UUID]authz.Scope{

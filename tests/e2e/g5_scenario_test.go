@@ -45,6 +45,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -130,7 +131,7 @@ func TestG5ThirdPartyToStatement(t *testing.T) {
 	t.Setenv(apiclientport.EnvPepperPrefix+"1", strings.Repeat("e2e-g5-pepper-", 4))
 	t.Setenv(apiclientport.EnvPepperCurrent, "1")
 	t.Setenv(apiclientport.EnvOperatorTenant, g.operator.String())
-	t.Setenv(meteringport.EnvEgressMode, string(meteringport.ModeEnforce))
+	t.Setenv(meter.EnvEgressMode, string(meter.ModeEnforce))
 	g.s = harness.New(t)
 	g.pm = newG5Pump(t, g.s, g.prog, g.mkg, g.operator, g.factory, g.verifier)
 	now := time.Now().In(clock.Zone())
@@ -182,7 +183,7 @@ func (g *g5) startPublicAPI() {
 		return g.s.PF(role), nil
 	}
 	mod, d, err := publicasm.Build(context.Background(), open, publicasm.Config{Operator: g.operator, Peppers: peppers, Store: g.s.Store,
-		Replicas: 1, EgressMode: meteringport.ModeEnforce, Clock: clock.System{}, Log: telemetry.NewLogger("api-public", g.s.Logs)})
+		Replicas: 1, EgressMode: meter.ModeEnforce, Clock: clock.System{}, Log: telemetry.NewLogger("api-public", g.s.Logs)})
 	if err != nil {
 		t.Fatalf("api-public Build: %v", err)
 	}
@@ -199,7 +200,7 @@ func (g *g5) startLaterAdmin() {
 	now := time.Now().In(clock.Zone())
 	next := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, clock.Zone()).AddDate(0, 1, 0)
 	laterClk := clock.NewFixed(next.Add(2 * time.Hour))
-	meter := metering.New(g.s.PF(metering.DBRole), laterClk, metering.Deps{Params: g.s.Mods.MasterData.Params(), Mode: meteringport.ModeEnforce})
+	meter := metering.New(g.s.PF(metering.DBRole), laterClk, metering.Deps{Params: g.s.Mods.MasterData.Params(), Mode: meter.ModeEnforce})
 	meter.UsePlans(g.s.Mods.APIClient.Plans())
 	eng := httpx.NewEngine(telemetry.NewLogger("api-platform-later", g.s.Logs), 1<<20)
 	meter.RegisterAdmin(eng.Group("/v1", httpx.Authenticate(g.s.Issuer.Verifier()), httpx.RequireMFA(), idempotency.Middleware(g.s.PF("platform_api"))))
@@ -719,7 +720,7 @@ func (g *g5) stepQuota() {
 		g.want(g.public(g.factoryKey, http.MethodGet, "/v1/data/collection-volumes", nil), 200, "đọc trong hạn mức")
 	}
 	r := g.public(g.factoryKey, http.MethodGet, "/v1/data/collection-volumes", nil)
-	if r.Status != http.StatusTooManyRequests || r.Code() != meteringport.ErrQuotaExceeded.Code || r.Header.Get("Retry-After") == "" ||
+	if r.Status != http.StatusTooManyRequests || r.Code() != meter.ErrQuotaExceeded.Code || r.Header.Get("Retry-After") == "" ||
 		strings.Contains(string(r.Raw), g5CommunePub) {
 		t.Fatalf("hết hạn mức ngày → 429 metering.quota_exceeded + Retry-After, không dữ liệu: %d %v %s", r.Status, r.Header, trim(r.Raw))
 	}
@@ -743,13 +744,13 @@ func (g *g5) stepQuota() {
 // tenant chủ dữ liệu nhận cảnh báo khẩn; cấp URL tải gói MRV vượt hạn mức kênh → 429, không cấp URL.
 func (g *g5) stepDLP() {
 	t := g.t
-	g.param(g.prog, meteringport.EgressParam(meteringport.ParamEgressDailyQuotaFmt, meteringport.ChannelReportExport), "1", "bản ghi")
-	g.param(g.prog, meteringport.EgressParam(meteringport.ParamEgressAnomalyRecordsFmt, meteringport.ChannelReportExport), "1", "bản ghi")
-	g.param(g.prog, meteringport.EgressParam(meteringport.ParamEgressDailyQuotaFmt, meteringport.ChannelMRVPackage), "1", "bằng chứng")
+	g.param(g.prog, meteringport.EgressParam(meteringport.ParamEgressDailyQuotaFmt, meter.ChannelReportExport), "1", "bản ghi")
+	g.param(g.prog, meteringport.EgressParam(meteringport.ParamEgressAnomalyRecordsFmt, meter.ChannelReportExport), "1", "bản ghi")
+	g.param(g.prog, meteringport.EgressParam(meteringport.ParamEgressDailyQuotaFmt, meter.ChannelMRVPackage), "1", "bằng chứng")
 	kn := g.user(g.prog, g.orgP92, partyport.RoleKNProvinceAdmin)
 	body := map[string]any{"template_key": "kn.sowing_progress", "format": "xlsx"}
 	g.want(kn.Do(harness.App, http.MethodPost, "/v1/reports/exports", "", body), 202, "xuất báo cáo lần 1 (trong hạn mức kênh)")
-	g.wantCode(kn.Do(harness.App, http.MethodPost, "/v1/reports/exports", "", body), 429, meteringport.ErrEgressQuotaExceeded.Code, "xuất báo cáo lần 2 vượt hạn mức kênh")
+	g.wantCode(kn.Do(harness.App, http.MethodPost, "/v1/reports/exports", "", body), 429, meter.ErrEgressQuotaExceeded.Code, "xuất báo cáo lần 2 vượt hạn mức kênh")
 	if n := g.count(g.prog, `SELECT count(*) FROM pf_metering.egress_event WHERE channel = 'report_export' AND counterparty_ref = $1::uuid AND decision = 'denied'
 	    AND mode = 'enforce'`, kn.Actor); n != 1 {
 		t.Fatalf("egress report_export denied: %d", n)
@@ -757,7 +758,7 @@ func (g *g5) stepDLP() {
 	if n := g.count(g.prog, `SELECT count(*) FROM pf_reports.export_audit WHERE kind = 'export'`); n != 1 {
 		t.Fatalf("bị từ chối → không có dòng export_audit: %d", n)
 	}
-	g.wantCode(g.mrvExporter.Do(harness.App, http.MethodGet, "/v1/mrv/exports/"+g.mrvExport+"/package", "", nil), 429, meteringport.ErrEgressQuotaExceeded.Code,
+	g.wantCode(g.mrvExporter.Do(harness.App, http.MethodGet, "/v1/mrv/exports/"+g.mrvExport+"/package", "", nil), 429, meter.ErrEgressQuotaExceeded.Code,
 		"tải gói MRV vượt hạn mức kênh")
 	if n := g.count(g.prog, `SELECT count(*) FROM pf_metering.egress_event WHERE channel = 'mrv_package' AND decision = 'denied'`); n != 1 {
 		t.Fatalf("egress mrv_package denied: %d", n)
@@ -766,7 +767,7 @@ func (g *g5) stepDLP() {
 	if n := g.count(g.prog, `SELECT count(*) FROM pf_metering.egress_anomaly WHERE channel = 'report_export'`); n != 1 {
 		t.Fatalf("một bất thường report_export: %d", n)
 	}
-	g.wantCode(kn.Do(harness.App, http.MethodPost, "/v1/reports/exports", "", body), 429, meteringport.ErrEgressQuotaExceeded.Code, "xuất báo cáo lần 3")
+	g.wantCode(kn.Do(harness.App, http.MethodPost, "/v1/reports/exports", "", body), 429, meter.ErrEgressQuotaExceeded.Code, "xuất báo cáo lần 3")
 	g.anomalyEvts = g.count(g.prog, `SELECT count(*) FROM shared.outbox WHERE event_type = $1`, meteringport.EventEgressAnomaly)
 	if g.anomalyEvts != 1 {
 		t.Fatalf("lần đầu vượt ngưỡng → đúng một pf.metering.egress.anomaly_detected: %d", g.anomalyEvts)

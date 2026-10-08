@@ -11,8 +11,10 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -23,7 +25,7 @@ const Producer = "pf/masterdata"
 // Mã lỗi của module (docs/errors.md).
 var (
 	ErrUnitNotFound = problem.New(http.StatusNotFound, "masterdata.admin_unit_not_found", "Không có đơn vị hành chính tại thời điểm tra").
-			WithCause(port.ErrUnitNotFound)
+			WithCause(partyport.ErrUnitNotFound)
 	ErrUnitConflict = problem.New(http.StatusConflict, "masterdata.admin_unit_conflict", "Phiên bản đơn vị hành chính đã có với nội dung khác")
 	ErrUnitOverlap  = problem.New(http.StatusConflict, "masterdata.admin_unit_overlap", "Hiệu lực chồng lấp với phiên bản khác của cùng mã")
 	ErrUnitRef      = problem.New(http.StatusUnprocessableEntity, "masterdata.admin_unit_invalid_reference", "Đơn vị cha hoặc đơn vị kế thừa không tồn tại trong khoảng hiệu lực")
@@ -40,7 +42,7 @@ var (
 		"Mục tham chiếu (nhóm cây trồng, cây trồng bị ảnh hưởng) không có hoặc đã ngừng dùng")
 
 	ErrParamNotFound = problem.New(http.StatusNotFound, "masterdata.param_not_found", "Không có tham số đã phê duyệt có hiệu lực tại thời điểm tra").
-				WithCause(port.ErrParamNotFound)
+				WithCause(params.ErrParamNotFound)
 	ErrVersionNotFound = problem.New(http.StatusNotFound, "masterdata.param_version_not_found", "Không có phiên bản tham số")
 	ErrTransition      = problem.New(http.StatusConflict, "masterdata.param_invalid_transition", "Trạng thái phiên bản không cho phép thao tác này")
 	ErrNotSetter       = problem.New(http.StatusForbidden, "masterdata.param_not_setter", "Chỉ người đặt được gửi duyệt phiên bản của mình")

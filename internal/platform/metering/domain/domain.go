@@ -17,6 +17,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 )
 
 // AllProducts là khóa sản phẩm của dòng bộ đếm tổng (hạn mức gói tính trên tổng mọi sản phẩm).
@@ -82,12 +83,12 @@ func UsageStream(client uuid.UUID, period string) string {
 }
 
 // EgressStream là stream_key của sổ xuất: egress:<kênh>:<YYYY-MM-DD>.
-func EgressStream(ch port.Channel, day time.Time) string {
+func EgressStream(ch meter.Channel, day time.Time) string {
 	return "egress:" + string(ch) + ":" + day.Format(time.DateOnly)
 }
 
 // EgressIdemKey là idem_key của dòng egress_event: <kênh>:<source_id>:<counterparty_ref>.
-func EgressIdemKey(e port.Egress) string {
+func EgressIdemKey(e meter.Egress) string {
 	return string(e.Channel) + ":" + e.SourceID.String() + ":" + e.CounterpartyRef.String()
 }
 
@@ -100,8 +101,8 @@ func StatementStream(client uuid.UUID, period string) string {
 func StatusClass(status int) string { return fmt.Sprintf("%dxx", status/100) }
 
 // ValidChannel cho biết ch có trong port.Channels.
-func ValidChannel(ch port.Channel) bool {
-	for _, c := range port.Channels {
+func ValidChannel(ch meter.Channel) bool {
+	for _, c := range meter.Channels {
 		if c == ch {
 			return true
 		}
@@ -110,9 +111,9 @@ func ValidChannel(ch port.Channel) bool {
 }
 
 // ValidCounterparty cho biết loại bên nhận hợp lệ.
-func ValidCounterparty(k port.CounterpartyKind) bool {
+func ValidCounterparty(k meter.CounterpartyKind) bool {
 	switch k {
-	case port.CounterpartyAPIClient, port.CounterpartyTenant, port.CounterpartyActor:
+	case meter.CounterpartyAPIClient, meter.CounterpartyTenant, meter.CounterpartyActor:
 		return true
 	}
 	return false
@@ -131,18 +132,18 @@ type EgressParams struct {
 }
 
 // DefaultEgressParams trả mặc định của kênh.
-func DefaultEgressParams(ch port.Channel) EgressParams {
+func DefaultEgressParams(ch meter.Channel) EgressParams {
 	p := EgressParams{AnomalyFactor: decimal.NewFromInt(3), Source: map[string]string{}}
 	switch ch {
-	case port.ChannelMRVPackage:
+	case meter.ChannelMRVPackage:
 		p.DailyQuota, p.AnomalyRecords = 50_000, 10_000
-	case port.ChannelPublicAPI:
+	case meter.ChannelPublicAPI:
 		p.AnomalyRecords = 50_000
-	case port.ChannelReportExport:
+	case meter.ChannelReportExport:
 		p.AnomalyRecords = 20_000
-	case port.ChannelValve:
+	case meter.ChannelValve:
 		p.AnomalyRecords = 20_000
-	case port.ChannelPartnerShare:
+	case meter.ChannelPartnerShare:
 		p.AnomalyRecords = 50_000
 	}
 	return p

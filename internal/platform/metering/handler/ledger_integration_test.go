@@ -19,6 +19,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
@@ -38,14 +39,14 @@ var oct = time.Date(2026, 10, 15, 2, 0, 0, 0, time.UTC)
 // hành (kể cả 4xx sau xác thực), đơn vị metering.units.v1 ghim rule_version; lời gọi phục vụ dữ liệu ghi
 // thêm egress_event kênh public_api ở tenant CHỦ DỮ LIỆU cùng giao dịch (L-02); Usage chỉ của khách hàng.
 func TestRecordOneRowPerCall_EgressInDataTenant_ADR0023(t *testing.T) {
-	f := newFixture(t, port.ModeObserve)
+	f := newFixture(t, meter.ModeObserve)
 	ctx := context.Background()
 	client, clientTenant, dataTenant := ids.New(), ids.New(), ids.New()
 	l := f.mod.Ledger()
 
 	ok := call(client, clientTenant, dataTenant, oct)
 	rec, err := l.Record(ctx, f.op, ok)
-	if err != nil || rec.Units != 1 || rec.RuleVersion != port.RuleUnitsV1 || rec.DailyRemaining != apiclientport.DefaultDailyUnits-1 {
+	if err != nil || rec.Units != 1 || rec.RuleVersion != meter.RuleUnitsV1 || rec.DailyRemaining != apiclientport.DefaultDailyUnits-1 {
 		t.Fatalf("đọc 200: %+v %v", rec, err)
 	}
 	forbidden := call(client, clientTenant, uuid.Nil, oct.Add(time.Minute))
@@ -54,7 +55,7 @@ func TestRecordOneRowPerCall_EgressInDataTenant_ADR0023(t *testing.T) {
 		t.Fatalf("403 sau xác thực phải ghi sổ với 0 đơn vị: %+v %v", rec, err)
 	}
 	dl := call(client, clientTenant, dataTenant, oct.Add(2*time.Minute))
-	dl.Kind, dl.Rows, dl.RouteTemplate = port.CallFileDownload, 2500, "GET /v1/jobs/{id}/file"
+	dl.Kind, dl.Rows, dl.RouteTemplate = meter.CallFileDownload, 2500, "GET /v1/jobs/{id}/file"
 	if rec, err := l.Record(ctx, f.op, dl); err != nil || rec.Units != 3 {
 		t.Fatalf("tải 2 500 dòng = 3 đơn vị: %+v %v", rec, err)
 	}
@@ -62,7 +63,7 @@ func TestRecordOneRowPerCall_EgressInDataTenant_ADR0023(t *testing.T) {
 	if n := f.count(f.op, `SELECT count(*) FROM pf_metering.usage_event`); n != 3 {
 		t.Fatalf("muốn 3 dòng sổ sử dụng, có %d", n)
 	}
-	if n := f.count(f.op, `SELECT count(*) FROM pf_metering.usage_event WHERE rule_version = $1 AND route_template NOT LIKE '%?%'`, port.RuleUnitsV1); n != 3 {
+	if n := f.count(f.op, `SELECT count(*) FROM pf_metering.usage_event WHERE rule_version = $1 AND route_template NOT LIKE '%?%'`, meter.RuleUnitsV1); n != 3 {
 		t.Fatal("rule_version phải ghim metering.units.v1, route là MẪU")
 	}
 	if n := f.count(f.op, `SELECT count(*) FROM pf_metering.egress_event`); n != 0 {
@@ -90,7 +91,7 @@ func TestRecordOneRowPerCall_EgressInDataTenant_ADR0023(t *testing.T) {
 // R-51 / ADR-0023 mục 2 (P-13): gọi lặp idempotent → 0 đơn vị; cùng request_id ghi hai lần → một dòng,
 // trả lại kết quả lần đầu.
 func TestRecordIdempotentReplayZeroUnits_ADR0023(t *testing.T) {
-	f := newFixture(t, port.ModeObserve)
+	f := newFixture(t, meter.ModeObserve)
 	ctx := context.Background()
 	client, ct, dt := ids.New(), ids.New(), ids.New()
 	c := call(client, ct, dt, oct)
@@ -121,7 +122,7 @@ func TestRecordIdempotentReplayZeroUnits_ADR0023(t *testing.T) {
 // ADR-0023 mục 3 (P-10, M-04): hạn mức gói chính xác dưới song song — N lời gọi đồng thời không bao giờ
 // vượt daily_units; phần vượt vẫn ghi sổ với status 429, units 0, trả metering.quota_exceeded.
 func TestQuotaExactUnderConcurrency_ADR0023(t *testing.T) {
-	f := newFixture(t, port.ModeObserve)
+	f := newFixture(t, meter.ModeObserve)
 	ctx := context.Background()
 	client, ct, dt := ids.New(), ids.New(), ids.New()
 	const quota, n = 25, 60
@@ -199,7 +200,7 @@ func TestRecordFailsClosed_ADR0023(t *testing.T) {
 // RB-1 / R-20 (X-01, M-10, L-01): sổ usage_event, egress_event, statement có chuỗi băm liền; mọi bảng chỉ
 // ghi thêm của pf_metering chặn UPDATE / DELETE / TRUNCATE bằng vai metering_app VÀ owner.
 func TestMeteringLedgersAppendOnlySixWays_R20(t *testing.T) {
-	f := newFixture(t, port.ModeObserve)
+	f := newFixture(t, meter.ModeObserve)
 	ctx := context.Background()
 	client, ct := ids.New(), ids.New()
 	for i := 0; i < 3; i++ {
@@ -208,7 +209,7 @@ func TestMeteringLedgersAppendOnlySixWays_R20(t *testing.T) {
 		}
 	}
 	// Bất thường + bảng kê để mọi bảng chỉ ghi thêm có dữ liệu.
-	f.params.set(f.op, port.EgressParam(port.ParamEgressAnomalyRecordsFmt, port.ChannelPublicAPI), "1")
+	f.params.set(f.op, port.EgressParam(port.ParamEgressAnomalyRecordsFmt, meter.ChannelPublicAPI), "1")
 	if _, err := f.mod.Ledger().Record(ctx, f.op, call(client, ct, f.op, oct.Add(time.Hour))); err != nil {
 		t.Fatal(err)
 	}
@@ -268,7 +269,7 @@ func TestMeteringLedgersAppendOnlySixWays_R20(t *testing.T) {
 // RB-2 / R-32 (X-02): cách ly tenant khi nhiều tenant đơn vị vận hành / chủ dữ liệu ghi song song trên
 // cùng pool metering_app (qua PgBouncer nếu có) — mỗi tenant chỉ thấy dòng của mình.
 func TestMeteringTenantIsolationParallel_RB2(t *testing.T) {
-	f := newFixture(t, port.ModeObserve)
+	f := newFixture(t, meter.ModeObserve)
 	ctx := context.Background()
 	const tenants, rounds = 6, 8
 	ops, data := make([]uuid.UUID, tenants), make([]uuid.UUID, tenants)
@@ -284,8 +285,8 @@ func TestMeteringTenantIsolationParallel_RB2(t *testing.T) {
 				if _, err := f.mod.Ledger().Record(ctx, op, call(client, ids.New(), dt, oct.Add(time.Duration(r)*time.Minute))); err != nil {
 					errs <- err
 				}
-				if _, err := f.mod.Checkpoint().Pass(ctx, port.Egress{SourceID: ids.New(), Channel: port.ChannelReportExport, DataTenantID: dt,
-					CounterpartyKind: port.CounterpartyActor, CounterpartyRef: ids.New(), Product: "t", Records: 5, OccurredAt: oct}); err != nil {
+				if _, err := f.mod.Checkpoint().Pass(ctx, meter.Egress{SourceID: ids.New(), Channel: meter.ChannelReportExport, DataTenantID: dt,
+					CounterpartyKind: meter.CounterpartyActor, CounterpartyRef: ids.New(), Product: "t", Records: 5, OccurredAt: oct}); err != nil {
 					errs <- err
 				}
 			}

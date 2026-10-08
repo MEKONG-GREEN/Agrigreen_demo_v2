@@ -143,7 +143,23 @@ type Publisher struct {
 	Broker Broker
 	Batch  int
 	Kind   Kind
+	// PublishTimeout là hạn chờ MỘT lần phát (gửi + confirm); 0 = DefaultPublishTimeout. Broker treo
+	// (connection.blocked, mạng nửa vời) không giữ giao dịch outbox và kết nối DB vô hạn.
+	PublishTimeout time.Duration
 }
+
+// DefaultPublishTimeout là hạn chờ mặc định của một lần phát.
+const DefaultPublishTimeout = 10 * time.Second
+
+// idleInTxTimeout chặn giao dịch outbox treo idle-in-transaction (giữ khóa hàng, giữ kết nối PgBouncer) khi
+// tiến trình kẹt ngoài DB. Hạn tính từ lệnh SQL cuối; mỗi sự kiện phát xong đều có một UPDATE, nên chỉ cần lớn
+// hơn PublishTimeout.
+const idleInTxTimeout = "60s"
+
+// batchLockKey là khóa tư vấn (theo giao dịch) giữ thứ tự khi nhiều bản publisher chạy song song: chỉ một
+// bản phát một loại (Kind) của một cụm tại một thời điểm. SKIP LOCKED một mình không đủ — bản B có thể bỏ
+// qua sự kiện X đang bị bản A giữ (lỗi, đang thử lại) rồi phát X+1 trước X.
+func batchLockKey(k Kind) string { return "ag.outbox.publish:" + string(k) }
 
 // ParkAfterRejections: số lần broker từ chối (ErrRejected) một sự kiện trước khi publisher gác nó (parked_at,
 // shared 000005) để sự kiện sau không bị chặn mãi. Lỗi kết nối không bao giờ dẫn tới gác.
@@ -162,6 +178,17 @@ func (p *Publisher) PublishBatch(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
+
+	if _, err := tx.Exec(ctx, "SELECT set_config('idle_in_transaction_session_timeout', $1, true)", idleInTxTimeout); err != nil {
+		return 0, err
+	}
+	var leader bool
+	if err := tx.QueryRow(ctx, "SELECT pg_try_advisory_xact_lock(hashtext($1))", batchLockKey(p.Kind.orDefault())).Scan(&leader); err != nil {
+		return 0, err
+	}
+	if !leader {
+		return 0, nil // bản khác đang phát loại này: chờ lượt sau
+	}
 
 	rows, err := tx.Query(ctx, `SELECT id, tenant_id, event_type, schema_version, occurred_at, recorded_at,
 	    coalesce(trace_id, ''), producer, payload, coalesce(trace_parent, ''), attempts
@@ -207,7 +234,9 @@ func (p *Publisher) PublishBatch(ctx context.Context) (int, error) {
 				pubErr = fmt.Errorf("outbox: gác sự kiện %s (%s) sau %d lần broker từ chối: %w", e.EventID, e.EventType, attempts[i]+1, err)
 				continue
 			}
-			if _, uerr := tx.Exec(ctx, "UPDATE shared.outbox SET attempts = attempts + 1, last_error = $2 WHERE id = $1", e.EventID, msg); uerr != nil {
+			// attempts chỉ đếm lần broker TỪ CHỐI (quyết định gác): lỗi kết nối/hết hạn chờ không đẩy sự kiện tới gác.
+			if _, uerr := tx.Exec(ctx, `UPDATE shared.outbox SET attempts = attempts + CASE WHEN $3 THEN 1 ELSE 0 END,
+			    last_error = $2 WHERE id = $1`, e.EventID, msg, errors.Is(err, ErrRejected)); uerr != nil {
 				return sent, uerr
 			}
 			break
@@ -227,6 +256,12 @@ func (p *Publisher) PublishBatch(ctx context.Context) (int, error) {
 // publishOne phát trong span producer là con của trace lúc ghi outbox. OTel
 // tắt → gọi thẳng broker như G0.
 func (p *Publisher) publishOne(ctx context.Context, e Envelope) error {
+	timeout := p.PublishTimeout
+	if timeout <= 0 {
+		timeout = DefaultPublishTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	if !telemetry.Enabled() {
 		return p.Broker.Publish(ctx, e)
 	}

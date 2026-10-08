@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/mechanizationsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -32,7 +32,7 @@ func TestReportDataEqualsSavedResults(t *testing.T) {
 
 	ctx := tenant.WithID(context.Background(), f.tenant)
 	rd := f.mod.ReportData()
-	q := port.ReportQuery{TenantID: f.tenant, Scope: authz.Scope{All: true}, SeasonCode: "DX", SeasonYear: 2025}
+	q := mechanizationsrc.ReportQuery{TenantID: f.tenant, Scope: authz.Scope{All: true}, SeasonCode: "DX", SeasonYear: 2025}
 	sh, err := rd.Shortage(ctx, q)
 	if err != nil || len(sh.Rows) != 1 {
 		t.Fatalf("thiếu hụt: %+v %v", sh, err)
@@ -51,7 +51,7 @@ func TestReportDataEqualsSavedResults(t *testing.T) {
 		cov.Rows[0].StatusLabel != "Cần chú ý" || cov.Rows[0].Cooperatives != 1 {
 		t.Fatalf("tổng hợp theo tỉnh × khâu × chủng loại: %+v %v", cov.Rows, err)
 	}
-	cmp, err := rd.SeasonCompare(ctx, port.CompareQuery{ReportQuery: q, SeasonCodeB: "DX", SeasonYearB: 2026})
+	cmp, err := rd.SeasonCompare(ctx, mechanizationsrc.CompareQuery{ReportQuery: q, SeasonCodeB: "DX", SeasonYearB: 2026})
 	if err != nil || len(cmp.Rows) != 4 {
 		t.Fatalf("đối chiếu: %+v %v", cmp, err)
 	}
@@ -59,7 +59,7 @@ func TestReportDataEqualsSavedResults(t *testing.T) {
 	if c.A.CoveragePct.String() != "60" || c.B.CoveragePct.String() != "120" || *c.CapacityDiff != 0 || c.PctDiff.String() != "60" {
 		t.Fatalf("chênh lệch B−A: %+v A=%+v B=%+v", c, c.A, c.B)
 	}
-	if _, err := rd.SeasonCompare(ctx, port.CompareQuery{ReportQuery: q, SeasonCodeB: "DX", SeasonYearB: 2025}); err == nil {
+	if _, err := rd.SeasonCompare(ctx, mechanizationsrc.CompareQuery{ReportQuery: q, SeasonCodeB: "DX", SeasonYearB: 2025}); err == nil {
 		t.Fatal("hai vụ trùng nhau phải bị chặn")
 	}
 	// Phạm vi tỉnh 92: chỉ thấy HTX c2 (thừa máy) → không có dòng thiếu hụt.

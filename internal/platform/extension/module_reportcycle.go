@@ -13,10 +13,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	rcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/app"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 )
@@ -37,7 +37,7 @@ func (m *Module) UseReportCycle(d ReportCycleDeps) {
 }
 
 // UseDispatchHistory nối cổng "kỳ đã gửi Chi cục" của pf/reports (cảnh báo khi mở lại kỳ).
-func (m *Module) UseDispatchHistory(h port.DispatchHistory) { m.rc.Dispatches = h }
+func (m *Module) UseDispatchHistory(h extensionsrc.DispatchHistory) { m.rc.Dispatches = h }
 
 // ReportSyncSource cho pf/sync (KN v7.7 P7): chiều xuống report_task, form_layout, report_submission của các xã phụ
 // trách trong ngữ cảnh Cấp Xã — field-app nhập báo cáo ngoại tuyến (N-07).
@@ -47,7 +47,7 @@ func (m *Module) ReportSyncSource() syncport.Source { return rcapp.ReportSync{Sv
 func (m *Module) ReportSyncSink() syncport.Sink { return rcapp.ReportSink{Svc: m.rc} }
 
 // Consolidations là cổng đọc lần tổng hợp cho pf/reports (báo cáo Chi cục, FN-TI-02.06).
-func (m *Module) Consolidations() port.Consolidations { return rcapp.Consolidations{Svc: m.rc} }
+func (m *Module) Consolidations() extensionsrc.Consolidations { return rcapp.Consolidations{Svc: m.rc} }
 
 // OpenPeriodsImpact là dòng "Kỳ báo cáo chưa chốt" của bảng Ảnh hưởng (P2 FN-AD-04.02).
 func (m *Module) OpenPeriodsImpact() partyport.OrgImpactSource { return rcapp.OrgImpact{Svc: m.rc} }

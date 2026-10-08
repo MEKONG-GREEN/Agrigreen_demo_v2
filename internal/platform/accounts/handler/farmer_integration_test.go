@@ -30,6 +30,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tabular"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
@@ -70,12 +71,12 @@ func (f *fakeHouseholds) Membership(ctx context.Context, ref uuid.UUID) (partypo
 
 type fixedParams map[string]string
 
-func (p fixedParams) At(_ context.Context, key string, at time.Time) (mdport.ParamValue, error) {
+func (p fixedParams) At(_ context.Context, key string, at time.Time) (params.ParamValue, error) {
 	v, ok := p[key]
 	if !ok {
-		return mdport.ParamValue{}, mdport.ErrParamNotFound
+		return params.ParamValue{}, params.ErrParamNotFound
 	}
-	return mdport.ParamValue{Key: key, Value: decimal.RequireFromString(v), Version: 1, EffectiveFrom: at}, nil
+	return params.ParamValue{Key: key, Value: decimal.RequireFromString(v), Version: 1, EffectiveFrom: at}, nil
 }
 
 // syncBuffer gom log của engine để kiểm token không bao giờ vào log.

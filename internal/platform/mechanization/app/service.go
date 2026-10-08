@@ -20,6 +20,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
@@ -52,9 +53,9 @@ var writeRoles = []string{port.RoleCGHAdmin}
 type Deps struct {
 	Scope      partyport.ScopeResolver // phạm vi TW → Tỉnh → Xã (ADR-0009)
 	Orgs       partyport.Orgs          // HTX: xã, trạng thái
-	Params     mdport.Params           // định mức, ngưỡng theo thời điểm (mục 16)
+	Params     params.Params           // định mức, ngưỡng theo thời điểm (mục 16)
 	Catalogs   mdport.Catalogs         // machine_type, farm_stage (cờ thí điểm), season
-	AdminUnits mdport.AdminUnits       // tỉnh của xã, tên tỉnh cho mã hiển thị
+	AdminUnits partyport.AdminUnits    // tỉnh của xã, tên tỉnh cho mã hiển thị
 	Vault      client.Client           // định danh chủ máy cá nhân (R-04)
 }
 
@@ -145,7 +146,7 @@ func (s *Service) coop(ctx context.Context, ref uuid.UUID, at time.Time) (*coopI
 		return ci, err
 	}
 	prov := *u
-	if u.Level != mdport.LevelProvince && u.ParentCode != "" {
+	if u.Level != partyport.LevelProvince && u.ParentCode != "" {
 		pu, err := s.unitAt(ctx, u.ParentCode, at)
 		if err != nil {
 			return ci, err
@@ -161,13 +162,13 @@ func (s *Service) coop(ctx context.Context, ref uuid.UUID, at time.Time) (*coopI
 }
 
 // unitAt tra đơn vị tại at; không có thì thử thời điểm hiện tại (đơn vị mới lập sau vụ).
-func (s *Service) unitAt(ctx context.Context, code string, at time.Time) (*mdport.AdminUnit, error) {
+func (s *Service) unitAt(ctx context.Context, code string, at time.Time) (*partyport.AdminUnit, error) {
 	for _, t := range []time.Time{at, s.now()} {
 		u, err := s.AdminUnits.Get(ctx, code, t)
 		if err == nil {
 			return &u, nil
 		}
-		if !errors.Is(err, mdport.ErrUnitNotFound) {
+		if !errors.Is(err, partyport.ErrUnitNotFound) {
 			return nil, ErrDependency.WithDetail("không tra được đơn vị hành chính").WithCause(err)
 		}
 	}
@@ -255,7 +256,7 @@ func (s *Service) paramAt(ctx context.Context, key string, at time.Time) (*domai
 		return nil, ErrDependency.WithDetail("chưa nối tham số pf/masterdata")
 	}
 	v, err := s.Params.At(ctx, key, at)
-	if errors.Is(err, mdport.ErrParamNotFound) {
+	if errors.Is(err, params.ErrParamNotFound) {
 		return nil, nil
 	}
 	if err != nil {

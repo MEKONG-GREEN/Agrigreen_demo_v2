@@ -12,6 +12,7 @@ import (
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -140,14 +141,14 @@ func (f *fakeParams) set(key, v string) {
 	f.vals[key] = decimal.RequireFromString(v)
 }
 
-func (f *fakeParams) At(_ context.Context, key string, _ time.Time) (mdport.ParamValue, error) {
+func (f *fakeParams) At(_ context.Context, key string, _ time.Time) (params.ParamValue, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	v, ok := f.vals[key]
 	if !ok {
-		return mdport.ParamValue{}, mdport.ErrParamNotFound
+		return params.ParamValue{}, params.ErrParamNotFound
 	}
-	return mdport.ParamValue{Key: key, Value: v, Version: 1}, nil
+	return params.ParamValue{Key: key, Value: v, Version: 1}, nil
 }
 
 // fakeFarmers thay port.FarmerHouseholds (liên kết tài khoản ↔ nông hộ của pf/accounts).

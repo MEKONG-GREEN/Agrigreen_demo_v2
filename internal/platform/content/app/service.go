@@ -57,7 +57,7 @@ type Service struct {
 	Clock    clock.Clock
 	Scope    partyport.ScopeResolver // phạm vi TW → Tỉnh → Xã; nil → ErrDependency
 	Catalogs mdport.Catalogs         // kiểm nhãn phân loại; nil → nhãn trả ErrDependency
-	Units    mdport.AdminUnits       // tùy chọn: kiểm mã đơn vị, tìm tỉnh cha của xã
+	Units    partyport.AdminUnits    // tùy chọn: kiểm mã đơn vị, tìm tỉnh cha của xã
 	Store    objstore.Store          // tùy chọn: tệp đính kèm; nil → ErrDependency khi tải lên
 }
 
@@ -92,7 +92,7 @@ func (s *Service) visibility(ctx context.Context, sc authz.Scope) (store.Visibil
 		now := s.Clock.Now()
 		for _, c := range sc.Units {
 			u, err := s.Units.Get(ctx, c, now)
-			if errors.Is(err, mdport.ErrUnitNotFound) {
+			if errors.Is(err, partyport.ErrUnitNotFound) {
 				continue
 			}
 			if err != nil {
@@ -178,15 +178,15 @@ func (s *Service) resolveAudience(ctx context.Context, a domain.Audience) (domai
 	province := ""
 	for _, code := range a.Units {
 		u, err := s.Units.Get(ctx, code, now)
-		if errors.Is(err, mdport.ErrUnitNotFound) {
+		if errors.Is(err, partyport.ErrUnitNotFound) {
 			return a, ErrAudienceInvalid.WithField("audience.units", "không có đơn vị hành chính "+code)
 		}
 		if err != nil {
 			return a, err
 		}
-		want := mdport.LevelProvince
+		want := partyport.LevelProvince
 		if a.Level == port.AudienceCommune {
-			want = mdport.LevelCommune
+			want = partyport.LevelCommune
 		}
 		if u.Level != want {
 			return a, ErrAudienceInvalid.WithField("audience.units", code+" không phải đơn vị cấp "+string(want))

@@ -11,6 +11,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/store"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -92,14 +93,14 @@ func (s *Service) rollForward(ctx context.Context, tid uuid.UUID, code string, a
 		out, err = domain.RollForward(*start, t, at, edgesIn(ctx, tx, at))
 		return err
 	})
-	if errors.Is(err, port.ErrUnitNotFound) {
+	if errors.Is(err, partyport.ErrUnitNotFound) {
 		return nil, ErrUnitNotFound
 	}
 	return out, err
 }
 
 // AdminUnitAt thực hiện port.AdminUnitHistory (cùng nghĩa Get).
-func (p UnitsPort) AdminUnitAt(ctx context.Context, code string, at time.Time) (port.AdminUnit, error) {
+func (p UnitsPort) AdminUnitAt(ctx context.Context, code string, at time.Time) (partyport.AdminUnit, error) {
 	return p.Get(ctx, code, at)
 }
 

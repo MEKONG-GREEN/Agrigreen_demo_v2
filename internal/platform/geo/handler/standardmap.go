@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/app"
-	wwport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/port"
+	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 )
 
@@ -29,7 +29,7 @@ func tagLayer(fc gin.H, layer string, out *[]gin.H) (count int, truncated bool) 
 	return len(feats), t
 }
 
-func waterwayFeature(s wwport.LayerSegment) gin.H {
+func waterwayFeature(s geoport.LayerSegment) gin.H {
 	coords := make([][2]float64, 0, len(s.Line))
 	for _, p := range s.Line {
 		coords = append(coords, [2]float64{p.Lng, p.Lat})

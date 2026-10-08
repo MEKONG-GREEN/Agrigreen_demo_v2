@@ -5,13 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"regexp"
 	"slices"
 	"sort"
 	"time"
 	"unicode/utf8"
-
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 )
 
 // ReorgDate là ngày sắp xếp đơn vị hành chính 2025 có hiệu lực: từ ngày này chỉ
@@ -45,7 +44,7 @@ var (
 type Unit struct {
 	Code       string
 	Name       string
-	Level      port.Level
+	Level      partyport.Level
 	ParentCode string
 	ValidFrom  time.Time  // ngày (Day)
 	ValidTo    *time.Time // ngày, không bao gồm; nil = còn hiệu lực
@@ -64,15 +63,15 @@ func (u Unit) Validate() error {
 		return FieldError{"code", ErrUnitCode}
 	case u.Name == "" || utf8.RuneCountInString(u.Name) > 200:
 		return FieldError{"name", ErrUnitName}
-	case u.Level != port.LevelProvince && u.Level != port.LevelCommune && u.Level != port.LevelDistrict:
+	case u.Level != partyport.LevelProvince && u.Level != partyport.LevelCommune && u.Level != partyport.LevelDistrict:
 		return FieldError{"level", ErrUnitLevel}
-	case u.Level == port.LevelProvince && u.ParentCode != "",
-		u.Level != port.LevelProvince && !unitCodeRe.MatchString(u.ParentCode),
+	case u.Level == partyport.LevelProvince && u.ParentCode != "",
+		u.Level != partyport.LevelProvince && !unitCodeRe.MatchString(u.ParentCode),
 		u.ParentCode == u.Code:
 		return FieldError{"parent_code", ErrUnitParent}
 	case u.ValidFrom.IsZero() || (u.ValidTo != nil && !u.ValidTo.After(u.ValidFrom)):
 		return FieldError{"valid_to", ErrUnitValidity}
-	case u.Level == port.LevelDistrict && (u.ValidTo == nil || u.ValidTo.After(ReorgDate)):
+	case u.Level == partyport.LevelDistrict && (u.ValidTo == nil || u.ValidTo.After(ReorgDate)):
 		return FieldError{"valid_to", ErrUnitDistrict}
 	}
 	if len(u.Successors) > 0 && u.ValidTo == nil {
@@ -153,7 +152,7 @@ func ResolveCurrent(code string, day time.Time, at, latest FindFunc) ([]string, 
 		return nil, err
 	}
 	if start == nil {
-		return nil, port.ErrUnitNotFound
+		return nil, partyport.ErrUnitNotFound
 	}
 	type key struct {
 		code string
@@ -191,7 +190,7 @@ func ResolveCurrent(code string, day time.Time, at, latest FindFunc) ([]string, 
 		}
 	}
 	if len(out) == 0 {
-		return nil, port.ErrUnitNotFound
+		return nil, partyport.ErrUnitNotFound
 	}
 	codes := make([]string, 0, len(out))
 	for c := range out {
@@ -239,7 +238,7 @@ func ParseGazetteer(raw []byte) (string, []Unit, error) {
 	seen := map[string]bool{}
 	for i, g := range f.Units {
 		prefix := fmt.Sprintf("units[%d].", i)
-		u := Unit{Code: g.Code, Name: g.Name, Level: port.Level(g.Level), ParentCode: g.ParentCode, Successors: g.Successors}
+		u := Unit{Code: g.Code, Name: g.Name, Level: partyport.Level(g.Level), ParentCode: g.ParentCode, Successors: g.Successors}
 		from, err := ParseDay(g.ValidFrom)
 		if err != nil {
 			return "", nil, FieldError{prefix + "valid_from", ErrUnitValidity}

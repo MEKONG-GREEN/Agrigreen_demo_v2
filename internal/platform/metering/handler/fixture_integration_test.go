@@ -18,7 +18,6 @@ import (
 	"github.com/shopspring/decimal"
 
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
@@ -27,6 +26,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -38,28 +39,28 @@ func TestMain(m *testing.M) { os.Exit(pgtest.Run(m)) }
 // fakeParams là pf/masterdata giả: tham số đã duyệt theo (tenant, khóa) — phiên bản tăng dần.
 type fakeParams struct {
 	mu   sync.Mutex
-	vals map[string]mdport.ParamValue
+	vals map[string]params.ParamValue
 }
 
-func newFakeParams() *fakeParams { return &fakeParams{vals: map[string]mdport.ParamValue{}} }
+func newFakeParams() *fakeParams { return &fakeParams{vals: map[string]params.ParamValue{}} }
 
 func (f *fakeParams) set(tid uuid.UUID, key, value string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	prev := f.vals[tid.String()+"|"+key]
-	f.vals[tid.String()+"|"+key] = mdport.ParamValue{Key: key, Value: decimal.RequireFromString(value), Version: prev.Version + 1}
+	f.vals[tid.String()+"|"+key] = params.ParamValue{Key: key, Value: decimal.RequireFromString(value), Version: prev.Version + 1}
 }
 
-func (f *fakeParams) At(ctx context.Context, key string, _ time.Time) (mdport.ParamValue, error) {
+func (f *fakeParams) At(ctx context.Context, key string, _ time.Time) (params.ParamValue, error) {
 	tid, err := tenant.FromContext(ctx)
 	if err != nil {
-		return mdport.ParamValue{}, err
+		return params.ParamValue{}, err
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	v, ok := f.vals[tid.String()+"|"+key]
 	if !ok {
-		return mdport.ParamValue{}, mdport.ErrParamNotFound
+		return params.ParamValue{}, params.ErrParamNotFound
 	}
 	return v, nil
 }
@@ -92,7 +93,7 @@ type fixture struct {
 	op     uuid.UUID // tenant đơn vị vận hành
 }
 
-func newFixture(t *testing.T, mode port.Mode) *fixture {
+func newFixture(t *testing.T, mode meter.Mode) *fixture {
 	env := pgtest.Get(t)
 	iss := authztest.New(t)
 	pool := env.Pool(t, migrations.PF, port.DBRole)
@@ -110,9 +111,9 @@ func newFixture(t *testing.T, mode port.Mode) *fixture {
 }
 
 // call là một lời gọi Public API giả (như cmd/api-public gửi).
-func call(client, clientTenant, dataTenant uuid.UUID, at time.Time) port.Call {
-	return port.Call{RequestID: ids.New(), ReceivedAt: at, ClientID: client, ClientTenantID: clientTenant, KeyPrefix: "agk_ABCDEFGHIJKL",
-		AuthMethod: "api_key", Kind: port.CallRead, Product: "collection_volume", ContractVersion: 1, Scope: "dp:collection_volume:read",
+func call(client, clientTenant, dataTenant uuid.UUID, at time.Time) meter.Call {
+	return meter.Call{RequestID: ids.New(), ReceivedAt: at, ClientID: client, ClientTenantID: clientTenant, KeyPrefix: "agk_ABCDEFGHIJKL",
+		AuthMethod: "api_key", Kind: meter.CallRead, Product: "collection_volume", ContractVersion: 1, Scope: "dp:collection_volume:read",
 		RouteTemplate: "GET /v1/data/collection-volumes", Status: 200, DataTenantID: dataTenant, Rows: 12, Bytes: 2048, Latency: 35 * time.Millisecond}
 }
 

@@ -14,9 +14,9 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/public"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 )
 
 const collPath = "/v1/data/collection-volumes"
@@ -60,7 +60,7 @@ func TestReadCollectionVolumes_ADR0022(t *testing.T) {
 		t.Fatalf("muốn đúng 1 dòng sổ 1 đơn vị, nhận %d dòng %d đơn vị", len(calls), units)
 	}
 	c := calls[0]
-	if c.Kind != meteringport.CallRead || c.Status != 200 || c.DataTenantID != e.grantor || c.Rows != 2 || c.Scope != "dp:collection_volume:read" ||
+	if c.Kind != meter.CallRead || c.Status != 200 || c.DataTenantID != e.grantor || c.Rows != 2 || c.Scope != "dp:collection_volume:read" ||
 		c.RouteTemplate != "GET /v1/data/collection-volumes" || c.ClientTenantID != e.thirdParty || c.ContractVersion != 1 || c.Bytes == 0 {
 		t.Fatalf("dòng sổ sai: %+v", c)
 	}
@@ -163,7 +163,7 @@ func TestLedgerFailureNoBody_ADR0023(t *testing.T) {
 	e := newEnv(t)
 	e.meter.err = errBoom
 	r := e.do(http.MethodGet, collPath, e.key, nil)
-	wantCode(t, r, 503, meteringport.ErrUnavailable.Code, "ghi sổ lỗi")
+	wantCode(t, r, 503, meter.ErrUnavailable.Code, "ghi sổ lỗi")
 	if strings.Contains(string(r.raw), "30001") || strings.Contains(string(r.raw), "items") || r.header.Get(port.HeaderDataContract) != "" {
 		t.Fatalf("503 không được có dữ liệu: %s", r.raw)
 	}
@@ -183,19 +183,19 @@ func TestQuotaExhausted429_ADR0022(t *testing.T) {
 		}
 	}
 	r := e.do(http.MethodGet, collPath, e.key, nil)
-	wantCode(t, r, 429, meteringport.ErrQuotaExceeded.Code, "hết hạn mức (kiểm sớm)")
+	wantCode(t, r, 429, meter.ErrQuotaExceeded.Code, "hết hạn mức (kiểm sớm)")
 	if r.header.Get("Retry-After") == "" || strings.Contains(string(r.raw), "items") {
 		t.Fatalf("429 cần Retry-After, không dữ liệu: %v %s", r.header, r.raw)
 	}
 	calls, units := e.meter.snapshot()
-	if len(calls) != 3 || units != 2 || calls[2].Status != 429 || meteringport.UnitsV1(calls[2]) != 0 {
+	if len(calls) != 3 || units != 2 || calls[2].Status != 429 || meter.UnitsV1(calls[2]) != 0 {
 		t.Fatalf("sổ: %d dòng, %d đơn vị, dòng cuối %+v", len(calls), units, calls[len(calls)-1])
 	}
 	// Thẩm quyền cuối là Ledger.Record: kiểm sớm cho qua nhưng Record từ chối → 429, không dữ liệu.
 	e2 := newEnv(t, func(d *public.Deps) { d.Quotas = alwaysRemaining{} })
 	e2.meter.monthly = 0
 	r = e2.do(http.MethodGet, collPath, e2.key, nil)
-	wantCode(t, r, 429, meteringport.ErrQuotaExceeded.Code, "Record từ chối")
+	wantCode(t, r, 429, meter.ErrQuotaExceeded.Code, "Record từ chối")
 	if strings.Contains(string(r.raw), "30001") || r.header.Get("Retry-After") == "" {
 		t.Fatalf("429 từ sổ không có dữ liệu, có Retry-After: %s", r.raw)
 	}
@@ -270,13 +270,13 @@ func TestExportRequiresIdempotencyKey_ADR0022(t *testing.T) {
 	e := newEnv(t)
 	r := e.do(http.MethodPost, collPath+"/exports", e.key, []byte(`{"format":"csv"}`))
 	wantCode(t, r, 400, "idempotency_key_required", "thiếu Idempotency-Key")
-	if calls, units := e.meter.snapshot(); len(calls) != 1 || units != 0 || calls[0].Kind != meteringport.CallExportRequest {
+	if calls, units := e.meter.snapshot(); len(calls) != 1 || units != 0 || calls[0].Kind != meter.CallExportRequest {
 		t.Fatalf("sổ: %+v", calls)
 	}
 }
 
 type alwaysRemaining struct{}
 
-func (alwaysRemaining) Remaining(context.Context, uuid.UUID, uuid.UUID, string, time.Time) (meteringport.Remaining, error) {
-	return meteringport.Remaining{DailyUnits: 1, MonthlyUnits: 1}, nil
+func (alwaysRemaining) Remaining(context.Context, uuid.UUID, uuid.UUID, string, time.Time) (meter.Remaining, error) {
+	return meter.Remaining{DailyUnits: 1, MonthlyUnits: 1}, nil
 }

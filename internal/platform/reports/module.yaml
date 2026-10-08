@@ -1,5 +1,5 @@
 # Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
-# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, consumes, permissions, owns_schema.
 # Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
 name: pf/reports
 aka: [cap/forms, cap/export, cap/import]
@@ -7,14 +7,18 @@ kind: capability
 zones: [pf]
 version: 1.0.0
 depends:
-  pf/cropcycle: ">=1.0 <2"
-  pf/extension: ">=1.0 <2"
+  pf/accounts: ">=1.0 <2"
   pf/masterdata: ">=1.0 <2"
-  pf/mechanization: ">=1.0 <2"
-  pf/metering: ">=1.0 <2"
   pf/party: ">=1.0 <2"
 provides:
-  ports: [FormEngine, MailDirectory, Mailer, RecipientDirectory]
+  ports:
+    - FormEngine
+    - Mailer
+    - cropcyclesrc.ReportData
+    - extensionsrc.Consolidations
+    - extensionsrc.DispatchHistory
+    - extensionsrc.ReportData
+    - mechanizationsrc.ReportData
   events:
     - pf.reports.dispatch.requested/v1
     - pf.reports.export.anomaly/v1
@@ -24,6 +28,8 @@ provides:
   internal_events: []
   publications: []
   data_products: []
+consumes:
+  events: []
 permissions: [reports_admin]
 shares: []
 owns_schema: [pf_reports]

@@ -9,9 +9,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -43,25 +44,27 @@ func (f *fakeScope) Scope(ctx context.Context) (authz.Scope, error) {
 }
 
 // fakeUnits là danh mục đơn vị hành chính giả: tỉnh Cần Thơ (92) với hai xã, An Giang (89) một xã.
-type fakeUnits struct{ units map[string]mdport.AdminUnit }
+type fakeUnits struct {
+	units map[string]partyport.AdminUnit
+}
 
 func newFakeUnits() *fakeUnits {
-	f := &fakeUnits{units: map[string]mdport.AdminUnit{}}
-	add := func(code, name string, lvl mdport.Level, parent string) {
-		f.units[code] = mdport.AdminUnit{Code: code, Name: name, Level: lvl, ParentCode: parent}
+	f := &fakeUnits{units: map[string]partyport.AdminUnit{}}
+	add := func(code, name string, lvl partyport.Level, parent string) {
+		f.units[code] = partyport.AdminUnit{Code: code, Name: name, Level: lvl, ParentCode: parent}
 	}
-	add("92", "Cần Thơ", mdport.LevelProvince, "")
-	add("31117", "Xã Thới Lai", mdport.LevelCommune, "92")
-	add("31120", "Xã Trường Xuân", mdport.LevelCommune, "92")
-	add("89", "An Giang", mdport.LevelProvince, "")
-	add("30001", "Xã A", mdport.LevelCommune, "89")
+	add("92", "Cần Thơ", partyport.LevelProvince, "")
+	add("31117", "Xã Thới Lai", partyport.LevelCommune, "92")
+	add("31120", "Xã Trường Xuân", partyport.LevelCommune, "92")
+	add("89", "An Giang", partyport.LevelProvince, "")
+	add("30001", "Xã A", partyport.LevelCommune, "89")
 	return f
 }
 
-func (f *fakeUnits) Get(_ context.Context, code string, _ time.Time) (mdport.AdminUnit, error) {
+func (f *fakeUnits) Get(_ context.Context, code string, _ time.Time) (partyport.AdminUnit, error) {
 	u, ok := f.units[code]
 	if !ok {
-		return mdport.AdminUnit{}, mdport.ErrUnitNotFound
+		return partyport.AdminUnit{}, partyport.ErrUnitNotFound
 	}
 	return u, nil
 }
@@ -109,14 +112,14 @@ func (p *paramValues) get(key string) (decimal.Decimal, bool) {
 	return v, ok
 }
 
-func (f fakeParams) At(_ context.Context, key string, _ time.Time) (mdport.ParamValue, error) {
+func (f fakeParams) At(_ context.Context, key string, _ time.Time) (params.ParamValue, error) {
 	if v, ok := f.values.get(key); ok {
-		return mdport.ParamValue{Key: key, Value: v, Version: 1}, nil
+		return params.ParamValue{Key: key, Value: v, Version: 1}, nil
 	}
 	if key != "geo.overlap_tolerance_pct" || f.tolerance == nil {
-		return mdport.ParamValue{}, mdport.ErrParamNotFound
+		return params.ParamValue{}, params.ErrParamNotFound
 	}
-	return mdport.ParamValue{Key: key, Value: *f.tolerance, Unit: "%", Version: 1}, nil
+	return params.ParamValue{Key: key, Value: *f.tolerance, Unit: "%", Version: 1}, nil
 }
 
 // Hình học kiểm thử quanh Cần Thơ.
@@ -149,12 +152,12 @@ func rect(east, north, w, h float64) map[string]any {
 // denyCP là điểm kiểm soát xuất giả luôn báo vượt hạn mức (A5: xuất nội bộ vẫn phải đi qua và không bị chặn).
 type denyCP struct {
 	mu  sync.Mutex
-	got []meteringport.Egress
+	got []meter.Egress
 }
 
-func (d *denyCP) Pass(_ context.Context, e meteringport.Egress) (meteringport.Decision, error) {
+func (d *denyCP) Pass(_ context.Context, e meter.Egress) (meter.Decision, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.got = append(d.got, e)
-	return meteringport.Decision{Allowed: false, Reason: "quota_exceeded", Mode: meteringport.ModeEnforce}, nil
+	return meter.Decision{Allowed: false, Reason: "quota_exceeded", Mode: meter.ModeEnforce}, nil
 }

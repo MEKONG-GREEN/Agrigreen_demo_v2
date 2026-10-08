@@ -17,10 +17,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	accountsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -498,14 +499,14 @@ func TestFN_TI_02_07_UnregisteredBulkRemindersExport(t *testing.T) {
 	// A5 (03/10/2026): xuất lịch là xuất NỘI BỘ — qua điểm kiểm soát dùng chung (ghi egress_event) nhưng không bị chặn
 	// kể cả enforce + checkpoint báo vượt hạn mức hoặc lỗi.
 	cp := &denyCP{}
-	f.mod.UseEgress(cp, meteringport.ModeEnforce, nil)
+	f.mod.UseEgress(cp, meter.ModeEnforce, nil)
 	if r := p.admin89.call(http.MethodGet, "/v1/extension/work-schedules/export?week_start="+nextWeek+"&format=pdf", "", nil); r.status != http.StatusOK || pdf.rows != 3 {
 		t.Fatalf("xuất PDF 3 dòng: %d %d", r.status, pdf.rows)
 	}
 	if x := p.admin89.call(http.MethodGet, "/v1/extension/work-schedules/export?week_start="+nextWeek, "", nil); x.status != http.StatusOK {
 		t.Fatalf("A5: xuất Excel ở enforce bị chặn: %d", x.status)
 	}
-	if len(cp.got) != 2 || !cp.got[0].Internal || cp.got[0].Channel != meteringport.ChannelReportExport || cp.got[0].Product != "kn_work_schedule" ||
+	if len(cp.got) != 2 || !cp.got[0].Internal || cp.got[0].Channel != meter.ChannelReportExport || cp.got[0].Product != "kn_work_schedule" ||
 		cp.got[0].Records != 3 || cp.got[0].CounterpartyRef == uuid.Nil {
 		t.Fatalf("A5: lần xuất phải qua checkpoint với Internal: %+v", cp.got)
 	}
@@ -560,12 +561,14 @@ func (p *fakePDF) RenderTablePDF(_ string, _ [][2]string, _ []string, rows [][]s
 }
 
 // P1 cắm vào qua port.KNContextResolver: cấp quản lý quyết định người duyệt (Q-05, tạm "truong_phong").
-type fakeKNContext struct{ byActor map[uuid.UUID]port.KNContext }
+type fakeKNContext struct {
+	byActor map[uuid.UUID]accountsport.KNContext
+}
 
-func (f fakeKNContext) KNContext(ctx context.Context) (port.KNContext, bool, error) {
+func (f fakeKNContext) KNContext(ctx context.Context) (accountsport.KNContext, bool, error) {
 	pr, ok := principalOf(ctx)
 	if !ok {
-		return port.KNContext{}, false, nil
+		return accountsport.KNContext{}, false, nil
 	}
 	c, ok := f.byActor[pr]
 	return c, ok, nil
@@ -581,7 +584,7 @@ func TestFN_TI_02_07_ApproverMgmtLevelViaP1Context(t *testing.T) {
 	p := f.seedPeople()
 	head := f.as(f.org.p89, port.RoleKNProvinceAdmin)
 	spec := f.as(f.org.p89, port.RoleKNProvinceAdmin)
-	f.mod.UseKNContext(fakeKNContext{byActor: map[uuid.UUID]port.KNContext{
+	f.mod.UseKNContext(fakeKNContext{byActor: map[uuid.UUID]accountsport.KNContext{
 		p.off30001a.actor: {Role: port.KNRoleXa, Department: "trong_trot", ProvinceCode: "89", Communes: []string{"30001", "30002"}},
 		head.actor:        {Role: port.KNRoleTinh, Department: "trong_trot", ProvinceCode: "89", MgmtLevel: "Truong_Phong"},
 		spec.actor:        {Role: port.KNRoleTinh, Department: "trong_trot", ProvinceCode: "89", MgmtLevel: port.MgmtLevelSpecialist},
@@ -657,12 +660,12 @@ func TestFN_XA_03_08_CopyPreviousAndValidation(t *testing.T) {
 // denyCP là điểm kiểm soát xuất giả luôn báo vượt hạn mức (A5: xuất nội bộ vẫn phải đi qua và không bị chặn).
 type denyCP struct {
 	mu  sync.Mutex
-	got []meteringport.Egress
+	got []meter.Egress
 }
 
-func (d *denyCP) Pass(_ context.Context, e meteringport.Egress) (meteringport.Decision, error) {
+func (d *denyCP) Pass(_ context.Context, e meter.Egress) (meter.Decision, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.got = append(d.got, e)
-	return meteringport.Decision{Allowed: false, Reason: "quota_exceeded", Mode: meteringport.ModeEnforce}, nil
+	return meter.Decision{Allowed: false, Reason: "quota_exceeded", Mode: meter.ModeEnforce}, nil
 }

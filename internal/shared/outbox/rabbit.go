@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
@@ -22,6 +24,13 @@ const DeadLetterExchange = "ag.dlx"
 // sự kiện, có thể bị gác sau ParkAfterRejections lần (Publisher.PublishBatch).
 var ErrRejected = errors.New("outbox: broker từ chối (nack)")
 
+// ErrUnroutable: broker trả lại thông điệp vì chưa hàng đợi nào bind routing key (chỉ khi FailOnReturn).
+// Là lỗi tạm thời như lỗi kết nối — sự kiện không bị đánh dấu đã phát, không bị gác, phát lại lượt sau.
+var ErrUnroutable = errors.New("outbox: broker trả lại thông điệp (không route được)")
+
+// stallAfter: một lần Publish giữ khóa lâu hơn mức này thì Check báo không sẵn sàng (publisher kẹt).
+const stallAfter = 30 * time.Second
+
 // Rabbit là Broker RabbitMQ có publisher confirm. Kết nối/kênh đứt (broker khởi động lại,
 // mạng chập chờn) được quay số lại ở lần Publish/Check kế tiếp — publisher không bị kẹt
 // mãi với kết nối chết.
@@ -32,9 +41,15 @@ type Rabbit struct {
 	conn    *amqp.Connection
 	ch      *amqp.Channel
 	returns chan amqp.Return
-	// OnReturn (tùy chọn) nhận thông điệp broker trả về vì không route được (mandatory):
-	// sự kiện chưa có hàng đợi nào bind — vẫn coi là đã phát, chỉ báo để quan sát.
+	// publishSince: thời điểm (UnixNano) lần Publish đang chạy bắt đầu; 0 khi không có.
+	publishSince atomic.Int64
+	// OnReturn (tùy chọn) nhận thông điệp broker trả về vì không route được (mandatory).
 	OnReturn func(amqp.Return)
+	// FailOnReturn: thông điệp bị trả về thì Publish trả ErrUnroutable thay vì coi là đã phát. Bật cho bản
+	// publisher không tự khai báo hàng đợi đích (vùng mkg phát van lên vhost nền tảng): hàng đợi pf chưa có
+	// thì chờ, không mất sự kiện. Tắt (mặc định) khi publisher đã khai báo mọi hàng đợi consumer lúc khởi
+	// động — thông điệp bị trả về khi đó nghĩa là chưa ai đăng ký, chỉ báo để quan sát.
+	FailOnReturn bool
 }
 
 // DialRabbit kết nối và khai báo exchange.
@@ -89,27 +104,34 @@ func (r *Rabbit) dropLocked() {
 	r.conn, r.ch, r.returns = nil, nil, nil
 }
 
-// drainReturnsLocked rút thông điệp bị trả về; người gọi giữ mu.
-func (r *Rabbit) drainReturnsLocked() {
+// drainReturnsLocked rút thông điệp bị trả về; báo có thông điệp messageID trong số đó. Người gọi giữ mu.
+func (r *Rabbit) drainReturnsLocked(messageID string) (returned bool) {
 	for {
 		select {
 		case ret, ok := <-r.returns:
 			if !ok {
-				return
+				return returned
+			}
+			if ret.MessageId == messageID {
+				returned = true
 			}
 			if r.OnReturn != nil {
 				r.OnReturn(ret)
 			}
 		default:
-			return
+			return returned
 		}
 	}
 }
 
 // Check báo kết nối còn dùng được (probe /readyz), quay số lại khi đã đứt. Đang có
-// Publish giữ khóa thì coi là sống — Publish tự xử lý lỗi kết nối của nó.
+// Publish giữ khóa thì coi là sống — Publish tự xử lý lỗi kết nối của nó — trừ khi lần
+// Publish đó đã kéo dài quá stallAfter (broker treo mà hạn chờ không gỡ được).
 func (r *Rabbit) Check(context.Context) error {
 	if !r.mu.TryLock() {
+		if since := r.publishSince.Load(); since != 0 && time.Since(time.Unix(0, since)) > stallAfter {
+			return fmt.Errorf("outbox: lần phát hiện tại kẹt quá %s", stallAfter)
+		}
 		return nil
 	}
 	defer r.mu.Unlock()
@@ -132,36 +154,48 @@ func (r *Rabbit) Publish(ctx context.Context, env Envelope) error {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.publishSince.Store(time.Now().UnixNano())
+	defer r.publishSince.Store(0)
 	if err := r.ensureLocked(); err != nil {
 		return err
 	}
-	defer r.drainReturnsLocked()
+	msgID := env.EventID.String()
+	// Hạn chờ chỉ được kiểm lúc bắt đầu gửi và khi chờ confirm; lần ghi socket bị chặn (broker gửi
+	// connection.blocked, ngừng đọc) không tự gỡ. Hết hạn thì đóng kết nối để gỡ nó; lần sau quay số lại.
+	conn := r.conn
+	stopWatch := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stopWatch()
 	conf, err := r.ch.PublishWithDeferredConfirmWithContext(ctx, Exchange, env.EventType, true, false, amqp.Publishing{
 		ContentType:  "application/json",
 		DeliveryMode: amqp.Persistent,
-		MessageId:    env.EventID.String(),
+		MessageId:    msgID,
 		Timestamp:    env.RecordedAt,
 		Type:         env.EventType,
 		Headers:      MessageHeaders(ctx, env), // R-63
 		Body:         body,
 	})
 	if err != nil {
-		if errors.Is(err, amqp.ErrClosed) {
+		if errors.Is(err, amqp.ErrClosed) || ctx.Err() != nil {
 			r.dropLocked()
 		}
+		r.drainReturnsLocked(msgID)
 		return err
 	}
 	ok, err := conf.WaitContext(ctx)
 	if err != nil {
-		// Không rõ broker đã nhận chưa (vd kênh đóng giữa chừng): bỏ kênh để lần sau mở
-		// kênh mới; phát lại an toàn vì inbox khử trùng theo event_id.
-		if ctx.Err() == nil {
-			r.dropLocked()
-		}
+		// Không rõ broker đã nhận chưa (kênh đóng giữa chừng, hết hạn chờ): bỏ kết nối để lần sau
+		// mở mới — confirm muộn của kênh cũ không lẫn vào lần sau; phát lại an toàn vì inbox khử
+		// trùng theo event_id.
+		r.dropLocked()
 		return err
 	}
+	// basic.return đến trước basic.ack của cùng thông điệp nên đã nằm trong kênh đệm lúc này.
+	returned := r.drainReturnsLocked(msgID)
 	if !ok {
 		return ErrRejected
+	}
+	if returned && r.FailOnReturn {
+		return fmt.Errorf("%w: routing key %s", ErrUnroutable, env.EventType)
 	}
 	return nil
 }

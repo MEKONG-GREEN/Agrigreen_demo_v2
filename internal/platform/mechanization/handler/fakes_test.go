@@ -13,6 +13,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 )
 
 // fakeScope tính phạm vi theo OrgRef của token (party đã có kiểm thử riêng cho cây phân cấp).
@@ -68,25 +69,27 @@ func (f *fakeOrgs) move(ref uuid.UUID, commune string) {
 }
 
 // fakeUnits: An Giang (89) có xã 30001, 30002; Thành phố Cần Thơ (92) có xã 31001.
-type fakeUnits struct{ units map[string]mdport.AdminUnit }
+type fakeUnits struct {
+	units map[string]partyport.AdminUnit
+}
 
 func newFakeUnits() *fakeUnits {
-	f := &fakeUnits{units: map[string]mdport.AdminUnit{}}
-	add := func(code, name string, lvl mdport.Level, parent string) {
-		f.units[code] = mdport.AdminUnit{Code: code, Name: name, Level: lvl, ParentCode: parent}
+	f := &fakeUnits{units: map[string]partyport.AdminUnit{}}
+	add := func(code, name string, lvl partyport.Level, parent string) {
+		f.units[code] = partyport.AdminUnit{Code: code, Name: name, Level: lvl, ParentCode: parent}
 	}
-	add("89", "An Giang", mdport.LevelProvince, "")
-	add("30001", "Xã Mỹ Hòa", mdport.LevelCommune, "89")
-	add("30002", "Xã Bình Thủy", mdport.LevelCommune, "89")
-	add("92", "Thành phố Cần Thơ", mdport.LevelProvince, "")
-	add("31001", "Xã Thới Lai", mdport.LevelCommune, "92")
+	add("89", "An Giang", partyport.LevelProvince, "")
+	add("30001", "Xã Mỹ Hòa", partyport.LevelCommune, "89")
+	add("30002", "Xã Bình Thủy", partyport.LevelCommune, "89")
+	add("92", "Thành phố Cần Thơ", partyport.LevelProvince, "")
+	add("31001", "Xã Thới Lai", partyport.LevelCommune, "92")
 	return f
 }
 
-func (f *fakeUnits) Get(_ context.Context, code string, _ time.Time) (mdport.AdminUnit, error) {
+func (f *fakeUnits) Get(_ context.Context, code string, _ time.Time) (partyport.AdminUnit, error) {
 	u, ok := f.units[code]
 	if !ok {
-		return mdport.AdminUnit{}, mdport.ErrUnitNotFound
+		return partyport.AdminUnit{}, partyport.ErrUnitNotFound
 	}
 	return u, nil
 }
@@ -148,30 +151,30 @@ func (f *fakeCatalogs) List(_ context.Context, catalog string) ([]mdport.Catalog
 // fakeParams: phiên bản ĐÃ DUYỆT theo ngày hiệu lực — At trả bản mới nhất có hiệu lực tại at (mục 16).
 type fakeParams struct {
 	mu   sync.Mutex
-	vals map[string][]mdport.ParamValue
+	vals map[string][]params.ParamValue
 }
 
 func (f *fakeParams) approve(key, value, from string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	t, _ := time.ParseInLocation(time.DateOnly, from, time.FixedZone("ICT", 7*3600))
-	f.vals[key] = append(f.vals[key], mdport.ParamValue{
+	f.vals[key] = append(f.vals[key], params.ParamValue{
 		Key: key, Value: decimal.RequireFromString(value), Version: len(f.vals[key]) + 1, EffectiveFrom: t.UTC(), SourceDoc: "QĐ thử " + from,
 	})
 	sort.Slice(f.vals[key], func(i, j int) bool { return f.vals[key][i].EffectiveFrom.Before(f.vals[key][j].EffectiveFrom) })
 }
 
-func (f *fakeParams) At(_ context.Context, key string, at time.Time) (mdport.ParamValue, error) {
+func (f *fakeParams) At(_ context.Context, key string, at time.Time) (params.ParamValue, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	var best *mdport.ParamValue
+	var best *params.ParamValue
 	for i, v := range f.vals[key] {
 		if !v.EffectiveFrom.After(at) {
 			best = &f.vals[key][i]
 		}
 	}
 	if best == nil {
-		return mdport.ParamValue{}, mdport.ErrParamNotFound
+		return params.ParamValue{}, params.ErrParamNotFound
 	}
 	return *best, nil
 }

@@ -11,12 +11,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -51,14 +51,14 @@ type Service struct {
 	Store   objstore.Store
 	// Params: tham số masterdata đã duyệt (hệ số CO2, ngưỡng FR-08, cửa sổ đối chiếu).
 	// nil → mặc định trong mã, ước tính không bao giờ chính thức.
-	Params mdport.Params
+	Params params.Params
 	// ValveGrants (ADR-0020): tenant bên cấp nhận van mrv_collection_evidence của tenant phong bì
 	// (pf/party). Thiếu → consumer van từ chối (DLQ, party.valve_share_grant_missing).
 	ValveGrants partyport.ValveGrants
 	// Egress (G5, ADR-0024): điểm kiểm soát xuất (pf/metering) — kênh mrv_package ở yêu cầu xuất và
 	// cấp URL tải gói; kênh valve ở consumer van mrv_collection_evidence. Nil → hành vi cũ.
-	Egress     meteringport.Checkpoint
-	EgressMode meteringport.Mode
+	Egress     meter.Checkpoint
+	EgressMode meter.Mode
 	Log        *slog.Logger
 }
 

@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
@@ -42,7 +41,7 @@ func (r *Registry) narrowScope(ctx context.Context, sc authz.Scope, unit string)
 		return sc, ErrDependency.WithDetail("chưa nối danh mục đơn vị hành chính")
 	}
 	codes, err := r.Units.Descendants(ctx, unit, r.now())
-	if errors.Is(err, mdport.ErrUnitNotFound) {
+	if errors.Is(err, port.ErrUnitNotFound) {
 		return sc, problem.Validation.WithField("admin_unit", "không có đơn vị hành chính còn hiệu lực với mã này")
 	}
 	if err != nil {
@@ -102,8 +101,8 @@ func (r *Registry) CoopExtras(ctx context.Context, items []store.Cooperative) (m
 			}
 		}
 	}
-	names := map[string]mdport.AdminUnit{}
-	unit := func(code string) *mdport.AdminUnit {
+	names := map[string]port.AdminUnit{}
+	unit := func(code string) *port.AdminUnit {
 		if code == "" || r.Units == nil {
 			return nil
 		}
@@ -125,7 +124,7 @@ func (r *Registry) CoopExtras(ctx context.Context, items []store.Cooperative) (m
 		}
 		if u := unit(it.AdminUnitCode); u != nil {
 			switch u.Level {
-			case mdport.LevelProvince:
+			case port.LevelProvince:
 				e.ProvinceCode, e.ProvinceName = u.Code, u.Name
 			default:
 				e.CommuneName, e.ProvinceCode = u.Name, u.ParentCode

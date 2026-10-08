@@ -21,7 +21,6 @@ import (
 	"go.opentelemetry.io/otel/metric"
 
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/handler"
@@ -29,6 +28,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
@@ -46,7 +46,7 @@ const MetricConflictOverdue = "ag.sync.conflict.overdue"
 type Deps struct {
 	Scope     partyport.ScopeResolver  // phạm vi TW → Tỉnh → Xã (ADR-0009); nil → phạm vi rỗng
 	Consent   partyport.ConsentChecker // tùy chọn: kiểm đồng ý trước khi cấp tệp minh chứng
-	Params    mdport.Params            // tùy chọn: sync.conflict_sla_hours (mặc định 72 giờ)
+	Params    params.Params            // tùy chọn: sync.conflict_sla_hours (mặc định 72 giờ)
 	Vault     client.Client            // khóa công khai (pubkey), mở DEK xem tệp
 	Store     objstore.Store           // kho đối tượng chỉ chứa bản mã (R-40); nil → /v1/files trả 503
 	CursorKey []byte                   // AG_SYNC_CURSOR_KEY, ít nhất 32 byte

@@ -17,7 +17,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/seeddata"
@@ -227,7 +226,7 @@ func (k *KN) EnsureCommuneNodes(ctx context.Context, province uuid.UUID, prefix,
 	if err != nil {
 		return EnsureResult{}, err
 	}
-	communes := make([]mdport.AdminUnit, 0, len(codes))
+	communes := make([]port.AdminUnit, 0, len(codes))
 	for _, c := range codes {
 		if c == prov.AdminUnitCode {
 			continue
@@ -236,11 +235,11 @@ func (k *KN) EnsureCommuneNodes(ctx context.Context, province uuid.UUID, prefix,
 		if err != nil {
 			return EnsureResult{}, err
 		}
-		if u.Level == mdport.LevelCommune {
+		if u.Level == port.LevelCommune {
 			communes = append(communes, u)
 		}
 	}
-	slices.SortFunc(communes, func(a, b mdport.AdminUnit) int { return strings.Compare(a.Code, b.Code) })
+	slices.SortFunc(communes, func(a, b port.AdminUnit) int { return strings.Compare(a.Code, b.Code) })
 	res := EnsureResult{ProvinceCode: prov.AdminUnitCode, Communes: len(communes), Created: []port.Org{}}
 	var existing map[string]uuid.UUID
 	all := make([]string, 0, len(communes))

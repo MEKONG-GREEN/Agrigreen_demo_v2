@@ -7,7 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 )
 
 // DataFilter là phạm vi đọc dữ liệu báo cáo (pf/reports đã giải phạm vi).
@@ -28,7 +28,7 @@ func where(p, c string) string {
 func decOf(s string) (decimal.Decimal, error) { return decimal.NewFromString(s) }
 
 // SowingRows tổng hợp diện tích đã sạ hiện hành theo xã × vụ × giống của các kỳ.
-func SowingRows(ctx context.Context, tx pgx.Tx, f DataFilter, periods []string) ([]port.SowingRow, error) {
+func SowingRows(ctx context.Context, tx pgx.Tx, f DataFilter, periods []string) ([]extensionsrc.SowingRow, error) {
 	rows, err := tx.Query(ctx, `SELECT c.province_code, c.commune_code, coalesce(r.season_code, ''), coalesce(r.variety_code, ''),
 	    coalesce(sum(c.sown_area_ha), 0)::text, count(DISTINCT c.cooperative_ref), count(*)
 	  FROM pf_extension.field_report_current c JOIN pf_extension.field_report r ON r.id = c.report_id
@@ -37,9 +37,9 @@ func SowingRows(ctx context.Context, tx pgx.Tx, f DataFilter, periods []string) 
 	if err != nil {
 		return nil, err
 	}
-	var out []port.SowingRow
+	var out []extensionsrc.SowingRow
 	err = scanEach(rows, func(r pgx.Rows) error {
-		var x port.SowingRow
+		var x extensionsrc.SowingRow
 		var sum string
 		if err := r.Scan(&x.ProvinceCode, &x.CommuneCode, &x.SeasonCode, &x.VarietyCode, &sum, &x.Cooperatives, &x.Reports); err != nil {
 			return err
@@ -53,7 +53,7 @@ func SowingRows(ctx context.Context, tx pgx.Tx, f DataFilter, periods []string) 
 }
 
 // PestRows tổng hợp quan sát sâu bệnh hiện hành theo xã × loại × mức độ.
-func PestRows(ctx context.Context, tx pgx.Tx, f DataFilter, periods []string) ([]port.PestRow, error) {
+func PestRows(ctx context.Context, tx pgx.Tx, f DataFilter, periods []string) ([]extensionsrc.PestRow, error) {
 	rows, err := tx.Query(ctx, `SELECT c.province_code, c.commune_code, coalesce(r.pest_code, ''), coalesce(r.severity, ''),
 	    coalesce(sum(c.affected_area_ha), 0)::text, count(*), count(*) FILTER (WHERE r.urgent)
 	  FROM pf_extension.field_report_current c JOIN pf_extension.field_report r ON r.id = c.report_id
@@ -62,9 +62,9 @@ func PestRows(ctx context.Context, tx pgx.Tx, f DataFilter, periods []string) ([
 	if err != nil {
 		return nil, err
 	}
-	var out []port.PestRow
+	var out []extensionsrc.PestRow
 	err = scanEach(rows, func(r pgx.Rows) error {
-		var x port.PestRow
+		var x extensionsrc.PestRow
 		var sum string
 		if err := r.Scan(&x.ProvinceCode, &x.CommuneCode, &x.PestCode, &x.Severity, &sum, &x.Observations, &x.Urgent); err != nil {
 			return err
@@ -78,7 +78,7 @@ func PestRows(ctx context.Context, tx pgx.Tx, f DataFilter, periods []string) ([
 }
 
 // ProgramRows đọc tiến độ Đề án hiện hành theo HTX × vụ.
-func ProgramRows(ctx context.Context, tx pgx.Tx, f DataFilter, season string, year int) ([]port.ProgramRow, error) {
+func ProgramRows(ctx context.Context, tx pgx.Tx, f DataFilter, season string, year int) ([]extensionsrc.ProgramRow, error) {
 	rows, err := tx.Query(ctx, `SELECT province_code, commune_code, cooperative_ref, season_code, season_year,
 	    registered_area_ha::text, deploying_area_ha::text, completed_area_ha::text, coalesce(approved_report_id = report_id, false)
 	  FROM pf_extension.program_report_current
@@ -87,9 +87,9 @@ func ProgramRows(ctx context.Context, tx pgx.Tx, f DataFilter, season string, ye
 	if err != nil {
 		return nil, err
 	}
-	var out []port.ProgramRow
+	var out []extensionsrc.ProgramRow
 	err = scanEach(rows, func(r pgx.Rows) error {
-		var x port.ProgramRow
+		var x extensionsrc.ProgramRow
 		var reg, dep, comp string
 		if err := r.Scan(&x.ProvinceCode, &x.CommuneCode, &x.CooperativeRef, &x.SeasonCode, &x.SeasonYear, &reg, &dep, &comp, &x.Approved); err != nil {
 			return err
@@ -109,7 +109,7 @@ func ProgramRows(ctx context.Context, tx pgx.Tx, f DataFilter, season string, ye
 }
 
 // TaskRows đếm nhiệm vụ theo xã trong [from, to); đang mở/quá hạn tính tại at.
-func TaskRows(ctx context.Context, tx pgx.Tx, f DataFilter, from, to, at time.Time) ([]port.TaskRow, error) {
+func TaskRows(ctx context.Context, tx pgx.Tx, f DataFilter, from, to, at time.Time) ([]extensionsrc.TaskRow, error) {
 	rows, err := tx.Query(ctx, `SELECT province_code, commune_code,
 	    count(*) FILTER (WHERE created_at >= $4 AND created_at < $5),
 	    count(*) FILTER (WHERE resolved_at >= $4 AND resolved_at < $5),
@@ -122,9 +122,9 @@ func TaskRows(ctx context.Context, tx pgx.Tx, f DataFilter, from, to, at time.Ti
 	if err != nil {
 		return nil, err
 	}
-	var out []port.TaskRow
+	var out []extensionsrc.TaskRow
 	err = scanEach(rows, func(r pgx.Rows) error {
-		var x port.TaskRow
+		var x extensionsrc.TaskRow
 		if err := r.Scan(&x.ProvinceCode, &x.CommuneCode, &x.Opened, &x.Resolved, &x.OnTime, &x.Escalated, &x.Open, &x.Overdue); err != nil {
 			return err
 		}

@@ -14,9 +14,10 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -99,7 +100,7 @@ func writeOnce[T any](ctx context.Context, s *Service, tid uuid.UUID, replay fun
 }
 
 // unitAt kiểm mã đơn vị hành chính còn hiệu lực, đúng cấp (level rỗng = mọi cấp).
-func (s *Service) unitAt(ctx context.Context, field, code string, level mdport.Level) error {
+func (s *Service) unitAt(ctx context.Context, field, code string, level partyport.Level) error {
 	if code == "" {
 		return problem.Validation.WithField(field, "bắt buộc")
 	}
@@ -107,7 +108,7 @@ func (s *Service) unitAt(ctx context.Context, field, code string, level mdport.L
 		return ErrDependency.WithDetail("chưa nối danh mục đơn vị hành chính")
 	}
 	u, err := s.Units.Get(ctx, code, s.now())
-	if errors.Is(err, mdport.ErrUnitNotFound) {
+	if errors.Is(err, partyport.ErrUnitNotFound) {
 		return problem.Validation.WithField(field, "không có đơn vị hành chính còn hiệu lực với mã này")
 	}
 	if err != nil {
@@ -125,7 +126,7 @@ func (s *Service) paramOr(ctx context.Context, key string, at time.Time, def dec
 		return def, nil
 	}
 	v, err := s.Params.At(ctx, key, at)
-	if errors.Is(err, mdport.ErrParamNotFound) {
+	if errors.Is(err, params.ErrParamNotFound) {
 		return def, nil
 	}
 	if err != nil {

@@ -6,7 +6,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
-	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 )
 
@@ -53,7 +52,7 @@ func ActiveCooperativeSites(ctx context.Context, tx pgx.Tx) ([]port.CooperativeS
 }
 
 // CoopMarkersInBBox đọc điểm vị trí hồ sơ của HTX đang hoạt động trong khung nhìn WGS84.
-func CoopMarkersInBBox(ctx context.Context, tx pgx.Tx, minLon, minLat, maxLon, maxLat float64, limit int) ([]geoport.CoopMarker, error) {
+func CoopMarkersInBBox(ctx context.Context, tx pgx.Tx, minLon, minLat, maxLon, maxLat float64, limit int) ([]port.CoopMarker, error) {
 	rows, err := tx.Query(ctx, `SELECT o.ref, o.code, o.name, coalesce(o.admin_unit_code, ''),
 	    ST_X(c.location)::numeric(10,7)::text, ST_Y(c.location)::numeric(10,7)::text
 	  FROM pf_party.cooperative c JOIN pf_party.org o ON o.tenant_id = c.tenant_id AND o.ref = c.org_ref
@@ -64,9 +63,9 @@ func CoopMarkersInBBox(ctx context.Context, tx pgx.Tx, minLon, minLat, maxLon, m
 		return nil, err
 	}
 	defer rows.Close()
-	var out []geoport.CoopMarker
+	var out []port.CoopMarker
 	for rows.Next() {
-		var m geoport.CoopMarker
+		var m port.CoopMarker
 		var lon, lat string
 		if err := rows.Scan(&m.Ref, &m.Code, &m.Name, &m.CommuneCode, &lon, &lat); err != nil {
 			return nil, err

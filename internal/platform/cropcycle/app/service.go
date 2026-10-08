@@ -26,12 +26,13 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/store"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -96,7 +97,7 @@ type Service struct {
 	Scope    partyport.ScopeResolver // phạm vi cán bộ KN; thiếu → vai KN nhận 503
 	Orgs     partyport.Orgs          // tùy chọn: kiểm HTX đang hoạt động
 	Plots    geoport.Plots           // bắt buộc cho ghi: thửa, diện tích, khoảng cách GPS
-	Params   mdport.Params           // tùy chọn: ngưỡng GPS, ngưỡng năng suất bất thường
+	Params   params.Params           // tùy chọn: ngưỡng GPS, ngưỡng năng suất bất thường
 	Catalogs mdport.Catalogs         // tùy chọn: giống lúa, vụ, máy (thiếu → chỉ kiểm dạng mã)
 	Farmers  port.FarmerHouseholds   // liên kết tài khoản ↔ nông hộ; thiếu → vai farmer nhận 503
 	GpsLog   geoport.GpsLog          // log GPS của pf/geo (consumer port.GpsLogConsumer); thiếu → consumer lỗi, giao lại
@@ -107,11 +108,11 @@ type Service struct {
 	// PlotFacts + Units (G5): sản phẩm collection_volume — xã/nông hộ/diện tích thửa (pf/geo), xã →
 	// tỉnh (pf/masterdata). Thiếu → nguồn trả 503 cropcycle.dependency_unavailable.
 	PlotFacts geoport.PlotFacts
-	Units     mdport.AdminUnits
+	Units     partyport.AdminUnits
 	// Egress (G5, ADR-0024): điểm kiểm soát xuất (pf/metering) — consumer van collection gọi Guard
 	// kênh valve sau ValveTargets, mỗi bên cấp một lần. Nil → hành vi cũ.
-	Egress     meteringport.Checkpoint
-	EgressMode meteringport.Mode
+	Egress     meter.Checkpoint
+	EgressMode meter.Mode
 	Log        *slog.Logger
 }
 
@@ -363,7 +364,7 @@ func (s *Service) param(ctx context.Context, key string, at time.Time, def decim
 		return def, false, nil
 	}
 	v, err := s.Params.At(ctx, key, at)
-	if errors.Is(err, mdport.ErrParamNotFound) {
+	if errors.Is(err, params.ErrParamNotFound) {
 		return def, false, nil
 	}
 	if err != nil {

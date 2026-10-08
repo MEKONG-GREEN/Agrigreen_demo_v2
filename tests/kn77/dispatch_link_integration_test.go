@@ -13,8 +13,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
@@ -22,15 +22,15 @@ import (
 // recCP là điểm kiểm soát xuất giả: ghi lại mọi lần xuất; deny → báo vượt hạn mức.
 type recCP struct {
 	mu   sync.Mutex
-	got  []meteringport.Egress
+	got  []meter.Egress
 	deny bool
 }
 
-func (c *recCP) Pass(_ context.Context, e meteringport.Egress) (meteringport.Decision, error) {
+func (c *recCP) Pass(_ context.Context, e meter.Egress) (meter.Decision, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.got = append(c.got, e)
-	return meteringport.Decision{Allowed: !c.deny, Mode: meteringport.ModeEnforce}, nil
+	return meter.Decision{Allowed: !c.deny, Mode: meter.ModeEnforce}, nil
 }
 
 var linkRe = regexp.MustCompile(`(https?://\S+/v1/public/report-links/[A-Za-z0-9_-]+)`)
@@ -56,7 +56,7 @@ func TestA4_ChiCucDownloadLink7Days(t *testing.T) {
 	// Giới hạn đính kèm 0 MB → chỉ gửi liên kết; điểm kiểm soát dùng chung ghi nhận lần tải.
 	f.repParams.set("reports.dispatch_attachment_limit_mb", "0")
 	cp := &recCP{}
-	f.rep.UseEgress(cp, meteringport.ModeEnforce)
+	f.rep.UseEgress(cp, meter.ModeEnforce)
 	c.tinh.must(c.tinh.post("/v1/reports/dispatches/"+did+"/send", map[string]any{}), http.StatusAccepted, "gửi email")
 	ev := f.events(repport.EventDispatchRequested)
 	// Review M2: email đã gửi rồi giao dịch inbox hủy (commit lỗi) → giao lại KHÔNG gửi trùng người nhận, liên kết trong
@@ -123,7 +123,7 @@ func TestA4_ChiCucDownloadLink7Days(t *testing.T) {
 	if n := f.count(`SELECT count(*) FROM pf_reports.export_audit WHERE tenant_id = $1 AND kind = 'download' AND job_id::text = $2`, f.tenant, did); n != 1 {
 		t.Fatalf("export_audit tải: %d", n)
 	}
-	if len(cp.got) != 1 || cp.got[0].Channel != meteringport.ChannelReportExport || cp.got[0].CounterpartyRef.String() != rid || cp.got[0].Internal {
+	if len(cp.got) != 1 || cp.got[0].Channel != meter.ChannelReportExport || cp.got[0].CounterpartyRef.String() != rid || cp.got[0].Internal {
 		t.Fatalf("điểm kiểm soát dùng chung: %+v", cp.got)
 	}
 

@@ -15,9 +15,12 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/store"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -71,7 +74,7 @@ func (s *Service) SubmitProgramReport(ctx context.Context, in ProgramInput) (Pro
 	if err != nil {
 		return ProgramResult{}, err
 	}
-	if level != mdport.LevelCommune {
+	if level != partyport.LevelCommune {
 		return ProgramResult{}, ErrUnitInvalid.WithField("commune_code", "báo cáo gắn với một xã")
 	}
 	r.ProvinceCode = province
@@ -190,23 +193,23 @@ func (s *Service) ApproveProgramReport(ctx context.Context, id uuid.UUID, note s
 }
 
 // ProgramProgress trả tiến độ Đề án trong phạm vi người gọi (FR-03, FR-10 lớp bản đồ).
-func (s *Service) ProgramProgress(ctx context.Context, unit, season string, year int) (port.ProgramData, error) {
+func (s *Service) ProgramProgress(ctx context.Context, unit, season string, year int) (extensionsrc.ProgramData, error) {
 	p, err := authz.Require(ctx, knReaders...)
 	if err != nil {
-		return port.ProgramData{}, err
+		return extensionsrc.ProgramData{}, err
 	}
 	sc, err := s.scope(ctx, p)
 	if err != nil {
-		return port.ProgramData{}, err
+		return extensionsrc.ProgramData{}, err
 	}
 	if sc.Empty() {
-		return port.ProgramData{}, ErrOutOfScope.WithDetail("tài khoản chưa gắn đơn vị công tác")
+		return extensionsrc.ProgramData{}, ErrOutOfScope.WithDetail("tài khoản chưa gắn đơn vị công tác")
 	}
 	unit = strings.TrimSpace(unit)
 	if unit != "" && !sc.Allows(unit) {
-		return port.ProgramData{}, ErrOutOfScope
+		return extensionsrc.ProgramData{}, ErrOutOfScope
 	}
-	return ReportData{Svc: s}.ProgramProgress(ctx, port.ReportQuery{
+	return ReportData{Svc: s}.ProgramProgress(ctx, extensionsrc.ReportQuery{
 		TenantID: p.TenantID, Scope: sc, Unit: unit, SeasonCode: strings.TrimSpace(season), SeasonYear: year, At: s.now(),
 	})
 }
@@ -223,7 +226,7 @@ func (s *Service) programTargets(ctx context.Context, provinces []string, at tim
 			continue
 		}
 		v, err := s.Params.At(ctx, port.ProgramTargetKey(pc), at)
-		if errors.Is(err, mdport.ErrParamNotFound) {
+		if errors.Is(err, params.ErrParamNotFound) {
 			out[pc] = nil
 			continue
 		}

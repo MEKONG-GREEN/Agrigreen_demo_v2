@@ -12,13 +12,13 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -394,8 +394,8 @@ func (s *Service) packageEgress(ctx context.Context, tx pgx.Tx, j domain.ExportJ
 	if err != nil {
 		return err
 	}
-	return meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
-		SourceID: j.ID, Channel: meteringport.ChannelMRVPackage, DataTenantID: j.TenantID, CounterpartyKind: meteringport.CounterpartyActor,
+	return meter.Guard(ctx, s.Egress, s.EgressMode, meter.Egress{
+		SourceID: j.ID, Channel: meter.ChannelMRVPackage, DataTenantID: j.TenantID, CounterpartyKind: meter.CounterpartyActor,
 		CounterpartyRef: actor, Product: ProductMRVPackage, Records: int64(len(rows)), OccurredAt: s.Clock.Now(), ActorRef: actor,
 		TraceID: telemetry.TraceID(ctx),
 	}, s.Log)
@@ -422,8 +422,8 @@ func (s *Service) downloadEgress(ctx context.Context, j domain.ExportJob) error 
 	if j.EvidenceCount != nil {
 		n = int64(*j.EvidenceCount)
 	}
-	return meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
-		SourceID: ids.New(), Channel: meteringport.ChannelMRVPackage, DataTenantID: j.TenantID, CounterpartyKind: meteringport.CounterpartyActor,
+	return meter.Guard(ctx, s.Egress, s.EgressMode, meter.Egress{
+		SourceID: ids.New(), Channel: meter.ChannelMRVPackage, DataTenantID: j.TenantID, CounterpartyKind: meter.CounterpartyActor,
 		CounterpartyRef: p.ActorRef, Product: ProductMRVPackage, Records: n, Bytes: size, OccurredAt: s.Clock.Now(), ActorRef: p.ActorRef,
 		TraceID: telemetry.TraceID(ctx),
 	}, s.Log)

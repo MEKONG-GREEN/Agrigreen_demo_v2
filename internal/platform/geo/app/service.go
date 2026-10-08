@@ -17,10 +17,10 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
-	wwport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
+
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -73,17 +73,17 @@ type Service struct {
 	DB     tenant.Beginner // pool vai geo_app
 	Clock  clock.Clock
 	Scope  partyport.ScopeResolver // bắt buộc — thiếu thì 503
-	Params mdport.Params           // tùy chọn — thiếu thì dùng ngưỡng mặc định
-	Units  mdport.AdminUnits       // bắt buộc cho ghi
+	Params params.Params           // tùy chọn — thiếu thì dùng ngưỡng mặc định
+	Units  partyport.AdminUnits    // bắt buộc cho ghi
 	Orgs   partyport.Orgs          // tùy chọn — có thì kiểm HTX khi gán
 	// Households (tùy chọn): có thì kiểm nông hộ thuộc đúng HTX của thửa khi gán.
 	Households partyport.Households
 	// Markers (tùy chọn): điểm pf_party.cooperative.location làm marker/dự phòng của lớp HTX.
-	Markers port.CoopMarkers
+	Markers partyport.CoopMarkers
 	// Farmers (tùy chọn): nông hộ của tài khoản nông dân (pf/accounts) — vai farmer đọc log GPS của mình.
 	Farmers port.FarmerHouseholds
 	// Waterways (tùy chọn): lớp tuyến đường thủy (pf/waterway) cho bản đồ chuẩn hóa (GIS US-INT-02).
-	Waterways wwport.Layer
+	Waterways port.Layer
 	// Sharing (ADR-0020): kiểm cấp quyền chia sẻ + sổ đọc cho bề mặt đối tác /v1/partner/plots
 	// (pf/party). Thiếu → 403 party.share_grant_missing (mặc định từ chối).
 	Sharing partyport.PartnerAccess
@@ -97,8 +97,8 @@ type Service struct {
 	Names partyport.ActorNames
 	// Egress (G5, ADR-0024): điểm kiểm soát xuất (pf/metering) — consumer van gọi Guard kênh valve
 	// sau ValveTargets, mỗi bên cấp một lần. Nil → hành vi cũ.
-	Egress     meteringport.Checkpoint
-	EgressMode meteringport.Mode
+	Egress     meter.Checkpoint
+	EgressMode meter.Mode
 	Log        *slog.Logger
 }
 
@@ -186,7 +186,7 @@ func (s *Service) tolerance(ctx context.Context, at time.Time) (decimal.Decimal,
 		return domain.DefaultOverlapTolerancePct, nil
 	}
 	v, err := s.Params.At(ctx, port.ParamOverlapTolerancePct, at)
-	if errors.Is(err, mdport.ErrParamNotFound) {
+	if errors.Is(err, params.ErrParamNotFound) {
 		return domain.DefaultOverlapTolerancePct, nil
 	}
 	if err != nil {
@@ -209,7 +209,7 @@ func (s *Service) thresholds(ctx context.Context, at time.Time) (tol, maxDev dec
 	}
 	v, perr := s.Params.At(ctx, port.ParamAreaDeviationMaxPct, at)
 	switch {
-	case errors.Is(perr, mdport.ErrParamNotFound):
+	case errors.Is(perr, params.ErrParamNotFound):
 	case perr != nil:
 		err = ErrDependency.WithDetail("không đọc được tham số ngưỡng lệch diện tích").WithCause(perr)
 	case v.Value.IsPositive():
@@ -227,13 +227,13 @@ func (s *Service) checkCommune(ctx context.Context, code string) error {
 		return ErrDependency.WithDetail("chưa nối danh mục đơn vị hành chính")
 	}
 	u, err := s.Units.Get(ctx, code, s.now())
-	if errors.Is(err, mdport.ErrUnitNotFound) {
+	if errors.Is(err, partyport.ErrUnitNotFound) {
 		return problem.Validation.WithField("commune_code", "không có đơn vị hành chính còn hiệu lực với mã này")
 	}
 	if err != nil {
 		return ErrDependency.WithDetail("không tra được đơn vị hành chính").WithCause(err)
 	}
-	if u.Level != mdport.LevelCommune {
+	if u.Level != partyport.LevelCommune {
 		return problem.Validation.WithField("commune_code", "phải là mã cấp xã")
 	}
 	return nil

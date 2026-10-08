@@ -160,29 +160,3 @@ type Router interface {
 	// CurrentVersion trả số phiên bản đang phát hành; 0 nếu chưa có.
 	CurrentVersion(ctx context.Context) (int, error)
 }
-
-// LayerSegment là một tuyến của phiên bản mạng đang phát hành trong khung nhìn — lớp "đường
-// thủy đi được" của bản đồ chuẩn hóa (GIS US-INT-02 / FN-17).
-type LayerSegment struct {
-	SegmentRef  uuid.UUID
-	Name        string
-	Class       string
-	MaxLoadTons *decimal.Decimal // nil = chưa kết luận được (không coi là đi được)
-	Certain     bool
-	Passable    bool // đi được với tải trọng yêu cầu
-	Line        []LatLng
-}
-
-// LayerPage là các tuyến trong khung nhìn của phiên bản đang phát hành.
-type LayerPage struct {
-	VersionNo     int // 0 = chưa có phiên bản phát hành
-	Items         []LayerSegment
-	Truncated     bool
-	PassableCount int
-}
-
-// Layer đọc lớp tuyến đường thủy theo khung nhìn cho module khác (pf/geo — bản đồ chuẩn hóa
-// cho TMS). Tenant lấy từ context. minLoadTons = 0 → không lọc tải trọng.
-type Layer interface {
-	SegmentsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64, minLoadTons decimal.Decimal, limit int) (LayerPage, error)
-}

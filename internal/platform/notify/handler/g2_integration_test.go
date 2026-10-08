@@ -22,8 +22,8 @@ func TestHouseholdEventsNotifyCommuneOfficerKNUSHTX05(t *testing.T) {
 	off := f.user(authz.Scope{Units: []string{ward1}}, partyport.RoleKNOfficer)
 	other := f.user(authz.Scope{Units: []string{ward2}}, partyport.RoleKNOfficer)
 	prov := f.user(authz.Scope{Units: []string{prov91, ward1, ward2}}, partyport.RoleKNProvinceAdmin)
-	f.staff.add(f.tenant, extport.StaffRef{ActorRef: off.actor, UnitCode: ward1, ProvinceCode: prov91})
-	f.staff.add(f.tenant, extport.StaffRef{ActorRef: prov.actor, UnitCode: prov91, ProvinceCode: prov91})
+	f.staff.add(f.tenant, port.StaffRef{ActorRef: off.actor, UnitCode: ward1, ProvinceCode: prov91})
+	f.staff.add(f.tenant, port.StaffRef{ActorRef: prov.actor, UnitCode: prov91, ProvinceCode: prov91})
 	hh := ids.New()
 	coop := ids.New()
 	reg := func(commune, src string) {

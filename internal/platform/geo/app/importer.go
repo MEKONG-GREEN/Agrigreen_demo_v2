@@ -12,7 +12,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -292,14 +292,14 @@ func (s *Service) ImportAdminBoundaries(ctx context.Context, in AdminImportInput
 			continue
 		}
 		u, err := s.Units.Get(ctx, r.UnitCode, now)
-		if errors.Is(err, mdport.ErrUnitNotFound) {
+		if errors.Is(err, partyport.ErrUnitNotFound) {
 			fail(problem.Validation.WithField("properties.code", "không có đơn vị hành chính còn hiệu lực với mã này"))
 			continue
 		}
 		if err != nil {
 			return AdminImportResult{}, ErrDependency.WithDetail("không tra được đơn vị hành chính").WithCause(err)
 		}
-		if u.Level != mdport.LevelProvince && u.Level != mdport.LevelCommune {
+		if u.Level != partyport.LevelProvince && u.Level != partyport.LevelCommune {
 			fail(problem.Validation.WithField("properties.code", "chỉ nhận ranh giới tỉnh hoặc xã"))
 			continue
 		}

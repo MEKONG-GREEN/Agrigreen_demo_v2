@@ -15,7 +15,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/seeddata"
@@ -38,7 +37,7 @@ func (k *KN) checkProvince(ctx context.Context, code string) error {
 		return ErrDependency.WithDetail("chưa nối danh mục đơn vị hành chính")
 	}
 	u, err := k.Reg.Units.Get(ctx, code, k.now())
-	if errors.Is(err, mdport.ErrUnitNotFound) || (err == nil && u.Level != mdport.LevelProvince) {
+	if errors.Is(err, port.ErrUnitNotFound) || (err == nil && u.Level != port.LevelProvince) {
 		return problem.Validation.WithField("province_code", "không có tỉnh còn hiệu lực với mã này")
 	}
 	return err

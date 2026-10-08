@@ -24,7 +24,6 @@ import (
 
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
@@ -36,6 +35,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -63,12 +63,12 @@ func (o orgs) Get(_ context.Context, ref uuid.UUID) (partyport.Org, error) {
 
 type units struct{ names map[string]string }
 
-func (u units) Get(_ context.Context, code string, _ time.Time) (mdport.AdminUnit, error) {
+func (u units) Get(_ context.Context, code string, _ time.Time) (partyport.AdminUnit, error) {
 	n, ok := u.names[code]
 	if !ok {
-		return mdport.AdminUnit{Code: code, Name: "ĐV " + code, Level: mdport.LevelCommune}, nil
+		return partyport.AdminUnit{Code: code, Name: "ĐV " + code, Level: partyport.LevelCommune}, nil
 	}
-	return mdport.AdminUnit{Code: code, Name: n, Level: mdport.LevelCommune}, nil
+	return partyport.AdminUnit{Code: code, Name: n, Level: partyport.LevelCommune}, nil
 }
 func (u units) Descendants(_ context.Context, code string, _ time.Time) ([]string, error) {
 	return []string{code}, nil
@@ -242,14 +242,14 @@ func (p *repParams) set(key, v string) {
 	p.v[key] = decimal.RequireFromString(v)
 }
 
-func (p *repParams) At(_ context.Context, key string, _ time.Time) (mdport.ParamValue, error) {
+func (p *repParams) At(_ context.Context, key string, _ time.Time) (params.ParamValue, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	v, ok := p.v[key]
 	if !ok {
-		return mdport.ParamValue{}, mdport.ErrParamNotFound
+		return params.ParamValue{}, params.ErrParamNotFound
 	}
-	return mdport.ParamValue{Key: key, Value: v, Version: 1}, nil
+	return params.ParamValue{Key: key, Value: v, Version: 1}, nil
 }
 
 func logErrors(t *testing.T) gin.HandlerFunc {

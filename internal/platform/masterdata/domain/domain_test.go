@@ -11,6 +11,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/seeddata"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 )
 
 func dp(t time.Time) *time.Time { return &t }
@@ -27,7 +28,7 @@ func TestDayOfUsesVietnamTime(t *testing.T) {
 }
 
 func TestUnitValidate(t *testing.T) {
-	ok := Unit{Code: "30742", Name: "Phường Rạch Giá", Level: port.LevelCommune, ParentCode: "91", ValidFrom: ReorgDate}
+	ok := Unit{Code: "30742", Name: "Phường Rạch Giá", Level: partyport.LevelCommune, ParentCode: "91", ValidFrom: ReorgDate}
 	if err := ok.Validate(); err != nil {
 		t.Fatalf("hợp lệ mà báo lỗi: %v", err)
 	}
@@ -36,19 +37,19 @@ func TestUnitValidate(t *testing.T) {
 		field string
 		err   error
 	}{
-		"mã thường": {Unit{Code: "ag", Name: "x", Level: port.LevelProvince, ValidFrom: ReorgDate}, "code", ErrUnitCode},
-		"tỉnh có cha": {Unit{Code: "91", Name: "x", Level: port.LevelProvince, ParentCode: "00", ValidFrom: ReorgDate},
+		"mã thường": {Unit{Code: "ag", Name: "x", Level: partyport.LevelProvince, ValidFrom: ReorgDate}, "code", ErrUnitCode},
+		"tỉnh có cha": {Unit{Code: "91", Name: "x", Level: partyport.LevelProvince, ParentCode: "00", ValidFrom: ReorgDate},
 			"parent_code", ErrUnitParent},
-		"xã thiếu cha": {Unit{Code: "91-X", Name: "x", Level: port.LevelCommune, ValidFrom: ReorgDate}, "parent_code", ErrUnitParent},
+		"xã thiếu cha": {Unit{Code: "91-X", Name: "x", Level: partyport.LevelCommune, ValidFrom: ReorgDate}, "parent_code", ErrUnitParent},
 		"cấp lạ":       {Unit{Code: "91", Name: "x", Level: "ward", ValidFrom: ReorgDate}, "level", ErrUnitLevel},
-		"to trước from": {Unit{Code: "91", Name: "x", Level: port.LevelProvince, ValidFrom: ReorgDate, ValidTo: dp(Day(2025, 1, 1))},
+		"to trước from": {Unit{Code: "91", Name: "x", Level: partyport.LevelProvince, ValidFrom: ReorgDate, ValidTo: dp(Day(2025, 1, 1))},
 			"valid_to", ErrUnitValidity},
 		// Sau sắp xếp 2025 chỉ còn hai cấp: huyện phải chấm dứt trước 01/07/2025.
-		"huyện còn mở": {Unit{Code: "883", Name: "x", Level: port.LevelDistrict, ParentCode: "89", ValidFrom: Day(2004, 1, 1)},
+		"huyện còn mở": {Unit{Code: "883", Name: "x", Level: partyport.LevelDistrict, ParentCode: "89", ValidFrom: Day(2004, 1, 1)},
 			"valid_to", ErrUnitDistrict},
-		"huyện sau 2025": {Unit{Code: "883", Name: "x", Level: port.LevelDistrict, ParentCode: "89", ValidFrom: Day(2004, 1, 1),
+		"huyện sau 2025": {Unit{Code: "883", Name: "x", Level: partyport.LevelDistrict, ParentCode: "89", ValidFrom: Day(2004, 1, 1),
 			ValidTo: dp(Day(2026, 1, 1))}, "valid_to", ErrUnitDistrict},
-		"kế thừa khi còn mở": {Unit{Code: "91", Name: "x", Level: port.LevelProvince, ValidFrom: ReorgDate, Successors: []string{"92"}},
+		"kế thừa khi còn mở": {Unit{Code: "91", Name: "x", Level: partyport.LevelProvince, ValidFrom: ReorgDate, Successors: []string{"92"}},
 			"successors", ErrUnitSuccessors},
 	}
 	for name, c := range cases {
@@ -61,7 +62,7 @@ func TestUnitValidate(t *testing.T) {
 }
 
 func TestPlanImport(t *testing.T) {
-	open := Unit{Code: "89", Name: "An Giang", Level: port.LevelProvince, ValidFrom: Day(2004, 1, 1)}
+	open := Unit{Code: "89", Name: "An Giang", Level: partyport.LevelProvince, ValidFrom: Day(2004, 1, 1)}
 	closed := open
 	closed.ValidTo, closed.Successors = dp(ReorgDate), []string{"91"}
 
@@ -120,9 +121,9 @@ func TestResolveCurrentMergerSplitAndReuse(t *testing.T) {
 	base, y2027 := Day(2004, 1, 1), Day(2027, 1, 1)
 	g := fakeGazetteer{
 		// Sáp nhập: 89 (An Giang cũ) và 91 (Kiên Giang) → 91 (An Giang mới, dùng lại mã 91).
-		{Code: "89", Level: port.LevelProvince, ValidFrom: base, ValidTo: dp(ReorgDate), Successors: []string{"91"}},
-		{Code: "91", Level: port.LevelProvince, ValidFrom: base, ValidTo: dp(ReorgDate), Successors: []string{"91"}},
-		{Code: "91", Level: port.LevelProvince, ValidFrom: ReorgDate},
+		{Code: "89", Level: partyport.LevelProvince, ValidFrom: base, ValidTo: dp(ReorgDate), Successors: []string{"91"}},
+		{Code: "91", Level: partyport.LevelProvince, ValidFrom: base, ValidTo: dp(ReorgDate), Successors: []string{"91"}},
+		{Code: "91", Level: partyport.LevelProvince, ValidFrom: ReorgDate},
 		// Chia tách hai bước: A → (B, C) năm 2025, C → D năm 2027.
 		{Code: "A", ValidFrom: base, ValidTo: dp(ReorgDate), Successors: []string{"B", "C"}},
 		{Code: "B", ValidFrom: ReorgDate},
@@ -149,10 +150,10 @@ func TestResolveCurrentMergerSplitAndReuse(t *testing.T) {
 			t.Errorf("Current(%s, %s) = %v, %v; muốn %v", c.code, c.day.Format(time.DateOnly), got, err, c.want)
 		}
 	}
-	if _, err := ResolveCurrent("Z", Day(2026, 1, 1), g.at, g.latest); !errors.Is(err, port.ErrUnitNotFound) {
+	if _, err := ResolveCurrent("Z", Day(2026, 1, 1), g.at, g.latest); !errors.Is(err, partyport.ErrUnitNotFound) {
 		t.Fatalf("bãi bỏ không kế thừa phải ErrUnitNotFound: %v", err)
 	}
-	if _, err := ResolveCurrent("B", Day(2020, 1, 1), g.at, g.latest); !errors.Is(err, port.ErrUnitNotFound) {
+	if _, err := ResolveCurrent("B", Day(2020, 1, 1), g.at, g.latest); !errors.Is(err, partyport.ErrUnitNotFound) {
 		t.Fatalf("trước khi có hiệu lực phải ErrUnitNotFound: %v", err)
 	}
 }
@@ -177,9 +178,9 @@ func TestEmbeddedGazetteerParses(t *testing.T) {
 	for _, u := range units {
 		if u.ValidAt(Day(2026, 1, 1)) {
 			switch u.Level {
-			case port.LevelProvince:
+			case partyport.LevelProvince:
 				provincesNow++
-			case port.LevelCommune:
+			case partyport.LevelCommune:
 				communesNow++
 			}
 		}

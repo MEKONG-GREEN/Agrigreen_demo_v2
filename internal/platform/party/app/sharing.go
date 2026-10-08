@@ -29,8 +29,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port/grantlookup"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
@@ -38,6 +36,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
@@ -61,8 +60,8 @@ type Sharing struct {
 	Clock clock.Clock
 	// Egress (G5, ADR-0024): điểm kiểm soát xuất dùng chung (pf/metering) cho kênh partner_share
 	// ở RecordRead. Nil → hành vi cũ (chỉ sổ partner_read_log).
-	Egress     meteringport.Checkpoint
-	EgressMode meteringport.Mode
+	Egress     meter.Checkpoint
+	EgressMode meter.Mode
 	Log        *slog.Logger
 }
 
@@ -438,14 +437,14 @@ func (s *Sharing) ActiveGrantors(ctx context.Context, grantee uuid.UUID, kind st
 }
 
 // readerOf trả (bên nhận, người đọc) của một lần đọc: người dùng OIDC của tenant bên nhận (bề mặt
-// /v1/partner/*) hoặc khách hàng Public API (apiclientport.Caller — tenant bên thứ ba lấy từ bản ghi
+// /v1/partner/*) hoặc khách hàng Public API (authz.APIClient — tenant bên thứ ba lấy từ bản ghi
 // khóa, người đọc = mã khách hàng API). viaAPI = true với khách hàng Public API.
 func readerOf(ctx context.Context) (tid, actor uuid.UUID, viaAPI, ok bool) {
 	if p, ok := authz.FromContext(ctx); ok {
 		return p.TenantID, p.ActorRef, false, true
 	}
-	if c, ok := apiclientport.CallerFrom(ctx); ok && c.Client.ID != uuid.Nil {
-		return c.Client.ClientTenantID, c.Client.ID, true, true
+	if c, ok := authz.APIClientFrom(ctx); ok && c.ClientID != uuid.Nil {
+		return c.TenantID, c.ClientID, true, true
 	}
 	return uuid.Nil, uuid.Nil, false, false
 }
@@ -474,9 +473,9 @@ func (s *Sharing) RecordRead(ctx context.Context, g port.ShareGrant, r port.Part
 	}
 	row := store.ReadLog{ID: ids.New(), TenantID: g.Grantor, GrantID: g.ID, Grantee: g.Grantee, Kind: r.Kind, Endpoint: r.Endpoint, Query: q,
 		Items: r.Items, EventTime: s.Clock.Now(), ActorRef: actor, IdemKey: "read:" + ids.New().String()}
-	if err := meteringport.Guard(ctx, s.Egress, s.EgressMode, meteringport.Egress{
-		SourceID: row.ID, Channel: meteringport.ChannelPartnerShare, DataTenantID: g.Grantor,
-		CounterpartyKind: meteringport.CounterpartyTenant, CounterpartyRef: g.Grantee, Product: r.Kind,
+	if err := meter.Guard(ctx, s.Egress, s.EgressMode, meter.Egress{
+		SourceID: row.ID, Channel: meter.ChannelPartnerShare, DataTenantID: g.Grantor,
+		CounterpartyKind: meter.CounterpartyTenant, CounterpartyRef: g.Grantee, Product: r.Kind,
 		Records: int64(r.Items), OccurredAt: row.EventTime, ActorRef: actor, TraceID: telemetry.TraceID(ctx),
 	}, s.Log); err != nil {
 		return err

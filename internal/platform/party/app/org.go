@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
@@ -78,7 +77,7 @@ type StatusInput struct {
 func (r *Registry) now() time.Time { return r.Clock.Now().UTC() }
 
 // unitInfo tra đơn vị hành chính và kiểm cấp theo loại tổ chức.
-func (r *Registry) unitInfo(ctx context.Context, kind port.OrgKind, code, field string) (*mdport.AdminUnit, error) {
+func (r *Registry) unitInfo(ctx context.Context, kind port.OrgKind, code, field string) (*port.AdminUnit, error) {
 	if code == "" {
 		return nil, nil
 	}
@@ -86,7 +85,7 @@ func (r *Registry) unitInfo(ctx context.Context, kind port.OrgKind, code, field 
 		return nil, ErrDependency.WithDetail("chưa nối danh mục đơn vị hành chính")
 	}
 	u, err := r.Units.Get(ctx, code, r.now())
-	if errors.Is(err, mdport.ErrUnitNotFound) {
+	if errors.Is(err, port.ErrUnitNotFound) {
 		return nil, problem.Validation.WithField(field, "không có đơn vị hành chính còn hiệu lực với mã này")
 	}
 	if err != nil {
@@ -102,7 +101,7 @@ func (r *Registry) unitInfo(ctx context.Context, kind port.OrgKind, code, field 
 }
 
 // unitWithin kiểm đơn vị của nút con nằm trong đơn vị của nút cha.
-func unitWithin(child *mdport.AdminUnit, parent *store.OrgState) bool {
+func unitWithin(child *port.AdminUnit, parent *store.OrgState) bool {
 	if parent == nil || parent.AdminUnitCode == "" || child == nil {
 		return true
 	}

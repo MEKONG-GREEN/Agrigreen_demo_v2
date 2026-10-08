@@ -34,7 +34,7 @@ import (
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/store"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -222,18 +222,18 @@ func volumeMatches(c domain.VolumeCell, q apiclientport.CollectionQuery) bool {
 
 // provinceOf tra tỉnh của xã: tại at, không có thì tại ngày gom (xã đã sáp nhập sau đó); đi lên qua
 // cấp huyện của dữ liệu lịch sử trước 01/07/2025. Không tra được → "" (bảng kê bị bỏ).
-func provinceOf(ctx context.Context, units mdport.AdminUnits, commune string, at, collectedOn time.Time) (string, error) {
+func provinceOf(ctx context.Context, units partyport.AdminUnits, commune string, at, collectedOn time.Time) (string, error) {
 	for _, t := range []time.Time{at, collectedOn} {
 		code := commune
 		for range 3 {
 			u, err := units.Get(ctx, code, t)
-			if errors.Is(err, mdport.ErrUnitNotFound) {
+			if errors.Is(err, partyport.ErrUnitNotFound) {
 				break
 			}
 			if err != nil {
 				return "", ErrDependency.WithDetail("không đọc được đơn vị hành chính (pf/masterdata)").WithCause(err)
 			}
-			if u.Level == mdport.LevelProvince {
+			if u.Level == partyport.LevelProvince {
 				return u.Code, nil
 			}
 			if u.ParentCode == "" {

@@ -7,12 +7,12 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/domain"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/store"
+	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
-var _ port.StaffNames = (*Service)(nil)
+var _ mdport.StaffNames = (*Service)(nil)
 
 // DisplayNames thực hiện port.StaffNames: tên hiển thị của cán bộ trong danh
 // bạ theo actor_ref (kể cả cán bộ đã ngừng hoạt động). Tenant lấy từ context.

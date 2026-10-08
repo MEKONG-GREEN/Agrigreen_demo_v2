@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
+	accountsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
@@ -792,7 +793,7 @@ func (f fakeContacts) PhoneOf(_ context.Context, _, actor uuid.UUID) (string, er
 	if p, ok := f[actor]; ok {
 		return p, nil
 	}
-	return "", port.ErrNoPhone
+	return "", accountsport.ErrNoPhone
 }
 
 // US-DIR-02 "gọi/nhắn 1 chạm": số điện thoại đọc lúc bấm, chỉ cho cán bộ người gọi thấy được

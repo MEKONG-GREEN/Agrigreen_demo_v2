@@ -7,6 +7,24 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// Cổng pf/party cung cấp cho pf/geo (marker HTX) và cổng pf/party cần từ pf/geo (thống kê thửa đã số hóa): cả hai
+// khai ở pf/party (lõi) để phụ thuộc chỉ đi xuống (R-MOD-05) — pf/geo hiện thực PlotStats qua gốc lắp ráp.
+
+// CoopMarker là điểm vị trí HTX (không có dữ liệu cá nhân).
+type CoopMarker struct {
+	Ref         uuid.UUID
+	Code        string
+	Name        string
+	CommuneCode string
+	Lon, Lat    decimal.Decimal
+}
+
+// CoopMarkers cho geo đọc điểm HTX làm marker/dự phòng khi HTX chưa có ranh giới
+// (GIS US-BND-02 "gắn Marker"). Tenant lấy từ context; không kiểm phạm vi.
+type CoopMarkers interface {
+	MarkersInBBox(ctx context.Context, minLon, minLat, maxLon, maxLat float64, limit int) ([]CoopMarker, error)
+}
+
 // PlotStat là số thửa đã số hoá (chưa ngừng dùng: nháp + đã gán HTX) và tổng
 // diện tích của một nhóm (xã hoặc HTX). Không có dữ liệu cá nhân.
 type PlotStat struct {

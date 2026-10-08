@@ -11,12 +11,12 @@ import (
 	"github.com/google/uuid"
 
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port/grantlookup"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -25,23 +25,23 @@ type fakeCheckpoint struct {
 	mu    sync.Mutex
 	allow bool
 	err   error
-	seen  []meteringport.Egress
+	seen  []meter.Egress
 }
 
-func (c *fakeCheckpoint) Pass(_ context.Context, e meteringport.Egress) (meteringport.Decision, error) {
+func (c *fakeCheckpoint) Pass(_ context.Context, e meter.Egress) (meter.Decision, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.seen = append(c.seen, e)
 	if c.err != nil {
-		return meteringport.Decision{}, c.err
+		return meter.Decision{}, c.err
 	}
-	return meteringport.Decision{Allowed: c.allow}, nil
+	return meter.Decision{Allowed: c.allow}, nil
 }
 
-func (c *fakeCheckpoint) calls() []meteringport.Egress {
+func (c *fakeCheckpoint) calls() []meter.Egress {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return append([]meteringport.Egress(nil), c.seen...)
+	return append([]meter.Egress(nil), c.seen...)
 }
 
 // grant đề xuất (a) + duyệt (b) một cấp quyền của tenant f.tenant cho grantee.
@@ -140,7 +140,7 @@ func TestRecordReadAPIClient_ADR0022(t *testing.T) {
 	third := ids.New()
 	f.grant(third, port.KindDPHubCapacity)
 	cp := &fakeCheckpoint{allow: false}
-	f.mod.UseEgress(cp, meteringport.ModeEnforce, nil)
+	f.mod.UseEgress(cp, meter.ModeEnforce, nil)
 	g, err := f.mod.GrantLookup().ActiveGrant(context.Background(), third, uuid.Nil, port.KindDPHubCapacity, time.Now())
 	if err != nil {
 		t.Fatal(err)
@@ -178,14 +178,14 @@ func TestPartnerShareEgress_ADR0024(t *testing.T) {
 	reads := func() int { return f.countIn(f.tenant, "pf_party.partner_read_log") }
 
 	cp := &fakeCheckpoint{allow: false}
-	f.mod.UseEgress(cp, meteringport.ModeObserve, nil)
+	f.mod.UseEgress(cp, meter.ModeObserve, nil)
 	wantStatus(t, sa.appDo(http.MethodGet, "/v1/partner/cooperatives", nil), http.StatusOK, "observe + vượt hạn mức vẫn cho qua")
 	calls := cp.calls()
 	if len(calls) != 1 {
 		t.Fatalf("một Egress mỗi lần đọc: %+v", calls)
 	}
 	e := calls[0]
-	if e.Channel != meteringport.ChannelPartnerShare || e.DataTenantID != f.tenant || e.CounterpartyKind != meteringport.CounterpartyTenant ||
+	if e.Channel != meter.ChannelPartnerShare || e.DataTenantID != f.tenant || e.CounterpartyKind != meter.CounterpartyTenant ||
 		e.CounterpartyRef != mkg || e.Product != port.KindCooperativeDirectory || e.Records != 2 || e.ActorRef != sa.actor || e.SourceID == uuid.Nil {
 		t.Fatalf("Egress partner_share: %+v", e)
 	}
@@ -199,7 +199,7 @@ func TestPartnerShareEgress_ADR0024(t *testing.T) {
 		t.Fatalf("sổ đọc: %d", reads())
 	}
 
-	f.mod.UseEgress(cp, meteringport.ModeEnforce, nil)
+	f.mod.UseEgress(cp, meter.ModeEnforce, nil)
 	wantCode(t, sa.appDo(http.MethodGet, "/v1/partner/cooperatives", nil), http.StatusServiceUnavailable, "metering.egress_unavailable", "enforce + checkpoint lỗi")
 	cp.err = nil
 	wantCode(t, sa.appDo(http.MethodGet, "/v1/partner/cooperatives", nil), http.StatusTooManyRequests, "metering.egress_quota_exceeded", "enforce + vượt hạn mức")
@@ -212,7 +212,7 @@ func TestPartnerShareEgress_ADR0024(t *testing.T) {
 		t.Fatalf("sổ đọc: %d", reads())
 	}
 
-	f.mod.UseEgress(nil, meteringport.ModeEnforce, nil)
+	f.mod.UseEgress(nil, meter.ModeEnforce, nil)
 	n := len(cp.calls())
 	wantStatus(t, sa.appDo(http.MethodGet, "/v1/partner/cooperatives", nil), http.StatusOK, "chưa nối checkpoint")
 	if len(cp.calls()) != n || reads() != 4 {

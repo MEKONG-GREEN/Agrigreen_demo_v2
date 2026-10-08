@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
+	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/store"
@@ -372,22 +373,22 @@ func (s *Service) CurrentPublished(ctx context.Context) (*domain.NetworkVersion,
 	return v, err
 }
 
-var _ port.Layer = (*Service)(nil)
+var _ geoport.Layer = (*Service)(nil)
 
 // SegmentsInBBox thực hiện port.Layer: một trang (tối đa limit) tuyến của phiên bản đang phát
 // hành giao khung nhìn, kèm cờ đi được theo tải trọng (GIS US-INT-02).
-func (s *Service) SegmentsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64, minLoad decimal.Decimal, limit int) (port.LayerPage, error) {
+func (s *Service) SegmentsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64, minLoad decimal.Decimal, limit int) (geoport.LayerPage, error) {
 	if limit <= 0 || limit > 1000 {
 		limit = 1000
 	}
 	box := &store.BBox{MinLng: minLng, MinLat: minLat, MaxLng: maxLng, MaxLat: maxLat}
 	var items []SegmentView
 	after := uuid.Nil
-	out := port.LayerPage{}
+	out := geoport.LayerPage{}
 	for {
 		res, err := s.SegmentLayer(ctx, box, minLoad, 0, after, min(200, limit-len(items)))
 		if err != nil {
-			return port.LayerPage{}, err
+			return geoport.LayerPage{}, err
 		}
 		if res.Version != nil {
 			out.VersionNo = res.Version.VersionNo
@@ -403,13 +404,13 @@ func (s *Service) SegmentsInBBox(ctx context.Context, minLng, minLat, maxLng, ma
 		}
 		after = res.Items[len(res.Items)-1].SegmentRef
 	}
-	out.Items = make([]port.LayerSegment, 0, len(items))
+	out.Items = make([]geoport.LayerSegment, 0, len(items))
 	for _, sg := range items {
-		line := make([]port.LatLng, 0, len(sg.Points))
+		line := make([]geoport.LayerPoint, 0, len(sg.Points))
 		for _, pt := range sg.Points {
-			line = append(line, port.LatLng{Lat: pt.Lat, Lng: pt.Lng})
+			line = append(line, geoport.LayerPoint{Lat: pt.Lat, Lng: pt.Lng})
 		}
-		out.Items = append(out.Items, port.LayerSegment{SegmentRef: sg.SegmentRef, Name: sg.Name, Class: sg.Class, MaxLoadTons: sg.MaxLoadTons,
+		out.Items = append(out.Items, geoport.LayerSegment{SegmentRef: sg.SegmentRef, Name: sg.Name, Class: sg.Class, MaxLoadTons: sg.MaxLoadTons,
 			Certain: sg.Certain, Passable: sg.Passable, Line: line})
 	}
 	return out, nil

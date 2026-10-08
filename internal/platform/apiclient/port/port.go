@@ -25,6 +25,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -204,8 +205,10 @@ type Caller struct {
 
 type callerKey struct{}
 
-// WithCaller gắn bên gọi vào context.
+// WithCaller gắn bên gọi vào context, kèm dạng tối thiểu authz.APIClient cho module khác đọc (không import
+// pf/apiclient — R-MOD-05).
 func WithCaller(ctx context.Context, c Caller) context.Context {
+	ctx = authz.WithAPIClient(ctx, authz.APIClient{ClientID: c.Client.ID, TenantID: c.Client.ClientTenantID, RequestID: c.RequestID, ReceivedAt: c.ReceivedAt})
 	return context.WithValue(ctx, callerKey{}, c)
 }
 

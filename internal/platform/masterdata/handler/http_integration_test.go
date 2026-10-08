@@ -22,6 +22,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -30,6 +31,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -198,7 +200,7 @@ func TestSuccessorResolutionAfterMerger(t *testing.T) {
 	if err != nil || cur.Name != "An Giang" || cur.ValidTo != nil {
 		t.Fatalf("91 năm 2026: %+v %v", cur, err)
 	}
-	if _, err := units.Get(u.ctx(), "89", day("2026-01-01")); !errors.Is(err, port.ErrUnitNotFound) {
+	if _, err := units.Get(u.ctx(), "89", day("2026-01-01")); !errors.Is(err, partyport.ErrUnitNotFound) {
 		t.Fatalf("89 đã đóng hiệu lực: %v", err)
 	}
 	// Qua HTTP.
@@ -276,7 +278,7 @@ func TestDescendantsAtTime(t *testing.T) {
 	if err != nil || !slices.Contains(old, "883") || !slices.Contains(old, "30280") || slices.Contains(old, "30742") {
 		t.Fatalf("An Giang cũ 2024: %v %v", old, err)
 	}
-	if _, err := units.Descendants(u.ctx(), "89", day("2026-01-01")); !errors.Is(err, port.ErrUnitNotFound) {
+	if _, err := units.Descendants(u.ctx(), "89", day("2026-01-01")); !errors.Is(err, partyport.ErrUnitNotFound) {
 		t.Fatalf("89 không còn hiệu lực năm 2026: %v", err)
 	}
 
@@ -379,7 +381,7 @@ func TestSelfApprovalBlocked(t *testing.T) {
 		t.Fatalf("tự từ chối phải bị chặn: %d %v", code, b)
 	}
 	// Chưa duyệt → chưa có giá trị.
-	if _, err := f.mod.Params().At(both.ctx(), "cgh.norm_ha_per_machine:MGD:thu_hoach", day("2026-05-01")); !errors.Is(err, port.ErrParamNotFound) {
+	if _, err := f.mod.Params().At(both.ctx(), "cgh.norm_ha_per_machine:MGD:thu_hoach", day("2026-05-01")); !errors.Is(err, params.ErrParamNotFound) {
 		t.Fatalf("chưa duyệt không được có giá trị: %v", err)
 	}
 	// Người thiếu vai param_approver → 403 forbidden.
@@ -425,7 +427,7 @@ func TestParamLookupAtEventTime(t *testing.T) {
 	// Bản nháp mới hơn chưa duyệt không được dùng.
 	propose(t, setter, key, "999", "2026-06-01", nil)
 
-	params := f.mod.Params()
+	prm := f.mod.Params()
 	for _, c := range []struct {
 		at   string
 		want string
@@ -436,12 +438,12 @@ func TestParamLookupAtEventTime(t *testing.T) {
 		{"2026-01-01", "100.5", 2}, // 00:00 giờ Việt Nam ngày hiệu lực
 		{"2026-09-01", "100.5", 2}, // nháp 999 chưa duyệt
 	} {
-		pv, err := params.At(setter.ctx(), key, day(c.at))
+		pv, err := prm.At(setter.ctx(), key, day(c.at))
 		if err != nil || !pv.Value.Equal(decimal.RequireFromString(c.want)) || pv.Version != c.ver {
 			t.Errorf("At(%s) = %v v%d, %v; muốn %s v%d", c.at, pv.Value, pv.Version, err, c.want, c.ver)
 		}
 	}
-	if _, err := params.At(setter.ctx(), key, day("2024-06-01")); !errors.Is(err, port.ErrParamNotFound) {
+	if _, err := prm.At(setter.ctx(), key, day("2024-06-01")); !errors.Is(err, params.ErrParamNotFound) {
 		t.Fatalf("trước mọi phiên bản: %v", err)
 	}
 	// Application API.
@@ -640,7 +642,7 @@ func TestTenantIsolation(t *testing.T) {
 	if code, _ := rb.get("/v1/masterdata/admin-units/91?at=2026-01-01"); code != 404 {
 		t.Fatalf("tenant B thấy đơn vị hành chính của A: %d", code)
 	}
-	if _, err := f.mod.Params().At(rb.ctx(), port.ParamCGHCoverageSufficient, day("2026-06-01")); !errors.Is(err, port.ErrParamNotFound) {
+	if _, err := f.mod.Params().At(rb.ctx(), port.ParamCGHCoverageSufficient, day("2026-06-01")); !errors.Is(err, params.ErrParamNotFound) {
 		t.Fatalf("tenant B thấy tham số của A: %v", err)
 	}
 	// Tenant A thấy ngưỡng QT-02 đã nạp sẵn.

@@ -1,5 +1,5 @@
 # Tệp khai báo module — ADR-0027, kiến trúc v4.1 §7.1, docs/dev/modules.md.
-# Trường SINH (go run ./tools/modgen): depends (khóa), provides, permissions, owns_schema.
+# Trường SINH (go run ./tools/modgen): depends (khóa), provides, consumes, permissions, owns_schema.
 # Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
 name: pf/waterway
 aka: [dom/waterway]
@@ -7,14 +7,17 @@ kind: domain
 zones: [pf]
 version: 1.0.0
 depends:
+  pf/geo: ">=1.0 <2"
   pf/masterdata: ">=1.0 <2"
   pf/party: ">=1.0 <2"
 provides:
-  ports: [Layer, Router]
+  ports: [Router]
   events: [pf.waterway.network.published/v1, pf.waterway.network_build.requested/v1]
   internal_events: []
   publications: []
   data_products: []
+consumes:
+  events: []
 permissions: [waterway_editor, waterway_publisher]
 shares: []
 owns_schema: [pf_waterway]

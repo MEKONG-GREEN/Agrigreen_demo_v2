@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -123,7 +122,7 @@ func (r *Registry) fillUnitNames(ctx context.Context, m *Me) error {
 			continue
 		}
 		u, err := r.Units.Get(ctx, code, now)
-		if errors.Is(err, mdport.ErrUnitNotFound) {
+		if errors.Is(err, port.ErrUnitNotFound) {
 			continue
 		}
 		if err != nil {

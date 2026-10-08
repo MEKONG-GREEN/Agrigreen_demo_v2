@@ -17,12 +17,12 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
-	wwport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
+
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -36,16 +36,16 @@ type Deps struct {
 	// Scope: phạm vi TW → Tỉnh → Xã của người gọi (pf/party, ADR-0009). Bắt buộc.
 	Scope partyport.ScopeResolver
 	// Params: ngưỡng chồng lấn geo.overlap_tolerance_pct (pf/masterdata). Thiếu → 1%.
-	Params mdport.Params
+	Params params.Params
 	// AdminUnits: kiểm mã xã khi tạo thửa, mã đơn vị khi nhập ranh giới hành chính. Bắt buộc cho ghi.
-	AdminUnits mdport.AdminUnits
+	AdminUnits partyport.AdminUnits
 	// Orgs (tùy chọn): kiểm HTX tồn tại, đang hoạt động khi tạo/gán thửa.
 	Orgs partyport.Orgs
 	// Households (tùy chọn): kiểm nông hộ là thành viên đang hoạt động của HTX sở hữu thửa khi gán.
 	Households partyport.Households
 	// CoopMarkers (tùy chọn): điểm vị trí HTX (pf_party.cooperative.location) làm
 	// marker/dự phòng cho lớp ranh giới HTX (GIS US-BND-02). pf/party cài ở đợt 2.
-	CoopMarkers port.CoopMarkers
+	CoopMarkers partyport.CoopMarkers
 	// Farmers (tùy chọn): nông hộ của tài khoản nông dân (pf/accounts) — vai farmer đọc log
 	// GPS của mình (HTX US-GPS-03). Gốc lắp ráp nối sau khi dựng pf/accounts (UseFarmers).
 	Farmers port.FarmerHouseholds
@@ -72,7 +72,7 @@ func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc
 func (m *Module) Plots() port.Plots { return m.svc }
 
 // PlotStats cho module khác đọc thống kê thửa đã số hoá (qua port, G-02/G-03).
-func (m *Module) PlotStats() port.PlotStats { return m.svc }
+func (m *Module) PlotStats() partyport.PlotStats { return m.svc }
 
 // GpsLog cho module khác ghi log GPS (HTX US-GPS-03) qua port; geo ghi trong giao dịch riêng.
 func (m *Module) GpsLog() port.GpsLog { return m.svc }
@@ -81,7 +81,7 @@ func (m *Module) GpsLog() port.GpsLog { return m.svc }
 func (m *Module) HubSink() port.HubSink { return m.svc }
 
 // UseWaterways nối lớp tuyến đường thủy (pf/waterway) cho bản đồ chuẩn hóa (GIS US-INT-02).
-func (m *Module) UseWaterways(l wwport.Layer) { m.svc.Waterways = l }
+func (m *Module) UseWaterways(l port.Layer) { m.svc.Waterways = l }
 
 // HubCapacitySource (G5, ADR-0022) là nguồn của sản phẩm dữ liệu hub_capacity cho cmd/api-public.
 func (m *Module) HubCapacitySource() apiclientport.HubCapacitySource { return m.svc }
@@ -91,7 +91,7 @@ func (m *Module) PlotFacts() port.PlotFacts { return m.svc }
 
 // UseEgress (G5, ADR-0024) nối điểm kiểm soát xuất (pf/metering) cho consumer van hub (kênh valve).
 // cp nil → hành vi cũ.
-func (m *Module) UseEgress(cp meteringport.Checkpoint, mode meteringport.Mode, log *slog.Logger) {
+func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logger) {
 	m.svc.Egress, m.svc.EgressMode, m.svc.Log = cp, mode, log
 }
 

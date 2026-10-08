@@ -18,10 +18,10 @@ import (
 )
 
 // fakeWaterways là lớp đường thủy giả (pf/waterway có kiểm thử riêng cho truy vấn khung nhìn).
-type fakeWaterways struct{ segs []wwport.LayerSegment }
+type fakeWaterways struct{ segs []port.LayerSegment }
 
-func (f fakeWaterways) SegmentsInBBox(_ context.Context, minLng, minLat, maxLng, maxLat float64, minLoad decimal.Decimal, limit int) (wwport.LayerPage, error) {
-	out := wwport.LayerPage{VersionNo: 3}
+func (f fakeWaterways) SegmentsInBBox(_ context.Context, minLng, minLat, maxLng, maxLat float64, minLoad decimal.Decimal, limit int) (port.LayerPage, error) {
+	out := port.LayerPage{VersionNo: 3}
 	for _, s := range f.segs {
 		p := s.Line[0]
 		if p.Lng < minLng || p.Lng > maxLng || p.Lat < minLat || p.Lat > maxLat {
@@ -97,13 +97,13 @@ func synthetic(t *testing.T, g *g2) {
 	}
 	// 300 đoạn đường thủy (giả).
 	dLat, dLon := degPerMetre(baseLat)
-	segs := make([]wwport.LayerSegment, 0, 300)
+	segs := make([]port.LayerSegment, 0, 300)
 	for k := range 300 {
 		x := baseLon + float64(k%30)*70*dLon
 		y := baseLat + float64(k/30)*220*dLat
 		load := decimal.NewFromInt(int64(50 + 10*(k%20)))
-		segs = append(segs, wwport.LayerSegment{SegmentRef: ids.New(), Name: fmt.Sprintf("Kênh %03d", k), Class: wwport.ClassFieldCanal,
-			MaxLoadTons: &load, Certain: true, Line: []wwport.LatLng{{Lat: y, Lng: x}, {Lat: y + 200*dLat, Lng: x}}})
+		segs = append(segs, port.LayerSegment{SegmentRef: ids.New(), Name: fmt.Sprintf("Kênh %03d", k), Class: wwport.ClassFieldCanal,
+			MaxLoadTons: &load, Certain: true, Line: []port.LayerPoint{{Lat: y, Lng: x}, {Lat: y + 200*dLat, Lng: x}}})
 	}
 	g.mod.UseWaterways(fakeWaterways{segs: segs})
 }

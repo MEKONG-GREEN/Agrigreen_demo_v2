@@ -11,6 +11,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -45,7 +46,7 @@ func TestAdminUnitHistory(t *testing.T) {
 	if err != nil || old.Name != "Kiên Giang" {
 		t.Fatalf("AdminUnitAt 91@2024: %+v %v", old, err)
 	}
-	if _, err := hist.AdminUnitAt(ctx, "89", day("2026-01-01")); !errors.Is(err, port.ErrUnitNotFound) {
+	if _, err := hist.AdminUnitAt(ctx, "89", day("2026-01-01")); !errors.Is(err, partyport.ErrUnitNotFound) {
 		t.Fatalf("AdminUnitAt 89@2026: %v", err)
 	}
 
@@ -140,7 +141,7 @@ func TestAdminUnitHistory(t *testing.T) {
 
 	// Tenant khác (chưa nạp danh mục) không thấy gì.
 	other := f.caller(ids.New())
-	if _, err := f.mod.AdminUnitHistory().SuccessorsAt(other.ctx(), "89", day("2024-05-01"), day("2026-03-01")); !errors.Is(err, port.ErrUnitNotFound) {
+	if _, err := f.mod.AdminUnitHistory().SuccessorsAt(other.ctx(), "89", day("2024-05-01"), day("2026-03-01")); !errors.Is(err, partyport.ErrUnitNotFound) {
 		t.Fatalf("tenant khác: %v", err)
 	}
 }

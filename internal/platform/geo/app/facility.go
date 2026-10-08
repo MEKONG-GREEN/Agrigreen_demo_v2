@@ -16,7 +16,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
-	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
@@ -148,10 +148,10 @@ func (s *Service) resolveFacility(ctx context.Context, a access, in *FacilityInp
 	if !facilityCodeRe(st.code) {
 		return st, problem.Validation.WithField("code", "1–40 ký tự chữ, số, '.', '_', '-'")
 	}
-	if err := s.unitAt(ctx, "province_code", st.province, mdport.LevelProvince); err != nil {
+	if err := s.unitAt(ctx, "province_code", st.province, partyport.LevelProvince); err != nil {
 		return st, err
 	}
-	if err := s.unitAt(ctx, "commune_code", st.commune, mdport.LevelCommune); err != nil {
+	if err := s.unitAt(ctx, "commune_code", st.commune, partyport.LevelCommune); err != nil {
 		return st, err
 	}
 	if !a.sc.Allows(st.commune) {

@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -16,7 +15,7 @@ import (
 )
 
 var (
-	_ geoport.CoopMarkers   = (*Registry)(nil)
+	_ port.CoopMarkers      = (*Registry)(nil)
 	_ port.CooperativeSites = (*Registry)(nil)
 )
 
@@ -26,7 +25,7 @@ const MaxMarkers = 1000
 // MarkersInBBox thực hiện geo/port.CoopMarkers: điểm vị trí hồ sơ (pf_party.cooperative.location)
 // của HTX đang hoạt động trong khung nhìn — marker/dự phòng của lớp ranh giới HTX (GIS
 // US-BND-02). Tenant lấy từ context; không kiểm phạm vi (pf/geo tự lọc).
-func (r *Registry) MarkersInBBox(ctx context.Context, minLon, minLat, maxLon, maxLat float64, limit int) ([]geoport.CoopMarker, error) {
+func (r *Registry) MarkersInBBox(ctx context.Context, minLon, minLat, maxLon, maxLat float64, limit int) ([]port.CoopMarker, error) {
 	for _, v := range []float64{minLon, minLat, maxLon, maxLat} {
 		if math.IsNaN(v) || math.IsInf(v, 0) {
 			return nil, problem.Validation.WithField("bbox", "toạ độ không hợp lệ")
@@ -35,7 +34,7 @@ func (r *Registry) MarkersInBBox(ctx context.Context, minLon, minLat, maxLon, ma
 	if limit <= 0 || limit > MaxMarkers {
 		limit = MaxMarkers
 	}
-	var out []geoport.CoopMarker
+	var out []port.CoopMarker
 	err := tenant.FromCtxTx(ctx, r.DB, func(tx pgx.Tx) error {
 		var e error
 		out, e = store.CoopMarkersInBBox(ctx, tx, minLon, minLat, maxLon, maxLat, limit)

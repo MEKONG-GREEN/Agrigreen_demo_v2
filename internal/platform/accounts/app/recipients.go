@@ -7,13 +7,12 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	reportsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 )
 
 // OrgRecipients liệt kê tài khoản đang bật, email đã xác minh, thuộc tổ chức orgRef
 // (HTX US-DASH-03: người nhận lịch báo cáo của quản lý HTX chỉ là tài khoản đã đăng ký
 // của HTX). Email trả về đã che; địa chỉ đầy đủ chỉ tra lúc gửi (EmailOf).
-func (m MailDirectory) OrgRecipients(ctx context.Context, tenantID, orgRef uuid.UUID) ([]reportsport.Recipient, error) {
+func (m MailDirectory) OrgRecipients(ctx context.Context, tenantID, orgRef uuid.UUID) ([]port.Recipient, error) {
 	if m.Dir == nil {
 		return nil, ErrNoDirectory
 	}
@@ -22,13 +21,13 @@ func (m MailDirectory) OrgRecipients(ctx context.Context, tenantID, orgRef uuid.
 	if err != nil {
 		return nil, err
 	}
-	out := []reportsport.Recipient{}
+	out := []port.Recipient{}
 	for _, u := range users {
 		if u.TenantID != tenantID || u.OrgRef != orgRef || !u.Enabled || !u.EmailVerified || strings.TrimSpace(u.Email) == "" {
 			continue
 		}
 		name := strings.TrimSpace(strings.TrimSpace(u.LastName) + " " + strings.TrimSpace(u.FirstName))
-		out = append(out, reportsport.Recipient{ActorRef: u.ID, DisplayName: name, MaskedEmail: MaskEmail(u.Email)})
+		out = append(out, port.Recipient{ActorRef: u.ID, DisplayName: name, MaskedEmail: MaskEmail(u.Email)})
 	}
 	return out, nil
 }

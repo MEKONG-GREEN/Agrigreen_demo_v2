@@ -12,7 +12,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
-	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
+
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
@@ -22,18 +22,18 @@ import (
 
 type fakeGeoStats map[string]int64 // xã → số thửa (diện tích = số thửa × 1,5 ha)
 
-func (f fakeGeoStats) DigitizedByCommune(_ context.Context, communes []string) ([]geoport.PlotStat, error) {
-	var out []geoport.PlotStat
+func (f fakeGeoStats) DigitizedByCommune(_ context.Context, communes []string) ([]partyport.PlotStat, error) {
+	var out []partyport.PlotStat
 	for c, n := range f {
 		if communes == nil || slices.Contains(communes, c) {
-			out = append(out, geoport.PlotStat{CommuneCode: c, Plots: n, AreaHa: decimal.NewFromInt(n).Mul(decimal.RequireFromString("1.5"))})
+			out = append(out, partyport.PlotStat{CommuneCode: c, Plots: n, AreaHa: decimal.NewFromInt(n).Mul(decimal.RequireFromString("1.5"))})
 		}
 	}
 	return out, nil
 }
 
-func (f fakeGeoStats) DigitizedByCooperative(context.Context, []uuid.UUID) (map[uuid.UUID]geoport.PlotStat, error) {
-	return map[uuid.UUID]geoport.PlotStat{}, nil
+func (f fakeGeoStats) DigitizedByCooperative(context.Context, []uuid.UUID) (map[uuid.UUID]partyport.PlotStat, error) {
+	return map[uuid.UUID]partyport.PlotStat{}, nil
 }
 
 type fakeCoopStats map[string][2]int64
