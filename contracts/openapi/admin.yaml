@@ -4375,8 +4375,13 @@ paths:
     post:
       summary: Đề xuất cấp quyền chia sẻ tenant này (bên cấp) → tenant khác (bên nhận) — ADR-0020
       description: |
-        Chỉ `platform_admin` của tenant bên cấp. Một `platform_admin` KHÁC duyệt (R-56). `valid_from` vắng → lúc đề xuất;
-        `valid_to` bắt buộc, ở tương lai, tối đa 5 năm.
+        Chỉ `platform_admin` của tenant bên cấp — quản trị viên của ĐƠN VỊ CHỦ dữ liệu (R-SEC-04). Một `platform_admin` KHÁC
+        duyệt (R-56). `valid_from` vắng → lúc đề xuất; `valid_to` bắt buộc, ở tương lai, tối đa 5 năm.
+
+        Cấp phép v2 (W4.1, ADR-0030 mục 3): `grant_class` vắng = `partner` (hành vi cũ: `kinds` ≥ 1, không `module_table`/
+        `scope_node_ref`). `intra_platform` (đọc tại chỗ qua `k_ref.share_scope`, có hiệu lực từ W4.2): KHÔNG `kinds`;
+        bắt buộc `module_table` (`<module>:<share>` có trong `shares` của module chủ — sai → 422 `party.share_table_not_shared`),
+        `scope_node_ref` (Nút đang hoạt động của tenant bên cấp), `purpose_code`, `basis_ref` (mã thỏa thuận chia sẻ).
       operationId: proposeShareGrant
       tags: [party]
       parameters:
@@ -4387,16 +4392,21 @@ paths:
           application/json:
             schema:
               type: object
-              required: [grantee_tenant_id, kinds, purpose, valid_to]
+              required: [grantee_tenant_id, purpose, valid_to]
               properties:
                 grantee_tenant_id: {type: string, format: uuid}
                 kinds:
                   type: array
-                  minItems: 1
+                  description: Bắt buộc (≥ 1) với partner; vắng/rỗng với intra_platform
                   items: {$ref: "#/components/schemas/ShareKind"}
                 purpose: {type: string, minLength: 10, maxLength: 500}
                 valid_from: {type: string, format: date-time}
                 valid_to: {type: string, format: date-time}
+                grant_class: {$ref: "#/components/schemas/ShareGrantClass"}
+                module_table: {type: string, pattern: "^(pf|mkg)/[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$", description: "Chỉ intra_platform, vd pf/cooperative:household"}
+                scope_node_ref: {type: string, format: uuid, description: "Chỉ intra_platform: Nút phạm vi của đơn vị chủ"}
+                purpose_code: {type: string, pattern: "^[a-z][a-z0-9-]{0,39}(\\.[a-z][a-z0-9-]{0,39}){0,3}$", description: "Mục đích có mã, vd khuyen-nong (bắt buộc với intra_platform)"}
+                basis_ref: {type: string, minLength: 3, maxLength: 200, description: "Mã thỏa thuận chia sẻ — căn cứ (bắt buộc với intra_platform)"}
       responses:
         "201":
           description: Đã đề xuất (gọi lặp cùng Idempotency-Key → như lần đầu)
@@ -4517,6 +4527,86 @@ paths:
                   items: {type: array, items: {$ref: "#/components/schemas/ShareGrantRead"}}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
+  /v1/share-grant-reviews/due:
+    get:
+      summary: Cấp phép đang hiệu lực đến hạn rà soát định kỳ (R-SEC-04) — W4.1
+      description: |
+        Chỉ `platform_admin` của đơn vị chủ (tenant bên cấp). Đến hạn khi lần rà soát cuối (hoặc lúc duyệt) + chu kỳ
+        (`review_interval_days`, hiện 90 ngày) ≤ hiện tại + `within_days`.
+      operationId: listShareGrantsDueForReview
+      tags: [party]
+      parameters:
+        - {name: within_days, in: query, schema: {type: integer, minimum: 0, maximum: 366, default: 0}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor, review_interval_days]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ShareGrant"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+                  review_interval_days: {type: integer}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/share-grants/{id}/reviews:
+    get:
+      summary: Sổ rà soát định kỳ của một cấp phép (chỉ ghi thêm) — W4.1, R-SEC-04
+      operationId: listShareGrantReviews
+      tags: [party]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Mọi dòng rà soát theo seq
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ShareGrantReview"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Ghi quyết định rà soát định kỳ (giữ | thu hồi) — W4.1, R-SEC-04
+      description: |
+        Chỉ cấp phép đang hiệu lực (khác → 409 `party.share_grant_state`). `retain` đặt lại hạn rà soát; `revoke` thu hồi
+        ngay trong cùng giao dịch (`note` là lý do, bắt buộc) và tăng epoch ngữ cảnh của đơn vị xem như thu hồi thường.
+      operationId: reviewShareGrant
+      tags: [party]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: {type: string, enum: [retain, revoke]}
+                note: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "201":
+          description: Đã ghi (gọi lặp cùng Idempotency-Key → như lần đầu)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ShareGrantReviewResult"}
+        "200":
+          description: Gọi lặp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ShareGrantReviewResult"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   # --- hết pf/party cấp quyền chia sẻ ---
   # --- pf/party KN v7.7 gói P2: phòng ban, khu vực, cây 3 cấp, bảng ảnh hưởng (FN-AD-04.02, 04.03) ---
   /v1/departments:
@@ -7059,7 +7149,7 @@ components:
       enum: [cooperative_directory, plot_directory, season_harvest_dates, htx_collection_responses, waterway_routes, valve_hub, valve_collection, valve_mrv_evidence, dp_collection_volume, dp_hub_capacity, dp_mrv_package_status]
     ShareGrant:
       type: object
-      required: [id, grantor_tenant_id, grantee_tenant_id, kinds, purpose, valid_from, valid_to, status, proposed_by, proposed_at, approved_by, approved_at, revoked_by, revoked_at, revoke_reason]
+      required: [id, grantor_tenant_id, grantee_tenant_id, kinds, purpose, valid_from, valid_to, status, proposed_by, proposed_at, approved_by, approved_at, revoked_by, revoked_at, revoke_reason, grant_class, legacy_terms, module_table, scope_node_ref, purpose_code, basis_ref, last_reviewed_at, last_reviewed_by, review_due_at]
       properties:
         id: {type: string, format: uuid}
         grantor_tenant_id: {type: string, format: uuid}
@@ -7076,6 +7166,37 @@ components:
         revoked_by: {type: [string, "null"], format: uuid}
         revoked_at: {type: [string, "null"], format: date-time}
         revoke_reason: {type: [string, "null"]}
+        grant_class: {$ref: "#/components/schemas/ShareGrantClass"}
+        legacy_terms: {type: boolean, description: "true = cấp phép trước v2 (không có điều khoản v2, coi là partner)"}
+        module_table: {type: [string, "null"]}
+        scope_node_ref: {type: [string, "null"], format: uuid}
+        purpose_code: {type: [string, "null"]}
+        basis_ref: {type: [string, "null"]}
+        last_reviewed_at: {type: [string, "null"], format: date-time}
+        last_reviewed_by: {type: [string, "null"], format: uuid}
+        review_due_at: {type: [string, "null"], format: date-time, description: "Hạn rà soát kế tiếp (chỉ cấp phép đang hiệu lực)"}
+    ShareGrantClass:
+      type: string
+      enum: [intra_platform, partner]
+      description: "ADR-0030 mục 3: intra_platform = đọc tại chỗ qua share_scope; partner = MKG/bên thứ ba (ADR-0020)"
+    ShareGrantReview:
+      type: object
+      required: [id, grant_id, seq, decision, note, actor_ref, event_time, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        grant_id: {type: string, format: uuid}
+        seq: {type: integer}
+        decision: {type: string, enum: [retain, revoke]}
+        note: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+    ShareGrantReviewResult:
+      type: object
+      required: [review, grant]
+      properties:
+        review: {$ref: "#/components/schemas/ShareGrantReview"}
+        grant: {$ref: "#/components/schemas/ShareGrant"}
     ShareGrantRead:
       type: object
       required: [id, seq, grantee_tenant_id, kind, endpoint, query, item_count, actor_ref, recorded_at]

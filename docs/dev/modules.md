@@ -21,7 +21,7 @@ Mỗi module `internal/{platform,mkg,vault}/<module>` có `module.yaml` cạnh `
 | `provides.publications` | **sinh** | `//ag:publication` | Van công bố (`contracts/publication`) |
 | `provides.data_products` | **sinh** | `//ag:dataproduct` | Sản phẩm dữ liệu Public API (`contracts/dataproduct`) |
 | `permissions` | **sinh** | hằng `Role*` trong `port/` | Vai realm module khai và kiểm. Mã quyền × lớp (R-MOD-07) đến ở W7.2 |
-| `shares` | tay | — | Bảng chấp nhận đọc chéo đơn vị (ADR-0030). Rỗng đến W4.1 |
+| `shares` | tay | — | Bảng chấp nhận đọc chéo đơn vị (ADR-0030), tên logic. Danh mục sinh `catalog_gen.go` mang `shares` (W4.1): cấp phép `intra_platform` chỉ nhận `module_table = <module>:<share>` khi `modreg.Shared` đúng |
 | `owns_schema` | **sinh** | migration | Schema `CREATE SCHEMA` tên `<cụm>_<module>` (vault: `vault`; schema lõi `k_ref` → `pf/kref`), hoặc schema chỉ module này nhắc trong chuỗi SQL (vd `ts_weigh` → `mkg/measurement`, `pf_files` → `pf/sync`). Schema lõi `k_*` có ở mọi cụm của `zones`, chỉ module `kernel` được sở hữu |
 | `enable` | tay | — | `always` (lõi, mkg, `pf/extdata`) \| `per_tenant` (bật theo đơn vị, W1.4). `kernel` bắt buộc `always` |
 
@@ -300,6 +300,24 @@ Kiến trúc v4.1 §26, R-56. Module năng lực `pf/workflow` (`internal/platfo
 | `pf/party` | `party.share_grant` | đề xuất cấp quyền | duyệt → `approved`; thu hồi đề xuất chưa duyệt → `cancelled` (thu hồi cấp quyền đã duyệt không thêm quyết định) |
 
 Chưa có route HTTP, sự kiện `pf.workflow.request.decided` (§26) chờ bên tiêu thụ (W6.2, W6.4). Vai DB: `r_workflow` là vai nhóm không có vai cũ (`dbadmin.groupOnlyModules`); `cmd/api-platform` mở pool `app_platform` cho giao dịch riêng của module.
+
+## Cấp phép chia sẻ v2 (W4.1)
+
+ADR-0030 mục 3, kiến trúc v4.1 §17.1, R-SEC-04. pf 000120. Mã ở `internal/platform/party/{app,store,handler}/sharing.go`.
+
+| Việc | Cách làm |
+|---|---|
+| Điều khoản v2 | `grant_class` (`intra_platform` \| `partner`), `module_table`, `scope_node_ref`, `purpose_code`, `basis_ref` ghi ở **sổ phụ** `pf_party.share_grant_terms` (một dòng mỗi cấp phép, CHECK `seq = 1`, cùng giao dịch với `proposed`) và cột NULL được của bảng chiếu `share_grant`. Sổ `share_grant_event` **không** thêm cột: chuỗi băm (`shared.fn_chain`/`verify_chain`) tính trên `to_jsonb` toàn dòng, cột mới đổi băm của mọi dòng cũ. Quy tắc chung: không `ADD COLUMN` vào bảng sổ đã có dữ liệu — dùng sổ phụ |
+| Cấp phép cũ | Dòng chiếu không có `grant_class` = `partner` kế thừa (`legacy_terms = true` ở API) |
+| Ai tạo | `platform_admin` của tenant bên cấp (đơn vị chủ). `intra_platform`: `scope_node_ref` phải là Nút đang hoạt động trong `pf_party.org` của chính tenant đó; không `kinds`; đủ mục đích + căn cứ. Duyệt bốn mắt như ADR-0020 (+ `cap/workflow`) |
+| `module_table` | Tên logic `<module>:<share>`, vd `pf/cooperative:household`; sai → 422 `party.share_table_not_shared`. W4.2 ánh xạ sang bảng vật lý của `k_ref.share_scope` (`pf_coop.household`, [cooperative.md §7.3](../design/cooperative.md)) |
+| Đường đọc | `partner`: như cũ (`share_grant_inbound`, `/v1/partner/*`, Public API, van). `intra_platform`: không ghi `share_grant_inbound`; đọc tại chỗ qua `share_scope` từ W4.2 |
+| Rà soát định kỳ | Sổ `pf_party.share_grant_review` (`retain` \| `revoke`, chỉ ghi thêm). Đến hạn khi lần rà soát cuối (hoặc lúc duyệt) + 90 ngày ≤ hiện tại + `within_days`. `GET /v1/share-grant-reviews/due`, `GET\|POST /v1/share-grants/{id}/reviews` (Idempotency-Key). `revoke` thu hồi cùng giao dịch |
+| Epoch ngữ cảnh | Trước W4.1 repo chưa có. Bản tối thiểu: `pf_party.context_epoch` (một dòng mỗi tenant đơn vị xem). Thu hồi cấp phép **đang hiệu lực** (thường hoặc khi rà soát) tăng epoch của tenant bên nhận trong cùng giao dịch (`tenant.Within` với bằng chứng bên cấp → bên nhận) và phát `pf.party.context_epoch.bumped` (tenant phong bì = đơn vị xem). Đọc: `party/port.ContextEpochs`. W7.2 (`k/access`) hợp nhất với epoch ở Valkey định danh |
+| Sự kiện | `pf.party.share_grant.approved`/`revoked` v1 thêm trường tùy chọn `grant_class`, `module_table`, `scope_node_ref`, `purpose_code`, `basis_ref` (tương thích ngược). `k_ref.share_grant_active` chưa có cột v2 — W4.2 thêm ở migration của `pf/kref` (agmodgraph cấm một migration sửa schema của hai module) |
+| Web-ops | Chưa có màn cấp phép để mở rộng — chỉ API (`apps/web-ops/src/api/generated/admin.ts` đã sinh) |
+
+Còn mở: C-10 (thỏa thuận chia sẻ mẫu, chu kỳ rà soát), H-1 (ai là đơn vị chủ HTX/hộ/thửa) — chưa bật production.
 
 ## Module `pf/cooperative` — mặt tiền (W3.2)
 

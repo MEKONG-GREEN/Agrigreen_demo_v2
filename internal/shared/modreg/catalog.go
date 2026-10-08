@@ -26,6 +26,8 @@ type CatalogEntry struct {
 	Zones []string
 	// OwnsSchema: schema module sở hữu (owns_schema) — W2.6: module có schema thì có vai nhóm r_<module>.
 	OwnsSchema []string
+	// Shares: bảng chia sẻ được (shares, ADR-0030) — tên logic, đã sắp (W4.1: kiểm module_table của cấp phép).
+	Shares []string
 }
 
 // Catalog trả mọi module theo tên (bản sao).
@@ -41,6 +43,7 @@ func (e CatalogEntry) clone() CatalogEntry {
 	e.Permissions = slices.Clone(e.Permissions)
 	e.Zones = slices.Clone(e.Zones)
 	e.OwnsSchema = slices.Clone(e.OwnsSchema)
+	e.Shares = slices.Clone(e.Shares)
 	return e
 }
 
@@ -58,6 +61,13 @@ func Entry(name string) (CatalogEntry, bool) {
 func PerTenant(name string) bool {
 	e, ok := Entry(name)
 	return ok && e.Enable == EnablePerTenant
+}
+
+// Shared cho biết module khai share trong shares của module.yaml (ADR-0030, R-DB-08): chỉ bảng khai ở
+// đây mới được cấp phép chia sẻ intra_platform (pf/party, W4.1) và mang nhánh share_scope (W4.2).
+func Shared(module, share string) bool {
+	e, ok := Entry(module)
+	return ok && share != "" && slices.Contains(e.Shares, share)
 }
 
 // RoleModules trả các module khai vai role trong permissions (đã sắp theo tên).
@@ -98,9 +108,11 @@ func FormatCatalog(mods []*Manifest) ([]byte, error) {
 	for _, m := range sorted {
 		perms := slices.Clone(m.Permissions)
 		slices.Sort(perms)
-		fmt.Fprintf(&b, "\t{Name: %s, Kind: %s, Enable: %s, Permissions: %s, Zones: %s, OwnsSchema: %s},\n",
+		shares := slices.Clone(m.Shares)
+		slices.Sort(shares)
+		fmt.Fprintf(&b, "\t{Name: %s, Kind: %s, Enable: %s, Permissions: %s, Zones: %s, OwnsSchema: %s, Shares: %s},\n",
 			strconv.Quote(m.Name), strconv.Quote(string(m.Kind)), strconv.Quote(string(m.Enable)),
-			goStrings(perms), goStrings(m.Zones), goStrings(m.OwnsSchema))
+			goStrings(perms), goStrings(m.Zones), goStrings(m.OwnsSchema), goStrings(shares))
 	}
 	b.WriteString("}\n")
 	return format.Source(b.Bytes())

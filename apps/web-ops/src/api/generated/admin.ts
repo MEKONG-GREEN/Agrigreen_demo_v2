@@ -2989,8 +2989,13 @@ export interface paths {
         put?: never;
         /**
          * Đề xuất cấp quyền chia sẻ tenant này (bên cấp) → tenant khác (bên nhận) — ADR-0020
-         * @description Chỉ `platform_admin` của tenant bên cấp. Một `platform_admin` KHÁC duyệt (R-56). `valid_from` vắng → lúc đề xuất;
-         *     `valid_to` bắt buộc, ở tương lai, tối đa 5 năm.
+         * @description Chỉ `platform_admin` của tenant bên cấp — quản trị viên của ĐƠN VỊ CHỦ dữ liệu (R-SEC-04). Một `platform_admin` KHÁC
+         *     duyệt (R-56). `valid_from` vắng → lúc đề xuất; `valid_to` bắt buộc, ở tương lai, tối đa 5 năm.
+         *
+         *     Cấp phép v2 (W4.1, ADR-0030 mục 3): `grant_class` vắng = `partner` (hành vi cũ: `kinds` ≥ 1, không `module_table`/
+         *     `scope_node_ref`). `intra_platform` (đọc tại chỗ qua `k_ref.share_scope`, có hiệu lực từ W4.2): KHÔNG `kinds`;
+         *     bắt buộc `module_table` (`<module>:<share>` có trong `shares` của module chủ — sai → 422 `party.share_table_not_shared`),
+         *     `scope_node_ref` (Nút đang hoạt động của tenant bên cấp), `purpose_code`, `basis_ref` (mã thỏa thuận chia sẻ).
          */
         post: operations["proposeShareGrant"];
         delete?: never;
@@ -3064,6 +3069,49 @@ export interface paths {
         get: operations["listShareGrantReads"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/share-grant-reviews/due": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cấp phép đang hiệu lực đến hạn rà soát định kỳ (R-SEC-04) — W4.1
+         * @description Chỉ `platform_admin` của đơn vị chủ (tenant bên cấp). Đến hạn khi lần rà soát cuối (hoặc lúc duyệt) + chu kỳ
+         *     (`review_interval_days`, hiện 90 ngày) ≤ hiện tại + `within_days`.
+         */
+        get: operations["listShareGrantsDueForReview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/share-grants/{id}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sổ rà soát định kỳ của một cấp phép (chỉ ghi thêm) — W4.1, R-SEC-04 */
+        get: operations["listShareGrantReviews"];
+        put?: never;
+        /**
+         * Ghi quyết định rà soát định kỳ (giữ | thu hồi) — W4.1, R-SEC-04
+         * @description Chỉ cấp phép đang hiệu lực (khác → 409 `party.share_grant_state`). `retain` đặt lại hạn rà soát; `revoke` thu hồi
+         *     ngay trong cùng giao dịch (`note` là lý do, bắt buộc) và tăng epoch ngữ cảnh của đơn vị xem như thu hồi thường.
+         */
+        post: operations["reviewShareGrant"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5323,6 +5371,48 @@ export interface components {
             /** Format: date-time */
             revoked_at: string | null;
             revoke_reason: string | null;
+            grant_class: components["schemas"]["ShareGrantClass"];
+            /** @description true = cấp phép trước v2 (không có điều khoản v2, coi là partner) */
+            legacy_terms: boolean;
+            module_table: string | null;
+            /** Format: uuid */
+            scope_node_ref: string | null;
+            purpose_code: string | null;
+            basis_ref: string | null;
+            /** Format: date-time */
+            last_reviewed_at: string | null;
+            /** Format: uuid */
+            last_reviewed_by: string | null;
+            /**
+             * Format: date-time
+             * @description Hạn rà soát kế tiếp (chỉ cấp phép đang hiệu lực)
+             */
+            review_due_at: string | null;
+        };
+        /**
+         * @description ADR-0030 mục 3: intra_platform = đọc tại chỗ qua share_scope; partner = MKG/bên thứ ba (ADR-0020)
+         * @enum {string}
+         */
+        ShareGrantClass: "intra_platform" | "partner";
+        ShareGrantReview: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            grant_id: string;
+            seq: number;
+            /** @enum {string} */
+            decision: "retain" | "revoke";
+            note: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        ShareGrantReviewResult: {
+            review: components["schemas"]["ShareGrantReview"];
+            grant: components["schemas"]["ShareGrant"];
         };
         ShareGrantRead: {
             /** Format: uuid */
@@ -12000,12 +12090,25 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     grantee_tenant_id: string;
-                    kinds: components["schemas"]["ShareKind"][];
+                    /** @description Bắt buộc (≥ 1) với partner; vắng/rỗng với intra_platform */
+                    kinds?: components["schemas"]["ShareKind"][];
                     purpose: string;
                     /** Format: date-time */
                     valid_from?: string;
                     /** Format: date-time */
                     valid_to: string;
+                    grant_class?: components["schemas"]["ShareGrantClass"];
+                    /** @description Chỉ intra_platform, vd pf/cooperative:household */
+                    module_table?: string;
+                    /**
+                     * Format: uuid
+                     * @description Chỉ intra_platform: Nút phạm vi của đơn vị chủ
+                     */
+                    scope_node_ref?: string;
+                    /** @description Mục đích có mã, vd khuyen-nong (bắt buộc với intra_platform) */
+                    purpose_code?: string;
+                    /** @description Mã thỏa thuận chia sẻ — căn cứ (bắt buộc với intra_platform) */
+                    basis_ref?: string;
                 };
             };
         };
@@ -12154,6 +12257,108 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    listShareGrantsDueForReview: {
+        parameters: {
+            query?: {
+                within_days?: number;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ShareGrant"][];
+                        /** Format: uuid */
+                        next_cursor: string | null;
+                        review_interval_days: number;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listShareGrantReviews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mọi dòng rà soát theo seq */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ShareGrantReview"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    reviewShareGrant: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "retain" | "revoke";
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareGrantReviewResult"];
+                };
+            };
+            /** @description Đã ghi (gọi lặp cùng Idempotency-Key → như lần đầu) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareGrantReviewResult"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     knAdminListDepartments: {

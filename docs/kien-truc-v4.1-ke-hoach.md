@@ -73,7 +73,7 @@ Cột **Khách?**:
 
 | Gói | Nội dung | Phụ thuộc | Migration | Khách? | CS |
 |---|---|---|---|---|---|
-| **W4.1** | **`share_grant` v2:** thêm `scope_node_ref`, `module_table` (chỉ bảng khai trong `shares`), `purpose_code`, `basis_ref` (thỏa thuận), `grant_class` (`intra_platform` \| `partner`) vào `pf_party.share_grant_event`/`share_grant` (cột NULL được); luồng tạo bởi quản trị viên đơn vị chủ; màn rà soát cấp phép định kỳ (R-SEC-04); thu hồi tăng epoch ngữ cảnh của tài khoản đơn vị xem | W0.1, W2.5 | **pf 000098** | Sau (C-10, H-1) | M |
+| **W4.1** | **`share_grant` v2:** thêm `scope_node_ref`, `module_table` (chỉ bảng khai trong `shares`), `purpose_code`, `basis_ref` (thỏa thuận), `grant_class` (`intra_platform` \| `partner`) vào `pf_party.share_grant_event`/`share_grant` (cột NULL được); luồng tạo bởi quản trị viên đơn vị chủ; màn rà soát cấp phép định kỳ (R-SEC-04); thu hồi tăng epoch ngữ cảnh của tài khoản đơn vị xem. **Trạng thái: xong mã (08/10/2026), bật production chờ C-10/H-1** — **pf 000120** (số 000098 cũ đã bị gói sau dùng): điều khoản v2 ở **sổ phụ** `pf_party.share_grant_terms` (một dòng mỗi cấp phép, CHECK `seq = 1`; **không** thêm cột vào sổ `share_grant_event` vì chuỗi băm tính trên `to_jsonb` toàn dòng — cột mới làm gãy `verify_chain` của dòng cũ), bảng chiếu `share_grant` thêm cột NULL được (dòng cũ = `partner` kế thừa) + CHECK lớp ↔ `kinds`; `module_table` = `<module>:<share>` kiểm theo `modreg.Shared` (danh mục sinh mang `shares`), Nút phạm vi phải là Nút đang hoạt động của đơn vị chủ; chỉ `platform_admin` của tenant bên cấp tạo/rà soát; sổ `share_grant_review` + `GET /v1/share-grant-reviews/due`, `GET\|POST /v1/share-grants/{id}/reviews` (chu kỳ 90 ngày, `revoke` thu hồi cùng giao dịch); epoch tối thiểu `pf_party.context_epoch` + sự kiện `pf.party.context_epoch.bumped` + port `ContextEpochs` (W7.2 hợp nhất); `approved`/`revoked` thêm trường tùy chọn. Chưa thêm cột `k_ref.share_grant_active` (agmodgraph cấm một migration sửa schema hai module — chuyển W4.2); chưa có màn web-ops (chưa có màn cấp phép để mở rộng — chỉ API) ([ADR-0030](adr/0030-doc-tai-cho-co-cap-phep.md#hiện-thực), [hướng dẫn](dev/modules.md#cấp-phép-chia-sẻ-v2-w41)) | W0.1, W2.5 | **pf 000120** | Sau (C-10, H-1) | M |
 | **W4.2** | **Đọc tại chỗ:** worker `k_ref` dựng `share_scope` (cấp phép × cây Nút) trong một giao dịch; nhánh `OR EXISTS share_scope` trên các bảng `shares` của `pf_coop`, `pf_mechanization.machine`; `WITH CHECK` không có nhánh; port trả `via_share_grant`; middleware ghi một sự kiện gộp mỗi yêu cầu; metric "đọc qua cấp phép theo đơn vị"; kiểm thử T6a–T6e, T9–T10, thu hồi + kết nối tái sử dụng qua PgBouncer | W4.1, W3.4 | **pf 000099** | Không | L |
 
 ### Giai đoạn 5 — Cổng tích hợp (G1+ của v4.1)
@@ -138,7 +138,7 @@ W0.1 → W0.2 → W0.3 → W0.4
   → W2.3 (pf 000090, shared 000007) → W2.4 (pf 000091) → W2.5 (pf 000092, mkg 000022)
   → W3.1 → W3.2 → W2.6 (pf 000119, mkg 000035, ts 000004, vault 000003)
   → W3.3 (pf 000094–96) → W3.4 (pf 000097)         ── mốc: trước 15/12/2026
-  → W4.1 (pf 000098) → W4.2 (pf 000099)
+  → W4.1 (pf 000120) → W4.2 (pf 000099)
   → W5.1 → W5.2 → W5.3 (pf 000100–01) → W5.4 (pf 000102)
   → W5.5 (mkg 000024) → W5.6 (pf 000103, mkg 000025) → W5.7 (pf 000104)
   → W5.8 → W5.9 → W5.10

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.party.context_epoch.bumped/v1",
+  "title": "pf.party.context_epoch.bumped — payload",
+  "description": "Epoch ngữ cảnh của một đơn vị xem vừa tăng (W4.1, kiến trúc v4.1 §17.1, ADR-0030 mục 3): một cấp phép chia sẻ đang hiệu lực mà đơn vị đó là bên nhận vừa bị thu hồi. Tenant của phong bì là ĐƠN VỊ XEM. Phiên của đơn vị đó làm mới ngữ cảnh ở yêu cầu kế tiếp (W7.2 k/access). Bộ đếm ở pf_party.context_epoch. Không dữ liệu cá nhân.",
+  "x-event-type": "pf.party.context_epoch.bumped",
+  "x-schema-version": 1,
+  "x-producer": "pf/party",
+  "type": "object",
+  "required": ["epoch", "cause", "grant_id", "grantor_tenant_id", "actor_ref", "event_time"],
+  "properties": {
+    "epoch":             { "type": "integer", "minimum": 1, "description": "Epoch mới của tenant phong bì (tăng dần)" },
+    "cause":             { "type": "string", "enum": ["share_grant_revoked"] },
+    "grant_id":          { "type": "string", "format": "uuid", "description": "Cấp phép bị thu hồi" },
+    "grantor_tenant_id": { "type": "string", "format": "uuid", "description": "Tenant bên cấp (đơn vị chủ)" },
+    "actor_ref":         { "type": "string", "format": "uuid" },
+    "event_time":        { "type": "string", "format": "date-time" }
+  }
+}

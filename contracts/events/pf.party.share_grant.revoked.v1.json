@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.agrigreen.vn/events/pf.party.share_grant.revoked/v1",
   "title": "pf.party.share_grant.revoked — payload",
-  "description": "Một cấp quyền chia sẻ (đề xuất hoặc đang hiệu lực) vừa bị bên cấp thu hồi. Ghi trong sổ pf_party.share_grant_event; tenant của phong bì là BÊN CẤP. Worker pf.kref dựng k_ref.share_grant_active (W2.5, ADR-0029). Không có mục đích dạng văn bản tự do, không dữ liệu cá nhân.",
+  "description": "Một cấp quyền chia sẻ (đề xuất hoặc đang hiệu lực) vừa bị bên cấp thu hồi. Ghi trong sổ pf_party.share_grant_event; tenant của phong bì là BÊN CẤP. Worker pf.kref dựng k_ref.share_grant_active (W2.5, ADR-0029). Không có mục đích dạng văn bản tự do, không dữ liệu cá nhân. W4.1 thêm điều khoản v2 (trường tùy chọn, tương thích ngược).",
   "x-event-type": "pf.party.share_grant.revoked",
   "x-schema-version": 1,
   "x-producer": "pf/party",
@@ -16,6 +16,11 @@
     "valid_to":          { "type": "string", "format": "date-time" },
     "actor_ref":         { "type": "string", "format": "uuid" },
     "event_time":        { "type": "string", "format": "date-time" },
-    "seq":               { "type": "integer", "minimum": 1, "description": "Thứ tự trong chuỗi băm của cấp quyền" }
+    "seq":               { "type": "integer", "minimum": 1, "description": "Thứ tự trong chuỗi băm của cấp quyền" },
+    "grant_class":       { "type": "string", "enum": ["intra_platform", "partner"], "description": "W4.1 (ADR-0030 mục 3), tùy chọn: vắng = cấp phép trước v2, coi là partner" },
+    "module_table":      { "type": "string", "pattern": "^(pf|mkg)/[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$", "description": "W4.1, chỉ intra_platform: '<module>:<share>' khai trong shares của module chủ" },
+    "scope_node_ref":    { "type": "string", "format": "uuid", "description": "W4.1, chỉ intra_platform: Nút phạm vi của đơn vị chủ (bên cấp)" },
+    "purpose_code":      { "type": "string", "description": "W4.1, tùy chọn: mục đích có mã (vd khuyen-nong), khớp app.purpose" },
+    "basis_ref":         { "type": "string", "description": "W4.1, tùy chọn: mã thỏa thuận chia sẻ (căn cứ, R-SEC-04) — không dữ liệu cá nhân" }
   }
 }

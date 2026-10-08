@@ -101,6 +101,9 @@ func (m *Module) ValveGrants() port.ValveGrants { return m.share }
 // GrantLookup (G5, ADR-0022 mục 3) cho cmd/api-public kiểm cấp quyền dp_* của bên thứ ba (không vai OIDC).
 func (m *Module) GrantLookup() port.GrantLookup { return m.share }
 
+// ContextEpochs trả bộ đọc epoch ngữ cảnh theo đơn vị xem (W4.1; W7.2 k/access hợp nhất).
+func (m *Module) ContextEpochs() port.ContextEpochs { return m.share }
+
 // UseEgress (G5, ADR-0024) nối điểm kiểm soát xuất (pf/metering) cho kênh partner_share của
 // RecordRead (bề mặt /v1/partner/*). cp nil → hành vi cũ.
 func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logger) {

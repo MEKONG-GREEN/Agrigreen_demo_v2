@@ -22,6 +22,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -38,6 +39,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/modreg"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
@@ -50,10 +52,23 @@ var (
 	ErrShareGrantState    = problem.New(http.StatusConflict, "party.share_grant_state",
 		"Cấp quyền không ở trạng thái cho phép thao tác này (chỉ duyệt bản đề xuất; bản đã thu hồi không thao tác được nữa)")
 	ErrPartnerNotFound = problem.New(http.StatusNotFound, "party.partner_not_found", "Bên cấp không có bản ghi này")
+	// ErrShareTableNotShared (W4.1, ADR-0030 mục 2): module_table của cấp phép intra_platform phải có trong shares
+	// của module.yaml chủ (danh mục modreg) — chỉ bảng đó mới mang nhánh share_scope (R-DB-08).
+	ErrShareTableNotShared = problem.New(http.StatusUnprocessableEntity, "party.share_table_not_shared",
+		"Bảng không được module chủ khai trong shares — không cấp phép chia sẻ được")
 )
 
 // Hạn tối đa của một cấp quyền (phải gia hạn bằng cấp quyền mới).
 const maxShareValidity = 5 * 366 * 24 * time.Hour
+
+// ShareReviewInterval là chu kỳ rà soát cấp phép định kỳ (R-SEC-04): cấp phép đang hiệu lực đến hạn rà soát khi
+// lần rà soát cuối (hoặc lúc duyệt) cách hiện tại ≥ chu kỳ này. Một quý — chờ khách hàng chốt (C-10).
+const ShareReviewInterval = 90 * 24 * time.Hour
+
+var (
+	reModuleTable = regexp.MustCompile(`^((?:pf|mkg)/[a-z][a-z0-9_]{0,39}):([a-z][a-z0-9_]{0,59})$`)
+	rePurposeCode = regexp.MustCompile(`^[a-z][a-z0-9-]{0,39}(\.[a-z][a-z0-9-]{0,39}){0,3}$`)
+)
 
 // Sharing là use case cấp quyền chia sẻ và bề mặt đối tác danh bạ HTX.
 type Sharing struct {
@@ -73,6 +88,7 @@ var (
 	_ port.PartnerAccess = (*Sharing)(nil)
 	_ port.ValveGrants   = (*Sharing)(nil)
 	_ port.GrantLookup   = (*Sharing)(nil)
+	_ port.ContextEpochs = (*Sharing)(nil)
 )
 
 // ProposeShareInput là dữ liệu đề xuất cấp quyền.
@@ -83,6 +99,71 @@ type ProposeShareInput struct {
 	ValidFrom time.Time
 	ValidTo   time.Time
 	IdemKey   string
+	// Điều khoản v2 (W4.1, ADR-0030 mục 3). GrantClass rỗng = partner (hành vi cũ).
+	GrantClass   string
+	ModuleTable  string    // '<module>:<share>', bắt buộc với intra_platform
+	ScopeNodeRef uuid.UUID // Nút của đơn vị chủ, bắt buộc với intra_platform
+	PurposeCode  string    // bắt buộc với intra_platform
+	BasisRef     string    // mã thỏa thuận, bắt buộc với intra_platform
+}
+
+func optStr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// shareTerms kiểm điều khoản v2 (không đọc DB) và trả điều khoản + danh sách loại đã chuẩn hóa.
+//   - partner (mặc định): ≥ 1 loại có tên (ADR-0020), không bảng/Nút; purpose_code, basis_ref tùy chọn.
+//   - intra_platform: KHÔNG loại; module_table có trong shares của module chủ (modreg), Nút, mục đích, căn cứ bắt buộc.
+func shareTerms(in ProposeShareInput) (store.Terms, []string, error) {
+	t := store.Terms{Class: strings.TrimSpace(in.GrantClass)}
+	if t.Class == "" {
+		t.Class = store.ClassPartner
+	}
+	purpose, basis := strings.TrimSpace(in.PurposeCode), strings.TrimSpace(in.BasisRef)
+	if purpose != "" && !rePurposeCode.MatchString(purpose) {
+		return t, nil, problem.Validation.WithField("purpose_code", "mã mục đích dạng khuyen-nong hoặc mrv.evidence (chữ thường, số, gạch nối)")
+	}
+	if n := len([]rune(basis)); basis != "" && (n < 3 || n > 200) {
+		return t, nil, problem.Validation.WithField("basis_ref", "3–200 ký tự (mã thỏa thuận chia sẻ)")
+	}
+	t.PurposeCode, t.BasisRef = optStr(purpose), optStr(basis)
+	switch t.Class {
+	case store.ClassPartner:
+		if strings.TrimSpace(in.ModuleTable) != "" || in.ScopeNodeRef != uuid.Nil {
+			return t, nil, problem.Validation.WithField("module_table", "chỉ dùng với grant_class = intra_platform")
+		}
+		kinds, ok := normKinds(in.Kinds)
+		if !ok {
+			return t, nil, problem.Validation.WithField("kinds", "danh sách loại dữ liệu hợp lệ: "+strings.Join(port.ShareKinds, ", "))
+		}
+		return t, kinds, nil
+	case store.ClassIntraPlatform:
+		if len(in.Kinds) > 0 {
+			return t, nil, problem.Validation.WithField("kinds", "cấp phép intra_platform không dùng kinds — phạm vi là module_table × Nút")
+		}
+		mt := strings.TrimSpace(in.ModuleTable)
+		m := reModuleTable.FindStringSubmatch(mt)
+		switch {
+		case m == nil:
+			return t, nil, problem.Validation.WithField("module_table", "bắt buộc, dạng <module>:<share>, vd pf/cooperative:household")
+		case !modreg.Shared(m[1], m[2]):
+			return t, nil, ErrShareTableNotShared.WithField("module_table", mt+" không có trong shares của "+m[1])
+		case in.ScopeNodeRef == uuid.Nil:
+			return t, nil, problem.Validation.WithField("scope_node_ref", "bắt buộc — Nút phạm vi của đơn vị chủ")
+		case purpose == "":
+			return t, nil, problem.Validation.WithField("purpose_code", "bắt buộc với intra_platform")
+		case basis == "":
+			return t, nil, problem.Validation.WithField("basis_ref", "bắt buộc với intra_platform — căn cứ thỏa thuận chia sẻ (R-SEC-04)")
+		}
+		node := in.ScopeNodeRef
+		t.ModuleTable, t.ScopeNodeRef = &mt, &node
+		return t, []string{}, nil
+	default:
+		return t, nil, problem.Validation.WithField("grant_class", "intra_platform | partner")
+	}
 }
 
 func normKinds(in []string) ([]string, bool) {
@@ -100,7 +181,9 @@ func normKinds(in []string) ([]string, bool) {
 	return out, len(out) > 0
 }
 
-// Propose ghi đề xuất cấp quyền: bên cấp = tenant người gọi (platform_admin).
+// Propose ghi đề xuất cấp quyền: bên cấp = tenant người gọi. Chỉ quản trị viên của ĐƠN VỊ CHỦ dữ liệu
+// (platform_admin của tenant bên cấp — R-SEC-04) đề xuất; Nút phạm vi của cấp phép intra_platform phải là Nút
+// đang hoạt động của chính đơn vị đó.
 func (s *Sharing) Propose(ctx context.Context, in ProposeShareInput) (store.Grant, bool, error) {
 	p, err := authz.Require(ctx, authz.RolePlatformAdmin)
 	if err != nil {
@@ -109,14 +192,15 @@ func (s *Sharing) Propose(ctx context.Context, in ProposeShareInput) (store.Gran
 	if in.IdemKey == "" {
 		return store.Grant{}, false, problem.IdempotencyRequired
 	}
-	kinds, ok := normKinds(in.Kinds)
-	switch {
-	case in.Grantee == uuid.Nil:
+	switch in.Grantee {
+	case uuid.Nil:
 		return store.Grant{}, false, problem.Validation.WithField("grantee_tenant_id", "bắt buộc, phải là UUID")
-	case in.Grantee == p.TenantID:
+	case p.TenantID:
 		return store.Grant{}, false, problem.Validation.WithField("grantee_tenant_id", "phải khác tenant bên cấp")
-	case !ok:
-		return store.Grant{}, false, problem.Validation.WithField("kinds", "danh sách loại dữ liệu hợp lệ: "+strings.Join(port.ShareKinds, ", "))
+	}
+	terms, kinds, err := shareTerms(in)
+	if err != nil {
+		return store.Grant{}, false, err
 	}
 	purpose := strings.TrimSpace(in.Purpose)
 	if n := len([]rune(purpose)); n < 10 || n > 500 {
@@ -155,11 +239,24 @@ func (s *Sharing) Propose(ctx context.Context, in ProposeShareInput) (store.Gran
 			out, replayed = *g, true
 			return nil
 		}
+		if terms.ScopeNodeRef != nil {
+			n, err := store.OrgByRef(ctx, tx, *terms.ScopeNodeRef, false)
+			if err != nil {
+				return err
+			}
+			if n == nil || !n.Active {
+				return problem.Validation.WithField("scope_node_ref", "không phải Nút đang hoạt động của đơn vị chủ (tenant bên cấp)")
+			}
+		}
 		if err := ledger.Classify(store.InsertGrantEvent(ctx, tx, &e)); err != nil {
 			return err
 		}
+		if err := ledger.Classify(store.InsertGrantTerms(ctx, tx, p.TenantID, id, p.ActorRef, terms, now, "share:terms:"+in.IdemKey)); err != nil {
+			return err
+		}
 		out = store.Grant{TenantID: p.TenantID, GrantID: id, Grantee: in.Grantee, Kinds: kinds, Purpose: purpose, ValidFrom: in.ValidFrom.UTC(),
-			ValidTo: in.ValidTo.UTC(), Status: "proposed", ProposedBy: p.ActorRef, ProposedAt: now.UTC(), LastEventID: e.ID, LastSeq: e.Seq, UpdatedAt: now.UTC()}
+			ValidTo: in.ValidTo.UTC(), Status: "proposed", ProposedBy: p.ActorRef, ProposedAt: now.UTC(), LastEventID: e.ID, LastSeq: e.Seq, UpdatedAt: now.UTC(),
+			Terms: &terms}
 		if err := store.PutGrant(ctx, tx, out); err != nil {
 			return err
 		}
@@ -219,13 +316,17 @@ func (s *Sharing) Approve(ctx context.Context, id uuid.UUID) (store.Grant, bool,
 		if err := store.PutGrant(ctx, tx, *g); err != nil {
 			return err
 		}
-		if err := tenant.Within(ctx, tx, tenant.MintGrant(p.TenantID, g.Grantee), func() error {
-			return store.PutInbound(ctx, tx, store.Inbound{TenantID: g.Grantee, GrantID: id, Grantor: p.TenantID, Kinds: g.Kinds,
-				ValidFrom: g.ValidFrom, ValidTo: g.ValidTo, Status: "active"})
-		}); err != nil {
-			return err
+		// Bảng chiếu bên nhận là đường của partner (/v1/partner/*, Public API, van); intra_platform đọc tại chỗ qua
+		// k_ref.share_scope (W4.2), không qua bảng chiếu này.
+		if g.Class() == store.ClassPartner {
+			if err := tenant.Within(ctx, tx, tenant.MintGrant(p.TenantID, g.Grantee), func() error {
+				return store.PutInbound(ctx, tx, store.Inbound{TenantID: g.Grantee, GrantID: id, Grantor: p.TenantID, Kinds: g.Kinds,
+					ValidFrom: g.ValidFrom, ValidTo: g.ValidTo, Status: "active"})
+			}); err != nil {
+				return err
+			}
 		}
-		if err := enqueueGrantEvent(ctx, tx, e); err != nil {
+		if err := enqueueGrantEvent(ctx, tx, e, g.Terms); err != nil {
 			return err
 		}
 		out = *g
@@ -235,27 +336,41 @@ func (s *Sharing) Approve(ctx context.Context, id uuid.UUID) (store.Grant, bool,
 }
 
 // enqueueGrantEvent phát pf.party.share_grant.approved / revoked (W2.5: worker pf.kref dựng
-// k_ref.share_grant_active) cùng giao dịch với sổ.
-func enqueueGrantEvent(ctx context.Context, tx pgx.Tx, e store.GrantEvent) error {
+// k_ref.share_grant_active) cùng giao dịch với sổ. Điều khoản v2 (W4.1) là trường tùy chọn của payload.
+func enqueueGrantEvent(ctx context.Context, tx pgx.Tx, e store.GrantEvent, t *store.Terms) error {
 	ev := outbox.Event{
 		ID: ids.New(), TenantID: e.TenantID, SchemaVersion: 1, OccurredAt: e.EventTime,
 		TraceID: telemetry.TraceID(ctx), Producer: "pf/party",
+	}
+	var class, table, purpose, basis string
+	var node *uuid.UUID
+	if t != nil {
+		class, table, purpose, basis, node = t.Class, deref(t.ModuleTable), deref(t.PurposeCode), deref(t.BasisRef), t.ScopeNodeRef
 	}
 	switch e.Action {
 	case "approved":
 		ev.Type = port.EventShareGrantApproved
 		ev.Payload = port.ShareGrantApprovedV1{GrantID: e.GrantID, GranteeTenantID: e.Grantee, Kinds: e.Kinds,
 			ValidFrom: e.ValidFrom.UTC().Format(time.RFC3339Nano), ValidTo: e.ValidTo.UTC().Format(time.RFC3339Nano),
-			ActorRef: e.ActorRef, EventTime: e.EventTime.UTC().Format(time.RFC3339), Seq: e.Seq}
+			ActorRef: e.ActorRef, EventTime: e.EventTime.UTC().Format(time.RFC3339), Seq: e.Seq,
+			GrantClass: class, ModuleTable: table, ScopeNodeRef: node, PurposeCode: purpose, BasisRef: basis}
 	case "revoked":
 		ev.Type = port.EventShareGrantRevoked
 		ev.Payload = port.ShareGrantRevokedV1{GrantID: e.GrantID, GranteeTenantID: e.Grantee, Kinds: e.Kinds,
 			ValidFrom: e.ValidFrom.UTC().Format(time.RFC3339Nano), ValidTo: e.ValidTo.UTC().Format(time.RFC3339Nano),
-			ActorRef: e.ActorRef, EventTime: e.EventTime.UTC().Format(time.RFC3339), Seq: e.Seq}
+			ActorRef: e.ActorRef, EventTime: e.EventTime.UTC().Format(time.RFC3339), Seq: e.Seq,
+			GrantClass: class, ModuleTable: table, ScopeNodeRef: node, PurposeCode: purpose, BasisRef: basis}
 	default:
 		return nil
 	}
 	return outbox.Enqueue(ctx, tx, ev)
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // Revoke thu hồi (đề xuất hoặc cấp quyền đang hiệu lực). Có lý do; đọc sau thu hồi → 403.
@@ -286,39 +401,210 @@ func (s *Sharing) Revoke(ctx context.Context, id uuid.UUID, reason string) (stor
 			}
 			return ErrShareGrantState
 		}
-		wasActive := g.Status == "active"
-		// W6.1: thu hồi đề xuất chưa duyệt = hủy yêu cầu duyệt trong cap/workflow (không cần bốn mắt).
-		if !wasActive && s.Approvals != nil {
-			if err := s.Approvals.Decide(db.JoinTx(ctx, tx), port.ShareGrantApprovalKind, id, g.ProposedBy, p.ActorRef, port.FourEyesCancelled, reason, now); err != nil {
-				return err
-			}
-		}
-		e := store.GrantEvent{ID: ids.New(), TenantID: p.TenantID, GrantID: id, Action: "revoked", Grantee: g.Grantee, Kinds: g.Kinds,
-			Purpose: g.Purpose, ValidFrom: g.ValidFrom, ValidTo: g.ValidTo, ProposedBy: g.ProposedBy, Reason: &reason, EventTime: now,
-			ActorRef: p.ActorRef, IdemKey: "share:revoke:" + id.String()}
-		if err := ledger.Classify(store.InsertGrantEvent(ctx, tx, &e)); err != nil {
-			return err
-		}
-		at := now.UTC()
-		g.Status, g.RevokedBy, g.RevokedAt, g.RevokeReason, g.LastEventID, g.LastSeq = "revoked", &p.ActorRef, &at, &reason, e.ID, e.Seq
-		if err := store.PutGrant(ctx, tx, *g); err != nil {
-			return err
-		}
-		if wasActive {
-			if err := tenant.Within(ctx, tx, tenant.MintGrant(p.TenantID, g.Grantee), func() error {
-				return store.PutInbound(ctx, tx, store.Inbound{TenantID: g.Grantee, GrantID: id, Grantor: p.TenantID, Kinds: g.Kinds,
-					ValidFrom: g.ValidFrom, ValidTo: g.ValidTo, Status: "revoked"})
-			}); err != nil {
-				return err
-			}
-		}
-		if err := enqueueGrantEvent(ctx, tx, e); err != nil {
+		if err := s.revokeTx(ctx, tx, p.TenantID, p.ActorRef, g, reason, now); err != nil {
 			return err
 		}
 		out = *g
 		return nil
 	})
 	return out, replayed, err
+}
+
+// revokeTx thu hồi g (đã khóa, chưa thu hồi) trong tx của tenant bên cấp: sổ + bảng chiếu + bảng chiếu bên nhận
+// (partner) + epoch ngữ cảnh của đơn vị xem (cấp phép đang hiệu lực) + sự kiện. g được cập nhật tại chỗ.
+func (s *Sharing) revokeTx(ctx context.Context, tx pgx.Tx, grantor, actor uuid.UUID, g *store.Grant, reason string, now time.Time) error {
+	id := g.GrantID
+	wasActive := g.Status == "active"
+	// W6.1: thu hồi đề xuất chưa duyệt = hủy yêu cầu duyệt trong cap/workflow (không cần bốn mắt).
+	if !wasActive && s.Approvals != nil {
+		if err := s.Approvals.Decide(db.JoinTx(ctx, tx), port.ShareGrantApprovalKind, id, g.ProposedBy, actor, port.FourEyesCancelled, reason, now); err != nil {
+			return err
+		}
+	}
+	e := store.GrantEvent{ID: ids.New(), TenantID: grantor, GrantID: id, Action: "revoked", Grantee: g.Grantee, Kinds: g.Kinds,
+		Purpose: g.Purpose, ValidFrom: g.ValidFrom, ValidTo: g.ValidTo, ProposedBy: g.ProposedBy, Reason: &reason, EventTime: now,
+		ActorRef: actor, IdemKey: "share:revoke:" + id.String()}
+	if err := ledger.Classify(store.InsertGrantEvent(ctx, tx, &e)); err != nil {
+		return err
+	}
+	at := now.UTC()
+	g.Status, g.RevokedBy, g.RevokedAt, g.RevokeReason, g.LastEventID, g.LastSeq = "revoked", &actor, &at, &reason, e.ID, e.Seq
+	if err := store.PutGrant(ctx, tx, *g); err != nil {
+		return err
+	}
+	if wasActive {
+		// Bằng chứng bên cấp → bên nhận (H4): ghi ở tenant BÊN NHẬN dưới RLS, không BYPASSRLS.
+		if err := tenant.Within(ctx, tx, tenant.MintGrant(grantor, g.Grantee), func() error {
+			if g.Class() == store.ClassPartner {
+				if err := store.PutInbound(ctx, tx, store.Inbound{TenantID: g.Grantee, GrantID: id, Grantor: grantor, Kinds: g.Kinds,
+					ValidFrom: g.ValidFrom, ValidTo: g.ValidTo, Status: "revoked"}); err != nil {
+					return err
+				}
+			}
+			return bumpViewerEpoch(ctx, tx, g.Grantee, grantor, id, actor, now)
+		}); err != nil {
+			return err
+		}
+	}
+	return enqueueGrantEvent(ctx, tx, e, g.Terms)
+}
+
+// bumpViewerEpoch tăng epoch ngữ cảnh của đơn vị xem (tx đang ở ngữ cảnh tenant viewer) và phát
+// pf.party.context_epoch.bumped (tenant phong bì = đơn vị xem) — kiến trúc v4.1 §17.1, ADR-0030 mục 3.
+func bumpViewerEpoch(ctx context.Context, tx pgx.Tx, viewer, grantor, grantID, actor uuid.UUID, now time.Time) error {
+	const cause = "share_grant_revoked"
+	epoch, err := store.BumpContextEpoch(ctx, tx, viewer, cause, grantID, grantor)
+	if err != nil {
+		return err
+	}
+	return outbox.Enqueue(ctx, tx, outbox.Event{
+		ID: ids.New(), TenantID: viewer, Type: port.EventContextEpochBumped, SchemaVersion: 1, OccurredAt: now,
+		TraceID: telemetry.TraceID(ctx), Producer: "pf/party",
+		Payload: port.ContextEpochBumpedV1{Epoch: epoch, Cause: cause, GrantID: grantID, GrantorTenant: grantor, ActorRef: actor,
+			EventTime: now.UTC().Format(time.RFC3339)},
+	})
+}
+
+// ContextEpoch cài đặt port.ContextEpochs: epoch ngữ cảnh hiện tại của tenant (0 = chưa từng tăng).
+func (s *Sharing) ContextEpoch(ctx context.Context, tid uuid.UUID) (int64, error) {
+	var epoch int64
+	err := tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
+		var e error
+		epoch, e = store.ContextEpoch(ctx, tx)
+		return e
+	})
+	return epoch, err
+}
+
+// ---------------------------------------------------------------------------
+// Rà soát cấp phép định kỳ (R-SEC-04)
+// ---------------------------------------------------------------------------
+
+// ReviewInput là một quyết định rà soát: retain (giữ) | revoke (thu hồi ngay, note là lý do).
+type ReviewInput struct {
+	Decision string
+	Note     string
+	IdemKey  string
+}
+
+// ReviewShareGrant ghi một quyết định rà soát định kỳ cho cấp phép đang hiệu lực của đơn vị chủ (platform_admin
+// bên cấp). Sổ share_grant_review chỉ ghi thêm; retain đặt lại hạn rà soát (last_reviewed_at), revoke thu hồi
+// trong CÙNG giao dịch (tăng epoch ngữ cảnh của đơn vị xem như Revoke).
+func (s *Sharing) ReviewShareGrant(ctx context.Context, id uuid.UUID, in ReviewInput) (store.Review, store.Grant, bool, error) {
+	p, err := authz.Require(ctx, authz.RolePlatformAdmin)
+	if err != nil {
+		return store.Review{}, store.Grant{}, false, err
+	}
+	if in.IdemKey == "" {
+		return store.Review{}, store.Grant{}, false, problem.IdempotencyRequired
+	}
+	note := strings.TrimSpace(in.Note)
+	switch n := len([]rune(note)); {
+	case in.Decision != "retain" && in.Decision != "revoke":
+		return store.Review{}, store.Grant{}, false, problem.Validation.WithField("decision", "retain | revoke")
+	case in.Decision == "revoke" && note == "":
+		return store.Review{}, store.Grant{}, false, problem.Validation.WithField("note", "bắt buộc khi thu hồi (lý do, 10–500 ký tự)")
+	case note != "" && (n < 10 || n > 500):
+		return store.Review{}, store.Grant{}, false, problem.Validation.WithField("note", "10–500 ký tự")
+	}
+	now := s.Clock.Now()
+	r := store.Review{ID: ids.New(), GrantID: id, Decision: in.Decision, Note: optStr(note), EventTime: now, ActorRef: p.ActorRef,
+		IdemKey: "share:review:" + in.IdemKey}
+	var g *store.Grant
+	replayed := false
+	err = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
+		if prev, err := store.ReviewByIdem(ctx, tx, r.IdemKey); err != nil || prev != nil {
+			if err != nil {
+				return err
+			}
+			if prev.GrantID != id {
+				return problem.Validation.WithDetail("Idempotency-Key đã dùng cho cấp phép khác")
+			}
+			r, replayed = *prev, true
+			g, err = store.GrantByID(ctx, tx, id, false)
+			return err
+		}
+		var err error
+		if g, err = store.GrantByID(ctx, tx, id, true); err != nil {
+			return err
+		}
+		if g == nil {
+			return ErrShareGrantNotFound
+		}
+		if g.Status != "active" {
+			return ErrShareGrantState.WithDetail("Chỉ rà soát cấp phép đang hiệu lực")
+		}
+		if err := ledger.Classify(store.InsertReview(ctx, tx, p.TenantID, &r)); err != nil {
+			return err
+		}
+		at := now.UTC()
+		g.LastReviewedAt, g.LastReviewedBy = &at, &p.ActorRef
+		if in.Decision == "revoke" {
+			return s.revokeTx(ctx, tx, p.TenantID, p.ActorRef, g, note, now)
+		}
+		return store.PutGrant(ctx, tx, *g)
+	})
+	if err != nil {
+		return store.Review{}, store.Grant{}, false, err
+	}
+	if g == nil {
+		return store.Review{}, store.Grant{}, false, ErrShareGrantNotFound
+	}
+	return r, *g, replayed, nil
+}
+
+// ShareGrantsDue liệt kê cấp phép đang hiệu lực của đơn vị chủ đến hạn rà soát định kỳ trong within tới (0 = đã
+// đến hạn): lần rà soát cuối (hoặc lúc duyệt) + ShareReviewInterval ≤ now + within.
+func (s *Sharing) ShareGrantsDue(ctx context.Context, within time.Duration, after uuid.UUID, limit int) ([]store.Grant, error) {
+	p, err := authz.Require(ctx, authz.RolePlatformAdmin)
+	if err != nil {
+		return nil, err
+	}
+	if within < 0 || within > 366*24*time.Hour {
+		return nil, problem.Validation.WithField("within_days", "0–366")
+	}
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	before := s.Clock.Now().Add(within - ShareReviewInterval)
+	var out []store.Grant
+	err = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
+		var e error
+		out, e = store.GrantsDueForReview(ctx, tx, before, after, limit)
+		return e
+	})
+	return out, err
+}
+
+// ShareGrantReviews trả sổ rà soát của một cấp phép (platform_admin bên cấp).
+func (s *Sharing) ShareGrantReviews(ctx context.Context, id uuid.UUID) ([]store.Review, error) {
+	if _, err := s.GetShareGrant(ctx, id); err != nil {
+		return nil, err
+	}
+	p, _ := authz.FromContext(ctx)
+	var out []store.Review
+	err := tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
+		var e error
+		out, e = store.Reviews(ctx, tx, id)
+		return e
+	})
+	return out, err
+}
+
+// ReviewDue trả hạn rà soát kế tiếp của một cấp phép đang hiệu lực (nil với cấp phép chưa duyệt / đã thu hồi).
+func ReviewDue(g store.Grant) *time.Time {
+	if g.Status != "active" {
+		return nil
+	}
+	base := g.ApprovedAt
+	if g.LastReviewedAt != nil {
+		base = g.LastReviewedAt
+	}
+	if base == nil {
+		return nil
+	}
+	t := base.Add(ShareReviewInterval)
+	return &t
 }
 
 // ListShareGrants liệt kê cấp quyền của tenant bên cấp (platform_admin).

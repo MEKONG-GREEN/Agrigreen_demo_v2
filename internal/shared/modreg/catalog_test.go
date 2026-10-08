@@ -64,3 +64,20 @@ func TestPerTenantAndRoleBlocked(t *testing.T) {
 		t.Fatalf("Entry pf/party: %+v", e)
 	}
 }
+
+// W4.1: danh mục mang shares — cấp phép intra_platform chỉ cho bảng module chủ khai.
+func TestShared(t *testing.T) {
+	for _, s := range []string{"household", "plot", "season", "diary_entry"} {
+		if !Shared("pf/cooperative", s) {
+			t.Fatalf("pf/cooperative khai shares %s", s)
+		}
+	}
+	if Shared("pf/cooperative", "cooperative") || Shared("pf/party", "org") || Shared("pf/khong_co", "household") || Shared("pf/cooperative", "") {
+		t.Fatal("chỉ bảng khai shares mới chia sẻ được")
+	}
+	e, _ := Entry("pf/cooperative")
+	e.Shares[0] = "x"
+	if !Shared("pf/cooperative", "diary_entry") {
+		t.Fatal("Entry phải trả bản sao shares")
+	}
+}

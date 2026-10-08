@@ -172,6 +172,22 @@ func TestEventsProjectIntoKRef_W25(t *testing.T) {
 	if gs := mustSnap(t, f, tid).ShareGrants; len(gs) != 0 {
 		t.Fatalf("thu hồi phải bỏ dòng: %+v", gs)
 	}
+	// W4.1: payload v2 (trường tùy chọn grant_class, module_table, scope_node_ref, purpose_code, basis_ref; intra_platform
+	// không kinds) vẫn chiếu được — cột v2 của k_ref.share_grant_active do W4.2 thêm (migration của pf/kref).
+	v2 := ids.New()
+	f.must(tid, EventShareGrantApprove, map[string]any{"grant_id": v2, "grantee_tenant_id": ids.New(), "kinds": []string{},
+		"valid_from": "2026-01-01T00:00:00Z", "valid_to": "2027-01-01T00:00:00Z", "seq": 2, "actor_ref": ids.New(), "event_time": "2026-01-01T00:00:00Z",
+		"grant_class": "intra_platform", "module_table": "pf/cooperative:household", "scope_node_ref": root, "purpose_code": "khuyen-nong",
+		"basis_ref": "TTCS-2026-001"})
+	if gs := mustSnap(t, f, tid).ShareGrants; len(gs) != 1 || gs[0].GrantID != v2 || len(gs[0].Kinds) != 0 {
+		t.Fatalf("cấp phép v2 intra_platform: %+v", gs)
+	}
+	f.must(tid, EventShareGrantRevoke, map[string]any{"grant_id": v2, "grantee_tenant_id": ids.New(), "kinds": []string{},
+		"valid_from": "2026-01-01T00:00:00Z", "valid_to": "2027-01-01T00:00:00Z", "seq": 3, "actor_ref": ids.New(), "event_time": "2026-01-01T00:00:00Z",
+		"grant_class": "intra_platform"})
+	if gs := mustSnap(t, f, tid).ShareGrants; len(gs) != 0 {
+		t.Fatalf("thu hồi v2 phải bỏ dòng: %+v", gs)
+	}
 
 	// Idempotent theo event_id (inbox).
 	raw, _ := json.Marshal(orgEv(ids.New(), root, 1))

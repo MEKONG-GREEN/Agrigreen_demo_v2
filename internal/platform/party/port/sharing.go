@@ -45,6 +45,12 @@ type ShareGrantApprovedV1 struct {
 	ActorRef        uuid.UUID `json:"actor_ref"`
 	EventTime       string    `json:"event_time"`
 	Seq             int64     `json:"seq"`
+	// Điều khoản v2 (W4.1, ADR-0030 mục 3) — tùy chọn: vắng ở cấp phép trước v2 (coi là partner).
+	GrantClass   string     `json:"grant_class,omitempty"`    // intra_platform | partner
+	ModuleTable  string     `json:"module_table,omitempty"`   // '<module>:<share>' (intra_platform)
+	ScopeNodeRef *uuid.UUID `json:"scope_node_ref,omitempty"` // Nút phạm vi của đơn vị chủ (intra_platform)
+	PurposeCode  string     `json:"purpose_code,omitempty"`
+	BasisRef     string     `json:"basis_ref,omitempty"` // mã thỏa thuận chia sẻ
 }
 
 // ShareGrantRevokedV1 là payload của pf.party.share_grant.revoked (đề xuất hoặc cấp quyền đang hiệu lực bị
@@ -60,6 +66,35 @@ type ShareGrantRevokedV1 struct {
 	ActorRef        uuid.UUID `json:"actor_ref"`
 	EventTime       string    `json:"event_time"`
 	Seq             int64     `json:"seq"`
+	// Điều khoản v2 (W4.1, ADR-0030 mục 3) — tùy chọn: vắng ở cấp phép trước v2 (coi là partner).
+	GrantClass   string     `json:"grant_class,omitempty"`    // intra_platform | partner
+	ModuleTable  string     `json:"module_table,omitempty"`   // '<module>:<share>' (intra_platform)
+	ScopeNodeRef *uuid.UUID `json:"scope_node_ref,omitempty"` // Nút phạm vi của đơn vị chủ (intra_platform)
+	PurposeCode  string     `json:"purpose_code,omitempty"`
+	BasisRef     string     `json:"basis_ref,omitempty"` // mã thỏa thuận chia sẻ
+}
+
+// EventContextEpochBumped (W4.1, kiến trúc v4.1 §17.1): epoch ngữ cảnh của một đơn vị xem vừa tăng — thu hồi
+// một cấp phép đang hiệu lực mà đơn vị đó là bên nhận. Tenant của phong bì là ĐƠN VỊ XEM. Phiên của đơn vị đó
+// phải làm mới ngữ cảnh ở yêu cầu kế tiếp (W7.2 k/access đọc epoch; tới đó chỉ có bộ đếm + sự kiện).
+const EventContextEpochBumped = "pf.party.context_epoch.bumped"
+
+// ContextEpochBumpedV1 là payload của pf.party.context_epoch.bumped.
+//
+//ag:event pf.party.context_epoch.bumped v1
+type ContextEpochBumpedV1 struct {
+	Epoch         int64     `json:"epoch"`    // epoch mới của tenant phong bì (tăng dần, từ 1)
+	Cause         string    `json:"cause"`    // share_grant_revoked
+	GrantID       uuid.UUID `json:"grant_id"` // cấp phép bị thu hồi
+	GrantorTenant uuid.UUID `json:"grantor_tenant_id"`
+	ActorRef      uuid.UUID `json:"actor_ref"`
+	EventTime     string    `json:"event_time"`
+}
+
+// ContextEpochs đọc epoch ngữ cảnh của một tenant (đơn vị xem); 0 = chưa từng tăng. pf/party giữ bộ đếm tối
+// thiểu ở DB cụm pf (pf 000120); W7.2 (k/access) hợp nhất với epoch ở Valkey định danh.
+type ContextEpochs interface {
+	ContextEpoch(ctx context.Context, tenantID uuid.UUID) (int64, error)
 }
 
 // Loại dữ liệu của một cấp quyền (cột kinds của pf_party.share_grant_event).
