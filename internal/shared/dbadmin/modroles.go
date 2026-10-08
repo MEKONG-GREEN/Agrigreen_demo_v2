@@ -39,11 +39,18 @@ const OpsGroup = "r_ops"
 
 // ModuleGroup nối module với vai nhóm r_* và vai đăng nhập cũ của nó.
 type ModuleGroup struct {
-	Module   string // tên module.yaml, vd pf/content
-	Role     string // r_<module>
-	Legacy   string // <module>_app (kỳ chuyển; rỗng nếu module sinh sau ADR-0028, vd pf/kref)
+	Module string // tên module.yaml, vd pf/content
+	Role   string // r_<module>
+	Legacy string // <module>_app (kỳ chuyển; rỗng nếu module sinh sau ADR-0028, vd pf/kref)
+	// Pub: vai đọc view công bố r_<module>_pub (§14, ADR-0031 §2, W6.3) — chỉ khi module sở hữu schema
+	// <cụm>_<module>_pub; rỗng nếu không. Quyền (USAGE schema, SELECT view) do migration công bố cấp.
+	Pub      string
 	Clusters []migrations.Cluster
 }
+
+// AnalyticsModule là module phân tích (cap/analytics, aka của pf/metrics — ADR-0027): vai nhóm của nó là thành
+// viên mọi r_<module>_pub (R-DB-10, W6.3). r_agg (W6.4) sẽ là bên đọc thứ hai.
+const AnalyticsModule = "pf/metrics"
 
 // LoginUnit là vai đăng nhập của một đơn vị triển khai.
 type LoginUnit struct {
@@ -123,7 +130,11 @@ func ModuleGroups() []ModuleGroup {
 		for _, z := range e.Zones {
 			cs = append(cs, migrations.Cluster(z))
 		}
-		out = append(out, ModuleGroup{Module: e.Name, Role: modreg.DBRole(e.Name), Legacy: legacy, Clusters: cs})
+		pub := ""
+		if slices.ContainsFunc(e.OwnsSchema, func(s string) bool { return strings.HasSuffix(s, "_pub") }) {
+			pub = modreg.PubRole(e.Name)
+		}
+		out = append(out, ModuleGroup{Module: e.Name, Role: modreg.DBRole(e.Name), Legacy: legacy, Pub: pub, Clusters: cs})
 	}
 	return out
 }
@@ -177,10 +188,22 @@ func LoginRoles() []string {
 func buildRoles() []Role {
 	groups := ModuleGroups()
 	out := []Role{baseRoles[0]} // ag_shared_user: đích MemberOf của mọi vai sau
+	// r_<module>_pub trước r_* (đích MemberOf của vai phân tích); không thuộc ag_shared_user — chỉ đọc view _pub.
+	var pubs []string
+	for _, g := range groups {
+		if g.Pub != "" {
+			pubs = append(pubs, g.Pub)
+			out = append(out, Role{Name: g.Pub, Clusters: g.Clusters})
+		}
+	}
 	for _, g := range groups {
 		// r_* thuộc ag_shared_user (outbox, inbox, idempotency như vai cũ); NOLOGIN nên Clusters chỉ để lọc
 		// theo AG_CLUSTERS, không GRANT CONNECT.
-		out = append(out, Role{Name: g.Role, MemberOf: []string{SharedUser}, Clusters: g.Clusters})
+		member := []string{SharedUser}
+		if g.Module == AnalyticsModule {
+			member = append(member, pubs...)
+		}
+		out = append(out, Role{Name: g.Role, MemberOf: member, Clusters: g.Clusters})
 	}
 	out = append(out, Role{Name: OpsGroup, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF, migrations.MKG}})
 	for _, r := range baseRoles[1:] {

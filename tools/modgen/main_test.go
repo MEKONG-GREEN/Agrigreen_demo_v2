@@ -144,3 +144,20 @@ func TestMentionsSchema(t *testing.T) {
 		}
 	}
 }
+
+// W6.3: <cụm>_<module>_pub thuộc chủ của <cụm>_<module> dù module khác (pf/metrics) nhắc nó trong SQL;
+// //ag:pubview vào provides.publications cùng van công bố.
+func TestPubSchemaOwnerAndPublications(t *testing.T) {
+	scans := map[string]*scan{
+		"pf/geo":     {literals: map[string]bool{"SELECT 1 FROM pf_geo.plot": true}},
+		"pf/metrics": {literals: map[string]bool{"SELECT 1 FROM pf_geo_pub.v1_plot_event": true}},
+	}
+	got := schemaOwners(scans, map[string]string{"pf_geo": "", "pf_geo_pub": ""})
+	if !slices.Equal(got["pf/geo"], []string{"pf_geo", "pf_geo_pub"}) || len(got["pf/metrics"]) != 0 {
+		t.Fatalf("owners: %v", got)
+	}
+	pubs := publications(map[string][]string{"publication": {"hub_capacity"}, "pubview": {"pf_geo_pub.plot_event/v1"}})
+	if !slices.Equal(pubs, []string{"hub_capacity", "pf_geo_pub.plot_event/v1"}) {
+		t.Fatalf("publications: %v", pubs)
+	}
+}

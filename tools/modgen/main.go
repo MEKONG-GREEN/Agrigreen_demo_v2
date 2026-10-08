@@ -12,10 +12,11 @@
 //     consumes khỏi depends).
 //   - provides.ports: interface xuất trong port/ (vault: client/), gói con có tiền tố.
 //   - provides.events / internal_events / publications / data_products: chỉ thị
-//     //ag:event, //ag:internal-event, //ag:publication, //ag:dataproduct.
+//     //ag:event, //ag:internal-event, //ag:publication, //ag:dataproduct; view công bố _pub
+//     (R-DB-10, W6.3) khai bằng //ag:pubview <schema>_pub.<tên> v<N> cũng vào provides.publications.
 //   - permissions: hằng Role* kiểu chuỗi trong port/ (vault: client/).
-//   - owns_schema: schema do migration tạo (CREATE SCHEMA) có tên <cụm>_<module>,
-//     hoặc được duy nhất module này nhắc trong chuỗi SQL của mã không phải kiểm thử.
+//   - owns_schema: schema do migration tạo (CREATE SCHEMA) có tên <cụm>_<module> hoặc <cụm>_<module>_pub
+//     (view công bố, W6.3), hoặc được duy nhất module này nhắc trong chuỗi SQL của mã không phải kiểm thử.
 //
 // Rồi sinh internal/shared/modreg/catalog_gen.go (W1.4): tên, kind, enable, permissions
 // của mọi module cho bật module theo đơn vị lúc chạy (nhị phân không mang module.yaml).
@@ -156,7 +157,7 @@ func run(root string, check bool) ([]string, error) {
 			Ports:          s.ports,
 			Events:         s.directives["event"],
 			InternalEvents: s.directives["internal-event"],
-			Publications:   s.directives["publication"],
+			Publications:   publications(s.directives),
 			DataProducts:   s.directives["dataproduct"],
 		}
 		next.Consumes = modreg.Consumes{Events: s.consumes}
@@ -569,7 +570,14 @@ func (s *scan) classify(idx map[string]*portPkg) {
 	s.consumes = keys(events)
 }
 
-var reDirective = regexp.MustCompile(`^//ag:(event|internal-event|publication|dataproduct)\s+(\S+)(?:\s+(v[0-9]+))?`)
+var reDirective = regexp.MustCompile(`^//ag:(event|internal-event|publication|pubview|dataproduct)\s+(\S+)(?:\s+(v[0-9]+))?`)
+
+// publications gộp van công bố (//ag:publication) và view công bố _pub (//ag:pubview), đã sắp.
+func publications(directives map[string][]string) []string {
+	out := append(slices.Clone(directives["publication"]), directives["pubview"]...)
+	slices.Sort(out)
+	return slices.Compact(out)
+}
 
 func scanModule(root, dir string) (*scan, error) {
 	s := &scan{name: modreg.NameForDir(dir), directives: map[string][]string{}, literals: map[string]bool{},
@@ -742,6 +750,14 @@ func schemaOwners(scans map[string]*scan, created map[string]string) map[string]
 		if owner, ok := byName[schema]; ok && scans[owner] != nil {
 			out[owner] = append(out[owner], schema)
 			continue
+		}
+		// View công bố (R-DB-01, W6.3): <cụm>_<module>_pub thuộc chủ của <cụm>_<module> — dù module phân tích
+		// (pf/metrics) nhắc nó trong chuỗi SQL.
+		if base, ok := strings.CutSuffix(schema, "_pub"); ok {
+			if owner, ok := byName[base]; ok && scans[owner] != nil {
+				out[owner] = append(out[owner], schema)
+				continue
+			}
 		}
 		var refs []string
 		for name, s := range scans {

@@ -32,7 +32,8 @@ import (
 //	version  ràng buộc phiên bản trong depends trỏ tới module có thật và thỏa phiên bản hiện có
 //	schema   owns_schema khớp schema migration tạo; migration của module này không tạo/sửa đối tượng
 //	         trong schema của module khác; migration không gắn module (tên không bắt đầu bằng
-//	         <cụm>_<module>) không đụng schema của module nào
+//	         <cụm>_<module>) không đụng schema của module nào — trừ migration công bố <cụm>_pub_* chỉ
+//	         đụng schema view công bố <cụm>_<module>_pub (W6.3)
 //
 // Vi phạm hiện có được liệt kê trong tệp ngoại lệ (modgraph_exceptions.yaml), mỗi mục có lý do và
 // gói kế hoạch sẽ gỡ. Vi phạm MỚI và ngoại lệ LỖI THỜI (không còn xảy ra) đều làm hỏng cổng, nên
@@ -522,6 +523,17 @@ var (
 	reMigrationName   = regexp.MustCompile(`^[0-9]+_([a-z0-9_]+)\.up\.sql$`)
 )
 
+// publication: migration công bố <cụm>_pub[_…] (W6.3, R-DB-10) — được tạo/sửa view trong schema
+// <cụm>_<module>_pub của nhiều module (mỗi schema vẫn phải thuộc owns_schema của module chủ), không đụng schema
+// nội bộ nào (câu chạm schema không _pub vẫn bị bắt như migration không gắn module).
+func (mg migration) publication() bool {
+	stem := strings.TrimSuffix(filepath.Base(mg.path), ".up.sql")
+	if i := strings.IndexByte(stem, '_'); i >= 0 {
+		stem = stem[i+1:]
+	}
+	return stem == mg.cluster+"_pub" || strings.HasPrefix(stem, mg.cluster+"_pub_")
+}
+
 // libraryCluster: migration của thư viện internal/shared (ADR-0027 mục 1) — schema nó tạo không cần chủ module.
 const libraryCluster = "shared"
 
@@ -625,7 +637,7 @@ func schemaViolations(root string, ms []*modreg.Manifest, ops []mgOpsSchema) ([]
 		}
 		for _, s := range mg.touches {
 			o := owner[s]
-			if o == "" || o == mg.module {
+			if o == "" || o == mg.module || (strings.HasSuffix(s, "_pub") && mg.publication()) {
 				continue
 			}
 			who := "migration không gắn module (tên tệp không bắt đầu bằng <cụm>_<module>)"

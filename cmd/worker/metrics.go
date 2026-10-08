@@ -22,17 +22,19 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
-// buildPlatform dựng toàn bộ module pf (assembly.Build) với pool nối thẳng theo vai của
-// từng module — job metrics_snapshot và lệnh backfill cần nguồn của nhiều module.
+// buildPlatform dựng toàn bộ module pf (assembly.Build) với pool nối thẳng vai đăng nhập app_worker — job
+// metrics_snapshot và lệnh backfill. W6.3: pf/metrics đọc view _pub trên bản sao chỉ đọc khi có AG_DB_REPLICA_URL.
 func buildPlatform(ctx context.Context, direct string) (assembly.Modules, []*pgxpool.Pool, error) {
+	opts := db.Options{AppName: "worker-metrics", MaxConns: 8}
 	open := func(ctx context.Context, role string) (*pgxpool.Pool, error) {
 		dsn, err := dbadmin.RoleURL(direct, migrations.PF, "", role)
 		if err != nil {
 			return nil, err
 		}
-		return db.Open(ctx, dsn, db.Options{AppName: "worker-metrics", MaxConns: 8})
+		return db.Open(ctx, dsn, opts)
 	}
-	return assembly.Build(ctx, open, clock.System{}, assembly.External{Login: dbadmin.AppWorker})
+	return assembly.Build(ctx, open, clock.System{}, assembly.External{Login: dbadmin.AppWorker,
+		Replica: assembly.ReplicaOpenerFromEnv(os.Getenv, opts)})
 }
 
 // parseRange đọc "YYYY-MM-DD:YYYY-MM-DD".

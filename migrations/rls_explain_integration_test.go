@@ -36,7 +36,7 @@ func TestRLSExplainNoPerRowFunctions_W91(t *testing.T) {
 	exc := loadExceptions(t, "rls_explain_exceptions.yaml",
 		func(e explainException) string { return e.Cluster + "|" + e.Table },
 		func(e explainException) error {
-			if e.Cluster == "" || e.Table == "" || strings.TrimSpace(e.Reason) == "" || !reIsoOwner.MatchString(e.Owner) {
+			if e.Cluster == "" || e.Table == "" || strings.TrimSpace(e.Reason) == "" || !rePkgOwner.MatchString(e.Owner) {
 				return fmt.Errorf("cluster, table, reason, owner (W<n>.<m>) bắt buộc: %+v", e)
 			}
 			return nil

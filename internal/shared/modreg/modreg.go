@@ -18,6 +18,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -70,8 +71,10 @@ type Provides struct {
 	Ports          []string `yaml:"ports"`           // interface xuất trong port/ (vault: client/)
 	Events         []string `yaml:"events"`          // //ag:event, dạng <tên>/v<N>
 	InternalEvents []string `yaml:"internal_events"` // //ag:internal-event, dạng <tên>/v<N>
-	Publications   []string `yaml:"publications"`    // //ag:publication (contracts/publication)
-	DataProducts   []string `yaml:"data_products"`   // //ag:dataproduct (contracts/dataproduct)
+	// Publications: van công bố //ag:publication (contracts/publication, tên snake) và view công bố _pub
+	// //ag:pubview (R-DB-10, W6.3) dạng <schema>_pub.<tên>/v<N> — view thật là <schema>_pub.v<N>_<tên>.
+	Publications []string `yaml:"publications"`
+	DataProducts []string `yaml:"data_products"` // //ag:dataproduct (contracts/dataproduct)
 }
 
 // Consumes là những gì module dùng của module khác mà KHÔNG tạo phụ thuộc gọi (§7.1 `consumes`): sự kiện
@@ -160,6 +163,8 @@ var (
 	reIdent   = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.]*$`)
 	reSnake   = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 	reSchema  = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+	rePubView = regexp.MustCompile(`^([a-z][a-z0-9_]*_pub)\.([a-z][a-z0-9_]*)/v([1-9][0-9]*)$`)
+	rePublish = regexp.MustCompile(`^([a-z][a-z0-9_]*|[a-z][a-z0-9_]*_pub\.[a-z][a-z0-9_]*/v[1-9][0-9]*)$`)
 	schemaZon = []struct{ prefix, zone string }{{"pf_", "pf"}, {"mkg_", "mkg"}, {"ts_", "ts"}, {"vault", "vault"}}
 )
 
@@ -220,7 +225,12 @@ func (m *Manifest) Validate() error {
 	listCheck("provides.ports", m.Provides.Ports, reIdent)
 	listCheck("provides.events", m.Provides.Events, reEvent)
 	listCheck("provides.internal_events", m.Provides.InternalEvents, reEvent)
-	listCheck("provides.publications", m.Provides.Publications, reSnake)
+	listCheck("provides.publications", m.Provides.Publications, rePublish)
+	for _, p := range m.Provides.Publications {
+		if v, ok := ParsePubView(p); ok && !slices.Contains(m.OwnsSchema, v.Schema) {
+			bad("provides.publications %q: schema %s không thuộc owns_schema", p, v.Schema)
+		}
+	}
 	listCheck("provides.data_products", m.Provides.DataProducts, reSnake)
 	listCheck("consumes.events", m.Consumes.Events, reEvent)
 	for _, e := range m.Consumes.Events {
@@ -255,6 +265,29 @@ func (m *Manifest) Validate() error {
 		bad("module lõi (kernel) phải enable: always")
 	}
 	return errors.Join(errs...)
+}
+
+// PubView là một view công bố _pub đã khai (R-DB-10, W6.3).
+type PubView struct {
+	Schema  string // vd pf_cropcycle_pub
+	Name    string // vd season_event
+	Version int    // vd 1
+}
+
+// View trả tên đầy đủ của view: <schema>.v<N>_<tên>.
+func (v PubView) View() string { return v.Schema + ".v" + strconv.Itoa(v.Version) + "_" + v.Name }
+
+// ParsePubView đọc mục provides.publications dạng <schema>_pub.<tên>/v<N>; ok=false với van công bố (tên snake).
+func ParsePubView(p string) (PubView, bool) {
+	mm := rePubView.FindStringSubmatch(p)
+	if mm == nil {
+		return PubView{}, false
+	}
+	n, err := strconv.Atoi(mm[3])
+	if err != nil {
+		return PubView{}, false
+	}
+	return PubView{Schema: mm[1], Name: mm[2], Version: n}, true
 }
 
 func schemaZone(s string) string {

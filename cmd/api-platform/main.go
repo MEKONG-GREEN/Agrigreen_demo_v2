@@ -7,6 +7,8 @@
 //	AG_PF_DB_URL         URL gốc tới database cụm pf (host, cổng, sslmode) — vai và mật khẩu ghép theo module
 //	AG_DB_PASSWORD_<VAI> hoặc AG_DB_APP_PASSWORD
 //	AG_DB_VIA_PGBOUNCER  =1 khi đi qua PgBouncer transaction mode
+//	AG_DB_REPLICA_URL    (tùy chọn) URL gốc bản sao chỉ đọc cụm pf — truy vấn phân tích pf/metrics trên view _pub
+//	                     (R-DB-10, W6.3); không đặt, hoặc bản sao chưa phát lại tới mốc cutoff → primary
 //	AG_OIDC_ISSUER       issuer của realm Keycloak
 //	AG_OIDC_AUDIENCE     audience bắt buộc trong token
 //	AG_OIDC_JWKS_URL     (tùy chọn) lấy khóa ký từ URL này thay vì discovery — khi issuer công khai khác địa chỉ nội bộ
@@ -111,7 +113,8 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	built, pools, err := assembly.Build(ctx, open, clock.System{}, External{Vault: client.NewHTTP(vaultURL, vaultHTTP)})
+	built, pools, err := assembly.Build(ctx, open, clock.System{}, External{Vault: client.NewHTTP(vaultURL, vaultHTTP),
+		Replica: assembly.ReplicaOpenerFromEnv(os.Getenv, opts)})
 	for _, p := range pools {
 		defer p.Close()
 	}

@@ -229,6 +229,16 @@ Chưa đổi chính sách RLS nào.
 3. W9.1: cổng "không `r_*` có quyền trên schema module khác trừ `k_ref`, `_pub`".
 4. Pool dùng chung: giao dịch lồng (module A giữ kết nối rồi gọi port module B) chiếm hai kết nối của **cùng** pool. Cần theo dõi chờ acquire và tăng `AG_DB_MAX_CONNS` nếu cần.
 
+### Điểm vào ghi chéo module (W6.3, 09/10/2026)
+
+Điểm vào GHI chéo module = hàm `SECURITY DEFINER` của module chủ (chủ hàm là chủ schema, không BYPASSRLS), vai bên
+gọi `r_*` chỉ có USAGE schema + EXECUTE hàm đó, không quyền bảng; được gọi TRONG giao dịch của module bên gọi (cùng
+`app.*`, cùng RLS). Mỗi điểm vào liệt kê trong `migrations/schema_isolation_exceptions.yaml` với
+`owner: ADR-0028-write-port` (cổng W9.1 chỉ nhận dạng này cho ngoại lệ lâu dài; ngoại lệ có hạn vẫn là `W<n>.<m>`) —
+**mỗi điểm vào mới phải rà soát** như thay đổi hợp đồng. Hiện có: `pf_workflow.submit/decide` cho `r_masterdata`,
+`r_party`, `r_forms`; `pf_forms.mirror` cho `r_extension`. Không đặt trong schema `_pub`: `_pub` chỉ chứa view đọc phân
+tích có phiên bản (R-DB-10, [modules.md](../dev/modules.md#view-công-bố-_pub-w63)).
+
 ## Liên quan
 
 - Kiến trúc v4.1: §6 (PgBouncer một pool mỗi đơn vị), §14 (R-DB-02, R-DB-03), Phụ lục B mục 7, Phụ lục D (`WithTenantTx` → `WithContextTx`).

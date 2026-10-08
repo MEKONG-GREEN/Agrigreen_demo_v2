@@ -35,11 +35,15 @@ provides:
     - pf.extension.work_schedule.reviewed/v1
     - pf.extension.work_schedule.submitted/v1
   internal_events: []
-  publications: []
+  publications:
+    - pf_extension_pub.directive_target_ack/v1
+    - pf_extension_pub.field_report/v1
+    - pf_extension_pub.task/v1
+    - pf_extension_pub.task_event/v1
   data_products: []
 consumes:
   events: []
 permissions: []
 shares: []
-owns_schema: [pf_extension]
+owns_schema: [pf_extension, pf_extension_pub]
 enable: per_tenant

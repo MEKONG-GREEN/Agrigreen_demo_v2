@@ -1,6 +1,6 @@
 // Package metrics là module pf/metrics (tài liệu kiến trúc mục 16, cổng G3): chỉ số
 // CÓ LỊCH SỬ từ định nghĩa khai báo có phiên bản (defs/*.yaml), tính "như hệ biết
-// lúc hết ngày D" (recorded_at < Cutoff(D)) qua port.Source của module chủ dữ liệu,
+// lúc hết ngày D" (recorded_at < Cutoff(D)) trên view công bố pf_<module>_pub của module chủ dữ liệu (W6.3, R-DB-10),
 // ghi sổ theo ngày; nhật ký lớp GIS + ảnh chụp cuối ngày + phát lại (GIS FN-18..21).
 //
 // Module khác chỉ được import metrics/port (R-02). Tệp này nối các lớp cho
@@ -33,12 +33,17 @@ const DBRole = port.DBRole
 
 // Deps là phụ thuộc của module.
 type Deps struct {
-	// Sources: nguồn chỉ số theo module chủ dữ liệu ("pf/extension", "pf/mechanization",
-	// "pf/cropcycle", "pf/geo") — mỗi nguồn đọc bằng pool vai của module đó (R-05).
-	Sources  map[string]port.Source
-	Scope    partyport.ScopeResolver
+	// Sources: nguồn chỉ số theo module chủ dữ liệu ("pf/extension", "pf/mechanization", "pf/cropcycle",
+	// "pf/geo"). Nil → nguồn trên view công bố _pub (R-DB-10, W6.3): module đọc pf_<module>_pub.v<N>_* bằng vai
+	// của chính nó (r_metrics ∈ r_<module>_pub), không đọc bảng nội bộ, không qua port của module chủ.
+	Sources map[string]port.Source
+	Scope   partyport.ScopeResolver
+	// Geometry: hình học as-of cho phát lại lớp GIS. Nil → pf_geo_pub.v1_layer_geometry (W6.3).
 	Geometry port.GeometryResolver
-	Log      *slog.Logger
+	// Replica: pool vai đăng nhập đơn vị trên bản sao chỉ đọc (AG_DB_REPLICA_URL) cho truy vấn phân tích; nil →
+	// primary. Được bọc db.ForModule như pool chính.
+	Replica tenant.Beginner
+	Log     *slog.Logger
 }
 
 // Module là pf/metrics đã nối.
@@ -56,9 +61,19 @@ var catalog = func() *domain.Catalog {
 // New tạo module với pool của vai metrics_app (nil ở worker khi chỉ chạy consumer).
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 	db = forModule(db)
-	return &Module{svc: &app.Service{DB: db, Clock: clk, Catalog: catalog, Sources: deps.Sources, Scope: deps.Scope,
-		Geometry: deps.Geometry, Log: deps.Log}}
+	svc := &app.Service{DB: db, Replica: forModule(deps.Replica), Clock: clk, Catalog: catalog, Sources: deps.Sources,
+		Scope: deps.Scope, Geometry: deps.Geometry, Log: deps.Log}
+	if svc.Sources == nil {
+		svc.Sources = svc.PubSources()
+	}
+	if svc.Geometry == nil {
+		svc.Geometry = app.PubGeometry{S: svc}
+	}
+	return &Module{svc: svc}
 }
+
+// PubSource trả nguồn chỉ số trên view _pub của module chủ dữ liệu (W6.3) — kiểm thử đối chứng của module chủ.
+func (m *Module) PubSource(module string) app.PubSource { return m.svc.PubSource(module) }
 
 // RegisterApp gắn route Application API.
 func (m *Module) RegisterApp(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterApp(rg) }

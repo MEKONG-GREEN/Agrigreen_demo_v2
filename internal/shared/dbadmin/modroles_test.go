@@ -11,6 +11,37 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
+func pubRoles() []string {
+	var out []string
+	for _, g := range ModuleGroups() {
+		if g.Pub != "" {
+			out = append(out, g.Pub)
+		}
+	}
+	return out
+}
+
+// W6.3 (§14, ADR-0031 §2, R-DB-10): r_<module>_pub NOLOGIN cho đúng các module sở hữu schema _pub, tạo trước
+// vai phân tích; chỉ r_metrics (cap/analytics) là thành viên; không thuộc ag_shared_user, không vượt RLS.
+func TestPubRoles_W63(t *testing.T) {
+	want := []string{"r_cropcycle_pub", "r_extension_pub", "r_geo_pub", "r_mechanization_pub"}
+	if got := pubRoles(); !slices.Equal(got, want) {
+		t.Fatalf("vai _pub: %v, muốn %v", got, want)
+	}
+	_, ai := roleByName(t, modreg.DBRole(AnalyticsModule))
+	for _, name := range want {
+		r, ri := roleByName(t, name)
+		if r.Login || r.BypassRLS || r.NoInherit || len(r.MemberOf) != 0 || !slices.Equal(r.Clusters, []migrations.Cluster{migrations.PF}) || ri > ai {
+			t.Errorf("%s: %+v (vị trí %d, r_metrics %d)", name, r, ri, ai)
+		}
+		for _, o := range Roles {
+			if slices.Contains(o.MemberOf, name) && o.Name != modreg.DBRole(AnalyticsModule) {
+				t.Errorf("%s không được là thành viên %s", o.Name, name)
+			}
+		}
+	}
+}
+
 func roleByName(t *testing.T, name string) (Role, int) {
 	t.Helper()
 	for i, r := range Roles {
@@ -41,7 +72,11 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 		}
 		seen[g.Role] = true
 		r, ri := roleByName(t, g.Role)
-		if r.Login || r.BypassRLS || r.NoInherit || !slices.Equal(r.MemberOf, []string{SharedUser}) || len(r.Clusters) == 0 {
+		want := []string{SharedUser}
+		if g.Module == AnalyticsModule {
+			want = append(want, pubRoles()...) // W6.3: cap/analytics đọc mọi view _pub
+		}
+		if r.Login || r.BypassRLS || r.NoInherit || !slices.Equal(r.MemberOf, want) || len(r.Clusters) == 0 {
 			t.Errorf("%s: %+v", g.Role, r)
 		}
 		if g.Legacy == "" {

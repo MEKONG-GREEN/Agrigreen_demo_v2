@@ -4,6 +4,10 @@
 # CHỈ ĐƯỢC CO LẠI: thêm mục mới cần lý do kiến trúc và gói kế hoạch gỡ (owner W<n>.<m>). Cổng hỏng khi có quyền
 # chéo không có ở đây, hoặc khi một mục không còn xảy ra (xóa mục đó).
 #
+# owner ADR-0028-write-port: điểm vào GHI chéo module LÂU DÀI — hàm SECURITY DEFINER của module chủ, chỉ USAGE schema +
+# EXECUTE cho r_* bên gọi, không quyền bảng (ADR-0028 Hiện thực, docs/dev/modules.md "Điểm vào ghi chéo module"). Không
+# thuộc schema _pub (_pub chỉ chứa view đọc phân tích, R-DB-10). Mỗi điểm vào mới phải rà soát như thay đổi hợp đồng.
+#
 # Khóa: role (vai nhóm r_<module>), schema (schema của module khác), object (rỗng = mọi đối tượng của schema;
 # "tiền_tố*" = theo tiền tố, vd "function pf_workflow.*"), cluster (rỗng = mọi cụm).
 exceptions:
@@ -11,26 +15,25 @@ exceptions:
     schema: pf_workflow
     reason: >-
       W6.1 (pf 000118): lối ghi duyệt bốn mắt là hàm SECURITY DEFINER pf_workflow.submit/decide gọi TRONG giao
-      dịch của module gửi duyệt (port Approvals) — USAGE schema + EXECUTE, không quyền bảng. Gỡ khi điểm vào
-      chuyển sang schema công bố pf_workflow_pub (R-DB-10).
-    owner: W6.3
+      dịch của module gửi duyệt (port Approvals) — USAGE schema + EXECUTE, không quyền bảng. Điểm vào ghi lâu dài.
+    owner: ADR-0028-write-port
   - role: r_party
     schema: pf_workflow
     reason: >-
       W6.1 (pf 000118): như r_masterdata — cấp quyền chia sẻ gửi/duyệt qua pf_workflow.submit/decide
-      (SECURITY DEFINER, port party/port.FourEyes). Gỡ khi điểm vào chuyển sang pf_workflow_pub (R-DB-10).
-    owner: W6.3
+      (SECURITY DEFINER, port party/port.FourEyes). Điểm vào ghi lâu dài.
+    owner: ADR-0028-write-port
   - role: r_forms
     schema: pf_workflow
     reason: >-
       W6.2 (pf 000122): rà soát bốn mắt của cap/forms ghi yêu cầu/quyết định (kind forms.submission) qua
       pf_workflow.submit/decide (SECURITY DEFINER) TRONG giao dịch của pf/forms — USAGE schema + EXECUTE, không quyền
-      bảng. Gỡ khi điểm vào chuyển sang pf_workflow_pub (R-DB-10).
-    owner: W6.3
+      bảng. Điểm vào ghi lâu dài.
+    owner: ADR-0028-write-port
   - role: r_extension
     schema: pf_forms
     reason: >-
       W6.2 (pf 000122): vòng đời báo cáo KN v1 (extension/reportcycle) ghi song song chốt/mở lại kỳ + ảnh chụp đóng
       băng qua pf_forms.mirror (SECURITY DEFINER, port forms/port.Freezer) TRONG giao dịch của pf/extension — USAGE
-      schema + EXECUTE, không quyền bảng. Gỡ khi điểm vào chuyển sang pf_forms_pub hoặc KN chuyển sang kỳ native.
-    owner: W6.3
+      schema + EXECUTE, không quyền bảng. Điểm vào ghi lâu dài; bỏ khi KN chuyển sang kỳ native.
+    owner: ADR-0028-write-port

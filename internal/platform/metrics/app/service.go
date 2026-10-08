@@ -39,10 +39,14 @@ const MaxRangeDays = 400
 
 // Service là use case của module.
 type Service struct {
-	DB      tenant.Beginner // pool vai metrics_app; nil ở worker khi chỉ chạy consumer trong tx của inbox
+	DB tenant.Beginner // pool vai đơn vị bọc db.ForModule (r_metrics); nil ở worker khi chỉ chạy consumer trong tx của inbox
+	// Replica: bản sao chỉ đọc cho truy vấn phân tích trên view _pub (AG_DB_REPLICA_URL, R-DB-10 §22.1; W6.3),
+	// cùng vai r_metrics; nil → DB. Chỉ dùng khi đã phát lại tới mốc cutoff (analytics).
+	Replica tenant.Beginner
 	Clock   clock.Clock
 	Catalog *domain.Catalog
-	// Sources: nguồn theo module chủ dữ liệu (Definition.SourceModule, vd "pf/extension").
+	// Sources: nguồn theo module chủ dữ liệu (Definition.SourceModule, vd "pf/extension") — mặc định nguồn view
+	// _pub của chính module (PubSources, W6.3); kiểm thử thay nguồn giả.
 	Sources  map[string]port.Source
 	Scope    partyport.ScopeResolver
 	Geometry port.GeometryResolver

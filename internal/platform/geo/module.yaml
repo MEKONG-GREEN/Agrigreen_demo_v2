@@ -31,11 +31,14 @@ provides:
     - pf.geo.plot.retired/v1
     - pf.geo.plot_boundary.recorded/v1
   internal_events: []
-  publications: []
+  publications:
+    - pf_geo_pub.layer_geometry/v1
+    - pf_geo_pub.plot_boundary/v1
+    - pf_geo_pub.plot_event/v1
   data_products: []
 consumes:
   events: []
 permissions: [coop_manager, farmer, geo_admin, map_consumer, plot_editor, plot_viewer]
 shares: []
-owns_schema: [pf_geo]
+owns_schema: [pf_geo, pf_geo_pub]
 enable: per_tenant

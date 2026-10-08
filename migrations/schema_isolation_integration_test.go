@@ -216,10 +216,18 @@ func (e isolationException) String() string {
 	return fmt.Sprintf("%s → %s", e.Role, o)
 }
 
-var reIsoOwner = regexp.MustCompile(`^W[0-9]+\.[0-9]+$`)
+// rePkgOwner: gói kế hoạch sẽ gỡ (W<n>.<m>) — ngoại lệ RLS EXPLAIN chỉ nhận dạng này.
+var rePkgOwner = regexp.MustCompile(`^W[0-9]+\.[0-9]+$`)
 
-// loadExceptions đọc tệp ngoại lệ YAML (chỉ được co lại) và kiểm định dạng: role, schema, reason, owner W<n>.<m>
-// bắt buộc; không lặp; chỉ khóa đã biết.
+// reIsoOwner: gói kế hoạch sẽ gỡ (W<n>.<m>), hoặc WritePortOwner cho điểm vào ghi chéo module lâu dài.
+var reIsoOwner = regexp.MustCompile(`^(W[0-9]+\.[0-9]+|` + WritePortOwner + `)$`)
+
+// WritePortOwner đánh dấu ngoại lệ LÂU DÀI (không gói nào gỡ): điểm vào ghi chéo module là hàm SECURITY DEFINER của
+// module chủ, EXECUTE cấp cho r_* bên gọi (ADR-0028 Hiện thực, docs/dev/modules.md) — mỗi điểm vào mới phải rà soát.
+// Không dùng cho quyền bảng/khung nhìn.
+const WritePortOwner = "ADR-0028-write-port"
+
+// loadExceptions đọc tệp ngoại lệ YAML (chỉ được co lại) và kiểm định dạng: role, schema, reason, owner bắt buộc; không lặp; chỉ khóa đã biết.
 func loadExceptions[T any](t *testing.T, file string, key func(T) string, check func(T) error) []T {
 	t.Helper()
 	data, err := os.ReadFile(file) //nolint:gosec // tệp trong repo
@@ -252,7 +260,7 @@ func loadIsolationExceptions(t *testing.T) []isolationException {
 		func(e isolationException) string { return e.Cluster + "|" + e.Role + "|" + e.Schema + "|" + e.Object },
 		func(e isolationException) error {
 			if e.Role == "" || e.Schema == "" || strings.TrimSpace(e.Reason) == "" || !reIsoOwner.MatchString(e.Owner) {
-				return fmt.Errorf("role, schema, reason, owner (W<n>.<m>) bắt buộc: %+v", e)
+				return fmt.Errorf("role, schema, reason, owner (W<n>.<m> | %s) bắt buộc: %+v", WritePortOwner, e)
 			}
 			return nil
 		})

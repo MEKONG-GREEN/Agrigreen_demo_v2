@@ -12,11 +12,8 @@ import (
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/pubgolden"
 )
-
-type geoAsOfAt interface {
-	AsOfAt(ctx context.Context, key metricsport.Key, d clock.Date, cutoff time.Time, sc metricsport.Scope) (metricsport.Value, error)
-}
 
 // pf/metrics geo.plots_digitised: thửa đã số hoá như hệ biết trước cutoff — thửa tạo
 // và ngừng dùng ghi nhận sau cutoff không đổi giá trị. Hình học as-of theo id dòng sổ
@@ -25,7 +22,7 @@ func TestMetricsPlotsDigitisedAsOf(t *testing.T) {
 	f := newFixture(t)
 	nat := f.national()
 	ctx := context.Background()
-	src := f.mod.MetricsSource().(geoAsOfAt)
+	src := pubgolden.Compare(t, "pf/geo", f.mod.MetricsSource()) // W6.3: đối chứng nguồn view _pub
 	now := func() time.Time {
 		var x time.Time
 		if err := f.pool.QueryRow(ctx, "SELECT clock_timestamp()").Scan(&x); err != nil {
@@ -69,7 +66,7 @@ func TestMetricsPlotsDigitisedAsOf(t *testing.T) {
 		t.Fatal(err)
 	}
 	ref := metricsport.GeometryRef{Kind: "plot_boundary", ID: bid}
-	g, err := f.mod.LayerGeometry().Geometries(tenant.WithID(ctx, f.tenant), []metricsport.GeometryRef{ref, {Kind: "unknown", ID: bid}})
+	g, err := src.Geometries(tenant.WithID(ctx, f.tenant), f.mod.LayerGeometry(), []metricsport.GeometryRef{ref, {Kind: "unknown", ID: bid}})
 	if err != nil || len(g) != 1 || len(g[ref]) == 0 {
 		t.Fatalf("hình học: %v %v", g, err)
 	}

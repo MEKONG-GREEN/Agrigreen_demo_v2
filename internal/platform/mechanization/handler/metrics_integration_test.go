@@ -8,11 +8,8 @@ import (
 
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/pubgolden"
 )
-
-type mechAsOfAt interface {
-	AsOfAt(ctx context.Context, key metricsport.Key, d clock.Date, cutoff time.Time, sc metricsport.Scope) (metricsport.Value, error)
-}
 
 // CGH FN-10/11 (pf/metrics cgh.*): giá trị theo vụ đọc lần cân đối ĐÃ LƯU mới nhất có
 // recorded_at < cutoff — lần tính lại ghi nhận sau cutoff không đổi giá trị cũ.
@@ -20,7 +17,7 @@ func TestCGHFN11MetricsAsOfLatestStoredRun(t *testing.T) {
 	f := newFixture(t, defaultNow)
 	adm := f.adminUser()
 	ctx := context.Background()
-	src := f.mod.MetricsSource().(mechAsOfAt)
+	src := pubgolden.Compare(t, "pf/mechanization", f.mod.MetricsSource()) // W6.3: đối chứng nguồn view _pub
 	dbNow := func() time.Time {
 		var x time.Time
 		if err := f.pool.QueryRow(ctx, "SELECT clock_timestamp()").Scan(&x); err != nil {
@@ -59,7 +56,7 @@ func TestCGHFN11MetricsAsOfLatestStoredRun(t *testing.T) {
 	if _, err := src.AsOfAt(ctx, "cgh.coop_sufficiency_pct", day, late, metricsport.Scope{TenantID: f.tenant, Dimension: "HT-2025"}); !errors.Is(err, metricsport.ErrNoData) {
 		t.Fatalf("vụ khác → ErrNoData: %v", err)
 	}
-	scopes, err := f.mod.MetricsSource().(metricsport.ScopeLister).Scopes(ctx, "cgh.coops_shortage", day, f.tenant)
+	scopes, err := src.Scopes(ctx, "cgh.coops_shortage", day, f.tenant)
 	if err != nil || len(scopes) == 0 || scopes[0].Dimension != "DX-2025" {
 		t.Fatalf("scopes: %+v %v", scopes, err)
 	}

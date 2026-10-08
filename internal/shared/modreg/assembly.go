@@ -40,6 +40,11 @@ func DBRole(module string) string {
 	return "r_" + seg
 }
 
+// PubRole trả vai NOLOGIN đọc view công bố của module (kiến trúc v4.1 §14, ADR-0031 §2, W6.3): r_<đoạn cuối>_pub,
+// vd pf/cropcycle → r_cropcycle_pub. Chỉ có khi module sở hữu schema <cụm>_<module>_pub; vai phân tích
+// (r_metrics — cap/analytics) là thành viên.
+func PubRole(module string) string { return DBRole(module) + "_pub" }
+
 // FormatAssembly sinh nội dung assembly_gen.go (đã gofmt) từ đơn vị → module.
 func FormatAssembly(wired map[string][]string) ([]byte, error) {
 	units := make([]string, 0, len(wired))

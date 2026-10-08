@@ -139,6 +139,8 @@ func TestInvalidManifests(t *testing.T) {
 		{"kernel phải always", "enable: always", "enable: per_tenant", "kernel"},
 		{"schema sai cụm", "owns_schema: [pf_party]", "owns_schema: [mkg_party]", "thuộc cụm mkg"},
 		{"schema tiền tố lạ", "owns_schema: [pf_party]", "owns_schema: [party]", "tiền tố"},
+		{"publication sai dạng", "publications: []", "publications: [pf_party.org/v1]", "provides.publications"},
+		{"view _pub ngoài owns_schema", "publications: []", "publications: [pf_party_pub.org/v1]", "không thuộc owns_schema"},
 		{"quyền lặp", "permissions: [registry_admin]", "permissions: [registry_admin, registry_admin]", "lặp"},
 	}
 	for _, tc := range cases {
@@ -264,5 +266,26 @@ func TestConstraint(t *testing.T) {
 	}
 	if got := DefaultConstraint(Version{2, 3, 1}); got != ">=2.3 <3" {
 		t.Fatalf("DefaultConstraint = %q", got)
+	}
+}
+
+// W6.3 (R-DB-10): mục provides.publications dạng <schema>_pub.<tên>/v<N> là view công bố; tên snake là van.
+func TestParsePubView(t *testing.T) {
+	v, ok := ParsePubView("pf_cropcycle_pub.season_event/v1")
+	if !ok || v.Schema != "pf_cropcycle_pub" || v.Name != "season_event" || v.Version != 1 || v.View() != "pf_cropcycle_pub.v1_season_event" {
+		t.Fatalf("%+v %v", v, ok)
+	}
+	for _, bad := range []string{"hub_capacity", "pf_cropcycle.season_event/v1", "pf_cropcycle_pub.season_event", "pf_x_pub.a/v0"} {
+		if _, ok := ParsePubView(bad); ok {
+			t.Errorf("%q không phải view công bố", bad)
+		}
+	}
+	if PubRole("pf/cropcycle") != "r_cropcycle_pub" {
+		t.Error(PubRole("pf/cropcycle"))
+	}
+	m := mustParse(t, strings.Replace(strings.Replace(validYAML, "publications: []", "publications: [pf_party_pub.org/v1, valve_x]", 1),
+		"owns_schema: [pf_party]", "owns_schema: [pf_party, pf_party_pub]", 1), "internal/platform/party/module.yaml")
+	if err := m.Validate(); err != nil {
+		t.Fatal(err)
 	}
 }

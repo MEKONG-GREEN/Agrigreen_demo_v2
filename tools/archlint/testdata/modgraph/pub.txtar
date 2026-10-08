@@ -1,0 +1,40 @@
+# View công bố _pub (W6.3, R-DB-10):
+#  - migration công bố <cụm>_pub_* được tạo view trong schema _pub của nhiều module (không lỗi);
+#  - nhưng vẫn không được đụng schema nội bộ (pf_b) — bị bắt như migration không gắn module;
+#  - migration không phải công bố đụng schema _pub của hai module bị bắt.
+violation schema migrations/pf/000004_pf_pub_hack.up.sql pf_b
+violation schema migrations/pf/000005_pf_other.up.sql pf_a_pub
+violation schema migrations/pf/000005_pf_other.up.sql pf_b_pub
+-- exceptions.yaml --
+exceptions: []
+-- internal/platform/a/module.yaml --
+name: pf/a
+kind: capability
+zones: [pf]
+version: 1.0.0
+owns_schema: [pf_a, pf_a_pub]
+enable: per_tenant
+-- internal/platform/b/module.yaml --
+name: pf/b
+kind: domain
+zones: [pf]
+version: 1.0.0
+owns_schema: [pf_b, pf_b_pub]
+enable: per_tenant
+-- migrations/pf/000001_pf_a.up.sql --
+CREATE SCHEMA pf_a;
+CREATE TABLE pf_a.t (id int);
+-- migrations/pf/000002_pf_b.up.sql --
+CREATE SCHEMA pf_b;
+CREATE TABLE pf_b.u (id int);
+-- migrations/pf/000003_pf_pub_v1.up.sql --
+CREATE SCHEMA pf_a_pub;
+CREATE VIEW pf_a_pub.v1_t AS SELECT id FROM pf_a.t;
+CREATE SCHEMA pf_b_pub;
+CREATE VIEW pf_b_pub.v1_u AS SELECT id FROM pf_b.u;
+-- migrations/pf/000004_pf_pub_hack.up.sql --
+CREATE OR REPLACE VIEW pf_a_pub.v1_t AS SELECT id FROM pf_a.t;
+ALTER TABLE pf_b.u ADD COLUMN x int;
+-- migrations/pf/000005_pf_other.up.sql --
+CREATE VIEW pf_a_pub.v2_t AS SELECT id FROM pf_a.t;
+CREATE VIEW pf_b_pub.v2_u AS SELECT id FROM pf_b.u;

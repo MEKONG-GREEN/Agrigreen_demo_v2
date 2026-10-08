@@ -26,7 +26,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics"
-	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
@@ -66,6 +65,9 @@ type External struct {
 	Egress meter.Checkpoint
 	// Login: vai đăng nhập của đơn vị mở pool (W2.6, ADR-0028). Rỗng → app_platform; worker đặt app_worker.
 	Login string
+	// Replica (W6.3, R-DB-10 §22.1): mở pool vai đăng nhập trên bản sao chỉ đọc cụm pf cho truy vấn phân tích
+	// của pf/metrics; nil → primary. ReplicaOpenerFromEnv dựng từ AG_DB_REPLICA_URL.
+	Replica PoolOpener
 }
 
 // Modules là các module đã nối — worker và kiểm thử dùng lại port của chúng.
@@ -277,12 +279,21 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		Supply: SupplySource{Seasons: coop.Seasons(), Coops: coop.Cooperatives(), Catalogs: md.Catalogs()},
 		Router: WaterwayRouter{WW: ww.Router()}})
 
-	// pf/metrics (G3): chỉ số có lịch sử qua port.Source của module chủ dữ liệu (mỗi nguồn đọc
-	// bằng pool vai của module đó, R-05); nhật ký lớp GIS + phát lại, hình học as-of qua pf/geo.
-	met := metrics.New(unit, clk, metrics.Deps{Scope: pty.ScopeResolver(), Geometry: g.LayerGeometry(),
-		Sources: map[string]metricsport.Source{
-			"pf/extension": kn.MetricsSource(), "pf/mechanization": mech.MetricsSource(), "pf/cropcycle": cc.MetricsSource(), "pf/geo": g.MetricsSource(),
-		}})
+	// pf/metrics (G3; cap/analytics): chỉ số có lịch sử + nhật ký lớp GIS. W6.3 (R-DB-10): nguồn chỉ số và hình
+	// học as-of đọc view công bố pf_<module>_pub bằng vai r_metrics — không còn nối port.Source của module chủ;
+	// truy vấn phân tích chạy trên bản sao chỉ đọc khi có (AG_DB_REPLICA_URL → ext.Replica), không thì primary.
+	var replica *pgxpool.Pool
+	if ext.Replica != nil {
+		if replica, err = ext.Replica(ctx, login); err != nil {
+			return Modules{}, pools, err
+		}
+		pools = append(pools, replica)
+	}
+	mdeps := metrics.Deps{Scope: pty.ScopeResolver()}
+	if replica != nil {
+		mdeps.Replica = replica
+	}
+	met := metrics.New(unit, clk, mdeps)
 
 	// pf/extdata (ADR-0007): thời tiết/độ mặn/tile qua proxy khử định danh; danh mục nguồn
 	// AG_EXTDATA_* (mặc định rỗng). Cấu hình sai (vd nguồn ngoài lãnh thổ thiếu ADR ở production) → lỗi khởi động.

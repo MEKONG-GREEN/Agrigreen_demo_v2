@@ -61,6 +61,8 @@
 //	AG_DB_URL, AG_AMQP_URL             như G0 (AG_AMQP_URL chỉ cần khi có consumer)
 //	AG_DB_DIRECT_URL                   (tùy chọn) URL nối THẲNG PostgreSQL cho job + khóa leader;
 //	                                   mặc định AG_DB_URL. Không trỏ vào PgBouncer.
+//	AG_DB_REPLICA_URL                  (tùy chọn) URL gốc bản sao chỉ đọc cụm pf: job metrics_snapshot và
+//	                                   -metrics-backfill đọc view _pub trên đó khi đã phát lại tới cutoff (W6.3)
 //	AG_DB_PASSWORD_AG_OPS_JOBS         vai của job vận hành ag_ops_jobs (migration shared/000002, 000009)
 //	AG_CLUSTERS                        (tùy chọn) cụm của job neo/dọn idempotency, mặc định mọi cụm;
 //	                                   phải có pf (cmd/internal/clusterenv, G4 tách vùng)
@@ -540,8 +542,8 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		js = append(js, mech.Jobs(mechanization.FeedTenants(out.pools[migrations.PF]), log)...)
 	}
 	if selected(jobs, metricsport.JobMetricsSnapshot) {
-		// Chỉ số có lịch sử + ảnh chụp lớp GIS: dựng module pf qua assembly.Build (mỗi nguồn một vai DB,
-		// R-05); tìm tenant bằng pool ag_ops_jobs (neo chuỗi của ngày, dự phòng outbox).
+		// Chỉ số có lịch sử + ảnh chụp lớp GIS: dựng module pf qua assembly.Build (pf/metrics đọc view _pub bằng
+		// r_metrics, trên bản sao chỉ đọc khi có AG_DB_REPLICA_URL — W6.3); tìm tenant bằng pool ag_ops_jobs.
 		mods, mpools, err := buildPlatform(ctx, direct)
 		prevClose := closeFn
 		closeFn = func() {

@@ -12,8 +12,8 @@
 //     dùng bản ghi có event_time thuộc phạm vi của định nghĩa tính tới hết D VÀ
 //     recorded_at ≤ Cutoff(D). Sửa sai ghi nhận SAU Cutoff(D) không đổi giá trị
 //     của D — kỳ đã chốt không bao giờ bị sửa (KN US-DASH-01/02, CGH FN-09..11).
-//   - Tính trên bản sao chỉ đọc; không join xuyên schema (R-06) — nguồn đọc qua
-//     port của module chủ dữ liệu hoặc qua sự kiện đã nhận (inbox).
+//   - Tính trên bản sao chỉ đọc khi có; không đọc bảng nội bộ của module khác (R-06,
+//     R-DB-10) — nguồn đọc view công bố pf_<module>_pub (W6.3) hoặc sự kiện đã nhận (inbox).
 //   - Không có dữ liệu cá nhân (R-14); phạm vi là mã đơn vị hành chính / tổ chức.
 package port
 

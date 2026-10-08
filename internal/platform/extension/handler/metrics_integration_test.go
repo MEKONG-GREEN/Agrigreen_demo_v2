@@ -10,11 +10,8 @@ import (
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/pubgolden"
 )
-
-type asOfAt interface {
-	AsOfAt(ctx context.Context, key metricsport.Key, d clock.Date, cutoff time.Time, sc metricsport.Scope) (metricsport.Value, error)
-}
 
 func (f *fixture) dbNow() time.Time {
 	f.t.Helper()
@@ -25,7 +22,7 @@ func (f *fixture) dbNow() time.Time {
 	return t
 }
 
-func (f *fixture) metric(src asOfAt, key metricsport.Key, cutoff time.Time, units ...string) string {
+func (f *fixture) metric(src pubgolden.AsOfAter, key metricsport.Key, cutoff time.Time, units ...string) string {
 	f.t.Helper()
 	v, err := src.AsOfAt(context.Background(), key, clock.BusinessDate(t0), cutoff, metricsport.Scope{TenantID: f.tenant, Units: units})
 	if err != nil {
@@ -39,7 +36,7 @@ func (f *fixture) metric(src asOfAt, key metricsport.Key, cutoff time.Time, unit
 func TestKNDash01MetricsAsOfExcludesLateRecords(t *testing.T) {
 	f := newFixture(t)
 	p := f.seedPeople()
-	src := f.mod.MetricsSource().(asOfAt)
+	src := pubgolden.Compare(t, "pf/extension", f.mod.MetricsSource()) // W6.3: đối chứng nguồn view _pub
 	before := f.dbNow()
 	p.off30001a.must(p.off30001a.post("/v1/extension/field-reports", sowing("30001", f.org.c1.String(), "10")), http.StatusCreated, "báo cáo")
 	p.off30001a.createTask("30001", nil)
@@ -85,7 +82,7 @@ func TestKNDash01MetricsAsOfExcludesLateRecords(t *testing.T) {
 		t.Fatalf("mong ErrUnknownMetric: %v", err)
 	}
 	// ScopeLister: toàn tenant + tỉnh có dữ liệu.
-	scopes, err := f.mod.MetricsSource().(metricsport.ScopeLister).Scopes(context.Background(), "kn.open_tasks", clock.BusinessDate(time.Now()), f.tenant)
+	scopes, err := src.Scopes(context.Background(), "kn.open_tasks", clock.BusinessDate(time.Now()), f.tenant)
 	if err != nil || len(scopes) < 2 || len(scopes[0].Units) != 0 {
 		t.Fatalf("scopes: %v %v", scopes, err)
 	}

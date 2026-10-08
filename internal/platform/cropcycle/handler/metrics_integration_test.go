@@ -9,11 +9,8 @@ import (
 
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/pubgolden"
 )
-
-type ccAsOfAt interface {
-	AsOfAt(ctx context.Context, key metricsport.Key, d clock.Date, cutoff time.Time, sc metricsport.Scope) (metricsport.Value, error)
-}
 
 // pf/metrics cc.season_area_ha, cc.yield_t_per_ha theo vụ (Scope.Dimension "DX-2026"):
 // sự việc mới nhất trước cutoff; bản ghi bù sản lượng ghi nhận sau cutoff không đổi giá trị cũ.
@@ -22,7 +19,7 @@ func TestMetricsSeasonAreaYieldAsOf(t *testing.T) {
 	f.publishedSOP("SOP OM5451", "OM5451")
 	fa := f.farmer(f.h1)
 	ctx := context.Background()
-	src := f.mod.MetricsSource().(ccAsOfAt)
+	src := pubgolden.Compare(t, "pf/cropcycle", f.mod.MetricsSource()) // W6.3: đối chứng nguồn view _pub
 	dbNow := func() time.Time {
 		var x time.Time
 		if err := f.pool.QueryRow(ctx, "SELECT clock_timestamp()").Scan(&x); err != nil {
@@ -59,7 +56,7 @@ func TestMetricsSeasonAreaYieldAsOf(t *testing.T) {
 	if _, err := val("cc.yield_t_per_ha", late, "31120"); !errors.Is(err, metricsport.ErrNoData) {
 		t.Fatalf("xã khác → ErrNoData: %v", err)
 	}
-	scopes, err := f.mod.MetricsSource().(metricsport.ScopeLister).Scopes(ctx, "cc.season_area_ha", clock.BusinessDate(time.Now()), f.tenant)
+	scopes, err := src.Scopes(ctx, "cc.season_area_ha", clock.BusinessDate(time.Now()), f.tenant)
 	if err != nil || len(scopes) != 2 || scopes[0].Dimension != "DX-2026" || len(scopes[1].Units) != 1 {
 		t.Fatalf("scopes: %+v %v", scopes, err)
 	}
