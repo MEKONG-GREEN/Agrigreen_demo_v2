@@ -617,12 +617,21 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 			}
 		}
 	}
+	if selected(jobs, apiclientport.JobWebhookDispatch) && os.Getenv(apiclientport.EnvOperatorTenant) != "" {
+		// W5.7 (ADR-0033 §4): giao chỉ báo cursor tới webhook + ngắt mạch, r_apiclient; cần AG_WEBHOOK_KEY_V<n>.
+		wjs, err := apiclientWebhookJobs(ctx, direct, &closeFn, log)
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		js = append(js, wjs...)
+	}
 	if len(js) == 0 {
 		closeFn()
 		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + extension.JobEscalation + ", " + extension.JobWorkSchedule + ", " +
 			notifyport.JobEmailDigest + ", " + reports.JobSchedules + ", " + mechport.JobAreaFeedCheck + ", " + metricsport.JobMetricsSnapshot +
 			", " + mrvport.JobReviewEscalator + ", " + extension.JobReportCycle +
-			", " + apiclientport.JobKeyExpiry + ", " + apiclientport.JobFeedBuild + ", " + apiclientport.JobFeedRetention + ")")
+			", " + apiclientport.JobKeyExpiry + ", " + apiclientport.JobFeedBuild + ", " + apiclientport.JobFeedRetention + ", " + apiclientport.JobWebhookDispatch + ")")
 	}
 	out.s = &schedule.Scheduler{Clock: clk, Log: log, Jobs: js}
 	return out, closeFn, nil

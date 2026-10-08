@@ -3927,6 +3927,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/api-clients/{id}/webhooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Webhook của khách hàng — trạng thái ngắt mạch, cursor đã báo, 10 lần giao gần nhất (không bí mật) */
+        get: operations["listApiWebhooks"];
+        put?: never;
+        /**
+         * Đăng ký webhook (api_client_admin; khách hàng active; feed phải có scope feed:<tên>:read đã duyệt) — bí mật hiện MỘT lần
+         * @description URL: chỉ `https`, cổng 443/8443, không userinfo/fragment, không tên máy nội bộ; IP literal và MỌI địa chỉ phân
+         *     giải phải ngoài dải nội bộ/loopback/link-local/metadata (kiểm lại lúc kết nối — chống DNS rebinding); tùy chọn
+         *     danh sách tên miền `AG_WEBHOOK_ALLOW_HOSTS`. Tối đa 5 webhook active mỗi khách hàng.
+         */
+        post: operations["registerApiWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-clients/{id}/webhooks/{webhook_id}/rotate-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xoay bí mật — bí mật cũ vẫn ký (v1 thứ hai) tới previous_secret_valid_until (24 giờ) */
+        post: operations["rotateApiWebhookSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-clients/{id}/webhooks/{webhook_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tắt webhook (lý do bắt buộc) — không giao nữa; đối tác vẫn đọc feed theo cursor */
+        post: operations["disableApiWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-clients/{id}/webhooks/{webhook_id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bật lại webhook đã tắt (đóng ngắt mạch) */
+        post: operations["enableApiWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-clients/{id}/webhooks/{webhook_id}/reset-breaker": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đóng ngắt mạch thủ công sau khi đối tác sửa đầu nhận (lý do bắt buộc) */
+        post: operations["resetApiWebhookBreaker"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5828,6 +5919,63 @@ export interface components {
             /** Format: date-time */
             revoked_at?: string | null;
             revoke_reason?: string | null;
+        };
+        /** @description Webhook mỏng (W5.7) — không bao giờ có nonce/khóa; secret CHỈ trong phản hồi đăng ký/xoay. */
+        ApiWebhook: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uri */
+            url: string;
+            feeds: string[];
+            /** @enum {string} */
+            status: "active" | "disabled";
+            status_reason?: string;
+            failure_threshold: number;
+            secret_version: number;
+            /** Format: date-time */
+            previous_secret_valid_until?: string | null;
+            /** Format: date-time */
+            created_at?: string;
+            secret?: string;
+            breaker: {
+                /** @enum {string} */
+                state: "closed" | "open" | "half_open";
+                consecutive_failures: number;
+                /** Format: date-time */
+                opened_at?: string | null;
+                /** Format: date-time */
+                next_probe_at?: string | null;
+                /** Format: date-time */
+                last_success_at?: string | null;
+                /** Format: date-time */
+                last_failure_at?: string | null;
+                last_error?: string | null;
+            };
+            cursors: {
+                feed?: string;
+                notified_cursor?: string | null;
+                pending_attempts?: number;
+                /** Format: date-time */
+                next_attempt_at?: string | null;
+                /** Format: date-time */
+                last_attempt_at?: string | null;
+            }[];
+            recent_deliveries?: {
+                /** Format: uuid */
+                id?: string;
+                feed?: string;
+                cursor?: string;
+                attempt?: number;
+                probe?: boolean;
+                /** @enum {string} */
+                outcome?: "delivered" | "failed" | "blocked";
+                http_status?: number | null;
+                error_class?: string | null;
+                /** @enum {string} */
+                breaker_state?: "closed" | "open" | "half_open";
+                /** Format: date-time */
+                at?: string;
+            }[];
         };
         ApiQuotaPlan: {
             version: number;
@@ -14005,6 +14153,188 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    listApiWebhooks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ApiWebhook"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    registerApiWebhook: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uri */
+                    url: string;
+                    feeds: string[];
+                    /**
+                     * @description N lỗi liên tiếp → ngắt mạch
+                     * @default 5
+                     */
+                    failure_threshold?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Webhook + secret (Cache-Control: no-store). Gọi lặp cùng Idempotency-Key trả bản KHÔNG có secret. */
+            201: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiWebhook"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    rotateApiWebhookSecret: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                webhook_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Webhook + secret mới (Cache-Control: no-store) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiWebhook"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    disableApiWebhook: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                webhook_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ApiClientReason"];
+        responses: {
+            /** @description Đã tắt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiWebhook"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    enableApiWebhook: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                webhook_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã bật */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiWebhook"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+        };
+    };
+    resetApiWebhookBreaker: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                webhook_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ApiClientReason"];
+        responses: {
+            /** @description Mạch đã đóng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiWebhook"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
 }

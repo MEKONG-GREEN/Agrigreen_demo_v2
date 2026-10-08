@@ -328,6 +328,17 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	}
 	apic := apiclient.New(unit, clk, apiclient.Deps{Peppers: peppers, OperatorTenant: opTenant, Store: store, Sandbox: sandbox})
 	apic.UseCollectionSource(cc.CollectionVolumeSource())
+	// W5.7 (ADR-0033 §4): đăng ký webhook mỏng — khóa chủ dẫn xuất bí mật (AG_WEBHOOK_KEY_V<n>, không đặt → 503) và
+	// chính sách đích chặn SSRF (AG_WEBHOOK_ALLOW_HOSTS; AG_WEBHOOK_ALLOW_CIDRS bị cấm ở production).
+	whKeys, err := apiclient.WebhookKeysFromEnv()
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	whGuard, err := apiclient.WebhookGuardFromEnv(os.Getenv, residency.Production(os.Getenv))
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	apic.UseWebhooks(whKeys, whGuard)
 	meter.UsePlans(apic.Plans())
 
 	// G5 (ADR-0022): nguồn sản phẩm collection_volume cần dữ kiện thửa (pf/cooperative) + đơn vị hành chính.

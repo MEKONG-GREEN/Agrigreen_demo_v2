@@ -896,6 +896,22 @@ Tệp được tách thành lô `ingest_batch.v1` và đi qua CHÍNH đường �
 | 409 | `integration.file_results_pending` | `GET /v1/files/{id}/results` khi còn lô `queued` hoặc chưa gửi (`incomplete` — tải lại cùng tệp) — kèm `Retry-After` |
 
 Môi trường thử của đối tác (`AG_PARTNER_SANDBOX=1`): khóa thử `agks_…` trình cho cổng thật, hoặc khóa thật `agk_…` trình cho cổng thử → `401 apiclient.unauthenticated` (log `apiclient.sandbox_key_refused`). Đặt cờ ở production → `api-platform` / `integration-gateway` không khởi động.
+### Cổng tích hợp — webhook mỏng, ngắt mạch, đối soát (W5.7; ADR-0033 §4)
+
+Đăng ký ở Admin API (`/v1/api-clients/{id}/webhooks…`, MFA, `api_client_admin`); trạng thái ở `GET /v1/webhooks` (cổng); đối soát `GET /v1/feeds/{feed}/checksums` (cổng). Bí mật webhook **không bao giờ** xuất hiện trong lỗi, log, danh sách — chỉ trong phản hồi đăng ký/xoay, một lần. [Runbook](runbooks/integration-webhooks.md).
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 422 | `apiclient.webhook_url_rejected` | URL không phải `https`, có userinfo/fragment, cổng khác 443/8443, tên máy nội bộ (`localhost`, `.local`, `.internal`, `.svc`, …) hoặc không phải tên miền đầy đủ, IP literal hoặc **bất kỳ** địa chỉ phân giải nào thuộc dải cấm (loopback, RFC 1918, link-local/metadata `169.254.0.0/16`, CGNAT, ULA, NAT64/6to4, multicast, …), không phân giải được, ngoài `AG_WEBHOOK_ALLOW_HOSTS` — `detail` nêu lý do, không lặp URL |
+| 422 | `apiclient.webhook_feed_not_subscribed` | Feed không có hợp đồng tích hợp, hoặc khách hàng chưa có scope `feed:<tên>:read` đã duyệt (bốn mắt) |
+| 409 | `apiclient.too_many_webhooks` | Khách hàng đã có 5 webhook `active` (đăng ký mới hoặc bật lại) |
+| 404 | `apiclient.webhook_not_found` | Không có webhook này của khách hàng (hoặc của đơn vị vận hành khác — RLS) |
+| 409 | `apiclient.state` | Xoay bí mật / tắt webhook không `active`; bật webhook không `disabled`; đăng ký cho khách hàng chưa `active` |
+| 503 | `apiclient.dependency_unavailable` | Đăng ký / xoay bí mật khi api-platform chưa có khóa chủ `AG_WEBHOOK_KEY_V<n>` |
+| 422 | `validation_failed` | `feeds` rỗng/quá 20/sai tên, `failure_threshold` ngoài 1–100, `reason` (tắt, đóng mạch) thiếu hoặc ngoài 10–500 ký tự; `GET …/checksums`: `from_version`, `limit` (1–100), `from`/`to` sai dạng, `from` > `to` hoặc quá 31 ngày |
+| 403 | `apiclient.forbidden` | `GET /v1/feeds/{hợp đồng song phương}/checksums` thiếu scope `ingest:<hợp đồng>:write` và `feed:<hợp đồng>:read`; feed tập dữ liệu: như `GET /v1/feeds/{feed}` |
+
+Lớp lỗi của một lần giao (`error_class` ở sổ `webhook_delivery`, `breaker.last_error`, metric — không phải phản hồi HTTP): `http_status` (đầu nhận trả 4xx/5xx), `redirect` (3xx — không theo chuyển hướng), `timeout`, `dns`, `tls`, `connect`, `blocked_address` (địa chỉ THẬT lúc kết nối thuộc dải cấm — DNS rebinding), `url_rejected` (URL đã lưu không còn qua chính sách). Mọi lớp tính vào N lỗi liên tiếp của ngắt mạch.
 
 ### pf/metering (sổ đo lường sử dụng, điểm kiểm soát xuất dữ liệu, bảng kê — G5-0 đóng băng, ADR-0023, ADR-0024)
 

@@ -48,6 +48,12 @@ tags:
       `contracts/integration/feeds/<tên>.v<N>.json`, phong bì `contracts/integration/envelope/feed_page.v1.json`. Scope
       `feed:<tên>:read` (đăng ký sản phẩm tên = tên feed). Giữ 30 ngày; cursor quá hạn → 410 kèm ảnh chụp. Hợp đồng
       chưa `approved` không phục vụ ở production (ngoài production cần `AG_GATEWAY_FEED_ALLOW_PROPOSED=1`).
+  - name: webhooks
+    description: |
+      Webhook MỎNG của cổng tích hợp (W5.7, ADR-0033 §4, R-INT-07/09): thân chỉ `{feed, cursor, occurred_at}` (xem mục
+      `webhooks` → `feedCursorAdvanced`), ký HMAC-SHA256 (`AG-Webhook-Signature: t=<giây>,v1=<hex>`), không bao giờ có
+      dữ liệu nghiệp vụ. Đăng ký / xoay bí mật / tắt / đóng mạch ở Admin API (api-platform, MFA). N lần lỗi liên tiếp
+      (mặc định 5) → ngắt mạch; thử half-open sau thời gian chờ. Đối tác xem trạng thái qua `GET /v1/webhooks`.
   - name: jobs
     description: Việc xuất bất đồng bộ (R-52) và tải tệp kết quả qua API (không URL có chữ ký)
   - name: usage
@@ -306,6 +312,58 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
         "429": {$ref: "#/components/responses/TooManyRequests"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/feeds/{feed}/checksums:
+    get:
+      tags: [integration_feeds]
+      summary: Tổng kiểm đối soát (R-INT-10) — theo phiên bản tập dữ liệu hoặc theo ngày của luồng song phương
+      description: |
+        W5.7 (ADR-0033 §4, ADR-0034). Hai dạng theo `{feed}`:
+          - feed tập dữ liệu (tổng hợp, tham chiếu — cùng điều kiện truy cập như `GET /v1/feeds/{feed}`): `kind:
+            dataset_version`, mỗi phiên bản `{version, record_count, sha256}` = tổng kiểm ghi lúc dựng (SHA-256 của ảnh
+            chụp NDJSON, bất biến); `?from_version=&limit=`.
+          - hợp đồng song phương (`collection_schedule`, `roll_count_statement`, `htx_roll_confirmation`; scope
+            `ingest:<hợp đồng>:write` hoặc `feed:<hợp đồng>:read`): `kind: bilateral_day`, mỗi NGÀY nghiệp vụ (giờ VN, ngày
+            cổng nhận lô) `{date, record_count, sha256}` theo `bilateral_day.v1`: SHA-256 của các dòng
+            `<business_key>TAB<contract_version>TAB<payload_sha256>LF` sắp theo (business_key theo byte, contract_version)
+            — bên kia của cặp tính cùng công thức. TẠM trên sổ đệm của bên gọi tới khi W5.6 có sổ song phương + feed
+            cặp. `?from=&to=` (YYYY-MM-DD, tối đa 31 ngày; mặc định 7 ngày tới hôm nay).
+      operationId: getFeedChecksums
+      parameters:
+        - {name: feed, in: path, required: true, schema: {type: string, pattern: "^[a-z][a-z0-9_]{2,47}$"}}
+        - {name: from_version, in: query, schema: {type: integer, minimum: 1, default: 1}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 100}}
+        - {name: from, in: query, description: "Song phương: ngày đầu (YYYY-MM-DD)", schema: {type: string, format: date}}
+        - {name: to, in: query, description: "Song phương: ngày cuối (YYYY-MM-DD)", schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Tổng kiểm
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FeedChecksums"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/webhooks:
+    get:
+      tags: [webhooks]
+      summary: Webhook của chính khách hàng, trạng thái ngắt mạch và cursor đã báo
+      operationId: listWebhooks
+      responses:
+        "200":
+          description: Danh sách (không bao giờ có bí mật)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/WebhookStatus"}}
+        "401": {$ref: "#/components/responses/Problem"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/jobs/{id}:
     get:
       tags: [jobs]
@@ -523,6 +581,27 @@ paths:
         "422": {$ref: "#/components/responses/Problem"}
         "429": {$ref: "#/components/responses/TooManyRequests"}
         "503": {$ref: "#/components/responses/Problem"}
+webhooks:
+  feedCursorAdvanced:
+    post:
+      tags: [webhooks]
+      summary: Chỉ báo feed có mục mới (gửi tới URL đối tác đã đăng ký)
+      description: |
+        Thân CHỈ là chỉ báo cursor — đối tác gọi `GET /v1/feeds/{feed}?cursor=<cursor của mình>` để lấy dữ liệu (giao lại,
+        mất chỉ báo hay ngắt mạch đều không mất dữ liệu). Xác minh: `HMAC-SHA256(bí mật, "<t>.<thân thô>")` so với từng
+        `v1` (trong 24 giờ sau khi xoay có hai `v1`), từ chối khi |now − t| > 5 phút; idempotent theo `AG-Webhook-Id`.
+        2xx = đã nhận; 3xx (không theo chuyển hướng), 4xx, 5xx, lỗi mạng = lỗi → thử lại lùi hàm mũ có nhiễu.
+      parameters:
+        - {name: AG-Webhook-Id, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: AG-Webhook-Timestamp, in: header, required: true, schema: {type: string, pattern: "^[0-9]+$"}}
+        - {name: AG-Webhook-Signature, in: header, required: true, schema: {type: string, pattern: "^t=[0-9]+(,v1=[0-9a-f]{64})+$"}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/WebhookHint"}
+      responses:
+        "2XX": {description: Đã nhận}
 components:
   securitySchemes:
     apiKey:
@@ -831,6 +910,99 @@ components:
               op: {type: string, enum: [upsert, retract]}
               recorded_at: {type: string, format: date-time}
               record: {type: [object, "null"], description: "Một bản ghi theo hợp đồng contracts/integration/feeds/<feed>.v<N>.json"}
+    FeedChecksums:
+      type: object
+      required: [feed, kind]
+      properties:
+        feed: {type: string}
+        kind: {type: string, enum: [dataset_version, bilateral_day]}
+        versions:
+          type: array
+          items:
+            type: object
+            required: [version, contract_version, built_at, as_of, record_count, sha256]
+            properties:
+              version: {type: integer}
+              contract_version: {type: integer}
+              built_at: {type: string, format: date-time}
+              as_of: {type: string, format: date-time}
+              record_count: {type: integer}
+              sha256: {type: string, pattern: "^[0-9a-f]{64}$"}
+              snapshot: {type: [object, "null"], description: "{dataset, version, href} — chỉ đường dẫn, không URL ký"}
+        next_from_version: {type: [integer, "null"]}
+        algorithm: {type: string, enum: [bilateral_day.v1]}
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+        days:
+          type: array
+          items:
+            type: object
+            required: [date, record_count, sha256]
+            properties:
+              date: {type: string, format: date}
+              record_count: {type: integer}
+              sha256: {type: string, pattern: "^[0-9a-f]{64}$"}
+    WebhookHint:
+      type: object
+      additionalProperties: false
+      required: [feed, cursor, occurred_at]
+      properties:
+        feed: {type: string, pattern: "^[a-z][a-z0-9_]{2,47}$"}
+        cursor: {type: string, description: "Cursor mờ của mục mới nhất (như next_cursor)"}
+        occurred_at: {type: string, format: date-time}
+    WebhookStatus:
+      type: object
+      required: [id, url, feeds, status, failure_threshold, secret_version, breaker, cursors]
+      properties:
+        id: {type: string, format: uuid}
+        url: {type: string, format: uri}
+        feeds: {type: array, items: {type: string}}
+        status: {type: string, enum: [active, disabled]}
+        status_reason: {type: string}
+        failure_threshold: {type: integer, minimum: 1, maximum: 100}
+        secret_version: {type: integer}
+        previous_secret_valid_until: {type: [string, "null"], format: date-time}
+        created_at: {type: string, format: date-time}
+        breaker:
+          type: object
+          required: [state, consecutive_failures]
+          properties:
+            state: {type: string, enum: [closed, open, half_open]}
+            consecutive_failures: {type: integer}
+            opened_at: {type: [string, "null"], format: date-time}
+            next_probe_at: {type: [string, "null"], format: date-time}
+            last_success_at: {type: [string, "null"], format: date-time}
+            last_failure_at: {type: [string, "null"], format: date-time}
+            last_error:
+              type: [string, "null"]
+              description: "http_status | redirect | timeout | dns | tls | connect | blocked_address | url_rejected"
+        cursors:
+          type: array
+          items:
+            type: object
+            properties:
+              feed: {type: string}
+              notified_cursor: {type: [string, "null"]}
+              pending_attempts: {type: integer}
+              next_attempt_at: {type: [string, "null"], format: date-time}
+              last_attempt_at: {type: [string, "null"], format: date-time}
+        recent_deliveries:
+          type: array
+          description: Chỉ ở Admin API — 10 lần giao gần nhất
+          items:
+            type: object
+            properties:
+              id: {type: string, format: uuid}
+              feed: {type: string}
+              cursor: {type: string}
+              attempt: {type: integer}
+              probe: {type: boolean}
+              outcome: {type: string, enum: [delivered, failed, blocked]}
+              http_status: {type: [integer, "null"]}
+              error_class: {type: [string, "null"]}
+              breaker_state: {type: string, enum: [closed, open, half_open]}
+              at: {type: string, format: date-time}
+        secret: {type: string, pattern: "^whsec_", description: "CHỈ trong phản hồi đăng ký / xoay bí mật (Admin API), một lần"}
     SnapshotLink:
       type: object
       required: [dataset, version, contract_version, url, expires_at, content_type, checksum]

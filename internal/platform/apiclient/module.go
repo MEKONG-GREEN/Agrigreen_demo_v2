@@ -63,7 +63,10 @@ type Deps struct {
 }
 
 // Module là pf/apiclient đã nối.
-type Module struct{ svc *app.Service }
+type Module struct {
+	svc *app.Service
+	wh  webhookWiring // W5.7 (webhook_wire.go)
+}
 
 // New tạo module với pool vai apiclient_app. Ở worker, db có thể nil (handler xuất chạy trong giao
 // dịch của inbox.Process).
@@ -122,7 +125,10 @@ func (m *Module) PublicRouter(d PublicDeps) *gin.Engine {
 func (m *Module) RegisterApp(*gin.RouterGroup) {}
 
 // RegisterAdmin gắn route Admin API (MFA): khách hàng, khóa, đăng ký, gói hạn mức.
-func (m *Module) RegisterAdmin(rg *gin.RouterGroup) { handler.Admin{Svc: m.svc}.Register(rg) }
+func (m *Module) RegisterAdmin(rg *gin.RouterGroup) {
+	handler.Admin{Svc: m.svc}.Register(rg)
+	handler.Webhooks{Svc: m.Webhooks()}.Register(rg) // W5.7
+}
 
 // ExpireDueKeys ghi sự kiện expired cho mọi khóa quá hạn của tenant đơn vị vận hành tại now — thân job
 // port.JobKeyExpiry; kiểm thử gọi trực tiếp với thời điểm giả. Trả số khóa vừa chuyển expired.

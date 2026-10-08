@@ -5788,6 +5788,131 @@ paths:
               schema: {$ref: "#/components/schemas/ApiQuotaPlan"}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
+  # --- pf/apiclient W5.7: webhook mỏng + ngắt mạch (ADR-0033 §4) ---
+  /v1/api-clients/{id}/webhooks:
+    get:
+      summary: Webhook của khách hàng — trạng thái ngắt mạch, cursor đã báo, 10 lần giao gần nhất (không bí mật)
+      operationId: listApiWebhooks
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/ApiWebhook"}}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Đăng ký webhook (api_client_admin; khách hàng active; feed phải có scope feed:<tên>:read đã duyệt) — bí mật hiện MỘT lần
+      description: |
+        URL: chỉ `https`, cổng 443/8443, không userinfo/fragment, không tên máy nội bộ; IP literal và MỌI địa chỉ phân
+        giải phải ngoài dải nội bộ/loopback/link-local/metadata (kiểm lại lúc kết nối — chống DNS rebinding); tùy chọn
+        danh sách tên miền `AG_WEBHOOK_ALLOW_HOSTS`. Tối đa 5 webhook active mỗi khách hàng.
+      operationId: registerApiWebhook
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [url, feeds]
+              properties:
+                url: {type: string, format: uri, maxLength: 2048}
+                feeds: {type: array, minItems: 1, maxItems: 20, items: {type: string, pattern: "^[a-z][a-z0-9_]{2,47}$"}}
+                failure_threshold: {type: integer, minimum: 1, maximum: 100, default: 5, description: "N lỗi liên tiếp → ngắt mạch"}
+      responses:
+        "201":
+          description: "Webhook + secret (Cache-Control: no-store). Gọi lặp cùng Idempotency-Key trả bản KHÔNG có secret."
+          headers:
+            Cache-Control: {schema: {type: string, enum: [no-store]}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiWebhook"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/api-clients/{id}/webhooks/{webhook_id}/rotate-secret:
+    post:
+      summary: Xoay bí mật — bí mật cũ vẫn ký (v1 thứ hai) tới previous_secret_valid_until (24 giờ)
+      operationId: rotateApiWebhookSecret
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: webhook_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: "Webhook + secret mới (Cache-Control: no-store)"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiWebhook"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/api-clients/{id}/webhooks/{webhook_id}/disable:
+    post:
+      summary: Tắt webhook (lý do bắt buộc) — không giao nữa; đối tác vẫn đọc feed theo cursor
+      operationId: disableApiWebhook
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: webhook_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody: {$ref: "#/components/requestBodies/ApiClientReason"}
+      responses:
+        "200":
+          description: Đã tắt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiWebhook"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/api-clients/{id}/webhooks/{webhook_id}/enable:
+    post:
+      summary: Bật lại webhook đã tắt (đóng ngắt mạch)
+      operationId: enableApiWebhook
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: webhook_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Đã bật
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiWebhook"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /v1/api-clients/{id}/webhooks/{webhook_id}/reset-breaker:
+    post:
+      summary: Đóng ngắt mạch thủ công sau khi đối tác sửa đầu nhận (lý do bắt buộc)
+      operationId: resetApiWebhookBreaker
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: webhook_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody: {$ref: "#/components/requestBodies/ApiClientReason"}
+      responses:
+        "200":
+          description: Mạch đã đóng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ApiWebhook"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   # --- hết pf/party KN v7.7 gói P2 ---
 components:
   securitySchemes:
@@ -7539,6 +7664,57 @@ components:
         approved_at: {type: [string, "null"], format: date-time}
         revoked_at: {type: [string, "null"], format: date-time}
         revoke_reason: {type: [string, "null"]}
+    ApiWebhook:
+      type: object
+      description: Webhook mỏng (W5.7) — không bao giờ có nonce/khóa; secret CHỈ trong phản hồi đăng ký/xoay.
+      required: [id, url, feeds, status, failure_threshold, secret_version, breaker, cursors]
+      properties:
+        id: {type: string, format: uuid}
+        url: {type: string, format: uri}
+        feeds: {type: array, items: {type: string}}
+        status: {type: string, enum: [active, disabled]}
+        status_reason: {type: string}
+        failure_threshold: {type: integer}
+        secret_version: {type: integer}
+        previous_secret_valid_until: {type: [string, "null"], format: date-time}
+        created_at: {type: string, format: date-time}
+        secret: {type: string, pattern: "^whsec_"}
+        breaker:
+          type: object
+          required: [state, consecutive_failures]
+          properties:
+            state: {type: string, enum: [closed, open, half_open]}
+            consecutive_failures: {type: integer}
+            opened_at: {type: [string, "null"], format: date-time}
+            next_probe_at: {type: [string, "null"], format: date-time}
+            last_success_at: {type: [string, "null"], format: date-time}
+            last_failure_at: {type: [string, "null"], format: date-time}
+            last_error: {type: [string, "null"]}
+        cursors:
+          type: array
+          items:
+            type: object
+            properties:
+              feed: {type: string}
+              notified_cursor: {type: [string, "null"]}
+              pending_attempts: {type: integer}
+              next_attempt_at: {type: [string, "null"], format: date-time}
+              last_attempt_at: {type: [string, "null"], format: date-time}
+        recent_deliveries:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: string, format: uuid}
+              feed: {type: string}
+              cursor: {type: string}
+              attempt: {type: integer}
+              probe: {type: boolean}
+              outcome: {type: string, enum: [delivered, failed, blocked]}
+              http_status: {type: [integer, "null"]}
+              error_class: {type: [string, "null"]}
+              breaker_state: {type: string, enum: [closed, open, half_open]}
+              at: {type: string, format: date-time}
     ApiQuotaPlan:
       type: object
       required: [version, requests_per_minute, daily_units, monthly_units, max_export_rows, effective_from, status, proposed_by, proposed_at]

@@ -156,6 +156,7 @@ func NewRouter(d Deps) *gin.Engine {
 	registerBatches(s, v1) // W5.4
 	s.registerFeeds(v1)    // W5.3
 	registerFiles(s, v1)   // W5.8
+	s.registerWebhooks(v1) // W5.7: /v1/webhooks, /v1/feeds/{feed}/checksums
 	return r
 }
 
