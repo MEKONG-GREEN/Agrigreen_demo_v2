@@ -10,6 +10,7 @@ depends:
   mkg/measurement: ">=1.0 <2"
 provides:
   ports:
+    - DirectoryFeed
     - HTXResponseFeed
     - HarvestCalendar
     - KgPerRollEstimates

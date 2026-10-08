@@ -15,8 +15,8 @@ func TestEmbeddedContractsLoad_W51(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		"admin_units.v1", "collection_schedule.v1", "collection_volume_by_commune.v1", "harvest_progress_by_commune.v1",
-		"htx_roll_confirmation.v1", "roll_count_statement.v1", "season_harvest_dates.v1", "waterway_routes.v1",
+		"admin_units.v1", "collection_schedule.v1", "collection_volume_by_commune.v1", "cooperative_directory.v1", "harvest_progress_by_commune.v1",
+		"htx_roll_confirmation.v1", "plot_directory.v1", "roll_count_statement.v1", "season_harvest_dates.v1", "waterway_routes.v1",
 	}
 	if len(all) != len(want) {
 		t.Fatalf("muốn %d hợp đồng, có %d", len(want), len(all))

@@ -17,6 +17,8 @@ provides:
     - Contributors
     - HubCapacitySource
     - MRVPackageSource
+    - PartnerGrantors
+    - PartnerSource
     - Plans
     - TokenAuthenticator
   events: [pf.apiclient.export.requested/v1]

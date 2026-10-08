@@ -55,6 +55,18 @@ func (s *Service) BuildAll(ctx context.Context) ([]BuildResult, error) {
 		}
 		out = append(out, r)
 	}
+	// W5.5: feed lớp partner theo bên cấp — chỉ khi gốc lắp ráp đã nối nguồn + danh sách bên cấp.
+	for _, f := range PartnerFeeds {
+		if s.Grantors == nil || s.PartnerSources[f] == nil {
+			continue
+		}
+		rs, err := s.BuildPartner(ctx, f)
+		out = append(out, rs...)
+		if err != nil {
+			s.log().ErrorContext(ctx, "feed: dựng tập dữ liệu lỗi", "event", "integration.dataset_build_failed", "dataset", f, "outcome", "error", "error", err.Error())
+			errs = append(errs, fmt.Errorf("%s: %w", f, err))
+		}
+	}
 	return out, errors.Join(errs...)
 }
 

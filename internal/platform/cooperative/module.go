@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/app"
 	memberapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/member/app"
 	memberhttp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/member/handler"
@@ -28,6 +29,7 @@ import (
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port/grantlookup"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/cropcyclesrc"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -155,6 +157,12 @@ func (m *Module) Resolve() port.Resolve { return m.svc }
 
 // CoopProfiles cho pf/party: hồ sơ HTX (tạo HTX hai bước, màn HTX, danh bạ đối tác).
 func (m *Module) CoopProfiles() partyport.CoopProfiles { return m.member }
+
+// CoopLocations (W5.5) cho party/port/grantlookup: vị trí hồ sơ HTX của bên cấp cho feed cooperative_directory.
+func (m *Module) CoopLocations() grantlookup.CoopLocations { return m.member }
+
+// PartnerFeedSource (W5.5) là nguồn bản ghi feed plot_directory theo bên cấp cho job dựng feed của pf/apiclient.
+func (m *Module) PartnerFeedSource() apiclientport.PartnerSource { return m.plot }
 
 // PartyHouseholds cho pf/accounts (liên kết tài khoản nông dân ↔ nông hộ): xã viên của hộ.
 func (m *Module) PartyHouseholds() partyport.Households {

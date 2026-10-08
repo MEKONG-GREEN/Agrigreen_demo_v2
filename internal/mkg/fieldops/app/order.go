@@ -90,8 +90,16 @@ func (s *Service) validatePlan(ctx context.Context, tid uuid.UUID, in PlanInput)
 	if bad {
 		return pl, v
 	}
-	if s.DirectoryUnconfigured || s.Directory == nil {
+	if !s.directoryConfigured() {
 		return pl, ErrDirectory // chưa cấu hình nguồn thửa/HTX: đóng
+	}
+	if s.feedSource() {
+		// W5.5: bản sao dựng từ feed của cổng tích hợp — không gọi nền tảng trong thao tác người dùng.
+		snap, maxAge, err := s.feedSnapshot(ctx, tid, in.HTXRef, pl.plots)
+		if err != nil {
+			return pl, mapErr(err)
+		}
+		return checkDirectory(pl, snap, s.Clock.Now(), maxAge)
 	}
 	snap, err := s.dirReplica().load(ctx, tid, in.HTXRef, pl.plots)
 	if err != nil {

@@ -4,7 +4,7 @@ Kiến trúc v4.1 §38–§42 (R-INT-01…11), [ADR-0033](../../docs/adr/0033-co
 
 Lược đồ dùng chung tập con JSON Schema của van công bố — `contracts/publication.Node` — và cùng hàm `Validate` (mặc định từ chối khóa lạ ở mọi cấp).
 
-## Hợp đồng hiện có (W5.1)
+## Hợp đồng hiện có (W5.1, W5.5)
 
 Tất cả ở trạng thái **`proposed`**: ADR-0033/0034/0035 chờ MKG ký (A7). `proposed_by`/`approved_by` là **vai giữ chỗ**. `proposed` chỉ phục vụ ngoài production (`Servable`).
 
@@ -13,6 +13,8 @@ Tất cả ở trạng thái **`proposed`**: ADR-0033/0034/0035 chờ MKG ký (A
 | [`harvest_progress_by_commune`](feeds/harvest_progress_by_commune.v1.json) | feed | licensed | `aggregate` (k) | `area_code:season_code` | PT15M | A7, **C-4, K-8** | — |
 | [`collection_volume_by_commune`](feeds/collection_volume_by_commune.v1.json) | feed | licensed | `aggregate` (k) | `area_code:season_code:period_month` | P1D | A7, C-4, K-8 | `dataproduct/collection_volume` (ADR-0035 §4) |
 | [`season_harvest_dates`](feeds/season_harvest_dates.v1.json) | feed | licensed | `partner` / `season_harvest_dates` | `season_ref` | P1D | A7 | `GET /v1/partner/season-harvest-dates` |
+| [`cooperative_directory`](feeds/cooperative_directory.v1.json) (W5.5) | feed | licensed | `partner` / `cooperative_directory`, theo bên cấp | `cooperative_ref` | PT6H | A7 | `GET /v1/partner/cooperatives` |
+| [`plot_directory`](feeds/plot_directory.v1.json) (W5.5) | feed | licensed | `partner` / `plot_directory`, theo bên cấp (v1 không hình học) | `plot_ref` | PT6H | A7 | `GET /v1/partner/plots` |
 | [`waterway_routes`](feeds/waterway_routes.v1.json) | feed | reference | `reference` | `network_version_ref` | PT1H | A7 | — (đồ thị ở ảnh chụp) |
 | [`admin_units`](feeds/admin_units.v1.json) | feed | reference, có hiệu lực theo thời gian + kế thừa | `reference` | `code:valid_from` | P1D | A7, **C-9** | — |
 | [`collection_schedule`](ingest/collection_schedule.v1.json) | nạp | **bilateral** (MKG ghi) | `bilateral` | `schedule_ref` | PT15M | A7, **C-12** | van `collection_schedule` (lược đồ dùng nguyên) |
@@ -20,6 +22,8 @@ Tất cả ở trạng thái **`proposed`**: ADR-0033/0034/0035 chờ MKG ký (A
 | [`htx_roll_confirmation`](ingest/htx_roll_confirmation.v1.json) | nạp | **bilateral** (HTX ghi) | `bilateral` | `confirmation_ref` | PT1H | A7, **C-12** | `GET /v1/partner/htx-collection/responses` |
 
 **Ngưỡng k (C-4/K-8 chưa ký).** Tập tổng hợp khai `aggregation.k_param` (tham số `pf/masterdata` có phiên bản, hiện `publicdata.k_min`) và `k_default` tạm = 10. Job dựng (W5.3) đọc tham số, **từ chối chạy** nếu nhỏ hơn k đã ký, ghi `dataset.k_used` vào mỗi phiên bản; `contractcheck` bắt mẫu có `k_used < k_default`. Đổi k **không** đổi hợp đồng (k là tham số, không phải trường), nhưng là thay đổi chính sách: đổi `k_default` cần người đề xuất ≠ người phê duyệt như mọi sửa hợp đồng. Quy tắc ẩn: ô dưới k bị bỏ (`op: retract` nếu đã phát), dòng `province_withheld` chỉ khi chính nó ≥ k, ẩn ô bù (`complementary_suppression`), trễ ẩn tới k + `hysteresis` (ADR-0035 §3).
+
+**Lớp `partner` (W5.5).** Tập theo bên cấp: job dựng một phân vùng (`partition_key` = tenant bên cấp) cho mỗi bên cấp đang có cấp quyền `grant_kind` cho một khách hàng API có đăng ký feed; cổng kiểm cấp quyền ở mỗi lời gọi (thu hồi → 403 `party.share_grant_missing`) và ghi sổ đọc ở tenant bên cấp. Không theo phiên bản, không ảnh chụp: mọi bản ghi còn hiệu lực được phát lại ≤ 7 ngày nên phần còn giữ 30 ngày là trạng thái đầy đủ.
 
 **Song phương (ADR-0034, Đề xuất, chờ C-12).** Chỉ hai bên (`party_a` = MKG, `party_b` = HTX) thấy bản ghi; không bao giờ có `aggregation`, không vào `contracts/dataproduct`, `r_agg`, view `_pub`. Bên kia đọc qua feed của cặp `GET /v1/feeds/bilateral?pair=…` — trang dùng phong bì `feed_page` với `items[].contract` = `<tên>.v<N>`. Không bật production trước C-12; `household_payment` chỉ thêm khi C-12 chấp nhận.
 

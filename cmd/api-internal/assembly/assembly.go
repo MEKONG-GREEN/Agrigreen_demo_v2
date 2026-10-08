@@ -9,6 +9,7 @@ package assembly
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -87,6 +88,9 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules,
 	rolls := &mkgwire.Rolls{}
 	mods.Measurement = measurement.New(unit, clk, measurement.Deps{Rolls: rolls, Origins: mods.Hub.LotOrigins(), Plots: rolls})
 	fo := FieldopsOptionsFromEnv(clk)
+	if fo.DirectorySource, err = DirectorySourceFromEnv(fo.DirectoryFeed != nil); err != nil {
+		return mods, ops, pools, err
+	}
 	// kg/cuộn học từ khối lượng cân HUB_IN (CUSTOMER_IN với tuyến DIRECT) của mkg/measurement,
 	// lệnh gom → lô cân qua liên kết lot_collection (đường làm mới tay; consumer
 	// mkg.fieldops.weigh_ticket ở worker-internal là đường chính).
@@ -165,6 +169,19 @@ func Jobs(mods Modules, tenantPool *pgxpool.Pool, selected string, log *slog.Log
 		}
 		out = append(out, mods.Fieldops.DirectoryJobs(tid, interval, log)...)
 	}
+	if picked(foport.JobDirectoryFeed) {
+		// W5.5 (ADR-0033 §5): bản sao danh bạ HTX/thửa từ feed của cổng tích hợp, chạy song song với fieldops_directory
+		// (đối soát hai nguồn ghi log). Thiếu AG_MKG_TENANT_ID hoặc cấu hình feed → không có job.
+		tid, err := EnvUUID("AG_MKG_TENANT_ID")
+		if err != nil {
+			return nil, err
+		}
+		interval, err := EnvDuration("AG_FIELDOPS_DIRECTORY_FEED_INTERVAL")
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, mods.Fieldops.DirectoryFeedJobs(tid, interval, log)...)
+	}
 	if picked(logistics.JobAlerts) {
 		// L-08: cảnh báo ghe chưa cân > N giờ, đăng kiểm hết / sắp hết hạn (AG_LOGISTICS_ALERT_INTERVAL, mặc định 15m).
 		interval, err := EnvDuration("AG_LOGISTICS_ALERT_INTERVAL")
@@ -216,7 +233,7 @@ func EnvDuration(name string) (time.Duration, error) {
 
 // JobNames liệt kê tên job hợp lệ của api-internal.
 func JobNames() string {
-	return hubport.JobDailyCapacity + ", " + foport.JobHTXResponses + ", " + foport.JobHarvestDates + ", " + foport.JobDirectory + ", " +
+	return hubport.JobDailyCapacity + ", " + foport.JobHTXResponses + ", " + foport.JobHarvestDates + ", " + foport.JobDirectory + ", " + foport.JobDirectoryFeed + ", " +
 		logistics.JobAlerts + ", " + acctbridge.JobPushRetry
 }
 
@@ -239,6 +256,11 @@ func JobNames() string {
 //	AG_FIELDOPS_DIRECTORY_MAX_AGE tuổi tối đa của bản sao trước khi lệnh gom gắn cờ fieldops.directory_stale (mặc định 6h)
 //	AG_FIELDOPS_DIRECTORY_LOOKUP_BUDGET tổng thời gian tra trực tiếp HTX/thửa CHƯA có trong bản sao khi lập/sửa lệnh gom
 //	    (mặc định 2s; "off" = chỉ bản sao, không gọi nền tảng trong thao tác người dùng — R-INT-02)
+//	AG_INTEGRATION_GATEWAY_URL, AG_FIELDOPS_FEED_API_KEY (W5.5, ADR-0033 §5) gốc cổng tích hợp + khóa API của khách hàng
+//	    API tenant MKG (scope feed:cooperative_directory:read, feed:plot_directory:read); bên cấp = AG_PARTNER_GRANTOR_TENANT.
+//	    Có cả hai → job fieldops_directory_feed (AG_FIELDOPS_DIRECTORY_FEED_INTERVAL, mặc định 15m) kéo feed danh bạ và
+//	    đối soát với bản sao cũ.
+//	AG_FIELDOPS_DIRECTORY_SOURCE partner (mặc định) | feed — nguồn đối chiếu của lập/sửa lệnh gom (DirectorySourceFromEnv).
 //
 // WeighedMass (mkg/measurement) nối trong Build.
 func FieldopsOptionsFromEnv(clk clock.Clock) fieldops.Options {
@@ -252,6 +274,10 @@ func FieldopsOptionsFromEnv(clk clock.Clock) fieldops.Options {
 		o.Directory = fieldops.NewPlatformDirectory(cfg, clk)
 		o.Feed = fieldops.NewPlatformFeed(cfg, clk)
 		o.Harvest = fieldops.NewPlatformHarvestCalendar(cfg, clk)
+	}
+	if gw, key := strings.TrimSpace(os.Getenv("AG_INTEGRATION_GATEWAY_URL")), os.Getenv("AG_FIELDOPS_FEED_API_KEY"); gw != "" && key != "" {
+		o.DirectoryFeed = fieldops.NewGatewayDirectoryFeed(fieldops.GatewayConfig{BaseURL: gw, APIKey: key,
+			GrantorTenant: strings.TrimSpace(os.Getenv("AG_PARTNER_GRANTOR_TENANT"))})
 	}
 	if s := os.Getenv("AG_FIELDOPS_KG_PER_ROLL"); s != "" {
 		if d, err := decimal.NewFromString(s); err == nil && d.Sign() > 0 {
@@ -274,6 +300,23 @@ func FieldopsOptionsFromEnv(clk clock.Clock) fieldops.Options {
 		}
 	}
 	return o
+}
+
+// DirectorySourceFromEnv đọc AG_FIELDOPS_DIRECTORY_SOURCE (W5.5): rỗng / "partner" → bản sao cũ qua /v1/partner/*;
+// "feed" → bản sao dựng từ feed của cổng tích hợp (cần cấu hình feed — haveFeed). Giá trị khác, hoặc "feed" khi chưa cấu
+// hình feed → lỗi khởi động (gõ nhầm không được lặng lẽ đổi nguồn).
+func DirectorySourceFromEnv(haveFeed bool) (string, error) {
+	switch v := strings.TrimSpace(os.Getenv("AG_FIELDOPS_DIRECTORY_SOURCE")); v {
+	case "", foport.DirectorySourcePartner:
+		return foport.DirectorySourcePartner, nil
+	case foport.DirectorySourceFeed:
+		if !haveFeed {
+			return "", errors.New("AG_FIELDOPS_DIRECTORY_SOURCE=feed cần AG_INTEGRATION_GATEWAY_URL và AG_FIELDOPS_FEED_API_KEY")
+		}
+		return v, nil
+	default:
+		return "", fmt.Errorf("AG_FIELDOPS_DIRECTORY_SOURCE phải là partner | feed, nhận %q", v)
+	}
 }
 
 // DocumentStoreFromEnv chọn kho đối tượng trong lãnh thổ cho tệp chứng từ vùng mkg (AG_S3_* | AG_OBJSTORE_DIR,

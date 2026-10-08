@@ -92,6 +92,11 @@ type publishInput struct {
 	hysteresis    *int
 	contributors  *int
 	shape         func(tx pgx.Tx, prevHidden map[string]bool) (shaped, error)
+	// refresh > 0 (feed lớp partner, W5.5): phát lại bản ghi còn hiệu lực có lần phát gần nhất cũ hơn refresh
+	// (port.PartnerFeedRefresh) — phần feed còn giữ luôn là trạng thái đầy đủ.
+	refresh time.Duration
+	// touch (feed lớp partner, W5.5): lần dựng không đổi vẫn nâng mốc as_of của đầu feed (store.TouchFeedHead).
+	touch bool
 }
 
 func (s *Service) operatorTx(ctx context.Context, fn func(tx pgx.Tx) error) error {
@@ -163,10 +168,16 @@ func (s *Service) publish(ctx context.Context, in publishInput) (BuildResult, er
 		}
 		var changes []change
 		seen := map[string]bool{}
+		var due map[string]bool
+		if in.refresh > 0 {
+			if due, err = store.RefreshDue(ctx, tx, c.Name, in.partition, in.refresh); err != nil {
+				return err
+			}
+		}
 		for _, r := range recs {
 			seen[r.EntityKey] = true
 			sha := domain.RecordSHA256(r.Record)
-			if p, ok := prev[r.EntityKey]; !ok || p.SHA256 != sha {
+			if p, ok := prev[r.EntityKey]; !ok || p.SHA256 != sha || due[r.EntityKey] {
 				changes = append(changes, change{key: r.EntityKey, rec: r.Record, sha: sha})
 				res.Upserts++
 			}
@@ -206,6 +217,9 @@ func (s *Service) publish(ctx context.Context, in publishInput) (BuildResult, er
 			}
 		}
 		if !res.Changed {
+			if in.touch {
+				return store.TouchFeedHead(ctx, tx, c.Name, in.partition, now)
+			}
 			return nil
 		}
 		entries := make([]store.FeedEntry, len(changes))

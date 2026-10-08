@@ -78,7 +78,13 @@ type Service struct {
 	// Harvest: ngày gặt theo vụ của thửa (bề mặt partner của nền tảng, FM-01/02); nil = chưa
 	// nối → mọi kiểm ngày gặt gắn cờ unavailable (vẫn cho ghi, không bao giờ im lặng).
 	Harvest port.HarvestCalendar
+	// DirectoryFeed (W5.5): feed danh bạ HTX/thửa của cổng tích hợp; nil = chưa cấu hình (không job feed).
+	DirectoryFeed port.DirectoryFeed
+	// DirectorySource (W5.5, AG_FIELDOPS_DIRECTORY_SOURCE): nguồn đối chiếu của lập/sửa lệnh gom —
+	// port.DirectorySourcePartner (rỗng = mặc định, bản sao cũ) | port.DirectorySourceFeed (app/directoryfeed.go).
+	DirectorySource string
 
+	feeds   feedRepo // nil = bảng feed của cụm mkg (kiểm thử đơn vị thay bản giả)
 	feed    feedState
 	replica directoryReplica // nil = bảng bản sao của cụm mkg (kiểm thử đơn vị thay bản giả)
 	metrics feedMetrics

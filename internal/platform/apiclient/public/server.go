@@ -215,6 +215,7 @@ type result struct {
 	rows            int64
 	dataTenant      uuid.UUID             // bên cấp có dữ liệu được phục vụ (2xx)
 	grant           *partyport.ShareGrant // cấp quyền dp_* đã kiểm cho dữ liệu được phục vụ (sổ đọc K-05)
+	grantKind       string                // loại cấp quyền của sổ đọc khi khác dp_<product> (feed lớp partner, W5.5)
 	product         string
 	contractVersion int
 	replayed        bool
@@ -329,7 +330,11 @@ func (s *Server) handle(sp spec, fn handlerFn) gin.HandlerFunc {
 		// lời gọi với status 503, 0 đơn vị.
 		if res.grant != nil && res.status >= 200 && res.status <= 299 && s.d.Reads != nil {
 			q := c.Request.URL.RawQuery
-			if rerr := s.d.Reads.RecordRead(ctx, *res.grant, partyport.PartnerRead{Kind: partyport.DataProductKind(res.product),
+			kind := res.grantKind
+			if kind == "" {
+				kind = partyport.DataProductKind(res.product)
+			}
+			if rerr := s.d.Reads.RecordRead(ctx, *res.grant, partyport.PartnerRead{Kind: kind,
 				Endpoint: routeTemplate(c), Query: q, Items: int(res.rows)}); rerr != nil {
 				if res.stream != nil {
 					_ = res.stream.Close()

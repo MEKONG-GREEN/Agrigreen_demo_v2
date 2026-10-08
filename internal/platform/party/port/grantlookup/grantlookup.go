@@ -5,7 +5,8 @@
 // diện) và handler Application/Admin. Gốc lắp ráp chỉ được import gốc module hoặc port/ (R-02), nên
 // bộ điều hợp nằm dưới port/: chỉ phụ thuộc party/port, party/store (SQL, không vault) và shared/*.
 // Ngữ nghĩa trùng app.Sharing.ActiveGrant (app/ gọi lại chính gói này): cùng truy vấn hai phía như
-// Authorize, nhưng không kiểm vai OIDC — vì vậy CHỈ nhận loại sản phẩm dữ liệu dp_*.
+// Authorize, nhưng không kiểm vai OIDC — vì vậy CHỈ nhận loại sản phẩm dữ liệu dp_* và loại feed lớp partner
+// của cổng tích hợp (port.FeedKinds — cooperative_directory, plot_directory; W5.5).
 //
 // Đọc bằng pool vai party_app (R-05), tenant.WithTenantTx ở tenant bên nhận; không BYPASSRLS.
 package grantlookup
@@ -13,7 +14,6 @@ package grantlookup
 import (
 	"context"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,6 +32,8 @@ import (
 type Lookup struct {
 	DB    tenant.Beginner // pool đã bọc r_party (New)
 	Clock clock.Clock
+	// Locations (W5.5/W3.3): vị trí hồ sơ HTX cho feed cooperative_directory (pf/cooperative); nil → tọa độ null.
+	Locations CoopLocations
 }
 
 var (
@@ -51,10 +53,8 @@ func New(db tenant.Beginner, clk clock.Clock) *Lookup {
 	return &Lookup{DB: shareddb.ForModule(db, dbModule), Clock: clk}
 }
 
-// dataProductKind: chỉ loại dp_* hợp lệ (ShareKinds) mới đi qua cổng không vai OIDC.
-func dataProductKind(kind string) bool {
-	return port.ValidKind(kind) && strings.HasPrefix(kind, port.DataProductKind(""))
-}
+// gatewayKind: chỉ loại dp_* hợp lệ và loại feed lớp partner (port.FeedKinds, W5.5) mới đi qua cổng không vai OIDC.
+func gatewayKind(kind string) bool { return port.GatewayKind(kind) }
 
 func (l *Lookup) active(ctx context.Context, grantee uuid.UUID, kind string, grantor uuid.UUID, at time.Time) ([]store.Inbound, error) {
 	var out []store.Inbound
@@ -67,11 +67,11 @@ func (l *Lookup) active(ctx context.Context, grantee uuid.UUID, kind string, gra
 }
 
 // ActiveGrant cài đặt port.GrantLookup: cấp quyền active, trong hạn tại at (zero = giờ đồng hồ),
-// bên cấp grantor (Nil = chỉ khi đúng một bên cấp) → bên nhận grantee, loại kind dp_*. Thiếu / hết
+// bên cấp grantor (Nil = chỉ khi đúng một bên cấp) → bên nhận grantee, loại kind dp_* hoặc port.FeedKinds. Thiếu / hết
 // hạn / chưa hiệu lực / thu hồi / loại lạ → party.share_grant_missing; nhiều bên cấp + grantor Nil →
 // party.share_grantor_ambiguous.
 func (l *Lookup) ActiveGrant(ctx context.Context, grantee, grantor uuid.UUID, kind string, at time.Time) (port.ShareGrant, error) {
-	if grantee == uuid.Nil || !dataProductKind(kind) {
+	if grantee == uuid.Nil || !gatewayKind(kind) {
 		return port.ShareGrant{}, port.ErrShareGrantMissing
 	}
 	if at.IsZero() {
@@ -93,10 +93,10 @@ func (l *Lookup) ActiveGrant(ctx context.Context, grantee, grantor uuid.UUID, ki
 	return port.ShareGrant{ID: in.GrantID, Grantor: in.Grantor, Grantee: in.TenantID, Kinds: in.Kinds, ValidFrom: in.ValidFrom, ValidTo: in.ValidTo}, nil
 }
 
-// ActiveGrantors liệt kê mọi bên cấp đang có cấp quyền loại kind (dp_*) cho grantee tại at — chỉ để
+// ActiveGrantors liệt kê mọi bên cấp đang có cấp quyền loại kind (dp_* hoặc port.FeedKinds) cho grantee tại at — chỉ để
 // điền danh mục /v1/data-products (apiclient/public.GrantorLister). Loại khác → rỗng.
 func (l *Lookup) ActiveGrantors(ctx context.Context, grantee uuid.UUID, kind string, at time.Time) ([]uuid.UUID, error) {
-	if grantee == uuid.Nil || !dataProductKind(kind) {
+	if grantee == uuid.Nil || !gatewayKind(kind) {
 		return nil, nil
 	}
 	if at.IsZero() {
@@ -120,14 +120,14 @@ const maxQuery = 500
 
 // RecordRead cài đặt port.APIReadLog (K-05, KN US-MRV-05): MỘT dòng partner_read_log ở tenant BÊN CẤP
 // cho một lần đọc của khách hàng Public API. Người đọc lấy từ authz.APIClient trong context (không
-// bao giờ từ request): tenant bên nhận phải = g.Grantee, actor_ref = mã khách hàng API. Chỉ loại dp_*
+// bao giờ từ request): tenant bên nhận phải = g.Grantee, actor_ref = mã khách hàng API. Chỉ loại dp_* (hoặc port.FeedKinds)
 // mà cấp quyền có. idem_key theo mã yêu cầu (AG-Request-Id) nên ghi lại trong cùng yêu cầu không thêm
 // dòng. Không qua kênh partner_share: egress public_api đã ghi cùng sổ sử dụng (ADR-0023). Lỗi →
 // port.ErrPartnerAuditUnavailable (module gọi không trả dữ liệu).
 func (l *Lookup) RecordRead(ctx context.Context, g port.ShareGrant, r port.PartnerRead) error {
 	c, ok := authz.APIClientFrom(ctx)
 	if !ok || c.ClientID == uuid.Nil || c.TenantID == uuid.Nil || c.TenantID != g.Grantee ||
-		g.Grantor == uuid.Nil || g.ID == uuid.Nil || !dataProductKind(r.Kind) || !g.Covers(r.Kind) {
+		g.Grantor == uuid.Nil || g.ID == uuid.Nil || !gatewayKind(r.Kind) || !g.Covers(r.Kind) {
 		return port.ErrPartnerAuditUnavailable
 	}
 	var q *string

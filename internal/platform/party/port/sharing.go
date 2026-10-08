@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -127,6 +128,18 @@ var ShareKinds = []string{KindCooperativeDirectory, KindPlotDirectory, KindSeaso
 
 // DataProductKind trả loại cấp quyền của một sản phẩm dữ liệu Public API: "dp_<product>".
 func DataProductKind(product string) string { return "dp_" + product }
+
+// FeedKinds (W5.5, ADR-0033 §2, §5) là các loại cấp quyền lớp partner phục vụ qua feed của cổng tích hợp
+// (GET /v1/feeds/<loại> — hợp đồng contracts/integration/feeds/<loại>.v<N>.json có grant_kind = loại): khách hàng
+// API đã xác thực bằng khóa (không vai OIDC) đọc được, như loại dp_*. Thêm loại ở đây = mở loại đó cho cổng (sửa
+// ADR-0033, hợp đồng feed, producer) — các loại khác vẫn chỉ qua /v1/partner/* (vai mkg_sync) tới W5.10.
+var FeedKinds = []string{KindCooperativeDirectory, KindPlotDirectory}
+
+// GatewayKind cho biết k đọc được qua cổng không vai OIDC (party/port/grantlookup): loại dp_* hợp lệ hoặc loại
+// trong FeedKinds.
+func GatewayKind(k string) bool {
+	return ValidKind(k) && (strings.HasPrefix(k, DataProductKind("")) || slices.Contains(FeedKinds, k))
+}
 
 // ShareGrantApprovalKind là loại yêu cầu duyệt của đề xuất cấp quyền trong cap/workflow (W6.1).
 const ShareGrantApprovalKind = "party.share_grant"

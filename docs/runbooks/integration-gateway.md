@@ -134,3 +134,38 @@ Tập có nguồn: `admin_units` (bảng chiếu `k_ref.admin_unit` của tenant
 - 500 `apiclient.contract_violation` ở `GET /v1/feeds/*`: bản ghi trong kho lệch hợp đồng hiện hành (thường do đổi hợp đồng không tăng phiên bản) — không sửa kho (trigger chặn); phát phiên bản hợp đồng mới `v<N+1>`.
 - Đối tác nhận 410 `integration.cursor_expired`: tải ảnh chụp ở `snapshot.href`, kiểm `checksum.sha256`, rồi đọc feed không tham số `cursor`.
 - Kho feed không được xóa tay: chỉ `pf_apiclient.purge_feed_entries` (job) xóa được mục đã quá 30 ngày.
+
+## W5.5 — MKG đọc danh bạ HTX/thửa qua feed
+
+ADR-0033 §2, §5. Feed lớp `partner` `cooperative_directory`, `plot_directory` thay `/v1/partner/cooperatives`, `/plots`; chạy **song song** với bề mặt cũ một kỳ phát hành (W5.10 gỡ).
+
+**Cấp quyền + khách hàng API (bốn mắt mỗi bước).**
+1. Bên cấp (tenant chương trình) đề xuất + duyệt cấp quyền chia sẻ có loại `cooperative_directory`, `plot_directory` cho tenant MKG (Admin API `/v1/share-grants`, như ADR-0020) — thường đã có từ G3.
+2. Đơn vị vận hành tạo khách hàng API `client_tenant_id` = tenant MKG, đăng ký `product = cooperative_directory` (scope `feed:cooperative_directory:read`) và `plot_directory` (scope `feed:plot_directory:read`), gói hạn mức, phát hành khóa; giao bí mật khóa qua kho bí mật vùng mkg.
+3. Ngoài production, hợp đồng còn `proposed` cần `AG_GATEWAY_FEED_ALLOW_PROPOSED=1` ở cổng; production chờ A7 (hợp đồng `approved`).
+
+**Dựng (cmd/worker).** Cùng job `apiclient_feed_build`: mỗi bên cấp đang có cấp quyền cho một bên nhận có đăng ký → một phân vùng; bản ghi còn hiệu lực phát lại mỗi ≤ 7 ngày. Không cấu hình thêm. Log `integration.dataset_built dataset=cooperative_directory …` mỗi bên cấp.
+
+**MKG (cmd/api-internal).**
+
+| Biến | Ý nghĩa |
+|---|---|
+| `AG_INTEGRATION_GATEWAY_URL` | Gốc cổng tích hợp (vd `https://partner.<domain>`) |
+| `AG_FIELDOPS_FEED_API_KEY` | Khóa API của khách hàng API tenant MKG (bí mật — không log) |
+| `AG_PARTNER_GRANTOR_TENANT` | Bên cấp (tham số `grantor`); rỗng → chỉ khi đúng một bên cấp |
+| `AG_FIELDOPS_DIRECTORY_FEED_INTERVAL` | Chu kỳ job `fieldops_directory_feed`, mặc định `15m` |
+| `AG_FIELDOPS_DIRECTORY_SOURCE` | `partner` (mặc định — bản sao cũ) \| `feed` — nguồn đối chiếu của lập/sửa lệnh gom. `feed` mà thiếu hai biến đầu → không khởi động |
+
+Job `fieldops_directory_feed` (`AG_MKG_JOBS`, cần `AG_MKG_TENANT_ID`) kéo hai feed vào `mkg_fieldops.directory_feed_*` (mkg 000036) rồi đối soát với bản sao cũ (`directory_*_replica`, job `fieldops_directory`).
+
+**Chuyển nguồn (một kỳ phát hành).**
+1. Bật job feed, giữ `AG_FIELDOPS_DIRECTORY_SOURCE=partner`.
+2. Theo dõi log `fieldops.directory_source_compare` (`outcome=match`) và `fieldops.directory_source_diff` (`kind` = `feed_missing` | `legacy_absent` | `mismatch`, `field`). Khác biệt kéo dài quá một chu kỳ dựng (15 phút) + một chu kỳ làm mới bản sao cũ → điều tra (cấp quyền khác nhau giữa hai đường, dữ liệu bên cấp đổi giữa hai lượt).
+3. Khớp liên tục ≥ 14 ngày → đặt `AG_FIELDOPS_DIRECTORY_SOURCE=feed`, khởi động lại `api-internal`. Lùi: đặt lại `partner`.
+4. Điều kiện W5.10 (ADR-0033 §7.3) thêm metric `partner_legacy_calls_total` = 0 (chưa có — xem ghi lệch W5.5).
+
+**Sự cố.**
+- Log job `outcome=revoked`: cổng trả 403 `party.share_grant_missing` — bên cấp thu hồi / cấp quyền hết hạn. Bản sao feed đã xóa; ở nguồn `feed` mọi lệnh gom mới bị từ chối `fieldops.htx_not_found`. Cấp lại → lượt sau đọc lại từ đầu.
+- Log job `outcome=stale` / lệnh gom có cảnh báo `fieldops.directory_stale`: dữ liệu quá `max_age` (PT6H) — cổng ngừng, khóa hết hạn (401), hạn mức (429), hoặc job dựng phía nền tảng ngừng (as_of không tiến). Xem `last_error` trong `mkg_fieldops.directory_feed_state`.
+- 410 `integration.cursor_expired`: bộ điều hợp tự xóa và đọc lại từ đầu trong cùng lượt (feed lớp `partner` không có ảnh chụp; phần còn giữ là trạng thái đầy đủ).
+- Đồng bộ lại tay: xóa dòng trạng thái của feed (`DELETE FROM mkg_fieldops.directory_feed_state WHERE feed = …` dưới vai `r_fieldops`, tenant MKG) và bản ghi tương ứng — lượt sau đọc từ đầu. Bảng đệm, không phải nguồn sự thật.

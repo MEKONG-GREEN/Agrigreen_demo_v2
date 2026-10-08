@@ -258,10 +258,15 @@ paths:
         theo `event_id`. `op: retract` = thực thể không còn được phát (vd ô tổng hợp xuống dưới k), `record = null`.
         Mỗi bản ghi đã kiểm theo hợp đồng tích hợp trước khi trả (mặc định từ chối). `snapshot.href` chỉ là đường dẫn
         tới `GET /v1/snapshots/{dataset}/{version}` — không bao giờ chứa URL ký. Feed W5.3: `harvest_progress_by_commune`,
-        `collection_volume_by_commune` (tổng hợp ngưỡng k), `admin_units` (tham chiếu).
+        `collection_volume_by_commune` (tổng hợp ngưỡng k), `admin_units` (tham chiếu). Feed lớp partner W5.5
+        (`cooperative_directory`, `plot_directory` — thay `/v1/partner/cooperatives`, `/plots`): tập theo bên cấp, thêm
+        điều kiện cấp quyền loại `grant_kind` của hợp đồng đang hiệu lực bên cấp → tenant khách hàng (kiểm ở MỖI lời gọi:
+        thu hồi → 403 `party.share_grant_missing`), mỗi trang một dòng sổ đọc ở tenant bên cấp; không theo phiên bản,
+        không ảnh chụp — mọi bản ghi còn hiệu lực được phát lại ≤ 7 ngày nên đọc từ đầu (hoặc sau 410) là trạng thái đầy đủ.
       operationId: getFeedPage
       parameters:
         - {name: feed, in: path, required: true, schema: {type: string, pattern: "^[a-z][a-z0-9_]{2,47}$"}}
+        - {name: grantor, in: query, description: "Feed lớp partner (W5.5): tenant bên cấp — chỉ CHỌN bên cấp, luôn kiểm cấp quyền loại grant_kind. Rỗng → chỉ nhận khi đúng một bên cấp (ADR-0020). Feed khác bỏ qua.", schema: {type: string, format: uuid}}
         - {name: cursor, in: query, description: "Cursor mờ của trang trước (next_cursor); bỏ trống = từ đầu phần còn giữ", schema: {type: string, pattern: "^[A-Za-z0-9_-]{1,200}$"}}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 1000, default: 500}}
         - {name: contract_version, in: query, description: "Phiên bản hợp đồng (mặc định: cao nhất còn hiệu lực)", schema: {type: integer, minimum: 1}}

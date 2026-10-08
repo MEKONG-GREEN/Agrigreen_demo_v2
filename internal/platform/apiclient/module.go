@@ -171,6 +171,12 @@ func (m *Module) UseFeedSources(src port.AggregateSource, contrib port.Contribut
 	m.svc.Aggregates, m.svc.Contributors, m.svc.Params = src, contrib, p
 }
 
+// UsePartnerFeedSources (W5.5) nối nguồn feed lớp partner theo bên cấp (tên feed → module chủ: pf/party
+// cooperative_directory, pf/geo plot_directory) và danh sách bên cấp đang có cấp quyền (party/port/grantlookup).
+func (m *Module) UsePartnerFeedSources(src map[string]port.PartnerSource, grantors port.PartnerGrantors) {
+	m.svc.PartnerSources, m.svc.Grantors = src, grantors
+}
+
 // BuildFeeds dựng một phiên bản mỗi tập có nguồn (thân job port.JobFeedBuild; kiểm thử gọi trực tiếp).
 func (m *Module) BuildFeeds(ctx context.Context) ([]app.BuildResult, error) {
 	return m.svc.BuildAll(ctx)

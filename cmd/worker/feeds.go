@@ -6,9 +6,11 @@ import (
 	"os"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
+	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port/grantlookup"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
@@ -51,5 +53,13 @@ func apiclientFeedJobs(ctx context.Context, direct string, closeFn *func(), log 
 	cc.UseCollectionVolume(coop.Plots(), coop.Seasons(), md.AdminUnits())
 	mod := apiclient.New(pool, clk, apiclient.Deps{OperatorTenant: op, Store: store, Log: log})
 	mod.UseFeedSources(cc.AggregateSource(), contrib, md.Params())
+	// W5.5: feed lớp partner theo bên cấp — danh bạ HTX (pf/party, bộ điều hợp không vault, vị trí hồ sơ từ
+	// pf/cooperative) và thửa (pf/cooperative, W3.3); bên cấp từ cấp quyền đang hiệu lực của bên nhận có đăng ký feed.
+	gl := grantlookup.New(pool, clk)
+	gl.Locations = coop.CoopLocations()
+	mod.UsePartnerFeedSources(map[string]apiclientport.PartnerSource{
+		apiclientport.FeedCooperativeDirectory: gl,
+		apiclientport.FeedPlotDirectory:        coop.PartnerFeedSource(),
+	}, gl)
 	return mod.FeedJobs(interval, log), nil
 }

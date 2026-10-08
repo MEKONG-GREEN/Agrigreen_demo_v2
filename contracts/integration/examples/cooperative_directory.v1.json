@@ -1,0 +1,38 @@
+{
+  "feed": "cooperative_directory",
+  "contract_version": 1,
+  "cursor": null,
+  "next_cursor": "c2VxOjI",
+  "has_more": false,
+  "as_of": "2026-10-09T07:00:00+07:00",
+  "max_age": "PT6H",
+  "dataset": null,
+  "snapshot": null,
+  "items": [
+    {
+      "seq": 1,
+      "event_id": "0199c8a0-0f00-7b11-a1c2-d3e4f5a6b7c8",
+      "entity_key": "01989e00-1111-7222-8333-944455566677",
+      "op": "upsert",
+      "recorded_at": "2026-10-09T06:58:12+07:00",
+      "record": {
+        "cooperative_ref": "01989e00-1111-7222-8333-944455566677",
+        "code": "HTX-TB-01",
+        "name": "HTX Nông nghiệp Tân Bình",
+        "commune_code": "89123",
+        "active": true,
+        "lon": "105.4351234",
+        "lat": "10.3812345",
+        "updated_at": "2026-10-08T09:15:00+07:00"
+      }
+    },
+    {
+      "seq": 2,
+      "event_id": "0199c8a0-0f01-7b11-a1c2-d3e4f5a6b7c8",
+      "entity_key": "01989e00-2222-7222-8333-944455566677",
+      "op": "retract",
+      "recorded_at": "2026-10-09T06:58:12+07:00",
+      "record": null
+    }
+  ]
+}

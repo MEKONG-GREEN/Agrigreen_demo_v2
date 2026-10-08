@@ -52,6 +52,10 @@ type Options struct {
 	// Harvest: ngày gặt theo vụ của thửa (bề mặt partner, FM-01/02); nil → mọi kiểm ngày gặt
 	// gắn cờ unavailable (vẫn cho ghi) và không có job làm mới bảng đệm.
 	Harvest port.HarvestCalendar
+	// DirectoryFeed (W5.5): feed danh bạ HTX/thửa qua cổng tích hợp (NewGatewayDirectoryFeed); nil → không job
+	// fieldops_directory_feed. DirectorySource: port.DirectorySourcePartner (rỗng = mặc định) | port.DirectorySourceFeed.
+	DirectoryFeed   port.DirectoryFeed
+	DirectorySource string
 }
 
 // Module là mkg/fieldops đã nối.
@@ -70,7 +74,8 @@ func New(db tenant.Beginner, clk clock.Clock, o Options) *Module {
 	}
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Directory: o.Directory, DirectoryUnconfigured: unconfigured,
 		DirectoryMaxAge: o.DirectoryMaxAge, DirectoryLookupBudget: o.DirectoryLookupBudget, Weighed: o.Weighed,
-		ConfiguredKgPerRoll: o.KgPerRoll, CursorKey: o.CursorKey, Feed: o.Feed, Harvest: o.Harvest}}
+		ConfiguredKgPerRoll: o.KgPerRoll, CursorKey: o.CursorKey, Feed: o.Feed, Harvest: o.Harvest,
+		DirectoryFeed: o.DirectoryFeed, DirectorySource: o.DirectorySource}}
 }
 
 // NewPlatformFeed tạo luồng phản hồi của HTX qua Application API công khai (tài khoản dịch

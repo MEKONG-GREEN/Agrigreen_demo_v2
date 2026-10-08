@@ -67,7 +67,11 @@ type Service struct {
 	Aggregates   port.AggregateSource
 	Contributors port.Contributors
 	Params       params.Params
-	Log          *slog.Logger
+	// PartnerSources: nguồn bản ghi feed lớp partner theo tên feed (W5.5 — pf/party cooperative_directory, pf/geo
+	// plot_directory); Grantors: bên cấp đang có cấp quyền cho một bên nhận (party/port/grantlookup).
+	PartnerSources map[string]port.PartnerSource
+	Grantors       port.PartnerGrantors
+	Log            *slog.Logger
 }
 
 func (s *Service) log() *slog.Logger {

@@ -106,11 +106,16 @@ func TestGrantLookupActiveGrant_ADR0022(t *testing.T) {
 		}
 	}
 
-	// Loại KHÔNG phải dp_* (đã cấp cho cùng tenant) không đọc được qua GrantLookup — chỉ qua
-	// Authorize (vai mkg_sync): cổng không vai OIDC không được mở rộng sang dữ liệu khác.
+	// Loại KHÔNG phải dp_* và không thuộc port.FeedKinds (đã cấp cho cùng tenant) không đọc được qua GrantLookup — chỉ
+	// qua Authorize (vai mkg_sync): cổng không vai OIDC không được mở rộng sang dữ liệu khác.
+	f.grant(third, port.KindSeasonHarvestDates)
+	if _, err := gl.ActiveGrant(ctx, third, uuid.Nil, port.KindSeasonHarvestDates, time.Now()); !errors.Is(err, port.ErrShareGrantMissing) {
+		t.Fatalf("loại không phải dp_* / feed → missing: %v", err)
+	}
+	// W5.5: loại feed lớp partner (port.FeedKinds) đọc được qua cổng.
 	f.grant(third, port.KindPlotDirectory)
-	if _, err := gl.ActiveGrant(ctx, third, uuid.Nil, port.KindPlotDirectory, time.Now()); !errors.Is(err, port.ErrShareGrantMissing) {
-		t.Fatalf("loại không phải dp_* → missing: %v", err)
+	if g, err := gl.ActiveGrant(ctx, third, uuid.Nil, port.KindPlotDirectory, time.Now()); err != nil || !g.Covers(port.KindPlotDirectory) {
+		t.Fatalf("loại feed plot_directory → cấp quyền: %v", err)
 	}
 
 	// Hai bên cấp cùng loại: Nil → ambiguous; chọn đúng bên cấp → được.
@@ -271,7 +276,7 @@ func TestAPIReadLogAdapter_K05(t *testing.T) {
 		"không có Caller":          {ctx, read},
 		"Caller của tenant khác":   {apiclientport.WithCaller(ctx, apiclientport.Caller{Client: apiclientport.Client{ID: ids.New(), ClientTenantID: ids.New()}}), read},
 		"loại không có trong cấp":  {call, port.PartnerRead{Kind: port.KindDPHubCapacity, Endpoint: "GET /v1/data/hub-capacities"}},
-		"loại không phải dp_*":     {call, port.PartnerRead{Kind: port.KindCooperativeDirectory, Endpoint: "GET /v1/partner/cooperatives"}},
+		"loại không phải dp_*":     {call, port.PartnerRead{Kind: port.KindHTXCollectionResponses, Endpoint: "GET /v1/partner/htx-collection/responses"}},
 		"người dùng OIDC không có": {authz.WithPrincipal(ctx, authz.Principal{TenantID: verifier, ActorRef: ids.New()}), read},
 	} {
 		if err := gl.RecordRead(bad.ctx, g, bad.read); !errors.Is(err, port.ErrPartnerAuditUnavailable) {

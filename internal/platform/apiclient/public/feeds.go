@@ -12,7 +12,11 @@ package public
 // MỌI bản ghi của trang qua ValidateRecord của hợp đồng và cả trang qua phong bì feed_page TRƯỚC khi trả (mặc định
 // từ chối: lệch → 500 apiclient.contract_violation, không byte dữ liệu).
 // Feed W5.3 là tập chung của đơn vị vận hành (tổng hợp ≥ k, tham chiếu): không lọc từng hàng theo đối tác.
-// Feed cấp phép theo bên cấp (grant_class partner, W5.5) và song phương (W5.6) chưa phục vụ ở đây.
+// Feed lớp partner (W5.5 — cooperative_directory, plot_directory): phân vùng = tenant bên cấp; thêm điều kiện cấp
+// quyền loại grant_kind đang hiệu lực bên cấp → tenant khách hàng (party/port.GrantLookup, hai phía, tại thời điểm
+// nhận yêu cầu — thu hồi → 403 party.share_grant_missing ngay ở lời gọi kế tiếp), tham số grantor tùy chọn (rỗng →
+// chỉ khi đúng một bên cấp), sổ đọc partner_read_log ở tenant bên cấp cho mỗi trang 2xx (K-05). Song phương (W5.6)
+// chưa phục vụ ở đây.
 
 import (
 	"net/http"
@@ -21,12 +25,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/integration"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/store"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
@@ -42,29 +48,61 @@ func (s *Server) registerFeeds(v1 *gin.RouterGroup) {
 	v1.GET("/snapshots/:dataset/:version", s.handle(spec{kind: meter.CallFileDownload}, s.snapshot))
 }
 
+// feedTarget là feed đã kiểm truy cập: hợp đồng, phân vùng kho feed, tenant chủ dữ liệu của sổ đo lường và cấp
+// quyền đã kiểm (feed lớp partner — sổ đọc K-05).
+type feedTarget struct {
+	ct         *integration.Contract
+	partition  string
+	dataTenant uuid.UUID
+	grant      *partyport.ShareGrant
+}
+
 // feedAccess kiểm hợp đồng phục vụ được, scope và lớp cấp phép của feed name.
-func (s *Server) feedAccess(c *gin.Context, caller port.Caller, name string, version int) (*integration.Contract, error) {
+func (s *Server) feedAccess(c *gin.Context, caller port.Caller, name string, version int) (feedTarget, error) {
 	if !feedNameRe.MatchString(name) {
-		return nil, port.ErrUnknownFeed
+		return feedTarget{}, port.ErrUnknownFeed
 	}
 	ct, err := app.FeedContract(name, version)
 	if err != nil {
-		return nil, err
+		return feedTarget{}, err
 	}
 	switch {
 	case ct.Servable(true):
 	case s.d.Production || !s.d.AllowUnapproved || !ct.Servable(false):
-		return nil, port.ErrContractNotServable.WithDetail("Hợp đồng " + ct.ID() + " ở trạng thái " + ct.Status)
+		return feedTarget{}, port.ErrContractNotServable.WithDetail("Hợp đồng " + ct.ID() + " ở trạng thái " + ct.Status)
 	default:
 		c.Header(HeaderContractStatus, ct.Status)
 	}
 	if !caller.Client.HasScope(port.FeedScope(name)) {
-		return nil, port.ErrForbidden
+		return feedTarget{}, port.ErrForbidden
 	}
-	if ct.GrantClass != integration.GrantAggregate && ct.GrantClass != integration.GrantReference {
-		return nil, port.ErrContractNotServable.WithDetail("Feed lớp " + ct.GrantClass + " chưa phục vụ ở cổng (W5.5/W5.6)")
+	switch ct.GrantClass {
+	case integration.GrantAggregate, integration.GrantReference:
+		return feedTarget{ct: ct, dataTenant: s.d.OperatorTenant}, nil
+	case integration.GrantPartner:
+		return s.partnerTarget(c, caller, ct)
 	}
-	return ct, nil
+	return feedTarget{}, port.ErrContractNotServable.WithDetail("Feed lớp " + ct.GrantClass + " chưa phục vụ ở cổng (W5.6)")
+}
+
+// partnerTarget kiểm cấp quyền grant_kind của feed lớp partner cho tenant khách hàng (lấy từ bản ghi khóa, không
+// bao giờ từ request); phân vùng = tenant bên cấp. Thiếu / thu hồi / hết hạn → 403 party.share_grant_missing.
+func (s *Server) partnerTarget(c *gin.Context, caller port.Caller, ct *integration.Contract) (feedTarget, error) {
+	grantor, err := grantorParam(c)
+	if err != nil {
+		return feedTarget{}, err
+	}
+	if s.d.Grants == nil || !partyport.GatewayKind(ct.GrantKind) {
+		return feedTarget{}, partyport.ErrShareGrantMissing
+	}
+	g, err := s.d.Grants.ActiveGrant(c.Request.Context(), caller.Client.ClientTenantID, grantor, ct.GrantKind, caller.ReceivedAt)
+	if err != nil {
+		return feedTarget{}, err
+	}
+	if g.Grantee != caller.Client.ClientTenantID || g.Grantor == uuid.Nil || !g.Covers(ct.GrantKind) {
+		return feedTarget{}, partyport.ErrShareGrantMissing
+	}
+	return feedTarget{ct: ct, partition: g.Grantor.String(), dataTenant: g.Grantor, grant: &g}, nil
 }
 
 func (s *Server) feed(c *gin.Context, caller port.Caller, _ port.Plan) (*result, error) {
@@ -95,17 +133,18 @@ func (s *Server) feed(c *gin.Context, caller port.Caller, _ port.Plan) (*result,
 		after = &n
 	}
 	name := c.Param("feed")
-	ct, err := s.feedAccess(c, caller, name, version)
+	t, err := s.feedAccess(c, caller, name, version)
 	if err != nil {
 		return nil, err
 	}
+	ct := t.ct
 	if err := s.precheck(ctx, caller, name); err != nil {
 		return nil, err
 	}
 	if s.d.Svc == nil {
 		return nil, app.ErrDependencyUnavailable
 	}
-	page, err := s.d.Svc.ReadFeed(ctx, ct, "", after, limit)
+	page, err := s.d.Svc.ReadFeed(ctx, ct, t.partition, after, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +200,10 @@ func (s *Server) feed(c *gin.Context, caller port.Caller, _ port.Plan) (*result,
 	}
 	r.header.Set(port.HeaderDataContract, ct.ID())
 	r.header.Set("Cache-Control", "no-store")
-	r.rows, r.dataTenant, r.product, r.contractVersion, r.scope = int64(len(items)), s.d.OperatorTenant, ct.Name, ct.Version, port.FeedScope(ct.Name)
+	r.rows, r.dataTenant, r.product, r.contractVersion, r.scope = int64(len(items)), t.dataTenant, ct.Name, ct.Version, port.FeedScope(ct.Name)
+	if t.grant != nil {
+		r.grant, r.grantKind = t.grant, ct.GrantKind
+	}
 	return r, nil
 }
 
@@ -202,9 +244,13 @@ func (s *Server) snapshot(c *gin.Context, caller port.Caller, _ port.Plan) (*res
 		return nil, port.ErrSnapshotNotFound
 	}
 	name := c.Param("dataset")
-	ct, err := s.feedAccess(c, caller, name, 0)
+	t, err := s.feedAccess(c, caller, name, 0)
 	if err != nil {
 		return nil, err
+	}
+	ct := t.ct
+	if t.grant != nil {
+		return nil, port.ErrSnapshotNotFound // feed lớp partner không theo phiên bản, không có ảnh chụp (W5.5)
 	}
 	if err := s.precheck(ctx, caller, name); err != nil {
 		return nil, err

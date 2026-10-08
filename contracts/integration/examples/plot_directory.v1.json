@@ -1,0 +1,30 @@
+{
+  "feed": "plot_directory",
+  "contract_version": 1,
+  "cursor": "c2VxOjEw",
+  "next_cursor": "c2VxOjEx",
+  "has_more": true,
+  "as_of": "2026-10-09T07:00:00+07:00",
+  "max_age": "PT6H",
+  "dataset": null,
+  "snapshot": null,
+  "items": [
+    {
+      "seq": 11,
+      "event_id": "0199c8a1-0f00-7b11-a1c2-d3e4f5a6b7c8",
+      "entity_key": "01989f00-aa11-7b22-8c33-d44e55f66a77",
+      "op": "upsert",
+      "recorded_at": "2026-10-09T06:58:13+07:00",
+      "record": {
+        "plot_ref": "01989f00-aa11-7b22-8c33-d44e55f66a77",
+        "code": "TB-0042",
+        "commune_code": "89123",
+        "cooperative_ref": "01989e00-1111-7222-8333-944455566677",
+        "status": "active",
+        "area_ha": "1.2500",
+        "revision": 3,
+        "updated_at": "2026-10-07T16:20:00+07:00"
+      }
+    }
+  ]
+}

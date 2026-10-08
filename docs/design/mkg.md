@@ -39,7 +39,7 @@
 | Cửa | Sau v4.1 | Gói |
 |---|---|---|
 | Van công bố | `mkg/hub`, `mkg/measurement` gửi lô từ `valve_export` tới `POST /v1/batches/<hợp đồng>` của cổng tích hợp. Sổ `valve_export` vẫn là bằng chứng (RB-1). Consumer RabbitMQ gỡ muộn nhất ở cổng G2 v4.1 | Sau W5.4 |
-| Tiêu thụ không đặc quyền | `mkg/fieldops` kéo `GET /v1/feeds/*` của cổng bằng khóa API + mTLS của tenant MKG. Gỡ `/v1/partner/*` và vai `mkg_sync` | W5.2, W5.5, W5.10 |
+| Tiêu thụ không đặc quyền | `mkg/fieldops` kéo `GET /v1/feeds/*` của cổng bằng khóa API + mTLS của tenant MKG. Gỡ `/v1/partner/*` và vai `mkg_sync`. **W5.5 (09/10/2026):** danh bạ HTX/thửa (`cooperative_directory`, `plot_directory`) đã có bộ điều hợp feed — job `fieldops_directory_feed`, bảng `mkg_fieldops.directory_feed_state` / `directory_feed_record` (mkg 000036, cursor + `as_of` + `max_age`), chạy song song bản sao cũ `directory_*_replica` (mkg 000033) với đối soát ghi log; cờ `AG_FIELDOPS_DIRECTORY_SOURCE` chọn nguồn của lập/sửa lệnh gom (mục 5.1 bên dưới). Ngày gặt, phản hồi HTX vẫn qua `/v1/partner/*` | W5.2, W5.5, W5.10 |
 | Van lọc dữ liệu công | Feed `harvest_progress_by_commune`: cấp phép tổng hợp theo xã có ngưỡng k (ADR-0035) | W5.3, W6.4 |
 | Luồng song phương | `POST /v1/batches/roll_count_statement` (MKG → HTX). Feed cặp `GET /v1/feeds/bilateral?pair=…` (HTX → MKG). Tổng kiểm hằng ngày theo cặp | W5.6 (chờ C-12) |
 | Luồng mạng | Vùng mkg chỉ ra **cổng tích hợp**, không gọi `api-platform` (ADR-0008, `check_flows.py`) | W5.10 |
@@ -211,10 +211,10 @@ Mỗi module: một schema, một vai DB, sổ theo mẫu 8.1, bảng chiếu `*
 | Bảng chiếu | `collection_order_current`, `roll_total_current` (theo lệnh gom, theo thửa); mkg 000012: `crew_current`, `crew_assignment_current`, `order_plot_harvest_current` (bảng đệm ngày gặt từ bề mặt partner của nền tảng, cổng `port.HarvestCalendar`, ADR-0020), `param_current` |
 | Sự kiện | Không sự kiện rời vùng ở G3 ngoài hợp đồng `collection_schedule`, `htx_collection_statement` (§3.2) khi được duyệt |
 | Liên kết | → `hub` (lô `receipt` có nguồn `roll_count`/`plot`), → `measurement` (cửa sổ lô để tích phân phiếu cân), → `costing` (quy đổi cuộn → tấn) — qua `port/` |
-| Nguồn ngoài | Thửa, HTX của nền tảng: gọi Application API công khai bằng tài khoản dịch vụ tenant MKG (cửa "tiêu thụ không đặc quyền"); lưu `plot_ref`, `htx_ref` UUID thuần (R-06) |
+| Nguồn ngoài | Thửa, HTX của nền tảng: gọi Application API công khai bằng tài khoản dịch vụ tenant MKG (cửa "tiêu thụ không đặc quyền"); lưu `plot_ref`, `htx_ref` UUID thuần (R-06). Lập/sửa lệnh gom đối chiếu với **bản sao trong cụm mkg** (R-INT-02): bản sao cũ `directory_*_replica` (mkg 000033, job `fieldops_directory` tra `/v1/partner/*`) hoặc — W5.5, cờ `AG_FIELDOPS_DIRECTORY_SOURCE=feed` — bản sao dựng từ feed `cooperative_directory` / `plot_directory` của cổng tích hợp (mkg 000036, job `fieldops_directory_feed`, khóa API như mọi đối tác; cursor lưu sau mỗi trang; `as_of`/`max_age` của feed → cảnh báo `fieldops.directory_stale`; thu hồi cấp quyền → xóa bản sao, mục "không có"). Hai đường chạy song song một kỳ, đối soát ghi log `fieldops.directory_source_diff`; W5.10 gỡ đường cũ |
+| Migration | mkg 000006 (G3) — g3-conventions §2; mkg 000033 (bản sao danh mục), mkg 000036 (bản sao từ feed, W5.5) |
 | Đồng bộ ngoại tuyến | App hiện trường MKG (Flutter, `apps/field-app` biến thể MKG) — engine đồng bộ riêng vùng mkg; `id` UUIDv7 + `idem_key` do máy sinh (R-11, mục 15); không ghi đè, xung đột giữ cả hai |
 | Vai DB / nghiệp vụ | `fieldops_app` (đã có) / `field_collector`, `field_supervisor` (duyệt lệnh gom ≠ người lập) |
-| Migration | mkg 000006 (G3) — g3-conventions §2 |
 
 ### 5.2 `mkg/measurement` — ba điểm cân, phiếu cân dẫn xuất, đối soát (mục 13) — **event sourcing mức B: sổ là nguồn**
 
