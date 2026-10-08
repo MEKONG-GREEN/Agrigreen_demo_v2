@@ -94,7 +94,7 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	// Không vai đặc quyền nào cấp cho app_* (ADR-0028 §1).
 	for _, u := range LoginUnits {
 		r, _ := roleByName(t, u.Role)
-		for _, bad := range []string{OutboxPublisher, MKGMonitorOwner, TSMonitorOwner, Migrator} {
+		for _, bad := range []string{OutboxPublisher, OpsJobs, MKGMonitorOwner, TSMonitorOwner, Migrator} {
 			if slices.Contains(r.MemberOf, bad) {
 				t.Errorf("%s không được thuộc %s", u.Role, bad)
 			}

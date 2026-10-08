@@ -16,7 +16,7 @@ import (
 )
 
 // ADR-0006 (mục 19, C-8): gauge ag.sync.conflict.overdue đo được cho MỌI tenant ở worker —
-// tìm tenant có xung đột đang mở bằng vai ag_outbox_publisher (hai cột, migration pf 000043),
+// tìm tenant có xung đột đang mở bằng vai ag_ops_jobs (hai cột, migration pf 000043),
 // đếm quá hạn bằng vai sync_app qua RegisterConflictSLAMetrics.
 func TestConflictTenantsForSLAGauge_ADR0006(t *testing.T) {
 	f := newFixture(t)
@@ -25,7 +25,7 @@ func TestConflictTenantsForSLAGauge_ADR0006(t *testing.T) {
 	results(t, c.post("/v1/sync/push", map[string]any{"device_id": c.device.String(), "records": []any{
 		rec(c, 1, "plot_boundary", map[string]any{"behave": "conflict", "conflict_key": "adr6"}),
 	}}))
-	pub := pgtest.Get(t).Pool(t, migrations.PF, dbadmin.OutboxPublisher)
+	pub := pgtest.Get(t).Pool(t, migrations.PF, dbadmin.OpsJobs)
 	ts, err := syncmod.ConflictTenants(pub)(context.Background())
 	if err != nil {
 		t.Fatal(err)

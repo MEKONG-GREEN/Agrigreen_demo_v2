@@ -10,18 +10,22 @@ import (
 	syncmod "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/opsjobs"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
 // registerGauges đăng ký chỉ số nghiệp vụ bắt buộc có cảnh báo của ADR-0006 (mục 19):
 //
 //   - ag.sync.conflict.overdue: xung đột đồng bộ đang mở quá SLA (C-8), theo tenant — tìm
-//     tenant bằng pool ag_outbox_publisher của lịch (hai cột, migration pf 000043), đếm bằng
+//     tenant bằng pool ag_ops_jobs của lịch (hai cột, migration pf 000043), đếm bằng
 //     vai sync_app (R-05);
-//   - ag.db.standby_replication_lag (giây): chỉ khi có AG_DB_STANDBY_URL.
+//   - ag.db.standby_replication_lag (giây): chỉ khi có AG_DB_STANDBY_URL;
+//   - ag.db.ledger_default_rows: số dòng ước lượng trong phân vùng DEFAULT của mọi bảng phân vùng, theo
+//     cụm của lịch (pool ag_ops_jobs, shared 000010) — > 0 nghĩa là từng thiếu phân vùng tháng.
 //
 // Lỗi đăng ký chỉ cảnh báo, không dừng worker. Trả hàm đóng pool đã mở.
-func registerGauges(ctx context.Context, log *slog.Logger, direct string, publisher *pgxpool.Pool) func() {
+func registerGauges(ctx context.Context, log *slog.Logger, direct string, opsPools map[migrations.Cluster]*pgxpool.Pool) func() {
+	publisher := opsPools[migrations.PF]
 	var pools []*pgxpool.Pool
 	closeFn := func() {
 		for _, p := range pools {
@@ -37,6 +41,15 @@ func registerGauges(ctx context.Context, log *slog.Logger, direct string, publis
 			warn("xung đột đồng bộ quá SLA", err)
 		} else if _, err := syncmod.RegisterConflictSLAMetrics(sp, clock.System{}, syncmod.ConflictTenants(publisher)); err != nil {
 			warn("xung đột đồng bộ quá SLA", err)
+		}
+	}
+	if len(opsPools) > 0 {
+		byName := make(map[string]*pgxpool.Pool, len(opsPools))
+		for c, p := range opsPools {
+			byName[string(c)] = p
+		}
+		if _, err := opsjobs.RegisterDefaultPartitionRows(byName); err != nil {
+			warn("phân vùng DEFAULT có dòng", err)
 		}
 	}
 	if dsn := os.Getenv(db.EnvStandbyURL); dsn != "" {

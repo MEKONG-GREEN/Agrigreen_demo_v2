@@ -4,9 +4,9 @@ Các job vận hành dùng chung cho mọi cụm (`ag_pf`, `ag_mkg`, `ag_vault`)
 
 | Việc | Khi nào | Chạy bằng | Vai DB | Runbook |
 |---|---|---|---|---|
-| Neo chuỗi + manifest ký số | 00:30 giờ VN hằng ngày | `cmd/worker` (leader) — Kubernetes G4: chỉ cụm pf (`AG_CLUSTERS=pf`); cụm mkg/ts/vault bằng CronJob `anchor-mkg`, `anchor-vault` (`migrate anchor`) | `ag_outbox_publisher` | [anchor.md](anchor.md), [k8s-deploy.md](k8s-deploy.md) mục 5 |
-| Ghi sổ chỉ số + ảnh chụp lớp GIS (pf/metrics) | 00:45 giờ VN hằng ngày (sau neo); backfill khi cần | `cmd/worker` (leader), `worker -metrics-backfill` | `metrics_app` + vai nguồn; tenant qua `ag_outbox_publisher` | [metrics.md](metrics.md) |
-| Dọn Idempotency-Key hết hạn | mỗi giờ | `cmd/worker` (leader); Kubernetes G4 cụm mkg/ts/vault: CronJob `purge-idempotency-<vùng>` (`migrate purge-idempotency`) | `ag_outbox_publisher` | mục dưới |
+| Neo chuỗi + manifest ký số | 00:30 giờ VN hằng ngày | `cmd/worker` (leader) — Kubernetes G4: chỉ cụm pf (`AG_CLUSTERS=pf`); cụm mkg/ts/vault bằng CronJob `anchor-mkg`, `anchor-vault` (`migrate anchor`) | `ag_ops_jobs` | [anchor.md](anchor.md), [k8s-deploy.md](k8s-deploy.md) mục 5 |
+| Ghi sổ chỉ số + ảnh chụp lớp GIS (pf/metrics) | 00:45 giờ VN hằng ngày (sau neo); backfill khi cần | `cmd/worker` (leader), `worker -metrics-backfill` | `metrics_app` + vai nguồn; tenant qua `ag_ops_jobs` | [metrics.md](metrics.md) |
+| Dọn Idempotency-Key hết hạn | mỗi giờ | `cmd/worker` (leader); Kubernetes G4 cụm mkg/ts/vault: CronJob `purge-idempotency-<vùng>` (`migrate purge-idempotency`) | `ag_ops_jobs` | mục dưới |
 | Tạo trước phân vùng tháng | hằng tháng, sau mỗi `migrate up` | `migrate maintain` | `ag_migrator` | [partitions.md](partitions.md) |
 | Xác minh chuỗi băm | hằng tuần, sau mỗi lần phục hồi | `migrate verify-chains` | `ag_migrator` | [verify-chains.md](verify-chains.md) |
 | Sao lưu PostgreSQL (pgBackRest) + kho đối tượng (`objsync`) | full tuần, diff ngày, WAL liên tục; objsync hằng ngày | pgBackRest, `cmd/objsync` | — | [backup.md](backup.md) |
@@ -19,20 +19,20 @@ Các job vận hành dùng chung cho mọi cụm (`ag_pf`, `ag_mkg`, `ag_vault`)
 | Diễn tập tải ĐTK 2 (sync push/pull, ingest, đọc) + chuyển đổi dự phòng DB giữa lúc đồng bộ | G4, rồi mỗi thay đổi lớn về khối lượng | `tools/loadgen` (staging, dữ liệu tổng hợp) | — | [load-drill.md](load-drill.md) |
 | Khai báo trước hàng đợi consumer RabbitMQ | mỗi lần `outbox-publisher` khởi động | `cmd/outbox-publisher` (`assembly.Queues`) | — | [rabbitmq-queues.md](rabbitmq-queues.md) |
 | Giám sát đồng bộ tích hợp, DLQ, cảnh báo Admin | liên tục; cảnh báo khi DLQ > 0 | màn `/quan-tri/giam-sat-dong-bo`, Prometheus + Alertmanager | `sync_app` | [integration-alerts.md](integration-alerts.md) |
-| Kiểm độ tươi dữ liệu App HTX (CGH FN-07) | mỗi giờ | `cmd/worker` (leader, job `mechanization_area_feed_check`) | `ag_outbox_publisher` (tìm tenant), `mechanization_app` | [integration-alerts.md](integration-alerts.md) |
-| Công bố sức chứa kho/Hub theo ngày (GIS US-WH-01) | 01:15 giờ VN hằng ngày, chạy bù khi khởi động | `cmd/api-internal` (leader cụm mkg, job `hub_capacity_daily`; cần `AG_MKG_DB_DIRECT_URL`) | `ag_outbox_publisher` (tìm tenant), `hub_app` | mục dưới |
+| Kiểm độ tươi dữ liệu App HTX (CGH FN-07) | mỗi giờ | `cmd/worker` (leader, job `mechanization_area_feed_check`) | `ag_ops_jobs` (tìm tenant), `mechanization_app` | [integration-alerts.md](integration-alerts.md) |
+| Công bố sức chứa kho/Hub theo ngày (GIS US-WH-01) | 01:15 giờ VN hằng ngày, chạy bù khi khởi động | `cmd/api-internal` (leader cụm mkg, job `hub_capacity_daily`; cần `AG_MKG_DB_DIRECT_URL`) | `ag_ops_jobs` (tìm tenant), `hub_app` | mục dưới |
 | Bản đồ chuẩn hóa cho TMS, đo độ trễ lớp | khi đổi truy vấn lớp; UAT | kiểm thử `TestStandardMapForTMSLatency_…` | `geo_app` | [gis-performance.md](gis-performance.md) |
 | Dựng lại bảng chiếu | diễn tập G4, khi nghi lệch | theo module | vai của module | [rebuild-projection.md](rebuild-projection.md) |
 | Agent biên đọc cân: cài, đăng ký, thay khóa, cập nhật | khi lắp/đổi cân, mất đĩa, phát hành | `cmd/edge-agent` | — | [edge-agent.md](edge-agent.md) |
 | Nhận số đo cân (ingest), duyệt thiết bị hai người, thay khóa, mất đĩa, vhost `mkg.internal`, cảnh báo, tầng lạnh `ts` | khi lắp/đổi cân, sự cố, hết cửa sổ C-7 | `cmd/ingest`, Admin API mkg, `scripts/dev-edge-bootstrap.sh` (dev) | `ingest_ts`, `ts_reader`, `ingest_mkg` | [ingest.md](ingest.md) |
 | PKI thiết bị: CA thiết bị riêng trong lãnh thổ, cấp/thu hồi chứng thư, thay CA | dựng một lần; mỗi kỳ thiết bị; kiểm hằng quý | CA ngoại tuyến + CA trung gian (HSM), `scripts/gen-dev-certs` (dev) | — | [device-pki.md](device-pki.md) |
 | Giám sát SQL xuyên tenant (sql_exporter) | liên tục (60 s) | `deploy/observability/sql-exporter/*.collector.yml` | `mkg_monitor`, `ts_monitor` (chỉ EXECUTE hàm gộp) | [ingest.md](ingest.md) mục 7 |
-| Leo thang hồ sơ MRV chờ duyệt quá hạn (KN US-MRV-06) | mỗi 15 phút | `cmd/worker` (leader, job `mrv_review_escalation`) | `ag_outbox_publisher` (tìm tenant), `mrv_app` | mục dưới |
+| Leo thang hồ sơ MRV chờ duyệt quá hạn (KN US-MRV-06) | mỗi 15 phút | `cmd/worker` (leader, job `mrv_review_escalation`) | `ag_ops_jobs` (tìm tenant), `mrv_app` | mục dưới |
 | Ghi `expired` cho khóa Public API quá hạn / quá hạn chồng lấn (ADR-0022 mục 4, G5) | mỗi giờ, chạy khi khởi động | `cmd/worker` (leader, job `apiclient_key_expiry`; chỉ khi có `AG_PUBLIC_OPERATOR_TENANT`) | `apiclient_app` | [public-api-onboarding.md](public-api-onboarding.md) mục 7 |
 
 ## Leo thang hồ sơ MRV quá hạn (pf/mrv)
 
-Job `mrv_review_escalation` (mỗi 15 phút, chạy bù khi khởi động) tìm tenant có hồ sơ chờ duyệt bằng `ag_outbox_publisher`. Vai này chỉ đọc hai cột `tenant_id` và `review_status` của `pf_mrv.evidence_current` (pf 000045). Job ghi bằng vai `mrv_app`, theo hai mức:
+Job `mrv_review_escalation` (mỗi 15 phút, chạy bù khi khởi động) tìm tenant có hồ sơ chờ duyệt bằng `ag_ops_jobs`. Vai này chỉ đọc hai cột `tenant_id` và `review_status` của `pf_mrv.evidence_current` (pf 000045). Job ghi bằng vai `mrv_app`, theo hai mức:
 
 - Hồ sơ vào hệ thống quá `mrv.review_sla_hours` (mặc định 72) → cảnh báo mức 1 cho người duyệt (`mrv_reviewer`).
 - Quá `mrv.review_escalate_hours` (mặc định 120) → mức 2 cho quản trị TTKN tỉnh (`kn_province_admin`).
@@ -92,7 +92,8 @@ Có khi đặt `AG_OTLP_ENDPOINT`. Ngưỡng dưới đây là đề xuất, ch�
 | `kube_deployment_status_replicas_available{deployment="api-public"}`, `traefik_service_requests_total` (host `partner`) | kube-state-metrics, Traefik | Phase K: `AgPublicAPIDown` (0 bản sao sẵn sàng 5 phút, P2), 5xx > 5 %, 429 > 20 % — `agrigreen-public-api.rules.yml`, [phase-k.md](phase-k.md) |
 | không có `ag.job.runs{job="anchor",outcome="ok"}` trong 26 giờ | worker | P1: mất neo hằng ngày |
 | `http.server.request.duration` | api-* | p95 > 2 giây (R-52) |
-| `ag.sync.conflict.overdue{tenant_id}` | worker khi có lịch (`registerGauges`; tenant qua `ag_outbox_publisher`, migration pf 000043; đếm bằng `sync_app`) | > 0 trong 1 giờ — xung đột đồng bộ quá SLA C-8 (tạm 72 giờ, tham số `sync.conflict_sla_hours`, ADR-0006). Xử lý ở Admin `GET /v1/sync/conflicts?overdue=true` (vai `sync_conflict_resolver`). Luật Prometheus đề xuất: `max by (tenant_id) (ag_sync_conflict_overdue) > 0` for 1h |
+| `ag.sync.conflict.overdue{tenant_id}` | worker khi có lịch (`registerGauges`; tenant qua `ag_ops_jobs`, migration pf 000043; đếm bằng `sync_app`) | > 0 trong 1 giờ — xung đột đồng bộ quá SLA C-8 (tạm 72 giờ, tham số `sync.conflict_sla_hours`, ADR-0006). Xử lý ở Admin `GET /v1/sync/conflicts?overdue=true` (vai `sync_conflict_resolver`). Luật Prometheus đề xuất: `max by (tenant_id) (ag_sync_conflict_overdue) > 0` for 1h |
 | `ag.db.standby_replication_lag` (giây, `cluster`) | worker khi đặt `AG_DB_STANDBY_URL` (DSN tới bản sao chờ; vai thường, không cần quyền giám sát) | > 60 giây trong 5 phút (cảnh báo), > 300 giây (P1) — ADR-0006. Luật đề xuất: `max(ag_db_standby_replication_lag_seconds) > 60` for 5m; thiếu số đo khi đã cấu hình standby (`absent(...)` 15m) = cấu hình sai hoặc DSN trỏ vào primary. Tệp luật ở `deploy/observability/prometheus/` do người tích hợp thêm |
 | `ag.k_ref.lag` (histogram giây, `relation`) — Prometheus `ag_k_ref_lag_seconds` | worker, consumer `pf.kref` (W2.5): từ `recorded_at` của sự kiện nguồn tới lúc `k_ref` phản ánh | p99 > 5 giây trong 5 phút → `AgKRefLagHigh` (P2, ADR-0029 §4, `agrigreen-platform.rules.yml`). **k_ref trễ:** xem hàng đợi `pf.kref` và DLQ `pf.kref.dlq`, log `kref:`; sự kiện vào DLQ vì `Nút chưa có trong k_ref` → chạy `worker -kref-rebuild` (dựng lại mọi tenant từ nguồn), rồi đẩy lại DLQ. Sau phục hồi `k_ref` trống/cũ → `worker -kref-rebuild` trước khi mở dịch vụ |
+| `ag.db.ledger_default_rows{cluster,table}` (Prometheus `ag_db_ledger_default_rows`) | worker khi có lịch (cụm của lịch, vai `ag_ops_jobs`); sql_exporter target `mkg`, `ts` (`shared.ledger_default_rows()`, shared 000010) | > 0 trong 15 phút (`AgLedgerDefaultPartitionRows`) — từng thiếu phân vùng tháng: chạy `migrate maintain` (tự chuyển dòng), xem [partitions.md](partitions.md) |
 | `ag.extension.support_task.latency{assignment_rule}` (giây) | api-platform | p99 > 60 giây trong 5 phút — KN US-TASK-01 (nhiệm vụ tự sinh ≤ 1 phút từ lúc nhận yêu cầu hỗ trợ). Kiểm pool `extension_app`, khóa trên `task_current`. Thêm cảnh báo nghiệp vụ: số yêu cầu `assignment_rule="admin_queue"` > 0 trong 1 giờ → danh bạ trực của xã/tỉnh trống |

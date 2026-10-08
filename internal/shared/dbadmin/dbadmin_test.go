@@ -27,7 +27,7 @@ func TestRolesForSelectedClusters_G4(t *testing.T) {
 		t.Fatalf("mọi cụm phải giữ đủ %d vai, có %d", len(Roles), len(got))
 	}
 	pf := roleNames(RolesFor([]migrations.Cluster{migrations.PF}))
-	for _, want := range []string{SharedUser, MKGMonitorOwner, Migrator, OutboxPublisher, "platform_api", "party_app"} {
+	for _, want := range []string{SharedUser, MKGMonitorOwner, Migrator, OutboxPublisher, OpsJobs, "platform_api", "party_app"} {
 		if !slices.Contains(pf, want) {
 			t.Errorf("cụm pf thiếu vai %s", want)
 		}

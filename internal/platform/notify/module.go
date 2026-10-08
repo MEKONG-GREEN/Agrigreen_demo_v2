@@ -162,7 +162,7 @@ func (m *Module) EventHandler() inbox.Handler { return m.svc.HandleEvent }
 func (m *Module) PushHandler() inbox.Handler { return m.svc.HandlePush }
 
 // DigestTenants dựng bộ tìm tenant có email tóm tắt chờ gửi từ pool vai
-// ag_outbox_publisher (worker, nối thẳng).
+// ag_ops_jobs (worker, nối thẳng).
 func DigestTenants(pool *pgxpool.Pool) app.TenantLister {
 	return func(ctx context.Context) ([]uuid.UUID, error) { return store.PendingDigestTenants(ctx, pool) }
 }

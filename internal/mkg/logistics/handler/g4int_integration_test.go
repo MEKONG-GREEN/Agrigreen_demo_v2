@@ -74,7 +74,7 @@ func TestLogisticsT1FM05VesselCodeAssignsVehicle(t *testing.T) {
 
 // L-08 / L-10 (proto GH-02, nhắc ghe chưa cân — G4 tích hợp mục 3): job logistics_alerts quét định kỳ → một thông
 // báo mỗi điều kiện (chống lặp giữa các lượt quét), metric theo loại cho Alertmanager, chỉ cảnh báo. Tenant tìm qua
-// vai ag_outbox_publisher (chỉ đọc cột tenant_id, status).
+// vai ag_ops_jobs (chỉ đọc cột tenant_id, status).
 func TestLogisticsL08AlertJobNotices(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
@@ -90,9 +90,9 @@ func TestLogisticsL08AlertJobNotices(t *testing.T) {
 	mustStatus(t, d.post("/v1/logistics/vessels", map[string]any{"code": "OK-1", "kind": "ghe",
 		"registration_expiry": f.clk.Now().AddDate(1, 0, 0).Format("2006-01-02")}), http.StatusCreated, "ghe còn hạn")
 
-	all, err := logistics.ActiveTenants(f.env.Pool(t, migrations.MKG, dbadmin.OutboxPublisher))(ctx)
+	all, err := logistics.ActiveTenants(f.env.Pool(t, migrations.MKG, dbadmin.OpsJobs))(ctx)
 	if err != nil || !slices.Contains(all, f.tenant) {
-		t.Fatalf("ActiveTenants qua ag_outbox_publisher: %v %v", err, err)
+		t.Fatalf("ActiveTenants qua ag_ops_jobs: %v %v", err, err)
 	}
 	only := func(context.Context) ([]uuid.UUID, error) { return []uuid.UUID{f.tenant}, nil }
 	r, err := f.svc.ScanAlerts(ctx, only)

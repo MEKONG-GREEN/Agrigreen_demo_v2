@@ -230,7 +230,7 @@ func (s *Service) remind(ctx context.Context, tid uuid.UUID, kind string, sc sto
 	return sent, err
 }
 
-// ScheduleTenants dùng pool vai ag_outbox_publisher (BYPASSRLS, chỉ đọc cột tenant_id/week_start/locked_at của
+// ScheduleTenants dùng pool vai ag_ops_jobs (BYPASSRLS, chỉ đọc cột tenant_id/week_start/locked_at của
 // work_schedule_current và tenant_id/active của staff — migration 000075) để tìm tenant cần chạy job lịch.
 func ScheduleTenants(pool *pgxpool.Pool) TenantLister {
 	return func(ctx context.Context, _ time.Time) ([]uuid.UUID, error) {

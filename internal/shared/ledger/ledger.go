@@ -3,6 +3,18 @@
 // Chuỗi băm, seq, prev_hash, row_hash và chống trùng idem_key đều tính trong
 // DB (shared.fn_chain). Package này chỉ cung cấp: các cột chung của bản ghi sổ,
 // nhận diện ghi trùng, và xác minh chuỗi.
+//
+// # Thứ tự khóa khi ghi nhiều chuỗi trong một giao dịch
+//
+// Mỗi lần INSERT vào bảng sổ, fn_chain khóa dòng đầu chuỗi shared.chain_head
+// (ledger, tenant_id, stream_key) bằng SELECT … FOR UPDATE và giữ khóa tới hết giao
+// dịch. Hai giao dịch cùng ghi hai chuỗi A, B theo thứ tự ngược nhau (A rồi B / B rồi A)
+// sẽ deadlock (PostgreSQL hủy một bên, 40P01). Quy ước: giao dịch ghi NHIỀU chuỗi (cùng
+// hoặc khác bảng sổ) phải ghi theo thứ tự tăng dần của (tên sổ, stream_key) — sắp danh
+// sách trước khi INSERT (vd slices.SortFunc theo ledger rồi stream_key; stream_key so
+// sánh theo byte như collation "C"). Ghi lặp nhiều dòng cùng một chuỗi không cần sắp.
+// Package không có hàm ghi nhiều chuỗi: module tự ghi bằng SQL của mình nên tự giữ
+// quy ước này.
 package ledger
 
 import (

@@ -41,7 +41,7 @@ Báo cáo: JSON `ag.restore-drill-report.v1`, mỗi kiểm có `status` (`pass`/
 2. Phục hồi PostgreSQL từ kho pgBackRest bằng danh tính phục hồi (repo chỉ đọc), mục tiêu mới nhất hoặc `--type=time --target=…`.
 3. `objsync restore -manifest <khóa hoặc latest>` với restore-reader.
 4. `drill check -manifest <db-manifest của lần sao lưu> -strict -report báo-cáo.json` với `AG_ANCHOR_PUBLIC_KEY` lấy từ **kênh công bố riêng** (không suy từ khóa ký).
-4b. Thứ tự §34: nguồn trước, `k_ref` sau. Chạy `drill kref -confirm-copy -report kref.json`, với `AG_DB_URL` của cụm pf và mật khẩu của `app_worker`, `party_app`, `masterdata_app`, `ag_outbox_publisher`. Trên môi trường đã phục hồi thật (không phải bản sao diễn tập), dùng `worker -kref-rebuild`. Dịch vụ đọc qua RLS phạm vi chỉ mở khi `ag_k_ref_lag_seconds` dưới ngưỡng.
+4b. Thứ tự §34: nguồn trước, `k_ref` sau. Chạy `drill kref -confirm-copy -report kref.json`, với `AG_DB_URL` của cụm pf và mật khẩu của `app_worker`, `party_app`, `masterdata_app`, `ag_ops_jobs`. Trên môi trường đã phục hồi thật (không phải bản sao diễn tập), dùng `worker -kref-rebuild`. Dịch vụ đọc qua RLS phạm vi chỉ mở khi `ag_k_ref_lag_seconds` dưới ngưỡng.
 5. Ghi biên bản: thời gian phục hồi (RTO), điểm phục hồi (RPO), báo cáo JSON, ai thực hiện. Kiểm hỏng → xử lý như sự cố P1 ([verify-chains.md](verify-chains.md)).
 
 `drill capture` phải chạy lúc sao lưu (production: ngay sau `pgbackrest backup`, trong cùng CronJob, lưu manifest vào kho sao lưu cạnh bản sao). Với sao lưu trong lúc hệ thống đang ghi, số dòng sau phục hồi đến thời điểm mục tiêu sẽ ≥ manifest; khi đó so theo bản chụp của đúng điểm phục hồi hoặc dùng `-ignore-tables` cho bảng đang ghi và ghi rõ trong biên bản.

@@ -169,7 +169,7 @@ func TestDrillEndToEndAndDetectsCorruption(t *testing.T) {
 	}
 	day := clock.Date{Year: 2026, Month: 9, Day: 27}
 	for _, c := range migrations.Clusters {
-		if _, err := opsjobs.AnchorDaily(ctx, env.Pool(t, c, dbadmin.OutboxPublisher), primary, signer, string(c), day); err != nil {
+		if _, err := opsjobs.AnchorDaily(ctx, env.Pool(t, c, dbadmin.OpsJobs), primary, signer, string(c), day); err != nil {
 			t.Fatal(err)
 		}
 	}

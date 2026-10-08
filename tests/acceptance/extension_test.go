@@ -84,7 +84,7 @@ func TestPrototypeLeoThangMotLanDuyNhat(t *testing.T) {
 	worker := extension.New(w.s.PF(extension.DBRole), clock.NewFixed(due.Add(6*time.Hour)), extension.Deps{
 		Scope: m.Party.ScopeResolver(), Orgs: m.Party.Orgs(), Units: m.MasterData.AdminUnits(), Params: m.MasterData.Params(), Catalogs: m.MasterData.Catalogs(),
 	})
-	jobs := worker.Jobs(extension.OverdueTenants(w.s.PF(dbadmin.OutboxPublisher)), nil)
+	jobs := worker.Jobs(extension.OverdueTenants(w.s.PF(dbadmin.OpsJobs)), nil)
 	if len(jobs) != 1 || jobs[0].Name != extension.JobEscalation {
 		t.Fatalf("job leo thang: %v", jobs)
 	}

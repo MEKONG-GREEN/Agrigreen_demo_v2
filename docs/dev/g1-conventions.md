@@ -58,6 +58,7 @@ Không đổi số đã cấp. Mỗi module chỉ tạo tệp migration mang s�
 
 - Các vai đã khai trong `internal/shared/dbadmin/dbadmin.go`. **Không sửa tệp đó.** Cần vai mới thì ghi vào báo cáo.
 - Migration **chỉ tiến**, không có tệp `.down.sql`. Không được có `UPDATE`, `DELETE`, `TRUNCATE` ở mức câu lệnh (R-25).
+- Sửa bảng **đã có** (`migratecheck`, quy tắc khóa): đặt `SET LOCAL lock_timeout = '5s';` trước câu `ALTER TABLE` đầu tiên (`SET LOCAL`, không `SET` — ADR-0028; mỗi tệp chạy trong một giao dịch). `ADD CONSTRAINT … CHECK` / `FOREIGN KEY` phải `NOT VALID`, rồi `ALTER TABLE … VALIDATE CONSTRAINT …` ở câu riêng — bản thiếu `NOT VALID` giữ ACCESS EXCLUSIVE suốt lúc quét toàn bảng (bảng sổ: mọi phân vùng). Bảng tạo trong cùng tệp được miễn. Tệp cũ vi phạm được miễn theo số trong `tools/migratecheck/grandfather.go` (danh sách đóng).
 - Mọi bảng trong schema nghiệp vụ phải có `tenant_id` và gọi `SELECT shared.apply_tenant_rls('<schema.bảng>')`.
 - Bảng sổ (chỉ ghi thêm) theo mẫu §15 v4.1 (mục 8.1 v3.0), rồi gọi `SELECT shared.apply_ledger('<schema.bảng>', '<schema.bảng>')`. Xem `migrations/pf/000001_pf_party_consent.up.sql`.
 - Khóa duy nhất trên bảng sổ không làm được vì bảng phân vùng (ADR-0012). `fn_chain` đã chống trùng `idem_key`.

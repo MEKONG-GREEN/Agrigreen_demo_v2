@@ -130,7 +130,7 @@ func (m *Module) SyncSink() syncport.Sink { return app.SyncSink{Svc: m.svc} }
 func (m *Module) ReportData() port.ReportData { return app.ReportData{Svc: m.svc} }
 
 // OverdueTenants dựng bộ tìm tenant có nhiệm vụ quá hạn từ pool vai
-// ag_outbox_publisher (worker, nối thẳng).
+// ag_ops_jobs (worker, nối thẳng).
 func OverdueTenants(pool *pgxpool.Pool) app.TenantLister { return app.OverdueTenants(pool) }
 
 // Jobs trả job định kỳ của module cho bộ lập lịch của worker (chỉ chạy ở leader):
@@ -152,7 +152,7 @@ func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job
 	}}
 }
 
-// ScheduleTenants dựng bộ tìm tenant cho job lịch công tác từ pool vai ag_outbox_publisher (worker, nối thẳng).
+// ScheduleTenants dựng bộ tìm tenant cho job lịch công tác từ pool vai ag_ops_jobs (worker, nối thẳng).
 func ScheduleTenants(pool *pgxpool.Pool) app.TenantLister { return app.ScheduleTenants(pool) }
 
 // ScheduleJobs trả job lịch công tác (KN v7.7 P5) cho bộ lập lịch của worker (chỉ chạy ở leader): mỗi 15 phút

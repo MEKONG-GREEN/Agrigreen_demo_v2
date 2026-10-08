@@ -62,7 +62,7 @@ func (m *Module) RebuildTenant(ctx context.Context, tid uuid.UUID) (map[string]i
 // JobAlerts là tên job cảnh báo định kỳ L-08 của api-internal (AG_MKG_JOBS).
 const JobAlerts = port.JobAlerts
 
-// ActiveTenants liệt kê tenant có chuyến mở hoặc phương tiện đang dùng — pool vai ag_outbox_publisher của cụm mkg
+// ActiveTenants liệt kê tenant có chuyến mở hoặc phương tiện đang dùng — pool vai ag_ops_jobs của cụm mkg
 // (chỉ đọc tenant_id, status; mkg 000020).
 func ActiveTenants(pool *pgxpool.Pool) app.TenantLister {
 	return func(ctx context.Context) ([]uuid.UUID, error) {

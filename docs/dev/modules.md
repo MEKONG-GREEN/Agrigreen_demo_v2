@@ -241,7 +241,7 @@ Mảng xã: `k_ref.ctx_text('app.xa_ids')::text[]`. Chưa chính sách RLS nào 
 
 Mọi ảnh chụp mang `seq` của sổ nguồn: bản cũ hơn bản đã áp thì bỏ qua (giao lại, sai thứ tự). Nút hoặc cha chưa có trong `k_ref` → `kref.ErrNotYetProjected`: giao lại, vẫn thiếu thì vào DLQ `pf.kref.dlq` — chạy dựng lại.
 
-**Dựng lại.** `worker -kref-rebuild` dựng lại mọi tenant từ nguồn (vai `party_app`, `masterdata_app`, `app_worker`, `ag_outbox_publisher` để tìm tenant). Chạy:
+**Dựng lại.** `worker -kref-rebuild` dựng lại mọi tenant từ nguồn (vai `party_app`, `masterdata_app`, `app_worker`, `ag_ops_jobs` để tìm tenant). Chạy:
 
 - **một lần sau khi triển khai W2.5** — tổ chức có trước W2.5 chưa từng phát `created`;
 - sau mỗi lần phục hồi (thứ tự §34: nguồn trước, `k_ref` sau);

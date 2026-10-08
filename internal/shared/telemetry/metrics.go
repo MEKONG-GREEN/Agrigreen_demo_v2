@@ -27,6 +27,10 @@ const (
 	// lúc worker pf.kref áp xong (ADR-0029 §4: k_ref_lag_seconds, mục tiêu p99 ≤ 5 giây) — Prometheus
 	// ag_k_ref_lag_seconds_bucket.
 	MetricKRefLag = "ag.k_ref.lag"
+	// MetricLedgerDefaultRows: số dòng (ước lượng) trong phân vùng DEFAULT theo cluster + bảng; > 0 → từng
+	// thiếu phân vùng tháng (shared 000010, opsjobs.RegisterDefaultPartitionRows). Prometheus
+	// ag_db_ledger_default_rows (worker cho cụm của lịch; sql_exporter cho mkg/ts).
+	MetricLedgerDefaultRows = "ag.db.ledger_default_rows"
 )
 
 type httpInstruments struct {

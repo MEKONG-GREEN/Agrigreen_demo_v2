@@ -40,6 +40,10 @@ const (
 	Migrator        = "ag_migrator"
 	SharedUser      = "ag_shared_user"
 	OutboxPublisher = "ag_outbox_publisher"
+	// OpsJobs là vai của job vận hành xuyên tenant (neo chuỗi, dọn idempotency, tìm tenant cho job định kỳ,
+	// đếm phân vùng DEFAULT) — tách khỏi ag_outbox_publisher (shared 000009, pf 000114, mkg 000034): BYPASSRLS
+	// nhưng chỉ có quyền migration cấp theo CỘT (tenant_id + cột trạng thái) và EXECUTE hàm vận hành.
+	OpsJobs = "ag_ops_jobs"
 	// Vai giám sát vận hành (G3, mục 19) và chủ hàm SECURITY DEFINER của chúng.
 	MKGMonitor      = "mkg_monitor"
 	TSMonitor       = "ts_monitor"
@@ -62,7 +66,10 @@ var baseRoles = []Role{
 	{Name: MKGMonitorOwner, Login: false, BypassRLS: true},
 	{Name: TSMonitorOwner, Login: false, BypassRLS: true},
 	{Name: Migrator, Login: true, MemberOf: []string{MKGMonitorOwner, TSMonitorOwner}, Clusters: migrations.Clusters},
+	// ag_outbox_publisher: chỉ shared.outbox (đọc xuyên tenant, sửa cột trạng thái) — cmd/outbox-publisher.
 	{Name: OutboxPublisher, Login: true, BypassRLS: true, Clusters: migrations.Clusters},
+	// ag_ops_jobs: worker (lịch), cmd/migrate anchor|purge-idempotency, api-internal (job mkg), rebuilddrill.
+	{Name: OpsJobs, Login: true, BypassRLS: true, Clusters: migrations.Clusters},
 	// platform_api: chỉ bảng vận hành trong schema shared (idempotency) của cụm pf, không có quyền nghiệp vụ.
 	{Name: "platform_api", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
 	{Name: "worker_platform", Login: true, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF}},
@@ -174,7 +181,7 @@ func RolesFor(clusters []migrations.Cluster) []Role {
 
 // BootstrapClusters như Bootstrap nhưng chỉ tạo vai và database của các cụm clusters (cmd/migrate bootstrap
 // đọc AG_CLUSTERS qua cmd/internal/clusterenv; rỗng = mọi cụm — hành vi cũ). Vai nhiều cụm (ag_migrator,
-// ag_outbox_publisher) chỉ được GRANT CONNECT trên database của cụm đã chọn.
+// ag_outbox_publisher, ag_ops_jobs) chỉ được GRANT CONNECT trên database của cụm đã chọn.
 func BootstrapClusters(ctx context.Context, adminURL, dbSuffix string, clusters []migrations.Cluster) error {
 	if len(clusters) == 0 {
 		return errors.New("dbadmin: không có cụm nào để dựng")

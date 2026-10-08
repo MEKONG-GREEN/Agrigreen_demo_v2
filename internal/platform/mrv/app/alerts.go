@@ -244,7 +244,7 @@ func (s *Service) escalateBatch(ctx context.Context, tid uuid.UUID, now time.Tim
 // TenantLister trả các tenant có hồ sơ chờ duyệt.
 type TenantLister func(ctx context.Context) ([]uuid.UUID, error)
 
-// PendingTenants dùng pool vai ag_outbox_publisher (BYPASSRLS, chỉ SELECT hai cột tenant_id,
+// PendingTenants dùng pool vai ag_ops_jobs (BYPASSRLS, chỉ SELECT hai cột tenant_id,
 // review_status của evidence_current — pf 000045) để tìm tenant cần chạy; leo thang chạy bằng vai
 // mrv_app theo từng tenant.
 func PendingTenants(pool *pgxpool.Pool) TenantLister {

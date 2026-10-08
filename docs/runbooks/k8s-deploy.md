@@ -94,10 +94,10 @@ kubectl -n agrigreen-data logs job/db-migrate-pf            # "cổng catalog: s
 
   | Kho (`remote`) | Nội dung | Namespace nhận |
   |---|---|---|
-  | `db/pf` | `AG_DB_PASSWORD_<VAI>` mọi vai cụm pf, `ag_migrator`, `ag_outbox_publisher` | `agrigreen-pf` (vai module + outbox), `agrigreen-data` (Job) |
-  | `db/mkg` | vai cụm mkg, `ag_outbox_publisher` dùng chung cho **mkg và ts**, `mkg_monitor` | `agrigreen-mkg`, `agrigreen-data`, `agrigreen-ops` (sql_exporter) |
+  | `db/pf` | `AG_DB_PASSWORD_<VAI>` mọi vai cụm pf, `ag_migrator`, `ag_outbox_publisher`, `ag_ops_jobs` | `agrigreen-pf` (vai module; `pf-db-outbox` chỉ outbox-publisher, `pf-db-ops` worker), `agrigreen-data` (Job) |
+  | `db/mkg` | vai cụm mkg, `ag_outbox_publisher` và `ag_ops_jobs` dùng chung cho **mkg và ts**, `mkg_monitor` | `agrigreen-mkg`, `agrigreen-data`, `agrigreen-ops` (sql_exporter) |
   | `db/ts` | `ingest_ts`, `ts_reader`, `ts_monitor`, `ag_migrator` | `agrigreen-mkg`, `agrigreen-data` |
-  | `db/vault` | `vault_app`, `ag_migrator`, `ag_outbox_publisher` | chỉ `agrigreen-vault` |
+  | `db/vault` | `vault_app`, `ag_migrator`, `ag_outbox_publisher`, `ag_ops_jobs` | chỉ `agrigreen-vault` |
   | `db/foreign-data`, `db/foreign-vault` | `AG_DB_APP_PASSWORD` ngẫu nhiên, không dùng ở đâu. Là mật khẩu cho vai của vùng khác mà `dbadmin.Bootstrap` vẫn tạo trên mỗi cụm | `agrigreen-data`, `agrigreen-vault` |
   | `rabbitmq/<user>` | `username`, `password` của tài khoản dịch vụ | `agrigreen-data` (`rmq-<user>`) + URL dựng sẵn ở vùng dùng (`amqp-*`) |
   | `app/pf`, `app/mkg`, `app/vault` | `AG_SYNC_CURSOR_KEY` (≥ 32 byte), `AG_KC_CLIENT_SECRET`; `AG_MKG_SA_CLIENT_SECRET`, `AG_FIELDOPS_CURSOR_KEY`; `AG_VAULT_KEK`, `AG_VAULT_BLIND_KEY` | vùng tương ứng |

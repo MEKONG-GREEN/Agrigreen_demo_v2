@@ -21,6 +21,7 @@
 6. **Số migration cấp theo thứ tự gộp.** `golang-migrate` bỏ qua im lặng một số nhỏ hơn số đã áp. Gộp khác thứ tự thì cấp lại số trước khi gộp.
    - `pf 000086`–`000087` đã dùng trên `main`, nên `pf` bắt đầu từ **000088**.
    - Các cụm khác: mkg từ 000022 · shared từ 000006 · vault từ 000003 · ts từ 000004.
+   - Sửa lỗi rà soát (review) gộp sau W2.5, lấy số SAU mọi số đã dành ở bảng dưới: **shared 000009** (vai `ag_ops_jobs`), **shared 000010** (chuyển dòng khỏi phân vùng DEFAULT + chỉ số), **pf 000114** (quyền cột cho `ag_ops_jobs`, gồm quyền tìm tenant của `k_ref`), **pf 000115–000117** (chỉ mục khóa ngoại cropcycle, simulation, reports), **mkg 000033** (bản sao danh bạ HTX/thửa fieldops), **mkg 000034** (quyền cột cho `ag_ops_jobs`). Bản review ban đầu dùng shared 000007/000008, pf 000092–000095, mkg 000023 — trùng số đã dành (W2.3, W7.1, W2.5, W2.6, W3.3) nên đã cấp lại.
 
 ## 2. Các giai đoạn và gói
 

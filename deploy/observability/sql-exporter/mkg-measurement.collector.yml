@@ -61,3 +61,13 @@ metrics:
     values: [ts]
     query: |
       SELECT mkg_monitor.dispute_oldest_open_ts() AS ts
+
+  # Phân vùng DEFAULT có dòng (shared 000010): ước lượng thống kê, không đọc dữ liệu. Vai mkg_monitor chỉ có
+  # USAGE schema shared + EXECUTE đúng hàm này. Cảnh báo AgLedgerDefaultPartitionRows (agrigreen-platform.rules.yml).
+  - metric_name: ag_db_ledger_default_rows
+    type: gauge
+    help: "Số dòng ước lượng trong phân vùng DEFAULT theo bảng (> 0: từng thiếu phân vùng tháng — chạy migrate maintain)"
+    key_labels: [table]
+    values: [n]
+    query: |
+      SELECT table_name AS "table", est_rows AS n FROM shared.ledger_default_rows()

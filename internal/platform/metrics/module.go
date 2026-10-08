@@ -80,7 +80,7 @@ func (m *Module) LayerLogHandler() inbox.Handler { return m.svc.HandleLayerEvent
 // LayerEvents là các sự kiện consumer nhật ký lớp bind vào.
 var LayerEvents = app.LayerEvents
 
-// JobTenants liệt kê tenant cho job bằng pool ag_outbox_publisher.
+// JobTenants liệt kê tenant cho job bằng pool ag_ops_jobs.
 func JobTenants(pool *pgxpool.Pool) app.TenantLister { return app.JobTenants(pool) }
 
 // Jobs trả job metrics_snapshot (00:45 giờ VN, sau anchor 00:30; chạy ở leader):

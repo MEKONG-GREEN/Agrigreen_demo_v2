@@ -18,12 +18,12 @@ import (
 // GIS FN-06 / GIS US-WH-01 AC-2 / Q-MKG-02: job hub_capacity_daily của api-internal chụp và công
 // bố sức chứa MỌI cơ sở đang dùng qua van hub_capacity mỗi ngày — idempotent theo (cơ sở,
 // ngày nghiệp vụ): chạy lại cùng ngày không xuất thêm, sang ngày mới xuất lại. Tìm tenant bằng
-// vai ag_outbox_publisher (chỉ đọc cột), ghi bằng vai hub_app, qua cửa van (valve_export + outbox).
+// vai ag_ops_jobs (chỉ đọc cột), ghi bằng vai hub_app, qua cửa van (valve_export + outbox).
 func TestDailyCapacityPublication_GIS_US_WH_01(t *testing.T) {
 	f := newFixture(t)
 	a := f.approvedFacility("HUB-D1", "500000")
 	b := f.approvedFacility("HUB-D2", "250000")
-	pub := f.env.Pool(t, migrations.MKG, dbadmin.OutboxPublisher)
+	pub := f.env.Pool(t, migrations.MKG, dbadmin.OpsJobs)
 	mod := hub.New(f.pool, f.clk)
 	ctx := context.Background()
 	all, err := hub.ActiveHubTenants(pub)(ctx)

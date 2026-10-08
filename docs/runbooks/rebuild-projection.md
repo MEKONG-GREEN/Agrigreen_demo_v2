@@ -58,7 +58,7 @@ go run ./cmd/rebuilddrill -confirm-copy -out rebuild-drill-$(date +%F).md -json 
 ```
 
 - `-tenants uuid,uuid` giới hạn tenant (mặc định: mọi tenant có sự kiện trên `shared.outbox` của cụm mkg, đọc bằng vai
-  `ag_outbox_publisher`); `-modules hub,costing` giới hạn module; `AG_DB_SUFFIX` cho database có hậu tố (như pgtest).
+  `ag_ops_jobs`); `-modules hub,costing` giới hạn module; `AG_DB_SUFFIX` cho database có hậu tố (như pgtest).
 - Mã thoát 0 = mọi bảng khớp; 1 = có bảng **LỆCH** hoặc lỗi dựng lại (báo cáo vẫn ghi); 2 = sai cấu hình.
 - Lưu `rebuild-drill-<ngày>.md` + `.json` vào hồ sơ diễn tập (cùng biên bản phục hồi, [restore-drill.md](restore-drill.md)) và ghi
   kết quả vào dòng A-4 của [g4-acceptance.md](../uat/g4-acceptance.md).

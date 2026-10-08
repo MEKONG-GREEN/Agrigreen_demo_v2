@@ -16,7 +16,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
-// TenantLister trả danh sách tenant cần xử lý (worker, pool ag_outbox_publisher).
+// TenantLister trả danh sách tenant cần xử lý (worker, pool ag_ops_jobs).
 type TenantLister func(ctx context.Context) ([]uuid.UUID, error)
 
 // maxDigestItems: số chỉ đạo tối đa trong một email.

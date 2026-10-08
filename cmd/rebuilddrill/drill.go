@@ -103,7 +103,7 @@ type Report struct {
 // Config là cấu hình một lần diễn tập.
 type Config struct {
 	Pool     PoolFor
-	Tenants  []uuid.UUID // rỗng → mọi tenant có sự kiện outbox (vai ag_outbox_publisher)
+	Tenants  []uuid.UUID // rỗng → mọi tenant có sự kiện outbox (vai ag_ops_jobs)
 	Lister   func(ctx context.Context) ([]uuid.UUID, error)
 	Clock    clock.Clock
 	Modules  []string // rỗng = mọi module

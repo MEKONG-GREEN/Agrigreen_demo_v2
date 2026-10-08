@@ -21,7 +21,7 @@ import (
 // TenantLister trả tenant có kỳ báo cáo (job vòng đời báo cáo).
 type TenantLister func(ctx context.Context) ([]uuid.UUID, error)
 
-// PeriodTenants dựng bộ tìm tenant từ pool vai ag_outbox_publisher (chỉ đọc (tenant_id, status) của report_period).
+// PeriodTenants dựng bộ tìm tenant từ pool vai ag_ops_jobs (chỉ đọc (tenant_id, status) của report_period).
 func PeriodTenants(pool *pgxpool.Pool) TenantLister {
 	return func(ctx context.Context) ([]uuid.UUID, error) {
 		rows, err := pool.Query(ctx, `SELECT DISTINCT tenant_id FROM pf_extension.report_period`)

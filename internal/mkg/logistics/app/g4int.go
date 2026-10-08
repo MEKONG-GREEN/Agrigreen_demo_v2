@@ -91,7 +91,7 @@ var (
 	AudienceRegistration = []string{RoleDispatcher}
 )
 
-// TenantLister liệt kê tenant cần quét (pool vai ag_outbox_publisher, chỉ đọc cột tenant_id, status).
+// TenantLister liệt kê tenant cần quét (pool vai ag_ops_jobs, chỉ đọc cột tenant_id, status).
 type TenantLister func(ctx context.Context) ([]uuid.UUID, error)
 
 // AlertScan là kết quả một lượt quét.

@@ -10,7 +10,7 @@ Phạm vi: gói P4 (`internal/platform/extension/reportcycle`). Mục tiêu BRD:
 | Phát hành | Một giao dịch: 1 sự kiện sổ đợt + N kỳ + công việc chèn bằng `INSERT … SELECT unnest(...)` theo khối 2.000 dòng (không ghi sổ băm từng công việc — sự kiện `issued` của đợt là nguồn); một sự kiện outbox `pf.extension.report_batch.issued` (thông báo một lần mỗi cán bộ) | `report_task_commune`, `report_task_period`, `report_task_batch` |
 | "Cập nhật" | Đọc bản "Đã gửi" mới nhất của mọi công việc đợt × biểu một lần (`SubmissionsByIDs`), tính lại bằng `FormEngine.Evaluate/Totals` trong bộ nhớ, so khác, ghi ảnh chụp + ô thay đổi (unnest) + **chỉ số dựng sẵn** | `consolidation_snapshot`, `consolidation_cell_change_run`, `consolidation_metric` |
 | Dashboard | KHÔNG đọc bài nộp: đọc con trỏ `consolidation_latest` của kỳ + `consolidation_metric` của các lần chạy (đã gom theo tỉnh/khu vực/xã) + một truy vấn trạng thái nộp của kỳ — 6–8 truy vấn theo chỉ mục, không phụ thuộc số cột của mẫu | `consolidation_latest` (PK kỳ × biểu), `consolidation_metric` (PK lần chạy × chỉ số × phạm vi × đơn vị), `consolidation_metric_lookup` |
-| Tự chốt / tự nhắc | Job 5 phút, chỉ mục một phần theo giờ chốt; tenant tìm bằng `ag_outbox_publisher` (2 cột) | `report_period_autoclose`, `report_task_reopened` |
+| Tự chốt / tự nhắc | Job 5 phút, chỉ mục một phần theo giờ chốt; tenant tìm bằng `ag_ops_jobs` (2 cột) | `report_period_autoclose`, `report_task_reopened` |
 
 ## Kiểm thử ghi số đo
 

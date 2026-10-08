@@ -705,7 +705,7 @@ func TestUrgentDirectiveEmailDigest(t *testing.T) {
 	for _, e := range []outbox.Envelope{urgent, normal, urgent} {
 		_, _ = inbox.Process(context.Background(), f.pool, port.ConsumerDirective, e, mod.EventHandler())
 	}
-	all := notify.DigestTenants(env.Pool(t, migrations.PF, dbadmin.OutboxPublisher))
+	all := notify.DigestTenants(env.Pool(t, migrations.PF, dbadmin.OpsJobs))
 	// Chỉ tenant của kiểm thử này (database dùng chung giữa các kiểm thử của gói).
 	mine := func(ctx context.Context) ([]uuid.UUID, error) {
 		ts, err := all(ctx)

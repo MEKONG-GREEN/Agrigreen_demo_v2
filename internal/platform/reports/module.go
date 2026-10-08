@@ -167,7 +167,7 @@ func (m *Module) ExportHandler() inbox.Handler { return m.svc.HandleExportReques
 // DeliveryHandler là inbox.Handler cho pf.reports.export.completed (consumer port.DeliveryConsumer).
 func (m *Module) DeliveryHandler() inbox.Handler { return m.svc.HandleExportCompleted }
 
-// ScheduleTenants dựng bộ tìm tenant có lịch đang dùng từ pool vai ag_outbox_publisher.
+// ScheduleTenants dựng bộ tìm tenant có lịch đang dùng từ pool vai ag_ops_jobs.
 func ScheduleTenants(pool *pgxpool.Pool) app.TenantLister { return app.ScheduleTenants(pool) }
 
 // Jobs trả job lịch gửi cho bộ lập lịch của worker (chỉ leader): mỗi 15 phút,

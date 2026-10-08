@@ -157,7 +157,7 @@ spec:
 {{- end }}
 {{- end }}
 {{- end }}
-{{- /* ---------------- CronJob theo vùng: anchor, purge-idempotency (ag_outbox_publisher) */}}
+{{- /* ---------------- CronJob theo vùng: anchor, purge-idempotency (ag_ops_jobs, shared 000009) */}}
 {{- range $job, $cmd := (dict "anchor" "anchor" "purgeIdempotency" "purge-idempotency") }}
 {{- $cj := index $root.Values.cronJobs $job }}
 {{- range $zone, $clusters := $cj.groups }}
@@ -211,7 +211,7 @@ spec:
                   valueFrom: { secretKeyRef: { name: {{ $zone }}-s3, key: AG_S3_SECRET_KEY } }
 {{- end }}
               envFrom:
-                - secretRef: { name: {{ $zone }}-db-outbox }
+                - secretRef: { name: {{ $zone }}-db-ops }
               resources: {{ toJson $root.Values.common.resources.small }}
 {{- end }}
 {{- end }}

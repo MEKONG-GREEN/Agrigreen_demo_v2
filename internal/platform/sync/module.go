@@ -147,13 +147,13 @@ func (m *Module) RegisterSLAMetrics(tenants func(context.Context) ([]uuid.UUID, 
 
 // RegisterConflictSLAMetrics đăng ký gauge ag.sync.conflict.overdue mà không cần dựng
 // module đầy đủ (worker, ADR-0006 + mục 19): db là pool vai sync_app, tenants thường là
-// ConflictTenants(pool ag_outbox_publisher).
+// ConflictTenants(pool ag_ops_jobs).
 func RegisterConflictSLAMetrics(db tenant.Beginner, clk clock.Clock, tenants func(context.Context) ([]uuid.UUID, error)) (metric.Registration, error) {
 	return registerSLA(&app.Service{DB: db, Clock: clk}, tenants)
 }
 
 // ConflictTenants liệt kê tenant có xung đột đồng bộ đang mở, đọc bằng pool vai
-// ag_outbox_publisher (hai cột tenant_id, status — migration pf 000043).
+// ag_ops_jobs (hai cột tenant_id, status — migration pf 000043).
 func ConflictTenants(pool *pgxpool.Pool) func(context.Context) ([]uuid.UUID, error) {
 	return func(ctx context.Context) ([]uuid.UUID, error) {
 		rows, err := pool.Query(ctx, "SELECT DISTINCT tenant_id FROM pf_sync.conflict WHERE status = 'open'")

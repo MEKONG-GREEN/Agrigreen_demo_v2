@@ -55,7 +55,7 @@ func (m *Module) OpenPeriodsImpact() partyport.OrgImpactSource { return rcapp.Or
 // ReportUsage đếm công việc báo cáo theo phòng ban (P2 FN-AD-04.03: chặn "xóa" phòng ban đã có dữ liệu).
 func (m *Module) ReportUsage() partyport.DepartmentUsage { return rcapp.DepartmentUsage{Svc: m.rc} }
 
-// ReportCycleTenants dựng bộ tìm tenant có kỳ báo cáo từ pool vai ag_outbox_publisher (worker, nối thẳng).
+// ReportCycleTenants dựng bộ tìm tenant có kỳ báo cáo từ pool vai ag_ops_jobs (worker, nối thẳng).
 func ReportCycleTenants(pool *pgxpool.Pool) rcapp.TenantLister { return rcapp.PeriodTenants(pool) }
 
 // ReportCycleJobs trả job vòng đời báo cáo (chỉ leader): mỗi 5 phút tự chốt kỳ quá giờ chốt (kèm tổng hợp "Hệ

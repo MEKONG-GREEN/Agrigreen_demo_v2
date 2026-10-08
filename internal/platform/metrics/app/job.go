@@ -16,7 +16,7 @@ import (
 // TenantLister trả các tenant cần chạy job cho ngày d.
 type TenantLister func(ctx context.Context, d clock.Date) ([]uuid.UUID, error)
 
-// JobTenants liệt kê tenant bằng pool ag_outbox_publisher (BYPASSRLS, không có quyền
+// JobTenants liệt kê tenant bằng pool ag_ops_jobs (BYPASSRLS, không có quyền
 // trên pf_metrics): tenant có chuỗi sổ đã neo của ngày d (job anchor 00:30 chạy
 // trước), không có neo → tenant có sự kiện outbox.
 func JobTenants(pool *pgxpool.Pool) TenantLister {

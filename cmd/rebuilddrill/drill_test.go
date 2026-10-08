@@ -144,8 +144,8 @@ func TestRebuildDrillChecksumsBeforeAfter_R22(t *testing.T) {
 		t.Fatalf("sau dựng lại phải khớp: %s", rep.Markdown())
 	}
 
-	// Tìm tenant qua vai ag_outbox_publisher (outbox cụm mkg có trip.completed của tenant).
-	pub, _ := p.get(dbadmin.OutboxPublisher)
+	// Tìm tenant qua vai ag_ops_jobs (outbox cụm mkg có trip.completed của tenant).
+	pub, _ := p.get(dbadmin.OpsJobs)
 	all, err := OutboxTenants(pub)(ctx)
 	if err != nil {
 		t.Fatal(err)

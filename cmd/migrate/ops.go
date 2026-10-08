@@ -67,9 +67,13 @@ func maintain(ctx context.Context) error {
 			default:
 				fmt.Printf("%s %s: tạo %d phân vùng (đủ %d tháng tới)\n", c, r.Table, r.Created, months)
 			}
+			if r.Moved > 0 {
+				warn++
+				fmt.Printf("CẢNH BÁO %s %s: đã chuyển %d dòng từ phân vùng DEFAULT sang phân vùng tháng — job maintain từng trễ, xem runbook\n", c, r.Table, r.Moved)
+			}
 			if r.DefaultRows > 0 {
 				warn++
-				fmt.Printf("CẢNH BÁO %s %s: phân vùng DEFAULT có ~%d dòng — từng thiếu phân vùng tháng, xem runbook\n", c, r.Table, r.DefaultRows)
+				fmt.Printf("CẢNH BÁO %s %s: phân vùng DEFAULT còn ~%d dòng (ước lượng thống kê) — xem runbook\n", c, r.Table, r.DefaultRows)
 			}
 		}
 		return nil
@@ -120,7 +124,7 @@ func verifyChains(ctx context.Context) error {
 }
 
 // purgeIdempotency: như job idempotency của worker (R-51) nhưng chạy một lần, cho vùng
-// không có lịch worker (vd CronJob vùng mkg/vault ở Kubernetes). Vai ag_outbox_publisher,
+// không có lịch worker (vd CronJob vùng mkg/vault ở Kubernetes). Vai ag_ops_jobs,
 // nối thẳng. Dọn cả shared.idempotency_key (48 giờ) và shared.ledger_idem (30 ngày, W2.1)
 // của từng cụm trong AG_CLUSTERS.
 func purgeIdempotency(ctx context.Context) error {
@@ -134,7 +138,7 @@ func purgeIdempotency(ctx context.Context) error {
 	}
 	const batch = 5000
 	for _, c := range clusters {
-		dsn, err := dbadmin.RoleURL(clusterenv.BaseURL(c, base), c, "", dbadmin.OutboxPublisher)
+		dsn, err := dbadmin.RoleURL(clusterenv.BaseURL(c, base), c, "", dbadmin.OpsJobs)
 		if err != nil {
 			return err
 		}

@@ -295,7 +295,7 @@ func (s *Service) deadLetter(ctx context.Context, tx pgx.Tx, jr store.Journal, j
 	return store.FinishJob(ctx, tx, j.JobID, nil, &code, at)
 }
 
-// TenantLister liệt kê tenant cần xét (job định kỳ, vai ag_outbox_publisher).
+// TenantLister liệt kê tenant cần xét (job định kỳ, vai ag_ops_jobs).
 type TenantLister func(ctx context.Context) ([]uuid.UUID, error)
 
 // RetryResult tổng kết một lượt thử lại.

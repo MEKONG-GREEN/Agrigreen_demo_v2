@@ -149,7 +149,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules,
 
 // Jobs trả job định kỳ của vùng mkg được chọn (danh sách phân tách bằng dấu phẩy hoặc "all"):
 // hub_capacity_daily — công bố sức chứa theo ngày qua van hub_capacity (GIS US-WH-01 AC-2).
-// tenantPool là pool vai ag_outbox_publisher của cụm mkg (tìm tenant xuyên RLS, chỉ đọc cột).
+// tenantPool là pool vai ag_ops_jobs của cụm mkg (tìm tenant xuyên RLS, chỉ đọc cột).
 // Biến môi trường của job ĐÃ ĐẶT nhưng sai cú pháp (UUID, Go duration) → lỗi khởi động thay vì lặng lẽ tắt
 // job hoặc rơi về mặc định; chưa đặt → giữ mặc định (job fieldops không chạy khi thiếu AG_MKG_TENANT_ID).
 func Jobs(mods Modules, tenantPool *pgxpool.Pool, selected string, log *slog.Logger) ([]schedule.Job, error) {
@@ -206,7 +206,7 @@ func Jobs(mods Modules, tenantPool *pgxpool.Pool, selected string, log *slog.Log
 		out = append(out, mods.Logistics.Jobs(logistics.ActiveTenants(tenantPool), interval, log)...)
 	}
 	if picked(acctbridge.JobPushRetry) {
-		// R-62: đẩy lại bút toán tổng hợp có hạn thử lại (giãn cách mũ) — tenant tìm qua vai ag_outbox_publisher.
+		// R-62: đẩy lại bút toán tổng hợp có hạn thử lại (giãn cách mũ) — tenant tìm qua vai ag_ops_jobs.
 		out = append(out, mods.Acctbridge.Jobs(acctbridge.PendingRetryTenants(tenantPool), log)...)
 	}
 	return out, nil

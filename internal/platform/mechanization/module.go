@@ -71,7 +71,7 @@ func (m *Module) AreaFeed() port.AreaFeed { return m.svc }
 func (m *Module) AreaSyncHandler() inbox.Handler { return m.svc.HandleCoopSeasonAreaChanged }
 
 // FeedTenants dựng bộ tìm tenant đã từng nhận dữ liệu App HTX từ pool vai
-// ag_outbox_publisher (worker, nối thẳng) cho job port.JobAreaFeedCheck.
+// ag_ops_jobs (worker, nối thẳng) cho job port.JobAreaFeedCheck.
 func FeedTenants(pool *pgxpool.Pool) app.TenantLister {
 	return func(ctx context.Context) ([]uuid.UUID, error) { return store.FeedTenants(ctx, pool) }
 }

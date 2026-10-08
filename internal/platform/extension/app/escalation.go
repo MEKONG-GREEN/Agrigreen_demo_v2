@@ -80,7 +80,7 @@ func (s *Service) escalateBatch(ctx context.Context, tid uuid.UUID, now time.Tim
 // TenantLister trả các tenant có nhiệm vụ quá hạn chưa leo thang tại thời điểm at.
 type TenantLister func(ctx context.Context, at time.Time) ([]uuid.UUID, error)
 
-// OverdueTenants dùng pool vai ag_outbox_publisher (BYPASSRLS, chỉ được SELECT bốn
+// OverdueTenants dùng pool vai ag_ops_jobs (BYPASSRLS, chỉ được SELECT bốn
 // cột tenant_id, status, escalated_at, due_at của task_current — migration 000006)
 // để tìm tenant cần chạy; việc leo thang chạy bằng vai extension_app theo từng tenant.
 func OverdueTenants(pool *pgxpool.Pool) TenantLister {

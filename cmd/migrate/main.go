@@ -7,7 +7,7 @@
 //	migrate maintain    tạo trước phân vùng tháng cho mọi bảng sổ ở mọi cụm (AG_PARTITION_MONTHS_AHEAD, mặc định 24)
 //	migrate verify-chains  chạy shared.verify_chain cho mọi chuỗi trong chain_head; có chỗ đứt → mã thoát 1
 //	migrate anchor      neo mọi cụm một lần + manifest ký số (AG_ANCHOR_DATE, mặc định ngày vừa kết thúc)
-//	migrate purge-idempotency  xóa Idempotency-Key hết hạn + idem_key sổ quá 30 ngày (W2.1) ở mọi cụm (vai ag_outbox_publisher) — CronJob
+//	migrate purge-idempotency  xóa Idempotency-Key hết hạn + idem_key sổ quá 30 ngày (W2.1) ở mọi cụm (vai ag_ops_jobs) — CronJob
 //	                    của vùng không chạy lịch worker (G4 Kubernetes, docs/runbooks/k8s-deploy.md)
 //
 // Mật khẩu vai: AG_DB_PASSWORD_<VAI> hoặc AG_DB_APP_PASSWORD.

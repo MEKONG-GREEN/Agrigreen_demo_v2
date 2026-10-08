@@ -76,7 +76,7 @@ func TestKRefIncrementalEqualsRebuild_W25(t *testing.T) {
 	pty := party.New(s.PF(party.DBRole), clock.System{})
 	md := masterdata.New(s.PF(masterdata.DBRole), clock.System{})
 	src := krefport.Sources{Orgs: pty.KRefOrgs(), ShareGrants: pty.KRefShareGrants(), AdminUnits: md.KRefAdminUnits(),
-		Tenants: kref.UnionTenants(party.KRefTenants(s.PF(dbadmin.OutboxPublisher)), masterdata.KRefTenants(s.PF(dbadmin.OutboxPublisher)))}
+		Tenants: kref.UnionTenants(party.KRefTenants(s.PF(dbadmin.OpsJobs)), masterdata.KRefTenants(s.PF(dbadmin.OpsJobs)))}
 	want, err := kref.Expected(ctx, src, w.tid)
 	if err != nil {
 		t.Fatal(err)

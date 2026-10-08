@@ -58,7 +58,7 @@ func (m *Module) RebuildTenant(ctx context.Context, tid uuid.UUID) (map[string]i
 // Stock (G4) cho mkg/orders đọc tồn theo dạng hàng / cơ sở với tenant tường minh (cảnh báo thiếu tồn O-05).
 func (m *Module) Stock() port.Stock { return m.svc }
 
-// ActiveHubTenants dựng bộ tìm tenant có cơ sở đang dùng từ pool vai ag_outbox_publisher.
+// ActiveHubTenants dựng bộ tìm tenant có cơ sở đang dùng từ pool vai ag_ops_jobs.
 func ActiveHubTenants(pool *pgxpool.Pool) app.TenantLister { return app.ActiveHubTenants(pool) }
 
 // Jobs trả job định kỳ của module cho bộ lập lịch của api-internal (chỉ chạy ở leader): công

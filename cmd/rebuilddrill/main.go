@@ -12,7 +12,7 @@
 //
 //	AG_MKG_DB_URL          URL gốc tới database cụm mkg của BẢN SAO (host, cổng, sslmode) — vai ghép theo module
 //	AG_DB_SUFFIX           (tùy chọn) hậu tố database (như pgtest)
-//	AG_DB_PASSWORD_<VAI>   hoặc AG_DB_APP_PASSWORD — vai của từng module + ag_outbox_publisher (tìm tenant)
+//	AG_DB_PASSWORD_<VAI>   hoặc AG_DB_APP_PASSWORD — vai của từng module + ag_ops_jobs (tìm tenant)
 //
 // Mã thoát: 0 mọi bảng khớp, 1 có bảng lệch / lỗi dựng lại, 2 sai cấu hình.
 package main
@@ -48,7 +48,7 @@ func main() {
 	os.Exit(code)
 }
 
-// OutboxTenants liệt kê tenant có sự kiện trên outbox cụm mkg (vai ag_outbox_publisher, chỉ cột tenant_id).
+// OutboxTenants liệt kê tenant có sự kiện trên outbox cụm mkg (vai ag_ops_jobs, chỉ cột tenant_id).
 func OutboxTenants(pool *pgxpool.Pool) func(ctx context.Context) ([]uuid.UUID, error) {
 	return func(ctx context.Context) ([]uuid.UUID, error) {
 		rows, err := pool.Query(ctx, "SELECT DISTINCT tenant_id FROM shared.outbox")
@@ -122,7 +122,7 @@ func run(args []string) (int, error) {
 	}
 	cfg := Config{Pool: pool, Tenants: tids, Modules: mods, Clock: clock.System{}, Database: dbadmin.DatabaseName(migrations.MKG, suffix)}
 	if len(tids) == 0 {
-		pub, err := pool(dbadmin.OutboxPublisher)
+		pub, err := pool(dbadmin.OpsJobs)
 		if err != nil {
 			return 2, err
 		}

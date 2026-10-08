@@ -5,19 +5,24 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 )
 
 // PurgeIdempotency xóa khóa Idempotency-Key đã hết hạn theo lô tới khi hết.
-// pool là vai ag_outbox_publisher (BYPASSRLS — xem migration shared/000002).
+// pool là vai ag_ops_jobs (BYPASSRLS — migration shared/000002, chuyển vai ở shared/000009).
 func PurgeIdempotency(ctx context.Context, pool *pgxpool.Pool, batch int) (int64, error) {
 	return purgeLoop(ctx, pool, "purge_expired_idempotency", batch)
 }
 
 // PurgeLedgerIdem xóa dòng đăng ký idem_key của sổ (shared.ledger_idem) đã quá hạn
 // 30 ngày theo lô tới khi hết (W2.1, DB-11, ADR-0012). Bản ghi sổ không bị đụng tới;
-// sau hạn, ghi lại cùng idem_key được nhận như bản ghi mới. pool: ag_outbox_publisher
-// (chỉ có EXECUTE trên hàm SECURITY DEFINER — migration shared/000006).
+// sau hạn, ghi lại cùng idem_key được nhận như bản ghi mới. pool: ag_ops_jobs
+// (chỉ có EXECUTE trên hàm SECURITY DEFINER — migration shared/000006, 000009).
 func PurgeLedgerIdem(ctx context.Context, pool *pgxpool.Pool, batch int) (int64, error) {
 	return purgeLoop(ctx, pool, "purge_expired_ledger_idem", batch)
 }
@@ -93,7 +98,8 @@ func LedgerTables(ctx context.Context, pool *pgxpool.Pool) ([]LedgerTable, error
 type PartitionReport struct {
 	Table       string
 	Created     int   // số phân vùng tháng mới tạo
-	DefaultRows int64 // ước lượng số dòng trong phân vùng DEFAULT (>0 = từng thiếu phân vùng)
+	Moved       int64 // số dòng đã chuyển từ DEFAULT sang phân vùng tháng (shared.drain_default_partition)
+	DefaultRows int64 // ước lượng số dòng còn trong phân vùng DEFAULT sau khi chạy (>0 = cần xem)
 	Partitioned bool  // false: bảng sổ không phân vùng — bỏ qua
 }
 
@@ -158,6 +164,18 @@ func EnsurePartitions(ctx context.Context, pool *pgxpool.Pool, monthsAhead int) 
 			out = append(out, r)
 			continue
 		}
+		// DEFAULT có dòng (thống kê): chuyển ra trước — kể cả tháng đã qua, mà create_monthly_partitions
+		// (chỉ từ tháng hiện tại) không bao giờ tạo. Tháng hiện tại/tương lai bị chặn mà thống kê chưa kịp
+		// thấy thì create_monthly_partitions tự chuyển (nhánh check_violation, shared 000010).
+		est, err := defaultRows(ctx, pool, lt.Table)
+		if err != nil {
+			return out, err
+		}
+		if est > 0 {
+			if err := pool.QueryRow(ctx, "SELECT shared.drain_default_partition($1::regclass)", lt.Table).Scan(&r.Moved); err != nil {
+				return out, fmt.Errorf("opsjobs: chuyển dòng khỏi DEFAULT của %s: %w", lt.Table, err)
+			}
+		}
 		before, err := count(lt.Table)
 		if err != nil {
 			return out, err
@@ -170,12 +188,71 @@ func EnsurePartitions(ctx context.Context, pool *pgxpool.Pool, monthsAhead int) 
 			return out, err
 		}
 		r.Created = after - before
-		// Thống kê, không đọc dữ liệu: owner bị FORCE RLS nên count(*) trả 0.
-		_ = pool.QueryRow(ctx, `SELECT coalesce(s.n_live_tup, 0) FROM pg_inherits i
-		    JOIN pg_class p ON p.oid = i.inhrelid
-		    LEFT JOIN pg_stat_all_tables s ON s.relid = p.oid
-		    WHERE i.inhparent = $1::regclass AND pg_get_expr(p.relpartbound, p.oid) = 'DEFAULT'`, lt.Table).Scan(&r.DefaultRows)
+		// drain chuyển MỌI dòng (mỗi dòng thuộc một tháng) nên DEFAULT rỗng chắc chắn; thống kê chỉ cập
+		// nhật khi tiến trình đã xóa xả số đếm (tới ~10 giây) — không đọc lại để tránh cảnh báo giả.
+		if r.Moved == 0 {
+			if r.DefaultRows, err = defaultRows(ctx, pool, lt.Table); err != nil {
+				return out, err
+			}
+		}
 		out = append(out, r)
 	}
 	return out, nil
+}
+
+// defaultRows ước lượng số dòng trong phân vùng DEFAULT của một bảng — thống kê n_live_tup như
+// shared.ledger_default_rows(), không đọc dữ liệu (owner bị FORCE RLS nên count(*) trả 0). 0 nếu
+// bảng không có DEFAULT.
+func defaultRows(ctx context.Context, pool *pgxpool.Pool, table string) (int64, error) {
+	var n int64
+	err := pool.QueryRow(ctx, `SELECT coalesce((SELECT s.n_live_tup FROM pg_partitioned_table pt
+	    JOIN pg_stat_all_tables s ON s.relid = pt.partdefid
+	    WHERE pt.partrelid = $1::regclass AND pt.partdefid <> 0), 0)`, table).Scan(&n)
+	return n, err
+}
+
+// DefaultRows là số dòng ước lượng trong phân vùng DEFAULT của một bảng phân vùng.
+type DefaultRows struct {
+	Table string // schema.bảng (bảng cha)
+	Rows  int64
+}
+
+// DefaultPartitionRows đọc shared.ledger_default_rows() (shared 000010): mọi bảng phân vùng có DEFAULT,
+// kèm số dòng ước lượng. pool: ag_ops_jobs (EXECUTE) hoặc owner.
+func DefaultPartitionRows(ctx context.Context, pool *pgxpool.Pool) ([]DefaultRows, error) {
+	rows, err := pool.Query(ctx, "SELECT table_name, est_rows FROM shared.ledger_default_rows()")
+	if err != nil {
+		return nil, fmt.Errorf("opsjobs: ledger_default_rows: %w", err)
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (DefaultRows, error) {
+		var d DefaultRows
+		err := r.Scan(&d.Table, &d.Rows)
+		return d, err
+	})
+}
+
+// RegisterDefaultPartitionRows đăng ký gauge telemetry.MetricLedgerDefaultRows (theo cluster, table) đọc
+// từ từng pool (khóa = tên cụm). Luật cảnh báo AgLedgerDefaultPartitionRows
+// (deploy/observability/prometheus/agrigreen-platform.rules.yml). Lỗi ở một cụm không chặn cụm khác.
+func RegisterDefaultPartitionRows(pools map[string]*pgxpool.Pool) (metric.Registration, error) {
+	m := telemetry.Meter()
+	g, err := m.Int64ObservableGauge(telemetry.MetricLedgerDefaultRows,
+		metric.WithDescription("Số dòng ước lượng trong phân vùng DEFAULT (> 0: từng thiếu phân vùng tháng — chạy migrate maintain)"))
+	if err != nil {
+		return nil, err
+	}
+	return m.RegisterCallback(func(ctx context.Context, o metric.Observer) error {
+		var errs []error
+		for c, p := range pools {
+			rs, err := DefaultPartitionRows(ctx, p)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("%s: %w", c, err))
+				continue
+			}
+			for _, r := range rs {
+				o.ObserveInt64(g, r.Rows, metric.WithAttributes(attribute.String("cluster", c), attribute.String("table", r.Table)))
+			}
+		}
+		return errors.Join(errs...)
+	}, g)
 }

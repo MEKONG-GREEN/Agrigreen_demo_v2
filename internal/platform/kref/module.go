@@ -60,7 +60,7 @@ var (
 	Project = app.Project
 	// Diff trả các quan hệ mà hai bản chiếu khác nhau.
 	Diff = app.Diff
-	// ProjectedTenants liệt kê tenant đang có dòng trong k_ref (pool ag_outbox_publisher).
+	// ProjectedTenants liệt kê tenant đang có dòng trong k_ref (pool ag_ops_jobs).
 	ProjectedTenants = app.ProjectedTenants
 	// UnionTenants gộp kết quả của nhiều hàm tìm tenant.
 	UnionTenants = app.UnionTenants

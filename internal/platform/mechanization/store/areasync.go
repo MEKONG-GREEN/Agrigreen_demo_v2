@@ -119,7 +119,7 @@ func InsertFeedAlert(ctx context.Context, tx pgx.Tx, tid uuid.UUID, day time.Tim
 	return tag.RowsAffected() == 1, err
 }
 
-// FeedTenants tìm tenant đã từng nhận dữ liệu App HTX (pool vai ag_outbox_publisher, xuyên tenant).
+// FeedTenants tìm tenant đã từng nhận dữ liệu App HTX (pool vai ag_ops_jobs, xuyên tenant).
 func FeedTenants(ctx context.Context, pool *pgxpool.Pool) ([]uuid.UUID, error) {
 	rows, err := pool.Query(ctx, "SELECT DISTINCT tenant_id FROM pf_mechanization.area_sync_log WHERE source = 'app_htx'")
 	if err != nil {

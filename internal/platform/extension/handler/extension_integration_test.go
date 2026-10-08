@@ -254,7 +254,7 @@ func TestEscalationJobOnlyOverdueAndIdempotent(t *testing.T) {
 	fresh := p.off30001a.createTask("30001", nil)
 	f.clk.Advance(5 * time.Hour) // t0 + 25h: chỉ "overdue" quá hạn
 
-	lister := extension.OverdueTenants(f.env.Pool(t, migrations.PF, dbadmin.OutboxPublisher))
+	lister := extension.OverdueTenants(f.env.Pool(t, migrations.PF, dbadmin.OpsJobs))
 	tids, err := lister(context.Background(), f.clk.Now())
 	if err != nil {
 		t.Fatal(err)

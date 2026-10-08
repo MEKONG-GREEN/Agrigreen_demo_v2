@@ -554,7 +554,7 @@ func snapshotTx(ctx context.Context, tx pgx.Tx, tid uuid.UUID) (Projection, erro
 // Tìm tenant
 // ---------------------------------------------------------------------------
 
-// ProjectedTenants liệt kê tenant đang có dòng trong k_ref (pool ag_outbox_publisher — BYPASSRLS, chỉ cột
+// ProjectedTenants liệt kê tenant đang có dòng trong k_ref (pool ag_ops_jobs — BYPASSRLS, chỉ cột
 // tenant_id, pf 000092): tenant đã mất hết nguồn vẫn được dựng lại (thành rỗng).
 func ProjectedTenants(pool *pgxpool.Pool) func(ctx context.Context) ([]uuid.UUID, error) {
 	return func(ctx context.Context) ([]uuid.UUID, error) {

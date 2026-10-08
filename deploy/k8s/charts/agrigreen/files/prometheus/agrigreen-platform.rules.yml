@@ -27,3 +27,13 @@ groups:
         annotations:
           summary: "k_ref trễ quá 5 giây ở p99 (quan hệ {{ $labels.relation }})"
           description: "ADR-0029 §4: cấp phép vừa thu hồi còn hiệu lực, Nút vừa di chuyển chưa áp trong khoảng trễ. Kiểm consumer pf.kref (worker), hàng đợi và DLQ pf.kref.dlq; runbook docs/runbooks/README.md mục k_ref."
+  - name: agrigreen-db-partitions
+    rules:
+      # Nguồn: worker (cụm của lịch, nhãn cluster) và sql_exporter (target mkg/ts). Ước lượng thống kê n_live_tup.
+      - alert: AgLedgerDefaultPartitionRows
+        expr: max by (cluster, table) (ag_db_ledger_default_rows) > 0
+        for: 15m
+        labels: { severity: warning, priority: P3 }
+        annotations:
+          summary: "Phân vùng DEFAULT của {{ $labels.table }} có dòng"
+          description: "Từng thiếu phân vùng tháng (job migrate maintain trễ/không chạy). Chạy migrate maintain — tự chuyển dòng sang phân vùng tháng (shared 000010) — rồi tìm vì sao job trễ. Xem docs/runbooks/partitions.md."

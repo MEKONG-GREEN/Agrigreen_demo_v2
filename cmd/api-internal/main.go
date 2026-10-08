@@ -15,7 +15,7 @@
 //	                     leader chạy. Mặc định all khi có AG_MKG_DB_DIRECT_URL, none khi không
 //	AG_LOGISTICS_ALERT_INTERVAL chu kỳ job logistics_alerts (Go duration, mặc định 15m — L-08)
 //	AG_MKG_DB_DIRECT_URL URL nối THẲNG cụm mkg (không qua PgBouncer) cho khóa leader + tìm tenant
-//	                     (vai ag_outbox_publisher, AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER)
+//	                     (vai ag_ops_jobs, AG_DB_PASSWORD_AG_OPS_JOBS)
 //
 // `api-internal -healthcheck <url>`: GET url, thoát 0 khi 200 — healthcheck của Docker
 // (ảnh distroless không có curl/wget).
@@ -116,7 +116,7 @@ func run(log *slog.Logger) error {
 	d := assembly.Deps{Log: log, Verifier: verifier, Ops: ops, Modules: mods.List(), Pools: pools, CORSOrigins: origins}
 	// Lịch job của vùng mkg (GIS US-WH-01 AC-2: công bố sức chứa theo ngày qua van). Chỉ MỘT bản
 	// api-internal chạy (khóa advisory trên kết nối THẲNG tới cụm mkg, không qua PgBouncer): mặc
-	// định bật khi có AG_MKG_DB_DIRECT_URL; tìm tenant bằng vai ag_outbox_publisher, ghi bằng vai
+	// định bật khi có AG_MKG_DB_DIRECT_URL; tìm tenant bằng vai ag_ops_jobs, ghi bằng vai
 	// của module (R-05).
 	direct := os.Getenv("AG_MKG_DB_DIRECT_URL")
 	defJobs := "none"
@@ -129,7 +129,7 @@ func run(log *slog.Logger) error {
 		if direct == "" {
 			direct = base
 		}
-		dsn, err := dbadmin.RoleURL(direct, migrations.MKG, "", dbadmin.OutboxPublisher)
+		dsn, err := dbadmin.RoleURL(direct, migrations.MKG, "", dbadmin.OpsJobs)
 		if err != nil {
 			return err
 		}

@@ -87,7 +87,7 @@ func runMetricsBackfill(log *slog.Logger, rng, tenantArg, keysArg string) error 
 		}
 		tids = []uuid.UUID{id}
 	} else {
-		dsn, err := dbadmin.RoleURL(direct, migrations.PF, "", dbadmin.OutboxPublisher)
+		dsn, err := dbadmin.RoleURL(direct, migrations.PF, "", dbadmin.OpsJobs)
 		if err != nil {
 			return err
 		}

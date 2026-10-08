@@ -10,6 +10,10 @@
 //     cụm không bao giờ được áp, pgtest và migrate up bỏ qua im lặng)
 //   - cụm ts (chuỗi thời gian, ADR-0017): không tham chiếu schema pf_* / mkg_* /
 //     vault (R-07), không CREATE EXTENSION timescaledb (TSL không dùng — RB-4)
+//   - khóa khi sửa bảng đã có (CheckLocking): ALTER TABLE … ADD CONSTRAINT CHECK/FOREIGN KEY
+//     phải NOT VALID (rồi VALIDATE CONSTRAINT ở câu riêng — chỉ khóa SHARE UPDATE EXCLUSIVE);
+//     tệp có ALTER TABLE trên bảng không tạo trong cùng tệp phải SET LOCAL lock_timeout trước
+//     đó. Tệp đã áp trước quy tắc được miễn theo số (lockGrandfathered) — không sửa được (R-24)
 //
 // Chạy: go run ./tools/migratecheck migrations
 package main
@@ -112,6 +116,11 @@ func checkTree(root string) ([]string, error) {
 			for _, p := range CheckSQL(string(src)) {
 				problems = append(problems, f+": "+p)
 			}
+			if !lockGrandfathered[e.Name()][n] {
+				for _, p := range CheckLocking(string(src)) {
+					problems = append(problems, f+": "+p)
+				}
+			}
 			if timescaleRe.MatchString(string(src)) {
 				problems = append(problems, f+": ADR-0017: không dùng extension timescaledb (tính năng TSL, RB-4) — phân vùng khai báo PostgreSQL thuần")
 			}
@@ -155,6 +164,54 @@ func CheckSQL(src string) []string {
 			if f.re.MatchString(stmt) {
 				out = append(out, fmt.Sprintf("câu lệnh %d: %s: %s", i+1, f.msg, abbreviate(stmt)))
 			}
+		}
+	}
+	return out
+}
+
+var (
+	createTableRe = regexp.MustCompile(`(?is)^\s*CREATE\s+(?:UNLOGGED\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z0-9_.]+)`)
+	alterTableRe  = regexp.MustCompile(`(?is)^\s*ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?([a-z0-9_.]+)`)
+	// ADD [CONSTRAINT tên] CHECK | FOREIGN KEY — không khớp ADD COLUMN … CHECK (cột mới).
+	addValidatedRe = regexp.MustCompile(`(?is)\bADD\s+(?:CONSTRAINT\s+[a-z0-9_]+\s+)?(?:CHECK|FOREIGN\s+KEY)\b`)
+	notValidRe     = regexp.MustCompile(`(?is)\bNOT\s+VALID\b`)
+	lockTimeoutRe  = regexp.MustCompile(`(?is)^\s*SET\s+LOCAL\s+lock_timeout\b`)
+)
+
+// CheckLocking trả vi phạm quy tắc khóa của một tệp migration:
+//
+//   - ALTER TABLE … ADD CONSTRAINT … CHECK / FOREIGN KEY trên bảng đã có mà thiếu NOT VALID:
+//     PostgreSQL giữ ACCESS EXCLUSIVE suốt lúc quét toàn bảng (bảng sổ phân vùng: mọi phân
+//     vùng). Mẫu đúng: ADD CONSTRAINT … NOT VALID; rồi ALTER TABLE … VALIDATE CONSTRAINT …
+//     ở câu riêng (SHARE UPDATE EXCLUSIVE, không chặn ghi).
+//   - ALTER TABLE trên bảng đã có mà chưa SET LOCAL lock_timeout ở câu trước đó: chờ khóa sau
+//     một giao dịch dài sẽ chặn mọi truy vấn xếp hàng sau nó. SET LOCAL (không phải SET) vì
+//     migration không được đặt biến mức phiên (ADR-0028); mỗi tệp chạy trong một giao dịch.
+//
+// Bảng tạo trong cùng tệp (CREATE TABLE, kể cả PARTITION OF) còn rỗng nên được miễn cả hai;
+// ràng buộc khai trong CREATE TABLE luôn được phép.
+func CheckLocking(src string) []string {
+	var out []string
+	created := map[string]bool{}
+	timeout := false
+	for i, stmt := range Statements(src) {
+		if m := createTableRe.FindStringSubmatch(stmt); m != nil {
+			created[strings.ToLower(m[1])] = true
+			continue
+		}
+		if lockTimeoutRe.MatchString(stmt) {
+			timeout = true
+			continue
+		}
+		m := alterTableRe.FindStringSubmatch(stmt)
+		if m == nil || created[strings.ToLower(m[1])] {
+			continue
+		}
+		if !timeout {
+			out = append(out, fmt.Sprintf("câu lệnh %d: khóa: ALTER TABLE bảng đã có phải đặt SET LOCAL lock_timeout trước (vd SET LOCAL lock_timeout = '5s'): %s", i+1, abbreviate(stmt)))
+		}
+		if len(addValidatedRe.FindAllStringIndex(stmt, -1)) > len(notValidRe.FindAllStringIndex(stmt, -1)) {
+			out = append(out, fmt.Sprintf("câu lệnh %d: khóa: ADD CONSTRAINT CHECK/FOREIGN KEY trên bảng đã có phải NOT VALID, rồi VALIDATE CONSTRAINT ở câu riêng: %s", i+1, abbreviate(stmt)))
 		}
 	}
 	return out

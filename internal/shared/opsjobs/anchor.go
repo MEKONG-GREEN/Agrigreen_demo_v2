@@ -136,7 +136,7 @@ type AnchorResult struct {
 }
 
 // AnchorDaily neo mọi chuỗi của một cụm cho ngày d và xuất manifest ký số.
-// pool là vai ag_outbox_publisher (quyền EXECUTE trên shared.anchor_chains và
+// pool là vai ag_ops_jobs (quyền EXECUTE trên shared.anchor_chains và
 // shared.chain_anchors_of — migration shared/000002). Idempotent: manifest đã
 // có → bỏ qua; chạy lại sau lỗi xuất → ghi bổ sung neo thiếu rồi xuất.
 func AnchorDaily(ctx context.Context, pool *pgxpool.Pool, store objstore.Store, s *Signer, cluster string, d clock.Date) (AnchorResult, error) {

@@ -32,7 +32,7 @@ func krefConsumer() consumer {
 }
 
 // krefSources nối nguồn của lần dựng lại k_ref: pf/party (vai party_app), pf/masterdata (vai masterdata_app) và
-// tìm tenant bằng ag_outbox_publisher (chỉ cột tenant_id). open mở pool theo vai.
+// tìm tenant bằng ag_ops_jobs (chỉ cột tenant_id). open mở pool theo vai.
 func krefSources(open func(role string) (*pgxpool.Pool, error)) (krefport.Sources, error) {
 	clk := clock.System{}
 	partyPool, err := open(party.DBRole)
@@ -43,7 +43,7 @@ func krefSources(open func(role string) (*pgxpool.Pool, error)) (krefport.Source
 	if err != nil {
 		return krefport.Sources{}, err
 	}
-	pub, err := open(dbadmin.OutboxPublisher)
+	pub, err := open(dbadmin.OpsJobs)
 	if err != nil {
 		return krefport.Sources{}, err
 	}

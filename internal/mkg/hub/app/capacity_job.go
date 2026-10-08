@@ -18,7 +18,7 @@ import (
 // TenantLister trả danh sách tenant cần chạy job.
 type TenantLister func(ctx context.Context) ([]uuid.UUID, error)
 
-// ActiveHubTenants tìm tenant có cơ sở đang dùng từ pool vai ag_outbox_publisher (xuyên
+// ActiveHubTenants tìm tenant có cơ sở đang dùng từ pool vai ag_ops_jobs (xuyên
 // tenant, chỉ đọc hai cột — migration mkg 000005).
 func ActiveHubTenants(pool *pgxpool.Pool) TenantLister {
 	return func(ctx context.Context) ([]uuid.UUID, error) {

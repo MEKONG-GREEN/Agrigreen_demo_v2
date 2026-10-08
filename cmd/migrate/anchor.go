@@ -17,7 +17,7 @@ import (
 // anchorNow: neo mọi cụm một lần cho ngày AG_ANCHOR_DATE (YYYY-MM-DD, mặc định
 // ngày vừa kết thúc như job worker) — neo bù ngày bị lỡ, hoặc neo trước khi sao
 // lưu trong diễn tập phục hồi. Cùng hàm với job anchor (opsjobs.AnchorDaily):
-// idempotent, manifest đã có thì bỏ qua. Vai ag_outbox_publisher, nối thẳng.
+// idempotent, manifest đã có thì bỏ qua. Vai ag_ops_jobs, nối thẳng.
 // Cần AG_DB_URL, AG_ANCHOR_SIGNING_KEY, AG_S3_* (hoặc AG_OBJSTORE_DIR).
 // Xem docs/runbooks/anchor.md.
 func anchorNow(ctx context.Context) error {
@@ -46,7 +46,7 @@ func anchorNow(ctx context.Context) error {
 		return err
 	}
 	for _, c := range clusters {
-		dsn, err := dbadmin.RoleURL(clusterenv.BaseURL(c, base), c, "", dbadmin.OutboxPublisher)
+		dsn, err := dbadmin.RoleURL(clusterenv.BaseURL(c, base), c, "", dbadmin.OpsJobs)
 		if err != nil {
 			return err
 		}

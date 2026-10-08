@@ -415,7 +415,7 @@ func (g *g1) stepTaskEscalation() {
 	worker := extension.New(g.s.PF(extension.DBRole), fake, extension.Deps{
 		Scope: m.Party.ScopeResolver(), Orgs: m.Party.Orgs(), Units: m.MasterData.AdminUnits(), Params: m.MasterData.Params(), Catalogs: m.MasterData.Catalogs(),
 	})
-	jobs := worker.Jobs(extension.OverdueTenants(g.s.PF(dbadmin.OutboxPublisher)), nil)
+	jobs := worker.Jobs(extension.OverdueTenants(g.s.PF(dbadmin.OpsJobs)), nil)
 	if len(jobs) != 1 || jobs[0].Name != extension.JobEscalation {
 		g.t.Fatalf("job leo thang: %v", jobs)
 	}

@@ -17,9 +17,9 @@
 //	metrics_snapshot      00:45 hằng ngày (sau anchor): ghi sổ chỉ số của hôm qua + ảnh chụp lớp GIS (pf/metrics, G3)
 //	mrv_review_escalation mỗi 15 phút: hồ sơ MRV chờ duyệt quá hạn → báo người duyệt, rồi quản trị TTKN tỉnh (KN US-MRV-06)
 //
-// Khi có lịch, worker đăng ký hai gauge của ADR-0006 (gauges.go): ag.sync.conflict.overdue
-// (xung đột đồng bộ quá SLA, theo tenant) và ag.db.standby_replication_lag (chỉ khi có
-// AG_DB_STANDBY_URL).
+// Khi có lịch, worker đăng ký các gauge (gauges.go) — ADR-0006: ag.sync.conflict.overdue
+// (xung đột đồng bộ quá SLA, theo tenant), ag.db.standby_replication_lag (chỉ khi có
+// AG_DB_STANDBY_URL) và ag.db.ledger_default_rows (phân vùng DEFAULT có dòng, shared 000010).
 //
 // Mọi consumer ghi lần xử lý thất bại vào pf_sync.integration_failure (vai sync_app — màn
 // giám sát đồng bộ, GIS US-SYNC-01); lần giao cuối trước DLQ phát pf.sync.integration.dead_lettered
@@ -28,7 +28,7 @@
 // Consumer pf.kref (W2.5, ADR-0029; vai đăng nhập app_worker → SET LOCAL ROLE r_kref): dựng bản chiếu k_ref từ
 // pf.party.org.created/moved/deactivated/reactivated, pf.masterdata.admin_unit.changed, pf.party.share_grant.*;
 // chỉ số ag.k_ref.lag. Lệnh một lần -kref-rebuild dựng lại k_ref mọi tenant từ nguồn (vai party_app,
-// masterdata_app, ag_outbox_publisher, app_worker — AG_DB_PASSWORD_APP_WORKER hoặc AG_DB_APP_PASSWORD).
+// masterdata_app, ag_ops_jobs, app_worker — AG_DB_PASSWORD_APP_WORKER hoặc AG_DB_APP_PASSWORD).
 //
 // Lệnh một lần (không chạy consumer/job): -metrics-backfill=YYYY-MM-DD:YYYY-MM-DD ghi sổ chỉ
 // số + ảnh chụp lớp cho từng ngày đã kết thúc (-metrics-tenant chọn một tenant, mặc định mọi
@@ -61,7 +61,7 @@
 //	AG_DB_URL, AG_AMQP_URL             như G0 (AG_AMQP_URL chỉ cần khi có consumer)
 //	AG_DB_DIRECT_URL                   (tùy chọn) URL nối THẲNG PostgreSQL cho job + khóa leader;
 //	                                   mặc định AG_DB_URL. Không trỏ vào PgBouncer.
-//	AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER vai của job vận hành (migration shared/000002)
+//	AG_DB_PASSWORD_AG_OPS_JOBS         vai của job vận hành ag_ops_jobs (migration shared/000002, 000009)
 //	AG_CLUSTERS                        (tùy chọn) cụm của job neo/dọn idempotency, mặc định mọi cụm;
 //	                                   phải có pf (cmd/internal/clusterenv, G4 tách vùng)
 //	AG_WORKER_JOBS                     mặc định cho -jobs: all | none | anchor,idempotency,extension_escalation,notify_email_digest
@@ -247,7 +247,7 @@ func run(log *slog.Logger, mods, jobs string) error {
 		if direct == "" {
 			direct = base
 		}
-		defer registerGauges(ctx, log, direct, lockPool)() // ADR-0006: xung đột quá SLA, độ trễ standby
+		defer registerGauges(ctx, log, direct, sched.pools)() // ADR-0006: xung đột quá SLA, độ trễ standby; phân vùng DEFAULT
 		hs.Add("jobs_db", healthsrv.Pools(func() []*pgxpool.Pool {
 			out := make([]*pgxpool.Pool, 0, len(sched.pools))
 			for _, p := range sched.pools {
@@ -344,7 +344,7 @@ type opsSchedule struct {
 	pools map[migrations.Cluster]*pgxpool.Pool
 }
 
-// buildSchedule mở pool ag_outbox_publisher nối thẳng tới mọi cụm và dựng lịch.
+// buildSchedule mở pool ag_ops_jobs nối thẳng tới mọi cụm và dựng lịch.
 // Thiếu cấu hình của job đã chọn → lỗi khởi động (không âm thầm bỏ neo chuỗi).
 func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSchedule, func(), error) {
 	direct := os.Getenv("AG_DB_DIRECT_URL")
@@ -369,7 +369,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		}
 	}
 	for _, c := range clusters {
-		dsn, err := dbadmin.RoleURL(direct, c, "", dbadmin.OutboxPublisher)
+		dsn, err := dbadmin.RoleURL(direct, c, "", dbadmin.OpsJobs)
 		if err != nil {
 			closeFn()
 			return nil, func() {}, err
@@ -434,7 +434,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		})
 	}
 	if selected(jobs, extension.JobEscalation) || selected(jobs, extension.JobWorkSchedule) {
-		// Leo thang SLA nhiệm vụ khuyến nông: tìm tenant bằng pool ag_outbox_publisher
+		// Leo thang SLA nhiệm vụ khuyến nông: tìm tenant bằng pool ag_ops_jobs
 		// (chỉ đọc 4 cột), ghi bằng vai extension_app của module (R-05).
 		openRole := func(role string) (*pgxpool.Pool, error) {
 			d, err := dbadmin.RoleURL(direct, migrations.PF, "", role)
@@ -489,7 +489,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		}
 	}
 	if selected(jobs, notifyport.JobEmailDigest) && os.Getenv("AG_SMTP_HOST") != "" {
-		// Email tóm tắt chỉ chạy khi đã cấu hình SMTP; tìm tenant bằng ag_outbox_publisher (2 cột).
+		// Email tóm tắt chỉ chạy khi đã cấu hình SMTP; tìm tenant bằng ag_ops_jobs (2 cột).
 		var kept []*pgxpool.Pool
 		nt, err := buildNotify(ctx, log, direct, func(p *pgxpool.Pool) { kept = append(kept, p) })
 		prevClose := closeFn
@@ -506,7 +506,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		js = append(js, nt.Jobs(notify.DigestTenants(out.pools[migrations.PF]), log)...)
 	}
 	if selected(jobs, reports.JobSchedules) {
-		// Lịch gửi báo cáo: tìm tenant bằng pool ag_outbox_publisher (hai cột), chạy bằng vai reports_app;
+		// Lịch gửi báo cáo: tìm tenant bằng pool ag_ops_jobs (hai cột), chạy bằng vai reports_app;
 		// tham số hạn mức DLP đọc qua pf/masterdata bằng vai của nó (R-05).
 		repPool, err := openPF(ctx, direct, reports.DBRole, &closeFn)
 		if err != nil {
@@ -541,7 +541,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		js = append(js, rep.Jobs(reports.ScheduleTenants(out.pools[migrations.PF]), log)...)
 	}
 	if selected(jobs, mechport.JobAreaFeedCheck) {
-		// Độ tươi dữ liệu App HTX (CGH FN-07 AC-02/AC-03): tìm tenant bằng ag_outbox_publisher
+		// Độ tươi dữ liệu App HTX (CGH FN-07 AC-02/AC-03): tìm tenant bằng ag_ops_jobs
 		// (hai cột), ghi cảnh báo bằng vai mechanization_app; ngưỡng đọc qua pf/masterdata (R-05).
 		mechPool, err := openPF(ctx, direct, mechanization.DBRole, &closeFn)
 		if err != nil {
@@ -558,7 +558,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 	}
 	if selected(jobs, metricsport.JobMetricsSnapshot) {
 		// Chỉ số có lịch sử + ảnh chụp lớp GIS: dựng module pf qua assembly.Build (mỗi nguồn một vai DB,
-		// R-05); tìm tenant bằng pool ag_outbox_publisher (neo chuỗi của ngày, dự phòng outbox).
+		// R-05); tìm tenant bằng pool ag_ops_jobs (neo chuỗi của ngày, dự phòng outbox).
 		mods, mpools, err := buildPlatform(ctx, direct)
 		prevClose := closeFn
 		closeFn = func() {
@@ -574,7 +574,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		js = append(js, mods.Metrics.Jobs(metrics.JobTenants(out.pools[migrations.PF]), log)...)
 	}
 	if selected(jobs, mrvport.JobReviewEscalator) {
-		// Leo thang hồ sơ MRV quá hạn (KN US-MRV-06): tìm tenant bằng ag_outbox_publisher (hai cột),
+		// Leo thang hồ sơ MRV quá hạn (KN US-MRV-06): tìm tenant bằng ag_ops_jobs (hai cột),
 		// ghi cảnh báo + sự kiện bằng vai mrv_app; SLA đọc qua pf/masterdata bằng vai của nó (R-05).
 		mrvPool, err := openPF(ctx, direct, mrv.DBRole, &closeFn)
 		if err != nil {
@@ -592,7 +592,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 	if selected(jobs, extension.JobReportCycle) {
 		// KN v7.7 P4 — vòng đời báo cáo (tự chốt kỳ + tổng hợp "Hệ thống", chốt lại sau hạn mở, tự nhắc): cần engine mẫu
 		// (pf/reports), khu vực (pf/party), gán vai trò (pf/accounts) → dựng module pf qua assembly.Build (mỗi module một
-		// vai DB, R-05); tìm tenant bằng ag_outbox_publisher (hai cột của report_period).
+		// vai DB, R-05); tìm tenant bằng ag_ops_jobs (hai cột của report_period).
 		mods, mpools, err := buildPlatform(ctx, direct)
 		prevClose := closeFn
 		closeFn = func() {

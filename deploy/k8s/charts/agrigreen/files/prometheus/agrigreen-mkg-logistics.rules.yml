@@ -39,4 +39,4 @@ groups:
         labels: { severity: ticket, priority: P3, area: logistics }
         annotations:
           summary: "Job logistics_alerts lỗi {{ $value }} lượt trong 1 giờ"
-          description: "Xem log api-internal (event job.logistics_alerts); kiểm vai ag_outbox_publisher (SELECT tenant_id, status trên trip_current / vessel_current, mkg 000020) và vai logistics_app."
+          description: "Xem log api-internal (event job.logistics_alerts); kiểm vai ag_ops_jobs (SELECT tenant_id, status trên trip_current / vessel_current, mkg 000034) và vai logistics_app."

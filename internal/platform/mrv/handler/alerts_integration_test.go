@@ -277,8 +277,8 @@ func TestReviewOverdueEscalationKNUSMRV06(t *testing.T) {
 		t.Fatalf("tenant khác: %d %v", n, err)
 	}
 
-	// Job: tìm tenant bằng ag_outbox_publisher (chỉ tenant_id, review_status).
-	pub := pgtest.Get(t).Pool(t, migrations.PF, "ag_outbox_publisher")
+	// Job: tìm tenant bằng ag_ops_jobs (chỉ tenant_id, review_status).
+	pub := pgtest.Get(t).Pool(t, migrations.PF, "ag_ops_jobs")
 	tids, err := mrv.PendingTenants(pub)(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -293,6 +293,6 @@ func TestReviewOverdueEscalationKNUSMRV06(t *testing.T) {
 	_, err = pub.Exec(ctx, "SELECT head_id FROM pf_mrv.evidence_current LIMIT 1")
 	var pe *pgconn.PgError
 	if !asPg(err, &pe) || pe.Code != "42501" {
-		t.Fatalf("ag_outbox_publisher không được đọc cột khác của evidence_current: %v", err)
+		t.Fatalf("ag_ops_jobs không được đọc cột khác của evidence_current: %v", err)
 	}
 }

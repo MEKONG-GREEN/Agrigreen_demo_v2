@@ -264,7 +264,7 @@ func MarkDigestSent(ctx context.Context, tx pgx.Tx, ids []uuid.UUID, digestID uu
 }
 
 // PendingDigestTenants tìm tenant có mục email chờ gửi. pool phải là vai
-// ag_outbox_publisher (BYPASSRLS, chỉ có quyền đọc hai cột).
+// ag_ops_jobs (BYPASSRLS, chỉ có quyền đọc hai cột).
 func PendingDigestTenants(ctx context.Context, pool *pgxpool.Pool) ([]uuid.UUID, error) {
 	rows, err := pool.Query(ctx, `SELECT DISTINCT tenant_id FROM pf_notify.email_digest_item WHERE sent_at IS NULL`)
 	if err != nil {

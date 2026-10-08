@@ -74,7 +74,7 @@ func (m *Module) RebuildTenant(ctx context.Context, tid uuid.UUID) (map[string]i
 	return map[string]int64{"mapping_current": int64(r.MappingEvents), "journal_current": int64(r.Journals)}, err
 }
 
-// PendingRetryTenants liệt kê tenant có bút toán đến hạn thử lại — pool vai ag_outbox_publisher của cụm mkg
+// PendingRetryTenants liệt kê tenant có bút toán đến hạn thử lại — pool vai ag_ops_jobs của cụm mkg
 // (chỉ đọc tenant_id, status, next_retry_at; mkg 000019).
 func PendingRetryTenants(pool *pgxpool.Pool) app.TenantLister {
 	return func(ctx context.Context) ([]uuid.UUID, error) {

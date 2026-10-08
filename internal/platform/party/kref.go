@@ -65,7 +65,7 @@ func (s krefSource) ActiveShareGrants(ctx context.Context, tid uuid.UUID) ([]kre
 	return out, nil
 }
 
-// KRefTenants liệt kê tenant có tổ chức hoặc cấp quyền (pool ag_outbox_publisher — BYPASSRLS, chỉ cột
+// KRefTenants liệt kê tenant có tổ chức hoặc cấp quyền (pool ag_ops_jobs — BYPASSRLS, chỉ cột
 // tenant_id, pf 000092), cho lần dựng lại k_ref mọi tenant.
 func KRefTenants(pool *pgxpool.Pool) func(ctx context.Context) ([]uuid.UUID, error) {
 	return func(ctx context.Context) ([]uuid.UUID, error) {

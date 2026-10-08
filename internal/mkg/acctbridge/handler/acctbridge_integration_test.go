@@ -352,8 +352,8 @@ func TestAcctbridgeRetryVersusDLQ_R62(t *testing.T) {
 	if r, err := f.svc.RetryDue(ctx, tenants); err != nil || r.Enqueued != 0 {
 		t.Fatalf("chưa đến hạn: %+v %v", r, err)
 	}
-	// Job định kỳ ở api-internal tìm tenant bằng vai ag_outbox_publisher (chỉ ba cột, mkg 000019).
-	if _, err := acctbridge.PendingRetryTenants(f.env.Pool(t, migrations.MKG, dbadmin.OutboxPublisher))(ctx); err != nil {
+	// Job định kỳ ở api-internal tìm tenant bằng vai ag_ops_jobs (chỉ ba cột, mkg 000019).
+	if _, err := acctbridge.PendingRetryTenants(f.env.Pool(t, migrations.MKG, dbadmin.OpsJobs))(ctx); err != nil {
 		t.Fatalf("PendingRetryTenants: %v", err)
 	}
 	f.clk.Advance(time.Minute)

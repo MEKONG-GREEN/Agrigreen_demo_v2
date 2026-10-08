@@ -41,7 +41,7 @@ func (s krefUnits) AdminUnitVersions(ctx context.Context, tid uuid.UUID) ([]kref
 	return out, nil
 }
 
-// KRefTenants liệt kê tenant có đơn vị hành chính (pool ag_outbox_publisher — BYPASSRLS, chỉ cột tenant_id,
+// KRefTenants liệt kê tenant có đơn vị hành chính (pool ag_ops_jobs — BYPASSRLS, chỉ cột tenant_id,
 // pf 000092).
 func KRefTenants(pool *pgxpool.Pool) func(ctx context.Context) ([]uuid.UUID, error) {
 	return func(ctx context.Context) ([]uuid.UUID, error) {

@@ -105,3 +105,76 @@ func TestRepositoryMigrationsPass(t *testing.T) {
 		t.Fatalf("migration của repo vi phạm: %v", p)
 	}
 }
+
+// M5: sửa bảng đã có — ADD CONSTRAINT CHECK/FOREIGN KEY phải NOT VALID, ALTER TABLE phải có lock_timeout.
+func TestCheckLocking(t *testing.T) {
+	ok := map[string]string{
+		"bảng tạo trong cùng tệp": `CREATE TABLE pf_x.a (id int, tenant_id uuid, CHECK (id > 0));
+ALTER TABLE pf_x.a ADD CONSTRAINT a_id CHECK (id < 10);
+CREATE TABLE pf_x.a_2026 PARTITION OF pf_x.a FOR VALUES FROM (1) TO (2);
+ALTER TABLE pf_x.a_2026 ADD CONSTRAINT a_fk FOREIGN KEY (id) REFERENCES pf_x.b (id);`,
+		"NOT VALID + VALIDATE": `SET LOCAL lock_timeout = '5s';
+ALTER TABLE pf_x.ledger ADD CONSTRAINT ledger_kind CHECK (kind IN ('a', 'b')) NOT VALID;
+ALTER TABLE pf_x.ledger VALIDATE CONSTRAINT ledger_kind;
+ALTER TABLE ONLY pf_x.t ADD CONSTRAINT t_fk FOREIGN KEY (tenant_id, ref) REFERENCES pf_x.u (tenant_id, id) NOT VALID;`,
+		"cột mới có CHECK": `SET LOCAL lock_timeout TO '3s';
+ALTER TABLE pf_x.t ADD COLUMN note text NULL CHECK (char_length(note) < 10);`,
+		"không ALTER TABLE": `CREATE INDEX IF NOT EXISTS t_ref ON pf_x.t (tenant_id, ref);
+GRANT SELECT (tenant_id) ON pf_x.t TO ag_ops_jobs;
+CREATE FUNCTION f() RETURNS void LANGUAGE plpgsql AS $$ BEGIN ALTER TABLE pf_x.t ADD CHECK (true); END $$;`,
+	}
+	for name, src := range ok {
+		if p := CheckLocking(src); len(p) != 0 {
+			t.Errorf("%s: không được báo lỗi: %v", name, p)
+		}
+		if p := CheckSQL(src); len(p) != 0 {
+			t.Errorf("%s: SET LOCAL lock_timeout phải qua quy tắc biến mức phiên: %v", name, p)
+		}
+	}
+	bad := map[string][]string{
+		`SET LOCAL lock_timeout = '5s';
+ALTER TABLE pf_x.ledger ADD CONSTRAINT ledger_kind CHECK (kind IN ('a'));`: {"NOT VALID"},
+		`SET LOCAL lock_timeout = '5s';
+ALTER TABLE pf_x.t ADD FOREIGN KEY (tenant_id, ref) REFERENCES pf_x.u (tenant_id, id);`: {"NOT VALID"},
+		`SET LOCAL lock_timeout = '5s';
+ALTER TABLE pf_x.t ADD CONSTRAINT a CHECK (x > 0) NOT VALID, ADD CONSTRAINT b CHECK (y > 0);`: {"NOT VALID"},
+		`ALTER TABLE pf_x.t ADD COLUMN note text NULL;`:                          {"lock_timeout"},
+		`ALTER TABLE IF EXISTS pf_x.t ADD CONSTRAINT c CHECK (x > 0) NOT VALID;`: {"lock_timeout"},
+		// lock_timeout phải đặt TRƯỚC câu ALTER.
+		`ALTER TABLE pf_x.t DROP CONSTRAINT c;
+SET LOCAL lock_timeout = '5s';`: {"lock_timeout"},
+		// SET mức phiên không tính (và bị quy tắc ADR-0028 chặn riêng).
+		`SET lock_timeout = '5s';
+ALTER TABLE pf_x.t ADD CHECK (x > 0);`: {"lock_timeout", "NOT VALID"},
+	}
+	for src, want := range bad {
+		p := CheckLocking(src)
+		if len(p) != len(want) {
+			t.Errorf("%q: muốn %d lỗi %v, nhận %v", src, len(want), want, p)
+			continue
+		}
+		for i, w := range want {
+			if !strings.Contains(p[i], w) {
+				t.Errorf("%q: lỗi %d phải chứa %q: %v", src, i, w, p)
+			}
+		}
+	}
+}
+
+// Tệp được miễn theo số chỉ ở đúng cụm; tệp mới (số khác) bị kiểm.
+func TestLockGrandfatheredByNumber(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "embed.go"), "package migrations\n\n//go:embed pf/*.sql mkg/*.sql\nvar FS embed.FS\n")
+	alter := "ALTER TABLE pf_x.t ADD CONSTRAINT c CHECK (x > 0);"
+	writeFile(t, filepath.Join(root, "pf", "000018_pf_geo_old.up.sql"), alter) // miễn (pf 18)
+	writeFile(t, filepath.Join(root, "mkg", "000018_mkg_new.up.sql"), alter)   // mkg 18 không được miễn
+	writeFile(t, filepath.Join(root, "pf", "000999_pf_geo_new.up.sql"), alter) // tệp mới
+	p, err := checkTree(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(p, "\n")
+	if strings.Contains(joined, "000018_pf_geo_old") || !strings.Contains(joined, "000018_mkg_new") || !strings.Contains(joined, "000999_pf_geo_new") {
+		t.Fatalf("miễn sai: %v", p)
+	}
+}

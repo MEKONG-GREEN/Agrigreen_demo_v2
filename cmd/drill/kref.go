@@ -9,7 +9,7 @@ package main
 //	drill kref -confirm-copy [-tenants uuid,uuid] [-report báo-cáo.json] [-out báo-cáo.md]
 //
 // Biến môi trường: AG_DB_URL (cụm pf của BẢN SAO), AG_DB_SUFFIX, AG_DB_PASSWORD_<VAI> hoặc AG_DB_APP_PASSWORD
-// cho app_worker (ghi k_ref qua r_kref), party_app, masterdata_app, ag_outbox_publisher.
+// cho app_worker (ghi k_ref qua r_kref), party_app, masterdata_app, ag_ops_jobs.
 
 import (
 	"context"
@@ -162,7 +162,7 @@ func RunKRef(ctx context.Context, cfg KRefConfig) (KRefReport, error) {
 	src := krefport.Sources{Orgs: pty.KRefOrgs(), ShareGrants: pty.KRefShareGrants(), AdminUnits: md.KRefAdminUnits()}
 	tids := cfg.Tenants
 	if len(tids) == 0 {
-		pub, err := cfg.Pool(dbadmin.OutboxPublisher)
+		pub, err := cfg.Pool(dbadmin.OpsJobs)
 		if err != nil {
 			return rep, err
 		}

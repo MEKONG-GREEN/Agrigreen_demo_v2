@@ -203,7 +203,7 @@ func (s *Service) ScheduleRuns(ctx context.Context, id uuid.UUID) ([]store.Run, 
 // TenantLister trả các tenant có lịch gửi đang dùng.
 type TenantLister func(ctx context.Context) ([]uuid.UUID, error)
 
-// ScheduleTenants dùng pool vai ag_outbox_publisher (chỉ SELECT hai cột
+// ScheduleTenants dùng pool vai ag_ops_jobs (chỉ SELECT hai cột
 // tenant_id, active của pf_reports.schedule — migration 000013).
 func ScheduleTenants(pool *pgxpool.Pool) TenantLister {
 	return func(ctx context.Context) ([]uuid.UUID, error) {
