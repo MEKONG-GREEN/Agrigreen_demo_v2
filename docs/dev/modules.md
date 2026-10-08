@@ -205,7 +205,7 @@ ADR-0028, R-DB-02, R-DB-03. Mỗi module pf có vai nhóm `r_<module>` (NOLOGIN,
 
 - xóa vai cũ (bản phát hành sau);
 - bỏ `tenant.WithTenantTx` gọi thẳng trong module;
-- W9.1 (cổng quyền chéo).
+- ~~W9.1 (cổng quyền chéo)~~ — xong, xem [Cổng kiến trúc W9.1](#cổng-kiến-trúc-w91).
 
 ## Biến ngữ cảnh trong DB (W2.4)
 
@@ -318,6 +318,37 @@ ADR-0030 mục 3, kiến trúc v4.1 §17.1, R-SEC-04. pf 000120. Mã ở `intern
 | Web-ops | Chưa có màn cấp phép để mở rộng — chỉ API (`apps/web-ops/src/api/generated/admin.ts` đã sinh) |
 
 Còn mở: C-10 (thỏa thuận chia sẻ mẫu, chu kỳ rà soát), H-1 (ai là đơn vị chủ HTX/hộ/thửa) — chưa bật production.
+
+## Cổng kiến trúc (W9.1)
+
+Bốn cổng giữ ranh giới module sau W2.6. Hai cổng DB dùng tệp ngoại lệ **chỉ được co lại**: mỗi mục có lý do và gói kế hoạch gỡ (`owner: W<n>.<m>`). Cổng hỏng khi có vi phạm mới, hoặc khi một mục ngoại lệ không còn xảy ra (xóa mục đó).
+
+**1. `agnoappname` (archlint).** Module `kind: capability` và `kind: kernel` không rẽ nhánh theo danh tính ứng dụng:
+
+- Cấm: `==`/`!=`, nhãn `case` của `switch`, `strings.EqualFold`/`bytes.EqualFold` với hằng chuỗi (literal hoặc hằng có tên) trùng mã trong `app/*/app.yaml` (KN, HTX, CGH, SIM, MKG, NH, PF). So khớp không phân biệt hoa thường.
+- Miễn: hằng có kiểu đặt tên mà tên kiểu không chứa `app` (enum miền, vd `party/port.OrgKind` `"mkg"` là loại tổ chức); tệp `_test.go`; module `kind: domain`.
+- Khác biệt giữa ứng dụng đi vào cấu hình: tham số (`masterdata`), cờ module theo đơn vị (W1.4), cấp quyền, `hierarchy`/`publish_by` (W6.2).
+- Lúc thêm W9.1: không vi phạm.
+
+**2. Quyền chéo schema** — `migrations/schema_isolation_integration_test.go`, mọi cụm (pf, mkg, ts, vault) sau khi migrate tới head:
+
+- Không `r_<module>` nào có quyền hiệu lực trên đối tượng thuộc schema của module khác (`owns_schema` trong `modreg.Catalog`), trừ `k_ref` và `*_pub`. Xét USAGE/CREATE schema, mọi quyền bảng/khung nhìn/chuỗi số, quyền cột riêng, EXECUTE hàm.
+- Quyền có được qua PUBLIC không tính cho `r_*`. Riêng PUBLIC không được có USAGE/CREATE schema hoặc quyền bảng trên schema module (ngoài `k_ref`, `*_pub`).
+- Schema không thuộc module (`shared`, `public`, schema vận hành) ngoài phạm vi.
+- Ngoại lệ: `migrations/schema_isolation_exceptions.yaml`. Lúc thêm W9.1: `r_masterdata`, `r_party` → `pf_workflow` (USAGE + EXECUTE `submit`/`decide`, hàm `SECURITY DEFINER` của W6.1); gỡ khi điểm vào chuyển sang `pf_workflow_pub` (W6.3).
+- Module mới cần quyền chéo: công bố view/hàm trong `pf_<module>_pub` (R-DB-10), không cấp thẳng.
+
+**3. `EXPLAIN` chung cho bảng RLS (DB-14)** — `migrations/rls_explain_integration_test.go`:
+
+- Mọi bảng bật RLS ở mọi cụm (bảng gốc, không phân vùng con): `EXPLAIN (FORMAT JSON, VERBOSE) SELECT * FROM t LIMIT 50` dưới vai đọc được bảng (ưu tiên `r_<module chủ>`, không superuser, không BYPASSRLS), ngữ cảnh mẫu `app.tenant_id`, `app.node_id`, `app.dept`, …
+- Hỏng khi hàm do repo định nghĩa xuất hiện trong `Filter`/`Join Filter` của bất kỳ nút nào, hoặc ở bất kỳ biểu thức nào dưới một SubPlan (chạy theo hàng ngoài). Hàm SQL `STABLE` inline được (`shared.current_tenant`, `k_ref.ctx_*`) biến mất khỏi kế hoạch; InitPlan được phép.
+- `TestRLSExplainGateDetects_W91` dựng chính sách mẫu (plpgsql trong Filter, EXISTS gọi hàm trong SubPlan, chính sách inline) để chứng minh cổng bắt được.
+- Ngoại lệ: `migrations/rls_explain_exceptions.yaml`. Lúc thêm W9.1: 357 bảng, không vi phạm, danh sách rỗng.
+- Chính sách mới (W3.4 trở đi): viết thẳng điều kiện, `EXISTS (SELECT 1 FROM k_ref.node_closure …)` không gọi hàm không inline được.
+
+**4. `agnofloat` cho `mkg/fieldops`, `pf/mechanization`.** Hai module trong `floatFreeProdZones`: cấm float trong mã không phải kiểm thử. Tệp `_test.go` miễn vì kiểm thử HTTP giải mã JSON bằng `encoding/json` (số → `float64`) và cố ý gửi số lẻ để kiểm từ chối. Không còn float trong mã sản phẩm của hai module.
+
+**Chạy:** `go run ./tools/archlint ./...`; `go test -count=1 -p 1 -run W91 ./migrations/` (cần `AG_TEST_PG_ADMIN_URL`).
 
 ## Module `pf/cooperative` — mặt tiền (W3.2)
 

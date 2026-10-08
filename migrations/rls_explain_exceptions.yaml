@@ -1,0 +1,3 @@
+# W9.1 cổng EXPLAIN chung (migrations/rls_explain_integration_test.go, DB-14). CHỈ ĐƯỢC CO LẠI.
+# Khóa: cluster, table (tên regclass như trong kế hoạch), reason, owner (gói gỡ W<n>.<m>).
+exceptions: []

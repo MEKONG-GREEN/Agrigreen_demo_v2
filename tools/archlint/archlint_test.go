@@ -89,3 +89,15 @@ func TestNoSessionSet_ADR0028(t *testing.T) {
 		"example.com/ag/internal/shared/db",
 	)
 }
+
+// W9.1: module capability/kernel không so sánh với mã ứng dụng trong app/*/app.yaml; domain được phép.
+func TestNoAppName(t *testing.T) {
+	if err := Boundary.Flags.Set("module", "example.com/ag"); err != nil {
+		t.Fatal(err)
+	}
+	analysistest.Run(t, analysistest.TestData(), NoAppName,
+		"example.com/ag/internal/platform/capx/app",
+		"example.com/ag/internal/platform/kernx",
+		"example.com/ag/internal/platform/domx",
+	)
+}

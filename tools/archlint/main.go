@@ -18,6 +18,8 @@
 //	agmodgraph  W1.2, ADR-0027, R-MOD-05 — đồ thị module.yaml: không chu trình, chỉ đi xuống theo kind,
 //	            import có trong depends, phiên bản thỏa, owns_schema khớp migration; ngoại lệ có tên
 //	            trong modgraph_exceptions.yaml (chỉ được co lại)
+//	agnoappname W9.1 — module kind: capability/kernel không so sánh với mã ứng dụng (app/*/app.yaml:
+//	            KN, HTX, CGH, SIM, MKG, NH, PF); năng lực được cấu hình, không rẽ nhánh theo ứng dụng
 //
 // Chạy: go run ./tools/archlint ./...
 package main
@@ -25,5 +27,5 @@ package main
 import "golang.org/x/tools/go/analysis/multichecker"
 
 func main() {
-	multichecker.Main(Boundary, NoFloat, NoTimeNow, PIILog, NoHardDelete, ModGraph, NoSessionSet, TenantGate)
+	multichecker.Main(Boundary, NoFloat, NoTimeNow, PIILog, NoHardDelete, ModGraph, NoSessionSet, TenantGate, NoAppName)
 }
