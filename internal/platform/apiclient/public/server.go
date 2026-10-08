@@ -38,6 +38,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/dataproduct"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/app"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/ingest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -76,6 +77,9 @@ type Deps struct {
 	Collection port.CollectionVolumeSource
 	Hubs       port.HubCapacitySource
 	MRV        port.MRVPackageSource
+
+	// Ingest: nạp theo lô (W5.4, POST/GET /v1/batches). Nil → 503 apiclient.dependency_unavailable.
+	Ingest *ingest.Service
 
 	OperatorTenant uuid.UUID
 	Production     bool // residency.Production: hợp đồng draft không phục vụ
@@ -139,6 +143,7 @@ func NewRouter(d Deps) *gin.Engine {
 	v1.GET("/jobs/:id", s.handle(spec{kind: meter.CallJobStatus}, s.job))
 	v1.GET("/jobs/:id/file", s.handle(spec{kind: meter.CallFileDownload, action: port.ActionExport}, s.jobFile))
 	v1.GET("/usage", s.handle(spec{kind: meter.CallMeta, scope: port.ScopeUsageRead}, s.usage))
+	registerBatches(s, v1) // W5.4
 	return r
 }
 

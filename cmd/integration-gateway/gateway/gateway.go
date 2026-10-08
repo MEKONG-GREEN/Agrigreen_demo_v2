@@ -213,10 +213,27 @@ func Run(ctx context.Context, log *slog.Logger, getenv func(string) string, unit
 		log.Warn("AG_VALKEY_URL đã đặt nhưng adapter Valkey chưa có — dùng giới hạn trong tiến trình chia theo số bản sao",
 			"event", "startup", "outcome", "degraded")
 	}
-	mod, d, err := assembly.Build(ctx, open, assembly.Config{Operator: operator, Peppers: peppers, Store: store, Replicas: replicas,
-		Production: residency.Production(getenv), EgressMode: mode, Clock: clock.System{}, Log: log})
+	production := residency.Production(getenv)
+	ing, err := IngestFromEnv(getenv, production, log)
 	if err != nil {
 		return err
+	}
+	if c, ok := ing.Queue.(interface{ Close() }); ok {
+		defer c.Close()
+	}
+	mod, d, err := assembly.Build(ctx, open, assembly.Config{Operator: operator, Peppers: peppers, Store: store, Replicas: replicas,
+		Production: production, EgressMode: mode, Clock: clock.System{}, Log: log,
+		IngestQueue: ing.Queue, IngestAllowProposed: ing.AllowProposed, IngestMaxQueued: ing.MaxQueued, IngestRetryAfter: ing.RetryAfter})
+	if err != nil {
+		return err
+	}
+	if d.Ingest != nil {
+		// Bộ xử lý lô chạy trong tiến trình cổng: consumer hàng đợi riêng của từng đối tác (vách ngăn R-INT-04).
+		go func() {
+			if err := d.Ingest.Run(ctx); err != nil && ctx.Err() == nil {
+				log.Error("bộ xử lý lô nạp dừng", "event", "ingest.worker_stopped", "outcome", "error", "error", err.Error())
+			}
+		}()
 	}
 	if mt.Identity != nil && mt.Addr == "" {
 		log.Warn("đã nạp gắn chứng chỉ nhưng listener mTLS tắt — khách hàng require_mtls bị từ chối (401)",

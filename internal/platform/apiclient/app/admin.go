@@ -223,17 +223,26 @@ func (s *Service) ProposeSubscription(ctx context.Context, clientID uuid.UUID, p
 	if idem == "" {
 		return store.Subscription{}, problem.IdempotencyRequired
 	}
-	prod, err := dataproduct.Get(strings.TrimSpace(product))
-	if err != nil {
+	name := strings.TrimSpace(product)
+	var (
+		sc []string
+		ok bool
+	)
+	if prod, err := dataproduct.Get(name); err == nil {
+		name = prod.Name
+		if sc, ok = domain.NormScopes(prod, scopes); !ok {
+			return store.Subscription{}, problem.Validation.WithField("scopes", "chỉ scope của hợp đồng sản phẩm ("+strings.Join(prod.Scopes, ", ")+") và usage:read")
+		}
+	} else if domain.IngestContract(name) { // W5.4: hợp đồng nạp contracts/integration/ingest — scope ingest:<tên>:write
+		if sc, ok = domain.NormIngestScopes(name, scopes); !ok {
+			return store.Subscription{}, problem.Validation.WithField("scopes", "chỉ "+port.IngestScope(name)+" và usage:read")
+		}
+	} else {
 		return store.Subscription{}, port.ErrUnknownProduct
-	}
-	sc, ok := domain.NormScopes(prod, scopes)
-	if !ok {
-		return store.Subscription{}, problem.Validation.WithField("scopes", "chỉ scope của hợp đồng sản phẩm ("+strings.Join(prod.Scopes, ", ")+") và usage:read")
 	}
 	now := s.Clock.Now()
 	sid := ids.New()
-	e := store.SubscriptionEvent{ID: ids.New(), TenantID: p.TenantID, SubscriptionID: sid, ClientID: clientID, Action: "proposed", Product: prod.Name,
+	e := store.SubscriptionEvent{ID: ids.New(), TenantID: p.TenantID, SubscriptionID: sid, ClientID: clientID, Action: "proposed", Product: name,
 		Scopes: sc, ProposedBy: p.ActorRef, EventTime: now, ActorRef: p.ActorRef, IdemKey: "subscription:propose:" + idem}
 	var out store.Subscription
 	err = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
@@ -262,14 +271,14 @@ func (s *Service) ProposeSubscription(ctx context.Context, clientID uuid.UUID, p
 			return err
 		}
 		for _, x := range subs {
-			if x.Product == prod.Name && x.Status != string(port.SubscriptionRevoked) {
+			if x.Product == name && x.Status != string(port.SubscriptionRevoked) {
 				return ErrState.WithDetail("Khách hàng đã có đăng ký chưa thu hồi cho sản phẩm này")
 			}
 		}
 		if err := ledger.Classify(store.InsertSubscriptionEvent(ctx, tx, &e)); err != nil {
 			return err
 		}
-		out = store.Subscription{TenantID: p.TenantID, SubscriptionID: sid, ClientID: clientID, Product: prod.Name, Scopes: sc,
+		out = store.Subscription{TenantID: p.TenantID, SubscriptionID: sid, ClientID: clientID, Product: name, Scopes: sc,
 			Status: string(port.SubscriptionProposed), ProposedBy: p.ActorRef, ProposedAt: now.UTC(), LastEventID: e.ID, UpdatedAt: now.UTC()}
 		return store.PutSubscription(ctx, tx, out)
 	})

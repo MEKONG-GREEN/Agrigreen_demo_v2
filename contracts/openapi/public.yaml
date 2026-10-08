@@ -46,6 +46,10 @@ tags:
     description: Việc xuất bất đồng bộ (R-52) và tải tệp kết quả qua API (không URL có chữ ký)
   - name: usage
     description: Sử dụng của chính khách hàng (sổ đo lường, ADR-0023)
+  - name: batches
+    description: |
+      Nạp theo lô của cổng tích hợp (W5.4, ADR-0033 §3): hợp đồng `contracts/integration/ingest/`, scope
+      `ingest:<hợp đồng>:write`, 202 + mã lô, hàng đợi + DLQ riêng từng đối tác, kết quả từng bản ghi.
 paths:
   /v1/data-products:
     get:
@@ -288,6 +292,66 @@ paths:
         "422": {$ref: "#/components/responses/Problem"}
         "429": {$ref: "#/components/responses/TooManyRequests"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/batches/{contract}:
+    post:
+      tags: [batches]
+      summary: Nạp một lô theo hợp đồng contracts/integration/ingest (202 + mã lô, scope ingest:<hợp đồng>:write)
+      description: |
+        W5.4 (R-INT-03, ADR-0033 §3, v4.1 §41.3). Thân = phong bì `contracts/integration/envelope/ingest_batch.v1.json`
+        (`contract` trùng path, `batch_ref` = header `Idempotency-Key`, `items[]` ≤ `ingest.max_batch` của hợp đồng). Cổng chỉ
+        kiểm phong bì đồng bộ rồi trả 202; từng bản ghi được kiểm hợp đồng (mặc định từ chối) và gửi port của module chủ
+        ở bộ xử lý hàng đợi RIÊNG của đối tác (inbox). Bản ghi lỗi không làm hỏng lô — tra `GET /v1/batches/{id}`.
+        Hợp đồng `proposed`/`draft` không phục vụ ở production (403 `integration.contract_not_servable`). Hàng đợi của
+        chính đối tác đầy → 429 `integration.queue_saturated` + `Retry-After`. Gọi lặp cùng khóa + cùng thân → cùng lô
+        (`Idempotent-Replayed: true`); cùng khóa khác thân → 422 `idempotency_key_reused`.
+      operationId: submitBatch
+      parameters:
+        - {name: contract, in: path, required: true, schema: {type: string, pattern: "^[a-z][a-z0-9_]{2,47}$"}}
+        - {name: Idempotency-Key, in: header, required: true, description: "= batch_ref của phong bì (UUIDv7)", schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/IngestBatchEnvelope"}
+      responses:
+        "202":
+          description: Đã nhận lô. Gọi lặp cùng Idempotency-Key trả cùng mã lô (0 đơn vị).
+          headers:
+            Location: {schema: {type: string}, description: "/v1/batches/{id}"}
+            AG-Data-Contract: {$ref: "#/components/headers/DataContract"}
+            Idempotent-Replayed: {schema: {type: string, enum: ["true"]}, description: "Có khi là phát lại"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/IngestBatch"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422":
+          description: "Idempotency-Key đã dùng cho thân khác (idempotency_key_reused)"
+          content:
+            application/problem+json:
+              schema: {$ref: "#/components/schemas/Problem"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/batches/{id}:
+    get:
+      tags: [batches]
+      summary: Trạng thái lô của chính khách hàng + kết quả từng bản ghi khi xong
+      operationId: getBatch
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Lô nạp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/IngestBatch"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "503": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     apiKey:
@@ -366,6 +430,55 @@ components:
         application/json:
           schema: {$ref: "#/components/schemas/Job"}
   schemas:
+    IngestBatchEnvelope:
+      type: object
+      description: Phong bì contracts/integration/envelope/ingest_batch.v1.json (mặc định từ chối khóa lạ).
+      additionalProperties: false
+      required: [contract, contract_version, batch_ref, sent_at, items]
+      properties:
+        contract: {type: string, pattern: "^[a-z][a-z0-9_]{2,47}$"}
+        contract_version: {type: integer, minimum: 1}
+        batch_ref: {type: string, format: uuid}
+        sent_at: {type: string, format: date-time}
+        as_of: {type: [string, "null"], format: date-time}
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [entity_key, record]
+            properties:
+              entity_key: {type: string, description: "Giá trị các trường entity_key của hợp đồng nối bằng ':'"}
+              record: {type: object, description: "Một bản ghi theo lược đồ của hợp đồng nạp"}
+    IngestBatch:
+      type: object
+      required: [id, contract, contract_version, batch_ref, status, items, accepted, rejected, received_at]
+      properties:
+        id: {type: string, format: uuid}
+        contract: {type: string}
+        contract_version: {type: integer}
+        batch_ref: {type: string, format: uuid}
+        status: {type: string, enum: [queued, completed, dead_lettered]}
+        items: {type: integer}
+        accepted: {type: integer}
+        rejected: {type: integer}
+        problem_code: {type: [string, "null"], description: "Khi dead_lettered, vd integration.owner_unavailable"}
+        received_at: {type: string, format: date-time}
+        completed_at: {type: [string, "null"], format: date-time}
+        results:
+          type: array
+          description: Chỉ ở GET khi completed — theo thứ tự phần tử của lô
+          items: {$ref: "#/components/schemas/IngestRecordResult"}
+    IngestRecordResult:
+      type: object
+      required: [index, entity_key, outcome]
+      properties:
+        index: {type: integer}
+        entity_key: {type: string}
+        outcome: {type: string, enum: [accepted, rejected]}
+        problem_code: {type: string, description: "Khi rejected, vd integration.record_invalid (docs/errors.md)"}
+        detail: {type: string, description: "Đường dẫn trường lỗi — không có giá trị bản ghi"}
     Problem:
       type: object
       required: [type, title, status, code]

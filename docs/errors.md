@@ -829,6 +829,33 @@ Public API dùng thêm mã dùng chung: `idempotency_key_required` (400, POST th
 
 Khóa API **không bao giờ** xuất hiện trong lỗi, log, URL, sự kiện (R-14, R-92); chỉ `key_prefix`.
 
+### Cổng tích hợp — nạp theo lô (W5.4, `POST /v1/batches/{contract}`, `GET /v1/batches/{id}`; ADR-0033 §3)
+
+Cổng `cmd/integration-gateway`, module `pf/apiclient` (gói `ingest`), hợp đồng `contracts/integration/ingest/`. Thiếu scope `ingest:<hợp đồng>:write` → `403 apiclient.forbidden` (không nói thiếu điều kiện nào); thiếu `Idempotency-Key` → `400 idempotency_key_required`; cùng khóa khác thân → `422 idempotency_key_reused`.
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 404 | `integration.contract_unknown` | Không có hợp đồng nạp hợp lệ với tên của path, hoặc `contract_version` của thân không có (kể cả tên là hợp đồng feed) — mặc định từ chối |
+| 403 | `integration.contract_not_servable` | Hợp đồng `retired`, `approved` còn `pending`, hoặc `proposed`/`draft` mà cổng không bật cờ dev/test `AG_GATEWAY_INGEST_ALLOW_PROPOSED=1` — production luôn từ chối (cổng không khởi động nếu đặt cờ ở production) |
+| 403 | `integration.no_owner_port` | Hợp đồng chưa nối port của module chủ ở gốc lắp ráp của cổng — mặc định từ chối |
+| 400 | `integration.batch_invalid` | Thân không đúng phong bì `ingest_batch.v1` (khóa lạ, thiếu trường, sai kiểu), `contract` khác path, `batch_ref` ≠ `Idempotency-Key`, `items` rỗng, `contract_version` không phải số nguyên ≥ 1 |
+| 413 | `integration.batch_too_large` | Số phần tử vượt `ingest.max_batch` của hợp đồng |
+| 429 | `integration.queue_saturated` | Hàng đợi của CHÍNH đối tác đã có `AG_GATEWAY_INGEST_MAX_QUEUED` lô chờ (mặc định 50; RabbitMQ `x-max-length` + `reject-publish`) — kèm `Retry-After` (`AG_GATEWAY_INGEST_RETRY_AFTER`, mặc định 30 giây). Lô không được ghi; đối tác khác không bị ảnh hưởng (R-INT-04) |
+| 503 | `integration.queue_unavailable` | Không đọc/phát được hàng đợi (broker đứt). Nếu lô đã ghi sổ, gọi lặp cùng `Idempotency-Key` + cùng thân sẽ phát lại |
+| 503 | `apiclient.dependency_unavailable` | Cổng không bật nạp theo lô (production thiếu `AG_AMQP_URL`) |
+| 404 | `integration.batch_not_found` | `GET /v1/batches/{id}`: không có lô, hoặc lô của khách hàng/đối tác khác (RLS theo tenant đối tác + `client_id`) |
+
+Mã `problem_code` trong kết quả từng bản ghi (`results[].problem_code`, không phải phản hồi HTTP — lô vẫn `completed`):
+
+| Mã | Khi nào |
+|---|---|
+| `integration.record_invalid` | Bản ghi không đúng lược đồ hợp đồng (trường ngoài hợp đồng, thiếu bắt buộc, sai kiểu/định dạng) hoặc thiếu trường khóa nghiệp vụ; `detail` chỉ có đường dẫn trường, không có giá trị |
+| `integration.entity_key_mismatch` | `items[].entity_key` khác giá trị các trường `entity_key` của bản ghi |
+| `integration.business_key_conflict` | Khóa nghiệp vụ (`ingest.business_key`, vd `statement_ref:revision`) đã nhận với nội dung khác — bản bù phải tăng `revision` |
+| `integration.contract_not_servable`, `integration.no_owner_port` | Hợp đồng bị thu hồi / mất port chủ giữa lúc nhận và lúc xử lý — mọi bản ghi của lô bị từ chối |
+
+Kết cục lô `dead_lettered` (`problem_code` của lô): `integration.owner_unavailable` — port của module chủ lỗi tạm quá `inbox.DeliveryLimit` lần giao; thông điệp ở DLQ riêng của đối tác `pf.apiclient.ingest.<client_id>.dlq` ([runbook](runbooks/integration-batches.md)). Đối tác gửi lại bằng `batch_ref` mới.
+
 ### pf/metering (sổ đo lường sử dụng, điểm kiểm soát xuất dữ liệu, bảng kê — G5-0 đóng băng, ADR-0023, ADR-0024)
 
 | HTTP | Mã | Khi nào |

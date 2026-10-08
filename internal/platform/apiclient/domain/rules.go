@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/dataproduct"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/integration"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 )
 
@@ -92,3 +93,35 @@ func ClientStream(id string) string { return "client:" + id }
 
 // PlanStream là stream_key của sổ gói hạn mức một khách hàng.
 func PlanStream(id string) string { return "plan:" + id }
+
+// IngestContract: name là hợp đồng nạp contracts/integration/ingest hợp lệ (bất kỳ phiên bản/trạng thái — việc
+// phục vụ do cổng kiểm lúc gọi, W5.4).
+func IngestContract(name string) bool {
+	all, err := integration.All()
+	if err != nil {
+		return false
+	}
+	for _, c := range all {
+		if c.Name == name && c.Kind == integration.KindIngest {
+			return true
+		}
+	}
+	return false
+}
+
+// NormIngestScopes kiểm và chuẩn hóa scope của một đăng ký hợp đồng nạp: chỉ ingest:<hợp đồng>:write hoặc
+// usage:read.
+func NormIngestScopes(contract string, in []string) ([]string, bool) {
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		s = strings.TrimSpace(s)
+		if s != port.ScopeUsageRead && s != port.IngestScope(contract) {
+			return nil, false
+		}
+		if !slices.Contains(out, s) {
+			out = append(out, s)
+		}
+	}
+	slices.Sort(out)
+	return out, len(out) > 0
+}

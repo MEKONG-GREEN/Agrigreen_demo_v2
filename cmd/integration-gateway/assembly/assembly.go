@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -46,6 +47,14 @@ type Config struct {
 	EgressMode meter.Mode
 	Clock      clock.Clock
 	Log        *slog.Logger
+
+	// Nạp theo lô (W5.4, ADR-0033 §3): IngestQueue nil → không bật /v1/batches (503 apiclient.dependency_unavailable).
+	IngestQueue         apiclient.IngestQueue
+	IngestAllowProposed bool // cờ dev/test — bỏ qua ở Production
+	IngestMaxQueued     int
+	IngestRetryAfter    time.Duration
+	// IngestOwners: hợp đồng → port module chủ; nil → ba hợp đồng song phương vào sổ đệm (W5.6 nối port thật).
+	IngestOwners map[string]apiclient.IngestOwner
 }
 
 // Ports là cổng của module khác mà Public API dùng — mỗi cổng đọc bằng pool vai của module chủ
@@ -117,6 +126,11 @@ func Build(ctx context.Context, open PoolOpener, cfg Config) (*apiclient.Module,
 	}
 	mod.UseCollectionSource(ports.Collection)
 	d, err := Assemble(cfg, ports, append([]*pgxpool.Pool{apPool}, ports.Ready...))
+	if err == nil && cfg.IngestQueue != nil {
+		d.Ingest = apiclient.NewIngest(apPool, apiclient.IngestDeps{Queue: cfg.IngestQueue, Production: cfg.Production,
+			AllowProposed: cfg.IngestAllowProposed, Owners: cfg.IngestOwners, MaxQueued: cfg.IngestMaxQueued, RetryAfter: cfg.IngestRetryAfter,
+			OperatorTenant: cfg.Operator, Clock: cfg.Clock, Log: cfg.Log})
+	}
 	return mod, d, err
 }
 
