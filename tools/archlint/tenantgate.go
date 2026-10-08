@@ -38,6 +38,8 @@ var withIDAllowed = map[string]string{
 	"internal/shared/inbox/inbox.go":                       "tenant của phong bì sự kiện, cùng giao dịch inbox",
 	"internal/platform/accounts/app/kn_extension.go":       "job worker: tenant truyền tường minh, không Principal",
 	"internal/platform/cropcycle/app/dataproduct.go":       "tenant dữ liệu dp_* đã kiểm GrantLookup ở apiclient/public — chờ grantlookup trả Grant (review M9)",
+	"internal/platform/cropcycle/app/aggregate.go":         "W5.3: tenant đóng góp tập tổng hợp (AG_INTEGRATION_CONTRIBUTORS, tạm) — chờ cấp phép aggregate của pf/party trả Grant (ADR-0035 §1)",
+	"internal/platform/apiclient/app/feedbuild.go":         "W5.3 job dựng feed: tham số k của CHÍNH tenant đơn vị vận hành (không phải bên cấp)",
 	"internal/platform/cropcycle/app/wiring.go":            "tenant của phong bì sự kiện",
 	"internal/platform/extension/app/gpslog.go":            "tenant của phong bì sự kiện",
 	"internal/platform/extension/app/schedule_job.go":      "job theo từng tenant",

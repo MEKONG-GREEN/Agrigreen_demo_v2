@@ -825,6 +825,19 @@ Tọa độ sai dạng, thiếu `lat`/`lon`, `z/x/y` không phải số trả `v
 
 Mã `error_code` của job `failed` (không phải phản hồi HTTP): `apiclient.export_too_large`, `apiclient.contract_violation` (một ô sai hợp đồng — không dựng tệp), `apiclient.export_not_supported` (sản phẩm không có xuất), `apiclient.unknown_product` (hợp đồng đổi phiên bản sau khi yêu cầu), `apiclient.export_conflict` (đã có tệp khác nội dung dưới cùng khóa đối tượng).
 
+#### Feed và tập dữ liệu dựng sẵn của cổng tích hợp (W5.3 — `GET /v1/feeds/{feed}`, `GET /v1/snapshots/{dataset}/{version}`; ADR-0033 §2, ADR-0035)
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 404 | `integration.unknown_feed` | Không có hợp đồng feed hợp lệ (`contracts/integration/feeds/`) với tên/`contract_version` này — mặc định từ chối |
+| 403 | `integration.contract_not_servable` | Hợp đồng feed chưa `approved` (`proposed`/`draft`/`retired`): production không bao giờ phục vụ; ngoài production cần `AG_GATEWAY_FEED_ALLOW_PROPOSED=1`. Cũng trả cho feed lớp `partner`/`bilateral` (chưa phục vụ ở cổng — W5.5/W5.6) |
+| 400 | `integration.invalid_cursor` | `cursor` sai dạng hoặc vượt đầu feed |
+| 410 | `integration.cursor_expired` | `cursor` trỏ vào phần đã quá hạn giữ 30 ngày — thân có `snapshot` (`href` của phiên bản mới nhất): đồng bộ lại từ ảnh chụp rồi đọc từ đầu phần còn giữ |
+| 404 | `integration.snapshot_not_found` | Phiên bản không có hoặc không có ảnh chụp (kho đối tượng chưa cấu hình lúc dựng) |
+| 500 | `apiclient.contract_violation` | (feed) Một bản ghi trong trang không khớp hợp đồng tích hợp hoặc trang không khớp phong bì `feed_page.v1` — không trả byte dữ liệu, log `integration.record_rejected` / `integration.envelope_violation` |
+
+Lỗi của job dựng (`cmd/worker -jobs apiclient_feed_build`, log `integration.dataset_build_failed`, không phải phản hồi HTTP): `integration.k_below_floor` (tham số `publicdata.k_min` của đơn vị vận hành nhỏ hơn `k_default` của hợp đồng — không dựng, ADR-0035 §3), `integration.record_rejected` (một bản ghi dựng ra lệch hợp đồng — cả phiên bản không ghi), `apiclient.dependency_unavailable` (chưa nối nguồn ô thô / danh sách đóng góp / tenant đơn vị vận hành).
+
 Public API dùng thêm mã dùng chung: `idempotency_key_required` (400, POST thiếu `Idempotency-Key`), `idempotency_key_reused` (422, cùng khóa khác thân hoặc khác bên cấp), `validation_failed` (422, tham số lọc / `grantor` sai dạng). Mọi lời gọi đã xác thực — kể cả 4xx/5xx sau xác thực — có đúng một dòng sổ `pf_metering.usage_event`; ghi sổ lỗi → `503 metering.unavailable` và không có byte dữ liệu.
 
 Khóa API **không bao giờ** xuất hiện trong lỗi, log, URL, sự kiện (R-14, R-92); chỉ `key_prefix`.

@@ -42,6 +42,12 @@ tags:
     description: |
       Trạng thái gói xuất MRV cho đơn vị thẩm định (chỉ xem — KN US-MRV-05). Tải gói CHƯA BẬT (C-1 + DPA).
       DỰ THẢO. Hợp đồng `contracts/dataproduct/mrv_package_status.json`.
+  - name: integration_feeds
+    description: |
+      Cổng tích hợp (W5.3, ADR-0033 §2, ADR-0035): feed theo cursor của tập dữ liệu dựng sẵn — hợp đồng
+      `contracts/integration/feeds/<tên>.v<N>.json`, phong bì `contracts/integration/envelope/feed_page.v1.json`. Scope
+      `feed:<tên>:read` (đăng ký sản phẩm tên = tên feed). Giữ 30 ngày; cursor quá hạn → 410 kèm ảnh chụp. Hợp đồng
+      chưa `approved` không phục vụ ở production (ngoài production cần `AG_GATEWAY_FEED_ALLOW_PROPOSED=1`).
   - name: jobs
     description: Việc xuất bất đồng bộ (R-52) và tải tệp kết quả qua API (không URL có chữ ký)
   - name: usage
@@ -225,6 +231,69 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/MRVPackageStatus"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/feeds/{feed}:
+    get:
+      tags: [integration_feeds]
+      summary: Một trang feed theo cursor (R-INT-06)
+      description: |
+        Giao ít nhất một lần, theo `seq` tăng (có thứ tự theo `entity_key` trong mỗi phiên bản); bên nhận idempotent
+        theo `event_id`. `op: retract` = thực thể không còn được phát (vd ô tổng hợp xuống dưới k), `record = null`.
+        Mỗi bản ghi đã kiểm theo hợp đồng tích hợp trước khi trả (mặc định từ chối). `snapshot.href` chỉ là đường dẫn
+        tới `GET /v1/snapshots/{dataset}/{version}` — không bao giờ chứa URL ký. Feed W5.3: `harvest_progress_by_commune`,
+        `collection_volume_by_commune` (tổng hợp ngưỡng k), `admin_units` (tham chiếu).
+      operationId: getFeedPage
+      parameters:
+        - {name: feed, in: path, required: true, schema: {type: string, pattern: "^[a-z][a-z0-9_]{2,47}$"}}
+        - {name: cursor, in: query, description: "Cursor mờ của trang trước (next_cursor); bỏ trống = từ đầu phần còn giữ", schema: {type: string, pattern: "^[A-Za-z0-9_-]{1,200}$"}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 1000, default: 500}}
+        - {name: contract_version, in: query, description: "Phiên bản hợp đồng (mặc định: cao nhất còn hiệu lực)", schema: {type: integer, minimum: 1}}
+      responses:
+        "200":
+          description: Trang feed (phong bì feed_page.v1)
+          headers:
+            AG-Data-Contract: {$ref: "#/components/headers/DataContract"}
+            AG-Contract-Status: {description: "Chỉ khi phục vụ hợp đồng chưa approved (ngoài production)", schema: {type: string}}
+            AG-Quota-Remaining: {$ref: "#/components/headers/QuotaRemaining"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FeedPage"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "410":
+          description: "integration.cursor_expired — thân problem có `snapshot` {dataset, version, href}"
+          content:
+            application/problem+json:
+              schema: {$ref: "#/components/schemas/Problem"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/snapshots/{dataset}/{version}:
+    get:
+      tags: [integration_feeds]
+      summary: URL ký có hạn (≤ 15 phút) của ảnh chụp một phiên bản tập dữ liệu
+      description: |
+        Cấp lúc yêu cầu, SAU khi ghi sổ đo lường theo kích thước ảnh chụp và qua điểm kiểm soát xuất (sửa ADR-0022 §8 —
+        ADR-0033 §2). Ảnh chụp NDJSON: mỗi dòng `{"entity_key", "record"}` theo `entity_key`; `checksum.sha256` = băm
+        của chính tệp (R-INT-10). Không lưu, không ghi log URL.
+      operationId: getSnapshotLink
+      parameters:
+        - {name: dataset, in: path, required: true, schema: {type: string, pattern: "^[a-z][a-z0-9_]{2,47}$"}}
+        - {name: version, in: path, required: true, schema: {type: integer, minimum: 1}}
+      responses:
+        "200":
+          description: URL ký
+          headers:
+            AG-Data-Contract: {$ref: "#/components/headers/DataContract"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SnapshotLink"}
         "401": {$ref: "#/components/responses/Problem"}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
@@ -583,6 +652,65 @@ components:
         sha256: {type: [string, "null"]}
         file_url: {type: [string, "null"], description: "/v1/jobs/{id}/file khi completed"}
         error_code: {type: string, description: "Khi failed, vd apiclient.export_too_large"}
+    FeedPage:
+      description: Phong bì contracts/integration/envelope/feed_page.v1.json (nguồn sự thật; tools/contractcheck kiểm mẫu).
+      type: object
+      required: [feed, contract_version, cursor, next_cursor, has_more, as_of, max_age, items]
+      properties:
+        feed: {type: string}
+        contract_version: {type: integer}
+        cursor: {type: [string, "null"]}
+        next_cursor: {type: string}
+        has_more: {type: boolean}
+        as_of: {type: string, format: date-time}
+        max_age: {type: string, description: "ISO 8601 (vd PT15M)"}
+        dataset:
+          type: [object, "null"]
+          properties:
+            version: {type: integer}
+            built_at: {type: string, format: date-time}
+            admin_unit_as_of: {type: [string, "null"], format: date}
+            k_used: {type: [integer, "null"]}
+            contributors: {type: [integer, "null"]}
+            checksum:
+              type: object
+              properties:
+                record_count: {type: integer}
+                sha256: {type: string}
+        snapshot:
+          type: [object, "null"]
+          properties:
+            dataset: {type: string}
+            version: {type: integer}
+            href: {type: string}
+        items:
+          type: array
+          items:
+            type: object
+            required: [seq, event_id, entity_key, op, recorded_at, record]
+            properties:
+              seq: {type: integer}
+              event_id: {type: string, format: uuid}
+              entity_key: {type: string}
+              op: {type: string, enum: [upsert, retract]}
+              recorded_at: {type: string, format: date-time}
+              record: {type: [object, "null"], description: "Một bản ghi theo hợp đồng contracts/integration/feeds/<feed>.v<N>.json"}
+    SnapshotLink:
+      type: object
+      required: [dataset, version, contract_version, url, expires_at, content_type, checksum]
+      properties:
+        dataset: {type: string}
+        version: {type: integer}
+        contract_version: {type: integer}
+        url: {type: string, format: uri, description: "URL ký — chỉ dùng một lần trong hạn, không chia sẻ"}
+        expires_at: {type: string, format: date-time}
+        content_type: {type: string, examples: ["application/x-ndjson"]}
+        size: {type: [integer, "null"]}
+        checksum:
+          type: object
+          properties:
+            record_count: {type: integer}
+            sha256: {type: string}
     UsageDay:
       type: object
       required: [date, product, calls, units]

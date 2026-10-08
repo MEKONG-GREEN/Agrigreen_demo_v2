@@ -80,6 +80,8 @@
 //	AG_REPORT_LINK_BASE                URL gốc công khai api-platform (vd https://api.<domain>) cho liên kết tải
 //	                                   báo cáo Chi cục 7 ngày (A4); thiếu → email vượt giới hạn đính kèm ghi "Gửi lỗi"
 //	AG_RABBITMQ_MGMT_URL               (tùy chọn) management API cho metric độ sâu DLQ
+//	AG_INTEGRATION_CONTRIBUTORS        (W5.3) tenant đóng góp tập tổng hợp của feed cổng tích hợp (job apiclient_feed_build);
+//	AG_INTEGRATION_BUILD_INTERVAL      chu kỳ dựng (mặc định 15m); job apiclient_feed_retention dọn feed quá 30 ngày
 //	AG_KC_ADMIN_URL, AG_KC_REALM,      Keycloak Admin REST (tài khoản dịch vụ agrigreen-accounts) cho consumer
 //	AG_KC_CLIENT_ID, AG_KC_CLIENT_SECRET  pf.accounts.org_status (khóa/mở tài khoản theo trạng thái tổ chức)
 //	AG_OTLP_ENDPOINT, ...              OpenTelemetry (shared/telemetry)
@@ -602,12 +604,25 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		}
 		js = append(js, mod.Jobs(log)...)
 	}
+	if (selected(jobs, apiclientport.JobFeedBuild) || selected(jobs, apiclientport.JobFeedRetention)) && os.Getenv(apiclientport.EnvOperatorTenant) != "" {
+		// W5.3 (ADR-0033 §2, ADR-0035): dựng tập dữ liệu của cổng tích hợp + dọn kho feed quá 30 ngày, r_apiclient.
+		fjs, err := apiclientFeedJobs(ctx, direct, &closeFn, log)
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
+		for _, j := range fjs {
+			if selected(jobs, j.Name) {
+				js = append(js, j)
+			}
+		}
+	}
 	if len(js) == 0 {
 		closeFn()
 		return nil, func() {}, errors.New("-jobs không chọn job hợp lệ nào (anchor, idempotency, " + extension.JobEscalation + ", " + extension.JobWorkSchedule + ", " +
 			notifyport.JobEmailDigest + ", " + reports.JobSchedules + ", " + mechport.JobAreaFeedCheck + ", " + metricsport.JobMetricsSnapshot +
 			", " + mrvport.JobReviewEscalator + ", " + extension.JobReportCycle +
-			", " + apiclientport.JobKeyExpiry + ")")
+			", " + apiclientport.JobKeyExpiry + ", " + apiclientport.JobFeedBuild + ", " + apiclientport.JobFeedRetention + ")")
 	}
 	out.s = &schedule.Scheduler{Clock: clk, Log: log, Jobs: js}
 	return out, closeFn, nil

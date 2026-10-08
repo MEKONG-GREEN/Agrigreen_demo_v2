@@ -123,7 +123,7 @@ Sổ cấp phép của ADR-0020 (`share_grant_event`, bốn mắt, thu hồi, `p
 |---|---|---|
 | W5.1 | `contracts/integration/` (feed, hợp đồng nạp, song phương), `contractcheck` mở rộng | — |
 | W5.2 | `cmd/integration-gateway` từ `cmd/api-public`, mTLS, port `MachineIdentity`, bí danh, NetworkPolicy, chart | — |
-| W5.3 | Kho feed, job dựng tập dữ liệu, ảnh chụp + URL ký, `GET /v1/feeds/*` | pf 000100–000101 |
+| W5.3 | Kho feed, job dựng tập dữ liệu, ảnh chụp + URL ký, `GET /v1/feeds/*` | pf 000126–000127 |
 | W5.4 | Nạp theo lô, hàng đợi + DLQ từng đối tác, inbox | pf 000125 |
 | W5.5 | Bộ điều hợp feed `mkg/fieldops`, `as_of`/`max_age`, header `Deprecation`/`Sunset` | mkg 000024 |
 | W5.6 | Luồng song phương (ADR-0034) | pf 000103, mkg 000025 |
@@ -150,6 +150,12 @@ Sổ cấp phép của ADR-0020 (`share_grant_event`, bốn mắt, thu hồi, `p
 - **Bí danh một kỳ (mục 7.5):** `cmd/api-public` là `main` mỏng gọi `gateway.Run` với tên đơn vị `api-public` (log `event=deprecated_alias`). Biến `AG_GATEWAY_ENABLED/HTTP_ADDR/OPERATOR_TENANT/REPLICAS` thắng tên `AG_PUBLIC_*` cũ (vẫn đọc). Image `agrigreen-api-public`, Deployment `api-public`, `values-phasek.yaml` và host `partner.<domain>` không đổi ở bản này.
 - **Triển khai:** CI build/quét/ký `integration-gateway` cạnh `api-public`; compose `--profile gateway` (host `:8086`); chart `apps.integration-gateway` 0 bản sao, `pf-public-db-roles` + `pf-apikey-pepper`, Secret tùy chọn `pf-gateway-mtls` (`certs[].optional`); NetworkPolicy dùng chung F08/F19/F26/F29 (`apps: [api-public, integration-gateway]`) và thêm **F09** Ingress → `:8443` (Ingress chuyển thẳng TLS); `check_flows.py` thêm `gateway_checks`. archlint `zoneRoots`/`noVaultRoots` có cả hai gốc.
 - **Ghi lệch / còn lại:** route Traefik chuyển thẳng TLS (IngressRouteTCP theo SNI) cho F09 và host riêng của cổng chưa có trong chart — làm khi bật đối tác ghi lớn đầu tiên; F27/F28 (scrape, OIDC) mới chỉ cho `api-public`; Valkey vẫn chưa có adapter (bắt buộc khi > 1 bản sao theo mục 1 — chờ gói hạn mức W5.4). Chuyển host `partner` sang `integration-gateway`, gỡ `cmd/api-public` theo [runbook](../runbooks/integration-gateway.md).
+
+### W5.3 (09/10/2026) — kho feed và tập dữ liệu dựng sẵn
+
+- **Kho (pf 000126–000127, `pf/apiclient`):** `feed_head` (seq mỗi feed × phân vùng, cấp dưới khóa dòng nên thứ tự commit = thứ tự seq; `purged_through`), `feed_entry` (bảng THƯỜNG, không phải sổ: trigger chặn UPDATE/TRUNCATE và xóa mục chưa đủ 30 ngày; job `apiclient_feed_retention` gọi `pf_apiclient.purge_feed_entries`), `dataset_version` (bất biến), `dataset_record` (trạng thái đã phát — chỉ nối upsert khi đổi, retract khi biến mất), `dataset_cell_state`. Chọn bảng thường + job dọn thay vì phân vùng + `DROP PARTITION` vì job chạy dưới `r_apiclient` (không DDL) và lượng §38.3 nhỏ — xem lại ở W5.9.
+- **Phục vụ:** `GET /v1/feeds/{feed}?cursor=&limit=&contract_version=` (phong bì `feed_page.v1`, cursor = `seq` mã hóa mờ, 410 `integration.cursor_expired` kèm `snapshot`), `GET /v1/snapshots/{dataset}/{version}` (URL ký ≤ 15 phút cấp SAU sổ đo lường, đo theo kích thước ảnh chụp; DB chỉ lưu khóa đối tượng). Cùng đường ống `handle` (khóa HMAC, hạn mức, metering, DLP — `data_tenant` = đơn vị vận hành). Mọi bản ghi qua `ValidateRecord` khi job ghi và khi cổng trả, cả trang qua phong bì. Hợp đồng `proposed`: production 403 `integration.contract_not_servable`; ngoài production cần `AG_GATEWAY_FEED_ALLOW_PROPOSED=1` (production từ chối khởi động nếu đặt). Scope `feed:<tên>:read`, đăng ký sản phẩm tên = tên feed.
+- **Ghi lệch / còn lại:** feed lớp `partner` (`season_harvest_dates`, phân vùng theo bên cấp + sổ đọc K-05) và feed của cặp chưa phục vụ (W5.5/W5.6, cột `partition_key` đã có); `waterway_routes` chưa có nguồn; `admin_units` kế thừa từ `k_ref.admin_unit.successor_codes` với `basis_status = pending_c9` (căn cứ chính thức khi `pf/masterdata` công bố kế thừa qua port); `GET /v1/feeds/{feed}/checksums` thuộc W5.7.
 
 ### W5.4 (09/10/2026) — nạp theo lô
 

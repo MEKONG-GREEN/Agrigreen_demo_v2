@@ -42,6 +42,9 @@ type Config struct {
 	Store      objstore.Store
 	Replicas   int
 	Production bool
+	// AllowUnapproved (W5.3): AG_GATEWAY_FEED_ALLOW_PROPOSED=1 — phục vụ feed có hợp đồng chưa approved, chỉ ngoài
+	// production (gateway.Run từ chối khởi động nếu đặt ở production).
+	AllowUnapproved bool
 	// EgressMode: AG_EGRESS_MODE cho pf/metering. Public API luôn đóng khi lỗi qua Ledger.Record,
 	// không phụ thuộc chế độ (ADR-0022 mục 1, ADR-0024).
 	EgressMode meter.Mode
@@ -146,5 +149,5 @@ func Assemble(cfg Config, ports Ports, pools []*pgxpool.Pool) (apiclient.PublicD
 	return apiclient.PublicDeps{Limiter: apiclient.NewRateLimiter(cfg.Replicas),
 		Ledger: ports.Ledger, Quotas: ports.Quotas, Usage: ports.Usage, Grants: ports.Grants, Reads: ports.Reads, Params: ports.Params,
 		Collection: ports.Collection, Hubs: ports.Hubs, MRV: ports.MRV, OperatorTenant: cfg.Operator, Production: cfg.Production,
-		Clock: cfg.Clock, Log: cfg.Log, Ready: ready}, nil
+		AllowUnapproved: cfg.AllowUnapproved && !cfg.Production, Clock: cfg.Clock, Log: cfg.Log, Ready: ready}, nil
 }

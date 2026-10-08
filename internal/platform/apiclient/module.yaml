@@ -10,8 +10,10 @@ depends:
   pf/party: ">=1.0 <2"
 provides:
   ports:
+    - AggregateSource
     - Authenticator
     - CollectionVolumeSource
+    - Contributors
     - HubCapacitySource
     - MRVPackageSource
     - Plans

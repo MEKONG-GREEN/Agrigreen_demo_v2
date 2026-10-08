@@ -8,8 +8,10 @@ package apiclient
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -23,6 +25,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -143,3 +146,78 @@ func (m *Module) Jobs(log *slog.Logger) []schedule.Job {
 
 // ExportHandler là inbox.Handler của consumer port.ExportConsumer (pool vai apiclient_app).
 func (m *Module) ExportHandler() inbox.Handler { return m.svc.HandleExportRequested }
+
+// ---------------------------------------------------------------------------
+// Feed và tập dữ liệu dựng sẵn (W5.3)
+// ---------------------------------------------------------------------------
+
+// UseFeedSources nối nguồn ô thô của tập tổng hợp (pf/cropcycle), danh sách tenant đóng góp và tham số k
+// (pf/masterdata) cho job dựng feed — gốc lắp ráp cmd/worker gọi sau khi dựng.
+func (m *Module) UseFeedSources(src port.AggregateSource, contrib port.Contributors, p params.Params) {
+	m.svc.Aggregates, m.svc.Contributors, m.svc.Params = src, contrib, p
+}
+
+// BuildFeeds dựng một phiên bản mỗi tập có nguồn (thân job port.JobFeedBuild; kiểm thử gọi trực tiếp).
+func (m *Module) BuildFeeds(ctx context.Context) ([]app.BuildResult, error) {
+	return m.svc.BuildAll(ctx)
+}
+
+// PurgeFeeds dọn mục feed quá 30 ngày (thân job port.JobFeedRetention).
+func (m *Module) PurgeFeeds(ctx context.Context) (int64, error) { return m.svc.PurgeFeeds(ctx, 5000) }
+
+// ContributorsFromEnv đọc port.EnvContributors (mã tenant phân tách bằng dấu phẩy; rỗng → không tenant nào).
+func ContributorsFromEnv() (port.StaticContributors, error) {
+	var out port.StaticContributors
+	for _, v := range strings.Split(os.Getenv(port.EnvContributors), ",") {
+		if v = strings.TrimSpace(v); v == "" {
+			continue
+		}
+		id, err := uuid.Parse(v)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %q không phải UUID", port.EnvContributors, v)
+		}
+		out = append(out, id)
+	}
+	return out, nil
+}
+
+// FeedBuildIntervalFromEnv đọc port.EnvFeedBuildInterval (mặc định port.DefaultFeedBuildInterval, tối thiểu 1 phút).
+func FeedBuildIntervalFromEnv() (time.Duration, error) {
+	v := os.Getenv(port.EnvFeedBuildInterval)
+	if v == "" {
+		return port.DefaultFeedBuildInterval, nil
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d < time.Minute {
+		return 0, fmt.Errorf("%s: thời lượng ≥ 1m (vd 15m)", port.EnvFeedBuildInterval)
+	}
+	return d, nil
+}
+
+// FeedJobs trả job dựng tập dữ liệu (mỗi interval) và dọn feed quá hạn (mỗi giờ) — chạy ở leader của cmd/worker.
+// Không có tenant đơn vị vận hành → không job nào.
+func (m *Module) FeedJobs(interval time.Duration, log *slog.Logger) []schedule.Job {
+	if m.svc.OperatorTenant == uuid.Nil {
+		return nil
+	}
+	if log == nil {
+		log = slog.Default()
+	}
+	return []schedule.Job{
+		{Name: port.JobFeedBuild, Spec: schedule.Every{Interval: interval}, RunOnStart: true, Timeout: 10 * time.Minute,
+			Run: func(ctx context.Context) error {
+				_, err := m.BuildFeeds(ctx)
+				return err
+			}},
+		{Name: port.JobFeedRetention, Spec: schedule.Every{Interval: time.Hour}, RunOnStart: true, Timeout: 10 * time.Minute,
+			Run: func(ctx context.Context) error {
+				n, err := m.PurgeFeeds(ctx)
+				outcome := "ok"
+				if err != nil {
+					outcome = "error"
+				}
+				log.Info("feed: dọn mục quá hạn giữ", "event", "job."+port.JobFeedRetention, "purged", n, "outcome", outcome)
+				return err
+			}},
+	}
+}

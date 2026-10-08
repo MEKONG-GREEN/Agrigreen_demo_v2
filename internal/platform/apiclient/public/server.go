@@ -87,6 +87,10 @@ type Deps struct {
 	Log            *slog.Logger
 	// Ready là các kiểm tra sẵn sàng của /readyz (ping pool).
 	Ready []func(context.Context) error
+
+	// AllowUnapproved (W5.3, AG_GATEWAY_FEED_ALLOW_PROPOSED=1): phục vụ feed có hợp đồng tích hợp chưa approved —
+	// CHỈ có tác dụng khi Production = false.
+	AllowUnapproved bool
 }
 
 // Server là Public API đã nối.
@@ -144,6 +148,7 @@ func NewRouter(d Deps) *gin.Engine {
 	v1.GET("/jobs/:id/file", s.handle(spec{kind: meter.CallFileDownload, action: port.ActionExport}, s.jobFile))
 	v1.GET("/usage", s.handle(spec{kind: meter.CallMeta, scope: port.ScopeUsageRead}, s.usage))
 	registerBatches(s, v1) // W5.4
+	s.registerFeeds(v1)    // W5.3
 	return r
 }
 
@@ -207,6 +212,8 @@ type result struct {
 	replayed        bool
 	jobID           uuid.UUID
 	problemCode     string
+	scope           string // scope đã kiểm khi khác dạng dp:<sản phẩm>:<hành động> (feed:<tên>:read)
+	meteredBytes    int64  // byte tính vào sổ khi khác thân phản hồi (cấp URL ảnh chụp: kích thước ảnh chụp)
 }
 
 func newResult(status int) *result { return &result{status: status, header: http.Header{}} }
@@ -325,6 +332,9 @@ func (s *Server) handle(sp spec, fn handlerFn) gin.HandlerFunc {
 			}
 		}
 		scope := sp.scope
+		if res.scope != "" {
+			scope = res.scope
+		}
 		if scope == "" && res.product != "" && sp.action != "" {
 			scope = port.ProductScope(res.product, sp.action)
 		}
@@ -336,6 +346,9 @@ func (s *Server) handle(sp spec, fn handlerFn) gin.HandlerFunc {
 			call.DataTenantID, call.Rows = res.dataTenant, res.rows
 		}
 		call.Bytes = int64(len(res.body))
+		if res.meteredBytes > 0 && res.status >= 200 && res.status <= 299 {
+			call.Bytes = res.meteredBytes
+		}
 		if res.stream != nil {
 			call.Bytes = res.size
 		}

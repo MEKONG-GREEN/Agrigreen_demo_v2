@@ -103,78 +103,13 @@ func (s *Service) CollectionCells(ctx context.Context, q apiclientport.Collectio
 	}
 	limit = min(limit, MaxVolumeLimit)
 
-	var rows []store.VolumeRow
-	if err := s.inTx(ctx, q.DataTenant, func(tx pgx.Tx) error {
-		var e error
-		rows, e = store.VolumeRows(ctx, tx, q.AsOf)
-		return e
-	}); err != nil {
+	keys, aggs, err := s.volumeAggs(ctx, q.DataTenant, q.AsOf)
+	if err != nil {
 		return apiclientport.CollectionPage{}, err
 	}
-	tctx := tenant.WithID(ctx, q.DataTenant)
-	refs := make([]uuid.UUID, 0, len(rows))
-	for _, r := range rows {
-		refs = append(refs, r.PlotRef)
-	}
-	slices.SortFunc(refs, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
-	refs = slices.Compact(refs)
-	plots, err := s.PlotFacts.Facts(tctx, refs)
-	if err != nil {
-		return apiclientport.CollectionPage{}, ErrDependency.WithDetail("không đọc được thửa (pf/cooperative)").WithCause(err)
-	}
-	at := q.AsOf
-	if at.IsZero() {
-		at = s.now()
-	}
-	provinces := map[string]string{}
-	aggs := map[string]*volumeAgg{}
-	for _, r := range rows {
-		if r.SeasonCode == nil || r.SeasonYear == nil {
-			continue
-		}
-		p, ok := plots[r.PlotRef]
-		if !ok || !communeRe.MatchString(p.CommuneCode) {
-			continue
-		}
-		prov, ok := provinces[p.CommuneCode]
-		if !ok {
-			if prov, err = provinceOf(tctx, s.Units, p.CommuneCode, at, r.CollectedOn); err != nil {
-				return apiclientport.CollectionPage{}, err
-			}
-			provinces[p.CommuneCode] = prov
-		}
-		if !provinceRe.MatchString(prov) {
-			continue
-		}
-		season := fmt.Sprintf("%d-%s", *r.SeasonYear, *r.SeasonCode)
-		if !seasonRe.MatchString(season) {
-			continue
-		}
-		c := domain.VolumeCell{ProvinceCode: prov, CommuneCode: p.CommuneCode, SeasonCode: season, PeriodMonth: r.CollectedOn.Format("2006-01")}
-		a := aggs[c.Key()]
-		if a == nil {
-			a = &volumeAgg{cell: c, hh: map[uuid.UUID]struct{}{}, plots: map[uuid.UUID]decimal.Decimal{}}
-			aggs[c.Key()] = a
-		}
-		a.cell.Rolls += r.Rolls
-		if p.HouseholdRef != uuid.Nil {
-			a.hh[p.HouseholdRef] = struct{}{}
-		}
-		a.plots[p.Ref] = p.AreaHa // mỗi thửa tính diện tích một lần trong ô
-		if r.ReceivedAt.After(a.asOf) {
-			a.asOf = r.ReceivedAt
-		}
-	}
-	keys := make([]string, 0, len(aggs))
-	for k := range aggs {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
 	cells := make([]domain.VolumeCell, len(keys))
 	for i, k := range keys {
-		a := aggs[k]
-		a.cell.Households = int64(len(a.hh))
-		cells[i] = a.cell
+		cells[i] = aggs[k].cell
 	}
 	domain.Suppress(cells, q.K)
 
@@ -213,6 +148,81 @@ func (s *Service) CollectionCells(ctx context.Context, q apiclientport.Collectio
 		page.Next = ""
 	}
 	return page, nil
+}
+
+// volumeAggs gộp bảng kê hiện hành tới asOf của tenant thành ô (tỉnh × xã × vụ × tháng) CHƯA ẩn, kèm tập nông hộ
+// phân biệt và diện tích thửa; keys đã sắp. Dùng chung cho sản phẩm collection_volume (ẩn theo KAnonRule ở đây)
+// và nguồn ô thô của feed collection_volume_by_commune (ẩn ở pf/apiclient — ADR-0035).
+func (s *Service) volumeAggs(ctx context.Context, dataTenant uuid.UUID, asOf time.Time) ([]string, map[string]*volumeAgg, error) {
+	var rows []store.VolumeRow
+	if err := s.inTx(ctx, dataTenant, func(tx pgx.Tx) error {
+		var e error
+		rows, e = store.VolumeRows(ctx, tx, asOf)
+		return e
+	}); err != nil {
+		return nil, nil, err
+	}
+	tctx := tenant.WithID(ctx, dataTenant)
+	refs := make([]uuid.UUID, 0, len(rows))
+	for _, r := range rows {
+		refs = append(refs, r.PlotRef)
+	}
+	slices.SortFunc(refs, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
+	refs = slices.Compact(refs)
+	plots, err := s.PlotFacts.Facts(tctx, refs)
+	if err != nil {
+		return nil, nil, ErrDependency.WithDetail("không đọc được thửa (pf/cooperative)").WithCause(err)
+	}
+	at := asOf
+	if at.IsZero() {
+		at = s.now()
+	}
+	provinces := map[string]string{}
+	aggs := map[string]*volumeAgg{}
+	for _, r := range rows {
+		if r.SeasonCode == nil || r.SeasonYear == nil {
+			continue
+		}
+		p, ok := plots[r.PlotRef]
+		if !ok || !communeRe.MatchString(p.CommuneCode) {
+			continue
+		}
+		prov, ok := provinces[p.CommuneCode]
+		if !ok {
+			if prov, err = provinceOf(tctx, s.Units, p.CommuneCode, at, r.CollectedOn); err != nil {
+				return nil, nil, err
+			}
+			provinces[p.CommuneCode] = prov
+		}
+		if !provinceRe.MatchString(prov) {
+			continue
+		}
+		season := fmt.Sprintf("%d-%s", *r.SeasonYear, *r.SeasonCode)
+		if !seasonRe.MatchString(season) {
+			continue
+		}
+		c := domain.VolumeCell{ProvinceCode: prov, CommuneCode: p.CommuneCode, SeasonCode: season, PeriodMonth: r.CollectedOn.Format("2006-01")}
+		a := aggs[c.Key()]
+		if a == nil {
+			a = &volumeAgg{cell: c, hh: map[uuid.UUID]struct{}{}, plots: map[uuid.UUID]decimal.Decimal{}}
+			aggs[c.Key()] = a
+		}
+		a.cell.Rolls += r.Rolls
+		if p.HouseholdRef != uuid.Nil {
+			a.hh[p.HouseholdRef] = struct{}{}
+		}
+		a.plots[p.Ref] = p.AreaHa // mỗi thửa tính diện tích một lần trong ô
+		if r.ReceivedAt.After(a.asOf) {
+			a.asOf = r.ReceivedAt
+		}
+	}
+	keys := make([]string, 0, len(aggs))
+	for k, a := range aggs {
+		a.cell.Households = int64(len(a.hh))
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	return keys, aggs, nil
 }
 
 func volumeMatches(c domain.VolumeCell, q apiclientport.CollectionQuery) bool {

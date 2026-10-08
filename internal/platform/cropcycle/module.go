@@ -77,6 +77,10 @@ func (m *Module) UseCollectionVolume(pf coopport.Plots, units partyport.AdminUni
 // cmd/api-public (ô xã × vụ × tháng, ngưỡng k — domain.KAnonRule).
 func (m *Module) CollectionVolumeSource() apiclientport.CollectionVolumeSource { return m.svc }
 
+// AggregateSource (W5.3) là nguồn ô thô của tập tổng hợp harvest_progress_by_commune và
+// collection_volume_by_commune cho job dựng feed của pf/apiclient (cmd/worker). Cần UseCollectionVolume.
+func (m *Module) AggregateSource() apiclientport.AggregateSource { return m.svc }
+
 // UseEgress (G5, ADR-0024) nối điểm kiểm soát xuất (pf/metering) cho consumer van collection_*
 // (kênh valve). cp nil → hành vi cũ.
 func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logger) {

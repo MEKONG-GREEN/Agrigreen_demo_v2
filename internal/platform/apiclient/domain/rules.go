@@ -28,6 +28,22 @@ func NormScopes(p *dataproduct.Product, in []string) ([]string, bool) {
 	return out, len(out) > 0
 }
 
+// NormFeedScopes kiểm scope của đăng ký một feed cổng tích hợp (W5.3): feed:<tên>:read hoặc usage:read.
+func NormFeedScopes(feed string, in []string) ([]string, bool) {
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		s = strings.TrimSpace(s)
+		if s != port.ScopeUsageRead && s != port.FeedScope(feed) {
+			return nil, false
+		}
+		if !slices.Contains(out, s) {
+			out = append(out, s)
+		}
+	}
+	slices.Sort(out)
+	return out, len(out) > 0
+}
+
 // NormAuthMethods kiểm phương thức xác thực của khách hàng: luôn có api_key (bắt buộc có, ADR-0022
 // mục 5); mtls chưa hiện thực nên chưa nhận.
 func NormAuthMethods(in []string) ([]string, bool) {

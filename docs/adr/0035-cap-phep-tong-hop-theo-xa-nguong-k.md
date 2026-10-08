@@ -74,10 +74,12 @@ Job chỉ gộp dữ liệu của đơn vị có đóng góp đang hiệu lực 
 |---|---|---|
 | W4.1 | Cấp phép v2 có `grant_class = aggregate`, `dataset`, `scope_admin_units` | pf 000098 |
 | W5.1 | Hợp đồng `harvest_progress_by_commune`, `collection_volume_by_commune` | — |
-| W5.3 | Job dựng tập dữ liệu, phiên bản, `k_used`, ẩn ô bù, trễ ẩn k + 2 | pf 000100–000101 |
+| W5.3 | Job dựng tập dữ liệu, phiên bản, `k_used`, ẩn ô bù, trễ ẩn k + 2 | pf 000126–000127 |
 | W6.4 | Job khai trong danh sách `r_agg` khi vượt đơn vị; bật production chờ K-8 | pf 000109 |
 
 **W5.1 (08/10/2026):** `harvest_progress_by_commune`, `collection_volume_by_commune` có `aggregation` (`k_param: publicdata.k_min`, `k_default: 10` tạm, `k_status`, `unit: household`, `suppression: omit`, `complementary_suppression: true`, `hysteresis: 2`), `pending: [A7, C-4, K-8]`; phong bì ghi `dataset.k_used`, `contractcheck` bắt mẫu `k_used < k_default`. k vẫn là tham số — ký K-8 không đổi hợp đồng.
+
+**W5.3 (09/10/2026):** job `apiclient_feed_build` (cmd/worker, `pf/apiclient`) dựng `harvest_progress_by_commune`, `collection_volume_by_commune` từ ô THÔ của `pf/cropcycle` (port `apiclient/port.AggregateSource`, mã nông hộ chỉ để đếm phân biệt trong bộ nhớ) của mọi tenant đóng góp, rồi áp §3 một lần trong `apiclient/domain.ApplyK`: ẩn sơ cấp < k; dòng `province_withheld` = HỢP đơn vị của các ô ẩn, phát khi ≥ k; ẩn ô bù khi withheld chỉ gom một ô (ẩn thêm ô phát nhỏ nhất, không còn ô thì ẩn withheld); trễ ẩn: ô đã ẩn (bảng `dataset_cell_state`) chỉ phát lại khi ≥ k + `hysteresis`. k = `publicdata.k_min` của tenant đơn vị vận hành, chưa đặt → `k_default`; nhỏ hơn `k_default` → từ chối (`integration.k_below_floor`). Mỗi phiên bản (`pf_apiclient.dataset_version`, bất biến, pf 000127) ghi `k_used`, `hysteresis`, `contributors` (số), `admin_unit_as_of`, tổng kiểm = SHA-256 ảnh chụp NDJSON. **Ghi lệch:** lớp quyền "Đóng góp" (§1) chưa có ở `pf/party` — danh sách đóng góp tạm lấy từ `AG_INTEGRATION_CONTRIBUTORS`; lớp "Phát hành" kiểm bằng scope `feed:<tên>:read` của đăng ký sản phẩm (bốn mắt) thay cho cấp phép `aggregate`; ô của xã không còn hiệu lực tại ngày dựng bị bỏ (cuộn theo kế thừa ở W6.4); `/v1/data/collection-volumes` chưa gắn `Deprecation` (W5.5).
 
 ## Liên quan
 

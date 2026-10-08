@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/shopspring/decimal"
 )
 
 // VolumeRow là một bảng kê thu gom hiện hành (revision cao nhất) cho sản phẩm tổng hợp
@@ -43,6 +44,43 @@ func VolumeRows(ctx context.Context, tx pgx.Tx, asOf time.Time) ([]VolumeRow, er
 			return nil, err
 		}
 		r.Rolls = int64(rolls)
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// HarvestRow là một vụ (không hủy) cho nguồn tiến độ gặt (feed harvest_progress_by_commune, W5.3).
+type HarvestRow struct {
+	CommuneCode         string
+	SeasonCode          string
+	SeasonYear          int
+	HouseholdRef        *uuid.UUID
+	AreaHa              decimal.Decimal
+	Completed           bool
+	ExpectedHarvestDate time.Time
+}
+
+// HarvestRows trả mọi vụ chưa hủy đã mở tới asOf (zero = không chặn) của tenant trong giao dịch.
+func HarvestRows(ctx context.Context, tx pgx.Tx, asOf time.Time) ([]HarvestRow, error) {
+	var at *time.Time
+	if !asOf.IsZero() {
+		t := asOf.UTC()
+		at = &t
+	}
+	rows, err := tx.Query(ctx, `SELECT commune_code, season_code, season_year, household_ref, area_ha, status = 'completed', expected_harvest_date
+	  FROM pf_cropcycle.season_current
+	  WHERE status <> 'cancelled' AND ($1::timestamptz IS NULL OR opened_at <= $1::timestamptz)
+	  ORDER BY season_ref`, at)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []HarvestRow
+	for rows.Next() {
+		var r HarvestRow
+		if err := rows.Scan(&r.CommuneCode, &r.SeasonCode, &r.SeasonYear, &r.HouseholdRef, &r.AreaHa, &r.Completed, &r.ExpectedHarvestDate); err != nil {
+			return nil, err
+		}
 		out = append(out, r)
 	}
 	return out, rows.Err()

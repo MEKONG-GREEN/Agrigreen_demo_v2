@@ -214,6 +214,13 @@ func Run(ctx context.Context, log *slog.Logger, getenv func(string) string, unit
 			"event", "startup", "outcome", "degraded")
 	}
 	production := residency.Production(getenv)
+	allowUnapproved := getenv(port.EnvAllowUnapproved) == "1"
+	if allowUnapproved && production {
+		return fmt.Errorf("%s: %s=1 bị cấm ở production (hợp đồng tích hợp chưa approved không phục vụ)", unit, port.EnvAllowUnapproved)
+	}
+	if allowUnapproved {
+		log.Warn("phục vụ feed có hợp đồng tích hợp chưa approved (chỉ ngoài production)", "event", "startup", "outcome", "degraded")
+	}
 	ing, err := IngestFromEnv(getenv, production, log)
 	if err != nil {
 		return err
@@ -222,7 +229,7 @@ func Run(ctx context.Context, log *slog.Logger, getenv func(string) string, unit
 		defer c.Close()
 	}
 	mod, d, err := assembly.Build(ctx, open, assembly.Config{Operator: operator, Peppers: peppers, Store: store, Replicas: replicas,
-		Production: production, EgressMode: mode, Clock: clock.System{}, Log: log,
+		Production: production, AllowUnapproved: allowUnapproved, EgressMode: mode, Clock: clock.System{}, Log: log,
 		IngestQueue: ing.Queue, IngestAllowProposed: ing.AllowProposed, IngestMaxQueued: ing.MaxQueued, IngestRetryAfter: ing.RetryAfter})
 	if err != nil {
 		return err

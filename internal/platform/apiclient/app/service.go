@@ -22,6 +22,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -58,7 +59,12 @@ type Service struct {
 	Store objstore.Store
 	// Collection: nguồn collection_volume (pf/cropcycle) cho worker xuất.
 	Collection port.CollectionVolumeSource
-	Log        *slog.Logger
+	// Aggregates: nguồn ô thô của tập tổng hợp (pf/cropcycle) cho job dựng feed (W5.3); Contributors: tenant
+	// chủ dữ liệu đóng góp; Params: ngưỡng k (publicdata.k_min, tenant đơn vị vận hành).
+	Aggregates   port.AggregateSource
+	Contributors port.Contributors
+	Params       params.Params
+	Log          *slog.Logger
 }
 
 func (s *Service) log() *slog.Logger {

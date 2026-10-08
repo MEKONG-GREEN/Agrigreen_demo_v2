@@ -112,3 +112,25 @@ Lùi bản: đặt lại `partner.service: api-public` và đổi số bản sao
 | Đối tác mTLS nhận `401` | Log `gateway.mtls_rejected`. `mtls_required`: đối tác đi qua host HTTP thay vì `:8443`. `cert_unbound`: vân tay chưa có trong tệp gắn. `cert_mismatch`: chứng chỉ của khách hàng khác |
 | Bắt tay TLS hỏng | Chứng chỉ không do CA trong `client-ca.crt` ký, hết hạn, hoặc thiếu EKU `clientAuth`. Ingress không chuyển thẳng TLS (khi Ingress kết thúc TLS, cổng không thấy chứng chỉ) |
 | `5xx` sau khi qua mTLS | Lỗi kho định danh máy hoặc DB. Cổng đóng khi lỗi, không trả dữ liệu |
+
+## Feed theo cursor và tập dữ liệu dựng sẵn (W5.3)
+
+ADR-0033 §2, ADR-0035. Kho feed thuộc `pf/apiclient` (schema `pf_apiclient`, pf 000126–000127): `feed_head`, `feed_entry` (chỉ ghi thêm, giữ 30 ngày), `dataset_version` (bất biến), `dataset_record`, `dataset_cell_state`.
+
+**Dựng (cmd/worker, leader).** `-jobs apiclient_feed_build,apiclient_feed_retention` (hoặc `all`), cần `AG_PUBLIC_OPERATOR_TENANT`.
+
+| Biến | Ý nghĩa |
+|---|---|
+| `AG_INTEGRATION_CONTRIBUTORS` | Tenant chủ dữ liệu đóng góp tập tổng hợp, phân tách bằng dấu phẩy. **Tạm** tới khi `pf/party` có cấp phép `grant_class = aggregate` (ADR-0035 §1). Rỗng → tập tổng hợp rỗng |
+| `AG_INTEGRATION_BUILD_INTERVAL` | Chu kỳ dựng, mặc định `15m` (tối thiểu `1m`) |
+| `AG_S3_*` / `AG_OBJSTORE_DIR` | Kho đối tượng cho ảnh chụp. Không có → phiên bản không có ảnh chụp (log `integration.snapshot_skipped`) |
+
+Tập có nguồn: `admin_units` (bảng chiếu `k_ref.admin_unit` của tenant vận hành; kế thừa `basis_status = pending_c9`), `harvest_progress_by_commune`, `collection_volume_by_commune` (ô thô từ `pf/cropcycle`, quy tắc k áp ở `pf/apiclient`). k = tham số `publicdata.k_min` của tenant vận hành, chưa đặt → `k_default` của hợp đồng (10, tạm — C-4/K-8); k nhỏ hơn `k_default` → job từ chối (`integration.k_below_floor`). Không có thay đổi → không phiên bản mới. `season_harvest_dates`, `waterway_routes` chưa có nguồn (W5.5 / khi `pf/waterway` công bố phiên bản mạng).
+
+**Phục vụ (cổng).** `GET /v1/feeds/{feed}?cursor=&limit=` và `GET /v1/snapshots/{dataset}/{version}`, scope `feed:<tên>:read` (đăng ký sản phẩm tên = tên feed, bốn mắt như sản phẩm dữ liệu). Hợp đồng `contracts/integration` còn `proposed`: production luôn trả 403 `integration.contract_not_servable`; dev/test/UAT đặt `AG_GATEWAY_FEED_ALLOW_PROPOSED=1` (cổng từ chối khởi động nếu đặt ở production). Mỗi trang và mỗi lần cấp URL ảnh chụp ghi sổ đo lường trước khi trả (URL ảnh chụp tính theo kích thước tệp, ≤ 15 phút, không lưu/ghi log).
+
+**Sự cố.**
+- `integration.record_rejected` trong log job: một bản ghi dựng ra lệch hợp đồng — cả phiên bản không ghi; sửa dữ liệu nguồn hoặc hợp đồng (bốn mắt), job chạy lại ở chu kỳ sau.
+- 500 `apiclient.contract_violation` ở `GET /v1/feeds/*`: bản ghi trong kho lệch hợp đồng hiện hành (thường do đổi hợp đồng không tăng phiên bản) — không sửa kho (trigger chặn); phát phiên bản hợp đồng mới `v<N+1>`.
+- Đối tác nhận 410 `integration.cursor_expired`: tải ảnh chụp ở `snapshot.href`, kiểm `checksum.sha256`, rồi đọc feed không tham số `cursor`.
+- Kho feed không được xóa tay: chỉ `pf_apiclient.purge_feed_entries` (job) xóa được mục đã quá 30 ngày.

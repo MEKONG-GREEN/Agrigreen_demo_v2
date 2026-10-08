@@ -237,6 +237,11 @@ func (s *Service) ProposeSubscription(ctx context.Context, clientID uuid.UUID, p
 		if sc, ok = domain.NormIngestScopes(name, scopes); !ok {
 			return store.Subscription{}, problem.Validation.WithField("scopes", "chỉ "+port.IngestScope(name)+" và usage:read")
 		}
+	} else if fc, ferr := FeedContract(name, 0); ferr == nil { // W5.3: feed contracts/integration/feeds — scope feed:<tên>:read
+		name = fc.Name
+		if sc, ok = domain.NormFeedScopes(name, scopes); !ok {
+			return store.Subscription{}, problem.Validation.WithField("scopes", "chỉ "+port.FeedScope(name)+" và usage:read")
+		}
 	} else {
 		return store.Subscription{}, port.ErrUnknownProduct
 	}
