@@ -396,6 +396,46 @@ apps:
     # OAuth client credentials cho đơn vị thẩm định (ADR-0022 mục 5) — chỉ khi khách chọn (Q5-7); mở F28.
     oidc: { enabled: false }
 
+  # Cổng tích hợp (W5.2, ADR-0033): cmd/integration-gateway — Public API mở rộng cho MỌI đối tác, gồm MKG. CÙNG
+  # vai DB app_public (pf-public-db-roles), cùng pepper, cùng luồng mạng với api-public (F08, F19, F26, F29) và
+  # thêm F09: listener mTLS :8443 cho đối tác ghi khối lượng lớn (chứng chỉ gắn khách hàng API, ADR-0033 §41.2).
+  # api-public là bí danh một kỳ (cùng mã, image agrigreen-api-public) — chuyển host partner sang đây rồi gỡ
+  # api-public ở bản phát hành sau (docs/runbooks/integration-gateway.md). 0 bản sao ở mọi hồ sơ cho tới khi
+  # chuyển (R-01: bật = cấu hình + số bản sao).
+  integration-gateway:
+    zone: pf
+    image: { repository: integration-gateway }
+    replicas: 0
+    size: medium
+    ports: { http: 8085, mtls: 8443 }
+    services: [{ name: integration-gateway, ports: [http, mtls] }]
+    probes: { readiness: { path: /readyz, port: http }, liveness: { path: /healthz, port: http } }
+    env:
+      AG_GATEWAY_HTTP_ADDR: ":8085"
+      # Listener mTLS: rỗng = tắt. Bật: ":8443" + AG_GATEWAY_MTLS_BINDINGS + Secret pf-gateway-mtls (externalSecrets).
+      AG_GATEWAY_MTLS_ADDR: ""
+      AG_GATEWAY_MTLS_BINDINGS: ""   # /certs/gateway/bindings.json khi bật
+      AG_GATEWAY_TLS_CERT: /certs/gateway/tls.crt
+      AG_GATEWAY_TLS_KEY: /certs/gateway/tls.key
+      AG_GATEWAY_CLIENT_CA: /certs/gateway/client-ca.crt   # CA ĐỐI TÁC — không phải CA dịch vụ nội bộ
+      AG_PF_DB_URL: "pooler:pf"
+      AG_DB_VIA_PGBOUNCER: "1"
+      AG_GATEWAY_OPERATOR_TENANT: ""
+      AG_EGRESS_MODE: observe
+      AG_S3_ENDPOINT: "{{ .Values.common.s3.endpoint }}"
+      AG_S3_BUCKET: "{{ .Values.common.s3.bucket }}"
+      AG_S3_USE_TLS: "{{ .Values.common.s3.useTLS }}"
+    envFromSecrets: [pf-public-db-roles, pf-apikey-pepper]
+    secretEnv:
+      - { name: AG_S3_ACCESS_KEY, secret: pf-public-s3, key: AG_S3_ACCESS_KEY }
+      - { name: AG_S3_SECRET_KEY, secret: pf-public-s3, key: AG_S3_SECRET_KEY }
+    # Chứng thư máy chủ mTLS + CA đối tác + tệp gắn chứng chỉ ↔ khách hàng API — chỉ có khi bật (optional).
+    certs:
+      - { secret: pf-gateway-mtls, mountPath: /certs/gateway, optional: true }
+    pdb: { minAvailable: 1 }
+    hpa: { enabled: false, minReplicas: 2, maxReplicas: 6, cpu: 70 }
+    metrics: { enabled: false, port: 9464, path: /metrics }
+
   # ============================ vùng nội bộ MKG (agrigreen-mkg)
   api-internal:
     zone: mkg
@@ -691,6 +731,9 @@ externalSecrets:
       pf-apikey-pepper: { enabled: false, remote: apikey/pf, extract: true }
       # Khóa S3 CHỈ ĐỌC cho api-public (tiền tố tệp xuất apiclient/ của bucket pf) — bật ở Phase K (values-phasek.yaml).
       pf-public-s3: { enabled: false, remote: s3/pf-public, keys: [AG_S3_ACCESS_KEY, AG_S3_SECRET_KEY] }
+      # mTLS của cổng tích hợp (W5.2, ADR-0033): chứng thư máy chủ, CA đối tác, tệp gắn chứng chỉ ↔ khách hàng API.
+      # Bật khi có đối tác ghi lớn (MKG, W5.4/W5.5) — runbook integration-gateway.
+      pf-gateway-mtls: { enabled: false, remote: tls/gateway-mtls, keys: [tls.crt, tls.key, client-ca.crt, bindings.json] }
       # TLS của partner.<domain> (Phase K).
       agrigreen-partner-tls: { enabled: false, remote: tls/partner, keys: [tls.crt, tls.key], type: kubernetes.io/tls }
       pf-app: { remote: app/pf, keys: [AG_SYNC_CURSOR_KEY, AG_KC_CLIENT_SECRET] }
@@ -779,7 +822,10 @@ networkPolicy:
     - { id: F06, adr: "DMZ → Định danh người dùng (OIDC)", from: { selector: ingressController }, to: { selector: keycloak }, ports: [8080] }
     - { id: F07, adr: "DMZ (bộ điều khiển Ingress → API server)", from: { selector: ingressController }, to: { external: kubeAPI }, portsFrom: kubeAPI }
     # Public API (G5, ADR-0025): mở sẵn ở mọi hồ sơ nhưng không có Pod nào khi api-public 0 bản sao.
-    - { id: F08, adr: "DMZ → Ứng dụng (Public API partner.<domain>, ADR-0022)", from: { selector: ingressController }, to: { zone: pf, app: api-public }, ports: [8085] }
+    # W5.2: integration-gateway cùng luồng (F08, F19, F26, F29) — api-public là bí danh một kỳ.
+    - { id: F08, adr: "DMZ → Ứng dụng (Public API partner.<domain>, ADR-0022)", from: { selector: ingressController }, to: { zone: pf, apps: [api-public, integration-gateway] }, ports: [8085] }
+    # mTLS đối tác ghi lớn (ADR-0033 §1): Ingress chuyển thẳng TLS (passthrough) tới listener 8443 của cổng.
+    - { id: F09, adr: "DMZ → Ứng dụng (cổng tích hợp mTLS, ADR-0033)", from: { selector: ingressController }, to: { zone: pf, app: integration-gateway }, ports: [8443] }
     # ---- Ứng dụng → Dữ liệu (chỉ cổng DB/MQ)
     - { id: F10, adr: "Ứng dụng → Dữ liệu", from: { zone: pf, apps: [api-platform, worker] }, to: { zone: data, pooler: pf }, ports: [5432] }
     - { id: F11, adr: "Ứng dụng → Dữ liệu", from: { zone: pf, apps: [worker, outbox-publisher-pf] }, to: { zone: data, pg: pf }, ports: [5432] }
@@ -791,7 +837,7 @@ networkPolicy:
     - { id: F17, adr: "Ứng dụng → Dữ liệu", from: { zone: mkg, apps: [outbox-publisher-mkg, anchor-mkg, purge-idempotency-mkg] }, to: { zone: data, pg: ts }, ports: [5432] }
     - { id: F18, adr: "Ứng dụng → Dữ liệu", from: { zone: mkg, apps: [outbox-publisher-mkg, worker-internal] }, to: { selector: rabbitmq }, ports: [5672] }
     # api-public CHỈ tới PgBouncer cụm pf (outbox ghi DB, outbox-publisher-pf phát) — ADR-0025 mục 1.
-    - { id: F19, adr: "Ứng dụng → Dữ liệu (Public API → PgBouncer pf, ADR-0025)", from: { zone: pf, app: api-public }, to: { zone: data, pooler: pf }, ports: [5432] }
+    - { id: F19, adr: "Ứng dụng → Dữ liệu (Public API → PgBouncer pf, ADR-0025)", from: { zone: pf, apps: [api-public, integration-gateway] }, to: { zone: data, pooler: pf }, ports: [5432] }
     # ---- Ứng dụng → Định danh (chỉ API vault, mTLS)
     - { id: F20, adr: "Ứng dụng → Định danh", from: { zone: pf, app: api-platform }, to: { zone: vault, app: identity-vault }, ports: [8090] }
     # ---- Trong vùng ứng dụng nền tảng: Internal API mTLS (mục 11)
@@ -803,12 +849,12 @@ networkPolicy:
     # ---- Nền tảng → MKG: MKG gọi Application API công khai qua DMZ (mục 5, ADR-0020) — không Pod-tới-Pod
     - { id: F25, adr: "Tiêu thụ không đặc quyền (mục 5)", from: { zone: mkg, app: api-internal }, to: { selector: ingressController }, portsFrom: ingressController }
     # ---- Public API: luồng tùy chọn (ADR-0022 mục 5, 7) — chỉ mở khi cấu hình
-    - { id: F26, adr: "Ứng dụng → Valkey trong lãnh thổ (giới hạn tần suất dùng chung, không phải nguồn sự thật)", from: { zone: pf, app: api-public }, to: { external: valkey }, ports: [6379] }
+    - { id: F26, adr: "Ứng dụng → Valkey trong lãnh thổ (giới hạn tần suất dùng chung, không phải nguồn sự thật)", from: { zone: pf, apps: [api-public, integration-gateway] }, to: { external: valkey }, ports: [6379] }
     - { id: F27, adr: "Quản trị → Ứng dụng (scrape api-public, mở rộng F53)", when: '{{ (index .Values.apps "api-public").metrics.enabled }}', from: { selector: prometheus }, to: { zone: pf, app: api-public }, ports: [9464] }
     - { id: F28, adr: "Ứng dụng → Định danh người dùng (JWKS, client credentials đơn vị thẩm định, R-54)", when: '{{ (index .Values.apps "api-public").oidc.enabled }}', from: { zone: pf, app: api-public }, to: { selector: keycloak }, ports: [8080] }
     # Public API → kho đối tượng: chỉ đọc tệp xuất để phát luồng (ADR-0022 mục 8). Mở sẵn ở mọi hồ sơ như F08/F19
     # (không Pod nào khi api-public 0 bản sao); khóa S3 chỉ có ở Phase K.
-    - { id: F29, adr: "Ứng dụng → kho đối tượng trong lãnh thổ (Public API phát luồng tệp xuất, khóa chỉ đọc)", from: { zone: pf, app: api-public }, to: { external: objectStorage }, ports: [443] }
+    - { id: F29, adr: "Ứng dụng → kho đối tượng trong lãnh thổ (Public API phát luồng tệp xuất, khóa chỉ đọc)", from: { zone: pf, apps: [api-public, integration-gateway] }, to: { external: objectStorage }, ports: [443] }
     # ---- Dịch vụ ngoài trong lãnh thổ (RB-7)
     - { id: F30, adr: "Ứng dụng → kho đối tượng trong lãnh thổ", from: { zone: pf, apps: [api-platform, worker] }, to: { external: objectStorage }, ports: [443] }
     - { id: F31, adr: "Ứng dụng → SMTP trong lãnh thổ", from: { zone: pf, app: worker }, to: { external: smtp }, portsFrom: smtp }

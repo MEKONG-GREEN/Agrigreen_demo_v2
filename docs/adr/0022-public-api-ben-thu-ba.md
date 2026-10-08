@@ -166,6 +166,8 @@ Hợp đồng `status: draft` chỉ phục vụ ngoài production. Production ch
 
 ## Hệ quả
 
+> **W5.2 (09/10/2026), ADR-0033 §1:** tiến trình đổi tên thành `cmd/integration-gateway` (thân ở `cmd/integration-gateway/gateway`, gốc lắp ráp ở `cmd/integration-gateway/assembly`); `cmd/api-public` còn là bí danh một kỳ (cùng mã, cùng vai `app_public`). Mọi quyết định của ADR này (khóa HMAC, scope, hạn mức, sổ đo lường, hợp đồng mặc định từ chối) áp nguyên cho cổng; thêm mTLS tùy chọn. Mục 5 "mTLS" của việc mở: đã có cơ chế, cấu hình theo khách hàng. Xem [runbook](../runbooks/integration-gateway.md).
+
 - Ở ĐTK 1, `api-public` có mã và kiểm thử nhưng số bản sao 0, không có host ingress, `AG_PUBLIC_API_ENABLED` không đặt. Phase K bật bằng cấu hình (ADR-0025).
 - Bên thứ ba là tenant, nên cấp quyền chia sẻ, thu hồi và sổ đọc của ADR-0020 dùng lại nguyên vẹn. Bên cấp thấy mọi lần đọc của bên thứ ba ở `partner_read_log` và ở sổ xuất `pf_metering.egress_event` (ADR-0024).
 - Mỗi lời gọi đã xác thực tốn một giao dịch ghi `pf_metering` trước khi trả byte. Ước lượng ở ĐTK 2: dưới 50 rps cho bên thứ ba đầu tiên. Đo ở diễn tập tải G5.

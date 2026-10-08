@@ -597,6 +597,34 @@ services:
       AG_PUBLIC_OIDC_AUDIENCE: ${AG_PUBLIC_OIDC_AUDIENCE:-}
     ports: ["127.0.0.1:8085:8085"]
 
+  # Cổng tích hợp (W5.2, ADR-0033) — cmd/integration-gateway, cùng vai DB app_public và biến với api-public (bí danh
+  # một kỳ). Hồ sơ riêng để không chạy song song với api-public trên cùng cổng host:
+  #   docker compose -f deploy/compose/docker-compose.yml --profile gateway up -d --build --wait
+  # mTLS tắt ở dev (AG_GATEWAY_MTLS_ADDR rỗng); bật thử theo docs/runbooks/integration-gateway.md mục 3.
+  integration-gateway:
+    <<: *go-app
+    profiles: [gateway]
+    image: agrigreen/integration-gateway:dev
+    build: { context: ../.., dockerfile: Dockerfile, args: { CMD: integration-gateway } }
+    depends_on:
+      migrate-up: { condition: service_completed_successfully }
+      pgbouncer: { condition: service_healthy }
+      valkey: { condition: service_healthy }
+    environment:
+      <<: [*otel-env, *s3-env]
+      AG_GATEWAY_ENABLED: "1"
+      AG_GATEWAY_HTTP_ADDR: ":8085"
+      AG_GATEWAY_MTLS_ADDR: ${AG_GATEWAY_MTLS_ADDR:-}
+      AG_PF_DB_URL: postgres://pgbouncer:6432/?sslmode=disable
+      AG_DB_VIA_PGBOUNCER: "1"
+      AG_DB_APP_PASSWORD: ${AG_DB_APP_PASSWORD}
+      AG_GATEWAY_OPERATOR_TENANT: ${AG_PUBLIC_OPERATOR_TENANT:-}
+      AG_APIKEY_PEPPER_V1: ${AG_APIKEY_PEPPER_V1:-}
+      AG_APIKEY_PEPPER_CURRENT: "1"
+      AG_VALKEY_URL: ${AG_VALKEY_URL:-redis://valkey:6379/0}
+      AG_EGRESS_MODE: ${AG_EGRESS_MODE:-enforce}
+    ports: ["127.0.0.1:8086:8085"]
+
   web-ops:
     <<: *hardened
     image: agrigreen/web-ops:dev

@@ -160,6 +160,8 @@ var zoneRoots = []struct{ root, forbidden string }{
 	// G4: công cụ diễn tập dựng lại bảng chiếu cụm mkg (R-22) — chỉ nối module mkg.
 	{"cmd/rebuilddrill", "platform"},
 	// G5: đơn vị triển khai Public API (ADR-0022) — gốc lắp ráp vùng nền tảng, chỉ nối platform/*.
+	// W5.2 (ADR-0033): cổng tích hợp cmd/integration-gateway; cmd/api-public còn là bí danh một kỳ.
+	{"cmd/integration-gateway", "mkg"},
 	{"cmd/api-public", "mkg"},
 	// worker-platform (mục 4: consumer + job của vùng nền tảng), diễn tập phục hồi cụm pf và bộ nạp mẫu
 	// báo cáo Excel — chỉ nối platform/*.
@@ -225,7 +227,7 @@ func contractDriverViolation(from loc, imp string) string {
 }
 
 // noVaultRoots là gốc lắp ráp không được import BẤT KỲ package nào của vault, kể cả client (RB-3).
-var noVaultRoots = []string{"cmd/api-public"}
+var noVaultRoots = []string{"cmd/integration-gateway", "cmd/api-public"}
 
 // edgeAgentRoot là nhị phân tĩnh ở vùng biên OT (mục 14, 17): không DB, không
 // mã nghiệp vụ, chỉ đi ra tới ingest qua mTLS.

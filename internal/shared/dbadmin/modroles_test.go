@@ -138,11 +138,11 @@ func TestEveryUnitHasLogin_ADR0028(t *testing.T) {
 	covered := map[string]LoginUnit{}
 	for _, u := range LoginUnits {
 		covered[u.Unit] = u
-		for _, tool := range u.Tools {
+		for _, tool := range slices.Concat(u.Tools, u.Aliases) {
 			covered[tool] = u
 		}
 	}
-	for _, unit := range []string{"api-platform", "api-public", "api-internal", "worker", "worker-internal", "ingest",
+	for _, unit := range []string{"api-platform", "integration-gateway", "api-public", "api-internal", "worker", "worker-internal", "ingest",
 		"identity-vault", "drill", "formimport", "rebuilddrill", "objsync"} {
 		u, ok := covered[unit]
 		if !ok {

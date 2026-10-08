@@ -20,7 +20,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-public/assembly"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/integration-gateway/assembly"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/integration-gateway/gateway"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
@@ -43,7 +44,7 @@ import (
 
 func TestMain(m *testing.M) { os.Exit(pgtest.Run(m)) }
 
-// intEnv là api-public THẬT (Build + integrationPorts thật) trên DB thật, cùng Admin API của
+// intEnv là cổng tích hợp THẬT (Build + integrationPorts thật + gateway.NewHandler) trên DB thật, cùng Admin API của
 // pf/apiclient và pf/party để cấp khóa và cấp quyền.
 type intEnv struct {
 	t        *testing.T
@@ -52,6 +53,8 @@ type intEnv struct {
 	admin    *httptest.Server
 	public   *httptest.Server
 	mod      *apiclient.Module
+	deps     apiclient.PublicDeps
+	log      *slog.Logger
 	operator uuid.UUID
 	grantor  uuid.UUID
 	third    uuid.UUID
@@ -147,12 +150,13 @@ func newIntEnv(t *testing.T) *intEnv {
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
-	// W2.6 (ADR-0028): api-public chỉ mở MỘT vai đăng nhập app_public; mỗi module chạy dưới r_<module>.
+	// W2.6 (ADR-0028): cổng (integration-gateway, bí danh api-public) chỉ mở MỘT vai đăng nhập app_public; mỗi module chạy dưới r_<module>.
 	if len(opened) != 1 || !opened[dbadmin.AppPublic] {
-		t.Fatalf("api-public chỉ mở vai %s, đã mở %v", dbadmin.AppPublic, opened)
+		t.Fatalf("cổng chỉ mở vai %s, đã mở %v", dbadmin.AppPublic, opened)
 	}
-	e.mod = mod
-	e.public = httptest.NewServer(mod.PublicRouter(d))
+	e.mod, e.deps, e.log = mod, d, log
+	// Handler THẬT của cổng (W5.2): router Public + lớp chứng chỉ client; không tệp gắn → chỉ khóa API.
+	e.public = httptest.NewServer(gateway.NewHandler(mod, d, nil, log))
 	t.Cleanup(e.public.Close)
 
 	// Admin API (MFA) — như api-platform: pf/apiclient (cùng module) + pf/party (cấp quyền dp_*).
@@ -288,7 +292,7 @@ func (e *intEnv) count(tid uuid.UUID, q string, args ...any) int {
 	return n
 }
 
-// Tích hợp G5 (A-2, A-3, P-06, P-10, M-05, D-01, D-04, X-03): api-public THẬT (gốc lắp ráp Build +
+// Tích hợp G5 (A-2, A-3, P-06, P-10, M-05, D-01, D-04, X-03): cổng tích hợp THẬT (gốc lắp ráp Build +
 // integrationPorts thật: pf/metering, party/port/grantlookup, nguồn pf/cropcycle + pf/geo +
 // pf/masterdata) trên DB thật. Khóa phát qua Admin API của pf/apiclient, cấp quyền dp_collection_volume
 // qua Admin API của pf/party:

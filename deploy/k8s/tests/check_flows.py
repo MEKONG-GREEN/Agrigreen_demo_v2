@@ -513,7 +513,8 @@ def structure_checks(env: str, docs: list[dict], values: dict, r: Report):
                 s = v["secret"]["secretName"]
                 if ns in forbid_prefix:
                     r.check(not s.startswith(forbid_prefix[ns]), f"[{env}] {ns}/{name}: gắn Secret vùng khác {s}")
-                if base_env(env) != "dev":
+                # optional: Secret chỉ có khi một tính năng bật (vd mTLS của integration-gateway, W5.2).
+                if base_env(env) != "dev" and not v["secret"].get("optional"):
                     r.check((ns, s) in es_names or (ns, s) in cert_names, f"[{env}] {ns}/{name}: volume Secret {s} không có nguồn")
     # PDB cho mọi Deployment nhiều bản; HPA cho api-platform, ingest (prod).
     pdbs = {(d["metadata"]["namespace"], d["metadata"]["name"]) for d in by_kind.get("PodDisruptionBudget", [])}
@@ -737,6 +738,68 @@ def public_api_checks(env: str, docs: list[dict], values: dict, r: Report):
     r.check(base_env(env) == "dev" or (pf, "pf-public-s3") in es, f"[{env}] Phase K: thiếu ExternalSecret pf-public-s3 (khóa S3 chỉ đọc của api-public)")
 
 
+# --------------------------------------------------------------------------- Cổng tích hợp (W5.2)
+def gateway_checks(env: str, docs: list[dict], values: dict, r: Report):
+    """ADR-0033 (W5.2): integration-gateway có CÙNG phong bì mạng với api-public — chỉ nhận từ Ingress (F08 :8085,
+    F09 mTLS :8443), chỉ ra PgBouncer pf (F19) + kho đối tượng 443 (F29) + DNS/OTLP; cùng vai DB app_public; chứng
+    thư mTLS chỉ từ Secret pf-gateway-mtls của vùng pf. 0 bản sao ở mọi hồ sơ cho tới khi chuyển host partner."""
+    pf, data, vault, mkg, ops = NS["pf"], NS["data"], NS["vault"], NS["mkg"], NS["ops"]
+    m = Model(docs)
+    pods = pods_from(docs)
+    gw = pods.get(f"{pf}/integration-gateway")
+    r.check(gw is not None, f"[{env}] thiếu Deployment integration-gateway (W5.2)")
+    if gw is None:
+        return
+    internet = IP("8.8.8.8")
+
+    def p(k):
+        return pods.get(k)
+
+    for desc, s, d, port in [
+        ("F08 Ingress → integration-gateway:8085", p("edge/traefik"), gw, 8085),
+        ("F09 Ingress → integration-gateway:8443 (mTLS)", p("edge/traefik"), gw, 8443),
+        ("F19 integration-gateway → PgBouncer pf", gw, p(f"{data}/pg-pf-pooler"), 5432),
+        ("F50 integration-gateway → OTLP", gw, p(f"{ops}/otel-collector"), 4317),
+    ]:
+        r.check(s is not None and d is not None and m.allowed(s, d, port), f"[{env}] cổng tích hợp: luồng bị chặn: {desc}")
+    srcs = [internet] + [x for x in (
+        p(f"{pf}/api-platform"), p(f"{pf}/worker"), p(f"{pf}/web-ops"), p(f"{pf}/api-public"), p(f"{mkg}/api-internal"),
+        p(f"{mkg}/ingest"), p(f"{mkg}/worker-internal"), p(f"{vault}/identity-vault"), p(f"{data}/rabbitmq"),
+        p("iam/keycloak"), p(f"{ops}/otel-collector")) if x is not None]
+    for s in srcs:
+        for port in (8085, 8443):
+            r.check(not m.allowed(s, gw, port), f"[{env}] luồng CẤM: {getattr(s, 'name', getattr(s, 'addr', s))} → integration-gateway:{port} (chỉ Ingress)")
+    banned = [
+        ("identity-vault", p(f"{vault}/identity-vault"), 8090),
+        ("RabbitMQ AMQP", p(f"{data}/rabbitmq"), 5672),
+        ("PostgreSQL pf trực tiếp", p(f"{data}/pg-pf"), 5432),
+        ("api-platform", p(f"{pf}/api-platform"), 8080),
+        ("Admin API", p(f"{pf}/api-platform"), 8082),
+        ("api-internal (MKG)", p(f"{mkg}/api-internal"), 8081),
+        ("Keycloak", p("iam/keycloak"), 8080),
+    ]
+    for t in ("pg-mkg-pooler", "pg-mkg", "pg-ts-pooler", "pg-ts", "pg-iam"):
+        banned.append((f"DB {t}", p(f"{data}/{t}"), 5432))
+    for desc, d, port in banned:
+        if d is not None:
+            r.check(not m.allowed(gw, d, port), f"[{env}] luồng CẤM: integration-gateway → {desc} ({port})")
+    for port in (80, 443, 5432, 6379):
+        r.check(not m.allowed(gw, internet, port), f"[{env}] ra Internet phải bị chặn: integration-gateway → 8.8.8.8:{port}")
+
+    dep = next(d for d in docs if d.get("kind") == "Deployment" and d["metadata"].get("namespace") == pf and d["metadata"]["name"] == "integration-gateway")
+    spec = dep["spec"]["template"]["spec"]
+    c = spec["containers"][0]
+    env_from = [e["secretRef"]["name"] for e in c.get("envFrom") or [] if "secretRef" in e]
+    r.check(set(env_from) >= {"pf-public-db-roles", "pf-apikey-pepper"}, f"[{env}] integration-gateway thiếu envFrom pf-public-db-roles/pf-apikey-pepper (vai app_public, ADR-0033)")
+    r.check(not any(s in env_from for s in ("pf-db-roles", "pf-app", "pf-s3", "pf-anchor")), f"[{env}] integration-gateway nhận Secret rộng hơn cần: {env_from}")
+    vols = {v["secret"]["secretName"] for v in spec.get("volumes") or [] if "secret" in v}
+    r.check(vols <= {"pf-gateway-mtls"}, f"[{env}] integration-gateway chỉ gắn Secret mTLS pf-gateway-mtls: {sorted(vols)}")
+    r.check(dep["spec"].get("replicas") == 0, f"[{env}] W5.2: integration-gateway 0 bản sao cho tới khi chuyển host partner (runbook)")
+    for d in docs:
+        if d.get("kind") == "ExternalSecret" and d["spec"]["target"]["name"] == "pf-gateway-mtls":
+            r.check(d["metadata"]["namespace"] == pf, f"[{env}] Secret mTLS cổng ngoài vùng pf: {d['metadata']['namespace']}")
+
+
 # --------------------------------------------------------------------------- chạy
 def helm_bin() -> str:
     h = os.environ.get("HELM") or shutil.which("helm")
@@ -804,6 +867,7 @@ def main() -> int:
         structure_checks(env, docs, values, r)
         flow_checks(env, docs, values, r)
         public_api_checks(env, docs, values, r)
+        gateway_checks(env, docs, values, r)
     phasek_overlay_checks(r)
     for f in r.fails:
         print("HỎNG:", f)

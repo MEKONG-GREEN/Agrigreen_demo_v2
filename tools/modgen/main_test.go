@@ -58,7 +58,7 @@ func TestRepoUpToDate(t *testing.T) {
 // TestWiredModules: ghép trong tiến trình tính từ import của cmd/<đơn vị> (không tính port/,
 // client/; theo cả cmd/internal/*).
 func TestWiredModules(t *testing.T) {
-	wired, err := wiredModules("../..", []string{"api-platform", "api-public", "identity-vault", "ingest", "migrate"})
+	wired, err := wiredModules("../..", []string{"api-platform", "integration-gateway", "api-public", "identity-vault", "ingest", "migrate"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,8 +66,12 @@ func TestWiredModules(t *testing.T) {
 	if !has("api-platform", "pf/party") || !has("api-platform", "pf/sync") || has("api-platform", "vault/identity") {
 		t.Errorf("api-platform: %v (vault/identity chỉ qua client/, không ghép)", wired["api-platform"])
 	}
-	if !has("api-public", "pf/apiclient") || has("api-public", "pf/party") {
-		t.Errorf("api-public: %v (pf/party chỉ qua port/)", wired["api-public"])
+	if !has("integration-gateway", "pf/apiclient") || has("integration-gateway", "pf/party") {
+		t.Errorf("integration-gateway: %v (pf/party chỉ qua port/)", wired["integration-gateway"])
+	}
+	// W5.2: bí danh một kỳ ghép đúng module của đơn vị đích.
+	if !slices.Equal(wired["api-public"], wired["integration-gateway"]) {
+		t.Errorf("api-public (bí danh) %v ≠ integration-gateway %v", wired["api-public"], wired["integration-gateway"])
 	}
 	if !has("identity-vault", "vault/identity") || !has("ingest", "mkg/measurement") || len(wired["migrate"]) != 0 {
 		t.Errorf("wired = %v", wired)

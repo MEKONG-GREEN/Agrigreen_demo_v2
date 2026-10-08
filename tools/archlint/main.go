@@ -2,7 +2,7 @@
 // golangci-lint mặc định:
 //
 //	agboundary  R-02, R-03, R-04 — ranh giới module; gốc lắp ráp theo vùng
-//	            (api-platform, api-public, worker, drill, formimport ↛ mkg; api-internal, ingest,
+//	            (api-platform, integration-gateway, api-public, worker, drill, formimport ↛ mkg; api-internal, ingest,
 //	            edge-agent, worker-internal ↛ platform; identity-vault ↛ platform, mkg);
 //	            vault ↛ platform, mkg (vùng chủ quyền riêng, mục 4); port/ (và client/ của vault) chỉ
 //	            interface + DTO — không import store/app/handler/adapter của chính module hay pgx (mục 8);

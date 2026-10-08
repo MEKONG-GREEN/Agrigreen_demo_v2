@@ -52,6 +52,9 @@ type LoginUnit struct {
 	// Tools: lệnh vận hành một lần (drill, formimport, rebuilddrill) dùng chung vai đăng nhập của đơn vị —
 	// module chúng ghép có trong membership (kiểm thử TestEveryUnitHasLogin_ADR0028).
 	Tools []string
+	// Aliases: tên cũ của đơn vị còn giữ một kỳ (cùng nhị phân, cùng vai) — vd api-public của integration-gateway
+	// (W5.2, ADR-0033 §7.5). Module bí danh ghép cũng vào membership.
+	Aliases []string
 	// Extra: module đơn vị mở pool theo TÊN mà không import gốc module (không thấy trong import),
 	// hoặc đơn vị chưa ghép module trong tiến trình nhưng ADR-0028 gán (engine đồng bộ).
 	Extra []string
@@ -71,8 +74,9 @@ var (
 var LoginUnits = []LoginUnit{
 	{Role: AppPlatform, Unit: "api-platform", Ops: true, Clusters: pfOnly},
 	{Role: AppWorker, Unit: "worker", Tools: []string{"drill", "formimport"}, Ops: true, Clusters: pfOnly},
-	// api-public mở pool party theo tên (cmd/api-public/assembly: không import gốc pf/party).
-	{Role: AppPublic, Unit: "api-public", Extra: []string{"pf/party"}, Ops: true, Clusters: pfOnly},
+	// Cổng tích hợp (W5.2, ADR-0033 §1: vai app_public, không thêm vai) mở pool party theo tên
+	// (cmd/integration-gateway/assembly: không import gốc pf/party). api-public là bí danh một kỳ.
+	{Role: AppPublic, Unit: "integration-gateway", Aliases: []string{"api-public"}, Extra: []string{"pf/party"}, Ops: true, Clusters: pfOnly},
 	// Engine đồng bộ (pf/sync) và objsync — objsync chưa ghép module nào trong tiến trình.
 	{Role: AppSync, Unit: "objsync", Extra: []string{"pf/sync"}, Clusters: pfOnly},
 	{Role: AppInternal, Unit: "api-internal", Ops: true, Clusters: mkgOnly},
@@ -135,10 +139,11 @@ func ClusterGroups(c migrations.Cluster) []ModuleGroup {
 	return out
 }
 
-// UnitModules trả module mà vai đăng nhập của đơn vị phục vụ: module ghép của đơn vị và các lệnh Tools, cộng Extra.
+// UnitModules trả module mà vai đăng nhập của đơn vị phục vụ: module ghép của đơn vị, các lệnh Tools và bí danh
+// Aliases, cộng Extra.
 func UnitModules(u LoginUnit) []string {
 	mods := slices.Clone(modreg.UnitModules(u.Unit))
-	for _, t := range u.Tools {
+	for _, t := range slices.Concat(u.Tools, u.Aliases) {
 		mods = append(mods, modreg.UnitModules(t)...)
 	}
 	return append(mods, u.Extra...)

@@ -4,7 +4,7 @@ app: PF
 description: Quản trị và vận hành nền tảng — tài khoản, danh mục, tham số, tổ chức, bản đồ, chỉ số, đồng bộ, Public API và đo đếm, kho định danh, job vận hành
 modules:
   pf/accounts: ">=1.0 <2"      # tài khoản cán bộ
-  pf/apiclient: ">=1.0 <2"     # khách hàng Public API (Admin API, api-public)
+  pf/apiclient: ">=1.0 <2"     # khách hàng Public API (Admin API, integration-gateway)
   pf/content: ">=1.0 <2"
   pf/cooperative: ">=1.0 <2"   # dữ kiện thửa/vụ của sản phẩm dữ liệu Public API
   pf/cropcycle: ">=1.0 <2"     # quy trình SOP; dữ liệu vụ của Public API
@@ -57,7 +57,8 @@ landing: # web-ops homeFor: mục đầu tiên vai thấy
   metering_viewer: /quan-tri/su-dung-api
 deployment_units:
   - api-platform
-  - api-public
+  - integration-gateway   # cổng tích hợp (W5.2, ADR-0033)
+  - api-public            # bí danh một kỳ của integration-gateway — gỡ ở bản phát hành sau W5.2
   - worker
   - identity-vault
   - outbox-publisher

@@ -1,7 +1,8 @@
-// Package assembly là gốc lắp ráp của cmd/api-public (Public API cho bên thứ ba, ADR-0022): nối pool
-// vai của từng module chủ dữ liệu (g5-conventions §3.1) thành apiclient.PublicDeps. Tách khỏi package
-// main để kịch bản đầu–cuối (tests/e2e) chạy ĐÚNG gốc lắp ráp và router của tiến trình thật. archlint
-// (zoneRoots, noVaultRoots) áp cho cả cây cmd/api-public, kể cả gói này.
+// Package assembly là gốc lắp ráp của cmd/integration-gateway (cổng tích hợp, ADR-0033; trước W5.2 là
+// cmd/api-public — Public API cho bên thứ ba, ADR-0022): nối pool vai của từng module chủ dữ liệu
+// (g5-conventions §3.1) thành apiclient.PublicDeps. Tách khỏi package main để kịch bản đầu–cuối (tests/e2e)
+// chạy ĐÚNG gốc lắp ráp và router của tiến trình thật. archlint (zoneRoots, noVaultRoots) áp cho cả cây
+// cmd/integration-gateway, kể cả gói này; cmd/api-public (bí danh một kỳ) chỉ gọi gói gateway.
 package assembly
 
 import (
@@ -33,7 +34,7 @@ import (
 // PoolOpener mở pool cho một vai đăng nhập của cụm pf (W2.6: app_public; mở lại cùng vai nên trả cùng pool).
 type PoolOpener func(ctx context.Context, role string) (*pgxpool.Pool, error)
 
-// Config là cấu hình đã đọc của api-public.
+// Config là cấu hình đã đọc của cổng tích hợp (integration-gateway, bí danh api-public).
 type Config struct {
 	Operator   uuid.UUID
 	Peppers    *apiclient.Peppers
@@ -48,7 +49,7 @@ type Config struct {
 }
 
 // Ports là cổng của module khác mà Public API dùng — mỗi cổng đọc bằng pool vai của module chủ
-// (R-05), api-public chỉ mở pool của g5-conventions §3.1.
+// (R-05), cổng chỉ mở pool của g5-conventions §3.1.
 type Ports struct {
 	Ledger meter.Ledger
 	Quotas meter.Quotas
@@ -67,7 +68,7 @@ type Ports struct {
 }
 
 // ErrNotWired: thiếu cổng bắt buộc (sổ đo lường, hạn mức, cấp quyền) — không khởi động (đóng khi lỗi).
-var ErrNotWired = errors.New("api-public: chưa nối metering/port.Ledger, Quotas hoặc party/port.GrantLookup — không khởi động")
+var ErrNotWired = errors.New("integration-gateway: chưa nối metering/port.Ledger, Quotas hoặc party/port.GrantLookup — không khởi động")
 
 // integrationPorts nối cổng THẬT của module khác (tích hợp G5, 02/10/2026) trên MỘT pool vai đăng nhập
 // app_public (W2.6, ADR-0028); mỗi cổng chạy dưới vai nhóm của module chủ (r_<module>, g5-conventions §3.1):

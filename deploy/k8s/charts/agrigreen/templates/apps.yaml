@@ -5,6 +5,7 @@ Cứng hóa (mục 18): non-root, rootfs chỉ đọc, bỏ capability, seccomp,
 replicas: 0 là hợp lệ (đơn vị có mã nhưng tắt theo cấu hình, R-01 — vd api-public ở ĐTK 1/G4).
 envFromSecrets: tên Secret, hoặc {secret, optional: true} cho Secret chỉ có khi một hồ sơ bật (Phase K).
 metrics: {enabled, port, path, service?} → cổng số đo + ServiceMonitor (chỉ khi tiến trình phục vụ /metrics).
+certs: {secret, mountPath, optional?} — optional: true cho Secret chỉ có khi một hồ sơ bật (vd mTLS cổng tích hợp).
 */ -}}
 {{- $root := . }}
 {{- range $name, $app := .Values.apps }}
@@ -147,7 +148,7 @@ spec:
 {{- end }}
 {{- range $i, $c := $app.certs }}
         - name: {{ printf "cert-%d" $i }}
-          secret: { secretName: {{ $c.secret }}, defaultMode: 0440 }
+          secret: { secretName: {{ $c.secret }}, defaultMode: 0440{{ if $c.optional }}, optional: true{{ end }} }
 {{- end }}
 {{- range $i, $c := $app.configMaps }}
         - name: {{ printf "cm-%d" $i }}

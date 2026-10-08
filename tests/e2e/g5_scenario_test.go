@@ -24,7 +24,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	platformasm "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
-	publicasm "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-public/assembly"
+	publicasm "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/integration-gateway/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/dataproduct"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"

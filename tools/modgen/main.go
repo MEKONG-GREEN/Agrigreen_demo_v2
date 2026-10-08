@@ -295,8 +295,21 @@ func wiredModules(root string, units []string) (map[string][]string, error) {
 		}
 		out[u] = keys(mods)
 	}
+	// Bí danh một kỳ chạy CÙNG thân tiến trình của đơn vị đích qua gói không phải cmd/internal (W5.2):
+	// ghép đúng module của đơn vị đích.
+	for alias, target := range unitAliases {
+		if _, ok := out[alias]; ok {
+			if mods, ok := out[target]; ok {
+				out[alias] = slices.Clone(mods)
+			}
+		}
+	}
 	return out, nil
 }
+
+// unitAliases: đơn vị bí danh → đơn vị đích (cùng thân tiến trình). cmd/api-public là bí danh một kỳ của
+// cmd/integration-gateway (ADR-0033 §7.5) — xóa mục khi gỡ bí danh.
+var unitAliases = map[string]string{"api-public": "integration-gateway"}
 
 // inProcess: đường dẫn internal/<vùng>/<module>[/gói] không thuộc port/ hay client/.
 func inProcess(rel string) bool {

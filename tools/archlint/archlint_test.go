@@ -24,6 +24,8 @@ func TestBoundary(t *testing.T) {
 		"example.com/ag/internal/mkg/measurement/port/edgewire",
 		// G5-0: Public API — gốc lắp ráp vùng nền tảng, không import vault kể cả client (RB-3).
 		"example.com/ag/cmd/api-public",
+		// W5.2: cổng tích hợp (ADR-0033) — cùng luật với api-public.
+		"example.com/ag/cmd/integration-gateway",
 		// Gốc lắp ráp vùng nền tảng còn thiếu (worker-platform, diễn tập, bộ nạp mẫu) — không nối mkg/*.
 		"example.com/ag/cmd/worker",
 		"example.com/ag/cmd/drill",
