@@ -124,7 +124,7 @@ Sổ cấp phép của ADR-0020 (`share_grant_event`, bốn mắt, thu hồi, `p
 | W5.1 | `contracts/integration/` (feed, hợp đồng nạp, song phương), `contractcheck` mở rộng | — |
 | W5.2 | `cmd/integration-gateway` từ `cmd/api-public`, mTLS, port `MachineIdentity`, bí danh, NetworkPolicy, chart | — |
 | W5.3 | Kho feed, job dựng tập dữ liệu, ảnh chụp + URL ký, `GET /v1/feeds/*` | pf 000100–000101 |
-| W5.4 | Nạp theo lô, hàng đợi + DLQ từng đối tác, inbox | pf 000130 (tạm; 000102 lỗi thời) |
+| W5.4 | Nạp theo lô, hàng đợi + DLQ từng đối tác, inbox | pf 000125 |
 | W5.5 | Bộ điều hợp feed `mkg/fieldops`, `as_of`/`max_age`, header `Deprecation`/`Sunset` | mkg 000024 |
 | W5.6 | Luồng song phương (ADR-0034) | pf 000103, mkg 000025 |
 | W5.7 | Webhook mỏng, ngắt mạch, tổng kiểm | pf 000104 |
@@ -153,7 +153,7 @@ Sổ cấp phép của ADR-0020 (`share_grant_event`, bốn mắt, thu hồi, `p
 
 ### W5.4 (09/10/2026) — nạp theo lô
 
-- **Chủ:** `pf/apiclient` (như kho feed ở mục 2 — không thêm module), gói con `internal/platform/apiclient/ingest`; route `POST /v1/batches/{contract}`, `GET /v1/batches/{id}` trong router Public (`public/batches.go`) nên kế thừa khóa API [+ mTLS], giới hạn tần suất, sổ đo lường trước byte. Migration **pf 000130** (tạm — số 000102 của kế hoạch đầu đã lỗi thời): sổ chỉ ghi thêm `ingest_batch` (thân lô jsonb, idem `batch:<client>:<batch_ref>`), `ingest_record_result`, `ingest_batch_outcome` (`completed` | `dead_lettered`), `ingest_staging`; RLS theo **tenant đối tác** (`client_tenant_id` từ bản ghi khóa); chỉ `r_apiclient` có quyền.
+- **Chủ:** `pf/apiclient` (như kho feed ở mục 2 — không thêm module), gói con `internal/platform/apiclient/ingest`; route `POST /v1/batches/{contract}`, `GET /v1/batches/{id}` trong router Public (`public/batches.go`) nên kế thừa khóa API [+ mTLS], giới hạn tần suất, sổ đo lường trước byte. Migration **pf 000125** (số 000102 của kế hoạch đầu đã lỗi thời): sổ chỉ ghi thêm `ingest_batch` (thân lô jsonb, idem `batch:<client>:<batch_ref>`), `ingest_record_result`, `ingest_batch_outcome` (`completed` | `dead_lettered`), `ingest_staging`; RLS theo **tenant đối tác** (`client_tenant_id` từ bản ghi khóa); chỉ `r_apiclient` có quyền.
 - **Quyền:** scope `ingest:<hợp đồng>:write`, cấp qua đăng ký có `product` = tên hợp đồng nạp (Admin API chấp nhận hợp đồng `contracts/integration/ingest`). Kiểm hợp đồng mặc định từ chối: không có / phiên bản lạ / hợp đồng feed → 404 `integration.contract_unknown`; `retired`, `approved` còn `pending`, `proposed`/`draft` không cờ dev/test → 403 `integration.contract_not_servable`; production + cờ `AG_GATEWAY_INGEST_ALLOW_PROPOSED` → cổng không khởi động; chưa nối port chủ → 403 `integration.no_owner_port`.
 - **Đồng bộ (rẻ):** phong bì `ingest_batch.v1`, `contract` = path, `batch_ref` = `Idempotency-Key`, `max_batch` → 413; độ sâu hàng đợi của chính đối tác ≥ `AG_GATEWAY_INGEST_MAX_QUEUED` → 429 `integration.queue_saturated` + `Retry-After` (lô không ghi). Gọi lặp cùng thân → cùng mã lô (`Idempotent-Replayed`), phát lại nếu chưa có kết cục; khác thân → 422.
 - **Hàng đợi (R-INT-04):** RabbitMQ `AG_AMQP_URL`: quorum queue `pf.apiclient.ingest.<client_id>` (`x-delivery-limit` 5, `x-max-length`, `x-overflow reject-publish`) + DLQ `.dlq` qua `ag.dlx`, phát thẳng qua exchange mặc định (không phải sự kiện công bố, không qua `ag.events`); mỗi đối tác một kênh tiêu thụ trong tiến trình cổng (`inbox.ConsumeWith`). Không có `AG_AMQP_URL`: dev/test dùng hàng đợi trong tiến trình cùng ngữ nghĩa; production tắt `/v1/batches` (503).

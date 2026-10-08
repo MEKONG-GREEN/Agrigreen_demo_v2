@@ -105,7 +105,7 @@ WITH CHECK (
 |---|---|---|
 | W0.3 | `mkg.md` §3.1, §3.2: bảng kê là song phương; hạn chế đọc tạm | — |
 | W5.1 | Hợp đồng `collection_schedule`, `roll_count_statement`, `htx_roll_confirmation` (`flow: bilateral`) | — |
-| W5.4 | Bộ xử lý lô gọi port module chủ với tenant bên gọi | pf 000102 |
+| W5.4 | Bộ xử lý lô gọi port module chủ với tenant bên gọi | pf 000125 |
 | W5.6 | Sổ song phương, `p_pair`, feed cặp, quy tắc CI không tổng hợp; bật production chờ C-12 | pf 000103, mkg 000025 |
 | W5.7 | Tổng kiểm hằng ngày theo cặp | pf 000104 |
 | W5.10 | Gỡ consumer `pf.cropcycle.htx_collection_valve` và `/v1/partner/htx-collection/responses` | — |
