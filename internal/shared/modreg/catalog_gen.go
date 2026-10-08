@@ -17,6 +17,7 @@ var catalog = []CatalogEntry{
 	{Name: "pf/cropcycle", Kind: "domain", Enable: "per_tenant", Permissions: []string{"coop_manager", "farmer", "mkg_sync", "sop_admin"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_cropcycle"}, Shares: []string{}},
 	{Name: "pf/extdata", Kind: "capability", Enable: "always", Permissions: []string{}, Zones: []string{"pf"}, OwnsSchema: []string{}, Shares: []string{}},
 	{Name: "pf/extension", Kind: "domain", Enable: "per_tenant", Permissions: []string{}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_extension"}, Shares: []string{}},
+	{Name: "pf/forms", Kind: "capability", Enable: "per_tenant", Permissions: []string{}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_forms"}, Shares: []string{}},
 	{Name: "pf/geo", Kind: "capability", Enable: "per_tenant", Permissions: []string{"coop_manager", "farmer", "geo_admin", "map_consumer", "plot_editor", "plot_viewer"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_geo"}, Shares: []string{}},
 	{Name: "pf/kref", Kind: "kernel", Enable: "always", Permissions: []string{}, Zones: []string{"pf", "mkg"}, OwnsSchema: []string{"k_ref"}, Shares: []string{}},
 	{Name: "pf/masterdata", Kind: "capability", Enable: "per_tenant", Permissions: []string{"masterdata_admin"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_masterdata"}, Shares: []string{}},

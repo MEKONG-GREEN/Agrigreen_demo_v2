@@ -5014,6 +5014,213 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/forms/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cấu hình biểu của các bên dùng (hierarchy, publish_by, close_by, review_by) */
+        get: operations["formsProfiles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/forms/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiên bản mới nhất của mỗi biểu của bên dùng */
+        get: operations["formsTemplates"];
+        put?: never;
+        /** Định nghĩa phiên bản mới của biểu (vai define_by) — phiên bản cũ và kỳ đã phát hành không đổi */
+        post: operations["formsDefineTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/forms/templates/fixtures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi các biểu mẫu thử (fixture) cho bên dùng — cơ chế chạy khi chưa có biểu thật (Q-01) */
+        post: operations["formsInstallFixtures"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/forms/templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một phiên bản biểu */
+        get: operations["formsTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/forms/periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kỳ của bên dùng mà người gọi thấy (toàn quốc, Nút phát hành, hoặc có đơn vị nhận trong phạm vi), mới trước */
+        get: operations["formsPeriods"];
+        put?: never;
+        /** Phát hành kỳ (cấp publish_by; đơn vị nhận thuộc phạm vi người phát hành; biểu fixture chỉ khi profile cho phép) */
+        post: operations["formsPublishPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/forms/periods/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kỳ kèm trạng thái chiếu từ sổ, bài nộp cuối của từng đơn vị trong phạm vi, ảnh chụp */
+        get: operations["formsPeriod"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/forms/periods/{id}/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử phiên bản bài nộp của một đơn vị (mới trước) kèm rà soát */
+        get: operations["formsSubmissions"];
+        put?: never;
+        /** Nộp phiên bản mới của bài (cấp lá, đơn vị trong phạm vi) — lập yêu cầu duyệt ở cap/workflow */
+        post: operations["formsSubmit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/forms/periods/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chốt kỳ (cấp close_by của Nút phát hành) — ảnh chụp đóng băng, băm SHA-256 do DB tính; sự kiện pf.forms.period.closed */
+        post: operations["formsClosePeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/forms/periods/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mở lại kỳ đã chốt (cả kỳ hoặc một số đơn vị; lý do bắt buộc) — bản ghi mới, ảnh chụp đã chốt không đổi */
+        post: operations["formsReopenPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/forms/periods/{id}/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ảnh chụp của kỳ (native hoặc ghi song song — mã kỳ của bên dùng; kỳ ghi song song chỉ cấp trên cấp lá), kèm kiểm băm */
+        get: operations["formsPeriodSnapshots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/forms/submissions/{id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rà soát phiên bản bài nộp cuối (cấp review_by) — chấp nhận hoặc trả lại; người rà soát ≠ người nộp (cap/workflow) */
+        post: operations["formsReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/forms/snapshots/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một ảnh chụp kèm nội dung đóng băng và kết quả kiểm băm (hash_valid) */
+        get: operations["formsSnapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -10137,6 +10344,178 @@ export interface components {
             supersedes_id: string | null;
             correction_reason?: string | null;
         };
+        FormsProfile: {
+            name: string;
+            hierarchy: string[];
+            roles: {
+                [key: string]: string;
+            };
+            publish_by: string;
+            close_by: string;
+            review_by: string;
+            allow_fixtures: boolean;
+            require_reviewed_before_close: boolean;
+        };
+        FormsField: {
+            key: string;
+            label: string;
+            /** @enum {string} */
+            type: "text" | "integer" | "decimal" | "date" | "choice";
+            required: boolean;
+            options?: string[];
+            unit?: string;
+        };
+        FormsTemplateInput: {
+            profile: string;
+            code: string;
+            title: string;
+            fields: components["schemas"]["FormsField"][];
+            /** @default false */
+            fixture: boolean;
+        };
+        FormsTemplate: {
+            /** Format: uuid */
+            id: string;
+            profile: string;
+            code: string;
+            version: number;
+            title: string;
+            fields: components["schemas"]["FormsField"][];
+            fixture: boolean;
+            /** Format: uuid */
+            created_by: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        FormsPublishInput: {
+            profile: string;
+            /** Format: uuid */
+            template_id: string;
+            label: string;
+            /** Format: date-time */
+            due_at: string;
+            units: string[];
+        };
+        FormsPeriod: {
+            /** Format: uuid */
+            id: string;
+            profile: string;
+            /** Format: uuid */
+            template_id: string;
+            template_code: string;
+            template_version: number;
+            label: string;
+            /** Format: date-time */
+            due_at: string;
+            units: string[];
+            /** Format: uuid */
+            owner_ref: string | null;
+            publisher_level: string;
+            /** Format: uuid */
+            published_by: string;
+            /** Format: date-time */
+            published_at: string;
+        };
+        FormsPeriodEvent: {
+            /** Format: uuid */
+            id: string;
+            seq: number;
+            /** @enum {string} */
+            action: "published" | "closed" | "reopened";
+            /** @enum {string} */
+            mode: "manual" | "auto";
+            units: string[];
+            reason: string | null;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            event_time: string;
+        };
+        FormsReview: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            decision: "accepted" | "returned";
+            /** Format: uuid */
+            reviewer_ref: string;
+            note: string | null;
+            /** Format: date-time */
+            event_time: string;
+        };
+        FormsSubmitInput: {
+            unit: string;
+            /** @description Khóa trường → giá trị chuỗi (thập phân dạng chuỗi, R-10) */
+            values: {
+                [key: string]: string;
+            };
+        };
+        FormsSubmission: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            period_id: string;
+            unit: string;
+            version: number;
+            values: {
+                [key: string]: string;
+            };
+            /** Format: uuid */
+            submitter_ref: string;
+            /** Format: date-time */
+            event_time: string;
+            /** @enum {string} */
+            status: "submitted" | "accepted" | "returned";
+            review: null | components["schemas"]["FormsReview"];
+        };
+        FormsReviewInput: {
+            /** @enum {string} */
+            decision: "accepted" | "returned";
+            /** @description Bắt buộc khi trả lại */
+            note?: string;
+        };
+        FormsReopenInput: {
+            reason: string;
+            /** @description Rỗng = cả kỳ */
+            units?: string[];
+        };
+        FormsSnapshot: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            period_ref: string;
+            profile: string;
+            snapshot_no: number;
+            /** Format: uuid */
+            period_event_id: string;
+            /** @description SHA-256 (hex) của nội dung, do DB tính */
+            content_hash: string;
+            /** @description Băm tính lại khớp content_hash */
+            hash_valid: boolean;
+            rule_version: string;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            event_time: string;
+            /** @description Nội dung đóng băng (chỉ ở GET /v1/forms/snapshots/{id}) */
+            content?: {
+                [key: string]: unknown;
+            };
+        };
+        FormsUnit: {
+            unit: string;
+            /** @enum {string} */
+            status: "not_submitted" | "submitted" | "accepted" | "returned";
+            submission: null | components["schemas"]["FormsSubmission"];
+        };
+        FormsPeriodView: {
+            period: components["schemas"]["FormsPeriod"];
+            /** @enum {string} */
+            status: "open" | "closed" | "reopened";
+            reopen_units: string[];
+            events: components["schemas"]["FormsPeriodEvent"][];
+            units: components["schemas"]["FormsUnit"][];
+            snapshots: components["schemas"]["FormsSnapshot"][];
+        };
     };
     responses: {
         /** @description RFC 9457 */
@@ -10241,6 +10620,8 @@ export interface components {
          *     khi đúng một bên cấp có loại dữ liệu này (nhiều bên cấp → 422 party.share_grantor_ambiguous).
          */
         PartnerGrantor: string;
+        /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+        FormsProfile: string;
         IdempotencyKey: string;
         /** @description Thời điểm tra (RFC 3339, hoặc YYYY-MM-DD = 00:00 giờ Việt Nam). Mặc định là hiện tại. */
         At: string;
@@ -20189,6 +20570,477 @@ export interface operations {
                 };
             };
             /** @description extension.material_record_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    formsProfiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["FormsProfile"][];
+                    };
+                };
+            };
+            401: components["responses"]["Problem"];
+        };
+    };
+    formsTemplates: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["FormsTemplate"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.profile_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    formsDefineTemplate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormsTemplateInput"];
+            };
+        };
+        responses: {
+            /** @description Phiên bản đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormsTemplate"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.profile_not_found */
+            404: components["responses"]["Problem"];
+            /** @description forms.template_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    formsInstallFixtures: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Các phiên bản đã ghi (fixture = true) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["FormsTemplate"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.profile_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    formsTemplate: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormsTemplate"];
+                };
+            };
+            /** @description forms.template_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    formsPeriods: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["FormsPeriod"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+        };
+    };
+    formsPublishPeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormsPublishInput"];
+            };
+        };
+        responses: {
+            /** @description Kỳ đã phát hành */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormsPeriodView"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.profile_not_found | forms.template_not_found */
+            404: components["responses"]["Problem"];
+            /** @description forms.fixture_template */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    formsPeriod: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kỳ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormsPeriodView"];
+                };
+            };
+            /** @description forms.period_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    formsSubmissions: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+                unit: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["FormsSubmission"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.period_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    formsSubmit: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormsSubmitInput"];
+            };
+        };
+        responses: {
+            /** @description Phiên bản đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormsSubmission"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description forms.period_closed | forms.submission_accepted */
+            409: components["responses"]["Problem"];
+            /** @description forms.values_invalid | forms.unit_not_in_period */
+            422: components["responses"]["Problem"];
+        };
+    };
+    formsClosePeriod: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kỳ sau chốt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormsPeriodView"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description forms.period_closed | forms.pending_review */
+            409: components["responses"]["Problem"];
+        };
+    };
+    formsReopenPeriod: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormsReopenInput"];
+            };
+        };
+        responses: {
+            /** @description Kỳ sau mở lại */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormsPeriodView"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description forms.period_not_closed */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | forms.unit_not_in_period */
+            422: components["responses"]["Problem"];
+        };
+    };
+    formsPeriodSnapshots: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách (không kèm nội dung) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["FormsSnapshot"][];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.period_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    formsReview: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormsReviewInput"];
+            };
+        };
+        responses: {
+            /** @description Bài nộp sau rà soát */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormsSubmission"];
+                };
+            };
+            /** @description forbidden | self_approval_forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.submission_not_found */
+            404: components["responses"]["Problem"];
+            /** @description forms.period_closed | forms.submission_superseded | forms.already_reviewed */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    formsSnapshot: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ảnh chụp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormsSnapshot"];
+                };
+            };
+            /** @description forms.snapshot_not_found */
             404: components["responses"]["Problem"];
         };
     };

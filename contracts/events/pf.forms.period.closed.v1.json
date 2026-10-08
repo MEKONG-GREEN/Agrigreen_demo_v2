@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.forms.period.closed/v1",
+  "title": "pf.forms.period.closed — payload",
+  "description": "cap/forms (W6.2, kiến trúc v4.1 §26): kỳ đã chốt, ảnh chụp đóng băng đã ghi (băm SHA-256 hex của nội dung do DB tính). origin = native (kỳ của /v1/forms) hoặc mirror (ghi song song từ vòng đời báo cáo KN v1). Chốt lại sau mở lại sinh ảnh chụp mới (snapshot_no tăng).",
+  "x-event-type": "pf.forms.period.closed",
+  "x-schema-version": 1,
+  "x-producer": "pf/forms",
+  "type": "object",
+  "required": [
+    "period_ref",
+    "profile",
+    "origin",
+    "mode",
+    "snapshot_id",
+    "snapshot_no",
+    "content_hash",
+    "actor_ref",
+    "event_time"
+  ],
+  "properties": {
+    "period_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "profile": {
+      "type": "string"
+    },
+    "origin": {
+      "type": "string",
+      "enum": [
+        "native",
+        "mirror"
+      ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "auto"
+      ]
+    },
+    "snapshot_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "snapshot_no": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "content_hash": {
+      "type": "string"
+    },
+    "actor_ref": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

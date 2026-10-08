@@ -2,7 +2,7 @@
 # Trường SINH (go run ./tools/modgen): depends (khóa), provides, consumes, permissions, owns_schema.
 # Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
 name: pf/reports
-aka: [cap/forms, cap/export, cap/import]
+aka: [cap/export, cap/import]
 kind: capability
 zones: [pf]
 version: 1.0.0

@@ -9,12 +9,13 @@ modules:
   pf/cropcycle: ">=1.0 <2"     # xem mùa vụ HTX trong phạm vi (dom/cooperative shared-read)
   pf/extdata: ">=1.0 <2"       # lớp dữ liệu ngoài của bản đồ GIS
   pf/extension: ">=1.0 <2"     # nhiệm vụ, chỉ đạo, phòng ban (dom/extension)
+  pf/forms: ">=1.0 <2"         # cap/forms: phát hành/nộp/rà soát/chốt kỳ + ảnh chụp (W6.2; KN v1 ghi song song)
   pf/geo: ">=1.0 <2"           # bản đồ khuyến nông, /v1/kn/* của geo
   pf/masterdata: ">=1.0 <2"
   pf/mrv: ">=1.0 <2"           # đối chiếu HTX ↔ KN (KN US-MRV-02), thu thập MRV ở app hiện trường
   pf/notify: ">=1.0 <2"
   pf/party: ">=1.0 <2"         # menu KN (/v1/menu), cây tổ chức, phòng ban, HTX/hộ trong phạm vi
-  pf/reports: ">=1.0 <2"       # biểu mẫu, kỳ báo cáo (cap/forms, cap/export)
+  pf/reports: ">=1.0 <2"       # biểu mẫu, kỳ báo cáo (cap/export; engine mẫu KN P3)
   pf/sync: ">=1.0 <2"          # đồng bộ ngoại tuyến của app hiện trường
   pf/workflow: ">=1.0 <2"      # cap/workflow: duyệt bốn mắt (tham số, cấp quyền chia sẻ — W6.1)
 roles:

@@ -20,3 +20,17 @@ exceptions:
       W6.1 (pf 000118): như r_masterdata — cấp quyền chia sẻ gửi/duyệt qua pf_workflow.submit/decide
       (SECURITY DEFINER, port party/port.FourEyes). Gỡ khi điểm vào chuyển sang pf_workflow_pub (R-DB-10).
     owner: W6.3
+  - role: r_forms
+    schema: pf_workflow
+    reason: >-
+      W6.2 (pf 000122): rà soát bốn mắt của cap/forms ghi yêu cầu/quyết định (kind forms.submission) qua
+      pf_workflow.submit/decide (SECURITY DEFINER) TRONG giao dịch của pf/forms — USAGE schema + EXECUTE, không quyền
+      bảng. Gỡ khi điểm vào chuyển sang pf_workflow_pub (R-DB-10).
+    owner: W6.3
+  - role: r_extension
+    schema: pf_forms
+    reason: >-
+      W6.2 (pf 000122): vòng đời báo cáo KN v1 (extension/reportcycle) ghi song song chốt/mở lại kỳ + ảnh chụp đóng
+      băng qua pf_forms.mirror (SECURITY DEFINER, port forms/port.Freezer) TRONG giao dịch của pf/extension — USAGE
+      schema + EXECUTE, không quyền bảng. Gỡ khi điểm vào chuyển sang pf_forms_pub hoặc KN chuyển sang kỳ native.
+    owner: W6.3

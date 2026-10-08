@@ -322,6 +322,13 @@ func TestFN_TI_02_KN77FullCycle(t *testing.T) {
 	if str(sysRun, "trigger") != "system" || str(sysRun, "actor_ref") != extport.SystemActor.String() {
 		t.Fatalf("FN-TI-02.05 phụ: lần tổng hợp 'Hệ thống' lúc chốt: %v", sysRun)
 	}
+	// W6.2: ghi song song sang cap/forms — sự kiện closed (mirror) + ảnh chụp đóng băng, băm SHA-256 khớp nội dung.
+	if n := f.count(`SELECT count(*) FROM pf_forms.close_snapshot s JOIN pf_forms.period_event e ON e.id = s.period_event_id
+	    WHERE s.tenant_id = $1 AND s.period_ref = $2::uuid AND s.seq = 1 AND e.origin = 'mirror' AND e.action = 'closed' AND e.mode = 'manual'
+	      AND s.profile = 'kn' AND s.content_hash = sha256(convert_to(s.content::text, 'UTF8')) AND jsonb_array_length(s.content->'tasks') > 0`,
+		f.tenant, c.p1); n != 1 {
+		t.Fatalf("cap/forms: ảnh chụp lúc chốt: %d", n)
+	}
 	c.xa1.fail(submit(c.xa1, tid, "submitted", map[string]string{"F": "26"}), http.StatusConflict, "extension.period_closed", "gửi sau chốt")
 	c.tinh.fail(c.tinh.post("/v1/extension/report-tasks/"+tid+"/adjustment-request", map[string]any{"reason": "Cần sửa lại số tuần 1 của xã"}), http.StatusConflict,
 		"extension.adjustment_after_close", "điều chỉnh sau chốt")
@@ -342,6 +349,18 @@ func TestFN_TI_02_KN77FullCycle(t *testing.T) {
 	jr, err := f.ext.ReportCycleJobRun(context.Background(), f.tenant, f.clk.Now())
 	if err != nil || jr.Reclosed != 1 {
 		t.Fatalf("job chốt lại: %+v %v", jr, err)
+	}
+	// W6.2: mở lại + chốt lại (Hệ thống) cũng ghi sang cap/forms — ảnh chụp mới, ảnh lúc chốt giữ nguyên.
+	if n := f.count(`SELECT count(*) FROM pf_forms.period_event WHERE tenant_id = $1 AND period_ref = $2::uuid AND origin = 'mirror'`, f.tenant, c.p1); n != 3 {
+		t.Fatalf("cap/forms: sự kiện chốt, mở lại, chốt lại: %d", n)
+	}
+	if n := f.count(`SELECT count(*) FROM pf_forms.close_snapshot WHERE tenant_id = $1 AND period_ref = $2::uuid
+	    AND content_hash = sha256(convert_to(content::text, 'UTF8'))`, f.tenant, c.p1); n != 2 {
+		t.Fatalf("cap/forms: hai ảnh chụp nguyên vẹn: %d", n)
+	}
+	if n := f.count(`SELECT count(*) FROM pf_forms.period_event WHERE tenant_id = $1 AND period_ref = $2::uuid AND action = 'reopened'
+	    AND units = ARRAY[$3]::text[] AND reason IS NOT NULL`, f.tenant, c.p1, c1); n != 1 {
+		t.Fatalf("cap/forms: mở lại xã %s: %d", c1, n)
 	}
 	c.xa1.fail(submit(c.xa1, tid, "submitted", map[string]string{"F": "27"}), http.StatusConflict, "extension.period_closed", "sau hạn mở")
 	view3 := c.tinh.must(c.tinh.get("/v1/extension/consolidations?period_id="+c.p1+"&form_code=T01"), http.StatusOK, "bảng sau chốt lại")

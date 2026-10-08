@@ -14,6 +14,7 @@ import (
 
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	rcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/app"
+	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
@@ -38,6 +39,10 @@ func (m *Module) UseReportCycle(d ReportCycleDeps) {
 
 // UseDispatchHistory nối cổng "kỳ đã gửi Chi cục" của pf/reports (cảnh báo khi mở lại kỳ).
 func (m *Module) UseDispatchHistory(h extensionsrc.DispatchHistory) { m.rc.Dispatches = h }
+
+// UseFormsFreezer (W6.2) nối cap/forms: mỗi lần chốt (thủ công, tự động, chốt lại) và mở lại kỳ KN còn ghi song song
+// sự kiện + ảnh chụp đóng băng vào pf_forms, cùng giao dịch. Nil → không ghi.
+func (m *Module) UseFormsFreezer(f formsport.Freezer) { m.rc.Freezer = f }
 
 // ReportSyncSource cho pf/sync (KN v7.7 P7): chiều xuống report_task, form_layout, report_submission của các xã phụ
 // trách trong ngữ cảnh Cấp Xã — field-app nhập báo cáo ngoại tuyến (N-07).

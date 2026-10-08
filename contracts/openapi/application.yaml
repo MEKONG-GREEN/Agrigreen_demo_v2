@@ -7085,6 +7085,301 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/KNRecordLogPage"}
         "404": {description: extension.material_record_not_found, $ref: "#/components/responses/Problem"}
+  # --- pf/forms (cap/forms, W6.2): biểu thu thập theo kỳ — phát hành, nộp, rà soát bốn mắt, chốt kèm ảnh chụp đóng băng, mở lại.
+  # Bên dùng chọn bằng query `profile` (KN: kn). Route v1 cũ của KN (/v1/extension/report-*) chạy song song và ghi song song
+  # chốt/mở lại kỳ + ảnh chụp sang pf_forms (origin = mirror). Ngữ cảnh KN: header X-AG-Context như các route KN khác.
+  # 14 biểu thật (Q-01) chưa có: chỉ có biểu mẫu thử (fixture); profile kn không phát hành kỳ trên biểu fixture. ---
+  /v1/forms/profiles:
+    get:
+      summary: Cấu hình biểu của các bên dùng (hierarchy, publish_by, close_by, review_by)
+      operationId: formsProfiles
+      tags: [forms]
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FormsProfile"}}
+        "401": {$ref: "#/components/responses/Problem"}
+  /v1/forms/templates:
+    get:
+      summary: Phiên bản mới nhất của mỗi biểu của bên dùng
+      operationId: formsTemplates
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/FormsProfile"
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FormsTemplate"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.profile_not_found, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Định nghĩa phiên bản mới của biểu (vai define_by) — phiên bản cũ và kỳ đã phát hành không đổi
+      operationId: formsDefineTemplate
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/FormsTemplateInput"}
+      responses:
+        "201":
+          description: Phiên bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsTemplate"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.profile_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: forms.template_invalid, $ref: "#/components/responses/Problem"}
+  /v1/forms/templates/fixtures:
+    post:
+      summary: Ghi các biểu mẫu thử (fixture) cho bên dùng — cơ chế chạy khi chưa có biểu thật (Q-01)
+      operationId: formsInstallFixtures
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/FormsProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: Các phiên bản đã ghi (fixture = true)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FormsTemplate"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.profile_not_found, $ref: "#/components/responses/Problem"}
+  /v1/forms/templates/{id}:
+    get:
+      summary: Một phiên bản biểu
+      operationId: formsTemplate
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+      responses:
+        "200":
+          description: Phiên bản
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsTemplate"}
+        "404": {description: forms.template_not_found, $ref: "#/components/responses/Problem"}
+  /v1/forms/periods:
+    get:
+      summary: Kỳ của bên dùng mà người gọi thấy (toàn quốc, Nút phát hành, hoặc có đơn vị nhận trong phạm vi), mới trước
+      operationId: formsPeriods
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/FormsProfile"
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FormsPeriod"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+    post:
+      summary: Phát hành kỳ (cấp publish_by; đơn vị nhận thuộc phạm vi người phát hành; biểu fixture chỉ khi profile cho phép)
+      operationId: formsPublishPeriod
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/FormsPublishInput"}
+      responses:
+        "201":
+          description: Kỳ đã phát hành
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsPeriodView"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: "forms.profile_not_found | forms.template_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: forms.fixture_template, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/forms/periods/{id}:
+    get:
+      summary: Kỳ kèm trạng thái chiếu từ sổ, bài nộp cuối của từng đơn vị trong phạm vi, ảnh chụp
+      operationId: formsPeriod
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+      responses:
+        "200":
+          description: Kỳ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsPeriodView"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
+  /v1/forms/periods/{id}/submissions:
+    post:
+      summary: Nộp phiên bản mới của bài (cấp lá, đơn vị trong phạm vi) — lập yêu cầu duyệt ở cap/workflow
+      operationId: formsSubmit
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/FormsSubmitInput"}
+      responses:
+        "201":
+          description: Phiên bản đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsSubmission"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "forms.period_closed | forms.submission_accepted", $ref: "#/components/responses/Problem"}
+        "422": {description: "forms.values_invalid | forms.unit_not_in_period", $ref: "#/components/responses/Problem"}
+    get:
+      summary: Lịch sử phiên bản bài nộp của một đơn vị (mới trước) kèm rà soát
+      operationId: formsSubmissions
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+        - {name: unit, in: query, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FormsSubmission"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
+  /v1/forms/periods/{id}/close:
+    post:
+      summary: Chốt kỳ (cấp close_by của Nút phát hành) — ảnh chụp đóng băng, băm SHA-256 do DB tính; sự kiện pf.forms.period.closed
+      operationId: formsClosePeriod
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Kỳ sau chốt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsPeriodView"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "forms.period_closed | forms.pending_review", $ref: "#/components/responses/Problem"}
+  /v1/forms/periods/{id}/reopen:
+    post:
+      summary: Mở lại kỳ đã chốt (cả kỳ hoặc một số đơn vị; lý do bắt buộc) — bản ghi mới, ảnh chụp đã chốt không đổi
+      operationId: formsReopenPeriod
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/FormsReopenInput"}
+      responses:
+        "200":
+          description: Kỳ sau mở lại
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsPeriodView"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: forms.period_not_closed, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | forms.unit_not_in_period", $ref: "#/components/responses/Problem"}
+  /v1/forms/periods/{id}/snapshots:
+    get:
+      summary: Ảnh chụp của kỳ (native hoặc ghi song song — mã kỳ của bên dùng; kỳ ghi song song chỉ cấp trên cấp lá), kèm kiểm băm
+      operationId: formsPeriodSnapshots
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+      responses:
+        "200":
+          description: Danh sách (không kèm nội dung)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FormsSnapshot"}}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
+  /v1/forms/submissions/{id}/review:
+    post:
+      summary: Rà soát phiên bản bài nộp cuối (cấp review_by) — chấp nhận hoặc trả lại; người rà soát ≠ người nộp (cap/workflow)
+      operationId: formsReview
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/FormsReviewInput"}
+      responses:
+        "200":
+          description: Bài nộp sau rà soát
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsSubmission"}
+        "403": {description: "forbidden | self_approval_forbidden", $ref: "#/components/responses/Problem"}
+        "404": {description: forms.submission_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "forms.period_closed | forms.submission_superseded | forms.already_reviewed", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/forms/snapshots/{id}:
+    get:
+      summary: Một ảnh chụp kèm nội dung đóng băng và kết quả kiểm băm (hash_valid)
+      operationId: formsSnapshot
+      tags: [forms]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/FormsProfile"
+      responses:
+        "200":
+          description: Ảnh chụp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsSnapshot"}
+        "404": {description: forms.snapshot_not_found, $ref: "#/components/responses/Problem"}
+  # --- hết pf/forms ---
 components:
   securitySchemes:
     oidc:
@@ -7098,6 +7393,12 @@ components:
         Tenant BÊN CẤP (ADR-0020) — không phải tenant người gọi (tenant người gọi luôn lấy từ token, R-16). Vắng mặt → chỉ nhận
         khi đúng một bên cấp có loại dữ liệu này (nhiều bên cấp → 422 party.share_grantor_ambiguous).
       schema: {type: string, format: uuid}
+    FormsProfile:
+      name: profile
+      in: query
+      required: true
+      description: Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn)
+      schema: {type: string, pattern: "^[a-z][a-z0-9_]{0,39}$"}
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -11472,3 +11773,163 @@ components:
         recorded_at: {type: string, format: date-time}
         supersedes_id: {type: [string, "null"], format: uuid}
         correction_reason: {type: [string, "null"]}
+    # --- pf/forms (W6.2) ---
+    FormsProfile:
+      type: object
+      required: [name, hierarchy, roles, publish_by, close_by, review_by, allow_fixtures, require_reviewed_before_close]
+      properties:
+        name: {type: string}
+        hierarchy: {type: array, items: {type: string}}
+        roles: {type: object, additionalProperties: {type: string}}
+        publish_by: {type: string}
+        close_by: {type: string}
+        review_by: {type: string}
+        allow_fixtures: {type: boolean}
+        require_reviewed_before_close: {type: boolean}
+    FormsField:
+      type: object
+      required: [key, label, type, required]
+      properties:
+        key: {type: string, pattern: "^[a-z][a-z0-9_]{0,39}$"}
+        label: {type: string}
+        type: {type: string, enum: [text, integer, decimal, date, choice]}
+        required: {type: boolean}
+        options: {type: array, items: {type: string}}
+        unit: {type: string}
+    FormsTemplateInput:
+      type: object
+      required: [profile, code, title, fields]
+      properties:
+        profile: {type: string}
+        code: {type: string, pattern: "^[A-Z0-9][A-Z0-9._-]{0,63}$"}
+        title: {type: string, minLength: 1, maxLength: 300}
+        fields: {type: array, minItems: 1, maxItems: 500, items: {$ref: "#/components/schemas/FormsField"}}
+        fixture: {type: boolean, default: false}
+    FormsTemplate:
+      type: object
+      required: [id, profile, code, version, title, fields, fixture, created_by, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        profile: {type: string}
+        code: {type: string}
+        version: {type: integer}
+        title: {type: string}
+        fields: {type: array, items: {$ref: "#/components/schemas/FormsField"}}
+        fixture: {type: boolean}
+        created_by: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+    FormsPublishInput:
+      type: object
+      required: [profile, template_id, label, due_at, units]
+      properties:
+        profile: {type: string}
+        template_id: {type: string, format: uuid}
+        label: {type: string, minLength: 1, maxLength: 200}
+        due_at: {type: string, format: date-time}
+        units: {type: array, minItems: 1, maxItems: 5000, items: {type: string}}
+    FormsPeriod:
+      type: object
+      required: [id, profile, template_id, template_code, template_version, label, due_at, units, owner_ref, publisher_level, published_by, published_at]
+      properties:
+        id: {type: string, format: uuid}
+        profile: {type: string}
+        template_id: {type: string, format: uuid}
+        template_code: {type: string}
+        template_version: {type: integer}
+        label: {type: string}
+        due_at: {type: string, format: date-time}
+        units: {type: array, items: {type: string}}
+        owner_ref: {type: [string, "null"], format: uuid}
+        publisher_level: {type: string}
+        published_by: {type: string, format: uuid}
+        published_at: {type: string, format: date-time}
+    FormsPeriodEvent:
+      type: object
+      required: [id, seq, action, mode, units, reason, actor_ref, event_time]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        action: {type: string, enum: [published, closed, reopened]}
+        mode: {type: string, enum: [manual, auto]}
+        units: {type: array, items: {type: string}}
+        reason: {type: [string, "null"]}
+        actor_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+    FormsReview:
+      type: object
+      required: [id, decision, reviewer_ref, note, event_time]
+      properties:
+        id: {type: string, format: uuid}
+        decision: {type: string, enum: [accepted, returned]}
+        reviewer_ref: {type: string, format: uuid}
+        note: {type: [string, "null"]}
+        event_time: {type: string, format: date-time}
+    FormsSubmitInput:
+      type: object
+      required: [unit, values]
+      properties:
+        unit: {type: string}
+        values: {type: object, additionalProperties: {type: string}, description: "Khóa trường → giá trị chuỗi (thập phân dạng chuỗi, R-10)"}
+    FormsSubmission:
+      type: object
+      required: [id, period_id, unit, version, values, submitter_ref, event_time, status, review]
+      properties:
+        id: {type: string, format: uuid}
+        period_id: {type: string, format: uuid}
+        unit: {type: string}
+        version: {type: integer}
+        values: {type: object, additionalProperties: {type: string}}
+        submitter_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+        status: {type: string, enum: [submitted, accepted, returned]}
+        review:
+          oneOf:
+            - {type: "null"}
+            - {$ref: "#/components/schemas/FormsReview"}
+    FormsReviewInput:
+      type: object
+      required: [decision]
+      properties:
+        decision: {type: string, enum: [accepted, returned]}
+        note: {type: string, maxLength: 1000, description: "Bắt buộc khi trả lại"}
+    FormsReopenInput:
+      type: object
+      required: [reason]
+      properties:
+        reason: {type: string, minLength: 10, maxLength: 500}
+        units: {type: array, items: {type: string}, description: "Rỗng = cả kỳ"}
+    FormsSnapshot:
+      type: object
+      required: [id, period_ref, profile, snapshot_no, period_event_id, content_hash, hash_valid, rule_version, actor_ref, event_time]
+      properties:
+        id: {type: string, format: uuid}
+        period_ref: {type: string, format: uuid}
+        profile: {type: string}
+        snapshot_no: {type: integer, minimum: 1}
+        period_event_id: {type: string, format: uuid}
+        content_hash: {type: string, description: "SHA-256 (hex) của nội dung, do DB tính"}
+        hash_valid: {type: boolean, description: "Băm tính lại khớp content_hash"}
+        rule_version: {type: string}
+        actor_ref: {type: string, format: uuid}
+        event_time: {type: string, format: date-time}
+        content: {type: object, additionalProperties: true, description: "Nội dung đóng băng (chỉ ở GET /v1/forms/snapshots/{id})"}
+    FormsUnit:
+      type: object
+      required: [unit, status, submission]
+      properties:
+        unit: {type: string}
+        status: {type: string, enum: [not_submitted, submitted, accepted, returned]}
+        submission:
+          oneOf:
+            - {type: "null"}
+            - {$ref: "#/components/schemas/FormsSubmission"}
+    FormsPeriodView:
+      type: object
+      required: [period, status, reopen_units, events, units, snapshots]
+      properties:
+        period: {$ref: "#/components/schemas/FormsPeriod"}
+        status: {type: string, enum: [open, closed, reopened]}
+        reopen_units: {type: array, items: {type: string}}
+        events: {type: array, items: {$ref: "#/components/schemas/FormsPeriodEvent"}}
+        units: {type: array, items: {$ref: "#/components/schemas/FormsUnit"}}
+        snapshots: {type: array, items: {$ref: "#/components/schemas/FormsSnapshot"}}

@@ -855,3 +855,29 @@ Chưa có route HTTP riêng: mã dưới đây đi ra qua route của module g�
 | 404 | `workflow.request_not_found` | Port `Requests.Status`: đối tượng chưa có yêu cầu duyệt trong tenant |
 | 409 | `workflow.already_decided` | Yêu cầu đã có quyết định khác (khác người quyết định hoặc khác kết quả); hai quyết định song song cùng yêu cầu |
 | 409 | `workflow.request_mismatch` | Đối tượng đã có yêu cầu duyệt với người lập hoặc người được hưởng khác dữ liệu bên gọi khai |
+
+### pf/forms (`cap/forms` — biểu theo kỳ, chốt kỳ kèm ảnh chụp đóng băng, W6.2)
+
+Route `/v1/forms/*` (Application API). Route v1 cũ của KN (`/v1/extension/report-*`) giữ mã `extension.*`; phần ghi song song sang `pf_forms` chỉ lộ mã dưới đây khi lỗi lắp ráp/dữ liệu (thao tác cũ hỏng theo, R-21).
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 403 | `forbidden` | Vai không thuộc cấu hình bên dùng; sai cấp (phát hành/rà soát/chốt/nộp); đơn vị ngoài phạm vi; chốt/mở lại không phải Nút phát hành; định nghĩa biểu không có vai `define_by` |
+| 403 | `self_approval_forbidden` | Người rà soát trùng người nộp — kiểm ở app/, ở `cap/workflow` (CHECK `decision_four_eyes`) và CHECK `review_four_eyes` (pf 000121) |
+| 404 | `forms.profile_not_found` | Tham số `profile` không có trong cấu hình của gốc lắp ráp |
+| 404 | `forms.template_not_found` | Phiên bản biểu không có, hoặc thuộc bên dùng khác |
+| 404 | `forms.period_not_found` | Kỳ không có trong tenant hoặc người gọi không thấy (ngoài phạm vi) |
+| 404 | `forms.submission_not_found` | Phiên bản bài nộp không có hoặc ngoài phạm vi |
+| 404 | `forms.snapshot_not_found` | Ảnh chụp không có hoặc người gọi không thấy kỳ |
+| 409 | `forms.fixture_template` | Phát hành kỳ trên biểu mẫu thử cho bên dùng không cho phép (KN — chờ 14 biểu thật, Q-01) |
+| 409 | `forms.period_closed` | Nộp/rà soát khi kỳ đã chốt; chốt kỳ đã chốt; DB từ chối bài nộp vào kỳ không mở (SQLSTATE AGF02) |
+| 409 | `forms.period_not_closed` | Mở lại kỳ đang mở |
+| 409 | `forms.submission_accepted` | Nộp lại khi bản cuối đã được chấp nhận và kỳ chưa mở lại sau đó |
+| 409 | `forms.submission_superseded` | Rà soát phiên bản không còn là bản cuối |
+| 409 | `forms.already_reviewed` | Phiên bản đã được rà soát |
+| 409 | `forms.pending_review` | Chốt khi còn bài chờ rà soát và bên dùng bật `require_reviewed_before_close` |
+| 409 | `conflict` | Trạng thái kỳ đổi giữa chừng (máy trạng thái ở DB, SQLSTATE AGF01); ghi song song vào mã kỳ native |
+| 422 | `forms.template_invalid` | Định nghĩa biểu sai (mã, tiêu đề, trường: khóa, kiểu `text`/`integer`/`decimal`/`date`/`choice`, lựa chọn) — `field` chỉ chỗ sai |
+| 422 | `forms.values_invalid` | Số liệu không khớp biểu: khóa lạ, thiếu trường bắt buộc, sai kiểu (thập phân là chuỗi, tối đa 6 chữ số lẻ) |
+| 422 | `forms.unit_not_in_period` | Đơn vị không thuộc kỳ, hoặc ngoài phạm vi mở lại của kỳ mở lại một phần |
+| 422 | `validation_failed` | Thiếu nhãn/hạn nộp/đơn vị khi phát hành; trả lại không ghi chú; lý do mở lại ngoài 10–500 ký tự |

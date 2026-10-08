@@ -48,7 +48,8 @@ KN v7.7 (D2) coi **phòng ban là module**: `pf_party.department` bật theo tr�
 | `pf/masterdata` | `cap/masterdata` | capability | Đơn vị hành chính có hiệu lực: ADR-0032 (W0.2) |
 | `pf/notify`, `pf/content`, `pf/sync` | `cap/notify`, `cap/content`, `cap/sync` | capability | Cùng tên |
 | `pf/geo` | `cap/geo` | capability | Hình học thửa chuyển sang `pf/cooperative` (W3.3) |
-| `pf/reports` (+ `extension/reportcycle`) | `cap/forms`, `cap/export`, `cap/import` | capability | Tách ở W6.2, W6.6 khi đủ quy tắc ba |
+| `pf/reports` (+ `extension/reportcycle`) | `cap/export`, `cap/import` | capability | `cap/forms` đã tách ở W6.2 (`pf/forms`); `cap/export`, `cap/import` tách ở W6.6 khi đủ quy tắc ba |
+| `pf/forms` (mới, W6.2) | `cap/forms` | capability | Biểu theo kỳ, chốt kỳ kèm ảnh chụp đóng băng (pf 000121–000122) |
 | `pf/metrics` | `cap/analytics` | capability | Chỉ đọc `_pub` (W6.3) |
 | schema `pf_files` | `cap/evidence` | capability | W6.5 |
 | `pf/workflow` (mới, W6.1) | `cap/workflow` | capability | Duyệt bốn mắt dùng chung (pf 000118) |
@@ -123,7 +124,8 @@ Giữ cả hai cơ chế, tách nghĩa:
 | W3.1 | Thiết kế ranh giới `pf/cooperative`: kiểm kê bảng, port, `module.yaml`, kế hoạch W3.3–W3.4 — [docs/design/cooperative.md](../design/cooperative.md) |
 | W3.2 | Module `pf/cooperative` (`kind: domain`) — xong 08/10/2026: mặt tiền không DB, đỉnh lá của đồ thị (nguồn cũ nối ở gốc lắp ráp, `cmd/internal/coopwire`); chỉ module domain import `cooperativeport` (R-MOD-05), tầng dưới dùng interface tự khai ([ghi chú](../design/cooperative.md#16-ghi-chú-hiện-thực-w32)) |
 | W6.1 | `pf/workflow` (`cap/workflow`, capability, pf 000118). `pf/masterdata` (capability) import `workflow/port` trực tiếp; `pf/party` (kernel) KHÔNG được import tầng trên (mục 5) nên khai interface của mình (`party/port.FourEyes`) và gốc lắp ráp `cmd/api-platform/assembly` nối cài đặt của workflow — mẫu đảo phụ thuộc cho module lõi cần năng lực `cap/*`, không thêm ngoại lệ `agmodgraph` |
-| W6.x | Tách `cap/forms`, `cap/export`, `cap/import`, `cap/task` |
+| W6.2 | `pf/forms` (`cap/forms`, capability, pf 000121–000122) import `workflow/port` trực tiếp (capability → capability, cùng tầng) cho rà soát bốn mắt; `pf/extension` (domain) import `forms/port` trực tiếp cho ghi song song chốt/mở lại kỳ KN (đi xuống tầng, không đảo phụ thuộc). Cấu hình theo bên dùng (§7.2 `cap/forms: {hierarchy, publish_by, close_by}`) là `forms/port.Profile` do gốc lắp ráp truyền (`assembly.KNProfile`) — `app.yaml` chưa mang cấu hình module. `aka cap/forms` chuyển từ `pf/reports` sang `pf/forms`. Không thêm ngoại lệ `agmodgraph` |
+| W6.x | Tách `cap/export`, `cap/import`, `cap/task` |
 | W9.1 | Lint cấm so sánh tên ứng dụng trong module `capability` |
 
 ## Liên quan

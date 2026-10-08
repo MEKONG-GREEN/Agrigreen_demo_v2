@@ -18,6 +18,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port/farmerid"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
@@ -87,6 +88,7 @@ type Modules struct {
 	ExtData       *extdata.Module   // proxy khử định danh nguồn ngoài (ADR-0007), không vai DB
 	Metering      *metering.Module  // G5 (ADR-0023/0024): sổ sử dụng Public API, điểm kiểm soát xuất, bảng kê
 	APIClient     *apiclient.Module // G5 (ADR-0022): khách hàng Public API, khóa, đăng ký, gói hạn mức — Admin API
+	Forms         *forms.Module     // W6.2 cap/forms: biểu theo kỳ, chốt kỳ kèm ảnh chụp đóng băng
 }
 
 // Named trả module kèm tên repo (module.yaml) theo thứ tự gắn route.
@@ -96,7 +98,7 @@ func (m Modules) Named() []NamedModule {
 		{"pf/extension", m.Extension}, {"pf/mechanization", m.Mechanization}, {"pf/mrv", m.MRV}, {"pf/sync", m.Sync},
 		{"pf/notify", m.Notify}, {"pf/accounts", m.Accounts}, {"pf/reports", m.Reports}, {"pf/waterway", m.Waterway},
 		{"pf/simulation", m.Simulation}, {"pf/cropcycle", m.CropCycle}, {"pf/metrics", m.Metrics}, {"pf/extdata", m.ExtData},
-		{"pf/metering", m.Metering}, {"pf/apiclient", m.APIClient},
+		{"pf/metering", m.Metering}, {"pf/apiclient", m.APIClient}, {"pf/forms", m.Forms},
 	}
 }
 
@@ -148,7 +150,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	md := masterdata.New(unit, clk)
 
 	pty := party.New(unit, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault})
-	wireWorkflow(unit, clk, md, pty) // W6.1: cap/workflow cho duyệt tham số, cấp quyền (r_workflow, W2.6: cùng pool đơn vị)
+	wf := wireWorkflow(unit, clk, md, pty) // W6.1: cap/workflow cho duyệt tham số, cấp quyền (r_workflow, W2.6: cùng pool đơn vị)
 
 	g := geo.New(unit, clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits(), Orgs: pty.Orgs(), Households: pty.Households(),
 		CoopMarkers: pty.CoopMarkers()}) // GIS US-BND-02: điểm vị trí HTX của pf/party
@@ -247,6 +249,10 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	kn.UseReportCycle(extension.ReportCycleDeps{Forms: rep.Forms(), Regions: pty.Regions(), Assignments: acc.Assignments(), Names: acc.ActorNames(),
 		Log: slog.Default()})
 	kn.UseDispatchHistory(rep.DispatchHistory())
+	fm, err := wireForms(unit, clk, wf, kn) // W6.2: cap/forms (/v1/forms/*), KN v1 ghi song song chốt/mở lại kỳ
+	if err != nil {
+		return Modules{}, pools, err
+	}
 	pty.UseOrgImpact(kn.OpenPeriodsImpact())
 	pty.UseDepartmentUsage(kn.ReportUsage())
 	pty.UseFormAvailability(rep.FormAvailability())
@@ -319,7 +325,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	kn.UseEgress(egress, mode, slog.Default()) // A5: xuất lịch công tác — nội bộ, observe
 
 	return Modules{MasterData: md, Party: pty, Geo: g, Content: cnt, Extension: kn, Mechanization: mech, MRV: mrvMod, Sync: snc, Notify: nt, Accounts: acc,
-		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Cooperative: coop, Metrics: met, ExtData: ed, Metering: meter, APIClient: apic}, pools, nil
+		Reports: rep, Waterway: ww, Simulation: sim, CropCycle: cc, Cooperative: coop, Metrics: met, ExtData: ed, Metering: meter, APIClient: apic,
+		Forms: fm}, pools, nil
 }
 
 // EgressModeFromEnv đọc AG_EGRESS_MODE (ADR-0024 mục 2): rỗng → observe; giá trị lạ → lỗi khởi động.

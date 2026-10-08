@@ -9,6 +9,7 @@ version: 1.0.0
 depends:
   pf/accounts: ">=1.0 <2"
   pf/cooperative: ">=1.0 <2"
+  pf/forms: ">=1.0 <2"
   pf/geo: ">=1.0 <2"
   pf/masterdata: ">=1.0 <2"
   pf/metrics: ">=1.0 <2"

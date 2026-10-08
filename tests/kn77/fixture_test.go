@@ -22,8 +22,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
+	platformasm "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms"
+	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
@@ -210,6 +213,12 @@ func newFixture(t *testing.T, o fixtureOpts) *fixture {
 		Params: f.repParams})
 	f.ext.UseReportCycle(extension.ReportCycleDeps{Forms: f.rep.Forms(), Regions: rg, Assignments: f.asg})
 	f.ext.UseDispatchHistory(f.rep.DispatchHistory())
+	// W6.2: ghi song song chốt/mở lại kỳ + ảnh chụp đóng băng sang cap/forms (cấu hình KN thật của gốc lắp ráp).
+	fm, err := forms.New(nil, f.clk, forms.Deps{Profiles: []formsport.Profile{platformasm.KNProfile}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.ext.UseFormsFreezer(fm.Freezer())
 	f.rep.UseConsolidations(f.ext.Consolidations())
 
 	ops := env.Pool(t, migrations.PF, "platform_api")

@@ -14,6 +14,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/store"
+	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
@@ -270,6 +271,9 @@ func (s *Service) closeTx(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p store
 	if err != nil {
 		return cons, err
 	}
+	if err := s.mirrorForms(ctx, tx, p, formsport.ActionClosed, mode, nil, "", actor, idem, now, cons.runs); err != nil { // W6.2: cap/forms
+		return cons, err
+	}
 	return cons, outbox.Enqueue(ctx, tx, outbox.Event{ID: ids.New(), TenantID: tid, Type: port.EventPeriodClosed, SchemaVersion: 1, OccurredAt: now,
 		Producer: port.EventProducerName, Payload: port.PeriodClosedV1{PeriodID: p.ID.String(), BatchID: p.BatchID.String(), Label: p.Label, Mode: mode,
 			DepartmentCode: p.DepartmentCode, ProvinceCode: p.ProvinceCode, ActorRef: actor.String(), EventTime: ts(now)}})
@@ -298,7 +302,15 @@ func (s *Service) reclose(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p store
 	if err := store.SetReopened(ctx, tx, ids_, nil, now); err != nil {
 		return consolidateOut{}, err
 	}
-	return s.consolidateTx(ctx, tx, tid, p, b, tpls, domain.TriggerSystem, port.SystemActor, nil, idem+":cons", now)
+	cons, err := s.consolidateTx(ctx, tx, tid, p, b, tpls, domain.TriggerSystem, port.SystemActor, nil, idem+":cons", now)
+	if err != nil {
+		return cons, err
+	}
+	mode := formsport.ModeManual
+	if actor == port.SystemActor {
+		mode = formsport.ModeAuto
+	}
+	return cons, s.mirrorForms(ctx, tx, p, formsport.ActionClosed, mode, communes, "", actor, idem, now, cons.runs) // W6.2: cap/forms
 }
 
 // ReopenInput là yêu cầu mở lại kỳ đã chốt cho xã/biểu.
@@ -379,6 +391,9 @@ func (s *Service) ReopenPeriod(ctx context.Context, id uuid.UUID, in ReopenInput
 		}
 		if err := store.SetReopened(ctx, tx, out.TaskIDs, &until, now); err != nil {
 			return err
+		}
+		if err := s.mirrorForms(ctx, tx, *p, formsport.ActionReopened, formsport.ModeManual, communes, why, a.p.ActorRef, idemOr(idem, "reopen"), now, nil); err != nil {
+			return err // W6.2: cap/forms
 		}
 		if s.Dispatches != nil {
 			if out.DispatchChanged, err = s.Dispatches.SentForPeriod(ctx, a.p.TenantID, p.ID); err != nil {

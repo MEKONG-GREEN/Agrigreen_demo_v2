@@ -298,8 +298,34 @@ Kiến trúc v4.1 §26, R-56. Module năng lực `pf/workflow` (`internal/platfo
 |---|---|---|---|
 | `pf/masterdata` | `masterdata.param_version` | gửi duyệt (người lập = người đặt) | duyệt → `approved`, từ chối → `rejected` |
 | `pf/party` | `party.share_grant` | đề xuất cấp quyền | duyệt → `approved`; thu hồi đề xuất chưa duyệt → `cancelled` (thu hồi cấp quyền đã duyệt không thêm quyết định) |
+| `pf/forms` (W6.2) | `forms.submission` | nộp một phiên bản bài (người lập = người nộp) | rà soát chấp nhận → `approved`, trả lại → `rejected` (cùng giao dịch với dòng `pf_forms.review`) |
 
-Chưa có route HTTP, sự kiện `pf.workflow.request.decided` (§26) chờ bên tiêu thụ (W6.2, W6.4). Vai DB: `r_workflow` là vai nhóm không có vai cũ (`dbadmin.groupOnlyModules`); `cmd/api-platform` mở pool `app_platform` cho giao dịch riêng của module.
+Chưa có route HTTP, sự kiện `pf.workflow.request.decided` (§26) chờ bên tiêu thụ (W6.4; `pf/forms` quyết định trong giao dịch của chính nó nên không cần sự kiện). Vai DB: `r_workflow` là vai nhóm không có vai cũ (`dbadmin.groupOnlyModules`); `cmd/api-platform` mở pool `app_platform` cho giao dịch riêng của module.
+
+## Biểu theo kỳ `cap/forms` (W6.2)
+
+Kiến trúc v4.1 §26, §7.2. Module năng lực `pf/forms` (`internal/platform/forms`, `cap/forms`, `enable: per_tenant`) sở hữu schema `pf_forms` (pf 000121–000122). Tách từ `pf/reports` (mẫu có phiên bản) và `extension/reportcycle` (vòng đời kỳ KN); hai module cũ chưa đổi hành vi.
+
+**Sổ** (mọi bảng là sổ `shared.apply_ledger`; không bảng nào sửa được — trạng thái là phép chiếu):
+
+| Sổ | Một dòng là | Bất biến ở DB |
+|---|---|---|
+| `template` | một phiên bản biểu (`profile`, `code`; phiên bản = `seq`), `fixture` = biểu mẫu thử | `stream_key = template:<profile>:<code>` |
+| `period` | một kỳ đã phát hành (phiên bản biểu cố định, đơn vị nhận cấp lá, Nút chủ) | `trg_bind_template` chép profile/mã/phiên bản; một dòng mỗi kỳ |
+| `period_event` | `published` / `closed` / `reopened` (`origin` native hoặc mirror) | `trg_transition` (sau `trg_chain`, đầu chuỗi đã khóa): native published → closed ⇄ reopened, sai → AGF01; mirror không trộn với kỳ native |
+| `submission` | một phiên bản bài của một đơn vị | `trg_bind_period`: kỳ tồn tại, đơn vị thuộc kỳ, kỳ đang mở hoặc đơn vị trong phạm vi mở lại — sai → AGF02 |
+| `review` | rà soát duy nhất của một phiên bản (`accepted` / `returned`) | `trg_bind_submission` chép người nộp; CHECK `review_four_eyes` |
+| `close_snapshot` | ảnh chụp đóng băng của một lần chốt | `trg_bind_close`: gắn sự kiện `closed` cùng kỳ, tính `content_hash = sha256(content::text)`; một ảnh mỗi lần chốt |
+
+**Cấu hình theo bên dùng** (`forms/port.Profile`, tương đương `cap/forms: {hierarchy, publish_by, close_by}` của app.yaml §7.2 — app.yaml của repo chưa mang cấu hình module nên gốc lắp ráp truyền): `Hierarchy` (cấp trên → lá; lá nộp bài), `Roles` (vai ngữ cảnh KN hoặc vai realm → cấp), `PublishBy`, `CloseBy`, `ReviewBy` (mặc định `PublishBy`), `DefineBy` (vai định nghĩa biểu), `AllowFixtures`, `RequireReviewedBeforeClose`. Cấu hình sai → lỗi lúc khởi động (`domain.ValidateProfile`). KN: `cmd/api-platform/assembly.KNProfile` — `kn_tw`/`kn_tinh`/`kn_xa` → TW/TINH/XA, Tỉnh phát hành, rà soát, chốt và mở lại; Admin KN và `reports_admin` định nghĩa biểu; không cho biểu mẫu thử.
+
+**Quyền.** Phạm vi đơn vị lấy từ ngữ cảnh KN (`KNContext.Scope`, `OrgRef` = Nút); vai realm không có ngữ cảnh chỉ có phạm vi toàn quốc ở cấp cao nhất. Phát hành: cấp `publish_by`, mọi đơn vị nhận trong phạm vi. Nộp: cấp lá, đơn vị trong phạm vi. Rà soát: cấp `review_by`, đơn vị trong phạm vi, người rà soát ≠ người nộp — kiểm ở app/, ở `cap/workflow` (`kind forms.submission`, CHECK `decision_four_eyes`) và CHECK `review_four_eyes`. Chốt/mở lại: cấp `close_by` của Nút phát hành (hoặc toàn quốc). Kỳ, bài nộp, rà soát, ảnh chụp ghi trong giao dịch `r_forms`; mọi thao tác trên một kỳ xếp hàng bằng `pg_advisory_xact_lock` để ảnh chụp không lỡ bài nộp chen giữa.
+
+**Ghi song song (v1 cũ của KN).** `/v1/extension/report-*` giữ sổ `pf_extension.*`, API và mã lỗi. `extension/reportcycle` có `Freezer formsport.Freezer` (gốc lắp ráp nối `forms.Module.Freezer()`): chốt thủ công, tự chốt (job), chốt lại và mở lại kỳ gọi `Freezer.Record` trong CÙNG giao dịch (`db.JoinTx`) → hàm `SECURITY DEFINER pf_forms.mirror` (vai `r_extension` chỉ có EXECUTE). Chốt kèm ảnh chụp `kn.report_period/v1`: mọi công việc (xã × biểu) của kỳ, trạng thái, bài nộp đang tính (`submitted_submission_id` — dòng sổ bất biến), hạn mở lại, các lần tổng hợp của lần chốt. Idempotent theo khóa của bên dùng (`mirror:kn:<idem>`). Lỗi ghi song song làm hỏng thao tác cũ (R-21). Đọc ảnh chụp kỳ KN: `GET /v1/forms/periods/{mã kỳ KN}/snapshots?profile=kn` (cấp trên cấp lá).
+
+**Biểu mẫu thử, Q-01.** 14 biểu thật của KN chưa có (câu hỏi Q-01): `domain.Fixtures()` (`FX-01` tiến độ gieo trồng, `FX-02` sâu bệnh) cài bằng `POST /v1/forms/templates/fixtures`, dòng sổ `fixture = true`. Profile có `AllowFixtures = false` (KN) trả `forms.fixture_template` khi phát hành kỳ trên biểu mẫu thử — bật production chờ Q-01 (định nghĩa biểu thật bằng `POST /v1/forms/templates`).
+
+**Chưa làm:** chuyển kỳ KN sang kỳ native và web-ops sang `/v1/forms`; báo cáo Chi cục đọc ảnh chụp; gộp engine mẫu dạng lưới của `pf/reports` (bố cục, công thức) làm kiểu trường của `cap/forms` (điểm mở rộng `forms.field_types`); `publications` cho `cap/analytics`.
 
 ## Cấp phép chia sẻ v2 (W4.1)
 

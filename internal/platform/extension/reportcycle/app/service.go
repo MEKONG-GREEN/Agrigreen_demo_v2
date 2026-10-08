@@ -17,6 +17,7 @@ import (
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/reportcycle/store"
+	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/extensionsrc"
@@ -67,6 +68,7 @@ type Service struct {
 	Assignments accport.Assignments          // P1: cán bộ xã phụ trách cùng phòng ban
 	Names       partyport.ActorNames         // tên người thao tác trong Log (tùy chọn)
 	Dispatches  extensionsrc.DispatchHistory // pf/reports: kỳ đã gửi Chi cục (tùy chọn)
+	Freezer     formsport.Freezer            // W6.2 cap/forms: ghi song song chốt/mở lại + ảnh chụp (tùy chọn)
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }
