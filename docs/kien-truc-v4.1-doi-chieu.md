@@ -161,6 +161,8 @@ Ngay sau mười mục trên:
 
    Làm **trước khi KN nhận dữ liệu thật** (15/12/2026). Xem gói W3.x của kế hoạch.
 
+   **Cập nhật 06/10/2026 (W3.1):** thiết kế ranh giới, kiểm kê bảng đã đối chiếu migration, port và kế hoạch migration ở [docs/design/cooperative.md](design/cooperative.md). Phạm vi chuyển rộng hơn bảng trên: thêm SOP, `harvest_declaration`, `yield_summary`, `boundary_conflict`, `kn_profile_event`; `collection_*` ở lại `pf_cropcycle`.
+
 ### 2.3 Mô hình chia sẻ
 
 | Điểm | Repo hiện tại | v4.1 | Đánh giá |

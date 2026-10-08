@@ -120,7 +120,7 @@ Rủi ro duy nhất nằm ở **đổi câu trả lời sau khi có dữ liệu 
 |---|---|---|
 | W2.4 | Biến `app.node_id`, `app.purpose` trong `WithContextTx` | trong pf 000091 |
 | W2.5 | `k_ref` với `share_grant_active`, `share_scope` rỗng | pf 000091–000092 |
-| W3.1 | Thiết kế `pf/cooperative`, `shares: [household, plot, season, diary_entry]`, ghi giả định H-1 | — |
+| W3.1 | Thiết kế `pf/cooperative`, `shares: [household, plot, season, diary_entry]`, ghi giả định H-1 — xong 06/10/2026: [docs/design/cooperative.md](../design/cooperative.md) (giả định (a) và phần đổi nếu (b) ở §11, ánh xạ `shares` → bảng ở §7.3, `p_scope` ở §9) | — |
 | W3.3, W3.4 | Schema `pf_coop`; `p_scope` theo Nút | pf 000094–000097 |
 | W4.1 | Cấp phép v2, luồng đơn vị chủ, rà soát định kỳ, epoch | pf 000098 |
 | W4.2 | Worker dựng `share_scope`; nhánh `OR EXISTS share_scope` trên `pf_coop`, `pf_mechanization.machine`; `via_share_grant`; nhật ký gộp; T6a–T6e, T9–T10 | pf 000099 |

@@ -119,6 +119,7 @@ Giữ cả hai cơ chế, tách nghĩa:
 | W1.2 | Analyzer `agmodgraph` trong `tools/archlint`, vào CI |
 | W1.3 | `app/*/app.yaml`, kiểm `cmd/*/assembly` ⊆ hợp `app.yaml` |
 | W1.4 | Bật module theo đơn vị (`module_enablement`, pf 000088), menu lọc |
+| W3.1 | Thiết kế ranh giới `pf/cooperative`: kiểm kê bảng, port, `module.yaml`, kế hoạch W3.3–W3.4 — [docs/design/cooperative.md](../design/cooperative.md) |
 | W3.2 | Module `pf/cooperative` |
 | W6.x | Tách `cap/workflow`, `cap/forms`, `cap/export`, `cap/import`, `cap/task` |
 | W9.1 | Lint cấm so sánh tên ứng dụng trong module `capability` |
