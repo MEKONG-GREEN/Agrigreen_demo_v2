@@ -5,6 +5,8 @@ package public
 //   - feed tập dữ liệu (tổng hợp, tham chiếu — cùng điều kiện truy cập như GET /v1/feeds/{feed}): mỗi phiên bản tập
 //     dữ liệu một dòng {version, record_count, sha256} = tổng kiểm ghi lúc dựng (SHA-256 của ảnh chụp NDJSON, bất
 //     biến); ?from_version=&limit= (1–100).
+//     Feed lớp partner (W5.5 — cooperative_directory, plot_directory): cùng kiểm cấp quyền bên cấp; không theo phiên
+//     bản nên danh sách rỗng.
 //   - hợp đồng song phương (collection_schedule, roll_count_statement, htx_roll_confirmation): mỗi NGÀY nghiệp vụ một
 //     dòng {date, record_count, sha256} theo công thức ingest.ChecksumAlgorithm trên bản ghi bên gọi đã gửi;
 //     ?from=&to= (YYYY-MM-DD, tối đa 31 ngày; mặc định 7 ngày tới hôm nay). Scope ingest:<hợp đồng>:write hoặc
@@ -58,10 +60,11 @@ func (s *Server) checksums(c *gin.Context, caller port.Caller, _ port.Plan) (*re
 		}
 		limit = n
 	}
-	ct, err := s.feedAccess(c, caller, name, 0)
+	t, err := s.feedAccess(c, caller, name, 0)
 	if err != nil {
-		return nil, err
+		return nil, err // feed lớp partner (W5.5): cùng kiểm cấp quyền grant_kind như GET /v1/feeds/{feed}
 	}
+	ct := t.ct
 	page, err := s.d.Svc.DatasetChecksums(c.Request.Context(), ct.Name, from, limit)
 	if err != nil {
 		return nil, err

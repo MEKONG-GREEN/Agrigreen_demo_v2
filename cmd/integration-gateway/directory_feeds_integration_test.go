@@ -262,10 +262,20 @@ func TestDirectoryFeedsOverGateway_W55Integration(t *testing.T) {
 		t.Fatalf("không có cấp quyền → 403 party.share_grant_missing: %d %s", r.status, r.raw)
 	}
 
+	// W5.7 tổng kiểm: feed lớp partner cùng kiểm cấp quyền; không theo phiên bản → danh sách rỗng.
+	r = get("/v1/feeds/" + apiclientport.FeedCooperativeDirectory + "/checksums")
+	if vs, _ := r.body["versions"].([]any); r.status != http.StatusOK || len(vs) != 0 {
+		t.Fatalf("tổng kiểm feed partner: %d %s", r.status, r.raw)
+	}
+
 	// Thu hồi → feed dừng ngay ở lời gọi kế tiếp.
 	rv := e.adminAs(e.grantor, authz.RolePlatformAdmin)(http.MethodPost, "/v1/share-grants/"+grantID+"/revoke", map[string]any{"reason": "Kết thúc hợp đồng (thử W5.5)"})
 	if rv.status >= 300 {
 		t.Fatalf("thu hồi cấp quyền: %d %s", rv.status, rv.raw)
+	}
+	if r = get("/v1/feeds/" + apiclientport.FeedCooperativeDirectory + "/checksums"); r.status != http.StatusForbidden ||
+		r.code() != partyport.ErrShareGrantMissing.Code {
+		t.Fatalf("thu hồi → tổng kiểm 403: %d %s", r.status, r.raw)
 	}
 	for _, f := range []string{apiclientport.FeedCooperativeDirectory, apiclientport.FeedPlotDirectory} {
 		if r = get("/v1/feeds/" + f); r.status != http.StatusForbidden || r.code() != partyport.ErrShareGrantMissing.Code || contains(r.raw, "items") {
