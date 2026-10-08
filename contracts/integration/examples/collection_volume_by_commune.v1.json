@@ -1,0 +1,37 @@
+{
+  "feed": "collection_volume_by_commune",
+  "contract_version": 1,
+  "cursor": null,
+  "next_cursor": "c2VxOjk",
+  "has_more": false,
+  "as_of": "2026-10-06T00:30:00+07:00",
+  "max_age": "P1D",
+  "dataset": {
+    "version": 12,
+    "built_at": "2026-10-06T00:31:05+07:00",
+    "admin_unit_as_of": "2026-10-05",
+    "k_used": 10,
+    "contributors": 1,
+    "checksum": { "record_count": 87, "sha256": "9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b" }
+  },
+  "snapshot": { "dataset": "collection_volume_by_commune", "version": 12, "href": "/v1/snapshots/collection_volume_by_commune/12" },
+  "items": [
+    {
+      "seq": 9,
+      "event_id": "0199b6f0-1a00-7c55-8d21-5e6f7a8b9c01",
+      "entity_key": "89123:2026-HT:2026-09",
+      "op": "upsert",
+      "recorded_at": "2026-10-06T00:31:05+07:00",
+      "record": {
+        "area_code": "89123",
+        "area_level": "commune",
+        "province_code": "89",
+        "admin_unit_valid_from": "2025-07-01",
+        "season_code": "2026-HT",
+        "period_month": "2026-09",
+        "rolls_collected": 18420,
+        "area_ha_collected": "301.75"
+      }
+    }
+  ]
+}

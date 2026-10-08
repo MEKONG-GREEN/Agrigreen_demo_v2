@@ -1,0 +1,44 @@
+{
+  "name": "waterway_routes",
+  "version": 1,
+  "kind": "feed",
+  "flow": "reference",
+  "status": "proposed",
+  "pending": ["A7"],
+  "status_note": "Feed mới (ADR-0033 §2). Đồ thị đầy đủ (cỡ chục MB) chỉ ở ảnh chụp qua URL ký; feed chỉ mang siêu dữ liệu phiên bản. Người đề xuất/phê duyệt là vai giữ chỗ.",
+  "owner": "pf/apiclient",
+  "sources": ["pf/waterway"],
+  "consumers": ["mkg/fieldops", "mkg/logistics"],
+  "proposed_by": "pf-waterway-module-owner",
+  "approved_by": "data-steward-don-vi-van-hanh",
+  "approved_at": "2026-10-06",
+  "purpose": "Engine và điều phối MKG cần đồ thị đường thủy đã phát hành để định tuyến ghe gom (§38.3: vài phiên bản/năm, ≤ 1 giờ sau phiên bản mới). Dữ liệu hạ tầng, không dữ liệu cá nhân.",
+  "personal_data": false,
+  "grant_class": "reference",
+  "entity_key": ["network_version_ref"],
+  "freshness": { "max_age": "PT1H" },
+  "delivery": { "cursor": true, "retention_days": 30, "dataset_versioned": true, "snapshot": "signed_url", "webhook": "thin", "channels": ["api", "file"] },
+  "description": "Một phiên bản mạng đường thủy đã phát hành (pf.waterway.network.published). Bên nhận tải ảnh chụp theo snapshot.href của trang, kiểm snapshot.sha256 và graph_sha256, rồi ghim version_no.",
+  "type": "object",
+  "required": ["network_version_ref", "version_no", "effective_from", "supersedes_version_no", "graph_sha256", "segment_set_sha256", "vertex_count", "edge_count", "rule_version", "snapshot"],
+  "properties": {
+    "network_version_ref":   { "type": "string", "format": "uuid" },
+    "version_no":            { "type": "integer" },
+    "effective_from":        { "type": "string", "format": "date-time" },
+    "supersedes_version_no": { "type": ["integer", "null"] },
+    "graph_sha256":          { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "segment_set_sha256":    { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "vertex_count":          { "type": "integer" },
+    "edge_count":            { "type": "integer" },
+    "rule_version":          { "type": "string" },
+    "snapshot": {
+      "type": "object",
+      "required": ["format", "byte_size", "sha256"],
+      "properties": {
+        "format":    { "type": "string", "enum": ["geojson", "geoparquet"] },
+        "byte_size": { "type": "integer" },
+        "sha256":    { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    }
+  }
+}

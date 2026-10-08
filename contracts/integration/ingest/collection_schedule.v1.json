@@ -1,0 +1,35 @@
+{
+  "name": "collection_schedule",
+  "version": 1,
+  "kind": "ingest",
+  "flow": "bilateral",
+  "status": "proposed",
+  "pending": ["A7", "C-12"],
+  "status_note": "ADR-0034 Đề xuất — chờ MKG ký (A7) và C-12 (H-2). W5.6 làm được mã, KHÔNG bật production trước C-12. Lược đồ bản ghi dùng NGUYÊN hợp đồng van contracts/publication/collection_schedule.json (ADR-0033 §3); trong lúc chờ, đường van G3 giữ cho ĐTK 1 (ADR-0033 §6). Người đề xuất/phê duyệt là vai giữ chỗ.",
+  "owner": "pf/cropcycle",
+  "consumers": ["HTX (bên b) qua App HTX", "pf/notify"],
+  "proposed_by": "pf-cropcycle-module-owner",
+  "approved_by": "mkg-data-steward",
+  "approved_at": "2026-10-06",
+  "purpose": "MKG gửi lịch gom (lệnh gom đã duyệt) cho đúng HTX là bên của giao dịch gom (§38.3: hàng trăm – nghìn/ngày, ≤ 15 phút). Chỉ hai bên thấy; không tham gia tổng hợp, chỉ số, view _pub, r_agg hay sản phẩm dữ liệu (ADR-0034 §1, §5).",
+  "personal_data": false,
+  "grant_class": "bilateral",
+  "entity_key": ["schedule_ref"],
+  "freshness": { "max_age": "PT15M", "note": "Xử lý lô song phương p95 ≤ 15 phút (§42)" },
+  "ingest": {
+    "route": "POST /v1/batches/collection_schedule",
+    "max_batch": 500,
+    "business_key": ["schedule_ref", "revision"],
+    "target_port": "pf/cropcycle port.BilateralLedger (W5.6; sau W3.3 chuyển pf/cooperative)",
+    "channels": ["api", "file"]
+  },
+  "bilateral": {
+    "party_a": "mkg (counterparty_tenant_id = tenant MKG, lấy từ khóa API)",
+    "party_b": "htx (htx_node_id trong cây tổ chức của tenant chủ)",
+    "author_side": "a",
+    "pair_key": ["htx_ref"],
+    "pair_feed": "bilateral"
+  },
+  "publication": "collection_schedule",
+  "description": "Một phiên bản lịch gom của MKG cho một HTX trong một xã. Bên nhận giữ bản có revision lớn nhất theo schedule_ref; idempotent theo (schedule_ref, revision)."
+}

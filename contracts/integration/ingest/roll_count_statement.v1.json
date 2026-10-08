@@ -1,0 +1,47 @@
+{
+  "name": "roll_count_statement",
+  "version": 1,
+  "kind": "ingest",
+  "flow": "bilateral",
+  "status": "proposed",
+  "pending": ["A7", "C-12"],
+  "status_note": "ADR-0034 Đề xuất — chờ MKG ký (A7) và C-12 (H-2). Thay hợp đồng van htx_collection_statement (X-04: nguồn gốc lô tới thửa không đi qua kênh dữ liệu mạng lưới). Không bật production trước C-12; nếu C-12 không chấp nhận, đối soát về mức HTX × ngày không plot_ref (ADR-0034 §7) bằng một hợp đồng v2 khác. Người đề xuất/phê duyệt là vai giữ chỗ.",
+  "owner": "pf/cropcycle",
+  "consumers": ["HTX (bên b) qua App HTX"],
+  "proposed_by": "pf-cropcycle-module-owner",
+  "approved_by": "mkg-data-steward",
+  "approved_at": "2026-10-06",
+  "purpose": "RB-6: số cuộn MKG ghi nhận trên từng thửa phải được HTX bán xác nhận. Bản ghi của một giao dịch giữa MKG và một HTX; chỉ hai bên thấy (p_pair), không tham gia tổng hợp. Chỉ số cuộn — không khối lượng cân, yield_kg_per_roll, giá hay khách hàng (§38.3: 10.000–13.000 bản ghi/ngày, ≤ 15 phút).",
+  "personal_data": false,
+  "grant_class": "bilateral",
+  "entity_key": ["statement_ref"],
+  "freshness": { "max_age": "PT15M" },
+  "ingest": {
+    "route": "POST /v1/batches/roll_count_statement",
+    "max_batch": 500,
+    "business_key": ["statement_ref", "revision"],
+    "target_port": "pf/cropcycle port.BilateralLedger (W5.6; sau W3.3 chuyển pf/cooperative)",
+    "channels": ["api", "file"]
+  },
+  "bilateral": {
+    "party_a": "mkg (counterparty_tenant_id = tenant MKG, lấy từ khóa API)",
+    "party_b": "htx (htx_node_id trong cây tổ chức của tenant chủ)",
+    "author_side": "a",
+    "pair_key": ["htx_ref"],
+    "pair_feed": "bilateral"
+  },
+  "replaces": ["publication/htx_collection_statement"],
+  "description": "Bảng kê số cuộn MKG đã gom trên một thửa của HTX trong một ngày, theo lệnh gom. Bản bù là revision lớn hơn cùng statement_ref (chỉ ghi thêm, RB-1).",
+  "type": "object",
+  "required": ["statement_ref", "schedule_ref", "htx_ref", "plot_ref", "season_ref", "collected_on", "rolls", "revision"],
+  "properties": {
+    "statement_ref": { "type": "string", "format": "uuid" },
+    "schedule_ref":  { "type": ["string", "null"], "format": "uuid", "description": "Lệnh gom (collection_schedule.schedule_ref), nếu có" },
+    "htx_ref":       { "type": "string", "format": "uuid", "description": "HTX bán (party_ref của nền tảng) — khóa cặp" },
+    "plot_ref":      { "type": "string", "format": "uuid", "description": "Thửa (plot_ref của pf/geo)" },
+    "season_ref":    { "type": ["string", "null"], "format": "uuid", "description": "Vụ (pf/cropcycle), nếu MKG biết" },
+    "collected_on":  { "type": "string", "format": "date", "description": "Ngày nghiệp vụ giờ Việt Nam" },
+    "rolls":         { "type": "integer", "description": "Số cuộn công đoạn cuối (≥ 0)" },
+    "revision":      { "type": "integer" }
+  }
+}

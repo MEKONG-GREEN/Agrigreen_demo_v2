@@ -133,6 +133,14 @@ Sổ cấp phép của ADR-0020 (`share_grant_event`, bốn mắt, thu hồi, `p
 | W5.10 | Gỡ `/v1/partner/*`, `mkg_sync`, consumer `htx_collection_valve` | — |
 | W0.3 | `docs/design/mkg.md` §1.1 "bốn cửa" theo ADR này | — |
 
+### W5.1 (08/10/2026) — hợp đồng, chưa có mã chạy
+
+- **`contracts/integration/`** ([README](../../contracts/integration/README.md)): package Go `integration` (nhúng hợp đồng, `Get`/`All`/`Servable`/`ValidateRecord`/`EntityKeyOf`/`CheckExample`/`EnvelopeFor`) dùng lại `publication.Node` và `Validate` (mặc định từ chối). Phong bì `envelope/feed_page.v1` (`cursor`, `next_cursor`, `as_of`, `max_age`, `dataset` có `k_used` + tổng kiểm, `snapshot.href` không chứa URL ký, `items[]` có `seq`, `event_id`, `entity_key`, `op` upsert/retract) và `envelope/ingest_batch.v1` (`batch_ref` = `Idempotency-Key`).
+- **Feed:** `harvest_progress_by_commune`, `collection_volume_by_commune` (ADR-0035 W5.1), `season_harvest_dates`, `waterway_routes`, `admin_units` (có hiệu lực `[)` + `successors` với `basis_status`, ADR-0032). **Nạp song phương:** `collection_schedule` (lược đồ dùng nguyên hợp đồng van `collection_schedule`, ADR-0033 §3), `roll_count_statement` (`replaces: publication/htx_collection_statement`), `htx_roll_confirmation` (`author_side: b`). Mỗi hợp đồng có mẫu ở `examples/`.
+- Tất cả `status: proposed` với `pending` (A7; C-4/K-8 cho k; C-9 cho `admin_units`; C-12 cho song phương) — `Servable(production)` = false. k là tham số `aggregation.k_param = publicdata.k_min`, `k_default` tạm 10.
+- **`contractcheck`** (`tools/contractcheck/integration.go`): siêu dữ liệu, tên/phiên bản/kind khớp tệp, `publication`/`replaces` có thật, khóa trỏ trường có thật, mẫu khớp phong bì + hợp đồng (khóa lạ, kiểu, `entity_key`, `max_age`, `k_used ≥ k`), mẫu mồ côi, `-base`: xóa/đổi kiểu/thêm required → phiên bản mới.
+- **Ghi lệch:** chưa sửa `contracts/openapi` (route `/v1/feeds`, `/v1/batches` thuộc W5.2–W5.4); feed của cặp không có hợp đồng riêng — dùng phong bì `feed_page` với `items[].contract`. `cooperative_directory`, `plot_directory` (bảng mục 2) chưa có hợp đồng — thêm khi W5.5 chuyển `/v1/partner/cooperatives`, `/plots`.
+
 ## Liên quan
 
 - Kiến trúc v4.1: §6, §37 (R-INT-01), §38, §39, §40 (R-INT-02…11), §41, §42, §43, §44, Phụ lục B mục 15 và 18, R-API-01, R-API-07, R-EVT-05, R-MOD-10.

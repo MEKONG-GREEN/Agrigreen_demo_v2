@@ -1,0 +1,63 @@
+{
+  "name": "feed_page",
+  "version": 1,
+  "description": "Phong bì một trang feed theo cursor (R-INT-06, ADR-0033 §2): GET /v1/feeds/{feed}?cursor=. Giao ít nhất một lần, có thứ tự theo entity_key; bên nhận idempotent theo event_id. as_of là mốc dữ liệu của trang (bộ điều hợp feed phía đối tác ghi vào kho quan sát, §41.4); max_age là độ tươi cam kết của hợp đồng — quá max_age thì bên nhận coi dữ liệu là cũ. Feed giữ 30 ngày; cursor quá hạn → 410 integration.cursor_expired kèm snapshot.",
+  "type": "object",
+  "required": ["feed", "contract_version", "cursor", "next_cursor", "has_more", "as_of", "max_age", "items"],
+  "properties": {
+    "feed":             { "type": "string", "pattern": "^[a-z][a-z0-9_]{2,47}$", "description": "Tên feed = tên hợp đồng" },
+    "contract_version": { "type": "integer", "description": "Phiên bản hợp đồng; header AG-Data-Contract: <feed>.v<N>" },
+    "cursor":           { "type": ["string", "null"], "pattern": "^[A-Za-z0-9_-]{1,200}$", "description": "Cursor đã yêu cầu (null = từ đầu phần còn giữ)" },
+    "next_cursor":      { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,200}$", "description": "Cursor mờ (seq mã hóa) để đọc tiếp; bằng cursor khi chưa có gì mới" },
+    "has_more":         { "type": "boolean" },
+    "as_of":            { "type": "string", "format": "date-time", "description": "Mốc dữ liệu của trang (recorded_at lớn nhất đã dựng)" },
+    "max_age":          { "type": "string", "pattern": "^P(?:[0-9]+D)?(?:T(?:[0-9]+H)?(?:[0-9]+M)?(?:[0-9]+S)?)?$", "description": "Độ tươi cam kết (ISO 8601), trùng freshness.max_age của hợp đồng" },
+    "dataset": {
+      "type": ["object", "null"],
+      "description": "Phiên bản tập dữ liệu dựng sẵn (R-INT-05, ADR-0035 §2); null với feed không theo phiên bản",
+      "required": ["version", "built_at", "checksum"],
+      "properties": {
+        "version":          { "type": "integer", "description": "dataset_version, tăng đơn điệu" },
+        "built_at":         { "type": "string", "format": "date-time" },
+        "admin_unit_as_of": { "type": ["string", "null"], "format": "date", "description": "Ngày của danh mục đơn vị hành chính dùng để nhóm (ADR-0032)" },
+        "k_used":           { "type": ["integer", "null"], "description": "Ngưỡng k đã áp (tập tổng hợp, ADR-0035); null nếu không tổng hợp" },
+        "contributors":     { "type": ["integer", "null"], "description": "Số đơn vị chủ dữ liệu đã đóng góp — chỉ số lượng, không tên" },
+        "checksum": {
+          "type": "object",
+          "description": "Tổng kiểm của phiên bản (R-INT-10)",
+          "required": ["record_count", "sha256"],
+          "properties": {
+            "record_count": { "type": "integer" },
+            "sha256":       { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+          }
+        }
+      }
+    },
+    "snapshot": {
+      "type": ["object", "null"],
+      "description": "Ảnh chụp đầy đủ của phiên bản (feed lớn): tải qua GET /v1/snapshots/{dataset}/{version} — cổng đo lường rồi trả URL ký ≤ 15 phút (ADR-0033 §2). Không bao giờ chứa URL ký trong trang feed.",
+      "required": ["dataset", "version", "href"],
+      "properties": {
+        "dataset": { "type": "string" },
+        "version": { "type": "integer" },
+        "href":    { "type": "string", "pattern": "^/v1/snapshots/[a-z][a-z0-9_]{2,47}/[0-9]+$" }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["seq", "event_id", "entity_key", "op", "recorded_at", "record"],
+        "properties": {
+          "seq":         { "type": "integer", "description": "Thứ tự trong feed (tăng đơn điệu)" },
+          "event_id":    { "type": "string", "format": "uuid", "description": "Khóa idempotent của bên nhận" },
+          "entity_key":  { "type": "string", "description": "Giá trị các trường entity_key của hợp đồng nối bằng ':'" },
+          "op":          { "type": "string", "enum": ["upsert", "retract"], "description": "retract: thực thể không còn được phát (vd ô tổng hợp xuống dưới k); record = null" },
+          "contract":    { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9_]{2,47}[.]v[0-9]+$", "description": "Chỉ feed của cặp (bilateral): hợp đồng của bản ghi" },
+          "recorded_at": { "type": "string", "format": "date-time" },
+          "record":      { "type": ["object", "null"], "description": "Một bản ghi theo lược đồ của hợp đồng" }
+        }
+      }
+    }
+  }
+}

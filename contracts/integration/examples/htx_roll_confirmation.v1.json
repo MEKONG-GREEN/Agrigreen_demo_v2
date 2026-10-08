@@ -1,0 +1,25 @@
+{
+  "contract": "htx_roll_confirmation",
+  "contract_version": 1,
+  "batch_ref": "0199bd10-4400-7d01-8e02-f03a04b05c06",
+  "sent_at": "2026-10-10T07:40:00+07:00",
+  "as_of": null,
+  "items": [
+    {
+      "entity_key": "0199bd0f-9900-7a11-8b22-c33d44e55f66",
+      "record": {
+        "confirmation_ref": "0199bd0f-9900-7a11-8b22-c33d44e55f66",
+        "statement_ref": "0199b8d1-0a00-7b01-8c02-d03e04f05a06",
+        "statement_revision": 1,
+        "htx_ref": "01989e00-1111-7222-8333-944455566677",
+        "plot_ref": "01989f00-aa11-7b22-8c33-d44e55f66a77",
+        "mkg_rolls": 46,
+        "outcome": "disputed",
+        "htx_rolls": 44,
+        "reason": "Hai cuộn tính trùng ở bờ kênh giáp thửa bên cạnh",
+        "responded_at": "2026-10-10T07:38:12+07:00",
+        "supersedes_confirmation_ref": null
+      }
+    }
+  ]
+}

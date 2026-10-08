@@ -1,0 +1,33 @@
+{
+  "feed": "season_harvest_dates",
+  "contract_version": 1,
+  "cursor": "c2VxOjEwMA",
+  "next_cursor": "c2VxOjEwMQ",
+  "has_more": true,
+  "as_of": "2026-10-06T07:00:00+07:00",
+  "max_age": "P1D",
+  "dataset": null,
+  "snapshot": null,
+  "items": [
+    {
+      "seq": 101,
+      "event_id": "0199b81c-0f00-7b11-a1c2-d3e4f5a6b7c8",
+      "entity_key": "0199a011-2b3c-7d4e-8f50-6a7b8c9d0e1f",
+      "op": "upsert",
+      "recorded_at": "2026-10-06T06:58:12+07:00",
+      "record": {
+        "season_ref": "0199a011-2b3c-7d4e-8f50-6a7b8c9d0e1f",
+        "plot_ref": "01989f00-aa11-7b22-8c33-d44e55f66a77",
+        "cooperative_ref": "01989e00-1111-7222-8333-944455566677",
+        "commune_code": "89123",
+        "season_code": "2026-HT",
+        "season_year": 2026,
+        "sowing_date": "2026-06-20",
+        "expected_harvest_date": "2026-10-12",
+        "harvest_open_date": "2026-10-08",
+        "status": "open",
+        "completed_at": null
+      }
+    }
+  ]
+}

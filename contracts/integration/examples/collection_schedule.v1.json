@@ -1,0 +1,21 @@
+{
+  "contract": "collection_schedule",
+  "contract_version": 1,
+  "batch_ref": "0199b8b0-5d00-7e12-9a34-b56c78d90e12",
+  "sent_at": "2026-10-06T08:20:00+07:00",
+  "as_of": "2026-10-06T08:19:30+07:00",
+  "items": [
+    {
+      "entity_key": "0199b8af-1000-7a01-8b02-c03d04e05f06",
+      "record": {
+        "schedule_ref": "0199b8af-1000-7a01-8b02-c03d04e05f06",
+        "htx_ref": "01989e00-1111-7222-8333-944455566677",
+        "commune_code": "89123",
+        "window_from": "2026-10-08",
+        "window_to": "2026-10-12",
+        "status": "confirmed",
+        "revision": 2
+      }
+    }
+  ]
+}

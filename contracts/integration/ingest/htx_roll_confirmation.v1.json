@@ -1,0 +1,49 @@
+{
+  "name": "htx_roll_confirmation",
+  "version": 1,
+  "kind": "ingest",
+  "flow": "bilateral",
+  "status": "proposed",
+  "pending": ["A7", "C-12"],
+  "status_note": "ADR-0034 Đề xuất — chờ MKG ký (A7) và C-12 (H-2). Thay GET /v1/partner/htx-collection/responses: MKG đọc qua feed của cặp. HTX thường ghi trên App HTX (kênh app, author_side b); kênh api/file cùng lược đồ cho HTX có IT hoặc chỉ gửi được tệp (R-INT-11). Người đề xuất/phê duyệt là vai giữ chỗ.",
+  "owner": "pf/cropcycle",
+  "consumers": ["mkg/fieldops (bên a) qua GET /v1/feeds/bilateral?pair=…"],
+  "proposed_by": "pf-cropcycle-module-owner",
+  "approved_by": "htx-data-steward",
+  "approved_at": "2026-10-06",
+  "purpose": "RB-6: HTX xác nhận hoặc phản đối có lý do số cuộn MKG ghi nhận (§38.3: ≤ 1 giờ). Chỉ hai bên thấy; không tham gia tổng hợp. Xác nhận, phản đối, sửa đều là bản ghi mới (RB-1).",
+  "personal_data": false,
+  "grant_class": "bilateral",
+  "entity_key": ["confirmation_ref"],
+  "freshness": { "max_age": "PT1H" },
+  "ingest": {
+    "route": "POST /v1/batches/htx_roll_confirmation",
+    "max_batch": 500,
+    "business_key": ["confirmation_ref"],
+    "target_port": "pf/cropcycle port.BilateralLedger (W5.6; sau W3.3 chuyển pf/cooperative)",
+    "channels": ["app", "api", "file"]
+  },
+  "bilateral": {
+    "party_a": "mkg (counterparty_tenant_id = tenant MKG)",
+    "party_b": "htx (htx_node_id trong cây tổ chức của tenant chủ)",
+    "author_side": "b",
+    "pair_key": ["htx_ref"],
+    "pair_feed": "bilateral"
+  },
+  "description": "Phản hồi của HTX cho một revision của roll_count_statement. Bản sau thay bản trước qua supersedes_confirmation_ref.",
+  "type": "object",
+  "required": ["confirmation_ref", "statement_ref", "statement_revision", "htx_ref", "plot_ref", "mkg_rolls", "outcome", "htx_rolls", "reason", "responded_at", "supersedes_confirmation_ref"],
+  "properties": {
+    "confirmation_ref":            { "type": "string", "format": "uuid" },
+    "statement_ref":               { "type": "string", "format": "uuid" },
+    "statement_revision":          { "type": "integer" },
+    "htx_ref":                     { "type": "string", "format": "uuid", "description": "Khóa cặp" },
+    "plot_ref":                    { "type": "string", "format": "uuid" },
+    "mkg_rolls":                   { "type": "integer", "description": "Số cuộn MKG đã ghi ở revision được phản hồi" },
+    "outcome":                     { "type": "string", "enum": ["confirmed", "disputed"] },
+    "htx_rolls":                   { "type": ["integer", "null"], "description": "Số cuộn HTX ghi nhận (bắt buộc khác null khi disputed)" },
+    "reason":                      { "type": ["string", "null"], "description": "Lý do phản đối" },
+    "responded_at":                { "type": "string", "format": "date-time" },
+    "supersedes_confirmation_ref": { "type": ["string", "null"], "format": "uuid" }
+  }
+}

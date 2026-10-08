@@ -1,0 +1,70 @@
+{
+  "feed": "admin_units",
+  "contract_version": 1,
+  "cursor": null,
+  "next_cursor": "c2VxOjM",
+  "has_more": false,
+  "as_of": "2026-10-05T23:00:00+07:00",
+  "max_age": "P1D",
+  "dataset": {
+    "version": 7,
+    "built_at": "2026-10-05T23:02:00+07:00",
+    "admin_unit_as_of": "2026-10-05",
+    "k_used": null,
+    "contributors": null,
+    "checksum": { "record_count": 3, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" }
+  },
+  "snapshot": { "dataset": "admin_units", "version": 7, "href": "/v1/snapshots/admin_units/7" },
+  "items": [
+    {
+      "seq": 1,
+      "event_id": "0199b2c0-0001-7000-8000-000000000001",
+      "entity_key": "30301:2008-08-01",
+      "op": "upsert",
+      "recorded_at": "2026-10-05T23:02:00+07:00",
+      "record": {
+        "code": "30301",
+        "valid_from": "2008-08-01",
+        "valid_to": "2025-07-01",
+        "name": "Xã Bình Mỹ (trước sắp xếp)",
+        "level": "commune",
+        "parent_code": "886",
+        "successors": [
+          { "code": "89123", "valid_from": "2025-07-01", "effective_on": "2025-07-01", "area_share": null, "basis_status": "pending_c9", "legal_basis": "điền từ successor_codes (W2.2) — chờ nguồn chính thức C-9" }
+        ]
+      }
+    },
+    {
+      "seq": 2,
+      "event_id": "0199b2c0-0001-7000-8000-000000000002",
+      "entity_key": "89123:2025-07-01",
+      "op": "upsert",
+      "recorded_at": "2026-10-05T23:02:00+07:00",
+      "record": {
+        "code": "89123",
+        "valid_from": "2025-07-01",
+        "valid_to": null,
+        "name": "Xã Bình Mỹ",
+        "level": "commune",
+        "parent_code": "89",
+        "successors": []
+      }
+    },
+    {
+      "seq": 3,
+      "event_id": "0199b2c0-0001-7000-8000-000000000003",
+      "entity_key": "89:2025-07-01",
+      "op": "upsert",
+      "recorded_at": "2026-10-05T23:02:00+07:00",
+      "record": {
+        "code": "89",
+        "valid_from": "2025-07-01",
+        "valid_to": null,
+        "name": "Tỉnh An Giang",
+        "level": "province",
+        "parent_code": null,
+        "successors": []
+      }
+    }
+  ]
+}

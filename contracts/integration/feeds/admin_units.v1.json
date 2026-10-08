@@ -1,0 +1,49 @@
+{
+  "name": "admin_units",
+  "version": 1,
+  "kind": "feed",
+  "flow": "reference",
+  "status": "proposed",
+  "pending": ["A7", "C-9"],
+  "status_note": "Tham chiếu dùng chung (ADR-0032, ADR-0033 §2). Bảng kế thừa chưa có nguồn chính thức (C-9): quan hệ pending_c9 được phát kèm basis_status để bên nhận không coi là chính thức. Người đề xuất/phê duyệt là vai giữ chỗ.",
+  "owner": "pf/apiclient",
+  "sources": ["pf/masterdata"],
+  "consumers": ["mkg/fieldops", "mọi đối tác có khóa"],
+  "proposed_by": "pf-masterdata-module-owner",
+  "approved_by": "data-steward-don-vi-van-hanh",
+  "approved_at": "2026-10-06",
+  "purpose": "Mọi đối tác cần cùng một danh mục đơn vị hành chính có hiệu lực theo thời gian để nhóm dữ liệu và đọc các feed theo xã (sau sắp xếp 2025 mã có thể được dùng lại).",
+  "personal_data": false,
+  "grant_class": "reference",
+  "entity_key": ["code", "valid_from"],
+  "freshness": { "max_age": "P1D" },
+  "delivery": { "cursor": true, "retention_days": 30, "dataset_versioned": true, "snapshot": "signed_url", "webhook": "thin", "channels": ["api", "file"] },
+  "effective_dating": { "valid_from": "valid_from", "valid_to": "valid_to", "interval": "[)", "succession": "successors" },
+  "description": "Một phiên bản hiệu lực của một đơn vị hành chính, khoảng [valid_from, valid_to) theo ngày giờ Việt Nam. Không bao giờ xóa: đóng phiên bản là bản ghi mới cùng entity_key (code, valid_from) có valid_to và successors. successors lấy từ pf_masterdata.admin_unit_succession; dòng official thắng dòng pending_c9 cùng cặp (ADR-0032 §3).",
+  "type": "object",
+  "required": ["code", "valid_from", "valid_to", "name", "level", "parent_code", "successors"],
+  "properties": {
+    "code":        { "type": "string", "pattern": "^[0-9A-Z][0-9A-Z.-]{0,39}$" },
+    "valid_from":  { "type": "string", "format": "date" },
+    "valid_to":    { "type": ["string", "null"], "format": "date" },
+    "name":        { "type": "string" },
+    "level":       { "type": "string", "enum": ["province", "district", "commune"], "description": "district chỉ còn ở phiên bản trước sắp xếp 2025" },
+    "parent_code": { "type": ["string", "null"] },
+    "successors": {
+      "type": "array",
+      "description": "Đơn vị kế thừa khi phiên bản bị đóng; rỗng với phiên bản đang mở",
+      "items": {
+        "type": "object",
+        "required": ["code", "valid_from", "effective_on", "area_share", "basis_status", "legal_basis"],
+        "properties": {
+          "code":         { "type": "string", "pattern": "^[0-9A-Z][0-9A-Z.-]{0,39}$" },
+          "valid_from":   { "type": "string", "format": "date", "description": "Phiên bản của đơn vị kế thừa" },
+          "effective_on": { "type": "string", "format": "date" },
+          "area_share":   { "type": ["string", "null"], "pattern": "^(0\\.[0-9]{1,6}|1(\\.0{1,6})?)$", "description": "Tỉ lệ diện tích khi tách một phần; null = toàn bộ hoặc chưa rõ" },
+          "basis_status": { "type": "string", "enum": ["official", "pending_c9"] },
+          "legal_basis":  { "type": "string", "description": "Căn cứ pháp lý (pending_c9: ghi nguồn tạm)" }
+        }
+      }
+    }
+  }
+}

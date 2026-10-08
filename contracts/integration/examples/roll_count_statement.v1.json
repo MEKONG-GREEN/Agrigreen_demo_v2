@@ -1,0 +1,22 @@
+{
+  "contract": "roll_count_statement",
+  "contract_version": 1,
+  "batch_ref": "0199b8d2-2200-7c01-8d02-e03f04a05b06",
+  "sent_at": "2026-10-09T18:05:00+07:00",
+  "as_of": "2026-10-09T18:00:00+07:00",
+  "items": [
+    {
+      "entity_key": "0199b8d1-0a00-7b01-8c02-d03e04f05a06",
+      "record": {
+        "statement_ref": "0199b8d1-0a00-7b01-8c02-d03e04f05a06",
+        "schedule_ref": "0199b8af-1000-7a01-8b02-c03d04e05f06",
+        "htx_ref": "01989e00-1111-7222-8333-944455566677",
+        "plot_ref": "01989f00-aa11-7b22-8c33-d44e55f66a77",
+        "season_ref": "0199a011-2b3c-7d4e-8f50-6a7b8c9d0e1f",
+        "collected_on": "2026-10-09",
+        "rolls": 46,
+        "revision": 1
+      }
+    }
+  ]
+}

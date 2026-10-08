@@ -1,0 +1,43 @@
+{
+  "feed": "waterway_routes",
+  "contract_version": 1,
+  "cursor": "c2VxOjI",
+  "next_cursor": "c2VxOjM",
+  "has_more": false,
+  "as_of": "2026-09-30T10:00:00+07:00",
+  "max_age": "PT1H",
+  "dataset": {
+    "version": 3,
+    "built_at": "2026-09-30T10:04:10+07:00",
+    "admin_unit_as_of": null,
+    "k_used": null,
+    "contributors": null,
+    "checksum": { "record_count": 1, "sha256": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0" }
+  },
+  "snapshot": { "dataset": "waterway_routes", "version": 3, "href": "/v1/snapshots/waterway_routes/3" },
+  "items": [
+    {
+      "seq": 3,
+      "event_id": "0199995a-7e00-7f01-b2c3-d4e5f6a7b8c9",
+      "entity_key": "01999959-0000-7a00-8b00-c00d00e00f01",
+      "op": "upsert",
+      "recorded_at": "2026-09-30T10:04:10+07:00",
+      "record": {
+        "network_version_ref": "01999959-0000-7a00-8b00-c00d00e00f01",
+        "version_no": 3,
+        "effective_from": "2026-09-30T10:00:00+07:00",
+        "supersedes_version_no": 2,
+        "graph_sha256": "aa11bb22cc33dd44ee55ff6600778899aa11bb22cc33dd44ee55ff6600778899",
+        "segment_set_sha256": "1122334455667788990011223344556677889900112233445566778899001122",
+        "vertex_count": 18240,
+        "edge_count": 23115,
+        "rule_version": "ww-build-2026.09",
+        "snapshot": {
+          "format": "geoparquet",
+          "byte_size": 41873920,
+          "sha256": "5566778899aabbccddeeff00112233445566778899aabbccddeeff0011223344"
+        }
+      }
+    }
+  ]
+}

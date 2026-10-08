@@ -110,6 +110,8 @@ WITH CHECK (
 | W5.7 | Tổng kiểm hằng ngày theo cặp | pf 000104 |
 | W5.10 | Gỡ consumer `pf.cropcycle.htx_collection_valve` và `/v1/partner/htx-collection/responses` | — |
 
+**W5.1 (08/10/2026):** ba hợp đồng `contracts/integration/ingest/` (`flow: bilateral`, khối `bilateral` có `party_a`, `party_b`, `author_side`, `pair_key: [htx_ref]`, `pair_feed: bilateral`), `status: proposed`, `pending: [A7, C-12]`; `contractcheck` cấm `aggregation` trên hợp đồng song phương. Chi tiết ở [ADR-0033 Hiện thực](0033-cong-tich-hop-mkg-nhu-moi-doi-tac.md#hiện-thực).
+
 ## Liên quan
 
 - Kiến trúc v4.1: §3 (RB-1, RB-6), §38.1, §38.2, §38.3, R-INT-05, R-INT-10, Phụ lục B mục 16, Phụ lục C C-12.

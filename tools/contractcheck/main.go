@@ -18,6 +18,9 @@
 //     đủ siêu dữ liệu, không dữ liệu cá nhân; struct //ag:dataproduct <tên> chỉ có
 //     trường của hợp đồng, đúng kiểu; mỗi sản phẩm có tag trong
 //     contracts/openapi/public.yaml (xem dataproduct.go).
+//   - Cổng tích hợp (W5.1, R-INT-08): contracts/integration/ — feed theo cursor,
+//     hợp đồng nạp (gồm song phương), phong bì, mẫu khớp hợp đồng, tương thích
+//     ngược theo -base (xem integration.go).
 //
 // Chạy: go run ./tools/contractcheck [-base origin/main]
 package main
@@ -262,6 +265,12 @@ func Check(root, base string) ([]string, error) {
 		return nil, err
 	}
 	problems = append(problems, dpr...)
+	// Hợp đồng cổng tích hợp (W5.1, R-INT-08 — xem integration.go).
+	itp, err := integrationRules(root, base, pubs)
+	if err != nil {
+		return nil, err
+	}
+	problems = append(problems, itp...)
 	sort.Strings(problems)
 	return problems, nil
 }

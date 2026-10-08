@@ -181,6 +181,11 @@ func (c *Contract) MetaProblems() []string {
 	return p
 }
 
+// Problems kiểm lược đồ n (kiểu hợp lệ, mọi trường có type, required có trong
+// properties, mảng có items, pattern biên dịch được) — đệ quy. Dùng lại cho các
+// hợp đồng khác cùng tập con JSON Schema (contracts/integration).
+func (n *Node) Problems() []string { return nodeProblems("", n) }
+
 var knownTypes = map[string]bool{"string": true, "integer": true, "number": true, "boolean": true, "object": true, "array": true, "null": true}
 
 func nodeProblems(path string, n *Node) []string {

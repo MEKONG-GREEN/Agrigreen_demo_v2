@@ -1,0 +1,68 @@
+{
+  "feed": "harvest_progress_by_commune",
+  "contract_version": 1,
+  "cursor": "c2VxOjQxMjA",
+  "next_cursor": "c2VxOjQxMjM",
+  "has_more": false,
+  "as_of": "2026-10-06T08:15:00+07:00",
+  "max_age": "PT15M",
+  "dataset": {
+    "version": 318,
+    "built_at": "2026-10-06T08:15:42+07:00",
+    "admin_unit_as_of": "2026-10-06",
+    "k_used": 10,
+    "contributors": 1,
+    "checksum": { "record_count": 412, "sha256": "4f1c2a9be0d3f6a8c7b5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3" }
+  },
+  "snapshot": { "dataset": "harvest_progress_by_commune", "version": 318, "href": "/v1/snapshots/harvest_progress_by_commune/318" },
+  "items": [
+    {
+      "seq": 4121,
+      "event_id": "0199b8a4-3c10-7a21-9f3e-0c6a1d2e3f41",
+      "entity_key": "89123:2026-HT",
+      "op": "upsert",
+      "recorded_at": "2026-10-06T08:15:42+07:00",
+      "record": {
+        "area_code": "89123",
+        "area_level": "commune",
+        "province_code": "89",
+        "admin_unit_valid_from": "2025-07-01",
+        "season_code": "2026-HT",
+        "season_year": 2026,
+        "area_ha_sown": "812.40",
+        "area_ha_harvested": "530.15",
+        "harvested_share": "0.6526",
+        "expected_harvest_from": "2026-10-07",
+        "expected_harvest_to": "2026-10-19"
+      }
+    },
+    {
+      "seq": 4122,
+      "event_id": "0199b8a4-3c10-7a21-9f3e-0c6a1d2e3f42",
+      "entity_key": "89:2026-HT",
+      "op": "upsert",
+      "recorded_at": "2026-10-06T08:15:42+07:00",
+      "record": {
+        "area_code": "89",
+        "area_level": "province_withheld",
+        "province_code": "89",
+        "admin_unit_valid_from": "2025-07-01",
+        "season_code": "2026-HT",
+        "season_year": 2026,
+        "area_ha_sown": "143.20",
+        "area_ha_harvested": "61.00",
+        "harvested_share": "0.4260",
+        "expected_harvest_from": null,
+        "expected_harvest_to": null
+      }
+    },
+    {
+      "seq": 4123,
+      "event_id": "0199b8a4-3c10-7a21-9f3e-0c6a1d2e3f43",
+      "entity_key": "89140:2026-HT",
+      "op": "retract",
+      "recorded_at": "2026-10-06T08:15:42+07:00",
+      "record": null
+    }
+  ]
+}

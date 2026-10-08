@@ -77,6 +77,8 @@ Job chỉ gộp dữ liệu của đơn vị có đóng góp đang hiệu lực 
 | W5.3 | Job dựng tập dữ liệu, phiên bản, `k_used`, ẩn ô bù, trễ ẩn k + 2 | pf 000100–000101 |
 | W6.4 | Job khai trong danh sách `r_agg` khi vượt đơn vị; bật production chờ K-8 | pf 000109 |
 
+**W5.1 (08/10/2026):** `harvest_progress_by_commune`, `collection_volume_by_commune` có `aggregation` (`k_param: publicdata.k_min`, `k_default: 10` tạm, `k_status`, `unit: household`, `suppression: omit`, `complementary_suppression: true`, `hysteresis: 2`), `pending: [A7, C-4, K-8]`; phong bì ghi `dataset.k_used`, `contractcheck` bắt mẫu `k_used < k_default`. k vẫn là tham số — ký K-8 không đổi hợp đồng.
+
 ## Liên quan
 
 - Kiến trúc v4.1: §4 (van dữ liệu công, k), §22.2 (R-DB-11), §38.3, §39, R-INT-05, Phụ lục B mục 17, Phụ lục C C-4.

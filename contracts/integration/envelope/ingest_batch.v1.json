@@ -1,0 +1,26 @@
+{
+  "name": "ingest_batch",
+  "version": 1,
+  "description": "Phong bì một lô nạp (R-INT-03, ADR-0033 §3, §41.3): POST /v1/batches/{contract} với header Idempotency-Key = batch_ref. Cổng kiểm phong bì đồng bộ rồi trả 202 + mã lô; từng bản ghi kiểm hợp đồng ở inbox, kết quả từng bản ghi tra sau (bản ghi lỗi không làm hỏng cả lô). Cùng lược đồ cho kênh tệp (R-INT-11).",
+  "type": "object",
+  "required": ["contract", "contract_version", "batch_ref", "sent_at", "items"],
+  "properties": {
+    "contract":         { "type": "string", "pattern": "^[a-z][a-z0-9_]{2,47}$" },
+    "contract_version": { "type": "integer" },
+    "batch_ref":        { "type": "string", "format": "uuid", "description": "Mã lô của bên gửi (UUIDv7) — bằng Idempotency-Key" },
+    "sent_at":          { "type": "string", "format": "date-time" },
+    "as_of":            { "type": ["string", "null"], "format": "date-time", "description": "Mốc dữ liệu phía bên gửi" },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["entity_key", "record"],
+        "properties": {
+          "entity_key": { "type": "string", "description": "Giá trị các trường entity_key của hợp đồng nối bằng ':'" },
+          "record":     { "type": "object", "description": "Một bản ghi theo lược đồ của hợp đồng" }
+        }
+      }
+    }
+  }
+}
