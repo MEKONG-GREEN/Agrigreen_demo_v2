@@ -8,8 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xuri/excelize/v2"
-
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tabular"
 )
@@ -21,21 +19,6 @@ func xlsxBytes(t *testing.T, header []string, rows [][]string) []byte {
 		t.Fatal(err)
 	}
 	return buf.Bytes()
-}
-
-// coopCodes trả mã HTX (hệ thống sinh) theo ref.
-func (f *fixture) coopCodes(tr tree) (string, string) {
-	var c1, c2 string
-	national := f.as(f.tenant, tr.national, port.RoleKNNationalAdmin)
-	for _, it := range items(national.appDo(http.MethodGet, "/v1/cooperatives", nil)) {
-		switch it["ref"] {
-		case tr.c1.String():
-			c1 = it["code"].(string)
-		case tr.c2.String():
-			c2 = it["code"].(string)
-		}
-	}
-	return c1, c2
 }
 
 // download gọi GET trả thân thô (tệp xuất).
@@ -59,67 +42,6 @@ func rowsOf(r resp) []map[string]any {
 		out = append(out, it.(map[string]any))
 	}
 	return out
-}
-
-// KN US-HTX-03: nhập nông hộ bằng tệp Excel .xlsx (tiêu đề tiếng Việt có dấu), kết quả theo dòng.
-func TestImportHouseholdsXLSX(t *testing.T) {
-	f := newFixture(t)
-	root := f.root()
-	tr := f.seedTree(root)
-	c1, c2 := f.coopCodes(tr)
-	header := []string{"Họ tên", "Số điện thoại", "CCCD", "Địa chỉ", "Mã HTX", "Diện tích (ha)", "Ngày vào HTX"}
-	body := xlsxBytes(t, header, [][]string{
-		{"Trần Thị Bình", "0907000001", "", "Ấp 2", c1, "2.5", "2023-05-01"},
-		{"Trần Thị Bình", "0907000001", "", "Ấp 2", c1, "2.5", "2023-05-01"},
-		{"Lê Văn Cường", "", "", "Ấp 3", c1, "1", ""},
-		{},
-		{"Phạm Văn Dũng", "0907000004", "", "Ấp 4", "HTX999999", "1", ""},
-		{"Võ Thị Em", "0907000005", "", "Ấp 5", c2, "1", ""},
-	})
-	prov := f.as(f.tenant, tr.p89, port.RoleKNProvinceAdmin)
-	r := prov.call(f.admin.URL, http.MethodPost, "/v1/households/import", key(), tabular.ContentTypeXLSX, body)
-	if r.status != http.StatusOK || r.body["accepted"] != float64(1) || r.body["duplicate"] != float64(1) || r.body["rejected"] != float64(3) {
-		t.Fatalf("kết quả nhập .xlsx: %d %v", r.status, r.body)
-	}
-	// Số dòng là dòng thật của trang tính (dòng trống thứ 5 bị bỏ qua).
-	wantStatus := []string{"accepted", "duplicate", "rejected", "rejected", "rejected"}
-	wantLine := []float64{2, 3, 4, 6, 7}
-	for i, row := range rowsOf(r) {
-		if row["status"] != wantStatus[i] || row["row"] != wantLine[i] {
-			t.Fatalf("dòng %d: %v", i, row)
-		}
-		if reason, _ := row["reason"].(string); strings.Contains(reason, "0907") || strings.Contains(reason, "Trần") {
-			t.Fatalf("lý do không được chứa dữ liệu cá nhân: %q", reason)
-		}
-	}
-	if got := len(items(prov.appDo(http.MethodGet, "/v1/cooperatives/"+tr.c1.String()+"/households", nil))); got != 1 {
-		t.Fatalf("HTX 1 có đúng 1 nông hộ: %d", got)
-	}
-}
-
-// Ô công thức trong .xlsx: cả tệp bị từ chối, không tính công thức.
-func TestImportHouseholdsXLSXFormulaRejected(t *testing.T) {
-	f := newFixture(t)
-	root := f.root()
-	tr := f.seedTree(root)
-	c1, _ := f.coopCodes(tr)
-	x := excelize.NewFile()
-	_ = x.SetSheetRow("Sheet1", "A1", &[]any{"ho_ten", "so_dien_thoai", "ma_htx", "dien_tich_ha"})
-	_ = x.SetSheetRow("Sheet1", "A2", &[]any{"Ngô Văn Giàu", "0907000009", c1, "1"})
-	_ = x.SetSheetRow("Sheet1", "A3", &[]any{"Ngô Thị Hoa", "0907000010", c1})
-	_ = x.SetCellFormula("Sheet1", "D3", "D2*2")
-	var buf bytes.Buffer
-	if _, err := x.WriteTo(&buf); err != nil {
-		t.Fatal(err)
-	}
-	prov := f.as(f.tenant, tr.p89, port.RoleKNProvinceAdmin)
-	r := prov.call(f.admin.URL, http.MethodPost, "/v1/households/import", key(), tabular.ContentTypeXLSX, buf.Bytes())
-	if r.status != http.StatusUnprocessableEntity || r.body["code"] != "party.import_invalid" || !strings.Contains(str(r.body, "detail"), "D3") {
-		t.Fatalf("ô công thức phải bị từ chối cả tệp: %d %v", r.status, r.body)
-	}
-	if got := len(items(prov.appDo(http.MethodGet, "/v1/cooperatives/"+tr.c1.String()+"/households", nil))); got != 0 {
-		t.Fatalf("không nạp dòng nào khi tệp bị từ chối: %d", got)
-	}
 }
 
 // KN US-ADM-08: xuất cây tổ chức ra Excel → nhập lại (khứ hồi) → sửa tệp để tạo, di chuyển, đổi tên.

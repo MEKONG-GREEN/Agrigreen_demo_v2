@@ -29,6 +29,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
@@ -184,6 +185,13 @@ func (e *intEnv) seedCollection() {
 			t.Fatalf("seed %s: %v", role, err)
 		}
 	}
+	// W3.3: thửa và vụ ở pf_coop — ghi dưới r_cooperative qua vai đăng nhập đơn vị app_public.
+	execCoop := func(f func(tx pgx.Tx) error) {
+		t.Helper()
+		if err := tenant.WithTenantTx(ctx, db.ForModule(e.pg.Pool(t, migrations.PF, dbadmin.AppPublic), db.Module("pf/cooperative")), e.grantor, f); err != nil {
+			t.Fatalf("seed pf/cooperative: %v", err)
+		}
+	}
 	exec("masterdata_app", func(tx pgx.Tx) error {
 		for _, u := range []struct{ code, level, parent string }{{"92", "province", ""}, {"31117", "commune", "92"}, {"31120", "commune", "92"}} {
 			var parent *string
@@ -210,9 +218,9 @@ func (e *intEnv) seedCollection() {
 		}
 		plots = append(plots, p)
 	}
-	exec("geo_app", func(tx pgx.Tx) error {
+	execCoop(func(tx pgx.Tx) error {
 		for i, p := range plots {
-			if _, err := tx.Exec(ctx, `INSERT INTO pf_geo.plot (tenant_id, ref, code, commune_code, cooperative_ref, household_ref, status, current_version,
+			if _, err := tx.Exec(ctx, `INSERT INTO pf_coop.plot (tenant_id, ref, code, commune_code, cooperative_ref, household_ref, status, current_version,
 			    current_boundary_id, geom, area_ha, source, created_by)
 			  VALUES ($1, $2, $3, $4, $5, $6, 'active', 1, $7, ST_GeomFromText('MULTIPOLYGON(((105.7 10.0,105.701 10.0,105.701 10.001,105.7 10.0)))', 4326),
 			    1.5000::numeric, 'kiểm thử G5', $8)`,
@@ -222,10 +230,10 @@ func (e *intEnv) seedCollection() {
 		}
 		return nil
 	})
-	exec("cropcycle_app", func(tx pgx.Tx) error {
-		now := time.Now().UTC()
+	now := time.Now().UTC()
+	execCoop(func(tx pgx.Tx) error {
 		for i, p := range plots {
-			if _, err := tx.Exec(ctx, `INSERT INTO pf_cropcycle.season_current (tenant_id, season_ref, plot_ref, plot_code, household_ref, cooperative_ref,
+			if _, err := tx.Exec(ctx, `INSERT INTO pf_coop.season_current (tenant_id, season_ref, plot_ref, plot_code, household_ref, cooperative_ref,
 			    commune_code, season_code, season_year, variety_code, sop_template_ref, sop_version_id, sop_version_no, sowing_date, expected_harvest_date,
 			    harvest_open_date, area_ha, status, current_event_id, version, location_status, gps_source, on_behalf, opened_by, opened_at)
 			  VALUES ($1, $2, $3, $4, $5, $6, $7, 'DX', 2026, 'OM5451', $8, $9, 1, '2026-05-01'::date, '2026-08-20'::date, '2026-08-10'::date,
@@ -233,6 +241,11 @@ func (e *intEnv) seedCollection() {
 				e.grantor, p.season, p.ref, fmt.Sprintf("G5-%02d", i), p.hh, coop, p.commune, ids.New(), ids.New(), ids.New(), actor, now); err != nil {
 				return err
 			}
+		}
+		return nil
+	})
+	exec("cropcycle_app", func(tx pgx.Tx) error {
+		for _, p := range plots {
 			if _, err := tx.Exec(ctx, `INSERT INTO pf_cropcycle.collection_statement_view (tenant_id, statement_ref, cooperative_ref, plot_ref, season_ref,
 			    collected_on, rolls, revision, receipt_id, source_tenant_id, published_at, received_at)
 			  VALUES ($1, $2, $3, $4, $5, $6::date, 10, 1, $7, $8, $9, $9)`,

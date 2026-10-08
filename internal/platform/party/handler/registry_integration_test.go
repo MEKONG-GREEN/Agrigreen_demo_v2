@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -36,16 +37,18 @@ import (
 func TestMain(m *testing.M) { os.Exit(pgtest.Run(m)) }
 
 type fixture struct {
-	t      *testing.T
-	env    *pgtest.Env
-	iss    *authztest.FakeIssuer
-	app    *httptest.Server
-	admin  *httptest.Server
-	vault  *fakeVault
-	units  *fakeUnits
-	mod    *party.Module
-	pool   *pgxpool.Pool
-	tenant uuid.UUID
+	t     *testing.T
+	env   *pgtest.Env
+	iss   *authztest.FakeIssuer
+	app   *httptest.Server
+	admin *httptest.Server
+	vault *fakeVault
+	units *fakeUnits
+	// profiles: hồ sơ HTX giả của pf/cooperative (W3.3 — partyport.CoopProfiles).
+	profiles *fakeCoopProfiles
+	mod      *party.Module
+	pool     *pgxpool.Pool
+	tenant   uuid.UUID
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -56,6 +59,8 @@ func newFixture(t *testing.T) *fixture {
 	vault := newFakeVault()
 	units := newFakeUnits()
 	mod := party.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, party.Deps{AdminUnits: units, Vault: vault})
+	profiles := newFakeCoopProfiles()
+	mod.UseCoopProfiles(profiles)
 	log := telemetry.NewLogger("test", io.Discard)
 
 	appEng := httpx.NewEngine(log, 1<<20)
@@ -65,7 +70,7 @@ func newFixture(t *testing.T) *fixture {
 	appSrv, adminSrv := httptest.NewServer(appEng), httptest.NewServer(adminEng)
 	t.Cleanup(appSrv.Close)
 	t.Cleanup(adminSrv.Close)
-	return &fixture{t: t, env: env, iss: iss, app: appSrv, admin: adminSrv, vault: vault, units: units, mod: mod, pool: pool, tenant: ids.New()}
+	return &fixture{t: t, env: env, iss: iss, app: appSrv, admin: adminSrv, vault: vault, units: units, profiles: profiles, mod: mod, pool: pool, tenant: ids.New()}
 }
 
 type caller struct {
@@ -203,13 +208,6 @@ func refs(r resp, field string) []string {
 	return out
 }
 
-func farmer(coop uuid.UUID, phone string) map[string]any {
-	return map[string]any{
-		"cooperative_ref": coop.String(), "cultivated_area_ha": "1.25", "member_since": "2024-01-15",
-		"identity": map[string]any{"full_name": "Nguyễn Văn An", "phone": phone, "address": "Ấp 1"},
-	}
-}
-
 // ---------------------------------------------------------------------------
 
 // KN US-HTX-01, ADR-0009: TTKN tỉnh chỉ thấy HTX của các xã trong tỉnh; TTKN QG thấy toàn quốc.
@@ -233,10 +231,6 @@ func TestScopeProvinceSeesOnlyItsCommunes(t *testing.T) {
 	national := f.as(f.tenant, tr.national, port.RoleKNNationalAdmin)
 	if got := refs(national.appDo(http.MethodGet, "/v1/cooperatives", nil), "ref"); len(got) != 2 {
 		t.Fatalf("TTKN QG thấy toàn quốc: %v", got)
-	}
-	// TTKN QG chỉ đọc (KN US-HTX-01): không tạo được nông hộ.
-	if r := national.appDo(http.MethodPost, "/v1/households", farmer(tr.c1, "0901000001")); r.status != http.StatusForbidden {
-		t.Fatalf("TTKN QG chỉ đọc, nhận %d", r.status)
 	}
 
 	// Chi tiết HTX: toạ độ và cờ "vị trí tạm" (CGH FN-03 AC-03).
@@ -278,34 +272,6 @@ func TestScopeProvinceSeesOnlyItsCommunes(t *testing.T) {
 	}
 }
 
-// KN US-HTX-02: cán bộ xã chỉ tạo nông hộ trong xã phụ trách.
-func TestCommuneOfficerCannotCreateOutsideCommune(t *testing.T) {
-	f := newFixture(t)
-	tr := f.seedTree(f.root())
-	officer := f.as(f.tenant, tr.t30001, port.RoleKNOfficer)
-
-	if r := officer.appDo(http.MethodPost, "/v1/households", farmer(tr.c2, "0902000001")); r.status != http.StatusForbidden || r.body["code"] != "party.out_of_scope" {
-		t.Fatalf("HTX ngoài xã phải 403 party.out_of_scope: %d %v", r.status, r.body)
-	}
-	other := farmer(tr.c1, "0902000002")
-	other["commune_code"] = "30002"
-	if r := officer.appDo(http.MethodPost, "/v1/households", other); r.status != http.StatusForbidden {
-		t.Fatalf("xã của hộ ngoài phạm vi phải 403: %d %v", r.status, r.body)
-	}
-	if r := officer.appDo(http.MethodPost, "/v1/households", farmer(tr.c1, "0902000003")); r.status != http.StatusCreated {
-		t.Fatalf("tạo trong xã: %d %v", r.status, r.body)
-	}
-	// Quản lý HTX chỉ thao tác nông hộ của HTX mình (HTX US-HH-01 AC-3).
-	mgrOther := f.as(f.tenant, tr.c2, port.RoleCoopManager)
-	if r := mgrOther.appDo(http.MethodPost, "/v1/households", farmer(tr.c1, "0902000004")); r.status != http.StatusForbidden {
-		t.Fatalf("quản lý HTX khác phải 403: %d %v", r.status, r.body)
-	}
-	mgr := f.as(f.tenant, tr.c1, port.RoleCoopManager)
-	if r := mgr.appDo(http.MethodPost, "/v1/households", farmer(tr.c1, "0902000005")); r.status != http.StatusCreated {
-		t.Fatalf("quản lý HTX tạo hộ của HTX mình: %d %v", r.status, r.body)
-	}
-}
-
 // ADR-0009: không có org_ref → phạm vi rỗng, mặc định chặn.
 func TestNoOrgSeesNothing(t *testing.T) {
 	f := newFixture(t)
@@ -320,9 +286,6 @@ func TestNoOrgSeesNothing(t *testing.T) {
 	if r := anon.appDo(http.MethodGet, "/v1/cooperatives/"+tr.c1.String(), nil); r.status != http.StatusNotFound {
 		t.Fatalf("không org_ref đọc chi tiết phải 404: %d", r.status)
 	}
-	if r := anon.appDo(http.MethodPost, "/v1/households", farmer(tr.c1, "0903000001")); r.status != http.StatusForbidden {
-		t.Fatalf("không org_ref ghi phải 403: %d %v", r.status, r.body)
-	}
 	unknown := f.as(f.tenant, ids.New(), port.RoleKNOfficer)
 	if r := unknown.appDo(http.MethodGet, "/v1/cooperatives", nil); len(items(r)) != 0 {
 		t.Fatalf("org_ref không tồn tại phải thấy rỗng: %v", r.body)
@@ -336,9 +299,7 @@ func TestDeactivateReactivateCooperative(t *testing.T) {
 	tr := f.seedTree(root)
 	path := "/v1/cooperatives/" + tr.c1.String()
 	mgr := f.as(f.tenant, tr.c1, port.RoleCoopManager)
-	if r := mgr.appDo(http.MethodPost, "/v1/households", farmer(tr.c1, "0904000001")); r.status != http.StatusCreated {
-		t.Fatalf("tạo hộ: %v", r.body)
-	}
+	f.profiles.setHouseholds(tr.c1, 1) // một nông hộ đang là thành viên (pf/cooperative)
 
 	short := "Giải thể theo QĐ 12" // 19 ký tự có dấu
 	if r := root.adminDo(http.MethodPost, path+"/deactivate", map[string]any{"reason": short}); r.status != http.StatusUnprocessableEntity || r.body["code"] != "validation_failed" {
@@ -451,39 +412,6 @@ func TestTaxCodeUniquePerTenant(t *testing.T) {
 	}
 }
 
-// KN US-HTX-05, HTX US-HH-01: tạo chủ hộ qua kho định danh, trùng → dùng lại mã cũ, báo "trùng".
-func TestHouseholdDedupeViaVault(t *testing.T) {
-	f := newFixture(t)
-	tr := f.seedTree(f.root())
-	officer := f.as(f.tenant, tr.t30001, port.RoleKNOfficer)
-
-	r1 := officer.appDo(http.MethodPost, "/v1/households", farmer(tr.c1, "0905000001"))
-	if r1.status != http.StatusCreated || r1.body["duplicate"] != false {
-		t.Fatalf("tạo hộ: %d %v", r1.status, r1.body)
-	}
-	ref := str(r1.body, "household", "household_ref")
-	r2 := officer.appDo(http.MethodPost, "/v1/households", farmer(tr.c1, "0905000001"))
-	if r2.status != http.StatusOK || r2.body["duplicate"] != true || r2.body["duplicate_label"] != "trùng" || str(r2.body, "household", "household_ref") != ref {
-		t.Fatalf("trùng SĐT phải dùng lại mã cũ: %d %v", r2.status, r2.body)
-	}
-	lst := officer.appDo(http.MethodGet, "/v1/cooperatives/"+tr.c1.String()+"/households", nil)
-	it := items(lst)
-	if len(it) != 1 || it[0]["household_ref"] != ref || it[0]["label"] != "Nguyễn A." || it[0]["masked_phone"] != "xxx 001" {
-		t.Fatalf("danh sách nông hộ kèm nhãn che: %v", lst.body)
-	}
-	if _, ok := it[0]["phone"]; ok {
-		t.Fatal("danh sách không được có SĐT đầy đủ")
-	}
-	p := f.vault.usedPurposes()
-	if !slices.Contains(p, "registry.admin") || !slices.Contains(p, "extension.field_support") {
-		t.Fatalf("mục đích gọi kho định danh: %v", p)
-	}
-	// Cục KTHT không xem nông hộ.
-	if r := f.as(f.tenant, tr.national, port.RoleCGHViewer).appDo(http.MethodGet, "/v1/cooperatives/"+tr.c1.String()+"/households", nil); r.status != http.StatusForbidden {
-		t.Fatalf("cgh_viewer xem nông hộ phải 403: %d", r.status)
-	}
-}
-
 // KN US-ADM-07/08: di chuyển nhánh khi sáp nhập, giữ lịch sử, chuỗi băm nguyên vẹn, chặn vòng.
 func TestOrgMoveHistoryAndChain(t *testing.T) {
 	f := newFixture(t)
@@ -585,51 +513,6 @@ func TestIdempotentCreateOrg(t *testing.T) {
 	}
 }
 
-// KN US-HTX-03, HTX US-HH-02: nhập CSV, kết quả theo dòng.
-func TestImportHouseholdsCSV(t *testing.T) {
-	f := newFixture(t)
-	root := f.root()
-	tr := f.seedTree(root)
-	var c1Code, c2Code string
-	national := f.as(f.tenant, tr.national, port.RoleKNNationalAdmin)
-	for _, it := range items(national.appDo(http.MethodGet, "/v1/cooperatives", nil)) {
-		switch it["ref"] {
-		case tr.c1.String():
-			c1Code = it["code"].(string)
-		case tr.c2.String():
-			c2Code = it["code"].(string)
-		}
-	}
-	csvBody := "ho_ten,so_dien_thoai,cccd,dia_chi,ma_htx,dien_tich_ha,ngay_vao_htx\n" +
-		"Trần Thị Bình,0906000001,,Ấp 2," + c1Code + ",2.5,2023-05-01\n" +
-		"Trần Thị Bình,0906000001,,Ấp 2," + c1Code + ",2.5,2023-05-01\n" +
-		"Lê Văn Cường,,,Ấp 3," + c1Code + ",1,\n" +
-		"Phạm Văn Dũng,0906000004,,Ấp 4,HTX999999,1,\n" +
-		"Võ Thị Em,0906000005,,Ấp 5," + c2Code + ",1,\n" +
-		"Đỗ Văn Phúc,0906000006,,Ấp 6," + c1Code + ",abc,\n"
-	prov := f.as(f.tenant, tr.p89, port.RoleKNProvinceAdmin)
-	r := prov.call(f.admin.URL, http.MethodPost, "/v1/households/import", key(), "text/csv", []byte(csvBody))
-	if r.status != http.StatusOK || r.body["accepted"] != float64(1) || r.body["duplicate"] != float64(1) || r.body["rejected"] != float64(4) {
-		t.Fatalf("kết quả nhập: %d %v", r.status, r.body)
-	}
-	rows, _ := r.body["rows"].([]any)
-	want := []string{"accepted", "duplicate", "rejected", "rejected", "rejected", "rejected"}
-	for i, raw := range rows {
-		row := raw.(map[string]any)
-		if row["status"] != want[i] || row["row"] != float64(i+2) {
-			t.Fatalf("dòng %d: %v", i+2, row)
-		}
-		if reason, _ := row["reason"].(string); strings.Contains(reason, "0906") || strings.Contains(reason, "Trần") {
-			t.Fatalf("lý do không được chứa dữ liệu cá nhân: %q", reason)
-		}
-	}
-	// Tệp thiếu cột bắt buộc → từ chối cả tệp.
-	bad := prov.call(f.admin.URL, http.MethodPost, "/v1/households/import", key(), "text/csv", []byte("ho_ten,dia_chi\nA,B\n"))
-	if bad.status != http.StatusUnprocessableEntity || bad.body["code"] != "party.import_invalid" {
-		t.Fatalf("tệp sai mẫu: %d %v", bad.status, bad.body)
-	}
-}
-
 // R-04: không có dữ liệu cá nhân trong bảng pf_party.
 func TestNoPIIColumns(t *testing.T) {
 	f := newFixture(t)
@@ -653,13 +536,72 @@ func TestNoPIIColumns(t *testing.T) {
 			}
 		}
 	}
-	hh := cols["household"]
-	slices.Sort(hh)
-	want := []string{"active", "commune_code", "created_at", "created_by", "cultivated_area_ha", "household_ref", "tenant_id", "updated_at"}
-	if !slices.Equal(hh, want) {
-		t.Fatalf("pf_party.household chỉ được giữ mã tham chiếu và thuộc tính không định danh: %v", hh)
+	// W3.3: hồ sơ HTX, nông hộ, xã viên ở pf_coop (kiểm ở cooperative/member/handler).
+	if len(cols["org_event"]) == 0 || len(cols["org"]) == 0 || len(cols["household"]) != 0 || len(cols["cooperative"]) != 0 {
+		t.Fatalf("bảng pf_party sau W3.3: %v", cols)
 	}
-	if len(cols["org_event"]) == 0 || len(cols["cooperative"]) == 0 || len(cols["household_membership"]) == 0 {
-		t.Fatalf("thiếu bảng: %v", cols)
+}
+
+// W3.3 (docs/design/cooperative.md mục 8.6): tạo HTX hai bước — Nút ở pf/party, hồ sơ ở pf/cooperative, không giao dịch
+// nào chạy qua hai vai. Bước 2 lỗi → 503 (middleware xóa khóa); gọi lại CÙNG Idempotency-Key → hoàn tất: đúng một Nút
+// (một dòng sổ org_event), một hồ sơ dựng từ details của dòng sổ, kết quả như lần gọi không gián đoạn (201).
+func TestCreateCooperativeTwoStepRetry_W33(t *testing.T) {
+	f := newFixture(t)
+	root := f.root()
+	name := "HTX Hai Bước " + ids.New().String()[:8]
+	b, _ := json.Marshal(map[string]any{"kind": "cooperative", "name": name, "admin_unit_code": "30001",
+		"cooperative": map[string]any{"tax_code": "0311111111", "area_ha": "12.5", "established_on": "2020-02-02", "address": "Ấp 9",
+			"location": map[string]any{"lat": "10.5", "lon": "105.5"}}})
+	count := func(q string) int {
+		t.Helper()
+		var n int
+		if err := tenant.WithTenantTx(context.Background(), f.pool, f.tenant, func(tx pgx.Tx) error {
+			return tx.QueryRow(context.Background(), q, name).Scan(&n)
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	f.profiles.failNext(1, nil)
+	k := key()
+	r1 := root.call(f.admin.URL, http.MethodPost, "/v1/orgs", k, "application/json", b)
+	if r1.status != http.StatusServiceUnavailable || r1.body["code"] != "party.dependency_unavailable" {
+		t.Fatalf("bước 2 lỗi phải 503: %d %v", r1.status, r1.body)
+	}
+	if count("SELECT count(*) FROM pf_party.org WHERE name = $1") != 1 || f.profiles.count(f.tenant) != 0 {
+		t.Fatal("sau bước 1: một Nút, chưa có hồ sơ")
+	}
+	r2 := root.call(f.admin.URL, http.MethodPost, "/v1/orgs", k, "application/json", b)
+	if r2.status != http.StatusCreated || str(r2.body, "org", "kind") != "cooperative" || !strings.HasPrefix(str(r2.body, "org", "code"), "HTX") {
+		t.Fatalf("gọi lại cùng khóa phải hoàn tất như lần đầu (201): %d %v", r2.status, r2.body)
+	}
+	ref := uuid.MustParse(str(r2.body, "org", "ref"))
+	r3 := root.call(f.admin.URL, http.MethodPost, "/v1/orgs", k, "application/json", b)
+	if r3.status != http.StatusCreated || str(r3.body, "org", "ref") != ref.String() || r3.hdr.Get("Idempotent-Replayed") != "true" {
+		t.Fatalf("gọi lặp sau khi hoàn tất: %d %v", r3.status, r3.body)
+	}
+	if n := count("SELECT count(*) FROM pf_party.org WHERE name = $1"); n != 1 {
+		t.Fatalf("đúng một Nút: %d", n)
+	}
+	if n := count("SELECT count(*) FROM pf_party.org_event WHERE name = $1 AND action = 'created'"); n != 1 {
+		t.Fatalf("đúng một dòng sổ org_event.created: %d", n)
+	}
+	p, ok := f.profiles.profile(f.tenant, ref)
+	if f.profiles.count(f.tenant) != 1 || !ok || p.TaxCode != "0311111111" || p.AreaHa == nil || p.AreaHa.String() != "12.5" ||
+		p.EstablishedOn == nil || p.EstablishedOn.Format(time.DateOnly) != "2020-02-02" || p.Address != "Ấp 9" ||
+		p.Lat == nil || p.Lat.String() != "10.5" || p.Lon == nil || p.Lon.String() != "105.5" {
+		t.Fatalf("hồ sơ dựng từ dòng sổ: %+v", p)
+	}
+	g := root.appDo(http.MethodGet, "/v1/cooperatives/"+ref.String(), nil)
+	if g.status != http.StatusOK || str(g.body, "tax_code") != "0311111111" || g.body["location_provisional"] != false {
+		t.Fatalf("chi tiết HTX: %d %v", g.status, g.body)
+	}
+
+	// Hai yêu cầu song song cùng MST lọt kiểm trước: chỉ mục duy nhất của hồ sơ chặn bên thua ở bước 2 → 409.
+	f.profiles.failNext(1, port.ErrCoopTaxCodeTaken)
+	r4 := root.adminDo(http.MethodPost, "/v1/orgs", map[string]any{"kind": "cooperative", "name": name + " B", "admin_unit_code": "30001",
+		"cooperative": map[string]any{"tax_code": "0322222222"}})
+	if r4.status != http.StatusConflict || r4.body["code"] != "party.tax_code_taken" {
+		t.Fatalf("MST trùng ở bước 2: %d %v", r4.status, r4.body)
 	}
 }

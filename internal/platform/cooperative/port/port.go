@@ -16,6 +16,7 @@ package port
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -135,6 +136,23 @@ type Seasons interface {
 	// HarvestDates: ngày gieo / thu hoạch của vụ trên các thửa (thay đọc chéo của van collection).
 	// W3.2: nguồn cũ không có cổng → ErrUnavailable; có ở W3.3.
 	HarvestDates(ctx context.Context, plotRefs []uuid.UUID) ([]SeasonHarvestDate, error)
+	// Codes: mã vụ / năm của các vụ (W3.3 — van thu gom pf/cropcycle gắn vụ cho bảng kê của sản phẩm
+	// collection_volume; trước W3.3 là JOIN pf_cropcycle.season_current). refs rỗng → rỗng; vụ không có → vắng mặt.
+	Codes(ctx context.Context, refs []uuid.UUID) (map[uuid.UUID]SeasonKey, error)
+	// Progress: mọi vụ chưa hủy đã mở tới asOf (zero = không chặn), sắp theo season_ref — nguồn tiến độ gặt của
+	// feed harvest_progress_by_commune (W5.3; trước W3.3 pf/cropcycle đọc thẳng season_current).
+	Progress(ctx context.Context, asOf time.Time) ([]SeasonProgress, error)
+}
+
+// SeasonProgress là một vụ chưa hủy cho nguồn tiến độ gặt (Seasons.Progress).
+type SeasonProgress struct {
+	CommuneCode         string
+	SeasonCode          string
+	SeasonYear          int
+	HouseholdRef        *uuid.UUID
+	AreaHa              decimal.Decimal
+	Completed           bool
+	ExpectedHarvestDate time.Time
 }
 
 // Diary: nhật ký canh tác (sổ farm_log + bảng chiếu farm_log_current), bằng chứng MRV

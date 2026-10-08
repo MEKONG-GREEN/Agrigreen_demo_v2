@@ -9,7 +9,7 @@ version: 1.0.0
 depends:
   pf/accounts: ">=1.0 <2"
   pf/evidence: ">=1.0 <2"
-  pf/party: ">=1.0 <2"
+  pf/party: ">=2.0 <3"
   vault/identity: ">=1.0 <2"
 provides:
   ports: [ConflictViewer, Devices, FarmerSource, Sink, Source]

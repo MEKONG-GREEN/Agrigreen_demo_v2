@@ -18,7 +18,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
-// Mã lỗi của sổ tổ chức, HTX, nông hộ (docs/errors.md).
+// Mã lỗi của sổ tổ chức, HTX (docs/errors.md). Mã lỗi nông hộ (party.household_*) do pf/cooperative trả (W3.3).
 var (
 	ErrOrgNotFound      = problem.New(http.StatusNotFound, "party.org_not_found", "Không tìm thấy tổ chức")
 	ErrOrgCodeTaken     = problem.New(http.StatusConflict, "party.org_code_taken", "Mã tổ chức đã được dùng")
@@ -31,10 +31,6 @@ var (
 	ErrImportInvalid    = problem.New(http.StatusUnprocessableEntity, "party.import_invalid", "Tệp nhập không đúng mẫu quy định")
 	// ErrCoopNameTaken: HTX US-HTX-03 AC-3 (và nhập hàng loạt US-HTX-02) — tên HTX đã có trong tenant.
 	ErrCoopNameTaken = problem.New(http.StatusConflict, "party.cooperative_name_taken", "Tên HTX này đã tồn tại, vui lòng chọn tên khác.")
-	// ErrPhoneTaken: sao chép nông hộ với SĐT đã có (HTX US-HH-02 AC-4, US-HH-01 AC-3).
-	ErrPhoneTaken = problem.New(http.StatusConflict, "party.household_phone_taken", "SĐT đã được sử dụng bởi nông hộ khác")
-	// ErrNoContact: chủ hộ chưa có SĐT hợp lệ trong kho định danh (HTX US-HH-03).
-	ErrNoContact = problem.New(http.StatusNotFound, "party.household_contact_unavailable", "Nông hộ chưa có số điện thoại liên hệ")
 )
 
 // Vai được đọc sổ tổ chức và HTX.
@@ -43,19 +39,10 @@ var readerRoles = []string{
 	port.RoleCoopManager, port.RoleCGHViewer, authz.RolePlatformAdmin,
 }
 
-// Vai được xem nông hộ (nhãn hiển thị đã che, mục 10.4). Cục KTHT không xem nông hộ.
-var householdReaderRoles = []string{
-	port.RoleRegistryAdmin, port.RoleKNNationalAdmin, port.RoleKNProvinceAdmin, port.RoleKNOfficer,
-	port.RoleCoopManager, authz.RolePlatformAdmin,
-}
-
-// Vai được tạo nông hộ (TTKN QG chỉ đọc — KN US-HTX-01).
-var householdWriterRoles = []string{port.RoleRegistryAdmin, port.RoleKNProvinceAdmin, port.RoleKNOfficer, port.RoleCoopManager}
-
 // Vai quản trị dữ liệu chủ trên Admin API.
 var adminRoles = []string{port.RoleRegistryAdmin, port.RoleKNProvinceAdmin, authz.RolePlatformAdmin}
 
-// Registry là use case sổ tổ chức, HTX và nông hộ.
+// Registry là use case sổ tổ chức và HTX (Nút). Nông hộ/xã viên và hồ sơ HTX ở pf/cooperative (W3.3).
 type Registry struct {
 	DB    tenant.Beginner // pool vai party_app
 	Clock clock.Clock
@@ -69,12 +56,17 @@ type Registry struct {
 	// Machines (tùy chọn): tổng số máy khai báo của HTX (pf/mechanization, KN v7.7 FN-XA-03.04) cho
 	// cảnh báo vô hiệu hóa HTX (FN-XA-03.03).
 	Machines port.CoopMachineCounts
+	// Profiles: hồ sơ HTX và số nông hộ thành viên (pf/cooperative, W3.3). Thiếu → thao tác cần hồ sơ HTX trả
+	// 503 party.dependency_unavailable.
+	Profiles port.CoopProfiles
 }
 
 var (
 	_ port.Orgs          = (*Registry)(nil)
 	_ port.OrgCodes      = (*Registry)(nil)
 	_ port.ScopeResolver = (*Registry)(nil)
+	_ port.OrgDirectory  = (*Registry)(nil)
+	_ port.ConsentStates = (*Registry)(nil)
 )
 
 // fieldProblem ánh xạ domain.FieldError sang problem 422 theo trường.
@@ -174,4 +166,39 @@ func (r *Registry) scopeFor(ctx context.Context, p authz.Principal) (authz.Scope
 		return authz.Scope{Units: []string{s.AdminUnitCode}}, nil
 	}
 	return authz.Scope{}, nil
+}
+
+// OrgsByRefs thực hiện port.OrgDirectory. Tenant lấy từ context.
+func (r *Registry) OrgsByRefs(ctx context.Context, refs []uuid.UUID) (map[uuid.UUID]port.Org, error) {
+	out := make(map[uuid.UUID]port.Org, len(refs))
+	if len(refs) == 0 {
+		return out, nil
+	}
+	var rows []port.Org
+	err := tenant.FromCtxTx(ctx, r.DB, func(tx pgx.Tx) error {
+		var e error
+		rows, e = store.OrgsByRefs(ctx, tx, refs)
+		return e
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, o := range rows {
+		out[o.Ref] = o
+	}
+	return out, nil
+}
+
+// OrgsOfKind thực hiện port.OrgDirectory. Tenant lấy từ context.
+func (r *Registry) OrgsOfKind(ctx context.Context, kind port.OrgKind, units []string, activeOnly bool) ([]port.Org, error) {
+	if units != nil && len(units) == 0 {
+		return []port.Org{}, nil
+	}
+	var out []port.Org
+	err := tenant.FromCtxTx(ctx, r.DB, func(tx pgx.Tx) error {
+		var e error
+		out, e = store.OrgsOfKind(ctx, tx, string(kind), units, activeOnly)
+		return e
+	})
+	return out, err
 }

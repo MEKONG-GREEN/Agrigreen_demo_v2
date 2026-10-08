@@ -3,6 +3,8 @@ package assembly
 import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
@@ -44,14 +46,14 @@ type Consumer struct {
 //   - pf.metrics.layer_log (G3): nhật ký thay đổi lớp GIS từ sự kiện geo/cropcycle/mechanization/waterway (GIS US-EVL-01).
 //   - pf.metering.statement (G5): bảng kê kỳ tháng của pf/metering (ADR-0023).
 var Consumers = []Consumer{
-	{Name: mechport.AreaSyncConsumer, Module: mechanization.DBModule, Events: []string{ccport.EventCoopSeasonAreaChanged},
+	{Name: mechport.AreaSyncConsumer, Module: mechanization.DBModule, Events: []string{coopport.EventCoopSeasonAreaChanged},
 		Handler: func(m Modules) inbox.Handler { return m.Mechanization.AreaSyncHandler() }},
 	{Name: geoport.HubValveConsumer, Module: geo.DBModule, Events: []string{geoport.EventMKGHubFacilityPublished, geoport.EventMKGHubCapacityPublished},
 		Handler: func(m Modules) inbox.Handler { return m.Geo.HubValveHandler() }},
 	{Name: ccport.CollectionValveConsumer, Module: cropcycle.DBModule, Events: ccport.CollectionValveEvents,
 		Handler: func(m Modules) inbox.Handler { return m.CropCycle.CollectionValveHandler() }},
-	{Name: ccport.GpsLogConsumer, Module: cropcycle.DBModule, Events: ccport.GpsLogEvents,
-		Handler: func(m Modules) inbox.Handler { return m.CropCycle.GpsLogHandler() }},
+	{Name: coopport.GpsLogConsumer, Module: cooperative.DBModule, Events: coopport.GpsLogEvents,
+		Handler: func(m Modules) inbox.Handler { return m.Cooperative.GpsLogHandler() }},
 	{Name: extport.GpsLogConsumer, Module: extension.DBModule, Events: []string{extport.EventSupportRequestSubmitted},
 		Handler: func(m Modules) inbox.Handler { return m.Extension.GpsLogHandler() }},
 	{Name: simport.SnapshotConsumer, Module: simulation.DBModule, Events: []string{simport.EventRunSubmitted},

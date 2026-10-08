@@ -12,18 +12,14 @@ import (
 
 // Phiên bản quy tắc ghim vào các sổ G2 (mục 8.1).
 const (
-	RuleCooperativeBoundary = "geo.cooperative_boundary.v1"
-	RuleFacility            = "geo.facility.v1"
-	RuleCapacity            = "geo.capacity.v1"
-	RuleRoad                = "geo.road.v1"
-	RuleGpsFix              = "geo.gps_fix.v1"
+	RuleFacility = "geo.facility.v1"
+	RuleCapacity = "geo.capacity.v1"
+	RuleRoad     = "geo.road.v1"
+	RuleGpsFix   = "geo.gps_fix.v1"
 )
 
-// Hành động trên các sổ phiên bản hình (ranh giới HTX, đường bộ).
-const (
-	ActionRecorded = "recorded"
-	// ActionRetired, ActionRestored dùng chung với plot_event.
-)
+// Hành động trên các sổ phiên bản hình (đường bộ).
+const ActionRecorded = "recorded"
 
 // Hành động trên sổ cơ sở.
 const (
@@ -37,31 +33,7 @@ const (
 	StatusRetired = "retired"
 )
 
-// Nguồn ranh giới HTX.
-const (
-	CoopSourceGeoWeb     = "geo_web"
-	CoopSourceHTXApp     = "htx_app"
-	CoopSourceImportFile = "import_file"
-	CoopSourcePartySync  = "party_sync" // đồng bộ từ API HTX (US-BND-01, đợt sau)
-)
-
-// KnownCoopSource cho biết nguồn ranh giới HTX hợp lệ khi ghi qua API.
-func KnownCoopSource(s string) bool {
-	switch s {
-	case CoopSourceGeoWeb, CoopSourceHTXApp, CoopSourceImportFile:
-		return true
-	}
-	return false
-}
-
-// Giới hạn diện tích hợp lý của ranh giới HTX (ha).
-var (
-	MinCoopAreaHa = decimal.RequireFromString("0.01")
-	MaxCoopAreaHa = decimal.RequireFromString("100000")
-)
-
 // StreamKey của các sổ G2.
-func CoopStreamKey(ref uuid.UUID) string     { return "cooperative:" + ref.String() }
 func FacilityStreamKey(ref uuid.UUID) string { return "facility:" + ref.String() }
 func RoadStreamKey(ref uuid.UUID) string     { return "road:" + ref.String() }
 func GpsStreamKey(actor uuid.UUID) string    { return "gps:" + actor.String() }
@@ -101,7 +73,6 @@ func KnownUnit(u string) bool { return u == UnitTon || u == UnitM3 || u == UnitK
 const (
 	MsgFacilityRequired = "Vui lòng nhập đầy đủ Tên Hub và Địa chỉ."
 	MsgCapacityPositive = "Sức chứa phải là số lớn hơn 0."
-	MsgCoopRequired     = "Vui lòng nhập đầy đủ Tên HTX và Địa chỉ." // GIS US-BND-02 AC-2 (HTX chọn từ sổ pf/party)
 	MsgRoadRequired     = "Vui lòng nhập đầy đủ Tên tuyến và Phân loại."
 	MsgRoadLoadPositive = "Tải trọng tối đa phải là số lớn hơn 0."
 	MsgRoadNoneMatched  = "Không tìm thấy tuyến đường phù hợp với tải trọng phương tiện đã nhập."

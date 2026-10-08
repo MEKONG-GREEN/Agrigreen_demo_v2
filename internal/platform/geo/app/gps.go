@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
@@ -83,6 +84,11 @@ func (s *Service) RecordFix(ctx context.Context, fix port.GpsFix) (port.GpsFixRe
 	receipt := func(f store.GpsFix, dup bool) port.GpsFixReceipt {
 		return port.GpsFixReceipt{ID: f.ID, Seq: f.Seq, RecordedAt: f.RecordedAt, DistanceToPlotM: f.DistanceToPlotM, Duplicate: dup}
 	}
+	// Dữ kiện lô (xã/HTX, khoảng cách tới ranh giới hiện hành) của pf/cooperative — đọc trước giao dịch ghi log (W3.3).
+	place, err := s.plotPlace(ctx, fix.PlotRef, lon, lat)
+	if err != nil {
+		return port.GpsFixReceipt{}, err
+	}
 	var out port.GpsFixReceipt
 	err = s.inTx(ctx, tid, func(tx pgx.Tx) error {
 		if prev, err := store.GpsFixByIdemKey(ctx, tx, fix.IdemKey); err != nil || prev != nil {
@@ -92,14 +98,8 @@ func (s *Service) RecordFix(ctx context.Context, fix port.GpsFix) (port.GpsFixRe
 			return err
 		}
 		// Phạm vi đọc: xã/HTX của lô; không có lô → xã gửi lên; không có → xã chứa điểm.
-		if row.PlotRef != uuid.Nil {
-			p, err := store.PlotByRef(ctx, tx, row.PlotRef, false)
-			if err != nil {
-				return err
-			}
-			if p != nil {
-				row.CommuneCode, row.CooperativeRef = p.CommuneCode, p.CooperativeRef
-			}
+		if place != nil {
+			row.CommuneCode, row.CooperativeRef, row.DistanceToPlotM = place.CommuneCode, place.CooperativeRef, place.DistanceM
 		}
 		if row.CommuneCode == "" && pointGJ != "" {
 			c, err := store.CommuneAt(ctx, tx, pointGJ)
@@ -194,7 +194,14 @@ func (s *Service) listFarmerGps(ctx context.Context, p authz.Principal, in GpsQu
 	if in.Purpose != "" && !domain.KnownGpsPurpose(in.Purpose) {
 		return GpsPage{}, problem.Validation.WithField("purpose", "phải là season_open, farm_log, harvest, support hoặc plot")
 	}
+	if s.Plots == nil {
+		return GpsPage{}, ErrDependency.WithDetail("chưa nối dữ kiện thửa (pf/cooperative)")
+	}
 	hh, err := s.Farmers.HouseholdsOf(ctx, p.ActorRef)
+	if err != nil {
+		return GpsPage{}, err
+	}
+	plots, err := s.Plots.PlotsOfHouseholds(ctx, hh)
 	if err != nil {
 		return GpsPage{}, err
 	}
@@ -202,7 +209,7 @@ func (s *Service) listFarmerGps(ctx context.Context, p authz.Principal, in GpsQu
 	err = s.inTx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		var e error
 		items, e = store.ListGpsFixes(ctx, tx, store.GpsQuery{
-			Filter: store.Filter{All: true}, OwnActor: p.ActorRef, OwnHouseholds: hh, ActorRef: in.ActorRef, TargetRef: in.TargetRef,
+			Filter: store.Filter{All: true}, OwnActor: p.ActorRef, OwnPlots: plots, ActorRef: in.ActorRef, TargetRef: in.TargetRef,
 			PlotRef: in.PlotRef, Purpose: in.Purpose, Before: in.Before, Limit: in.Limit + 1,
 		})
 		return e
@@ -224,4 +231,22 @@ func gpsPage(items []store.GpsFix, limit int) GpsPage {
 		pg.Items = []store.GpsFix{}
 	}
 	return pg
+}
+
+// plotPlace đọc xã/HTX của lô và khoảng cách từ điểm tới ranh giới hiện hành qua port.PlotGeometry (pf/cooperative).
+// Không có lô, chưa nối port hoặc không có thửa → nil (log không có khoảng cách, phạm vi theo xã).
+func (s *Service) plotPlace(ctx context.Context, ref uuid.UUID, lon, lat *float64) (*port.PlotPlace, error) {
+	if ref == uuid.Nil || s.Plots == nil {
+		return nil, nil
+	}
+	var dlon, dlat *decimal.Decimal
+	if lon != nil && lat != nil {
+		x, y := decimal.NewFromFloat(*lon), decimal.NewFromFloat(*lat)
+		dlon, dlat = &x, &y
+	}
+	pl, found, err := s.Plots.PlotPlace(ctx, ref, dlon, dlat)
+	if err != nil || !found {
+		return nil, err
+	}
+	return &pl, nil
 }

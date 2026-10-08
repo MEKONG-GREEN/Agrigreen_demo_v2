@@ -195,7 +195,8 @@ func newEvent(p authz.Principal, o port.Org, action domain.OrgAction, now time.T
 	}
 }
 
-// CreateOrg tạo tổ chức (kèm hồ sơ HTX nếu kind = cooperative): sổ + bảng hiện tại trong một giao dịch.
+// CreateOrg tạo tổ chức: sổ + bảng hiện tại trong một giao dịch; kind = cooperative thêm bước 2 ghi hồ sơ HTX ở
+// pf/cooperative (coop.go).
 func (r *Registry) CreateOrg(ctx context.Context, in CreateOrgInput) (OrgResult, error) {
 	p, err := authz.Require(ctx, adminRoles...)
 	if err != nil {
@@ -248,11 +249,21 @@ func (r *Registry) createOrg(ctx context.Context, p authz.Principal, in CreateOr
 		return OrgResult{}, err
 	}
 
-	// Gọi lặp: trả kết quả cũ trước khi chạm kho định danh.
+	// Gọi lặp: trả kết quả cũ trước khi chạm kho định danh (kèm bước 2 nếu lần trước dừng giữa hai bước).
 	if prev, err := r.replay(ctx, p.TenantID, in.IdemKey); err != nil {
 		return OrgResult{}, err
 	} else if prev != nil {
-		return *prev, nil
+		return r.completeCoop(ctx, p.TenantID, *prev)
+	}
+	if isCoop {
+		if _, err := r.coopProfiles(); err != nil {
+			return OrgResult{}, err
+		}
+		if profile.TaxCode != "" {
+			if err := r.taxCodeTaken(ctx, p.TenantID, profile.TaxCode, uuid.Nil); err != nil {
+				return OrgResult{}, err
+			}
+		}
 	}
 	repRef, repDup := in.RepresentativeRef, false
 	if in.Representative != nil {
@@ -262,7 +273,7 @@ func (r *Registry) createOrg(ctx context.Context, p authz.Principal, in CreateOr
 		}
 	}
 
-	return r.write(ctx, p.TenantID, in.IdemKey, func(tx pgx.Tx) (OrgResult, error) {
+	res, err := r.write(ctx, p.TenantID, in.IdemKey, func(tx pgx.Tx) (OrgResult, error) {
 		var parent *store.OrgState
 		var parentKind *port.OrgKind
 		if in.ParentRef != uuid.Nil {
@@ -299,15 +310,6 @@ func (r *Registry) createOrg(ctx context.Context, p authz.Principal, in CreateOr
 			if code, err = store.NextCooperativeCode(ctx, tx); err != nil {
 				return OrgResult{}, err
 			}
-			if profile.TaxCode != "" {
-				owner, err := store.TaxCodeOwner(ctx, tx, profile.TaxCode)
-				if err != nil {
-					return OrgResult{}, err
-				}
-				if owner != uuid.Nil {
-					return OrgResult{}, ErrTaxCodeTaken.With("existing_ref", owner.String())
-				}
-			}
 		} else if taken, err := store.OrgCodeTaken(ctx, tx, code); err != nil {
 			return OrgResult{}, err
 		} else if taken {
@@ -327,17 +329,17 @@ func (r *Registry) createOrg(ctx context.Context, p authz.Principal, in CreateOr
 		if err := store.InsertOrg(ctx, tx, p.TenantID, o, ev); err != nil {
 			return OrgResult{}, err
 		}
-		if isCoop {
-			if err := store.InsertCooperative(ctx, tx, p.TenantID, o.Ref, profile); err != nil {
-				return OrgResult{}, err
-			}
-		}
 		// W2.5: pf.party.org.created → worker pf.kref (k_ref.org, k_ref.node_closure).
 		if err := enqueueStatusEvent(ctx, tx, ev, 0); err != nil {
 			return OrgResult{}, err
 		}
 		return OrgResult{Org: o, Event: ev, RepresentativeDuplicate: repDup}, nil
 	})
+	if err != nil {
+		return OrgResult{}, err
+	}
+	// Bước 2 (W3.3): hồ sơ HTX ở pf/cooperative, dựng từ details của dòng sổ org_event.created.
+	return r.completeCoop(ctx, p.TenantID, res)
 }
 
 func (r *Registry) createRepresentative(ctx context.Context, rep Representative, area string) (uuid.UUID, bool, error) {
@@ -547,6 +549,16 @@ func (r *Registry) changeStatusIn(ctx context.Context, p authz.Principal, sc aut
 		return OrgResult{}, problem.IdempotencyRequired
 	}
 	now := r.now()
+	// Nông hộ đang là thành viên (pf/cooperative) đọc TRƯỚC giao dịch của sổ tổ chức — chỉ là số cảnh báo trong
+	// payload pf.party.org.deactivated, không phải điều kiện chặn.
+	households := 0
+	if action == domain.ActionDeactivated && (in.ExpectKind == port.OrgCooperative || in.ExpectKind == "") && r.Profiles != nil {
+		n, err := r.activeHouseholds(ctx, p.TenantID, in.Ref)
+		if err != nil {
+			return OrgResult{}, err
+		}
+		households = n
+	}
 	return r.write(ctx, p.TenantID, in.IdemKey, func(tx pgx.Tx) (OrgResult, error) {
 		cur, err := store.OrgByRef(ctx, tx, in.Ref, true)
 		if err != nil {
@@ -563,7 +575,9 @@ func (r *Registry) changeStatusIn(ctx context.Context, p authz.Principal, sc aut
 		}
 		o := cur.Org
 		statusReason := cur.StatusReason
-		var households int
+		if cur.Kind != port.OrgCooperative {
+			households = 0
+		}
 		switch action {
 		case domain.ActionRenamed:
 			o.Name = strings.TrimSpace(in.Name)
@@ -574,9 +588,6 @@ func (r *Registry) changeStatusIn(ctx context.Context, p authz.Principal, sc aut
 			}
 			if n > 0 {
 				return OrgResult{}, ErrActiveChildren.With("active_children", n)
-			}
-			if households, err = store.CountActiveHouseholds(ctx, tx, cur.Ref); err != nil {
-				return OrgResult{}, err
 			}
 			o.Active, statusReason = false, strings.TrimSpace(in.Reason)
 		case domain.ActionReactivated:
@@ -728,11 +739,11 @@ func (r *Registry) ListOrgs(ctx context.Context, q ListQuery) (OrgPage, error) {
 
 // CoopPage là một trang HTX.
 type CoopPage struct {
-	Items []store.Cooperative
+	Items []Cooperative
 	Next  *uuid.UUID
 }
 
-// ListCooperatives liệt kê HTX trong phạm vi, tìm theo tên/mã/mã số thuế.
+// ListCooperatives liệt kê HTX trong phạm vi, tìm theo tên/mã (Nút) hoặc mã số thuế (hồ sơ ở pf/cooperative).
 func (r *Registry) ListCooperatives(ctx context.Context, q ListQuery) (CoopPage, error) {
 	p, err := authz.Require(ctx, readerRoles...)
 	if err != nil {
@@ -744,52 +755,51 @@ func (r *Registry) ListCooperatives(ctx context.Context, q ListQuery) (CoopPage,
 		sc, err = r.narrowScope(ctx, sc, q.AdminUnit)
 	}
 	if err != nil || sc.Empty() {
-		return CoopPage{Items: []store.Cooperative{}}, err
+		return CoopPage{Items: []Cooperative{}}, err
 	}
-	var items []store.Cooperative
+	qRefs, _, err := r.coopFilterRefs(ctx, p.TenantID, q.Q, nil, nil)
+	if err != nil {
+		return CoopPage{}, err
+	}
+	var orgs []store.CoopOrg
 	err = tenant.WithTenantTx(ctx, r.DB, p.TenantID, func(tx pgx.Tx) error {
 		var e error
-		items, e = store.ListCooperatives(ctx, tx, store.OrgFilter{
-			All: sc.All, Units: sc.Units, Q: q.Q, IncludeInactive: q.IncludeInactive, After: q.After, Limit: q.Limit + 1,
+		orgs, e = store.ListCooperativeOrgs(ctx, tx, store.CoopOrgFilter{
+			All: sc.All, Units: sc.Units, Q: q.Q, QRefs: qRefs, IncludeInactive: q.IncludeInactive, After: q.After, Limit: q.Limit + 1,
 		})
 		return e
 	})
 	if err != nil {
 		return CoopPage{}, err
 	}
-	pg := CoopPage{Items: items}
-	if len(items) > q.Limit {
-		pg.Items = items[:q.Limit]
-		last := pg.Items[q.Limit-1].Ref
+	var pg CoopPage
+	if len(orgs) > q.Limit {
+		orgs = orgs[:q.Limit]
+		last := orgs[q.Limit-1].Ref
 		pg.Next = &last
 	}
-	if pg.Items == nil {
-		pg.Items = []store.Cooperative{}
+	if pg.Items, err = r.cooperatives(ctx, p.TenantID, orgs, false); err != nil {
+		return CoopPage{}, err
 	}
 	return pg, nil
 }
 
 // GetCooperative đọc một HTX; ngoài phạm vi → 404 (không lộ sự tồn tại).
-func (r *Registry) GetCooperative(ctx context.Context, ref uuid.UUID) (store.Cooperative, error) {
+func (r *Registry) GetCooperative(ctx context.Context, ref uuid.UUID) (Cooperative, error) {
 	p, err := authz.Require(ctx, readerRoles...)
 	if err != nil {
-		return store.Cooperative{}, err
+		return Cooperative{}, err
 	}
 	sc, err := r.scopeFor(ctx, p)
 	if err != nil {
-		return store.Cooperative{}, err
+		return Cooperative{}, err
 	}
-	var c *store.Cooperative
-	err = tenant.WithTenantTx(ctx, r.DB, p.TenantID, func(tx pgx.Tx) error {
-		var e error
-		c, e = store.CooperativeByRef(ctx, tx, ref)
-		return e
-	})
+	c, err := r.cooperativeByRef(ctx, p.TenantID, ref, false)
 	if err != nil {
-		return store.Cooperative{}, err
+		return Cooperative{}, err
 	}
 	if c == nil || !visible(sc, c.AdminUnitCode) {
-		return store.Cooperative{}, ErrOrgNotFound
+		return Cooperative{}, ErrOrgNotFound
 	}
 	return *c, nil
 }

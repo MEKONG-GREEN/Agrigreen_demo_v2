@@ -105,11 +105,11 @@ func TestPubViewsDeclaredAndPrivileges_W63(t *testing.T) {
 	     AND a.grantee <> c.relowner
 	  UNION ALL
 	  SELECT n.nspname || '.' || c.relname || ' → r_metrics' FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-	   WHERE n.nspname IN ('pf_cropcycle', 'pf_extension', 'pf_geo', 'pf_mechanization') AND c.relkind IN ('r', 'p', 'v', 'm')
+	   WHERE n.nspname IN ('pf_cropcycle', 'pf_extension', 'pf_geo', 'pf_mechanization', 'pf_coop') AND c.relkind IN ('r', 'p', 'v', 'm')
 	     AND has_table_privilege('r_metrics', c.oid, 'SELECT, INSERT, UPDATE, DELETE')
 	  UNION ALL
 	  SELECT n.nspname || ' USAGE → r_metrics' FROM pg_namespace n
-	   WHERE n.nspname IN ('pf_cropcycle', 'pf_extension', 'pf_geo', 'pf_mechanization') AND has_schema_privilege('r_metrics', n.oid, 'USAGE')`)
+	   WHERE n.nspname IN ('pf_cropcycle', 'pf_extension', 'pf_geo', 'pf_mechanization', 'pf_coop') AND has_schema_privilege('r_metrics', n.oid, 'USAGE')`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,9 +150,11 @@ func TestPubViewsDeclaredAndPrivileges_W63(t *testing.T) {
 			t.Errorf("r_metrics đọc %s: %d %v", v, n, err)
 		}
 	}
-	for _, base := range []string{"pf_cropcycle.season_event", "pf_cropcycle.harvest_declaration", "pf_extension.field_report",
-		"pf_extension.task_event", "pf_extension.task_current", "pf_extension.directive_ack", "pf_geo.plot_event",
-		"pf_geo.plot_boundary", "pf_mechanization.balance_run", "pf_mechanization.balance_result"} {
+	// W3.3: sổ vụ, khai sản lượng, sổ thửa, ranh giới thửa/HTX chuyển sang pf_coop (view _pub giữ tên — bám OID).
+	for _, base := range []string{"pf_coop.season_event", "pf_coop.harvest_declaration", "pf_extension.field_report",
+		"pf_extension.task_event", "pf_extension.task_current", "pf_extension.directive_ack", "pf_coop.plot_event",
+		"pf_coop.plot_boundary", "pf_coop.cooperative_boundary", "pf_geo.facility_event", "pf_mechanization.balance_run",
+		"pf_mechanization.balance_result"} {
 		err := tenant.WithTenantTx(ctx, db, ids.New(), func(tx pgx.Tx) error {
 			_, e := tx.Exec(ctx, "SELECT 1 FROM "+base+" LIMIT 1")
 			return e

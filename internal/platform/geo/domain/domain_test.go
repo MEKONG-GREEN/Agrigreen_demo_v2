@@ -3,9 +3,6 @@ package domain
 import (
 	"encoding/json"
 	"testing"
-
-	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 )
 
 func code(err error) string {
@@ -108,35 +105,5 @@ func TestParseFeaturesFormats(t *testing.T) {
 	}
 	if _, err := ParseFeatures(FormatKML, []byte("<kml><Placemark>")); code(err) != CodeFormat {
 		t.Fatalf("KML hỏng phải trả geo.format_invalid, được %v", err)
-	}
-}
-
-func TestClassifyOverlaps(t *testing.T) {
-	coopA, coopB := uuid.New(), uuid.New()
-	tol := decimal.NewFromInt(1)
-	hits := []Overlap{
-		{Code: "a-nhỏ", CooperativeRef: coopA, Pct: decimal.RequireFromString("0.5")},
-		{Code: "a-lớn", CooperativeRef: coopA, Pct: decimal.RequireFromString("12")},
-		{Code: "b", CooperativeRef: coopB, Pct: decimal.RequireFromString("40")},
-		{Code: "nháp", CooperativeRef: uuid.Nil, Pct: decimal.RequireFromString("5")},
-	}
-	// Cùng HTX hoặc thửa nháp → cần xác nhận; HTX khác → chặn.
-	same, cross := ClassifyOverlaps(coopA, hits, tol)
-	if len(same) != 2 || same[0].Code != "a-lớn" || same[1].Code != "nháp" {
-		t.Fatalf("cần xác nhận = %+v", same)
-	}
-	if len(cross) != 1 || cross[0].Code != "b" {
-		t.Fatalf("bị chặn = %+v", cross)
-	}
-	// Thửa mới là thửa nháp: mọi chồng lấn chỉ cần xác nhận.
-	same, cross = ClassifyOverlaps(uuid.Nil, hits, tol)
-	if len(same) != 3 || len(cross) != 0 {
-		t.Fatalf("thửa nháp = %+v / %+v", same, cross)
-	}
-	if got := AreaDeviationPct(decimal.RequireFromString("1.06"), decimal.NewFromInt(1)); !got.Equal(decimal.NewFromInt(6)) {
-		t.Fatalf("AreaDeviationPct = %s", got)
-	}
-	if got := OverlapPct(decimal.NewFromInt(1), decimal.NewFromInt(10), decimal.NewFromInt(4)); !got.Equal(decimal.NewFromInt(25)) {
-		t.Fatalf("OverlapPct theo thửa nhỏ hơn = %s", got)
 	}
 }

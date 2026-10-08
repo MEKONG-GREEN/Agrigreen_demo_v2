@@ -1,0 +1,46 @@
+# Chuyển schema (W3.3): migration của pf/c được ALTER TABLE/SEQUENCE/FUNCTION <schema khác>.<x> SET SCHEMA pf_c
+# (đích là schema của mình) — không vi phạm dù nguồn là pf_a. Chuyển SANG schema của module khác, hay sửa đối
+# tượng của schema khác bằng dạng khác (ADD COLUMN) trong cùng tệp, vẫn là vi phạm.
+violation schema migrations/pf/000004_pf_c_bad.up.sql pf_a
+violation schema migrations/pf/000004_pf_c_bad.up.sql pf_b
+-- exceptions.yaml --
+exceptions: []
+-- internal/platform/a/module.yaml --
+name: pf/a
+kind: capability
+zones: [pf]
+version: 1.0.0
+owns_schema: [pf_a]
+enable: per_tenant
+-- internal/platform/b/module.yaml --
+name: pf/b
+kind: capability
+zones: [pf]
+version: 1.0.0
+owns_schema: [pf_b]
+enable: per_tenant
+-- internal/platform/c/module.yaml --
+name: pf/c
+kind: domain
+zones: [pf]
+version: 1.0.0
+owns_schema: [pf_c]
+enable: per_tenant
+-- migrations/pf/000001_pf_a.up.sql --
+CREATE SCHEMA pf_a;
+CREATE TABLE pf_a.t (id int);
+CREATE SEQUENCE pf_a.s;
+CREATE FUNCTION pf_a.f() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$;
+-- migrations/pf/000002_pf_b.up.sql --
+CREATE SCHEMA pf_b;
+CREATE TABLE pf_b.u (id int);
+-- migrations/pf/000003_pf_c_move.up.sql --
+CREATE SCHEMA pf_c;
+LOCK TABLE pf_a.t IN ACCESS EXCLUSIVE MODE;
+ALTER SEQUENCE pf_a.s SET SCHEMA pf_c;
+ALTER FUNCTION pf_a.f() SET SCHEMA pf_c;
+ALTER TABLE IF EXISTS pf_a.t SET SCHEMA pf_c;
+REVOKE ALL ON pf_c.t FROM PUBLIC;
+-- migrations/pf/000004_pf_c_bad.up.sql --
+ALTER TABLE pf_b.u SET SCHEMA pf_b;
+ALTER TABLE pf_a.t2 ADD COLUMN x int;

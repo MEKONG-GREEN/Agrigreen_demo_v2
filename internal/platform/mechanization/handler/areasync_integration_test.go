@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
@@ -18,12 +18,12 @@ import (
 
 func areaChanged(t *testing.T, tid, coop uuid.UUID, season string, year int, ha string, at time.Time) outbox.Envelope {
 	t.Helper()
-	b, err := json.Marshal(ccport.CoopSeasonAreaChangedV1{CooperativeRef: coop, SeasonCode: season, SeasonYear: year, AreaHa: ha,
+	b, err := json.Marshal(coopport.CoopSeasonAreaChangedV1{CooperativeRef: coop, SeasonCode: season, SeasonYear: year, AreaHa: ha,
 		Seasons: 3, OpenSeasons: 2, CompletedSeasons: 1, SourceAt: at.UTC().Format(time.RFC3339Nano)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return outbox.Envelope{EventID: ids.New(), TenantID: tid, EventType: ccport.EventCoopSeasonAreaChanged, SchemaVersion: 1,
+	return outbox.Envelope{EventID: ids.New(), TenantID: tid, EventType: coopport.EventCoopSeasonAreaChanged, SchemaVersion: 1,
 		OccurredAt: at, Producer: "pf/cropcycle", Payload: b}
 }
 

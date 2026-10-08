@@ -403,13 +403,14 @@ type CooperativeEntry struct {
 	UpdatedAt   time.Time
 }
 
-const coopEntrySQL = `SELECT o.ref, o.code, o.name, o.admin_unit_code, o.active, round(ST_X(c.location)::numeric, 7)::text, round(ST_Y(c.location)::numeric, 7)::text, o.updated_at
-  FROM pf_party.org o LEFT JOIN pf_party.cooperative c ON c.tenant_id = o.tenant_id AND c.org_ref = o.ref
+// coopEntrySQL đọc Nút HTX; toạ độ hồ sơ (pf_coop, W3.3) do app/ ghép qua partyport.CoopProfiles.
+const coopEntrySQL = `SELECT o.ref, o.code, o.name, o.admin_unit_code, o.active, o.updated_at
+  FROM pf_party.org o
  WHERE o.kind = 'cooperative'`
 
 func scanCoopEntry(row pgx.Row) (CooperativeEntry, error) {
 	var e CooperativeEntry
-	err := row.Scan(&e.Ref, &e.Code, &e.Name, &e.CommuneCode, &e.Active, &e.Lon, &e.Lat, &e.UpdatedAt)
+	err := row.Scan(&e.Ref, &e.Code, &e.Name, &e.CommuneCode, &e.Active, &e.UpdatedAt)
 	return e, err
 }
 

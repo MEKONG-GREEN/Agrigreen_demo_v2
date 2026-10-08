@@ -15,7 +15,8 @@
 //     tệp có ALTER TABLE trên bảng không tạo trong cùng tệp phải SET LOCAL lock_timeout trước
 //     đó. Tệp đã áp trước quy tắc được miễn theo số (lockGrandfathered) — không sửa được (R-24)
 //   - cột của bảng sổ (CheckLedgerColumns, ADR-0012): ADD COLUMN phải NULL được, không DEFAULT, và
-//     đăng ký bằng shared.register_ledger_columns trong cùng tệp; cấm DROP/RENAME/đổi kiểu cột
+//     đăng ký bằng shared.register_ledger_columns trong cùng tệp; cấm DROP/RENAME/đổi kiểu cột. Sổ chuyển schema
+//     (ALTER TABLE … SET SCHEMA, W3.3) vẫn là sổ dưới tên mới
 //
 // Chạy: go run ./tools/migratecheck migrations
 package main
@@ -150,6 +151,7 @@ func checkTree(root string) ([]string, error) {
 // ledgerSet gom tên mọi bảng sổ (shared.apply_ledger) của mọi thư mục cụm.
 func ledgerSet(root string, entries []os.DirEntry) (map[string]bool, error) {
 	out := map[string]bool{}
+	var moves [][2]string
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
@@ -165,6 +167,17 @@ func ledgerSet(root string, entries []os.DirEntry) (map[string]bool, error) {
 			}
 			for _, t := range LedgerTables(string(src)) {
 				out[t] = true
+			}
+			moves = append(moves, LedgerMoves(string(src))...)
+		}
+	}
+	// Sổ chuyển schema (ALTER TABLE … SET SCHEMA, W3.3) vẫn là sổ dưới tên mới; lặp tới điểm bất động cho
+	// chuyển nhiều chặng. Tên cũ giữ trong tập (tệp cũ đã áp vẫn được kiểm như trước).
+	for changed := true; changed; {
+		changed = false
+		for _, m := range moves {
+			if out[m[0]] && !out[m[1]] {
+				out[m[1]], changed = true, true
 			}
 		}
 	}

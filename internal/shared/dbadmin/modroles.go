@@ -90,7 +90,10 @@ var (
 // (job vận hành, không theo module) và vai giám sát (mkg_monitor/ts_monitor): bí mật pf 7, mkg 7, ts 5, vault 4.
 var LoginUnits = []LoginUnit{
 	{Role: AppPlatform, Unit: "api-platform", Ops: true, Clusters: pfOnly},
-	{Role: AppWorker, Unit: "worker", Tools: []string{"drill", "formimport"}, Ops: true, Agg: true, Clusters: pfOnly},
+	// worker chạy consumer liên module của cmd/api-platform/assembly.Consumers (gói không thuộc cmd/internal nên modgen
+	// không thấy): van thu gom pf/cropcycle (r_cropcycle) và van hub pf/geo (r_geo) — W3.3 bỏ import trực tiếp hai
+	// module này khỏi cmd/worker (vụ, thửa sang pf/cooperative), nên khai Extra để giữ membership.
+	{Role: AppWorker, Unit: "worker", Tools: []string{"drill", "formimport"}, Extra: []string{"pf/cropcycle", "pf/geo"}, Ops: true, Agg: true, Clusters: pfOnly},
 	// Cổng tích hợp (W5.2, ADR-0033 §1: vai app_public, không thêm vai) mở pool party theo tên
 	// (cmd/integration-gateway/assembly: không import gốc pf/party). api-public là bí danh một kỳ.
 	{Role: AppPublic, Unit: "integration-gateway", Aliases: []string{"api-public"}, Extra: []string{"pf/party"}, Ops: true, Clusters: pfOnly},

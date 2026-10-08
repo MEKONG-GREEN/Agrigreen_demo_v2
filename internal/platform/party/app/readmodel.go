@@ -17,19 +17,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
-var _ port.CooperativeStats = (*Registry)(nil)
-
-// CooperativesByUnit thực hiện port.CooperativeStats (G-02). Tenant lấy từ context.
-func (r *Registry) CooperativesByUnit(ctx context.Context, units []string) ([]port.UnitCooperatives, error) {
-	var out []port.UnitCooperatives
-	err := tenant.FromCtxTx(ctx, r.DB, func(tx pgx.Tx) error {
-		var e error
-		out, e = store.CooperativesByUnit(ctx, tx, units == nil, units)
-		return e
-	})
-	return out, err
-}
-
 // narrowScope thu hẹp phạm vi đọc theo đơn vị lọc (mã tỉnh hoặc xã, G-03): chỉ
 // giữ đơn vị vừa thuộc đơn vị lọc vừa thuộc phạm vi của người gọi.
 func (r *Registry) narrowScope(ctx context.Context, sc authz.Scope, unit string) (authz.Scope, error) {
@@ -70,8 +57,8 @@ type CoopExtra struct {
 }
 
 // CoopExtras tra tên xã/tỉnh (pf/masterdata), số hộ thành viên và số thửa đã số
-// hoá (pf/geo) cho các HTX đã đọc. Tên thiếu không chặn danh sách.
-func (r *Registry) CoopExtras(ctx context.Context, items []store.Cooperative) (map[uuid.UUID]CoopExtra, error) {
+// hoá cho các HTX đã đọc (hộ, thửa ở pf/cooperative qua port). Tên thiếu không chặn danh sách.
+func (r *Registry) CoopExtras(ctx context.Context, items []Cooperative) (map[uuid.UUID]CoopExtra, error) {
 	out := make(map[uuid.UUID]CoopExtra, len(items))
 	if len(items) == 0 {
 		return out, nil
@@ -84,13 +71,13 @@ func (r *Registry) CoopExtras(ctx context.Context, items []store.Cooperative) (m
 	for _, it := range items {
 		refs = append(refs, it.Ref)
 	}
-	var members map[uuid.UUID]int64
-	if err := tenant.WithTenantTx(ctx, r.DB, p.TenantID, func(tx pgx.Tx) error {
-		var e error
-		members, e = store.MemberCounts(ctx, tx, refs)
-		return e
-	}); err != nil {
+	ps, err := r.coopProfiles()
+	if err != nil {
 		return nil, err
+	}
+	members, err := ps.ActiveHouseholds(tenant.WithID(ctx, p.TenantID), refs)
+	if err != nil {
+		return nil, ErrDependency.WithDetail("không đọc được nông hộ của HTX").WithCause(err)
 	}
 	var plots map[uuid.UUID]int64
 	if r.Plots != nil {
@@ -138,14 +125,11 @@ func (r *Registry) CoopExtras(ctx context.Context, items []store.Cooperative) (m
 	return out, nil
 }
 
-// ConsentStates đọc trạng thái đồng ý hiện tại theo mục đích của các nông hộ (G-04).
-func (r *Registry) ConsentStates(ctx context.Context, subjects []uuid.UUID) (map[uuid.UUID][]store.ConsentState, error) {
-	p, ok := authz.FromContext(ctx)
-	if !ok {
-		return nil, problem.Unauthenticated
-	}
-	var out map[uuid.UUID][]store.ConsentState
-	err := tenant.WithTenantTx(ctx, r.DB, p.TenantID, func(tx pgx.Tx) error {
+// ConsentStates thực hiện port.ConsentStates: trạng thái đồng ý hiện tại theo mục đích của các nông hộ (G-04 —
+// danh sách nông hộ của pf/cooperative). Tenant lấy từ context.
+func (r *Registry) ConsentStates(ctx context.Context, subjects []uuid.UUID) (map[uuid.UUID][]port.ConsentState, error) {
+	var out map[uuid.UUID][]port.ConsentState
+	err := tenant.FromCtxTx(ctx, r.DB, func(tx pgx.Tx) error {
 		var e error
 		out, e = store.ConsentStates(ctx, tx, subjects)
 		return e

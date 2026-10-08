@@ -20,7 +20,8 @@ type CoopMarker struct {
 }
 
 // CoopMarkers cho geo đọc điểm HTX làm marker/dự phòng khi HTX chưa có ranh giới
-// (GIS US-BND-02 "gắn Marker"). Tenant lấy từ context; không kiểm phạm vi.
+// (GIS US-BND-02 "gắn Marker"). Tenant lấy từ context; không kiểm phạm vi. Hiện thực ở
+// pf/cooperative (vị trí hồ sơ HTX, pf_coop), gốc lắp ráp nối (W3.3).
 type CoopMarkers interface {
 	MarkersInBBox(ctx context.Context, minLon, minLat, maxLon, maxLat float64, limit int) ([]CoopMarker, error)
 }

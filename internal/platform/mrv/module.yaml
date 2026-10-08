@@ -8,7 +8,7 @@ zones: [pf]
 version: 1.0.0
 depends:
   pf/apiclient: ">=1.0 <2"
-  pf/party: ">=1.0 <2"
+  pf/party: ">=2.0 <3"
   pf/sync: ">=1.0 <2"
 provides:
   ports: []

@@ -15,56 +15,11 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/publication"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
-
-// ---------------------------------------------------------------------------
-// Cổng đọc cho gốc lắp ráp (G2 đợt 2)
-// ---------------------------------------------------------------------------
-
-var (
-	_ port.PlotHouseholds = (*Service)(nil)
-	_ port.CoopCentroids  = (*Service)(nil)
-)
-
-// HouseholdsInCommunes thực hiện port.PlotHouseholds (HTX US-NEWS-03). Tenant lấy từ context.
-func (s *Service) HouseholdsInCommunes(ctx context.Context, communes []string) ([]uuid.UUID, error) {
-	if communes != nil && len(communes) == 0 {
-		return []uuid.UUID{}, nil
-	}
-	var out []uuid.UUID
-	err := tenant.FromCtxTx(ctx, s.DB, func(tx pgx.Tx) error {
-		var e error
-		out, e = store.HouseholdsInCommunes(ctx, tx, communes == nil, communes)
-		return e
-	})
-	return out, err
-}
-
-// CoopCentroids thực hiện port.CoopCentroids (tâm vùng nguyên liệu cho mô phỏng).
-func (s *Service) CoopCentroids(ctx context.Context, coops []uuid.UUID) (map[uuid.UUID]port.CoopCentroid, error) {
-	out := map[uuid.UUID]port.CoopCentroid{}
-	if coops != nil && len(coops) == 0 {
-		return out, nil
-	}
-	var rows []store.CoopCentroid
-	err := tenant.FromCtxTx(ctx, s.DB, func(tx pgx.Tx) error {
-		var e error
-		rows, e = store.CoopCentroids(ctx, tx, coops == nil, coops)
-		return e
-	})
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range rows {
-		out[r.CooperativeRef] = port.CoopCentroid{CooperativeRef: r.CooperativeRef, Lon: r.Lon, Lat: r.Lat}
-	}
-	return out, nil
-}
 
 // ---------------------------------------------------------------------------
 // Consumer van công bố MKG (port.HubValveConsumer)

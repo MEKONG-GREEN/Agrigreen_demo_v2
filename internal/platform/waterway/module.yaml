@@ -7,9 +7,9 @@ kind: domain
 zones: [pf]
 version: 1.0.0
 depends:
-  pf/geo: ">=1.0 <2"
+  pf/geo: ">=2.0 <3"
   pf/masterdata: ">=1.0 <2"
-  pf/party: ">=1.0 <2"
+  pf/party: ">=2.0 <3"
 provides:
   ports: [Router]
   events: [pf.waterway.network.published/v1, pf.waterway.network_build.requested/v1]

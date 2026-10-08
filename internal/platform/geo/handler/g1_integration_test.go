@@ -1,15 +1,14 @@
 package handler_test
 
 import (
+	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
-	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 // G-05: ranh giới hành chính theo cấp + đơn vị cha, đơn vị chưa có hình ở "missing".
@@ -35,45 +34,46 @@ func TestAdminBoundariesByParentG05(t *testing.T) {
 	expect(t, adm.appDo(http.MethodGet, "/v1/geo/admin-boundaries?level=commune&parent=XX", nil), http.StatusUnprocessableEntity, "cha sai")
 }
 
-// US-SYNC-03: chi tiết xung đột ranh giới giữ cả hai phiên bản; PlotStats (G-02/G-03).
-func TestConflictDetailBothVersions(t *testing.T) {
+// GIS FN-07 BR-26: nhập ranh giới xã (xem trước rồi áp dụng; nhập lại đóng hình cũ). Thửa phải nằm trong địa giới
+// xã (BR-27) — kiểm ở pf/cooperative (cooperative/plot/handler, qua geoport.AdminGeometry) từ W3.3.
+func TestAdminBoundaryImport(t *testing.T) {
 	f := newFixture(t)
-	c := f.national()
-	p1, _ := c.createPlot("31117", f.coopA, rect(0, 0, 100, 100))
-	r := c.appDo(http.MethodPost, "/v1/plots", map[string]any{"commune_code": "31117", "cooperative_ref": f.coopA.String(),
-		"geometry": rect(50, 0, 100, 100), "confirm_overlap": true})
-	expect(t, r, http.StatusCreated, "cùng HTX đã xác nhận")
-	p2 := str(r.body, "plot", "id")
-	cid := str(list(r.body, "conflicts")[0], "id")
-
-	d := f.officerA().appDo(http.MethodGet, "/v1/geo/conflicts/"+cid, nil)
-	expect(t, d, http.StatusOK, "chi tiết xung đột")
-	vs := list(d.body, "versions")
-	if len(vs) != 2 || str(vs[0], "role") != "record" || str(vs[0], "plot_ref") != p2 || get(vs[0], "geometry") == nil ||
-		str(vs[1], "role") != "overlapping" || str(vs[1], "plot_ref") != p1.String() || get(vs[1], "current") != true {
-		t.Fatalf("versions: %s", d.raw)
+	adm := f.national()
+	commune := rect(-500, -500, 2000, 2000)
+	fc, _ := json.Marshal(map[string]any{"type": "FeatureCollection", "features": []any{
+		map[string]any{"type": "Feature", "properties": map[string]any{"code": "31117"}, "geometry": commune},
+		map[string]any{"type": "Feature", "properties": map[string]any{"code": "00000"}, "geometry": commune},
+	}})
+	r := adm.adminPost("/v1/geo/admin-boundaries/import?dry_run=true&source=CloudMap%202026-09", "application/geo+json", fc)
+	expect(t, r, http.StatusOK, "xem trước")
+	if get(r.body, "dry_run") != true || get(r.body, "accepted") != 1.0 || get(r.body, "rejected") != 1.0 {
+		t.Fatalf("xem trước: %s", r.raw)
 	}
-	expect(t, f.officerB().appDo(http.MethodGet, "/v1/geo/conflicts/"+cid, nil), http.StatusNotFound, "ngoài phạm vi")
-
-	viewer, ok := f.mod.SyncSink().(syncport.ConflictViewer)
-	if !ok {
-		t.Fatal("SyncSink phải hiện thực ConflictViewer")
+	expect(t, adm.appDo(http.MethodGet, "/v1/geo/admin-boundaries/31117", nil), http.StatusNotFound, "xem trước không áp dụng")
+	r = adm.adminPost("/v1/geo/admin-boundaries/import?source=CloudMap%202026-09", "application/geo+json", fc)
+	expect(t, r, http.StatusOK, "áp dụng")
+	r = adm.appDo(http.MethodGet, "/v1/geo/admin-boundaries/31117", nil)
+	if r.status != http.StatusOK || str(r.body, "properties", "name") != "Xã Thới Lai" {
+		t.Fatalf("ranh giới xã: %d %s", r.status, r.raw)
 	}
-	ctx := syncCtx(f, f.orgA)
-	sv, err := viewer.ConflictVersions(ctx, authz.Scope{Units: []string{"31117"}}, uuid.MustParse(cid))
-	if err != nil || len(sv) != 2 || sv[0].Role != syncport.VersionRoleRecord {
-		t.Fatalf("ConflictVersions: %v %+v", err, sv)
+	// AdminGeometry (cho pf/cooperative): hình trong xã → 0 %, nửa ngoài → ~50 %.
+	ag := f.mod.AdminGeometry()
+	ctx := tenant.WithID(context.Background(), f.tenant)
+	inside, _ := json.Marshal(rect(0, 0, 100, 100))
+	half, _ := json.Marshal(rect(1450, 0, 100, 100))
+	if p, err := ag.OutsideCommunePct(ctx, string(inside), "31117"); err != nil || p == nil || !p.IsZero() {
+		t.Fatalf("trong xã: %v %v", p, err)
 	}
-	if _, err := viewer.ConflictVersions(ctx, authz.Scope{Units: []string{"31120"}}, uuid.MustParse(cid)); !errors.Is(err, syncport.ErrConflictUnknown) {
-		t.Fatalf("ngoài phạm vi: %v", err)
+	if p, err := ag.OutsideCommunePct(ctx, string(half), "31117"); err != nil || p == nil || p.LessThan(decimal.NewFromInt(40)) {
+		t.Fatalf("nửa ngoài xã: %v %v", p, err)
 	}
-
-	st, err := f.mod.PlotStats().DigitizedByCommune(ctx, []string{"31117"})
-	if err != nil || len(st) != 1 || st[0].Plots != 2 {
-		t.Fatalf("DigitizedByCommune: %v %+v", err, st)
+	if p, err := ag.OutsideCommunePct(ctx, string(inside), "31120"); err != nil || p != nil {
+		t.Fatalf("xã chưa nhập ranh giới → nil: %v %v", p, err)
 	}
-	bc, err := f.mod.PlotStats().DigitizedByCooperative(ctx, []uuid.UUID{f.coopA, f.coopB})
-	if err != nil || bc[f.coopA].Plots != 2 || bc[f.coopB].Plots != 0 {
-		t.Fatalf("DigitizedByCooperative: %v %+v", err, bc)
+	// Nhập lại: hình cũ được đóng (không xóa), đánh dấu replaced.
+	r = adm.adminPost("/v1/geo/admin-boundaries/import?source=CloudMap%202026-10", "application/geo+json", fc)
+	if fs := list(r.body, "features"); len(fs) != 2 || get(fs[0], "replaced") != true {
+		t.Fatalf("nhập lại: %s", r.raw)
 	}
+	expect(t, adm.adminPost("/v1/geo/admin-boundaries/import", "application/geo+json", fc), http.StatusUnprocessableEntity, "thiếu nguồn")
 }

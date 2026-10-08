@@ -6,13 +6,13 @@ modules:
   pf/accounts: ">=1.0 <2"      # /v1/farmer/* (hộ của tôi, cán bộ HTX)
   pf/content: ">=1.0 <2"
   pf/cooperative: ">=1.0 <2"
-  pf/cropcycle: ">=1.0 <2"
+  pf/cropcycle: ">=2.0 <3"
   pf/evidence: ">=1.0 <2"      # cap/evidence: tệp minh chứng, Open(purpose) có nhật ký (W6.5)
   pf/extension: ">=1.0 <2"     # yêu cầu hỗ trợ
-  pf/geo: ">=1.0 <2"
+  pf/geo: ">=2.0 <3"
   pf/masterdata: ">=1.0 <2"
   pf/notify: ">=1.0 <2"
-  pf/party: ">=1.0 <2"
+  pf/party: ">=2.0 <3"
   pf/sync: ">=1.0 <2"
   vault/identity: ">=1.0 <2"   # định danh nông hộ (vai farmer khai ở vault/identity), cụm riêng
 roles: [farmer]

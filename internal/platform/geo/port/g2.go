@@ -132,29 +132,9 @@ type HubSink interface {
 // Sự kiện G2
 // ---------------------------------------------------------------------------
 const (
-	EventCooperativeBoundaryRecorded = "pf.geo.cooperative_boundary.recorded"
-	EventFacilityRecorded            = "pf.geo.facility.recorded"
+	// EventFacilityRecorded: pf.geo.cooperative_boundary.recorded chuyển chủ sang pf/cooperative (W3.3).
+	EventFacilityRecorded = "pf.geo.facility.recorded"
 )
-
-// CooperativeBoundaryRecordedV1 là payload của pf.geo.cooperative_boundary.recorded.
-// Không mang hình (consumer đọc qua API).
-//
-//ag:event pf.geo.cooperative_boundary.recorded v1
-type CooperativeBoundaryRecordedV1 struct {
-	CooperativeRef   uuid.UUID  `json:"cooperative_ref"`
-	BoundaryID       uuid.UUID  `json:"boundary_id"`
-	Version          int64      `json:"version"`
-	Action           string     `json:"action"`
-	Status           string     `json:"status"`
-	AreaHa           string     `json:"area_ha"`
-	PointCount       int        `json:"point_count"`
-	Source           string     `json:"source"`
-	CommuneCode      string     `json:"commune_code"`
-	SupersedesID     *uuid.UUID `json:"supersedes_id"`
-	CorrectionReason *string    `json:"correction_reason"`
-	ActorRef         uuid.UUID  `json:"actor_ref"`
-	EventTime        string     `json:"event_time"`
-}
 
 // FacilityRecordedV1 là payload của pf.geo.facility.recorded (tạo, sửa, ngừng dùng,
 // khôi phục một cơ sở kho/Hub/nhà máy của tenant).

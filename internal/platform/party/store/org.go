@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -28,25 +27,6 @@ func nilIfEmpty(s string) *string {
 		return nil
 	}
 	return &s
-}
-
-func decPtr(d *decimal.Decimal) *string {
-	if d == nil {
-		return nil
-	}
-	s := d.String()
-	return &s
-}
-
-func parseDec(s *string) (*decimal.Decimal, error) {
-	if s == nil {
-		return nil, nil
-	}
-	d, err := decimal.NewFromString(*s)
-	if err != nil {
-		return nil, err
-	}
-	return &d, nil
 }
 
 const orgCols = `ref, kind, code, name, coalesce(admin_unit_code, ''),
@@ -276,72 +256,6 @@ func units(u []string) []string {
 	return u
 }
 
-// Cooperative là HTX kèm hồ sơ.
-type Cooperative struct {
-	OrgState
-	Profile domain.CooperativeProfile
-}
-
-const coopCols = `o.ref, o.kind, o.code, o.name, coalesce(o.admin_unit_code, ''),
-  coalesce(o.parent_ref, '00000000-0000-0000-0000-000000000000'::uuid),
-  coalesce(o.representative_ref, '00000000-0000-0000-0000-000000000000'::uuid), o.active,
-  coalesce(o.status_reason, ''), o.last_seq,
-  coalesce(c.tax_code, ''), c.area_ha::text, c.established_on::text,
-  ST_Y(c.location)::numeric(10,7)::text, ST_X(c.location)::numeric(10,7)::text, coalesce(c.head_office, '')`
-
-func scanCoop(row pgx.Row) (Cooperative, error) {
-	var c Cooperative
-	var kind string
-	var area, est, lat, lon *string
-	err := row.Scan(&c.Ref, &kind, &c.Code, &c.Name, &c.AdminUnitCode, &c.ParentRef, &c.RepresentativeRef, &c.Active,
-		&c.StatusReason, &c.LastSeq, &c.Profile.TaxCode, &area, &est, &lat, &lon, &c.Profile.Address)
-	if err != nil {
-		return c, err
-	}
-	c.Kind = port.OrgKind(kind)
-	if c.Profile.AreaHa, err = parseDec(area); err != nil {
-		return c, err
-	}
-	if est != nil {
-		t, err := time.Parse(time.DateOnly, *est)
-		if err != nil {
-			return c, err
-		}
-		c.Profile.EstablishedOn = &t
-	}
-	if lat != nil && lon != nil {
-		la, err := parseDec(lat)
-		if err != nil {
-			return c, err
-		}
-		lo, err := parseDec(lon)
-		if err != nil {
-			return c, err
-		}
-		c.Profile.Location = &domain.Point{Lat: *la, Lon: *lo}
-	}
-	return c, nil
-}
-
-// InsertCooperative ghi hồ sơ HTX.
-func InsertCooperative(ctx context.Context, tx pgx.Tx, tenantID, ref uuid.UUID, p domain.CooperativeProfile) error {
-	var est, lat, lon *string
-	if p.EstablishedOn != nil {
-		s := p.EstablishedOn.Format(time.DateOnly)
-		est = &s
-	}
-	if p.Location != nil {
-		a, b := p.Location.Lat.String(), p.Location.Lon.String()
-		lat, lon = &a, &b
-	}
-	_, err := tx.Exec(ctx, `INSERT INTO pf_party.cooperative (tenant_id, org_ref, tax_code, area_ha, established_on, location, head_office)
-	  VALUES ($1, $2, $3, $4::numeric, $5::date,
-	    CASE WHEN $6::text IS NULL THEN NULL
-	         ELSE ST_SetSRID(ST_MakePoint($7::text::float8, $6::text::float8), 4326) END, $8)`,
-		tenantID, ref, nilIfEmpty(p.TaxCode), decPtr(p.AreaHa), est, lat, lon, nilIfEmpty(strings.TrimSpace(p.Address)))
-	return err
-}
-
 // LockCooperativeName tuần tự hóa việc tạo HTX cùng tên (không phân biệt hoa thường)
 // trong giao dịch hiện tại — khóa tư vấn tự nhả khi giao dịch kết thúc.
 func LockCooperativeName(ctx context.Context, tx pgx.Tx, name string) error {
@@ -361,64 +275,112 @@ func CooperativeNameOwner(ctx context.Context, tx pgx.Tx, name string) (uuid.UUI
 	return ref, err
 }
 
-// TaxCodeOwner trả HTX đang giữ mã số thuế trong tenant, Nil nếu chưa có.
-func TaxCodeOwner(ctx context.Context, tx pgx.Tx, tax string) (uuid.UUID, error) {
-	var ref uuid.UUID
-	err := tx.QueryRow(ctx, "SELECT org_ref FROM pf_party.cooperative WHERE tax_code = $1", tax).Scan(&ref)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return uuid.Nil, nil
-	}
-	return ref, err
+// CoopOrgFilter là điều kiện liệt kê Nút HTX (kind = cooperative) của màn HTX. Hồ sơ HTX ở pf/cooperative (W3.3):
+// điều kiện trên hồ sơ (mã số thuế, diện tích) được bên gọi quy thành danh sách Nút qua partyport.CoopProfiles.
+type CoopOrgFilter struct {
+	All             bool
+	Units           []string
+	Commune         string // rỗng = mọi xã trong phạm vi
+	Status          string // active | inactive | all (rỗng = theo IncludeInactive)
+	IncludeInactive bool
+	// Q tìm theo tên (không phân biệt hoa thường) hoặc tiền tố mã; QRefs là Nút khớp Q theo hồ sơ (mã số thuế) —
+	// cũng được nhận.
+	Q     string
+	QRefs []uuid.UUID
+	// Only khác nil: chỉ các Nút này (lọc theo hồ sơ, vd diện tích).
+	Only  []uuid.UUID
+	After uuid.UUID
+	Limit int
 }
 
-// CooperativeByRef đọc HTX kèm hồ sơ.
-func CooperativeByRef(ctx context.Context, tx pgx.Tx, ref uuid.UUID) (*Cooperative, error) {
-	c, err := scanCoop(tx.QueryRow(ctx, "SELECT "+coopCols+` FROM pf_party.org o
-	    JOIN pf_party.cooperative c ON c.tenant_id = o.tenant_id AND c.org_ref = o.ref WHERE o.ref = $1`, ref))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &c, nil
+// CoopOrg là Nút HTX kèm lý do trạng thái, seq cuối và thời điểm cập nhật Nút.
+type CoopOrg struct {
+	OrgState
+	UpdatedAt time.Time
 }
 
-// CooperativeByCode đọc HTX theo Mã HTX.
-func CooperativeByCode(ctx context.Context, tx pgx.Tx, code string) (*Cooperative, error) {
-	c, err := scanCoop(tx.QueryRow(ctx, "SELECT "+coopCols+` FROM pf_party.org o
-	    JOIN pf_party.cooperative c ON c.tenant_id = o.tenant_id AND c.org_ref = o.ref WHERE o.code = $1`, code))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &c, nil
+const coopOrgCols = orgCols + ", coalesce(status_reason, ''), last_seq, updated_at"
+
+func scanCoopOrg(row pgx.Row) (CoopOrg, error) {
+	var c CoopOrg
+	var kind string
+	err := row.Scan(&c.Ref, &kind, &c.Code, &c.Name, &c.AdminUnitCode, &c.ParentRef, &c.RepresentativeRef, &c.Active,
+		&c.StatusReason, &c.LastSeq, &c.UpdatedAt)
+	c.Kind = port.OrgKind(kind)
+	return c, err
 }
 
-// ListCooperatives liệt kê HTX trong phạm vi, tìm theo tên/mã/mã số thuế, phân trang cursor.
-func ListCooperatives(ctx context.Context, tx pgx.Tx, f OrgFilter) ([]Cooperative, error) {
-	rows, err := tx.Query(ctx, "SELECT "+coopCols+` FROM pf_party.org o
-	    JOIN pf_party.cooperative c ON c.tenant_id = o.tenant_id AND c.org_ref = o.ref
-	    WHERE ($1::boolean OR o.admin_unit_code = ANY($2::text[]))
-	      AND ($3 = '' OR o.name ILIKE '%' || $3 || '%' OR o.code ILIKE $3 || '%' OR c.tax_code LIKE $3 || '%')
-	      AND ($4::boolean OR o.active)
-	      AND o.ref > $5
-	    ORDER BY o.ref LIMIT $6`, f.All, units(f.Units), escapeLike(f.Q), f.IncludeInactive, f.After, f.Limit)
+// ListCooperativeOrgs liệt kê Nút HTX trong phạm vi theo bộ lọc, phân trang cursor theo ref (R-53).
+func ListCooperativeOrgs(ctx context.Context, tx pgx.Tx, f CoopOrgFilter) ([]CoopOrg, error) {
+	status := f.Status
+	if status == "" {
+		status = "active"
+		if f.IncludeInactive {
+			status = "all"
+		}
+	}
+	var only []string
+	if f.Only != nil {
+		only = uuidStrings(f.Only)
+	}
+	rows, err := tx.Query(ctx, "SELECT "+coopOrgCols+` FROM pf_party.org
+	    WHERE kind = 'cooperative'
+	      AND ($1::boolean OR admin_unit_code = ANY($2::text[]))
+	      AND ($3 = '' OR admin_unit_code = $3)
+	      AND ($4 = 'all' OR ($4 = 'active' AND active) OR ($4 = 'inactive' AND NOT active))
+	      AND ($5 = '' OR name ILIKE '%' || $5 || '%' OR code ILIKE $5 || '%' OR ref = ANY($6::text[]::uuid[]))
+	      AND ($7::text[] IS NULL OR ref = ANY($7::text[]::uuid[]))
+	      AND ref > $8
+	    ORDER BY ref LIMIT $9`,
+		f.All, units(f.Units), f.Commune, status, escapeLike(strings.TrimSpace(f.Q)), uuidStrings(f.QRefs), only, f.After, f.Limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Cooperative
+	out := []CoopOrg{}
 	for rows.Next() {
-		c, err := scanCoop(rows)
+		c, err := scanCoopOrg(rows)
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, c)
 	}
 	return out, rows.Err()
+}
+
+// CoopOrgByRef đọc Nút HTX; nil nếu không có hoặc không phải HTX.
+func CoopOrgByRef(ctx context.Context, tx pgx.Tx, ref uuid.UUID) (*CoopOrg, error) {
+	c, err := scanCoopOrg(tx.QueryRow(ctx, "SELECT "+coopOrgCols+" FROM pf_party.org WHERE ref = $1 AND kind = 'cooperative'", ref))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+// OrgsByRefs đọc tổ chức theo lô (partyport.OrgDirectory).
+func OrgsByRefs(ctx context.Context, tx pgx.Tx, refs []uuid.UUID) ([]port.Org, error) {
+	if len(refs) == 0 {
+		return nil, nil
+	}
+	rows, err := tx.Query(ctx, "SELECT "+orgCols+" FROM pf_party.org WHERE ref = ANY($1::text[]::uuid[])", uuidStrings(refs))
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (port.Org, error) { return scanOrg(r) })
+}
+
+// OrgsOfKind liệt kê tổ chức theo loại, sắp theo ref (partyport.OrgDirectory). unitCodes nil = mọi đơn vị.
+func OrgsOfKind(ctx context.Context, tx pgx.Tx, kind string, unitCodes []string, activeOnly bool) ([]port.Org, error) {
+	rows, err := tx.Query(ctx, "SELECT "+orgCols+` FROM pf_party.org
+	    WHERE kind = $1 AND ($2::boolean OR admin_unit_code = ANY($3::text[])) AND (NOT $4::boolean OR active)
+	    ORDER BY ref`, kind, unitCodes == nil, units(unitCodes), activeOnly)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (port.Org, error) { return scanOrg(r) })
 }
 
 // escapeLike vô hiệu ký tự đại diện của LIKE trong từ khóa người dùng.

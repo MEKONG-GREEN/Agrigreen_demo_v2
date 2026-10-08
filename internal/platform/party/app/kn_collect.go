@@ -5,13 +5,15 @@ package app
 // Quyền theo ngữ cảnh phiên (authz.RequireKN, BRD §5.1): Cấp Xã thêm/sửa/vô hiệu hóa trong xã phụ trách
 // (k.Scope); Cấp Tỉnh xem trong tỉnh; Cấp Quốc gia xem; Admin mọi thứ (chế độ hỗ trợ: lý do ≥ 10 ký tự, lưu
 // on_behalf_of). HTX/nông hộ là dữ liệu chủ dùng chung các phòng ban — không lọc phòng ban (tạm, chờ khách).
-// Tạo/vô hiệu hóa/kích hoạt lại HTX dùng lõi của sổ org_event (G1); "sửa" hồ sơ HTX và diện tích nông hộ là
-// sự kiện bù trên sổ kn_profile_event (pf 000078) + cập nhật bảng chiếu trong cùng giao dịch (RB-1, R-21).
-// Dữ liệu cá nhân (người đại diện, chủ hộ) chỉ đi vào kho định danh; API trả nhãn đã che + SĐT che (RB-3).
+// Tạo/vô hiệu hóa/kích hoạt lại HTX dùng lõi của sổ org_event (G1, tạo HTX hai bước — coop.go); "sửa" hồ sơ HTX
+// là sự kiện bù trên sổ kn_profile_event + bảng chiếu hồ sơ trong MỘT giao dịch ở pf/cooperative
+// (partyport.CoopProfiles.UpdateProfile), rồi tên/người đại diện hiện hành của Nút ở pf_party (W3.3).
+// Nông hộ của màn (/v1/kn/cooperatives/{ref}/households, /v1/kn/households/*) ở pf/cooperative (W3.3).
+// Dữ liệu cá nhân (người đại diện) chỉ đi vào kho định danh; API trả nhãn đã che + SĐT che (RB-3).
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"net/http"
 	"sort"
 	"strconv"
@@ -27,7 +29,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
@@ -97,7 +98,7 @@ type KNPerson struct {
 
 // KNCooperative là một HTX của màn "Danh sách HTX".
 type KNCooperative struct {
-	store.KNCoop
+	Cooperative
 	Representative *KNPerson
 }
 
@@ -132,8 +133,8 @@ func (k *KN) display(ctx context.Context, ref uuid.UUID) *KNPerson {
 	return &KNPerson{Label: d.Label, MaskedPhone: d.MaskedPhone}
 }
 
-func (k *KN) withRep(ctx context.Context, c store.KNCoop) KNCooperative {
-	return KNCooperative{KNCoop: c, Representative: k.display(ctx, c.RepresentativeRef)}
+func (k *KN) withRep(ctx context.Context, c Cooperative) KNCooperative {
+	return KNCooperative{Cooperative: c, Representative: k.display(ctx, c.RepresentativeRef)}
 }
 
 // ListKNCooperatives liệt kê HTX trong phạm vi ngữ cảnh phiên (mặc định mọi xã phụ trách, HTX đang hoạt động).
@@ -163,21 +164,29 @@ func (k *KN) ListKNCooperatives(ctx context.Context, q KNCoopQuery) (KNCoopPage,
 	if sc.Empty() {
 		return KNCoopPage{Items: []KNCooperative{}}, nil
 	}
-	var rows []store.KNCoop
+	qRefs, only, err := k.Reg.coopFilterRefs(ctx, c.p.TenantID, q.Q, q.AreaMin, q.AreaMax)
+	if err != nil {
+		return KNCoopPage{}, err
+	}
+	var orgs []store.CoopOrg
 	err = tenant.WithTenantTx(ctx, k.DB, c.p.TenantID, func(tx pgx.Tx) error {
 		var e error
-		rows, e = store.ListKNCooperatives(ctx, tx, store.KNCoopFilter{All: sc.All, Units: sc.Units, Commune: q.Commune, Status: q.Status,
-			Q: q.Q, AreaMin: q.AreaMin, AreaMax: q.AreaMax, After: q.After, Limit: q.Limit + 1})
+		orgs, e = store.ListCooperativeOrgs(ctx, tx, store.CoopOrgFilter{All: sc.All, Units: sc.Units, Commune: q.Commune, Status: q.Status,
+			Q: q.Q, QRefs: qRefs, Only: only, After: q.After, Limit: q.Limit + 1})
 		return e
 	})
 	if err != nil {
 		return KNCoopPage{}, err
 	}
-	pg := KNCoopPage{Items: make([]KNCooperative, 0, len(rows))}
-	if len(rows) > q.Limit {
-		rows = rows[:q.Limit]
-		last := rows[q.Limit-1].Ref
+	pg := KNCoopPage{Items: make([]KNCooperative, 0, len(orgs))}
+	if len(orgs) > q.Limit {
+		orgs = orgs[:q.Limit]
+		last := orgs[q.Limit-1].Ref
 		pg.Next = &last
+	}
+	rows, err := k.Reg.cooperatives(ctx, c.p.TenantID, orgs, true)
+	if err != nil {
+		return KNCoopPage{}, err
 	}
 	for _, r := range rows {
 		pg.Items = append(pg.Items, k.withRep(ctx, r))
@@ -186,8 +195,8 @@ func (k *KN) ListKNCooperatives(ctx context.Context, q KNCoopQuery) (KNCoopPage,
 }
 
 // readCoop đọc HTX trong phạm vi đọc; ngoài phạm vi hoặc không phải HTX → 404 (không lộ sự tồn tại).
-func (k *KN) readCoop(ctx context.Context, tx pgx.Tx, sc authz.Scope, ref uuid.UUID) (*store.KNCoop, error) {
-	cur, err := store.KNCooperativeByRef(ctx, tx, ref)
+func (k *KN) readCoop(ctx context.Context, tid uuid.UUID, sc authz.Scope, ref uuid.UUID) (*Cooperative, error) {
+	cur, err := k.Reg.cooperativeByRef(ctx, tid, ref, true)
 	if err != nil {
 		return nil, err
 	}
@@ -203,12 +212,7 @@ func (k *KN) GetKNCooperative(ctx context.Context, ref uuid.UUID) (KNCooperative
 	if err != nil {
 		return KNCooperative{}, err
 	}
-	var cur *store.KNCoop
-	err = tenant.WithTenantTx(ctx, k.DB, c.p.TenantID, func(tx pgx.Tx) error {
-		var e error
-		cur, e = k.readCoop(ctx, tx, c.scope(), ref)
-		return e
-	})
+	cur, err := k.readCoop(ctx, c.p.TenantID, c.scope(), ref)
 	if err != nil {
 		return KNCooperative{}, err
 	}
@@ -216,12 +220,7 @@ func (k *KN) GetKNCooperative(ctx context.Context, ref uuid.UUID) (KNCooperative
 }
 
 func (k *KN) coopAfter(ctx context.Context, tid, ref uuid.UUID) (KNCooperative, error) {
-	var cur *store.KNCoop
-	err := tenant.WithTenantTx(ctx, k.DB, tid, func(tx pgx.Tx) error {
-		var e error
-		cur, e = store.KNCooperativeByRef(ctx, tx, ref)
-		return e
-	})
+	cur, err := k.Reg.cooperativeByRef(ctx, tid, ref, true)
 	if err != nil {
 		return KNCooperative{}, err
 	}
@@ -334,26 +333,66 @@ func parseOptArea(field string, s *string) (*decimal.Decimal, bool, error) {
 	return &d, true, nil
 }
 
-func (k *KN) profileReplay(ctx context.Context, tid uuid.UUID, key string) (*store.ProfileEvent, error) {
-	var ev *store.ProfileEvent
-	err := tenant.WithTenantTx(ctx, k.DB, tid, func(tx pgx.Tx) error {
-		var e error
-		ev, e = store.ProfileEventByIdem(ctx, tx, key)
-		return e
-	})
-	return ev, err
+func (k *KN) profileReplay(ctx context.Context, tid uuid.UUID, key string) (*port.CoopProfileEvent, error) {
+	ps, err := k.Reg.coopProfiles()
+	if err != nil {
+		return nil, err
+	}
+	ev, err := ps.ProfileEventByIdem(tenant.WithID(ctx, tid), key)
+	if err != nil {
+		return nil, ErrDependency.WithDetail("không đọc được sổ hồ sơ HTX").WithCause(err)
+	}
+	return ev, nil
 }
 
-func (k *KN) newProfileEvent(c knCaller, kind string, ref uuid.UUID, commune string, before, after []byte, reason, key string) store.ProfileEvent {
-	ob, sid, sr := c.support()
-	return store.ProfileEvent{ID: ids.New(), TenantID: c.p.TenantID, SubjectKind: kind, SubjectRef: ref, CommuneCode: commune, Action: "updated",
-		Before: before, After: after, Reason: optReason(reason), OnBehalfOf: ob, SupportSessionID: sid, SupportReason: sr,
-		EventTime: k.now(), ActorRef: c.p.ActorRef, IdemKey: key}
+// applyOrgSnapshot là bước 2 của sửa hồ sơ HTX: ghi tên và người đại diện hiện hành của Nút (pf_party) theo ảnh
+// chụp After của dòng sổ kn_profile_event (đã ghi ở bước 1, pf/cooperative). Lũy đẳng — gọi lặp cùng khóa hoàn
+// tất một lần sửa dừng giữa hai bước.
+func (k *KN) applyOrgSnapshot(ctx context.Context, tid, ref uuid.UUID, after []byte) error {
+	var snap struct {
+		Name string  `json:"name"`
+		Rep  *string `json:"representative_ref"`
+	}
+	if err := json.Unmarshal(after, &snap); err != nil || strings.TrimSpace(snap.Name) == "" {
+		return err
+	}
+	rep := uuid.Nil
+	if snap.Rep != nil {
+		if u, err := uuid.Parse(*snap.Rep); err == nil {
+			rep = u
+		}
+	}
+	return tenant.WithTenantTx(ctx, k.DB, tid, func(tx pgx.Tx) error {
+		cur, err := store.OrgByRef(ctx, tx, ref, true)
+		if err != nil || cur == nil {
+			return err
+		}
+		if cur.Name == snap.Name && cur.RepresentativeRef == rep {
+			return nil
+		}
+		if !strings.EqualFold(snap.Name, cur.Name) {
+			if err := store.LockCooperativeName(ctx, tx, snap.Name); err != nil {
+				return err
+			}
+			owner, err := store.CooperativeNameOwner(ctx, tx, snap.Name)
+			if err != nil {
+				return err
+			}
+			if owner != uuid.Nil && owner != cur.Ref {
+				return ErrCoopNameTaken.With("existing_ref", owner.String())
+			}
+		}
+		return store.UpdateOrgProfile(ctx, tx, cur.Ref, snap.Name, rep)
+	})
 }
 
 // UpdateKNCooperative sửa hồ sơ HTX bằng một sự kiện bù trên kn_profile_event (Log cũ → mới; người đại diện
 // mới đi vào kho định danh, sổ chỉ ghi representative_ref cũ → mới). Gọi lặp cùng khóa → kết quả hiện tại,
 // không ghi thêm dòng. Không có thay đổi → trả hiện trạng, không ghi sổ.
+//
+// W3.3 — hai bước, không giao dịch nào chạy qua hai vai: (1) pf/cooperative ghi dòng sổ (ảnh chụp đầy đủ, gồm cả
+// tên và người đại diện) + bảng chiếu hồ sơ trong một giao dịch; (2) pf/party ghi tên/người đại diện hiện hành
+// của Nút theo ảnh chụp After. Bước 2 lỗi → gọi lại cùng Idempotency-Key: bước 1 phát lại dòng sổ, bước 2 chạy lại.
 func (k *KN) UpdateKNCooperative(ctx context.Context, in KNUpdateCoopInput) (KNCooperative, error) {
 	c, err := collectCaller(ctx, true)
 	if err != nil {
@@ -365,6 +404,9 @@ func (k *KN) UpdateKNCooperative(ctx context.Context, in KNUpdateCoopInput) (KNC
 	if prev, err := k.profileReplay(ctx, c.p.TenantID, in.IdemKey); err != nil {
 		return KNCooperative{}, err
 	} else if prev != nil {
+		if err := k.applyOrgSnapshot(ctx, c.p.TenantID, prev.SubjectRef, prev.After); err != nil {
+			return KNCooperative{}, err
+		}
 		return k.coopAfter(ctx, c.p.TenantID, prev.SubjectRef)
 	}
 	area, areaSet, err := parseOptArea("area_ha", in.AreaHa)
@@ -392,14 +434,14 @@ func (k *KN) UpdateKNCooperative(ctx context.Context, in KNUpdateCoopInput) (KNC
 	if utf8.RuneCountInString(strings.TrimSpace(in.Reason)) > 500 {
 		return KNCooperative{}, problem.Validation.WithField("reason", "tối đa 500 ký tự")
 	}
+	ps, err := k.Reg.coopProfiles()
+	if err != nil {
+		return KNCooperative{}, err
+	}
 	sc := c.scope()
 	// Kiểm phạm vi trước khi chạm kho định danh.
-	var pre *store.KNCoop
-	if err := tenant.WithTenantTx(ctx, k.DB, c.p.TenantID, func(tx pgx.Tx) error {
-		var e error
-		pre, e = k.readCoop(ctx, tx, sc, in.Ref)
-		return e
-	}); err != nil {
+	pre, err := k.readCoop(ctx, c.p.TenantID, sc, in.Ref)
+	if err != nil {
 		return KNCooperative{}, err
 	}
 	repRef := uuid.Nil
@@ -408,77 +450,64 @@ func (k *KN) UpdateKNCooperative(ctx context.Context, in KNUpdateCoopInput) (KNC
 			return KNCooperative{}, err
 		}
 	}
-	err = tenant.WithTenantTx(ctx, k.DB, c.p.TenantID, func(tx pgx.Tx) error {
-		if _, err := store.OrgByRef(ctx, tx, in.Ref, true); err != nil {
-			return err
+	cur, err := k.readCoop(ctx, c.p.TenantID, sc, in.Ref)
+	if err != nil {
+		return KNCooperative{}, err
+	}
+	if !sc.Allows(cur.AdminUnitCode) {
+		return KNCooperative{}, ErrOutOfScope
+	}
+	if !cur.Active {
+		return KNCooperative{}, ErrOrgState.WithDetail("HTX đã bị vô hiệu hóa — kích hoạt lại trước khi sửa")
+	}
+	nName, nArea, nTax, nHead, nRep := cur.Name, cur.Profile.AreaHa, cur.Profile.TaxCode, cur.Profile.Address, cur.RepresentativeRef
+	if in.Name != nil {
+		nName = name
+	}
+	if areaSet {
+		nArea = area
+	}
+	if in.TaxCode != nil {
+		nTax = tax
+	}
+	if in.HeadOffice != nil {
+		nHead = head
+	}
+	if repRef != uuid.Nil {
+		nRep = repRef
+	}
+	before := coopSnapshot(cur.Name, cur.Profile.AreaHa, cur.Profile.TaxCode, cur.Profile.Address, cur.RepresentativeRef)
+	after := coopSnapshot(nName, nArea, nTax, nHead, nRep)
+	if len(domain.Diff(before, after)) == 0 {
+		return k.withRep(ctx, *cur), nil
+	}
+	if !strings.EqualFold(nName, cur.Name) {
+		var owner uuid.UUID
+		if err := tenant.WithTenantTx(ctx, k.DB, c.p.TenantID, func(tx pgx.Tx) error {
+			var e error
+			owner, e = store.CooperativeNameOwner(ctx, tx, nName)
+			return e
+		}); err != nil {
+			return KNCooperative{}, err
 		}
-		cur, err := k.readCoop(ctx, tx, sc, in.Ref)
-		if err != nil {
-			return err
-		}
-		if !sc.Allows(cur.AdminUnitCode) {
-			return ErrOutOfScope
-		}
-		if !cur.Active {
-			return ErrOrgState.WithDetail("HTX đã bị vô hiệu hóa — kích hoạt lại trước khi sửa")
-		}
-		nName, nArea, nTax, nHead, nRep := cur.Name, cur.Profile.AreaHa, cur.Profile.TaxCode, cur.Profile.Address, cur.RepresentativeRef
-		if in.Name != nil {
-			nName = name
-		}
-		if areaSet {
-			nArea = area
-		}
-		if in.TaxCode != nil {
-			nTax = tax
-		}
-		if in.HeadOffice != nil {
-			nHead = head
-		}
-		if repRef != uuid.Nil {
-			nRep = repRef
-		}
-		before := coopSnapshot(cur.Name, cur.Profile.AreaHa, cur.Profile.TaxCode, cur.Profile.Address, cur.RepresentativeRef)
-		after := coopSnapshot(nName, nArea, nTax, nHead, nRep)
-		if len(domain.Diff(before, after)) == 0 {
-			return nil
-		}
-		if !strings.EqualFold(nName, cur.Name) {
-			if err := store.LockCooperativeName(ctx, tx, nName); err != nil {
-				return err
-			}
-			owner, err := store.CooperativeNameOwner(ctx, tx, nName)
-			if err != nil {
-				return err
-			}
-			if owner != uuid.Nil && owner != cur.Ref {
-				return ErrCoopNameTaken.With("existing_ref", owner.String())
-			}
-		}
-		if nTax != "" && nTax != cur.Profile.TaxCode {
-			owner, err := store.TaxCodeOwner(ctx, tx, nTax)
-			if err != nil {
-				return err
-			}
-			if owner != uuid.Nil && owner != cur.Ref {
-				return ErrTaxCodeTaken.With("existing_ref", owner.String())
-			}
-		}
-		ev := k.newProfileEvent(c, store.ProfileCooperative, cur.Ref, cur.AdminUnitCode, before, after, in.Reason, in.IdemKey)
-		if err := store.InsertProfileEvent(ctx, tx, &ev); err != nil {
-			return err
-		}
-		if err := store.UpdateOrgProfile(ctx, tx, cur.Ref, nName, nRep); err != nil {
-			return err
-		}
-		return store.UpdateCoopProfile(ctx, tx, cur.Ref, nArea, nTax, nHead)
-	})
-	if err = classifyOrgErr(err); errors.Is(err, ledger.ErrDuplicate) {
-		if prev, rerr := k.profileReplay(ctx, c.p.TenantID, in.IdemKey); rerr == nil && prev != nil {
-			return k.coopAfter(ctx, c.p.TenantID, prev.SubjectRef)
+		if owner != uuid.Nil && owner != cur.Ref {
+			return KNCooperative{}, ErrCoopNameTaken.With("existing_ref", owner.String())
 		}
 	}
-	if err != nil {
+	if nTax != "" && nTax != cur.Profile.TaxCode {
+		if err := k.Reg.taxCodeTaken(ctx, c.p.TenantID, nTax, cur.Ref); err != nil {
+			return KNCooperative{}, err
+		}
+	}
+	ob, sid, sr := c.support()
+	if err := ps.UpdateProfile(tenant.WithID(ctx, c.p.TenantID), port.CoopProfileChange{
+		Ref: cur.Ref, CommuneCode: cur.AdminUnitCode, AreaHa: nArea, TaxCode: nTax, Address: nHead, Before: before, After: after,
+		Reason: optReason(in.Reason), OnBehalfOf: ob, SupportSessionID: sid, SupportReason: sr, EventTime: k.now(),
+		ActorRef: c.p.ActorRef, IdemKey: in.IdemKey,
+	}); err != nil {
+		return KNCooperative{}, k.Reg.profileError(ctx, c.p.TenantID, nTax, cur.Ref, err)
+	}
+	if err := k.applyOrgSnapshot(ctx, c.p.TenantID, cur.Ref, after); err != nil {
 		return KNCooperative{}, err
 	}
 	return k.coopAfter(ctx, c.p.TenantID, in.Ref)
@@ -559,184 +588,10 @@ func (k *KN) ReactivateKNCooperative(ctx context.Context, ref uuid.UUID, reason,
 }
 
 // ---------------------------------------------------------------------------
-// Nông hộ
-// ---------------------------------------------------------------------------
-
-// KNHousehold là một nông hộ thành viên trên tab "Nông hộ".
-type KNHousehold struct {
-	domain.Household
-	Holder KNPerson
-}
-
-// KNHouseholdPage là một trang nông hộ.
-type KNHouseholdPage struct {
-	Items []KNHousehold
-	Next  *uuid.UUID
-}
-
-func (k *KN) holder(ctx context.Context, ref uuid.UUID) KNPerson {
-	if p := k.display(ctx, ref); p != nil {
-		return *p
-	}
-	return KNPerson{Unavailable: true}
-}
-
-// ListKNHouseholds liệt kê nông hộ đang là thành viên của HTX trong phạm vi.
-func (k *KN) ListKNHouseholds(ctx context.Context, coopRef, after uuid.UUID, limit int) (KNHouseholdPage, error) {
-	c, err := collectCaller(ctx, false)
-	if err != nil {
-		return KNHouseholdPage{}, err
-	}
-	if limit <= 0 || limit > 200 {
-		limit = 50
-	}
-	var items []domain.Household
-	err = tenant.WithTenantTx(ctx, k.DB, c.p.TenantID, func(tx pgx.Tx) error {
-		if _, e := k.readCoop(ctx, tx, c.scope(), coopRef); e != nil {
-			return e
-		}
-		var e error
-		items, e = store.ListHouseholdsByCooperative(ctx, tx, coopRef, after, limit+1)
-		return e
-	})
-	if err != nil {
-		return KNHouseholdPage{}, err
-	}
-	pg := KNHouseholdPage{Items: make([]KNHousehold, 0, len(items))}
-	if len(items) > limit {
-		items = items[:limit]
-		last := items[limit-1].Ref
-		pg.Next = &last
-	}
-	for _, h := range items {
-		pg.Items = append(pg.Items, KNHousehold{Household: h, Holder: k.holder(ctx, h.Ref)})
-	}
-	return pg, nil
-}
-
-// KNCreateHouseholdInput là dữ liệu thêm nông hộ vào HTX.
-type KNCreateHouseholdInput struct {
-	CooperativeRef   uuid.UUID
-	FullName         string `pii:"true"`
-	Phone            string `pii:"true"`
-	CultivatedAreaHa *decimal.Decimal
-}
-
-// CreateKNHousehold thêm nông hộ vào HTX (lõi createHousehold: chủ hộ vào kho định danh, chỉ giữ ref).
-// SĐT đã có trong kho → 409 party.household_phone_taken. Gọi lặp: middleware Idempotency-Key phát lại.
-func (k *KN) CreateKNHousehold(ctx context.Context, in KNCreateHouseholdInput) (KNHousehold, error) {
-	c, err := collectCaller(ctx, true)
-	if err != nil {
-		return KNHousehold{}, err
-	}
-	sc := c.scope()
-	var coop *store.KNCoop
-	if err := tenant.WithTenantTx(ctx, k.DB, c.p.TenantID, func(tx pgx.Tx) error {
-		var e error
-		coop, e = k.readCoop(ctx, tx, sc, in.CooperativeRef)
-		return e
-	}); err != nil {
-		return KNHousehold{}, err
-	}
-	res, err := k.Reg.createHousehold(ctx, c.p, sc, CreateHouseholdInput{
-		Identity: FarmerIdentity{FullName: in.FullName, Phone: in.Phone}, CooperativeRef: coop.Ref, CultivatedAreaHa: in.CultivatedAreaHa,
-		Source: port.HouseholdSourceKNApp, RejectDuplicate: true, KNScoped: true,
-	})
-	if err != nil {
-		return KNHousehold{}, err
-	}
-	return KNHousehold{Household: res.Household, Holder: k.holder(ctx, res.Household.Ref)}, nil
-}
-
-func householdSnapshot(area *decimal.Decimal) []byte {
-	m := map[string]any{"cultivated_area_ha": nil}
-	if area != nil {
-		m["cultivated_area_ha"] = area.String()
-	}
-	return snapshotJSON(m)
-}
-
-// readHousehold đọc nông hộ trong phạm vi (xã của hộ); ngoài phạm vi → 404.
-func readHousehold(ctx context.Context, tx pgx.Tx, sc authz.Scope, ref uuid.UUID) (*domain.Household, error) {
-	h, err := store.HouseholdByRef(ctx, tx, ref)
-	if err != nil {
-		return nil, err
-	}
-	if h == nil || !visible(sc, h.CommuneCode) {
-		return nil, ErrHouseholdNotFound
-	}
-	return h, nil
-}
-
-// UpdateKNHousehold sửa diện tích canh tác của nông hộ (sự kiện bù trên kn_profile_event + bảng chiếu).
-func (k *KN) UpdateKNHousehold(ctx context.Context, ref uuid.UUID, area *string, reason, key string) (KNHousehold, error) {
-	c, err := collectCaller(ctx, true)
-	if err != nil {
-		return KNHousehold{}, err
-	}
-	if area == nil {
-		return KNHousehold{}, problem.Validation.WithField("cultivated_area_ha", "bắt buộc (chuỗi rỗng = xóa giá trị)")
-	}
-	nArea, _, err := parseOptArea("cultivated_area_ha", area)
-	if err != nil {
-		return KNHousehold{}, err
-	}
-	if utf8.RuneCountInString(strings.TrimSpace(reason)) > 500 {
-		return KNHousehold{}, problem.Validation.WithField("reason", "tối đa 500 ký tự")
-	}
-	if key == "" {
-		key = "kn-household-" + ids.New().String()
-	}
-	if prev, err := k.profileReplay(ctx, c.p.TenantID, key); err != nil {
-		return KNHousehold{}, err
-	} else if prev != nil {
-		ref = prev.SubjectRef
-	} else {
-		sc := c.scope()
-		err = tenant.WithTenantTx(ctx, k.DB, c.p.TenantID, func(tx pgx.Tx) error {
-			if err := store.LockHousehold(ctx, tx, ref); err != nil {
-				return err
-			}
-			h, err := readHousehold(ctx, tx, sc, ref)
-			if err != nil {
-				return err
-			}
-			if !sc.Allows(h.CommuneCode) {
-				return ErrOutOfScope
-			}
-			before, after := householdSnapshot(h.CultivatedAreaHa), householdSnapshot(nArea)
-			if len(domain.Diff(before, after)) == 0 {
-				return nil
-			}
-			ev := k.newProfileEvent(c, store.ProfileHousehold, h.Ref, h.CommuneCode, before, after, reason, key)
-			if err := store.InsertProfileEvent(ctx, tx, &ev); err != nil {
-				return err
-			}
-			return store.UpdateHouseholdArea(ctx, tx, h.Ref, nArea)
-		})
-		if err = ledger.Classify(err); err != nil && !errors.Is(err, ledger.ErrDuplicate) {
-			return KNHousehold{}, err
-		}
-	}
-	var h *domain.Household
-	if err := tenant.WithTenantTx(ctx, k.DB, c.p.TenantID, func(tx pgx.Tx) error {
-		var e error
-		h, e = store.HouseholdByRef(ctx, tx, ref)
-		return e
-	}); err != nil {
-		return KNHousehold{}, err
-	}
-	if h == nil {
-		return KNHousehold{}, ErrHouseholdNotFound
-	}
-	return KNHousehold{Household: *h, Holder: k.holder(ctx, h.Ref)}, nil
-}
-
-// ---------------------------------------------------------------------------
 // Log
 // ---------------------------------------------------------------------------
 
-// KNLogPage là một trang Log đã gộp (org_event + kn_profile_event); Next là vị trí tiếp theo.
+// KNLogPage là một trang Log đã gộp (org_event ở pf/party + kn_profile_event ở pf/cooperative); Next là vị trí tiếp theo.
 type KNLogPage struct {
 	Items []LogEntry
 	Next  *int64
@@ -753,7 +608,7 @@ func detailStr(d map[string]any, key string) *string {
 	return nil
 }
 
-func profileEntry(e store.ProfileEvent) LogEntry {
+func profileEntry(e port.CoopProfileEvent) LogEntry {
 	r := e.Reason
 	if e.SupportReason != nil && r == nil {
 		r = e.SupportReason
@@ -792,27 +647,31 @@ func (k *KN) pageLog(ctx context.Context, all []LogEntry, after int64, limit int
 }
 
 // CooperativeLog trả Log của HTX: tạo, vô hiệu hóa/kích hoạt lại, đổi vị trí (org_event) và sửa hồ sơ
-// (kn_profile_event) — người, thời điểm, giá trị cũ → mới, lý do (AC-CHUNG). Không có dữ liệu cá nhân.
+// (kn_profile_event, pf/cooperative) — người, thời điểm, giá trị cũ → mới, lý do (AC-CHUNG). Không có dữ liệu cá nhân.
 func (k *KN) CooperativeLog(ctx context.Context, ref uuid.UUID, after int64, limit int) (KNLogPage, error) {
 	c, err := collectCaller(ctx, false)
 	if err != nil {
 		return KNLogPage{}, err
 	}
+	if _, err := k.readCoop(ctx, c.p.TenantID, c.scope(), ref); err != nil {
+		return KNLogPage{}, err
+	}
 	var orgEvs []domain.OrgEvent
-	var profEvs []store.ProfileEvent
 	err = tenant.WithTenantTx(ctx, k.DB, c.p.TenantID, func(tx pgx.Tx) error {
-		if _, e := k.readCoop(ctx, tx, c.scope(), ref); e != nil {
-			return e
-		}
 		var e error
-		if orgEvs, e = store.OrgEvents(ctx, tx, ref); e != nil {
-			return e
-		}
-		profEvs, e = store.ProfileEvents(ctx, tx, store.ProfileCooperative, ref)
+		orgEvs, e = store.OrgEvents(ctx, tx, ref)
 		return e
 	})
 	if err != nil {
 		return KNLogPage{}, err
+	}
+	ps, err := k.Reg.coopProfiles()
+	if err != nil {
+		return KNLogPage{}, err
+	}
+	profEvs, err := ps.ProfileEvents(tenant.WithID(ctx, c.p.TenantID), ref)
+	if err != nil {
+		return KNLogPage{}, ErrDependency.WithDetail("không đọc được sổ hồ sơ HTX").WithCause(err)
 	}
 	all := make([]LogEntry, 0, len(orgEvs)+len(profEvs))
 	var name string
@@ -850,56 +709,6 @@ func (k *KN) CooperativeLog(ctx context.Context, ref uuid.UUID, after int64, lim
 		all = append(all, le)
 	}
 	for _, e := range profEvs {
-		all = append(all, profileEntry(e))
-	}
-	return k.pageLog(ctx, all, after, limit), nil
-}
-
-// HouseholdLog trả Log của nông hộ: dòng tạo (từ hồ sơ) và các lần sửa diện tích (kn_profile_event).
-func (k *KN) HouseholdLog(ctx context.Context, ref uuid.UUID, after int64, limit int) (KNLogPage, error) {
-	c, err := collectCaller(ctx, false)
-	if err != nil {
-		return KNLogPage{}, err
-	}
-	var h *domain.Household
-	var meta *store.HouseholdMeta
-	var evs []store.ProfileEvent
-	err = tenant.WithTenantTx(ctx, k.DB, c.p.TenantID, func(tx pgx.Tx) error {
-		var e error
-		if h, e = readHousehold(ctx, tx, c.scope(), ref); e != nil {
-			return e
-		}
-		if meta, e = store.HouseholdMetaByRef(ctx, tx, ref); e != nil {
-			return e
-		}
-		evs, e = store.ProfileEvents(ctx, tx, store.ProfileHousehold, ref)
-		return e
-	})
-	if err != nil {
-		return KNLogPage{}, err
-	}
-	all := make([]LogEntry, 0, len(evs)+1)
-	if meta != nil {
-		initial := h.CultivatedAreaHa
-		if len(evs) > 0 {
-			ch := domain.Diff(nil, evs[0].Before)
-			initial = nil
-			for _, x := range ch {
-				if x.Field == "cultivated_area_ha" && x.New != nil {
-					d, err := decimal.NewFromString(*x.New)
-					if err == nil {
-						initial = &d
-					}
-				}
-			}
-		}
-		changes := []domain.FieldChange{{Field: "commune_code", New: strp(h.CommuneCode)}}
-		if initial != nil {
-			changes = append(changes, domain.FieldChange{Field: "cultivated_area_ha", New: strp(initial.String())})
-		}
-		all = append(all, LogEntry{Event: "created", ActorRef: meta.CreatedBy, At: meta.CreatedAt, RecordedAt: meta.CreatedAt, Changes: changes})
-	}
-	for _, e := range evs {
 		all = append(all, profileEntry(e))
 	}
 	return k.pageLog(ctx, all, after, limit), nil

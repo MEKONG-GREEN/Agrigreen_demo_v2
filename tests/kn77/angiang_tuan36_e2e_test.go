@@ -749,7 +749,7 @@ func (s *agScenario) count(q string, args ...any) int {
 // knLedgers: mọi sổ (apply_ledger) của KN v7.7 — migration pf 000060–000079.
 var knLedgers = []string{
 	"pf_accounts.role_assignment_event", "pf_accounts.support_session_event", "pf_accounts.support_action_log", "pf_accounts.account_profile_change",
-	"pf_party.department_event", "pf_party.region_event", "pf_party.org_region_event", "pf_party.kn_profile_event",
+	"pf_party.department_event", "pf_party.region_event", "pf_party.org_region_event", "pf_coop.kn_profile_event", // W3.3: bảng ở pf_coop, tên sổ giữ "pf_party.kn_profile_event"
 	"pf_reports.form_assignment_event", "pf_reports.form_template_event", "pf_reports.dispatch_recipient_event", "pf_reports.dispatch_event",
 	"pf_extension.report_batch_event", "pf_extension.report_task_event", "pf_extension.provincial_value", "pf_extension.submission_version",
 	"pf_extension.review_event", "pf_extension.reminder_event", "pf_extension.period_event", "pf_extension.consolidation_run",

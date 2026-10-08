@@ -52,9 +52,12 @@ func TestPerTenantAndRoleBlocked(t *testing.T) {
 	if b, _ := RoleBlocked("coop_manager", off("pf/cropcycle", "pf/geo")); b {
 		t.Fatal("vai có module lõi khai không bị chặn")
 	}
-	// plot_editor chỉ pf/geo; geo_admin chỉ pf/geo.
-	if b, _ := RoleBlocked("plot_editor", off("pf/geo")); !b {
-		t.Fatal("plot_editor phải bị chặn khi pf/geo tắt")
+	// plot_editor chỉ pf/cooperative khai (W3.3, thửa chuyển từ pf/geo); geo_admin chỉ pf/geo.
+	if b, _ := RoleBlocked("plot_editor", off("pf/cooperative")); !b {
+		t.Fatal("plot_editor phải bị chặn khi pf/cooperative tắt")
+	}
+	if b, _ := RoleBlocked("geo_admin", off("pf/geo")); !b {
+		t.Fatal("geo_admin phải bị chặn khi pf/geo tắt")
 	}
 	// Vai không module nào khai (platform_admin) cấp được.
 	if b, _ := RoleBlocked("platform_admin", off("pf/geo")); b {

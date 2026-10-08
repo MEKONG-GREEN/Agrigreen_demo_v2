@@ -18,17 +18,11 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
-// registerG2App gắn route Application API của G2: đọc lớp nền (ranh giới HTX,
-// kho/Hub + widget sức chứa, đường bộ, lớp gộp), ghi ranh giới HTX, đọc log GPS.
+// registerG2App gắn route Application API của G2: đọc lớp nền (kho/Hub + widget sức chứa, đường bộ, lớp gộp,
+// bản đồ chuẩn hóa), đọc log GPS. Ranh giới HTX do pf/cooperative phục vụ (W3.3).
 func (h Handler) registerG2App(rg *gin.RouterGroup) {
 	rg.GET("/geo/layers", h.layers)
 	rg.GET("/geo/standard-map", h.standardMap) // GIS US-INT-02: bản đồ chuẩn hóa cho TMS
-	rg.GET("/geo/cooperative-boundaries", h.coopBBox)
-	rg.POST("/geo/cooperative-boundaries", h.coopCreate)
-	rg.GET("/geo/cooperative-boundaries/:ref", h.coopGet)
-	rg.POST("/geo/cooperative-boundaries/:ref/versions", h.coopCorrect)
-	rg.POST("/geo/cooperative-boundaries/:ref/retire", h.coopRetire)
-	rg.POST("/geo/cooperative-boundaries/:ref/restore", h.coopRestore)
 	rg.GET("/geo/facilities", h.facilities)
 	rg.GET("/geo/facilities/:ref", h.facilityGet)
 	rg.GET("/geo/hubs/:ref/capacity", h.hubCapacity)
@@ -42,11 +36,8 @@ func (h Handler) registerG2App(rg *gin.RouterGroup) {
 	}
 }
 
-// registerG2Admin gắn route Admin API của G2 (MFA): nhập ranh giới HTX, quản lý
-// kho/Hub và sức chứa (BR-52: chỉ Admin nhập tay), vẽ/sửa đường bộ.
+// registerG2Admin gắn route Admin API của G2 (MFA): quản lý kho/Hub và sức chứa (BR-52: chỉ Admin nhập tay), vẽ/sửa đường bộ.
 func (h Handler) registerG2Admin(rg *gin.RouterGroup) {
-	httpx.AllowBody(rg, http.MethodPost, "/geo/cooperative-boundaries/import", MaxImportBody)
-	rg.POST("/geo/cooperative-boundaries/import", h.coopImport)
 	rg.POST("/geo/facilities", h.facilityCreate)
 	httpx.AllowBody(rg, http.MethodPost, "/geo/facilities/import", MaxImportBody)
 	rg.POST("/geo/facilities/import", h.facilityImport)
@@ -121,229 +112,6 @@ func f7(x float64) string { return strconv.FormatFloat(x, 'f', 7, 64) }
 
 func pointGeom(lon, lat float64) json.RawMessage {
 	return json.RawMessage(`{"type":"Point","coordinates":[` + f7(lon) + "," + f7(lat) + "]}")
-}
-
-// ---------------------------------------------------------------------------
-// Ranh giới HTX
-// ---------------------------------------------------------------------------
-
-func coopFeature(a store.CoopArea, marker json.RawMessage, markerSource string) gin.H {
-	if marker == nil {
-		marker, markerSource = pointGeom(a.MarkerLon, a.MarkerLat), "point_on_surface"
-	}
-	return gin.H{
-		"type": "Feature", "id": a.CooperativeRef.String(), "geometry": json.RawMessage(a.GeoJSON),
-		"properties": gin.H{
-			"cooperative_ref": a.CooperativeRef.String(), "commune_code": a.CommuneCode, "status": a.Status,
-			"status_reason": strOrNil(a.StatusReason), "version": a.CurrentVersion, "boundary_id": a.CurrentBoundaryID.String(),
-			"area_ha": a.AreaHa.StringFixed(4), "source": a.Source, "revision": a.Revision, "marker": marker,
-			"marker_source": markerSource, "created_at": ts(a.CreatedAt), "updated_at": ts(a.UpdatedAt),
-		},
-	}
-}
-
-func coopBoundaryDTO(b store.CoopBoundary) gin.H {
-	m := gin.H{
-		"boundary_id": b.ID.String(), "cooperative_ref": b.CooperativeRef.String(), "version": b.Version, "action": b.Action,
-		"area_ha": b.AreaHa.StringFixed(4), "point_count": b.PointCount, "source": b.Source, "commune_code": b.CommuneCode,
-		"event_time": ts(b.EventTime), "recorded_at": ts(b.RecordedAt), "supersedes_id": nil,
-		"correction_reason": b.CorrectionReason, "actor_ref": b.ActorRef.String(), "device_id": b.DeviceID,
-	}
-	if b.SupersedesID != nil {
-		m["supersedes_id"] = b.SupersedesID.String()
-	}
-	if b.GeoJSON != "" {
-		m["geometry"] = json.RawMessage(b.GeoJSON)
-	}
-	return m
-}
-
-func (h Handler) coopBBox(c *gin.Context) {
-	in, ok := bboxInput(c, 12)
-	if !ok {
-		return
-	}
-	l, err := h.Svc.CoopBoundariesInBBox(c.Request.Context(), in)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, coopLayerDTO(l, in.Limit))
-}
-
-func coopLayerDTO(l app.CoopLayer, limit int) gin.H {
-	feats := make([]gin.H, 0, len(l.Items)+len(l.Unbounded))
-	for _, a := range l.Items {
-		var marker json.RawMessage
-		src := ""
-		if m, ok := l.Markers[a.CooperativeRef]; ok {
-			marker, src = pointGeom(m.Lon.InexactFloat64(), m.Lat.InexactFloat64()), "party_location"
-		}
-		feats = append(feats, coopFeature(a, marker, src))
-	}
-	for _, m := range l.Unbounded {
-		feats = append(feats, gin.H{
-			"type": "Feature", "id": m.Ref.String(), "geometry": pointGeom(m.Lon.InexactFloat64(), m.Lat.InexactFloat64()),
-			"properties": gin.H{"cooperative_ref": m.Ref.String(), "code": m.Code, "name": m.Name, "commune_code": m.CommuneCode,
-				"status": nil, "boundary_id": nil, "marker_source": "party_location"},
-		})
-	}
-	if limit == 0 {
-		limit = app.MaxViewportPlots
-	}
-	return gin.H{"type": "FeatureCollection", "features": feats, "truncated": l.Truncated, "limit": limit}
-}
-
-type coopShapeReq struct {
-	BoundaryID *string         `json:"boundary_id"`
-	Geometry   json.RawMessage `json:"geometry"`
-	Source     string          `json:"source"`
-	EventTime  *string         `json:"event_time"`
-	DeviceID   *string         `json:"device_id"`
-}
-
-func (r coopShapeReq) input(f *fieldCollector) app.CoopShapeInput {
-	return app.CoopShapeInput{
-		ID: f.v7("boundary_id", r.BoundaryID), Geometry: r.Geometry, Source: strings.TrimSpace(r.Source),
-		EventTime: f.at("event_time", r.EventTime), DeviceID: r.DeviceID,
-	}
-}
-
-func coopWriteResult(c *gin.Context, res app.CoopWriteResult, created bool) {
-	status := http.StatusOK
-	if created && !res.Replayed {
-		status = http.StatusCreated
-	}
-	c.Header("Location", "/v1/geo/cooperative-boundaries/"+res.Area.CooperativeRef.String())
-	c.JSON(status, gin.H{"cooperative": coopFeature(res.Area, nil, ""), "boundary": coopBoundaryDTO(res.Boundary)})
-}
-
-func (h Handler) coopCreate(c *gin.Context) {
-	var req struct {
-		coopShapeReq
-		CooperativeRef *string `json:"cooperative_ref"`
-		CommuneCode    string  `json:"commune_code"`
-	}
-	if !bindJSON(c, &req) {
-		return
-	}
-	f := newCollector()
-	in := app.CoopBoundaryInput{
-		CooperativeRef: f.ref("cooperative_ref", req.CooperativeRef), CommuneCode: req.CommuneCode, Shape: req.input(f), IdemKey: idem(c),
-	}
-	if f.bad {
-		httpx.Fail(c, f.p)
-		return
-	}
-	res, err := h.Svc.CreateCoopBoundary(c.Request.Context(), in)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	coopWriteResult(c, res, true)
-}
-
-func (h Handler) coopCorrect(c *gin.Context) {
-	ref, ok := refParam(c, "ref", app.ErrCoopBoundaryNotFound)
-	if !ok {
-		return
-	}
-	var req struct {
-		coopShapeReq
-		SupersedesID     *string `json:"supersedes_id"`
-		CorrectionReason string  `json:"correction_reason"`
-	}
-	if !bindJSON(c, &req) {
-		return
-	}
-	f := newCollector()
-	in := app.CoopCorrectInput{
-		CooperativeRef: ref, SupersedesID: f.ref("supersedes_id", req.SupersedesID), Reason: req.CorrectionReason,
-		Shape: req.input(f), IdemKey: idem(c),
-	}
-	if f.bad {
-		httpx.Fail(c, f.p)
-		return
-	}
-	res, err := h.Svc.CorrectCoopBoundary(c.Request.Context(), in)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	coopWriteResult(c, res, true)
-}
-
-func (h Handler) coopStatus(c *gin.Context, fn func(*gin.Context, app.CoopStatusInput) (app.CoopWriteResult, error)) {
-	ref, ok := refParam(c, "ref", app.ErrCoopBoundaryNotFound)
-	if !ok {
-		return
-	}
-	var req struct {
-		Reason string `json:"reason"`
-	}
-	if !bindJSON(c, &req) {
-		return
-	}
-	res, err := fn(c, app.CoopStatusInput{CooperativeRef: ref, Reason: req.Reason, IdemKey: idem(c)})
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	coopWriteResult(c, res, false)
-}
-
-func (h Handler) coopRetire(c *gin.Context) {
-	h.coopStatus(c, func(c *gin.Context, in app.CoopStatusInput) (app.CoopWriteResult, error) {
-		return h.Svc.RetireCoopBoundary(c.Request.Context(), in)
-	})
-}
-
-func (h Handler) coopRestore(c *gin.Context) {
-	h.coopStatus(c, func(c *gin.Context, in app.CoopStatusInput) (app.CoopWriteResult, error) {
-		return h.Svc.RestoreCoopBoundary(c.Request.Context(), in)
-	})
-}
-
-func (h Handler) coopGet(c *gin.Context) {
-	ref, ok := refParam(c, "ref", app.ErrCoopBoundaryNotFound)
-	if !ok {
-		return
-	}
-	d, err := h.Svc.GetCoopBoundary(c.Request.Context(), ref)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	versions := make([]gin.H, 0, len(d.Versions))
-	for _, v := range d.Versions {
-		versions = append(versions, coopBoundaryDTO(v))
-	}
-	c.JSON(http.StatusOK, gin.H{"cooperative": coopFeature(d.Area, nil, ""), "versions": versions})
-}
-
-func (h Handler) coopImport(c *gin.Context) {
-	raw, err := c.GetRawData()
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	res, err := h.Svc.ImportCoopBoundaries(c.Request.Context(), app.CoopImportInput{
-		Format: c.Query("format"), FileName: c.Query("file_name"), Data: raw, Reason: c.Query("reason"), IdemKey: idem(c),
-	})
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	feats := make([]gin.H, 0, len(res.Features))
-	for _, r := range res.Features {
-		feats = append(feats, gin.H{
-			"index": r.Index, "name": strOrNil(r.Name), "status": r.Status, "replaced": r.Replaced, "code": strOrNil(r.Code),
-			"reason": strOrNil(r.Reason), "cooperative_ref": refOrNil(r.CooperativeRef), "boundary_id": refOrNil(r.BoundaryID),
-			"version": r.Version, "area_ha": decOrNil(r.AreaHa),
-		})
-	}
-	c.JSON(http.StatusOK, gin.H{"format": res.Format, "accepted": res.Accepted, "duplicate": res.Duplicate,
-		"rejected": res.Rejected, "features": feats})
 }
 
 // ---------------------------------------------------------------------------
@@ -1014,10 +782,10 @@ func (h Handler) layers(c *gin.Context) {
 	res := gin.H{"zoom": bb.Zoom, "plot_min_zoom": out.PlotMinZoom, "plots_notice": strOrNil(out.PlotsNotice),
 		"cooperatives": nil, "plots": nil, "facilities": nil, "roads": nil}
 	if out.Cooperatives != nil {
-		res["cooperatives"] = coopLayerDTO(*out.Cooperatives, bb.Limit)
+		res["cooperatives"] = out.Cooperatives
 	}
 	if out.Plots != nil {
-		res["plots"] = gin.H{"type": "FeatureCollection", "features": featureCollection(out.Plots.Items), "truncated": out.Plots.Truncated}
+		res["plots"] = out.Plots
 	}
 	if out.Facilities != nil {
 		res["facilities"] = facilityPageDTO(*out.Facilities, bb.Limit)

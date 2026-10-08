@@ -16,30 +16,27 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 )
 
 // Mã lỗi G2 của pf/geo (docs/errors.md).
 var (
-	ErrCoopBoundaryNotFound = problem.New(http.StatusNotFound, "geo.cooperative_boundary_not_found", "HTX chưa có ranh giới hoặc nằm ngoài phạm vi")
-	ErrCoopBoundaryExists   = problem.New(http.StatusConflict, "geo.cooperative_boundary_exists", "HTX đã có ranh giới — gửi phiên bản mới (kèm supersedes_id và lý do) để sửa")
-	ErrFacilityNotFound     = problem.New(http.StatusNotFound, "geo.facility_not_found", "Không tìm thấy kho/Hub")
-	ErrFacilityCodeExists   = problem.New(http.StatusConflict, "geo.facility_code_exists", "Mã kho/Hub đã được dùng")
-	ErrHubNotFound          = problem.New(http.StatusNotFound, "geo.hub_not_found", "Chưa nhận hub MKG này qua van công bố")
-	ErrRoadNotFound         = problem.New(http.StatusNotFound, "geo.road_not_found", "Không tìm thấy tuyến đường bộ")
-	ErrFeatureState         = problem.New(http.StatusConflict, "geo.feature_state_conflict", "Trạng thái đối tượng không cho phép thao tác này")
-	ErrNothingToRelease     = problem.New(http.StatusConflict, "geo.capacity_nothing_to_release", "Không có số sức chứa nhập tay đang áp dụng để nhả")
-	ErrGpsLogReadOnly       = problem.New(http.StatusMethodNotAllowed, "geo.gps_log_read_only", domain.MsgGpsReadOnly)
+	ErrFacilityNotFound   = problem.New(http.StatusNotFound, "geo.facility_not_found", "Không tìm thấy kho/Hub")
+	ErrFacilityCodeExists = problem.New(http.StatusConflict, "geo.facility_code_exists", "Mã kho/Hub đã được dùng")
+	ErrHubNotFound        = problem.New(http.StatusNotFound, "geo.hub_not_found", "Chưa nhận hub MKG này qua van công bố")
+	ErrRoadNotFound       = problem.New(http.StatusNotFound, "geo.road_not_found", "Không tìm thấy tuyến đường bộ")
+	ErrFeatureState       = problem.New(http.StatusConflict, "geo.feature_state_conflict", "Trạng thái đối tượng không cho phép thao tác này")
+	ErrNothingToRelease   = problem.New(http.StatusConflict, "geo.capacity_nothing_to_release", "Không có số sức chứa nhập tay đang áp dụng để nhả")
+	ErrGpsLogReadOnly     = problem.New(http.StatusMethodNotAllowed, "geo.gps_log_read_only", domain.MsgGpsReadOnly)
 )
 
-// Vai ghi ranh giới HTX (Application API): cán bộ KN trong phạm vi, quản lý HTX
-// cho chính HTX mình, quản trị GIS.
-var coopWriteRoles = []string{port.RolePlotEditor, port.RoleCoopManager, port.RoleGeoAdmin, authz.RolePlatformAdmin}
-
 // Vai đọc lớp nền G2 (bản đồ GIS, App HTX).
-var layerReadRoles = []string{port.RolePlotViewer, port.RolePlotEditor, port.RoleCoopManager, port.RoleGeoAdmin, authz.RolePlatformAdmin}
+var layerReadRoles = []string{rolePlotViewer, rolePlotEditor, port.RoleCoopManager, port.RoleGeoAdmin, authz.RolePlatformAdmin}
 
 // validBBox kiểm khung nhìn WGS84.
 func validBBox(b store.BBox) error {
@@ -169,3 +166,11 @@ const DefaultPlotLayerMinZoom = 13
 
 // positive kiểm số dương (sức chứa, tải trọng).
 func positive(d *decimal.Decimal) bool { return d != nil && d.IsPositive() }
+
+// enqueue ghi sự kiện vào outbox trong cùng giao dịch với sổ (R-21).
+func enqueue(ctx context.Context, tx pgx.Tx, tid uuid.UUID, typ string, at time.Time, payload any) error {
+	return outbox.Enqueue(ctx, tx, outbox.Event{
+		ID: ids.New(), TenantID: tid, Type: typ, SchemaVersion: 1, OccurredAt: at,
+		TraceID: telemetry.TraceID(ctx), Producer: "pf/geo", Payload: payload,
+	})
+}

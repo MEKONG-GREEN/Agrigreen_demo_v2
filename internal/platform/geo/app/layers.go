@@ -6,13 +6,15 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
 // Lớp bản đồ web GIS gộp một lần gọi (BRD FN-01: bật/tắt từng lớp): chỉ khung
 // nhìn, mỗi lớp tối đa 1.000 đối tượng (BR-25); polygon thửa chỉ khi zoom ≥
-// geo.plot_layer_min_zoom (BR-24, mặc định 13).
+// geo.plot_layer_min_zoom (BR-24, mặc định 13). Lớp HTX và lớp thửa do pf/cooperative
+// dựng (port.MapLayers, W3.3).
 
 // Tên lớp.
 const (
@@ -30,14 +32,28 @@ type LayersInput struct {
 	MinLoadBad  bool
 }
 
-// LayersOut là các lớp đã yêu cầu (nil = không yêu cầu).
+// LayersOut là các lớp đã yêu cầu (nil = không yêu cầu). Cooperatives, Plots là FeatureCollection GeoJSON đã dựng
+// của pf/cooperative.
 type LayersOut struct {
-	Cooperatives *CoopLayer
-	Plots        *BBoxPage
+	Cooperatives map[string]any
+	Plots        map[string]any
 	PlotsNotice  string
 	PlotMinZoom  int
 	Facilities   *FacilityPage
 	Roads        *RoadPage
+}
+
+func (in BBoxInput) mapQuery(mapConsumer bool) port.MapLayerQuery {
+	return port.MapLayerQuery{MinLon: in.MinLon, MinLat: in.MinLat, MaxLon: in.MaxLon, MaxLat: in.MaxLat, Zoom: in.Zoom, Limit: in.Limit,
+		MapConsumer: mapConsumer}
+}
+
+// mapLayers trả lớp của pf/cooperative; chưa nối → 503.
+func (s *Service) mapLayers() (port.MapLayers, error) {
+	if s.MapLayers == nil {
+		return nil, ErrDependency.WithDetail("chưa nối lớp HTX / thửa (pf/cooperative)")
+	}
+	return s.MapLayers, nil
 }
 
 // Layers trả các lớp của khung nhìn.
@@ -61,19 +77,23 @@ func (s *Service) Layers(ctx context.Context, in LayersInput) (LayersOut, error)
 		return LayersOut{}, err
 	}
 	if in.Layers[LayerCooperatives] {
-		l, err := s.coopLayer(ctx, a, in.BBoxInput)
+		ml, err := s.mapLayers()
 		if err != nil {
 			return LayersOut{}, err
 		}
-		out.Cooperatives = &l
+		if out.Cooperatives, err = ml.CooperativeLayer(ctx, in.mapQuery(false)); err != nil {
+			return LayersOut{}, err
+		}
 	}
 	if in.Layers[LayerPlots] {
 		if in.Zoom >= out.PlotMinZoom {
-			pg, err := s.PlotsInBBox(ctx, in.BBoxInput)
+			ml, err := s.mapLayers()
 			if err != nil {
 				return LayersOut{}, err
 			}
-			out.Plots = &pg
+			if out.Plots, err = ml.PlotLayer(ctx, in.mapQuery(false)); err != nil {
+				return LayersOut{}, err
+			}
 		} else {
 			out.PlotsNotice = "Polygon lô/thửa chỉ hiển thị từ mức zoom cận cảnh (≥ " + strconv.Itoa(out.PlotMinZoom) + ")."
 		}

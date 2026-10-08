@@ -15,6 +15,9 @@ var ledgerColumnsGrandfathered = map[string]map[int]bool{
 
 var (
 	applyLedgerRe = regexp.MustCompile(`(?i)\bapply_ledger\s*\(\s*'([a-z0-9_.]+)'`)
+	// setSchemaRe: ALTER TABLE <schema>.<bảng> SET SCHEMA <đích> (W3.3, pf 000132) — sổ chuyển schema vẫn là sổ dưới
+	// tên mới <đích>.<bảng> (quy tắc ADD COLUMN áp tiếp).
+	setSchemaRe   = regexp.MustCompile(`(?is)\bALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?([a-z0-9_]+)\.([a-z0-9_]+)\s+SET\s+SCHEMA\s+([a-z0-9_]+)`)
 	registerColRe = regexp.MustCompile(`(?is)\bregister_ledger_columns\s*\(\s*'([a-z0-9_.]+)'(?:\s*::\s*regclass)?\s*,\s*ARRAY\s*\[([^\]]*)\]`)
 	quotedNameRe  = regexp.MustCompile(`'([a-z0-9_]+)'`)
 	addColumnRe   = regexp.MustCompile(`(?is)^ADD\s+(?:COLUMN\s+)?(?:IF\s+NOT\s+EXISTS\s+)?([a-z0-9_]+)\b(.*)$`)
@@ -32,6 +35,18 @@ func LedgerTables(src string) []string {
 	var out []string
 	for _, m := range applyLedgerRe.FindAllStringSubmatch(src, -1) {
 		out = append(out, strings.ToLower(m[1]))
+	}
+	return out
+}
+
+// LedgerMoves trả các cặp (tên cũ, tên mới) của ALTER TABLE … SET SCHEMA trong một tệp.
+func LedgerMoves(src string) [][2]string {
+	var out [][2]string
+	for _, st := range Statements(src) {
+		if m := setSchemaRe.FindStringSubmatch(st); m != nil {
+			from := strings.ToLower(m[1] + "." + m[2])
+			out = append(out, [2]string{from, strings.ToLower(m[3] + "." + m[2])})
+		}
 	}
 	return out
 }

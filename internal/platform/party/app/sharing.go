@@ -82,6 +82,8 @@ type Sharing struct {
 	// Approvals (tùy chọn, W6.1): cap/workflow — đề xuất/duyệt/thu hồi đề xuất ghi thêm yêu cầu và quyết định vào
 	// sổ pf_workflow CÙNG giao dịch (bốn mắt kiểm lại ở DB). Nil → chỉ luồng cũ.
 	Approvals port.FourEyes
+	// Profiles (W3.3): vị trí hồ sơ HTX (pf/cooperative) cho danh bạ HTX của bên nhận. Nil → toạ độ null.
+	Profiles port.CoopProfiles
 }
 
 var (
@@ -839,6 +841,9 @@ func (s *Sharing) PartnerCooperatives(ctx context.Context, grantor, after uuid.U
 		n := pg.Items[limit-1].Ref
 		pg.Next = &n
 	}
+	if err := s.withLocations(ctx, g, pg.Items); err != nil {
+		return PartnerCooperativePage{}, err
+	}
 	if err := s.RecordRead(ctx, g, port.PartnerRead{Kind: port.KindCooperativeDirectory, Endpoint: "GET /v1/partner/cooperatives",
 		Query: query, Items: len(pg.Items)}); err != nil {
 		return PartnerCooperativePage{}, err
@@ -863,6 +868,11 @@ func (s *Sharing) PartnerCooperative(ctx context.Context, grantor, ref uuid.UUID
 	n := 0
 	if e != nil {
 		n = 1
+		one := []store.CooperativeEntry{*e}
+		if err := s.withLocations(ctx, g, one); err != nil {
+			return store.CooperativeEntry{}, err
+		}
+		*e = one[0]
 	}
 	if err := s.RecordRead(ctx, g, port.PartnerRead{Kind: port.KindCooperativeDirectory, Endpoint: "GET /v1/partner/cooperatives/{ref}",
 		Query: "ref=" + ref.String(), Items: n}); err != nil {
@@ -872,4 +882,33 @@ func (s *Sharing) PartnerCooperative(ctx context.Context, grantor, ref uuid.UUID
 		return store.CooperativeEntry{}, ErrPartnerNotFound
 	}
 	return *e, nil
+}
+
+// withLocations ghép toạ độ hồ sơ HTX (pf/cooperative, W3.3) vào dòng danh bạ — độ, 7 chữ số thập phân như
+// round(ST_X(location)::numeric, 7)::text trước W3.3. Tenant là bên cấp — đi qua bằng chứng của cấp quyền (H4).
+func (s *Sharing) withLocations(ctx context.Context, g port.ShareGrant, items []store.CooperativeEntry) error {
+	if s.Profiles == nil || len(items) == 0 {
+		return nil
+	}
+	refs := make([]uuid.UUID, 0, len(items))
+	for _, it := range items {
+		refs = append(refs, it.Ref)
+	}
+	gctx, err := tenant.WithGrant(ctx, g.Access)
+	if err != nil {
+		return err
+	}
+	profs, err := s.Profiles.Profiles(gctx, refs)
+	if err != nil {
+		return ErrDependency.WithDetail("không đọc được hồ sơ HTX").WithCause(err)
+	}
+	for i := range items {
+		p, ok := profs[items[i].Ref]
+		if !ok || p.Lat == nil || p.Lon == nil {
+			continue
+		}
+		lon, lat := p.Lon.StringFixed(7), p.Lat.StringFixed(7)
+		items[i].Lon, items[i].Lat = &lon, &lat
+	}
+	return nil
 }

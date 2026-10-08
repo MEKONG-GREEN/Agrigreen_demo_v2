@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization"
@@ -71,7 +71,8 @@ func buildReportsWorker(ctx context.Context, log *slog.Logger) (*reports.Module,
 	mech := mechanization.New(pool, clk, mechanization.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Params: md.Params(), Catalogs: md.Catalogs(), AdminUnits: md.AdminUnits(),
 	})
-	cc := cropcycle.New(pool, clk, cropcycle.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Params: md.Params(), Catalogs: md.Catalogs()})
+	// W3.3: báo cáo sản lượng HTX đọc yield_summary ở pf_coop (pf/cooperative, r_cooperative).
+	coop := cooperative.New(pool, clk, cooperative.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Params: md.Params(), Catalogs: md.Catalogs()})
 	// Email người nhận tra qua pf/accounts (Keycloak Admin REST, AG_KC_*); chưa cấu hình → bỏ gửi kèm cảnh báo.
 	kc, err := accounts.DirectoryFromEnv()
 	if err != nil {
@@ -90,7 +91,7 @@ func buildReportsWorker(ctx context.Context, log *slog.Logger) (*reports.Module,
 	}
 	return reports.New(nil, clk, reports.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(), Store: store,
-		Extension: kn.ReportData(), Mechanization: mech.ReportData(), CropCycle: cc.ReportData(), Directory: dir, Mailer: mailer, LinkBase: os.Getenv("AG_WEB_OPS_URL"), Log: log,
+		Extension: kn.ReportData(), Mechanization: mech.ReportData(), CropCycle: coop.ReportData(), Directory: dir, Mailer: mailer, LinkBase: os.Getenv("AG_WEB_OPS_URL"), Log: log,
 		LinkDownloadBase: os.Getenv("AG_REPORT_LINK_BASE"), // A4: liên kết tải Chi cục do api-platform phục vụ
 	}), nil
 }

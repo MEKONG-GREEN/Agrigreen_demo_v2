@@ -12,9 +12,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
-
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -63,7 +62,7 @@ type StandardMap struct {
 	AdminLevel      string
 	AdminBoundaries []store.AdminBoundary
 	AdminTruncated  bool
-	Cooperatives    *CoopLayer
+	Cooperatives    map[string]any // FeatureCollection đã dựng của pf/cooperative (port.MapLayers)
 	Facilities      *FacilityPage
 	Roads           *RoadPage
 	Waterways       *port.LayerPage
@@ -135,11 +134,13 @@ func (s *Service) StandardMap(ctx context.Context, in StandardMapInput) (Standar
 		}
 	}
 	if want[LayerCooperatives] {
-		l, err := s.coopLayer(ctx, a, in.BBoxInput)
+		ml, err := s.mapLayers()
 		if err != nil {
 			return StandardMap{}, err
 		}
-		out.Cooperatives = &l
+		if out.Cooperatives, err = ml.CooperativeLayer(ctx, in.mapQuery(a.p.Has(port.RoleMapConsumer))); err != nil {
+			return StandardMap{}, err
+		}
 	}
 	if want[LayerFacilities] {
 		pg, err := s.facilityLayer(ctx, a, FacilityListInput{BBoxInput: in.BBoxInput})

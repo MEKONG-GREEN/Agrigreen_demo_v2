@@ -2,7 +2,6 @@ package handler_test
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"slices"
 	"strings"
@@ -17,17 +16,22 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
-// pfText gom mọi cột văn bản của sổ/bảng HTX trong tenant để kiểm không có PII ở pf.
+// pfText gom mọi cột văn bản của sổ tổ chức và hồ sơ HTX (giả của pf/cooperative, W3.3) trong tenant để kiểm không có
+// PII ở pf.
 func (f *fixture) pfText(t *testing.T) string {
 	t.Helper()
 	var out string
 	err := tenant.WithTenantTx(context.Background(), f.pool, f.tenant, func(tx pgx.Tx) error {
 		return tx.QueryRow(context.Background(), `SELECT
-		   coalesce((SELECT string_agg(e.name || ' ' || coalesce(e.details::text, '') || ' ' || coalesce(e.reason, ''), ' ') FROM pf_party.org_event e), '') || ' ' ||
-		   coalesce((SELECT string_agg(coalesce(c.head_office, '') || ' ' || coalesce(c.tax_code, ''), ' ') FROM pf_party.cooperative c), '')`).Scan(&out)
+		   coalesce((SELECT string_agg(e.name || ' ' || coalesce(e.details::text, '') || ' ' || coalesce(e.reason, ''), ' ') FROM pf_party.org_event e), '')`).Scan(&out)
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	f.profiles.mu.Lock()
+	defer f.profiles.mu.Unlock()
+	for _, p := range f.profiles.profiles[f.tenant] {
+		out += " " + p.Address + " " + p.TaxCode
 	}
 	return out
 }
@@ -194,169 +198,6 @@ func TestCooperativeCopy_HTX_US_HTX_03(t *testing.T) {
 	if txt := f.pfText(t); strings.Contains(txt, "0919000002") || strings.Contains(txt, "Mai Thị Mới") {
 		t.Fatal("người đại diện của bản sao không được nằm ở pf_party")
 	}
-}
-
-// HTX US-HH-02 AC-2..4: sao chép hàng loạt nông hộ, sửa riêng họ tên/SĐT từng hồ sơ; hồ sơ
-// lỗi bị loại với "Thiếu họ tên" / "SĐT đã tồn tại", không chặn hồ sơ khác; định danh mới chỉ ở kho.
-func TestHouseholdBulkCopy_HTX_US_HH_02(t *testing.T) {
-	f := newFixture(t)
-	tr := f.seedTree(f.root())
-	mgr := f.as(f.tenant, tr.c1, port.RoleCoopManager)
-	h1 := str(mgr.appDo(http.MethodPost, "/v1/households", farmer(tr.c1, "0906000001")).body, "household", "household_ref")
-	h2 := str(mgr.appDo(http.MethodPost, "/v1/households", farmer(tr.c1, "0906000002")).body, "household", "household_ref")
-	officer := f.as(f.tenant, tr.p92, port.RoleKNProvinceAdmin)
-	hFar := str(officer.appDo(http.MethodPost, "/v1/households", farmer(tr.c2, "0906000009")).body, "household", "household_ref")
-	// HTX khác cùng xã 30001: trong phạm vi xã nhưng không phải HTX của quản lý.
-	sameCommune := f.root().createOrg(map[string]any{"kind": "cooperative", "name": "HTX Cùng Xã", "admin_unit_code": "30001"})
-	hOther := str(f.root().appDo(http.MethodPost, "/v1/households", farmer(sameCommune, "0906000008")).body, "household", "household_ref")
-
-	k := key()
-	payload := map[string]any{"items": []map[string]any{
-		{"source_ref": h1, "full_name": "Nguyễn Văn Bản Sao", "phone": "0906000101"},
-		{"source_ref": h1, "full_name": " ", "phone": "0906000102"},
-		{"source_ref": h2, "full_name": "Trần Thị Trùng", "phone": "0906000001"},
-		{"source_ref": hOther, "full_name": "Hộ HTX Khác", "phone": "0906000103"},
-		{"source_ref": h2, "full_name": "Lê Văn Hai", "phone": "0906000104"},
-		{"source_ref": hFar, "full_name": "Hộ Ngoài Xã", "phone": "0906000107"},
-	}}
-	b := mustJSON(t, payload)
-	r := mgr.call(f.app.URL, http.MethodPost, "/v1/households/copy", k, "application/json", b)
-	if r.status != http.StatusOK || r.body["created"] != float64(2) || r.body["rejected"] != float64(4) {
-		t.Fatalf("sao chép hàng loạt: %d %v", r.status, r.body)
-	}
-	rows := rowsOf(r)
-	wantReason := []string{"", "Thiếu họ tên", "SĐT đã tồn tại", "Bạn không có quyền truy cập nông hộ này.", "", "Không tìm thấy nông hộ nguồn"}
-	for i, w := range wantReason {
-		reason, _ := rows[i]["reason"].(string)
-		if reason != w || rows[i]["index"] != float64(i+1) {
-			t.Fatalf("hồ sơ %d: %v", i+1, rows[i])
-		}
-	}
-	list := items(mgr.appDo(http.MethodGet, "/v1/cooperatives/"+tr.c1.String()+"/households", nil))
-	if len(list) != 4 {
-		t.Fatalf("HTX có 2 hộ gốc + 2 bản sao: %d", len(list))
-	}
-	newRef := rows[0]["household_ref"].(string)
-	for _, it := range list {
-		if it["household_ref"] == newRef && (it["cultivated_area_ha"] != "1.25" || it["cooperative_ref"] != tr.c1.String() || it["commune_code"] != "30001") {
-			t.Fatalf("bản sao giữ HTX, xã, diện tích của hộ nguồn: %v", it)
-		}
-	}
-	// Gọi lặp cùng khóa → phát lại đúng kết quả lần đầu, không tạo thêm.
-	r2 := mgr.call(f.app.URL, http.MethodPost, "/v1/households/copy", k, "application/json", b)
-	if r2.hdr.Get("Idempotent-Replayed") != "true" || rowsOf(r2)[0]["household_ref"] != newRef {
-		t.Fatalf("gọi lặp: %v", r2.body)
-	}
-	if n := len(items(mgr.appDo(http.MethodGet, "/v1/cooperatives/"+tr.c1.String()+"/households", nil))); n != 4 {
-		t.Fatalf("gọi lặp không tạo thêm: %d", n)
-	}
-	// Quản lý HTX không sao chép sang HTX khác.
-	r3 := mgr.appDo(http.MethodPost, "/v1/households/copy", map[string]any{"target_cooperative_ref": tr.c2.String(),
-		"items": []map[string]any{{"source_ref": h1, "full_name": "Hộ Sang HTX Khác", "phone": "0906000105"}}})
-	if r3.status != http.StatusOK || rowsOf(r3)[0]["status"] != "rejected" {
-		t.Fatalf("sao chép sang HTX khác: %d %v", r3.status, r3.body)
-	}
-	// Quá 50 hồ sơ → 422; tenant khác không thấy hộ nguồn.
-	many := make([]map[string]any, 51)
-	for i := range many {
-		many[i] = map[string]any{"source_ref": h1, "full_name": "A", "phone": "0906"}
-	}
-	if r := mgr.appDo(http.MethodPost, "/v1/households/copy", map[string]any{"items": many}); r.status != http.StatusUnprocessableEntity {
-		t.Fatalf("quá 50 hồ sơ: %d", r.status)
-	}
-	stranger := f.as(ids.New(), tr.c1, port.RoleCoopManager)
-	if r := stranger.appDo(http.MethodPost, "/v1/households/copy", map[string]any{"items": []map[string]any{{"source_ref": h1, "full_name": "B", "phone": "0906000106"}}}); r.status == http.StatusOK && rowsOf(r)[0]["status"] != "rejected" {
-		t.Fatalf("tenant khác sao chép hộ: %v", r.body)
-	}
-}
-
-// HTX US-HH-03: gọi nhanh nông hộ — SĐT đọc từ kho định danh lúc bấm (mục đích
-// extension.contact), không lưu đệm; hộ của HTX khác → "Bạn không có quyền truy cập nông hộ này."
-func TestHouseholdQuickCall_HTX_US_HH_03(t *testing.T) {
-	f := newFixture(t)
-	tr := f.seedTree(f.root())
-	mgr := f.as(f.tenant, tr.c1, port.RoleCoopManager)
-	h := str(mgr.appDo(http.MethodPost, "/v1/households", farmer(tr.c1, "0907100001")).body, "household", "household_ref")
-
-	r := mgr.appDo(http.MethodGet, "/v1/households/"+h+"/contact", nil)
-	if r.status != http.StatusOK || r.body["phone"] != "0907100001" || r.hdr.Get("Cache-Control") != "no-store" {
-		t.Fatalf("SĐT gọi nhanh: %d %v %v", r.status, r.body, r.hdr)
-	}
-	if !slices.Contains(f.vault.usedPurposes(), "extension.contact") {
-		t.Fatal("đọc SĐT phải kèm mục đích extension.contact")
-	}
-	other := f.as(f.tenant, tr.c2, port.RoleCoopManager)
-	if r := other.appDo(http.MethodGet, "/v1/households/"+h+"/contact", nil); r.status != http.StatusNotFound && r.status != http.StatusForbidden {
-		t.Fatalf("quản lý HTX khác: %d", r.status)
-	}
-	// Cùng xã, HTX khác trong xã → 403 kèm thông điệp AC-3 của US-HH-01.
-	sameCommune := f.root().createOrg(map[string]any{"kind": "cooperative", "name": "HTX Cùng Xã", "admin_unit_code": "30001"})
-	if r := f.as(f.tenant, sameCommune, port.RoleCoopManager).appDo(http.MethodGet, "/v1/households/"+h+"/contact", nil); r.status != http.StatusForbidden ||
-		r.body["detail"] != "Bạn không có quyền truy cập nông hộ này." {
-		t.Fatalf("HTX cùng xã: %d %v", r.status, r.body)
-	}
-	if r := mgr.appDo(http.MethodGet, "/v1/households/"+ids.New().String()+"/contact", nil); r.status != http.StatusNotFound {
-		t.Fatalf("hộ không có: %d", r.status)
-	}
-	if r := f.as(ids.New(), tr.c1, port.RoleCoopManager).appDo(http.MethodGet, "/v1/households/"+h+"/contact", nil); r.status != http.StatusNotFound {
-		t.Fatalf("tenant khác: %d", r.status)
-	}
-	// Chủ thể đã xóa định danh / không có trong kho → 404 party.household_contact_unavailable.
-	f.vault.mu.Lock()
-	for ref := range f.vault.subjects {
-		if ref.String() == h {
-			delete(f.vault.subjects, ref)
-		}
-	}
-	f.vault.mu.Unlock()
-	if r := mgr.appDo(http.MethodGet, "/v1/households/"+h+"/contact", nil); r.status != http.StatusNotFound || r.body["code"] != "party.household_contact_unavailable" {
-		t.Fatalf("không còn SĐT: %d %v", r.status, r.body)
-	}
-	if r := f.as(f.tenant, tr.national, port.RoleCGHViewer).appDo(http.MethodGet, "/v1/households/"+h+"/contact", nil); r.status != http.StatusForbidden {
-		t.Fatalf("cgh_viewer: %d", r.status)
-	}
-}
-
-// HTX US-HH-01 AC-2: tìm nông hộ đúng SĐT qua chỉ mục mù của kho định danh (không lộ danh sách);
-// hộ HTX khác hoặc SĐT lạ → rỗng; giá trị không phải SĐT → 422.
-func TestHouseholdSearchByPhone_HTX_US_HH_01(t *testing.T) {
-	f := newFixture(t)
-	tr := f.seedTree(f.root())
-	mgr := f.as(f.tenant, tr.c1, port.RoleCoopManager)
-	h := str(mgr.appDo(http.MethodPost, "/v1/households", farmer(tr.c1, "0908200001")).body, "household", "household_ref")
-	_ = mgr.appDo(http.MethodPost, "/v1/households", farmer(tr.c1, "0908200002"))
-	officer := f.as(f.tenant, tr.p92, port.RoleKNProvinceAdmin)
-	_ = officer.appDo(http.MethodPost, "/v1/households", farmer(tr.c2, "0908200003"))
-	base := "/v1/cooperatives/" + tr.c1.String() + "/households?phone="
-
-	if l := items(mgr.appDo(http.MethodGet, base+"0908200001", nil)); len(l) != 1 || l[0]["household_ref"] != h || l[0]["masked_phone"] != "xxx 001" {
-		t.Fatalf("tìm theo SĐT: %v", l)
-	}
-	if l := items(mgr.appDo(http.MethodGet, base+"0908200003", nil)); len(l) != 0 {
-		t.Fatalf("hộ HTX khác không được trả: %v", l)
-	}
-	if l := items(mgr.appDo(http.MethodGet, base+"0908299999", nil)); len(l) != 0 {
-		t.Fatalf("SĐT lạ: %v", l)
-	}
-	if r := mgr.appDo(http.MethodGet, base+"nguyen", nil); r.status != http.StatusUnprocessableEntity {
-		t.Fatalf("không phải SĐT: %d %v", r.status, r.body)
-	}
-	if !slices.Contains(f.vault.usedPurposes(), "registry.admin") {
-		t.Fatal("tra SĐT qua kho phải kèm mục đích")
-	}
-	// Quản lý HTX khác không tra được hộ của HTX này.
-	if r := f.as(f.tenant, tr.c2, port.RoleCoopManager).appDo(http.MethodGet, base+"0908200001", nil); r.status != http.StatusNotFound {
-		t.Fatalf("HTX khác tra: %d", r.status)
-	}
-}
-
-func mustJSON(t *testing.T, v any) []byte {
-	t.Helper()
-	b, err := json.Marshal(v)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return b
 }
 
 func uuid0() uuid.UUID { return uuid.Nil }

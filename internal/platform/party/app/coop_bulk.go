@@ -242,7 +242,7 @@ func (r *Registry) createCoopUnique(ctx context.Context, in CreateOrgInput) (Org
 	if prev, err := r.replay(ctx, p.TenantID, in.IdemKey); err != nil {
 		return OrgResult{}, err
 	} else if prev != nil {
-		return *prev, nil
+		return r.completeCoop(ctx, p.TenantID, *prev) // bước 2 nếu lần trước dừng giữa hai bước (W3.3)
 	}
 	var owner uuid.UUID
 	if err := tenant.WithTenantTx(ctx, r.DB, p.TenantID, func(tx pgx.Tx) error {
@@ -280,12 +280,8 @@ func (r *Registry) CopyCooperative(ctx context.Context, in CopyCooperativeInput)
 	if err != nil {
 		return OrgResult{}, err
 	}
-	var src *store.Cooperative
-	if err := tenant.WithTenantTx(ctx, r.DB, p.TenantID, func(tx pgx.Tx) error {
-		var e error
-		src, e = store.CooperativeByRef(ctx, tx, in.SourceRef)
-		return e
-	}); err != nil {
+	src, err := r.cooperativeByRef(ctx, p.TenantID, in.SourceRef, false)
+	if err != nil {
 		return OrgResult{}, err
 	}
 	if src == nil || !visible(sc, src.AdminUnitCode) {

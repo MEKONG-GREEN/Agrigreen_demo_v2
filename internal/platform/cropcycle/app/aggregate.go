@@ -3,7 +3,7 @@ package app
 // Nguồn ô THÔ của tập tổng hợp cho feed cổng tích hợp (W5.3, apiclientport.AggregateSource — ADR-0033 §2,
 // ADR-0035). pf/apiclient gọi cho từng tenant đóng góp rồi áp quy tắc k MỘT lần (xuyên tenant); ở đây KHÔNG ẩn,
 // chỉ gộp theo xã × vụ [× tháng] trên tenant chủ dữ liệu (pool vai của module — R-05):
-//   - harvest_progress_by_commune: vụ chưa hủy (season_current) — diện tích gieo, đã gặt (status completed), ngày
+//   - harvest_progress_by_commune: vụ chưa hủy (pf/cooperative Seasons.Progress — W3.3, vụ ở pf_coop) — diện tích gieo, đã gặt (status completed), ngày
 //     gặt dự kiến của phần chưa gặt; đơn vị đếm = nông hộ;
 //   - collection_volume_by_commune: bảng kê thu gom hiện hành (cùng phép gộp với sản phẩm collection_volume) — số
 //     cuộn, diện tích thửa; đơn vị đếm = nông hộ.
@@ -17,11 +17,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/store"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -33,8 +31,8 @@ func (s *Service) AggregateCells(ctx context.Context, dataset string, dataTenant
 	if dataTenant == uuid.Nil {
 		return nil, tenant.ErrMissing
 	}
-	if s.Units == nil || (dataset == apiclientport.FeedCollectionVolume && s.PlotFacts == nil) {
-		return nil, ErrDependency.WithDetail("chưa nối pf/masterdata AdminUnits hoặc pf/cooperative Plots")
+	if s.Units == nil || s.Seasons == nil || (dataset == apiclientport.FeedCollectionVolume && s.PlotFacts == nil) {
+		return nil, ErrDependency.WithDetail("chưa nối pf/masterdata AdminUnits hoặc pf/cooperative Plots/Seasons")
 	}
 	if asOf.IsZero() {
 		asOf = s.now()
@@ -96,13 +94,9 @@ func (u *unitVersions) place(commune, province string) (place, bool, error) {
 }
 
 func (s *Service) harvestCells(ctx context.Context, dataTenant uuid.UUID, asOf time.Time, units *unitVersions) ([]apiclientport.AggregateCell, error) {
-	var rows []store.HarvestRow
-	if err := s.inTx(ctx, dataTenant, func(tx pgx.Tx) error {
-		var e error
-		rows, e = store.HarvestRows(ctx, tx, asOf)
-		return e
-	}); err != nil {
-		return nil, err
+	rows, err := s.Seasons.Progress(tenant.WithID(ctx, dataTenant), asOf)
+	if err != nil {
+		return nil, ErrDependency.WithDetail("không đọc được vụ (pf/cooperative)").WithCause(err)
 	}
 	type acc struct {
 		cell apiclientport.AggregateCell

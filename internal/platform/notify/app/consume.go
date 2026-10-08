@@ -11,9 +11,9 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
-
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
@@ -39,8 +39,8 @@ var (
 var HandledEvents = []string{
 	extport.EventDirectiveIssued, extport.EventTaskEscalated, contentport.EventAlertPublished,
 	contentport.EventDocumentPublished, syncport.EventConflictOpened, syncport.EventDeviceRevoked,
-	partyport.EventOrgDeactivated, partyport.EventHouseholdRegistered, partyport.EventHouseholdMembershipChanged,
-	extport.EventTaskCreated, ccport.EventFarmLogRecorded, ccport.EventFarmLogReviewed, ccport.EventSeasonOpened,
+	partyport.EventOrgDeactivated, coopport.EventHouseholdRegistered, coopport.EventHouseholdMembershipChanged,
+	extport.EventTaskCreated, coopport.EventFarmLogRecorded, coopport.EventFarmLogReviewed, coopport.EventSeasonOpened,
 	extport.EventReportBatchIssued, extport.EventReportTaskReminded, extport.EventSubmissionAdjustmentRequested, extport.EventPeriodReopened,
 	ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived,
 	syncport.EventIntegrationDeadLettered, mechport.EventAreaFeedStale, mrvport.EventAlertRaised,
@@ -74,17 +74,17 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 			return err
 		}
 		return s.onTaskCreated(ctx, tx, env, p)
-	case partyport.EventHouseholdRegistered:
-		var p partyport.HouseholdRegisteredV1
+	case coopport.EventHouseholdRegistered:
+		var p coopport.HouseholdRegisteredV1
 		if err := decode(env, &p); err != nil {
 			return err
 		}
-		if p.Source != partyport.HouseholdSourceHTXApp {
+		if p.Source != coopport.HouseholdSourceHTXApp {
 			return nil // chỉ báo nông hộ đến từ App HTX (KN US-HTX-05); nhập tệp không làm tràn hộp thư
 		}
 		return s.onCommuneHousehold(ctx, tx, env, p.CommuneCode, domain.HouseholdRegisteredTemplate(p, env.OccurredAt))
-	case partyport.EventHouseholdMembershipChanged:
-		var p partyport.HouseholdMembershipChangedV1
+	case coopport.EventHouseholdMembershipChanged:
+		var p coopport.HouseholdMembershipChangedV1
 		if err := decode(env, &p); err != nil {
 			return err
 		}
@@ -114,8 +114,8 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 			ns = append(ns, tpl.For(r))
 		}
 		return s.deliver(ctx, tx, env, ns)
-	case ccport.EventFarmLogRecorded:
-		var p ccport.FarmLogRecordedV1
+	case coopport.EventFarmLogRecorded:
+		var p coopport.FarmLogRecordedV1
 		if err := decode(env, &p); err != nil {
 			return err
 		}
@@ -125,8 +125,8 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 			return nil
 		}
 		return s.deliver(ctx, tx, env, []domain.Notification{domain.FarmLogPendingTemplate(p, env.OccurredAt).ForAudience(coopManagers(p.CooperativeRef))})
-	case ccport.EventFarmLogReviewed:
-		var p ccport.FarmLogReviewedV1
+	case coopport.EventFarmLogReviewed:
+		var p coopport.FarmLogReviewedV1
 		if err := decode(env, &p); err != nil {
 			return err
 		}
@@ -134,8 +134,8 @@ func (s *Service) HandleEvent(ctx context.Context, tx pgx.Tx, env outbox.Envelop
 			return nil
 		}
 		return s.deliver(ctx, tx, env, []domain.Notification{domain.FarmLogReviewedTemplate(p, env.OccurredAt).For(p.AuthorRef)})
-	case ccport.EventSeasonOpened:
-		var p ccport.SeasonOpenedV1
+	case coopport.EventSeasonOpened:
+		var p coopport.SeasonOpenedV1
 		if err := decode(env, &p); err != nil {
 			return err
 		}

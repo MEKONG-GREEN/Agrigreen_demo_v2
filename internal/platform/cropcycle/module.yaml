@@ -5,35 +5,23 @@ name: pf/cropcycle
 aka: [dom/cooperative]
 kind: domain
 zones: [pf]
-version: 1.0.0
+version: 2.0.0
 depends:
   pf/apiclient: ">=1.0 <2"
   pf/cooperative: ">=1.0 <2"
-  pf/geo: ">=1.0 <2"
-  pf/masterdata: ">=1.0 <2"
-  pf/metrics: ">=1.0 <2"
-  pf/party: ">=1.0 <2"
-  pf/reports: ">=1.0 <2"
+  pf/party: ">=2.0 <3"
   pf/sync: ">=1.0 <2"
 provides:
-  ports: [FarmerHouseholds, Stats, SupplyStats]
+  ports: []
   events:
     - pf.cropcycle.collection_schedule.received/v1
     - pf.cropcycle.collection_statement.received/v1
-    - pf.cropcycle.coop_season_area.changed/v1
-    - pf.cropcycle.farm_log.recorded/v1
-    - pf.cropcycle.farm_log.reviewed/v1
-    - pf.cropcycle.harvest.declared/v1
-    - pf.cropcycle.season.completed/v1
-    - pf.cropcycle.season.corrected/v1
-    - pf.cropcycle.season.opened/v1
-    - pf.cropcycle.sop.published/v1
   internal_events: []
   publications: [pf_cropcycle_pub.harvest_declaration/v1, pf_cropcycle_pub.season_event/v1]
   data_products: []
 consumes:
   events: []
-permissions: [coop_manager, farmer, mkg_sync, sop_admin]
+permissions: [coop_manager, mkg_sync]
 shares: []
 owns_schema: [pf_cropcycle, pf_cropcycle_pub]
 enable: per_tenant

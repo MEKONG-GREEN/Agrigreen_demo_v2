@@ -418,7 +418,7 @@ R-DB-11, R-SEC-03, ADR-0031 §3–§7; [runbook](../runbooks/agg-jobs.md). Modul
 
 ## Module `pf/cooperative` — mặt tiền (W3.2)
 
-[Thiết kế](../design/cooperative.md) (W3.1), ADR-0027, ADR-0030. `internal/platform/cooperative` (`dom/cooperative`, `kind: domain`, `enable: per_tenant`, `shares: [household, plot, season, diary_entry]`). W3.2 **không đổi DB**: module chưa có schema, vai hay route; `owns_schema` rỗng đến W3.3 (`pf_coop`, pf 000094).
+[Thiết kế](../design/cooperative.md) (W3.1), ADR-0027, ADR-0030. `internal/platform/cooperative` (`dom/cooperative`, `kind: domain`, `enable: per_tenant`, `shares: [household, plot, season, diary_entry]`). W3.2 **không đổi DB**: module chưa có schema, vai hay route; `owns_schema` rỗng đến W3.3 (`pf_coop`, pf 000131 — mục dưới).
 
 **Cổng** (`cooperativeport`): `Cooperatives`, `Households`, `Plots`, `Seasons`, `Diary`, `Resolve` và hai interface module khác hiện thực `MachineCounts` (pf/mechanization), `FarmerHouseholds`. DTO giữ nguyên trường của DTO cũ (partyport, geoport, ccport). Nguồn chưa nối → `cooperativeport.ErrUnavailable` (bên gọi coi như phụ thuộc lỗi, 503). Bộ kiểm hợp đồng `cooperative/port/porttest.RunContract(t, tenant.WithID, mk)` + bản giả `porttest.Memory` cho kiểm thử của module khác.
 
@@ -437,4 +437,29 @@ Bên tiêu thụ tầng dưới (`pf/accounts` kernel; `pf/party`; `pf/reports`,
 
 **Thêm bên tiêu thụ:** chỉ từ module domain; module tầng dưới khai interface của mình (port của nó) và gốc lắp ráp nối `coop.*` vào.
 
-**W3.3** thay `store.Legacy` bằng store SQL `pf_coop`, ghi đè `modreg.DBRole` → `r_coop`, thêm `dbadmin.groupOnlyModules`, chuyển handler/consumer/sync và xóa `cmd/internal/coopwire` cùng port cũ.
+**W3.3 (đã làm, mục dưới)** thay `store.Legacy` bằng store SQL `pf_coop`, chuyển handler/consumer/sync và xóa `cmd/internal/coopwire` cùng port cũ. Vai giữ `r_cooperative` (không ghi đè `r_coop`).
+
+## Module `pf/cooperative` — chủ schema `pf_coop` (W3.3)
+
+[Ghi chú hiện thực](../design/cooperative.md#17-ghi-chú-hiện-thực-w33), [runbook chuyển schema](../runbooks/cooperative-schema-move.md). Từ pf 000131–000133, 22 bảng HTX/hộ/thửa/vụ (cùng phân vùng, 5 chuỗi số, 4 hàm trigger) ở `pf_coop`; mọi giao dịch của module chạy `SET LOCAL ROLE r_cooperative` (`cooperative.DBModule`). `r_party`, `r_geo`, `r_cropcycle` không còn quyền trên các bảng này, `r_cooperative` không có quyền trên `pf_party`/`pf_geo`/`pf_cropcycle`.
+
+**Gói.** `cooperative/season` (vụ, nhật ký, SOP, sản lượng — từ `pf/cropcycle`), `cooperative/plot` (thửa, ranh giới, ranh giới/vùng HTX — từ `pf/geo`), `cooperative/member` (nông hộ, xã viên, hồ sơ HTX, sổ hồ sơ KN — từ `pf/party`), `cooperative/app` (mặt tiền `cooperativeport` trên `store.Sources`). Đường dẫn HTTP, mã lỗi (`cropcycle.*`, `geo.*`, `party.*`), tên sự kiện v1 và tên thực thể đồng bộ giữ nguyên; route gắn trong nhóm `pf/cooperative` ở gốc lắp ráp.
+
+**Nối ở gốc lắp ráp** (`cmd/api-platform/assembly`, `cmd/api-public/assembly`, `cmd/worker`):
+
+```go
+coop := cooperative.New(unit, clk, cooperative.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Dir: pty.OrgDirectory(),
+	Consents: pty.ConsentStates(), AdminUnits: md.AdminUnits(), AdminGeom: g.AdminGeometry(), Params: md.Params(),
+	Catalogs: md.Catalogs(), GpsLog: g.GpsLog(), Households: farmerid.Households(ext.Vault), Farmers: farmerid.New(ext.Vault)})
+pty.UseCoopProfiles(coop.CoopProfiles()) // tạo HTX hai bước (party điều phối)
+pty.UsePlotStats(coop.PlotStats())
+g.UsePlots(coop.PlotGeometry())    // log GPS: khoảng cách tới lô
+g.UseMapLayers(coop.MapLayers())   // lớp HTX, lớp thửa của bản đồ gộp
+cc.UseCollectionVolume(coop.Plots(), coop.Seasons(), md.AdminUnits())
+```
+
+`coop.SyncSources()`/`SyncSinks()` vào `pf/sync`; consumer `pf.cropcycle.gps_log` chạy dưới `cooperative.DBModule`. Gốc module không kéo kho định danh (kho qua `cooperativeport.HouseholdIdentities`/`FarmerIdentity`, bộ điều hợp `cooperative/port/farmerid`), nên `cmd/integration-gateway` và job feed của `cmd/worker` dựng `cooperative.New(pool, clk, cooperative.Deps{})` cho `Plots().Facts`, `Seasons().Codes/Progress`. View công bố W6.3 trên bảng vụ/thửa (`pf_cropcycle_pub.*`, `pf_geo_pub.*`) giữ tên và chủ cũ, đọc bảng `pf_coop` (bám OID).
+
+**Tên sự kiện ≠ module phát.** Sự kiện `pf.geo.plot.*`, `pf.cropcycle.{season,farm_log,harvest,sop,coop_season_area}.*`, `pf.party.household.*` do `pf/cooperative` khai `//ag:event` và phát (D-8). `modreg` lấy module phát theo tiền tố tên nếu module đó khai sự kiện, không thì module duy nhất khai nó trong `provides.events`.
+
+**Migration chuyển schema.** Quy tắc `schema` của `agmodgraph` cho phép đúng một dạng sửa đối tượng của schema khác: `ALTER {TABLE|SEQUENCE|FUNCTION} <schema khác>.<x> SET SCHEMA <schema của module gắn migration>`. `migratecheck` coi sổ đã chuyển (`ALTER TABLE … SET SCHEMA`) vẫn là sổ dưới tên mới (quy tắc ADD COLUMN, ADR-0012). Tên sổ (`TG_ARGV`, `chain_head.ledger`) không đổi khi chuyển schema; `shared.ledger_added_column` khóa theo tên bảng thật nên phải đăng ký bù dưới tên mới.

@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
@@ -88,7 +88,7 @@ func TestGISLayerLogSnapshotReplay(t *testing.T) {
 	coopRef := ids.New()
 	b1, b2, b3 := ids.New(), ids.New(), ids.New()
 
-	created := envOf(t, tid, geoport.EventPlotCreated, geoport.PlotCreatedV1{PlotRef: plot, Code: "TH0000001", CommuneCode: "80001",
+	created := envOf(t, tid, coopport.EventPlotCreated, coopport.PlotCreatedV1{PlotRef: plot, Code: "TH0000001", CommuneCode: "80001",
 		CooperativeRef: &coopRef, Status: "active", BoundaryID: b1, AreaHa: "1.2500", Source: "kn_web", ActorRef: ids.New(), EventTime: now.UTC().Format(time.RFC3339)})
 	if !f.deliver(t, created) || f.deliver(t, created) {
 		t.Fatal("giao lần đầu phải xử lý, giao lặp phải bỏ qua (inbox)")
@@ -100,17 +100,17 @@ func TestGISLayerLogSnapshotReplay(t *testing.T) {
 	if n := f.countLayer(t, tid); n != 1 {
 		t.Fatalf("giao lặp ghi thêm: %d dòng", n)
 	}
-	f.deliver(t, envOf(t, tid, geoport.EventPlotBoundaryRecorded, geoport.PlotBoundaryRecordedV1{PlotRef: plot, BoundaryID: b2, Version: 2,
+	f.deliver(t, envOf(t, tid, coopport.EventPlotBoundaryRecorded, coopport.PlotBoundaryRecordedV1{PlotRef: plot, BoundaryID: b2, Version: 2,
 		BecameCurrent: true, AreaHa: "1.3000", CommuneCode: "80001", Source: "kn_web", EventTime: now.UTC().Format(time.RFC3339)}))
 	// Bản không thành hiện hành (xung đột) không đổi lớp.
-	f.deliver(t, envOf(t, tid, geoport.EventPlotBoundaryRecorded, geoport.PlotBoundaryRecordedV1{PlotRef: plot, BoundaryID: ids.New(), Version: 9,
+	f.deliver(t, envOf(t, tid, coopport.EventPlotBoundaryRecorded, coopport.PlotBoundaryRecordedV1{PlotRef: plot, BoundaryID: ids.New(), Version: 9,
 		BecameCurrent: false, AreaHa: "9.9", CommuneCode: "80001", Source: "kn_web", EventTime: now.UTC().Format(time.RFC3339)}))
-	f.deliver(t, envOf(t, tid, geoport.EventCooperativeBoundaryRecorded, geoport.CooperativeBoundaryRecordedV1{CooperativeRef: coop, BoundaryID: ids.New(),
+	f.deliver(t, envOf(t, tid, coopport.EventCooperativeBoundaryRecorded, coopport.CooperativeBoundaryRecordedV1{CooperativeRef: coop, BoundaryID: ids.New(),
 		Version: 1, Action: "recorded", Status: "active", AreaHa: "50.0000", CommuneCode: "86001", Source: "kn_web", EventTime: now.UTC().Format(time.RFC3339)}))
 	commune := "80001"
 	f.deliver(t, envOf(t, tid, geoport.EventFacilityRecorded, geoport.FacilityRecordedV1{FacilityRef: fac, EventID: ids.New(), Version: 1, Action: "created",
 		Kind: "hub", Code: "HUB1", Name: "Hub 1", Status: "active", ProvinceCode: "80", CommuneCode: &commune, Lon: "105.7", Lat: "10.0", Capacity: "100.000", Unit: "t"}))
-	f.deliver(t, envOf(t, tid, ccport.EventSeasonOpened, ccport.SeasonOpenedV1{SeasonRef: season, EventID: ids.New(), PlotRef: plot, CooperativeRef: coopRef,
+	f.deliver(t, envOf(t, tid, coopport.EventSeasonOpened, coopport.SeasonOpenedV1{SeasonRef: season, EventID: ids.New(), PlotRef: plot, CooperativeRef: coopRef,
 		CommuneCode: "80001", SeasonCode: "DX", SeasonYear: 2026, VarietyCode: "OM18", SowingDate: "2026-09-01", ExpectedHarvestDate: "2026-12-01", AreaHa: "1.3"}))
 	f.deliver(t, envOf(t, tid, wwport.EventNetworkPublished, wwport.NetworkPublishedV1{NetworkVersionID: ids.New().String(), VersionNo: 1, EffectiveFrom: now.UTC().Format(time.RFC3339)}))
 
@@ -143,7 +143,7 @@ func TestGISLayerLogSnapshotReplay(t *testing.T) {
 	}
 
 	// Thay đổi SAU ảnh chụp (cùng ngày, sau watermark): phải được áp khi phát lại.
-	f.deliver(t, envOf(t, tid, geoport.EventPlotBoundaryRecorded, geoport.PlotBoundaryRecordedV1{PlotRef: plot, BoundaryID: b3, Version: 3,
+	f.deliver(t, envOf(t, tid, coopport.EventPlotBoundaryRecorded, coopport.PlotBoundaryRecordedV1{PlotRef: plot, BoundaryID: b3, Version: 3,
 		BecameCurrent: true, AreaHa: "1.4000", CommuneCode: "80001", Source: "kn_web", EventTime: now.UTC().Format(time.RFC3339)}))
 	f.deliver(t, envOf(t, tid, geoport.EventFacilityRecorded, geoport.FacilityRecordedV1{FacilityRef: fac, EventID: ids.New(), Version: 2, Action: "retired",
 		Kind: "hub", Code: "HUB1", Name: "Hub 1", Status: "retired", ProvinceCode: "80", CommuneCode: &commune, Lon: "105.7", Lat: "10.0", Capacity: "100.000", Unit: "t"}))
@@ -182,7 +182,7 @@ func TestGISLayerLogSnapshotReplay(t *testing.T) {
 	nat := f.as(tid, all, "geo_admin")
 	res := nat.get("/v1/gis/events?layer=plot&from=" + today.String() + "&to=" + today.String())
 	expect(t, res, 200, "")
-	if it := res.items(); len(it) != 3 || it[0]["op"] != "create" || it[1]["before"] == nil || it[1]["source_type"] != geoport.EventPlotBoundaryRecorded {
+	if it := res.items(); len(it) != 3 || it[0]["op"] != "create" || it[1]["before"] == nil || it[1]["source_type"] != coopport.EventPlotBoundaryRecorded {
 		t.Fatalf("nhật ký thửa: %v", it)
 	}
 	page := nat.get("/v1/gis/events?limit=2&from=" + today.String())

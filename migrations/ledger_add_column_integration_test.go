@@ -117,13 +117,14 @@ func TestLedgerAddColumnUpgradePF(t *testing.T) {
 	pool, dsn := upgradeEnv(t, migrations.PF, 78) // pf 000079 thêm cột vào plot_boundary, plot_event
 	tid, plot := ids.New(), ids.New()
 	stream := "plot:" + plot.String()
+	schema := "pf_geo" // W3.3 (pf 000132): sau khi nâng lên đầu, bảng ở pf_coop — tên sổ giữ "pf_geo.*"
 	insBoundary := func(tx pgx.Tx, extra string, args ...any) error {
 		cols, vals := "", ""
 		if extra != "" {
 			cols, vals = ", shape, declared_area_ha", ", $8, $9"
 		}
 		base := []any{ids.New(), tid, stream, plot, time.Now().UTC().Add(-time.Hour), ids.New(), ids.New().String()}
-		_, err := tx.Exec(ctx, `INSERT INTO pf_geo.plot_boundary
+		_, err := tx.Exec(ctx, `INSERT INTO `+schema+`.plot_boundary
 		    (id, tenant_id, stream_key, plot_ref, geom, area_ha, point_count, source, commune_code, became_current,
 		     event_time, actor_ref, idem_key, rule_version`+cols+`)
 		  VALUES ($1, $2, $3, $4,
@@ -132,14 +133,14 @@ func TestLedgerAddColumnUpgradePF(t *testing.T) {
 		return err
 	}
 	insEvent := func(tx pgx.Tx, lotName *string) error {
-		_, err := tx.Exec(ctx, `INSERT INTO pf_geo.plot_event
+		_, err := tx.Exec(ctx, `INSERT INTO `+schema+`.plot_event
 		    (id, tenant_id, stream_key, plot_ref, action, code, commune_code, status, event_time, actor_ref, idem_key, rule_version)
 		  VALUES ($1, $2, $3, $4, 'created', 'KT-1', 'xa_kt', 'draft', $5, $6, $7, 'geo/v1')`,
 			ids.New(), tid, stream, plot, time.Now().UTC().Add(-time.Hour), ids.New(), ids.New().String())
 		if err != nil || lotName == nil {
 			return err
 		}
-		_, err = tx.Exec(ctx, `INSERT INTO pf_geo.plot_event
+		_, err = tx.Exec(ctx, `INSERT INTO `+schema+`.plot_event
 		    (id, tenant_id, stream_key, plot_ref, action, code, commune_code, status, event_time, actor_ref, idem_key,
 		     rule_version, lot_name, shape)
 		  VALUES ($1, $2, $3, $4, 'attributes_changed', 'KT-1', 'xa_kt', 'draft', $5, $6, $7, 'geo/v2', $8, 'polygon')`,
@@ -161,6 +162,7 @@ func TestLedgerAddColumnUpgradePF(t *testing.T) {
 	}
 
 	migrateDir(t, dsn, "pf", 0) // nâng cấp lên đầu: ADD COLUMN trên hai sổ
+	schema = "pf_coop"
 
 	// Dòng mới sau nâng cấp, cùng chuỗi: có giá trị ở cột mới và cũng có dòng để cột mới NULL.
 	lot := "Lô kiểm thử"

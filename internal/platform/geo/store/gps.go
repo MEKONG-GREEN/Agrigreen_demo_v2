@@ -33,8 +33,8 @@ type GpsFix struct {
 	IdemKey         string
 }
 
-// InsertGpsFix ghi log; DB tính seq, băm và khoảng cách trắc địa tới ranh giới
-// hiện hành của lô (0 khi điểm nằm trong lô). pointGJ rỗng = không có điểm.
+// InsertGpsFix ghi log; DB tính seq, băm. f.DistanceToPlotM (khoảng cách trắc địa tới ranh giới hiện hành của lô,
+// 0 khi điểm nằm trong lô) do pf/cooperative tính trước (geoport.PlotGeometry, W3.3). pointGJ rỗng = không có điểm.
 func InsertGpsFix(ctx context.Context, tx pgx.Tx, f *GpsFix, pointGJ string) error {
 	var dist *string
 	err := tx.QueryRow(ctx, `WITH pt AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON(nullif($11::text, '')), 4326) AS g)
@@ -43,14 +43,13 @@ func InsertGpsFix(ctx context.Context, tx pgx.Tx, f *GpsFix, pointGJ string) err
 	     accuracy_m, source, distance_to_plot_m, event_time, idem_key, rule_version)
 	  SELECT $1::uuid, $2::uuid, $3::text, $4::uuid, $5::text, $6::text, $7::uuid, $8::uuid, $9::text, $10::uuid, pt.g,
 	         $12::numeric, $13::text,
-	         (SELECT round(ST_Distance(p.geom::geography, pt.g::geography)::numeric, 1) FROM pf_geo.plot p
-	           WHERE pt.g IS NOT NULL AND p.ref = $8::uuid),
+	         CASE WHEN pt.g IS NULL THEN NULL ELSE $17::numeric END,
 	         $14::timestamptz, $15::text, $16::text
 	  FROM pt
 	  RETURNING seq, recorded_at, distance_to_plot_m::text`,
 		f.ID, f.TenantID, domain.GpsStreamKey(f.ActorRef), f.ActorRef, nilIfEmpty(f.DeviceID), f.Purpose, nilIfZero(f.TargetRef),
 		nilIfZero(f.PlotRef), nilIfEmpty(f.CommuneCode), nilIfZero(f.CooperativeRef), pointGJ, decPtr(f.AccuracyM), f.Source,
-		f.EventTime.UTC(), f.IdemKey, domain.RuleGpsFix).Scan(&f.Seq, &f.RecordedAt, &dist)
+		f.EventTime.UTC(), f.IdemKey, domain.RuleGpsFix, decPtr(f.DistanceToPlotM)).Scan(&f.Seq, &f.RecordedAt, &dist)
 	if err != nil {
 		return err
 	}
@@ -113,9 +112,10 @@ type GpsQuery struct {
 	Purpose   string
 	Before    uuid.UUID // Nil = từ mới nhất
 	Limit     int
-	// OwnActor khác Nil: chỉ log do OwnActor ghi HOẶC gắn với thửa của OwnHouseholds (vai farmer).
-	OwnActor      uuid.UUID
-	OwnHouseholds []uuid.UUID
+	// OwnActor khác Nil: chỉ log do OwnActor ghi HOẶC gắn với một thửa trong OwnPlots (thửa của nông hộ
+	// liên kết — vai farmer; danh sách do pf/cooperative trả qua geoport.PlotGeometry).
+	OwnActor uuid.UUID
+	OwnPlots []uuid.UUID
 }
 
 // ListGpsFixes trả log mới nhất trước. Log không có xã chỉ phạm vi toàn quốc thấy.
@@ -126,11 +126,10 @@ func ListGpsFixes(ctx context.Context, tx pgx.Tx, q GpsQuery) ([]GpsFix, error) 
 	    AND ($5::uuid IS NULL OR g.actor_ref = $5::uuid) AND ($6::uuid IS NULL OR g.target_ref = $6::uuid)
 	    AND ($7::uuid IS NULL OR g.plot_ref = $7::uuid) AND ($8::text = '' OR g.purpose = $8::text)
 	    AND ($9::uuid IS NULL OR g.id < $9::uuid)
-	    AND ($11::uuid IS NULL OR g.actor_ref = $11::uuid OR g.plot_ref IN (
-	      SELECT p.ref FROM pf_geo.plot p WHERE p.household_ref = ANY($12::text[]::uuid[])))
+	    AND ($11::uuid IS NULL OR g.actor_ref = $11::uuid OR g.plot_ref = ANY($12::text[]::uuid[]))
 	  ORDER BY g.id DESC LIMIT $10::int`,
 		q.All, units(q.Units), q.CoopOnly, q.Coop, nilIfZero(q.ActorRef), nilIfZero(q.TargetRef), nilIfZero(q.PlotRef), q.Purpose,
-		nilIfZero(q.Before), q.Limit, nilIfZero(q.OwnActor), refStrs(q.OwnHouseholds))
+		nilIfZero(q.Before), q.Limit, nilIfZero(q.OwnActor), refStrs(q.OwnPlots))
 	if err != nil {
 		return nil, err
 	}

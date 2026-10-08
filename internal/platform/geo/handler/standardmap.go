@@ -16,11 +16,23 @@ import (
 // StandardMapSchema là định danh phiên bản định dạng của bản đồ chuẩn hóa (GIS US-INT-02).
 const StandardMapSchema = "agrigreen.standard_map/v1"
 
-// tagLayer gắn properties.layer cho từng đối tượng của một FeatureCollection đã dựng.
-func tagLayer(fc gin.H, layer string, out *[]gin.H) (count int, truncated bool) {
-	feats, _ := fc["features"].([]gin.H)
+// tagLayer gắn properties.layer cho từng đối tượng của một FeatureCollection đã dựng (của geo: gin.H; của
+// pf/cooperative qua port.MapLayers: map[string]any).
+func tagLayer(fc map[string]any, layer string, out *[]gin.H) (count int, truncated bool) {
+	var feats []map[string]any
+	switch fs := fc["features"].(type) {
+	case []gin.H:
+		for _, f := range fs {
+			feats = append(feats, f)
+		}
+	case []map[string]any:
+		feats = fs
+	}
 	for _, f := range feats {
-		if p, ok := f["properties"].(gin.H); ok {
+		switch p := f["properties"].(type) {
+		case gin.H:
+			p["layer"] = layer
+		case map[string]any:
 			p["layer"] = layer
 		}
 		*out = append(*out, f)
@@ -79,7 +91,7 @@ func (h Handler) standardMap(c *gin.Context) {
 	}
 	var thresholds any
 	if out.Cooperatives != nil {
-		n, t := tagLayer(coopLayerDTO(*out.Cooperatives, bb.Limit), app.LayerCooperatives, &feats)
+		n, t := tagLayer(out.Cooperatives, app.LayerCooperatives, &feats)
 		sum(app.LayerCooperatives, n, t)
 	}
 	if out.Facilities != nil {

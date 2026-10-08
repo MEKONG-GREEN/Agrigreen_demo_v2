@@ -1,5 +1,5 @@
 // Package app là mặt tiền của pf/cooperative: hiện thực các cổng của cooperative/port trên store.
-// W3.2 store là store.Legacy (nguồn cũ của party/geo/cropcycle); mặt tiền thêm phần chung — nguồn
+// W3.3 store là store.Sources (store pf_coop của season/plot/member); mặt tiền thêm phần chung — nguồn
 // chưa nối → port.ErrUnavailable, khóa rỗng không gọi nguồn, chuẩn hóa giới hạn trang và phân giải
 // chủ thể (Resolve) từ các cổng đọc.
 package app
@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -25,7 +26,7 @@ const (
 
 // Service là mặt tiền. Store có thể nối dần (Use* của module) trước khi phục vụ.
 type Service struct {
-	Store store.Legacy
+	Store store.Sources
 }
 
 var (
@@ -200,6 +201,25 @@ func (s *Service) HarvestDates(ctx context.Context, plotRefs []uuid.UUID) ([]por
 	return s.Store.Seasons.HarvestDates(ctx, plotRefs)
 }
 
+// Codes thực hiện port.Seasons.
+func (s *Service) Codes(ctx context.Context, refs []uuid.UUID) (map[uuid.UUID]port.SeasonKey, error) {
+	if s.Store.Seasons == nil {
+		return nil, unavailable("seasons")
+	}
+	if len(refs) == 0 {
+		return map[uuid.UUID]port.SeasonKey{}, nil
+	}
+	return s.Store.Seasons.Codes(ctx, refs)
+}
+
+// Progress thực hiện port.Seasons.
+func (s *Service) Progress(ctx context.Context, asOf time.Time) ([]port.SeasonProgress, error) {
+	if s.Store.Seasons == nil {
+		return nil, unavailable("seasons")
+	}
+	return s.Store.Seasons.Progress(ctx, asOf)
+}
+
 // ---- Diary ----
 
 // Diary là port.Diary của mặt tiền (tách khỏi Service vì Get trùng tên với port.Plots.Get).
@@ -237,9 +257,8 @@ func ClampDiaryLimit(limit int) int {
 
 // ---- Resolve ----
 
-// Resolve thực hiện port.Resolve từ các cổng đọc. Tenant lấy từ context (bắt buộc). W3.2 phân giải
-// cooperative (HTX đang hoạt động), household, plot, diary_entry; season và harvest chờ store
-// riêng (W3.3) → port.ErrSubjectTypeUnsupported.
+// Resolve thực hiện port.Resolve từ các cổng đọc. Tenant lấy từ context (bắt buộc). Phân giải cooperative (HTX
+// đang hoạt động), household, plot, diary_entry qua cổng đọc; season, harvest qua store vụ (W3.3).
 func (s *Service) Resolve(ctx context.Context, t port.SubjectType, id uuid.UUID) (port.Subject, error) {
 	tid, err := tenant.FromContext(ctx)
 	if err != nil {
@@ -247,7 +266,7 @@ func (s *Service) Resolve(ctx context.Context, t port.SubjectType, id uuid.UUID)
 	}
 	sub := port.Subject{Type: t, ID: id, TenantID: tid}
 	switch t {
-	case port.SubjectCooperative, port.SubjectHousehold, port.SubjectPlot, port.SubjectDiaryEntry:
+	case port.SubjectCooperative, port.SubjectHousehold, port.SubjectPlot, port.SubjectDiaryEntry, port.SubjectSeason, port.SubjectHarvest:
 	default:
 		return port.Subject{}, fmt.Errorf("%w: %q", port.ErrSubjectTypeUnsupported, t)
 	}
@@ -255,6 +274,20 @@ func (s *Service) Resolve(ctx context.Context, t port.SubjectType, id uuid.UUID)
 		return port.Subject{}, port.ErrSubjectNotFound
 	}
 	switch t {
+	case port.SubjectSeason, port.SubjectHarvest:
+		if s.Store.Season == nil {
+			return port.Subject{}, unavailable("seasons")
+		}
+		resolve := s.Store.Season.ResolveSeason
+		if t == port.SubjectHarvest {
+			resolve = s.Store.Season.ResolveHarvest
+		}
+		r, err := resolve(ctx, id)
+		if err != nil {
+			return port.Subject{}, err
+		}
+		r.TenantID = tid
+		return r, nil
 	case port.SubjectCooperative:
 		sites, err := s.Active(ctx)
 		if err != nil {

@@ -10,7 +10,7 @@ depends:
   pf/cooperative: ">=1.0 <2"
   pf/masterdata: ">=1.0 <2"
   pf/metrics: ">=1.0 <2"
-  pf/party: ">=1.0 <2"
+  pf/party: ">=2.0 <3"
   pf/reports: ">=1.0 <2"
   vault/identity: ">=1.0 <2"
 provides:

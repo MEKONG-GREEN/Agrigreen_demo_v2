@@ -3,8 +3,8 @@ package handler
 // HTTP của KN v7.7 FN-XA-03.03 — HTX & nông hộ trên các xã phụ trách (hợp đồng P7 §1). Application API, bắt buộc
 // header X-AG-Context (ngữ cảnh phiên P1):
 //   GET  /v1/kn/cooperatives, POST /v1/kn/cooperatives, GET|PUT /v1/kn/cooperatives/{ref},
-//   POST /v1/kn/cooperatives/{ref}/deactivate|reactivate, GET|POST /v1/kn/cooperatives/{ref}/households,
-//   PUT /v1/kn/households/{ref}, GET /v1/kn/cooperatives/{ref}/log, GET /v1/kn/households/{ref}/log.
+//   POST /v1/kn/cooperatives/{ref}/deactivate|reactivate, GET /v1/kn/cooperatives/{ref}/log.
+// Nông hộ của màn (/v1/kn/cooperatives/{ref}/households, /v1/kn/households/*) ở pf/cooperative (W3.3).
 
 import (
 	"bytes"
@@ -14,13 +14,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
 // RegisterKNCollect gắn route FN-XA-03.03 vào nhóm Application API.
@@ -32,11 +30,8 @@ func (h KN) RegisterKNCollect(rg *gin.RouterGroup) {
 	g.PUT("/cooperatives/:ref", h.knUpdateCoop)
 	g.POST("/cooperatives/:ref/deactivate", h.knDeactivateCoop)
 	g.POST("/cooperatives/:ref/reactivate", h.knReactivateCoop)
-	g.GET("/cooperatives/:ref/households", h.knListHouseholds)
-	g.POST("/cooperatives/:ref/households", h.knCreateHousehold)
 	g.GET("/cooperatives/:ref/log", h.knCoopLog)
-	g.PUT("/households/:ref", h.knUpdateHousehold)
-	g.GET("/households/:ref/log", h.knHouseholdLog)
+	// Nông hộ (/kn/cooperatives/{ref}/households, /kn/households/*) do pf/cooperative phục vụ (W3.3).
 }
 
 // ---------------------------------------------------------------------------
@@ -84,27 +79,6 @@ func toKNCoopDTO(c app.KNCooperative) knCoopDTO {
 	if c.Representative != nil {
 		d := toPersonDTO(*c.Representative)
 		out.Representative = &d
-	}
-	return out
-}
-
-type knHouseholdDTO struct {
-	Ref              string      `json:"ref"`
-	Holder           knPersonDTO `json:"holder"`
-	CultivatedAreaHa *string     `json:"cultivated_area_ha"`
-	Active           bool        `json:"active"`
-	SinceDate        *string     `json:"since_date"`
-}
-
-func toKNHouseholdDTO(h app.KNHousehold) knHouseholdDTO {
-	out := knHouseholdDTO{Ref: h.Ref.String(), Holder: toPersonDTO(h.Holder), Active: h.Active}
-	if h.CultivatedAreaHa != nil {
-		s := h.CultivatedAreaHa.String()
-		out.CultivatedAreaHa = &s
-	}
-	if h.MemberSince != nil {
-		s := h.MemberSince.Format(time.DateOnly)
-		out.SinceDate = &s
 	}
 	return out
 }
@@ -355,120 +329,5 @@ func (h KN) knCoopLog(c *gin.Context) {
 		return
 	}
 	pg, err := h.Svc.CooperativeLog(c.Request.Context(), ref, after, limitOf(c))
-	writeKNLog(c, pg, err)
-}
-
-// ---------------------------------------------------------------------------
-// Nông hộ
-// ---------------------------------------------------------------------------
-
-func (h KN) knListHouseholds(c *gin.Context) {
-	ref, ok := pathRef(c)
-	if !ok {
-		return
-	}
-	after, ok := parseCursor(c)
-	if !ok {
-		return
-	}
-	pg, err := h.Svc.ListKNHouseholds(c.Request.Context(), ref, after, queryLimit(c))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	items := make([]knHouseholdDTO, 0, len(pg.Items))
-	for _, it := range pg.Items {
-		items = append(items, toKNHouseholdDTO(it))
-	}
-	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": encodeCursor(pg.Next)})
-}
-
-type knCreateHouseholdReq struct {
-	FullName         string          `json:"full_name" pii:"true"`
-	Phone            string          `json:"phone" pii:"true"`
-	CultivatedAreaHa json.RawMessage `json:"cultivated_area_ha"`
-}
-
-func (h KN) knCreateHousehold(c *gin.Context) {
-	ref, ok := pathRef(c)
-	if !ok {
-		return
-	}
-	var req knCreateHouseholdReq
-	if !bindJSON(c, &req) {
-		return
-	}
-	var fe fieldErrs
-	area := decimalValue(&fe, "cultivated_area_ha", req.CultivatedAreaHa)
-	if strings.TrimSpace(req.FullName) == "" {
-		fe.add("full_name", "bắt buộc")
-	}
-	if strings.TrimSpace(req.Phone) == "" {
-		fe.add("phone", "bắt buộc")
-	}
-	if fe.fail(c) {
-		return
-	}
-	out, err := h.Svc.CreateKNHousehold(c.Request.Context(), app.KNCreateHouseholdInput{
-		CooperativeRef: ref, FullName: req.FullName, Phone: req.Phone, CultivatedAreaHa: area,
-	})
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.JSON(http.StatusCreated, toKNHouseholdDTO(out))
-}
-
-type knUpdateHouseholdReq struct {
-	CultivatedAreaHa json.RawMessage `json:"cultivated_area_ha"`
-	Reason           string          `json:"reason"`
-}
-
-func householdRef(c *gin.Context) (uuid.UUID, bool) {
-	ref, err := uuid.Parse(c.Param("ref"))
-	if err != nil {
-		httpx.Fail(c, app.ErrHouseholdNotFound)
-		return ref, false
-	}
-	return ref, true
-}
-
-func (h KN) knUpdateHousehold(c *gin.Context) {
-	ref, ok := householdRef(c)
-	if !ok {
-		return
-	}
-	var req knUpdateHouseholdReq
-	if !bindJSON(c, &req) {
-		return
-	}
-	var fe fieldErrs
-	area := decimalText(&fe, "cultivated_area_ha", req.CultivatedAreaHa)
-	if fe.fail(c) {
-		return
-	}
-	if area == nil {
-		httpx.Fail(c, problem.Validation.WithField("cultivated_area_ha", "bắt buộc (null = xóa giá trị)"))
-		return
-	}
-	out, err := h.Svc.UpdateKNHousehold(c.Request.Context(), ref, area, req.Reason, putKey(c))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, toKNHouseholdDTO(out))
-}
-
-func (h KN) knHouseholdLog(c *gin.Context) {
-	ref, ok := householdRef(c)
-	if !ok {
-		return
-	}
-	after, err := app.ParseLogCursor(c.Query("cursor"))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	pg, err := h.Svc.HouseholdLog(c.Request.Context(), ref, after, limitOf(c))
 	writeKNLog(c, pg, err)
 }

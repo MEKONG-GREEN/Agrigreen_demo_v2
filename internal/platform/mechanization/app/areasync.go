@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
-	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/store"
@@ -34,10 +34,10 @@ func AreaSyncKey(eventID uuid.UUID) string { return "cropcycle:" + eventID.Strin
 // (ResolveArea); sự kiện cũ hơn bản App HTX đã áp bị bỏ qua (giao không theo thứ tự).
 // Tác nhân trong sổ là port.SyncActorRef với vai cgh_sync, phạm vi toàn tenant.
 func (s *Service) HandleCoopSeasonAreaChanged(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
-	if env.EventType != ccport.EventCoopSeasonAreaChanged {
+	if env.EventType != coopport.EventCoopSeasonAreaChanged {
 		return nil
 	}
-	var p ccport.CoopSeasonAreaChangedV1
+	var p coopport.CoopSeasonAreaChangedV1
 	if err := json.Unmarshal(env.Payload, &p); err != nil {
 		return fmt.Errorf("mechanization: payload %s hỏng: %w", env.EventType, err)
 	}

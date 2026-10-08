@@ -7,15 +7,15 @@ package app
 // publicdata.k_min TRƯỚC khi gọi. Ở đây, trên tenant bên cấp (pool vai cropcycle_app,
 // tenant.WithTenantTx — R-05, không BYPASSRLS):
 //   - nguồn: bảng kê thu gom HTX nhận qua van htx_collection_statement (bảng chiếu = revision cao
-//     nhất) + vụ (season_current) của chính module;
+//     nhất) + vụ (pf/cooperative Seasons.Codes — W3.3, vụ ở pf_coop);
 //   - thửa → xã, nông hộ, diện tích: pf/cooperative (cooperativeport.Plots.Facts — chủ quan hệ thửa ↔ nông hộ; W3.2 đọc qua pf/geo);
 //     xã → tỉnh: pf/masterdata (AdminUnits);
 //   - ô (tỉnh × xã × vụ × tháng giờ VN), ẩn theo domain.KAnonRule (ẩn sơ cấp < k + ẩn bổ sung, tính
 //     trên TOÀN BỘ dữ liệu bên cấp rồi mới lọc) — ô bị ẩn không bao giờ trả, chỉ đếm Suppressed;
 //   - chỉ điền trường của DTO CollectionVolumeV1: không thửa, nông hộ, HTX, khối lượng cân, giá.
 //
-// Bảng kê bị bỏ khỏi mọi ô (không đếm vào Suppressed): chưa gắn vụ / vụ không có ở season_current;
-// thửa không có ở pf/geo; xã không tra được tỉnh hoặc mã sai dạng hợp đồng.
+// Bảng kê bị bỏ khỏi mọi ô (không đếm vào Suppressed): chưa gắn vụ / vụ không có ở pf/cooperative;
+// thửa không có ở pf/cooperative; xã không tra được tỉnh hoặc mã sai dạng hợp đồng.
 
 import (
 	"context"
@@ -86,8 +86,8 @@ func (s *Service) CollectionCells(ctx context.Context, q apiclientport.Collectio
 	if err := validateVolumeQuery(q); err != nil {
 		return apiclientport.CollectionPage{}, err
 	}
-	if s.PlotFacts == nil || s.Units == nil {
-		return apiclientport.CollectionPage{}, ErrDependency.WithDetail("chưa nối pf/cooperative Plots hoặc pf/masterdata AdminUnits")
+	if s.PlotFacts == nil || s.Seasons == nil || s.Units == nil {
+		return apiclientport.CollectionPage{}, ErrDependency.WithDetail("chưa nối pf/cooperative Plots/Seasons hoặc pf/masterdata AdminUnits")
 	}
 	after := ""
 	if q.After != "" {
@@ -164,14 +164,23 @@ func (s *Service) volumeAggs(ctx context.Context, dataTenant uuid.UUID, asOf tim
 	}
 	tctx := tenant.WithID(ctx, dataTenant)
 	refs := make([]uuid.UUID, 0, len(rows))
+	seasonRefs := make([]uuid.UUID, 0, len(rows))
 	for _, r := range rows {
 		refs = append(refs, r.PlotRef)
+		if r.SeasonRef != nil {
+			seasonRefs = append(seasonRefs, *r.SeasonRef)
+		}
 	}
 	slices.SortFunc(refs, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
 	refs = slices.Compact(refs)
 	plots, err := s.PlotFacts.Facts(tctx, refs)
 	if err != nil {
 		return nil, nil, ErrDependency.WithDetail("không đọc được thửa (pf/cooperative)").WithCause(err)
+	}
+	slices.SortFunc(seasonRefs, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
+	seasons, err := s.Seasons.Codes(tctx, slices.Compact(seasonRefs))
+	if err != nil {
+		return nil, nil, ErrDependency.WithDetail("không đọc được vụ (pf/cooperative)").WithCause(err)
 	}
 	at := asOf
 	if at.IsZero() {
@@ -180,7 +189,11 @@ func (s *Service) volumeAggs(ctx context.Context, dataTenant uuid.UUID, asOf tim
 	provinces := map[string]string{}
 	aggs := map[string]*volumeAgg{}
 	for _, r := range rows {
-		if r.SeasonCode == nil || r.SeasonYear == nil {
+		if r.SeasonRef == nil {
+			continue
+		}
+		sk, known := seasons[*r.SeasonRef]
+		if !known {
 			continue
 		}
 		p, ok := plots[r.PlotRef]
@@ -197,7 +210,7 @@ func (s *Service) volumeAggs(ctx context.Context, dataTenant uuid.UUID, asOf tim
 		if !provinceRe.MatchString(prov) {
 			continue
 		}
-		season := fmt.Sprintf("%d-%s", *r.SeasonYear, *r.SeasonCode)
+		season := fmt.Sprintf("%d-%s", sk.SeasonYear, sk.SeasonCode)
 		if !seasonRe.MatchString(season) {
 			continue
 		}

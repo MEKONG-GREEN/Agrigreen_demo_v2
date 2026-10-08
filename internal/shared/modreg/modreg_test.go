@@ -289,3 +289,55 @@ func TestParsePubView(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// W3.3 (D-8): sự kiện giữ tên v1 khi chủ dữ liệu chuyển module — module phát là module DUY NHẤT khai sự kiện trong
+// provides.events khi module theo tiền tố tên không khai; không ai khai → lỗi như cũ.
+func TestConsumesEventMovedProducer(t *testing.T) {
+	coop := mustParse(t, `name: pf/coop
+kind: domain
+zones: [pf]
+version: 1.0.0
+depends: {}
+provides:
+  events: [pf.geo.plot.created/v1]
+permissions: []
+shares: []
+owns_schema: [pf_coop]
+enable: per_tenant
+`, "internal/platform/coop/module.yaml")
+	geo := mustParse(t, `name: pf/geo
+kind: capability
+zones: [pf]
+version: 2.0.0
+depends: {}
+provides:
+  events: [pf.geo.facility.recorded/v1]
+permissions: []
+shares: []
+owns_schema: [pf_geo]
+enable: per_tenant
+`, "internal/platform/geo/module.yaml")
+	consumer := func(ev string) *Manifest {
+		return mustParse(t, `name: pf/metrics
+kind: capability
+zones: [pf]
+version: 1.0.0
+depends: {}
+consumes:
+  events: [`+ev+`]
+permissions: []
+shares: []
+owns_schema: [pf_metrics]
+enable: per_tenant
+`, "internal/platform/metrics/module.yaml")
+	}
+	for _, ev := range []string{"pf.geo.plot.created/v1", "pf.geo.facility.recorded/v1"} {
+		if _, err := New([]*Manifest{coop, geo, consumer(ev)}); err != nil {
+			t.Fatalf("%s: %v", ev, err)
+		}
+	}
+	if _, err := New([]*Manifest{coop, geo, consumer("pf.geo.road.recorded/v1")}); err == nil ||
+		!strings.Contains(err.Error(), "pf/geo không khai sự kiện này") {
+		t.Fatalf("sự kiện không ai khai phải lỗi: %v", err)
+	}
+}

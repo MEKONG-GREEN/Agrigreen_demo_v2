@@ -6,18 +6,18 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/shopspring/decimal"
 )
 
 // VolumeRow là một bảng kê thu gom hiện hành (revision cao nhất) cho sản phẩm tổng hợp
-// collection_volume (G5): thửa (chỉ để tra xã/nông hộ/diện tích ở pf/geo), ngày gom, số cuộn, vụ.
+// collection_volume (G5): thửa (chỉ để tra xã/nông hộ/diện tích ở pf/cooperative), ngày gom, số cuộn, vụ.
+// W3.3: vụ ở pf_coop (pf/cooperative) — store chỉ trả season_ref, app tra mã vụ qua cooperativeport.Seasons.Codes
+// (không JOIN chéo schema, vai r_cropcycle không có quyền trên pf_coop).
 type VolumeRow struct {
 	PlotRef     uuid.UUID
 	CollectedOn time.Time
 	Rolls       int64
 	ReceivedAt  time.Time
-	SeasonCode  *string // mã vụ của season_current (nil = bảng kê chưa gắn vụ / vụ không có)
-	SeasonYear  *int
+	SeasonRef   *uuid.UUID // nil = bảng kê chưa gắn vụ
 }
 
 // VolumeRows trả mọi bảng kê hiện hành đã nhận tới asOf (zero = không chặn) của tenant trong giao dịch.
@@ -27,9 +27,8 @@ func VolumeRows(ctx context.Context, tx pgx.Tx, asOf time.Time) ([]VolumeRow, er
 		t := asOf.UTC()
 		at = &t
 	}
-	rows, err := tx.Query(ctx, `SELECT s.plot_ref, s.collected_on, s.rolls, s.received_at, c.season_code, c.season_year
+	rows, err := tx.Query(ctx, `SELECT s.plot_ref, s.collected_on, s.rolls, s.received_at, s.season_ref
 	  FROM pf_cropcycle.collection_statement_view s
-	  LEFT JOIN pf_cropcycle.season_current c ON c.tenant_id = s.tenant_id AND c.season_ref = s.season_ref
 	  WHERE ($1::timestamptz IS NULL OR s.received_at <= $1::timestamptz)
 	  ORDER BY s.statement_ref`, at)
 	if err != nil {
@@ -40,47 +39,10 @@ func VolumeRows(ctx context.Context, tx pgx.Tx, asOf time.Time) ([]VolumeRow, er
 	for rows.Next() {
 		var r VolumeRow
 		var rolls int32
-		if err := rows.Scan(&r.PlotRef, &r.CollectedOn, &rolls, &r.ReceivedAt, &r.SeasonCode, &r.SeasonYear); err != nil {
+		if err := rows.Scan(&r.PlotRef, &r.CollectedOn, &rolls, &r.ReceivedAt, &r.SeasonRef); err != nil {
 			return nil, err
 		}
 		r.Rolls = int64(rolls)
-		out = append(out, r)
-	}
-	return out, rows.Err()
-}
-
-// HarvestRow là một vụ (không hủy) cho nguồn tiến độ gặt (feed harvest_progress_by_commune, W5.3).
-type HarvestRow struct {
-	CommuneCode         string
-	SeasonCode          string
-	SeasonYear          int
-	HouseholdRef        *uuid.UUID
-	AreaHa              decimal.Decimal
-	Completed           bool
-	ExpectedHarvestDate time.Time
-}
-
-// HarvestRows trả mọi vụ chưa hủy đã mở tới asOf (zero = không chặn) của tenant trong giao dịch.
-func HarvestRows(ctx context.Context, tx pgx.Tx, asOf time.Time) ([]HarvestRow, error) {
-	var at *time.Time
-	if !asOf.IsZero() {
-		t := asOf.UTC()
-		at = &t
-	}
-	rows, err := tx.Query(ctx, `SELECT commune_code, season_code, season_year, household_ref, area_ha, status = 'completed', expected_harvest_date
-	  FROM pf_cropcycle.season_current
-	  WHERE status <> 'cancelled' AND ($1::timestamptz IS NULL OR opened_at <= $1::timestamptz)
-	  ORDER BY season_ref`, at)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []HarvestRow
-	for rows.Next() {
-		var r HarvestRow
-		if err := rows.Scan(&r.CommuneCode, &r.SeasonCode, &r.SeasonYear, &r.HouseholdRef, &r.AreaHa, &r.Completed, &r.ExpectedHarvestDate); err != nil {
-			return nil, err
-		}
 		out = append(out, r)
 	}
 	return out, rows.Err()

@@ -94,9 +94,9 @@ func roleByName(t *testing.T, name string) (Role, int) {
 // thứ tự tạo nhóm trước.
 func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	groups := ModuleGroups()
-	// 17 pf có vai cũ + pf/kref + pf/workflow + pf/forms + pf/evidence + 7 mkg + vault/identity; pf/extdata không schema.
-	if len(groups) != 29 || len(legacyGroups()) != 25 {
-		t.Errorf("số vai nhóm: %d (muốn 29, 25 có vai cũ): %v", len(groups), groups)
+	// 17 pf có vai cũ + pf/kref + pf/workflow + pf/forms + pf/evidence + pf/cooperative (W3.3) + 7 mkg + vault/identity; pf/extdata không schema.
+	if len(groups) != 30 || len(legacyGroups()) != 25 {
+		t.Errorf("số vai nhóm: %d (muốn 30, 25 có vai cũ): %v", len(groups), groups)
 	}
 	if slices.ContainsFunc(groups, func(g ModuleGroup) bool { return g.Module == "pf/extdata" }) {
 		t.Error("pf/extdata không có schema — không có vai nhóm")
@@ -116,7 +116,7 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 			t.Errorf("%s: %+v", g.Role, r)
 		}
 		if g.Legacy == "" {
-			// Module không có vai cũ (W2.5: pf/kref, W6.1: pf/workflow, W6.2: pf/forms, W6.5: pf/evidence) — không vai đăng nhập nào ngoài app_* là thành viên.
+			// Module không có vai cũ (W2.5: pf/kref, W6.1: pf/workflow, W6.2: pf/forms, W6.5: pf/evidence, W3.3: pf/cooperative) — không vai đăng nhập nào ngoài app_* là thành viên.
 			for _, o := range Roles {
 				if slices.Contains(o.MemberOf, g.Role) && !slices.Contains(LoginRoles(), o.Name) {
 					t.Errorf("%s không được là thành viên %s", o.Name, g.Role)
@@ -385,7 +385,12 @@ func TestMigration91MatchesModuleGroups(t *testing.T) {
 }
 
 // laterGroups: module có vai nhóm sinh SAU pf 000092 — migration của chính module cấp k_ref cho r_* của nó.
-var laterGroups = map[string]string{"pf/workflow": "pf/000118_pf_workflow.up.sql", "pf/forms": "pf/000122_pf_forms_grants.up.sql", "pf/evidence": "pf/000123_pf_evidence.up.sql"}
+var laterGroups = map[string]string{
+	"pf/workflow":    "pf/000118_pf_workflow.up.sql",
+	"pf/forms":       "pf/000122_pf_forms_grants.up.sql",
+	"pf/evidence":    "pf/000123_pf_evidence.up.sql",
+	"pf/cooperative": "pf/000131_pf_cooperative_schema.up.sql", // W3.3: vai r_cooperative sinh khi module có owns_schema
+}
 
 // pf 000092 (W2.5) cấp SELECT k_ref.* cho MỌI r_* của module pf lúc đó (R-DB-05) — danh sách ghi tay khớp
 // ModuleGroups cụm pf trừ module sinh sau (laterGroups).

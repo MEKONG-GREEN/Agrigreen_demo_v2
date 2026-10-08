@@ -26,7 +26,7 @@ func (f *fixture) deliver(tid uuid.UUID, evType string, payload any) (uuid.UUID,
 	b, _ := json.Marshal(payload)
 	env := outbox.Envelope{EventID: ids.New(), EventType: evType, SchemaVersion: 1, TenantID: tid, OccurredAt: f.clk.Now(),
 		RecordedAt: f.clk.Now(), Producer: "mkg/fieldops", Payload: b}
-	_, err := inbox.Process(context.Background(), f.pool, port.CollectionValveConsumer, env, f.mod.CollectionValveHandler())
+	_, err := inbox.Process(context.Background(), f.db, port.CollectionValveConsumer, env, f.mod.CollectionValveHandler())
 	return env.EventID, err
 }
 
@@ -268,4 +268,14 @@ func TestCollectionSyncPushPull_RB6(t *testing.T) {
 	if str(d, "response", "outcome") != "disputed" || d["pending"] != false {
 		t.Fatalf("bảng kê sau phản hồi: %v", d)
 	}
+}
+
+func rec(entity, op string, payload any, sup *uuid.UUID, reason string, at time.Time) syncport.Record {
+	b, _ := json.Marshal(payload)
+	r := syncport.Record{ID: ids.New(), IdemKey: "dev:" + ids.New().String() + ":1", Entity: entity, Op: op, EventTime: at,
+		DeviceID: ids.New(), Payload: b, SupersedesID: sup}
+	if reason != "" {
+		r.CorrectionReason = &reason
+	}
+	return r
 }

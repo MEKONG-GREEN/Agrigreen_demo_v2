@@ -54,31 +54,10 @@ func synthetic(t *testing.T, g *g2) {
 		map[string]any{"type": "Feature", "properties": map[string]any{"code": "31117"}, "geometry": rect(-1000, -1000, 6000, 6000)},
 		map[string]any{"type": "Feature", "properties": map[string]any{"code": "92"}, "geometry": rect(-2000, -2000, 9000, 9000)},
 	})), http.StatusOK, "nhập ranh giới hành chính")
-	// 1.000 thửa: 5 lần nhập × 200 (giới hạn mỗi lần nhập).
-	n := 0
-	for batch := range 5 {
-		feats := make([]any, 0, 200)
-		for range 200 {
-			i, j := n%32, n/32
-			feats = append(feats, map[string]any{"type": "Feature", "properties": map[string]any{"name": fmt.Sprintf("T%04d", n), "commune_code": "31117"},
-				"geometry": rect(float64(i)*70, float64(j)*70, 60, 60)})
-			n++
-		}
-		r := adm.adminPost(fmt.Sprintf("/v1/geo/plots/import?file_name=thua_%d.geojson", batch), "application/geo+json", fc(feats))
-		if r.status != http.StatusOK || num(r.body, "accepted") != 200 {
-			t.Fatalf("nhập thửa lần %d: %d %s", batch, r.status, string(r.raw[:min(len(r.raw), 400)]))
-		}
-	}
-	// 60 HTX có ranh giới.
-	coops := make([]any, 0, 60)
-	for k := range 60 {
-		ref := ids.New()
-		g.orgs.add(ref, fmt.Sprintf("HTXS%02d", k), "31117")
-		coops = append(coops, map[string]any{"type": "Feature", "properties": map[string]any{"cooperative_ref": ref.String()},
-			"geometry": rect(float64(k%8)*300, float64(k/8)*300, 280, 280)})
-	}
-	if r := g.geoAdmin92().adminPost("/v1/geo/cooperative-boundaries/import?format=geojson", "application/geo+json", fc(coops)); num(r.body, "accepted") != 60 {
-		t.Fatalf("nhập HTX: %s", r.raw)
+	// 60 HTX có ranh giới — lớp HTX do pf/cooperative dựng (geoport.MapLayers giả, W3.3; lớp thật và độ trễ lớp
+	// thửa GIS US-BASE-01 kiểm ở cooperative/plot/handler).
+	for range 60 {
+		g.layers.coops = append(g.layers.coops, feature(ids.New(), "cooperatives"))
 	}
 	// 200 kho/Hub.
 	facs := make([]any, 0, 200)
@@ -133,9 +112,9 @@ func timeIt(t *testing.T, n int, fn func() resp) (time.Duration, resp) {
 // GIS US-INT-02 AC-1 (FN-17): bản đồ chuẩn hóa chỉ đọc cho TMS — MỘT lần gọi trả mọi lớp nền
 // (ranh giới hành chính, HTX, kho/Hub kèm widget sức chứa, đường bộ, đường thủy đi được) dạng
 // GeoJSON trong khung nhìn, theo quyền (tài khoản dịch vụ vai map_consumer, không có thửa),
-// p95 < 500 ms trên bộ dữ liệu tổng hợp. GIS US-BASE-01 AC-2: lớp thửa trong khung nhìn ở zoom
-// cận cảnh (1.000 polygon) p95 ≤ 1,5 s. Cách đo: docs/runbooks/gis-performance.md.
-func TestStandardMapForTMSLatency_GIS_US_INT_02_US_BASE_01(t *testing.T) {
+// p95 < 500 ms trên bộ dữ liệu tổng hợp. (GIS US-BASE-01 AC-2 — lớp thửa 1.000 polygon — ở
+// cooperative/plot/handler từ W3.3.) Cách đo: docs/runbooks/gis-performance.md.
+func TestStandardMapForTMSLatency_GIS_US_INT_02(t *testing.T) {
 	g := newG2(t)
 	synthetic(t, g)
 	tms := g.as(g.tenant, uuid.Nil, port.RoleMapConsumer)
@@ -178,14 +157,5 @@ func TestStandardMapForTMSLatency_GIS_US_INT_02_US_BASE_01(t *testing.T) {
 	t.Logf("GIS US-INT-02: GET /v1/geo/standard-map (661 đối tượng, 5 lớp) p95 = %v", tmsP95)
 	if tmsP95 >= 500*time.Millisecond {
 		t.Fatalf("GIS US-INT-02: p95 %v ≥ 500 ms", tmsP95)
-	}
-	plotPath := "/v1/geo/layers?zoom=15&layers=plots&bbox=" + bbox
-	plotP95, pr := timeIt(t, 30, func() resp { return g.national().appDo(http.MethodGet, plotPath, nil) })
-	t.Logf("GIS US-BASE-01: GET /v1/geo/layers?layers=plots (zoom 15, %d polygon) p95 = %v", len(list(pr.body, "plots", "features")), plotP95)
-	if len(list(pr.body, "plots", "features")) != 1000 {
-		t.Fatalf("1.000 polygon trong khung nhìn: %d", len(list(pr.body, "plots", "features")))
-	}
-	if plotP95 > 1500*time.Millisecond {
-		t.Fatalf("GIS US-BASE-01: p95 %v > 1,5 s", plotP95)
 	}
 }

@@ -24,7 +24,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 // fakeCheckpoint là điểm kiểm soát xuất giả (pf/metering chưa nối ở kiểm thử module).
@@ -89,7 +88,7 @@ func TestHubCapacityProductAndValveEgress_G5(t *testing.T) {
 	share := porttest.New()
 	share.Grant(g.tenant, mkg, partyport.KindValveHub)
 	share.Grant(second, mkg, partyport.KindValveHub)
-	g.mod.UseSharing(share, share)
+	g.mod.UseSharing(share)
 	cp := &fakeCheckpoint{allow: false}
 	g.mod.UseEgress(cp, meter.ModeObserve, nil)
 	h := g.mod.HubValveHandler()
@@ -213,26 +212,5 @@ func TestUtilizationBand_G5_D02(t *testing.T) {
 	}
 	if app.UtilizationBand(domain.CapacityUnknown) != app.BandUnknown {
 		t.Fatal("chưa có số → unknown")
-	}
-}
-
-// G5 (collection_volume): PlotFacts trả xã/HTX/nông hộ/diện tích của nhiều thửa theo tenant trong
-// context; thửa lạ và tenant khác không có trong kết quả.
-func TestPlotFacts_G5(t *testing.T) {
-	f := newFixture(t)
-	p1, _ := f.national().createPlot("31117", f.coopA, rect(0, 0, 100, 100))
-	pf := f.mod.PlotFacts()
-	got, err := pf.PlotFacts(tenant.WithID(context.Background(), f.tenant), []uuid.UUID{p1, ids.New()})
-	if err != nil || len(got) != 1 {
-		t.Fatalf("PlotFacts: %+v %v", got, err)
-	}
-	if p := got[p1]; p.CommuneCode != "31117" || p.CooperativeRef != f.coopA || !p.AreaHa.IsPositive() {
-		t.Fatalf("dữ kiện thửa: %+v", p)
-	}
-	if other, err := pf.PlotFacts(tenant.WithID(context.Background(), ids.New()), []uuid.UUID{p1}); err != nil || len(other) != 0 {
-		t.Fatalf("tenant khác: %+v %v", other, err)
-	}
-	if _, err := pf.PlotFacts(context.Background(), []uuid.UUID{p1}); err == nil {
-		t.Fatal("thiếu tenant trong context phải lỗi")
 	}
 }

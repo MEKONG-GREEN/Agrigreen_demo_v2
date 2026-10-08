@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -27,10 +28,10 @@ func TestHouseholdEventsNotifyCommuneOfficerKNUSHTX05(t *testing.T) {
 	hh := ids.New()
 	coop := ids.New()
 	reg := func(commune, src string) {
-		f.process(port.ConsumerParty, f.event(f.tenant, partyport.EventHouseholdRegistered, partyport.HouseholdRegisteredV1{
+		f.process(port.ConsumerParty, f.event(f.tenant, coopport.EventHouseholdRegistered, coopport.HouseholdRegisteredV1{
 			HouseholdRef: hh, CommuneCode: commune, CooperativeRef: &coop, Source: src, ActorRef: ids.New(), EventTime: f.clk.Now().Format(time.RFC3339)}))
 	}
-	reg(ward1, partyport.HouseholdSourceHTXApp)
+	reg(ward1, coopport.HouseholdSourceHTXApp)
 	in := off.inbox()
 	if len(in) != 1 || in[0]["kind"] != port.KindHouseholdRegistered || in[0]["deep_link"] != "/households/"+hh.String() || in[0]["topic"] != false {
 		t.Fatalf("cán bộ xã: %v", in)
@@ -38,13 +39,13 @@ func TestHouseholdEventsNotifyCommuneOfficerKNUSHTX05(t *testing.T) {
 	if len(prov.inbox()) != 0 || len(other.inbox()) != 0 {
 		t.Fatal("chỉ cán bộ cấp xã của xã nhận")
 	}
-	reg(ward1, partyport.HouseholdSourceImport)
+	reg(ward1, coopport.HouseholdSourceImport)
 	if len(off.inbox()) != 1 {
 		t.Fatal("nhập tệp không được báo")
 	}
 	// Xã 30301 chưa có cán bộ trong danh bạ → chủ đề kn_officer của xã.
-	f.process(port.ConsumerParty, f.event(f.tenant, partyport.EventHouseholdMembershipChanged, partyport.HouseholdMembershipChangedV1{
-		HouseholdRef: hh, CommuneCode: ward2, PrevCooperativeRef: &coop, Change: partyport.MembershipLeft, EffectiveDate: "2026-09-29",
+	f.process(port.ConsumerParty, f.event(f.tenant, coopport.EventHouseholdMembershipChanged, coopport.HouseholdMembershipChangedV1{
+		HouseholdRef: hh, CommuneCode: ward2, PrevCooperativeRef: &coop, Change: coopport.MembershipLeft, EffectiveDate: "2026-09-29",
 		ActorRef: ids.New(), EventTime: f.clk.Now().Format(time.RFC3339)}))
 	if in := other.inbox(); len(in) != 1 || in[0]["kind"] != port.KindHouseholdMembershipChanged || !strings.Contains(in[0]["title"].(string), "rời HTX") {
 		t.Fatalf("chủ đề xã: %v", in)

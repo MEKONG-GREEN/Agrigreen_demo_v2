@@ -41,6 +41,10 @@ Thời gian chạy tỷ lệ với tổng số dòng sổ, vì mỗi chuỗi dù
 5. Phục hồi dòng đúng từ bản sao lưu đã kiểm, **bằng quy trình phục hồi**, không dùng lệnh tay trên production. Sau đó chạy lại `verify-chains`.
 6. Nếu dòng có dữ liệu cá nhân hoặc số liệu tài chính thì áp cả quy trình của nghĩa vụ báo cáo tương ứng (mục 23).
 
+## Tên sổ là định danh logic
+
+Tên sổ (`TG_ARGV[0]` của `trg_chain`, cột `ledger` của `shared.chain_head`, `ledger_idem`, `chain_anchor`) là **định danh logic bất biến**, không phải vị trí bảng. W3.3 (pf 000132) chuyển 9 sổ HTX/hộ/thửa/vụ sang schema `pf_coop` nhưng giữ tên cũ (`pf_geo.plot_boundary`, `pf_cropcycle.farm_log`, `pf_party.kn_profile_event`…, quyết định PO 09/10/2026 — [thiết kế](../design/cooperative.md) mục 8.3). `verify-chains` ánh xạ tên sổ → bảng qua `pg_trigger.tgargs`, nên báo cáo hiện tên cũ cạnh bảng `pf_coop.*` — đúng như thiết kế, không phải lỗi. Riêng `shared.ledger_added_column` khóa theo tên bảng thật và được đăng ký bù dưới tên `pf_coop.*` ([runbook chuyển schema](cooperative-schema-move.md)).
+
 ## Kiểm thử
 
 `internal/shared/opsjobs`, `TestVerifyAllChainsDetectsTampering`: kiểm thử sửa một dòng (vượt trigger bằng `session_replication_role = replica`) và xóa dòng cuối. Cả hai phải bị phát hiện đúng `seq`, còn chuỗi không bị đụng vẫn hợp lệ.

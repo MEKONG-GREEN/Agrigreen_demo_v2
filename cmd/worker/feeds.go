@@ -5,11 +5,9 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/coopwire"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
@@ -19,7 +17,7 @@ import (
 // apiclientFeedJobs dựng job feed của cổng tích hợp (W5.3, ADR-0033 §2, ADR-0035): dựng tập dữ liệu
 // (apiclientport.JobFeedBuild) và dọn feed quá 30 ngày (apiclientport.JobFeedRetention). Một pool app_worker nối thẳng
 // cụm pf; mỗi module chạy dưới vai nhóm của nó (pf/apiclient r_apiclient; nguồn ô thô pf/cropcycle + dữ kiện thửa
-// pf/cooperative/pf/geo + đơn vị hành chính và k ở pf/masterdata). Ảnh chụp ghi kho đối tượng (AG_S3_* hoặc
+// và vụ pf/cooperative + đơn vị hành chính và k ở pf/masterdata). Ảnh chụp ghi kho đối tượng (AG_S3_* hoặc
 // AG_OBJSTORE_DIR; không cấu hình → phiên bản không có ảnh chụp, cảnh báo). Tenant đóng góp: AG_INTEGRATION_CONTRIBUTORS.
 func apiclientFeedJobs(ctx context.Context, direct string, closeFn *func(), log *slog.Logger) ([]schedule.Job, error) {
 	op, err := apiclient.OperatorTenantFromEnv()
@@ -48,10 +46,9 @@ func apiclientFeedJobs(ctx context.Context, direct string, closeFn *func(), log 
 	}
 	clk := clock.System{}
 	md := masterdata.New(pool, clk)
-	g := geo.New(pool, clk, geo.Deps{Params: md.Params(), AdminUnits: md.AdminUnits()})
-	cc := cropcycle.New(pool, clk, cropcycle.Deps{Params: md.Params()})
-	coop := cooperative.New(coopwire.Sources(coopwire.Legacy{PlotFacts: g.PlotFacts()}))
-	cc.UseCollectionVolume(coop.Plots(), md.AdminUnits())
+	cc := cropcycle.New(pool, clk, cropcycle.Deps{})
+	coop := cooperative.New(pool, clk, cooperative.Deps{}) // W3.3: dữ kiện thửa và vụ ở pf_coop (r_cooperative)
+	cc.UseCollectionVolume(coop.Plots(), coop.Seasons(), md.AdminUnits())
 	mod := apiclient.New(pool, clk, apiclient.Deps{OperatorTenant: op, Store: store, Log: log})
 	mod.UseFeedSources(cc.AggregateSource(), contrib, md.Params())
 	return mod.FeedJobs(interval, log), nil

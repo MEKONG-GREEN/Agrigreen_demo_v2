@@ -3,13 +3,10 @@ package handler
 import (
 	"context"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/app"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -25,7 +22,7 @@ type coopItemDTO struct {
 	DigitizedPlots   *int64  `json:"digitized_plots"`
 }
 
-func (h Registry) coopItems(ctx context.Context, items []store.Cooperative) ([]coopItemDTO, error) {
+func (h Registry) coopItems(ctx context.Context, items []app.Cooperative) ([]coopItemDTO, error) {
 	ex, err := h.Reg.CoopExtras(ctx, items)
 	if err != nil {
 		return nil, err
@@ -37,29 +34,6 @@ func (h Registry) coopItems(ctx context.Context, items []store.Cooperative) ([]c
 			coopDTO: toCoopDTO(it), ProvinceCode: strPtr(e.ProvinceCode), CommuneName: strPtr(e.CommuneName),
 			ProvinceName: strPtr(e.ProvinceName), MemberHouseholds: e.MemberHouseholds, DigitizedPlots: e.DigitizedPlots,
 		})
-	}
-	return out, nil
-}
-
-// consentStateDTO là trạng thái đồng ý hiện tại theo mục đích (G-04).
-type consentStateDTO struct {
-	Purpose   string `json:"purpose"`
-	Status    string `json:"status"`
-	EventTime string `json:"event_time"`
-}
-
-func (h Registry) consentsOf(ctx context.Context, refs []uuid.UUID) (map[uuid.UUID][]consentStateDTO, error) {
-	st, err := h.Reg.ConsentStates(ctx, refs)
-	if err != nil {
-		return nil, err
-	}
-	out := make(map[uuid.UUID][]consentStateDTO, len(refs))
-	for _, r := range refs {
-		list := make([]consentStateDTO, 0, len(st[r]))
-		for _, c := range st[r] {
-			list = append(list, consentStateDTO{Purpose: c.Purpose, Status: c.Status, EventTime: c.EventTime.UTC().Format(time.RFC3339Nano)})
-		}
-		out[r] = list
 	}
 	return out, nil
 }

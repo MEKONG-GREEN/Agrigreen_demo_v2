@@ -7,6 +7,7 @@ import (
 	"context"
 	"slices"
 	"sort"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -192,6 +193,16 @@ func (m Memory) Production(context.Context, port.ProductionQuery) (port.Producti
 // HarvestDates thực hiện port.Seasons: bản giả không giữ ngày thu hoạch.
 func (m Memory) HarvestDates(context.Context, []uuid.UUID) ([]port.SeasonHarvestDate, error) {
 	return []port.SeasonHarvestDate{}, nil
+}
+
+// Codes thực hiện port.Seasons: bản giả không giữ vụ theo ref.
+func (m Memory) Codes(context.Context, []uuid.UUID) (map[uuid.UUID]port.SeasonKey, error) {
+	return map[uuid.UUID]port.SeasonKey{}, nil
+}
+
+// Progress thực hiện port.Seasons: bản giả không giữ tiến độ vụ.
+func (m Memory) Progress(context.Context, time.Time) ([]port.SeasonProgress, error) {
+	return []port.SeasonProgress{}, nil
 }
 
 // MemoryDiary cài đặt port.Diary trên Seed.Diary.

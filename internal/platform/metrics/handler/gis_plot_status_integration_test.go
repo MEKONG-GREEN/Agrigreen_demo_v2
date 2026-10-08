@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -66,15 +66,15 @@ func TestGISPlotRetireRestoreLayerLog(t *testing.T) {
 		if p == plotB {
 			b = ids.New()
 		}
-		f.deliver(t, envOf(t, tid, geoport.EventPlotCreated, geoport.PlotCreatedV1{PlotRef: p, Code: codes[p], CommuneCode: "80001",
+		f.deliver(t, envOf(t, tid, coopport.EventPlotCreated, coopport.PlotCreatedV1{PlotRef: p, Code: codes[p], CommuneCode: "80001",
 			CooperativeRef: &coopRef, Status: "active", BoundaryID: b, AreaHa: "1.2500", Source: "kn_web", ActorRef: ids.New(), EventTime: at}))
 	}
-	retA := envOf(t, tid, geoport.EventPlotRetired, geoport.PlotRetiredV1{PlotRef: plotA, PlotEventID: ids.New(), Code: "TH0000001",
+	retA := envOf(t, tid, coopport.EventPlotRetired, coopport.PlotRetiredV1{PlotRef: plotA, PlotEventID: ids.New(), Code: "TH0000001",
 		CommuneCode: "80001", CooperativeRef: &coopRef, StatusBefore: "active", StatusAfter: "retired",
 		Reason: "Thửa đã chuyển đổi sang đất ở", ActorRef: ids.New(), EventTime: at})
 	retA.Producer = "pf/geo"
 	f.deliver(t, retA)
-	f.deliver(t, envOf(t, tid, geoport.EventPlotRetired, geoport.PlotRetiredV1{PlotRef: plotB, PlotEventID: ids.New(), Code: "TH0000002",
+	f.deliver(t, envOf(t, tid, coopport.EventPlotRetired, coopport.PlotRetiredV1{PlotRef: plotB, PlotEventID: ids.New(), Code: "TH0000002",
 		CommuneCode: "80001", CooperativeRef: &coopRef, StatusBefore: "active", StatusAfter: "retired",
 		Reason: "Thửa trùng với thửa địa chính", ActorRef: ids.New(), EventTime: at}))
 
@@ -108,7 +108,7 @@ func TestGISPlotRetireRestoreLayerLog(t *testing.T) {
 	if _, err := svc.BuildSnapshots(ctx, tid, today); err != nil {
 		t.Fatal(err)
 	}
-	resA := envOf(t, tid, geoport.EventPlotRestored, geoport.PlotRestoredV1{PlotRef: plotA, PlotEventID: ids.New(), Code: "TH0000001",
+	resA := envOf(t, tid, coopport.EventPlotRestored, coopport.PlotRestoredV1{PlotRef: plotA, PlotEventID: ids.New(), Code: "TH0000001",
 		CommuneCode: "80001", CooperativeRef: &coopRef, StatusBefore: "retired", StatusAfter: "active",
 		Reason: "Ngừng dùng nhầm, khôi phục lại", ActorRef: ids.New(), EventTime: at})
 	resA.Producer = "pf/geo"
@@ -116,7 +116,7 @@ func TestGISPlotRetireRestoreLayerLog(t *testing.T) {
 	f.deliver(t, resA)
 
 	// Trước/sau + nguồn.
-	ret := f.layerRowFor(t, tid, geoport.EventPlotRetired)
+	ret := f.layerRowFor(t, tid, coopport.EventPlotRetired)
 	if len(ret) != 2 {
 		t.Fatalf("số dòng retired = %d", len(ret))
 	}
@@ -130,7 +130,7 @@ func TestGISPlotRetireRestoreLayerLog(t *testing.T) {
 		rowA.after["status_change_reason"] != "Thửa đã chuyển đổi sang đất ở" || rowA.after["area_ha"] != "1.2500" {
 		t.Fatalf("dòng retire: %+v", rowA)
 	}
-	res := f.layerRowFor(t, tid, geoport.EventPlotRestored)
+	res := f.layerRowFor(t, tid, coopport.EventPlotRestored)
 	if len(res) != 1 || res[0].op != "restore" || res[0].before["status"] != "retired" || res[0].after["status"] != "active" ||
 		res[0].after["status_change_reason"] != "Ngừng dùng nhầm, khôi phục lại" {
 		t.Fatalf("dòng restore: %+v", res)

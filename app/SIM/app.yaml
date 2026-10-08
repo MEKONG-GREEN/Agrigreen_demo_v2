@@ -5,8 +5,8 @@ description: Mô phỏng chọn hub (dom/hubsim) và mạng đường thủy (do
 modules:
   pf/accounts: ">=1.0 <2"
   pf/cooperative: ">=1.0 <2"   # nguồn cung HTX × vụ, toạ độ HTX
-  pf/cropcycle: ">=1.0 <2"     # mô hình cung từ vụ
-  pf/geo: ">=1.0 <2"           # kho/hub và dung lượng
+  pf/cropcycle: ">=2.0 <3"     # mô hình cung từ vụ
+  pf/geo: ">=2.0 <3"           # kho/hub và dung lượng
   pf/masterdata: ">=1.0 <2"
   pf/simulation: ">=1.0 <2"    # /v1/simulations, /v1/candidate-hubs, /v1/scenarios
   pf/waterway: ">=1.0 <2"

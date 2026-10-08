@@ -11,11 +11,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/coopwire"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -56,7 +54,7 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 		return nil, err
 	}
 	keep(pool)
-	nPool, extPool, mdPool, geoPool, accPool := pool, pool, pool, pool, pool
+	nPool, extPool, mdPool, coopPool, accPool := pool, pool, pool, pool, pool
 	ch, err := notify.ChannelsFromEnv(log)
 	if err != nil {
 		return nil, err
@@ -65,8 +63,8 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	md := masterdata.New(mdPool, clk)
 	kn := extension.New(extPool, clk, extension.Deps{Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs()})
 	log.Info("kênh thông báo", "event", "startup", "push", ch.Pusher.Name(), "email", ch.Mailer != nil, "outcome", "ok")
-	// pf/cooperative (W3.2): nông hộ có thửa theo xã qua mặt tiền (nguồn cũ pf/geo, cmd/internal/coopwire).
-	coop := cooperative.New(coopwire.Sources(coopwire.Legacy{PlotHH: geo.New(geoPool, clk, geo.Deps{}).PlotHouseholds()}))
+	// pf/cooperative (W3.3): nông hộ có thửa theo xã (schema pf_coop, r_cooperative).
+	coop := cooperative.New(coopPool, clk, cooperative.Deps{})
 	farmers := assembly.AreaFarmers{Households: coop.Households(),
 		Accounts: accounts.New(accPool, clk, accounts.Deps{}).FarmerAccounts()}
 	return notify.New(nPool, clk, notify.Deps{Staff: kn.Staff(), Units: md.AdminUnits(), Farmers: farmers, Pusher: ch.Pusher, Mailer: ch.Mailer,

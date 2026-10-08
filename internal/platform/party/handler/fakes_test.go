@@ -7,12 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
-	"github.com/google/uuid"
 )
 
 // fakeUnits là danh mục đơn vị hành chính giả (masterdata đang được làm song song).
@@ -183,3 +184,247 @@ func (v *fakeVault) usedPurposes() []client.Purpose {
 }
 
 var _ client.Client = (*fakeVault)(nil)
+
+// fakeCoopProfiles là hồ sơ HTX giả của pf/cooperative (partyport.CoopProfiles, W3.3) trong bộ nhớ, theo tenant:
+// mã số thuế duy nhất trong tenant, sổ hồ sơ KN chống lặp theo idem_key. failCreate > 0: lần gọi CreateProfile kế
+// tiếp lỗi (giả lập bước 2 của tạo HTX dừng giữa chừng).
+type fakeCoopProfiles struct {
+	mu         sync.Mutex
+	profiles   map[uuid.UUID]map[uuid.UUID]partyport.CoopProfile // tenant → Nút → hồ sơ
+	households map[uuid.UUID]int64                               // Nút → số hộ thành viên
+	events     map[uuid.UUID][]partyport.CoopProfileEvent        // tenant → sổ
+	idem       map[string]int                                    // tenant|khóa → vị trí+1 trong sổ
+	changes    map[uuid.UUID][]partyport.CoopProfileChange       // tenant → các lần sửa đã ghi
+	failCreate int
+	failErr    error // lỗi của lần CreateProfile bị ép lỗi; nil = errFakeProfileDown
+	creates    int
+}
+
+func newFakeCoopProfiles() *fakeCoopProfiles {
+	return &fakeCoopProfiles{profiles: map[uuid.UUID]map[uuid.UUID]partyport.CoopProfile{}, households: map[uuid.UUID]int64{},
+		events: map[uuid.UUID][]partyport.CoopProfileEvent{}, idem: map[string]int{},
+		changes: map[uuid.UUID][]partyport.CoopProfileChange{}}
+}
+
+var errFakeProfileDown = errors.New("fakeCoopProfiles: pf/cooperative không phản hồi")
+
+func (f *fakeCoopProfiles) tenantMap(ctx context.Context) (uuid.UUID, map[uuid.UUID]partyport.CoopProfile, error) {
+	tid, err := tenant.FromContext(ctx)
+	if err != nil {
+		return uuid.Nil, nil, err
+	}
+	m := f.profiles[tid]
+	if m == nil {
+		m = map[uuid.UUID]partyport.CoopProfile{}
+		f.profiles[tid] = m
+	}
+	return tid, m, nil
+}
+
+// failNext ép n lần CreateProfile kế tiếp lỗi err (nil = pf/cooperative không phản hồi).
+func (f *fakeCoopProfiles) failNext(n int, err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.failCreate, f.failErr = n, err
+}
+
+// setHouseholds đặt số hộ thành viên đang mở của HTX.
+func (f *fakeCoopProfiles) setHouseholds(ref uuid.UUID, n int64) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.households[ref] = n
+}
+
+// count trả số hồ sơ của tenant.
+func (f *fakeCoopProfiles) count(tid uuid.UUID) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.profiles[tid])
+}
+
+// profile đọc hồ sơ của Nút.
+func (f *fakeCoopProfiles) profile(tid, ref uuid.UUID) (partyport.CoopProfile, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	p, ok := f.profiles[tid][ref]
+	return p, ok
+}
+
+// eventCount trả số dòng sổ hồ sơ KN của tenant (kèm điều kiện tùy chọn).
+func (f *fakeCoopProfiles) eventCount(tid uuid.UUID, keep func(partyport.CoopProfileEvent) bool) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, e := range f.events[tid] {
+		if keep == nil || keep(e) {
+			n++
+		}
+	}
+	return n
+}
+
+// supportCount đếm lần sửa ghi ở chế độ hỗ trợ thay actor (on_behalf_of, có lý do hỗ trợ).
+func (f *fakeCoopProfiles) supportCount(tid, actor uuid.UUID) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, c := range f.changes[tid] {
+		if c.OnBehalfOf != nil && *c.OnBehalfOf == actor && c.SupportReason != nil {
+			n++
+		}
+	}
+	return n
+}
+
+func (f *fakeCoopProfiles) Profiles(ctx context.Context, refs []uuid.UUID) (map[uuid.UUID]partyport.CoopProfile, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	_, m, err := f.tenantMap(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := map[uuid.UUID]partyport.CoopProfile{}
+	for _, r := range refs {
+		if p, ok := m[r]; ok {
+			out[r] = p
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeCoopProfiles) taxOwner(m map[uuid.UUID]partyport.CoopProfile, tax string) uuid.UUID {
+	for ref, p := range m {
+		if tax != "" && p.TaxCode == tax {
+			return ref
+		}
+	}
+	return uuid.Nil
+}
+
+func (f *fakeCoopProfiles) CreateProfile(ctx context.Context, ref uuid.UUID, p partyport.CoopProfile) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.failCreate > 0 {
+		f.failCreate--
+		if f.failErr != nil {
+			return f.failErr
+		}
+		return errFakeProfileDown
+	}
+	_, m, err := f.tenantMap(ctx)
+	if err != nil {
+		return err
+	}
+	if _, ok := m[ref]; ok {
+		return nil
+	}
+	if o := f.taxOwner(m, p.TaxCode); o != uuid.Nil {
+		return partyport.ErrCoopTaxCodeTaken
+	}
+	p.UpdatedAt = time.Now()
+	m[ref] = p
+	f.creates++
+	return nil
+}
+
+func (f *fakeCoopProfiles) TaxCodeOwner(ctx context.Context, tax string) (uuid.UUID, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	_, m, err := f.tenantMap(ctx)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return f.taxOwner(m, tax), nil
+}
+
+func (f *fakeCoopProfiles) MatchProfiles(ctx context.Context, q partyport.CoopProfileFilter) ([]uuid.UUID, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	_, m, err := f.tenantMap(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out []uuid.UUID
+	for ref, p := range m {
+		if q.TaxPrefix != "" && !strings.HasPrefix(p.TaxCode, q.TaxPrefix) {
+			continue
+		}
+		if q.AreaMin != nil && (p.AreaHa == nil || p.AreaHa.LessThan(*q.AreaMin)) {
+			continue
+		}
+		if q.AreaMax != nil && (p.AreaHa == nil || p.AreaHa.GreaterThan(*q.AreaMax)) {
+			continue
+		}
+		out = append(out, ref)
+	}
+	return out, nil
+}
+
+func (f *fakeCoopProfiles) ActiveHouseholds(_ context.Context, coops []uuid.UUID) (map[uuid.UUID]int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := map[uuid.UUID]int64{}
+	for _, c := range coops {
+		if n := f.households[c]; n > 0 {
+			out[c] = n
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeCoopProfiles) UpdateProfile(ctx context.Context, c partyport.CoopProfileChange) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	tid, m, err := f.tenantMap(ctx)
+	if err != nil {
+		return err
+	}
+	if f.idem[tid.String()+"|"+c.IdemKey] > 0 {
+		return nil
+	}
+	if o := f.taxOwner(m, c.TaxCode); o != uuid.Nil && o != c.Ref {
+		return partyport.ErrCoopTaxCodeTaken
+	}
+	p := m[c.Ref]
+	p.AreaHa, p.TaxCode, p.Address, p.UpdatedAt = c.AreaHa, c.TaxCode, c.Address, time.Now()
+	m[c.Ref] = p
+	f.idem[tid.String()+"|"+c.IdemKey] = len(f.events[tid]) + 1
+	f.changes[tid] = append(f.changes[tid], c)
+	f.events[tid] = append(f.events[tid], partyport.CoopProfileEvent{SubjectRef: c.Ref, Action: "updated", Before: c.Before, After: c.After,
+		Reason: c.Reason, SupportReason: c.SupportReason, ActorRef: c.ActorRef, EventTime: c.EventTime, RecordedAt: time.Now(),
+		Seq: int64(len(f.events[tid]) + 1)})
+	return nil
+}
+
+func (f *fakeCoopProfiles) ProfileEventByIdem(ctx context.Context, key string) (*partyport.CoopProfileEvent, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	tid, err := tenant.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	i := f.idem[tid.String()+"|"+key]
+	if i == 0 {
+		return nil, nil
+	}
+	e := f.events[tid][i-1]
+	return &e, nil
+}
+
+func (f *fakeCoopProfiles) ProfileEvents(ctx context.Context, ref uuid.UUID) ([]partyport.CoopProfileEvent, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	tid, err := tenant.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out []partyport.CoopProfileEvent
+	for _, e := range f.events[tid] {
+		if e.SubjectRef == ref {
+			out = append(out, e)
+		}
+	}
+	return out, nil
+}
+
+var _ partyport.CoopProfiles = (*fakeCoopProfiles)(nil)

@@ -80,3 +80,35 @@ func TestLedgerColumnsGrandfathered(t *testing.T) {
 		}
 	}
 }
+
+// W3.3 (pf 000132): sổ chuyển schema bằng ALTER TABLE … SET SCHEMA vẫn là sổ dưới tên mới — ADD COLUMN về sau trên
+// pf_coop.<sổ> phải đăng ký như cũ; bảng không phải sổ chuyển theo thì không thành sổ.
+func TestLedgerSetFollowsSetSchema(t *testing.T) {
+	root := filepath.Join("..", "..", "migrations")
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ledgers, err := ledgerSet(root, entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, l := range []string{"pf_coop.plot_boundary", "pf_coop.plot_event", "pf_coop.farm_log", "pf_coop.kn_profile_event",
+		"pf_coop.harvest_declaration", "pf_geo.plot_boundary"} {
+		if !ledgers[l] {
+			t.Errorf("%s phải là sổ", l)
+		}
+	}
+	for _, nl := range []string{"pf_coop.plot", "pf_coop.season_current"} {
+		if ledgers[nl] {
+			t.Errorf("%s không phải sổ", nl)
+		}
+	}
+	if p := CheckLedgerColumns("ALTER TABLE pf_coop.plot_event ADD COLUMN a text NULL;", ledgers); len(p) != 1 {
+		t.Errorf("ADD COLUMN không đăng ký trên sổ đã chuyển phải bị bắt: %v", p)
+	}
+	if got := LedgerMoves("ALTER TABLE IF EXISTS pf_geo.plot SET SCHEMA pf_coop; ALTER SEQUENCE pf_geo.s SET SCHEMA pf_coop;"); len(got) != 1 ||
+		got[0] != [2]string{"pf_geo.plot", "pf_coop.plot"} {
+		t.Errorf("LedgerMoves = %v", got)
+	}
+}

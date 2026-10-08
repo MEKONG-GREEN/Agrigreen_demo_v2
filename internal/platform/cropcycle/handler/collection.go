@@ -22,7 +22,6 @@ func (h Handler) registerCollection(rg *gin.RouterGroup) {
 	// (cùng kiểm cấp quyền htx_collection_responses, cùng sổ đọc).
 	rg.GET("/partner/htx-collection/responses", h.responseFeed)
 	rg.GET("/cropcycle/htx-collection/responses", h.responseFeed)
-	rg.GET("/partner/season-harvest-dates", h.partnerHarvestDates)
 }
 
 func collectionList(c *gin.Context) (app.CollectionListInput, bool) {

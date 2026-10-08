@@ -367,15 +367,16 @@ func (g *g5) stepProgrammeData() {
 		}
 		g.plots = append(g.plots, p)
 	}
-	exec := func(role string, f func(tx pgx.Tx) error) {
+	// W3.3: thửa và vụ ở pf_coop — ghi dưới r_cooperative qua vai đăng nhập đơn vị app_platform.
+	execCoop := func(f func(tx pgx.Tx) error) {
 		t.Helper()
-		if err := tenant.WithTenantTx(ctx, s.PF(role), g.prog, f); err != nil {
-			t.Fatalf("dữ kiện %s: %v", role, err)
+		if err := tenant.WithTenantTx(ctx, db.ForModule(s.PF(dbadmin.AppPlatform), db.Module("pf/cooperative")), g.prog, f); err != nil {
+			t.Fatalf("dữ kiện pf/cooperative: %v", err)
 		}
 	}
-	exec("geo_app", func(tx pgx.Tx) error {
+	execCoop(func(tx pgx.Tx) error {
 		for i, p := range g.plots {
-			if _, err := tx.Exec(ctx, `INSERT INTO pf_geo.plot (tenant_id, ref, code, commune_code, cooperative_ref, household_ref, status, current_version,
+			if _, err := tx.Exec(ctx, `INSERT INTO pf_coop.plot (tenant_id, ref, code, commune_code, cooperative_ref, household_ref, status, current_version,
 			    current_boundary_id, geom, area_ha, source, created_by)
 			  VALUES ($1, $2, $3, $4, $5, $6, 'active', 1, $7, ST_GeomFromText('MULTIPOLYGON(((105.7 10.0,105.701 10.0,105.701 10.001,105.7 10.0)))', 4326),
 			    1.5000::numeric, 'kiểm thử E2E G5', $8)`, g.prog, p.ref, fmt.Sprintf("E2E-G5-%02d", i), p.commune, g.coop, p.hh, ids.New(), actor); err != nil {
@@ -384,9 +385,9 @@ func (g *g5) stepProgrammeData() {
 		}
 		return nil
 	})
-	exec("cropcycle_app", func(tx pgx.Tx) error {
+	execCoop(func(tx pgx.Tx) error {
 		for i, p := range g.plots {
-			if _, err := tx.Exec(ctx, `INSERT INTO pf_cropcycle.season_current (tenant_id, season_ref, plot_ref, plot_code, household_ref, cooperative_ref,
+			if _, err := tx.Exec(ctx, `INSERT INTO pf_coop.season_current (tenant_id, season_ref, plot_ref, plot_code, household_ref, cooperative_ref,
 			    commune_code, season_code, season_year, variety_code, sop_template_ref, sop_version_id, sop_version_no, sowing_date, expected_harvest_date,
 			    harvest_open_date, area_ha, status, current_event_id, version, location_status, gps_source, on_behalf, opened_by, opened_at)
 			  VALUES ($1, $2, $3, $4, $5, $6, $7, 'DX', 2026, 'OM5451', $8, $9, 1, '2026-05-01'::date, '2026-08-20'::date, '2026-08-10'::date,

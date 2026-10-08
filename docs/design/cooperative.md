@@ -1,7 +1,7 @@
 # Thiết kế ranh giới `pf/cooperative` (`dom/cooperative`, schema `pf_coop`)
 
 **Gói:** W3.1 ([kế hoạch v4.1](../kien-truc-v4.1-ke-hoach.md)). Bản này là đầu vào cho W3.2 (module Go), W3.3 (chuyển schema, pf 000094–000096), W3.4 (RLS theo Nút, pf 000097) và W3.5 (hợp nhất dữ liệu UAT).
-**Ngày:** 06/10/2026 · **Trạng thái:** đề xuất. Giả định chủ dữ liệu theo phương án (a) của H-1 (mục 11).
+**Ngày:** 06/10/2026 · **Trạng thái:** đã hiện thực ở W3.2 (mục 16) và W3.3 (mục 17). Giả định chủ dữ liệu theo phương án (a) của H-1 (mục 11).
 **Đọc cùng:**
 - [bản đối chiếu](../kien-truc-v4.1-doi-chieu.md) §2.2, §2.3, X-01, DB-07;
 - [ADR-0027](../adr/0027-bon-tang-module-tep-khai-bao.md) (bảng ánh xạ tên, `kind`);
@@ -332,6 +332,8 @@ enable: per_tenant             # mặc định bật (W1.4); KN/HTX/CGH cần, M
 
 ### 7.2 Vai `r_coop`
 
+> **Hiện thực W3.3:** giữ **`r_cooperative`** (quy tắc `r_<đoạn cuối tên module>` của W2.6, `modreg.DBRole` không có bảng ghi đè) — mọi chỗ ghi `r_coop` trong bản này đọc là `r_cooperative` (mục 17.2).
+
 - `modreg.DBRole("pf/cooperative")` hôm nay trả `r_cooperative`. W3.2 thêm bảng ghi đè một mục `{"pf/cooperative": "r_coop"}` trong `internal/shared/modreg/assembly.go`. Kiểm thử bảng đảm bảo không trùng vai.
 - Phương án thay thế: đặt tên module là `pf/coop`. Bị loại vì Phụ lục D dùng `pf/cooperative`.
 - `dbadmin.groupOnlyModules["pf/cooperative"] = {migrations.PF}`. Module không có vai cũ `cooperative_app`, nên `migrate bootstrap` tạo `r_coop` NOLOGIN và cấp membership cho `app_platform`, `app_worker`, `app_public`, `app_sync` theo `modreg/assembly_gen.go`.
@@ -360,6 +362,8 @@ enable: per_tenant             # mặc định bật (W1.4); KN/HTX/CGH cần, M
 ---
 
 ## 8. W3.3 — kế hoạch migration pf 000094–000096
+
+> **Hiện thực (W3.3, 09/10/2026):** số migration thật là **pf 000131–000133** (000094–000096 của bản kế hoạch đã cũ; 000125–000127, 000128–000130 rồi 000130–000132 cấp tạm cũng đổi vì W5.3, W5.4, W5.7, W5.8, W6.3, W6.4, W6.5 gộp trước); vai là **`r_cooperative`** (không ghi đè `r_coop`, mục 17.2). Đọc mục 17 trước mục này.
 
 ### 8.1 Tệp
 
@@ -444,6 +448,8 @@ END $$;
 Khi diễn tập W3.3 còn phải đo thời gian khóa với số phân vùng thật.
 
 ### 8.3 Chuỗi băm: giữ tên sổ (D-3)
+
+> **Quyết định chủ sản phẩm (09/10/2026): chọn (A)** — giữ tên sổ cũ trong `TG_ARGV`, không chèn tên mới vào `shared.chain_head`, không đụng `ledger_idem`, `chain_anchor`. Câu "thêm tên mới trong `chain_head` bằng INSERT" của dòng W3.3 trong kế hoạch bị thay. Hiện thực: mục 17.3.
 
 `shared.fn_chain` dùng `TG_ARGV[0]` làm khóa của ba nơi:
 - `shared.chain_head (ledger, tenant_id, stream_key)`;
@@ -696,3 +702,86 @@ Mục 4 và 7.1 cho `pf/cooperative` gọi port cũ trong module (`depends: pf/p
 ### 16.5 Ngoại lệ `agmodgraph`
 
 Rà soát aabe11c đã gỡ mọi mục chủ W3.2 (kể cả `geo → waterway`: `geoport.Layer` do geo khai). W3.2 không thêm, không bớt mục nào; tệp còn 22 mục (4 `cycle`, 1 `tier` trong `{accounts, party, sync}`, 17 `schema`). Mục 3 ("W3.2 gỡ 15 mục") đã do rà soát làm.
+
+---
+
+## 17. Ghi chú hiện thực W3.3
+
+**Ngày:** 09/10/2026, nhánh `w33` từ `origin/main` 920a835 (rebase lên main sau W4.1, W5.2–W5.4, W5.8, W6.2–W6.5, W9.1). Phần dưới ghi những gì hiện thực **khác** mục 2–8 và lý do.
+
+### 17.1 Migration pf 000131–000133
+
+| Tệp | Nội dung |
+|---|---|
+| `000131_pf_cooperative_schema` | Kiểm `r_cooperative` tồn tại (không thì `RAISE` — `migrate bootstrap` phải chạy trước). `CREATE SCHEMA pf_coop`, `REVOKE ALL … FROM PUBLIC`, `USAGE` cho `r_cooperative`, quyền `k_ref` (R-DB-05, như pf 000118) |
+| `000132_pf_cooperative_move` | `SET LOCAL lock_timeout = '5s'`, `LOCK` 22 bảng theo thứ tự cố định, `SET SCHEMA` 5 chuỗi số, 4 hàm, 22 bảng cha, rồi phân vùng (vòng `pg_inherits`). Đăng ký bù `shared.ledger_added_column` dưới tên `pf_coop.*` (17.3). Thu hồi **mọi** quyền của vai khác chủ (đọc ACL bảng + cột thật — không phụ thuộc danh sách vai) rồi cấp ma trận 8.4 cho `r_cooperative`. `COMMENT ON TABLE` 9 sổ ghi tên sổ giữ nguyên |
+| `000133_pf_cooperative_verify` | Chỉ kiểm: 22 bảng, 5 chuỗi số, 4 hàm ở `pf_coop`, không còn ở schema cũ; mọi phân vùng (mọi cấp) cùng schema với bảng cha; `trg_chain` của 9 sổ giữ đúng tên sổ cũ; RLS bật + ép trên mọi bảng/phân vùng; `v_missing_rls`, `v_missing_immutability` rỗng; trên `pf_coop` chỉ chủ và `r_cooperative` có quyền (bảng, cột, chuỗi số, schema), `r_cooperative` không có quyền phân vùng; `r_party`/`r_geo`/`r_cropcycle` không còn quyền; đăng ký cột thêm đủ |
+
+Phát hiện khi diễn tập: `pg_inherits` liệt kê cả **chỉ mục phân vùng** (`*_id_idx` gắn với chỉ mục phân vùng của bảng cha, pf 000115) — vòng chuyển phải lọc `relkind IN ('r','p')`, chỉ mục đi theo bảng của nó. Bản phác thảo 8.2 thiếu điều kiện này.
+
+### 17.2 Vai `r_cooperative`
+
+Giữ `r_cooperative` thay vì ghi đè `r_coop` (D-1, 7.2): W2.6 suy mọi `r_*` từ `modreg.Catalog` theo `r_<đoạn cuối tên>`; bảng ghi đè cho một module chỉ thêm ngoại lệ vào `modreg.DBRole`, `dbadmin`, kiểm thử vai và runbook mà không thêm an toàn nào. Module không có vai cũ `cooperative_app` (như `pf/kref`, `pf/workflow`): `dbadmin.ModuleGroups` sinh `r_cooperative` khi `owns_schema: [pf_coop]`, `migrate bootstrap` cấp membership cho `app_platform`, `app_worker`, `app_public` theo `modreg/assembly_gen.go`.
+
+`cmd/worker` không còn import trực tiếp `pf/cropcycle`, `pf/geo` (vụ, thửa sang `pf/cooperative`) nhưng vẫn chạy consumer liên module `cmd/api-platform/assembly.Consumers` dưới `r_cropcycle` (van thu gom) và `r_geo` (van hub) — `modgen` chỉ thấy import trong `cmd/<đơn vị>` và `cmd/internal/*`, nên `dbadmin.LoginUnits` khai `Extra: [pf/cropcycle, pf/geo]` cho `app_worker`.
+
+Gốc module `pf/cooperative` **không** kéo kho định danh (RB-3): `cooperative/member` gọi kho qua cổng hẹp `cooperativeport.HouseholdIdentities` (cùng kiểu với `FarmerIdentity` của thửa KN), bộ điều hợp trên vault client là `cooperative/port/farmerid` (`Households`, `New`) do gốc lắp ráp `cmd/api-platform` nối. Nhờ vậy `cmd/integration-gateway` (và `cmd/worker` cho job dựng feed) dựng thẳng `cooperative.New(pool, clk, Deps{})` để lấy `Plots().Facts` và `Seasons().Codes/Progress`; `app_public` thành viên `r_cooperative` theo import (không cần `Extra`). Kiểm: `cmd/integration-gateway.TestNoVaultTransitiveDeps_RB3`.
+
+### 17.3 Tên sổ (quyết định A) và cột thêm vào sổ
+
+Tên sổ giữ nguyên (`'pf_geo.plot_boundary'`, `'pf_cropcycle.farm_log'`, `'pf_party.kn_profile_event'`…). `chain_head`, `ledger_idem`, `chain_anchor` không đổi; `opsjobs.VerifyAllChains` ánh xạ tên sổ → bảng qua `pg_trigger.tgargs` nên báo cáo tên cũ cạnh bảng `pf_coop.*` ([runbook verify-chains](../runbooks/verify-chains.md#tên-sổ-là-định-danh-logic)).
+
+Ngoại lệ duy nhất: `shared.ledger_added_column` (shared 000011) khóa theo **tên bảng thật** (`format('%I.%I', schema, bảng)`), không theo tên sổ. Không đăng ký bù thì dòng ghi trước pf 000079 của `plot_boundary`/`plot_event` báo đứt chuỗi giả sau khi chuyển. 000132 chèn dòng cùng đợt cho tên `pf_coop.*` (INSERT, dòng tên cũ giữ). `migratecheck` theo dõi `ALTER TABLE … SET SCHEMA` để quy tắc ADD COLUMN của sổ (ADR-0012) áp tiếp dưới tên mới.
+
+### 17.4 Mã Go
+
+| Phần | Gói | Từ |
+|---|---|---|
+| Vụ, nhật ký, SOP, sản lượng, bảng điều hành, chỉ số `cc.*`, đồng bộ `sop_version`/`season`/`farm_log`/`season_open`/`farm_log_batch`/`harvest`, `/v1/partner/season-harvest-dates`, consumer `pf.cropcycle.gps_log` | `cooperative/season/{app,store,domain,handler}` | `pf/cropcycle` (trừ van `collection_*`) |
+| Thửa, ranh giới thửa, xung đột, ranh giới/vùng HTX, nhập thửa, màn KN thửa (FN-XA-03.05), `/v1/partner/plots*`, đồng bộ `plot`/`plot_boundary`, chỉ số `geo.plots_digitised` | `cooperative/plot/{app,store,domain,handler}` (+ `plot/shptest`) | `pf/geo` |
+| Nông hộ, xã viên, nhập hộ, màn KN hộ (FN-XA-03.03 phần hộ), hồ sơ HTX (`CoopProfiles`), marker HTX, sổ hồ sơ KN | `cooperative/member/{app,store,domain,handler}` | `pf/party` |
+| Mặt tiền cổng `cooperativeport` | `cooperative/app` + `cooperative/store.Sources` | thay `store.Legacy` + `cmd/internal/coopwire` (đã xóa) |
+
+- `cooperativeport` thêm `season.go`, `plot.go`, `member.go`: vai (`farmer`, `sop_admin`, `plot_editor`, `plot_viewer`; `coop_manager` lặp lại), thực thể đồng bộ, tham số `cropcycle.*`, tên consumer, và `//ag:event` của 15 sự kiện — **tên sự kiện v1 giữ tiền tố cũ** (D-8). `modreg` trước đây suy module phát từ tiền tố tên sự kiện; W3.3 thêm `Registry.producerOf`: module theo tiền tố nếu nó khai sự kiện, không thì module duy nhất khai nó trong `provides.events`.
+- `Seasons.Codes(refs)` (mới): mã vụ/năm theo `season_ref` cho sản phẩm `collection_volume` và feed `collection_volume_by_commune` của van thu gom (trước W3.3 là JOIN `collection_statement_view ⋈ season_current` — giờ hai schema, hai vai). `Seasons.Progress(asOf)` (mới): vụ chưa hủy cho feed `harvest_progress_by_commune` (W5.3 đọc thẳng `pf_cropcycle.season_current`). `Seasons.HarvestDates`, `Diary` có nguồn thật; `Resolve` phân giải thêm `season`, `harvest`.
+- Mã lỗi (`cropcycle.*`, `geo.*`, `party.*`), đường dẫn HTTP, JSON giữ nguyên. Route của phần chuyển gắn trong nhóm của `pf/cooperative` ở gốc lắp ráp: cổng bật module theo đơn vị (W1.4) xét `pf/cooperative` (mặc định bật) thay cho `pf/cropcycle`/`pf/geo`/`pf/party`.
+- Outbox `Producer` của phần chuyển là `pf/cooperative`. Khóa tư vấn `pf_cropcycle.*` của vụ đổi tiền tố `pf_coop.*` (chỉ có nghĩa trong một nhị phân).
+
+### 17.5 Cổng giữa module (đi xuống theo R-MOD-05)
+
+| Interface (bên khai) | Hiện thực | Dùng |
+|---|---|---|
+| `partyport.CoopProfiles` (party, tiêu thụ) | `cooperative/member` | tạo HTX hai bước, màn HTX, danh bạ `/v1/partner/cooperatives*` (toạ độ) |
+| `partyport.OrgDirectory`, `ConsentStates` (party, cung cấp) | `pf/party` | danh bạ/thống kê/marker HTX (tên Nút đọc theo lô từ `pf_party.org` — không thêm cột `name` vào `k_ref.org`, 8.6 (i)); trạng thái đồng ý trong danh sách hộ |
+| `partyport.Households`, `PlotStats`, `CoopMarkers` (party, tiêu thụ) | `cooperative` (member/plot) | `pf/accounts` (liên kết nông dân), số thửa của HTX, bảng Ảnh hưởng |
+| `geoport.PlotGeometry` (geo, tiêu thụ) | `cooperative/plot` | log GPS: khoảng cách tới lô (tính trước khi INSERT `gps_fix`), thửa của hộ nông dân |
+| `geoport.MapLayers` (geo, tiêu thụ) | `cooperative/plot` | lớp HTX, lớp thửa của `/v1/geo/layers` và bản đồ chuẩn hóa (FeatureCollection đã dựng — JSON không đổi) |
+| `geoport.AdminGeometry` (geo, cung cấp) | `pf/geo` | thửa ngoài địa giới xã (`geo.outside_commune`) — `r_cooperative` không đọc `pf_geo.admin_boundary` |
+
+`pf/party`, `pf/geo` không import `cooperativeport`. `module.yaml` của `pf/party`, `pf/geo`, `pf/cropcycle` lên **2.0.0** (bỏ port cũ: `Plots`, `PlotFacts`, `PlotHouseholds`, `CoopCentroids`, `CooperativeSites`, `CooperativeStats`, `Stats`, `SupplyStats`, `FarmerHouseholds` của cropcycle…); ràng buộc của bên phụ thuộc và `app/*/app.yaml` đổi `">=2.0 <3"`.
+
+### 17.6 Tạo HTX hai bước (lệch 8.6)
+
+8.6 cho `pf/cooperative` điều phối. Hiện thực để **`pf/party` điều phối** qua `partyport.CoopProfiles`: route tạo/nhập/sao chép HTX là route Nút chung của sổ tổ chức (gin cấm trùng route, hợp đồng HTTP không đổi), và party (kernel) không được import `cooperativeport`. Bước 1: Nút + `org_event` + `pf.party.org.created` (giao dịch `r_party`, idem_key = Idempotency-Key). Bước 2: `CreateProfile` (giao dịch `r_cooperative`, lũy đẳng theo Nút). Bước 2 lỗi → 503, gọi lại cùng khóa hoàn tất phần còn thiếu, kết quả như lần gọi không gián đoạn. Mã số thuế kiểm qua `TaxCodeOwner` trước bước 1; hai yêu cầu song song cùng mã số thuế → bên thua 409 ở bước 2 (Nút còn, chưa hồ sơ — đối soát báo "HTX thiếu hồ sơ", R-4). Kiểm thử: `party/handler.TestCreateCooperativeTwoStepRetry_W33`.
+
+### 17.7 Chỉ số, đồng bộ
+
+- Tệp định nghĩa chỉ số đã ghim băm (`pf_metrics.definition_pin`) nên `source_module` **giữ** `pf/cropcycle` (`cc.*`) và `pf/geo` (`geo.plots_digitised`). Từ W6.3, `pf/metrics` đọc view công bố bằng `r_metrics`, không nối nguồn của module chủ.
+- **View công bố W6.3 giữ nguyên** (lệch sở hữu, có chủ ý): `pf_cropcycle_pub.v1_season_event`, `v1_harvest_declaration`, `pf_geo_pub.v1_plot_event`, `v1_plot_boundary`, `v1_layer_geometry` (pf 000124) đọc bảng nay ở `pf_coop`. View bám bảng theo OID nên `SET SCHEMA` không làm vỡ; chủ view `ag_migrator` không vượt RLS (bảng gốc vẫn FORCE RLS); `r_cropcycle_pub`/`r_geo_pub` chỉ có quyền trên view, không trên `pf_coop`. Tên view là hợp đồng có phiên bản (như tên sự kiện, D-8) nên không đổi. Chuyển sang `pf_coop_pub` (view `v1_*` mới do `pf/cooperative` khai `//ag:pubview`, định nghĩa chỉ số phiên bản mới) là việc sau. Kiểm: `TestCooperativeSchemaMoveRehearsal_W33` (số dòng mỗi view theo tenant trước = sau), `metrics/handler` (bảng gốc `pf_coop.*` từ chối `r_metrics`), đối chứng golden `tests/pubgolden` trong kiểm thử chỉ số của `cooperative/{season,plot}`.
+- Thực thể đồng bộ giữ tên; `pf/cooperative` đăng ký nguồn/đích (`SyncSources`, `SyncSinks`); `pf/cropcycle` chỉ còn `htx_collection_*`. Tên consumer `pf.cropcycle.gps_log` giữ (khóa hộp thư) — chạy dưới `r_cooperative`.
+
+### 17.8 Công cụ
+
+- `agmodgraph` (quy tắc `schema`): `ALTER {TABLE|SEQUENCE|FUNCTION} <schema khác>.<x> SET SCHEMA <đích>` chỉ tính là đụng schema đích; đích phải là schema của module gắn migration (ca `testdata/modgraph/setschema.txtar`). Tệp ngoại lệ không thêm mục.
+- Ngoại lệ `cycle`/`tier` `pf/party ↔ pf/sync` (chủ W3.3) **không** gỡ được: cạnh còn lại là đồng bộ đồng ý (`ConsentSink` của party → `syncport`; sync → `partyport.ConsentChecker`), không phải HTX/hộ. Ba mục chuyển chủ sang W7.2 (hợp nhất `k/access`); tệp không lớn thêm.
+- `agtenantgate`: danh sách tệp được `tenant.WithID` đổi theo tệp chuyển (`season/app/wiring.go`, `member/app/{service,import}.go`, `party/app/{coop,deactivation,readmodel}.go` — tenant của Principal); danh bạ đối tác đọc hồ sơ ở tenant bên cấp đi qua `tenant.WithGrant` (bằng chứng của cấp quyền).
+
+### 17.9 Kiểm thử
+
+- `migrations.TestCooperativeSchemaMoveRehearsal_W33`: database dừng ở migration pf cuối trước 000131, nạp dữ liệu đại diện (2 tenant × 2 lô, cả 22 bảng, sổ nhiều dòng), nâng lên đầu; kiểm đếm dòng + tổng kiểm từng bảng, phân vùng, `VerifyAllChains` sạch trước/sau với tên sổ cũ, ghi tiếp chuỗi dưới `r_cooperative` (seq + 1), `sync_seq` tiếp tục, FORCE RLS, không còn quyền chéo, `r_geo` bị từ chối.
+- Kiểm thử của phần chuyển đi theo mã: `cooperative/{season,plot,member}/handler` (fixture dựng Service trực tiếp; `AdminGeometry` của kiểm thử thửa chạy đúng SQL của pf/geo dưới `r_geo`). Kiểm thử còn ở `pf/geo`, `pf/cropcycle` dùng bản giả của `geoport.MapLayers`/`PlotGeometry`, `cooperativeport.Seasons`. Độ trễ lớp thửa 1.000 polygon (GIS US-BASE-01) đo ở `cooperative/plot/handler`.
+
+### 17.10 Còn mở
+
+- **H-17**: cửa sổ bảo trì và bản sao UAT để diễn tập ([runbook](../runbooks/cooperative-schema-move.md)). **H-1** vẫn giả định (a).
+- `cmd/worker` cũng chạy consumer `pf.simulation.snapshot` dưới `r_simulation` nhưng `app_worker` không là thành viên `r_simulation` (có từ trước W3.3, không đổi ở đây) — cần `Extra` như 17.2 hoặc sửa `modgen` để thấy `assembly.Consumers`.

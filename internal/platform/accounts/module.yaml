@@ -7,7 +7,7 @@ kind: kernel
 zones: [pf]
 version: 1.0.0
 depends:
-  pf/party: ">=1.0 <2"
+  pf/party: ">=2.0 <3"
   vault/identity: ">=1.0 <2"
 provides:
   ports:

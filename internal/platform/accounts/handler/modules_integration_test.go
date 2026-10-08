@@ -34,7 +34,7 @@ func (f fakeModules) ModuleEnabled(_ context.Context, tid uuid.UUID, m string) (
 
 func TestRoleOfDisabledModuleNotGrantable(t *testing.T) {
 	f := newFixture(t)
-	mods := fakeModules{f.tenant: {"pf/geo": true}}
+	mods := fakeModules{f.tenant: {"pf/geo": true, "pf/cooperative": true}}
 	mod := accounts.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{Directory: f.dir, Scope: f.party, Orgs: f.party, Modules: mods})
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)
 	mod.RegisterAdmin(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), httpx.RequireMFA(), idempotency.Middleware(f.env.Pool(t, migrations.PF, "platform_api"))))
@@ -43,7 +43,7 @@ func TestRoleOfDisabledModuleNotGrantable(t *testing.T) {
 	f.admin = srv
 	nat := f.nationalAdmin()
 
-	// plot_editor chỉ pf/geo khai → chặn; kn_officer do pf/party (lõi) khai → cấp được.
+	// plot_editor chỉ pf/cooperative khai (W3.3), geo_admin chỉ pf/geo → chặn; kn_officer do pf/party (lõi) khai → cấp được.
 	r := nat.do(http.MethodPost, "/v1/accounts/users", person(f.team30292, "kn_officer", "plot_editor"))
 	if r.status != http.StatusConflict || r.body["code"] != "accounts.role_module_not_enabled" || r.body["role"] != "plot_editor" {
 		t.Fatalf("tạo với vai của module tắt: %d %v", r.status, r.body)
@@ -60,7 +60,7 @@ func TestRoleOfDisabledModuleNotGrantable(t *testing.T) {
 		t.Fatalf("thêm mrv_viewer (module bật): %d %v", r.status, r.body)
 	}
 
-	// Bật lại pf/geo cho tenant → cấp được.
+	// Bật lại pf/geo, pf/cooperative cho tenant → cấp được.
 	mods[f.tenant] = nil
 	nat.create(person(f.team30292, "kn_officer", "plot_editor"))
 }

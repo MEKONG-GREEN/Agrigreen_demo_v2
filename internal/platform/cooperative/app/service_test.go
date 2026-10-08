@@ -19,7 +19,7 @@ import (
 func TestFacadeContract(t *testing.T) {
 	porttest.RunContract(t, tenant.WithID, func(_ *testing.T, s porttest.Seed) porttest.Ports {
 		mem := porttest.Memory{S: s}
-		m := cooperative.New(cooperative.Sources{Cooperatives: mem, Households: mem, Plots: mem, Seasons: mem, Diary: porttest.MemoryDiary{S: s}})
+		m := cooperative.NewFacade(cooperative.Sources{Cooperatives: mem, Households: mem, Plots: mem, Seasons: mem, Diary: porttest.MemoryDiary{S: s}})
 		return porttest.Ports{Cooperatives: m.Cooperatives(), Households: m.Households(), Plots: m.Plots(), Seasons: m.Seasons(),
 			Diary: m.Diary(), Resolve: m.Resolve()}
 	})
@@ -27,7 +27,7 @@ func TestFacadeContract(t *testing.T) {
 
 // Nguồn chưa nối → ErrUnavailable trên mọi cổng (bên gọi trả 503), không panic.
 func TestFacadeUnwired(t *testing.T) {
-	m := cooperative.New(cooperative.Sources{})
+	m := cooperative.NewFacade(cooperative.Sources{})
 	ctx := tenant.WithID(context.Background(), uuid.New())
 	ref := uuid.New()
 	checks := map[string]error{}
@@ -56,18 +56,16 @@ func TestFacadeUnwired(t *testing.T) {
 	}
 }
 
-// Nối dần bằng Use* (gốc lắp ráp dựng nguồn vụ sau pf/cropcycle).
-func TestFacadeUseLate(t *testing.T) {
+// Mặt tiền trên nguồn đã nối (vụ, thửa).
+func TestFacadeSources(t *testing.T) {
 	s := porttest.SampleSeed()
-	m := cooperative.New(cooperative.Sources{})
-	m.UseSeasons(porttest.Memory{S: s})
-	m.UsePlots(porttest.Memory{S: s})
+	m := cooperative.NewFacade(cooperative.Sources{Seasons: porttest.Memory{S: s}, Plots: porttest.Memory{S: s}})
 	ctx := tenant.WithID(context.Background(), s.Tenant)
 	if rows, err := m.Seasons().Supply(ctx, 2026); err != nil || len(rows) != 1 {
-		t.Fatalf("Supply sau UseSeasons = %v, %v", rows, err)
+		t.Fatalf("Supply = %v, %v", rows, err)
 	}
 	if _, err := m.Plots().Get(ctx, s.Plots[0].Ref); err != nil {
-		t.Fatalf("Get sau UsePlots: %v", err)
+		t.Fatalf("Get: %v", err)
 	}
 }
 
@@ -83,7 +81,7 @@ func (d *spyDiary) BySeason(_ context.Context, _, _ uuid.UUID, limit int) ([]por
 
 func TestDiaryLimitClamped(t *testing.T) {
 	spy := &spyDiary{}
-	m := cooperative.New(cooperative.Sources{Diary: spy})
+	m := cooperative.NewFacade(cooperative.Sources{Diary: spy})
 	for in, want := range map[int]int{-1: app.DefaultDiaryLimit, 0: app.DefaultDiaryLimit, 7: 7, 10_000: app.MaxDiaryLimit} {
 		if _, err := m.Diary().BySeason(context.Background(), uuid.New(), uuid.Nil, in); err != nil {
 			t.Fatal(err)
@@ -94,15 +92,18 @@ func TestDiaryLimitClamped(t *testing.T) {
 	}
 }
 
-// Season, harvest chưa phân giải được ở W3.2 (store riêng W3.3).
-func TestResolveSeasonUnsupportedInW32(t *testing.T) {
+// W3.3: season, harvest phân giải qua store vụ (Sources.Season); chưa nối → ErrUnavailable; loại lạ → ErrSubjectTypeUnsupported.
+func TestResolveSeasonNeedsStore(t *testing.T) {
 	s := porttest.SampleSeed()
 	mem := porttest.Memory{S: s}
-	m := cooperative.New(cooperative.Sources{Cooperatives: mem, Households: mem, Plots: mem, Seasons: mem})
+	m := cooperative.NewFacade(cooperative.Sources{Cooperatives: mem, Households: mem, Plots: mem, Seasons: mem})
 	ctx := tenant.WithID(context.Background(), s.Tenant)
 	for _, typ := range []port.SubjectType{port.SubjectSeason, port.SubjectHarvest} {
-		if _, err := m.Resolve().Resolve(ctx, typ, uuid.New()); !errors.Is(err, port.ErrSubjectTypeUnsupported) {
+		if _, err := m.Resolve().Resolve(ctx, typ, uuid.New()); !errors.Is(err, port.ErrUnavailable) {
 			t.Fatalf("%s: err = %v", typ, err)
 		}
+	}
+	if _, err := m.Resolve().Resolve(ctx, port.SubjectType("tractor"), uuid.New()); !errors.Is(err, port.ErrSubjectTypeUnsupported) {
+		t.Fatalf("loại lạ: err = %v", err)
 	}
 }

@@ -15,7 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
@@ -303,13 +303,13 @@ func TestMetricsTenantLeakParallel(t *testing.T) {
 				return fmt.Errorf("RecordDay %s: %w", d, err)
 			}
 			coop := ids.New()
-			raw, err := json.Marshal(geoport.PlotCreatedV1{PlotRef: ids.New(), Code: fmt.Sprintf("TH%03d%04d", i, r), CommuneCode: "80001",
+			raw, err := json.Marshal(coopport.PlotCreatedV1{PlotRef: ids.New(), Code: fmt.Sprintf("TH%03d%04d", i, r), CommuneCode: "80001",
 				CooperativeRef: &coop, Status: "active", BoundaryID: ids.New(), AreaHa: "1.2500", Source: "kn_web", ActorRef: ids.New(),
 				EventTime: now.UTC().Format(time.RFC3339)})
 			if err != nil {
 				return err
 			}
-			env := outbox.Envelope{EventID: ids.New(), EventType: geoport.EventPlotCreated, SchemaVersion: 1, TenantID: tid, OccurredAt: now.UTC(),
+			env := outbox.Envelope{EventID: ids.New(), EventType: coopport.EventPlotCreated, SchemaVersion: 1, TenantID: tid, OccurredAt: now.UTC(),
 				RecordedAt: now.UTC(), Producer: "pf/test", Payload: raw}
 			if _, err := inbox.Process(ctx, f.pool, port.LayerLogConsumer, env, f.mod.LayerLogHandler()); err != nil {
 				return fmt.Errorf("nhật ký lớp: %w", err)

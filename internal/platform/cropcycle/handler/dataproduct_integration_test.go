@@ -24,21 +24,6 @@ import (
 )
 
 // Facts cài cooperativeport.Plots.Facts trên thửa giả (tenant phải có trong context như pf/geo thật).
-func (f *fakePlots) Facts(ctx context.Context, refs []uuid.UUID) (map[uuid.UUID]coopport.Plot, error) {
-	if _, err := tenant.FromContext(ctx); err != nil {
-		return nil, err
-	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	out := map[uuid.UUID]coopport.Plot{}
-	for _, r := range refs {
-		if p, ok := f.plots[r]; ok {
-			out[r] = p
-		}
-	}
-	return out, nil
-}
-
 // fakeUnits: mọi xã 311xx thuộc tỉnh 92 (Cần Thơ, sau sắp xếp 2025 chỉ tỉnh → xã).
 type fakeUnits struct{}
 
@@ -83,11 +68,9 @@ func (c *fakeCheckpoint) n() int {
 // chối → lỗi, không ghi bảng kê.
 func TestCollectionVolumeKAnonymity_G5_D01(t *testing.T) {
 	f := newFixture(t)
-	f.mod.UseCollectionVolume(f.plots, fakeUnits{})
+	f.mod.UseCollectionVolume(f.plots, f.seasons, fakeUnits{})
 	cp := &fakeCheckpoint{allow: false}
 	f.mod.UseEgress(cp, meter.ModeObserve, nil)
-	f.publishedSOP("SOP OM5451", "OM5451")
-	adm := f.platformAdmin()
 	area := decimal.RequireFromString("1.5000")
 	plot := func(commune string, coop uuid.UUID) uuid.UUID {
 		ref := ids.New()
@@ -113,7 +96,7 @@ func TestCollectionVolumeKAnonymity_G5_D01(t *testing.T) {
 		all = append(all, pl{plot("31120", f.coopB), f.coopB, 5})
 	}
 	for _, p := range all {
-		season := adm.mustOpen(p.ref)
+		season := f.seasons.open(p.ref)
 		pay := statementPayload(ids.New(), p.coop, p.ref, p.rolls, 1)
 		pay["season_ref"] = season
 		if _, err := f.deliver(f.mkg, port.EventMKGHTXCollectionStatementPublished, pay); err != nil {
@@ -208,7 +191,7 @@ func TestCollectionVolumeKAnonymity_G5_D01(t *testing.T) {
 	f.mod.UseEgress(cp, meter.ModeEnforce, nil)
 	extra := plot("31117", f.coopA)
 	pay := statementPayload(ids.New(), f.coopA, extra, 50, 1)
-	pay["season_ref"] = adm.mustOpen(extra)
+	pay["season_ref"] = f.seasons.open(extra)
 	_, err = f.deliver(f.mkg, port.EventMKGHTXCollectionStatementPublished, pay)
 	var pr *problem.Problem
 	if !errors.As(err, &pr) || pr.Code != "metering.egress_quota_exceeded" {

@@ -1,47 +1,137 @@
-// Package cooperative là module pf/cooperative (dom/cooperative): hồ sơ HTX, nông hộ và xã viên,
-// thửa, vụ, nhật ký canh tác, khai báo sản lượng (docs/design/cooperative.md, ADR-0027, ADR-0030).
+// Package cooperative là module pf/cooperative (dom/cooperative): hồ sơ HTX, nông hộ và xã viên, thửa, vụ, nhật ký
+// canh tác, SOP, khai báo sản lượng (docs/design/cooperative.md, ADR-0027, ADR-0030).
 //
-// W3.2: module là MẶT TIỀN không có DB — các cổng của cooperative/port đọc qua store.Legacy mà gốc
-// lắp ráp dựng từ port cũ của pf/party, pf/geo, pf/cropcycle (cmd/internal/coopwire). Bên tiêu thụ
-// ở tầng domain dùng cooperativeport thay port cũ. W3.3 chuyển bảng sang schema pf_coop (vai r_coop),
-// chuyển store/handler/consumer/sync vào module và xóa port cũ.
+// W3.3: dữ liệu ở schema pf_coop (pf 000131–000133), mọi giao dịch chạy dưới vai r_cooperative (DBModule). Mã chuyển
+// từ pf/cropcycle (season/), pf/geo (plot/), pf/party (member/) cùng route, consumer, thực thể đồng bộ, nguồn chỉ số;
+// mặt tiền app/ hiện thực các cổng của cooperative/port trên các phần đó (thay store.Legacy + cmd/internal/coopwire
+// của W3.2). Đường dẫn HTTP, mã lỗi và tên sự kiện v1 giữ nguyên (D-8, D-9).
 //
 // Module khác chỉ được import cooperative/port (R-02). Tệp này nối các lớp cho các gốc lắp ráp.
 package cooperative
 
 import (
+	"context"
+	"log/slog"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/app"
+	memberapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/member/app"
+	memberhttp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/member/handler"
+	plotapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/plot/app"
+	plothttp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/plot/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
+	seasonapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/season/app"
+	seasonhttp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/season/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/store"
+	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
+	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port/cropcyclesrc"
+	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 // Name là tên repo của module (module.yaml).
 const Name = "pf/cooperative"
 
-// Sources là nguồn cũ (store tạm W3.2); trường nil = chưa nối → port.ErrUnavailable.
-type Sources = store.Legacy
+// Sources là nguồn của mặt tiền (store.Sources); trường nil = chưa nối → port.ErrUnavailable.
+type Sources = store.Sources
+
+// Deps là port của module khác mà pf/cooperative cần. Trường nil = tính năng tương ứng trả 503 hoặc bỏ qua kiểm
+// (như trước W3.3 ở module chủ cũ).
+type Deps struct {
+	// Scope: phạm vi TW → Tỉnh → Xã của người gọi (pf/party, ADR-0009).
+	Scope partyport.ScopeResolver
+	// Orgs: Nút tổ chức (HTX = Nút kind=cooperative); nếu cũng là partyport.OrgCodes thì nhập tệp theo Mã HTX được.
+	Orgs partyport.Orgs
+	// Dir: đọc Nút theo lô (danh bạ, thống kê, marker HTX — hồ sơ ở pf_coop, Nút ở pf_party).
+	Dir partyport.OrgDirectory
+	// Consents: trạng thái đồng ý trong danh sách nông hộ (G-04).
+	Consents partyport.ConsentStates
+	// AdminUnits: kiểm mã xã khi tạo thửa.
+	AdminUnits partyport.AdminUnits
+	// AdminGeom: phép tính trên ranh giới hành chính của pf/geo (thửa ngoài địa giới xã).
+	AdminGeom geoport.AdminGeometry
+	// Params: ngưỡng GPS, năng suất, chồng lấn thửa (pf/masterdata).
+	Params params.Params
+	// Catalogs: rice_variety, season, machine_type (pf/masterdata).
+	Catalogs mdport.Catalogs
+	// GpsLog: log GPS của pf/geo cho consumer port.GpsLogConsumer (HTX US-GPS-03).
+	GpsLog geoport.GpsLog
+	// Households, Farmers: kho định danh qua cổng hẹp (chủ hộ; tên nông dân của thửa KN — nhãn đã che). Bộ điều hợp
+	// trên vault client: cooperative/port/farmerid (gốc lắp ráp nối) — gốc module không import kho định danh (RB-3).
+	Households port.HouseholdIdentities
+	Farmers    port.FarmerIdentity
+}
 
 // Module là pf/cooperative đã nối.
-type Module struct{ svc *app.Service }
+type Module struct {
+	svc    *app.Service
+	season *seasonapp.Service
+	plot   *plotapp.Service
+	member *memberapp.Service
+}
 
-// New tạo module trên các nguồn cũ. TODO(W3.3): nhận pool vai r_coop (modreg.DBRole ghi đè
-// pf/cooperative → r_coop, dbadmin.groupOnlyModules) và thay store.Legacy bằng store SQL pf_coop.
-func New(src Sources) *Module { return &Module{svc: &app.Service{Store: src}} }
+// New tạo module; mọi giao dịch chạy dưới r_cooperative (db.ForModule(DBModule)).
+func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
+	db = forModule(db)
+	m := &Module{svc: &app.Service{}}
+	codes, _ := deps.Orgs.(partyport.OrgCodes)
+	m.member = &memberapp.Service{DB: db, Clock: clk, Orgs: deps.Orgs, Codes: codes, Dir: deps.Dir, Scope: deps.Scope,
+		Consents: deps.Consents, Vault: deps.Households}
+	m.plot = &plotapp.Service{DB: db, Clock: clk, Scope: deps.Scope, Params: deps.Params, Units: deps.AdminUnits, Orgs: deps.Orgs,
+		Households: memberships{m.member}, Markers: markers{m.member}, AdminGeom: deps.AdminGeom}
+	m.plot.Vault = deps.Farmers
+	m.season = &seasonapp.Service{DB: db, Clock: clk, Scope: deps.Scope, Orgs: deps.Orgs, Plots: m.plot, Params: deps.Params,
+		Catalogs: deps.Catalogs, GpsLog: deps.GpsLog}
+	m.svc.Store = store.Sources{
+		Cooperatives: cooperatives{m.member, m.plot},
+		Households:   households{m.member, m.plot},
+		Plots:        m.plot,
+		Seasons:      seasonapp.SeasonsPort{Svc: m.season},
+		Diary:        seasonapp.DiaryPort{Svc: m.season},
+		Season:       m.season,
+	}
+	return m
+}
 
-// UseCooperatives nối nguồn hồ sơ HTX (gốc lắp ráp dựng sau pf/party, pf/geo).
-func (m *Module) UseCooperatives(c port.Cooperatives) { m.svc.Store.Cooperatives = c }
+// NewFacade tạo mặt tiền trên nguồn có sẵn (kiểm thử hợp đồng port, không DB).
+func NewFacade(src Sources) *Module { return &Module{svc: &app.Service{Store: src}} }
 
-// UseHouseholds nối nguồn nông hộ.
-func (m *Module) UseHouseholds(h port.Households) { m.svc.Store.Households = h }
+// UseFarmerHouseholds nối liên kết tài khoản nông dân ↔ nông hộ (pf/accounts) sau khi module đó được dựng.
+func (m *Module) UseFarmerHouseholds(f port.FarmerHouseholds) { m.season.Farmers = f }
 
-// UsePlots nối nguồn thửa.
-func (m *Module) UsePlots(p port.Plots) { m.svc.Store.Plots = p }
+// UseSharing nối cổng cấp quyền chia sẻ của pf/party (ADR-0020): bề mặt đối tác /v1/partner/plots*,
+// /v1/partner/season-harvest-dates.
+func (m *Module) UseSharing(pa partyport.PartnerAccess) { m.season.Sharing, m.plot.Sharing = pa, pa }
 
-// UseSeasons nối nguồn vụ (gốc lắp ráp dựng sau pf/cropcycle — cropcycle lại cần Plots() của module này).
-func (m *Module) UseSeasons(s port.Seasons) { m.svc.Store.Seasons = s }
+// UseActorNames nối danh bạ tên người thao tác (khung Log của thửa KN và sổ hồ sơ KN — pf/accounts).
+func (m *Module) UseActorNames(n partyport.ActorNames) { m.plot.Names, m.member.Names = n, n }
 
-// UseDiary nối nguồn nhật ký canh tác.
-func (m *Module) UseDiary(d port.Diary) { m.svc.Store.Diary = d }
+// UseEgress (G5, ADR-0024) nối điểm kiểm soát xuất (pf/metering) cho tệp KN xuất (kn_plot_file). cp nil → hành vi cũ.
+func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logger) {
+	m.plot.Egress, m.plot.EgressMode, m.plot.Log = cp, mode, log
+}
+
+// RegisterApp gắn route Application API (đường dẫn giữ nguyên từ pf/cropcycle, pf/geo, pf/party).
+func (m *Module) RegisterApp(rg *gin.RouterGroup) {
+	seasonhttp.Handler{Svc: m.season}.RegisterApp(rg)
+	plothttp.Handler{Svc: m.plot}.RegisterApp(rg)
+	memberhttp.Handler{Svc: m.member}.RegisterApp(rg)
+}
+
+// RegisterAdmin gắn route Admin API (nhóm đã bắt buộc MFA).
+func (m *Module) RegisterAdmin(rg *gin.RouterGroup) {
+	seasonhttp.Handler{Svc: m.season}.RegisterAdmin(rg)
+	plothttp.Handler{Svc: m.plot}.RegisterAdmin(rg)
+	memberhttp.Handler{Svc: m.member}.RegisterAdmin(rg)
+}
 
 // Cooperatives trả cổng hồ sơ HTX.
 func (m *Module) Cooperatives() port.Cooperatives { return m.svc }
@@ -60,3 +150,121 @@ func (m *Module) Diary() port.Diary { return app.Diary{Svc: m.svc} }
 
 // Resolve trả cổng phân giải chủ thể (R-DB-07, cap/evidence W6.5).
 func (m *Module) Resolve() port.Resolve { return m.svc }
+
+// ---- Cổng do module tầng dưới khai (gốc lắp ráp nối, R-MOD-05) ----
+
+// CoopProfiles cho pf/party: hồ sơ HTX (tạo HTX hai bước, màn HTX, danh bạ đối tác).
+func (m *Module) CoopProfiles() partyport.CoopProfiles { return m.member }
+
+// PartyHouseholds cho pf/accounts (liên kết tài khoản nông dân ↔ nông hộ): xã viên của hộ.
+func (m *Module) PartyHouseholds() partyport.Households {
+	return memberapp.PartyHouseholds{Svc: m.member}
+}
+
+// PlotStats cho pf/party: số thửa đã số hoá theo xã / HTX (G-02/G-03, bảng Ảnh hưởng của cây Nút).
+func (m *Module) PlotStats() partyport.PlotStats { return plotStats{m.plot} }
+
+// PlotGeometry cho pf/geo: xã, HTX, khoảng cách tới thửa cho log GPS (HTX US-GPS-01/03).
+func (m *Module) PlotGeometry() geoport.PlotGeometry { return m.plot }
+
+// MapLayers cho pf/geo: lớp HTX, lớp thửa của bản đồ gộp và bản đồ chuẩn hóa.
+func (m *Module) MapLayers() geoport.MapLayers { return plothttp.MapLayers{Svc: m.plot} }
+
+// ReportData cho pf/reports (qua gốc lắp ráp): báo cáo sản lượng HTX (HTX US-DASH-02, US-DASH-03).
+func (m *Module) ReportData() cropcyclesrc.ReportData { return seasonapp.ReportData{Svc: m.season} }
+
+// SyncSources là chiều xuống của module cho pf/sync: sop_version, season, farm_log, plot.
+func (m *Module) SyncSources() []syncport.Source {
+	return []syncport.Source{seasonapp.SyncSource{Svc: m.season}, plotapp.SyncSource{Svc: m.plot}}
+}
+
+// SyncSinks là chiều lên của module cho pf/sync: season_open, farm_log, farm_log_batch, harvest, plot_boundary.
+func (m *Module) SyncSinks() []syncport.Sink {
+	return []syncport.Sink{seasonapp.SyncSink{Svc: m.season}, plotapp.SyncSink{Svc: m.plot}}
+}
+
+// GpsLogHandler là inbox.Handler của consumer port.GpsLogConsumer (tên consumer giữ "pf.cropcycle.gps_log").
+func (m *Module) GpsLogHandler() inbox.Handler { return m.season.HandleGpsLog }
+
+// ---- bộ ghép nội bộ ----
+
+// cooperatives ghép hồ sơ HTX (member) và tâm vùng HTX (plot) thành port.Cooperatives.
+type cooperatives struct {
+	member *memberapp.Service
+	plot   *plotapp.Service
+}
+
+func (c cooperatives) ByUnit(ctx context.Context, units []string) ([]port.UnitCooperatives, error) {
+	return c.member.CooperativesByUnit(ctx, units)
+}
+
+func (c cooperatives) Active(ctx context.Context) ([]port.CooperativeSite, error) {
+	return c.member.ActiveCooperatives(ctx)
+}
+
+func (c cooperatives) Centroids(ctx context.Context, coops []uuid.UUID) (map[uuid.UUID]port.CoopCentroid, error) {
+	return c.plot.Centroids(ctx, coops)
+}
+
+// households ghép xã viên (member) và nông hộ có thửa trong xã (plot) thành port.Households.
+type households struct {
+	member *memberapp.Service
+	plot   *plotapp.Service
+}
+
+func (h households) Membership(ctx context.Context, ref uuid.UUID) (port.HouseholdMembership, error) {
+	return h.member.HouseholdMembership(ctx, ref)
+}
+
+func (h households) InCommunes(ctx context.Context, communes []string) ([]uuid.UUID, error) {
+	return h.plot.InCommunes(ctx, communes)
+}
+
+// memberships: plot kiểm nông hộ thuộc HTX của thửa khi gán.
+type memberships struct{ member *memberapp.Service }
+
+func (s memberships) Membership(ctx context.Context, ref uuid.UUID) (port.HouseholdMembership, error) {
+	return s.member.HouseholdMembership(ctx, ref)
+}
+
+// markers: điểm vị trí hồ sơ HTX (member) cho lớp HTX của plot.
+type markers struct{ member *memberapp.Service }
+
+func (k markers) MarkersInBBox(ctx context.Context, minLon, minLat, maxLon, maxLat float64, limit int) ([]plotapp.CoopMarker, error) {
+	ms, err := k.member.MarkersInBBox(ctx, minLon, minLat, maxLon, maxLat, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]plotapp.CoopMarker, len(ms))
+	for i, x := range ms {
+		out[i] = plotapp.CoopMarker(x)
+	}
+	return out, nil
+}
+
+// plotStats đổi DTO thống kê thửa sang partyport.PlotStat.
+type plotStats struct{ plot *plotapp.Service }
+
+func (p plotStats) DigitizedByCommune(ctx context.Context, communes []string) ([]partyport.PlotStat, error) {
+	rows, err := p.plot.DigitizedByCommune(ctx, communes)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]partyport.PlotStat, len(rows))
+	for i, r := range rows {
+		out[i] = partyport.PlotStat(r)
+	}
+	return out, nil
+}
+
+func (p plotStats) DigitizedByCooperative(ctx context.Context, coops []uuid.UUID) (map[uuid.UUID]partyport.PlotStat, error) {
+	m, err := p.plot.DigitizedByCooperative(ctx, coops)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[uuid.UUID]partyport.PlotStat, len(m))
+	for k, v := range m {
+		out[k] = partyport.PlotStat(v)
+	}
+	return out, nil
+}

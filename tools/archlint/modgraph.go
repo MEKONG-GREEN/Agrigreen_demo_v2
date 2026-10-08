@@ -33,7 +33,8 @@ import (
 //	schema   owns_schema khớp schema migration tạo; migration của module này không tạo/sửa đối tượng
 //	         trong schema của module khác; migration không gắn module (tên không bắt đầu bằng
 //	         <cụm>_<module>) không đụng schema của module nào — trừ migration công bố <cụm>_pub_* chỉ
-//	         đụng schema view công bố <cụm>_<module>_pub (W6.3)
+//	         đụng schema view công bố <cụm>_<module>_pub (W6.3). Ngoại lệ chuyển schema (W3.3): ALTER
+//	         TABLE|SEQUENCE|FUNCTION <schema khác>.<x> SET SCHEMA <schema của mình> chỉ tính là đụng schema đích
 //
 // Vi phạm hiện có được liệt kê trong tệp ngoại lệ (modgraph_exceptions.yaml), mỗi mục có lý do và
 // gói kế hoạch sẽ gỡ. Vi phạm MỚI và ngoại lệ LỖI THỜI (không còn xảy ra) đều làm hỏng cổng, nên
@@ -518,6 +519,9 @@ var (
 		regexp.MustCompile(`(?i)\bCOMMENT\s+ON\s+(?:TABLE|COLUMN|VIEW|MATERIALIZED\s+VIEW|FUNCTION|INDEX|SEQUENCE|TYPE)\s+` + sqlIdent),
 		regexp.MustCompile(`(?i)\b(?:ALTER|DROP)\s+SCHEMA\s+(?:IF\s+EXISTS\s+)?"?([a-z_][a-z0-9_]*)`),
 	}
+	// reSQLSetSchema: ALTER TABLE|SEQUENCE|FUNCTION <schema khác>.<x>[(…)] SET SCHEMA <đích> (nhóm 1 là đích) — dạng DUY NHẤT
+	// được sửa đối tượng của schema khác: chuyển nó vào schema của module gắn migration (W3.3, pf 000132).
+	reSQLSetSchema    = regexp.MustCompile(`(?i)\bALTER\s+(?:TABLE|SEQUENCE|FUNCTION)\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?"?[a-z_][a-z0-9_]*"?\s*\.\s*"?[a-z_][a-z0-9_]*"?\s*(?:\([^)]*\))?\s+SET\s+SCHEMA\s+"?([a-z_][a-z0-9_]*)"?`)
 	reSQLLineComment  = regexp.MustCompile(`--[^\n]*`)
 	reSQLBlockComment = regexp.MustCompile(`(?s)/\*.*?\*/`)
 	reMigrationName   = regexp.MustCompile(`^[0-9]+_([a-z0-9_]+)\.up\.sql$`)
@@ -543,6 +547,7 @@ type migration struct {
 	module  string // module gắn theo tên tệp, "" nếu không gắn
 	creates []string
 	touches []string
+	moveTo  []string // schema đích của ALTER … SET SCHEMA (đối tượng chuyển vào)
 }
 
 func readMigrations(root string, ms []*modreg.Manifest) ([]migration, error) {
@@ -575,7 +580,18 @@ func readMigrations(root string, ms []*modreg.Manifest) ([]migration, error) {
 			for _, mm := range reSQLCreateSchema.FindAllStringSubmatch(sql, -1) {
 				mg.creates = appendUnique(mg.creates, strings.ToLower(mm[1]))
 			}
+			// W3.3: chuyển đối tượng của schema khác VÀO schema của mình (ALTER TABLE/SEQUENCE/FUNCTION a.x SET SCHEMA b)
+			// chỉ tính là đụng schema đích — đích phải là schema của module gắn migration (nếu không, vẫn là vi phạm).
+			sql = reSQLSetSchema.ReplaceAllStringFunc(sql, func(m string) string {
+				if mm := reSQLSetSchema.FindStringSubmatch(m); mm != nil {
+					mg.moveTo = appendUnique(mg.moveTo, strings.ToLower(mm[1]))
+				}
+				return " "
+			})
 			mg.touches = slices.Clone(mg.creates)
+			for _, s := range mg.moveTo {
+				mg.touches = appendUnique(mg.touches, s)
+			}
 			for _, re := range reSQLTouch {
 				for _, mm := range re.FindAllStringSubmatch(sql, -1) {
 					mg.touches = appendUnique(mg.touches, strings.ToLower(mm[1]))

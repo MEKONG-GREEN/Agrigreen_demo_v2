@@ -12,12 +12,10 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/integration-gateway/gateway"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/coopwire"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/integration"
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
@@ -55,14 +53,14 @@ func (e *intEnv) onboardFeed() (clientID, key string) {
 }
 
 // buildFeeds chạy job dựng của pf/apiclient (như cmd/worker) trên module THẬT của cổng: nguồn ô thô pf/cropcycle
-// (dữ kiện thửa pf/cooperative → pf/geo, đơn vị hành chính + k ở pf/masterdata), một tenant đóng góp = bên cấp.
+// (dữ kiện thửa và vụ pf/cooperative, đơn vị hành chính + k ở pf/masterdata), một tenant đóng góp = bên cấp.
 func (e *intEnv) buildFeeds() {
 	e.t.Helper()
 	pool, clk := e.pg.Pool(e.t, migrations.PF, dbadmin.AppPublic), clock.System{}
 	md := masterdata.New(pool, clk)
-	g := geo.New(pool, clk, geo.Deps{Params: md.Params(), AdminUnits: md.AdminUnits()})
-	cc := cropcycle.New(pool, clk, cropcycle.Deps{Params: md.Params()})
-	cc.UseCollectionVolume(cooperative.New(coopwire.Sources(coopwire.Legacy{PlotFacts: g.PlotFacts()})).Plots(), md.AdminUnits())
+	cc := cropcycle.New(pool, clk, cropcycle.Deps{})
+	coop := cooperative.New(pool, clk, cooperative.Deps{}) // W3.3: thửa và vụ ở pf_coop (r_cooperative)
+	cc.UseCollectionVolume(coop.Plots(), coop.Seasons(), md.AdminUnits())
 	e.mod.UseFeedSources(cc.AggregateSource(), apiclientport.StaticContributors{e.grantor}, md.Params())
 	if _, err := e.mod.BuildFeeds(context.Background()); err != nil {
 		e.t.Fatalf("dựng feed: %v", err)

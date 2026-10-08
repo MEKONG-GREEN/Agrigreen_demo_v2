@@ -5,10 +5,10 @@ description: Cơ giới hóa — Bản đồ CGH cho Cục KTHT, cân đối má
 modules:
   pf/accounts: ">=1.0 <2"
   pf/cooperative: ">=1.0 <2"   # diện tích vụ HTX (FN-07), số máy theo HTX (MachineCounts)
-  pf/geo: ">=1.0 <2"
+  pf/geo: ">=2.0 <3"
   pf/masterdata: ">=1.0 <2"
   pf/mechanization: ">=1.0 <2" # dom/mechanization
-  pf/party: ">=1.0 <2"         # số máy theo HTX (CoopMachineCounts)
+  pf/party: ">=2.0 <3"         # số máy theo HTX (CoopMachineCounts)
   pf/reports: ">=1.0 <2"       # xuất báo cáo CGH (FN-11)
   pf/workflow: ">=1.0 <2"      # cap/workflow: duyệt bốn mắt (tham số, cấp quyền chia sẻ — W6.1)
 roles: [cgh_viewer, cgh_admin, cgh_sync]

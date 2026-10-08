@@ -11,3 +11,6 @@ var DBModule = shareddb.Module("pf/cropcycle")
 
 // forModule bọc pool để mọi giao dịch mở qua nó chạy dưới vai của module (db.ForModule; nil giữ nil).
 func forModule(b tenant.Beginner) tenant.Beginner { return shareddb.ForModule(b, DBModule) }
+
+// DBRole là vai đăng nhập cũ của module (kỳ chuyển ADR-0028 — chỉ còn membership r_cropcycle; kiểm thử e2e dùng).
+const DBRole = "cropcycle_app"

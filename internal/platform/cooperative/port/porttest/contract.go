@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -182,6 +183,12 @@ func RunContract(t *testing.T, withTenant func(context.Context, uuid.UUID) conte
 		}
 		if hd, err := p.Seasons.HarvestDates(ctx, nil); err != nil || len(hd) != 0 {
 			t.Fatalf("HarvestDates(nil) = %v, %v", hd, err)
+		}
+		if sc, err := p.Seasons.Codes(ctx, nil); err != nil || len(sc) != 0 {
+			t.Fatalf("Codes(nil) = %v, %v", sc, err)
+		}
+		if _, err := p.Seasons.Progress(ctx, time.Time{}); err != nil {
+			t.Fatalf("Progress = %v", err)
 		}
 	})
 

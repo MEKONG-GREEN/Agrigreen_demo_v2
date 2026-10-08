@@ -21,15 +21,15 @@ exceptions:
   - rule: cycle
     from: pf/party
     to: pf/sync
-    owner: W3.3
-    until: khi đóng W3.3
-    reason: "pf/party còn giữ HTX/hộ (ngoại lệ có tên của ADR-0027, hết hạn ở W3.3 khi chuyển sang pf_coop/pf/cooperative)"
+    owner: W7.2
+    until: khi đóng W7.2
+    reason: "W3.3 đã chuyển HTX/hộ sang pf/cooperative; cạnh còn lại là đồng bộ đồng ý (party ConsentSink → syncport, sync → partyport.ConsentChecker/ScopeResolver) — W7.2 hợp nhất k/access và tách cổng đồng bộ đồng ý"
   - rule: cycle
     from: pf/sync
     to: pf/party
-    owner: W3.3
-    until: khi đóng W3.3
-    reason: "pf/party còn giữ HTX/hộ (ngoại lệ có tên của ADR-0027, hết hạn ở W3.3 khi chuyển sang pf_coop/pf/cooperative)"
+    owner: W7.2
+    until: khi đóng W7.2
+    reason: "W3.3 đã chuyển HTX/hộ sang pf/cooperative; cạnh còn lại là đồng bộ đồng ý (party ConsentSink → syncport, sync → partyport.ConsentChecker/ScopeResolver) — W7.2 hợp nhất k/access và tách cổng đồng bộ đồng ý"
   - rule: cycle
     from: pf/accounts
     to: pf/party
@@ -147,6 +147,6 @@ exceptions:
   - rule: tier
     from: pf/party
     to: pf/sync
-    owner: W3.3
-    until: khi đóng W3.3
-    reason: "pf/party còn giữ HTX/hộ (ngoại lệ có tên của ADR-0027, hết hạn ở W3.3 khi chuyển sang pf_coop/pf/cooperative)"
+    owner: W7.2
+    until: khi đóng W7.2
+    reason: "W3.3 đã chuyển HTX/hộ sang pf/cooperative; cạnh còn lại là đồng bộ đồng ý (party ConsentSink → syncport, sync → partyport.ConsentChecker/ScopeResolver) — W7.2 hợp nhất k/access và tách cổng đồng bộ đồng ý"

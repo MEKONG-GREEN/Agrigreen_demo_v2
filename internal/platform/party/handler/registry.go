@@ -14,7 +14,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -22,7 +21,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tabular"
 )
 
-// Registry gói app.Registry cho HTTP: sổ tổ chức, HTX, nông hộ.
+// Registry gói app.Registry cho HTTP: sổ tổ chức và HTX.
 type Registry struct {
 	Reg *app.Registry
 	KN  *app.KN // KN v7.7: khu vực của Nút xã trong /v1/orgs (tùy chọn)
@@ -33,11 +32,7 @@ func (h Registry) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/orgs", h.listOrgs)
 	rg.GET("/cooperatives", h.listCooperatives)
 	rg.GET("/cooperatives/:ref", h.getCooperative)
-	rg.GET("/cooperatives/:ref/households", h.listHouseholds)
-	rg.POST("/households", h.createHousehold)
-	rg.POST("/households/copy", h.copyHouseholds)
-	rg.GET("/households/:ref/contact", h.householdContact)
-	rg.POST("/households/:ref/membership", h.changeMembership)
+	// Nông hộ (/v1/cooperatives/{ref}/households, /v1/households*) do pf/cooperative phục vụ (W3.3).
 }
 
 // RegisterAdmin gắn route Admin API (MFA bắt buộc ở router).
@@ -57,8 +52,7 @@ func (h Registry) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.GET("/cooperatives/import-template.xlsx", h.coopTemplate)
 	httpx.AllowBody(rg, http.MethodPost, "/cooperatives/import", app.MaxImportBytes)
 	rg.POST("/cooperatives/import", h.importCooperatives)
-	httpx.AllowBody(rg, http.MethodPost, "/households/import", app.MaxImportBytes)
-	rg.POST("/households/import", h.importHouseholds)
+	// POST /v1/households/import do pf/cooperative phục vụ (W3.3).
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +111,7 @@ type coopDTO struct {
 	LocationProvisional bool `json:"location_provisional"`
 }
 
-func toCoopDTO(c store.Cooperative) coopDTO {
+func toCoopDTO(c app.Cooperative) coopDTO {
 	d := coopDTO{
 		orgDTO: toOrgDTO(c.Org), StatusReason: strPtr(c.StatusReason), TaxCode: strPtr(c.Profile.TaxCode),
 		AreaHa: c.Profile.AreaHa, LocationProvisional: c.Profile.Location == nil, Address: strPtr(c.Profile.Address),
@@ -304,155 +298,12 @@ func (h Registry) getCooperative(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	items, err := h.coopItems(c.Request.Context(), []store.Cooperative{out})
+	items, err := h.coopItems(c.Request.Context(), []app.Cooperative{out})
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, items[0])
-}
-
-type householdDTO struct {
-	HouseholdRef     string           `json:"household_ref"`
-	CooperativeRef   *string          `json:"cooperative_ref"`
-	CommuneCode      string           `json:"commune_code"`
-	CultivatedAreaHa *decimal.Decimal `json:"cultivated_area_ha"`
-	MemberSince      *string          `json:"member_since"`
-	Active           bool             `json:"active"`
-}
-
-func toHouseholdDTO(hh domain.Household) householdDTO {
-	d := householdDTO{
-		HouseholdRef: hh.Ref.String(), CooperativeRef: refPtr(hh.CooperativeRef), CommuneCode: hh.CommuneCode,
-		CultivatedAreaHa: hh.CultivatedAreaHa, Active: hh.Active,
-	}
-	if hh.MemberSince != nil {
-		s := hh.MemberSince.Format(time.DateOnly)
-		d.MemberSince = &s
-	}
-	return d
-}
-
-type householdListItem struct {
-	householdDTO
-	Label            string `json:"label" pii:"true"`
-	MaskedPhone      string `json:"masked_phone" pii:"true"`
-	LabelUnavailable bool   `json:"label_unavailable"`
-	// Consents: trạng thái đồng ý hiện tại theo mục đích (G-04, R-41/R-42).
-	Consents []consentStateDTO `json:"consents"`
-}
-
-func (h Registry) listHouseholds(c *gin.Context) {
-	ref, ok := pathRef(c)
-	if !ok {
-		return
-	}
-	after, ok := parseCursor(c)
-	if !ok {
-		return
-	}
-	page, err := h.Reg.ListHouseholds(c.Request.Context(), ref, after, queryLimit(c), c.Query("phone"))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	refs := make([]uuid.UUID, 0, len(page.Items))
-	for _, it := range page.Items {
-		refs = append(refs, it.Ref)
-	}
-	consents, err := h.consentsOf(c.Request.Context(), refs)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	items := make([]householdListItem, 0, len(page.Items))
-	for _, it := range page.Items {
-		items = append(items, householdListItem{
-			householdDTO: toHouseholdDTO(it.Household), Label: it.Label, MaskedPhone: it.MaskedPhone, LabelUnavailable: it.LabelUnavailable,
-			Consents: consents[it.Ref],
-		})
-	}
-	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": encodeCursor(page.Next)})
-}
-
-type identityReq struct {
-	FullName   string `json:"full_name" pii:"true"`
-	Phone      string `json:"phone" pii:"true"`
-	NationalID string `json:"national_id" pii:"true"`
-	Address    string `json:"address" pii:"true"`
-}
-
-type createHouseholdReq struct {
-	CooperativeRef   *string          `json:"cooperative_ref"`
-	CommuneCode      string           `json:"commune_code"`
-	CultivatedAreaHa *decimal.Decimal `json:"cultivated_area_ha"`
-	MemberSince      *string          `json:"member_since"`
-	Identity         identityReq      `json:"identity"`
-}
-
-func (h Registry) createHousehold(c *gin.Context) {
-	var req createHouseholdReq
-	if !bindJSON(c, &req) {
-		return
-	}
-	var fe fieldErrs
-	in := app.CreateHouseholdInput{
-		Identity: app.FarmerIdentity{
-			FullName: req.Identity.FullName, Phone: req.Identity.Phone, NationalID: req.Identity.NationalID, Address: req.Identity.Address,
-		},
-		CommuneCode: req.CommuneCode, CultivatedAreaHa: req.CultivatedAreaHa,
-	}
-	in.CooperativeRef = fe.optRef("cooperative_ref", req.CooperativeRef)
-	in.MemberSince = fe.date("member_since", req.MemberSince)
-	if fe.fail(c) {
-		return
-	}
-	out, err := h.Reg.CreateHousehold(c.Request.Context(), in)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	status := http.StatusCreated
-	body := gin.H{"household": toHouseholdDTO(out.Household), "duplicate": out.Duplicate}
-	if out.Duplicate {
-		body["duplicate_label"] = app.DuplicateLabel
-	}
-	if !out.Created {
-		status = http.StatusOK
-	}
-	c.JSON(status, body)
-}
-
-type membershipReq struct {
-	CooperativeRef *string `json:"cooperative_ref"` // null = rời HTX
-	EffectiveDate  *string `json:"effective_date"`
-	Reason         string  `json:"reason"`
-}
-
-// changeMembership: nông hộ vào / chuyển / rời HTX (KN US-HTX-02, US-HTX-05).
-func (h Registry) changeMembership(c *gin.Context) {
-	ref, err := uuid.Parse(c.Param("ref"))
-	if err != nil {
-		httpx.Fail(c, app.ErrHouseholdNotFound)
-		return
-	}
-	var req membershipReq
-	if !bindJSON(c, &req) {
-		return
-	}
-	var fe fieldErrs
-	in := app.ChangeMembershipInput{HouseholdRef: ref, Reason: req.Reason}
-	in.CooperativeRef = fe.optRef("cooperative_ref", req.CooperativeRef)
-	in.EffectiveDate = fe.date("effective_date", req.EffectiveDate)
-	if fe.fail(c) {
-		return
-	}
-	out, err := h.Reg.ChangeMembership(c.Request.Context(), in)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"household": toHouseholdDTO(out.Household), "change": out.Change, "prev_cooperative_ref": refPtr(out.Prev)})
 }
 
 // ---------------------------------------------------------------------------
@@ -621,26 +472,6 @@ func (h Registry) orgEvents(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 
-type importRowDTO struct {
-	Row          int     `json:"row"`
-	Status       string  `json:"status"`
-	Reason       *string `json:"reason"`
-	HouseholdRef *string `json:"household_ref"`
-}
-
-func (h Registry) importHouseholds(c *gin.Context) {
-	out, err := h.Reg.ImportHouseholds(c.Request.Context(), c.Request.Body)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	rows := make([]importRowDTO, 0, len(out.Rows))
-	for _, r := range out.Rows {
-		rows = append(rows, importRowDTO{Row: r.Row, Status: r.Status, Reason: strPtr(r.Reason), HouseholdRef: refPtr(r.HouseholdRef)})
-	}
-	c.JSON(http.StatusOK, gin.H{"accepted": out.Accepted, "duplicate": out.Duplicate, "rejected": out.Rejected, "rows": rows})
-}
-
 func (h Registry) exportOrgTree(c *gin.Context) {
 	data, err := h.Reg.ExportOrgTree(c.Request.Context())
 	if err != nil {
@@ -680,7 +511,7 @@ func (h Registry) importOrgTree(c *gin.Context) {
 }
 
 // ---------------------------------------------------------------------------
-// HTX US-HTX-02/03, US-HH-02/03
+// HTX US-HTX-02/03
 // ---------------------------------------------------------------------------
 
 // coopTemplate: tệp .xlsx mẫu để nhập HTX hàng loạt (HTX US-HTX-02).
@@ -749,74 +580,4 @@ func (h Registry) copyCooperative(c *gin.Context) {
 	}
 	c.Header("Location", "/v1/cooperatives/"+out.Org.Ref.String())
 	c.JSON(status, gin.H{"org": toOrgDTO(out.Org), "source_ref": ref.String(), "representative_duplicate": out.RepresentativeDuplicate})
-}
-
-type copyHouseholdItemReq struct {
-	SourceRef  string `json:"source_ref"`
-	FullName   string `json:"full_name" pii:"true"`
-	Phone      string `json:"phone" pii:"true"`
-	NationalID string `json:"national_id" pii:"true"`
-	Address    string `json:"address" pii:"true"`
-}
-
-type copyHouseholdsReq struct {
-	TargetCooperativeRef *string                `json:"target_cooperative_ref"`
-	Items                []copyHouseholdItemReq `json:"items"`
-}
-
-type copyRowDTO struct {
-	Index        int     `json:"index"`
-	SourceRef    string  `json:"source_ref"`
-	Status       string  `json:"status"`
-	Reason       *string `json:"reason"`
-	HouseholdRef *string `json:"household_ref"`
-}
-
-// copyHouseholds: sao chép hàng loạt nông hộ, sửa riêng họ tên/SĐT từng hồ sơ (HTX US-HH-02).
-func (h Registry) copyHouseholds(c *gin.Context) {
-	var req copyHouseholdsReq
-	if !bindJSON(c, &req) {
-		return
-	}
-	var fe fieldErrs
-	in := app.CopyHouseholdsInput{TargetCooperativeRef: fe.optRef("target_cooperative_ref", req.TargetCooperativeRef)}
-	for i, it := range req.Items {
-		src, err := ids.ParseRef(it.SourceRef)
-		if err != nil {
-			fe.add("items["+strconv.Itoa(i)+"].source_ref", "phải là UUID")
-			continue
-		}
-		in.Items = append(in.Items, app.CopyHouseholdItem{SourceRef: src, Identity: app.FarmerIdentity{
-			FullName: it.FullName, Phone: it.Phone, NationalID: it.NationalID, Address: it.Address,
-		}})
-	}
-	if fe.fail(c) {
-		return
-	}
-	out, err := h.Reg.CopyHouseholds(c.Request.Context(), in)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	rows := make([]copyRowDTO, 0, len(out.Rows))
-	for _, r := range out.Rows {
-		rows = append(rows, copyRowDTO{Index: r.Index, SourceRef: r.SourceRef.String(), Status: r.Status, Reason: strPtr(r.Reason), HouseholdRef: refPtr(r.HouseholdRef)})
-	}
-	c.JSON(http.StatusOK, gin.H{"created": out.Created, "rejected": out.Rejected, "rows": rows})
-}
-
-// householdContact: SĐT chủ hộ lúc bấm gọi nhanh (HTX US-HH-03). Không lưu đệm.
-func (h Registry) householdContact(c *gin.Context) {
-	ref, err := uuid.Parse(c.Param("ref"))
-	if err != nil {
-		httpx.Fail(c, app.ErrHouseholdNotFound)
-		return
-	}
-	phone, err := h.Reg.HouseholdPhone(c.Request.Context(), ref)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.Header("Cache-Control", "no-store")
-	c.JSON(http.StatusOK, gin.H{"household_ref": ref.String(), "phone": phone})
 }

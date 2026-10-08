@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/coopwire"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
@@ -93,7 +92,7 @@ var ErrNotWired = errors.New("integration-gateway: chưa nối metering/port.Led
 //   - pf/metering: Ledger, Quotas, Usage; gói hạn mức qua plans (pf/apiclient); tham số kênh qua pf/masterdata;
 //   - pf/party: GrantLookup + sổ đọc partner_read_log của bên cấp (APIReadLog, K-05) — bộ điều hợp
 //     party/port/grantlookup (không vault, r_party);
-//   - pf/cropcycle: CollectionVolumeSource, dữ kiện thửa qua pf/cooperative (mặt tiền W3.2 trên pf/geo) + đơn vị
+//   - pf/cropcycle: CollectionVolumeSource, dữ kiện thửa và mã vụ qua pf/cooperative (r_cooperative, W3.3) + đơn vị
 //     hành chính pf/masterdata;
 //   - pf/geo: HubCapacitySource;
 //   - pf/mrv: MRVPackageSource (chỉ đọc export_job — không kho đối tượng).
@@ -106,14 +105,15 @@ var integrationPorts = func(ctx context.Context, open PoolOpener, cfg Config, pl
 	if err != nil {
 		return Ports{}, err
 	}
-	mdPool, meterPool, partyPool, geoPool, ccPool, mrvPool := unit, unit, unit, unit, unit, unit
+	mdPool, meterPool, partyPool, geoPool, ccPool, coopPool, mrvPool := unit, unit, unit, unit, unit, unit, unit
 	md := masterdata.New(mdPool, clk)
 	meter := metering.New(meterPool, clk, metering.Deps{Plans: plans, Params: md.Params(), Mode: cfg.EgressMode, Log: cfg.Log})
 	g := geo.New(geoPool, clk, geo.Deps{Params: md.Params(), AdminUnits: md.AdminUnits()})
-	cc := cropcycle.New(ccPool, clk, cropcycle.Deps{Params: md.Params()})
-	// pf/cooperative (W3.2): dữ kiện thửa qua mặt tiền (nguồn cũ pf/geo, cmd/internal/coopwire).
-	coop := cooperative.New(coopwire.Sources(coopwire.Legacy{PlotFacts: g.PlotFacts()}))
-	cc.UseCollectionVolume(coop.Plots(), md.AdminUnits())
+	cc := cropcycle.New(ccPool, clk, cropcycle.Deps{})
+	// pf/cooperative (W3.3): dữ kiện thửa và mã vụ của bảng kê (schema pf_coop, r_cooperative). Gốc module không kéo
+	// kho định danh (kho định danh qua cổng hẹp HouseholdIdentities/FarmerIdentity, ở đây không nối — RB-3).
+	coop := cooperative.New(coopPool, clk, cooperative.Deps{})
+	cc.UseCollectionVolume(coop.Plots(), coop.Seasons(), md.AdminUnits())
 	m := mrv.New(mrvPool, clk, mrv.Deps{Params: md.Params()})
 	grants := grantlookup.New(partyPool, clk)
 	return Ports{Ledger: meter.Ledger(), Quotas: meter.Quotas(), Usage: meter.Usage(), Grants: grants, Reads: grants, Params: md.Params(),

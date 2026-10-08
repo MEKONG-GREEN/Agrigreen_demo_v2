@@ -6,14 +6,14 @@ modules:
   pf/accounts: ">=1.0 <2"      # tài khoản nông dân do HTX cấp (/v1/farmer-accounts)
   pf/content: ">=1.0 <2"       # tài liệu, SOP
   pf/cooperative: ">=1.0 <2"   # dom/cooperative: HTX, hộ, thửa, vụ, nhật ký (W3.2 mặt tiền; W3.3 chuyển dữ liệu)
-  pf/cropcycle: ">=1.0 <2"     # mùa vụ, nhật ký, sản lượng, phê duyệt
+  pf/cropcycle: ">=2.0 <3"     # mùa vụ, nhật ký, sản lượng, phê duyệt
   pf/evidence: ">=1.0 <2"      # cap/evidence: tệp minh chứng, Open(purpose) có nhật ký (W6.5)
   pf/extension: ">=1.0 <2"     # yêu cầu hỗ trợ gửi khuyến nông
-  pf/geo: ">=1.0 <2"           # lô ruộng, ranh giới
+  pf/geo: ">=2.0 <3"           # lô ruộng, ranh giới
   pf/masterdata: ">=1.0 <2"
   pf/mrv: ">=1.0 <2"           # hồ sơ MRV phía HTX
   pf/notify: ">=1.0 <2"
-  pf/party: ">=1.0 <2"         # HTX, nông hộ, đồng ý (/v1/cooperatives, /v1/households, /v1/consents)
+  pf/party: ">=2.0 <3"         # HTX, nông hộ, đồng ý (/v1/cooperatives, /v1/households, /v1/consents)
   pf/reports: ">=1.0 <2"       # lịch gửi báo cáo của quản lý HTX
   pf/sync: ">=1.0 <2"          # đồng bộ ngoại tuyến của app HTX
   pf/workflow: ">=1.0 <2"      # cap/workflow: duyệt bốn mắt (tham số, cấp quyền chia sẻ — W6.1)

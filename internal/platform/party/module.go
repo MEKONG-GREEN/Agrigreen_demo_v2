@@ -1,5 +1,6 @@
 // Package party là module bên tham gia (mục 10.5): đồng ý theo mục đích, cây tổ
-// chức TW → Tỉnh → Xã, HTX/THT và nông hộ (ADR-0009).
+// chức TW → Tỉnh → Xã, Nút HTX/THT (ADR-0009). Hồ sơ HTX, nông hộ, xã viên và sổ hồ sơ KN
+// thuộc pf/cooperative từ W3.3 — nối qua port (UseCoopProfiles, OrgDirectory, ConsentStates).
 //
 // Module khác chỉ được import party/port (R-02). Tệp này nối các lớp cho
 // cmd/api-platform.
@@ -72,7 +73,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.Me{Reg: m.reg}.Register(rg)
 	handler.Sharing{Svc: m.share}.RegisterApp(rg)
 	handler.KN{Svc: m.kn}.RegisterApp(rg)
-	handler.KN{Svc: m.kn}.RegisterKNCollect(rg)  // KN v7.7 FN-XA-03.03: /v1/kn/cooperatives*, /v1/kn/households*
+	handler.KN{Svc: m.kn}.RegisterKNCollect(rg)  // KN v7.7 FN-XA-03.03: /v1/kn/cooperatives* (nông hộ: pf/cooperative)
 	handler.Modules{Svc: m.mods}.RegisterApp(rg) // W1.4: GET /v1/me/modules
 }
 
@@ -119,8 +120,16 @@ func (m *Module) ConsentChecker() port.ConsentChecker { return m.svc }
 // Orgs cho module khác tra cứu tổ chức (qua port).
 func (m *Module) Orgs() port.Orgs { return m.reg }
 
-// Households cho module khác tra HTX hiện tại của nông hộ (geo: gán thửa).
-func (m *Module) Households() port.Households { return m.reg }
+// OrgDirectory cho pf/cooperative đọc Nút theo lô (danh sách, thống kê, marker HTX — W3.3).
+func (m *Module) OrgDirectory() port.OrgDirectory { return m.reg }
+
+// ConsentStates cho pf/cooperative đọc trạng thái đồng ý của nông hộ trong danh sách (G-04, W3.3).
+func (m *Module) ConsentStates() port.ConsentStates { return m.reg }
+
+// UseCoopProfiles (W3.3) nối hồ sơ HTX và số nông hộ thành viên của pf/cooperative cho các màn HTX của sổ tổ
+// chức (G1, HTX US-HTX-*, KN FN-XA-03.03, danh bạ đối tác) và bước 2 của tạo HTX. Thiếu → thao tác cần hồ sơ
+// HTX trả 503 party.dependency_unavailable.
+func (m *Module) UseCoopProfiles(p port.CoopProfiles) { m.reg.Profiles, m.share.Profiles = p, p }
 
 // ScopeResolver cho module khác tính phạm vi theo cây phân cấp (qua port, ADR-0009).
 func (m *Module) ScopeResolver() port.ScopeResolver { return m.reg }
@@ -129,18 +138,9 @@ func (m *Module) ScopeResolver() port.ScopeResolver { return m.reg }
 // gọi sau khi dựng pf/geo (pf/geo cần phạm vi của pf/party nên dựng sau).
 func (m *Module) UsePlotStats(ps port.PlotStats) { m.reg.Plots = ps }
 
-// UseSeasonActivity nối số vụ chưa xong / nhật ký chờ duyệt của pf/cropcycle (qua gốc
+// UseSeasonActivity nối số vụ chưa xong / nhật ký chờ duyệt của pf/cooperative (qua gốc
 // lắp ráp) cho cảnh báo trước khi vô hiệu hóa HTX (HTX US-HTXSTATUS-01 AC-1).
 func (m *Module) UseSeasonActivity(a port.SeasonActivity) { m.reg.Activity = a }
-
-// CoopMarkers cho pf/geo: điểm vị trí HTX làm marker lớp ranh giới HTX (GIS US-BND-02).
-func (m *Module) CoopMarkers() port.CoopMarkers { return m.reg }
-
-// CooperativeSites cho gốc lắp ráp: HTX đang hoạt động, vị trí, số hộ (nguồn cung mô phỏng).
-func (m *Module) CooperativeSites() port.CooperativeSites { return m.reg }
-
-// CooperativeStats cho module khác đếm HTX, hộ thành viên theo đơn vị (qua port, G-02).
-func (m *Module) CooperativeStats() port.CooperativeStats { return m.reg }
 
 // SyncSink nhận bản ghi đồng ý thu ngoại tuyến qua pf/sync (entity consent).
 func (m *Module) SyncSink() syncport.Sink { return app.ConsentSink{Svc: m.svc} }

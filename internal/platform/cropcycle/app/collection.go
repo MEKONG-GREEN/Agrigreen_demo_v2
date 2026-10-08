@@ -365,7 +365,7 @@ func (s *Service) GetCollectionStatement(ctx context.Context, ref uuid.UUID) (St
 	if err != nil {
 		return d, err
 	}
-	if st == nil || !a.sees("", st.CooperativeRef, uuid.Nil) {
+	if st == nil || !a.sees("", st.CooperativeRef) {
 		return d, ErrStatementNotFound
 	}
 	d.Statement = s.withPlotCodes(ctx, []store.StatementView{*st})[0]

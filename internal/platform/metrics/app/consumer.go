@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
@@ -31,9 +31,9 @@ import (
 // Chưa có nguồn: thời tiết (FN-19 "giữ cảnh báo lớn nhất ngày" — bỏ qua), hub MKG
 // (van hub_* chỉ cho pf/geo).
 var LayerEvents = []string{
-	geoport.EventPlotCreated, geoport.EventPlotBoundaryRecorded, geoport.EventPlotRetired, geoport.EventPlotRestored,
-	geoport.EventCooperativeBoundaryRecorded, geoport.EventFacilityRecorded,
-	ccport.EventSeasonOpened, ccport.EventSeasonCompleted, ccport.EventSeasonCorrected,
+	coopport.EventPlotCreated, coopport.EventPlotBoundaryRecorded, coopport.EventPlotRetired, coopport.EventPlotRestored,
+	coopport.EventCooperativeBoundaryRecorded, geoport.EventFacilityRecorded,
+	coopport.EventSeasonOpened, coopport.EventSeasonCompleted, coopport.EventSeasonCorrected,
 	mechport.EventBalanceComputed, wwport.EventNetworkPublished,
 }
 
@@ -113,15 +113,15 @@ func facilityOp(action string) port.LayerOp {
 // bỏ actor_ref, household_ref.
 func patchesOf(env outbox.Envelope) ([]patch, time.Time, error) {
 	switch env.EventType {
-	case geoport.EventPlotCreated:
-		p, err := decode[geoport.PlotCreatedV1](env)
+	case coopport.EventPlotCreated:
+		p, err := decode[coopport.PlotCreatedV1](env)
 		return []patch{{Layer: port.LayerPlot, Feature: p.PlotRef, Op: port.LayerCreate, Attrs: map[string]any{
 			"code": p.Code, "commune_code": p.CommuneCode, "cooperative_ref": uuidp(p.CooperativeRef), "status": p.Status,
 			"boundary_id": p.BoundaryID.String(), "boundary_version": 1, "area_ha": p.AreaHa, "source": p.Source,
 			"geometry_ref": geomRef("plot_boundary", p.BoundaryID),
 		}}}, eventTime(p.EventTime, env.OccurredAt), err
-	case geoport.EventPlotBoundaryRecorded:
-		p, err := decode[geoport.PlotBoundaryRecordedV1](env)
+	case coopport.EventPlotBoundaryRecorded:
+		p, err := decode[coopport.PlotBoundaryRecordedV1](env)
 		if err != nil || !p.BecameCurrent {
 			return nil, time.Time{}, err // bản không thành hiện hành (xung đột) không đổi lớp
 		}
@@ -132,20 +132,20 @@ func patchesOf(env outbox.Envelope) ([]patch, time.Time, error) {
 		}}}, eventTime(p.EventTime, env.OccurredAt), nil
 	// Ngừng dùng/khôi phục thửa: ghép vào thuộc tính trước (giữ ranh giới, diện tích);
 	// status_change_reason = lý do của lần đổi trạng thái gần nhất.
-	case geoport.EventPlotRetired:
-		p, err := decode[geoport.PlotRetiredV1](env)
+	case coopport.EventPlotRetired:
+		p, err := decode[coopport.PlotRetiredV1](env)
 		return []patch{{Layer: port.LayerPlot, Feature: p.PlotRef, Op: port.LayerRetire, Attrs: map[string]any{
 			"commune_code": p.CommuneCode, "cooperative_ref": uuidp(p.CooperativeRef), "status": p.StatusAfter,
 			"status_change_reason": p.Reason, "plot_event_id": p.PlotEventID.String(),
 		}}}, eventTime(p.EventTime, env.OccurredAt), err
-	case geoport.EventPlotRestored:
-		p, err := decode[geoport.PlotRestoredV1](env)
+	case coopport.EventPlotRestored:
+		p, err := decode[coopport.PlotRestoredV1](env)
 		return []patch{{Layer: port.LayerPlot, Feature: p.PlotRef, Op: port.LayerRestore, Attrs: map[string]any{
 			"commune_code": p.CommuneCode, "cooperative_ref": uuidp(p.CooperativeRef), "status": p.StatusAfter,
 			"status_change_reason": p.Reason, "plot_event_id": p.PlotEventID.String(),
 		}}}, eventTime(p.EventTime, env.OccurredAt), err
-	case geoport.EventCooperativeBoundaryRecorded:
-		p, err := decode[geoport.CooperativeBoundaryRecordedV1](env)
+	case coopport.EventCooperativeBoundaryRecorded:
+		p, err := decode[coopport.CooperativeBoundaryRecordedV1](env)
 		op := port.LayerCreate
 		switch p.Action {
 		case "retired":
@@ -170,21 +170,21 @@ func patchesOf(env outbox.Envelope) ([]patch, time.Time, error) {
 		}
 		return []patch{{Layer: port.LayerFacility, Feature: p.FacilityRef, Op: facilityOp(p.Action), Attrs: attrs}},
 			eventTime(p.EventTime, env.OccurredAt), err
-	case ccport.EventSeasonOpened:
-		p, err := decode[ccport.SeasonOpenedV1](env)
+	case coopport.EventSeasonOpened:
+		p, err := decode[coopport.SeasonOpenedV1](env)
 		return []patch{{Layer: port.LayerSeasonStage, Feature: p.SeasonRef, Op: port.LayerCreate, Attrs: map[string]any{
 			"plot_ref": p.PlotRef.String(), "cooperative_ref": p.CooperativeRef.String(), "commune_code": p.CommuneCode,
 			"season": port.SeasonDimension(p.SeasonCode, p.SeasonYear), "variety_code": p.VarietyCode, "sowing_date": p.SowingDate,
 			"expected_harvest_date": p.ExpectedHarvestDate, "area_ha": p.AreaHa, "stage": "opened",
 		}}}, eventTime(p.EventTime, env.OccurredAt), err
-	case ccport.EventSeasonCompleted:
-		p, err := decode[ccport.SeasonCompletedV1](env)
+	case coopport.EventSeasonCompleted:
+		p, err := decode[coopport.SeasonCompletedV1](env)
 		return []patch{{Layer: port.LayerSeasonStage, Feature: p.SeasonRef, Op: port.LayerUpdate, Attrs: map[string]any{
 			"plot_ref": p.PlotRef.String(), "cooperative_ref": p.CooperativeRef.String(), "commune_code": p.CommuneCode,
 			"season": port.SeasonDimension(p.SeasonCode, p.SeasonYear), "harvest_date": p.HarvestDate, "area_ha": p.AreaHa, "stage": "completed",
 		}}}, eventTime(p.EventTime, env.OccurredAt), err
-	case ccport.EventSeasonCorrected:
-		p, err := decode[ccport.SeasonCorrectedV1](env)
+	case coopport.EventSeasonCorrected:
+		p, err := decode[coopport.SeasonCorrectedV1](env)
 		op, stage := port.LayerUpdate, any(nil)
 		if p.Action == "cancelled" {
 			op, stage = port.LayerRetire, "cancelled"

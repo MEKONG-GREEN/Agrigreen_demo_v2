@@ -17,6 +17,6 @@ var assembly = map[string][]string{
 	"outbox-publisher":    {},
 	"rebuilddrill":        {"mkg/acctbridge", "mkg/costing", "mkg/fieldops", "mkg/hub", "mkg/logistics", "mkg/measurement", "mkg/orders"},
 	"seed-synthetic":      {},
-	"worker":              {"pf/accounts", "pf/apiclient", "pf/cooperative", "pf/cropcycle", "pf/extension", "pf/geo", "pf/kref", "pf/masterdata", "pf/mechanization", "pf/metering", "pf/metrics", "pf/mrv", "pf/notify", "pf/party", "pf/reports", "pf/sync", "pf/waterway"},
+	"worker":              {"pf/accounts", "pf/apiclient", "pf/cooperative", "pf/cropcycle", "pf/extension", "pf/kref", "pf/masterdata", "pf/mechanization", "pf/metering", "pf/metrics", "pf/mrv", "pf/notify", "pf/party", "pf/reports", "pf/sync", "pf/waterway"},
 	"worker-internal":     {"mkg/acctbridge", "mkg/costing", "mkg/fieldops", "mkg/hub", "mkg/logistics", "mkg/measurement", "mkg/orders"},
 }

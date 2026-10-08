@@ -6,24 +6,48 @@ aka: [dom/cooperative]
 kind: domain
 zones: [pf]
 version: 1.0.0
-depends: {}
+depends:
+  pf/geo: ">=2.0 <3"
+  pf/masterdata: ">=1.0 <2"
+  pf/metrics: ">=1.0 <2"
+  pf/party: ">=2.0 <3"
+  pf/reports: ">=1.0 <2"
+  pf/sync: ">=1.0 <2"
+  vault/identity: ">=1.0 <2"
 provides:
   ports:
     - Cooperatives
     - Diary
     - FarmerHouseholds
+    - FarmerIdentity
+    - HouseholdIdentities
     - Households
     - MachineCounts
     - Plots
     - Resolve
     - Seasons
-  events: []
+  events:
+    - pf.cropcycle.coop_season_area.changed/v1
+    - pf.cropcycle.farm_log.recorded/v1
+    - pf.cropcycle.farm_log.reviewed/v1
+    - pf.cropcycle.harvest.declared/v1
+    - pf.cropcycle.season.completed/v1
+    - pf.cropcycle.season.corrected/v1
+    - pf.cropcycle.season.opened/v1
+    - pf.cropcycle.sop.published/v1
+    - pf.geo.cooperative_boundary.recorded/v1
+    - pf.geo.plot.created/v1
+    - pf.geo.plot.restored/v1
+    - pf.geo.plot.retired/v1
+    - pf.geo.plot_boundary.recorded/v1
+    - pf.party.household.membership_changed/v1
+    - pf.party.household.registered/v1
   internal_events: []
   publications: []
   data_products: []
 consumes:
   events: []
-permissions: []
+permissions: [coop_manager, farmer, plot_editor, plot_viewer, sop_admin]
 shares: [diary_entry, household, plot, season]
-owns_schema: []
+owns_schema: [pf_coop]
 enable: per_tenant

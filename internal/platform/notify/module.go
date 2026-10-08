@@ -21,9 +21,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/port"
-
 	mechport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/port"
 	meteringport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
@@ -140,9 +140,9 @@ func (m *Module) Consumers() []Consumer {
 		{Name: port.ConsumerContent, Events: []string{contentport.EventAlertPublished, contentport.EventDocumentPublished}, Handler: ev},
 		{Name: port.ConsumerTask, Events: []string{extport.EventTaskEscalated, extport.EventTaskCreated}, Handler: ev},
 		{Name: port.ConsumerSync, Events: []string{syncport.EventConflictOpened, syncport.EventDeviceRevoked}, Handler: ev},
-		{Name: port.ConsumerParty, Events: []string{partyport.EventOrgDeactivated, partyport.EventHouseholdRegistered,
-			partyport.EventHouseholdMembershipChanged}, Handler: ev},
-		{Name: port.ConsumerCropCycle, Events: []string{ccport.EventFarmLogRecorded, ccport.EventFarmLogReviewed, ccport.EventSeasonOpened,
+		{Name: port.ConsumerParty, Events: []string{partyport.EventOrgDeactivated, coopport.EventHouseholdRegistered,
+			coopport.EventHouseholdMembershipChanged}, Handler: ev},
+		{Name: port.ConsumerCropCycle, Events: []string{coopport.EventFarmLogRecorded, coopport.EventFarmLogReviewed, coopport.EventSeasonOpened,
 			ccport.EventCollectionScheduleReceived, ccport.EventCollectionStatementReceived}, Handler: ev},
 		{Name: port.ConsumerReportCycle, Events: []string{extport.EventReportBatchIssued, extport.EventReportTaskReminded,
 			extport.EventSubmissionAdjustmentRequested, extport.EventPeriodReopened}, Handler: ev},

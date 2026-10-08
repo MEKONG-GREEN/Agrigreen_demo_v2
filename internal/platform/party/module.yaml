@@ -5,7 +5,7 @@ name: pf/party
 aka: [k/orgtree, k/access]
 kind: kernel
 zones: [pf]
-version: 1.0.0
+version: 2.0.0
 depends:
   pf/kref: ">=1.0 <2"
   pf/sync: ">=1.0 <2"
@@ -17,11 +17,11 @@ provides:
     - AdminUnitTree
     - AdminUnits
     - ConsentChecker
+    - ConsentStates
     - ContextEpochs
     - CoopMachineCounts
     - CoopMarkers
-    - CooperativeSites
-    - CooperativeStats
+    - CoopProfiles
     - DepartmentUsage
     - Departments
     - FormAvailability
@@ -30,6 +30,7 @@ provides:
     - Households
     - ModuleEnablement
     - OrgCodes
+    - OrgDirectory
     - OrgImpactSource
     - Orgs
     - PartnerAccess
@@ -42,8 +43,6 @@ provides:
   events:
     - pf.party.consent.recorded/v1
     - pf.party.context_epoch.bumped/v1
-    - pf.party.household.membership_changed/v1
-    - pf.party.household.registered/v1
     - pf.party.org.created/v1
     - pf.party.org.deactivated/v1
     - pf.party.org.moved/v1

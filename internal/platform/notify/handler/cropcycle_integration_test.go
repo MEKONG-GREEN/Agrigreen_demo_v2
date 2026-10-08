@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	contentport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content/port"
-	ccport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle/port"
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
@@ -57,13 +57,13 @@ func TestFarmLogNotificationsHTXUSLOG05(t *testing.T) {
 	mgrA := f.userIn(f.tenant, coopA, authz.Scope{Units: []string{ward1}}, partyport.RoleCoopManager)
 	mgrB := f.userIn(f.tenant, coopB, authz.Scope{Units: []string{ward1}}, partyport.RoleCoopManager)
 	officer := f.userIn(f.tenant, coopA, authz.Scope{Units: []string{ward1}}, partyport.RoleKNOfficer)
-	farmer := f.asActor(f.tenant, uuid.Nil, ids.New(), ccport.RoleFarmer)
+	farmer := f.asActor(f.tenant, uuid.Nil, ids.New(), coopport.RoleFarmer)
 	farmer.device(fcmToken)
 
 	logID, logRef := ids.New(), ids.New()
 	hh := ids.New()
 	rec := func(onBehalf bool) {
-		f.process(port.ConsumerCropCycle, f.event(f.tenant, ccport.EventFarmLogRecorded, ccport.FarmLogRecordedV1{
+		f.process(port.ConsumerCropCycle, f.event(f.tenant, coopport.EventFarmLogRecorded, coopport.FarmLogRecordedV1{
 			LogID: logID, LogRef: logRef, Version: 1, SeasonRef: ids.New(), PlotRef: ids.New(), HouseholdRef: &hh, CooperativeRef: coopA,
 			CommuneCode: ward1, ActivityCode: "bon_phan", LocationStatus: "mismatch", GPSSource: "device", BecameCurrent: true,
 			OnBehalf: onBehalf, AuthorRef: farmer.actor, EventTime: f.clk.Now().Format(time.RFC3339)}))
@@ -87,11 +87,11 @@ func TestFarmLogNotificationsHTXUSLOG05(t *testing.T) {
 	reviewer := ids.New()
 	note := "Bổ sung ảnh chụp bao phân"
 	review := func(decision string) bool {
-		return f.process(port.ConsumerCropCycle, f.event(f.tenant, ccport.EventFarmLogReviewed, ccport.FarmLogReviewedV1{
+		return f.process(port.ConsumerCropCycle, f.event(f.tenant, coopport.EventFarmLogReviewed, coopport.FarmLogReviewedV1{
 			ReviewID: ids.New(), LogID: logID, LogRef: logRef, SeasonRef: ids.New(), CooperativeRef: coopA, Decision: decision,
 			Note: &note, AuthorRef: farmer.actor, ReviewerRef: reviewer, EventTime: f.clk.Now().Format(time.RFC3339)}))
 	}
-	review(ccport.LogNeedsSupplement)
+	review(coopport.LogNeedsSupplement)
 	in = farmer.inbox()
 	if len(in) != 1 || in[0]["kind"] != port.KindFarmLogReviewed || in[0]["topic"] != false || !strings.Contains(in[0]["title"].(string), "cần bổ sung") ||
 		strings.Contains(in[0]["body"].(string), note) {
@@ -104,8 +104,8 @@ func TestFarmLogNotificationsHTXUSLOG05(t *testing.T) {
 		t.Fatalf("đẩy tới máy nông dân: %v", msgs)
 	}
 	// Giao lặp cùng sự kiện → không trùng.
-	env := f.event(f.tenant, ccport.EventFarmLogReviewed, ccport.FarmLogReviewedV1{ReviewID: ids.New(), LogID: logID, LogRef: logRef,
-		CooperativeRef: coopA, Decision: ccport.LogApproved, AuthorRef: farmer.actor, ReviewerRef: reviewer, EventTime: f.clk.Now().Format(time.RFC3339)})
+	env := f.event(f.tenant, coopport.EventFarmLogReviewed, coopport.FarmLogReviewedV1{ReviewID: ids.New(), LogID: logID, LogRef: logRef,
+		CooperativeRef: coopA, Decision: coopport.LogApproved, AuthorRef: farmer.actor, ReviewerRef: reviewer, EventTime: f.clk.Now().Format(time.RFC3339)})
 	if !f.process(port.ConsumerCropCycle, env) || f.process(port.ConsumerCropCycle, env) {
 		t.Fatal("inbox phải bỏ qua lần giao lặp")
 	}
@@ -119,7 +119,7 @@ func TestFarmLogNotificationsHTXUSLOG05(t *testing.T) {
 		t.Fatalf("pull nông dân: %v %d", err, len(ch))
 	}
 	// Tenant khác không thấy.
-	other := f.asActor(ids.New(), uuid.Nil, farmer.actor, ccport.RoleFarmer)
+	other := f.asActor(ids.New(), uuid.Nil, farmer.actor, coopport.RoleFarmer)
 	if len(other.inbox()) != 0 {
 		t.Fatal("cách ly tenant")
 	}
@@ -131,7 +131,7 @@ func TestSeasonOpenedByFarmerNotifiesManagerHTXUSSEASON01(t *testing.T) {
 	coop := ids.New()
 	mgr := f.userIn(f.tenant, coop, authz.Scope{Units: []string{ward1}}, partyport.RoleCoopManager)
 	open := func(onBehalf bool) {
-		f.process(port.ConsumerCropCycle, f.event(f.tenant, ccport.EventSeasonOpened, ccport.SeasonOpenedV1{
+		f.process(port.ConsumerCropCycle, f.event(f.tenant, coopport.EventSeasonOpened, coopport.SeasonOpenedV1{
 			SeasonRef: ids.New(), EventID: ids.New(), PlotRef: ids.New(), PlotCode: "TH01", CooperativeRef: coop, CommuneCode: ward1,
 			SeasonCode: "HT", SeasonYear: 2026, VarietyCode: "OM5451", SOPVersionID: ids.New(), SowingDate: "2026-09-20",
 			AreaHa: "1.5", OnBehalf: onBehalf, ActorRef: ids.New(), EventTime: f.clk.Now().Format(time.RFC3339)}))
@@ -151,9 +151,9 @@ func TestAlertReachesFarmersAndCoopManagersInAreaHTXUSNEWS03(t *testing.T) {
 	f := newFixture(t)
 	farmers := &fakeAreaFarmers{byTid: map[uuid.UUID]map[string][]uuid.UUID{}}
 	f.mod.UseAreaFarmers(farmers)
-	in1 := f.asActor(f.tenant, uuid.Nil, ids.New(), ccport.RoleFarmer)
+	in1 := f.asActor(f.tenant, uuid.Nil, ids.New(), coopport.RoleFarmer)
 	in1.device(fcmToken)
-	out := f.asActor(f.tenant, uuid.Nil, ids.New(), ccport.RoleFarmer)
+	out := f.asActor(f.tenant, uuid.Nil, ids.New(), coopport.RoleFarmer)
 	farmers.add(f.tenant, ward1, in1.actor)
 	farmers.add(f.tenant, ward1, in1.actor) // hai thửa, một tài khoản → một thông báo
 	farmers.add(f.tenant, ward92, out.actor)

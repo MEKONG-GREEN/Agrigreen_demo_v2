@@ -353,7 +353,7 @@ func New(ms []*Manifest) (*Registry, error) {
 			schemaOwner[s] = m.Name
 		}
 		for _, e := range m.Consumes.Events {
-			p, ok := r.byName[EventProducer(e)]
+			p, ok := r.byName[r.producerOf(e)]
 			switch {
 			case !ok:
 				errs = append(errs, fmt.Errorf("%s: consumes.events %q: không có module phát %q", m.Path, e, EventProducer(e)))
@@ -459,6 +459,29 @@ func (r *Registry) ByKind(k Kind) []string {
 		}
 	}
 	return out
+}
+
+// producerOf trả module phát sự kiện e: module theo tiền tố tên (EventProducer) nếu nó khai e; nếu không, module DUY
+// NHẤT khai e trong provides — tên sự kiện v1 giữ nguyên khi chủ dữ liệu chuyển module (W3.3, D-8: pf.geo.plot.*,
+// pf.cropcycle.season.*, pf.party.household.* do pf/cooperative phát). Không tìm được → module theo tiền tố.
+func (r *Registry) producerOf(e string) string {
+	pre := EventProducer(e)
+	if p, ok := r.byName[pre]; ok && (slices.Contains(p.Provides.Events, e) || slices.Contains(p.Provides.InternalEvents, e)) {
+		return pre
+	}
+	owner := ""
+	for _, n := range r.names {
+		if slices.Contains(r.byName[n].Provides.Events, e) {
+			if owner != "" {
+				return pre
+			}
+			owner = n
+		}
+	}
+	if owner == "" {
+		return pre
+	}
+	return owner
 }
 
 // EventProducer trả tên module phát sự kiện theo quy ước tên R-64 (<vùng>.<module>.<thực thể>.<động từ>),

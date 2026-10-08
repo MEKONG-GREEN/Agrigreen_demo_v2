@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
-	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
+	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	simport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation/port"
 )
@@ -53,7 +53,7 @@ func TestLayerLogQueueBindsPlotRetireRestore(t *testing.T) {
 		if q.Name != metricsport.LayerLogConsumer {
 			continue
 		}
-		for _, ev := range []string{geoport.EventPlotCreated, geoport.EventPlotRetired, geoport.EventPlotRestored} {
+		for _, ev := range []string{coopport.EventPlotCreated, coopport.EventPlotRetired, coopport.EventPlotRestored} {
 			if !slices.Contains(q.Events, ev) {
 				t.Fatalf("hàng đợi %s thiếu %s: %v", q.Name, ev, q.Events)
 			}

@@ -26,7 +26,6 @@ import (
 
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -34,7 +33,6 @@ import (
 
 var (
 	_ apiclientport.HubCapacitySource = (*Service)(nil)
-	_ port.PlotFacts                  = (*Service)(nil)
 )
 
 // Giới hạn trang của sản phẩm dữ liệu.
@@ -167,28 +165,6 @@ func hubProduct(h store.ProductHub, v CapacityView) apiclientport.HubCapacityV1 
 		item.CapacityTons = &c
 	}
 	return item
-}
-
-// PlotFacts cài đặt port.PlotFacts (tenant lấy từ context).
-func (s *Service) PlotFacts(ctx context.Context, refs []uuid.UUID) (map[uuid.UUID]port.Plot, error) {
-	out := make(map[uuid.UUID]port.Plot, len(refs))
-	if len(refs) == 0 {
-		return out, nil
-	}
-	err := tenant.FromCtxTx(ctx, s.DB, func(tx pgx.Tx) error {
-		for i := 0; i < len(refs); i += 1000 {
-			rows, err := store.PlotFacts(ctx, tx, refs[i:min(i+1000, len(refs))])
-			if err != nil {
-				return err
-			}
-			for _, p := range rows {
-				out[p.Ref] = port.Plot{Ref: p.Ref, Code: p.Code, CommuneCode: p.CommuneCode, CooperativeRef: p.CooperativeRef,
-					HouseholdRef: p.HouseholdRef, Status: p.Status, Version: p.Version, AreaHa: p.AreaHa}
-			}
-		}
-		return nil
-	})
-	return out, err
 }
 
 func jsonNumber(s string) json.Number { return json.Number(s) }

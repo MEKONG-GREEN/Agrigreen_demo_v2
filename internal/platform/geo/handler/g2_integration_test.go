@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strings"
 	"sync"
@@ -19,8 +20,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/shptest"
-	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
@@ -28,81 +27,103 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Giả lập pf/party cho G2: sổ HTX (Orgs + OrgCodes) và marker vị trí HTX.
+// Giả lập pf/cooperative cho G2 (W3.3): lớp HTX / lớp thửa của bản đồ gộp (geoport.MapLayers) và dữ kiện thửa cho
+// log GPS (geoport.PlotGeometry). Hiện thực thật nằm ở pf/cooperative (kiểm thử riêng ở cooperative/plot/handler).
 // ---------------------------------------------------------------------------
 
-type coopRegistry struct {
-	mu   sync.Mutex
-	orgs map[uuid.UUID]partyport.Org
+type fakeMapLayers struct {
+	mu     sync.Mutex
+	tenant uuid.UUID // tenant của đối tượng giả — tenant khác đọc rỗng (như hiện thực thật)
+	coops  []map[string]any
+	plots  []map[string]any
 }
 
-func (f *coopRegistry) add(ref uuid.UUID, code, unit string) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.orgs[ref] = partyport.Org{Ref: ref, Kind: partyport.OrgCooperative, Code: code, Name: "HTX " + code, AdminUnitCode: unit, Active: true}
+func feature(ref uuid.UUID, layer string) map[string]any {
+	return map[string]any{"type": "Feature", "id": ref.String(), "geometry": map[string]any{"type": "Point", "coordinates": []float64{105.6, 10.05}},
+		"properties": map[string]any{"ref": ref.String(), "layer": layer}}
 }
 
-func (f *coopRegistry) Get(_ context.Context, ref uuid.UUID) (partyport.Org, error) {
+func (f *fakeMapLayers) CooperativeLayer(ctx context.Context, _ port.MapLayerQuery) (map[string]any, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	o, ok := f.orgs[ref]
+	feats := []map[string]any{}
+	if tid, err := tenant.FromContext(ctx); err == nil && tid == f.tenant {
+		feats = append(feats, f.coops...)
+	}
+	return map[string]any{"type": "FeatureCollection", "features": feats, "truncated": false, "limit": 1000}, nil
+}
+
+func (f *fakeMapLayers) PlotLayer(ctx context.Context, _ port.MapLayerQuery) (map[string]any, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	feats := []map[string]any{}
+	if tid, err := tenant.FromContext(ctx); err == nil && tid == f.tenant {
+		feats = append(feats, f.plots...)
+	}
+	return map[string]any{"type": "FeatureCollection", "features": feats, "truncated": false}, nil
+}
+
+// fakePlotGeometry: thửa giả cho log GPS — xã, HTX, khoảng cách cấu hình được.
+type fakePlotGeometry struct {
+	mu     sync.Mutex
+	places map[uuid.UUID]port.PlotPlace
+	dist   map[uuid.UUID]func(lon, lat decimal.Decimal) decimal.Decimal
+	owners map[uuid.UUID][]uuid.UUID // nông hộ → thửa
+}
+
+func (f *fakePlotGeometry) put(ref, household uuid.UUID, p port.PlotPlace) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.places[ref] = p
+	if household != uuid.Nil {
+		f.owners[household] = append(f.owners[household], ref)
+	}
+}
+
+func (f *fakePlotGeometry) PlotPlace(_ context.Context, ref uuid.UUID, lon, lat *decimal.Decimal) (port.PlotPlace, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	p, ok := f.places[ref]
 	if !ok {
-		return partyport.Org{}, partyport.ErrOrgNotFound
+		return port.PlotPlace{}, false, nil
 	}
-	return o, nil
+	p.DistanceM = nil
+	if d := f.dist[ref]; d != nil && lon != nil && lat != nil {
+		v := d(*lon, *lat).Round(1)
+		p.DistanceM = &v
+	}
+	return p, true, nil
 }
 
-func (f *coopRegistry) ByCode(_ context.Context, code string) (partyport.Org, error) {
+func (f *fakePlotGeometry) PlotsOfHouseholds(_ context.Context, hh []uuid.UUID) ([]uuid.UUID, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for _, o := range f.orgs {
-		if o.Code == code {
-			return o, nil
-		}
-	}
-	return partyport.Org{}, partyport.ErrOrgNotFound
-}
-
-type fakeMarkers struct {
-	mu sync.Mutex
-	ms []partyport.CoopMarker
-}
-
-func (f *fakeMarkers) MarkersInBBox(_ context.Context, minLon, minLat, maxLon, maxLat float64, _ int) ([]partyport.CoopMarker, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	var out []partyport.CoopMarker
-	for _, m := range f.ms {
-		lon, lat := m.Lon.InexactFloat64(), m.Lat.InexactFloat64()
-		if lon >= minLon && lon <= maxLon && lat >= minLat && lat <= maxLat {
-			out = append(out, m)
-		}
+	out := []uuid.UUID{}
+	for _, h := range hh {
+		out = append(out, f.owners[h]...)
 	}
 	return out, nil
 }
 
 type g2 struct {
 	*fixture
-	orgs    *coopRegistry
-	markers *fakeMarkers
-	params  *paramValues
-	coopC   uuid.UUID // HTX ở xã 31120
-	prov92  uuid.UUID // tổ chức cấp tỉnh Cần Thơ (92)
-	prov89  uuid.UUID // tổ chức cấp tỉnh An Giang (89)
+	layers *fakeMapLayers
+	plots  *fakePlotGeometry
+	params *paramValues
+	coopC  uuid.UUID // HTX ở xã 31120
+	prov92 uuid.UUID // tổ chức cấp tỉnh Cần Thơ (92)
+	prov89 uuid.UUID // tổ chức cấp tỉnh An Giang (89)
 }
 
 func newG2(t *testing.T) *g2 {
-	orgs := &coopRegistry{orgs: map[uuid.UUID]partyport.Org{}}
-	markers := &fakeMarkers{}
 	params := &paramValues{m: map[string]decimal.Decimal{}}
 	tol := decimal.NewFromInt(1)
-	f := newFixture(t, func(d *geo.Deps) {
-		d.Orgs, d.CoopMarkers, d.Params = orgs, markers, fakeParams{tolerance: &tol, values: params}
-	})
-	g := &g2{fixture: f, orgs: orgs, markers: markers, params: params, coopC: ids.New(), prov92: ids.New(), prov89: ids.New()}
-	orgs.add(f.coopA, "HTXA", "31117")
-	orgs.add(f.coopB, "HTXB", "31117")
-	orgs.add(g.coopC, "HTXC", "31120")
+	f := newFixture(t, func(d *geo.Deps) { d.Params = fakeParams{tolerance: &tol, values: params} })
+	g := &g2{fixture: f, params: params, coopC: ids.New(), prov92: ids.New(), prov89: ids.New(),
+		layers: &fakeMapLayers{tenant: f.tenant}, plots: &fakePlotGeometry{places: map[uuid.UUID]port.PlotPlace{}, owners: map[uuid.UUID][]uuid.UUID{},
+			dist: map[uuid.UUID]func(lon, lat decimal.Decimal) decimal.Decimal{}}}
+	f.mod.UseMapLayers(g.layers)
+	f.mod.UsePlots(g.plots)
 	f.scope.set(g.coopC, authz.Scope{Units: []string{"31120"}})
 	f.scope.set(g.prov92, authz.Scope{Units: []string{"92", "31117", "31120"}})
 	f.scope.set(g.prov89, authz.Scope{Units: []string{"89", "30001"}})
@@ -160,13 +181,6 @@ func g2BBox(path string) string {
 		sep = "&"
 	}
 	return fmt.Sprintf("%s%sbbox=%f,%f,%f,%f", path, sep, baseLon-0.05, baseLat-0.05, baseLon+0.1, baseLat+0.1)
-}
-
-func (c caller) createCoop(coop uuid.UUID, geom map[string]any) resp {
-	c.f.t.Helper()
-	r := c.appDo(http.MethodPost, "/v1/geo/cooperative-boundaries", map[string]any{"cooperative_ref": coop.String(), "geometry": geom})
-	expect(c.f.t, r, http.StatusCreated, "tạo ranh giới HTX")
-	return r
 }
 
 func featureRefs(r resp) []string {
@@ -233,146 +247,24 @@ func outboxCount(t *testing.T, f *fixture, eventType, key, val string) int {
 // Ranh giới HTX
 // ---------------------------------------------------------------------------
 
-// GIS US-BND-02 AC-1/AC-2, US-BND-03 AC-1/AC-2 (BRD FN-04 BR-13/14): ranh giới HTX
-// là sổ phiên bản — diện tích trắc địa tính trong DB, sửa bằng bản ghi bù có lý
-// do, xóa mềm ẩn khỏi bản đồ nhưng giữ lịch sử và người xóa; chuỗi băm hợp lệ.
-func TestCoopBoundaryLedger_GIS_US_BND_02_03(t *testing.T) {
-	g := newG2(t)
-	c := g.officerA()
-
-	// AC-2: thiếu HTX → chặn lưu kèm thông báo.
-	r := c.appDo(http.MethodPost, "/v1/geo/cooperative-boundaries", map[string]any{"geometry": rect(0, 0, 1000, 1000)})
-	if r.status != http.StatusUnprocessableEntity || str(r.body, "detail") != domain.MsgCoopRequired {
-		t.Fatalf("thiếu HTX: %d %s", r.status, r.raw)
-	}
-	r = c.createCoop(g.coopA, rect(0, 0, 1000, 1000))
-	if a := dec(t, r.body, "cooperative", "properties", "area_ha"); !near(a, decimal.NewFromInt(100), "0.05") {
-		t.Fatalf("diện tích trắc địa = %s, muốn 100 ha", a)
-	}
-	v1 := str(r.body, "boundary", "boundary_id")
-	if str(r.body, "cooperative", "properties", "commune_code") != "31117" || str(r.body, "boundary", "source") != domain.CoopSourceGeoWeb {
-		t.Fatalf("xã/nguồn sai: %s", r.raw)
-	}
-	// Đã có ranh giới → phải gửi phiên bản mới.
-	r = c.appDo(http.MethodPost, "/v1/geo/cooperative-boundaries", map[string]any{"cooperative_ref": g.coopA.String(), "geometry": rect(0, 0, 900, 900)})
-	if r.status != http.StatusConflict || code(r) != "geo.cooperative_boundary_exists" {
-		t.Fatalf("tạo lần 2: %d %s", r.status, r.raw)
-	}
-	path := "/v1/geo/cooperative-boundaries/" + g.coopA.String()
-	r = c.appDo(http.MethodPost, path+"/versions", map[string]any{"supersedes_id": v1, "correction_reason": "ngắn", "geometry": rect(0, 0, 1000, 1200)})
-	expect(t, r, http.StatusUnprocessableEntity, "lý do ngắn")
-	r = c.appDo(http.MethodPost, path+"/versions", map[string]any{"supersedes_id": v1, "correction_reason": "Đo lại ranh giới theo bản đồ địa chính", "geometry": rect(0, 0, 1000, 1200)})
-	expect(t, r, http.StatusCreated, "sửa ranh giới HTX")
-	v2 := str(r.body, "boundary", "boundary_id")
-	if num(r.body, "boundary", "version") != 2 || str(r.body, "boundary", "supersedes_id") != v1 ||
-		!near(dec(t, r.body, "cooperative", "properties", "area_ha"), decimal.NewFromInt(120), "0.06") {
-		t.Fatalf("phiên bản 2 sai: %s", r.raw)
-	}
-	r = c.appDo(http.MethodPost, path+"/versions", map[string]any{"supersedes_id": v1, "correction_reason": "Sửa dựa trên bản cũ đã bị thay", "geometry": rect(0, 0, 500, 500)})
-	if r.status != http.StatusConflict || code(r) != "geo.version_conflict" || str(r.body, "current_boundary_id") != v2 {
-		t.Fatalf("sửa trên bản cũ: %d %s", r.status, r.raw)
-	}
-
-	// AC-2 (US-BND-03): xóa mềm — ẩn khỏi bản đồ dùng chung, lịch sử + người xóa còn đủ.
-	r = c.appDo(http.MethodPost, path+"/retire", map[string]any{"reason": "HTX giải thể theo quyết định của xã"})
-	expect(t, r, http.StatusOK, "ngừng dùng")
-	if str(r.body, "cooperative", "properties", "status") != "retired" || str(r.body, "boundary", "actor_ref") != c.actor.String() {
-		t.Fatalf("ngừng dùng: %s", r.raw)
-	}
-	if has(featureRefs(c.appDo(http.MethodGet, g2BBox("/v1/geo/cooperative-boundaries"), nil)), g.coopA.String()) {
-		t.Fatal("ranh giới đã ngừng dùng vẫn hiện trên bản đồ")
-	}
-	r = c.appDo(http.MethodGet, path, nil)
-	expect(t, r, http.StatusOK, "đọc lịch sử")
-	vs := list(r.body, "versions")
-	if len(vs) != 3 || str(vs[2], "action") != "retired" || str(vs[2], "correction_reason") == "" || get(vs[0], "geometry") == nil {
-		t.Fatalf("lịch sử = %s", r.raw)
-	}
-	r = c.appDo(http.MethodPost, path+"/versions", map[string]any{"supersedes_id": str(vs[2], "boundary_id"), "correction_reason": "Sửa khi đã ngừng dùng thì phải chặn", "geometry": rect(0, 0, 500, 500)})
-	if r.status != http.StatusConflict || code(r) != "geo.feature_state_conflict" {
-		t.Fatalf("sửa khi đã ngừng dùng: %d %s", r.status, r.raw)
-	}
-	r = c.appDo(http.MethodPost, path+"/restore", map[string]any{"reason": "Khôi phục do xóa nhầm HTX"})
-	expect(t, r, http.StatusOK, "khôi phục")
-	if !has(featureRefs(c.appDo(http.MethodGet, g2BBox("/v1/geo/cooperative-boundaries"), nil)), g.coopA.String()) {
-		t.Fatal("ranh giới khôi phục không hiện lại")
-	}
-	if n := outboxCount(t, g.fixture, port.EventCooperativeBoundaryRecorded, "cooperative_ref", g.coopA.String()); n != 4 {
-		t.Fatalf("số sự kiện %s = %d, muốn 4", port.EventCooperativeBoundaryRecorded, n)
-	}
-	verifyChain(t, g.fixture, "pf_geo.cooperative_boundary", "cooperative:"+g.coopA.String())
-	mustFailUpdate(t, g.fixture, "UPDATE pf_geo.cooperative_boundary SET area_ha = 1 WHERE cooperative_ref = $1", g.coopA)
-	mustFailUpdate(t, g.fixture, "DELETE FROM pf_geo.cooperative_area WHERE cooperative_ref = $1", g.coopA)
-}
-
-// Phạm vi cây phân cấp (ADR-0009) + quản lý HTX chỉ HTX mình (GIS US-BND-02).
-func TestCoopBoundaryScope_GIS_US_BND_02(t *testing.T) {
-	g := newG2(t)
-	// Cán bộ xã 31120 không vẽ được cho HTX ở xã 31117.
-	r := g.officerB().appDo(http.MethodPost, "/v1/geo/cooperative-boundaries", map[string]any{"cooperative_ref": g.coopA.String(), "geometry": rect(0, 0, 500, 500)})
-	if r.status != http.StatusForbidden || code(r) != "geo.out_of_scope" {
-		t.Fatalf("cán bộ xã khác: %d %s", r.status, r.raw)
-	}
-	// Quản lý HTX A không vẽ cho HTX B; vẽ cho HTX mình (mặc định HTX mình, nguồn htx_app).
-	m := g.managerA()
-	r = m.appDo(http.MethodPost, "/v1/geo/cooperative-boundaries", map[string]any{"cooperative_ref": g.coopB.String(), "geometry": rect(0, 0, 500, 500)})
-	expect(t, r, http.StatusForbidden, "quản lý HTX vẽ cho HTX khác")
-	r = m.appDo(http.MethodPost, "/v1/geo/cooperative-boundaries", map[string]any{"geometry": rect(0, 0, 500, 500)})
-	expect(t, r, http.StatusCreated, "quản lý HTX vẽ cho HTX mình")
-	if str(r.body, "boundary", "cooperative_ref") != g.coopA.String() || str(r.body, "boundary", "source") != domain.CoopSourceHTXApp {
-		t.Fatalf("mặc định HTX mình/nguồn: %s", r.raw)
-	}
-	g.officerA().createCoop(g.coopB, rect(2000, 0, 500, 500))
-	g.as(g.tenant, g.coopC, port.RolePlotEditor).createCoop(g.coopC, rect(4000, 0, 500, 500))
-
-	// Tỉnh thấy cả ba; xã 31117 thấy A, B; quản lý HTX A chỉ thấy A; xã 31120 chỉ thấy C.
-	for _, tc := range []struct {
-		name string
-		c    caller
-		want []uuid.UUID
-	}{
-		{"tỉnh", g.as(g.tenant, g.prov92, port.RolePlotViewer), []uuid.UUID{g.coopA, g.coopB, g.coopC}},
-		{"xã 31117", g.officerA(), []uuid.UUID{g.coopA, g.coopB}},
-		{"quản lý HTX A", m, []uuid.UUID{g.coopA}},
-		{"xã 31120", g.officerB(), []uuid.UUID{g.coopC}},
-	} {
-		got := featureRefs(tc.c.appDo(http.MethodGet, g2BBox("/v1/geo/cooperative-boundaries"), nil))
-		if len(got) != len(tc.want) {
-			t.Fatalf("%s thấy %v, muốn %v", tc.name, got, tc.want)
-		}
-		for _, w := range tc.want {
-			if !has(got, w.String()) {
-				t.Fatalf("%s không thấy %s", tc.name, w)
-			}
-		}
-	}
-	expect(t, m.appDo(http.MethodGet, "/v1/geo/cooperative-boundaries/"+g.coopB.String(), nil), http.StatusNotFound, "quản lý HTX đọc HTX khác")
-	r = m.appDo(http.MethodPost, "/v1/geo/cooperative-boundaries/"+g.coopB.String()+"/retire", map[string]any{"reason": "Quản lý HTX khác không được xóa"})
-	expect(t, r, http.StatusNotFound, "quản lý HTX xóa HTX khác")
-	// Không có vai → 403.
-	expect(t, g.as(g.tenant, g.orgA, "mrv_viewer").appDo(http.MethodGet, g2BBox("/v1/geo/cooperative-boundaries"), nil), http.StatusForbidden, "không vai")
-}
-
 // Cách ly tenant (RB-2) cho ranh giới HTX, kho/Hub, đường bộ.
 func TestG2TenantIsolation(t *testing.T) {
 	g := newG2(t)
-	g.officerA().createCoop(g.coopA, rect(0, 0, 500, 500))
 	admin := g.national()
 	expect(t, admin.adminJSON("/v1/geo/facilities", map[string]any{"kind": "kho", "name": "Kho A",
 		"point": point(100, 100), "province_code": "92", "commune_code": "31117", "capacity": "500"}), http.StatusCreated, "tạo kho")
 	expect(t, admin.adminJSON("/v1/geo/roads", map[string]any{"name": "ĐT 922", "road_class": "tinh_lo", "max_load_tons": "30",
 		"geometry": line([2]float64{0, 0}, [2]float64{1000, 0}), "province_code": "92"}), http.StatusCreated, "tạo đường")
 
-	other := g.as(ids.New(), uuid.Nil, port.RolePlotViewer, port.RoleGeoAdmin, authz.RolePlatformAdmin)
-	for _, p := range []string{"/v1/geo/cooperative-boundaries", "/v1/geo/facilities", "/v1/geo/roads"} {
+	other := g.as(ids.New(), uuid.Nil, port.RoleGeoAdmin, authz.RolePlatformAdmin)
+	for _, p := range []string{"/v1/geo/facilities", "/v1/geo/roads"} {
 		if n := len(featureRefs(other.appDo(http.MethodGet, g2BBox(p), nil))); n != 0 {
 			t.Fatalf("tenant khác thấy %d đối tượng ở %s", n, p)
 		}
 	}
-	expect(t, other.appDo(http.MethodGet, "/v1/geo/cooperative-boundaries/"+g.coopA.String(), nil), http.StatusNotFound, "tenant khác đọc HTX")
 }
 
-// R-51: gọi lặp POST cùng Idempotency-Key trả đúng phản hồi lần đầu (ranh giới HTX, kho, đường).
+// R-51: gọi lặp POST cùng Idempotency-Key trả đúng phản hồi lần đầu (kho, đường; ranh giới HTX ở pf/cooperative).
 func TestG2IdempotentReplay(t *testing.T) {
 	g := newG2(t)
 	for _, tc := range []struct {
@@ -380,7 +272,6 @@ func TestG2IdempotentReplay(t *testing.T) {
 		c          caller
 		body       map[string]any
 	}{
-		{g.app.URL, "/v1/geo/cooperative-boundaries", g.officerA(), map[string]any{"cooperative_ref": g.coopA.String(), "geometry": rect(0, 0, 300, 300)}},
 		{g.admin.URL, "/v1/geo/facilities", g.national(), map[string]any{"kind": "hub", "name": "Hub Thới Lai", "point": point(10, 10), "province_code": "92", "commune_code": "31117", "capacity": 1000}},
 		{g.admin.URL, "/v1/geo/roads", g.national(), map[string]any{"name": "Bờ kênh 1", "road_class": "bo_ruong", "max_load_tons": 2, "geometry": line([2]float64{0, 0}, [2]float64{0, 300}), "province_code": "92"}},
 	} {
@@ -395,102 +286,6 @@ func TestG2IdempotentReplay(t *testing.T) {
 	}
 	if n := len(featureRefs(g.national().appDo(http.MethodGet, g2BBox("/v1/geo/facilities"), nil))); n != 1 {
 		t.Fatalf("số kho sau 2 lần gọi = %d", n)
-	}
-}
-
-// GIS US-BND-07: nhập hàng loạt ranh giới HTX (GeoJSON, Shapefile) — HTX theo
-// cooperative_ref hoặc Mã HTX; HTX đã có ranh giới → phiên bản mới; hệ toạ độ
-// khác WGS84 → geo.crs_unsupported cho cả tệp.
-func TestCoopBoundaryImport_GIS_US_BND_07(t *testing.T) {
-	g := newG2(t)
-	admin := g.as(g.tenant, g.prov92, port.RoleGeoAdmin)
-	fc := func(feats ...map[string]any) []byte {
-		b, _ := json.Marshal(map[string]any{"type": "FeatureCollection", "features": feats})
-		return b
-	}
-	feat := func(props map[string]any, geom map[string]any) map[string]any {
-		return map[string]any{"type": "Feature", "properties": props, "geometry": geom}
-	}
-	data := fc(
-		feat(map[string]any{"cooperative_ref": g.coopA.String(), "name": "HTX A"}, rect(0, 0, 500, 500)),
-		feat(map[string]any{"ma_htx": "HTXB"}, rect(1000, 0, 500, 500)),
-		feat(map[string]any{"name": "Không rõ HTX"}, rect(2000, 0, 500, 500)),
-		feat(map[string]any{"cooperative_ref": g.coopA.String()}, map[string]any{"type": "Point", "coordinates": []float64{105.6, 10.05}}),
-	)
-	r := admin.adminPost("/v1/geo/cooperative-boundaries/import?format=geojson&file_name=htx.geojson", "application/geo+json", data)
-	expect(t, r, http.StatusOK, "nhập GeoJSON")
-	if num(r.body, "accepted") != 2 || num(r.body, "rejected") != 2 {
-		t.Fatalf("kết quả nhập: %s", r.raw)
-	}
-	fs := list(r.body, "features")
-	if str(fs[1], "cooperative_ref") != g.coopB.String() || str(fs[2], "code") != "validation_failed" || str(fs[3], "code") != "geo.invalid_geometry" {
-		t.Fatalf("từng đối tượng: %s", r.raw)
-	}
-	// Nhập lại HTX A → phiên bản 2 thay phiên bản 1, lý do mặc định nêu tên tệp.
-	r = admin.adminPost("/v1/geo/cooperative-boundaries/import?file_name=htx_v2.geojson", "application/geo+json",
-		fc(feat(map[string]any{"cooperative_ref": g.coopA.String()}, rect(0, 0, 600, 600))))
-	expect(t, r, http.StatusOK, "nhập lại")
-	if f0 := list(r.body, "features")[0]; str(f0, "status") != "accepted" || get(f0, "replaced") != true || num(f0, "version") != 2 {
-		t.Fatalf("nhập đè: %s", r.raw)
-	}
-	d := g.officerA().appDo(http.MethodGet, "/v1/geo/cooperative-boundaries/"+g.coopA.String(), nil)
-	if vs := list(d.body, "versions"); len(vs) != 2 || !strings.Contains(str(vs[1], "correction_reason"), "htx_v2.geojson") || str(vs[1], "source") != "import_file" {
-		t.Fatalf("lịch sử sau nhập: %s", d.raw)
-	}
-	// Shapefile WGS84 có trường MA_HTX; VN-2000 → từ chối cả tệp.
-	sq := func(e, n, w float64) []shptest.Point {
-		dLat, dLon := degPerMetre(baseLat)
-		x0, y0 := baseLon+e*dLon, baseLat+n*dLat
-		x1, y1 := x0+w*dLon, y0+w*dLat
-		return []shptest.Point{{x0, y0}, {x0, y1}, {x1, y1}, {x1, y0}, {x0, y0}}
-	}
-	shp := []shptest.Feature{{Parts: []shptest.Polygon{{Outer: sq(5000, 0, 400)}}, Attrs: map[string]string{"MA_HTX": "HTXC"}}}
-	r = admin.adminPost("/v1/geo/cooperative-boundaries/import?file_name=htx.zip", "application/zip", shptest.Zip([]string{"MA_HTX"}, shp, shptest.WGS84, shptest.Options{Base: "htx"}))
-	if r.status != http.StatusOK || num(r.body, "accepted") != 1 {
-		t.Fatalf("Shapefile WGS84: %d %s", r.status, r.raw)
-	}
-	r = admin.adminPost("/v1/geo/cooperative-boundaries/import?file_name=htx.zip", "application/zip", shptest.Zip([]string{"MA_HTX"}, shp, shptest.VN2000UTM48, shptest.Options{Base: "htx"}))
-	if r.status != http.StatusUnprocessableEntity || code(r) != "geo.crs_unsupported" {
-		t.Fatalf("Shapefile VN-2000: %d %s", r.status, r.raw)
-	}
-	// Admin tỉnh An Giang nhập cho HTX Cần Thơ → ngoài phạm vi (từng đối tượng).
-	r = g.geoAdmin89().adminPost("/v1/geo/cooperative-boundaries/import", "application/geo+json",
-		fc(feat(map[string]any{"cooperative_ref": g.coopB.String()}, rect(0, 3000, 300, 300))))
-	if r.status != http.StatusOK || str(list(r.body, "features")[0], "code") != "geo.out_of_scope" {
-		t.Fatalf("nhập ngoài phạm vi: %s", r.raw)
-	}
-	// Không có vai quản trị GIS → 403.
-	expect(t, g.officerA().adminPost("/v1/geo/cooperative-boundaries/import", "application/geo+json", data), http.StatusForbidden, "không vai geo_admin")
-}
-
-// Marker HTX: điểm pf_party.cooperative.location được ưu tiên cho HTX có ranh giới,
-// HTX chưa có ranh giới hiện bằng điểm (GIS US-BND-02 "gắn Marker").
-func TestCoopMarkersFallback_GIS_US_BND_02(t *testing.T) {
-	g := newG2(t)
-	g.officerA().createCoop(g.coopA, rect(0, 0, 500, 500))
-	dLat, dLon := degPerMetre(baseLat)
-	at := func(e, n float64) (decimal.Decimal, decimal.Decimal) {
-		return decimal.NewFromFloat(baseLon + e*dLon), decimal.NewFromFloat(baseLat + n*dLat)
-	}
-	lonA, latA := at(250, 250)
-	lonB, latB := at(3000, 0)
-	g.markers.mu.Lock()
-	g.markers.ms = []partyport.CoopMarker{
-		{Ref: g.coopA, Code: "HTXA", Name: "HTX A", CommuneCode: "31117", Lon: lonA, Lat: latA},
-		{Ref: g.coopB, Code: "HTXB", Name: "HTX B", CommuneCode: "31117", Lon: lonB, Lat: latB},
-		{Ref: g.coopC, Code: "HTXC", Name: "HTX C", CommuneCode: "31120", Lon: lonB, Lat: latB},
-	}
-	g.markers.mu.Unlock()
-	r := g.officerA().appDo(http.MethodGet, g2BBox("/v1/geo/cooperative-boundaries"), nil)
-	fs := list(r.body, "features")
-	if len(fs) != 2 {
-		t.Fatalf("muốn 1 vùng + 1 marker (HTX C ngoài phạm vi): %s", r.raw)
-	}
-	if str(fs[0], "properties", "marker_source") != "party_location" || str(fs[0], "geometry", "type") != "MultiPolygon" {
-		t.Fatalf("vùng HTX A: %s", r.raw)
-	}
-	if str(fs[1], "id") != g.coopB.String() || str(fs[1], "geometry", "type") != "Point" {
-		t.Fatalf("marker HTX B: %s", r.raw)
 	}
 }
 
@@ -575,7 +370,7 @@ func TestFacilityLedger_GIS_US_BND_05_06(t *testing.T) {
 	// AC-2: xóa mềm — ẩn khỏi bản đồ, lịch sử + người xóa còn đủ.
 	r = admin.adminJSON("/v1/geo/facilities/"+ref+"/retire", map[string]any{"reason": "Kho ngừng hợp đồng thuê"})
 	expect(t, r, http.StatusOK, "ngừng dùng kho")
-	viewer := g.as(g.tenant, g.orgA, port.RolePlotViewer)
+	viewer := g.as(g.tenant, g.orgA, rolePlotViewer)
 	if has(featureRefs(viewer.appDo(http.MethodGet, g2BBox("/v1/geo/facilities"), nil)), ref) {
 		t.Fatal("kho đã ngừng dùng vẫn hiện")
 	}
@@ -664,7 +459,7 @@ func TestCapacityManualNotOverwritten_BR52_GIS_US_WH_01(t *testing.T) {
 	if ok, err := sink.AppendHubCapacity(ctx, c); err != nil || ok {
 		t.Fatalf("van lặp cùng as_of phải bỏ qua: %v %v", ok, err)
 	}
-	viewer := g.as(g.tenant, g.orgA, port.RolePlotViewer)
+	viewer := g.as(g.tenant, g.orgA, rolePlotViewer)
 	widget := func() map[string]any {
 		t.Helper()
 		r := viewer.appDo(http.MethodGet, g2BBox("/v1/geo/capacity-widgets"), nil)
@@ -827,7 +622,7 @@ func TestRoadLedger_GIS_US_ROAD_01_02_03(t *testing.T) {
 		"geometry": line([2]float64{0, 100}, [2]float64{0, 300}), "province_code": "92"})
 	expect(t, r, http.StatusCreated, "vẽ bờ ruộng")
 
-	viewer := g.as(g.tenant, g.orgA, port.RolePlotViewer)
+	viewer := g.as(g.tenant, g.orgA, rolePlotViewer)
 	r = viewer.appDo(http.MethodGet, g2BBox("/v1/geo/roads?min_load_tons=10"), nil)
 	if ids := featureRefs(r); len(ids) != 1 || ids[0] != road || r.body["none_matched"] != false {
 		t.Fatalf("lọc ≥ 10 t: %s", r.raw)
@@ -877,7 +672,14 @@ func TestRoadLedger_GIS_US_ROAD_01_02_03(t *testing.T) {
 // theo phạm vi + cursor; khoảng cách tới lô tính trắc địa (HTX US-GPS-01).
 func TestGpsFixLog_HTX_US_GPS_03(t *testing.T) {
 	g := newG2(t)
-	plot, _ := g.managerA().createPlot("31117", g.coopA, rect(0, 0, 100, 100))
+	// Thửa 100 m × 100 m ở góc gốc (pf/cooperative giả): khoảng cách theo trục đông khi điểm ở giữa theo trục bắc.
+	plot := ids.New()
+	g.plots.put(plot, uuid.Nil, port.PlotPlace{CommuneCode: "31117", CooperativeRef: g.coopA})
+	g.plots.dist[plot] = func(lon, _ decimal.Decimal) decimal.Decimal {
+		_, dLon := degPerMetre(baseLat)
+		e := (lon.InexactFloat64() - baseLon) / dLon
+		return decimal.NewFromFloat(math.Max(0, e-100))
+	}
 	log := g.mod.GpsLog()
 	ctx := hubCtx(g.fixture)
 	farmer := ids.New()
@@ -934,7 +736,7 @@ func TestGpsFixLog_HTX_US_GPS_03(t *testing.T) {
 	if n := count(g.officerB(), ""); n != 0 {
 		t.Fatalf("xã 31120 thấy %d", n)
 	}
-	if n := count(g.as(g.tenant, g.coopB, port.RolePlotEditor, port.RoleCoopManager), ""); n != 0 {
+	if n := count(g.as(g.tenant, g.coopB, rolePlotEditor, port.RoleCoopManager), ""); n != 0 {
 		t.Fatalf("HTX B thấy log của HTX A: %d", n)
 	}
 	if n := count(g.managerA(), "?purpose=harvest"); n != 1 {
@@ -974,8 +776,9 @@ func TestGpsFixLog_HTX_US_GPS_03(t *testing.T) {
 // geo.plot_layer_min_zoom (mặc định 13).
 func TestLayersZoomGate_GIS_BR24(t *testing.T) {
 	g := newG2(t)
-	g.officerA().createPlot("31117", uuid.Nil, rect(0, 0, 100, 100))
-	g.officerA().createCoop(g.coopA, rect(0, 0, 500, 500))
+	// Lớp thửa, lớp HTX do pf/cooperative dựng (geoport.MapLayers giả, W3.3) — pf/geo chỉ ghép và chặn theo zoom.
+	g.layers.plots = append(g.layers.plots, feature(ids.New(), "plots"))
+	g.layers.coops = append(g.layers.coops, feature(g.coopA, "cooperatives"))
 	c := g.national()
 	r := c.appDo(http.MethodGet, g2BBox("/v1/geo/layers?zoom=12"), nil)
 	expect(t, r, http.StatusOK, "lớp zoom 12")

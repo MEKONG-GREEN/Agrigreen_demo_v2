@@ -127,7 +127,8 @@ func (f *aggFx) seedHarvest(tid uuid.UUID, mass string, communes ...string) {
 	}
 	for _, c := range communes {
 		season := ids.New()
-		if _, err := tx.Exec(f.ctx, `INSERT INTO pf_cropcycle.harvest_declaration (id, tenant_id, stream_key, season_ref, plot_ref,
+		// W3.3: sổ khai sản lượng ở pf_coop (view pf_cropcycle_pub.v1_harvest_declaration bám OID).
+		if _, err := tx.Exec(f.ctx, `INSERT INTO pf_coop.harvest_declaration (id, tenant_id, stream_key, season_ref, plot_ref,
 		    cooperative_ref, commune_code, season_code, season_year, variety_code, harvest_date, mass_kg, area_ha, yield_t_per_ha,
 		    anomaly_confirmed, source, gps_source, location_status, on_behalf, event_time, actor_ref, idem_key, rule_version)
 		  VALUES ($1, $2, 'harvest:' || $3::uuid::text, $3, $4, $5, $6, 'he_thu', 2026, 'OM5451', '2026-09-01', $7::numeric, 1, $7::numeric / 1000,
@@ -403,10 +404,10 @@ func TestAggRunRefusedAndRoleScope_W64(t *testing.T) {
 	// Giao dịch job chỉ đọc; r_agg không ghi được, không đọc bảng nội bộ.
 	err = db.WithAggTx(f.ctx, f.agg.DB, aggOwner, f.gov, func(pgx.Tx) error { return nil }, func(a db.AggTx) error {
 		for q, code := range map[string]string{
-			`SELECT count(*) FROM pf_cropcycle.harvest_declaration`: "42501",
-			`SELECT count(*) FROM pf_metrics.agg_job`:               "42501",
-			`SELECT count(ref) FROM k_ref.org`:                      "42501",
-			`CREATE TEMP TABLE agg_probe (a int)`:                   "25006",
+			`SELECT count(*) FROM pf_coop.harvest_declaration`: "42501",
+			`SELECT count(*) FROM pf_metrics.agg_job`:          "42501",
+			`SELECT count(ref) FROM k_ref.org`:                 "42501",
+			`CREATE TEMP TABLE agg_probe (a int)`:              "25006",
 		} {
 			_, _ = a.Tx().Exec(f.ctx, "SAVEPOINT p")
 			if _, err := a.Tx().Exec(f.ctx, q); pgCode(err) != code {
