@@ -27,35 +27,35 @@ import (
 
 const feedHP = apiclientport.FeedHarvestProgress
 
-// onboardFeed: khÃ¡ch hÃ ng API (Ä‘á» xuáº¥t â‰  duyá»‡t) + Ä‘Äƒng kÃ½ feed harvest_progress_by_commune (scope feed:<tÃªn>:read,
-// bá»‘n máº¯t) + gÃ³i háº¡n má»©c + khÃ³a API HMAC. Tráº£ bÃ­ máº­t khÃ³a.
+// onboardFeed: khách hàng API (đề xuất ≠ duyệt) + đăng ký feed harvest_progress_by_commune (scope feed:<tên>:read,
+// bốn mắt) + gói hạn mức + khóa API HMAC. Trả bí mật khóa.
 func (e *intEnv) onboardFeed() (clientID, key string) {
 	t := e.t
 	tenantB := ids.New()
 	ad, ap := e.adminAs(e.operator, apiclientport.RoleAPIClientAdmin), e.adminAs(e.operator, apiclientport.RoleAPIClientApprover)
-	r := ad(http.MethodPost, "/v1/api-clients", map[string]any{"client_tenant_id": tenantB.String(), "display_name": "Äá»‘i tÃ¡c feed (thá»­)",
-		"purpose": "Äiá»u phá»‘i gom rÆ¡m theo tiáº¿n Ä‘á»™ gáº·t tá»«ng xÃ£", "contact_ref": ids.New().String()})
-	want(t, r, http.StatusCreated, "Ä‘á» xuáº¥t khÃ¡ch hÃ ng API")
+	r := ad(http.MethodPost, "/v1/api-clients", map[string]any{"client_tenant_id": tenantB.String(), "display_name": "Đối tác feed (thử)",
+		"purpose": "Điều phối gom rơm theo tiến độ gặt từng xã", "contact_ref": ids.New().String()})
+	want(t, r, http.StatusCreated, "đề xuất khách hàng API")
 	clientID = r.body["id"].(string)
-	want(t, ap(http.MethodPost, "/v1/api-clients/"+clientID+"/approve", nil), http.StatusOK, "duyá»‡t khÃ¡ch hÃ ng")
+	want(t, ap(http.MethodPost, "/v1/api-clients/"+clientID+"/approve", nil), http.StatusOK, "duyệt khách hàng")
 	r = ad(http.MethodPost, "/v1/api-clients/"+clientID+"/subscriptions", map[string]any{"product": feedHP, "scopes": []string{"dp:x:read"}})
-	want(t, r, http.StatusUnprocessableEntity, "scope láº¡ cho feed bá»‹ tá»« chá»‘i")
+	want(t, r, http.StatusUnprocessableEntity, "scope lạ cho feed bị từ chối")
 	r = ad(http.MethodPost, "/v1/api-clients/"+clientID+"/subscriptions", map[string]any{"product": feedHP,
 		"scopes": []string{apiclientport.FeedScope(feedHP), apiclientport.ScopeUsageRead}})
-	want(t, r, http.StatusCreated, "Ä‘á» xuáº¥t Ä‘Äƒng kÃ½ feed")
-	want(t, ap(http.MethodPost, "/v1/api-clients/"+clientID+"/subscriptions/"+r.body["id"].(string)+"/approve", nil), http.StatusOK, "duyá»‡t Ä‘Äƒng kÃ½ feed")
+	want(t, r, http.StatusCreated, "đề xuất đăng ký feed")
+	want(t, ap(http.MethodPost, "/v1/api-clients/"+clientID+"/subscriptions/"+r.body["id"].(string)+"/approve", nil), http.StatusOK, "duyệt đăng ký feed")
 	r = ad(http.MethodPost, "/v1/api-clients/"+clientID+"/plans", map[string]any{"requests_per_minute": 600, "daily_units": 1000,
 		"monthly_units": 10000, "max_export_rows": 1000})
-	want(t, r, http.StatusCreated, "Ä‘á» xuáº¥t gÃ³i háº¡n má»©c")
-	want(t, ap(http.MethodPost, fmt.Sprintf("/v1/api-clients/%s/plans/%v/approve", clientID, r.body["version"]), nil), http.StatusOK, "duyá»‡t gÃ³i")
+	want(t, r, http.StatusCreated, "đề xuất gói hạn mức")
+	want(t, ap(http.MethodPost, fmt.Sprintf("/v1/api-clients/%s/plans/%v/approve", clientID, r.body["version"]), nil), http.StatusOK, "duyệt gói")
 	r = ad(http.MethodPost, "/v1/api-clients/"+clientID+"/keys", nil)
-	want(t, r, http.StatusCreated, "phÃ¡t hÃ nh khÃ³a")
+	want(t, r, http.StatusCreated, "phát hành khóa")
 	key, _ = r.body["api_key"].(string)
 	return clientID, key
 }
 
-// buildFeeds cháº¡y job dá»±ng cá»§a pf/apiclient (nhÆ° cmd/worker) trÃªn module THáº¬T cá»§a cá»•ng: nguá»“n Ã´ thÃ´ pf/cropcycle
-// (dá»¯ kiá»‡n thá»­a pf/cooperative â†’ pf/geo, Ä‘Æ¡n vá»‹ hÃ nh chÃ­nh + k á»Ÿ pf/masterdata), má»™t tenant Ä‘Ã³ng gÃ³p = bÃªn cáº¥p.
+// buildFeeds chạy job dựng của pf/apiclient (như cmd/worker) trên module THẬT của cổng: nguồn ô thô pf/cropcycle
+// (dữ kiện thửa pf/cooperative → pf/geo, đơn vị hành chính + k ở pf/masterdata), một tenant đóng góp = bên cấp.
 func (e *intEnv) buildFeeds() {
 	e.t.Helper()
 	pool, clk := e.pg.Pool(e.t, migrations.PF, dbadmin.AppPublic), clock.System{}
@@ -65,17 +65,17 @@ func (e *intEnv) buildFeeds() {
 	cc.UseCollectionVolume(cooperative.New(coopwire.Sources(coopwire.Legacy{PlotFacts: g.PlotFacts()})).Plots(), md.AdminUnits())
 	e.mod.UseFeedSources(cc.AggregateSource(), apiclientport.StaticContributors{e.grantor}, md.Params())
 	if _, err := e.mod.BuildFeeds(context.Background()); err != nil {
-		e.t.Fatalf("dá»±ng feed: %v", err)
+		e.t.Fatalf("dựng feed: %v", err)
 	}
 }
 
-// W5.3 (R-INT-05, R-INT-06, ADR-0033 Â§2, ADR-0035): GET /v1/feeds/{feed}?cursor= qua cá»•ng THáº¬T vá»›i khÃ³a API HMAC:
-//   - há»£p Ä‘á»“ng cÃ²n proposed â†’ 403 integration.contract_not_servable khi chÆ°a báº­t AG_GATEWAY_FEED_ALLOW_PROPOSED;
-//   - báº­t (ngoÃ i production) â†’ 200 phong bÃ¬ feed_page.v1, Ã´ dÆ°á»›i k khÃ´ng bao giá» cÃ³, k_used + tá»•ng kiá»ƒm, áº£nh chá»¥p
-//     chá»‰ lÃ  href; phÃ¢n trang theo cursor; cursor sai â†’ 400;
-//   - thiáº¿u scope feed:<tÃªn>:read â†’ 403; má»—i lá»i gá»i má»™t dÃ²ng sá»• Ä‘o lÆ°á»ng;
-//   - URL kÃ½ áº£nh chá»¥p cáº¥p lÃºc yÃªu cáº§u (â‰¤ 15 phÃºt), Ä‘o theo kÃ­ch thÆ°á»›c áº£nh chá»¥p;
-//   - báº£n ghi trong kho lá»‡ch há»£p Ä‘á»“ng â†’ 500 apiclient.contract_violation, khÃ´ng byte dá»¯ liá»‡u.
+// W5.3 (R-INT-05, R-INT-06, ADR-0033 §2, ADR-0035): GET /v1/feeds/{feed}?cursor= qua cổng THẬT với khóa API HMAC:
+//   - hợp đồng còn proposed → 403 integration.contract_not_servable khi chưa bật AG_INTEGRATION_ALLOW_UNAPPROVED;
+//   - bật (ngoài production) → 200 phong bì feed_page.v1, ô dưới k không bao giờ có, k_used + tổng kiểm, ảnh chụp
+//     chỉ là href; phân trang theo cursor; cursor sai → 400;
+//   - thiếu scope feed:<tên>:read → 403; mỗi lời gọi một dòng sổ đo lường;
+//   - URL ký ảnh chụp cấp lúc yêu cầu (≤ 15 phút), đo theo kích thước ảnh chụp;
+//   - bản ghi trong kho lệch hợp đồng → 500 apiclient.contract_violation, không byte dữ liệu.
 func TestFeedsOverGateway_W53Integration(t *testing.T) {
 	e := newIntEnv(t)
 	e.seedCollection()
@@ -84,7 +84,7 @@ func TestFeedsOverGateway_W53Integration(t *testing.T) {
 
 	r := e.call(http.MethodGet, "/v1/feeds/"+feedHP, key, nil)
 	if r.status != http.StatusForbidden || r.code() != apiclientport.ErrContractNotServable.Code {
-		t.Fatalf("há»£p Ä‘á»“ng proposed, chÆ°a báº­t cá» â†’ 403 integration.contract_not_servable: %d %s", r.status, r.raw)
+		t.Fatalf("hợp đồng proposed, chưa bật cờ → 403 integration.contract_not_servable: %d %s", r.status, r.raw)
 	}
 
 	d := e.deps
@@ -96,17 +96,17 @@ func TestFeedsOverGateway_W53Integration(t *testing.T) {
 	}
 
 	r = get("/v1/feeds/"+feedHP, key)
-	want(t, r, http.StatusOK, "Ä‘á»c feed")
+	want(t, r, http.StatusOK, "đọc feed")
 	if r.header.Get(apiclientport.HeaderDataContract) != feedHP+".v1" || r.header.Get("AG-Contract-Status") != "proposed" {
-		t.Fatalf("header há»£p Ä‘á»“ng: %v", r.header)
+		t.Fatalf("header hợp đồng: %v", r.header)
 	}
 	env, err := integration.EnvelopeFor(integration.KindFeed)
 	if err != nil || env.Validate(r.raw) != nil {
-		t.Fatalf("trang pháº£i khá»›p phong bÃ¬ feed_page.v1: %v %s", err, r.raw)
+		t.Fatalf("trang phải khớp phong bì feed_page.v1: %v %s", err, r.raw)
 	}
 	items, _ := r.body["items"].([]any)
 	if len(items) != 1 || !strings.Contains(string(r.raw), `"area_code":"31117"`) || strings.Contains(string(r.raw), "31120") {
-		t.Fatalf("chá»‰ xÃ£ 31117 (10 nÃ´ng há»™ = k); 31120 (3) vÃ  dÃ²ng withheld (3 < k) bá»‹ áº©n: %s", r.raw)
+		t.Fatalf("chỉ xã 31117 (10 nông hộ = k); 31120 (3) và dòng withheld (3 < k) bị ẩn: %s", r.raw)
 	}
 	ds, _ := r.body["dataset"].(map[string]any)
 	snap, _ := r.body["snapshot"].(map[string]any)
@@ -115,46 +115,46 @@ func TestFeedsOverGateway_W53Integration(t *testing.T) {
 	}
 	for _, banned := range []string{"household", "plot_ref", "sig=", "X-Amz"} {
 		if strings.Contains(string(r.raw), banned) {
-			t.Fatalf("trang feed khÃ´ng Ä‘Æ°á»£c cÃ³ %q: %s", banned, r.raw)
+			t.Fatalf("trang feed không được có %q: %s", banned, r.raw)
 		}
 	}
 	next := r.body["next_cursor"].(string)
 	r = get("/v1/feeds/"+feedHP+"?cursor="+next, key)
 	if r.status != http.StatusOK || len(r.body["items"].([]any)) != 0 || r.body["next_cursor"] != next || r.body["cursor"] != next {
-		t.Fatalf("Ä‘á»c tiáº¿p sau cursor: %d %s", r.status, r.raw)
+		t.Fatalf("đọc tiếp sau cursor: %d %s", r.status, r.raw)
 	}
 	if r = get("/v1/feeds/"+feedHP+"?cursor=@@", key); r.status != http.StatusBadRequest || r.code() != apiclientport.ErrInvalidCursor.Code {
-		t.Fatalf("cursor sai â†’ 400 integration.invalid_cursor: %d %s", r.status, r.raw)
+		t.Fatalf("cursor sai → 400 integration.invalid_cursor: %d %s", r.status, r.raw)
 	}
 	if r = get("/v1/feeds/no_such_feed", key); r.status != http.StatusNotFound || r.code() != apiclientport.ErrUnknownFeed.Code {
-		t.Fatalf("feed khÃ´ng cÃ³ â†’ 404: %d %s", r.status, r.raw)
+		t.Fatalf("feed không có → 404: %d %s", r.status, r.raw)
 	}
-	// KhÃ¡ch hÃ ng chá»‰ cÃ³ scope sáº£n pháº©m dá»¯ liá»‡u â†’ 403 vá»›i feed.
+	// Khách hàng chỉ có scope sản phẩm dữ liệu → 403 với feed.
 	_, _, otherKey := e.onboard(100)
 	if r = get("/v1/feeds/"+feedHP, otherKey); r.status != http.StatusForbidden || r.code() != apiclientport.ErrForbidden.Code {
-		t.Fatalf("thiáº¿u scope feed â†’ 403 apiclient.forbidden: %d %s", r.status, r.raw)
+		t.Fatalf("thiếu scope feed → 403 apiclient.forbidden: %d %s", r.status, r.raw)
 	}
 
-	// áº¢nh chá»¥p: URL kÃ½ cáº¥p lÃºc yÃªu cáº§u, â‰¤ 15 phÃºt; Ä‘o theo kÃ­ch thÆ°á»›c áº£nh chá»¥p.
+	// Ảnh chụp: URL ký cấp lúc yêu cầu, ≤ 15 phút; đo theo kích thước ảnh chụp.
 	r = get("/v1/snapshots/"+feedHP+"/1", key)
-	want(t, r, http.StatusOK, "cáº¥p URL áº£nh chá»¥p")
+	want(t, r, http.StatusOK, "cấp URL ảnh chụp")
 	exp, err := time.Parse(time.RFC3339, fmt.Sprint(r.body["expires_at"]))
 	if err != nil || time.Until(exp) > 15*time.Minute+time.Second || r.body["url"] == "" || r.header.Get("Cache-Control") != "no-store" {
-		t.Fatalf("URL kÃ½ â‰¤ 15 phÃºt: %s", r.raw)
+		t.Fatalf("URL ký ≤ 15 phút: %s", r.raw)
 	}
 	size, _ := r.body["size"].(float64)
 	if n := e.count(e.operator, `SELECT count(*) FROM pf_metering.usage_event WHERE client_id = $1::uuid AND call_kind = 'file_download'
 	    AND product = $2::text AND bytes_out = $3::bigint`, uuid.MustParse(cid), feedHP, int64(size)); n != 1 {
-		t.Fatalf("sá»• Ä‘o lÆ°á»ng láº§n cáº¥p URL theo kÃ­ch thÆ°á»›c áº£nh chá»¥p: %d", n)
+		t.Fatalf("sổ đo lường lần cấp URL theo kích thước ảnh chụp: %d", n)
 	}
 	if r = get("/v1/snapshots/"+feedHP+"/9", key); r.status != http.StatusNotFound || r.code() != apiclientport.ErrSnapshotNotFound.Code {
-		t.Fatalf("phiÃªn báº£n khÃ´ng cÃ³ â†’ 404: %d %s", r.status, r.raw)
+		t.Fatalf("phiên bản không có → 404: %d %s", r.status, r.raw)
 	}
 	if n := e.count(e.operator, `SELECT count(*) FROM pf_metering.usage_event WHERE client_id = $1::uuid`, uuid.MustParse(cid)); n < 7 {
-		t.Fatalf("má»—i lá»i gá»i Ä‘Ã£ xÃ¡c thá»±c má»™t dÃ²ng sá»• Ä‘o lÆ°á»ng: %d", n)
+		t.Fatalf("mỗi lời gọi đã xác thực một dòng sổ đo lường: %d", n)
 	}
 
-	// Báº£n ghi lá»‡ch há»£p Ä‘á»“ng trong kho (ghi tháº³ng báº±ng vai quáº£n trá»‹) â†’ cá»•ng khÃ´ng tráº£ trang.
+	// Bản ghi lệch hợp đồng trong kho (ghi thẳng bằng vai quản trị) → cổng không trả trang.
 	ctx := context.Background()
 	admin := e.pg.AdminPool(t, migrations.PF)
 	if _, err := admin.Exec(ctx, `INSERT INTO pf_apiclient.feed_entry (tenant_id, feed, partition_key, seq, event_id, entity_key, op, contract_version, record, recorded_at)
@@ -167,6 +167,6 @@ func TestFeedsOverGateway_W53Integration(t *testing.T) {
 	}
 	r = get("/v1/feeds/"+feedHP+"?cursor="+next, key)
 	if r.status != http.StatusInternalServerError || r.code() != apiclientport.ErrContractViolation.Code || strings.Contains(string(r.raw), "household_ref") {
-		t.Fatalf("báº£n ghi lá»‡ch há»£p Ä‘á»“ng â†’ 500 apiclient.contract_violation, khÃ´ng dá»¯ liá»‡u: %d %s", r.status, r.raw)
+		t.Fatalf("bản ghi lệch hợp đồng → 500 apiclient.contract_violation, không dữ liệu: %d %s", r.status, r.raw)
 	}
 }
