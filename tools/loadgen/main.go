@@ -17,6 +17,9 @@
 //	   -rate sync_pull=40,sync_push=10,read=20 -duration 10m
 //	go run ./tools/loadgen -ingest https://ingest.ot.staging.example.vn:8443/v1/ingest/batches \
 //	   -devices devices.json -ingest-ca service-ca.crt -rate ingest_batch=15 -duration 10m
+//
+// Kịch bản cổng tích hợp (W5.9, §42 — 200 đối tác, một đối tác ồn gấp 10 lần hạn mức): lệnh con
+// `gateway-provision` (cấp đối tác tổng hợp qua Admin API) và `gateway` (đo nền/ồn xen kẽ), xem gwcli.go.
 package main
 
 import (
@@ -225,6 +228,14 @@ func main() {
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "gateway":
+			return runGateway(args[1:], stdout, stderr)
+		case "gateway-provision":
+			return runProvision(args[1:], stdout, stderr)
+		}
+	}
 	c, err := parseFlags(args, stderr)
 	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {

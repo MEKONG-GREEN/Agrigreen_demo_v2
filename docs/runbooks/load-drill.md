@@ -116,3 +116,54 @@ Trong lúc chạy, theo dõi Grafana/Prometheus:
 - Thu hồi token và tài khoản tổng hợp. Thu hồi kỳ thiết bị tổng hợp trong sổ thiết bị staging. Xóa `accounts.tsv`.
 - Mở việc cho mọi ngưỡng không đạt: chỉ mục DB, pool PgBouncer, số bản/HPA, `max_connections`. Đổi cấu hình, **không đổi mã** nếu có thể (R-01).
 - Cập nhật mục 1.2 khi MKG chốt khối lượng thật.
+
+## 6. Kiểm thử tải cổng tích hợp (W5.9, kiến trúc v4.1 §42, ADR-0033)
+
+Tiêu chí §42: **200 đối tác**, tải trộn `GET /v1/feeds/{feed}`, `GET /v1/feeds/{feed}/checksums`, `POST /v1/batches/{contract}`, `POST /v1/files/{contract}`; **một đối tác ồn gửi gấp 10 lần hạn mức** (`requests_per_minute` của gói). Đạt khi: đối tác ồn nhận `429` + `Retry-After` (không lỗi nào khác); đối tác thường (dưới hạn mức) không nhận `429`, lỗi ≤ 1 %; **p95 của đối tác thường không tăng quá 10 %** so với lượt nền không có đối tác ồn. Số liệu định cỡ production (C-13 tốc độ đối tác thật, G-3 cỡ hạ tầng) là **đầu vào của khách** — lượt đo chính thức là việc **Sau**, trên staging đủ cấu hình (mục 2), không phải máy dev.
+
+Công cụ: `tools/loadgen` lệnh con `gateway-provision` + `gateway` (`gateway.go`, `gwprovision.go`, `gwcli.go`). Lượt nền và lượt ồn chạy **xen kẽ** `-rounds` vòng (nền, ồn, nền, ồn…) và gộp mẫu theo loại: khử trôi chậm của môi trường khỏi phép so. Mỗi đối tác một nhịp vòng hở riêng, lệch pha ngẫu nhiên, bắt đầu ở vị trí khác nhau trong dãy trộn thao tác (tỷ lệ thao tác của nhóm đúng trọng số ở mọi lúc).
+
+### 6.1 Chạy cục bộ (cổng trong tiến trình + PostgreSQL cục bộ)
+
+Kiểm thử `TestGatewayNoisyPartnerIsolation_W59` dựng cổng THẬT (`assembly.Build` + `gateway.NewHandler`, hàng đợi nạp trong tiến trình với bộ xử lý chạy nền như tiến trình cổng, feed `harvest_progress_by_commune` dựng từ nguồn ô tổng hợp), cấp đối tác qua Admin API bốn mắt bằng token giả (`authztest`) — không có khóa thật nào. Bỏ qua dưới `-short`.
+
+```powershell
+. .\scripts\dev-env.ps1
+go test -count=1 -p 1 -run TestGatewayNoisyPartnerIsolation_W59 -v ./tools/loadgen/
+# quy mô lớn hơn / ghi báo cáo:
+$env:AG_LOADGEN_GW_PARTNERS="200"; $env:AG_LOADGEN_GW_RPS="0.1"; $env:AG_LOADGEN_GW_BASELINE_NOISY_FACTOR="0"
+$env:AG_LOADGEN_GW_PHASE="20s"; $env:AG_LOADGEN_GW_REPORT="$env:TEMP"   # → w59-report.json + w59-report.md
+```
+
+| Biến | Mặc định | Ý nghĩa |
+|---|---|---|
+| `AG_LOADGEN_GW_PARTNERS` | 20 | số đối tác (một ồn) |
+| `AG_LOADGEN_GW_RPS` | 0,5 | lượt/giây mỗi đối tác thường (phải ≤ hạn mức / 60) |
+| `AG_LOADGEN_GW_QUOTA_RPM` | 60 | `requests_per_minute` của gói; đối tác ồn gửi 10 × hạn mức = 10 lượt/giây |
+| `AG_LOADGEN_GW_WARMUP`, `_PHASE`, `_ROUNDS` | 10s, 15s, 2 | khởi động (không đo), độ dài mỗi lượt, số vòng nền/ồn |
+| `AG_LOADGEN_GW_BASELINE_NOISY_FACTOR` | 1 | đối tác ồn trong lượt nền gửi bao nhiêu lần hạn mức. Quy mô nhỏ dùng 1: tải HỢP LỆ của một đối tác đã là ~10 % tổng tải của 20 đối tác, so với 0 sẽ tính nhầm phần dùng đúng hạn mức (gồm cả burst = cỡ bucket) là ảnh hưởng của phần vượt. Lượt 200 đối tác dùng 0 (đúng chữ §42) |
+| `AG_LOADGEN_GW_MAX_INCREASE`, `_SLACK` | 0,10, 5ms | ngưỡng tăng p95 và dung sai tuyệt đối cộng thêm (đo cục bộ: p95 vài chục–vài trăm ms, nhiễu lịch CPU/đồng hồ Windows + DB dùng chung). Chỉ tiêu chí cách ly hỏng → kiểm thử đo lại **một** lần; hỏng hai lần liên tiếp mới là hồi quy |
+
+Cục bộ chỉ khẳng định **cơ chế** (429 + `Retry-After`, không lỗi, không kẹt), không phải số định cỡ: DB dùng chung với tiến trình khác làm p95 dao động lớn giữa các lần chạy (xem ADR-0033 Hiện thực W5.9).
+
+### 6.2 Chạy trên staging (lượt đo chính thức — Sau)
+
+1. **Cấp 200 đối tác tổng hợp** qua Admin API (`api-platform` staging), hai người, token MFA riêng (vai `api_client_admin` đề xuất, `api_client_approver` duyệt, tenant đơn vị vận hành). Mỗi đối tác: khách hàng API → đăng ký feed (`feed:<tên>:read`) → đăng ký hợp đồng nạp (`ingest:<hợp đồng>:write`) → gói hạn mức → khóa. Khóa ghi vào tệp 0600, ngoài repo:
+   ```
+   go run ./tools/loadgen gateway-provision -admin https://admin.staging.<miền> \
+     -admin-token-file proposer.jwt -approver-token-file approver.jwt \
+     -partners 200 -noisy 1 -quota-rpm 60 -label loadgen-w59-<ngày> -out partners.tsv
+   ```
+   Hợp đồng feed/nạp còn `proposed` (A7, C-12): staging cần `AG_GATEWAY_FEED_ALLOW_PROPOSED=1`, `AG_GATEWAY_INGEST_ALLOW_PROPOSED=1` và job dựng feed đã chạy (feed có phiên bản). Nếu C-13 cho tốc độ/hạn mức khác, đổi `-quota-rpm` và `-gw-rps` cho khớp.
+2. **Đo** từ máy phát trong mạng staging, đi qua Ingress công khai của cổng (host `partner`):
+   ```
+   go run ./tools/loadgen gateway -gateway https://partners.staging.<miền> -partners partners.tsv \
+     -gw-rps 0.5 -gw-quota-rpm 60 -gw-noisy-factor 10 -gw-mix feed=6,checksums=1,batch=2,file=1 \
+     -warmup 1m -baseline 5m -duration 5m -rounds 3 -baseline-noisy-factor 0 -p95-slack 0 \
+     -json w59.json -md w59.md
+   ```
+   Thoát 0 = đạt; 1 = vi phạm (liệt kê cuối báo cáo); 2 = cấu hình sai. URL không chứa `staging`/`dev`/`localhost` bị từ chối (R-95).
+3. **Ghi vào biên bản** (cùng mục 4): `w59.json` + `w59.md` (p50/p95/p99 theo lớp `normal`/`noisy` và từng thao tác, số `429`, `429_without_retry_after`, tỷ lệ lỗi, `dropped`); số bản sao cổng (`AG_GATEWAY_REPLICAS` — giới hạn tần suất trong tiến trình chia hạn mức theo số bản sao khi chưa có Valkey: đối tác thường gần hạn mức có thể nhận 429 nếu cân tải lệch), `AG_DB_MAX_CONNS`, cỡ pool PgBouncer, CPU/bộ nhớ pod cổng; độ sâu hàng đợi `pf.apiclient.ingest.*` và DLQ (phải 0); `pg_stat_statements` top theo thời gian; dashboard `http.server.request.duration` theo route. Ghi kèm số C-13 (tốc độ đối tác thật) và G-3 (cỡ hạ tầng) đã dùng.
+4. **Sau lượt đo:** thu hồi khóa và tạm dừng 200 khách hàng API theo `-label` (Admin API), xóa `partners.tsv` và tệp token.
+
+Lưu ý thiết kế (đo được ở W5.9): lời gọi bị `429 apiclient.rate_limited` **không rẻ** — vẫn qua xác thực khóa (một giao dịch), đọc gói (một giao dịch) và ghi sổ đo lường (một lần ghi, ADR-0023 "mọi lời gọi đã xác thực"). Cục bộ, p50 của lời gọi bị 429 ≈ một nửa p50 của lời gọi thật: đối tác ồn gấp 10 lần vẫn đặt lên DB tải đáng kể. Ở staging, nếu tiêu chí cách ly không đạt, xem trước pool PgBouncer/`AG_DB_MAX_CONNS` và CPU DB; việc làm rẻ đường từ chối (đệm khóa/gói ngắn hạn, gộp dòng sổ 429) là quyết định của ADR-0023, không sửa trong runbook.

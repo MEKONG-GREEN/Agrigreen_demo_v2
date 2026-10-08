@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,6 +50,11 @@ type Service struct {
 	OperatorTenant uuid.UUID
 	Clock          clock.Clock
 	Log            *slog.Logger
+	// MaxConcurrent: số lô xử lý đồng thời tối đa của bản sao (≤ 0 → DefaultMaxConcurrent), xem limit.go.
+	MaxConcurrent int
+
+	semOnce sync.Once
+	sem     chan struct{}
 }
 
 func (s *Service) now() time.Time {
@@ -407,7 +413,14 @@ func (s *Service) Partners(ctx context.Context) ([]uuid.UUID, error) {
 
 // Worker trả phần xử lý cho Queue.Run / Memory.Drain.
 func (s *Service) Worker() Worker {
-	return Worker{DB: s.DB, Handler: s.Handle, Failure: s.Failure, Partners: s.Partners, Log: s.log()}
+	s.semOnce.Do(func() {
+		n := s.MaxConcurrent
+		if n <= 0 {
+			n = DefaultMaxConcurrent
+		}
+		s.sem = make(chan struct{}, n)
+	})
+	return Worker{DB: limitedDB{inner: s.DB, sem: s.sem}, Handler: s.Handle, Failure: s.Failure, Partners: s.Partners, Log: s.log()}
 }
 
 // Run tiêu thụ hàng đợi các đối tác tới khi ctx hủy.
