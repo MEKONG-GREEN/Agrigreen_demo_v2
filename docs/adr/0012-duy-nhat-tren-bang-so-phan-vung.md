@@ -37,3 +37,38 @@ Ghi lệch theo gói W0.3 ([kế hoạch](../kien-truc-v4.1-ke-hoach.md)), mục
 - Kiểm thử: `TestLedgerIdemExpiryDefault`, `TestDuplicateIdemKeyExpiresAfter30Days` (`internal/shared/ledger`), `TestPurgeLedgerIdemEveryCluster`, `TestLedgerReplayAcceptedAfterPurge` (`internal/shared/opsjobs`).
 
 Vai DB của v4.1 (`SET LOCAL ROLE r_<module>`, ADR-0028) không cần quyền trên hai bảng chung: trigger `shared.fn_chain` là `SECURITY DEFINER` (migration `shared 000001`), và hai bảng không cấp quyền cho vai ứng dụng. Kiểm thử ghi sổ dưới vai `r_<module>` thuộc gói W2.3.
+
+## Hiện thực — cột thêm vào sổ sau khi đã có dòng (fx2, `shared 000011`, 08/10/2026)
+
+**Lỗi (đã chứng minh bằng kiểm thử).** `shared.fn_chain` băm `sha256(prev_hash || canonical(to_jsonb(NEW)))`: **cả dòng**, chỉ bỏ `recorded_at`, `prev_hash`, `row_hash`, không `jsonb_strip_nulls`. `shared.verify_chain` băm lại `to_jsonb(dòng hiện tại)`. Sau `ALTER TABLE <sổ> ADD COLUMN`, dòng cũ hiện thêm khóa `"<cột>": null` (hoặc giá trị `DEFAULT`), nên băm lại khác `row_hash`. Job xác minh (`opsjobs.VerifyAllChains` → chỉ số và cảnh báo đứt chuỗi) báo `row_hash không khớp nội dung dòng` ở **dòng đầu tiên của mọi chuỗi có dòng cũ**. Đây là P1 giả, và nó che mất tín hiệu sửa dữ liệu thật. Có hai migration đã gây lỗi này:
+- `mkg 000006`: `mkg_fieldops.roll_count` (4 cột). Sổ này có bản ghi mẫu từ G0.
+- `pf 000079`: `pf_geo.plot_boundary` (4 cột) và `pf_geo.plot_event` (8 cột).
+
+Database dựng mới từ đầu không gặp lỗi, vì lúc thêm cột sổ còn rỗng. Database đã có dữ liệu trước hai migration này (dev, UAT) thì gặp. Các `ADD COLUMN` khác trong repo đều trên bảng thường, không phải sổ.
+
+**Sửa.** Không đổi `fn_chain`. Không đổi `row_hash` nào, không `UPDATE` dòng sổ.
+- `shared.ledger_added_column(ledger_table, column_name, epoch)` (`ag:no-rls`, siêu dữ liệu lược đồ) ghi các cột thêm vào sổ sau khi tạo, theo đợt tăng dần cho từng sổ. Hàm `shared.ledger_added_columns(regclass)` (`SECURITY DEFINER`) trả các đợt, đợt mới nhất trước. Vì là `SECURITY DEFINER`, `verify_chain` chạy dưới vai ứng dụng vẫn đọc được mà không cần cấp quyền bảng.
+- `verify_chain`: nếu băm cả dòng không khớp, hàm bỏ lần lượt khóa của từng đợt, đợt mới nhất trước, rồi băm lại. Mỗi đợt chỉ được bỏ khi **mọi cột của đợt đang NULL**. Dòng ghi trước đợt k vì thế xác minh được, kể cả khi có nhiều đợt.
+- **Không làm yếu chuỗi băm.** Dòng chỉ được nhận khi `row_hash` đã lưu bằng đúng băm của nội dung **thiếu các khóa null** đó. Mọi sửa đổi giá trị đều vẫn lệch băm: đổi cột thêm của dòng cũ từ NULL sang có giá trị, đưa cột thêm của dòng mới từ có giá trị về NULL, hay sửa cột gốc. Kể cả đăng ký sai cột vào `ledger_added_column` cũng chỉ có thể làm hỏng việc xác minh, không thể làm một dòng bị sửa qua được.
+- `shared.register_ledger_columns(bảng, ARRAY[cột…])`: migration thêm cột vào sổ **phải** gọi hàm này ngay sau `ADD COLUMN`. Mỗi lần gọi là một đợt. Hàm chỉ nhận cột thỏa cả ba điều kiện: NULL được, không `DEFAULT`, không generated. `DEFAULT` bị từ chối (`23514`) vì nó làm dòng cũ hiện một giá trị chưa từng được ghi, tức một sự kiện giả trên sổ chỉ ghi thêm. Hàm cũng từ chối bảng không có `trg_chain`. Hàm đăng ký trên bảng cha; phân vùng được quy về bảng cha (`pg_partition_root`).
+- Đăng ký bù cho `mkg 000006` và `pf 000079` (đợt 1) nằm ngay trong `shared 000011`. Tên bảng ghi dạng văn bản, vì `shared` chạy trước migration của cụm nên lúc đó bảng có thể chưa tồn tại. Dòng đăng ký của cụm khác vô hại: chỉ dùng khi tên bảng khớp.
+- `migratecheck` (`CheckLedgerColumns`) áp trên bảng sổ, tức bảng khai qua `shared.apply_ledger`:
+  - `ADD COLUMN` phải NULL được, không `DEFAULT`, `NOT NULL` hay `GENERATED`, và phải có `register_ledger_columns` cho đúng cột trong cùng tệp.
+  - Cấm `DROP COLUMN`, `RENAME COLUMN` và đổi kiểu cột, vì cả ba đổi khóa hoặc biểu diễn của dòng đã băm.
+  - Hai tệp cũ được miễn theo số (`ledgerColumnsGrandfathered`, danh sách đóng).
+  - Như các quy tắc khác, công cụ không thấy `ALTER` nằm trong khối `DO`.
+
+**Kiểm thử.**
+- `TestLedgerAddColumnKeepsChainVerifiable` (`internal/shared/ledger`) chạy trên sổ tạm:
+  - cột chưa đăng ký thì đứt giả, đăng ký xong thì sạch;
+  - hai đợt cột, có dòng xen giữa;
+  - `ADD COLUMN … DEFAULT` làm đứt chuỗi và bị từ chối đăng ký;
+  - 5 kiểu sửa vượt trigger đều bị bắt đúng `seq`;
+  - xác minh dưới vai ứng dụng.
+- `TestLedgerAddColumnUpgradePF` / `…MKG` (`migrations`):
+  - dựng database riêng, áp `shared` tới đầu, rồi áp cụm tới `pf 000078` / `mkg 000005`;
+  - ghi dòng sổ, nâng cấp lên đầu, ghi thêm dòng có giá trị ở cột mới;
+  - `opsjobs.VerifyAllChains` trên cả database phải sạch.
+  
+  Trước `shared 000011`, hai kiểm thử này **hỏng** đúng như mô tả ở trên.
+- `TestLedgerColumns*` (`tools/migratecheck`).

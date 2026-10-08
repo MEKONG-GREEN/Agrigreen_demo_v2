@@ -14,6 +14,8 @@
 //     phải NOT VALID (rồi VALIDATE CONSTRAINT ở câu riêng — chỉ khóa SHARE UPDATE EXCLUSIVE);
 //     tệp có ALTER TABLE trên bảng không tạo trong cùng tệp phải SET LOCAL lock_timeout trước
 //     đó. Tệp đã áp trước quy tắc được miễn theo số (lockGrandfathered) — không sửa được (R-24)
+//   - cột của bảng sổ (CheckLedgerColumns, ADR-0012): ADD COLUMN phải NULL được, không DEFAULT, và
+//     đăng ký bằng shared.register_ledger_columns trong cùng tệp; cấm DROP/RENAME/đổi kiểu cột
 //
 // Chạy: go run ./tools/migratecheck migrations
 package main
@@ -83,6 +85,10 @@ func checkTree(root string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	ledgers, err := ledgerSet(root, entries)
+	if err != nil {
+		return nil, err
+	}
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
@@ -121,6 +127,11 @@ func checkTree(root string) ([]string, error) {
 					problems = append(problems, f+": "+p)
 				}
 			}
+			if !ledgerColumnsGrandfathered[e.Name()][n] {
+				for _, p := range CheckLedgerColumns(string(src), ledgers) {
+					problems = append(problems, f+": "+p)
+				}
+			}
 			if timescaleRe.MatchString(string(src)) {
 				problems = append(problems, f+": ADR-0017: không dùng extension timescaledb (tính năng TSL, RB-4) — phân vùng khai báo PostgreSQL thuần")
 			}
@@ -134,6 +145,30 @@ func checkTree(root string) ([]string, error) {
 		}
 	}
 	return problems, nil
+}
+
+// ledgerSet gom tên mọi bảng sổ (shared.apply_ledger) của mọi thư mục cụm.
+func ledgerSet(root string, entries []os.DirEntry) (map[string]bool, error) {
+	out := map[string]bool{}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		files, err := filepath.Glob(filepath.Join(root, e.Name(), "*.sql"))
+		if err != nil {
+			return nil, err
+		}
+		for _, f := range files {
+			src, err := os.ReadFile(f)
+			if err != nil {
+				return nil, err
+			}
+			for _, t := range LedgerTables(string(src)) {
+				out[t] = true
+			}
+		}
+	}
+	return out, nil
 }
 
 var forbidden = []struct {
