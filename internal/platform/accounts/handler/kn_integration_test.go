@@ -25,9 +25,11 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
@@ -109,7 +111,7 @@ func newKNFixture(t *testing.T) *knFix {
 	f.depts.depts[f.national] = []partyport.Department{mk(f.national, deptTT, "Phòng Trồng trọt", partyport.DeptActive)}
 
 	ops := f.env.Pool(t, migrations.PF, "platform_api")
-	f.kmod = accounts.New(f.pool, clock.System{}, accounts.Deps{Directory: f.dir, Scope: f.party, Orgs: f.party, Departments: f.depts})
+	f.kmod = accounts.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{Directory: f.dir, Scope: f.party, Orgs: f.party, Departments: f.depts})
 	log := telemetry.NewLogger("test", io.Discard)
 	app := httpx.NewEngine(log, 1<<20)
 	ag := app.Group("/v1", httpx.Authenticate(f.iss.Verifier()), f.kmod.Middleware(), idempotency.Middleware(ops))

@@ -43,7 +43,8 @@ type Module struct{ svc *app.Service }
 // New tạo module với pool của vai waterway_app. Ở worker, db có thể nil — handler
 // dựng mạng chỉ dùng giao dịch do inbox.Process mở.
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
-	return &Module{svc: &app.Service{DB: db, Read: deps.Read, Clock: clk, Params: deps.Params, Catalogs: deps.Catalogs}}
+	db = forModule(db)
+	return &Module{svc: &app.Service{DB: db, Read: forModule(deps.Read), Clock: clk, Params: deps.Params, Catalogs: deps.Catalogs}}
 }
 
 // UseSharing nối cổng cấp quyền chia sẻ của pf/party (ADR-0020): bề mặt đối tác

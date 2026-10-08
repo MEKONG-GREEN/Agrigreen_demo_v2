@@ -46,6 +46,7 @@ type Module struct {
 // với gốc lắp ráp cũ; thiếu deps thì các thao tác cần masterdata/vault trả
 // 503 party.dependency_unavailable.
 func New(db tenant.Beginner, clk clock.Clock, deps ...Deps) *Module {
+	db = forModule(db)
 	var d Deps
 	if len(deps) > 0 {
 		d = deps[0]

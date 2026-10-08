@@ -29,6 +29,9 @@ Các job vận hành dùng chung cho mọi cụm (`ag_pf`, `ag_mkg`, `ag_vault`)
 | Giám sát SQL xuyên tenant (sql_exporter) | liên tục (60 s) | `deploy/observability/sql-exporter/*.collector.yml` | `mkg_monitor`, `ts_monitor` (chỉ EXECUTE hàm gộp) | [ingest.md](ingest.md) mục 7 |
 | Leo thang hồ sơ MRV chờ duyệt quá hạn (KN US-MRV-06) | mỗi 15 phút | `cmd/worker` (leader, job `mrv_review_escalation`) | `ag_ops_jobs` (tìm tenant), `mrv_app` | mục dưới |
 | Ghi `expired` cho khóa Public API quá hạn / quá hạn chồng lấn (ADR-0022 mục 4, G5) | mỗi giờ, chạy khi khởi động | `cmd/worker` (leader, job `apiclient_key_expiry`; chỉ khi có `AG_PUBLIC_OPERATOR_TENANT`) | `apiclient_app` | [public-api-onboarding.md](public-api-onboarding.md) mục 7 |
+| Chuyển vai DB sang vai đăng nhập đơn vị `app_*` (W2.6, ADR-0028): bí mật → bootstrap → migrate → ứng dụng, lùi bản | một lần khi lên bản W2.6 | `migrate bootstrap`, `migrate up`, chart `data` + vùng ứng dụng | `app_*` (module chạy `r_<module>`); vai cũ còn một kỳ | [db-roles-w26.md](db-roles-w26.md) |
+
+Từ W2.6, cột "Vai DB" ghi tên vai cũ hoặc vai module. Đọc tên đó là `r_<module>`, chạy qua vai đăng nhập của đơn vị (`app_worker`, `app_internal`, …); xem [db-roles-w26.md](db-roles-w26.md).
 
 ## Leo thang hồ sơ MRV quá hạn (pf/mrv)
 

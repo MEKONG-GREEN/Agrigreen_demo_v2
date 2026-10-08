@@ -18,7 +18,7 @@ import (
 
 // accountsOrgStatusConsumer khóa/mở tài khoản theo pf.party.org.deactivated/
 // reactivated (HTX US-HTXSTATUS-01 AC-2, US-HTXSTATUS-02 AC-2). Handler chạy trong
-// giao dịch của inbox.Process trên pool vai accounts_app. Client Keycloak Admin
+// giao dịch của inbox.Process trên pool r_accounts. Client Keycloak Admin
 // (AG_KC_*) mở ở sự kiện đầu tiên; thiếu cấu hình → handler lỗi, sự kiện được giao
 // lại rồi vào DLQ (R-62) — không mất yêu cầu khóa.
 func accountsOrgStatusConsumer(log *slog.Logger) consumer {
@@ -28,7 +28,7 @@ func accountsOrgStatusConsumer(log *slog.Logger) consumer {
 		err  error
 	)
 	return consumer{
-		name: accport.OrgStatusConsumer, cluster: migrations.PF, role: accounts.DBRole,
+		name: accport.OrgStatusConsumer, cluster: migrations.PF, module: accounts.DBModule,
 		events: accounts.OrgStatusEvents,
 		handler: func(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
 			once.Do(func() {

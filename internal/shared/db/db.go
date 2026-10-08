@@ -38,10 +38,18 @@ type Options struct {
 // (khóa chờ mãi, kế hoạch tồi) bị Postgres hủy thay vì giữ kết nối và giao dịch vô hạn.
 const DefaultStatementTimeout = 2 * time.Minute
 
-// OptionsFromEnv đọc AG_DB_VIA_PGBOUNCER và AG_DB_STATEMENT_TIMEOUT (Go duration, vd 30s, 2m; "0" = không
+// DefaultUnitMaxConns là cỡ pool mặc định của vai đăng nhập một đơn vị triển khai (ADR-0028 §3: một pool
+// mỗi đơn vị, trần ĐTK 2 cụm pf 4 vai × 20). Ghi đè bằng AG_DB_MAX_CONNS.
+const DefaultUnitMaxConns = 20
+
+// OptionsFromEnv đọc AG_DB_VIA_PGBOUNCER, AG_DB_MAX_CONNS (mặc định DefaultUnitMaxConns — W2.6: mọi module của
+// đơn vị dùng chung MỘT pool vai app_<đơn vị>) và AG_DB_STATEMENT_TIMEOUT (Go duration, vd 30s, 2m; "0" = không
 // đặt; chưa đặt = DefaultStatementTimeout). Giá trị sai cú pháp → db.Open trả lỗi nêu tên biến.
 func OptionsFromEnv(appName string) Options {
-	o := Options{ViaPgBouncer: os.Getenv("AG_DB_VIA_PGBOUNCER") == "1", AppName: appName}
+	o := Options{ViaPgBouncer: os.Getenv("AG_DB_VIA_PGBOUNCER") == "1", AppName: appName, MaxConns: DefaultUnitMaxConns}
+	if n, err := strconv.Atoi(os.Getenv("AG_DB_MAX_CONNS")); err == nil && n > 0 && n <= 1000 {
+		o.MaxConns = int32(n) //nolint:gosec // đã chặn khoảng
+	}
 	o.StatementTimeout, o.envErr = statementTimeoutFromEnv(os.Getenv("AG_DB_STATEMENT_TIMEOUT"))
 	return o
 }

@@ -49,6 +49,7 @@ type Module struct{ svc *app.Service }
 
 // New tạo module với pool vai acctbridge_app (cụm mkg).
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
+	db = forModule(db)
 	return &Module{svc: newService(db, clk, deps)}
 }
 
@@ -118,6 +119,7 @@ type Consumers struct{ svc *app.Service }
 
 // NewConsumers dựng handler consumer của acctbridge.
 func NewConsumers(db tenant.Beginner, clk clock.Clock, deps Deps) Consumers {
+	db = forModule(db)
 	return Consumers{svc: newService(db, clk, deps)}
 }
 

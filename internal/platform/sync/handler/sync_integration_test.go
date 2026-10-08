@@ -28,6 +28,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/envelope"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
@@ -91,7 +92,7 @@ func newFixture(t *testing.T, o ...opts) *fixture {
 	}
 	f.objects = objs
 	ops := env.Pool(t, migrations.PF, "platform_api")
-	f.mod = syncmod.New(f.pool, f.clk, syncmod.Deps{
+	f.mod = syncmod.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), f.clk, syncmod.Deps{
 		Scope: f.scope, Consent: f.consent, Params: fakeParams{hours: op.slaHours}, Vault: f.vault, Store: objs,
 		CursorKey: []byte("khoa-con-tro-kiem-thu-0123456789abcdef"),
 		Sources:   append([]port.Source{f.source}, op.extra...), Sinks: []port.Sink{f.sink},

@@ -22,6 +22,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -786,7 +787,7 @@ func (g *g3) stepRevokeShare() {
 		}
 		env := d.env
 		env.EventID = ids.New()
-		_, err := inbox.Process(context.Background(), g.s.Env.Pool(g.t, d.cluster, d.role), d.consumer, env, d.handler)
+		_, err := inbox.Process(context.Background(), db.ForModule(g.s.Env.Pool(g.t, d.cluster, d.role), d.module), d.consumer, env, d.handler)
 		if err == nil || !strings.Contains(err.Error(), "party.valve_share_grant_missing") {
 			g.t.Fatalf("van sau thu hồi phải bị từ chối party.valve_share_grant_missing: %v", err)
 		}

@@ -79,6 +79,7 @@ type Module struct{ svc *app.Service }
 // New tạo module với pool của vai reports_app. Ở worker, db là pool reports_app
 // (job lịch); handler inbox dùng giao dịch do inbox.Process mở.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
+	db = forModule(db)
 	svc := &app.Service{
 		DB: db, Clock: clk, Log: d.Log, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
 		Store: d.Store, Extension: d.Extension, Mechanization: d.Mechanization, CropCycle: d.CropCycle, Directory: d.Directory, Recipients: d.Recipients, Mailer: d.Mailer,

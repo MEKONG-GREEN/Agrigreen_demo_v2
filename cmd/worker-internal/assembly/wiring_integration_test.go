@@ -24,6 +24,7 @@ import (
 	measport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -83,9 +84,9 @@ func (w *wired) deliver(tid uuid.UUID, name, eventType string, payload any) {
 			w.t.Fatal(err)
 		}
 	}
-	p, _ := w.pool(c.Role)
+	p, _ := w.pool(OpsRole) // W2.6: app_worker_internal, giao dịch inbox dưới r_<module> như cmd/worker-internal
 	env := outbox.Envelope{EventID: ids.New(), EventType: eventType, SchemaVersion: 1, TenantID: tid, OccurredAt: w.clk.Now(), Producer: "test", Payload: raw}
-	if _, err := inbox.Process(context.Background(), p, name, env, h); err != nil {
+	if _, err := inbox.Process(context.Background(), db.ForModule(p, c.Module), name, env, h); err != nil {
 		w.t.Fatalf("%s: %v", name, err)
 	}
 }

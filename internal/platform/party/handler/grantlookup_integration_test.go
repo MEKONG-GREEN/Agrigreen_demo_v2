@@ -15,9 +15,12 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port/grantlookup"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
 // fakeCheckpoint là điểm kiểm soát xuất giả (pf/metering chưa nối ở kiểm thử module).
@@ -230,7 +233,7 @@ func TestAPIReadLogAdapter_K05(t *testing.T) {
 	f := newFixture(t)
 	verifier := ids.New()
 	f.grant(verifier, port.KindDPMRVPackageStatus)
-	gl := grantlookup.New(f.pool, clock.System{})
+	gl := grantlookup.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{})
 	ctx := context.Background()
 	g, err := gl.ActiveGrant(ctx, verifier, uuid.Nil, port.KindDPMRVPackageStatus, time.Now())
 	if err != nil {

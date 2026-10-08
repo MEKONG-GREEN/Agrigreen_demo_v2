@@ -15,6 +15,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
@@ -34,7 +35,7 @@ func glueFixture(t *testing.T, origins ...string) (app, admin *httptest.Server, 
 	}
 	d := Deps{
 		Log: telemetry.NewLogger("test", io.Discard), Verifier: iss.Verifier(),
-		Ops: env.Pool(t, migrations.PF, "platform_api"), Modules: mods, Pools: pools, CORSOrigins: origins,
+		Ops: env.Pool(t, migrations.PF, dbadmin.AppPlatform), Modules: mods, Pools: pools, CORSOrigins: origins,
 	}
 	app, admin = httptest.NewServer(NewRouter(d)), httptest.NewServer(NewAdminRouter(d))
 	t.Cleanup(app.Close)

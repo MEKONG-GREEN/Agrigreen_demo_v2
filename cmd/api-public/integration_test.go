@@ -147,13 +147,9 @@ func newIntEnv(t *testing.T) *intEnv {
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
-	for _, role := range []string{"public_api", "apiclient_app", "metering_app", "party_app", "cropcycle_app", "geo_app", "mrv_app", "masterdata_app"} {
-		if !opened[role] {
-			t.Fatalf("api-public phải mở pool vai %s (g5-conventions §3.1)", role)
-		}
-	}
-	if len(opened) != 8 {
-		t.Fatalf("api-public chỉ mở đúng 8 vai, đã mở %v", opened)
+	// W2.6 (ADR-0028): api-public chỉ mở MỘT vai đăng nhập app_public; mỗi module chạy dưới r_<module>.
+	if len(opened) != 1 || !opened[dbadmin.AppPublic] {
+		t.Fatalf("api-public chỉ mở vai %s, đã mở %v", dbadmin.AppPublic, opened)
 	}
 	e.mod = mod
 	e.public = httptest.NewServer(mod.PublicRouter(d))

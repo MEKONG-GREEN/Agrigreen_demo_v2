@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port/edgewire"
@@ -53,8 +52,10 @@ type WindowReader interface {
 
 // TSStore hiện thực BatchStore + WindowReader trên cụm ts.
 type TSStore struct {
-	Writer *pgxpool.Pool // ingest_ts
-	Reader *pgxpool.Pool // ts_reader (nil → dùng Writer)
+	// Writer, Reader: pool cụm ts. cmd/ingest dựng bằng measurement.NewIngestTSStore (vai đăng nhập app_ingest,
+	// mọi giao dịch SET LOCAL ROLE r_measurement — W2.6); kiểm thử có thể dùng vai cũ ingest_ts / ts_reader.
+	Writer tenant.Beginner
+	Reader tenant.Beginner // nil → dùng Writer
 }
 
 func pgCode(err error) string {

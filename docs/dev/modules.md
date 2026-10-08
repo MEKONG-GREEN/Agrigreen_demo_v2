@@ -158,16 +158,26 @@ R-MOD-08 (kiến trúc v4.1 §7.3): module chưa bật cho đơn vị thì route
 
 ADR-0028, R-DB-02, R-DB-03. Mỗi module pf có vai nhóm `r_<module>` (NOLOGIN, tên = `modreg.DBRole`, vd `pf/content` → `r_content`). Mỗi đơn vị triển khai có một vai đăng nhập NOINHERIT (`app_platform`, `app_worker`, `app_public`, `app_sync`), là thành viên các `r_*` của module đơn vị ghép (`modreg/assembly_gen.go`, `modgen` sinh). Tự vai đăng nhập không có quyền bảng nào; giao dịch của module chạy `SET LOCAL ROLE r_<module>`, nên SQL của module chỉ có quyền của chính nó. `SET LOCAL` hết khi COMMIT/ROLLBACK, an toàn với PgBouncer transaction mode.
 
-**Kỳ chuyển (tới W2.6):** vai cũ `<module>_app` vẫn chạy, giữ quyền và là thành viên `r_<module>`. Module đã chuyển chạy được trên cả pool cũ lẫn pool `app_*`. Đã chuyển: `pf/content`, `pf/notify`.
+**Từ W2.6:**
+
+- Mọi module có schema đã chạy dưới `r_<module>`: 19 pf, 7 mkg, vault/identity (`r_identity`); `r_measurement` có ở cả cụm mkg và ts.
+- Mỗi đơn vị mở **một** pool vai đăng nhập:
+  - pf: `app_platform`, `app_worker` (cả `drill`, `formimport`), `app_public`, `app_sync`;
+  - mkg: `app_internal`, `app_worker_internal` (cả `rebuilddrill`);
+  - mkg + ts: `app_ingest`;
+  - vault: `app_vault`.
+- Idempotency HTTP và consumer không thuộc module chạy `db.Ops` (vai `r_ops`).
+- Vai cũ `<module>_app` không còn quyền trực tiếp, chỉ còn qua membership `r_<module>`, và bị xóa ở bản phát hành sau.
+- Thứ tự triển khai và lùi bản: [runbook](../runbooks/db-roles-w26.md).
 
 **Chuyển một module sang `r_*`:**
 
-1. Gốc module (`module.go`): `var DBModule = db.Module("pf/<module>")`. Tên phải có trong registry, không thì panic lúc khởi tạo.
-2. Trong `New`, bọc pool một lần: `app.Service{DB: db.ForModule(b, DBModule), …}`. Mọi `tenant.WithTenantTx`/`FromCtxTx` của module từ đó chạy dưới `r_<module>`. Mã mới dùng `db.WithContextTx(ctx, pool, DBModule, fn)` (tenant lấy từ ctx), hoặc `db.WithModuleTenantTx` khi đã có tenant (consumer, job).
+1. Gốc module (`dbmodule.go` hoặc `module.go`): `var DBModule = db.Module("<vùng>/<module>")`. Tên phải có trong registry, không thì panic lúc khởi tạo. Cổng `TestEveryModuleWrapsPoolForModule_ADR0028` hỏng nếu module có `owns_schema` thiếu khai báo này hoặc thiếu `ForModule`.
+2. Trong `New` (và mọi hàm xuất nhận `tenant.Beginner`), bọc pool một lần: `app.Service{DB: db.ForModule(b, DBModule), …}`. Mọi `tenant.WithTenantTx`/`FromCtxTx` của module từ đó chạy dưới `r_<module>`. Mã mới dùng `db.WithContextTx(ctx, pool, DBModule, fn)` (tenant lấy từ ctx), hoặc `db.WithModuleTenantTx` khi đã có tenant (consumer, job).
 3. Consumer của worker: đặt `module: <pkg>.DBModule` trong `consumer` (`cmd/worker`), để giao dịch inbox cũng chạy dưới `r_<module>`. Ở chỗ khác, đưa `db.ForModule(pool, DBModule)` cho `inbox.Process`/`ConsumeWith`.
-4. Grant: migration mới `GRANT … TO r_<module>`, không grant cho `<module>_app`; vai cũ thừa hưởng qua membership. Module chưa từng có vai cũ thì thêm vào `dbadmin.groupOnlyModules` (W2.5: `pf/kref`; W2.6 đổi nguồn danh sách) và grant cho `r_<module>`. Pool là vai đăng nhập của đơn vị (`app_worker`…), mật khẩu `AG_DB_PASSWORD_APP_*`.
+4. Grant: migration mới `GRANT … TO r_<module>`, không bao giờ cho vai đăng nhập. Module mới có `owns_schema` tự có vai `r_<module>` (danh sách suy từ `modreg.Catalog`, cụm theo `zones` — W2.6). Đơn vị ghép module (import trong `cmd/<đơn vị>`) thì vai đăng nhập của đơn vị tự thành thành viên sau `migrate bootstrap`.
 5. Module pf mới (có `r_*`) phải được migration của nó `GRANT USAGE ON SCHEMA k_ref` + `SELECT` các quan hệ `k_ref` + `EXECUTE k_ref.ctx_*` (R-DB-05) — pf 000091/000092 chỉ cấp cho các `r_*` lúc đó.
-6. Kiểm thử tích hợp: dựng module trên `env.Pool(t, migrations.PF, dbadmin.AppPlatform)`. Toàn bộ bộ kiểm thử phải xanh: vai đăng nhập NOINHERIT chỉ chạm bảng qua `r_*`. Kiểm trực tiếp DB vẫn dùng pool vai cũ.
+6. Kiểm thử tích hợp: dựng module trên vai đăng nhập đơn vị — `env.Pool(t, migrations.PF, dbadmin.AppPlatform)`, hoặc `dbadmin.AppInternal` ở cụm mkg. Toàn bộ bộ kiểm thử phải xanh: vai đăng nhập NOINHERIT chỉ chạm bảng qua `r_*`. Kiểm trực tiếp DB dùng pool vai cũ trong kỳ chuyển cuối, sau đó dùng `env.AdminPool` hoặc `db.ForModule`.
 7. Truy vấn ngoài giao dịch, như `pool.Query(…)` thẳng trên pool, sẽ bị `permission denied` khi pool là `app_*`. Chuyển chúng vào `db.WithContextTx`.
 
 **Lint.** `agnosessionset` (archlint) cấm, trong chuỗi SQL của mã `internal/*` và `cmd/*` (trừ `*_test.go`):
@@ -179,15 +189,23 @@ ADR-0028, R-DB-02, R-DB-03. Mỗi module pf có vai nhóm `r_<module>` (NOLOGIN,
 
 `migratecheck` cấm tương tự trong migration. Biến cục bộ dùng `SET LOCAL` hoặc `set_config(…, true)`.
 
-**Triển khai:** chạy `migrate bootstrap` (tạo `r_*`, `app_*`, membership) trước `migrate up` (pf 000090 chép quyền và lỗi nếu thiếu vai). Mật khẩu `app_*` lấy từ `AG_DB_PASSWORD_APP_PLATFORM`, … hoặc `AG_DB_APP_PASSWORD`.
+**Triển khai:** chạy `migrate bootstrap` (tạo `r_*`, `app_*`, membership) trước `migrate up` (pf 000090/000119, mkg 000035, ts 000004, vault 000003 lỗi nếu thiếu vai hoặc membership). Mật khẩu `app_*` lấy từ `AG_DB_PASSWORD_APP_<VAI>` hoặc `AG_DB_APP_PASSWORD`; cỡ pool từ `AG_DB_MAX_CONNS` (mặc định 20).
 
-**Còn lại (W2.6):**
+**Cổng CI (W2.6):**
 
-- 15 module pf: accounts, apiclient, cropcycle, extension, geo, masterdata, mechanization, metering, metrics, mrv, party, reports, simulation, sync, waterway;
-- 7 module mkg, ts, vault;
-- `cmd/*` đổi pool sang `app_*`;
-- compose, chart, PgBouncer `userlist`;
-- bỏ quyền bảng của `<module>_app`.
+- `migrations/login_roles_gate_integration_test.go`, mọi cụm:
+  - vai `app_*` không có quyền nào trên bảng;
+  - truy vấn thẳng trên pool `app_*` trả 42501, cùng truy vấn trong giao dịch của module chạy được;
+  - vai cũ không còn ACL trực tiếp.
+- `internal/shared/db/modules_wired_test.go`:
+  - mọi module có schema bọc `ForModule`;
+  - `cmd/*` không tham chiếu vai đăng nhập cũ.
+
+**Còn lại:**
+
+- xóa vai cũ (bản phát hành sau);
+- bỏ `tenant.WithTenantTx` gọi thẳng trong module;
+- W9.1 (cổng quyền chéo).
 
 ## Biến ngữ cảnh trong DB (W2.4)
 

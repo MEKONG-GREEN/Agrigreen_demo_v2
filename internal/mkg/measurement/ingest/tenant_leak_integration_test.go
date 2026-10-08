@@ -260,9 +260,12 @@ func TestTSWeighTenantLeakParallel(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
 	const schema = "ts_weigh"
+	writer, reader := env.Pool(t, migrations.TS, port.IngestTSRole), env.Pool(t, migrations.TS, port.TSReaderRole)
 	pools := []lkPool{
-		{role: port.IngestTSRole, pool: r.store.Writer, tables: lkTables(ctx, t, r.store.Writer, schema)},
-		{role: port.TSReaderRole, pool: r.store.Reader, tables: lkTables(ctx, t, r.store.Reader, schema)},
+		// Kiểm RLS cả NGOÀI ngữ cảnh (lkNoContext truy vấn thẳng pool) — cần vai có quyền trực tiếp: vai cũ ingest_ts /
+		// ts_reader (quyền giữ một kỳ, W2.6). Rig ghi/đọc qua app_ingest → r_measurement.
+		{role: port.IngestTSRole, pool: writer, tables: lkTables(ctx, t, writer, schema)},
+		{role: port.TSReaderRole, pool: reader, tables: lkTables(ctx, t, reader, schema)},
 	}
 	t.Logf("%s: %v (%s), %v (%s)", schema, pools[0].tables, port.IngestTSRole, pools[1].tables, port.TSReaderRole)
 	key := vectorKey()

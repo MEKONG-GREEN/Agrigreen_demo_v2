@@ -13,8 +13,10 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
@@ -33,7 +35,7 @@ func (f fakeModules) ModuleEnabled(_ context.Context, tid uuid.UUID, m string) (
 func TestRoleOfDisabledModuleNotGrantable(t *testing.T) {
 	f := newFixture(t)
 	mods := fakeModules{f.tenant: {"pf/geo": true}}
-	mod := accounts.New(f.pool, clock.System{}, accounts.Deps{Directory: f.dir, Scope: f.party, Orgs: f.party, Modules: mods})
+	mod := accounts.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{Directory: f.dir, Scope: f.party, Orgs: f.party, Modules: mods})
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)
 	mod.RegisterAdmin(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), httpx.RequireMFA(), idempotency.Middleware(f.env.Pool(t, migrations.PF, "platform_api"))))
 	srv := httptest.NewServer(eng)
@@ -67,7 +69,7 @@ func TestRoleOfDisabledModuleNotGrantable(t *testing.T) {
 func TestKNAssignmentModuleDisabled(t *testing.T) {
 	f := newKNFixture(t)
 	mods := fakeModules{f.tenant: {"pf/extension": true}}
-	kmod := accounts.New(f.pool, clock.System{}, accounts.Deps{Directory: f.dir, Scope: f.party, Orgs: f.party, Departments: f.depts, Modules: mods})
+	kmod := accounts.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{Directory: f.dir, Scope: f.party, Orgs: f.party, Departments: f.depts, Modules: mods})
 	adm := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)
 	kmod.RegisterAdmin(adm.Group("/v1", httpx.Authenticate(f.iss.Verifier()), httpx.RequireMFA(), kmod.Middleware(),
 		idempotency.Middleware(f.env.Pool(t, migrations.PF, "platform_api"))))

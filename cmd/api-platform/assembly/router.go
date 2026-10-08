@@ -14,6 +14,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 )
@@ -23,7 +24,7 @@ import (
 type Deps struct {
 	Log      *slog.Logger
 	Verifier *authz.Verifier
-	// Ops là pool của vai platform_api: chỉ bảng vận hành trong schema shared.
+	// Ops là pool vai đăng nhập đơn vị (app_platform); idempotency chạy SET LOCAL ROLE r_ops — chỉ bảng vận hành schema shared (W2.6).
 	Ops     *pgxpool.Pool
 	Modules []httpx.Module
 	// Pools liệt kê mọi pool để /readyz kiểm.
@@ -89,7 +90,7 @@ type publicRoutes interface {
 // pf/accounts) → Idempotency-Key.
 func chain(d Deps, auth ...gin.HandlerFunc) []gin.HandlerFunc {
 	out := append(auth, httpx.Middlewares(d.Modules)...)
-	return append(out, idempotency.Middleware(d.Ops))
+	return append(out, idempotency.Middleware(db.ForModule(d.Ops, db.Ops)))
 }
 
 // NewAdminRouter dựng Admin API (admin.<domain>): MFA bắt buộc cho mọi route (mục 11).

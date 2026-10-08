@@ -19,6 +19,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -123,7 +124,7 @@ func newFixture(t *testing.T, clk *clock.Fixed) *fixture {
 	src := &fakeSource{values: map[string]decimal.Decimal{}}
 	sc := &fakeScope{by: map[uuid.UUID]authz.Scope{}}
 	sources := map[string]port.Source{"pf/extension": src, "pf/mechanization": src, "pf/cropcycle": src, "pf/geo": src}
-	mod := metrics.New(pool, clk, metrics.Deps{Sources: sources, Scope: sc, Geometry: fakeGeom{}})
+	mod := metrics.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clk, metrics.Deps{Sources: sources, Scope: sc, Geometry: fakeGeom{}})
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)
 	mod.RegisterApp(eng.Group("/v1", httpx.Authenticate(iss.Verifier()), idempotency.Middleware(ops)))
 	srv := httptest.NewServer(eng)

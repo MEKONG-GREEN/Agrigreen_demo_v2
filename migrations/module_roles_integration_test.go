@@ -4,17 +4,20 @@ import (
 	"context"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
-// pf 000090 (W2.3, ADR-0028 §4 bước 1): r_<module> có ĐÚNG quyền của vai cũ <module>_app trên mọi bảng,
-// chuỗi số, cột, schema và hàm của database pf — không thiếu (mã chuyển sang r_* chạy như cũ), không thừa
-// (giữ "không quyền chéo").
+// pf 000090 (W2.3) + pf 000119, mkg 000035, vault 000003 (W2.6, ADR-0028 §4): r_<module> có ĐÚNG quyền hiệu lực
+// của vai cũ <module>_app trên mọi bảng, chuỗi số, cột, schema và hàm của database mỗi cụm — không thiếu (mã chuyển
+// sang r_* chạy như cũ), không thừa (giữ "không quyền chéo"). Sau W2.6 vai cũ chỉ còn quyền qua membership r_*
+// (lùi bản), nên phép so là tautology có chủ đích: hai vai PHẢI tương đương.
 func TestModuleGroupRolesMirrorLegacy_ADR0028(t *testing.T) {
 	ctx := context.Background()
-	admin := pgtest.Get(t).AdminPool(t, migrations.PF)
+	env := pgtest.Get(t)
 	const diff = `
 		WITH rel AS (
 		  SELECT c.oid, c.relkind, c.oid::regclass::text AS name
@@ -40,25 +43,14 @@ func TestModuleGroupRolesMirrorLegacy_ADR0028(t *testing.T) {
 		 WHERE ns.nspname NOT IN ('pg_catalog', 'information_schema')
 		   AND has_function_privilege($1, f.oid, 'EXECUTE') <> has_function_privilege($2, f.oid, 'EXECUTE')
 		LIMIT 10`
+	admin := env.AdminPool(t, migrations.PF)
 	for _, g := range dbadmin.ModuleGroups() {
 		if g.Legacy == "" {
-			continue // vai nhóm không có vai cũ (pf/kref, W2.5): không có gì để so
+			continue
 		}
-		rows, err := admin.Query(ctx, diff, g.Legacy, g.Role)
-		if err != nil {
-			t.Fatal(err)
+		for _, c := range g.Clusters {
+			mirror(ctx, t, env.AdminPool(t, c), diff, g.Legacy, g.Role)
 		}
-		for rows.Next() {
-			var d string
-			if err := rows.Scan(&d); err != nil {
-				t.Fatal(err)
-			}
-			t.Errorf("%s ≠ %s: %s", g.Legacy, g.Role, d)
-		}
-		if err := rows.Err(); err != nil {
-			t.Fatal(err)
-		}
-		rows.Close()
 	}
 	// Kiểm có nghĩa: r_content thật sự có quyền trên bảng của mình, không có trên bảng pf_notify.
 	var own, other bool
@@ -68,5 +60,24 @@ func TestModuleGroupRolesMirrorLegacy_ADR0028(t *testing.T) {
 	}
 	if !own || other {
 		t.Fatalf("r_content: SELECT pf_content.document=%v pf_notify.notification=%v", own, other)
+	}
+}
+
+func mirror(ctx context.Context, t *testing.T, admin *pgxpool.Pool, diff, legacy, group string) {
+	t.Helper()
+	rows, err := admin.Query(ctx, diff, legacy, group)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var d string
+		if err := rows.Scan(&d); err != nil {
+			t.Fatal(err)
+		}
+		t.Errorf("%s ≠ %s: %s", legacy, group, d)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -30,6 +30,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port/edgewire"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	shareddb "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
@@ -159,12 +161,17 @@ type rig struct {
 	tenantOf map[string]uuid.UUID
 }
 
+// measurementDB: vai nhóm của module chủ ts_weigh (gói ingest không import gốc mkg/measurement).
+var measurementDB = shareddb.Module("mkg/measurement")
+
 func newRig(t *testing.T) *rig {
 	t.Helper()
 	env := pgtest.Get(t)
 	r := &rig{
 		t: t, ca: newCA(t), reg: &fakeRegistry{}, clk: clock.NewFixed(time.Date(2026, 12, 3, 0, 20, 0, 0, time.UTC)),
-		store:    &TSStore{Writer: env.Pool(t, migrations.TS, port.IngestTSRole), Reader: env.Pool(t, migrations.TS, port.TSReaderRole)},
+		// W2.6: vai đăng nhập app_ingest, mọi giao dịch SET LOCAL ROLE r_measurement (như cmd/ingest).
+		store: &TSStore{Writer: shareddb.ForModule(env.Pool(t, migrations.TS, dbadmin.AppIngest), measurementDB),
+			Reader: shareddb.ForModule(env.Pool(t, migrations.TS, dbadmin.AppIngest), measurementDB)},
 		certs:    map[string]*x509.Certificate{},
 		tenantOf: map[string]uuid.UUID{},
 	}

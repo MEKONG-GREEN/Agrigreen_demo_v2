@@ -30,13 +30,15 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders"
 	ordport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 )
 
-// OpsRole là vai DB cụm mkg của worker-internal (dbadmin: worker_internal) —
-// shared.inbox qua ag_shared_user, không quyền nghiệp vụ. Consumer không khai vai
-// riêng chạy bằng vai này.
-const OpsRole = "worker_internal"
+// OpsRole là vai đăng nhập cụm mkg của worker-internal (W2.6, ADR-0028): app_worker_internal NOINHERIT, MỘT
+// pool cho mọi consumer; giao dịch inbox chạy SET LOCAL ROLE r_<module> của consumer (Consumer.Module), module
+// dựng thêm (fieldops, costing, …) tự bọc db.ForModule. Thay worker_internal + bảy vai <module>_app.
+const OpsRole = dbadmin.AppWorkerInternal
 
 // Consumer là một consumer sự kiện nội bộ.
 type Consumer struct {
@@ -44,13 +46,13 @@ type Consumer struct {
 	Name string
 	// Events: event_type nội bộ bind vào hàng đợi — phải có schema ở contracts/events-internal/.
 	Events []string
-	// Role: vai DB cụm mkg mà giao dịch xử lý chạy (inbox + ghi nghiệp vụ cùng giao dịch); rỗng = OpsRole.
-	Role string
+	// Module: vai nhóm mà giao dịch xử lý chạy (inbox + ghi nghiệp vụ cùng giao dịch, SET LOCAL ROLE r_<module>).
+	Module db.ModuleID
 	// Build dựng handler lúc khởi động (nối module mkg qua port/) — handler chỉ dùng giao
 	// dịch inbox. Nil khi consumer cần pool của module khác (dùng BuildWith).
 	Build func(clk clock.Clock) inbox.Handler
 	// BuildWith (G3-2) dựng handler cần đọc module mkg khác qua pool vai của module đó
-	// (vd measurement đọc số cuộn của fieldops bằng vai fieldops_app). Ưu tiên hơn Build.
+	// (vd measurement đọc số cuộn của fieldops bằng r_fieldops). Ưu tiên hơn Build.
 	BuildWith func(clk clock.Clock, pool PoolFor) (inbox.Handler, error)
 }
 
@@ -66,9 +68,9 @@ func (c Consumer) Handler(clk clock.Clock, pool PoolFor) (inbox.Handler, error) 
 }
 
 // buildMeasurementRollCount: measurement đối soát lại khi số cuộn về — đọc số cuộn/kg
-// cuộn của fieldops qua mkgwire.Rolls trên pool vai fieldops_app (chỉ đọc).
+// cuộn của fieldops qua mkgwire.Rolls trên pool r_fieldops (chỉ đọc).
 func buildMeasurementRollCount(clk clock.Clock, pool PoolFor) (inbox.Handler, error) {
-	fp, err := pool(fieldops.DBRole)
+	fp, err := pool(OpsRole)
 	if err != nil {
 		return nil, err
 	}
@@ -77,26 +79,26 @@ func buildMeasurementRollCount(clk clock.Clock, pool PoolFor) (inbox.Handler, er
 	return measurement.NewConsumers(clk, measurement.Deps{Rolls: rolls}).RollCount(), nil
 }
 
-// buildLogisticsRollCount: tấn ước FM-05 = cuộn × kg/cuộn học theo HTX của fieldops (pool vai fieldops_app, chỉ đọc).
+// buildLogisticsRollCount: tấn ước FM-05 = cuộn × kg/cuộn học theo HTX của fieldops (pool r_fieldops, chỉ đọc).
 func buildLogisticsRollCount(clk clock.Clock, pool PoolFor) (inbox.Handler, error) {
-	fp, err := pool(fieldops.DBRole)
+	fp, err := pool(OpsRole)
 	if err != nil {
 		return nil, err
 	}
 	return logistics.NewConsumers(clk, fieldops.New(fp, clk, fieldops.Options{}).KgPerRoll()).RollCount(), nil
 }
 
-// buildAcctbridge dựng consumer của mkg/acctbridge (vai acctbridge_app): bộ điều hợp kế toán theo
+// buildAcctbridge dựng consumer của mkg/acctbridge (r_acctbridge): bộ điều hợp kế toán theo
 // AG_ACCTBRIDGE_ADAPTER (mặc định xuất tệp vào kho đối tượng trong lãnh thổ). Kỳ đã đóng đọc qua
-// costing/port.ClosedPeriods trên pool vai costing_app (chỉ đọc).
+// costing/port.ClosedPeriods trên pool r_costing (chỉ đọc).
 func buildAcctbridge(pick func(acctbridge.Consumers) inbox.Handler) func(clock.Clock, PoolFor) (inbox.Handler, error) {
 	return func(clk clock.Clock, pool PoolFor) (inbox.Handler, error) {
-		p, err := pool(acctbridge.DBRole)
+		p, err := pool(OpsRole)
 		if err != nil {
 			return nil, err
 		}
 		ad, _ := acctbridge.AdapterFromEnv(context.Background(), clk)
-		cp, err := pool(costing.DBRole)
+		cp, err := pool(OpsRole)
 		if err != nil {
 			return nil, err
 		}
@@ -111,7 +113,7 @@ func buildAcctbridge(pick func(acctbridge.Consumers) inbox.Handler) func(clock.C
 //
 // G3-2: mkg.fieldops.weigh_ticket (fieldops_app) và mkg.measurement.roll_count (measurement_app).
 //
-// G3 (mkg/hub, vai hub_app):
+// G3 (mkg/hub, r_hub):
 //   - mkg.hub.weigh_ticket   ← mkg.measurement.weigh_ticket.recorded (Q-MKG-04: khối lượng lô HUB_IN, gắn HUB_OUT ↔ phiếu xuất);
 //   - mkg.hub.roll_count     ← mkg.fieldops.roll_count.recorded (hàng dự kiến về);
 //   - mkg.hub.reconciliation ← mkg.measurement.reconciliation.completed (quy kết hao hụt theo cơ sở).
@@ -124,50 +126,50 @@ func buildAcctbridge(pick func(acctbridge.Consumers) inbox.Handler) func(clock.C
 //     costport.PeriodCloseConsumer ← period_close.requested (job đóng kỳ, mẫu mục 12);
 //   - acctbridge_app: abport.PeriodClosedConsumer ← period.closed, abport.JournalBuildConsumer, abport.JournalPushConsumer.
 var Consumers = []Consumer{
-	{Name: hubport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Role: hub.DBRole,
+	{Name: hubport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Module: hub.DBModule,
 		Build: func(clk clock.Clock) inbox.Handler { return hub.NewConsumers(clk).WeighTicket() }},
-	{Name: hubport.RollCountConsumer, Events: []string{fieldport.EventRollCountRecorded}, Role: hub.DBRole,
+	{Name: hubport.RollCountConsumer, Events: []string{fieldport.EventRollCountRecorded}, Module: hub.DBModule,
 		Build: func(clk clock.Clock) inbox.Handler { return hub.NewConsumers(clk).RollCount() }},
-	{Name: hubport.ReconciliationConsumer, Events: []string{measport.EventReconciliationCompleted}, Role: hub.DBRole,
+	{Name: hubport.ReconciliationConsumer, Events: []string{measport.EventReconciliationCompleted}, Module: hub.DBModule,
 		Build: func(clk clock.Clock) inbox.Handler { return hub.NewConsumers(clk).Reconciliation() }},
 	// G4 (proto FM-05): mốc chuyến có đích là cơ sở → thông báo hàng đến mang mã chuyến (cho_den → da_den).
-	{Name: hubport.TripMilestoneConsumer, Events: []string{logport.EventTripMilestoneRecorded}, Role: hub.DBRole,
+	{Name: hubport.TripMilestoneConsumer, Events: []string{logport.EventTripMilestoneRecorded}, Module: hub.DBModule,
 		Build: func(clk clock.Clock) inbox.Handler { return hub.NewConsumers(clk).TripMilestone() }},
-	// G3-2 (mkg/fieldops, vai fieldops_app): phiếu cân → bảng đệm học kg/cuộn.
-	{Name: fieldport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Role: fieldops.DBRole,
+	// G3-2 (mkg/fieldops, r_fieldops): phiếu cân → bảng đệm học kg/cuộn.
+	{Name: fieldport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Module: fieldops.DBModule,
 		Build: func(clk clock.Clock) inbox.Handler { return fieldops.NewConsumers(clk).WeighTicket() }},
-	// G3-2 (mkg/measurement, vai measurement_app): số cuộn mới → đối soát lại lô (RB-6).
-	{Name: RollCountReconcileConsumer, Events: []string{fieldport.EventRollCountRecorded}, Role: measurement.DBRole,
+	// G3-2 (mkg/measurement, r_measurement): số cuộn mới → đối soát lại lô (RB-6).
+	{Name: RollCountReconcileConsumer, Events: []string{fieldport.EventRollCountRecorded}, Module: measurement.DBModule,
 		BuildWith: buildMeasurementRollCount},
-	// G4 (mkg/logistics, vai logistics_app): xuống ghe → chuyến đường thủy planned (FM-05); phiếu cân → đóng chuyến.
-	{Name: logport.RollCountConsumer, Events: []string{fieldport.EventRollCountRecorded}, Role: logistics.DBRole,
+	// G4 (mkg/logistics, r_logistics): xuống ghe → chuyến đường thủy planned (FM-05); phiếu cân → đóng chuyến.
+	{Name: logport.RollCountConsumer, Events: []string{fieldport.EventRollCountRecorded}, Module: logistics.DBModule,
 		BuildWith: buildLogisticsRollCount},
-	{Name: logport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Role: logistics.DBRole,
+	{Name: logport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Module: logistics.DBModule,
 		Build: func(clk clock.Clock) inbox.Handler { return logistics.NewConsumers(clk, nil).WeighTicket() }},
-	// G4 (mkg/orders, vai orders_app): HUB_IN → phiếu nhận hàng ↔ đơn mua; CUSTOMER_IN → giao nhận.
-	{Name: ordport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Role: orders.DBRole,
+	// G4 (mkg/orders, r_orders): HUB_IN → phiếu nhận hàng ↔ đơn mua; CUSTOMER_IN → giao nhận.
+	{Name: ordport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Module: orders.DBModule,
 		Build: func(clk clock.Clock) inbox.Handler { return orders.NewConsumers(clk).WeighTicket() }},
-	// G4 (mkg/costing, vai costing_app): đầu vào giá thành + job đóng kỳ (mẫu mục 12).
-	{Name: costport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Role: costing.DBRole,
+	// G4 (mkg/costing, r_costing): đầu vào giá thành + job đóng kỳ (mẫu mục 12).
+	{Name: costport.WeighTicketConsumer, Events: []string{measport.EventWeighTicketRecorded}, Module: costing.DBModule,
 		BuildWith: buildCosting(costing.Consumers.WeighTicket)},
-	{Name: costport.ReconciliationConsumer, Events: []string{measport.EventReconciliationCompleted}, Role: costing.DBRole,
+	{Name: costport.ReconciliationConsumer, Events: []string{measport.EventReconciliationCompleted}, Module: costing.DBModule,
 		BuildWith: buildCosting(costing.Consumers.Reconciliation)},
-	{Name: costport.RollCountConsumer, Events: []string{fieldport.EventRollCountRecorded}, Role: costing.DBRole,
+	{Name: costport.RollCountConsumer, Events: []string{fieldport.EventRollCountRecorded}, Module: costing.DBModule,
 		BuildWith: buildCosting(costing.Consumers.RollCount)},
-	{Name: costport.TripConsumer, Events: []string{logport.EventTripCompleted}, Role: costing.DBRole,
+	{Name: costport.TripConsumer, Events: []string{logport.EventTripCompleted}, Module: costing.DBModule,
 		BuildWith: buildCosting(costing.Consumers.Trip)},
-	{Name: costport.DeliveryConsumer, Events: []string{ordport.EventDeliveryAccepted}, Role: costing.DBRole,
+	{Name: costport.DeliveryConsumer, Events: []string{ordport.EventDeliveryAccepted}, Module: costing.DBModule,
 		BuildWith: buildCosting(costing.Consumers.Delivery)},
-	{Name: costport.JournalPushedConsumer, Events: []string{abport.EventJournalPushed}, Role: costing.DBRole,
+	{Name: costport.JournalPushedConsumer, Events: []string{abport.EventJournalPushed}, Module: costing.DBModule,
 		BuildWith: buildCosting(costing.Consumers.JournalPushed)},
-	{Name: costport.PeriodCloseConsumer, Events: []string{costport.EventPeriodCloseRequested}, Role: costing.DBRole,
+	{Name: costport.PeriodCloseConsumer, Events: []string{costport.EventPeriodCloseRequested}, Module: costing.DBModule,
 		BuildWith: buildCosting(costing.Consumers.PeriodClose)},
-	// G4 (mkg/acctbridge, vai acctbridge_app): đóng kỳ → job dựng → dựng; duyệt → job đẩy → đẩy (R-62).
-	{Name: abport.PeriodClosedConsumer, Events: []string{costport.EventPeriodClosed}, Role: acctbridge.DBRole,
+	// G4 (mkg/acctbridge, r_acctbridge): đóng kỳ → job dựng → dựng; duyệt → job đẩy → đẩy (R-62).
+	{Name: abport.PeriodClosedConsumer, Events: []string{costport.EventPeriodClosed}, Module: acctbridge.DBModule,
 		BuildWith: buildAcctbridge(acctbridge.Consumers.PeriodClosed)},
-	{Name: abport.JournalBuildConsumer, Events: []string{abport.EventJournalBuildRequested}, Role: acctbridge.DBRole,
+	{Name: abport.JournalBuildConsumer, Events: []string{abport.EventJournalBuildRequested}, Module: acctbridge.DBModule,
 		BuildWith: buildAcctbridge(acctbridge.Consumers.JournalBuild)},
-	{Name: abport.JournalPushConsumer, Events: []string{abport.EventJournalPushRequested}, Role: acctbridge.DBRole,
+	{Name: abport.JournalPushConsumer, Events: []string{abport.EventJournalPushRequested}, Module: acctbridge.DBModule,
 		BuildWith: buildAcctbridge(acctbridge.Consumers.JournalPush)},
 }
 
@@ -178,15 +180,15 @@ var Consumers = []Consumer{
 //   - Trips (logistics_app): ghe chưa cân của lệnh gom (PM-02) + đọc lại chuyến khi đóng kỳ (asOf);
 //   - Deliveries (orders_app): đọc lại giao nhận đã chấp nhận khi đóng kỳ (asOf).
 func CostingDeps(clk clock.Clock, pool PoolFor) (costing.Deps, error) {
-	hp, err := pool(hub.DBRole)
+	hp, err := pool(OpsRole)
 	if err != nil {
 		return costing.Deps{}, err
 	}
-	op, err := pool(orders.DBRole)
+	op, err := pool(OpsRole)
 	if err != nil {
 		return costing.Deps{}, err
 	}
-	lp, err := pool(logistics.DBRole)
+	lp, err := pool(OpsRole)
 	if err != nil {
 		return costing.Deps{}, err
 	}
@@ -199,7 +201,7 @@ func CostingDeps(clk clock.Clock, pool PoolFor) (costing.Deps, error) {
 	}, nil
 }
 
-// buildCosting dựng một consumer của mkg/costing (vai costing_app) với đủ cổng đọc CostingDeps.
+// buildCosting dựng một consumer của mkg/costing (r_costing) với đủ cổng đọc CostingDeps.
 func buildCosting(pick func(costing.Consumers) inbox.Handler) func(clock.Clock, PoolFor) (inbox.Handler, error) {
 	return func(clk clock.Clock, pool PoolFor) (inbox.Handler, error) {
 		deps, err := CostingDeps(clk, pool)

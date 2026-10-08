@@ -13,8 +13,10 @@ import (
 
 	coopport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
@@ -68,7 +70,7 @@ func (f fakeCoopStats) ByUnit(_ context.Context, units []string) ([]coopport.Uni
 
 // withStats dựng bản module nối pf/geo, pf/party giả (bảng điều hành gộp G-02) trên cùng DB.
 func (f *fixture) withStats() *fixture {
-	mod := extension.New(f.pool, f.clk, extension.Deps{Scope: f.org, Orgs: f.org, Units: newFakeUnits(), Params: f.params, Catalogs: fakeCatalogs{},
+	mod := extension.New(pgtest.Get(f.t).Pool(f.t, migrations.PF, dbadmin.AppPlatform), f.clk, extension.Deps{Scope: f.org, Orgs: f.org, Units: newFakeUnits(), Params: f.params, Catalogs: fakeCatalogs{},
 		Plots: fakeGeoStats{"30001": 4, "30002": 2, "31001": 3}, Coops: fakeCoopStats{"30001": {2, 10}, "31001": {1, 5}}})
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)
 	mod.RegisterApp(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), idempotency.Middleware(f.env.Pool(f.t, migrations.PF, "platform_api"))))

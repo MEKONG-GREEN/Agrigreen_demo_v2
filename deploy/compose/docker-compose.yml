@@ -19,7 +19,7 @@
 #
 # Bí mật chỉ nằm trong deploy/compose/.env (không commit). Mỗi dịch vụ chỉ nhận
 # đúng biến nó cần (không dùng env_file chung): api-platform KHÔNG có mật khẩu
-# vai vault_app, KEK hay khóa ký neo.
+# vai app_vault/vault_app, KEK hay khóa ký neo.
 # Kho S3: SeaweedFS thay cho kho tương thích S3 TRONG LÃNH THỔ (RB-7) ở môi trường thật.
 name: agrigreen
 
@@ -108,6 +108,7 @@ services:
     environment:
       AG_DB_APP_PASSWORD: ${AG_DB_APP_PASSWORD:?chạy scripts/gen-dev-secrets}
       AG_DB_PASSWORD_VAULT_APP: ${AG_DB_PASSWORD_VAULT_APP:?chạy scripts/gen-dev-secrets}
+      AG_DB_PASSWORD_APP_VAULT: ${AG_DB_PASSWORD_APP_VAULT:?chạy scripts/gen-dev-secrets}
     entrypoint: ["/bin/sh", "/etc/pgbouncer-src/entrypoint.sh"]
     volumes: ["./pgbouncer:/etc/pgbouncer-src:ro"]
     ports: ["127.0.0.1:6432:6432"]
@@ -129,6 +130,7 @@ services:
       AG_PG_ADMIN_URL: postgres://postgres:${PG_SUPERUSER_PASSWORD}@postgres:5432/postgres?sslmode=disable
       AG_DB_APP_PASSWORD: ${AG_DB_APP_PASSWORD}
       AG_DB_PASSWORD_VAULT_APP: ${AG_DB_PASSWORD_VAULT_APP}
+      AG_DB_PASSWORD_APP_VAULT: ${AG_DB_PASSWORD_APP_VAULT}
     restart: "no"
 
   migrate-up:
@@ -296,7 +298,8 @@ services:
       AG_HTTP_ADDR: ":8090"
       AG_VAULT_DB_URL: postgres://pgbouncer:6432/?sslmode=disable
       AG_DB_VIA_PGBOUNCER: "1"
-      AG_DB_PASSWORD_VAULT_APP: ${AG_DB_PASSWORD_VAULT_APP}
+      # W2.6 (ADR-0028): vai đăng nhập đơn vị app_vault (module chạy r_identity); vai cũ vault_app chỉ còn cho lùi bản.
+      AG_DB_PASSWORD_APP_VAULT: ${AG_DB_PASSWORD_APP_VAULT}
       AG_VAULT_KEK: ${AG_VAULT_KEK:?chạy scripts/gen-dev-secrets}
       AG_VAULT_KEK_ID: local-1
       AG_VAULT_BLIND_KEY: ${AG_VAULT_BLIND_KEY:?chạy scripts/gen-dev-secrets}
@@ -340,7 +343,7 @@ services:
     # 8084 (Internal, mTLS) chỉ trong mạng compose — KHÔNG publish ra máy chủ.
     expose: ["8084"]
 
-  # API nội bộ MKG (vùng mkg, mục 5): cụm ag_mkg qua PgBouncer, vai theo module + mkg_api (idempotency).
+  # API nội bộ MKG (vùng mkg, mục 5): cụm ag_mkg qua PgBouncer, MỘT vai app_internal (W2.6: r_<module>, idempotency r_ops).
   api-internal:
     <<: *go-app
     image: agrigreen/api-internal:dev
@@ -442,8 +445,8 @@ services:
       retries: 20
 
   # Nhận lô số đo có chữ ký nguồn từ agent biên qua mTLS (vùng mkg, mục 13.2/14, ADR-0017/0019):
-  # ghi ts_weigh (cụm ag_ts, vai ingest_ts/ts_reader) và tích phân phiếu cân (cụm ag_mkg, vai
-  # ingest_mkg) — hai pool qua PgBouncer, không câu SQL nào chạm cả hai cụm (R-07).
+  # ghi ts_weigh (cụm ag_ts) và tích phân phiếu cân (cụm ag_mkg) — vai app_ingest ở cả hai cụm,
+  # giao dịch r_measurement (W2.6) — hai pool qua PgBouncer, không câu SQL nào chạm cả hai cụm (R-07).
   # 8091: /healthz, /readyz thuần HTTP — chỉ trong mạng compose. 8443: nhận lô mTLS — chỉ
   # 127.0.0.1 của máy (VPS: địa chỉ giao diện VPN/OT qua AG_INGEST_BIND_ADDR, xem
   # docs/runbooks/ingest.md; KHÔNG bao giờ qua Caddy/internet).

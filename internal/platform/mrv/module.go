@@ -53,6 +53,7 @@ type Module struct{ svc *app.Service }
 // xuất gói chỉ dùng giao dịch do inbox.Process mở. Thiếu phụ thuộc → 503
 // mrv.dependency_unavailable ở thao tác cần nó.
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
+	db = forModule(db)
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Scope: deps.Scope, Consent: deps.Consent, Store: deps.Store, Params: deps.Params}}
 }
 

@@ -53,7 +53,7 @@ func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	env := pgtest.Get(t)
 	iss := authztest.New(t)
-	mod := masterdata.New(env.Pool(t, migrations.PF, masterdata.DBRole), clock.System{})
+	mod := masterdata.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{})
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	log := telemetry.NewLogger("test", io.Discard)
 

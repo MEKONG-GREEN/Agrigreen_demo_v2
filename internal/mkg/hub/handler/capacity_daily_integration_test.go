@@ -12,6 +12,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
@@ -24,7 +25,7 @@ func TestDailyCapacityPublication_GIS_US_WH_01(t *testing.T) {
 	a := f.approvedFacility("HUB-D1", "500000")
 	b := f.approvedFacility("HUB-D2", "250000")
 	pub := f.env.Pool(t, migrations.MKG, dbadmin.OpsJobs)
-	mod := hub.New(f.pool, f.clk)
+	mod := hub.New(pgtest.Get(t).Pool(t, migrations.MKG, dbadmin.AppInternal), f.clk)
 	ctx := context.Background()
 	all, err := hub.ActiveHubTenants(pub)(ctx)
 	if err != nil || !slices.Contains(all, f.tenant) {

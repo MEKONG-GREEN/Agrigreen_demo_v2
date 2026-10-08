@@ -59,6 +59,7 @@ type Module struct{ svc *app.Service }
 
 // New tạo module với pool của vai fieldops_app (cụm mkg).
 func New(db tenant.Beginner, clk clock.Clock, o Options) *Module {
+	db = forModule(db)
 	unconfigured := o.Directory == nil
 	if unconfigured {
 		o.Directory = adapter.Unconfigured{}

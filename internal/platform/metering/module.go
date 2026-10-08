@@ -47,6 +47,7 @@ type Module struct{ svc *app.Service }
 
 // New tạo module với pool của vai metering_app.
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
+	db = forModule(db)
 	m := deps.Metrics
 	if m == nil {
 		m = app.NewMetrics(telemetry.Meter())

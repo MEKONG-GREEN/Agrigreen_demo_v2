@@ -77,14 +77,24 @@ func run(log *slog.Logger) error {
 	}
 	defer func() { _ = shutdownOTel(context.Background()) }()
 	opts := db.OptionsFromEnv("api-platform")
+	// W2.6 (ADR-0028): một pool cho mỗi vai đăng nhập — idempotency (r_ops) và mọi module (r_<module>) dùng chung
+	// pool app_platform; Build mở lại cùng vai nhận về cùng pool.
+	opened := map[string]*pgxpool.Pool{}
 	open := func(ctx context.Context, role string) (*pgxpool.Pool, error) {
+		if p, ok := opened[role]; ok {
+			return p, nil
+		}
 		dsn, err := dbadmin.RoleURL(base, migrations.PF, "", role)
 		if err != nil {
 			return nil, err
 		}
-		return db.Open(ctx, dsn, opts)
+		p, err := db.Open(ctx, dsn, opts)
+		if err == nil {
+			opened[role] = p
+		}
+		return p, err
 	}
-	ops, err := open(ctx, "platform_api")
+	ops, err := open(ctx, dbadmin.AppPlatform)
 	if err != nil {
 		return err
 	}

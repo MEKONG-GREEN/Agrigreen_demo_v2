@@ -63,6 +63,7 @@ type Module struct{ svc *app.Service }
 // động lại hoặc khi đi qua phiên bản khác — CHỈ chấp nhận ở Local/Dev.
 // Hai Source/Sink cùng entity là lỗi lắp ráp → panic lúc khởi động.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
+	db = forModule(db)
 	if len(d.CursorKey) == 0 {
 		d.CursorKey = make([]byte, 32)
 		if _, err := rand.Read(d.CursorKey); err != nil {
@@ -96,7 +97,7 @@ func CheckCursorKey(key []byte, production bool) error {
 // NewDevices dựng cổng đọc sổ thiết bị (port.Devices) từ pool vai sync_app, độc
 // lập với module (không cần Source/Sink) — gốc lắp ráp dùng khi module khác vừa cần
 // kiểm thiết bị vừa là Source của pf/sync.
-func NewDevices(db tenant.Beginner) port.Devices { return app.DeviceLookup{DB: db} }
+func NewDevices(db tenant.Beginner) port.Devices { return app.DeviceLookup{DB: forModule(db)} }
 
 // Devices là cổng đọc sổ thiết bị của module đã nối.
 func (m *Module) Devices() port.Devices { return app.DeviceLookup{DB: m.svc.DB} }
@@ -122,6 +123,7 @@ func (m *Module) UseIntegrations(consumers []string, dlq func(context.Context) (
 // pf_sync.integration_failure (vai sync_app) và phát pf.sync.integration.dead_lettered ở lần
 // giao cuối (GIS US-SYNC-01/02). Không cần dựng module đầy đủ — worker dùng cho mọi consumer.
 func FailureRecorder(db tenant.Beginner, clk clock.Clock) inbox.FailureRecorder {
+	db = forModule(db)
 	svc := &app.Service{DB: db, Clock: clk}
 	return func(ctx context.Context, f inbox.Failure) error {
 		return svc.RecordFailure(ctx, port.ConsumerFailure{
@@ -149,6 +151,7 @@ func (m *Module) RegisterSLAMetrics(tenants func(context.Context) ([]uuid.UUID, 
 // module đầy đủ (worker, ADR-0006 + mục 19): db là pool vai sync_app, tenants thường là
 // ConflictTenants(pool ag_ops_jobs).
 func RegisterConflictSLAMetrics(db tenant.Beginner, clk clock.Clock, tenants func(context.Context) ([]uuid.UUID, error)) (metric.Registration, error) {
+	db = forModule(db)
 	return registerSLA(&app.Service{DB: db, Clock: clk}, tenants)
 }
 

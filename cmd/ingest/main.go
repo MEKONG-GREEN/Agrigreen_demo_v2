@@ -43,7 +43,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
@@ -53,7 +52,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
-// wireMeasurement nối hiện thực cổng mkg/measurement trên pool ingest_mkg (G3-A2):
+// wireMeasurement nối hiện thực cổng mkg/measurement trên pool app_ingest (G3-A2; r_measurement — W2.6):
 // sổ thiết bị, hàng phiên đã đóng, bì theo cửa sổ, sổ phiếu cân.
 var wireMeasurement = func(_ context.Context, pool *pgxpool.Pool, clk clock.Clock) (measurement.IngestPorts, error) {
 	return measurement.NewIngestPorts(pool, clk), nil
@@ -180,15 +179,13 @@ func run(log *slog.Logger) error {
 		pools = append(pools, p)
 		return p, nil
 	}
-	tsWriter, err := open(tsBase, migrations.TS, port.IngestTSRole)
+	// W2.6 (ADR-0028): vai đăng nhập app_ingest ở cả hai cụm; mọi giao dịch chạy SET LOCAL ROLE r_measurement
+	// (quyền của ingest_mkg, ingest_ts, ts_reader gộp ở mkg 000035, ts 000004).
+	tsPool, err := open(tsBase, migrations.TS, dbadmin.AppIngest)
 	if err != nil {
 		return err
 	}
-	tsReader, err := open(tsBase, migrations.TS, port.TSReaderRole)
-	if err != nil {
-		return err
-	}
-	mkgPool, err := open(mkgBase, migrations.MKG, port.IngestRole)
+	mkgPool, err := open(mkgBase, migrations.MKG, dbadmin.AppIngest)
 	if err != nil {
 		return err
 	}
@@ -204,7 +201,7 @@ func run(log *slog.Logger) error {
 		return err
 	}
 	metrics := measurement.NewIngestMetrics(telemetry.Meter())
-	store := &measurement.IngestTSStore{Writer: tsWriter, Reader: tsReader}
+	store := measurement.NewIngestTSStore(tsPool, tsPool)
 	rv := &measurement.IngestReceiver{
 		Devices: ports.Devices, Store: store, Clock: clk, Log: log, Metrics: metrics,
 		Limiter:    measurement.NewIngestRateLimiter(clk, cfg.ratePerMin, cfg.burst),

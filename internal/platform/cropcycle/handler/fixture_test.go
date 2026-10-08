@@ -24,6 +24,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -93,7 +94,7 @@ func newFixture(t *testing.T) *fixture {
 	}}
 	f.params = &fakeParams{vals: map[string]decimal.Decimal{}}
 	f.farmers = &fakeFarmers{links: map[uuid.UUID][]uuid.UUID{}}
-	f.mod = cropcycle.New(pool, f.clk, cropcycle.Deps{Scope: sc, Orgs: f.orgs, Plots: f.plots, Params: f.params,
+	f.mod = cropcycle.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), f.clk, cropcycle.Deps{Scope: sc, Orgs: f.orgs, Plots: f.plots, Params: f.params,
 		Catalogs: newFakeCatalogs(), Farmers: f.farmers})
 	f.share.Grant(f.tenant, f.mkg, partyport.ShareKinds...) // ADR-0020: tenant chương trình → tenant MKG, mọi loại
 	f.mod.UseSharing(f.share, f.share)

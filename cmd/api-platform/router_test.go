@@ -46,7 +46,7 @@ func newFixture(t *testing.T) *fixture {
 	}
 	r := NewRouter(Deps{
 		Log: telemetry.NewLogger("test", io.Discard), Verifier: iss.Verifier(),
-		Ops: env.Pool(t, migrations.PF, "platform_api"), Modules: mods, Pools: pools,
+		Ops: env.Pool(t, migrations.PF, dbadmin.AppPlatform), Modules: mods, Pools: pools,
 	})
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)

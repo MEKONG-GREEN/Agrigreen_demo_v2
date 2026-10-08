@@ -4,7 +4,7 @@
 // Cấu hình (biến môi trường):
 //
 //	AG_HTTP_ADDR         mặc định :8090
-//	AG_VAULT_DB_URL      URL gốc tới database cụm vault (host, cổng, sslmode) — vai vault_app ghép vào
+//	AG_VAULT_DB_URL      URL gốc tới database cụm vault (host, cổng, sslmode) — vai app_vault ghép vào (W2.6)
 //	AG_DB_PASSWORD_VAULT_APP hoặc AG_DB_APP_PASSWORD
 //	AG_DB_VIA_PGBOUNCER  =1 khi đi qua PgBouncer transaction mode
 //	AG_OIDC_ISSUER       issuer của realm Keycloak — kho tự xác minh token người dùng cuối (R-54)
@@ -112,7 +112,7 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	dsn, err := dbadmin.RoleURL(base, migrations.Vault, "", identity.DBRole)
+	dsn, err := dbadmin.RoleURL(base, migrations.Vault, "", dbadmin.AppVault) // W2.6: module chạy r_identity
 	if err != nil {
 		return err
 	}

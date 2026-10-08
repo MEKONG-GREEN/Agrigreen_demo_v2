@@ -36,6 +36,7 @@ type Module struct {
 
 // New tạo module với pool của vai masterdata_app.
 func New(db tenant.Beginner, clk clock.Clock) *Module {
+	db = forModule(db)
 	return &Module{svc: &app.Service{DB: db, Clock: clk}}
 }
 

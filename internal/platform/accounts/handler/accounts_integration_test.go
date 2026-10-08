@@ -26,6 +26,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -61,7 +62,7 @@ func newFixture(t *testing.T) *fixture {
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	dir := keycloak.NewMemory()
 	pty := newFakeParty()
-	mod := accounts.New(pool, clock.System{}, accounts.Deps{Directory: dir, Scope: pty, Orgs: pty})
+	mod := accounts.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{Directory: dir, Scope: pty, Orgs: pty})
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)
 	mod.RegisterAdmin(eng.Group("/v1", httpx.Authenticate(iss.Verifier()), httpx.RequireMFA(), idempotency.Middleware(ops)))
 	srv := httptest.NewServer(eng)
@@ -727,9 +728,8 @@ func TestNoPIIColumns(t *testing.T) {
 
 // Chưa cấu hình Keycloak → 503 có mã riêng.
 func TestNoDirectoryIs503(t *testing.T) {
-	env := pgtest.Get(t)
 	iss := authztest.New(t)
-	mod := accounts.New(env.Pool(t, migrations.PF, accounts.DBRole), clock.System{}, accounts.Deps{})
+	mod := accounts.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{})
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)
 	mod.RegisterAdmin(eng.Group("/v1", httpx.Authenticate(iss.Verifier()), httpx.RequireMFA()))
 	srv := httptest.NewServer(eng)

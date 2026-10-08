@@ -24,6 +24,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -50,10 +51,9 @@ type knFix struct {
 func newKNFix(t *testing.T) *knFix {
 	env := pgtest.Get(t)
 	f := &knFix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}}
-	pool := env.Pool(t, migrations.PF, geo.DBRole)
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	tol := decimal.NewFromInt(1)
-	f.mod = geo.New(pool, clock.System{}, geo.Deps{Scope: newFakeScope(), Params: fakeParams{tolerance: &tol}, AdminUnits: newFakeUnits()})
+	f.mod = geo.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, geo.Deps{Scope: newFakeScope(), Params: fakeParams{tolerance: &tol}, AdminUnits: newFakeUnits()})
 	f.mod.UseKN(farmerid.New(clienttest.New()), nil)
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 4<<20)
 	f.mod.RegisterApp(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), f.knMiddleware(), idempotency.Middleware(ops)))

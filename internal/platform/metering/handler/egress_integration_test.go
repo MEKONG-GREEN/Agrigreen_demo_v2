@@ -14,8 +14,11 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
 func egress(ch meter.Channel, dataTenant, counterparty uuid.UUID, records int64, at time.Time) meter.Egress {
@@ -60,7 +63,7 @@ func TestCheckpointObserveEnforce_ADR0024(t *testing.T) {
 	}
 
 	// enforce (Phase K): cùng tenant, cùng hạn mức → từ chối, không đếm.
-	enf := metering.New(f.pool, f.clk, metering.Deps{Params: f.params, Mode: meter.ModeEnforce})
+	enf := metering.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), f.clk, metering.Deps{Params: f.params, Mode: meter.ModeEnforce})
 	d, err = enf.Checkpoint().Pass(ctx, egress(meter.ChannelValve, dt, recv, 1, at))
 	if err != nil || d.Allowed || d.Reason != "quota_exceeded" || d.DailyRecords != 35 {
 		t.Fatalf("enforce phải từ chối: %+v %v", d, err)
@@ -233,7 +236,7 @@ func TestRebuildProjectionsEqualsLive_R22(t *testing.T) {
 	if _, err := f.mod.Ledger().Record(ctx, f.op, call(client, ct, f.op, oct.Add(100*time.Hour))); codeOf(err) != "metering.egress_quota_exceeded" {
 		t.Fatalf("muốn bị checkpoint từ chối: %v", err)
 	}
-	enf := metering.New(f.pool, f.clk, metering.Deps{Params: f.params, Mode: meter.ModeEnforce})
+	enf := metering.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), f.clk, metering.Deps{Params: f.params, Mode: meter.ModeEnforce})
 	f.params.set(f.op, port.EgressParam(port.ParamEgressDailyQuotaFmt, meter.ChannelMRVPackage), "3")
 	_, _ = enf.Checkpoint().Pass(ctx, egress(meter.ChannelMRVPackage, f.op, ids.New(), 9, oct))
 	sid := f.draftAndApprove(client, "2026-10")
@@ -263,7 +266,7 @@ func TestCheckpointInternalObserveUnderEnforce_A5(t *testing.T) {
 	f := newFixture(t, meter.ModeEnforce)
 	dt, actor := ids.New(), ids.New()
 	f.params.set(dt, port.EgressParam(port.ParamEgressDailyQuotaFmt, meter.ChannelReportExport), "3")
-	enf := metering.New(f.pool, f.clk, metering.Deps{Params: f.params, Mode: meter.ModeEnforce})
+	enf := metering.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), f.clk, metering.Deps{Params: f.params, Mode: meter.ModeEnforce})
 	internal := func(records int64) meter.Egress {
 		return meter.Egress{SourceID: ids.New(), Channel: meter.ChannelReportExport, DataTenantID: dt, CounterpartyKind: meter.CounterpartyActor,
 			CounterpartyRef: actor, Product: "kn_plot_file", Records: records, OccurredAt: oct, ActorRef: actor, Internal: true}

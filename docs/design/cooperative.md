@@ -105,7 +105,7 @@ Mọi bảng hiện có chính sách `p_tenant` (`shared.apply_tenant_rls`, `FOR
 **Quyền hiện có trên các bảng chuyển:**
 - vai đăng nhập cũ `party_app`, `geo_app`, `cropcycle_app` (pf 000003, 000004, 000020, 000021, 000022, 000078);
 - `r_party`, `r_geo`, `r_cropcycle`, do pf 000090 chép từ vai cũ;
-- W2.6 (pf 000093) bỏ quyền bảng của `<module>_app`.
+- W2.6 (pf 000119) bỏ quyền bảng của `<module>_app`.
 
 ACL đi theo bảng khi `SET SCHEMA`, nên W3.3 phải `REVOKE` của `r_party`/`r_geo`/`r_cropcycle` và `GRANT` cho `r_coop` (mục 8.4). Không có quyền nào trên các bảng này cấp cho `ag_outbox_publisher`, `r_agg` hay vai giám sát.
 
@@ -604,7 +604,7 @@ W3.5 vẫn **chặn** chờ dữ liệu UAT (C-9).
 | R-4 | Tạo HTX hai bước (8.6) để lại Nút không hồ sơ | Trung bình | Khóa lũy đẳng + job đối soát + màn KN hiển thị "HTX thiếu hồ sơ" |
 | R-5 | `p_scope` nhánh `node_id IS NULL` mở rộng nếu Principal người dùng mất Nút | Trung bình | Kiểm thử + từ chối ở `db.ForModule` (mục 9) |
 | R-6 | `household` không có cột Nút → SubPlan theo hàng (DB-14) | Trung bình | Cổng `EXPLAIN`; phương án cột thường ở W3.4 |
-| R-7 | Song song với W2.6 (pf 000093 đổi quyền của mọi module) | Trung bình | W3.3 sau W2.6 (đường găng). 000095 `REVOKE` cả vai cũ, idempotent |
+| R-7 | Song song với W2.6 (pf 000119 đổi quyền của mọi module) | Trung bình | W3.3 sau W2.6 (đường găng). 000095 `REVOKE` cả vai cũ, idempotent |
 | R-8 | Chu trình mới `cooperative ↔ cropcycle` nếu SOP ở lại cropcycle | Trung bình | D-4 |
 | R-9 | `coop_manager` chỉ còn module `per_tenant` khai → bị chặn gán vai khi tắt module | Thấp | 7.1, kiểm ở W3.3 |
 | R-10 | Xung đột tài liệu với gói song song (`cau-hoi-ton-dong.md` §H, `roadmap.md`) | Thấp | Một dòng mỗi tệp |
@@ -620,7 +620,7 @@ W3.5 vẫn **chặn** chờ dữ liệu UAT (C-9).
    - đổi bên tiêu thụ theo mục 5;
    - đánh dấu port cũ `Deprecated`;
    - xóa ngoại lệ `agmodgraph` có chủ W3.2.
-3. **W2.6** (song song, pf 000093).
+3. **W2.6** (song song, pf 000119).
 4. **W3.3** (L): 000094–000096; chuyển store, handler, consumer, sync, metrics vào cooperative; xóa port cũ (party, geo, cropcycle `2.0.0`); sửa `agmodgraph` (8.1); diễn tập UAT; xóa ngoại lệ W3.3.
 5. **W3.4** (M): pf 000097, cổng `EXPLAIN`.
 6. **W4.2**: nhánh `share_scope` trên bảng `shares`. **W6.5**: `Resolve`. **W3.5**: khi có dữ liệu UAT.

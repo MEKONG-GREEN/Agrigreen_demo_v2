@@ -22,24 +22,33 @@ type CatalogEntry struct {
 	Kind        Kind
 	Enable      Enable
 	Permissions []string // vai realm module khai (permissions)
+	// Zones: cụm dữ liệu module chạy (zones) — W2.6: cụm của vai nhóm r_<module> (dbadmin).
+	Zones []string
+	// OwnsSchema: schema module sở hữu (owns_schema) — W2.6: module có schema thì có vai nhóm r_<module>.
+	OwnsSchema []string
 }
 
 // Catalog trả mọi module theo tên (bản sao).
 func Catalog() []CatalogEntry {
 	out := make([]CatalogEntry, len(catalog))
 	for i, e := range catalog {
-		e.Permissions = slices.Clone(e.Permissions)
-		out[i] = e
+		out[i] = e.clone()
 	}
 	return out
+}
+
+func (e CatalogEntry) clone() CatalogEntry {
+	e.Permissions = slices.Clone(e.Permissions)
+	e.Zones = slices.Clone(e.Zones)
+	e.OwnsSchema = slices.Clone(e.OwnsSchema)
+	return e
 }
 
 // Entry trả mục danh mục của một module.
 func Entry(name string) (CatalogEntry, bool) {
 	for _, e := range catalog {
 		if e.Name == name {
-			e.Permissions = slices.Clone(e.Permissions)
-			return e, true
+			return e.clone(), true
 		}
 	}
 	return CatalogEntry{}, false
@@ -89,13 +98,18 @@ func FormatCatalog(mods []*Manifest) ([]byte, error) {
 	for _, m := range sorted {
 		perms := slices.Clone(m.Permissions)
 		slices.Sort(perms)
-		q := make([]string, len(perms))
-		for i, p := range perms {
-			q[i] = strconv.Quote(p)
-		}
-		fmt.Fprintf(&b, "\t{Name: %s, Kind: %s, Enable: %s, Permissions: []string{%s}},\n",
-			strconv.Quote(m.Name), strconv.Quote(string(m.Kind)), strconv.Quote(string(m.Enable)), strings.Join(q, ", "))
+		fmt.Fprintf(&b, "\t{Name: %s, Kind: %s, Enable: %s, Permissions: %s, Zones: %s, OwnsSchema: %s},\n",
+			strconv.Quote(m.Name), strconv.Quote(string(m.Kind)), strconv.Quote(string(m.Enable)),
+			goStrings(perms), goStrings(m.Zones), goStrings(m.OwnsSchema))
 	}
 	b.WriteString("}\n")
 	return format.Source(b.Bytes())
+}
+
+func goStrings(xs []string) string {
+	q := make([]string, len(xs))
+	for i, x := range xs {
+		q[i] = strconv.Quote(x)
+	}
+	return "[]string{" + strings.Join(q, ", ") + "}"
 }

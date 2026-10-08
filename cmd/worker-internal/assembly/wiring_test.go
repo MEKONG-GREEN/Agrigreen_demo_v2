@@ -9,9 +9,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/costing"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/logistics"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 )
 
@@ -47,14 +44,13 @@ func TestWorkerInternalConsumersBuildWithDeps_G4(t *testing.T) {
 		if err != nil || h == nil {
 			t.Errorf("%s: handler nil / lỗi %v", c.Name, err)
 		}
-		if c.Role == costing.DBRole && c.BuildWith == nil {
+		if c.Module == costing.DBModule && c.BuildWith == nil {
 			t.Errorf("%s: consumer costing phải dựng bằng BuildWith (cần cổng đọc module khác)", c.Name)
 		}
 	}
-	for _, role := range []string{hub.DBRole, orders.DBRole, logistics.DBRole, costing.DBRole} {
-		if lp.asked[role] == 0 {
-			t.Errorf("không consumer nào hỏi pool vai %s", role)
-		}
+	// W2.6: mọi module dùng MỘT pool vai đăng nhập đơn vị (OpsRole = app_worker_internal), không còn pool <module>_app.
+	if len(lp.asked) != 1 || lp.asked[OpsRole] == 0 {
+		t.Errorf("pool được hỏi: %v (muốn chỉ %s)", lp.asked, OpsRole)
 	}
 	deps, err := CostingDeps(clock.System{}, lp.pool)
 	if err != nil {
@@ -64,10 +60,8 @@ func TestWorkerInternalConsumersBuildWithDeps_G4(t *testing.T) {
 		t.Fatalf("CostingDeps thiếu cổng: %+v", deps)
 	}
 	// Pool của module chủ lỗi → consumer không dựng được (worker dừng khởi động, không chạy thiếu cổng).
-	for _, role := range []string{hub.DBRole, orders.DBRole, logistics.DBRole} {
-		bad := &lazyPools{t: t, asked: map[string]int{}, fail: role}
-		if _, err := CostingDeps(clock.System{}, bad.pool); err == nil {
-			t.Errorf("pool %s lỗi phải trả lỗi", role)
-		}
+	bad := &lazyPools{t: t, asked: map[string]int{}, fail: OpsRole}
+	if _, err := CostingDeps(clock.System{}, bad.pool); err == nil {
+		t.Errorf("pool %s lỗi phải trả lỗi", OpsRole)
 	}
 }

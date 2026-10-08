@@ -104,7 +104,7 @@ Mỗi bước có đường lui: vai cũ còn quyền cho đến khi bước k�
 |---|---|---|
 | W2.3 | Khung vai, `WithContextTx`, registry, lint, 2 module mẫu, T4/T5 | pf 000090, shared 000007 |
 | W2.4 | Biến ngữ cảnh `app.*` trong `WithContextTx` | trong pf 000091 |
-| W2.6 | Chuyển mọi module, bỏ quyền vai cũ, cổng CI | pf 000093, mkg 000023, ts 000004, vault 000003 |
+| W2.6 | Chuyển mọi module, bỏ quyền vai cũ, cổng CI | pf 000119, mkg 000035, ts 000004, vault 000003 |
 | W9.1 | Cổng "không `r_*` có quyền trên schema module khác trừ `k_ref`, `_pub`" | — |
 
 ### W2.3 (05/10/2026): khung và hai module mẫu
@@ -150,6 +150,84 @@ Kiểm thử:
 - `ctxvars_integration_test.go`: `pf/content` trên `app_platform`, pool một kết nối, cả hai chế độ thực thi. Biến thấy được qua `k_ref.ctx_*`; sau COMMIT và sau ROLLBACK, giao dịch kế tiếp thấy NULL.
 
 Chưa đổi chính sách RLS nào.
+
+### W2.6 (08/10/2026): chuyển hết, bỏ quyền vai cũ, cổng CI
+
+**Vai** (`dbadmin/modroles.go`):
+
+- Danh sách `r_<module>` suy từ `modreg.Catalog()`: mọi module có `owns_schema`, cụm lấy theo `zones`. Danh sách **không** phụ thuộc vai cũ còn tồn tại; `modgen` sinh thêm `Zones`, `OwnsSchema` vào `catalog_gen.go`, và `groupOnlyModules` bị bỏ. Kết quả là 27 vai nhóm:
+  - 19 vai pf (gồm `r_workflow`, W6.1);
+  - 7 vai mkg;
+  - `r_identity` (vault/identity);
+  - `r_measurement` có ở cả cụm mkg và ts.
+- Thêm `r_ops` (NOLOGIN, thuộc `ag_shared_user`). Đây là vai vận hành của đơn vị: idempotency HTTP và consumer không thuộc module (`db.Ops`).
+- Vai đăng nhập (LOGIN **NOINHERIT**, không thuộc `ag_shared_user`):
+  - `app_platform`, `app_worker`, `app_public`, `app_sync` (pf);
+  - `app_internal`, `app_worker_internal` (mkg);
+  - `app_ingest` (mkg + ts);
+  - `app_vault` (vault).
+- `LoginUnit.Tools`: các lệnh một lần dùng chung vai của đơn vị. `drill` và `formimport` dùng `app_worker`; `rebuilddrill` dùng `app_worker_internal`. Kiểm thử bảo đảm vai là thành viên `r_*` của mọi module có schema mà lệnh ghép.
+- Số bí mật đăng nhập mỗi cụm: pf 7, mkg 7, ts 5, vault 4 — gồm `ag_ops_jobs` (rà soát 08/10/2026, shared 000009: job vận hành xuyên tenant). Không kể `ag_ops_jobs` thì là 6/6/4/3, khớp mục tiêu 4–6 của §4.
+
+**Vai cũ — quyết định:**
+
+1. `<module>_app` (25 vai, gồm `vault_app`): migration **thu hồi mọi quyền trực tiếp** do ag_migrator cấp (schema, bảng, chuỗi số, cột, hàm). Vai giữ tên và membership INHERIT trong `r_<module>` **một kỳ phát hành**. Lý do: nhị phân cũ vẫn chạy khi lùi bản, còn quyền chỉ có một nguồn là `r_*`. Bản phát hành sau `DROP ROLE` các vai này và gỡ chúng khỏi `userlist`.
+2. Vai không theo module (quyết định §1, mục mở W2.3):
+   - `platform_api`, `public_api`, `worker_platform`, `mkg_api`, `worker_internal` **gộp vào `r_ops`**. Chúng chỉ có shared qua `ag_shared_user`.
+   - `ingest_mkg`, `ingest_ts`, `ts_reader` **gộp vào `r_measurement`**, vì ingest thuộc `mkg/measurement` (owns_schema `mkg_measurement`, `ts_weigh`). Quyền được chép (mkg 000035, ts 000004). Vai cũ **giữ nguyên quyền** một kỳ, **không** là thành viên vai nhóm: membership sẽ mở rộng quyền của vai cũ khi lùi bản.
+   - **Lệch:** ingest mất tách đọc/ghi giữa `ts_reader` và `ingest_ts` trong cùng tiến trình. `r_measurement` ở cụm ts có SELECT, INSERT, không UPDATE/DELETE. Mức này bằng hiện trạng (tiến trình vốn giữ cả hai bí mật, xem Hệ quả).
+   - `ag_outbox_publisher`, `ag_ops_jobs` (rà soát 08/10/2026: neo, dọn idempotency, tìm tenant cho job — BYPASSRLS, chỉ cột cần), `mkg_monitor`/`ts_monitor` và chủ hàm giám sát giữ riêng, không theo module (§1). Không `app_*` nào là thành viên.
+
+**Migration:**
+
+- pf 000119, mkg 000035, vault 000003 dùng một khối DO chung, theo cặp `[vai cũ, vai nhóm, move|copy]`:
+  - kiểm vai nhóm tồn tại;
+  - với `move`, kiểm vai cũ là thành viên INHERIT của vai nhóm;
+  - chép mọi ACL ag_migrator đã cấp cho vai cũ;
+  - với `move`, `REVOKE` các ACL đó (cột trước bảng).
+- ts 000004 chỉ chép.
+- Danh sách cặp khớp `ModuleGroups()`/`FoldedLogins` (kiểm thử `TestMigrationsW26MatchModuleGroups`).
+- Thứ tự triển khai không đổi so với W2.3: bootstrap → migrate → bí mật/pool → ứng dụng ([runbook](../runbooks/db-roles-w26.md)).
+
+**Mã:**
+
+- 23 module (15 pf còn lại, 7 mkg, vault/identity) khai `DBModule` (`dbmodule.go`, `db.Module`). Hàm `forModule` bọc pool trong `New` và trong mọi hàm xuất nhận `tenant.Beginner`:
+  - `sync.NewDevices`, `FailureRecorder`, `RegisterConflictSLAMetrics`;
+  - `measurement.NewIngest*`, `NewIngestTSStore`;
+  - `acctbridge.NewConsumers`, `orders.NewWith`;
+  - `waterway.Deps.Read`;
+  - `party/port/grantlookup` (tự khai `pf/party`).
+- `cmd/*` mở **một pool mỗi đơn vị** (`OptionsFromEnv` mặc định `MaxConns` 20, `AG_DB_MAX_CONNS`):
+  - `assembly.Build` (api-platform; worker qua `External.Login = app_worker`), api-public, api-internal (`OpsRole = app_internal`), worker-internal (`OpsRole = app_worker_internal`), ingest (`app_ingest` hai cụm), identity-vault, drill, rebuilddrill (băm/dựng lại trong giao dịch của module);
+  - consumer (`cmd/worker`, `assembly.Consumers`, worker-internal) mang `Module` thay `Role`. Giao dịch inbox chạy `db.ForModule(pool, Module)`; consumer mẫu G0 chạy `db.Ops`;
+  - idempotency của api-platform và api-internal chạy `db.ForModule(ops, db.Ops)`.
+- Job vận hành tìm tenant xuyên RLS bằng `ag_ops_jobs` (pool riêng của lịch worker).
+- `tenant.WithTenantTx` **chưa bỏ**. Nó là lớp dưới của `db.WithModuleTenantTx` và chỉ an toàn khi Beginner đã bọc `ForModule`. Bỏ hẳn cần đổi mọi lời gọi trong module (gói sau).
+
+**Triển khai:**
+
+- compose: `AG_DB_PASSWORD_APP_VAULT`; identity-vault dùng `app_vault`.
+- PgBouncer `userlist` (compose, CI) thêm 4 vai mới, giữ vai cũ một kỳ.
+- Chart: Secret ứng dụng chỉ còn khóa `APP_*` (`pf-db-roles`, `pf-public-db-roles`, `mkg-db-roles`, `vault-db-roles`); `ts-db-roles` bị bỏ, vì `app_ingest` dùng chung mật khẩu `db/mkg`. `pg-*-roles` của Job bootstrap thêm khóa `APP_*` và giữ khóa vai cũ.
+
+**Cổng CI "truy vấn ngoài `WithContextTx` thất bại":**
+
+- `migrations/login_roles_gate_integration_test.go` (mọi cụm):
+  - mọi `app_*` có 0 quyền hiệu lực trên mọi quan hệ ngoài schema hệ thống;
+  - với mỗi `r_*`, một bảng của module: truy vấn thẳng trên pool `app_*` trả 42501 (cả `shared.outbox`), cùng truy vấn trong `db.WithModuleTenantTx` chạy được;
+  - vai cũ `<module>_app` có 0 ACL trực tiếp.
+- `internal/shared/db/modules_wired_test.go`:
+  - mọi module có schema khai `DBModule = db.Module("<tên>")` và gọi `ForModule` ở gốc (hoặc `app/`);
+  - mã không phải kiểm thử trong `cmd/*` không còn chuỗi vai cũ hay `.DBRole`.
+- `migrations/module_roles_integration_test.go` so `r_*` ≡ vai cũ (hiệu lực) trên mọi cụm.
+- Bộ kiểm thử module dựng module trên `app_platform`/`app_internal`/`app_ingest`/`app_vault`. Kiểm trực tiếp DB vẫn dùng vai cũ (quyền qua membership), tới khi xóa vai cũ.
+
+**Còn mở:**
+
+1. Xóa vai cũ, gỡ khỏi `userlist`/`pg-*-roles`, đổi kiểm thử kiểm trực tiếp sang `env.AdminPool` hoặc `db.ForModule` — bản phát hành sau.
+2. Bỏ `tenant.WithTenantTx` trực tiếp trong module, chuyển sang `db.WithContextTx`.
+3. W9.1: cổng "không `r_*` có quyền trên schema module khác trừ `k_ref`, `_pub`".
+4. Pool dùng chung: giao dịch lồng (module A giữ kết nối rồi gọi port module B) chiếm hai kết nối của **cùng** pool. Cần theo dõi chờ acquire và tăng `AG_DB_MAX_CONNS` nếu cần.
 
 ## Liên quan
 

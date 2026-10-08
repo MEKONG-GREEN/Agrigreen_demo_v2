@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
@@ -54,34 +53,25 @@ func buildReportsWorker(ctx context.Context, log *slog.Logger) (*reports.Module,
 	if base == "" {
 		return nil, errors.New("thiếu AG_DB_URL")
 	}
-	open := func(role string) (*pgxpool.Pool, error) {
-		dsn, err := dbadmin.RoleURL(base, migrations.PF, "", role)
-		if err != nil {
-			return nil, err
-		}
-		return db.Open(context.WithoutCancel(ctx), dsn, db.OptionsFromEnv("worker-reports"))
+	// W2.6: một pool vai app_worker cho mọi module nguồn (mỗi module tự bọc db.ForModule — r_<module>).
+	dsn, err := dbadmin.RoleURL(base, migrations.PF, "", dbadmin.AppWorker)
+	if err != nil {
+		return nil, err
 	}
-	pools := map[string]*pgxpool.Pool{}
-	for _, role := range []string{masterdata.DBRole, party.DBRole, extension.DBRole, mechanization.DBRole, cropcycle.DBRole} {
-		p, err := open(role)
-		if err != nil {
-			for _, q := range pools {
-				q.Close()
-			}
-			return nil, err
-		}
-		pools[role] = p
+	pool, err := db.Open(context.WithoutCancel(ctx), dsn, db.OptionsFromEnv("worker-reports"))
+	if err != nil {
+		return nil, err
 	}
 	clk := clock.System{}
-	md := masterdata.New(pools[masterdata.DBRole], clk)
-	pty := party.New(pools[party.DBRole], clk, party.Deps{AdminUnits: md.AdminUnits()})
-	kn := extension.New(pools[extension.DBRole], clk, extension.Deps{
+	md := masterdata.New(pool, clk)
+	pty := party.New(pool, clk, party.Deps{AdminUnits: md.AdminUnits()})
+	kn := extension.New(pool, clk, extension.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(),
 	})
-	mech := mechanization.New(pools[mechanization.DBRole], clk, mechanization.Deps{
+	mech := mechanization.New(pool, clk, mechanization.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Params: md.Params(), Catalogs: md.Catalogs(), AdminUnits: md.AdminUnits(),
 	})
-	cc := cropcycle.New(pools[cropcycle.DBRole], clk, cropcycle.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Params: md.Params(), Catalogs: md.Catalogs()})
+	cc := cropcycle.New(pool, clk, cropcycle.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Params: md.Params(), Catalogs: md.Catalogs()})
 	// Email người nhận tra qua pf/accounts (Keycloak Admin REST, AG_KC_*); chưa cấu hình → bỏ gửi kèm cảnh báo.
 	kc, err := accounts.DirectoryFromEnv()
 	if err != nil {
@@ -106,7 +96,7 @@ func buildReportsWorker(ctx context.Context, log *slog.Logger) (*reports.Module,
 }
 
 // reportsConsumers là consumer dựng tệp (pf.reports.export.requested) và gửi
-// email lịch (pf.reports.export.completed), cùng pool vai reports_app.
+// email lịch (pf.reports.export.completed), cùng pool r_reports.
 func reportsConsumers(log *slog.Logger) []consumer {
 	w := &reportsWorker{}
 	wrap := func(pick func(*reports.Module) inbox.Handler) inbox.Handler {
@@ -120,12 +110,12 @@ func reportsConsumers(log *slog.Logger) []consumer {
 		}
 	}
 	return []consumer{
-		{name: repport.ExportConsumer, cluster: migrations.PF, role: reports.DBRole, events: []string{repport.EventExportRequested},
+		{name: repport.ExportConsumer, cluster: migrations.PF, module: reports.DBModule, events: []string{repport.EventExportRequested},
 			handler: wrap(func(m *reports.Module) inbox.Handler { return m.ExportHandler() })},
-		{name: repport.DeliveryConsumer, cluster: migrations.PF, role: reports.DBRole, events: []string{repport.EventExportCompleted},
+		{name: repport.DeliveryConsumer, cluster: migrations.PF, module: reports.DBModule, events: []string{repport.EventExportCompleted},
 			handler: wrap(func(m *reports.Module) inbox.Handler { return m.DeliveryHandler() })},
 		// KN v7.7 P4: gửi email báo cáo Chi cục kèm tệp (SMTP công vụ AG_SMTP_*; thiếu → "Gửi lỗi", gửi lại được).
-		{name: repport.DispatchConsumer, cluster: migrations.PF, role: reports.DBRole, events: []string{repport.EventDispatchRequested},
+		{name: repport.DispatchConsumer, cluster: migrations.PF, module: reports.DBModule, events: []string{repport.EventDispatchRequested},
 			handler: wrap(func(m *reports.Module) inbox.Handler { return m.DispatchHandler() })},
 	}
 }

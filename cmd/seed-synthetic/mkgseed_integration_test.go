@@ -25,6 +25,7 @@ import (
 	mport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
@@ -104,10 +105,11 @@ func TestMKGSeedEndToEnd(t *testing.T) {
 	t.Cleanup(app.Close)
 	t.Cleanup(adm.Close)
 
-	// Ingest: bộ nhận mTLS + kho ts + vòng tích phân (như cmd/ingest), vai ingest_mkg / ingest_ts.
-	ingestPool := env.Pool(t, migrations.MKG, mport.IngestRole)
+	// Ingest: bộ nhận mTLS + kho ts + vòng tích phân (như cmd/ingest), vai app_ingest ở hai cụm (W2.6: r_measurement).
+	ingestPool := env.Pool(t, migrations.MKG, dbadmin.AppIngest)
 	ports := measurement.NewIngestPorts(ingestPool, clk)
-	store := &measurement.IngestTSStore{Writer: env.Pool(t, migrations.TS, mport.IngestTSRole), Reader: env.Pool(t, migrations.TS, mport.TSReaderRole)}
+	tsPool := env.Pool(t, migrations.TS, dbadmin.AppIngest)
+	store := measurement.NewIngestTSStore(tsPool, tsPool)
 	lg := slog.New(slog.NewTextHandler(io.Discard, nil))
 	metrics := measurement.NewIngestMetrics(nil)
 	rv := &measurement.IngestReceiver{Devices: ports.Devices, Store: store, Clock: clk, Log: lg, Metrics: metrics}

@@ -71,9 +71,8 @@ PHASEK_ALLOWED = (
     r"ingress\.optionalHosts\.[a-z0-9-]+\.enabled",
     r"externalSecrets\.secrets\.[a-z]+\.[a-z0-9-]+\.enabled",
 )
-# Vai DB mà api-public được nhận (g5-conventions §3.1) — không vai nào khác của vùng pf.
-PUBLIC_DB_KEYS = {f"AG_DB_PASSWORD_{r}" for r in (
-    "PUBLIC_API", "APICLIENT_APP", "METERING_APP", "CROPCYCLE_APP", "GEO_APP", "MRV_APP", "MASTERDATA_APP", "PARTY_APP")}
+# Vai DB mà api-public được nhận — W2.6 (ADR-0028): CHỈ vai đăng nhập đơn vị app_public.
+PUBLIC_DB_KEYS = {"AG_DB_PASSWORD_APP_PUBLIC"}
 
 NS = {
     "edge": "agrigreen-edge-ingress",
@@ -697,7 +696,7 @@ def public_api_checks(env: str, docs: list[dict], values: dict, r: Report):
     pg_roles = es.get((data, "pg-pf-roles"))
     if pg_roles is not None:
         keys = {x["secretKey"] for x in pg_roles["spec"].get("data") or []}
-        need = {"AG_DB_PASSWORD_PUBLIC_API", "AG_DB_PASSWORD_APICLIENT_APP", "AG_DB_PASSWORD_METERING_APP"}
+        need = {"AG_DB_PASSWORD_APP_PUBLIC", "AG_DB_PASSWORD_PUBLIC_API", "AG_DB_PASSWORD_APICLIENT_APP", "AG_DB_PASSWORD_METERING_APP"}
         r.check(need <= keys, f"[{env}] pg-pf-roles thiếu vai G5 cho bootstrap: {sorted(need - keys)}")
     r.check(set(env_from) >= {"pf-public-db-roles", "pf-apikey-pepper"}, f"[{env}] api-public thiếu envFrom pf-public-db-roles/pf-apikey-pepper")
     r.check(not any(s in env_from for s in ("pf-db-roles", "pf-app", "pf-s3", "pf-anchor")), f"[{env}] api-public nhận Secret rộng hơn cần: {env_from}")

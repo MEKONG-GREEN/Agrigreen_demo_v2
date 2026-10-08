@@ -484,7 +484,7 @@ apps:
       AG_MKG_DB_URL: "pooler:mkg"
       AG_DB_VIA_PGBOUNCER: "1"
       AG_INGEST_INTEGRATE_INTERVAL: 15s
-    envFromSecrets: [mkg-db-roles, ts-db-roles]
+    envFromSecrets: [mkg-db-roles]
     certs:
       - { secret: ingest-server-tls, mountPath: /certs/server }
     configMaps:
@@ -677,12 +677,14 @@ externalSecrets:
   # Cùng "remote" ở hai vùng (vd db/pf ở pf và data) = cùng mật khẩu vai, một nguồn.
   secrets:
     pf:
-      pf-db-roles: { remote: db/pf, keys: [AG_DB_PASSWORD_PLATFORM_API, AG_DB_PASSWORD_WORKER_PLATFORM, AG_DB_PASSWORD_PARTY_APP, AG_DB_PASSWORD_MASTERDATA_APP, AG_DB_PASSWORD_GEO_APP, AG_DB_PASSWORD_EXTENSION_APP, AG_DB_PASSWORD_CONTENT_APP, AG_DB_PASSWORD_MECHANIZATION_APP, AG_DB_PASSWORD_MRV_APP, AG_DB_PASSWORD_SYNC_APP, AG_DB_PASSWORD_ACCOUNTS_APP, AG_DB_PASSWORD_NOTIFY_APP, AG_DB_PASSWORD_REPORTS_APP, AG_DB_PASSWORD_CROPCYCLE_APP, AG_DB_PASSWORD_WATERWAY_APP, AG_DB_PASSWORD_SIMULATION_APP, AG_DB_PASSWORD_METRICS_APP, AG_DB_PASSWORD_APICLIENT_APP, AG_DB_PASSWORD_METERING_APP, AG_DB_PASSWORD_APP_WORKER] }
+      # W2.6 (ADR-0028): ứng dụng chỉ nhận mật khẩu vai đăng nhập đơn vị app_* (một pool mỗi đơn vị); vai cũ
+      # <module>_app chỉ còn ở pg-*-roles (Job bootstrap tạo/giữ một kỳ cho lùi bản).
+      pf-db-roles: { remote: db/pf, keys: [AG_DB_PASSWORD_APP_PLATFORM, AG_DB_PASSWORD_APP_WORKER] }
       pf-db-outbox: { remote: db/pf, keys: [AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER] }   # chỉ outbox-publisher-pf
       # ag_ops_jobs (worker: neo, dọn idempotency, tìm tenant cho job) — tách khỏi ag_outbox_publisher (shared 000009).
       pf-db-ops: { remote: db/pf, keys: [AG_DB_PASSWORD_AG_OPS_JOBS] }
-      # api-public (G5): CHỈ các vai nó mở (g5-conventions §3.1) — không vai nào khác của vùng pf.
-      pf-public-db-roles: { remote: db/pf, keys: [AG_DB_PASSWORD_PUBLIC_API, AG_DB_PASSWORD_APICLIENT_APP, AG_DB_PASSWORD_METERING_APP, AG_DB_PASSWORD_CROPCYCLE_APP, AG_DB_PASSWORD_GEO_APP, AG_DB_PASSWORD_MRV_APP, AG_DB_PASSWORD_MASTERDATA_APP, AG_DB_PASSWORD_PARTY_APP] }
+      # api-public (G5): CHỈ vai đăng nhập của nó (app_public, W2.6) — không vai nào khác của vùng pf.
+      pf-public-db-roles: { remote: db/pf, keys: [AG_DB_PASSWORD_APP_PUBLIC] }
       # Pepper HMAC khóa API theo phiên bản (ADR-0022 mục 4): AG_APIKEY_PEPPER_V<n> (≥ 32 byte), AG_APIKEY_PEPPER_CURRENT.
       # extract: lấy mọi thuộc tính của apikey/pf → xoay pepper chỉ là thêm V<n+1> + đổi CURRENT ở kho bí mật.
       # Chỉ tồn tại ở vùng pf; bật ở Phase K (values-phasek.yaml).
@@ -696,8 +698,8 @@ externalSecrets:
       pf-anchor: { remote: anchor/pf, keys: [AG_ANCHOR_SIGNING_KEY] }
       agrigreen-public-tls: { remote: tls/public, keys: [tls.crt, tls.key], type: kubernetes.io/tls }
     mkg:
-      mkg-db-roles: { remote: db/mkg, keys: [AG_DB_PASSWORD_MKG_API, AG_DB_PASSWORD_FIELDOPS_APP, AG_DB_PASSWORD_HUB_APP, AG_DB_PASSWORD_MEASUREMENT_APP, AG_DB_PASSWORD_INGEST_MKG, AG_DB_PASSWORD_WORKER_INTERNAL] }
-      ts-db-roles: { remote: db/ts, keys: [AG_DB_PASSWORD_INGEST_TS, AG_DB_PASSWORD_TS_READER] }
+      mkg-db-roles: { remote: db/mkg, keys: [AG_DB_PASSWORD_APP_INTERNAL, AG_DB_PASSWORD_APP_WORKER_INTERNAL, AG_DB_PASSWORD_APP_INGEST] }
+      # W2.6: ingest đăng nhập cụm ts bằng CÙNG vai app_ingest (mật khẩu ở db/mkg, mkg-db-roles) — không còn ts-db-roles.
       # ag_outbox_publisher của cụm mkg VÀ ts: cùng biến môi trường → cùng mật khẩu trong vùng mkg.
       mkg-db-outbox: { remote: db/mkg, keys: [AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER] }   # chỉ outbox-publisher-mkg
       # ag_ops_jobs của cụm mkg VÀ ts (api-internal, CronJob anchor/purge-idempotency) — cùng mẫu mkg-db-outbox.
@@ -707,26 +709,28 @@ externalSecrets:
       mkg-anchor: { remote: anchor/mkg, keys: [AG_ANCHOR_SIGNING_KEY] }
       agrigreen-public-tls: { remote: tls/public, keys: [tls.crt, tls.key], type: kubernetes.io/tls }
     vault:
-      vault-db-roles: { remote: db/vault, keys: [AG_DB_PASSWORD_VAULT_APP] }
+      vault-db-roles: { remote: db/vault, keys: [AG_DB_PASSWORD_APP_VAULT] }
       vault-db-outbox: { remote: db/vault, keys: [AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER] }
       vault-db-ops: { remote: db/vault, keys: [AG_DB_PASSWORD_AG_OPS_JOBS] }
       vault-keys: { remote: app/vault, keys: [AG_VAULT_KEK, AG_VAULT_BLIND_KEY] }
       vault-s3: { remote: s3/vault, keys: [AG_S3_ACCESS_KEY, AG_S3_SECRET_KEY] }
       vault-anchor: { remote: anchor/vault, keys: [AG_ANCHOR_SIGNING_KEY] }
       # Mọi vai của cụm vault cho Job bootstrap/migrate.
-      pg-vault-roles: { remote: db/vault, keys: [AG_DB_PASSWORD_AG_MIGRATOR, AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER, AG_DB_PASSWORD_AG_OPS_JOBS, AG_DB_PASSWORD_VAULT_APP] }
+      pg-vault-roles: { remote: db/vault, keys: [AG_DB_PASSWORD_AG_MIGRATOR, AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER, AG_DB_PASSWORD_AG_OPS_JOBS, AG_DB_PASSWORD_VAULT_APP, AG_DB_PASSWORD_APP_VAULT] }
       db-bootstrap-foreign: { remote: db/foreign-vault, keys: [AG_DB_APP_PASSWORD] }
       # Sao lưu vault: bucket và khóa RIÊNG (mục 22).
       pg-backup-s3: { remote: backup/vault, keys: [ACCESS_KEY_ID, ACCESS_SECRET_KEY] }
     data:
       # Vai của từng cụm cho Job bootstrap/migrate — cùng nguồn với secret của vùng ứng dụng.
-      # W2.3 (ADR-0028): AG_DB_PASSWORD_APP_* — vai đăng nhập theo đơn vị, Job bootstrap tạo; ứng dụng dùng từ W2.6.
+      # W2.3/W2.6 (ADR-0028): AG_DB_PASSWORD_APP_* — vai đăng nhập theo đơn vị (ứng dụng dùng từ W2.6); vai cũ giữ một
+      # kỳ (bootstrap vẫn tạo, không còn quyền trực tiếp — pf 000119, mkg 000035, vault 000003), rồi gỡ khỏi danh sách.
       pg-pf-roles: { remote: db/pf, keys: [AG_DB_PASSWORD_AG_MIGRATOR, AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER, AG_DB_PASSWORD_AG_OPS_JOBS, AG_DB_PASSWORD_PLATFORM_API, AG_DB_PASSWORD_WORKER_PLATFORM, AG_DB_PASSWORD_PARTY_APP, AG_DB_PASSWORD_MASTERDATA_APP, AG_DB_PASSWORD_GEO_APP, AG_DB_PASSWORD_EXTENSION_APP, AG_DB_PASSWORD_CONTENT_APP, AG_DB_PASSWORD_MECHANIZATION_APP, AG_DB_PASSWORD_MRV_APP, AG_DB_PASSWORD_SYNC_APP, AG_DB_PASSWORD_ACCOUNTS_APP, AG_DB_PASSWORD_NOTIFY_APP, AG_DB_PASSWORD_REPORTS_APP, AG_DB_PASSWORD_CROPCYCLE_APP, AG_DB_PASSWORD_WATERWAY_APP, AG_DB_PASSWORD_SIMULATION_APP, AG_DB_PASSWORD_METRICS_APP, AG_DB_PASSWORD_APICLIENT_APP, AG_DB_PASSWORD_METERING_APP, AG_DB_PASSWORD_PUBLIC_API, AG_DB_PASSWORD_APP_PLATFORM, AG_DB_PASSWORD_APP_WORKER, AG_DB_PASSWORD_APP_PUBLIC, AG_DB_PASSWORD_APP_SYNC] }
-      pg-mkg-roles: { remote: db/mkg, keys: [AG_DB_PASSWORD_AG_MIGRATOR, AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER, AG_DB_PASSWORD_AG_OPS_JOBS, AG_DB_PASSWORD_MKG_API, AG_DB_PASSWORD_FIELDOPS_APP, AG_DB_PASSWORD_HUB_APP, AG_DB_PASSWORD_MEASUREMENT_APP, AG_DB_PASSWORD_INGEST_MKG, AG_DB_PASSWORD_WORKER_INTERNAL, AG_DB_PASSWORD_MKG_MONITOR] }
+      pg-mkg-roles: { remote: db/mkg, keys: [AG_DB_PASSWORD_AG_MIGRATOR, AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER, AG_DB_PASSWORD_AG_OPS_JOBS, AG_DB_PASSWORD_MKG_API, AG_DB_PASSWORD_FIELDOPS_APP, AG_DB_PASSWORD_HUB_APP, AG_DB_PASSWORD_MEASUREMENT_APP, AG_DB_PASSWORD_INGEST_MKG, AG_DB_PASSWORD_WORKER_INTERNAL, AG_DB_PASSWORD_MKG_MONITOR, AG_DB_PASSWORD_APP_INTERNAL, AG_DB_PASSWORD_APP_WORKER_INTERNAL, AG_DB_PASSWORD_APP_INGEST] }
       pg-ts-roles:
         remote: db/ts
-        keys: [AG_DB_PASSWORD_AG_MIGRATOR, AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER, AG_DB_PASSWORD_AG_OPS_JOBS, AG_DB_PASSWORD_INGEST_TS, AG_DB_PASSWORD_TS_READER, AG_DB_PASSWORD_TS_MONITOR]
-        keyRemotes: { AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER: db/mkg, AG_DB_PASSWORD_AG_OPS_JOBS: db/mkg }   # xem mkg-db-outbox, mkg-db-ops
+        keys: [AG_DB_PASSWORD_AG_MIGRATOR, AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER, AG_DB_PASSWORD_AG_OPS_JOBS, AG_DB_PASSWORD_INGEST_TS, AG_DB_PASSWORD_TS_READER, AG_DB_PASSWORD_TS_MONITOR, AG_DB_PASSWORD_APP_INGEST]
+        # ag_outbox_publisher/ag_ops_jobs: xem mkg-db-outbox, mkg-db-ops; app_ingest (W2.6): cùng mật khẩu với cụm mkg.
+        keyRemotes: { AG_DB_PASSWORD_AG_OUTBOX_PUBLISHER: db/mkg, AG_DB_PASSWORD_AG_OPS_JOBS: db/mkg, AG_DB_PASSWORD_APP_INGEST: db/mkg }
       # Mật khẩu ngẫu nhiên KHÔNG dùng ở đâu, cho vai của vùng khác mà dbadmin.Bootstrap vẫn tạo
       # trên mỗi cụm (Bootstrap chưa lọc theo cụm — mục mở cho G4-0).
       db-bootstrap-foreign: { remote: db/foreign-data, keys: [AG_DB_APP_PASSWORD] }

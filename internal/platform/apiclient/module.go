@@ -62,6 +62,7 @@ type Module struct{ svc *app.Service }
 // New tạo module với pool vai apiclient_app. Ở worker, db có thể nil (handler xuất chạy trong giao
 // dịch của inbox.Process).
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
+	db = forModule(db)
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Peppers: deps.Peppers, OperatorTenant: deps.OperatorTenant, Store: deps.Store,
 		Collection: deps.Collection, Log: deps.Log}}
 }

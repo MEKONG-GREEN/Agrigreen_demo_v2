@@ -267,7 +267,7 @@ func TestBuildWiresG2Consumers(t *testing.T) {
 	}
 	names := map[string]bool{}
 	for _, c := range Consumers {
-		if names[c.Name] || c.Role == "" || len(c.Events) == 0 || c.Handler(mods) == nil {
+		if names[c.Name] || !c.Module.Valid() || len(c.Events) == 0 || c.Handler(mods) == nil {
 			t.Fatalf("consumer %s không hợp lệ", c.Name)
 		}
 		names[c.Name] = true

@@ -24,6 +24,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity"
@@ -37,7 +38,7 @@ const maxBody = 64 << 10
 // v (issuer giả của kiểm thử). KEK và khóa chỉ mục mù là hằng số kiểm thử.
 func NewServer(t testing.TB, env *pgtest.Env, v *authz.Verifier, log *slog.Logger) *httptest.Server {
 	t.Helper()
-	pool := env.Pool(t, migrations.Vault, identity.DBRole)
+	pool := env.Pool(t, migrations.Vault, dbadmin.AppVault) // W2.6: vai đăng nhập đơn vị, module chạy r_identity
 	keys, err := identity.NewLocalKMS("e2e-1", bytes.Repeat([]byte{7}, 32))
 	if err != nil {
 		t.Fatal(err)

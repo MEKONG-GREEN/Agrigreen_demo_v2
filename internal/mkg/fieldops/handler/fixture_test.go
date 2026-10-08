@@ -23,6 +23,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	shareddb "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -64,7 +66,8 @@ func newFixture(t *testing.T, cfgKg *decimal.Decimal) *fixture {
 		f.dir.AddPlot(p, f.htx, "31117")
 		f.plots = append(f.plots, p)
 	}
-	f.svc = &app.Service{DB: pool, Clock: clk, Directory: f.dir, Weighed: f.weighed, ConfiguredKgPerRoll: cfgKg,
+	// W2.6: dịch vụ chạy trên vai đăng nhập app_internal, mọi giao dịch SET LOCAL ROLE r_fieldops; pool (vai cũ) chỉ để kiểm DB.
+	f.svc = &app.Service{DB: shareddb.ForModule(env.Pool(t, migrations.MKG, dbadmin.AppInternal), shareddb.Module("mkg/fieldops")), Clock: clk, Directory: f.dir, Weighed: f.weighed, ConfiguredKgPerRoll: cfgKg,
 		CursorKey: []byte("khoa-thu-nghiem"), Harvest: f.harvest}
 	f.iss = authztest.New(t)
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)

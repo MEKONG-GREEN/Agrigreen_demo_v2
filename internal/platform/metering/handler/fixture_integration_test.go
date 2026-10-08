@@ -23,6 +23,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metering/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -101,7 +102,7 @@ func newFixture(t *testing.T, mode meter.Mode) *fixture {
 	clk := clock.NewFixed(time.Date(2026, 11, 3, 3, 0, 0, 0, time.UTC))
 	f := &fixture{t: t, env: env, iss: iss, pool: pool, clk: clk, params: newFakeParams(), plans: &fakePlans{plans: map[uuid.UUID]apiclientport.Plan{}},
 		op: ids.New()}
-	f.mod = metering.New(pool, clk, metering.Deps{Plans: f.plans, Params: f.params, Mode: mode, Metrics: app.NewMetrics(nil)})
+	f.mod = metering.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clk, metering.Deps{Plans: f.plans, Params: f.params, Mode: mode, Metrics: app.NewMetrics(nil)})
 	log := telemetry.NewLogger("test", io.Discard)
 	eng := httpx.NewEngine(log, 1<<20)
 	f.mod.RegisterAdmin(eng.Group("/v1", httpx.Authenticate(iss.Verifier()), httpx.RequireMFA(), idempotency.Middleware(ops)))

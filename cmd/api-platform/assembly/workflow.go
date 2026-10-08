@@ -13,7 +13,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/workflow"
 	wfport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/workflow/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 )
 
 // ---------------------------------------------------------------------------
@@ -23,15 +22,12 @@ import (
 // ---------------------------------------------------------------------------
 
 // wireWorkflow dựng pf/workflow và nối vào pf/masterdata, pf/party.
-func wireWorkflow(pool func(string) (*pgxpool.Pool, error), clk clock.Clock, md *masterdata.Module, pty *party.Module) (*workflow.Module, error) {
-	p, err := pool(dbadmin.AppPlatform)
-	if err != nil {
-		return nil, err
-	}
+// Pool là vai đăng nhập của đơn vị (app_platform; worker: app_worker) — module chạy SET LOCAL ROLE r_workflow.
+func wireWorkflow(p *pgxpool.Pool, clk clock.Clock, md *masterdata.Module, pty *party.Module) *workflow.Module {
 	wf := workflow.New(p, clk)
 	md.UseApprovals(wf.Approvals())
 	pty.UseFourEyes(FourEyes{Approvals: wf.Approvals()})
-	return wf, nil
+	return wf
 }
 
 // FourEyes chuyển workflow/port.Approvals thành party/port.FourEyes (pf/party là kernel, không import cap/*).

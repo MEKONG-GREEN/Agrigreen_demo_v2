@@ -20,6 +20,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -33,29 +35,31 @@ type rebuildFn func(ctx context.Context, tid uuid.UUID) (map[string]int64, error
 type target struct {
 	Module string
 	Schema string
-	Role   string
-	build  func(pool *pgxpool.Pool, clk clock.Clock) rebuildFn // nil = module CHƯA có hàm dựng lại (chỉ băm, báo thiếu)
+	// DB: vai nhóm của module (W2.6): băm và dựng lại chạy SET LOCAL ROLE r_<module> trên pool vai đăng nhập
+	// app_worker_internal (Config.Pool).
+	DB    db.ModuleID
+	build func(pool tenant.Beginner, clk clock.Clock) rebuildFn // nil = module CHƯA có hàm dựng lại (chỉ băm, báo thiếu)
 }
 
 // Targets là mọi module mkg có bảng chiếu (docs/dev/g4-conventions.md §7: hub, measurement, fieldops, costing,
 // logistics, orders, acctbridge).
 var Targets = []target{
-	{Module: "hub", Schema: "mkg_hub", Role: hub.DBRole, build: func(p *pgxpool.Pool, c clock.Clock) rebuildFn { return hub.New(p, c).RebuildTenant }},
-	{Module: "measurement", Schema: "mkg_measurement", Role: measurement.DBRole, build: func(p *pgxpool.Pool, c clock.Clock) rebuildFn {
+	{Module: "hub", Schema: "mkg_hub", DB: hub.DBModule, build: func(p tenant.Beginner, c clock.Clock) rebuildFn { return hub.New(p, c).RebuildTenant }},
+	{Module: "measurement", Schema: "mkg_measurement", DB: measurement.DBModule, build: func(p tenant.Beginner, c clock.Clock) rebuildFn {
 		return measurement.New(p, c, measurement.Deps{}).RebuildTenant
 	}},
 	// fieldops (G4): weighed_loading_current, order_plot_harvest_current là bảng đệm nguồn ngoài — không dựng lại, băm vẫn phải khớp.
-	{Module: "fieldops", Schema: "mkg_fieldops", Role: fieldops.DBRole, build: func(p *pgxpool.Pool, c clock.Clock) rebuildFn {
+	{Module: "fieldops", Schema: "mkg_fieldops", DB: fieldops.DBModule, build: func(p tenant.Beginner, c clock.Clock) rebuildFn {
 		return fieldops.New(p, c, fieldops.Options{}).RebuildTenant
 	}},
-	{Module: "logistics", Schema: "mkg_logistics", Role: logistics.DBRole, build: func(p *pgxpool.Pool, c clock.Clock) rebuildFn {
+	{Module: "logistics", Schema: "mkg_logistics", DB: logistics.DBModule, build: func(p tenant.Beginner, c clock.Clock) rebuildFn {
 		return logistics.New(p, c, logistics.Options{}).RebuildTenant
 	}},
-	{Module: "orders", Schema: "mkg_orders", Role: orders.DBRole, build: func(p *pgxpool.Pool, c clock.Clock) rebuildFn { return orders.New(p, c).RebuildTenant }},
-	{Module: "costing", Schema: "mkg_costing", Role: costing.DBRole, build: func(p *pgxpool.Pool, c clock.Clock) rebuildFn {
+	{Module: "orders", Schema: "mkg_orders", DB: orders.DBModule, build: func(p tenant.Beginner, c clock.Clock) rebuildFn { return orders.New(p, c).RebuildTenant }},
+	{Module: "costing", Schema: "mkg_costing", DB: costing.DBModule, build: func(p tenant.Beginner, c clock.Clock) rebuildFn {
 		return costing.New(p, c, costing.Deps{}).RebuildTenant
 	}},
-	{Module: "acctbridge", Schema: "mkg_acctbridge", Role: acctbridge.DBRole, build: func(p *pgxpool.Pool, c clock.Clock) rebuildFn {
+	{Module: "acctbridge", Schema: "mkg_acctbridge", DB: acctbridge.DBModule, build: func(p tenant.Beginner, c clock.Clock) rebuildFn {
 		return acctbridge.New(p, c, acctbridge.Deps{}).RebuildTenant
 	}},
 }
@@ -123,8 +127,14 @@ func selectedModule(list []string, m string) bool {
 }
 
 // projectionTables liệt kê bảng chiếu của schema mà vai module thấy: *_current và mkg_hub.lot_balance.
-func projectionTables(ctx context.Context, pool *pgxpool.Pool, schema string) ([]string, error) {
-	rows, err := pool.Query(ctx, `SELECT table_name FROM information_schema.tables
+func projectionTables(ctx context.Context, pool tenant.Beginner, schema string) ([]string, error) {
+	// Trong giao dịch của module: information_schema chỉ liệt kê bảng vai hiện hành có quyền (r_<module>).
+	tx, err := pool.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	rows, err := tx.Query(ctx, `SELECT table_name FROM information_schema.tables
 	  WHERE table_schema = $1 AND table_type = 'BASE TABLE' AND (table_name LIKE '%\_current' OR (table_schema = 'mkg_hub' AND table_name = 'lot_balance'))
 	  ORDER BY table_name`, schema)
 	if err != nil {
@@ -135,7 +145,7 @@ func projectionTables(ctx context.Context, pool *pgxpool.Pool, schema string) ([
 
 // checksum băm tất định một bảng chiếu của tenant (RLS theo tenant): số dòng + SHA-256 của các dòng dạng jsonb
 // (bỏ cột dễ biến), sắp theo văn bản.
-func checksum(ctx context.Context, pool *pgxpool.Pool, tid uuid.UUID, schema, table string) (int64, string, error) {
+func checksum(ctx context.Context, pool tenant.Beginner, tid uuid.UUID, schema, table string) (int64, string, error) {
 	drop := ""
 	for _, c := range VolatileColumns {
 		drop += " - '" + c + "'"
@@ -169,10 +179,11 @@ func Run(ctx context.Context, cfg Config) (Report, error) {
 		if !selectedModule(cfg.Modules, tg.Module) {
 			continue
 		}
-		pool, err := cfg.Pool(tg.Role)
+		raw, err := cfg.Pool(dbadmin.AppWorkerInternal)
 		if err != nil {
-			return rep, fmt.Errorf("%s: pool %s: %w", tg.Module, tg.Role, err)
+			return rep, fmt.Errorf("%s: pool %s: %w", tg.Module, dbadmin.AppWorkerInternal, err)
 		}
+		pool := db.ForModule(raw, tg.DB)
 		tables, err := projectionTables(ctx, pool, tg.Schema)
 		if err != nil {
 			return rep, fmt.Errorf("%s: bảng chiếu: %w", tg.Module, err)

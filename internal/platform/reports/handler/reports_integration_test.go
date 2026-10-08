@@ -25,6 +25,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -81,7 +82,7 @@ func newFixture(t *testing.T, withDirectory bool) *fixture {
 	if withDirectory {
 		deps.Directory, deps.Recipients = f.dir, f.dir
 	}
-	f.mod = reports.New(f.pool, f.clk, deps)
+	f.mod = reports.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), f.clk, deps)
 	log := telemetry.NewLogger("test", io.Discard)
 	appEng := httpx.NewEngine(log, 1<<20)
 	appEng.Use(logErrors(t))

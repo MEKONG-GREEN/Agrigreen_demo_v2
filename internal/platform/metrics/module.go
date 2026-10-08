@@ -55,6 +55,7 @@ var catalog = func() *domain.Catalog {
 
 // New tạo module với pool của vai metrics_app (nil ở worker khi chỉ chạy consumer).
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
+	db = forModule(db)
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Catalog: catalog, Sources: deps.Sources, Scope: deps.Scope,
 		Geometry: deps.Geometry, Log: deps.Log}}
 }

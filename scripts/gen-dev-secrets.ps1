@@ -41,6 +41,7 @@ $lines = @(
     "PG_SUPERUSER_PASSWORD=$(New-Hex 24)"
     "AG_DB_APP_PASSWORD=$(New-Hex 24)"
     "AG_DB_PASSWORD_VAULT_APP=$(New-Hex 24)"
+    "AG_DB_PASSWORD_APP_VAULT=$(New-Hex 24)"
     "AMQP_PASSWORD=$(New-Hex 24)"
     "AMQP_INTERNAL_PASSWORD=$(New-Hex 24)"
     "KEYCLOAK_ADMIN_PASSWORD=$(New-Hex 24)"

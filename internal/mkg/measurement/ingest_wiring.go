@@ -1,6 +1,9 @@
 package measurement
 
-import "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/ingest"
+import (
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/ingest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+)
 
 // Mặt nối của dịch vụ ingest cho gốc lắp ráp cmd/ingest (R-02: gốc lắp ráp chỉ import
 // gốc module hoặc port/). Hiện thực ở internal/mkg/measurement/ingest.
@@ -11,7 +14,7 @@ type (
 	IngestReceiver = ingest.Receiver
 	// IngestLoop tích phân phiên cân đã đóng thành phiếu (R-70).
 	IngestLoop = ingest.Loop
-	// IngestTSStore ghi/đọc ts_weigh (ingest_ts / ts_reader).
+	// IngestTSStore ghi/đọc ts_weigh (r_measurement; dựng bằng NewIngestTSStore).
 	IngestTSStore = ingest.TSStore
 	// IngestIntegrator là hiện thực port.Integrator (weigh.integrate.v1).
 	IngestIntegrator = ingest.Integrator
@@ -32,3 +35,9 @@ const (
 	IngestDefaultSkewFlagMs = ingest.DefaultSkewFlagMs
 	IngestDefaultStuckAfter = ingest.DefaultStuckAfter
 )
+
+// NewIngestTSStore dựng kho ts_weigh của cmd/ingest: mọi giao dịch trên writer/reader chạy SET LOCAL ROLE
+// r_measurement (W2.6 — vai đăng nhập app_ingest; quyền của ingest_ts + ts_reader gộp ở ts 000004).
+func NewIngestTSStore(writer, reader tenant.Beginner) *IngestTSStore {
+	return &IngestTSStore{Writer: forModule(writer), Reader: forModule(reader)}
+}

@@ -1,13 +1,18 @@
 package dbadmin
 
-// Vai theo ADR-0028 (W2.3): vai nhóm r_<module> NOLOGIN mang quyền chạy của module, vai đăng nhập
-// app_<đơn vị> LOGIN NOINHERIT là thành viên các r_* của module ghép trong đơn vị, `SET LOCAL ROLE` trong
-// giao dịch (internal/shared/db.ForModule / WithContextTx).
+// Vai theo ADR-0028: vai nhóm r_<module> NOLOGIN mang quyền chạy của module, vai đăng nhập app_<đơn vị> LOGIN
+// NOINHERIT là thành viên các r_* của module ghép trong đơn vị, `SET LOCAL ROLE` trong giao dịch
+// (internal/shared/db.ForModule / WithContextTx).
 //
-// Kỳ chuyển (W2.3 → W2.6): vai đăng nhập cũ <module>_app vẫn chạy, là thành viên r_<module> (INHERIT, SET)
-// — mã chưa chuyển chạy như cũ, mã đã chuyển `SET LOCAL ROLE r_<module>` được trên cả pool cũ lẫn pool
-// app_<đơn vị>. Quyền bảng hiện có của <module>_app được chép sang r_<module> ở pf 000090; migration mới
-// GRANT cho r_<module> (vai cũ thừa hưởng qua membership). W2.6 bỏ quyền bảng trực tiếp của <module>_app.
+// W2.3 dựng khung cho cụm pf; W2.6 chuyển hết (mkg, ts, vault), bỏ quyền trực tiếp của vai cũ:
+//   - danh sách r_* suy từ registry (modreg.Catalog: module có owns_schema), KHÔNG phụ thuộc vai cũ còn tồn tại;
+//     cụm của r_* = zones của module;
+//   - vai cũ <module>_app (kỳ chuyển cuối, xóa ở bản phát hành sau): không còn quyền trực tiếp nào (pf 000119,
+//     mkg 000035, vault 000003 thu hồi) nhưng VẪN là thành viên r_<module> (INHERIT) — nhị phân cũ chạy được
+//     khi lùi bản; giữ tên cho userlist PgBouncer;
+//   - vai đăng nhập không theo module (platform_api, public_api, worker_platform, mkg_api, worker_internal,
+//     ingest_mkg, ingest_ts, ts_reader): quyền chép sang r_ops / r_measurement (FoldedLogins), vai giữ nguyên
+//     một kỳ cho lùi bản, mã mới không dùng.
 
 import (
 	"slices"
@@ -17,99 +22,162 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
-// Vai đăng nhập theo đơn vị triển khai (ADR-0028 §1, cụm pf).
+// Vai đăng nhập theo đơn vị triển khai (ADR-0028 §1).
 const (
-	AppPlatform = "app_platform"
-	AppWorker   = "app_worker"
-	AppPublic   = "app_public"
-	AppSync     = "app_sync"
+	AppPlatform       = "app_platform"
+	AppWorker         = "app_worker"
+	AppPublic         = "app_public"
+	AppSync           = "app_sync"
+	AppInternal       = "app_internal"
+	AppWorkerInternal = "app_worker_internal" //nolint:gosec // G101: tên vai DB, không phải mật khẩu
+	AppIngest         = "app_ingest"
+	AppVault          = "app_vault"
 )
+
+// OpsGroup là vai nhóm vận hành NOLOGIN (db.OpsRole): bảng vận hành schema shared qua ag_shared_user.
+const OpsGroup = "r_ops"
 
 // ModuleGroup nối module với vai nhóm r_* và vai đăng nhập cũ của nó.
 type ModuleGroup struct {
-	Module string // tên module.yaml, vd pf/content
-	Role   string // r_<module>
-	Legacy string // <module>_app (kỳ chuyển)
+	Module   string // tên module.yaml, vd pf/content
+	Role     string // r_<module>
+	Legacy   string // <module>_app (kỳ chuyển; rỗng nếu module sinh sau ADR-0028, vd pf/kref)
+	Clusters []migrations.Cluster
 }
 
 // LoginUnit là vai đăng nhập của một đơn vị triển khai.
 type LoginUnit struct {
 	Role string
 	Unit string // cmd/<đơn vị>; module ghép lấy từ modreg.UnitModules (modgen sinh từ import)
-	// Extra: module đơn vị mở pool theo TÊN vai mà không import gốc module (không thấy trong import),
+	// Tools: lệnh vận hành một lần (drill, formimport, rebuilddrill) dùng chung vai đăng nhập của đơn vị —
+	// module chúng ghép có trong membership (kiểm thử TestEveryUnitHasLogin_ADR0028).
+	Tools []string
+	// Extra: module đơn vị mở pool theo TÊN mà không import gốc module (không thấy trong import),
 	// hoặc đơn vị chưa ghép module trong tiến trình nhưng ADR-0028 gán (engine đồng bộ).
 	Extra []string
+	// Ops: đơn vị cần r_ops (idempotency HTTP, consumer không thuộc module).
+	Ops      bool
+	Clusters []migrations.Cluster
 }
 
-// LoginUnits là vai đăng nhập cụm pf (ADR-0028 §1). mkg/ts/vault: W2.6.
+var (
+	pfOnly    = []migrations.Cluster{migrations.PF}
+	mkgOnly   = []migrations.Cluster{migrations.MKG}
+	vaultOnly = []migrations.Cluster{migrations.Vault}
+)
+
+// LoginUnits là vai đăng nhập theo đơn vị (ADR-0028 §1). Mỗi cụm còn ag_migrator, ag_outbox_publisher, ag_ops_jobs
+// (job vận hành, không theo module) và vai giám sát (mkg_monitor/ts_monitor): bí mật pf 7, mkg 7, ts 5, vault 4.
 var LoginUnits = []LoginUnit{
-	{Role: AppPlatform, Unit: "api-platform"},
-	{Role: AppWorker, Unit: "worker"},
-	// api-public mở pool party_app theo tên (cmd/api-public/assembly: không import gốc pf/party).
-	{Role: AppPublic, Unit: "api-public", Extra: []string{"pf/party"}},
+	{Role: AppPlatform, Unit: "api-platform", Ops: true, Clusters: pfOnly},
+	{Role: AppWorker, Unit: "worker", Tools: []string{"drill", "formimport"}, Ops: true, Clusters: pfOnly},
+	// api-public mở pool party theo tên (cmd/api-public/assembly: không import gốc pf/party).
+	{Role: AppPublic, Unit: "api-public", Extra: []string{"pf/party"}, Ops: true, Clusters: pfOnly},
 	// Engine đồng bộ (pf/sync) và objsync — objsync chưa ghép module nào trong tiến trình.
-	{Role: AppSync, Unit: "objsync", Extra: []string{"pf/sync"}},
+	{Role: AppSync, Unit: "objsync", Extra: []string{"pf/sync"}, Clusters: pfOnly},
+	{Role: AppInternal, Unit: "api-internal", Ops: true, Clusters: mkgOnly},
+	{Role: AppWorkerInternal, Unit: "worker-internal", Tools: []string{"rebuilddrill"}, Ops: true, Clusters: mkgOnly},
+	// ingest: sổ thiết bị + phiếu cân dẫn xuất ở cụm mkg, chuỗi thời gian ts_weigh ở cụm ts (mkg/measurement).
+	{Role: AppIngest, Unit: "ingest", Clusters: []migrations.Cluster{migrations.MKG, migrations.TS}},
+	{Role: AppVault, Unit: "identity-vault", Clusters: vaultOnly},
 }
 
-// groupOnlyModules: module pf sinh sau ADR-0028, KHÔNG có vai đăng nhập cũ <module>_app — chỉ có r_<module>,
-// chạy trên vai đăng nhập của đơn vị (app_worker…). Cụm của vai nhóm (lọc theo AG_CLUSTERS).
-var groupOnlyModules = map[string][]migrations.Cluster{
-	// pf/kref (W2.5, ADR-0029): ghi k_ref ở cụm pf (worker) và — khi có kênh nguồn — ở cụm mkg (mkg 000022).
-	"pf/kref": {migrations.PF, migrations.MKG},
-	// pf/workflow (W6.1, cap/workflow): sổ pf_workflow (pf 000118); app_platform (api-platform) là thành viên.
-	"pf/workflow": {migrations.PF},
+// legacyLogin: vai đăng nhập cũ của module có tên khác <đoạn cuối>_app.
+var legacyLogin = map[string]string{"vault/identity": "vault_app"}
+
+// FoldedLogins: vai đăng nhập cũ KHÔNG theo module → vai nhóm nhận quyền của nó (W2.6, mkg 000035, ts 000004).
+// Các vai này không là thành viên vai nhóm (tránh mở rộng quyền khi lùi bản) và giữ nguyên quyền một kỳ.
+var FoldedLogins = map[string]string{
+	"platform_api":    OpsGroup,
+	"worker_platform": OpsGroup,
+	"public_api":      OpsGroup,
+	"mkg_api":         OpsGroup,
+	"worker_internal": OpsGroup,
+	// ingest là một phần của mkg/measurement (owns_schema mkg_measurement, ts_weigh).
+	"ingest_mkg": "r_measurement",
+	"ingest_ts":  "r_measurement",
+	"ts_reader":  "r_measurement",
 }
 
-// ModuleGroups trả vai nhóm của mọi module pf có vai đăng nhập cũ <module>_app, cùng module trong
-// groupOnlyModules (Legacy rỗng), đã sắp theo tên module. Suy từ registry (modreg.Catalog) + baseRoles: thêm
-// module pf mới có vai <module>_app thì r_* tự có.
+// ModuleGroups trả vai nhóm của MỌI module có schema (owns_schema) trong registry (modreg.Catalog), sắp theo tên
+// module. Cụm = zones của module. Legacy là vai đăng nhập cũ nếu còn trong danh mục vai (kỳ chuyển).
 func ModuleGroups() []ModuleGroup {
 	var out []ModuleGroup
 	for _, e := range modreg.Catalog() {
-		zone, seg, ok := strings.Cut(e.Name, "/")
-		if !ok || zone != "pf" {
+		if len(e.OwnsSchema) == 0 {
 			continue
 		}
-		legacy := seg + "_app"
-		if _, only := groupOnlyModules[e.Name]; only {
+		_, seg, _ := strings.Cut(e.Name, "/")
+		legacy, ok := legacyLogin[e.Name]
+		if !ok {
+			legacy = seg + "_app"
+		}
+		if !slices.ContainsFunc(baseRoles, func(r Role) bool { return r.Name == legacy }) {
 			legacy = ""
-		} else if !slices.ContainsFunc(baseRoles, func(r Role) bool { return r.Name == legacy }) {
-			continue
 		}
-		out = append(out, ModuleGroup{Module: e.Name, Role: modreg.DBRole(e.Name), Legacy: legacy})
+		cs := make([]migrations.Cluster, 0, len(e.Zones))
+		for _, z := range e.Zones {
+			cs = append(cs, migrations.Cluster(z))
+		}
+		out = append(out, ModuleGroup{Module: e.Name, Role: modreg.DBRole(e.Name), Legacy: legacy, Clusters: cs})
 	}
 	return out
 }
 
-func groupClusters(g ModuleGroup) []migrations.Cluster {
-	if cs, ok := groupOnlyModules[g.Module]; ok {
-		return cs
+// ClusterGroups trả vai nhóm r_* có ở cụm c (đã sắp theo module).
+func ClusterGroups(c migrations.Cluster) []ModuleGroup {
+	var out []ModuleGroup
+	for _, g := range ModuleGroups() {
+		if slices.Contains(g.Clusters, c) {
+			out = append(out, g)
+		}
 	}
-	return []migrations.Cluster{migrations.PF}
+	return out
 }
 
-// UnitGroupRoles trả các r_* mà vai đăng nhập của đơn vị là thành viên (đã sắp).
+// UnitModules trả module mà vai đăng nhập của đơn vị phục vụ: module ghép của đơn vị và các lệnh Tools, cộng Extra.
+func UnitModules(u LoginUnit) []string {
+	mods := slices.Clone(modreg.UnitModules(u.Unit))
+	for _, t := range u.Tools {
+		mods = append(mods, modreg.UnitModules(t)...)
+	}
+	return append(mods, u.Extra...)
+}
+
+// UnitGroupRoles trả các vai nhóm mà vai đăng nhập của đơn vị là thành viên (đã sắp).
 func UnitGroupRoles(u LoginUnit) []string {
-	mods := append(modreg.UnitModules(u.Unit), u.Extra...)
+	mods := UnitModules(u)
 	var out []string
 	for _, g := range ModuleGroups() {
 		if slices.Contains(mods, g.Module) && !slices.Contains(out, g.Role) {
 			out = append(out, g.Role)
 		}
 	}
+	if u.Ops {
+		out = append(out, OpsGroup)
+	}
 	slices.Sort(out)
+	return out
+}
+
+// LoginRoles trả tên mọi vai đăng nhập theo đơn vị.
+func LoginRoles() []string {
+	out := make([]string, 0, len(LoginUnits))
+	for _, u := range LoginUnits {
+		out = append(out, u.Role)
+	}
 	return out
 }
 
 func buildRoles() []Role {
 	groups := ModuleGroups()
-	pf := []migrations.Cluster{migrations.PF}
 	out := []Role{baseRoles[0]} // ag_shared_user: đích MemberOf của mọi vai sau
 	for _, g := range groups {
 		// r_* thuộc ag_shared_user (outbox, inbox, idempotency như vai cũ); NOLOGIN nên Clusters chỉ để lọc
 		// theo AG_CLUSTERS, không GRANT CONNECT.
-		out = append(out, Role{Name: g.Role, MemberOf: []string{SharedUser}, Clusters: groupClusters(g)})
+		out = append(out, Role{Name: g.Role, MemberOf: []string{SharedUser}, Clusters: g.Clusters})
 	}
+	out = append(out, Role{Name: OpsGroup, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF, migrations.MKG}})
 	for _, r := range baseRoles[1:] {
 		for _, g := range groups {
 			if g.Legacy == r.Name {
@@ -120,7 +188,7 @@ func buildRoles() []Role {
 	}
 	for _, u := range LoginUnits {
 		// Không thuộc ag_shared_user: tự vai đăng nhập không có quyền bảng nào (kể cả shared.*).
-		out = append(out, Role{Name: u.Role, Login: true, NoInherit: true, MemberOf: UnitGroupRoles(u), Clusters: pf})
+		out = append(out, Role{Name: u.Role, Login: true, NoInherit: true, MemberOf: UnitGroupRoles(u), Clusters: u.Clusters})
 	}
 	return out
 }

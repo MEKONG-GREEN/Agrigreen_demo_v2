@@ -33,13 +33,15 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 )
 
-// PoolOpener mở pool cho một vai DB của cụm mkg.
+// PoolOpener mở pool cho một vai đăng nhập của cụm mkg (W2.6: app_internal).
 type PoolOpener func(ctx context.Context, role string) (*pgxpool.Pool, error)
 
 // Modules là các module mkg đã nối.
@@ -58,92 +60,58 @@ func (m Modules) List() []httpx.Module {
 	return []httpx.Module{m.Hub, m.Measurement, m.Fieldops, m.Logistics, m.Orders, m.Costing, m.Acctbridge}
 }
 
-// OpsRole là vai vận hành của api-internal ở cụm mkg (tương đương platform_api ở
-// cụm pf): chỉ bảng vận hành shared.idempotency_key qua ag_shared_user, không có
-// quyền nghiệp vụ (Q-MKG-07).
-const OpsRole = "mkg_api"
+// OpsRole là vai đăng nhập của api-internal ở cụm mkg (W2.6, ADR-0028): app_internal NOINHERIT — idempotency chạy
+// SET LOCAL ROLE r_ops (chỉ shared.idempotency_key qua ag_shared_user, Q-MKG-07), module chạy r_<module>.
+// Thay vai mkg_api + bảy vai <module>_app.
+const OpsRole = dbadmin.AppInternal
 
-// Build mở pool theo vai của từng module và nối port giữa các module mkg.
+// Build mở MỘT pool vai đăng nhập app_internal (W2.6) và nối port giữa các module mkg (mỗi module chạy r_<module>).
 //
-// G4 (CHỖ NỐI — docs/dev/g4-conventions.md §6): logistics (logistics_app; WaterwayRoutes qua bề mặt
-// đối tác, cùng tài khoản dịch vụ AG_MKG_SA_* của fieldops), orders (orders_app), costing
-// (costing_app; đọc hub.LotOrigins, measurement.LotMass, logistics.Trips, orders.Deliveries/Contracts),
-// acctbridge (acctbridge_app; costing.ClosedPeriods, LedgerAdapter theo AG_ACCTBRIDGE_ADAPTER). Thêm
+// G4 (CHỖ NỐI — docs/dev/g4-conventions.md §6): logistics (WaterwayRoutes qua bề mặt
+// đối tác, cùng tài khoản dịch vụ AG_MKG_SA_* của fieldops), orders, costing
+// (đọc hub.LotOrigins, measurement.LotMass, logistics.Trips, orders.Deliveries/Contracts),
+// acctbridge (costing.ClosedPeriods, LedgerAdapter theo AG_ACCTBRIDGE_ADAPTER). Thêm
 // trường vào Modules và List theo thứ tự phụ thuộc: logistics, orders → costing → acctbridge.
 //
-// ops là pool của vai OpsRole cho idempotency (cũng nằm trong pools để /readyz kiểm).
+// ops là pool của vai OpsRole (một pool cho cả đơn vị): idempotency (r_ops) và mọi module (r_<module>).
 func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules, ops *pgxpool.Pool, pools []*pgxpool.Pool, err error) {
 	ops, err = open(ctx, OpsRole)
 	if err != nil {
 		return mods, nil, pools, err
 	}
 	pools = append(pools, ops)
-	hubPool, err := open(ctx, hub.DBRole)
-	if err != nil {
-		return mods, ops, pools, err
-	}
-	pools = append(pools, hubPool)
-	mods.Hub = hub.New(hubPool, clk)
-	measPool, err := open(ctx, measurement.DBRole)
-	if err != nil {
-		return mods, ops, pools, err
-	}
-	pools = append(pools, measPool)
+	unit := ops
+	mods.Hub = hub.New(unit, clk)
 	// G3-2: số cuộn + tỷ lệ thửa từ mkg/fieldops qua adapter mkgwire.Rolls (gán sau khi dựng
 	// fieldops); nguồn gốc lô hub đọc với tenant tường minh (không cần vai hub).
 	rolls := &mkgwire.Rolls{}
-	mods.Measurement = measurement.New(measPool, clk, measurement.Deps{Rolls: rolls, Origins: mods.Hub.LotOrigins(), Plots: rolls})
-	foPool, err := open(ctx, fieldops.DBRole)
-	if err != nil {
-		return mods, ops, pools, err
-	}
-	pools = append(pools, foPool)
+	mods.Measurement = measurement.New(unit, clk, measurement.Deps{Rolls: rolls, Origins: mods.Hub.LotOrigins(), Plots: rolls})
 	fo := FieldopsOptionsFromEnv(clk)
 	// kg/cuộn học từ khối lượng cân HUB_IN (CUSTOMER_IN với tuyến DIRECT) của mkg/measurement,
 	// lệnh gom → lô cân qua liên kết lot_collection (đường làm mới tay; consumer
 	// mkg.fieldops.weigh_ticket ở worker-internal là đường chính).
 	fo.Weighed = mkgwire.Weighed{Links: mods.Measurement.CollectionLinks(), Lots: mods.Measurement.LotMass()}
-	mods.Fieldops = fieldops.New(foPool, clk, fo)
+	mods.Fieldops = fieldops.New(unit, clk, fo)
 	rolls.Totals, rolls.KgPerRoll = mods.Fieldops.RollTotals(), mods.Fieldops.KgPerRoll()
 	// G4 mkg/logistics: định tuyến đường thủy qua bề mặt đối tác (cùng tài khoản dịch vụ AG_MKG_SA_*).
-	logPool, err := open(ctx, logistics.DBRole)
-	if err != nil {
-		return mods, ops, pools, err
-	}
-	pools = append(pools, logPool)
 	// G4: tệp chứng từ vùng mkg (biên bản chênh lệch, ePOD / e-bill) ở kho đối tượng trong lãnh thổ (RB-7).
 	docs := DocumentStoreFromEnv(ctx)
 	lo := LogisticsOptionsFromEnv(clk)
 	lo.Files = docs
-	mods.Logistics = logistics.New(logPool, clk, lo)
+	mods.Logistics = logistics.New(unit, clk, lo)
 	// G4 mkg/orders: hợp đồng mua rơm, đơn mua/phiếu nhận, đơn bán/giao nhận.
-	ordPool, err := open(ctx, orders.DBRole)
-	if err != nil {
-		return mods, ops, pools, err
-	}
-	pools = append(pools, ordPool)
-	mods.Orders = orders.NewWith(ordPool, clk, orders.Options{Stock: mods.Hub.Stock(), Files: docs}) // O-05: cảnh báo thiếu tồn
+	mods.Orders = orders.NewWith(unit, clk, orders.Options{Stock: mods.Hub.Stock(), Files: docs}) // O-05: cảnh báo thiếu tồn
 	// G4 costing (costing_app): nguồn gốc lô hub (quy kết hao hụt), hợp đồng mua rơm + giao nhận của
 	// mkg/orders, chuyến của mkg/logistics (ghe chưa cân, đọc lại khi đóng kỳ).
-	costPool, err := open(ctx, costing.DBRole)
-	if err != nil {
-		return mods, ops, pools, err
-	}
-	pools = append(pools, costPool)
-	mods.Costing = costing.New(costPool, clk, costing.Deps{
+	mods.Costing = costing.New(unit, clk, costing.Deps{
 		Origins:    mods.Hub.LotOrigins(),
 		Contracts:  mods.Orders.Contracts(),
 		Trips:      mods.Logistics.Trips(),
 		Deliveries: mods.Orders.Deliveries(),
 	})
-	// G4 mkg/acctbridge (vai acctbridge_app): HTTP + job thử lại đẩy. API không dựng bút toán (worker dựng)
+	// G4 mkg/acctbridge (r_acctbridge): HTTP + job thử lại đẩy. API không dựng bút toán (worker dựng)
 	// nên không cần costing.ClosedPeriods ở đây; bộ điều hợp dùng cho đẩy lại chạy ở worker-internal.
-	abPool, err := open(ctx, acctbridge.DBRole)
-	if err != nil {
-		return mods, ops, pools, err
-	}
-	pools = append(pools, abPool)
-	mods.Acctbridge = acctbridge.New(abPool, clk, acctbridge.Deps{RetryMax: acctbridge.RetryMaxFromEnv()})
+	mods.Acctbridge = acctbridge.New(unit, clk, acctbridge.Deps{RetryMax: acctbridge.RetryMaxFromEnv()})
 	return mods, ops, pools, nil
 }
 
@@ -370,7 +338,7 @@ func NewRouter(d Deps) *gin.Engine {
 	r := httpx.NewEngine(d.Log, maxBody)
 	r.Use(httpx.CORS(d.CORSOrigins)) // trước mọi route: preflight đi qua cả nhánh 404/405
 	health(d)(r)
-	v1 := r.Group("/v1", httpx.Authenticate(d.Verifier), idempotency.Middleware(d.Ops))
+	v1 := r.Group("/v1", httpx.Authenticate(d.Verifier), idempotency.Middleware(db.ForModule(d.Ops, db.Ops)))
 	for _, m := range d.Modules {
 		m.RegisterApp(v1)
 	}
@@ -382,7 +350,7 @@ func NewAdminRouter(d Deps) *gin.Engine {
 	r := httpx.NewEngine(d.Log, maxBody)
 	r.Use(httpx.CORS(d.CORSOrigins))
 	health(d)(r)
-	v1 := r.Group("/v1", httpx.Authenticate(d.Verifier), httpx.RequireMFA(), idempotency.Middleware(d.Ops))
+	v1 := r.Group("/v1", httpx.Authenticate(d.Verifier), httpx.RequireMFA(), idempotency.Middleware(db.ForModule(d.Ops, db.Ops)))
 	for _, m := range d.Modules {
 		m.RegisterAdmin(v1)
 	}

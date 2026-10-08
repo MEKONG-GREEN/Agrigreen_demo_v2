@@ -33,6 +33,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
@@ -105,7 +106,7 @@ func NewAt(t testing.TB, clk clock.Clock) *Stack {
 	}
 	kc := accounts.NewMemoryDirectory()
 	mods := build(func(role string) *pgxpool.Pool { return env.Pool(t, migrations.PF, role) }, clk, vc, store, kc)
-	ops := env.Pool(t, migrations.PF, "platform_api")
+	ops := env.Pool(t, migrations.PF, dbadmin.AppPlatform) // W2.6: idempotency chạy r_ops
 	verifier := iss.Verifier()
 	app := httptest.NewServer(newRouter(log, verifier, ops, mods.List(), false))
 	t.Cleanup(app.Close)

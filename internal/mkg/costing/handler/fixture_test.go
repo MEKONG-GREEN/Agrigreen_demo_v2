@@ -25,6 +25,7 @@ import (
 	ordport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/orders/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -126,7 +127,7 @@ func newFixture(t *testing.T) *fixture {
 	origins := &fakeOrigins{m: map[uuid.UUID]hubport.LotInfo{}}
 	trips := &fakeTrips{forLot: map[uuid.UUID][]logport.TripView{}}
 	deps := costing.Deps{Origins: origins, Contracts: contracts, Trips: trips}
-	mod := costing.New(pool, clk, deps)
+	mod := costing.New(pgtest.Get(t).Pool(t, migrations.MKG, dbadmin.AppInternal), clk, deps)
 	iss := authztest.New(t)
 	log := telemetry.NewLogger("test", io.Discard)
 	appEng := httpx.NewEngine(log, 1<<20)

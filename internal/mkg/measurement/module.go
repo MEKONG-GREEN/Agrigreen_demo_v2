@@ -52,6 +52,7 @@ type Module struct {
 
 // New tạo module với pool của vai measurement_app (cụm mkg).
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
+	db = forModule(db)
 	w := &app.Writer{DB: db, Clock: clk}
 	return &Module{w: w, svc: &app.Service{DB: db, Clock: clk, Writer: w, Rolls: deps.Rolls, Origins: deps.Origins,
 		Plots: deps.Plots}}
@@ -90,6 +91,7 @@ type Ingest struct {
 
 // NewIngest dựng cổng cho cmd/ingest với pool vai port.IngestRole (cụm mkg).
 func NewIngest(db tenant.Beginner, clk clock.Clock) Ingest {
+	db = forModule(db)
 	w := &app.Writer{DB: db, Clock: clk}
 	return Ingest{Tickets: w, Devices: w, Health: w, Sessions: w, LotMass: w}
 }
@@ -98,6 +100,7 @@ func NewIngest(db tenant.Beginner, clk clock.Clock) Ingest {
 // vai ingest_mkg: sổ thiết bị, hàng phiên đã đóng (xuyên tenant), bì theo cửa sổ,
 // sổ phiếu (idempotent theo IdemKey ingest:<session>:<rule_version>).
 func NewIngestPorts(db tenant.Beginner, clk clock.Clock) IngestPorts {
+	db = forModule(db)
 	w := &app.Writer{DB: db, Clock: clk}
 	return IngestPorts{Devices: w, Sessions: ingestSessions{w}, Tare: w, Tickets: w}
 }

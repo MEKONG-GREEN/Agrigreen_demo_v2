@@ -39,6 +39,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
@@ -187,8 +188,8 @@ func (g *g5) startPublicAPI() {
 	if err != nil {
 		t.Fatalf("api-public Build: %v", err)
 	}
-	if len(opened) != 8 || opened[dbadmin.Migrator] {
-		t.Fatalf("api-public chỉ mở 8 vai của g5-conventions §3.1: %v", opened)
+	if len(opened) != 1 || !opened[dbadmin.AppPublic] { // W2.6 (ADR-0028): một vai đăng nhập app_public
+		t.Fatalf("api-public chỉ mở vai %s: %v", dbadmin.AppPublic, opened)
 	}
 	g.pub = httptest.NewServer(mod.PublicRouter(d))
 	t.Cleanup(g.pub.Close)
@@ -1124,9 +1125,10 @@ func (g *g5) stepLedgersChained() {
 // g5consumer là một consumer của cmd/worker mà kịch bản G5 cần: consumer liên module (assembly.Consumers — van MKG,
 // pf.apiclient.export, pf.metering.statement), xuất gói MRV và cảnh báo DLP của pf/notify.
 type g5consumer struct {
-	name, role string
-	events     []string
-	handler    inbox.Handler
+	name    string
+	module  db.ModuleID // W2.6: giao dịch inbox trên app_worker, SET LOCAL ROLE r_<module>
+	events  []string
+	handler inbox.Handler
 }
 
 type g5delivery struct {
@@ -1149,13 +1151,13 @@ type g5pump struct {
 func newG5Pump(t *testing.T, s *harness.Stack, tids ...uuid.UUID) *g5pump {
 	p := &g5pump{t: t, s: s, tids: tids, seen: map[uuid.UUID]bool{}, byConsumer: map[string]int{}}
 	for _, c := range platformasm.Consumers {
-		p.consumers = append(p.consumers, g5consumer{name: c.Name, role: c.Role, events: c.Events, handler: c.Handler(s.Mods)})
+		p.consumers = append(p.consumers, g5consumer{name: c.Name, module: c.Module, events: c.Events, handler: c.Handler(s.Mods)})
 	}
 	p.consumers = append(p.consumers,
-		g5consumer{name: mrvport.ExportConsumer, role: mrv.DBRole, events: []string{mrvport.EventExportRequested}, handler: s.Mods.MRV.ExportHandler()})
+		g5consumer{name: mrvport.ExportConsumer, module: mrv.DBModule, events: []string{mrvport.EventExportRequested}, handler: s.Mods.MRV.ExportHandler()})
 	for _, c := range s.Mods.Notify.Consumers() {
 		if c.Name == notifyport.ConsumerEgressAnomaly {
-			p.consumers = append(p.consumers, g5consumer{name: c.Name, role: notify.DBRole, events: c.Events, handler: c.Handler})
+			p.consumers = append(p.consumers, g5consumer{name: c.Name, module: notify.DBModule, events: c.Events, handler: c.Handler})
 		}
 	}
 	return p
@@ -1169,7 +1171,7 @@ func (p *g5pump) deliver(env outbox.Envelope) int {
 		if !slices.Contains(c.events, env.EventType) {
 			continue
 		}
-		ok, err := inbox.Process(context.Background(), p.s.PF(c.role), c.name, env, c.handler)
+		ok, err := inbox.Process(context.Background(), db.ForModule(p.s.PF(dbadmin.AppWorker), c.module), c.name, env, c.handler)
 		if err != nil {
 			p.t.Fatalf("consumer %s xử lý %s (%s): %v", c.name, env.EventType, env.EventID, err)
 		}
@@ -1224,7 +1226,7 @@ func (p *g5pump) run() int {
 func (p *g5pump) redeliverAll() {
 	p.t.Helper()
 	for _, d := range p.delivered {
-		ok, err := inbox.Process(context.Background(), p.s.PF(d.c.role), d.c.name, d.env, d.c.handler)
+		ok, err := inbox.Process(context.Background(), db.ForModule(p.s.PF(dbadmin.AppWorker), d.c.module), d.c.name, d.env, d.c.handler)
 		if err != nil || ok {
 			p.t.Fatalf("R-61: giao lặp %s → %s phải bị bỏ qua: processed=%v err=%v", d.env.EventType, d.c.name, ok, err)
 		}

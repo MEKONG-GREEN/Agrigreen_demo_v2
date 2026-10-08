@@ -23,6 +23,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port/edgewire"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
@@ -45,11 +46,11 @@ func TestIngestEndToEndIntoTicketLedger(t *testing.T) {
 	mustStatus(t, f.approver().adm(http.MethodPost, "/v1/measurement/devices/"+devID+"/epochs/1/decision", map[string]any{"decision": "approved"}),
 		http.StatusCreated, "duyệt")
 
-	ports := measurement.NewIngestPorts(f.ingestPool, f.clk)
+	ports := measurement.NewIngestPorts(f.env.Pool(t, migrations.MKG, dbadmin.AppIngest), f.clk) // W2.6
 	if err := ports.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	store := &measurement.IngestTSStore{Writer: f.env.Pool(t, migrations.TS, port.IngestTSRole), Reader: f.env.Pool(t, migrations.TS, port.TSReaderRole)}
+	store := measurement.NewIngestTSStore(f.env.Pool(t, migrations.TS, dbadmin.AppIngest), f.env.Pool(t, migrations.TS, dbadmin.AppIngest))
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	metrics := measurement.NewIngestMetrics(nil)
 	rv := &measurement.IngestReceiver{Devices: ports.Devices, Store: store, Clock: f.clk, Log: log, Metrics: metrics}

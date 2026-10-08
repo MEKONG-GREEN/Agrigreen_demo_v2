@@ -47,7 +47,7 @@ func newAdmin(t *testing.T) *admin {
 		t.Fatal(err)
 	}
 	op := ids.New()
-	mod := apiclient.New(env.Pool(t, migrations.PF, port.DBRole), clock.NewFixed(time.Date(2026, 10, 1, 3, 0, 0, 0, time.UTC)),
+	mod := apiclient.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.NewFixed(time.Date(2026, 10, 1, 3, 0, 0, 0, time.UTC)),
 		apiclient.Deps{Peppers: peppers})
 	a := &admin{t: t, op: op, actors: map[string]authz.Principal{
 		"admin":    {ActorRef: ids.New(), TenantID: op, Roles: []string{port.RoleAPIClientAdmin}, MFA: true},

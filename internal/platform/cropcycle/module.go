@@ -56,6 +56,7 @@ type Module struct{ svc *app.Service }
 
 // New tạo module với pool của vai cropcycle_app.
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
+	db = forModule(db)
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Scope: deps.Scope, Orgs: deps.Orgs, Plots: deps.Plots, Params: deps.Params,
 		Catalogs: deps.Catalogs, Farmers: deps.Farmers, GpsLog: deps.GpsLog}}
 }

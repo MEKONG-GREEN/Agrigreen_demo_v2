@@ -19,14 +19,15 @@ import (
 	mrvport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation"
 	simport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 )
 
 // Consumer là một consumer liên module của worker chạy trên Modules đã nối ở Build.
-// Handler chạy trong giao dịch inbox trên pool của Role (vai DB của module nhận, R-05).
+// Handler chạy trong giao dịch inbox dưới vai nhóm của Module (module nhận; SET LOCAL ROLE r_<module>, W2.6).
 type Consumer struct {
 	Name    string
-	Role    string
+	Module  db.ModuleID
 	Events  []string
 	Handler func(Modules) inbox.Handler
 }
@@ -43,28 +44,28 @@ type Consumer struct {
 //   - pf.metrics.layer_log (G3): nhật ký thay đổi lớp GIS từ sự kiện geo/cropcycle/mechanization/waterway (GIS US-EVL-01).
 //   - pf.metering.statement (G5): bảng kê kỳ tháng của pf/metering (ADR-0023).
 var Consumers = []Consumer{
-	{Name: mechport.AreaSyncConsumer, Role: mechanization.DBRole, Events: []string{ccport.EventCoopSeasonAreaChanged},
+	{Name: mechport.AreaSyncConsumer, Module: mechanization.DBModule, Events: []string{ccport.EventCoopSeasonAreaChanged},
 		Handler: func(m Modules) inbox.Handler { return m.Mechanization.AreaSyncHandler() }},
-	{Name: geoport.HubValveConsumer, Role: geo.DBRole, Events: []string{geoport.EventMKGHubFacilityPublished, geoport.EventMKGHubCapacityPublished},
+	{Name: geoport.HubValveConsumer, Module: geo.DBModule, Events: []string{geoport.EventMKGHubFacilityPublished, geoport.EventMKGHubCapacityPublished},
 		Handler: func(m Modules) inbox.Handler { return m.Geo.HubValveHandler() }},
-	{Name: ccport.CollectionValveConsumer, Role: cropcycle.DBRole, Events: ccport.CollectionValveEvents,
+	{Name: ccport.CollectionValveConsumer, Module: cropcycle.DBModule, Events: ccport.CollectionValveEvents,
 		Handler: func(m Modules) inbox.Handler { return m.CropCycle.CollectionValveHandler() }},
-	{Name: ccport.GpsLogConsumer, Role: cropcycle.DBRole, Events: ccport.GpsLogEvents,
+	{Name: ccport.GpsLogConsumer, Module: cropcycle.DBModule, Events: ccport.GpsLogEvents,
 		Handler: func(m Modules) inbox.Handler { return m.CropCycle.GpsLogHandler() }},
-	{Name: extport.GpsLogConsumer, Role: extension.DBRole, Events: []string{extport.EventSupportRequestSubmitted},
+	{Name: extport.GpsLogConsumer, Module: extension.DBModule, Events: []string{extport.EventSupportRequestSubmitted},
 		Handler: func(m Modules) inbox.Handler { return m.Extension.GpsLogHandler() }},
-	{Name: simport.SnapshotConsumer, Role: simulation.DBRole, Events: []string{simport.EventRunSubmitted},
+	{Name: simport.SnapshotConsumer, Module: simulation.DBModule, Events: []string{simport.EventRunSubmitted},
 		Handler: func(m Modules) inbox.Handler { return m.Simulation.SnapshotHandler() }},
-	{Name: mrvport.FarmLogLinkConsumer, Role: mrv.DBRole, Events: mrvport.FarmLogLinkEvents,
+	{Name: mrvport.FarmLogLinkConsumer, Module: mrv.DBModule, Events: mrvport.FarmLogLinkEvents,
 		Handler: func(m Modules) inbox.Handler { return m.MRV.FarmLogLinkHandler() }},
-	{Name: mrvport.CollectionEvidenceConsumer, Role: mrv.DBRole, Events: mrvport.CollectionEvidenceEvents,
+	{Name: mrvport.CollectionEvidenceConsumer, Module: mrv.DBModule, Events: mrvport.CollectionEvidenceEvents,
 		Handler: func(m Modules) inbox.Handler { return m.MRV.CollectionEvidenceHandler() }},
-	{Name: metricsport.LayerLogConsumer, Role: metrics.DBRole, Events: metrics.LayerEvents,
+	{Name: metricsport.LayerLogConsumer, Module: metrics.DBModule, Events: metrics.LayerEvents,
 		Handler: func(m Modules) inbox.Handler { return m.Metrics.LayerLogHandler() }},
 	// G5 (ADR-0023 mục 4): bảng kê kỳ tháng — ảnh chụp bất biến + bảng kê draft (mẫu §12).
-	{Name: meteringport.StatementConsumer, Role: metering.DBRole, Events: []string{meteringport.EventStatementRequested},
+	{Name: meteringport.StatementConsumer, Module: metering.DBModule, Events: []string{meteringport.EventStatementRequested},
 		Handler: func(m Modules) inbox.Handler { return m.Metering.StatementHandler() }},
 	// G5 (ADR-0022 mục 8): việc xuất Public API — dựng tệp tất định qua nguồn của module chủ dữ liệu.
-	{Name: apiclientport.ExportConsumer, Role: apiclient.DBRole, Events: []string{apiclientport.EventExportRequested},
+	{Name: apiclientport.ExportConsumer, Module: apiclient.DBModule, Events: []string{apiclientport.EventExportRequested},
 		Handler: func(m Modules) inbox.Handler { return m.APIClient.ExportHandler() }},
 }

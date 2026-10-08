@@ -44,8 +44,8 @@ func TestTripMilestoneContractAndConsumer_FM05(t *testing.T) {
 			continue
 		}
 		n++
-		if c.Role != hub.DBRole || len(c.Events) != 1 || c.Events[0] != logport.EventTripMilestoneRecorded || !ValidName(c.Name) {
-			t.Fatalf("consumer %s: vai %s sự kiện %v", c.Name, c.Role, c.Events)
+		if c.Module != hub.DBModule || len(c.Events) != 1 || c.Events[0] != logport.EventTripMilestoneRecorded || !ValidName(c.Name) {
+			t.Fatalf("consumer %s: vai %s sự kiện %v", c.Name, c.Module.Role(), c.Events)
 		}
 	}
 	if n != 1 {

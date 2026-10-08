@@ -55,7 +55,7 @@ func newFixture(t *testing.T) *fixture {
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	vault := newFakeVault()
 	units := newFakeUnits()
-	mod := party.New(pool, clock.System{}, party.Deps{AdminUnits: units, Vault: vault})
+	mod := party.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, party.Deps{AdminUnits: units, Vault: vault})
 	log := telemetry.NewLogger("test", io.Discard)
 
 	appEng := httpx.NewEngine(log, 1<<20)

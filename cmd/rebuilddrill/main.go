@@ -113,7 +113,7 @@ func run(args []string) (int, error) {
 		if err != nil {
 			return nil, err
 		}
-		p, err := db.Open(ctx, dsn, db.Options{AppName: "rebuilddrill", MaxConns: 2})
+		p, err := db.Open(ctx, dsn, db.Options{AppName: "rebuilddrill", MaxConns: 4})
 		if err != nil {
 			return nil, err
 		}

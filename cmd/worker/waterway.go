@@ -9,11 +9,11 @@ import (
 
 // waterwayBuildConsumer dựng phiên bản mạng đường thủy cho
 // pf.waterway.network_build.requested (mục 16, mẫu mục 12). Handler chạy trong
-// giao dịch của inbox.Process trên pool vai waterway_app; tham số dựng đã chốt
+// giao dịch của inbox.Process trên pool r_waterway; tham số dựng đã chốt
 // trên job nên worker không cần pf/masterdata.
 func waterwayBuildConsumer() consumer {
 	return consumer{
-		name: wwport.BuildConsumer, cluster: migrations.PF, role: waterway.DBRole,
+		name: wwport.BuildConsumer, cluster: migrations.PF, module: waterway.DBModule,
 		events:  []string{wwport.EventBuildRequested},
 		handler: waterway.New(nil, clock.System{}, waterway.Deps{}).BuildHandler(),
 	}

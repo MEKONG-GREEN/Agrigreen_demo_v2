@@ -17,7 +17,7 @@ import (
 )
 
 // mrvExportConsumer dựng gói bằng chứng MRV cho pf.mrv.export.requested (mục 12).
-// Handler chạy trong giao dịch của inbox.Process trên pool vai mrv_app. Kho đối
+// Handler chạy trong giao dịch của inbox.Process trên pool r_mrv. Kho đối
 // tượng (AG_S3_* hoặc AG_OBJSTORE_DIR) mở ở sự kiện đầu tiên; thiếu cấu hình →
 // handler lỗi, sự kiện được giao lại rồi vào DLQ (R-62) — không mất yêu cầu.
 func mrvExportConsumer(log *slog.Logger) consumer {
@@ -27,7 +27,7 @@ func mrvExportConsumer(log *slog.Logger) consumer {
 		err  error
 	)
 	return consumer{
-		name: mrvport.ExportConsumer, cluster: migrations.PF, role: mrv.DBRole,
+		name: mrvport.ExportConsumer, cluster: migrations.PF, module: mrv.DBModule,
 		events: []string{mrvport.EventExportRequested},
 		handler: func(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
 			once.Do(func() {

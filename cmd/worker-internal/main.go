@@ -97,6 +97,28 @@ func run(log *slog.Logger) error {
 	if _, err := pool(assembly.OpsRole); err != nil {
 		return err
 	}
+	// Cổng đọc của module khác mà handler dùng (vd costing đọc hub/orders/logistics) mở giao dịch RIÊNG trong lúc
+	// giao dịch inbox còn giữ kết nối: dùng pool thứ hai (cùng vai app_worker_internal) để không tranh kết nối với
+	// giao dịch inbox của chính các consumer (W2.6: một vai, hai pool).
+	depPools := map[string]*pgxpool.Pool{}
+	depPool := func(role string) (*pgxpool.Pool, error) {
+		if p, ok := depPools[role]; ok {
+			return p, nil
+		}
+		dsn, err := dbadmin.RoleURL(base, migrations.MKG, "", role)
+		if err != nil {
+			return nil, err
+		}
+		o := opts
+		o.AppName = "worker-internal-deps"
+		p, err := db.Open(ctx, dsn, o)
+		if err != nil {
+			return nil, err
+		}
+		depPools[role] = p
+		pools[role+"#deps"] = p
+		return p, nil
+	}
 
 	conn, err := amqp.Dial(amqpURL)
 	if err != nil {
@@ -122,19 +144,20 @@ func run(log *slog.Logger) error {
 	errc := make(chan error, len(selected)+1)
 	clk := clock.System{}
 	for _, c := range selected {
-		p, err := pool(c.Role)
+		p, err := pool(assembly.OpsRole)
 		if err != nil {
 			return err
 		}
+		b := db.ForModule(p, c.Module) // W2.6: giao dịch inbox chạy dưới r_<module>
 		ch, err := conn.Channel()
 		if err != nil {
 			return err
 		}
-		h, err := c.Handler(clk, pool)
+		h, err := c.Handler(clk, depPool)
 		if err != nil {
 			return err
 		}
-		go func(name string) { errc <- inbox.Consume(ctx, ch, p, name, h, log) }(c.Name)
+		go func(name string) { errc <- inbox.Consume(ctx, ch, b, name, h, log) }(c.Name)
 	}
 	log.Info("đang chạy", "event", "startup", "consumers", len(selected), "outcome", "ok")
 

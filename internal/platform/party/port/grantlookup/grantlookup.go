@@ -23,13 +23,14 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	shareddb "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 // Lookup hiện thực port.GrantLookup (và danh sách bên cấp cho danh mục /v1/data-products).
 type Lookup struct {
-	DB    tenant.Beginner // pool vai party_app
+	DB    tenant.Beginner // pool đã bọc r_party (New)
 	Clock clock.Clock
 }
 
@@ -38,12 +39,16 @@ var (
 	_ port.APIReadLog  = (*Lookup)(nil)
 )
 
-// New tạo bộ điều hợp trên pool vai party_app.
+// dbModule: bộ điều hợp đọc/ghi bảng của pf/party — giao dịch chạy SET LOCAL ROLE r_party (W2.6). Không import
+// gốc pf/party (R-02), nên khai lại cùng module (ModuleID so sánh theo giá trị).
+var dbModule = shareddb.Module("pf/party")
+
+// New tạo bộ điều hợp trên pool vai đăng nhập của đơn vị (app_public) hoặc vai cũ party_app.
 func New(db tenant.Beginner, clk clock.Clock) *Lookup {
 	if clk == nil {
 		clk = clock.System{}
 	}
-	return &Lookup{DB: db, Clock: clk}
+	return &Lookup{DB: shareddb.ForModule(db, dbModule), Clock: clk}
 }
 
 // dataProductKind: chỉ loại dp_* hợp lệ (ShareKinds) mới đi qua cổng không vai OIDC.

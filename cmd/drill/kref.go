@@ -145,11 +145,11 @@ type KRefReport struct {
 // RunKRef chạy bước dựng lại k_ref + so khớp nguồn.
 func RunKRef(ctx context.Context, cfg KRefConfig) (KRefReport, error) {
 	rep := KRefReport{Database: cfg.Database}
-	partyPool, err := cfg.Pool(party.DBRole)
+	partyPool, err := cfg.Pool(dbadmin.AppWorker) // W2.6: r_party / r_masterdata qua vai đăng nhập app_worker
 	if err != nil {
 		return rep, err
 	}
-	mdPool, err := cfg.Pool(masterdata.DBRole)
+	mdPool, err := cfg.Pool(dbadmin.AppWorker)
 	if err != nil {
 		return rep, err
 	}

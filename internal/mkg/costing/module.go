@@ -41,6 +41,7 @@ type Module struct{ svc *app.Service }
 
 // New tạo module với pool của vai costing_app (cụm mkg).
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
+	db = forModule(db)
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Deps: deps}}
 }
 

@@ -49,6 +49,7 @@ type Module struct{ svc *app.Service }
 
 // New tạo module với pool của vai logistics_app (cụm mkg).
 func New(db tenant.Beginner, clk clock.Clock, o Options) *Module {
+	db = forModule(db)
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Waterway: o.Waterway, Road: o.Road, Files: o.Files, Metrics: app.NewMetrics(telemetry.Meter())}}
 }
 

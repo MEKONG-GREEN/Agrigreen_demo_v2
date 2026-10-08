@@ -123,7 +123,7 @@ jobs:
             go run ./cmd/drill check -manifest "$OUT/db-manifest.json" -objects-manifest latest -report "$OUT/drill-report.json" -strict
 
       # W2.5 (ADR-0029 §5): SAU drill check (lệnh này ghi k_ref): xóa + dựng lại k_ref từ nguồn, so số dòng + băm
-      # theo quan hệ với một lần dựng độc lập. Vai module (app_worker, party_app, masterdata_app, ag_outbox_publisher).
+      # theo quan hệ với một lần dựng độc lập. Vai đăng nhập app_worker (r_party, r_masterdata, r_kref — W2.6) và ag_outbox_publisher.
       - name: drill kref (k_ref dựng lại khớp nguồn)
         run: |
           set -eu; set -a; . deploy/compose/.env; set +a

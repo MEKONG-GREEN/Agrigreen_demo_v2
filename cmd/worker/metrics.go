@@ -30,9 +30,9 @@ func buildPlatform(ctx context.Context, direct string) (assembly.Modules, []*pgx
 		if err != nil {
 			return nil, err
 		}
-		return db.Open(ctx, dsn, db.Options{AppName: "worker-metrics", MaxConns: 2})
+		return db.Open(ctx, dsn, db.Options{AppName: "worker-metrics", MaxConns: 8})
 	}
-	return assembly.Build(ctx, open, clock.System{}, assembly.External{})
+	return assembly.Build(ctx, open, clock.System{}, assembly.External{Login: dbadmin.AppWorker})
 }
 
 // parseRange đọc "YYYY-MM-DD:YYYY-MM-DD".

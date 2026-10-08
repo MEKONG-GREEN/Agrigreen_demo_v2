@@ -49,6 +49,7 @@ type Module struct {
 
 // New tạo module với pool của vai simulation_app.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
+	db = forModule(db)
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Params: d.Params, Supply: d.Supply, Router: d.Router, Log: d.Log}, auth: d.InternalAuth}
 }
 

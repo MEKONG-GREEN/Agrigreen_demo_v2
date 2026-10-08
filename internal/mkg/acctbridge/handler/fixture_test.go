@@ -24,6 +24,8 @@ import (
 	cp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/costing/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	shareddb "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -89,7 +91,8 @@ func newFixture(t *testing.T, ad port.LedgerAdapter) *fixture {
 	if ad == nil {
 		ad = f.fake
 	}
-	f.svc = &app.Service{DB: pool, Clock: clk, Periods: f.periods, Adapter: ad, RetryMax: 3, Metrics: app.NewMetrics(nil)}
+	// W2.6: dịch vụ chạy trên vai đăng nhập app_internal, mọi giao dịch SET LOCAL ROLE r_acctbridge; pool (vai cũ) chỉ để kiểm DB.
+	f.svc = &app.Service{DB: shareddb.ForModule(env.Pool(t, migrations.MKG, dbadmin.AppInternal), shareddb.Module("mkg/acctbridge")), Clock: clk, Periods: f.periods, Adapter: ad, RetryMax: 3, Metrics: app.NewMetrics(nil)}
 	f.iss = authztest.New(t)
 	h := handler.Handler{Svc: f.svc}
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)

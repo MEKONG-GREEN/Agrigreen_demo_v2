@@ -26,6 +26,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -72,7 +73,7 @@ func newFixture(t *testing.T, now time.Time) *fixture {
 	}}
 	f.orgs.put(partyport.Org{Ref: f.c1, Kind: partyport.OrgCooperative, Code: "HTX000001", Name: "HTX Lúa Xanh", AdminUnitCode: "30001", Active: true})
 	f.orgs.put(partyport.Org{Ref: f.c2, Kind: partyport.OrgCooperative, Code: "HTX000002", Name: "HTX Cần Thơ Xanh", AdminUnitCode: "31001", Active: true})
-	f.mod = mechanization.New(pool, f.clk, mechanization.Deps{
+	f.mod = mechanization.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), f.clk, mechanization.Deps{
 		Scope: f.scope, Orgs: f.orgs, Params: f.params, Catalogs: newFakeCatalogs(), AdminUnits: newFakeUnits(), Vault: clienttest.New(),
 	})
 	log := telemetry.NewLogger("test", io.Discard)

@@ -33,6 +33,15 @@ func Module(name string) ModuleID {
 	return ModuleID{name: name, role: modreg.DBRole(name)}
 }
 
+// OpsRole là vai nhóm vận hành NOLOGIN của đơn vị triển khai (W2.6, ADR-0028 §1): chỉ bảng vận hành schema
+// shared (idempotency, inbox của consumer không thuộc module) qua ag_shared_user — thay các vai đăng nhập
+// không theo module platform_api, public_api, worker_platform, mkg_api, worker_internal.
+const OpsRole = "r_ops"
+
+// Ops là "module" vận hành của đơn vị: giao dịch mở qua ForModule(pool, Ops) chạy SET LOCAL ROLE r_ops.
+// Không thuộc registry module (không có module.yaml) — dùng cho idempotency HTTP, consumer mẫu G0.
+var Ops = ModuleID{name: "shared/ops", role: OpsRole}
+
 // Name là tên module (vd pf/content).
 func (m ModuleID) Name() string { return m.name }
 

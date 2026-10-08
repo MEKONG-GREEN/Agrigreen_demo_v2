@@ -24,18 +24,14 @@ import (
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port/grantlookup"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 )
 
-// PoolOpener mở pool cho một vai DB của cụm pf.
+// PoolOpener mở pool cho một vai đăng nhập của cụm pf (W2.6: app_public; mở lại cùng vai nên trả cùng pool).
 type PoolOpener func(ctx context.Context, role string) (*pgxpool.Pool, error)
-
-// partyDBRole là vai DB của pf/party (party.DBRole). Không import gốc module pf/party: gốc đó kéo
-// client kho định danh và handler Application/Admin (RB-3, ADR-0022 mục 1) — api-public chỉ dùng bộ
-// điều hợp chỉ đọc party/port/grantlookup.
-const partyDBRole = "party_app"
 
 // Config là cấu hình đã đọc của api-public.
 type Config struct {
@@ -66,37 +62,32 @@ type Ports struct {
 	Hubs       apiclientport.HubCapacitySource
 	MRV        apiclientport.MRVPackageSource
 
-	// Ready: pool của cổng bắt buộc (metering, party) — /readyz ping thêm.
+	// Ready: pool của cổng bắt buộc (app_public) — /readyz ping thêm.
 	Ready []*pgxpool.Pool
 }
 
 // ErrNotWired: thiếu cổng bắt buộc (sổ đo lường, hạn mức, cấp quyền) — không khởi động (đóng khi lỗi).
 var ErrNotWired = errors.New("api-public: chưa nối metering/port.Ledger, Quotas hoặc party/port.GrantLookup — không khởi động")
 
-// integrationPorts nối cổng THẬT của module khác (tích hợp G5, 02/10/2026), mỗi cổng một pool vai
-// của module chủ (g5-conventions §3.1):
-//   - pf/metering (metering_app): Ledger, Quotas, Usage; gói hạn mức qua plans (pf/apiclient, pool
-//     apiclient_app); tham số kênh qua pf/masterdata;
-//   - pf/party (party_app): GrantLookup + sổ đọc partner_read_log của bên cấp (APIReadLog, K-05) — bộ
-//     điều hợp party/port/grantlookup (không vault);
-//   - pf/cropcycle (cropcycle_app): CollectionVolumeSource, dữ kiện thửa qua pf/cooperative (mặt tiền
-//     W3.2 trên pf/geo, geo_app) + đơn vị hành chính pf/masterdata (masterdata_app);
-//   - pf/geo (geo_app): HubCapacitySource;
-//   - pf/mrv (mrv_app): MRVPackageSource (chỉ đọc export_job — không kho đối tượng).
+// integrationPorts nối cổng THẬT của module khác (tích hợp G5, 02/10/2026) trên MỘT pool vai đăng nhập
+// app_public (W2.6, ADR-0028); mỗi cổng chạy dưới vai nhóm của module chủ (r_<module>, g5-conventions §3.1):
+//   - pf/metering: Ledger, Quotas, Usage; gói hạn mức qua plans (pf/apiclient); tham số kênh qua pf/masterdata;
+//   - pf/party: GrantLookup + sổ đọc partner_read_log của bên cấp (APIReadLog, K-05) — bộ điều hợp
+//     party/port/grantlookup (không vault, r_party);
+//   - pf/cropcycle: CollectionVolumeSource, dữ kiện thửa qua pf/cooperative (mặt tiền W3.2 trên pf/geo) + đơn vị
+//     hành chính pf/masterdata;
+//   - pf/geo: HubCapacitySource;
+//   - pf/mrv: MRVPackageSource (chỉ đọc export_job — không kho đối tượng).
 //
 // Biến (không phải hàm) để kiểm thử thay bằng cổng giả.
 var integrationPorts = func(ctx context.Context, open PoolOpener, cfg Config, plans apiclientport.Plans) (Ports, error) {
 	clk := cfg.Clock
-	pools := map[string]*pgxpool.Pool{}
-	for _, role := range []string{masterdata.DBRole, metering.DBRole, partyDBRole, geo.DBRole, cropcycle.DBRole, mrv.DBRole} {
-		p, err := open(ctx, role)
-		if err != nil {
-			return Ports{}, err
-		}
-		pools[role] = p
+	// W2.6 (ADR-0028): một pool vai app_public; mỗi module tự bọc db.ForModule (r_<module>), grantlookup → r_party.
+	unit, err := open(ctx, dbadmin.AppPublic)
+	if err != nil {
+		return Ports{}, err
 	}
-	mdPool, meterPool, partyPool := pools[masterdata.DBRole], pools[metering.DBRole], pools[partyDBRole]
-	geoPool, ccPool, mrvPool := pools[geo.DBRole], pools[cropcycle.DBRole], pools[mrv.DBRole]
+	mdPool, meterPool, partyPool, geoPool, ccPool, mrvPool := unit, unit, unit, unit, unit, unit
 	md := masterdata.New(mdPool, clk)
 	meter := metering.New(meterPool, clk, metering.Deps{Plans: plans, Params: md.Params(), Mode: cfg.EgressMode, Log: cfg.Log})
 	g := geo.New(geoPool, clk, geo.Deps{Params: md.Params(), AdminUnits: md.AdminUnits()})
@@ -108,17 +99,13 @@ var integrationPorts = func(ctx context.Context, open PoolOpener, cfg Config, pl
 	grants := grantlookup.New(partyPool, clk)
 	return Ports{Ledger: meter.Ledger(), Quotas: meter.Quotas(), Usage: meter.Usage(), Grants: grants, Reads: grants, Params: md.Params(),
 		Collection: cc.CollectionVolumeSource(), Hubs: g.HubCapacitySource(), MRV: m.PackageSource(),
-		Ready: []*pgxpool.Pool{meterPool, partyPool}}, nil
+		Ready: []*pgxpool.Pool{unit}}, nil
 }
 
-// Build dựng phụ thuộc của Public API: pool public_api (vận hành shared, /readyz), pool apiclient_app
-// (khách hàng, khóa, gói, việc xuất) và cổng của module khác qua integrationPorts.
+// Build dựng phụ thuộc của Public API: pool app_public (W2.6; pf/apiclient — khách hàng, khóa, gói, việc xuất —
+// chạy dưới r_apiclient) và cổng của module khác qua integrationPorts.
 func Build(ctx context.Context, open PoolOpener, cfg Config) (*apiclient.Module, apiclient.PublicDeps, error) {
-	ops, err := open(ctx, apiclientport.PublicDBRole)
-	if err != nil {
-		return nil, apiclient.PublicDeps{}, err
-	}
-	apPool, err := open(ctx, apiclient.DBRole)
+	apPool, err := open(ctx, dbadmin.AppPublic)
 	if err != nil {
 		return nil, apiclient.PublicDeps{}, err
 	}
@@ -128,7 +115,7 @@ func Build(ctx context.Context, open PoolOpener, cfg Config) (*apiclient.Module,
 		return nil, apiclient.PublicDeps{}, err
 	}
 	mod.UseCollectionSource(ports.Collection)
-	d, err := Assemble(cfg, ports, append([]*pgxpool.Pool{ops, apPool}, ports.Ready...))
+	d, err := Assemble(cfg, ports, append([]*pgxpool.Pool{apPool}, ports.Ready...))
 	return mod, d, err
 }
 

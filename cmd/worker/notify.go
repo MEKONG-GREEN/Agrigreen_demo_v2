@@ -46,39 +46,17 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	if base == "" {
 		return nil, errors.New("thiếu AG_DB_URL")
 	}
-	open := func(role string) (*pgxpool.Pool, error) {
-		dsn, err := dbadmin.RoleURL(base, migrations.PF, "", role)
-		if err != nil {
-			return nil, err
-		}
-		p, err := db.Open(ctx, dsn, db.Options{AppName: "worker-notify", MaxConns: 4})
-		if err == nil {
-			keep(p)
-		}
-		return p, err
-	}
-	nPool, err := open(notify.DBRole)
+	// W2.6: một pool vai app_worker; mỗi module tự bọc db.ForModule (r_<module>).
+	dsn, err := dbadmin.RoleURL(base, migrations.PF, "", dbadmin.AppWorker)
 	if err != nil {
 		return nil, err
 	}
-	extPool, err := open(extension.DBRole)
+	pool, err := db.Open(ctx, dsn, db.Options{AppName: "worker-notify", MaxConns: 8})
 	if err != nil {
 		return nil, err
 	}
-	mdPool, err := open(masterdata.DBRole)
-	if err != nil {
-		return nil, err
-	}
-	// Cảnh báo khẩn tới nông dân theo địa bàn (HTX US-NEWS-03): thửa (geo_app) + liên kết
-	// tài khoản nông dân (accounts_app), mỗi module một vai.
-	geoPool, err := open(geo.DBRole)
-	if err != nil {
-		return nil, err
-	}
-	accPool, err := open(accounts.DBRole)
-	if err != nil {
-		return nil, err
-	}
+	keep(pool)
+	nPool, extPool, mdPool, geoPool, accPool := pool, pool, pool, pool, pool
 	ch, err := notify.ChannelsFromEnv(log)
 	if err != nil {
 		return nil, err
@@ -96,7 +74,7 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 }
 
 // notifyConsumers: một consumer mỗi nhóm sự kiện (pf.notify.directive, .content,
-// .task, .sync, .party, .cropcycle, .push), cùng chạy trên vai notify_app; idempotent qua inbox.
+// .task, .sync, .party, .cropcycle, .push), cùng chạy trên r_notify; idempotent qua inbox.
 func notifyConsumers(log *slog.Logger) []consumer {
 	lazy := &notifyLazy{log: log}
 	// Danh sách consumer và sự kiện lấy từ module (không cần DB để liệt kê).
@@ -105,7 +83,7 @@ func notifyConsumers(log *slog.Logger) []consumer {
 	for i := range specs {
 		sp := specs[i]
 		out = append(out, consumer{
-			name: sp.Name, cluster: migrations.PF, role: notify.DBRole, module: notify.DBModule, events: sp.Events,
+			name: sp.Name, cluster: migrations.PF, module: notify.DBModule, events: sp.Events,
 			handler: func(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
 				m, err := lazy.get(ctx)
 				if err != nil {

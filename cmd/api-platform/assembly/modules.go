@@ -34,6 +34,7 @@ import (
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/waterway"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
@@ -42,7 +43,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
-// PoolOpener mở pool cho một vai DB của cụm pf.
+// PoolOpener mở pool cho một vai đăng nhập của cụm pf (W2.6: vai đơn vị app_*).
 type PoolOpener func(ctx context.Context, role string) (*pgxpool.Pool, error)
 
 // External là phụ thuộc ngoài cụm pf.
@@ -61,6 +62,8 @@ type External struct {
 	// gói MRV, ba consumer van và /v1/partner/*. Nil → hành vi cũ (chưa nối pf/metering). Chế độ đọc
 	// từ AG_EGRESS_MODE (observe mặc định | enforce).
 	Egress meter.Checkpoint
+	// Login: vai đăng nhập của đơn vị mở pool (W2.6, ADR-0028). Rỗng → app_platform; worker đặt app_worker.
+	Login string
 }
 
 // Modules là các module đã nối — worker và kiểm thử dùng lại port của chúng.
@@ -112,7 +115,7 @@ func (m Modules) List() []httpx.Module {
 	return out
 }
 
-// Build là gốc lắp ráp DUY NHẤT: mở pool theo vai của từng module (R-05) và nối
+// Build là gốc lắp ráp DUY NHẤT: mở MỘT pool vai đăng nhập đơn vị (ADR-0028; module chạy dưới r_<module>) và nối
 // port giữa các module (R-02: module chỉ thấy port của nhau). Thêm module ở đây.
 func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) (Modules, []*pgxpool.Pool, error) {
 	var pools []*pgxpool.Pool
@@ -123,6 +126,16 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		}
 		return p, err
 	}
+	// W2.6 (ADR-0028): MỘT pool vai đăng nhập của đơn vị (app_platform; worker: app_worker) cho mọi module —
+	// mỗi module tự bọc pool bằng db.ForModule trong New (SET LOCAL ROLE r_<module>).
+	login := ext.Login
+	if login == "" {
+		login = dbadmin.AppPlatform
+	}
+	unit, err := pool(login)
+	if err != nil {
+		return Modules{}, pools, err
+	}
 	store := ext.Store
 	if store == nil {
 		s, err := FileStoreFromEnv(ctx)
@@ -132,26 +145,12 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		store = s
 	}
 
-	mdPool, err := pool(masterdata.DBRole)
-	if err != nil {
-		return Modules{}, pools, err
-	}
-	md := masterdata.New(mdPool, clk)
+	md := masterdata.New(unit, clk)
 
-	partyPool, err := pool(party.DBRole)
-	if err != nil {
-		return Modules{}, pools, err
-	}
-	pty := party.New(partyPool, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault})
-	if _, err := wireWorkflow(pool, clk, md, pty); err != nil { // W6.1: cap/workflow cho duyệt tham số, cấp quyền
-		return Modules{}, pools, err
-	}
+	pty := party.New(unit, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault})
+	wireWorkflow(unit, clk, md, pty) // W6.1: cap/workflow cho duyệt tham số, cấp quyền (r_workflow, W2.6: cùng pool đơn vị)
 
-	geoPool, err := pool(geo.DBRole)
-	if err != nil {
-		return Modules{}, pools, err
-	}
-	g := geo.New(geoPool, clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits(), Orgs: pty.Orgs(), Households: pty.Households(),
+	g := geo.New(unit, clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits(), Orgs: pty.Orgs(), Households: pty.Households(),
 		CoopMarkers: pty.CoopMarkers()}) // GIS US-BND-02: điểm vị trí HTX của pf/party
 	pty.UsePlotStats(g.PlotStats()) // G-03: số thửa đã số hoá trong danh sách HTX
 	// pf/cooperative (W3.2, docs/design/cooperative.md): mặt tiền không DB trên port cũ của pf/party, pf/geo
@@ -161,42 +160,22 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		Households: pty.Households(), PlotHH: g.PlotHouseholds(), Plots: g.Plots(), PlotFacts: g.PlotFacts(), PlotStats: g.PlotStats(),
 	}))
 
-	contentPool, err := pool(content.DBRole)
-	if err != nil {
-		return Modules{}, pools, err
-	}
-	cnt := content.New(contentPool, clk, content.Deps{Scope: pty.ScopeResolver(), Catalogs: md.Catalogs(), AdminUnits: md.AdminUnits(), Store: store})
+	cnt := content.New(unit, clk, content.Deps{Scope: pty.ScopeResolver(), Catalogs: md.Catalogs(), AdminUnits: md.AdminUnits(), Store: store})
 
-	extPool, err := pool(extension.DBRole)
-	if err != nil {
-		return Modules{}, pools, err
-	}
-	kn := extension.New(extPool, clk, extension.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(),
+	kn := extension.New(unit, clk, extension.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(),
 		Plots: coop.Plots(), Coops: coop.Cooperatives()})
 	md.UseStaffDirectory(kn.StaffNames()) // G-07: tên người đặt/duyệt tham số
 	pty.UseActorNames(kn.StaffNames())    // KN v7.7 P2: tên người thao tác trong Log phòng ban/khu vực
 
-	mechPool, err := pool(mechanization.DBRole)
-	if err != nil {
-		return Modules{}, pools, err
-	}
-	mech := mechanization.New(mechPool, clk, mechanization.Deps{
+	mech := mechanization.New(unit, clk, mechanization.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Params: md.Params(), Catalogs: md.Catalogs(), AdminUnits: md.AdminUnits(), Vault: ext.Vault,
 	})
 
-	mrvPool, err := pool(mrv.DBRole)
-	if err != nil {
-		return Modules{}, pools, err
-	}
-	mrvMod := mrv.New(mrvPool, clk, mrv.Deps{Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Store: store, Params: md.Params()})
+	mrvMod := mrv.New(unit, clk, mrv.Deps{Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Store: store, Params: md.Params()})
 
 	// pf/cropcycle (App HTX): SOP, vụ, nhật ký, sản lượng. Liên kết tài khoản nông dân ↔ nông hộ
 	// (port.FarmerHouseholds) nối sau khi dựng pf/accounts (bên dưới).
-	ccPool, err := pool(cropcycle.DBRole)
-	if err != nil {
-		return Modules{}, pools, err
-	}
-	cc := cropcycle.New(ccPool, clk, cropcycle.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Plots: coop.Plots(), Params: md.Params(), Catalogs: md.Catalogs(),
+	cc := cropcycle.New(unit, clk, cropcycle.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Plots: coop.Plots(), Params: md.Params(), Catalogs: md.Catalogs(),
 		GpsLog: g.GpsLog()}) // HTX US-GPS-03: log GPS qua consumer outbox pf.cropcycle.gps_log
 	coop.UseSeasons(coopwire.Seasons{Stats: cc.Stats(), SupplyStats: cc.SupplyStats(), Reports: cc.ReportData()})
 	pty.UseSeasonActivity(SeasonActivity{Seasons: coop.Seasons()}) // HTX US-HTXSTATUS-01 AC-1: vụ chưa xong / nhật ký chờ duyệt
@@ -207,26 +186,18 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	mrvMod.UseValveGrants(pty.ValveGrants())
 	kn.UseGpsLog(g.GpsLog()) // HTX US-GPS-03: log GPS yêu cầu hỗ trợ (pf.extension.gps_log)
 
-	syncPool, err := pool(syncmod.DBRole)
-	if err != nil {
-		return Modules{}, pools, err
-	}
 	// pf/notify cần sổ thiết bị của pf/sync (gắn token đẩy) và là Source của pf/sync:
 	// dùng cổng thiết bị độc lập (syncmod.NewDevices) để không vòng phụ thuộc. API chỉ
 	// xếp lần gửi đẩy; gửi thật ở consumer pf.notify.push của worker.
-	notifyPool, err := pool(notify.DBRole)
-	if err != nil {
-		return Modules{}, pools, err
-	}
-	nt := notify.New(notifyPool, clk, notify.Deps{
-		Scope: pty.ScopeResolver(), Devices: syncmod.NewDevices(syncPool), Staff: kn.Staff(), Units: md.AdminUnits(),
+	nt := notify.New(unit, clk, notify.Deps{
+		Scope: pty.ScopeResolver(), Devices: syncmod.NewDevices(unit), Staff: kn.Staff(), Units: md.AdminUnits(),
 	})
 
 	// ADR-0006: con trỏ pull ký HMAC — production bắt buộc AG_SYNC_CURSOR_KEY ≥ 32 byte.
 	if err := syncmod.CheckCursorKey(cursorKey(ext), residency.Production(os.Getenv)); err != nil {
 		return Modules{}, pools, err
 	}
-	snc := syncmod.New(syncPool, clk, syncmod.Deps{
+	snc := syncmod.New(unit, clk, syncmod.Deps{
 		Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Params: md.Params(), Vault: ext.Vault,
 		Store: store, CursorKey: cursorKey(ext),
 		Sources: []syncport.Source{md.SyncSource(), g.SyncSource(), cnt.SyncSource(), kn.SyncSource(), nt.SyncSource(), mrvMod.SyncSource(), cc.SyncSource(),
@@ -236,17 +207,13 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	nt.UseSyncEntities(snc.PullEntities())               // KN US-SYNC-02: kiểm entities[] của nudge
 	snc.UseIntegrations(queueNames(), dlqDepthFromEnv()) // GIS US-SYNC-01: màn giám sát đồng bộ
 
-	accPool, err := pool(accounts.DBRole)
-	if err != nil {
-		return Modules{}, pools, err
-	}
 	dir := ext.Accounts
 	if dir == nil {
 		if dir, err = accounts.DirectoryFromEnv(); err != nil {
 			return Modules{}, pools, err
 		}
 	}
-	acc := accounts.New(accPool, clk, accounts.Deps{Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs(),
+	acc := accounts.New(unit, clk, accounts.Deps{Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs(),
 		Households: pty.Households(), Vault: ext.Vault, Params: md.Params(),
 		Departments: pty.Departments(), Units: md.AdminUnits(), Names: kn.StaffNames(), // KN v7.7 P1
 		Modules: pty.ModuleEnablement()}) // W1.4: vai của module đã tắt không cấp được
@@ -268,11 +235,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	nt.UseAreaFarmers(AreaFarmers{Households: coop.Households(), Accounts: acc.FarmerAccounts()}) // HTX US-NEWS-03
 
 	// pf/reports: API tạo việc xuất và cấp URL tải; worker dựng tệp (cmd/worker). Địa chỉ email tra qua pf/accounts (MailDirectory).
-	repPool, err := pool(reports.DBRole)
-	if err != nil {
-		return Modules{}, pools, err
-	}
-	rep := reports.New(repPool, clk, reports.Deps{
+	rep := reports.New(unit, clk, reports.Deps{
 		Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Units: md.AdminUnits(), Params: md.Params(), Catalogs: md.Catalogs(), Store: store,
 		Extension: kn.ReportData(), Mechanization: mech.ReportData(), CropCycle: cc.ReportData(), Directory: acc.MailDirectory(),
 		Recipients:     acc.ReportRecipients(),                 // HTX US-DASH-03: người nhận = tài khoản của HTX
@@ -293,32 +256,20 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	kn.UseKNContext(acc.ExtensionKNContext(), acc.ExtensionKNDirectory())
 
 	// pf/waterway (G2): API ghi sổ đoạn/công trình, tạo job dựng và phát hành; worker dựng đồ thị (cmd/worker).
-	wwPool, err := pool(waterway.DBRole)
-	if err != nil {
-		return Modules{}, pools, err
-	}
-	ww := waterway.New(wwPool, clk, waterway.Deps{Params: md.Params(), Catalogs: md.Catalogs()})
+	ww := waterway.New(unit, clk, waterway.Deps{Params: md.Params(), Catalogs: md.Catalogs()})
 	g.UseWaterways(ww.Layer()) // GIS US-INT-02: lớp đường thủy của bản đồ chuẩn hóa
 	// G4-0 (ADR-0020): bề mặt đối tác /v1/partner/waterway/route cho mkg/logistics (loại waterway_routes).
 	ww.UseSharing(pty.PartnerAccess())
 
 	// pf/simulation: API ghi kịch bản/yêu cầu; worker dựng ảnh chụp qua SupplySource (pf/cooperative
 	// + pf/masterdata) và WaterwayRouter (pf/waterway); optimizer tính và nộp qua RegisterInternal.
-	simPool, err := pool(simulation.DBRole)
-	if err != nil {
-		return Modules{}, pools, err
-	}
-	sim := simulation.New(simPool, clk, simulation.Deps{Params: simulation.MasterdataParams(md.Params()),
+	sim := simulation.New(unit, clk, simulation.Deps{Params: simulation.MasterdataParams(md.Params()),
 		Supply: SupplySource{Seasons: coop.Seasons(), Coops: coop.Cooperatives(), Catalogs: md.Catalogs()},
 		Router: WaterwayRouter{WW: ww.Router()}})
 
 	// pf/metrics (G3): chỉ số có lịch sử qua port.Source của module chủ dữ liệu (mỗi nguồn đọc
 	// bằng pool vai của module đó, R-05); nhật ký lớp GIS + phát lại, hình học as-of qua pf/geo.
-	metPool, err := pool(metrics.DBRole)
-	if err != nil {
-		return Modules{}, pools, err
-	}
-	met := metrics.New(metPool, clk, metrics.Deps{Scope: pty.ScopeResolver(), Geometry: g.LayerGeometry(),
+	met := metrics.New(unit, clk, metrics.Deps{Scope: pty.ScopeResolver(), Geometry: g.LayerGeometry(),
 		Sources: map[string]metricsport.Source{
 			"pf/extension": kn.MetricsSource(), "pf/mechanization": mech.MetricsSource(), "pf/cropcycle": cc.MetricsSource(), "pf/geo": g.MetricsSource(),
 		}})
@@ -336,19 +287,11 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	meterPool, err := pool(metering.DBRole)
-	if err != nil {
-		return Modules{}, pools, err
-	}
-	meter := metering.New(meterPool, clk, metering.Deps{Params: md.Params(), Mode: mode})
+	meter := metering.New(unit, clk, metering.Deps{Params: md.Params(), Mode: mode})
 
 	// pf/apiclient (G5, ADR-0022): Admin API quản trị khách hàng Public API; pepper khóa từ trình quản lý
 	// bí mật (không đặt → phát hành khóa trả 503). Worker xuất đọc collection_volume qua pf/cropcycle
 	// (cùng luật k-ẩn danh với đọc trực tuyến); pf/metering tra gói hạn mức qua pf/apiclient.
-	apicPool, err := pool(apiclient.DBRole)
-	if err != nil {
-		return Modules{}, pools, err
-	}
 	peppers, err := apiclient.PeppersFromEnv()
 	if err != nil {
 		return Modules{}, pools, err
@@ -357,7 +300,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	apic := apiclient.New(apicPool, clk, apiclient.Deps{Peppers: peppers, OperatorTenant: opTenant, Store: store})
+	apic := apiclient.New(unit, clk, apiclient.Deps{Peppers: peppers, OperatorTenant: opTenant, Store: store})
 	apic.UseCollectionSource(cc.CollectionVolumeSource())
 	meter.UsePlans(apic.Plans())
 

@@ -59,7 +59,7 @@ func newFixture(t *testing.T) *fixture {
 	clk := clock.NewFixed(t0)
 	params := &fakeParams{v: map[string]decimal.Decimal{}}
 	org := newOrgTree()
-	mod := extension.New(pool, clk, extension.Deps{Scope: org, Orgs: org, Units: newFakeUnits(), Params: params, Catalogs: fakeCatalogs{}})
+	mod := extension.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clk, extension.Deps{Scope: org, Orgs: org, Units: newFakeUnits(), Params: params, Catalogs: fakeCatalogs{}})
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)
 	mod.RegisterApp(eng.Group("/v1", httpx.Authenticate(iss.Verifier()), idempotency.Middleware(ops)))
 	srv := httptest.NewServer(eng)

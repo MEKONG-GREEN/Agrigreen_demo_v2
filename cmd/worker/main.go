@@ -21,24 +21,24 @@
 // (xung đột đồng bộ quá SLA, theo tenant), ag.db.standby_replication_lag (chỉ khi có
 // AG_DB_STANDBY_URL) và ag.db.ledger_default_rows (phân vùng DEFAULT có dòng, shared 000010).
 //
-// Mọi consumer ghi lần xử lý thất bại vào pf_sync.integration_failure (vai sync_app — màn
+// Mọi consumer ghi lần xử lý thất bại vào pf_sync.integration_failure (r_sync — màn
 // giám sát đồng bộ, GIS US-SYNC-01); lần giao cuối trước DLQ phát pf.sync.integration.dead_lettered
 // → pf/notify báo Admin nền tảng (GIS US-SYNC-02).
 //
 // Consumer pf.kref (W2.5, ADR-0029; vai đăng nhập app_worker → SET LOCAL ROLE r_kref): dựng bản chiếu k_ref từ
 // pf.party.org.created/moved/deactivated/reactivated, pf.masterdata.admin_unit.changed, pf.party.share_grant.*;
-// chỉ số ag.k_ref.lag. Lệnh một lần -kref-rebuild dựng lại k_ref mọi tenant từ nguồn (vai party_app,
-// masterdata_app, ag_ops_jobs, app_worker — AG_DB_PASSWORD_APP_WORKER hoặc AG_DB_APP_PASSWORD).
+// chỉ số ag.k_ref.lag. Lệnh một lần -kref-rebuild dựng lại k_ref mọi tenant từ nguồn (app_worker →
+// r_party, r_masterdata, r_kref; ag_ops_jobs tìm tenant — AG_DB_PASSWORD_APP_WORKER hoặc AG_DB_APP_PASSWORD).
 //
 // Lệnh một lần (không chạy consumer/job): -metrics-backfill=YYYY-MM-DD:YYYY-MM-DD ghi sổ chỉ
 // số + ảnh chụp lớp cho từng ngày đã kết thúc (-metrics-tenant chọn một tenant, mặc định mọi
 // tenant có sự kiện; -metrics-keys chọn chỉ số). Dòng không đổi được giữ; khác → bản ghi bù.
 //
-// Consumer pf/notify (vai notify_app): pf.notify.directive, pf.notify.content,
+// Consumer pf/notify (r_notify): pf.notify.directive, pf.notify.content,
 // pf.notify.task, pf.notify.sync, pf.notify.party (dựng thông báo) và pf.notify.push
 // (gửi thông điệp dữ liệu tới thiết bị).
 //
-// Consumer pf/reports (vai reports_app): pf.reports.export (dựng tệp Excel/PDF) và
+// Consumer pf/reports (r_reports): pf.reports.export (dựng tệp Excel/PDF) và
 // pf.reports.delivery (email lịch gửi báo cáo).
 //
 // Consumer liên module G2 (cmd/api-platform/assembly.Consumers, dựng toàn bộ module pf
@@ -51,9 +51,9 @@
 //	pf.extension.gps_log        yêu cầu hỗ trợ → log GPS pf/geo sau commit (HTX US-GPS-03)
 //	pf.simulation.snapshot      ảnh chụp đầu vào (SupplySource pf/cropcycle+party+geo, Router pf/waterway)
 //
-// Consumer pf.notify.cropcycle (vai notify_app): nhật ký chờ duyệt / kết quả duyệt / nông
+// Consumer pf.notify.cropcycle (r_notify): nhật ký chờ duyệt / kết quả duyệt / nông
 // dân mở vụ (HTX US-LOG-05, US-SEASON-01).
-// Consumer pf/waterway (vai waterway_app): pf.waterway.build (dựng phiên bản mạng
+// Consumer pf/waterway (r_waterway): pf.waterway.build (dựng phiên bản mạng
 // đường thủy từ tập đoạn đã xác nhận).
 //
 // Biến môi trường:
@@ -65,10 +65,9 @@
 //	AG_CLUSTERS                        (tùy chọn) cụm của job neo/dọn idempotency, mặc định mọi cụm;
 //	                                   phải có pf (cmd/internal/clusterenv, G4 tách vùng)
 //	AG_WORKER_JOBS                     mặc định cho -jobs: all | none | anchor,idempotency,extension_escalation,notify_email_digest
-//	AG_DB_PASSWORD_EXTENSION_APP       (hoặc AG_DB_APP_PASSWORD) vai extension_app — khi có job extension_escalation
-//	AG_DB_PASSWORD_SYNC_APP            vai sync_app — ghi lần xử lý thất bại của consumer (giám sát đồng bộ)
-//	AG_DB_PASSWORD_MECHANIZATION_APP   vai mechanization_app — job mechanization_area_feed_check
-//	AG_DB_PASSWORD_NOTIFY_APP          vai notify_app (cùng extension_app, masterdata_app, geo_app, accounts_app) — consumer/job pf/notify
+//	AG_DB_PASSWORD_APP_WORKER          (hoặc AG_DB_APP_PASSWORD) vai đăng nhập app_worker (W2.6, ADR-0028) — MỘT pool cho
+//	                                   mọi consumer và một pool nối thẳng cho job; mỗi module chạy SET LOCAL ROLE r_<module>
+//	AG_DB_MAX_CONNS                    (tùy chọn) cỡ pool vai đơn vị, mặc định 20
 //	AG_FCM_PROJECT_ID, AG_FCM_CREDENTIALS_FILE  FCM HTTP v1 (không đặt → kênh đẩy chỉ ghi log); AG_FCM_ENDPOINT, AG_FCM_TOKEN_URL tùy chọn
 //	AG_SMTP_HOST, AG_SMTP_PORT, AG_SMTP_USERNAME, AG_SMTP_PASSWORD, AG_SMTP_FROM, AG_SMTP_DIGEST_TO  email tóm tắt (SMTP trong lãnh thổ)
 //	AG_ANCHOR_SIGNING_KEY              Ed25519 (base64 seed 32 byte) — bắt buộc khi có job anchor
@@ -81,7 +80,6 @@
 //	AG_RABBITMQ_MGMT_URL               (tùy chọn) management API cho metric độ sâu DLQ
 //	AG_KC_ADMIN_URL, AG_KC_REALM,      Keycloak Admin REST (tài khoản dịch vụ agrigreen-accounts) cho consumer
 //	AG_KC_CLIENT_ID, AG_KC_CLIENT_SECRET  pf.accounts.org_status (khóa/mở tài khoản theo trạng thái tổ chức)
-//	AG_DB_PASSWORD_ACCOUNTS_APP        (hoặc AG_DB_APP_PASSWORD) vai accounts_app của consumer đó
 //	AG_OTLP_ENDPOINT, ...              OpenTelemetry (shared/telemetry)
 //	AG_HEALTH_ADDR                     /healthz, /readyz (pool ping + kết nối RabbitMQ) — mặc định :8087, chỉ mạng nội bộ
 //
@@ -96,6 +94,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -134,15 +133,14 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
 type consumer struct {
 	name    string
 	cluster migrations.Cluster
-	role    string
-	// module (tùy chọn, ADR-0028): giao dịch inbox của consumer chạy SET LOCAL ROLE r_<module> (db.ForModule).
+	// module (ADR-0028, W2.6): giao dịch inbox của consumer chạy SET LOCAL ROLE r_<module> (db.ForModule) trên
+	// pool vai đăng nhập app_worker; db.Ops cho consumer không thuộc module (r_ops).
 	module  db.ModuleID
 	events  []string
 	handler inbox.Handler
@@ -150,7 +148,7 @@ type consumer struct {
 
 func consumers(log *slog.Logger) []consumer {
 	return append([]consumer{{
-		name: assembly.AuditConsentConsumer, cluster: migrations.PF, role: "worker_platform",
+		name: assembly.AuditConsentConsumer, cluster: migrations.PF, module: db.Ops,
 		events: []string{port.EventConsentRecorded},
 		handler: func(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
 			log.Info("đồng ý đã ghi", "event", env.EventType, "event_id", env.EventID, "tenant_id", env.TenantID, "trace_id", env.TraceID, "outcome", "ok")
@@ -287,39 +285,40 @@ func startConsumers(ctx context.Context, log *slog.Logger, base, mods string, er
 		}
 		_ = conn.Close()
 	}
-	// GIS US-SYNC-01/02: mọi lần xử lý thất bại ghi vào pf_sync.integration_failure (vai
-	// sync_app, giao dịch riêng) cho màn giám sát đồng bộ; lần giao cuối (vào DLQ) phát
-	// pf.sync.integration.dead_lettered → pf/notify báo Admin.
-	recDSN, err := dbadmin.RoleURL(base, migrations.PF, "", syncmod.DBRole)
+	// W2.6 (ADR-0028): MỘT pool vai đăng nhập app_worker cho mọi consumer; mỗi consumer chạy giao dịch inbox
+	// dưới vai nhóm của module nhận (db.ForModule). GIS US-SYNC-01/02: mọi lần xử lý thất bại ghi vào
+	// pf_sync.integration_failure (r_sync, giao dịch riêng) cho màn giám sát đồng bộ; lần giao cuối (vào DLQ)
+	// phát pf.sync.integration.dead_lettered → pf/notify báo Admin.
+	dsn, err := dbadmin.RoleURL(base, migrations.PF, "", dbadmin.AppWorker)
 	if err != nil {
 		closeFn()
 		return 0, func() {}, err
 	}
-	recPool, err := db.Open(ctx, recDSN, db.Options{AppName: "worker-sync-monitor", MaxConns: 2})
+	pool, err := db.Open(ctx, dsn, db.OptionsFromEnv("worker"))
+	if err != nil {
+		closeFn()
+		return 0, func() {}, err
+	}
+	pools = append(pools, pool)
+	hs.Add("amqp", healthsrv.Closed(conn.IsClosed))
+	hs.Add("db", healthsrv.Pools(func() []*pgxpool.Pool { return pools }))
+	// Ghi lần thất bại trên pool riêng (cùng vai app_worker): không tranh kết nối với giao dịch inbox đang mở.
+	recPool, err := db.Open(ctx, dsn, db.Options{AppName: "worker-sync-monitor", MaxConns: 2, ViaPgBouncer: db.OptionsFromEnv("").ViaPgBouncer})
 	if err != nil {
 		closeFn()
 		return 0, func() {}, err
 	}
 	pools = append(pools, recPool)
-	hs.Add("amqp", healthsrv.Closed(conn.IsClosed))
-	hs.Add("db", healthsrv.Pools(func() []*pgxpool.Pool { return pools }))
 	rec := syncmod.FailureRecorder(recPool, clock.System{})
 	started := 0
 	for _, c := range allConsumers(log) {
 		if !selected(mods, c.name) {
 			continue
 		}
-		dsn, err := dbadmin.RoleURL(base, c.cluster, "", c.role)
-		if err != nil {
+		if c.cluster != migrations.PF || !c.module.Valid() {
 			closeFn()
-			return 0, func() {}, err
+			return 0, func() {}, errors.New("worker: consumer " + c.name + " thiếu module (ADR-0028) hoặc không ở cụm pf")
 		}
-		pool, err := db.Open(ctx, dsn, db.OptionsFromEnv("worker"))
-		if err != nil {
-			closeFn()
-			return 0, func() {}, err
-		}
-		pools = append(pools, pool)
 		ch, err := conn.Channel()
 		if err != nil {
 			closeFn()
@@ -330,10 +329,7 @@ func startConsumers(ctx context.Context, log *slog.Logger, base, mods string, er
 			return 0, func() {}, err
 		}
 		started++
-		var b tenant.Beginner = pool
-		if c.module.Valid() {
-			b = db.ForModule(pool, c.module)
-		}
+		b := db.ForModule(pool, c.module)
 		go func(c consumer) { errc <- inbox.ConsumeWith(ctx, ch, b, c.name, c.handler, log, rec) }(c)
 	}
 	return started, closeFn, nil
@@ -435,33 +431,20 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 	}
 	if selected(jobs, extension.JobEscalation) || selected(jobs, extension.JobWorkSchedule) {
 		// Leo thang SLA nhiệm vụ khuyến nông: tìm tenant bằng pool ag_ops_jobs
-		// (chỉ đọc 4 cột), ghi bằng vai extension_app của module (R-05).
-		openRole := func(role string) (*pgxpool.Pool, error) {
-			d, err := dbadmin.RoleURL(direct, migrations.PF, "", role)
-			if err != nil {
-				return nil, err
-			}
-			p, err := db.Open(ctx, d, db.Options{AppName: "worker-extension", MaxConns: 2})
-			if err != nil {
-				return nil, err
-			}
-			prevClose := closeFn
-			closeFn = func() { p.Close(); prevClose() }
-			return p, nil
-		}
-		extPool, err := openRole(extension.DBRole)
+		// (chỉ đọc 4 cột), ghi bằng r_extension của module (R-05).
+		extPool, err := openPF(ctx, direct, &closeFn)
 		if err != nil {
 			closeFn()
 			return nil, func() {}, err
 		}
 		// Leo thang cần cây tổ chức (tìm TTKN tỉnh) và đơn vị hành chính (tỉnh của xã):
 		// dựng port của party/masterdata bằng vai riêng của từng module (R-05).
-		mdPool, err := openRole(masterdata.DBRole)
+		mdPool, err := openPF(ctx, direct, &closeFn)
 		if err != nil {
 			closeFn()
 			return nil, func() {}, err
 		}
-		partyPool, err := openRole(party.DBRole)
+		partyPool, err := openPF(ctx, direct, &closeFn)
 		if err != nil {
 			closeFn()
 			return nil, func() {}, err
@@ -476,8 +459,8 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		}
 		if selected(jobs, extension.JobWorkSchedule) {
 			// KN v7.7 P1 → P5: người nhận nhắc / người duyệt lấy từ sổ gán vai trò (phòng ban × tỉnh × cấp quản
-			// lý) bằng vai accounts_app; thiếu → danh bạ trực pf_extension.staff như trước.
-			accPool, err := openRole(accounts.DBRole)
+			// lý) bằng r_accounts; thiếu → danh bạ trực pf_extension.staff như trước.
+			accPool, err := openPF(ctx, direct, &closeFn)
 			if err != nil {
 				closeFn()
 				return nil, func() {}, err
@@ -506,14 +489,14 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		js = append(js, nt.Jobs(notify.DigestTenants(out.pools[migrations.PF]), log)...)
 	}
 	if selected(jobs, reports.JobSchedules) {
-		// Lịch gửi báo cáo: tìm tenant bằng pool ag_ops_jobs (hai cột), chạy bằng vai reports_app;
+		// Lịch gửi báo cáo: tìm tenant bằng pool ag_ops_jobs (hai cột), chạy bằng r_reports;
 		// tham số hạn mức DLP đọc qua pf/masterdata bằng vai của nó (R-05).
-		repPool, err := openPF(ctx, direct, reports.DBRole, &closeFn)
+		repPool, err := openPF(ctx, direct, &closeFn)
 		if err != nil {
 			closeFn()
 			return nil, func() {}, err
 		}
-		mdPool, err := openPF(ctx, direct, masterdata.DBRole, &closeFn)
+		mdPool, err := openPF(ctx, direct, &closeFn)
 		if err != nil {
 			closeFn()
 			return nil, func() {}, err
@@ -521,7 +504,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		md := masterdata.New(mdPool, clk)
 		rep := reports.New(repPool, clk, reports.Deps{Params: md.Params(), Log: log})
 		// G5 (ADR-0024): lối "lịch" của xuất báo cáo qua điểm kiểm soát chung (kênh report_export) —
-		// Checkpoint của pf/metering (vai metering_app); workerEgress ghi đè cho kiểm thử.
+		// Checkpoint của pf/metering (r_metering); workerEgress ghi đè cho kiểm thử.
 		// AG_EGRESS_MODE sai → lỗi khởi động.
 		mode, err := assembly.EgressModeFromEnv(os.Getenv)
 		if err != nil {
@@ -530,7 +513,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		}
 		egress := workerEgress
 		if egress == nil {
-			meterPool, err := openPF(ctx, direct, metering.DBRole, &closeFn)
+			meterPool, err := openPF(ctx, direct, &closeFn)
 			if err != nil {
 				closeFn()
 				return nil, func() {}, err
@@ -542,13 +525,13 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 	}
 	if selected(jobs, mechport.JobAreaFeedCheck) {
 		// Độ tươi dữ liệu App HTX (CGH FN-07 AC-02/AC-03): tìm tenant bằng ag_ops_jobs
-		// (hai cột), ghi cảnh báo bằng vai mechanization_app; ngưỡng đọc qua pf/masterdata (R-05).
-		mechPool, err := openPF(ctx, direct, mechanization.DBRole, &closeFn)
+		// (hai cột), ghi cảnh báo bằng r_mechanization; ngưỡng đọc qua pf/masterdata (R-05).
+		mechPool, err := openPF(ctx, direct, &closeFn)
 		if err != nil {
 			closeFn()
 			return nil, func() {}, err
 		}
-		mdPool, err := openPF(ctx, direct, masterdata.DBRole, &closeFn)
+		mdPool, err := openPF(ctx, direct, &closeFn)
 		if err != nil {
 			closeFn()
 			return nil, func() {}, err
@@ -575,13 +558,13 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 	}
 	if selected(jobs, mrvport.JobReviewEscalator) {
 		// Leo thang hồ sơ MRV quá hạn (KN US-MRV-06): tìm tenant bằng ag_ops_jobs (hai cột),
-		// ghi cảnh báo + sự kiện bằng vai mrv_app; SLA đọc qua pf/masterdata bằng vai của nó (R-05).
-		mrvPool, err := openPF(ctx, direct, mrv.DBRole, &closeFn)
+		// ghi cảnh báo + sự kiện bằng r_mrv; SLA đọc qua pf/masterdata bằng vai của nó (R-05).
+		mrvPool, err := openPF(ctx, direct, &closeFn)
 		if err != nil {
 			closeFn()
 			return nil, func() {}, err
 		}
-		mdPool, err := openPF(ctx, direct, masterdata.DBRole, &closeFn)
+		mdPool, err := openPF(ctx, direct, &closeFn)
 		if err != nil {
 			closeFn()
 			return nil, func() {}, err
@@ -609,7 +592,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 	}
 	if selected(jobs, apiclientport.JobKeyExpiry) && os.Getenv(apiclientport.EnvOperatorTenant) != "" {
 		// G5 (ADR-0022 mục 4, RB-1): khóa API quá hạn → sự kiện expired ở sổ api_key_event của tenant đơn vị
-		// vận hành (AG_PUBLIC_OPERATOR_TENANT; không đặt — ĐTK 1 — thì không có job), vai apiclient_app.
+		// vận hành (AG_PUBLIC_OPERATOR_TENANT; không đặt — ĐTK 1 — thì không có job), r_apiclient.
 		mod, err := apiclientKeyJobs(ctx, direct, &closeFn)
 		if err != nil {
 			closeFn()
@@ -628,17 +611,37 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 	return out, closeFn, nil
 }
 
-// openPF mở pool nối thẳng cụm pf cho một vai của job và đăng ký đóng pool.
-func openPF(ctx context.Context, direct, role string, closeFn *func()) (*pgxpool.Pool, error) {
-	d, err := dbadmin.RoleURL(direct, migrations.PF, "", role)
+// openPF mở (một lần cho mỗi URL) pool nối thẳng cụm pf bằng vai đăng nhập app_worker cho job và đăng ký đóng
+// pool. W2.6 (ADR-0028): mọi module của job dùng chung pool này, mỗi module tự bọc db.ForModule (r_<module>).
+func openPF(ctx context.Context, direct string, closeFn *func()) (*pgxpool.Pool, error) {
+	jobPoolsMu.Lock()
+	defer jobPoolsMu.Unlock()
+	if p, ok := jobPools[direct]; ok {
+		return p, nil
+	}
+	d, err := dbadmin.RoleURL(direct, migrations.PF, "", dbadmin.AppWorker)
 	if err != nil {
 		return nil, err
 	}
-	p, err := db.Open(ctx, d, db.Options{AppName: "worker-" + role, MaxConns: 2})
+	o := db.OptionsFromEnv("worker-jobs-" + dbadmin.AppWorker)
+	o.ViaPgBouncer = false // nối thẳng (AG_DB_DIRECT_URL)
+	p, err := db.Open(ctx, d, o)
 	if err != nil {
 		return nil, err
 	}
+	jobPools[direct] = p
 	prev := *closeFn
-	*closeFn = func() { p.Close(); prev() }
+	*closeFn = func() {
+		jobPoolsMu.Lock()
+		delete(jobPools, direct)
+		jobPoolsMu.Unlock()
+		p.Close()
+		prev()
+	}
 	return p, nil
 }
+
+var (
+	jobPoolsMu sync.Mutex
+	jobPools   = map[string]*pgxpool.Pool{}
+)

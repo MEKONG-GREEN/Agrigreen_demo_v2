@@ -98,7 +98,12 @@ func run(ctx context.Context, log *slog.Logger, getenv func(string) string) erro
 			p.Close()
 		}
 	}()
+	// W2.6 (ADR-0028): một pool cho mỗi vai đăng nhập (app_public) — mở lại cùng vai trả cùng pool.
+	opened := map[string]*pgxpool.Pool{}
 	open := func(ctx context.Context, role string) (*pgxpool.Pool, error) {
+		if p, ok := opened[role]; ok {
+			return p, nil
+		}
 		dsn, err := dbadmin.RoleURL(base, migrations.PF, "", role)
 		if err != nil {
 			return nil, err
@@ -106,6 +111,7 @@ func run(ctx context.Context, log *slog.Logger, getenv func(string) string) erro
 		p, err := db.Open(ctx, dsn, opts)
 		if err == nil {
 			pools = append(pools, p)
+			opened[role] = p
 		}
 		return p, err
 	}

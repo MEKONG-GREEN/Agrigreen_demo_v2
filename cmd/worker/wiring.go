@@ -41,9 +41,9 @@ func (p *platformLazy) get(ctx context.Context) (assembly.Modules, error) {
 			if err != nil {
 				return nil, err
 			}
-			return db.Open(ctx, dsn, db.Options{AppName: "worker-platform", MaxConns: 2})
+			return db.Open(ctx, dsn, db.Options{AppName: "worker-platform", MaxConns: 8})
 		}
-		p.mods, _, p.err = assembly.Build(context.WithoutCancel(ctx), open, clock.System{}, assembly.External{Egress: workerEgress})
+		p.mods, _, p.err = assembly.Build(context.WithoutCancel(ctx), open, clock.System{}, assembly.External{Egress: workerEgress, Login: dbadmin.AppWorker})
 	})
 	return p.mods, p.err
 }
@@ -57,7 +57,7 @@ func wiredConsumers(log *slog.Logger) []consumer {
 	for _, c := range assembly.Consumers {
 		spec := c
 		out = append(out, consumer{
-			name: spec.Name, cluster: migrations.PF, role: spec.Role, events: spec.Events,
+			name: spec.Name, cluster: migrations.PF, module: spec.Module, events: spec.Events,
 			handler: func(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
 				m, err := lazy.get(ctx)
 				if err != nil {

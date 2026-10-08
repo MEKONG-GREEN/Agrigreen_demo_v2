@@ -121,7 +121,7 @@ func newFarmerFixture(t *testing.T) *farmerFixture {
 	f := &farmerFixture{t: t, env: env, iss: iss, dir: keycloak.NewMemory(), party: newFakeParty(),
 		hh: &fakeHouseholds{m: map[uuid.UUID]map[uuid.UUID]partyport.HouseholdMembership{}}, vault: clienttest.New(),
 		pool: pool, logs: &syncBuffer{}, tenant: ids.New()}
-	f.mod = accounts.New(pool, clock.System{}, accounts.Deps{Directory: f.dir, Scope: f.party, Orgs: f.party,
+	f.mod = accounts.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{Directory: f.dir, Scope: f.party, Orgs: f.party,
 		Households: f.hh, Vault: f.vault, Params: fixedParams{mdport.ParamActivationGrantLifespan: "48"}})
 	eng := httpx.NewEngine(telemetry.NewLogger("test", f.logs), 1<<20)
 	f.mod.RegisterApp(eng.Group("/v1", httpx.Authenticate(iss.Verifier()), idempotency.Middleware(ops)))

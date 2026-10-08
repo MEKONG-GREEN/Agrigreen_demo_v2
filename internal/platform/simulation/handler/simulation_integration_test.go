@@ -24,6 +24,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation/simtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -69,7 +70,7 @@ func newFixture(t *testing.T) *fixture {
 	}}
 	f.pool = env.Pool(t, migrations.PF, simulation.DBRole)
 	ops := env.Pool(t, migrations.PF, "platform_api")
-	f.mod = simulation.New(f.pool, clock.NewFixed(t0), simulation.Deps{Params: f.params, Supply: f.supply, Router: f.router,
+	f.mod = simulation.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.NewFixed(t0), simulation.Deps{Params: f.params, Supply: f.supply, Router: f.router,
 		InternalAuth: func(*http.Request) error { return nil }})
 	log := telemetry.NewLogger("test", io.Discard)
 	appEng := httpx.NewEngine(log, 1<<20)
@@ -470,7 +471,7 @@ func TestOptimizerFailureIsRecorded(t *testing.T) {
 // Thiếu nguồn cung (pf/cropcycle chưa nối) → việc hỏng simulation.dependency_unavailable, có job.completed(failed).
 func TestMissingSupplySourceFailsJob(t *testing.T) {
 	f := newFixture(t)
-	f.mod = simulation.New(f.pool, clock.NewFixed(t0), simulation.Deps{})
+	f.mod = simulation.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.NewFixed(t0), simulation.Deps{})
 	c := f.analyst()
 	scID, _ := f.scenario(c, 10, false)
 	r := must(t, c.post("/v1/simulations", map[string]any{"scenario_id": scID}), 202, "gửi")

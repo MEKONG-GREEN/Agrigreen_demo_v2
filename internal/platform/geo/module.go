@@ -58,6 +58,7 @@ type Module struct{ svc *app.Service }
 
 // New tạo module với pool của vai geo_app.
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
+	db = forModule(db)
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Scope: deps.Scope, Params: deps.Params, Units: deps.AdminUnits, Orgs: deps.Orgs, Households: deps.Households,
 		Markers: deps.CoopMarkers, Farmers: deps.Farmers, Vault: deps.Vault}}
 }

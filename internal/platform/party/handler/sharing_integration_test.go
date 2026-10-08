@@ -17,9 +17,12 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
 func code(r resp) string { return str(r.body, "code") }
@@ -158,7 +161,7 @@ func TestShareGrantLifecycle_SoD_Audit_ADR0020(t *testing.T) {
 		t.Fatalf("bên cấp của loại đã cấp: %v %v", gs, err)
 	}
 	// Hết hạn (đồng hồ sau valid_to) → 403.
-	later := party.New(f.pool, clock.NewFixed(time.Now().Add(40*24*time.Hour)))
+	later := party.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.NewFixed(time.Now().Add(40*24*time.Hour)))
 	if _, err := later.PartnerAccess().Authorize(ctx, port.KindCooperativeDirectory, uuid.Nil); !errors.Is(err, port.ErrShareGrantMissing) {
 		t.Fatalf("hết hạn → share_grant_missing: %v", err)
 	}

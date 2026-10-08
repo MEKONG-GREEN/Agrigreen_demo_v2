@@ -18,7 +18,7 @@ import (
 //
 //   - ag.sync.conflict.overdue: xung đột đồng bộ đang mở quá SLA (C-8), theo tenant — tìm
 //     tenant bằng pool ag_ops_jobs của lịch (hai cột, migration pf 000043), đếm bằng
-//     vai sync_app (R-05);
+//     r_sync trên pool app_worker (R-05, W2.6);
 //   - ag.db.standby_replication_lag (giây): chỉ khi có AG_DB_STANDBY_URL;
 //   - ag.db.ledger_default_rows: số dòng ước lượng trong phân vùng DEFAULT của mọi bảng phân vùng, theo
 //     cụm của lịch (pool ag_ops_jobs, shared 000010) — > 0 nghĩa là từng thiếu phân vùng tháng.
@@ -36,7 +36,7 @@ func registerGauges(ctx context.Context, log *slog.Logger, direct string, opsPoo
 		log.Warn("không đăng ký được chỉ số "+what, "event", "startup", "outcome", "error", "error", err.Error())
 	}
 	if publisher != nil {
-		sp, err := openPF(ctx, direct, syncmod.DBRole, &closeFn)
+		sp, err := openPF(ctx, direct, &closeFn)
 		if err != nil {
 			warn("xung đột đồng bộ quá SLA", err)
 		} else if _, err := syncmod.RegisterConflictSLAMetrics(sp, clock.System{}, syncmod.ConflictTenants(publisher)); err != nil {

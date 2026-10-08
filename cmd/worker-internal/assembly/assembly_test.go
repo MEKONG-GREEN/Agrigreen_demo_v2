@@ -25,8 +25,8 @@ func TestHubG3ConsumersRegistered(t *testing.T) {
 			continue
 		}
 		got[c.Name] = true
-		if c.Role != "hub_app" || len(c.Events) != 1 || c.Events[0] != ev || c.Build(clock.System{}) == nil {
-			t.Errorf("%s: vai %q sự kiện %v", c.Name, c.Role, c.Events)
+		if c.Module.Role() != "r_hub" || len(c.Events) != 1 || c.Events[0] != ev || c.Build(clock.System{}) == nil {
+			t.Errorf("%s: vai %q sự kiện %v", c.Name, c.Module.Role(), c.Events)
 		}
 	}
 	if len(got) != len(want) {
@@ -101,8 +101,8 @@ func TestFrozenInternalSchemasExist(t *testing.T) {
 // G3-2: consumer tích hợp fieldops ↔ measurement, đúng vai và sự kiện.
 func TestG32ConsumersRegistered(t *testing.T) {
 	want := map[string][2]string{
-		"mkg.fieldops.weigh_ticket":  {"fieldops_app", "mkg.measurement.weigh_ticket.recorded"},
-		"mkg.measurement.roll_count": {"measurement_app", "mkg.fieldops.roll_count.recorded"},
+		"mkg.fieldops.weigh_ticket":  {"r_fieldops", "mkg.measurement.weigh_ticket.recorded"},
+		"mkg.measurement.roll_count": {"r_measurement", "mkg.fieldops.roll_count.recorded"},
 	}
 	n := 0
 	for _, c := range Consumers {
@@ -111,8 +111,8 @@ func TestG32ConsumersRegistered(t *testing.T) {
 			continue
 		}
 		n++
-		if c.Role != w[0] || len(c.Events) != 1 || c.Events[0] != w[1] {
-			t.Errorf("%s: vai %q sự kiện %v", c.Name, c.Role, c.Events)
+		if c.Module.Role() != w[0] || len(c.Events) != 1 || c.Events[0] != w[1] {
+			t.Errorf("%s: vai %q sự kiện %v", c.Name, c.Module.Role(), c.Events)
 		}
 	}
 	if n != len(want) {
@@ -133,8 +133,8 @@ func TestG4LogisticsConsumersRegistered(t *testing.T) {
 			continue
 		}
 		n++
-		if c.Role != "logistics_app" || len(c.Events) != 1 || c.Events[0] != e {
-			t.Errorf("%s: vai %q sự kiện %v", c.Name, c.Role, c.Events)
+		if c.Module.Role() != "r_logistics" || len(c.Events) != 1 || c.Events[0] != e {
+			t.Errorf("%s: vai %q sự kiện %v", c.Name, c.Module.Role(), c.Events)
 		}
 	}
 	if n != len(want) {

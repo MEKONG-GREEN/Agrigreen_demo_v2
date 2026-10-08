@@ -12,10 +12,13 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops"
 	mport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/mass"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
 // G3-2 consumer mkg.fieldops.weigh_ticket (thay đường làm mới tay): phiếu HUB_IN của lô
@@ -72,7 +75,7 @@ func TestWeighTicketConsumerLearnsKgPerRoll(t *testing.T) {
 		t.Fatalf("phiếu bù: %s %v", kg, tk)
 	}
 	// Học kg/cuộn: 95 000 / 4 400 = 21,6 (HTX); mốc trước lần cân → không có mẫu → cấu hình/mặc định 20; bỏ chính lô → 20.
-	kp := fieldops.New(f.pool, f.clk, fieldops.Options{}).KgPerRoll()
+	kp := fieldops.New(pgtest.Get(t).Pool(t, migrations.MKG, dbadmin.AppInternal), f.clk, fieldops.Options{}).KgPerRoll()
 	if e, err := kp.KgPerRollAsOf(context.Background(), f.tenant, f.htx, f.clk.Now(), ids.New()); err != nil || e.Kg.String() != "21.600" || e.Source != "htx" {
 		t.Fatalf("học HTX: %+v %v", e, err)
 	}
@@ -101,7 +104,7 @@ func TestWeighTicketConsumerLearnsKgPerRoll(t *testing.T) {
 		t.Fatalf("cuộn bảng đệm sau bù: %d", rolls)
 	}
 	// RollTotals: số hiệu lực + HTXConfirmed (chưa HTX xác nhận → false).
-	lr, err := fieldops.New(f.pool, f.clk, fieldops.Options{}).RollTotals().LotRolls(context.Background(), f.tenant, oid)
+	lr, err := fieldops.New(pgtest.Get(t).Pool(t, migrations.MKG, dbadmin.AppInternal), f.clk, fieldops.Options{}).RollTotals().LotRolls(context.Background(), f.tenant, oid)
 	if err != nil || lr.Rolls != 4000 || lr.Stage != "boat_load" || lr.HTXConfirmed {
 		t.Fatalf("LotRolls: %+v %v", lr, err)
 	}

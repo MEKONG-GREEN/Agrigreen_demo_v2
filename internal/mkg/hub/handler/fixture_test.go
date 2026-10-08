@@ -20,6 +20,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -47,7 +48,7 @@ func newFixture(t *testing.T) *fixture {
 	env := pgtest.Get(t)
 	pool := env.Pool(t, migrations.MKG, hub.DBRole)
 	clk := clock.NewFixed(time.Now().UTC().Truncate(time.Second))
-	mod := hub.New(pool, clk)
+	mod := hub.New(pgtest.Get(t).Pool(t, migrations.MKG, dbadmin.AppInternal), clk)
 	iss := authztest.New(t)
 	log := telemetry.NewLogger("test", io.Discard)
 	appEng := httpx.NewEngine(log, 1<<20)

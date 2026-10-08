@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	abport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/acctbridge/port"
@@ -59,8 +60,8 @@ func TestG4FrozenInternalContracts(t *testing.T) {
 	}
 	// Không trùng hàng đợi G3 đã có (agent module thêm consumer G4 vào Consumers sau).
 	for _, c := range Consumers {
-		if seen[c.Name] && c.Role != logport.DBRole && c.Role != ordport.DBRole && c.Role != costport.DBRole && c.Role != abport.DBRole {
-			t.Errorf("hàng đợi G4 %s trùng consumer của vai %s", c.Name, c.Role)
+		if seen[c.Name] && !slices.Contains([]string{"r_logistics", "r_orders", "r_costing", "r_acctbridge"}, c.Module.Role()) {
+			t.Errorf("hàng đợi G4 %s trùng consumer của vai %s", c.Name, c.Module.Role())
 		}
 	}
 }

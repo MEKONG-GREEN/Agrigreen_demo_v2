@@ -28,6 +28,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -97,7 +98,7 @@ type fixture struct {
 	iss        *authztest.FakeIssuer
 	app, admin *httptest.Server
 	pool       *pgxpool.Pool // measurement_app
-	ingestPool *pgxpool.Pool // ingest_mkg
+	ingestPool *pgxpool.Pool // ingest_mkg (vai cũ — chỉ để kiểm quyền/RLS trực tiếp; cổng ingest chạy app_ingest)
 	ingest     measurement.Ingest
 	clk        *clock.Fixed
 	tenant     uuid.UUID
@@ -115,7 +116,7 @@ func newFixture(t *testing.T) *fixture {
 	rolls := &fakeRolls{m: map[uuid.UUID]port.RollTotal{}}
 	lots := &fakeLots{m: map[uuid.UUID]hubport.LotInfo{}}
 	plots := &fakePlots{m: map[uuid.UUID][]port.PlotShare{}}
-	mod := measurement.New(pool, clk, measurement.Deps{Rolls: rolls, Origins: lots, Plots: plots})
+	mod := measurement.New(pgtest.Get(t).Pool(t, migrations.MKG, dbadmin.AppInternal), clk, measurement.Deps{Rolls: rolls, Origins: lots, Plots: plots})
 	iss := authztest.New(t)
 	log := telemetry.NewLogger("test", io.Discard)
 	appEng := httpx.NewEngine(log, 1<<20)
@@ -125,7 +126,7 @@ func newFixture(t *testing.T) *fixture {
 	a, ad := httptest.NewServer(appEng), httptest.NewServer(adminEng)
 	t.Cleanup(a.Close)
 	t.Cleanup(ad.Close)
-	return &fixture{t: t, env: env, iss: iss, app: a, admin: ad, pool: pool, ingestPool: ingestPool, ingest: measurement.NewIngest(ingestPool, clk),
+	return &fixture{t: t, env: env, iss: iss, app: a, admin: ad, pool: pool, ingestPool: ingestPool, ingest: measurement.NewIngest(env.Pool(t, migrations.MKG, dbadmin.AppIngest), clk), // W2.6: app_ingest → r_measurement
 		clk: clk, tenant: ids.New(), rolls: rolls, lots: lots, plots: plots, mod: mod}
 }
 

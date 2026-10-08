@@ -43,6 +43,7 @@ type Options struct {
 
 // NewWith tạo module với phụ thuộc tùy chọn.
 func NewWith(db tenant.Beginner, clk clock.Clock, o Options) *Module {
+	db = forModule(db)
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Stock: o.Stock, Files: o.Files}}
 }
 

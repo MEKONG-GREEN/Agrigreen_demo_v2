@@ -26,20 +26,20 @@ import (
 // (ADR-0028 — pf/kref không có vai cũ), mọi giao dịch inbox chạy SET LOCAL ROLE r_kref: vai DUY NHẤT ghi được k_ref.
 func krefConsumer() consumer {
 	return consumer{
-		name: kref.Consumer, cluster: migrations.PF, role: dbadmin.AppWorker, module: kref.DBModule,
+		name: kref.Consumer, cluster: migrations.PF, module: kref.DBModule,
 		events: kref.Events, handler: kref.New(nil, clock.System{}).Handler(),
 	}
 }
 
-// krefSources nối nguồn của lần dựng lại k_ref: pf/party (vai party_app), pf/masterdata (vai masterdata_app) và
+// krefSources nối nguồn của lần dựng lại k_ref: pf/party (r_party), pf/masterdata (r_masterdata) trên pool app_worker và
 // tìm tenant bằng ag_ops_jobs (chỉ cột tenant_id). open mở pool theo vai.
 func krefSources(open func(role string) (*pgxpool.Pool, error)) (krefport.Sources, error) {
 	clk := clock.System{}
-	partyPool, err := open(party.DBRole)
+	partyPool, err := open(dbadmin.AppWorker)
 	if err != nil {
 		return krefport.Sources{}, err
 	}
-	mdPool, err := open(masterdata.DBRole)
+	mdPool, err := open(dbadmin.AppWorker)
 	if err != nil {
 		return krefport.Sources{}, err
 	}
@@ -77,7 +77,11 @@ func runKRefRebuild(log *slog.Logger) error {
 			p.Close()
 		}
 	}()
+	opened := map[string]*pgxpool.Pool{}
 	open := func(role string) (*pgxpool.Pool, error) {
+		if p, ok := opened[role]; ok {
+			return p, nil
+		}
 		dsn, err := dbadmin.RoleURL(direct, migrations.PF, "", role)
 		if err != nil {
 			return nil, err
@@ -87,6 +91,7 @@ func runKRefRebuild(log *slog.Logger) error {
 			return nil, err
 		}
 		pools = append(pools, p)
+		opened[role] = p
 		return p, nil
 	}
 	src, err := krefSources(open)

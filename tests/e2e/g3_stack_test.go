@@ -49,10 +49,10 @@ import (
 	platformasm "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	winternal "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/worker-internal/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement"
-	mport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port/edgewire"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
@@ -105,8 +105,8 @@ func newMKGStack(t *testing.T, s *harness.Stack, saToken func() string, grantor 
 	t.Cleanup(adm.Close)
 
 	// Ingest như cmd/ingest: vai ingest_mkg (cụm mkg), ingest_ts / ts_reader (cụm ts).
-	ports := measurement.NewIngestPorts(s.Env.Pool(t, migrations.MKG, mport.IngestRole), clk)
-	store := &measurement.IngestTSStore{Writer: s.Env.Pool(t, migrations.TS, mport.IngestTSRole), Reader: s.Env.Pool(t, migrations.TS, mport.TSReaderRole)}
+	ports := measurement.NewIngestPorts(s.Env.Pool(t, migrations.MKG, dbadmin.AppIngest), clk) // W2.6: r_measurement
+	store := measurement.NewIngestTSStore(s.Env.Pool(t, migrations.TS, dbadmin.AppIngest), s.Env.Pool(t, migrations.TS, dbadmin.AppIngest))
 	lg := slog.New(slog.NewTextHandler(s.Logs, nil))
 	met := measurement.NewIngestMetrics(nil)
 	rv := &measurement.IngestReceiver{Devices: ports.Devices, Store: store, Clock: clk, Log: lg, Metrics: met}
@@ -325,7 +325,8 @@ func (m *mkgStack) push(t *testing.T, b edgewire.Batch) (int, string) {
 
 type delivery struct {
 	cluster  migrations.Cluster
-	role     string
+	role     string      // vai đăng nhập đơn vị (W2.6: app_worker_internal / app_worker)
+	module   db.ModuleID // giao dịch inbox chạy SET LOCAL ROLE r_<module>
 	consumer string
 	env      outbox.Envelope
 	handler  inbox.Handler
@@ -428,23 +429,19 @@ func (p *pump) deliver(c migrations.Cluster, r outboxRow) int {
 			if err != nil {
 				p.t.Fatal(err)
 			}
-			role := wc.Role
-			if role == "" {
-				role = winternal.OpsRole
-			}
-			ds = append(ds, delivery{cluster: migrations.MKG, role: role, consumer: wc.Name, env: r.env, handler: h})
+			ds = append(ds, delivery{cluster: migrations.MKG, role: winternal.OpsRole, module: wc.Module, consumer: wc.Name, env: r.env, handler: h})
 		}
 	} else {
 		// Vhost nền tảng: van MKG (kind platform) và sự kiện pf → consumer liên module của worker.
 		for _, pc := range platformasm.Consumers {
 			if slices.Contains(pc.Events, r.env.EventType) {
-				ds = append(ds, delivery{cluster: migrations.PF, role: pc.Role, consumer: pc.Name, env: r.env, handler: pc.Handler(p.s.Mods)})
+				ds = append(ds, delivery{cluster: migrations.PF, role: dbadmin.AppWorker, module: pc.Module, consumer: pc.Name, env: r.env, handler: pc.Handler(p.s.Mods)})
 			}
 		}
 	}
 	n := 0
 	for _, d := range ds {
-		ok, err := inbox.Process(context.Background(), p.s.Env.Pool(p.t, d.cluster, d.role), d.consumer, d.env, d.handler)
+		ok, err := inbox.Process(context.Background(), db.ForModule(p.s.Env.Pool(p.t, d.cluster, d.role), d.module), d.consumer, d.env, d.handler)
 		if err != nil {
 			p.t.Fatalf("consumer %s xử lý %s (%s): %v", d.consumer, d.env.EventType, d.env.EventID, err)
 		}
@@ -461,7 +458,7 @@ func (p *pump) deliver(c migrations.Cluster, r outboxRow) int {
 func (p *pump) redeliverAll() {
 	p.t.Helper()
 	for _, d := range p.delivered {
-		ok, err := inbox.Process(context.Background(), p.s.Env.Pool(p.t, d.cluster, d.role), d.consumer, d.env, d.handler)
+		ok, err := inbox.Process(context.Background(), db.ForModule(p.s.Env.Pool(p.t, d.cluster, d.role), d.module), d.consumer, d.env, d.handler)
 		if err != nil || ok {
 			p.t.Fatalf("R-61: giao lặp %s → %s phải bị bỏ qua: processed=%v err=%v", d.env.EventType, d.consumer, ok, err)
 		}

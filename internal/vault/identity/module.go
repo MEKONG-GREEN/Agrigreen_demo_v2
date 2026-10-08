@@ -63,7 +63,7 @@ func BlindKeyFromEnv() ([]byte, error) {
 
 // Config là phụ thuộc của module.
 type Config struct {
-	DB       tenant.Beginner // pool vai vault_app — dùng cả cho shared.idempotency_key của cụm vault
+	DB       tenant.Beginner // pool vai app_vault (hoặc vai cũ vault_app) — mọi giao dịch chạy dưới r_identity, cả shared.idempotency_key
 	Clock    clock.Clock
 	KMS      KMS
 	BlindKey []byte
@@ -89,6 +89,7 @@ type Module struct {
 
 // New dựng module.
 func New(cfg Config) (*Module, error) {
+	cfg.DB = forModule(cfg.DB)
 	svc := &app.Service{DB: cfg.DB, Clock: cfg.Clock, KMS: cfg.KMS, BlindKey: cfg.BlindKey, Quota: cfg.Quota,
 		RequireMFASensitive: cfg.RequireMFASensitive}
 	if err := svc.Validate(); err != nil {
