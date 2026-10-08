@@ -397,14 +397,10 @@ func TestPublicAPIRealWiring_G5Integration(t *testing.T) {
 	}
 	// Đơn vị đã dùng hôm nay: đọc 1 + tải tệp 1 = 2 (danh mục, usage, yêu cầu xuất, trạng thái job = 0).
 
-	// Sổ đọc không ghi được (thu quyền INSERT của party_app) → 503, không byte dữ liệu, 0 đơn vị.
-	if _, err := e.pg.AdminPool(t, migrations.PF).Exec(ctx, `REVOKE INSERT ON pf_party.partner_read_log FROM party_app`); err != nil {
-		t.Fatal(err)
-	}
+	// Sổ đọc không ghi được (mọi INSERT vào partner_read_log lỗi) → 503, không byte dữ liệu, 0 đơn vị.
+	restore := e.failInserts("pf_party.partner_read_log")
 	r = e.call(http.MethodGet, "/v1/jobs/"+jobID+"/file", key, nil)
-	if _, err := e.pg.AdminPool(t, migrations.PF).Exec(ctx, `GRANT INSERT ON pf_party.partner_read_log TO party_app`); err != nil {
-		t.Fatal(err)
-	}
+	restore()
 	if r.status != http.StatusServiceUnavailable || r.code() != partyport.ErrPartnerAuditUnavailable.Code || strings.Contains(string(r.raw), "31117") {
 		t.Fatalf("sổ đọc lỗi → 503 party.partner_audit_unavailable, không dữ liệu: %d %s", r.status, r.raw)
 	}
@@ -423,15 +419,10 @@ func TestPublicAPIRealWiring_G5Integration(t *testing.T) {
 	if n := e.count(e.grantor, `SELECT count(*) FROM pf_party.partner_read_log WHERE actor_ref = $1::uuid`, cid); n != 3 {
 		t.Fatalf("sổ đọc: đọc 2 + tải tệp 1, 429 không ghi — nhận %d", n)
 	}
-	// Sổ đo lường lỗi (thu quyền INSERT của metering_app) → 503, không byte dữ liệu; trả lại quyền.
-	adminPool := e.pg.AdminPool(t, migrations.PF)
-	if _, err := adminPool.Exec(ctx, `REVOKE INSERT ON pf_metering.usage_event FROM metering_app`); err != nil {
-		t.Fatal(err)
-	}
+	// Sổ đo lường lỗi (mọi INSERT vào usage_event lỗi) → 503, không byte dữ liệu; gỡ lỗi giả lập.
+	restore = e.failInserts("pf_metering.usage_event")
 	r = e.call(http.MethodGet, "/v1/data-products", key, nil)
-	if _, err := adminPool.Exec(ctx, `GRANT INSERT ON pf_metering.usage_event TO metering_app`); err != nil {
-		t.Fatal(err)
-	}
+	restore()
 	if r.status != http.StatusServiceUnavailable || r.code() != meteringport.ErrUnavailable.Code || strings.Contains(string(r.raw), "collection_volume") {
 		t.Fatalf("sổ lỗi → 503 metering.unavailable, không dữ liệu: %d %s", r.status, r.raw)
 	}
@@ -452,5 +443,29 @@ func TestPublicAPIRealWiring_G5Integration(t *testing.T) {
 	want(t, e.call(http.MethodGet, "/v1/data-products", key[:len(key)-2]+"AA", nil), http.StatusUnauthorized, "khóa sai")
 	if after := e.count(e.operator, `SELECT count(*) FROM pf_metering.usage_event`); after != before {
 		t.Fatalf("lời gọi chưa xác thực không ghi sổ: %d → %d", before, after)
+	}
+}
+
+// failInserts làm MỌI INSERT vào bảng lỗi (trigger BEFORE INSERT do tài khoản quản trị cài) cho tới khi
+// gọi restore. Không dựa vào thu quyền của một vai cụ thể: từ W2.3 (pf 000090) vai đăng nhập cũ
+// <module>_app là thành viên INHERIT của r_<module> nên REVOKE trên <module>_app không còn làm lỗi lần
+// ghi, và vai thực thi sẽ còn đổi (app_<đơn vị> + SET LOCAL ROLE, ADR-0028).
+func (e *intEnv) failInserts(table string) (restore func()) {
+	e.t.Helper()
+	ctx, admin := context.Background(), e.pg.AdminPool(e.t, migrations.PF)
+	for _, q := range []string{
+		`CREATE OR REPLACE FUNCTION public.agtest_fail_insert() RETURNS trigger LANGUAGE plpgsql AS
+		 $f$ BEGIN RAISE EXCEPTION 'agtest: ghi % bị lỗi giả lập', TG_TABLE_NAME; END $f$`,
+		`CREATE TRIGGER agtest_fail_insert BEFORE INSERT ON ` + table + ` FOR EACH ROW EXECUTE FUNCTION public.agtest_fail_insert()`,
+	} {
+		if _, err := admin.Exec(ctx, q); err != nil {
+			e.t.Fatalf("cài lỗi giả lập trên %s: %v", table, err)
+		}
+	}
+	return func() {
+		e.t.Helper()
+		if _, err := admin.Exec(ctx, `DROP TRIGGER agtest_fail_insert ON `+table); err != nil {
+			e.t.Fatalf("gỡ lỗi giả lập trên %s: %v", table, err)
+		}
 	}
 }
