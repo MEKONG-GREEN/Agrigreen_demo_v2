@@ -14,6 +14,7 @@ modules:
   pf/party: ">=1.0 <2"         # HTX, nông hộ, đồng ý (/v1/cooperatives, /v1/households, /v1/consents)
   pf/reports: ">=1.0 <2"       # lịch gửi báo cáo của quản lý HTX
   pf/sync: ">=1.0 <2"          # đồng bộ ngoại tuyến của app HTX
+  pf/workflow: ">=1.0 <2"      # cap/workflow: duyệt bốn mắt (tham số, cấp quyền chia sẻ — W6.1)
 roles:
   - coop_manager
   - plot_editor

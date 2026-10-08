@@ -843,3 +843,14 @@ Khóa API **không bao giờ** xuất hiện trong lỗi, log, URL, sự kiện 
 | 409 | `metering.statement_frozen` (bảng kê bù) | Bảng kê cần thay đã bị thay bởi bảng kê khác (`superseded_by`) — bù cho bảng kê hiện hành; duyệt bảng kê đã bị thay cũng trả mã này |
 | 404 | `metering.not_found` | Admin API: không có bảng kê / yêu cầu lập bảng kê (hoặc thuộc tenant khác — RLS); bảng kê bù trỏ tới bảng kê không cùng khách hàng/kỳ |
 | 503 | `metering.dependency_unavailable` | Module chưa nối pool `metering_app` |
+
+### pf/workflow (`cap/workflow` — duyệt bốn mắt dùng chung, W6.1)
+
+Chưa có route HTTP riêng: mã dưới đây đi ra qua route của module gọi port (`pf/masterdata` duyệt tham số, `pf/party` cấp quyền chia sẻ). Hai module đó kiểm trạng thái và bốn mắt TRƯỚC khi gọi workflow, nên luồng hiện có vẫn trả mã cũ (`masterdata.param_invalid_transition`, `party.share_grant_state`, `self_approval_forbidden`); mã của workflow chỉ lộ ra khi dữ liệu hai sổ lệch nhau.
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 403 | `self_approval_forbidden` | Người quyết định trùng người lập hoặc người được hưởng của yêu cầu (R-56) — kiểm ở app/ và bằng CHECK `decision_four_eyes` (pf 000118) |
+| 404 | `workflow.request_not_found` | Port `Requests.Status`: đối tượng chưa có yêu cầu duyệt trong tenant |
+| 409 | `workflow.already_decided` | Yêu cầu đã có quyết định khác (khác người quyết định hoặc khác kết quả); hai quyết định song song cùng yêu cầu |
+| 409 | `workflow.request_mismatch` | Đối tượng đã có yêu cầu duyệt với người lập hoặc người được hưởng khác dữ liệu bên gọi khai |

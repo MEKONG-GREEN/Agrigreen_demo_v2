@@ -10,6 +10,7 @@ depends:
   pf/kref: ">=1.0 <2"
   pf/party: ">=1.0 <2"
   pf/sync: ">=1.0 <2"
+  pf/workflow: ">=1.0 <2"
 provides:
   ports: [AdminUnitHistory, Catalogs, FormUsage, StaffNames]
   events: [pf.masterdata.admin_unit.changed/v1, pf.masterdata.param.approved/v1]

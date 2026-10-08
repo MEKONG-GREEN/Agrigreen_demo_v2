@@ -29,5 +29,6 @@ var catalog = []CatalogEntry{
 	{Name: "pf/simulation", Kind: "domain", Enable: "per_tenant", Permissions: []string{"simulation_analyst"}},
 	{Name: "pf/sync", Kind: "capability", Enable: "per_tenant", Permissions: []string{"device_admin", "sync_conflict_resolver"}},
 	{Name: "pf/waterway", Kind: "domain", Enable: "per_tenant", Permissions: []string{"waterway_editor", "waterway_publisher"}},
+	{Name: "pf/workflow", Kind: "capability", Enable: "always", Permissions: []string{}},
 	{Name: "vault/identity", Kind: "kernel", Enable: "always", Permissions: []string{"farmer", "vault_display", "vault_eraser", "vault_evidence_viewer", "vault_pubkey_sync", "vault_registrar"}},
 }

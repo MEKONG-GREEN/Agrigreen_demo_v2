@@ -9,6 +9,7 @@ modules:
   pf/mechanization: ">=1.0 <2" # dom/mechanization
   pf/party: ">=1.0 <2"         # số máy theo HTX (CoopMachineCounts)
   pf/reports: ">=1.0 <2"       # xuất báo cáo CGH (FN-11)
+  pf/workflow: ">=1.0 <2"      # cap/workflow: duyệt bốn mắt (tham số, cấp quyền chia sẻ — W6.1)
 roles: [cgh_viewer, cgh_admin, cgh_sync]
 landing:
   cgh_viewer: /cgh # web-ops homeFor: cấp Cục → /cgh

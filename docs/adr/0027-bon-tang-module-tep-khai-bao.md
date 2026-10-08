@@ -51,7 +51,8 @@ KN v7.7 (D2) coi **phòng ban là module**: `pf_party.department` bật theo tr�
 | `pf/reports` (+ `extension/reportcycle`) | `cap/forms`, `cap/export`, `cap/import` | capability | Tách ở W6.2, W6.6 khi đủ quy tắc ba |
 | `pf/metrics` | `cap/analytics` | capability | Chỉ đọc `_pub` (W6.3) |
 | schema `pf_files` | `cap/evidence` | capability | W6.5 |
-| — | `cap/workflow`, `cap/task`, `cap/price` | — | Chưa có (W6.1, W6.6) |
+| `pf/workflow` (mới, W6.1) | `cap/workflow` | capability | Duyệt bốn mắt dùng chung (pf 000118) |
+| — | `cap/task`, `cap/price` | — | Chưa có (W6.6) |
 | `pf/extdata` | — | chốt ở W1.1 | Không có tên v4.1 tương ứng |
 | `pf/metering` | `dom/metering` | domain | ADR-0023 |
 | `pf/extension` | `dom/extension` | domain | |
@@ -121,7 +122,8 @@ Giữ cả hai cơ chế, tách nghĩa:
 | W1.4 | Bật module theo đơn vị (`module_enablement`, pf 000088), menu lọc |
 | W3.1 | Thiết kế ranh giới `pf/cooperative`: kiểm kê bảng, port, `module.yaml`, kế hoạch W3.3–W3.4 — [docs/design/cooperative.md](../design/cooperative.md) |
 | W3.2 | Module `pf/cooperative` |
-| W6.x | Tách `cap/workflow`, `cap/forms`, `cap/export`, `cap/import`, `cap/task` |
+| W6.1 | `pf/workflow` (`cap/workflow`, capability, pf 000118). `pf/masterdata` (capability) import `workflow/port` trực tiếp; `pf/party` (kernel) KHÔNG được import tầng trên (mục 5) nên khai interface của mình (`party/port.FourEyes`) và gốc lắp ráp `cmd/api-platform/assembly` nối cài đặt của workflow — mẫu đảo phụ thuộc cho module lõi cần năng lực `cap/*`, không thêm ngoại lệ `agmodgraph` |
+| W6.x | Tách `cap/forms`, `cap/export`, `cap/import`, `cap/task` |
 | W9.1 | Lint cấm so sánh tên ứng dụng trong module `capability` |
 
 ## Liên quan

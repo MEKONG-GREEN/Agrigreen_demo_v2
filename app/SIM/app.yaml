@@ -9,6 +9,7 @@ modules:
   pf/masterdata: ">=1.0 <2"
   pf/simulation: ">=1.0 <2"    # /v1/simulations, /v1/candidate-hubs, /v1/scenarios
   pf/waterway: ">=1.0 <2"
+  pf/workflow: ">=1.0 <2"      # cap/workflow: duyệt bốn mắt (tham số, cấp quyền chia sẻ — W6.1)
 roles: [simulation_analyst, waterway_editor, waterway_publisher]
 landing:
   simulation_analyst: /mo-phong

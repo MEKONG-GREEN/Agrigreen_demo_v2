@@ -93,6 +93,25 @@ var ShareKinds = []string{KindCooperativeDirectory, KindPlotDirectory, KindSeaso
 // DataProductKind trả loại cấp quyền của một sản phẩm dữ liệu Public API: "dp_<product>".
 func DataProductKind(product string) string { return "dp_" + product }
 
+// ShareGrantApprovalKind là loại yêu cầu duyệt của đề xuất cấp quyền trong cap/workflow (W6.1).
+const ShareGrantApprovalKind = "party.share_grant"
+
+// FourEyes là cổng duyệt bốn mắt (cap/workflow — pf/workflow, W6.1) cho đề xuất cấp quyền chia sẻ: lập yêu cầu
+// khi đề xuất, ghi quyết định khi duyệt (approved) hoặc thu hồi đề xuất chưa duyệt (cancelled), TRONG giao dịch
+// của pf/party — ctx mang giao dịch (db.JoinTx; hợp đồng port không import driver DB). pf/party là kernel, không được import module capability (ADR-0027 mục 5), nên khai interface
+// ở đây; gốc lắp ráp (cmd/api-platform/assembly) nối cài đặt của pf/workflow. Lỗi trả về là lỗi của workflow
+// (problem.SelfApproval khi người duyệt trùng người lập).
+type FourEyes interface {
+	Submit(ctx context.Context, kind string, subject, requester uuid.UUID, at time.Time) error
+	Decide(ctx context.Context, kind string, subject, requester, decider uuid.UUID, outcome, note string, at time.Time) error
+}
+
+// Kết quả quyết định truyền qua FourEyes.Decide (khớp workflow/port.Outcome).
+const (
+	FourEyesApproved  = "approved"
+	FourEyesCancelled = "cancelled"
+)
+
 // GrantLookup (G5-0, ADR-0022 mục 3) cho cmd/api-public kiểm cấp quyền của bên thứ ba MÀ KHÔNG cần
 // vai OIDC (bên gọi là khách hàng API đã xác thực bằng khóa, không phải người dùng Keycloak):
 // trả cấp quyền active, trong hạn tại at, bên cấp grantor → bên nhận grantee (tenant bên thứ ba lấy

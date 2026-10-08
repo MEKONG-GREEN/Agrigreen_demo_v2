@@ -56,6 +56,8 @@ var LoginUnits = []LoginUnit{
 var groupOnlyModules = map[string][]migrations.Cluster{
 	// pf/kref (W2.5, ADR-0029): ghi k_ref ở cụm pf (worker) và — khi có kênh nguồn — ở cụm mkg (mkg 000022).
 	"pf/kref": {migrations.PF, migrations.MKG},
+	// pf/workflow (W6.1, cap/workflow): sổ pf_workflow (pf 000118); app_platform (api-platform) là thành viên.
+	"pf/workflow": {migrations.PF},
 }
 
 // ModuleGroups trả vai nhóm của mọi module pf có vai đăng nhập cũ <module>_app, cùng module trong

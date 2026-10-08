@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -14,7 +15,9 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/store"
+	wfport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/workflow/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
@@ -131,7 +134,7 @@ func (s *Service) Submit(ctx context.Context, id uuid.UUID) (domain.ParamVersion
 			return e
 		}
 		v.Status, v.SubmittedAt = domain.StatusSubmitted, &now
-		return nil
+		return s.submitApproval(ctx, tx, v, now)
 	})
 	return v, err
 }
@@ -172,6 +175,9 @@ func (s *Service) Approve(ctx context.Context, id uuid.UUID, note *string) (doma
 		if e := checkThresholdOrder(ctx, tx, v); e != nil {
 			return e
 		}
+		if e := s.decideApproval(ctx, tx, v, p.ActorRef, wfport.OutcomeApproved, note, now); e != nil {
+			return e
+		}
 		if e := store.MarkDecided(ctx, tx, v.ID, domain.StatusApproved, p.ActorRef, now, note); e != nil {
 			return e
 		}
@@ -181,6 +187,34 @@ func (s *Service) Approve(ctx context.Context, id uuid.UUID, note *string) (doma
 		return e
 	})
 	return v, a, err
+}
+
+// ApprovalKind là loại yêu cầu duyệt của phiên bản tham số trong cap/workflow (W6.1).
+const ApprovalKind = "masterdata.param_version"
+
+// submitApproval lập yêu cầu duyệt trong cap/workflow (W6.1) cùng giao dịch gửi duyệt. Người lập = người đặt.
+func (s *Service) submitApproval(ctx context.Context, tx pgx.Tx, v domain.ParamVersion, now time.Time) error {
+	if s.Approvals == nil {
+		return nil
+	}
+	_, err := s.Approvals.Submit(db.JoinTx(ctx, tx), wfport.SubmitInput{Kind: ApprovalKind, Subject: v.ID, Requester: v.SetterRef, Summary: v.Key, At: now})
+	return err
+}
+
+// decideApproval ghi quyết định trong cap/workflow (W6.1) cùng giao dịch duyệt/từ chối, SAU các kiểm của luồng cũ
+// (mã lỗi không đổi). Phiên bản gửi duyệt trước W6.1 chưa có yêu cầu: workflow lập bù với người lập = người đặt.
+func (s *Service) decideApproval(ctx context.Context, tx pgx.Tx, v domain.ParamVersion, approver uuid.UUID, o wfport.Outcome, note *string, now time.Time) error {
+	if s.Approvals == nil {
+		return nil
+	}
+	in := wfport.DecideInput{Kind: ApprovalKind, Subject: v.ID, Requester: v.SetterRef, Decider: approver, Outcome: o, At: now}
+	// Ghi chú duyệt của luồng cũ không giới hạn độ dài (bản đầy đủ ở param_version.decision_note); sổ workflow
+	// nhận tối đa 1000 ký tự — dài hơn thì bỏ (ghi chú không bắt buộc khi duyệt; từ chối đã giới hạn 10–500).
+	if note != nil && (o != wfport.OutcomeApproved || utf8.RuneCountInString(strings.TrimSpace(*note)) <= 1000) {
+		in.Note = *note
+	}
+	_, err := s.Approvals.Decide(db.JoinTx(ctx, tx), in)
+	return err
 }
 
 // thresholdOrder là ba mốc ngưỡng mức đáp ứng CGH (QT-02) theo thứ tự tăng dần:
@@ -284,6 +318,9 @@ func (s *Service) Reject(ctx context.Context, id uuid.UUID, note string) (domain
 		}
 		if e := v.CanDecide(); e != nil {
 			return ErrTransition.WithDetail(e.Error())
+		}
+		if e := s.decideApproval(ctx, tx, v, p.ActorRef, wfport.OutcomeRejected, &note, now); e != nil {
+			return e
 		}
 		if e := store.MarkDecided(ctx, tx, v.ID, domain.StatusRejected, p.ActorRef, now, &note); e != nil {
 			return e

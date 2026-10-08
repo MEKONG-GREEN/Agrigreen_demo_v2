@@ -258,3 +258,27 @@ Diễn tập: `drill kref -confirm-copy` (chỉ trên bản sao, xem [restore-dr
 2. Thêm `Rel*`, phần chiếu trong `kref.Project`/`Digests`, `snapshotTx`, `rebuildTenantTx`.
 3. Thêm interface nguồn trong `kref/port`; module nguồn cài bằng vai của nó.
 4. Thêm sự kiện vào `kref.Events`.
+
+## Duyệt bốn mắt `cap/workflow` (W6.1)
+
+Kiến trúc v4.1 §26, R-56. Module năng lực `pf/workflow` (`internal/platform/workflow`, `cap/workflow`, `enable: always`) sở hữu schema `pf_workflow` (pf 000118): sổ `request` (một yêu cầu cho một đối tượng `(kind, subject_ref)`: người lập, người được hưởng) và `decision` (một quyết định cho một yêu cầu: `approved` | `rejected` | `cancelled`). Module không biết đối tượng là gì; `kind` dạng `<module>.<đối tượng>`.
+
+| Bất biến | Ở app/ | Ở DB |
+|---|---|---|
+| Người duyệt ≠ người lập, ≠ người được hưởng (trừ `cancelled`) | `domain.FourEyes` → `self_approval_forbidden` | CHECK `decision_four_eyes`; người lập/người hưởng của `decision` do trigger `trg_bind_request` chép từ `request` |
+| Quyết định phải có yêu cầu cùng tenant | — | trigger → 23503 |
+| Một đối tượng một yêu cầu, một yêu cầu một quyết định | idempotent: gọi lặp trả lại bản cũ | `stream_key` cố định + CHECK `seq = 1` (`request_one_per_subject`, `decision_one_per_request`) |
+| Từ chối/hủy có ghi chú | `domain.ValidateDecide` | CHECK `decision_note_required` |
+
+**Dùng từ module khác.** Port `workflow/port.Approvals` (`Submit`, `Decide`) ghi **trong giao dịch của bên gọi**, để thay đổi nghiệp vụ và quyết định cùng commit: bên gọi gắn giao dịch đang mở vào ctx bằng `db.JoinTx(ctx, tx)` (hợp đồng `port/` không import driver DB — archlint mục 8), cài đặt lấy lại bằng `db.JoinedTx`; thiếu → `ErrNoCallerTx`. Giao dịch đó chạy dưới vai của bên gọi, nên lối ghi là hai hàm `SECURITY DEFINER` `pf_workflow.submit`/`decide` (thân cố định, `search_path` cố định, RLS vẫn áp vì `FORCE`). Bên gọi chỉ có `EXECUTE` + `USAGE` schema, không quyền bảng. Thêm bên gọi mới: migration mới `GRANT USAGE ON SCHEMA pf_workflow` + `GRANT EXECUTE` hai hàm cho `r_<module>` của nó. `Decide` lập bù yêu cầu nếu đối tượng chưa có (dữ liệu trước khi nối). `Requests.Status` đọc trong giao dịch riêng (`db.WithContextTx`, vai `r_workflow`, tenant từ ctx).
+
+**Module lõi (kernel).** `agmodgraph` cấm kernel import capability. Module lõi cần duyệt bốn mắt khai interface của mình trong `port/` và gốc lắp ráp viết bộ chuyển sang `workflow/port.Approvals` (`pf/party`: `party/port.FourEyes`, `cmd/api-platform/assembly/workflow.go`).
+
+**Bên dùng hiện có** (chạy song song, nguyên tắc 3 — cột/CHECK duyệt cũ giữ nguyên, API và mã lỗi không đổi; kiểm cũ chạy trước):
+
+| Module | `kind` | Yêu cầu | Quyết định |
+|---|---|---|---|
+| `pf/masterdata` | `masterdata.param_version` | gửi duyệt (người lập = người đặt) | duyệt → `approved`, từ chối → `rejected` |
+| `pf/party` | `party.share_grant` | đề xuất cấp quyền | duyệt → `approved`; thu hồi đề xuất chưa duyệt → `cancelled` (thu hồi cấp quyền đã duyệt không thêm quyết định) |
+
+Chưa có route HTTP, sự kiện `pf.workflow.request.decided` (§26) chờ bên tiêu thụ (W6.2, W6.4). Vai DB: `r_workflow` là vai nhóm không có vai cũ (`dbadmin.groupOnlyModules`); `cmd/api-platform` mở pool `app_platform` cho giao dịch riêng của module.

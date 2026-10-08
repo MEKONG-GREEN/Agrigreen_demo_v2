@@ -95,7 +95,7 @@ Cột **Khách?**:
 
 | Gói | Nội dung | Phụ thuộc | Migration | Khách? | CS |
 |---|---|---|---|---|---|
-| **W6.1** | **`pf/workflow` (`cap/workflow`):** sổ `request` + `decision`, CHECK người duyệt ≠ người lập ≠ người hưởng; chuyển duyệt tham số (`masterdata`) và cấp phép (`party`) sang dùng | W1.2 | **pf 000105** | Không | M |
+| **W6.1** | **`pf/workflow` (`cap/workflow`):** sổ `request` + `decision`, CHECK người duyệt ≠ người lập ≠ người hưởng; chuyển duyệt tham số (`masterdata`) và cấp phép (`party`) sang dùng. **Trạng thái: xong** — module `pf/workflow` (`cap/workflow`, capability, `enable: always`; app KN, HTX, CGH, SIM, PF), port `Approvals` (`Submit`, `Decide` — ghi TRONG giao dịch của module gọi) + `Requests` (`Status` — giao dịch riêng, `db.ForModule` → `r_workflow`); **pf 000118**: schema `pf_workflow`, sổ `request`, `decision` (`shared.apply_ledger`), CHECK `decision_four_eyes` (người duyệt ≠ người lập, ≠ người được hưởng; `cancelled` miễn), trigger `trg_bind_request` chép người lập/người hưởng từ `request` (không giả được; không có yêu cầu → 23503), một đối tượng một yêu cầu / một yêu cầu một quyết định (`stream_key` cố định + CHECK `seq = 1`); lối ghi là hai hàm `SECURITY DEFINER` `pf_workflow.submit`/`decide` — `r_masterdata`, `r_party` chỉ có EXECUTE, không quyền bảng; `r_workflow` (vai nhóm mới, `dbadmin.groupOnlyModules`, thành viên `app_platform`) SELECT/INSERT + `k_ref`. Chuyển **song song** (nguyên tắc 3): `masterdata` gửi duyệt → yêu cầu, duyệt/từ chối → quyết định; `party` đề xuất → yêu cầu, duyệt → `approved`, thu hồi đề xuất chưa duyệt → `cancelled` — sau kiểm cũ, cùng giao dịch, API và mã lỗi không đổi; bản gửi duyệt trước W6.1 được lập bù yêu cầu lúc duyệt. `party` (kernel) không import `cap/*`: interface `party/port.FourEyes`, gốc lắp ráp nối. Chưa có HTTP, sự kiện `request.decided` (chưa có bên tiêu thụ — W6.2/W6.4). Bỏ cột/CHECK duyệt cũ là gói riêng ([ADR-0027](adr/0027-bon-tang-module-tep-khai-bao.md#hiện-thực), [hướng dẫn](dev/modules.md#duyệt-bốn-mắt-capworkflow-w61)) | W1.2 | **pf 000118** | Không | M |
 | **W6.2** | **`pf/forms` (`cap/forms`):** tách phát hành/nộp/rà soát/chốt/mở lại kỳ + ảnh chụp đóng băng từ `pf/reports` + `extension/reportcycle`; KN dùng qua cấu hình (`hierarchy`, `publish_by`, `close_by`); đường dẫn `/v1/forms/*` (v1 cũ song song) | W6.1 | **pf 000106–000107** | Sau (Q-01: 14 mẫu) | L |
 | **W6.3** | **`_pub` + `cap/analytics` (R-DB-10):** schema `pf_<module>_pub`, view có phiên bản khai trong `provides.publications`; `pf/metrics` chỉ đọc `_pub`; chạy trên bản sao chỉ đọc khi có | W2.6 | **pf 000108** | Không | M |
 | **W6.4** | **`r_agg` (R-DB-11, R-SEC-03):** vai BYPASSRLS chỉ cho job đã khai; danh sách job có phiên bản; thêm job qua `pf/workflow` (bốn mắt); nhật ký mỗi lần chạy | W6.1, W6.3 | **pf 000109** | Sau (C-4 k) | M |
@@ -142,7 +142,7 @@ W0.1 → W0.2 → W0.3 → W0.4
   → W5.1 → W5.2 → W5.3 (pf 000100–01) → W5.4 (pf 000102)
   → W5.5 (mkg 000024) → W5.6 (pf 000103, mkg 000025) → W5.7 (pf 000104)
   → W5.8 → W5.9 → W5.10
-  → W6.1 (pf 000105) → W6.2 (pf 000106–07) → W6.3 (pf 000108)
+  → W6.1 (pf 000118) → W6.2 (pf 000106–07) → W6.3 (pf 000108)
   → W6.4 (pf 000109) → W6.5 (pf 000110) → W6.6
   → W9.1 → W7.1 (shared 000008)
   → W8.1 → W8.2 (mkg 000026)

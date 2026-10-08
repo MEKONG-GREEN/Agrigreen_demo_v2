@@ -25,8 +25,8 @@ func roleByName(t *testing.T, name string) (Role, int) {
 // NOINHERIT là thành viên đúng các r_* của module đơn vị ghép (modreg.UnitModules); thứ tự tạo nhóm trước.
 func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	groups := ModuleGroups()
-	if len(groups) != 18 || len(legacyGroups()) != 17 {
-		t.Errorf("số module pf có vai nhóm: %d (muốn 18, 17 có vai cũ): %v", len(groups), groups)
+	if len(groups) != 19 || len(legacyGroups()) != 17 {
+		t.Errorf("số module pf có vai nhóm: %d (muốn 19, 17 có vai cũ): %v", len(groups), groups)
 	}
 	seen := map[string]bool{}
 	for _, g := range groups {
@@ -39,7 +39,7 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 			t.Errorf("%s: %+v", g.Role, r)
 		}
 		if g.Legacy == "" {
-			// Module không có vai cũ (W2.5: pf/kref) — không vai đăng nhập nào ngoài app_* là thành viên.
+			// Module không có vai cũ (W2.5: pf/kref, W6.1: pf/workflow) — không vai đăng nhập nào ngoài app_* là thành viên.
 			for _, o := range Roles {
 				if slices.Contains(o.MemberOf, g.Role) && !slices.ContainsFunc(LoginUnits, func(u LoginUnit) bool { return u.Role == o.Name }) {
 					t.Errorf("%s không được là thành viên %s", o.Name, g.Role)
@@ -90,6 +90,10 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	}
 	if k, _ := roleByName(t, "r_kref"); !slices.Equal(k.Clusters, []migrations.Cluster{migrations.PF, migrations.MKG}) {
 		t.Errorf("r_kref: %+v", k)
+	}
+	// W6.1: api-platform ghép pf/workflow — app_platform là thành viên r_workflow, app_worker thì không.
+	if w, _ := roleByName(t, AppWorker); !slices.Contains(plat.MemberOf, "r_workflow") || slices.Contains(w.MemberOf, "r_workflow") {
+		t.Errorf("r_workflow: app_platform %v, app_worker %v", plat.MemberOf, w.MemberOf)
 	}
 	// Không vai đặc quyền nào cấp cho app_* (ADR-0028 §1).
 	for _, u := range LoginUnits {
@@ -165,9 +169,36 @@ func TestMigration91MatchesModuleGroups(t *testing.T) {
 	}
 }
 
-// pf 000092 (W2.5) cấp SELECT k_ref.* cho MỌI r_* (R-DB-05) — danh sách ghi tay khớp ModuleGroups.
+// laterGroups: module có vai nhóm sinh SAU pf 000092 — migration của chính module cấp k_ref cho r_* của nó.
+var laterGroups = map[string]string{"pf/workflow": "pf/000118_pf_workflow.up.sql"}
+
+// pf 000092 (W2.5) cấp SELECT k_ref.* cho MỌI r_* lúc đó (R-DB-05) — danh sách ghi tay khớp ModuleGroups trừ
+// module sinh sau (laterGroups).
 func TestMigration92MatchesModuleGroups(t *testing.T) {
-	if got, want := migrationRoles(t, "pf/000092_pf_kref_relations.up.sql"), roles(ModuleGroups()); !slices.Equal(got, want) {
-		t.Fatalf("000092 cấp cho %v, ModuleGroups %v", got, want)
+	var want []ModuleGroup
+	for _, g := range ModuleGroups() {
+		if _, later := laterGroups[g.Module]; !later {
+			want = append(want, g)
+		}
+	}
+	if got := migrationRoles(t, "pf/000092_pf_kref_relations.up.sql"); !slices.Equal(got, roles(want)) {
+		t.Fatalf("000092 cấp cho %v, ModuleGroups %v", got, roles(want))
+	}
+}
+
+// Module sinh sau 000092 phải tự cấp k_ref (docs/dev/modules.md, vai DB bước 5).
+func TestLaterGroupsGrantKRef(t *testing.T) {
+	for m, file := range laterGroups {
+		src, err := fs.ReadFile(migrations.FS, file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		role := modreg.DBRole(m)
+		for _, want := range []string{"GRANT USAGE ON SCHEMA k_ref TO " + role, "k_ref.ctx_uuid(text) TO " + role,
+			"k_ref.share_scope TO " + role} {
+			if !regexp.MustCompile(regexp.QuoteMeta(want)).Match(src) {
+				t.Errorf("%s: thiếu %q", file, want)
+			}
+		}
 	}
 }

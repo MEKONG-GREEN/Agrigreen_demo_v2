@@ -24,6 +24,7 @@ provides:
     - DepartmentUsage
     - Departments
     - FormAvailability
+    - FourEyes
     - GrantLookup
     - Households
     - ModuleEnablement

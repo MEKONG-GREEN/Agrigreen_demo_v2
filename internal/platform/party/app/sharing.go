@@ -34,6 +34,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
@@ -63,6 +64,9 @@ type Sharing struct {
 	Egress     meter.Checkpoint
 	EgressMode meter.Mode
 	Log        *slog.Logger
+	// Approvals (tùy chọn, W6.1): cap/workflow — đề xuất/duyệt/thu hồi đề xuất ghi thêm yêu cầu và quyết định vào
+	// sổ pf_workflow CÙNG giao dịch (bốn mắt kiểm lại ở DB). Nil → chỉ luồng cũ.
+	Approvals port.FourEyes
 }
 
 var (
@@ -156,7 +160,13 @@ func (s *Sharing) Propose(ctx context.Context, in ProposeShareInput) (store.Gran
 		}
 		out = store.Grant{TenantID: p.TenantID, GrantID: id, Grantee: in.Grantee, Kinds: kinds, Purpose: purpose, ValidFrom: in.ValidFrom.UTC(),
 			ValidTo: in.ValidTo.UTC(), Status: "proposed", ProposedBy: p.ActorRef, ProposedAt: now.UTC(), LastEventID: e.ID, LastSeq: e.Seq, UpdatedAt: now.UTC()}
-		return store.PutGrant(ctx, tx, out)
+		if err := store.PutGrant(ctx, tx, out); err != nil {
+			return err
+		}
+		if s.Approvals != nil {
+			return s.Approvals.Submit(db.JoinTx(ctx, tx), port.ShareGrantApprovalKind, id, p.ActorRef, now)
+		}
+		return nil
 	})
 	return out, replayed, err
 }
@@ -191,6 +201,12 @@ func (s *Sharing) Approve(ctx context.Context, id uuid.UUID) (store.Grant, bool,
 		}
 		if !g.ValidTo.After(now) {
 			return ErrShareGrantState.WithDetail("Cấp quyền đã quá hạn valid_to — đề xuất cấp quyền mới")
+		}
+		// W6.1: quyết định vào sổ cap/workflow (đề xuất trước W6.1 chưa có yêu cầu — workflow lập bù).
+		if s.Approvals != nil {
+			if err := s.Approvals.Decide(db.JoinTx(ctx, tx), port.ShareGrantApprovalKind, id, g.ProposedBy, p.ActorRef, port.FourEyesApproved, "", now); err != nil {
+				return err
+			}
 		}
 		e := store.GrantEvent{ID: ids.New(), TenantID: p.TenantID, GrantID: id, Action: "approved", Grantee: g.Grantee, Kinds: g.Kinds,
 			Purpose: g.Purpose, ValidFrom: g.ValidFrom, ValidTo: g.ValidTo, ProposedBy: g.ProposedBy, EventTime: now, ActorRef: p.ActorRef,
@@ -271,6 +287,12 @@ func (s *Sharing) Revoke(ctx context.Context, id uuid.UUID, reason string) (stor
 			return ErrShareGrantState
 		}
 		wasActive := g.Status == "active"
+		// W6.1: thu hồi đề xuất chưa duyệt = hủy yêu cầu duyệt trong cap/workflow (không cần bốn mắt).
+		if !wasActive && s.Approvals != nil {
+			if err := s.Approvals.Decide(db.JoinTx(ctx, tx), port.ShareGrantApprovalKind, id, g.ProposedBy, p.ActorRef, port.FourEyesCancelled, reason, now); err != nil {
+				return err
+			}
+		}
 		e := store.GrantEvent{ID: ids.New(), TenantID: p.TenantID, GrantID: id, Action: "revoked", Grantee: g.Grantee, Kinds: g.Kinds,
 			Purpose: g.Purpose, ValidFrom: g.ValidFrom, ValidTo: g.ValidTo, ProposedBy: g.ProposedBy, Reason: &reason, EventTime: now,
 			ActorRef: p.ActorRef, IdemKey: "share:revoke:" + id.String()}

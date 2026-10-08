@@ -140,6 +140,9 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		return Modules{}, pools, err
 	}
 	pty := party.New(partyPool, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault})
+	if _, err := wireWorkflow(pool, clk, md, pty); err != nil { // W6.1: cap/workflow cho duyệt tham số, cấp quyền
+		return Modules{}, pools, err
+	}
 
 	geoPool, err := pool(geo.DBRole)
 	if err != nil {

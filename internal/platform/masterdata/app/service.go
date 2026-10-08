@@ -12,6 +12,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	wfport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/workflow/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
@@ -64,6 +65,9 @@ type Service struct {
 	Staff staffDirectory
 	// Forms (tùy chọn, P3): số mẫu báo cáo đang dùng mỗi mục — cột "biểu đang dùng" (FN-AD-04.05).
 	Forms port.FormUsage
+	// Approvals (tùy chọn, W6.1): cap/workflow — gửi duyệt/duyệt/từ chối phiên bản tham số ghi thêm yêu cầu và
+	// quyết định vào sổ pf_workflow CÙNG giao dịch (bốn mắt kiểm lại ở DB). Nil → chỉ luồng cũ.
+	Approvals wfport.Approvals
 }
 
 // Page là một trang kết quả phân trang bằng cursor (R-53).

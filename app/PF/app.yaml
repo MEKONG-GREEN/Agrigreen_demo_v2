@@ -18,6 +18,7 @@ modules:
   pf/party: ">=1.0 <2"         # cơ cấu tổ chức, nhập nông hộ, cấp quyền chia sẻ
   pf/reports: ">=1.0 <2"       # mẫu và lịch báo cáo
   pf/sync: ">=1.0 <2"          # giám sát đồng bộ, xung đột, thiết bị
+  pf/workflow: ">=1.0 <2"      # cap/workflow: duyệt bốn mắt (tham số, cấp quyền chia sẻ — W6.1)
   vault/identity: ">=1.0 <2"   # kho định danh
 roles:
   - platform_admin

@@ -106,6 +106,9 @@ func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logge
 	m.share.Egress, m.share.EgressMode, m.share.Log = cp, mode, log
 }
 
+// UseFourEyes (W6.1) nối cap/workflow (pf/workflow) cho duyệt đề xuất cấp quyền chia sẻ. Nil → luồng cũ.
+func (m *Module) UseFourEyes(f port.FourEyes) { m.share.Approvals = f }
+
 // ConsentChecker cho module khác (qua port).
 func (m *Module) ConsentChecker() port.ConsentChecker { return m.svc }
 

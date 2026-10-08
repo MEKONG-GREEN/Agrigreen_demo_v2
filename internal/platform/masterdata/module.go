@@ -17,6 +17,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
+	wfport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/workflow/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -24,6 +25,9 @@ import (
 
 // DBRole là vai DB riêng của module (R-05).
 const DBRole = "masterdata_app"
+
+// ParamApprovalKind là loại yêu cầu duyệt phiên bản tham số trong cap/workflow (W6.1).
+const ParamApprovalKind = app.ApprovalKind
 
 // Module là pf/masterdata đã nối.
 type Module struct {
@@ -63,6 +67,10 @@ func (m *Module) UseStaffDirectory(d port.StaffNames) { m.svc.Staff = d }
 
 // UseFormUsage nối P3 (pf/reports) cho cột "biểu đang dùng" của danh mục nông nghiệp (KN v7.7 FN-AD-04.05).
 func (m *Module) UseFormUsage(f port.FormUsage) { m.svc.Forms = f }
+
+// UseApprovals (W6.1) nối cap/workflow (pf/workflow): gửi duyệt/duyệt/từ chối phiên bản tham số ghi thêm yêu cầu
+// và quyết định vào sổ pf_workflow cùng giao dịch. Không nối → luồng cũ.
+func (m *Module) UseApprovals(a wfport.Approvals) { m.svc.Approvals = a }
 
 // Seed nạp dữ liệu nền nhúng cho một tenant (chạy lặp an toàn) — gọi khi tạo tenant.
 func (m *Module) Seed(ctx context.Context, tenantID uuid.UUID) (app.SeedResult, error) {
