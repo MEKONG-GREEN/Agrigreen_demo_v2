@@ -7,6 +7,7 @@ modules:
   pf/content: ">=1.0 <2"       # thư viện số, tài liệu (/v1/documents, /v1/library)
   pf/cooperative: ">=1.0 <2"   # dom/cooperative: HTX, hộ, thửa, vụ (W3.2 mặt tiền; W3.3 chuyển dữ liệu)
   pf/cropcycle: ">=1.0 <2"     # xem mùa vụ HTX trong phạm vi (dom/cooperative shared-read)
+  pf/evidence: ">=1.0 <2"      # cap/evidence: tệp minh chứng, Open(purpose) có nhật ký (W6.5)
   pf/extdata: ">=1.0 <2"       # lớp dữ liệu ngoài của bản đồ GIS
   pf/extension: ">=1.0 <2"     # nhiệm vụ, chỉ đạo, phòng ban (dom/extension)
   pf/forms: ">=1.0 <2"         # cap/forms: phát hành/nộp/rà soát/chốt kỳ + ảnh chụp (W6.2; KN v1 ghi song song)

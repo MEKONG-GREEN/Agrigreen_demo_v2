@@ -563,7 +563,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Siêu dữ liệu tệp + URL tải BẢN MÃ có hạn 5 phút (vai vault_evidence_viewer, có mục đích) */
+        /** Siêu dữ liệu tệp + URL tải BẢN MÃ có hạn 5 phút (vai vault_evidence_viewer, có mục đích; mọi quyết định ghi sổ truy cập) */
         get: operations["getFile"];
         put?: never;
         post?: never;
@@ -6181,6 +6181,15 @@ export interface components {
                 lon?: number;
                 accuracy_m?: number;
             };
+            /**
+             * @description Bộ ba R-DB-07 (W6.5): module chủ; null ở tệp cũ và tệp tải trước khi biết thực thể
+             * @example pf/cooperative
+             */
+            subject_module: string | null;
+            /** @example plot */
+            subject_type: string | null;
+            /** Format: uuid */
+            subject_id: string | null;
             /** Format: date-time */
             created_at: string;
         };
@@ -11617,6 +11626,23 @@ export interface operations {
                      * @description Tùy chọn: UUIDv7 máy sinh để bản ghi evidence ngoại tuyến tham chiếu trước khi tải
                      */
                     file_ref?: string;
+                    /**
+                     * @description Tùy chọn (W6.5, R-DB-07): module chủ của thực thể gắn tệp; đi cùng subject_type, subject_id
+                     * @example pf/cooperative
+                     */
+                    subject_module?: string;
+                    /**
+                     * @description Loại thực thể module chủ cho tham chiếu
+                     * @example plot
+                     * @example household
+                     * @example diary_entry
+                     */
+                    subject_type?: string;
+                    /**
+                     * Format: uuid
+                     * @description Mã thực thể — module chủ phải phân giải được trong tenant người gọi
+                     */
+                    subject_id?: string;
                 };
             };
         };
@@ -11645,7 +11671,7 @@ export interface operations {
             /** @description sync.file_ref_taken */
             409: components["responses"]["Problem"];
             413: components["responses"]["Problem"];
-            /** @description validation_failed | sync.file_checksum_mismatch */
+            /** @description validation_failed | sync.file_checksum_mismatch | evidence.subject_unresolved */
             422: components["responses"]["Problem"];
             /** @description sync.dependency_unavailable — chưa cấu hình kho đối tượng */
             503: components["responses"]["Problem"];
@@ -11682,7 +11708,7 @@ export interface operations {
             };
             /** @description sync.purpose_required */
             400: components["responses"]["Problem"];
-            /** @description forbidden | sync.purpose_not_allowed | sync.consent_missing */
+            /** @description forbidden | sync.purpose_not_allowed | sync.consent_missing | evidence.subject_forbidden */
             403: components["responses"]["Problem"];
             /** @description sync.file_not_found */
             404: components["responses"]["Problem"];

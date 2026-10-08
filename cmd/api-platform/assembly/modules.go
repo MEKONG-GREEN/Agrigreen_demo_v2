@@ -16,6 +16,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/content"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cropcycle"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extdata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms"
@@ -199,9 +200,12 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err := syncmod.CheckCursorKey(cursorKey(ext), residency.Production(os.Getenv)); err != nil {
 		return Modules{}, pools, err
 	}
+	// W6.5: cap/evidence sở hữu pf_files — route /v1/files của pf/sync gọi port.Files; chủ thể pf/cooperative.
+	ev := wireEvidence(unit, clk, evidence.Deps{Store: store, Vault: ext.Vault, Scope: pty.ScopeResolver(),
+		Consent: pty.ConsentChecker()}, coop.Resolve())
 	snc := syncmod.New(unit, clk, syncmod.Deps{
-		Scope: pty.ScopeResolver(), Consent: pty.ConsentChecker(), Params: md.Params(), Vault: ext.Vault,
-		Store: store, CursorKey: cursorKey(ext),
+		Scope: pty.ScopeResolver(), Params: md.Params(), Vault: ext.Vault,
+		Files: ev.Files(), CursorKey: cursorKey(ext),
 		Sources: []syncport.Source{md.SyncSource(), g.SyncSource(), cnt.SyncSource(), kn.SyncSource(), nt.SyncSource(), mrvMod.SyncSource(), cc.SyncSource(),
 			kn.ReportSyncSource()}, // KN v7.7 P7: report_task, form_layout, report_submission (Cấp Xã ngoại tuyến)
 		Sinks: []syncport.Sink{g.SyncSink(), kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink(), cc.SyncSink(), kn.ReportSyncSink()},

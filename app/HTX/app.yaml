@@ -7,6 +7,7 @@ modules:
   pf/content: ">=1.0 <2"       # tài liệu, SOP
   pf/cooperative: ">=1.0 <2"   # dom/cooperative: HTX, hộ, thửa, vụ, nhật ký (W3.2 mặt tiền; W3.3 chuyển dữ liệu)
   pf/cropcycle: ">=1.0 <2"     # mùa vụ, nhật ký, sản lượng, phê duyệt
+  pf/evidence: ">=1.0 <2"      # cap/evidence: tệp minh chứng, Open(purpose) có nhật ký (W6.5)
   pf/extension: ">=1.0 <2"     # yêu cầu hỗ trợ gửi khuyến nông
   pf/geo: ">=1.0 <2"           # lô ruộng, ranh giới
   pf/masterdata: ">=1.0 <2"

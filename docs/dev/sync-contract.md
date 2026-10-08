@@ -11,6 +11,7 @@ Thân: `{ "device_id": "<UUIDv7 sinh trên máy>", "platform": "android" | "ios"
 - `actor_ref` và `org_ref` của thiết bị lấy từ **token**, không từ thân (R-16).
 - Cùng người đăng ký lại cùng mã (cài lại, nâng cấp app) → `200`, cập nhật `app_version`. Mã của người khác → `409 sync.device_taken`.
 - **Mọi** lời gọi đồng bộ (`/v1/sync/pull`, `/v1/sync/push`, `POST /v1/files`) mang header `X-Device-Id`. Thiếu header, thiết bị chưa đăng ký trong tenant, hoặc đăng ký bởi tài khoản khác → `403 sync.device_unregistered`. Máy chủ ghi `last_seen_at` (tối đa mỗi phút một lần).
+- `POST /v1/files` (W6.5): lưu trữ và `GET /v1/files/{ref}[/content]` do `pf/evidence` (`cap/evidence`) thực hiện sau khi pf/sync kiểm thiết bị. Multipart nhận thêm bộ ba tùy chọn `subject_module`, `subject_type`, `subject_id` (R-DB-07: đủ cả ba hoặc không; module chủ phải phân giải được trong tenant → không thì `422 evidence.subject_unresolved`). Tệp tải trước khi biết thực thể (bản ghi ngoại tuyến tham chiếu `file_ref` sau) bỏ trống bộ ba. Mở tệp có chủ thể: người xem phải thấy chủ thể (`403 evidence.subject_forbidden`); mọi quyết định ghi sổ `pf_files.access_log`.
 - Thiết bị bị **thu hồi** (Admin API `POST /v1/devices/{id}/revoke {reason}`, vai `device_admin`, phát `pf.sync.device.revoked`): mọi lời gọi sync trả `403` với `code = sync.device_revoked`. App **xóa dữ liệu cục bộ** và khóa token ngay (mục 15). Mã đã thu hồi không đăng ký lại được — app sinh mã mới.
 - Đăng nhập ngoại tuyến tối đa **72 giờ** kể từ lần xác thực trực tuyến cuối. Mở khóa bằng PIN 6 số (App KN US-ADM).
 

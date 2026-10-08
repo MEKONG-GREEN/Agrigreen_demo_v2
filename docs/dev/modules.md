@@ -22,7 +22,7 @@ Mỗi module `internal/{platform,mkg,vault}/<module>` có `module.yaml` cạnh `
 | `provides.data_products` | **sinh** | `//ag:dataproduct` | Sản phẩm dữ liệu Public API (`contracts/dataproduct`) |
 | `permissions` | **sinh** | hằng `Role*` trong `port/` | Vai realm module khai và kiểm. Mã quyền × lớp (R-MOD-07) đến ở W7.2 |
 | `shares` | tay | — | Bảng chấp nhận đọc chéo đơn vị (ADR-0030), tên logic. Danh mục sinh `catalog_gen.go` mang `shares` (W4.1): cấp phép `intra_platform` chỉ nhận `module_table = <module>:<share>` khi `modreg.Shared` đúng |
-| `owns_schema` | **sinh** | migration | Schema `CREATE SCHEMA` tên `<cụm>_<module>` (vault: `vault`; schema lõi `k_ref` → `pf/kref`), hoặc schema chỉ module này nhắc trong chuỗi SQL (vd `ts_weigh` → `mkg/measurement`, `pf_files` → `pf/sync`). Schema lõi `k_*` có ở mọi cụm của `zones`, chỉ module `kernel` được sở hữu |
+| `owns_schema` | **sinh** | migration | Schema `CREATE SCHEMA` tên `<cụm>_<module>` (vault: `vault`; schema lõi `k_ref` → `pf/kref`), hoặc schema chỉ module này nhắc trong chuỗi SQL (vd `ts_weigh` → `mkg/measurement`, `pf_files` → `pf/evidence`). Schema lõi `k_*` có ở mọi cụm của `zones`, chỉ module `kernel` được sở hữu |
 | `enable` | tay | — | `always` (lõi, mkg, `pf/extdata`) \| `per_tenant` (bật theo đơn vị, W1.4). `kernel` bắt buộc `always` |
 
 Kiểm của `modreg`: trường lạ là lỗi, giá trị enum, semver, tên duy nhất, `depends` trỏ tới module có thật và ràng buộc thỏa phiên bản hiện có, mỗi schema một chủ, schema khớp `zones`. **Không** kiểm hướng tầng và chu trình (W1.2 `agmodgraph`).
@@ -62,7 +62,7 @@ go test ./tools/archlint -run ModGraph
 | `version` | `depends` trỏ tới module có thật, ràng buộc thỏa `version` hiện có | có |
 | `schema` | Schema trong `owns_schema` phải được migration `CREATE SCHEMA`; schema migration tạo phải có chủ (trừ cụm `shared` và `ops_schemas`); migration của module A không tạo/sửa/xóa đối tượng (bảng, view, chỉ mục, hàm, trigger, policy, chú thích) trong schema của module B | có |
 
-Migration được gắn module theo tên tệp `<số>_<cụm>_<module>[_…].up.sql` (khớp dài nhất). Tệp không khớp tên mà chỉ đụng schema của **một** module thì gắn module đó (vd `pf 000010_pf_files` → `pf/sync`, `ts 000001_ts_weigh` → `mkg/measurement`). Tệp đụng schema của nhiều module là vi phạm `schema`: migration mới phải tách theo module.
+Migration được gắn module theo tên tệp `<số>_<cụm>_<module>[_…].up.sql` (khớp dài nhất). Tệp không khớp tên mà chỉ đụng schema của **một** module thì gắn module đó (vd `pf 000010_pf_files` → `pf/evidence`, `ts 000001_ts_weigh` → `mkg/measurement`). Tệp đụng schema của nhiều module là vi phạm `schema`: migration mới phải tách theo module.
 
 Lỗi được báo ở `module.go` của module liên quan (với `depends`: ở dòng import). Vi phạm không gắn được module nào làm `archlint` dừng với lỗi chung.
 
@@ -375,6 +375,21 @@ Bốn cổng giữ ranh giới module sau W2.6. Hai cổng DB dùng tệp ngoạ
 **4. `agnofloat` cho `mkg/fieldops`, `pf/mechanization`.** Hai module trong `floatFreeProdZones`: cấm float trong mã không phải kiểm thử. Tệp `_test.go` miễn vì kiểm thử HTTP giải mã JSON bằng `encoding/json` (số → `float64`) và cố ý gửi số lẻ để kiểm từ chối. Không còn float trong mã sản phẩm của hai module.
 
 **Chạy:** `go run ./tools/archlint ./...`; `go test -count=1 -p 1 -run W91 ./migrations/` (cần `AG_TEST_PG_ADMIN_URL`).
+
+## Tệp minh chứng `cap/evidence` (W6.5)
+
+Kiến trúc v4.1 §18 (R-DB-07), §26; ADR-0027 mục 2. **Chọn module mới** `pf/evidence` (`internal/platform/evidence`, `cap/evidence`, `kind: capability`, `enable: always`) thay vì mở rộng `pf/sync`: bảng ánh xạ ADR-0027 gán schema `pf_files` cho `cap/evidence`, v4.1 tách `cap/evidence` khỏi `cap/sync`, và `Open(purpose)` là năng lực dùng chung (MRV, khuyến nông), không phải việc của động cơ đồng bộ. `pf/evidence` sở hữu `pf_files` (mã SQL chỉ ở `evidence/store`, modgen suy `owns_schema`); `pf/sync` giữ route `/v1/files` (kiểm thiết bị `X-Device-Id`, multipart) và gọi `evidence/port.Files`. Hợp đồng HTTP và mã lỗi `sync.file_*`, `sync.purpose_*`, `sync.consent_missing` giữ nguyên.
+
+| Việc | Quy tắc |
+|---|---|
+| Bộ ba chủ thể | `(subject_module, subject_type, subject_id)` trên `pf_files.file` (pf 000123), NULL được (tệp cũ — không UPDATE điền ngược; tệp tải trước khi biết thực thể). CHECK `file_subject_triple`: đủ cả ba hoặc không có. Không khóa ngoại xuyên schema |
+| `Attach` | Kiểm phong bì, băm bản mã; bộ ba (multipart `subject_module`, `subject_type`, `subject_id`) phải phân giải được qua `Resolver` của module chủ trong tenant người gọi → không thì `evidence.subject_unresolved` (422) |
+| `Open(purpose)` / `OpenContent(purpose)` | Vai `vault_evidence_viewer`, mục đích bắt buộc + được phép (R-42), người gọi thấy chủ thể (`Resolver` → mã xã; phạm vi người gọi — ngữ cảnh KN hoặc `ScopeResolver` — chứa xã, hoặc `ViaShareGrant`) → không thì `evidence.subject_forbidden` (403); đồng ý của hộ. Tệp chưa có bộ ba: chỉ vai + mục đích + đồng ý như trước |
+| Nhật ký | **Mọi** quyết định sau khi thấy tệp — `granted`, `denied_subject`, `denied_scope`, `denied_consent` — ghi một dòng sổ `pf_files.access_log` (`shared.apply_ledger`, chuỗi `file:<ref>`, chỉ mã tham chiếu). Ghi sổ lỗi → không cấp (fail-closed) |
+
+**Thêm module chủ.** Module chủ có cổng phân giải riêng (vd `cooperativeport.Resolve`); `pf/evidence` khai `evidence/port.Resolver` (interface bên tiêu thụ, mẫu `pf/workflow` ↔ `pf/party`) vì module năng lực không import module domain. Gốc lắp ráp viết bộ chuyển và nối bằng `evidence.Module.UseResolver(<tên module.yaml>, r)` — hiện có `pf/cooperative` (`cmd/api-platform/assembly/evidence.go`: `cooperative`, `household`, `plot`, `diary_entry`; `season`, `harvest` → không hỗ trợ đến W3.3). Phạm vi và đồng ý cũng là interface tự khai (`app.ScopeResolver`, `app.ConsentChecker`) để không thêm cạnh vào chu trình `pf/party ↔ pf/sync`.
+
+Vai DB: `r_evidence` là vai nhóm không có vai cũ (suy từ `owns_schema` trong `modreg.Catalog`, W2.6), `app_platform` là thành viên; `SELECT, INSERT` trên `pf_files.file`, `pf_files.access_log`. pf 000123 thu quyền `pf_files` của `r_sync` (và `sync_app` — sau W2.6 không còn quyền trực tiếp, lệnh vô hại).
 
 ## Module `pf/cooperative` — mặt tiền (W3.2)
 

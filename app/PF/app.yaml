@@ -8,6 +8,7 @@ modules:
   pf/content: ">=1.0 <2"
   pf/cooperative: ">=1.0 <2"   # dữ kiện thửa/vụ của sản phẩm dữ liệu Public API
   pf/cropcycle: ">=1.0 <2"     # quy trình SOP; dữ liệu vụ của Public API
+  pf/evidence: ">=1.0 <2"      # cap/evidence: tệp minh chứng, Open(purpose) có nhật ký (W6.5)
   pf/extdata: ">=1.0 <2"
   pf/geo: ">=1.0 <2"           # nhập thửa, biên tập bản đồ, quy chuẩn hiển thị; map_consumer
   pf/kref: ">=1.0 <2"          # bản chiếu k_ref (worker pf.kref, diễn tập dựng lại — W2.5)

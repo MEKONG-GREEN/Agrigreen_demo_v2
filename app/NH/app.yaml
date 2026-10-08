@@ -7,6 +7,7 @@ modules:
   pf/content: ">=1.0 <2"
   pf/cooperative: ">=1.0 <2"
   pf/cropcycle: ">=1.0 <2"
+  pf/evidence: ">=1.0 <2"      # cap/evidence: tệp minh chứng, Open(purpose) có nhật ký (W6.5)
   pf/extension: ">=1.0 <2"     # yêu cầu hỗ trợ
   pf/geo: ">=1.0 <2"
   pf/masterdata: ">=1.0 <2"

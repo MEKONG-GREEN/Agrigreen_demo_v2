@@ -118,12 +118,12 @@ Tự phê duyệt hoặc tự từ chối phiên bản tham số của chính m�
 | 404 | `sync.conflict_not_found` | pf/sync (Admin): không có xung đột |
 | 409 | `sync.conflict_state` | pf/sync (Admin): xung đột đã được đóng |
 | 422 | `sync.conflict_resolution_invalid` | pf/sync (Admin, US-SYNC-03): `resolution = keep_version` mà `resolved_record_id` không phải bản ghi của xung đột, hoặc `correction` trỏ lại bản ghi của xung đột |
-| 422 | `sync.file_checksum_mismatch` | pf/sync: SHA-256 của `blob` khác `meta.sha256_ciphertext` |
-| 409 | `sync.file_ref_taken` | pf/sync: `file_ref` đã dùng cho tệp có bản mã khác |
-| 404 | `sync.file_not_found` | pf/sync: không có tệp minh chứng trong tenant |
-| 400 | `sync.purpose_required` | pf/sync: đọc tệp minh chứng thiếu header `X-Purpose` (R-42) |
-| 403 | `sync.purpose_not_allowed` | pf/sync: mục đích không phải `mrv.evidence` hoặc `extension.field_support` |
-| 403 | `sync.consent_missing` | pf/sync: chủ thể chưa đồng ý (hoặc đã rút) cho mục đích đọc tệp |
+| 422 | `sync.file_checksum_mismatch` | pf/sync → pf/evidence (W6.5): SHA-256 của `blob` khác `meta.sha256_ciphertext` |
+| 409 | `sync.file_ref_taken` | pf/sync → pf/evidence (W6.5): `file_ref` đã dùng cho tệp có bản mã khác |
+| 404 | `sync.file_not_found` | pf/sync → pf/evidence (W6.5): không có tệp minh chứng trong tenant |
+| 400 | `sync.purpose_required` | pf/sync → pf/evidence (W6.5): đọc tệp minh chứng thiếu header `X-Purpose` (R-42) |
+| 403 | `sync.purpose_not_allowed` | pf/sync → pf/evidence (W6.5): mục đích không phải `mrv.evidence` hoặc `extension.field_support` |
+| 403 | `sync.consent_missing` | pf/sync → pf/evidence (W6.5): chủ thể chưa đồng ý (hoặc đã rút) cho mục đích đọc tệp |
 | 503 | `sync.dependency_unavailable` | pf/sync: chưa cấu hình kho đối tượng hoặc kho định danh |
 | 422 | `mrv.consent_missing` | pf/mrv: minh chứng gắn `household_ref` nhưng nông hộ chưa đồng ý mục đích `mrv.evidence` (mục 10.5). Đồng bộ ngoại tuyến trả `rejected` với cùng mã |
 | 403 | `mrv.out_of_scope` | pf/mrv: thu minh chứng hoặc xuất gói cho đơn vị ngoài phạm vi TW → Tỉnh → Xã của người gọi (ADR-0009) |
@@ -881,3 +881,12 @@ Route `/v1/forms/*` (Application API). Route v1 cũ của KN (`/v1/extension/rep
 | 422 | `forms.values_invalid` | Số liệu không khớp biểu: khóa lạ, thiếu trường bắt buộc, sai kiểu (thập phân là chuỗi, tối đa 6 chữ số lẻ) |
 | 422 | `forms.unit_not_in_period` | Đơn vị không thuộc kỳ, hoặc ngoài phạm vi mở lại của kỳ mở lại một phần |
 | 422 | `validation_failed` | Thiếu nhãn/hạn nộp/đơn vị khi phát hành; trả lại không ghi chú; lý do mở lại ngoài 10–500 ký tự |
+
+### pf/evidence (`cap/evidence` — tệp minh chứng, R-DB-07, W6.5)
+
+Đi ra qua route `/v1/files` của `pf/sync`. Mã tệp chuyển từ `pf/sync` giữ tiền tố `sync.*` (bảng pf/sync ở trên); mã dưới đây là mới.
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 422 | `evidence.subject_unresolved` | `POST /v1/files` có bộ ba `subject_module`/`subject_type`/`subject_id` mà module chủ không phân giải được: module chưa nối `Resolver`, thực thể không có (hoặc ngoài tenant), loại không cho tham chiếu |
+| 403 | `evidence.subject_forbidden` | `GET /v1/files/{ref}[/content]`: tệp có chủ thể mà người gọi không thấy (mã xã của chủ thể ngoài phạm vi, không qua cấp phép chia sẻ) hoặc chủ thể không còn phân giải được. Quyết định vẫn ghi sổ `pf_files.access_log` |

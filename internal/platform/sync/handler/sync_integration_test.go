@@ -22,6 +22,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
+	evport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence/port"
 	syncmod "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/store"
@@ -33,7 +34,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -51,20 +51,19 @@ const (
 )
 
 type fixture struct {
-	t       *testing.T
-	iss     *authztest.FakeIssuer
-	app     *httptest.Server
-	admin   *httptest.Server
-	mod     *syncmod.Module
-	pool    *pgxpool.Pool
-	clk     *clock.Fixed
-	scope   *fakeScope
-	consent *fakeConsent
-	vault   *clienttest.Fake
-	objects *objstore.Local
-	source  *memSource
-	sink    *memSink
-	tenant  uuid.UUID
+	t      *testing.T
+	iss    *authztest.FakeIssuer
+	app    *httptest.Server
+	admin  *httptest.Server
+	mod    *syncmod.Module
+	files  *fakeFiles // pf/evidence giả (W6.5)
+	pool   *pgxpool.Pool
+	clk    *clock.Fixed
+	scope  *fakeScope
+	vault  *clienttest.Fake
+	source *memSource
+	sink   *memSink
+	tenant uuid.UUID
 }
 
 type opts struct {
@@ -82,18 +81,14 @@ func newFixture(t *testing.T, o ...opts) *fixture {
 	}
 	f := &fixture{
 		t: t, iss: authztest.New(t), pool: env.Pool(t, migrations.PF, syncmod.DBRole), clk: clock.NewFixed(time.Now()),
-		scope: &fakeScope{scopes: map[uuid.UUID]authz.Scope{}}, consent: &fakeConsent{denied: map[uuid.UUID]bool{}},
+		scope: &fakeScope{scopes: map[uuid.UUID]authz.Scope{}}, files: newFakeFiles(),
 		vault: clienttest.New(), source: newMemSource("plot", "task"), sink: newMemSink("field_report", "plot_boundary"),
 		tenant: ids.New(),
 	}
-	objs, err := objstore.NewLocal(t.TempDir(), objstore.LocalOptions{PresignSecret: []byte("presign-secret-kiem-thu-0123456789"), BaseURL: "http://objstore.test"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.objects = objs
 	ops := env.Pool(t, migrations.PF, "platform_api")
+	// W6.5: tệp minh chứng thuộc pf/evidence (pf_files) — route /v1/files của pf/sync gọi port.Files (ở đây bản giả).
 	f.mod = syncmod.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), f.clk, syncmod.Deps{
-		Scope: f.scope, Consent: f.consent, Params: fakeParams{hours: op.slaHours}, Vault: f.vault, Store: objs,
+		Scope: f.scope, Params: fakeParams{hours: op.slaHours}, Vault: f.vault, Files: f.files,
 		CursorKey: []byte("khoa-con-tro-kiem-thu-0123456789abcdef"),
 		Sources:   append([]port.Source{f.source}, op.extra...), Sinks: []port.Sink{f.sink},
 	})
@@ -727,6 +722,9 @@ func (f *fixture) upload(c caller, s sealed, fileRef *string, idem ...string) re
 	return c.do(f.app.URL, http.MethodPost, "/v1/files", k, nil, w.FormDataContentType(), buf.Bytes())
 }
 
+// Route /v1/files (W6.5): pf/sync kiểm thiết bị và multipart rồi giao pf/evidence (port.Files); thân tới 15 MB
+// vượt giới hạn chung; mục đích từ header X-Purpose; lỗi của evidence đi thẳng ra. Quy tắc tệp (phong bì, băm,
+// file_ref, kho đối tượng, Open(purpose), đồng ý, sổ truy cập) kiểm ở internal/platform/evidence/app.
 func TestFilesUploadAndView(t *testing.T) {
 	f := newFixture(t)
 	c := f.officer()
@@ -735,86 +733,80 @@ func TestFilesUploadAndView(t *testing.T) {
 	photo := bytes.Repeat([]byte("JPEG"), 512<<10)
 	s := c.sealFor(unitA, photo)
 
-	// Sai băm → 422, không có đối tượng nào được ghi.
-	bad := s
-	bad.meta.SHA256Ciphertext = strings.Repeat("0", 64)
-	if r := f.upload(c, bad, nil); r.status != http.StatusUnprocessableEntity || code(r) != "sync.file_checksum_mismatch" {
-		t.Fatalf("sai băm: %d %s", r.status, r.raw)
-	}
-	// wrapped_dek phải đúng 80 byte.
-	bad = s
-	bad.meta.WrappedDEK = s.meta.WrappedDEK[:79]
-	if r := f.upload(c, bad, nil); r.status != http.StatusUnprocessableEntity || !strings.Contains(string(r.raw), "meta.wrapped_dek") {
-		t.Fatalf("wrapped_dek 79 byte: %d %s", r.status, r.raw)
-	}
-	bad = s
-	bad.meta.V, bad.meta.SubjectRef = 2, ""
-	if r := f.upload(c, bad, nil); r.status != http.StatusUnprocessableEntity {
-		t.Fatalf("v = 2, thiếu subject_ref: %d %s", r.status, r.raw)
-	}
-
 	ref := ids.New().String()
 	r := f.upload(c, s, &ref)
-	if r.status != http.StatusCreated || r.body["file_ref"] != ref {
+	if r.status != http.StatusCreated || r.body["file_ref"] != ref || r.hdr.Get("Location") != "/v1/files/"+ref {
 		t.Fatalf("tải: %d %s", r.status, r.raw)
 	}
-	// Kho đối tượng giữ ĐÚNG bản mã tại files/<tenant>/<file_ref>, không phải bản rõ (R-40).
-	rc, info, err := f.objects.Get(context.Background(), "files/"+f.tenant.String()+"/"+ref)
-	if err != nil {
-		t.Fatal(err)
+	if got := f.files.attached[0]; got.DeviceID == nil || *got.DeviceID != c.device || !bytes.Equal(got.Blob, s.blob) ||
+		got.Meta.SHA256Ciphertext != s.meta.SHA256Ciphertext || got.Subject != nil {
+		t.Fatalf("đầu vào Attach: device %v, subject %+v", got.DeviceID, got.Subject)
 	}
-	stored, _ := io.ReadAll(rc)
-	_ = rc.Close()
-	if !bytes.Equal(stored, s.blob) || bytes.Contains(stored, []byte("JPEGJPEG")) || info.ContentType != "application/octet-stream" {
-		t.Fatalf("đối tượng lưu phải là bản mã (%d byte, %s)", len(stored), info.ContentType)
-	}
-	// Gửi lại cùng file_ref, cùng bản mã → 200 bản cũ; khác bản mã → 409.
 	if r := f.upload(c, s, &ref); r.status != http.StatusOK {
 		t.Fatalf("gửi lại: %d %s", r.status, r.raw)
 	}
-	s2 := c.sealFor(unitA, []byte("ảnh khác"))
-	if r := f.upload(c, s2, &ref); code(r) != "sync.file_ref_taken" {
-		t.Fatalf("file_ref đã dùng: %d %s", r.status, r.raw)
+	if r := f.upload(c, c.sealFor(unitA, []byte("ảnh khác")), &ref); code(r) != "sync.file_ref_taken" {
+		t.Fatalf("lỗi của evidence đi thẳng ra: %d %s", r.status, r.raw)
 	}
 
-	// Xem: cần vai xem minh chứng + mục đích hợp lệ + đồng ý.
 	viewer := f.officer(client.RoleEvidenceViewer)
 	purpose := map[string]string{port.HeaderPurpose: string(client.PurposeMRVEvidence)}
-	if r := c.get("/v1/files/"+ref, purpose); r.status != http.StatusForbidden {
-		t.Fatalf("không có vai: %d", r.status)
-	}
 	if r := viewer.get("/v1/files/"+ref, nil); code(r) != "sync.purpose_required" {
 		t.Fatalf("thiếu mục đích: %d %s", r.status, r.raw)
 	}
-	if r := viewer.get("/v1/files/"+ref, map[string]string{port.HeaderPurpose: "registry.dedup"}); code(r) != "sync.purpose_not_allowed" {
-		t.Fatalf("mục đích sai: %d %s", r.status, r.raw)
-	}
 	g := viewer.get("/v1/files/"+ref, purpose)
 	file, _ := g.body["file"].(map[string]any)
-	if g.status != http.StatusOK || file["sha256_ciphertext"] != s.meta.SHA256Ciphertext || !strings.HasPrefix(fmt.Sprint(g.body["download_url"]), "http://objstore.test/") {
+	if g.status != http.StatusOK || file["sha256_ciphertext"] != s.meta.SHA256Ciphertext || file["subject_id"] != nil ||
+		!strings.HasPrefix(fmt.Sprint(g.body["download_url"]), "http://objstore.test/") || g.hdr.Get("Cache-Control") != "no-store" {
 		t.Fatalf("siêu dữ liệu: %d %s", g.status, g.raw)
 	}
 	ct := viewer.get("/v1/files/"+ref+"/content", purpose)
-	if ct.status != http.StatusOK || !bytes.Equal(ct.raw, photo) || ct.hdr.Get("Content-Type") != "image/jpeg" || ct.hdr.Get("Cache-Control") != "no-store" {
-		t.Fatalf("nội dung giải mã: %d %d byte", ct.status, len(ct.raw))
+	if ct.status != http.StatusOK || !bytes.Equal(ct.raw, s.blob) || ct.hdr.Get("Content-Type") != "image/jpeg" ||
+		ct.hdr.Get("Cache-Control") != "no-store" || ct.hdr.Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("nội dung: %d %d byte", ct.status, len(ct.raw))
 	}
-	var unwraps int
-	for _, a := range f.vault.Accesses() {
-		if a.Op == "unwrap" && a.Purpose == client.PurposeMRVEvidence && a.Ref == s.subject {
-			unwraps++
+	if p := f.files.purposes; len(p) != 3 || p[1] != string(client.PurposeMRVEvidence) || p[2] != string(client.PurposeMRVEvidence) {
+		t.Fatalf("mục đích chuyển cho evidence: %v", p)
+	}
+	if r := viewer.get("/v1/files/khong-phai-uuid", purpose); code(r) != "sync.file_not_found" {
+		t.Fatalf("ref sai dạng: %d %s", r.status, r.raw)
+	}
+}
+
+// W6.5: bộ ba chủ thể đi qua multipart tới pf/evidence — đủ cả ba hoặc không có; module chủ phải phân giải được.
+func TestFilesUploadSubject_W65(t *testing.T) {
+	f := newFixture(t)
+	c := f.officer()
+	c.register()
+	s := c.sealFor(unitA, []byte("ảnh thửa"))
+	send := func(fields map[string]string) resp {
+		var buf bytes.Buffer
+		w := multipart.NewWriter(&buf)
+		mb, _ := json.Marshal(s.meta)
+		_ = w.WriteField("meta", string(mb))
+		for k, v := range fields {
+			_ = w.WriteField(k, v)
 		}
+		part, _ := w.CreateFormFile("blob", "blob.bin")
+		_, _ = part.Write(s.blob)
+		_ = w.Close()
+		return c.do(f.app.URL, http.MethodPost, "/v1/files", key(), nil, w.FormDataContentType(), buf.Bytes())
 	}
-	if unwraps != 1 {
-		t.Fatalf("mở DEK phải qua kho định danh đúng một lần, có mục đích: %d", unwraps)
+	if r := send(map[string]string{"subject_module": "pf/cooperative", "subject_type": "plot"}); r.status != http.StatusUnprocessableEntity || code(r) != "validation_failed" {
+		t.Fatalf("thiếu subject_id: %d %s", r.status, r.raw)
 	}
-	f.consent.mu.Lock()
-	f.consent.denied[s.subject] = true
-	f.consent.mu.Unlock()
-	if r := viewer.get("/v1/files/"+ref, purpose); code(r) != "sync.consent_missing" {
-		t.Fatalf("chưa đồng ý: %d %s", r.status, r.raw)
+	plot := ids.New()
+	r := send(map[string]string{"subject_module": "pf/cooperative", "subject_type": "plot", "subject_id": plot.String()})
+	if r.status != http.StatusCreated {
+		t.Fatalf("có chủ thể: %d %s", r.status, r.raw)
 	}
-	if r := viewer.get("/v1/files/"+ids.New().String(), purpose); code(r) != "sync.file_not_found" {
-		t.Fatalf("tệp lạ: %d %s", r.status, r.raw)
+	if got := f.files.attached[len(f.files.attached)-1].Subject; got == nil || *got != (evport.Subject{Module: "pf/cooperative", Type: "plot", ID: plot}) {
+		t.Fatalf("bộ ba chuyển cho evidence: %+v", got)
+	}
+	// Bản giả không kiểm vai (Open(purpose) thật kiểm ở pf/evidence) — đọc lại để kiểm DTO.
+	file, _ := c.get("/v1/files/"+fmt.Sprint(r.body["file_ref"]), map[string]string{port.HeaderPurpose: string(client.PurposeMRVEvidence)}).body["file"].(map[string]any)
+	if file["subject_module"] != "pf/cooperative" || file["subject_type"] != "plot" || file["subject_id"] != plot.String() {
+		t.Fatalf("DTO bộ ba: %v", file)
 	}
 }
 

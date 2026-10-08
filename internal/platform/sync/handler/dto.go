@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	evport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
@@ -136,15 +137,23 @@ type fileDTO struct {
 	ContentType      string  `json:"content_type"`
 	CapturedAt       *string `json:"captured_at" pii:"true"`
 	GPS              *gpsDTO `json:"gps"`
-	CreatedAt        string  `json:"created_at"`
+	// Bộ ba R-DB-07 (W6.5); null ở tệp cũ và tệp tải trước khi biết thực thể.
+	SubjectModule *string `json:"subject_module"`
+	SubjectType   *string `json:"subject_type"`
+	SubjectID     *string `json:"subject_id"`
+	CreatedAt     string  `json:"created_at"`
 }
 
-func toFileDTO(f domain.File) fileDTO {
+func toFileDTO(f evport.File) fileDTO {
 	out := fileDTO{FileRef: f.Ref.String(), SubjectRef: f.SubjectRef.String(), V: f.V, Alg: f.Alg, Nonce: f.Nonce,
 		WrappedDEK: f.WrappedDEK, SHA256Ciphertext: f.SHA256Ciphertext, Size: f.Size, ContentType: f.ContentType,
 		CapturedAt: tsPtr(f.CapturedAt), CreatedAt: ts(f.CreatedAt)}
 	if f.GPSLat != nil && f.GPSLon != nil {
 		out.GPS = &gpsDTO{Lat: *f.GPSLat, Lon: *f.GPSLon, AccuracyM: f.GPSAccuracyM}
+	}
+	if sub := f.Subject; sub != nil {
+		id := sub.ID.String()
+		out.SubjectModule, out.SubjectType, out.SubjectID = &sub.Module, &sub.Type, &id
 	}
 	return out
 }

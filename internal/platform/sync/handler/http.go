@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	evport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
@@ -21,19 +22,18 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
 // Handler gói Service cho HTTP.
 type Handler struct{ Svc *app.Service }
 
 // RegisterApp gắn route Application API vào nhóm /v1 (xác thực + idempotency).
-// POST /files được phép thân tới domain.MaxUploadBody thay cho giới hạn chung.
+// POST /files được phép thân tới evport.MaxUploadBody thay cho giới hạn chung.
 func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.POST("/devices", h.register)
 	rg.GET("/sync/pull", h.pull)
 	rg.POST("/sync/push", h.push)
-	httpx.AllowBody(rg, http.MethodPost, "/files", domain.MaxUploadBody)
+	httpx.AllowBody(rg, http.MethodPost, "/files", evport.MaxUploadBody)
 	rg.POST("/files", h.upload)
 	rg.GET("/files/:ref", h.getFile)
 	rg.GET("/files/:ref/content", h.content)
@@ -120,7 +120,8 @@ func (h Handler) push(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"results": out})
 }
 
-// upload đọc multipart: phần meta (JSON phong bì), blob (bản mã), file_ref (tùy chọn).
+// upload đọc multipart: phần meta (JSON phong bì), blob (bản mã), file_ref và bộ ba chủ thể subject_module,
+// subject_type, subject_id (tùy chọn, R-DB-07).
 func (h Handler) upload(c *gin.Context) {
 	mr, err := c.Request.MultipartReader()
 	if err != nil {
@@ -129,6 +130,7 @@ func (h Handler) upload(c *gin.Context) {
 	}
 	in := app.UploadInput{DeviceHeader: c.GetHeader(port.HeaderDeviceID)}
 	var gotMeta, gotBlob bool
+	subject := map[string]string{}
 	for {
 		part, err := mr.NextPart()
 		if errors.Is(err, io.EOF) {
@@ -152,7 +154,7 @@ func (h Handler) upload(c *gin.Context) {
 			}
 			in.Meta, gotMeta = m, true
 		case "blob":
-			b, err := io.ReadAll(io.LimitReader(part, domain.MaxFileBytes+1))
+			b, err := io.ReadAll(io.LimitReader(part, evport.MaxFileBytes+1))
 			if err != nil {
 				httpx.Fail(c, uploadErr(err))
 				return
@@ -166,14 +168,29 @@ func (h Handler) upload(c *gin.Context) {
 			}
 			s := string(b)
 			in.FileRef = &s
+		case "subject_module", "subject_type", "subject_id":
+			b, err := io.ReadAll(io.LimitReader(part, 64))
+			if err != nil {
+				httpx.Fail(c, uploadErr(err))
+				return
+			}
+			subject[part.FormName()] = strings.TrimSpace(string(b))
 		default:
-			httpx.Fail(c, problem.BadRequest.WithDetail("Phần multipart không được hỗ trợ: chỉ meta, blob, file_ref"))
+			httpx.Fail(c, problem.BadRequest.WithDetail("Phần multipart không được hỗ trợ: chỉ meta, blob, file_ref, subject_module, subject_type, subject_id"))
 			return
 		}
 	}
 	if !gotMeta || !gotBlob {
 		httpx.Fail(c, problem.Validation.WithField("meta", "bắt buộc phần meta và blob"))
 		return
+	}
+	if len(subject) > 0 { // bộ ba R-DB-07: đủ cả ba hoặc không có
+		id, err := uuid.Parse(subject["subject_id"])
+		if len(subject) != 3 || err != nil {
+			httpx.Fail(c, problem.Validation.WithField("subject_id", "subject_module, subject_type, subject_id đi cùng nhau; subject_id là UUID"))
+			return
+		}
+		in.Subject = &evport.Subject{Module: subject["subject_module"], Type: subject["subject_type"], ID: id}
 	}
 	f, created, err := h.Svc.Upload(c.Request.Context(), in)
 	if err != nil {
@@ -196,7 +213,7 @@ func uploadErr(err error) error {
 	return problem.BadRequest.WithDetail("multipart không hợp lệ")
 }
 
-func purpose(c *gin.Context) client.Purpose { return client.Purpose(c.GetHeader(port.HeaderPurpose)) }
+func purpose(c *gin.Context) string { return c.GetHeader(port.HeaderPurpose) }
 
 func (h Handler) getFile(c *gin.Context) {
 	ref, err := uuid.Parse(c.Param("ref"))

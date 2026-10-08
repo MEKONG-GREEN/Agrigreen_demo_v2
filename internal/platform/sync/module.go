@@ -1,6 +1,7 @@
 // Package sync là module đồng bộ ngoại tuyến phía máy chủ (mục 15, ADR-0006,
 // docs/dev/sync-contract.md): đăng ký/thu hồi thiết bị, pull theo phạm vi, push
-// chỉ ghi thêm, tệp minh chứng đã mã hóa, sổ đăng ký xung đột có SLA.
+// chỉ ghi thêm, route tải/xem tệp minh chứng (lưu trữ, Open(purpose) ở pf/evidence — W6.5),
+// sổ đăng ký xung đột có SLA.
 //
 // pf/sync không đọc bảng của module khác: dữ liệu đi xuống qua port.Source, đi lên
 // qua port.Sink, do gốc lắp ráp truyền vào (R-02, R-05, R-06).
@@ -21,20 +22,20 @@ import (
 	"go.opentelemetry.io/otel/metric"
 
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
+	evport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
-// DBRole là vai DB riêng của module (R-05) cho cả pf_sync và pf_files.
+// DBRole là vai DB riêng của module (R-05) cho pf_sync (pf_files thuộc pf/evidence từ W6.5).
 const DBRole = "sync_app"
 
 // MetricConflictOverdue là chỉ số nghiệp vụ bắt buộc có cảnh báo (mục 19): số
@@ -44,12 +45,11 @@ const MetricConflictOverdue = "ag.sync.conflict.overdue"
 // Deps là phụ thuộc của module. Sources/Sinks là port của các module có dữ liệu
 // hiện trường (geo, content, extension, mrv…), gốc lắp ráp gom lại.
 type Deps struct {
-	Scope     partyport.ScopeResolver  // phạm vi TW → Tỉnh → Xã (ADR-0009); nil → phạm vi rỗng
-	Consent   partyport.ConsentChecker // tùy chọn: kiểm đồng ý trước khi cấp tệp minh chứng
-	Params    params.Params            // tùy chọn: sync.conflict_sla_hours (mặc định 72 giờ)
-	Vault     client.Client            // khóa công khai (pubkey), mở DEK xem tệp
-	Store     objstore.Store           // kho đối tượng chỉ chứa bản mã (R-40); nil → /v1/files trả 503
-	CursorKey []byte                   // AG_SYNC_CURSOR_KEY, ít nhất 32 byte
+	Scope     partyport.ScopeResolver // phạm vi TW → Tỉnh → Xã (ADR-0009); nil → phạm vi rỗng
+	Params    params.Params           // tùy chọn: sync.conflict_sla_hours (mặc định 72 giờ)
+	Vault     client.Client           // khóa công khai (pubkey) của hộ
+	Files     evport.Files            // tệp minh chứng (pf/evidence, W6.5); nil → /v1/files trả 503
+	CursorKey []byte                  // AG_SYNC_CURSOR_KEY, ít nhất 32 byte
 	Log       *slog.Logger
 	Sources   []port.Source
 	Sinks     []port.Sink
@@ -70,8 +70,8 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 			panic("sync: không sinh được khóa con trỏ: " + err.Error())
 		}
 	}
-	svc, err := app.NewService(db, clk, app.Deps{Scope: d.Scope, Consent: d.Consent, Params: d.Params, Vault: d.Vault,
-		Store: d.Store, CursorKey: d.CursorKey, Log: d.Log}, d.Sources, d.Sinks)
+	svc, err := app.NewService(db, clk, app.Deps{Scope: d.Scope, Params: d.Params, Vault: d.Vault,
+		Files: d.Files, CursorKey: d.CursorKey, Log: d.Log}, d.Sources, d.Sinks)
 	if err != nil {
 		panic(err.Error())
 	}

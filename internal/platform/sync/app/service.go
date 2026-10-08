@@ -1,4 +1,4 @@
-// Package app: use case của pf/sync — thiết bị, pull, push, tệp minh chứng, xung
+// Package app: use case của pf/sync — thiết bị, pull, push, tải tệp (qua pf/evidence), xung
 // đột. Giao dịch mở ở đây; dữ liệu nghiệp vụ đi qua Source/Sink của module sở hữu.
 package app
 
@@ -14,13 +14,13 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
+	evport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -37,13 +37,10 @@ var (
 	ErrCursorInvalid        = problem.New(http.StatusBadRequest, "sync.cursor_invalid", "Con trỏ đồng bộ không hợp lệ — pull lại từ đầu")
 	ErrConflictNotFound     = problem.New(http.StatusNotFound, "sync.conflict_not_found", "Không tìm thấy xung đột")
 	ErrConflictState        = problem.New(http.StatusConflict, "sync.conflict_state", "Xung đột đã được xử lý")
-	ErrFileChecksum         = problem.New(http.StatusUnprocessableEntity, "sync.file_checksum_mismatch", "SHA-256 bản mã không khớp sha256_ciphertext")
-	ErrFileRefTaken         = problem.New(http.StatusConflict, "sync.file_ref_taken", "file_ref đã dùng cho tệp có nội dung khác")
-	ErrFileNotFound         = problem.New(http.StatusNotFound, "sync.file_not_found", "Không tìm thấy tệp minh chứng")
-	ErrPurposeRequired      = problem.New(http.StatusBadRequest, "sync.purpose_required", "Thiếu mục đích xử lý (header X-Purpose)")
-	ErrPurposeNotAllowed    = problem.New(http.StatusForbidden, "sync.purpose_not_allowed", "Mục đích không được phép xem tệp minh chứng")
-	ErrConsentMissing       = problem.New(http.StatusForbidden, "sync.consent_missing", "Chủ thể chưa đồng ý cho mục đích này")
-	ErrDependency           = problem.New(http.StatusServiceUnavailable, "sync.dependency_unavailable", "Chưa nối phụ thuộc của module đồng bộ")
+	// ErrFileNotFound: đường dẫn /v1/files/{ref} sai dạng — cùng mã pf/evidence trả khi không có tệp. Các mã
+	// tệp khác (sync.file_*, sync.purpose_*, sync.consent_missing) do pf/evidence trả (W6.5).
+	ErrFileNotFound = problem.New(http.StatusNotFound, "sync.file_not_found", "Không tìm thấy tệp minh chứng")
+	ErrDependency   = problem.New(http.StatusServiceUnavailable, "sync.dependency_unavailable", "Chưa nối phụ thuộc của module đồng bộ")
 )
 
 // Deps là phụ thuộc ngoài module, do gốc lắp ráp truyền vào.
@@ -52,11 +49,10 @@ type Deps struct {
 	// Farmers (tùy chọn): nông hộ liên kết với tài khoản nông dân (pf/accounts). Thiếu →
 	// thiết bị của nông dân không nhận gì (mặc định chặn), như trước G2 đợt 3.
 	Farmers   accport.FarmerHouseholds
-	Consent   partyport.ConsentChecker // tùy chọn: kiểm đồng ý trước khi cấp tệp minh chứng
-	Params    params.Params            // tùy chọn: sync.conflict_sla_hours
-	Vault     client.Client            // khóa công khai (pubkey) và mở DEK xem tệp
-	Store     objstore.Store           // kho đối tượng chỉ chứa bản mã (R-40)
-	CursorKey []byte                   // khóa HMAC của con trỏ pull (AG_SYNC_CURSOR_KEY)
+	Params    params.Params // tùy chọn: sync.conflict_sla_hours
+	Vault     client.Client // khóa công khai (pubkey) của hộ
+	Files     evport.Files  // tệp minh chứng (pf/evidence, W6.5); nil → /v1/files trả 503
+	CursorKey []byte        // khóa HMAC của con trỏ pull (AG_SYNC_CURSOR_KEY)
 	Log       *slog.Logger
 }
 
@@ -177,10 +173,6 @@ func validation(errs []problem.FieldError) error {
 		v = v.WithField(e.Field, e.Reason)
 	}
 	return v
-}
-
-func fieldErr(field, reason string) problem.FieldError {
-	return problem.FieldError{Field: field, Reason: reason}
 }
 
 func orgPtr(p authz.Principal) *uuid.UUID {

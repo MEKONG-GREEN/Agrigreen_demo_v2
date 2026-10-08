@@ -27,9 +27,9 @@ func roleByName(t *testing.T, name string) (Role, int) {
 // thứ tự tạo nhóm trước.
 func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	groups := ModuleGroups()
-	// 17 pf có vai cũ + pf/kref + pf/workflow + pf/forms + 7 mkg + vault/identity; pf/extdata không schema.
-	if len(groups) != 28 || len(legacyGroups()) != 25 {
-		t.Errorf("số vai nhóm: %d (muốn 28, 25 có vai cũ): %v", len(groups), groups)
+	// 17 pf có vai cũ + pf/kref + pf/workflow + pf/forms + pf/evidence + 7 mkg + vault/identity; pf/extdata không schema.
+	if len(groups) != 29 || len(legacyGroups()) != 25 {
+		t.Errorf("số vai nhóm: %d (muốn 29, 25 có vai cũ): %v", len(groups), groups)
 	}
 	if slices.ContainsFunc(groups, func(g ModuleGroup) bool { return g.Module == "pf/extdata" }) {
 		t.Error("pf/extdata không có schema — không có vai nhóm")
@@ -45,7 +45,7 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 			t.Errorf("%s: %+v", g.Role, r)
 		}
 		if g.Legacy == "" {
-			// Module không có vai cũ (W2.5: pf/kref, W6.1: pf/workflow, W6.2: pf/forms) — không vai đăng nhập nào ngoài app_* là thành viên.
+			// Module không có vai cũ (W2.5: pf/kref, W6.1: pf/workflow, W6.2: pf/forms, W6.5: pf/evidence) — không vai đăng nhập nào ngoài app_* là thành viên.
 			for _, o := range Roles {
 				if slices.Contains(o.MemberOf, g.Role) && !slices.Contains(LoginRoles(), o.Name) {
 					t.Errorf("%s không được là thành viên %s", o.Name, g.Role)
@@ -117,6 +117,10 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	// W6.2: api-platform ghép pf/forms — app_platform là thành viên r_forms.
 	if !slices.Contains(plat.MemberOf, "r_forms") {
 		t.Errorf("r_forms: app_platform %v", plat.MemberOf)
+	}
+	// W6.5: api-platform ghép pf/evidence (route /v1/files của pf/sync gọi port) — app_platform là thành viên r_evidence.
+	if w, _ := roleByName(t, AppWorker); !slices.Contains(plat.MemberOf, "r_evidence") || slices.Contains(w.MemberOf, "r_evidence") {
+		t.Errorf("r_evidence: app_platform %v, app_worker %v", plat.MemberOf, w.MemberOf)
 	}
 	// Không vai đặc quyền nào cấp cho app_* (ADR-0028 §1).
 	for _, u := range LoginUnits {
@@ -310,7 +314,7 @@ func TestMigration91MatchesModuleGroups(t *testing.T) {
 }
 
 // laterGroups: module có vai nhóm sinh SAU pf 000092 — migration của chính module cấp k_ref cho r_* của nó.
-var laterGroups = map[string]string{"pf/workflow": "pf/000118_pf_workflow.up.sql", "pf/forms": "pf/000122_pf_forms_grants.up.sql"}
+var laterGroups = map[string]string{"pf/workflow": "pf/000118_pf_workflow.up.sql", "pf/forms": "pf/000122_pf_forms_grants.up.sql", "pf/evidence": "pf/000123_pf_evidence.up.sql"}
 
 // pf 000092 (W2.5) cấp SELECT k_ref.* cho MỌI r_* của module pf lúc đó (R-DB-05) — danh sách ghi tay khớp
 // ModuleGroups cụm pf trừ module sinh sau (laterGroups).

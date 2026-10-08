@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/envelope"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 )
 
@@ -109,30 +108,5 @@ func TestNormalizeResult(t *testing.T) {
 	}
 	if r := NormalizeResult(port.Result{Status: port.StatusRejected}, id, gen); r.Code != "validation_failed" || r.ID != id {
 		t.Fatalf("rejected thiếu mã: %+v", r)
-	}
-}
-
-func TestParseFileMeta(t *testing.T) {
-	now := time.Now().UTC()
-	pub, _, _ := envelope.GenerateKeyPair(nil)
-	s, err := envelope.Seal([]byte("ảnh"), pub)
-	if err != nil {
-		t.Fatal(err)
-	}
-	m := envelope.NewMetadata(ids.New().String(), s, "image/jpeg", now.Format(time.RFC3339))
-	m.GPS = &envelope.GPS{Lat: 10.03, Lon: 105.78, AccuracyM: 6.5}
-	f, errs := ParseFileMeta(m, int64(len(s.Ciphertext)), now)
-	if len(errs) > 0 || f.GPSLat == nil || *f.GPSLat != 10.03 {
-		t.Fatalf("metadata hợp lệ: %v", errs)
-	}
-	bad := m
-	bad.WrappedDEK = bad.WrappedDEK[:79]
-	if _, errs := ParseFileMeta(bad, int64(len(s.Ciphertext)), now); len(errs) != 1 || errs[0].Field != "meta.wrapped_dek" {
-		t.Fatalf("wrapped_dek 79 byte: %v", errs)
-	}
-	bad = m
-	bad.V, bad.SubjectRef = 2, ""
-	if _, errs := ParseFileMeta(bad, MaxFileBytes+1, now); len(errs) != 3 {
-		t.Fatalf("v, subject_ref, kích thước: %v", errs)
 	}
 }

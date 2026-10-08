@@ -3,6 +3,7 @@ package handler_test
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
+	evport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/evidence/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -49,16 +51,71 @@ func (f fakeParams) At(_ context.Context, key string, at time.Time) (params.Para
 	return params.ParamValue{Key: key, Value: *f.hours, Unit: "h", Version: 1, EffectiveFrom: at}, nil
 }
 
-// fakeConsent từ chối các chủ thể trong denied.
-type fakeConsent struct {
-	mu     sync.Mutex
-	denied map[uuid.UUID]bool
+// fakeFiles thay pf/evidence (W6.5 — sync/handler chỉ import port/ của module khác, R-02): lưu theo
+// (tenant, file_ref), ghi lại đầu vào để kiểm route /v1/files. Quy tắc tệp (phong bì, băm, chủ thể,
+// Open(purpose), đồng ý, sổ truy cập) kiểm ở internal/platform/evidence/app.
+type fakeFiles struct {
+	mu       sync.Mutex
+	files    map[[2]uuid.UUID]evport.File
+	blobs    map[[2]uuid.UUID][]byte
+	attached []evport.AttachInput
+	purposes []string
 }
 
-func (f *fakeConsent) HasConsent(_ context.Context, subject uuid.UUID, _ string) (bool, error) {
+func newFakeFiles() *fakeFiles {
+	return &fakeFiles{files: map[[2]uuid.UUID]evport.File{}, blobs: map[[2]uuid.UUID][]byte{}}
+}
+
+func (f *fakeFiles) Attach(ctx context.Context, in evport.AttachInput) (evport.File, bool, error) {
+	p, _ := authz.FromContext(ctx)
+	ref := ids.New()
+	if in.FileRef != nil {
+		r, err := uuid.Parse(*in.FileRef)
+		if err != nil {
+			return evport.File{}, false, problem.Validation.WithField("file_ref", "phải là UUIDv7")
+		}
+		ref = r
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return !f.denied[subject], nil
+	f.attached = append(f.attached, in)
+	k := [2]uuid.UUID{p.TenantID, ref}
+	if old, ok := f.files[k]; ok {
+		if old.SHA256Ciphertext != in.Meta.SHA256Ciphertext {
+			return evport.File{}, false, problem.New(http.StatusConflict, "sync.file_ref_taken", "file_ref đã dùng")
+		}
+		return old, false, nil
+	}
+	file := evport.File{TenantID: p.TenantID, Ref: ref, SHA256Ciphertext: in.Meta.SHA256Ciphertext, Size: int64(len(in.Blob)),
+		ContentType: in.Meta.ContentType, UploadedBy: p.ActorRef, DeviceID: in.DeviceID, Subject: in.Subject, CreatedAt: time.Now()}
+	f.files[k], f.blobs[k] = file, in.Blob
+	return file, true, nil
+}
+
+func (f *fakeFiles) find(ctx context.Context, ref uuid.UUID, purpose string) (evport.File, []byte, error) {
+	p, _ := authz.FromContext(ctx)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.purposes = append(f.purposes, purpose)
+	if purpose == "" {
+		return evport.File{}, nil, problem.New(http.StatusBadRequest, "sync.purpose_required", "Thiếu mục đích")
+	}
+	k := [2]uuid.UUID{p.TenantID, ref}
+	file, ok := f.files[k]
+	if !ok {
+		return evport.File{}, nil, problem.New(http.StatusNotFound, "sync.file_not_found", "Không tìm thấy tệp")
+	}
+	return file, f.blobs[k], nil
+}
+
+func (f *fakeFiles) Open(ctx context.Context, ref uuid.UUID, purpose string) (evport.Opened, error) {
+	file, _, err := f.find(ctx, ref, purpose)
+	return evport.Opened{File: file, URL: "http://objstore.test/" + ref.String(), ExpiresAt: time.Now().Add(5 * time.Minute)}, err
+}
+
+func (f *fakeFiles) OpenContent(ctx context.Context, ref uuid.UUID, purpose string) (string, []byte, error) {
+	file, blob, err := f.find(ctx, ref, purpose)
+	return file.ContentType, blob, err
 }
 
 // memSource là Source trong bộ nhớ: mỗi thay đổi có cursor = vị trí + 1 và mã
