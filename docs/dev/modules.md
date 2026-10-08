@@ -343,7 +343,7 @@ Bốn cổng giữ ranh giới module sau W2.6. Hai cổng DB dùng tệp ngoạ
 - Mọi bảng bật RLS ở mọi cụm (bảng gốc, không phân vùng con): `EXPLAIN (FORMAT JSON, VERBOSE) SELECT * FROM t LIMIT 50` dưới vai đọc được bảng (ưu tiên `r_<module chủ>`, không superuser, không BYPASSRLS), ngữ cảnh mẫu `app.tenant_id`, `app.node_id`, `app.dept`, …
 - Hỏng khi hàm do repo định nghĩa xuất hiện trong `Filter`/`Join Filter` của bất kỳ nút nào, hoặc ở bất kỳ biểu thức nào dưới một SubPlan (chạy theo hàng ngoài). Hàm SQL `STABLE` inline được (`shared.current_tenant`, `k_ref.ctx_*`) biến mất khỏi kế hoạch; InitPlan được phép.
 - `TestRLSExplainGateDetects_W91` dựng chính sách mẫu (plpgsql trong Filter, EXISTS gọi hàm trong SubPlan, chính sách inline) để chứng minh cổng bắt được.
-- Ngoại lệ: `migrations/rls_explain_exceptions.yaml`. Lúc thêm W9.1: 357 bảng, không vi phạm, danh sách rỗng.
+- Ngoại lệ: `migrations/rls_explain_exceptions.yaml`. Lúc thêm W9.1: 360 bảng, không vi phạm, danh sách rỗng.
 - Chính sách mới (W3.4 trở đi): viết thẳng điều kiện, `EXISTS (SELECT 1 FROM k_ref.node_closure …)` không gọi hàm không inline được.
 
 **4. `agnofloat` cho `mkg/fieldops`, `pf/mechanization`.** Hai module trong `floatFreeProdZones`: cấm float trong mã không phải kiểm thử. Tệp `_test.go` miễn vì kiểm thử HTTP giải mã JSON bằng `encoding/json` (số → `float64`) và cố ý gửi số lẻ để kiểm từ chối. Không còn float trong mã sản phẩm của hai module.
