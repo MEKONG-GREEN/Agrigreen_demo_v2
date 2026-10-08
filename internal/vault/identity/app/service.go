@@ -52,6 +52,12 @@ type Service struct {
 	KMS      kms.KMS
 	BlindKey []byte    // khóa HMAC của chỉ mục mù (AG_VAULT_BLIND_KEY), tách khỏi KEK
 	Rand     io.Reader // nil = crypto/rand
+	// Quota là hạn mức theo người yêu cầu cho Lookup/Resolve (quota.go). nil = không giới hạn.
+	Quota *Quota
+	// RequireMFASensitive bắt buộc MFA (cùng kiểm như Erase) cho Resolve (định danh đầy
+	// đủ) và Unwrap (mở DEK ảnh). cmd/identity-vault bật mặc định ở production
+	// (AG_VAULT_REQUIRE_MFA), tắt ở dev/test khi token thử chưa có amr.
+	RequireMFASensitive bool
 }
 
 var _ client.Client = (*Service)(nil)
@@ -74,8 +80,9 @@ func (s *Service) rand() io.Reader {
 	return rand.Reader
 }
 
-// begin kiểm người gọi, mục đích (R-42) rồi vai.
-func (s *Service) begin(ctx context.Context, purpose client.Purpose, roles ...string) (authz.Principal, error) {
+// begin kiểm người gọi, mục đích (R-42: đúng dạng VÀ thuộc danh mục của thao tác op,
+// domain.AllowedPurpose) rồi vai.
+func (s *Service) begin(ctx context.Context, op string, purpose client.Purpose, roles ...string) (authz.Principal, error) {
 	if _, ok := authz.FromContext(ctx); !ok {
 		return authz.Principal{}, problem.Unauthenticated
 	}
@@ -85,7 +92,24 @@ func (s *Service) begin(ctx context.Context, purpose client.Purpose, roles ...st
 	if !domain.ValidPurpose(string(purpose)) {
 		return authz.Principal{}, problem.Validation.WithField("purpose", "phải khớp ^[a-z][a-z0-9_.]{2,63}$")
 	}
+	if !domain.AllowedPurpose(op, string(purpose)) {
+		return authz.Principal{}, problem.Validation.WithField("purpose",
+			"không thuộc danh mục mục đích của thao tác "+op+": "+strings.Join(domain.AllowedPurposes(op), ", "))
+	}
 	return authz.Require(ctx, roles...)
+}
+
+// sensitive kiểm thêm cho thao tác trả định danh đầy đủ / mở DEK: MFA (khi bật
+// RequireMFASensitive — cùng kiểm như Erase) và hạn mức theo người yêu cầu (quota
+// chỉ áp khi quota=true: Lookup, Resolve).
+func (s *Service) sensitive(ctx context.Context, p authz.Principal, op string, purpose client.Purpose, mfa, quota bool) error {
+	if mfa && s.RequireMFASensitive && !p.MFA {
+		return problem.MFARequired
+	}
+	if quota {
+		return s.Quota.check(ctx, p.TenantID, p.ActorRef, op, purpose)
+	}
+	return nil
 }
 
 // logAccess ghi một dòng sổ truy cập. ref nil → chuỗi "miss".
@@ -111,7 +135,7 @@ var errBlindRace = errors.New("vault: tranh chấp chỉ mục mù")
 // Create tạo chủ thể, sinh cặp khóa X25519. Trùng SĐT/CCCD trong tenant →
 // trả Created của chủ thể cũ kèm client.ProblemDuplicate.
 func (s *Service) Create(ctx context.Context, purpose client.Purpose, in client.Identity) (client.Created, error) {
-	p, err := s.begin(ctx, purpose, client.RoleRegistrar)
+	p, err := s.begin(ctx, domain.OpCreate, purpose, client.RoleRegistrar)
 	if err != nil {
 		return client.Created{}, err
 	}
@@ -307,7 +331,7 @@ func (s *Service) decrypt(ctx context.Context, tx pgx.Tx, tid, ref uuid.UUID) (p
 
 // Display trả nhãn hiển thị tối thiểu (mục 10.4). Đã xóa → nhãn "(đã xóa định danh)" kèm client.ProblemErased.
 func (s *Service) Display(ctx context.Context, purpose client.Purpose, ref uuid.UUID) (client.Display, error) {
-	p, err := s.begin(ctx, purpose, client.RoleRegistrar, client.RoleDisplay, client.RoleEvidenceViewer)
+	p, err := s.begin(ctx, domain.OpDisplay, purpose, client.RoleRegistrar, client.RoleDisplay, client.RoleEvidenceViewer)
 	if err != nil {
 		return client.Display{}, err
 	}
@@ -337,8 +361,11 @@ func (s *Service) Display(ctx context.Context, purpose client.Purpose, ref uuid.
 
 // Resolve trả định danh đầy đủ; mọi lần gọi đều ghi sổ có mục đích và người yêu cầu (R-42).
 func (s *Service) Resolve(ctx context.Context, purpose client.Purpose, ref uuid.UUID) (client.Identity, error) {
-	p, err := s.begin(ctx, purpose, client.RoleRegistrar)
+	p, err := s.begin(ctx, domain.OpResolve, purpose, client.RoleRegistrar)
 	if err != nil {
+		return client.Identity{}, err
+	}
+	if err := s.sensitive(ctx, p, domain.OpResolve, purpose, true, true); err != nil {
 		return client.Identity{}, err
 	}
 	var out client.Identity
@@ -368,13 +395,17 @@ func (s *Service) Resolve(ctx context.Context, purpose client.Purpose, ref uuid.
 
 // Lookup tìm chủ thể theo SĐT hoặc CCCD qua chỉ mục mù. Không thấy → ProblemNotFound (vẫn ghi sổ).
 func (s *Service) Lookup(ctx context.Context, purpose client.Purpose, phoneOrNationalID string) (uuid.UUID, error) {
-	p, err := s.begin(ctx, purpose, client.RoleRegistrar)
+	p, err := s.begin(ctx, domain.OpLookup, purpose, client.RoleRegistrar)
 	if err != nil {
 		return uuid.Nil, err
 	}
 	cands := domain.LookupCandidates(phoneOrNationalID)
 	if len(cands) == 0 {
 		return uuid.Nil, problem.Validation.WithField("value", "phải là SĐT Việt Nam hoặc CCCD/CMND")
+	}
+	// Lookup không trả định danh nên không đòi MFA, nhưng là đường dò SĐT/CCCD → có hạn mức.
+	if err := s.sensitive(ctx, p, domain.OpLookup, purpose, false, true); err != nil {
+		return uuid.Nil, err
 	}
 	blinds := make([]store.Blind, 0, len(cands))
 	for _, c := range cands {
@@ -403,8 +434,11 @@ func (s *Service) Lookup(ctx context.Context, purpose client.Purpose, phoneOrNat
 
 // Unwrap mở DEK đã seal bằng khóa công khai của chủ thể (xem ảnh minh chứng).
 func (s *Service) Unwrap(ctx context.Context, purpose client.Purpose, ref uuid.UUID, wrappedDEK []byte) ([]byte, error) {
-	p, err := s.begin(ctx, purpose, client.RoleEvidenceViewer)
+	p, err := s.begin(ctx, domain.OpUnwrap, purpose, client.RoleEvidenceViewer)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.sensitive(ctx, p, domain.OpUnwrap, purpose, true, false); err != nil {
 		return nil, err
 	}
 	if len(wrappedDEK) != envelope.WrappedDEKLen {

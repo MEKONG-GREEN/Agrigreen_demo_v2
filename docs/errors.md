@@ -41,6 +41,7 @@ Mã lỗi của module có dạng `<module>.<lỗi>`.
 | 409 | `vault.duplicate` | vault/identity: trùng SĐT hoặc CCCD trong tenant; problem có thêm `ref` và `public_key` của chủ thể cũ |
 | 410 | `vault.erased` | vault/identity: chủ thể đã bị xóa định danh (RB-3); khóa bí mật đã hủy |
 | 422 | `vault.unwrap_failed` | vault/identity: `wrapped_dek` không mở được bằng khóa của chủ thể |
+| 429 | `vault.quota_exceeded` | vault/identity: người yêu cầu vượt hạn mức Lookup/Resolve (`AG_VAULT_QUOTA_PER_HOUR`/`_BURST`); problem có `retry_after_s`. Mục đích ngoài danh mục của thao tác → 422 `validation_failed` (trường `purpose`); Resolve/Unwrap thiếu MFA khi `AG_VAULT_REQUIRE_MFA` bật → 403 `mfa_required` |
 | 502/503 | `vault.unavailable` | client của kho: kho định danh không phản hồi hoặc lỗi hệ thống |
 | 404 | `masterdata.admin_unit_not_found` | pf/masterdata: không có đơn vị hành chính với mã đó tại thời điểm tra (hoặc đã bãi bỏ không có kế thừa) |
 | 409 | `masterdata.admin_unit_conflict` | pf/masterdata: nhập danh mục có phiên bản `(code, valid_from)` đã có với nội dung khác — chỉ được đóng hiệu lực phiên bản đang mở |

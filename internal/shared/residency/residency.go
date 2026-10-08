@@ -6,7 +6,9 @@
 //
 // Biến môi trường:
 //
-//	AG_ENV                  production (hoặc prod) mới kiểm; môi trường khác bỏ qua
+//	AG_ENV                  BẮT BUỘC, một trong production|prod|staging|test|development|dev|local.
+//	                        Thiếu hoặc sai chính tả → dừng khởi động (không "mở cửa" vì quên đặt biến).
+//	                        production (hoặc prod) mới kiểm RB-7; môi trường khác bỏ qua
 //	AG_RESIDENCY_ALLOWLIST  danh mục trong lãnh thổ, phân tách bằng dấu phẩy — BẮT BUỘC ở production
 //	AG_NONPII_ALLOWLIST     (tùy chọn) đích ngoài lãnh thổ CHỈ nhận dữ liệu không định danh
 //	                        (vd FCM data-only: fcm.googleapis.com) — chỉ áp cho biến đẩy thông báo
@@ -58,6 +60,30 @@ var nonPIIPrefixes = []string{"AG_FCM_", "AG_APNS_", "AG_PUSH_", "AG_EXTDATA_"}
 // ErrViolation là lỗi gốc của mọi vi phạm RB-7.
 var ErrViolation = errors.New("RB-7: đích ngoài danh mục nhà cung cấp trong lãnh thổ")
 
+// ErrEnv: AG_ENV thiếu hoặc không thuộc danh mục môi trường đã biết. Guard production
+// (RB-7, RB-3 kho định danh…) không được "mở cửa" chỉ vì quên đặt biến hay gõ sai.
+var ErrEnv = errors.New("AG_ENV thiếu hoặc không hợp lệ")
+
+// knownEnvs là các giá trị AG_ENV hợp lệ (sau khi trim + chữ thường). Helm dùng
+// production/staging/dev, compose dev dùng local, kiểm thử dùng test.
+var knownEnvs = map[string]bool{
+	"production": true, "prod": true, "staging": true, "test": true,
+	"development": true, "dev": true, "local": true,
+}
+
+// ValidateEnv bắt buộc AG_ENV được đặt và thuộc knownEnvs. Lỗi chỉ nêu tên biến
+// và danh mục — giá trị lạ vẫn được in (không phải bí mật) để người vận hành sửa.
+func ValidateEnv(getenv func(string) string) error {
+	e := strings.ToLower(strings.TrimSpace(getenv(EnvName)))
+	if e == "" {
+		return fmt.Errorf("%w: chưa đặt %s (production|staging|test|development|local)", ErrEnv, EnvName)
+	}
+	if !knownEnvs[e] {
+		return fmt.Errorf("%w: %s=%q không thuộc production|prod|staging|test|development|dev|local", ErrEnv, EnvName, e)
+	}
+	return nil
+}
+
 // Production cho biết AG_ENV là production.
 func Production(getenv func(string) string) bool {
 	e := strings.ToLower(strings.TrimSpace(getenv(EnvName)))
@@ -67,8 +93,12 @@ func Production(getenv func(string) string) bool {
 // CheckEnv kiểm môi trường của tiến trình hiện tại. Gọi đầu tiên trong main.
 func CheckEnv() error { return Check(os.Getenv, os.Environ()) }
 
-// Check kiểm các biến trong environ (dạng K=V) với getenv. Không phải production → nil.
+// Check kiểm các biến trong environ (dạng K=V) với getenv: trước hết AG_ENV phải
+// hợp lệ (ValidateEnv, ErrEnv); sau đó không phải production → nil.
 func Check(getenv func(string) string, environ []string) error {
+	if err := ValidateEnv(getenv); err != nil {
+		return err
+	}
 	if !Production(getenv) {
 		return nil
 	}

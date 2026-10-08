@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -38,6 +39,12 @@ func NewLocalKMS(id string, kek []byte) (KMS, error) { return kms.NewLocal(id, k
 // LocalKMSFromEnv đọc AG_VAULT_KEK (base64 32 byte) và AG_VAULT_KEK_ID.
 func LocalKMSFromEnv() (KMS, error) { return kms.LocalFromEnv() }
 
+// KMSFromEnv chọn hiện thực KMS theo AG_VAULT_KMS (rỗng → local) — trả kèm tên nhà cung cấp.
+func KMSFromEnv() (KMS, string, error) { return kms.FromEnv(os.Getenv) }
+
+// KMSIsSoftware cho biết k là KMS phần mềm (KEK trong bộ nhớ tiến trình).
+func KMSIsSoftware(k KMS) bool { return kms.IsSoftware(k) }
+
 // BlindKeyFromEnv đọc AG_VAULT_BLIND_KEY.
 func BlindKeyFromEnv() ([]byte, error) {
 	raw := strings.TrimSpace(os.Getenv(EnvBlindKey))
@@ -60,6 +67,18 @@ type Config struct {
 	Clock    clock.Clock
 	KMS      KMS
 	BlindKey []byte
+	// Quota: hạn mức Lookup/Resolve theo người yêu cầu (QuotaFromEnv). nil = không giới hạn.
+	Quota *Quota
+	// RequireMFASensitive: bắt buộc MFA cho Resolve/Unwrap (như Erase).
+	RequireMFASensitive bool
+}
+
+// Quota là hạn mức theo người yêu cầu của kho (app/quota.go).
+type Quota = app.Quota
+
+// QuotaFromEnv đọc AG_VAULT_QUOTA_PER_HOUR / AG_VAULT_QUOTA_BURST.
+func QuotaFromEnv(clk clock.Clock, log *slog.Logger) (*Quota, error) {
+	return app.QuotaFromEnv(clk, log)
 }
 
 // Module là vault/identity đã nối.
@@ -70,7 +89,8 @@ type Module struct {
 
 // New dựng module.
 func New(cfg Config) (*Module, error) {
-	svc := &app.Service{DB: cfg.DB, Clock: cfg.Clock, KMS: cfg.KMS, BlindKey: cfg.BlindKey}
+	svc := &app.Service{DB: cfg.DB, Clock: cfg.Clock, KMS: cfg.KMS, BlindKey: cfg.BlindKey, Quota: cfg.Quota,
+		RequireMFASensitive: cfg.RequireMFASensitive}
 	if err := svc.Validate(); err != nil {
 		return nil, err
 	}

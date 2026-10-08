@@ -51,6 +51,7 @@ không thuộc công cụ này (R-03: gốc lắp ráp một vùng).
 Chạy (máy vận hành trong vùng mkg, trỏ vào **bản sao**; lệnh GHI bảng chiếu nên bắt buộc `-confirm-copy`):
 
 ```
+AG_ENV=production AG_RESIDENCY_ALLOWLIST=<danh mục, xem residency.md> \
 AG_MKG_DB_URL=postgres://<host bản sao>:5432/?sslmode=require \
 AG_DB_APP_PASSWORD=… \
 go run ./cmd/rebuilddrill -confirm-copy -out rebuild-drill-$(date +%F).md -json rebuild-drill-$(date +%F).json

@@ -14,12 +14,24 @@
 # Xem docs/runbooks/vps-deploy.md.
 
 x-vps-env: &vps-env
+  # Bắt buộc với mọi dịch vụ Go (residency.ValidateEnv): thiếu/sai → từ chối khởi động.
   AG_ENV: ${AG_ENV:-staging}
   # Chỉ có hiệu lực khi AG_ENV=production: mọi đích phải thuộc tên miền của mình hoặc dịch vụ nội bộ.
   AG_RESIDENCY_ALLOWLIST: ${AG_DOMAIN:?chạy deploy/vps/prepare.sh},single-label
 
 x-vps-oidc: &vps-oidc
   AG_OIDC_ISSUER: https://auth.${AG_DOMAIN}/realms/agrigreen
+
+# sslmode=disable giữa ứng dụng ↔ pgbouncer ↔ postgres (kế thừa docker-compose.yml): CHẤP NHẬN cho VPS MỘT
+# máy — lưu lượng chỉ trong mạng bridge nội bộ của Docker trên cùng host, không ra NIC vật lý. Phải xem lại
+# (bật TLS/verify-full hoặc ADR chấp nhận rủi ro) ngay khi DB tách sang máy khác hay chạy nhiều node.
+
+# Mạng compose cố định (M12): Caddy có IP tĩnh để api-platform tin ĐÚNG một proxy (AG_TRUSTED_PROXIES) —
+# ClientIP = IP thật của người dùng (giới hạn theo IP của /v1/public, sổ truy cập), không giả được bằng
+# X-Forwarded-For. Đổi dải khi trùng mạng có sẵn trên host (đặt cả hai biến trong .env, IP phải thuộc dải).
+# Lần đầu áp dụng trên VPS đang chạy: `docker compose ... down` rồi `up` để Docker tạo lại mạng default.
+x-vps-proxy: &vps-proxy
+  AG_TRUSTED_PROXIES: ${AG_VPS_CADDY_IP:-172.30.10.10}
 
 services:
   caddy:
@@ -33,6 +45,9 @@ services:
       ACME_EMAIL: ${ACME_EMAIL:?chạy deploy/vps/prepare.sh}
       ADMIN_ALLOW_CIDR: ${ADMIN_ALLOW_CIDR:?chạy deploy/vps/prepare.sh}
     ports: ["80:80", "443:443", "443:443/udp"]
+    networks:
+      default:
+        ipv4_address: ${AG_VPS_CADDY_IP:-172.30.10.10}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -71,6 +86,7 @@ services:
       KC_HOSTNAME: https://auth.${AG_DOMAIN}
       KC_HTTP_ENABLED: "true"          # TLS kết thúc ở Caddy
       KC_PROXY_HEADERS: xforwarded
+      KC_PROXY_TRUSTED_ADDRESSES: ${AG_VPS_CADDY_IP:-172.30.10.10}  # chỉ tin X-Forwarded-* từ Caddy (M12)
       KC_CACHE: local                  # một node: không lập cụm JGroups
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
@@ -81,6 +97,10 @@ services:
 
   # Ngoại lệ tường minh (cmd/identity-vault/prodguard.go, có hiệu lực khi AG_ENV=production): VPS một máy — kho chỉ
   # trong mạng compose (cổng chỉ bind 127.0.0.1), không mTLS; KEK phần mềm từ .env cho tới khi có KMS/HSM.
+  # RỦI RO ĐÃ BIẾT (M10, RB-3/RB-7): KEK bọc khóa của mọi chủ thể nằm trong .env/bộ nhớ tiến trình — lộ máy là
+  # lộ KEK. CHỜ QUYẾT ĐỊNH nhà cung cấp KMS/HSM trong lãnh thổ; khi có: hiện thực ở internal/vault/identity/kms,
+  # đặt AG_VAULT_KMS=<nhà cung cấp> và BỎ AG_VAULT_ALLOW_LOCAL_KMS. Trong lúc chờ: kho ghi cảnh báo
+  # event=security.kms_software lúc khởi động, /readyz trả kms_local=1, metric ag_vault_kms_software=1.
   identity-vault:
     environment:
       <<: [*vps-env, *vps-oidc]
@@ -91,7 +111,7 @@ services:
   # tuyến tới, không publish. Chứng thư dev do prepare.sh → gen-dev-secrets → gen-dev-certs sinh.
   api-platform:
     environment:
-      <<: [*vps-env, *vps-oidc]
+      <<: [*vps-env, *vps-oidc, *vps-proxy]
       AG_CORS_ORIGINS: https://app.${AG_DOMAIN}
       AG_KC_ACTIONS_REDIRECT_URI: https://app.${AG_DOMAIN}/
 
@@ -143,6 +163,12 @@ services:
       NEXT_PUBLIC_API_BASE_URL: https://api.${AG_DOMAIN}
       NEXT_PUBLIC_ADMIN_API_BASE: https://admin.${AG_DOMAIN}
       NEXT_PUBLIC_OIDC_ISSUER: https://auth.${AG_DOMAIN}/realms/agrigreen
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${AG_VPS_SUBNET:-172.30.10.0/24}
 
 volumes:
   caddy_data: {}

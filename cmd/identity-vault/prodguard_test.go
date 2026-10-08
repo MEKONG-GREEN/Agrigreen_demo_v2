@@ -21,6 +21,8 @@ func TestProductionGuard(t *testing.T) {
 		wantErr  []string // rỗng → không lỗi
 	}{
 		{name: "ngoài production không kiểm", env: map[string]string{"AG_ENV": "staging"}, localKMS: true},
+		{name: "thiếu AG_ENV → lỗi, không mở cửa", env: map[string]string{}, localKMS: true, wantErr: []string{"AG_ENV"}},
+		{name: "AG_ENV gõ sai → lỗi", env: map[string]string{"AG_ENV": "prd"}, localKMS: true, wantErr: []string{"AG_ENV"}},
 		{name: "production đủ mTLS, KMS thật", env: map[string]string{"AG_ENV": "production"}, tls: mtls},
 		{name: "production không TLS", env: map[string]string{"AG_ENV": "production"}, wantErr: []string{"mTLS"}},
 		{name: "production TLS không xác thực client", env: map[string]string{"AG_ENV": "production"}, tls: tlsOnly, wantErr: []string{"mTLS"}},

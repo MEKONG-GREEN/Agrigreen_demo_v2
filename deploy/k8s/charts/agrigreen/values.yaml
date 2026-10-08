@@ -531,6 +531,10 @@ apps:
       AG_VAULT_KEK_ID: prod-kek-1
       # Ngoại lệ tường minh (cmd/identity-vault/prodguard.go): KEK phần mềm từ Secret vault-keys cho tới khi chọn được
       # KMS/HSM trong lãnh thổ — production từ chối khởi động nếu bỏ dòng này mà chưa có KMS. Gỡ khi có KMS.
+      # RỦI RO ĐÃ BIẾT (M10, RB-3/RB-7): KEK bọc khóa của mọi chủ thể nằm trong Secret/bộ nhớ Pod, không có HSM.
+      # CHỜ QUYẾT ĐỊNH nhà cung cấp KMS/HSM trong lãnh thổ → hiện thực ở internal/vault/identity/kms (FromEnv),
+      # đặt AG_VAULT_KMS=<nhà cung cấp>, rồi xóa dòng dưới. Trong lúc chờ: log event=security.kms_software lúc
+      # khởi động, metric ag_vault_kms_software=1 (luật AgVaultSoftwareKMS), /readyz trả kms_local=1.
       AG_VAULT_ALLOW_LOCAL_KMS: "1"
       AG_OIDC_ISSUER: "{{ .Values.common.oidc.issuer }}"
       AG_OIDC_AUDIENCE: "{{ .Values.common.oidc.audience }}"

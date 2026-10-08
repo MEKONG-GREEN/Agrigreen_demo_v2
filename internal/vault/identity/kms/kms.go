@@ -38,6 +38,53 @@ const (
 	EnvKEKID = "AG_VAULT_KEK_ID" // tùy chọn, mặc định "local-1"
 )
 
+// EnvProvider chọn hiện thực KMS. Hiện chỉ có ProviderLocal (KEK phần mềm). Nhà
+// cung cấp KMS/HSM trong lãnh thổ (RB-7) CHƯA được chốt — khi chốt, thêm một
+// nhánh trong FromEnv trả hiện thực KMS mới (không cài Software() hoặc trả false),
+// cmd/identity-vault tự bỏ yêu cầu ngoại lệ AG_VAULT_ALLOW_LOCAL_KMS.
+const EnvProvider = "AG_VAULT_KMS"
+
+// ProviderLocal là KMS phần mềm (Local) — mặc định khi chưa đặt AG_VAULT_KMS để
+// không làm gãy các bản triển khai hiện có.
+const ProviderLocal = "local"
+
+// ErrUnknownProvider: AG_VAULT_KMS không thuộc danh mục hiện thực đã có.
+var ErrUnknownProvider = errors.New("kms: nhà cung cấp KMS chưa được hỗ trợ")
+
+// Softwarer là giao diện tùy chọn: hiện thực trả Software()=true giữ KEK trong
+// bộ nhớ tiến trình (không phải KMS/HSM). Production chỉ chấp nhận khi có ngoại
+// lệ tường minh (cmd/identity-vault/prodguard.go).
+type Softwarer interface {
+	Software() bool
+}
+
+// IsSoftware cho biết k là KMS phần mềm. Hiện thực không cài Softwarer được coi
+// là KMS/HSM thật.
+func IsSoftware(k KMS) bool {
+	s, ok := k.(Softwarer)
+	return ok && s.Software()
+}
+
+// FromEnv chọn hiện thực theo AG_VAULT_KMS (rỗng → local) và trả kèm tên nhà
+// cung cấp đã chọn (không bao giờ chứa dữ liệu khóa).
+func FromEnv(getenv func(string) string) (KMS, string, error) {
+	p := strings.ToLower(strings.TrimSpace(getenv(EnvProvider)))
+	if p == "" {
+		p = ProviderLocal
+	}
+	switch p {
+	case ProviderLocal:
+		k, err := localFrom(getenv)
+		if err != nil {
+			return nil, p, err
+		}
+		return k, p, nil
+	default:
+		return nil, p, fmt.Errorf("%w: %s=%q (hiện chỉ có %q — cần quyết định nhà cung cấp KMS/HSM trong lãnh thổ)",
+			ErrUnknownProvider, EnvProvider, p, ProviderLocal)
+	}
+}
+
 // Local là KMS phần mềm: AES-256-GCM với KEK trong bộ nhớ. CHỈ cho dev/test;
 // production dùng KMS/HSM trong lãnh thổ.
 type Local struct {
@@ -67,8 +114,10 @@ func NewLocal(id string, kek []byte) (*Local, error) {
 }
 
 // LocalFromEnv đọc AG_VAULT_KEK (base64) và AG_VAULT_KEK_ID.
-func LocalFromEnv() (*Local, error) {
-	raw := strings.TrimSpace(os.Getenv(EnvKEK))
+func LocalFromEnv() (*Local, error) { return localFrom(os.Getenv) }
+
+func localFrom(getenv func(string) string) (*Local, error) {
+	raw := strings.TrimSpace(getenv(EnvKEK))
 	if raw == "" {
 		return nil, fmt.Errorf("kms: chưa đặt %s", EnvKEK)
 	}
@@ -76,11 +125,14 @@ func LocalFromEnv() (*Local, error) {
 	if err != nil {
 		return nil, fmt.Errorf("kms: %s phải là base64 chuẩn", EnvKEK)
 	}
-	return NewLocal(os.Getenv(EnvKEKID), kek)
+	return NewLocal(getenv(EnvKEKID), kek)
 }
 
 // KeyID trả định danh KEK.
 func (l *Local) KeyID() string { return l.id }
+
+// Software: Local giữ KEK trong bộ nhớ tiến trình — luôn là KMS phần mềm.
+func (l *Local) Software() bool { return true }
 
 // Wrap = nonce 12 byte ‖ AES-256-GCM(KEK, plaintext, aad).
 func (l *Local) Wrap(_ context.Context, plaintext, aad []byte) ([]byte, error) {

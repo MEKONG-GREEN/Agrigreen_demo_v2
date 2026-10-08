@@ -4,6 +4,8 @@ Mục 21 (danh mục nhà cung cấp được phép) và RB-7. Mã: [internal/sh
 
 Khi `AG_ENV=production` (hoặc `prod`), tiến trình **dừng ngay** nếu một biến `AG_*` có tên kết thúc bằng `_URL`, `_URLS`, `_ENDPOINT`, `_HOST`, `_ISSUER` (trừ `AG_TEST_*`) trỏ tới máy chủ ngoài danh mục. Như vậy DB (`AG_PF_DB_URL`, `AG_DB_URL`, `AG_DB_DIRECT_URL`, `AG_VAULT_DB_URL`), S3 (`AG_S3_ENDPOINT`, `AG_BACKUP_S3_ENDPOINT`), OTLP (`AG_OTLP_ENDPOINT`), Keycloak (`AG_OIDC_ISSUER`, `AG_OIDC_JWKS_URL`), kho định danh (`AG_VAULT_URL`), RabbitMQ (`AG_AMQP_URL`, `AG_RABBITMQ_MGMT_URL`) đều được kiểm; module mới (SMTP `AG_SMTP_HOST`, FCM `AG_FCM_ENDPOINT`…) chỉ cần đặt tên biến theo quy ước. Môi trường khác production: không kiểm.
 
+`AG_ENV` là **bắt buộc** với mọi tiến trình gọi `residency.CheckEnv` (dịch vụ và công cụ `objsync`, `drill`, `rebuilddrill`): một trong `production|prod|staging|test|development|dev|local`. Thiếu hoặc gõ sai (vd `prd`) → dừng khởi động với `AG_ENV thiếu hoặc không hợp lệ` — guard production không "mở cửa" chỉ vì quên đặt biến. Compose dev đặt `local`, Helm đặt `global.env`, VPS mặc định `staging`; khi chạy công cụ bằng `go run` trên máy dev hãy đặt `AG_ENV=local` (hoặc `test`).
+
 | Biến | Ý nghĩa |
 |---|---|
 | `AG_RESIDENCY_ALLOWLIST` | **Bắt buộc** ở production. Danh sách phân tách bằng dấu phẩy: hậu tố tên miền (`agrigreen.vn` khớp `agrigreen.vn` và `*.agrigreen.vn`), IP, CIDR (`10.0.0.0/8`), từ khóa `single-label` (tên dịch vụ nội cụm một nhãn như `pgbouncer`). Không nhận `*`. |

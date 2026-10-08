@@ -31,6 +31,7 @@ func TestDisabledFlagExits_ADR0022(t *testing.T) {
 
 // Đóng khi lỗi: bật nhưng thiếu AG_PUBLIC_OPERATOR_TENANT → không khởi động.
 func TestEnabledRequiresOperatorTenant_ADR0022(t *testing.T) {
+	t.Setenv("AG_ENV", "test") // AG_ENV bắt buộc (residency.CheckEnv) — kiểm trước tenant vận hành
 	err := run(context.Background(), slog.New(slog.NewTextHandler(io.Discard, nil)), func(k string) string {
 		if k == port.EnvEnabled {
 			return "1"

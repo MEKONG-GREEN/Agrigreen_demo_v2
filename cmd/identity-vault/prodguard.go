@@ -18,8 +18,12 @@ const (
 
 // productionGuard: ở production (residency.Production) kho định danh — nơi giữ dữ liệu cá nhân — bắt buộc mTLS
 // (TLS + chứng thư client) và KMS không phải phần mềm, trừ khi người vận hành đặt ngoại lệ tường minh. Ngoài
-// production không kiểm.
+// production không kiểm. AG_ENV thiếu/sai → lỗi (residency.ValidateEnv): guard không "mở cửa" vì quên đặt biến.
+// localKMS lấy từ hiện thực KMS thật sự được cấu hình (identity.KMSIsSoftware), không phải hằng.
 func productionGuard(getenv func(string) string, tlsCfg *tls.Config, localKMS bool, log *slog.Logger) error {
+	if err := residency.ValidateEnv(getenv); err != nil {
+		return err
+	}
 	if !residency.Production(getenv) {
 		return nil
 	}
@@ -34,8 +38,12 @@ func productionGuard(getenv func(string) string, tlsCfg *tls.Config, localKMS bo
 	}
 	if localKMS {
 		if getenv(AllowLocalKMSEnv) == "1" {
-			log.Warn("production dùng KEK phần mềm (AG_VAULT_KEK) theo ngoại lệ "+AllowLocalKMSEnv+" — thay bằng KMS/HSM trong lãnh thổ",
-				"event", "startup", "outcome", "degraded")
+			// Cảnh báo LỚN, có event riêng để luật log/alert bắt được; readyz và metric ag.vault.kms_software
+			// cũng phơi trạng thái này (main.go, router.go). Chờ quyết định nhà cung cấp KMS/HSM trong lãnh thổ.
+			log.Warn("!!! RỦI RO RB-3/RB-7: production dùng KEK PHẦN MỀM (AG_VAULT_KEK) theo ngoại lệ "+AllowLocalKMSEnv+
+				" — KEK nằm trong biến môi trường/bộ nhớ tiến trình, không có HSM bảo vệ. Cần quyết định nhà cung cấp KMS/HSM trong lãnh thổ"+
+				" rồi đặt AG_VAULT_KMS và bỏ ngoại lệ !!!",
+				"event", "security.kms_software", "kms_local", 1, "outcome", "degraded")
 		} else {
 			errs = append(errs, errors.New("production: KMS phần mềm (AG_VAULT_KEK) chỉ cho dev/test — cấu hình KMS/HSM hoặc đặt "+
 				AllowLocalKMSEnv+"=1 để chấp nhận rủi ro"))

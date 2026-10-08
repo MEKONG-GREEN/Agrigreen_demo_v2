@@ -71,3 +71,29 @@ func TestLabelAndMask(t *testing.T) {
 		t.Fatalf("MaskPhone = %q", got)
 	}
 }
+
+// M13: mục đích đúng dạng nhưng ngoài danh mục của thao tác bị từ chối.
+func TestAllowedPurpose(t *testing.T) {
+	ok := [][2]string{
+		{OpLookup, "registry.dedup"}, {OpLookup, "registry.admin"}, {OpResolve, "extension.contact"},
+		{OpUnwrap, "mrv.evidence"}, {OpDisplay, "mechanization.owner"}, {OpErase, "registry.erasure"},
+		{OpCreate, "mechanization.owner"},
+	}
+	for _, c := range ok {
+		if !AllowedPurpose(c[0], c[1]) {
+			t.Errorf("%s/%s phải được phép", c[0], c[1])
+		}
+	}
+	bad := [][2]string{
+		{OpLookup, "extension.contact"}, {OpLookup, "mrv.evidence"}, {OpResolve, "mrv.evidence"},
+		{OpResolve, "marketing.campaign"}, {OpUnwrap, "registry.admin"}, {"khac", "registry.admin"},
+	}
+	for _, c := range bad {
+		if AllowedPurpose(c[0], c[1]) {
+			t.Errorf("%s/%s phải bị từ chối", c[0], c[1])
+		}
+	}
+	if got := AllowedPurposes(OpLookup); len(got) != 2 || got[0] != "registry.admin" {
+		t.Errorf("AllowedPurposes(lookup) = %v", got)
+	}
+}

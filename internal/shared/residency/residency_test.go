@@ -200,3 +200,25 @@ func TestServiceMainsCallGuard(t *testing.T) {
 		}
 	}
 }
+
+// M11: thiếu AG_ENV hay gõ sai không được làm guard production "mở cửa" — dừng khởi động.
+func TestEnvMissingOrUnknownFailsClosed(t *testing.T) {
+	for _, v := range []string{"", "   ", "prd", "Productio", "uat"} {
+		m := prodEnv()
+		m["AG_S3_ENDPOINT"] = "s3.amazonaws.com" // nếu guard bỏ qua thì đích ngoài lãnh thổ lọt qua
+		if v == "" {
+			delete(m, "AG_ENV")
+		} else {
+			m["AG_ENV"] = v
+		}
+		get, environ := envOf(m)
+		if err := Check(get, environ); !errors.Is(err, ErrEnv) {
+			t.Fatalf("AG_ENV=%q phải trả ErrEnv, nhận %v", v, err)
+		}
+	}
+	for _, v := range []string{"production", "PROD", "staging", "test", "development", "dev", " local "} {
+		if err := ValidateEnv(func(string) string { return v }); err != nil {
+			t.Fatalf("AG_ENV=%q hợp lệ, nhận %v", v, err)
+		}
+	}
+}

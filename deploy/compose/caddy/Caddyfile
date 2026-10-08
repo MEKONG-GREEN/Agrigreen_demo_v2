@@ -7,8 +7,22 @@
 (common) {
 	encode zstd gzip
 	header {
-		Strict-Transport-Security "max-age=31536000"
+		# includeSubDomains chỉ phủ tên con CỦA CHÍNH host gửi header (vd *.api.<domain>) — mọi host ở đây đều
+		# là lá, chỉ phục vụ HTTPS qua Caddy, nên an toàn. Chưa thêm preload (cần đăng ký và khó rút lại).
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		-Server
+	}
+}
+
+# Chỉ cho host API (JSON, không giao diện): cấm nhúng khung, cấm đoán kiểu, CSP chặn mọi tài nguyên.
+# KHÔNG áp cho app. (Next.js tự đặt X-Frame-Options SAMEORIGIN — gia hạn token im lặng chạy trong iframe
+# cùng gốc /login/silent) và auth. (Keycloak tự đặt X-Frame-Options/CSP frame-ancestors cho iframe phiên).
+(api_headers) {
+	header {
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
 	}
 }
 
@@ -19,12 +33,14 @@ app.{$AG_DOMAIN} {
 
 api.{$AG_DOMAIN} {
 	import common
+	import api_headers
 	reverse_proxy api-platform:8080
 }
 
 # Admin API (MFA bắt buộc ở tầng ứng dụng) — thêm lớp chặn theo IP.
 admin.{$AG_DOMAIN} {
 	import common
+	import api_headers
 	@outside not remote_ip {$ADMIN_ALLOW_CIDR}
 	respond @outside 403
 	reverse_proxy api-platform:8082

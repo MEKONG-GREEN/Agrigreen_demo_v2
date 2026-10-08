@@ -15,7 +15,8 @@ import (
 // Verifier xác minh access token OIDC: issuer, audience, chữ ký, hạn (R-54).
 // Backend tự xác minh cả token do biên cấp — không tin header do gateway chèn.
 type Verifier struct {
-	v *oidc.IDTokenVerifier
+	v   *oidc.IDTokenVerifier
+	mfa MFAPolicy
 }
 
 // NewVerifier dùng discovery của issuer (Keycloak realm).
@@ -24,12 +25,12 @@ func NewVerifier(ctx context.Context, issuer, audience string) (*Verifier, error
 	if err != nil {
 		return nil, fmt.Errorf("authz: discovery %s: %w", issuer, err)
 	}
-	return &Verifier{v: provider.Verifier(&oidc.Config{ClientID: audience, SupportedSigningAlgs: []string{oidc.RS256, oidc.ES256}})}, nil
+	return &Verifier{v: provider.Verifier(&oidc.Config{ClientID: audience, SupportedSigningAlgs: []string{oidc.RS256, oidc.ES256}}), mfa: DefaultMFAPolicy()}, nil
 }
 
 // NewVerifierWithKeys dùng tập khóa có sẵn — cho kiểm thử và môi trường không có discovery.
 func NewVerifierWithKeys(issuer, audience string, keys oidc.KeySet) *Verifier {
-	return &Verifier{v: oidc.NewVerifier(issuer, keys, &oidc.Config{ClientID: audience, SupportedSigningAlgs: []string{oidc.RS256, oidc.ES256}})}
+	return &Verifier{v: oidc.NewVerifier(issuer, keys, &oidc.Config{ClientID: audience, SupportedSigningAlgs: []string{oidc.RS256, oidc.ES256}}), mfa: DefaultMFAPolicy()}
 }
 
 type claims struct {
@@ -43,8 +44,88 @@ type claims struct {
 	} `json:"realm_access"`
 }
 
-// Yếu tố thứ hai được chấp nhận trong amr (RFC 8176).
-var secondFactors = []string{"otp", "mfa", "hwk", "swk", "sms"}
+// MFAPolicy quyết định amr nào (RFC 8176) được tính là yếu tố thứ hai. Vai nhạy cảm
+// (quản trị nền tảng, vai kho định danh đọc/xóa dữ liệu cá nhân) chỉ chấp nhận yếu tố
+// mạnh — SMS OTP dễ bị chiếm SIM/chuyển tiếp nên KHÔNG tính cho các vai này; vai khác giữ
+// danh mục cũ (có sms).
+//
+// Biến môi trường (MFAPolicyFromEnv, danh sách phân tách bằng dấu phẩy):
+//
+//	AG_MFA_FACTORS         yếu tố thứ hai cho vai thường (mặc định otp,mfa,hwk,swk,sms)
+//	AG_MFA_STRONG_FACTORS  yếu tố thứ hai cho vai nhạy cảm (mặc định otp,mfa,hwk,swk)
+//	AG_MFA_STRONG_ROLES    vai nhạy cảm (mặc định platform_admin,vault_registrar,
+//	                       vault_evidence_viewer,vault_eraser)
+type MFAPolicy struct {
+	Factors       []string // vai thường
+	StrongFactors []string // khi người gọi có ít nhất một vai trong StrongRoles
+	StrongRoles   []string
+}
+
+// Tên biến môi trường của MFAPolicy.
+const (
+	EnvMFAFactors       = "AG_MFA_FACTORS"
+	EnvMFAStrongFactors = "AG_MFA_STRONG_FACTORS"
+	EnvMFAStrongRoles   = "AG_MFA_STRONG_ROLES"
+)
+
+// DefaultMFAPolicy: sms chỉ được tính cho vai thường. Tên vai kho định danh lặp lại
+// literal (authz là gói dùng chung, không import vault/identity/client — R-04).
+func DefaultMFAPolicy() MFAPolicy {
+	return MFAPolicy{
+		Factors:       []string{"otp", "mfa", "hwk", "swk", "sms"},
+		StrongFactors: []string{"otp", "mfa", "hwk", "swk"},
+		StrongRoles:   []string{RolePlatformAdmin, "vault_registrar", "vault_evidence_viewer", "vault_eraser"},
+	}
+}
+
+// MFAPolicyFromEnv đọc chính sách từ biến môi trường; biến rỗng giữ mặc định. Danh
+// sách đặt ra nhưng rỗng (vd ",") bị từ chối để không vô tình tắt MFA.
+func MFAPolicyFromEnv(getenv func(string) string) (MFAPolicy, error) {
+	p := DefaultMFAPolicy()
+	for _, f := range []struct {
+		env string
+		dst *[]string
+	}{{EnvMFAFactors, &p.Factors}, {EnvMFAStrongFactors, &p.StrongFactors}, {EnvMFAStrongRoles, &p.StrongRoles}} {
+		raw := strings.TrimSpace(getenv(f.env))
+		if raw == "" {
+			continue
+		}
+		var list []string
+		for _, v := range strings.Split(raw, ",") {
+			if v = strings.ToLower(strings.TrimSpace(v)); v != "" {
+				list = append(list, v)
+			}
+		}
+		if len(list) == 0 {
+			return MFAPolicy{}, fmt.Errorf("authz: %s đặt nhưng rỗng", f.env)
+		}
+		*f.dst = list
+	}
+	return p, nil
+}
+
+// WithMFAPolicy thay chính sách yếu tố thứ hai (mặc định DefaultMFAPolicy).
+func (v *Verifier) WithMFAPolicy(p MFAPolicy) *Verifier {
+	v.mfa = p
+	return v
+}
+
+// satisfied cho biết amr có yếu tố thứ hai hợp lệ với tập vai roles.
+func (p MFAPolicy) satisfied(amr, roles []string) bool {
+	factors := p.Factors
+	for _, r := range roles {
+		if slices.Contains(p.StrongRoles, r) {
+			factors = p.StrongFactors
+			break
+		}
+	}
+	for _, m := range amr {
+		if slices.Contains(factors, strings.ToLower(m)) {
+			return true
+		}
+	}
+	return false
+}
 
 // Verify xác minh token Bearer và dựng Principal.
 func (v *Verifier) Verify(ctx context.Context, raw string) (Principal, error) {
@@ -65,13 +146,7 @@ func (v *Verifier) Verify(ctx context.Context, raw string) (Principal, error) {
 		return Principal{}, errors.New("authz: token thiếu claim tenant_id")
 	}
 	roles := append(slices.Clone(c.Roles), c.RealmAccess.Roles...)
-	mfa := false
-	for _, m := range c.AMR {
-		if slices.Contains(secondFactors, strings.ToLower(m)) {
-			mfa = true
-		}
-	}
-	p := Principal{ActorRef: actor, TenantID: tid, Roles: roles, MFA: mfa}
+	p := Principal{ActorRef: actor, TenantID: tid, Roles: roles, MFA: v.mfa.satisfied(c.AMR, roles)}
 	if c.OrgRef != "" {
 		org, err := uuid.Parse(c.OrgRef)
 		if err != nil {

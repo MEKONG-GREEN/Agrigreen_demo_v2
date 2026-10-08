@@ -42,6 +42,7 @@ $C exec -T -u postgres postgres pgbackrest --stanza=agrigreen info
 Kho đối tượng (từ máy có Go; biến lấy từ `deploy/compose/.env`):
 
 ```bash
+AG_ENV=local \
 AG_S3_ENDPOINT=127.0.0.1:9000 AG_S3_BUCKET=agrigreen AG_S3_ACCESS_KEY=agrigreen-app AG_S3_SECRET_KEY=… AG_S3_USE_TLS=false \
 AG_BACKUP_S3_ENDPOINT=127.0.0.1:9100 AG_BACKUP_S3_BUCKET=agrigreen-backup AG_BACKUP_S3_ACCESS_KEY=backup-writer AG_BACKUP_S3_SECRET_KEY=… AG_BACKUP_S3_USE_TLS=false \
   go run ./cmd/objsync backup -label pf

@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"regexp"
+	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -176,6 +177,46 @@ var purposeRe = regexp.MustCompile(`^[a-z][a-z0-9_.]{2,63}$`)
 
 // ValidPurpose kiểm dạng mục đích — cùng quy ước với pf_party.consent.purpose.
 func ValidPurpose(s string) bool { return purposeRe.MatchString(s) }
+
+// opPurposes là danh mục mục đích ĐƯỢC PHÉP theo thao tác (R-42, M13). Mỗi thao tác
+// gắn với một tập vai cố định (client/roles.go: Create/Lookup/Resolve chỉ
+// vault_registrar, Unwrap chỉ vault_evidence_viewer, Display ba vai đọc), nên danh
+// mục theo thao tác cũng là danh mục theo vai. Rút từ mọi nơi gọi kho hiện có
+// (pf/party, pf/accounts, pf/geo farmerid, pf/mechanization, pf/sync files) — mục
+// đích ngoài danh mục bị từ chối dù đúng dạng, để token bị lộ không thể "khai" mục
+// đích tùy ý mà dò SĐT/CCCD. Thêm mục đích mới = sửa danh mục này + kiểm thử.
+var opPurposes = map[string]map[string]bool{
+	OpCreate: set("registry.admin", "registry.dedup", "extension.contact", "mechanization.owner"),
+	OpLookup: set("registry.admin", "registry.dedup"),
+	// Resolve (định danh đầy đủ): quản trị hồ sơ, liên hệ hộ, khuyến nông hỗ trợ hộ.
+	OpResolve: set("registry.admin", "extension.contact", "extension.field_support"),
+	OpDisplay: set("registry.admin", "extension.contact", "extension.field_support",
+		"mechanization.owner", "mrv.evidence"),
+	// Unwrap (mở DEK ảnh): đúng tập mục đích tệp của pf/sync (FilePurposes).
+	OpUnwrap: set("mrv.evidence", "extension.field_support"),
+	OpErase:  set("registry.erasure"),
+}
+
+func set(vs ...string) map[string]bool {
+	m := make(map[string]bool, len(vs))
+	for _, v := range vs {
+		m[v] = true
+	}
+	return m
+}
+
+// AllowedPurpose cho biết mục đích purpose được phép cho thao tác op.
+func AllowedPurpose(op, purpose string) bool { return opPurposes[op][purpose] }
+
+// AllowedPurposes trả danh mục mục đích của op (sắp xếp) — để báo lỗi rõ ràng.
+func AllowedPurposes(op string) []string {
+	out := make([]string, 0, len(opPurposes[op]))
+	for p := range opPurposes[op] {
+		out = append(out, p)
+	}
+	sort.Strings(out)
+	return out
+}
 
 // ValidReason kiểm lý do xóa: 10–500 ký tự.
 func ValidReason(s string) bool {

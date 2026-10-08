@@ -1,0 +1,41 @@
+# Dependabot (mục 20 chuỗi cung ứng): PR nâng phiên bản hằng tuần, mỗi PR vẫn qua đủ cổng CI
+# (go-licenses RB-4, govulncheck, Trivy). Action GitHub đã ghim SHA — Dependabot cập nhật cả SHA lẫn
+# chú thích phiên bản. Phiên bản công cụ ghim trong lệnh (govulncheck, go-licenses, gitleaks, cosign
+# kèm SHA-256) phải nâng tay trong .github/workflows/ci.yml.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule: { interval: weekly, day: monday, timezone: Asia/Ho_Chi_Minh }
+    open-pull-requests-limit: 10
+    groups:
+      go-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /apps/web-ops
+    schedule: { interval: weekly, day: monday, timezone: Asia/Ho_Chi_Minh }
+    open-pull-requests-limit: 10
+    groups:
+      web-ops-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /apps/web-internal
+    schedule: { interval: weekly, day: monday, timezone: Asia/Ho_Chi_Minh }
+    open-pull-requests-limit: 10
+    groups:
+      web-internal-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directory: /optimizer
+    schedule: { interval: weekly, day: monday, timezone: Asia/Ho_Chi_Minh }
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday, timezone: Asia/Ho_Chi_Minh }
+    groups:
+      actions:
+        patterns: ["*"]

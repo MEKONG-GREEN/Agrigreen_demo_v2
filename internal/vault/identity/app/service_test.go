@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -545,5 +546,81 @@ func TestCatalogGates(t *testing.T) {
 		if len(probs) > 0 {
 			t.Errorf("%s không rỗng: %v", view, probs)
 		}
+	}
+}
+
+// M13: mục đích đúng dạng nhưng ngoài danh mục của thao tác → 422, không chạm DB.
+func TestPurposeWhitelist(t *testing.T) {
+	s, _ := newService(t)
+	ctx := as(ids.New(), true, allRoles...)
+	if _, err := s.Lookup(ctx, client.Purpose("marketing.campaign"), "0901000801"); code(err) != "validation_failed" {
+		t.Fatalf("lookup mục đích lạ: %v", err)
+	}
+	if _, err := s.Lookup(ctx, client.PurposeContact, "0901000801"); code(err) != "validation_failed" {
+		t.Fatalf("lookup với extension.contact phải bị từ chối: %v", err)
+	}
+	if _, err := s.Resolve(ctx, client.PurposeMRVEvidence, ids.New()); code(err) != "validation_failed" {
+		t.Fatalf("resolve với mrv.evidence phải bị từ chối: %v", err)
+	}
+	if _, err := s.Unwrap(ctx, client.PurposeRegistryAdmin, ids.New(), make([]byte, 80)); code(err) != "validation_failed" {
+		t.Fatalf("unwrap với registry.admin phải bị từ chối: %v", err)
+	}
+}
+
+// M13: hạn mức theo người yêu cầu — vượt → 429 vault.quota_exceeded; người khác không bị ảnh hưởng.
+func TestActorQuota(t *testing.T) {
+	s, _ := newService(t)
+	clk := clock.NewFixed(time.Date(2026, 10, 5, 8, 0, 0, 0, time.UTC))
+	s.Quota = app.NewQuota(clk, nil, 60, 3) // 1 lượt/phút, dồn 3
+	tid := ids.New()
+	reg := as(tid, true, client.RoleRegistrar)
+	c, err := s.Create(reg, client.PurposeRegistryAdmin, sample("0901000811"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range 3 {
+		if _, err := s.Lookup(reg, client.PurposeDedup, "0901000811"); err != nil {
+			t.Fatalf("lượt %d: %v", i, err)
+		}
+	}
+	err = func() error { _, e := s.Lookup(reg, client.PurposeDedup, "0901000811"); return e }()
+	if code(err) != client.CodeQuotaExceeded || problem.From(err).Status != 429 {
+		t.Fatalf("lượt thứ 4 phải 429 vault.quota_exceeded: %v", err)
+	}
+	// Resolve có bucket riêng theo thao tác.
+	if _, err := s.Resolve(reg, client.PurposeRegistryAdmin, c.Ref); err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	// Người yêu cầu khác cùng tenant không bị ảnh hưởng.
+	if _, err := s.Lookup(as(tid, true, client.RoleRegistrar), client.PurposeDedup, "0901000811"); err != nil {
+		t.Fatalf("người khác: %v", err)
+	}
+	clk.Advance(time.Minute)
+	if _, err := s.Lookup(reg, client.PurposeDedup, "0901000811"); err != nil {
+		t.Fatalf("sau một phút phải có lại lượt: %v", err)
+	}
+}
+
+// M14 (LOW): RequireMFASensitive → Resolve/Unwrap đòi MFA như Erase; Display/Lookup không.
+func TestRequireMFASensitive(t *testing.T) {
+	s, _ := newService(t)
+	s.RequireMFASensitive = true
+	tid := ids.New()
+	noMFA := as(tid, false, allRoles...)
+	c, err := s.Create(noMFA, client.PurposeRegistryAdmin, sample("0901000821"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Resolve(noMFA, client.PurposeRegistryAdmin, c.Ref); code(err) != "mfa_required" {
+		t.Fatalf("resolve không MFA: %v", err)
+	}
+	if _, err := s.Unwrap(noMFA, client.PurposeMRVEvidence, c.Ref, make([]byte, 80)); code(err) != "mfa_required" {
+		t.Fatalf("unwrap không MFA: %v", err)
+	}
+	if _, err := s.Lookup(noMFA, client.PurposeDedup, "0901000821"); err != nil {
+		t.Fatalf("lookup không đòi MFA: %v", err)
+	}
+	if _, err := s.Resolve(as(tid, true, allRoles...), client.PurposeRegistryAdmin, c.Ref); err != nil {
+		t.Fatalf("resolve có MFA: %v", err)
 	}
 }

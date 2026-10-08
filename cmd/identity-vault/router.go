@@ -28,6 +28,9 @@ type Deps struct {
 	Verifier *authz.Verifier // xác minh token người dùng cuối được chuyển tiếp (R-54)
 	Module   httpx.Module
 	DB       Pinger
+	// KMSLocal: kho chạy KEK phần mềm — phơi ở /readyz (kms_local=1) để vận hành thấy rủi ro (M10).
+	KMSLocal    bool
+	KMSProvider string
 }
 
 // maxBody giới hạn thân request.
@@ -45,7 +48,11 @@ func NewRouter(d Deps) *gin.Engine {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "db_unavailable"})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"status": "ready"})
+		kmsLocal := 0
+		if d.KMSLocal {
+			kmsLocal = 1
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "ready", "kms_local": kmsLocal, "kms_provider": d.KMSProvider})
 	})
 	v1 := r.Group("/v1", httpx.Authenticate(d.Verifier))
 	d.Module.RegisterApp(v1)

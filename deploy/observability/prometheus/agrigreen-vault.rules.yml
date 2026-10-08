@@ -1,0 +1,26 @@
+# Luật cảnh báo kho định danh (vault/identity, mục 10, RB-3). Kiểm: promtool check rules (CI job lint).
+#
+# Nguồn metric (OTLP → OpenTelemetry Collector, exporter prometheus: dấu chấm → gạch dưới, counter thêm _total).
+# Nhãn cardinality thấp (R-91): không tenant, không người yêu cầu — actor_ref chỉ nằm trong log sự kiện.
+#   ag_vault_quota_exceeded_total{op}   lần từ chối vì một người yêu cầu vượt hạn mức Lookup/Resolve
+#                                       (429 vault.quota_exceeded; AG_VAULT_QUOTA_PER_HOUR/_BURST). Tra ai: log
+#                                       event=vault.quota_exceeded (actor_ref, tenant_id, op, purpose).
+#   ag_vault_kms_software{provider}     1 khi kho chạy KEK phần mềm (KMS local) — chưa có KMS/HSM trong lãnh thổ
+#
+# Ngưỡng là đề xuất (tạm, chờ khách).
+groups:
+  - name: agrigreen-vault
+    rules:
+      - alert: AgVaultActorQuotaExceeded
+        expr: sum by (op) (increase(ag_vault_quota_exceeded_total[10m])) > 0
+        labels: { severity: warning, priority: P2 }
+        annotations:
+          summary: "Có người yêu cầu vượt hạn mức tra/đọc định danh ở kho ({{ $labels.op }})"
+          description: "M13/RB-3: dấu hiệu dò hàng loạt SĐT/CCCD bằng tài khoản vault_registrar (token có thể bị lộ). Tra log event=vault.quota_exceeded lấy actor_ref, đối chiếu vault.access_log; khóa tài khoản trên Keycloak nếu bất thường."
+      - alert: AgVaultSoftwareKMS
+        expr: max(ag_vault_kms_software) > 0
+        for: 1h
+        labels: { severity: info, priority: P4 }
+        annotations:
+          summary: "Kho định danh đang dùng KEK phần mềm (chưa có KMS/HSM trong lãnh thổ)"
+          description: "M10/RB-3: rủi ro đã chấp nhận tạm qua AG_VAULT_ALLOW_LOCAL_KMS. Cần quyết định nhà cung cấp KMS/HSM trong lãnh thổ rồi đặt AG_VAULT_KMS và bỏ ngoại lệ."

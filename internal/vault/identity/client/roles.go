@@ -44,6 +44,8 @@ const (
 	CodeDuplicate       = "vault.duplicate"
 	CodeUnwrapFailed    = "vault.unwrap_failed"
 	CodeUnavailable     = "vault.unavailable"
+	// CodeQuotaExceeded: người yêu cầu vượt hạn mức tra/đọc định danh (Lookup, Resolve) — M13.
+	CodeQuotaExceeded = "vault.quota_exceeded"
 )
 
 // Problem tương ứng các lỗi của kho. errors.Is(p, ErrX) đúng nhờ WithCause.
@@ -53,4 +55,5 @@ var (
 	ProblemErased          = problem.New(http.StatusGone, CodeErased, "Chủ thể đã bị xóa định danh").WithCause(ErrErased)
 	ProblemDuplicate       = problem.New(http.StatusConflict, CodeDuplicate, "Đã có chủ thể cùng số điện thoại hoặc CCCD").WithCause(ErrDuplicate)
 	ProblemUnwrapFailed    = problem.New(http.StatusUnprocessableEntity, CodeUnwrapFailed, "Không mở được khóa tệp bằng khóa của chủ thể")
+	ProblemQuotaExceeded   = problem.New(http.StatusTooManyRequests, CodeQuotaExceeded, "Vượt hạn mức tra cứu định danh, vui lòng thử lại sau")
 )

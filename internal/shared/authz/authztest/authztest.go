@@ -53,6 +53,8 @@ type Token struct {
 	TenantID uuid.UUID
 	Roles    []string
 	MFA      bool
+	// AMR thay amr mặc định (["pwd"] + "otp" khi MFA) — kiểm chính sách yếu tố thứ hai.
+	AMR      []string
 	OrgRef   uuid.UUID
 	Issuer   string // rỗng = Issuer
 	Audience string // rỗng = Audience
@@ -80,6 +82,9 @@ func (f *FakeIssuer) Sign(t testing.TB, tk Token) string {
 	amr := []string{"pwd"}
 	if tk.MFA {
 		amr = append(amr, "otp")
+	}
+	if tk.AMR != nil {
+		amr = tk.AMR
 	}
 	extra := map[string]any{"tenant_id": tk.TenantID.String(), "realm_access": map[string]any{"roles": tk.Roles}, "amr": amr, "auth_time": now.Unix()}
 	if tk.OrgRef != uuid.Nil {
