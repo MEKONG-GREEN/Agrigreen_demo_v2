@@ -85,7 +85,7 @@ Ngưỡng k là mục `[KÝ]` của v4.1 (K-8, Phụ lục C C-4, câu hỏi Q5-
 | W6.1 | `pf/workflow` (bốn mắt cho thêm job) | pf 000118 |
 | W6.3 | Schema `_pub`, view có phiên bản, vai `r_<module>_pub` (thành viên: `r_metrics`), `pf/metrics` chỉ đọc `_pub`, bản sao chỉ đọc `AG_DB_REPLICA_URL` — xong 09/10/2026 ([modules.md](../dev/modules.md#view-công-bố-_pub-w63)) | pf 000124 |
 | W6.4 | `r_agg`, danh mục job, nhật ký chạy, cổng CI danh mục BYPASSRLS — mã xong 09/10/2026, bật production chờ C-4 (ghi chú dưới) | pf 000129 (000109 cũ bỏ) |
-| W5.3 | Tập dữ liệu dựng sẵn cho cổng tích hợp qua ngưỡng k | pf 000100–000101 |
+| W5.3 | Tập dữ liệu dựng sẵn cho cổng tích hợp qua ngưỡng k | pf 000126–000127 (000100–000101 cũ bỏ) |
 
 Bản đối chiếu ghi gói `r_agg` là "W6.5" ở vài chỗ; số đúng theo kế hoạch là **W6.4**.
 

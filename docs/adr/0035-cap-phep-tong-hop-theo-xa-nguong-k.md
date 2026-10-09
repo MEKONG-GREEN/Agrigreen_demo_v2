@@ -72,10 +72,10 @@ Job chỉ gộp dữ liệu của đơn vị có đóng góp đang hiệu lực 
 
 | Gói | Việc | Migration |
 |---|---|---|
-| W4.1 | Cấp phép v2 có `grant_class = aggregate`, `dataset`, `scope_admin_units` | pf 000098 |
+| W4.1 | Cấp phép v2 có `grant_class = aggregate`, `dataset`, `scope_admin_units` — W4.1 (pf 000120) mới làm lớp `intra_platform`/`partner`; lớp `aggregate` chưa giao gói (H-19) | pf 000120 (000098 cũ bỏ) |
 | W5.1 | Hợp đồng `harvest_progress_by_commune`, `collection_volume_by_commune` | — |
 | W5.3 | Job dựng tập dữ liệu, phiên bản, `k_used`, ẩn ô bù, trễ ẩn k + 2 | pf 000126–000127 |
-| W6.4 | Job khai trong danh sách `r_agg` khi vượt đơn vị; bật production chờ K-8 | pf 000109 |
+| W6.4 | Job khai trong danh sách `r_agg` khi vượt đơn vị; bật production chờ K-8 | pf 000129 (000109 cũ bỏ) |
 
 **W5.1 (08/10/2026):** `harvest_progress_by_commune`, `collection_volume_by_commune` có `aggregation` (`k_param: publicdata.k_min`, `k_default: 10` tạm, `k_status`, `unit: household`, `suppression: omit`, `complementary_suppression: true`, `hysteresis: 2`), `pending: [A7, C-4, K-8]`; phong bì ghi `dataset.k_used`, `contractcheck` bắt mẫu `k_used < k_default`. k vẫn là tham số — ký K-8 không đổi hợp đồng.
 

@@ -126,8 +126,8 @@ Sổ cấp phép của ADR-0020 (`share_grant_event`, bốn mắt, thu hồi, `p
 | W5.3 | Kho feed, job dựng tập dữ liệu, ảnh chụp + URL ký, `GET /v1/feeds/*` | pf 000126–000127 |
 | W5.4 | Nạp theo lô, hàng đợi + DLQ từng đối tác, inbox | pf 000125 |
 | W5.5 | Bộ điều hợp feed `mkg/fieldops`, `as_of`/`max_age`, header `Deprecation`/`Sunset` | mkg 000036 |
-| W5.6 | Luồng song phương (ADR-0034) | pf 000103, mkg 000025 |
-| W5.7 | Webhook mỏng, ngắt mạch, tổng kiểm | pf 000104 |
+| W5.6 | Luồng song phương (ADR-0034) | pf 000135, mkg 000038 (000103/000025 cũ bỏ) |
+| W5.7 | Webhook mỏng, ngắt mạch, tổng kiểm | pf 000130 (000104 cũ bỏ) |
 | W5.8 | Kênh tệp cùng lược đồ, môi trường thử đối tác | pf 000128 |
 | W5.9 | Kiểm thử tải §42 | — |
 | W5.10 | Gỡ `/v1/partner/*`, `mkg_sync`, consumer `htx_collection_valve` | — |

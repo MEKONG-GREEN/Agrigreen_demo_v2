@@ -228,7 +228,9 @@ Ngay sau mười mục trên:
 **Tổng:**
 - 5 phát hiện **còn tồn tại**: DB-04, DB-08, DB-11, DB-12, và DB-06 (một phần);
 - 4 phát hiện **đã sửa trước**: DB-01, DB-03, DB-13, và DB-07 (về dữ liệu);
-- 5 phát hiện **chưa phát sinh** vì repo chưa có tính năng tương ứng: DB-02, DB-05, DB-09 (một phần), DB-10, DB-14. Chúng trở thành ràng buộc thiết kế cho W2.1/W4.2.
+- 5 phát hiện **chưa phát sinh** vì repo chưa có tính năng tương ứng: DB-02, DB-05, DB-09 (một phần), DB-10, DB-14. Chúng trở thành ràng buộc thiết kế cho W2.5/W4.2.
+
+**Cập nhật 09/10/2026:** trạng thái sau các gói ở [mục 3.5](#35-mười-bốn-phát-hiện-db--bảng-gọn); cột "Việc cần làm" ở trên giữ mã gói của bản nháp đầu (W2.1 = `k_ref` nay là W2.5, W2.2 = vai DB nay là W2.3/W2.6, W2.4 = đơn vị hành chính nay là W2.2, W6.4/W6.5/W6.6 nay là W6.3/W6.4/W6.5, W9.1 = migration theo module nay là W7.1).
 
 ### 2.6 Vùng MKG §27.2 so với `mkg/*` và optimizer
 
@@ -271,16 +273,18 @@ Ngay sau mười mục trên:
 
 Cột: **Yêu cầu v4.1** · **Ở đâu trong repo** · **TT** (trạng thái) · **Cần thay đổi** · **CS** (công sức) · **RR** (rủi ro khi đổi). "—" = không cần.
 
+**Cập nhật 09/10/2026 (sau các gói W0.1–W9.1 đã gộp vào `dev`):** ô TT dạng `Đ ← CC` là trạng thái hiện tại ← trạng thái lúc đối chiếu 04/10/2026; cột "Cần thay đổi" ghi gói đã làm (**xong Wx.y**) và phần còn lại. "Đ" ở đây là **mã** đáp ứng — bật production vẫn có thể chờ câu hỏi khách (ghi trong ô). Cột "Ở đâu" giữ nguyên bằng chứng lúc đối chiếu. Dòng chưa cập nhật có thể còn mã gói của bản nháp kế hoạch đầu (vd. "W2.2" cho vai DB nay là W2.3/W2.6; "W2.1" cho `k_ref` nay là W2.5; "W6.4/W6.5" cho `_pub`/`r_agg` nay là W6.3/W6.4; "W10.1" nay là W9.1) — tra [kế hoạch](kien-truc-v4.1-ke-hoach.md).
+
 ### 3.1 Ràng buộc cứng `[KÝ]` và R-ARC (§2–§3)
 
 | Yêu cầu | Ở đâu | TT | Cần thay đổi | CS | RR |
 |---|---|---|---|---|---|
 | RB-1 Chỉ ghi thêm, ba lớp | `shared.fn_immutable`, `apply_ledger`, `v_missing_immutability` (shared 000001, 000003). `migratecheck` cấm UPDATE/DELETE/TRUNCATE. `agnoharddelete`. ADR-0003, ADR-0011 | Đ | — | — | — |
-| RB-2 Cách ly đơn vị, `tenant_id` mọi bảng, RLS | `apply_tenant_rls`, `v_missing_rls`. `TestTenantLeakParallel` qua PgBouncer. ADR-0005 | Đ | Mở rộng sang phạm vi Nút (§17.2) | M | TB |
+| RB-2 Cách ly đơn vị, `tenant_id` mọi bảng, RLS | `apply_tenant_rls`, `v_missing_rls`. `TestTenantLeakParallel` qua PgBouncer. ADR-0005 | Đ | Phạm vi Nút ở DB: **xong W3.4** (pf 000134) | — | — |
 | RB-3 PII xóa được | `vault` cụm riêng, ADR-0004 (khóa từng hộ), `vault.access_log` | Đ | — | — | — |
 | RB-4 Giấy phép | `deploy/policies/allowed-licenses.txt`, ADR-0016, ADR-0017 (không TSL), ADR-0021 (không Barman GPL) | Đ | Rà Grafana/Loki/Tempo (A10) | S | TB |
-| RB-5 Mã chịu cấu hình ĐTK 2 | `cmd/internal/clusterenv` (`AG_CLUSTERS`, URL theo cụm), ADR-0021 §6, ADR-0025 (lớp giá trị Phase K) | LN | Bật module theo đơn vị; cấu hình build bản lite (§7.4) | M | Thấp |
-| RB-6 Đối soát chéo số đo ở biên | `mkg/measurement` đối soát (mkg 000008). HTX xác nhận số cuộn: `pf_cropcycle.collection_response` (pf 000040) | Đ | Chuyển xác nhận sang luồng song phương (§38.2) | M | TB |
+| RB-5 Mã chịu cấu hình ĐTK 2 | `cmd/internal/clusterenv` (`AG_CLUSTERS`, URL theo cụm), ADR-0021 §6, ADR-0025 (lớp giá trị Phase K) | LN | Bật module theo đơn vị: **xong W1.4**. Còn: cấu hình build bản lite (§7.4) | S | Thấp |
+| RB-6 Đối soát chéo số đo ở biên | `mkg/measurement` đối soát (mkg 000008). HTX xác nhận số cuộn: `pf_cropcycle.collection_response` (pf 000040) | Đ | Chuyển xác nhận sang luồng song phương: **mã xong W5.6** (pf 000135, mkg 000038), bật chờ C-12 | M | TB |
 | RB-7 Không lưu ngoài lãnh thổ | ADR-0007, ADR-0015, ADR-0021 (kho bí mật, CA trong lãnh thổ). A4 (liên kết tải trong lãnh thổ) | Đ | — | — | — |
 | R-ARC-01 Chuyển giai đoạn = đổi cấu hình | Như RB-5. ADR-0025 | LN | Như RB-5 | M | Thấp |
 
@@ -288,22 +292,22 @@ Cột: **Yêu cầu v4.1** · **Ở đâu trong repo** · **TT** (trạng thái)
 
 | Yêu cầu | Ở đâu | TT | Cần thay đổi | CS | RR |
 |---|---|---|---|---|---|
-| §1 Phạm vi: bảy ứng dụng, lõi, năng lực, biên | `apps/{web-ops,htx-app,field-app,mkg-field-app,web-internal}`, `cmd/edge-agent`, `cmd/ingest`. Kênh nông hộ chỉ có ADR-0010 | LN | Tệp `app.yaml` cho 7 ứng dụng. Kênh NH (G3) | S | Thấp |
+| §1 Phạm vi: bảy ứng dụng, lõi, năng lực, biên | `apps/{web-ops,htx-app,field-app,mkg-field-app,web-internal}`, `cmd/edge-agent`, `cmd/ingest`. Kênh nông hộ chỉ có ADR-0010 | LN | `app.yaml` 7 ứng dụng: **xong W1.3**. Còn: Kênh NH (G3) | S | Thấp |
 | §2 Hai điểm thiết kế, Phase K là cấp phát | `docs/roadmap.md`, ADR-0025 | Đ | — | — | — |
 | §3 Bảy ràng buộc | Mục 3.1 | Đ | — | — | — |
-| §4 Bốn vùng, cụm, đơn vị triển khai | Cụm `pf`, `mkg`, `ts` (= `mkg-ts`), `vault`. Keycloak `pg-iam`. Đơn vị: `api-platform`, `worker`, `api-internal`, `worker-internal`, `ingest`, `optimizer`, `identity-vault`, `edge-agent`, `api-public`. Chưa có `access`, `sync` riêng, `integration-gateway` | LN | Thêm `cmd/integration-gateway`. `access` ở G4 | L | TB |
+| §4 Bốn vùng, cụm, đơn vị triển khai | Cụm `pf`, `mkg`, `ts` (= `mkg-ts`), `vault`. Keycloak `pg-iam`. Đơn vị: `api-platform`, `worker`, `api-internal`, `worker-internal`, `ingest`, `optimizer`, `identity-vault`, `edge-agent`, `api-public`. Chưa có `access`, `sync` riêng, `integration-gateway` | LN | `cmd/integration-gateway`: **xong W5.2**. Còn: `access` ở G4 (W7.4) | M | TB |
 | §4 Cửa 1 — Van công bố (mạng lưới) | `contracts/publication`, `valve_export`, `contractcheck`, ADR-0018 | Đ | Đưa qua cổng (nạp theo lô) ở G2 | M | TB |
-| §4 Cửa 2 — Tiêu thụ không đặc quyền qua **cổng tích hợp** | `/v1/partner/*` trên Application API (ADR-0020), OIDC `mkg_sync` | LL | Chuyển sang feed của cổng (W5.6) | M | TB |
-| §4 Cửa 3 — Van lọc dữ liệu công, k ≥ `[KÝ]` | Sản phẩm dữ liệu `collection_volume` với `publicdata.k_min` = 10 tạm (Q5-3) | LN | Tập dữ liệu dựng sẵn qua `r_agg` (R-DB-11). Chốt k (C-4) | M | Thấp |
-| §4 Cửa 4 — Luồng song phương | Không có | CC | ADR B16 + W5.5 | L | Cao (C-12) |
-| §4 Trong vùng nền tảng: đọc tại chỗ có cấp phép | Không có (mục 2.3) | LL | W4.1–W4.2 | L | Cao |
-| §5 Bốn tầng module | Vùng `platform/mkg/vault/shared` | LL | Khai `kind` trong `module.yaml`; giữ thư mục (ADR mới) | M | Thấp |
-| §5.1 Ma trận module × ứng dụng, quy tắc ba | Chưa có `cap/*`. Năng lực nằm trong module nghiệp vụ (`reports`, `extension`) | LL | Tách dần `cap/workflow`, `cap/forms`… (P6) | L | Cao (KN đang chạy) |
+| §4 Cửa 2 — Tiêu thụ không đặc quyền qua **cổng tích hợp** | `/v1/partner/*` trên Application API (ADR-0020), OIDC `mkg_sync` | LN ← LL | Feed danh bạ qua cổng: **mã xong W5.5** (mkg 000036), chạy song song `/v1/partner/*`; gỡ lối cũ ở W5.10 | S | TB |
+| §4 Cửa 3 — Van lọc dữ liệu công, k ≥ `[KÝ]` | Sản phẩm dữ liệu `collection_volume` với `publicdata.k_min` = 10 tạm (Q5-3) | LN | Tập dữ liệu dựng sẵn: **mã xong W5.3**; `r_agg`: **mã xong W6.4**. Còn: chốt k (C-4) | S | Thấp |
+| §4 Cửa 4 — Luồng song phương | Không có | Đ ← CC | **Mã xong W5.6** (ADR-0034); bật production chờ C-12 | — | Cao (C-12) |
+| §4 Trong vùng nền tảng: đọc tại chỗ có cấp phép | Không có (mục 2.3) | Đ ← LL | **Mã xong W4.1–W4.2**; bật production chờ C-10/H-1 | — | Cao |
+| §5 Bốn tầng module | Vùng `platform/mkg/vault/shared` | Đ ← LL | **Xong W1.1** (`kind` trong `module.yaml`, giữ thư mục — ADR-0027) | — | — |
+| §5.1 Ma trận module × ứng dụng, quy tắc ba | Chưa có `cap/*`. Năng lực nằm trong module nghiệp vụ (`reports`, `extension`) | LN ← LL | **Đã tách:** `cap/workflow` (W6.1), `cap/forms` (W6.2), `cap/analytics` `_pub` (W6.3), `cap/evidence` (W6.5). `cap/import`/`task`/`export` chưa đủ quy tắc ba (W6.6, khai `hosts`) | M | Cao (KN đang chạy) |
 | §6 Stack: Go, Python, Go biên | Go 1.23+, `optimizer/` Python 3.12, `cmd/edge-agent` Go | Đ | — | — | — |
 | §6 Java SPI Keycloak | Không có `keycloak-ext/` | CC | Khi có Zalo/SMS OTP | M | TB |
-| §6 PostgreSQL 17 + PostGIS, pgRouting, pgcrypto, btree_gist | `agrigreen/postgres:dev` (postgis 17-3.5 + pgRouting). btree_gist chưa dùng | LN | Thêm extension khi làm `EXCLUDE` (W2.4) | S | Thấp |
+| §6 PostgreSQL 17 + PostGIS, pgRouting, pgcrypto, btree_gist | `agrigreen/postgres:dev` (postgis 17-3.5 + pgRouting). btree_gist chưa dùng | Đ ← LN | `btree_gist` + `EXCLUDE`: **xong W2.2** (pf 000089) | — | — |
 | §6 TimescaleDB chỉ ở `mkg-ts` | Cụm `ts`, **PostgreSQL thuần phân vùng tháng**, cấm TSL (ADR-0017) | LN | Ghi lệch (mục 4, X-05) | S | Thấp |
-| §6 PgBouncer **một pool mỗi đơn vị triển khai** | Pool theo vai module | LL | W2.2 | L | Cao |
+| §6 PgBouncer **một pool mỗi đơn vị triển khai** | Pool theo vai module | Đ ← LL | **Xong W2.6**: một pool vai đăng nhập `app_*` mỗi đơn vị | — | — |
 | §6 RabbitMQ quorum, DLQ, confirm | ADR-0002 | Đ | — | — | — |
 | §6 Valkey hai instance (nghiệp vụ, định danh `noeviction`) | Một Valkey | LN | Thêm instance định danh khi có Access/epoch | S | Thấp |
 | §6 Keycloak 26.x + Access | Keycloak 26.3 (A3). Access = `pf/accounts` | LN | Mục 2.4 | M | TB |
@@ -312,42 +316,42 @@ Cột: **Yêu cầu v4.1** · **Ở đâu trong repo** · **TT** (trạng thái)
 | §6 OSRM | Cần kiểm (`pf/simulation` có `Router`) | LN | Cần kiểm | S | Thấp |
 | §6 Next.js mỗi ứng dụng một BFF; Flutter app hiện trường | `apps/web-ops` (Next.js), `packages/agrigreen_mobile` (Flutter) | LN | BFF theo ứng dụng: cần kiểm | S | Thấp |
 | §6 Compose → K8s từ G4 | ADR-0008, ADR-0021, `deploy/k8s` | Đ | — | — | — |
-| §6 `lib/optcore` | Không có | CC | W7.1 | M | Thấp |
+| §6 `lib/optcore` | Không có | Đ ← CC | **Xong W8.1** | — | — |
 | §6 Bộ giải HiGHS; OR-Tools chờ ADR | ADR-0016 (highspy MIT) | Đ | ADR OR-Tools khi cần (B20) | S | Thấp |
-| §6 `cmd/integration-gateway` | Không có (gần nhất: `cmd/api-public`) | CC | W5.2 | M | TB |
+| §6 `cmd/integration-gateway` | Không có (gần nhất: `cmd/api-public`) | Đ ← CC | **Xong W5.2** (`api-public` là bí danh một kỳ) | — | — |
 | §6 Quan sát OTel, Prometheus, Loki, Tempo, Grafana | OTel collector, Prometheus, sql-exporter. Loki/Tempo/Grafana chưa dùng vì AGPL (A10) | LN | Quyết A10 (X-08) | S | Thấp |
 
 ### 3.3 Phần II — Hợp đồng module và quy ước (§7–§11)
 
 | Yêu cầu | Ở đâu | TT | Cần thay đổi | CS | RR |
 |---|---|---|---|---|---|
-| §7.1 `module.yaml` | Không có | CC | W1.1 | M | Thấp |
-| §7.2 `app.yaml` | Không có | CC | W1.3 | S | Thấp |
+| §7.1 `module.yaml` | Không có | Đ ← CC | **Xong W1.1** | — | — |
+| §7.2 `app.yaml` | Không có | Đ ← CC | **Xong W1.3** | — | — |
 | §7.4 Registry lúc biên dịch, không plugin | `module.go`, `cmd/*/assembly` | Đ | Đọc tập module từ `app.yaml` | S | Thấp |
 | §7.4 Bản lite = cấu hình build | Không có | CC | Sau W1.3 (G6) | M | Thấp |
 | §7.4 depguard chỉ `port/` | `archlint agboundary` | Đ | — | — | — |
-| R-MOD-01 Một schema, một vai mỗi module | Schema `pf_<module>`, `mkg_<module>`, một vai `<module>_app`. Ngoại lệ: schema `shared` (outbox, inbox, idempotency, chain_head) | Đ | Vai thành NOLOGIN `r_<module>` (W2.2) | — | — |
+| R-MOD-01 Một schema, một vai mỗi module | Schema `pf_<module>`, `mkg_<module>`, một vai `<module>_app`. Ngoại lệ: schema `shared` (outbox, inbox, idempotency, chain_head) | Đ | Vai NOLOGIN `r_<module>`: **xong W2.3/W2.6** | — | — |
 | R-MOD-02 Gọi qua port hoặc sự kiện; khác vùng qua API | `agboundary`, ADR-0018/0020 | Đ | — | — | — |
 | R-MOD-03 Không sửa model của module khác; điểm mở rộng đã khai | `port/` + DTO. Chưa có điểm mở rộng khai báo | LN | Khai `extension_points` trong `module.yaml` | S | Thấp |
-| R-MOD-04 `cap/*` không biết tên ứng dụng | Chưa có `cap/*`. Logic riêng KN nằm ở `shared/authz/kn.go` | LN | Lint cấm so sánh tên app khi có `cap/*`. Đưa `kn.go` về `pf/accounts` | S | Thấp |
-| R-MOD-05 DAG đi xuống, CI đọc `module.yaml` | Không có | CC | W1.2 `agmodgraph` | M | Thấp |
+| R-MOD-04 `cap/*` không biết tên ứng dụng | Chưa có `cap/*`. Logic riêng KN nằm ở `shared/authz/kn.go` | LN | Lint cấm so sánh tên app: **xong W9.1** (`agnoappname`). Còn: đưa `kn.go` về `pf/accounts` | S | Thấp |
+| R-MOD-05 DAG đi xuống, CI đọc `module.yaml` | Không có | Đ ← CC | **Xong W1.2** (`agmodgraph`) | — | — |
 | R-MOD-06 Port có semver; kiểm thử hợp đồng của bên tiêu thụ | Port không có phiên bản. Hợp đồng sự kiện/van có kiểm tương thích ngược | LN | Phiên bản port trong `module.yaml`; `contract_test/` | M | Thấp |
 | R-MOD-07 Quyền do module khai (mã + lớp), vai do app gom | Realm roles + `RoleOrgKinds` + vai KN v7.7 | LN | `permissions` trong `module.yaml`; seed vai theo app | M | TB |
-| R-MOD-08 Bật/tắt theo đơn vị, `module_not_enabled` | Phòng ban KN (D2), `AG_PUBLIC_API_ENABLED` | LN | W1.4 | M | Thấp |
+| R-MOD-08 Bật/tắt theo đơn vị, `module_not_enabled` | Phòng ban KN (D2), `AG_PUBLIC_API_ENABLED` | Đ ← LN | **Xong W1.4** (pf 000088) | — | — |
 | R-MOD-09 Quy tắc ba | Định hướng | KA | — | — | — |
 | R-MOD-10 Mã chung, dữ liệu riêng mỗi vùng | `shared/*` dùng ở cả hai vùng. `idempotency`/`outbox` mỗi cụm. Chưa có `cap/*` hai thể hiện | LN | Khi `cap/*` chạy ở mkg: schema riêng ở cụm mkg | M | Thấp |
 | §8 Cấu trúc repo | `internal/{platform,mkg,vault,shared}`, `apps/`, `packages/`, `optimizer/`, `contracts/`, `deploy/{compose,k8s,iac,policies}`. Không có `app/`, `keycloak-ext/`, `migrations/` trong module | LN | Ghi lệch: giữ thư mục, thêm `module.yaml` + `app/<APP>/app.yaml` | S | Thấp |
 | §9 Quy ước mã (R-CODE-01 … 07) | `tools/archlint` (nofloat, notimenow, piilog), `shared/{money,mass,ids,clock,problem}` | LN | Theo từng dòng dưới | — | — |
-| R-CODE-01 decimal, cấm float | `nofloat` (costing, measurement, orders, acctbridge, metering, mkg/hub, mkg/logistics, reports/*, money, mass) | LN | Thêm `mkg/fieldops`, `pf/mechanization` vào phạm vi | S | Thấp |
+| R-CODE-01 decimal, cấm float | `nofloat` (costing, measurement, orders, acctbridge, metering, mkg/hub, mkg/logistics, reports/*, money, mass) | Đ ← LN | `mkg/fieldops`, `pf/mechanization`: **xong W9.1** | — | — |
 | R-CODE-02 UUIDv7 sinh ở nơi tạo | `shared/ids`; thiết bị sinh (sync-contract) | Đ | — | — | — |
 | R-CODE-03 `timestamptz` UTC; cấm `time.Now()` trong `domain/` | `shared/clock`, `notimenow` | Đ | — | — | — |
 | R-CODE-04 `event_time` + `recorded_at` | Mọi bảng sổ | Đ | — | — | — |
 | R-CODE-05 Không PII trong log | `piilog` (tag `pii`) | Đ | — | — | — |
 | R-CODE-06 RFC 9457 | `shared/problem`, `docs/errors.md` | Đ | — | — | — |
-| R-CODE-07 Mọi truy cập DB qua `WithContextTx`; ngoài giao dịch thì thất bại | `tenant.WithTenantTx`. Ngoài giao dịch: RLS trả rỗng (không lỗi quyền). Vai đăng nhập **có** quyền bảng | LL | W2.2 | L | Cao |
-| §10 Bề mặt Application (OIDC + token ngữ cảnh) | OIDC + `X-AG-Context` (KN) | LN | Ngữ cảnh chung cho mọi app (W8.1) | M | TB |
+| R-CODE-07 Mọi truy cập DB qua `WithContextTx`; ngoài giao dịch thì thất bại | `tenant.WithTenantTx`. Ngoài giao dịch: RLS trả rỗng (không lỗi quyền). Vai đăng nhập **có** quyền bảng | Đ ← LL | **Xong W2.3/W2.6**: vai đăng nhập không quyền bảng, truy vấn ngoài giao dịch module → 42501 (cổng CI). Còn dọn: bỏ `tenant.WithTenantTx` gọi thẳng | — | — |
+| §10 Bề mặt Application (OIDC + token ngữ cảnh) | OIDC + `X-AG-Context` (KN) | LN | Ngữ cảnh chung cho mọi app (W7.2, chờ SAD v1.1) | M | TB |
 | §10 Admin (LoA 2) | Admin API MFA (ADR-0020, accounts) | Đ | — | — | — |
-| §10 Public (khóa API do `k/access`), tắt ở ĐTK 1, ghi `dom/metering` | `cmd/api-public`, `pf/apiclient`, `pf/metering`, mặc định tắt (ADR-0022/0023/0025) | LN | Gộp vào cổng tích hợp; khóa API thuộc `k/access` | M | TB |
+| §10 Public (khóa API do `k/access`), tắt ở ĐTK 1, ghi `dom/metering` | `cmd/api-public`, `pf/apiclient`, `pf/metering`, mặc định tắt (ADR-0022/0023/0025) | LN | Gộp vào cổng tích hợp: **xong W5.2**. Còn: khóa API về `k/access` (W7.2) | M | TB |
 | §10 Internal mTLS; Vận hành VPN + MFA | optimizer ↔ api mTLS, ingest mTLS, ADR-0008/0021 | Đ | — | — | — |
 | R-API-01 `/v1`, `/v2` song song | Mọi route | Đ | — | — | — |
 | R-API-02 Idempotency-Key 48 giờ | `shared.idempotency_key` (`expires_at` 48 giờ), `shared/idempotency` | Đ | — | — | — |
@@ -369,58 +373,58 @@ Cột: **Yêu cầu v4.1** · **Ở đâu trong repo** · **TT** (trạng thái)
 | Yêu cầu | Ở đâu | TT | Cần thay đổi | CS | RR |
 |---|---|---|---|---|---|
 | §12 Rà soát DB | Mục 2.5 | LN | Theo từng DB-xx | — | — |
-| §12.1 Phép thử T0–T12 | Có tương đương: T1–T3 (`TestHash…`, `migrate verify-chains`, trigger), T5 (CONNECT/GRANT theo vai), T6a/T6e-tenant (`TestTenantLeakParallel`, `TestCannotWriteForeignTenant`), T6d (`TestNoTenantContextSeesNothing`), T7 (trigger chồng lấp). Chưa có: T4, T6b/c (cấp phép), T8–T11, T12 | LN | Thêm T4, T6b/c, T9–T11 khi làm W2.2/W4.2; T12 = R-OPS-04 | M | Thấp |
-| §13 Tổ chức cụm, database, schema | `ag_pf`, `ag_mkg`, `ag_ts`, `ag_vault`; schema `pf_*`, `mkg_*`, `ts_*`, `vault`, `shared`. Chưa có `k_ref`, `_pub`, `idp/access` | LN | W2.1, W6.4 | M | Thấp |
-| R-DB-01 Tên schema `<tầng>_<module>`, `_pub` | `pf_<module>`, `mkg_<module>` (Phụ lục D chấp nhận). Không có `_pub` | LN | Giữ tên; thêm `_pub` | S | Thấp |
+| §12.1 Phép thử T0–T12 | Có tương đương: T1–T3 (`TestHash…`, `migrate verify-chains`, trigger), T5 (CONNECT/GRANT theo vai), T6a/T6e-tenant (`TestTenantLeakParallel`, `TestCannotWriteForeignTenant`), T6d (`TestNoTenantContextSeesNothing`), T7 (trigger chồng lấp). Chưa có: T4, T6b/c (cấp phép), T8–T11, T12 | LN | Đã thêm: T4/T5 (W2.3), T6a–T6e, T9–T10 (W4.2), T12 = R-OPS-04 (W0.4). Còn: T8, T11 | S | Thấp |
+| §13 Tổ chức cụm, database, schema | `ag_pf`, `ag_mkg`, `ag_ts`, `ag_vault`; schema `pf_*`, `mkg_*`, `ts_*`, `vault`, `shared`. Chưa có `k_ref`, `_pub`, `idp/access` | LN | `k_ref`: **xong W2.5**; `_pub`: **xong W6.3**. Còn: `idp/access` (W7.4) | M | Thấp |
+| R-DB-01 Tên schema `<tầng>_<module>`, `_pub` | `pf_<module>`, `mkg_<module>` (Phụ lục D chấp nhận). Không có `_pub` | Đ ← LN | Giữ tên; `_pub`: **xong W6.3** | — | — |
 | §13 `vault` instance riêng từ ĐTK 1 | K8s `pg-vault` riêng (ADR-0021). Compose ĐTK 1 dùng chung một instance (chỉ local/dev, ADR-0008) | LN | Bảo đảm ĐTK 1 production dùng instance riêng (G-1) | S | Thấp |
-| §14 Ba vai mỗi module (`own_`, `r_`, `r_…_pub`) | Một vai `<module>_app` LOGIN; `ag_migrator` sở hữu mọi schema | LL | W2.2, W9.1 | L | Cao |
-| R-DB-02 Vai đăng nhập NOINHERIT; quyền chỉ sau `SET LOCAL ROLE` | Có (W2.3 khung; W2.6: mọi module pf/mkg/vault dưới `r_*`, một vai `app_*` mỗi đơn vị, vai cũ mất quyền trực tiếp, cổng CI truy vấn ngoài giao dịch module bị 42501) | CC | W2.2 | L | Cao |
-| R-DB-03 Vai do registry gán; lint cấm `SET ROLE` | Có (W2.3: `db.Module` từ registry, archlint `agnosessionset`, `migratecheck`) | CC | W2.2 + lint | S | Thấp |
-| §14 Tối đa 80 kết nối máy chủ cụm `pf` | Theo vai module × đơn vị | LL | W2.2 | — | — |
+| §14 Ba vai mỗi module (`own_`, `r_`, `r_…_pub`) | Một vai `<module>_app` LOGIN; `ag_migrator` sở hữu mọi schema | LN ← LL | `r_<module>`: **xong W2.3/W2.6**; `r_<module>_pub`: **xong W6.3**; `own_<module>`: tạo ở W7.1 bước 1, chạy migration bằng nó ở bước 2 | M | TB |
+| R-DB-02 Vai đăng nhập NOINHERIT; quyền chỉ sau `SET LOCAL ROLE` | Có (W2.3 khung; W2.6: mọi module pf/mkg/vault dưới `r_*`, một vai `app_*` mỗi đơn vị, vai cũ mất quyền trực tiếp, cổng CI truy vấn ngoài giao dịch module bị 42501) | Đ ← CC | **Xong W2.3/W2.6** | — | — |
+| R-DB-03 Vai do registry gán; lint cấm `SET ROLE` | Có (W2.3: `db.Module` từ registry, archlint `agnosessionset`, `migratecheck`) | Đ ← CC | **Xong W2.3** | — | — |
+| §14 Tối đa 80 kết nối máy chủ cụm `pf` | Theo vai module × đơn vị | LN ← LL | Một pool mỗi đơn vị (**W2.6**, `AG_DB_MAX_CONNS` mặc định 20). Còn: đo tổng kết nối thật ≤ 80 | S | — |
 | §15.1 DDL sổ: PK có `recorded_at`, phân vùng tháng | ADR-0012, `apply_ledger` | Đ | — | — | — |
 | §15.2 `chain_head` | `shared.chain_head` (một bảng, cột `ledger`), `fn_chain` SECURITY DEFINER | Đ | Ghi lệch (bảng chung thay vì mỗi schema) | — | — |
-| §15.3 Idempotency riêng, hạn 30 ngày | `shared.ledger_idem` **không hạn** | LN | W2.3 (DB-11) | S | Thấp |
+| §15.3 Idempotency riêng, hạn 30 ngày | `shared.ledger_idem` **không hạn** | Đ ← LN | Hạn 30 ngày: **xong W2.1** (shared 000006); vị trí chung ghi lệch (X-09) | — | — |
 | §15.4 Ba lớp bất biến + neo | `fn_immutable`, quyền, chuỗi + `shared.anchor_chains` hằng ngày | Đ | Neo ra kho bất biến ngoài DB: cần kiểm (`migrate anchor`) | — | — |
 | R-DB-06 Sổ theo mẫu; `v_missing_immutability` rỗng | `shared.v_missing_immutability` (cổng CI) | Đ | — | — | — |
 | §16 Bảng chiếu cùng giao dịch; ES mức B; diễn tập dựng lại | ADR-0003, `cmd/rebuilddrill`, `make rebuild-projection` (cần kiểm tên) | Đ | — | — | — |
-| §17.1 `k/ref` bản chiếu trong mỗi cụm | Không có | CC | W2.1 | L | TB |
-| R-DB-05 Quan hệ công bố của lõi | Không có | CC | Theo W2.1 | S | Thấp |
-| §17.2 `ctx_uuid`/`ctx_text` chuẩn hóa chuỗi rỗng | `shared.current_tenant()` cùng mẫu | Đ | Bổ sung các biến khác (node, dept, purpose) | S | Thấp |
-| §17.2 Chính sách phạm vi Nút viết thẳng `EXISTS node_closure` | Phạm vi Nút ở tầng ứng dụng (ADR-0009, KN P1) | LL | W3.4 | M | TB |
-| §17.3 `share_scope`, nhánh đọc tại chỗ | Không có | CC | W4.2 | L | Cao |
-| R-DB-08 FORCE RLS, một policy, chỉ đọc biến qua hàm, không hàm có truy vấn con, `shares`, `WITH CHECK` không có nhánh chia sẻ | FORCE + một policy `p_tenant` + hàm `nullif` đã có. Phần chia sẻ chưa có | LN | Đổi `v_missing_rls` chấp nhận `p_scope`; cổng `EXPLAIN` | M | TB |
-| §17.3 Ghi nhật ký mọi lần đọc qua chia sẻ | `pf_party.partner_read_log` (mỗi lời gọi `/v1/partner/*`) | LN | Cờ `via_share_grant` + sự kiện gộp | S | Thấp |
-| §18 Tham chiếu chéo module | `*_ref` tự do; FK chỉ trong schema | LN | Quy ước bộ ba + `Resolve` (W6.6) | M | Thấp |
-| R-DB-07 Không FK xuyên schema; bộ ba; `Resolve` | Vế 1 đạt (pf 000003…000068 chỉ FK nội schema). Vế 2–3 chưa có | LN | W6.6 | M | Thấp |
-| §19 Đơn vị hành chính có hiệu lực | `pf_masterdata.admin_unit` + trigger chồng lấp + `successor_codes` | LN | W2.4 | S | Thấp |
+| §17.1 `k/ref` bản chiếu trong mỗi cụm | Không có | Đ ← CC | **Xong W2.5** (pf 000092, mkg 000022) | — | — |
+| R-DB-05 Quan hệ công bố của lõi | Không có | Đ ← CC | **Xong W2.5** | — | — |
+| §17.2 `ctx_uuid`/`ctx_text` chuẩn hóa chuỗi rỗng | `shared.current_tenant()` cùng mẫu | Đ | Biến node, dept, xa_ids, purpose…: **xong W2.4** (pf 000091) | S | Thấp |
+| §17.2 Chính sách phạm vi Nút viết thẳng `EXISTS node_closure` | Phạm vi Nút ở tầng ứng dụng (ADR-0009, KN P1) | Đ ← LL | **Xong W3.4** (pf 000134, shared 000012); giữ kiểm ở ứng dụng | — | — |
+| §17.3 `share_scope`, nhánh đọc tại chỗ | Không có | Đ ← CC | **Mã xong W4.2** (pf 000136, shared 000014); bật production chờ C-10/H-1 | — | Cao |
+| R-DB-08 FORCE RLS, một policy, chỉ đọc biến qua hàm, không hàm có truy vấn con, `shares`, `WITH CHECK` không có nhánh chia sẻ | FORCE + một policy `p_tenant` + hàm `nullif` đã có. Phần chia sẻ chưa có | LN | `v_missing_rls` nhận `p_scope` (W3.4), cổng `EXPLAIN` (W9.1), nhánh chia sẻ (W4.2). Lệch có ghi: nhánh chia sẻ là policy riêng `p_share` PERMISSIVE `FOR SELECT` (ADR-0030 Hiện thực); song phương giữ tên `p_tenant` (ADR-0034, H-18) | S | TB |
+| §17.3 Ghi nhật ký mọi lần đọc qua chia sẻ | `pf_party.partner_read_log` (mỗi lời gọi `/v1/partner/*`) | Đ ← LN | `ViaShareGrant` + sự kiện gộp `pf.party.share_read.recorded`: **xong W4.2** | — | — |
+| §18 Tham chiếu chéo module | `*_ref` tự do; FK chỉ trong schema | Đ ← LN | Bộ ba + `Resolve`: **xong W6.5** (pf 000123) | — | — |
+| R-DB-07 Không FK xuyên schema; bộ ba; `Resolve` | Vế 1 đạt (pf 000003…000068 chỉ FK nội schema). Vế 2–3 chưa có | Đ ← LN | Vế 2–3: **xong W6.5** | — | — |
+| §19 Đơn vị hành chính có hiệu lực | `pf_masterdata.admin_unit` + trigger chồng lấp + `successor_codes` | Đ ← LN | **Xong W2.2** (pf 000089); nạp nguồn chính thức chờ C-9 (W3.5) | — | Thấp |
 | R-DB-09 Danh mục pháp lý có hiệu lực; trỏ phiên bản tại `event_time` | `admin_unit`, `param_version`, định mức cơ giới hóa có hiệu lực (pf 000007). Báo cáo kỳ cũ theo đơn vị tại thời điểm kỳ: cần kiểm. **Kiểm ở W2.2 (05/10/2026):** đã có port `AdminUnitHistory` (`AdminUnitAt`, `SuccessorsAt`, `RollForward`, pf 000089). Chỗ phải sửa: (1) `reports/app/build.go` `names.unit` lấy tên đơn vị tại `now()` thay vì tại kỳ — mã dùng lại (vd 91) ra tên mới cho kỳ cũ; (2) các truy vấn nhóm theo mã lưu trên bản ghi — `party/store/readmodel.go` (`GROUP BY o.admin_unit_code`), `geo/store/stats.go` (`commune_code`), `extension/store/dashboard.go`, `extension/reportcycle/store/task.go`, `extension/material/store/store.go` — đúng "đơn vị tại thời điểm ghi" nhưng so sánh qua 01/07/2025 trộn mã cũ và mới, cần `RollForward` (gắn cờ ước tính khi tách một phần) | LN | Kiểm `pf/reports` nhóm theo đơn vị tại kỳ; sửa các chỗ trên (gói sau, chưa giao) | S | TB |
-| §20 Dữ liệu cá nhân: sổ chỉ `*_ref`; vault; ảnh mã hóa theo hộ; PII người dùng `k_access.account_pii` | `vault`, ADR-0004, `piilog`. PII người dùng ở Keycloak | LN | `account_pii` khi có SAD (W8.2) | M | TB |
+| §20 Dữ liệu cá nhân: sổ chỉ `*_ref`; vault; ảnh mã hóa theo hộ; PII người dùng `k_access.account_pii` | `vault`, ADR-0004, `piilog`. PII người dùng ở Keycloak | LN | `account_pii` khi có SAD (W7.3) | M | TB |
 | §20 Tọa độ thửa là PII gián tiếp, không vào view công bố mức thửa | Sản phẩm dữ liệu không trả thửa (`dataproduct.go`). `/v1/partner/plots` trả hình học thửa cho MKG theo cấp phép | LN | Ghi rõ trong ADR cổng: hình học thửa chỉ qua cấp phép có mục đích | S | TB |
 | §21 Chuỗi thời gian chỉ `mkg-ts`, không join, không xóa, lạnh có nén | Cụm `ts` (ADR-0017), `migratecheck` cấm tham chiếu `pf_*`/`mkg_*`, chỉ ghi thêm. Không nén TSL | LN | Ghi lệch (X-05); cửa sổ kiểm toán `[KÝ]` | S | Thấp |
-| §22.1 / R-DB-10 Phân tích chỉ đọc `_pub`, trên bản sao | `pf/metrics`, `pf/reports` đọc qua `port/` trên primary | LN | W6.4 | M | Thấp |
-| §22.2 / R-DB-11 `r_agg` BYPASSRLS có kiểm soát, ngưỡng k, nhật ký chạy | Không có vai BYPASSRLS cho ứng dụng (chỉ `ag_outbox_publisher`). Ngưỡng k trong một tenant | LN | W6.5 | M | TB |
-| §23 / R-DB-12 Lịch sử migration theo schema, thứ tự topo, vai `own_<module>` | `golang-migrate` một bảng mỗi cụm, `ag_migrator` | LL | W9.1 | L | TB |
+| §22.1 / R-DB-10 Phân tích chỉ đọc `_pub`, trên bản sao | `pf/metrics`, `pf/reports` đọc qua `port/` trên primary | LN | `pf/metrics` đọc `_pub` + bản sao: **xong W6.3**. Còn: `pf/reports` vẫn đọc qua `port/` | S | Thấp |
+| §22.2 / R-DB-11 `r_agg` BYPASSRLS có kiểm soát, ngưỡng k, nhật ký chạy | Không có vai BYPASSRLS cho ứng dụng (chỉ `ag_outbox_publisher`). Ngưỡng k trong một tenant | LN | **Mã xong W6.4** (pf 000129). Lệch: chưa tách `app_agg` (H-20); bật chờ C-4 | S | TB |
+| §23 / R-DB-12 Lịch sử migration theo schema, thứ tự topo, vai `own_<module>` | `golang-migrate` một bảng mỗi cụm, `ag_migrator` | LN ← LL | Bộ chạy v2 **bước 1 xong W7.1** (sau cờ); bước 2 còn (H-24) | M | TB |
 | §24 Kiểu dữ liệu chuẩn | `numeric(14,3)` (130 cột), `numeric(18,2)`, `numeric(18,4)`. Diện tích dùng `numeric(14,4)` thay `(12,4)`. Thửa tối thiểu **3 điểm** (A2) thay vì 4 | LN | Ghi lệch A2 (X-12) | S | Thấp |
-| R-DB-13 Bảng vận hành có hạn lưu | outbox (cần kiểm hạn), inbox, `idempotency_key` 48 giờ, `chain_head`, `session_context` | LN | Khai hạn lưu cho outbox/inbox; `ledger_idem` (W2.3) | S | Thấp |
+| R-DB-13 Bảng vận hành có hạn lưu | outbox (cần kiểm hạn), inbox, `idempotency_key` 48 giờ, `chain_head`, `session_context` | LN | `ledger_idem`: **xong W2.1**. Còn: khai hạn lưu outbox/inbox | S | Thấp |
 
 ### 3.5 Mười bốn phát hiện DB — bảng gọn
 
 | Mã | TT | CS | RR |
 |---|---|---|---|
 | DB-01 | Đ | — | — |
-| DB-02 | KA (chưa phát sinh) → ràng buộc của W2.1 | — | — |
+| DB-02 | Đ ← KA: RLS theo Nút/cấp phép chỉ đọc `k_ref` cùng cụm (W2.5, W3.4, W4.2) | — | — |
 | DB-03 | Đ | — | — |
-| DB-04 | LL | L | Cao |
-| DB-05 | CC (theo W2.1) | S | Thấp |
-| DB-06 | LN | S | Thấp |
-| DB-07 | LL (cấu trúc) | L | Cao |
-| DB-08 | CC | M | Thấp |
-| DB-09 | LN | M | Thấp |
-| DB-10 | CC | M | TB |
-| DB-11 | LN | S | Thấp |
-| DB-12 | LL | L | TB |
+| DB-04 | Đ ← LL: **xong W2.3/W2.6** | — | — |
+| DB-05 | Đ ← CC: **xong W2.5** | — | — |
+| DB-06 | Đ ← LN: **xong W2.2** (nguồn chính thức chờ C-9) | — | — |
+| DB-07 | LN ← LL: **W3.1–W3.4 xong**, W3.5 chờ dữ liệu | M | Cao |
+| DB-08 | Đ ← CC: **xong W6.5** | — | — |
+| DB-09 | LN: `_pub` **xong W6.3** (`pf/metrics`); `pf/reports` còn đọc qua `port/` | S | Thấp |
+| DB-10 | LN ← CC: `r_agg` **mã xong W6.4** (chưa tách `app_agg`, H-20) | S | TB |
+| DB-11 | Đ ← LN: **xong W2.1** | — | — |
+| DB-12 | LN ← LL: bộ chạy v2 **bước 1 W7.1** (sau cờ) | M | TB |
 | DB-13 | Đ | — | — |
-| DB-14 | KA (chưa phát sinh) → cổng `EXPLAIN` | S | Thấp |
+| DB-14 | Đ ← KA: chính sách viết thẳng `EXISTS` (W3.4), cổng `EXPLAIN` (W9.1) | — | — |
 
 Chi tiết và bằng chứng ở mục 2.5.
 
@@ -429,40 +433,40 @@ Chi tiết và bằng chứng ở mục 2.5.
 | Yêu cầu | Ở đâu | TT | Cần thay đổi | CS | RR |
 |---|---|---|---|---|---|
 | §25 `k/access` | `pf/accounts` + Keycloak + `pf/apiclient` + `pf/party` share grant | LN | Mục 2.4, W8.x | L | TB |
-| §25 `k/orgtree` (cây Nút, đơn vị hành chính, `AdminUnitAt`) | `pf_party.org` (+ phòng ban, khu vực pf 000062), `pf_masterdata.admin_unit` | LN | Khai `kind: kernel`; xuất `node_closure` cho `k_ref` | M | TB |
-| §25 `k/ref` | Không có | CC | W2.1 | L | TB |
+| §25 `k/orgtree` (cây Nút, đơn vị hành chính, `AdminUnitAt`) | `pf_party.org` (+ phòng ban, khu vực pf 000062), `pf_masterdata.admin_unit` | Đ ← LN | `kind: kernel` (**W1.1**), `node_closure` cho `k_ref` (**W2.5**), `AdminUnitAt` (**W2.2**) | — | — |
+| §25 `k/ref` | Không có | Đ ← CC | **Xong W2.5** | — | — |
 | §25 `k/ledger` | `shared` (fn_immutable, fn_chain, canonical, verify_chain, anchor) | Đ | — | — | — |
 | §25 `k/jobs` | `shared/{outbox,inbox,idempotency,opsjobs,leader,schedule}` | Đ | — | — | — |
 | §25 `k/audit` (sổ nhật ký an ninh, đọc nhật ký cũng ghi) | Rải rác: `vault.access_log`, `partner_read_log`, `account_event`, `support_action_log`, `dispatch_link_access`. Chưa có đẩy SIEM | LN | Module audit gom + đẩy (G4) | M | Thấp |
 | §25 `k/ui-shell` (menu từ quyền qua `module.yaml`) | `apps/web-ops` menu theo phòng ban/cấu hình (KN P2/P6) | LN | Menu đọc từ `module.yaml` | M | Thấp |
-| §25 Thay SAD 6.3: `share_grant` thuộc `k/access`, đơn vị chủ tạo | `pf/party` | LN | W4.1 | M | TB |
+| §25 Thay SAD 6.3: `share_grant` thuộc `k/access`, đơn vị chủ tạo | `pf/party` | LN | Đơn vị chủ tạo: **xong W4.1**. Còn: chuyển về `k/access` (W7.2) | M | TB |
 | §26 `cap/masterdata` | `pf/masterdata` (danh mục, tham số có phiên bản, duyệt) | Đ | Duyệt qua `cap/workflow` khi có | — | — |
-| §26 `cap/workflow` | Không có module chung. Duyệt bốn mắt rải từng module | CC | W6.1 | M | TB |
-| §26 `cap/forms` (chốt kỳ = ảnh chụp đóng băng) | `pf/reports` (mẫu 000065, nhập 000066, gửi 000072) + `extension/reportcycle` (đợt, nộp, kỳ, tổng hợp 000068–000071) | LN | W6.2 | L | Cao |
-| §26 `cap/export` | `pf/reports` xuất (ADR-0014), ADR-0026 Google Sheets, băm tệp: cần kiểm | LN | Gom về `cap/export` | M | TB |
-| §26 `cap/analytics` | `pf/metrics` (000036–37) | LN | Chỉ đọc `_pub` (W6.4) | M | Thấp |
-| §26 `cap/import` | `pf/reports/formimport`, `cmd/formimport`, nhập HTX hàng loạt | LN | Gom (P6) | M | TB |
-| §26 `cap/task` | `pf/extension` nhiệm vụ + SLA + leo thang | LN | Tách khi có app thứ hai | M | Thấp |
+| §26 `cap/workflow` | Không có module chung. Duyệt bốn mắt rải từng module | Đ ← CC | **Xong W6.1** (pf 000118) | — | — |
+| §26 `cap/forms` (chốt kỳ = ảnh chụp đóng băng) | `pf/reports` (mẫu 000065, nhập 000066, gửi 000072) + `extension/reportcycle` (đợt, nộp, kỳ, tổng hợp 000068–000071) | LN | **Mã xong W6.2** (pf 000121–000122); KN còn chạy v1 ghi song song; 14 biểu thật chờ Q-01 | M | Cao |
+| §26 `cap/export` | `pf/reports` xuất (ADR-0014), ADR-0026 Google Sheets, băm tệp: cần kiểm | LN | Chưa tách — W6.6 khai `hosts`, điều kiện kích hoạt tách ở [modules.md](dev/modules.md#năng-lực-chưa-tách-capimport-captask-capexport-w66) | M | TB |
+| §26 `cap/analytics` | `pf/metrics` (000036–37) | Đ ← LN | Chỉ đọc `_pub`: **xong W6.3** | — | — |
+| §26 `cap/import` | `pf/reports/formimport`, `cmd/formimport`, nhập HTX hàng loạt | LN | Chưa tách — W6.6 khai `hosts` | M | TB |
+| §26 `cap/task` | `pf/extension` nhiệm vụ + SLA + leo thang | LN | Chưa tách — một nơi cài (W6.6) | M | Thấp |
 | §26 `cap/notify` | `pf/notify` (trong app, email, đẩy) | LN | SMS/Zalo khi có kênh | M | Thấp |
-| §26 `cap/evidence` | `pf/files` (000010), ADR-0004 | LN | Bộ ba subject + `Open(purpose)` (W6.6) | M | TB |
+| §26 `cap/evidence` | `pf/files` (000010), ADR-0004 | Đ ← LN | Bộ ba subject + `Open(purpose)`: **xong W6.5** (module `pf/evidence`) | — | — |
 | §26 `cap/content` | `pf/content` | Đ | — | — | — |
 | §26 `cap/price` | Không có | CC | Chờ yêu cầu (NH, KN) | M | Thấp |
-| §26 `cap/geo` | `pf/geo` (+ hình học thửa) | LN | Chuyển hình học thửa sang `pf/cooperative` | M | TB |
+| §26 `cap/geo` | `pf/geo` (+ hình học thửa) | Đ ← LN | Hình học thửa sang `pf/cooperative`: **xong W3.3** | — | — |
 | §26 `cap/sync` | `pf/sync` (ADR-0006) | Đ | — | — | — |
-| §27.1 `dom/cooperative` | Mục 2.2 | LL | W3.1–W3.5 | L | Cao |
+| §27.1 `dom/cooperative` | Mục 2.2 | LN ← LL | **Xong W3.1–W3.4** (pf 000131–000134); còn W3.5 (hợp nhất dữ liệu UAT, chờ dữ liệu) và cửa sổ bảo trì H-17 | M | Cao |
 | §27.1 `dom/extension` | `pf/extension` (+ lịch công tác 000075, vật tư 000077) | LN | Tách phần `cap/forms`/`cap/task` | M | TB |
-| §27.1 `dom/mechanization` (`shares: machine`, định mức dẫn văn bản) | `pf/mechanization` | Đ | Khai `shares` | — | — |
+| §27.1 `dom/mechanization` (`shares: machine`, định mức dẫn văn bản) | `pf/mechanization` | Đ | `shares: [machine]`: **xong W4.2** | — | — |
 | §27.1 `dom/waterway` | `pf/waterway` | Đ | — | — | — |
 | §27.1 `dom/hubsim` (ảnh chụp gồm kết quả định tuyến, `algorithm_version`) | `pf/simulation` + `optimizer/` | Đ | — | — | — |
 | §27.1 `dom/mrv` (lưu package kèm băm; danh mục chờ C-2) | `pf/mrv` (000008, 000038, 000045) | Đ | — | — | — |
 | §27.1 `dom/metering` | `pf/metering` (ADR-0023) | Đ | — | — | — |
 | §27.2 A — Kế toán mua ngoài | `mkg/acctbridge` | Đ | — | — | — |
 | §27.2 B — Hệ vận hành một khối | `mkg/*`, `cmd/api-internal` | Đ | — | — | — |
-| §27.2 `mkg/workforce` | Không có | CC | W7.4 | L | Cao (PII 1.500 người) |
-| §27.2 Mở rộng fieldops/orders/logistics/measurement/hub | Mục 2.6 | LN | W7.5 | L | TB |
-| §27.2 C — Engine ba chế độ ở vùng nội bộ | `optimizer/` cho `pf/simulation` | CC | W7.2 | L | TB |
-| §27.2 Ba tầng T1/T2a/T2b/T3, vùng đóng băng, tự duyệt năm điều kiện | Không có | CC | W7.2 (cần MKG v1.3) | L | TB |
-| §27.2 Kho quan sát + tham số chính sách | Không có | CC | W7.3 | M | Thấp |
+| §27.2 `mkg/workforce` | Không có | CC | W8.4 (chờ MKG v1.3, pháp chế) | L | Cao (PII 1.500 người) |
+| §27.2 Mở rộng fieldops/orders/logistics/measurement/hub | Mục 2.6 | LN | W8.5 (chờ MKG v1.3) | L | TB |
+| §27.2 C — Engine ba chế độ ở vùng nội bộ | `optimizer/` cho `pf/simulation` | CC | `lib/optcore` xong W8.1; engine W8.3 (chờ MKG v1.3) | L | TB |
+| §27.2 Ba tầng T1/T2a/T2b/T3, vùng đóng băng, tự duyệt năm điều kiện | Không có | CC | W8.3 (cần MKG v1.3) | L | TB |
+| §27.2 Kho quan sát + tham số chính sách | Không có | LN ← CC | Kho quan sát: **mã xong W8.2** (mkg 000037). Còn: tham số chính sách (W8.3) | S | Thấp |
 | §27.2 Dòng rơm (45–55% đi thẳng, ghe 6–200 tấn) | Tham số mô phỏng (cần kiểm) | LN | Theo v1.3 | M | Thấp |
 | §28 KN (G1) | `apps/web-ops`, `apps/field-app`, KN v7.7 | Đ | `app.yaml` | — | — |
 | §28 HTX, CGH, SIM (G2) | `apps/htx-app`, `web-ops`, `pf/mechanization`, `pf/simulation` | LN | Chuyển lên module dùng chung (G2 v4.1) | L | TB |
@@ -474,23 +478,23 @@ Chi tiết và bằng chứng ở mục 2.5.
 
 | Yêu cầu | Ở đâu | TT | Cần thay đổi | CS | RR |
 |---|---|---|---|---|---|
-| §29 Phân vùng mạng cấp độ 3 | ADR-0008, ADR-0021, `check_flows.py`, NetworkPolicy | Đ | Thêm luồng `integration-gateway`, `access` | S | Thấp |
+| §29 Phân vùng mạng cấp độ 3 | ADR-0008, ADR-0021, `check_flows.py`, NetworkPolicy | Đ | Luồng `integration-gateway` (F09 mTLS…): **xong W5.2**. Còn: `access` (W7.4) | S | Thấp |
 | R-SEC-01 Internet không chạm vùng dữ liệu; namespace + default deny | ADR-0008/0021 | Đ | — | — | — |
 | R-SEC-02 Bằng chứng tách biệt của nhà cung cấp đám mây | Chờ chọn nhà cung cấp (G-1) | KA | Điều kiện mua sắm | — | — |
 | §30 Kiểm soát TCVN 11930 | SAST/SBOM/ký image (cần kiểm trong CI), DLP ADR-0024, nhật ký | LN | CI chưa chạy từ G2 (A8). Nhật ký 1 năm (G-6) | M | Cao |
-| R-SEC-03 `r_agg` là tài sản đặc quyền, bốn mắt | Không có `r_agg` | CC | W6.5 | S | TB |
-| R-SEC-04 Cấp phép do quản trị viên đơn vị chủ, có căn cứ, thời hạn, rà soát | Đơn vị chủ đề xuất + bốn mắt + hạn ≤ 5 năm. Chưa có căn cứ thỏa thuận, chưa có rà soát định kỳ | LN | W4.1 | S | Thấp |
-| §31 Quan sát: trường log chuẩn, chỉ số nghiệp vụ | OTel, `ag.sync.conflict.overdue`, `ag_db_standby_replication_lag_seconds`, DLQ, `ag_egress_*`. Chưa có `k_ref_lag_seconds`, đếm đọc qua cấp phép theo đơn vị, `r_agg` | LN | Theo W2.1/W4.2/W6.5 | S | Thấp |
-| §32 Cổng CI: đồ thị module | Không | CC | W1.2 | M | Thấp |
-| §32 Cổng: ranh giới mã, không nhánh theo app | `agboundary` có; lint tên app chưa | LN | W10.1 | S | Thấp |
-| §32 Cổng: hợp đồng port, sự kiện, view công bố | Sự kiện + van có; port, `_pub` chưa | LN | W1.1/W6.4 | M | Thấp |
-| §32 Cổng: quyền DB, bất biến, chuỗi băm, rò rỉ đơn vị qua PgBouncer | `v_missing_immutability`, `v_missing_rls`, `verify_chain`, `TestTenantLeakParallel` (`AG_TEST_PGBOUNCER_URL`). Kiểm "không `r_*` trên schema khác": cần thêm | LN | W10.1 | S | Thấp |
-| §32 Cổng: `EXPLAIN` chính sách | Không | CC | W10.1 | S | Thấp |
-| §32 Cổng: vai DB (ngoài `WithContextTx` thất bại) | Không | CC | W2.2 | S | Thấp |
-| §32 Kiểm thử định kỳ (phục hồi, failover, dựng lại, tải) | `restore-drill.yml`, `cmd/drill`, `cmd/rebuilddrill`, `tools/loadgen` | Đ | Thêm RLS có nhánh chia sẻ | S | Thấp |
-| R-OPS-04 DDL trong tài liệu kiến trúc chạy trong CI | Không. Repo không có bản tài liệu kiến trúc trong `docs/` | CC | W0.4 | S | Thấp |
-| §33 Môi trường; R-OPS-01 PII thật không ra khỏi production; dữ liệu tổng hợp có cây hành chính sau 2025 kèm bảng kế thừa | `cmd/seed-synthetic`, `docs/requirements/danh-muc-hanh-chinh.md`, `successor_codes` | LN | Bảng kế thừa theo W2.4 | S | Thấp |
-| §34 Sao lưu, RPO/RTO, thứ tự phục hồi, `k_ref` dựng lại khớp nguồn | pgBackRest (ADR-0021), `restore-drill.yml`, vault bucket riêng. RPO/RTO repo ghi 24 h/4 h (G-2), v4.1 ghi ≤ 1 h | LN | Chốt RPO (G-2); thêm bước `k_ref` | S | TB |
+| R-SEC-03 `r_agg` là tài sản đặc quyền, bốn mắt | Không có `r_agg` | LN ← CC | **Mã xong W6.4** (danh mục job bốn mắt, nhật ký chạy). Lệch: chưa có `app_agg` (H-20) | S | TB |
+| R-SEC-04 Cấp phép do quản trị viên đơn vị chủ, có căn cứ, thời hạn, rà soát | Đơn vị chủ đề xuất + bốn mắt + hạn ≤ 5 năm. Chưa có căn cứ thỏa thuận, chưa có rà soát định kỳ | Đ ← LN | **Mã xong W4.1** (căn cứ `basis_ref`, rà soát 90 ngày); bật chờ C-10 | — | Thấp |
+| §31 Quan sát: trường log chuẩn, chỉ số nghiệp vụ | OTel, `ag.sync.conflict.overdue`, `ag_db_standby_replication_lag_seconds`, DLQ, `ag_egress_*`. Chưa có `k_ref_lag_seconds`, đếm đọc qua cấp phép theo đơn vị, `r_agg` | Đ ← LN | `ag.k_ref.lag` (**W2.5**), `ag.share.reads` (**W4.2**), nhật ký chạy `r_agg` (**W6.4**) | — | — |
+| §32 Cổng CI: đồ thị module | Không | Đ ← CC | **Xong W1.2** | — | — |
+| §32 Cổng: ranh giới mã, không nhánh theo app | `agboundary` có; lint tên app chưa | Đ ← LN | **Xong W9.1** (`agnoappname`) | — | — |
+| §32 Cổng: hợp đồng port, sự kiện, view công bố | Sự kiện + van có; port, `_pub` chưa | LN | View `_pub` khai + kiểm: **xong W6.3**. Còn: phiên bản port (R-MOD-06) | M | Thấp |
+| §32 Cổng: quyền DB, bất biến, chuỗi băm, rò rỉ đơn vị qua PgBouncer | `v_missing_immutability`, `v_missing_rls`, `verify_chain`, `TestTenantLeakParallel` (`AG_TEST_PGBOUNCER_URL`). Kiểm "không `r_*` trên schema khác": cần thêm | Đ ← LN | "Không `r_*` trên schema khác": **xong W9.1** | — | — |
+| §32 Cổng: `EXPLAIN` chính sách | Không | Đ ← CC | **Xong W9.1** (cùng EXPLAIN có dữ liệu của W3.4) | — | — |
+| §32 Cổng: vai DB (ngoài `WithContextTx` thất bại) | Không | Đ ← CC | **Xong W2.6** | — | — |
+| §32 Kiểm thử định kỳ (phục hồi, failover, dựng lại, tải) | `restore-drill.yml`, `cmd/drill`, `cmd/rebuilddrill`, `tools/loadgen` | Đ | RLS có nhánh chia sẻ: kiểm thử T6/T9/T10 **W4.2**; `drill kref` (**W2.5**) | S | Thấp |
+| R-OPS-04 DDL trong tài liệu kiến trúc chạy trong CI | Không. Repo không có bản tài liệu kiến trúc trong `docs/` | Đ ← CC | **Xong W0.4** (`tools/docsql`) | — | — |
+| §33 Môi trường; R-OPS-01 PII thật không ra khỏi production; dữ liệu tổng hợp có cây hành chính sau 2025 kèm bảng kế thừa | `cmd/seed-synthetic`, `docs/requirements/danh-muc-hanh-chinh.md`, `successor_codes` | LN | Bảng kế thừa: **xong W2.2** (`pending_c9`). Còn: seed tổng hợp dùng bảng kế thừa | S | Thấp |
+| §34 Sao lưu, RPO/RTO, thứ tự phục hồi, `k_ref` dựng lại khớp nguồn | pgBackRest (ADR-0021), `restore-drill.yml`, vault bucket riêng. RPO/RTO repo ghi 24 h/4 h (G-2), v4.1 ghi ≤ 1 h | LN | Bước `k_ref`: **xong W2.5** (`drill kref`). Còn: chốt RPO (G-2, H-13) | S | TB |
 | §35 Ứng cứu sự cố P1–P4, hai nghĩa vụ báo cáo `[KÝ — pháp chế]` | `docs/runbooks/*` | LN | Thêm P1 "đọc chéo không cấp phép", P2 "`k_ref` trễ" | S | Thấp |
 | §36 Chế độ hỏng (phân vùng sổ tạo trước, đường nhập tay cân) | Tạo trước 24 tháng + DEFAULT (`apply_ledger`, `migrate maintain`). Nhập tay cân: cần kiểm | LN | Thêm `k_ref`, `chain_head` theo lô | S | Thấp |
 
@@ -498,28 +502,28 @@ Chi tiết và bằng chứng ở mục 2.5.
 
 | Yêu cầu | Ở đâu | TT | Cần thay đổi | CS | RR |
 |---|---|---|---|---|---|
-| §37 / R-INT-01 MKG qua đúng cổng, không lối riêng | Van RabbitMQ + `/v1/partner/*` + `mkg_sync` | LL | W5.2–W5.6 | L | TB |
-| §38.1 Bốn loại luồng | Có hai loại tương đương (cấp phép, công bố). Chưa có song phương và tham chiếu dùng chung | LL | W5.1 | M | TB |
-| §38.2 Luồng song phương (ADR sửa ADR-0020) | Không có; bảng kê đang là van | CC | ADR B16 + W5.5 | L | Cao |
-| §38.3 Sáu luồng thí điểm MKG | Đều có nhưng qua đường riêng: ngày thu hoạch (`season_harvest_dates`), đồ thị thủy (`waterway_routes`), lịch gom và số cuộn (van), xác nhận (`htx-collection/responses`). Tiến độ gặt tổng hợp theo xã: chưa có | LN | Chuyển từng luồng sang cổng | L | TB |
+| §37 / R-INT-01 MKG qua đúng cổng, không lối riêng | Van RabbitMQ + `/v1/partner/*` + `mkg_sync` | LN ← LL | **Mã xong W5.2–W5.6** (cổng, feed, lô, song phương); lối cũ gỡ ở W5.10 sau một kỳ | M | TB |
+| §38.1 Bốn loại luồng | Có hai loại tương đương (cấp phép, công bố). Chưa có song phương và tham chiếu dùng chung | Đ ← LL | **Mã xong:** hợp đồng W5.1, tham chiếu `admin_units` W5.3, song phương W5.6 | — | TB |
+| §38.2 Luồng song phương (ADR sửa ADR-0020) | Không có; bảng kê đang là van | Đ ← CC | **Mã xong W5.6** (ADR-0034, Đề xuất); bật production chờ C-12 | — | Cao (C-12) |
+| §38.3 Sáu luồng thí điểm MKG | Đều có nhưng qua đường riêng: ngày thu hoạch (`season_harvest_dates`), đồ thị thủy (`waterway_routes`), lịch gom và số cuộn (van), xác nhận (`htx-collection/responses`). Tiến độ gặt tổng hợp theo xã: chưa có | LN | Đã qua cổng (mã): danh bạ HTX/thửa (W5.5), tiến độ gặt theo xã (W5.3), lịch gom + số cuộn + xác nhận (W5.6). Còn: `season_harvest_dates`, `waterway_routes` chưa có producer | M | TB |
 | §38.3 Dữ liệu VFT không qua nền tảng; cổng nhận vùng nội bộ dùng chung mã | `mkg/orders` (VFT là khách). Chưa có cổng nhận | LN | Dùng mã cổng cho cổng nhận nội bộ (G3+) | M | Thấp |
 | §39 Năm rủi ro hiệu năng | Phân tích | KA | — | — | — |
 | §40 Quy tắc tích hợp (R-INT-02 … 11) | Theo từng dòng dưới | LN | — | — | — |
-| R-INT-02 Không gọi đồng bộ xuyên hệ thống trong đường găng | `mkg/fieldops` kéo định kỳ về bản sao. Mô phỏng nền tảng không gọi MKG | Đ | Thêm `as_of`/`max_age` (W5.6) | S | Thấp |
-| R-INT-03 Bất đồng bộ mặc định, 202 + mã lô | Van bất đồng bộ; chưa có mã lô | LN | W5.4 | M | TB |
-| R-INT-04 Vách ngăn theo đối tác | Hạn mức + 429 ở `api-public` | LN | Hàng đợi, DLQ riêng (W5.4) | M | TB |
-| R-INT-05 Tính một lần, phát nhiều lần | Tính theo yêu cầu | LN | W5.3 | M | TB |
-| R-INT-06 Feed cursor, giữ 30 ngày, ảnh chụp qua URL ký | Phân trang cursor, xuất tệp qua job | LN | W5.3 | M | TB |
-| R-INT-07 Webhook mỏng HMAC | Không | CC | W5.7 | M | Thấp |
-| R-INT-08 Hợp đồng có phiên bản, môi trường thử đối tác | `contracts/*` có phiên bản; chưa `integration/`, chưa có môi trường thử | LN | W5.1, W5.8 | M | Thấp |
-| R-INT-09 Ngắt mạch webhook | Không | CC | W5.7 | S | Thấp |
-| R-INT-10 Đối soát tổng kiểm | `payload_sha256` van, đối soát cân | LN | W5.7 | S | Thấp |
-| R-INT-11 Kênh tệp cùng lược đồ | Nhập Excel riêng từng module | LN | W5.8 | M | Thấp |
-| §41.1 Thành phần cổng | Không (gần nhất `api-public`) | CC | W5.2–W5.4 | L | TB |
-| §41.2 Xác thực máy (khóa HMAC, mTLS cho đối tác lớn), phạm vi khóa = cấp phép, ghi metering | Khóa HMAC + pepper, scope `dp:*`, `usage_event` mỗi lời gọi. Chưa mTLS cho đối tác | LN | W5.2 | M | TB |
-| §41.3 Ghi từ đối tác: lô → 202 → hàng đợi riêng → inbox → kiểm hợp đồng → port | Không | CC | W5.4 | L | TB |
-| §41.4 Phía MKG: bộ điều hợp feed → kho quan sát | Không | CC | W5.6 + W7.3 | M | Thấp |
-| §42 Mục tiêu dịch vụ của cổng, phép thử gấp 10 hạn mức | `tools/loadgen` (G4) | CC | W5.9 | M | Thấp |
+| R-INT-02 Không gọi đồng bộ xuyên hệ thống trong đường găng | `mkg/fieldops` kéo định kỳ về bản sao. Mô phỏng nền tảng không gọi MKG | Đ | `as_of`/`max_age`: **xong W5.5** | S | Thấp |
+| R-INT-03 Bất đồng bộ mặc định, 202 + mã lô | Van bất đồng bộ; chưa có mã lô | Đ ← LN | **Xong W5.4** | — | — |
+| R-INT-04 Vách ngăn theo đối tác | Hạn mức + 429 ở `api-public` | Đ ← LN | **Xong W5.4** (hàng đợi + DLQ riêng), kiểm thử W5.9 | — | — |
+| R-INT-05 Tính một lần, phát nhiều lần | Tính theo yêu cầu | Đ ← LN | **Xong W5.3** | — | — |
+| R-INT-06 Feed cursor, giữ 30 ngày, ảnh chụp qua URL ký | Phân trang cursor, xuất tệp qua job | Đ ← LN | **Xong W5.3** | — | — |
+| R-INT-07 Webhook mỏng HMAC | Không | Đ ← CC | **Xong W5.7** | — | — |
+| R-INT-08 Hợp đồng có phiên bản, môi trường thử đối tác | `contracts/*` có phiên bản; chưa `integration/`, chưa có môi trường thử | Đ ← LN | **Xong W5.1** (hợp đồng), **W5.8** (môi trường thử) | — | — |
+| R-INT-09 Ngắt mạch webhook | Không | Đ ← CC | **Xong W5.7** | — | — |
+| R-INT-10 Đối soát tổng kiểm | `payload_sha256` van, đối soát cân | Đ ← LN | **Xong W5.7** (theo phiên bản), theo ngày song phương trên sổ thật **W5.6** | — | — |
+| R-INT-11 Kênh tệp cùng lược đồ | Nhập Excel riêng từng module | Đ ← LN | **Xong W5.8** | — | — |
+| §41.1 Thành phần cổng | Không (gần nhất `api-public`) | Đ ← CC | **Xong W5.2–W5.4** | — | — |
+| §41.2 Xác thực máy (khóa HMAC, mTLS cho đối tác lớn), phạm vi khóa = cấp phép, ghi metering | Khóa HMAC + pepper, scope `dp:*`, `usage_event` mỗi lời gọi. Chưa mTLS cho đối tác | Đ ← LN | mTLS: **xong W5.2** (định danh máy tạm do cổng khai; về `pf/accounts` ở W7.2). Route Traefik passthrough chưa có trong chart (H-23) | — | TB |
+| §41.3 Ghi từ đối tác: lô → 202 → hàng đợi riêng → inbox → kiểm hợp đồng → port | Không | Đ ← CC | **Xong W5.4** | — | — |
+| §41.4 Phía MKG: bộ điều hợp feed → kho quan sát | Không | Đ ← CC | **Mã xong W5.5 + W8.2** | — | — |
+| §42 Mục tiêu dịch vụ của cổng, phép thử gấp 10 hạn mức | `tools/loadgen` (G4) | LN ← CC | **W5.9**: công cụ + kiểm thử quy mô nhỏ đạt; lượt staging 200 đối tác chờ C-13/G-3 | S | Thấp |
 | §43 Chế độ hỏng của cổng | Không | CC | Theo W5.x | — | — |
 | §44 Mở rộng sang các bên | `pf/mrv` xuất package (Đ). Cơ quan nhà nước: không thiết kế trước (đúng) | LN | — | — | — |
 
@@ -527,35 +531,35 @@ Chi tiết và bằng chứng ở mục 2.5.
 
 | Cổng v4.1 | Repo | TT | Ghi chú |
 |---|---|---|---|
-| G0: khung module, registry, kiểm đồ thị; `k/ledger` sửa DB-01/03; `k/access` tối thiểu; `k/ref`; vai theo đơn vị triển khai; R-OPS-04 | `k/ledger` có. Còn lại chưa có | LL | Gói P0–P2 |
-| G1: KN chạy thật trên `cap/import`, `cap/workflow`, `cap/forms`, `dom/cooperative` làm chủ duy nhất | KN v7.7 chạy trên `pf/reports`, `pf/extension`, `pf/party`, `pf/geo` | LN | Chức năng đủ; cấu trúc module chưa đổi |
-| G1+: cổng tích hợp tối thiểu; ADR song phương, cấp phép tổng hợp theo xã | Không có | CC | P5 |
-| G2: HTX/CGH/SIM lên module dùng chung, `share_grant` chạy thật | Ba app đã chạy trên mã chung (repo G2) nhưng không có `share_grant` nội nền tảng | LN | P4 |
+| G0: khung module, registry, kiểm đồ thị; `k/ledger` sửa DB-01/03; `k/access` tối thiểu; `k/ref`; vai theo đơn vị triển khai; R-OPS-04 | `k/ledger` có. Còn lại chưa có | LN ← LL | Cập nhật 09/10/2026: W0.4, W1.1–W1.4, W2.1–W2.6 xong; `k/access` tối thiểu = KN P1 (ADR-0037), hợp nhất ở W7.2 |
+| G1: KN chạy thật trên `cap/import`, `cap/workflow`, `cap/forms`, `dom/cooperative` làm chủ duy nhất | KN v7.7 chạy trên `pf/reports`, `pf/extension`, `pf/party`, `pf/geo` | LN | Cập nhật 09/10/2026: `cap/workflow` (W6.1), `cap/forms` (W6.2, KN còn ghi song song v1), `pf/cooperative` chủ `pf_coop` (W3.3–W3.4) có mã; `cap/import` chưa tách (W6.6); production chờ H-17, Q-01 |
+| G1+: cổng tích hợp tối thiểu; ADR song phương, cấp phép tổng hợp theo xã | Không có | LN ← CC | Cập nhật 09/10/2026: W5.1–W5.9 có mã; ADR-0033…0035 viết, chờ ký |
+| G2: HTX/CGH/SIM lên module dùng chung, `share_grant` chạy thật | Ba app đã chạy trên mã chung (repo G2) nhưng không có `share_grant` nội nền tảng | LN | Cập nhật 09/10/2026: `share_grant` v2 + đọc tại chỗ có mã (W4.1–W4.2), bật chờ C-10/H-1 |
 | G3–G6 | Repo đã làm `mkg/*` (G3–G4), K8s (G4), Phase K + Public API (G5). Mốc v4.1 muộn hơn | LN | Đổi thứ tự: repo đi trước ở G3–G5, đi sau ở G0–G1 của v4.1 |
 
 ### 3.10 Phụ lục B — 20 ADR phải có trước G1
 
 | # | ADR v4.1 | ADR repo | TT | Việc |
 |---|---|---|---|---|
-| 1 | Bốn tầng, tệp khai báo, ứng dụng là tổ hợp | ADR-0011 (khác nội dung) | CC | ADR-0027 |
-| 2 | Module gọi nhau trong tiến trình, không microservice | Ngầm trong ADR-0001, g1-conventions | LN | Ghép vào ADR-0027 |
+| 1 | Bốn tầng, tệp khai báo, ứng dụng là tổ hợp | ADR-0011 (khác nội dung) | Đ ← CC (viết, chờ ký) | ADR-0027 |
+| 2 | Module gọi nhau trong tiến trình, không microservice | Ngầm trong ADR-0001, g1-conventions | Đ ← LN (ghép ADR-0027, chờ ký) | Ghép vào ADR-0027 |
 | 3 | Go; ngoại lệ Python, Go biên, Java SPI | ADR-0001, ADR-0016 | Đ | — |
 | 4 | RabbitMQ | ADR-0002 | Đ | — |
 | 5 | Event sourcing mức B | ADR-0003 | Đ | — |
 | 6 | Mẫu bảng sổ | ADR-0012 | Đ | Cập nhật hạn `ledger_idem` (DB-11) |
-| 7 | Một vai đăng nhập mỗi đơn vị triển khai, `SET LOCAL ROLE` | — | CC | ADR-0028 |
-| 8 | `k/ref`, độ trễ có giới hạn | — | CC | ADR-0029 |
-| 9 | Đọc tại chỗ có cấp phép | ADR-0020 (khác) | CC | ADR-0030, sửa ADR-0009/0020 |
-| 10 | `r_agg` BYPASSRLS có kiểm soát | — | CC | ADR-0031 |
-| 11 | Đơn vị hành chính có hiệu lực + kế thừa | Chỉ có migration pf 000002 | LN | ADR-0032 |
+| 7 | Một vai đăng nhập mỗi đơn vị triển khai, `SET LOCAL ROLE` | — | Đ ← CC (viết, chờ ký) | ADR-0028 |
+| 8 | `k/ref`, độ trễ có giới hạn | — | Đ ← CC (viết, chờ ký) | ADR-0029 |
+| 9 | Đọc tại chỗ có cấp phép | ADR-0020 (khác) | Đ ← CC (viết, chờ ký) | ADR-0030, sửa ADR-0009/0020 |
+| 10 | `r_agg` BYPASSRLS có kiểm soát | — | Đ ← CC (viết, chờ ký) | ADR-0031 |
+| 11 | Đơn vị hành chính có hiệu lực + kế thừa | Chỉ có migration pf 000002 | Đ ← LN (viết, chờ ký) | ADR-0032 |
 | 12 | `vault` cụm riêng từ ĐTK 1 | ADR-0021 (`pg-vault`), ADR-0008 | LN | Ghi rõ ĐTK 1 production |
-| 13 | TimescaleDB chỉ ở vùng nội bộ một đơn vị | ADR-0017 (**không** TimescaleDB) | LN | Ghi lệch (X-05) |
-| 14 | Tách xác thực và phân quyền; không mạo danh | `kn-v7.7-gap.md` §4.5 phương án A, chế độ hỗ trợ có lý do | LN | ADR-0037 ghi lại KN P1 |
-| 15 | MKG qua cổng như mọi đối tác | ADR-0020 (ngược lại) | CC | ADR-0033 |
-| 16 | Luồng song phương | — | CC | ADR-0034 (chờ C-12) |
-| 17 | Cấp phép tổng hợp theo xã có ngưỡng k | ADR-0022 (`dp_*`, `k_min`) | LN | ADR-0035 |
-| 18 | Feed cursor + webhook mỏng | — | CC | Ghép ADR-0033 |
-| 19 | Ba chế độ engine ở vùng nội bộ; `lib/optcore` | ADR-0016 (phần giấy phép) | CC | ADR-0036 |
+| 13 | TimescaleDB chỉ ở vùng nội bộ một đơn vị | ADR-0017 (**không** TimescaleDB) | LN (ghi lệch xong W0.3) | Ghi lệch (X-05) |
+| 14 | Tách xác thực và phân quyền; không mạo danh | `kn-v7.7-gap.md` §4.5 phương án A, chế độ hỗ trợ có lý do | Đ ← LN (viết, chờ ký) | ADR-0037 ghi lại KN P1 |
+| 15 | MKG qua cổng như mọi đối tác | ADR-0020 (ngược lại) | Đ ← CC (viết, chờ ký) | ADR-0033 |
+| 16 | Luồng song phương | — | Đ ← CC (viết, chờ ký + C-12) | ADR-0034 (chờ C-12) |
+| 17 | Cấp phép tổng hợp theo xã có ngưỡng k | ADR-0022 (`dp_*`, `k_min`) | Đ ← LN (viết, chờ ký) | ADR-0035 |
+| 18 | Feed cursor + webhook mỏng | — | Đ ← CC (ghép ADR-0033, chờ ký) | Ghép ADR-0033 |
+| 19 | Ba chế độ engine ở vùng nội bộ; `lib/optcore` | ADR-0016 (phần giấy phép) | Đ ← CC (viết, chờ ký) | ADR-0036 |
 | 20 | OR-Tools theo quy trình giấy phép | ADR-0016 (chỉ HiGHS) | CC | Khi cần, ADR riêng |
 
 ### 3.11 Phụ lục D — Ánh xạ quy tắc cũ
@@ -566,7 +570,7 @@ Chi tiết và bằng chứng ở mục 2.5.
 | v3.0 | R-02 … R-07 → R-MOD-01/02, R-DB-07, mục 21 | `agboundary`, CONNECT theo vai, `migratecheck` cụm ts | Đ |
 | v3.0 | R-10 … R-16 → R-CODE-01 … 06, R-API-05 | `nofloat`, `ids`, `clock`, `piilog`, `problem`, tenant từ token | Đ |
 | v3.0 | R-20 … R-25 → R-DB-06, R-DB-12 (DDL sửa DB-01, DB-03) | ADR-0012; R-DB-12 chưa | LN |
-| v3.0 | R-30 … R-33 → R-DB-08; `WithTenantTx` → `WithContextTx` + `SET LOCAL ROLE` | Vẫn `WithTenantTx` | LL |
+| v3.0 | R-30 … R-33 → R-DB-08; `WithTenantTx` → `WithContextTx` + `SET LOCAL ROLE` | Mọi module bọc `db.ForModule` (`SET LOCAL ROLE`, W2.3/W2.6); `WithTenantTx` còn gọi trong module đã bọc | LN ← LL |
 | v3.0 | R-40 … R-42 → §20, SAD | vault, ADR-0004 | Đ |
 | v3.0 | R-50 … R-56 → R-API-01 … 06; R-56 → `cap/workflow` + SAD | R-API đạt. R-56 bằng CHECK từng module | LN |
 | v3.0 | R-60 … R-64 → R-EVT-01 … 04 | ADR-0002, `contractcheck` | Đ |
@@ -577,13 +581,13 @@ Chi tiết và bằng chứng ở mục 2.5.
 | SAD v1.1 | §6.3 chia sẻ bằng sao chép → thay bằng §17.3 | Repo chưa từng hiện thực sao chép; dùng API + cấp phép (ADR-0020) | LN |
 | SAD v1.1 | §7.1 DDL `assignment_event` → mẫu 15.1 | `role_assignment_event` PK `(id, recorded_at)` (pf 000060) | Đ |
 | v3.0 R-31, SAD 6.2 | "Thiếu biến → NULL → rỗng" sai trên kết nối tái sử dụng → `ctx_uuid` | `shared.current_tenant()` + ADR-0005 (đã sửa từ G0) | Đ |
-| SAD 6.2 | `in_node_scope()` → `k_ref.node_closure`, `share_scope` | Repo không dùng `in_node_scope`; phạm vi ở ứng dụng | LN |
+| SAD 6.2 | `in_node_scope()` → `k_ref.node_closure`, `share_scope` | Chính sách viết thẳng `EXISTS k_ref.node_closure` (W3.4), `share_scope` (W4.2) | Đ ← LN |
 | Module hóa v1.0 | R-MOD-01 … 10 (thêm ngoại lệ lõi) | Mục 3.3 | LN |
 | v4.0 | `dom/hubsim`, `dom/waterway` → `pf/simulation`, `waterway_routes` (pf 000046) | Đúng như ghi | Đ |
 | v4.0 | `cap/*`, `dom/*`, R-MOD-10 chưa có, đưa vào `docs/` qua ADR | Tài liệu này + ADR-0027 | CC |
 | MKG v1.3 | Toàn bộ → §27.2; cổng nhận VFT dùng chung mã cổng | Repo chưa có tài liệu v1.3 | LN |
-| v3.0 | "Ba cửa" (mkg.md §1.1) → bốn cửa | `docs/design/mkg.md` §1.1 vẫn ghi ba cửa | LN |
-| v3.0 | "Mục x" trong ADR/conventions (số mục v3.0) | Các ADR dẫn mục v3.0 (vd. "mục 8.1", "mục 9", "mục 17") | LN |
+| v3.0 | "Ba cửa" (mkg.md §1.1) → bốn cửa | `docs/design/mkg.md` §1.1 bốn cửa (W0.3) | Đ ← LN |
+| v3.0 | "Mục x" trong ADR/conventions (số mục v3.0) | Bảng đổi mục v3.0 → v4.1 ở `g1-conventions.md` (W0.3) | Đ ← LN |
 
 > Hai dòng cuối là ánh xạ ngầm do repo phát sinh, không có trong Phụ lục D. Chúng được giữ lại để tính công việc cập nhật tài liệu.
 
@@ -619,4 +623,4 @@ Chi tiết và bằng chứng ở mục 2.5.
 
 1. **Số migration.** Nhiệm vụ ghi "bắt đầu từ pf 000086", nhưng `pf 000086` (`reports_dispatch_recipient_mailed`) và `pf 000087` (`reports_dispatch_link_revoke_oneway`) **đã có** trên `main` từ commit review sau cùng. Kế hoạch bắt đầu từ **pf 000088**.
 2. **`golang-migrate` áp theo số phiên bản.** Một migration có số nhỏ hơn số đã áp trên một cụm sẽ **không bao giờ được áp** và không báo lỗi. Vì vậy số trong kế hoạch được cấp theo **thứ tự gộp dự kiến**. Gộp khác thứ tự thì phải cấp lại số trước khi gộp.
-3. **Số còn trống ở các cụm khác:** mkg kế tiếp 000022 · shared 000006 · vault 000003 · ts 000004 (000002 dành cho `ts_env` theo ADR-0017).
+3. **Số còn trống ở các cụm khác (04/10/2026, lỗi thời):** mkg kế tiếp 000022 · shared 000006 · vault 000003 · ts 000004 (000002 dành cho `ts_env` theo ADR-0017). Số thực tế đã dùng: [kế hoạch §1.6](kien-truc-v4.1-ke-hoach.md#16-số-migration-thực-tế).

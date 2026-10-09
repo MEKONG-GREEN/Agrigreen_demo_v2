@@ -843,7 +843,7 @@ Mã `error_code` của job `failed` (không phải phản hồi HTTP): `apiclien
 | HTTP | Mã | Khi nào |
 |---|---|---|
 | 404 | `integration.unknown_feed` | Không có hợp đồng feed hợp lệ (`contracts/integration/feeds/`) với tên/`contract_version` này — mặc định từ chối |
-| 403 | `integration.contract_not_servable` | Hợp đồng feed chưa `approved` (`proposed`/`draft`/`retired`): production không bao giờ phục vụ; ngoài production cần `AG_GATEWAY_FEED_ALLOW_PROPOSED=1`. Cũng trả cho feed lớp `partner`/`bilateral` (chưa phục vụ ở cổng — W5.5/W5.6) |
+| 403 | `integration.contract_not_servable` | Hợp đồng feed chưa `approved` (`proposed`/`draft`/`retired`): production không bao giờ phục vụ; ngoài production cần `AG_GATEWAY_FEED_ALLOW_PROPOSED=1`. Feed lớp `partner` (W5.5) và feed cặp song phương (W5.6) áp cùng quy tắc; mã riêng của chúng ở `party.share_grant_missing` (bảng pf/party) và mục luồng song phương dưới |
 | 400 | `integration.invalid_cursor` | `cursor` sai dạng hoặc vượt đầu feed |
 | 410 | `integration.cursor_expired` | `cursor` trỏ vào phần đã quá hạn giữ 30 ngày — thân có `snapshot` (`href` của phiên bản mới nhất): đồng bộ lại từ ảnh chụp rồi đọc từ đầu phần còn giữ |
 | 404 | `integration.snapshot_not_found` | Phiên bản không có hoặc không có ảnh chụp (kho đối tượng chưa cấu hình lúc dựng) |
@@ -897,6 +897,7 @@ Tệp được tách thành lô `ingest_batch.v1` và đi qua CHÍNH đường �
 | 409 | `integration.file_results_pending` | `GET /v1/files/{id}/results` khi còn lô `queued` hoặc chưa gửi (`incomplete` — tải lại cùng tệp) — kèm `Retry-After` |
 
 Môi trường thử của đối tác (`AG_PARTNER_SANDBOX=1`): khóa thử `agks_…` trình cho cổng thật, hoặc khóa thật `agk_…` trình cho cổng thử → `401 apiclient.unauthenticated` (log `apiclient.sandbox_key_refused`). Đặt cờ ở production → `api-platform` / `integration-gateway` không khởi động.
+
 ### Cổng tích hợp — webhook mỏng, ngắt mạch, đối soát (W5.7; ADR-0033 §4)
 
 Đăng ký ở Admin API (`/v1/api-clients/{id}/webhooks…`, MFA, `api_client_admin`); trạng thái ở `GET /v1/webhooks` (cổng); đối soát `GET /v1/feeds/{feed}/checksums` (cổng). Bí mật webhook **không bao giờ** xuất hiện trong lỗi, log, danh sách — chỉ trong phản hồi đăng ký/xoay, một lần. [Runbook](runbooks/integration-webhooks.md).

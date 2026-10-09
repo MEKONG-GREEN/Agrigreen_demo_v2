@@ -119,7 +119,7 @@ Rủi ro duy nhất nằm ở **đổi câu trả lời sau khi có dữ liệu 
 | Gói | Việc | Migration |
 |---|---|---|
 | W2.4 | Biến `app.node_id`, `app.purpose` trong `WithContextTx` | trong pf 000091 |
-| W2.5 | `k_ref` với `share_grant_active`, `share_scope` rỗng | pf 000091–000092 |
+| W2.5 | `k_ref` với `share_grant_active`, `share_scope` rỗng | pf 000092, mkg 000022 (`ctx_*` ở pf 000091 của W2.4) |
 | W3.1 | Thiết kế `pf/cooperative`, `shares: [household, plot, season, diary_entry]`, ghi giả định H-1 — xong 06/10/2026: [docs/design/cooperative.md](../design/cooperative.md) (giả định (a) và phần đổi nếu (b) ở §11, ánh xạ `shares` → bảng ở §7.3, `p_scope` ở §9) | — |
 | W3.2 | Module `pf/cooperative` khai `shares: [household, plot, season, diary_entry]` (chưa có hiệu lực tới W4.2), port `Resolve` (bộ ba R-DB-07; W3.2 phân giải `cooperative`, `household`, `plot`, `diary_entry`) — xong 08/10/2026 | — |
 | W3.3 | Schema `pf_coop` — xong 09/10/2026: 22 bảng của `shares` (household, plot, season, diary_entry) ở một schema, một vai `r_cooperative`; `Resolve` phân giải đủ sáu loại chủ thể (thêm `season`, `harvest`); tên sổ giữ nguyên; giả định H-1 (a) không đổi ([ghi chú](../design/cooperative.md#17-ghi-chú-hiện-thực-w33)) | pf 000131–000133 |

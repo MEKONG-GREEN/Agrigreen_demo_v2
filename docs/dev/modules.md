@@ -232,9 +232,10 @@ Mã tham chiếu chỉ nhận `uuid.UUID`, nên không có đường nào đưa 
 - được planner inline thành `current_setting(…)`;
 - EXECUTE chỉ cấp cho `r_*` (vai cũ `<module>_app` có qua membership).
 
-Mảng xã: `k_ref.ctx_text('app.xa_ids')::text[]`. `app.node_id` và `app.xa_ids` được chính sách `p_scope` của `pf_coop` đọc từ W3.4 (mục "Phạm vi Nút trên `pf_coop`" dưới); `app.purpose` chờ W4.x.
+Mảng xã: `k_ref.ctx_text('app.xa_ids')::text[]`. `app.node_id` và `app.xa_ids` được chính sách `p_scope` của `pf_coop` đọc từ W3.4 (mục "Phạm vi Nút trên `pf_coop`" dưới); `app.purpose` được nhánh chia sẻ `p_share` đọc từ W4.2 (mục "Đọc tại chỗ qua cấp phép").
 
 `db.WithoutNodeScope(ctx, tx, fn)` đặt tạm `app.node_id`, `app.xa_ids` rỗng cho `fn` rồi đặt lại — chỉ cho kiểm toàn vẹn phải nhìn cả tenant (vd chồng lấn thửa giữa HTX), không để trả dữ liệu ngoài phạm vi.
+
 ## Bản chiếu `k_ref` (W2.5)
 
 [ADR-0029](../adr/0029-k-ref-ban-chieu-loi-moi-cum.md#hiện-thực), kiến trúc v4.1 §17.1–17.3, R-DB-05. Module lõi `pf/kref` (`internal/platform/kref`, `k/ref`) sở hữu schema `k_ref` ở cụm pf (pf 000092) và mkg (mkg 000022, rỗng). `k_ref` là dữ liệu **dẫn xuất**: nguồn là sổ của `pf/party`, `pf/masterdata`.
@@ -350,7 +351,7 @@ Còn mở: C-10 (thỏa thuận chia sẻ mẫu, chu kỳ rà soát), H-1 (ai l�
 
 ## Cổng kiến trúc (W9.1)
 
-Bốn cổng giữ ranh giới module sau W2.6. Hai cổng DB dùng tệp ngoại lệ **chỉ được co lại**: mỗi mục có lý do và gói kế hoạch gỡ (`owner: W<n>.<m>`). Cổng hỏng khi có vi phạm mới, hoặc khi một mục ngoại lệ không còn xảy ra (xóa mục đó).
+Bốn cổng giữ ranh giới module sau W2.6. Hai cổng DB dùng tệp ngoại lệ **chỉ được co lại**: mỗi mục có lý do và gói kế hoạch gỡ (`owner: W<n>.<m>`), hoặc `owner: ADR-0028-write-port` cho điểm vào ghi chéo module lâu dài. Cổng hỏng khi có vi phạm mới, hoặc khi một mục ngoại lệ không còn xảy ra (xóa mục đó).
 
 **1. `agnoappname` (archlint).** Module `kind: capability` và `kind: kernel` không rẽ nhánh theo danh tính ứng dụng:
 
@@ -364,7 +365,7 @@ Bốn cổng giữ ranh giới module sau W2.6. Hai cổng DB dùng tệp ngoạ
 - Không `r_<module>` nào có quyền hiệu lực trên đối tượng thuộc schema của module khác (`owns_schema` trong `modreg.Catalog`), trừ `k_ref` và `*_pub`. Xét USAGE/CREATE schema, mọi quyền bảng/khung nhìn/chuỗi số, quyền cột riêng, EXECUTE hàm.
 - Quyền có được qua PUBLIC không tính cho `r_*`. Riêng PUBLIC không được có USAGE/CREATE schema hoặc quyền bảng trên schema module (ngoài `k_ref`, `*_pub`).
 - Schema không thuộc module (`shared`, `public`, schema vận hành) ngoài phạm vi.
-- Ngoại lệ: `migrations/schema_isolation_exceptions.yaml`. Lúc thêm W9.1: `r_masterdata`, `r_party` → `pf_workflow` (USAGE + EXECUTE `submit`/`decide`, hàm `SECURITY DEFINER` của W6.1); gỡ khi điểm vào chuyển sang `pf_workflow_pub` (W6.3).
+- Ngoại lệ: `migrations/schema_isolation_exceptions.yaml`. Lúc thêm W9.1: `r_masterdata`, `r_party` → `pf_workflow` (USAGE + EXECUTE `submit`/`decide`, hàm `SECURITY DEFINER` của W6.1). W6.3 không gỡ mà xếp chúng thành điểm vào ghi lâu dài (`owner: ADR-0028-write-port`, xem "Điểm vào ghi chéo module" ở mục `_pub`); W6.2 thêm `r_forms` → `pf_workflow`, `r_extension` → `pf_forms`, W6.4 thêm `r_metrics` → `pf_workflow`.
 - Module mới cần quyền chéo: công bố view/hàm trong `pf_<module>_pub` (R-DB-10), không cấp thẳng.
 
 **3. `EXPLAIN` chung cho bảng RLS (DB-14)** — `migrations/rls_explain_integration_test.go`:
@@ -390,7 +391,7 @@ Kiến trúc v4.1 §18 (R-DB-07), §26; ADR-0027 mục 2. **Chọn module mới*
 | `Open(purpose)` / `OpenContent(purpose)` | Vai `vault_evidence_viewer`, mục đích bắt buộc + được phép (R-42), người gọi thấy chủ thể (`Resolver` → mã xã; phạm vi người gọi — ngữ cảnh KN hoặc `ScopeResolver` — chứa xã, hoặc `ViaShareGrant`) → không thì `evidence.subject_forbidden` (403); đồng ý của hộ. Tệp chưa có bộ ba: chỉ vai + mục đích + đồng ý như trước |
 | Nhật ký | **Mọi** quyết định sau khi thấy tệp — `granted`, `denied_subject`, `denied_scope`, `denied_consent` — ghi một dòng sổ `pf_files.access_log` (`shared.apply_ledger`, chuỗi `file:<ref>`, chỉ mã tham chiếu). Ghi sổ lỗi → không cấp (fail-closed) |
 
-**Thêm module chủ.** Module chủ có cổng phân giải riêng (vd `cooperativeport.Resolve`); `pf/evidence` khai `evidence/port.Resolver` (interface bên tiêu thụ, mẫu `pf/workflow` ↔ `pf/party`) vì module năng lực không import module domain. Gốc lắp ráp viết bộ chuyển và nối bằng `evidence.Module.UseResolver(<tên module.yaml>, r)` — hiện có `pf/cooperative` (`cmd/api-platform/assembly/evidence.go`: `cooperative`, `household`, `plot`, `diary_entry`; `season`, `harvest` → không hỗ trợ đến W3.3). Phạm vi và đồng ý cũng là interface tự khai (`app.ScopeResolver`, `app.ConsentChecker`) để không thêm cạnh vào chu trình `pf/party ↔ pf/sync`.
+**Thêm module chủ.** Module chủ có cổng phân giải riêng (vd `cooperativeport.Resolve`); `pf/evidence` khai `evidence/port.Resolver` (interface bên tiêu thụ, mẫu `pf/workflow` ↔ `pf/party`) vì module năng lực không import module domain. Gốc lắp ráp viết bộ chuyển và nối bằng `evidence.Module.UseResolver(<tên module.yaml>, r)` — hiện có `pf/cooperative` (`cmd/api-platform/assembly/evidence.go`: `cooperative`, `household`, `plot`, `diary_entry`; `season`, `harvest` qua store vụ từ W3.3). Phạm vi và đồng ý cũng là interface tự khai (`app.ScopeResolver`, `app.ConsentChecker`) để không thêm cạnh vào chu trình `pf/party ↔ pf/sync`.
 
 Vai DB: `r_evidence` là vai nhóm không có vai cũ (suy từ `owns_schema` trong `modreg.Catalog`, W2.6), `app_platform` là thành viên; `SELECT, INSERT` trên `pf_files.file`, `pf_files.access_log`. pf 000123 thu quyền `pf_files` của `r_sync` (và `sync_app` — sau W2.6 không còn quyền trực tiếp, lệnh vô hại).
 
@@ -512,6 +513,7 @@ ADR-0030 (mục "W4.2 — hình chính sách"), kiến trúc v4.1 §17.3, pf 000
 - Kiểm phạm vi ở ứng dụng **giữ nguyên** (`authz.Scope`, `coopOnly`) — RLS là lớp thứ hai.
 - Nút của người dùng HTX là `OrgRef` của token: kiểm thử dựng `k_ref` cho tenant (vd `kref.RebuildTenant`) thì người dùng chỉ thấy cây con của Nút; không dựng thì chính sách lùi về `p_tenant`.
 - Bảng mới có `tenant_id` trong `pf_coop` (hay schema khác muốn phạm vi Nút): thêm `p_scope AS RESTRICTIVE` viết thẳng `EXISTS k_ref.node_closure` (không hàm do repo định nghĩa) — `shared.v_missing_rls` báo nếu `p_scope` PERMISSIVE hay có chính sách thứ ba; cổng EXPLAIN W9.1 báo nếu gọi hàm theo hàng.
+
 ## Module `mkg/engine` — kho quan sát (W8.2)
 
 [Thiết kế](../design/mkg.md#59-mkgengine--kho-quan-sát-của-engine-điều-phối-w82), [ADR-0036](../adr/0036-engine-ba-che-do-vung-noi-bo-optcore.md#hiện-thực). Module mới `internal/mkg/engine` (`kind: domain`, `zones: [mkg]`, `enable: always`, ứng dụng MKG). Sở hữu `mkg_engine` (mkg 000037): sổ `observation` + bảng đệm `observation_feed_state`. Vai nhóm `r_engine` suy từ `modreg.Catalog` (không vai cũ `engine_app`); `cmd/api-internal` ghép module nên `app_internal` là thành viên. Giao dịch chạy `SET LOCAL ROLE r_engine` (`engine.DBModule`).
@@ -521,6 +523,7 @@ ADR-0030 (mục "W4.2 — hình chính sách"), kiến trúc v4.1 §17.3, pf 000
 **Nối ở gốc lắp ráp** (`cmd/api-internal/assembly`): `engine.New(unit, clk, EngineOptionsFromEnv(fo.DirectoryFeed))` — bộ điều hợp feed của `mkg/fieldops` (W5.5, `AG_INTEGRATION_GATEWAY_URL` + `AG_FIELDOPS_FEED_API_KEY`); `AG_ENGINE_FEEDS` (danh sách feed), `AG_ENGINE_FEED_ALLOW_PROPOSED=1` (dev/test, bỏ qua ở production), `AG_ENGINE_FEED_INTERVAL`; job `engine_observation_feed` trong `AG_MKG_JOBS` (cần `AG_MKG_TENANT_ID`). Module không có route HTTP (không trong `Modules.List`).
 
 **Cấm float** (`agnofloat`, `floatFreeZones`): giá trị và cận bất định là `decimal`.
+
 ## Migration theo module (W7.1)
 
 Bộ chạy v2 (`internal/shared/migrator`, [ADR-0038](../adr/0038-bo-chay-migration-theo-module.md)) gắn mỗi tệp `migrations/<cụm>/NNNNNN_*.up.sql` cho module bằng đúng quy tắc của `agmodgraph` ở trên (tên `<cụm>_<module>`, nếu không thì schema đụng; tệp nhiều module → module giả `<cụm>`), ghi lịch sử theo module (cột `module` của `shared.schema_migrations`; dời vào schema module là bước 2) và áp mọi tệp vắng trong sổ theo thứ tự topo `depends` — **số nhỏ hơn số đã áp vẫn được áp**. Trong kỳ chuyển (`AG_MIGRATE_RUNNER=v2` chưa là mặc định) vẫn cấp số theo thứ tự gộp như kế hoạch §1 mục 6.

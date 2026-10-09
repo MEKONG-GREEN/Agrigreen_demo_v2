@@ -102,7 +102,7 @@ Mỗi bước có đường lui: vai cũ còn quyền cho đến khi bước k�
 
 | Gói | Việc | Migration |
 |---|---|---|
-| W2.3 | Khung vai, `WithContextTx`, registry, lint, 2 module mẫu, T4/T5 | pf 000090, shared 000007 |
+| W2.3 | Khung vai, `WithContextTx`, registry, lint, 2 module mẫu, T4/T5 | pf 000090 (shared 000007 dành, không dùng) |
 | W2.4 | Biến ngữ cảnh `app.*` trong `WithContextTx` | trong pf 000091 |
 | W2.6 | Chuyển mọi module, bỏ quyền vai cũ, cổng CI | pf 000119, mkg 000035, ts 000004, vault 000003 |
 | W9.1 | Cổng "không `r_*` có quyền trên schema module khác trừ `k_ref`, `_pub`" | — |

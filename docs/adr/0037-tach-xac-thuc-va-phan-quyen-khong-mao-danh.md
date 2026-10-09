@@ -60,9 +60,9 @@
 | Gói | Việc | Migration |
 |---|---|---|
 | KN P1 (đã có) | Sổ gán vai, `session_context`, middleware `X-AG-Context`, chế độ hỗ trợ, nhật ký | pf 000060, 000061 |
-| W2.3 | `WithContextTx` đặt biến ngữ cảnh cùng `SET LOCAL ROLE` | pf 000090, shared 000007 |
-| W2.5 | Bảng chiếu `k_ref` mà RLS đọc theo ngữ cảnh | pf 000091–000092, mkg 000022 |
-| W7.2 | `k/access` hợp nhất: một ngữ cảnh cho mọi app (thay `ScopeResolver`), epoch, quyền module × lớp | pf 000111–000112 |
+| W2.3 | `WithContextTx` đặt biến ngữ cảnh cùng `SET LOCAL ROLE` | pf 000090 (biến ngữ cảnh ở pf 000091, W2.4) |
+| W2.5 | Bảng chiếu `k_ref` mà RLS đọc theo ngữ cảnh | pf 000092, mkg 000022 |
+| W7.2 | `k/access` hợp nhất: một ngữ cảnh cho mọi app (thay `ScopeResolver`), epoch, quyền module × lớp | pf 000111–000112 (tạm, cấp lại khi gộp) |
 
 ## Liên quan
 
