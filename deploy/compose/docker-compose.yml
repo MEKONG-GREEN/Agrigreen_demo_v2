@@ -109,6 +109,7 @@ services:
       AG_DB_APP_PASSWORD: ${AG_DB_APP_PASSWORD:?chạy scripts/gen-dev-secrets}
       AG_DB_PASSWORD_VAULT_APP: ${AG_DB_PASSWORD_VAULT_APP:?chạy scripts/gen-dev-secrets}
       AG_DB_PASSWORD_APP_VAULT: ${AG_DB_PASSWORD_APP_VAULT:?chạy scripts/gen-dev-secrets}
+      AG_DB_PASSWORD_APP_AGG: ${AG_DB_PASSWORD_APP_AGG:-}   # rỗng → AG_DB_APP_PASSWORD
     entrypoint: ["/bin/sh", "/etc/pgbouncer-src/entrypoint.sh"]
     volumes: ["./pgbouncer:/etc/pgbouncer-src:ro"]
     ports: ["127.0.0.1:6432:6432"]
@@ -131,6 +132,7 @@ services:
       AG_DB_APP_PASSWORD: ${AG_DB_APP_PASSWORD}
       AG_DB_PASSWORD_VAULT_APP: ${AG_DB_PASSWORD_VAULT_APP}
       AG_DB_PASSWORD_APP_VAULT: ${AG_DB_PASSWORD_APP_VAULT}
+      AG_DB_PASSWORD_APP_AGG: ${AG_DB_PASSWORD_APP_AGG:-}   # app_agg (ADR-0031 §3); rỗng → AG_DB_APP_PASSWORD
     restart: "no"
 
   migrate-up:
@@ -558,6 +560,9 @@ services:
       AG_DB_VIA_PGBOUNCER: "1"
       AG_DB_DIRECT_URL: postgres://postgres:5432/?sslmode=disable
       AG_DB_APP_PASSWORD: ${AG_DB_APP_PASSWORD}
+      # app_agg (ADR-0031 §3): chỉ `worker -agg-run`; rỗng → AG_DB_APP_PASSWORD. AG_AGG_GOVERNANCE_TENANT: tenant quản trị.
+      AG_DB_PASSWORD_APP_AGG: ${AG_DB_PASSWORD_APP_AGG:-}
+      AG_AGG_GOVERNANCE_TENANT: ${AG_AGG_GOVERNANCE_TENANT:-}
       AG_AMQP_URL: amqp://agrigreen:${AMQP_PASSWORD}@rabbitmq:5672/
       AG_ANCHOR_SIGNING_KEY: ${AG_ANCHOR_SIGNING_KEY:?chạy scripts/gen-dev-secrets}
       AG_ANCHOR_KEY_ID: local-dev-1

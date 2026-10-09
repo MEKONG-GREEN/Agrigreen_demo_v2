@@ -70,6 +70,8 @@
 //	AG_DB_PASSWORD_APP_WORKER          (hoặc AG_DB_APP_PASSWORD) vai đăng nhập app_worker (W2.6, ADR-0028) — MỘT pool cho
 //	                                   mọi consumer và một pool nối thẳng cho job; mỗi module chạy SET LOCAL ROLE r_<module>
 //	AG_DB_MAX_CONNS                    (tùy chọn) cỡ pool vai đơn vị, mặc định 20
+//	AG_DB_PASSWORD_APP_AGG             (chỉ -agg-run) vai đăng nhập riêng app_agg của job tổng hợp (ADR-0031 §3, gói FC) —
+//	                                   pool 2 kết nối, trên AG_DB_REPLICA_URL khi có; AG_AGG_GOVERNANCE_TENANT: tenant quản trị
 //	AG_FCM_PROJECT_ID, AG_FCM_CREDENTIALS_FILE  FCM HTTP v1 (không đặt → kênh đẩy chỉ ghi log); AG_FCM_ENDPOINT, AG_FCM_TOKEN_URL tùy chọn
 //	AG_SMTP_HOST, AG_SMTP_PORT, AG_SMTP_USERNAME, AG_SMTP_PASSWORD, AG_SMTP_FROM, AG_SMTP_DIGEST_TO  email tóm tắt (SMTP trong lãnh thổ)
 //	AG_ANCHOR_SIGNING_KEY              Ed25519 (base64 seed 32 byte) — bắt buộc khi có job anchor
@@ -180,7 +182,16 @@ func main() {
 	bfTenant := flag.String("metrics-tenant", "", "(với -metrics-backfill) chỉ một tenant")
 	bfKeys := flag.String("metrics-keys", "", "(với -metrics-backfill) danh sách chỉ số, phân tách dấu phẩy")
 	krefRebuild := flag.Bool("kref-rebuild", false, "dựng lại k_ref của mọi tenant từ nguồn rồi thoát (W2.5)")
+	aggRun := flag.String("agg-run", "", "chạy một job tổng hợp đã khai và đã duyệt (vai đăng nhập app_agg, ADR-0031 §3) rồi thoát")
+	aggActor := flag.String("agg-actor", "", "(với -agg-run) người chạy (uuid) ghi vào nhật ký pf_metrics.agg_run")
+	aggK := flag.Int("agg-k", 0, "(với -agg-run) ngưỡng k; 0 = max(k job, k sàn publicdata.k_min)")
 	flag.Parse()
+	if *aggRun != "" {
+		if err := runAggJob(log, *aggRun, *aggActor, *aggK); err != nil {
+			os.Exit(1)
+		}
+		return
+	}
 	if *krefRebuild {
 		if err := runKRefRebuild(log); err != nil {
 			log.Error("dựng lại k_ref lỗi", "event", "kref.rebuild", "outcome", "error", "error", err.Error())

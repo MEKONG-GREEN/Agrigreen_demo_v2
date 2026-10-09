@@ -36,6 +36,7 @@ Vai đăng nhập đề xuất (chốt ở W2.3, W2.6):
 | `pf` | `app_worker` | `worker` (gồm worker `pf.kref`, ADR-0029) |
 | `pf` | `app_public` | `api-public` (sau là `integration-gateway`, ADR-0033) |
 | `pf` | `app_sync` | engine đồng bộ, `objsync` |
+| `pf` | `app_agg` | bộ chạy job tổng hợp trong `worker` (`-agg-run`) — **chỉ** thành viên `r_agg`, không `r_<module>` nào (ADR-0031 §3, gói FC) |
 | `mkg` | `app_internal`, `app_worker_internal` | `api-internal`, `worker-internal` |
 | `ts` | `app_ingest` | `ingest` |
 | `vault` | `app_vault` | `identity-vault` |
@@ -163,11 +164,13 @@ Chưa đổi chính sách RLS nào.
 - Thêm `r_ops` (NOLOGIN, thuộc `ag_shared_user`). Đây là vai vận hành của đơn vị: idempotency HTTP và consumer không thuộc module (`db.Ops`).
 - Vai đăng nhập (LOGIN **NOINHERIT**, không thuộc `ag_shared_user`):
   - `app_platform`, `app_worker`, `app_public`, `app_sync` (pf);
+  - `app_agg` (pf, gói FC — ADR-0031 §3): vai đăng nhập riêng của job tổng hợp, **chỉ** thành viên `r_agg`, không phải `LoginUnit` (không ghép module nào); `dbadmin.ExclusiveMembers` bảo đảm không `app_*` nào khác thuộc `r_agg`;
   - `app_internal`, `app_worker_internal` (mkg);
   - `app_ingest` (mkg + ts);
   - `app_vault` (vault).
 - `LoginUnit.Tools`: các lệnh một lần dùng chung vai của đơn vị. `drill` và `formimport` dùng `app_worker`; `rebuilddrill` dùng `app_worker_internal`. Kiểm thử bảo đảm vai là thành viên `r_*` của mọi module có schema mà lệnh ghép.
-- Số bí mật đăng nhập mỗi cụm: pf 7, mkg 7, ts 5, vault 4 — gồm `ag_ops_jobs` (rà soát 08/10/2026, shared 000009: job vận hành xuyên tenant). Không kể `ag_ops_jobs` thì là 6/6/4/3, khớp mục tiêu 4–6 của §4.
+- `LoginUnit.Extra`: module đơn vị chạy mà `modgen` không thấy qua import — `app_worker` có `pf/cropcycle`, `pf/geo`, `pf/simulation` (consumer liên module của `assembly.Consumers`; gói FC thêm `pf/simulation`). Kiểm thử `cmd/worker` `TestConsumerModulesInUnitLogin`: vai module của MỌI consumer worker là membership của `app_worker`.
+- Số bí mật đăng nhập mỗi cụm: pf 8 (gồm `app_agg`, gói FC), mkg 7, ts 5, vault 4 — gồm `ag_ops_jobs` (rà soát 08/10/2026, shared 000009: job vận hành xuyên tenant). Không kể `ag_ops_jobs` và `app_agg` (vai đặc quyền tách riêng theo ADR-0031) thì là 6/6/4/3, khớp mục tiêu 4–6 của §4.
 
 **Vai cũ — quyết định:**
 

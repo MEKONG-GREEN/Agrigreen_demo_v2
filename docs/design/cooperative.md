@@ -784,7 +784,7 @@ Ngoại lệ duy nhất: `shared.ledger_added_column` (shared 000011) khóa theo
 ### 17.10 Còn mở
 
 - **H-17**: cửa sổ bảo trì và bản sao UAT để diễn tập ([runbook](../runbooks/cooperative-schema-move.md)). **H-1** vẫn giả định (a).
-- `cmd/worker` cũng chạy consumer `pf.simulation.snapshot` dưới `r_simulation` nhưng `app_worker` không là thành viên `r_simulation` (có từ trước W3.3, không đổi ở đây) — cần `Extra` như 17.2 hoặc sửa `modgen` để thấy `assembly.Consumers`.
+- `cmd/worker` cũng chạy consumer `pf.simulation.snapshot` dưới `r_simulation` nhưng `app_worker` không là thành viên `r_simulation` (có từ trước W3.3, không đổi ở đây). **Đã sửa ở gói FC:** `Extra: [pf/cropcycle, pf/geo, pf/simulation]`; kiểm thử `cmd/worker` `TestConsumerModulesInUnitLogin` bắt mọi consumer có vai module ngoài membership `app_worker`.
 
 ---
 

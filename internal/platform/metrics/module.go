@@ -124,18 +124,20 @@ func (m *Module) Jobs(tenants app.TenantLister, log *slog.Logger) []schedule.Job
 }
 
 // AggDeps là phụ thuộc của bộ chạy job tổng hợp (W6.4, ADR-0031): pool vai đăng nhập của đơn vị chạy job
-// (app_worker — thành viên r_metrics và vai tổng hợp), cap/workflow cho bốn mắt, tenant quản trị (danh mục, quyết
-// định, nhật ký chạy), nguồn k sàn publicdata.k_min (nil → 10 tạm, ADR-0031 §7).
+// (app_worker — thành viên r_metrics; danh mục, kiểm duyệt, nhật ký), pool vai đăng nhập riêng app_agg (chỉ thành
+// viên vai tổng hợp — ADR-0031 §3, gói FC; nil → chỉ Propose/Decide), cap/workflow cho bốn mắt (nil → chỉ Run),
+// tenant quản trị (danh mục, quyết định, nhật ký chạy), nguồn k sàn publicdata.k_min (nil → 10 tạm, ADR-0031 §7).
 type AggDeps struct {
 	DB         tenant.Beginner
+	AggDB      tenant.Beginner
 	Approvals  wfport.Approvals
 	Governance uuid.UUID
 	KFloor     app.KFloorSource
 }
 
-// Agg dựng bộ quản lý danh mục + bộ chạy job tổng hợp. Chưa nối vào cmd/worker: bật production chờ C-4.
+// Agg dựng bộ quản lý danh mục + bộ chạy job tổng hợp (cmd/worker -agg-run; lịch production chờ C-4).
 func Agg(clk clock.Clock, d AggDeps) *app.Agg {
-	return &app.Agg{DB: forModule(d.DB), Clock: clk, Approvals: d.Approvals, Governance: d.Governance, KFloor: d.KFloor}
+	return &app.Agg{DB: forModule(d.DB), AggDB: d.AggDB, Clock: clk, Approvals: d.Approvals, Governance: d.Governance, KFloor: d.KFloor}
 }
 
 // AggJobs là mọi job tổng hợp đã khai (đăng ký lúc biên dịch).

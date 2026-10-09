@@ -684,6 +684,26 @@ def public_api_checks(env: str, docs: list[dict], values: dict, r: Report):
         mode = {e["name"]: e.get("value") for e in d["spec"]["template"]["spec"]["containers"][0].get("env") or []}.get("AG_EGRESS_MODE")
         want = "enforce" if phasek else "observe"
         r.check(mode == want, f"[{env}] {name}: AG_EGRESS_MODE={mode}, mong đợi {want} (ADR-0024/0025)")
+    # app_agg (ADR-0031 §3, gói FC): mật khẩu vai đăng nhập riêng của job tổng hợp chỉ ở Secret pf-db-agg, chỉ worker gắn.
+    for d in docs:
+        if d.get("kind") not in ("Deployment", "StatefulSet", "CronJob", "Job"):
+            continue
+        spec = d["spec"]["jobTemplate"]["spec"] if d["kind"] == "CronJob" else d["spec"]
+        for ctr in spec["template"]["spec"].get("containers") or []:
+            refs = [e["secretRef"]["name"] for e in ctr.get("envFrom") or [] if "secretRef" in e]
+            if "pf-db-agg" in refs:
+                r.check(d["kind"] == "Deployment" and d["metadata"]["name"] == "worker",
+                        f"[{env}] pf-db-agg (app_agg) chỉ cho worker: {d['kind']}/{d['metadata']['name']}")
+    agg_es = es.get((pf, "pf-db-agg"))
+    if base_env(env) != "dev":
+        r.check(agg_es is not None, f"[{env}] thiếu ExternalSecret pf-db-agg (app_agg)")
+    if agg_es is not None:
+        keys = {x["secretKey"] for x in agg_es["spec"].get("data") or []}
+        r.check(keys == {"AG_DB_PASSWORD_APP_AGG"}, f"[{env}] pf-db-agg chỉ chứa AG_DB_PASSWORD_APP_AGG: {sorted(keys)}")
+    pg_pf = es.get((data, "pg-pf-roles"))
+    if pg_pf is not None:
+        r.check("AG_DB_PASSWORD_APP_AGG" in {x["secretKey"] for x in pg_pf["spec"].get("data") or []},
+                f"[{env}] pg-pf-roles thiếu AG_DB_PASSWORD_APP_AGG cho bootstrap app_agg")
     # Pepper chỉ ở vùng pf; vai DB của api-public đúng tập.
     for (ns, name) in es:
         if "apikey-pepper" in name:

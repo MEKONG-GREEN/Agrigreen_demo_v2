@@ -92,11 +92,18 @@ Bản đối chiếu ghi gói `r_agg` là "W6.5" ở vài chỗ; số đúng the
 **W6.4 (09/10/2026)** — [modules.md](../dev/modules.md#vai-tổng-hợp-r_agg-w64), [runbook](../runbooks/agg-jobs.md):
 
 - **Module chủ:** `pf/metrics` (`cap/analytics`): sổ `pf_metrics.agg_job` (danh mục có phiên bản: job, phiên bản, view `_pub`, SQL, mục đích, k, băm định nghĩa; `proposed` → đúng một `approved`/`rejected`) và `pf_metrics.agg_run` (nhật ký mỗi lần chạy, §5) ở **tenant quản trị**; `pf/workflow` giữ yêu cầu/quyết định (kind `agg.job`) — `r_metrics` gọi `pf_workflow.submit/decide` trong giao dịch của mình (§4 bốn mắt; CHECK `agg_job_four_eyes` ở cả sổ danh mục).
-- **§3 vai:** `r_agg` NOLOGIN BYPASSRLS (bootstrap), thành viên `r_<module>_pub`, thêm SELECT cột `k_ref.org.tenant_id`. **Lệch:** chưa có `app_agg` — `app_worker` (NOINHERIT) là thành viên; bù bằng đường vào duy nhất `db.WithAggTx` (giao dịch chỉ đọc, `statement_timeout` cục bộ, kiểm job đã duyệt trước khi đổi vai) và lint `agnosessionset`. Tách `app_agg` + `pg_hba` trước khi bật production. Chưa chạy trên bản sao chỉ đọc (pool truyền vào có thể là pool bản sao).
+- **§3 vai:** `r_agg` NOLOGIN BYPASSRLS (bootstrap), thành viên `r_<module>_pub`, thêm SELECT cột `k_ref.org.tenant_id`. Lệch ban đầu (`app_worker` là thành viên `r_agg`) đã sửa ở gói FC (dưới).
+
+**Gói FC (09/10/2026)** — tách vai đăng nhập `app_agg` (§3), không migration:
+
+- `dbadmin.AppAgg`: LOGIN NOINHERIT, **chỉ** thành viên `r_agg` (INHERIT FALSE, SET TRUE), cụm pf; `ALTER ROLE app_agg SET default_transaction_read_only = on, statement_timeout = '10min'` (`dbadmin.AggRoleSettings`, bootstrap). `LoginUnit.Agg` bỏ — `app_worker` không còn thuộc `r_agg`; bootstrap thu hồi mọi thành viên `r_agg` khác `app_agg` (`dbadmin.ExclusiveMembers`), nên grant cũ của W6.4 tự gỡ.
+- `db.WithAggTx(ctx, b, owner, governance, agg, authorize, fn)`: hai giao dịch chỉ đọc nối tiếp — kiểm duyệt trên pool đơn vị (`app_worker` → `r_metrics`), rồi đổi vai trên pool `app_agg` (`app_agg` không đọc được danh mục, `app_worker` không đổi được sang `r_agg` — kiểm thử 42501 cả hai chiều). Hệ quả: kiểm duyệt và đọc không còn chung một giao dịch; cửa sổ giữa hai giao dịch chỉ cho phép chạy phiên bản vừa bị thay bằng phiên bản mới hơn được duyệt cùng lúc — nhật ký vẫn ghi phiên bản đã kiểm.
+- `cmd/worker -agg-run <job> -agg-actor <uuid>`: pool `app_agg` 2 kết nối, trên `AG_DB_REPLICA_URL` khi có (§3 bản sao chỉ đọc); `AG_AGG_GOVERNANCE_TENANT`. Chạy theo lịch vẫn chờ C-4 (§7).
+- Triển khai: `AG_DB_PASSWORD_APP_AGG` — Helm Secret riêng `pf-db-agg` chỉ worker gắn (`check_flows.py`) + `pg-pf-roles` cho bootstrap; userlist PgBouncer compose + CI; compose/gen-dev-secrets. **Còn mở:** `pg_hba` chỉ cho `app_agg` từ worker (repo chưa quản lý `pg_hba`). Runbook [agg-jobs.md](../runbooks/agg-jobs.md).
 - **§2 lệch đã có từ W6.3:** view `_pub` **không** `security_invoker` — chủ `ag_migrator` (NOBYPASSRLS, bảng gốc FORCE RLS), nên BYPASSRLS của `r_agg` không xuyên qua view. Bộ chạy liệt kê tenant bằng `k_ref.org` (đọc thẳng, vượt RLS) và đọc từng lát tenant (`app.tenant_id` cục bộ) trong cùng giao dịch; k áp trên nhóm sau khi gộp mọi tenant như §4. Chuyển sang view `security_invoker` đòi `r_agg` có quyền bảng gốc — không làm.
 - **§4:** job khai trong mã (`domain.AggJob`, `app/aggjobs.go`); bộ chạy so băm định nghĩa với phiên bản đã duyệt **mới nhất** — phiên bản cũ, chưa duyệt, bị từ chối, sửa tại chỗ → `refused` (không đổi vai). Ô bù chưa cần (đầu ra chỉ có nhóm, không có tổng).
 - **§6:** cổng `TestAggRole_W64` (danh mục `dbadmin`) + `TestSchemaIsolationAggRole_W64` (`pg_roles` mọi cụm, quyền hiệu lực của `r_agg`).
-- **§7:** k sàn đọc qua `KFloorSource` (`publicdata.k_min` của tenant quản trị, chưa đặt → 10); job/k xin dưới sàn bị từ chối. Bộ chạy chưa nối `cmd/worker` — bật sau C-4.
+- **§7:** k sàn đọc qua `KFloorSource` (`publicdata.k_min` của tenant quản trị, chưa đặt → 10); job/k xin dưới sàn bị từ chối. Chạy theo lịch bật sau C-4 (gói FC thêm lệnh một lần `worker -agg-run`, chưa nối `KFloorSource` → 10).
 
 ## Liên quan
 

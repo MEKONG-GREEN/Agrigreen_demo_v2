@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -32,6 +33,8 @@ type Role struct {
 	// chỉ có quyền sau SET LOCAL ROLE r_<module>). Membership được cấp WITH INHERIT FALSE, SET TRUE.
 	NoInherit bool
 	MemberOf  []string
+	// Settings: tham số mặc định của vai (ALTER ROLE … SET), vd app_agg chỉ đọc (ADR-0031 §3).
+	Settings map[string]string
 	// Clusters là các database vai được CONNECT.
 	Clusters []migrations.Cluster
 }
@@ -205,6 +208,9 @@ func BootstrapClusters(ctx context.Context, adminURL, dbSuffix string, clusters 
 			return err
 		}
 	}
+	if err := revokeStrayMembers(ctx, conn, roles); err != nil {
+		return err
+	}
 	for _, c := range clusters {
 		name := DatabaseName(c, dbSuffix)
 		var exists bool
@@ -311,6 +317,44 @@ func ensureRole(ctx context.Context, conn *pgx.Conn, r Role) error {
 	for _, m := range r.MemberOf {
 		if _, err := conn.Exec(ctx, fmt.Sprintf("GRANT %s TO %s WITH INHERIT %s, SET TRUE", ident(m), ident(r.Name), inherit)); err != nil {
 			return fmt.Errorf("dbadmin: GRANT %s TO %s: %w", m, r.Name, err)
+		}
+	}
+	keys := make([]string, 0, len(r.Settings))
+	for k := range r.Settings {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	for _, k := range keys {
+		if _, err := conn.Exec(ctx, fmt.Sprintf("ALTER ROLE %s SET %s = %s", ident(r.Name), ident(k), quoteLiteral(r.Settings[k]))); err != nil {
+			return fmt.Errorf("dbadmin: ALTER ROLE %s SET %s: %w", r.Name, k, err)
+		}
+	}
+	return nil
+}
+
+// revokeStrayMembers thu hồi thành viên không được phép của vai nhóm đặc quyền (ExclusiveMembers) — chỉ khi vai
+// nhóm thuộc các vai đang dựng. Chạy lặp an toàn.
+func revokeStrayMembers(ctx context.Context, conn *pgx.Conn, roles []Role) error {
+	for grp, allowed := range ExclusiveMembers {
+		if !slices.ContainsFunc(roles, func(r Role) bool { return r.Name == grp }) {
+			continue
+		}
+		rows, err := conn.Query(ctx, `SELECT m.rolname FROM pg_auth_members a JOIN pg_roles g ON g.oid = a.roleid
+		    JOIN pg_roles m ON m.oid = a.member WHERE g.rolname = $1 ORDER BY 1`, grp)
+		if err != nil {
+			return err
+		}
+		members, err := pgx.CollectRows(rows, pgx.RowTo[string])
+		if err != nil {
+			return err
+		}
+		for _, m := range members {
+			if slices.Contains(allowed, m) {
+				continue
+			}
+			if _, err := conn.Exec(ctx, fmt.Sprintf("REVOKE %s FROM %s", ident(grp), ident(m))); err != nil {
+				return fmt.Errorf("dbadmin: REVOKE %s FROM %s: %w", grp, m, err)
+			}
 		}
 	}
 	return nil

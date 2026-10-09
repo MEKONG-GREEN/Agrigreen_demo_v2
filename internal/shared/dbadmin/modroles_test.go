@@ -43,8 +43,9 @@ func TestPubRoles_W63(t *testing.T) {
 }
 
 // W6.4 (ADR-0031 §3, R-DB-11): r_agg NOLOGIN BYPASSRLS INHERIT, thành viên đúng mọi r_<module>_pub (không
-// ag_shared_user, không vai module nào), tạo sau vai _pub và trước vai đăng nhập; chỉ app_worker (đơn vị chạy job,
-// LoginUnit.Agg) là thành viên — NOINHERIT. Không vai BYPASSRLS mới nào khác.
+// ag_shared_user, không vai module nào), tạo sau vai _pub và trước vai đăng nhập; thành viên DUY NHẤT là vai đăng nhập
+// riêng app_agg (gói FC) — NOINHERIT, chỉ thuộc r_agg, mặc định chỉ đọc + statement_timeout; không app_<đơn vị> nào
+// thuộc r_agg. Không vai BYPASSRLS mới nào khác.
 func TestAggRole_W64(t *testing.T) {
 	r, ri := roleByName(t, AggRole)
 	if r.Login || !r.BypassRLS || r.NoInherit || !slices.Equal(r.MemberOf, pubRoles()) ||
@@ -68,8 +69,13 @@ func TestAggRole_W64(t *testing.T) {
 			bypass = append(bypass, o.Name)
 		}
 	}
-	if !slices.Equal(members, []string{AppWorker}) {
-		t.Errorf("thành viên r_agg: %v, muốn [app_worker]", members)
+	if !slices.Equal(members, []string{AppAgg}) || !slices.Equal(ExclusiveMembers[AggRole], members) {
+		t.Errorf("thành viên r_agg: %v, muốn [app_agg] (ExclusiveMembers %v)", members, ExclusiveMembers[AggRole])
+	}
+	a, _ := roleByName(t, AppAgg)
+	if !slices.Equal(a.MemberOf, []string{AggRole}) || a.BypassRLS || !slices.Equal(a.Clusters, []migrations.Cluster{migrations.PF}) ||
+		a.Settings["default_transaction_read_only"] != "on" || a.Settings["statement_timeout"] == "" || !slices.Contains(LoginRoles(), AppAgg) {
+		t.Errorf("app_agg: %+v", a)
 	}
 	slices.Sort(bypass)
 	// ADR-0031 §6: danh mục vai BYPASSRLS.
@@ -179,6 +185,10 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	if w, _ := roleByName(t, AppWorker); !slices.Contains(w.MemberOf, "r_kref") || slices.Contains(plat.MemberOf, "r_kref") {
 		t.Errorf("r_kref: app_worker %v, app_platform %v", w.MemberOf, plat.MemberOf)
 	}
+	// Gói FC (cooperative.md §17.10): worker chạy consumer pf.simulation.snapshot — app_worker ∋ r_simulation.
+	if w, _ := roleByName(t, AppWorker); !slices.Contains(w.MemberOf, "r_simulation") {
+		t.Errorf("r_simulation: app_worker %v", w.MemberOf)
+	}
 	if k, _ := roleByName(t, "r_kref"); !slices.Equal(k.Clusters, []migrations.Cluster{migrations.PF, migrations.MKG}) {
 		t.Errorf("r_kref: %+v", k)
 	}
@@ -256,8 +266,9 @@ func TestEveryUnitHasLogin_ADR0028(t *testing.T) {
 				n++
 			}
 		}
-		if n < 4 || n > 7 {
-			t.Errorf("cụm %s: %d vai đăng nhập (muốn 4–7)", c, n)
+		// pf: + app_agg (ADR-0031 §3, gói FC) → 8.
+		if n < 4 || n > 8 {
+			t.Errorf("cụm %s: %d vai đăng nhập (muốn 4–8)", c, n)
 		}
 	}
 }

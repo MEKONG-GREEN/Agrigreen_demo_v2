@@ -27,7 +27,7 @@ func TestLoginRolesQueryOutsideModuleTxFails_ADR0028(t *testing.T) {
 	env := pgtest.Get(t)
 	for _, c := range migrations.Clusters {
 		admin := env.AdminPool(t, c)
-		for _, u := range dbadmin.LoginUnits {
+		for _, u := range append(slices.Clone(dbadmin.LoginUnits), dbadmin.LoginUnit{Role: dbadmin.AppAgg, Clusters: []migrations.Cluster{migrations.PF}}) {
 			if !slices.Contains(u.Clusters, c) {
 				continue
 			}
