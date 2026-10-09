@@ -277,7 +277,8 @@ type Service struct {
 }
 
 // ErrNotServable: hợp đồng song phương chưa phục vụ ở môi trường này (proposed — bật production chờ C-12).
-var ErrNotServable = problem.New(http.StatusForbidden, "integration.contract_not_servable", "Hợp đồng nạp không phục vụ ở môi trường này")
+// Bí danh của định nghĩa duy nhất apiclient/port.ErrContractNotServable (cùng mã cho cổng và App HTX).
+var ErrNotServable = apiclientport.ErrContractNotServable
 
 // servable: hợp đồng htx_roll_confirmation v1 phục vụ được (approved không pending; proposed chỉ với cờ ngoài
 // production).

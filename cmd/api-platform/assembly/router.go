@@ -32,6 +32,8 @@ type Deps struct {
 	// CORSOrigins là origin trình duyệt được gọi chéo (AG_CORS_ORIGINS, khớp chính xác).
 	// Rỗng → không origin nào; app di động và server-to-server không bị ảnh hưởng.
 	CORSOrigins []string
+	// PartnerLegacy: header ngừng dùng của /v1/partner/* (ADR-0033 §7.2; PartnerLegacyFromEnv). 0 = không Sunset.
+	PartnerLegacy PartnerLegacy
 }
 
 // maxBody giới hạn thân request (tải tệp đi qua đường riêng có giới hạn riêng).
@@ -63,7 +65,8 @@ func health(d Deps) func(r *gin.Engine) {
 // NewRouter dựng Application API (api.<domain>). Public API tắt ở ĐTK 1 (mục 11).
 func NewRouter(d Deps) *gin.Engine {
 	r := httpx.NewEngine(d.Log, maxBody)
-	r.Use(httpx.CORS(d.CORSOrigins)) // trước mọi route: preflight đi qua cả nhánh 404/405
+	r.Use(httpx.CORS(d.CORSOrigins))                                      // trước mọi route: preflight đi qua cả nhánh 404/405
+	r.Use(partnerLegacyMiddleware(d.PartnerLegacy, otelPartnerCounter())) // trước xác thực: header có cả trên 401/403
 	health(d)(r)
 	// Route công khai (không đăng nhập, không middleware phiên): mã thông báo trong đường dẫn là quyền truy cập —
 	// liên kết tải tệp Chi cục của pf/reports (quyết định A4). Đăng ký trước nhóm /v1 có xác thực.

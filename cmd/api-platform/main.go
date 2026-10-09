@@ -20,6 +20,9 @@
 //	AG_INTERNAL_HTTP_ADDR  (tùy chọn) Internal API /internal/v1 cho optimizer — chỉ trong mạng cụm, mTLS bắt buộc;
 //	                       không đặt → tắt. Đặt thì cần AG_INTERNAL_TLS_CERT, AG_INTERNAL_TLS_KEY, AG_INTERNAL_CLIENT_CA
 //	AG_INTERNAL_CLIENT_NAMES  CN/DNS SAN client được phép (mặc định optimizer)
+//	AG_PARTNER_SUNSET    (tùy chọn) ngày gỡ /v1/partner/* (YYYY-MM-DD) → header Sunset (RFC 8594); không đặt → không
+//	                     phát. Không bắt buộc ở production: điều kiện gỡ là metric (ADR-0033 §7.3), không phải ngày
+//	AG_PARTNER_SUCCESSOR_BASE_URL  (tùy chọn) gốc URL cổng tích hợp cho Link rel="successor-version"; https ở production
 package main
 
 import (
@@ -130,7 +133,12 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	d := Deps{Log: log, Verifier: verifier, Ops: ops, Modules: built.List(), Pools: pools, CORSOrigins: origins}
+	partnerLegacy, err := assembly.PartnerLegacyFromEnv(os.Getenv)
+	if err != nil {
+		return err
+	}
+	d := Deps{Log: log, Verifier: verifier, Ops: ops, Modules: built.List(), Pools: pools, CORSOrigins: origins,
+		PartnerLegacy: partnerLegacy}
 	servers := []*http.Server{
 		{Addr: env("AG_HTTP_ADDR", ":8080"), Handler: NewRouter(d)},
 		{Addr: env("AG_ADMIN_HTTP_ADDR", ":8082"), Handler: NewAdminRouter(d)},

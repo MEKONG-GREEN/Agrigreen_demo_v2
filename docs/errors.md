@@ -844,6 +844,7 @@ Mã `error_code` của job `failed` (không phải phản hồi HTTP): `apiclien
 |---|---|---|
 | 404 | `integration.unknown_feed` | Không có hợp đồng feed hợp lệ (`contracts/integration/feeds/`) với tên/`contract_version` này — mặc định từ chối |
 | 403 | `integration.contract_not_servable` | Hợp đồng feed chưa `approved` (`proposed`/`draft`/`retired`): production không bao giờ phục vụ; ngoài production cần `AG_GATEWAY_FEED_ALLOW_PROPOSED=1`. Feed lớp `partner` (W5.5) và feed cặp song phương (W5.6) áp cùng quy tắc; mã riêng của chúng ở `party.share_grant_missing` (bảng pf/party) và mục luồng song phương dưới |
+| 403 | `integration.contract_not_servable` | **Mục duy nhất của mã này** (một định nghĩa `apiclient/port.ErrContractNotServable`, dùng lại ở `ingest` và App HTX song phương). Hợp đồng tích hợp không phục vụ ở môi trường này. **Feed:** hợp đồng chưa `approved` (`proposed`/`draft`/`retired`) — production không bao giờ phục vụ; ngoài production cần `AG_GATEWAY_FEED_ALLOW_PROPOSED=1`. **Nạp theo lô / kênh tệp:** hợp đồng `retired`, `approved` còn `pending`, hoặc `proposed`/`draft` mà cổng không bật `AG_GATEWAY_INGEST_ALLOW_PROPOSED=1` (cổng không khởi động nếu đặt cờ ở production); trong kết quả từng bản ghi (`results[].problem_code`): hợp đồng bị thu hồi giữa lúc nhận và lúc xử lý — mọi bản ghi của lô bị từ chối. **Song phương:** feed cặp khi không hợp đồng song phương nào phục vụ được; App HTX khi `htx_roll_confirmation` chưa phục vụ |
 | 400 | `integration.invalid_cursor` | `cursor` sai dạng hoặc vượt đầu feed |
 | 410 | `integration.cursor_expired` | `cursor` trỏ vào phần đã quá hạn giữ 30 ngày — thân có `snapshot` (`href` của phiên bản mới nhất): đồng bộ lại từ ảnh chụp rồi đọc từ đầu phần còn giữ |
 | 404 | `integration.snapshot_not_found` | Phiên bản không có hoặc không có ảnh chụp (kho đối tượng chưa cấu hình lúc dựng) |
@@ -857,12 +858,11 @@ Khóa API **không bao giờ** xuất hiện trong lỗi, log, URL, sự kiện 
 
 ### Cổng tích hợp — nạp theo lô (W5.4, `POST /v1/batches/{contract}`, `GET /v1/batches/{id}`; ADR-0033 §3)
 
-Cổng `cmd/integration-gateway`, module `pf/apiclient` (gói `ingest`), hợp đồng `contracts/integration/ingest/`. Thiếu scope `ingest:<hợp đồng>:write` → `403 apiclient.forbidden` (không nói thiếu điều kiện nào); thiếu `Idempotency-Key` → `400 idempotency_key_required`; cùng khóa khác thân → `422 idempotency_key_reused`.
+Cổng `cmd/integration-gateway`, module `pf/apiclient` (gói `ingest`), hợp đồng `contracts/integration/ingest/`. Thiếu scope `ingest:<hợp đồng>:write` → `403 apiclient.forbidden` (không nói thiếu điều kiện nào); thiếu `Idempotency-Key` → `400 idempotency_key_required`; cùng khóa khác thân → `422 idempotency_key_reused`; hợp đồng không phục vụ ở môi trường này → `403 integration.contract_not_servable` (mục duy nhất ở bảng Feed phía trên).
 
 | HTTP | Mã | Khi nào |
 |---|---|---|
 | 404 | `integration.contract_unknown` | Không có hợp đồng nạp hợp lệ với tên của path, hoặc `contract_version` của thân không có (kể cả tên là hợp đồng feed) — mặc định từ chối |
-| 403 | `integration.contract_not_servable` | Hợp đồng `retired`, `approved` còn `pending`, hoặc `proposed`/`draft` mà cổng không bật cờ dev/test `AG_GATEWAY_INGEST_ALLOW_PROPOSED=1` — production luôn từ chối (cổng không khởi động nếu đặt cờ ở production) |
 | 403 | `integration.no_owner_port` | Hợp đồng chưa nối port của module chủ ở gốc lắp ráp của cổng — mặc định từ chối |
 | 400 | `integration.batch_invalid` | Thân không đúng phong bì `ingest_batch.v1` (khóa lạ, thiếu trường, sai kiểu), `contract` khác path, `batch_ref` ≠ `Idempotency-Key`, `items` rỗng, `contract_version` không phải số nguyên ≥ 1 |
 | 413 | `integration.batch_too_large` | Số phần tử vượt `ingest.max_batch` của hợp đồng |
@@ -878,7 +878,7 @@ Mã `problem_code` trong kết quả từng bản ghi (`results[].problem_code`,
 | `integration.record_invalid` | Bản ghi không đúng lược đồ hợp đồng (trường ngoài hợp đồng, thiếu bắt buộc, sai kiểu/định dạng) hoặc thiếu trường khóa nghiệp vụ; `detail` chỉ có đường dẫn trường, không có giá trị |
 | `integration.entity_key_mismatch` | `items[].entity_key` khác giá trị các trường `entity_key` của bản ghi |
 | `integration.business_key_conflict` | Khóa nghiệp vụ (`ingest.business_key`, vd `statement_ref:revision`) đã nhận với nội dung khác — bản bù phải tăng `revision` |
-| `integration.contract_not_servable`, `integration.no_owner_port` | Hợp đồng bị thu hồi / mất port chủ giữa lúc nhận và lúc xử lý — mọi bản ghi của lô bị từ chối |
+| `integration.no_owner_port` | Mất port chủ giữa lúc nhận và lúc xử lý — mọi bản ghi của lô bị từ chối (hợp đồng bị thu hồi: `integration.contract_not_servable`, mục Feed ở trên) |
 
 Kết cục lô `dead_lettered` (`problem_code` của lô): `integration.owner_unavailable` — port của module chủ lỗi tạm quá `inbox.DeliveryLimit` lần giao; thông điệp ở DLQ riêng của đối tác `pf.apiclient.ingest.<client_id>.dlq` ([runbook](runbooks/integration-batches.md)). Đối tác gửi lại bằng `batch_ref` mới.
 
@@ -917,12 +917,11 @@ Lớp lỗi của một lần giao (`error_class` ở sổ `webhook_delivery`, `
 
 ### Cổng tích hợp và pf/cooperative — luồng song phương MKG ↔ HTX (W5.6; ADR-0034, Đề xuất — bật production chờ C-12)
 
-Sổ song phương `pf_coop.bilateral_record` / `bilateral_pair_event` (`pf/cooperative`, pf 000135). Cổng: nạp theo lô `collection_schedule`, `roll_count_statement` (bên a), feed của cặp `GET /v1/feeds/bilateral?pair=<htx_ref>`, tổng kiểm `GET /v1/feeds/{hợp đồng}/checksums?pair=`. App HTX: `/v1/bilateral/*` (Application API, chỉ bật với `AG_BILATERAL_ALLOW_PROPOSED=1` ngoài production). [Runbook](runbooks/integration-batches.md#8-luồng-song-phương-w56-adr-0034).
+Sổ song phương `pf_coop.bilateral_record` / `bilateral_pair_event` (`pf/cooperative`, pf 000135). Cổng: nạp theo lô `collection_schedule`, `roll_count_statement` (bên a), feed của cặp `GET /v1/feeds/bilateral?pair=<htx_ref>`, tổng kiểm `GET /v1/feeds/{hợp đồng}/checksums?pair=`. App HTX: `/v1/bilateral/*` (Application API, chỉ bật với `AG_BILATERAL_ALLOW_PROPOSED=1` ngoài production). Hợp đồng song phương không phục vụ → `403 integration.contract_not_servable` (mục duy nhất ở bảng Feed phía trên). [Runbook](runbooks/integration-batches.md#8-luồng-song-phương-w56-adr-0034).
 
 | HTTP | Mã | Khi nào |
 |---|---|---|
 | 403 | `integration.pair_missing` | Không có cặp song phương ĐANG HIỆU LỰC giữa tenant bên gọi và HTX (`pair`): chưa lập / đã chấm dứt / HTX của tenant khác. Feed cặp, tổng kiểm với `pair` lạ, App HTX đọc cặp không phải của mình, HTX xác nhận khi cặp đã chấm dứt. Trong kết quả lô (`results[].problem_code`): bản ghi bên a gửi tới HTX chưa có cặp với tenant gửi |
-| 403 | `integration.contract_not_servable` | Feed cặp: không hợp đồng song phương nào phục vụ được (proposed mà cổng không đặt `AG_GATEWAY_FEED_ALLOW_PROPOSED=1`, hoặc production); App HTX: hợp đồng `htx_roll_confirmation` chưa phục vụ |
 | 403 | `apiclient.forbidden` | Feed cặp: khách hàng không có scope `ingest:<tên>:write` hoặc `feed:<tên>:read` của hợp đồng song phương nào |
 | 403 | `integration.no_owner_port` | `POST /v1/batches/htx_roll_confirmation` — bên b không ghi qua cổng (chờ gắn khách hàng API ↔ Nút HTX, W7.2) |
 | 503 | `integration.bilateral_unavailable` | Cổng / worker chưa nối sổ song phương (`Ports.Bilateral`) |
