@@ -1,7 +1,9 @@
 // Package migrations nhúng các tệp migration SQL viết tay (R-23).
 //
 // Thứ tự áp cho mỗi database: shared/ trước (bảng migration riêng
-// schema_migrations_shared), rồi thư mục của cụm (pf/, mkg/, vault/, ts/).
+// schema_migrations_shared), rồi thư mục của cụm (pf/, mkg/, vault/, ts/). Bộ chạy v2 (W7.1,
+// internal/shared/migrator, AG_MIGRATE_RUNNER=v2) giữ bố cục này, gắn mỗi tệp cho module và ghi sổ trong
+// <schema>.schema_migrations của module (ADR-0038).
 package migrations
 
 import "embed"

@@ -19,6 +19,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/migrator"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
@@ -330,8 +331,48 @@ func RoleURL(baseURL string, c migrations.Cluster, dbSuffix, role string) (strin
 	return u.String(), nil
 }
 
-// Migrate áp migration shared/ rồi migration của cụm, bằng vai ag_migrator.
+// EnvRunner chọn bộ chạy migration (W7.1, ADR-0038): "v2" = internal/shared/migrator (sổ theo module, thứ tự
+// topo); rỗng hoặc "v1" = golang-migrate (mặc định trong kỳ chuyển một bản phát hành).
+const EnvRunner = "AG_MIGRATE_RUNNER"
+
+// Runner trả bộ chạy đã chọn qua AG_MIGRATE_RUNNER ("v1" hoặc "v2").
+func Runner() (string, error) {
+	switch v := strings.ToLower(strings.TrimSpace(os.Getenv(EnvRunner))); v {
+	case "", "v1":
+		return "v1", nil
+	case "v2":
+		return "v2", nil
+	default:
+		return "", fmt.Errorf("dbadmin: %s=%q không hợp lệ (v1, v2)", EnvRunner, v)
+	}
+}
+
+// Migrate áp migration shared/ rồi migration của cụm, bằng vai ag_migrator, theo bộ chạy AG_MIGRATE_RUNNER.
 func Migrate(baseURL string, c migrations.Cluster, dbSuffix string) error {
+	r, err := Runner()
+	if err != nil {
+		return err
+	}
+	if r == "v2" {
+		return MigrateV2(context.Background(), baseURL, c, dbSuffix, nil)
+	}
+	return MigrateV1(baseURL, c, dbSuffix)
+}
+
+// MigrateV2 áp migration bằng bộ chạy v2 (internal/shared/migrator). log có thể nil.
+func MigrateV2(ctx context.Context, baseURL string, c migrations.Cluster, dbSuffix string, log func(string, ...any)) error {
+	dsn, err := RoleURL(baseURL, c, dbSuffix, Migrator)
+	if err != nil {
+		return err
+	}
+	if _, err := migrator.Up(ctx, dsn, c, migrator.Options{Log: log}); err != nil {
+		return fmt.Errorf("dbadmin: migration v2 → %s: %w", DatabaseName(c, dbSuffix), err)
+	}
+	return nil
+}
+
+// MigrateV1 áp migration shared/ rồi migration của cụm bằng golang-migrate (bộ chạy cũ).
+func MigrateV1(baseURL string, c migrations.Cluster, dbSuffix string) error {
 	dsn, err := RoleURL(baseURL, c, dbSuffix, Migrator)
 	if err != nil {
 		return err

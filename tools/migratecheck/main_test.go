@@ -178,3 +178,27 @@ func TestLockGrandfatheredByNumber(t *testing.T) {
 		t.Fatalf("miễn sai: %v", p)
 	}
 }
+
+// W7.1: migratecheck theo module — chỉ kiểm tệp gắn cho module (như bộ chạy v2), module lạ là lỗi.
+func TestCheckByModule_W71(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "embed.go"), "package migrations\n\n//go:embed pf/*.sql\nvar FS embed.FS\n")
+	writeFile(t, filepath.Join(root, "pf", "000001_pf_party_x.up.sql"), "CREATE TABLE pf_party.x (id int);\nUPDATE pf_party.x SET id = 1;\n")
+	writeFile(t, filepath.Join(root, "pf", "000002_pf_notify_y.up.sql"), "CREATE TABLE pf_notify.y (id int);\n")
+	writeFile(t, filepath.Join(root, "pf", "000003_roles.up.sql"), "CREATE TABLE pf_notify.z (id int);\nCREATE TABLE pf_party.z (id int);\n")
+	if p, err := checkTreeModule(root, "pf/notify"); err != nil || len(p) != 0 {
+		t.Errorf("pf/notify phải sạch: %v %v", p, err)
+	}
+	if p, err := checkTreeModule(root, "pf/party"); err != nil || len(p) != 1 || !strings.Contains(p[0], "000001_pf_party_x") {
+		t.Errorf("pf/party phải bắt UPDATE: %v %v", p, err)
+	}
+	if p, err := checkTreeModule(root, "pf"); err != nil || len(p) != 0 {
+		t.Errorf("module giả pf (tệp toàn cụm 000003): %v %v", p, err)
+	}
+	if _, err := checkTreeModule(root, "pf/khong-co"); err == nil {
+		t.Error("module không có tệp phải lỗi")
+	}
+	if p, _ := checkTree(root); len(p) != 1 {
+		t.Errorf("không lọc: %v", p)
+	}
+}

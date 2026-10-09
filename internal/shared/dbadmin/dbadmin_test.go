@@ -82,3 +82,30 @@ func TestBootstrapClustersOnlySelected_G4(t *testing.T) {
 		t.Error("không có cụm phải lỗi")
 	}
 }
+
+// W7.1 (R-DB-12, ADR-0038): mỗi module có schema có vai chủ own_<module> NOLOGIN, tạo trước ag_migrator (thành viên).
+func TestOwnerRoles_W71(t *testing.T) {
+	names := roleNames(Roles)
+	i := slices.Index(names, Migrator)
+	if i < 0 {
+		t.Fatal("thiếu ag_migrator")
+	}
+	mig := Roles[i]
+	for _, g := range ModuleGroups() {
+		o := OwnerRole(g.Module)
+		j := slices.Index(names, o)
+		if j < 0 {
+			t.Errorf("thiếu vai %s", o)
+			continue
+		}
+		if r := Roles[j]; r.Login || r.BypassRLS || len(r.MemberOf) != 0 {
+			t.Errorf("%s phải NOLOGIN, không BYPASSRLS, không thuộc vai nào: %+v", o, r)
+		}
+		if j > i || !slices.Contains(mig.MemberOf, o) {
+			t.Errorf("ag_migrator phải là thành viên %s (tạo trước)", o)
+		}
+	}
+	if OwnerRole("pf/party") != "own_party" || OwnerRole("mkg/measurement") != "own_measurement" {
+		t.Error("tên vai chủ")
+	}
+}

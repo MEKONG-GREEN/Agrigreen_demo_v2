@@ -2,7 +2,9 @@
 // khi triển khai ứng dụng (mục 20).
 //
 //	migrate bootstrap   tạo/cập nhật vai và database — cần AG_PG_ADMIN_URL (quản trị cụm)
-//	migrate up          áp migration cho mọi cụm bằng vai ag_migrator — cần AG_DB_URL
+//	migrate up          áp migration cho mọi cụm bằng vai ag_migrator — cần AG_DB_URL; AG_MIGRATE_RUNNER=v2 chọn bộ
+//	                    chạy theo module (W7.1, ADR-0038), mặc định v1 (golang-migrate) trong kỳ chuyển
+//	migrate verify-runner  đối chiếu trạng thái golang-migrate với sổ theo module (v2) — mã thoát 1 nếu lệch
 //	migrate verify      kiểm các view cổng (v_missing_immutability, v_missing_rls) phải rỗng
 //	migrate maintain    tạo trước phân vùng tháng cho mọi bảng sổ ở mọi cụm (AG_PARTITION_MONTHS_AHEAD, mặc định 24)
 //	migrate verify-chains  chạy shared.verify_chain cho mọi chuỗi trong chain_head; có chỗ đứt → mã thoát 1
@@ -28,7 +30,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "dùng: migrate bootstrap|up|verify|maintain|verify-chains|anchor|purge-idempotency")
+		fmt.Fprintln(os.Stderr, "dùng: migrate bootstrap|up|verify|verify-runner|maintain|verify-chains|anchor|purge-idempotency")
 		os.Exit(2)
 	}
 	if err := run(os.Args[1]); err != nil {
@@ -68,13 +70,24 @@ func run(cmd string) error {
 		if err != nil {
 			return err
 		}
+		runner, err := dbadmin.Runner()
+		if err != nil {
+			return err
+		}
 		for _, c := range clusters {
-			if err := dbadmin.Migrate(clusterenv.BaseURL(c, base), c, ""); err != nil {
+			if runner == "v2" {
+				err = dbadmin.MigrateV2(ctx, clusterenv.BaseURL(c, base), c, "", func(f string, a ...any) { fmt.Printf(f+"\n", a...) })
+			} else {
+				err = dbadmin.MigrateV1(clusterenv.BaseURL(c, base), c, "")
+			}
+			if err != nil {
 				return err
 			}
-			fmt.Println("đã áp migration:", dbadmin.DatabaseName(c, ""))
+			fmt.Printf("đã áp migration (bộ chạy %s): %s\n", runner, dbadmin.DatabaseName(c, ""))
 		}
 		return nil
+	case "verify-runner":
+		return verifyRunner(ctx)
 	case "verify":
 		base, err := need("AG_DB_URL")
 		if err != nil {

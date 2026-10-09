@@ -115,8 +115,21 @@ func FormatCatalog(mods []*Manifest) ([]byte, error) {
 			goStrings(perms), goStrings(m.Zones), goStrings(m.OwnsSchema), goStrings(shares))
 	}
 	b.WriteString("}\n")
+	// W7.1 (R-DB-12): phụ thuộc module cho bộ chạy migration v2 (thứ tự topo) — biến riêng ở cuối tệp để gộp
+	// nhánh ít đụng các dòng danh mục ở trên.
+	b.WriteString("\nvar catalogDepends = map[string][]string{\n")
+	for _, m := range sorted {
+		if deps := m.DependNames(); len(deps) > 0 {
+			fmt.Fprintf(&b, "\t%s: %s,\n", strconv.Quote(m.Name), strings.TrimPrefix(goStrings(deps), "[]string"))
+		}
+	}
+	b.WriteString("}\n")
 	return format.Source(b.Bytes())
 }
+
+// Depends trả các module mà name khai trong depends của module.yaml (đã sắp; nil nếu không có) — W7.1: bộ
+// chạy migration v2 (internal/shared/migrator) xếp thứ tự topo theo đồ thị này lúc chạy, không cần module.yaml.
+func Depends(name string) []string { return slices.Clone(catalogDepends[name]) }
 
 func goStrings(xs []string) string {
 	q := make([]string, len(xs))

@@ -106,7 +106,7 @@ Cột **Khách?**:
 
 | Gói | Nội dung | Phụ thuộc | Migration | Khách? | CS |
 |---|---|---|---|---|---|
-| **W7.1** | **Migration theo schema (DB-12, R-DB-12):** bộ chạy mới: bảng `schema_migrations` trong mỗi schema, thứ tự topo từ `module.yaml`, vai `own_<module>`; chuyển trạng thái hiện có (đánh dấu đã áp) không chạy lại; `migratecheck` theo thư mục module | W1.2, W2.6 | **shared 000008** | Không | L |
+| **W7.1** | **Migration theo schema (DB-12, R-DB-12):** bộ chạy mới: bảng `schema_migrations` trong mỗi schema, thứ tự topo từ `module.yaml`, vai `own_<module>`; chuyển trạng thái hiện có (đánh dấu đã áp) không chạy lại; `migratecheck` theo thư mục module. **Trạng thái: bước 1 xong (mã), v2 sau cờ — mặc định vẫn golang-migrate một bản phát hành** — `internal/shared/migrator`: giữ bố cục `migrations/<cụm>/NNNNNN_*.up.sql`, gắn mỗi tệp cho module như agmodgraph (tiền tố `<cụm>_<module>`, suy từ schema đụng; còn lại module giả `shared`/`<cụm>`); sổ `<schema>.schema_migrations` (dir, file, version, module, checksum SHA-256, method apply\|import) trong schema đầu tiên đã có của `owns_schema` (module giả → `shared`), chỉ ghi thêm, RLS ép, chỉ chủ đọc, bộ chạy tự tạo — **không migration**; chờ áp = vắng trong sổ (số nhỏ hơn số đã áp KHÔNG còn bị bỏ qua — §1 mục 6 hết hiệu lực khi v2 là mặc định); thứ tự: `shared/` rồi Kahn theo hạng topo `depends` (chu trình gộp) giữ ràng buộc lịch sử (cùng module theo số, tệp toàn cụm là rào chắn, phụ thuộc/tham chiếu schema số nhỏ hơn trước); mỗi tệp một giao dịch cùng dòng sổ; lệch tổng kiểm/dòng sổ lạ → dừng; chuyển trạng thái: tệp số trong (số lớn nhất của sổ, phiên bản golang-migrate] ghi sổ `import` không chạy; v2 giữ bảng + khóa tư vấn của golang-migrate (quay về v1 được). `AG_MIGRATE_RUNNER=v2` cho `migrate up`/`dbadmin.Migrate`/`pgtest`; `migrate verify-runner` đối chiếu hai trạng thái; CI `TestRunnerV1V2_W71` (DB mới v1 = v2 theo dấu vân tay catalog, chuyển DB v1 → 0 tệp chạy lại, tệp ngoài thứ tự được áp, tệp bị sửa thì dừng); `migratecheck -module <m>` / `-modules`; vai `own_<module>` (NOLOGIN, `ag_migrator` thành viên); `modreg.Depends` (danh mục sinh). Còn lại (bước 2): thư mục theo module cho tệp mới, chuyển chủ đối tượng sang `own_<module>` + chạy bằng `SET ROLE`, gỡ ngoại lệ `schema` chủ W7.1 của agmodgraph; đổi mặc định sang v2 ở bản sau, bỏ golang-migrate bản tiếp ([ADR-0038](adr/0038-bo-chay-migration-theo-module.md), [runbook](runbooks/migrate-runner-v2.md)) | W1.2, W2.6 | **Không** (shared 000008 của bản kế hoạch đầu lỗi thời — 000009–000012 đã dùng; shared 000013 dành lại, không cần) | Không | L |
 | **W7.2** | **`k/access` hợp nhất:** ngữ cảnh chung cho mọi app (thay `ScopeResolver` + KN context), epoch ngữ cảnh (Valkey định danh `noeviction`), quyền module × lớp (R-MOD-07), khóa API về `pf/accounts` | W0.1, W4.1 | **pf 000111–000112** | **Chặn** (SAD v1.1) | L |
 | **W7.3** | **`account_pii`:** PII người dùng mã hóa mức trường + chỉ mục HMAC | W7.2 | **pf 000113** | **Chặn** (SAD v1.1) | M |
 | **W7.4** | **Cụm `idp`:** DB Access riêng, `k_ref` đồng bộ xuyên cụm, thứ tự phục hồi `idp → vault → pf/mkg → k_ref` | W7.2, W2.5 | cụm mới `access` 000001 | Sau (G-1) | L |
@@ -146,6 +146,8 @@ W0.1 → W0.2 → W0.3 → W0.4
   → W6.4 (pf 000129) → W6.5 (pf 000123) → W6.6
   → W9.1 → W7.1 (shared 000008)
   → W8.1 → W8.2 (mkg 000037)
+  → W9.1 → W7.1 (không migration)
+  → W8.1 → W8.2 (mkg 000026)
   [chờ SAD v1.1]  W7.2 (pf 000111–12) → W7.3 (pf 000113) → W7.4
   [chờ MKG v1.3]  W8.3 → W8.4 (mkg 000027–28) → W8.5 (mkg 000029–32)
   [chờ dữ liệu]   W3.5

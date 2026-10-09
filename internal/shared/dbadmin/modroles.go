@@ -201,6 +201,9 @@ func LoginRoles() []string {
 	return out
 }
 
+// OwnerRole trả vai chủ schema của module: own_<đoạn cuối>, vd pf/party → own_party (cùng đoạn với r_<module>).
+func OwnerRole(module string) string { return "own_" + strings.TrimPrefix(modreg.DBRole(module), "r_") }
+
 func buildRoles() []Role {
 	groups := ModuleGroups()
 	out := []Role{baseRoles[0]} // ag_shared_user: đích MemberOf của mọi vai sau
@@ -226,7 +229,18 @@ func buildRoles() []Role {
 		out = append(out, Role{Name: g.Role, MemberOf: member, Clusters: g.Clusters})
 	}
 	out = append(out, Role{Name: OpsGroup, MemberOf: []string{SharedUser}, Clusters: []migrations.Cluster{migrations.PF, migrations.MKG}})
+	// own_<module> (W7.1, R-DB-12, ADR-0038): vai NOLOGIN chủ schema của module, chỉ pipeline migration dùng —
+	// ag_migrator là thành viên. Bước này chỉ dựng vai; chuyển quyền sở hữu đối tượng sẵn có và chạy migration
+	// bằng SET ROLE own_<module> là bước sau (cần thư mục migration theo module).
+	var owners []string
+	for _, g := range groups {
+		owners = append(owners, OwnerRole(g.Module))
+		out = append(out, Role{Name: OwnerRole(g.Module), Clusters: g.Clusters})
+	}
 	for _, r := range baseRoles[1:] {
+		if r.Name == Migrator {
+			r.MemberOf = append(slices.Clone(r.MemberOf), owners...)
+		}
 		for _, g := range groups {
 			if g.Legacy == r.Name {
 				r.MemberOf = append(slices.Clone(r.MemberOf), g.Role)

@@ -17,26 +17,41 @@
 //   - cột của bảng sổ (CheckLedgerColumns, ADR-0012): ADD COLUMN phải NULL được, không DEFAULT, và
 //     đăng ký bằng shared.register_ledger_columns trong cùng tệp; cấm DROP/RENAME/đổi kiểu cột. Sổ chuyển schema
 //     (ALTER TABLE … SET SCHEMA, W3.3) vẫn là sổ dưới tên mới
+//   - theo module (W7.1, ADR-0038): -module <tên> chỉ kiểm tệp gắn cho module (gắn như bộ chạy v2 — tiền tố
+//     <cụm>_<module>, suy từ schema đụng, còn lại module giả <cụm>/shared) và in kế hoạch của nó; -modules in bảng
+//     tệp theo module của mọi cụm
 //
-// Chạy: go run ./tools/migratecheck migrations
+// Chạy: go run ./tools/migratecheck [-module pf/party | -modules] migrations
 package main
 
 import (
+	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 )
 
 func main() {
+	module := flag.String("module", "", "chỉ kiểm tệp gắn cho module này (vd pf/party, hoặc module giả shared/pf/mkg/vault/ts) và in kế hoạch của nó (W7.1)")
+	list := flag.Bool("modules", false, "in bảng tệp theo module (gắn module của bộ chạy v2, W7.1) rồi kiểm như thường")
+	flag.Parse()
 	dir := "migrations"
-	if len(os.Args) > 1 {
-		dir = os.Args[1]
+	if flag.NArg() > 0 {
+		dir = flag.Arg(0)
 	}
-	problems, err := checkTree(dir)
+	if *list || *module != "" {
+		if err := printModules(os.Stdout, dir, *module); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+	}
+	problems, err := checkTreeModule(dir, *module)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
@@ -76,11 +91,23 @@ var (
 	timescaleRe       = regexp.MustCompile(`(?is)\bCREATE\s+EXTENSION\b[^;]*\btimescaledb`)
 )
 
-func checkTree(root string) ([]string, error) {
+func checkTree(root string) ([]string, error) { return checkTreeModule(root, "") }
+
+// checkTreeModule như checkTree; module khác rỗng → chỉ kiểm theo tệp những tệp gắn cho module đó (W7.1:
+// migratecheck theo module — gắn như bộ chạy v2, internal/shared/migrator). Kiểm mức thư mục (embed, trùng số)
+// vẫn chạy đủ.
+func checkTreeModule(root, module string) ([]string, error) {
 	var problems []string
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return nil, err
+	}
+	owners, err := fileOwners(root, entries)
+	if err != nil {
+		return nil, err
+	}
+	if module != "" && !slices.Contains(slices.Collect(maps.Values(owners)), module) {
+		return nil, fmt.Errorf("migratecheck: không tệp nào gắn cho module %q", module)
 	}
 	embeds, err := embedded(root)
 	if err != nil {
@@ -116,6 +143,9 @@ func checkTree(root string) ([]string, error) {
 				problems = append(problems, fmt.Sprintf("%s: trùng số %06d với %s", f, n, prev))
 			}
 			seen[n] = base
+			if module != "" && owners[e.Name()+"/"+base] != module {
+				continue
+			}
 			src, err := os.ReadFile(f)
 			if err != nil {
 				return nil, err
