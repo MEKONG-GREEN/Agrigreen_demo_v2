@@ -21,7 +21,7 @@
 // Rồi sinh internal/shared/modreg/catalog_gen.go (W1.4): tên, kind, enable, permissions
 // của mọi module cho bật module theo đơn vị lúc chạy (nhị phân không mang module.yaml).
 //
-// Trường TAY (name, aka, kind, zones, version, shares, enable) giữ nguyên. Tệp chưa
+// Trường TAY (name, aka, hosts, kind, zones, version, shares, enable) giữ nguyên. Tệp chưa
 // có được tạo khung; kind/zones/enable phải điền tay rồi chạy lại.
 //
 // Sau đó kiểm app/*/app.yaml (W1.3, viết tay, không sinh): đủ bảy ứng dụng, tham chiếu

@@ -86,8 +86,9 @@ type Consumes struct {
 
 // Manifest là nội dung một module.yaml.
 type Manifest struct {
-	Name        string            `yaml:"name"` // tên repo, vd pf/party
-	Aka         []string          `yaml:"aka"`  // tên v4.1 (Phụ lục D), vd k/orgtree
+	Name        string            `yaml:"name"`            // tên repo, vd pf/party
+	Aka         []string          `yaml:"aka"`             // tên v4.1 (Phụ lục D), vd k/orgtree
+	Hosts       []string          `yaml:"hosts,omitempty"` // cap/* CHƯA tách, đang cài ở đây (R-MOD-09, W6.6)
 	Kind        Kind              `yaml:"kind"`
 	Zones       []string          `yaml:"zones"`
 	Version     string            `yaml:"version"`
@@ -159,6 +160,7 @@ func Parse(data []byte, p string) (*Manifest, error) {
 var (
 	reName    = regexp.MustCompile(`^(pf|mkg|vault)/[a-z][a-z0-9]*$`)
 	reAka     = regexp.MustCompile(`^(k|cap|dom|mkg)/[a-z][a-z0-9-]*$`)
+	reCap     = regexp.MustCompile(`^cap/[a-z][a-z0-9-]*$`)
 	reEvent   = regexp.MustCompile(`^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+/v[1-9][0-9]*$`)
 	reIdent   = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.]*$`)
 	reSnake   = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
@@ -188,6 +190,15 @@ func (m *Manifest) Validate() error {
 			bad("aka %q phải có dạng k|cap|dom|mkg/<tên>", a)
 		}
 	}
+	for _, h := range m.Hosts {
+		if !reCap.MatchString(h) {
+			bad("hosts %q phải có dạng cap/<tên>", h)
+		}
+		if slices.Contains(m.Aka, h) {
+			bad("hosts %q đã là aka của chính module — module đã là năng lực đó, bỏ khỏi hosts", h)
+		}
+	}
+	checkUnique(m.Hosts, "hosts", bad)
 	if m.Kind.Rank() < 0 {
 		bad("kind %q phải là kernel | capability | domain", m.Kind)
 	}
@@ -332,6 +343,14 @@ func New(ms []*Manifest) (*Registry, error) {
 	}
 	sort.Strings(r.names)
 	schemaOwner := map[string]string{}
+	akaOwner := map[string]string{}
+	for _, name := range r.names {
+		for _, a := range r.byName[name].Aka {
+			if _, ok := akaOwner[a]; !ok {
+				akaOwner[a] = name
+			}
+		}
+	}
 	for _, name := range r.names {
 		m := r.byName[name]
 		for _, dep := range m.DependNames() {
@@ -344,6 +363,11 @@ func New(ms []*Manifest) (*Registry, error) {
 			dv, verr := ParseVersion(d.Version)
 			if err == nil && verr == nil && !c.Allows(dv) {
 				errs = append(errs, fmt.Errorf("%s: depends %s %q không thỏa phiên bản hiện có %s", m.Path, dep, c, dv))
+			}
+		}
+		for _, h := range m.Hosts {
+			if o, ok := akaOwner[h]; ok {
+				errs = append(errs, fmt.Errorf("%s: hosts %q đã tách thành module %s — chuyển sang dùng port của nó và gỡ khai hosts", m.Path, h, o))
 			}
 		}
 		for _, s := range m.OwnsSchema {
@@ -444,6 +468,18 @@ func (r *Registry) Dependents(name string) []string {
 	var out []string
 	for _, n := range r.names {
 		if _, ok := r.byName[n].Depends[name]; ok {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// Hosts trả các module khai hosts chứa năng lực c (cap/* chưa tách, W6.6), đã sắp — kiểm kê bên dùng cho quy tắc
+// ba (R-MOD-09).
+func (r *Registry) Hosts(c string) []string {
+	var out []string
+	for _, n := range r.names {
+		if slices.Contains(r.byName[n].Hosts, c) {
 			out = append(out, n)
 		}
 	}

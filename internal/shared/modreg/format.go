@@ -19,6 +19,9 @@ func Format(m *Manifest) []byte {
 	b.WriteString(header)
 	b.WriteString("name: " + m.Name + "\n")
 	b.WriteString("aka:" + flow(m.Aka, false) + "\n")
+	if len(m.Hosts) > 0 { // chỉ ghi khi có: module không cài năng lực chưa tách giữ nguyên tệp
+		b.WriteString("hosts:" + flow(m.Hosts, true) + "\n")
+	}
 	b.WriteString("kind: " + string(m.Kind) + "\n")
 	b.WriteString("zones:" + flow(m.Zones, false) + "\n")
 	b.WriteString("version: " + m.Version + "\n")

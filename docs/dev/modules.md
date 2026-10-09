@@ -10,6 +10,7 @@ Mỗi module `internal/{platform,mkg,vault}/<module>` có `module.yaml` cạnh `
 |---|---|---|---|
 | `name` | tay | đường dẫn | Tên repo: `pf/<m>`, `mkg/<m>`, `vault/<m>`; phải khớp thư mục |
 | `aka` | tay | ADR-0027 mục 2 | Tên v4.1 (`k/*`, `cap/*`, `dom/*`, `mkg/*`), có thể nhiều tên hoặc rỗng |
+| `hosts` | tay, tùy chọn | W6.6, R-MOD-09 | Năng lực `cap/*` **chưa tách** thành module mà module này đang cài (kiểm kê bên dùng trước quy tắc ba). Chỉ ghi khi khác rỗng; không trùng `aka` của chính module; năng lực đã có module mang `aka` đó thì khai `hosts` là lỗi (`modreg`) — tách xong phải gỡ. `Registry.Hosts(c)` trả danh sách. [Mục W6.6](#năng-lực-chưa-tách-capimport-captask-capexport-w66) |
 | `kind` | tay | ADR-0027 | `kernel` \| `capability` \| `domain`. Đổi `kind` cần sửa ADR-0027 |
 | `zones` | tay | — | Cụm dữ liệu module chạy: `pf`, `mkg`, `vault`, `ts`. Phải chứa cụm của mọi `owns_schema` |
 | `version` | tay | — | Semver `MAJOR.MINOR.PATCH`, bắt đầu `1.0.0`. Tăng MAJOR khi port phá vỡ (R-MOD-06) |
@@ -415,6 +416,30 @@ R-DB-11, R-SEC-03, ADR-0031 §3–§7; [runbook](../runbooks/agg-jobs.md). Modul
 - **Chạy:** `Agg.Run` — k áp = max(k job, k sàn `publicdata.k_min`, mặc định 10); k thấp hơn, job chưa khai/chưa duyệt/cũ/sửa → `refused`. Liệt kê tenant qua `k_ref.org` (vượt RLS), đọc từng lát tenant qua view `_pub` (view W6.3 chạy bằng quyền chủ có FORCE RLS — BYPASSRLS không xuyên view), gộp + ẩn nhóm < k trong tiến trình; mỗi lần chạy một dòng `pf_metrics.agg_run`, không ghi được → không trả đầu ra.
 - **k sàn:** `app.KFloorSource` (interface của bên dùng, gốc lắp ráp nối tham số masterdata của tenant quản trị); nil → 10. Bật production chờ C-4; bộ chạy chưa nối `cmd/worker`.
 - **Ghi chú W5.3:** bản dựng tập dữ liệu tổng hợp của cổng tích hợp (`pf/apiclient` feedbuild, W5.3) dùng danh sách tenant bên góp chứ không dùng `r_agg`; khi cần tổng hợp toàn nền tảng có k trên nhóm sau gộp, chuyển thành một job đã khai ở đây (vd `cc.harvest_by_commune`) — đi qua bốn mắt như mọi job.
+
+## Năng lực chưa tách `cap/import`, `cap/task`, `cap/export` (W6.6)
+
+R-MOD-09 (quy tắc ba), kiến trúc v4.1 §5.1, §26; ADR-0027 mục 2. **Quyết định: chưa tách module nào**, khai `hosts` ở module đang cài (bảng dưới = `Registry.Hosts`). Không migration, không dời mã. `pf/reports` bỏ `aka: [cap/export, cap/import]` (nó không phải *là* hai năng lực đó — chỉ cài một phần) sang `hosts`.
+
+**Kiểm kê (09/10/2026)** — đếm theo cơ chế, không theo tên hàm:
+
+| Năng lực | Cơ chế | Cài ở (module → luồng) | Số |
+|---|---|---|---|
+| `cap/import` | Đọc tệp CSV/.xlsx **đã tách** thành thư viện `internal/shared/tabular` (giới hạn dung lượng/zip bomb/dòng/cột, từ chối công thức, ghi .xlsx toàn chuỗi). Còn lại là ánh xạ cột + kiểm từng dòng + ghi, **đồng bộ** trong một request (R-52), kết quả từng dòng `ok/rejected` + lý do không PII, khóa idempotency | `pf/cooperative` (hộ, sản lượng; thửa GeoJSON/KML/SHP; ranh giới HTX), `pf/party` (HTX hàng loạt, cây tổ chức), `pf/accounts` (nông dân qua `tabular`; người dùng CSV/XLSX tự đọc bằng `excelize` — `MaxImportBytes`), `pf/mechanization` (máy), `pf/masterdata` (danh mục hàng loạt — có sổ `catalog_import`; đơn vị hành chính JSON `agrigreen.admin_units/v1`), `pf/geo` (ranh giới hành chính GeoJSON, cơ sở, công suất JSON), `pf/reports` (định nghĩa biểu từ .xlsx — `formimport`, `cmd/formimport`; sổ `form_import`), `mkg/measurement` (số cân khách — sổ `customer_weight_import`, sai một dòng → từ chối cả lần) | 8 module, ≥ 14 luồng |
+| `cap/export` | (a) **Việc xuất bất đồng bộ**: sổ job + sự kiện `*.export.requested` (outbox) → worker dựng tệp tất định → `objstore.SHA256Hex` + `Put` (`ErrExists` = idempotent) → tải. Khác nhau ở phần lõi: `pf/reports` có hạn mức/ngày, sổ `export_audit`, cảnh báo `export.anomaly` (DLP), URL ký + gửi thư; `pf/mrv` lưu băm ảnh chụp vào sổ, `VerifyExport`, gói nhiều tệp; `pf/apiclient` ngưỡng k, hợp đồng dataproduct, **không** URL ký (ADR-0022 §8) + ảnh chụp tập dữ liệu W5.3. (b) **Tải đồng bộ** không ghi lần xuất: dựng tệp trong request | (a) `pf/reports`, `pf/mrv`, `pf/apiclient`. (b) `pf/extension` (lịch công tác Excel/PDF), `pf/party` (cây tổ chức .xlsx khứ hồi), `pf/cooperative` (thửa KN GeoJSON/KML), `pf/metering` (bảng kê CSV), `mkg/acctbridge` (bút toán csv/xml, có SHA-256) | (a) 3, (b) 5 |
+| `cap/task` | Nhiệm vụ có vòng đời tạo → giao → cập nhật → đóng, SLA mặc định + leo thang (`task_event`/`task_current`, `BulkAssign`, `enqueueEscalated`) | `pf/extension` (nhiệm vụ KN US-TASK-*). **Không tính:** `extension/reportcycle` (công việc nộp biểu theo kỳ — thuộc `cap/forms`), `mkg/fieldops` `crew_assignment` (xếp tổ máy cho đơn — phân bổ nguồn lực vùng mkg, không vòng đời nhiệm vụ/kết quả), `pf/reports` `form_assignment` (gán biểu cho loại báo cáo), `pf/accounts` `role_assignment` | 1 |
+
+Không tính vào `cap/import`/`cap/export`: nhận lô đối tác `pf/apiclient` `ingest_batch` (cổng tích hợp, R-INT), van công bố `valve_export` của `mkg/*` (`contracts/publication`), tệp chứng từ `shared/docfile` (`cap/evidence`).
+
+**Vì sao chưa tách:**
+- `cap/import`: phần chung đáng tách (đọc tệp an toàn) **đã** là thư viện `shared/tabular` — thư viện, không cần `module.yaml`/schema (ADR-0027 mục 1). Phần còn lại theo §26 là "bộ ánh xạ cột theo module chủ" — vốn ở module chủ. Mô hình §26 (lô nhập có dòng lỗi lưu lại, hai bước `Validate`/`Commit`, sự kiện `import.committed`) **chưa có ở luồng nào** (mọi luồng một bước, đồng bộ); dựng nó cần schema mới (migration) và đổi hợp đồng HTTP của 14 luồng — không thấp rủi ro.
+- `cap/export`: ba việc xuất bất đồng bộ dùng chung khung, nhưng khung đã nằm ở thư viện (`shared/outbox`, `shared/objstore`, `shared/idempotency`); phần khác nhau (DLP, băm vào sổ, ngưỡng k, cách tải) là lõi nghiệp vụ. Gom sổ job về một schema `cap/export` cần migration và dời ba sổ chỉ ghi thêm (chuỗi băm) — đúng điều kiện **dừng** của gói. Mẫu văn bản có phiên bản + Render PDF của §26 chưa có bên dùng thứ hai.
+- `cap/task`: một nơi cài — chưa đạt quy tắc ba (khớp ghi chú bản đối chiếu: "tách khi có app thứ hai").
+
+**Điều kiện kích hoạt tách** (gói mới, cấp số migration riêng; xóa `hosts` tương ứng trong cùng PR — `modreg` báo lỗi nếu còn):
+- `cap/import` → module `pf/import` khi một luồng cần **lô nhập lưu dòng lỗi / hai bước xem trước–ghi** hoặc nhập lớn hơn ngưỡng đồng bộ R-52 (job), và ứng dụng thứ hai có lịch — dự kiến G1 KN (kiến trúc v4.1 Phụ lục A, cổng G1: "App KN chạy thật trên `cap/import`"). Giữ `tabular` làm bộ đọc; module chủ khai bộ ánh xạ cột qua interface của `cap/import` (interface bên tiêu thụ, không import domain). Việc nhỏ làm trước được: chuyển nhập người dùng `pf/accounts` sang `tabular`.
+- `cap/export` → module `pf/export` khi (i) mẫu văn bản có phiên bản/PDF cần cho ứng dụng thứ hai, hoặc (ii) có việc xuất bất đồng bộ thứ tư, hoặc (iii) điểm kiểm soát chống thất thoát chung cho mọi đường xuất (§30: nhật ký, hạn mức, cảnh báo khối lượng bất thường) được yêu cầu — lúc đó các tải đồng bộ (b) cũng đi qua nó. Hiện chỉ `pf/reports` có hạn mức + cảnh báo khối lượng.
+- `cap/task` → module `pf/task` khi ứng dụng thứ hai (HTX/CGH, v4.1 G2 "tổng quát `cap/task`") cần nhiệm vụ có SLA + kết quả bắt buộc khi đóng; tách từ `pf/extension` (sổ `task_event`), `dom/extension` dùng qua port.
 
 ## Module `pf/cooperative` — mặt tiền (W3.2)
 

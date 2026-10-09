@@ -48,12 +48,12 @@ KN v7.7 (D2) coi **phòng ban là module**: `pf_party.department` bật theo tr�
 | `pf/masterdata` | `cap/masterdata` | capability | Đơn vị hành chính có hiệu lực: ADR-0032 (W0.2) |
 | `pf/notify`, `pf/content`, `pf/sync` | `cap/notify`, `cap/content`, `cap/sync` | capability | Cùng tên |
 | `pf/geo` | `cap/geo` | capability | Hình học thửa chuyển sang `pf/cooperative` (W3.3) |
-| `pf/reports` (+ `extension/reportcycle`) | `cap/export`, `cap/import` | capability | `cap/forms` đã tách ở W6.2 (`pf/forms`); `cap/export`, `cap/import` tách ở W6.6 khi đủ quy tắc ba |
+| `pf/reports` (+ `extension/reportcycle`) | — (`hosts: [cap/export, cap/import]`) | capability | `cap/forms` đã tách ở W6.2 (`pf/forms`). W6.6: `cap/export`, `cap/import` chưa tách — khai `hosts` ở mọi module đang cài, không còn là `aka` của `pf/reports` |
 | `pf/forms` (mới, W6.2) | `cap/forms` | capability | Biểu theo kỳ, chốt kỳ kèm ảnh chụp đóng băng (pf 000121–000122) |
 | `pf/metrics` | `cap/analytics` | capability | Chỉ đọc `_pub` (W6.3) |
 | `pf/evidence` (mới, W6.5) — schema `pf_files` | `cap/evidence` | capability | Chuyển `pf_files` từ `pf/sync` (pf 000123) |
 | `pf/workflow` (mới, W6.1) | `cap/workflow` | capability | Duyệt bốn mắt dùng chung (pf 000118) |
-| — | `cap/task`, `cap/price` | — | Chưa có (W6.6) |
+| — | `cap/task`, `cap/price` | — | Chưa có module. `cap/task` khai `hosts` ở `pf/extension` (W6.6) |
 | `pf/extdata` | — | chốt ở W1.1 | Không có tên v4.1 tương ứng |
 | `pf/metering` | `dom/metering` | domain | ADR-0023 |
 | `pf/extension` | `dom/extension` | domain | |
@@ -128,7 +128,7 @@ Giữ cả hai cơ chế, tách nghĩa:
 | W6.2 | `pf/forms` (`cap/forms`, capability, pf 000121–000122) import `workflow/port` trực tiếp (capability → capability, cùng tầng) cho rà soát bốn mắt; `pf/extension` (domain) import `forms/port` trực tiếp cho ghi song song chốt/mở lại kỳ KN (đi xuống tầng, không đảo phụ thuộc). Cấu hình theo bên dùng (§7.2 `cap/forms: {hierarchy, publish_by, close_by}`) là `forms/port.Profile` do gốc lắp ráp truyền (`assembly.KNProfile`) — `app.yaml` chưa mang cấu hình module. `aka cap/forms` chuyển từ `pf/reports` sang `pf/forms`. Không thêm ngoại lệ `agmodgraph` |
 | W6.3 | View công bố `pf_<module>_pub` (pf 000124): chỉ thị `//ag:pubview <schema>_pub.<tên> v<N>` trong `port/` của module chủ → `provides.publications` dạng `<schema>_pub.<tên>/v<N>` (view thật `v<N>_<tên>`); `modgen` gán `<cụm>_<module>_pub` cho chủ của `<cụm>_<module>`; `modreg` kiểm schema của view thuộc `owns_schema`; `agmodgraph` cho migration công bố `<cụm>_pub_*` tạo view trong schema `_pub` của nhiều module (không đụng schema nội bộ). `pf/metrics` có `aka: [cap/analytics]` — giữ tên repo |
 | W6.5 | `pf/evidence` (`cap/evidence`, capability, pf 000123) — **module mới** thay vì mở rộng `pf/sync`: bảng mục 2 gán `pf_files` cho `cap/evidence`, `Open(purpose)` là năng lực dùng chung. Sở hữu `pf_files` (mã SQL chuyển khỏi `pf/sync`, `pf/sync` giữ route `/v1/files` và gọi `evidence/port.Files`); bộ ba R-DB-07 NULL được trên `pf_files.file`, sổ `pf_files.access_log`. Module chủ phân giải chủ thể qua `evidence/port.Resolver` — interface bên tiêu thụ, gốc lắp ráp nối `cooperativeport.Resolve` (capability không import domain, mẫu W6.1); phạm vi/đồng ý cũng là interface tự khai để không thêm cạnh vào chu trình `pf/party ↔ pf/sync` |
-| W6.x | Tách `cap/export`, `cap/import`, `cap/task` |
+| W6.6 | `cap/import`, `cap/task`, `cap/export` **chưa tách** (R-MOD-09): trường tay mới `hosts` trong `module.yaml` khai năng lực `cap/*` chưa tách mà module đang cài (`modreg`: dạng `cap/<tên>`, không trùng `aka`, lỗi nếu năng lực đã có module mang `aka` đó; `Registry.Hosts`). Kiểm kê: `cap/import` 8 module (đọc tệp đã là thư viện `shared/tabular`, phần còn lại là ánh xạ cột của module chủ), `cap/export` 3 việc xuất bất đồng bộ (`pf/reports`, `pf/mrv`, `pf/apiclient` — khung chung đã ở `shared/outbox`/`objstore`, khác nhau ở lõi DLP/băm/ngưỡng k) + 5 tải đồng bộ, `cap/task` 1 (`pf/extension`). Tách `cap/export` cần schema mới và dời ba sổ chỉ ghi thêm — không làm trong gói không migration. Điều kiện kích hoạt tách ghi ở [modules.md](../dev/modules.md#năng-lực-chưa-tách-capimport-captask-capexport-w66) |
 | W9.1 | Lint cấm so sánh tên ứng dụng trong module `capability` |
 
 ## Liên quan

@@ -3,6 +3,7 @@
 # Trường TAY: name, aka, kind, zones, version, ràng buộc trong depends, shares, enable.
 name: mkg/measurement
 aka: [mkg/measurement]
+hosts: [cap/import]
 kind: domain
 zones: [mkg, ts]
 version: 1.0.0

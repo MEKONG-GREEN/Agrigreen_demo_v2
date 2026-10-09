@@ -132,6 +132,9 @@ func TestInvalidManifests(t *testing.T) {
 		{"tên sai", "name: pf/party", "name: party", "name"},
 		{"tên không khớp thư mục", "name: pf/party", "name: pf/geo", "không khớp thư mục"},
 		{"aka sai", "aka: [k/orgtree]", "aka: [orgtree]", "aka"},
+		{"hosts không phải cap", "aka: [k/orgtree]", "aka: [k/orgtree]\nhosts: [dom/task]", "hosts \"dom/task\""},
+		{"hosts lặp", "aka: [k/orgtree]", "aka: [k/orgtree]\nhosts: [cap/task, cap/task]", "lặp"},
+		{"hosts trùng aka", "aka: [k/orgtree]", "aka: [cap/task]\nhosts: [cap/task]", "đã là aka"},
 		{"event thiếu phiên bản", "pf.party.org.deactivated/v1", "pf.party.org.deactivated", "provides.events"},
 		{"ràng buộc hỏng", `">=1.0 <2"`, `">=x"`, "depends pf/masterdata"},
 		{"tự phụ thuộc", "pf/masterdata:", "pf/party:", "chính nó"},
@@ -197,6 +200,39 @@ func TestRegistryCrossChecks(t *testing.T) {
 	}
 }
 
+// TestHosts: năng lực chưa tách khai ở hosts (W6.6) — kiểm kê qua Registry.Hosts, Format chỉ ghi khi có, và
+// hosts trỏ tới năng lực đã có module (aka) là lỗi.
+func TestHosts(t *testing.T) {
+	md := mustParse(t, masterdataYAML, "internal/platform/masterdata/module.yaml")
+	hosted := strings.Replace(validYAML, "aka: [k/orgtree]", "aka: [k/orgtree]\nhosts: [cap/task, cap/import]", 1)
+	p := mustParse(t, hosted, "internal/platform/party/module.yaml")
+	r, err := New([]*Manifest{p, md})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := r.Hosts("cap/import"); len(got) != 1 || got[0] != "pf/party" {
+		t.Fatalf("Hosts = %v", got)
+	}
+	if got := r.Hosts("cap/export"); len(got) != 0 {
+		t.Fatalf("Hosts(cap/export) = %v", got)
+	}
+	if out := string(Format(p)); !strings.Contains(out, "aka: [k/orgtree]\nhosts: [cap/import, cap/task]\nkind:") {
+		t.Fatalf("Format thiếu hosts đã sắp:\n%s", out)
+	}
+	if out := string(Format(md)); strings.Contains(out, "hosts:") {
+		t.Fatalf("Format ghi hosts rỗng:\n%s", out)
+	}
+	back := mustParse(t, string(Format(p)), "internal/platform/party/module.yaml")
+	if len(back.Hosts) != 2 {
+		t.Fatalf("đọc lại hosts = %v", back.Hosts)
+	}
+
+	extracted := mustParse(t, strings.Replace(validYAML, "aka: [k/orgtree]", "aka: [k/orgtree]\nhosts: [cap/masterdata]", 1), "internal/platform/party/module.yaml")
+	if _, err := New([]*Manifest{extracted, md}); err == nil || !strings.Contains(err.Error(), "đã tách thành module pf/masterdata") {
+		t.Fatalf("cần lỗi hosts đã tách, có %v", err)
+	}
+}
+
 func TestLoadFS(t *testing.T) {
 	fsys := fstest.MapFS{
 		"internal/platform/party/module.yaml":      {Data: []byte(validYAML)},
@@ -228,6 +264,12 @@ func TestRepoManifests(t *testing.T) {
 	for _, name := range []string{"pf/accounts", "pf/party", "vault/identity"} {
 		if m, ok := r.Get(name); !ok || m.Kind != KindKernel {
 			t.Fatalf("%s phải là kernel (ADR-0027)", name)
+		}
+	}
+	// W6.6: cap/import, cap/task, cap/export chưa đủ điều kiện tách (R-MOD-09) — khai hosts ở module đang cài.
+	for _, c := range []string{"cap/import", "cap/task", "cap/export"} {
+		if len(r.Hosts(c)) == 0 {
+			t.Fatalf("%s: không module nào khai hosts (docs/dev/modules.md, W6.6)", c)
 		}
 	}
 }
