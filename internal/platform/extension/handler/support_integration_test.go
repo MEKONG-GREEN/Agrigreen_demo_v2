@@ -282,7 +282,7 @@ func TestSupportRequestViaSync(t *testing.T) {
 		t.Fatalf("trạng thái: %v", d)
 	}
 	// Cán bộ (không phải nông dân) pull entity này → rỗng, không lỗi.
-	offCtx := tenant.WithID(authz.WithPrincipal(context.Background(), authz.Principal{ActorRef: p.off30001a.actor, TenantID: f.tenant, Roles: []string{port.RoleKNOfficer}}), f.tenant)
+	offCtx := tenant.WithID(authz.WithPrincipal(context.Background(), authz.Principal{ActorRef: p.off30001a.actor, TenantID: f.tenant, OrgRef: p.off30001a.org, Roles: []string{port.RoleKNOfficer}}), f.tenant)
 	if ch, _, err := src.Changes(offCtx, authz.Scope{Units: []string{"30001"}}, port.EntitySupportRequest, 0, 100); err != nil || len(ch) != 0 {
 		t.Fatalf("cán bộ pull support_request: %v %v", ch, err)
 	}
