@@ -98,12 +98,17 @@ func (d moduleDB) BeginTx(ctx context.Context, opts pgx.TxOptions) (pgx.Tx, erro
 }
 
 // setLocalContext đặt vai của module và biến ngữ cảnh app.* (ctxvars.go) trong một câu lệnh — nơi duy
-// nhất mọi giao dịch của module (ForModule, WithContextTx, WithModuleTenantTx) đi qua.
+// nhất mọi giao dịch của module (ForModule, WithContextTx, WithModuleTenantTx) đi qua. Principal người dùng có
+// vai/cấp gắn Nút mà không có Nút → ErrNodeScopeRequired (403 node_scope_required, FD — ctxvars.go).
 func setLocalContext(ctx context.Context, tx pgx.Tx, m ModuleID) error {
 	if !m.Valid() {
 		return fmt.Errorf("db: ModuleID rỗng — dùng db.Module(\"<vùng>/<module>\")")
 	}
-	args := append([]any{m.role}, ContextVarsFrom(ctx).args()...)
+	v := ContextVarsFrom(ctx)
+	if err := checkNodeScope(ctx, v); err != nil {
+		return err
+	}
+	args := append([]any{m.role}, v.args()...)
 	if _, err := tx.Exec(ctx, setConfigSQL, args...); err != nil {
 		return fmt.Errorf("db: SET LOCAL ROLE %s + biến ngữ cảnh: %w", m.role, err)
 	}

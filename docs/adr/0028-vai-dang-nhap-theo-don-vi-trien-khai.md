@@ -152,6 +152,8 @@ Kiểm thử:
 
 Chưa đổi chính sách RLS nào.
 
+**FD (09/10/2026, rủi ro R-5 của W3.4):** cùng chỗ đặt biến, `setLocalContext` gọi `checkNodeScope` trước `set_config`: Principal người dùng có vai/cấp gắn Nút (`db.RequiresNode`: ngữ cảnh KN `kn_xa`; không ngữ cảnh — `coop_manager`, `kn_officer` trừ khi kèm `platform_admin`, `kn_province_admin`, `kn_national_admin`) mà `app.node_id` rỗng → không mở giao dịch, lỗi `db.ErrNodeScopeRequired` bọc trong `problem.NodeScopeRequired` (403 `node_scope_required`). Không có Principal (consumer, job) → không xét. Lý do: `p_scope` (pf 000134) coi Nút rỗng là "cả tenant" cho consumer/job/Admin ([thiết kế cooperative §18.4](../design/cooperative.md#184-kiểm-ở-ứng-dụng-và-kiểm-toàn-vẹn-cả-tenant)).
+
 ### W2.6 (08/10/2026): chuyển hết, bỏ quyền vai cũ, cổng CI
 
 **Vai** (`dbadmin/modroles.go`):

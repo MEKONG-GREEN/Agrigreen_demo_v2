@@ -17,6 +17,7 @@ Mọi lỗi trả về `application/problem+json` theo RFC 9457. Mỗi lỗi có
 | 403 | `mfa_required` | Bề mặt Admin khi token chưa qua yếu tố thứ hai |
 | 403 | `self_approval_forbidden` | Tự phê duyệt thay đổi do chính mình đặt (R-56) |
 | 403 | `module_not_enabled` | Route của một module `enable: per_tenant` đã tắt cho đơn vị (tenant) người gọi (R-MOD-08, W1.4). Thân có `module` (vd `pf/geo`). Module lõi/`always` không bao giờ trả mã này |
+| 403 | `node_scope_required` | Người dùng có vai/cấp gắn Nút — quản lý HTX (`coop_manager`), cán bộ KN (`kn_officer`) không kèm vai tỉnh/quốc gia/`platform_admin`, ngữ cảnh phiên Cấp Xã (`kn_xa`) — mà không có đơn vị công tác (`org_ref`/Nút của lần gán). `db.ForModule` không mở giao dịch của module (FD, rủi ro R-5 của RLS `p_scope`, docs/design/cooperative.md §18.4). Cấp Tỉnh/Quốc gia/Admin và consumer/job không bị xét |
 | 404 | `not_found` | Đường dẫn không tồn tại |
 | 405 | `method_not_allowed` | Phương thức HTTP không được hỗ trợ |
 | 409 | `idempotency_in_progress` | Yêu cầu cùng khóa đang chạy |

@@ -553,7 +553,7 @@ CREATE POLICY p_scope ON pf_coop.plot
 - **Vì sao có nhánh `node_id IS NULL`.** Consumer, job, worker `pf.kref` và Admin không gắn Nút (W2.4: "Có KN mà không gắn Nút (Admin) → rỗng"). Nếu không có nhánh này, chính sách §17.2 trả rỗng cho họ. Nhánh này không làm yếu hơn hiện trạng: hôm nay chỉ có `p_tenant`, phạm vi kiểm ở ứng dụng, và W3.4 **giữ** kiểm ở ứng dụng.
 - **Rủi ro.** Một yêu cầu người dùng KN mất `app.node_id` sẽ thấy cả tenant. Có hai biện pháp:
   1. kiểm thử W3.4: mọi Principal có KN hoặc HTX phải đặt `app.node_id`;
-  2. `db.ForModule` từ chối giao dịch người dùng có vai HTX/KN xã mà `node_id` rỗng. Hỏi lại ở W3.4.
+  2. `db.ForModule` từ chối giao dịch người dùng có vai HTX/KN xã mà `node_id` rỗng — đã làm ở FD (§18.4).
 - `shared.v_missing_rls` chấp nhận chính sách tên `p_scope` (hôm nay chỉ `p_tenant`).
 - **Cổng CI `EXPLAIN`** (DB-14): với mỗi bảng `pf_coop`, `EXPLAIN (FORMAT JSON) SELECT * FROM t` dưới `r_coop` có ngữ cảnh mẫu. Cổng hỏng nếu có SubPlan không `hashed` hoặc có lời gọi hàm không inline.
 - Phân vùng: `shared.secure_partition` gọi `apply_tenant_rls` nên phân vùng giữ `p_tenant`. Truy cập thẳng phân vùng chỉ có `ag_migrator`; `r_coop` không có quyền phân vùng. W3.4 kiểm rằng không vai ứng dụng nào có quyền trên phân vùng.
@@ -608,7 +608,7 @@ W3.5 vẫn **chặn** chờ dữ liệu UAT (C-9).
 | R-2 | Nhị phân cũ chạy sau 000095 (SQL `pf_geo.*`) | Cao | Cửa sổ bảo trì (H-17), thứ tự triển khai 8.5, `readyz` kiểm phiên bản migration |
 | R-3 | Đổi tên sổ (nếu chọn 8.3-B) → `verify-chains` báo P1 giả, mất chống trùng | Cao | Chọn (A) |
 | R-4 | Tạo HTX hai bước (8.6) để lại Nút không hồ sơ | Trung bình | Khóa lũy đẳng + job đối soát + màn KN hiển thị "HTX thiếu hồ sơ" |
-| R-5 | `p_scope` nhánh `node_id IS NULL` mở rộng nếu Principal người dùng mất Nút | Trung bình | Kiểm thử + từ chối ở `db.ForModule` (mục 9) |
+| R-5 | `p_scope` nhánh `node_id IS NULL` mở rộng nếu Principal người dùng mất Nút | Trung bình | Kiểm thử + từ chối ở `db.ForModule` (mục 9; đã làm FD, §18.4 — 403 `node_scope_required`) |
 | R-6 | `household` không có cột Nút → SubPlan theo hàng (DB-14) | Trung bình | Cổng `EXPLAIN`; phương án cột thường ở W3.4 |
 | R-7 | Song song với W2.6 (pf 000119 đổi quyền của mọi module) | Trung bình | W3.3 sau W2.6 (đường găng). 000095 `REVOKE` cả vai cũ, idempotent |
 | R-8 | Chu trình mới `cooperative ↔ cropcycle` nếu SOP ở lại cropcycle | Trung bình | D-4 |
@@ -821,7 +821,11 @@ Hệ quả cần biết: người dùng Nút cấp trên (không có xã phụ t
 
 - Kiểm phạm vi ở ứng dụng giữ nguyên (`access.sees`/`canWrite`, `authz.Scope`, `coopOnly`) — phòng thủ nhiều lớp.
 - Kiểm chồng lấn thửa giữa các HTX (`classifiedOverlaps` → `store.FindOverlaps`) phải nhìn cả tenant: chạy trong `db.WithoutNodeScope` (đặt `app.node_id`, `app.xa_ids` rỗng cho riêng câu kiểm, rồi đặt lại). Kết quả chỉ để phân loại/chặn (lỗi chồng lấn giữa HTX vẫn trả mã thửa như trước W3.4), không trả dòng ngoài phạm vi.
-- Biện pháp 2 của rủi ro R-5 (`db.ForModule` từ chối người dùng HTX/KN xã mà `node_id` rỗng) **chưa làm**: `ContextVarsFrom` đã đặt Nút = `KN.OrgRef` hoặc `OrgRef` của token; HTX có `OrgRef` rỗng thì ứng dụng đã đặt phạm vi rỗng (`accessFor`). Để mở.
+- Biện pháp 2 của rủi ro R-5 **đã làm (FD)**: `setLocalContext` (nơi duy nhất `db.ForModule`/`WithContextTx`/`WithModuleTenantTx` đặt biến ngữ cảnh) gọi `checkNodeScope` trước `set_config`. Principal người dùng mà `db.RequiresNode` đúng và `app.node_id` rỗng → không mở giao dịch, trả `db.ErrNodeScopeRequired` bọc trong `problem.NodeScopeRequired` (403 `node_scope_required`, docs/errors.md). Ánh xạ (`internal/shared/db/ctxvars.go`, nguồn `app/HTX/app.yaml`, `app/KN/app.yaml`):
+  - có ngữ cảnh phiên KN → chỉ xét vai ngữ cảnh: `kn_xa` bắt buộc Nút; `kn_tinh`, `kn_tw`, `admin` giữ nhánh rỗng (lần gán khác `admin` luôn có `org_ref` — `accounts/domain.NormalizeAssignment`);
+  - không có ngữ cảnh → vai realm `coop_manager`, `kn_officer` bắt buộc `org_ref`, trừ khi có thêm `platform_admin`, `kn_national_admin`, `kn_province_admin`;
+  - không có Principal (consumer, job, worker `pf.kref`) → không xét.
+  `xa_ids` không bắt buộc: Cấp Xã chưa có xã phụ trách đã có phạm vi ứng dụng rỗng, còn RLS chỉ mở tới cây của Nút (không cả tenant); bắt buộc sẽ chặn cả menu, ngữ cảnh của người dùng đó. `db.WithoutNodeScope` không đi qua kiểm này (xóa Nút tạm trong giao dịch đã mở). Kiểm thử: `TestRequiresNode_FD`, `TestNodeBoundRolesDeclared_FD` (vai còn khai trong app.yaml), `TestCoopScopeNodeGuard_FD` (migrations: HTX/Cấp Xã/cán bộ KN không Nút → 403; có Nút → đúng phạm vi; Admin KN, `platform_admin`, consumer → cả tenant; `WithoutNodeScope` vẫn chạy).
 
 ### 18.5 Kiểm thử
 

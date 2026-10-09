@@ -236,6 +236,8 @@ Mảng xã: `k_ref.ctx_text('app.xa_ids')::text[]`. `app.node_id` và `app.xa_id
 
 `db.WithoutNodeScope(ctx, tx, fn)` đặt tạm `app.node_id`, `app.xa_ids` rỗng cho `fn` rồi đặt lại — chỉ cho kiểm toàn vẹn phải nhìn cả tenant (vd chồng lấn thửa giữa HTX), không để trả dữ liệu ngoài phạm vi.
 
+**Người dùng gắn Nút phải có Nút (FD).** `p_scope` coi `app.node_id` rỗng là "cả tenant" (consumer, job, Admin). Vì vậy `db.ForModule` **không mở giao dịch** khi Principal người dùng có vai/cấp gắn Nút mà Nút rỗng — lỗi `db.ErrNodeScopeRequired`, ra ngoài là 403 `node_scope_required` (docs/errors.md). Ánh xạ `db.RequiresNode` (`ctxvars.go`): có ngữ cảnh KN → chỉ `kn_xa` bắt buộc; không ngữ cảnh → `coop_manager`, `kn_officer` bắt buộc `org_ref`, trừ khi kèm `platform_admin`, `kn_province_admin`, `kn_national_admin`. Không Principal → không xét. Thêm vai mới có phạm vi theo Nút cấp HTX/xã: thêm vào `db.NodeBoundRoles`/`NodeBoundContextRoles` (kiểm thử `TestNodeBoundRolesDeclared_FD` đối chiếu `app/*/app.yaml`). Kiểm thử dựng Principal HTX/xã phải đặt `OrgRef` (hoặc `KN.OrgRef`).
+
 ## Bản chiếu `k_ref` (W2.5)
 
 [ADR-0029](../adr/0029-k-ref-ban-chieu-loi-moi-cum.md#hiện-thực), kiến trúc v4.1 §17.1–17.3, R-DB-05. Module lõi `pf/kref` (`internal/platform/kref`, `k/ref`) sở hữu schema `k_ref` ở cụm pf (pf 000092) và mkg (mkg 000022, rỗng). `k_ref` là dữ liệu **dẫn xuất**: nguồn là sổ của `pf/party`, `pf/masterdata`.
