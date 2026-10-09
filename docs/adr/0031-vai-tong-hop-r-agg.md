@@ -85,6 +85,7 @@ Ngưỡng k là mục `[KÝ]` của v4.1 (K-8, Phụ lục C C-4, câu hỏi Q5-
 | W6.1 | `pf/workflow` (bốn mắt cho thêm job) | pf 000118 |
 | W6.3 | Schema `_pub`, view có phiên bản, vai `r_<module>_pub` (thành viên: `r_metrics`), `pf/metrics` chỉ đọc `_pub`, bản sao chỉ đọc `AG_DB_REPLICA_URL` — xong 09/10/2026 ([modules.md](../dev/modules.md#view-công-bố-_pub-w63)) | pf 000124 |
 | W6.4 | `r_agg`, danh mục job, nhật ký chạy, cổng CI danh mục BYPASSRLS — mã xong 09/10/2026, bật production chờ C-4 (ghi chú dưới) | pf 000129 (000109 cũ bỏ) |
+| FC | Vai đăng nhập riêng `app_agg`, `worker -agg-run`, EXECUTE `k_ref.ctx_*` cho `r_agg` (ghi chú dưới) | pf 000137 |
 | W5.3 | Tập dữ liệu dựng sẵn cho cổng tích hợp qua ngưỡng k | pf 000126–000127 (000100–000101 cũ bỏ) |
 
 Bản đối chiếu ghi gói `r_agg` là "W6.5" ở vài chỗ; số đúng theo kế hoạch là **W6.4**.
@@ -94,7 +95,9 @@ Bản đối chiếu ghi gói `r_agg` là "W6.5" ở vài chỗ; số đúng the
 - **Module chủ:** `pf/metrics` (`cap/analytics`): sổ `pf_metrics.agg_job` (danh mục có phiên bản: job, phiên bản, view `_pub`, SQL, mục đích, k, băm định nghĩa; `proposed` → đúng một `approved`/`rejected`) và `pf_metrics.agg_run` (nhật ký mỗi lần chạy, §5) ở **tenant quản trị**; `pf/workflow` giữ yêu cầu/quyết định (kind `agg.job`) — `r_metrics` gọi `pf_workflow.submit/decide` trong giao dịch của mình (§4 bốn mắt; CHECK `agg_job_four_eyes` ở cả sổ danh mục).
 - **§3 vai:** `r_agg` NOLOGIN BYPASSRLS (bootstrap), thành viên `r_<module>_pub`, thêm SELECT cột `k_ref.org.tenant_id`. Lệch ban đầu (`app_worker` là thành viên `r_agg`) đã sửa ở gói FC (dưới).
 
-**Gói FC (09/10/2026)** — tách vai đăng nhập `app_agg` (§3), không migration:
+**Gói FC (09/10/2026)** — tách vai đăng nhập `app_agg` (§3), vai bằng bootstrap; migration **pf 000137**:
+
+- pf 000137 (`000137_pf_kref_agg_ctx_grant`): `GRANT EXECUTE` `k_ref.ctx_uuid/ctx_text/ctx_reject(text)` cho `r_agg`. Chính sách RLS dưới view `_pub` (`p_scope` pf 000134, `p_share` pf 000136 — gộp sau W6.4) gọi các hàm này; quyền EXECUTE kiểm theo `current_user` (`r_agg`), không theo chủ view — thiếu thì mọi job lỗi 42501. Không mở bảng/view/schema mới (cổng `TestSchemaIsolationAggRole_W64` giữ nguyên, kiểm thêm ba quyền EXECUTE).
 
 - `dbadmin.AppAgg`: LOGIN NOINHERIT, **chỉ** thành viên `r_agg` (INHERIT FALSE, SET TRUE), cụm pf; `ALTER ROLE app_agg SET default_transaction_read_only = on, statement_timeout = '10min'` (`dbadmin.AggRoleSettings`, bootstrap). `LoginUnit.Agg` bỏ — `app_worker` không còn thuộc `r_agg`; bootstrap thu hồi mọi thành viên `r_agg` khác `app_agg` (`dbadmin.ExclusiveMembers`), nên grant cũ của W6.4 tự gỡ.
 - `db.WithAggTx(ctx, b, owner, governance, agg, authorize, fn)`: hai giao dịch chỉ đọc nối tiếp — kiểm duyệt trên pool đơn vị (`app_worker` → `r_metrics`), rồi đổi vai trên pool `app_agg` (`app_agg` không đọc được danh mục, `app_worker` không đổi được sang `r_agg` — kiểm thử 42501 cả hai chiều). Hệ quả: kiểm duyệt và đọc không còn chung một giao dịch; cửa sổ giữa hai giao dịch chỉ cho phép chạy phiên bản vừa bị thay bằng phiên bản mới hơn được duyệt cùng lúc — nhật ký vẫn ghi phiên bản đã kiểm.

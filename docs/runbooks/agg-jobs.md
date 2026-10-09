@@ -1,6 +1,6 @@
 # Job tổng hợp `r_agg` (W6.4)
 
-ADR-0031 §3–§7, R-DB-11, R-SEC-03. Mã: `internal/shared/db/agg.go` (`db.WithAggTx`), `internal/platform/metrics/app/agg.go` (`Agg`: `Propose`, `Decide`, `Run`), `internal/platform/metrics/app/aggjobs.go` (job đã khai), migration **pf 000129** (`pf_metrics.agg_job`, `pf_metrics.agg_run`).
+ADR-0031 §3–§7, R-DB-11, R-SEC-03. Mã: `internal/shared/db/agg.go` (`db.WithAggTx`), `internal/platform/metrics/app/agg.go` (`Agg`: `Propose`, `Decide`, `Run`), `internal/platform/metrics/app/aggjobs.go` (job đã khai), migration **pf 000129** (`pf_metrics.agg_job`, `pf_metrics.agg_run`), **pf 000137** (gói FC: EXECUTE `k_ref.ctx_*` cho `r_agg`).
 
 > **Production:** chưa bật theo lịch. Bộ chạy nối vào `cmd/worker` dạng lệnh một lần `worker -agg-run <job>` (gói FC); chạy định kỳ chỉ bật sau khi ngưỡng k được ký (C-4, K-8, Q5-3). Tới lúc đó k sàn là `publicdata.k_min` = 10 (tạm).
 
@@ -8,7 +8,7 @@ ADR-0031 §3–§7, R-DB-11, R-SEC-03. Mã: `internal/shared/db/agg.go` (`db.Wit
 
 | Vai | Thuộc tính | Quyền | Ai dùng |
 |---|---|---|---|
-| `r_agg` | NOLOGIN, **BYPASSRLS**, INHERIT | thành viên mọi `r_<module>_pub` (SELECT view `_pub`); USAGE `k_ref` + SELECT **cột** `k_ref.org.tenant_id` (pf 000129). Không quyền ghi, không quyền schema nội bộ | chỉ `db.WithAggTx` |
+| `r_agg` | NOLOGIN, **BYPASSRLS**, INHERIT | thành viên mọi `r_<module>_pub` (SELECT view `_pub`); USAGE `k_ref` + SELECT **cột** `k_ref.org.tenant_id` (pf 000129); EXECUTE `k_ref.ctx_uuid/ctx_text/ctx_reject` (pf 000137 — chính sách RLS dưới view `_pub` gọi chúng, quyền hàm kiểm theo `current_user`). Không quyền ghi, không quyền schema nội bộ | chỉ `db.WithAggTx` |
 | `app_agg` | LOGIN, NOINHERIT; mặc định `default_transaction_read_only = on`, `statement_timeout = 10min` (`ALTER ROLE … SET`, bootstrap) | **chỉ** thành viên `r_agg` (INHERIT FALSE, SET TRUE) — không `r_*` nào khác, không `ag_shared_user`, tự nó không quyền bảng nào | pool 2 kết nối của `worker -agg-run` (`dbadmin.AppAgg`) |
 | `app_worker` | LOGIN, NOINHERIT | thành viên `r_metrics` (danh mục, kiểm duyệt, nhật ký) — **không** thuộc `r_agg` | giao dịch 1 và nhật ký của `Agg.Run`; `Propose`/`Decide` |
 
@@ -28,13 +28,14 @@ Bản W6.4 (lần đầu):
 2. `cmd/migrate up` — pf 000129 dừng với lỗi "thiếu vai r_agg … chạy cmd/migrate bootstrap bản W6.4" nếu bỏ bước 1.
 3. Kiểm: `SELECT rolbypassrls, rolcanlogin FROM pg_roles WHERE rolname = 'r_agg'` → `t, f`; `go test -run 'SchemaIsolation|LoginRoles' ./migrations/` trên staging.
 
-Bản FC (tách `app_agg` khỏi `app_worker`, không migration):
+Bản FC (tách `app_agg` khỏi `app_worker`; migration pf 000137):
 
 1. Kho bí mật: thêm `AG_DB_PASSWORD_APP_AGG` vào `<remotePrefix>/db/pf` **trước** — Job bootstrap đọc nó qua `pg-pf-roles`, worker qua Secret mới `pf-db-agg` (thiếu → bootstrap dùng `AG_DB_APP_PASSWORD` chung và worker không đăng nhập được `app_agg`). Dev: Secret `pg-pf-roles` đã có thì `dev-secrets.ps1` giữ nguyên — xóa rồi chạy lại để có khóa mới. Compose: chạy lại `scripts/gen-dev-secrets` hoặc để rỗng (dùng mật khẩu chung).
 2. `cmd/migrate bootstrap` bản FC — tạo `app_agg` (+ tham số mặc định), cấp `r_agg`, **thu hồi** `r_agg` khỏi `app_worker`.
-3. PgBouncer Local/Dev: khởi động lại `pgbouncer` (userlist có `app_agg`). Kubernetes (pooler CNPG, `auth_query`): không cần.
-4. Nhị phân worker mới (cờ `-agg-run`). Thứ tự 2 ↔ 4 không quan trọng: nhị phân cũ không gọi `db.WithAggTx`.
-5. Kiểm: `SELECT m.rolname FROM pg_auth_members a JOIN pg_roles g ON g.oid = a.roleid JOIN pg_roles m ON m.oid = a.member WHERE g.rolname = 'r_agg'` → chỉ `app_agg`; `go test -run 'AggRole|LoginRoles' ./migrations/`.
+3. `cmd/migrate up` — pf 000137 cấp EXECUTE `k_ref.ctx_*` cho `r_agg` (dừng nếu thiếu `r_agg`). Thiếu bước này mọi job lỗi `42501 permission denied for function ctx_uuid`.
+4. PgBouncer Local/Dev: khởi động lại `pgbouncer` (userlist có `app_agg`). Kubernetes (pooler CNPG, `auth_query`): không cần.
+5. Nhị phân worker mới (cờ `-agg-run`). Thứ tự 2–3 ↔ 5 không quan trọng: nhị phân cũ không gọi `db.WithAggTx`.
+6. Kiểm: `SELECT m.rolname FROM pg_auth_members a JOIN pg_roles g ON g.oid = a.roleid JOIN pg_roles m ON m.oid = a.member WHERE g.rolname = 'r_agg'` → chỉ `app_agg`; `go test -run 'AggRole|LoginRoles' ./migrations/`.
 
 Lùi bản: không cần thu hồi — nhị phân cũ không gọi `db.WithAggTx`; bootstrap bản cũ cấp lại `r_agg` cho `app_worker` (vô hại tới khi chạy lại bootstrap mới), `app_agg` còn lại không dùng. Không xóa sổ `agg_job`/`agg_run` (chỉ ghi thêm).
 

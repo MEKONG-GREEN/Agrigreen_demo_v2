@@ -27,7 +27,7 @@
 
 ### 1.6 Số migration thực tế
 
-Đối chiếu thư mục `migrations/` trên `dev` (09/10/2026), theo thứ tự gộp. Số lớn nhất hiện có: **pf 000136, mkg 000038, shared 000014, ts 000004, vault 000003**.
+Đối chiếu thư mục `migrations/` trên `dev` (09/10/2026), theo thứ tự gộp. Số lớn nhất hiện có: **pf 000137, mkg 000038, shared 000014, ts 000004, vault 000003**.
 
 | Gói | pf | mkg | shared | ts / vault |
 |---|---|---|---|---|
@@ -57,6 +57,7 @@
 | W7.1 (bước 1) | — | — | — (sổ do bộ chạy tạo) | — |
 | W5.6 | 000135 | 000038 | — | — |
 | W4.2 | 000136 | — | 000014 | — |
+| FC (vai `app_agg`, quyền `k_ref.ctx_*` cho `r_agg`) | 000137 | — | — | — |
 | W0.x, W1.1–W1.3, W3.1, W3.2, W5.1, W5.2, W5.9, W6.6, W8.1, W9.1 | — | — | — | — |
 
 **Số chưa dùng (lỗ):** pf 000093–000113, mkg 000023–000032, shared 000007, 000008, 000013, ts 000002. Với golang-migrate (v1) các số này **không dùng được nữa** (nhỏ hơn số đã áp, bị bỏ qua im lặng).

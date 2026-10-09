@@ -79,7 +79,23 @@ func TestSchemaIsolationAggRole_W64(t *testing.T) {
 	if pubViews == 0 || tenantCol != 1 {
 		t.Errorf("r_agg: SELECT %d view _pub, k_ref.org.tenant_id %d", pubViews, tenantCol)
 	}
+	// pf 000137 (gói FC): chính sách RLS dưới view _pub gọi k_ref.ctx_* — quyền EXECUTE kiểm theo current_user (r_agg).
+	for _, fn := range []string{"k_ref.ctx_uuid(text)", "k_ref.ctx_text(text)", "k_ref.ctx_reject(text)"} {
+		var ok bool
+		if err := admin.QueryRow(ctx, `SELECT has_function_privilege($1, $2, 'EXECUTE')`, dbadmin.AggRole, fn).Scan(&ok); err != nil || !ok {
+			t.Errorf("r_agg EXECUTE %s: %v %v", fn, ok, err)
+		}
+	}
 
+	// Gói FC: grant cũ app_worker → r_agg (W6.4) bị bootstrap thu hồi (dbadmin.ExclusiveMembers). Dựng lại trạng thái
+	// W6.4 rồi bootstrap — cũng thu hẹp cửa sổ với tiến trình khác đang chạy bootstrap bản cũ trên cùng máy chủ (vai là
+	// đối tượng toàn cụm PostgreSQL).
+	if _, err := admin.Exec(ctx, `GRANT r_agg TO app_worker WITH INHERIT FALSE, SET TRUE`); err != nil {
+		t.Fatal(err)
+	}
+	if err := dbadmin.Bootstrap(ctx, env.AdminURL, env.Suffix); err != nil {
+		t.Fatal(err)
+	}
 	var members []string
 	mrows, err := admin.Query(ctx, `SELECT m.rolname || ':' || g.inherit_option::text FROM pg_auth_members g
 	    JOIN pg_roles r ON r.oid = g.roleid JOIN pg_roles m ON m.oid = g.member WHERE r.rolname = $1 ORDER BY 1`, dbadmin.AggRole)
