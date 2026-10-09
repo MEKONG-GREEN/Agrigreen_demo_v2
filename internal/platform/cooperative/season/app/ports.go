@@ -114,7 +114,8 @@ func diaryEntry(s store.LogState) port.DiaryEntry {
 	return port.DiaryEntry{ID: s.ID, LogRef: s.LogRef, Version: s.Version, SeasonRef: s.SeasonRef, PlotRef: s.PlotRef,
 		HouseholdRef: s.HouseholdRef, CooperativeRef: s.CooperativeRef, CommuneCode: s.CommuneCode, ActivityCode: s.ActivityCode,
 		SOPStepSeq: s.SOPStepSeq, EventTime: s.EventTime, LocationStatus: s.LocationStatus, DistanceM: s.DistanceM,
-		AuthorRef: s.AuthorRef, OnBehalf: s.OnBehalf, BatchRef: s.BatchRef, Status: s.Status, RecordedAt: s.RecordedAt}
+		AuthorRef: s.AuthorRef, OnBehalf: s.OnBehalf, BatchRef: s.BatchRef, Status: s.Status, RecordedAt: s.RecordedAt,
+		OwnerTenant: s.TenantID}
 }
 
 // Get thực hiện port.Diary: phiên bản hiện hành của nhật ký ref (log_ref); không có → port.ErrDiaryEntryNotFound.

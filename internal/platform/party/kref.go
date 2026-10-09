@@ -60,7 +60,8 @@ func (s krefSource) ActiveShareGrants(ctx context.Context, tid uuid.UUID) ([]kre
 	for _, g := range rows {
 		kinds := slices.Clone(g.Kinds)
 		slices.Sort(kinds)
-		out = append(out, krefport.ShareGrant{GrantID: g.GrantID, Grantee: g.Grantee, Kinds: kinds, ValidFrom: g.ValidFrom, ValidTo: g.ValidTo, Seq: g.LastSeq})
+		out = append(out, krefport.ShareGrant{GrantID: g.GrantID, Grantee: g.Grantee, Kinds: kinds, ValidFrom: g.ValidFrom, ValidTo: g.ValidTo, Seq: g.LastSeq,
+			Class: g.Class, ModuleTable: g.ModuleTable, ScopeNode: g.ScopeNodeRef, Purpose: g.PurposeCode, Basis: g.BasisRef})
 	}
 	return out, nil
 }

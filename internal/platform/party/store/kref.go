@@ -42,17 +42,26 @@ type ActiveGrantRow struct {
 	ValidFrom time.Time
 	ValidTo   time.Time
 	LastSeq   int64
+	// Điều khoản v2 (W4.1; chiếu sang k_ref ở W4.2). Rỗng/Nil ở cấp phép trước v2 (partner kế thừa).
+	Class        string
+	ModuleTable  string
+	ScopeNodeRef uuid.UUID
+	PurposeCode  string
+	BasisRef     string
 }
 
 // ActiveGrantRows liệt kê cấp quyền status = active mà tenant trong giao dịch là bên cấp.
 func ActiveGrantRows(ctx context.Context, tx pgx.Tx) ([]ActiveGrantRow, error) {
-	rows, err := tx.Query(ctx, `SELECT grant_id, grantee_tenant_id, kinds, valid_from, valid_to, last_seq
+	rows, err := tx.Query(ctx, `SELECT grant_id, grantee_tenant_id, kinds, valid_from, valid_to, last_seq,
+	    coalesce(grant_class, ''), coalesce(module_table, ''), coalesce(scope_node_ref, '00000000-0000-0000-0000-000000000000'::uuid),
+	    coalesce(purpose_code, ''), coalesce(basis_ref, '')
 	  FROM pf_party.share_grant WHERE status = 'active' ORDER BY grant_id`)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (ActiveGrantRow, error) {
 		var g ActiveGrantRow
-		return g, r.Scan(&g.GrantID, &g.Grantee, &g.Kinds, &g.ValidFrom, &g.ValidTo, &g.LastSeq)
+		return g, r.Scan(&g.GrantID, &g.Grantee, &g.Kinds, &g.ValidFrom, &g.ValidTo, &g.LastSeq, &g.Class, &g.ModuleTable, &g.ScopeNodeRef,
+			&g.PurposeCode, &g.BasisRef)
 	})
 }

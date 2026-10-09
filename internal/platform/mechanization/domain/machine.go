@@ -135,6 +135,10 @@ type Machine struct {
 	DeactivatedOn  *time.Time
 	StatusReason   string
 	LastSeq        int64
+	// W4.2 (ADR-0030 mục 4): đơn vị chủ của máy và cờ đọc qua cấp phép chia sẻ (tenant ≠ tenant phiên). Chỉ đặt khi
+	// đọc (store), không ghi vào sổ.
+	TenantID      uuid.UUID
+	ViaShareGrant bool
 }
 
 // MachineEvent là một dòng sổ machine_event.

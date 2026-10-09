@@ -15,7 +15,16 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/store"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/shareread"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+)
+
+// Khóa share_scope (modreg.ShareTable) của các bảng `shares` — nhật ký đọc qua cấp phép (W4.2, shareread).
+const (
+	ShareHousehold  = "pf_coop.household"
+	SharePlot       = "pf_coop.plot"
+	ShareSeason     = "pf_coop.season"
+	ShareDiaryEntry = "pf_coop.diary_entry"
 )
 
 // Giới hạn trang của Diary.BySeason.
@@ -82,7 +91,12 @@ func (s *Service) Membership(ctx context.Context, ref uuid.UUID) (port.Household
 	if ref == uuid.Nil {
 		return port.HouseholdMembership{}, port.ErrHouseholdNotFound
 	}
-	return s.Store.Households.Membership(ctx, ref)
+	m, err := s.Store.Households.Membership(ctx, ref)
+	if err != nil {
+		return m, err
+	}
+	m.ViaShareGrant = shareread.Mark(ctx, ShareHousehold, []uuid.UUID{m.OwnerTenant})[0]
+	return m, nil
 }
 
 // InCommunes thực hiện port.Households.
@@ -106,7 +120,12 @@ func (s *Service) Get(ctx context.Context, ref uuid.UUID) (port.Plot, error) {
 	if ref == uuid.Nil {
 		return port.Plot{}, port.ErrPlotNotFound
 	}
-	return s.Store.Plots.Get(ctx, ref)
+	p, err := s.Store.Plots.Get(ctx, ref)
+	if err != nil {
+		return p, err
+	}
+	p.ViaShareGrant = shareread.Mark(ctx, SharePlot, []uuid.UUID{p.OwnerTenant})[0]
+	return p, nil
 }
 
 // DistanceM thực hiện port.Plots.
@@ -128,7 +147,21 @@ func (s *Service) Facts(ctx context.Context, refs []uuid.UUID) (map[uuid.UUID]po
 	if len(refs) == 0 {
 		return map[uuid.UUID]port.Plot{}, nil
 	}
-	return s.Store.Plots.Facts(ctx, refs)
+	facts, err := s.Store.Plots.Facts(ctx, refs)
+	if err != nil {
+		return facts, err
+	}
+	keys := make([]uuid.UUID, 0, len(facts))
+	owners := make([]uuid.UUID, 0, len(facts))
+	for k, p := range facts {
+		keys, owners = append(keys, k), append(owners, p.OwnerTenant)
+	}
+	for i, via := range shareread.Mark(ctx, SharePlot, owners) {
+		p := facts[keys[i]]
+		p.ViaShareGrant = via
+		facts[keys[i]] = p
+	}
+	return facts, nil
 }
 
 // DigitizedByCommune thực hiện port.Plots.
@@ -233,7 +266,12 @@ func (d Diary) Get(ctx context.Context, ref uuid.UUID) (port.DiaryEntry, error) 
 	if ref == uuid.Nil {
 		return port.DiaryEntry{}, port.ErrDiaryEntryNotFound
 	}
-	return d.Svc.Store.Diary.Get(ctx, ref)
+	e, err := d.Svc.Store.Diary.Get(ctx, ref)
+	if err != nil {
+		return e, err
+	}
+	e.ViaShareGrant = shareread.Mark(ctx, ShareDiaryEntry, []uuid.UUID{e.OwnerTenant})[0]
+	return e, nil
 }
 
 // BySeason thực hiện port.Diary.
@@ -241,7 +279,18 @@ func (d Diary) BySeason(ctx context.Context, season, after uuid.UUID, limit int)
 	if d.Svc == nil || d.Svc.Store.Diary == nil {
 		return nil, unavailable("diary")
 	}
-	return d.Svc.Store.Diary.BySeason(ctx, season, after, ClampDiaryLimit(limit))
+	out, err := d.Svc.Store.Diary.BySeason(ctx, season, after, ClampDiaryLimit(limit))
+	if err != nil {
+		return out, err
+	}
+	owners := make([]uuid.UUID, len(out))
+	for i := range out {
+		owners[i] = out[i].OwnerTenant
+	}
+	for i, via := range shareread.Mark(ctx, ShareDiaryEntry, owners) {
+		out[i].ViaShareGrant = via
+	}
+	return out, nil
 }
 
 // ClampDiaryLimit chuẩn hóa giới hạn trang của Diary.BySeason.

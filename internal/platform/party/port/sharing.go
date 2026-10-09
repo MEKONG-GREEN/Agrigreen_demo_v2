@@ -92,6 +92,30 @@ type ContextEpochBumpedV1 struct {
 	EventTime     string    `json:"event_time"`
 }
 
+// EventShareReadRecorded (W4.2, ADR-0030 mục 4, kiến trúc v4.1 §17.3): nhật ký gộp MỘT yêu cầu đã đọc tại chỗ
+// dữ liệu của đơn vị chủ qua cấp phép intra_platform (nhánh p_share của RLS). Tenant của phong bì là ĐƠN VỊ XEM.
+// Middleware internal/shared/shareread ghi trước khi trả phản hồi — không ghi được → 503 (đóng khi lỗi).
+const EventShareReadRecorded = "pf.party.share_read.recorded"
+
+// ShareReadV1 là một dòng của sự kiện gộp: số bản ghi của một bảng (khóa share_scope) thuộc một đơn vị chủ.
+type ShareReadV1 struct {
+	ModuleTable string    `json:"module_table"`
+	OwnerTenant uuid.UUID `json:"owner_tenant_id"`
+	Rows        int       `json:"rows"`
+}
+
+// ShareReadRecordedV1 là payload của pf.party.share_read.recorded.
+//
+//ag:event pf.party.share_read.recorded v1
+type ShareReadRecordedV1 struct {
+	ActorRef    uuid.UUID     `json:"actor_ref"` // sub của token — mã tham chiếu, không PII
+	PurposeCode string        `json:"purpose_code"`
+	Method      string        `json:"method"`
+	Route       string        `json:"route"` // mẫu route, không tham số thật
+	Reads       []ShareReadV1 `json:"reads"`
+	EventTime   string        `json:"event_time"`
+}
+
 // ContextEpochs đọc epoch ngữ cảnh của một tenant (đơn vị xem); 0 = chưa từng tăng. pf/party giữ bộ đếm tối
 // thiểu ở DB cụm pf (pf 000120); W7.2 (k/access) hợp nhất với epoch ở Valkey định danh.
 type ContextEpochs interface {

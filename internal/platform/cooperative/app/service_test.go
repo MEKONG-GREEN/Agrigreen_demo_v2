@@ -12,6 +12,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port/porttest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/shareread"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -105,5 +106,48 @@ func TestResolveSeasonNeedsStore(t *testing.T) {
 	}
 	if _, err := m.Resolve().Resolve(ctx, port.SubjectType("tractor"), uuid.New()); !errors.Is(err, port.ErrSubjectTypeUnsupported) {
 		t.Fatalf("loại lạ: err = %v", err)
+	}
+}
+
+// W4.2 (ADR-0030 mục 4): mặt tiền đặt cờ ViaShareGrant cho bản ghi có tenant ≠ tenant phiên và ghi vào nhật ký
+// gộp của yêu cầu (shareread) — bản ghi của chính đơn vị và bản ghi không rõ tenant (bản giả) không tính.
+func TestFacadeFlagsShareReads_W42(t *testing.T) {
+	s := porttest.SampleSeed()
+	viewer, owner := uuid.New(), uuid.New()
+	s.Plots[0].OwnerTenant, s.Plots[1].OwnerTenant = owner, viewer
+	s.Diary[0].OwnerTenant = owner
+	s.Members[0].OwnerTenant = owner
+	mem := porttest.Memory{S: s}
+	m := cooperative.NewFacade(cooperative.Sources{Plots: mem, Households: mem, Diary: porttest.MemoryDiary{S: s}})
+	ctx, reads := shareread.WithCollector(tenant.WithID(context.Background(), viewer))
+
+	if p, err := m.Plots().Get(ctx, s.Plots[0].Ref); err != nil || !p.ViaShareGrant {
+		t.Fatalf("thửa của đơn vị chủ: %+v %v", p, err)
+	}
+	if p, err := m.Plots().Get(ctx, s.Plots[1].Ref); err != nil || p.ViaShareGrant {
+		t.Fatalf("thửa của chính đơn vị: %+v %v", p, err)
+	}
+	facts, err := m.Plots().Facts(ctx, []uuid.UUID{s.Plots[0].Ref, s.Plots[1].Ref, s.Plots[2].Ref})
+	if err != nil || !facts[s.Plots[0].Ref].ViaShareGrant || facts[s.Plots[1].Ref].ViaShareGrant || facts[s.Plots[2].Ref].ViaShareGrant {
+		t.Fatalf("Facts: %+v %v", facts, err)
+	}
+	if e, err := m.Diary().Get(ctx, s.Diary[0].LogRef); err != nil || !e.ViaShareGrant {
+		t.Fatalf("nhật ký: %+v %v", e, err)
+	}
+	if es, err := m.Diary().BySeason(ctx, s.Diary[0].SeasonRef, uuid.Nil, 10); err != nil || len(es) != 1 || !es[0].ViaShareGrant {
+		t.Fatalf("nhật ký theo vụ: %+v %v", es, err)
+	}
+	if h, err := m.Households().Membership(ctx, s.Members[0].Ref); err != nil || !h.ViaShareGrant {
+		t.Fatalf("hộ: %+v %v", h, err)
+	}
+	got := map[string]int{}
+	for _, r := range reads() {
+		if r.OwnerTenant != owner {
+			t.Fatalf("đơn vị chủ sai: %+v", r)
+		}
+		got[r.ModuleTable] = r.Rows
+	}
+	if got[app.SharePlot] != 2 || got[app.ShareDiaryEntry] != 2 || got[app.ShareHousehold] != 1 || len(got) != 3 {
+		t.Fatalf("nhật ký gộp: %v", got)
 	}
 }

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.party.share_read.recorded/v1",
+  "title": "pf.party.share_read.recorded — payload",
+  "description": "Nhật ký gộp của MỘT yêu cầu đã đọc tại chỗ dữ liệu của đơn vị chủ qua cấp phép chia sẻ intra_platform (W4.2, ADR-0030 mục 4, kiến trúc v4.1 §17.3: nhánh p_share của RLS). Tenant của phong bì là ĐƠN VỊ XEM. Middleware internal/shared/shareread ghi trước khi trả phản hồi; không ghi được → 503 share.read_log_unavailable, không trả dữ liệu. Không dữ liệu cá nhân: chỉ mã tham chiếu, mã bảng, số bản ghi.",
+  "x-event-type": "pf.party.share_read.recorded",
+  "x-schema-version": 1,
+  "x-producer": "pf/party",
+  "type": "object",
+  "required": ["actor_ref", "purpose_code", "method", "route", "reads", "event_time"],
+  "properties": {
+    "actor_ref":    { "type": "string", "format": "uuid", "description": "sub của token người đọc (mã tham chiếu); Nil nếu không có Principal" },
+    "purpose_code": { "type": "string", "description": "Mã mục đích của yêu cầu (X-Purpose), khớp purpose_code của cấp phép" },
+    "method":       { "type": "string" },
+    "route":        { "type": "string", "description": "Mẫu route (vd /v1/plots/:id), không chứa tham số thật" },
+    "reads": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["module_table", "owner_tenant_id", "rows"],
+        "properties": {
+          "module_table":    { "type": "string", "description": "Khóa share_scope '<schema>.<share>', vd pf_coop.plot" },
+          "owner_tenant_id": { "type": "string", "format": "uuid", "description": "Tenant đơn vị chủ dữ liệu" },
+          "rows":            { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "event_time":   { "type": "string", "format": "date-time" }
+  }
+}

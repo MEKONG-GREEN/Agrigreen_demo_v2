@@ -351,6 +351,7 @@ func AllReviews(ctx context.Context, tx pgx.Tx) ([]Review, error) {
 
 // LogState là trạng thái hiện tại của một phiên bản nhật ký.
 type LogState struct {
+	TenantID       uuid.UUID // đơn vị chủ (W4.2)
 	ID             uuid.UUID
 	LogRef         uuid.UUID
 	Version        int64
@@ -418,7 +419,7 @@ func SaveLogState(ctx context.Context, tx pgx.Tx, tid uuid.UUID, s LogState) err
 const logStateCols = `l.id, l.log_ref, l.version, l.season_ref, l.plot_ref, l.household_ref, l.cooperative_ref, l.commune_code,
   l.activity_code, l.sop_step_seq, l.event_time, l.gps_source, l.location_status, l.distance_m::text, l.author_ref, l.on_behalf,
   l.batch_ref, l.status, l.superseded_by, l.last_review_id, coalesce(l.review_note, ''), l.reviewed_by, l.reviewed_at,
-  l.recorded_at, l.sync_seq, l.updated_at`
+  l.recorded_at, l.sync_seq, l.updated_at, l.tenant_id`
 
 func scanLogState(row pgx.Row) (LogState, error) {
 	var s LogState
@@ -426,7 +427,7 @@ func scanLogState(row pgx.Row) (LogState, error) {
 	var dist *string
 	if err := row.Scan(&s.ID, &s.LogRef, &s.Version, &s.SeasonRef, &s.PlotRef, &hh, &s.CooperativeRef, &s.CommuneCode,
 		&s.ActivityCode, &s.SOPStepSeq, &s.EventTime, &s.GPSSource, &s.LocationStatus, &dist, &s.AuthorRef, &s.OnBehalf,
-		&batch, &s.Status, &sup, &rev, &s.ReviewNote, &by, &s.ReviewedAt, &s.RecordedAt, &s.SyncSeq, &s.UpdatedAt); err != nil {
+		&batch, &s.Status, &sup, &rev, &s.ReviewNote, &by, &s.ReviewedAt, &s.RecordedAt, &s.SyncSeq, &s.UpdatedAt, &s.TenantID); err != nil {
 		return s, err
 	}
 	s.HouseholdRef, s.BatchRef, s.SupersededBy, s.LastReviewID, s.ReviewedBy = deref(hh), deref(batch), deref(sup), deref(rev), deref(by)

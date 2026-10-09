@@ -23,6 +23,6 @@ provides:
 consumes:
   events: [pf.cropcycle.coop_season_area.changed/v1]
 permissions: [cgh_admin, cgh_sync, cgh_viewer]
-shares: []
+shares: [machine]
 owns_schema: [pf_mechanization, pf_mechanization_pub]
 enable: per_tenant

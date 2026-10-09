@@ -39,7 +39,7 @@ func (s *Service) Get(ctx context.Context, ref uuid.UUID) (port.Plot, error) {
 	}
 	return port.Plot{
 		Ref: p.Ref, Code: p.Code, CommuneCode: p.CommuneCode, CooperativeRef: p.CooperativeRef, HouseholdRef: p.HouseholdRef,
-		Status: p.Status, Version: p.CurrentVersion, AreaHa: p.AreaHa,
+		Status: p.Status, Version: p.CurrentVersion, AreaHa: p.AreaHa, OwnerTenant: p.TenantID,
 	}, nil
 }
 
@@ -74,7 +74,7 @@ func (s *Service) Facts(ctx context.Context, refs []uuid.UUID) (map[uuid.UUID]po
 			}
 			for _, p := range rows {
 				out[p.Ref] = port.Plot{Ref: p.Ref, Code: p.Code, CommuneCode: p.CommuneCode, CooperativeRef: p.CooperativeRef,
-					HouseholdRef: p.HouseholdRef, Status: p.Status, Version: p.Version, AreaHa: p.AreaHa}
+					HouseholdRef: p.HouseholdRef, Status: p.Status, Version: p.Version, AreaHa: p.AreaHa, OwnerTenant: p.TenantID}
 			}
 		}
 		return nil

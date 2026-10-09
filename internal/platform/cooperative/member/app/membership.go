@@ -43,7 +43,8 @@ func (s *Service) HouseholdMembership(ctx context.Context, ref uuid.UUID) (port.
 	if err != nil {
 		return port.HouseholdMembership{}, err
 	}
-	return port.HouseholdMembership{Ref: h.Ref, CooperativeRef: h.CooperativeRef, CommuneCode: h.CommuneCode, Active: h.Active}, nil
+	return port.HouseholdMembership{Ref: h.Ref, CooperativeRef: h.CooperativeRef, CommuneCode: h.CommuneCode, Active: h.Active,
+		OwnerTenant: h.TenantID}, nil
 }
 
 // PartyHouseholds là bộ điều hợp partyport.Households cho bên tiêu thụ tầng lõi (pf/accounts — không import

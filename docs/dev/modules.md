@@ -491,6 +491,20 @@ cc.UseCollectionVolume(coop.Plots(), coop.Seasons(), md.AdminUnits())
 
 **Migration chuyển schema.** Quy tắc `schema` của `agmodgraph` cho phép đúng một dạng sửa đối tượng của schema khác: `ALTER {TABLE|SEQUENCE|FUNCTION} <schema khác>.<x> SET SCHEMA <schema của module gắn migration>`. `migratecheck` coi sổ đã chuyển (`ALTER TABLE … SET SCHEMA`) vẫn là sổ dưới tên mới (quy tắc ADD COLUMN, ADR-0012). Tên sổ (`TG_ARGV`, `chain_head.ledger`) không đổi khi chuyển schema; `shared.ledger_added_column` khóa theo tên bảng thật nên phải đăng ký bù dưới tên mới.
 
+## Đọc tại chỗ qua cấp phép (W4.2)
+
+ADR-0030 (mục "W4.2 — hình chính sách"), kiến trúc v4.1 §17.3, pf 000136, shared 000014, [thiết kế §19](../design/cooperative.md#19-ghi-chú-hiện-thực-w42). Bật production chờ C-10/H-1.
+
+| Việc | Cách làm |
+|---|---|
+| Chia sẻ một bảng mới | Khai share trong `shares` của `module.yaml` (`go run ./tools/modgen`); khóa `share_scope` là `modreg.ShareTable("<module>:<share>")` = `<schema đầu của owns_schema>.<share>`. Trong migration của module gọi `shared.apply_share_rls('<schema>.<bảng>', <biểu thức USING>)` với biểu thức như pf 000136 (`EXISTS k_ref.share_scope` theo đơn vị xem, mục đích, khóa, đơn vị chủ, Nút, hiệu lực) — không viết `CREATE POLICY p_share` tay. Thêm bảng vào `shareExpectedTables` của `migrations/share_rls_integration_test.go` |
+| Chính sách | `p_share` PERMISSIVE **FOR SELECT**, không `WITH CHECK` (cấp phép là quyền đọc); `shared.v_missing_rls` báo nếu sai hình. `apply_share_rls` nới `p_scope` cho dòng khác tenant |
+| Dựng `share_scope` | Worker `pf.kref`: sự kiện `share_grant.approved`/`revoked` → dựng lại dòng của cấp phép; `org.created`/`moved` → mọi cấp phép của đơn vị chủ; `Rebuild` → cuối giao dịch tenant. Chỉ cấp phép `intra_platform` có mục đích và `module_table` khai `shares` |
+| Mục đích | Client gửi `X-Purpose: <mã>` (vd `khuyen-nong`) — middleware `shareread` (do `pf/party` cài) đặt `authz.WithPurpose` → `app.purpose`. Không có mục đích → không bao giờ thấy dòng chia sẻ |
+| Port | Store đọc `tenant_id` của dòng; port/mặt tiền đặt `ViaShareGrant = shareread.Via(ctx, tenant dòng)` và gọi `shareread.Mark`/`Note` **trước** khi handler ghi phản hồi (middleware chỉ đệm phản hồi khi đã có bản ghi chia sẻ lúc bắt đầu ghi) |
+| Nhật ký | Một sự kiện `pf.party.share_read.recorded` mỗi yêu cầu (tenant = đơn vị xem; bảng × đơn vị chủ × số bản ghi). Không ghi được → 503 `share.read_log_unavailable`, không trả dữ liệu. Chỉ số `ag.share.reads` (`viewer_tenant`, `module_table`) |
+| Thu hồi | Worker xóa dòng `share_scope` của cấp phép cùng giao dịch; biến `app.*` là SET LOCAL nên kết nối PgBouncer tái sử dụng không giữ quyền. Trễ ≤ 5 s (p99) sau thu hồi |
+
 ## Phạm vi Nút trên `pf_coop` (W3.4)
 
 [Ghi chú hiện thực](../design/cooperative.md#18-ghi-chú-hiện-thực-w34), kiến trúc v4.1 §17.2, pf 000134, shared 000012. Ngoài `p_tenant` (PERMISSIVE), 19 bảng `pf_coop` có `p_scope` **RESTRICTIVE** (`sop_template`, `sop_version`, `variety_sop_binding` chỉ `p_tenant`). Hàng thấy/ghi được dưới `r_cooperative` = cùng tenant **và** một trong các nhánh: không Nút (`app.node_id` rỗng — consumer, job, Admin không gắn Nút); tenant chưa có bản chiếu `k_ref`; Nút của dòng là hậu duệ của `app.node_id` theo `k_ref.node_closure`; xã của dòng thuộc `app.xa_ids`; dòng chưa gắn Nút (thửa nháp…) khi người gọi không có xã phụ trách. `WITH CHECK` dùng cùng biểu thức (trừ `household`) → ghi dòng ngoài phạm vi trả 42501, sửa dòng ngoài phạm vi ảnh hưởng 0 dòng.

@@ -42,6 +42,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/modreg"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/shareread"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -464,6 +465,28 @@ func bumpViewerEpoch(ctx context.Context, tx pgx.Tx, viewer, grantor, grantID, a
 		TraceID: telemetry.TraceID(ctx), Producer: "pf/party",
 		Payload: port.ContextEpochBumpedV1{Epoch: epoch, Cause: cause, GrantID: grantID, GrantorTenant: grantor, ActorRef: actor,
 			EventTime: now.UTC().Format(time.RFC3339)},
+	})
+}
+
+// RecordShareRead là shareread.Sink của pf/party (W4.2, ADR-0030 mục 4): ghi sự kiện gộp
+// pf.party.share_read.recorded ở tenant ĐƠN VỊ XEM (outbox, cùng giao dịch) cho một yêu cầu đã đọc tại chỗ dữ liệu
+// của đơn vị chủ qua cấp phép. Lỗi → middleware trả 503, không trả dữ liệu (đóng khi lỗi).
+func (s *Sharing) RecordShareRead(ctx context.Context, e shareread.Event) error {
+	if e.ViewerTenant == uuid.Nil || len(e.Reads) == 0 {
+		return problem.Internal.WithDetail("nhật ký đọc chia sẻ thiếu đơn vị xem hoặc bản ghi")
+	}
+	reads := make([]port.ShareReadV1, 0, len(e.Reads))
+	for _, r := range e.Reads {
+		reads = append(reads, port.ShareReadV1{ModuleTable: r.ModuleTable, OwnerTenant: r.OwnerTenant, Rows: r.Rows})
+	}
+	now := s.Clock.Now()
+	return tenant.WithTenantTx(ctx, s.DB, e.ViewerTenant, func(tx pgx.Tx) error {
+		return outbox.Enqueue(ctx, tx, outbox.Event{
+			ID: ids.New(), TenantID: e.ViewerTenant, Type: port.EventShareReadRecorded, SchemaVersion: 1, OccurredAt: now,
+			TraceID: telemetry.TraceID(ctx), Producer: "pf/party",
+			Payload: port.ShareReadRecordedV1{ActorRef: e.ActorRef, PurposeCode: e.Purpose, Method: e.Method, Route: e.Route, Reads: reads,
+				EventTime: now.UTC().Format(time.RFC3339)},
+		})
 	})
 }
 

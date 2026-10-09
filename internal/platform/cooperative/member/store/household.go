@@ -13,7 +13,7 @@ import (
 )
 
 const householdCols = `h.household_ref, h.commune_code, h.cultivated_area_ha::text, h.active,
-  coalesce(m.org_ref, '00000000-0000-0000-0000-000000000000'::uuid), m.since_date::text, h.created_at`
+  coalesce(m.org_ref, '00000000-0000-0000-0000-000000000000'::uuid), m.since_date::text, h.created_at, h.tenant_id`
 
 const householdFrom = ` FROM pf_coop.household h
   LEFT JOIN pf_coop.household_membership m
@@ -22,7 +22,7 @@ const householdFrom = ` FROM pf_coop.household h
 func scanHousehold(row pgx.Row) (domain.Household, error) {
 	var h domain.Household
 	var area, since *string
-	if err := row.Scan(&h.Ref, &h.CommuneCode, &area, &h.Active, &h.CooperativeRef, &since, &h.CreatedAt); err != nil {
+	if err := row.Scan(&h.Ref, &h.CommuneCode, &area, &h.Active, &h.CooperativeRef, &since, &h.CreatedAt, &h.TenantID); err != nil {
 		return h, err
 	}
 	var err error

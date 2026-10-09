@@ -51,6 +51,7 @@ provides:
     - pf.party.org.reactivated/v1
     - pf.party.share_grant.approved/v1
     - pf.party.share_grant.revoked/v1
+    - pf.party.share_read.recorded/v1
   internal_events: []
   publications: []
   data_products: []

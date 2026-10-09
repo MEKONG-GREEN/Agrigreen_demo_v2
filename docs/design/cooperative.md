@@ -350,7 +350,7 @@ enable: per_tenant             # mặc định bật (W1.4); KN/HTX/CGH cần, M
 
 | `shares` | Bảng mang nhánh `OR EXISTS share_scope` (W4.2) | `module_table` trong `k_ref.share_scope` | Cột Nút |
 |---|---|---|---|
-| `household` | `pf_coop.household`, `household_membership` | `pf_coop.household` | Qua xã viên đang mở (mục 9) |
+| `household` | `pf_coop.household`, `household_membership` | `pf_coop.household` | Qua xã viên đang mở (mục 9) — hiện thực W4.2: mục 19 |
 | `plot` | `pf_coop.plot`. `plot_boundary` chỉ khi ADR-0030 cho đọc lịch sử hình học | `pf_coop.plot` | `cooperative_ref` |
 | `season` | `pf_coop.season_current`, `coop_season_area`, `yield_summary` | `pf_coop.season` | `cooperative_ref` |
 | `diary_entry` | `pf_coop.farm_log_current` | `pf_coop.diary_entry` | `cooperative_ref` |
@@ -827,3 +827,38 @@ Hệ quả cần biết: người dùng Nút cấp trên (không có xã phụ t
 
 - `TestCoopScopeRLS_W34`: cây Tỉnh → 2 tổ xã → 2 HTX, thửa có HTX + thửa nháp, hộ thành viên; HTX chỉ thấy Nút mình + nháp; cán bộ xã theo Nút và theo `xa_ids`; Cấp Tỉnh thấy mọi hậu duệ; không Nút → cả tenant; Nút chưa chiếu → đóng; Nút/tenant khác → không thấy; tenant chưa có `k_ref` → lùi `p_tenant`; `WITH CHECK` chặn chèn/chuyển thửa ra ngoài phạm vi và ghi thành viên vào HTX khác; tenant khác bị `p_tenant` chặn; `db.WithoutNodeScope` thấy cả tenant rồi trở lại phạm vi; `v_missing_rls` báo `p_scope` PERMISSIVE, chính sách thứ ba, thiếu `p_tenant`.
 - `TestCoopScopeExplainVolume_W34`: 1 tỉnh, 40 tổ xã, 800 HTX, 40 000 thửa, 8 000 hộ, 60 000 dòng `node_closure` nhiễu của 30 tenant khác; dưới `r_cooperative` ở Nút một tổ xã: đúng số dòng, `node_closure` chỉ đọc bằng chỉ mục, không SubPlan nào quá một vòng, không gọi hàm của repo theo hàng. Cổng chung W9.1 (`TestRLSExplainNoPerRowFunctions_W91`) qua cho mọi bảng, không ngoại lệ.
+
+---
+
+## 19. Ghi chú hiện thực W4.2
+
+Migration **pf 000136** (thay pf 000099 của kế hoạch) và **shared 000014**. Bật production chờ C-10 (thỏa thuận chia sẻ mẫu) và H-1 (chủ dữ liệu — mục 11). Quyết định hình chính sách ghi ở [ADR-0030 "W4.2 — hình chính sách"](../adr/0030-doc-tai-cho-co-cap-phep.md#w42--hình-chính-sách-lệch-mục-2).
+
+### 19.1 Bảng mang nhánh chia sẻ (đúng mục 7.3)
+
+| Khóa `share_scope` (`modreg.ShareTable`) | Bảng có `p_share` | Cột Nút so với `share_scope.node_id` |
+|---|---|---|
+| `pf_coop.household` | `household`, `household_membership` | `household`: xã viên **đang mở** (`household_membership` JOIN `share_scope`, như nhánh (c) của W3.4); `household_membership`: `org_ref` |
+| `pf_coop.plot` | `plot` | `cooperative_ref` (thửa nháp — Nút NULL — không bao giờ chia sẻ) |
+| `pf_coop.season` | `season_current`, `coop_season_area`, `yield_summary` | `cooperative_ref` |
+| `pf_coop.diary_entry` | `farm_log_current` | `cooperative_ref` |
+| `pf_mechanization.machine` | `pf_mechanization.machine` (`pf/mechanization` khai `shares: [machine]`) | `cooperative_ref` |
+
+`plot_boundary` không có nhánh (mục 7.3: chỉ khi ADR-0030 cho đọc lịch sử hình học). Sổ, hồ sơ HTX (`cooperative`), danh mục SOP không có nhánh.
+
+### 19.2 Chính sách
+
+- `p_tenant` (PERMISSIVE, FOR ALL) không đổi; `p_share` PERMISSIVE **FOR SELECT**, không `WITH CHECK`; `p_scope` (RESTRICTIVE) thêm nhánh đầu `T.tenant_id <> shared.current_tenant()` — dòng khác tenant không bị phạm vi Nút **của người xem** chặn (Nút của người xem ở cây đơn vị xem, không so được); phạm vi của dòng chia sẻ là Nút phạm vi cấp phép (trong `p_share`). Ghi/sửa/xóa dòng chia sẻ: không có chính sách PERMISSIVE nào ngoài `p_tenant` áp cho lệnh ghi → 42501 / 0 dòng (T6e).
+- Mục đích: `p_share` so `share_scope.purpose = k_ref.ctx_text('app.purpose')` — giao dịch không có mục đích không bao giờ thấy dòng chia sẻ. `app.purpose` đến từ header `X-Purpose` (middleware `shareread`, đúng dạng mã mục đích).
+- Hiệu lực: `valid_from <= now() AND valid_to > now()` trong chính sách — cấp phép hết hạn đóng ngay.
+- Giả định H-1 (a) (mục 11): KN đọc dữ liệu cùng tenant chương trình qua `p_scope`, nhánh chia sẻ dùng cho CGH và đơn vị khác; nếu H-1 chọn (b) thì KN đọc qua `p_share` với cấp phép mỗi HTX — không đổi mã.
+
+### 19.3 Ứng dụng
+
+- Port gắn cờ `ViaShareGrant` (+ `OwnerTenant`) ở mặt tiền `cooperative/app`: `Plots.Get`, `Plots.Facts`, `Households.Membership`, `Diary.Get`, `Diary.BySeason`; `pf/mechanization` `ListMachines`. Store đọc thêm `tenant_id`. Truy vấn của module **không** lọc `tenant_id` tường minh (dựa RLS) nên dòng chia sẻ đi qua cùng truy vấn; kiểm phạm vi ở ứng dụng (`access.sees`, `coopVisible`) vẫn áp — handler hiện hành của HTX/KN/CGH chưa mở cho người xem khác tenant (chưa bật production).
+- Nhật ký: `shareread.Mark/Note` cộng vào bộ gom của yêu cầu; middleware của `pf/party` ghi `pf.party.share_read.recorded` một lần mỗi yêu cầu, đóng khi lỗi (503 `share.read_log_unavailable`).
+
+### 19.4 Kiểm thử
+
+- `migrations/share_rls_integration_test.go`: `TestShareScopeRLS_W42` (T6a đơn vị chủ; T6b đúng dòng của Nút phạm vi — hai hộ, một thửa, một máy — với mọi Nút người xem; bảng `shares` không có cấp phép cho khóa và bảng không khai `shares` → 0; T6c mục đích sai / không mục đích / tenant thứ ba → 0; cấp phép hết hạn → 0; T6e chèn 42501, UPDATE 0 dòng; tập bảng `p_share` = `modreg.ShareTables` + mục 7.3; cổng `v_missing_rls` báo `p_share` sai hình); `TestShareScopeRevokeReusedConnection_W42` (cùng `pg_backend_pid`: đọc được → giao dịch không ngữ cảnh 0 dòng không lỗi (T6d) → worker xóa dòng của cấp phép → 0 dòng); `TestShareScopeExplainVolume_W42` (T9/T10: 40 000 thửa, 20 cấp phép phạm vi một nửa số tổ xã, 30 000 dòng `share_scope` nhiễu: 20 000 = đối chứng 20 000, không SubPlan quá một vòng, không quét tuần tự `share_scope`, không gọi hàm của repo theo hàng).
+- `internal/platform/kref/app/share_scope_integration_test.go` (worker: duyệt, Nút mới, chuyển nhánh, partner/share không khai, máy, thu hồi, Rebuild = bản dựng Go, quyền đọc/ghi `share_scope`), `internal/shared/shareread` (gộp, đóng khi lỗi, không đệm khi không đọc chéo), `cooperative/app` (cờ ở mặt tiền), `party/handler` (sự kiện outbox).

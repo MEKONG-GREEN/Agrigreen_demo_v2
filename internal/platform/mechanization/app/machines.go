@@ -15,6 +15,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/shareread"
 )
 
 // MachineInput là dữ liệu hồ sơ máy (FN-05 B2–B3). Không có Mã máy (hệ thống tự
@@ -519,6 +520,9 @@ type MachineQuery struct {
 	Limit           int
 }
 
+// ShareMachine là khóa share_scope của máy (modreg.ShareTable("pf/mechanization:machine")) — W4.2.
+const ShareMachine = "pf_mechanization.machine"
+
 // MachinePage là một trang máy.
 type MachinePage struct {
 	Items []domain.Machine
@@ -545,6 +549,13 @@ func (s *Service) ListMachines(ctx context.Context, q MachineQuery) (MachinePage
 		return e
 	}); err != nil {
 		return MachinePage{}, err
+	}
+	owners := make([]uuid.UUID, len(items))
+	for i := range items {
+		owners[i] = items[i].TenantID
+	}
+	for i, via := range shareread.Mark(ctx, ShareMachine, owners[:min(len(owners), q.Limit)]) {
+		items[i].ViaShareGrant = via
 	}
 	pg := MachinePage{Items: items}
 	if len(items) > q.Limit {

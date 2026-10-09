@@ -18,6 +18,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/modreg"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -107,6 +108,21 @@ type shareGrantV1 struct {
 	ValidFrom time.Time `json:"valid_from"`
 	ValidTo   time.Time `json:"valid_to"`
 	Seq       int64     `json:"seq"`
+	// Điều khoản v2 (W4.1) — tùy chọn, vắng ở cấp phép trước v2.
+	GrantClass   string     `json:"grant_class"`
+	ModuleTable  string     `json:"module_table"`
+	ScopeNodeRef *uuid.UUID `json:"scope_node_ref"`
+	PurposeCode  string     `json:"purpose_code"`
+	BasisRef     string     `json:"basis_ref"`
+}
+
+func (p shareGrantV1) grant() port.ShareGrant {
+	g := port.ShareGrant{GrantID: p.GrantID, Grantee: p.Grantee, Kinds: sortedStrings(p.Kinds), ValidFrom: p.ValidFrom, ValidTo: p.ValidTo,
+		Seq: p.Seq, Class: p.GrantClass, ModuleTable: p.ModuleTable, Purpose: p.PurposeCode, Basis: p.BasisRef}
+	if p.ScopeNodeRef != nil {
+		g.ScopeNode = *p.ScopeNodeRef
+	}
+	return g
 }
 
 func badPayload(env outbox.Envelope, err error) error {
@@ -137,7 +153,11 @@ func (m *Module) apply(ctx context.Context, tx pgx.Tx, env outbox.Envelope) (str
 			if p.ParentRef != nil {
 				o.ParentRef = *p.ParentRef
 			}
-			return port.RelNodeClosure, applyOrgSnapshot(ctx, tx, tid, o)
+			if err := applyOrgSnapshot(ctx, tx, tid, o); err != nil {
+				return "", err
+			}
+			// Cây Nút đổi (Nút mới, nhánh chuyển) → dựng lại share_scope của mọi cấp phép của đơn vị chủ, cùng giao dịch.
+			return port.RelNodeClosure, rebuildShareScope(ctx, tx, tid, uuid.Nil)
 		default:
 			return port.RelOrg, applyOrgStatus(ctx, tx, tid, p.OrgRef, env.EventType == EventOrgReactivated, p.Seq)
 		}
@@ -162,11 +182,18 @@ func (m *Module) apply(ctx context.Context, tx pgx.Tx, env outbox.Envelope) (str
 		if err := lockTenant(ctx, tx, tid); err != nil {
 			return "", err
 		}
+		var err error
 		if env.EventType == EventShareGrantRevoke {
-			return port.RelShareGrantActive, clearShareGrant(ctx, tx, tid, p.GrantID, p.Seq)
+			err = clearShareGrant(ctx, tx, tid, p.GrantID, p.Seq)
+		} else {
+			err = upsertShareGrant(ctx, tx, tid, p.grant())
 		}
-		g := port.ShareGrant{GrantID: p.GrantID, Grantee: p.Grantee, Kinds: sortedStrings(p.Kinds), ValidFrom: p.ValidFrom, ValidTo: p.ValidTo, Seq: p.Seq}
-		return port.RelShareGrantActive, upsertShareGrant(ctx, tx, tid, g)
+		if err != nil {
+			return "", err
+		}
+		// share_scope của cấp phép dựng lại từ share_grant_active trong CÙNG giao dịch (W4.2): thu hồi xong là
+		// đơn vị xem hết đọc được ở câu kế tiếp, kể cả trên kết nối tái sử dụng (biến app.* là SET LOCAL).
+		return port.RelShareScope, rebuildShareScope(ctx, tx, tid, p.GrantID)
 	}
 	return "", nil
 }
@@ -339,12 +366,53 @@ func upsertAdminUnit(ctx context.Context, tx pgx.Tx, tid uuid.UUID, u port.Admin
 }
 
 func upsertShareGrant(ctx context.Context, tx pgx.Tx, tid uuid.UUID, g port.ShareGrant) error {
-	_, err := tx.Exec(ctx, `INSERT INTO k_ref.share_grant_active (tenant_id, grant_id, grantee_tenant_id, kinds, valid_from, valid_to, source_seq)
-	  VALUES ($1, $2, $3, $4::text[], $5, $6, $7)
+	_, err := tx.Exec(ctx, `INSERT INTO k_ref.share_grant_active (tenant_id, grant_id, grantee_tenant_id, kinds, valid_from, valid_to, source_seq,
+	    grant_class, module_table, scope_node_ref, purpose_code, basis_ref)
+	  VALUES ($1, $2, $3, $4::text[], $5, $6, $7, $8, $9, $10::uuid, $11, $12)
 	  ON CONFLICT (tenant_id, grant_id) DO UPDATE SET grantee_tenant_id = EXCLUDED.grantee_tenant_id, kinds = EXCLUDED.kinds,
-	    valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to, source_seq = EXCLUDED.source_seq, synced_at = now()
+	    valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to, source_seq = EXCLUDED.source_seq,
+	    grant_class = EXCLUDED.grant_class, module_table = EXCLUDED.module_table, scope_node_ref = EXCLUDED.scope_node_ref,
+	    purpose_code = EXCLUDED.purpose_code, basis_ref = EXCLUDED.basis_ref, synced_at = now()
 	  WHERE k_ref.share_grant_active.source_seq < EXCLUDED.source_seq`,
-		tid, g.GrantID, g.Grantee, g.Kinds, g.ValidFrom.UTC(), g.ValidTo.UTC(), g.Seq)
+		tid, g.GrantID, g.Grantee, g.Kinds, g.ValidFrom.UTC(), g.ValidTo.UTC(), g.Seq,
+		nullText(g.Class), nullText(g.ModuleTable), nullUUID(g.ScopeNode), nullText(g.Purpose), nullText(g.Basis))
+	return err
+}
+
+// shareTableArgs trả ánh xạ tên logic → khóa share_scope (modreg.ShareTable) dạng hai mảng song song.
+func shareTableArgs() (logical, keys []string) {
+	m := modreg.ShareTables()
+	for l := range m {
+		logical = append(logical, l)
+	}
+	slices.Sort(logical)
+	for _, l := range logical {
+		keys = append(keys, m[l])
+	}
+	return logical, keys
+}
+
+// rebuildShareScope dựng lại k_ref.share_scope của đơn vị chủ tid từ share_grant_active × node_closure (kiến
+// trúc §17.3, ADR-0030 mục 3): mỗi cấp phép intra_platform đang hiệu lực sinh một dòng cho mỗi hậu duệ (kể cả
+// chính nó) của scope_node_ref, khóa bảng = modreg.ShareTable(module_table). grant = uuid.Nil → mọi cấp phép
+// của tid (cây Nút đổi, dựng lại toàn bộ). Gọi trong giao dịch đã khóa tenant (lockTenant): xóa + chèn là một
+// đơn vị — đơn vị xem không bao giờ thấy trạng thái nửa vời. Cấp phép mà Nút phạm vi chưa được chiếu (sự kiện
+// tới sai thứ tự) sinh 0 dòng (đóng) — sự kiện Nút đến sau dựng lại đủ. module_table không còn khai trong
+// `shares` (module bỏ share) → 0 dòng (đóng).
+func rebuildShareScope(ctx context.Context, tx pgx.Tx, tid, grant uuid.UUID) error {
+	if _, err := tx.Exec(ctx, `DELETE FROM k_ref.share_scope WHERE owner_tenant = $1 AND ($2::uuid IS NULL OR grant_id = $2::uuid)`,
+		tid, nullUUID(grant)); err != nil {
+		return err
+	}
+	logical, keys := shareTableArgs()
+	_, err := tx.Exec(ctx, `INSERT INTO k_ref.share_scope (viewer_tenant, purpose, module_table, owner_tenant, node_id, grant_id, valid_from, valid_to)
+	  SELECT g.grantee_tenant_id, g.purpose_code, m.key, g.tenant_id, c.descendant, g.grant_id, g.valid_from, g.valid_to
+	    FROM k_ref.share_grant_active g
+	    JOIN unnest($3::text[], $4::text[]) AS m(logical, key) ON m.logical = g.module_table
+	    JOIN k_ref.node_closure c ON c.tenant_id = g.tenant_id AND c.ancestor = g.scope_node_ref
+	   WHERE g.tenant_id = $1 AND g.grant_class = 'intra_platform' AND g.purpose_code IS NOT NULL
+	     AND ($2::uuid IS NULL OR g.grant_id = $2::uuid)`,
+		tid, nullUUID(grant), logical, keys)
 	return err
 }
 
@@ -420,7 +488,7 @@ func rebuildTenantTx(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p Projection
 	if err := lockTenant(ctx, tx, tid); err != nil {
 		return err
 	}
-	// share_scope: không có nguồn (W4.2) — không đụng.
+	// share_scope: dẫn xuất của share_grant_active × node_closure — dựng lại ở cuối (rebuildShareScope).
 	for _, t := range []string{"k_ref.node_closure", "k_ref.org", "k_ref.admin_unit", "k_ref.share_grant_active"} {
 		if _, err := tx.Exec(ctx, "DELETE FROM "+t+" WHERE tenant_id = $1", tid); err != nil {
 			return err
@@ -475,7 +543,7 @@ func rebuildTenantTx(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p Projection
 			return err
 		}
 	}
-	return nil
+	return rebuildShareScope(ctx, tx, tid, uuid.Nil)
 }
 
 // ---------------------------------------------------------------------------
@@ -531,19 +599,31 @@ func snapshotTx(ctx context.Context, tx pgx.Tx, tid uuid.UUID) (Projection, erro
 	if err != nil {
 		return p, err
 	}
-	rows, err = tx.Query(ctx, `SELECT grant_id, grantee_tenant_id, kinds, valid_from, valid_to, source_seq
+	rows, err = tx.Query(ctx, `SELECT grant_id, grantee_tenant_id, kinds, valid_from, valid_to, source_seq,
+	    coalesce(grant_class, ''), coalesce(module_table, ''), coalesce(scope_node_ref, '00000000-0000-0000-0000-000000000000'::uuid),
+	    coalesce(purpose_code, ''), coalesce(basis_ref, '')
 	  FROM k_ref.share_grant_active WHERE tenant_id = $1`, tid)
 	if err != nil {
 		return p, err
 	}
 	p.ShareGrants, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (port.ShareGrant, error) {
 		var g port.ShareGrant
-		return g, r.Scan(&g.GrantID, &g.Grantee, &g.Kinds, &g.ValidFrom, &g.ValidTo, &g.Seq)
+		return g, r.Scan(&g.GrantID, &g.Grantee, &g.Kinds, &g.ValidFrom, &g.ValidTo, &g.Seq, &g.Class, &g.ModuleTable, &g.ScopeNode,
+			&g.Purpose, &g.Basis)
 	})
 	if err != nil {
 		return p, err
 	}
-	if err := tx.QueryRow(ctx, `SELECT count(*) FROM k_ref.share_scope WHERE viewer_tenant = $1`, tid).Scan(&p.ShareScopeRows); err != nil {
+	rows, err = tx.Query(ctx, `SELECT viewer_tenant, purpose, module_table, node_id, grant_id, valid_from, valid_to
+	  FROM k_ref.share_scope WHERE owner_tenant = $1`, tid)
+	if err != nil {
+		return p, err
+	}
+	p.ShareScope, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (port.ShareScopeRow, error) {
+		var s port.ShareScopeRow
+		return s, r.Scan(&s.Viewer, &s.Purpose, &s.ModuleTable, &s.Node, &s.Grant, &s.ValidFrom, &s.ValidTo)
+	})
+	if err != nil {
 		return p, err
 	}
 	p.normalize()

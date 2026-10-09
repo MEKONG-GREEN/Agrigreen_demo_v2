@@ -23,6 +23,7 @@ type Household struct {
 	CooperativeRef   uuid.UUID  // HTX hiện tại; Nil nếu chưa là thành viên
 	MemberSince      *time.Time // ngày vào HTX hiện tại
 	CreatedAt        time.Time
+	TenantID         uuid.UUID // đơn vị chủ (W4.2: khác tenant phiên = đọc qua cấp phép)
 }
 
 // Lỗi kiểm dữ liệu nông hộ (thông điệp giữ nguyên từ pf/party — hợp đồng HTTP không đổi).

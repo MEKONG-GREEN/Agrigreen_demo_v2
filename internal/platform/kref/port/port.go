@@ -79,6 +79,30 @@ type ShareGrant struct {
 	ValidFrom time.Time
 	ValidTo   time.Time
 	Seq       int64 // seq cuối của sổ pf_party.share_grant_event đã áp
+	// Điều khoản v2 (W4.1, ADR-0030 mục 3; cột k_ref từ W4.2). Class rỗng = cấp phép trước v2 (partner kế thừa).
+	Class       string    // GrantClassIntraPlatform | GrantClassPartner | ""
+	ModuleTable string    // tên logic '<module>:<share>' (chỉ intra_platform)
+	ScopeNode   uuid.UUID // Nút phạm vi của đơn vị chủ (chỉ intra_platform)
+	Purpose     string    // mã mục đích, khớp app.purpose của phiên đơn vị xem
+	Basis       string    // mã thỏa thuận chia sẻ
+}
+
+// Lớp cấp phép (W4.1). Chỉ intra_platform sinh dòng k_ref.share_scope (đọc tại chỗ, W4.2).
+const (
+	GrantClassIntraPlatform = "intra_platform"
+	GrantClassPartner       = "partner"
+)
+
+// ShareScopeRow là một dòng k_ref.share_scope: đơn vị xem Viewer đọc được dòng của đơn vị chủ (tenant của bản
+// chiếu) gắn Nút Node ở bảng có khóa ModuleTable (modreg.ShareTable) với mục đích Purpose, nhờ cấp phép Grant.
+type ShareScopeRow struct {
+	Viewer      uuid.UUID
+	Purpose     string
+	ModuleTable string // khóa '<schema>.<share>', vd pf_coop.household
+	Node        uuid.UUID
+	Grant       uuid.UUID
+	ValidFrom   time.Time
+	ValidTo     time.Time
 }
 
 // OrgSource liệt kê mọi Nút (kể cả đã vô hiệu hóa) của một tenant — pf/party cài đặt.

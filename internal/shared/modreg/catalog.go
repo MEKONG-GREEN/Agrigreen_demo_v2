@@ -70,6 +70,36 @@ func Shared(module, share string) bool {
 	return ok && share != "" && slices.Contains(e.Shares, share)
 }
 
+// ShareTable ánh xạ tên logic "<module>:<share>" của cấp phép intra_platform (pf/party, W4.1) sang khóa
+// module_table của k_ref.share_scope và của chính sách p_share (W4.2): "<schema chính>.<share>", schema chính
+// là schema đầu tiên của owns_schema (vd pf/cooperative:household → pf_coop.household, pf/mechanization:machine
+// → pf_mechanization.machine). Khóa là tên của share, không nhất thiết là một bảng vật lý (pf_coop.season phủ
+// season_current, coop_season_area, yield_summary — docs/design/cooperative.md §7.3). Share không khai → false.
+func ShareTable(moduleTable string) (string, bool) {
+	module, share, ok := strings.Cut(moduleTable, ":")
+	if !ok || !Shared(module, share) {
+		return "", false
+	}
+	e, _ := Entry(module)
+	if len(e.OwnsSchema) == 0 {
+		return "", false
+	}
+	return e.OwnsSchema[0] + "." + share, true
+}
+
+// ShareTables trả mọi ánh xạ tên logic → khóa share_scope của danh mục (xem ShareTable).
+func ShareTables() map[string]string {
+	out := map[string]string{}
+	for _, e := range catalog {
+		for _, s := range e.Shares {
+			if k, ok := ShareTable(e.Name + ":" + s); ok {
+				out[e.Name+":"+s] = k
+			}
+		}
+	}
+	return out
+}
+
 // RoleModules trả các module khai vai role trong permissions (đã sắp theo tên).
 func RoleModules(role string) []string {
 	var out []string

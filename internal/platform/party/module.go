@@ -17,6 +17,7 @@ import (
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/shareread"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
@@ -104,6 +105,11 @@ func (m *Module) GrantLookup() port.GrantLookup { return m.share }
 
 // ContextEpochs trả bộ đọc epoch ngữ cảnh theo đơn vị xem (W4.1; W7.2 k/access hợp nhất).
 func (m *Module) ContextEpochs() port.ContextEpochs { return m.share }
+
+// Middleware (httpx.RequestMiddleware) gắn nhật ký đọc qua cấp phép chia sẻ cho MỌI route (W4.2, ADR-0030 mục 4):
+// mục đích X-Purpose → app.purpose; một sự kiện gộp pf.party.share_read.recorded mỗi yêu cầu có đọc qua cấp phép,
+// đóng khi lỗi (internal/shared/shareread).
+func (m *Module) Middleware() gin.HandlerFunc { return shareread.Middleware(m.share.RecordShareRead) }
 
 // UseEgress (G5, ADR-0024) nối điểm kiểm soát xuất (pf/metering) cho kênh partner_share của
 // RecordRead (bề mặt /v1/partner/*). cp nil → hành vi cũ.

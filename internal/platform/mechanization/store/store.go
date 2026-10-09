@@ -276,7 +276,7 @@ func OwnersByIDs(ctx context.Context, tx pgx.Tx, idList []uuid.UUID) (map[uuid.U
 
 const machineCols = `ref, code, machine_type, farm_stage, cooperative_ref, owner_id, coalesce(brand, ''), coalesce(model, ''),
   coalesce(serial_no, ''), coalesce(chassis_no, ''), year_made, coalesce(fuel, ''), power_hp::text, capacity_ha::text,
-  owned_since, status, status_source, status_at, active, deactivated_on, coalesce(status_reason, ''), last_seq`
+  owned_since, status, status_source, status_at, active, deactivated_on, coalesce(status_reason, ''), last_seq, tenant_id`
 
 func scanMachine(row pgx.Row) (domain.Machine, error) {
 	var m domain.Machine
@@ -284,7 +284,7 @@ func scanMachine(row pgx.Row) (domain.Machine, error) {
 	var power, capacity *string
 	err := row.Scan(&m.Ref, &m.Code, &m.MachineType, &m.FarmStage, &m.CooperativeRef, &m.OwnerID, &m.Brand, &m.Model, &m.SerialNo,
 		&m.ChassisNo, &m.YearMade, &m.Fuel, &power, &capacity, &m.OwnedSince, &status, &m.StatusSource, &m.StatusAt, &m.Active,
-		&m.DeactivatedOn, &m.StatusReason, &m.LastSeq)
+		&m.DeactivatedOn, &m.StatusReason, &m.LastSeq, &m.TenantID)
 	if err != nil {
 		return m, err
 	}

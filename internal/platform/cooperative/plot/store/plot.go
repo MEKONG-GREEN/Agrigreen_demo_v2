@@ -336,6 +336,7 @@ func PlotEventByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*PlotEvent,
 
 // Plot là trạng thái hiện tại của thửa.
 type Plot struct {
+	TenantID          uuid.UUID // đơn vị chủ (W4.2: khác tenant phiên = đọc qua cấp phép)
 	Ref               uuid.UUID
 	Code              string
 	Name              string
@@ -362,7 +363,7 @@ const plotCols = `p.ref, p.code, coalesce(p.name, ''), p.commune_code, p.coopera
   coalesce(p.status_reason, ''), p.current_version, p.current_boundary_id, p.area_ha::text, p.source, p.needs_review,
   p.revision, p.sync_seq, p.created_by, p.created_at, p.updated_at,
   p.farmer_ref, coalesce(p.lot_name, ''), coalesce(p.note, ''), p.declared_area_ha::text, coalesce(p.shape, ''),
-  coalesce(p.department_code, '')`
+  coalesce(p.department_code, ''), p.tenant_id`
 
 func scanPlot(row pgx.Row, withGeom bool) (Plot, error) {
 	var p Plot
@@ -371,7 +372,7 @@ func scanPlot(row pgx.Row, withGeom bool) (Plot, error) {
 	var coop, hh, farmer *uuid.UUID
 	dest := []any{&p.Ref, &p.Code, &p.Name, &p.CommuneCode, &coop, &hh, &p.Status, &p.StatusReason, &p.CurrentVersion,
 		&p.CurrentBoundaryID, &area, &p.Source, &p.NeedsReview, &p.Revision, &p.SyncSeq, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt,
-		&farmer, &p.LotName, &p.Note, &declared, &p.Shape, &p.Department}
+		&farmer, &p.LotName, &p.Note, &declared, &p.Shape, &p.Department, &p.TenantID}
 	if withGeom {
 		dest = append(dest, &p.GeoJSON)
 	}

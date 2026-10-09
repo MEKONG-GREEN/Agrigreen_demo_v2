@@ -43,6 +43,10 @@ type HouseholdMembership struct {
 	CooperativeRef uuid.UUID // HTX hiện tại; Nil nếu chưa là thành viên
 	CommuneCode    string
 	Active         bool
+	// W4.2 (ADR-0030 mục 4): tenant đơn vị chủ của bản ghi, và cờ bản ghi đến từ nhánh chia sẻ của RLS (tenant ≠
+	// tenant phiên — đọc tại chỗ qua cấp phép intra_platform). Mặt tiền đặt cờ và ghi vào nhật ký gộp (shareread).
+	OwnerTenant   uuid.UUID
+	ViaShareGrant bool
 }
 
 // Plot là thông tin tối thiểu của thửa. Nguồn: geoport.Plot.
@@ -55,6 +59,10 @@ type Plot struct {
 	Status         string    // Plot*
 	Version        int64
 	AreaHa         decimal.Decimal
+	// W4.2 (ADR-0030 mục 4): tenant đơn vị chủ của bản ghi, và cờ bản ghi đến từ nhánh chia sẻ của RLS (tenant ≠
+	// tenant phiên — đọc tại chỗ qua cấp phép intra_platform). Mặt tiền đặt cờ và ghi vào nhật ký gộp (shareread).
+	OwnerTenant   uuid.UUID
+	ViaShareGrant bool
 }
 
 // PlotStat là số thửa đã số hoá và tổng diện tích của một nhóm (xã hoặc HTX). Nguồn: geoport.PlotStat.
@@ -178,4 +186,8 @@ type DiaryEntry struct {
 	BatchRef       uuid.UUID // Nil = không thuộc lô
 	Status         string    // Log*
 	RecordedAt     time.Time
+	// W4.2 (ADR-0030 mục 4): tenant đơn vị chủ của bản ghi, và cờ bản ghi đến từ nhánh chia sẻ của RLS (tenant ≠
+	// tenant phiên — đọc tại chỗ qua cấp phép intra_platform). Mặt tiền đặt cờ và ghi vào nhật ký gộp (shareread).
+	OwnerTenant   uuid.UUID
+	ViaShareGrant bool
 }

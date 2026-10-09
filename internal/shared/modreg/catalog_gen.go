@@ -23,7 +23,7 @@ var catalog = []CatalogEntry{
 	{Name: "pf/geo", Kind: "capability", Enable: "per_tenant", Permissions: []string{"coop_manager", "farmer", "geo_admin", "map_consumer"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_geo", "pf_geo_pub"}, Shares: []string{}},
 	{Name: "pf/kref", Kind: "kernel", Enable: "always", Permissions: []string{}, Zones: []string{"pf", "mkg"}, OwnsSchema: []string{"k_ref"}, Shares: []string{}},
 	{Name: "pf/masterdata", Kind: "capability", Enable: "per_tenant", Permissions: []string{"masterdata_admin"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_masterdata"}, Shares: []string{}},
-	{Name: "pf/mechanization", Kind: "domain", Enable: "per_tenant", Permissions: []string{"cgh_admin", "cgh_sync", "cgh_viewer"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_mechanization", "pf_mechanization_pub"}, Shares: []string{}},
+	{Name: "pf/mechanization", Kind: "domain", Enable: "per_tenant", Permissions: []string{"cgh_admin", "cgh_sync", "cgh_viewer"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_mechanization", "pf_mechanization_pub"}, Shares: []string{"machine"}},
 	{Name: "pf/metering", Kind: "domain", Enable: "per_tenant", Permissions: []string{"billing_approver", "billing_officer", "metering_viewer"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_metering"}, Shares: []string{}},
 	{Name: "pf/metrics", Kind: "capability", Enable: "per_tenant", Permissions: []string{"metrics_viewer"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_metrics"}, Shares: []string{}},
 	{Name: "pf/mrv", Kind: "domain", Enable: "per_tenant", Permissions: []string{"mrv_collector", "mrv_exporter", "mrv_reviewer", "mrv_viewer"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_mrv"}, Shares: []string{}},
