@@ -40,6 +40,7 @@ var catalog = []CatalogEntry{
 var catalogDepends = map[string][]string{
 	"mkg/acctbridge":   {"mkg/costing"},
 	"mkg/costing":      {"mkg/hub", "mkg/logistics", "mkg/orders"},
+	"mkg/engine":       {"mkg/fieldops"},
 	"mkg/fieldops":     {"mkg/measurement"},
 	"mkg/logistics":    {"mkg/fieldops"},
 	"mkg/measurement":  {"mkg/hub"},
