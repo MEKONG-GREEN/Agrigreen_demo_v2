@@ -1,4 +1,4 @@
-# ADR-0038: Bộ chạy migration theo module — sổ trong schema của module, thứ tự topo, vai `own_<module>`
+# ADR-0038: Bộ chạy migration theo module — sổ theo module, thứ tự topo, vai `own_<module>`
 
 **Trạng thái:** Đề xuất — hiện thực bước 1 ở W7.1 (09/10/2026); mặc định vẫn bộ chạy cũ một bản phát hành · **Ngày:** 09/10/2026 (gói W7.1) · **Phát hiện DB:** DB-12 · **Yêu cầu:** R-DB-12, kiến trúc v4.1 mục 23 · **Thành phần:** `internal/shared/migrator`, `internal/shared/dbadmin`, `cmd/migrate`, `tools/migratecheck`, `internal/shared/modreg` (danh mục sinh thêm `depends`) · **Liên quan:** [ADR-0027](0027-bon-tang-module-tep-khai-bao.md), [ADR-0028](0028-vai-dang-nhap-theo-don-vi-trien-khai.md), [kế hoạch v4.1 §1 mục 6](../kien-truc-v4.1-ke-hoach.md), [runbook](../runbooks/migrate-runner-v2.md)
 
@@ -15,9 +15,9 @@
 
 Giữ `migrations/<cụm>/NNNNNN_*.up.sql` và số chung mỗi cụm. Mỗi tệp được gắn cho một module bằng cùng quy tắc với agmodgraph: tiền tố tên `<cụm>_<module>` dài nhất, nếu không thì module DUY NHẤT sở hữu (`owns_schema`) các schema tệp đụng. Còn lại là **module giả**: `shared` (thư mục `shared/`, thư viện `internal/shared`) và `<cụm>` (tệp toàn cụm — vai nhóm, view công bố, tích hợp nhiều module). `go run ./tools/migratecheck -modules migrations` in bảng gắn.
 
-### 2. Sổ trong schema của module
+### 2. Sổ theo module — bước 1 ở `shared`, dời vào schema module ở bước 2
 
-Mỗi module có `<schema>.schema_migrations(dir, file, version, module, checksum, method, applied_at, applied_by)`, khóa `(dir, file)`, trong schema đầu tiên của `owns_schema` đã có ở database đó (vd `mkg/measurement` ở cụm ts dùng `ts_weigh`). Module giả, hoặc module chưa có schema ở database → `shared.schema_migrations`. Bảng sổ: chỉ ghi thêm (trigger `shared.fn_immutable`), không quyền cho vai nào ngoài chủ, RLS bật + ép với policy toàn quyền (thỏa các migration kiểm "mọi bảng của schema có RLS", vd pf 000133), chú thích `ag:no-rls: sổ migration theo module …` (miễn `v_missing_rls`, và là dấu để bộ chạy tìm sổ). Bộ chạy tự tạo sổ trong cùng giao dịch với tệp đầu tiên của module; **không cần migration** (shared 000008 của kế hoạch đầu lỗi thời; shared 000013 dành lại không dùng).
+Sổ `schema_migrations(dir, file, version, module, checksum, method, applied_at, applied_by)`, khóa `(dir, file)`; mỗi dòng mang module chủ, nên lịch sử là theo module. **Bước 1 đặt sổ ở `shared.schema_migrations`** của mỗi database, KHÔNG trong schema của module như R-DB-12: các migration kiểm đã áp coi mọi bảng của schema module là bảng nghiệp vụ (pf 000133: mọi bảng `pf_coop` có RLS ép; pf 000134: mọi bảng `pf_coop` ngoài danh mục có `p_scope` RESTRICTIVE) — một bảng sổ trong `pf_coop` làm hỏng chúng trên database mới, và migration kiểm như vậy là mẫu chung của repo. Dời sổ vào `<schema>` của module ở bước 2 (cùng lúc `own_<module>` làm chủ schema; migration kiểm mới phải loại bảng mang dấu sổ). Bộ chạy đọc mọi bảng `schema_migrations` mang dấu ở BẤT KỲ schema nào, nên dời không đổi bộ chạy. Bảng sổ: chỉ ghi thêm (trigger `shared.fn_immutable`), không quyền cho vai nào ngoài chủ, chú thích `ag:no-rls: sổ migration theo module …` (miễn `v_missing_rls`, và là dấu để bộ chạy tìm sổ). Bộ chạy tự tạo sổ trong cùng giao dịch với tệp đầu tiên (sau shared 000001); **không cần migration** (shared 000008 của kế hoạch đầu lỗi thời; shared 000013 dành lại không dùng).
 
 ### 3. "Chờ áp" = vắng trong sổ; thứ tự topo giữ ràng buộc lịch sử
 
@@ -42,13 +42,13 @@ Mỗi module có `<schema>.schema_migrations(dir, file, version, module, checksu
 
 - **Giữ golang-migrate, mỗi module một bảng `x-migrations-table`.** Vẫn chỉ nhớ số lớn nhất mỗi bảng — bỏ qua im lặng vẫn còn trong một module; không có thứ tự giữa module. Loại.
 - **Thứ tự topo thuần (bỏ qua số).** Đặt tệp của module tầng thấp trước tệp tầng cao bất kể số: tệp toàn cụm (vai nhóm, view công bố) tạo chu trình với tệp module, và tệp cũ có phụ thuộc SQL không khai trong `depends`. Loại; giữ ràng buộc lịch sử như mục 3.
-- **Một sổ chung `shared.schema_migrations` có cột module.** Đơn giản nhưng trái R-DB-12 (sổ trong schema của module — dời/xóa module mang lịch sử theo). Chỉ dùng cho module giả.
+- **Sổ trong schema của module ngay (R-DB-12 đúng chữ).** Đã làm thử: hỏng pf 000133/000134 (kiểm "mọi bảng của schema") trên database mới. Để bước 2.
 - **Dời tệp cũ sang thư mục module ngay.** Đụng các gói đang thêm migration song song (W3.4, W5.6, W8.2) và không cần để bỏ lỗi chính. Để bước 2.
 
 ## Hệ quả
 
 - Hết lớp lỗi "số nhỏ hơn bị bỏ qua": khi v2 là mặc định, hai nhánh chỉ còn phải tránh **trùng** số (`migratecheck`), không phải cấp theo thứ tự gộp.
-- Mỗi schema module có thêm bảng `schema_migrations` (không tenant, chỉ chủ đọc được); cổng catalog, cổng cô lập schema (W9.1), cổng EXPLAIN không bị ảnh hưởng (đã kiểm với `AG_MIGRATE_RUNNER=v2`).
+- Mỗi database có thêm bảng `shared.schema_migrations` (không tenant, chỉ chủ đọc được); cổng catalog, cổng cô lập schema (W9.1), cổng EXPLAIN không bị ảnh hưởng (đã kiểm với `AG_MIGRATE_RUNNER=v2`).
 - Database mới bằng v2 có thể khác v1 ở **thứ tự mục ACL** (GRANT của hai module không liên quan chạy khác thứ tự); quyền như nhau.
 - `catalog_gen.go` có thêm `catalogDepends`: đổi `depends` trong `module.yaml` → `go run ./tools/modgen` (như mọi trường danh mục).
 

@@ -1,6 +1,6 @@
 # Chuyển bộ chạy migration sang v2 (W7.1, ADR-0038)
 
-Bộ chạy v2 (`internal/shared/migrator`) ghi lịch sử migration theo module trong `<schema>.schema_migrations`, áp theo thứ tự topo module và áp mọi tệp **vắng trong sổ** — tệp có số nhỏ hơn số đã áp không còn bị bỏ qua im lặng như `golang-migrate`. Quyết định: [ADR-0038](../adr/0038-bo-chay-migration-theo-module.md).
+Bộ chạy v2 (`internal/shared/migrator`) ghi lịch sử migration theo module (cột `module` của `shared.schema_migrations`; dời vào schema module là bước 2), áp theo thứ tự topo module và áp mọi tệp **vắng trong sổ** — tệp có số nhỏ hơn số đã áp không còn bị bỏ qua im lặng như `golang-migrate`. Quyết định: [ADR-0038](../adr/0038-bo-chay-migration-theo-module.md).
 
 | Biến | Giá trị | Ý nghĩa |
 |---|---|---|
@@ -30,7 +30,7 @@ Trong kỳ chuyển, v2 luôn cập nhật bảng `schema_migrations_<thư mục
 -- mọi sổ của database (chạy bằng ag_migrator hoặc quản trị cụm)
 SELECT n.nspname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
  WHERE c.relname = 'schema_migrations' AND obj_description(c.oid, 'pg_class') LIKE 'ag:no-rls: sổ migration theo module%';
-SELECT * FROM pf_party.schema_migrations ORDER BY version;
+SELECT * FROM shared.schema_migrations WHERE module = 'pf/party' ORDER BY version;
 ```
 
 Bảng gắn tệp → module → sổ: `go run ./tools/migratecheck -modules migrations`; thứ tự áp các tệp của một module và kiểm riêng chúng: `go run ./tools/migratecheck -module pf/party migrations`.

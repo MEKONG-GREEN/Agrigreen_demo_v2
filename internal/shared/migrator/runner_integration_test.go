@@ -162,12 +162,8 @@ func TestRunnerV1V2_W71(t *testing.T) {
 				if r.Method != "apply" {
 					t.Errorf("%s: %s method %s", c, r.Key(), r.Method)
 				}
-				if r.Module == "shared" || r.Module == string(c) {
-					if r.Schema != "shared" {
-						t.Errorf("%s: %s (module giả) ở sổ %s", c, r.Key(), r.Schema)
-					}
-				} else if r.Schema == "shared" {
-					t.Errorf("%s: %s của module %s phải ghi ở schema của module", c, r.Key(), r.Module)
+				if r.Schema != "shared" {
+					t.Errorf("%s: %s ở sổ %s, muốn shared (bước 1)", c, r.Key(), r.Schema)
 				}
 			}
 			// Phiên bản golang-migrate đồng bộ = số lớn nhất mỗi thư mục (quay về v1 được).
@@ -194,13 +190,13 @@ func TestRunnerV1V2_W71(t *testing.T) {
 				}
 			}
 		}
-		// Ví dụ: sổ của pf/party nằm trong pf_party, chỉ ghi thêm.
+		// Lịch sử theo module: cột module; sổ chỉ ghi thêm.
 		conn := connDB(t, admin, dbadmin.DatabaseName(migrations.PF, s2))
 		var n int
-		if err := conn.QueryRow(ctx, "SELECT count(*) FROM pf_party.schema_migrations WHERE module = 'pf/party'").Scan(&n); err != nil || n == 0 {
-			t.Errorf("pf_party.schema_migrations: %d %v", n, err)
+		if err := conn.QueryRow(ctx, "SELECT count(*) FROM shared.schema_migrations WHERE module = 'pf/party'").Scan(&n); err != nil || n == 0 {
+			t.Errorf("sổ pf/party: %d %v", n, err)
 		}
-		if _, err := conn.Exec(ctx, "UPDATE pf_party.schema_migrations SET checksum = checksum"); err == nil {
+		if _, err := conn.Exec(ctx, "UPDATE shared.schema_migrations SET checksum = checksum"); err == nil {
 			t.Error("sổ phải chặn UPDATE")
 		}
 	})
@@ -260,8 +256,8 @@ func TestRunnerV1V2_W71(t *testing.T) {
 		}
 		conn := connDB(t, admin, dbadmin.DatabaseName(migrations.PF, s1))
 		var mod string
-		if err := conn.QueryRow(ctx, "SELECT module FROM pf_notify.schema_migrations WHERE file = $1", key[3:]).Scan(&mod); err != nil || mod != "pf/notify" {
-			t.Errorf("sổ pf_notify: %q %v", mod, err)
+		if err := conn.QueryRow(ctx, "SELECT module FROM shared.schema_migrations WHERE file = $1", key[3:]).Scan(&mod); err != nil || mod != "pf/notify" {
+			t.Errorf("sổ: module %q, muốn pf/notify %v", mod, err)
 		}
 		var v int64
 		if err := conn.QueryRow(ctx, "SELECT version FROM schema_migrations_pf").Scan(&v); err != nil || v <= int64(n) {

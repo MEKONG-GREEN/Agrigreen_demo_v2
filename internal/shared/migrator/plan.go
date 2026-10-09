@@ -1,5 +1,5 @@
 // Package migrator là bộ chạy migration v2 (W7.1, DB-12, R-DB-12, ADR-0038): lịch sử migration theo
-// module trong chính schema của module (<schema>.schema_migrations), thứ tự topo theo đồ thị depends của
+// module (sổ shared.schema_migrations có cột module — dời vào schema của module là bước 2), thứ tự topo theo đồ thị depends của
 // module.yaml, và một tệp là "chờ áp" khi và chỉ khi nó VẮNG trong sổ — số nhỏ hơn số đã áp không còn bị bỏ
 // qua im lặng như golang-migrate (kế hoạch v4.1 §1 mục 6).
 //
@@ -54,7 +54,7 @@ type File struct {
 	// Owner: module chủ (vd "pf/party"), hoặc module giả "shared" / "<cụm>" (Pseudo).
 	Owner  string
 	Pseudo bool
-	// LedgerSchemas: schema ứng viên chứa sổ của Owner theo thứ tự ưu tiên (owns_schema); rỗng → shared.
+	// LedgerSchemas: owns_schema của Owner — đích của sổ khi dời sổ vào schema module (bước 2); hiện sổ ở shared.
 	LedgerSchemas []string
 	Checksum      string // sha256 hex của nội dung (CRLF → LF)
 	SQL           string

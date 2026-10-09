@@ -66,7 +66,7 @@ func printModules(w io.Writer, root, module string) error {
 			if !ok {
 				ledger := "shared"
 				if len(f.LedgerSchemas) > 0 {
-					ledger = strings.Join(f.LedgerSchemas, "|") // schema đầu tiên đã có trong database
+					ledger = strings.Join(f.LedgerSchemas, "|") // đích khi dời sổ vào schema module (bước 2)
 				}
 				s = &sum{first: f.Version, ledger: ledger}
 				byMod[k] = s
@@ -78,7 +78,7 @@ func printModules(w io.Writer, root, module string) error {
 		sort.Strings(order)
 		for _, k := range order {
 			s := byMod[k]
-			if _, err := fmt.Fprintf(w, "%s\t%s\t%d tệp\t%06d–%06d\tsổ (%s).%s\n", c, k, s.n, s.first, s.last, s.ledger, migrator.LedgerTable); err != nil {
+			if _, err := fmt.Fprintf(w, "%s\t%s\t%d tệp\t%06d–%06d\tschema %s (sổ: shared.%s)\n", c, k, s.n, s.first, s.last, s.ledger, migrator.LedgerTable); err != nil {
 				return err
 			}
 		}

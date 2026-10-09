@@ -239,24 +239,15 @@ func readLedgers(ctx context.Context, conn *pgx.Conn) ([]Row, error) {
 	return out, nil
 }
 
-// ledgerSchema chọn schema chứa sổ của tệp: schema đầu tiên của module chủ (owns_schema) đã có trong database;
-// module giả, hoặc module chưa có schema ở database này → shared.
-func ledgerSchema(ctx context.Context, tx pgx.Tx, f File) (string, error) {
-	for _, s := range f.LedgerSchemas {
-		var ok bool
-		if err := tx.QueryRow(ctx, "SELECT to_regnamespace(quote_ident($1)) IS NOT NULL", s).Scan(&ok); err != nil {
-			return "", err
-		}
-		if ok {
-			return s, nil
-		}
-	}
-	return SharedDir, nil
-}
+// ledgerSchema chọn schema chứa sổ: hiện luôn là shared (một bảng, cột module = lịch sử theo module). Đặt sổ trong
+// chính schema của module (R-DB-12) làm hỏng các migration kiểm "mọi bảng của schema module …" đã áp (pf 000133 RLS,
+// pf 000134 p_scope) — dời sổ vào schema module là bước 2, cùng lúc chuyển chủ sang own_<module> (ADR-0038 §2).
+// readLedgers vẫn đọc mọi bảng mang LedgerComment ở bất kỳ schema nào nên dời sau không cần đổi bộ chạy.
+func ledgerSchema(context.Context, pgx.Tx, File) (string, error) { return SharedDir, nil }
 
 // ensureLedger tạo bảng sổ trong schema nếu chưa có: chỉ ghi thêm (trigger shared.fn_immutable chặn
 // UPDATE/DELETE/TRUNCATE — cũng thỏa cổng v_missing_immutability của schema ts_*), không quyền cho PUBLIC hay
-// vai nào khác ngoài chủ (ag_migrator), RLS bật + ép (xem dưới), chú thích LedgerComment.
+// vai nào khác ngoài chủ (ag_migrator), chú thích LedgerComment (miễn v_missing_rls: không có tenant).
 func ensureLedger(ctx context.Context, tx pgx.Tx, schema string) error {
 	tbl := pgx.Identifier{schema, LedgerTable}.Sanitize()
 	var exists bool
@@ -279,11 +270,6 @@ func ensureLedger(ctx context.Context, tx pgx.Tx, schema string) error {
 		  PRIMARY KEY (dir, file))`,
 		`COMMENT ON TABLE ` + tbl + ` IS '` + LedgerComment + `'`,
 		`REVOKE ALL ON ` + tbl + ` FROM PUBLIC`,
-		// RLS bật + ép với một policy toàn quyền: chỉ chủ (ag_migrator) có quyền trên bảng, nên policy không mở
-		// gì thêm — nhưng thỏa các migration kiểm "mọi bảng của schema module có RLS" (vd pf 000133).
-		`ALTER TABLE ` + tbl + ` ENABLE ROW LEVEL SECURITY`,
-		`ALTER TABLE ` + tbl + ` FORCE ROW LEVEL SECURITY`,
-		`CREATE POLICY p_migration_ledger ON ` + tbl + ` USING (true) WITH CHECK (true)`,
 		`CREATE TRIGGER trg_immutable BEFORE UPDATE OR DELETE ON ` + tbl + ` FOR EACH ROW EXECUTE FUNCTION shared.fn_immutable()`,
 		`CREATE TRIGGER trg_immutable_trunc BEFORE TRUNCATE ON ` + tbl + ` FOR EACH STATEMENT EXECUTE FUNCTION shared.fn_immutable()`,
 	}
