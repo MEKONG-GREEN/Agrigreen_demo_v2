@@ -177,6 +177,10 @@ func (m *Module) UsePartnerFeedSources(src map[string]port.PartnerSource, granto
 	m.svc.PartnerSources, m.svc.Grantors = src, grantors
 }
 
+// UseBilateral (W5.6, ADR-0034) nối sổ song phương của pf/cooperative: nguồn feed của cặp (job dựng feed) — gốc lắp ráp
+// cmd/worker gọi; cổng tích hợp nối qua PublicDeps.Bilateral và IngestDeps.Bilateral.
+func (m *Module) UseBilateral(l port.BilateralLedger) { m.svc.Bilateral = l }
+
 // BuildFeeds dựng một phiên bản mỗi tập có nguồn (thân job port.JobFeedBuild; kiểm thử gọi trực tiếp).
 func (m *Module) BuildFeeds(ctx context.Context) ([]app.BuildResult, error) {
 	return m.svc.BuildAll(ctx)

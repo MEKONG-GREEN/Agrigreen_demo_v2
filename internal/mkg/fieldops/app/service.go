@@ -83,6 +83,9 @@ type Service struct {
 	// DirectorySource (W5.5, AG_FIELDOPS_DIRECTORY_SOURCE): nguồn đối chiếu của lập/sửa lệnh gom —
 	// port.DirectorySourcePartner (rỗng = mặc định, bản sao cũ) | port.DirectorySourceFeed (app/directoryfeed.go).
 	DirectorySource string
+	// Bilateral (W5.6, ADR-0034): cổng tích hợp cho luồng song phương (nạp theo lô, feed của cặp, tổng kiểm ngày);
+	// nil = chưa cấu hình (không job fieldops_bilateral).
+	Bilateral port.BilateralGateway
 
 	feeds   feedRepo // nil = bảng feed của cụm mkg (kiểm thử đơn vị thay bản giả)
 	feed    feedState

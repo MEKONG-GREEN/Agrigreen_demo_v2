@@ -6,7 +6,7 @@
   "status": "proposed",
   "pending": ["A7", "C-12"],
   "status_note": "ADR-0034 Đề xuất — chờ MKG ký (A7) và C-12 (H-2). Thay hợp đồng van htx_collection_statement (X-04: nguồn gốc lô tới thửa không đi qua kênh dữ liệu mạng lưới). Không bật production trước C-12; nếu C-12 không chấp nhận, đối soát về mức HTX × ngày không plot_ref (ADR-0034 §7) bằng một hợp đồng v2 khác. Người đề xuất/phê duyệt là vai giữ chỗ.",
-  "owner": "pf/cropcycle",
+  "owner": "pf/cooperative",
   "consumers": ["HTX (bên b) qua App HTX"],
   "proposed_by": "pf-cropcycle-module-owner",
   "approved_by": "mkg-data-steward",
@@ -20,7 +20,7 @@
     "route": "POST /v1/batches/roll_count_statement",
     "max_batch": 500,
     "business_key": ["statement_ref", "revision"],
-    "target_port": "pf/cropcycle port.BilateralLedger (W5.6; sau W3.3 chuyển pf/cooperative)",
+    "target_port": "pf/cooperative qua apiclient/port.BilateralLedger → pf_coop.bilateral_record (W5.6)",
     "channels": ["api", "file"]
   },
   "bilateral": {

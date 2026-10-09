@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/ingest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
@@ -49,8 +50,11 @@ type IngestDeps struct {
 	Production bool
 	// AllowProposed: cờ dev/test AG_GATEWAY_INGEST_ALLOW_PROPOSED (bị bỏ qua ở production).
 	AllowProposed bool
-	// Owners: hợp đồng → port module chủ. Nil → chỉ ba hợp đồng song phương vào sổ đệm (StagingOwners).
-	Owners     map[string]ingest.Owner
+	// Owners: hợp đồng → port module chủ. Nil → hợp đồng song phương bên a vào sổ song phương thật (BilateralOwners
+	// trên Bilateral, W5.6); Bilateral cũng nil → không hợp đồng nào (mặc định từ chối).
+	Owners map[string]ingest.Owner
+	// Bilateral: sổ song phương pf/cooperative (W5.6, ADR-0034) cho BilateralOwners.
+	Bilateral  port.BilateralLedger
 	MaxQueued  int
 	RetryAfter time.Duration
 	// MaxFileBytes, MaxFileRecords: giới hạn kênh tệp (W5.8); ≤ 0 → mặc định.
@@ -66,7 +70,7 @@ func NewIngest(db tenant.Beginner, d IngestDeps) *ingest.Service {
 	db = forModule(db)
 	owners := d.Owners
 	if owners == nil {
-		owners = StagingOwners(db, d.Clock)
+		owners = ingest.BilateralOwners(d.Bilateral)
 	}
 	return &ingest.Service{DB: db, Queue: d.Queue, Gate: ingest.Gate{Production: d.Production, AllowProposed: d.AllowProposed && !d.Production},
 		Owners: owners, MaxQueued: d.MaxQueued, RetryAfter: d.RetryAfter, MaxFileBytes: d.MaxFileBytes, MaxFileRecords: d.MaxFileRecords,
@@ -74,7 +78,8 @@ func NewIngest(db tenant.Beginner, d IngestDeps) *ingest.Service {
 }
 
 // StagingOwners nối ba hợp đồng song phương (collection_schedule, roll_count_statement, htx_roll_confirmation) vào
-// sổ đệm pf_apiclient.ingest_staging — port module chủ CHƯA có (W5.6 thay bằng port thật).
+// sổ đệm pf_apiclient.ingest_staging của W5.4. Từ W5.6 không còn là mặc định (port thật: BilateralOwners) — chỉ kiểm thử
+// cơ chế lô / kênh tệp truyền tường minh qua IngestDeps.Owners.
 func StagingOwners(db tenant.Beginner, clk clock.Clock) map[string]ingest.Owner {
 	db = forModule(db)
 	out := map[string]ingest.Owner{}

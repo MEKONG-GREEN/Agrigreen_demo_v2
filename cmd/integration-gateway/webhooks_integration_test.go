@@ -2,16 +2,13 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -280,59 +277,5 @@ func TestWebhookDeliveryBreakerChecksums_W57Integration(t *testing.T) {
 	r = e.call(http.MethodGet, "/v1/webhooks", otherKey, nil)
 	if r.status != http.StatusOK || len(r.body["items"].([]any)) != 0 {
 		t.Fatalf("khách hàng khác không thấy webhook: %s", r.raw)
-	}
-}
-
-// W5.7 (R-INT-10, ADR-0034): tổng kiểm theo NGÀY của luồng song phương (tạm trên sổ đệm tới W5.6): số bản ghi + băm
-// theo công thức bilateral_day.v1 của chính bên gửi; đối tác khác không thấy; khoảng > 31 ngày → 400.
-func TestBilateralDailyChecksums_W57Integration(t *testing.T) {
-	e := newIngestEnv(t, true, 0, nil)
-	partner, other := ids.New(), ids.New()
-	_, key := e.onboardIngest(partner, "roll_count_statement")
-	_, key2 := e.onboardIngest(other, "roll_count_statement")
-	refA, refB, refC := ids.New().String(), ids.New().String(), ids.New().String()
-	want(t, e.post(key, "roll_count_statement", batchBody("roll_count_statement", ids.New().String(),
-		item(refA, rollRecord(refA, 1, 46)), item(refB, rollRecord(refB, 1, 12)))), http.StatusAccepted, "lô đối tác 1")
-	want(t, e.post(key2, "roll_count_statement", batchBody("roll_count_statement", ids.New().String(),
-		item(refC, rollRecord(refC, 1, 9)))), http.StatusAccepted, "lô đối tác 2")
-	e.drain()
-
-	today := clock.BusinessDate(time.Now()).String()
-	r := e.call(http.MethodGet, "/v1/feeds/roll_count_statement/checksums?from="+today+"&to="+today, key, nil)
-	want(t, r, http.StatusOK, "tổng kiểm ngày")
-	days := r.body["days"].([]any)
-	day := days[0].(map[string]any)
-	// Tính lại từ sổ đệm theo đúng công thức (bên kia của cặp làm cùng phép tính trên bản ghi của mình).
-	var lines []string
-	owner := e.pg.Pool(t, migrations.PF, dbadmin.Migrator)
-	if err := tenant.WithTenantTx(context.Background(), owner, partner, func(tx pgx.Tx) error {
-		rows, err := tx.Query(context.Background(), `SELECT business_key, contract_version, payload_sha256 FROM pf_apiclient.ingest_staging`)
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var bk, sum string
-			var v int
-			if err := rows.Scan(&bk, &v, &sum); err != nil {
-				return err
-			}
-			lines = append(lines, bk+"\t"+strconv.Itoa(v)+"\t"+sum+"\n")
-		}
-		return rows.Err()
-	}); err != nil {
-		t.Fatal(err)
-	}
-	sort.Strings(lines)
-	h := sha256.Sum256([]byte(strings.Join(lines, "")))
-	if r.body["kind"] != "bilateral_day" || r.body["algorithm"] != "bilateral_day.v1" || len(days) != 1 || day["date"] != today ||
-		day["record_count"] != float64(2) || day["sha256"] != hex.EncodeToString(h[:]) {
-		t.Fatalf("tổng kiểm ngày của bên gửi (2 bản ghi, không gồm đối tác khác): %s", r.raw)
-	}
-	if r = e.call(http.MethodGet, "/v1/feeds/roll_count_statement/checksums?from=2026-01-01&to=2026-03-01", key, nil); r.status != http.StatusUnprocessableEntity && r.status != http.StatusBadRequest {
-		t.Fatalf("> 31 ngày → lỗi kiểm tra: %d %s", r.status, r.raw)
-	}
-	if r = e.call(http.MethodGet, "/v1/feeds/collection_schedule/checksums", key, nil); r.status != http.StatusForbidden {
-		t.Fatalf("thiếu scope hợp đồng → 403: %d %s", r.status, r.raw)
 	}
 }

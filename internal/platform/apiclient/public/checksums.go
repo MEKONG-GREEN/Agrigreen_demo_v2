@@ -9,8 +9,10 @@ package public
 //     bản nên danh sách rỗng.
 //   - hợp đồng song phương (collection_schedule, roll_count_statement, htx_roll_confirmation): mỗi NGÀY nghiệp vụ một
 //     dòng {date, record_count, sha256} theo công thức ingest.ChecksumAlgorithm trên bản ghi bên gọi đã gửi;
-//     ?from=&to= (YYYY-MM-DD, tối đa 31 ngày; mặc định 7 ngày tới hôm nay). Scope ingest:<hợp đồng>:write hoặc
-//     feed:<hợp đồng>:read. Tạm trên sổ đệm tới khi W5.6 có sổ song phương + feed của cặp.
+//     ?from=&to= (YYYY-MM-DD, tối đa 31 ngày; mặc định 7 ngày tới hôm nay), ?pair=<htx_ref> tùy chọn (một cặp của bên
+//     gọi). Scope ingest:<hợp đồng>:write hoặc feed:<hợp đồng>:read. Từ W5.6 trên sổ song phương thật (pf_coop qua
+//     port.BilateralLedger, mọi cặp mà tenant bên gọi là counterparty — kể cả cặp đã chấm dứt: lịch sử đối soát);
+//     ngày = ngày nghiệp vụ của recorded_at của sổ (= recorded_at của mục feed cặp).
 
 import (
 	"net/http"
@@ -19,6 +21,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/ingest"
@@ -123,7 +126,22 @@ func (s *Server) pairChecksums(c *gin.Context, caller port.Caller, name string) 
 	if span < 0 || span >= ingest.MaxChecksumDays*24*time.Hour {
 		return nil, problem.Validation.WithField("from", "from ≤ to, tối đa 31 ngày")
 	}
-	days, err := ingest.DailyChecksums(c.Request.Context(), s.d.Svc.DB, caller.Client.ClientTenantID, name, from, to)
+	var pair uuid.UUID
+	if v := c.Query("pair"); v != "" {
+		htx, err := uuid.Parse(v)
+		if err != nil {
+			return nil, problem.Validation.WithField("pair", "htx_ref (UUID)")
+		}
+		if s.d.Bilateral == nil {
+			return nil, port.ErrBilateralUnavailable
+		}
+		p, err := s.d.Bilateral.CounterpartyPair(c.Request.Context(), caller.Client.ClientTenantID, htx)
+		if err != nil {
+			return nil, err
+		}
+		pair = p.PairID
+	}
+	days, err := ingest.DailyChecksums(c.Request.Context(), s.d.Bilateral, caller.Client.ClientTenantID, name, pair, from, to)
 	if err != nil {
 		return nil, err
 	}

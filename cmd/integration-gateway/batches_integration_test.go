@@ -19,6 +19,7 @@ import (
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -33,6 +34,10 @@ type ingestEnv struct {
 	*intEnv
 	queue *apiclient.IngestMemoryQueue
 }
+
+// realOwners: truyền cho newIngestEnv để dùng port THẬT của gốc lắp ráp (W5.6 — hợp đồng song phương bên a vào sổ song
+// phương pf_coop). owners = nil → sổ đệm W5.4 (apiclient.StagingOwners) cho kiểm thử cơ chế lô.
+var realOwners = map[string]apiclient.IngestOwner{}
 
 // newIngestEnv dựng cổng THẬT (assembly.Build + gateway.NewHandler) với nạp theo lô trên hàng đợi trong tiến trình.
 func newIngestEnv(t *testing.T, allowProposed bool, maxQueued int, owners map[string]apiclient.IngestOwner) *ingestEnv {
@@ -52,9 +57,15 @@ func newIngestEnv(t *testing.T, allowProposed bool, maxQueued int, owners map[st
 	open := func(_ context.Context, role string) (*pgxpool.Pool, error) {
 		return pg.Pool(t, migrations.PF, role), nil
 	}
+	switch {
+	case owners == nil:
+		owners = apiclient.StagingOwners(pg.Pool(t, migrations.PF, dbadmin.AppPublic), clk)
+	case len(owners) == 0:
+		owners = nil // gốc lắp ráp nối port thật
+	}
 	mod, d, err := assembly.Build(context.Background(), open, assembly.Config{Operator: e.operator, Peppers: peppers, Replicas: 1,
 		EgressMode: meter.ModeEnforce, Clock: clk, Log: log, IngestQueue: q, IngestAllowProposed: allowProposed, IngestMaxQueued: maxQueued,
-		IngestOwners: owners})
+		IngestOwners: owners, AllowUnapproved: allowProposed})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}

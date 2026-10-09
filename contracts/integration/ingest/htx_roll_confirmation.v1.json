@@ -6,7 +6,7 @@
   "status": "proposed",
   "pending": ["A7", "C-12"],
   "status_note": "ADR-0034 Đề xuất — chờ MKG ký (A7) và C-12 (H-2). Thay GET /v1/partner/htx-collection/responses: MKG đọc qua feed của cặp. HTX thường ghi trên App HTX (kênh app, author_side b); kênh api/file cùng lược đồ cho HTX có IT hoặc chỉ gửi được tệp (R-INT-11). Người đề xuất/phê duyệt là vai giữ chỗ.",
-  "owner": "pf/cropcycle",
+  "owner": "pf/cooperative",
   "consumers": ["mkg/fieldops (bên a) qua GET /v1/feeds/bilateral?pair=…"],
   "proposed_by": "pf-cropcycle-module-owner",
   "approved_by": "htx-data-steward",
@@ -20,7 +20,7 @@
     "route": "POST /v1/batches/htx_roll_confirmation",
     "max_batch": 500,
     "business_key": ["confirmation_ref"],
-    "target_port": "pf/cropcycle port.BilateralLedger (W5.6; sau W3.3 chuyển pf/cooperative)",
+    "target_port": "pf/cooperative sổ song phương pf_coop.bilateral_record (W5.6): kênh app = App HTX POST /v1/bilateral/confirmations; kênh api/file qua cổng chưa nối (chờ gắn khách hàng API ↔ Nút HTX, W7.2) — mặc định từ chối",
     "channels": ["app", "api", "file"]
   },
   "bilateral": {

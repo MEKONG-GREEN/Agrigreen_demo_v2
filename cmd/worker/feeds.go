@@ -61,5 +61,7 @@ func apiclientFeedJobs(ctx context.Context, direct string, closeFn *func(), log 
 		apiclientport.FeedCooperativeDirectory: gl,
 		apiclientport.FeedPlotDirectory:        coop.PartnerFeedSource(),
 	}, gl)
+	// W5.6 (ADR-0034): feed của cặp song phương — chép bản ghi mới của sổ song phương pf_coop (pf/cooperative) theo seq.
+	mod.UseBilateral(coop.BilateralLedger())
 	return mod.FeedJobs(interval, log), nil
 }

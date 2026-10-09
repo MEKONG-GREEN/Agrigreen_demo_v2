@@ -106,11 +106,20 @@ WITH CHECK (
 | W0.3 | `mkg.md` §3.1, §3.2: bảng kê là song phương; hạn chế đọc tạm | — |
 | W5.1 | Hợp đồng `collection_schedule`, `roll_count_statement`, `htx_roll_confirmation` (`flow: bilateral`) | — |
 | W5.4 | Bộ xử lý lô gọi port module chủ với tenant bên gọi | pf 000125 |
-| W5.6 | Sổ song phương, `p_pair`, feed cặp, quy tắc CI không tổng hợp; bật production chờ C-12 | pf 000103, mkg 000025 |
+| W5.6 | Sổ song phương, `p_pair`, feed cặp, quy tắc CI không tổng hợp; bật production chờ C-12 | pf 000135, mkg 000038 (000103/000025 lỗi thời) |
 | W5.7 | Tổng kiểm hằng ngày theo cặp | pf 000104 |
 | W5.10 | Gỡ consumer `pf.cropcycle.htx_collection_valve` và `/v1/partner/htx-collection/responses` | — |
 
 **W5.1 (08/10/2026):** ba hợp đồng `contracts/integration/ingest/` (`flow: bilateral`, khối `bilateral` có `party_a`, `party_b`, `author_side`, `pair_key: [htx_ref]`, `pair_feed: bilateral`), `status: proposed`, `pending: [A7, C-12]`; `contractcheck` cấm `aggregation` trên hợp đồng song phương. Chi tiết ở [ADR-0033 Hiện thực](0033-cong-tich-hop-mkg-nhu-moi-doi-tac.md#hiện-thực).
+
+**W5.6 (09/10/2026, Đề xuất — bật production chờ C-12):**
+
+- **Chủ:** `pf/cooperative` (schema `pf_coop` đã có từ W3.3 — không qua `pf_cropcycle`; bảng van `pf_cropcycle.collection_*` giữ tới W5.10). pf **000135** (không phải 000103): sổ `bilateral_pair_event` (vòng đời cặp; `pair_id` = UUIDv5(`counterparty_tenant_id`, `htx_ref`) = `apiclient/port.PairID`; chỉ bên b lập, bên nào cũng chấm dứt có lý do) và `bilateral_record` (mô hình §2: `tenant_id` chủ, `htx_node_id` = `htx_ref` = Nút HTX, `counterparty_tenant_id`, `contract`/`contract_version`/`record_ref`/`business_key`, payload JSON chuẩn + `payload_sha256`, `author_side`, `channel`; idem_key theo (cặp, hợp đồng, phiên bản, khóa nghiệp vụ); stream `pair:<pair_id>` → seq liên tục mỗi cặp theo thứ tự commit).
+- **Chính sách §3:** đúng biểu thức `p_pair` (so khớp Nút bằng; WITH CHECK theo `author_side`), nhưng **tên giữ `p_tenant`** — `ALTER POLICY` trên policy mặc định (migratecheck cấm `DROP POLICY p_tenant`; `shared.v_missing_rls` đòi `p_tenant` là policy PERMISSIVE duy nhất, W3.4). Đổi tên `p_pair` khi cổng chấp nhận tên này. Chỉ `r_cooperative` có SELECT/INSERT; không view nào đọc — cổng `migrations/bilateral_isolation_integration_test.go` (§5 phần DB). Quy tắc `agmodgraph` riêng cho §5 **chưa thêm** (contractcheck đã cấm `aggregation` trên hợp đồng song phương; sổ không nằm trong `provides.publications`).
+- **Bên a qua cổng:** port hẹp `apiclient/port.BilateralLedger` (cài đặt `cooperative/bilateral/app.Ledger`, nối ở `cmd/integration-gateway/assembly` + `cmd/worker`) — `ingest.BilateralOwners` thay sổ đệm `Staging` cho `collection_schedule`, `roll_count_statement` (không có cặp hiệu lực → `integration.pair_missing`). `htx_roll_confirmation` **không** nối qua cổng (kênh api/file của bên b chờ gắn khách hàng API ↔ Nút HTX, W7.2) — mặc định từ chối.
+- **Bên b (App HTX):** Application API `/v1/bilateral/pairs[/{id}/terminate|/records]`, `/v1/bilateral/confirmations` (vai `coop_manager`, `org_ref` = Nút HTX có hồ sơ; xác nhận phải trỏ đúng revision bảng kê trong cặp, `mkg_rolls` khớp; phản đối có `htx_rolls` + lý do); chỉ bật với `AG_BILATERAL_ALLOW_PROPOSED=1` ngoài production.
+- **Feed của cặp:** `GET /v1/feeds/bilateral?pair=<htx_ref>` trên kho feed W5.3 (phân vùng = `pair_id`, `entity_key` lưu `<hợp đồng>|<khóa>`, `items[].contract`); job `apiclient_feed_build` chép theo seq (seq feed = seq sổ); cổng kiểm cặp đang hiệu lực mỗi lời gọi và chỉ trả mục của hợp đồng có scope. Tổng kiểm ngày W5.7 chuyển sang sổ thật (ngày = `recorded_at` của sổ, thêm `?pair=`).
+- **MKG:** `mkg/fieldops` mkg **000038** (không phải 000025): hàng gửi `bilateral_send` (chiếu từ sổ `valve_export`), bản sao feed cặp, job `fieldops_bilateral` + đối soát tổng kiểm ngày (công thức chung `contracts/integration.BilateralDayDigest`). Kiểm thử đầu–cuối `tests/e2e/w56_bilateral_test.go`, `cmd/integration-gateway/bilateral_integration_test.go`.
 
 ## Liên quan
 

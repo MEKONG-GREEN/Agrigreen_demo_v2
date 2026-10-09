@@ -202,6 +202,19 @@ func Jobs(mods Modules, tenantPool *pgxpool.Pool, selected string, log *slog.Log
 		}
 		out = append(out, mods.Engine.Jobs(tid, interval, log)...)
 	}
+	if picked(foport.JobBilateral) {
+		// W5.6 (ADR-0034): luồng song phương qua cổng tích hợp — gửi lịch gom + bảng kê số cuộn (nạp theo lô), kéo feed của
+		// cặp, đối soát tổng kiểm ngày. Thiếu AG_MKG_TENANT_ID hoặc AG_FIELDOPS_BILATERAL_API_KEY → không có job.
+		tid, err := EnvUUID("AG_MKG_TENANT_ID")
+		if err != nil {
+			return nil, err
+		}
+		interval, err := EnvDuration("AG_FIELDOPS_BILATERAL_INTERVAL")
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, mods.Fieldops.BilateralJobs(tid, interval, log)...)
+	}
 	if picked(logistics.JobAlerts) {
 		// L-08: cảnh báo ghe chưa cân > N giờ, đăng kiểm hết / sắp hết hạn (AG_LOGISTICS_ALERT_INTERVAL, mặc định 15m).
 		interval, err := EnvDuration("AG_LOGISTICS_ALERT_INTERVAL")
@@ -254,7 +267,7 @@ func EnvDuration(name string) (time.Duration, error) {
 // JobNames liệt kê tên job hợp lệ của api-internal.
 func JobNames() string {
 	return hubport.JobDailyCapacity + ", " + foport.JobHTXResponses + ", " + foport.JobHarvestDates + ", " + foport.JobDirectory + ", " + foport.JobDirectoryFeed + ", " +
-		engport.JobObservationFeed + ", " + logistics.JobAlerts + ", " + acctbridge.JobPushRetry
+		engport.JobObservationFeed + ", " + foport.JobBilateral + ", " + logistics.JobAlerts + ", " + acctbridge.JobPushRetry
 }
 
 // FieldopsOptionsFromEnv đọc cấu hình mkg/fieldops:
@@ -281,6 +294,10 @@ func JobNames() string {
 //	    Có cả hai → job fieldops_directory_feed (AG_FIELDOPS_DIRECTORY_FEED_INTERVAL, mặc định 15m) kéo feed danh bạ và
 //	    đối soát với bản sao cũ.
 //	AG_FIELDOPS_DIRECTORY_SOURCE partner (mặc định) | feed — nguồn đối chiếu của lập/sửa lệnh gom (DirectorySourceFromEnv).
+//	AG_FIELDOPS_BILATERAL_API_KEY (W5.6, ADR-0034) khóa API của khách hàng API tenant MKG cho luồng song phương (scope
+//	    ingest:collection_schedule:write, ingest:roll_count_statement:write, feed:htx_roll_confirmation:read) trên
+//	    AG_INTEGRATION_GATEWAY_URL → job fieldops_bilateral (AG_FIELDOPS_BILATERAL_INTERVAL, mặc định 5m). Hợp đồng còn
+//	    proposed: cổng production từ chối (C-12) — chỉ đặt ở dev/staging.
 //
 // WeighedMass (mkg/measurement) nối trong Build.
 func FieldopsOptionsFromEnv(clk clock.Clock) fieldops.Options {
@@ -298,6 +315,9 @@ func FieldopsOptionsFromEnv(clk clock.Clock) fieldops.Options {
 	if gw, key := strings.TrimSpace(os.Getenv("AG_INTEGRATION_GATEWAY_URL")), os.Getenv("AG_FIELDOPS_FEED_API_KEY"); gw != "" && key != "" {
 		o.DirectoryFeed = fieldops.NewGatewayDirectoryFeed(fieldops.GatewayConfig{BaseURL: gw, APIKey: key,
 			GrantorTenant: strings.TrimSpace(os.Getenv("AG_PARTNER_GRANTOR_TENANT"))})
+	}
+	if gw, key := strings.TrimSpace(os.Getenv("AG_INTEGRATION_GATEWAY_URL")), os.Getenv("AG_FIELDOPS_BILATERAL_API_KEY"); gw != "" && key != "" {
+		o.Bilateral = fieldops.NewGatewayBilateral(fieldops.GatewayConfig{BaseURL: gw, APIKey: key}, clk)
 	}
 	if s := os.Getenv("AG_FIELDOPS_KG_PER_ROLL"); s != "" {
 		if d, err := decimal.NewFromString(s); err == nil && d.Sign() > 0 {

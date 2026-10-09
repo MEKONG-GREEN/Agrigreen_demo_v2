@@ -11,6 +11,7 @@ package cooperative
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,8 @@ import (
 
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/app"
+	bilateralapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/bilateral/app"
+	bilateralhttp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/bilateral/handler"
 	memberapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/member/app"
 	memberhttp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/member/handler"
 	plotapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/plot/app"
@@ -78,6 +81,11 @@ type Module struct {
 	season *seasonapp.Service
 	plot   *plotapp.Service
 	member *memberapp.Service
+	// W5.6 (ADR-0034): sổ song phương MKG ↔ HTX — phía HTX (route chỉ gắn sau UseBilateral) và cổng hẹp cho cổng
+	// tích hợp (BilateralLedger).
+	bilateral   *bilateralapp.Service
+	bilateralOn bool
+	ledger      bilateralapp.Ledger
 }
 
 // New tạo module; mọi giao dịch chạy dưới r_cooperative (db.ForModule(DBModule)).
@@ -92,6 +100,8 @@ func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 	m.plot.Vault = deps.Farmers
 	m.season = &seasonapp.Service{DB: db, Clock: clk, Scope: deps.Scope, Orgs: deps.Orgs, Plots: m.plot, Params: deps.Params,
 		Catalogs: deps.Catalogs, GpsLog: deps.GpsLog}
+	m.bilateral = &bilateralapp.Service{DB: db, Clock: clk}
+	m.ledger = bilateralapp.Ledger{DB: db, Clock: clk}
 	m.svc.Store = store.Sources{
 		Cooperatives: cooperatives{m.member, m.plot},
 		Households:   households{m.member, m.plot},
@@ -121,12 +131,37 @@ func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logge
 	m.plot.Egress, m.plot.EgressMode, m.plot.Log = cp, mode, log
 }
 
+// EnvBilateralAllowProposed: "1" bật phía HTX của luồng song phương với hợp đồng proposed (dev/test, W5.6). Production
+// từ chối khởi động nếu đặt (ErrBilateralProposedInProduction) — bật production chờ C-12.
+const EnvBilateralAllowProposed = "AG_BILATERAL_ALLOW_PROPOSED"
+
+// ErrBilateralProposedInProduction: cờ dev/test của luồng song phương đặt ở production.
+var ErrBilateralProposedInProduction = errors.New("pf/cooperative: " + EnvBilateralAllowProposed +
+	" chỉ cho dev/test — production từ chối hợp đồng song phương proposed (C-12)")
+
+// UseBilateral (W5.6, ADR-0034) bật phía HTX của luồng song phương (/v1/bilateral/*): hợp đồng proposed chỉ phục vụ
+// ngoài production với allowProposed (AG_BILATERAL_ALLOW_PROPOSED=1) — production từ chối tới khi C-12 chấp nhận và
+// hợp đồng approved. Gọi trước RegisterApp.
+func (m *Module) UseBilateral(production, allowProposed bool) {
+	m.bilateral.Production, m.bilateral.AllowProposed, m.bilateralOn = production, allowProposed && !production, true
+}
+
 // RegisterApp gắn route Application API (đường dẫn giữ nguyên từ pf/cropcycle, pf/geo, pf/party).
 func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	seasonhttp.Handler{Svc: m.season}.RegisterApp(rg)
 	plothttp.Handler{Svc: m.plot}.RegisterApp(rg)
 	memberhttp.Handler{Svc: m.member}.RegisterApp(rg)
+	if m.bilateralOn {
+		bilateralhttp.Handler{Svc: m.bilateral}.RegisterApp(rg)
+	}
 }
+
+// Bilateral trả use case phía HTX của luồng song phương (kiểm thử, gốc lắp ráp).
+func (m *Module) Bilateral() *bilateralapp.Service { return m.bilateral }
+
+// BilateralLedger (W5.6) là cổng hẹp của sổ song phương cho cổng tích hợp (nạp theo lô bên a, feed của cặp, tổng kiểm
+// ngày) — chạy ở tenant đối tác, chỉ nhánh counterparty của chính sách hai bên.
+func (m *Module) BilateralLedger() apiclientport.BilateralLedger { return m.ledger }
 
 // RegisterAdmin gắn route Admin API (nhóm đã bắt buộc MFA).
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) {

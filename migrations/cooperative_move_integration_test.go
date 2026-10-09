@@ -267,7 +267,9 @@ func TestCooperativeSchemaMoveRehearsal_W33(t *testing.T) {
 			t.Errorf("%s còn ở schema cũ (%v)", tbl, err)
 		}
 	}
-	if n := partitionCount(ctx, t, admin, `p.relnamespace = 'pf_coop'::regnamespace`); n != partsBefore || n == 0 {
+	// Chỉ bảng đã chuyển — sổ mới tạo sau W3.3 ở pf_coop (vd W5.6 bilateral_*) không tính.
+	if n := partitionCount(ctx, t, admin, `p.relnamespace = 'pf_coop'::regnamespace
+	    AND p.relname = ANY ('{kn_profile_event,plot_boundary,plot_event,cooperative_boundary,season_event,farm_log_batch,farm_log,farm_log_review,harvest_declaration}'::text[])`); n != partsBefore || n == 0 {
 		t.Errorf("phân vùng ở pf_coop: %d, trước %d", n, partsBefore)
 	}
 	if n := partitionCount(ctx, t, admin, `p.relnamespace = 'pf_coop'::regnamespace AND c.relnamespace <> 'pf_coop'::regnamespace`); n != 0 {

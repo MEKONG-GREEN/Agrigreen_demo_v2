@@ -202,6 +202,13 @@ Sổ cấp phép của ADR-0020 (`share_grant_event`, bốn mắt, thu hồi, `p
 - **`mkg/fieldops`** (mkg 000036 — `directory_feed_state`, `directory_feed_record`): `adapter.GatewayFeed` (khóa API ở `X-API-Key`), job `fieldops_directory_feed` — áp mỗi trang + cursor trong một giao dịch (dừng giữa chừng đọc tiếp đúng chỗ, áp lại là no-op theo seq), 410 → xóa + đọc lại từ đầu, 403 `party.share_grant_missing` → xóa bản sao + `revoked_at` (mục "không có", như bề mặt cũ), as_of + max_age của trang lưu khi đọc tới đầu, quá max_age → `fieldops.directory_stale` (không chặn) + log `outcome=stale`. Cờ `AG_FIELDOPS_DIRECTORY_SOURCE` (`partner` mặc định | `feed`) chọn nguồn của lập/sửa lệnh gom; nguồn feed không bao giờ gọi nền tảng trong thao tác người dùng. Chạy song song: sau mỗi lượt, đối soát bản sao cũ ↔ feed, log từng khác biệt `fieldops.directory_source_diff` (`feed_missing` | `legacy_absent` | `mismatch` + trường) và tóm tắt `fieldops.directory_source_compare` — điều kiện bật `feed` và W5.10.
 - **Ghi lệch / còn lại:** header `Deprecation`/`Sunset` và metric `partner_legacy_calls_total` của `/v1/partner/*` (mục 7.2) chưa làm (thuộc `api-platform`); `season_harvest_dates`, `htx_collection_responses` vẫn qua `/v1/partner/*`; phân vùng của bên cấp không còn bên nhận nào thì ngừng dựng và hết hạn theo 30 ngày (không retract chủ động); mTLS của MKG tới cổng là `GatewayConfig.Client` tùy chọn, chưa nối biến môi trường.
 
+### W5.6 (09/10/2026) — luồng song phương qua cổng
+
+- Ba hợp đồng song phương có chủ `pf/cooperative` (sổ `pf_coop.bilateral_record`, pf 000135 — [ADR-0034 Hiện thực](0034-luong-song-phuong.md#hiện-thực)); nạp theo lô bên a (`collection_schedule`, `roll_count_statement`) đi vào port thật `apiclient/port.BilateralLedger` thay sổ đệm `ingest_staging` (W5.4 — `Staging` chỉ còn cho kiểm thử cơ chế lô/kênh tệp khi truyền tường minh); `htx_roll_confirmation` mặc định từ chối qua cổng (bên b ghi ở App HTX).
+- Feed của cặp `GET /v1/feeds/bilateral?pair=<htx_ref>` — ngoại lệ duy nhất "lọc theo cặp" của R-INT-05, trên kho feed W5.3 (phân vùng = mã cặp), mục mang `contract`; tổng kiểm ngày song phương (W5.7) đọc sổ thật.
+- Hợp đồng nạp song phương nhận thêm scope `feed:<tên>:read` khi đăng ký (bên kia của cặp đọc qua feed cặp/tổng kiểm, không ghi).
+- MKG (mkg 000038): job `fieldops_bilateral` — chiếu van `valve_export` sang hợp đồng song phương, gửi lô, kéo feed cặp, đối soát tổng kiểm; van `valve_collection` giữ tới W5.10.
+
 ## Liên quan
 
 - Kiến trúc v4.1: §6, §37 (R-INT-01), §38, §39, §40 (R-INT-02…11), §41, §42, §43, §44, Phụ lục B mục 15 và 18, R-API-01, R-API-07, R-EVT-05, R-MOD-10.

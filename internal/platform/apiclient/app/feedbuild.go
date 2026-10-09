@@ -67,6 +67,15 @@ func (s *Service) BuildAll(ctx context.Context) ([]BuildResult, error) {
 			errs = append(errs, fmt.Errorf("%s: %w", f, err))
 		}
 	}
+	// W5.6: feed của cặp song phương — chép bản ghi mới của sổ song phương (chỉ khi gốc lắp ráp đã nối sổ).
+	if s.Bilateral != nil {
+		rs, err := s.BuildBilateral(ctx)
+		out = append(out, rs...)
+		if err != nil {
+			s.log().ErrorContext(ctx, "feed: dựng tập dữ liệu lỗi", "event", "integration.dataset_build_failed", "dataset", port.FeedBilateral, "outcome", "error", "error", err.Error())
+			errs = append(errs, fmt.Errorf("%s: %w", port.FeedBilateral, err))
+		}
+	}
 	return out, errors.Join(errs...)
 }
 

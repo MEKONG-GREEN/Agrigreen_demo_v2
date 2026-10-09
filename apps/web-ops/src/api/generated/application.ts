@@ -426,6 +426,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/bilateral/pairs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cặp song phương của HTX người gọi (W5.6, ADR-0034)
+         * @description Luồng song phương MKG ↔ HTX (hợp đồng proposed — chỉ phục vụ ngoài production với AG_BILATERAL_ALLOW_PROPOSED=1,
+         *     bật production chờ C-12). Người gọi: vai coop_manager, đơn vị công tác (org_ref) là Nút HTX có hồ sơ. Cán bộ KN cấp
+         *     trên cùng tenant không thấy (chính sách hai bên so khớp Nút bằng).
+         */
+        get: operations["listBilateralPairs"];
+        put?: never;
+        /** Lập cặp song phương giữa HTX người gọi và tenant đối tác (chỉ bên HTX lập) */
+        post: operations["establishBilateralPair"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/bilateral/pairs/{pair_id}/terminate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Chấm dứt cặp song phương (bản ghi cũ giữ nguyên; đối tác bị từ chối ghi và đọc feed cặp từ lời gọi kế tiếp) */
+        post: operations["terminateBilateralPair"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/bilateral/pairs/{pair_id}/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bản ghi song phương của cặp (lịch gom, bảng kê số cuộn của MKG; xác nhận/phản đối của HTX), theo seq */
+        get: operations["listBilateralRecords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/bilateral/confirmations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * HTX xác nhận / phản đối số cuộn của một revision bảng kê (bản ghi htx_roll_confirmation v1, RB-6)
+         * @description Thân = một bản ghi đúng hợp đồng contracts/integration/ingest/htx_roll_confirmation.v1.json (mặc định từ chối);
+         *     htx_ref phải là HTX của người gọi; bảng kê (statement_ref, statement_revision) phải có trong cặp và mkg_rolls khớp;
+         *     phản đối phải có htx_rolls + reason. Idempotent theo confirmation_ref (cùng nội dung → 200 bản ghi cũ; khác → 409).
+         */
+        post: operations["confirmBilateralRolls"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/households": {
         parameters: {
             query?: never;
@@ -5907,6 +5986,43 @@ export interface components {
             member_since: string | null;
             active: boolean;
         };
+        BilateralPair: {
+            /**
+             * Format: uuid
+             * @description UUIDv5(counterparty_tenant_id, htx_ref)
+             */
+            pair_id: string;
+            /** Format: uuid */
+            htx_ref: string;
+            /** Format: uuid */
+            counterparty_tenant_id: string;
+            active: boolean;
+            /** Format: date-time */
+            since: string | null;
+            /** Format: date-time */
+            terminated_at: string | null;
+        };
+        BilateralRecord: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            pair_id: string;
+            seq: number;
+            contract: string;
+            entity_key: string;
+            /**
+             * @description a = MKG qua cổng tích hợp; b = HTX
+             * @enum {string}
+             */
+            author_side: "a" | "b";
+            /** @enum {string} */
+            channel: "api" | "file" | "app";
+            /** @description Bản ghi theo hợp đồng contracts/integration/ingest/<tên>.v<N>.json */
+            record: Record<string, never>;
+            payload_sha256: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
         HouseholdListItem: components["schemas"]["Household"] & {
             /** @description Nhãn đã che, vd "Nguyễn V. A." */
             label: string;
@@ -11364,6 +11480,166 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    listBilateralPairs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách cặp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["BilateralPair"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    establishBilateralPair: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: uuid
+                     * @description Tenant đối tác (MKG)
+                     */
+                    counterparty_tenant_id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã lập */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BilateralPair"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    terminateBilateralPair: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                pair_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã chấm dứt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BilateralPair"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    listBilateralRecords: {
+        parameters: {
+            query?: {
+                after?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                pair_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["BilateralRecord"][];
+                        next_after: number;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    confirmBilateralRolls: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi trước đó (cùng nội dung) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BilateralRecord"];
+                };
+            };
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BilateralRecord"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     createHousehold: {

@@ -71,7 +71,9 @@ type Service struct {
 	// plot_directory); Grantors: bên cấp đang có cấp quyền cho một bên nhận (party/port/grantlookup).
 	PartnerSources map[string]port.PartnerSource
 	Grantors       port.PartnerGrantors
-	Log            *slog.Logger
+	// Bilateral: sổ song phương pf/cooperative (W5.6, ADR-0034) — nguồn feed của cặp (BuildBilateral).
+	Bilateral port.BilateralLedger
+	Log       *slog.Logger
 }
 
 func (s *Service) log() *slog.Logger {

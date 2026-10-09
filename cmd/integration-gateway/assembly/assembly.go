@@ -55,7 +55,8 @@ type Config struct {
 	IngestAllowProposed bool // cờ dev/test — bỏ qua ở Production
 	IngestMaxQueued     int
 	IngestRetryAfter    time.Duration
-	// IngestOwners: hợp đồng → port module chủ; nil → ba hợp đồng song phương vào sổ đệm (W5.6 nối port thật).
+	// IngestOwners: hợp đồng → port module chủ; nil → hợp đồng song phương bên a vào sổ song phương thật của
+	// pf/cooperative (W5.6, ADR-0034; Ports.Bilateral). Kiểm thử cơ chế lô truyền apiclient.StagingOwners tường minh.
 	IngestOwners map[string]apiclient.IngestOwner
 	// Kênh tệp (W5.8): giới hạn byte / bản ghi mỗi tệp (≤ 0 → mặc định).
 	IngestMaxFileBytes   int64
@@ -79,6 +80,8 @@ type Ports struct {
 	Collection apiclientport.CollectionVolumeSource
 	Hubs       apiclientport.HubCapacitySource
 	MRV        apiclientport.MRVPackageSource
+	// Bilateral: sổ song phương pf/cooperative (W5.6) — nạp theo lô bên a, feed của cặp, tổng kiểm ngày.
+	Bilateral apiclientport.BilateralLedger
 
 	// Ready: pool của cổng bắt buộc (app_public) — /readyz ping thêm.
 	Ready []*pgxpool.Pool
@@ -95,7 +98,8 @@ var ErrNotWired = errors.New("integration-gateway: chưa nối metering/port.Led
 //   - pf/cropcycle: CollectionVolumeSource, dữ kiện thửa và mã vụ qua pf/cooperative (r_cooperative, W3.3) + đơn vị
 //     hành chính pf/masterdata;
 //   - pf/geo: HubCapacitySource;
-//   - pf/mrv: MRVPackageSource (chỉ đọc export_job — không kho đối tượng).
+//   - pf/mrv: MRVPackageSource (chỉ đọc export_job — không kho đối tượng);
+//   - pf/cooperative: BilateralLedger — sổ song phương pf_coop (W5.6, ADR-0034), nhánh counterparty của chính sách hai bên.
 //
 // Biến (không phải hàm) để kiểm thử thay bằng cổng giả.
 var integrationPorts = func(ctx context.Context, open PoolOpener, cfg Config, plans apiclientport.Plans) (Ports, error) {
@@ -117,7 +121,7 @@ var integrationPorts = func(ctx context.Context, open PoolOpener, cfg Config, pl
 	m := mrv.New(mrvPool, clk, mrv.Deps{Params: md.Params()})
 	grants := grantlookup.New(partyPool, clk)
 	return Ports{Ledger: meter.Ledger(), Quotas: meter.Quotas(), Usage: meter.Usage(), Grants: grants, Reads: grants, Params: md.Params(),
-		Collection: cc.CollectionVolumeSource(), Hubs: g.HubCapacitySource(), MRV: m.PackageSource(),
+		Collection: cc.CollectionVolumeSource(), Hubs: g.HubCapacitySource(), MRV: m.PackageSource(), Bilateral: coop.BilateralLedger(),
 		Ready: []*pgxpool.Pool{unit}}, nil
 }
 
@@ -139,7 +143,8 @@ func Build(ctx context.Context, open PoolOpener, cfg Config) (*apiclient.Module,
 	if err == nil && cfg.IngestQueue != nil {
 		d.Ingest = apiclient.NewIngest(apPool, apiclient.IngestDeps{Queue: cfg.IngestQueue, Production: cfg.Production,
 			AllowProposed: cfg.IngestAllowProposed, Owners: cfg.IngestOwners, MaxQueued: cfg.IngestMaxQueued, RetryAfter: cfg.IngestRetryAfter,
-			MaxFileBytes: cfg.IngestMaxFileBytes, MaxFileRecords: cfg.IngestMaxFileRecords, OperatorTenant: cfg.Operator, Clock: cfg.Clock, Log: cfg.Log})
+			MaxFileBytes: cfg.IngestMaxFileBytes, MaxFileRecords: cfg.IngestMaxFileRecords, OperatorTenant: cfg.Operator, Clock: cfg.Clock, Log: cfg.Log,
+			Bilateral: ports.Bilateral})
 	}
 	return mod, d, err
 }
@@ -155,6 +160,6 @@ func Assemble(cfg Config, ports Ports, pools []*pgxpool.Pool) (apiclient.PublicD
 	}
 	return apiclient.PublicDeps{Limiter: apiclient.NewRateLimiter(cfg.Replicas),
 		Ledger: ports.Ledger, Quotas: ports.Quotas, Usage: ports.Usage, Grants: ports.Grants, Reads: ports.Reads, Params: ports.Params,
-		Collection: ports.Collection, Hubs: ports.Hubs, MRV: ports.MRV, OperatorTenant: cfg.Operator, Production: cfg.Production,
+		Collection: ports.Collection, Hubs: ports.Hubs, MRV: ports.MRV, Bilateral: ports.Bilateral, OperatorTenant: cfg.Operator, Production: cfg.Production,
 		AllowUnapproved: cfg.AllowUnapproved && !cfg.Production, Sandbox: cfg.Sandbox, Clock: cfg.Clock, Log: cfg.Log, Ready: ready}, nil
 }

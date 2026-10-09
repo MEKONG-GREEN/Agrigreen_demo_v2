@@ -263,9 +263,15 @@ paths:
         điều kiện cấp quyền loại `grant_kind` của hợp đồng đang hiệu lực bên cấp → tenant khách hàng (kiểm ở MỖI lời gọi:
         thu hồi → 403 `party.share_grant_missing`), mỗi trang một dòng sổ đọc ở tenant bên cấp; không theo phiên bản,
         không ảnh chụp — mọi bản ghi còn hiệu lực được phát lại ≤ 7 ngày nên đọc từ đầu (hoặc sau 410) là trạng thái đầy đủ.
+        Feed của cặp song phương W5.6 (`feed = bilateral`, ADR-0034, hợp đồng proposed — chỉ ngoài production với cờ): bắt
+        buộc `pair` = `htx_ref`; cặp (tenant khách hàng, HTX) phải đang hiệu lực ở sổ song phương — chưa lập / đã chấm dứt →
+        403 `integration.pair_missing`; trang gồm bản ghi của cả hai bên (mỗi mục có `contract` = `<tên>.v<N>`), chỉ hợp
+        đồng mà khách hàng có scope `ingest:<tên>:write` hoặc `feed:<tên>:read`; `recorded_at` = thời điểm sổ song phương
+        nhận (ngày của tổng kiểm `bilateral_day.v1`).
       operationId: getFeedPage
       parameters:
         - {name: feed, in: path, required: true, schema: {type: string, pattern: "^[a-z][a-z0-9_]{2,47}$"}}
+        - {name: pair, in: query, description: "Feed của cặp (W5.6, feed = bilateral, bắt buộc): htx_ref của HTX trong cặp với tenant khách hàng. Feed khác bỏ qua.", schema: {type: string, format: uuid}}
         - {name: grantor, in: query, description: "Feed lớp partner (W5.5): tenant bên cấp — chỉ CHỌN bên cấp, luôn kiểm cấp quyền loại grant_kind. Rỗng → chỉ nhận khi đúng một bên cấp (ADR-0020). Feed khác bỏ qua.", schema: {type: string, format: uuid}}
         - {name: cursor, in: query, description: "Cursor mờ của trang trước (next_cursor); bỏ trống = từ đầu phần còn giữ", schema: {type: string, pattern: "^[A-Za-z0-9_-]{1,200}$"}}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 1000, default: 500}}
@@ -339,6 +345,7 @@ paths:
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 100}}
         - {name: from, in: query, description: "Song phương: ngày đầu (YYYY-MM-DD)", schema: {type: string, format: date}}
         - {name: to, in: query, description: "Song phương: ngày cuối (YYYY-MM-DD)", schema: {type: string, format: date}}
+        - {name: pair, in: query, description: "Song phương (W5.6): htx_ref — chỉ tổng kiểm của một cặp của tenant khách hàng (không có cặp → 403 integration.pair_missing); bỏ trống = mọi cặp", schema: {type: string, format: uuid}}
       responses:
         "200":
           description: Tổng kiểm
@@ -913,6 +920,7 @@ components:
               event_id: {type: string, format: uuid}
               entity_key: {type: string}
               op: {type: string, enum: [upsert, retract]}
+              contract: {type: [string, "null"], pattern: "^[a-z][a-z0-9_]{2,47}[.]v[0-9]+$", description: "Chỉ feed của cặp (bilateral, W5.6): hợp đồng của bản ghi"}
               recorded_at: {type: string, format: date-time}
               record: {type: [object, "null"], description: "Một bản ghi theo hợp đồng contracts/integration/feeds/<feed>.v<N>.json"}
     FeedChecksums:

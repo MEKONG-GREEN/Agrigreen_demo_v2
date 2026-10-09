@@ -15,8 +15,8 @@ package public
 // Feed lớp partner (W5.5 — cooperative_directory, plot_directory): phân vùng = tenant bên cấp; thêm điều kiện cấp
 // quyền loại grant_kind đang hiệu lực bên cấp → tenant khách hàng (party/port.GrantLookup, hai phía, tại thời điểm
 // nhận yêu cầu — thu hồi → 403 party.share_grant_missing ngay ở lời gọi kế tiếp), tham số grantor tùy chọn (rỗng →
-// chỉ khi đúng một bên cấp), sổ đọc partner_read_log ở tenant bên cấp cho mỗi trang 2xx (K-05). Song phương (W5.6)
-// chưa phục vụ ở đây.
+// chỉ khi đúng một bên cấp), sổ đọc partner_read_log ở tenant bên cấp cho mỗi trang 2xx (K-05). Feed của cặp song
+// phương GET /v1/feeds/bilateral?pair=<htx_ref> (W5.6): pairfeed.go.
 
 import (
 	"net/http"
@@ -133,6 +133,9 @@ func (s *Server) feed(c *gin.Context, caller port.Caller, _ port.Plan) (*result,
 		after = &n
 	}
 	name := c.Param("feed")
+	if name == port.FeedBilateral {
+		return s.pairFeed(c, caller, after, cursor, limit)
+	}
 	t, err := s.feedAccess(c, caller, name, version)
 	if err != nil {
 		return nil, err

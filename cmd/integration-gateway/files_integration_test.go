@@ -63,7 +63,9 @@ func newFileEnv(t *testing.T, o fileOpts) *ingestEnv {
 	}
 	mod, d, err := assembly.Build(context.Background(), open, assembly.Config{Operator: e.operator, Peppers: peppers, Replicas: 1,
 		EgressMode: meter.ModeEnforce, Clock: clock.System{}, Log: log, IngestQueue: q, IngestAllowProposed: true, IngestMaxQueued: o.maxQueued,
-		IngestMaxFileBytes: o.maxFileBytes, Sandbox: o.sandbox})
+		IngestMaxFileBytes: o.maxFileBytes, Sandbox: o.sandbox,
+		// W5.6: cơ chế kênh tệp kiểm trên sổ đệm W5.4 (port thật của hợp đồng song phương cần cặp đang hiệu lực).
+		IngestOwners: apiclient.StagingOwners(pg.Pool(t, migrations.PF, dbadmin.AppPublic), clock.System{})})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}

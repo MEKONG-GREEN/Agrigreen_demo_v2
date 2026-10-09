@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -63,6 +64,9 @@ type FeedEntry struct {
 	DatasetVersion  *int64
 	Record          json.RawMessage // nil khi retract
 	RecordedAt      time.Time
+	// Contract: tên hợp đồng của bản ghi — chỉ feed của cặp (nhiều hợp đồng, W5.6): lưu trong cột entity_key dạng
+	// "<hợp đồng>|<entity_key>" (PairEntityKey) — kho feed W5.3 không đổi lược đồ; rỗng với feed một hợp đồng.
+	Contract string
 }
 
 // InsertFeedEntries nối các mục (seq đã cấp) — một câu INSERT … unnest mỗi lô 1000 (COPY FROM không chạy được
@@ -87,7 +91,11 @@ func InsertFeedEntries(ctx context.Context, tx pgx.Tx, tid uuid.UUID, es []FeedE
 				s := string(e.Record)
 				rec = &s
 			}
-			feeds, parts, keys, ops = append(feeds, e.Feed), append(parts, e.Partition), append(keys, e.EntityKey), append(ops, e.Op)
+			key := e.EntityKey
+			if e.Contract != "" {
+				key = PairEntityKey(e.Contract, e.EntityKey)
+			}
+			feeds, parts, keys, ops = append(feeds, e.Feed), append(parts, e.Partition), append(keys, key), append(ops, e.Op)
 			seqs, evs, cvs = append(seqs, e.Seq), append(evs, e.EventID.String()), append(cvs, int32(e.ContractVersion)) //nolint:gosec // phiên bản hợp đồng nhỏ
 			dvs, recs, ats = append(dvs, e.DatasetVersion), append(recs, rec), append(ats, e.RecordedAt.UTC())
 		}
@@ -119,6 +127,38 @@ func FeedEntriesAfter(ctx context.Context, tx pgx.Tx, feed, partition string, co
 		var rec []byte
 		if err := rows.Scan(&e.Seq, &e.EventID, &e.EntityKey, &e.Op, &e.ContractVersion, &e.DatasetVersion, &rec, &e.RecordedAt); err != nil {
 			return nil, err
+		}
+		if rec != nil {
+			e.Record = rec
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// PairEntityKey là entity_key lưu trong kho feed của mục feed cặp: "<hợp đồng>|<entity_key của hợp đồng>".
+func PairEntityKey(contract, key string) string { return contract + "|" + key }
+
+// PairFeedEntriesAfter trả tối đa limit mục có seq > after của feed của cặp (mọi hợp đồng, mỗi mục mang tên hợp
+// đồng tách từ entity_key đã lưu), theo seq (W5.6).
+func PairFeedEntriesAfter(ctx context.Context, tx pgx.Tx, feed, partition string, after int64, limit int) ([]FeedEntry, error) {
+	rows, err := tx.Query(ctx, `SELECT seq, event_id, entity_key, op, contract_version, dataset_version, record, recorded_at
+	  FROM pf_apiclient.feed_entry
+	  WHERE feed = $1::text AND partition_key = $2::text AND seq > $3::bigint
+	  ORDER BY seq LIMIT $4::int`, feed, partition, after, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []FeedEntry
+	for rows.Next() {
+		e := FeedEntry{Feed: feed, Partition: partition}
+		var rec []byte
+		if err := rows.Scan(&e.Seq, &e.EventID, &e.EntityKey, &e.Op, &e.ContractVersion, &e.DatasetVersion, &rec, &e.RecordedAt); err != nil {
+			return nil, err
+		}
+		if c, k, ok := strings.Cut(e.EntityKey, "|"); ok {
+			e.Contract, e.EntityKey = c, k
 		}
 		if rec != nil {
 			e.Record = rec

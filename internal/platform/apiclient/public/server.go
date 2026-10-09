@@ -80,6 +80,9 @@ type Deps struct {
 
 	// Ingest: nạp theo lô (W5.4, POST/GET /v1/batches). Nil → 503 apiclient.dependency_unavailable.
 	Ingest *ingest.Service
+	// Bilateral: sổ song phương pf/cooperative (W5.6, ADR-0034) — kiểm cặp của feed GET /v1/feeds/bilateral và tổng
+	// kiểm ngày song phương. Nil → 503 integration.bilateral_unavailable.
+	Bilateral port.BilateralLedger
 
 	OperatorTenant uuid.UUID
 	Production     bool // residency.Production: hợp đồng draft không phục vụ

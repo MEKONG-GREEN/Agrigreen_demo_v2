@@ -126,12 +126,14 @@ func IngestContract(name string) bool {
 }
 
 // NormIngestScopes kiểm và chuẩn hóa scope của một đăng ký hợp đồng nạp: chỉ ingest:<hợp đồng>:write hoặc
-// usage:read.
+// usage:read; hợp đồng song phương (W5.6) thêm feed:<hợp đồng>:read — bên kia của cặp đọc bản ghi của hợp đồng qua
+// feed của cặp và tổng kiểm ngày mà không được ghi (vd MKG đọc htx_roll_confirmation).
 func NormIngestScopes(contract string, in []string) ([]string, bool) {
 	out := make([]string, 0, len(in))
+	bilateral := slices.Contains(integration.BilateralContracts(), contract)
 	for _, s := range in {
 		s = strings.TrimSpace(s)
-		if s != port.ScopeUsageRead && s != port.IngestScope(contract) {
+		if s != port.ScopeUsageRead && s != port.IngestScope(contract) && (!bilateral || s != port.FeedScope(contract)) {
 			return nil, false
 		}
 		if !slices.Contains(out, s) {

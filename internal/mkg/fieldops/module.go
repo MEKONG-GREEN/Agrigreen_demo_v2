@@ -56,6 +56,9 @@ type Options struct {
 	// fieldops_directory_feed. DirectorySource: port.DirectorySourcePartner (rỗng = mặc định) | port.DirectorySourceFeed.
 	DirectoryFeed   port.DirectoryFeed
 	DirectorySource string
+	// Bilateral (W5.6, ADR-0034): luồng song phương qua cổng tích hợp (NewGatewayBilateral); nil → không job
+	// fieldops_bilateral. Hợp đồng còn proposed — cổng production từ chối tới khi C-12 chấp nhận.
+	Bilateral port.BilateralGateway
 }
 
 // Module là mkg/fieldops đã nối.
@@ -75,7 +78,7 @@ func New(db tenant.Beginner, clk clock.Clock, o Options) *Module {
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Directory: o.Directory, DirectoryUnconfigured: unconfigured,
 		DirectoryMaxAge: o.DirectoryMaxAge, DirectoryLookupBudget: o.DirectoryLookupBudget, Weighed: o.Weighed,
 		ConfiguredKgPerRoll: o.KgPerRoll, CursorKey: o.CursorKey, Feed: o.Feed, Harvest: o.Harvest,
-		DirectoryFeed: o.DirectoryFeed, DirectorySource: o.DirectorySource}}
+		DirectoryFeed: o.DirectoryFeed, DirectorySource: o.DirectorySource, Bilateral: o.Bilateral}}
 }
 
 // NewPlatformFeed tạo luồng phản hồi của HTX qua Application API công khai (tài khoản dịch

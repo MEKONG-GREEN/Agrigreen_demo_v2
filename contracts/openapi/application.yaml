@@ -512,6 +512,124 @@ paths:
                   next_cursor: {type: [string, "null"]}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
+  /v1/bilateral/pairs:
+    get:
+      summary: Cặp song phương của HTX người gọi (W5.6, ADR-0034)
+      description: |
+        Luồng song phương MKG ↔ HTX (hợp đồng proposed — chỉ phục vụ ngoài production với AG_BILATERAL_ALLOW_PROPOSED=1,
+        bật production chờ C-12). Người gọi: vai coop_manager, đơn vị công tác (org_ref) là Nút HTX có hồ sơ. Cán bộ KN cấp
+        trên cùng tenant không thấy (chính sách hai bên so khớp Nút bằng).
+      operationId: listBilateralPairs
+      responses:
+        "200":
+          description: Danh sách cặp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/BilateralPair"}}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Lập cặp song phương giữa HTX người gọi và tenant đối tác (chỉ bên HTX lập)
+      operationId: establishBilateralPair
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [counterparty_tenant_id]
+              additionalProperties: false
+              properties:
+                counterparty_tenant_id: {type: string, format: uuid, description: "Tenant đối tác (MKG)"}
+      responses:
+        "201":
+          description: Đã lập
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/BilateralPair"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/bilateral/pairs/{pair_id}/terminate:
+    post:
+      summary: Chấm dứt cặp song phương (bản ghi cũ giữ nguyên; đối tác bị từ chối ghi và đọc feed cặp từ lời gọi kế tiếp)
+      operationId: terminateBilateralPair
+      parameters:
+        - {name: pair_id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              additionalProperties: false
+              properties:
+                reason: {type: string, minLength: 10, maxLength: 500}
+      responses:
+        "200":
+          description: Đã chấm dứt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/BilateralPair"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/bilateral/pairs/{pair_id}/records:
+    get:
+      summary: Bản ghi song phương của cặp (lịch gom, bảng kê số cuộn của MKG; xác nhận/phản đối của HTX), theo seq
+      operationId: listBilateralRecords
+      parameters:
+        - {name: pair_id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: after, in: query, schema: {type: integer, minimum: 0, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 1000, default: 100}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_after]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/BilateralRecord"}}
+                  next_after: {type: integer}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/bilateral/confirmations:
+    post:
+      summary: HTX xác nhận / phản đối số cuộn của một revision bảng kê (bản ghi htx_roll_confirmation v1, RB-6)
+      description: |
+        Thân = một bản ghi đúng hợp đồng contracts/integration/ingest/htx_roll_confirmation.v1.json (mặc định từ chối);
+        htx_ref phải là HTX của người gọi; bảng kê (statement_ref, statement_revision) phải có trong cặp và mkg_rolls khớp;
+        phản đối phải có htx_rolls + reason. Idempotent theo confirmation_ref (cùng nội dung → 200 bản ghi cũ; khác → 409).
+      operationId: confirmBilateralRolls
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: true}
+      responses:
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/BilateralRecord"}
+        "200":
+          description: Đã ghi trước đó (cùng nội dung)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/BilateralRecord"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/households:
     post:
       summary: Tạo nông hộ — định danh chủ hộ đi thẳng vào kho định danh; trùng SĐT/CCCD → dùng lại mã cũ, báo "trùng"
@@ -8096,6 +8214,30 @@ components:
         cultivated_area_ha: {oneOf: [{$ref: "#/components/schemas/Decimal"}, {type: "null"}]}
         member_since: {type: [string, "null"], format: date}
         active: {type: boolean}
+    BilateralPair:
+      type: object
+      required: [pair_id, htx_ref, counterparty_tenant_id, active, since, terminated_at]
+      properties:
+        pair_id: {type: string, format: uuid, description: "UUIDv5(counterparty_tenant_id, htx_ref)"}
+        htx_ref: {type: string, format: uuid}
+        counterparty_tenant_id: {type: string, format: uuid}
+        active: {type: boolean}
+        since: {type: [string, "null"], format: date-time}
+        terminated_at: {type: [string, "null"], format: date-time}
+    BilateralRecord:
+      type: object
+      required: [id, pair_id, seq, contract, entity_key, author_side, channel, record, payload_sha256, recorded_at]
+      properties:
+        id: {type: string, format: uuid}
+        pair_id: {type: string, format: uuid}
+        seq: {type: integer}
+        contract: {type: string, pattern: "^[a-z][a-z0-9_]{2,47}[.]v[0-9]+$"}
+        entity_key: {type: string}
+        author_side: {type: string, enum: [a, b], description: "a = MKG qua cổng tích hợp; b = HTX"}
+        channel: {type: string, enum: [api, file, app]}
+        record: {type: object, description: "Bản ghi theo hợp đồng contracts/integration/ingest/<tên>.v<N>.json"}
+        payload_sha256: {type: string, pattern: "^[0-9a-f]{64}$"}
+        recorded_at: {type: string, format: date-time}
     HouseholdListItem:
       allOf:
         - $ref: "#/components/schemas/Household"

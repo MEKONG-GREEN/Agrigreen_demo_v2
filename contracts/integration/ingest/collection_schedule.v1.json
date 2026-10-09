@@ -6,7 +6,7 @@
   "status": "proposed",
   "pending": ["A7", "C-12"],
   "status_note": "ADR-0034 Đề xuất — chờ MKG ký (A7) và C-12 (H-2). W5.6 làm được mã, KHÔNG bật production trước C-12. Lược đồ bản ghi dùng NGUYÊN hợp đồng van contracts/publication/collection_schedule.json (ADR-0033 §3); trong lúc chờ, đường van G3 giữ cho ĐTK 1 (ADR-0033 §6). Người đề xuất/phê duyệt là vai giữ chỗ.",
-  "owner": "pf/cropcycle",
+  "owner": "pf/cooperative",
   "consumers": ["HTX (bên b) qua App HTX", "pf/notify"],
   "proposed_by": "pf-cropcycle-module-owner",
   "approved_by": "mkg-data-steward",
@@ -20,7 +20,7 @@
     "route": "POST /v1/batches/collection_schedule",
     "max_batch": 500,
     "business_key": ["schedule_ref", "revision"],
-    "target_port": "pf/cropcycle port.BilateralLedger (W5.6; sau W3.3 chuyển pf/cooperative)",
+    "target_port": "pf/cooperative qua apiclient/port.BilateralLedger → pf_coop.bilateral_record (W5.6)",
     "channels": ["api", "file"]
   },
   "bilateral": {

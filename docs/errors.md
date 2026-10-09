@@ -913,6 +913,28 @@ Môi trường thử của đối tác (`AG_PARTNER_SANDBOX=1`): khóa thử `ag
 
 Lớp lỗi của một lần giao (`error_class` ở sổ `webhook_delivery`, `breaker.last_error`, metric — không phải phản hồi HTTP): `http_status` (đầu nhận trả 4xx/5xx), `redirect` (3xx — không theo chuyển hướng), `timeout`, `dns`, `tls`, `connect`, `blocked_address` (địa chỉ THẬT lúc kết nối thuộc dải cấm — DNS rebinding), `url_rejected` (URL đã lưu không còn qua chính sách). Mọi lớp tính vào N lỗi liên tiếp của ngắt mạch.
 
+### Cổng tích hợp và pf/cooperative — luồng song phương MKG ↔ HTX (W5.6; ADR-0034, Đề xuất — bật production chờ C-12)
+
+Sổ song phương `pf_coop.bilateral_record` / `bilateral_pair_event` (`pf/cooperative`, pf 000135). Cổng: nạp theo lô `collection_schedule`, `roll_count_statement` (bên a), feed của cặp `GET /v1/feeds/bilateral?pair=<htx_ref>`, tổng kiểm `GET /v1/feeds/{hợp đồng}/checksums?pair=`. App HTX: `/v1/bilateral/*` (Application API, chỉ bật với `AG_BILATERAL_ALLOW_PROPOSED=1` ngoài production). [Runbook](runbooks/integration-batches.md#8-luồng-song-phương-w56-adr-0034).
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 403 | `integration.pair_missing` | Không có cặp song phương ĐANG HIỆU LỰC giữa tenant bên gọi và HTX (`pair`): chưa lập / đã chấm dứt / HTX của tenant khác. Feed cặp, tổng kiểm với `pair` lạ, App HTX đọc cặp không phải của mình, HTX xác nhận khi cặp đã chấm dứt. Trong kết quả lô (`results[].problem_code`): bản ghi bên a gửi tới HTX chưa có cặp với tenant gửi |
+| 403 | `integration.contract_not_servable` | Feed cặp: không hợp đồng song phương nào phục vụ được (proposed mà cổng không đặt `AG_GATEWAY_FEED_ALLOW_PROPOSED=1`, hoặc production); App HTX: hợp đồng `htx_roll_confirmation` chưa phục vụ |
+| 403 | `apiclient.forbidden` | Feed cặp: khách hàng không có scope `ingest:<tên>:write` hoặc `feed:<tên>:read` của hợp đồng song phương nào |
+| 403 | `integration.no_owner_port` | `POST /v1/batches/htx_roll_confirmation` — bên b không ghi qua cổng (chờ gắn khách hàng API ↔ Nút HTX, W7.2) |
+| 503 | `integration.bilateral_unavailable` | Cổng / worker chưa nối sổ song phương (`Ports.Bilateral`) |
+| 403 | `integration.bilateral_wrong_side` | (port) ghi hợp đồng của bên kia của cặp |
+| 422 | `integration.record_invalid` | App HTX: bản ghi xác nhận không đúng `htx_roll_confirmation.v1`, `htx_ref` không phải HTX của người gọi |
+| 409 | `integration.business_key_conflict` | Cùng khóa nghiệp vụ trong cặp đã ghi với nội dung khác (lô: `results[].problem_code`; App HTX: `confirmation_ref` trùng khác nội dung) |
+| 403 | `cooperative.bilateral_not_htx` | App HTX: người gọi thiếu vai `coop_manager` hoặc đơn vị công tác (`org_ref`) không phải Nút HTX có hồ sơ ở `pf_coop.cooperative` |
+| 409 | `cooperative.bilateral_pair_state` | Lập cặp đang hiệu lực, hoặc hai thao tác cặp đồng thời |
+| 422 | `cooperative.bilateral_statement_unknown` | Xác nhận trỏ bảng kê (`statement_ref`, `statement_revision`) không có trong cặp của HTX |
+| 422 | `cooperative.bilateral_rolls_mismatch` | `mkg_rolls` khác số cuộn của revision bảng kê được phản hồi |
+| 422 | `validation_failed` | `pair` thiếu/không phải UUID; lý do chấm dứt ngoài 10–500 ký tự; phản đối thiếu `htx_rolls`/`reason`; `counterparty_tenant_id` trùng tenant HTX |
+
+Phía MKG (`mkg/fieldops`, job `fieldops_bilateral`, cột `mkg_fieldops.bilateral_send.problem_code` — không phải phản hồi HTTP): mã của cổng ở trên, cộng `fieldops.bilateral_unmappable` (bản ghi van không chiếu được sang hợp đồng song phương — bỏ qua), `fieldops.bilateral_duplicate` (khóa nghiệp vụ đã có trong hàng gửi), `fieldops.bilateral_batch_refused` (cổng từ chối cả lô 4xx — đưa về pending), `integration.dead_lettered` (lô vào DLQ — gửi lại lô mới). Log `fieldops.bilateral_checksum_mismatch` khi tổng kiểm ngày lệch.
+
 ### pf/metering (sổ đo lường sử dụng, điểm kiểm soát xuất dữ liệu, bảng kê — G5-0 đóng băng, ADR-0023, ADR-0024)
 
 | HTTP | Mã | Khi nào |

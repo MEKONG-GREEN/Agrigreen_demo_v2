@@ -164,6 +164,14 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	pty.UsePlotStats(coop.PlotStats())       // G-03: số thửa đã số hoá trong danh sách HTX
 	g.UsePlots(coop.PlotGeometry())          // HTX US-GPS-01/03: khoảng cách tới lô của log GPS
 	g.UseMapLayers(coop.MapLayers())         // GIS FN-01, US-INT-02: lớp HTX, lớp thửa của bản đồ gộp
+	// W5.6 (ADR-0034, C-12): phía HTX của luồng song phương (/v1/bilateral/*) — hợp đồng còn proposed: chỉ bật ngoài
+	// production với AG_BILATERAL_ALLOW_PROPOSED=1; production từ chối khởi động nếu đặt.
+	if os.Getenv(cooperative.EnvBilateralAllowProposed) == "1" {
+		if residency.Production(os.Getenv) {
+			return Modules{}, pools, cooperative.ErrBilateralProposedInProduction
+		}
+		coop.UseBilateral(false, true)
+	}
 
 	cnt := content.New(unit, clk, content.Deps{Scope: pty.ScopeResolver(), Catalogs: md.Catalogs(), AdminUnits: md.AdminUnits(), Store: store})
 

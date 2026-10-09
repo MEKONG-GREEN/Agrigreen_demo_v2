@@ -10,6 +10,7 @@ depends:
   mkg/measurement: ">=1.0 <2"
 provides:
   ports:
+    - BilateralGateway
     - DirectoryFeed
     - HTXResponseFeed
     - HarvestCalendar

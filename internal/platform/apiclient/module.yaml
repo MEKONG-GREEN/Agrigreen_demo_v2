@@ -13,6 +13,7 @@ provides:
   ports:
     - AggregateSource
     - Authenticator
+    - BilateralLedger
     - CollectionVolumeSource
     - Contributors
     - HubCapacitySource

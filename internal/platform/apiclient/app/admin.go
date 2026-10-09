@@ -235,7 +235,7 @@ func (s *Service) ProposeSubscription(ctx context.Context, clientID uuid.UUID, p
 		}
 	} else if domain.IngestContract(name) { // W5.4: hợp đồng nạp contracts/integration/ingest — scope ingest:<tên>:write
 		if sc, ok = domain.NormIngestScopes(name, scopes); !ok {
-			return store.Subscription{}, problem.Validation.WithField("scopes", "chỉ "+port.IngestScope(name)+" và usage:read")
+			return store.Subscription{}, problem.Validation.WithField("scopes", "chỉ "+port.IngestScope(name)+" (song phương: thêm "+port.FeedScope(name)+") và usage:read")
 		}
 	} else if fc, ferr := FeedContract(name, 0); ferr == nil { // W5.3: feed contracts/integration/feeds — scope feed:<tên>:read
 		name = fc.Name
