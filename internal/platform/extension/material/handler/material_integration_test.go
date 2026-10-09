@@ -140,6 +140,7 @@ func (f *fix) user(tid uuid.UUID, role, department string, units ...string) user
 	switch role {
 	case authz.KNXa:
 		kc.Communes, kc.Scope = units, authz.Scope{Units: units}
+		kc.OrgRef = ids.New() // như P1: lần gán Cấp Xã luôn có Nút (db.ForModule đòi Nút — FD)
 	case authz.KNTW, authz.KNAdmin:
 		kc.Scope = authz.Scope{All: true}
 	default:

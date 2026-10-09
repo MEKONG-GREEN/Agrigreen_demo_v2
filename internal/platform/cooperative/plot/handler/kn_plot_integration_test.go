@@ -106,6 +106,7 @@ func (f *knFix) user(tid uuid.UUID, role, dept string, units ...string) knUser {
 	switch role {
 	case authz.KNXa:
 		kc.Communes, kc.Scope = units, authz.Scope{Units: units}
+		kc.OrgRef = ids.New() // như P1: lần gán Cấp Xã luôn có Nút (db.ForModule đòi Nút — FD)
 	case authz.KNTW, authz.KNAdmin:
 		kc.Scope = authz.Scope{All: true}
 	default:
