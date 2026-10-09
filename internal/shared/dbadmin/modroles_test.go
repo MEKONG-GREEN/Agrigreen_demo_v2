@@ -94,9 +94,10 @@ func roleByName(t *testing.T, name string) (Role, int) {
 // thứ tự tạo nhóm trước.
 func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	groups := ModuleGroups()
-	// 17 pf có vai cũ + pf/kref + pf/workflow + pf/forms + pf/evidence + pf/cooperative (W3.3) + 7 mkg + vault/identity; pf/extdata không schema.
-	if len(groups) != 30 || len(legacyGroups()) != 25 {
-		t.Errorf("số vai nhóm: %d (muốn 30, 25 có vai cũ): %v", len(groups), groups)
+	// 17 pf có vai cũ + pf/kref + pf/workflow + pf/forms + pf/evidence + pf/cooperative (W3.3) + 7 mkg có vai cũ
+	// + mkg/engine (W8.2, không vai cũ) + vault/identity; pf/extdata không schema.
+	if len(groups) != 31 || len(legacyGroups()) != 25 {
+		t.Errorf("số vai nhóm: %d (muốn 31, 25 có vai cũ): %v", len(groups), groups)
 	}
 	if slices.ContainsFunc(groups, func(g ModuleGroup) bool { return g.Module == "pf/extdata" }) {
 		t.Error("pf/extdata không có schema — không có vai nhóm")
@@ -188,6 +189,13 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	// W6.2: api-platform ghép pf/forms — app_platform là thành viên r_forms.
 	if !slices.Contains(plat.MemberOf, "r_forms") {
 		t.Errorf("r_forms: app_platform %v", plat.MemberOf)
+	}
+	// W8.2: api-internal ghép mkg/engine (job engine_observation_feed) — app_internal là thành viên r_engine (chỉ cụm mkg).
+	if in, _ := roleByName(t, AppInternal); !slices.Contains(in.MemberOf, "r_engine") {
+		t.Errorf("r_engine: app_internal %v", in.MemberOf)
+	}
+	if e, _ := roleByName(t, "r_engine"); !slices.Equal(e.Clusters, []migrations.Cluster{migrations.MKG}) || e.Login {
+		t.Errorf("r_engine: %+v", e)
 	}
 	// W6.5: api-platform ghép pf/evidence (route /v1/files của pf/sync gọi port) — app_platform là thành viên r_evidence.
 	if w, _ := roleByName(t, AppWorker); !slices.Contains(plat.MemberOf, "r_evidence") || slices.Contains(w.MemberOf, "r_evidence") {

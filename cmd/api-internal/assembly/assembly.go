@@ -25,6 +25,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/internal/mkgwire"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/acctbridge"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/costing"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/engine"
+	engport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/engine/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops"
 	foport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub"
@@ -39,6 +41,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/residency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 )
 
@@ -54,6 +57,8 @@ type Modules struct {
 	Orders      *orders.Module // G4: hợp đồng mua rơm, đơn mua/phiếu nhận, đơn bán/giao nhận (orders_app)
 	Costing     *costing.Module
 	Acctbridge  *acctbridge.Module
+	// W8.2: kho quan sát của engine (r_engine) — không route HTTP (không có trong List); job engine_observation_feed.
+	Engine *engine.Module
 }
 
 // List trả module theo thứ tự gắn route.
@@ -116,6 +121,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock) (mods Modules,
 	// G4 mkg/acctbridge (r_acctbridge): HTTP + job thử lại đẩy. API không dựng bút toán (worker dựng)
 	// nên không cần costing.ClosedPeriods ở đây; bộ điều hợp dùng cho đẩy lại chạy ở worker-internal.
 	mods.Acctbridge = acctbridge.New(unit, clk, acctbridge.Deps{RetryMax: acctbridge.RetryMaxFromEnv()})
+	// W8.2 mkg/engine (r_engine): kho quan sát nạp từ feed của cổng tích hợp qua CÙNG bộ điều hợp feed của W5.5.
+	mods.Engine = engine.New(unit, clk, EngineOptionsFromEnv(fo.DirectoryFeed))
 	return mods, ops, pools, nil
 }
 
@@ -182,6 +189,19 @@ func Jobs(mods Modules, tenantPool *pgxpool.Pool, selected string, log *slog.Log
 		}
 		out = append(out, mods.Fieldops.DirectoryFeedJobs(tid, interval, log)...)
 	}
+	if picked(engport.JobObservationFeed) && mods.Engine != nil {
+		// W8.2 (ADR-0036 §3, v4.1 §41.4): feed của cổng tích hợp → kho quan sát của engine. Thiếu AG_MKG_TENANT_ID
+		// hoặc cấu hình feed → không có job.
+		tid, err := EnvUUID("AG_MKG_TENANT_ID")
+		if err != nil {
+			return nil, err
+		}
+		interval, err := EnvDuration("AG_ENGINE_FEED_INTERVAL")
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, mods.Engine.Jobs(tid, interval, log)...)
+	}
 	if picked(logistics.JobAlerts) {
 		// L-08: cảnh báo ghe chưa cân > N giờ, đăng kiểm hết / sắp hết hạn (AG_LOGISTICS_ALERT_INTERVAL, mặc định 15m).
 		interval, err := EnvDuration("AG_LOGISTICS_ALERT_INTERVAL")
@@ -234,7 +254,7 @@ func EnvDuration(name string) (time.Duration, error) {
 // JobNames liệt kê tên job hợp lệ của api-internal.
 func JobNames() string {
 	return hubport.JobDailyCapacity + ", " + foport.JobHTXResponses + ", " + foport.JobHarvestDates + ", " + foport.JobDirectory + ", " + foport.JobDirectoryFeed + ", " +
-		logistics.JobAlerts + ", " + acctbridge.JobPushRetry
+		engport.JobObservationFeed + ", " + logistics.JobAlerts + ", " + acctbridge.JobPushRetry
 }
 
 // FieldopsOptionsFromEnv đọc cấu hình mkg/fieldops:
@@ -317,6 +337,27 @@ func DirectorySourceFromEnv(haveFeed bool) (string, error) {
 	default:
 		return "", fmt.Errorf("AG_FIELDOPS_DIRECTORY_SOURCE phải là partner | feed, nhận %q", v)
 	}
+}
+
+// EngineOptionsFromEnv đọc cấu hình kho quan sát mkg/engine (W8.2):
+//
+//	feed  bộ điều hợp feed của W5.5 (AG_INTEGRATION_GATEWAY_URL + AG_FIELDOPS_FEED_API_KEY, bên cấp
+//	      AG_PARTNER_GRANTOR_TENANT); khóa API cần thêm scope feed:<tên>:read của các feed quan sát. nil → không job.
+//	AG_ENGINE_FEEDS                danh sách feed kéo, phân tách bằng dấu phẩy (rỗng = mọi feed có bộ ánh xạ).
+//	AG_ENGINE_FEED_ALLOW_PROPOSED  "1" — cờ dev/test: kéo cả feed có hợp đồng proposed (chưa ký A7); bỏ qua ở
+//	                               production (AG_ENV), như AG_GATEWAY_FEED_ALLOW_PROPOSED của cổng.
+//	AG_ENGINE_FEED_INTERVAL        chu kỳ job engine_observation_feed (Go duration, mặc định 15m).
+func EngineOptionsFromEnv(feed foport.DirectoryFeed) engine.Options {
+	o := engine.Options{Feed: feed, Production: residency.Production(os.Getenv),
+		AllowProposed: strings.TrimSpace(os.Getenv("AG_ENGINE_FEED_ALLOW_PROPOSED")) == "1"}
+	if v := strings.TrimSpace(os.Getenv("AG_ENGINE_FEEDS")); v != "" {
+		for _, f := range strings.Split(v, ",") {
+			if f = strings.TrimSpace(f); f != "" {
+				o.Feeds = append(o.Feeds, f)
+			}
+		}
+	}
+	return o
 }
 
 // DocumentStoreFromEnv chọn kho đối tượng trong lãnh thổ cho tệp chứng từ vùng mkg (AG_S3_* | AG_OBJSTORE_DIR,

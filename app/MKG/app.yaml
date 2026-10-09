@@ -1,10 +1,11 @@
 # Tệp khai báo ứng dụng — ADR-0027 mục 3, kiến trúc v4.1 §7.2, docs/dev/modules.md#ứng-dụng-appyaml-w13.
 # Viết tay; kiểm bằng go run ./tools/modgen -check.
 app: MKG
-description: Vận hành nội bộ Mekong Green (vùng mkg) — hub/kho, cân và đối soát, gom, điều vận, bán hàng, giá thành, cầu nối kế toán
+description: Vận hành nội bộ Mekong Green (vùng mkg) — hub/kho, cân và đối soát, gom, điều vận, bán hàng, giá thành, cầu nối kế toán, kho quan sát của engine
 modules:
   mkg/acctbridge: ">=1.0 <2"
   mkg/costing: ">=1.0 <2"
+  mkg/engine: ">=1.0 <2"
   mkg/fieldops: ">=1.0 <2"
   mkg/hub: ">=1.0 <2"
   mkg/logistics: ">=1.0 <2"

@@ -5,6 +5,7 @@ package modreg
 var catalog = []CatalogEntry{
 	{Name: "mkg/acctbridge", Kind: "domain", Enable: "always", Permissions: []string{"accounting_bridge_operator"}, Zones: []string{"mkg"}, OwnsSchema: []string{"mkg_acctbridge"}, Shares: []string{}},
 	{Name: "mkg/costing", Kind: "domain", Enable: "always", Permissions: []string{"chief_accountant", "cost_accountant", "period_closer"}, Zones: []string{"mkg"}, OwnsSchema: []string{"mkg_costing"}, Shares: []string{}},
+	{Name: "mkg/engine", Kind: "domain", Enable: "always", Permissions: []string{}, Zones: []string{"mkg"}, OwnsSchema: []string{"mkg_engine"}, Shares: []string{}},
 	{Name: "mkg/fieldops", Kind: "domain", Enable: "always", Permissions: []string{"field_collector", "field_supervisor"}, Zones: []string{"mkg"}, OwnsSchema: []string{"mkg_fieldops"}, Shares: []string{}},
 	{Name: "mkg/hub", Kind: "domain", Enable: "always", Permissions: []string{"hub_approver", "hub_operator"}, Zones: []string{"mkg"}, OwnsSchema: []string{"mkg_hub"}, Shares: []string{}},
 	{Name: "mkg/logistics", Kind: "domain", Enable: "always", Permissions: []string{"dispatcher", "driver"}, Zones: []string{"mkg"}, OwnsSchema: []string{"mkg_logistics"}, Shares: []string{}},

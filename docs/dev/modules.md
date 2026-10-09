@@ -498,3 +498,12 @@ cc.UseCollectionVolume(coop.Plots(), coop.Seasons(), md.AdminUnits())
 - Kiểm phạm vi ở ứng dụng **giữ nguyên** (`authz.Scope`, `coopOnly`) — RLS là lớp thứ hai.
 - Nút của người dùng HTX là `OrgRef` của token: kiểm thử dựng `k_ref` cho tenant (vd `kref.RebuildTenant`) thì người dùng chỉ thấy cây con của Nút; không dựng thì chính sách lùi về `p_tenant`.
 - Bảng mới có `tenant_id` trong `pf_coop` (hay schema khác muốn phạm vi Nút): thêm `p_scope AS RESTRICTIVE` viết thẳng `EXISTS k_ref.node_closure` (không hàm do repo định nghĩa) — `shared.v_missing_rls` báo nếu `p_scope` PERMISSIVE hay có chính sách thứ ba; cổng EXPLAIN W9.1 báo nếu gọi hàm theo hàng.
+## Module `mkg/engine` — kho quan sát (W8.2)
+
+[Thiết kế](../design/mkg.md#59-mkgengine--kho-quan-sát-của-engine-điều-phối-w82), [ADR-0036](../adr/0036-engine-ba-che-do-vung-noi-bo-optcore.md#hiện-thực). Module mới `internal/mkg/engine` (`kind: domain`, `zones: [mkg]`, `enable: always`, ứng dụng MKG). Sở hữu `mkg_engine` (mkg 000037): sổ `observation` + bảng đệm `observation_feed_state`. Vai nhóm `r_engine` suy từ `modreg.Catalog` (không vai cũ `engine_app`); `cmd/api-internal` ghép module nên `app_internal` là thành viên. Giao dịch chạy `SET LOCAL ROLE r_engine` (`engine.DBModule`).
+
+**Port.** `engine/port.Observations` (`Latest(ctx, tid, Query{Kind, EntityKeys})` → `Snapshot{Fresh, Stale, Missing}`) cho engine W8.3. Hằng `Kind*`, `Source*`, `Unit*`, `JobObservationFeed`.
+
+**Nối ở gốc lắp ráp** (`cmd/api-internal/assembly`): `engine.New(unit, clk, EngineOptionsFromEnv(fo.DirectoryFeed))` — bộ điều hợp feed của `mkg/fieldops` (W5.5, `AG_INTEGRATION_GATEWAY_URL` + `AG_FIELDOPS_FEED_API_KEY`); `AG_ENGINE_FEEDS` (danh sách feed), `AG_ENGINE_FEED_ALLOW_PROPOSED=1` (dev/test, bỏ qua ở production), `AG_ENGINE_FEED_INTERVAL`; job `engine_observation_feed` trong `AG_MKG_JOBS` (cần `AG_MKG_TENANT_ID`). Module không có route HTTP (không trong `Modules.List`).
+
+**Cấm float** (`agnofloat`, `floatFreeZones`): giá trị và cận bất định là `decimal`.

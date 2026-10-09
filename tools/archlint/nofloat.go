@@ -25,7 +25,8 @@ var NoFloat = &analysis.Analyzer{
 // KN v7.7 P3: engine mẫu báo cáo (diện tích, sản lượng, năng suất, tỷ lệ — decimal), bộ tính
 // công thức con của Excel và bộ nạp Excel.
 // KN v7.7 P4: vòng đời báo cáo (diện tích, sản lượng, chỉ số dashboard — decimal) và quy tắc báo cáo Chi cục.
-var floatFreeZones = []string{"/internal/mkg/hub", "/internal/mkg/logistics",
+// W8.2: mkg/engine — giá trị và cận bất định của quan sát (diện tích, tỷ lệ) đều decimal.
+var floatFreeZones = []string{"/internal/mkg/hub", "/internal/mkg/logistics", "/internal/mkg/engine",
 	"/internal/platform/reports/formula", "/internal/platform/reports/form", "/internal/platform/reports/formimport",
 	"/internal/platform/extension/reportcycle", "/internal/platform/reports/dispatch"}
 

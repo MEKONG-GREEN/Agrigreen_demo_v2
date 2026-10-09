@@ -72,8 +72,8 @@ ADR-0016 áp cho `lib/optcore` và engine nội bộ. Thêm bộ giải mới (O
 | Gói | Việc | Migration |
 |---|---|---|
 | W8.1 | Tách `lib/optcore`, golden test giữ nguyên byte — **xong** (08/10/2026), xem ghi chú dưới | — |
-| W5.5 | Bộ điều hợp feed `mkg/fieldops` (nguồn của kho quan sát) | mkg 000024 |
-| W8.2 | Kho quan sát | mkg 000026 |
+| W5.5 | Bộ điều hợp feed `mkg/fieldops` (nguồn của kho quan sát) — **xong** (09/10/2026) | mkg 000036 (000024 lỗi thời) |
+| W8.2 | Kho quan sát — **xong** (09/10/2026), xem ghi chú dưới | mkg 000037 (000026 lỗi thời) |
 | W8.3 | Engine nội bộ ba chế độ, T1/T2a/T2b/T3, vùng đóng băng, tự duyệt (chờ v1.3) | — |
 
 **W8.1 (xong).**
@@ -83,6 +83,13 @@ ADR-0016 áp cho `lib/optcore` và engine nội bộ. Thêm bộ giải mới (O
 - Không đổi hành vi. Golden byte được chụp ở commit riêng **trước** khi tách: 35 đầu ra lõi trên 5 ca (evaluate, bỏ đối chứng, độ nhạy, lịch thu hoạch, select_hubs) và 20 phong bì kết quả. Sau khi tách, sha256 và độ dài trùng hết. Bản dump đầy đủ trước và sau cũng trùng từng byte (diff -r).
 - Phiên bản: mỗi kết quả vẫn ghi `engine_version` (= `optcore.ENGINE_VERSION`). Chưa thêm trường `optcore_version` vào phong bì, vì làm vậy đổi hợp đồng `result.v1` và đổi byte. Việc này để cho W8.3, khi có triển khai thứ hai. Tới lúc đó, phiên bản gói được ghim ở pyproject của optimizer.
 - Build: `optimizer/Dockerfile` nhận lõi qua ngữ cảnh đặt tên `optcore` (`docker build --build-context optcore=lib/optcore … optimizer`; compose `additional_contexts`). CI thêm job `optcore` (pytest, mypy, giấy phép highspy). Job `optimizer` cài lõi từ đường dẫn.
+
+**W8.2 (xong, mã).**
+
+- Chủ kho quan sát: **module mới `mkg/engine`** (`kind: domain`, vùng mkg, schema `mkg_engine`, vai nhóm `r_engine` suy từ registry) — §3 cho phép "module do v1.3 chỉ định"; chọn module riêng thay `mkg/fieldops` vì quan sát phủ nhiều miền (tiến độ gặt theo xã, đơn vị hành chính, đồ thị thủy, danh bạ), và engine (dịch vụ Python, không giữ dữ liệu) cần một module Go phía dữ liệu cho W8.3 (tham số chính sách, kế hoạch đề xuất). Phụ thuộc `mkg/fieldops` chỉ qua `fieldops/port` (kiểu bộ điều hợp feed).
+- Sổ `mkg_engine.observation` chỉ ghi thêm (`shared.apply_ledger`): `kind, source (api | manual | sensor), as_of, max_age, uncertainty` như §3, cộng `entity_key`, giá trị decimal + đơn vị (giữ số lẻ của nguồn), `uncertainty_basis`, `payload` (bản ghi hợp đồng), nguồn gốc feed (`feed`, `contract_version`, `feed_seq`, `event_id`, `feed_cursor`), `mapper_version`. `uncertainty` là nửa độ rộng tuyệt đối cùng đơn vị giá trị: từ làm tròn của nguồn, lan truyền theo cận tuyến tính (bảo thủ — engine định cỡ tồn đệm). Ô bị ẩn dưới k (ADR-0035) không phát nên vắng quan sát; dòng `province_withheld` mang căn cứ `k_suppressed_residual`.
+- Nạp: job `engine_observation_feed` (api-internal) dùng **cùng** bộ điều hợp feed của W5.5 với cursor riêng; mỗi trang kiểm hợp đồng tích hợp như mọi đối tác, ghi sổ + cursor trong một giao dịch, idempotent theo `event_id`. "Quá `max_age`" là phép đọc: `Observations.Latest` tách `Stale` khỏi `Fresh`; `as_of` hiệu lực tiến theo lần đọc tới đầu feed (feed là dòng trạng thái). Nền tảng ngừng → quan sát chuyển dần sang `Stale`, engine không chờ (§41.4).
+- Lệch/chưa làm: đường ghi `manual`/`sensor` và chính sách tăng tồn đệm theo `Stale` thuộc W8.3; thu hồi cấp quyền ghi quan sát rút (lịch sử vẫn trong sổ chỉ ghi thêm — khác bản sao W5.5 xóa dòng; quyết định lưu giữ chờ A7); sau 410 đọc lại phần feed còn giữ, chưa dựng lại từ ảnh chụp tập dữ liệu.
 
 ## Liên quan
 
