@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // ---------------------------------------------------------------------------
@@ -61,7 +62,7 @@ func oneForecastRun(ctx context.Context, tx pgx.Tx, where string, args ...any) (
 
 // ForecastRunByIdem tìm lần chạy đã ghi với idem_key.
 func ForecastRunByIdem(ctx context.Context, tx pgx.Tx, key string) (*domain.ForecastRun, error) {
-	return oneForecastRun(ctx, tx, "idem_key = $1", key)
+	return oneForecastRun(ctx, tx, "idem_key = $1"+ledger.NewestByIdem(""), key)
 }
 
 // ForecastRunByID đọc một lần chạy.

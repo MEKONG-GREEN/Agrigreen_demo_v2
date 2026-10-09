@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 const scheduleCols = `schedule_id, owner_ref, owner_level, department_code, province_code, commune_codes, week_start, status,
@@ -132,7 +133,7 @@ func InsertScheduleEvent(ctx context.Context, tx pgx.Tx, e *domain.ScheduleEvent
 
 // ScheduleEventByIdem tìm sự việc đã ghi với idem_key (gọi lặp, hàng đợi ngoại tuyến phát lại).
 func ScheduleEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*domain.ScheduleEvent, error) {
-	e, err := scanScheduleEvent(tx.QueryRow(ctx, "SELECT "+scheduleEventCols+" FROM pf_extension.work_schedule_event WHERE idem_key = $1", key))
+	e, err := scanScheduleEvent(tx.QueryRow(ctx, "SELECT "+scheduleEventCols+" FROM pf_extension.work_schedule_event WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

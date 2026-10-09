@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/season/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/mass"
 )
 
@@ -118,7 +119,7 @@ func oneHarvest(ctx context.Context, tx pgx.Tx, where string, arg any) (*Harvest
 
 // HarvestByIdem đọc khai báo theo idem_key.
 func HarvestByIdem(ctx context.Context, tx pgx.Tx, key string) (*Harvest, error) {
-	return oneHarvest(ctx, tx, "idem_key = $1::text", key)
+	return oneHarvest(ctx, tx, "idem_key = $1::text"+ledger.NewestFirst(""), key)
 }
 
 // HarvestByID đọc khai báo theo id.

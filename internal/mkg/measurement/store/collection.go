@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // CollectionLink là một dòng sổ mkg_measurement.lot_collection (lô cân ↔ lệnh gom).
@@ -86,7 +87,7 @@ func LotOfCollection(ctx context.Context, tx pgx.Tx, order uuid.UUID) (*Collecti
 
 // CollectionLinkByIdem đọc dòng sổ theo idem_key (phát lại).
 func CollectionLinkByIdem(ctx context.Context, tx pgx.Tx, key string) (*CollectionLink, error) {
-	return scanLink(tx.QueryRow(ctx, `SELECT `+linkCols+` FROM mkg_measurement.lot_collection WHERE idem_key = $1`, key))
+	return scanLink(tx.QueryRow(ctx, `SELECT `+linkCols+` FROM mkg_measurement.lot_collection WHERE idem_key = $1`+ledger.NewestByIdem(""), key))
 }
 
 // CollectionOrderRefOf đọc lệnh gom liên kết tường minh của lô qua bảng chiếu (nil khi

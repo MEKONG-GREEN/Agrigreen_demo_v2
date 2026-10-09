@@ -11,6 +11,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // DeviceStream là khóa chuỗi của thiết bị.
@@ -72,7 +73,7 @@ func InsertDeviceVersion(ctx context.Context, tx pgx.Tx, tid uuid.UUID, v *Devic
 func DeviceVersionByIdem(ctx context.Context, tx pgx.Tx, key string) (*DeviceVersion, error) {
 	var v DeviceVersion
 	err := tx.QueryRow(ctx, `SELECT id, seq, scale_device_id, epoch, action, facility_ref, point, public_key, key_id, cert_sha256,
-	    scale_model, reason, event_time, recorded_at, actor_ref, idem_key FROM mkg_measurement.device_version WHERE idem_key = $1`, key).
+	    scale_model, reason, event_time, recorded_at, actor_ref, idem_key FROM mkg_measurement.device_version WHERE idem_key = $1`+ledger.NewestByIdem(""), key).
 		Scan(&v.ID, &v.Seq, &v.DeviceID, &v.Epoch, &v.Action, &v.FacilityRef, &v.Point, &v.PublicKey, &v.KeyID, &v.CertSHA256,
 			&v.ScaleModel, &v.Reason, &v.EventTime, &v.RecordedAt, &v.ActorRef, &v.IdemKey)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -279,7 +280,7 @@ func InsertSessionEvent(ctx context.Context, tx pgx.Tx, tid uuid.UUID, e *Sessio
 // SessionEventByIdem trả session_id của sự kiện phiên có idem_key.
 func SessionEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*uuid.UUID, error) {
 	var id uuid.UUID
-	err := tx.QueryRow(ctx, "SELECT session_id FROM mkg_measurement.weighing_session WHERE idem_key = $1", key).Scan(&id)
+	err := tx.QueryRow(ctx, "SELECT session_id FROM mkg_measurement.weighing_session WHERE idem_key = $1"+ledger.NewestByIdem(""), key).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

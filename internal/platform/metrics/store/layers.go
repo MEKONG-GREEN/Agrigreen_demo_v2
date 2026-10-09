@@ -50,7 +50,7 @@ func IdemKey(c port.LayerChange) string {
 
 // LayerByIdem tìm dòng đã ghi cho cùng sự kiện nguồn; không có → nil.
 func LayerByIdem(ctx context.Context, tx pgx.Tx, c port.LayerChange) (*LayerRow, error) {
-	x, err := scanLayer(tx.QueryRow(ctx, "SELECT "+layerCols+" FROM pf_metrics.layer_event WHERE idem_key = $1 LIMIT 1", IdemKey(c)))
+	x, err := scanLayer(tx.QueryRow(ctx, "SELECT "+layerCols+" FROM pf_metrics.layer_event WHERE idem_key = $1"+ledger.NewestByIdem(""), IdemKey(c)))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // ---------------------------------------------------------------------------
@@ -86,7 +87,7 @@ func InsertAlert(ctx context.Context, tx pgx.Tx, tid uuid.UUID, a *AlertRow) err
 
 // AlertByIdem đọc dòng cảnh báo theo idem_key (nil khi chưa có).
 func AlertByIdem(ctx context.Context, tx pgx.Tx, key string) (*AlertRow, error) {
-	a, err := scanAlert(tx.QueryRow(ctx, "SELECT "+alertCols+" FROM pf_mrv.alert a WHERE a.idem_key = $1::text", key))
+	a, err := scanAlert(tx.QueryRow(ctx, "SELECT "+alertCols+" FROM pf_mrv.alert a WHERE a.idem_key = $1::text"+ledger.NewestByIdem("a"), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

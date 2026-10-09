@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 const programCols = `id, tenant_id, version_key, commune_code, province_code, cooperative_ref, season_code, season_year,
@@ -51,7 +52,7 @@ func oneProgram(row pgx.Row) (*domain.ProgramReport, error) {
 
 // ProgramByIdemKey tìm báo cáo Đề án đã ghi với idem_key.
 func ProgramByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*domain.ProgramReport, error) {
-	return oneProgram(tx.QueryRow(ctx, "SELECT "+programCols+" FROM pf_extension.program_report WHERE idem_key = $1", key))
+	return oneProgram(tx.QueryRow(ctx, "SELECT "+programCols+" FROM pf_extension.program_report WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 }
 
 // ProgramByID đọc một phiên bản báo cáo Đề án.

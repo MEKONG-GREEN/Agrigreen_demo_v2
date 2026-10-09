@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // ---------------------------------------------------------------------------
@@ -121,7 +122,7 @@ func InsertAreaEvent(ctx context.Context, tx pgx.Tx, e *domain.AreaEvent) error 
 
 // AreaEventByIdem tìm dòng sổ diện tích đã ghi với idem_key.
 func AreaEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*domain.AreaEvent, error) {
-	e, err := scanAreaEvent(tx.QueryRow(ctx, "SELECT "+areaEventCols+" FROM pf_mechanization.season_area_event WHERE idem_key = $1", key))
+	e, err := scanAreaEvent(tx.QueryRow(ctx, "SELECT "+areaEventCols+" FROM pf_mechanization.season_area_event WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

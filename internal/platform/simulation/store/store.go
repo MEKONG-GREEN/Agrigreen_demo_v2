@@ -14,6 +14,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/simulation/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 func lock(ctx context.Context, tx pgx.Tx, parts ...string) error {
@@ -179,7 +180,7 @@ func ChangeByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*ChangeRow, er
 	var c ChangeRow
 	var p string
 	err := tx.QueryRow(ctx, `SELECT id, seq, kind, hub_id, simulation_id, payload::text, event_time, recorded_at, supersedes_id,
-	    correction_reason, actor_ref FROM pf_simulation.scenario_change WHERE idem_key = $1::text ORDER BY recorded_at LIMIT 1`, key).
+	    correction_reason, actor_ref FROM pf_simulation.scenario_change WHERE idem_key = $1::text`+ledger.NewestByIdem(""), key).
 		Scan(&c.ID, &c.Seq, &c.Kind, &c.HubID, &c.SimulationID, &p, &c.EventTime, &c.RecordedAt, &c.SupersedesID, &c.CorrectionReason, &c.ActorRef)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

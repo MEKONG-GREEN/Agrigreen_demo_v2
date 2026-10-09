@@ -11,6 +11,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mrv/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // Cột đọc của sổ minh chứng. Toạ độ đọc thành chuỗi thập phân 7 chữ số lẻ.
@@ -65,7 +66,7 @@ func oneEvidence(ctx context.Context, tx pgx.Tx, where string, args ...any) (*do
 
 // EvidenceByIdemKey tìm bản ghi đã ghi với idem_key (gọi lặp / đồng bộ lặp).
 func EvidenceByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*domain.Evidence, error) {
-	return oneEvidence(ctx, tx, "e.idem_key = $1::text", key)
+	return oneEvidence(ctx, tx, "e.idem_key = $1::text"+ledger.NewestByIdem("e"), key)
 }
 
 // EvidenceByID đọc một phiên bản minh chứng.
@@ -190,7 +191,7 @@ func scanReview(row pgx.Row) (domain.Review, error) {
 
 // ReviewByIdemKey tìm quyết định đã ghi với idem_key.
 func ReviewByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*domain.Review, error) {
-	r, err := scanReview(tx.QueryRow(ctx, "SELECT "+reviewCols+" FROM pf_mrv.evidence_review r WHERE r.idem_key = $1::text", key))
+	r, err := scanReview(tx.QueryRow(ctx, "SELECT "+reviewCols+" FROM pf_mrv.evidence_review r WHERE r.idem_key = $1::text"+ledger.NewestByIdem("r"), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

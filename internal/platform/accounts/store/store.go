@@ -12,6 +12,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 func causePtr(c port.LockCause) *string {
@@ -77,7 +78,7 @@ func scanEvent(row pgx.Row) (domain.Event, error) {
 
 // EventByIdemKey tìm dòng sổ đã ghi với idem_key (gọi lặp).
 func EventByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*domain.Event, error) {
-	e, err := scanEvent(tx.QueryRow(ctx, "SELECT "+eventCols+" FROM pf_accounts.account_event WHERE idem_key = $1 ORDER BY seq LIMIT 1", key))
+	e, err := scanEvent(tx.QueryRow(ctx, "SELECT "+eventCols+" FROM pf_accounts.account_event WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

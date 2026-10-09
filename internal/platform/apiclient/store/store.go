@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 func utc(t *time.Time) *time.Time {
@@ -61,7 +62,7 @@ func InsertClientEvent(ctx context.Context, tx pgx.Tx, e *ClientEvent) error {
 // ClientIDByIdem trả client_id của dòng sổ đã ghi với idem_key (gọi lặp); Nil nếu chưa có.
 func ClientIDByIdem(ctx context.Context, tx pgx.Tx, key string) (uuid.UUID, error) {
 	var id uuid.UUID
-	err := tx.QueryRow(ctx, `SELECT client_id FROM pf_apiclient.client_event WHERE idem_key = $1::text LIMIT 1`, key).Scan(&id)
+	err := tx.QueryRow(ctx, `SELECT client_id FROM pf_apiclient.client_event WHERE idem_key = $1::text`+ledger.NewestByIdem(""), key).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return uuid.Nil, nil
 	}
@@ -188,7 +189,7 @@ func InsertKeyEvent(ctx context.Context, tx pgx.Tx, e *KeyEvent) error {
 // KeyIDByIdem trả key_id của dòng sổ khóa đã ghi với idem_key; Nil nếu chưa có.
 func KeyIDByIdem(ctx context.Context, tx pgx.Tx, key string) (uuid.UUID, error) {
 	var id uuid.UUID
-	err := tx.QueryRow(ctx, `SELECT key_id FROM pf_apiclient.api_key_event WHERE idem_key = $1::text LIMIT 1`, key).Scan(&id)
+	err := tx.QueryRow(ctx, `SELECT key_id FROM pf_apiclient.api_key_event WHERE idem_key = $1::text`+ledger.NewestByIdem(""), key).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return uuid.Nil, nil
 	}
@@ -310,7 +311,7 @@ func InsertSubscriptionEvent(ctx context.Context, tx pgx.Tx, e *SubscriptionEven
 // SubscriptionIDByIdem trả subscription_id đã ghi với idem_key; Nil nếu chưa có.
 func SubscriptionIDByIdem(ctx context.Context, tx pgx.Tx, key string) (uuid.UUID, error) {
 	var id uuid.UUID
-	err := tx.QueryRow(ctx, `SELECT subscription_id FROM pf_apiclient.subscription_event WHERE idem_key = $1::text LIMIT 1`, key).Scan(&id)
+	err := tx.QueryRow(ctx, `SELECT subscription_id FROM pf_apiclient.subscription_event WHERE idem_key = $1::text`+ledger.NewestByIdem(""), key).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return uuid.Nil, nil
 	}
@@ -432,7 +433,7 @@ func InsertPlanEvent(ctx context.Context, tx pgx.Tx, id uuid.UUID, p PlanRow, ac
 // PlanVersionByIdem trả phiên bản đã ghi với idem_key; 0 nếu chưa có.
 func PlanVersionByIdem(ctx context.Context, tx pgx.Tx, key string) (int, error) {
 	var v int
-	err := tx.QueryRow(ctx, `SELECT version FROM pf_apiclient.quota_plan WHERE idem_key = $1::text LIMIT 1`, key).Scan(&v)
+	err := tx.QueryRow(ctx, `SELECT version FROM pf_apiclient.quota_plan WHERE idem_key = $1::text`+ledger.NewestByIdem(""), key).Scan(&v)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return 0, nil
 	}

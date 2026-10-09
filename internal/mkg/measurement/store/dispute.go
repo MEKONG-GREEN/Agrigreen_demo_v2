@@ -12,6 +12,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/mass"
 )
 
@@ -62,7 +63,7 @@ func InsertDisputeEvent(ctx context.Context, tx pgx.Tx, tid uuid.UUID, e *Disput
 // DisputeEventByIdem trả dispute_id của sự kiện có idem_key.
 func DisputeEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*uuid.UUID, error) {
 	var id uuid.UUID
-	err := tx.QueryRow(ctx, "SELECT dispute_id FROM mkg_measurement.dispute_event WHERE idem_key = $1", key).Scan(&id)
+	err := tx.QueryRow(ctx, "SELECT dispute_id FROM mkg_measurement.dispute_event WHERE idem_key = $1"+ledger.NewestByIdem(""), key).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -331,7 +332,7 @@ func oneImport(ctx context.Context, tx pgx.Tx, where string, arg any) (*Import, 
 
 // ImportByIdem tìm lần nhập theo idem_key.
 func ImportByIdem(ctx context.Context, tx pgx.Tx, key string) (*Import, error) {
-	return oneImport(ctx, tx, "idem_key = $1", key)
+	return oneImport(ctx, tx, "idem_key = $1"+ledger.NewestByIdem(""), key)
 }
 
 // ImportByID tìm lần nhập theo id.
@@ -403,7 +404,7 @@ func LastValveFor(ctx context.Context, tx pgx.Tx, lot, plot uuid.UUID) (*ValveEx
 
 // ValveByIdem tìm lần xuất theo idem_key.
 func ValveByIdem(ctx context.Context, tx pgx.Tx, key string) (*ValveExport, error) {
-	v, err := scanValve(tx.QueryRow(ctx, "SELECT "+valveCols+" FROM mkg_measurement.valve_export WHERE idem_key = $1", key))
+	v, err := scanValve(tx.QueryRow(ctx, "SELECT "+valveCols+" FROM mkg_measurement.valve_export WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

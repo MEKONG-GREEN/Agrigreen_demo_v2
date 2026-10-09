@@ -172,6 +172,23 @@ func (e *Env) AdminPool(t testing.TB, c migrations.Cluster) *pgxpool.Pool {
 	return p
 }
 
+// ExpireLedgerIdem đặt hạn các dòng đăng ký shared.ledger_idem có idem_key cho trước
+// về quá khứ — giả lập 30 ngày đã trôi qua (ADR-0012, W2.1). Lần ghi sổ sau đó với
+// cùng idem_key được shared.fn_chain nhận như bản ghi MỚI, nên sổ có hai dòng cùng
+// khóa; dùng để kiểm truy vấn tra cứu theo idem_key chọn dòng mới nhất. Chạy bằng
+// tài khoản quản trị (vai ứng dụng không có quyền trên ledger_idem); chỉ dùng trong kiểm thử.
+func (e *Env) ExpireLedgerIdem(t testing.TB, c migrations.Cluster, idemKeys ...string) {
+	t.Helper()
+	tag, err := e.AdminPool(t, c).Exec(context.Background(),
+		"UPDATE shared.ledger_idem SET expires_at = now() - interval '1 second' WHERE idem_key = ANY($1::text[])", idemKeys)
+	if err != nil {
+		t.Fatalf("pgtest: đặt hạn ledger_idem: %v", err)
+	}
+	if tag.RowsAffected() < int64(len(idemKeys)) {
+		t.Fatalf("pgtest: chỉ %d/%d dòng ledger_idem khớp %v", tag.RowsAffected(), len(idemKeys), idemKeys)
+	}
+}
+
 func (e *Env) closePools() {
 	e.mu.Lock()
 	defer e.mu.Unlock()

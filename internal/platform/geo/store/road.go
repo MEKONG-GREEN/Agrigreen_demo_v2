@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // RoadSegment là một phiên bản tuyến đường bộ (một dòng sổ).
@@ -82,7 +83,7 @@ func scanRoadSegment(row pgx.Row, withGeom bool) (RoadSegment, error) {
 
 // RoadSegmentByIdemKey tìm phiên bản đã ghi với idem_key.
 func RoadSegmentByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*RoadSegment, error) {
-	s, err := scanRoadSegment(tx.QueryRow(ctx, "SELECT "+roadSegmentCols+" FROM pf_geo.road_segment WHERE idem_key = $1::text", key), false)
+	s, err := scanRoadSegment(tx.QueryRow(ctx, "SELECT "+roadSegmentCols+" FROM pf_geo.road_segment WHERE idem_key = $1::text"+ledger.NewestByIdem(""), key), false)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

@@ -12,6 +12,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 func nilRef(u uuid.UUID) *uuid.UUID {
@@ -92,7 +93,7 @@ func scanAsgEvent(row pgx.Row) (AsgEvent, error) {
 
 // AsgEventByIdem tìm dòng sổ đã ghi với idem_key.
 func AsgEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*AsgEvent, error) {
-	e, err := scanAsgEvent(tx.QueryRow(ctx, "SELECT "+asgEventCols+" FROM pf_accounts.role_assignment_event WHERE idem_key = $1 ORDER BY seq LIMIT 1", key))
+	e, err := scanAsgEvent(tx.QueryRow(ctx, "SELECT "+asgEventCols+" FROM pf_accounts.role_assignment_event WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -360,7 +361,7 @@ func SupportByID(ctx context.Context, tx pgx.Tx, id uuid.UUID, forUpdate bool) (
 // SupportEventByIdem trả phiên của dòng sổ đã ghi với idem_key (gọi lặp).
 func SupportEventByIdem(ctx context.Context, tx pgx.Tx, key string) (uuid.UUID, bool, error) {
 	var id uuid.UUID
-	err := tx.QueryRow(ctx, "SELECT support_session_id FROM pf_accounts.support_session_event WHERE idem_key = $1 LIMIT 1", key).Scan(&id)
+	err := tx.QueryRow(ctx, "SELECT support_session_id FROM pf_accounts.support_session_event WHERE idem_key = $1"+ledger.NewestByIdem(""), key).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return uuid.Nil, false, nil
 	}
@@ -458,7 +459,7 @@ func InsertProfileChange(ctx context.Context, tx pgx.Tx, p *ProfileChange) error
 func ProfileChangeByIdem(ctx context.Context, tx pgx.Tx, key string) (*ProfileChange, error) {
 	var p ProfileChange
 	err := tx.QueryRow(ctx, `SELECT id, user_ref, fields, reason, event_time, recorded_at, actor_ref, idem_key, seq
-	  FROM pf_accounts.account_profile_change WHERE idem_key = $1 LIMIT 1`, key).
+	  FROM pf_accounts.account_profile_change WHERE idem_key = $1`+ledger.NewestByIdem(""), key).
 		Scan(&p.ID, &p.UserRef, &p.Fields, &p.Reason, &p.EventTime, &p.RecordedAt, &p.ActorRef, &p.IdemKey, &p.Seq)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

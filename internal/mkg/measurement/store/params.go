@@ -13,6 +13,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // Loại tham số.
@@ -118,7 +119,7 @@ func ParamIDByIdem(ctx context.Context, tx pgx.Tx, kind, key string) (*uuid.UUID
 		table = "loss_norm_version"
 	}
 	var id uuid.UUID
-	err := tx.QueryRow(ctx, "SELECT id FROM mkg_measurement."+table+" WHERE idem_key = $1", key).Scan(&id)
+	err := tx.QueryRow(ctx, "SELECT id FROM mkg_measurement."+table+" WHERE idem_key = $1"+ledger.NewestByIdem(""), key).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -302,7 +303,7 @@ func GetTerms(ctx context.Context, tx pgx.Tx, lot uuid.UUID) (*Terms, error) {
 // TermsByIdem cho biết idem_key đã ghi thuộc tính của lô nào.
 func TermsByIdem(ctx context.Context, tx pgx.Tx, key string) (*uuid.UUID, error) {
 	var lot uuid.UUID
-	err := tx.QueryRow(ctx, "SELECT lot_ref FROM mkg_measurement.lot_terms WHERE idem_key = $1", key).Scan(&lot)
+	err := tx.QueryRow(ctx, "SELECT lot_ref FROM mkg_measurement.lot_terms WHERE idem_key = $1"+ledger.NewestByIdem(""), key).Scan(&lot)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

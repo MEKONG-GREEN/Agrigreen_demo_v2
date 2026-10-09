@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/mass"
 )
 
@@ -120,7 +121,7 @@ func ParamVersionBySeq(ctx context.Context, tx pgx.Tx, set string, seq int64) (*
 
 // ParamVersionByIdem tìm phiên bản đã ghi với idem_key.
 func ParamVersionByIdem(ctx context.Context, tx pgx.Tx, key string) (*ParamVersion, error) {
-	return oneParam(ctx, tx, "v.idem_key = $1", key)
+	return oneParam(ctx, tx, "v.idem_key = $1"+ledger.NewestFirst("v"), key)
 }
 
 // ParamVersions liệt kê phiên bản của bộ, mới trước.
@@ -163,7 +164,7 @@ func InsertParamDecision(ctx context.Context, tx pgx.Tx, d *ParamDecision) error
 // ParamDecisionByIdem tìm quyết định đã ghi với idem_key.
 func ParamDecisionByIdem(ctx context.Context, tx pgx.Tx, key string) (*ParamDecision, error) {
 	var d ParamDecision
-	err := tx.QueryRow(ctx, `SELECT id, param_set, version_id, version_seq, decision FROM mkg_hub.param_decision WHERE idem_key = $1`, key).
+	err := tx.QueryRow(ctx, `SELECT id, param_set, version_id, version_seq, decision FROM mkg_hub.param_decision WHERE idem_key = $1`+ledger.NewestByIdem(""), key).
 		Scan(&d.ID, &d.Set, &d.VersionID, &d.VersionSeq, &d.Decision)
 	if err != nil {
 		return nil, none(err)
@@ -272,7 +273,7 @@ func queryWeigh(ctx context.Context, tx pgx.Tx, where string, args ...any) ([]We
 
 // WeighLinkByIdem tìm dòng đã ghi với idem_key.
 func WeighLinkByIdem(ctx context.Context, tx pgx.Tx, key string) (*WeighLink, error) {
-	ls, err := queryWeigh(ctx, tx, "idem_key = $1 LIMIT 1", key)
+	ls, err := queryWeigh(ctx, tx, "idem_key = $1"+ledger.NewestByIdem(""), key)
 	if err != nil || len(ls) == 0 {
 		return nil, err
 	}
@@ -456,7 +457,7 @@ func StocktakeByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*Stocktake, er
 
 // StocktakeByIdem tìm lần đếm đã ghi với idem_key.
 func StocktakeByIdem(ctx context.Context, tx pgx.Tx, key string) (*Stocktake, error) {
-	return oneStocktake(ctx, tx, "s.idem_key = $1", key)
+	return oneStocktake(ctx, tx, "s.idem_key = $1"+ledger.NewestFirst("s"), key)
 }
 
 // PendingStocktake đọc phiên chờ duyệt của cơ sở.
@@ -520,7 +521,7 @@ func InsertStocktakeDecision(ctx context.Context, tx pgx.Tx, d *StocktakeDecisio
 func StocktakeDecisionByIdem(ctx context.Context, tx pgx.Tx, key string) (*StocktakeDecision, error) {
 	var d StocktakeDecision
 	var adj string
-	err := tx.QueryRow(ctx, `SELECT id, stocktake_id, decision, adjustments::text FROM mkg_hub.stocktake_decision WHERE idem_key = $1`, key).
+	err := tx.QueryRow(ctx, `SELECT id, stocktake_id, decision, adjustments::text FROM mkg_hub.stocktake_decision WHERE idem_key = $1`+ledger.NewestByIdem(""), key).
 		Scan(&d.ID, &d.StocktakeID, &d.Decision, &adj)
 	if err != nil {
 		return nil, none(err)
@@ -618,7 +619,7 @@ func InsertTransferEvent(ctx context.Context, tx pgx.Tx, e *TransferEvent, devic
 // TransferEventByIdem tìm dòng đã ghi với idem_key; trả transfer_id.
 func TransferEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*uuid.UUID, error) {
 	var id uuid.UUID
-	if err := tx.QueryRow(ctx, `SELECT transfer_id FROM mkg_hub.transfer_event WHERE idem_key = $1`, key).Scan(&id); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT transfer_id FROM mkg_hub.transfer_event WHERE idem_key = $1`+ledger.NewestByIdem(""), key).Scan(&id); err != nil {
 		return nil, none(err)
 	}
 	return &id, nil

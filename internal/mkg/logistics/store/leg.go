@@ -125,8 +125,14 @@ func LatestPlan(ctx context.Context, tx pgx.Tx, trip uuid.UUID, asOf *time.Time)
 }
 
 // LegsByIdemPrefix đọc các chặng của một lần lập (idem_key = prefix + ":" + seq).
+// Các chặng của một lần lập ghi trong một giao dịch nên cùng recorded_at; phát lại
+// sau hạn 30 ngày của shared.ledger_idem (ADR-0012) tạo bộ chặng mới cùng khóa —
+// chỉ lấy bộ mới nhất.
 func LegsByIdemPrefix(ctx context.Context, tx pgx.Tx, prefix string) ([]Leg, error) {
-	return queryLegs(ctx, tx, "SELECT "+legCols+" FROM mkg_logistics.leg_event WHERE left(idem_key, length($1)) = $1 ORDER BY leg_seq", prefix+":")
+	return queryLegs(ctx, tx, "SELECT "+legCols+` FROM mkg_logistics.leg_event
+	    WHERE left(idem_key, length($1)) = $1
+	      AND recorded_at = (SELECT max(recorded_at) FROM mkg_logistics.leg_event WHERE left(idem_key, length($1)) = $1)
+	    ORDER BY leg_seq`, prefix+":")
 }
 
 // ---------------------------------------------------------------------------

@@ -11,6 +11,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/season/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // FarmLog là một phiên bản nhật ký (một dòng sổ farm_log).
@@ -126,7 +127,7 @@ func oneFarmLog(ctx context.Context, tx pgx.Tx, where string, arg any) (*FarmLog
 
 // FarmLogByIdem đọc phiên bản theo idem_key.
 func FarmLogByIdem(ctx context.Context, tx pgx.Tx, key string) (*FarmLog, error) {
-	return oneFarmLog(ctx, tx, "idem_key = $1::text", key)
+	return oneFarmLog(ctx, tx, "idem_key = $1::text"+ledger.NewestFirst(""), key)
 }
 
 // FarmLogByID đọc phiên bản theo id.
@@ -247,7 +248,7 @@ func BatchByIdem(ctx context.Context, tx pgx.Tx, key string) (*Batch, error) {
 	var skipped, inputs []byte
 	err := tx.QueryRow(ctx, `SELECT id, tenant_id, cooperative_ref, activity_code, sop_step_seq, requested, accepted, skipped,
 	    machine_codes, inputs, coalesce(note, ''), on_behalf, channel, event_time, recorded_at, actor_ref, device_id, idem_key
-	  FROM pf_coop.farm_log_batch WHERE idem_key = $1::text LIMIT 1`, key).Scan(&b.ID, &b.TenantID, &coop, &b.ActivityCode,
+	  FROM pf_coop.farm_log_batch WHERE idem_key = $1::text`+ledger.NewestByIdem(""), key).Scan(&b.ID, &b.TenantID, &coop, &b.ActivityCode,
 		&b.SOPStepSeq, &b.Requested, &b.Accepted, &skipped, &b.MachineCodes, &inputs, &b.Note, &b.OnBehalf, &b.Channel, &b.EventTime,
 		&b.RecordedAt, &b.ActorRef, &b.DeviceID, &b.IdemKey)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -317,7 +318,7 @@ func scanReview(row pgx.Row) (Review, error) {
 
 // ReviewByIdem đọc lần duyệt theo idem_key.
 func ReviewByIdem(ctx context.Context, tx pgx.Tx, key string) (*Review, error) {
-	r, err := scanReview(tx.QueryRow(ctx, "SELECT "+reviewCols+" FROM pf_coop.farm_log_review WHERE idem_key = $1::text LIMIT 1", key))
+	r, err := scanReview(tx.QueryRow(ctx, "SELECT "+reviewCols+" FROM pf_coop.farm_log_review WHERE idem_key = $1::text"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

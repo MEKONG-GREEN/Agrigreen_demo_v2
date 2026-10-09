@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/season/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // SeasonEvent là một dòng sổ season_event.
@@ -123,7 +124,7 @@ func oneSeasonEvent(ctx context.Context, tx pgx.Tx, where string, arg any) (*Sea
 
 // SeasonEventByIdem đọc sự kiện theo idem_key (gọi lặp).
 func SeasonEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*SeasonEvent, error) {
-	return oneSeasonEvent(ctx, tx, "idem_key = $1::text", key)
+	return oneSeasonEvent(ctx, tx, "idem_key = $1::text"+ledger.NewestFirst(""), key)
 }
 
 // SeasonEventByID đọc sự kiện theo id.

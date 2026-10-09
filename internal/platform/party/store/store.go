@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 const consentCols = `id, tenant_id, subject_ref, purpose, text_version, status, channel, event_time,
@@ -27,7 +28,7 @@ func scanConsent(row pgx.Row) (domain.Consent, error) {
 
 // ByIdemKey tìm bản ghi đã ghi với idem_key (đường nhanh cho gọi lặp).
 func ByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*domain.Consent, error) {
-	c, err := scanConsent(tx.QueryRow(ctx, "SELECT "+consentCols+" FROM pf_party.consent WHERE idem_key = $1", key))
+	c, err := scanConsent(tx.QueryRow(ctx, "SELECT "+consentCols+" FROM pf_party.consent WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

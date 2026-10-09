@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
@@ -93,7 +94,7 @@ func scanParam(row pgx.Row) (Param, error) {
 // ParamEventByIdem trả phiên bản ghi với idem_key.
 func ParamEventByIdem(ctx context.Context, tx pgx.Tx, idem string) (*Param, error) {
 	return noRows(scanParam(tx.QueryRow(ctx, "SELECT "+paramSelect+` FROM mkg_orders.param_current
-	    WHERE version_id = (SELECT version_id FROM mkg_orders.param_version WHERE idem_key = $1 LIMIT 1)`, idem)))
+	    WHERE version_id = (SELECT version_id FROM mkg_orders.param_version WHERE idem_key = $1`+ledger.NewestByIdem("")+`)`, idem)))
 }
 
 // NextParamSeq trả số phiên bản kế tiếp của khóa (gọi sau Lock "param:<key>").

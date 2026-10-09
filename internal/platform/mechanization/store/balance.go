@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/mechanization/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // ---------------------------------------------------------------------------
@@ -66,7 +67,7 @@ func oneRun(ctx context.Context, tx pgx.Tx, where string, args ...any) (*domain.
 
 // RunByIdem tìm lần cân đối đã ghi với idem_key (gọi lặp).
 func RunByIdem(ctx context.Context, tx pgx.Tx, key string) (*domain.BalanceRun, error) {
-	return oneRun(ctx, tx, "idem_key = $1", key)
+	return oneRun(ctx, tx, "idem_key = $1"+ledger.NewestByIdem(""), key)
 }
 
 // RunByID đọc một lần cân đối.

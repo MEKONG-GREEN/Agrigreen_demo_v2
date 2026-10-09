@@ -16,6 +16,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 func nilIfZero(u uuid.UUID) *uuid.UUID {
@@ -174,7 +175,7 @@ func InsertEvent(ctx context.Context, tx pgx.Tx, e *domain.Event) error {
 
 // EventByIdemKey tìm sự việc đã ghi với idem_key (gọi lặp / bản ghi đồng bộ trùng).
 func EventByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*domain.Event, error) {
-	e, err := scanEvent(tx.QueryRow(ctx, "SELECT "+eventCols+" FROM pf_extension.task_event WHERE idem_key = $1", key))
+	e, err := scanEvent(tx.QueryRow(ctx, "SELECT "+eventCols+" FROM pf_extension.task_event WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

@@ -69,7 +69,7 @@ func InsertInput(ctx context.Context, tx pgx.Tx, tid uuid.UUID, in *Input) error
 
 // InputByIdem đọc đầu vào theo idem_key.
 func InputByIdem(ctx context.Context, tx pgx.Tx, idem string) (*Input, error) {
-	return one(scanInput(tx.QueryRow(ctx, "SELECT "+inputCols+" FROM mkg_costing.input_event WHERE idem_key = $1", idem)))
+	return one(scanInput(tx.QueryRow(ctx, "SELECT "+inputCols+" FROM mkg_costing.input_event WHERE idem_key = $1"+ledger.NewestByIdem(""), idem)))
 }
 
 // InputBySource đọc đầu vào mới nhất của một nguồn (phiếu / đếm cuộn).
@@ -311,7 +311,7 @@ func EntryByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*Entry, error) {
 
 // EntryByIdem đọc bút toán theo idem_key.
 func EntryByIdem(ctx context.Context, tx pgx.Tx, idem string) (*Entry, error) {
-	return one(scanEntry(tx.QueryRow(ctx, "SELECT "+entryCols+" FROM mkg_costing.cost_entry WHERE idem_key = $1", idem)))
+	return one(scanEntry(tx.QueryRow(ctx, "SELECT "+entryCols+" FROM mkg_costing.cost_entry WHERE idem_key = $1"+ledger.NewestByIdem(""), idem)))
 }
 
 // EntrySuperseded cho biết bút toán đã bị dòng khác thay.
@@ -493,7 +493,7 @@ func AllocationByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*Allocation, 
 
 // AllocationByIdem đọc kết quả phân bổ theo idem_key.
 func AllocationByIdem(ctx context.Context, tx pgx.Tx, idem string) (*Allocation, error) {
-	return one(scanAlloc(tx.QueryRow(ctx, "SELECT "+allocCols+allocFrom+" WHERE a.idem_key = $1", idem)))
+	return one(scanAlloc(tx.QueryRow(ctx, "SELECT "+allocCols+allocFrom+" WHERE a.idem_key = $1"+ledger.NewestByIdem("a"), idem)))
 }
 
 // LiveAllocation đọc kết quả hiệu lực của một nguồn.

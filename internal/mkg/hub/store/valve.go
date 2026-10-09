@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // ValveExport là một dòng sổ xuất của van công bố (mkg_hub.valve_export).
@@ -60,7 +61,7 @@ func scanValve(row pgx.Row) (ValveExport, error) {
 
 // ValveByIdem tìm bản ghi xuất với idem_key.
 func ValveByIdem(ctx context.Context, tx pgx.Tx, key string) (*ValveExport, error) {
-	v, err := scanValve(tx.QueryRow(ctx, "SELECT "+valveCols+" FROM mkg_hub.valve_export WHERE idem_key = $1", key))
+	v, err := scanValve(tx.QueryRow(ctx, "SELECT "+valveCols+" FROM mkg_hub.valve_export WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

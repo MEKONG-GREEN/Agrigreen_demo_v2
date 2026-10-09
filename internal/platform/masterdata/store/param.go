@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 func decStr(d *decimal.Decimal) *string {
@@ -173,7 +174,7 @@ func ApprovedSameEffective(ctx context.Context, tx pgx.Tx, key string, eff time.
 
 // ApprovedByIdemKey tìm dòng sổ đã ghi với idem_key.
 func ApprovedByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*domain.Approved, error) {
-	return oneApproved(tx.QueryRow(ctx, "SELECT "+approvedCols+" FROM pf_masterdata.param_approved WHERE idem_key = $1", key))
+	return oneApproved(tx.QueryRow(ctx, "SELECT "+approvedCols+" FROM pf_masterdata.param_approved WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 }
 
 // InsertApproved ghi sổ phiên bản đã duyệt; DB tính seq, chuỗi băm, recorded_at.

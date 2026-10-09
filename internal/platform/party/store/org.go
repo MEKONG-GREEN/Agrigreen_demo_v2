@@ -12,6 +12,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // nilIfZero đổi uuid.Nil thành NULL.
@@ -164,7 +165,7 @@ func InsertOrgEvent(ctx context.Context, tx pgx.Tx, e *domain.OrgEvent) error {
 
 // OrgEventByIdemKey tìm bản ghi sổ đã ghi với idem_key (gọi lặp).
 func OrgEventByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*domain.OrgEvent, error) {
-	e, err := scanOrgEvent(tx.QueryRow(ctx, "SELECT "+orgEventCols+" FROM pf_party.org_event WHERE idem_key = $1", key))
+	e, err := scanOrgEvent(tx.QueryRow(ctx, "SELECT "+orgEventCols+" FROM pf_party.org_event WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

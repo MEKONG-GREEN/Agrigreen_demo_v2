@@ -13,6 +13,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // KNEvent là các cột chung của ba sổ KN (department_event, region_event, org_region_event).
@@ -86,7 +87,7 @@ func scanDeptEvent(row pgx.Row) (KNEvent, error) {
 
 // DeptEventByIdem đọc dòng sổ đã ghi với idem_key.
 func DeptEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*KNEvent, error) {
-	return noRows(scanDeptEvent(tx.QueryRow(ctx, "SELECT "+deptEventCols+" FROM pf_party.department_event WHERE idem_key = $1::text", key)))
+	return noRows(scanDeptEvent(tx.QueryRow(ctx, "SELECT "+deptEventCols+" FROM pf_party.department_event WHERE idem_key = $1::text"+ledger.NewestByIdem(""), key)))
 }
 
 // DeptEvents trả sổ của một phòng ban, seq > after, tăng dần.
@@ -213,7 +214,7 @@ func scanRegionEvent(row pgx.Row) (KNEvent, error) {
 
 // RegionEventByIdem đọc dòng sổ khu vực đã ghi với idem_key.
 func RegionEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*KNEvent, error) {
-	return noRows(scanRegionEvent(tx.QueryRow(ctx, "SELECT "+regionEventCols+" FROM pf_party.region_event WHERE idem_key = $1::text", key)))
+	return noRows(scanRegionEvent(tx.QueryRow(ctx, "SELECT "+regionEventCols+" FROM pf_party.region_event WHERE idem_key = $1::text"+ledger.NewestByIdem(""), key)))
 }
 
 // RegionEvents trả sổ của một khu vực.
@@ -350,7 +351,7 @@ func scanOrgRegionEvent(row pgx.Row) (KNEvent, error) {
 
 // OrgRegionEventByIdem đọc dòng sổ gán khu vực đã ghi với idem_key.
 func OrgRegionEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*KNEvent, error) {
-	return noRows(scanOrgRegionEvent(tx.QueryRow(ctx, "SELECT "+orgRegionEventCols+" FROM pf_party.org_region_event WHERE idem_key = $1::text", key)))
+	return noRows(scanOrgRegionEvent(tx.QueryRow(ctx, "SELECT "+orgRegionEventCols+" FROM pf_party.org_region_event WHERE idem_key = $1::text"+ledger.NewestByIdem(""), key)))
 }
 
 // OrgRegionEvents trả sổ gán khu vực của một Nút.

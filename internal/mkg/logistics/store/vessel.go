@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
@@ -54,7 +55,7 @@ func VesselEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*VesselEvent
 	var rt, rv, pt, rate *string
 	err := tx.QueryRow(ctx, `SELECT id, tenant_id, seq, vessel_id, kind, version, code, vehicle_kind, name, owner_ref, registered_tons::text,
 	    straw_payload_tons::text, registration_expiry, rate_type, rate_vnd::text, status, reason, event_time, recorded_at, actor_ref, idem_key,
-	    rule_version FROM mkg_logistics.vessel_event WHERE idem_key = $1`, key).Scan(&e.ID, &e.TenantID, &e.Seq, &e.VesselID, &e.Kind,
+	    rule_version FROM mkg_logistics.vessel_event WHERE idem_key = $1`+ledger.NewestByIdem(""), key).Scan(&e.ID, &e.TenantID, &e.Seq, &e.VesselID, &e.Kind,
 		&e.Version, &e.Code, &e.VehicleKind, &e.Name, &e.OwnerRef, &rt, &pt, &e.RegistrationExpiry, &rv, &rate, &e.Status, &e.Reason,
 		&e.EventTime, &e.RecordedAt, &e.ActorRef, &e.IdemKey, &e.RuleVersion)
 	if errors.Is(err, pgx.ErrNoRows) {

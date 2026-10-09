@@ -13,6 +13,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/logistics/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/mass"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/money"
 )
@@ -228,7 +229,7 @@ func queryTripEvents(ctx context.Context, tx pgx.Tx, q string, args ...any) ([]T
 
 // TripEventByIdem tìm sự kiện chuyến theo idem_key.
 func TripEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*TripEvent, error) {
-	e, err := scanTripEvent(tx.QueryRow(ctx, "SELECT "+tripEventCols+" FROM mkg_logistics.trip_event WHERE idem_key = $1", key))
+	e, err := scanTripEvent(tx.QueryRow(ctx, "SELECT "+tripEventCols+" FROM mkg_logistics.trip_event WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

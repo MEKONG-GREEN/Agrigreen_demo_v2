@@ -96,10 +96,14 @@ func ByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*Record, error) {
 	return &r, nil
 }
 
-// ByIdemKeys đọc các dòng theo idem_key, theo thứ tự keys (bỏ khóa chưa có).
+// ByIdemKeys đọc các dòng theo idem_key, theo thứ tự keys (bỏ khóa chưa có). Mỗi khóa
+// một dòng — dòng mới nhất nếu khóa được phát lại sau hạn 30 ngày (ADR-0012).
 func ByIdemKeys(ctx context.Context, tx pgx.Tx, keys []string) ([]Record, error) {
 	rows, err := tx.Query(ctx, "SELECT "+cols+` FROM pf_extension.material_record m
-	  WHERE m.idem_key = ANY($1::text[]) ORDER BY array_position($1::text[], m.idem_key)`, keys)
+	  WHERE m.idem_key = ANY($1::text[])
+	    AND m.id IN (SELECT DISTINCT ON (idem_key) id FROM pf_extension.material_record
+	                 WHERE idem_key = ANY($1::text[]) ORDER BY idem_key, recorded_at DESC, id DESC)
+	  ORDER BY array_position($1::text[], m.idem_key)`, keys)
 	if err != nil {
 		return nil, err
 	}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/measurement/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/mass"
 )
 
@@ -179,7 +180,7 @@ func scanTicketRV(row pgx.Row) (port.Ticket, string, error) {
 
 // TicketByIdem tìm phiếu theo idem_key.
 func TicketByIdem(ctx context.Context, tx pgx.Tx, key string) (*port.Ticket, error) {
-	return oneTicket(ctx, tx, "idem_key = $1", key)
+	return oneTicket(ctx, tx, "idem_key = $1"+ledger.NewestFirst(""), key)
 }
 
 // TicketByID tìm phiếu theo id.

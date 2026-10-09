@@ -130,7 +130,7 @@ func InsertParamVersion(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p *ParamV
 
 // ParamVersionByIdem đọc phiên bản theo idem_key.
 func ParamVersionByIdem(ctx context.Context, tx pgx.Tx, idem string) (*ParamVersion, error) {
-	return one(scanParam(tx.QueryRow(ctx, "SELECT "+paramCols+paramFrom+" WHERE v.idem_key = $1", idem)))
+	return one(scanParam(tx.QueryRow(ctx, "SELECT "+paramCols+paramFrom+" WHERE v.idem_key = $1"+ledger.NewestByIdem("v"), idem)))
 }
 
 // ParamVersionBySeq đọc phiên bản theo khóa + số.
@@ -180,7 +180,7 @@ func InsertParamDecision(ctx context.Context, tx pgx.Tx, tid uuid.UUID, d ParamD
 
 // ParamDecisionByIdem đọc (khóa, số phiên bản) của quyết định theo idem_key.
 func ParamDecisionByIdem(ctx context.Context, tx pgx.Tx, idem string) (key string, seq int64, ok bool, err error) {
-	err = tx.QueryRow(ctx, "SELECT param_key, version_seq FROM mkg_costing.param_decision WHERE idem_key = $1", idem).Scan(&key, &seq)
+	err = tx.QueryRow(ctx, "SELECT param_key, version_seq FROM mkg_costing.param_decision WHERE idem_key = $1"+ledger.NewestByIdem(""), idem).Scan(&key, &seq)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", 0, false, nil
 	}

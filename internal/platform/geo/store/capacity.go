@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // CapacitySnapshot là một dòng sổ sức chứa (ảnh chụp hoặc lệnh nhả số Admin).
@@ -68,7 +69,7 @@ func scanCapacity(row pgx.Row) (CapacitySnapshot, error) {
 
 // CapacityByIdemKey tìm dòng sổ sức chứa đã ghi với idem_key.
 func CapacityByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*CapacitySnapshot, error) {
-	s, err := scanCapacity(tx.QueryRow(ctx, "SELECT "+capacityCols+" FROM pf_geo.facility_capacity WHERE idem_key = $1::text", key))
+	s, err := scanCapacity(tx.QueryRow(ctx, "SELECT "+capacityCols+" FROM pf_geo.facility_capacity WHERE idem_key = $1::text"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

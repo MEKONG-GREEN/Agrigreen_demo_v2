@@ -11,6 +11,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -44,7 +45,7 @@ func NextCode(ctx context.Context, tx pgx.Tx, table, idCol string) (int64, error
 // EntityByIdem tìm thực thể đã ghi với idem_key (gọi lặp — R-51, lớp hai sau middleware).
 func EntityByIdem(ctx context.Context, tx pgx.Tx, table, idCol, idem string) (*uuid.UUID, error) {
 	var id uuid.UUID
-	err := tx.QueryRow(ctx, "SELECT "+idCol+" FROM mkg_orders."+table+" WHERE idem_key = $1 LIMIT 1", idem).Scan(&id)
+	err := tx.QueryRow(ctx, "SELECT "+idCol+" FROM mkg_orders."+table+" WHERE idem_key = $1"+ledger.NewestByIdem(""), idem).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

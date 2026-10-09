@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 const itemCols = `catalog, code, name, attrs::text, active, coalesce(deactivation_reason, ''), revision, updated_by, updated_at`
@@ -111,7 +112,7 @@ func InsertChange(ctx context.Context, tx pgx.Tx, tenantID uuid.UUID, c *domain.
 
 // ChangeByIdemKey tìm dòng sổ đã ghi với idem_key (gọi lặp).
 func ChangeByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*domain.Change, error) {
-	rows, err := tx.Query(ctx, changeSelect+" WHERE idem_key = $1", key)
+	rows, err := tx.Query(ctx, changeSelect+" WHERE idem_key = $1"+ledger.NewestByIdem(""), key)
 	cs, err := scanChanges(rows, err)
 	if err != nil || len(cs) == 0 {
 		return nil, err

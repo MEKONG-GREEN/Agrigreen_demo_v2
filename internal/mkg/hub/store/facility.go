@@ -13,6 +13,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/hub/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/mass"
 )
 
@@ -119,7 +120,7 @@ func oneVersion(ctx context.Context, tx pgx.Tx, where string, args ...any) (*dom
 
 // VersionByIdem tìm phiên bản đã ghi với idem_key (gọi lặp).
 func VersionByIdem(ctx context.Context, tx pgx.Tx, key string) (*domain.FacilityVersion, error) {
-	return oneVersion(ctx, tx, "v.idem_key = $1", key)
+	return oneVersion(ctx, tx, "v.idem_key = $1"+ledger.NewestByIdem("v"), key)
 }
 
 // VersionBySeq đọc một phiên bản của cơ sở.
@@ -196,7 +197,7 @@ func DecisionByIdem(ctx context.Context, tx pgx.Tx, key string) (*Decision, erro
 	var d Decision
 	var dec string
 	err := tx.QueryRow(ctx, `SELECT id, tenant_id, facility_id, version_id, version_seq, decision, reason, proposer_ref,
-	    actor_ref, event_time, idem_key, seq FROM mkg_hub.facility_decision WHERE idem_key = $1`, key).
+	    actor_ref, event_time, idem_key, seq FROM mkg_hub.facility_decision WHERE idem_key = $1`+ledger.NewestByIdem(""), key).
 		Scan(&d.ID, &d.TenantID, &d.FacilityID, &d.VersionID, &d.VersionSeq, &dec, &d.Reason, &d.ProposerRef,
 			&d.ActorRef, &d.EventTime, &d.IdemKey, &d.Seq)
 	if errors.Is(err, pgx.ErrNoRows) {

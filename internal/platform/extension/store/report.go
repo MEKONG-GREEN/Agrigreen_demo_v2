@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/extension/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 const reportCols = `id, tenant_id, version_key, report_kind, commune_code, province_code, cooperative_ref, period,
@@ -49,7 +50,7 @@ func oneReport(row pgx.Row) (*domain.Report, error) {
 
 // ReportByIdemKey tìm báo cáo đã ghi với idem_key.
 func ReportByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*domain.Report, error) {
-	return oneReport(tx.QueryRow(ctx, "SELECT "+reportCols+" FROM pf_extension.field_report WHERE idem_key = $1", key))
+	return oneReport(tx.QueryRow(ctx, "SELECT "+reportCols+" FROM pf_extension.field_report WHERE idem_key = $1"+ledger.NewestByIdem(""), key))
 }
 
 // ReportByID đọc một phiên bản báo cáo.

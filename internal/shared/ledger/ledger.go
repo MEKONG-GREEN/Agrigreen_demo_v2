@@ -68,6 +68,27 @@ func (m Meta) Validate() error {
 // ErrDuplicate: idem_key đã ghi — gọi lặp, đọc lại bản ghi cũ và trả như lần đầu.
 var ErrDuplicate = errors.New("ledger: idem_key đã được ghi")
 
+// NewestFirst là mệnh đề ORDER BY chọn bản ghi sổ mới nhất trước, cho truy vấn tra
+// cứu theo idem_key (ADR-0012, hạn 30 ngày của shared.ledger_idem). Sau 30 ngày,
+// shared.fn_chain nhận phát lại cùng idem_key như bản ghi MỚI, nên sổ có thể giữ hai
+// dòng cùng khóa; tra cứu phải chọn dòng mới nhất, không lấy dòng tùy ý. recorded_at
+// là lúc ghi (do hệ đặt); id (UUIDv7, tăng theo thời gian) phá hòa. Không dùng seq:
+// seq chỉ so được trong cùng một chuỗi. alias là bí danh bảng sổ trong truy vấn có
+// JOIN; rỗng = cột không bí danh. Dùng khi hàm gọi tự thêm LIMIT 1.
+func NewestFirst(alias string) string {
+	p := ""
+	if alias != "" {
+		p = alias + "."
+	}
+	return " ORDER BY " + p + "recorded_at DESC, " + p + "id DESC"
+}
+
+// NewestByIdem là NewestFirst(alias) + " LIMIT 1": đuôi của truy vấn đọc MỘT dòng sổ
+// theo idem_key, vd "SELECT … FROM sổ WHERE idem_key = $1" + ledger.NewestByIdem("").
+func NewestByIdem(alias string) string {
+	return NewestFirst(alias) + " LIMIT 1"
+}
+
 // ErrImmutable: có thao tác UPDATE/DELETE/TRUNCATE vào bảng sổ.
 var ErrImmutable = errors.New("ledger: bảng sổ chỉ ghi thêm")
 

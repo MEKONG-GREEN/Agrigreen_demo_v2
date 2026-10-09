@@ -19,6 +19,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/plot/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // geomSQL dựng hình từ tham số GeoJSON thứ n.
@@ -235,7 +236,7 @@ func oneBoundary(ctx context.Context, tx pgx.Tx, where string, arg any) (*Bounda
 
 // BoundaryByIdemKey tìm phiên bản đã ghi với idem_key (gọi lặp, đồng bộ lặp).
 func BoundaryByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*Boundary, error) {
-	return oneBoundary(ctx, tx, "idem_key = $1::text", key)
+	return oneBoundary(ctx, tx, "idem_key = $1::text"+ledger.NewestByIdem(""), key)
 }
 
 // BoundaryByID đọc một phiên bản theo id.
@@ -320,7 +321,7 @@ func InsertPlotEvent(ctx context.Context, tx pgx.Tx, e *PlotEvent) error {
 
 // PlotEventByIdemKey tìm biến động đã ghi với idem_key.
 func PlotEventByIdemKey(ctx context.Context, tx pgx.Tx, key string) (*PlotEvent, error) {
-	e, err := scanPlotEvent(tx.QueryRow(ctx, "SELECT "+plotEventCols+" FROM pf_coop.plot_event WHERE idem_key = $1::text", key))
+	e, err := scanPlotEvent(tx.QueryRow(ctx, "SELECT "+plotEventCols+" FROM pf_coop.plot_event WHERE idem_key = $1::text"+ledger.NewestByIdem(""), key))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

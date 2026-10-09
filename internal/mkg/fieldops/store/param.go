@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/mkg/fieldops/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 )
 
 // ParamEvent là một dòng sổ param_version (đề xuất / duyệt / từ chối).
@@ -48,7 +49,7 @@ func ParamEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*ParamEvent, 
 	var e ParamEvent
 	var v string
 	err := tx.QueryRow(ctx, `SELECT id, tenant_id, seq, param_key, version_id, version_seq, kind, value::text, effective_from, provisional,
-	    proposer_ref, reason, event_time, recorded_at, actor_ref, idem_key FROM mkg_fieldops.param_version WHERE idem_key = $1`, key).Scan(
+	    proposer_ref, reason, event_time, recorded_at, actor_ref, idem_key FROM mkg_fieldops.param_version WHERE idem_key = $1`+ledger.NewestByIdem(""), key).Scan(
 		&e.ID, &e.TenantID, &e.Seq, &e.Key, &e.VersionID, &e.VersionSeq, &e.Kind, &v, &e.EffectiveFrom, &e.Provisional, &e.ProposerRef,
 		&e.Reason, &e.EventTime, &e.RecordedAt, &e.ActorRef, &e.IdemKey)
 	if errors.Is(err, pgx.ErrNoRows) {
