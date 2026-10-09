@@ -14,6 +14,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/plot/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/plot/store"
 	port "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port"
+	shareddb "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
@@ -158,7 +159,13 @@ func (s *Service) checkShape(ctx context.Context, tx pgx.Tx, mp domain.MultiPoly
 
 // classifiedOverlaps tìm và phân loại chồng lấn của hình geojson (diện tích areaHa) nếu thuộc HTX coop.
 func classifiedOverlaps(ctx context.Context, tx pgx.Tx, geojson string, areaHa decimal.Decimal, coop, exclude uuid.UUID, tol decimal.Decimal) (same, cross []domain.Overlap, err error) {
-	hits, err := store.FindOverlaps(ctx, tx, geojson, exclude)
+	// Chồng lấn giữa các HTX phải nhìn cả tenant: tạm bỏ phạm vi Nút của p_scope (W3.4, pf 000134) chỉ cho câu
+	// kiểm này; kết quả chỉ dùng để phân loại/chặn, không trả dòng ngoài phạm vi.
+	var hits []store.OverlapHit
+	err = shareddb.WithoutNodeScope(ctx, tx, func() (e error) {
+		hits, e = store.FindOverlaps(ctx, tx, geojson, exclude)
+		return e
+	})
 	if err != nil {
 		return nil, nil, err
 	}

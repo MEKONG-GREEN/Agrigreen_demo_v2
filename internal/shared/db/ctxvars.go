@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 )
@@ -120,4 +121,25 @@ func textArray(xs []string) string {
 	}
 	b.WriteByte('}')
 	return b.String()
+}
+
+// WithoutNodeScope chạy fn trong giao dịch tx với app.node_id và app.xa_ids tạm rỗng, rồi đặt lại giá trị cũ
+// (W3.4). Chính sách p_scope (RESTRICTIVE, pf 000134) khi đó chỉ còn lọc tenant (p_tenant vẫn áp). CHỈ dùng
+// cho kiểm toàn vẹn phải nhìn cả tenant — vd chồng lấn thửa giữa các HTX — và không trả dòng ngoài phạm vi cho
+// người gọi; mọi đọc/ghi khác giữ phạm vi Nút. fn lỗi → trả lỗi đó (giao dịch thường đã hỏng, không đặt lại).
+func WithoutNodeScope(ctx context.Context, tx pgx.Tx, fn func() error) error {
+	var node, xa string
+	if err := tx.QueryRow(ctx, "SELECT coalesce(current_setting('"+VarNodeID+"', true), ''), "+
+		"coalesce(current_setting('"+VarXaIDs+"', true), '')").Scan(&node, &xa); err != nil {
+		return err
+	}
+	const set = "SELECT set_config('" + VarNodeID + "', $1, true), set_config('" + VarXaIDs + "', $2, true)"
+	if _, err := tx.Exec(ctx, set, "", ""); err != nil {
+		return err
+	}
+	if err := fn(); err != nil {
+		return err
+	}
+	_, err := tx.Exec(ctx, set, node, xa)
+	return err
 }

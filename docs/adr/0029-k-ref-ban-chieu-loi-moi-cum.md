@@ -75,7 +75,7 @@ Có ở cụm `pf` và `mkg`. Không cần ở `ts`, `vault` cho đến khi có 
 |---|---|---|
 | W2.4 | Hàm `k_ref.ctx_uuid`, `k_ref.ctx_text`; biến ngữ cảnh trong `WithContextTx` | trong pf 000091 |
 | W2.5 | Quan hệ `k_ref`, module `pf/kref`, worker `pf.kref`, sự kiện `pf.party.org.created`/`moved`, `pf.party.share_grant.approved`/`revoked`, `SELECT` cho mọi `r_*`, `k_ref_lag_seconds` + cảnh báo, bước dựng lại trong `restore-drill` | pf 000092, mkg 000022 |
-| W3.4 | Chính sách `p_scope` đọc `k_ref.node_closure` trên `pf_coop` | pf 000097 |
+| W3.4 | Chính sách `p_scope` đọc `k_ref.node_closure` trên `pf_coop` — xong 09/10/2026; tenant chưa có bản chiếu (`node_closure` rỗng) → lùi về `p_tenant`, Nút chưa chiếu trong tenant đã chiếu → đóng ([ghi chú](../design/cooperative.md#18-ghi-chú-hiện-thực-w34)) | pf 000134 |
 | W4.2 | Worker dựng `share_scope` | pf 000099 |
 
 **W2.4 (05/10/2026, pf 000091):** `CREATE SCHEMA IF NOT EXISTS k_ref` cùng `k_ref.ctx_text(k)` và `k_ref.ctx_uuid(k)`. Hai hàm `LANGUAGE sql STABLE PARALLEL SAFE`, thân là một biểu thức, nên được inline (`EXPLAIN VERBOSE` chỉ còn `current_setting`). Khác bản §17.2:

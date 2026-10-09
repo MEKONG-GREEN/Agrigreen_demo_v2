@@ -1,6 +1,6 @@
 # Thiết kế ranh giới `pf/cooperative` (`dom/cooperative`, schema `pf_coop`)
 
-**Gói:** W3.1 ([kế hoạch v4.1](../kien-truc-v4.1-ke-hoach.md)). Bản này là đầu vào cho W3.2 (module Go), W3.3 (chuyển schema, pf 000094–000096), W3.4 (RLS theo Nút, pf 000097) và W3.5 (hợp nhất dữ liệu UAT).
+**Gói:** W3.1 ([kế hoạch v4.1](../kien-truc-v4.1-ke-hoach.md)). Bản này là đầu vào cho W3.2 (module Go), W3.3 (chuyển schema, pf 000094–000096), W3.4 (RLS theo Nút, pf 000134 — đổi số khi giao) và W3.5 (hợp nhất dữ liệu UAT).
 **Ngày:** 06/10/2026 · **Trạng thái:** đã hiện thực ở W3.2 (mục 16) và W3.3 (mục 17). Giả định chủ dữ liệu theo phương án (a) của H-1 (mục 11).
 **Đọc cùng:**
 - [bản đối chiếu](../kien-truc-v4.1-doi-chieu.md) §2.2, §2.3, X-01, DB-07;
@@ -520,7 +520,7 @@ Ma trận quyền mong đợi được kiểm bằng `migrations/module_roles_in
 
 ---
 
-## 9. W3.4 — RLS `p_scope` theo Nút (pf 000097)
+## 9. W3.4 — RLS `p_scope` theo Nút (pf 000134 — hiện thực ở mục 18)
 
 Thay `p_tenant` bằng **một** chính sách `p_scope` mỗi bảng (R-DB-08, ADR-0005), theo mẫu §17.2. Biến ngữ cảnh đã có từ W2.4. Nút = HTX (`cooperative_ref`) vì HTX là Nút `kind=cooperative` trong `k_ref.org`.
 
@@ -628,7 +628,7 @@ W3.5 vẫn **chặn** chờ dữ liệu UAT (C-9).
    - xóa ngoại lệ `agmodgraph` có chủ W3.2.
 3. **W2.6** (song song, pf 000119).
 4. **W3.3** (L): 000094–000096; chuyển store, handler, consumer, sync, metrics vào cooperative; xóa port cũ (party, geo, cropcycle `2.0.0`); sửa `agmodgraph` (8.1); diễn tập UAT; xóa ngoại lệ W3.3.
-5. **W3.4** (M): pf 000097, cổng `EXPLAIN`.
+5. **W3.4** (M): pf 000134 (+ shared 000012), cổng `EXPLAIN` — xong 09/10/2026 (mục 18).
 6. **W4.2**: nhánh `share_scope` trên bảng `shares`. **W6.5**: `Resolve`. **W3.5**: khi có dữ liệu UAT.
 
 Mốc: W3.3 + W3.4 xong **trước 15/12/2026**. H-1 phải được trả lời trước khi chạy W3.3 trên production.
@@ -785,3 +785,45 @@ Ngoại lệ duy nhất: `shared.ledger_added_column` (shared 000011) khóa theo
 
 - **H-17**: cửa sổ bảo trì và bản sao UAT để diễn tập ([runbook](../runbooks/cooperative-schema-move.md)). **H-1** vẫn giả định (a).
 - `cmd/worker` cũng chạy consumer `pf.simulation.snapshot` dưới `r_simulation` nhưng `app_worker` không là thành viên `r_simulation` (có từ trước W3.3, không đổi ở đây) — cần `Extra` như 17.2 hoặc sửa `modgen` để thấy `assembly.Consumers`.
+
+---
+
+## 18. Ghi chú hiện thực W3.4
+
+Migration **pf 000134** (thay số pf 000097 của bản này) và **shared 000012**. Kiểm thử: `migrations/coop_scope_rls_integration_test.go`.
+
+### 18.1 Cấu trúc chính sách (lệch mục 9: không thay `p_tenant`)
+
+- Mục 9 viết **một** chính sách thay `p_tenant`. Hiện thực **giữ** `p_tenant` (PERMISSIVE, `apply_tenant_rls`; `migratecheck` cấm `DROP POLICY p_tenant`) và thêm `p_scope` **RESTRICTIVE** `FOR ALL`. Hàng thấy/ghi được = `p_tenant AND p_scope`: phạm vi Nút chỉ thu hẹp trong tenant, không bao giờ nới ra tenant khác.
+- `shared.v_missing_rls` (shared 000012) đổi bất biến: có `p_tenant` PERMISSIVE; ngoài nó chỉ được có `p_scope` và `p_scope` phải RESTRICTIVE; chính sách thứ ba → báo. Một `p_scope` PERMISSIVE (OR với `p_tenant`) bị cổng chặn.
+- W4.2 (nhánh `share_scope`): vì `p_tenant` là chính sách cho phép duy nhất, đọc khác tenant qua cấp phép **không** thêm được bằng một chính sách PERMISSIVE mới mà không đổi bất biến trên — W4.2 phải thiết kế lại chỗ này (ghi ở rủi ro W4.2).
+- 19 bảng có `p_scope`; `sop_template`, `sop_version`, `variety_sop_binding` chỉ `p_tenant` (như mục 9).
+
+### 18.2 Các nhánh của `p_scope`
+
+| Nhánh | Biểu thức | Ghi |
+|---|---|---|
+| (a) không Nút | `k_ref.ctx_uuid('app.node_id') IS NULL` | Như mục 9 (consumer, job, worker, Admin không gắn Nút) |
+| (b) tenant chưa có `k_ref` | `(SELECT 1 FROM k_ref.node_closure u WHERE u.tenant_id = shared.current_tenant() ORDER BY u.ancestor LIMIT 1) IS NULL` | **Mới.** Trước lần Rebuild đầu tiên (W2.5) hoặc tenant chưa có tổ chức, chính sách lùi về `p_tenant` (hiện trạng trước W3.4) thay vì trả rỗng cho mọi người dùng. Tenant đã chiếu mà Nút của người gọi chưa có (độ trễ worker) → **đóng**. InitPlan một lần/câu, quét chỉ mục khóa chính (dạng `NOT EXISTS` bị planner quét tuần tự "tới dòng đầu") |
+| (c) Nút | `EXISTS (SELECT 1 FROM k_ref.node_closure nc WHERE nc.tenant_id = T.tenant_id AND nc.ancestor = ctx_uuid('app.node_id') AND nc.descendant = T.<cột Nút>)` | Như mục 9. Kế hoạch: `hashed SubPlan` một vòng, Index Only Scan `node_closure_pkey` |
+| (d) xã phụ trách | `T.commune_code = ANY (ctx_text('app.xa_ids')::text[])`; bảng không có `commune_code` (`cooperative`, `household_membership`, `farm_log_batch`, `farm_log_review`, `coop_season_area`) dùng `k_ref.org.admin_unit_code` của Nút trong dòng | Mở rộng mục 9 (mục 9 chỉ có cho bảng có `commune_code`) |
+| (e) dòng chưa gắn Nút | `T.<cột Nút> IS NULL AND ctx_text('app.xa_ids') IS NULL` (chỉ bảng có cột Nút NULL được: `plot`, `plot_boundary`, `plot_event`, `boundary_conflict`, `farm_log_batch`) | **Mới.** Mục 9 chỉ cho thửa nháp qua `xa_ids`, khi đó HTX và Cấp Tỉnh mất thửa nháp mà ứng dụng vẫn cho thấy (`access.sees`: "HTX mình hoặc thửa nháp"). Người có xã phụ trách chỉ thấy dòng chưa gắn Nút qua (d) |
+
+`household`: (c) qua `household_membership` đang mở (`until_date IS NULL OR until_date > current_date`) JOIN `node_closure` — EXPLAIN cho `hashed SubPlan` một vòng ở 8 000 hộ, nên **không** cần cột `node_ref` (phương án dự phòng của mục 9 không dùng). `kn_profile_event`: `subject_kind = cooperative` → (c) trên `subject_ref`; `household` → như `household`; (d) qua `commune_code`. Không đệ quy chính sách: `household` đọc `household_membership`, còn chính sách của `household_membership` chỉ đọc `k_ref`.
+
+### 18.3 `WITH CHECK` (lệch mục 9)
+
+Mục 9 để `WITH CHECK` chỉ kiểm tenant. Hiện thực: `p_tenant` vẫn kiểm tenant; `p_scope` dùng **cùng biểu thức phạm vi** cho `WITH CHECK` — người gọi không ghi được dòng mà mình không đọc được (INSERT … RETURNING của sổ vốn cũng cần đọc lại được dòng mới). UPDATE: `USING` lọc dòng cũ (dòng ngoài phạm vi → 0 dòng), `WITH CHECK` chặn chuyển dòng ra ngoài phạm vi (42501). Ngoại lệ `household`: `WITH CHECK (true)` vì dòng hộ được ghi **trước** `household_membership` trong cùng giao dịch (Nút của hộ suy ra từ thành viên); thành viên vẫn bị `WITH CHECK` của `household_membership` chặn nếu ghi vào HTX ngoài phạm vi.
+
+Hệ quả cần biết: người dùng Nút cấp trên (không có xã phụ trách) ghi dòng cho một HTX vừa tạo trước khi worker `pf.kref` chiếu Nút đó → 42501 cho tới khi bản chiếu theo kịp. Ghi KN (Cấp Xã) đi qua nhánh (d) nên không bị ảnh hưởng; Cấp Tỉnh/Quốc gia chỉ đọc (`collectCaller`).
+
+### 18.4 Kiểm ở ứng dụng và kiểm toàn vẹn cả tenant
+
+- Kiểm phạm vi ở ứng dụng giữ nguyên (`access.sees`/`canWrite`, `authz.Scope`, `coopOnly`) — phòng thủ nhiều lớp.
+- Kiểm chồng lấn thửa giữa các HTX (`classifiedOverlaps` → `store.FindOverlaps`) phải nhìn cả tenant: chạy trong `db.WithoutNodeScope` (đặt `app.node_id`, `app.xa_ids` rỗng cho riêng câu kiểm, rồi đặt lại). Kết quả chỉ để phân loại/chặn (lỗi chồng lấn giữa HTX vẫn trả mã thửa như trước W3.4), không trả dòng ngoài phạm vi.
+- Biện pháp 2 của rủi ro R-5 (`db.ForModule` từ chối người dùng HTX/KN xã mà `node_id` rỗng) **chưa làm**: `ContextVarsFrom` đã đặt Nút = `KN.OrgRef` hoặc `OrgRef` của token; HTX có `OrgRef` rỗng thì ứng dụng đã đặt phạm vi rỗng (`accessFor`). Để mở.
+
+### 18.5 Kiểm thử
+
+- `TestCoopScopeRLS_W34`: cây Tỉnh → 2 tổ xã → 2 HTX, thửa có HTX + thửa nháp, hộ thành viên; HTX chỉ thấy Nút mình + nháp; cán bộ xã theo Nút và theo `xa_ids`; Cấp Tỉnh thấy mọi hậu duệ; không Nút → cả tenant; Nút chưa chiếu → đóng; Nút/tenant khác → không thấy; tenant chưa có `k_ref` → lùi `p_tenant`; `WITH CHECK` chặn chèn/chuyển thửa ra ngoài phạm vi và ghi thành viên vào HTX khác; tenant khác bị `p_tenant` chặn; `db.WithoutNodeScope` thấy cả tenant rồi trở lại phạm vi; `v_missing_rls` báo `p_scope` PERMISSIVE, chính sách thứ ba, thiếu `p_tenant`.
+- `TestCoopScopeExplainVolume_W34`: 1 tỉnh, 40 tổ xã, 800 HTX, 40 000 thửa, 8 000 hộ, 60 000 dòng `node_closure` nhiễu của 30 tenant khác; dưới `r_cooperative` ở Nút một tổ xã: đúng số dòng, `node_closure` chỉ đọc bằng chỉ mục, không SubPlan nào quá một vòng, không gọi hàm của repo theo hàng. Cổng chung W9.1 (`TestRLSExplainNoPerRowFunctions_W91`) qua cho mọi bảng, không ngoại lệ.

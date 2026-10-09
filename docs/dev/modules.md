@@ -232,7 +232,9 @@ Mã tham chiếu chỉ nhận `uuid.UUID`, nên không có đường nào đưa 
 - được planner inline thành `current_setting(…)`;
 - EXECUTE chỉ cấp cho `r_*` (vai cũ `<module>_app` có qua membership).
 
-Mảng xã: `k_ref.ctx_text('app.xa_ids')::text[]`. Chưa chính sách RLS nào đọc các biến mới (W3.4, W4.x).
+Mảng xã: `k_ref.ctx_text('app.xa_ids')::text[]`. `app.node_id` và `app.xa_ids` được chính sách `p_scope` của `pf_coop` đọc từ W3.4 (mục "Phạm vi Nút trên `pf_coop`" dưới); `app.purpose` chờ W4.x.
+
+`db.WithoutNodeScope(ctx, tx, fn)` đặt tạm `app.node_id`, `app.xa_ids` rỗng cho `fn` rồi đặt lại — chỉ cho kiểm toàn vẹn phải nhìn cả tenant (vd chồng lấn thửa giữa HTX), không để trả dữ liệu ngoài phạm vi.
 ## Bản chiếu `k_ref` (W2.5)
 
 [ADR-0029](../adr/0029-k-ref-ban-chieu-loi-moi-cum.md#hiện-thực), kiến trúc v4.1 §17.1–17.3, R-DB-05. Module lõi `pf/kref` (`internal/platform/kref`, `k/ref`) sở hữu schema `k_ref` ở cụm pf (pf 000092) và mkg (mkg 000022, rỗng). `k_ref` là dữ liệu **dẫn xuất**: nguồn là sổ của `pf/party`, `pf/masterdata`.
@@ -488,3 +490,11 @@ cc.UseCollectionVolume(coop.Plots(), coop.Seasons(), md.AdminUnits())
 **Tên sự kiện ≠ module phát.** Sự kiện `pf.geo.plot.*`, `pf.cropcycle.{season,farm_log,harvest,sop,coop_season_area}.*`, `pf.party.household.*` do `pf/cooperative` khai `//ag:event` và phát (D-8). `modreg` lấy module phát theo tiền tố tên nếu module đó khai sự kiện, không thì module duy nhất khai nó trong `provides.events`.
 
 **Migration chuyển schema.** Quy tắc `schema` của `agmodgraph` cho phép đúng một dạng sửa đối tượng của schema khác: `ALTER {TABLE|SEQUENCE|FUNCTION} <schema khác>.<x> SET SCHEMA <schema của module gắn migration>`. `migratecheck` coi sổ đã chuyển (`ALTER TABLE … SET SCHEMA`) vẫn là sổ dưới tên mới (quy tắc ADD COLUMN, ADR-0012). Tên sổ (`TG_ARGV`, `chain_head.ledger`) không đổi khi chuyển schema; `shared.ledger_added_column` khóa theo tên bảng thật nên phải đăng ký bù dưới tên mới.
+
+## Phạm vi Nút trên `pf_coop` (W3.4)
+
+[Ghi chú hiện thực](../design/cooperative.md#18-ghi-chú-hiện-thực-w34), kiến trúc v4.1 §17.2, pf 000134, shared 000012. Ngoài `p_tenant` (PERMISSIVE), 19 bảng `pf_coop` có `p_scope` **RESTRICTIVE** (`sop_template`, `sop_version`, `variety_sop_binding` chỉ `p_tenant`). Hàng thấy/ghi được dưới `r_cooperative` = cùng tenant **và** một trong các nhánh: không Nút (`app.node_id` rỗng — consumer, job, Admin không gắn Nút); tenant chưa có bản chiếu `k_ref`; Nút của dòng là hậu duệ của `app.node_id` theo `k_ref.node_closure`; xã của dòng thuộc `app.xa_ids`; dòng chưa gắn Nút (thửa nháp…) khi người gọi không có xã phụ trách. `WITH CHECK` dùng cùng biểu thức (trừ `household`) → ghi dòng ngoài phạm vi trả 42501, sửa dòng ngoài phạm vi ảnh hưởng 0 dòng.
+
+- Kiểm phạm vi ở ứng dụng **giữ nguyên** (`authz.Scope`, `coopOnly`) — RLS là lớp thứ hai.
+- Nút của người dùng HTX là `OrgRef` của token: kiểm thử dựng `k_ref` cho tenant (vd `kref.RebuildTenant`) thì người dùng chỉ thấy cây con của Nút; không dựng thì chính sách lùi về `p_tenant`.
+- Bảng mới có `tenant_id` trong `pf_coop` (hay schema khác muốn phạm vi Nút): thêm `p_scope AS RESTRICTIVE` viết thẳng `EXISTS k_ref.node_closure` (không hàm do repo định nghĩa) — `shared.v_missing_rls` báo nếu `p_scope` PERMISSIVE hay có chính sách thứ ba; cổng EXPLAIN W9.1 báo nếu gọi hàm theo hàng.
