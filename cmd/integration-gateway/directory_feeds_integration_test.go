@@ -17,12 +17,12 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/integration-gateway/gateway"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/contracts/integration"
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port/grantlookup"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -57,7 +57,8 @@ func (e *intEnv) seedDirectory() (coops, plots []uuid.UUID) {
 		}
 		return nil
 	})
-	exec("geo_app", func(tx pgx.Tx) error {
+	coopDB := db.ForModule(e.pg.Pool(t, migrations.PF, dbadmin.AppPublic), db.Module("pf/cooperative")) // W3.3: thửa ở pf_coop
+	if err := tenant.WithTenantTx(ctx, coopDB, e.grantor, func(tx pgx.Tx) error {
 		for i, p := range plots {
 			var coop, hh *uuid.UUID
 			status := "active"
@@ -67,7 +68,7 @@ func (e *intEnv) seedDirectory() (coops, plots []uuid.UUID) {
 			} else {
 				status = "draft"
 			}
-			if _, err := tx.Exec(ctx, `INSERT INTO pf_geo.plot (tenant_id, ref, code, commune_code, cooperative_ref, household_ref, status, current_version,
+			if _, err := tx.Exec(ctx, `INSERT INTO pf_coop.plot (tenant_id, ref, code, commune_code, cooperative_ref, household_ref, status, current_version,
 			    current_boundary_id, geom, area_ha, source, created_by)
 			  VALUES ($1, $2, $3, '89123', $4, $5, $6, 1, $7, ST_GeomFromText('MULTIPOLYGON(((105.7 10.0,105.701 10.0,105.701 10.001,105.7 10.0)))', 4326),
 			    1.2500::numeric, 'kiểm thử W5.5', $8)`,
@@ -76,7 +77,9 @@ func (e *intEnv) seedDirectory() (coops, plots []uuid.UUID) {
 			}
 		}
 		return nil
-	})
+	}); err != nil {
+		t.Fatalf("seed pf/cooperative: %v", err)
+	}
 	return coops, plots
 }
 
@@ -121,11 +124,11 @@ func (e *intEnv) onboardDirectoryFeeds() (clientID, key string) {
 func (e *intEnv) buildDirectory() {
 	e.t.Helper()
 	pool, clk := e.pg.Pool(e.t, migrations.PF, dbadmin.AppPublic), clock.System{}
-	md := masterdata.New(pool, clk)
-	g := geo.New(pool, clk, geo.Deps{Params: md.Params(), AdminUnits: md.AdminUnits()})
+	coop := cooperative.New(pool, clk, cooperative.Deps{}) // W3.3: thửa + hồ sơ HTX ở pf_coop (r_cooperative)
 	gl := grantlookup.New(pool, clk)
+	gl.Locations = coop.CoopLocations()
 	e.mod.UsePartnerFeedSources(map[string]apiclientport.PartnerSource{apiclientport.FeedCooperativeDirectory: gl,
-		apiclientport.FeedPlotDirectory: g.PartnerFeedSource()}, gl)
+		apiclientport.FeedPlotDirectory: coop.PartnerFeedSource()}, gl)
 	for _, f := range []string{apiclientport.FeedCooperativeDirectory, apiclientport.FeedPlotDirectory} {
 		if _, err := e.mod.Service().BuildPartner(context.Background(), f); err != nil {
 			e.t.Fatalf("dựng feed %s: %v", f, err)
@@ -239,8 +242,9 @@ func TestDirectoryFeedsOverGateway_W55Integration(t *testing.T) {
 	if items, _ := r.body["items"].([]any); len(items) != 0 || !asOf.After(page.AsOf) {
 		t.Fatalf("không đổi → 0 mục, as_of tiến (%s → %s): %s", page.AsOf, asOf, r.raw)
 	}
-	if err := tenant.WithTenantTx(context.Background(), e.pg.Pool(t, migrations.PF, "geo_app"), e.grantor, func(tx pgx.Tx) error {
-		_, err := tx.Exec(context.Background(), `UPDATE pf_geo.plot SET status = 'retired', updated_at = now() WHERE ref = $1`, plots[1])
+	coopDB := db.ForModule(e.pg.Pool(t, migrations.PF, dbadmin.AppPublic), db.Module("pf/cooperative"))
+	if err := tenant.WithTenantTx(context.Background(), coopDB, e.grantor, func(tx pgx.Tx) error {
+		_, err := tx.Exec(context.Background(), `UPDATE pf_coop.plot SET status = 'retired', updated_at = now() WHERE ref = $1`, plots[1])
 		return err
 	}); err != nil {
 		t.Fatal(err)

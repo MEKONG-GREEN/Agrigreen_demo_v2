@@ -8,6 +8,7 @@ kind: domain
 zones: [pf]
 version: 1.0.0
 depends:
+  pf/apiclient: ">=1.0 <2"
   pf/geo: ">=2.0 <3"
   pf/masterdata: ">=1.0 <2"
   pf/metrics: ">=1.0 <2"

@@ -41,6 +41,7 @@ provides:
     - SeasonActivity
     - SessionContext
     - ValveGrants
+    - grantlookup.CoopLocations
   events:
     - pf.party.consent.recorded/v1
     - pf.party.context_epoch.bumped/v1

@@ -7,7 +7,7 @@
   "pending": ["A7"],
   "status_note": "Thay GET /v1/partner/cooperatives (ADR-0033 §2, §7: chạy song song một kỳ tới W5.10). Phân vùng theo bên cấp (partition_key = tenant bên cấp); cổng kiểm cấp phép cooperative_directory của bên gọi ở MỖI lời gọi. Người đề xuất/phê duyệt là vai giữ chỗ.",
   "owner": "pf/apiclient",
-  "sources": ["pf/party"],
+  "sources": ["pf/party", "pf/cooperative"],
   "consumers": ["mkg/fieldops"],
   "proposed_by": "pf-party-module-owner",
   "approved_by": "data-steward-tenant-chuong-trinh",
