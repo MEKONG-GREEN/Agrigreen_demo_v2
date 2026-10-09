@@ -210,12 +210,15 @@ func TestFarmerPullByLinkedHouseholds(t *testing.T) {
 		t.Fatalf("pull cán bộ không đổi: %v", g)
 	}
 
-	// Tài khoản không có vai farmer, không org_ref → không nhận gì (mặc định chặn).
+	// Tài khoản không có vai farmer, không org_ref → không nhận gì (mặc định chặn). Từ FD, kn_officer không Nút
+	// bị chặn ngay khi mở giao dịch của module (403 node_scope_required), kể cả đăng ký thiết bị.
 	nobody := f.as(f.tenant, uuid.Nil, "kn_officer")
-	nobody.register()
 	farmers.link(nobody.actor, accport.HouseholdLink{HouseholdRef: hh1, CommuneCode: unitA})
-	if np, _ := nobody.pull("", 100); len(np.Changes) != 0 {
-		t.Fatalf("không vai farmer: %v", count(np))
+	if r := nobody.post("/v1/devices", map[string]any{"device_id": ids.New().String(), "platform": "android", "app_version": "1.0.0+12"}); r.status != http.StatusForbidden || r.body["code"] != "node_scope_required" {
+		t.Fatalf("kn_officer không Nút đăng ký thiết bị: %d %s", r.status, r.raw)
+	}
+	if np, r := nobody.pull("", 100); len(np.Changes) != 0 || r.status == http.StatusOK {
+		t.Fatalf("không vai farmer, không Nút: %d %v", r.status, count(np))
 	}
 
 	// Nông dân tenant khác (cùng liên kết giả) không thấy khóa của tenant này.

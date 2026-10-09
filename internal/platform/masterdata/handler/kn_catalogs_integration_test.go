@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/google/uuid"
 )
 
 // fakeFormUsage giả P3: số mẫu báo cáo dùng mỗi mục.
@@ -20,6 +22,14 @@ func (f fakeFormUsage) FormsUsing(_ context.Context, catalog string, codes []str
 		}
 	}
 	return out, nil
+}
+
+// knOfficer là cán bộ KN như luồng thật: luôn có org_ref (Nút công tác). FD chặn kn_officer không Nút
+// (403 node_scope_required) ngay khi mở giao dịch của module.
+func knOfficer(t *testing.T, f *fixture, tid uuid.UUID) caller {
+	c := f.caller(tid, "kn_officer")
+	c.token = f.iss.Sign(t, authztest.Token{Subject: c.actor, TenantID: tid, Roles: []string{"kn_officer"}, MFA: true, OrgRef: ids.New()})
+	return c
 }
 
 func codesOf(body map[string]any) map[string]map[string]any {
@@ -40,7 +50,7 @@ func TestFN_AD_04_05_AgriCatalogs(t *testing.T) {
 	f := newFixture(t)
 	tid := f.seeded()
 	admin := f.caller(tid, port.RoleMasterdataAdmin)
-	reader := f.caller(tid, "kn_officer")
+	reader := knOfficer(t, f, tid)
 
 	// Dữ liệu nền tạm (Q-01) có đủ danh mục mới, kể cả loại báo cáo "dot_xuat" cho menu đột xuất.
 	for catalog, code := range map[string]string{port.CatalogCrop: "RAU_MUONG", port.CatalogMaterial: "PHAN_URE",
@@ -139,7 +149,7 @@ func TestFN_AD_04_05_AgriCatalogs(t *testing.T) {
 
 	// Cách ly tenant: tenant khác không thấy mục vừa tạo.
 	other := f.seeded()
-	if st, _ := f.caller(other, "kn_officer").get("/v1/masterdata/catalogs/crop/DUA_HAU"); st != http.StatusNotFound {
+	if st, _ := knOfficer(t, f, other).get("/v1/masterdata/catalogs/crop/DUA_HAU"); st != http.StatusNotFound {
 		t.Fatalf("tenant khác thấy mục: %d", st)
 	}
 }
