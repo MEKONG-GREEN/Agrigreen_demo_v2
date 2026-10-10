@@ -47,7 +47,7 @@ func (t TimeOfDay) On(day time.Time) time.Time {
 }
 
 // Weekdays là tập ngày trong tuần, bit (1 << time.Weekday): Chủ nhật = bit 0 … Thứ Bảy = bit 6. Khớp cột smallint
-// weekdays của pf_price.calendar_rule (pf 000146).
+// weekdays của pf_price.calendar_rule (pf 000139).
 type Weekdays uint8
 
 // WeekdaysOf dựng tập từ danh sách.
@@ -101,7 +101,7 @@ var TemplateVars = []string{"{ngày}", "{xã}", "{giờ khóa}"}
 
 var reTemplateVar = regexp.MustCompile(`\{[^{}]*\}`)
 
-// MaxTemplate là độ dài tối đa nội dung mẫu (khớp CHECK pf 000146).
+// MaxTemplate là độ dài tối đa nội dung mẫu (khớp CHECK pf 000139).
 const MaxTemplate = 500
 
 // UnknownVars trả các biến không được hỗ trợ trong nội dung mẫu (theo thứ tự xuất hiện, không trùng).
@@ -141,7 +141,7 @@ var (
 	ErrTemplateVar = errors.New("price: nội dung mẫu có biến không hỗ trợ")
 )
 
-// ValidateSchedule kiểm một phiên bản lịch (cùng ràng buộc CHECK của pf 000146).
+// ValidateSchedule kiểm một phiên bản lịch (cùng ràng buộc CHECK của pf 000139).
 func ValidateSchedule(s Schedule) error {
 	if s.Weekdays == 0 || s.Weekdays > 127 {
 		return fmt.Errorf("%w: phải chọn ít nhất một ngày báo giá trong tuần", ErrInvalid)
@@ -198,7 +198,7 @@ type Exception struct {
 	Version int64
 }
 
-// MaxReason là độ dài tối đa lý do ngoại lệ (khớp CHECK pf 000146).
+// MaxReason là độ dài tối đa lý do ngoại lệ (khớp CHECK pf 000139).
 const MaxReason = 300
 
 // ValidateException kiểm một ngày ngoại lệ (chưa xét lịch — xem CheckException).

@@ -642,7 +642,7 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 	}
 	if selected(jobs, priceport.JobCalendar) {
 		// W11.74 (BRD Báo giá FN-AD-04.04 AC-01, FN-XA-03.04): mỗi phút ghi mốc khóa 12:00 (±1 phút) và nhắc nhập giá;
-		// tìm tenant bằng ag_ops_jobs (cột tenant_id của pf_price, pf 000146), ghi bằng r_price; nhắc → outbox → pf/notify.
+		// tìm tenant bằng ag_ops_jobs (cột tenant_id của pf_price, pf 000139), ghi bằng r_price; nhắc → outbox → pf/notify.
 		pricePool, err := openPF(ctx, direct, &closeFn)
 		if err != nil {
 			closeFn()

@@ -85,7 +85,7 @@ Chưa làm trong gói này: lưu `Key`/`WeekYear` của kỳ vào DB (không có
 | X-02 PII ở ô tự do | Chỉ **cảnh báo** (không chặn) khi ô ghi chú/lý do/nội dung chứa SĐT, email, số CCCD/CMND — nhận dạng bằng mẫu ở web (`src/kn/pii.tsx`) và mobile (`lib/domain/pii_hint.dart`); máy chủ không quét nội dung | hai tệp trên |
 | Di chuyển Nút xã (FN-AD-04.02 B3) | Dùng Admin API có sẵn `POST /v1/orgs/{ref}/move` (lý do ≥ 10 ký tự, giữ lịch sử, bỏ gán khu vực cũ). Xã sang tỉnh khác mà mã ĐVHC không thuộc tỉnh mới → nhập "Mã ĐVHC mới" (máy chủ kiểm ĐVHC trong địa bàn cha) | `OrgStructureScreen` |
 
-## W11.74 — Lịch báo giá, giờ khóa, nhắc, ngưỡng (pf 000146)
+## W11.74 — Lịch báo giá, giờ khóa, nhắc, ngưỡng (pf 000139)
 
 | Câu hỏi | Lựa chọn đã dùng | Ở đâu | Đổi thế nào |
 |---|---|---|---|

@@ -342,7 +342,7 @@ Làm lại app Khuyến nông theo các BRD ngày 07/10/2026 (Trồng trọt Fin
 - [ ] W11.71: khung `pf/price`.
 - [ ] W11.72: xã báo giá + phân công.
 - [ ] W11.73: mặt hàng theo thời kỳ.
-- [x] W11.74 (10/10/2026): lịch báo giá (T2–T6 mặc định, ngoại lệ), giờ khóa 12:00 ±1 phút (job `price_calendar` mỗi phút ở leader), hạn phản hồi 13:30, nhắc nhập giá qua `pf/notify` (`pf.price.reminder.issued`), ngưỡng cảnh báo có phiên bản theo mặc định/nhóm/mặt hàng; mặc định ở `port.Profile.Schedule`; pf 000146; màn `web-ops` `/kn/phong-ban/thong_tin_truyen_thong/bao-gia-lich`.
+- [x] W11.74 (10/10/2026): lịch báo giá (T2–T6 mặc định, ngoại lệ), giờ khóa 12:00 ±1 phút (job `price_calendar` mỗi phút ở leader), hạn phản hồi 13:30, nhắc nhập giá qua `pf/notify` (`pf.price.reminder.issued`), ngưỡng cảnh báo có phiên bản theo mặc định/nhóm/mặt hàng; mặc định ở `port.Profile.Schedule`; pf 000139; màn `web-ops` `/kn/phong-ban/thong_tin_truyen_thong/bao-gia-lich`.
 - [ ] W11.75: nhập báo giá + xác minh.
 - [ ] W11.76: duyệt/mở duyệt bảng giá.
 - [x] W11.06 (10/10/2026): mở phòng ban + menu `kn.menu/v3` — seed 5 phòng ban (`trong_trot`, `chan_nuoi_thuy_san`, `ke_hoach_tai_chinh`, `thong_tin_truyen_thong` tên "Thông tin Tuyên truyền", `hanh_chinh_tong_hop`), mã tạm `phong_ban_5` → `hanh_chinh_tong_hop`, `phong_ban_6` bỏ (bí danh `port.CanonicalDepartmentCode`, nạp lại seed xóa mã tạm chưa dùng); khuôn menu theo phòng ban (nhóm "Nghiệp vụ", mục module chưa có "Sắp có") + nhóm "Dùng chung" (Contact) cho mọi vai; web-ops + app di động vẽ "Sắp có"; không migration ([mã phòng ban](kn/phong-ban-seed.md), [giả định](kn/gia-dinh-brd-2026-10.md#w1106--mở-phòng-ban--menu-knmenuv3)).

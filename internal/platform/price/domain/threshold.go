@@ -20,7 +20,7 @@ const (
 
 var (
 	pctHundred = decimal.NewFromInt(100)
-	// reThresholdItem: mã mặt hàng (W11.73 sở hữu danh mục; ở đây chỉ kiểm dạng — CHECK pf 000146).
+	// reThresholdItem: mã mặt hàng (W11.73 sở hữu danh mục; ở đây chỉ kiểm dạng — CHECK pf 000139).
 	reThresholdItem = regexp.MustCompile(`^[a-z0-9][a-z0-9_.-]{0,39}$`)
 )
 
@@ -48,7 +48,7 @@ func ValidPct(p decimal.Decimal) bool {
 	return p.IsPositive() && p.LessThanOrEqual(pctHundred) && p.Equal(p.Round(2))
 }
 
-// ValidateThreshold kiểm một ngưỡng (cùng ràng buộc CHECK của pf 000146). Ngưỡng ≤ 0 % hoặc > 100 % bị chặn.
+// ValidateThreshold kiểm một ngưỡng (cùng ràng buộc CHECK của pf 000139). Ngưỡng ≤ 0 % hoặc > 100 % bị chặn.
 func ValidateThreshold(t Threshold) error {
 	switch t.Scope {
 	case ThresholdScopeDefault:

@@ -36,7 +36,7 @@ var CalendarJobActor = uuid.MustParse("00000000-0000-0000-0000-000000011740")
 type CalendarTenantLister func(ctx context.Context) ([]uuid.UUID, error)
 
 // CalendarTenants dùng pool vai ag_ops_jobs (BYPASSRLS, chỉ cột tenant_id của pf_price.unit, pf_price.calendar_rule —
-// pf 000146): tenant đã bật Báo giá (đã ghi danh mục nền hoặc cấu hình lịch).
+// pf 000139): tenant đã bật Báo giá (đã ghi danh mục nền hoặc cấu hình lịch).
 func CalendarTenants(pool *pgxpool.Pool) CalendarTenantLister {
 	return func(ctx context.Context) ([]uuid.UUID, error) {
 		rows, err := pool.Query(ctx, `SELECT tenant_id FROM pf_price.unit UNION SELECT tenant_id FROM pf_price.calendar_rule`)

@@ -344,7 +344,7 @@ Kiến trúc v4.1 §26, §7.2. Module năng lực `pf/forms` (`internal/platform
 | `port.Calendar`, `port.Thresholds`, `port.ReminderTargets` | W11.74: kế hoạch ngày báo giá (`DayPlan.Locked`), ngưỡng mặt hàng → nhóm → mặc định, bộ chọn người nhận nhắc | W11.72/W11.75 cài `ReminderTargets`; W11.75 đọc `Calendar`, `Thresholds` |
 | Sổ `pf_price.unit`, `pf_price.commodity_group` | mỗi dòng một phiên bản của một mã (`seq`), `valid_from` (date giờ VN), `status` `active`/`retired` | W11.73 tham chiếu `code` |
 | HTTP | `GET /v1/price/status`, `GET /v1/price/catalog?at=`, `POST /v1/price/catalog/defaults` (5 nhóm BRD + 8 ĐVT, chỉ mã chưa có) | W11.72–W11.76 thêm route |
-| Sổ W11.74 (pf 000146) | `calendar_rule`, `calendar_exception`, `alert_threshold`, `calendar_run`; job `price_calendar` (`cmd/worker`, mỗi phút, leader) ghi mốc khóa ±1 phút + nhắc → `pf.price.reminder.issued` → `pf.notify.price` | `/v1/price/calendar*`, `/v1/price/thresholds*` |
+| Sổ W11.74 (pf 000139) | `calendar_rule`, `calendar_exception`, `alert_threshold`, `calendar_run`; job `price_calendar` (`cmd/worker`, mỗi phút, leader) ghi mốc khóa ±1 phút + nhắc → `pf.price.reminder.issued` → `pf.notify.price` | `/v1/price/calendar*`, `/v1/price/thresholds*` |
 
 Bảng mới của các gói sau: migration riêng tên `<số>_pf_price_<việc>.up.sql`, sổ `shared.apply_ledger`, `GRANT SELECT, INSERT … TO r_price`; view công bố mới khai `//ag:pubview pf_price_pub.<tên> v1` trong `price/port` rồi `GRANT SELECT … TO r_price_pub` (kiểm thử `TestPubViewsDeclaredAndPrivileges_W63` đếm số view).
 

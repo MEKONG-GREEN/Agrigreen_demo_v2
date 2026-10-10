@@ -64,10 +64,10 @@ Bảng giá xã là giá thị trường, không phải dữ liệu hộ → kh�
 - `app/KN/app.yaml` thêm `pf/price`; agnofloat `floatFreeZones` thêm `/internal/platform/price`; `dbadmin` kiểm thử: `laterGroups`, số vai nhóm, `r_price_pub`.
 - Giả định (docs/kn/gia-dinh-brd-2026-10.md): QĐ-5 (a), Q-082 (một danh mục ở `cap/price`), mã phòng ban `thong_tin_truyen_thong`, danh sách đơn vị tính mặc định.
 
-### W11.74 lịch báo giá, giờ khóa, nhắc, ngưỡng (10/10/2026, pf 000146)
+### W11.74 lịch báo giá, giờ khóa, nhắc, ngưỡng (10/10/2026, pf 000139)
 
 - `port.Profile.Schedule` (`ScheduleDefaults`): lịch/ngưỡng MẶC ĐỊNH của bên dùng (KN: T2–T6, khóa 12:00, hạn phản hồi 13:30, nhắc 07:30/11:00, 30 %, N = 7, đi ngang 1 %, phiếu điều tra 40 %) — không rẽ nhánh theo tên ứng dụng; `module.New` kiểm cấu hình lúc khởi động.
-- pf 000146: sổ `pf_price.calendar_rule` (phiên bản lịch, `valid_from`), `calendar_exception` (ngày nghỉ/bổ sung, xóa = `retired`), `alert_threshold` (`numeric(5,2)`, phạm vi default/group/item; default mang N, đi ngang, phiếu điều tra; không `retired` được), `calendar_run` (nhật ký job, CHECK `seq = 1`). `ag_ops_jobs` đọc cột `tenant_id` của `unit`, `calendar_rule`.
+- pf 000139: sổ `pf_price.calendar_rule` (phiên bản lịch, `valid_from`), `calendar_exception` (ngày nghỉ/bổ sung, xóa = `retired`), `alert_threshold` (`numeric(5,2)`, phạm vi default/group/item; default mang N, đi ngang, phiếu điều tra; không `retired` được), `calendar_run` (nhật ký job, CHECK `seq = 1`). `ag_ops_jobs` đọc cột `tenant_id` của `unit`, `calendar_rule`.
 - Port: `Calendar.Day` (kế hoạch ngày, `DayPlan.Locked(now)` — W11.75 chặn ghi theo đồng hồ, không đợi job), `Thresholds` (ngưỡng mặt hàng → nhóm → mặc định, tham số chung), `ReminderTargets` (W11.72/W11.75 cài, `Module.UseReminderTargets`).
 - Job `price_calendar` (`cmd/worker`, `schedule.Every{1 phút}` ở leader, `RunOnStart`): ghi mốc khóa (độ trễ = `event_time − scheduled_at`, kiểm thử ≤ 60 s) và nhắc lần 1/2 (một lần mỗi ngày; ngày nghỉ/ngoài lịch không nhắc), phát `pf.price.reminder.issued` → consumer `pf.notify.price` (loại thông báo tạm dùng `report_task_due`).
 - HTTP: `GET /v1/price/calendar`, `POST /v1/price/calendar/schedule`, `POST /v1/price/calendar/exceptions`, `POST /v1/price/calendar/exceptions/{day}/retire`, `GET /v1/price/calendar/runs`, `POST /v1/price/calendar/reminder-test`, `GET|POST /v1/price/thresholds`, `POST /v1/price/thresholds/{scope}/{code}/retire`. Web-ops: `/kn/phong-ban/[dept]/bao-gia-lich` (chưa có mục menu — menu do người tích hợp bật).

@@ -1,6 +1,6 @@
 package store
 
-// SQL lịch báo giá, ngoại lệ, ngưỡng, nhật ký job (pf 000146, W11.74). Chạy trong giao dịch của module (vai r_price);
+// SQL lịch báo giá, ngoại lệ, ngưỡng, nhật ký job (pf 000139, W11.74). Chạy trong giao dịch của module (vai r_price);
 // RLS p_tenant lọc tenant. Sổ chỉ ghi thêm. Số % đọc/ghi qua text ↔ decimal (không float — R-CODE-01).
 
 import (
