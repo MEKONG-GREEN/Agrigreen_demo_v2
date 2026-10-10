@@ -226,7 +226,8 @@ func previewDTO(pv app.Preview) gin.H {
 	periods := make([]gin.H, 0, len(pv.Periods))
 	for _, p := range pv.Periods {
 		periods = append(periods, gin.H{"slot": p.Slot, "label": p.Label, "range_label": p.RangeLabel, "from_date": date(p.From), "to_date": date(p.To),
-			"due_at": tss(p.DueAt), "auto_close_at": tss(p.AutoCloseAt)})
+			"due_at": tss(p.DueAt), "auto_close_at": tss(p.AutoCloseAt), "period_key": nilIfZero(p.Key), "iso_week": nilIfZero(p.ISOWeek),
+			"week_year": nilIfZero(p.WeekYear)})
 	}
 	communes := make([]gin.H, 0, len(pv.Communes))
 	for _, c := range pv.Communes {
@@ -1142,4 +1143,13 @@ func (h Handler) badges(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"counts": m})
+}
+
+// nilIfZero trả nil cho giá trị rỗng (khóa/số tuần của kỳ không phải tuần ở khung xem trước).
+func nilIfZero[T comparable](v T) *T {
+	var zero T
+	if v == zero {
+		return nil
+	}
+	return &v
 }

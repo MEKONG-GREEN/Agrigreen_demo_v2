@@ -55,7 +55,19 @@ export interface RcPreview {
   deadline: { offset_days: number; time: string };
   close_after_days: number;
   forms: { template_id: string; version_id: string; code: string; name: string; version: number; period_block: boolean; slots: number }[];
-  periods: { slot: number; label: string; range_label: string; from_date: string; to_date: string; due_at: string; auto_close_at: string }[];
+  periods: {
+    slot: number;
+    label: string;
+    range_label: string;
+    from_date: string;
+    to_date: string;
+    due_at: string;
+    auto_close_at: string;
+    /** Khóa kỳ theo lịch kỳ hệ thống (W11.05b) — null với vụ/đột xuất. */
+    period_key: string | null;
+    iso_week: number | null;
+    week_year: number | null;
+  }[];
   communes: { commune_code: string; region_code: string; region_name: string; officer_count: number }[];
   communes_without_officer: string[];
   provincial_columns: { template_id: string; form_code: string; letter: string; title: string; unit: string }[];

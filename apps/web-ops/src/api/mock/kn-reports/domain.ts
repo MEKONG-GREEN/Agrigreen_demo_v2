@@ -8,6 +8,32 @@ export type ReportType = "weekly" | "monthly" | "seasonal" | "annual" | "adhoc";
 
 export const REPORT_PERIOD_TYPE: Record<ReportType, PeriodType> = { weekly: "week", monthly: "month", seasonal: "season", annual: "year", adhoc: "adhoc" };
 
+/** Như domain.ReportPeriodTypes (W11.05b): loại kỳ chọn được theo loại báo cáo, phần tử đầu = mặc định. */
+export const REPORT_PERIOD_TYPES: Record<ReportType, PeriodType[]> = {
+  weekly: ["week", "ksgm_week", "day"],
+  monthly: ["month", "quarter"],
+  seasonal: ["season"],
+  annual: ["year", "quarter"],
+  adhoc: ["adhoc", "day"],
+};
+
+/** Như domain.ResolvePeriodType: rỗng → mặc định; ngoài danh sách → PeriodError("period_type"). */
+export function resolvePeriodType(rt: ReportType, pt: unknown): PeriodType {
+  const allowed = REPORT_PERIOD_TYPES[rt];
+  if (pt === undefined || pt === null || pt === "") return allowed[0]!;
+  if (allowed.includes(pt as PeriodType)) return pt as PeriodType;
+  throw new PeriodError("period_type", `loại báo cáo ${rt} chia kỳ ${allowed.join(" | ")}`);
+}
+
+/** Như domain.ParseKSGMStarts ("1,10,16,23"); sai dạng → null (Service.ksgmStarts bỏ qua → mặc định). */
+export function parseKsgmStarts(v: string): number[] | null {
+  const out = v.split(",").map((x) => Number(x.trim()));
+  return out.every((n) => Number.isInteger(n)) && v.trim() ? out : null;
+}
+
+/** Ranh giới 4 tuần KSGM của một tháng (tham số extension.ksgm_week_starts:YYYY-MM); null → 1, 8, 15, 22. m: 0–11. */
+export type KsgmStarts = (y: number, m: number) => number[] | null;
+
 // Lịch kỳ hệ thống (W11.03) — quy tắc có phiên bản như domain.PeriodRule; tag ghi vào đợt (period_rule).
 export const RULE_VERSION_V1 = "kn.period_rule/v1-tam";
 export const RULE_VERSION_V2 = "kn.period_rule/v2";
@@ -177,8 +203,8 @@ const ROMAN_Q = ["I", "II", "III", "IV"];
 const PT_V1 = "week | month | season | year | adhoc";
 const PT_V2 = "day | week | ksgm_week | month | quarter | season | year | adhoc";
 
-/** Như PeriodRule.PeriodOf (tuần KSGM: chỉ ranh giới mặc định 1, 8, 15, 22). */
-export function periodOf(r: PeriodRule, pt: string, t: number): Span {
+/** Như PeriodRule.PeriodOf (tuần KSGM: ranh giới ksgm(y, m) — như KSGMWeeks — hoặc mặc định 1, 8, 15, 22). */
+export function periodOf(r: PeriodRule, pt: string, t: number, ksgm?: KsgmStarts): Span {
   const aligned = isV2(r) && r.month_align === "week_end";
   const anchor = (x: number) => (aligned ? weekOf(r, x).to : x);
   const bound = (first: number) => (aligned ? weekOf(r, first).from : first);
@@ -207,7 +233,10 @@ export function periodOf(r: PeriodRule, pt: string, t: number): Span {
     }
     if (pt === "ksgm_week") {
       const [y, m, d] = ymdParts(t);
-      const starts = [1, 8, 15, 22];
+      const starts = ksgm?.(y, m) ?? [1, 8, 15, 22];
+      const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+      if (starts.length !== 4 || starts[0] !== 1) throw new PeriodError("ksgm_week_starts", "4 ngày bắt đầu, tuần 1 từ ngày 1");
+      for (let k = 1; k < 4; k++) if (starts[k]! <= starts[k - 1]! || starts[k]! > last) throw new PeriodError("ksgm_week_starts", `ngày bắt đầu tăng dần, không quá ${last}`);
       const i = starts.filter((s) => s <= d).length - 1;
       const end = i < 3 ? Date.UTC(y, m, starts[i + 1]!) - DAY : Date.UTC(y, m + 1, 1) - DAY;
       return { key: `${y}-${pad2(m + 1)}-K${i + 1}`, label: `Tuần KSGM ${i + 1} tháng ${m + 1}/${y}`, from: Date.UTC(y, m, starts[i]!), to: end, week_year: 0, week_no: 0 };
@@ -217,7 +246,7 @@ export function periodOf(r: PeriodRule, pt: string, t: number): Span {
 }
 
 /** Như domain.Split. */
-export function split(pt: string, fromS: string, toS: string, season: string, rule: PeriodRule, d: Deadline, closeAfter: number): SplitPeriod[] {
+export function split(pt: string, fromS: string, toS: string, season: string, rule: PeriodRule, d: Deadline, closeAfter: number, ksgm?: KsgmStarts): SplitPeriod[] {
   const from = parseDate(fromS);
   const to = parseDate(toS);
   if (from === null) throw new PeriodError("from_date", "ngày phải dạng YYYY-MM-DD");
@@ -248,10 +277,10 @@ export function split(pt: string, fromS: string, toS: string, season: string, ru
     add(from, to, { key: "", label: season || (pt === "year" ? `Năm ${new Date(from).getUTCFullYear()}` : ""), week_year: 0, week_no: 0 });
     return out;
   }
-  periodOf(rule, pt, from);
+  periodOf(rule, pt, from, ksgm);
   if ((to - from) / DAY > 3660) throw new PeriodError("to_date", `tối đa ${limit} kỳ mỗi đợt`);
   for (let t0 = from; t0 <= to; ) {
-    const s = periodOf(rule, pt, t0);
+    const s = periodOf(rule, pt, t0, ksgm);
     const t = Math.min(s.to, to);
     if (pt === "week" && rule.week_numbering === "season") s.label = `Tuần ${out.length + 1}`;
     else if (pt === "week" && !isV2(rule)) s.label = `Tuần ${s.week_no}`;

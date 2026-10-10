@@ -83,6 +83,8 @@ type periodDTO struct {
 	Label       string     `json:"label"`
 	RangeLabel  string     `json:"range_label"`
 	ISOWeek     *int       `json:"iso_week"`
+	PeriodKey   *string    `json:"period_key"` // khóa kỳ đã lưu (W11.05b); null với vụ/đột xuất, kỳ phát hành trước pf 000143
+	WeekYear    *int       `json:"week_year"`
 	FromDate    string     `json:"from_date"`
 	ToDate      string     `json:"to_date"`
 	DueAt       string     `json:"due_at"`
@@ -94,7 +96,8 @@ type periodDTO struct {
 }
 
 func toPeriod(p store.Period) periodDTO {
-	return periodDTO{ID: p.ID, BatchID: p.BatchID, Slot: p.Slot, Label: p.Label, RangeLabel: p.RangeLabel, ISOWeek: p.ISOWeek, FromDate: date(p.From),
+	return periodDTO{ID: p.ID, BatchID: p.BatchID, Slot: p.Slot, Label: p.Label, RangeLabel: p.RangeLabel, ISOWeek: p.ISOWeek, PeriodKey: p.PeriodKey,
+		WeekYear: p.WeekYear, FromDate: date(p.From),
 		ToDate: date(p.To), DueAt: tss(p.DueAt), AutoCloseAt: tss(p.AutoCloseAt), Status: p.Status, ClosedAt: tsp(p.ClosedAt), ClosedBy: p.ClosedBy,
 		CloseMode: p.CloseMode}
 }

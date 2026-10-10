@@ -6,7 +6,7 @@ import { createCycleApi } from "@/kn/cycle/api";
 import { ApiProblem } from "@/api/problem";
 import { mockFetchNoDelay } from "../handler";
 import { resetMockForms } from "../forms/routes";
-import { resetReportCycle } from "./store";
+import { KSGM_WEEK_STARTS, resetReportCycle } from "./store";
 
 // Thứ Sáu 02/10/2026 10:00 giờ Việt Nam.
 let now = Date.parse("2026-10-02T03:00:00Z");
@@ -167,5 +167,64 @@ describe("vòng đời báo cáo giả lập (P4)", () => {
     now += 5000;
     expect((await tinh.dispatch(exp.dispatch.id)).dispatch.status).toBe("sent");
     expect((await tinh.download(exp.dispatch.id, exp.files[0]!.id)).url).toMatch(/^data:application\/vnd/);
+  });
+});
+
+describe("W11.05b: kỳ ngày / tuần KSGM / quý ở Phát hành biểu + khóa kỳ lưu khi phát hành", () => {
+  it("chọn loại kỳ theo loại báo cáo, ranh giới KSGM theo tham số, khóa kỳ lưu ở kỳ đã phát hành", async () => {
+    const tinh = await clientFor("kn-binh", "asg-binh-tinh");
+    const t01 = (await tinh.reportForms("weekly")).items.find((f) => f.code === "T01")!;
+    const base = {
+      report_type: "weekly" as const,
+      template_ids: [t01.template_id],
+      scope: { mode: "communes" as const, communes: ["91301"] },
+      season_label: "Đợt KSGM",
+    };
+    // Lịch v1 (trước 04/11/2026) không có kỳ ngày/KSGM/quý.
+    expect(await code(tinh.preview({ ...base, period_type: "ksgm_week", from_date: "2026-10-01", to_date: "2026-10-31" }))).toBe("422 validation_failed");
+    // Loại kỳ không thuộc loại báo cáo.
+    expect(await code(tinh.preview({ ...base, period_type: "quarter", from_date: "2026-11-04", to_date: "2026-12-31" }))).toBe("422 validation_failed");
+    // Tuần KSGM: tháng 11 mặc định 1, 8, 15, 22; tháng 12 Cấp Tỉnh sửa ranh giới (tham số extension.ksgm_week_starts:2026-12).
+    KSGM_WEEK_STARTS.set("2026-12", "1,10,16,23");
+    try {
+      const pv = await tinh.preview({ ...base, period_type: "ksgm_week", from_date: "2026-11-04", to_date: "2026-12-31" });
+      expect(pv.period_type).toBe("ksgm_week");
+      expect(pv.periods.map((p) => [p.period_key, p.range_label])).toEqual([
+        ["2026-11-K1", "04/11–07/11/2026"],
+        ["2026-11-K2", "08/11–14/11/2026"],
+        ["2026-11-K3", "15/11–21/11/2026"],
+        ["2026-11-K4", "22/11–30/11/2026"],
+        ["2026-12-K1", "01/12–09/12/2026"],
+        ["2026-12-K2", "10/12–15/12/2026"],
+        ["2026-12-K3", "16/12–22/12/2026"],
+        ["2026-12-K4", "23/12–31/12/2026"],
+      ]);
+      expect(pv.periods[0]!.week_year).toBeNull();
+      const { batch, periods } = await tinh.issue({ ...base, period_type: "ksgm_week", from_date: "2026-12-01", to_date: "2026-12-31" });
+      expect(batch.period_type).toBe("ksgm_week");
+      expect(periods.map((p) => p.period_key)).toEqual(["2026-12-K1", "2026-12-K2", "2026-12-K3", "2026-12-K4"]);
+      // Khóa đã lưu không đổi khi tham số đổi về sau.
+      KSGM_WEEK_STARTS.set("2026-12", "1,8,15,22");
+      const again = await tinh.batch(batch.id);
+      expect(again.periods.map((p) => p.period_key)).toEqual(periods.map((p) => p.period_key));
+      expect(again.periods[1]).toMatchObject({ period_key: "2026-12-K2", from_date: "2026-12-10", to_date: "2026-12-15", week_year: null });
+    } finally {
+      KSGM_WEEK_STARTS.clear();
+    }
+    // Kỳ ngày của báo cáo tuần: hạn 09:00 hôm sau; tuần báo cáo mang week_year.
+    const day = await tinh.preview({ ...base, period_type: "day", from_date: "2026-11-04", to_date: "2026-11-06" });
+    expect(day.periods.map((p) => [p.period_key, p.label, p.due_at])).toEqual([
+      ["2026-11-04", "Ngày 04/11/2026", "2026-11-05T02:00:00Z"],
+      ["2026-11-05", "Ngày 05/11/2026", "2026-11-06T02:00:00Z"],
+      ["2026-11-06", "Ngày 06/11/2026", "2026-11-07T02:00:00Z"],
+    ]);
+    const wk = await tinh.preview({ ...base, from_date: "2026-11-04", to_date: "2026-11-10" });
+    expect(wk.periods[0]).toMatchObject({ period_key: "2026-W45", iso_week: 45, week_year: 2026 });
+    // Báo cáo tháng chia quý.
+    const monthly = (await tinh.reportForms("monthly")).items;
+    if (monthly.length) {
+      const q = await tinh.preview({ ...base, report_type: "monthly", template_ids: [monthly[0]!.template_id], period_type: "quarter", from_date: "2026-11-04", to_date: "2027-03-30" });
+      expect(q.periods.map((p) => p.period_key)).toEqual(["2026-Q4", "2027-Q1"]);
+    }
   });
 });

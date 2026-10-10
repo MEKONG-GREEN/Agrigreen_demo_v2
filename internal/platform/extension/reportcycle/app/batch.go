@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -140,12 +141,12 @@ func (s *Service) preview(ctx context.Context, a actor, in BatchInput, strict bo
 	if a.province == "" || a.k.Department == "" {
 		return pv, ErrOutOfScope.WithDetail("ngữ cảnh phiên không gắn tỉnh/phòng ban")
 	}
-	pt, ok := domain.ReportPeriodType[in.ReportType]
-	if !ok {
-		return pv, problem.Validation.WithField("report_type", "weekly | monthly | seasonal | annual | adhoc")
-	}
-	if in.PeriodType != "" && in.PeriodType != pt {
-		return pv, problem.Validation.WithField("period_type", "các mẫu cùng loại kỳ: loại báo cáo "+in.ReportType+" dùng kỳ "+pt)
+	// W11.05b: loại kỳ chọn được trong ReportPeriodTypes của loại báo cáo (ngày / tuần KSGM / quý — quy tắc v2).
+	pt, err := domain.ResolvePeriodType(in.ReportType, in.PeriodType)
+	if err != nil {
+		var pe domain.ErrPeriod
+		errors.As(err, &pe)
+		return pv, problem.Validation.WithField(pe.Field, pe.Msg)
 	}
 	pv.PeriodType = pt
 	from, err := domain.ParseDate(in.From)
@@ -343,6 +344,14 @@ func (s *Service) IssueBatch(ctx context.Context, in BatchInput, idem string) (I
 			w := p.ISOWeek
 			sp.ISOWeek = &w
 		}
+		if p.Key != "" {
+			k := p.Key
+			sp.PeriodKey = &k
+			if p.WeekYear > 0 {
+				y := p.WeekYear
+				sp.WeekYear = &y
+			}
+		}
 		periods = append(periods, sp)
 	}
 	var tasks []store.NewTask
@@ -379,6 +388,14 @@ func (s *Service) IssueBatch(ctx context.Context, in BatchInput, idem string) (I
 		for _, p := range periods {
 			if err := store.InsertPeriod(ctx, tx, a.p.TenantID, p); err != nil {
 				return err
+			}
+			// W11.05b: khóa kỳ theo lịch kỳ hệ thống LƯU lúc phát hành (sổ report_period_key), không tính lại về sau.
+			if p.PeriodKey != nil {
+				k := store.PeriodKey{ID: ids.New(), PeriodID: p.ID, BatchID: b.ID, PeriodType: b.PeriodType, Key: *p.PeriodKey, WeekYear: p.WeekYear,
+					PeriodRule: b.PeriodRule, EventTime: now, ActorRef: a.p.ActorRef, IdemKey: idemOr(idem, "key:"+strconv.Itoa(p.Slot))}
+				if err := store.InsertPeriodKey(ctx, tx, a.p.TenantID, k); err != nil {
+					return err
+				}
 			}
 		}
 		if err := store.InsertTasks(ctx, tx, a.p.TenantID, b.ID, b.DepartmentCode, b.ProvinceCode, tasks, now); err != nil {

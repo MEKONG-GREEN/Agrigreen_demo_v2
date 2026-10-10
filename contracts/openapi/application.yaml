@@ -3729,6 +3729,9 @@ paths:
         tuần báo cáo Thứ Tư–Thứ Ba, nhãn "Tuần 41/2026" (tuần chứa 01/01 là tuần 1), tháng/quý/năm = các tuần có Thứ Ba
         thuộc kỳ. Hạn mặc định v2: tuần = 12:00 ngày sau ngày cuối kỳ, tháng = 10:00 Thứ Tư sau Thứ Ba cuối tháng.
         Đợt đã phát hành giữ period_rule đã ghi (v1 "kn.period_rule/v1-tam;week=season": tuần thứ Hai–Chủ nhật).
+        W11.05b: period_type chọn kỳ ngày (day, hạn 09:00 hôm sau), tuần KSGM (ksgm_week — 4 tuần/tháng, ranh giới theo
+        tham số extension.ksgm_week_starts:YYYY-MM, mặc định 1, 8, 15, 22) hoặc quý (quarter) — chỉ với quy tắc v2. Kỳ
+        mang period_key; phát hành lưu khóa này (không tính lại khi tham số đổi).
       operationId: rcPreviewBatch
       parameters:
         - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
@@ -4029,7 +4032,7 @@ paths:
       parameters:
         - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
         - {name: commune, in: query, schema: {type: string}}
-        - {name: period_type, in: query, schema: {type: string, enum: [week, month, season, year, adhoc]}}
+        - {name: period_type, in: query, schema: {type: string, enum: [day, week, ksgm_week, month, quarter, season, year, adhoc]}}
         - {name: status, in: query, schema: {type: string, enum: [not_started, draft, submitted, overdue, adjustment_requested, confirmed, closed]}}
         - {name: form_code, in: query, schema: {type: string}}
         - {name: batch_id, in: query, schema: {type: string, format: uuid}}
@@ -12033,7 +12036,7 @@ components:
         report_type: {type: string, enum: [weekly, monthly, seasonal, annual, adhoc]}
         template_ids: {type: array, items: {type: string, format: uuid}}
         scope: {type: object, required: [mode], properties: {mode: {type: string, enum: [province, regions, communes]}, regions: {type: array, items: {type: string}}, communes: {type: array, items: {type: string}}}}
-        period_type: {type: string, enum: [week, month, season, year, adhoc]}
+        period_type: {type: string, enum: [day, week, ksgm_week, month, quarter, season, year, adhoc], description: "Loại kỳ chia đợt (W11.05b); bỏ trống = mặc định của report_type. Chọn được theo report_type — weekly: week | ksgm_week | day; monthly: month | quarter; seasonal: season; annual: year | quarter; adhoc: adhoc | day. day/ksgm_week/quarter chỉ với quy tắc chia kỳ v2 (extension.report_period_rule tại from_date); ranh giới tuần KSGM theo tham số extension.ksgm_week_starts:YYYY-MM"}
         from_date: {type: string, format: date}
         to_date: {type: string, format: date}
         season_label: {type: string}
@@ -12053,7 +12056,7 @@ components:
         deadline: {type: object, additionalProperties: true}
         close_after_days: {type: integer}
         forms: {type: array, items: {type: object, additionalProperties: true}}
-        periods: {type: array, items: {type: object, additionalProperties: true}}
+        periods: {type: array, description: "Kỳ đã chia: slot, label, range_label, from_date, to_date, due_at, auto_close_at, period_key, iso_week, week_year (W11.05b — null khi không có)", items: {type: object, additionalProperties: true}}
         communes: {type: array, items: {type: object, additionalProperties: true}}
         communes_without_officer: {type: array, items: {type: string}}
         provincial_columns: {type: array, items: {type: object, additionalProperties: true}}
@@ -12102,7 +12105,7 @@ components:
         updated_at: {type: string, format: date-time}
     RcPeriod:
       type: object
-      required: [id, batch_id, slot, label, range_label, iso_week, from_date, to_date, due_at, auto_close_at, status, closed_at, closed_by, close_mode]
+      required: [id, batch_id, slot, label, range_label, iso_week, period_key, week_year, from_date, to_date, due_at, auto_close_at, status, closed_at, closed_by, close_mode]
       properties:
         id: {type: string, format: uuid}
         batch_id: {type: string, format: uuid}
@@ -12110,6 +12113,8 @@ components:
         label: {type: string}
         range_label: {type: string}
         iso_week: {type: [integer, "null"], description: "Số tuần của năm theo period_rule của đợt (v1: ISO 8601; v2: tuần chứa 01/01 là tuần 1); null nếu không phải kỳ tuần"}
+        period_key: {type: [string, "null"], description: "Khóa kỳ theo lịch kỳ hệ thống, LƯU lúc phát hành (W11.05b): 2026-11-05 (ngày), 2026-W45 (tuần), 2026-11-K2 (tuần KSGM), 2026-11, 2026-Q4, 2026; null với vụ/đột xuất và kỳ phát hành trước khi có sổ khóa kỳ"}
+        week_year: {type: [integer, "null"], description: "Năm của iso_week (kỳ tuần có khóa đã lưu); null nếu không"}
         from_date: {type: string, format: date}
         to_date: {type: string, format: date}
         due_at: {type: string, format: date-time}

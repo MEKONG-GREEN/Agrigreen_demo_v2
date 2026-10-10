@@ -2657,6 +2657,9 @@ export interface paths {
          *     tuần báo cáo Thứ Tư–Thứ Ba, nhãn "Tuần 41/2026" (tuần chứa 01/01 là tuần 1), tháng/quý/năm = các tuần có Thứ Ba
          *     thuộc kỳ. Hạn mặc định v2: tuần = 12:00 ngày sau ngày cuối kỳ, tháng = 10:00 Thứ Tư sau Thứ Ba cuối tháng.
          *     Đợt đã phát hành giữ period_rule đã ghi (v1 "kn.period_rule/v1-tam;week=season": tuần thứ Hai–Chủ nhật).
+         *     W11.05b: period_type chọn kỳ ngày (day, hạn 09:00 hôm sau), tuần KSGM (ksgm_week — 4 tuần/tháng, ranh giới theo
+         *     tham số extension.ksgm_week_starts:YYYY-MM, mặc định 1, 8, 15, 22) hoặc quý (quarter) — chỉ với quy tắc v2. Kỳ
+         *     mang period_key; phát hành lưu khóa này (không tính lại khi tham số đổi).
          */
         post: operations["rcPreviewBatch"];
         delete?: never;
@@ -10172,8 +10175,11 @@ export interface components {
                 regions?: string[];
                 communes?: string[];
             };
-            /** @enum {string} */
-            period_type?: "week" | "month" | "season" | "year" | "adhoc";
+            /**
+             * @description Loại kỳ chia đợt (W11.05b); bỏ trống = mặc định của report_type. Chọn được theo report_type — weekly: week | ksgm_week | day; monthly: month | quarter; seasonal: season; annual: year | quarter; adhoc: adhoc | day. day/ksgm_week/quarter chỉ với quy tắc chia kỳ v2 (extension.report_period_rule tại from_date); ranh giới tuần KSGM theo tham số extension.ksgm_week_starts:YYYY-MM
+             * @enum {string}
+             */
+            period_type?: "day" | "week" | "ksgm_week" | "month" | "quarter" | "season" | "year" | "adhoc";
             /** Format: date */
             from_date: string;
             /** Format: date */
@@ -10208,6 +10214,7 @@ export interface components {
             forms: {
                 [key: string]: unknown;
             }[];
+            /** @description Kỳ đã chia: slot, label, range_label, from_date, to_date, due_at, auto_close_at, period_key, iso_week, week_year (W11.05b — null khi không có) */
             periods: {
                 [key: string]: unknown;
             }[];
@@ -10279,6 +10286,10 @@ export interface components {
             range_label: string;
             /** @description Số tuần của năm theo period_rule của đợt (v1: ISO 8601; v2: tuần chứa 01/01 là tuần 1); null nếu không phải kỳ tuần */
             iso_week: number | null;
+            /** @description Khóa kỳ theo lịch kỳ hệ thống, LƯU lúc phát hành (W11.05b): 2026-11-05 (ngày), 2026-W45 (tuần), 2026-11-K2 (tuần KSGM), 2026-11, 2026-Q4, 2026; null với vụ/đột xuất và kỳ phát hành trước khi có sổ khóa kỳ */
+            period_key: string | null;
+            /** @description Năm của iso_week (kỳ tuần có khóa đã lưu); null nếu không */
+            week_year: number | null;
             /** Format: date */
             from_date: string;
             /** Format: date */
@@ -17422,7 +17433,7 @@ export interface operations {
         parameters: {
             query?: {
                 commune?: string;
-                period_type?: "week" | "month" | "season" | "year" | "adhoc";
+                period_type?: "day" | "week" | "ksgm_week" | "month" | "quarter" | "season" | "year" | "adhoc";
                 status?: "not_started" | "draft" | "submitted" | "overdue" | "adjustment_requested" | "confirmed" | "closed";
                 form_code?: string;
                 batch_id?: string;

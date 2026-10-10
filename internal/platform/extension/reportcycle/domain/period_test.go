@@ -330,3 +330,32 @@ func TestSplit_HoChiMinhNoDST(t *testing.T) {
 		t.Fatalf("ngày đợt theo lịch VN: %+v %v", ps, err)
 	}
 }
+
+// W11.05b: loại kỳ chọn được theo loại báo cáo; rỗng = mặc định ReportPeriodType.
+func TestResolvePeriodType(t *testing.T) {
+	ok := map[[2]string]string{
+		{"weekly", ""}: PeriodWeek, {"weekly", PeriodKSGMWeek}: PeriodKSGMWeek, {"weekly", PeriodDay}: PeriodDay,
+		{"monthly", ""}: PeriodMonth, {"monthly", PeriodQuarter}: PeriodQuarter, {"annual", PeriodQuarter}: PeriodQuarter,
+		{"seasonal", ""}: PeriodSeason, {"adhoc", PeriodDay}: PeriodDay, {"annual", ""}: PeriodYear,
+	}
+	for in, want := range ok {
+		if got, err := ResolvePeriodType(in[0], in[1]); err != nil || got != want {
+			t.Errorf("%v: %q %v, muốn %q", in, got, err, want)
+		}
+	}
+	bad := map[[2]string]string{
+		{"weekly", PeriodQuarter}: "period_type", {"seasonal", PeriodDay}: "period_type", {"monthly", "fortnight"}: "period_type",
+		{"daily", ""}: "report_type",
+	}
+	for in, field := range bad {
+		var pe ErrPeriod
+		if _, err := ResolvePeriodType(in[0], in[1]); !errors.As(err, &pe) || pe.Field != field {
+			t.Errorf("%v: muốn lỗi %s, nhận %v", in, field, err)
+		}
+	}
+	for rt, pt := range ReportPeriodType {
+		if ReportPeriodTypes[rt][0] != pt {
+			t.Errorf("%s: mặc định %s ≠ %s", rt, ReportPeriodTypes[rt][0], pt)
+		}
+	}
+}

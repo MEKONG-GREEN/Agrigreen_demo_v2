@@ -62,6 +62,35 @@ var ReportPeriodType = map[string]string{
 	"weekly": PeriodWeek, "monthly": PeriodMonth, "seasonal": PeriodSeason, "annual": PeriodYear, "adhoc": PeriodAdhoc,
 }
 
+// ReportPeriodTypes là các loại kỳ Cấp Tỉnh được chọn khi phát hành mỗi loại báo cáo (W11.05b, giả định chờ Q-045:
+// loại báo cáo của pf/reports chưa có "ngày"/"quý" nên kỳ ngày đi với báo cáo tuần/đột xuất, tuần KSGM với báo cáo
+// tuần, quý với báo cáo tháng/năm). Phần tử đầu = ReportPeriodType (mặc định). Ngày/quý/tuần KSGM chỉ chia được với
+// quy tắc v2 (PeriodOf báo lỗi period_type với v1).
+var ReportPeriodTypes = map[string][]string{
+	"weekly":   {PeriodWeek, PeriodKSGMWeek, PeriodDay},
+	"monthly":  {PeriodMonth, PeriodQuarter},
+	"seasonal": {PeriodSeason},
+	"annual":   {PeriodYear, PeriodQuarter},
+	"adhoc":    {PeriodAdhoc, PeriodDay},
+}
+
+// ResolvePeriodType trả loại kỳ của đợt: rỗng → mặc định của loại báo cáo; khác → phải thuộc ReportPeriodTypes.
+func ResolvePeriodType(reportType, periodType string) (string, error) {
+	allowed, ok := ReportPeriodTypes[reportType]
+	if !ok {
+		return "", ErrPeriod{"report_type", "weekly | monthly | seasonal | annual | adhoc"}
+	}
+	if periodType == "" {
+		return allowed[0], nil
+	}
+	for _, pt := range allowed {
+		if pt == periodType {
+			return pt, nil
+		}
+	}
+	return "", ErrPeriod{"period_type", "loại báo cáo " + reportType + " chia kỳ " + strings.Join(allowed, " | ")}
+}
+
 // Cách đánh số tuần: "season" = Tuần n của đợt (cột Tuần 1, Tuần 2 của PL 01); "year" = tuần của năm, tuần 1 là
 // tuần chứa 01/01 (KHTC II.4); "iso" = tuần của năm theo ngày thứ 4 của tuần (ISO 8601 khi tuần bắt đầu thứ Hai).
 const (

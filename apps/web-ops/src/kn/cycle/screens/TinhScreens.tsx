@@ -14,7 +14,7 @@ import type { FormDefinition } from "@/kn/forms/types";
 import { FormGrid, communeRows } from "@/kn/grid";
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
 import { RawFile, type RcBatchInput, type RcFormItem, type RcPreview, type RcProvincialImport, type RcStatusItem, type RcTask } from "../api";
-import { LoadState, TaskPill, dt, toLog, useAction, useCommuneNames, useCycleReadOnly, useLoad, weekStartLocal, ymdLocal } from "../common";
+import { LoadState, REPORT_RULE_V2_FROM, TaskPill, dt, toLog, useAction, useCommuneNames, useCycleReadOnly, useLoad, weekStartLocal, ymdLocal } from "../common";
 import { PiiHint } from "@/kn/pii";
 
 
@@ -27,12 +27,38 @@ const DEADLINES = [
   { value: "2|11:00", label: "2 ngày sau ngày cuối kỳ, 11:00" },
 ];
 
+type PublishReportType = "weekly" | "monthly" | "seasonal" | "adhoc";
+type PeriodChoice = "" | NonNullable<RcBatchInput["period_type"]>;
+
+/**
+ * Cách chia kỳ theo loại báo cáo (W11.05b, như reportcycle/domain.ReportPeriodTypes): "" = mặc định của loại báo cáo.
+ * Ngày / Tuần KSGM / Quý chỉ chia được với lịch kỳ v2 (đợt bắt đầu từ REPORT_RULE_V2_FROM); tuần KSGM theo ranh giới
+ * tham số extension.ksgm_week_starts của từng tháng.
+ */
+const PERIOD_CHOICES: Record<PublishReportType, { value: PeriodChoice; label: string }[]> = {
+  weekly: [
+    { value: "", label: "Tuần báo cáo" },
+    { value: "ksgm_week", label: "Tuần KSGM (4 tuần/tháng)" },
+    { value: "day", label: "Ngày" },
+  ],
+  monthly: [
+    { value: "", label: "Tháng" },
+    { value: "quarter", label: "Quý" },
+  ],
+  seasonal: [{ value: "", label: "Cả vụ (một kỳ)" }],
+  adhoc: [
+    { value: "", label: "Một kỳ" },
+    { value: "day", label: "Ngày" },
+  ],
+};
+
 /** FN-TI-02.02 Phát hành biểu mẫu báo cáo (Hình 7). */
 export function PublishScreen() {
   const { cycleApi } = useAuth();
   const router = useRouter();
   const ws = weekStartLocal();
-  const [rt, setRt] = useState<"weekly" | "monthly" | "seasonal" | "adhoc">("weekly");
+  const [rt, setRt] = useState<PublishReportType>("weekly");
+  const [pt, setPt] = useState<PeriodChoice>("");
   const [picked, setPicked] = useState<string[]>([]);
   const [mode, setMode] = useState<"province" | "regions" | "communes">("province");
   const [regions, setRegions] = useState<string[]>([]);
@@ -56,6 +82,7 @@ export function PublishScreen() {
     return {
       report_type: rt,
       template_ids: picked,
+      ...(pt ? { period_type: pt } : {}),
       scope: { mode, ...(mode === "regions" ? { regions } : {}), ...(mode === "communes" ? { communes } : {}) },
       from_date: from,
       to_date: to,
@@ -317,13 +344,28 @@ export function PublishScreen() {
             <h2>Bước 3 · Kỳ và hạn nộp</h2>
             <label className="field">
               <span>Loại kỳ*</span>
-              <select className="input" value={rt} onChange={(e) => (setRt(e.target.value as typeof rt), setPicked([]))}>
+              <select className="input" value={rt} onChange={(e) => (setRt(e.target.value as typeof rt), setPt(""), setPicked([]), setPreview(null))}>
                 <option value="weekly">Tuần</option>
                 <option value="monthly">Tháng</option>
                 <option value="seasonal">Vụ</option>
                 <option value="adhoc">Đột xuất</option>
               </select>
             </label>
+            <label className="field">
+              <span>Chia kỳ theo</span>
+              <select className="input" value={pt} onChange={(e) => (setPt(e.target.value as PeriodChoice), setPreview(null))}>
+                {PERIOD_CHOICES[rt].map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {pt && from < REPORT_RULE_V2_FROM ? (
+              <p className="small" role="note" style={{ color: "var(--warn, #b45309)" }}>
+                Kỳ ngày / tuần KSGM / quý theo lịch kỳ hệ thống mới — đợt phải bắt đầu từ {REPORT_RULE_V2_FROM.split("-").reverse().join("/")}.
+              </p>
+            ) : null}
             <label className="field">
               <span>Từ ngày*</span>
               <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -373,7 +415,7 @@ export function PublishScreen() {
                 <ol className="list-plain small">
                   {preview.periods.map((p) => (
                     <li key={p.slot}>
-                      {p.label} ({p.range_label}) — hạn {dt(p.due_at)}
+                      {p.label} ({p.range_label}){p.period_key ? ` · ${p.period_key}` : ""} — hạn {dt(p.due_at)}
                     </li>
                   ))}
                 </ol>

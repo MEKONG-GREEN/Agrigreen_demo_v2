@@ -244,16 +244,48 @@ type Period struct {
 	CloseMode      *string
 	DepartmentCode string
 	ProvinceCode   string
+	// Khóa kỳ đã lưu ở sổ report_period_key (W11.05b, pf 000143); nil với vụ/đột xuất và kỳ phát hành trước đó.
+	PeriodKey *string
+	WeekYear  *int // năm của ISOWeek (chỉ kỳ tuần có khóa)
 }
 
 const periodCols = `id, batch_id, slot, label, range_label, iso_week, from_date, to_date, due_at, auto_close_at, status, closed_at, closed_by,
   close_mode, department_code, province_code`
 
+// periodFrom là SELECT các cột kỳ (bí danh p) kèm khóa kỳ đã lưu (bí danh k, LEFT JOIN — kỳ cũ không có dòng).
+// Khóa dòng kỳ bằng "FOR UPDATE OF p" (không khóa được phía NULL của LEFT JOIN).
+var periodFrom = "SELECT " + prefixed("p.", periodCols) + `, k.period_key, k.week_year FROM pf_extension.report_period p
+  LEFT JOIN pf_extension.report_period_key k ON k.tenant_id = p.tenant_id AND k.period_id = p.id`
+
 func scanPeriod(row pgx.Row) (Period, error) {
 	var p Period
 	err := row.Scan(&p.ID, &p.BatchID, &p.Slot, &p.Label, &p.RangeLabel, &p.ISOWeek, &p.From, &p.To, &p.DueAt, &p.AutoCloseAt, &p.Status,
-		&p.ClosedAt, &p.ClosedBy, &p.CloseMode, &p.DepartmentCode, &p.ProvinceCode)
+		&p.ClosedAt, &p.ClosedBy, &p.CloseMode, &p.DepartmentCode, &p.ProvinceCode, &p.PeriodKey, &p.WeekYear)
 	return p, err
+}
+
+// PeriodKey là một dòng sổ report_period_key: khóa kỳ theo lịch kỳ hệ thống, chép loại kỳ và quy tắc của đợt.
+type PeriodKey struct {
+	ID         uuid.UUID
+	PeriodID   uuid.UUID
+	BatchID    uuid.UUID
+	PeriodType string
+	Key        string
+	WeekYear   *int
+	PeriodRule string
+	EventTime  time.Time
+	ActorRef   uuid.UUID
+	IdemKey    string
+}
+
+// InsertPeriodKey ghi khóa kỳ — cùng giao dịch phát hành đợt (trg_bind_period_key kiểm).
+func InsertPeriodKey(ctx context.Context, tx pgx.Tx, tid uuid.UUID, k PeriodKey) error {
+	_, err := tx.Exec(ctx, `INSERT INTO pf_extension.report_period_key (id, tenant_id, stream_key, period_id, batch_id, period_type, period_key,
+	    week_year, period_rule, event_time, actor_ref, idem_key, rule_version)
+	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+		k.ID, tid, "period:"+k.PeriodID.String(), k.PeriodID, k.BatchID, k.PeriodType, k.Key, k.WeekYear, k.PeriodRule, k.EventTime.UTC(), k.ActorRef,
+		k.IdemKey, RuleVersion)
+	return err
 }
 
 // InsertPeriod ghi một kỳ.
@@ -268,9 +300,9 @@ func InsertPeriod(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p Period) error
 
 // PeriodByID đọc (khóa nếu lock) một kỳ; không có → nil.
 func PeriodByID(ctx context.Context, tx pgx.Tx, id uuid.UUID, lock bool) (*Period, error) {
-	q := "SELECT " + periodCols + " FROM pf_extension.report_period WHERE id = $1::uuid"
+	q := periodFrom + " WHERE p.id = $1::uuid"
 	if lock {
-		q += " FOR UPDATE"
+		q += " FOR UPDATE OF p"
 	}
 	p, err := scanPeriod(tx.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -284,7 +316,7 @@ func PeriodByID(ctx context.Context, tx pgx.Tx, id uuid.UUID, lock bool) (*Perio
 
 // PeriodsOfBatch trả các kỳ của đợt theo thứ tự khe.
 func PeriodsOfBatch(ctx context.Context, tx pgx.Tx, batchID uuid.UUID) ([]Period, error) {
-	rows, err := tx.Query(ctx, "SELECT "+periodCols+" FROM pf_extension.report_period WHERE batch_id = $1::uuid ORDER BY slot", batchID)
+	rows, err := tx.Query(ctx, periodFrom+" WHERE p.batch_id = $1::uuid ORDER BY p.slot", batchID)
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +325,7 @@ func PeriodsOfBatch(ctx context.Context, tx pgx.Tx, batchID uuid.UUID) ([]Period
 
 // PeriodsByIDs trả các kỳ theo id.
 func PeriodsByIDs(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) (map[uuid.UUID]Period, error) {
-	rows, err := tx.Query(ctx, "SELECT "+periodCols+" FROM pf_extension.report_period WHERE id = ANY($1::uuid[])", strs(ids))
+	rows, err := tx.Query(ctx, periodFrom+" WHERE p.id = ANY($1::uuid[])", strs(ids))
 	if err != nil {
 		return nil, err
 	}
@@ -333,10 +365,10 @@ func ClosePeriod(ctx context.Context, tx pgx.Tx, id, actor uuid.UUID, mode strin
 
 // DuePeriods trả kỳ mở đã tới giờ chốt tự động (job).
 func DuePeriods(ctx context.Context, tx pgx.Tx, now time.Time, limit int) ([]Period, error) {
-	rows, err := tx.Query(ctx, "SELECT "+periodCols+` FROM pf_extension.report_period p
+	rows, err := tx.Query(ctx, periodFrom+`
 	  WHERE p.status = 'open' AND p.auto_close_at <= $1
 	    AND EXISTS (SELECT 1 FROM pf_extension.report_batch b WHERE b.id = p.batch_id AND b.status = 'issued')
-	  ORDER BY auto_close_at LIMIT $2`, now.UTC(), limit)
+	  ORDER BY p.auto_close_at LIMIT $2`, now.UTC(), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -345,9 +377,9 @@ func DuePeriods(ctx context.Context, tx pgx.Tx, now time.Time, limit int) ([]Per
 
 // OpenPeriodsOf trả kỳ còn mở (của đợt chưa thu hồi) — cho job tự nhắc.
 func OpenPeriodsOf(ctx context.Context, tx pgx.Tx, limit int) ([]Period, error) {
-	rows, err := tx.Query(ctx, "SELECT "+periodCols+` FROM pf_extension.report_period p
+	rows, err := tx.Query(ctx, periodFrom+`
 	  WHERE p.status = 'open' AND EXISTS (SELECT 1 FROM pf_extension.report_batch b WHERE b.id = p.batch_id AND b.status = 'issued')
-	  ORDER BY due_at LIMIT $1`, limit)
+	  ORDER BY p.due_at LIMIT $1`, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -366,7 +398,7 @@ type PeriodFilter struct {
 
 // ListPeriods trả kỳ của đợt đã phát hành (mới nhất trước).
 func ListPeriods(ctx context.Context, tx pgx.Tx, f PeriodFilter) ([]Period, error) {
-	rows, err := tx.Query(ctx, "SELECT "+prefixed("p.", periodCols)+` FROM pf_extension.report_period p
+	rows, err := tx.Query(ctx, periodFrom+`
 	  JOIN pf_extension.report_batch b ON b.id = p.batch_id AND b.status = 'issued'
 	  WHERE ($1::boolean OR p.province_code = $2) AND ($3 = '' OR p.department_code = $3) AND ($4 = '' OR b.report_type = $4)
 	    AND ($5::uuid IS NULL OR p.batch_id = $5::uuid)

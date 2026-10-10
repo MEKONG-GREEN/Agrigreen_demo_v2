@@ -23,7 +23,8 @@ import {
   DEFAULT_CLOSE_AFTER_DAYS,
   LEGACY_RULE,
   PeriodError,
-  REPORT_PERIOD_TYPE,
+  parseKsgmStarts,
+  resolvePeriodType,
   STATUS_LABEL,
   dec,
   defaultDeadline,
@@ -228,6 +229,8 @@ export interface Period {
   label: string;
   range_label: string;
   iso_week: number | null;
+  period_key: string | null;
+  week_year: number | null;
   from_date: string;
   to_date: string;
   due_at: string;
@@ -618,14 +621,29 @@ export interface BatchPlan {
 
 const REPORT_TYPES: ReportType[] = ["weekly", "monthly", "seasonal", "annual", "adhoc"];
 
+/**
+ * Giả lập tham số extension.ksgm_week_starts:YYYY-MM (pf/masterdata, Cấp Tỉnh sửa ranh giới 4 tuần KSGM từng tháng):
+ * khóa "YYYY-MM" → "1,10,16,23". Vắng/sai → 1, 8, 15, 22 (như Service.ksgmStarts).
+ */
+export const KSGM_WEEK_STARTS = new Map<string, string>();
+const ksgmStarts = (y: number, m: number): number[] | null => {
+  const v = KSGM_WEEK_STARTS.get(`${y}-${String(m + 1).padStart(2, "0")}`);
+  return v ? parseKsgmStarts(v) : null;
+};
+
 /** rule: quy tắc chia kỳ; mặc định = tham số extension.report_period_rule tại from_date (W11.03, ruleAt). */
 export function planBatch(c: Caller, body: unknown, ruleIn?: PeriodRule): Result<BatchPlan> {
   const b = (body ?? {}) as Record<string, unknown>;
   const rule = ruleIn ?? ruleAt(String(b.from_date ?? ""));
   const rt = b.report_type as ReportType;
   if (!REPORT_TYPES.includes(rt)) return fieldErr("report_type", "weekly | monthly | seasonal | annual | adhoc");
-  const pt = REPORT_PERIOD_TYPE[rt];
-  if (b.period_type !== undefined && b.period_type !== pt) return fieldErr("period_type", `loại báo cáo ${rt} dùng kỳ ${pt}`);
+  let pt: string;
+  try {
+    pt = resolvePeriodType(rt, b.period_type);
+  } catch (e) {
+    if (e instanceof PeriodError) return fieldErr(e.field, e.msg);
+    throw e;
+  }
   const tplIds = Array.isArray(b.template_ids) ? (b.template_ids as unknown[]).filter((x): x is string => typeof x === "string") : [];
   if (!tplIds.length) return fieldErr("template_ids", "chọn ít nhất một mẫu");
   const scope = (b.scope ?? {}) as { mode?: string; regions?: unknown; communes?: unknown };
@@ -644,7 +662,7 @@ export function planBatch(c: Caller, body: unknown, ruleIn?: PeriodRule): Result
   const closeAfter = typeof b.close_after_days === "number" ? b.close_after_days : DEFAULT_CLOSE_AFTER_DAYS;
   let periods: SplitPeriod[];
   try {
-    periods = split(pt, String(b.from_date ?? ""), String(b.to_date ?? ""), season, rule, deadline, closeAfter);
+    periods = split(pt, String(b.from_date ?? ""), String(b.to_date ?? ""), season, rule, deadline, closeAfter, ksgmStarts);
   } catch (e) {
     if (e instanceof PeriodError) return fieldErr(e.field, e.msg);
     throw e;
@@ -745,7 +763,7 @@ export function previewWire(p: BatchPlan) {
       period_block: f.definition.period_blocks.length > 0,
       slots: p.slots.get(f.template.id) ?? 0,
     })),
-    periods: p.periods,
+    periods: p.periods.map(({ key, iso_week, week_year, ...x }) => ({ ...x, period_key: key || null, iso_week: iso_week || null, week_year: week_year || null })),
     communes: p.communes.map((x) => ({ commune_code: x, region_code: regionOf(x), region_name: regionName(regionOf(x)), officer_count: officersOf(AG_DEPARTMENT, x).length })),
     communes_without_officer: p.without_officer,
     provincial_columns: p.forms.flatMap((f) =>
@@ -794,7 +812,7 @@ export function issueBatch(c: Caller, plan: BatchPlan, at = nowMs()): Result<{ b
   };
   S.batches.push(batch);
   const periods = plan.periods.map(
-    (p): Period => ({ id: uuidv7(at), batch_id: batch.id, slot: p.slot, label: p.label, range_label: p.range_label, iso_week: p.iso_week || null, from_date: p.from_date, to_date: p.to_date, due_at: p.due_at, auto_close_at: p.auto_close_at, status: "open", closed_at: null, closed_by: null, close_mode: null }),
+    (p): Period => ({ id: uuidv7(at), batch_id: batch.id, slot: p.slot, label: p.label, range_label: p.range_label, iso_week: p.iso_week || null, period_key: p.key || null, week_year: (p.key && p.week_year) || null, from_date: p.from_date, to_date: p.to_date, due_at: p.due_at, auto_close_at: p.auto_close_at, status: "open", closed_at: null, closed_by: null, close_mode: null }),
   );
   S.periods.push(...periods);
   S.provincial.set(batch.id, plan.provincial);

@@ -21,8 +21,12 @@ import (
 // Freezer nil → không ghi (kiểm thử cũ, lắp ráp chưa nối).
 //
 // W11.05 (đơn vị lá tổng quát): ảnh chụp ghi loại đơn vị lá (unit_kind = "commune" — đơn vị của vòng đời KN v7.7 là
-// xã) và khóa kỳ theo lịch kỳ hệ thống (period_key, tính lại từ quy tắc chia kỳ đã lưu ở đợt — W11.03; rỗng với
-// vụ/đột xuất); thu hồi đợt ghi sự kiện 'cancelled' (hủy kỳ) cho mọi kỳ của đợt.
+// xã) và khóa kỳ theo lịch kỳ hệ thống (period_key — W11.03; rỗng với vụ/đột xuất); thu hồi đợt ghi sự kiện
+// 'cancelled' (hủy kỳ) cho mọi kỳ của đợt.
+//
+// W11.05b: period_key/week_year là khóa ĐÃ LƯU lúc phát hành (sổ pf_extension.report_period_key, pf 000143) — không
+// tính lại (tham số KSGM/quy tắc đổi về sau không đổi khóa kỳ đã chạy). Kỳ phát hành trước pf 000143 không có dòng →
+// tính lại từ period_rule của đợt như W11.05.
 
 // FormsProfile là tên cấu hình bên dùng KN ở cap/forms.
 const FormsProfile = "kn"
@@ -49,6 +53,7 @@ type mirrorContent struct {
 	UnitKind   string       `json:"unit_kind"`
 	PeriodType string       `json:"period_type"`
 	PeriodKey  string       `json:"period_key"`
+	WeekYear   *int         `json:"week_year,omitempty"`
 	PeriodRule string       `json:"period_rule"`
 	Department string       `json:"department_code"`
 	Province   string       `json:"province_code"`
@@ -77,7 +82,8 @@ func (s *Service) mirrorForms(ctx context.Context, tx pgx.Tx, p store.Period, ac
 			return err
 		}
 		if b != nil {
-			c.PeriodType, c.PeriodRule, c.PeriodKey = b.PeriodType, b.PeriodRule, periodKey(*b, p)
+			c.PeriodType, c.PeriodRule = b.PeriodType, b.PeriodRule
+			c.PeriodKey, c.WeekYear = periodKey(*b, p)
 		}
 		for _, t := range tasks {
 			mt := mirrorTask{TaskID: t.ID.String(), Commune: t.CommuneCode, Unit: t.CommuneCode, TemplateID: t.TemplateID.String(), FormCode: t.FormCode,
@@ -101,19 +107,27 @@ func (s *Service) mirrorForms(ctx context.Context, tx pgx.Tx, p store.Period, ac
 	return err
 }
 
-// periodKey trả khóa kỳ theo lịch kỳ hệ thống của kỳ p (domain.Span.Key — "2026-W41", "2026-10", "2026-Q4"…) tính từ
-// quy tắc chia kỳ lưu ở đợt; vụ/đột xuất hoặc quy tắc không đọc được → rỗng. Không tra tham số KSGM: đợt chưa có kỳ
-// ksgm_week (pf_extension.report_batch.period_type chưa nhận — cần migration của extension).
-func periodKey(b store.Batch, p store.Period) string {
+// periodKey trả khóa kỳ (domain.Span.Key — "2026-W41", "2026-10-K2", "2026-Q4"…) và năm của số tuần của kỳ p: khóa đã
+// lưu ở sổ report_period_key (W11.05b) nếu có; không có (kỳ phát hành trước pf 000143) → tính lại từ quy tắc chia kỳ
+// lưu ở đợt. Kỳ cũ không có tuần KSGM (CHECK period_type cũ không nhận) nên tính lại không cần tham số KSGM. Vụ/đột
+// xuất hoặc quy tắc không đọc được → rỗng.
+func periodKey(b store.Batch, p store.Period) (string, *int) {
+	if p.PeriodKey != nil {
+		return *p.PeriodKey, p.WeekYear
+	}
 	r, err := domain.ParseRule(b.PeriodRule)
 	if err != nil {
-		return ""
+		return "", nil
 	}
 	sp, err := r.PeriodOf(b.PeriodType, p.From, nil)
 	if err != nil {
-		return ""
+		return "", nil
 	}
-	return sp.Key
+	if sp.WeekYear > 0 {
+		y := sp.WeekYear
+		return sp.Key, &y
+	}
+	return sp.Key, nil
 }
 
 // mirrorWithdrawn ghi hủy kỳ (cancelled) sang cap/forms cho mọi kỳ của đợt bị thu hồi, trong giao dịch tx.
